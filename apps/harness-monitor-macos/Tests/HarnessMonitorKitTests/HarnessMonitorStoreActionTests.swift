@@ -92,6 +92,29 @@ struct HarnessMonitorStoreActionTests {
     #expect(store.currentSuccessFeedbackMessage == "Assign task")
   }
 
+  @Test("Assign task defaults to the Monitor control-plane actor")
+  func assignTaskDefaultsToControlPlaneActor() async {
+    let client = RecordingHarnessClient()
+    let store = await selectedActionStore(client: client)
+
+    await store.assignTask(
+      taskID: PreviewFixtures.tasks[0].taskId,
+      agentID: PreviewFixtures.agents[1].agentId
+    )
+
+    #expect(
+      client.recordedCalls()
+        == [
+          .assignTask(
+            sessionID: PreviewFixtures.summary.sessionId,
+            taskID: PreviewFixtures.tasks[0].taskId,
+            agentID: PreviewFixtures.agents[1].agentId,
+            actor: "harness-app"
+          )
+        ]
+    )
+  }
+
   @Test("Drop task sends target request and refreshes the selected session")
   func dropTaskSendsRequestAndRefreshesSession() async {
     let client = RecordingHarnessClient()

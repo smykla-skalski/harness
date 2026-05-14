@@ -15,6 +15,43 @@ use crate::errors::CliError;
 use super::frames::{error_response, error_response_with_payload, ok_response};
 use super::params::{extract_session_agent_id, extract_session_id, extract_string_param};
 
+#[derive(Debug, Clone, Copy)]
+enum ActorBinding {
+    ControlPlane,
+    Preserve,
+}
+
+impl ActorBinding {
+    fn apply(self, params: &mut Value) {
+        if matches!(self, Self::ControlPlane) {
+            bind_control_plane_actor_value(params);
+        }
+    }
+}
+
+fn task_mutation_request_parts(
+    request: &WsRequest,
+    actor_binding: ActorBinding,
+) -> Result<(String, String, Value), WsResponse> {
+    let Some(session_id) = extract_session_id(&request.params) else {
+        return Err(error_response(
+            &request.id,
+            "MISSING_PARAM",
+            "missing session_id",
+        ));
+    };
+    let Some(task_id) = extract_string_param(&request.params, "task_id") else {
+        return Err(error_response(
+            &request.id,
+            "MISSING_PARAM",
+            "missing task_id",
+        ));
+    };
+    let mut params = request.params.clone();
+    actor_binding.apply(&mut params);
+    Ok((session_id, task_id, params))
+}
+
 pub(crate) fn dispatch_query<T: serde::Serialize>(
     request_id: &str,
     query: impl FnOnce() -> Result<T, CliError>,
@@ -182,9 +219,43 @@ where
     }
 }
 
+#[cfg(test)]
 pub(crate) fn dispatch_mutation_with_task(
     request: &WsRequest,
     state: &DaemonHttpState,
+    handler: impl FnOnce(
+        String,
+        String,
+        Value,
+        Option<&DaemonDb>,
+    ) -> Result<SessionDetail, MutationError>,
+) -> WsResponse {
+    dispatch_mutation_with_task_with_actor_binding(
+        request,
+        state,
+        ActorBinding::ControlPlane,
+        handler,
+    )
+}
+
+#[cfg(test)]
+pub(crate) fn dispatch_mutation_with_task_preserving_actor(
+    request: &WsRequest,
+    state: &DaemonHttpState,
+    handler: impl FnOnce(
+        String,
+        String,
+        Value,
+        Option<&DaemonDb>,
+    ) -> Result<SessionDetail, MutationError>,
+) -> WsResponse {
+    dispatch_mutation_with_task_with_actor_binding(request, state, ActorBinding::Preserve, handler)
+}
+
+fn dispatch_mutation_with_task_with_actor_binding(
+    request: &WsRequest,
+    state: &DaemonHttpState,
+    actor_binding: ActorBinding,
     handler: impl FnOnce(
         String,
         String,
@@ -197,14 +268,10 @@ pub(crate) fn dispatch_mutation_with_task(
         .get()
         .map(|db: &Arc<Mutex<DaemonDb>>| db.lock().expect("db lock"));
     let db_ref = db_guard.as_deref();
-    let Some(session_id) = extract_session_id(&request.params) else {
-        return error_response(&request.id, "MISSING_PARAM", "missing session_id");
+    let (session_id, task_id, params) = match task_mutation_request_parts(request, actor_binding) {
+        Ok(parts) => parts,
+        Err(response) => return response,
     };
-    let Some(task_id) = extract_string_param(&request.params, "task_id") else {
-        return error_response(&request.id, "MISSING_PARAM", "missing task_id");
-    };
-    let mut params = request.params.clone();
-    bind_control_plane_actor_value(&mut params);
 
     match handler(session_id.clone(), task_id, params, db_ref) {
         Ok(detail) => {
@@ -238,17 +305,71 @@ where
     AsyncHandler: FnOnce(String, String, Value, Arc<AsyncDaemonDb>) -> AsyncResult,
     AsyncResult: Future<Output = Result<SessionDetail, MutationError>>,
 {
+    dispatch_mutation_with_task_prefer_async_with_actor_binding(
+        request,
+        state,
+        ActorBinding::ControlPlane,
+        sync_handler,
+        async_handler,
+    )
+    .await
+}
+
+pub(crate) async fn dispatch_mutation_with_task_preserving_actor_prefer_async<
+    SyncHandler,
+    AsyncHandler,
+    AsyncResult,
+>(
+    request: &WsRequest,
+    state: &DaemonHttpState,
+    sync_handler: SyncHandler,
+    async_handler: AsyncHandler,
+) -> WsResponse
+where
+    SyncHandler:
+        FnOnce(String, String, Value, Option<&DaemonDb>) -> Result<SessionDetail, MutationError>,
+    AsyncHandler: FnOnce(String, String, Value, Arc<AsyncDaemonDb>) -> AsyncResult,
+    AsyncResult: Future<Output = Result<SessionDetail, MutationError>>,
+{
+    dispatch_mutation_with_task_prefer_async_with_actor_binding(
+        request,
+        state,
+        ActorBinding::Preserve,
+        sync_handler,
+        async_handler,
+    )
+    .await
+}
+
+async fn dispatch_mutation_with_task_prefer_async_with_actor_binding<
+    SyncHandler,
+    AsyncHandler,
+    AsyncResult,
+>(
+    request: &WsRequest,
+    state: &DaemonHttpState,
+    actor_binding: ActorBinding,
+    sync_handler: SyncHandler,
+    async_handler: AsyncHandler,
+) -> WsResponse
+where
+    SyncHandler:
+        FnOnce(String, String, Value, Option<&DaemonDb>) -> Result<SessionDetail, MutationError>,
+    AsyncHandler: FnOnce(String, String, Value, Arc<AsyncDaemonDb>) -> AsyncResult,
+    AsyncResult: Future<Output = Result<SessionDetail, MutationError>>,
+{
     let Some(async_db) = state.async_db.get().cloned() else {
-        return dispatch_mutation_with_task(request, state, sync_handler);
+        return dispatch_mutation_with_task_with_actor_binding(
+            request,
+            state,
+            actor_binding,
+            sync_handler,
+        );
     };
-    let Some(session_id) = extract_session_id(&request.params) else {
-        return error_response(&request.id, "MISSING_PARAM", "missing session_id");
+    let (session_id, task_id, params) = match task_mutation_request_parts(request, actor_binding) {
+        Ok(parts) => parts,
+        Err(response) => return response,
     };
-    let Some(task_id) = extract_string_param(&request.params, "task_id") else {
-        return error_response(&request.id, "MISSING_PARAM", "missing task_id");
-    };
-    let mut params = request.params.clone();
-    bind_control_plane_actor_value(&mut params);
 
     match async_handler(session_id.clone(), task_id, params, async_db.clone()).await {
         Ok(detail) => {

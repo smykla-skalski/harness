@@ -75,6 +75,23 @@ struct HarnessMonitorUITestAccessibilityRegistryTests {
     )
     #expect(HarnessMonitorAccessibility.checkpointTaskButton == "harness.action.task.checkpoint")
     #expect(
+      HarnessMonitorAccessibility.submitTaskForReviewButton
+        == "harness.action.task.submit-for-review"
+    )
+    #expect(
+      HarnessMonitorAccessibility.claimTaskReviewButton
+        == "harness.action.task.claim-review"
+    )
+    #expect(
+      HarnessMonitorAccessibility.submitTaskReviewButton
+        == "harness.action.task.submit-review"
+    )
+    #expect(
+      HarnessMonitorAccessibility.respondTaskReviewButton
+        == "harness.action.task.respond-review"
+    )
+    #expect(HarnessMonitorAccessibility.arbitrateTaskButton == "harness.action.task.arbitrate")
+    #expect(
       HarnessMonitorAccessibility.leaderTransferSection
         == "harness.action.leader-transfer.section"
     )

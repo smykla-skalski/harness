@@ -13,7 +13,9 @@ use super::frames::{
 };
 use super::mutations::{
     dispatch_mutation_prefer_async, dispatch_mutation_with_agent_prefer_async,
-    dispatch_mutation_with_task_prefer_async, dispatch_session_start, dispatch_set_log_level,
+    dispatch_mutation_with_task_prefer_async,
+    dispatch_mutation_with_task_preserving_actor_prefer_async, dispatch_session_start,
+    dispatch_set_log_level,
 };
 use super::parity::{
     dispatch_bridge_reconfigure, dispatch_managed_agent_input,

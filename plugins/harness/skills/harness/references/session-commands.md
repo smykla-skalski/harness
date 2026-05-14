@@ -13,7 +13,7 @@
 ## Lifecycle
 
 ```
-harness session start --context "<goal>" [--title "<title>"] [--session-id <id>] [--runtime <runtime>]
+harness session start --context "<goal>" [--title "<title>"] [--session-id <id>] [--project-dir <path>] [--policy-preset <name>]
 harness session join <session-id> --role <role> --runtime <runtime> [--capabilities "x,y"] [--name "<name>"]
 harness session end <session-id> --actor <agent-id>
 harness session status <session-id> [--json]

@@ -12,6 +12,11 @@ extension HarnessMonitorAccessibility {
   public static let updateTaskQueuePolicyButton = "harness.action.task.update-queue-policy"
   public static let updateTaskStatusButton = "harness.action.task.update-status"
   public static let checkpointTaskButton = "harness.action.task.checkpoint"
+  public static let submitTaskForReviewButton = "harness.action.task.submit-for-review"
+  public static let claimTaskReviewButton = "harness.action.task.claim-review"
+  public static let submitTaskReviewButton = "harness.action.task.submit-review"
+  public static let respondTaskReviewButton = "harness.action.task.respond-review"
+  public static let arbitrateTaskButton = "harness.action.task.arbitrate"
   public static let manageTaskOpenButton = "harness.session.task.manage-open"
 
   public static let leaderTransferSheet = "harness.action.leader-transfer.sheet"

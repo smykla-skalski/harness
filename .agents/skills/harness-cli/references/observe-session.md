@@ -62,9 +62,8 @@ Sources: `cargo run --quiet -- session --help`; `cargo run --quiet -- session ta
 | Surface | Value |
 | --- | --- |
 | Required flag | `--context <CONTEXT>` |
-| Optional flags | `--title <TITLE>`, `--project-dir <PROJECT_DIR>`, `--runtime <RUNTIME>`, `--session-id <SESSION_ID>` |
-| Runtime values | `claude`, `copilot`, `codex`, `gemini`, `vibe`, `opencode` |
-| Runtime meaning | Leader runtime recorded when the session is created |
+| Optional flags | `--title <TITLE>`, `--project-dir <PROJECT_DIR>`, `--session-id <SESSION_ID>`, `--policy-preset <POLICY_PRESET>` |
+| Leader behavior | Created sessions are leaderless; join with `--role leader --runtime <RUNTIME>` to register the leader |
 | Project-dir behavior | Defaults to cwd and also reads `CLAUDE_PROJECT_DIR` |
 | Session-id behavior | Auto-generated if omitted |
 

@@ -1,6 +1,6 @@
 # harness
 
-Workflow engine for tracked test work against Kubernetes and Kuma clusters. Harness manages disposable environments, suite authoring, tracked execution, live session inspection, and cross-agent coordination for Claude, Codex, Gemini, Copilot, and OpenCode.
+Local multi-agent swarm control plane for Claude, Codex, Gemini, Copilot, and OpenCode. Harness manages session state, roles, task assignment, review, arbitration, and live inspection, while still carrying tracked Kubernetes/Kuma suite workflows for disposable test environments.
 
 For the internal module map, see [ARCHITECTURE.md](ARCHITECTURE.md).
 
@@ -135,7 +135,7 @@ Runtime API for cross-agent coordination. Generated hooks call these commands to
 ### session - multi-agent orchestration
 
 ```
-harness session start --context "goal" --runtime <runtime> [--session-id <id>]
+harness session start --context "goal" [--title "name"] [--session-id <id>]
 harness session join <session-id> --role <role> --runtime <runtime> [--capabilities "x,y"]
 harness session end <session-id> --actor <agent-id>
 harness session assign <session-id> <agent-id> --role <role> --actor <agent-id>
@@ -150,7 +150,7 @@ harness session status <session-id> [--json]
 harness session list [--json]
 ```
 
-Coordinates multiple AI agents within a shared session. `start` creates a session and registers the caller as leader. `join` adds agents with roles (leader, observer, worker, reviewer, improver). Each role has a permission set controlling which commands it can invoke. `observe` scans all agent logs through the existing classifier pipeline and creates work items for detected issues. With `--poll-interval`, it runs continuously with periodic sweeps that create dual work items (one for the issue, one to improve heuristics that missed it). Signals between agents use file-based delivery picked up during hook callbacks.
+Coordinates multiple AI agents within a shared session. `start` creates a leaderless session. `join` registers agents with roles (leader, observer, worker, reviewer, improver). Each role has a permission set controlling which commands it can invoke. `observe` scans all agent logs through the existing classifier pipeline and creates work items for detected issues. With `--poll-interval`, it runs continuously with periodic sweeps that create dual work items (one for the issue, one to improve heuristics that missed it). Signals between agents use file-based delivery picked up during hook callbacks.
 
 ### Hidden commands
 
@@ -287,12 +287,13 @@ harness observe --agent codex scan <session-id>
 ### Multi-agent orchestration
 
 ```bash
-harness session start --context "fix mesh retry feature" --runtime claude
+harness session start --context "fix mesh retry feature" --title "mesh retry"
+harness session join <session-id> --role leader --runtime claude
 harness session join <session-id> --role worker --runtime codex
 harness session join <session-id> --role observer --runtime gemini
-harness session observe <session-id> --poll-interval 3 --json --actor claude-leader
+harness session observe <session-id> --poll-interval 3 --json --actor <leader-agent-id>
 harness session task list <session-id> --json
-harness session end <session-id> --actor claude-leader
+harness session end <session-id> --actor <leader-agent-id>
 ```
 
 The session system coordinates multiple agents with role-based access control. Five roles are supported: leader, observer, worker, reviewer, and improver. The observer scans all agent logs using the same classifier pipeline as `harness observe`, extended with coordination-specific checks for stalled progress, guard denial loops, rate limits, and cross-agent file conflicts.
