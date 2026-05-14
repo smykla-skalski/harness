@@ -41,18 +41,20 @@ extension PolicyCanvasViewModel {
   func mutate(_ change: PolicyCanvasChange) {
     let inverse = applyChange(change)
     if let manager = undoManager {
-      // Open and close an explicit undo group around the registration. In
-      // `groupsByEvent=true` mode this becomes a nested sub-group inside
-      // the auto event group; in `groupsByEvent=false` mode it's the only
-      // way to attach an action name without raising an
-      // internal-consistency exception. Either way, each mutate produces
-      // a well-named entry the system menu's "Undo X" can surface.
-      manager.beginUndoGrouping()
+      // Delegate grouping to the AppKit runloop event group
+      // (`groupsByEvent=true` is the default for window-attached managers,
+      // which is what `@Environment(\.undoManager)` resolves to). Each user
+      // gesture lands on its own runloop tick, so the event group already
+      // collapses one gesture's mutations into a single Edit-menu entry —
+      // an inner explicit group would only nest a degenerate sub-group
+      // inside that and leak whichever `setActionName` ran last when two
+      // mutations land in the same tick. Test code that needs synchronous
+      // step boundaries opens its own explicit groups around each
+      // mutation.
       manager.registerUndo(withTarget: self) { target in
         target.mutate(inverse)
       }
       manager.setActionName(change.actionName)
-      manager.endUndoGrouping()
     }
     documentDirty = true
     invalidateValidationCache()
@@ -168,7 +170,20 @@ extension PolicyCanvasViewModel {
     restoreSelection: PolicyCanvasSelection?
   ) -> PolicyCanvasChange {
     nodes.append(node)
+    // If the daemon republished while this node was removed, an incident
+    // edge may now reference a node that no longer exists locally. Filter
+    // rather than crash — the user can replay the missing edge via remote
+    // re-load (load-seam dirty-protect lets them keep their other local
+    // edits). Live-node set is the freshly appended node id plus every
+    // other id currently in `nodes`.
+    let liveNodeIDs = Set(nodes.map(\.id))
     for edge in incidentEdges where !edges.contains(where: { $0.id == edge.id }) {
+      guard
+        liveNodeIDs.contains(edge.source.nodeID),
+        liveNodeIDs.contains(edge.target.nodeID)
+      else {
+        continue
+      }
       edges.append(edge)
     }
     if cleanEphemeralNodeIncluded {

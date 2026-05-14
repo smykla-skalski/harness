@@ -114,7 +114,18 @@ public struct PolicyCanvasView: View {
     .overlay(alignment: .topLeading) {
       deletionShortcutButtons
     }
-    .task {
+    // Bind to `pipelineIdentity` so the closure re-fires only when the
+    // identity actually flips (nil on first mount, then again when the
+    // daemon hands back a loaded pipeline). Without the id binding, the
+    // `.optionalID` view-identity flip silently tears down the subtree on
+    // the first load, which restarts `.task` mid-flight and re-runs
+    // `attachUndoManager` against a half-built environment. Each call is
+    // idempotent (bindStatusLine reassigns, attachUndoManager swaps the
+    // weak ref, loadPolicyPipeline is gated by
+    // `markInitialRemoteLoadRequested`), so a deterministic re-fire is
+    // safer than the incidental restart that the identity flip would
+    // otherwise cause.
+    .task(id: viewModel.pipelineIdentity) {
       bindStatusLine()
       viewModel.attachUndoManager(undoManager)
       await loadPolicyPipeline()

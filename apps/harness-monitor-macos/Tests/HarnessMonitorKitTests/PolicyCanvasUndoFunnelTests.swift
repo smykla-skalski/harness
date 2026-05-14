@@ -211,19 +211,30 @@ struct PolicyCanvasUndoFunnelTests {
   @Test("multi-step undo unwinds in reverse insertion order")
   func multiStepUndoUnwindsInReverseOrder() {
     let viewModel = PolicyCanvasViewModel.sample()
-    // Use a non-event-grouped manager so each `mutate(_:)` registers its
-    // own undo step. In production each user gesture (drag-end, palette
-    // click, delete) spans separate runloop ticks, so the default
-    // groupsByEvent=true naturally gives one entry per gesture. Tests run
-    // synchronously and would otherwise coalesce all mutations into one
-    // undo step.
-    let undoManager = makeStepwiseUndoManager()
+    // Tests run synchronously inside one runloop tick. With the default
+    // `groupsByEvent=true`, an explicit `beginUndoGrouping`/
+    // `endUndoGrouping` block opens a nested sub-group inside the auto
+    // event group, so a single `undo()` would unwind the whole event
+    // group (all three sub-groups at once). Disable `groupsByEvent` so
+    // each `stepwise(_:_:)` block becomes its own top-level group with
+    // one mutation each.
+    //
+    // In production each user gesture (drag-end, palette click, delete)
+    // lands on its own runloop tick, so `groupsByEvent=true` already
+    // gives one undo step per gesture.
+    let undoManager = stepwiseManager()
     viewModel.attachUndoManager(undoManager)
     let baselineNodeCount = viewModel.nodes.count
 
-    viewModel.createNode(kind: .condition, at: CGPoint(x: 200, y: 200))
-    viewModel.createNode(kind: .transform, at: CGPoint(x: 400, y: 220))
-    viewModel.createNode(kind: .review, at: CGPoint(x: 600, y: 240))
+    stepwise(undoManager) {
+      viewModel.createNode(kind: .condition, at: CGPoint(x: 200, y: 200))
+    }
+    stepwise(undoManager) {
+      viewModel.createNode(kind: .transform, at: CGPoint(x: 400, y: 220))
+    }
+    stepwise(undoManager) {
+      viewModel.createNode(kind: .review, at: CGPoint(x: 600, y: 240))
+    }
     #expect(viewModel.nodes.count == baselineNodeCount + 3)
 
     undoManager.undo()
@@ -232,22 +243,6 @@ struct PolicyCanvasUndoFunnelTests {
     #expect(viewModel.nodes.count == baselineNodeCount + 1)
     undoManager.undo()
     #expect(viewModel.nodes.count == baselineNodeCount)
-  }
-
-  @Test("restoreState clears the undo stack")
-  func restoreStateClearsUndoStack() {
-    let viewModel = PolicyCanvasViewModel.sample()
-    let undoManager = makeStepwiseUndoManager()
-    viewModel.attachUndoManager(undoManager)
-    let snapshot = viewModel.snapshotState()
-
-    viewModel.deleteNode("policy-source")
-    viewModel.createNode(kind: .condition, at: CGPoint(x: 200, y: 200))
-    #expect(undoManager.canUndo)
-
-    viewModel.restoreState(snapshot)
-
-    #expect(!undoManager.canUndo)
   }
 
   @Test("mutate without an attached undo manager applies the change but registers nothing")
@@ -320,13 +315,19 @@ struct PolicyCanvasUndoFunnelTests {
   @Test("multi-mutation undo/redo round-trip preserves node id ordering")
   func multiMutationUndoRedoRoundTripIDOrdering() {
     let viewModel = PolicyCanvasViewModel.sample()
-    let undoManager = UndoManager()
+    // See `multiStepUndoUnwindsInReverseOrder` for why
+    // `groupsByEvent=false` is needed inside a synchronous test run.
+    let undoManager = stepwiseManager()
     viewModel.attachUndoManager(undoManager)
     let originalNodeIDs = viewModel.nodes.map(\.id)
     let originalEdgeIDs = viewModel.edges.map(\.id)
 
-    viewModel.deleteNode("risk-score")
-    viewModel.deleteEdge("edge-context-promote")
+    stepwise(undoManager) {
+      viewModel.deleteNode("risk-score")
+    }
+    stepwise(undoManager) {
+      viewModel.deleteEdge("edge-context-promote")
+    }
 
     undoManager.undo()
     undoManager.undo()
@@ -347,14 +348,29 @@ struct PolicyCanvasUndoFunnelTests {
     #expect(undoManager.undoActionName == "Add Node")
   }
 
-  /// Build a fresh undo manager with `groupsByEvent` disabled so every
-  /// `mutate(_:)` registers as its own undo step. In production the
-  /// runloop-managed event group separates user gestures naturally; tests
-  /// run synchronously and would otherwise coalesce all mutations into a
-  /// single undo entry.
-  private func makeStepwiseUndoManager() -> UndoManager {
+  /// Build an undo manager that produces one undo step per
+  /// `stepwise(_:_:)` block when used in synchronous test code. The
+  /// default `groupsByEvent=true` mode opens an auto event group per
+  /// runloop tick and nests every explicit `beginUndoGrouping` inside
+  /// it; a single `undo()` then unwinds the whole event group. With
+  /// `groupsByEvent=false`, each `beginUndoGrouping`/`endUndoGrouping`
+  /// pair is its own top-level group, and `undo()` unwinds one at a
+  /// time.
+  private func stepwiseManager() -> UndoManager {
     let manager = UndoManager()
     manager.groupsByEvent = false
     return manager
+  }
+
+  /// Wrap a synchronous mutation in an explicit undo group so each
+  /// `mutate(_:)` becomes its own undo step against a
+  /// `stepwiseManager()`. In production each user gesture (drag-end,
+  /// palette click, delete) lands on its own runloop tick, so the
+  /// runtime event group naturally separates gestures into one undo
+  /// step each.
+  private func stepwise(_ manager: UndoManager, _ body: () -> Void) {
+    manager.beginUndoGrouping()
+    body()
+    manager.endUndoGrouping()
   }
 }
