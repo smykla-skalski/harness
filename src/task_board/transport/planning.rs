@@ -5,9 +5,7 @@ use serde::Serialize;
 
 use crate::app::command_context::{AppContext, Execute};
 use crate::errors::CliError;
-use crate::task_board::planning::{
-    PlanningTransition, approve_plan, begin_planning, submit_plan,
-};
+use crate::task_board::planning::{PlanningTransition, approve_plan, begin_planning, submit_plan};
 use crate::task_board::store::TaskBoardItemPatch;
 use crate::task_board::types::TaskBoardItem;
 use crate::workspace::utc_now;

@@ -313,9 +313,9 @@ async fn sync_external_tasks_dry_run_reports_reconciliation_without_writing() {
         String::new(),
         "2026-05-14T00:00:00Z".to_owned(),
     );
-    local.external_refs.push(
-        ExternalTaskRef::new(ExternalProvider::Todoist, "remote-1").into_core_ref(),
-    );
+    local
+        .external_refs
+        .push(ExternalTaskRef::new(ExternalProvider::Todoist, "remote-1").into_core_ref());
     board
         .create("Old title", "", local)
         .expect("create local task");
