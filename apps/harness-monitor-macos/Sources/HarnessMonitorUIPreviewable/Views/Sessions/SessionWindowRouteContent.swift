@@ -4,6 +4,7 @@ import SwiftUI
 struct SessionWindowOverview: View {
   let store: HarnessMonitorStore
   let snapshot: HarnessMonitorSessionWindowSnapshot
+  let decisions: [Decision]
   let tuiStatusByAgent: [String: AgentTuiStatus]
   @Environment(\.fontScale)
   private var fontScale
@@ -57,10 +58,12 @@ struct SessionWindowOverview: View {
           taskBoardItems: linkedTaskBoardItems,
           orchestratorStatus: store.contentUI.dashboard.taskBoardOrchestratorStatus,
           evaluationSummary: store.contentUI.dashboard.taskBoardEvaluationSummary,
+          decisions: decisions,
           isActionInFlight: store.contentUI.dashboard.isBusy,
           onOpenItem: openTaskActions,
           onOpenTaskBoardItem: openTaskBoardItem,
           onMoveTaskBoardItem: moveTaskBoardItem,
+          onOpenDecision: openDecision,
           onEvaluateTaskBoard: evaluateTaskBoard,
           onEvaluateTaskBoardItem: evaluateTaskBoardItem,
           onRefreshTaskBoard: refreshTaskBoard,
@@ -155,6 +158,17 @@ struct SessionWindowOverview: View {
     Task { @MainActor in
       await store.updateTaskBoardItemStatus(id: itemID, status: status)
     }
+  }
+
+  private func openDecision(_ decision: Decision) {
+    store.supervisorSelectedDecisionID = decision.id
+    store.requestSessionRoute(
+      .decision(
+        sessionID: decision.sessionID ?? snapshot.summary.sessionId,
+        decisionID: decision.id
+      ),
+      resetDecisionFilters: true
+    )
   }
 
   private func evaluateTaskBoard() {

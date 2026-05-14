@@ -124,9 +124,17 @@ struct SessionWindowRouteContentMetricsTests {
   @Test("Overview route embeds the task board")
   func overviewRouteEmbedsTaskBoard() throws {
     let routeContentSource = try sourceFile(named: "SessionWindowRouteContent.swift")
+    let columnsSource = try sourceFile(named: "SessionWindowView+Columns.swift")
 
     #expect(routeContentSource.contains("TaskBoardOverviewView("))
+    #expect(routeContentSource.contains("let decisions: [Decision]"))
+    #expect(routeContentSource.contains("decisions: decisions"))
     #expect(routeContentSource.contains("onOpenItem: openTaskActions"))
+    #expect(routeContentSource.contains("onOpenDecision: openDecision"))
+    #expect(routeContentSource.contains("private func openDecision(_ decision: Decision)"))
+    #expect(routeContentSource.contains("store.supervisorSelectedDecisionID = decision.id"))
+    #expect(routeContentSource.contains("store.requestSessionRoute("))
+    #expect(columnsSource.contains("decisions: matchingDecisions"))
   }
 
   @Test("Dashboard starts from the global task board")
