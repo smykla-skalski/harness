@@ -65,20 +65,16 @@ extension SessionWindowFlowTests {
     #expect(sectionsSource.contains(".padding(.trailing, HarnessMonitorTheme.spacingSM)"))
     #expect(sidebarSource.contains("currentModifiers: currentModifiers"))
     #expect(sectionsSource.contains("let shortcut = kind.createShortcut"))
-    // swiftlint:disable line_length
-    #expect(
-      sectionsSource.contains(
-        "SessionSidebarHeaderCreateButton(\n        state: state,\n        kind: .agent,\n        accessibilityLabel: \"New Agent\""
-      ))
-    #expect(
-      sectionsSource.contains(
-        "SessionSidebarHeaderCreateButton(\n        state: state,\n        kind: .task,\n        accessibilityLabel: \"New Task\""
-      ))
+    let agentButtonSource =
+      "SessionSidebarHeaderCreateButton(\n        state: state,\n        kind: .agent,\n        accessibilityLabel: \"New Agent\""
+    let taskButtonSource =
+      "SessionSidebarHeaderCreateButton(\n        state: state,\n        kind: .task,\n        accessibilityLabel: \"New Task\""
+    #expect(sectionsSource.contains(agentButtonSource))
+    #expect(sectionsSource.contains(taskButtonSource))
     #expect(
       decisionsSource.contains(
         "SessionSidebarHeaderCreateButton(\n        state: state,\n        kind: .decision,\n        accessibilityLabel: \"New Decision\""
       ))
-    // swiftlint:enable line_length
   }
 
   @Test("Keyboard shortcut descriptors support reveal across modifier families")

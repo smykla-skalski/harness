@@ -83,11 +83,13 @@ enum NotificationRoutingResponseFactory {
       let archiver = NSKeyedArchiver(requiringSecureCoding: false)
       archiver.encode(Date(), forKey: "date")
       archiver.finishEncoding()
-      // swift-format-ignore: NeverUseForceTry
-      // swiftlint:disable:next force_try
-      let unarchiver = try! NSKeyedUnarchiver(forReadingFrom: archiver.encodedData)
-      unarchiver.requiresSecureCoding = false
-      return unarchiver
+      do {
+        let unarchiver = try NSKeyedUnarchiver(forReadingFrom: archiver.encodedData)
+        unarchiver.requiresSecureCoding = false
+        return unarchiver
+      } catch {
+        preconditionFailure("Failed to build notification test coder: \(error)")
+      }
     }
   }
 
@@ -114,11 +116,13 @@ enum NotificationRoutingResponseFactory {
       let archiver = NSKeyedArchiver(requiringSecureCoding: false)
       archiver.encode("", forKey: "actionIdentifier")
       archiver.finishEncoding()
-      // swift-format-ignore: NeverUseForceTry
-      // swiftlint:disable:next force_try
-      let unarchiver = try! NSKeyedUnarchiver(forReadingFrom: archiver.encodedData)
-      unarchiver.requiresSecureCoding = false
-      return unarchiver
+      do {
+        let unarchiver = try NSKeyedUnarchiver(forReadingFrom: archiver.encodedData)
+        unarchiver.requiresSecureCoding = false
+        return unarchiver
+      } catch {
+        preconditionFailure("Failed to build notification test coder: \(error)")
+      }
     }
   }
 }
