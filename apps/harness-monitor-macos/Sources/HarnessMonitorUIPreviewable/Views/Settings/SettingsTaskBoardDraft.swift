@@ -18,14 +18,21 @@ struct TaskBoardGitSettingsDraft: Equatable {
   var needsHumanLabel = "harness:needs-human"
   var protectedPathLabel = "harness:protected-path"
   var protectedPathsText = ""
+  var requestedReviewersText = ""
+  var requestedTeamReviewersText = ""
   var enabledAutomations: Set<TaskBoardGitHubAutomation> = Set(TaskBoardGitHubAutomation.allCases)
   var authorName = ""
   var authorEmail = ""
   var sshKeyPath = ""
+  var sshPrivateKey = ""
+  var sshPrivateKeyPassphrase = ""
   var signingMode: TaskBoardGitSigningMode = .none
   var signingSSHKeyPath = ""
+  var signingSSHPrivateKey = ""
+  var signingSSHPrivateKeyPassphrase = ""
   var gpgKeyId = ""
   var gpgPrivateKeyPath = ""
+  var gpgPrivateKey = ""
   var gpgPrivateKeyPassphrase = ""
   var globalToken = ""
   var todoistToken = ""
@@ -55,14 +62,21 @@ struct TaskBoardGitSettingsDraft: Equatable {
     needsHumanLabel = project.labels.needsHuman
     protectedPathLabel = project.labels.protectedPath
     protectedPathsText = project.protectedPaths.map(\.pattern).joined(separator: "\n")
+    requestedReviewersText = project.requestedReviewers.reviewers.joined(separator: "\n")
+    requestedTeamReviewersText = project.requestedReviewers.teamReviewers.joined(separator: "\n")
     enabledAutomations = Set(project.enabledAutomations.enabled)
     authorName = runtime.global.authorName ?? ""
     authorEmail = runtime.global.authorEmail ?? ""
     sshKeyPath = runtime.global.sshKeyPath ?? ""
+    sshPrivateKey = runtime.global.sshPrivateKey ?? ""
+    sshPrivateKeyPassphrase = runtime.global.sshPrivateKeyPassphrase ?? ""
     signingMode = runtime.global.signing.mode
     signingSSHKeyPath = runtime.global.signing.sshKeyPath ?? ""
+    signingSSHPrivateKey = runtime.global.signing.sshPrivateKey ?? ""
+    signingSSHPrivateKeyPassphrase = runtime.global.signing.sshPrivateKeyPassphrase ?? ""
     gpgKeyId = runtime.global.signing.gpgKeyId ?? ""
     gpgPrivateKeyPath = runtime.global.signing.gpgPrivateKeyPath ?? ""
+    gpgPrivateKey = runtime.global.signing.gpgPrivateKey ?? ""
     gpgPrivateKeyPassphrase = runtime.global.signing.gpgPrivateKeyPassphrase ?? ""
     globalToken = snapshot.githubCredentials.globalToken ?? ""
     todoistToken = snapshot.todoistCredentials.token ?? ""
@@ -79,10 +93,15 @@ struct TaskBoardGitSettingsDraft: Equatable {
         authorName: override.profile.authorName ?? "",
         authorEmail: override.profile.authorEmail ?? "",
         sshKeyPath: override.profile.sshKeyPath ?? "",
+        sshPrivateKey: override.profile.sshPrivateKey ?? "",
+        sshPrivateKeyPassphrase: override.profile.sshPrivateKeyPassphrase ?? "",
         signingMode: override.profile.signing.mode,
         signingSSHKeyPath: override.profile.signing.sshKeyPath ?? "",
+        signingSSHPrivateKey: override.profile.signing.sshPrivateKey ?? "",
+        signingSSHPrivateKeyPassphrase: override.profile.signing.sshPrivateKeyPassphrase ?? "",
         gpgKeyId: override.profile.signing.gpgKeyId ?? "",
         gpgPrivateKeyPath: override.profile.signing.gpgPrivateKeyPath ?? "",
+        gpgPrivateKey: override.profile.signing.gpgPrivateKey ?? "",
         gpgPrivateKeyPassphrase: override.profile.signing.gpgPrivateKeyPassphrase ?? "",
         token: tokensByRepository[override.repository] ?? ""
       )
@@ -124,6 +143,10 @@ struct TaskBoardGitSettingsDraft: Equatable {
             protectedPath: normalized(protectedPathLabel) ?? "harness:protected-path"
           ),
           protectedPaths: protectedPaths,
+          requestedReviewers: TaskBoardGitHubRequestedReviewers(
+            reviewers: normalizedUniqueLines(from: requestedReviewersText),
+            teamReviewers: normalizedUniqueLines(from: requestedTeamReviewersText)
+          ),
           enabledAutomations: TaskBoardGitHubAutomationToggles(
             enabled: enabledAutomations.sorted(by: { $0.rawValue < $1.rawValue })
           )
@@ -136,11 +159,18 @@ struct TaskBoardGitSettingsDraft: Equatable {
           authorName: normalized(authorName),
           authorEmail: normalized(authorEmail),
           sshKeyPath: normalized(sshKeyPath),
+          sshPrivateKey: normalized(sshPrivateKey),
+          sshPrivateKeyPassphrase: normalized(sshPrivateKeyPassphrase),
           signing: TaskBoardGitSigningConfig(
             mode: signingMode,
             sshKeyPath: signingMode == .ssh ? normalized(signingSSHKeyPath) : nil,
+            sshPrivateKey: signingMode == .ssh ? normalized(signingSSHPrivateKey) : nil,
+            sshPrivateKeyPassphrase: signingMode == .ssh
+              ? normalized(signingSSHPrivateKeyPassphrase)
+              : nil,
             gpgKeyId: signingMode == .gpg ? normalized(gpgKeyId) : nil,
             gpgPrivateKeyPath: signingMode == .gpg ? normalized(gpgPrivateKeyPath) : nil,
+            gpgPrivateKey: signingMode == .gpg ? normalized(gpgPrivateKey) : nil,
             gpgPrivateKeyPassphrase: signingMode == .gpg
               ? normalized(gpgPrivateKeyPassphrase)
               : nil
@@ -172,6 +202,17 @@ struct TaskBoardGitSettingsDraft: Equatable {
 
   private var githubInboxRepositories: [String] {
     normalizedRepositories(from: githubInboxRepositoriesText)
+  }
+
+  private func normalizedUniqueLines(from value: String) -> [String] {
+    Array(
+      Set(
+        value
+          .split(whereSeparator: \.isNewline)
+          .compactMap { normalized(String($0)) }
+      )
+    )
+    .sorted()
   }
 
   private func normalized(_ value: String) -> String? {
@@ -217,10 +258,15 @@ struct TaskBoardRepositoryOverrideDraft: Equatable {
   var authorName = ""
   var authorEmail = ""
   var sshKeyPath = ""
+  var sshPrivateKey = ""
+  var sshPrivateKeyPassphrase = ""
   var signingMode: TaskBoardGitSigningMode = .none
   var signingSSHKeyPath = ""
+  var signingSSHPrivateKey = ""
+  var signingSSHPrivateKeyPassphrase = ""
   var gpgKeyId = ""
   var gpgPrivateKeyPath = ""
+  var gpgPrivateKey = ""
   var gpgPrivateKeyPassphrase = ""
   var token = ""
 
@@ -229,10 +275,15 @@ struct TaskBoardRepositoryOverrideDraft: Equatable {
     authorName: String = "",
     authorEmail: String = "",
     sshKeyPath: String = "",
+    sshPrivateKey: String = "",
+    sshPrivateKeyPassphrase: String = "",
     signingMode: TaskBoardGitSigningMode = .none,
     signingSSHKeyPath: String = "",
+    signingSSHPrivateKey: String = "",
+    signingSSHPrivateKeyPassphrase: String = "",
     gpgKeyId: String = "",
     gpgPrivateKeyPath: String = "",
+    gpgPrivateKey: String = "",
     gpgPrivateKeyPassphrase: String = "",
     token: String = ""
   ) {
@@ -240,10 +291,15 @@ struct TaskBoardRepositoryOverrideDraft: Equatable {
     self.authorName = authorName
     self.authorEmail = authorEmail
     self.sshKeyPath = sshKeyPath
+    self.sshPrivateKey = sshPrivateKey
+    self.sshPrivateKeyPassphrase = sshPrivateKeyPassphrase
     self.signingMode = signingMode
     self.signingSSHKeyPath = signingSSHKeyPath
+    self.signingSSHPrivateKey = signingSSHPrivateKey
+    self.signingSSHPrivateKeyPassphrase = signingSSHPrivateKeyPassphrase
     self.gpgKeyId = gpgKeyId
     self.gpgPrivateKeyPath = gpgPrivateKeyPath
+    self.gpgPrivateKey = gpgPrivateKey
     self.gpgPrivateKeyPassphrase = gpgPrivateKeyPassphrase
     self.token = token
   }
@@ -258,11 +314,18 @@ struct TaskBoardRepositoryOverrideDraft: Equatable {
         authorName: normalized(authorName),
         authorEmail: normalized(authorEmail),
         sshKeyPath: normalized(sshKeyPath),
+        sshPrivateKey: normalized(sshPrivateKey),
+        sshPrivateKeyPassphrase: normalized(sshPrivateKeyPassphrase),
         signing: TaskBoardGitSigningConfig(
           mode: signingMode,
           sshKeyPath: signingMode == .ssh ? normalized(signingSSHKeyPath) : nil,
+          sshPrivateKey: signingMode == .ssh ? normalized(signingSSHPrivateKey) : nil,
+          sshPrivateKeyPassphrase: signingMode == .ssh
+            ? normalized(signingSSHPrivateKeyPassphrase)
+            : nil,
           gpgKeyId: signingMode == .gpg ? normalized(gpgKeyId) : nil,
           gpgPrivateKeyPath: signingMode == .gpg ? normalized(gpgPrivateKeyPath) : nil,
+          gpgPrivateKey: signingMode == .gpg ? normalized(gpgPrivateKey) : nil,
           gpgPrivateKeyPassphrase: signingMode == .gpg
             ? normalized(gpgPrivateKeyPassphrase)
             : nil
@@ -283,116 +346,19 @@ struct TaskBoardRepositoryOverrideDraft: Equatable {
     normalized(authorName) != nil
       || normalized(authorEmail) != nil
       || normalized(sshKeyPath) != nil
+      || normalized(sshPrivateKey) != nil
+      || normalized(sshPrivateKeyPassphrase) != nil
       || (signingMode == .ssh && normalized(signingSSHKeyPath) != nil)
+      || (signingMode == .ssh && normalized(signingSSHPrivateKey) != nil)
+      || (signingMode == .ssh && normalized(signingSSHPrivateKeyPassphrase) != nil)
       || (signingMode == .gpg && normalized(gpgKeyId) != nil)
       || (signingMode == .gpg && normalized(gpgPrivateKeyPath) != nil)
+      || (signingMode == .gpg && normalized(gpgPrivateKey) != nil)
       || (signingMode == .gpg && normalized(gpgPrivateKeyPassphrase) != nil)
   }
 
   private func normalized(_ value: String) -> String? {
     let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
     return trimmed.isEmpty ? nil : trimmed
-  }
-}
-
-enum DispatchStatusFilterChoice: String, CaseIterable, Hashable {
-  case all
-  case new
-  case planning
-  case planReview
-  case needsYou
-  case todo
-  case inProgress
-  case blocked
-  case inReview
-  case done
-
-  init(status: TaskBoardStatus?) {
-    switch status {
-    case .none:
-      self = .all
-    case .new:
-      self = .new
-    case .planning:
-      self = .planning
-    case .planReview:
-      self = .planReview
-    case .needsYou:
-      self = .needsYou
-    case .todo:
-      self = .todo
-    case .inProgress:
-      self = .inProgress
-    case .blocked:
-      self = .blocked
-    case .inReview:
-      self = .inReview
-    case .done:
-      self = .done
-    }
-  }
-
-  var title: String {
-    switch self {
-    case .all: "All Items"
-    case .new: "New"
-    case .planning: "Planning"
-    case .planReview: "Plan Review"
-    case .needsYou: "Needs You"
-    case .todo: "Todo"
-    case .inProgress: "In Progress"
-    case .blocked: "Blocked"
-    case .inReview: "In Review"
-    case .done: "Done"
-    }
-  }
-
-  var status: TaskBoardStatus? {
-    switch self {
-    case .all: nil
-    case .new: .new
-    case .planning: .planning
-    case .planReview: .planReview
-    case .needsYou: .needsYou
-    case .todo: .todo
-    case .inProgress: .inProgress
-    case .blocked: .blocked
-    case .inReview: .inReview
-    case .done: .done
-    }
-  }
-}
-
-extension TaskBoardOrchestratorWorkflow {
-  var title: String {
-    switch self {
-    case .defaultTask: "Default Task"
-    case .prFix: "PR Fix"
-    case .prReview: "PR Review"
-    case .dependencyUpdate: "Dependency Update"
-    }
-  }
-}
-
-extension TaskBoardGitHubMergeMethod {
-  var title: String {
-    switch self {
-    case .squash: "Squash"
-    case .merge: "Merge Commit"
-    case .rebase: "Rebase"
-    }
-  }
-}
-
-extension TaskBoardGitHubAutomation {
-  var title: String {
-    switch self {
-    case .syncTaskBoard: "Sync Task Board"
-    case .createBranch: "Create Branch"
-    case .openPullRequest: "Open Pull Request"
-    case .watchChecks: "Watch Checks"
-    case .requestReview: "Request Review"
-    case .autoMerge: "Auto Merge"
-    }
   }
 }

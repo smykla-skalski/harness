@@ -34,17 +34,23 @@ public struct TaskBoardGitRuntimeProfile: Codable, Equatable, Sendable {
   public let authorName: String?
   public let authorEmail: String?
   public let sshKeyPath: String?
+  public let sshPrivateKey: String?
+  public let sshPrivateKeyPassphrase: String?
   public let signing: TaskBoardGitSigningConfig
 
   public init(
     authorName: String? = nil,
     authorEmail: String? = nil,
     sshKeyPath: String? = nil,
+    sshPrivateKey: String? = nil,
+    sshPrivateKeyPassphrase: String? = nil,
     signing: TaskBoardGitSigningConfig = TaskBoardGitSigningConfig()
   ) {
     self.authorName = authorName
     self.authorEmail = authorEmail
     self.sshKeyPath = sshKeyPath
+    self.sshPrivateKey = sshPrivateKey
+    self.sshPrivateKeyPassphrase = sshPrivateKeyPassphrase
     self.signing = signing
   }
 
@@ -52,6 +58,8 @@ public struct TaskBoardGitRuntimeProfile: Codable, Equatable, Sendable {
     case authorName
     case authorEmail
     case sshKeyPath
+    case sshPrivateKey
+    case sshPrivateKeyPassphrase
     case signing
   }
 
@@ -61,6 +69,11 @@ public struct TaskBoardGitRuntimeProfile: Codable, Equatable, Sendable {
       authorName: try container.decodeIfPresent(String.self, forKey: .authorName),
       authorEmail: try container.decodeIfPresent(String.self, forKey: .authorEmail),
       sshKeyPath: try container.decodeIfPresent(String.self, forKey: .sshKeyPath),
+      sshPrivateKey: try container.decodeIfPresent(String.self, forKey: .sshPrivateKey),
+      sshPrivateKeyPassphrase: try container.decodeIfPresent(
+        String.self,
+        forKey: .sshPrivateKeyPassphrase
+      ),
       signing: try container.decodeIfPresent(TaskBoardGitSigningConfig.self, forKey: .signing)
         ?? TaskBoardGitSigningConfig()
     )
@@ -70,29 +83,41 @@ public struct TaskBoardGitRuntimeProfile: Codable, Equatable, Sendable {
 public struct TaskBoardGitSigningConfig: Codable, Equatable, Sendable {
   public let mode: TaskBoardGitSigningMode
   public let sshKeyPath: String?
+  public let sshPrivateKey: String?
+  public let sshPrivateKeyPassphrase: String?
   public let gpgKeyId: String?
   public let gpgPrivateKeyPath: String?
+  public let gpgPrivateKey: String?
   public let gpgPrivateKeyPassphrase: String?
 
   public init(
     mode: TaskBoardGitSigningMode = .none,
     sshKeyPath: String? = nil,
+    sshPrivateKey: String? = nil,
+    sshPrivateKeyPassphrase: String? = nil,
     gpgKeyId: String? = nil,
     gpgPrivateKeyPath: String? = nil,
+    gpgPrivateKey: String? = nil,
     gpgPrivateKeyPassphrase: String? = nil
   ) {
     self.mode = mode
     self.sshKeyPath = sshKeyPath
+    self.sshPrivateKey = sshPrivateKey
+    self.sshPrivateKeyPassphrase = sshPrivateKeyPassphrase
     self.gpgKeyId = gpgKeyId
     self.gpgPrivateKeyPath = gpgPrivateKeyPath
+    self.gpgPrivateKey = gpgPrivateKey
     self.gpgPrivateKeyPassphrase = gpgPrivateKeyPassphrase
   }
 
   enum CodingKeys: String, CodingKey {
     case mode
     case sshKeyPath
+    case sshPrivateKey
+    case sshPrivateKeyPassphrase
     case gpgKeyId
     case gpgPrivateKeyPath
+    case gpgPrivateKey
     case gpgPrivateKeyPassphrase
   }
 
@@ -101,8 +126,14 @@ public struct TaskBoardGitSigningConfig: Codable, Equatable, Sendable {
     self.init(
       mode: try container.decodeIfPresent(TaskBoardGitSigningMode.self, forKey: .mode) ?? .none,
       sshKeyPath: try container.decodeIfPresent(String.self, forKey: .sshKeyPath),
+      sshPrivateKey: try container.decodeIfPresent(String.self, forKey: .sshPrivateKey),
+      sshPrivateKeyPassphrase: try container.decodeIfPresent(
+        String.self,
+        forKey: .sshPrivateKeyPassphrase
+      ),
       gpgKeyId: try container.decodeIfPresent(String.self, forKey: .gpgKeyId),
       gpgPrivateKeyPath: try container.decodeIfPresent(String.self, forKey: .gpgPrivateKeyPath),
+      gpgPrivateKey: try container.decodeIfPresent(String.self, forKey: .gpgPrivateKey),
       gpgPrivateKeyPassphrase: try container.decodeIfPresent(
         String.self,
         forKey: .gpgPrivateKeyPassphrase

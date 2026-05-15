@@ -28,6 +28,7 @@ public struct TaskBoardGitHubProjectConfig: Codable, Equatable, Sendable {
   public let mergeMethod: TaskBoardGitHubMergeMethod
   public let labels: TaskBoardGitHubAutomationLabels
   public let protectedPaths: [TaskBoardProtectedPathRule]
+  public let requestedReviewers: TaskBoardGitHubRequestedReviewers
   public let enabledAutomations: TaskBoardGitHubAutomationToggles
 
   public init(
@@ -39,6 +40,7 @@ public struct TaskBoardGitHubProjectConfig: Codable, Equatable, Sendable {
     mergeMethod: TaskBoardGitHubMergeMethod = .squash,
     labels: TaskBoardGitHubAutomationLabels = TaskBoardGitHubAutomationLabels(),
     protectedPaths: [TaskBoardProtectedPathRule] = [],
+    requestedReviewers: TaskBoardGitHubRequestedReviewers = TaskBoardGitHubRequestedReviewers(),
     enabledAutomations: TaskBoardGitHubAutomationToggles = TaskBoardGitHubAutomationToggles()
   ) {
     self.owner = owner
@@ -49,6 +51,7 @@ public struct TaskBoardGitHubProjectConfig: Codable, Equatable, Sendable {
     self.mergeMethod = mergeMethod
     self.labels = labels
     self.protectedPaths = protectedPaths
+    self.requestedReviewers = requestedReviewers
     self.enabledAutomations = enabledAutomations
   }
 
@@ -61,6 +64,7 @@ public struct TaskBoardGitHubProjectConfig: Codable, Equatable, Sendable {
     case mergeMethod
     case labels
     case protectedPaths
+    case requestedReviewers
     case enabledAutomations
   }
 
@@ -82,6 +86,10 @@ public struct TaskBoardGitHubProjectConfig: Codable, Equatable, Sendable {
         [TaskBoardProtectedPathRule].self,
         forKey: .protectedPaths
       ) ?? [],
+      requestedReviewers: try container.decodeIfPresent(
+        TaskBoardGitHubRequestedReviewers.self,
+        forKey: .requestedReviewers
+      ) ?? TaskBoardGitHubRequestedReviewers(),
       enabledAutomations: try container.decodeIfPresent(
         TaskBoardGitHubAutomationToggles.self,
         forKey: .enabledAutomations
@@ -135,6 +143,32 @@ public struct TaskBoardGitHubAutomationLabels: Codable, Equatable, Sendable {
         ?? "harness:needs-human",
       protectedPath: try container.decodeIfPresent(String.self, forKey: .protectedPath)
         ?? "harness:protected-path"
+    )
+  }
+}
+
+public struct TaskBoardGitHubRequestedReviewers: Codable, Equatable, Sendable {
+  public let reviewers: [String]
+  public let teamReviewers: [String]
+
+  public init(
+    reviewers: [String] = [],
+    teamReviewers: [String] = []
+  ) {
+    self.reviewers = reviewers
+    self.teamReviewers = teamReviewers
+  }
+
+  enum CodingKeys: String, CodingKey {
+    case reviewers
+    case teamReviewers
+  }
+
+  public init(from decoder: Decoder) throws {
+    let container = try decoder.container(keyedBy: CodingKeys.self)
+    self.init(
+      reviewers: try container.decodeIfPresent([String].self, forKey: .reviewers) ?? [],
+      teamReviewers: try container.decodeIfPresent([String].self, forKey: .teamReviewers) ?? []
     )
   }
 }

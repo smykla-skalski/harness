@@ -127,12 +127,26 @@ extension HarnessMonitorAccessibility {
   public static let settingsTaskBoardCheckoutPathField = "harness.settings.task-board.checkout-path"
   public static let settingsTaskBoardProtectedPathsField =
     "harness.settings.task-board.protected-paths"
+  public static let settingsTaskBoardRequestedReviewersField =
+    "harness.settings.task-board.requested-reviewers"
+  public static let settingsTaskBoardTeamReviewersField =
+    "harness.settings.task-board.requested-team-reviewers"
   public static let settingsTaskBoardSSHKeyPathField = "harness.settings.task-board.ssh-key-path"
+  public static let settingsTaskBoardSSHPrivateKeyField =
+    "harness.settings.task-board.ssh-private-key"
+  public static let settingsTBSSHKeyPassphraseField =
+    "harness.settings.task-board.ssh-private-key-passphrase"
   public static let settingsTaskBoardSigningSSHKeyPathField =
     "harness.settings.task-board.signing-ssh-key-path"
+  public static let settingsTBSigningSSHKeyField =
+    "harness.settings.task-board.signing-ssh-private-key"
+  public static let settingsTBSigningSSHPassphraseField =
+    "harness.settings.task-board.signing-ssh-private-key-passphrase"
   public static let settingsTaskBoardGPGKeyIDField = "harness.settings.task-board.gpg-key-id"
   public static let settingsTaskBoardGPGPrivateKeyPathField =
     "harness.settings.task-board.gpg-private-key-path"
+  public static let settingsTaskBoardGPGPrivateKeyField =
+    "harness.settings.task-board.gpg-private-key"
   public static let settingsTaskBoardGPGPassphraseField =
     "harness.settings.task-board.gpg-private-key-passphrase"
   public static let settingsTaskBoardGlobalTokenField = "harness.settings.task-board.global-token"
@@ -176,12 +190,36 @@ extension HarnessMonitorAccessibility {
     "harness.settings.task-board.override.\(index).ssh-key-path"
   }
 
+  public static func settingsTaskBoardRepositoryOverrideSSHPrivateKeyField(
+    _ index: Int
+  ) -> String {
+    "harness.settings.task-board.override.\(index).ssh-private-key"
+  }
+
+  public static func settingsTBRepoSSHKeyPassphraseField(_ index: Int) -> String {
+    "harness.settings.task-board.override.\(index).ssh-private-key-passphrase"
+  }
+
   public static func settingsTaskBoardRepositoryOverrideSigningSSHKeyField(_ index: Int) -> String {
     "harness.settings.task-board.override.\(index).signing-ssh-key-path"
   }
 
+  public static func settingsTBRepoSigningSSHKeyField(_ index: Int) -> String {
+    "harness.settings.task-board.override.\(index).signing-ssh-private-key"
+  }
+
+  public static func settingsTBRepoSigningSSHPassphraseField(_ index: Int) -> String {
+    "harness.settings.task-board.override.\(index).signing-ssh-private-key-passphrase"
+  }
+
   public static func settingsTaskBoardRepositoryOverrideGPGPrivateKeyField(_ index: Int) -> String {
     "harness.settings.task-board.override.\(index).gpg-private-key-path"
+  }
+
+  public static func settingsTaskBoardRepositoryOverrideGPGPrivateKeyMaterialField(
+    _ index: Int
+  ) -> String {
+    "harness.settings.task-board.override.\(index).gpg-private-key"
   }
 
   public static func settingsTaskBoardRepositoryOverrideGPGPassphraseField(_ index: Int) -> String {
