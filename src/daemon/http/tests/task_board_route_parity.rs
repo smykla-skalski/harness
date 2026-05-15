@@ -34,7 +34,12 @@ async fn run_task_board_workflow_parity() {
         &base_url,
         http_paths::TASK_BOARD_DISPATCH,
         ws_methods::TASK_BOARD_DISPATCH,
-        json!({ "id": "parity-workflow", "status": "todo", "dry_run": true }),
+        json!({
+            "id": "parity-workflow",
+            "status": "todo",
+            "dry_run": true,
+            "actor": "spoofed-client",
+        }),
     )
     .await;
     assert_http_ws_post_match(

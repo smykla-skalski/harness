@@ -146,6 +146,7 @@ pub(super) async fn assert_run_once_routes_match(client: &reqwest::Client, base_
         http_paths::TASK_BOARD_ORCHESTRATOR_RUN_ONCE,
         json!({
             "dry_run": true,
+            "actor": "spoofed-client",
             "input": {
                 "dispatch_status": "todo",
                 "sync_direction": "pull",
@@ -162,6 +163,7 @@ pub(super) async fn assert_run_once_routes_match(client: &reqwest::Client, base_
         ws_methods::TASK_BOARD_ORCHESTRATOR_RUN_ONCE,
         json!({
             "dry_run": true,
+            "actor": "spoofed-client",
             "input": {
                 "dispatch_status": "todo",
                 "sync_direction": "pull",
