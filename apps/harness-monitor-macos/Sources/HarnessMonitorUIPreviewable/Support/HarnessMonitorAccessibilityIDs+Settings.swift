@@ -128,6 +128,17 @@ extension HarnessMonitorAccessibility {
     "harness.settings.task-board.github-inbox.label-filter"
   public static let settingsTaskBoardTodoistProjectFilterField =
     "harness.settings.task-board.todoist-inbox.project-filter"
+  public static let settingsTaskBoardHostStatus = "harness.settings.task-board.host.status"
+  public static let settingsTaskBoardHostLocalIdField =
+    "harness.settings.task-board.host.local-id"
+  public static let settingsTaskBoardHostLocalLabelField =
+    "harness.settings.task-board.host.local-label"
+  public static let settingsTaskBoardHostProjectTypesField =
+    "harness.settings.task-board.host.project-types"
+  public static let settingsTaskBoardHostReloadButton =
+    "harness.settings.task-board.host.reload"
+  public static let settingsTaskBoardHostSaveButton =
+    "harness.settings.task-board.host.save"
   public static let settingsTaskBoardCheckoutPathField = "harness.settings.task-board.checkout-path"
   public static let settingsTaskBoardProtectedPathsField =
     "harness.settings.task-board.protected-paths"

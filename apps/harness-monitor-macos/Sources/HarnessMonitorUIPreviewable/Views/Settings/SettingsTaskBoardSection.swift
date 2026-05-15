@@ -39,6 +39,7 @@ public struct SettingsTaskBoardSection: View {
         projectSection
         githubInboxSection
         todoistInboxSection
+        SettingsTaskBoardHostSection(store: store)
         automationSection
         gitDefaultsSection
         credentialsSection
