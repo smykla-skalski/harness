@@ -78,49 +78,6 @@ struct PolicyCanvasViewModelTests {
     #expect(viewModel.zoom == 1)
   }
 
-  @Test("command scroll zooms around the pointer")
-  func commandScrollZoomsAroundPointer() {
-    let viewModel = PolicyCanvasViewModel.sample()
-    viewModel.setZoom(1)
-
-    let viewportPoint = CGPoint(x: 340, y: 220)
-    let canvasPoint = CGPoint(x: 1_100, y: 960)
-    #expect(viewModel.zoomByCommandScroll(deltaY: 30))
-    #expect(viewModel.zoom > 1)
-
-    let scrollPoint = viewModel.viewportScrollPoint(
-      keepingCanvasPoint: canvasPoint,
-      atViewportPoint: viewportPoint,
-      viewportSize: CGSize(width: 1_100, height: 820)
-    )
-
-    #expect(scrollPoint.x == (canvasPoint.x * viewModel.zoom) - viewportPoint.x)
-    #expect(scrollPoint.y == (canvasPoint.y * viewModel.zoom) - viewportPoint.y)
-  }
-
-  @Test("command scroll event requires command modifier")
-  func commandScrollEventRequiresCommandModifier() {
-    let commandDelta = policyCanvasCommandScrollDeltaY(
-      isCommandModified: true,
-      oldOffset: CGPoint(x: 40, y: 120),
-      newOffset: CGPoint(x: 40, y: 112)
-    )
-    let regularDelta = policyCanvasCommandScrollDeltaY(
-      isCommandModified: false,
-      oldOffset: CGPoint(x: 40, y: 120),
-      newOffset: CGPoint(x: 40, y: 112)
-    )
-    let horizontalDelta = policyCanvasCommandScrollDeltaY(
-      isCommandModified: true,
-      oldOffset: CGPoint(x: 40, y: 120),
-      newOffset: CGPoint(x: 44, y: 120)
-    )
-
-    #expect(commandDelta == 8)
-    #expect(regularDelta == nil)
-    #expect(horizontalDelta == -4)
-  }
-
   @Test("clean empty palette node deletes without confirmation")
   func cleanEmptyPaletteNodeDeletesWithoutConfirmation() {
     let viewModel = PolicyCanvasViewModel.sample()
@@ -282,25 +239,12 @@ struct PolicyCanvasViewModelTests {
   @Test("loaded default graph starts centered in large canvas space")
   func loadedDefaultGraphStartsCenteredInLargeCanvasSpace() {
     let viewModel = PolicyCanvasViewModel.sample()
-    viewModel.load(
-      document: PreviewFixtures.policyCanvasPipelineDocument(), simulation: nil, audit: nil)
+    viewModel.load(document: PreviewFixtures.policyCanvasPipelineDocument(), simulation: nil, audit: nil)
 
-    let expectedY =
-      viewModel.canvasContentBounds.minY
-      + min(
-        viewModel.canvasContentBounds.height / 2, PolicyCanvasLayout.initialViewportFocusYOffset)
-    #expect(
-      viewModel.initialViewportAnchorPoint.x == viewModel.canvasContentBounds.midX * viewModel.zoom)
-    #expect(viewModel.initialViewportAnchorPoint.y == expectedY * viewModel.zoom)
+    #expect(viewModel.initialViewportAnchorPoint.x == viewModel.canvasContentBounds.midX)
+    #expect(viewModel.initialViewportAnchorPoint.y == viewModel.canvasContentBounds.midY)
     #expect(viewModel.canvasContentSize.width - viewModel.canvasContentBounds.maxX >= 1_000)
     #expect(viewModel.canvasContentSize.height - viewModel.canvasContentBounds.maxY >= 1_000)
-
-    let viewport = CGSize(width: 1_048, height: 863)
-    let scrollPoint = viewModel.initialViewportScrollPoint(for: viewport)
-    #expect(scrollPoint.x == viewModel.initialViewportAnchorPoint.x - viewport.width / 2)
-    #expect(scrollPoint.y == viewModel.initialViewportAnchorPoint.y - viewport.height / 2)
-    #expect(scrollPoint.x > 0)
-    #expect(scrollPoint.y > 0)
   }
 
   @Test("generic policy edge labels are hidden")

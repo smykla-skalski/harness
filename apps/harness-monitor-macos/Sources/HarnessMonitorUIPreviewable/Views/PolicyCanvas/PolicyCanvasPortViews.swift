@@ -108,10 +108,12 @@ private struct PolicyCanvasPortView: View {
       // Gesture protocol between `.draggable()` and `.simultaneousGesture(...)`
       // on the same view:
       //
-      //  * `.draggable()` owns the actual SwiftUI drag session. It carries the
-      //    port payload, fires the matching `.dropDestination` (which calls
+      //  * `.draggable()` owns the actual drag session — it starts an
+      //    NSDraggingSession when the OS recognizes the touch-down -> move
+      //    gesture, carries the port payload, fires the drop destination on
+      //    a matching `.dropDestination` (which calls
       //    `connectDroppedPortPayloads(...)` to commit the edge), and is
-      //    cancelled by the system on Esc, Cmd-Tab, or focus loss.
+      //    cancelled by the OS on Esc, Cmd-Tab, or focus loss.
       //
       //  * The `.simultaneousGesture(DragGesture)` below does NOT participate
       //    in drop-target routing and never wins ownership of the touch — it
@@ -154,10 +156,10 @@ private struct PolicyCanvasPortView: View {
   }
 
   /// Fires alongside `.draggable()` to capture the live cursor position in
-  /// the named canvas coordinate space. `.draggable()` owns the SwiftUI drag
-  /// session (so the drop destination still fires); this gesture only writes
-  /// to the rubber-band preview state and never claims the drag itself. See
-  /// the gesture-protocol comment in `body` for the full contract.
+  /// the named canvas coordinate space. `.draggable()` owns the NSDraggingSession
+  /// (so the drop destination still fires); this gesture only writes to the
+  /// rubber-band preview state and never claims the drag itself. See the
+  /// gesture-protocol comment in `body` for the full contract.
   private var rubberBandGesture: some Gesture {
     DragGesture(minimumDistance: 3, coordinateSpace: .named(PolicyCanvasCoordinateSpaces.canvas))
       .onChanged { value in
@@ -198,7 +200,13 @@ private struct PolicyCanvasPortView: View {
       )
       .contentShape(Circle().inset(by: -PolicyCanvasLayout.portHitTestExtension))
       .help(port.title)
-      .accessibilityLabel("\(node.title) \(port.title)")
+      // Role suffix ("output port" / "input port") tells the VoiceOver user
+      // which side of an edge this circle sits on — without it the label is
+      // ambiguous ("Policy intake source") between a draggable output and a
+      // drop-target input, and the only visual distinguisher is fill color.
+      .accessibilityLabel(
+        "\(node.title) \(port.title) \(port.kind == .output ? "output port" : "input port")"
+      )
       .accessibilityIdentifier(
         HarnessMonitorAccessibility.policyCanvasPort(
           node.id,
