@@ -7,13 +7,13 @@ use crate::daemon::protocol::{
     TaskBoardCreateItemRequest, TaskBoardDeleteItemRequest, TaskBoardDispatchRequest,
     TaskBoardDispatchResponse, TaskBoardGetItemRequest, TaskBoardListItemsRequest,
     TaskBoardListItemsResponse, TaskBoardMachinesResponse, TaskBoardPlanApproveRequest,
-    TaskBoardPlanBeginRequest, TaskBoardPlanSubmitRequest, TaskBoardPlanningResponse,
-    TaskBoardPolicyPipelineAuditResponse, TaskBoardPolicyPipelinePromoteRequest,
-    TaskBoardPolicyPipelinePromoteResponse, TaskBoardPolicyPipelineResponse,
-    TaskBoardPolicyPipelineSaveDraftRequest, TaskBoardPolicyPipelineSaveDraftResponse,
-    TaskBoardPolicyPipelineSimulateRequest, TaskBoardPolicyPipelineSimulationResponse,
-    TaskBoardProjectsResponse, TaskBoardSyncRequest, TaskBoardSyncResponse,
-    TaskBoardUpdateItemRequest,
+    TaskBoardPlanBeginRequest, TaskBoardPlanRevokeRequest, TaskBoardPlanSubmitRequest,
+    TaskBoardPlanningResponse, TaskBoardPolicyPipelineAuditResponse,
+    TaskBoardPolicyPipelinePromoteRequest, TaskBoardPolicyPipelinePromoteResponse,
+    TaskBoardPolicyPipelineResponse, TaskBoardPolicyPipelineSaveDraftRequest,
+    TaskBoardPolicyPipelineSaveDraftResponse, TaskBoardPolicyPipelineSimulateRequest,
+    TaskBoardPolicyPipelineSimulationResponse, TaskBoardProjectsResponse, TaskBoardSyncRequest,
+    TaskBoardSyncResponse, TaskBoardUpdateItemRequest,
 };
 use crate::errors::{CliError, CliErrorKind};
 use crate::task_board::store::{OptionalFieldPatch, TaskBoardItemPatch};
@@ -23,7 +23,7 @@ use crate::task_board::{
     build_project_summaries, build_sync_summary, configured_sync_clients, default_board_root,
     sync_external_tasks,
 };
-use crate::task_board::{PlanningTransition, approve_plan, begin_planning, submit_plan};
+use crate::task_board::{PlanningTransition, approve_plan, begin_planning, revoke_plan, submit_plan};
 use crate::workspace::utc_now;
 
 use super::task_board_runtime::external_sync_config_for_repository;
@@ -137,6 +137,30 @@ pub fn approve_task_board_plan(
     apply_planning_transition(&request.id, |item| {
         approve_plan(item, &request.approved_by, &approved_at)
     })
+}
+
+/// Revoke a previously granted plan approval and bounce the item back to
+/// `PlanReview` while keeping the plan summary intact.
+///
+/// # Errors
+/// Returns `CliError` when the item cannot be loaded or persisted.
+pub fn revoke_task_board_plan(
+    request: &TaskBoardPlanRevokeRequest,
+) -> Result<TaskBoardPlanningResponse, CliError> {
+    let actor = request.actor.as_deref();
+    let board = store();
+    let current = board.get(&request.id)?;
+    let transition = revoke_plan(&current, actor);
+    let item = board.update(
+        &request.id,
+        TaskBoardItemPatch {
+            status: Some(transition.to_status),
+            planning: Some(transition.planning.clone()),
+            clear_approval: true,
+            ..TaskBoardItemPatch::default()
+        },
+    )?;
+    Ok(TaskBoardPlanningResponse { transition, item })
 }
 
 /// Preview or apply external sync for local task-board items.
@@ -292,6 +316,7 @@ fn patch_from_request(request: &TaskBoardUpdateItemRequest) -> TaskBoardItemPatc
         external_refs: request.external_refs.clone(),
         planning: request.planning.clone(),
         clear_planning: request.clear_state.clear_planning,
+        clear_approval: false,
         workflow: request.workflow.clone(),
         clear_workflow: request.clear_state.clear_workflow,
         session_id: optional_string_patch(

@@ -47,6 +47,7 @@ pub const TASK_BOARD_DELETE: &str = "task_board.delete";
 pub const TASK_BOARD_PLAN_BEGIN: &str = "task_board.plan_begin";
 pub const TASK_BOARD_PLAN_SUBMIT: &str = "task_board.plan_submit";
 pub const TASK_BOARD_PLAN_APPROVE: &str = "task_board.plan_approve";
+pub const TASK_BOARD_PLAN_REVOKE: &str = "task_board.plan_revoke";
 pub const TASK_BOARD_SYNC: &str = "task_board.sync";
 pub const TASK_BOARD_DISPATCH: &str = "task_board.dispatch";
 pub const TASK_BOARD_EVALUATE: &str = "task_board.evaluate";

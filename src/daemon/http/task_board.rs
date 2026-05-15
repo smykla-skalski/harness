@@ -27,8 +27,8 @@ use self::items::{
     get_task_board_host_local, get_task_board_item, get_task_board_items, get_task_board_machines,
     get_task_board_projects, post_task_board_dispatch, post_task_board_evaluate,
     post_task_board_item, post_task_board_plan_approve, post_task_board_plan_begin,
-    post_task_board_plan_submit, post_task_board_sync, put_task_board_host_set_project_types,
-    put_task_board_item,
+    post_task_board_plan_revoke, post_task_board_plan_submit, post_task_board_sync,
+    put_task_board_host_set_project_types, put_task_board_item,
 };
 
 macro_rules! authenticated_request {
@@ -81,6 +81,10 @@ pub(super) fn task_board_routes() -> Router<DaemonHttpState> {
         .route(
             http_paths::TASK_BOARD_PLAN_APPROVE,
             post(post_task_board_plan_approve),
+        )
+        .route(
+            http_paths::TASK_BOARD_PLAN_REVOKE,
+            post(post_task_board_plan_revoke),
         )
         .route(http_paths::TASK_BOARD_SYNC, post(post_task_board_sync))
         .route(

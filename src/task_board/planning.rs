@@ -74,6 +74,18 @@ pub fn approve_plan(
     transition(item, TaskBoardStatus::Todo, planning)
 }
 
+/// Drop an existing plan approval and send the item back to plan review while
+/// keeping the existing plan summary intact. `_actor` is accepted for parity
+/// with the approval flow even though revocation does not record a who/when.
+#[must_use]
+pub fn revoke_plan(item: &TaskBoardItem, _actor: Option<&str>) -> PlanningTransition {
+    transition(
+        item,
+        TaskBoardStatus::PlanReview,
+        clear_approval(&item.planning),
+    )
+}
+
 #[must_use]
 pub fn approval_gate(item: &TaskBoardItem) -> PlanApprovalGate {
     if item.is_deleted() {

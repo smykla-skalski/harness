@@ -137,6 +137,13 @@ pub struct TaskBoardPlanApproveRequest {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TaskBoardPlanRevokeRequest {
+    pub id: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub actor: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TaskBoardListItemsResponse {
     pub items: Vec<TaskBoardItem>,
 }

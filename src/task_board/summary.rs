@@ -57,7 +57,7 @@ pub struct TaskBoardMachineSummary {
 pub fn build_audit_summary(items: &[TaskBoardItem]) -> TaskBoardAuditSummary {
     let plans = build_dispatch_plans(items);
     TaskBoardAuditSummary {
-        total: items.len(),
+        total: items.iter().filter(|item| !item.is_deleted()).count(),
         ready: plans.iter().filter(|plan| plan.is_ready()).count(),
         blocked: plans.iter().filter(|plan| !plan.is_ready()).count(),
         deleted: items.iter().filter(|item| item.is_deleted()).count(),
@@ -227,7 +227,10 @@ fn status_counts(items: &[TaskBoardItem]) -> Vec<TaskBoardStatusCount> {
         .into_iter()
         .map(|status| TaskBoardStatusCount {
             status,
-            count: items.iter().filter(|item| item.status == status).count(),
+            count: items
+                .iter()
+                .filter(|item| !item.is_deleted() && item.status == status)
+                .count(),
         })
         .filter(|entry| entry.count > 0)
         .collect()
@@ -330,6 +333,37 @@ mod tests {
             .expect("needs-you count");
 
         assert_eq!(count.count, 1);
+    }
+
+    #[test]
+    fn audit_summary_excludes_deleted_from_status_and_total() {
+        let mut live = TaskBoardItem::new(
+            "task-live".into(),
+            "Live".into(),
+            String::new(),
+            "2026-05-14T00:00:00Z".into(),
+        );
+        live.status = TaskBoardStatus::Todo;
+
+        let mut tombstoned = TaskBoardItem::new(
+            "task-deleted".into(),
+            "Tombstone".into(),
+            String::new(),
+            "2026-05-14T00:00:00Z".into(),
+        );
+        tombstoned.status = TaskBoardStatus::Todo;
+        tombstoned.deleted_at = Some("2026-05-14T02:00:00Z".into());
+
+        let summary = build_audit_summary(&[live, tombstoned]);
+
+        assert_eq!(summary.total, 1);
+        assert_eq!(summary.deleted, 1);
+        let todo_count = summary
+            .by_status
+            .iter()
+            .find(|entry| entry.status == TaskBoardStatus::Todo)
+            .expect("todo count");
+        assert_eq!(todo_count.count, 1);
     }
 
     fn ready_item(id: &str, project_id: &str, mode: AgentMode) -> TaskBoardItem {

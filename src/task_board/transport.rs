@@ -29,7 +29,10 @@ pub use evaluate::TaskBoardEvaluateArgs;
 pub use host::TaskBoardHostCommand;
 use item_args::TaskBoardItemFieldArgs;
 pub use orchestrator::TaskBoardOrchestratorCommand;
-pub use planning::{TaskBoardPlanApproveArgs, TaskBoardPlanBeginArgs, TaskBoardPlanSubmitArgs};
+pub use planning::{
+    TaskBoardPlanApproveArgs, TaskBoardPlanBeginArgs, TaskBoardPlanRevokeArgs,
+    TaskBoardPlanSubmitArgs,
+};
 
 #[derive(Debug, Clone, Subcommand)]
 #[non_exhaustive]
@@ -50,6 +53,8 @@ pub enum TaskBoardCommand {
     Submit(TaskBoardPlanSubmitArgs),
     /// Approve a submitted plan and move it to ready work.
     Approve(TaskBoardPlanApproveArgs),
+    /// Revoke a previously granted approval; the plan summary stays intact.
+    PlanRevoke(TaskBoardPlanRevokeArgs),
     /// Run external synchronization.
     Sync(TaskBoardSyncArgs),
     /// Dispatch ready work into sessions.
@@ -236,6 +241,7 @@ impl Execute for TaskBoardCommand {
             Self::Begin(args) => args.execute(context),
             Self::Submit(args) => args.execute(context),
             Self::Approve(args) => args.execute(context),
+            Self::PlanRevoke(args) => args.execute(context),
             Self::Sync(args) => args.execute(context),
             Self::Dispatch(args) => args.execute(context),
             Self::Evaluate(args) => args.execute(context),

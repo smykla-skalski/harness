@@ -26,7 +26,9 @@ pub struct TaskBoardTodoistInboxConfig {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct TaskBoardOrchestratorSettings {
+    #[serde(default = "default_enabled_workflows")]
     pub enabled_workflows: Vec<TaskBoardOrchestratorWorkflow>,
+    #[serde(default = "default_dry_run_default")]
     pub dry_run_default: bool,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub dispatch_status_filter: Option<TaskBoardStatus>,
@@ -38,6 +40,7 @@ pub struct TaskBoardOrchestratorSettings {
     pub github_inbox: TaskBoardGitHubInboxConfig,
     #[serde(default)]
     pub todoist_inbox: TaskBoardTodoistInboxConfig,
+    #[serde(default = "default_policy_version")]
     pub policy_version: String,
 }
 
@@ -123,8 +126,11 @@ pub struct TaskBoardOrchestratorStatus {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TaskBoardOrchestratorState {
+    #[serde(default = "default_state_schema_version")]
     pub schema_version: u32,
+    #[serde(default)]
     pub enabled: bool,
+    #[serde(default)]
     pub running: bool,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub current_tick: Option<TaskBoardOrchestratorTickInfo>,
@@ -187,19 +193,14 @@ pub struct TaskBoardWorkflowExecutionCount {
 impl Default for TaskBoardOrchestratorSettings {
     fn default() -> Self {
         Self {
-            enabled_workflows: vec![
-                TaskBoardOrchestratorWorkflow::DefaultTask,
-                TaskBoardOrchestratorWorkflow::PrFix,
-                TaskBoardOrchestratorWorkflow::PrReview,
-                TaskBoardOrchestratorWorkflow::DependencyUpdate,
-            ],
-            dry_run_default: true,
+            enabled_workflows: default_enabled_workflows(),
+            dry_run_default: default_dry_run_default(),
             dispatch_status_filter: Some(TaskBoardStatus::Todo),
             project_dir: None,
             github_project: TaskBoardGitHubProjectConfig::default(),
             github_inbox: TaskBoardGitHubInboxConfig::default(),
             todoist_inbox: TaskBoardTodoistInboxConfig::default(),
-            policy_version: TASK_BOARD_POLICY_VERSION.to_string(),
+            policy_version: default_policy_version(),
         }
     }
 }
@@ -207,13 +208,34 @@ impl Default for TaskBoardOrchestratorSettings {
 impl Default for TaskBoardOrchestratorState {
     fn default() -> Self {
         Self {
-            schema_version: CURRENT_ORCHESTRATOR_STATE_VERSION,
+            schema_version: default_state_schema_version(),
             enabled: false,
             running: false,
             current_tick: None,
             last_run: None,
         }
     }
+}
+
+fn default_enabled_workflows() -> Vec<TaskBoardOrchestratorWorkflow> {
+    vec![
+        TaskBoardOrchestratorWorkflow::DefaultTask,
+        TaskBoardOrchestratorWorkflow::PrFix,
+        TaskBoardOrchestratorWorkflow::PrReview,
+        TaskBoardOrchestratorWorkflow::DependencyUpdate,
+    ]
+}
+
+const fn default_dry_run_default() -> bool {
+    true
+}
+
+fn default_policy_version() -> String {
+    TASK_BOARD_POLICY_VERSION.to_string()
+}
+
+const fn default_state_schema_version() -> u32 {
+    CURRENT_ORCHESTRATOR_STATE_VERSION
 }
 
 impl TaskBoardOrchestratorStatus {
