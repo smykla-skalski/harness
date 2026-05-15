@@ -1,5 +1,7 @@
 use crate::task_board::store::{OptionalFieldPatch, TaskBoardItemPatch};
-use crate::task_board::types::{ExternalRef, ExternalRefSyncState, TaskBoardItem};
+use crate::task_board::types::{
+    ExternalRef, ExternalRefProvider, ExternalRefSyncState, TaskBoardItem,
+};
 use crate::workspace::utc_now;
 
 use crate::task_board::external::{
@@ -267,7 +269,7 @@ pub(super) fn external_ref_matches(
     if candidate.external_id == reference.external_id {
         return true;
     }
-    provider == crate::task_board::types::ExternalRefProvider::GitHub
+    provider == ExternalRefProvider::GitHub
         && project_id.is_some_and(|project_id| project_matches(item, candidate, project_id))
         && github_legacy_external_id(reference.external_id.as_str())
             .is_some_and(|legacy_id| candidate.external_id == legacy_id)

@@ -74,26 +74,38 @@ pub struct TaskBoardUpdateItemRequest {
     pub tags: Option<Vec<String>>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub project_id: Option<String>,
-    #[serde(default)]
-    pub clear_project_id: bool,
+    #[serde(default, flatten)]
+    pub clear_identity: TaskBoardUpdateIdentityClears,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub external_refs: Option<Vec<ExternalRef>>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub planning: Option<PlanningState>,
-    #[serde(default)]
-    pub clear_planning: bool,
+    #[serde(default, flatten)]
+    pub clear_state: TaskBoardUpdateStateClears,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub workflow: Option<TaskBoardWorkflowState>,
-    #[serde(default)]
-    pub clear_workflow: bool,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub session_id: Option<String>,
-    #[serde(default)]
-    pub clear_session_id: bool,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub work_item_id: Option<String>,
+}
+
+#[derive(Debug, Clone, Copy, Default, Serialize, Deserialize)]
+pub struct TaskBoardUpdateIdentityClears {
+    #[serde(default)]
+    pub clear_project_id: bool,
+    #[serde(default)]
+    pub clear_session_id: bool,
     #[serde(default)]
     pub clear_work_item_id: bool,
+}
+
+#[derive(Debug, Clone, Copy, Default, Serialize, Deserialize)]
+pub struct TaskBoardUpdateStateClears {
+    #[serde(default)]
+    pub clear_planning: bool,
+    #[serde(default)]
+    pub clear_workflow: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

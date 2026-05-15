@@ -281,17 +281,23 @@ fn patch_from_request(request: &TaskBoardUpdateItemRequest) -> TaskBoardItemPatc
         status: request.status,
         priority: request.priority,
         tags: request.tags.clone(),
-        project_id: optional_string_patch(request.project_id.as_ref(), request.clear_project_id),
+        project_id: optional_string_patch(
+            request.project_id.as_ref(),
+            request.clear_identity.clear_project_id,
+        ),
         agent_mode: request.agent_mode,
         external_refs: request.external_refs.clone(),
         planning: request.planning.clone(),
-        clear_planning: request.clear_planning,
+        clear_planning: request.clear_state.clear_planning,
         workflow: request.workflow.clone(),
-        clear_workflow: request.clear_workflow,
-        session_id: optional_string_patch(request.session_id.as_ref(), request.clear_session_id),
+        clear_workflow: request.clear_state.clear_workflow,
+        session_id: optional_string_patch(
+            request.session_id.as_ref(),
+            request.clear_identity.clear_session_id,
+        ),
         work_item_id: optional_string_patch(
             request.work_item_id.as_ref(),
-            request.clear_work_item_id,
+            request.clear_identity.clear_work_item_id,
         ),
     }
 }

@@ -91,27 +91,12 @@ pub fn configured_sync_clients(
     provider: Option<ExternalProvider>,
 ) -> Result<Vec<Box<dyn ExternalSyncClient>>, CliError> {
     let provider_was_requested = provider.is_some();
-    let providers: Vec<ExternalProvider> = match provider {
-        Some(provider) => vec![provider],
-        None => vec![ExternalProvider::GitHub, ExternalProvider::Todoist],
-    };
+    let providers = requested_providers(provider);
     let mut clients: Vec<Box<dyn ExternalSyncClient>> = Vec::new();
     for provider in providers {
         match provider {
             ExternalProvider::GitHub if config.token_for(provider).is_some() => {
-                let pull_enabled = config.github_repository().is_some_and(|repository| {
-                    !config
-                        .github_inbox_repositories()
-                        .iter()
-                        .any(|candidate| candidate.eq_ignore_ascii_case(repository))
-                });
-                clients.push(Box::new(GitHubSyncClient::from_config_with_pull(
-                    config,
-                    pull_enabled,
-                )?));
-                if !config.github_inbox_repositories().is_empty() {
-                    clients.push(Box::new(GitHubInboxSyncClient::from_config(config)?));
-                }
+                add_github_clients(config, &mut clients)?;
             }
             ExternalProvider::Todoist if config.token_for(provider).is_some() => {
                 clients.push(Box::new(TodoistSyncClient::from_config(config)?));
@@ -123,6 +108,33 @@ pub fn configured_sync_clients(
         }
     }
     Ok(clients)
+}
+
+fn requested_providers(provider: Option<ExternalProvider>) -> Vec<ExternalProvider> {
+    match provider {
+        Some(provider) => vec![provider],
+        None => vec![ExternalProvider::GitHub, ExternalProvider::Todoist],
+    }
+}
+
+fn add_github_clients(
+    config: &ExternalSyncConfig,
+    clients: &mut Vec<Box<dyn ExternalSyncClient>>,
+) -> Result<(), CliError> {
+    let pull_enabled = config.github_repository().is_some_and(|repository| {
+        !config
+            .github_inbox_repositories()
+            .iter()
+            .any(|candidate| candidate.eq_ignore_ascii_case(repository))
+    });
+    clients.push(Box::new(GitHubSyncClient::from_config_with_pull(
+        config,
+        pull_enabled,
+    )?));
+    if !config.github_inbox_repositories().is_empty() {
+        clients.push(Box::new(GitHubInboxSyncClient::from_config(config)?));
+    }
+    Ok(())
 }
 
 /// Pull and/or push task-board items through configured provider clients.

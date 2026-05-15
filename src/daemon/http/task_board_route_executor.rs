@@ -1,5 +1,6 @@
 use tokio::task::spawn_blocking;
 
+use crate::daemon::db::AsyncDaemonDb;
 use crate::daemon::protocol::{
     TaskBoardDispatchRequest, TaskBoardDispatchResponse, TaskBoardEvaluateRequest,
     TaskBoardEvaluationResponse, TaskBoardOrchestratorRunOnceRequest,
@@ -83,7 +84,7 @@ pub(crate) async fn run_once(
 async fn handle_dispatch_result(
     state: &DaemonHttpState,
     result: Result<TaskBoardDispatchResponse, CliError>,
-    async_db: Option<&crate::daemon::db::AsyncDaemonDb>,
+    async_db: Option<&AsyncDaemonDb>,
 ) -> Result<TaskBoardDispatchResponse, CliError> {
     let response = result?;
     if !response.applied.is_empty() {
@@ -96,7 +97,7 @@ async fn handle_dispatch_result(
 async fn handle_run_once_result(
     state: &DaemonHttpState,
     result: Result<TaskBoardOrchestratorRunOnceResponse, CliError>,
-    async_db: Option<&crate::daemon::db::AsyncDaemonDb>,
+    async_db: Option<&AsyncDaemonDb>,
 ) -> Result<TaskBoardOrchestratorRunOnceResponse, CliError> {
     let status = result?;
     if status.last_run_applied_count() > 0 {
@@ -106,10 +107,7 @@ async fn handle_run_once_result(
     Ok(status)
 }
 
-async fn broadcast_sessions_updated(
-    state: &DaemonHttpState,
-    async_db: Option<&crate::daemon::db::AsyncDaemonDb>,
-) {
+async fn broadcast_sessions_updated(state: &DaemonHttpState, async_db: Option<&AsyncDaemonDb>) {
     if let Some(async_db) = async_db {
         service::broadcast_sessions_updated_async(&state.sender, Some(async_db)).await;
         return;

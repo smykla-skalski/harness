@@ -50,11 +50,19 @@ async fn wait_for_shutdown(shutdown_rx: &mut tokio_watch::Receiver<bool>) {
 
 async fn run_logged_tick(state: &DaemonHttpState) {
     let request = TaskBoardOrchestratorRunOnceRequest::default();
-    match drive_task_board_orchestrator_once(task_board_orchestrator_status, || {
+    let result = drive_task_board_orchestrator_once(task_board_orchestrator_status, || {
         task_board_route_executor::run_once(state, request)
     })
-    .await
-    {
+    .await;
+    log_tick_result(result);
+}
+
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "tracing macro expansion; tokio-rs/tracing#553"
+)]
+fn log_tick_result(result: Result<bool, CliError>) {
+    match result {
         Ok(true) => tracing::debug!("task-board orchestrator autonomous tick completed"),
         Ok(false) => {}
         Err(error) => tracing::warn!(%error, "task-board orchestrator autonomous tick failed"),
