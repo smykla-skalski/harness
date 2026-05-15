@@ -15,11 +15,9 @@ struct SessionWindowRouteContentSelectionTests {
         "ForEach([SessionWindowRoute.overview, .timeline, .agents, .decisions])"
       )
     )
-    #expect(
-      sidebar.contains(
-        "routeSection\n      agentsSection\n      decisionsSection\n      tasksSection"
-      )
-    )
+    #expect(sidebar.contains("sidebarRouteSection"))
+    #expect(sidebar.contains("if showsDeferredSidebarSections {"))
+    #expect(sidebar.contains("pendingSidebarLoadingSection"))
     #expect(!sidebar.contains("Text(\"Routes\")"))
     #expect(!sidebar.contains(".padding(.top, HarnessMonitorTheme.spacingLG)"))
   }

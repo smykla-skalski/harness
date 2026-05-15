@@ -59,13 +59,18 @@ struct SessionSwiftUIOperationalSourceTests {
   func sessionSidebarKeepsStaticRoutesVisibleWhileDeferredRowsLoad() throws {
     let sidebarSource = try sourceFile(at: "Views/Sessions/SessionSidebar.swift")
 
-    #expect(sidebarSource.contains("private var pendingSidebarList: some View"))
+    #expect(sidebarSource.contains("@State private var showsDeferredSidebarSections = false"))
+    #expect(sidebarSource.contains("List(selection: nativeSelectionBinding) {"))
+    #expect(sidebarSource.contains("sidebarRouteSection"))
+    #expect(sidebarSource.contains("if showsDeferredSidebarSections {"))
+    #expect(sidebarSource.contains("private var sidebarRouteSection: some View"))
     #expect(sidebarSource.contains("private var pendingRouteSection: some View"))
     #expect(sidebarSource.contains("selectPendingRoute(route)"))
     #expect(sidebarSource.contains("ProgressView()"))
     #expect(sidebarSource.contains("\"Loading session items\""))
     #expect(sidebarSource.contains("sessionWindowSidebarDeferredLoader"))
     #expect(sidebarSource.contains("Agents, decisions, and tasks will appear shortly."))
+    #expect(!sidebarSource.contains("private var pendingSidebarList: some View"))
   }
 
   @Test("Disabled visual perf variants reuse base routes and skip optional session chrome")
