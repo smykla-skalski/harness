@@ -61,6 +61,7 @@ struct PolicyCanvasInspector: View {
       PolicyCanvasInspectorIssuesSection(viewModel: viewModel, selection: .edge(edge.id))
     } else {
       canvasSection
+      edgeKindCountsSection
     }
   }
 
@@ -282,9 +283,38 @@ struct PolicyCanvasInspector: View {
 
   private var canvasSection: some View {
     PolicyCanvasInspectorSection(title: "Canvas") {
-      PolicyCanvasInspectorRow(label: "Selection", value: "None")
-      PolicyCanvasInspectorRow(label: "Mode", value: viewModel.selectedTab.title)
+      // Mode is intentionally absent here. The Draft/Simulation/Promote
+      // segmented control above the canvas owns the mode display; an
+      // inspector row duplicating it wasted the panel on a value the
+      // user has already seen.
+      PolicyCanvasInspectorRow(label: "Nodes", value: "\(viewModel.nodes.count)")
+      PolicyCanvasInspectorRow(label: "Edges", value: "\(viewModel.edges.count)")
+      PolicyCanvasInspectorRow(label: "Groups", value: "\(viewModel.groups.count)")
+      PolicyCanvasInspectorRow(label: "Zoom", value: zoomDisplayValue)
     }
+  }
+
+  @ViewBuilder
+  private var edgeKindCountsSection: some View {
+    if !viewModel.edges.isEmpty {
+      let counts = viewModel.edgeCountsByKind
+      PolicyCanvasInspectorSection(title: "Edge kinds") {
+        ForEach(PolicyCanvasEdgeKind.allCases, id: \.self) { kind in
+          PolicyCanvasInspectorRow(
+            label: kind.accessibilityWord.capitalized,
+            value: "\(counts[kind, default: 0])"
+          )
+        }
+      }
+    }
+  }
+
+  /// Zoom percentage rendered without trailing decimals. Matches the
+  /// canvas chrome's HUD format so the two surfaces don't show
+  /// different precisions for the same value.
+  private var zoomDisplayValue: String {
+    let percent = Int((viewModel.zoom * 100).rounded())
+    return "\(percent)%"
   }
 
   @ViewBuilder
