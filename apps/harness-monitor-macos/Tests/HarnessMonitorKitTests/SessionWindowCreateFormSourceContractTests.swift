@@ -17,6 +17,7 @@ extension SessionWindowCreateFormMetricsTests {
     let form: String
     let submission: String
     let runtimePane: String
+    let runtimePaneSupport: String
     let helper: String
     let multiline: String
     let theme: String
@@ -27,6 +28,7 @@ extension SessionWindowCreateFormMetricsTests {
       form: sourceFile(named: "SessionWindowCreateForm.swift"),
       submission: sourceFile(named: "SessionWindowCreateForm+Submission.swift"),
       runtimePane: sourceFile(named: "SessionWindowCreateAgentRuntimePane.swift"),
+      runtimePaneSupport: sourceFile(named: "SessionWindowCreateAgentRuntimePane+Support.swift"),
       helper: sourceFile(named: "SessionWindowCreateForm+Helpers.swift"),
       multiline: previewableSourceFile(
         at: "Views/Shared/HarnessMonitorMultilineTextField.swift"),
@@ -42,7 +44,7 @@ extension SessionWindowCreateFormMetricsTests {
     #expect(source.submission.contains("SessionWindowCreateFormValidation.result"))
     #expect(source.form.contains("validationMessage(for: .name)"))
     #expect(source.form.contains("Validation error:"))
-    #expect(source.submission.contains("focusedField = .name"))
+    #expect(source.submission.contains("focusValidationField(validationResult.field)"))
     #expect(source.form.contains("LabeledContent(\"Name\")"))
     #expect(source.form.contains("LabeledContent(\"Prompt\")"))
     #expect(source.form.contains("Spacer(minLength: 0)"))
@@ -111,7 +113,8 @@ extension SessionWindowCreateFormMetricsTests {
     #expect(source.form.contains("Text(\"Session\")"))
     #expect(source.form.contains("Text(\"Advanced overrides\")"))
     #expect(!source.form.contains("Optional project directory override"))
-    #expect(source.runtimePane.contains("SessionWindowCreateProviderListRow"))
+    #expect(source.runtimePaneSupport.contains("SessionWindowCreateProviderListRow"))
+    #expect(source.runtimePane.contains("SessionWindowCreateProviderButtonList("))
     #expect(source.runtimePane.contains("HarnessMonitorColumnScrollView("))
     #expect(
       source.runtimePane.contains("SessionWindowCreateSidebarSectionHeader(title: \"Provider\")"))
@@ -127,9 +130,9 @@ extension SessionWindowCreateFormMetricsTests {
     #expect(
       !source.runtimePane.contains(
         ".padding(.horizontal, embeddedInForm ? 0 : HarnessMonitorTheme.spacingXS)"))
-    #expect(source.runtimePane.contains(".truncationMode(.tail)"))
+    #expect(source.runtimePaneSupport.contains(".truncationMode(.tail)"))
     #expect(!source.runtimePane.contains(".padding(.horizontal, HarnessMonitorTheme.spacingMD)"))
-    #expect(source.runtimePane.contains(".padding(.vertical, HarnessMonitorTheme.spacingXS)"))
+    #expect(source.runtimePaneSupport.contains(".padding(.vertical, HarnessMonitorTheme.spacingXS)"))
     #expect(!source.runtimePane.contains(".buttonStyle(.plain)"))
   }
 
