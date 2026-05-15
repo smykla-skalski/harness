@@ -55,6 +55,21 @@ extension PolicyCanvasViewModel {
     return nodeObstacles + groupObstacles
   }
 
+  /// Per-kind edge counts for the inspector empty-state breakdown.
+  /// Returns 0 for kinds with no edges so the inspector can render a
+  /// stable three-row layout (flow / control / error) regardless of
+  /// which kinds are present in the current document.
+  var edgeCountsByKind: [PolicyCanvasEdgeKind: Int] {
+    var counts: [PolicyCanvasEdgeKind: Int] = [:]
+    for kind in PolicyCanvasEdgeKind.allCases {
+      counts[kind] = 0
+    }
+    for edge in edges {
+      counts[edge.kind, default: 0] += 1
+    }
+    return counts
+  }
+
   var edgeRouteLanes: [String: Int] {
     let sortedEdges = edges.sorted { left, right in
       let leftKey = edgeLaneSortKey(left)
