@@ -44,8 +44,13 @@ final class ScenarioContractParityTests: XCTestCase {
                 "Tests/HarnessMonitorUITests/HarnessMonitorPerfTests+VisualOptions.swift",
             ]
         )
+        // Live-daemon scenarios cannot be measured by the XCUITest hitch harness
+        // because the host runner does not bring up a real daemon for them. The
+        // audit pipeline records them directly via `monitor:audit` instead.
         let expected = Set(
-            PerfScenarioDefinitions.all.map { testMethodName(for: $0.id, suffix: "HitchRate") }
+            PerfScenarioDefinitions.all
+                .filter { !$0.usesLiveDaemon }
+                .map { testMethodName(for: $0.id, suffix: "HitchRate") }
         ).union([
             testMethodName(for: "settings-database-scroll", suffix: "HitchRate"),
         ])

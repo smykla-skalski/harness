@@ -18,6 +18,7 @@ public struct HarnessMonitorColumnScrollView<
   public let bottomInsetSpacing: CGFloat
   public let scrollSurfaceIdentifier: String?
   public let scrollSurfaceLabel: String?
+  private let externalScrollPosition: Binding<ScrollPosition>?
   private let content: Content
   private let underlay: Underlay?
   private let overlay: Overlay?
@@ -35,6 +36,7 @@ public struct HarnessMonitorColumnScrollView<
     bottomScrollContentMargin: CGFloat = 0,
     scrollSurfaceIdentifier: String? = nil,
     scrollSurfaceLabel: String? = nil,
+    scrollPosition: Binding<ScrollPosition>? = nil,
     @ViewBuilder content: () -> Content
   ) where Underlay == EmptyView, Overlay == EmptyView, BottomInset == EmptyView {
     self.horizontalPadding = horizontalPadding
@@ -46,6 +48,7 @@ public struct HarnessMonitorColumnScrollView<
     bottomInsetSpacing = 0
     self.scrollSurfaceIdentifier = scrollSurfaceIdentifier
     self.scrollSurfaceLabel = scrollSurfaceLabel
+    externalScrollPosition = scrollPosition
     self.content = content()
     underlay = nil
     overlay = nil
@@ -62,6 +65,7 @@ public struct HarnessMonitorColumnScrollView<
     bottomInsetSpacing: CGFloat = 0,
     scrollSurfaceIdentifier: String? = nil,
     scrollSurfaceLabel: String? = nil,
+    scrollPosition: Binding<ScrollPosition>? = nil,
     @ViewBuilder bottomInset: () -> BottomInset,
     @ViewBuilder content: () -> Content
   ) where Underlay == EmptyView, Overlay == EmptyView {
@@ -74,6 +78,7 @@ public struct HarnessMonitorColumnScrollView<
     self.bottomInsetSpacing = bottomInsetSpacing
     self.scrollSurfaceIdentifier = scrollSurfaceIdentifier
     self.scrollSurfaceLabel = scrollSurfaceLabel
+    externalScrollPosition = scrollPosition
     self.content = content()
     underlay = nil
     overlay = nil
@@ -89,6 +94,7 @@ public struct HarnessMonitorColumnScrollView<
     bottomScrollContentMargin: CGFloat = 0,
     scrollSurfaceIdentifier: String? = nil,
     scrollSurfaceLabel: String? = nil,
+    scrollPosition: Binding<ScrollPosition>? = nil,
     @ViewBuilder underlay: () -> Underlay,
     @ViewBuilder content: () -> Content
   ) where Overlay == EmptyView, BottomInset == EmptyView {
@@ -101,6 +107,7 @@ public struct HarnessMonitorColumnScrollView<
     bottomInsetSpacing = 0
     self.scrollSurfaceIdentifier = scrollSurfaceIdentifier
     self.scrollSurfaceLabel = scrollSurfaceLabel
+    externalScrollPosition = scrollPosition
     self.content = content()
     self.underlay = underlay()
     overlay = nil
@@ -116,6 +123,7 @@ public struct HarnessMonitorColumnScrollView<
     bottomScrollContentMargin: CGFloat = 0,
     scrollSurfaceIdentifier: String? = nil,
     scrollSurfaceLabel: String? = nil,
+    scrollPosition: Binding<ScrollPosition>? = nil,
     @ViewBuilder overlay: () -> Overlay,
     @ViewBuilder content: () -> Content
   ) where Underlay == EmptyView, BottomInset == EmptyView {
@@ -128,6 +136,7 @@ public struct HarnessMonitorColumnScrollView<
     bottomInsetSpacing = 0
     self.scrollSurfaceIdentifier = scrollSurfaceIdentifier
     self.scrollSurfaceLabel = scrollSurfaceLabel
+    externalScrollPosition = scrollPosition
     self.content = content()
     underlay = nil
     self.overlay = overlay()
@@ -143,6 +152,7 @@ public struct HarnessMonitorColumnScrollView<
     bottomScrollContentMargin: CGFloat = 0,
     scrollSurfaceIdentifier: String? = nil,
     scrollSurfaceLabel: String? = nil,
+    scrollPosition: Binding<ScrollPosition>? = nil,
     @ViewBuilder underlay: () -> Underlay,
     @ViewBuilder overlay: () -> Overlay,
     @ViewBuilder content: () -> Content
@@ -156,6 +166,7 @@ public struct HarnessMonitorColumnScrollView<
     bottomInsetSpacing = 0
     self.scrollSurfaceIdentifier = scrollSurfaceIdentifier
     self.scrollSurfaceLabel = scrollSurfaceLabel
+    externalScrollPosition = scrollPosition
     self.content = content()
     self.underlay = underlay()
     self.overlay = overlay()
@@ -205,6 +216,7 @@ public struct HarnessMonitorColumnScrollView<
     .scrollClipDisabled(underlay != nil)
     .contentMargins(.bottom, bottomScrollContentMargin, for: .scrollContent)
     .modifier(TopScrollEdgeEffectModifier(effect: topScrollEdgeEffect))
+    .modifier(ExternalScrollPositionModifier(binding: externalScrollPosition))
     .harnessPrimaryContentScrollSurface(
       listIdentifier: scrollSurfaceIdentifier,
       listLabel: scrollSurfaceLabel
@@ -248,6 +260,21 @@ private struct TopScrollEdgeEffectModifier: ViewModifier {
       content.scrollEdgeEffectStyle(.soft, for: .top)
     case .hard:
       content.scrollEdgeEffectStyle(.soft, for: .top)
+    }
+  }
+}
+
+/// Applies `.scrollPosition` only when the caller supplied a binding so the shared
+/// scroll-view stays inert for the common case while perf scenarios opt in.
+private struct ExternalScrollPositionModifier: ViewModifier {
+  let binding: Binding<ScrollPosition>?
+
+  @ViewBuilder
+  func body(content: Content) -> some View {
+    if let binding {
+      content.scrollPosition(binding)
+    } else {
+      content
     }
   }
 }

@@ -109,6 +109,8 @@ enum HarnessMonitorPerfDriver {
       }
       await settle(.milliseconds(2_800))
       return .completed
+    case .dashboardLiveScroll:
+      return await runDashboardLiveScrollScenario(store: store)
     case .policyCanvas,
       .agentDetailForm,
       .agentDetailFormVisualOptionsDisabled,
@@ -168,7 +170,8 @@ enum HarnessMonitorPerfDriver {
       .taskBoardSettings,
       .timelineBurst,
       .toastOverlayChurn,
-      .offlineCachedOpen:
+      .offlineCachedOpen,
+      .dashboardLiveScroll:
       return nil
     }
   }
@@ -203,7 +206,8 @@ enum HarnessMonitorPerfDriver {
       .permissionModal,
       .timelineBurst,
       .toastOverlayChurn,
-      .offlineCachedOpen:
+      .offlineCachedOpen,
+      .dashboardLiveScroll:
       return nil
     }
   }
@@ -238,7 +242,8 @@ enum HarnessMonitorPerfDriver {
       .taskBoardSettings,
       .settingsBackdropCycle,
       .settingsBackgroundCycle,
-      .offlineCachedOpen:
+      .offlineCachedOpen,
+      .dashboardLiveScroll:
       return .failed("unsupported-scenario")
     }
   }
