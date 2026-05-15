@@ -72,6 +72,13 @@ pub(super) struct NativeSshCommitSignature {
 }
 
 #[derive(Debug, PartialEq, Eq)]
+pub(super) struct NativeSshCommitObject {
+    pub(super) commit_payload: Vec<u8>,
+    pub(super) signature: NativeSshCommitSignature,
+    pub(super) unsigned_payload: String,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(super) enum NativeGitTransportReason {
     ConfiguredSshSigning,
     ExistingSshSignature,
