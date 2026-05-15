@@ -255,15 +255,17 @@ struct SessionWindowRouteContentMetricsTests {
     #expect(laneSource.contains("TaskBoardLaneDropPolicy.moveFirstPayload("))
     #expect(laneSupportSource.contains("TaskBoardInboxDropPolicy"))
     #expect(laneSupportSource.contains("payload.sourceLane != destination"))
-    #expect(needsYouSource.contains("payload.sourceLane != .needsYou"))
+    #expect(needsYouSource.contains("TaskBoardLaneDropPolicy.moveFirstPayload("))
     #expect(laneSource.contains(".draggable(dragPayload)"))
+    #expect(laneSource.contains(".onDrag"))
+    #expect(laneSource.contains("handleLegacyDrop"))
     #expect(laneSource.contains(".dropDestination(for: TaskBoardItemDragPayload.self"))
     #expect(laneSource.contains(".dropDestination(for: TaskBoardInboxItemDragPayload.self"))
     #expect(needsYouSource.contains(".dropDestination(for: TaskBoardItemDragPayload.self"))
   }
 
-  @Test("Task board lanes keep card column chrome")
-  func taskBoardLanesKeepCardColumnChrome() throws {
+  @Test("Task board lanes keep board column chrome")
+  func taskBoardLanesKeepBoardColumnChrome() throws {
     let laneSource = try taskBoardSourceFile(named: "TaskBoardLaneViews.swift")
     let laneSupportSource = try taskBoardSourceFile(named: "TaskBoardLaneSupport.swift")
     let overviewSource = try taskBoardSourceFile(named: "TaskBoardOverviewView.swift")
@@ -271,7 +273,8 @@ struct SessionWindowRouteContentMetricsTests {
     #expect(laneSource.contains(".taskBoardLaneColumnChrome("))
     #expect(laneSupportSource.contains("private struct TaskBoardLaneColumnChrome"))
     #expect(laneSupportSource.contains("private var laneFill: AnyShapeStyle"))
-    #expect(laneSupportSource.contains("strokeBorder(laneStrokeColor"))
+    #expect(laneSupportSource.contains("private var laneSeparatorColor: Color"))
+    #expect(laneSupportSource.contains("private var laneAccentHeight: CGFloat"))
     #expect(!overviewSource.contains("Board-owned work awaiting progression."))
     #expect(!overviewSource.contains("Open work pulled from active sessions."))
   }
