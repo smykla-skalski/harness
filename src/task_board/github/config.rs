@@ -20,6 +20,8 @@ pub struct GitHubProjectConfig {
     pub labels: GitHubAutomationLabels,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub protected_paths: Vec<ProtectedPathRule>,
+    #[serde(default, skip_serializing_if = "GitHubRequestedReviewers::is_empty")]
+    pub requested_reviewers: GitHubRequestedReviewers,
     #[serde(default)]
     pub enabled_automations: GitHubAutomationToggles,
 }
@@ -59,6 +61,14 @@ pub struct GitHubAutomationToggles {
     pub enabled: Vec<GitHubAutomation>,
 }
 
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct GitHubRequestedReviewers {
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub reviewers: Vec<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub team_reviewers: Vec<String>,
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum GitHubAutomation {
@@ -87,6 +97,7 @@ impl GitHubProjectConfig {
             merge_method: GitHubMergeMethod::Squash,
             labels: GitHubAutomationLabels::default(),
             protected_paths: Vec::new(),
+            requested_reviewers: GitHubRequestedReviewers::default(),
             enabled_automations: GitHubAutomationToggles::default(),
         }
     }
@@ -113,6 +124,7 @@ impl Default for GitHubProjectConfig {
             merge_method: GitHubMergeMethod::Squash,
             labels: GitHubAutomationLabels::default(),
             protected_paths: Vec::new(),
+            requested_reviewers: GitHubRequestedReviewers::default(),
             enabled_automations: GitHubAutomationToggles::default(),
         }
     }
@@ -150,6 +162,23 @@ impl GitHubAutomationToggles {
     }
 }
 
+impl GitHubRequestedReviewers {
+    #[must_use]
+    pub fn is_empty(&self) -> bool {
+        self.reviewers.is_empty() && self.team_reviewers.is_empty()
+    }
+
+    #[must_use]
+    pub fn normalized_reviewers(&self) -> Vec<String> {
+        normalized_entries(&self.reviewers)
+    }
+
+    #[must_use]
+    pub fn normalized_team_reviewers(&self) -> Vec<String> {
+        normalized_entries(&self.team_reviewers)
+    }
+}
+
 impl ProtectedPathRule {
     #[must_use]
     pub fn new(pattern: impl Into<String>) -> Self {
@@ -180,4 +209,17 @@ fn normalize_path(path: impl AsRef<str>) -> String {
 
 fn directory_prefix(path: &str) -> String {
     format!("{path}/")
+}
+
+fn normalized_entries(entries: &[String]) -> Vec<String> {
+    let mut normalized = entries
+        .iter()
+        .filter_map(|entry| {
+            let trimmed = entry.trim();
+            (!trimmed.is_empty()).then(|| trimmed.to_string())
+        })
+        .collect::<Vec<_>>();
+    normalized.sort();
+    normalized.dedup();
+    normalized
 }

@@ -29,6 +29,8 @@ pub struct GitHubPullRequestHandle {
     pub draft: bool,
     pub merged: bool,
     pub head_sha: String,
+    pub requested_reviewers: Vec<String>,
+    pub requested_team_reviewers: Vec<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -224,6 +226,25 @@ impl GitHubAutomationClient for GitHubApiAutomationClient {
         self.get_pull_request(config, pull_request_number).await
     }
 
+    async fn request_pull_request_reviewers(
+        &self,
+        config: &GitHubProjectConfig,
+        pull_request_number: u64,
+        reviewers: &[String],
+        team_reviewers: &[String],
+    ) -> Result<(), CliError> {
+        self.client
+            .pulls(config.owner.as_str(), config.repo.as_str())
+            .request_reviews(
+                pull_request_number,
+                reviewers.to_vec(),
+                team_reviewers.to_vec(),
+            )
+            .await
+            .map(|_| ())
+            .map_err(operation_error)
+    }
+
     async fn sync_pull_request_labels(
         &self,
         config: &GitHubProjectConfig,
@@ -310,6 +331,16 @@ fn handle_from_pull_request(pull_request: &models::pulls::PullRequest) -> GitHub
         draft: pull_request.draft.unwrap_or(false),
         merged: pull_request.merged,
         head_sha: pull_request.head.sha.clone(),
+        requested_reviewers: pull_request
+            .requested_reviewers
+            .iter()
+            .map(|reviewer| reviewer.login.clone())
+            .collect(),
+        requested_team_reviewers: pull_request
+            .requested_teams
+            .iter()
+            .map(|team| team.slug.clone())
+            .collect(),
     }
 }
 
