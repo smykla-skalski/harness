@@ -249,7 +249,12 @@ extension HarnessMonitorStore {
         isLaunchAgentInstalled: daemonStatus?.launchAgent.installed == true,
         taskBoardItems: globalTaskBoardItems,
         taskBoardOrchestratorStatus: globalTaskBoardOrchestratorStatus,
+        taskBoardSyncSummary: globalTaskBoardSyncSummary,
+        taskBoardDispatchSummary: globalTaskBoardDispatchSummary,
         taskBoardEvaluationSummary: globalTaskBoardEvaluationSummary,
+        taskBoardItemAuditSummary: globalTaskBoardItemAuditSummary,
+        taskBoardProjects: globalTaskBoardProjects,
+        taskBoardMachines: globalTaskBoardMachines,
         taskBoardPolicyPipeline: globalTaskBoardPolicyPipeline,
         taskBoardPolicySimulation: globalTaskBoardPolicySimulation,
         taskBoardPolicyAudit: globalTaskBoardPolicyAudit

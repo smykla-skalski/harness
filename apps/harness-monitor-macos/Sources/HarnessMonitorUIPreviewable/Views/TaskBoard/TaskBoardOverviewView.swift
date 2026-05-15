@@ -4,6 +4,7 @@ import SwiftUI
 public struct TaskBoardOverviewView: View {
   let snapshot: TaskBoardInboxSnapshot
   let taskBoardItems: [TaskBoardItem]
+  let store: HarnessMonitorStore?
   let orchestratorStatus: TaskBoardOrchestratorStatus?
   let evaluationSummary: TaskBoardEvaluationSummary?
   let decisions: [Decision]
@@ -37,6 +38,7 @@ public struct TaskBoardOverviewView: View {
   public init(
     snapshot: TaskBoardInboxSnapshot,
     taskBoardItems: [TaskBoardItem] = [],
+    store: HarnessMonitorStore? = nil,
     orchestratorStatus: TaskBoardOrchestratorStatus? = nil,
     evaluationSummary: TaskBoardEvaluationSummary? = nil,
     decisions: [Decision] = [],
@@ -61,6 +63,7 @@ public struct TaskBoardOverviewView: View {
   ) {
     self.snapshot = snapshot
     self.taskBoardItems = Self.sortedTaskBoardItems(taskBoardItems)
+    self.store = store
     self.orchestratorStatus = orchestratorStatus
     self.evaluationSummary = evaluationSummary
     self.decisions = Self.sortedDecisions(decisions)
@@ -87,11 +90,7 @@ public struct TaskBoardOverviewView: View {
   public var body: some View {
     VStack(alignment: .leading, spacing: HarnessMonitorTheme.sectionSpacing) {
       header
-      if snapshot.isEmpty && taskBoardItems.isEmpty && decisions.isEmpty
-        && orchestratorStatus == nil
-      {
-        emptyState
-      } else {
+      if hasRouteContent || store != nil {
         if let orchestratorStatus {
           TaskBoardOrchestratorSummaryView(
             status: orchestratorStatus,
@@ -103,6 +102,12 @@ public struct TaskBoardOverviewView: View {
           )
         } else if let evaluationSummary {
           evaluationSummaryRow(evaluationSummary)
+        }
+        if let store {
+          TaskBoardOperationsPanel(store: store, taskBoardItems: taskBoardItems)
+        }
+        if !hasRouteContent {
+          emptyState
         }
         if !taskBoardItems.isEmpty || !decisions.isEmpty {
           taskBoard
@@ -128,6 +133,8 @@ public struct TaskBoardOverviewView: View {
         if !snapshot.isEmpty {
           sessionTaskBoard
         }
+      } else {
+        emptyState
       }
     }
     .frame(maxWidth: .infinity, alignment: .leading)
@@ -137,6 +144,11 @@ public struct TaskBoardOverviewView: View {
 }
 
 extension TaskBoardOverviewView {
+  private var hasRouteContent: Bool {
+    !snapshot.isEmpty || !taskBoardItems.isEmpty || !decisions.isEmpty || orchestratorStatus != nil
+      || evaluationSummary != nil
+  }
+
   private var header: some View {
     ViewThatFits(in: .horizontal) {
       HStack(alignment: .top, spacing: HarnessMonitorTheme.spacingMD) {

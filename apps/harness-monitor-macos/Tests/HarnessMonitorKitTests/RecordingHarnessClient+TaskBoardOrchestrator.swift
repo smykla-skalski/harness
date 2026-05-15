@@ -124,6 +124,57 @@ extension RecordingHarnessClient {
     }
   }
 
+  func dispatchTaskBoard(
+    request: TaskBoardDispatchRequest
+  ) async throws -> TaskBoardDispatchSummary {
+    calls.append(
+      .dispatchTaskBoard(
+        dryRun: request.dryRun,
+        status: request.status,
+        itemID: request.itemId,
+        projectDir: request.projectDir,
+        actor: request.actor
+      )
+    )
+    return lock.withLock {
+      let matching = filteredTaskBoardItems(status: request.status, itemId: request.itemId)
+      var applied: [TaskBoardDispatchAppliedTask] = []
+      let plans = matching.map { item in
+        if request.dryRun {
+          return sampleDispatchPlan(for: item)
+        }
+
+        let updated = item.applying(
+          TaskBoardUpdateItemRequest(
+            status: .inProgress,
+            workflow: TaskBoardWorkflowState(
+              executionId: "exec-\(item.id)",
+              status: .running,
+              currentStepId: "dispatch",
+              attempts: (item.workflow?.attempts ?? 0) + 1,
+              branch: item.workflow?.branch ?? "task-board/\(item.id)",
+              worktree: item.workflow?.worktree,
+              policyTraceIds: ["trace-\(item.id)"]
+            ),
+            sessionId: item.sessionId ?? "sess-\(item.id)",
+            workItemId: item.workItemId ?? "task-\(item.id)"
+          )
+        )
+        replaceTaskBoardItem(updated)
+        applied.append(
+          TaskBoardDispatchAppliedTask(
+            boardItemId: updated.id,
+            sessionId: updated.sessionId ?? "sess-\(updated.id)",
+            workItemId: updated.workItemId ?? "task-\(updated.id)",
+            item: updated
+          )
+        )
+        return sampleDispatchPlan(for: updated)
+      }
+      return TaskBoardDispatchSummary(plans: plans, applied: applied)
+    }
+  }
+
   func taskBoardOrchestratorStatus() async throws -> TaskBoardOrchestratorStatus {
     recordReadCall(.taskBoardOrchestratorStatus)
     return sampleTaskBoardOrchestratorStatus()
@@ -181,6 +232,76 @@ extension RecordingHarnessClient {
         )
       ]
     )
+  }
+
+  func auditTaskBoard(status: TaskBoardStatus?) async throws -> TaskBoardAuditSummary {
+    calls.append(.auditTaskBoard(status: status))
+    return lock.withLock {
+      if let summary = taskBoardAuditSummaryStorage {
+        return summary
+      }
+      let items = filteredTaskBoardItems(status: status, itemId: nil)
+      return TaskBoardAuditSummary(
+        total: items.count,
+        ready: items.count { $0.status == .todo },
+        blocked: items.count { $0.status == .blocked },
+        deleted: 0,
+        byStatus: statusCounts(for: items)
+      )
+    }
+  }
+
+  func taskBoardProjects(status: TaskBoardStatus?) async throws -> [TaskBoardProjectSummary] {
+    calls.append(.taskBoardProjects(status: status))
+    return lock.withLock {
+      if let summaries = taskBoardProjectSummariesStorage {
+        return summaries
+      }
+      let grouped = Dictionary(
+        grouping: filteredTaskBoardItems(status: status, itemId: nil)
+          .filter { $0.projectId != nil },
+        by: \.projectId
+      )
+      return grouped.compactMap { key, items in
+        guard let projectId = key else {
+          return nil
+        }
+        return TaskBoardProjectSummary(
+          projectId: projectId,
+          itemCount: items.count,
+          readyCount: items.count { $0.status == .todo }
+        )
+      }
+      .sorted { lhs, rhs in
+        if lhs.readyCount == rhs.readyCount {
+          return lhs.projectId < rhs.projectId
+        }
+        return lhs.readyCount > rhs.readyCount
+      }
+    }
+  }
+
+  func taskBoardMachines(status: TaskBoardStatus?) async throws -> [TaskBoardMachineSummary] {
+    calls.append(.taskBoardMachines(status: status))
+    return lock.withLock {
+      if let summaries = taskBoardMachineSummariesStorage {
+        return summaries
+      }
+      let grouped = Dictionary(grouping: filteredTaskBoardItems(status: status, itemId: nil), by: \.agentMode)
+      return grouped.map { mode, items in
+        TaskBoardMachineSummary(
+          mode: mode,
+          itemCount: items.count,
+          readyCount: items.count { $0.status == .todo }
+        )
+      }
+      .sorted { lhs, rhs in
+        if lhs.readyCount == rhs.readyCount {
+          return lhs.mode.title < rhs.mode.title
+        }
+        return lhs.readyCount > rhs.readyCount
+      }
+    }
   }
 
   func taskBoardOrchestratorSettings() async throws -> TaskBoardOrchestratorSettings {
@@ -315,6 +436,68 @@ extension RecordingHarnessClient {
           )
         )
       ]
+    )
+  }
+
+  private func filteredTaskBoardItems(
+    status: TaskBoardStatus?,
+    itemId: String?
+  ) -> [TaskBoardItem] {
+    taskBoardItemsStorage.filter { item in
+      (status == nil || item.status == status) && (itemId == nil || item.id == itemId)
+    }
+  }
+
+  private func replaceTaskBoardItem(_ item: TaskBoardItem) {
+    guard let index = taskBoardItemsStorage.firstIndex(where: { $0.id == item.id }) else {
+      taskBoardItemsStorage.append(item)
+      return
+    }
+    taskBoardItemsStorage[index] = item
+  }
+
+  private func statusCounts(for items: [TaskBoardItem]) -> [TaskBoardStatusCount] {
+    let totals = Dictionary(grouping: items, by: \.status)
+    return TaskBoardStatus.allCases.compactMap { status in
+      guard let itemsForStatus = totals[status], !itemsForStatus.isEmpty else {
+        return nil
+      }
+      return TaskBoardStatusCount(status: status, count: itemsForStatus.count)
+    }
+  }
+
+  private func sampleDispatchPlan(for item: TaskBoardItem) -> TaskBoardDispatchPlan {
+    TaskBoardDispatchPlan(
+      boardItemId: item.id,
+      readiness: TaskBoardDispatchReadiness(state: "ready", reason: nil),
+      session: TaskBoardSessionIntent(
+        kind: item.sessionId == nil ? "create" : "existing",
+        sessionId: item.sessionId,
+        title: item.title,
+        context: item.body,
+        projectId: item.projectId
+      ),
+      task: TaskBoardTaskCreationIntent(
+        title: item.title,
+        context: item.body,
+        severity: .medium,
+        suggestedFix: item.planning.summary,
+        source: .manual,
+        tags: item.tags,
+        externalRefs: item.externalRefs
+      ),
+      worker: TaskBoardWorkerIntent(mode: item.agentMode),
+      reviewer: TaskBoardReviewerIntent(
+        phase: "review",
+        suggestedPersona: "reviewer",
+        requiredConsensus: 1
+      ),
+      evaluator: TaskBoardEvaluatorIntent(phase: "evaluate", mode: .evaluate),
+      policy: TaskBoardPolicyDecision(
+        decision: "allow",
+        reasonCode: "test_allow",
+        policyVersion: "test"
+      )
     )
   }
 }

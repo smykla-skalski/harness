@@ -45,7 +45,10 @@ extension HarnessMonitorStore {
     }
     isDaemonActionInFlight = true
     defer { isDaemonActionInFlight = false }
-    _ = await syncAndRefreshTaskBoardDashboard(using: client)
+    _ = await syncAndRefreshTaskBoardDashboard(
+      using: client,
+      request: Self.taskBoardDashboardSyncRequest
+    )
   }
 
   @discardableResult
@@ -228,6 +231,111 @@ extension HarnessMonitorStore {
     }
   }
 
+  @discardableResult
+  public func syncTaskBoard(request: TaskBoardSyncRequest) async -> Bool {
+    guard let client else {
+      return false
+    }
+    isDaemonActionInFlight = true
+    defer { isDaemonActionInFlight = false }
+    return await syncAndRefreshTaskBoardDashboard(
+      using: client,
+      request: request,
+      successMessage: "Synced task board"
+    )
+  }
+
+  @discardableResult
+  public func dispatchTaskBoard(request: TaskBoardDispatchRequest) async -> Bool {
+    guard let client else {
+      return false
+    }
+    isDaemonActionInFlight = true
+    defer { isDaemonActionInFlight = false }
+
+    do {
+      let measuredSummary = try await Self.measureOperation {
+        try await client.dispatchTaskBoard(request: request)
+      }
+      recordRequestSuccess()
+      globalTaskBoardDispatchSummary = measuredSummary.value
+      await refreshTaskBoardDashboardSnapshot(using: client)
+      presentSuccessFeedback(
+        request.dryRun ? "Prepared task board dispatch" : "Dispatched task board"
+      )
+      return true
+    } catch {
+      presentFailureFeedback(error.localizedDescription)
+      return false
+    }
+  }
+
+  @discardableResult
+  public func auditTaskBoard(status: TaskBoardStatus? = nil) async -> Bool {
+    guard let client else {
+      return false
+    }
+    isDaemonActionInFlight = true
+    defer { isDaemonActionInFlight = false }
+
+    do {
+      let measuredSummary = try await Self.measureOperation {
+        try await client.auditTaskBoard(status: status)
+      }
+      recordRequestSuccess()
+      globalTaskBoardItemAuditSummary = measuredSummary.value
+      presentSuccessFeedback("Loaded task board audit")
+      return true
+    } catch {
+      presentFailureFeedback(error.localizedDescription)
+      return false
+    }
+  }
+
+  @discardableResult
+  public func refreshTaskBoardProjects(status: TaskBoardStatus? = nil) async -> Bool {
+    guard let client else {
+      return false
+    }
+    isDaemonActionInFlight = true
+    defer { isDaemonActionInFlight = false }
+
+    do {
+      let measuredProjects = try await Self.measureOperation {
+        try await client.taskBoardProjects(status: status)
+      }
+      recordRequestSuccess()
+      globalTaskBoardProjects = measuredProjects.value
+      presentSuccessFeedback("Loaded task board projects")
+      return true
+    } catch {
+      presentFailureFeedback(error.localizedDescription)
+      return false
+    }
+  }
+
+  @discardableResult
+  public func refreshTaskBoardMachines(status: TaskBoardStatus? = nil) async -> Bool {
+    guard let client else {
+      return false
+    }
+    isDaemonActionInFlight = true
+    defer { isDaemonActionInFlight = false }
+
+    do {
+      let measuredMachines = try await Self.measureOperation {
+        try await client.taskBoardMachines(status: status)
+      }
+      recordRequestSuccess()
+      globalTaskBoardMachines = measuredMachines.value
+      presentSuccessFeedback("Loaded task board machines")
+      return true
+    } catch {
+      presentFailureFeedback(error.localizedDescription)
+      return false
+    }
+  }
+
   private func mutateTaskBoardPlanning(
     actionName: String,
     mutation:
@@ -300,14 +408,20 @@ extension HarnessMonitorStore {
   @discardableResult
   func syncAndRefreshTaskBoardDashboard(
     using client: any HarnessMonitorClientProtocol,
+    request: TaskBoardSyncRequest,
+    successMessage: String? = nil,
     failureMessagePrefix: String? = nil
   ) async -> Bool {
     do {
-      _ = try await Self.measureOperation {
-        try await client.syncTaskBoard(request: Self.taskBoardDashboardSyncRequest)
+      let measuredSummary = try await Self.measureOperation {
+        try await client.syncTaskBoard(request: request)
       }
       recordRequestSuccess()
+      globalTaskBoardSyncSummary = measuredSummary.value
       await refreshTaskBoardDashboardSnapshot(using: client)
+      if let successMessage {
+        presentSuccessFeedback(successMessage)
+      }
       return true
     } catch {
       await refreshTaskBoardDashboardSnapshot(using: client)

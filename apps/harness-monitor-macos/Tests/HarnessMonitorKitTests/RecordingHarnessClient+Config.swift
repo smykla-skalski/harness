@@ -152,6 +152,24 @@ extension RecordingHarnessClient {
     }
   }
 
+  func configureTaskBoardAudit(_ summary: TaskBoardAuditSummary?) {
+    lock.withLock {
+      taskBoardAuditSummaryStorage = summary
+    }
+  }
+
+  func configureTaskBoardProjects(_ projects: [TaskBoardProjectSummary]?) {
+    lock.withLock {
+      taskBoardProjectSummariesStorage = projects
+    }
+  }
+
+  func configureTaskBoardMachines(_ machines: [TaskBoardMachineSummary]?) {
+    lock.withLock {
+      taskBoardMachineSummariesStorage = machines
+    }
+  }
+
   func configureDetailDelay(_ delay: Duration?, for sessionID: String) {
     lock.withLock {
       if let delay {

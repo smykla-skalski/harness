@@ -88,4 +88,21 @@ struct PreviewHarnessClientTaskBoardTests {
     #expect(approved.item.status == .todo)
     #expect(approved.item.planning.approvedBy == "preview-user")
   }
+
+  @Test("Preview client returns task board audit and catalog summaries")
+  func previewClientReturnsTaskBoardAuditAndCatalogSummaries() async throws {
+    let client = PreviewHarnessClient(
+      fixtures: .taskBoardBoardOnly,
+      isLaunchAgentInstalled: true
+    )
+
+    let audit = try await client.auditTaskBoard(status: nil)
+    let projects = try await client.taskBoardProjects(status: nil)
+    let machines = try await client.taskBoardMachines(status: nil)
+
+    #expect(audit.total >= 1)
+    #expect(audit.ready >= 1)
+    #expect(!projects.isEmpty)
+    #expect(!machines.isEmpty)
+  }
 }

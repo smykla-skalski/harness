@@ -50,9 +50,39 @@ public final class HarnessMonitorStore {
       scheduleUISync([.contentDashboard])
     }
   }
+  public var globalTaskBoardSyncSummary: TaskBoardSyncSummary? {
+    didSet {
+      guard oldValue != globalTaskBoardSyncSummary else { return }
+      scheduleUISync([.contentDashboard])
+    }
+  }
+  public var globalTaskBoardDispatchSummary: TaskBoardDispatchSummary? {
+    didSet {
+      guard oldValue != globalTaskBoardDispatchSummary else { return }
+      scheduleUISync([.contentDashboard])
+    }
+  }
   public var globalTaskBoardEvaluationSummary: TaskBoardEvaluationSummary? {
     didSet {
       guard oldValue != globalTaskBoardEvaluationSummary else { return }
+      scheduleUISync([.contentDashboard])
+    }
+  }
+  public var globalTaskBoardItemAuditSummary: TaskBoardAuditSummary? {
+    didSet {
+      guard oldValue != globalTaskBoardItemAuditSummary else { return }
+      scheduleUISync([.contentDashboard])
+    }
+  }
+  public var globalTaskBoardProjects: [TaskBoardProjectSummary]? {
+    didSet {
+      guard oldValue != globalTaskBoardProjects else { return }
+      scheduleUISync([.contentDashboard])
+    }
+  }
+  public var globalTaskBoardMachines: [TaskBoardMachineSummary]? {
+    didSet {
+      guard oldValue != globalTaskBoardMachines else { return }
       scheduleUISync([.contentDashboard])
     }
   }

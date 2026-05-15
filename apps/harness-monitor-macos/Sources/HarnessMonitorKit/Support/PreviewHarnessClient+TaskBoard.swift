@@ -64,6 +64,21 @@ extension PreviewHarnessClient {
     return await state.dispatchTaskBoard(request: request)
   }
 
+  public func auditTaskBoard(status: TaskBoardStatus?) async throws -> TaskBoardAuditSummary {
+    try await performActionDelay()
+    return await state.auditTaskBoard(status: status)
+  }
+
+  public func taskBoardProjects(status: TaskBoardStatus?) async throws -> [TaskBoardProjectSummary] {
+    try await performActionDelay()
+    return await state.taskBoardProjects(status: status)
+  }
+
+  public func taskBoardMachines(status: TaskBoardStatus?) async throws -> [TaskBoardMachineSummary] {
+    try await performActionDelay()
+    return await state.taskBoardMachines(status: status)
+  }
+
   public func evaluateTaskBoard(
     request: TaskBoardEvaluateRequest
   ) async throws -> TaskBoardEvaluationSummary {

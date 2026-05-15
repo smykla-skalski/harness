@@ -307,7 +307,12 @@ extension HarnessMonitorStore {
     public var isLaunchAgentInstalled = false
     public var taskBoardItems: [TaskBoardItem] = []
     public var taskBoardOrchestratorStatus: TaskBoardOrchestratorStatus?
+    public var taskBoardSyncSummary: TaskBoardSyncSummary?
+    public var taskBoardDispatchSummary: TaskBoardDispatchSummary?
     public var taskBoardEvaluationSummary: TaskBoardEvaluationSummary?
+    public var taskBoardItemAuditSummary: TaskBoardAuditSummary?
+    public var taskBoardProjects: [TaskBoardProjectSummary]?
+    public var taskBoardMachines: [TaskBoardMachineSummary]?
     public var taskBoardPolicyPipeline: TaskBoardPolicyPipelineDocument?
     public var taskBoardPolicySimulation: TaskBoardPolicyPipelineSimulationResult?
     public var taskBoardPolicyAudit: TaskBoardPolicyPipelineAuditSummary?
@@ -333,8 +338,23 @@ extension HarnessMonitorStore {
       if taskBoardOrchestratorStatus != state.taskBoardOrchestratorStatus {
         taskBoardOrchestratorStatus = state.taskBoardOrchestratorStatus
       }
+      if taskBoardSyncSummary != state.taskBoardSyncSummary {
+        taskBoardSyncSummary = state.taskBoardSyncSummary
+      }
+      if taskBoardDispatchSummary != state.taskBoardDispatchSummary {
+        taskBoardDispatchSummary = state.taskBoardDispatchSummary
+      }
       if taskBoardEvaluationSummary != state.taskBoardEvaluationSummary {
         taskBoardEvaluationSummary = state.taskBoardEvaluationSummary
+      }
+      if taskBoardItemAuditSummary != state.taskBoardItemAuditSummary {
+        taskBoardItemAuditSummary = state.taskBoardItemAuditSummary
+      }
+      if taskBoardProjects != state.taskBoardProjects {
+        taskBoardProjects = state.taskBoardProjects
+      }
+      if taskBoardMachines != state.taskBoardMachines {
+        taskBoardMachines = state.taskBoardMachines
       }
       if taskBoardPolicyPipeline != state.taskBoardPolicyPipeline {
         taskBoardPolicyPipeline = state.taskBoardPolicyPipeline

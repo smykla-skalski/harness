@@ -74,6 +74,28 @@ struct TaskBoardOverviewBehaviorTests {
     #expect(TaskBoardOverviewItemBehavior.selectionAction(for: item) == .openLinkedTask)
   }
 
+  @Test("Dispatch confirmation prefers the targeted board item title")
+  func dispatchConfirmationPrefersTargetedBoardItemTitle() {
+    let confirmation = TaskBoardDispatchConfirmationPresentation(
+      request: TaskBoardDispatchRequest(itemId: "board-1", dryRun: false),
+      itemTitle: "Board item"
+    )
+
+    #expect(confirmation.title == "Dispatch Board item?")
+    #expect(confirmation.message.contains("selected board item"))
+  }
+
+  @Test("Dispatch confirmation falls back to the status filter title")
+  func dispatchConfirmationFallsBackToStatusFilterTitle() {
+    let confirmation = TaskBoardDispatchConfirmationPresentation(
+      request: TaskBoardDispatchRequest(status: .todo, dryRun: false),
+      itemTitle: nil
+    )
+
+    #expect(confirmation.title == "Dispatch Ready items?")
+    #expect(confirmation.message.contains("current filter"))
+  }
+
   @Test("Inbox drop policy ignores unknown source lane payloads")
   func inboxDropPolicyIgnoresUnknownSourceLanePayloads() throws {
     let payload = try JSONDecoder().decode(

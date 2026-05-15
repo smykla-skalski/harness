@@ -40,7 +40,9 @@ struct HarnessMonitorStoreTaskBoardDashboardTests {
     #expect(client.readCallCount(.taskBoardItems(nil)) == baselineCalls + 1)
     #expect(store.globalTaskBoardItems.first?.id == "board-1")
     #expect(store.globalTaskBoardItems.first?.externalRefs.first?.provider == .gitHub)
+    #expect(store.globalTaskBoardSyncSummary?.operations.first?.boardItemId == "board-1")
     #expect(store.contentUI.dashboard.taskBoardItems.first?.id == "board-1")
+    #expect(store.contentUI.dashboard.taskBoardSyncSummary?.total == 1)
   }
 
   @Test("Evaluate task board records the summary and refreshes dashboard state")
@@ -79,6 +81,61 @@ struct HarnessMonitorStoreTaskBoardDashboardTests {
       )
     )
     #expect(store.globalTaskBoardEvaluationSummary?.records.first?.boardItemId == "board-1")
+  }
+
+  @Test("Dispatch task board can apply one board item and refresh dashboard state")
+  func dispatchTaskBoardCanApplyOneBoardItemAndRefreshDashboardState() async {
+    let client = RecordingHarnessClient()
+    client.configureTaskBoardItems([sampleTaskBoardItem()])
+    let store = await makeBootstrappedStore(client: client)
+
+    let success = await store.dispatchTaskBoard(
+      request: TaskBoardDispatchRequest(itemId: "board-1", dryRun: false)
+    )
+
+    #expect(success)
+    #expect(
+      client.recordedCalls().contains(
+        .dispatchTaskBoard(
+          dryRun: false,
+          status: nil,
+          itemID: "board-1",
+          projectDir: nil,
+          actor: nil
+        )
+      )
+    )
+    #expect(store.globalTaskBoardDispatchSummary?.applied.map(\.boardItemId) == ["board-1"])
+    #expect(store.contentUI.dashboard.taskBoardDispatchSummary?.applied.count == 1)
+    #expect(store.globalTaskBoardItems.first?.status == .inProgress)
+    #expect(store.currentSuccessFeedbackMessage == "Dispatched task board")
+  }
+
+  @Test("Audit, projects, and machines summaries update dashboard state")
+  func auditProjectsAndMachinesUpdateDashboardState() async {
+    let client = RecordingHarnessClient()
+    client.configureTaskBoardItems([
+      sampleTaskBoardItem(id: "board-1", status: .todo, agentMode: .interactive, projectId: "project-1"),
+      sampleTaskBoardItem(id: "board-2", status: .blocked, agentMode: .planning, projectId: "project-2"),
+    ])
+    let store = await makeBootstrappedStore(client: client)
+
+    let audited = await store.auditTaskBoard()
+    let loadedProjects = await store.refreshTaskBoardProjects()
+    let loadedMachines = await store.refreshTaskBoardMachines()
+
+    #expect(audited)
+    #expect(loadedProjects)
+    #expect(loadedMachines)
+    #expect(client.recordedCalls().contains(.auditTaskBoard(status: nil)))
+    #expect(client.recordedCalls().contains(.taskBoardProjects(status: nil)))
+    #expect(client.recordedCalls().contains(.taskBoardMachines(status: nil)))
+    #expect(store.globalTaskBoardItemAuditSummary?.total == 2)
+    #expect(store.contentUI.dashboard.taskBoardItemAuditSummary?.blocked == 1)
+    #expect(store.globalTaskBoardProjects?.count == 2)
+    #expect(store.contentUI.dashboard.taskBoardProjects?.count == 2)
+    #expect(store.globalTaskBoardMachines?.count == 2)
+    #expect(store.contentUI.dashboard.taskBoardMachines?.count == 2)
   }
 
   @Test("Moving a task board item updates status through the daemon")
@@ -273,17 +330,22 @@ struct HarnessMonitorStoreTaskBoardDashboardTests {
     #expect(store.currentSuccessFeedbackMessage == "Stopped task board")
   }
 
-  private func sampleTaskBoardItem() -> TaskBoardItem {
+  private func sampleTaskBoardItem(
+    id: String = "board-1",
+    status: TaskBoardStatus = .todo,
+    agentMode: TaskBoardAgentMode = .interactive,
+    projectId: String = "project-1"
+  ) -> TaskBoardItem {
     TaskBoardItem(
       schemaVersion: 1,
-      id: "board-1",
+      id: id,
       title: "Board item",
       body: "Body",
-      status: .todo,
+      status: status,
       priority: .high,
       tags: ["automation"],
-      projectId: "project-1",
-      agentMode: .interactive,
+      projectId: projectId,
+      agentMode: agentMode,
       externalRefs: [
         TaskBoardExternalRef(
           provider: .gitHub,
