@@ -285,9 +285,9 @@ fn patch_from_request(request: &TaskBoardUpdateItemRequest) -> TaskBoardItemPatc
         agent_mode: request.agent_mode,
         external_refs: request.external_refs.clone(),
         planning: request.planning.clone(),
-        clear_planning: false,
+        clear_planning: request.clear_planning,
         workflow: request.workflow.clone(),
-        clear_workflow: false,
+        clear_workflow: request.clear_workflow,
         session_id: optional_string_patch(request.session_id.as_ref(), request.clear_session_id),
         work_item_id: optional_string_patch(
             request.work_item_id.as_ref(),
