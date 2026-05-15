@@ -339,7 +339,7 @@ public struct SettingsTaskBoardSection: View {
   }
 
   @ViewBuilder private var repositoryOverrideSections: some View {
-    ForEach(Array(draft.repositoryOverrides.enumerated()), id: \.offset) { index, _ in
+    ForEach(Array(draft.repositoryOverrides.enumerated()), id: \.element.id) { index, _ in
       Section {
         TextField("owner/repo", text: $draft.repositoryOverrides[index].repository)
           .accessibilityIdentifier(
