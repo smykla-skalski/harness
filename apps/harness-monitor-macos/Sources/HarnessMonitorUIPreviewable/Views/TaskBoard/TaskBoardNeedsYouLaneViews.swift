@@ -42,6 +42,11 @@ struct TaskBoardNeedsYouLaneColumn: View {
     .dropDestination(for: TaskBoardItemDragPayload.self, action: handleDrop) { targeted in
       isDropTargeted = targeted
     }
+    .onDrop(
+      of: [.harnessMonitorTaskBoardItem],
+      isTargeted: $isDropTargeted,
+      perform: handleLegacyDrop
+    )
     .accessibilityElement(children: .contain)
     .accessibilityIdentifier("harness.task-board.needs-you-column")
   }
@@ -52,6 +57,12 @@ struct TaskBoardNeedsYouLaneColumn: View {
       to: .needsYou,
       move: onMoveItem
     )
+  }
+
+  private func handleLegacyDrop(_ providers: [NSItemProvider]) -> Bool {
+    TaskBoardItemDragPayload.loadFirst(from: providers) { payload in
+      _ = handleDrop([payload], .zero)
+    }
   }
 }
 
