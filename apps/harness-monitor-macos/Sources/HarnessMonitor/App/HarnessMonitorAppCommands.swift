@@ -108,15 +108,17 @@ struct HarnessMonitorAppCommands: Commands {
     CommandGroup(after: .toolbar) {
       Button("Increase Text Size", action: increaseTextSize)
         .keyboardShortcut("+", modifiers: .command)
-        .disabled(!canIncreaseTextSize)
+        .disabled(!canIncreaseTextSize || policyCanvasZoomFocus != nil)
 
       Button("Decrease Text Size", action: decreaseTextSize)
         .keyboardShortcut("-", modifiers: .command)
-        .disabled(!canDecreaseTextSize)
+        .disabled(!canDecreaseTextSize || policyCanvasZoomFocus != nil)
 
       Button("Reset Text Size", action: resetTextSize)
         .keyboardShortcut("0", modifiers: .command)
-        .disabled(textSizeIndex == HarnessMonitorTextSize.defaultIndex)
+        .disabled(
+          textSizeIndex == HarnessMonitorTextSize.defaultIndex
+            || policyCanvasZoomFocus != nil)
 
       Divider()
 
@@ -125,19 +127,35 @@ struct HarnessMonitorAppCommands: Commands {
     }
   }
 
-  /// Scene-level keyboard shortcut for the Mac-standard Cmd-= zoom-in chord
-  /// when a policy canvas owns the active scene focus. Preview, Maps, Safari,
-  /// and Xcode IB bind both Cmd-+ and Cmd-= to zoom-in; the canvas chrome
-  /// already owns the Cmd-+ binding directly on its visible button, so this
-  /// menu entry adds the alternate chord without a hidden Button. The item
-  /// is gated on `policyCanvasZoomFocus != nil` so the chord only intercepts
-  /// when a canvas is focused; non-canvas scenes leave the chord unbound.
+  /// Scene-level keyboard shortcuts for canvas zoom. All three primary zoom
+  /// chords (Cmd-=, Cmd--, Cmd-0) plus the Mac-standard alternate Cmd-= live
+  /// here, gated on `policyCanvasZoomFocus != nil` so the chords only
+  /// intercept when a canvas owns scene focus. Non-canvas scenes leave the
+  /// chords for the text-size shortcuts above (which themselves gate off
+  /// when a canvas is focused, so the two paths never fire together).
+  ///
+  /// The visible zoom HUD buttons on `PolicyCanvasZoomControls` stay
+  /// clickable but no longer carry `.keyboardShortcut` modifiers; one source
+  /// of truth for the chords keeps menu and responder-chain behavior
+  /// auditable from a single file.
   @CommandsBuilder private var policyCanvasZoomCommands: some Commands {
     CommandGroup(after: .toolbar) {
       Button("Zoom In") {
         policyCanvasZoomFocus?.dispatcher.performZoomIn()
       }
       .keyboardShortcut("=", modifiers: .command)
+      .disabled(policyCanvasZoomFocus == nil)
+
+      Button("Zoom Out") {
+        policyCanvasZoomFocus?.dispatcher.performZoomOut()
+      }
+      .keyboardShortcut("-", modifiers: .command)
+      .disabled(policyCanvasZoomFocus == nil)
+
+      Button("Reset Zoom") {
+        policyCanvasZoomFocus?.dispatcher.performResetZoom()
+      }
+      .keyboardShortcut("0", modifiers: .command)
       .disabled(policyCanvasZoomFocus == nil)
     }
   }

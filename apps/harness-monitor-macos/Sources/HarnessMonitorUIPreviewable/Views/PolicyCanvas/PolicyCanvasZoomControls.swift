@@ -1,13 +1,15 @@
 import SwiftUI
 
-/// Bottom-leading viewport zoom HUD. The visible chrome owns one keyboard
-/// chord per Button — Cmd-- (zoom out), Cmd-+ (zoom in), Cmd-0 (reset) —
-/// and the alternate Cmd-= chord for zoom-in is registered at the scene
-/// level through `harnessPolicyCanvasZoomFocus` so the menu / Mac-standard
-/// keyboard convention works without a hidden Button anti-pattern.
+/// Bottom-leading viewport zoom HUD. The buttons stay clickable for users who
+/// prefer mouse interaction, but the keyboard chords (Cmd-=, Cmd--, Cmd-0)
+/// are bound exclusively at scene level via `policyCanvasZoomCommands` in
+/// `HarnessMonitorAppCommands`. Centralizing the chords keeps one source of
+/// truth for the View-menu entries and avoids the previous conflict where
+/// both the HUD buttons and the app-wide text-size shortcuts bound the same
+/// keys — see `PolicyCanvasShortcuts.md` for the full audit.
 ///
 /// Trackpad pinch zoom lives on `PolicyCanvasViewport.magnifyGesture` and
-/// is the primary zoom gesture. The chrome buttons drive
+/// is the primary zoom gesture. The HUD buttons drive
 /// `PolicyCanvasViewModel.setZoom` through a `withAnimation(zoomTransition)`
 /// path so each click animates; live pinch bypasses the animation so the
 /// per-frame magnification stays gesture-fresh.
@@ -29,7 +31,6 @@ struct PolicyCanvasZoomControls: View {
       } label: {
         Image(systemName: "minus.magnifyingglass")
       }
-      .keyboardShortcut("-", modifiers: [.command])
       .accessibilityLabel("Zoom out")
       .accessibilityIdentifier(HarnessMonitorAccessibility.policyCanvasZoomOutButton)
 
@@ -46,7 +47,6 @@ struct PolicyCanvasZoomControls: View {
       } label: {
         Image(systemName: "plus.magnifyingglass")
       }
-      .keyboardShortcut("+", modifiers: [.command])
       .accessibilityLabel("Zoom in")
       .accessibilityIdentifier(HarnessMonitorAccessibility.policyCanvasZoomInButton)
 
@@ -57,7 +57,6 @@ struct PolicyCanvasZoomControls: View {
       } label: {
         Image(systemName: "arrow.counterclockwise")
       }
-      .keyboardShortcut("0", modifiers: [.command])
       .accessibilityLabel("Reset zoom to 100 percent")
       .accessibilityIdentifier(HarnessMonitorAccessibility.policyCanvasZoomResetButton)
     }
