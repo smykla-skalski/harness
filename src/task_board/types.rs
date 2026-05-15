@@ -96,10 +96,25 @@ pub struct TaskBoardWorkflowState {
     pub policy_trace_ids: Vec<String>,
 }
 
+/// Maximum number of policy trace ids retained per item. Oldest entries are
+/// dropped when the cap is reached so an item that re-dispatches indefinitely
+/// cannot grow unbounded on disk.
+pub const MAX_POLICY_TRACE_IDS: usize = 32;
+
 impl TaskBoardWorkflowState {
     #[must_use]
     pub fn is_default(&self) -> bool {
         self == &Self::default()
+    }
+
+    /// Append a policy trace id, capping growth at `MAX_POLICY_TRACE_IDS` by
+    /// dropping the oldest ids first.
+    pub fn push_policy_trace_id(&mut self, trace_id: String) {
+        self.policy_trace_ids.push(trace_id);
+        let len = self.policy_trace_ids.len();
+        if len > MAX_POLICY_TRACE_IDS {
+            self.policy_trace_ids.drain(0..len - MAX_POLICY_TRACE_IDS);
+        }
     }
 }
 

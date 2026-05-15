@@ -4,8 +4,9 @@ use crate::daemon::protocol::{
     TaskBoardHostListResponse, TaskBoardHostLocalResponse, TaskBoardHostSetProjectTypesRequest,
     TaskBoardHostSetProjectTypesResponse, TaskBoardListItemsRequest, TaskBoardListItemsResponse,
     TaskBoardMachinesResponse, TaskBoardPlanApproveRequest, TaskBoardPlanBeginRequest,
-    TaskBoardPlanSubmitRequest, TaskBoardPlanningResponse, TaskBoardProjectsResponse,
-    TaskBoardSyncRequest, TaskBoardSyncResponse, TaskBoardUpdateItemRequest,
+    TaskBoardPlanRevokeRequest, TaskBoardPlanSubmitRequest, TaskBoardPlanningResponse,
+    TaskBoardProjectsResponse, TaskBoardSyncRequest, TaskBoardSyncResponse,
+    TaskBoardUpdateItemRequest,
 };
 use crate::daemon::service;
 use crate::errors::CliError;
@@ -52,6 +53,12 @@ pub(crate) fn approve_plan(
     request: &TaskBoardPlanApproveRequest,
 ) -> Result<TaskBoardPlanningResponse, CliError> {
     service::approve_task_board_plan(request)
+}
+
+pub(crate) fn revoke_plan(
+    request: &TaskBoardPlanRevokeRequest,
+) -> Result<TaskBoardPlanningResponse, CliError> {
+    service::revoke_task_board_plan(request)
 }
 
 pub(crate) async fn sync(

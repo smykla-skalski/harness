@@ -105,6 +105,42 @@ fn create_rejects_duplicate_id() {
 }
 
 #[test]
+fn revoke_approval_preserves_summary() {
+    let temp = tempdir().expect("tempdir");
+    let store = TaskBoardStore::new(temp.path().join("board"));
+    let mut item = TaskBoardItem::new(
+        "task-1".into(),
+        "Plan".into(),
+        String::new(),
+        "2026-05-14T00:00:00Z".into(),
+    );
+    item.planning.summary = Some("Use the reviewed plan".into());
+    item.planning.approved_by = Some("lead".into());
+    item.planning.approved_at = Some("2026-05-14T01:00:00Z".into());
+    item.status = TaskBoardStatus::Todo;
+    store.create("Plan", "", item).expect("create");
+
+    let revoked = store
+        .update(
+            "task-1",
+            TaskBoardItemPatch {
+                status: Some(TaskBoardStatus::PlanReview),
+                clear_approval: true,
+                ..TaskBoardItemPatch::default()
+            },
+        )
+        .expect("update item");
+
+    assert_eq!(revoked.status, TaskBoardStatus::PlanReview);
+    assert_eq!(
+        revoked.planning.summary.as_deref(),
+        Some("Use the reviewed plan")
+    );
+    assert_eq!(revoked.planning.approved_by, None);
+    assert_eq!(revoked.planning.approved_at, None);
+}
+
+#[test]
 fn update_with_approver_only_preserves_planning_summary() {
     let temp = tempdir().expect("tempdir");
     let store = TaskBoardStore::new(temp.path().join("board"));

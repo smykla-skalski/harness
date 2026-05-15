@@ -192,6 +192,27 @@ fn complete_run_records_evaluation_and_trace_ids() {
 }
 
 #[test]
+fn partial_state_json_populates_defaults() {
+    let state: TaskBoardOrchestratorState =
+        serde_json::from_str("{}").expect("deserialize empty state");
+    assert_eq!(state.schema_version, CURRENT_ORCHESTRATOR_STATE_VERSION);
+    assert!(!state.enabled);
+    assert!(!state.running);
+    assert!(state.current_tick.is_none());
+    assert!(state.last_run.is_none());
+}
+
+#[test]
+fn partial_settings_json_populates_defaults() {
+    let defaults = TaskBoardOrchestratorSettings::default();
+    let settings: TaskBoardOrchestratorSettings =
+        serde_json::from_str("{}").expect("deserialize empty settings");
+    assert_eq!(settings.enabled_workflows, defaults.enabled_workflows);
+    assert_eq!(settings.dry_run_default, defaults.dry_run_default);
+    assert_eq!(settings.policy_version, defaults.policy_version);
+}
+
+#[test]
 fn dispatch_filters_items_that_target_other_machines() {
     let temp = tempdir().expect("tempdir");
     let root = temp.path().join("board");

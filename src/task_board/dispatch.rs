@@ -5,11 +5,13 @@ use serde::{Deserialize, Serialize};
 use crate::session::types::{TaskSeverity, TaskSource};
 
 use super::default_board_root;
+use super::machines::{Machine, MachineRegistry};
 use super::planning::{PlanApprovalBlockReason, PlanApprovalGate, approval_gate};
 use super::policy::{
     BuiltInPolicyGate, PolicyAction, PolicyDecision, PolicyGate, PolicyInput, PolicySubject,
 };
 use super::policy_graph::{GraphPolicyGate, PolicyPipelineMode, PolicyPipelineStore};
+use super::store::TaskBoardStore;
 use super::types::{AgentMode, ExternalRef, TaskBoardItem, TaskBoardPriority, TaskBoardStatus};
 
 #[path = "dispatch_lifecycle.rs"]
@@ -181,6 +183,63 @@ pub fn build_dispatch_plans_with_policy_root(
         .iter()
         .map(|item| build_dispatch_plan_with_policy_root(item, policy_root))
         .collect()
+}
+
+/// Partition items by whether the local machine's declared `project_types`
+/// accept them. The local machine record is looked up from `board`; if it
+/// cannot be loaded, every item is kept (fail-open) so dispatch on an
+/// unregistered host behaves like a single-machine setup.
+#[must_use]
+pub fn filter_for_local_machine(
+    items: Vec<TaskBoardItem>,
+    board: &TaskBoardStore,
+) -> (Vec<TaskBoardItem>, Vec<(TaskBoardItem, Machine)>) {
+    let Ok(machine) = MachineRegistry::new(board.root().to_path_buf()).ensure_local() else {
+        return (items, Vec::new());
+    };
+    let mut kept = Vec::with_capacity(items.len());
+    let mut rejected = Vec::new();
+    for item in items {
+        if machine.accepts_any(&item.target_project_types) {
+            kept.push(item);
+        } else {
+            rejected.push((item, machine.clone()));
+        }
+    }
+    (kept, rejected)
+}
+
+/// Build a `Blocked { MachineMismatch }` plan for an item the local machine
+/// refused. Surfaces the item's required `target_project_types` and the
+/// machine's declared `project_types` so callers can show users why their
+/// dispatch didn't reach this host. Defers to the configured policy
+/// pipeline at `policy_root` for the plan's policy field so the response
+/// still reflects what policy evaluation would have produced.
+#[must_use]
+pub fn machine_mismatch_plan_with_policy_root(
+    item: &TaskBoardItem,
+    machine: &Machine,
+    policy_root: &Path,
+) -> DispatchPlan {
+    let worker = WorkerIntent {
+        mode: item.agent_mode,
+    };
+    let reviewer = reviewer_intent();
+    let evaluator = evaluator_intent();
+    DispatchPlan {
+        board_item_id: item.id.clone(),
+        readiness: blocked(DispatchBlockReason::MachineMismatch {
+            required: item.target_project_types.clone(),
+            declared: machine.project_types.clone(),
+        }),
+        session: session_intent(item),
+        task: task_creation_intent(item),
+        lifecycle: DispatchLifecycle::planned(&worker, &reviewer, &evaluator),
+        worker,
+        reviewer,
+        evaluator,
+        policy: dispatch_policy(item, policy_root),
+    }
 }
 
 fn readiness(item: &TaskBoardItem, policy: &PolicyDecision) -> DispatchReadiness {

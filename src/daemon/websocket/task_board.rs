@@ -5,13 +5,14 @@ use crate::daemon::protocol::{
     TaskBoardGetItemRequest, TaskBoardGitHubTokensSyncRequest, TaskBoardGitRuntimeConfig,
     TaskBoardHostSetProjectTypesRequest, TaskBoardListItemsRequest,
     TaskBoardOrchestratorRunOnceRequest, TaskBoardOrchestratorSettingsUpdateRequest,
-    TaskBoardPlanApproveRequest, TaskBoardPlanBeginRequest, TaskBoardPlanSubmitRequest,
-    TaskBoardPolicyPipelinePromoteRequest, TaskBoardPolicyPipelineSaveDraftRequest,
-    TaskBoardPolicyPipelineSimulateRequest, TaskBoardSyncRequest,
-    TaskBoardTodoistTokenSyncRequest, TaskBoardUpdateItemRequest, WsRequest, WsResponse,
-    ws_methods,
+    TaskBoardPlanApproveRequest, TaskBoardPlanBeginRequest, TaskBoardPlanRevokeRequest,
+    TaskBoardPlanSubmitRequest, TaskBoardPolicyPipelinePromoteRequest,
+    TaskBoardPolicyPipelineSaveDraftRequest, TaskBoardPolicyPipelineSimulateRequest,
+    TaskBoardSyncRequest, TaskBoardTodoistTokenSyncRequest, TaskBoardUpdateItemRequest, WsRequest,
+    WsResponse, ws_methods,
 };
 use crate::errors::CliError;
+use crate::session::types::CONTROL_PLANE_ACTOR_ID;
 use serde::de::DeserializeOwned;
 
 use super::frames::error_response;
@@ -30,6 +31,7 @@ pub(crate) async fn dispatch_task_board_method(
         ws_methods::TASK_BOARD_PLAN_BEGIN => Some(dispatch_task_board_plan_begin(request)),
         ws_methods::TASK_BOARD_PLAN_SUBMIT => Some(dispatch_task_board_plan_submit(request)),
         ws_methods::TASK_BOARD_PLAN_APPROVE => Some(dispatch_task_board_plan_approve(request)),
+        ws_methods::TASK_BOARD_PLAN_REVOKE => Some(dispatch_task_board_plan_revoke(request)),
         ws_methods::TASK_BOARD_SYNC => Some(dispatch_task_board_sync(request).await),
         ws_methods::TASK_BOARD_DISPATCH => Some(dispatch_task_board_dispatch(request, state).await),
         ws_methods::TASK_BOARD_EVALUATE => Some(dispatch_task_board_evaluate(request, state).await),
@@ -153,6 +155,16 @@ fn dispatch_task_board_plan_approve(request: &WsRequest) -> WsResponse {
         return invalid_params(request);
     };
     dispatch_query_result(&request.id, task_board_route_executor::approve_plan(&body))
+}
+
+fn dispatch_task_board_plan_revoke(request: &WsRequest) -> WsResponse {
+    let Ok(mut body) = parse_params::<TaskBoardPlanRevokeRequest>(request) else {
+        return invalid_params(request);
+    };
+    // Manual control-plane override mirrors `http/task_board.rs:200-203`; Unit
+    // 7 swaps both call sites for the binding trait impl together.
+    body.actor = Some(CONTROL_PLANE_ACTOR_ID.to_string());
+    dispatch_query_result(&request.id, task_board_route_executor::revoke_plan(&body))
 }
 
 async fn dispatch_task_board_sync(request: &WsRequest) -> WsResponse {

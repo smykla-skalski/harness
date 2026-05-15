@@ -6,6 +6,7 @@ use clap::Args;
 use crate::app::command_context::{AppContext, Execute};
 use crate::errors::{CliError, CliErrorKind};
 use crate::session::service as session_service;
+use crate::task_board::dispatch::filter_for_local_machine;
 use crate::task_board::evaluation::{
     TaskBoardEvaluationRecord, TaskBoardEvaluationSummary, evaluate_task_board_item,
     failed_workflow, missing_session_record, missing_task_record, record_from_decision,
@@ -106,10 +107,12 @@ impl Execute for TaskBoardEvaluateArgs {
 
 impl TaskBoardEvaluateArgs {
     fn selected_items(&self, board: &TaskBoardStore) -> Result<Vec<TaskBoardItem>, CliError> {
-        self.item_id.as_deref().map_or_else(
+        let items = self.item_id.as_deref().map_or_else(
             || board.list(self.status),
             |item_id| board.get(item_id).map(|item| vec![item]),
-        )
+        )?;
+        let (kept, _rejected) = filter_for_local_machine(items, board);
+        Ok(kept)
     }
 
     fn failure_record(
@@ -279,5 +282,51 @@ mod tests {
                 },
             )
             .expect("link board item");
+    }
+
+    #[test]
+    fn selected_items_drops_items_targeting_other_project_types() {
+        let temp = tempdir().expect("tempdir");
+        let root = temp.path().join("board");
+        let board = TaskBoardStore::new(root.clone());
+        for (id, project_type) in [
+            ("matches", Some("web")),
+            ("mismatches", Some("data")),
+            ("wildcard", None),
+        ] {
+            let mut item = TaskBoardItem::new(
+                id.into(),
+                id.into(),
+                String::new(),
+                "2026-05-15T00:00:00Z".into(),
+            );
+            item.status = TaskBoardStatus::Todo;
+            if let Some(value) = project_type {
+                item.target_project_types = vec![value.into()];
+            }
+            board.create(id, "", item).expect("create item");
+        }
+
+        let registry = crate::task_board::machines::MachineRegistry::new(root.clone());
+        let mut local = registry.ensure_local().expect("ensure local");
+        local.project_types = vec!["web".into()];
+        registry.upsert(&local).expect("declare project types");
+
+        let args = TaskBoardEvaluateArgs {
+            json: true,
+            dry_run: true,
+            item_id: None,
+            status: Some(TaskBoardStatus::Todo),
+            project_dir: None,
+            board_root: Some(root),
+        };
+        let items = args.selected_items(&board).expect("selected items");
+        let ids: Vec<&str> = items.iter().map(|item| item.id.as_str()).collect();
+        assert!(ids.contains(&"matches"));
+        assert!(ids.contains(&"wildcard"));
+        assert!(
+            !ids.contains(&"mismatches"),
+            "evaluate must skip items routed to other project_types"
+        );
     }
 }

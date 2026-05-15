@@ -8,6 +8,7 @@ use crate::session::service::TaskSpec;
 use crate::session::types::CONTROL_PLANE_ACTOR_ID;
 use crate::task_board::dispatch::{
     DispatchAppliedTask, DispatchExecutionSummary, DispatchPlan, DispatchReadiness, SessionIntent,
+    filter_for_local_machine, machine_mismatch_plan_with_policy_root,
 };
 use crate::task_board::store::{OptionalFieldPatch, TaskBoardItemPatch, TaskBoardStore};
 use crate::task_board::summary::build_dispatch_summary_with_policy_root;
@@ -20,8 +21,7 @@ use super::{
 impl Execute for TaskBoardDispatchArgs {
     fn execute(&self, _context: &AppContext) -> Result<i32, CliError> {
         let board = store(self.board_root.clone());
-        let items = self.selected_items(&board)?;
-        let plans = build_dispatch_summary_with_policy_root(&items, board.root());
+        let plans = self.build_plans(&board)?;
         let summary = if self.dry_run {
             DispatchExecutionSummary::dry_run(plans)
         } else {
@@ -37,6 +37,16 @@ impl Execute for TaskBoardDispatchArgs {
 }
 
 impl TaskBoardDispatchArgs {
+    fn build_plans(&self, board: &TaskBoardStore) -> Result<Vec<DispatchPlan>, CliError> {
+        let items = self.selected_items(board)?;
+        let (kept, rejected) = filter_for_local_machine(items, board);
+        let mut plans = build_dispatch_summary_with_policy_root(&kept, board.root());
+        plans.extend(rejected.iter().map(|(item, machine)| {
+            machine_mismatch_plan_with_policy_root(item, machine, board.root())
+        }));
+        Ok(plans)
+    }
+
     fn selected_items(&self, board: &TaskBoardStore) -> Result<Vec<TaskBoardItem>, CliError> {
         self.item_id.as_deref().map_or_else(
             || board.list(self.status),
@@ -101,7 +111,7 @@ impl TaskBoardDispatchArgs {
         workflow.status = TaskBoardWorkflowStatus::Running;
         workflow.current_step_id = Some("dispatch".to_string());
         workflow.attempts = workflow.attempts.saturating_add(1);
-        workflow.policy_trace_ids.push(new_policy_trace_id());
+        workflow.push_policy_trace_id(new_policy_trace_id());
         board.update(
             &plan.board_item_id,
             TaskBoardItemPatch {
@@ -164,5 +174,82 @@ fn dispatch_readiness_label(readiness: &DispatchReadiness) -> &'static str {
     match readiness {
         DispatchReadiness::Ready => "ready",
         DispatchReadiness::Blocked { .. } => "blocked",
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::task_board::dispatch::DispatchBlockReason;
+    use crate::task_board::machines::MachineRegistry;
+    use tempfile::tempdir;
+
+    fn seed_item(board: &TaskBoardStore, id: &str, project_type: Option<&str>) {
+        let mut item = TaskBoardItem::new(
+            id.into(),
+            id.into(),
+            String::new(),
+            "2026-05-15T00:00:00Z".into(),
+        );
+        item.status = TaskBoardStatus::Todo;
+        if let Some(project_type) = project_type {
+            item.target_project_types = vec![project_type.into()];
+        }
+        board.create(id, "", item).expect("create board item");
+    }
+
+    fn dry_run_args(board_root: PathBuf) -> TaskBoardDispatchArgs {
+        TaskBoardDispatchArgs {
+            json: true,
+            dry_run: true,
+            item_id: None,
+            status: Some(TaskBoardStatus::Todo),
+            project_dir: None,
+            actor: None,
+            board_root: Some(board_root),
+        }
+    }
+
+    #[test]
+    fn cli_dispatch_surfaces_machine_mismatch_for_other_project_types() {
+        let temp = tempdir().expect("tempdir");
+        let root = temp.path().join("board");
+        let board = TaskBoardStore::new(root.clone());
+        seed_item(&board, "matches", Some("web"));
+        seed_item(&board, "mismatches", Some("data"));
+
+        let registry = MachineRegistry::new(root.clone());
+        let mut local = registry.ensure_local().expect("ensure local");
+        local.project_types = vec!["web".into()];
+        registry.upsert(&local).expect("declare project types");
+
+        let plans = dry_run_args(root).build_plans(&board).expect("build plans");
+
+        let mismatched = plans
+            .iter()
+            .find(|plan| plan.board_item_id == "mismatches")
+            .expect("mismatched plan present");
+        match &mismatched.readiness {
+            DispatchReadiness::Blocked {
+                reason: DispatchBlockReason::MachineMismatch { required, declared },
+            } => {
+                assert_eq!(required, &vec!["data".to_string()]);
+                assert_eq!(declared, &vec!["web".to_string()]);
+            }
+            other => panic!("expected machine_mismatch, got {other:?}"),
+        }
+        let matched = plans
+            .iter()
+            .find(|plan| plan.board_item_id == "matches")
+            .expect("matched plan present");
+        assert!(
+            !matches!(
+                matched.readiness,
+                DispatchReadiness::Blocked {
+                    reason: DispatchBlockReason::MachineMismatch { .. },
+                }
+            ),
+            "matching item must not be flagged as machine_mismatch"
+        );
     }
 }

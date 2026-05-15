@@ -45,6 +45,15 @@ fn task_board_http_catalog_routes_use_real_state() {
     });
 }
 
+#[test]
+fn task_board_http_plan_revoke_round_trips() {
+    let sandbox = tempdir().expect("tempdir");
+    harness_testkit::with_isolated_harness_env(sandbox.path(), || {
+        let runtime = tokio::runtime::Runtime::new().expect("runtime");
+        runtime.block_on(run_task_board_http_plan_revoke_flow());
+    });
+}
+
 async fn run_task_board_http_flow(sandbox: &Path) {
     let project_dir = sandbox.join("project");
     harness_testkit::init_git_repo_with_seed(&project_dir);
@@ -264,6 +273,35 @@ async fn run_task_board_http_policy_pipeline_flow() {
         audit["latest_simulation"]["revision"].as_u64(),
         Some(saved_revision)
     );
+
+    server.abort();
+    let _ = server.await;
+}
+
+async fn run_task_board_http_plan_revoke_flow() {
+    let state = test_http_state_with_db();
+    let (base_url, server) = serve_http(state).await;
+    let client = reqwest::Client::new();
+
+    seed_ready_board_item("board-revoke-1", "Revoke me");
+    let path = http_paths::TASK_BOARD_PLAN_REVOKE.replace("{item_id}", "board-revoke-1");
+    let response = post_json(&client, &base_url, &path, json!({})).await;
+
+    assert_eq!(response["item"]["status"].as_str(), Some("plan_review"));
+    assert_eq!(
+        response["item"]["planning"]["summary"].as_str(),
+        Some("Use task dispatch.")
+    );
+    assert!(response["item"]["planning"]["approved_by"].is_null());
+    assert!(response["item"]["planning"]["approved_at"].is_null());
+
+    let stored = TaskBoardStore::new(default_board_root())
+        .get("board-revoke-1")
+        .expect("load board item");
+    assert_eq!(stored.status, TaskBoardStatus::PlanReview);
+    assert_eq!(stored.planning.summary.as_deref(), Some("Use task dispatch."));
+    assert!(stored.planning.approved_by.is_none());
+    assert!(stored.planning.approved_at.is_none());
 
     server.abort();
     let _ = server.await;

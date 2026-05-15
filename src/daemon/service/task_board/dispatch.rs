@@ -7,9 +7,10 @@ use crate::errors::{CliError, CliErrorKind};
 use crate::session::types::CONTROL_PLANE_ACTOR_ID;
 use crate::task_board::store::{OptionalFieldPatch, TaskBoardItemPatch};
 use crate::task_board::{
-    DispatchAppliedTask, DispatchExecutionSummary, DispatchPlan, MachineRegistry, SessionIntent,
-    TaskBoardItem, TaskBoardStatus, TaskBoardStore, TaskBoardWorkflowStatus,
-    build_dispatch_summary_with_policy_root,
+    DispatchAppliedTask, DispatchExecutionSummary, DispatchPlan, SessionIntent, TaskBoardItem,
+    TaskBoardStatus, TaskBoardStore, TaskBoardWorkflowStatus,
+    build_dispatch_summary_with_policy_root, filter_for_local_machine,
+    machine_mismatch_plan_with_policy_root,
 };
 
 use super::super::{
@@ -25,8 +26,7 @@ pub fn dispatch_task_board(
     db: Option<&DaemonDb>,
     board: &TaskBoardStore,
 ) -> Result<TaskBoardDispatchResponse, CliError> {
-    let items = selected_dispatch_items(board, request)?;
-    let plans = build_dispatch_summary_with_policy_root(&items, board.root());
+    let plans = build_dispatch_plans_for_request(board, request)?;
     if request.dry_run {
         return Ok(DispatchExecutionSummary::dry_run(plans));
     }
@@ -47,8 +47,7 @@ pub async fn dispatch_task_board_async(
     async_db: &AsyncDaemonDb,
     board: &TaskBoardStore,
 ) -> Result<TaskBoardDispatchResponse, CliError> {
-    let items = selected_dispatch_items(board, request)?;
-    let plans = build_dispatch_summary_with_policy_root(&items, board.root());
+    let plans = build_dispatch_plans_for_request(board, request)?;
     if request.dry_run {
         return Ok(DispatchExecutionSummary::dry_run(plans));
     }
@@ -59,28 +58,29 @@ pub async fn dispatch_task_board_async(
     Ok(DispatchExecutionSummary { plans, applied })
 }
 
-fn selected_dispatch_items(
+fn build_dispatch_plans_for_request(
+    board: &TaskBoardStore,
+    request: &TaskBoardDispatchRequest,
+) -> Result<Vec<DispatchPlan>, CliError> {
+    let items = selected_items(board, request)?;
+    let (kept, rejected) = filter_for_local_machine(items, board);
+    let mut plans = build_dispatch_summary_with_policy_root(&kept, board.root());
+    plans.extend(
+        rejected
+            .iter()
+            .map(|(item, machine)| machine_mismatch_plan_with_policy_root(item, machine, board.root())),
+    );
+    Ok(plans)
+}
+
+fn selected_items(
     board: &TaskBoardStore,
     request: &TaskBoardDispatchRequest,
 ) -> Result<Vec<TaskBoardItem>, CliError> {
-    let items = request.item_id.as_deref().map_or_else(
+    request.item_id.as_deref().map_or_else(
         || board.list(request.status),
         |item_id| board.get(item_id).map(|item| vec![item]),
-    )?;
-    Ok(filter_for_local_machine(items, board))
-}
-
-fn filter_for_local_machine(
-    items: Vec<TaskBoardItem>,
-    board: &TaskBoardStore,
-) -> Vec<TaskBoardItem> {
-    let Ok(machine) = MachineRegistry::new(board.root().to_path_buf()).ensure_local() else {
-        return items;
-    };
-    items
-        .into_iter()
-        .filter(|item| machine.accepts_any(&item.target_project_types))
-        .collect()
+    )
 }
 
 fn apply_dispatch_plan(
@@ -242,7 +242,7 @@ fn link_dispatched_item(
     workflow.status = TaskBoardWorkflowStatus::Running;
     workflow.current_step_id = Some("dispatch".to_string());
     workflow.attempts = workflow.attempts.saturating_add(1);
-    workflow.policy_trace_ids.push(new_policy_trace_id());
+    workflow.push_policy_trace_id(new_policy_trace_id());
     board.update(
         &plan.board_item_id,
         TaskBoardItemPatch {
@@ -266,6 +266,7 @@ fn new_policy_trace_id() -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::task_board::{DispatchBlockReason, DispatchReadiness, MachineRegistry};
     use tempfile::tempdir;
 
     fn seed_item(board: &TaskBoardStore, id: &str, project_type: Option<&str>) {
@@ -283,7 +284,7 @@ mod tests {
     }
 
     #[test]
-    fn dispatch_drops_items_that_target_other_project_types() {
+    fn dispatch_surfaces_machine_mismatch_for_other_project_types() {
         let temp = tempdir().expect("tempdir");
         let root = temp.path().join("board");
         let board = TaskBoardStore::new(root.clone());
@@ -316,9 +317,21 @@ mod tests {
             .collect();
         assert!(ids.contains(&"matches"));
         assert!(ids.contains(&"wildcard"));
-        assert!(
-            !ids.contains(&"mismatches"),
-            "dispatch must skip items that target other project_types"
-        );
+        assert!(ids.contains(&"mismatches"));
+
+        let mismatched = response
+            .plans
+            .iter()
+            .find(|plan| plan.board_item_id == "mismatches")
+            .expect("mismatched plan present");
+        match &mismatched.readiness {
+            DispatchReadiness::Blocked {
+                reason: DispatchBlockReason::MachineMismatch { required, declared },
+            } => {
+                assert_eq!(required, &vec!["data".to_string()]);
+                assert_eq!(declared, &vec!["web".to_string()]);
+            }
+            other => panic!("expected machine_mismatch, got {other:?}"),
+        }
     }
 }

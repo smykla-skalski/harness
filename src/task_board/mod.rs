@@ -17,7 +17,8 @@ pub use dispatch::{
     DispatchAppliedTask, DispatchBlockReason, DispatchExecutionSummary, DispatchPlan,
     DispatchReadiness, EvaluatorIntent, FollowUpPhase, ReviewerIntent, SessionIntent,
     TaskCreationIntent, WorkerIntent, build_dispatch_plan, build_dispatch_plans,
-    build_dispatch_plans_with_policy_root,
+    build_dispatch_plans_with_policy_root, filter_for_local_machine,
+    machine_mismatch_plan_with_policy_root,
 };
 pub use evaluation::{
     TaskBoardEvaluationDecision, TaskBoardEvaluationOutcome, TaskBoardEvaluationRecord,
@@ -43,7 +44,7 @@ pub use orchestrator::{
 };
 pub use planning::{
     PlanApprovalBlockReason, PlanApprovalGate, PlanningTransition, approval_gate, approve_plan,
-    begin_planning, submit_plan,
+    begin_planning, revoke_plan, submit_plan,
 };
 pub use policy::{
     BuiltInPolicyGate, PolicyAction, PolicyDecision, PolicyEvidence, PolicyGate, PolicyInput,

@@ -46,6 +46,7 @@ pub const TASK_BOARD_ITEM: &str = "/v1/task-board/items/{item_id}";
 pub const TASK_BOARD_PLAN_BEGIN: &str = "/v1/task-board/items/{item_id}/planning/begin";
 pub const TASK_BOARD_PLAN_SUBMIT: &str = "/v1/task-board/items/{item_id}/planning/submit";
 pub const TASK_BOARD_PLAN_APPROVE: &str = "/v1/task-board/items/{item_id}/planning/approve";
+pub const TASK_BOARD_PLAN_REVOKE: &str = "/v1/task-board/items/{item_id}/planning/revoke";
 pub const TASK_BOARD_SYNC: &str = "/v1/task-board/sync";
 pub const TASK_BOARD_DISPATCH: &str = "/v1/task-board/dispatch";
 pub const TASK_BOARD_EVALUATE: &str = "/v1/task-board/evaluate";
