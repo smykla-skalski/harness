@@ -100,6 +100,95 @@ struct HarnessMonitorStoreTaskBoardDashboardTests {
     #expect(store.currentSuccessFeedbackMessage == "Moved task board item")
   }
 
+  @Test("Create task board item saves the draft and applies the chosen status")
+  func createTaskBoardItemSavesDraftAndAppliesStatus() async {
+    let client = RecordingHarnessClient()
+    let store = await makeBootstrappedStore(client: client)
+
+    let success = await store.createTaskBoardItem(
+      request: TaskBoardCreateItemRequest(
+        title: "New board item",
+        body: "Body",
+        priority: .critical,
+        agentMode: .planning,
+        tags: ["monitor"],
+        projectId: "project-1",
+        planning: TaskBoardPlanningState(summary: "Plan first")
+      ),
+      initialStatus: .planReview
+    )
+
+    #expect(success)
+    #expect(
+      client.recordedCalls().contains(
+        .createTaskBoardItem(title: "New board item", priority: .critical)
+      )
+    )
+    #expect(
+      client.recordedCalls().contains(
+        .updateTaskBoardItem(id: "board-1", status: .planReview)
+      )
+    )
+    #expect(store.globalTaskBoardItems.first?.title == "New board item")
+    #expect(store.globalTaskBoardItems.first?.status == .planReview)
+    #expect(store.currentSuccessFeedbackMessage == "Created task board item")
+  }
+
+  @Test("Edit task board item saves full editor fields")
+  func editTaskBoardItemSavesFullEditorFields() async {
+    let client = RecordingHarnessClient()
+    client.configureTaskBoardItems([sampleTaskBoardItem()])
+    let store = await makeBootstrappedStore(client: client)
+
+    let success = await store.updateTaskBoardItem(
+      id: "board-1",
+      request: TaskBoardUpdateItemRequest(
+        title: "Edited",
+        body: "Updated body",
+        status: .blocked,
+        priority: .low,
+        agentMode: .evaluate,
+        tags: ["edited", "ui"],
+        projectId: nil,
+        clearProjectId: true,
+        planning: TaskBoardPlanningState(summary: "Updated plan"),
+        sessionId: nil,
+        clearSessionId: true,
+        workItemId: nil,
+        clearWorkItemId: true
+      )
+    )
+
+    #expect(success)
+    let item = store.globalTaskBoardItems.first
+    #expect(item?.title == "Edited")
+    #expect(item?.body == "Updated body")
+    #expect(item?.status == .blocked)
+    #expect(item?.priority == .low)
+    #expect(item?.agentMode == .evaluate)
+    #expect(item?.tags == ["edited", "ui"])
+    #expect(item?.projectId == nil)
+    #expect(item?.sessionId == nil)
+    #expect(item?.workItemId == nil)
+    #expect(item?.planning.summary == "Updated plan")
+    #expect(store.currentSuccessFeedbackMessage == "Saved task board item")
+  }
+
+  @Test("Delete task board item removes it from dashboard state")
+  func deleteTaskBoardItemRemovesItFromDashboardState() async {
+    let client = RecordingHarnessClient()
+    client.configureTaskBoardItems([sampleTaskBoardItem()])
+    let store = await makeBootstrappedStore(client: client)
+
+    let success = await store.deleteTaskBoardItem(id: "board-1")
+
+    #expect(success)
+    #expect(client.recordedCalls().contains(.deleteTaskBoardItem(id: "board-1")))
+    #expect(store.globalTaskBoardItems.isEmpty)
+    #expect(store.contentUI.dashboard.taskBoardItems.isEmpty)
+    #expect(store.currentSuccessFeedbackMessage == "Deleted task board item")
+  }
+
   @Test("Run once forwards scoped board request and refreshes dashboard status")
   func runOnceForwardsScopedBoardRequestAndRefreshesDashboardStatus() async {
     let client = RecordingHarnessClient()

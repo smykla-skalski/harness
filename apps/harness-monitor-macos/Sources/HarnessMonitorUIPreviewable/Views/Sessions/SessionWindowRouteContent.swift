@@ -65,6 +65,9 @@ struct SessionWindowOverview: View {
           onMoveInboxItem: moveInboxItem,
           onMoveTaskBoardItem: moveTaskBoardItem,
           onOpenDecision: openDecision,
+          onCreateTaskBoardItem: createTaskBoardItem,
+          onUpdateTaskBoardItem: updateTaskBoardItem,
+          onDeleteTaskBoardItem: deleteTaskBoardItem,
           onEvaluateTaskBoard: evaluateTaskBoard,
           onEvaluateTaskBoardItem: evaluateTaskBoardItem,
           onRefreshTaskBoard: refreshTaskBoard,
@@ -115,108 +118,6 @@ struct SessionWindowOverview: View {
     return "\(summary.activeCount) active of \(summary.registeredCount)"
   }
 
-  private var taskBoardSnapshot: TaskBoardInboxSnapshot {
-    guard let detail = snapshot.detail else {
-      return TaskBoardInboxSnapshot(
-        generatedAt: nil,
-        isFromCache: snapshot.source != .live
-      )
-    }
-    return TaskBoardInboxSnapshot(
-      sessions: [snapshot.summary],
-      detailsBySessionID: [snapshot.summary.sessionId: detail],
-      generatedAt: nil,
-      isFromCache: snapshot.source != .live
-    )
-  }
-
-  private func openTaskActions(_ item: TaskBoardInboxItem) {
-    store.presentedSheet = .taskActions(
-      sessionID: item.session.sessionId,
-      taskID: item.task.taskId
-    )
-  }
-
-  private var linkedTaskBoardItems: [TaskBoardItem] {
-    let dashboardItems = store.contentUI.dashboard.taskBoardItems
-    let sourceItems = dashboardItems.isEmpty ? snapshot.taskBoardItems ?? [] : dashboardItems
-    return sourceItems.filter { item in
-      item.sessionId == snapshot.summary.sessionId
-    }
-  }
-
-  private func openTaskBoardItem(_ item: TaskBoardItem) {
-    guard let workItemId = item.workItemId else {
-      return
-    }
-    store.presentedSheet = .taskActions(
-      sessionID: snapshot.summary.sessionId,
-      taskID: workItemId
-    )
-  }
-
-  private func moveTaskBoardItem(_ itemID: String, status: TaskBoardStatus) {
-    Task { @MainActor in
-      await store.updateTaskBoardItemStatus(id: itemID, status: status)
-    }
-  }
-
-  private func moveInboxItem(_ item: TaskBoardInboxItem, status: TaskStatus) {
-    Task { @MainActor in
-      await store.updateTaskStatus(
-        taskID: item.task.taskId,
-        status: status,
-        sessionID: item.session.sessionId
-      )
-    }
-  }
-
-  private func openDecision(_ decision: Decision) {
-    store.supervisorSelectedDecisionID = decision.id
-    store.requestSessionRoute(
-      .decision(
-        sessionID: decision.sessionID ?? snapshot.summary.sessionId,
-        decisionID: decision.id
-      ),
-      resetDecisionFilters: true
-    )
-  }
-
-  private func evaluateTaskBoard() {
-    Task { @MainActor in
-      await store.evaluateTaskBoard()
-    }
-  }
-
-  private func evaluateTaskBoardItem(_ item: TaskBoardItem) {
-    Task { @MainActor in
-      await store.evaluateTaskBoard(status: item.status, itemID: item.id)
-    }
-  }
-
-  private func refreshTaskBoard() {
-    Task { @MainActor in
-      await store.refreshTaskBoardDashboard()
-    }
-  }
-
-  private func startTaskBoardOrchestrator() {
-    Task { @MainActor in
-      await store.startTaskBoardOrchestrator()
-    }
-  }
-
-  private func stopTaskBoardOrchestrator() {
-    Task { @MainActor in
-      await store.stopTaskBoardOrchestrator()
-    }
-  }
-
-  private func runTaskBoardOrchestratorOnce(_ request: TaskBoardOrchestratorRunOnceRequest) {
-    Task { @MainActor in
-      await store.runTaskBoardOrchestratorOnce(request: request)
-    }
-  }
 }
 
 struct SessionWindowAgentsList: View {
