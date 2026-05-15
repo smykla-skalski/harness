@@ -242,7 +242,7 @@ fn link_dispatched_item(
     workflow.status = TaskBoardWorkflowStatus::Running;
     workflow.current_step_id = Some("dispatch".to_string());
     workflow.attempts = workflow.attempts.saturating_add(1);
-    workflow.policy_trace_ids.push(new_policy_trace_id());
+    workflow.push_policy_trace_id(new_policy_trace_id());
     board.update(
         &plan.board_item_id,
         TaskBoardItemPatch {

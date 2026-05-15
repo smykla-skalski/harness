@@ -96,10 +96,25 @@ pub struct TaskBoardWorkflowState {
     pub policy_trace_ids: Vec<String>,
 }
 
+/// Maximum number of policy trace ids retained per item. Oldest entries are
+/// dropped when the cap is reached so an item that re-dispatches indefinitely
+/// cannot grow unbounded on disk.
+pub const MAX_POLICY_TRACE_IDS: usize = 32;
+
 impl TaskBoardWorkflowState {
     #[must_use]
     pub fn is_default(&self) -> bool {
         self == &Self::default()
+    }
+
+    /// Append a policy trace id, capping growth at `MAX_POLICY_TRACE_IDS` by
+    /// dropping the oldest ids first.
+    pub fn push_policy_trace_id(&mut self, trace_id: String) {
+        self.policy_trace_ids.push(trace_id);
+        let len = self.policy_trace_ids.len();
+        if len > MAX_POLICY_TRACE_IDS {
+            self.policy_trace_ids.drain(0..len - MAX_POLICY_TRACE_IDS);
+        }
     }
 }
 
@@ -219,4 +234,27 @@ pub struct TaskUsage {
 #[allow(clippy::trivially_copy_pass_by_ref)]
 fn is_zero(value: &u32) -> bool {
     *value == 0
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{MAX_POLICY_TRACE_IDS, TaskBoardWorkflowState};
+
+    #[test]
+    fn dispatch_policy_trace_ids_caps_growth_at_32() {
+        let mut workflow = TaskBoardWorkflowState::default();
+        for index in 0..40 {
+            workflow.push_policy_trace_id(format!("trace-{index:02}"));
+        }
+
+        assert_eq!(workflow.policy_trace_ids.len(), MAX_POLICY_TRACE_IDS);
+        assert_eq!(
+            workflow.policy_trace_ids.first().map(String::as_str),
+            Some("trace-08")
+        );
+        assert_eq!(
+            workflow.policy_trace_ids.last().map(String::as_str),
+            Some("trace-39")
+        );
+    }
 }
