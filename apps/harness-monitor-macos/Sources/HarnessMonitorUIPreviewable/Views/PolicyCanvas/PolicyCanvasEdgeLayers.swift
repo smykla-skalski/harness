@@ -154,15 +154,36 @@ struct PolicyCanvasEdgeLabelMetrics {
 
 struct PolicyCanvasEdgeShape: Shape {
   let route: PolicyCanvasEdgeRoute
+  var cornerRadius: CGFloat = 7
 
   func path(in rect: CGRect) -> Path {
     var path = Path()
-    guard let firstPoint = route.points.first else {
+    let points = route.points
+    guard let first = points.first else {
       return path
     }
-    path.move(to: firstPoint)
-    for point in route.points.dropFirst() {
-      path.addLine(to: point)
+    path.move(to: first)
+    guard points.count >= 3 else {
+      for point in points.dropFirst() {
+        path.addLine(to: point)
+      }
+      return path
+    }
+    for index in 1 ..< points.count - 1 {
+      let previous = points[index - 1]
+      let current = points[index]
+      let next = points[index + 1]
+      let inUnit = (current - previous).normalized
+      let outUnit = (next - current).normalized
+      let radius = min(
+        cornerRadius,
+        min((current - previous).length, (next - current).length) / 2
+      )
+      path.addLine(to: current - inUnit * radius)
+      path.addQuadCurve(to: current + outUnit * radius, control: current)
+    }
+    if let last = points.last {
+      path.addLine(to: last)
     }
     return path
   }
