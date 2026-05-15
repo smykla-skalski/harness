@@ -70,7 +70,7 @@ struct PolicyCanvasAccessibilityTests {
       source: endpoint,
       target: target,
       label: "",
-      condition: "if amount > 1000"
+      condition: "manual_approval_required"
     )
     #expect(viewModel.accessibilityValue(for: flow) == "flow")
     #expect(viewModel.accessibilityValue(for: denied) == "error")

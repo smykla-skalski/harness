@@ -26,11 +26,22 @@ struct PolicyCanvasEdgeKindTests {
     #expect(PolicyCanvasEdgeKind.derive(from: "error_path") == .error)
   }
 
-  @Test("Other non-empty conditions map to .control")
-  func conditionalIsControl() {
+  @Test("Human-workflow conditions map to .control")
+  func humanWorkflowMapsToControl() {
     #expect(PolicyCanvasEdgeKind.derive(from: "approved") == .control)
-    #expect(PolicyCanvasEdgeKind.derive(from: "if x > 5") == .control)
     #expect(PolicyCanvasEdgeKind.derive(from: "human_review") == .control)
+    #expect(PolicyCanvasEdgeKind.derive(from: "audit_passed") == .control)
+  }
+
+  @Test("Generic non-error, non-human conditions default to .flow")
+  func genericConditionsDefaultToFlow() {
+    // Default fallback is `.flow`, not `.control`. The policy-flow domain
+    // is mostly flow: forwarding rules without human-workflow or error
+    // markers are not decision gates.
+    #expect(PolicyCanvasEdgeKind.derive(from: "if x > 5") == .flow)
+    #expect(PolicyCanvasEdgeKind.derive(from: "low risk") == .flow)
+    #expect(PolicyCanvasEdgeKind.derive(from: "normalize") == .flow)
+    #expect(PolicyCanvasEdgeKind.derive(from: "allow") == .flow)
   }
 
   @Test("Human-workflow tokens short-circuit error matching to .control")
@@ -50,10 +61,12 @@ struct PolicyCanvasEdgeKindTests {
   func noSubstringFalsePositives() {
     // `predenial` should NOT match `deny`/`denied` because token splitting
     // produces ["predenial"], which is not in the error-marker set. The
-    // prior substring heuristic would have classified this as `.error`.
-    #expect(PolicyCanvasEdgeKind.derive(from: "predenial") == .control)
-    #expect(PolicyCanvasEdgeKind.derive(from: "errorless_check") == .control)
-    #expect(PolicyCanvasEdgeKind.derive(from: "rejectable_step") == .control)
+    // prior substring heuristic would have classified this as `.error`;
+    // the token-boundary classifier with `.flow` default routes these to
+    // `.flow` instead - the intent is "no false positive into .error".
+    #expect(PolicyCanvasEdgeKind.derive(from: "predenial") != .error)
+    #expect(PolicyCanvasEdgeKind.derive(from: "errorless_check") != .error)
+    #expect(PolicyCanvasEdgeKind.derive(from: "rejectable_step") != .error)
   }
 
   @Test("Explicit kind override bypasses derivation")

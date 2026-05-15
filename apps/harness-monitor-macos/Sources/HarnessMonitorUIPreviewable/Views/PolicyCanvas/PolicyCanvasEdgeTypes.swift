@@ -185,8 +185,12 @@ extension PolicyCanvasEdgeKind {
   /// 3. Token-level match against an error-marker set (`denied`, `deny`,
   ///    `error`, `errors`, `reject`, `rejected`, `failed`, `fail`,
   ///    `failure`) -> `.error`.
-  /// 4. Otherwise -> `.control` (some condition was specified but it does
-  ///    not look like an error path).
+  /// 4. Otherwise -> `.flow`. The policy-flow domain is mostly flow:
+  ///    conditions like `"normalize"`, `"low risk"`, `"allow"` describe
+  ///    data moving through a step, not a decision gate. Generic
+  ///    expressions like `"if x > 5"` also default to flow because a
+  ///    bare predicate without human-workflow or error markers is more
+  ///    likely a forwarding rule than a control branch.
   ///
   /// The token-boundary discipline plus the human-workflow short-circuit
   /// are the two changes that turn the prior substring heuristic into
@@ -214,6 +218,6 @@ extension PolicyCanvasEdgeKind {
     if tokens.contains(where: { errorMarkers.contains($0) }) {
       return .error
     }
-    return .control
+    return .flow
   }
 }
