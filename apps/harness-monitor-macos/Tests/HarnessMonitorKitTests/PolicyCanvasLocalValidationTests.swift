@@ -203,6 +203,67 @@ struct PolicyCanvasLocalValidationTests {
     #expect(codes.contains("dangling_edge"))
   }
 
+  @Test("duplicate node titles are flagged with the matched ids")
+  func duplicateTitlesAreFlagged() {
+    let viewModel = makeLabeledCanvas(nodes: [
+      ("n1", "action in"),
+      ("n2", "action in"),
+      ("n3", "evidence pass"),
+      ("n4", "action in"),
+    ])
+
+    let issues = viewModel.validateGraph()
+    let dupes = issues.filter { $0.code == "duplicate_label" }
+
+    #expect(dupes.count == 1)
+    let nodeIds = Set(dupes.first?.nodeIds ?? [])
+    #expect(nodeIds == ["n1", "n2", "n4"])
+    let message = dupes.first?.message ?? ""
+    #expect(message.contains("action in"))
+    #expect(message.contains("3"))
+  }
+
+  @Test("unique titles produce no duplicate_label issues")
+  func uniqueTitlesProduceNoIssue() {
+    let viewModel = makeLabeledCanvas(nodes: [
+      ("n1", "intake"),
+      ("n2", "decision"),
+      ("n3", "outcome"),
+    ])
+
+    let codes = viewModel.validateGraph().map(\.code)
+    #expect(!codes.contains("duplicate_label"))
+  }
+
+  @Test("empty / whitespace titles do not surface as duplicates")
+  func emptyTitleDuplicatesIgnored() {
+    let viewModel = makeLabeledCanvas(nodes: [
+      ("n1", ""),
+      ("n2", "   "),
+      ("n3", ""),
+    ])
+
+    let codes = viewModel.validateGraph().map(\.code)
+    #expect(!codes.contains("duplicate_label"))
+  }
+
+  @Test("multiple duplicate groups land in alphabetical title order")
+  func duplicateGroupsSortedByTitle() {
+    let viewModel = makeLabeledCanvas(nodes: [
+      ("n1", "zeta"),
+      ("n2", "zeta"),
+      ("n3", "alpha"),
+      ("n4", "alpha"),
+    ])
+
+    let messages = viewModel.validateGraph()
+      .filter { $0.code == "duplicate_label" }
+      .map(\.message)
+    #expect(messages.count == 2)
+    #expect(messages[0].contains("alpha"))
+    #expect(messages[1].contains("zeta"))
+  }
+
   // MARK: - Helpers
 
   private struct OrphanNodeSpec {
@@ -280,6 +341,30 @@ struct PolicyCanvasLocalValidationTests {
       nodes: canvasNodes,
       groups: canvasGroups,
       edges: canvasEdges,
+      selection: nil,
+      zoom: 1
+    )
+  }
+
+  /// Build a canvas with explicit `(id, title)` pairs so the
+  /// duplicate-label validator has a stable fixture. No edges, no
+  /// groups - those are exercised separately by `makeCycleCanvas` and
+  /// `makeOrphanCanvas`. The duplicate-label rule operates over node
+  /// titles only, so a bare node list is the minimum sufficient
+  /// fixture.
+  private func makeLabeledCanvas(nodes: [(String, String)]) -> PolicyCanvasViewModel {
+    let canvasNodes = nodes.map { id, title in
+      PolicyCanvasNode(
+        id: id,
+        title: title,
+        kind: .source,
+        position: .zero
+      )
+    }
+    return PolicyCanvasViewModel(
+      nodes: canvasNodes,
+      groups: [],
+      edges: [],
       selection: nil,
       zoom: 1
     )
