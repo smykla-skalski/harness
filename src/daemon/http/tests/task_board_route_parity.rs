@@ -28,6 +28,7 @@ async fn run_task_board_workflow_parity() {
     let (base_url, server) = serve_http(state).await;
     let client = reqwest::Client::new();
 
+    assert_planning_routes_match(&client, &base_url).await;
     assert_http_ws_post_match(
         &client,
         &base_url,
@@ -70,6 +71,77 @@ async fn run_task_board_workflow_parity() {
 
     server.abort();
     let _ = server.await;
+}
+
+async fn assert_planning_routes_match(client: &reqwest::Client, base_url: &str) {
+    seed_planning_board_item("parity-plan-http");
+    seed_planning_board_item("parity-plan-ws");
+
+    let http_begin = post_json(
+        client,
+        base_url,
+        &planning_path(http_paths::TASK_BOARD_PLAN_BEGIN, "parity-plan-http"),
+        json!({}),
+    )
+    .await;
+    let ws_begin = ws_result(
+        base_url,
+        "req-task-board-plan-begin",
+        ws_methods::TASK_BOARD_PLAN_BEGIN,
+        json!({ "id": "parity-plan-ws" }),
+    )
+    .await;
+    assert_eq!(
+        normalized_planning_response(&http_begin),
+        normalized_planning_response(&ws_begin)
+    );
+
+    let submit_body = json!({ "summary": "Use the semantic plan." });
+    let http_submit = post_json(
+        client,
+        base_url,
+        &planning_path(http_paths::TASK_BOARD_PLAN_SUBMIT, "parity-plan-http"),
+        submit_body.clone(),
+    )
+    .await;
+    let mut ws_submit_body = submit_body;
+    ws_submit_body["id"] = json!("parity-plan-ws");
+    let ws_submit = ws_result(
+        base_url,
+        "req-task-board-plan-submit",
+        ws_methods::TASK_BOARD_PLAN_SUBMIT,
+        ws_submit_body,
+    )
+    .await;
+    assert_eq!(
+        normalized_planning_response(&http_submit),
+        normalized_planning_response(&ws_submit)
+    );
+
+    let approve_body = json!({
+        "approved_by": "lead",
+        "approved_at": "2026-05-14T02:00:00Z",
+    });
+    let http_approve = post_json(
+        client,
+        base_url,
+        &planning_path(http_paths::TASK_BOARD_PLAN_APPROVE, "parity-plan-http"),
+        approve_body.clone(),
+    )
+    .await;
+    let mut ws_approve_body = approve_body;
+    ws_approve_body["id"] = json!("parity-plan-ws");
+    let ws_approve = ws_result(
+        base_url,
+        "req-task-board-plan-approve",
+        ws_methods::TASK_BOARD_PLAN_APPROVE,
+        ws_approve_body,
+    )
+    .await;
+    assert_eq!(
+        normalized_planning_response(&http_approve),
+        normalized_planning_response(&ws_approve)
+    );
 }
 
 #[test]
@@ -512,6 +584,34 @@ fn seed_ready_board_item(id: &str, title: &str) {
     let title = item.title.clone();
     let body = item.body.clone();
     store.create(&title, &body, item).expect("create item");
+}
+
+fn seed_planning_board_item(id: &str) {
+    let store = TaskBoardStore::new(default_board_root());
+    let mut item = TaskBoardItem::new(
+        id.to_string(),
+        "Planning parity item".to_string(),
+        "Create a planning parity task.".to_string(),
+        "2026-05-14T00:00:00Z".to_string(),
+    );
+    item.status = TaskBoardStatus::Todo;
+    item.planning.summary = Some("Old plan".into());
+    item.planning.approved_by = Some("lead".into());
+    item.planning.approved_at = Some("2026-05-14T01:00:00Z".into());
+    let title = item.title.clone();
+    let body = item.body.clone();
+    store.create(&title, &body, item).expect("create item");
+}
+
+fn planning_path(template: &str, id: &str) -> String {
+    template.replace("{item_id}", id)
+}
+
+fn normalized_planning_response(value: &Value) -> Value {
+    let mut value = value.clone();
+    value["transition"]["board_item_id"] = json!("normalized-item");
+    value["item"]["id"] = json!("normalized-item");
+    value
 }
 
 fn normalized_policy(value: &Value) -> Value {

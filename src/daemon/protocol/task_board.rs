@@ -1,5 +1,6 @@
 use serde::{Deserialize, Serialize};
 
+use crate::task_board::planning::PlanningTransition;
 use crate::task_board::types::TaskBoardWorkflowState;
 use crate::task_board::{
     AgentMode, DispatchExecutionSummary, ExternalProvider, ExternalRef, ExternalSyncDirection,
@@ -97,8 +98,33 @@ pub struct TaskBoardDeleteItemRequest {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TaskBoardPlanBeginRequest {
+    pub id: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TaskBoardPlanSubmitRequest {
+    pub id: String,
+    pub summary: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TaskBoardPlanApproveRequest {
+    pub id: String,
+    pub approved_by: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub approved_at: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TaskBoardListItemsResponse {
     pub items: Vec<TaskBoardItem>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TaskBoardPlanningResponse {
+    pub transition: PlanningTransition,
+    pub item: TaskBoardItem,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

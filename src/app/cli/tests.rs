@@ -314,6 +314,26 @@ fn parse_task_board_orchestrator_runtime_config_and_tokens() {
         }
         _ => panic!("expected TaskBoard Orchestrator GithubTokens"),
     }
+
+    let todoist = Cli::try_parse_from([
+        "harness",
+        "task-board",
+        "orchestrator",
+        "todoist-token",
+        "--token-env",
+        "HARNESS_TODOIST_TOKEN",
+        "--json",
+    ])
+    .unwrap();
+    match task_board_command(todoist.command) {
+        TaskBoardCommand::Orchestrator {
+            command: TaskBoardOrchestratorCommand::TodoistToken(args),
+        } => {
+            assert_eq!(args.token_env.as_deref(), Some("HARNESS_TODOIST_TOKEN"));
+            assert!(args.json);
+        }
+        _ => panic!("expected TaskBoard Orchestrator TodoistToken"),
+    }
 }
 
 #[test]

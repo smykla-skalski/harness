@@ -6,12 +6,14 @@ use crate::daemon::protocol::{
     TaskBoardAuditRequest, TaskBoardAuditResponse, TaskBoardCatalogRequest,
     TaskBoardCreateItemRequest, TaskBoardDeleteItemRequest, TaskBoardDispatchRequest,
     TaskBoardDispatchResponse, TaskBoardGetItemRequest, TaskBoardListItemsRequest,
-    TaskBoardListItemsResponse, TaskBoardMachinesResponse, TaskBoardPolicyPipelineAuditResponse,
-    TaskBoardPolicyPipelinePromoteRequest, TaskBoardPolicyPipelinePromoteResponse,
-    TaskBoardPolicyPipelineResponse, TaskBoardPolicyPipelineSaveDraftRequest,
-    TaskBoardPolicyPipelineSaveDraftResponse, TaskBoardPolicyPipelineSimulateRequest,
-    TaskBoardPolicyPipelineSimulationResponse, TaskBoardProjectsResponse, TaskBoardSyncRequest,
-    TaskBoardSyncResponse, TaskBoardUpdateItemRequest,
+    TaskBoardListItemsResponse, TaskBoardMachinesResponse, TaskBoardPlanApproveRequest,
+    TaskBoardPlanBeginRequest, TaskBoardPlanSubmitRequest, TaskBoardPlanningResponse,
+    TaskBoardPolicyPipelineAuditResponse, TaskBoardPolicyPipelinePromoteRequest,
+    TaskBoardPolicyPipelinePromoteResponse, TaskBoardPolicyPipelineResponse,
+    TaskBoardPolicyPipelineSaveDraftRequest, TaskBoardPolicyPipelineSaveDraftResponse,
+    TaskBoardPolicyPipelineSimulateRequest, TaskBoardPolicyPipelineSimulationResponse,
+    TaskBoardProjectsResponse, TaskBoardSyncRequest, TaskBoardSyncResponse,
+    TaskBoardUpdateItemRequest,
 };
 use crate::errors::{CliError, CliErrorKind};
 use crate::task_board::store::{OptionalFieldPatch, TaskBoardItemPatch};
@@ -21,6 +23,7 @@ use crate::task_board::{
     build_project_summaries, build_sync_summary, configured_sync_clients, default_board_root,
     sync_external_tasks,
 };
+use crate::task_board::{PlanningTransition, approve_plan, begin_planning, submit_plan};
 use crate::workspace::utc_now;
 
 use super::task_board_runtime::external_sync_config_for_repository;
@@ -99,6 +102,39 @@ pub fn delete_task_board_item(
     request: &TaskBoardDeleteItemRequest,
 ) -> Result<TaskBoardItem, CliError> {
     store().delete(&request.id)
+}
+
+/// Move an item back into planning and clear prior approval.
+///
+/// # Errors
+/// Returns `CliError` when the item cannot be loaded or persisted.
+pub fn begin_task_board_planning(
+    request: &TaskBoardPlanBeginRequest,
+) -> Result<TaskBoardPlanningResponse, CliError> {
+    apply_planning_transition(&request.id, begin_planning)
+}
+
+/// Submit a semantic plan summary for review.
+///
+/// # Errors
+/// Returns `CliError` when the item cannot be loaded or persisted.
+pub fn submit_task_board_plan(
+    request: &TaskBoardPlanSubmitRequest,
+) -> Result<TaskBoardPlanningResponse, CliError> {
+    apply_planning_transition(&request.id, |item| submit_plan(item, &request.summary))
+}
+
+/// Approve the current semantic plan and move the item to ready work.
+///
+/// # Errors
+/// Returns `CliError` when the item cannot be loaded or persisted.
+pub fn approve_task_board_plan(
+    request: &TaskBoardPlanApproveRequest,
+) -> Result<TaskBoardPlanningResponse, CliError> {
+    let approved_at = request.approved_at.clone().unwrap_or_else(utc_now);
+    apply_planning_transition(&request.id, |item| {
+        approve_plan(item, &request.approved_by, &approved_at)
+    })
 }
 
 /// Preview or apply external sync for local task-board items.
@@ -267,6 +303,24 @@ fn optional_string_patch(value: Option<&String>, clear: bool) -> OptionalFieldPa
     value
         .cloned()
         .map_or(OptionalFieldPatch::Unchanged, OptionalFieldPatch::Set)
+}
+
+fn apply_planning_transition(
+    id: &str,
+    transition_for: impl FnOnce(&TaskBoardItem) -> PlanningTransition,
+) -> Result<TaskBoardPlanningResponse, CliError> {
+    let board = store();
+    let current = board.get(id)?;
+    let transition = transition_for(&current);
+    let item = board.update(
+        id,
+        TaskBoardItemPatch {
+            status: Some(transition.to_status),
+            planning: Some(transition.planning.clone()),
+            ..TaskBoardItemPatch::default()
+        },
+    )?;
+    Ok(TaskBoardPlanningResponse { transition, item })
 }
 
 fn store() -> TaskBoardStore {

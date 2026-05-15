@@ -10,12 +10,14 @@ use crate::daemon::service;
 use crate::errors::{CliError, CliErrorKind};
 use crate::task_board::types::TaskBoardStatus;
 use crate::task_board::{
-    TaskBoardGitHubRepositoryToken, TaskBoardGitHubTokensSyncRequest,
     TaskBoardGitRepositoryOverride, TaskBoardGitRuntimeConfig, TaskBoardGitRuntimeProfile,
     TaskBoardGitSigningConfig, TaskBoardGitSigningMode, TaskBoardOrchestratorStatus,
     normalize_repository_slug,
 };
 
+use super::orchestrator_tokens::{
+    TaskBoardOrchestratorGithubTokensArgs, TaskBoardOrchestratorTodoistTokenArgs,
+};
 use super::print_json;
 
 #[derive(Debug, Clone, Subcommand)]
@@ -35,6 +37,8 @@ pub enum TaskBoardOrchestratorCommand {
     RuntimeConfig(TaskBoardOrchestratorRuntimeConfigArgs),
     /// Sync process-local GitHub tokens from environment variables.
     GithubTokens(TaskBoardOrchestratorGithubTokensArgs),
+    /// Sync the process-local Todoist token from an environment variable.
+    TodoistToken(TaskBoardOrchestratorTodoistTokenArgs),
 }
 
 #[derive(Debug, Clone, Args)]
@@ -121,18 +125,6 @@ pub struct TaskBoardRuntimeSigningArgs {
     pub clear_signing: bool,
 }
 
-#[derive(Debug, Clone, Args)]
-pub struct TaskBoardOrchestratorGithubTokensArgs {
-    #[arg(long)]
-    pub json: bool,
-    #[arg(long)]
-    pub clear: bool,
-    #[arg(long)]
-    pub global_token_env: Option<String>,
-    #[arg(long)]
-    pub repository_token_env: Vec<String>,
-}
-
 #[derive(Debug, Clone, Copy, ValueEnum)]
 #[value(rename_all = "snake_case")]
 pub enum TaskBoardGitSigningModeArg {
@@ -151,6 +143,7 @@ impl Execute for TaskBoardOrchestratorCommand {
             Self::Settings(args) => args.execute(context),
             Self::RuntimeConfig(args) => args.execute(context),
             Self::GithubTokens(args) => args.execute(context),
+            Self::TodoistToken(args) => args.execute(context),
         }
     }
 }
@@ -340,48 +333,6 @@ impl TaskBoardRuntimeSigningArgs {
     }
 }
 
-impl Execute for TaskBoardOrchestratorGithubTokensArgs {
-    fn execute(&self, _context: &AppContext) -> Result<i32, CliError> {
-        if !self.clear && self.global_token_env.is_none() && self.repository_token_env.is_empty() {
-            return Err(CliErrorKind::workflow_parse(
-                "provide --clear, --global-token-env, or --repository-token-env",
-            )
-            .into());
-        }
-        let request = self.sync_request()?;
-        let response = service::sync_task_board_github_tokens(&request)?;
-        if self.json {
-            print_json(&response)?;
-        } else {
-            println!(
-                "task-board github tokens: global_configured={}, repository_count={}",
-                response.global_token_configured, response.repository_token_count
-            );
-        }
-        Ok(0)
-    }
-}
-
-impl TaskBoardOrchestratorGithubTokensArgs {
-    fn sync_request(&self) -> Result<TaskBoardGitHubTokensSyncRequest, CliError> {
-        if self.clear {
-            return Ok(TaskBoardGitHubTokensSyncRequest::default());
-        }
-        Ok(TaskBoardGitHubTokensSyncRequest {
-            global_token: self
-                .global_token_env
-                .as_deref()
-                .map(read_secret_env)
-                .transpose()?,
-            repository_tokens: self
-                .repository_token_env
-                .iter()
-                .map(|value| repository_token_from_env(value))
-                .collect::<Result<Vec<_>, _>>()?,
-        })
-    }
-}
-
 impl From<TaskBoardGitSigningModeArg> for TaskBoardGitSigningMode {
     fn from(value: TaskBoardGitSigningModeArg) -> Self {
         match value {
@@ -459,21 +410,6 @@ fn read_secret_env(name: &str) -> Result<String, CliError> {
         .into());
     }
     Ok(value)
-}
-
-fn repository_token_from_env(value: &str) -> Result<TaskBoardGitHubRepositoryToken, CliError> {
-    let (repository, env_name) = value.split_once('=').ok_or_else(|| {
-        CliErrorKind::workflow_parse("repository token env must be owner/repo=ENV_VAR")
-    })?;
-    let repository = normalize_repository_slug(Some(repository)).ok_or_else(|| {
-        CliErrorKind::workflow_parse(format!(
-            "invalid task-board repository token override '{repository}', expected owner/repo"
-        ))
-    })?;
-    Ok(TaskBoardGitHubRepositoryToken {
-        repository,
-        token: read_secret_env(env_name.trim())?,
-    })
 }
 
 fn print_runtime_config_summary(config: &TaskBoardGitRuntimeConfig) {

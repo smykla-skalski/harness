@@ -107,6 +107,24 @@ fn task_board_routes_have_complete_ws_parity() {
             ),
             (
                 HttpRouteMethod::Post,
+                http_paths::TASK_BOARD_PLAN_BEGIN,
+                ws_methods::TASK_BOARD_PLAN_BEGIN,
+                true,
+            ),
+            (
+                HttpRouteMethod::Post,
+                http_paths::TASK_BOARD_PLAN_SUBMIT,
+                ws_methods::TASK_BOARD_PLAN_SUBMIT,
+                true,
+            ),
+            (
+                HttpRouteMethod::Post,
+                http_paths::TASK_BOARD_PLAN_APPROVE,
+                ws_methods::TASK_BOARD_PLAN_APPROVE,
+                true,
+            ),
+            (
+                HttpRouteMethod::Post,
                 http_paths::TASK_BOARD_SYNC,
                 ws_methods::TASK_BOARD_SYNC,
                 true,

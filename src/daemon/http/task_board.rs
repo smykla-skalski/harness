@@ -24,7 +24,9 @@ mod items;
 use self::items::{
     delete_task_board_item, get_task_board_audit, get_task_board_item, get_task_board_items,
     get_task_board_machines, get_task_board_projects, post_task_board_dispatch,
-    post_task_board_evaluate, post_task_board_item, post_task_board_sync, put_task_board_item,
+    post_task_board_evaluate, post_task_board_item, post_task_board_plan_approve,
+    post_task_board_plan_begin, post_task_board_plan_submit, post_task_board_sync,
+    put_task_board_item,
 };
 
 macro_rules! authenticated_request {
@@ -49,6 +51,18 @@ pub(super) fn task_board_routes() -> Router<DaemonHttpState> {
             get(get_task_board_item)
                 .put(put_task_board_item)
                 .delete(delete_task_board_item),
+        )
+        .route(
+            http_paths::TASK_BOARD_PLAN_BEGIN,
+            post(post_task_board_plan_begin),
+        )
+        .route(
+            http_paths::TASK_BOARD_PLAN_SUBMIT,
+            post(post_task_board_plan_submit),
+        )
+        .route(
+            http_paths::TASK_BOARD_PLAN_APPROVE,
+            post(post_task_board_plan_approve),
         )
         .route(http_paths::TASK_BOARD_SYNC, post(post_task_board_sync))
         .route(

@@ -5,6 +5,7 @@ use crate::daemon::protocol::{
     TaskBoardGetItemRequest, TaskBoardGitHubTokensSyncRequest, TaskBoardGitRuntimeConfig,
     TaskBoardListItemsRequest, TaskBoardOrchestratorRunOnceRequest,
     TaskBoardOrchestratorRunOnceResponse, TaskBoardOrchestratorSettingsUpdateRequest,
+    TaskBoardPlanApproveRequest, TaskBoardPlanBeginRequest, TaskBoardPlanSubmitRequest,
     TaskBoardPolicyPipelinePromoteRequest, TaskBoardPolicyPipelineSaveDraftRequest,
     TaskBoardPolicyPipelineSimulateRequest, TaskBoardSyncRequest, TaskBoardTodoistTokenSyncRequest,
     TaskBoardUpdateItemRequest, WsRequest, WsResponse, ws_methods,
@@ -28,6 +29,9 @@ pub(crate) async fn dispatch_task_board_method(
         ws_methods::TASK_BOARD_GET => Some(dispatch_task_board_get(request)),
         ws_methods::TASK_BOARD_UPDATE => Some(dispatch_task_board_update(request)),
         ws_methods::TASK_BOARD_DELETE => Some(dispatch_task_board_delete(request)),
+        ws_methods::TASK_BOARD_PLAN_BEGIN => Some(dispatch_task_board_plan_begin(request)),
+        ws_methods::TASK_BOARD_PLAN_SUBMIT => Some(dispatch_task_board_plan_submit(request)),
+        ws_methods::TASK_BOARD_PLAN_APPROVE => Some(dispatch_task_board_plan_approve(request)),
         ws_methods::TASK_BOARD_SYNC => Some(dispatch_task_board_sync(request).await),
         ws_methods::TASK_BOARD_DISPATCH => Some(dispatch_task_board_dispatch(request, state).await),
         ws_methods::TASK_BOARD_EVALUATE => Some(dispatch_task_board_evaluate(request, state).await),
@@ -119,6 +123,27 @@ fn dispatch_task_board_delete(request: &WsRequest) -> WsResponse {
         return invalid_params(request);
     };
     dispatch_query_result(&request.id, service::delete_task_board_item(&body))
+}
+
+fn dispatch_task_board_plan_begin(request: &WsRequest) -> WsResponse {
+    let Ok(body) = parse_params::<TaskBoardPlanBeginRequest>(request) else {
+        return invalid_params(request);
+    };
+    dispatch_query_result(&request.id, service::begin_task_board_planning(&body))
+}
+
+fn dispatch_task_board_plan_submit(request: &WsRequest) -> WsResponse {
+    let Ok(body) = parse_params::<TaskBoardPlanSubmitRequest>(request) else {
+        return invalid_params(request);
+    };
+    dispatch_query_result(&request.id, service::submit_task_board_plan(&body))
+}
+
+fn dispatch_task_board_plan_approve(request: &WsRequest) -> WsResponse {
+    let Ok(body) = parse_params::<TaskBoardPlanApproveRequest>(request) else {
+        return invalid_params(request);
+    };
+    dispatch_query_result(&request.id, service::approve_task_board_plan(&body))
 }
 
 async fn dispatch_task_board_sync(request: &WsRequest) -> WsResponse {

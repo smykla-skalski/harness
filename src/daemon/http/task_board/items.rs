@@ -9,7 +9,8 @@ use serde::Deserialize;
 use crate::daemon::protocol::{
     TaskBoardAuditRequest, TaskBoardCatalogRequest, TaskBoardCreateItemRequest,
     TaskBoardDeleteItemRequest, TaskBoardDispatchRequest, TaskBoardEvaluateRequest,
-    TaskBoardGetItemRequest, TaskBoardListItemsRequest, TaskBoardSyncRequest,
+    TaskBoardGetItemRequest, TaskBoardListItemsRequest, TaskBoardPlanApproveRequest,
+    TaskBoardPlanBeginRequest, TaskBoardPlanSubmitRequest, TaskBoardSyncRequest,
     TaskBoardUpdateItemRequest, http_paths,
 };
 use crate::daemon::service;
@@ -23,6 +24,17 @@ use super::super::response::{extract_request_id, timed_json};
 #[derive(Debug, Clone, Default, Deserialize)]
 pub(super) struct TaskBoardListQuery {
     pub status: Option<TaskBoardStatus>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub(super) struct TaskBoardPlanSubmitBody {
+    pub summary: String,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub(super) struct TaskBoardPlanApproveBody {
+    pub approved_by: String,
+    pub approved_at: Option<String>,
 }
 
 macro_rules! authenticated_parts {
@@ -111,6 +123,63 @@ pub(super) async fn delete_task_board_item(
         &request_id,
         start,
         service::delete_task_board_item(&request),
+    )
+}
+
+pub(super) async fn post_task_board_plan_begin(
+    Path(item_id): Path<String>,
+    headers: HeaderMap,
+    State(state): State<DaemonHttpState>,
+) -> Response {
+    let (start, request_id) = authenticated_parts!(headers, state);
+    let request = TaskBoardPlanBeginRequest { id: item_id };
+    timed_json(
+        "POST",
+        http_paths::TASK_BOARD_PLAN_BEGIN,
+        &request_id,
+        start,
+        service::begin_task_board_planning(&request),
+    )
+}
+
+pub(super) async fn post_task_board_plan_submit(
+    Path(item_id): Path<String>,
+    headers: HeaderMap,
+    State(state): State<DaemonHttpState>,
+    Json(body): Json<TaskBoardPlanSubmitBody>,
+) -> Response {
+    let (start, request_id) = authenticated_parts!(headers, state);
+    let request = TaskBoardPlanSubmitRequest {
+        id: item_id,
+        summary: body.summary,
+    };
+    timed_json(
+        "POST",
+        http_paths::TASK_BOARD_PLAN_SUBMIT,
+        &request_id,
+        start,
+        service::submit_task_board_plan(&request),
+    )
+}
+
+pub(super) async fn post_task_board_plan_approve(
+    Path(item_id): Path<String>,
+    headers: HeaderMap,
+    State(state): State<DaemonHttpState>,
+    Json(body): Json<TaskBoardPlanApproveBody>,
+) -> Response {
+    let (start, request_id) = authenticated_parts!(headers, state);
+    let request = TaskBoardPlanApproveRequest {
+        id: item_id,
+        approved_by: body.approved_by,
+        approved_at: body.approved_at,
+    };
+    timed_json(
+        "POST",
+        http_paths::TASK_BOARD_PLAN_APPROVE,
+        &request_id,
+        start,
+        service::approve_task_board_plan(&request),
     )
 }
 
