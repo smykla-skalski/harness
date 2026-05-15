@@ -242,6 +242,42 @@ fn predicate_passes_is_positive_admits_count_evidence() {
     );
 }
 
+#[test]
+fn evaluate_graph_uses_visited_set_not_counter() {
+    // Seed has 11 nodes; the previous counter capped at `nodes.len() + 1`.
+    // Pad the graph with unconnected nodes so the visited-set check is the
+    // structural guard (rather than the loop counter) keeping evaluation
+    // bounded.
+    let mut graph = PolicyGraph::seeded_v2();
+    let template = graph
+        .nodes
+        .iter()
+        .find(|node| node.id == "supervisor:default-allow")
+        .cloned()
+        .expect("supervisor node");
+    for index in 0..32 {
+        let mut cloned = template.clone();
+        cloned.id = format!("supervisor:padding-{index}");
+        graph.nodes.push(cloned);
+    }
+    assert!(graph.validate().is_valid(), "padded graph stays valid");
+
+    let simulation = graph.simulate(&PolicyInput::new(PolicyAction::SpawnAgent));
+    let reason = match simulation.decision {
+        PolicyDecision::Allow { reason_code, .. } => reason_code,
+        other => panic!("unexpected decision: {other:?}"),
+    };
+    assert_eq!(reason, PolicyReasonCode::DefaultAllow);
+    let mut visited_seen = std::collections::HashSet::new();
+    for node_id in &simulation.visited_node_ids {
+        assert!(
+            visited_seen.insert(node_id.clone()),
+            "evaluation revisited node {node_id} (visited: {:?})",
+            simulation.visited_node_ids,
+        );
+    }
+}
+
 fn merge_evidence(green: bool, protected_path: bool, risk_score: u8) -> PolicyEvidence {
     PolicyEvidence {
         checks_green: Some(green),
