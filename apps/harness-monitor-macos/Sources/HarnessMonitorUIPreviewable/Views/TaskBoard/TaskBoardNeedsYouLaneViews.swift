@@ -27,14 +27,18 @@ struct TaskBoardNeedsYouLaneColumn: View {
         if section.items.isEmpty && decisions.isEmpty {
           TaskBoardEmptyLane(lane: .needsYou)
         } else {
-          VStack(spacing: metrics.laneSpacing) {
-            ForEach(decisions, id: \.id) { decision in
-              TaskBoardDecisionRow(decision: decision, onOpenDecision: onOpenDecision)
+          ScrollView(.vertical, showsIndicators: true) {
+            VStack(spacing: metrics.laneSpacing) {
+              ForEach(decisions, id: \.id) { decision in
+                TaskBoardDecisionRow(decision: decision, onOpenDecision: onOpenDecision)
+              }
+              ForEach(section.items) { item in
+                TaskBoardItemRow(item: item, onOpenItem: onOpenItem)
+              }
             }
-            ForEach(section.items) { item in
-              TaskBoardItemRow(item: item, onOpenItem: onOpenItem)
-            }
+            .frame(maxWidth: .infinity)
           }
+          .scrollBounceBehavior(.basedOnSize)
         }
       }
       .taskBoardLaneBodyChrome(lane: .needsYou, isDropTargeted: isDropTargeted)
@@ -43,7 +47,6 @@ struct TaskBoardNeedsYouLaneColumn: View {
     .dropDestination(for: TaskBoardItemDragPayload.self, action: handleDrop) { targeted in
       updateDropTargeted(targeted)
     }
-    .onDrop(of: [.harnessMonitorTaskBoardItem], isTargeted: nil, perform: handleLegacyDrop)
     .accessibilityElement(children: .contain)
     .accessibilityIdentifier("harness.task-board.needs-you-column")
   }
@@ -60,12 +63,6 @@ struct TaskBoardNeedsYouLaneColumn: View {
         to: .needsYou,
         move: onMoveItem
       )
-    }
-  }
-
-  private func handleLegacyDrop(_ providers: [NSItemProvider]) -> Bool {
-    TaskBoardItemDragPayload.loadFirst(from: providers) { payload in
-      _ = handleDrop([payload], .zero)
     }
   }
 
