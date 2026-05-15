@@ -171,8 +171,11 @@ extension PolicyCanvasViewModel {
       return to == nil ? "Removed from group" : "Moved to group"
     case .setNodeSubtitle(_, _, let to):
       return "Subtitle set to \(to)"
-    case .setNodePolicyKind:
-      return "Node binding updated"
+    case .setNodePolicyKind(_, _, let to):
+      if let to {
+        return "Node binding set to \(to.kind)"
+      }
+      return "Node binding cleared"
     case .setEdgeCondition(_, _, let to):
       return "Condition set to \(to)"
     case .setEdgeLabel(_, _, let to):
@@ -180,7 +183,7 @@ extension PolicyCanvasViewModel {
     case .setEdgeKind(_, _, let to):
       return "Edge kind set to \(to.accessibilityWord)"
     case .setEdgePinnedPortSide(_, _, let to):
-      return to ? "Edge ports pinned" : "Edge ports flex"
+      return to ? "Edge ports pinned" : "Edge ports unpinned"
     case .setGroupTitle(_, _, let to):
       return "Group renamed to \(to)"
     case .setGroupTone(_, _, let to):
