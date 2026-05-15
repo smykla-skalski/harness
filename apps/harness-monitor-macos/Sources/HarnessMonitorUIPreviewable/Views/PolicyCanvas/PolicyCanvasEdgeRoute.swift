@@ -4,6 +4,11 @@ struct PolicyCanvasEdgeRoute {
   let points: [CGPoint]
   let labelPosition: CGPoint
 
+  init(points: [CGPoint], labelPosition: CGPoint) {
+    self.points = points
+    self.labelPosition = labelPosition
+  }
+
   init(
     source: CGPoint,
     target: CGPoint,
