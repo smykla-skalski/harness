@@ -205,6 +205,19 @@ enum PolicyCanvasChange {
   /// label, not one per character.
   case setEdgeLabel(id: String, from: String, to: String)
 
+  /// Commit an edge's semantic kind (flow / control / error). Lands on a
+  /// single Cmd-Z entry per inspector picker pick. Defaults to the
+  /// heuristic-derived kind when an edge is constructed; the inspector
+  /// override surfaces this case so the user can correct a misclassified
+  /// condition string.
+  case setEdgeKind(id: String, from: PolicyCanvasEdgeKind, to: PolicyCanvasEdgeKind)
+
+  /// Toggle an edge's `pinnedPortSide` flag. When false, the visibility
+  /// router walks all 4-side anchor combinations and picks the lowest-cost
+  /// route. Inspector toggle writes land here so flipping the pin produces
+  /// one undo entry.
+  case setEdgePinnedPortSide(id: String, from: Bool, to: Bool)
+
   /// Commit a group's title edit. Same per-commit funnel rule as
   /// `setEdgeLabel` — inspector text fields keep local @State for keystrokes
   /// and route to this case only on commit.
@@ -257,6 +270,10 @@ enum PolicyCanvasChange {
       return "Edit Condition"
     case .setEdgeLabel:
       return "Edit Label"
+    case .setEdgeKind:
+      return "Change Edge Kind"
+    case .setEdgePinnedPortSide:
+      return "Toggle Port Pin"
     case .setGroupTitle:
       return "Rename Group"
     case .setGroupTone:

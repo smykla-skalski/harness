@@ -97,14 +97,33 @@ struct PolicyCanvasInteractiveEdge: View {
     .accessibilityActivationPoint(route.arcLengthMidpoint)
   }
 
-  /// Hover tooltip surfacing the same kind word a VoiceOver user hears via
-  /// `.accessibilityValue`. Without this, sighted users hovering an edge got
-  /// only the "from source to target" label while AT users got the kind -
-  /// modality asymmetry that left sighted users to decode the color or dash
-  /// pattern unaided. The kind is named in parentheses so the existing label
-  /// stays the headline.
+  /// Hover tooltip surfacing the kind word + dash-pattern key so sighted
+  /// users hovering an edge see what VoiceOver hears AND can decode the
+  /// stroke style without a legend lookup. Shape is
+  /// `<source-to-target> (<kind>, <dash-key>)` - the dash key names what
+  /// the visible pattern means in plain words ("solid" for flow,
+  /// "widely dashed" for control, "tightly dashed" for error). Without
+  /// the dash key, the WCAG 1.4.1 non-color signifier shipped in
+  /// Phase 3 still required a separate legend to interpret.
   private var hoverHelpString: String {
-    "\(accessibilityLabel) (\(accessibilityKindWord))"
+    let key = dashPatternKey(for: kindDashPattern)
+    return "\(accessibilityLabel) (\(accessibilityKindWord), \(key))"
+  }
+
+  /// Map a stored kind dash pattern to a plain-language label. Matches
+  /// the three patterns shipped by `PolicyCanvasEdgeKind.strokeDashPattern`
+  /// today (empty / `[6, 4]` / `[3, 2]`). Defaults to "dashed" for any
+  /// future pattern so the tooltip stays informative without forcing the
+  /// caller to extend this map every time.
+  private func dashPatternKey(for pattern: [CGFloat]) -> String {
+    if pattern.isEmpty {
+      return "solid"
+    }
+    let first = pattern.first ?? 0
+    if first >= 6 {
+      return "widely dashed"
+    }
+    return "tightly dashed"
   }
 
   /// VoiceOver value combining the kind word with an "active" suffix when
