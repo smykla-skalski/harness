@@ -304,28 +304,21 @@ extension TaskBoardOverviewView {
   }
 
   private func openTaskBoardItem(_ item: TaskBoardItem) {
-    if shouldOpenLinkedTask(item) {
+    switch TaskBoardOverviewItemBehavior.selectionAction(
+      for: item,
+      selectedTaskBoardItemID: selectedTaskBoardItemID,
+      inboxItems: snapshot.items
+    ) {
+    case .openLinkedTask:
       isCreatingTaskBoardItem = false
       selectedTaskBoardItemID = nil
       onOpenTaskBoardItem(item)
-    } else if selectedTaskBoardItemID == item.id {
-      selectedTaskBoardItemID = nil
-    } else {
+    case .selectBoardItem:
       isCreatingTaskBoardItem = false
       selectedTaskBoardItemID = item.id
-    }
-  }
-
-  private func shouldOpenLinkedTask(_ item: TaskBoardItem) -> Bool {
-    guard item.hasLinkedSessionTask else {
-      return false
-    }
-    guard !snapshot.items.isEmpty else {
-      return true
-    }
-    return snapshot.items.contains { inboxItem in
-      inboxItem.session.sessionId == item.sessionId
-        && inboxItem.task.taskId == item.workItemId
+    case .clearBoardSelection:
+      isCreatingTaskBoardItem = false
+      selectedTaskBoardItemID = nil
     }
   }
 
@@ -377,9 +370,7 @@ extension TaskBoardOverviewView {
   }
 
   private func runOrchestratorOnceForItem(_ item: TaskBoardItem) {
-    onRunTaskBoardOrchestratorOnce?(
-      TaskBoardOrchestratorRunOnceRequest(itemId: item.id, status: item.status)
-    )
+    onRunTaskBoardOrchestratorOnce?(TaskBoardOverviewItemBehavior.runOnceRequest(for: item))
   }
 
   private var selectedTaskBoardItemEvaluateAction: ((TaskBoardItem) -> Void)? {

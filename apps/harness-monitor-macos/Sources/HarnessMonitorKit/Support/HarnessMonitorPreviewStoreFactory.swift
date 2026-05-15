@@ -52,6 +52,7 @@ public enum HarnessMonitorPreviewStoreFactory {
     case agentTuiSingle
     case agentTuiOverflow
     case taskDropCockpit
+    case taskBoardBoardOnly
     case offlineCached
     case sidebarOverflow
     case empty
@@ -97,6 +98,7 @@ public enum HarnessMonitorPreviewStoreFactory {
     )
     store.connectionMetrics = configuration.connectionMetrics
     store.connectionEvents = configuration.connectionEvents
+    store.globalTaskBoardItems = configuration.fixtures.taskBoardItems
     store.sessionIndex.replaceSnapshot(
       projects: configuration.fixtures.projects,
       sessions: configuration.fixtures.sessions
@@ -136,6 +138,7 @@ public enum HarnessMonitorPreviewStoreFactory {
       hostBridgeOverride: hostBridgeOverride
     )
     store.synchronizeActionActor()
+    store.syncAllUI()
     return store
   }
 

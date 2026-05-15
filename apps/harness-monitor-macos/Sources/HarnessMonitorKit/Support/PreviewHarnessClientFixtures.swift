@@ -15,6 +15,7 @@ extension PreviewHarnessClient {
     let codexRunsBySessionID: [String: [CodexRunSnapshot]]
     let taskBoardOrchestratorSettings: TaskBoardOrchestratorSettings
     let taskBoardGitRuntimeConfig: TaskBoardGitRuntimeConfig
+    let taskBoardItems: [TaskBoardItem]
 
     public init(
       health: HealthResponse,
@@ -30,7 +31,8 @@ extension PreviewHarnessClient {
       codexRunsBySessionID: [String: [CodexRunSnapshot]] = [:],
       taskBoardOrchestratorSettings: TaskBoardOrchestratorSettings = Self
         .defaultTaskBoardOrchestratorSettings,
-      taskBoardGitRuntimeConfig: TaskBoardGitRuntimeConfig = Self.defaultTaskBoardGitRuntimeConfig
+      taskBoardGitRuntimeConfig: TaskBoardGitRuntimeConfig = Self.defaultTaskBoardGitRuntimeConfig,
+      taskBoardItems: [TaskBoardItem] = []
     ) {
       self.health = health
       self.projects = projects
@@ -45,6 +47,7 @@ extension PreviewHarnessClient {
       self.codexRunsBySessionID = codexRunsBySessionID
       self.taskBoardOrchestratorSettings = taskBoardOrchestratorSettings
       self.taskBoardGitRuntimeConfig = taskBoardGitRuntimeConfig
+      self.taskBoardItems = taskBoardItems
     }
 
     public static let defaultTaskBoardOrchestratorSettings = TaskBoardOrchestratorSettings(
@@ -97,6 +100,27 @@ extension PreviewHarnessClient {
           )
         )
       ]
+    )
+
+    private static let boardOnlyTaskBoardItem = TaskBoardItem(
+      schemaVersion: 1,
+      id: "preview-board-only",
+      title: "Board-only preview item",
+      body: "Board item without a linked session task.",
+      status: .todo,
+      priority: .high,
+      tags: ["preview"],
+      projectId: "project-6ccf8d0a",
+      agentMode: .interactive,
+      externalRefs: [],
+      planning: TaskBoardPlanningState(summary: "Ready for board-only action validation."),
+      workflow: nil,
+      sessionId: nil,
+      workItemId: nil,
+      usage: TaskBoardUsage(),
+      createdAt: "2026-03-28T14:05:00Z",
+      updatedAt: "2026-03-28T14:06:00Z",
+      deletedAt: nil
     )
 
     public static let populated = Self(
@@ -157,6 +181,27 @@ extension PreviewHarnessClient {
       detailsBySessionID: [PreviewFixtures.summary.sessionId: PreviewFixtures.detail],
       coreDetailsBySessionID: [:],
       timelinesBySessionID: [PreviewFixtures.summary.sessionId: PreviewFixtures.timeline]
+    )
+
+    public static let taskBoardBoardOnly = Self(
+      health: HealthResponse(
+        status: "ok",
+        version: "14.5.0",
+        pid: 4242,
+        endpoint: "http://127.0.0.1:9999",
+        startedAt: "2026-03-28T14:00:00Z",
+        projectCount: 1,
+        sessionCount: 1
+      ),
+      projects: PreviewFixtures.projects,
+      sessions: [PreviewFixtures.summary],
+      detail: PreviewFixtures.detail,
+      timeline: PreviewFixtures.timeline,
+      readySessionID: nil,
+      detailsBySessionID: [PreviewFixtures.summary.sessionId: PreviewFixtures.detail],
+      coreDetailsBySessionID: [:],
+      timelinesBySessionID: [PreviewFixtures.summary.sessionId: PreviewFixtures.timeline],
+      taskBoardItems: [boardOnlyTaskBoardItem]
     )
 
     public static let singleAgent = Self(
