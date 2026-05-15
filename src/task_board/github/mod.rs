@@ -8,6 +8,7 @@ use crate::task_board::policy::PolicyInput;
 mod client;
 mod config;
 mod evidence;
+mod evidence_api;
 mod publication;
 mod risk;
 

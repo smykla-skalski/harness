@@ -2,6 +2,7 @@ mod acp_inspect_publisher;
 mod binary_stamp;
 mod open_db;
 mod shutdown_signals;
+mod task_board_orchestrator_loop;
 
 pub(crate) use open_db::{open_daemon_async_db, open_daemon_db};
 
@@ -20,6 +21,7 @@ use crate::workspace::orphan_cleanup::run_startup_sweep;
 use acp_inspect_publisher::spawn_acp_inspect_publisher;
 use binary_stamp::current_binary_stamp;
 use std::time::Instant;
+use task_board_orchestrator_loop::spawn_task_board_orchestrator_loop;
 use tracing::Instrument as _;
 use tracing::field::{Empty, display};
 
@@ -121,6 +123,13 @@ pub async fn serve(config: DaemonServeConfig) -> Result<(), CliError> {
         shutdown_rx.clone(),
         app_state.acp_agent_manager.clone(),
     );
+    let _task_board_orchestrator_loop = app_state.async_db.get().map(|async_db| {
+        spawn_task_board_orchestrator_loop(
+            Arc::clone(async_db),
+            config.poll_interval,
+            shutdown_rx.clone(),
+        )
+    });
 
     let serve_result = http::serve(listener, app_state, shutdown_rx).await;
     let cleanup_result = state::clear_manifest_for_pid(process_id());

@@ -80,8 +80,12 @@ pub struct TaskBoardUpdateItemRequest {
     pub external_refs: Option<Vec<ExternalRef>>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub planning: Option<PlanningState>,
+    #[serde(default)]
+    pub clear_planning: bool,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub workflow: Option<TaskBoardWorkflowState>,
+    #[serde(default)]
+    pub clear_workflow: bool,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub session_id: Option<String>,
     #[serde(default)]

@@ -33,6 +33,10 @@ async fn run_task_board_transport_parity() {
         "project_id": "project-alpha",
         "planning": {
             "summary": "Shared planning summary"
+        },
+        "workflow": {
+            "status": "running",
+            "branch": "feature/parity"
         }
     });
 
@@ -90,6 +94,8 @@ async fn run_task_board_transport_parity() {
         "status": "in_progress",
         "priority": "critical",
         "tags": ["parity", "updated"],
+        "clear_planning": true,
+        "clear_workflow": true,
     });
     let http_updated = put_json(
         &client,
@@ -108,6 +114,10 @@ async fn run_task_board_transport_parity() {
     )
     .await;
     assert_eq!(normalized_item(&http_updated), normalized_item(&ws_updated));
+    assert_eq!(http_updated["planning"], json!({}));
+    assert!(http_updated.get("workflow").is_none());
+    assert_eq!(ws_updated["planning"], json!({}));
+    assert!(ws_updated.get("workflow").is_none());
 
     let http_deleted = delete_json(&client, &base_url, "/v1/task-board/items/parity-http").await;
     let ws_deleted = ws_result(

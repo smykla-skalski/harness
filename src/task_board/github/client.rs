@@ -1,4 +1,3 @@
-use std::collections::BTreeMap;
 use std::path::Path;
 use std::sync::OnceLock;
 
@@ -12,9 +11,10 @@ use crate::errors::{CliError, CliErrorKind};
 
 use super::GitHubAutomationClient;
 use super::config::{GitHubMergeMethod, GitHubProjectConfig};
-use super::evidence::{
-    GitHubBranchProtectionEvidence, GitHubCheckConclusion, GitHubCheckEvidence, GitHubCheckStatus,
-    GitHubMergeEvidence, GitHubPullRequestEvidence, GitHubReviewEvidence, GitHubReviewState,
+use super::evidence::{GitHubMergeEvidence, GitHubPullRequestEvidence};
+use super::evidence_api::{
+    branch_protection_evidence, check_runs_for_ref, combined_status_for_sha, merge_checks,
+    merge_reviews, review_thread_summary,
 };
 use super::publication::{
     GitHubBranchState, branch_state_async, publish_branch_from_worktree_async,
@@ -123,19 +123,19 @@ impl GitHubAutomationClient for GitHubApiAutomationClient {
             )
             .await
             .map_err(operation_error)?;
-        let combined_status = self
-            .client
-            .repos(config.owner.as_str(), config.repo.as_str())
-            .combined_status_for_ref(&params::repos::Reference::Branch(
-                pull_request.head.ref_field.clone(),
-            ))
+        let head_sha = pull_request.head.sha.clone();
+        let combined_status = combined_status_for_sha(&self.client, config, &head_sha)
             .await
             .map_err(operation_error)?;
-        let required_checks = combined_status
-            .statuses
-            .iter()
-            .filter_map(|status| status.context.clone())
-            .collect();
+        let check_runs = check_runs_for_ref(&self.client, config, &head_sha)
+            .await
+            .map_err(operation_error)?;
+        let branch_protection = branch_protection_evidence(&self.client, config, &pull_request)
+            .await
+            .map_err(operation_error)?;
+        let review_threads = review_thread_summary(&self.client, config, &pull_request)
+            .await
+            .map_err(operation_error)?;
         Ok(GitHubMergeEvidence {
             pull_request: GitHubPullRequestEvidence {
                 number: pull_request.number,
@@ -145,13 +145,9 @@ impl GitHubAutomationClient for GitHubApiAutomationClient {
                 draft: pull_request.draft.unwrap_or(false),
                 changed_paths: files.into_iter().map(|entry| entry.filename).collect(),
             },
-            checks: merge_checks(combined_status.statuses),
-            reviews: merge_reviews(reviews),
-            branch_protection: GitHubBranchProtectionEvidence {
-                enabled: true,
-                merge_allowed: pull_request.mergeable.unwrap_or(false),
-                required_checks,
-            },
+            checks: merge_checks(combined_status.statuses, check_runs),
+            reviews: merge_reviews(reviews, &review_threads),
+            branch_protection,
         })
     }
 
@@ -315,65 +311,6 @@ fn handle_from_pull_request(pull_request: &models::pulls::PullRequest) -> GitHub
         merged: pull_request.merged,
         head_sha: pull_request.head.sha.clone(),
     }
-}
-
-fn merge_checks(statuses: Vec<models::Status>) -> Vec<GitHubCheckEvidence> {
-    let mut merged = BTreeMap::new();
-    for status in statuses {
-        let Some(name) = status.context else {
-            continue;
-        };
-        merged.insert(
-            name.clone(),
-            GitHubCheckEvidence {
-                name,
-                status: match status.state {
-                    models::StatusState::Failure
-                    | models::StatusState::Error
-                    | models::StatusState::Success => GitHubCheckStatus::Completed,
-                    _ => GitHubCheckStatus::InProgress,
-                },
-                conclusion: Some(match status.state {
-                    models::StatusState::Success => GitHubCheckConclusion::Success,
-                    models::StatusState::Failure | models::StatusState::Error => {
-                        GitHubCheckConclusion::Failure
-                    }
-                    _ => GitHubCheckConclusion::ActionRequired,
-                }),
-            },
-        );
-    }
-    merged.into_values().collect()
-}
-
-fn merge_reviews(reviews: Vec<models::pulls::Review>) -> Vec<GitHubReviewEvidence> {
-    let mut merged = BTreeMap::new();
-    for review in reviews {
-        let Some(reviewer) = review.user.as_ref().map(|user| user.login.clone()) else {
-            continue;
-        };
-        let Some(state) = review.state else {
-            continue;
-        };
-        let (state, unresolved_requested_changes) = match state {
-            models::pulls::ReviewState::Approved => (GitHubReviewState::Approved, 0),
-            models::pulls::ReviewState::ChangesRequested => {
-                (GitHubReviewState::ChangesRequested, 1)
-            }
-            models::pulls::ReviewState::Commented => (GitHubReviewState::Commented, 0),
-            models::pulls::ReviewState::Dismissed => (GitHubReviewState::Dismissed, 0),
-            _ => continue,
-        };
-        merged.insert(
-            reviewer.clone(),
-            GitHubReviewEvidence {
-                reviewer,
-                state,
-                unresolved_requested_changes,
-            },
-        );
-    }
-    merged.into_values().collect()
 }
 
 fn client_error(error: octocrab::Error) -> CliError {
