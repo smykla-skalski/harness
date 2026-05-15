@@ -225,3 +225,42 @@ struct GitHubSearchIssuePullRequestQuery {
     per_page: u8,
     page: u32,
 }
+
+#[cfg(test)]
+mod tests {
+    use serde_json::json;
+
+    use super::*;
+
+    #[test]
+    fn github_inbox_search_queries_scope_assigned_issues_and_review_requests() {
+        let repository = parse_github_repository("owner/repo").expect("repository");
+
+        assert_eq!(
+            assigned_issue_query(&repository, "octo-user"),
+            "repo:owner/repo is:issue assignee:octo-user state:all"
+        );
+        assert_eq!(
+            review_request_query(&repository, "octo-user"),
+            "repo:owner/repo is:pr review-requested:octo-user state:open"
+        );
+    }
+
+    #[test]
+    fn github_inbox_search_payload_serializes_query_page_and_page_size() {
+        let payload = GitHubSearchIssuePullRequestQuery {
+            q: "repo:owner/repo is:pr review-requested:octo-user state:open".into(),
+            per_page: 100,
+            page: 2,
+        };
+
+        assert_eq!(
+            serde_json::to_value(payload).expect("serialize payload"),
+            json!({
+                "q": "repo:owner/repo is:pr review-requested:octo-user state:open",
+                "per_page": 100,
+                "page": 2
+            })
+        );
+    }
+}
