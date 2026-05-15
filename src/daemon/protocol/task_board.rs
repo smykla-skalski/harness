@@ -219,6 +219,8 @@ pub struct TaskBoardAuditRequest {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TaskBoardPolicyPipelineSaveDraftRequest {
     pub document: PolicyPipelineDocument,
+    #[serde(default)]
+    pub if_revision: u64,
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]

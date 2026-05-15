@@ -281,7 +281,7 @@ pub fn task_board_policy_pipeline() -> Result<TaskBoardPolicyPipelineResponse, C
 pub fn save_task_board_policy_pipeline_draft(
     request: &TaskBoardPolicyPipelineSaveDraftRequest,
 ) -> Result<TaskBoardPolicyPipelineSaveDraftResponse, CliError> {
-    policy_store().save_draft(request.document.clone())
+    policy_store().save_draft(request.document.clone(), request.if_revision)
 }
 
 /// Simulate a V2 policy pipeline in dry-run mode.
