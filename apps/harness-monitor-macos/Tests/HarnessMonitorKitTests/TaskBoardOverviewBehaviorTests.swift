@@ -142,8 +142,10 @@ struct TaskBoardOverviewBehaviorTests {
         checkpointSummary: nil
       )
     )
-    precondition(item != nil)
-    return item!
+    guard let item else {
+      preconditionFailure("expected task board inbox item fixture")
+    }
+    return item
   }
 
   private func taskBoardItem(
