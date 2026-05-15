@@ -55,8 +55,11 @@ public enum PreviewLatencyMeasurer {
 
     static let lineRegex: NSRegularExpression = {
         let pattern = #"^(?<timestamp>\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d{3})\s+\S+\s+(?<process>.+?)\[(?<pid>\d+):[^\]]+\].*(?<phase>__previews_injection_[^ ]+)"#
-        // swiftlint:disable:next force_try
-        return try! NSRegularExpression(pattern: pattern)
+        do {
+            return try NSRegularExpression(pattern: pattern)
+        } catch {
+            preconditionFailure("Invalid preview latency regex: \(error)")
+        }
     }()
 
     /// Pure parser entry point used by tests. Mirrors the python state machine: a

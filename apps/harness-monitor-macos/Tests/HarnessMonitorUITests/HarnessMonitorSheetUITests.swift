@@ -4,7 +4,6 @@ private typealias Accessibility = HarnessMonitorUITestAccessibility
 
 @MainActor
 final class HarnessMonitorSheetUITests: HarnessMonitorUITestCase {
-  // swiftlint:disable:next static_over_final_class
   override nonisolated class var reuseLaunchedApp: Bool { true }
 
   func testSendSignalSheetSupportsDismissalAndPreviewVoiceCapture() throws {

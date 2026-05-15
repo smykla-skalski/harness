@@ -9,7 +9,6 @@ final class HarnessMonitorMenuBarTests: HarnessMonitorUITestCase {
   private static let dashboardLandingScenario = "dashboard-landing"
   private static let previewSessionTitle = "Harness Monitor Cockpit"
 
-  // swiftlint:disable:next static_over_final_class
   override nonisolated class var reuseLaunchedApp: Bool { true }
 
   func testWindowMenuOpensDashboardWindow() throws {
