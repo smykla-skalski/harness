@@ -18,6 +18,9 @@ struct PolicyCanvasEdgeLayer: View {
     // both are layer-specific and the label layer does not need them.
     let severityMap = viewModel.edgeSeverityMap
     let edgeLanes = viewModel.edgeRouteLanes
+    let obstacles = viewModel.nodes.map { node in
+      CGRect(origin: node.position, size: PolicyCanvasLayout.nodeSize)
+    }
     ZStack(alignment: .topLeading) {
       ForEach(edges) { edge in
         if let source = portAnchors[edge.source],
@@ -29,7 +32,8 @@ struct PolicyCanvasEdgeLayer: View {
             lane: edgeLanes[edge.id, default: 0],
             groups: viewModel.groups,
             sourceGroupID: viewModel.node(edge.source.nodeID)?.groupID,
-            targetGroupID: viewModel.node(edge.target.nodeID)?.groupID
+            targetGroupID: viewModel.node(edge.target.nodeID)?.groupID,
+            obstacles: obstacles
           )
           let severity = severityMap[edge.id]
           let isSelected = viewModel.selection == .edge(edge.id)
@@ -94,6 +98,9 @@ struct PolicyCanvasEdgeLabelLayer: View {
     let metrics = PolicyCanvasEdgeLabelMetrics(fontScale: fontScale)
     let edgeLanes = viewModel.edgeRouteLanes
     let collapsed = viewModel.zoom < Self.labelCollapseThreshold
+    let obstacles = viewModel.nodes.map { node in
+      CGRect(origin: node.position, size: PolicyCanvasLayout.nodeSize)
+    }
     ZStack(alignment: .topLeading) {
       ForEach(edges) { edge in
         if !edge.label.isEmpty,
@@ -106,7 +113,8 @@ struct PolicyCanvasEdgeLabelLayer: View {
             lane: edgeLanes[edge.id, default: 0],
             groups: viewModel.groups,
             sourceGroupID: viewModel.node(edge.source.nodeID)?.groupID,
-            targetGroupID: viewModel.node(edge.target.nodeID)?.groupID
+            targetGroupID: viewModel.node(edge.target.nodeID)?.groupID,
+            obstacles: obstacles
           )
           if collapsed {
             Circle()

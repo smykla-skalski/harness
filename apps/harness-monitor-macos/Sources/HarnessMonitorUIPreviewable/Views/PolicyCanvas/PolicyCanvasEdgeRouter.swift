@@ -1,9 +1,9 @@
 import SwiftUI
 
-/// Pluggable edge-routing strategy. The current implementation is the
-/// six-case hand-coded orthogonal router (`PolicyCanvasHandCodedOrthogonalRouter`);
-/// future implementations include a channel-model unification and a
-/// visibility-graph A* router. Consumers read the router from the
+/// Pluggable edge-routing strategy. Two implementations ship today:
+/// `PolicyCanvasHandCodedOrthogonalRouter` (six-case hand-coded) and
+/// `PolicyCanvasVisibilityRouter` (sparse orthogonal visibility graph + A*,
+/// active default on production canvases). Consumers read the router from the
 /// `\.policyCanvasEdgeRouter` environment value and invoke `route(...)`
 /// per-edge rather than constructing `PolicyCanvasEdgeRoute` directly.
 protocol PolicyCanvasEdgeRouter: Sendable {
@@ -13,15 +13,15 @@ protocol PolicyCanvasEdgeRouter: Sendable {
     lane: Int,
     groups: [PolicyCanvasGroup],
     sourceGroupID: String?,
-    targetGroupID: String?
+    targetGroupID: String?,
+    obstacles: [CGRect]
   ) -> PolicyCanvasEdgeRoute
 }
 
-/// Default router. Delegates to the existing `PolicyCanvasEdgeRoute` init
-/// (six hand-coded cases) so the protocol introduction is bit-identical to
-/// pre-refactor output. Tests in `PolicyCanvasEdgeRoutingTests` confirm the
-/// polyline pins survive.
-struct PolicyCanvasHandCodedOrthogonalRouter: PolicyCanvasEdgeRouter {
+extension PolicyCanvasEdgeRouter {
+  /// Convenience overload for call sites that don't have per-node frames yet
+  /// (older tests, hand-coded route comparisons). Forwards with an empty
+  /// obstacle list so the hand-coded router stays bit-identical.
   func route(
     source: CGPoint,
     target: CGPoint,
@@ -29,6 +29,33 @@ struct PolicyCanvasHandCodedOrthogonalRouter: PolicyCanvasEdgeRouter {
     groups: [PolicyCanvasGroup],
     sourceGroupID: String?,
     targetGroupID: String?
+  ) -> PolicyCanvasEdgeRoute {
+    route(
+      source: source,
+      target: target,
+      lane: lane,
+      groups: groups,
+      sourceGroupID: sourceGroupID,
+      targetGroupID: targetGroupID,
+      obstacles: []
+    )
+  }
+}
+
+/// Legacy router preserving the six hand-coded orthogonal cases. Kept as a
+/// fallback for tests that pin specific polyline outputs and as the engine
+/// `PolicyCanvasVisibilityRouter` falls back to when A* cannot find a path
+/// through its sparse grid. Obstacles are accepted but ignored - the
+/// hand-coded cases use group frames only.
+struct PolicyCanvasHandCodedOrthogonalRouter: PolicyCanvasEdgeRouter {
+  func route(
+    source: CGPoint,
+    target: CGPoint,
+    lane: Int,
+    groups: [PolicyCanvasGroup],
+    sourceGroupID: String?,
+    targetGroupID: String?,
+    obstacles: [CGRect]
   ) -> PolicyCanvasEdgeRoute {
     PolicyCanvasEdgeRoute(
       source: source,
@@ -43,7 +70,7 @@ struct PolicyCanvasHandCodedOrthogonalRouter: PolicyCanvasEdgeRouter {
 
 private struct PolicyCanvasEdgeRouterKey: EnvironmentKey {
   static let defaultValue: any PolicyCanvasEdgeRouter =
-    PolicyCanvasHandCodedOrthogonalRouter()
+    PolicyCanvasVisibilityRouter()
 }
 
 extension EnvironmentValues {
