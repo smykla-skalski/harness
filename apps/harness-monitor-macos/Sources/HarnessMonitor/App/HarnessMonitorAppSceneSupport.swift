@@ -68,7 +68,7 @@ struct DashboardWindowRootView: View {
       mcpWindowCommandRegistrar: mcpWindowCommandRegistrar,
       themeMode: $themeMode,
       contentReadiness: contentReadiness,
-      windowToolbarBackgroundVisibility: .hidden,
+      windowToolbarBackgroundVisibility: .visible,
       toast: store.toast
     ) {
       liveContent
