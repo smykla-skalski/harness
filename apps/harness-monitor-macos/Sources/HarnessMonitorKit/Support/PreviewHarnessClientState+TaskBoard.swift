@@ -127,6 +127,57 @@ extension PreviewHarnessClientState {
     return TaskBoardDispatchSummary(plans: plans, applied: applied)
   }
 
+  func auditTaskBoard(status: TaskBoardStatus?) -> TaskBoardAuditSummary {
+    let items = currentTaskBoardItems(status: status)
+    return TaskBoardAuditSummary(
+      total: items.count,
+      ready: items.count { $0.status == .todo },
+      blocked: items.count { $0.status == .blocked },
+      deleted: 0,
+      byStatus: statusCounts(for: items)
+    )
+  }
+
+  func taskBoardProjects(status: TaskBoardStatus?) -> [TaskBoardProjectSummary] {
+    let grouped = Dictionary(
+      grouping: currentTaskBoardItems(status: status).filter { $0.projectId != nil },
+      by: \.projectId
+    )
+    return grouped.compactMap { key, items in
+      guard let projectId = key else {
+        return nil
+      }
+      return TaskBoardProjectSummary(
+        projectId: projectId,
+        itemCount: items.count,
+        readyCount: items.count { $0.status == .todo }
+      )
+    }
+    .sorted { lhs, rhs in
+      if lhs.readyCount == rhs.readyCount {
+        return lhs.projectId < rhs.projectId
+      }
+      return lhs.readyCount > rhs.readyCount
+    }
+  }
+
+  func taskBoardMachines(status: TaskBoardStatus?) -> [TaskBoardMachineSummary] {
+    let grouped = Dictionary(grouping: currentTaskBoardItems(status: status), by: \.agentMode)
+    return grouped.map { mode, items in
+      TaskBoardMachineSummary(
+        mode: mode,
+        itemCount: items.count,
+        readyCount: items.count { $0.status == .todo }
+      )
+    }
+    .sorted { lhs, rhs in
+      if lhs.readyCount == rhs.readyCount {
+        return lhs.mode.title < rhs.mode.title
+      }
+      return lhs.readyCount > rhs.readyCount
+    }
+  }
+
   func evaluateTaskBoard(request: TaskBoardEvaluateRequest) -> TaskBoardEvaluationSummary {
     var records: [TaskBoardEvaluationRecord] = []
     for item in matchingTaskBoardItems(status: request.status, itemId: request.itemId) {
@@ -239,6 +290,16 @@ extension PreviewHarnessClientState {
 
   private func taskBoardItemUnavailable() -> HarnessMonitorAPIError {
     HarnessMonitorAPIError.server(code: 404, message: "Task board item unavailable.")
+  }
+
+  private func statusCounts(for items: [TaskBoardItem]) -> [TaskBoardStatusCount] {
+    let totals = Dictionary(grouping: items, by: \.status)
+    return TaskBoardStatus.allCases.compactMap { status in
+      guard let itemsForStatus = totals[status], !itemsForStatus.isEmpty else {
+        return nil
+      }
+      return TaskBoardStatusCount(status: status, count: itemsForStatus.count)
+    }
   }
 }
 

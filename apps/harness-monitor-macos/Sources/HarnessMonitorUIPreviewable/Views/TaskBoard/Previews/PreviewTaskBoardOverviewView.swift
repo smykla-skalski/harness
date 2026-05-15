@@ -4,6 +4,8 @@ import SwiftUI
 #Preview("Task Board Overview") {
   TaskBoardOverviewView(
     snapshot: TaskBoardPreviewFixtures.snapshot,
+    taskBoardItems: TaskBoardPreviewFixtures.store.globalTaskBoardItems,
+    store: TaskBoardPreviewFixtures.store,
     orchestratorStatus: TaskBoardPreviewFixtures.orchestratorStatus,
     evaluationSummary: TaskBoardPreviewFixtures.evaluationSummary,
     onEvaluateTaskBoard: {},
@@ -17,6 +19,11 @@ import SwiftUI
 }
 
 private enum TaskBoardPreviewFixtures {
+  @MainActor
+  static let store: HarnessMonitorStore = {
+    HarnessMonitorPreviewStoreFactory.makeStore(for: .taskBoardBoardOnly)
+  }()
+
   static let evaluationSummary = TaskBoardEvaluationSummary(
     total: 12,
     evaluated: 8,

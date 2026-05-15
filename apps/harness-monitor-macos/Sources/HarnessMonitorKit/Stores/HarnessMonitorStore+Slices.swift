@@ -345,7 +345,12 @@ extension HarnessMonitorStore {
     public var isLaunchAgentInstalled = false
     public var taskBoardItems: [TaskBoardItem] = []
     public var taskBoardOrchestratorStatus: TaskBoardOrchestratorStatus?
+    public var taskBoardSyncSummary: TaskBoardSyncSummary?
+    public var taskBoardDispatchSummary: TaskBoardDispatchSummary?
     public var taskBoardEvaluationSummary: TaskBoardEvaluationSummary?
+    public var taskBoardItemAuditSummary: TaskBoardAuditSummary?
+    public var taskBoardProjects: [TaskBoardProjectSummary]?
+    public var taskBoardMachines: [TaskBoardMachineSummary]?
     public var taskBoardPolicyPipeline: TaskBoardPolicyPipelineDocument?
     public var taskBoardPolicySimulation: TaskBoardPolicyPipelineSimulationResult?
     public var taskBoardPolicyAudit: TaskBoardPolicyPipelineAuditSummary?

@@ -20,6 +20,7 @@ struct TaskBoardOverviewHost: View {
     TaskBoardOverviewView(
       snapshot: snapshot,
       taskBoardItems: taskBoardItems,
+      store: store,
       orchestratorStatus: orchestratorStatus,
       evaluationSummary: evaluationSummary,
       decisions: decisions,

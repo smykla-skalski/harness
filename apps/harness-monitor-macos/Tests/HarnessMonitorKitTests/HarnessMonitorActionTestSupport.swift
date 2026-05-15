@@ -160,6 +160,13 @@ final class RecordingHarnessClient: HarnessMonitorClientProtocol, @unchecked Sen
       status: TaskBoardStatus?,
       projectDir: String?
     )
+    case dispatchTaskBoard(
+      dryRun: Bool,
+      status: TaskBoardStatus?,
+      itemID: String?,
+      projectDir: String?,
+      actor: String?
+    )
     case evaluateTaskBoard(
       dryRun: Bool,
       status: TaskBoardStatus?,
@@ -191,6 +198,9 @@ final class RecordingHarnessClient: HarnessMonitorClientProtocol, @unchecked Sen
       status: TaskBoardStatus?,
       provider: TaskBoardExternalProvider?
     )
+    case auditTaskBoard(status: TaskBoardStatus?)
+    case taskBoardProjects(status: TaskBoardStatus?)
+    case taskBoardMachines(status: TaskBoardStatus?)
     case saveTaskBoardPolicyPipelineDraft(revision: UInt64)
     case simulateTaskBoardPolicyPipeline
     case promoteTaskBoardPolicyPipeline(revision: UInt64)
@@ -249,6 +259,9 @@ final class RecordingHarnessClient: HarnessMonitorClientProtocol, @unchecked Sen
   var taskBoardItemsStorage: [TaskBoardItem] = []
   var taskBoardItemsAfterSyncStorage: [TaskBoardItem]?
   var taskBoardSyncSummaryStorage = TaskBoardSyncSummary(total: 0, providers: [])
+  var taskBoardAuditSummaryStorage: TaskBoardAuditSummary?
+  var taskBoardProjectSummariesStorage: [TaskBoardProjectSummary]?
+  var taskBoardMachineSummariesStorage: [TaskBoardMachineSummary]?
   var sessionDetailsByID: [String: SessionDetail] = [:]
   var detailDelaysBySessionID: [String: Duration] = [:]
   var sessionDetailErrorsByID: [String: any Error] = [:]
