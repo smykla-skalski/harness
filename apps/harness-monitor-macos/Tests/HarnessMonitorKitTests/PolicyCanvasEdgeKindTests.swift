@@ -33,6 +33,55 @@ struct PolicyCanvasEdgeKindTests {
     #expect(PolicyCanvasEdgeKind.derive(from: "human_review") == .control)
   }
 
+  @Test("Human-workflow tokens short-circuit error matching to .control")
+  func humanWorkflowDoesNotMatchError() {
+    // Prior substring heuristic landed these in `.error` because they
+    // mention `denied`/`reject`/`fail`. The token-boundary classifier with
+    // the human-workflow prefix short-circuit routes them to `.control`,
+    // matching the document author's likely intent.
+    #expect(PolicyCanvasEdgeKind.derive(from: "human_review_denied") == .control)
+    #expect(PolicyCanvasEdgeKind.derive(from: "manual_approval_required") == .control)
+    #expect(PolicyCanvasEdgeKind.derive(from: "reviewer_rejected") == .control)
+    #expect(PolicyCanvasEdgeKind.derive(from: "audited_pass") == .control)
+    #expect(PolicyCanvasEdgeKind.derive(from: "approver_denied") == .control)
+  }
+
+  @Test("Token-boundary matching ignores embedded substrings")
+  func noSubstringFalsePositives() {
+    // `predenial` should NOT match `deny`/`denied` because token splitting
+    // produces ["predenial"], which is not in the error-marker set. The
+    // prior substring heuristic would have classified this as `.error`.
+    #expect(PolicyCanvasEdgeKind.derive(from: "predenial") == .control)
+    #expect(PolicyCanvasEdgeKind.derive(from: "errorless_check") == .control)
+    #expect(PolicyCanvasEdgeKind.derive(from: "rejectable_step") == .control)
+  }
+
+  @Test("Explicit kind override bypasses derivation")
+  func explicitOverrideBypassesDerivation() {
+    let endpoint = PolicyCanvasPortEndpoint(nodeID: "n", portID: "p", kind: .output)
+    let target = PolicyCanvasPortEndpoint(nodeID: "n2", portID: "p2", kind: .input)
+    // Condition text would derive `.error`, but the explicit kind wins.
+    let denied = PolicyCanvasEdge(
+      id: "e",
+      source: endpoint,
+      target: target,
+      label: "",
+      condition: "denied",
+      kind: .control
+    )
+    #expect(denied.kind == .control)
+    // Condition text would derive `.flow`, but the explicit kind wins.
+    let always = PolicyCanvasEdge(
+      id: "e2",
+      source: endpoint,
+      target: target,
+      label: "",
+      condition: "always",
+      kind: .error
+    )
+    #expect(always.kind == .error)
+  }
+
   @Test("Each kind exposes a distinct accent color")
   func distinctAccentColors() {
     let colors = PolicyCanvasEdgeKind.allCases.map { $0.accentColor.description }

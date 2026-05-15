@@ -12,13 +12,28 @@ struct PolicyCanvasInteractiveEdge: View {
   let strokeWidth: CGFloat
   let isSelected: Bool
   let accessibilityLabel: String
+  /// Spoken kind word (`"flow"` / `"control"` / `"error"`) surfaced to
+  /// VoiceOver via `.accessibilityValue`. Without this, the kind encoding
+  /// is color-only and fails WCAG 1.4.1 for users who cannot perceive the
+  /// cyan/purple/red palette. Combined with `kindDashPattern`, the kind
+  /// becomes both visible (pattern) and audible (value) - color is no
+  /// longer the sole differentiator.
+  let accessibilityKindWord: String
+  /// Static dash pattern bound to the edge kind. Empty for `.flow` (solid
+  /// stroke); wider gaps for `.control` (occasional condition); tighter
+  /// dashes for `.error` (urgent). When `isAnimated && !reducedMotion`,
+  /// the animated overlay supersedes this pattern with its own dash march;
+  /// otherwise this pattern is what the user sees.
+  let kindDashPattern: [CGFloat]
   let isAnimated: Bool
   let onTap: () -> Void
   let onDelete: () -> Void
 
   @State private var isHovering = false
-  @Environment(\.policyCanvasReducedMotion) private var canvasReducedMotion
-  @Environment(\.accessibilityReduceMotion) private var systemReduceMotion
+  @Environment(\.policyCanvasReducedMotion)
+  private var canvasReducedMotion
+  @Environment(\.accessibilityReduceMotion)
+  private var systemReduceMotion
 
   init(
     route: PolicyCanvasEdgeRoute,
@@ -26,6 +41,8 @@ struct PolicyCanvasInteractiveEdge: View {
     strokeWidth: CGFloat,
     isSelected: Bool,
     accessibilityLabel: String,
+    accessibilityKindWord: String,
+    kindDashPattern: [CGFloat] = [],
     isAnimated: Bool = false,
     onTap: @escaping () -> Void,
     onDelete: @escaping () -> Void
@@ -35,6 +52,8 @@ struct PolicyCanvasInteractiveEdge: View {
     self.strokeWidth = strokeWidth
     self.isSelected = isSelected
     self.accessibilityLabel = accessibilityLabel
+    self.accessibilityKindWord = accessibilityKindWord
+    self.kindDashPattern = kindDashPattern
     self.isAnimated = isAnimated
     self.onTap = onTap
     self.onDelete = onDelete
@@ -64,7 +83,19 @@ struct PolicyCanvasInteractiveEdge: View {
     }
     .accessibilityElement(children: .ignore)
     .accessibilityLabel(accessibilityLabel)
+    .accessibilityValue(accessibilityValueString)
     .accessibilityAddTraits(.isButton)
+  }
+
+  /// VoiceOver value combining the kind word with an "active" suffix when
+  /// motion is permitted. Without the reduce-motion gate the value would
+  /// announce "active" even when the dash march is frozen, leaving the AT
+  /// user with a stale model of edge state.
+  private var accessibilityValueString: String {
+    if isAnimated, !reducedMotion {
+      return "\(accessibilityKindWord), active"
+    }
+    return accessibilityKindWord
   }
 
   @ViewBuilder
@@ -91,7 +122,8 @@ struct PolicyCanvasInteractiveEdge: View {
           style: StrokeStyle(
             lineWidth: effectiveStrokeWidth,
             lineCap: .round,
-            lineJoin: .round
+            lineJoin: .round,
+            dash: kindDashPattern
           )
         )
     }
@@ -115,6 +147,7 @@ struct PolicyCanvasInteractiveEdge: View {
     PolicyCanvasEdgeAnimation.dashPattern
   }
 
+  @MainActor
   static func animatedDashPhase(at date: Date) -> CGFloat {
     PolicyCanvasEdgeAnimation.dashPhase(at: date)
   }

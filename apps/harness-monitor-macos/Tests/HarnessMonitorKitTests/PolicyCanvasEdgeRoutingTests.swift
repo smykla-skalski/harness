@@ -171,8 +171,7 @@ struct PolicyCanvasEdgeRoutingTests {
       lane: 0
     )
     let labelPosition = route.labelPosition
-    let onSomeSegment = zip(route.points, route.points.dropFirst()).contains {
-      (left, right) in
+    let onSomeSegment = zip(route.points, route.points.dropFirst()).contains { left, right in
       let minX = min(left.x, right.x)
       let maxX = max(left.x, right.x)
       let minY = min(left.y, right.y)

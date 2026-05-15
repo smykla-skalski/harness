@@ -12,10 +12,7 @@ struct PolicyCanvasEdgeRouterTests {
     let viaRouter = router.route(
       source: CGPoint(x: 0, y: 0),
       target: CGPoint(x: 200, y: 100),
-      lane: 0,
-      groups: [],
-      sourceGroupID: nil,
-      targetGroupID: nil
+      context: context()
     )
     let direct = PolicyCanvasEdgeRoute(
       source: CGPoint(x: 0, y: 0),
@@ -32,19 +29,22 @@ struct PolicyCanvasEdgeRouterTests {
     let lane0 = router.route(
       source: CGPoint(x: 0, y: 0),
       target: CGPoint(x: 200, y: 100),
-      lane: 0,
-      groups: [],
-      sourceGroupID: nil,
-      targetGroupID: nil
+      context: context()
     )
     let lane3 = router.route(
       source: CGPoint(x: 0, y: 0),
       target: CGPoint(x: 200, y: 100),
-      lane: 3,
+      context: context(lane: 3)
+    )
+    #expect(lane0.points[1].x != lane3.points[1].x)
+  }
+
+  private func context(lane: Int = 0) -> PolicyCanvasRouteContext {
+    PolicyCanvasRouteContext(
+      lane: lane,
       groups: [],
       sourceGroupID: nil,
       targetGroupID: nil
     )
-    #expect(lane0.points[1].x != lane3.points[1].x)
   }
 }

@@ -11,7 +11,8 @@ struct PolicyCanvasEdgeLayer: View {
   /// with `PolicyCanvasEdgeLabelLayer` so the two layers do not each rebuild
   /// the same dictionary per render cycle.
   let portAnchors: [PolicyCanvasPortEndpoint: CGPoint]
-  @Environment(\.policyCanvasEdgeRouter) private var router
+  @Environment(\.policyCanvasEdgeRouter)
+  private var router
 
   var body: some View {
     // Severity map and edge-lane assignments stay local to this layer:
@@ -41,6 +42,8 @@ struct PolicyCanvasEdgeLayer: View {
             strokeWidth: severity == nil ? 2.4 : 3.0,
             isSelected: isSelected,
             accessibilityLabel: viewModel.accessibilityLabel(for: edge),
+            accessibilityKindWord: edge.kind.accessibilityWord,
+            kindDashPattern: edge.kind.strokeDashPattern,
             isAnimated: edge.isAnimated,
             onTap: { viewModel.select(.edge(edge.id)) },
             onDelete: { viewModel.deleteEdge(edge.id) }
@@ -62,25 +65,24 @@ struct PolicyCanvasEdgeLayer: View {
   ) -> PolicyCanvasEdgeRoute {
     let sourceGroupID = viewModel.node(edge.source.nodeID)?.groupID
     let targetGroupID = viewModel.node(edge.target.nodeID)?.groupID
-    if edge.pinnedPortSide {
-      return router.route(
-        source: source,
-        target: target,
-        lane: lane,
-        groups: viewModel.groups,
-        sourceGroupID: sourceGroupID,
-        targetGroupID: targetGroupID,
-        obstacles: obstacles
-      )
-    }
-    return router.route(
-      sourceCandidates: viewModel.portAnchorCandidates(for: edge.source),
-      targetCandidates: viewModel.portAnchorCandidates(for: edge.target),
+    let context = PolicyCanvasRouteContext(
       lane: lane,
       groups: viewModel.groups,
       sourceGroupID: sourceGroupID,
       targetGroupID: targetGroupID,
       obstacles: obstacles
+    )
+    if edge.pinnedPortSide {
+      return router.route(
+        source: source,
+        target: target,
+        context: context
+      )
+    }
+    return router.route(
+      sourceCandidates: viewModel.portAnchorCandidates(for: edge.source),
+      targetCandidates: viewModel.portAnchorCandidates(for: edge.target),
+      context: context
     )
   }
 
@@ -118,8 +120,10 @@ struct PolicyCanvasEdgeLabelLayer: View {
   /// Shared bulk port-anchor map built once in the viewport parent — see
   /// `PolicyCanvasEdgeLayer` for the dedup rationale.
   let portAnchors: [PolicyCanvasPortEndpoint: CGPoint]
-  @Environment(\.fontScale) private var fontScale
-  @Environment(\.policyCanvasEdgeRouter) private var router
+  @Environment(\.fontScale)
+  private var fontScale
+  @Environment(\.policyCanvasEdgeRouter)
+  private var router
 
   /// Below this zoom, capsule labels collapse to a 4pt accent-colored dot
   /// at the label anchor. React Flow's threshold is 0.6; matches the
@@ -208,25 +212,24 @@ struct PolicyCanvasEdgeLabelLayer: View {
   ) -> PolicyCanvasEdgeRoute {
     let sourceGroupID = viewModel.node(edge.source.nodeID)?.groupID
     let targetGroupID = viewModel.node(edge.target.nodeID)?.groupID
-    if edge.pinnedPortSide {
-      return router.route(
-        source: source,
-        target: target,
-        lane: lane,
-        groups: viewModel.groups,
-        sourceGroupID: sourceGroupID,
-        targetGroupID: targetGroupID,
-        obstacles: obstacles
-      )
-    }
-    return router.route(
-      sourceCandidates: viewModel.portAnchorCandidates(for: edge.source),
-      targetCandidates: viewModel.portAnchorCandidates(for: edge.target),
+    let context = PolicyCanvasRouteContext(
       lane: lane,
       groups: viewModel.groups,
       sourceGroupID: sourceGroupID,
       targetGroupID: targetGroupID,
       obstacles: obstacles
+    )
+    if edge.pinnedPortSide {
+      return router.route(
+        source: source,
+        target: target,
+        context: context
+      )
+    }
+    return router.route(
+      sourceCandidates: viewModel.portAnchorCandidates(for: edge.source),
+      targetCandidates: viewModel.portAnchorCandidates(for: edge.target),
+      context: context
     )
   }
 }

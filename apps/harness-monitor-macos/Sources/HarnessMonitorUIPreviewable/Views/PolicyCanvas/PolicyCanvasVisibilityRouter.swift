@@ -1,6 +1,17 @@
 import CoreGraphics
 import Foundation
 import SwiftUI
+import os
+
+/// Router-decision log. Only the *fallback* path emits a line - A* success
+/// is the expected case and a per-frame "solved" log would flood Console.
+/// The fallback line names the reason so an operator looking at a
+/// misshapen polyline can grep the log and confirm which path produced it
+/// (silent supervision becomes observable supervision).
+private let policyCanvasRouterLog = Logger(
+  subsystem: "io.harnessmonitor",
+  category: "policy-canvas.router"
+)
 
 /// Orthogonal visibility-graph router with A* pathfinding. Produces
 /// axis-aligned polylines that avoid node-frame obstacles while minimizing a
@@ -35,23 +46,82 @@ struct PolicyCanvasVisibilityRouter: PolicyCanvasEdgeRouter {
   func route(
     source: CGPoint,
     target: CGPoint,
-    lane: Int,
-    groups: [PolicyCanvasGroup],
-    sourceGroupID: String?,
-    targetGroupID: String?,
-    obstacles: [CGRect]
+    context: PolicyCanvasRouteContext
   ) -> PolicyCanvasEdgeRoute {
-    let prepared = preparedObstacles(source: source, target: target, raw: obstacles)
+    routeAndCost(
+      source: source,
+      target: target,
+      context: context
+    ).route
+  }
+
+  /// Flex-anchor override. Walks every source/target combination, takes the
+  /// A* cost back from the visibility engine, and returns the lowest-cost
+  /// route. Combos whose A* call falls back (no path through the sparse
+  /// grid) report `nil` cost and are skipped during ranking; if every combo
+  /// falls back the result is the single-anchor fallback for the first
+  /// candidate pair. Ranking sources its cost from `PolicyCanvasVisibilityAStar`
+  /// directly, not from a second compute helper - one algorithm, one cost.
+  func route(
+    sourceCandidates: [CGPoint],
+    targetCandidates: [CGPoint],
+    context: PolicyCanvasRouteContext
+  ) -> PolicyCanvasEdgeRoute {
+    guard !sourceCandidates.isEmpty, !targetCandidates.isEmpty else {
+      return route(
+        source: sourceCandidates.first ?? .zero,
+        target: targetCandidates.first ?? .zero,
+        context: context
+      )
+    }
+    var bestRoute: PolicyCanvasEdgeRoute?
+    var bestCost: CGFloat = .infinity
+    for sourceAnchor in sourceCandidates {
+      for targetAnchor in targetCandidates {
+        let outcome = routeAndCost(
+          source: sourceAnchor,
+          target: targetAnchor,
+          context: context
+        )
+        guard let cost = outcome.cost else {
+          continue
+        }
+        if cost < bestCost {
+          bestCost = cost
+          bestRoute = outcome.route
+        }
+      }
+    }
+    return bestRoute
+      ?? route(
+        source: sourceCandidates[0],
+        target: targetCandidates[0],
+        context: context
+      )
+  }
+
+  /// Internal single-anchor routing that returns both the post-processed
+  /// route and the raw A* cost. A* cost is `nil` when the algorithm could
+  /// not find a path (grid not indexable, no connected path) - the route in
+  /// that case is the hand-coded fallback. Flex-anchor selection only
+  /// considers candidates with non-nil cost; fallback candidates are skipped
+  /// in ranking so an A*-solved combo always wins over a fallback combo.
+  private func routeAndCost(
+    source: CGPoint,
+    target: CGPoint,
+    context: PolicyCanvasRouteContext
+  ) -> (route: PolicyCanvasEdgeRoute, cost: CGFloat?) {
+    let prepared = preparedObstacles(source: source, target: target, raw: context.obstacles)
     let gridXs = sortedAxisCoordinates(
       anchor1: source.x,
       anchor2: target.x,
-      laneOffset: laneOffsetX(lane: lane),
+      laneOffset: laneOffsetX(lane: context.lane),
       bounds: prepared.map { ($0.minX, $0.maxX) }
     )
     let gridYs = sortedAxisCoordinates(
       anchor1: source.y,
       anchor2: target.y,
-      laneOffset: laneOffsetY(lane: lane),
+      laneOffset: laneOffsetY(lane: context.lane),
       bounds: prepared.map { ($0.minY, $0.maxY) }
     )
     guard
@@ -60,44 +130,61 @@ struct PolicyCanvasVisibilityRouter: PolicyCanvasEdgeRouter {
       let tx = gridXs.firstIndex(of: target.x),
       let ty = gridYs.firstIndex(of: target.y)
     else {
-      return fallback(
-        source: source,
-        target: target,
-        lane: lane,
-        groups: groups,
-        sourceGroupID: sourceGroupID,
-        targetGroupID: targetGroupID
+      policyCanvasRouterLog.debug(
+        """
+        visibility router fallback (grid-miss): obstacles=\
+        \(prepared.count, privacy: .public) gridX=\
+        \(gridXs.count, privacy: .public) gridY=\
+        \(gridYs.count, privacy: .public)
+        """
+      )
+      return (
+        fallback(
+          source: source,
+          target: target,
+          context: context
+        ),
+        nil
       )
     }
-    let aStarPoints = PolicyCanvasVisibilityAStar.run(
+    let aStarResult = PolicyCanvasVisibilityAStar.run(
       gridXs: gridXs,
       gridYs: gridYs,
       sourceIndex: PolicyCanvasGridIndex(x: sx, y: sy),
       targetIndex: PolicyCanvasGridIndex(x: tx, y: ty),
       obstacles: prepared
     )
-    guard let aStarPoints, aStarPoints.count >= 2 else {
-      return fallback(
-        source: source,
-        target: target,
-        lane: lane,
-        groups: groups,
-        sourceGroupID: sourceGroupID,
-        targetGroupID: targetGroupID
+    guard let aStarResult, aStarResult.points.count >= 2 else {
+      policyCanvasRouterLog.debug(
+        """
+        visibility router fallback (astar-no-path): obstacles=\
+        \(prepared.count, privacy: .public) gridX=\
+        \(gridXs.count, privacy: .public) gridY=\
+        \(gridYs.count, privacy: .public)
+        """
+      )
+      return (
+        fallback(
+          source: source,
+          target: target,
+          context: context
+        ),
+        nil
       )
     }
-    let compressed = Self.compressCollinear(aStarPoints)
+    let compressed = Self.compressCollinear(aStarResult.points)
     let spread = Self.applyLaneSpread(
       compressed,
-      lane: lane,
+      lane: context.lane,
       source: source,
       target: target
     )
     let snapped = Self.snapToChannels(spread, source: source, target: target)
-    return PolicyCanvasEdgeRoute(
+    let polyline = PolicyCanvasEdgeRoute(
       points: snapped,
       labelPosition: Self.labelPosition(for: snapped)
     )
+    return (polyline, aStarResult.cost)
   }
 
   private func preparedObstacles(source: CGPoint, target: CGPoint, raw: [CGRect]) -> [CGRect] {
@@ -137,19 +224,17 @@ struct PolicyCanvasVisibilityRouter: PolicyCanvasEdgeRouter {
   private func fallback(
     source: CGPoint,
     target: CGPoint,
-    lane: Int,
-    groups: [PolicyCanvasGroup],
-    sourceGroupID: String?,
-    targetGroupID: String?
+    context: PolicyCanvasRouteContext
   ) -> PolicyCanvasEdgeRoute {
     PolicyCanvasHandCodedOrthogonalRouter().route(
       source: source,
       target: target,
-      lane: lane,
-      groups: groups,
-      sourceGroupID: sourceGroupID,
-      targetGroupID: targetGroupID,
-      obstacles: []
+      context: PolicyCanvasRouteContext(
+        lane: context.lane,
+        groups: context.groups,
+        sourceGroupID: context.sourceGroupID,
+        targetGroupID: context.targetGroupID
+      )
     )
   }
 
