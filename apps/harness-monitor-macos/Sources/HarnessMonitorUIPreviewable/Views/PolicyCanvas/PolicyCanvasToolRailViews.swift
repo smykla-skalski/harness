@@ -64,6 +64,8 @@ private struct PolicyCanvasPaletteButton: View {
   let kind: PolicyCanvasNodeKind
   let metrics: PolicyCanvasToolRailMetrics
 
+  @State private var isHovering = false
+
   var body: some View {
     Button {
       viewModel.createNode(kind: kind, at: viewModel.nextPaletteDropCenter())
@@ -80,12 +82,39 @@ private struct PolicyCanvasPaletteButton: View {
       .background(kind.accentColor.opacity(0.12), in: RoundedRectangle(cornerRadius: 8))
       .overlay {
         RoundedRectangle(cornerRadius: 8)
-          .stroke(kind.accentColor.opacity(0.38), lineWidth: 1)
+          .stroke(
+            kind.accentColor.opacity(isHovering ? 0.78 : 0.38),
+            lineWidth: isHovering ? 1.4 : 1
+          )
       }
+      .overlay(alignment: .topTrailing) {
+        if isHovering {
+          // Surface the drag affordance on hover. The tile is both a
+          // button (click) and draggable, but neither interaction was
+          // visible until the user discovered the .help tooltip after
+          // 500ms. The chevron + cursor change make the drag mode the
+          // obvious primary affordance for sighted mouse users; the
+          // button path still works for keyboard / a11y.
+          Image(systemName: "hand.draw.fill")
+            .scaledFont(.caption2.weight(.semibold))
+            .foregroundStyle(kind.accentColor.opacity(0.85))
+            .padding(3)
+            .transition(.opacity)
+        }
+      }
+      .animation(.easeOut(duration: 0.12), value: isHovering)
     }
     .harnessPlainButtonStyle()
     .draggable(viewModel.palettePayload(for: kind)) {
       PolicyCanvasPaletteDragChip(kind: kind, metrics: metrics)
+    }
+    .onHover { hovering in
+      isHovering = hovering
+      if hovering {
+        NSCursor.openHand.push()
+      } else {
+        NSCursor.pop()
+      }
     }
     .help("Drag onto the canvas, or click to drop near the center.")
     .accessibilityIdentifier(HarnessMonitorAccessibility.policyCanvasPaletteItem(kind.rawValue))
