@@ -71,6 +71,36 @@ enum TaskBoardLaneDropPolicy {
   }
 }
 
+struct TaskBoardDropDeduper<Key: Equatable> {
+  private var handledKey: Key?
+
+  mutating func perform(_ key: Key, move: () -> Bool) -> Bool {
+    guard handledKey != key else {
+      return true
+    }
+    let moved = move()
+    if moved {
+      handledKey = key
+    }
+    return moved
+  }
+
+  mutating func reset() {
+    handledKey = nil
+  }
+}
+
+struct TaskBoardItemDropSignature: Equatable {
+  let itemID: String
+  let destination: TaskBoardInboxLane
+}
+
+struct TaskBoardInboxItemDropSignature: Equatable {
+  let sessionID: String
+  let taskID: String
+  let destination: TaskBoardInboxLane
+}
+
 enum TaskBoardInboxDropPolicy {
   static func moveFirstPayload(
     _ payloads: [TaskBoardInboxItemDragPayload],

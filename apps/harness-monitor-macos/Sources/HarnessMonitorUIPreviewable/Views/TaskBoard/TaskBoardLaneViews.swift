@@ -3,7 +3,7 @@ import HarnessMonitorKit
 import SwiftUI
 import UniformTypeIdentifiers
 
-struct TaskBoardItemDragPayload: Codable, Transferable {
+struct TaskBoardItemDragPayload: Codable, Transferable, Sendable {
   let itemID: String
   let status: TaskBoardStatus
 
@@ -16,22 +16,50 @@ struct TaskBoardItemDragPayload: Codable, Transferable {
   }
 
   func itemProvider() -> NSItemProvider {
-    legacyDragItemProvider(for: self, contentType: .harnessMonitorTaskBoardItem)
+    let provider = NSItemProvider()
+    guard let encodedPayload = try? JSONEncoder().encode(self) else {
+      return provider
+    }
+    provider.registerDataRepresentation(
+      forTypeIdentifier: UTType.harnessMonitorTaskBoardItem.identifier,
+      visibility: .all
+    ) { completion in
+      completion(encodedPayload, nil)
+      return nil
+    }
+    return provider
   }
 
   static func loadFirst(
     from providers: [NSItemProvider],
-    completion: @escaping (TaskBoardItemDragPayload) -> Void
+    completion: @escaping @MainActor (TaskBoardItemDragPayload) -> Void
   ) -> Bool {
-    loadFirstPayload(
-      from: providers,
-      contentType: .harnessMonitorTaskBoardItem,
-      completion: completion
-    )
+    guard
+      let provider = providers.first(where: {
+        $0.hasItemConformingToTypeIdentifier(UTType.harnessMonitorTaskBoardItem.identifier)
+      })
+    else {
+      return false
+    }
+    provider.loadDataRepresentation(forTypeIdentifier: UTType.harnessMonitorTaskBoardItem.identifier) {
+      data,
+      _
+      in
+      guard
+        let data,
+        let payload = try? JSONDecoder().decode(Self.self, from: data)
+      else {
+        return
+      }
+      Task { @MainActor in
+        completion(payload)
+      }
+    }
+    return true
   }
 }
 
-struct TaskBoardInboxItemDragPayload: Codable, Transferable {
+struct TaskBoardInboxItemDragPayload: Codable, Transferable, Sendable {
   let sessionID: String
   let taskID: String
   let status: TaskStatus
@@ -76,18 +104,45 @@ struct TaskBoardInboxItemDragPayload: Codable, Transferable {
   }
 
   func itemProvider() -> NSItemProvider {
-    legacyDragItemProvider(for: self, contentType: .harnessMonitorTaskBoardInboxItem)
+    let provider = NSItemProvider()
+    guard let encodedPayload = try? JSONEncoder().encode(self) else {
+      return provider
+    }
+    provider.registerDataRepresentation(
+      forTypeIdentifier: UTType.harnessMonitorTaskBoardInboxItem.identifier,
+      visibility: .all
+    ) { completion in
+      completion(encodedPayload, nil)
+      return nil
+    }
+    return provider
   }
 
   static func loadFirst(
     from providers: [NSItemProvider],
-    completion: @escaping (TaskBoardInboxItemDragPayload) -> Void
+    completion: @escaping @MainActor (TaskBoardInboxItemDragPayload) -> Void
   ) -> Bool {
-    loadFirstPayload(
-      from: providers,
-      contentType: .harnessMonitorTaskBoardInboxItem,
-      completion: completion
-    )
+    guard
+      let provider = providers.first(where: {
+        $0.hasItemConformingToTypeIdentifier(UTType.harnessMonitorTaskBoardInboxItem.identifier)
+      })
+    else {
+      return false
+    }
+    provider.loadDataRepresentation(
+      forTypeIdentifier: UTType.harnessMonitorTaskBoardInboxItem.identifier
+    ) { data, _ in
+      guard
+        let data,
+        let payload = try? JSONDecoder().decode(Self.self, from: data)
+      else {
+        return
+      }
+      Task { @MainActor in
+        completion(payload)
+      }
+    }
+    return true
   }
 }
 
@@ -110,6 +165,7 @@ struct TaskBoardItemLaneColumn: View {
   @Environment(\.fontScale)
   private var fontScale
   @State private var isDropTargeted = false
+  @State private var dropDeduper = TaskBoardDropDeduper<TaskBoardItemDropSignature>()
 
   private var metrics: TaskBoardLaneMetrics { TaskBoardLaneMetrics(fontScale: fontScale) }
 
@@ -132,29 +188,49 @@ struct TaskBoardItemLaneColumn: View {
     }
     .taskBoardLaneColumnChrome(lane: section.lane, isDropTargeted: isDropTargeted)
     .dropDestination(for: TaskBoardItemDragPayload.self, action: handleDrop) { targeted in
-      isDropTargeted = targeted
+      updateDropTargeted(targeted)
     }
-    .onDrop(
-      of: [.harnessMonitorTaskBoardItem],
-      isTargeted: $isDropTargeted,
-      perform: handleLegacyDrop
-    )
+    .onDrop(of: [.harnessMonitorTaskBoardItem], isTargeted: nil, perform: handleLegacyDrop)
     .accessibilityElement(children: .contain)
     .accessibilityIdentifier("harness.task-board.api-column.\(section.lane.rawValue)")
   }
 
   private func handleDrop(_ payloads: [TaskBoardItemDragPayload], _: CGPoint) -> Bool {
-    TaskBoardLaneDropPolicy.moveFirstPayload(
-      payloads,
-      to: section.lane,
-      move: onMoveItem
-    )
+    guard let payload = payloads.first else {
+      return false
+    }
+    return performDrop(
+      signature: TaskBoardItemDropSignature(itemID: payload.itemID, destination: section.lane)
+    ) {
+      TaskBoardLaneDropPolicy.moveFirstPayload(
+        payloads,
+        to: section.lane,
+        move: onMoveItem
+      )
+    }
   }
 
   private func handleLegacyDrop(_ providers: [NSItemProvider]) -> Bool {
     TaskBoardItemDragPayload.loadFirst(from: providers) { payload in
       _ = handleDrop([payload], .zero)
     }
+  }
+
+  private func updateDropTargeted(_ targeted: Bool) {
+    isDropTargeted = targeted
+    if !targeted {
+      dropDeduper = TaskBoardDropDeduper()
+    }
+  }
+
+  private func performDrop(
+    signature: TaskBoardItemDropSignature,
+    action: () -> Bool
+  ) -> Bool {
+    var deduper = dropDeduper
+    let handled = deduper.perform(signature, move: action)
+    dropDeduper = deduper
+    return handled
   }
 }
 
@@ -165,6 +241,7 @@ struct TaskBoardInboxLaneColumn: View {
   @Environment(\.fontScale)
   private var fontScale
   @State private var isDropTargeted = false
+  @State private var dropDeduper = TaskBoardDropDeduper<TaskBoardInboxItemDropSignature>()
 
   private var metrics: TaskBoardLaneMetrics { TaskBoardLaneMetrics(fontScale: fontScale) }
 
@@ -190,29 +267,53 @@ struct TaskBoardInboxLaneColumn: View {
     }
     .taskBoardLaneColumnChrome(lane: section.lane, isDropTargeted: isDropTargeted)
     .dropDestination(for: TaskBoardInboxItemDragPayload.self, action: handleDrop) { targeted in
-      isDropTargeted = targeted
+      updateDropTargeted(targeted)
     }
-    .onDrop(
-      of: [.harnessMonitorTaskBoardInboxItem],
-      isTargeted: $isDropTargeted,
-      perform: handleLegacyDrop
-    )
+    .onDrop(of: [.harnessMonitorTaskBoardInboxItem], isTargeted: nil, perform: handleLegacyDrop)
     .accessibilityElement(children: .contain)
     .accessibilityIdentifier("harness.task-board.column.\(section.lane.rawValue)")
   }
 
   private func handleDrop(_ payloads: [TaskBoardInboxItemDragPayload], _: CGPoint) -> Bool {
-    TaskBoardInboxDropPolicy.moveFirstPayload(
-      payloads,
-      to: section.lane,
-      move: onMoveItem
-    )
+    guard let payload = payloads.first else {
+      return false
+    }
+    return performDrop(
+      signature: TaskBoardInboxItemDropSignature(
+        sessionID: payload.sessionID,
+        taskID: payload.taskID,
+        destination: section.lane
+      )
+    ) {
+      TaskBoardInboxDropPolicy.moveFirstPayload(
+        payloads,
+        to: section.lane,
+        move: onMoveItem
+      )
+    }
   }
 
   private func handleLegacyDrop(_ providers: [NSItemProvider]) -> Bool {
     TaskBoardInboxItemDragPayload.loadFirst(from: providers) { payload in
       _ = handleDrop([payload], .zero)
     }
+  }
+
+  private func updateDropTargeted(_ targeted: Bool) {
+    isDropTargeted = targeted
+    if !targeted {
+      dropDeduper = TaskBoardDropDeduper()
+    }
+  }
+
+  private func performDrop(
+    signature: TaskBoardInboxItemDropSignature,
+    action: () -> Bool
+  ) -> Bool {
+    var deduper = dropDeduper
+    let handled = deduper.perform(signature, move: action)
+    dropDeduper = deduper
+    return handled
   }
 }
 
@@ -438,49 +539,4 @@ func taskBoardStatusColor(for status: TaskBoardStatus) -> Color {
   case .done:
     HarnessMonitorTheme.secondaryInk
   }
-}
-
-private func legacyDragItemProvider<Payload: Encodable>(
-  for payload: Payload,
-  contentType: UTType
-) -> NSItemProvider {
-  let provider = NSItemProvider()
-  provider.registerDataRepresentation(
-    forTypeIdentifier: contentType.identifier,
-    visibility: .all
-  ) { completion in
-    do {
-      completion(try JSONEncoder().encode(payload), nil)
-    } catch {
-      completion(nil, error)
-    }
-    return nil
-  }
-  return provider
-}
-
-private func loadFirstPayload<Payload: Decodable>(
-  from providers: [NSItemProvider],
-  contentType: UTType,
-  completion: @escaping (Payload) -> Void
-) -> Bool {
-  guard
-    let provider = providers.first(where: {
-      $0.hasItemConformingToTypeIdentifier(contentType.identifier)
-    })
-  else {
-    return false
-  }
-  provider.loadDataRepresentation(forTypeIdentifier: contentType.identifier) { data, _ in
-    guard
-      let data,
-      let payload = try? JSONDecoder().decode(Payload.self, from: data)
-    else {
-      return
-    }
-    DispatchQueue.main.async {
-      completion(payload)
-    }
-  }
-  return true
 }
