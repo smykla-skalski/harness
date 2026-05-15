@@ -181,7 +181,7 @@ public struct TaskBoardInboxSnapshot: Equatable, Sendable {
     generatedAt: Date? = nil,
     isFromCache: Bool = false
   ) {
-    let lookup = Dictionary(uniqueKeysWithValues: sessions.map { ($0.sessionId, $0) })
+    let lookup = Self.sessionLookup(sessions)
     let items = detailsBySessionID.values.flatMap { detail in
       let session = lookup[detail.session.sessionId] ?? detail.session
       return detail.tasks.compactMap { TaskBoardInboxItem(session: session, task: $0) }
@@ -190,6 +190,20 @@ public struct TaskBoardInboxSnapshot: Equatable, Sendable {
     self.items = Array(limitedItems)
     self.generatedAt = generatedAt
     self.isFromCache = isFromCache
+  }
+
+  static func sessionLookup(_ sessions: [SessionSummary]) -> [String: SessionSummary] {
+    Dictionary(sessions.map { ($0.sessionId, $0) }) { existing, duplicate in
+      HarnessMonitorLogger.store.warning(
+        """
+        TaskBoardInboxSnapshot deduplicated duplicate session id \
+        \(existing.sessionId, privacy: .public); \
+        keeping first entry, dropping duplicate updatedAt=\
+        \(duplicate.updatedAt, privacy: .public)
+        """
+      )
+      return existing
+    }
   }
 
   public var sections: [TaskBoardInboxSection] {

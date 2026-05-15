@@ -41,24 +41,61 @@ extension HarnessMonitorStore {
     do {
       let client = try await taskBoardSettingsClient()
       let materializedSnapshot = try await materializeTaskBoardGitSettings(snapshot)
-      async let updatedOrchestrator = client.updateTaskBoardOrchestratorSettings(
-        request: Self.orchestratorSettingsUpdateRequest(
-          from: materializedSnapshot.orchestratorSettings)
-      )
-      async let updatedRuntime = client.updateTaskBoardGitRuntimeConfig(
-        request: materializedSnapshot.runtimeConfig
-      )
 
-      let orchestratorSettings = try await updatedOrchestrator
-      _ = try await updatedRuntime
-      try Self.taskBoardGitHubCredentialStore.save(materializedSnapshot.githubCredentials)
-      try Self.taskBoardTodoistCredentialStore.save(materializedSnapshot.todoistCredentials)
-      _ = try await client.syncTaskBoardGitHubTokens(
-        request: materializedSnapshot.githubCredentials.syncRequest
-      )
-      _ = try await client.syncTaskBoardTodoistToken(
-        request: materializedSnapshot.todoistCredentials.syncRequest
-      )
+      let orchestratorSettings: TaskBoardOrchestratorSettings
+      do {
+        orchestratorSettings = try await client.updateTaskBoardOrchestratorSettings(
+          request: Self.orchestratorSettingsUpdateRequest(
+            from: materializedSnapshot.orchestratorSettings)
+        )
+      } catch {
+        presentFailureFeedback(error.localizedDescription)
+        return false
+      }
+
+      do {
+        _ = try await client.updateTaskBoardGitRuntimeConfig(
+          request: materializedSnapshot.runtimeConfig
+        )
+      } catch {
+        presentFailureFeedback(
+          """
+          Partial save: orchestrator settings saved, runtime config did not: \
+          \(error.localizedDescription) - review and retry.
+          """
+        )
+        return false
+      }
+
+      do {
+        _ = try await client.syncTaskBoardGitHubTokens(
+          request: materializedSnapshot.githubCredentials.syncRequest
+        )
+        _ = try await client.syncTaskBoardTodoistToken(
+          request: materializedSnapshot.todoistCredentials.syncRequest
+        )
+      } catch {
+        presentFailureFeedback(
+          """
+          Partial save: orchestrator and runtime saved, token sync did not: \
+          \(error.localizedDescription) - keychain left unchanged, review and retry.
+          """
+        )
+        return false
+      }
+
+      do {
+        try Self.taskBoardGitHubCredentialStore.save(materializedSnapshot.githubCredentials)
+        try Self.taskBoardTodoistCredentialStore.save(materializedSnapshot.todoistCredentials)
+      } catch {
+        presentFailureFeedback(
+          """
+          Partial save: daemon updated, but storing credentials in keychain failed: \
+          \(error.localizedDescription) - review and retry.
+          """
+        )
+        return false
+      }
 
       if let status = globalTaskBoardOrchestratorStatus {
         globalTaskBoardOrchestratorStatus = TaskBoardOrchestratorStatus(

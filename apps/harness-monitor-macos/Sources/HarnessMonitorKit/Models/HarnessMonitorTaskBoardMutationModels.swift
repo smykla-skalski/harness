@@ -9,6 +9,7 @@ public struct TaskBoardUpdateItemRequest: Codable, Equatable, Sendable {
   public let tags: [String]?
   public let projectId: String?
   public let clearProjectId: Bool
+  public let targetProjectTypes: [String]?
   public let externalRefs: [TaskBoardExternalRef]?
   public let planning: TaskBoardPlanningState?
   public let clearPlanning: Bool
@@ -28,6 +29,7 @@ public struct TaskBoardUpdateItemRequest: Codable, Equatable, Sendable {
     tags: [String]? = nil,
     projectId: String? = nil,
     clearProjectId: Bool = false,
+    targetProjectTypes: [String]? = nil,
     externalRefs: [TaskBoardExternalRef]? = nil,
     planning: TaskBoardPlanningState? = nil,
     clearPlanning: Bool = false,
@@ -46,6 +48,7 @@ public struct TaskBoardUpdateItemRequest: Codable, Equatable, Sendable {
     self.tags = tags
     self.projectId = projectId
     self.clearProjectId = clearProjectId
+    self.targetProjectTypes = targetProjectTypes
     self.externalRefs = externalRefs
     self.planning = planning
     self.clearPlanning = clearPlanning

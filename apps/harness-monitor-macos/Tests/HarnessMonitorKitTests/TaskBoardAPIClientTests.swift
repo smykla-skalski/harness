@@ -138,6 +138,90 @@ struct TaskBoardAPIClientTests {
     #expect(item.workflow?.policyTraceIds == ["trace-1"])
   }
 
+  @Test("Task board item decodes empty target project types when field omitted")
+  func taskBoardItemDecodesEmptyTargetProjectTypes() throws {
+    let data = Data(
+      #"""
+      {
+        "schema_version": 1,
+        "id": "board-1",
+        "title": "Board item",
+        "body": "Body",
+        "status": "todo",
+        "priority": "medium",
+        "agent_mode": "headless",
+        "planning": {},
+        "usage": {},
+        "created_at": "2026-05-14T10:00:00Z",
+        "updated_at": "2026-05-14T10:01:00Z"
+      }
+      """#.utf8
+    )
+
+    let item = try taskBoardDecoder().decode(TaskBoardItem.self, from: data)
+
+    #expect(item.targetProjectTypes.isEmpty)
+  }
+
+  @Test("Task board item round trips target project types")
+  func taskBoardItemRoundTripsTargetProjectTypes() throws {
+    let data = Data(
+      #"""
+      {
+        "schema_version": 1,
+        "id": "board-1",
+        "title": "Board item",
+        "body": "Body",
+        "status": "todo",
+        "priority": "medium",
+        "target_project_types": ["web", "data"],
+        "agent_mode": "headless",
+        "planning": {},
+        "usage": {},
+        "created_at": "2026-05-14T10:00:00Z",
+        "updated_at": "2026-05-14T10:01:00Z"
+      }
+      """#.utf8
+    )
+
+    let item = try taskBoardDecoder().decode(TaskBoardItem.self, from: data)
+
+    #expect(item.targetProjectTypes == ["web", "data"])
+  }
+
+  @Test("Task board create request encodes target project types as snake case")
+  func taskBoardCreateItemRequestEncodesTargetProjectTypes() throws {
+    let request = TaskBoardCreateItemRequest(
+      title: "Routed",
+      targetProjectTypes: ["web", "data"]
+    )
+
+    let encoder = JSONEncoder()
+    encoder.keyEncodingStrategy = .convertToSnakeCase
+    let data = try encoder.encode(request)
+    let json = try #require(
+      JSONSerialization.jsonObject(with: data) as? [String: Any]
+    )
+
+    #expect(json["target_project_types"] as? [String] == ["web", "data"])
+  }
+
+  @Test("Task board update request includes target project types when set")
+  func taskBoardUpdateItemRequestEncodesTargetProjectTypes() throws {
+    let request = TaskBoardUpdateItemRequest(
+      targetProjectTypes: ["web"]
+    )
+
+    let encoder = JSONEncoder()
+    encoder.keyEncodingStrategy = .convertToSnakeCase
+    let data = try encoder.encode(request)
+    let json = try #require(
+      JSONSerialization.jsonObject(with: data) as? [String: Any]
+    )
+
+    #expect(json["target_project_types"] as? [String] == ["web"])
+  }
+
   @Test("Task board item decodes needs-you status")
   func taskBoardItemDecodesNeedsYouStatus() throws {
     let data = Data(

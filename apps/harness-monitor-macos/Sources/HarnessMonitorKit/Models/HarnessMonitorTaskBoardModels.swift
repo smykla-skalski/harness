@@ -208,6 +208,7 @@ public struct TaskBoardItem: Codable, Equatable, Identifiable, Sendable {
   public let priority: TaskBoardPriority
   public let tags: [String]
   public let projectId: String?
+  public let targetProjectTypes: [String]
   public let agentMode: TaskBoardAgentMode
   public let externalRefs: [TaskBoardExternalRef]
   public let planning: TaskBoardPlanningState
@@ -218,6 +219,48 @@ public struct TaskBoardItem: Codable, Equatable, Identifiable, Sendable {
   public let createdAt: String
   public let updatedAt: String
   public let deletedAt: String?
+
+  public init(
+    schemaVersion: UInt32,
+    id: String,
+    title: String,
+    body: String,
+    status: TaskBoardStatus,
+    priority: TaskBoardPriority,
+    tags: [String],
+    projectId: String?,
+    targetProjectTypes: [String] = [],
+    agentMode: TaskBoardAgentMode,
+    externalRefs: [TaskBoardExternalRef],
+    planning: TaskBoardPlanningState,
+    workflow: TaskBoardWorkflowState?,
+    sessionId: String?,
+    workItemId: String?,
+    usage: TaskBoardUsage,
+    createdAt: String,
+    updatedAt: String,
+    deletedAt: String?
+  ) {
+    self.schemaVersion = schemaVersion
+    self.id = id
+    self.title = title
+    self.body = body
+    self.status = status
+    self.priority = priority
+    self.tags = tags
+    self.projectId = projectId
+    self.targetProjectTypes = targetProjectTypes
+    self.agentMode = agentMode
+    self.externalRefs = externalRefs
+    self.planning = planning
+    self.workflow = workflow
+    self.sessionId = sessionId
+    self.workItemId = workItemId
+    self.usage = usage
+    self.createdAt = createdAt
+    self.updatedAt = updatedAt
+    self.deletedAt = deletedAt
+  }
 }
 
 extension TaskBoardItem {
@@ -230,6 +273,7 @@ extension TaskBoardItem {
     case priority
     case tags
     case projectId
+    case targetProjectTypes
     case agentMode
     case externalRefs
     case planning
@@ -252,6 +296,8 @@ extension TaskBoardItem {
     self.priority = try container.decode(TaskBoardPriority.self, forKey: .priority)
     self.tags = try container.decodeIfPresent([String].self, forKey: .tags) ?? []
     self.projectId = try container.decodeIfPresent(String.self, forKey: .projectId)
+    self.targetProjectTypes =
+      try container.decodeIfPresent([String].self, forKey: .targetProjectTypes) ?? []
     self.agentMode = try container.decode(TaskBoardAgentMode.self, forKey: .agentMode)
     self.externalRefs =
       try container.decodeIfPresent([TaskBoardExternalRef].self, forKey: .externalRefs) ?? []
@@ -273,6 +319,7 @@ public struct TaskBoardCreateItemRequest: Codable, Equatable, Sendable {
   public let agentMode: TaskBoardAgentMode
   public let tags: [String]
   public let projectId: String?
+  public let targetProjectTypes: [String]
   public let externalRefs: [TaskBoardExternalRef]
   public let planning: TaskBoardPlanningState
   public let workflow: TaskBoardWorkflowState?
@@ -287,6 +334,7 @@ public struct TaskBoardCreateItemRequest: Codable, Equatable, Sendable {
     agentMode: TaskBoardAgentMode = .headless,
     tags: [String] = [],
     projectId: String? = nil,
+    targetProjectTypes: [String] = [],
     externalRefs: [TaskBoardExternalRef] = [],
     planning: TaskBoardPlanningState = TaskBoardPlanningState(),
     workflow: TaskBoardWorkflowState? = nil,
@@ -300,6 +348,7 @@ public struct TaskBoardCreateItemRequest: Codable, Equatable, Sendable {
     self.agentMode = agentMode
     self.tags = tags
     self.projectId = projectId
+    self.targetProjectTypes = targetProjectTypes
     self.externalRefs = externalRefs
     self.planning = planning
     self.workflow = workflow

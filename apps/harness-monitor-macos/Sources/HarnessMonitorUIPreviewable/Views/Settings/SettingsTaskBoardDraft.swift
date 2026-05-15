@@ -87,8 +87,15 @@ struct TaskBoardGitSettingsDraft: Equatable {
     policyVersion = orchestrator.policyVersion
 
     let tokensByRepository = Dictionary(
-      uniqueKeysWithValues: snapshot.githubCredentials.repositoryTokens.map {
-        ($0.repository, $0.token)
+      snapshot.githubCredentials.repositoryTokens.map { ($0.repository, $0.token) },
+      uniquingKeysWith: { existing, _ in
+        HarnessMonitorLogger.store.warning(
+          """
+          SettingsTaskBoardDraft dropped duplicate repository token entry; \
+          keeping first token for repository
+          """
+        )
+        return existing
       }
     )
     repositoryOverrides = runtime.repositoryOverrides.map { override in

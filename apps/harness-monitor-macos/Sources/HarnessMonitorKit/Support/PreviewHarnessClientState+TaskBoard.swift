@@ -25,6 +25,7 @@ extension PreviewHarnessClientState {
       priority: request.priority,
       tags: request.tags,
       projectId: request.projectId,
+      targetProjectTypes: request.targetProjectTypes,
       agentMode: request.agentMode,
       externalRefs: request.externalRefs,
       planning: request.planning,
@@ -352,6 +353,7 @@ extension TaskBoardItem {
       priority: request.priority ?? priority,
       tags: request.tags ?? tags,
       projectId: request.clearProjectId ? nil : request.projectId ?? projectId,
+      targetProjectTypes: request.targetProjectTypes ?? targetProjectTypes,
       agentMode: request.agentMode ?? agentMode,
       externalRefs: request.externalRefs ?? externalRefs,
       planning: request.clearPlanning

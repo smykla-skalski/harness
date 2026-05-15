@@ -265,6 +265,11 @@ final class RecordingHarnessClient: HarnessMonitorClientProtocol, @unchecked Sen
   var taskBoardAuditSummaryStorage: TaskBoardAuditSummary?
   var taskBoardProjectSummariesStorage: [TaskBoardProjectSummary]?
   var taskBoardMachineSummariesStorage: [TaskBoardMachineSummary]?
+  var taskBoardUpdateError: (any Error)?
+  var taskBoardRuntimeConfigError: (any Error)?
+  var taskBoardOrchestratorSettingsError: (any Error)?
+  var taskBoardGitHubTokensSyncError: (any Error)?
+  var taskBoardTodoistTokenSyncError: (any Error)?
   var sessionDetailsByID: [String: SessionDetail] = [:]
   var detailDelaysBySessionID: [String: Duration] = [:]
   var sessionDetailErrorsByID: [String: any Error] = [:]
