@@ -156,7 +156,8 @@ struct PolicyCanvasInteractiveEdge: View {
     PolicyCanvasEdgeAnimation.dashPattern
   }
 
-  @MainActor static func animatedDashPhase(at date: Date) -> CGFloat {
+  @MainActor
+  static func animatedDashPhase(at date: Date) -> CGFloat {
     PolicyCanvasEdgeAnimation.dashPhase(at: date)
   }
 }
