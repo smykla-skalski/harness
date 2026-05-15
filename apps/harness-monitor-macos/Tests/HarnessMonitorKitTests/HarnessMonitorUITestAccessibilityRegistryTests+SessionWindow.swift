@@ -76,6 +76,7 @@ extension HarnessMonitorUITestAccessibilityRegistryTests {
     let sidebarFooterView = try sourceFile(named: "SessionSidebarFooter.swift")
     let inspectorView = try sourceFile(named: "SessionWindowInspector.swift")
     let toolbarView = try sourceFile(named: "SessionWindowToolbar.swift")
+    let sharedToolbarView = try sourceFile(named: "HarnessMonitorWindowToolbar.swift")
 
     #expect(
       dashboardView.contains(
@@ -91,6 +92,8 @@ extension HarnessMonitorUITestAccessibilityRegistryTests {
     #expect(dashboardView.contains("HarnessMonitorAccessibility.dashboardScrollView"))
     #expect(dashboardView.contains("HarnessMonitorAccessibility.dashboardNewSessionButton"))
     #expect(dashboardView.contains("HarnessMonitorAccessibility.dashboardOpenFolderButton"))
+    #expect(dashboardView.contains("DashboardWindowToolbar("))
+    #expect(dashboardView.contains("SleepPreventionToolbarButton("))
     #expect(windowView.contains("HarnessMonitorAccessibility.sessionWindowShell"))
     #expect(
       rootView.contains(
@@ -121,6 +124,8 @@ extension HarnessMonitorUITestAccessibilityRegistryTests {
     #expect(toolbarView.contains("HarnessMonitorAccessibility.sessionWindowFocusModeButton"))
     #expect(toolbarView.contains("HarnessMonitorAccessibility.sessionNavigateBackButton"))
     #expect(toolbarView.contains("HarnessMonitorAccessibility.sessionNavigateForwardButton"))
+    #expect(toolbarView.contains("HarnessMonitorWindowToolbar {"))
+    #expect(sharedToolbarView.contains("struct HarnessMonitorWindowToolbar<"))
     #expect(
       inspectorView.contains(
         ".accessibilityTestProbe(\n      HarnessMonitorAccessibility.sessionWindowInspector"

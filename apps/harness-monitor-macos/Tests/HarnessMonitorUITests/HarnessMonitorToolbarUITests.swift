@@ -200,6 +200,34 @@ final class HarnessMonitorToolbarUITests: HarnessMonitorUITestCase {
     )
   }
 
+  func testDashboardWindowPlacesQuickActionsInToolbarChrome() throws {
+    let app = launch(
+      mode: "preview",
+      additionalEnvironment: ["HARNESS_MONITOR_PREVIEW_SCENARIO": "dashboard"]
+    )
+    let dashboardWindow = element(in: app, identifier: Accessibility.dashboardWindowRoot)
+    let toolbar = mainWindow(in: app).toolbars.firstMatch
+    let newSessionButton = button(in: app, identifier: Accessibility.dashboardNewSessionButton)
+    let openFolderButton = button(in: app, identifier: Accessibility.dashboardOpenFolderButton)
+    let sleepPreventionButton = button(in: app, identifier: Accessibility.sleepPreventionButton)
+
+    XCTAssertTrue(waitForElement(dashboardWindow, timeout: Self.actionTimeout))
+    XCTAssertTrue(waitForElement(toolbar, timeout: Self.actionTimeout))
+    XCTAssertTrue(
+      waitUntil(timeout: Self.actionTimeout) {
+        newSessionButton.exists && !newSessionButton.frame.isEmpty
+          && openFolderButton.exists && !openFolderButton.frame.isEmpty
+          && sleepPreventionButton.exists && !sleepPreventionButton.frame.isEmpty
+      },
+      "Expected dashboard toolbar quick actions and sleep prevention to be visible"
+    )
+
+    for button in [newSessionButton, openFolderButton, sleepPreventionButton] {
+      XCTAssertGreaterThanOrEqual(button.frame.minY, toolbar.frame.minY - 4)
+      XCTAssertLessThanOrEqual(button.frame.maxY, toolbar.frame.maxY + 4)
+    }
+  }
+
   func testCockpitCreateMenuOpensNewTaskSheet() throws {
     let app = launch(
       mode: "preview",
