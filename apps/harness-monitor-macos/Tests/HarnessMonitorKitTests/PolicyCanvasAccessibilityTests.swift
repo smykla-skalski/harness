@@ -59,11 +59,17 @@ struct PolicyCanvasAccessibilityTests {
     let target = PolicyCanvasPortEndpoint(nodeID: "n2", portID: "p2", kind: .input)
     let flow = PolicyCanvasEdge(id: "e1", source: endpoint, target: target, label: "")
     let denied = PolicyCanvasEdge(
-      id: "e2", source: endpoint, target: target, label: "",
+      id: "e2",
+      source: endpoint,
+      target: target,
+      label: "",
       condition: "denied"
     )
     let conditional = PolicyCanvasEdge(
-      id: "e3", source: endpoint, target: target, label: "",
+      id: "e3",
+      source: endpoint,
+      target: target,
+      label: "",
       condition: "if amount > 1000"
     )
     #expect(viewModel.accessibilityValue(for: flow) == "flow")
@@ -78,7 +84,10 @@ struct PolicyCanvasAccessibilityTests {
     let target = PolicyCanvasPortEndpoint(nodeID: "n2", portID: "p2", kind: .input)
     let staticEdge = PolicyCanvasEdge(id: "s", source: endpoint, target: target, label: "")
     let liveEdge = PolicyCanvasEdge(
-      id: "l", source: endpoint, target: target, label: "",
+      id: "l",
+      source: endpoint,
+      target: target,
+      label: "",
       isAnimated: true
     )
     #expect(viewModel.accessibilityValue(for: staticEdge, isAnimating: false) == "flow")

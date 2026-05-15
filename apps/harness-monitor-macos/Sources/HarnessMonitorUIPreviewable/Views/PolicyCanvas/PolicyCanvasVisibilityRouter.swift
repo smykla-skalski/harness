@@ -1,7 +1,7 @@
 import CoreGraphics
 import Foundation
-import SwiftUI
 import os
+import SwiftUI
 
 /// Router-decision log. Only the *fallback* path emits a line - A* success
 /// is the expected case and a per-frame "solved" log would flood Console.
