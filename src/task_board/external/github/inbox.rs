@@ -13,13 +13,14 @@ use crate::task_board::types::{TaskBoardItem, TaskBoardStatus};
 use super::{
     GitHubRepository, assigned_issue_query, ensure_rustls_provider, github_client_error,
     github_external_id, github_inbox_issue_status, github_sync_error, parse_github_repository,
-    review_request_query,
+    review_request_query, search_label_matches_filter,
 };
 
 #[derive(Clone)]
 pub struct GitHubInboxSyncClient {
     client: octocrab::Octocrab,
     repositories: Vec<GitHubRepository>,
+    import_labels: Vec<String>,
 }
 
 impl GitHubInboxSyncClient {
@@ -29,6 +30,20 @@ impl GitHubInboxSyncClient {
     /// Returns an error when the token is empty, repositories are invalid, or
     /// the SDK client cannot be built.
     pub fn new(token: impl Into<String>, repositories: &[String]) -> Result<Self, CliError> {
+        Self::new_with_labels(token, repositories, &[])
+    }
+
+    /// Build a GitHub inbox client with an optional label filter applied to issue
+    /// searches.
+    ///
+    /// # Errors
+    /// Returns an error when the token is empty, repositories are invalid, or
+    /// the SDK client cannot be built.
+    pub fn new_with_labels(
+        token: impl Into<String>,
+        repositories: &[String],
+        import_labels: &[String],
+    ) -> Result<Self, CliError> {
         let token = normalize_token(ExternalProvider::GitHub, token)?;
         ensure_rustls_provider();
         let client = octocrab::Octocrab::builder()
@@ -43,6 +58,7 @@ impl GitHubInboxSyncClient {
         Ok(Self {
             client,
             repositories,
+            import_labels: import_labels.to_vec(),
         })
     }
 
@@ -51,9 +67,10 @@ impl GitHubInboxSyncClient {
     /// # Errors
     /// Returns an error when no GitHub token is configured or repositories are invalid.
     pub fn from_config(config: &ExternalSyncConfig) -> Result<Self, CliError> {
-        Self::new(
+        Self::new_with_labels(
             config.require_token(ExternalProvider::GitHub)?,
             config.github_inbox_repositories(),
+            config.github_import_labels(),
         )
     }
 
@@ -152,6 +169,7 @@ impl GitHubInboxSyncClient {
             .await?;
         Ok(items
             .into_iter()
+            .filter(|item| search_label_matches_filter(&item.label_names(), &self.import_labels))
             .map(|item| ExternalTask {
                 reference: github_task_ref(repository, item.number, item.html_url),
                 title: item.title,
@@ -217,6 +235,22 @@ struct GitHubSearchIssuePullRequestItem {
     html_url: String,
     state: String,
     updated_at: String,
+    #[serde(default)]
+    labels: Vec<GitHubSearchLabel>,
+}
+
+impl GitHubSearchIssuePullRequestItem {
+    fn label_names(&self) -> Vec<String> {
+        self.labels
+            .iter()
+            .map(|label| label.name.clone())
+            .collect()
+    }
+}
+
+#[derive(Debug, Clone, Deserialize)]
+struct GitHubSearchLabel {
+    name: String,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -262,5 +296,43 @@ mod tests {
                 "page": 2
             })
         );
+    }
+
+    #[test]
+    fn github_inbox_search_item_deserializes_label_names() {
+        let payload = json!({
+            "number": 42,
+            "title": "Fix bug",
+            "body": null,
+            "html_url": "https://example.com/i/42",
+            "state": "open",
+            "updated_at": "2026-05-15T00:00:00Z",
+            "labels": [{ "name": "needs-fix" }, { "name": "automation" }]
+        });
+
+        let item: GitHubSearchIssuePullRequestItem =
+            serde_json::from_value(payload).expect("deserialize search item");
+
+        assert_eq!(
+            item.label_names(),
+            vec!["needs-fix".to_string(), "automation".to_string()]
+        );
+    }
+
+    #[test]
+    fn search_label_filter_admits_only_matching_labels() {
+        assert!(search_label_matches_filter(
+            &["bug".into(), "automation".into()],
+            &["automation".into()]
+        ));
+        assert!(!search_label_matches_filter(
+            &["docs".into()],
+            &["automation".into()]
+        ));
+        assert!(search_label_matches_filter(
+            &["bug".into()],
+            &[" Bug ".into()]
+        ));
+        assert!(search_label_matches_filter(&["bug".into()], &[]));
     }
 }

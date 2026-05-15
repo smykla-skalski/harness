@@ -1,3 +1,4 @@
+use std::collections::BTreeSet;
 use std::{env, fmt};
 
 use async_trait::async_trait;
@@ -137,7 +138,9 @@ pub struct ExternalSyncConfig {
     pub github_token: Option<String>,
     pub github_repository: Option<String>,
     pub github_inbox_repositories: Vec<String>,
+    pub github_import_labels: Vec<String>,
     pub todoist_token: Option<String>,
+    pub todoist_import_project_ids: Vec<String>,
 }
 
 impl ExternalSyncConfig {
@@ -150,7 +153,9 @@ impl ExternalSyncConfig {
                 GITHUB_REPOSITORY_ENV,
             ]),
             github_inbox_repositories: Vec::new(),
+            github_import_labels: Vec::new(),
             todoist_token: first_present_env(&[HARNESS_TODOIST_TOKEN_ENV]),
+            todoist_import_project_ids: Vec::new(),
         }
     }
 
@@ -173,6 +178,16 @@ impl ExternalSyncConfig {
     #[must_use]
     pub fn github_inbox_repositories(&self) -> &[String] {
         &self.github_inbox_repositories
+    }
+
+    #[must_use]
+    pub fn github_import_labels(&self) -> &[String] {
+        &self.github_import_labels
+    }
+
+    #[must_use]
+    pub fn todoist_import_project_ids(&self) -> &[String] {
+        &self.todoist_import_project_ids
     }
 
     #[must_use]
@@ -225,6 +240,18 @@ impl ExternalSyncConfig {
         self
     }
 
+    #[must_use]
+    pub fn with_github_import_labels_override(mut self, labels: &[String]) -> Self {
+        self.github_import_labels = normalize_string_list(labels);
+        self
+    }
+
+    #[must_use]
+    pub fn with_todoist_import_project_ids_override(mut self, project_ids: &[String]) -> Self {
+        self.todoist_import_project_ids = normalize_string_list(project_ids);
+        self
+    }
+
     /// Return the configured token for a provider.
     ///
     /// # Errors
@@ -244,9 +271,29 @@ impl fmt::Debug for ExternalSyncConfig {
             .field("github_token", &redacted(self.github_token.as_deref()))
             .field("github_repository", &self.github_repository)
             .field("github_inbox_repositories", &self.github_inbox_repositories)
+            .field("github_import_labels", &self.github_import_labels)
             .field("todoist_token", &redacted(self.todoist_token.as_deref()))
+            .field(
+                "todoist_import_project_ids",
+                &self.todoist_import_project_ids,
+            )
             .finish()
     }
+}
+
+fn normalize_string_list(values: &[String]) -> Vec<String> {
+    let mut seen = BTreeSet::new();
+    let mut out = Vec::with_capacity(values.len());
+    for value in values {
+        let trimmed = value.trim();
+        if trimmed.is_empty() {
+            continue;
+        }
+        if seen.insert(trimmed.to_owned()) {
+            out.push(trimmed.to_owned());
+        }
+    }
+    out
 }
 
 #[async_trait]

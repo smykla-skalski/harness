@@ -26,6 +26,7 @@ pub struct GitHubSyncClient {
     client: octocrab::Octocrab,
     repository: Option<GitHubRepository>,
     pull_enabled: bool,
+    import_labels: Vec<String>,
 }
 
 impl GitHubSyncClient {
@@ -68,6 +69,7 @@ impl GitHubSyncClient {
             client,
             repository,
             pull_enabled,
+            import_labels: Vec::new(),
         })
     }
 
@@ -89,11 +91,13 @@ impl GitHubSyncClient {
         config: &ExternalSyncConfig,
         pull_enabled: bool,
     ) -> Result<Self, CliError> {
-        Self::new_with_repository_mode(
+        let mut client = Self::new_with_repository_mode(
             config.require_token(ExternalProvider::GitHub)?,
             config.github_repository.as_deref(),
             pull_enabled,
-        )
+        )?;
+        client.import_labels = config.github_import_labels().to_vec();
+        Ok(client)
     }
 
     #[must_use]
@@ -146,15 +150,14 @@ impl ExternalSyncClient for GitHubSyncClient {
         }
         let repository = self.repository_for(None)?;
         let project_id = repository.slug();
-        let page = self
+        let issues_api = self
             .octocrab()
-            .issues(repository.owner.as_str(), repository.repo.as_str())
-            .list()
-            .state(State::All)
-            .per_page(100_u8)
-            .send()
-            .await
-            .map_err(github_sync_error)?;
+            .issues(repository.owner.as_str(), repository.repo.as_str());
+        let mut request = issues_api.list().state(State::All).per_page(100_u8);
+        if !self.import_labels.is_empty() {
+            request = request.labels(&self.import_labels);
+        }
+        let page = request.send().await.map_err(github_sync_error)?;
         let issues = self
             .octocrab()
             .all_pages(page)
@@ -318,6 +321,20 @@ fn review_request_query(repository: &GitHubRepository, login: &str) -> String {
         "repo:{} is:pr review-requested:{login} state:open",
         repository.slug()
     )
+}
+
+pub(super) fn search_label_matches_filter(
+    item_labels: &[String],
+    import_labels: &[String],
+) -> bool {
+    if import_labels.is_empty() {
+        return true;
+    }
+    item_labels.iter().any(|name| {
+        import_labels
+            .iter()
+            .any(|wanted| name.eq_ignore_ascii_case(wanted.trim()))
+    })
 }
 
 fn github_client_error(error: octocrab::Error) -> CliError {

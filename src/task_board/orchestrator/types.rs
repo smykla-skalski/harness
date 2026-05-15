@@ -14,6 +14,14 @@ pub const CURRENT_ORCHESTRATOR_STATE_VERSION: u32 = 1;
 pub struct TaskBoardGitHubInboxConfig {
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub repositories: Vec<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub label_filter: Vec<String>,
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TaskBoardTodoistInboxConfig {
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub project_filter: Vec<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -28,6 +36,8 @@ pub struct TaskBoardOrchestratorSettings {
     pub github_project: TaskBoardGitHubProjectConfig,
     #[serde(default)]
     pub github_inbox: TaskBoardGitHubInboxConfig,
+    #[serde(default)]
+    pub todoist_inbox: TaskBoardTodoistInboxConfig,
     pub policy_version: String,
 }
 
@@ -49,6 +59,8 @@ pub struct TaskBoardOrchestratorSettingsUpdateRequest {
     pub github_project: Option<TaskBoardGitHubProjectConfig>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub github_inbox: Option<TaskBoardGitHubInboxConfig>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub todoist_inbox: Option<TaskBoardTodoistInboxConfig>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub policy_version: Option<String>,
 }
@@ -186,6 +198,7 @@ impl Default for TaskBoardOrchestratorSettings {
             project_dir: None,
             github_project: TaskBoardGitHubProjectConfig::default(),
             github_inbox: TaskBoardGitHubInboxConfig::default(),
+            todoist_inbox: TaskBoardTodoistInboxConfig::default(),
             policy_version: TASK_BOARD_POLICY_VERSION.to_string(),
         }
     }

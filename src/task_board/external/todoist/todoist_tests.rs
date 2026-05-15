@@ -148,6 +148,65 @@ fn todoist_update_classifies_metadata_and_status_changes() {
     assert!(status.changes_status());
 }
 
+#[test]
+fn todoist_project_filter_admits_only_matching_project_ids() {
+    assert!(todoist_project_matches_filter(
+        Some("proj-1"),
+        &["proj-1".into()]
+    ));
+    assert!(!todoist_project_matches_filter(
+        Some("proj-2"),
+        &["proj-1".into()]
+    ));
+    assert!(todoist_project_matches_filter(
+        Some("proj-1"),
+        &[" Proj-1 ".into()]
+    ));
+    assert!(todoist_project_matches_filter(Some("proj-1"), &[]));
+    assert!(!todoist_project_matches_filter(None, &["proj-1".into()]));
+    assert!(todoist_project_matches_filter(None, &[]));
+}
+
+#[tokio::test]
+async fn todoist_pull_drops_tasks_outside_project_filter() {
+    let body = r#"[
+        {"id":"a","content":"In scope","description":"","project_id":"proj-keep"},
+        {"id":"b","content":"Out of scope","description":"","project_id":"proj-skip"},
+        {"id":"c","content":"No project","description":""}
+    ]"#;
+    let (endpoint, _captured, handle) = spawn_json_mock_response(body);
+    let mut config = ExternalSyncConfig::default()
+        .with_todoist_token_override(Some("token"))
+        .with_todoist_import_project_ids_override(&["proj-keep".into()]);
+    config.todoist_token = Some("token".into());
+    let mut client = TodoistSyncClient::new_with_api_base("token", endpoint).expect("client");
+    client.import_project_ids = config.todoist_import_project_ids().to_vec();
+
+    let tasks = client.pull_tasks().await.expect("pull tasks");
+
+    handle.join().expect("mock server");
+    assert_eq!(tasks.len(), 1);
+    assert_eq!(tasks[0].reference.external_id, "a");
+    assert_eq!(tasks[0].project_id.as_deref(), Some("proj-keep"));
+}
+
+fn spawn_json_mock_response(
+    response_body: &str,
+) -> (String, Arc<Mutex<CapturedRequest>>, thread::JoinHandle<()>) {
+    let listener = TcpListener::bind("127.0.0.1:0").expect("bind");
+    let endpoint = format!("http://{}", listener.local_addr().expect("addr"));
+    let captured = Arc::new(Mutex::new(CapturedRequest::default()));
+    let captured_clone = Arc::clone(&captured);
+    let body = response_body.to_string();
+    let handle = thread::spawn(move || {
+        let (mut stream, _) = listener.accept().expect("accept");
+        let request = read_http_request(&mut stream);
+        *captured_clone.lock().expect("captured request") = capture_request(&request);
+        write_json_response(&mut stream, &body);
+    });
+    (endpoint, captured, handle)
+}
+
 fn local_item_with_status(status: TaskBoardStatus) -> TaskBoardItem {
     let mut item = local_item("Local task", "", None);
     item.status = status;

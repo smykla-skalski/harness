@@ -1,27 +1,26 @@
-use std::{
-    collections::BTreeSet,
-    path::{Path, PathBuf},
-};
-
-use uuid::Uuid;
+use std::path::PathBuf;
 
 use crate::errors::CliError;
-use crate::infra::io::{read_json_typed, write_json_pretty};
+use crate::infra::io::write_json_pretty;
 use crate::workspace::utc_now;
 
 use super::dispatch::DispatchExecutionSummary;
 use super::evaluation::TaskBoardEvaluationSummary;
 use super::external::ExternalSyncConfig;
 use super::store::TaskBoardStore;
-use super::summary::{
-    TaskBoardAuditSummary, TaskBoardSyncSummary, build_audit_summary, build_sync_summary,
-};
-use super::types::{TaskBoardItem, TaskBoardStatus, TaskBoardWorkflowStatus};
+use super::summary::{build_audit_summary, build_sync_summary};
+use super::types::TaskBoardItem;
 
+mod run_record;
 mod settings;
 mod types;
 
-use self::settings::{apply_settings_update, dispatch_input, normalize_github_inbox};
+use self::run_record::{
+    RunRecordInput, new_run_id, read_or_default, run_items, run_record, workflow_statuses,
+};
+use self::settings::{
+    apply_settings_update, dispatch_input, normalize_github_inbox, normalize_todoist_inbox,
+};
 pub use self::types::*;
 
 const SETTINGS_FILE: &str = "orchestrator-settings.json";
@@ -61,6 +60,7 @@ impl TaskBoardOrchestrator {
         let mut settings = self.settings()?;
         apply_settings_update(&mut settings, update);
         settings.github_inbox = normalize_github_inbox(&settings.github_inbox)?;
+        settings.todoist_inbox = normalize_todoist_inbox(&settings.todoist_inbox);
         write_json_pretty(&self.settings_path(), &settings)?;
         Ok(settings)
     }
@@ -343,95 +343,6 @@ impl TaskBoardOrchestrator {
     fn state_path(&self) -> PathBuf {
         self.root.join(STATE_FILE)
     }
-}
-
-fn run_items(
-    board: &TaskBoardStore,
-    item_id: Option<&str>,
-    status: Option<TaskBoardStatus>,
-) -> Result<Vec<TaskBoardItem>, CliError> {
-    item_id.map_or_else(
-        || board.list(status),
-        |id| board.get(id).map(|item| vec![item]),
-    )
-}
-
-struct RunRecordInput {
-    run_id: String,
-    started_at: String,
-    dry_run: bool,
-    sync: TaskBoardSyncSummary,
-    audit: TaskBoardAuditSummary,
-    dispatch: Option<DispatchExecutionSummary>,
-    evaluation: Option<TaskBoardEvaluationSummary>,
-    error: Option<String>,
-}
-
-fn run_record(input: RunRecordInput) -> TaskBoardOrchestratorRunSummary {
-    let policy_trace_ids = policy_trace_ids(input.dispatch.as_ref(), input.evaluation.as_ref());
-    TaskBoardOrchestratorRunSummary {
-        run_id: input.run_id,
-        started_at: input.started_at,
-        completed_at: utc_now(),
-        status: if input.error.is_some() {
-            TaskBoardOrchestratorRunStatus::Failed
-        } else {
-            TaskBoardOrchestratorRunStatus::Completed
-        },
-        dry_run: input.dry_run,
-        sync: input.sync,
-        audit: input.audit,
-        dispatch: input.dispatch,
-        evaluation: input.evaluation,
-        error: input.error,
-        policy_trace_ids,
-    }
-}
-
-fn policy_trace_ids(
-    dispatch: Option<&DispatchExecutionSummary>,
-    evaluation: Option<&TaskBoardEvaluationSummary>,
-) -> Vec<String> {
-    let mut trace_ids = BTreeSet::new();
-    if let Some(dispatch) = dispatch {
-        for applied in &dispatch.applied {
-            trace_ids.extend(applied.item.workflow.policy_trace_ids.iter().cloned());
-        }
-    }
-    if let Some(evaluation) = evaluation {
-        for record in &evaluation.records {
-            if let Some(item) = &record.item {
-                trace_ids.extend(item.workflow.policy_trace_ids.iter().cloned());
-            }
-        }
-    }
-    trace_ids.into_iter().collect()
-}
-
-const fn workflow_statuses() -> [TaskBoardWorkflowStatus; 6] {
-    [
-        TaskBoardWorkflowStatus::Idle,
-        TaskBoardWorkflowStatus::Running,
-        TaskBoardWorkflowStatus::Paused,
-        TaskBoardWorkflowStatus::Completed,
-        TaskBoardWorkflowStatus::Failed,
-        TaskBoardWorkflowStatus::Cancelled,
-    ]
-}
-
-fn read_or_default<T>(path: &Path) -> Result<T, CliError>
-where
-    T: Default + for<'de> serde::Deserialize<'de>,
-{
-    if path.exists() {
-        read_json_typed(path)
-    } else {
-        Ok(T::default())
-    }
-}
-
-fn new_run_id() -> String {
-    format!("task-board-run-{}", Uuid::new_v4().simple())
 }
 
 #[cfg(test)]
