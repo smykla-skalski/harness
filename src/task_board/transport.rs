@@ -17,6 +17,7 @@ use crate::task_board::types::{AgentMode, TaskBoardPriority, TaskBoardStatus};
 mod catalog;
 mod dispatch;
 mod evaluate;
+mod host;
 mod item_args;
 mod item_commands;
 mod orchestrator;
@@ -25,6 +26,7 @@ mod planning;
 mod sync;
 
 pub use evaluate::TaskBoardEvaluateArgs;
+pub use host::TaskBoardHostCommand;
 use item_args::TaskBoardItemFieldArgs;
 pub use orchestrator::TaskBoardOrchestratorCommand;
 pub use planning::{TaskBoardPlanApproveArgs, TaskBoardPlanBeginArgs, TaskBoardPlanSubmitArgs};
@@ -60,6 +62,11 @@ pub enum TaskBoardCommand {
     Project(TaskBoardCatalogArgs),
     /// Manage known worker machines.
     Machine(TaskBoardCatalogArgs),
+    /// Manage the local host record and its declared project types.
+    Host {
+        #[command(subcommand)]
+        command: TaskBoardHostCommand,
+    },
     /// Manage autonomous task-board orchestration.
     Orchestrator {
         #[command(subcommand)]
@@ -235,6 +242,7 @@ impl Execute for TaskBoardCommand {
             Self::Audit(args) => args.execute(context),
             Self::Project(args) => args.execute_project(context),
             Self::Machine(args) => args.execute_machine(context),
+            Self::Host { command } => command.execute(context),
             Self::Orchestrator { command } => command.execute(context),
         }
     }
