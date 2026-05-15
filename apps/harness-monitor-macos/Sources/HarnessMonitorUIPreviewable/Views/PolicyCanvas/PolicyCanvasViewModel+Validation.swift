@@ -259,6 +259,15 @@ extension PolicyCanvasViewModel {
         )
       )
     }
+    for duplicate in detectDuplicateTitles() {
+      issues.append(
+        TaskBoardPolicyPipelineValidationIssue(
+          code: "duplicate_label",
+          message: "\(duplicate.nodeIds.count) nodes share the title \"\(duplicate.title)\"",
+          nodeIds: duplicate.nodeIds
+        )
+      )
+    }
     return issues
   }
 
@@ -312,6 +321,36 @@ extension PolicyCanvasViewModel {
       }
     }
     return nil
+  }
+
+  /// Title + node-ids tuple for duplicate-label issue construction.
+  /// Separating the detection result from the issue payload keeps the
+  /// `validateGraph()` body uniform across all three local rules.
+  private struct DuplicateTitleGroup {
+    let title: String
+    let nodeIds: [String]
+  }
+
+  /// Returns groups of node ids whose `title` matches verbatim. Empty
+  /// titles are skipped (their own smell, covered by a separate
+  /// daemon-side validator). The result is sorted by title so banner
+  /// rendering is deterministic across renders and tests can pin the
+  /// order. Within each group the node-id list is also sorted.
+  private func detectDuplicateTitles() -> [DuplicateTitleGroup] {
+    let bucketed = Dictionary(grouping: nodes, by: \.title)
+    return
+      bucketed
+      .compactMap { title, members -> DuplicateTitleGroup? in
+        let trimmed = title.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty, members.count > 1 else {
+          return nil
+        }
+        return DuplicateTitleGroup(
+          title: title,
+          nodeIds: members.map(\.id).sorted()
+        )
+      }
+      .sorted { $0.title < $1.title }
   }
 
   /// Returns node ids that have neither incoming nor outgoing edges and are
