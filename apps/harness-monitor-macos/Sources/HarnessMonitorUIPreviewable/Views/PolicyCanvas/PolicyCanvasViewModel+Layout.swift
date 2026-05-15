@@ -32,49 +32,9 @@ extension PolicyCanvasViewModel {
         y: PolicyCanvasLayout.minimumCanvasSize.height / 2
       )
     }
-    let focusY =
-      bounds.minY
-      + min(bounds.height / 2, PolicyCanvasLayout.initialViewportFocusYOffset)
     return CGPoint(
       x: bounds.midX * zoom,
-      y: focusY * zoom
-    )
-  }
-
-  func initialViewportScrollPoint(for viewportSize: CGSize) -> CGPoint {
-    let contentSize = scaledCanvasContentSize(for: viewportSize)
-    let focus = initialViewportAnchorPoint
-    return CGPoint(
-      x: clampedScrollOffset(
-        focus.x - viewportSize.width / 2,
-        contentLength: contentSize.width,
-        viewportLength: viewportSize.width
-      ),
-      y: clampedScrollOffset(
-        focus.y - viewportSize.height / 2,
-        contentLength: contentSize.height,
-        viewportLength: viewportSize.height
-      )
-    )
-  }
-
-  func viewportScrollPoint(
-    keepingCanvasPoint canvasPoint: CGPoint,
-    atViewportPoint viewportPoint: CGPoint,
-    viewportSize: CGSize
-  ) -> CGPoint {
-    let contentSize = scaledCanvasContentSize(for: viewportSize)
-    return CGPoint(
-      x: clampedScrollOffset(
-        (canvasPoint.x * zoom) - viewportPoint.x,
-        contentLength: contentSize.width,
-        viewportLength: viewportSize.width
-      ),
-      y: clampedScrollOffset(
-        (canvasPoint.y * zoom) - viewportPoint.y,
-        contentLength: contentSize.height,
-        viewportLength: viewportSize.height
-      )
+      y: bounds.midY * zoom
     )
   }
 
@@ -218,20 +178,5 @@ extension PolicyCanvasViewModel {
     let sourceGroup = node(edge.source.nodeID)?.groupID ?? "ungrouped"
     let targetGroup = node(edge.target.nodeID)?.groupID ?? "ungrouped"
     return "\(sourceGroup)->\(targetGroup)"
-  }
-
-  private func scaledCanvasContentSize(for viewportSize: CGSize) -> CGSize {
-    CGSize(
-      width: max(viewportSize.width, canvasContentSize.width * zoom),
-      height: max(viewportSize.height, canvasContentSize.height * zoom)
-    )
-  }
-
-  private func clampedScrollOffset(
-    _ proposedOffset: CGFloat,
-    contentLength: CGFloat,
-    viewportLength: CGFloat
-  ) -> CGFloat {
-    min(max(0, proposedOffset), max(0, contentLength - viewportLength))
   }
 }

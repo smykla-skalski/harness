@@ -14,12 +14,19 @@ extension PolicyCanvasViewModel {
     clearTransientGestureState()
   }
 
-  /// Clears transient gesture state without mutating the persisted graph.
-  /// `highlightedInput` is fed by `setInputTargeted(_:nodeID:portID:)` while
-  /// a port drag is over a drop target; `highlightedGroupID` is set by node
-  /// and group drags. Both are cleared on drag-end normally, but rejected
-  /// gestures (Escape, daemon-side reject, foreign delete) can leave them
-  /// stale — call this method on those paths to keep the canvas quiet.
+  /// Drop every piece of in-flight gesture state in one call: the rubber-band
+  /// edge preview (via `clearPendingEdge()`), the highlighted input port
+  /// stroke, and the highlighted drop-target group. Use this from interruption
+  /// surfaces (scenePhase transitions, Escape keypress, document republish)
+  /// where the canvas needs to return to a resting state regardless of which
+  /// gesture was mid-flight.
+  ///
+  /// Routes the pending-edge clear through `clearPendingEdge()` so the
+  /// rubber-band presence-bit (`hasPendingEdge`) stays in sync — Wave 2F is
+  /// the only writer of that bit, and reaching past its single setter would
+  /// strand views that subscribe to the bit instead of the payload.
+  ///
+  /// Idempotent — every write is to optional storage that may already be nil.
   func clearTransientGestureState() {
     highlightedInput = nil
     highlightedGroupID = nil
@@ -54,25 +61,9 @@ extension PolicyCanvasViewModel {
 
   /// Updates the canvas zoom and marks the viewport (not the document) dirty.
   /// Viewport state is window-scoped layout, not part of the saved pipeline.
-  @discardableResult
-  func setZoom(_ nextZoom: CGFloat) -> Bool {
-    let clampedZoom = min(1.4, max(0.6, nextZoom))
-    guard clampedZoom != zoom else {
-      return false
-    }
-    zoom = clampedZoom
+  func setZoom(_ nextZoom: CGFloat) {
+    zoom = min(1.4, max(0.6, nextZoom))
     viewportDirty = true
-    return true
-  }
-
-  @discardableResult
-  func zoomByCommandScroll(deltaY: CGFloat) -> Bool {
-    guard abs(deltaY) >= 0.1 else {
-      return false
-    }
-    let boundedDelta = min(80, max(-80, deltaY))
-    let zoomStep = 1 + (boundedDelta * 0.003)
-    return setZoom(zoom * max(0.76, min(1.24, zoomStep)))
   }
 
   func palettePayload(for kind: PolicyCanvasNodeKind) -> String {
@@ -95,7 +86,6 @@ extension PolicyCanvasViewModel {
   }
 
   func requestViewportCentering() {
-    viewportScrollPoint = nil
     viewportCenteringGeneration += 1
   }
 

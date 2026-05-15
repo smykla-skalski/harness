@@ -30,7 +30,8 @@ struct PolicyCanvasValidationPanel: View {
     .accessibilityIdentifier(HarnessMonitorAccessibility.policyCanvasValidationPanel)
   }
 
-  @ViewBuilder private var content: some View {
+  @ViewBuilder
+  private var content: some View {
     let issues = viewModel.allValidationIssues
     if issues.isEmpty {
       Text("No validation issues detected")

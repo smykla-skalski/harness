@@ -80,8 +80,7 @@ struct PolicyCanvasSnapshotTests {
     viewModel.restoreState(snapshot)
 
     #expect(statuses.count >= 1)
-    #expect(
-      statuses.last?.contains("restored") == true || statuses.last?.contains("Restored") == true)
+    #expect(statuses.last?.contains("restored") == true || statuses.last?.contains("Restored") == true)
   }
 
   @Test("restore leaves documentDirty true so caller can resave")
