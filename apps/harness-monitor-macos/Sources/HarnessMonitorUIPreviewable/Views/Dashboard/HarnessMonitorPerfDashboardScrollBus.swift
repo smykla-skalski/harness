@@ -1,4 +1,6 @@
 import Foundation
+import OSLog
+import SwiftUI
 
 /// Perf-only bus used by `HarnessMonitorPerfDriver` to ask the live dashboard window
 /// to programmatically scroll. The dashboard view listens for these notifications
@@ -33,5 +35,55 @@ public enum HarnessMonitorPerfDashboardScrollBus {
     environment[scenarioEnvironmentKey]?
       .trimmingCharacters(in: .whitespacesAndNewlines)
       == activeScenarioID
+  }
+
+  /// Signposter used by the scroll trigger and the geometry observer so an audit
+  /// trace can prove the scroll path was exercised. Lives in the same subsystem and
+  /// category as the rest of the perf scenario signposts so the existing extractor
+  /// picks them up.
+  private static let signposter = OSSignposter(
+    subsystem: "io.harnessmonitor",
+    category: "perf"
+  )
+
+  /// Emit a scroll-trigger signpost. Called from the dashboard route view when the
+  /// scroll notification arrives so we can confirm `ScrollPosition.scrollTo(edge:)`
+  /// was invoked.
+  public static func recordTrigger(edge: String) {
+    signposter.emitEvent(
+      "perf_event",
+      "component=perf.dashboard-live-scroll event=scroll.trigger.\(edge)"
+    )
+  }
+
+  /// Emit an offset signpost. Called from the dashboard route view's
+  /// `.onScrollGeometryChange` so the trace records every time the actual scroll
+  /// position moves. An audit can compare trigger events against offset events to
+  /// confirm the scroll surface really moved.
+  public static func recordOffset(_ y: CGFloat) {
+    signposter.emitEvent(
+      "perf_event",
+      "component=perf.dashboard-live-scroll event=scroll.offset y=\(Int(y.rounded()))"
+    )
+  }
+}
+
+/// Observes the closest scroll view's content offset and emits a perf signpost on
+/// every change. Only the dashboard live-scroll scenario opts in via `enabled`, so
+/// the modifier stays inert for shipping builds and non-perf surfaces.
+struct DashboardPerfScrollGeometryProbe: ViewModifier {
+  let enabled: Bool
+
+  @ViewBuilder
+  func body(content: Content) -> some View {
+    if enabled {
+      content.onScrollGeometryChange(for: CGFloat.self) { geometry in
+        geometry.contentOffset.y
+      } action: { _, newY in
+        HarnessMonitorPerfDashboardScrollBus.recordOffset(newY)
+      }
+    } else {
+      content
+    }
   }
 }

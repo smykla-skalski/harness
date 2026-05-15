@@ -361,6 +361,9 @@ private struct DashboardTaskBoardRouteView: View {
       }
       .frame(maxWidth: .infinity, alignment: .leading)
     }
+    .modifier(
+      DashboardPerfScrollGeometryProbe(enabled: perfScrollHookEnabled)
+    )
     .task(id: taskBoardInboxSessionIDs) {
       await refreshVisibleTaskBoardInboxSnapshot()
     }
@@ -370,6 +373,7 @@ private struct DashboardTaskBoardRouteView: View {
       )
     ) { _ in
       guard perfScrollHookEnabled else { return }
+      HarnessMonitorPerfDashboardScrollBus.recordTrigger(edge: "bottom")
       perfScrollPosition.scrollTo(edge: .bottom)
     }
     .onReceive(
@@ -378,6 +382,7 @@ private struct DashboardTaskBoardRouteView: View {
       )
     ) { _ in
       guard perfScrollHookEnabled else { return }
+      HarnessMonitorPerfDashboardScrollBus.recordTrigger(edge: "top")
       perfScrollPosition.scrollTo(edge: .top)
     }
   }

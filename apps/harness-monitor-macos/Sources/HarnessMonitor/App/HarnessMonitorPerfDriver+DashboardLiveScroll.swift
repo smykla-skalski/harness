@@ -33,32 +33,56 @@ extension HarnessMonitorPerfDriver {
       return .failed("daemon-not-ready")
     }
 
+    HarnessMonitorPerfTrace.recordScenarioEvent(
+      component: "perf.dashboard-live-scroll",
+      event: "ready",
+      details: [
+        "connection_state": String(describing: store.connectionState),
+        "recent_session_count": String(store.recentSessions.count),
+      ]
+    )
+
     // First settle so first-frame work clears before the scroll begins, otherwise
     // the audit captures cold-start churn instead of the scroll path.
     await settle(.milliseconds(900))
 
-    NotificationCenter.default.post(
-      name: HarnessMonitorPerfDashboardScrollBus.scrollToBottom,
-      object: nil
-    )
+    postScrollEvent(.bottom, pass: 1)
     await settle(.milliseconds(1_400))
 
-    NotificationCenter.default.post(
-      name: HarnessMonitorPerfDashboardScrollBus.scrollToTop,
-      object: nil
-    )
+    postScrollEvent(.top, pass: 1)
     await settle(.milliseconds(1_000))
 
     // Second pass exercises the steady-state scroll once the cache is warm. The
     // audit window stays inside `signposter.beginAnimationInterval` so SwiftUI's
     // High-severity update / Hitch events get pinned to this scenario interval.
-    NotificationCenter.default.post(
-      name: HarnessMonitorPerfDashboardScrollBus.scrollToBottom,
-      object: nil
-    )
+    postScrollEvent(.bottom, pass: 2)
     await settle(.milliseconds(1_400))
 
     return .completed
+  }
+
+  private enum LiveScrollDirection: String {
+    case top
+    case bottom
+  }
+
+  private static func postScrollEvent(
+    _ direction: LiveScrollDirection,
+    pass: Int
+  ) {
+    HarnessMonitorPerfTrace.recordScenarioEvent(
+      component: "perf.dashboard-live-scroll",
+      event: "scroll.post.\(direction.rawValue)",
+      details: ["pass": String(pass)]
+    )
+    let name: Notification.Name
+    switch direction {
+    case .top:
+      name = HarnessMonitorPerfDashboardScrollBus.scrollToTop
+    case .bottom:
+      name = HarnessMonitorPerfDashboardScrollBus.scrollToBottom
+    }
+    NotificationCenter.default.post(name: name, object: nil)
   }
 
   private static func waitForLiveDashboardReady(
