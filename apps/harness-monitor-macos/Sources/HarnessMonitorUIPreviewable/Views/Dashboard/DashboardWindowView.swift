@@ -361,9 +361,10 @@ private struct DashboardTaskBoardRouteView: View {
       }
       .frame(maxWidth: .infinity, alignment: .leading)
     }
-    .modifier(
-      DashboardPerfScrollGeometryProbe(enabled: perfScrollHookEnabled)
-    )
+    .onAppear {
+      guard perfScrollHookEnabled else { return }
+      HarnessMonitorPerfDashboardScrollBus.recordTrigger(edge: "view.appear")
+    }
     .task(id: taskBoardInboxSessionIDs) {
       await refreshVisibleTaskBoardInboxSnapshot()
     }

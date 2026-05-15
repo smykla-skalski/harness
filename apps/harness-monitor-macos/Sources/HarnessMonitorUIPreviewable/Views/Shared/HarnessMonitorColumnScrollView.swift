@@ -217,6 +217,7 @@ public struct HarnessMonitorColumnScrollView<
     .contentMargins(.bottom, bottomScrollContentMargin, for: .scrollContent)
     .modifier(TopScrollEdgeEffectModifier(effect: topScrollEdgeEffect))
     .modifier(ExternalScrollPositionModifier(binding: externalScrollPosition))
+    .modifier(LiveScrollGeometryProbeModifier(active: externalScrollPosition != nil))
     .harnessPrimaryContentScrollSurface(
       listIdentifier: scrollSurfaceIdentifier,
       listLabel: scrollSurfaceLabel
@@ -273,6 +274,27 @@ private struct ExternalScrollPositionModifier: ViewModifier {
   func body(content: Content) -> some View {
     if let binding {
       content.scrollPosition(binding)
+    } else {
+      content
+    }
+  }
+}
+
+/// Records every scroll-offset change to the perf signpost bus so a live-scroll
+/// audit can prove the surface actually moved. Only attached when the column-scroll
+/// view is participating in a perf-driven scroll (signalled by an external scroll
+/// position binding), so shipping callers stay on the existing no-op path.
+private struct LiveScrollGeometryProbeModifier: ViewModifier {
+  let active: Bool
+
+  @ViewBuilder
+  func body(content: Content) -> some View {
+    if active {
+      content.onScrollGeometryChange(for: CGFloat.self) { geometry in
+        geometry.contentOffset.y
+      } action: { _, newY in
+        HarnessMonitorPerfDashboardScrollBus.recordOffset(newY)
+      }
     } else {
       content
     }
