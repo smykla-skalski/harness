@@ -16,5 +16,6 @@ extension SessionWindowView {
         dismiss()
       }
     )
+    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
   }
 }
