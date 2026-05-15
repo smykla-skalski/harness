@@ -11,8 +11,8 @@ use crate::task_board::types::{TaskBoardItem, TaskBoardStatus};
 
 use super::{
     ExternalProvider, ExternalProviderCapabilities, ExternalSyncClient, ExternalSyncConfig,
-    ExternalSyncField, ExternalTask, ExternalTaskRef, ExternalTaskUpdate, GITHUB_REPOSITORY_ENV,
-    HARNESS_GITHUB_REPOSITORY_ENV, non_empty_body, normalize_token,
+    ExternalSyncField, ExternalTask, ExternalTaskRef, ExternalTaskUpdate, ExternalUpdateOutcome,
+    GITHUB_REPOSITORY_ENV, HARNESS_GITHUB_REPOSITORY_ENV, non_empty_body, normalize_token,
 };
 
 static RUSTLS_PROVIDER: OnceLock<()> = OnceLock::new();
@@ -203,12 +203,21 @@ impl ExternalSyncClient for GitHubSyncClient {
         item: &TaskBoardItem,
         reference: &ExternalTaskRef,
         update: ExternalTaskUpdate,
-    ) -> Result<ExternalTaskRef, CliError> {
+    ) -> Result<ExternalUpdateOutcome, CliError> {
         let repository = self.repository_for(Some(item))?;
         let issue_number = parse_issue_number(&reference.external_id)?;
         let issues = self
             .octocrab()
             .issues(repository.owner.as_str(), repository.repo.as_str());
+        if let Some(precondition) = update.precondition_updated_at.as_deref() {
+            let current = issues
+                .get(issue_number)
+                .await
+                .map_err(github_sync_error)?;
+            if current.updated_at.to_rfc3339() != precondition {
+                return Ok(ExternalUpdateOutcome::PreconditionFailed);
+            }
+        }
         let mut request = issues.update(issue_number);
         if update.changed_fields.contains(&ExternalSyncField::Title) {
             request = request.title(&item.title);
@@ -220,11 +229,36 @@ impl ExternalSyncClient for GitHubSyncClient {
             request = request.state(github_issue_state(item.status));
         }
         let issue = request.send().await.map_err(github_sync_error)?;
-        Ok(ExternalTaskRef::new(
-            ExternalProvider::GitHub,
-            github_external_id(&repository, issue.number),
-        )
-        .with_url(issue.html_url.to_string()))
+        Ok(ExternalUpdateOutcome::Applied(
+            ExternalTaskRef::new(
+                ExternalProvider::GitHub,
+                github_external_id(&repository, issue.number),
+            )
+            .with_url(issue.html_url.to_string()),
+        ))
+    }
+
+    fn allows_delete(&self) -> bool {
+        true
+    }
+
+    async fn delete_task(
+        &self,
+        item: &TaskBoardItem,
+        reference: &ExternalTaskRef,
+    ) -> Result<(), CliError> {
+        let repository = self.repository_for(Some(item))?;
+        let issue_number = parse_issue_number(&reference.external_id)?;
+        let issues = self
+            .octocrab()
+            .issues(repository.owner.as_str(), repository.repo.as_str());
+        issues
+            .update(issue_number)
+            .state(IssueState::Closed)
+            .send()
+            .await
+            .map_err(github_sync_error)?;
+        Ok(())
     }
 }
 

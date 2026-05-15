@@ -16,6 +16,7 @@ mod todoist;
 
 pub use capabilities::{
     ExternalProviderCapabilities, ExternalSyncConflictPolicy, ExternalSyncField, ExternalTaskUpdate,
+    ExternalUpdateOutcome,
 };
 pub use github::{GitHubInboxSyncClient, GitHubSyncClient};
 pub use sync::{
@@ -316,6 +317,11 @@ pub trait ExternalSyncClient: Send + Sync {
         true
     }
 
+    #[must_use]
+    fn allows_delete(&self) -> bool {
+        false
+    }
+
     /// Pull provider-side tasks.
     ///
     /// # Errors
@@ -330,6 +336,11 @@ pub trait ExternalSyncClient: Send + Sync {
 
     /// Update one linked provider task.
     ///
+    /// Implementations that honour `update.precondition_updated_at` may return
+    /// `ExternalUpdateOutcome::PreconditionFailed` when the remote task changed
+    /// since the precondition timestamp. The sync layer surfaces that as a
+    /// conflict and skips the write.
+    ///
     /// # Errors
     /// Returns provider or transport errors surfaced by the implementation.
     async fn update_task(
@@ -337,13 +348,26 @@ pub trait ExternalSyncClient: Send + Sync {
         _item: &TaskBoardItem,
         reference: &ExternalTaskRef,
         _update: ExternalTaskUpdate,
-    ) -> Result<ExternalTaskRef, CliError> {
+    ) -> Result<ExternalUpdateOutcome, CliError> {
         Err(CliErrorKind::workflow_io(format!(
             "task-board {} sync does not support updating linked remote items '{}'",
             self.provider(),
             reference.external_id
         ))
         .into())
+    }
+
+    /// Delete (or close) one linked provider task. Default is a no-op so
+    /// pull-only clients keep working without explicit opt-out.
+    ///
+    /// # Errors
+    /// Returns provider or transport errors surfaced by the implementation.
+    async fn delete_task(
+        &self,
+        _item: &TaskBoardItem,
+        _reference: &ExternalTaskRef,
+    ) -> Result<(), CliError> {
+        Ok(())
     }
 }
 

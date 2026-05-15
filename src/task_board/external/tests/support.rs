@@ -1,17 +1,19 @@
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
 
 use async_trait::async_trait;
 
 use crate::errors::CliError;
 use crate::task_board::{
-    ExternalProvider, ExternalRef, ExternalRefSyncState, ExternalSyncClient, ExternalTask,
-    ExternalTaskRef, PlanningState, TaskBoardItem, TaskBoardStatus,
+    ExternalProvider, ExternalRef, ExternalRefProvider, ExternalRefSyncState, ExternalSyncClient,
+    ExternalTask, ExternalTaskRef, PlanningState, TaskBoardItem, TaskBoardStatus,
 };
 
 pub(super) struct FakeSyncClient {
     provider: ExternalProvider,
     tasks: Vec<ExternalTask>,
     pushed: Mutex<Vec<String>>,
+    allows_delete: bool,
+    deleted: Arc<Mutex<Vec<String>>>,
 }
 
 impl FakeSyncClient {
@@ -20,7 +22,14 @@ impl FakeSyncClient {
             provider,
             tasks,
             pushed: Mutex::new(Vec::new()),
+            allows_delete: false,
+            deleted: Arc::new(Mutex::new(Vec::new())),
         }
+    }
+
+    pub(super) fn with_delete(mut self) -> Self {
+        self.allows_delete = true;
+        self
     }
 
     pub(super) fn pushed_ids(&self) -> Vec<String> {
@@ -29,12 +38,20 @@ impl FakeSyncClient {
             .expect("push log should not be poisoned")
             .clone()
     }
+
+    pub(super) fn deleted_handle(&self) -> Arc<Mutex<Vec<String>>> {
+        self.deleted.clone()
+    }
 }
 
 #[async_trait]
 impl ExternalSyncClient for FakeSyncClient {
     fn provider(&self) -> ExternalProvider {
         self.provider
+    }
+
+    fn allows_delete(&self) -> bool {
+        self.allows_delete
     }
 
     async fn pull_tasks(&self) -> Result<Vec<ExternalTask>, CliError> {
@@ -47,6 +64,18 @@ impl ExternalSyncClient for FakeSyncClient {
             .expect("push log should not be poisoned")
             .push(item.id.clone());
         Ok(ExternalTaskRef::new(self.provider, item.id.clone()))
+    }
+
+    async fn delete_task(
+        &self,
+        _item: &TaskBoardItem,
+        reference: &ExternalTaskRef,
+    ) -> Result<(), CliError> {
+        self.deleted
+            .lock()
+            .expect("delete log should not be poisoned")
+            .push(reference.external_id.clone());
+        Ok(())
     }
 }
 
@@ -99,6 +128,7 @@ pub(super) fn github_review_request_item(
     );
     item.status = status;
     item.project_id = Some("owner/repo".to_owned());
+    item.imported_from_provider = Some(ExternalRefProvider::GitHub);
     item.planning = PlanningState::default();
     item.external_refs = vec![github_review_request_ref(external_id)];
     item

@@ -55,11 +55,27 @@ impl ExternalProviderCapabilities {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ExternalTaskUpdate {
     pub changed_fields: Vec<ExternalSyncField>,
+    pub precondition_updated_at: Option<String>,
 }
 
 impl ExternalTaskUpdate {
     #[must_use]
     pub fn new(changed_fields: Vec<ExternalSyncField>) -> Self {
-        Self { changed_fields }
+        Self {
+            changed_fields,
+            precondition_updated_at: None,
+        }
     }
+
+    #[must_use]
+    pub fn with_precondition_updated_at(mut self, updated_at: Option<String>) -> Self {
+        self.precondition_updated_at = updated_at;
+        self
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ExternalUpdateOutcome {
+    Applied(super::ExternalTaskRef),
+    PreconditionFailed,
 }
