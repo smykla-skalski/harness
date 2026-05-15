@@ -31,6 +31,7 @@ pub(super) async fn automate_item(request: AutomationRequest<'_>) -> TaskBoardWo
         config: request.config,
         item: request.item,
         client: request.client,
+        host_id: request.host_id,
     };
     let mut prepared = match prepare_item(
         &context,
@@ -81,6 +82,7 @@ struct AutomationContext<'a> {
     config: &'a GitHubProjectConfig,
     item: &'a TaskBoardItem,
     client: &'a dyn GitHubAutomationClient,
+    host_id: &'a str,
 }
 
 struct PreparedItem {
@@ -129,7 +131,7 @@ fn prepare_item(
     {
         return AutomationFlow::Done(workflow);
     }
-    let branch = managed_branch_name(context.config, &context.item.id);
+    let branch = managed_branch_name(context.config, &context.item.id, context.host_id);
     if workflow.branch.as_deref() != Some(branch.as_str()) {
         workflow.branch = Some(branch.clone());
     }
