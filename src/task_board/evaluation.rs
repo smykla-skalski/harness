@@ -18,6 +18,14 @@ pub struct TaskBoardEvaluationSummary {
     pub blocked: usize,
     pub failed: usize,
     pub records: Vec<TaskBoardEvaluationRecord>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub signal_failures: Vec<EvaluationSignalFailure>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct EvaluationSignalFailure {
+    pub board_item_id: String,
+    pub message: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
