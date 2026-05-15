@@ -38,7 +38,7 @@ async fn start_worker_for_applied_task(
     applied: &DispatchAppliedTask,
 ) -> Result<ManagedAgentSnapshot, CliError> {
     match applied.item.agent_mode {
-        AgentMode::Interactive => start_interactive_worker(state, applied).await,
+        AgentMode::Interactive => start_interactive_worker(state, applied),
         AgentMode::Headless | AgentMode::Planning | AgentMode::Evaluate => {
             start_codex_worker(state, applied).await
         }
@@ -60,7 +60,7 @@ async fn start_codex_worker(
         .map(ManagedAgentSnapshot::Codex)
 }
 
-async fn start_interactive_worker(
+fn start_interactive_worker(
     state: &DaemonHttpState,
     applied: &DispatchAppliedTask,
 ) -> Result<ManagedAgentSnapshot, CliError> {

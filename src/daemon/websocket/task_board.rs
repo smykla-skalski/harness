@@ -1,4 +1,4 @@
-use crate::daemon::http::DaemonHttpState;
+use crate::daemon::http::{DaemonHttpState, task_board_route_executor};
 use crate::daemon::protocol::{
     TaskBoardAuditRequest, TaskBoardCatalogRequest, TaskBoardCreateItemRequest,
     TaskBoardDeleteItemRequest, TaskBoardDispatchRequest, TaskBoardEvaluateRequest,
@@ -155,7 +155,7 @@ async fn dispatch_task_board_dispatch(request: &WsRequest, state: &DaemonHttpSta
     let Ok(body) = parse_params::<TaskBoardDispatchRequest>(request) else {
         return invalid_params(request);
     };
-    let result = crate::daemon::http::task_board_route_executor::dispatch(state, body).await;
+    let result = task_board_route_executor::dispatch(state, body).await;
     dispatch_query_result(&request.id, result)
 }
 
@@ -163,7 +163,7 @@ async fn dispatch_task_board_evaluate(request: &WsRequest, state: &DaemonHttpSta
     let Ok(body) = parse_params::<TaskBoardEvaluateRequest>(request) else {
         return invalid_params(request);
     };
-    let result = crate::daemon::http::task_board_route_executor::evaluate(state, body).await;
+    let result = task_board_route_executor::evaluate(state, body).await;
     dispatch_query_result(&request.id, result)
 }
 
@@ -207,7 +207,7 @@ async fn dispatch_task_board_orchestrator_run_once(
     let Ok(body) = parse_params::<TaskBoardOrchestratorRunOnceRequest>(request) else {
         return invalid_params(request);
     };
-    let result = crate::daemon::http::task_board_route_executor::run_once(state, body).await;
+    let result = task_board_route_executor::run_once(state, body).await;
     dispatch_query_result(&request.id, result)
 }
 

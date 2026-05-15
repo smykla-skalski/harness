@@ -1,4 +1,4 @@
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 use octocrab::models;
 use octocrab::{Error as OctocrabError, Octocrab};
@@ -198,7 +198,7 @@ pub(super) fn merge_reviews(
 ) -> Vec<GitHubReviewEvidence> {
     reviews.sort_by_key(|review| review.submitted_at);
     merge_review_rollups(
-        reviews.into_iter().filter_map(review_rollup),
+        reviews.iter().filter_map(review_rollup),
         &threads.unresolved_by_reviewer,
     )
 }
@@ -231,7 +231,7 @@ fn merge_review_rollups(
     merged.into_values().collect()
 }
 
-fn review_rollup(review: models::pulls::Review) -> Option<GitHubReviewRollup> {
+fn review_rollup(review: &models::pulls::Review) -> Option<GitHubReviewRollup> {
     let reviewer = review.user.as_ref().map(|user| user.login.clone())?;
     let state = match review.state? {
         models::pulls::ReviewState::Approved => GitHubReviewState::Approved,
@@ -266,13 +266,13 @@ fn required_check_names(
     status_checks: Option<&GitHubRequiredStatusChecksResponse>,
     rules: &[GitHubBranchRuleResponse],
 ) -> Vec<String> {
-    let mut required = BTreeMap::new();
+    let mut required = BTreeSet::new();
     if let Some(status_checks) = status_checks {
         for context in &status_checks.contexts {
-            required.insert(context.clone(), ());
+            required.insert(context.clone());
         }
         for check in &status_checks.checks {
-            required.insert(check.context.clone(), ());
+            required.insert(check.context.clone());
         }
     }
     for rule in rules {
@@ -283,10 +283,10 @@ fn required_check_names(
             continue;
         };
         for check in &parameters.required_status_checks {
-            required.insert(check.context.clone(), ());
+            required.insert(check.context.clone());
         }
     }
-    required.into_keys().collect()
+    required.into_iter().collect()
 }
 
 fn pull_request_merge_allowed(pull_request: &models::pulls::PullRequest) -> bool {
@@ -322,7 +322,7 @@ fn encode_path_segment(value: &str) -> String {
         .collect()
 }
 
-const REVIEW_THREADS_QUERY: &str = r#"
+const REVIEW_THREADS_QUERY: &str = r"
 query($owner: String!, $repo: String!, $number: Int!, $after: String) {
   repository(owner: $owner, name: $repo) {
     pullRequest(number: $number) {
@@ -345,7 +345,7 @@ query($owner: String!, $repo: String!, $number: Int!, $after: String) {
     }
   }
 }
-"#;
+";
 
 #[derive(Debug)]
 struct GitHubReviewRollup {
