@@ -9,9 +9,10 @@ use crate::task_board::policy::{
 };
 
 use super::{
-    GraphPolicyGate, PORT_IN, PolicyCanvasRect, PolicyGraph, PolicyGraphEdge,
-    PolicyGraphEdgeCondition, PolicyGraphMode, PolicyGraphNodeKind, PolicyGraphNodeLayout,
-    PolicyGraphValidationIssue, PolicyPipelinePromoteRequest, PolicyPipelineStore,
+    GraphPolicyGate, PORT_IN, PolicyCanvasRect, PolicyEvidencePredicate, PolicyGraph,
+    PolicyGraphEdge, PolicyGraphEdgeCondition, PolicyGraphMode, PolicyGraphNodeKind,
+    PolicyGraphNodeLayout, PolicyGraphValidationIssue, PolicyPipelinePromoteRequest,
+    PolicyPipelineStore,
 };
 
 const NODE_WIDTH: i32 = 168;
@@ -213,6 +214,32 @@ fn reason_codes_are_stable_for_key_default_paths() {
     };
 
     assert_eq!(reason, PolicyReasonCode::MissingMergeEvidence);
+}
+
+#[test]
+fn predicate_passes_is_positive_admits_count_evidence() {
+    use super::evaluation::predicate_passes;
+
+    assert!(
+        !predicate_passes(PolicyEvidencePredicate::IsPositive, 0),
+        "IsPositive must reject zero counts"
+    );
+    assert!(
+        predicate_passes(PolicyEvidencePredicate::IsPositive, 1),
+        "IsPositive must accept positive counts"
+    );
+    assert!(
+        predicate_passes(PolicyEvidencePredicate::IsPositive, u32::MAX),
+        "IsPositive must accept saturating counts"
+    );
+    assert!(
+        predicate_passes(PolicyEvidencePredicate::IsTrue, 1),
+        "IsTrue stays strictly bool",
+    );
+    assert!(
+        !predicate_passes(PolicyEvidencePredicate::IsTrue, 2),
+        "IsTrue must reject non-one counts to stay bool-only",
+    );
 }
 
 fn merge_evidence(green: bool, protected_path: bool, risk_score: u8) -> PolicyEvidence {

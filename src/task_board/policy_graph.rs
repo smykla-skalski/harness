@@ -134,6 +134,7 @@ pub enum PolicyEvidencePredicate {
     IsTrue,
     IsFalse,
     IsZero,
+    IsPositive,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
