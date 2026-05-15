@@ -28,6 +28,60 @@ fn websocket_task_board_crud_sync_audit_and_orchestrator_routes_use_real_state()
             )
             .await;
             assert_eq!(created["id"].as_str(), Some("board-ws-crud"));
+            let plan_begun = call(
+                &state,
+                &connection,
+                "req-crud-plan-begin",
+                ws_methods::TASK_BOARD_PLAN_BEGIN,
+                json!({ "id": "board-ws-crud" }),
+            )
+            .await;
+            assert_eq!(
+                plan_begun["transition"]["to_status"].as_str(),
+                Some("planning")
+            );
+            assert_eq!(plan_begun["item"]["status"].as_str(), Some("planning"));
+
+            let plan_submitted = call(
+                &state,
+                &connection,
+                "req-crud-plan-submit",
+                ws_methods::TASK_BOARD_PLAN_SUBMIT,
+                json!({
+                    "id": "board-ws-crud",
+                    "summary": "Use websocket planning coverage.",
+                }),
+            )
+            .await;
+            assert_eq!(
+                plan_submitted["transition"]["to_status"].as_str(),
+                Some("plan_review")
+            );
+            assert_eq!(
+                plan_submitted["item"]["planning"]["summary"].as_str(),
+                Some("Use websocket planning coverage.")
+            );
+
+            let plan_approved = call(
+                &state,
+                &connection,
+                "req-crud-plan-approve",
+                ws_methods::TASK_BOARD_PLAN_APPROVE,
+                json!({
+                    "id": "board-ws-crud",
+                    "approved_by": "lead",
+                    "approved_at": "2026-05-14T02:00:00Z",
+                }),
+            )
+            .await;
+            assert_eq!(
+                plan_approved["transition"]["to_status"].as_str(),
+                Some("todo")
+            );
+            assert_eq!(
+                plan_approved["item"]["planning"]["approved_by"].as_str(),
+                Some("lead")
+            );
 
             let updated = call(
                 &state,
@@ -229,6 +283,17 @@ fn websocket_task_board_crud_sync_audit_and_orchestrator_routes_use_real_state()
             .await;
             assert_eq!(tokens["global_token_configured"].as_bool(), Some(true));
             assert_eq!(tokens["repository_token_count"].as_u64(), Some(1));
+            let todoist = call(
+                &state,
+                &connection,
+                "req-orch-todoist-token",
+                ws_methods::TASK_BOARD_ORCHESTRATOR_TODOIST_TOKEN_SYNC,
+                json!({
+                    "token": "todoist-token",
+                }),
+            )
+            .await;
+            assert_eq!(todoist["token_configured"].as_bool(), Some(true));
             assert_eq!(
                 call(
                     &state,
