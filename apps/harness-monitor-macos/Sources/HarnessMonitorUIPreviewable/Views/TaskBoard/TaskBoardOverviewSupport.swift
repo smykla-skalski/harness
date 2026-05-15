@@ -172,10 +172,14 @@ extension TaskBoardInboxLane {
   }
 
   func taskBoardDropStatus(for item: TaskBoardItem) -> TaskBoardStatus {
-    guard self == .needsYou else {
+    switch self {
+    case .needsYou:
+      return item.status == .needsYou || item.isImportedGitHubInboxItem ? .needsYou : .planReview
+    case .backlog:
+      return item.status == .planning ? .planning : .new
+    case .ready, .running, .review, .blocked, .done:
       return taskBoardDropStatus
     }
-    return item.status == .needsYou || item.isImportedGitHubInboxItem ? .needsYou : .planReview
   }
 }
 
