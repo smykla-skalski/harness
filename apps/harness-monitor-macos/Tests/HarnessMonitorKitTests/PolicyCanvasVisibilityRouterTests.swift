@@ -154,6 +154,50 @@ struct PolicyCanvasVisibilityRouterTests {
     #expect(elapsed < 0.016, "Average route time was \(elapsed * 1000)ms, expected <16ms")
   }
 
+  @Test("Flex anchor selection picks the lowest-bend combination")
+  func flexAnchorPicksLowestBendRoute() {
+    let router = PolicyCanvasVisibilityRouter()
+    // Source candidates: trailing (right) at (200, 100), top at (100, 0),
+    // bottom at (100, 200), leading at (0, 100). Target candidates similar.
+    // For the natural left-to-right flow, trailing→leading should be the
+    // 0-bend pick (both at y=300 on a clear right path).
+    let sourceCandidates = [
+      CGPoint(x: 200, y: 300),  // trailing
+      CGPoint(x: 100, y: 200),  // top
+      CGPoint(x: 100, y: 400),  // bottom
+      CGPoint(x: 0, y: 300),  // leading
+    ]
+    let targetCandidates = [
+      CGPoint(x: 700, y: 300),  // leading
+      CGPoint(x: 800, y: 200),  // top
+      CGPoint(x: 800, y: 400),  // bottom
+      CGPoint(x: 900, y: 300),  // trailing
+    ]
+    let flexed = router.route(
+      sourceCandidates: sourceCandidates,
+      targetCandidates: targetCandidates,
+      lane: 0,
+      groups: [],
+      sourceGroupID: nil,
+      targetGroupID: nil,
+      obstacles: []
+    )
+    let pinned = router.route(
+      source: sourceCandidates[3],  // leading (worst for left-to-right)
+      target: targetCandidates[3],  // trailing (worst)
+      lane: 0,
+      groups: [],
+      sourceGroupID: nil,
+      targetGroupID: nil,
+      obstacles: []
+    )
+    #expect(bendCount(of: flexed.points) <= bendCount(of: pinned.points))
+    // Trailing→leading produces a straight horizontal route between the
+    // two aligned anchors at y=300; flex should land there.
+    #expect(flexed.points.first == CGPoint(x: 200, y: 300))
+    #expect(flexed.points.last == CGPoint(x: 700, y: 300))
+  }
+
   @Test("Channel snap rounds intermediate points to 5pt grid")
   func channelSnapAlignsIntermediates() {
     let obstacle = CGRect(x: 100, y: 50, width: 80, height: 120)

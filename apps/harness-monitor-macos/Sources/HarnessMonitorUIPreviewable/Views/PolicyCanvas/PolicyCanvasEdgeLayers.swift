@@ -26,13 +26,11 @@ struct PolicyCanvasEdgeLayer: View {
         if let source = portAnchors[edge.source],
           let target = portAnchors[edge.target]
         {
-          let route = router.route(
+          let route = routeFor(
+            edge: edge,
             source: source,
             target: target,
             lane: edgeLanes[edge.id, default: 0],
-            groups: viewModel.groups,
-            sourceGroupID: viewModel.node(edge.source.nodeID)?.groupID,
-            targetGroupID: viewModel.node(edge.target.nodeID)?.groupID,
             obstacles: obstacles
           )
           let severity = severityMap[edge.id]
@@ -49,6 +47,40 @@ struct PolicyCanvasEdgeLayer: View {
         }
       }
     }
+  }
+
+  /// Pick the route per edge. Pinned edges (the default) go straight to the
+  /// single-anchor router path; unpinned edges expand to the 4-side
+  /// candidate list so T2.2 can pick the lowest-bend combination.
+  private func routeFor(
+    edge: PolicyCanvasEdge,
+    source: CGPoint,
+    target: CGPoint,
+    lane: Int,
+    obstacles: [CGRect]
+  ) -> PolicyCanvasEdgeRoute {
+    let sourceGroupID = viewModel.node(edge.source.nodeID)?.groupID
+    let targetGroupID = viewModel.node(edge.target.nodeID)?.groupID
+    if edge.pinnedPortSide {
+      return router.route(
+        source: source,
+        target: target,
+        lane: lane,
+        groups: viewModel.groups,
+        sourceGroupID: sourceGroupID,
+        targetGroupID: targetGroupID,
+        obstacles: obstacles
+      )
+    }
+    return router.route(
+      sourceCandidates: viewModel.portAnchorCandidates(for: edge.source),
+      targetCandidates: viewModel.portAnchorCandidates(for: edge.target),
+      lane: lane,
+      groups: viewModel.groups,
+      sourceGroupID: sourceGroupID,
+      targetGroupID: targetGroupID,
+      obstacles: obstacles
+    )
   }
 
   private func edgeColor(for edge: PolicyCanvasEdge) -> Color {
@@ -107,13 +139,11 @@ struct PolicyCanvasEdgeLabelLayer: View {
           let source = portAnchors[edge.source],
           let target = portAnchors[edge.target]
         {
-          let route = router.route(
+          let route = labelRouteFor(
+            edge: edge,
             source: source,
             target: target,
             lane: edgeLanes[edge.id, default: 0],
-            groups: viewModel.groups,
-            sourceGroupID: viewModel.node(edge.source.nodeID)?.groupID,
-            targetGroupID: viewModel.node(edge.target.nodeID)?.groupID,
             obstacles: obstacles
           )
           if collapsed {
@@ -164,6 +194,39 @@ struct PolicyCanvasEdgeLabelLayer: View {
 
   private func edgeColor(for edge: PolicyCanvasEdge) -> Color {
     viewModel.node(edge.source.nodeID)?.kind.accentColor ?? Color.cyan
+  }
+
+  /// Mirrors `PolicyCanvasEdgeLayer.routeFor` so the label position stays on
+  /// the same polyline the stroke layer draws.
+  private func labelRouteFor(
+    edge: PolicyCanvasEdge,
+    source: CGPoint,
+    target: CGPoint,
+    lane: Int,
+    obstacles: [CGRect]
+  ) -> PolicyCanvasEdgeRoute {
+    let sourceGroupID = viewModel.node(edge.source.nodeID)?.groupID
+    let targetGroupID = viewModel.node(edge.target.nodeID)?.groupID
+    if edge.pinnedPortSide {
+      return router.route(
+        source: source,
+        target: target,
+        lane: lane,
+        groups: viewModel.groups,
+        sourceGroupID: sourceGroupID,
+        targetGroupID: targetGroupID,
+        obstacles: obstacles
+      )
+    }
+    return router.route(
+      sourceCandidates: viewModel.portAnchorCandidates(for: edge.source),
+      targetCandidates: viewModel.portAnchorCandidates(for: edge.target),
+      lane: lane,
+      groups: viewModel.groups,
+      sourceGroupID: sourceGroupID,
+      targetGroupID: targetGroupID,
+      obstacles: obstacles
+    )
   }
 }
 

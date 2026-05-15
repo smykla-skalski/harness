@@ -130,6 +130,8 @@ enum PolicyCanvasPortSide: String, Hashable {
   case trailing
   case top
   case bottom
+
+  static let allSides: [PolicyCanvasPortSide] = [.leading, .trailing, .top, .bottom]
 }
 
 struct PolicyCanvasPort: Identifiable, Hashable {
@@ -228,19 +230,27 @@ struct PolicyCanvasEdge: Identifiable, Hashable {
   /// on `exportDocument()`, overriding only the `condition` string the user
   /// edited here.
   var condition: String
+  /// When `false`, the visibility router is allowed to pick any of the four
+  /// node sides for source and target anchors, choosing the combination that
+  /// yields the fewest bends. Defaults to `true` so existing documents keep
+  /// their stable port positions; flips off only when the user opts in via
+  /// the inspector toggle (deferred UI surface, T2.2 follow-up).
+  var pinnedPortSide: Bool
 
   init(
     id: String,
     source: PolicyCanvasPortEndpoint,
     target: PolicyCanvasPortEndpoint,
     label: String,
-    condition: String = "always"
+    condition: String = "always",
+    pinnedPortSide: Bool = true
   ) {
     self.id = id
     self.source = source
     self.target = target
     self.label = label
     self.condition = condition
+    self.pinnedPortSide = pinnedPortSide
   }
 }
 

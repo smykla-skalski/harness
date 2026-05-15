@@ -70,6 +70,23 @@ extension PolicyCanvasViewModel {
     return portAnchor(for: node, side: side, index: index, count: ports.count)
   }
 
+  /// All four side anchors for the endpoint's port, used by T2.2 flex
+  /// routing. Returns at most four points (leading/trailing/top/bottom) so
+  /// the router can pick the combination that yields the fewest bends.
+  /// Returns an empty array when the endpoint cannot resolve.
+  func portAnchorCandidates(for endpoint: PolicyCanvasPortEndpoint) -> [CGPoint] {
+    guard let node = node(endpoint.nodeID) else {
+      return []
+    }
+    let ports = endpoint.kind == .input ? node.inputPorts : node.outputPorts
+    guard let index = ports.firstIndex(where: { $0.id == endpoint.portID }) else {
+      return []
+    }
+    return PolicyCanvasPortSide.allSides.map { side in
+      portAnchor(for: node, side: side, index: index, count: ports.count)
+    }
+  }
+
   /// Bulk-resolve every endpoint referenced by `edges` into a single dictionary
   /// the body-local site can hoist before iterating. Hot-path callers
   /// (`PolicyCanvasEdgeLayer`, `PolicyCanvasEdgeLabelLayer`) used to call
