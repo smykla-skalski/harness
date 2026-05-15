@@ -43,18 +43,7 @@ struct TaskBoardLaneUnifiedColumn: View {
           TaskBoardEmptyLane(lane: lane)
         } else {
           ScrollView(.vertical, showsIndicators: true) {
-            VStack(spacing: metrics.laneSpacing) {
-              ForEach(decisions, id: \.id) { decision in
-                TaskBoardDecisionRow(decision: decision, onOpenDecision: onOpenDecision)
-              }
-              ForEach(apiItems) { item in
-                TaskBoardItemRow(item: item, onOpenItem: onOpenAPIItem)
-              }
-              ForEach(inboxItems) { item in
-                TaskBoardInboxItemRow(item: item, onOpenItem: onOpenInboxItem)
-              }
-            }
-            .frame(maxWidth: .infinity)
+            laneRows
           }
           .scrollBounceBehavior(.basedOnSize)
         }
@@ -80,6 +69,31 @@ struct TaskBoardLaneUnifiedColumn: View {
     )
     .accessibilityElement(children: .contain)
     .accessibilityIdentifier("harness.task-board.column.\(lane.rawValue)")
+  }
+
+  @ViewBuilder private var laneRows: some View {
+    VStack(spacing: metrics.laneSpacing) {
+      if !decisions.isEmpty {
+        TimelineView(.periodic(from: .now, by: 1)) { context in
+          decisionRows(now: context.date)
+        }
+      }
+      ForEach(apiItems) { item in
+        TaskBoardItemRow(item: item, onOpenItem: onOpenAPIItem)
+      }
+      ForEach(inboxItems) { item in
+        TaskBoardInboxItemRow(item: item, onOpenItem: onOpenInboxItem)
+      }
+    }
+    .frame(maxWidth: .infinity)
+  }
+
+  @ViewBuilder private func decisionRows(now: Date) -> some View {
+    VStack(spacing: metrics.laneSpacing) {
+      ForEach(decisions, id: \.id) { decision in
+        TaskBoardDecisionRow(decision: decision, now: now, onOpenDecision: onOpenDecision)
+      }
+    }
   }
 
   private func handleAPIDrop(_ payloads: [TaskBoardItemDragPayload], _: CGPoint) -> Bool {

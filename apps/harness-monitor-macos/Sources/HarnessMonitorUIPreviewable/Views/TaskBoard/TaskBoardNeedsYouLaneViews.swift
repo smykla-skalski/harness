@@ -11,6 +11,7 @@ import SwiftUI
 
 struct TaskBoardDecisionRow: View {
   let decision: Decision
+  let now: Date
   let onOpenDecision: (Decision) -> Void
   private let primaryAction: SuggestedAction?
   @Environment(\.fontScale)
@@ -18,8 +19,13 @@ struct TaskBoardDecisionRow: View {
 
   private var metrics: TaskBoardLaneMetrics { TaskBoardLaneMetrics(fontScale: fontScale) }
 
-  init(decision: Decision, onOpenDecision: @escaping (Decision) -> Void) {
+  init(
+    decision: Decision,
+    now: Date = Date.now,
+    onOpenDecision: @escaping (Decision) -> Void
+  ) {
     self.decision = decision
+    self.now = now
     self.onOpenDecision = onOpenDecision
     primaryAction = Self.resolvePrimaryAction(for: decision)
   }
@@ -136,7 +142,7 @@ struct TaskBoardDecisionRow: View {
   }
 
   private var relativeAge: String {
-    let interval = Date.now.timeIntervalSince(decision.createdAt)
+    let interval = now.timeIntervalSince(decision.createdAt)
     return taskBoardDecisionAgeFormatter.localizedString(fromTimeInterval: -interval)
   }
 
