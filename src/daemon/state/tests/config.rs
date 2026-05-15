@@ -4,11 +4,13 @@ use tempfile::tempdir;
 use super::super::{
     DaemonRuntimeConfig, config_path, load_persisted_log_level, load_runtime_config,
     load_task_board_git_runtime_config, persist_log_level, persist_task_board_git_runtime_config,
-    read_recent_events, replace_task_board_github_tokens, task_board_github_token,
+    read_recent_events, replace_task_board_github_tokens, replace_task_board_todoist_token,
+    task_board_github_token, task_board_todoist_token,
 };
 use crate::task_board::{
     TaskBoardGitHubRepositoryToken, TaskBoardGitHubTokensSyncRequest, TaskBoardGitRuntimeConfig,
     TaskBoardGitRuntimeProfile, TaskBoardGitSigningConfig, TaskBoardGitSigningMode,
+    TaskBoardTodoistTokenSyncRequest,
 };
 
 #[test]
@@ -163,5 +165,45 @@ fn github_token_snapshot_prefers_repository_override() {
             task_board_github_token(Some("other/repo")).as_deref(),
             Some("global-token")
         );
+    });
+}
+
+#[test]
+fn task_board_credential_snapshots_are_scoped_by_daemon_root() {
+    let first = tempdir().expect("first tempdir");
+    let second = tempdir().expect("second tempdir");
+
+    with_isolated_harness_env(first.path(), || {
+        let _ = replace_task_board_github_tokens(&TaskBoardGitHubTokensSyncRequest {
+            global_token: Some("first-gh".into()),
+            repository_tokens: vec![],
+        });
+        let _ = replace_task_board_todoist_token(&TaskBoardTodoistTokenSyncRequest {
+            token: Some("first-todoist".into()),
+        });
+    });
+
+    with_isolated_harness_env(second.path(), || {
+        assert!(task_board_github_token(None).is_none());
+        assert!(task_board_todoist_token().is_none());
+
+        let _ = replace_task_board_github_tokens(&TaskBoardGitHubTokensSyncRequest {
+            global_token: Some("second-gh".into()),
+            repository_tokens: vec![],
+        });
+        let _ = replace_task_board_todoist_token(&TaskBoardTodoistTokenSyncRequest {
+            token: Some("second-todoist".into()),
+        });
+
+        assert_eq!(task_board_github_token(None).as_deref(), Some("second-gh"));
+        assert_eq!(
+            task_board_todoist_token().as_deref(),
+            Some("second-todoist")
+        );
+    });
+
+    with_isolated_harness_env(first.path(), || {
+        assert_eq!(task_board_github_token(None).as_deref(), Some("first-gh"));
+        assert_eq!(task_board_todoist_token().as_deref(), Some("first-todoist"));
     });
 }
