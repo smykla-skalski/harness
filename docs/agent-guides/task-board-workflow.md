@@ -146,7 +146,10 @@ the inbox state on the next pull sync.
    has no `session_id`, creates a session work item from the board title/body,
    maps priority to task severity, stores `session_id` and `work_item_id`, marks
    the board item `in_progress`, and advances workflow state to `running` at
-   the `dispatch` step.
+   the `dispatch` step. When dispatch is applied through the daemon HTTP or
+   WebSocket route, the daemon also starts the requested managed worker and
+   attaches the board item id, session task id, workflow execution id, and
+   task-board capabilities to the started agent.
 
 3. Mark active work explicitly when work starts outside applied dispatch.
 
@@ -216,7 +219,9 @@ harness task-board orchestrator settings --json
   changes instead of previewing them. GitHub pull imports preserve `owner/repo`
   in `project_id` and synthesize dispatch-ready planning approval.
 - `dispatch` reports the session, worker, reviewer, and evaluator intent for
-  each selected board item, including readiness block reasons.
+  each selected board item, including readiness block reasons. Daemon HTTP and
+  WebSocket dispatch routes use the same executor, so apply/broadcast behavior
+  and managed-worker launch are kept in parity across transports.
 - `evaluate` reports evaluated, updated, skipped, completed, running,
   reviewing, blocked, and failed counts for the selected status or item.
 - `orchestrator status` reports enabled/running intent, current tick, last run,
@@ -239,8 +244,11 @@ agents:
 - `evaluator`: request an `evaluate` follow-up after worker review.
 - `policy`: include the policy decision that allowed or blocked dispatch.
 
-`dispatch` does not directly start managed agents. Leaders use the dispatch
-plan plus session agent commands to launch capacity:
+The standalone CLI `dispatch` command mutates board/session state but does not
+own live runtime managers. Daemon HTTP and WebSocket dispatch, including Monitor
+and autonomous orchestrator ticks, start the managed worker for every applied
+plan. If a leader is operating from the CLI or needs extra capacity, use the
+dispatch plan plus session agent commands:
 
 ```bash
 harness session agents start terminal <session-id> --runtime <runtime> \
@@ -254,6 +262,22 @@ Managed agent controls include `list`, `show`, terminal `input`/`resize`/`stop`,
 Codex `steer`/`interrupt`/`approve`, and ACP `inspect`. Start commands can carry
 role, fallback role, capability tags, display name, persona, model, effort, and
 project directory where the runtime supports them.
+
+## Runtime And Provider Settings
+
+The task-board runtime config supports repository-level Git transport and commit
+signing settings. SSH keys can be supplied either by path or directly as inline
+private-key material with an optional passphrase. Signing supports SSH key path,
+inline SSH private key material with passphrase, GPG key id, inline GPG private
+key material with passphrase, and the signing format selected by the runtime
+config. Monitor exposes these fields directly so sandboxed or isolated profiles
+do not need to discover keys from the host system.
+
+GitHub project settings include protected paths, requested user reviewers, and
+requested team reviewers. When PR automation creates or updates a managed pull
+request, those reviewer lists are sent through the GitHub API along with the
+existing branch, label, draft, ready-for-review, evidence, and merge-policy
+automation.
 
 ## Orchestrator
 
