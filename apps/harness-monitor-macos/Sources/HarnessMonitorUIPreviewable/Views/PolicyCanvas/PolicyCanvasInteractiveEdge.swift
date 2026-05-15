@@ -145,7 +145,10 @@ struct PolicyCanvasInteractiveEdge: View {
             lineWidth: effectiveStrokeWidth,
             lineCap: .round,
             lineJoin: .round,
-            dash: kindDashPattern
+            dash: PolicyCanvasEdgeAnimation.scaledDashPattern(
+              kindDashPattern,
+              canvasZoom: canvasZoom
+            )
           )
         )
     }
@@ -217,6 +220,27 @@ enum PolicyCanvasEdgeAnimation {
     let zoom = max(0.01, canvasZoom)
     let apparent = min(baseVelocityPointsPerSecond * zoom, maxApparentVelocityPointsPerSecond)
     return apparent / zoom
+  }
+
+  /// Adapt a static kind-dash pattern (`[3,2]` for error, `[6,4]` for
+  /// control) for far-zoom rendering. The canvas applies
+  /// `.scaleEffect(viewModel.zoom)` over the whole edge layer, so a
+  /// `[3,2]` world pattern renders as `~0.75pt` dashes at zoom 0.25 -
+  /// approaching the device-pixel limit where dashes alias to solid.
+  /// Multiplying the pattern by `1 / max(0.5, zoom)` keeps the on-screen
+  /// dash period constant across zoom levels at and below 1x.
+  /// (Norman R2 deferred item: dash visibility at far zoom.)
+  ///
+  /// At zoom >= 1 we leave the pattern alone - the existing world pattern
+  /// already renders at or above its design size. Empty patterns pass
+  /// through unchanged so the solid `.flow` stroke never gains a phantom
+  /// dash entry.
+  static func scaledDashPattern(_ pattern: [CGFloat], canvasZoom: CGFloat) -> [CGFloat] {
+    guard !pattern.isEmpty, canvasZoom < 1 else {
+      return pattern
+    }
+    let scale = 1 / max(0.5, canvasZoom)
+    return pattern.map { $0 * scale }
   }
 }
 
