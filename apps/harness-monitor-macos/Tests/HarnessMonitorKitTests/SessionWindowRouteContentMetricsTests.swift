@@ -273,8 +273,14 @@ struct SessionWindowRouteContentMetricsTests {
     #expect(laneSource.contains(".taskBoardLaneColumnChrome("))
     #expect(laneSupportSource.contains("private struct TaskBoardLaneColumnChrome"))
     #expect(laneSupportSource.contains("private var laneFill: AnyShapeStyle"))
-    #expect(laneSupportSource.contains("private var laneSeparatorColor: Color"))
-    #expect(laneSupportSource.contains("private var laneAccentHeight: CGFloat"))
+    #expect(
+      laneSupportSource.contains(
+        "RoundedRectangle(cornerRadius: metrics.cardCornerRadius, style: .continuous)"
+      )
+    )
+    #expect(laneSupportSource.contains(".strokeBorder(laneStrokeColor, lineWidth: laneStrokeWidth)"))
+    #expect(laneSupportSource.contains("private var laneStrokeColor: Color"))
+    #expect(laneSupportSource.contains("private var laneStrokeWidth: CGFloat"))
     #expect(!overviewSource.contains("Board-owned work awaiting progression."))
     #expect(!overviewSource.contains("Open work pulled from active sessions."))
   }

@@ -291,34 +291,34 @@ private struct TaskBoardLaneColumnChrome: ViewModifier {
       .frame(width: metrics.laneWidth, alignment: .topLeading)
       .frame(minHeight: metrics.laneMinHeight, alignment: .topLeading)
       .background {
-        Rectangle()
+        RoundedRectangle(cornerRadius: metrics.cardCornerRadius, style: .continuous)
           .fill(laneFill)
+      }
+      .overlay {
+        RoundedRectangle(cornerRadius: metrics.cardCornerRadius, style: .continuous)
+          .strokeBorder(laneStrokeColor, lineWidth: laneStrokeWidth)
       }
       .overlay(alignment: .top) {
         Rectangle()
           .fill(laneAccentColor)
-          .frame(height: laneAccentHeight)
-      }
-      .overlay(alignment: .trailing) {
-        Rectangle()
-          .fill(laneSeparatorColor)
-          .frame(width: laneSeparatorWidth)
+          .padding(.horizontal, metrics.laneInnerPadding)
+          .frame(height: max(2, laneStrokeWidth + 1))
       }
   }
 
   private var laneFill: AnyShapeStyle {
     if isDropTargeted {
-      return AnyShapeStyle(taskBoardLaneColor(for: lane).opacity(reduceTransparency ? 0.16 : 0.1))
+      return AnyShapeStyle(taskBoardLaneColor(for: lane).opacity(reduceTransparency ? 0.18 : 0.12))
     }
-    return AnyShapeStyle(.background.opacity(reduceTransparency ? 0.28 : 0.18))
+    return AnyShapeStyle(.background.opacity(reduceTransparency ? 0.72 : 0.6))
   }
 
-  private var laneSeparatorColor: Color {
+  private var laneStrokeColor: Color {
     if isDropTargeted {
-      return taskBoardLaneColor(for: lane).opacity(colorSchemeContrast == .increased ? 0.68 : 0.46)
+      return taskBoardLaneColor(for: lane).opacity(colorSchemeContrast == .increased ? 0.84 : 0.62)
     }
     return HarnessMonitorTheme.controlBorder.opacity(
-      colorSchemeContrast == .increased ? 0.52 : 0.22
+      colorSchemeContrast == .increased ? 0.78 : 0.54
     )
   }
 
@@ -329,12 +329,8 @@ private struct TaskBoardLaneColumnChrome: ViewModifier {
     return taskBoardLaneColor(for: lane).opacity(colorSchemeContrast == .increased ? 0.72 : 0.48)
   }
 
-  private var laneAccentHeight: CGFloat {
-    colorSchemeContrast == .increased ? 3 : 2
-  }
-
-  private var laneSeparatorWidth: CGFloat {
-    colorSchemeContrast == .increased ? 1 : 0.5
+  private var laneStrokeWidth: CGFloat {
+    colorSchemeContrast == .increased ? 2 : 1
   }
 }
 
