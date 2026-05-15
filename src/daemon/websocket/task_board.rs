@@ -3,12 +3,13 @@ use crate::daemon::protocol::{
     TaskBoardAuditRequest, TaskBoardCatalogRequest, TaskBoardCreateItemRequest,
     TaskBoardDeleteItemRequest, TaskBoardDispatchRequest, TaskBoardEvaluateRequest,
     TaskBoardGetItemRequest, TaskBoardGitHubTokensSyncRequest, TaskBoardGitRuntimeConfig,
-    TaskBoardListItemsRequest, TaskBoardOrchestratorRunOnceRequest,
-    TaskBoardOrchestratorSettingsUpdateRequest, TaskBoardPlanApproveRequest,
-    TaskBoardPlanBeginRequest, TaskBoardPlanSubmitRequest, TaskBoardPolicyPipelinePromoteRequest,
-    TaskBoardPolicyPipelineSaveDraftRequest, TaskBoardPolicyPipelineSimulateRequest,
-    TaskBoardSyncRequest, TaskBoardTodoistTokenSyncRequest, TaskBoardUpdateItemRequest, WsRequest,
-    WsResponse, ws_methods,
+    TaskBoardHostSetProjectTypesRequest, TaskBoardListItemsRequest,
+    TaskBoardOrchestratorRunOnceRequest, TaskBoardOrchestratorSettingsUpdateRequest,
+    TaskBoardPlanApproveRequest, TaskBoardPlanBeginRequest, TaskBoardPlanSubmitRequest,
+    TaskBoardPolicyPipelinePromoteRequest, TaskBoardPolicyPipelineSaveDraftRequest,
+    TaskBoardPolicyPipelineSimulateRequest, TaskBoardSyncRequest,
+    TaskBoardTodoistTokenSyncRequest, TaskBoardUpdateItemRequest, WsRequest, WsResponse,
+    ws_methods,
 };
 use crate::errors::CliError;
 use serde::de::DeserializeOwned;
@@ -35,6 +36,11 @@ pub(crate) async fn dispatch_task_board_method(
         ws_methods::TASK_BOARD_AUDIT => Some(dispatch_task_board_audit(request)),
         ws_methods::TASK_BOARD_PROJECTS => Some(dispatch_task_board_projects(request)),
         ws_methods::TASK_BOARD_MACHINES => Some(dispatch_task_board_machines(request)),
+        ws_methods::TASK_BOARD_HOST_LOCAL => Some(dispatch_task_board_host_local(request)),
+        ws_methods::TASK_BOARD_HOST_LIST => Some(dispatch_task_board_host_list(request)),
+        ws_methods::TASK_BOARD_HOST_SET_PROJECT_TYPES => {
+            Some(dispatch_task_board_host_set_project_types(request))
+        }
         ws_methods::TASK_BOARD_ORCHESTRATOR_STATUS => {
             Some(dispatch_task_board_orchestrator_status(request))
         }
@@ -191,6 +197,24 @@ fn dispatch_task_board_machines(request: &WsRequest) -> WsResponse {
         return invalid_params(request);
     };
     dispatch_query_result(&request.id, task_board_route_executor::machines(&body))
+}
+
+fn dispatch_task_board_host_local(request: &WsRequest) -> WsResponse {
+    dispatch_query_result(&request.id, task_board_route_executor::host_local())
+}
+
+fn dispatch_task_board_host_list(request: &WsRequest) -> WsResponse {
+    dispatch_query_result(&request.id, task_board_route_executor::host_list())
+}
+
+fn dispatch_task_board_host_set_project_types(request: &WsRequest) -> WsResponse {
+    let Ok(body) = parse_params_or_default::<TaskBoardHostSetProjectTypesRequest>(request) else {
+        return invalid_params(request);
+    };
+    dispatch_query_result(
+        &request.id,
+        task_board_route_executor::host_set_project_types(&body),
+    )
 }
 
 fn dispatch_task_board_orchestrator_status(request: &WsRequest) -> WsResponse {

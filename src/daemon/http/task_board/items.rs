@@ -9,9 +9,9 @@ use serde::Deserialize;
 use crate::daemon::protocol::{
     TaskBoardAuditRequest, TaskBoardCatalogRequest, TaskBoardCreateItemRequest,
     TaskBoardDeleteItemRequest, TaskBoardDispatchRequest, TaskBoardEvaluateRequest,
-    TaskBoardGetItemRequest, TaskBoardListItemsRequest, TaskBoardPlanApproveRequest,
-    TaskBoardPlanBeginRequest, TaskBoardPlanSubmitRequest, TaskBoardSyncRequest,
-    TaskBoardUpdateItemRequest, http_paths,
+    TaskBoardGetItemRequest, TaskBoardHostSetProjectTypesRequest, TaskBoardListItemsRequest,
+    TaskBoardPlanApproveRequest, TaskBoardPlanBeginRequest, TaskBoardPlanSubmitRequest,
+    TaskBoardSyncRequest, TaskBoardUpdateItemRequest, http_paths,
 };
 use crate::task_board::TaskBoardStatus;
 
@@ -280,6 +280,49 @@ pub(super) async fn get_task_board_machines(
         &request_id,
         start,
         task_board_route_executor::machines(&request),
+    )
+}
+
+pub(super) async fn get_task_board_host_local(
+    headers: HeaderMap,
+    State(state): State<DaemonHttpState>,
+) -> Response {
+    let (start, request_id) = authenticated_parts!(headers, state);
+    timed_json(
+        "GET",
+        http_paths::TASK_BOARD_HOST_LOCAL,
+        &request_id,
+        start,
+        task_board_route_executor::host_local(),
+    )
+}
+
+pub(super) async fn get_task_board_host_list(
+    headers: HeaderMap,
+    State(state): State<DaemonHttpState>,
+) -> Response {
+    let (start, request_id) = authenticated_parts!(headers, state);
+    timed_json(
+        "GET",
+        http_paths::TASK_BOARD_HOST_LIST,
+        &request_id,
+        start,
+        task_board_route_executor::host_list(),
+    )
+}
+
+pub(super) async fn put_task_board_host_set_project_types(
+    headers: HeaderMap,
+    State(state): State<DaemonHttpState>,
+    Json(request): Json<TaskBoardHostSetProjectTypesRequest>,
+) -> Response {
+    let (start, request_id) = authenticated_parts!(headers, state);
+    timed_json(
+        "PUT",
+        http_paths::TASK_BOARD_HOST_SET_PROJECT_TYPES,
+        &request_id,
+        start,
+        task_board_route_executor::host_set_project_types(&request),
     )
 }
 

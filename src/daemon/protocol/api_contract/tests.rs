@@ -161,6 +161,24 @@ fn task_board_routes_have_complete_ws_parity() {
             ),
             (
                 HttpRouteMethod::Get,
+                http_paths::TASK_BOARD_HOST_LOCAL,
+                ws_methods::TASK_BOARD_HOST_LOCAL,
+                true,
+            ),
+            (
+                HttpRouteMethod::Get,
+                http_paths::TASK_BOARD_HOST_LIST,
+                ws_methods::TASK_BOARD_HOST_LIST,
+                true,
+            ),
+            (
+                HttpRouteMethod::Put,
+                http_paths::TASK_BOARD_HOST_SET_PROJECT_TYPES,
+                ws_methods::TASK_BOARD_HOST_SET_PROJECT_TYPES,
+                true,
+            ),
+            (
+                HttpRouteMethod::Get,
                 http_paths::TASK_BOARD_ORCHESTRATOR_STATUS,
                 ws_methods::TASK_BOARD_ORCHESTRATOR_STATUS,
                 true,

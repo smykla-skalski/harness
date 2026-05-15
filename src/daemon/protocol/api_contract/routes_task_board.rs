@@ -115,6 +115,30 @@ pub(crate) const ROUTES: &[HttpApiRouteContract] = &[
     },
     HttpApiRouteContract {
         method: HttpRouteMethod::Get,
+        path: http_paths::TASK_BOARD_HOST_LOCAL,
+        parity: HttpRouteParity::Rpc {
+            ws_method: ws_methods::TASK_BOARD_HOST_LOCAL,
+        },
+        swift_client_exposed: true,
+    },
+    HttpApiRouteContract {
+        method: HttpRouteMethod::Get,
+        path: http_paths::TASK_BOARD_HOST_LIST,
+        parity: HttpRouteParity::Rpc {
+            ws_method: ws_methods::TASK_BOARD_HOST_LIST,
+        },
+        swift_client_exposed: true,
+    },
+    HttpApiRouteContract {
+        method: HttpRouteMethod::Put,
+        path: http_paths::TASK_BOARD_HOST_SET_PROJECT_TYPES,
+        parity: HttpRouteParity::Rpc {
+            ws_method: ws_methods::TASK_BOARD_HOST_SET_PROJECT_TYPES,
+        },
+        swift_client_exposed: true,
+    },
+    HttpApiRouteContract {
+        method: HttpRouteMethod::Get,
         path: http_paths::TASK_BOARD_ORCHESTRATOR_STATUS,
         parity: HttpRouteParity::Rpc {
             ws_method: ws_methods::TASK_BOARD_ORCHESTRATOR_STATUS,

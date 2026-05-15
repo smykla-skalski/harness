@@ -23,10 +23,11 @@ use super::task_board_route_executor;
 mod items;
 
 use self::items::{
-    delete_task_board_item, get_task_board_audit, get_task_board_item, get_task_board_items,
-    get_task_board_machines, get_task_board_projects, post_task_board_dispatch,
-    post_task_board_evaluate, post_task_board_item, post_task_board_plan_approve,
-    post_task_board_plan_begin, post_task_board_plan_submit, post_task_board_sync,
+    delete_task_board_item, get_task_board_audit, get_task_board_host_list,
+    get_task_board_host_local, get_task_board_item, get_task_board_items, get_task_board_machines,
+    get_task_board_projects, post_task_board_dispatch, post_task_board_evaluate,
+    post_task_board_item, post_task_board_plan_approve, post_task_board_plan_begin,
+    post_task_board_plan_submit, post_task_board_sync, put_task_board_host_set_project_types,
     put_task_board_item,
 };
 
@@ -39,6 +40,22 @@ macro_rules! authenticated_request {
         }
         (start, request_id)
     }};
+}
+
+fn task_board_host_routes() -> Router<DaemonHttpState> {
+    Router::new()
+        .route(
+            http_paths::TASK_BOARD_HOST_LOCAL,
+            get(get_task_board_host_local),
+        )
+        .route(
+            http_paths::TASK_BOARD_HOST_LIST,
+            get(get_task_board_host_list),
+        )
+        .route(
+            http_paths::TASK_BOARD_HOST_SET_PROJECT_TYPES,
+            put(put_task_board_host_set_project_types),
+        )
 }
 
 pub(super) fn task_board_routes() -> Router<DaemonHttpState> {
@@ -83,6 +100,7 @@ pub(super) fn task_board_routes() -> Router<DaemonHttpState> {
             http_paths::TASK_BOARD_MACHINES,
             get(get_task_board_machines),
         )
+        .merge(task_board_host_routes())
         .route(
             http_paths::TASK_BOARD_ORCHESTRATOR_STATUS,
             get(get_task_board_orchestrator_status),
