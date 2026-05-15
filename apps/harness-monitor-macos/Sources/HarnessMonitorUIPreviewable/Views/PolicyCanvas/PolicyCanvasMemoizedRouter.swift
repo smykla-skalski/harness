@@ -50,6 +50,13 @@ import os
 /// move to a real LRU. Today the bench fixture stops at 50 edges so
 /// either intervention is premature.
 final class PolicyCanvasMemoizedRouter: PolicyCanvasEdgeRouter, @unchecked Sendable {
+  /// Cache identity for a single routing call. The invariant is the same
+  /// two-halves rule documented on `PolicyCanvasRouteContext`: every input
+  /// the inner router reads must live in this struct - endpoints and
+  /// candidates inside `mode`, everything else inside `context`. The
+  /// `PolicyCanvasMemoizedRouterContextContractTests` suite enforces both
+  /// halves field-by-field. Adding an input to the inner router without
+  /// extending one of these two slots silently serves stale polylines.
   private struct CacheKey: Hashable {
     let mode: Mode
     let context: PolicyCanvasRouteContext
