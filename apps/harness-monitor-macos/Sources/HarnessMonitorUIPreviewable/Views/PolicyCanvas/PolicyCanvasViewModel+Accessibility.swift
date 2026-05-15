@@ -37,6 +37,14 @@ extension PolicyCanvasViewModel {
     }
   }
 
+  /// Accessible name for an edge. Front-loads the user-meaningful payload
+  /// (the label or "connection") so a rotor walk through edges scans by
+  /// the distinguishing token first. The literal word "edge" appears as
+  /// a noun, not a prefix - watson R2: previously every entry started
+  /// with "Edge X", which the `.isButton` trait and an edges-only rotor
+  /// filter already convey. The endpoint phrase "from X to Y" trails so
+  /// the rotor user can confirm direction without waiting for it on
+  /// every entry.
   func accessibilityLabel(for edge: PolicyCanvasEdge) -> String {
     let sourceNode = node(edge.source.nodeID)
     let targetNode = node(edge.target.nodeID)
@@ -50,9 +58,9 @@ extension PolicyCanvasViewModel {
       .joined(separator: " ")
     let edgeName = edge.label.isEmpty ? "connection" : edge.label
     if sourcePiece.isEmpty || targetPiece.isEmpty {
-      return "Edge \(edgeName)"
+      return "\(edgeName) edge"
     }
-    return "Edge \(edgeName), from \(sourcePiece) to \(targetPiece)"
+    return "\(edgeName) edge, from \(sourcePiece) to \(targetPiece)"
   }
 
   /// Accessible value pairing an edge's *kind* and animation state so the

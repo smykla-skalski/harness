@@ -121,13 +121,14 @@ struct PolicyCanvasHandCodedOrthogonalRouter: PolicyCanvasEdgeRouter {
 }
 
 private struct PolicyCanvasEdgeRouterKey: EnvironmentKey {
-  /// Default to a memoized visibility router. Phase 1.3 of the tier-2
-  /// follow-up plan: SwiftUI body re-evaluation on selection / hover /
-  /// `TimelineView(.animation)` tick used to dispatch N route calls per
-  /// invocation; with this default, repeat routes for unchanged geometry
-  /// resolve from the cache instead of re-running A*. The cache lives for
-  /// the process lifetime - keys include the full input so cross-canvas
-  /// collisions are not possible, and the LRU cap (1024 entries) bounds RAM.
+  /// Default to a memoized visibility router. SwiftUI body re-evaluation
+  /// on selection / hover / `TimelineView(.animation)` tick used to
+  /// dispatch N route calls per invocation; with this default, repeat
+  /// routes for unchanged geometry resolve from the cache instead of
+  /// re-running A*. The cache lives for the process lifetime - keys
+  /// include the full input so cross-canvas collisions are not possible,
+  /// and a wipe-on-overflow cap (1024 entries) bounds RAM (drops the
+  /// whole cache on overflow rather than running an LRU eviction list).
   /// Tests that want raw routing characteristics can still inject a bare
   /// `PolicyCanvasVisibilityRouter()` via `.environment(...)`.
   static let defaultValue: any PolicyCanvasEdgeRouter =

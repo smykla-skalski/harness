@@ -49,7 +49,7 @@ struct PolicyCanvasEdgeLayer: View {
             isSelected: isSelected,
             accessibilityLabel: viewModel.accessibilityLabel(for: edge),
             accessibilityKindWord: edge.kind.accessibilityWord,
-            accessibilityDashKey: edge.kind.dashKey,
+            accessibilityDashDescription: edge.kind.dashDescription,
             kindDashPattern: edge.kind.strokeDashPattern,
             isAnimated: edge.isAnimated,
             canvasZoom: viewModel.zoom,

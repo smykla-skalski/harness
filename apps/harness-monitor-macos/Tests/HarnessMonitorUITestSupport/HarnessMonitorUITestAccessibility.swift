@@ -144,8 +144,13 @@ enum HarnessMonitorUITestAccessibility {
   static let blockedChip = "harness.sidebar.focus-chip.blocked"
   static let observedChip = "harness.sidebar.focus-chip.observed"
   static let idleChip = "harness.sidebar.focus-chip.idle"
-  static let sessionsBoardRoot = "harness.board.root"
-  static let sessionsBoardScrollView = "harness.board.scroll"
+  static let dashboardWindowRoot = "harness.dashboard.window"
+  static let dashboardSidebar = "harness.dashboard.sidebar"
+  static let dashboardScrollView = "harness.dashboard.scroll"
+  static let dashboardNewSessionButton = "harness.dashboard.new-session"
+  static let dashboardOpenFolderButton = "harness.dashboard.open-folder"
+  static let sessionsBoardRoot = dashboardWindowRoot
+  static let sessionsBoardScrollView = dashboardScrollView
   static let recentSessionsCard = "harness.board.recent-sessions-card"
   static let recentSessionsCardFrame = "harness.board.recent-sessions-card.frame"
   static let contentRoot = "harness.content.root"
@@ -289,6 +294,10 @@ enum HarnessMonitorUITestAccessibility {
 
   static func dashboardSessionCardFrame(_ sessionID: String) -> String {
     "\(dashboardSessionCard(sessionID)).frame"
+  }
+
+  static func dashboardWindowRoute(_ route: String) -> String {
+    "harness.dashboard.route.\(slug(route))"
   }
 
   static let policyCanvasRoot = "harness.policy-canvas.root"

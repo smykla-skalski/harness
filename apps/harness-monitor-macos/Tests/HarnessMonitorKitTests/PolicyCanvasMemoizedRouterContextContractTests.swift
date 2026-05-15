@@ -92,6 +92,83 @@ struct PolicyCanvasMemoizedRouterContextContractTests {
     assertFieldIsInCacheKey(baseline: baseline, mutated: mutated, named: "obstacles")
   }
 
+  @Test("Mutating flex `sourceCandidates` defeats the cache")
+  func mutatingFlexSourceCandidatesMisses() {
+    let context = makeBaselineContext()
+    let inner = MissCountingRouter()
+    let memoized = PolicyCanvasMemoizedRouter(inner: inner)
+    let baselineSources = [CGPoint(x: 100, y: 200), CGPoint(x: 100, y: 220)]
+    let baselineTargets = [CGPoint(x: 500, y: 200), CGPoint(x: 500, y: 220)]
+    _ = memoized.route(
+      sourceCandidates: baselineSources,
+      targetCandidates: baselineTargets,
+      context: context
+    )
+    _ = memoized.route(
+      sourceCandidates: baselineSources + [CGPoint(x: 100, y: 240)],
+      targetCandidates: baselineTargets,
+      context: context
+    )
+    #expect(
+      memoized.misses == 2,
+      """
+      Flex sourceCandidates must be part of the cache key. Mutating it \
+      should produce two misses; saw \(memoized.misses).
+      """
+    )
+  }
+
+  @Test("Mutating flex `targetCandidates` defeats the cache")
+  func mutatingFlexTargetCandidatesMisses() {
+    let context = makeBaselineContext()
+    let inner = MissCountingRouter()
+    let memoized = PolicyCanvasMemoizedRouter(inner: inner)
+    let baselineSources = [CGPoint(x: 100, y: 200), CGPoint(x: 100, y: 220)]
+    let baselineTargets = [CGPoint(x: 500, y: 200), CGPoint(x: 500, y: 220)]
+    _ = memoized.route(
+      sourceCandidates: baselineSources,
+      targetCandidates: baselineTargets,
+      context: context
+    )
+    _ = memoized.route(
+      sourceCandidates: baselineSources,
+      targetCandidates: baselineTargets + [CGPoint(x: 500, y: 240)],
+      context: context
+    )
+    #expect(
+      memoized.misses == 2,
+      """
+      Flex targetCandidates must be part of the cache key. Mutating it \
+      should produce two misses; saw \(memoized.misses).
+      """
+    )
+  }
+
+  @Test("Pinned and flex routing with identical endpoints stay in distinct cache slots")
+  func pinnedAndFlexAreDistinctCacheSlots() {
+    let context = makeBaselineContext()
+    let inner = MissCountingRouter()
+    let memoized = PolicyCanvasMemoizedRouter(inner: inner)
+    _ = memoized.route(
+      source: Self.endpoint.source,
+      target: Self.endpoint.target,
+      context: context
+    )
+    _ = memoized.route(
+      sourceCandidates: [Self.endpoint.source],
+      targetCandidates: [Self.endpoint.target],
+      context: context
+    )
+    #expect(
+      memoized.misses == 2,
+      """
+      Pinned and flex modes carry different routing semantics even when \
+      endpoint geometry happens to coincide; the cache must not collapse \
+      them into one slot.
+      """
+    )
+  }
+
   /// Run two routing calls against a fresh memoized router - one with the
   /// baseline context, one with the mutated context. Both calls should miss
   /// the cache. If the mutated field is not in the cache key, the second

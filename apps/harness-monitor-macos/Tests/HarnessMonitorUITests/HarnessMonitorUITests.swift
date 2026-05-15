@@ -112,7 +112,6 @@ final class HarnessMonitorUITests: HarnessMonitorUITestCase {
       mode: "preview",
       additionalEnvironment: [
         "HARNESS_MONITOR_PREVIEW_SCENARIO": "task-board-board-only",
-        "HARNESS_MONITOR_UI_TEST_SURFACE": "content-dashboard",
       ]
     )
 

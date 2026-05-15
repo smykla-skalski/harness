@@ -1,5 +1,5 @@
 public enum HarnessMonitorWindowID {
-  public static let openRecent = "open-recent"
+  public static let dashboard = "open-recent"
   public static let sessionScene = "session"
   public static let settings = "settings"
 

@@ -63,13 +63,16 @@ enum PolicyCanvasEdgeKind: String, Hashable, CaseIterable {
     }
   }
 
-  /// Plain-English name for the stroke's dash pattern. Single source of
-  /// truth for the three surfaces that describe the dash encoding to the
-  /// user: the legend swatch label, the hover tooltip, and the VoiceOver
-  /// accessibility value paired with each legend row. Keeping them
-  /// unified avoids the Nielsen consistency violation where one surface
-  /// said "dense" and another said "tightly dashed" for the same stroke.
-  var dashKey: String {
+  /// Plain-English description of the stroke's dash pattern. Single
+  /// source of truth for the three surfaces that describe the dash
+  /// encoding to the user: the legend swatch label, the hover tooltip,
+  /// and the VoiceOver accessibility value paired with each legend row.
+  /// Keeping them unified avoids the Nielsen consistency violation
+  /// where one surface said "dense" and another said "tightly dashed"
+  /// for the same stroke. The name is "description" rather than "key"
+  /// because the value is user-facing prose (eligible for
+  /// localization) rather than a stable identifier.
+  var dashDescription: String {
     switch self {
     case .flow:
       "solid"

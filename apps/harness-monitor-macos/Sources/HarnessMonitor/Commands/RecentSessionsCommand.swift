@@ -3,9 +3,9 @@ import HarnessMonitorUIPreviewable
 import SwiftUI
 
 struct RecentSessionsCommand: Commands {
-  static let menuTitle = "Open Recent Session"
+  static let menuTitle = "Recent Sessions"
   static let emptyTitle = "No Recent Sessions"
-  static let showWindowTitle = "Show Open Recent Window"
+  static let showWindowTitle = "Show Dashboard"
   private static let maxRecentSessions = 10
 
   let store: HarnessMonitorStore
@@ -32,7 +32,7 @@ struct RecentSessionsCommand: Commands {
         }
 
         Button(Self.showWindowTitle) {
-          openWindow(id: HarnessMonitorWindowID.openRecent)
+          openWindow(id: HarnessMonitorWindowID.dashboard)
         }
       }
     }

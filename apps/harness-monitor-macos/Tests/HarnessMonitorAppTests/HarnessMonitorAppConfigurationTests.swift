@@ -166,7 +166,7 @@ final class HarnessMonitorAppConfigurationTests: XCTestCase {
     )
 
     recorder.recordScenarioReady(
-      windowID: HarnessMonitorWindowID.openRecent,
+      windowID: HarnessMonitorWindowID.dashboard,
       stateLabel: "running",
       includesBootstrapInScenarioMeasurement: false,
       currentSystemUptime: 100.25
@@ -180,7 +180,7 @@ final class HarnessMonitorAppConfigurationTests: XCTestCase {
 
     XCTAssertEqual(sample.measuredFrom, "app_init")
     XCTAssertEqual(sample.stateLabel, "running")
-    XCTAssertEqual(sample.windowID, HarnessMonitorWindowID.openRecent)
+    XCTAssertEqual(sample.windowID, HarnessMonitorWindowID.dashboard)
     XCTAssertEqual(sample.includesBootstrapInScenarioMeasurement, false)
     XCTAssertEqual(sample.appInitToReadyMilliseconds, 250, accuracy: 0.001)
   }
@@ -196,7 +196,7 @@ final class HarnessMonitorAppConfigurationTests: XCTestCase {
     )
 
     recorder.recordScenarioReady(
-      windowID: HarnessMonitorWindowID.openRecent,
+      windowID: HarnessMonitorWindowID.dashboard,
       stateLabel: "running",
       includesBootstrapInScenarioMeasurement: true,
       currentSystemUptime: 50.1
@@ -214,7 +214,7 @@ final class HarnessMonitorAppConfigurationTests: XCTestCase {
       from: data
     )
 
-    XCTAssertEqual(sample.windowID, HarnessMonitorWindowID.openRecent)
+    XCTAssertEqual(sample.windowID, HarnessMonitorWindowID.dashboard)
     XCTAssertEqual(sample.stateLabel, "running")
     XCTAssertEqual(sample.includesBootstrapInScenarioMeasurement, true)
     XCTAssertEqual(sample.appInitToReadyMilliseconds, 100, accuracy: 0.001)

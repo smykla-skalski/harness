@@ -3,12 +3,6 @@
   "configuration": "Preview",
   "entries": [
     {
-      "id": "ContentView",
-      "description": "Main content shell with sidebar + detail",
-      "file": "Sources/HarnessMonitorUIPreviewable/Views/ContentViewCanvasPreviews.swift",
-      "index": 0
-    },
-    {
       "id": "SettingsView",
       "description": "Settings root window",
       "file": "Sources/HarnessMonitorUIPreviewable/Views/SettingsViewPreviews.swift",
@@ -43,12 +37,6 @@
       "description": "Workspace opening shell before live content mounts in dark appearance",
       "file": "Sources/HarnessMonitorUIPreviewable/Views/WorkspaceWindowOpeningView.swift",
       "index": 1
-    },
-    {
-      "id": "SessionsBoardView",
-      "description": "Dashboard with sessions grid",
-      "file": "Sources/HarnessMonitorUIPreviewable/Views/SessionsBoardView.swift",
-      "index": 0
     },
     {
       "id": "SessionCockpitView",
@@ -132,12 +120,6 @@
       "id": "ConnectionViews",
       "description": "Connection status banners",
       "file": "Sources/HarnessMonitorUIPreviewable/Views/ConnectionViews.swift",
-      "index": 0
-    },
-    {
-      "id": "ContentSessionSurface",
-      "description": "Session surface container",
-      "file": "Sources/HarnessMonitorUIPreviewable/Views/ContentSessionSurface.swift",
       "index": 0
     },
     {

@@ -9,19 +9,19 @@ final class HarnessMonitorPerfTests: HarnessMonitorUITestCase {
   func testOpenRecentWindowScenarioState() {
     let app = XCUIApplication(bundleIdentifier: Self.uiTestHostBundleIdentifier)
     let launched = launchForPerf(app: app, scenario: "open-recent-window")
-    let openRecentRoot = element(in: launched, identifier: Accessibility.openRecentRoot)
-    let projectList = element(in: launched, identifier: Accessibility.openRecentProjectList)
-    let sessionRow = element(
+    let dashboardRoot = element(in: launched, identifier: Accessibility.dashboardWindowRoot)
+    let dashboardScrollView = element(in: launched, identifier: Accessibility.dashboardScrollView)
+    let sessionCard = element(
       in: launched,
-      identifier: Accessibility.openRecentSessionRow(Self.previewSessionID)
+      identifier: Accessibility.dashboardSessionCard(Self.previewSessionID)
     )
     let sessionWindow = element(in: launched, identifier: Accessibility.sessionWindowShell)
 
     waitForScenarioCompletion(app: launched, scenario: "open-recent-window")
 
-    XCTAssertTrue(openRecentRoot.waitForExistence(timeout: Self.uiTimeout))
-    XCTAssertTrue(projectList.waitForExistence(timeout: Self.uiTimeout))
-    XCTAssertTrue(sessionRow.waitForExistence(timeout: Self.uiTimeout))
+    XCTAssertTrue(dashboardRoot.waitForExistence(timeout: Self.uiTimeout))
+    XCTAssertTrue(dashboardScrollView.waitForExistence(timeout: Self.uiTimeout))
+    XCTAssertTrue(sessionCard.waitForExistence(timeout: Self.uiTimeout))
     XCTAssertFalse(sessionWindow.exists)
 
     launched.terminate()

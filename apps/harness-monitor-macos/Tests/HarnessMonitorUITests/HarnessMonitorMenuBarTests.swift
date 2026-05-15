@@ -2,7 +2,7 @@ import XCTest
 
 private typealias Accessibility = HarnessMonitorUITestAccessibility
 
-/// UI tests covering the welcome-window menu affordances.
+/// UI tests covering the dashboard-window menu affordances.
 @MainActor
 final class HarnessMonitorMenuBarTests: HarnessMonitorUITestCase {
   private static let previewScenarioKey = "HARNESS_MONITOR_PREVIEW_SCENARIO"
@@ -12,18 +12,18 @@ final class HarnessMonitorMenuBarTests: HarnessMonitorUITestCase {
   // swiftlint:disable:next static_over_final_class
   override nonisolated class var reuseLaunchedApp: Bool { true }
 
-  func testWindowMenuOpensOpenRecentWindow() throws {
+  func testWindowMenuOpensDashboardWindow() throws {
     let app = launch(mode: "preview")
-    invokeMenuItem(in: app, menu: "Window", title: "Open Recent Session")
+    invokeMenuItem(in: app, menu: "Window", title: "Dashboard")
 
-    let openRecentWindow = element(in: app, identifier: Accessibility.openRecentRoot)
+    let dashboardWindow = element(in: app, identifier: Accessibility.dashboardWindowRoot)
     XCTAssertTrue(
-      waitUntil(timeout: Self.uiTimeout) { openRecentWindow.exists },
-      "Open Recent should appear after invoking Window > Open Recent Session"
+      waitUntil(timeout: Self.uiTimeout) { dashboardWindow.exists },
+      "Dashboard should appear after invoking Window > Dashboard"
     )
   }
 
-  func testWindowMenuKeepsOpenRecentCommandAvailableAlongsideSystemItems() throws {
+  func testWindowMenuKeepsDashboardCommandAvailableAlongsideSystemItems() throws {
     let app = launch(mode: "preview")
     let windowMenu = app.menuBars.firstMatch.menuBarItems["Window"]
     XCTAssertTrue(
@@ -33,7 +33,7 @@ final class HarnessMonitorMenuBarTests: HarnessMonitorUITestCase {
     windowMenu.click()
 
     XCTAssertTrue(
-      windowMenu.menuItems["Open Recent Session"].exists,
+      windowMenu.menuItems["Dashboard"].exists,
       "The app-owned window command should stay available while native window items remain system-owned"
     )
 
@@ -50,14 +50,14 @@ final class HarnessMonitorMenuBarTests: HarnessMonitorUITestCase {
     invokeNestedMenuItem(
       in: app,
       menu: "File",
-      submenu: "Open Recent Session",
+      submenu: "Recent Sessions",
       title: Self.previewSessionTitle
     )
 
     let sessionWindow = element(in: app, identifier: Accessibility.sessionWindowShell)
     XCTAssertTrue(
       waitForElement(sessionWindow, timeout: Self.uiTimeout),
-      "File > Open Recent Session should reopen the selected recent session"
+      "File > Recent Sessions should reopen the selected recent session"
     )
   }
 }

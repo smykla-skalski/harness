@@ -149,31 +149,17 @@ private struct AdaptiveGridHeightProbeTile: View {
   }
 }
 
-@Suite("Content window toolbar model")
-struct ContentWindowToolbarModelTests {
+@Suite("Sleep prevention toolbar presentation")
+struct SleepPreventionToolbarPresentationTests {
   @Test("Sleep prevention presentation follows enabled state")
   func sleepPreventionPresentationFollowsEnabledState() {
-    let enabled = ContentWindowToolbarModel(
-      canNavigateBack: false,
-      canNavigateForward: false,
-      canCreateTask: false,
-      isRefreshing: false,
-      sleepPreventionEnabled: true,
-      manualRefreshSuccessToken: 0
-    )
-    let disabled = ContentWindowToolbarModel(
-      canNavigateBack: false,
-      canNavigateForward: false,
-      canCreateTask: false,
-      isRefreshing: false,
-      sleepPreventionEnabled: false,
-      manualRefreshSuccessToken: 0
-    )
+    let enabled = SleepPreventionToolbarPresentation(isEnabled: true)
+    let disabled = SleepPreventionToolbarPresentation(isEnabled: false)
 
-    #expect(enabled.sleepPreventionPresentation.title == "Allow Sleep")
-    #expect(enabled.sleepPreventionPresentation.systemImage == "cup.and.heat.waves.fill")
-    #expect(disabled.sleepPreventionPresentation.title == "Prevent Sleep")
-    #expect(disabled.sleepPreventionPresentation.systemImage == "cup.and.heat.waves")
+    #expect(enabled.title == "Allow Sleep")
+    #expect(enabled.systemImage == "cup.and.heat.waves.fill")
+    #expect(disabled.title == "Prevent Sleep")
+    #expect(disabled.systemImage == "cup.and.heat.waves")
   }
 }
 

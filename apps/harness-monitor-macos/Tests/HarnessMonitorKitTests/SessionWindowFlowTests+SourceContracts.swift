@@ -60,6 +60,8 @@ extension SessionWindowFlowTests {
   @Test("Session tabs route through SwiftUI commands plus the tabbing accessor")
   func sessionTabsUseSwiftUISceneCommands() throws {
     let appSource = try harnessSourceFile(named: "App/HarnessMonitorApp.swift")
+    let scenesSource = try harnessSourceFile(named: "App/HarnessMonitorApp+Scenes.swift")
+    let sceneContentSource = try harnessSourceFile(named: "App/HarnessMonitorApp+SceneContent.swift")
     let routerSource = try harnessSourceFile(named: "App/HarnessMonitorInitialWindowRouter.swift")
     let rootSource = try harnessSourceFile(named: "App/SessionWindowRootView.swift")
     let commandsSource = try harnessSourceFile(named: "Commands/WindowMenuCommands.swift")
@@ -70,14 +72,16 @@ extension SessionWindowFlowTests {
     )
 
     #expect(FileManager.default.fileExists(atPath: tabbingAccessorPath))
-    #expect(appSource.contains("Window("))
-    #expect(appSource.contains("WindowGroup("))
-    #expect(appSource.contains("id: HarnessMonitorWindowID.openRecent"))
-    #expect(appSource.contains("id: HarnessMonitorWindowID.sessionScene"))
-    #expect(appSource.contains("for: SessionWindowToken.self"))
-    #expect(appSource.contains(".restorationBehavior(.disabled)"))
-    #expect(appSource.contains(".commandsRemoved()"))
-    #expect(appSource.contains("SessionWindowTabbing(isSessionWindow: false)"))
+    #expect(appSource.contains("dashboardWindowScene"))
+    #expect(appSource.contains("sessionWindowScene"))
+    #expect(scenesSource.contains("Window("))
+    #expect(scenesSource.contains("WindowGroup("))
+    #expect(scenesSource.contains("id: HarnessMonitorWindowID.dashboard"))
+    #expect(scenesSource.contains("id: HarnessMonitorWindowID.sessionScene"))
+    #expect(scenesSource.contains("for: SessionWindowToken.self"))
+    #expect(scenesSource.contains(".restorationBehavior(.disabled)"))
+    #expect(scenesSource.contains(".commandsRemoved()"))
+    #expect(sceneContentSource.contains("SessionWindowTabbing(isSessionWindow: false)"))
     #expect(commandsSource.contains("@Environment(\\.openWindow)"))
     #expect(commandsSource.contains("openHarnessSessionWindow"))
     #expect(rootSource.contains("SessionWindowTabbing("))
@@ -204,7 +208,10 @@ extension SessionWindowFlowTests {
       named: "Views/Sessions/SessionWindowView+DetailFocus.swift"
     )
 
-    #expect(rootSource.contains("ZStack {\n      bodyContent\n      sessionSearchHost\n    }"))
+    #expect(rootSource.contains("ZStack {"))
+    #expect(rootSource.contains("bodyContent"))
+    #expect(rootSource.contains("sessionSearchHost"))
+    #expect(rootSource.contains("if !HarnessMonitorPerfIsolation.disablesSearchHost"))
     #expect(!rootSource.contains(".appSearchHost("))
     #expect(
       rootSource.contains(

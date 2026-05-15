@@ -6,7 +6,7 @@ extension OpenWindowAction {
   @MainActor
   public func openHarnessSessionWindow(sessionID: String?) {
     guard let sessionID, !sessionID.isEmpty else {
-      self(id: HarnessMonitorWindowID.openRecent)
+      self(id: HarnessMonitorWindowID.dashboard)
       return
     }
     let tabbingPreference = SessionWindowTabbingPreference.resolved(

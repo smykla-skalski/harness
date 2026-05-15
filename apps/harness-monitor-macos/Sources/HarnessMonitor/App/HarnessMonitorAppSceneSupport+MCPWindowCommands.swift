@@ -6,8 +6,8 @@ enum HarnessMonitorMCPWindowCommandDescriptors {
     HarnessMonitorMCPWindowCommandDescriptor(
       identifier: HarnessMonitorAccessibility.windowMenuMainItem,
       label: WindowMenuCommands.mainTitle,
-      hint: "Open the recent sessions window.",
-      windowID: HarnessMonitorWindowID.openRecent
+      hint: "Open the dashboard window.",
+      windowID: HarnessMonitorWindowID.dashboard
     )
   ]
 }

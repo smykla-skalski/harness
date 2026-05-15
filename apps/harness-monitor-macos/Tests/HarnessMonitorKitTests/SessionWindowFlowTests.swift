@@ -22,7 +22,7 @@ struct SessionWindowFlowTests {
 
   @Test("Session windows use dedicated scene identifiers")
   func sessionWindowsUseDedicatedSceneIdentifiers() {
-    #expect(HarnessMonitorWindowID.openRecent == "open-recent")
+    #expect(HarnessMonitorWindowID.dashboard == "open-recent")
     #expect(HarnessMonitorWindowID.sessionScene == "session")
     #expect(HarnessMonitorWindowID.sessionWindow("sess-alpha") == "session-sess-alpha")
   }
@@ -237,7 +237,7 @@ struct SessionWindowFlowTests {
   func sessionRoutesExposeStableSidebarOrder() {
     #expect(
       SessionWindowRoute.allCases.map(\.rawValue)
-        == ["overview", "agents", "tasks", "decisions", "timeline"]
+        == ["overview", "agents", "tasks", "policyCanvas", "decisions", "timeline"]
     )
     #expect(SessionWindowRoute.agents.title == "Agents")
     #expect(SessionWindowRoute.agents.systemImage == "person.2")

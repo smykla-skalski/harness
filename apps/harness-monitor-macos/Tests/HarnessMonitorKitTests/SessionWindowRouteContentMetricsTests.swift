@@ -125,42 +125,58 @@ struct SessionWindowRouteContentMetricsTests {
   func overviewRouteEmbedsTaskBoard() throws {
     let routeContentSource = try sourceFile(named: "SessionWindowRouteContent.swift")
     let overviewTaskBoardSource = try sourceFile(named: "SessionWindowOverview+TaskBoard.swift")
+    let hostSource = try taskBoardSourceFile(named: "TaskBoardOverviewHost.swift")
     let columnsSource = try sourceFile(named: "SessionWindowView+Columns.swift")
 
-    #expect(routeContentSource.contains("TaskBoardOverviewView("))
-    #expect(routeContentSource.contains("let decisions: [Decision]"))
+    #expect(routeContentSource.contains("TaskBoardOverviewHost("))
+    #expect(routeContentSource.contains("scope: .session(sessionID: snapshot.summary.sessionId)"))
     #expect(routeContentSource.contains("decisions: decisions"))
-    #expect(routeContentSource.contains("onOpenItem: openTaskActions"))
-    #expect(routeContentSource.contains("onOpenDecision: openDecision"))
-    #expect(overviewTaskBoardSource.contains("func openDecision(_ decision: Decision)"))
-    #expect(overviewTaskBoardSource.contains("store.supervisorSelectedDecisionID = decision.id"))
-    #expect(overviewTaskBoardSource.contains("store.requestSessionRoute("))
+    #expect(
+      routeContentSource.contains(
+        "orchestratorStatus: store.contentUI.dashboard.taskBoardOrchestratorStatus"
+      )
+    )
+    #expect(
+      routeContentSource.contains(
+        "evaluationSummary: store.contentUI.dashboard.taskBoardEvaluationSummary"
+      )
+    )
+    #expect(hostSource.contains("onOpenTaskBoardItem: openTaskBoardItem"))
+    #expect(hostSource.contains("onOpenDecision: openDecision"))
+    #expect(hostSource.contains("store.supervisorSelectedDecisionID = decision.id"))
+    #expect(hostSource.contains("store.requestSessionRoute("))
+    #expect(overviewTaskBoardSource.contains("store.contentUI.dashboard.taskBoardItems"))
     #expect(columnsSource.contains("decisions: matchingDecisions"))
   }
 
   @Test("Dashboard starts from the global task board")
   func dashboardStartsFromGlobalTaskBoard() throws {
-    let boardSource = try sourceFile(named: "SessionsBoardView.swift")
+    let dashboardSource = try previewableSourceFile(
+      domain: "Dashboard",
+      named: "DashboardWindowView.swift"
+    )
 
-    #expect(boardSource.contains("TaskBoardOverviewView("))
-    #expect(boardSource.contains("snapshot: taskBoardInboxSnapshot"))
-    #expect(boardSource.contains("store.loadCachedTaskBoardInboxSnapshot("))
-    #expect(boardSource.contains("sessions: visibleTaskBoardSessions"))
-    #expect(boardSource.contains("dashboardUI.taskBoardItems"))
-    #expect(boardSource.contains("dashboardUI.taskBoardEvaluationSummary"))
-    #expect(boardSource.contains("onEvaluateTaskBoard: evaluateTaskBoard"))
-    #expect(boardSource.contains("onEvaluateTaskBoardItem: evaluateTaskBoardItem"))
-    #expect(boardSource.contains("onMoveTaskBoardItem: moveTaskBoardItem"))
-    #expect(boardSource.contains("decisions: store.supervisorOpenDecisions"))
+    #expect(dashboardSource.contains("TaskBoardOverviewHost("))
+    #expect(dashboardSource.contains("scope: .dashboard"))
+    #expect(dashboardSource.contains("snapshot: taskBoardInboxSnapshot"))
+    #expect(dashboardSource.contains("store.loadCachedTaskBoardInboxSnapshot("))
+    #expect(dashboardSource.contains("sessions: visibleTaskBoardSessions"))
+    #expect(dashboardSource.contains("dashboardUI.taskBoardItems"))
+    #expect(dashboardSource.contains("dashboardUI.taskBoardEvaluationSummary"))
+    #expect(dashboardSource.contains("dashboardUI.taskBoardOrchestratorStatus"))
+    #expect(dashboardSource.contains("decisions: store.supervisorOpenDecisions"))
   }
 
   @Test("Overview and dashboard expose task board orchestrator controls")
   func overviewAndDashboardExposeTaskBoardOrchestratorControls() throws {
     let routeContentSource = try sourceFile(named: "SessionWindowRouteContent.swift")
-    let overviewTaskBoardSource = try sourceFile(named: "SessionWindowOverview+TaskBoard.swift")
-    let boardSource = try sourceFile(named: "SessionsBoardView.swift")
+    let dashboardSource = try previewableSourceFile(
+      domain: "Dashboard",
+      named: "DashboardWindowView.swift"
+    )
+    let hostSource = try taskBoardSourceFile(named: "TaskBoardOverviewHost.swift")
 
-    for source in [routeContentSource, boardSource] {
+    for source in [hostSource] {
       #expect(source.contains("onStartTaskBoardOrchestrator: startTaskBoardOrchestrator"))
       #expect(source.contains("onStopTaskBoardOrchestrator: stopTaskBoardOrchestrator"))
       #expect(source.contains("onRunTaskBoardOrchestratorOnce: runTaskBoardOrchestratorOnce"))
@@ -171,9 +187,10 @@ struct SessionWindowRouteContentMetricsTests {
       #expect(source.contains("onApproveTaskBoardPlan: approveTaskBoardPlan"))
     }
 
+    #expect(routeContentSource.contains("TaskBoardOverviewHost("))
     #expect(routeContentSource.contains("store.contentUI.dashboard.taskBoardOrchestratorStatus"))
-    #expect(overviewTaskBoardSource.contains("store.contentUI.dashboard.taskBoardItems"))
-    #expect(boardSource.contains("dashboardUI.taskBoardOrchestratorStatus"))
+    #expect(dashboardSource.contains("TaskBoardOverviewHost("))
+    #expect(dashboardSource.contains("dashboardUI.taskBoardOrchestratorStatus"))
   }
 
   @Test("Task board controls stay explicit after chrome cleanup")

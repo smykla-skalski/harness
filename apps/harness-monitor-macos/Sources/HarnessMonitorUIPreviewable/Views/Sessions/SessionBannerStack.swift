@@ -168,7 +168,7 @@ public struct SessionBannerStack<Content: View>: View {
         chromeDivider(tint: MCPStatusViewSupport.tint(for: chrome.mcpStatus.tone))
       }
       if chrome.acpBridgeBanner != nil {
-        ContentAcpBridgeBannerBridge(
+        AcpBridgeBannerBridge(
           store: store,
           contentChrome: chrome,
           keyWindowObserver: nil,

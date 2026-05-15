@@ -1,9 +1,9 @@
 import SwiftUI
 
 // Route-aware label for the Cmd-F menu item. Four callers use this type today
-// (main window, workspace decision route, workspace non-decision route, and
-// the unified session-window search). When a fifth caller appears, widen the
-// enum here.
+// (dashboard window, workspace decision route, workspace non-decision route,
+// and the unified session-window search). When a fifth caller appears, widen
+// the enum here.
 public enum HarnessSidebarSearchMenuLabel: Sendable, Equatable {
   case findInSessions
   case findInDecisions
@@ -110,10 +110,6 @@ public final class HarnessSidebarVisibilityExpander {
 public struct HarnessSidebarVisibilityRequest: Equatable {
   public let expander: HarnessSidebarVisibilityExpander
 
-  // Equality by identity: two requests are the same iff they share the same
-  // expander object (i.e. the same window's expander). This lets @FocusedValue
-  // detect key-window switches even when both windows happen to have the same
-  // visible/collapsed state.
   public static func == (lhs: Self, rhs: Self) -> Bool {
     lhs.expander === rhs.expander
   }

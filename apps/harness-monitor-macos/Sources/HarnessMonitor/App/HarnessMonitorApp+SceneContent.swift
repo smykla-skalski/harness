@@ -45,9 +45,9 @@ extension HarnessMonitorApp {
     }
   }
 
-  @ViewBuilder var openRecentWindowSceneContent: some View {
+  @ViewBuilder var dashboardWindowSceneContent: some View {
     if rendersLiveSceneContent {
-      openRecentWindowContent
+      dashboardWindowContent
         .modifier(SessionWindowTabbing(isSessionWindow: false))
         .harnessTrackMCPWindow()
     } else {
@@ -72,8 +72,8 @@ extension HarnessMonitorApp {
     }
   }
 
-  @ViewBuilder private var openRecentWindowContent: some View {
-    HarnessMonitorOpenRecentWindowContent(
+  @ViewBuilder private var dashboardWindowContent: some View {
+    HarnessMonitorDashboardWindowContent(
       delegate: appDelegate,
       store: appStore,
       notifications: notificationController,

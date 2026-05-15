@@ -16,10 +16,10 @@ struct SessionWindowUnavailableView: View {
         Button {
           openRecents()
         } label: {
-          Label("Open Recents", systemImage: "clock.arrow.circlepath")
+          Label("Open Dashboard", systemImage: "clock.arrow.circlepath")
         }
         .keyboardShortcut("o", modifiers: [.command])
-        .help("Open recent sessions")
+        .help("Open the dashboard window")
 
         Button(role: .cancel) {
           closeWindow()

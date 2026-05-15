@@ -3,11 +3,8 @@ import HarnessMonitorKit
 import HarnessMonitorUIPreviewable
 import SwiftUI
 
-struct HarnessMonitorWindowRootView: View {
+struct DashboardWindowRootView: View {
   private static let minimumSize = CGSize(width: 900, height: 600)
-  private static let uiTestSurfaceKey = "HARNESS_MONITOR_UI_TEST_SURFACE"
-  private static let uiTestContentDashboardSurface = "content-dashboard"
-
   let delegate: HarnessMonitorAppDelegate
   let store: HarnessMonitorStore
   let notifications: HarnessMonitorUserNotificationController
@@ -23,25 +20,45 @@ struct HarnessMonitorWindowRootView: View {
   private var openWindow
   @State private var completedInitialBootstrap = false
   @State private var handledSettingsOpenRequestID = 0
+  @State private var hasRunPerfScenario = false
+  @State private var perfScenarioStatus: HarnessMonitorPerfScenarioStatus = .idle
+  @State private var perfScenarioFailureReason: String?
 
   private var shouldShowBootstrapPlaceholder: Bool {
-    defersInitialContentUntilBootstrap && !completedInitialBootstrap
+    defersInitialContentUntilBootstrap
+      && perfScenario == nil
+      && !completedInitialBootstrap
   }
 
   private var hostsSharedShellPresentation: Bool {
-    keyWindowObserver.isKey(windowID: HarnessMonitorWindowID.openRecent)
+    keyWindowObserver.isKey(windowID: HarnessMonitorWindowID.dashboard)
   }
 
-  private var showsContentDashboardForUITests: Bool {
-    HarnessMonitorUITestEnvironment.isEnabled
-      && ProcessInfo.processInfo.environment[Self.uiTestSurfaceKey]
-        == Self.uiTestContentDashboardSurface
+  private var shouldPublishPerfScenarioState: Bool {
+    HarnessMonitorUITestEnvironment.accessibilityMarkersEnabled
+  }
+
+  private var perfScenarioStateText: String? {
+    guard shouldPublishPerfScenarioState,
+      let perfScenario
+    else {
+      return nil
+    }
+    var fields = [
+      "scenario=\(perfScenario.rawValue)",
+      "status=\(perfScenarioStatus.rawValue)",
+    ]
+    fields.append(contentsOf: perfVisualSettingsStateFields())
+    if let perfScenarioFailureReason {
+      fields.append("reason=\(perfScenarioFailureReason)")
+    }
+    return fields.joined(separator: ", ")
   }
 
   private var contentReadiness: WindowContentReadiness {
     WindowContentReadiness(
       isReady: !shouldShowBootstrapPlaceholder,
-      stateLabel: shouldShowBootstrapPlaceholder ? "welcome-cache-deferred" : "ready",
+      stateLabel: shouldShowBootstrapPlaceholder ? "dashboard-cache-deferred" : "ready",
       placeholder: .clear,
       prepare: { await bootstrapDeferredContentIfNeeded() }
     )
@@ -49,10 +66,11 @@ struct HarnessMonitorWindowRootView: View {
 
   var body: some View {
     HarnessMonitorWindowShell(
-      windowID: HarnessMonitorWindowID.openRecent,
-      windowTitle: "Open Recent Session",
+      windowID: HarnessMonitorWindowID.dashboard,
+      windowTitle: "Dashboard",
       scope: .main,
       minimumSize: Self.minimumSize,
+      accessibilityIdentifier: HarnessMonitorAccessibility.dashboardWindowRoot,
       keyWindowObserver: keyWindowObserver,
       windowCommandRouting: windowCommandRouting,
       mcpWindowCommandRegistrar: mcpWindowCommandRegistrar,
@@ -82,8 +100,9 @@ struct HarnessMonitorWindowRootView: View {
       store: store,
       notifications: notifications,
       attentionState: acpAttentionState,
-      windowID: HarnessMonitorWindowID.openRecent
+      windowID: HarnessMonitorWindowID.dashboard
     )
+    .modifier(PerfScenarioStateMarker(text: perfScenarioStateText))
     .onChange(of: notifications.settingsOpenRequestID) { _, requestID in
       guard requestID != handledSettingsOpenRequestID else {
         return
@@ -95,18 +114,19 @@ struct HarnessMonitorWindowRootView: View {
   }
 
   @ViewBuilder private var liveContent: some View {
-    Group {
-      if showsContentDashboardForUITests {
-        ContentView(store: store, keyWindowObserver: keyWindowObserver)
-      } else {
-        OpenRecentView(store: store)
-      }
-    }
+    DashboardWindowView(
+      store: store,
+      dashboardUI: store.contentUI.dashboard,
+      sessionCatalog: store.sessionIndex.catalog
+    )
     .modifier(
       HarnessMonitorPerfScenarioModifier(
         delegate: delegate,
         store: store,
-        perfScenario: perfScenario
+        perfScenario: perfScenario,
+        hasRunPerfScenario: $hasRunPerfScenario,
+        perfScenarioStatus: $perfScenarioStatus,
+        perfScenarioFailureReason: $perfScenarioFailureReason
       )
     )
     .toolbar {}
@@ -118,6 +138,7 @@ struct HarnessMonitorWindowRootView: View {
       return
     }
     delegate.bind(store: store)
+    await store.bootstrapIfNeeded()
     await store.prepareOpenRecentSessions()
     completedInitialBootstrap = true
   }
@@ -135,67 +156,33 @@ private struct HarnessMonitorPerfScenarioModifier: ViewModifier {
   let delegate: HarnessMonitorAppDelegate
   let store: HarnessMonitorStore
   let perfScenario: HarnessMonitorPerfScenario?
+  @Binding var hasRunPerfScenario: Bool
+  @Binding var perfScenarioStatus: HarnessMonitorPerfScenarioStatus
+  @Binding var perfScenarioFailureReason: String?
   @Environment(\.openWindow)
   private var openWindow
-  @State private var hasRunPerfScenario = false
-  @State private var perfScenarioStatus: HarnessMonitorPerfScenarioStatus = .idle
-  @State private var perfScenarioFailureReason: String?
-  private var perfScenarioStateText: String? {
-    guard shouldPublishPerfScenarioState,
-      let perfScenario
-    else {
-      return nil
-    }
-    var fields = [
-      "scenario=\(perfScenario.rawValue)",
-      "status=\(perfScenarioStatus.rawValue)",
-    ]
-    fields.append(contentsOf: visualSettingsStateFields())
-    if let perfScenarioFailureReason {
-      fields.append("reason=\(perfScenarioFailureReason)")
-    }
-    return fields.joined(separator: ", ")
-  }
   private var shouldPublishPerfScenarioState: Bool {
     HarnessMonitorUITestEnvironment.accessibilityMarkersEnabled
   }
 
-  private func visualSettingsStateFields() -> [String] {
-    let defaults = UserDefaults.standard
-    let backdrop =
-      defaults.string(forKey: HarnessMonitorBackdropDefaults.modeKey)
-      ?? HarnessMonitorBackdropMode.none.rawValue
-    let shortcutOverlays = boolLabel(
-      defaults.bool(forKey: SessionWindowKeyboardShortcutOverlaySettings.storageKey)
-    )
-    let titleBlur = boolLabel(
-      defaults.bool(forKey: HarnessMonitorSessionTitleBlurDefaults.enabledKey)
-    )
-    let menuBarStateColors = boolLabel(
-      defaults.bool(forKey: HarnessMonitorMenuBarDefaults.stateColorVariantsEnabledKey)
-    )
-    return [
-      "backdrop=\(backdrop)",
-      "shortcutOverlays=\(shortcutOverlays)",
-      "titleBlur=\(titleBlur)",
-      "menuBarStateColors=\(menuBarStateColors)",
-    ]
-  }
-
-  private func boolLabel(_ value: Bool) -> String {
-    value ? "enabled" : "disabled"
-  }
-
   func body(content: Content) -> some View {
     content
-      .modifier(PerfScenarioStateMarker(text: perfScenarioStateText))
       .task {
         await runPerfScenarioIfNeeded()
       }
   }
   private func runPerfScenarioIfNeeded() async {
     delegate.bind(store: store)
+    HarnessMonitorUITestTrace.record(
+      component: "perf.scenario",
+      event: "task.start",
+      details: [
+        "scenario": perfScenario?.rawValue ?? "none",
+        "publishes_marker": shouldPublishPerfScenarioState ? "true" : "false",
+      ]
+    )
     guard let perfScenario else {
+      await store.bootstrapIfNeeded()
       await store.prepareOpenRecentSessions()
       return
     }
@@ -229,9 +216,19 @@ private struct HarnessMonitorPerfScenarioModifier: ViewModifier {
       return
     }
     perfScenarioStatus = status
+    if let perfScenario {
+      HarnessMonitorUITestTrace.record(
+        component: "perf.scenario",
+        event: "status",
+        details: [
+          "scenario": perfScenario.rawValue,
+          "status": status.rawValue,
+        ]
+      )
+    }
     if status == .running, let perfScenario {
       HarnessMonitorPerfLaunchMetricsRecorder.recordScenarioReady(
-        windowID: HarnessMonitorWindowID.openRecent,
+        windowID: HarnessMonitorWindowID.dashboard,
         stateLabel: status.rawValue,
         includesBootstrapInScenarioMeasurement: perfScenario.includesBootstrapInMeasurement
       )
@@ -250,6 +247,32 @@ private struct HarnessMonitorPerfScenarioModifier: ViewModifier {
       publishPerfScenarioStatus(.failed)
     }
   }
+}
+
+private func perfVisualSettingsStateFields() -> [String] {
+  let defaults = UserDefaults.standard
+  let backdrop =
+    defaults.string(forKey: HarnessMonitorBackdropDefaults.modeKey)
+    ?? HarnessMonitorBackdropMode.none.rawValue
+  let shortcutOverlays = perfBoolLabel(
+    defaults.bool(forKey: SessionWindowKeyboardShortcutOverlaySettings.storageKey)
+  )
+  let titleBlur = perfBoolLabel(
+    defaults.bool(forKey: HarnessMonitorSessionTitleBlurDefaults.enabledKey)
+  )
+  let menuBarStateColors = perfBoolLabel(
+    defaults.bool(forKey: HarnessMonitorMenuBarDefaults.stateColorVariantsEnabledKey)
+  )
+  return [
+    "backdrop=\(backdrop)",
+    "shortcutOverlays=\(shortcutOverlays)",
+    "titleBlur=\(titleBlur)",
+    "menuBarStateColors=\(menuBarStateColors)",
+  ]
+}
+
+private func perfBoolLabel(_ value: Bool) -> String {
+  value ? "enabled" : "disabled"
 }
 
 private struct PerfScenarioStateMarker: ViewModifier {

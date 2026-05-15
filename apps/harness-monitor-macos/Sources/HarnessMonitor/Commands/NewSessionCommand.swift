@@ -19,7 +19,7 @@ struct NewSessionCommand: Commands {
   private var trackedKeyWindowIdentifier: String? {
     let keyWindowIdentifier = keyWindowObserver.snapshot.keyWindowIdentifier
     guard
-      keyWindowIdentifier == HarnessMonitorWindowID.openRecent
+      keyWindowIdentifier == HarnessMonitorWindowID.dashboard
         || keyWindowIdentifier?.hasPrefix("session-") == true
     else {
       return nil

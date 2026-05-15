@@ -21,10 +21,10 @@ struct PolicyCanvasInteractiveEdge: View {
   let accessibilityKindWord: String
   /// Plain-English name for the static dash pattern, surfaced to sighted
   /// users in the hover tooltip and to AT users in the legend swatch
-  /// `accessibilityLabel`. Drawn from `PolicyCanvasEdgeKind.dashKey` at the
+  /// `accessibilityLabel`. Drawn from `PolicyCanvasEdgeKind.dashDescription` at the
   /// call site so the legend and the tooltip share one vocabulary instead
   /// of three.
-  let accessibilityDashKey: String
+  let accessibilityDashDescription: String
   /// Static dash pattern bound to the edge kind. Empty for `.flow` (solid
   /// stroke); wider gaps for `.control` (occasional condition); tighter
   /// dashes for `.error` (urgent). When `isAnimated && !reducedMotion`,
@@ -70,7 +70,7 @@ struct PolicyCanvasInteractiveEdge: View {
     isSelected: Bool,
     accessibilityLabel: String,
     accessibilityKindWord: String,
-    accessibilityDashKey: String = "solid",
+    accessibilityDashDescription: String = "solid",
     kindDashPattern: [CGFloat] = [],
     isAnimated: Bool = false,
     canvasZoom: CGFloat = 1,
@@ -86,7 +86,7 @@ struct PolicyCanvasInteractiveEdge: View {
     self.isSelected = isSelected
     self.accessibilityLabel = accessibilityLabel
     self.accessibilityKindWord = accessibilityKindWord
-    self.accessibilityDashKey = accessibilityDashKey
+    self.accessibilityDashDescription = accessibilityDashDescription
     self.kindDashPattern = kindDashPattern
     self.isAnimated = isAnimated
     self.canvasZoom = canvasZoom
@@ -132,12 +132,12 @@ struct PolicyCanvasInteractiveEdge: View {
   /// users hovering an edge see what VoiceOver hears AND can decode the
   /// stroke style without a legend lookup. Shape is
   /// `<source-to-target> (<kind>, <dash-key>)`. The dash key is passed in
-  /// from `PolicyCanvasEdgeKind.dashKey` at the call site so the tooltip,
+  /// from `PolicyCanvasEdgeKind.dashDescription` at the call site so the tooltip,
   /// the legend swatch label, and the legend row's a11y label all draw
   /// from the same vocabulary. Without that single source, the previous
   /// release shipped three different words for the same stroke pattern.
   private var hoverHelpString: String {
-    "\(accessibilityLabel) (\(accessibilityKindWord), \(accessibilityDashKey))"
+    "\(accessibilityLabel) (\(accessibilityKindWord), \(accessibilityDashDescription))"
   }
 
   /// VoiceOver value combining the kind word with an "active" suffix when
@@ -244,17 +244,18 @@ enum PolicyCanvasEdgeAnimation {
   }
 
   /// Resolve the in-route dash velocity that produces a clamped apparent
-  /// on-screen velocity. The function is the identity (returns
-  /// `baseVelocityPointsPerSecond`) while the unclamped apparent velocity
-  /// `baseVelocityPointsPerSecond * canvasZoom` is below the
+  /// on-screen velocity. The function is constant at
+  /// `baseVelocityPointsPerSecond` while the unclamped apparent velocity
+  /// `baseVelocityPointsPerSecond * canvasZoom` stays under the
   /// `maxApparentVelocityPointsPerSecond` cap - that holds for every zoom
   /// `<= 2.0` because base is 12pt/sec and the cap is 24pt/sec. Above
   /// zoom 2, the apparent velocity is clamped to 24pt/sec and the
   /// returned in-route velocity scales *down* as zoom climbs so the
   /// on-screen march stays at the cap. Below zoom 1 the function is also
-  /// the identity: apparent velocity falls below 12pt/sec linearly, which
-  /// is the intended slow-down at far zoom (no vestibular cost). The low
-  /// `0.01` clamp keeps the division well-defined at extreme far-zoom.
+  /// constant at base: apparent velocity falls below 12pt/sec linearly,
+  /// which is the intended slow-down at far zoom (no vestibular cost).
+  /// The low `0.01` clamp keeps the division well-defined at extreme
+  /// far-zoom.
   static func effectiveVelocity(canvasZoom: CGFloat) -> CGFloat {
     let zoom = max(0.01, canvasZoom)
     let apparent = min(baseVelocityPointsPerSecond * zoom, maxApparentVelocityPointsPerSecond)

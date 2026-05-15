@@ -3,12 +3,12 @@ import HarnessMonitorUIPreviewable
 import SwiftUI
 
 extension HarnessMonitorApp {
-  var openRecentWindowScene: some Scene {
+  var dashboardWindowScene: some Scene {
     Window(
-      "Open Recent Session",
-      id: HarnessMonitorWindowID.openRecent
+      "Dashboard",
+      id: HarnessMonitorWindowID.dashboard
     ) {
-      openRecentWindowSceneContent
+      dashboardWindowSceneContent
     }
     .windowToolbarStyle(.unified)
     .defaultSize(width: mainWindowDefaultSize.width, height: mainWindowDefaultSize.height)

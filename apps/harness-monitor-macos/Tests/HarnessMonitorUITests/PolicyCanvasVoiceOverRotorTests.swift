@@ -71,8 +71,13 @@ final class PolicyCanvasVoiceOverRotorTests: HarnessMonitorUITestCase {
 
       let label = edgeElement.label
       XCTAssertTrue(
-        label.contains("Edge \(seed.label)"),
-        "Edge \(seed.id) label '\(label)' should include 'Edge \(seed.label)'."
+        label.hasPrefix("\(seed.label) edge"),
+        """
+        Edge \(seed.id) label '\(label)' should front-load the user payload \
+        and trail with the noun "edge" ("\(seed.label) edge, from ..."). \
+        The previous shape "Edge \(seed.label), ..." led with the role word \
+        and made rotor scanning slower.
+        """
       )
       XCTAssertTrue(
         label.contains(seed.source) && label.contains(seed.target),
@@ -93,7 +98,7 @@ final class PolicyCanvasVoiceOverRotorTests: HarnessMonitorUITestCase {
     let validKindWords: Set<String> = ["flow", "control", "error"]
 
     for seed in Self.seededEdges {
-      let labelPrefix = "Edge \(seed.label),"
+      let labelPrefix = "\(seed.label) edge,"
       let predicate = NSPredicate(
         format: "label BEGINSWITH %@",
         labelPrefix
@@ -137,7 +142,7 @@ final class PolicyCanvasVoiceOverRotorTests: HarnessMonitorUITestCase {
     XCTAssertTrue(root.waitForExistence(timeout: Self.actionTimeout))
 
     var seenOrder: [String] = []
-    let labelOnlyPredicate = NSPredicate(format: "label BEGINSWITH 'Edge '")
+    let labelOnlyPredicate = NSPredicate(format: "label CONTAINS ' edge,'")
     let labelButtons = root.descendants(matching: .button)
       .matching(labelOnlyPredicate)
 
