@@ -36,6 +36,7 @@ pub mod protocol;
 pub mod service;
 pub mod snapshot;
 pub mod state;
+pub(crate) mod task_board_managed_agents;
 pub mod timeline;
 pub mod transport;
 pub mod voice;

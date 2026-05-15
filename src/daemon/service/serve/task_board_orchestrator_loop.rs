@@ -1,31 +1,29 @@
 use std::future::Future;
-use std::sync::Arc;
 use std::time::Duration;
 
 use tokio::sync::watch as tokio_watch;
 use tokio::task::JoinHandle;
 use tokio::time::{MissedTickBehavior, interval};
 
-use crate::daemon::db::AsyncDaemonDb;
-use crate::daemon::service::run_task_board_orchestrator_once_async;
+use crate::daemon::http::{DaemonHttpState, task_board_route_executor};
 use crate::daemon::service::task_board_orchestrator_status;
 use crate::errors::CliError;
 use crate::task_board::{TaskBoardOrchestratorRunOnceRequest, TaskBoardOrchestratorStatus};
 
 pub(super) fn spawn_task_board_orchestrator_loop(
-    async_db: Arc<AsyncDaemonDb>,
+    state: DaemonHttpState,
     tick_interval: Duration,
     shutdown_rx: tokio_watch::Receiver<bool>,
 ) -> JoinHandle<()> {
     tokio::spawn(run_task_board_orchestrator_loop(
-        async_db,
+        state,
         tick_interval,
         shutdown_rx,
     ))
 }
 
 async fn run_task_board_orchestrator_loop(
-    async_db: Arc<AsyncDaemonDb>,
+    state: DaemonHttpState,
     tick_interval: Duration,
     mut shutdown_rx: tokio_watch::Receiver<bool>,
 ) {
@@ -34,7 +32,7 @@ async fn run_task_board_orchestrator_loop(
     loop {
         tokio::select! {
             () = wait_for_shutdown(&mut shutdown_rx) => break,
-            _ = ticker.tick() => run_logged_tick(&async_db).await,
+            _ = ticker.tick() => run_logged_tick(&state).await,
         }
     }
 }
@@ -50,10 +48,10 @@ async fn wait_for_shutdown(shutdown_rx: &mut tokio_watch::Receiver<bool>) {
     }
 }
 
-async fn run_logged_tick(async_db: &AsyncDaemonDb) {
+async fn run_logged_tick(state: &DaemonHttpState) {
     let request = TaskBoardOrchestratorRunOnceRequest::default();
     match drive_task_board_orchestrator_once(task_board_orchestrator_status, || {
-        run_task_board_orchestrator_once_async(&request, async_db)
+        task_board_route_executor::run_once(state, request)
     })
     .await
     {
