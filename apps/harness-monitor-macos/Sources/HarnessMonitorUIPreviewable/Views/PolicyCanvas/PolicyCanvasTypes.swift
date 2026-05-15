@@ -263,6 +263,13 @@ struct PolicyCanvasEdge: Identifiable, Hashable {
   /// overridden at the model boundary if the daemon ever surfaces an
   /// explicit kind field.
   var kind: PolicyCanvasEdgeKind
+  /// When `true`, the stroke renders an animated dashed phase to suggest
+  /// flow direction. Gated on reduce-motion at the render layer so the
+  /// animation collapses to a static dashed stroke when the user has
+  /// reduce-motion enabled. Defaults to `false`; the live runtime
+  /// visualization layer wires this on per its own signal (deferred -
+  /// daemon does not emit a "live edge" event today).
+  var isAnimated: Bool
 
   init(
     id: String,
@@ -271,7 +278,8 @@ struct PolicyCanvasEdge: Identifiable, Hashable {
     label: String,
     condition: String = "always",
     pinnedPortSide: Bool = true,
-    kind: PolicyCanvasEdgeKind? = nil
+    kind: PolicyCanvasEdgeKind? = nil,
+    isAnimated: Bool = false
   ) {
     self.id = id
     self.source = source
@@ -280,6 +288,7 @@ struct PolicyCanvasEdge: Identifiable, Hashable {
     self.condition = condition
     self.pinnedPortSide = pinnedPortSide
     self.kind = kind ?? PolicyCanvasEdgeKind.derive(from: condition)
+    self.isAnimated = isAnimated
   }
 }
 
