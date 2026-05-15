@@ -114,12 +114,12 @@ extension PolicyCanvasViewModel {
       width: toOrigin.x - groupOriginAtStart.origin.x,
       height: toOrigin.y - groupOriginAtStart.origin.y
     )
-    let memberDestinations: [String: CGPoint] = memberOriginsAtStart.reduce(into: [:]) {
-      partial, entry in
-      partial[entry.key] = snapped(
-        CGPoint(x: entry.value.x + delta.width, y: entry.value.y + delta.height)
-      )
-    }
+    let memberDestinations: [String: CGPoint] =
+      memberOriginsAtStart.reduce(into: [:]) { partial, entry in
+        partial[entry.key] = snapped(
+          CGPoint(x: entry.value.x + delta.width, y: entry.value.y + delta.height)
+        )
+      }
     groups[index].frame.origin = groupOriginAtStart.origin
     for nodeIndex in nodes.indices where nodes[nodeIndex].groupID == groupID {
       if let origin = memberOriginsAtStart[nodes[nodeIndex].id] {

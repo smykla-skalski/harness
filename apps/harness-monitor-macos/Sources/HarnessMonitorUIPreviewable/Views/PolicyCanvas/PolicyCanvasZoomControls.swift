@@ -15,8 +15,10 @@ import SwiftUI
 /// per-frame magnification stays gesture-fresh.
 struct PolicyCanvasZoomControls: View {
   let viewModel: PolicyCanvasViewModel
-  @Environment(\.policyCanvasReducedMotion) private var canvasReducedMotion
-  @Environment(\.accessibilityReduceMotion) private var systemReduceMotion
+  @Environment(\.policyCanvasReducedMotion)
+  private var canvasReducedMotion
+  @Environment(\.accessibilityReduceMotion)
+  private var systemReduceMotion
 
   private var reducedMotion: Bool {
     canvasReducedMotion ?? systemReduceMotion

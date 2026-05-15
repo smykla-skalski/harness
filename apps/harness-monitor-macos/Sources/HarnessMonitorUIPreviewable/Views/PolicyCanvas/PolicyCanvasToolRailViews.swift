@@ -7,7 +7,8 @@ import SwiftUI
 /// unchanged.
 struct PolicyCanvasToolRail: View {
   let viewModel: PolicyCanvasViewModel
-  @Environment(\.fontScale) private var fontScale
+  @Environment(\.fontScale)
+  private var fontScale
 
   var body: some View {
     let metrics = PolicyCanvasToolRailMetrics(fontScale: fontScale)

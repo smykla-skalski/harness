@@ -152,7 +152,10 @@ public struct SettingsTaskBoardSection: View {
         .harnessNativeFormSectionHeader()
     } footer: {
       Text(
-        "List repositories to import issues assigned to you and pull requests requesting your review into Needs You. This does not change the automation repository above."
+        """
+        List repositories to import issues assigned to you and pull requests requesting your \
+        review into Needs You. This does not change the automation repository above.
+        """
       )
     }
   }

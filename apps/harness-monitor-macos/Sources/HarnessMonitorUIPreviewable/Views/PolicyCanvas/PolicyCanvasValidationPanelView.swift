@@ -1,6 +1,8 @@
 import HarnessMonitorKit
 import SwiftUI
 
+typealias PolicyCanvasIssueFocusAction = @MainActor (PolicyCanvasResolvedIssue) -> Void
+
 /// Fold-out validation panel rendered under the canvas top bar. Lists every
 /// resolved issue (daemon + local) with a severity icon, code, message, and a
 /// focus button that selects the offending component. Stays collapsed by
@@ -8,7 +10,7 @@ import SwiftUI
 /// the user can see at a glance whether the graph is clean.
 struct PolicyCanvasValidationPanel: View {
   let viewModel: PolicyCanvasViewModel
-  let focus: @MainActor (PolicyCanvasResolvedIssue) -> Void
+  let focus: PolicyCanvasIssueFocusAction
   @State private var isExpanded: Bool = false
 
   var body: some View {
@@ -30,8 +32,7 @@ struct PolicyCanvasValidationPanel: View {
     .accessibilityIdentifier(HarnessMonitorAccessibility.policyCanvasValidationPanel)
   }
 
-  @ViewBuilder
-  private var content: some View {
+  @ViewBuilder private var content: some View {
     let issues = viewModel.allValidationIssues
     if issues.isEmpty {
       Text("No validation issues detected")
