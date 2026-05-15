@@ -8,7 +8,7 @@ use crate::infra::io::{read_json_typed, write_json_pretty};
 use crate::task_board::{
     TaskBoardGitHubRepositoryToken, TaskBoardGitHubTokensSyncRequest,
     TaskBoardGitHubTokensSyncResponse, TaskBoardGitRuntimeConfig, TaskBoardGitRuntimeProfile,
-    normalize_repository_slug,
+    TaskBoardTodoistTokenSyncRequest, TaskBoardTodoistTokenSyncResponse, normalize_repository_slug,
 };
 
 use super::{append_event_best_effort, config_path, ensure_daemon_dirs};
@@ -17,6 +17,8 @@ pub const VALID_LOG_LEVELS: &[&str] = &["trace", "debug", "info", "warn", "error
 
 static TASK_BOARD_GITHUB_TOKENS: LazyLock<RwLock<TaskBoardGitHubTokenState>> =
     LazyLock::new(|| RwLock::new(TaskBoardGitHubTokenState::default()));
+static TASK_BOARD_TODOIST_TOKEN: LazyLock<RwLock<Option<String>>> =
+    LazyLock::new(|| RwLock::new(None));
 static TASK_BOARD_GIT_RUNTIME_SECRETS: LazyLock<RwLock<TaskBoardGitRuntimeConfig>> =
     LazyLock::new(|| RwLock::new(TaskBoardGitRuntimeConfig::default()));
 
@@ -177,6 +179,33 @@ pub fn task_board_github_repository_token(repository: &str) -> Option<String> {
         .expect("task-board github token state lock poisoned");
     normalize_repository_slug(Some(repository))
         .and_then(|repository| state.repository_tokens.get(&repository).cloned())
+}
+
+/// Replace the daemon's in-memory Todoist token snapshot.
+///
+/// # Panics
+/// Panics when the in-memory token state lock is poisoned.
+#[must_use]
+pub fn replace_task_board_todoist_token(
+    request: &TaskBoardTodoistTokenSyncRequest,
+) -> TaskBoardTodoistTokenSyncResponse {
+    let mut state = TASK_BOARD_TODOIST_TOKEN
+        .write()
+        .expect("task-board todoist token state lock poisoned");
+    *state = normalize_optional_value(request.token.as_deref());
+    TaskBoardTodoistTokenSyncResponse {
+        token_configured: state.is_some(),
+    }
+}
+
+/// # Panics
+/// Panics when the in-memory token state lock is poisoned.
+#[must_use]
+pub fn task_board_todoist_token() -> Option<String> {
+    TASK_BOARD_TODOIST_TOKEN
+        .read()
+        .expect("task-board todoist token state lock poisoned")
+        .clone()
 }
 
 /// Normalize and validate a daemon log level.

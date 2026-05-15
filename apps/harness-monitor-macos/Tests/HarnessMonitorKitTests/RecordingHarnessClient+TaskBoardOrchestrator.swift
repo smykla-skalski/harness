@@ -156,6 +156,13 @@ extension RecordingHarnessClient {
     )
   }
 
+  func syncTaskBoardTodoistToken(
+    request: TaskBoardTodoistTokenSyncRequest
+  ) async throws -> TaskBoardTodoistTokenSyncResponse {
+    calls.append(.syncTaskBoardTodoistToken(tokenConfigured: request.token != nil))
+    return TaskBoardTodoistTokenSyncResponse(tokenConfigured: request.token != nil)
+  }
+
   private func sampleTaskBoardOrchestratorStatus(
     enabled: Bool = true,
     running: Bool = false

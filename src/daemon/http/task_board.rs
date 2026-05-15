@@ -10,7 +10,7 @@ use crate::daemon::protocol::{
     TaskBoardGitHubTokensSyncRequest, TaskBoardGitRuntimeConfig,
     TaskBoardOrchestratorRunOnceRequest, TaskBoardOrchestratorSettingsUpdateRequest,
     TaskBoardPolicyPipelinePromoteRequest, TaskBoardPolicyPipelineSaveDraftRequest,
-    TaskBoardPolicyPipelineSimulateRequest, http_paths,
+    TaskBoardPolicyPipelineSimulateRequest, TaskBoardTodoistTokenSyncRequest, http_paths,
 };
 use crate::daemon::service;
 use crate::session::types::CONTROL_PLANE_ACTOR_ID;
@@ -96,6 +96,10 @@ pub(super) fn task_board_routes() -> Router<DaemonHttpState> {
         .route(
             http_paths::TASK_BOARD_ORCHESTRATOR_GITHUB_TOKENS,
             put(put_task_board_orchestrator_github_tokens),
+        )
+        .route(
+            http_paths::TASK_BOARD_ORCHESTRATOR_TODOIST_TOKEN,
+            put(put_task_board_orchestrator_todoist_token),
         )
         .route(
             http_paths::TASK_BOARD_POLICY_PIPELINE,
@@ -244,6 +248,21 @@ async fn put_task_board_orchestrator_github_tokens(
         &request_id,
         start,
         service::sync_task_board_github_tokens(&request),
+    )
+}
+
+async fn put_task_board_orchestrator_todoist_token(
+    headers: HeaderMap,
+    State(state): State<DaemonHttpState>,
+    Json(request): Json<TaskBoardTodoistTokenSyncRequest>,
+) -> Response {
+    let (start, request_id) = authenticated_request!(headers, state);
+    timed_json(
+        "PUT",
+        http_paths::TASK_BOARD_ORCHESTRATOR_TODOIST_TOKEN,
+        &request_id,
+        start,
+        Ok::<_, crate::errors::CliError>(service::sync_task_board_todoist_token(&request)),
     )
 }
 

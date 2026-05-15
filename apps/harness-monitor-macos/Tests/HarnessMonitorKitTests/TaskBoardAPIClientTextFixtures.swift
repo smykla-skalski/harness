@@ -167,6 +167,13 @@ let sampleGitHubTokensSyncText =
   }
   """
 
+let sampleTodoistTokenSyncText =
+  """
+  {
+    "token_configured": true
+  }
+  """
+
 let sampleOrchestratorStatusText =
   """
   {

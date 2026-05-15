@@ -123,6 +123,14 @@ async fn run_task_board_orchestrator_parity() {
         }),
     )
     .await;
+    assert_http_ws_put_match(
+        &client,
+        &base_url,
+        http_paths::TASK_BOARD_ORCHESTRATOR_TODOIST_TOKEN,
+        ws_methods::TASK_BOARD_ORCHESTRATOR_TODOIST_TOKEN_SYNC,
+        json!({ "token": "todoist-token" }),
+    )
+    .await;
     assert_http_ws_post_match(
         &client,
         &base_url,

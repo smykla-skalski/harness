@@ -2,18 +2,21 @@ import Foundation
 
 extension HarnessMonitorStore {
   private static let taskBoardGitHubCredentialStore = TaskBoardGitHubCredentialStore()
+  private static let taskBoardTodoistCredentialStore = TaskBoardTodoistCredentialStore()
 
   public func taskBoardGitSettingsSnapshot() async throws -> TaskBoardGitSettingsSnapshot {
     let client = try await taskBoardSettingsClient()
 
     async let orchestratorSettings = client.taskBoardOrchestratorSettings()
     async let runtimeConfig = client.taskBoardGitRuntimeConfig()
-    let credentials = try Self.taskBoardGitHubCredentialStore.load()
+    let githubCredentials = try Self.taskBoardGitHubCredentialStore.load()
+    let todoistCredentials = try Self.taskBoardTodoistCredentialStore.load()
 
     return try await TaskBoardGitSettingsSnapshot(
       orchestratorSettings: orchestratorSettings,
       runtimeConfig: runtimeConfig,
-      credentials: credentials
+      githubCredentials: githubCredentials,
+      todoistCredentials: todoistCredentials
     )
   }
 
@@ -48,9 +51,13 @@ extension HarnessMonitorStore {
 
       let orchestratorSettings = try await updatedOrchestrator
       _ = try await updatedRuntime
-      try Self.taskBoardGitHubCredentialStore.save(materializedSnapshot.credentials)
+      try Self.taskBoardGitHubCredentialStore.save(materializedSnapshot.githubCredentials)
+      try Self.taskBoardTodoistCredentialStore.save(materializedSnapshot.todoistCredentials)
       _ = try await client.syncTaskBoardGitHubTokens(
-        request: materializedSnapshot.credentials.syncRequest
+        request: materializedSnapshot.githubCredentials.syncRequest
+      )
+      _ = try await client.syncTaskBoardTodoistToken(
+        request: materializedSnapshot.todoistCredentials.syncRequest
       )
 
       if let status = globalTaskBoardOrchestratorStatus {
@@ -90,10 +97,12 @@ extension HarnessMonitorStore {
     return bootstrappedClient
   }
 
-  func syncStoredTaskBoardGitHubCredentials(using client: any HarnessMonitorClientProtocol) async {
+  func syncStoredTaskBoardCredentials(using client: any HarnessMonitorClientProtocol) async {
     do {
-      let credentials = try Self.taskBoardGitHubCredentialStore.load()
-      _ = try await client.syncTaskBoardGitHubTokens(request: credentials.syncRequest)
+      let githubCredentials = try Self.taskBoardGitHubCredentialStore.load()
+      let todoistCredentials = try Self.taskBoardTodoistCredentialStore.load()
+      _ = try await client.syncTaskBoardGitHubTokens(request: githubCredentials.syncRequest)
+      _ = try await client.syncTaskBoardTodoistToken(request: todoistCredentials.syncRequest)
     } catch {
       let description = RefreshSnapshotErrorFormatting.describeUnderlying(error)
       HarnessMonitorLogger.store.error(
@@ -125,7 +134,8 @@ extension HarnessMonitorStore {
         snapshot.orchestratorSettings
       ),
       runtimeConfig: try await materializeTaskBoardGitRuntimeConfig(snapshot.runtimeConfig),
-      credentials: snapshot.credentials
+      githubCredentials: snapshot.githubCredentials,
+      todoistCredentials: snapshot.todoistCredentials
     )
   }
 

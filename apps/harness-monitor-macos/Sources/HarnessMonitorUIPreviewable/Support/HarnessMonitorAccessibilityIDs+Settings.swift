@@ -18,6 +18,8 @@ extension HarnessMonitorAccessibility {
   public static let settingsTaskBoardGPGPassphraseField =
     "harness.settings.task-board.gpg-private-key-passphrase"
   public static let settingsTaskBoardGlobalTokenField = "harness.settings.task-board.global-token"
+  public static let settingsTaskBoardTodoistTokenField =
+    "harness.settings.task-board.todoist-token"
   public static let settingsTaskBoardAddOverrideButton = "harness.settings.task-board.override.add"
 
   public static func settingsSectionButton(_ key: String) -> String {

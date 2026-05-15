@@ -179,6 +179,7 @@ final class RecordingHarnessClient: HarnessMonitorClientProtocol, @unchecked Sen
       globalTokenConfigured: Bool,
       repositoryTokenCount: Int
     )
+    case syncTaskBoardTodoistToken(tokenConfigured: Bool)
     case syncTaskBoard(
       direction: TaskBoardExternalSyncDirection,
       dryRun: Bool,

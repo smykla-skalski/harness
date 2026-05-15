@@ -245,6 +245,10 @@ struct WebSocketProtocolTests {
         == "task_board.orchestrator_github_tokens_sync"
     )
     #expect(
+      WebSocketRPCMethod.taskBoardOrchestratorTodoistTokenSync.rawValue
+        == "task_board.orchestrator_todoist_token_sync"
+    )
+    #expect(
       WebSocketRPCMethod.taskBoardPolicyPipelineGet.rawValue
         == "task_board.policy_pipeline_get"
     )

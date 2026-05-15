@@ -42,4 +42,11 @@ extension PreviewHarnessClientState {
       repositoryTokenCount: request.repositoryTokens.filter { !$0.token.isEmpty }.count
     )
   }
+
+  func syncTaskBoardTodoistToken(
+    _ request: TaskBoardTodoistTokenSyncRequest
+  ) -> TaskBoardTodoistTokenSyncResponse {
+    taskBoardTodoistToken = request
+    return TaskBoardTodoistTokenSyncResponse(tokenConfigured: request.token?.isEmpty == false)
+  }
 }

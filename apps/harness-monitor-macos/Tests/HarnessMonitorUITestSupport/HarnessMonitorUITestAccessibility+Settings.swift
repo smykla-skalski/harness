@@ -46,6 +46,7 @@ extension HarnessMonitorUITestAccessibility {
   static let settingsTaskBoardOwnerField = "harness.settings.task-board.owner"
   static let settingsTaskBoardRepoField = "harness.settings.task-board.repo"
   static let settingsTaskBoardGlobalTokenField = "harness.settings.task-board.global-token"
+  static let settingsTaskBoardTodoistTokenField = "harness.settings.task-board.todoist-token"
   static let settingsTaskBoardAddOverrideButton = "harness.settings.task-board.override.add"
   static let settingsMCPSection = "harness.settings.mcp"
   static let settingsMCPRegistryHostToggle = "harness.settings.mcp.registry-host"

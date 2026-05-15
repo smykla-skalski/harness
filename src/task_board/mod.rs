@@ -63,7 +63,7 @@ pub use runtime_config::{
     TaskBoardGitHubRepositoryToken, TaskBoardGitHubTokensSyncRequest,
     TaskBoardGitHubTokensSyncResponse, TaskBoardGitRepositoryOverride, TaskBoardGitRuntimeConfig,
     TaskBoardGitRuntimeProfile, TaskBoardGitSigningConfig, TaskBoardGitSigningMode,
-    normalize_repository_slug,
+    TaskBoardTodoistTokenSyncRequest, TaskBoardTodoistTokenSyncResponse, normalize_repository_slug,
 };
 pub use store::{TaskBoardStore, default_board_root};
 pub use summary::{

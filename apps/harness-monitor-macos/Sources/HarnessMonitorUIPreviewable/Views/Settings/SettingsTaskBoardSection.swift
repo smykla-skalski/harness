@@ -212,6 +212,8 @@ public struct SettingsTaskBoardSection: View {
     Section {
       SecureField("GitHub Token", text: $draft.globalToken)
         .accessibilityIdentifier(HarnessMonitorAccessibility.settingsTaskBoardGlobalTokenField)
+      SecureField("Todoist Token", text: $draft.todoistToken)
+        .accessibilityIdentifier(HarnessMonitorAccessibility.settingsTaskBoardTodoistTokenField)
     } header: {
       Text("Credentials")
         .harnessNativeFormSectionHeader()

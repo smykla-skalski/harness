@@ -16,6 +16,7 @@ actor PreviewHarnessClientState {
   var taskBoardOrchestratorSettings: TaskBoardOrchestratorSettings
   var taskBoardGitRuntimeConfig: TaskBoardGitRuntimeConfig
   var taskBoardGitHubTokens: TaskBoardGitHubTokensSyncRequest
+  var taskBoardTodoistToken: TaskBoardTodoistTokenSyncRequest
   var nextAgentTuiSequence: Int
   var nextCodexRunSequence: Int
   var nextAcpAgentSequence: Int
@@ -47,6 +48,7 @@ actor PreviewHarnessClientState {
       globalToken: nil,
       repositoryTokens: []
     )
+    self.taskBoardTodoistToken = TaskBoardTodoistTokenSyncRequest(token: nil)
     self.nextAgentTuiSequence = max(
       fixtures.agentTuisBySessionID.values.flatMap(\.self).count,
       0

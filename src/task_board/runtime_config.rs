@@ -213,6 +213,17 @@ pub struct TaskBoardGitHubTokensSyncResponse {
     pub repository_token_count: usize,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
+pub struct TaskBoardTodoistTokenSyncRequest {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub token: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TaskBoardTodoistTokenSyncResponse {
+    pub token_configured: bool,
+}
+
 #[must_use]
 pub fn normalize_repository_slug(repository: Option<&str>) -> Option<String> {
     let repository = normalize_optional_value(repository)?;

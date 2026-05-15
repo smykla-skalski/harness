@@ -27,6 +27,7 @@ struct TaskBoardGitSettingsDraft: Equatable {
   var gpgPrivateKeyPath = ""
   var gpgPrivateKeyPassphrase = ""
   var globalToken = ""
+  var todoistToken = ""
   var repositoryOverrides: [TaskBoardRepositoryOverrideDraft] = []
   var policyVersion = ""
 
@@ -61,11 +62,14 @@ struct TaskBoardGitSettingsDraft: Equatable {
     gpgKeyId = runtime.global.signing.gpgKeyId ?? ""
     gpgPrivateKeyPath = runtime.global.signing.gpgPrivateKeyPath ?? ""
     gpgPrivateKeyPassphrase = runtime.global.signing.gpgPrivateKeyPassphrase ?? ""
-    globalToken = snapshot.credentials.globalToken ?? ""
+    globalToken = snapshot.githubCredentials.globalToken ?? ""
+    todoistToken = snapshot.todoistCredentials.token ?? ""
     policyVersion = orchestrator.policyVersion
 
     let tokensByRepository = Dictionary(
-      uniqueKeysWithValues: snapshot.credentials.repositoryTokens.map { ($0.repository, $0.token) }
+      uniqueKeysWithValues: snapshot.githubCredentials.repositoryTokens.map {
+        ($0.repository, $0.token)
+      }
     )
     repositoryOverrides = runtime.repositoryOverrides.map { override in
       TaskBoardRepositoryOverrideDraft(
@@ -83,7 +87,7 @@ struct TaskBoardGitSettingsDraft: Equatable {
     }
 
     let runtimeRepositories = Set(runtime.repositoryOverrides.map(\.repository))
-    let tokenOnlyOverrides = snapshot.credentials.repositoryTokens
+    let tokenOnlyOverrides = snapshot.githubCredentials.repositoryTokens
       .filter { !runtimeRepositories.contains($0.repository) }
       .map { token in
         TaskBoardRepositoryOverrideDraft(
@@ -141,9 +145,12 @@ struct TaskBoardGitSettingsDraft: Equatable {
         ),
         repositoryOverrides: repositoryOverrides
       ),
-      credentials: TaskBoardGitHubCredentialSnapshot(
+      githubCredentials: TaskBoardGitHubCredentialSnapshot(
         globalToken: normalized(globalToken),
         repositoryTokens: repositoryTokens
+      ),
+      todoistCredentials: TaskBoardTodoistCredentialSnapshot(
+        token: normalized(todoistToken)
       )
     )
   }

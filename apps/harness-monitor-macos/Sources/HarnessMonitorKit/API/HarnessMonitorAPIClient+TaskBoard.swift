@@ -121,6 +121,12 @@ extension HarnessMonitorAPIClient {
     try await put("/v1/task-board/orchestrator/github-tokens", body: request)
   }
 
+  public func syncTaskBoardTodoistToken(
+    request: TaskBoardTodoistTokenSyncRequest
+  ) async throws -> TaskBoardTodoistTokenSyncResponse {
+    try await put("/v1/task-board/orchestrator/todoist-token", body: request)
+  }
+
   public func taskBoardPolicyPipeline() async throws -> TaskBoardPolicyPipelineDocument {
     try await get("/v1/task-board/policy/pipeline")
   }
