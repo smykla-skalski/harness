@@ -1,3 +1,5 @@
+use tracing::warn;
+
 use crate::agents::runtime::runtime_for_name;
 use crate::daemon::db::{AsyncDaemonDb, DaemonDb};
 use crate::daemon::index::ResolvedSession;
@@ -10,10 +12,10 @@ use crate::session::storage as session_storage;
 use crate::session::types::{SessionSignalRecord, TaskStatus, WorkItem};
 use crate::task_board::store::TaskBoardItemPatch;
 use crate::task_board::{
-    TaskBoardEvaluationOutcome, TaskBoardEvaluationRecord, TaskBoardEvaluationSummary,
-    TaskBoardItem, TaskBoardStatus, TaskBoardStore, default_board_root, evaluate_task_board_item,
-    failed_workflow, missing_session_record, missing_task_record, record_from_decision,
-    skipped_unlinked_record,
+    EvaluationSignalFailure, TaskBoardEvaluationOutcome, TaskBoardEvaluationRecord,
+    TaskBoardEvaluationSummary, TaskBoardItem, TaskBoardStatus, TaskBoardStore, default_board_root,
+    evaluate_task_board_item, failed_workflow, missing_session_record, missing_task_record,
+    record_from_decision, skipped_unlinked_record,
 };
 use crate::workspace::utc_now;
 
@@ -39,6 +41,35 @@ pub fn evaluate_task_board(
         },
         |item, task, record| materialize_reviewer_signal(item, task, record, db),
     )
+}
+
+fn record_signal_failure(
+    summary: &mut TaskBoardEvaluationSummary,
+    item: &TaskBoardItem,
+    error: &CliError,
+) {
+    let failure = signal_failure(item, error);
+    log_signal_failure(&failure);
+    summary.signal_failures.push(failure);
+}
+
+fn signal_failure(item: &TaskBoardItem, error: &CliError) -> EvaluationSignalFailure {
+    EvaluationSignalFailure {
+        board_item_id: item.id.clone(),
+        message: error.to_string(),
+    }
+}
+
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "tracing macro expansion inflates the score; tokio-rs/tracing#553"
+)]
+fn log_signal_failure(failure: &EvaluationSignalFailure) {
+    warn!(
+        board_item_id = %failure.board_item_id,
+        error = %failure.message,
+        "task-board evaluation: reviewer signal materialization failed",
+    );
 }
 
 /// Evaluate linked task-board items through the async daemon DB.
@@ -84,8 +115,15 @@ pub(crate) async fn evaluate_task_board_async(
             continue;
         };
         let record = evaluate_linked_item(&board, item, &task, request.dry_run)?;
-        materialize_reviewer_signal_async(item, &task, &record, async_db).await?;
+        // Record the decision before attempting reviewer materialization so a
+        // downstream signal failure cannot drop the evaluation outcome.
+        let signal_outcome = materialize_reviewer_signal_async(item, &task, &record, async_db)
+            .await
+            .err();
         summary.push(record);
+        if let Some(error) = signal_outcome {
+            record_signal_failure(&mut summary, item, &error);
+        }
     }
     Ok(summary)
 }
@@ -144,8 +182,13 @@ where
             continue;
         };
         let record = evaluate_linked_item(board, item, &task, dry_run)?;
-        schedule_reviewer(item, &task, &record)?;
+        // Record the decision before scheduling the reviewer signal so a
+        // downstream failure cannot drop the evaluation outcome from the summary.
+        let signal_outcome = schedule_reviewer(item, &task, &record).err();
         summary.push(record);
+        if let Some(error) = signal_outcome {
+            record_signal_failure(&mut summary, item, &error);
+        }
     }
     Ok(summary)
 }

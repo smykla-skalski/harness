@@ -220,6 +220,63 @@ fn review_pending_update_schedules_reviewer_signal() {
 }
 
 #[test]
+fn reviewer_signal_failure_keeps_record_in_summary() {
+    let temp = tempdir().expect("tempdir");
+    let store = TaskBoardStore::new(temp.path().join("task-board"));
+    let item_a = create_linked_item(&store, "board-a", TaskBoardStatus::InProgress);
+    let mut item_b = create_linked_item(&store, "board-b", TaskBoardStatus::InProgress);
+    // Distinct task ids so the loader can decide which to "fail" the signal on.
+    item_b.session_id = Some("session-b".into());
+    item_b.work_item_id = Some("work-b".into());
+    let _ = store.update(
+        "board-b",
+        TaskBoardItemPatch {
+            session_id: crate::task_board::store::OptionalFieldPatch::Set("session-b".into()),
+            work_item_id: crate::task_board::store::OptionalFieldPatch::Set("work-b".into()),
+            ..TaskBoardItemPatch::default()
+        },
+    );
+    let item_b = store.get("board-b").expect("reload b");
+
+    let summary = evaluate_items_with_loader(
+        &store,
+        &[item_a, item_b],
+        false,
+        |_, _| Ok(Some(work_item(TaskStatus::AwaitingReview))),
+        |item, _, _| {
+            if item.id == "board-b" {
+                Err(CliErrorKind::workflow_io("signal write failed").into())
+            } else {
+                Ok(())
+            }
+        },
+    )
+    .expect("evaluate items");
+
+    // Both records must be present even though item-b's signal failed.
+    assert_eq!(summary.total, 2, "summary kept both records");
+    assert_eq!(summary.reviewing, 2);
+    let ids: Vec<&str> = summary
+        .records
+        .iter()
+        .map(|record| record.board_item_id.as_str())
+        .collect();
+    assert!(ids.contains(&"board-a"));
+    assert!(ids.contains(&"board-b"));
+    assert_eq!(
+        summary.signal_failures.len(),
+        1,
+        "exactly one signal failure recorded"
+    );
+    assert_eq!(summary.signal_failures[0].board_item_id, "board-b");
+    assert!(
+        summary.signal_failures[0]
+            .message
+            .contains("signal write failed")
+    );
+}
+
+#[test]
 fn dry_run_leaves_sync_item_unchanged() {
     let temp = tempdir().expect("tempdir");
     let store = TaskBoardStore::new(temp.path().join("task-board"));
