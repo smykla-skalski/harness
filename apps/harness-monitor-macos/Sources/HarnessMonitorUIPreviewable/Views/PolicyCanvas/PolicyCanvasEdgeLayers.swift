@@ -25,9 +25,7 @@ struct PolicyCanvasEdgeLayer: View {
     // both are layer-specific and the label layer does not need them.
     let severityMap = viewModel.edgeSeverityMap
     let edgeLanes = viewModel.edgeRouteLanes
-    let obstacles = viewModel.nodes.map { node in
-      CGRect(origin: node.position, size: PolicyCanvasLayout.nodeSize)
-    }
+    let obstacles = viewModel.routingObstacles
     ZStack(alignment: .topLeading) {
       ForEach(edges) { edge in
         if let source = portAnchors[edge.source],
@@ -146,9 +144,7 @@ struct PolicyCanvasEdgeLabelLayer: View {
     let metrics = PolicyCanvasEdgeLabelMetrics(fontScale: fontScale)
     let edgeLanes = viewModel.edgeRouteLanes
     let collapsed = viewModel.zoom < Self.labelCollapseThreshold
-    let obstacles = viewModel.nodes.map { node in
-      CGRect(origin: node.position, size: PolicyCanvasLayout.nodeSize)
-    }
+    let obstacles = viewModel.routingObstacles
     ZStack(alignment: .topLeading) {
       ForEach(edges) { edge in
         if !edge.label.isEmpty,

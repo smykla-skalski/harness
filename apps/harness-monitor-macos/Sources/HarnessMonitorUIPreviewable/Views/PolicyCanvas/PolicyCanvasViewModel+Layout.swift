@@ -38,6 +38,23 @@ extension PolicyCanvasViewModel {
     )
   }
 
+  /// Obstacles handed to the visibility router. Node frames + group
+  /// frames; both layers (`PolicyCanvasEdgeLayer` and
+  /// `PolicyCanvasEdgeLabelLayer`) hoist this once per body so the
+  /// stroke and label render against the same obstacle set.
+  /// `PolicyCanvasVisibilityRouter.preparedObstacles` auto-drops any
+  /// obstacle whose padded rect contains source or target, which is
+  /// what makes intra-group edges still work: a member node's source
+  /// port sits inside its group's padded frame, so the source's group
+  /// gets filtered automatically and the route can exit cleanly.
+  var routingObstacles: [CGRect] {
+    let nodeObstacles = nodes.map { node in
+      CGRect(origin: node.position, size: PolicyCanvasLayout.nodeSize)
+    }
+    let groupObstacles = groups.map(\.frame)
+    return nodeObstacles + groupObstacles
+  }
+
   var edgeRouteLanes: [String: Int] {
     let sortedEdges = edges.sorted { left, right in
       let leftKey = edgeLaneSortKey(left)

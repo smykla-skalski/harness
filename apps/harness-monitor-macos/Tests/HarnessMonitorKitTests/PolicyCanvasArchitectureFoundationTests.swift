@@ -278,6 +278,24 @@ struct PolicyCanvasArchitectureFoundationTests {
     )
   }
 
+  @Test("routingObstacles returns node frames plus group frames")
+  func routingObstaclesIncludesGroupFrames() {
+    let viewModel = PolicyCanvasViewModel.sample()
+    let obstacles = viewModel.routingObstacles
+    let expectedNodeFrames = viewModel.nodes.map { node in
+      CGRect(origin: node.position, size: PolicyCanvasLayout.nodeSize)
+    }
+    let expectedGroupFrames = viewModel.groups.map(\.frame)
+
+    #expect(obstacles.count == expectedNodeFrames.count + expectedGroupFrames.count)
+    for frame in expectedNodeFrames {
+      #expect(obstacles.contains(frame))
+    }
+    for frame in expectedGroupFrames {
+      #expect(obstacles.contains(frame))
+    }
+  }
+
   private func archSimulation(revision: UInt64) -> TaskBoardPolicyPipelineSimulationResult {
     TaskBoardPolicyPipelineSimulationResult(
       revision: revision,
