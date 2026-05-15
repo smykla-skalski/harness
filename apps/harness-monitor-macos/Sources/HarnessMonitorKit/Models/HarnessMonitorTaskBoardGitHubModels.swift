@@ -2,19 +2,42 @@ import Foundation
 
 public struct TaskBoardGitHubInboxConfig: Codable, Equatable, Sendable {
   public let repositories: [String]
+  public let labelFilter: [String]
 
-  public init(repositories: [String] = []) {
+  public init(repositories: [String] = [], labelFilter: [String] = []) {
     self.repositories = repositories
+    self.labelFilter = labelFilter
   }
 
   enum CodingKeys: String, CodingKey {
     case repositories
+    case labelFilter
   }
 
   public init(from decoder: Decoder) throws {
     let container = try decoder.container(keyedBy: CodingKeys.self)
     self.init(
-      repositories: try container.decodeIfPresent([String].self, forKey: .repositories) ?? []
+      repositories: try container.decodeIfPresent([String].self, forKey: .repositories) ?? [],
+      labelFilter: try container.decodeIfPresent([String].self, forKey: .labelFilter) ?? []
+    )
+  }
+}
+
+public struct TaskBoardTodoistInboxConfig: Codable, Equatable, Sendable {
+  public let projectFilter: [String]
+
+  public init(projectFilter: [String] = []) {
+    self.projectFilter = projectFilter
+  }
+
+  enum CodingKeys: String, CodingKey {
+    case projectFilter
+  }
+
+  public init(from decoder: Decoder) throws {
+    let container = try decoder.container(keyedBy: CodingKeys.self)
+    self.init(
+      projectFilter: try container.decodeIfPresent([String].self, forKey: .projectFilter) ?? []
     )
   }
 }

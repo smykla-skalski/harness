@@ -18,6 +18,7 @@ public struct TaskBoardOrchestratorSettings: Codable, Equatable, Sendable {
   public let projectDir: String?
   public let githubProject: TaskBoardGitHubProjectConfig
   public let githubInbox: TaskBoardGitHubInboxConfig
+  public let todoistInbox: TaskBoardTodoistInboxConfig
   public let policyVersion: String
 
   public init(
@@ -27,6 +28,7 @@ public struct TaskBoardOrchestratorSettings: Codable, Equatable, Sendable {
     projectDir: String? = nil,
     githubProject: TaskBoardGitHubProjectConfig = TaskBoardGitHubProjectConfig(),
     githubInbox: TaskBoardGitHubInboxConfig = TaskBoardGitHubInboxConfig(),
+    todoistInbox: TaskBoardTodoistInboxConfig = TaskBoardTodoistInboxConfig(),
     policyVersion: String
   ) {
     self.enabledWorkflows = enabledWorkflows
@@ -35,6 +37,7 @@ public struct TaskBoardOrchestratorSettings: Codable, Equatable, Sendable {
     self.projectDir = projectDir
     self.githubProject = githubProject
     self.githubInbox = githubInbox
+    self.todoistInbox = todoistInbox
     self.policyVersion = policyVersion
   }
 
@@ -45,6 +48,7 @@ public struct TaskBoardOrchestratorSettings: Codable, Equatable, Sendable {
     case projectDir
     case githubProject
     case githubInbox
+    case todoistInbox
     case policyVersion
   }
 
@@ -69,6 +73,10 @@ public struct TaskBoardOrchestratorSettings: Codable, Equatable, Sendable {
         TaskBoardGitHubInboxConfig.self,
         forKey: .githubInbox
       ) ?? TaskBoardGitHubInboxConfig(),
+      todoistInbox: try container.decodeIfPresent(
+        TaskBoardTodoistInboxConfig.self,
+        forKey: .todoistInbox
+      ) ?? TaskBoardTodoistInboxConfig(),
       policyVersion: try container.decode(String.self, forKey: .policyVersion)
     )
   }
@@ -83,6 +91,7 @@ public struct TaskBoardOrchestratorSettingsUpdateRequest: Codable, Equatable, Se
   public let clearProjectDir: Bool
   public let githubProject: TaskBoardGitHubProjectConfig?
   public let githubInbox: TaskBoardGitHubInboxConfig?
+  public let todoistInbox: TaskBoardTodoistInboxConfig?
   public let policyVersion: String?
 
   public init(
@@ -94,6 +103,7 @@ public struct TaskBoardOrchestratorSettingsUpdateRequest: Codable, Equatable, Se
     clearProjectDir: Bool = false,
     githubProject: TaskBoardGitHubProjectConfig? = nil,
     githubInbox: TaskBoardGitHubInboxConfig? = nil,
+    todoistInbox: TaskBoardTodoistInboxConfig? = nil,
     policyVersion: String? = nil
   ) {
     self.enabledWorkflows = enabledWorkflows
@@ -104,6 +114,7 @@ public struct TaskBoardOrchestratorSettingsUpdateRequest: Codable, Equatable, Se
     self.clearProjectDir = clearProjectDir
     self.githubProject = githubProject
     self.githubInbox = githubInbox
+    self.todoistInbox = todoistInbox
     self.policyVersion = policyVersion
   }
 }

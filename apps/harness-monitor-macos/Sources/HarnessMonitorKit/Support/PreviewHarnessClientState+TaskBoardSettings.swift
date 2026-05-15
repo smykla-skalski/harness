@@ -18,6 +18,7 @@ extension PreviewHarnessClientState {
       projectDir: request.clearProjectDir ? nil : (request.projectDir ?? current.projectDir),
       githubProject: request.githubProject ?? current.githubProject,
       githubInbox: request.githubInbox ?? current.githubInbox,
+      todoistInbox: request.todoistInbox ?? current.todoistInbox,
       policyVersion: request.policyVersion ?? current.policyVersion
     )
     return taskBoardOrchestratorSettings
