@@ -30,6 +30,10 @@ pub struct TaskBoardItemPatch {
     pub external_refs: Option<Vec<ExternalRef>>,
     pub planning: Option<PlanningState>,
     pub clear_planning: bool,
+    /// Clear `approved_by` / `approved_at` while preserving the plan summary.
+    /// Mutually exclusive with `clear_planning`; takes effect after `planning`
+    /// is merged.
+    pub clear_approval: bool,
     pub workflow: Option<TaskBoardWorkflowState>,
     pub clear_workflow: bool,
     pub session_id: OptionalFieldPatch<String>,
@@ -283,6 +287,10 @@ fn apply_core_patch(item: &mut TaskBoardItem, patch: &TaskBoardItemPatch) {
         item.planning = PlanningState::default();
     } else {
         apply_planning_patch(&mut item.planning, patch.planning.as_ref());
+        if patch.clear_approval {
+            item.planning.approved_by = None;
+            item.planning.approved_at = None;
+        }
     }
     if patch.clear_workflow {
         item.workflow = TaskBoardWorkflowState::default();

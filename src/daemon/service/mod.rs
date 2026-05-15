@@ -300,9 +300,10 @@ pub use task_board::{
     approve_task_board_plan, audit_task_board, audit_task_board_policy_pipeline,
     begin_task_board_planning, create_task_board_item, delete_task_board_item, dispatch_task_board,
     get_task_board_item, list_task_board_items, list_task_board_machines, list_task_board_projects,
-    promote_task_board_policy_pipeline, save_task_board_policy_pipeline_draft,
-    simulate_task_board_policy_pipeline, submit_task_board_plan, sync_task_board,
-    sync_task_board_async, task_board_policy_pipeline, update_task_board_item,
+    promote_task_board_policy_pipeline, revoke_task_board_plan,
+    save_task_board_policy_pipeline_draft, simulate_task_board_policy_pipeline,
+    submit_task_board_plan, sync_task_board, sync_task_board_async, task_board_policy_pipeline,
+    update_task_board_item,
 };
 pub use task_board_evaluation::evaluate_task_board;
 #[allow(unused_imports)]

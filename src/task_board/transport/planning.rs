@@ -5,7 +5,9 @@ use serde::Serialize;
 
 use crate::app::command_context::{AppContext, Execute};
 use crate::errors::CliError;
-use crate::task_board::planning::{PlanningTransition, approve_plan, begin_planning, submit_plan};
+use crate::task_board::planning::{
+    PlanningTransition, approve_plan, begin_planning, revoke_plan, submit_plan,
+};
 use crate::task_board::store::TaskBoardItemPatch;
 use crate::task_board::types::TaskBoardItem;
 use crate::workspace::utc_now;
@@ -39,6 +41,15 @@ pub struct TaskBoardPlanApproveArgs {
     pub board_root: Option<PathBuf>,
 }
 
+#[derive(Debug, Clone, Args)]
+pub struct TaskBoardPlanRevokeArgs {
+    pub id: String,
+    #[arg(long)]
+    pub actor: Option<String>,
+    #[arg(long)]
+    pub board_root: Option<PathBuf>,
+}
+
 #[derive(Debug, Serialize)]
 struct TaskBoardPlanningResponse {
     transition: PlanningTransition,
@@ -65,6 +76,26 @@ impl Execute for TaskBoardPlanApproveArgs {
         apply_transition(self.board_root.clone(), self.id.as_str(), |item| {
             approve_plan(item, self.approved_by.as_str(), approved_at.as_str())
         })
+    }
+}
+
+impl Execute for TaskBoardPlanRevokeArgs {
+    fn execute(&self, _context: &AppContext) -> Result<i32, CliError> {
+        let actor = self.actor.as_deref();
+        let board = store(self.board_root.clone());
+        let current = board.get(self.id.as_str())?;
+        let transition = revoke_plan(&current, actor);
+        let item = board.update(
+            self.id.as_str(),
+            TaskBoardItemPatch {
+                status: Some(transition.to_status),
+                planning: Some(transition.planning.clone()),
+                clear_approval: true,
+                ..TaskBoardItemPatch::default()
+            },
+        )?;
+        print_json(&TaskBoardPlanningResponse { transition, item })?;
+        Ok(0)
     }
 }
 

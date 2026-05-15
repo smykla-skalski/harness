@@ -10,9 +10,10 @@ use crate::daemon::protocol::{
     TaskBoardAuditRequest, TaskBoardCatalogRequest, TaskBoardCreateItemRequest,
     TaskBoardDeleteItemRequest, TaskBoardDispatchRequest, TaskBoardEvaluateRequest,
     TaskBoardGetItemRequest, TaskBoardHostSetProjectTypesRequest, TaskBoardListItemsRequest,
-    TaskBoardPlanApproveRequest, TaskBoardPlanBeginRequest, TaskBoardPlanSubmitRequest,
-    TaskBoardSyncRequest, TaskBoardUpdateItemRequest, http_paths,
+    TaskBoardPlanApproveRequest, TaskBoardPlanBeginRequest, TaskBoardPlanRevokeRequest,
+    TaskBoardPlanSubmitRequest, TaskBoardSyncRequest, TaskBoardUpdateItemRequest, http_paths,
 };
+use crate::session::types::CONTROL_PLANE_ACTOR_ID;
 use crate::task_board::TaskBoardStatus;
 
 use super::super::DaemonHttpState;
@@ -34,6 +35,12 @@ pub(super) struct TaskBoardPlanSubmitBody {
 pub(super) struct TaskBoardPlanApproveBody {
     pub approved_by: String,
     pub approved_at: Option<String>,
+}
+
+#[derive(Debug, Clone, Default, Deserialize)]
+pub(super) struct TaskBoardPlanRevokeBody {
+    #[serde(default)]
+    pub actor: Option<String>,
 }
 
 macro_rules! authenticated_parts {
@@ -179,6 +186,30 @@ pub(super) async fn post_task_board_plan_approve(
         &request_id,
         start,
         task_board_route_executor::approve_plan(&request),
+    )
+}
+
+pub(super) async fn post_task_board_plan_revoke(
+    Path(item_id): Path<String>,
+    headers: HeaderMap,
+    State(state): State<DaemonHttpState>,
+    _body: Option<Json<TaskBoardPlanRevokeBody>>,
+) -> Response {
+    let (start, request_id) = authenticated_parts!(headers, state);
+    // Unit 7 will replace this manual override with the binding-trait impl;
+    // for now mirror the existing `run_once` pattern so audit logs always
+    // attribute the mutation to the control plane (the caller-supplied
+    // `actor` in the body is intentionally discarded).
+    let request = TaskBoardPlanRevokeRequest {
+        id: item_id,
+        actor: Some(CONTROL_PLANE_ACTOR_ID.to_string()),
+    };
+    timed_json(
+        "POST",
+        http_paths::TASK_BOARD_PLAN_REVOKE,
+        &request_id,
+        start,
+        task_board_route_executor::revoke_plan(&request),
     )
 }
 
