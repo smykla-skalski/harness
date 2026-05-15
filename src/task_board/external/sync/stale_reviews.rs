@@ -3,7 +3,7 @@ use crate::task_board::external::{
     ExternalProvider, ExternalSyncField, ExternalTask, ExternalTaskRef,
 };
 use crate::task_board::store::{TaskBoardItemPatch, TaskBoardStore};
-use crate::task_board::types::{TaskBoardItem, TaskBoardStatus};
+use crate::task_board::types::{ExternalRefProvider, TaskBoardItem, TaskBoardStatus};
 use crate::workspace::utc_now;
 
 use super::merge::{external_ref_matches, matching_ref};
@@ -13,6 +13,7 @@ pub(super) fn reconcile_stale_github_review_requests(
     board: &TaskBoardStore,
     options: ExternalSyncOptions,
     provider: ExternalProvider,
+    board_items: &[TaskBoardItem],
     tasks: &[ExternalTask],
     operations: &mut Vec<ExternalSyncOperation>,
 ) -> Result<(), CliError> {
@@ -20,12 +21,12 @@ pub(super) fn reconcile_stale_github_review_requests(
         return Ok(());
     }
 
-    let stale_items = board
-        .list(None)?
-        .into_iter()
+    let stale_items = board_items
+        .iter()
         .filter_map(|item| {
-            let reference = provider_ref(&item, provider)?;
-            is_stale_github_review_request(&item, &reference, tasks).then_some((item, reference))
+            let reference = provider_ref(item, provider)?;
+            is_stale_github_review_request(item, &reference, tasks)
+                .then_some((item.clone(), reference))
         })
         .collect::<Vec<_>>();
 
@@ -111,7 +112,7 @@ fn is_stale_github_review_request(
     reference: &ExternalTaskRef,
     tasks: &[ExternalTask],
 ) -> bool {
-    item.id.starts_with("github-")
+    item.imported_from_provider == Some(ExternalRefProvider::GitHub)
         && item.planning.summary.is_none()
         && matches!(
             item.status,
