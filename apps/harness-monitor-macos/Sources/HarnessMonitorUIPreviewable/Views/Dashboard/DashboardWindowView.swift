@@ -5,6 +5,8 @@ public struct DashboardWindowView: View {
   public let store: HarnessMonitorStore
   public let dashboardUI: HarnessMonitorStore.ContentDashboardSlice
   public let sessionCatalog: HarnessMonitorStore.SessionCatalogSlice
+  @AppStorage(HarnessMonitorMCPSettingsDefaults.registryHostEnabledKey)
+  private var mcpRegistryHostEnabled = HarnessMonitorMCPSettingsDefaults.registryHostEnabledDefault
   @SceneStorage("dashboard.route")
   private var persistedRouteRaw = DashboardWindowRoute.taskBoard.rawValue
   @SceneStorage("dashboard.columnVisibility")
@@ -47,6 +49,22 @@ public struct DashboardWindowView: View {
     ]
   }
 
+  private var dashboardStatusSummaryModel: SessionStatusSummaryModel {
+    let metrics = store.connectionMetrics
+    return SessionStatusSummaryModel(
+      metrics: metrics,
+      sourceTitle: "Dashboard",
+      sourceSystemImage: "square.grid.2x2",
+      sourceTint: harnessSidebarStatusSourceTint(for: metrics),
+      statusStripState: harnessSidebarStatusStripState(
+        for: store,
+        isMCPRegistryHostEnabled: mcpRegistryHostEnabled
+      ),
+      connectionSummaryText: harnessSidebarConnectionSummaryText(for: store),
+      sessionStatusTitle: selectedRoute.title
+    )
+  }
+
   private var sidebarWidth: Double {
     get { persistedSidebarWidth }
     nonmutating set { persistedSidebarWidth = newValue }
@@ -82,7 +100,10 @@ public struct DashboardWindowView: View {
         columnVisibility: columnVisibilityBinding,
         sidebarWidth: sidebarWidth
       ) {
-        DashboardSidebar(selectedRoute: selectedRouteBinding)
+        DashboardSidebar(
+          selectedRoute: selectedRouteBinding,
+          statusModel: dashboardStatusSummaryModel
+        )
       } detail: {
         DashboardRouteContent(
           route: selectedRoute,
@@ -134,6 +155,7 @@ private enum DashboardWindowRoute: String, CaseIterable, Identifiable {
 
 private struct DashboardSidebar: View {
   @Binding var selectedRoute: DashboardWindowRoute
+  let statusModel: SessionStatusSummaryModel
 
   var body: some View {
     ViewBodySignposter.trace(
@@ -150,7 +172,7 @@ private struct DashboardSidebar: View {
           Button {
             selectedRoute = route
           } label: {
-            SessionSidebarRow(
+            HarnessMonitorSidebarRow(
               title: route.title,
               systemImage: route.systemImage
             )
@@ -168,6 +190,9 @@ private struct DashboardSidebar: View {
       }
       .listStyle(.sidebar)
       .accessibilityIdentifier(HarnessMonitorAccessibility.dashboardSidebar)
+      .safeAreaInset(edge: .bottom, spacing: 0) {
+        SessionSidebarFooter(model: statusModel)
+      }
     }
   }
 }
