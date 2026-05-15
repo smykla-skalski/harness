@@ -19,8 +19,10 @@ struct PolicyCanvasNodeLayer: View {
   /// drop-end spring (P18) collapses to instant when the user has the
   /// system-wide reduce-motion accessibility setting on. The canvas-scoped
   /// override is optional with system fallback; see `PolicyCanvasMotion`.
-  @Environment(\.policyCanvasReducedMotion) private var canvasReducedMotion
-  @Environment(\.accessibilityReduceMotion) private var systemReduceMotion
+  @Environment(\.policyCanvasReducedMotion)
+  private var canvasReducedMotion
+  @Environment(\.accessibilityReduceMotion)
+  private var systemReduceMotion
 
   private var reducedMotion: Bool {
     canvasReducedMotion ?? systemReduceMotion
@@ -119,8 +121,10 @@ struct PolicyCanvasNodeCard: View {
   /// from the environment so the animation gating uses the same root-seeded
   /// bit the rest of the canvas reads. Canvas-scoped override is optional
   /// with system fallback; see `PolicyCanvasMotion`.
-  @Environment(\.policyCanvasReducedMotion) private var canvasReducedMotion
-  @Environment(\.accessibilityReduceMotion) private var systemReduceMotion
+  @Environment(\.policyCanvasReducedMotion)
+  private var canvasReducedMotion
+  @Environment(\.accessibilityReduceMotion)
+  private var systemReduceMotion
 
   private var reducedMotion: Bool {
     canvasReducedMotion ?? systemReduceMotion

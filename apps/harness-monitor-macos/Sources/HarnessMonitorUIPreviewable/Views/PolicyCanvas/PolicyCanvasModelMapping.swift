@@ -229,7 +229,6 @@ func taskBoardPolicyNodeKind(
   }
 }
 
-
 private func policyCanvasEdgeLabel(_ edge: TaskBoardPolicyPipelineEdge) -> String {
   if let label = edge.label?.trimmingCharacters(in: .whitespacesAndNewlines),
     !label.isEmpty

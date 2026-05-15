@@ -19,8 +19,7 @@ extension PolicyCanvasView {
   /// TextField, not clear the canvas selection mid-typing. SwiftUI's text-field
   /// first responder consumes these keys natively, so disabling the overlay
   /// buttons hands the chord back to the field without an alternate route.
-  @ViewBuilder
-  var deletionShortcutButtons: some View {
+  @ViewBuilder var deletionShortcutButtons: some View {
     Group {
       Button("Delete selected policy component") {
         requestDeleteSelectedComponent()
@@ -51,8 +50,7 @@ extension PolicyCanvasView {
   /// or label edit can still receive its own Cmd+F if a future field opts
   /// into one. The palette itself takes focus via `@FocusState` on appear
   /// and routes Esc back to dismiss through its own Cancel button.
-  @ViewBuilder
-  var searchShortcutButtons: some View {
+  @ViewBuilder var searchShortcutButtons: some View {
     Button("Toggle policy canvas search palette") {
       searchPaletteVisible.toggle()
     }

@@ -34,7 +34,7 @@ extension PolicyCanvasViewModel {
       sourceEdges: sourceEdges,
       sourceGroups: sourceGroups,
       sourceMemberIDs: memberIDs,
-      offset: PolicyCanvasPasteOffset
+      offset: policyCanvasPasteOffset
     )
     let priorSelection = selection
     let priorSecondaries = secondarySelections
@@ -83,18 +83,28 @@ extension PolicyCanvasViewModel {
     guard !(ids.nodeIDs.isEmpty && ids.groupIDs.isEmpty) else {
       return false
     }
-    // Build O(1)-lookup index of the live nodes/groups once. Walking the
-    // arrays per element would push the cost back to O(n*s) per nudge tick.
-    var nodeIndex: [String: PolicyCanvasNode] = [:]
-    for node in nodes {
-      nodeIndex[node.id] = node
+    let nodeIndex = Dictionary(uniqueKeysWithValues: nodes.map { ($0.id, $0) })
+    let groupIndex = Dictionary(uniqueKeysWithValues: groups.map { ($0.id, $0) })
+    let nodeMoves = buildNodeNudgeMoves(
+      delta: delta, ids: ids, nodeIndex: nodeIndex
+    )
+    let groupMoves = buildGroupNudgeMoves(
+      delta: delta, ids: ids, groupIndex: groupIndex
+    )
+    guard !(nodeMoves.isEmpty && groupMoves.isEmpty) else {
+      return false
     }
-    var groupIndex: [String: PolicyCanvasGroup] = [:]
-    for group in groups {
-      groupIndex[group.id] = group
-    }
-    var nodeMoves: [PolicyCanvasNodeMove] = []
-    nodeMoves.reserveCapacity(ids.nodeIDs.count)
+    mutate(.bulkMove(nodeMoves: nodeMoves, groupMoves: groupMoves))
+    return true
+  }
+
+  private func buildNodeNudgeMoves(
+    delta: CGSize,
+    ids: PolicyCanvasSelectionIDSets,
+    nodeIndex: [String: PolicyCanvasNode]
+  ) -> [PolicyCanvasNodeMove] {
+    var moves: [PolicyCanvasNodeMove] = []
+    moves.reserveCapacity(ids.nodeIDs.count)
     for nodeID in selectedNodeIDs {
       guard let current = nodeIndex[nodeID] else { continue }
       // Skip nodes that already live inside a group ALSO being moved — the
@@ -108,12 +118,18 @@ extension PolicyCanvasViewModel {
         y: current.position.y + delta.height
       )
       guard destination != current.position else { continue }
-      nodeMoves.append(
-        PolicyCanvasNodeMove(id: nodeID, from: current.position, to: destination)
-      )
+      moves.append(PolicyCanvasNodeMove(id: nodeID, from: current.position, to: destination))
     }
-    var groupMoves: [PolicyCanvasGroupMove] = []
-    groupMoves.reserveCapacity(ids.groupIDs.count)
+    return moves
+  }
+
+  private func buildGroupNudgeMoves(
+    delta: CGSize,
+    ids: PolicyCanvasSelectionIDSets,
+    groupIndex: [String: PolicyCanvasGroup]
+  ) -> [PolicyCanvasGroupMove] {
+    var moves: [PolicyCanvasGroupMove] = []
+    moves.reserveCapacity(ids.groupIDs.count)
     for groupID in selectedGroupIDs {
       guard let current = groupIndex[groupID] else { continue }
       let fromOrigin = current.frame.origin
@@ -131,7 +147,7 @@ extension PolicyCanvasViewModel {
           y: node.position.y + delta.height
         )
       }
-      groupMoves.append(
+      moves.append(
         PolicyCanvasGroupMove(
           id: groupID,
           fromOrigin: fromOrigin,
@@ -141,11 +157,7 @@ extension PolicyCanvasViewModel {
         )
       )
     }
-    guard !(nodeMoves.isEmpty && groupMoves.isEmpty) else {
-      return false
-    }
-    mutate(.bulkMove(nodeMoves: nodeMoves, groupMoves: groupMoves))
-    return true
+    return moves
   }
 }
 

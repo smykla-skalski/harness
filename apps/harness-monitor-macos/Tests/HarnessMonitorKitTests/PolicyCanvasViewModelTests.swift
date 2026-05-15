@@ -239,7 +239,8 @@ struct PolicyCanvasViewModelTests {
   @Test("loaded default graph starts centered in large canvas space")
   func loadedDefaultGraphStartsCenteredInLargeCanvasSpace() {
     let viewModel = PolicyCanvasViewModel.sample()
-    viewModel.load(document: PreviewFixtures.policyCanvasPipelineDocument(), simulation: nil, audit: nil)
+    viewModel.load(
+      document: PreviewFixtures.policyCanvasPipelineDocument(), simulation: nil, audit: nil)
 
     #expect(viewModel.initialViewportAnchorPoint.x == viewModel.canvasContentBounds.midX)
     #expect(viewModel.initialViewportAnchorPoint.y == viewModel.canvasContentBounds.midY)

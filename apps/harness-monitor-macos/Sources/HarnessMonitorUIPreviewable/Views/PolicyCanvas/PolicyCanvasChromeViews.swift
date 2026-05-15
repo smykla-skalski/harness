@@ -163,4 +163,3 @@ private struct PolicyCanvasSimulationToggleButton: View {
     .accessibilityIdentifier(HarnessMonitorAccessibility.policyCanvasSimulationToggle)
   }
 }
-

@@ -17,7 +17,8 @@ struct PolicyCanvasViewport: View {
   @State private var magnifyStartZoom: CGFloat?
   @State private var zoomFocusDispatcher = PolicyCanvasZoomFocusDispatcher()
   @State private var zoomFocus: PolicyCanvasZoomFocus?
-  @Environment(\.scenePhase) private var scenePhase
+  @Environment(\.scenePhase)
+  private var scenePhase
 
   var body: some View {
     GeometryReader { proxy in

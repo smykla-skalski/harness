@@ -28,7 +28,7 @@ struct PolicyCanvasSceneStorageTests {
     let raw = PolicyCanvasView.encodeSelection(nil)
     let decoded = PolicyCanvasView.decodeSelection(raw)
 
-    #expect(raw == "")
+    #expect(raw.isEmpty)
     #expect(decoded == nil)
   }
 
