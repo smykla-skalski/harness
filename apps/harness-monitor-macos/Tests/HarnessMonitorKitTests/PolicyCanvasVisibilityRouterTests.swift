@@ -181,6 +181,29 @@ struct PolicyCanvasVisibilityRouterTests {
     #expect(bends >= 2)
   }
 
+  @Test("8 parallel edges spread at least 80pt across the bus column")
+  func eightParallelEdgesSpreadWidely() {
+    let obstacle = CGRect(x: 150, y: 50, width: 100, height: 100)
+    let routes = (0..<8).map { lane in
+      PolicyCanvasVisibilityRouter().route(
+        source: CGPoint(x: 0, y: 100),
+        target: CGPoint(x: 400, y: 100),
+        context: context(lane: lane, obstacles: [obstacle])
+      )
+    }
+    let busYs = routes.compactMap { route -> CGFloat? in
+      guard route.points.count >= 3 else {
+        return nil
+      }
+      return route.points[1].y
+    }
+    let spread = (busYs.max() ?? 0) - (busYs.min() ?? 0)
+    // laneSpreadStep is 12pt, so 7 lanes between the extremes should
+    // produce ~84pt of spread (less the channel-snap rounding).
+    #expect(spread >= 80)
+    #expect(Set(busYs).count == 8)
+  }
+
   @Test("Channel snap rounds intermediate points to 5pt grid")
   func channelSnapAlignsIntermediates() {
     let obstacle = CGRect(x: 100, y: 50, width: 80, height: 120)

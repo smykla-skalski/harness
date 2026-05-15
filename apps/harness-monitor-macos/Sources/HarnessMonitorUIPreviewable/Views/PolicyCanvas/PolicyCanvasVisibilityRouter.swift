@@ -37,6 +37,15 @@ struct PolicyCanvasVisibilityRouter: PolicyCanvasEdgeRouter {
   /// Channel snap grid. 5pt gives parallel-edge separation without visibly
   /// shifting routes off straight axes when only one edge runs the channel.
   static let channelStep: CGFloat = 5
+  /// Per-lane visual separation for parallel edges sharing a bus column.
+  /// 12pt is wide enough that 8+ parallel edges (e.g. converging on a
+  /// terminal-decisions group) read as distinct rails rather than a
+  /// single tight bundle, but narrow enough that simple 2-3-edge fans
+  /// still fit within node-clearance bounds. Lifted out of
+  /// `channelStep` because the channel snap (5pt) wants the tighter
+  /// grid to keep routes axis-aligned, while the visible spread wants
+  /// the wider step for legibility.
+  static let laneSpreadStep: CGFloat = 12
   /// Bend penalty for A*. 100pt is the dominant cost term once segment
   /// lengths drop below ~100pt, matching the recommendations' research
   /// citation (50-200 typical range).
@@ -278,7 +287,7 @@ struct PolicyCanvasVisibilityRouter: PolicyCanvasEdgeRouter {
     guard lane != 0, points.count == 4 else {
       return points
     }
-    let offset = CGFloat(lane) * channelStep
+    let offset = CGFloat(lane) * laneSpreadStep
     let pointA = points[1]
     let pointB = points[2]
     let busHorizontal = abs(pointA.y - pointB.y) < 0.001
