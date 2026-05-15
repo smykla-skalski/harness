@@ -46,7 +46,7 @@ struct PolicyCanvasAccessibilityTests {
 
     let label = viewModel.accessibilityLabel(for: edge)
 
-    #expect(label == "Edge normalize, from Policy intake event to Risk score event")
+    #expect(label == "normalize edge, from Policy intake event to Risk score event")
   }
 
   // Watson's WCAG 1.4.1 concern: the new kind palette (cyan/purple/red) is
@@ -151,10 +151,29 @@ struct PolicyCanvasAccessibilityTests {
     #expect(midpoint.y == 35)
   }
 
-  @Test("arc-length midpoint of an empty route is the origin")
+  @Test("arc-length midpoint of an empty route falls back to labelPosition")
   func arcLengthMidpointOfEmptyRoute() {
-    let route = PolicyCanvasEdgeRoute(points: [], labelPosition: .zero)
-    #expect(route.arcLengthMidpoint == .zero)
+    let labelPosition = CGPoint(x: 7, y: 11)
+    let route = PolicyCanvasEdgeRoute(points: [], labelPosition: labelPosition)
+    // Watson R2 sev0 robustness guard: a degenerate empty-route can't
+    // activate at (0, 0); it would land outside the stroke. Falling
+    // back to labelPosition keeps the activation point on the edge's
+    // visual anchor.
+    #expect(route.arcLengthMidpoint == labelPosition)
+  }
+
+  @Test("arc-length midpoint of an all-coincident route falls back to labelPosition")
+  func arcLengthMidpointOfCoincidentPoints() {
+    let labelPosition = CGPoint(x: 33, y: 21)
+    let route = PolicyCanvasEdgeRoute(
+      points: [CGPoint(x: 5, y: 5), CGPoint(x: 5, y: 5), CGPoint(x: 5, y: 5)],
+      labelPosition: labelPosition
+    )
+    // When every point coincides the total length is zero; without the
+    // guard the function returned (0, 0) via the trailing `?? .zero`.
+    // Now it returns labelPosition so the activation point stays on
+    // the edge's visual anchor.
+    #expect(route.arcLengthMidpoint == labelPosition)
   }
 
   @Test("arc-length midpoint of a single-point route returns that point")

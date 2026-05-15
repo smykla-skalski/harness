@@ -17,12 +17,23 @@ struct PolicyCanvasEdgeRoute {
   /// frame-center can sit in empty canvas for L-shaped or zig-zag routes,
   /// per Watson's R2 a11y note.
   var arcLengthMidpoint: CGPoint {
+    // Empty or single-point route -> fall back to labelPosition rather
+    // than (0, 0). Activation point at the canvas origin would land in
+    // empty canvas and miss the stroke entirely; labelPosition is the
+    // already-computed visual anchor for this edge, so it's the safest
+    // fallback for the degenerate cases that should never reach this
+    // path in practice.
     guard points.count >= 2 else {
-      return points.first ?? .zero
+      return points.first ?? labelPosition
     }
     var total: CGFloat = 0
     for index in 0..<(points.count - 1) {
       total += distance(points[index], points[index + 1])
+    }
+    // Zero total length (all points coincide) -> labelPosition again,
+    // same rationale as the empty-array branch above.
+    guard total > 0 else {
+      return labelPosition
     }
     let halfway = total / 2
     var traversed: CGFloat = 0
@@ -40,7 +51,7 @@ struct PolicyCanvasEdgeRoute {
       }
       traversed += segmentLength
     }
-    return points.last ?? .zero
+    return points.last ?? labelPosition
   }
 
   private func distance(_ a: CGPoint, _ b: CGPoint) -> CGFloat {

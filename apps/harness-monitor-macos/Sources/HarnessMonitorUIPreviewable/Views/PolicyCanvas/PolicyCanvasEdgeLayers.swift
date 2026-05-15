@@ -83,7 +83,7 @@ struct PolicyCanvasEdgeLayer: View {
       targetGroupID: targetGroupID,
       obstacles: obstacles
     )
-    if edge.pinnedPortSide {
+    if edge.effectivePinnedPortSide {
       return router.route(
         source: source,
         target: target,
@@ -236,7 +236,7 @@ struct PolicyCanvasEdgeLabelLayer: View {
       targetGroupID: targetGroupID,
       obstacles: obstacles
     )
-    if edge.pinnedPortSide {
+    if edge.effectivePinnedPortSide {
       return router.route(
         source: source,
         target: target,

@@ -133,6 +133,18 @@ struct PolicyCanvasEdge: Identifiable, Hashable {
   /// documents.
   var isAnimated: Bool
 
+  /// Whether the router treats this edge's source/target ports as pinned
+  /// for routing. `.error` edges are always pinned regardless of
+  /// `pinnedPortSide`: an author who placed a deny-branch port on a
+  /// specific side did so deliberately, and the flex pass silently
+  /// relocating it would turn a slip in the routing layer into a
+  /// safety-critical visual confusion. Norman R2 sev1 forcing function:
+  /// pin error edges as a hard constraint rather than a default the
+  /// user has to remember to re-set.
+  var effectivePinnedPortSide: Bool {
+    kind == .error || pinnedPortSide
+  }
+
   init(
     id: String,
     source: PolicyCanvasPortEndpoint,

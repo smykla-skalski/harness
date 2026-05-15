@@ -268,7 +268,10 @@ struct PolicyCanvasInspector: View {
         }
       }
       PolicyCanvasInspectorField(label: "Port pin") {
-        PolicyCanvasInspectorEdgePinToggle(pinnedPortSide: edge.pinnedPortSide) { newValue in
+        PolicyCanvasInspectorEdgePinToggle(
+          pinnedPortSide: edge.pinnedPortSide,
+          isLockedByKind: edge.kind == .error
+        ) { newValue in
           viewModel.commitSelectedEdgePinnedPortSide(newValue)
         }
       }
