@@ -37,9 +37,6 @@ struct SessionSidebar: View {
 
   var body: some View {
     sidebarList
-      .safeAreaInset(edge: .bottom, spacing: 0) {
-        SessionSidebarFooter(model: statusModel)
-      }
   }
 
   private var shouldShowShortcutOverlays: Bool {
@@ -80,7 +77,14 @@ struct SessionSidebar: View {
   }
 
   private var sidebarList: some View {
-    nativeSidebarList
+    HarnessMonitorSidebar(
+      accessibilityIdentifier: HarnessMonitorAccessibility.sessionWindowSidebar,
+      accessibilityValue: decisionSelectionAccessibilityValue,
+      statusModel: statusModel,
+      rowSize: sidebarRowSize
+    ) {
+      nativeSidebarList
+    }
     .harnessFocusedSceneValue(\.harnessSessionSidebarSelection, selectionFocus)
     .onChange(of: state.selection) { _, _ in
       deferListSelectionSync(renderedSelectionSet())
@@ -103,8 +107,6 @@ struct SessionSidebar: View {
       selectionDispatcher.clearSelection = nil
       selectionDispatcher.deleteSelection = nil
     }
-    .accessibilityValue(decisionSelectionAccessibilityValue)
-    .accessibilityIdentifier(HarnessMonitorAccessibility.sessionWindowSidebar)
   }
 
   private var nativeSidebarList: some View {
@@ -130,12 +132,6 @@ struct SessionSidebar: View {
         )
       }
     }
-    .listStyle(.sidebar)
-    .transaction { transaction in
-      transaction.animation = nil
-      transaction.disablesAnimations = true
-    }
-    .environment(\.sidebarRowSize, sidebarRowSize)
     .onChange(of: decisions.map(\.id)) { _, ids in
       state.sidebarSelection.prune(kind: .decision, visibleIDs: Set(ids))
       pruneListSelection(kind: .decision, visibleIDs: Set(ids))
