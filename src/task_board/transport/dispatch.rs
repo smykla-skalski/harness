@@ -63,7 +63,11 @@ impl TaskBoardDispatchArgs {
         for plan in plans.iter().filter(|plan| plan.is_ready()) {
             applied.push(self.apply_plan(board, plan)?);
         }
-        Ok(DispatchExecutionSummary { plans, applied })
+        Ok(DispatchExecutionSummary {
+            plans,
+            applied,
+            failures: Vec::new(),
+        })
     }
 
     fn apply_plan(

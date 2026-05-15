@@ -41,6 +41,8 @@ pub struct DispatchPlan {
 pub struct DispatchExecutionSummary {
     pub plans: Vec<DispatchPlan>,
     pub applied: Vec<DispatchAppliedTask>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub failures: Vec<DispatchFailure>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -50,6 +52,22 @@ pub struct DispatchAppliedTask {
     pub work_item_id: String,
     pub lifecycle: DispatchLifecycle,
     pub item: TaskBoardItem,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct DispatchFailure {
+    pub board_item_id: String,
+    pub kind: DispatchFailureKind,
+    pub message: String,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum DispatchFailureKind {
+    CreateSession,
+    CreateTask,
+    LinkItem,
+    WorkerSpawnFailed,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -136,6 +154,7 @@ impl DispatchExecutionSummary {
         Self {
             plans,
             applied: Vec::new(),
+            failures: Vec::new(),
         }
     }
 }

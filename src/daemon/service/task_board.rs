@@ -242,6 +242,19 @@ pub(crate) async fn dispatch_task_board_async(
     dispatch::dispatch_task_board_async(request, async_db, &board).await
 }
 
+/// Roll back the link patch applied to a dispatched item when a downstream
+/// stage (worker spawn) fails. Resets status to `Todo` + clears the session
+/// and task link so the row is not orphaned in `InProgress`.
+///
+/// # Errors
+/// Returns `CliError` when the board item cannot be reloaded or persisted.
+pub(crate) fn unlink_dispatched_task_board_item(
+    board_item_id: &str,
+    reason: &str,
+) -> Result<TaskBoardItem, CliError> {
+    dispatch::unlink_dispatched_item(&store(), board_item_id, reason)
+}
+
 /// Build task-board audit counts.
 ///
 /// # Errors

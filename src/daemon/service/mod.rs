@@ -296,6 +296,8 @@ pub use status::{
 };
 #[allow(unused_imports)]
 pub(crate) use task_board::dispatch_task_board_async;
+#[allow(unused_imports)]
+pub(crate) use task_board::unlink_dispatched_task_board_item;
 pub use task_board::{
     approve_task_board_plan, audit_task_board, audit_task_board_policy_pipeline,
     begin_task_board_planning, create_task_board_item, delete_task_board_item, dispatch_task_board,
