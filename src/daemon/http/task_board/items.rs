@@ -13,7 +13,6 @@ use crate::daemon::protocol::{
     TaskBoardPlanApproveRequest, TaskBoardPlanBeginRequest, TaskBoardPlanRevokeRequest,
     TaskBoardPlanSubmitRequest, TaskBoardSyncRequest, TaskBoardUpdateItemRequest, http_paths,
 };
-use crate::session::types::CONTROL_PLANE_ACTOR_ID;
 use crate::task_board::TaskBoardStatus;
 
 use super::super::DaemonHttpState;
@@ -39,11 +38,7 @@ pub(super) struct TaskBoardPlanApproveBody {
 
 #[derive(Debug, Clone, Default, Deserialize)]
 pub(super) struct TaskBoardPlanRevokeBody {
-    /// Accepted for forward compatibility with the upcoming binding-trait
-    /// override (Unit 7); currently ignored — the route always attributes
-    /// revocation to the control plane.
     #[serde(default)]
-    #[expect(dead_code)]
     pub actor: Option<String>,
 }
 
@@ -208,17 +203,13 @@ pub(super) async fn post_task_board_plan_revoke(
     Path(item_id): Path<String>,
     headers: HeaderMap,
     State(state): State<DaemonHttpState>,
-    _body: Option<Json<TaskBoardPlanRevokeBody>>,
+    body: Option<Json<TaskBoardPlanRevokeBody>>,
 ) -> Response {
-    let (start, request_id) = authenticated_parts!(headers, state);
-    // Unit 7 will replace this manual override with the binding-trait impl;
-    // for now mirror the existing `run_once` pattern so audit logs always
-    // attribute the mutation to the control plane (the caller-supplied
-    // `actor` in the body is intentionally discarded).
-    let request = TaskBoardPlanRevokeRequest {
+    let mut request = TaskBoardPlanRevokeRequest {
         id: item_id,
-        actor: Some(CONTROL_PLANE_ACTOR_ID.to_string()),
+        actor: body.and_then(|Json(body)| body.actor),
     };
+    let (start, request_id) = authorized_control_parts!(headers, state, request);
     timed_json(
         "POST",
         http_paths::TASK_BOARD_PLAN_REVOKE,

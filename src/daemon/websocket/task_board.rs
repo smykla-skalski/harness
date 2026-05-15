@@ -11,7 +11,6 @@ use crate::daemon::protocol::{
     TaskBoardSyncRequest, TaskBoardTodoistTokenSyncRequest, TaskBoardUpdateItemRequest, WsRequest,
     WsResponse, ws_methods,
 };
-use crate::session::types::CONTROL_PLANE_ACTOR_ID;
 use serde::de::DeserializeOwned;
 
 use super::frames::error_response;
@@ -157,12 +156,9 @@ fn dispatch_task_board_plan_approve(request: &WsRequest) -> WsResponse {
 }
 
 fn dispatch_task_board_plan_revoke(request: &WsRequest) -> WsResponse {
-    let Ok(mut body) = parse_params::<TaskBoardPlanRevokeRequest>(request) else {
+    let Ok(body) = parse_control_plane_params::<TaskBoardPlanRevokeRequest>(request) else {
         return invalid_params(request);
     };
-    // Manual control-plane override mirrors `http/task_board.rs:200-203`; Unit
-    // 7 swaps both call sites for the binding trait impl together.
-    body.actor = Some(CONTROL_PLANE_ACTOR_ID.to_string());
     dispatch_query_result(&request.id, task_board_route_executor::revoke_plan(&body))
 }
 
