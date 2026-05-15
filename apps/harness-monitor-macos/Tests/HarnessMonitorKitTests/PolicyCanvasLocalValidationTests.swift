@@ -247,6 +247,43 @@ struct PolicyCanvasLocalValidationTests {
     #expect(!codes.contains("duplicate_label"))
   }
 
+  @Test("error edge into a default-allow supervisor rule is flagged")
+  func errorIntoDefaultAllowFlagged() {
+    let viewModel = makeAllowMismatchCanvas(
+      ruleId: "default-allow",
+      edgeCondition: "evidence_failure"
+    )
+
+    let issues = viewModel.validateGraph()
+    let mismatch = issues.first { $0.code == "error_into_allow" }
+
+    #expect(mismatch != nil)
+    #expect(mismatch?.edgeId == "e")
+    #expect(mismatch?.nodeId == "allow")
+  }
+
+  @Test("control edge into the same default-allow target is ignored")
+  func controlIntoAllowIgnored() {
+    let viewModel = makeAllowMismatchCanvas(
+      ruleId: "default-allow",
+      edgeCondition: "manual_approval"
+    )
+
+    let codes = viewModel.validateGraph().map(\.code)
+    #expect(!codes.contains("error_into_allow"))
+  }
+
+  @Test("error edge into a deny terminal is ignored")
+  func errorIntoDenyIgnored() {
+    let viewModel = makeAllowMismatchCanvas(
+      ruleId: "merge-deny",
+      edgeCondition: "evidence_failure"
+    )
+
+    let codes = viewModel.validateGraph().map(\.code)
+    #expect(!codes.contains("error_into_allow"))
+  }
+
   @Test("multiple duplicate groups land in alphabetical title order")
   func duplicateGroupsSortedByTitle() {
     let viewModel = makeLabeledCanvas(nodes: [
@@ -341,6 +378,53 @@ struct PolicyCanvasLocalValidationTests {
       nodes: canvasNodes,
       groups: canvasGroups,
       edges: canvasEdges,
+      selection: nil,
+      zoom: 1
+    )
+  }
+
+  /// Build a canvas with one source node and one supervisor-rule
+  /// terminal, joined by a single edge. The terminal carries the given
+  /// `ruleId` so the error-into-allow validator has structured ground
+  /// truth to match against, and the edge's `condition` decides its
+  /// kind via the heuristic (e.g. `"evidence_failure"` -> `.error`).
+  private func makeAllowMismatchCanvas(
+    ruleId: String,
+    edgeCondition: String
+  ) -> PolicyCanvasViewModel {
+    var source = PolicyCanvasNode(
+      id: "src",
+      title: "source",
+      kind: .source,
+      position: .zero
+    )
+    source.outputPorts = [
+      PolicyCanvasPort(id: "out", title: "out", kind: .output)
+    ]
+    var allow = PolicyCanvasNode(
+      id: "allow",
+      title: "supervisor:\(ruleId)",
+      kind: .decision,
+      position: CGPoint(x: 400, y: 0)
+    )
+    allow.inputPorts = [
+      PolicyCanvasPort(id: "in", title: "in", kind: .input)
+    ]
+    allow.policyKind = TaskBoardPolicyPipelineNodeKind(
+      kind: "supervisor_rule",
+      ruleId: ruleId
+    )
+    let edge = PolicyCanvasEdge(
+      id: "e",
+      source: PolicyCanvasPortEndpoint(nodeID: "src", portID: "out", kind: .output),
+      target: PolicyCanvasPortEndpoint(nodeID: "allow", portID: "in", kind: .input),
+      label: "",
+      condition: edgeCondition
+    )
+    return PolicyCanvasViewModel(
+      nodes: [source, allow],
+      groups: [],
+      edges: [edge],
       selection: nil,
       zoom: 1
     )

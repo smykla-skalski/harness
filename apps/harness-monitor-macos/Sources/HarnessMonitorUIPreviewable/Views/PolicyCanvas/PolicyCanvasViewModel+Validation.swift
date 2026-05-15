@@ -268,6 +268,17 @@ extension PolicyCanvasViewModel {
         )
       )
     }
+    for mismatch in detectErrorIntoAllowEdges() {
+      issues.append(
+        TaskBoardPolicyPipelineValidationIssue(
+          code: "error_into_allow",
+          message:
+            "Error edge \"\(mismatch.edgeLabel)\" terminates at \"\(mismatch.targetLabel)\" - verify intended",
+          nodeId: mismatch.targetNodeId,
+          edgeId: mismatch.edgeId
+        )
+      )
+    }
     return issues
   }
 
@@ -321,6 +332,53 @@ extension PolicyCanvasViewModel {
       }
     }
     return nil
+  }
+
+  /// Match for the error-into-allow validator: the offending edge plus
+  /// the terminal node it's flowing into. The validator reports edges
+  /// that the user likely wired by mistake (an error-classified edge
+  /// landing on a "default-allow" supervisor rule should almost
+  /// certainly route to a deny / human-gate terminal instead).
+  private struct ErrorIntoAllowMatch {
+    let edgeId: String
+    let edgeLabel: String
+    let targetNodeId: String
+    let targetLabel: String
+  }
+
+  /// Policy-kind / rule-id pairs that indicate an "allow" terminal. The
+  /// list is intentionally narrow: `default-allow`, `allow`, and
+  /// `permit` are the rule-id suffixes a policy author would name an
+  /// allow outcome. Wider matching (e.g. anything containing "allow")
+  /// would false-positive on identifiers like `manual-allow-list-rebuild`.
+  private static let allowingPolicyKinds: Set<String> = ["supervisor_rule"]
+  private static let allowingRuleSuffixes: [String] = [
+    "default-allow", "allow", "permit",
+  ]
+
+  /// Detect `.error` edges that land on a terminal node tagged as an
+  /// allow outcome. The check is structural (policy kind + rule id) so
+  /// it survives author-customized titles. Empty result means either no
+  /// error edges exist or no allow terminals are reachable from them.
+  private func detectErrorIntoAllowEdges() -> [ErrorIntoAllowMatch] {
+    edges.compactMap { edge -> ErrorIntoAllowMatch? in
+      guard edge.kind == .error,
+        let target = node(edge.target.nodeID),
+        let policyKind = target.policyKind,
+        Self.allowingPolicyKinds.contains(policyKind.kind),
+        let ruleId = policyKind.ruleId?.lowercased(),
+        Self.allowingRuleSuffixes.contains(where: { ruleId.contains($0) })
+      else {
+        return nil
+      }
+      let label = edge.label.isEmpty ? edge.condition : edge.label
+      return ErrorIntoAllowMatch(
+        edgeId: edge.id,
+        edgeLabel: label.isEmpty ? edge.id : label,
+        targetNodeId: target.id,
+        targetLabel: target.title
+      )
+    }
   }
 
   /// Title + node-ids tuple for duplicate-label issue construction.
