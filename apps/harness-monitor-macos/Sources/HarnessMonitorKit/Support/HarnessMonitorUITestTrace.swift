@@ -12,7 +12,10 @@ public enum HarnessMonitorUITestTrace {
   public static let perfArtifactsDirectoryKey = "HARNESS_MONITOR_PERF_ARTIFACTS_DIR"
   private static let fileName = "app-trace.jsonl"
   private static let preservedDirectoryName = "HarnessMonitorUITestPreservedArtifacts"
-  private static let lock = NSLock()
+  private static let writeQueue = DispatchQueue(
+    label: "io.harnessmonitor.uitrace.write",
+    qos: .utility
+  )
   private static let encoder: JSONEncoder = {
     let encoder = JSONEncoder()
     encoder.outputFormatting = [.sortedKeys]
@@ -78,25 +81,24 @@ public enum HarnessMonitorUITestTrace {
       return
     }
 
-    lock.lock()
-    defer { lock.unlock() }
-
-    for fileURL in fileURLs {
-      do {
-        try FileManager.default.createDirectory(
-          at: fileURL.deletingLastPathComponent(),
-          withIntermediateDirectories: true
-        )
-        if FileManager.default.fileExists(atPath: fileURL.path) == false {
-          _ = FileManager.default.createFile(atPath: fileURL.path, contents: nil)
+    writeQueue.async {
+      for fileURL in fileURLs {
+        do {
+          try FileManager.default.createDirectory(
+            at: fileURL.deletingLastPathComponent(),
+            withIntermediateDirectories: true
+          )
+          if FileManager.default.fileExists(atPath: fileURL.path) == false {
+            _ = FileManager.default.createFile(atPath: fileURL.path, contents: nil)
+          }
+          let handle = try FileHandle(forWritingTo: fileURL)
+          try handle.seekToEnd()
+          try handle.write(contentsOf: data)
+          try handle.write(contentsOf: Data([0x0A]))
+          try handle.close()
+        } catch {
+          continue
         }
-        let handle = try FileHandle(forWritingTo: fileURL)
-        try handle.seekToEnd()
-        try handle.write(contentsOf: data)
-        try handle.write(contentsOf: Data([0x0A]))
-        try handle.close()
-      } catch {
-        continue
       }
     }
   }
