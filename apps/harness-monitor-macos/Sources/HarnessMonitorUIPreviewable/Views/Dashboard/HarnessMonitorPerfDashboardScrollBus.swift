@@ -59,4 +59,21 @@ public enum HarnessMonitorPerfDashboardScrollBus {
       details: ["y": String(Int(y.rounded()))]
     )
   }
+
+  /// Record the scroll surface's content size vs container size. Captured once
+  /// per geometry transition so the audit can prove whether content > viewport.
+  /// If contentH <= containerH, scrollTo(edge:) is a no-op by definition.
+  public static func recordGeometry(
+    contentHeight: CGFloat,
+    containerHeight: CGFloat
+  ) {
+    HarnessMonitorPerfTrace.recordScenarioEvent(
+      component: auditComponent,
+      event: "scroll.geometry",
+      details: [
+        "content_h": String(Int(contentHeight.rounded())),
+        "container_h": String(Int(containerHeight.rounded())),
+      ]
+    )
+  }
 }
