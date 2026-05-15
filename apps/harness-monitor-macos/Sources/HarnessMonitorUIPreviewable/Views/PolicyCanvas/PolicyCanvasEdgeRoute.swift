@@ -54,8 +54,8 @@ struct PolicyCanvasEdgeRoute {
     return points.last ?? labelPosition
   }
 
-  private func distance(_ a: CGPoint, _ b: CGPoint) -> CGFloat {
-    hypot(b.x - a.x, b.y - a.y)
+  private func distance(_ start: CGPoint, _ end: CGPoint) -> CGFloat {
+    hypot(end.x - start.x, end.y - start.y)
   }
 
   init(

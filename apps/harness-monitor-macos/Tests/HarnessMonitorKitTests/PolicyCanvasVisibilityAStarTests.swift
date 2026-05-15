@@ -232,8 +232,8 @@ private struct AStarFixture {
   let target: CGPoint
   let obstacles: [CGRect]
 
-  func with(obstacles: [CGRect]) -> AStarFixture {
-    AStarFixture(source: source, target: target, obstacles: obstacles)
+  func with(obstacles: [CGRect]) -> Self {
+    Self(source: source, target: target, obstacles: obstacles)
   }
 }
 
