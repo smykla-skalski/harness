@@ -129,7 +129,6 @@ public struct TaskBoardOverviewView: View {
             onRefresh: onRefreshTaskBoard,
             onClose: clearSelectedTaskBoardItem
           )
-          .id(selectedTaskBoardItem?.id ?? "new")
         }
       } else {
         emptyState
