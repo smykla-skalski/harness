@@ -187,6 +187,9 @@ struct SessionSidebar: View {
       .buttonStyle(.borderless)
       .accessibilityIdentifier(HarnessMonitorAccessibility.sessionWindowRoute(route))
       .accessibilityValue(isSelected ? "selected" : "not selected")
+      .contextMenu {
+        unavailableRouteContextMenu
+      }
     }
   }
 
