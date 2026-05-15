@@ -5,181 +5,139 @@
     {
       "id": "SettingsView",
       "description": "Settings root window",
-      "file": "Sources/HarnessMonitorUIPreviewable/Views/SettingsViewPreviews.swift",
+      "file": "Sources/HarnessMonitorUIPreviewable/Views/Settings/Previews/PreviewSettingsView.swift",
       "index": 0
-    },
-    {
-      "id": "WorkspaceWindowView",
-      "description": "Workspace window with terminal + sidebar",
-      "file": "Sources/HarnessMonitorUIPreviewable/Views/WorkspaceWindowViewPreviews.swift",
-      "index": 0
-    },
-    {
-      "id": "WorkspaceWindowAgentDetailPane",
-      "description": "Workspace window with agent detail pane selected (worker-codex) - sticky composer, role disclosure, cockpit chrome, full overhaul applied",
-      "file": "Sources/HarnessMonitorUIPreviewable/Views/WorkspaceWindowViewPreviews.swift",
-      "index": 8
-    },
-    {
-      "id": "WorkspaceWindowAgentDetailLeader",
-      "description": "Workspace window with agent detail pane selected (leader-claude) - leader role locked, sticky composer, cockpit chrome",
-      "file": "Sources/HarnessMonitorUIPreviewable/Views/WorkspaceWindowViewPreviews.swift",
-      "index": 9
-    },
-    {
-      "id": "WorkspaceWindowOpeningLight",
-      "description": "Workspace opening shell before live content mounts in light appearance",
-      "file": "Sources/HarnessMonitorUIPreviewable/Views/WorkspaceWindowOpeningView.swift",
-      "index": 0
-    },
-    {
-      "id": "WorkspaceWindowOpeningDark",
-      "description": "Workspace opening shell before live content mounts in dark appearance",
-      "file": "Sources/HarnessMonitorUIPreviewable/Views/WorkspaceWindowOpeningView.swift",
-      "index": 1
     },
     {
       "id": "SessionCockpitView",
       "description": "Session cockpit detail",
-      "file": "Sources/HarnessMonitorUIPreviewable/Views/SessionCockpitView.swift",
+      "file": "Sources/HarnessMonitorUIPreviewable/Views/Sessions/Previews/PreviewSessionCockpitView.swift",
       "index": 0
     },
     {
       "id": "SessionCockpitHeaderCard",
       "description": "Session header card with status + metrics",
-      "file": "Sources/HarnessMonitorUIPreviewable/Views/SessionCockpitHeaderCard.swift",
+      "file": "Sources/HarnessMonitorUIPreviewable/Views/Sessions/Previews/PreviewSessionCockpitHeaderCard.swift",
       "index": 0
     },
     {
       "id": "SessionCockpitTimelineSection",
       "description": "Session timeline with paged events",
-      "file": "Sources/HarnessMonitorUIPreviewable/Views/MonitorTimelineSection.swift",
+      "file": "Sources/HarnessMonitorUIPreviewable/Views/Timeline/Previews/PreviewMonitorTimelineSectionNavigation.swift",
       "index": 0
     },
     {
       "id": "SessionCockpitTimelineSignalSquish",
       "description": "Session timeline signal squish regression surface with one-line and multiline rows",
-      "file": "Sources/HarnessMonitorUIPreviewable/Views/MonitorTimelineSection+Previews.swift",
+      "file": "Sources/HarnessMonitorUIPreviewable/Views/Timeline/Previews/PreviewMonitorTimelineSection.swift",
       "index": 0
     },
     {
       "id": "SessionCockpitTimelineCursor",
       "description": "Session timeline pagination and scroll cursor surface",
-      "file": "Sources/HarnessMonitorUIPreviewable/Views/MonitorTimelineSection+Previews.swift",
+      "file": "Sources/HarnessMonitorUIPreviewable/Views/Timeline/Previews/PreviewMonitorTimelineSection.swift",
       "index": 1
     },
     {
       "id": "SessionCockpitTimelineSignalSquishLargest",
       "description": "Session timeline signal squish surface at largest text size",
-      "file": "Sources/HarnessMonitorUIPreviewable/Views/MonitorTimelineSection+Previews.swift",
+      "file": "Sources/HarnessMonitorUIPreviewable/Views/Timeline/Previews/PreviewMonitorTimelineSection.swift",
       "index": 2
     },
     {
       "id": "SessionAgentLaneViews",
       "description": "Agent lane with tasks + drop zones",
-      "file": "Sources/HarnessMonitorUIPreviewable/Views/SessionAgentLaneViews.swift",
+      "file": "Sources/HarnessMonitorUIPreviewable/Views/Sessions/Previews/PreviewSessionAgentLaneViews.swift",
       "index": 0
     },
     {
       "id": "SessionTaskLaneViews",
       "description": "Task lane card variations",
-      "file": "Sources/HarnessMonitorUIPreviewable/Views/SessionTaskLaneViews.swift",
+      "file": "Sources/HarnessMonitorUIPreviewable/Views/Sessions/Previews/PreviewSessionTaskLaneViews.swift",
       "index": 0
     },
     {
       "id": "SessionMetricGrid",
       "description": "Metric tiles grid",
-      "file": "Sources/HarnessMonitorUIPreviewable/Views/SessionMetricGrid.swift",
-      "index": 0
-    },
-    {
-      "id": "SessionActionDock",
-      "description": "Session action dock buttons",
-      "file": "Sources/HarnessMonitorUIPreviewable/Views/SessionActionDock.swift",
+      "file": "Sources/HarnessMonitorUIPreviewable/Views/Sessions/Previews/PreviewSessionMetricGrid.swift",
       "index": 0
     },
     {
       "id": "SessionsBoardRecentSessionsSection",
       "description": "Recent sessions overflow section",
-      "file": "Sources/HarnessMonitorUIPreviewable/Views/SessionsBoardRecentSessionsSection.swift",
+      "file": "Sources/HarnessMonitorUIPreviewable/Views/Sessions/Previews/PreviewSessionsBoardRecentSessionsSection.swift",
       "index": 0
     },
     {
       "id": "SidebarSessionRow",
       "description": "Sidebar session row variants",
-      "file": "Sources/HarnessMonitorUIPreviewable/Views/SidebarSessionRow.swift",
-      "index": 0
-    },
-    {
-      "id": "SidebarFooterAccessory",
-      "description": "Sidebar footer status bar",
-      "file": "Sources/HarnessMonitorUIPreviewable/Views/SidebarFooterAccessory.swift",
+      "file": "Sources/HarnessMonitorUIPreviewable/Views/Sessions/Previews/PreviewSessionSidebarRow.swift",
       "index": 0
     },
     {
       "id": "ConnectionViews",
       "description": "Connection status banners",
-      "file": "Sources/HarnessMonitorUIPreviewable/Views/ConnectionViews.swift",
-      "index": 0
-    },
-    {
-      "id": "AcpPermissionAttentionToast",
-      "description": "ACP permission attention toast overlay",
-      "file": "Sources/HarnessMonitorUIPreviewable/Views/Attention/AcpPermissionAttentionToastView.swift",
+      "file": "Sources/HarnessMonitorUIPreviewable/Views/App/Previews/PreviewConnectionViews.swift",
       "index": 0
     },
     {
       "id": "DaemonRecoveryToast",
       "description": "External daemon stale manifest recovery toast",
-      "file": "Sources/HarnessMonitorUIPreviewable/Views/HarnessMonitorFeedbackToastView+Previews.swift",
+      "file": "Sources/HarnessMonitorUIPreviewable/Views/Shared/Previews/PreviewHarnessMonitorFeedbackToastView.swift",
       "index": 0
     },
     {
       "id": "DaemonRecoveryToastExpanded",
       "description": "External daemon stale manifest recovery toast with restart details expanded",
-      "file": "Sources/HarnessMonitorUIPreviewable/Views/HarnessMonitorFeedbackToastView+Previews.swift",
+      "file": "Sources/HarnessMonitorUIPreviewable/Views/Shared/Previews/PreviewHarnessMonitorFeedbackToastView.swift",
       "index": 1
     },
     {
       "id": "WorkspaceDecisionDeskCrowded",
       "description": "Workspace decision desk with sidebar, detail, and inspector populated",
-      "file": "Sources/HarnessMonitorUIPreviewable/Views/Decisions/WorkspaceDecisionDeskCrowdedPreview.swift",
+      "file": "Sources/HarnessMonitorUIPreviewable/Views/Decisions/Previews/PreviewWorkspaceDecisionDeskCrowded.swift",
       "index": 0
     },
     {
       "id": "SignalDetailSheet",
       "description": "Signal detail sheet card",
-      "file": "Sources/HarnessMonitorUIPreviewable/Views/Signals/SignalDetailSheet.swift",
+      "file": "Sources/HarnessMonitorUIPreviewable/Views/Signals/Previews/PreviewSignalDetailSheet.swift",
       "index": 0
     },
     {
       "id": "ObserverSummaryPanel",
       "description": "Observer summary panel for the decisions surface",
-      "file": "Sources/HarnessMonitorUIPreviewable/Views/Decisions/ObserverSummaryPanel.swift",
+      "file": "Sources/HarnessMonitorUIPreviewable/Views/Decisions/Previews/PreviewObserverSummaryPanel.swift",
       "index": 0
     },
     {
       "id": "ReviewStatePanel",
       "description": "Review state panel awaiting review",
-      "file": "Sources/HarnessMonitorUIPreviewable/Views/Review/ReviewPanel.swift",
+      "file": "Sources/HarnessMonitorUIPreviewable/Views/Review/Previews/PreviewReviewPanel.swift",
       "index": 0
     },
     {
       "id": "CreateTaskSheet",
       "description": "Create task action sheet",
-      "file": "Sources/HarnessMonitorUIPreviewable/Views/Actions/CreateTaskSheet.swift",
+      "file": "Sources/HarnessMonitorUIPreviewable/Views/Actions/Previews/PreviewCreateTaskSheet.swift",
       "index": 0
     },
     {
       "id": "TaskActionsSheet",
       "description": "Manage task actions sheet",
-      "file": "Sources/HarnessMonitorUIPreviewable/Views/Actions/TaskActionsSheet.swift",
+      "file": "Sources/HarnessMonitorUIPreviewable/Views/Actions/Previews/PreviewTaskActionsSheet.swift",
       "index": 0
     },
     {
       "id": "LeaderTransferSheet",
       "description": "Leader transfer action sheet",
-      "file": "Sources/HarnessMonitorUIPreviewable/Views/Actions/LeaderTransferSheet.swift",
+      "file": "Sources/HarnessMonitorUIPreviewable/Views/Actions/Previews/PreviewLeaderTransferSheet.swift",
+      "index": 0
+    },
+    {
+      "id": "TaskBoardOverview",
+      "description": "Task-board overview with board queue and session tasks",
+      "file": "Sources/HarnessMonitorUIPreviewable/Views/TaskBoard/Previews/PreviewTaskBoardOverviewView.swift",
       "index": 0
     }
   ]
