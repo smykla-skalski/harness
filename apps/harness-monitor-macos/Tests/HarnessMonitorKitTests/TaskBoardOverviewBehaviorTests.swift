@@ -121,6 +121,35 @@ struct TaskBoardOverviewBehaviorTests {
     #expect(evaluation.dryRun == false)
   }
 
+  @Test("Needs You lane preserves explicit inbox status for imported GitHub inbox items")
+  func needsYouLanePreservesImportedGitHubInboxStatus() {
+    let inboxItem = taskBoardItem(
+      id: "github-example-repo-42",
+      status: .todo,
+      externalRefs: [
+        TaskBoardExternalRef(
+          provider: .gitHub,
+          externalId: "example/repo#42",
+          url: "https://github.com/example/repo/issues/42"
+        )
+      ],
+      planning: TaskBoardPlanningState()
+    )
+
+    #expect(TaskBoardInboxLane.needsYou.taskBoardDropStatus(for: inboxItem) == .needsYou)
+  }
+
+  @Test("Needs You lane keeps plan-review semantics for manual items")
+  func needsYouLaneKeepsPlanReviewForManualItems() {
+    let manualItem = taskBoardItem(
+      id: "board-only",
+      status: .todo,
+      planning: TaskBoardPlanningState(summary: "Review the plan")
+    )
+
+    #expect(TaskBoardInboxLane.needsYou.taskBoardDropStatus(for: manualItem) == .planReview)
+  }
+
   private func inboxItem(taskID: String) -> TaskBoardInboxItem {
     let item = TaskBoardInboxItem(
       session: PreviewFixtures.summary,
@@ -151,6 +180,8 @@ struct TaskBoardOverviewBehaviorTests {
   private func taskBoardItem(
     id: String,
     status: TaskBoardStatus,
+    externalRefs: [TaskBoardExternalRef] = [],
+    planning: TaskBoardPlanningState = TaskBoardPlanningState(),
     sessionId: String? = nil,
     workItemId: String? = nil
   ) -> TaskBoardItem {
@@ -164,8 +195,8 @@ struct TaskBoardOverviewBehaviorTests {
       tags: [],
       projectId: "project-1",
       agentMode: .interactive,
-      externalRefs: [],
-      planning: TaskBoardPlanningState(),
+      externalRefs: externalRefs,
+      planning: planning,
       workflow: nil,
       sessionId: sessionId,
       workItemId: workItemId,

@@ -6,6 +6,7 @@ use tempfile::tempdir;
 
 use super::*;
 use crate::task_board::store::TaskBoardStore;
+use crate::task_board::types::{ExternalRefSyncState, PlanningState};
 use crate::task_board::{ExternalRefProvider, build_dispatch_plan};
 
 #[test]
@@ -504,7 +505,8 @@ async fn sync_external_tasks_reconciles_legacy_github_refs_by_project_scope() {
     );
     primary.status = TaskBoardStatus::Todo;
     primary.project_id = Some("owner/repo".to_owned());
-    primary.external_refs = vec![ExternalTaskRef::new(ExternalProvider::GitHub, "7").into_core_ref()];
+    primary.external_refs =
+        vec![ExternalTaskRef::new(ExternalProvider::GitHub, "7").into_core_ref()];
     board
         .create("Old title", "Body", primary)
         .expect("create primary task");
@@ -555,8 +557,7 @@ async fn sync_external_tasks_reconciles_legacy_github_refs_by_project_scope() {
         .expect("load reconciled legacy task");
     assert_eq!(updated.title, "Updated title");
     assert!(updated.external_refs.iter().any(|reference| {
-        reference.provider == ExternalRefProvider::GitHub
-            && reference.external_id == "owner/repo#7"
+        reference.provider == ExternalRefProvider::GitHub && reference.external_id == "owner/repo#7"
     }));
 
     let untouched = board
@@ -566,6 +567,145 @@ async fn sync_external_tasks_reconciles_legacy_github_refs_by_project_scope() {
     assert!(untouched.external_refs.iter().any(|reference| {
         reference.provider == ExternalRefProvider::GitHub && reference.external_id == "7"
     }));
+}
+
+#[tokio::test]
+async fn sync_external_tasks_resolves_stale_github_review_requests() {
+    let temp = tempdir().expect("tempdir");
+    let board = TaskBoardStore::new(temp.path().join("board"));
+    let item = github_review_request_item(
+        "github-owner-repo-71",
+        "owner/repo#71",
+        TaskBoardStatus::PlanReview,
+    );
+    board
+        .create("Review requested", "Please review the pull request.", item)
+        .expect("create review request task");
+
+    let clients: Vec<Box<dyn ExternalSyncClient>> = vec![Box::new(FakeSyncClient {
+        provider: ExternalProvider::GitHub,
+        tasks: Vec::new(),
+        pushed: Mutex::new(Vec::new()),
+    })];
+
+    let operations = sync_external_tasks(
+        &board,
+        ExternalSyncOptions {
+            provider: Some(ExternalProvider::GitHub),
+            direction: ExternalSyncDirection::Pull,
+            conflict_policy: ExternalSyncConflictPolicy::Report,
+            dry_run: false,
+            status: None,
+        },
+        &clients,
+    )
+    .await
+    .expect("sync external tasks");
+
+    assert_eq!(operations.len(), 1);
+    assert_eq!(
+        operations[0].changed_fields,
+        vec![ExternalSyncField::Status]
+    );
+    assert!(operations[0].applied);
+
+    let updated = board
+        .get("github-owner-repo-71")
+        .expect("load resolved review request");
+    assert_eq!(updated.status, TaskBoardStatus::Done);
+    assert_eq!(
+        updated.external_refs[0]
+            .sync_state
+            .as_ref()
+            .and_then(|state| state.status),
+        Some(TaskBoardStatus::Done)
+    );
+}
+
+#[tokio::test]
+async fn sync_external_tasks_dry_run_reports_stale_github_review_requests_without_writing() {
+    let temp = tempdir().expect("tempdir");
+    let board = TaskBoardStore::new(temp.path().join("board"));
+    let item = github_review_request_item(
+        "github-owner-repo-72",
+        "owner/repo#72",
+        TaskBoardStatus::NeedsYou,
+    );
+    board
+        .create("Review requested", "Please review the pull request.", item)
+        .expect("create review request task");
+
+    let clients: Vec<Box<dyn ExternalSyncClient>> = vec![Box::new(FakeSyncClient {
+        provider: ExternalProvider::GitHub,
+        tasks: Vec::new(),
+        pushed: Mutex::new(Vec::new()),
+    })];
+
+    let operations = sync_external_tasks(
+        &board,
+        ExternalSyncOptions {
+            provider: Some(ExternalProvider::GitHub),
+            direction: ExternalSyncDirection::Pull,
+            conflict_policy: ExternalSyncConflictPolicy::Report,
+            dry_run: true,
+            status: None,
+        },
+        &clients,
+    )
+    .await
+    .expect("sync external tasks");
+
+    assert_eq!(operations.len(), 1);
+    assert_eq!(
+        operations[0].changed_fields,
+        vec![ExternalSyncField::Status]
+    );
+    assert!(!operations[0].applied);
+
+    let unchanged = board
+        .get("github-owner-repo-72")
+        .expect("load unchanged review request");
+    assert_eq!(unchanged.status, TaskBoardStatus::NeedsYou);
+}
+
+#[tokio::test]
+async fn sync_external_tasks_keeps_started_github_review_requests_when_remote_request_disappears() {
+    let temp = tempdir().expect("tempdir");
+    let board = TaskBoardStore::new(temp.path().join("board"));
+    let item = github_review_request_item(
+        "github-owner-repo-73",
+        "owner/repo#73",
+        TaskBoardStatus::Todo,
+    );
+    board
+        .create("Review requested", "Please review the pull request.", item)
+        .expect("create started review request task");
+
+    let clients: Vec<Box<dyn ExternalSyncClient>> = vec![Box::new(FakeSyncClient {
+        provider: ExternalProvider::GitHub,
+        tasks: Vec::new(),
+        pushed: Mutex::new(Vec::new()),
+    })];
+
+    let operations = sync_external_tasks(
+        &board,
+        ExternalSyncOptions {
+            provider: Some(ExternalProvider::GitHub),
+            direction: ExternalSyncDirection::Pull,
+            conflict_policy: ExternalSyncConflictPolicy::Report,
+            dry_run: false,
+            status: None,
+        },
+        &clients,
+    )
+    .await
+    .expect("sync external tasks");
+
+    assert!(operations.is_empty());
+    let unchanged = board
+        .get("github-owner-repo-73")
+        .expect("load unchanged started review request");
+    assert_eq!(unchanged.status, TaskBoardStatus::Todo);
 }
 
 struct FakeSyncClient {
@@ -623,4 +763,37 @@ fn github_external_task_with_status(
         project_id: Some(project_id.to_owned()),
         updated_at: Some("2026-05-14T03:00:00Z".to_string()),
     }
+}
+
+fn github_review_request_item(
+    id: &str,
+    external_id: &str,
+    status: TaskBoardStatus,
+) -> TaskBoardItem {
+    let mut item = TaskBoardItem::new(
+        id.to_owned(),
+        "Review requested".to_owned(),
+        "Please review the pull request.".to_owned(),
+        "2026-05-14T00:00:00Z".to_owned(),
+    );
+    item.status = status;
+    item.project_id = Some("owner/repo".to_owned());
+    item.planning = PlanningState::default();
+    item.external_refs = vec![github_review_request_ref(external_id)];
+    item
+}
+
+fn github_review_request_ref(external_id: &str) -> crate::task_board::types::ExternalRef {
+    let mut reference = ExternalTaskRef::new(ExternalProvider::GitHub, external_id)
+        .with_url(format!("https://example.test/pull/{external_id}"))
+        .into_core_ref();
+    reference.sync_state = Some(ExternalRefSyncState {
+        title: Some("Review requested".to_owned()),
+        body: Some("Please review the pull request.".to_owned()),
+        status: Some(TaskBoardStatus::NeedsYou),
+        project_id: Some("owner/repo".to_owned()),
+        updated_at: Some("2026-05-14T03:00:00Z".to_owned()),
+        synced_at: Some("2026-05-14T03:00:00Z".to_owned()),
+    });
+    reference
 }

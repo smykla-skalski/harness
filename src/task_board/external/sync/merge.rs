@@ -23,7 +23,7 @@ pub(super) fn pull_conflict_fields(
     item: &TaskBoardItem,
     task: &ExternalTask,
 ) -> Vec<ExternalSyncField> {
-    let Some(reference) = matching_ref(item, &task.reference) else {
+    let Some(reference) = matching_ref(item, &task.reference, task.project_id.as_deref()) else {
         return Vec::new();
     };
     match &reference.sync_state {
@@ -41,7 +41,7 @@ pub(super) fn local_update_fields(
     reference: &ExternalTaskRef,
     capabilities: &ExternalProviderCapabilities,
 ) -> Vec<ExternalSyncField> {
-    matching_ref(item, reference)
+    matching_ref(item, reference, item.project_id.as_deref())
         .and_then(|reference| reference.sync_state.as_ref())
         .map_or_else(
             || capabilities.update_fields.clone(),
@@ -244,12 +244,45 @@ fn push_if(fields: &mut Vec<ExternalSyncField>, condition: bool, field: External
     }
 }
 
-fn matching_ref<'a>(
+pub(super) fn matching_ref<'a>(
     item: &'a TaskBoardItem,
     reference: &ExternalTaskRef,
+    project_id: Option<&str>,
 ) -> Option<&'a ExternalRef> {
+    item.external_refs
+        .iter()
+        .find(|candidate| external_ref_matches(item, candidate, reference, project_id))
+}
+
+pub(super) fn external_ref_matches(
+    item: &TaskBoardItem,
+    candidate: &ExternalRef,
+    reference: &ExternalTaskRef,
+    project_id: Option<&str>,
+) -> bool {
     let provider = reference.provider.into();
-    item.external_refs.iter().find(|candidate| {
-        candidate.provider == provider && candidate.external_id == reference.external_id
-    })
+    if candidate.provider != provider {
+        return false;
+    }
+    if candidate.external_id == reference.external_id {
+        return true;
+    }
+    provider == crate::task_board::types::ExternalRefProvider::GitHub
+        && project_id.is_some_and(|project_id| project_matches(item, candidate, project_id))
+        && github_legacy_external_id(reference.external_id.as_str())
+            .is_some_and(|legacy_id| candidate.external_id == legacy_id)
+}
+
+fn project_matches(item: &TaskBoardItem, candidate: &ExternalRef, project_id: &str) -> bool {
+    candidate
+        .sync_state
+        .as_ref()
+        .and_then(|state| state.project_id.as_deref())
+        .or(item.project_id.as_deref())
+        .is_some_and(|candidate_project| candidate_project.eq_ignore_ascii_case(project_id))
+}
+
+fn github_legacy_external_id(external_id: &str) -> Option<&str> {
+    let (_, legacy_id) = external_id.rsplit_once('#')?;
+    (!legacy_id.trim().is_empty()).then_some(legacy_id)
 }

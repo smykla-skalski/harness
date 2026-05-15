@@ -91,6 +91,12 @@ extension TaskBoardItem {
   var hasLinkedSessionTask: Bool {
     sessionId != nil && workItemId != nil
   }
+
+  var isImportedGitHubInboxItem: Bool {
+    id.hasPrefix("github-")
+      && planning.summary == nil
+      && externalRefs.contains(where: { $0.provider == .gitHub })
+  }
 }
 
 enum TaskBoardOverviewItemSelectionAction: Equatable {
@@ -171,6 +177,13 @@ extension TaskBoardInboxLane {
     case .backlog:
       .new
     }
+  }
+
+  func taskBoardDropStatus(for item: TaskBoardItem) -> TaskBoardStatus {
+    guard self == .needsYou else {
+      return taskBoardDropStatus
+    }
+    return item.status == .needsYou || item.isImportedGitHubInboxItem ? .needsYou : .planReview
   }
 }
 
