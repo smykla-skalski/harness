@@ -8,7 +8,7 @@ use crate::session::types::CONTROL_PLANE_ACTOR_ID;
 use crate::task_board::store::{OptionalFieldPatch, TaskBoardItemPatch};
 use crate::task_board::{
     DispatchAppliedTask, DispatchExecutionSummary, DispatchFailure, DispatchFailureKind,
-    DispatchPlan, MachineRegistry, SessionIntent, TaskBoardItem, TaskBoardStatus, TaskBoardStore,
+    DispatchPlan, SessionIntent, TaskBoardItem, TaskBoardStatus, TaskBoardStore,
     TaskBoardWorkflowStatus, build_dispatch_summary_with_policy_root, filter_for_local_machine,
     machine_mismatch_plan_with_policy_root,
 };
@@ -337,7 +337,7 @@ fn new_policy_trace_id() -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::task_board::{DispatchBlockReason, DispatchReadiness};
+    use crate::task_board::{DispatchBlockReason, DispatchReadiness, MachineRegistry};
     use crate::task_board::planning::{approve_plan, submit_plan};
     use tempfile::tempdir;
 
