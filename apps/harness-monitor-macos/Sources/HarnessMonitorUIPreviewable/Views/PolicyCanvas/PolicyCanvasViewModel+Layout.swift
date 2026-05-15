@@ -38,21 +38,31 @@ extension PolicyCanvasViewModel {
     )
   }
 
-  /// Obstacles handed to the visibility router. Node frames + group
-  /// frames; both layers (`PolicyCanvasEdgeLayer` and
-  /// `PolicyCanvasEdgeLabelLayer`) hoist this once per body so the
-  /// stroke and label render against the same obstacle set.
-  /// `PolicyCanvasVisibilityRouter.preparedObstacles` auto-drops any
-  /// obstacle whose padded rect contains source or target, which is
-  /// what makes intra-group edges still work: a member node's source
-  /// port sits inside its group's padded frame, so the source's group
-  /// gets filtered automatically and the route can exit cleanly.
-  var routingObstacles: [CGRect] {
-    let nodeObstacles = nodes.map { node in
+  /// Node-only obstacles. Always part of the router's obstacle set; the
+  /// per-edge `routingObstacles(source:target:)` overlay adds group
+  /// frames only when both endpoints are outside every group.
+  var nodeRoutingObstacles: [CGRect] {
+    nodes.map { node in
       CGRect(origin: node.position, size: PolicyCanvasLayout.nodeSize)
     }
-    let groupObstacles = groups.map(\.frame)
-    return nodeObstacles + groupObstacles
+  }
+
+  /// Per-edge obstacle list. Always includes every node frame; adds
+  /// group frames only when neither source nor target lives inside any
+  /// group. Edges that originate or terminate inside a group cross a
+  /// group boundary by nature - constraining them to skirt OTHER groups
+  /// produces long backward loops with no perceptual gain. Edges
+  /// between ungrouped nodes still see groups as obstacles so they
+  /// route around the rectangles instead of cutting through.
+  func routingObstacles(source: CGPoint, target: CGPoint) -> [CGRect] {
+    let nodeObstacles = nodeRoutingObstacles
+    let endpointInsideAnyGroup = groups.contains { group in
+      group.frame.contains(source) || group.frame.contains(target)
+    }
+    guard !endpointInsideAnyGroup else {
+      return nodeObstacles
+    }
+    return nodeObstacles + groups.map(\.frame)
   }
 
   /// Per-kind edge counts for the inspector empty-state breakdown.

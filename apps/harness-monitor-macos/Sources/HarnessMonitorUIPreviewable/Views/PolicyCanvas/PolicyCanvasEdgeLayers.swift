@@ -25,7 +25,6 @@ struct PolicyCanvasEdgeLayer: View {
     // both are layer-specific and the label layer does not need them.
     let severityMap = viewModel.edgeSeverityMap
     let edgeLanes = viewModel.edgeRouteLanes
-    let obstacles = viewModel.routingObstacles
     ZStack(alignment: .topLeading) {
       ForEach(edges) { edge in
         if let source = portAnchors[edge.source],
@@ -36,7 +35,7 @@ struct PolicyCanvasEdgeLayer: View {
             source: source,
             target: target,
             lane: edgeLanes[edge.id, default: 0],
-            obstacles: obstacles
+            obstacles: viewModel.routingObstacles(source: source, target: target)
           )
           let severity = severityMap[edge.id]
           let isSelected = viewModel.selection == .edge(edge.id)
@@ -163,7 +162,6 @@ struct PolicyCanvasEdgeLabelLayer: View {
     let metrics = PolicyCanvasEdgeLabelMetrics(fontScale: fontScale)
     let edgeLanes = viewModel.edgeRouteLanes
     let collapsed = viewModel.zoom < Self.labelCollapseThreshold
-    let obstacles = viewModel.routingObstacles
     ZStack(alignment: .topLeading) {
       ForEach(edges) { edge in
         if !edge.label.isEmpty,
@@ -175,7 +173,7 @@ struct PolicyCanvasEdgeLabelLayer: View {
             source: source,
             target: target,
             lane: edgeLanes[edge.id, default: 0],
-            obstacles: obstacles
+            obstacles: viewModel.routingObstacles(source: source, target: target)
           )
           if collapsed {
             Circle()
