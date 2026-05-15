@@ -27,8 +27,8 @@ pub fn update_task_board_git_runtime_config(
 ) -> Result<TaskBoardGitRuntimeConfig, CliError> {
     let normalized = normalized_runtime_config(request)?;
     let persisted = normalized.without_secrets();
-    state::replace_task_board_git_runtime_secrets(&normalized);
     state::persist_task_board_git_runtime_config(&persisted)?;
+    state::replace_task_board_git_runtime_secrets(&normalized);
     Ok(persisted)
 }
 
@@ -362,6 +362,64 @@ mod tests {
             );
             let _ =
                 super::sync_task_board_todoist_token(&TaskBoardTodoistTokenSyncRequest::default());
+        });
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn runtime_config_persist_failure_keeps_in_memory_secrets() {
+        use std::fs::Permissions;
+        use std::os::unix::fs::PermissionsExt;
+
+        let tmp = tempdir().expect("tempdir");
+        with_isolated_harness_env(tmp.path(), || {
+            // Seed an initial runtime config with secret material so we can
+            // assert the in-memory snapshot is untouched after a persist failure.
+            update_task_board_git_runtime_config(&TaskBoardGitRuntimeConfig {
+                global: TaskBoardGitRuntimeProfile {
+                    ssh_private_key: Some("initial-secret".into()),
+                    ..Default::default()
+                },
+                repository_overrides: vec![],
+            })
+            .expect("seed runtime config");
+
+            let baseline = super::git_runtime_profile_for_repository(None)
+                .expect("baseline profile")
+                .ssh_private_key
+                .expect("baseline secret stored");
+            assert_eq!(baseline, "initial-secret");
+
+            // Make the daemon root read-only so the next persist call fails.
+            let daemon_root = state::config_path()
+                .parent()
+                .expect("daemon root parent")
+                .to_path_buf();
+            let original = daemon_root
+                .metadata()
+                .expect("daemon root metadata")
+                .permissions();
+            fs_err::set_permissions(&daemon_root, Permissions::from_mode(0o500))
+                .expect("lock daemon root");
+
+            let outcome = update_task_board_git_runtime_config(&TaskBoardGitRuntimeConfig {
+                global: TaskBoardGitRuntimeProfile {
+                    ssh_private_key: Some("rotated-secret".into()),
+                    ..Default::default()
+                },
+                repository_overrides: vec![],
+            });
+            fs_err::set_permissions(&daemon_root, original).expect("restore daemon root");
+
+            assert!(outcome.is_err(), "persist should fail when path is read-only");
+            let after = super::git_runtime_profile_for_repository(None)
+                .expect("post-failure profile")
+                .ssh_private_key
+                .expect("in-memory secret unchanged");
+            assert_eq!(
+                after, "initial-secret",
+                "in-memory secret must stay stale when persist fails",
+            );
         });
     }
 
