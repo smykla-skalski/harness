@@ -83,6 +83,9 @@ struct TaskBoardItemManagementPanel: View {
     .task { await loadProjectTypeSuggestions() }
     .accessibilityElement(children: .contain)
     .accessibilityIdentifier("harness.task-board.manage-item.\(item?.id ?? "new")")
+    .onChange(of: item) { _, newValue in
+      draft = newValue.map(TaskBoardItemEditorDraft.init) ?? TaskBoardItemEditorDraft()
+    }
   }
 
   @MainActor
