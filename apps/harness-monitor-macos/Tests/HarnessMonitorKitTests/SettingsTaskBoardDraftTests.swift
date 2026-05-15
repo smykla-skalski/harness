@@ -131,4 +131,24 @@ struct SettingsTaskBoardDraftTests {
 
     #expect(repositories == ["example/harness", "example/aff"])
   }
+
+  @Test("GitHub inbox label filter trims, dedupes case-insensitively, preserves first casing")
+  func githubInboxLabelFilterRoundTrip() {
+    var draft = TaskBoardGitSettingsDraft()
+    draft.githubInboxLabelFilterText = " Bug \n triage \n  bug  \n needs-design "
+
+    let labels = draft.snapshot.orchestratorSettings.githubInbox.labelFilter
+
+    #expect(labels == ["Bug", "triage", "needs-design"])
+  }
+
+  @Test("Todoist inbox project filter trims and dedupes through orchestrator snapshot")
+  func todoistInboxProjectFilterRoundTrip() {
+    var draft = TaskBoardGitSettingsDraft()
+    draft.todoistInboxProjectFilterText = " 1234567890 \n 1234567890 \n 9876543210 \n "
+
+    let projects = draft.snapshot.orchestratorSettings.todoistInbox.projectFilter
+
+    #expect(projects == ["1234567890", "9876543210"])
+  }
 }

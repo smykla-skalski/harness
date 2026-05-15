@@ -38,6 +38,7 @@ public struct SettingsTaskBoardSection: View {
         workflowSection
         projectSection
         githubInboxSection
+        todoistInboxSection
         automationSection
         gitDefaultsSection
         credentialsSection
@@ -160,6 +161,15 @@ public struct SettingsTaskBoardSection: View {
       .accessibilityIdentifier(
         HarnessMonitorAccessibility.settingsTaskBoardInboxRepositoriesField
       )
+      HarnessMonitorMultilineTextField<Never>(
+        placeholder: "label, one per line (leave empty for all labels)",
+        text: $draft.githubInboxLabelFilterText,
+        minHeight: 66,
+        accessibilityLabel: "GitHub inbox label filter"
+      )
+      .accessibilityIdentifier(
+        HarnessMonitorAccessibility.settingsTaskBoardInboxLabelFilterField
+      )
     } header: {
       Text("GitHub Inbox")
         .harnessNativeFormSectionHeader()
@@ -167,7 +177,32 @@ public struct SettingsTaskBoardSection: View {
       Text(
         """
         List repositories to import issues assigned to you and pull requests requesting your \
-        review into Needs You. This does not change the automation repository above.
+        review into Needs You. Add labels to restrict imports to issues that carry any of those \
+        labels (case-insensitive). Leave the label list empty to import everything.
+        """
+      )
+    }
+  }
+
+  private var todoistInboxSection: some View {
+    Section {
+      HarnessMonitorMultilineTextField<Never>(
+        placeholder: "project id, one per line (leave empty for all projects)",
+        text: $draft.todoistInboxProjectFilterText,
+        minHeight: 66,
+        accessibilityLabel: "Todoist inbox project filter"
+      )
+      .accessibilityIdentifier(
+        HarnessMonitorAccessibility.settingsTaskBoardTodoistProjectFilterField
+      )
+    } header: {
+      Text("Todoist Inbox")
+        .harnessNativeFormSectionHeader()
+    } footer: {
+      Text(
+        """
+        Add Todoist project ids to restrict imports to tasks in those projects. \
+        Leave empty to import every task on the account.
         """
       )
     }

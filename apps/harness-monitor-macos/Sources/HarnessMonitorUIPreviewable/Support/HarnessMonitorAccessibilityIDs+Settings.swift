@@ -124,6 +124,10 @@ extension HarnessMonitorAccessibility {
   public static let settingsTaskBoardRepoField = "harness.settings.task-board.repo"
   public static let settingsTaskBoardInboxRepositoriesField =
     "harness.settings.task-board.github-inbox.repositories"
+  public static let settingsTaskBoardInboxLabelFilterField =
+    "harness.settings.task-board.github-inbox.label-filter"
+  public static let settingsTaskBoardTodoistProjectFilterField =
+    "harness.settings.task-board.todoist-inbox.project-filter"
   public static let settingsTaskBoardCheckoutPathField = "harness.settings.task-board.checkout-path"
   public static let settingsTaskBoardProtectedPathsField =
     "harness.settings.task-board.protected-paths"

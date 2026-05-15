@@ -249,7 +249,10 @@ extension TaskBoardAPIClientTests {
     }
     #expect(
       objectValue(calls[14].params, key: "github_inbox")
-        == .object(["repositories": .array([.string("example/harness"), .string("example/aff")])])
+        == .object([
+          "repositories": .array([.string("example/harness"), .string("example/aff")]),
+          "label_filter": .array([]),
+        ])
     )
     #expect(objectValue(calls[14].params, key: "policy_version") == .string("task-board-policy-v3"))
     #expect(calls[15].params == nil)

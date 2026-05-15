@@ -10,6 +10,8 @@ struct TaskBoardGitSettingsDraft: Equatable {
   var repo = ""
   var checkoutPath = ""
   var githubInboxRepositoriesText = ""
+  var githubInboxLabelFilterText = ""
+  var todoistInboxProjectFilterText = ""
   var defaultBranch = "main"
   var branchPrefix = "c/"
   var mergeMethod: TaskBoardGitHubMergeMethod = .squash
@@ -54,6 +56,8 @@ struct TaskBoardGitSettingsDraft: Equatable {
     repo = project.repo
     checkoutPath = project.checkoutPath
     githubInboxRepositoriesText = orchestrator.githubInbox.repositories.joined(separator: "\n")
+    githubInboxLabelFilterText = orchestrator.githubInbox.labelFilter.joined(separator: "\n")
+    todoistInboxProjectFilterText = orchestrator.todoistInbox.projectFilter.joined(separator: "\n")
     defaultBranch = project.defaultBranch
     branchPrefix = project.branchPrefix
     mergeMethod = project.mergeMethod
@@ -151,7 +155,11 @@ struct TaskBoardGitSettingsDraft: Equatable {
             enabled: enabledAutomations.sorted(by: { $0.rawValue < $1.rawValue })
           )
         ),
-        githubInbox: TaskBoardGitHubInboxConfig(repositories: githubInboxRepositories),
+        githubInbox: TaskBoardGitHubInboxConfig(
+          repositories: githubInboxRepositories,
+          labelFilter: githubInboxLabels
+        ),
+        todoistInbox: TaskBoardTodoistInboxConfig(projectFilter: todoistInboxProjects),
         policyVersion: policyVersion
       ),
       runtimeConfig: TaskBoardGitRuntimeConfig(
@@ -202,6 +210,28 @@ struct TaskBoardGitSettingsDraft: Equatable {
 
   private var githubInboxRepositories: [String] {
     normalizedRepositories(from: githubInboxRepositoriesText)
+  }
+
+  private var githubInboxLabels: [String] {
+    normalizedFilterEntries(from: githubInboxLabelFilterText)
+  }
+
+  private var todoistInboxProjects: [String] {
+    normalizedFilterEntries(from: todoistInboxProjectFilterText)
+  }
+
+  private func normalizedFilterEntries(from value: String) -> [String] {
+    var entries: [String] = []
+    var seen: Set<String> = []
+    for entry in value.split(whereSeparator: \.isNewline) {
+      let trimmed = entry.trimmingCharacters(in: .whitespacesAndNewlines)
+      guard !trimmed.isEmpty else { continue }
+      let key = trimmed.lowercased()
+      if seen.insert(key).inserted {
+        entries.append(trimmed)
+      }
+    }
+    return entries
   }
 
   private func normalizedUniqueLines(from value: String) -> [String] {
