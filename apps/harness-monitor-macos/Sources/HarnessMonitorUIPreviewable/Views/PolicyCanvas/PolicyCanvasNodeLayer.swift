@@ -176,10 +176,11 @@ struct PolicyCanvasNodeCard: View {
           // 0.85) trades a tighter title against the AX5 reality that an
           // 0.85-scaled headline still overflows the fixed card height; the
           // alternative (growing the card) would re-lay out every port anchor.
-          Text(node.title)
+          Text(PolicyCanvasNodeTitleWrap.wrapSafe(node.title))
             .scaledFont(.callout.weight(.semibold))
             .foregroundStyle(.white)
             .lineLimit(2)
+            .truncationMode(.middle)
             .minimumScaleFactor(0.7)
             .allowsTightening(true)
 
