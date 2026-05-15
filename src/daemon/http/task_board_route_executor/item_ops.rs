@@ -1,10 +1,11 @@
 use crate::daemon::protocol::{
     TaskBoardAuditRequest, TaskBoardAuditResponse, TaskBoardCatalogRequest,
     TaskBoardCreateItemRequest, TaskBoardDeleteItemRequest, TaskBoardGetItemRequest,
-    TaskBoardListItemsRequest, TaskBoardListItemsResponse, TaskBoardMachinesResponse,
-    TaskBoardPlanApproveRequest, TaskBoardPlanBeginRequest, TaskBoardPlanSubmitRequest,
-    TaskBoardPlanningResponse, TaskBoardProjectsResponse, TaskBoardSyncRequest,
-    TaskBoardSyncResponse, TaskBoardUpdateItemRequest,
+    TaskBoardHostListResponse, TaskBoardHostLocalResponse, TaskBoardHostSetProjectTypesRequest,
+    TaskBoardHostSetProjectTypesResponse, TaskBoardListItemsRequest, TaskBoardListItemsResponse,
+    TaskBoardMachinesResponse, TaskBoardPlanApproveRequest, TaskBoardPlanBeginRequest,
+    TaskBoardPlanSubmitRequest, TaskBoardPlanningResponse, TaskBoardProjectsResponse,
+    TaskBoardSyncRequest, TaskBoardSyncResponse, TaskBoardUpdateItemRequest,
 };
 use crate::daemon::service;
 use crate::errors::CliError;
@@ -73,4 +74,18 @@ pub(crate) fn machines(
     request: &TaskBoardCatalogRequest,
 ) -> Result<TaskBoardMachinesResponse, CliError> {
     service::list_task_board_machines(request)
+}
+
+pub(crate) fn host_local() -> Result<TaskBoardHostLocalResponse, CliError> {
+    service::task_board_host_local()
+}
+
+pub(crate) fn host_list() -> Result<TaskBoardHostListResponse, CliError> {
+    service::task_board_host_list()
+}
+
+pub(crate) fn host_set_project_types(
+    request: &TaskBoardHostSetProjectTypesRequest,
+) -> Result<TaskBoardHostSetProjectTypesResponse, CliError> {
+    service::task_board_host_set_project_types(request)
 }

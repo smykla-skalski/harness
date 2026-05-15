@@ -4,11 +4,11 @@ use crate::task_board::planning::PlanningTransition;
 use crate::task_board::types::TaskBoardWorkflowState;
 use crate::task_board::{
     AgentMode, DispatchExecutionSummary, ExternalProvider, ExternalRef, ExternalSyncConflictPolicy,
-    ExternalSyncDirection, PlanningState, PolicyPipelineAuditSummary, PolicyPipelineDocument,
-    PolicyPipelinePromoteRequest, PolicyPipelinePromoteResponse, PolicyPipelineSaveResponse,
-    PolicyPipelineSimulationResult, TaskBoardAuditSummary, TaskBoardEvaluationSummary,
-    TaskBoardItem, TaskBoardMachineSummary, TaskBoardPriority, TaskBoardProjectSummary,
-    TaskBoardStatus, TaskBoardSyncSummary,
+    ExternalSyncDirection, Machine, PlanningState, PolicyPipelineAuditSummary,
+    PolicyPipelineDocument, PolicyPipelinePromoteRequest, PolicyPipelinePromoteResponse,
+    PolicyPipelineSaveResponse, PolicyPipelineSimulationResult, TaskBoardAuditSummary,
+    TaskBoardEvaluationSummary, TaskBoardItem, TaskBoardMachineSummary, TaskBoardPriority,
+    TaskBoardProjectSummary, TaskBoardStatus, TaskBoardSyncSummary,
 };
 
 pub use crate::task_board::{
@@ -223,6 +223,15 @@ pub struct TaskBoardPolicyPipelineSimulateRequest {
 pub type TaskBoardSyncResponse = TaskBoardSyncSummary;
 pub type TaskBoardProjectsResponse = Vec<TaskBoardProjectSummary>;
 pub type TaskBoardMachinesResponse = Vec<TaskBoardMachineSummary>;
+pub type TaskBoardHostListResponse = Vec<Machine>;
+pub type TaskBoardHostLocalResponse = Machine;
+pub type TaskBoardHostSetProjectTypesResponse = Machine;
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct TaskBoardHostSetProjectTypesRequest {
+    #[serde(default)]
+    pub project_types: Vec<String>,
+}
 pub type TaskBoardDispatchResponse = DispatchExecutionSummary;
 pub type TaskBoardEvaluationResponse = TaskBoardEvaluationSummary;
 pub type TaskBoardAuditResponse = TaskBoardAuditSummary;

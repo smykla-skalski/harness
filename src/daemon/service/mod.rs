@@ -239,6 +239,7 @@ mod status;
 mod sync_support;
 mod task_board;
 mod task_board_evaluation;
+mod task_board_host;
 mod task_board_github;
 mod task_board_orchestrator;
 mod task_board_runtime;
@@ -306,6 +307,9 @@ pub use task_board::{
 pub use task_board_evaluation::evaluate_task_board;
 #[allow(unused_imports)]
 pub(crate) use task_board_evaluation::evaluate_task_board_async;
+pub use task_board_host::{
+    task_board_host_list, task_board_host_local, task_board_host_set_project_types,
+};
 #[allow(unused_imports)]
 pub(crate) use task_board_orchestrator::run_task_board_orchestrator_once_async;
 pub use task_board_orchestrator::{
