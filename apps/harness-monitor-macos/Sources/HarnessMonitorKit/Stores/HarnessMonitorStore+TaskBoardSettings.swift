@@ -122,6 +122,7 @@ extension HarnessMonitorStore {
       projectDir: settings.projectDir,
       clearProjectDir: settings.projectDir == nil,
       githubProject: settings.githubProject,
+      githubInbox: settings.githubInbox,
       policyVersion: settings.policyVersion
     )
   }
@@ -167,6 +168,7 @@ extension HarnessMonitorStore {
         protectedPaths: githubProject.protectedPaths,
         enabledAutomations: githubProject.enabledAutomations
       ),
+      githubInbox: settings.githubInbox,
       policyVersion: settings.policyVersion
     )
   }

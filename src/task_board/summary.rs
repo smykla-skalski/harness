@@ -263,6 +263,7 @@ mod tests {
         let config = ExternalSyncConfig {
             github_token: Some("token".into()),
             github_repository: None,
+            github_inbox_repositories: Vec::new(),
             todoist_token: None,
         };
 
@@ -290,6 +291,7 @@ mod tests {
         let config = ExternalSyncConfig {
             github_token: Some("token".into()),
             github_repository: Some("owner/repo".into()),
+            github_inbox_repositories: Vec::new(),
             todoist_token: None,
         };
 

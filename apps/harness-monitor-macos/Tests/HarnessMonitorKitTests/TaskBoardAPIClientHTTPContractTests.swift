@@ -87,7 +87,7 @@ extension TaskBoardAPIClientTests {
         projectDir: "/tmp/next",
         clearProjectDir: false,
         githubProject: TaskBoardGitHubProjectConfig(
-          owner: "kong",
+          owner: "example",
           repo: "harness",
           checkoutPath: "/tmp/harness",
           protectedPaths: [TaskBoardProtectedPathRule(pattern: "src/security")],
@@ -95,6 +95,7 @@ extension TaskBoardAPIClientTests {
             .syncTaskBoard, .autoMerge,
           ])
         ),
+        githubInbox: TaskBoardGitHubInboxConfig(repositories: ["example/harness", "example/aff"]),
         policyVersion: "task-board-policy-v3"
       )
     )
@@ -116,7 +117,7 @@ extension TaskBoardAPIClientTests {
       request: TaskBoardGitHubTokensSyncRequest(
         globalToken: "ghu_global",
         repositoryTokens: [
-          TaskBoardGitHubRepositoryToken(repository: "kong/harness", token: "ghu_repo")
+          TaskBoardGitHubRepositoryToken(repository: "example/harness", token: "ghu_repo")
         ]
       )
     )
@@ -225,12 +226,14 @@ extension TaskBoardAPIClientTests {
     #expect(records[14].body?["project_dir"] as? String == "/tmp/next")
     #expect(records[14].body?["clear_project_dir"] as? Bool == false)
     let githubProject = records[14].body?["github_project"] as? [String: Any]
-    #expect(githubProject?["owner"] as? String == "kong")
+    #expect(githubProject?["owner"] as? String == "example")
     #expect(githubProject?["repo"] as? String == "harness")
     #expect(githubProject?["checkout_path"] as? String == "/tmp/harness")
     #expect(githubProject?["merge_method"] as? String == "squash")
     let enabledAutomations = githubProject?["enabled_automations"] as? [String: Any]
     #expect(enabledAutomations?["enabled"] as? [String] == ["sync_task_board", "auto_merge"])
+    let githubInbox = records[14].body?["github_inbox"] as? [String: Any]
+    #expect(githubInbox?["repositories"] as? [String] == ["example/harness", "example/aff"])
     #expect(records[14].body?["policy_version"] as? String == "task-board-policy-v3")
     #expect(records[15].body == nil)
     let runtimeGlobal = records[16].body?["global"] as? [String: Any]
@@ -241,7 +244,7 @@ extension TaskBoardAPIClientTests {
     #expect(runtimeSigning?["ssh_key_path"] as? String == "/Users/test/.ssh/id_signing")
     #expect(records[17].body?["global_token"] as? String == "ghu_global")
     let repositoryTokens = records[17].body?["repository_tokens"] as? [[String: Any]]
-    #expect(repositoryTokens?.first?["repository"] as? String == "kong/harness")
+    #expect(repositoryTokens?.first?["repository"] as? String == "example/harness")
     #expect(repositoryTokens?.first?["token"] as? String == "ghu_repo")
     #expect(records[18].body?["token"] as? String == "todoist-token")
     #expect(records[19].query == "status=todo")
@@ -267,9 +270,10 @@ extension TaskBoardAPIClientTests {
     #expect(result.runOnce.lastRun?.evaluation?.updated == 1)
     #expect(result.runOnce.lastRun?.policyTraceIds == ["trace-1"])
     #expect(result.runOnce.lastRun?.dispatch?.applied.first?.workItemId == "task-1")
+    #expect(result.updatedSettings.githubInbox.repositories == ["example/harness", "example/aff"])
     #expect(result.updatedSettings.policyVersion == "task-board-policy-v2")
     #expect(result.runtimeConfig.global.authorName == "Harness Bot")
-    #expect(result.updatedRuntimeConfig.repositoryOverrides.first?.repository == "kong/harness")
+    #expect(result.updatedRuntimeConfig.repositoryOverrides.first?.repository == "example/harness")
     #expect(result.tokenSync.globalTokenConfigured == true)
     #expect(result.tokenSync.repositoryTokenCount == 1)
     #expect(result.todoistTokenSync.tokenConfigured == true)

@@ -1,19 +1,14 @@
 use clap::ValueEnum;
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ValueEnum)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, ValueEnum)]
 #[value(rename_all = "snake_case")]
 #[serde(rename_all = "snake_case")]
 pub enum ExternalSyncConflictPolicy {
+    #[default]
     Report,
     PreferLocal,
     PreferRemote,
-}
-
-impl Default for ExternalSyncConflictPolicy {
-    fn default() -> Self {
-        Self::Report
-    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ValueEnum)]

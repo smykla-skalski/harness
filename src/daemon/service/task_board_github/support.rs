@@ -167,7 +167,8 @@ pub(super) fn automation_config(
         (!project.owner.trim().is_empty() && !project.repo.trim().is_empty())
             .then(|| project.repository_slug())
     };
-    let external_sync_config = external_sync_config_for_repository(settings_repository.as_deref());
+    let external_sync_config =
+        external_sync_config_for_repository(settings_repository.as_deref(), &[]);
     let token = external_sync_config
         .token_for(ExternalProvider::GitHub)?
         .to_string();

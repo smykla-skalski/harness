@@ -104,11 +104,12 @@ extension TaskBoardAPIClientTests {
         dispatchStatusFilter: .planReview,
         projectDir: "/tmp/next",
         githubProject: TaskBoardGitHubProjectConfig(
-          owner: "kong",
+          owner: "example",
           repo: "harness",
           checkoutPath: "/tmp/harness",
           enabledAutomations: TaskBoardGitHubAutomationToggles(enabled: [.autoMerge])
         ),
+        githubInbox: TaskBoardGitHubInboxConfig(repositories: ["example/harness", "example/aff"]),
         policyVersion: "task-board-policy-v3"
       )
     )
@@ -129,7 +130,7 @@ extension TaskBoardAPIClientTests {
       request: TaskBoardGitHubTokensSyncRequest(
         globalToken: "ghu_global",
         repositoryTokens: [
-          TaskBoardGitHubRepositoryToken(repository: "kong/harness", token: "ghu_repo")
+          TaskBoardGitHubRepositoryToken(repository: "example/harness", token: "ghu_repo")
         ]
       )
     )
@@ -208,7 +209,7 @@ extension TaskBoardAPIClientTests {
     #expect(objectValue(calls[14].params, key: "dry_run_default") == .bool(false))
     #expect(objectValue(calls[14].params, key: "dispatch_status_filter") == .string("plan_review"))
     if case .object(let githubProject)? = objectValue(calls[14].params, key: "github_project") {
-      #expect(githubProject["owner"] == .string("kong"))
+      #expect(githubProject["owner"] == .string("example"))
       #expect(githubProject["repo"] == .string("harness"))
       #expect(githubProject["checkout_path"] == .string("/tmp/harness"))
       #expect(
@@ -218,6 +219,10 @@ extension TaskBoardAPIClientTests {
     } else {
       Issue.record("Expected github_project object in websocket settings update")
     }
+    #expect(
+      objectValue(calls[14].params, key: "github_inbox")
+        == .object(["repositories": .array([.string("example/harness"), .string("example/aff")])])
+    )
     #expect(objectValue(calls[14].params, key: "policy_version") == .string("task-board-policy-v3"))
     #expect(calls[15].params == nil)
     #expect(objectValue(calls[16].params, key: "global") != nil)
@@ -225,7 +230,7 @@ extension TaskBoardAPIClientTests {
     if case .array(let repositoryTokens)? = objectValue(calls[17].params, key: "repository_tokens")
     {
       if case .object(let token)? = repositoryTokens.first {
-        #expect(token["repository"] == .string("kong/harness"))
+        #expect(token["repository"] == .string("example/harness"))
         #expect(token["token"] == .string("ghu_repo"))
       } else {
         Issue.record("Expected repository token object in websocket token sync payload")
@@ -251,6 +256,7 @@ extension TaskBoardAPIClientTests {
     #expect(result.status.currentTick?.phase == .evaluation)
     #expect(result.runOnce.lastRun?.evaluation?.updated == 1)
     #expect(result.runOnce.lastRun?.policyTraceIds == ["trace-1"])
+    #expect(result.status.settings.githubInbox.repositories == ["example/harness", "example/aff"])
     #expect(result.runtimeConfig.global.authorEmail == "bot@example.com")
     #expect(result.updatedRuntimeConfig.repositoryOverrides.first?.profile.signing.mode == .gpg)
     #expect(result.tokenSync.repositoryTokenCount == 1)

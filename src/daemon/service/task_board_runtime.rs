@@ -44,6 +44,7 @@ pub fn sync_task_board_github_tokens(
 }
 
 /// Replace the in-memory Todoist token snapshot used by the daemon.
+#[must_use]
 pub fn sync_task_board_todoist_token(
     request: &TaskBoardTodoistTokenSyncRequest,
 ) -> TaskBoardTodoistTokenSyncResponse {
@@ -340,8 +341,9 @@ mod tests {
     fn external_sync_config_uses_app_configured_todoist_token_when_env_missing() {
         let tmp = tempdir().expect("tempdir");
         with_isolated_harness_env(tmp.path(), || {
-            super::sync_task_board_todoist_token(&TaskBoardTodoistTokenSyncRequest::default());
-            super::sync_task_board_todoist_token(&TaskBoardTodoistTokenSyncRequest {
+            let _ =
+                super::sync_task_board_todoist_token(&TaskBoardTodoistTokenSyncRequest::default());
+            let _ = super::sync_task_board_todoist_token(&TaskBoardTodoistTokenSyncRequest {
                 token: Some(" todoist-token ".into()),
             });
 
@@ -351,7 +353,8 @@ mod tests {
                 config.token_for(crate::task_board::ExternalProvider::Todoist),
                 Some("todoist-token")
             );
-            super::sync_task_board_todoist_token(&TaskBoardTodoistTokenSyncRequest::default());
+            let _ =
+                super::sync_task_board_todoist_token(&TaskBoardTodoistTokenSyncRequest::default());
         });
     }
 
@@ -359,9 +362,10 @@ mod tests {
     fn external_sync_config_keeps_todoist_env_precedence() {
         let tmp = tempdir().expect("tempdir");
         with_isolated_harness_env(tmp.path(), || {
-            super::sync_task_board_todoist_token(&TaskBoardTodoistTokenSyncRequest::default());
+            let _ =
+                super::sync_task_board_todoist_token(&TaskBoardTodoistTokenSyncRequest::default());
             temp_env::with_var("HARNESS_TODOIST_TOKEN", Some("env-token"), || {
-                super::sync_task_board_todoist_token(&TaskBoardTodoistTokenSyncRequest {
+                let _ = super::sync_task_board_todoist_token(&TaskBoardTodoistTokenSyncRequest {
                     token: Some("app-token".into()),
                 });
 
@@ -372,7 +376,8 @@ mod tests {
                     Some("env-token")
                 );
             });
-            super::sync_task_board_todoist_token(&TaskBoardTodoistTokenSyncRequest::default());
+            let _ =
+                super::sync_task_board_todoist_token(&TaskBoardTodoistTokenSyncRequest::default());
         });
     }
 }

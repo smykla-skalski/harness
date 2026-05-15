@@ -89,6 +89,65 @@ struct TaskBoardAPIClientTests {
     #expect(item.workflow?.policyTraceIds == ["trace-1"])
   }
 
+  @Test("Task board item decodes needs-you status")
+  func taskBoardItemDecodesNeedsYouStatus() throws {
+    let data = Data(
+      #"""
+      {
+        "schema_version": 1,
+        "id": "board-1",
+        "title": "Board item",
+        "body": "Body",
+        "status": "needs_you",
+        "priority": "medium",
+        "agent_mode": "headless",
+        "planning": {},
+        "usage": {},
+        "created_at": "2026-05-14T10:00:00Z",
+        "updated_at": "2026-05-14T10:01:00Z"
+      }
+      """#.utf8
+    )
+
+    let item = try taskBoardDecoder().decode(TaskBoardItem.self, from: data)
+
+    #expect(item.status == .needsYou)
+  }
+
+  @Test("Task board orchestrator settings decode missing GitHub inbox config")
+  func orchestratorSettingsDecodeMissingGitHubInboxConfig() throws {
+    let data = Data(
+      #"""
+      {
+        "enabled_workflows": ["default_task"],
+        "dry_run_default": true,
+        "github_project": {
+          "owner": "example",
+          "repo": "harness",
+          "checkout_path": "/tmp/harness",
+          "default_branch": "main",
+          "branch_prefix": "c/",
+          "merge_method": "squash",
+          "labels": {
+            "managed": "harness:managed",
+            "auto_merge": "harness:auto-merge",
+            "needs_human": "harness:needs-human",
+            "protected_path": "harness:protected-path"
+          },
+          "enabled_automations": {
+            "enabled": ["sync_task_board"]
+          }
+        },
+        "policy_version": "task-board-policy-v1"
+      }
+      """#.utf8
+    )
+
+    let settings = try taskBoardDecoder().decode(TaskBoardOrchestratorSettings.self, from: data)
+
+    #expect(settings.githubInbox.repositories.isEmpty)
+  }
+
   @Test("Task board run summary decodes omitted policy trace IDs")
   func taskBoardRunSummaryDecodesOmittedPolicyTraceIDs() throws {
     let data = Data(
@@ -189,13 +248,14 @@ struct TaskBoardAPIClientTests {
       request: TaskBoardOrchestratorSettingsUpdateRequest(
         clearDispatchStatusFilter: true,
         clearProjectDir: true,
+        githubInbox: TaskBoardGitHubInboxConfig(repositories: ["example/harness", "example/aff"]),
         policyVersion: "task-board-policy-v3"
       )
     )
     let updatedRuntimeConfig = try await client.updateTaskBoardGitRuntimeConfig(
       request: TaskBoardGitRuntimeConfig(
         repositoryOverrides: [
-          TaskBoardGitRepositoryOverride(repository: "kong/harness")
+          TaskBoardGitRepositoryOverride(repository: "example/harness")
         ]
       )
     )
@@ -203,7 +263,7 @@ struct TaskBoardAPIClientTests {
       request: TaskBoardGitHubTokensSyncRequest(
         globalToken: "ghu_global",
         repositoryTokens: [
-          TaskBoardGitHubRepositoryToken(repository: "kong/harness", token: "ghu_repo")
+          TaskBoardGitHubRepositoryToken(repository: "example/harness", token: "ghu_repo")
         ]
       )
     )
@@ -211,13 +271,14 @@ struct TaskBoardAPIClientTests {
       request: TaskBoardTodoistTokenSyncRequest(token: "todoist-token")
     )
 
-    #expect(status.settings.githubProject.owner == "kong")
+    #expect(status.settings.githubProject.owner == "example")
     #expect(status.settings.githubProject.repo == "harness")
     #expect(runtimeConfig.global.authorName == "Harness Bot")
     #expect(runOnce.lastRun?.sync.total == 1)
     #expect(runOnce.lastRun?.policyTraceIds == ["trace-1"])
+    #expect(settings.githubInbox.repositories == ["example/harness", "example/aff"])
     #expect(settings.policyVersion == "task-board-policy-v3")
-    #expect(updatedRuntimeConfig.repositoryOverrides.first?.repository == "kong/harness")
+    #expect(updatedRuntimeConfig.repositoryOverrides.first?.repository == "example/harness")
     #expect(tokenSync.globalTokenConfigured == true)
     #expect(tokenSync.repositoryTokenCount == 1)
     #expect(todoistTokenSync.tokenConfigured == true)

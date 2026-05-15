@@ -241,11 +241,16 @@ fn github_sync_config(
         .github_project
         .enabled_automations
         .enables(GitHubAutomation::SyncTaskBoard)
+        && settings.github_inbox.repositories.is_empty()
     {
         return Ok(None);
     }
-    let config = external_sync_config_for_repository(github_repository(&settings).as_deref());
-    if config.token_for(ExternalProvider::GitHub).is_none() || config.github_repository().is_none()
+    let config = external_sync_config_for_repository(
+        github_repository(&settings).as_deref(),
+        &settings.github_inbox.repositories,
+    );
+    if config.token_for(ExternalProvider::GitHub).is_none()
+        || (config.github_repository().is_none() && config.github_inbox_repositories().is_empty())
     {
         return Ok(None);
     }

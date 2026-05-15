@@ -39,6 +39,7 @@ mod task_board;
 mod task_board_crud;
 mod task_board_parity;
 mod task_board_route_parity;
+mod task_board_route_parity_support;
 mod task_review;
 mod telemetry;
 

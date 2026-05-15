@@ -10,6 +10,12 @@ pub use crate::task_board::github::GitHubProjectConfig as TaskBoardGitHubProject
 
 pub const CURRENT_ORCHESTRATOR_STATE_VERSION: u32 = 1;
 
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TaskBoardGitHubInboxConfig {
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub repositories: Vec<String>,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct TaskBoardOrchestratorSettings {
     pub enabled_workflows: Vec<TaskBoardOrchestratorWorkflow>,
@@ -20,6 +26,8 @@ pub struct TaskBoardOrchestratorSettings {
     pub project_dir: Option<String>,
     #[serde(default)]
     pub github_project: TaskBoardGitHubProjectConfig,
+    #[serde(default)]
+    pub github_inbox: TaskBoardGitHubInboxConfig,
     pub policy_version: String,
 }
 
@@ -39,6 +47,8 @@ pub struct TaskBoardOrchestratorSettingsUpdateRequest {
     pub clear_project_dir: bool,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub github_project: Option<TaskBoardGitHubProjectConfig>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub github_inbox: Option<TaskBoardGitHubInboxConfig>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub policy_version: Option<String>,
 }
@@ -175,6 +185,7 @@ impl Default for TaskBoardOrchestratorSettings {
             dispatch_status_filter: Some(TaskBoardStatus::Todo),
             project_dir: None,
             github_project: TaskBoardGitHubProjectConfig::default(),
+            github_inbox: TaskBoardGitHubInboxConfig::default(),
             policy_version: TASK_BOARD_POLICY_VERSION.to_string(),
         }
     }

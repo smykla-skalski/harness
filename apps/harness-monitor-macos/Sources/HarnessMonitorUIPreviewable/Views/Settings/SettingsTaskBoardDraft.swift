@@ -9,6 +9,7 @@ struct TaskBoardGitSettingsDraft: Equatable {
   var owner = ""
   var repo = ""
   var checkoutPath = ""
+  var githubInboxRepositoriesText = ""
   var defaultBranch = "main"
   var branchPrefix = "c/"
   var mergeMethod: TaskBoardGitHubMergeMethod = .squash
@@ -45,6 +46,7 @@ struct TaskBoardGitSettingsDraft: Equatable {
     owner = project.owner
     repo = project.repo
     checkoutPath = project.checkoutPath
+    githubInboxRepositoriesText = orchestrator.githubInbox.repositories.joined(separator: "\n")
     defaultBranch = project.defaultBranch
     branchPrefix = project.branchPrefix
     mergeMethod = project.mergeMethod
@@ -126,6 +128,7 @@ struct TaskBoardGitSettingsDraft: Equatable {
             enabled: enabledAutomations.sorted(by: { $0.rawValue < $1.rawValue })
           )
         ),
+        githubInbox: TaskBoardGitHubInboxConfig(repositories: githubInboxRepositories),
         policyVersion: policyVersion
       ),
       runtimeConfig: TaskBoardGitRuntimeConfig(
@@ -167,9 +170,45 @@ struct TaskBoardGitSettingsDraft: Equatable {
     repositoryOverrides.compactMap(\.tokenOverride)
   }
 
+  private var githubInboxRepositories: [String] {
+    normalizedRepositories(from: githubInboxRepositoriesText)
+  }
+
   private func normalized(_ value: String) -> String? {
     let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
     return trimmed.isEmpty ? nil : trimmed
+  }
+
+  private func normalizedRepositories(from value: String) -> [String] {
+    var repositories: [String] = []
+    var seen: Set<String> = []
+    for entry in value.split(whereSeparator: \.isNewline) {
+      guard let repository = normalizedRepositoryEntry(String(entry)) else {
+        continue
+      }
+      let key = repository.lowercased()
+      if seen.insert(key).inserted {
+        repositories.append(repository)
+      }
+    }
+    return repositories
+  }
+
+  private func normalizedRepositoryEntry(_ value: String) -> String? {
+    let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard !trimmed.isEmpty else {
+      return nil
+    }
+    let parts = trimmed.split(separator: "/", maxSplits: 2, omittingEmptySubsequences: false)
+    guard parts.count == 2 else {
+      return trimmed
+    }
+    let owner = parts[0].trimmingCharacters(in: .whitespacesAndNewlines)
+    let repo = parts[1].trimmingCharacters(in: .whitespacesAndNewlines)
+    guard !owner.isEmpty, !repo.isEmpty, !repo.contains("/") else {
+      return trimmed
+    }
+    return "\(owner.lowercased())/\(repo.lowercased())"
   }
 }
 
@@ -261,6 +300,7 @@ enum DispatchStatusFilterChoice: String, CaseIterable, Hashable {
   case new
   case planning
   case planReview
+  case needsYou
   case todo
   case inProgress
   case blocked
@@ -277,6 +317,8 @@ enum DispatchStatusFilterChoice: String, CaseIterable, Hashable {
       self = .planning
     case .planReview:
       self = .planReview
+    case .needsYou:
+      self = .needsYou
     case .todo:
       self = .todo
     case .inProgress:
@@ -296,6 +338,7 @@ enum DispatchStatusFilterChoice: String, CaseIterable, Hashable {
     case .new: "New"
     case .planning: "Planning"
     case .planReview: "Plan Review"
+    case .needsYou: "Needs You"
     case .todo: "Todo"
     case .inProgress: "In Progress"
     case .blocked: "Blocked"
@@ -310,6 +353,7 @@ enum DispatchStatusFilterChoice: String, CaseIterable, Hashable {
     case .new: .new
     case .planning: .planning
     case .planReview: .planReview
+    case .needsYou: .needsYou
     case .todo: .todo
     case .inProgress: .inProgress
     case .blocked: .blocked

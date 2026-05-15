@@ -43,6 +43,7 @@ pub struct GitHubCreatePullRequest {
 #[derive(Clone)]
 pub struct GitHubApiAutomationClient {
     client: octocrab::Octocrab,
+    token: String,
 }
 
 impl GitHubApiAutomationClient {
@@ -61,7 +62,10 @@ impl GitHubApiAutomationClient {
             .personal_token(token.to_string())
             .build()
             .map_err(client_error)?;
-        Ok(Self { client })
+        Ok(Self {
+            client,
+            token: token.to_string(),
+        })
     }
 }
 
@@ -81,7 +85,8 @@ impl GitHubAutomationClient for GitHubApiAutomationClient {
         worktree: &Path,
         branch: &str,
     ) -> Result<(), CliError> {
-        publish_branch_from_worktree_async(&self.client, config, worktree, branch).await
+        publish_branch_from_worktree_async(&self.client, config, worktree, branch, &self.token)
+            .await
     }
 
     async fn pull_request_merge_evidence(

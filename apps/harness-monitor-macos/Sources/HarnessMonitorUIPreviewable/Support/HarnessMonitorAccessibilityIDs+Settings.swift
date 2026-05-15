@@ -6,6 +6,8 @@ extension HarnessMonitorAccessibility {
   public static let settingsTaskBoardProjectDirField = "harness.settings.task-board.project-dir"
   public static let settingsTaskBoardOwnerField = "harness.settings.task-board.owner"
   public static let settingsTaskBoardRepoField = "harness.settings.task-board.repo"
+  public static let settingsTaskBoardInboxRepositoriesField =
+    "harness.settings.task-board.github-inbox.repositories"
   public static let settingsTaskBoardCheckoutPathField = "harness.settings.task-board.checkout-path"
   public static let settingsTaskBoardProtectedPathsField =
     "harness.settings.task-board.protected-paths"

@@ -1,5 +1,24 @@
 import Foundation
 
+public struct TaskBoardGitHubInboxConfig: Codable, Equatable, Sendable {
+  public let repositories: [String]
+
+  public init(repositories: [String] = []) {
+    self.repositories = repositories
+  }
+
+  enum CodingKeys: String, CodingKey {
+    case repositories
+  }
+
+  public init(from decoder: Decoder) throws {
+    let container = try decoder.container(keyedBy: CodingKeys.self)
+    self.init(
+      repositories: try container.decodeIfPresent([String].self, forKey: .repositories) ?? []
+    )
+  }
+}
+
 public struct TaskBoardGitHubProjectConfig: Codable, Equatable, Sendable {
   public let owner: String
   public let repo: String

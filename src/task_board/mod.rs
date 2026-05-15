@@ -26,18 +26,19 @@ pub use evaluation::{
 pub use external::{
     ExternalProvider, ExternalProviderCapabilities, ExternalSyncAction, ExternalSyncClient,
     ExternalSyncConfig, ExternalSyncConflictPolicy, ExternalSyncDirection, ExternalSyncField,
-    ExternalSyncOperation, ExternalSyncOptions, ExternalTask, ExternalTaskRef, ExternalTaskUpdate,
-    GH_TOKEN_ENV, GITHUB_REPOSITORY_ENV, GitHubSyncClient, HARNESS_GITHUB_REPOSITORY_ENV,
-    HARNESS_GITHUB_TOKEN_ENV, HARNESS_TODOIST_TOKEN_ENV, TodoistSyncClient,
-    configured_sync_clients, sync_external_tasks,
+    ExternalSyncOperation, ExternalSyncOptions, ExternalTask, ExternalTaskRef,
+    ExternalTaskUpdate, GH_TOKEN_ENV, GITHUB_REPOSITORY_ENV, GitHubInboxSyncClient,
+    GitHubSyncClient, HARNESS_GITHUB_REPOSITORY_ENV, HARNESS_GITHUB_TOKEN_ENV,
+    HARNESS_TODOIST_TOKEN_ENV, TodoistSyncClient, configured_sync_clients, sync_external_tasks,
 };
 pub use orchestrator::{
-    TaskBoardGitHubProjectConfig, TaskBoardOrchestrator, TaskBoardOrchestratorDispatchInput,
-    TaskBoardOrchestratorRunOnceRequest, TaskBoardOrchestratorRunStatus,
-    TaskBoardOrchestratorRunSummary, TaskBoardOrchestratorSettings,
-    TaskBoardOrchestratorSettingsUpdateRequest, TaskBoardOrchestratorState,
-    TaskBoardOrchestratorStatus, TaskBoardOrchestratorTickInfo, TaskBoardOrchestratorTickPhase,
-    TaskBoardOrchestratorWorkflow, TaskBoardWorkflowExecutionCount,
+    TaskBoardGitHubInboxConfig, TaskBoardGitHubProjectConfig, TaskBoardOrchestrator,
+    TaskBoardOrchestratorDispatchInput, TaskBoardOrchestratorRunOnceRequest,
+    TaskBoardOrchestratorRunStatus, TaskBoardOrchestratorRunSummary,
+    TaskBoardOrchestratorSettings, TaskBoardOrchestratorSettingsUpdateRequest,
+    TaskBoardOrchestratorState, TaskBoardOrchestratorStatus, TaskBoardOrchestratorTickInfo,
+    TaskBoardOrchestratorTickPhase, TaskBoardOrchestratorWorkflow,
+    TaskBoardWorkflowExecutionCount,
 };
 pub use planning::{
     PlanApprovalBlockReason, PlanApprovalGate, PlanningTransition, approval_gate, approve_plan,

@@ -20,7 +20,7 @@ let sampleTaskBoardItemJSON: [String: JSONValue] = [
     "branch": .string("c/board-1"),
     "worktree": .string("/tmp/harness"),
     "pr_number": .number(42),
-    "pr_url": .string("https://github.com/kong/harness/pull/42"),
+    "pr_url": .string("https://github.com/example/harness/pull/42"),
     "last_error": .null,
     "policy_trace_ids": .array([.string("trace-1")]),
   ]),
@@ -145,7 +145,7 @@ let sampleTaskBoardOrchestratorSettingsJSON: [String: JSONValue] = [
   "dispatch_status_filter": .string("todo"),
   "project_dir": .string("/tmp/harness"),
   "github_project": .object([
-    "owner": .string("kong"),
+    "owner": .string("example"),
     "repo": .string("harness"),
     "checkout_path": .string("/tmp/harness"),
     "default_branch": .string("main"),
@@ -168,6 +168,9 @@ let sampleTaskBoardOrchestratorSettingsJSON: [String: JSONValue] = [
         .string("auto_merge"),
       ])
     ]),
+  ]),
+  "github_inbox": .object([
+    "repositories": .array([.string("example/harness"), .string("example/aff")])
   ]),
   "policy_version": .string("task-board-policy-v2"),
 ]
@@ -223,7 +226,7 @@ let sampleTaskBoardGitRuntimeConfigJSON: [String: JSONValue] = [
   ]),
   "repository_overrides": .array([
     .object([
-      "repository": .string("kong/harness"),
+      "repository": .string("example/harness"),
       "profile": .object([
         "author_name": .string("Repo Bot"),
         "author_email": .string("repo@example.com"),

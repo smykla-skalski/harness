@@ -39,8 +39,8 @@ Common read flags: `--json`, `--board-root <path>`.
 Each task carries:
 
 - `id`, `title`, `body`
-- `status`: `new`, `planning`, `plan_review`, `todo`, `in_progress`,
-  `in_review`, `done`, `blocked`
+- `status`: `new`, `planning`, `plan_review`, `needs_you`, `todo`,
+  `in_progress`, `in_review`, `done`, `blocked`
 - `priority`: `low`, `medium`, `high`, `critical`
 - `agent_mode`: `headless`, `interactive`, `planning`, `evaluate`
 - `tags`, optional `project_id`, external refs, planning metadata, and optional
@@ -62,6 +62,11 @@ new -> planning -> plan_review -> todo -> in_progress -> in_review -> done
            |                         |          |
            v                         v          v
         blocked                   blocked    blocked
+
+github inbox -> needs_you -> todo
+                   |
+                   v
+                blocked
 ```
 
 `blocked` means the task cannot proceed without new input, an external
@@ -77,10 +82,11 @@ Dispatch readiness requires:
 
 The CLI sets `approved_at` when `--approved-by` is provided.
 
-Applied GitHub pulls synthesize planning approval with the control-plane actor so
-imported issues land as repo-scoped `todo` items that are immediately eligible
-for dispatch. The full issue body remains in the task body; the synthesized plan
-summary only captures the automation intent.
+Standard GitHub issue sync still imports repo-scoped `todo` items with a
+synthesized planning summary. The separate GitHub inbox flow for selected repos
+imports issues assigned to you and pull requests requesting your review as
+repo-scoped `needs_you` items instead. Inbox items are not dispatch-ready until
+a human moves them into the normal planning/ready flow.
 
 ## Intake And Planning
 
@@ -325,8 +331,8 @@ Missing merge evidence requires a human. Invalid graphs also require a human.
 
 - Prefer many small tasks over one broad task. Each task needs one clear close
   condition.
-- Do not dispatch `new`, `planning`, `plan_review`, `in_progress`,
-  `in_review`, `done`, or `blocked` items.
+- Do not dispatch `new`, `planning`, `plan_review`, `needs_you`,
+  `in_progress`, `in_review`, `done`, or `blocked` items.
 - Do not bypass the planning/review gate by setting `todo` without
   `--planning-summary` and `--approved-by`.
 - Use `delete` for tombstones, not manual file removal.

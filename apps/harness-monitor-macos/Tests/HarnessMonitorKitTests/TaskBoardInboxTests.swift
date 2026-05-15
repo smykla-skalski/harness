@@ -140,6 +140,7 @@ struct TaskBoardInboxTests {
   @Test("Task board item status maps to global board lanes")
   func taskBoardItemStatusMapsToGlobalBoardLanes() {
     #expect(TaskBoardInboxLane(status: TaskBoardStatus.planReview) == .needsYou)
+    #expect(TaskBoardInboxLane(status: TaskBoardStatus.needsYou) == .needsYou)
     #expect(TaskBoardInboxLane(status: TaskBoardStatus.blocked) == .blocked)
     #expect(TaskBoardInboxLane(status: TaskBoardStatus.todo) == .ready)
     #expect(TaskBoardInboxLane(status: TaskBoardStatus.inProgress) == .running)
@@ -150,6 +151,9 @@ struct TaskBoardInboxTests {
 
     #expect(
       TaskBoardInboxLane(taskBoardItem: makeTaskBoardItem(status: .planReview)) == .needsYou
+    )
+    #expect(
+      TaskBoardInboxLane(taskBoardItem: makeTaskBoardItem(status: .needsYou)) == .needsYou
     )
   }
 

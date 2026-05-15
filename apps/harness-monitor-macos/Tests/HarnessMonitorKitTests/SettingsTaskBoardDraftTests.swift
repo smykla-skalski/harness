@@ -54,7 +54,7 @@ struct SettingsTaskBoardDraftTests {
     var draft = TaskBoardGitSettingsDraft()
     draft.repositoryOverrides = [
       TaskBoardRepositoryOverrideDraft(
-        repository: " KONG/HARNESS ",
+        repository: " EXAMPLE/HARNESS ",
         signingMode: .gpg,
         gpgKeyId: " DEF456 ",
         gpgPrivateKeyPath: " /Users/test/.gnupg/repo.asc ",
@@ -65,10 +65,20 @@ struct SettingsTaskBoardDraftTests {
     let override = try #require(draft.snapshot.runtimeConfig.repositoryOverrides.first)
     let signing = override.profile.signing
 
-    #expect(override.repository == "kong/harness")
+    #expect(override.repository == "example/harness")
     #expect(signing.mode == .gpg)
     #expect(signing.gpgKeyId == "DEF456")
     #expect(signing.gpgPrivateKeyPath == "/Users/test/.gnupg/repo.asc")
     #expect(signing.gpgPrivateKeyPassphrase == "repo-passphrase")
+  }
+
+  @Test("GitHub inbox repositories round trip through orchestrator snapshot")
+  func githubInboxRepositoriesRoundTrip() {
+    var draft = TaskBoardGitSettingsDraft()
+    draft.githubInboxRepositoriesText = " EXAMPLE/HARNESS \n example/aff \n EXAMPLE/HARNESS "
+
+    let repositories = draft.snapshot.orchestratorSettings.githubInbox.repositories
+
+    #expect(repositories == ["example/harness", "example/aff"])
   }
 }

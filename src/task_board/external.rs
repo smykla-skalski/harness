@@ -16,7 +16,7 @@ mod todoist;
 pub use capabilities::{
     ExternalProviderCapabilities, ExternalSyncConflictPolicy, ExternalSyncField, ExternalTaskUpdate,
 };
-pub use github::GitHubSyncClient;
+pub use github::{GitHubInboxSyncClient, GitHubSyncClient};
 pub use sync::{
     ExternalSyncAction, ExternalSyncDirection, ExternalSyncOperation, ExternalSyncOptions,
     configured_sync_clients, sync_external_tasks,
@@ -136,6 +136,7 @@ pub struct ExternalTask {
 pub struct ExternalSyncConfig {
     pub github_token: Option<String>,
     pub github_repository: Option<String>,
+    pub github_inbox_repositories: Vec<String>,
     pub todoist_token: Option<String>,
 }
 
@@ -148,6 +149,7 @@ impl ExternalSyncConfig {
                 HARNESS_GITHUB_REPOSITORY_ENV,
                 GITHUB_REPOSITORY_ENV,
             ]),
+            github_inbox_repositories: Vec::new(),
             todoist_token: first_present_env(&[HARNESS_TODOIST_TOKEN_ENV]),
         }
     }
@@ -166,6 +168,11 @@ impl ExternalSyncConfig {
             .as_deref()
             .map(str::trim)
             .filter(|repository| !repository.is_empty())
+    }
+
+    #[must_use]
+    pub fn github_inbox_repositories(&self) -> &[String] {
+        &self.github_inbox_repositories
     }
 
     #[must_use]
@@ -206,6 +213,18 @@ impl ExternalSyncConfig {
         self
     }
 
+    #[must_use]
+    pub fn with_github_inbox_repositories_override(mut self, repositories: &[String]) -> Self {
+        self.github_inbox_repositories = repositories
+            .iter()
+            .map(String::as_str)
+            .map(str::trim)
+            .filter(|repository| !repository.is_empty())
+            .map(ToOwned::to_owned)
+            .collect();
+        self
+    }
+
     /// Return the configured token for a provider.
     ///
     /// # Errors
@@ -224,6 +243,7 @@ impl fmt::Debug for ExternalSyncConfig {
             .debug_struct("ExternalSyncConfig")
             .field("github_token", &redacted(self.github_token.as_deref()))
             .field("github_repository", &self.github_repository)
+            .field("github_inbox_repositories", &self.github_inbox_repositories)
             .field("todoist_token", &redacted(self.todoist_token.as_deref()))
             .finish()
     }
@@ -237,6 +257,16 @@ pub trait ExternalSyncClient: Send + Sync {
     #[must_use]
     fn capabilities(&self) -> ExternalProviderCapabilities {
         ExternalProviderCapabilities::creates_only()
+    }
+
+    #[must_use]
+    fn allows_pull(&self) -> bool {
+        true
+    }
+
+    #[must_use]
+    fn allows_push(&self) -> bool {
+        true
     }
 
     /// Pull provider-side tasks.
