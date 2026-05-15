@@ -189,6 +189,44 @@ struct HarnessMonitorStoreTaskBoardDashboardTests {
     #expect(store.currentSuccessFeedbackMessage == "Deleted task board item")
   }
 
+  @Test("Planning lifecycle actions update task board item state")
+  func planningLifecycleActionsUpdateTaskBoardItemState() async {
+    let client = RecordingHarnessClient()
+    client.configureTaskBoardItems([sampleTaskBoardItem()])
+    let store = await makeBootstrappedStore(client: client)
+
+    let began = await store.beginTaskBoardPlan(id: "board-1")
+    let submitted = await store.submitTaskBoardPlan(id: "board-1", summary: "Use plan.")
+    let approved = await store.approveTaskBoardPlan(
+      id: "board-1",
+      approvedBy: "lead",
+      approvedAt: "2026-05-14T02:00:00Z"
+    )
+
+    #expect(began)
+    #expect(submitted)
+    #expect(approved)
+    #expect(client.recordedCalls().contains(.beginTaskBoardPlan(id: "board-1")))
+    #expect(
+      client.recordedCalls().contains(
+        .submitTaskBoardPlan(id: "board-1", summary: "Use plan.")
+      )
+    )
+    #expect(
+      client.recordedCalls().contains(
+        .approveTaskBoardPlan(
+          id: "board-1",
+          approvedBy: "lead",
+          approvedAt: "2026-05-14T02:00:00Z"
+        )
+      )
+    )
+    #expect(store.globalTaskBoardItems.first?.status == .todo)
+    #expect(store.globalTaskBoardItems.first?.planning.summary == "Use plan.")
+    #expect(store.globalTaskBoardItems.first?.planning.approvedBy == "lead")
+    #expect(store.currentSuccessFeedbackMessage == "Approved task board plan")
+  }
+
   @Test("Run once forwards scoped board request and refreshes dashboard status")
   func runOnceForwardsScopedBoardRequestAndRefreshesDashboardStatus() async {
     let client = RecordingHarnessClient()

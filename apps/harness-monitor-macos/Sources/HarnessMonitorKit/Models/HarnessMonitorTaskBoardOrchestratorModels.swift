@@ -51,13 +51,24 @@ public struct TaskBoardOrchestratorSettings: Codable, Equatable, Sendable {
   public init(from decoder: Decoder) throws {
     let container = try decoder.container(keyedBy: CodingKeys.self)
     self.init(
-      enabledWorkflows: try container.decode([TaskBoardOrchestratorWorkflow].self, forKey: .enabledWorkflows),
+      enabledWorkflows: try container.decode(
+        [TaskBoardOrchestratorWorkflow].self,
+        forKey: .enabledWorkflows
+      ),
       dryRunDefault: try container.decode(Bool.self, forKey: .dryRunDefault),
-      dispatchStatusFilter: try container.decodeIfPresent(TaskBoardStatus.self, forKey: .dispatchStatusFilter),
+      dispatchStatusFilter: try container.decodeIfPresent(
+        TaskBoardStatus.self,
+        forKey: .dispatchStatusFilter
+      ),
       projectDir: try container.decodeIfPresent(String.self, forKey: .projectDir),
-      githubProject: try container.decode(TaskBoardGitHubProjectConfig.self, forKey: .githubProject),
-      githubInbox: try container.decodeIfPresent(TaskBoardGitHubInboxConfig.self, forKey: .githubInbox)
-        ?? TaskBoardGitHubInboxConfig(),
+      githubProject: try container.decode(
+        TaskBoardGitHubProjectConfig.self,
+        forKey: .githubProject
+      ),
+      githubInbox: try container.decodeIfPresent(
+        TaskBoardGitHubInboxConfig.self,
+        forKey: .githubInbox
+      ) ?? TaskBoardGitHubInboxConfig(),
       policyVersion: try container.decode(String.self, forKey: .policyVersion)
     )
   }

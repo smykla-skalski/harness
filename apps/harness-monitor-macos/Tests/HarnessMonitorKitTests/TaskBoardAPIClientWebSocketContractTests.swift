@@ -25,10 +25,12 @@ extension TaskBoardAPIClientTests {
     let tokenSync = try await performWebSocketGitHubTokenCalls(transport)
     let todoistTokenSync = try await performWebSocketTodoistTokenCalls(transport)
     try await performWebSocketDiscoveryCalls(transport)
+    let planning = try await performWebSocketPlanningCalls(transport)
 
     let calls = await probe.calls
     return TaskBoardWebSocketContractResult(
       calls: calls,
+      planning: planning,
       sync: workflow.sync,
       dispatch: workflow.dispatch,
       evaluation: workflow.evaluation,
@@ -48,7 +50,11 @@ extension TaskBoardAPIClientTests {
       request: TaskBoardCreateItemRequest(title: "Board item"))
     _ = try await transport.updateTaskBoardItem(
       id: "board-1",
-      request: TaskBoardUpdateItemRequest(status: .done)
+      request: TaskBoardUpdateItemRequest(
+        status: .done,
+        clearPlanning: true,
+        clearWorkflow: true
+      )
     )
     _ = try await transport.deleteTaskBoardItem(id: "board-1")
   }
@@ -149,6 +155,23 @@ extension TaskBoardAPIClientTests {
     _ = try await transport.taskBoardMachines(status: .todo)
   }
 
+  private func performWebSocketPlanningCalls(
+    _ transport: WebSocketTransport
+  ) async throws -> TaskBoardPlanningResponse {
+    _ = try await transport.beginTaskBoardPlan(id: "board-1")
+    _ = try await transport.submitTaskBoardPlan(
+      id: "board-1",
+      request: TaskBoardPlanSubmitRequest(summary: "Use the semantic plan.")
+    )
+    return try await transport.approveTaskBoardPlan(
+      id: "board-1",
+      request: TaskBoardPlanApproveRequest(
+        approvedBy: "lead",
+        approvedAt: "2026-05-14T02:00:00Z"
+      )
+    )
+  }
+
   func assertWebSocketRPCContract(_ calls: [RPCProbe.Call]) {
     #expect(
       calls.map(\.method)
@@ -174,6 +197,9 @@ extension TaskBoardAPIClientTests {
           .taskBoardOrchestratorTodoistTokenSync,
           .taskBoardProjects,
           .taskBoardMachines,
+          .taskBoardPlanBegin,
+          .taskBoardPlanSubmit,
+          .taskBoardPlanApprove,
         ]
     )
   }
@@ -183,6 +209,8 @@ extension TaskBoardAPIClientTests {
     #expect(objectValue(calls[1].params, key: "id") == .string("board-1"))
     #expect(objectValue(calls[3].params, key: "id") == .string("board-1"))
     #expect(objectValue(calls[3].params, key: "status") == .string("done"))
+    #expect(objectValue(calls[3].params, key: "clear_planning") == .bool(true))
+    #expect(objectValue(calls[3].params, key: "clear_workflow") == .bool(true))
     #expect(objectValue(calls[5].params, key: "status") == .string("todo"))
     #expect(objectValue(calls[5].params, key: "provider") == .string("git_hub"))
     #expect(objectValue(calls[5].params, key: "direction") == .string("push"))
@@ -241,9 +269,17 @@ extension TaskBoardAPIClientTests {
     #expect(objectValue(calls[18].params, key: "token") == .string("todoist-token"))
     #expect(objectValue(calls[19].params, key: "status") == .string("todo"))
     #expect(objectValue(calls[20].params, key: "status") == .string("todo"))
+    #expect(objectValue(calls[21].params, key: "id") == .string("board-1"))
+    #expect(objectValue(calls[22].params, key: "id") == .string("board-1"))
+    #expect(objectValue(calls[22].params, key: "summary") == .string("Use the semantic plan."))
+    #expect(objectValue(calls[23].params, key: "id") == .string("board-1"))
+    #expect(objectValue(calls[23].params, key: "approved_by") == .string("lead"))
+    #expect(objectValue(calls[23].params, key: "approved_at") == .string("2026-05-14T02:00:00Z"))
   }
 
   func assertWebSocketResults(_ result: TaskBoardWebSocketContractResult) {
+    #expect(result.planning.transition.boardItemId == "board-1")
+    #expect(result.planning.transition.toStatus == .planReview)
     #expect(result.sync.providers.first?.provider == .gitHub)
     #expect(result.sync.operations.first?.action == .push)
     #expect(result.sync.operations.first?.boardItemId == "board-1")
@@ -273,6 +309,7 @@ extension TaskBoardAPIClientTests {
 
 struct TaskBoardWebSocketContractResult {
   let calls: [RPCProbe.Call]
+  let planning: TaskBoardPlanningResponse
   let sync: TaskBoardSyncSummary
   let dispatch: TaskBoardDispatchSummary
   let evaluation: TaskBoardEvaluationSummary

@@ -66,6 +66,47 @@ extension RecordingHarnessClient {
     }
   }
 
+  func beginTaskBoardPlan(id: String) async throws -> TaskBoardPlanningResponse {
+    calls.append(.beginTaskBoardPlan(id: id))
+    return try updateTaskBoardPlanning(
+      id: id,
+      toStatus: .planning,
+      planning: nil
+    )
+  }
+
+  func submitTaskBoardPlan(
+    id: String,
+    request: TaskBoardPlanSubmitRequest
+  ) async throws -> TaskBoardPlanningResponse {
+    calls.append(.submitTaskBoardPlan(id: id, summary: request.summary))
+    return try updateTaskBoardPlanning(
+      id: id,
+      toStatus: .planReview,
+      planning: TaskBoardPlanningState(summary: request.summary)
+    )
+  }
+
+  func approveTaskBoardPlan(
+    id: String,
+    request: TaskBoardPlanApproveRequest
+  ) async throws -> TaskBoardPlanningResponse {
+    calls.append(
+      .approveTaskBoardPlan(
+        id: id,
+        approvedBy: request.approvedBy,
+        approvedAt: request.approvedAt
+      )
+    )
+    return try updateTaskBoardPlanning(
+      id: id,
+      toStatus: .todo,
+      planning: nil,
+      approvedBy: request.approvedBy,
+      approvedAt: request.approvedAt ?? "2026-05-14T10:06:00Z"
+    )
+  }
+
   func syncTaskBoard(request: TaskBoardSyncRequest) async throws -> TaskBoardSyncSummary {
     calls.append(
       .syncTaskBoard(
@@ -298,6 +339,69 @@ extension TaskBoardItem {
       usage: usage,
       createdAt: createdAt,
       updatedAt: "2026-05-14T10:05:00Z",
+      deletedAt: deletedAt
+    )
+  }
+}
+
+extension RecordingHarnessClient {
+  fileprivate func updateTaskBoardPlanning(
+    id: String,
+    toStatus: TaskBoardStatus,
+    planning: TaskBoardPlanningState?,
+    approvedBy: String? = nil,
+    approvedAt: String? = nil
+  ) throws -> TaskBoardPlanningResponse {
+    try lock.withLock {
+      guard let index = taskBoardItemsStorage.firstIndex(where: { $0.id == id }) else {
+        throw HarnessMonitorAPIError.server(code: 404, message: "Task board item unavailable.")
+      }
+      let current = taskBoardItemsStorage[index]
+      let nextPlanning =
+        planning
+        ?? TaskBoardPlanningState(
+          summary: current.planning.summary,
+          approvedBy: approvedBy,
+          approvedAt: approvedAt
+        )
+      let updated = current.applyingPlanning(status: toStatus, planning: nextPlanning)
+      taskBoardItemsStorage[index] = updated
+      return TaskBoardPlanningResponse(
+        transition: TaskBoardPlanningTransition(
+          boardItemId: id,
+          fromStatus: current.status,
+          toStatus: toStatus,
+          planning: nextPlanning
+        ),
+        item: updated
+      )
+    }
+  }
+}
+
+extension TaskBoardItem {
+  fileprivate func applyingPlanning(
+    status: TaskBoardStatus,
+    planning: TaskBoardPlanningState
+  ) -> TaskBoardItem {
+    TaskBoardItem(
+      schemaVersion: schemaVersion,
+      id: id,
+      title: title,
+      body: body,
+      status: status,
+      priority: priority,
+      tags: tags,
+      projectId: projectId,
+      agentMode: agentMode,
+      externalRefs: externalRefs,
+      planning: planning,
+      workflow: workflow,
+      sessionId: sessionId,
+      workItemId: workItemId,
+      usage: usage,
+      createdAt: createdAt,
+      updatedAt: "2026-05-14T10:06:00Z",
       deletedAt: deletedAt
     )
   }

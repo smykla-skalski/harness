@@ -141,6 +141,37 @@ extension HarnessMonitorStore {
   }
 
   @discardableResult
+  public func beginTaskBoardPlan(id: String) async -> Bool {
+    await mutateTaskBoardPlanning(actionName: "Began task board planning") { client in
+      try await client.beginTaskBoardPlan(id: id)
+    }
+  }
+
+  @discardableResult
+  public func submitTaskBoardPlan(id: String, summary: String) async -> Bool {
+    await mutateTaskBoardPlanning(actionName: "Submitted task board plan") { client in
+      try await client.submitTaskBoardPlan(
+        id: id,
+        request: TaskBoardPlanSubmitRequest(summary: summary)
+      )
+    }
+  }
+
+  @discardableResult
+  public func approveTaskBoardPlan(
+    id: String,
+    approvedBy: String,
+    approvedAt: String? = nil
+  ) async -> Bool {
+    await mutateTaskBoardPlanning(actionName: "Approved task board plan") { client in
+      try await client.approveTaskBoardPlan(
+        id: id,
+        request: TaskBoardPlanApproveRequest(approvedBy: approvedBy, approvedAt: approvedAt)
+      )
+    }
+  }
+
+  @discardableResult
   public func startTaskBoardOrchestrator() async -> Bool {
     await mutateTaskBoardOrchestrator(actionName: "Started task board") { client in
       try await client.startTaskBoardOrchestrator()
@@ -190,6 +221,33 @@ extension HarnessMonitorStore {
       globalTaskBoardEvaluationSummary = measuredSummary.value
       await refreshTaskBoardDashboardSnapshot(using: client)
       presentSuccessFeedback("Evaluated task board")
+      return true
+    } catch {
+      presentFailureFeedback(error.localizedDescription)
+      return false
+    }
+  }
+
+  private func mutateTaskBoardPlanning(
+    actionName: String,
+    mutation:
+      @escaping @Sendable (any HarnessMonitorClientProtocol) async throws
+      -> TaskBoardPlanningResponse
+  ) async -> Bool {
+    guard let client else {
+      return false
+    }
+    isDaemonActionInFlight = true
+    defer { isDaemonActionInFlight = false }
+
+    do {
+      let measuredResponse = try await Self.measureOperation {
+        try await mutation(client)
+      }
+      recordRequestSuccess()
+      mergeTaskBoardItem(measuredResponse.value.item)
+      await refreshTaskBoardDashboardSnapshot(using: client)
+      presentSuccessFeedback(actionName)
       return true
     } catch {
       presentFailureFeedback(error.localizedDescription)

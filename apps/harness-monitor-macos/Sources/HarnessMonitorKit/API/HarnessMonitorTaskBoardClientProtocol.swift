@@ -9,6 +9,15 @@ public protocol HarnessMonitorTaskBoardClientProtocol: Sendable {
     request: TaskBoardUpdateItemRequest
   ) async throws -> TaskBoardItem
   func deleteTaskBoardItem(id: String) async throws -> TaskBoardItem
+  func beginTaskBoardPlan(id: String) async throws -> TaskBoardPlanningResponse
+  func submitTaskBoardPlan(
+    id: String,
+    request: TaskBoardPlanSubmitRequest
+  ) async throws -> TaskBoardPlanningResponse
+  func approveTaskBoardPlan(
+    id: String,
+    request: TaskBoardPlanApproveRequest
+  ) async throws -> TaskBoardPlanningResponse
   func syncTaskBoard(request: TaskBoardSyncRequest) async throws -> TaskBoardSyncSummary
   func dispatchTaskBoard(request: TaskBoardDispatchRequest) async throws -> TaskBoardDispatchSummary
   func evaluateTaskBoard(request: TaskBoardEvaluateRequest) async throws
@@ -73,6 +82,24 @@ extension HarnessMonitorTaskBoardClientProtocol {
 
   public func deleteTaskBoardItem(id _: String) async throws -> TaskBoardItem {
     throw HarnessMonitorAPIError.server(code: 501, message: "Task board unavailable.")
+  }
+
+  public func beginTaskBoardPlan(id _: String) async throws -> TaskBoardPlanningResponse {
+    throw HarnessMonitorAPIError.server(code: 501, message: "Task board planning unavailable.")
+  }
+
+  public func submitTaskBoardPlan(
+    id _: String,
+    request _: TaskBoardPlanSubmitRequest
+  ) async throws -> TaskBoardPlanningResponse {
+    throw HarnessMonitorAPIError.server(code: 501, message: "Task board planning unavailable.")
+  }
+
+  public func approveTaskBoardPlan(
+    id _: String,
+    request _: TaskBoardPlanApproveRequest
+  ) async throws -> TaskBoardPlanningResponse {
+    throw HarnessMonitorAPIError.server(code: 501, message: "Task board planning unavailable.")
   }
 
   public func syncTaskBoard(request _: TaskBoardSyncRequest) async throws -> TaskBoardSyncSummary {

@@ -88,6 +88,69 @@ struct TaskBoardExternalLinks: View {
   }
 }
 
+struct TaskBoardPlanLifecycleActionButtons: View {
+  let item: TaskBoardItem
+  let draft: TaskBoardItemEditorDraft
+  let metrics: TaskBoardOverviewMetrics
+  let isActionInFlight: Bool
+  let onBeginPlan: ((TaskBoardItem) -> Void)?
+  let onSubmitPlan: ((TaskBoardItem, String) -> Void)?
+  let onApprovePlan: ((TaskBoardItem, String, String?) -> Void)?
+
+  var body: some View {
+    beginPlanButton
+    submitPlanButton
+    approvePlanButton
+  }
+
+  private var beginPlanButton: some View {
+    Button {
+      onBeginPlan?(item)
+    } label: {
+      Label("Begin Plan", systemImage: "pencil.and.list.clipboard")
+        .scaledFont(.caption.weight(.semibold))
+    }
+    .frame(minHeight: metrics.controlMinHeight)
+    .harnessActionButtonStyle(variant: .bordered, tint: HarnessMonitorTheme.accent)
+    .controlSize(HarnessMonitorControlMetrics.compactControlSize)
+    .disabled(isActionInFlight || onBeginPlan == nil)
+    .help("Move this board item into planning")
+    .accessibilityIdentifier("harness.task-board.manage-item.begin-plan")
+  }
+
+  private var submitPlanButton: some View {
+    Button {
+      guard let summary = draft.planSummaryForSubmit else { return }
+      onSubmitPlan?(item, summary)
+    } label: {
+      Label("Submit Plan", systemImage: "paperplane")
+        .scaledFont(.caption.weight(.semibold))
+    }
+    .frame(minHeight: metrics.controlMinHeight)
+    .harnessActionButtonStyle(variant: .bordered, tint: HarnessMonitorTheme.accent)
+    .controlSize(HarnessMonitorControlMetrics.compactControlSize)
+    .disabled(isActionInFlight || onSubmitPlan == nil || draft.planSummaryForSubmit == nil)
+    .help("Submit this plan for review")
+    .accessibilityIdentifier("harness.task-board.manage-item.submit-plan")
+  }
+
+  private var approvePlanButton: some View {
+    Button {
+      guard let approvedBy = draft.approverForApproval else { return }
+      onApprovePlan?(item, approvedBy, draft.approvalTimestampForRequest)
+    } label: {
+      Label("Approve Plan", systemImage: "checkmark.seal")
+        .scaledFont(.caption.weight(.semibold))
+    }
+    .frame(minHeight: metrics.controlMinHeight)
+    .harnessActionButtonStyle(variant: .bordered, tint: HarnessMonitorTheme.accent)
+    .controlSize(HarnessMonitorControlMetrics.compactControlSize)
+    .disabled(isActionInFlight || onApprovePlan == nil || draft.approverForApproval == nil)
+    .help("Approve this plan")
+    .accessibilityIdentifier("harness.task-board.manage-item.approve-plan")
+  }
+}
+
 extension TaskBoardWorkflowStatus {
   var title: String {
     switch self {

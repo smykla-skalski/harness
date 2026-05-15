@@ -134,6 +134,20 @@ let sampleTaskBoardSyncSummaryJSON: [String: JSONValue] = [
   ]),
 ]
 
+let sampleTaskBoardPlanningResponseJSON: [String: JSONValue] = [
+  "transition": .object([
+    "board_item_id": .string("board-1"),
+    "from_status": .string("planning"),
+    "to_status": .string("plan_review"),
+    "planning": .object([
+      "summary": .string("Use the semantic plan."),
+      "approved_by": .null,
+      "approved_at": .null,
+    ]),
+  ]),
+  "item": .object(sampleTaskBoardItemJSON),
+]
+
 let sampleTaskBoardOrchestratorSettingsJSON: [String: JSONValue] = [
   "enabled_workflows": .array([
     .string("default_task"),
