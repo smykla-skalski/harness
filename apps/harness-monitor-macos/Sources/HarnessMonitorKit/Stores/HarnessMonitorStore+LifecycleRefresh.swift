@@ -41,7 +41,7 @@ extension HarnessMonitorStore {
     }
     self.client = client
     await refreshPersistedSessionMetadata()
-    await syncStoredTaskBoardGitHubCredentials(using: client)
+    await syncStoredTaskBoardCredentials(using: client)
 
     if maintainsLiveDaemonObservation {
       await connectLive(using: client)

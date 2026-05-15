@@ -62,6 +62,8 @@ pub const TASK_BOARD_ORCHESTRATOR_RUNTIME_CONFIG_UPDATE: &str =
     "task_board.orchestrator_runtime_config_update";
 pub const TASK_BOARD_ORCHESTRATOR_GITHUB_TOKENS_SYNC: &str =
     "task_board.orchestrator_github_tokens_sync";
+pub const TASK_BOARD_ORCHESTRATOR_TODOIST_TOKEN_SYNC: &str =
+    "task_board.orchestrator_todoist_token_sync";
 pub const TASK_BOARD_POLICY_PIPELINE_GET: &str = "task_board.policy_pipeline_get";
 pub const TASK_BOARD_POLICY_PIPELINE_SAVE_DRAFT: &str = "task_board.policy_pipeline_save_draft";
 pub const TASK_BOARD_POLICY_PIPELINE_SIMULATE: &str = "task_board.policy_pipeline_simulate";

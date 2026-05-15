@@ -162,6 +162,14 @@ pub(crate) const ROUTES: &[HttpApiRouteContract] = &[
         swift_client_exposed: true,
     },
     HttpApiRouteContract {
+        method: HttpRouteMethod::Put,
+        path: http_paths::TASK_BOARD_ORCHESTRATOR_TODOIST_TOKEN,
+        parity: HttpRouteParity::Rpc {
+            ws_method: ws_methods::TASK_BOARD_ORCHESTRATOR_TODOIST_TOKEN_SYNC,
+        },
+        swift_client_exposed: true,
+    },
+    HttpApiRouteContract {
         method: HttpRouteMethod::Get,
         path: http_paths::TASK_BOARD_POLICY_PIPELINE,
         parity: HttpRouteParity::Rpc {

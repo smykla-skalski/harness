@@ -177,6 +177,15 @@ async fn run_flow() {
     .await;
     assert_eq!(tokens["global_token_configured"].as_bool(), Some(true));
     assert_eq!(tokens["repository_token_count"].as_u64(), Some(1));
+    let todoist_token = put_json(
+        &client,
+        &base_url,
+        http_paths::TASK_BOARD_ORCHESTRATOR_TODOIST_TOKEN,
+        json!({ "token": "todoist-token" }),
+    )
+    .await;
+    assert_eq!(todoist_token["token_configured"].as_bool(), Some(true));
+    assert_eq!(todoist_token["token"].as_str(), None);
     assert_eq!(
         post_json(
             &client,

@@ -148,6 +148,14 @@ extension WebSocketTransport {
     return try decode(value)
   }
 
+  public func syncTaskBoardTodoistToken(
+    request: TaskBoardTodoistTokenSyncRequest
+  ) async throws -> TaskBoardTodoistTokenSyncResponse {
+    let params = try encodeParams(request, extra: [:])
+    let value = try await rpc(method: .taskBoardOrchestratorTodoistTokenSync, params: params)
+    return try decode(value)
+  }
+
   public func taskBoardPolicyPipeline() async throws -> TaskBoardPolicyPipelineDocument {
     let value = try await rpc(method: .taskBoardPolicyPipelineGet)
     return try decode(value)

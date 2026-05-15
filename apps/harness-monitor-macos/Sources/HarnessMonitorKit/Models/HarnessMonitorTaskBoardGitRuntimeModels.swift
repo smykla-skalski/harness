@@ -189,6 +189,38 @@ public struct TaskBoardGitHubTokensSyncResponse: Codable, Equatable, Sendable {
   }
 }
 
+public struct TaskBoardTodoistTokenSyncRequest: Codable, Equatable, Sendable {
+  public let token: String?
+
+  public init(token: String? = nil) {
+    self.token = token
+  }
+}
+
+public struct TaskBoardTodoistTokenSyncResponse: Codable, Equatable, Sendable {
+  public let tokenConfigured: Bool
+
+  public init(tokenConfigured: Bool) {
+    self.tokenConfigured = tokenConfigured
+  }
+}
+
+public struct TaskBoardTodoistCredentialSnapshot: Codable, Equatable, Sendable {
+  public let token: String?
+
+  public init(token: String? = nil) {
+    self.token = token
+  }
+
+  public var syncRequest: TaskBoardTodoistTokenSyncRequest {
+    TaskBoardTodoistTokenSyncRequest(token: token)
+  }
+
+  public var isEmpty: Bool {
+    token == nil
+  }
+}
+
 public struct TaskBoardGitHubCredentialSnapshot: Codable, Equatable, Sendable {
   public let globalToken: String?
   public let repositoryTokens: [TaskBoardGitHubRepositoryToken]
@@ -216,15 +248,18 @@ public struct TaskBoardGitHubCredentialSnapshot: Codable, Equatable, Sendable {
 public struct TaskBoardGitSettingsSnapshot: Equatable, Sendable {
   public let orchestratorSettings: TaskBoardOrchestratorSettings
   public let runtimeConfig: TaskBoardGitRuntimeConfig
-  public let credentials: TaskBoardGitHubCredentialSnapshot
+  public let githubCredentials: TaskBoardGitHubCredentialSnapshot
+  public let todoistCredentials: TaskBoardTodoistCredentialSnapshot
 
   public init(
     orchestratorSettings: TaskBoardOrchestratorSettings,
     runtimeConfig: TaskBoardGitRuntimeConfig,
-    credentials: TaskBoardGitHubCredentialSnapshot
+    githubCredentials: TaskBoardGitHubCredentialSnapshot,
+    todoistCredentials: TaskBoardTodoistCredentialSnapshot = TaskBoardTodoistCredentialSnapshot()
   ) {
     self.orchestratorSettings = orchestratorSettings
     self.runtimeConfig = runtimeConfig
-    self.credentials = credentials
+    self.githubCredentials = githubCredentials
+    self.todoistCredentials = todoistCredentials
   }
 }

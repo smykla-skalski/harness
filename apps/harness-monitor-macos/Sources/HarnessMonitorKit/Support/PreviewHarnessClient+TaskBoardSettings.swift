@@ -31,4 +31,11 @@ extension PreviewHarnessClient {
     try await performActionDelay()
     return await state.syncTaskBoardGitHubTokens(request)
   }
+
+  public func syncTaskBoardTodoistToken(
+    request: TaskBoardTodoistTokenSyncRequest
+  ) async throws -> TaskBoardTodoistTokenSyncResponse {
+    try await performActionDelay()
+    return await state.syncTaskBoardTodoistToken(request)
+  }
 }

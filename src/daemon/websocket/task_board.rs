@@ -6,8 +6,8 @@ use crate::daemon::protocol::{
     TaskBoardListItemsRequest, TaskBoardOrchestratorRunOnceRequest,
     TaskBoardOrchestratorRunOnceResponse, TaskBoardOrchestratorSettingsUpdateRequest,
     TaskBoardPolicyPipelinePromoteRequest, TaskBoardPolicyPipelineSaveDraftRequest,
-    TaskBoardPolicyPipelineSimulateRequest, TaskBoardSyncRequest, TaskBoardUpdateItemRequest,
-    WsRequest, WsResponse, ws_methods,
+    TaskBoardPolicyPipelineSimulateRequest, TaskBoardSyncRequest, TaskBoardTodoistTokenSyncRequest,
+    TaskBoardUpdateItemRequest, WsRequest, WsResponse, ws_methods,
 };
 use crate::daemon::service;
 use crate::errors::{CliError, CliErrorKind};
@@ -60,6 +60,9 @@ pub(crate) async fn dispatch_task_board_method(
         ),
         ws_methods::TASK_BOARD_ORCHESTRATOR_GITHUB_TOKENS_SYNC => {
             Some(dispatch_task_board_orchestrator_github_tokens_sync(request))
+        }
+        ws_methods::TASK_BOARD_ORCHESTRATOR_TODOIST_TOKEN_SYNC => {
+            Some(dispatch_task_board_orchestrator_todoist_token_sync(request))
         }
         ws_methods::TASK_BOARD_POLICY_PIPELINE_GET => {
             Some(dispatch_task_board_policy_pipeline_get(request))
@@ -294,6 +297,16 @@ fn dispatch_task_board_orchestrator_github_tokens_sync(request: &WsRequest) -> W
         return invalid_params(request);
     };
     dispatch_query_result(&request.id, service::sync_task_board_github_tokens(&body))
+}
+
+fn dispatch_task_board_orchestrator_todoist_token_sync(request: &WsRequest) -> WsResponse {
+    let Ok(body) = parse_params::<TaskBoardTodoistTokenSyncRequest>(request) else {
+        return invalid_params(request);
+    };
+    dispatch_query_result(
+        &request.id,
+        Ok::<_, CliError>(service::sync_task_board_todoist_token(&body)),
+    )
 }
 
 fn dispatch_task_board_policy_pipeline_get(request: &WsRequest) -> WsResponse {

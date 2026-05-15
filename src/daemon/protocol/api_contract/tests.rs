@@ -196,6 +196,12 @@ fn task_board_routes_have_complete_ws_parity() {
                 true,
             ),
             (
+                HttpRouteMethod::Put,
+                http_paths::TASK_BOARD_ORCHESTRATOR_TODOIST_TOKEN,
+                ws_methods::TASK_BOARD_ORCHESTRATOR_TODOIST_TOKEN_SYNC,
+                true,
+            ),
+            (
                 HttpRouteMethod::Get,
                 http_paths::TASK_BOARD_POLICY_PIPELINE,
                 ws_methods::TASK_BOARD_POLICY_PIPELINE_GET,

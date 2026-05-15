@@ -13,6 +13,7 @@ extension TaskBoardAPIClientTests {
     let orchestrator = try await performHTTPOrchestratorCalls(client)
     let settings = try await performHTTPSettingsCalls(client)
     let tokenSync = try await performHTTPGitHubTokenCalls(client)
+    let todoistTokenSync = try await performHTTPTodoistTokenCalls(client)
     try await performHTTPDiscoveryCalls(client)
 
     return TaskBoardHTTPContractResult(
@@ -24,7 +25,8 @@ extension TaskBoardAPIClientTests {
       updatedSettings: settings.updatedSettings,
       runtimeConfig: settings.runtimeConfig,
       updatedRuntimeConfig: settings.updatedRuntimeConfig,
-      tokenSync: tokenSync
+      tokenSync: tokenSync,
+      todoistTokenSync: todoistTokenSync
     )
   }
 
@@ -120,6 +122,14 @@ extension TaskBoardAPIClientTests {
     )
   }
 
+  private func performHTTPTodoistTokenCalls(
+    _ client: HarnessMonitorAPIClient
+  ) async throws -> TaskBoardTodoistTokenSyncResponse {
+    try await client.syncTaskBoardTodoistToken(
+      request: TaskBoardTodoistTokenSyncRequest(token: "todoist-token")
+    )
+  }
+
   private func performHTTPDiscoveryCalls(_ client: HarnessMonitorAPIClient) async throws {
     _ = try await client.taskBoardProjects(status: .todo)
     _ = try await client.taskBoardMachines(status: .todo)
@@ -152,7 +162,7 @@ extension TaskBoardAPIClientTests {
       records.map(\.method)
         == [
           "GET", "GET", "POST", "PUT", "DELETE", "POST", "POST", "POST", "GET", "GET", "POST",
-          "POST", "POST", "GET", "PUT", "GET", "PUT", "PUT", "GET", "GET",
+          "POST", "POST", "GET", "PUT", "GET", "PUT", "PUT", "PUT", "GET", "GET",
         ]
     )
     #expect(
@@ -176,6 +186,7 @@ extension TaskBoardAPIClientTests {
           "/v1/task-board/orchestrator/runtime-config",
           "/v1/task-board/orchestrator/runtime-config",
           "/v1/task-board/orchestrator/github-tokens",
+          "/v1/task-board/orchestrator/todoist-token",
           "/v1/task-board/projects",
           "/v1/task-board/machines",
         ]
@@ -232,8 +243,9 @@ extension TaskBoardAPIClientTests {
     let repositoryTokens = records[17].body?["repository_tokens"] as? [[String: Any]]
     #expect(repositoryTokens?.first?["repository"] as? String == "kong/harness")
     #expect(repositoryTokens?.first?["token"] as? String == "ghu_repo")
-    #expect(records[18].query == "status=todo")
+    #expect(records[18].body?["token"] as? String == "todoist-token")
     #expect(records[19].query == "status=todo")
+    #expect(records[20].query == "status=todo")
   }
 
   func assertHTTPClientResults(_ result: TaskBoardHTTPContractResult) {
@@ -260,6 +272,7 @@ extension TaskBoardAPIClientTests {
     #expect(result.updatedRuntimeConfig.repositoryOverrides.first?.repository == "kong/harness")
     #expect(result.tokenSync.globalTokenConfigured == true)
     #expect(result.tokenSync.repositoryTokenCount == 1)
+    #expect(result.todoistTokenSync.tokenConfigured == true)
   }
 
   private func makeClient() throws -> HarnessMonitorAPIClient {
@@ -286,6 +299,7 @@ struct TaskBoardHTTPContractResult {
   let runtimeConfig: TaskBoardGitRuntimeConfig
   let updatedRuntimeConfig: TaskBoardGitRuntimeConfig
   let tokenSync: TaskBoardGitHubTokensSyncResponse
+  let todoistTokenSync: TaskBoardTodoistTokenSyncResponse
 }
 
 private struct TaskBoardHTTPWorkflowResult {

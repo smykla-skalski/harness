@@ -207,6 +207,9 @@ struct TaskBoardAPIClientTests {
         ]
       )
     )
+    let todoistTokenSync = try await client.syncTaskBoardTodoistToken(
+      request: TaskBoardTodoistTokenSyncRequest(token: "todoist-token")
+    )
 
     #expect(status.settings.githubProject.owner == "kong")
     #expect(status.settings.githubProject.repo == "harness")
@@ -217,6 +220,7 @@ struct TaskBoardAPIClientTests {
     #expect(updatedRuntimeConfig.repositoryOverrides.first?.repository == "kong/harness")
     #expect(tokenSync.globalTokenConfigured == true)
     #expect(tokenSync.repositoryTokenCount == 1)
+    #expect(todoistTokenSync.tokenConfigured == true)
     #expect(
       client.calls == [
         .startTaskBoardOrchestrator,
@@ -234,6 +238,7 @@ struct TaskBoardAPIClientTests {
         ),
         .updateTaskBoardGitRuntimeConfig(overrideCount: 1),
         .syncTaskBoardGitHubTokens(globalTokenConfigured: true, repositoryTokenCount: 1),
+        .syncTaskBoardTodoistToken(tokenConfigured: true),
       ]
     )
   }

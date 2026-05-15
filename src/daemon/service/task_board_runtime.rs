@@ -6,7 +6,7 @@ use crate::task_board::{
     ExternalProvider, ExternalSyncConfig, TaskBoardGitHubRepositoryToken,
     TaskBoardGitHubTokensSyncRequest, TaskBoardGitHubTokensSyncResponse,
     TaskBoardGitRepositoryOverride, TaskBoardGitRuntimeConfig, TaskBoardGitRuntimeProfile,
-    normalize_repository_slug,
+    TaskBoardTodoistTokenSyncRequest, TaskBoardTodoistTokenSyncResponse, normalize_repository_slug,
 };
 
 /// Load the persisted task-board git runtime config.
@@ -43,6 +43,13 @@ pub fn sync_task_board_github_tokens(
     Ok(state::replace_task_board_github_tokens(request))
 }
 
+/// Replace the in-memory Todoist token snapshot used by the daemon.
+pub fn sync_task_board_todoist_token(
+    request: &TaskBoardTodoistTokenSyncRequest,
+) -> TaskBoardTodoistTokenSyncResponse {
+    state::replace_task_board_todoist_token(request)
+}
+
 pub(crate) fn external_sync_config_for_repository(repository: Option<&str>) -> ExternalSyncConfig {
     let repository = normalize_repository_slug(repository);
     let mut config = ExternalSyncConfig::from_env();
@@ -61,6 +68,11 @@ pub(crate) fn external_sync_config_for_repository(repository: Option<&str>) -> E
     }
     if let Some(repository) = repository.as_deref() {
         config = config.with_github_repository_override(Some(repository));
+    }
+    if config.token_for(ExternalProvider::Todoist).is_none()
+        && let Some(token) = state::task_board_todoist_token()
+    {
+        config = config.with_todoist_token_override(Some(token.as_str()));
     }
     config
 }
@@ -138,7 +150,8 @@ mod tests {
     use super::{
         TaskBoardGitHubRepositoryToken, TaskBoardGitHubTokensSyncRequest,
         TaskBoardGitRepositoryOverride, TaskBoardGitRuntimeConfig,
-        update_task_board_git_runtime_config, validate_repository_tokens,
+        TaskBoardTodoistTokenSyncRequest, update_task_board_git_runtime_config,
+        validate_repository_tokens,
     };
     use crate::daemon::state;
     use crate::task_board::{
@@ -281,6 +294,46 @@ mod tests {
                 .expect("clear tokens");
             assert!(state::task_board_github_token(Some("owner/repo")).is_none());
             assert!(state::task_board_github_token(None).is_none());
+        });
+    }
+
+    #[test]
+    fn external_sync_config_uses_app_configured_todoist_token_when_env_missing() {
+        let tmp = tempdir().expect("tempdir");
+        with_isolated_harness_env(tmp.path(), || {
+            super::sync_task_board_todoist_token(&TaskBoardTodoistTokenSyncRequest::default());
+            super::sync_task_board_todoist_token(&TaskBoardTodoistTokenSyncRequest {
+                token: Some(" todoist-token ".into()),
+            });
+
+            let config = super::external_sync_config_for_repository(Some("owner/repo"));
+
+            assert_eq!(
+                config.token_for(crate::task_board::ExternalProvider::Todoist),
+                Some("todoist-token")
+            );
+            super::sync_task_board_todoist_token(&TaskBoardTodoistTokenSyncRequest::default());
+        });
+    }
+
+    #[test]
+    fn external_sync_config_keeps_todoist_env_precedence() {
+        let tmp = tempdir().expect("tempdir");
+        with_isolated_harness_env(tmp.path(), || {
+            super::sync_task_board_todoist_token(&TaskBoardTodoistTokenSyncRequest::default());
+            temp_env::with_var("HARNESS_TODOIST_TOKEN", Some("env-token"), || {
+                super::sync_task_board_todoist_token(&TaskBoardTodoistTokenSyncRequest {
+                    token: Some("app-token".into()),
+                });
+
+                let config = super::external_sync_config_for_repository(Some("owner/repo"));
+
+                assert_eq!(
+                    config.token_for(crate::task_board::ExternalProvider::Todoist),
+                    Some("env-token")
+                );
+            });
+            super::sync_task_board_todoist_token(&TaskBoardTodoistTokenSyncRequest::default());
         });
     }
 }
