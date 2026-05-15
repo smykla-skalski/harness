@@ -107,6 +107,10 @@ pub struct TaskBoardRuntimeIdentityArgs {
     pub ssh_key_path: Option<String>,
     #[arg(long)]
     pub clear_ssh_key_path: bool,
+    #[arg(long)]
+    pub ssh_private_key_env: Option<String>,
+    #[arg(long)]
+    pub ssh_private_key_passphrase_env: Option<String>,
 }
 
 #[derive(Debug, Clone, Args)]
@@ -116,9 +120,15 @@ pub struct TaskBoardRuntimeSigningArgs {
     #[arg(long)]
     pub signing_ssh_key_path: Option<String>,
     #[arg(long)]
+    pub signing_ssh_private_key_env: Option<String>,
+    #[arg(long)]
+    pub signing_ssh_private_key_passphrase_env: Option<String>,
+    #[arg(long)]
     pub gpg_key_id: Option<String>,
     #[arg(long)]
     pub gpg_private_key_path: Option<String>,
+    #[arg(long)]
+    pub gpg_private_key_env: Option<String>,
     #[arg(long)]
     pub gpg_private_key_passphrase_env: Option<String>,
     #[arg(long)]
@@ -276,6 +286,12 @@ impl TaskBoardOrchestratorRuntimeConfigArgs {
             self.identity.ssh_key_path.as_ref(),
             self.identity.clear_ssh_key_path,
         );
+        if let Some(name) = &self.identity.ssh_private_key_env {
+            profile.ssh_private_key = Some(read_secret_env(name)?);
+        }
+        if let Some(name) = &self.identity.ssh_private_key_passphrase_env {
+            profile.ssh_private_key_passphrase = Some(read_secret_env(name)?);
+        }
         self.apply_signing_update(&mut profile.signing)
     }
 
@@ -294,6 +310,12 @@ impl TaskBoardOrchestratorRuntimeConfigArgs {
             self.signing.signing_ssh_key_path.as_ref(),
             false,
         );
+        if let Some(name) = &self.signing.signing_ssh_private_key_env {
+            signing.ssh_private_key = Some(read_secret_env(name)?);
+        }
+        if let Some(name) = &self.signing.signing_ssh_private_key_passphrase_env {
+            signing.ssh_private_key_passphrase = Some(read_secret_env(name)?);
+        }
         apply_optional_string(
             &mut signing.gpg_key_id,
             self.signing.gpg_key_id.as_ref(),
@@ -304,6 +326,9 @@ impl TaskBoardOrchestratorRuntimeConfigArgs {
             self.signing.gpg_private_key_path.as_ref(),
             false,
         );
+        if let Some(name) = &self.signing.gpg_private_key_env {
+            signing.gpg_private_key = Some(read_secret_env(name)?);
+        }
         if let Some(name) = &self.signing.gpg_private_key_passphrase_env {
             signing.gpg_private_key_passphrase = Some(read_secret_env(name)?);
         }
@@ -319,6 +344,8 @@ impl TaskBoardRuntimeIdentityArgs {
             || self.clear_author_email
             || self.ssh_key_path.is_some()
             || self.clear_ssh_key_path
+            || self.ssh_private_key_env.is_some()
+            || self.ssh_private_key_passphrase_env.is_some()
     }
 }
 
@@ -326,8 +353,11 @@ impl TaskBoardRuntimeSigningArgs {
     fn has_update(&self) -> bool {
         self.signing_mode.is_some()
             || self.signing_ssh_key_path.is_some()
+            || self.signing_ssh_private_key_env.is_some()
+            || self.signing_ssh_private_key_passphrase_env.is_some()
             || self.gpg_key_id.is_some()
             || self.gpg_private_key_path.is_some()
+            || self.gpg_private_key_env.is_some()
             || self.gpg_private_key_passphrase_env.is_some()
             || self.clear_signing
     }

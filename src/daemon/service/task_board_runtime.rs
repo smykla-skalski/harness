@@ -167,11 +167,16 @@ mod tests {
                     author_name: Some(" Global ".into()),
                     author_email: Some(" user@example.com ".into()),
                     ssh_key_path: Some(" /tmp/id_ed25519 ".into()),
+                    ssh_private_key: None,
+                    ssh_private_key_passphrase: None,
                     signing: TaskBoardGitSigningConfig {
                         mode: TaskBoardGitSigningMode::Ssh,
                         ssh_key_path: Some(" /tmp/id_sign ".into()),
+                        ssh_private_key: None,
+                        ssh_private_key_passphrase: None,
                         gpg_key_id: None,
                         gpg_private_key_path: None,
+                        gpg_private_key: None,
                         gpg_private_key_passphrase: None,
                     },
                 },
@@ -181,6 +186,8 @@ mod tests {
                         author_name: None,
                         author_email: Some(" repo@example.com ".into()),
                         ssh_key_path: None,
+                        ssh_private_key: None,
+                        ssh_private_key_passphrase: None,
                         signing: TaskBoardGitSigningConfig::default(),
                     },
                 }],
@@ -205,15 +212,20 @@ mod tests {
     }
 
     #[test]
-    fn update_runtime_config_keeps_passphrases_process_local() {
+    fn update_runtime_config_keeps_private_key_material_process_local() {
         let tmp = tempdir().expect("tempdir");
         with_isolated_harness_env(tmp.path(), || {
             let saved = update_task_board_git_runtime_config(&TaskBoardGitRuntimeConfig {
                 global: TaskBoardGitRuntimeProfile {
+                    ssh_private_key: Some("ssh-secret".into()),
+                    ssh_private_key_passphrase: Some("ssh-passphrase".into()),
                     signing: TaskBoardGitSigningConfig {
                         mode: TaskBoardGitSigningMode::Gpg,
+                        ssh_private_key: Some("signing-ssh-secret".into()),
+                        ssh_private_key_passphrase: Some("signing-ssh-passphrase".into()),
                         gpg_key_id: Some("ABC123".into()),
                         gpg_private_key_path: Some("/tmp/private.asc".into()),
+                        gpg_private_key: Some("gpg-secret".into()),
                         gpg_private_key_passphrase: Some("secret".into()),
                         ..Default::default()
                     },
@@ -223,9 +235,21 @@ mod tests {
             })
             .expect("save runtime config");
 
+            assert!(saved.global.ssh_private_key.is_none());
+            assert!(saved.global.ssh_private_key_passphrase.is_none());
+            assert!(saved.global.signing.ssh_private_key.is_none());
+            assert!(saved.global.signing.ssh_private_key_passphrase.is_none());
+            assert!(saved.global.signing.gpg_private_key.is_none());
             assert!(saved.global.signing.gpg_private_key_passphrase.is_none());
             let raw_config = fs_err::read_to_string(state::config_path()).expect("read raw config");
+            assert!(!raw_config.contains("ssh-secret"));
+            assert!(!raw_config.contains("ssh-passphrase"));
+            assert!(!raw_config.contains("signing-ssh-secret"));
+            assert!(!raw_config.contains("signing-ssh-passphrase"));
+            assert!(!raw_config.contains("gpg-secret"));
             assert!(!raw_config.contains("secret"));
+            assert!(!raw_config.contains("\"ssh_private_key\""));
+            assert!(!raw_config.contains("\"gpg_private_key\""));
             assert!(!raw_config.contains("gpg_private_key_passphrase"));
             assert!(
                 state::load_task_board_git_runtime_config()
@@ -235,12 +259,27 @@ mod tests {
                     .gpg_private_key_passphrase
                     .is_none()
             );
+            let profile =
+                super::git_runtime_profile_for_repository(None).expect("load signing profile");
+            assert_eq!(profile.ssh_private_key.as_deref(), Some("ssh-secret"));
             assert_eq!(
-                super::git_runtime_profile_for_repository(None)
-                    .expect("load signing profile")
-                    .signing
-                    .gpg_private_key_passphrase
-                    .as_deref(),
+                profile.ssh_private_key_passphrase.as_deref(),
+                Some("ssh-passphrase")
+            );
+            assert_eq!(
+                profile.signing.ssh_private_key.as_deref(),
+                Some("signing-ssh-secret")
+            );
+            assert_eq!(
+                profile.signing.ssh_private_key_passphrase.as_deref(),
+                Some("signing-ssh-passphrase")
+            );
+            assert_eq!(
+                profile.signing.gpg_private_key.as_deref(),
+                Some("gpg-secret")
+            );
+            assert_eq!(
+                profile.signing.gpg_private_key_passphrase.as_deref(),
                 Some("secret")
             );
         });
