@@ -74,6 +74,18 @@ extension PolicyCanvasViewModel {
   /// routing. Returns at most four points (leading/trailing/top/bottom) so
   /// the router can pick the combination that yields the fewest bends.
   /// Returns an empty array when the endpoint cannot resolve.
+  ///
+  /// **Order is load-bearing for the fallback path.**
+  /// `PolicyCanvasPortSide.allSides` returns `[.leading, .trailing, .top,
+  /// .bottom]`, and `PolicyCanvasVisibilityRouter.route(sourceCandidates:
+  /// targetCandidates:context:)` falls back to `sourceCandidates[0]` paired
+  /// with `targetCandidates[0]` when every combo's A* call reports no path
+  /// (the degenerate "all candidates fall back" case). With the current
+  /// order that degenerate fallback is `leading → leading`, the canonical
+  /// node side for inbound flow. Reordering this list silently changes
+  /// which side gets picked when routing cannot solve, so any caller
+  /// touching `allSides` must consider whether the new `[0]` is still the
+  /// right default geometry.
   func portAnchorCandidates(for endpoint: PolicyCanvasPortEndpoint) -> [CGPoint] {
     guard let node = node(endpoint.nodeID) else {
       return []
