@@ -65,6 +65,15 @@ public struct DashboardWindowView: View {
     )
   }
 
+  private var dashboardToolbarModel: DashboardWindowToolbarModel {
+    DashboardWindowToolbarModel(
+      selectedRoute: selectedRoute,
+      sleepPreventionPresentation: SleepPreventionToolbarPresentation(
+        isEnabled: store.contentUI.toolbar.sleepPreventionEnabled
+      )
+    )
+  }
+
   private var sidebarWidth: Double {
     get { persistedSidebarWidth }
     nonmutating set { persistedSidebarWidth = newValue }
@@ -114,7 +123,12 @@ public struct DashboardWindowView: View {
       }
       .accessibilityElement(children: .contain)
       .accessibilityIdentifier(HarnessMonitorAccessibility.dashboardWindowRoot)
-      .toolbar { Spacer() }
+      .toolbar {
+        DashboardWindowToolbar(
+          store: store,
+          model: dashboardToolbarModel
+        )
+      }
       .toolbarBackground(.visible, for: .windowToolbar)
       .task {
         HarnessMonitorUITestTrace.record(
@@ -124,6 +138,76 @@ public struct DashboardWindowView: View {
             "selected_route": selectedRoute.rawValue,
             "recent_session_count": String(sessionCatalog.recentSessions.count),
           ]
+        )
+      }
+    }
+  }
+}
+
+private struct DashboardWindowToolbarModel: Equatable {
+  let selectedRoute: DashboardWindowRoute
+  let sleepPreventionPresentation: SleepPreventionToolbarPresentation
+
+  var showsQuickActions: Bool {
+    selectedRoute == .taskBoard
+  }
+}
+
+private struct DashboardWindowToolbar: ToolbarContent {
+  let store: HarnessMonitorStore
+  let model: DashboardWindowToolbarModel
+
+  @ToolbarContentBuilder
+  var body: some ToolbarContent {
+    HarnessMonitorWindowToolbar {
+      ToolbarItemGroup(placement: .navigation) {
+        if model.showsQuickActions {
+          Button {
+            store.presentedSheet = .newSession
+          } label: {
+            Label {
+              Text("New Session")
+            } icon: {
+              Image(systemName: "plus.square")
+                .frame(width: 14, height: 14)
+            }
+          }
+          .help("New Session")
+          .accessibilityIdentifier(HarnessMonitorAccessibility.dashboardNewSessionButton)
+          .harnessMCPButton(
+            HarnessMonitorAccessibility.dashboardNewSessionButton,
+            label: "New Session",
+            hint: "Create a new session.",
+            pressAction: { store.presentedSheet = .newSession }
+          )
+
+          Button {
+            store.requestOpenFolder()
+          } label: {
+            Label {
+              Text("Open Folder")
+            } icon: {
+              Image(systemName: "folder")
+                .frame(width: 14, height: 14)
+            }
+          }
+          .help("Open Folder")
+          .accessibilityIdentifier(HarnessMonitorAccessibility.dashboardOpenFolderButton)
+          .harnessMCPButton(
+            HarnessMonitorAccessibility.dashboardOpenFolderButton,
+            label: "Open Folder",
+            hint: "Open a project folder.",
+            pressAction: { store.requestOpenFolder() }
+          )
+        }
+      }
+    } automatic: {
+      ToolbarItemGroup(placement: .automatic) {}
+    } primaryAction: {
+      ToolbarItem(placement: .primaryAction) {
+        SleepPreventionToolbarButton(
+          store: store,
+          presentation: model.sleepPreventionPresentation
         )
       }
     }
@@ -256,7 +340,7 @@ private struct DashboardTaskBoardRouteView: View {
       scrollSurfaceLabel: "Dashboard"
     ) {
       VStack(alignment: .leading, spacing: 24) {
-        DashboardQuickActionsSection(store: store)
+        DashboardQuickActionsSection()
         TaskBoardOverviewHost(
           scope: .dashboard,
           store: store,
@@ -290,29 +374,10 @@ private struct DashboardTaskBoardRouteView: View {
 }
 
 private struct DashboardQuickActionsSection: View {
-  let store: HarnessMonitorStore
-
   var body: some View {
-    VStack(alignment: .leading, spacing: HarnessMonitorTheme.sectionSpacing) {
-      Text("Dashboard")
-        .scaledFont(.system(.title2, design: .rounded, weight: .semibold))
-        .accessibilityAddTraits(.isHeader)
-      HStack(spacing: HarnessMonitorTheme.itemSpacing) {
-        Button("New Session") {
-          store.presentedSheet = .newSession
-        }
-        .harnessActionButtonStyle(variant: .prominent, tint: nil)
-        .controlSize(HarnessMonitorControlMetrics.compactControlSize)
-        .accessibilityIdentifier(HarnessMonitorAccessibility.dashboardNewSessionButton)
-
-        Button("Open Folder") {
-          store.requestOpenFolder()
-        }
-        .harnessActionButtonStyle(variant: .bordered, tint: .secondary)
-        .controlSize(HarnessMonitorControlMetrics.compactControlSize)
-        .accessibilityIdentifier(HarnessMonitorAccessibility.dashboardOpenFolderButton)
-      }
-    }
-    .frame(maxWidth: .infinity, alignment: .leading)
+    Text("Dashboard")
+      .scaledFont(.system(.title2, design: .rounded, weight: .semibold))
+      .accessibilityAddTraits(.isHeader)
+      .frame(maxWidth: .infinity, alignment: .leading)
   }
 }
