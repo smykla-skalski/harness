@@ -11,6 +11,7 @@ struct PolicyCanvasEdgeLayer: View {
   /// with `PolicyCanvasEdgeLabelLayer` so the two layers do not each rebuild
   /// the same dictionary per render cycle.
   let portAnchors: [PolicyCanvasPortEndpoint: CGPoint]
+  @Environment(\.policyCanvasEdgeRouter) private var router
 
   var body: some View {
     // Severity map and edge-lane assignments stay local to this layer:
@@ -22,7 +23,7 @@ struct PolicyCanvasEdgeLayer: View {
         if let source = portAnchors[edge.source],
           let target = portAnchors[edge.target]
         {
-          let route = PolicyCanvasEdgeRoute(
+          let route = router.route(
             source: source,
             target: target,
             lane: edgeLanes[edge.id, default: 0],
@@ -81,17 +82,25 @@ struct PolicyCanvasEdgeLabelLayer: View {
   /// `PolicyCanvasEdgeLayer` for the dedup rationale.
   let portAnchors: [PolicyCanvasPortEndpoint: CGPoint]
   @Environment(\.fontScale) private var fontScale
+  @Environment(\.policyCanvasEdgeRouter) private var router
+
+  /// Below this zoom, capsule labels collapse to a 4pt accent-colored dot
+  /// at the label anchor. React Flow's threshold is 0.6; matches the
+  /// far-zoom legibility cliff where the capsule text becomes ineligible
+  /// to read anyway.
+  private static let labelCollapseThreshold: CGFloat = 0.6
 
   var body: some View {
     let metrics = PolicyCanvasEdgeLabelMetrics(fontScale: fontScale)
     let edgeLanes = viewModel.edgeRouteLanes
+    let collapsed = viewModel.zoom < Self.labelCollapseThreshold
     ZStack(alignment: .topLeading) {
       ForEach(edges) { edge in
         if !edge.label.isEmpty,
           let source = portAnchors[edge.source],
           let target = portAnchors[edge.target]
         {
-          let route = PolicyCanvasEdgeRoute(
+          let route = router.route(
             source: source,
             target: target,
             lane: edgeLanes[edge.id, default: 0],
@@ -99,34 +108,45 @@ struct PolicyCanvasEdgeLabelLayer: View {
             sourceGroupID: viewModel.node(edge.source.nodeID)?.groupID,
             targetGroupID: viewModel.node(edge.target.nodeID)?.groupID
           )
-          Button {
-            viewModel.select(.edge(edge.id))
-          } label: {
-            Text(edge.label)
-              .scaledFont(.caption2.weight(.semibold))
-              .foregroundStyle(.white.opacity(0.92))
-              .lineLimit(1)
-              .truncationMode(.middle)
-              .padding(.horizontal, metrics.horizontalPadding)
-              .frame(
-                minWidth: metrics.minWidth,
-                maxWidth: PolicyCanvasLayout.edgeLabelMaxWidth,
-                minHeight: metrics.height
-              )
-              .background(Color(red: 0.04, green: 0.05, blue: 0.08).opacity(0.96), in: Capsule())
-              .overlay {
-                Capsule()
-                  .stroke(edgeColor(for: edge).opacity(0.72), lineWidth: 1.2)
+          if collapsed {
+            Circle()
+              .fill(edgeColor(for: edge).opacity(0.72))
+              .frame(width: 4, height: 4)
+              .position(route.labelPosition)
+              .help(edge.label)
+              .accessibilityFocused(focusedComponent, equals: .edge(edge.id))
+              .accessibilityLabel(viewModel.accessibilityLabel(for: edge))
+              .accessibilityIdentifier(HarnessMonitorAccessibility.policyCanvasEdge(edge.id))
+          } else {
+            Button {
+              viewModel.select(.edge(edge.id))
+            } label: {
+              Text(edge.label)
+                .scaledFont(.caption2.weight(.semibold))
+                .foregroundStyle(.white.opacity(0.92))
+                .lineLimit(1)
+                .truncationMode(.middle)
+                .padding(.horizontal, metrics.horizontalPadding)
+                .frame(
+                  minWidth: metrics.minWidth,
+                  maxWidth: PolicyCanvasLayout.edgeLabelMaxWidth,
+                  minHeight: metrics.height
+                )
+                .background(Color(red: 0.04, green: 0.05, blue: 0.08).opacity(0.96), in: Capsule())
+                .overlay {
+                  Capsule()
+                    .stroke(edgeColor(for: edge).opacity(0.72), lineWidth: 1.2)
+                }
+            }
+            .harnessPlainButtonStyle()
+            .position(route.labelPosition)
+            .accessibilityFocused(focusedComponent, equals: .edge(edge.id))
+            .accessibilityLabel(viewModel.accessibilityLabel(for: edge))
+            .accessibilityIdentifier(HarnessMonitorAccessibility.policyCanvasEdge(edge.id))
+            .contextMenu {
+              Button("Delete edge", role: .destructive) {
+                viewModel.deleteEdge(edge.id)
               }
-          }
-          .harnessPlainButtonStyle()
-          .position(route.labelPosition)
-          .accessibilityFocused(focusedComponent, equals: .edge(edge.id))
-          .accessibilityLabel(viewModel.accessibilityLabel(for: edge))
-          .accessibilityIdentifier(HarnessMonitorAccessibility.policyCanvasEdge(edge.id))
-          .contextMenu {
-            Button("Delete edge", role: .destructive) {
-              viewModel.deleteEdge(edge.id)
             }
           }
         }
