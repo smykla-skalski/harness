@@ -1,5 +1,22 @@
 import SwiftUI
 
+/// Routing input the canvas hands to a `PolicyCanvasEdgeRouter`.
+///
+/// **Cache identity invariant.** `PolicyCanvasMemoizedRouter` uses this
+/// struct's synthesized `Hashable` derivation as the cache key for the
+/// non-endpoint portion of every routing call. Every field that any
+/// concrete router reads MUST be a stored property here, and the
+/// `Hashable` synthesis MUST cover it. Adding a non-routing field
+/// (telemetry handle, debug flag, anything the routing function does
+/// not actually consume) silently widens the cache key and burns hit
+/// rate; adding a *routing*-relevant input without adding it here
+/// silently serves stale polylines.
+///
+/// The contract test in
+/// `Tests/HarnessMonitorKitTests/PolicyCanvasMemoizedRouterContextContractTests.swift`
+/// guards the second failure mode by mutating each field one at a time
+/// and asserting the wrapped router miss-rate flips to 100%. New fields
+/// must extend that test in the same change.
 struct PolicyCanvasRouteContext: Hashable {
   let lane: Int
   let groups: [PolicyCanvasGroup]
