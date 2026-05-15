@@ -85,12 +85,51 @@ fn create_schema() -> Value {
             "body": { "type": "string" },
             "priority": { "type": "string" },
             "agent_mode": { "type": "string" },
+            "tags": string_array_schema(),
             "project_id": { "type": "string" },
+            "target_project_types": string_array_schema(),
+            "external_refs": external_refs_schema(),
+            "planning": planning_schema(),
+            "workflow": { "type": "object" },
             "session_id": { "type": "string" },
-            "work_item_id": { "type": "string" }
+            "work_item_id": { "type": "string" },
+            "id": { "type": "string" }
         },
         "required": ["title"],
-        "additionalProperties": true
+        "additionalProperties": false
+    })
+}
+
+fn string_array_schema() -> Value {
+    json!({
+        "type": "array",
+        "items": { "type": "string" }
+    })
+}
+
+fn external_refs_schema() -> Value {
+    json!({
+        "type": "array",
+        "items": {
+            "type": "object",
+            "properties": {
+                "provider": { "type": "string" },
+                "external_id": { "type": "string" },
+                "url": { "type": "string" }
+            },
+            "required": ["provider", "external_id"]
+        }
+    })
+}
+
+fn planning_schema() -> Value {
+    json!({
+        "type": "object",
+        "properties": {
+            "summary": { "type": "string" },
+            "approved_by": { "type": "string" },
+            "approved_at": { "type": "string" }
+        }
     })
 }
 
@@ -119,10 +158,28 @@ fn update_schema() -> Value {
     json!({
         "type": "object",
         "properties": {
-            "id": { "type": "string" }
+            "id": { "type": "string" },
+            "title": { "type": "string" },
+            "body": { "type": "string" },
+            "status": { "type": "string" },
+            "priority": { "type": "string" },
+            "agent_mode": { "type": "string" },
+            "tags": string_array_schema(),
+            "project_id": { "type": "string" },
+            "target_project_types": string_array_schema(),
+            "clear_project_id": { "type": "boolean" },
+            "clear_session_id": { "type": "boolean" },
+            "clear_work_item_id": { "type": "boolean" },
+            "external_refs": external_refs_schema(),
+            "planning": planning_schema(),
+            "clear_planning": { "type": "boolean" },
+            "clear_workflow": { "type": "boolean" },
+            "workflow": { "type": "object" },
+            "session_id": { "type": "string" },
+            "work_item_id": { "type": "string" }
         },
         "required": ["id"],
-        "additionalProperties": true
+        "additionalProperties": false
     })
 }
 

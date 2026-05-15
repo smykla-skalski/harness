@@ -318,3 +318,105 @@ async fn policy_save_draft_tool_proxies_to_running_daemon() {
     );
     assert_eq!(captured.request.params, arguments);
 }
+
+/// Public fields the MCP create schema must advertise. Hard-coded so a
+/// future field rename or addition forces this test to fail until
+/// `create_schema` is updated.
+const TASK_BOARD_CREATE_FIELDS: &[&str] = &[
+    "title",
+    "body",
+    "priority",
+    "agent_mode",
+    "tags",
+    "project_id",
+    "target_project_types",
+    "external_refs",
+    "planning",
+    "workflow",
+    "session_id",
+    "work_item_id",
+    "id",
+];
+
+/// Public fields the MCP update schema must advertise. Same regression guard
+/// shape as `TASK_BOARD_CREATE_FIELDS`.
+const TASK_BOARD_UPDATE_FIELDS: &[&str] = &[
+    "id",
+    "title",
+    "body",
+    "status",
+    "priority",
+    "agent_mode",
+    "tags",
+    "project_id",
+    "target_project_types",
+    "external_refs",
+    "planning",
+    "workflow",
+    "session_id",
+    "work_item_id",
+];
+
+fn assert_schema_covers_fields(schema: &Value, tool_name: &str, expected: &[&str]) {
+    let properties = schema
+        .get("properties")
+        .and_then(Value::as_object)
+        .unwrap_or_else(|| panic!("{tool_name} schema missing properties object"));
+    for field in expected {
+        assert!(
+            properties.contains_key(*field),
+            "{tool_name} schema missing field `{field}`; properties: {:?}",
+            properties.keys().collect::<Vec<_>>()
+        );
+    }
+    assert_eq!(
+        schema.get("additionalProperties"),
+        Some(&Value::Bool(false)),
+        "{tool_name} schema must reject unknown fields for strict-client compatibility"
+    );
+}
+
+fn task_board_tool_schema(tool_name: &str) -> Value {
+    let registry = task_board_registry();
+    let tool = registry
+        .get(tool_name)
+        .unwrap_or_else(|| panic!("{tool_name} tool registered"));
+    tool.input_schema()
+}
+
+#[test]
+fn create_schema_covers_every_public_field() {
+    let schema = task_board_tool_schema(ws_methods::TASK_BOARD_CREATE);
+    assert_schema_covers_fields(
+        &schema,
+        ws_methods::TASK_BOARD_CREATE,
+        TASK_BOARD_CREATE_FIELDS,
+    );
+
+    let probe = json!({
+        "title": "probe",
+        "body": "",
+        "priority": "high",
+        "agent_mode": "headless",
+        "tags": ["mcp"],
+        "project_id": "proj-1",
+        "target_project_types": ["web"],
+        "external_refs": [],
+        "planning": { "summary": "draft" },
+        "session_id": "sess-1",
+        "work_item_id": "work-1",
+        "id": "item-1",
+    });
+    serde_json::from_value::<crate::daemon::protocol::TaskBoardCreateItemRequest>(probe)
+        .expect("create request should accept every schema field");
+}
+
+#[test]
+fn update_schema_uses_strict_additional_properties() {
+    let schema = task_board_tool_schema(ws_methods::TASK_BOARD_UPDATE);
+    assert_schema_covers_fields(
+        &schema,
+        ws_methods::TASK_BOARD_UPDATE,
+        TASK_BOARD_UPDATE_FIELDS,
+    );
+}
