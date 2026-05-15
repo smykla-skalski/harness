@@ -131,7 +131,7 @@ enum PolicyCanvasPortSide: String, Hashable {
   case top
   case bottom
 
-  static let allSides: [PolicyCanvasPortSide] = [.leading, .trailing, .top, .bottom]
+  static let allSides: [Self] = [.leading, .trailing, .top, .bottom]
 }
 
 struct PolicyCanvasPort: Identifiable, Hashable {
@@ -209,105 +209,6 @@ struct PolicyCanvasGroup: Identifiable {
   var title: String
   var frame: CGRect
   var tone: PolicyCanvasGroupTone
-}
-
-struct PolicyCanvasPortEndpoint: Hashable {
-  let nodeID: String
-  let portID: String
-  let kind: PolicyCanvasPortKind
-  var side: PolicyCanvasPortSide?
-}
-
-/// Semantic kind of a `PolicyCanvasEdge`. Drives stroke color so the canvas
-/// reader can distinguish unconditional flow, conditional control branches,
-/// and error/deny paths at a glance. Mapped from the daemon `condition`
-/// string in `policyCanvasEdge(_:)`; defaults to `.flow` for `"always"` so
-/// untyped historical edges keep the existing neutral hue.
-enum PolicyCanvasEdgeKind: String, Hashable, CaseIterable {
-  case flow
-  case control
-  case error
-
-  var accentColor: Color {
-    switch self {
-    case .flow:
-      Color.cyan
-    case .control:
-      Color.purple
-    case .error:
-      Color.red
-    }
-  }
-}
-
-struct PolicyCanvasEdge: Identifiable, Hashable {
-  let id: String
-  var source: PolicyCanvasPortEndpoint
-  var target: PolicyCanvasPortEndpoint
-  var label: String
-  /// Free-form condition string surfaced by the inspector for user editing.
-  /// Defaults to `"always"` to match the daemon's wire shape; the document
-  /// round-trip preserves any other `TaskBoardPolicyPipelineEdgeCondition`
-  /// fields (actions, reasonCode) through the `originalEdgeConditions` cache
-  /// on `exportDocument()`, overriding only the `condition` string the user
-  /// edited here.
-  var condition: String
-  /// When `false`, the visibility router is allowed to pick any of the four
-  /// node sides for source and target anchors, choosing the combination that
-  /// yields the fewest bends. Defaults to `true` so existing documents keep
-  /// their stable port positions; flips off only when the user opts in via
-  /// the inspector toggle (deferred UI surface, T2.2 follow-up).
-  var pinnedPortSide: Bool
-  /// Semantic kind used to pick the stroke color. Derived from `condition`
-  /// at construction by `PolicyCanvasEdgeKind.derive(from:)`; can be
-  /// overridden at the model boundary if the daemon ever surfaces an
-  /// explicit kind field.
-  var kind: PolicyCanvasEdgeKind
-  /// When `true`, the stroke renders an animated dashed phase to suggest
-  /// flow direction. Gated on reduce-motion at the render layer so the
-  /// animation collapses to a static dashed stroke when the user has
-  /// reduce-motion enabled. Defaults to `false`; the live runtime
-  /// visualization layer wires this on per its own signal (deferred -
-  /// daemon does not emit a "live edge" event today).
-  var isAnimated: Bool
-
-  init(
-    id: String,
-    source: PolicyCanvasPortEndpoint,
-    target: PolicyCanvasPortEndpoint,
-    label: String,
-    condition: String = "always",
-    pinnedPortSide: Bool = true,
-    kind: PolicyCanvasEdgeKind? = nil,
-    isAnimated: Bool = false
-  ) {
-    self.id = id
-    self.source = source
-    self.target = target
-    self.label = label
-    self.condition = condition
-    self.pinnedPortSide = pinnedPortSide
-    self.kind = kind ?? PolicyCanvasEdgeKind.derive(from: condition)
-    self.isAnimated = isAnimated
-  }
-}
-
-extension PolicyCanvasEdgeKind {
-  /// Map a daemon condition string to a semantic kind. "always" + an empty
-  /// string fall to `.flow`; conditions whose text mentions `denied`,
-  /// `error`, `reject`, `failed`, or `fail` map to `.error`; everything
-  /// else is `.control`.
-  static func derive(from condition: String) -> PolicyCanvasEdgeKind {
-    let lowered = condition.lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
-    if lowered.isEmpty || lowered == "always" {
-      return .flow
-    }
-    let errorMarkers = ["denied", "deny", "error", "reject", "failed", "fail"]
-    if errorMarkers.contains(where: { lowered.contains($0) }) {
-      return .error
-    }
-    return .control
-  }
 }
 
 enum PolicyCanvasSelection: Hashable {

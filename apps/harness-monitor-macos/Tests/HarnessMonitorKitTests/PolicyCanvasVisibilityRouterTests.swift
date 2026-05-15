@@ -15,11 +15,7 @@ struct PolicyCanvasVisibilityRouterTests {
     let route = PolicyCanvasVisibilityRouter().route(
       source: CGPoint(x: 0, y: 100),
       target: CGPoint(x: 400, y: 100),
-      lane: 0,
-      groups: [],
-      sourceGroupID: nil,
-      targetGroupID: nil,
-      obstacles: []
+      context: context()
     )
     #expect(route.points.first == CGPoint(x: 0, y: 100))
     #expect(route.points.last == CGPoint(x: 400, y: 100))
@@ -32,11 +28,7 @@ struct PolicyCanvasVisibilityRouterTests {
     let route = PolicyCanvasVisibilityRouter().route(
       source: CGPoint(x: 0, y: 100),
       target: CGPoint(x: 400, y: 100),
-      lane: 0,
-      groups: [],
-      sourceGroupID: nil,
-      targetGroupID: nil,
-      obstacles: [obstacle]
+      context: context(obstacles: [obstacle])
     )
     let bends = bendCount(of: route.points)
     #expect(bends >= 2)
@@ -51,11 +43,7 @@ struct PolicyCanvasVisibilityRouterTests {
       PolicyCanvasVisibilityRouter().route(
         source: CGPoint(x: 0, y: 100),
         target: CGPoint(x: 400, y: 100),
-        lane: lane,
-        groups: [],
-        sourceGroupID: nil,
-        targetGroupID: nil,
-        obstacles: [obstacle]
+        context: context(lane: lane, obstacles: [obstacle])
       )
     }
     // Each lane offsets the midX/midY anchors by `lane * channelStep`. With
@@ -76,20 +64,12 @@ struct PolicyCanvasVisibilityRouterTests {
     let horizontal = PolicyCanvasVisibilityRouter().route(
       source: CGPoint(x: 0, y: 200),
       target: CGPoint(x: 400, y: 200),
-      lane: 0,
-      groups: [],
-      sourceGroupID: nil,
-      targetGroupID: nil,
-      obstacles: []
+      context: context()
     )
     let vertical = PolicyCanvasVisibilityRouter().route(
       source: CGPoint(x: 200, y: 0),
       target: CGPoint(x: 200, y: 400),
-      lane: 0,
-      groups: [],
-      sourceGroupID: nil,
-      targetGroupID: nil,
-      obstacles: []
+      context: context()
     )
     #expect(allSegmentsAxisAligned(horizontal.points))
     #expect(allSegmentsAxisAligned(vertical.points))
@@ -113,11 +93,7 @@ struct PolicyCanvasVisibilityRouterTests {
       let route = PolicyCanvasVisibilityRouter().route(
         source: source,
         target: target,
-        lane: 0,
-        groups: [],
-        sourceGroupID: nil,
-        targetGroupID: nil,
-        obstacles: nodes
+        context: context(obstacles: nodes)
       )
       #expect(route.points.first == source)
       #expect(route.points.last == target)
@@ -143,11 +119,7 @@ struct PolicyCanvasVisibilityRouterTests {
       _ = router.route(
         source: CGPoint(x: 10, y: 400),
         target: CGPoint(x: 1_300, y: 400),
-        lane: index,
-        groups: [],
-        sourceGroupID: nil,
-        targetGroupID: nil,
-        obstacles: nodes
+        context: context(lane: index, obstacles: nodes)
       )
     }
     let elapsed = Date().timeIntervalSince(start) / 10.0
@@ -176,20 +148,12 @@ struct PolicyCanvasVisibilityRouterTests {
     let flexed = router.route(
       sourceCandidates: sourceCandidates,
       targetCandidates: targetCandidates,
-      lane: 0,
-      groups: [],
-      sourceGroupID: nil,
-      targetGroupID: nil,
-      obstacles: []
+      context: context()
     )
     let pinned = router.route(
       source: sourceCandidates[3],  // leading (worst for left-to-right)
       target: targetCandidates[3],  // trailing (worst)
-      lane: 0,
-      groups: [],
-      sourceGroupID: nil,
-      targetGroupID: nil,
-      obstacles: []
+      context: context()
     )
     #expect(bendCount(of: flexed.points) <= bendCount(of: pinned.points))
     // Trailing→leading produces a straight horizontal route between the
@@ -204,11 +168,7 @@ struct PolicyCanvasVisibilityRouterTests {
     let route = PolicyCanvasVisibilityRouter().route(
       source: CGPoint(x: 0, y: 100),
       target: CGPoint(x: 400, y: 100),
-      lane: 1,
-      groups: [],
-      sourceGroupID: nil,
-      targetGroupID: nil,
-      obstacles: [obstacle]
+      context: context(lane: 1, obstacles: [obstacle])
     )
     for index in 1..<(route.points.count - 1) {
       let point = route.points[index]
@@ -233,6 +193,19 @@ struct PolicyCanvasVisibilityRouterTests {
       }
     }
     return bends
+  }
+
+  private func context(
+    lane: Int = 0,
+    obstacles: [CGRect] = []
+  ) -> PolicyCanvasRouteContext {
+    PolicyCanvasRouteContext(
+      lane: lane,
+      groups: [],
+      sourceGroupID: nil,
+      targetGroupID: nil,
+      obstacles: obstacles
+    )
   }
 
   private func polylineEntersObstacle(_ points: [CGPoint], obstacle: CGRect) -> Bool {

@@ -55,6 +55,23 @@ extension PolicyCanvasViewModel {
     return "Edge \(edgeName), from \(sourcePiece) to \(targetPiece)"
   }
 
+  /// Accessible value pairing an edge's *kind* and animation state so the
+  /// screen reader hears information that sighted users perceive from the
+  /// stroke color and dash march. Without this, VoiceOver users have no
+  /// path to the kind distinction the cyan/purple/red palette encodes -
+  /// which would fail WCAG 1.4.1 (color as the sole signal). The value is
+  /// composable: `"flow"`, `"control"`, or `"error"`, optionally suffixed
+  /// with `", active"` when the edge is animated *and* motion is allowed.
+  /// Pass the active flag in from the rendering layer so the value reflects
+  /// the same reduce-motion gate the stroke layer uses.
+  func accessibilityValue(for edge: PolicyCanvasEdge, isAnimating: Bool = false) -> String {
+    let kindWord = edge.kind.accessibilityWord
+    if isAnimating {
+      return "\(kindWord), active"
+    }
+    return kindWord
+  }
+
   /// Visual-order traversal of `nodes` for keyboard focus and the VoiceOver
   /// nodes rotor. Nodes are sorted top-to-bottom, then left-to-right within
   /// the same row (10pt tolerance to absorb minor y-axis drift after snap).

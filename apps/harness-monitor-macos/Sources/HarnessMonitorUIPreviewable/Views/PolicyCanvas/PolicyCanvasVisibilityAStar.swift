@@ -7,6 +7,11 @@ import Foundation
 /// engine moves to the nearest unblocked grid neighbor on each axis from a
 /// cell rather than stepping one index at a time - skipping the unblocked
 /// stretch keeps the open-set small and the path well-formed.
+///
+/// `run(...)` returns both the reconstructed polyline AND the goal `gScore`
+/// so callers ranking candidate routes (flex-anchor selection) can compare
+/// the A*-internal cost directly. There is no second cost function: A*'s
+/// gScore is the single source of truth.
 enum PolicyCanvasVisibilityAStar {
   static func run(
     gridXs: [CGFloat],
@@ -14,7 +19,7 @@ enum PolicyCanvasVisibilityAStar {
     sourceIndex: PolicyCanvasGridIndex,
     targetIndex: PolicyCanvasGridIndex,
     obstacles: [CGRect]
-  ) -> [CGPoint]? {
+  ) -> (points: [CGPoint], cost: CGFloat)? {
     guard !gridXs.isEmpty, !gridYs.isEmpty else {
       return nil
     }
@@ -32,12 +37,13 @@ enum PolicyCanvasVisibilityAStar {
     var closed: Set<PolicyCanvasAStarState> = []
     while let current = openHeap.pop() {
       if current.index == targetIndex {
-        return reconstruct(
+        let points = reconstruct(
           end: current,
           cameFrom: cameFrom,
           gridXs: gridXs,
           gridYs: gridYs
         )
+        return (points, gScore[current] ?? .infinity)
       }
       if closed.contains(current) {
         continue
@@ -58,7 +64,7 @@ enum PolicyCanvasVisibilityAStar {
         }
         gScore[next] = tentative
         cameFrom[next] = current
-        let f =
+        let priority =
           tentative
           + heuristic(
             from: next.index,
@@ -66,7 +72,7 @@ enum PolicyCanvasVisibilityAStar {
             gridXs: gridXs,
             gridYs: gridYs
           )
-        openHeap.push(next, priority: f)
+        openHeap.push(next, priority: priority)
       }
     }
     return nil

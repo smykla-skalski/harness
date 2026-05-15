@@ -49,6 +49,62 @@ struct PolicyCanvasAccessibilityTests {
     #expect(label == "Edge normalize, from Policy intake event to Risk score event")
   }
 
+  // Watson's WCAG 1.4.1 concern: the new kind palette (cyan/purple/red) is
+  // a color-only signal unless VoiceOver also surfaces it. The value must
+  // name the kind and an active suffix when the edge is animating.
+  @Test("edge accessibility value names the kind word")
+  func edgeAccessibilityValueNamesKind() {
+    let viewModel = PolicyCanvasViewModel.sample()
+    let endpoint = PolicyCanvasPortEndpoint(nodeID: "n", portID: "p", kind: .output)
+    let target = PolicyCanvasPortEndpoint(nodeID: "n2", portID: "p2", kind: .input)
+    let flow = PolicyCanvasEdge(id: "e1", source: endpoint, target: target, label: "")
+    let denied = PolicyCanvasEdge(
+      id: "e2", source: endpoint, target: target, label: "",
+      condition: "denied"
+    )
+    let conditional = PolicyCanvasEdge(
+      id: "e3", source: endpoint, target: target, label: "",
+      condition: "if amount > 1000"
+    )
+    #expect(viewModel.accessibilityValue(for: flow) == "flow")
+    #expect(viewModel.accessibilityValue(for: denied) == "error")
+    #expect(viewModel.accessibilityValue(for: conditional) == "control")
+  }
+
+  @Test("edge accessibility value adds 'active' suffix when animating")
+  func edgeAccessibilityValueAddsActiveSuffix() {
+    let viewModel = PolicyCanvasViewModel.sample()
+    let endpoint = PolicyCanvasPortEndpoint(nodeID: "n", portID: "p", kind: .output)
+    let target = PolicyCanvasPortEndpoint(nodeID: "n2", portID: "p2", kind: .input)
+    let staticEdge = PolicyCanvasEdge(id: "s", source: endpoint, target: target, label: "")
+    let liveEdge = PolicyCanvasEdge(
+      id: "l", source: endpoint, target: target, label: "",
+      isAnimated: true
+    )
+    #expect(viewModel.accessibilityValue(for: staticEdge, isAnimating: false) == "flow")
+    #expect(viewModel.accessibilityValue(for: liveEdge, isAnimating: true) == "flow, active")
+    // Reduce-motion gate at the call site flips `isAnimating` false; the
+    // value drops the "active" suffix so the AT user has an accurate model
+    // of edge state.
+    #expect(viewModel.accessibilityValue(for: liveEdge, isAnimating: false) == "flow")
+  }
+
+  @Test("kind dash pattern is non-empty for control and error")
+  func kindDashPatternEncodesKindWithoutColor() {
+    // Watson + WCAG 1.4.1: color cannot be the only signal. The dash
+    // pattern gives users with color-vision deficiencies a non-color
+    // signifier of kind.
+    #expect(PolicyCanvasEdgeKind.flow.strokeDashPattern.isEmpty)
+    #expect(!PolicyCanvasEdgeKind.control.strokeDashPattern.isEmpty)
+    #expect(!PolicyCanvasEdgeKind.error.strokeDashPattern.isEmpty)
+    // Patterns must be distinct so control and error read as different
+    // stroke shapes, not just different colors.
+    #expect(
+      PolicyCanvasEdgeKind.control.strokeDashPattern
+        != PolicyCanvasEdgeKind.error.strokeDashPattern
+    )
+  }
+
   @Test("port diameter meets the accessibility hit-test floor")
   func portDiameterMeetsAccessibilityFloor() {
     #expect(PolicyCanvasLayout.portDiameter >= 18)
