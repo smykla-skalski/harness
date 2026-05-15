@@ -198,9 +198,17 @@ final class WindowMenuCommandsTests: XCTestCase {
   func testSessionWindowTabbingAccessorHasFallbackWarning() throws {
     let source = try harnessSourceFile(named: "App/SessionWindowTabbing.swift")
 
-    XCTAssertTrue(source.contains("Session tabbing identifier unavailable"))
+    XCTAssertTrue(source.contains("Shared tabbing identifier unavailable"))
     XCTAssertTrue(source.contains("falling back to standalone windows"))
     XCTAssertTrue(source.contains("window.tabbingMode = .automatic"))
+  }
+
+  func testDashboardCommandsUseSharedTabOpenHelper() throws {
+    let windowCommandsSource = try harnessSourceFile(named: "Commands/WindowMenuCommands.swift")
+    let recentCommandsSource = try harnessSourceFile(named: "Commands/RecentSessionsCommand.swift")
+
+    XCTAssertTrue(windowCommandsSource.contains("openWindow.openHarnessDashboardWindow()"))
+    XCTAssertTrue(recentCommandsSource.contains("openWindow.openHarnessDashboardWindow()"))
   }
 
   func testSessionWindowCycleCommandsAreWiredAndUseCommandBacktick() throws {
@@ -227,7 +235,7 @@ final class WindowMenuCommandsTests: XCTestCase {
     XCTAssertTrue(commandSetSource.contains("RecentSessionsCommand(store: store)"))
     XCTAssertTrue(source.contains("Menu(Self.menuTitle)"))
     XCTAssertTrue(source.contains("openWindow.openHarnessSessionWindow"))
-    XCTAssertTrue(source.contains("HarnessMonitorWindowID.dashboard"))
+    XCTAssertTrue(source.contains("openWindow.openHarnessDashboardWindow()"))
     XCTAssertTrue(source.contains("Show Dashboard"))
   }
 

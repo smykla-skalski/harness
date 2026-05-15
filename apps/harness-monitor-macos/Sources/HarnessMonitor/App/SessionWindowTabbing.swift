@@ -5,7 +5,12 @@ import OSLog
 import SwiftUI
 
 struct SessionWindowTabbing: ViewModifier {
-  let isSessionWindow: Bool
+  enum Role: Equatable {
+    case dashboard
+    case session
+  }
+
+  let role: Role
   var tabTitle: String = ""
   var pendingDecisionCount: Int = 0
   var pendingDecisionSeverity: DecisionSeverity?
@@ -20,7 +25,7 @@ struct SessionWindowTabbing: ViewModifier {
     content.background(
       SessionWindowTabbingAccessor(
         configuration: .init(
-          isSessionWindow: isSessionWindow,
+          role: role,
           preference: preference,
           tabTitle: tabTitle,
           pendingDecisionCount: pendingDecisionCount,
@@ -35,7 +40,7 @@ struct SessionWindowTabbing: ViewModifier {
 
 private struct SessionWindowTabbingAccessor: NSViewRepresentable {
   struct Configuration: Equatable {
-    let isSessionWindow: Bool
+    let role: SessionWindowTabbing.Role
     let preference: SessionWindowTabbingPreference
     let tabTitle: String
     let pendingDecisionCount: Int
@@ -67,7 +72,7 @@ private final class AccessorView: NSView {
   )
 
   var configuration = SessionWindowTabbingAccessor.Configuration(
-    isSessionWindow: false,
+    role: .dashboard,
     preference: .system,
     tabTitle: "",
     pendingDecisionCount: 0,
@@ -136,26 +141,23 @@ private final class AccessorView: NSView {
     guard let window else {
       return
     }
-    if configuration.isSessionWindow {
-      guard window.toolbar != nil else {
-        return
-      }
-      SessionWindowTabbingSupport.prepareSessionWindowForTabbing(
-        window,
-        preference: configuration.preference
-      )
-      applyTabBadge(on: window)
-      guard window.tabbingIdentifier == SessionWindowTabbingSupport.tabbingIdentifier else {
-        Self.log.warning(
-          "Session tabbing identifier unavailable; falling back to standalone windows")
-        window.tabbingMode = .automatic
-        return
-      }
-      applyTitlebarChromeOverrides(to: window)
-    } else {
-      window.tabbingIdentifier = ""
-      window.tabbingMode = .disallowed
+    guard window.toolbar != nil else {
+      return
     }
+    SessionWindowTabbingSupport.prepareWindowForTabbing(
+      window,
+      preference: configuration.preference
+    )
+    guard window.tabbingIdentifier == SessionWindowTabbingSupport.tabbingIdentifier else {
+      Self.log.warning(
+        "Shared tabbing identifier unavailable; falling back to standalone windows")
+      window.tabbingMode = .automatic
+      return
+    }
+    if configuration.role == .session {
+      applyTabBadge(on: window)
+    }
+    applyTitlebarChromeOverrides(to: window)
   }
 
   private func applyTabBadge(on window: NSWindow) {

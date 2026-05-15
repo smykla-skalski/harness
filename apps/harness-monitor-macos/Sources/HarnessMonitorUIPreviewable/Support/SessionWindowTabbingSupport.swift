@@ -51,7 +51,7 @@ public enum SessionWindowTabbingSupport {
   }
 
   @MainActor
-  public static func prepareSessionWindowForTabbing(
+  public static func prepareWindowForTabbing(
     _ window: NSWindow,
     preference: SessionWindowTabbingPreference
   ) {
@@ -60,7 +60,7 @@ public enum SessionWindowTabbingSupport {
   }
 
   @MainActor
-  public static func visibleSessionTabTargetWindow(
+  public static func visibleTabTargetWindow(
     preference: SessionWindowTabbingPreference
   ) -> NSWindow? {
     guard

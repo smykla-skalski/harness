@@ -37,7 +37,10 @@ extension HarnessMonitorApp {
         mcpWindowCommandRegistrar: appMCPWindowCommandRegistrar,
         sessionWindowPresenceTracker: appSessionWindowPresenceTracker,
         initialRoute: initialSessionWindowRoute,
-        themeMode: themeModeBinding
+        themeMode: themeModeBinding,
+        perfScenario: perfScenario,
+        perfScenarioStatus: perfScenarioStatusBinding,
+        perfScenarioFailureReason: perfScenarioFailureReasonBinding
       )
       .harnessTrackMCPWindow()
     } else {
@@ -48,7 +51,7 @@ extension HarnessMonitorApp {
   @ViewBuilder var dashboardWindowSceneContent: some View {
     if rendersLiveSceneContent {
       dashboardWindowContent
-        .modifier(SessionWindowTabbing(isSessionWindow: false))
+        .modifier(SessionWindowTabbing(role: .dashboard))
         .harnessTrackMCPWindow()
     } else {
       Color.clear.accessibilityHidden(true)
@@ -84,6 +87,9 @@ extension HarnessMonitorApp {
       themeMode: themeModeBinding,
       settingsSelectedSection: settingsSelectedSectionBinding,
       perfScenario: perfScenario,
+      hasRunPerfScenario: hasRunPerfScenarioBinding,
+      perfScenarioStatus: perfScenarioStatusBinding,
+      perfScenarioFailureReason: perfScenarioFailureReasonBinding,
       defersInitialContentUntilBootstrap: defersInitialMainWindowUntilBootstrap,
       container: container
     )

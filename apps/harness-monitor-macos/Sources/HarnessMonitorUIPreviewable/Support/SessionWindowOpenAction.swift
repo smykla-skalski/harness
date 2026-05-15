@@ -6,13 +6,13 @@ extension OpenWindowAction {
   @MainActor
   public func openHarnessSessionWindow(sessionID: String?) {
     guard let sessionID, !sessionID.isEmpty else {
-      self(id: HarnessMonitorWindowID.dashboard)
+      openHarnessDashboardWindow()
       return
     }
     let tabbingPreference = SessionWindowTabbingPreference.resolved(
       rawValue: UserDefaults.standard.string(forKey: SessionWindowTabbingPreference.storageKey)
     )
-    let tabTargetWindow = SessionWindowTabbingSupport.visibleSessionTabTargetWindow(
+    let tabTargetWindow = SessionWindowTabbingSupport.visibleTabTargetWindow(
       preference: tabbingPreference
     )
     self(
@@ -23,7 +23,27 @@ extension OpenWindowAction {
       return
     }
     Task { @MainActor in
-      await SessionWindowTabMergeCoordinator.mergeNewestSessionWindowIfNeeded(
+      await SessionWindowTabMergeCoordinator.mergeNewestTabbedWindowIfNeeded(
+        into: tabTargetWindow,
+        preference: tabbingPreference
+      )
+    }
+  }
+
+  @MainActor
+  public func openHarnessDashboardWindow() {
+    let tabbingPreference = SessionWindowTabbingPreference.resolved(
+      rawValue: UserDefaults.standard.string(forKey: SessionWindowTabbingPreference.storageKey)
+    )
+    let tabTargetWindow = SessionWindowTabbingSupport.visibleTabTargetWindow(
+      preference: tabbingPreference
+    )
+    self(id: HarnessMonitorWindowID.dashboard)
+    guard let tabTargetWindow else {
+      return
+    }
+    Task { @MainActor in
+      await SessionWindowTabMergeCoordinator.mergeNewestTabbedWindowIfNeeded(
         into: tabTargetWindow,
         preference: tabbingPreference
       )
@@ -52,8 +72,8 @@ extension OpenWindowAction {
 }
 
 @MainActor
-private enum SessionWindowTabMergeCoordinator {
-  static func mergeNewestSessionWindowIfNeeded(
+enum SessionWindowTabMergeCoordinator {
+  static func mergeNewestTabbedWindowIfNeeded(
     into targetWindow: NSWindow,
     preference: SessionWindowTabbingPreference
   ) async {
@@ -66,7 +86,7 @@ private enum SessionWindowTabMergeCoordinator {
       return
     }
 
-    SessionWindowTabbingSupport.prepareSessionWindowForTabbing(
+    SessionWindowTabbingSupport.prepareWindowForTabbing(
       targetWindow,
       preference: preference
     )
@@ -74,7 +94,7 @@ private enum SessionWindowTabMergeCoordinator {
     for _ in 0..<6 {
       await Task.yield()
       if let candidateWindow = candidateWindow(for: targetWindow) {
-        SessionWindowTabbingSupport.prepareSessionWindowForTabbing(
+        SessionWindowTabbingSupport.prepareWindowForTabbing(
           candidateWindow,
           preference: preference
         )
@@ -90,17 +110,17 @@ private enum SessionWindowTabMergeCoordinator {
 
   private static func candidateWindow(for targetWindow: NSWindow) -> NSWindow? {
     if let keyWindow = NSApplication.shared.keyWindow,
-      isSessionWindowCandidate(keyWindow, excluding: targetWindow)
+      isTabbedWindowCandidate(keyWindow, excluding: targetWindow)
     {
       return keyWindow
     }
 
     return NSApplication.shared.orderedWindows.first {
-      isSessionWindowCandidate($0, excluding: targetWindow)
+      isTabbedWindowCandidate($0, excluding: targetWindow)
     }
   }
 
-  private static func isSessionWindowCandidate(
+  private static func isTabbedWindowCandidate(
     _ window: NSWindow,
     excluding targetWindow: NSWindow
   ) -> Bool {

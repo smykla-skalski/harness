@@ -6,13 +6,30 @@ private typealias Accessibility = HarnessMonitorUITestAccessibility
 @MainActor
 final class HarnessMonitorMenuBarTests: HarnessMonitorUITestCase {
   private static let previewScenarioKey = "HARNESS_MONITOR_PREVIEW_SCENARIO"
+  private static let initialRouteKey = "HARNESS_MONITOR_UI_TEST_SESSION_ROUTE"
   private static let dashboardLandingScenario = "dashboard-landing"
+  private static let cockpitScenario = "cockpit"
+  private static let overviewRoute = "overview"
   private static let previewSessionTitle = "Harness Monitor Cockpit"
 
   override nonisolated class var reuseLaunchedApp: Bool { true }
 
   func testWindowMenuOpensDashboardWindow() throws {
-    let app = launch(mode: "preview")
+    let app = launch(
+      mode: "preview",
+      additionalEnvironment: [
+        Self.previewScenarioKey: Self.cockpitScenario,
+        Self.initialRouteKey: Self.overviewRoute,
+      ]
+    )
+    XCTAssertTrue(
+      waitForElement(
+        element(in: app, identifier: Accessibility.sessionWindowShell),
+        timeout: Self.uiTimeout
+      ),
+      "Window > Dashboard should be exercised from a session window, not a dashboard launch"
+    )
+
     invokeMenuItem(in: app, menu: "Window", title: "Dashboard")
 
     let dashboardWindow = element(in: app, identifier: Accessibility.dashboardWindowRoot)

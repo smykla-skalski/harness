@@ -81,11 +81,11 @@ extension SessionWindowFlowTests {
     #expect(scenesSource.contains("for: SessionWindowToken.self"))
     #expect(scenesSource.contains(".restorationBehavior(.disabled)"))
     #expect(scenesSource.contains(".commandsRemoved()"))
-    #expect(sceneContentSource.contains("SessionWindowTabbing(isSessionWindow: false)"))
+    #expect(sceneContentSource.contains("SessionWindowTabbing(role: .dashboard)"))
     #expect(commandsSource.contains("@Environment(\\.openWindow)"))
     #expect(commandsSource.contains("openHarnessSessionWindow"))
     #expect(rootSource.contains("SessionWindowTabbing("))
-    #expect(rootSource.contains("isSessionWindow: true"))
+    #expect(rootSource.contains("role: .session"))
     #expect(rootSource.contains("private var hostsSharedShellPresentation"))
     #expect(rootSource.contains("HarnessMonitorConfirmationDialogModifier("))
     #expect(rootSource.contains("HarnessMonitorSheetModifier("))
@@ -105,7 +105,28 @@ extension SessionWindowFlowTests {
     #expect(routerSource.contains("let tabReadyWindows = windows.filter { $0.toolbar != nil }"))
     #expect(tabbingSupportSource.contains("tabbingIdentifier"))
     #expect(tabbingSupportSource.contains("shouldPreferTabbedOpen"))
-    #expect(tabbingSupportSource.contains("visibleSessionTabTargetWindow"))
+    #expect(tabbingSupportSource.contains("visibleTabTargetWindow"))
+  }
+
+  @Test("Dashboard window routing reuses the shared tab helper")
+  func dashboardWindowRoutingUsesSharedTabHelper() throws {
+    let routingSource = try harnessSourceFile(named: "App/HarnessMonitorApp+InitialWindowRouting.swift")
+    let menuBarSource = try harnessSourceFile(named: "App/HarnessMonitorMenuBarExtra.swift")
+    let windowCommandsSource = try harnessSourceFile(named: "Commands/WindowMenuCommands.swift")
+    let recentCommandsSource = try harnessSourceFile(named: "Commands/RecentSessionsCommand.swift")
+    let openActionSource = try previewableSourceFile(named: "Support/SessionWindowOpenAction.swift")
+    let unavailableSource = try previewableSourceFile(
+      named: "Views/Sessions/SessionWindowView+Unavailable.swift"
+    )
+
+    #expect(openActionSource.contains("public func openHarnessDashboardWindow()"))
+    #expect(openActionSource.contains("guard let sessionID, !sessionID.isEmpty else {\n      openHarnessDashboardWindow()"))
+    #expect(openActionSource.contains("mergeNewestTabbedWindowIfNeeded"))
+    #expect(windowCommandsSource.contains("openWindow.openHarnessDashboardWindow()"))
+    #expect(recentCommandsSource.contains("openWindow.openHarnessDashboardWindow()"))
+    #expect(routingSource.contains("openWindow.openHarnessDashboardWindow()"))
+    #expect(menuBarSource.contains("openWindow.openHarnessDashboardWindow()"))
+    #expect(unavailableSource.contains("openWindow.openHarnessDashboardWindow()"))
   }
 
   @Test("Decision routing reuses an already open session window")

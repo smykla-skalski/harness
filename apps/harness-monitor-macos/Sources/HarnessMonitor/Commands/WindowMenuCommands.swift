@@ -26,7 +26,7 @@ struct WindowMenuCommands: Commands {
       .keyboardShortcut(Self.newTabShortcut, modifiers: .command)
 
       Button(Self.mainTitle) {
-        openWindow(id: HarnessMonitorWindowID.dashboard)
+        openWindow.openHarnessDashboardWindow()
       }
       .keyboardShortcut("1", modifiers: [.command, .shift])
     }

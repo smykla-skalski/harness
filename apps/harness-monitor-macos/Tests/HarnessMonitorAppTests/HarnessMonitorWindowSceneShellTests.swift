@@ -6,7 +6,7 @@ final class HarnessMonitorWindowShellTests: XCTestCase {
     let mainRootSource = try appSourceFile(named: "HarnessMonitorAppSceneSupport.swift")
     let mainRoot = try mainRootSource.slice(
       from: "struct DashboardWindowRootView",
-      to: "private enum HarnessMonitorPerfScenarioStatus"
+      to: "enum HarnessMonitorPerfScenarioStatus"
     )
 
     XCTAssertTrue(mainRoot.contains("HarnessMonitorWindowShell("))
@@ -27,7 +27,7 @@ final class HarnessMonitorWindowShellTests: XCTestCase {
     let source = try appSourceFile(named: "HarnessMonitorAppSceneSupport.swift")
     let mainRoot = try source.slice(
       from: "struct DashboardWindowRootView",
-      to: "private enum HarnessMonitorPerfScenarioStatus"
+      to: "enum HarnessMonitorPerfScenarioStatus"
     )
 
     XCTAssertTrue(mainRoot.contains("&& perfScenario == nil"))
@@ -46,6 +46,8 @@ final class HarnessMonitorWindowShellTests: XCTestCase {
     XCTAssertTrue(shell.contains(".environment(\\.windowSurfaceContext"))
     XCTAssertTrue(shell.contains("HarnessMonitorAccessibility.windowShellState(windowID)"))
     XCTAssertTrue(shell.contains("windowID: windowID"))
+    XCTAssertTrue(shell.contains("openMainWindow: {"))
+    XCTAssertTrue(shell.contains("openWindow.openHarnessDashboardWindow()"))
   }
 
   func testWindowCommandTrackingPinsLogicalWindowIdentifiers() throws {
@@ -59,9 +61,11 @@ final class HarnessMonitorWindowShellTests: XCTestCase {
 
   func testPerfScenarioStateMarkerIsNotInstalledWhenDisabled() throws {
     let source = try appSourceFile(named: "HarnessMonitorAppSceneSupport.swift")
+    let sessionRoot = try appSourceFile(named: "SessionWindowRootView.swift")
 
     XCTAssertTrue(source.contains(".modifier(PerfScenarioStateMarker(text: perfScenarioStateText))"))
-    XCTAssertTrue(source.contains("private struct PerfScenarioStateMarker: ViewModifier"))
+    XCTAssertTrue(sessionRoot.contains(".modifier(PerfScenarioStateMarker(text: sessionPerfScenarioStateText))"))
+    XCTAssertTrue(source.contains("struct PerfScenarioStateMarker: ViewModifier"))
     XCTAssertFalse(source.contains(".overlay {\n        if let perfScenarioStateText"))
   }
 

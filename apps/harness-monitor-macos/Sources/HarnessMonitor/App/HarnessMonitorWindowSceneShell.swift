@@ -133,6 +133,9 @@ struct HarnessMonitorWindowShell<Content: View>: View {
       navigationScope: scope,
       openWindow: { windowID in
         openWindow(id: windowID)
+      },
+      openMainWindow: {
+        openWindow.openHarnessDashboardWindow()
       }
     )
   }
