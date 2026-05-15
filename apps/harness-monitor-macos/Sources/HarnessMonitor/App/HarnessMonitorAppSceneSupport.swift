@@ -5,6 +5,8 @@ import SwiftUI
 
 struct HarnessMonitorWindowRootView: View {
   private static let minimumSize = CGSize(width: 900, height: 600)
+  private static let uiTestSurfaceKey = "HARNESS_MONITOR_UI_TEST_SURFACE"
+  private static let uiTestContentDashboardSurface = "content-dashboard"
 
   let delegate: HarnessMonitorAppDelegate
   let store: HarnessMonitorStore
@@ -28,6 +30,12 @@ struct HarnessMonitorWindowRootView: View {
 
   private var hostsSharedShellPresentation: Bool {
     keyWindowObserver.isKey(windowID: HarnessMonitorWindowID.openRecent)
+  }
+
+  private var showsContentDashboardForUITests: Bool {
+    HarnessMonitorUITestEnvironment.isEnabled
+      && ProcessInfo.processInfo.environment[Self.uiTestSurfaceKey]
+        == Self.uiTestContentDashboardSurface
   }
 
   private var contentReadiness: WindowContentReadiness {
@@ -87,15 +95,21 @@ struct HarnessMonitorWindowRootView: View {
   }
 
   @ViewBuilder private var liveContent: some View {
-    OpenRecentView(store: store)
-      .modifier(
-        HarnessMonitorPerfScenarioModifier(
-          delegate: delegate,
-          store: store,
-          perfScenario: perfScenario
-        )
+    Group {
+      if showsContentDashboardForUITests {
+        ContentView(store: store, keyWindowObserver: keyWindowObserver)
+      } else {
+        OpenRecentView(store: store)
+      }
+    }
+    .modifier(
+      HarnessMonitorPerfScenarioModifier(
+        delegate: delegate,
+        store: store,
+        perfScenario: perfScenario
       )
-      .toolbar {}
+    )
+    .toolbar {}
   }
 
   @MainActor
