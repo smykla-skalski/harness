@@ -48,3 +48,13 @@ Keep implementation and preview files in the same domain so navigator grouping
 and Open Quickly stay predictable. If a runtime file gains a preview, add a
 mirrored companion in `Previews/` instead of dropping preview code into the
 runtime file or an unrelated folder.
+
+## Performance gotcha
+
+Views in `Settings/` and `Shared/` often use shared action controls that opt
+into MCP accessibility tracking. If a dense pane here feels slow to open or
+react, inspect that tracking path before restructuring the visible SwiftUI
+layout. A tracked-element probe that resolves `accessibilityFrame()` or
+republishes unthrottled on `NSWindow.didUpdateNotification` can make the whole
+window feel stalled; prefer clip-aware AppKit geometry conversion plus
+throttled refreshes.

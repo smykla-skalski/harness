@@ -191,3 +191,8 @@ task state honest.
 - Use the installed XcodeBuildMCP skill before XcodeBuildMCP tools. Monitor app
   work needs a full worktree plus explicit `HARNESS_MONITOR_BUILD_LANE` and
   `HARNESS_MONITOR_RUNTIME_LANE`.
+- Harness Monitor enables MCP accessibility tracking on normal app paths. In
+  tracked-element hot paths, do not call `accessibilityFrame()` or republish on
+  every `NSWindow.didUpdateNotification`; dense windows such as Settings can
+  become visibly sluggish. Prefer clip-aware AppKit geometry conversion plus a
+  throttled `didUpdate` refresh path.

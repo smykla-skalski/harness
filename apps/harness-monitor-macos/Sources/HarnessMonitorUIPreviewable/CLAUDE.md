@@ -9,3 +9,4 @@ Read `AGENTS.md` first. It is the canonical layout and preview-organization cont
 3. Runtime implementation files in this directory should not contain `#Preview`; preview code belongs in the nearest `Previews/` folder.
 4. Keep moves feature-local. Examples: `Workspace/Window/`, `Workspace/Sidebar/`, and `Settings/Supervisor/`.
 5. Before finishing a layout change here, confirm that every file containing `#Preview` lives under `Previews/`.
+6. If Settings or toolbar clicks feel laggy, inspect the shared MCP-tracking path before refactoring the local SwiftUI layout. Dense panes here often mount tracked action controls, and a probe that resolves `accessibilityFrame()` or republishes on every `NSWindow.didUpdateNotification` can be the real bottleneck.

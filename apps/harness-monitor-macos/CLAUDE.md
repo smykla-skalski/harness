@@ -40,6 +40,16 @@ XCODE_ONLY_TESTING='HarnessMonitorKitTests/WorkspaceSelectionStoreTests/createAg
 
 `test-swift.sh` defaults to skipping `build-for-testing` when the existing `.xctestrun` is fresher than every Swift source, project descriptor, SPM lockfile, and the cross-project `mcp-servers/` tree. Break-glass: set `HARNESS_MONITOR_FORCE_BUILD_FOR_TESTING=1` to always rebuild (use after tooling changes that the freshness scope does not capture, e.g. .xcconfig edits, environment switches, or external package updates outside the scoped roots).
 
+## Settings/toolbar lag triage
+
+Slow Settings-window interactions are not automatically a SwiftUI layout bug.
+This app's shared action controls can register MCP-tracked elements, and the
+registry host is enabled on normal paths. Before refactoring the visible view
+tree, inspect the tracked-element probe: a hot path that resolves
+`accessibilityFrame()` or republishes on every `NSWindow.didUpdateNotification`
+can stall dense panes. The safe pattern is clip-aware AppKit geometry
+conversion plus throttled `didUpdate` refreshes.
+
 ## Lane cleanup
 
 Named build lanes live under `xcode-derived-lanes/<lane>`. Delete stale lane directories only when no process is using that lane. Use `rtk mise run clean:stale` for safe stale process/socket cleanup and `rtk mise run monitor:reset` only when resetting the active runtime lane is intended.

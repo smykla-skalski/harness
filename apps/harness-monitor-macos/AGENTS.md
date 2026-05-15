@@ -216,6 +216,13 @@ or a targeted `monitor:build` / `monitor:test` lane for compile verification.
 - For Swift-only verification in a tree with dirty Rust changes, build with the
   `HarnessMonitor (External Daemon)` scheme. The default scheme runs the daemon
   build phase and can fail on unrelated Rust breakage.
+- Dense Monitor surfaces often mount MCP-tracked controls through shared action
+  helpers, and the registry host is enabled in normal app flows. When Settings,
+  toolbar, or similar interactions feel slow, inspect the tracking probe before
+  rewriting the visible SwiftUI tree. Do not use `accessibilityFrame()` or an
+  unthrottled `NSWindow.didUpdateNotification` fan-out in tracked-element hot
+  paths; use clip-aware AppKit geometry conversion and throttle `didUpdate`
+  refreshes.
 - Never wrap `deinit` cleanup in `MainActor.assumeIsolated { ... }` on
   `@MainActor` classes or SDK-overlay MainActor types under Swift 6 strict
   concurrency on macOS 26. Use nonisolated thread-safe cleanup and move
