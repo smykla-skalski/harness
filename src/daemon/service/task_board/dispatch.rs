@@ -7,8 +7,8 @@ use crate::errors::{CliError, CliErrorKind};
 use crate::session::types::CONTROL_PLANE_ACTOR_ID;
 use crate::task_board::store::{OptionalFieldPatch, TaskBoardItemPatch};
 use crate::task_board::{
-    DispatchAppliedTask, DispatchExecutionSummary, DispatchPlan, SessionIntent, TaskBoardItem,
-    TaskBoardStatus, TaskBoardStore, TaskBoardWorkflowStatus,
+    DispatchAppliedTask, DispatchExecutionSummary, DispatchPlan, MachineRegistry, SessionIntent,
+    TaskBoardItem, TaskBoardStatus, TaskBoardStore, TaskBoardWorkflowStatus,
     build_dispatch_summary_with_policy_root,
 };
 
@@ -63,10 +63,24 @@ fn selected_dispatch_items(
     board: &TaskBoardStore,
     request: &TaskBoardDispatchRequest,
 ) -> Result<Vec<TaskBoardItem>, CliError> {
-    request.item_id.as_deref().map_or_else(
+    let items = request.item_id.as_deref().map_or_else(
         || board.list(request.status),
         |item_id| board.get(item_id).map(|item| vec![item]),
-    )
+    )?;
+    Ok(filter_for_local_machine(items, board))
+}
+
+fn filter_for_local_machine(
+    items: Vec<TaskBoardItem>,
+    board: &TaskBoardStore,
+) -> Vec<TaskBoardItem> {
+    let Ok(machine) = MachineRegistry::new(board.root().to_path_buf()).ensure_local() else {
+        return items;
+    };
+    items
+        .into_iter()
+        .filter(|item| machine.accepts_any(&item.target_project_types))
+        .collect()
 }
 
 fn apply_dispatch_plan(
@@ -247,4 +261,64 @@ fn new_workflow_execution_id() -> String {
 
 fn new_policy_trace_id() -> String {
     format!("policy-trace-{}", uuid::Uuid::new_v4().simple())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tempfile::tempdir;
+
+    fn seed_item(board: &TaskBoardStore, id: &str, project_type: Option<&str>) {
+        let mut item = TaskBoardItem::new(
+            id.into(),
+            id.into(),
+            String::new(),
+            "2026-05-15T00:00:00Z".into(),
+        );
+        item.status = TaskBoardStatus::Todo;
+        if let Some(project_type) = project_type {
+            item.target_project_types = vec![project_type.into()];
+        }
+        board.create(id, "", item).expect("create board item");
+    }
+
+    #[test]
+    fn dispatch_drops_items_that_target_other_project_types() {
+        let temp = tempdir().expect("tempdir");
+        let root = temp.path().join("board");
+        let board = TaskBoardStore::new(root.clone());
+        seed_item(&board, "matches", Some("web"));
+        seed_item(&board, "mismatches", Some("data"));
+        seed_item(&board, "wildcard", None);
+
+        let registry = MachineRegistry::new(root.clone());
+        let mut local = registry.ensure_local().expect("ensure local");
+        local.project_types = vec!["web".into()];
+        registry.upsert(&local).expect("declare project types");
+
+        let response = dispatch_task_board(
+            &TaskBoardDispatchRequest {
+                item_id: None,
+                status: Some(TaskBoardStatus::Todo),
+                dry_run: true,
+                project_dir: None,
+                actor: None,
+            },
+            None,
+            &board,
+        )
+        .expect("dispatch");
+
+        let ids: Vec<&str> = response
+            .plans
+            .iter()
+            .map(|plan| plan.board_item_id.as_str())
+            .collect();
+        assert!(ids.contains(&"matches"));
+        assert!(ids.contains(&"wildcard"));
+        assert!(
+            !ids.contains(&"mismatches"),
+            "dispatch must skip items that target other project_types"
+        );
+    }
 }
