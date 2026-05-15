@@ -192,7 +192,7 @@ struct PolicyCanvasEdgeShape: Shape {
       }
       return path
     }
-    for index in 1 ..< points.count - 1 {
+    for index in 1..<points.count - 1 {
       let previous = points[index - 1]
       let current = points[index]
       let next = points[index + 1]
