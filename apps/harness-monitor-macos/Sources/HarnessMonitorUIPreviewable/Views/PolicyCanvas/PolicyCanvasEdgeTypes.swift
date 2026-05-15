@@ -102,6 +102,15 @@ struct PolicyCanvasEdge: Identifiable, Hashable {
   /// reduce-motion enabled. Defaults to `false`; the live runtime
   /// visualization layer wires this on per its own signal (deferred -
   /// daemon does not emit a "live edge" event today).
+  ///
+  /// **Delete-by**: if the daemon's live-edge event has not landed by the
+  /// time the next tier of canvas work ships, delete this field and the
+  /// `TimelineView`-wrapped animation path in `PolicyCanvasInteractiveEdge`
+  /// rather than carrying dormant storage indefinitely. The animation
+  /// surface is meaningless without a real producer wiring it on, and
+  /// keeping the field as `Bool = false` everywhere is the storage-side
+  /// version of the dead-code smell the `pinnedPortSide` doc above
+  /// documents.
   var isAnimated: Bool
 
   init(
