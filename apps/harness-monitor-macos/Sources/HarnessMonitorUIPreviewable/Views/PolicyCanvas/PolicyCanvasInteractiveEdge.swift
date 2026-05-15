@@ -12,10 +12,33 @@ struct PolicyCanvasInteractiveEdge: View {
   let strokeWidth: CGFloat
   let isSelected: Bool
   let accessibilityLabel: String
+  let isAnimated: Bool
   let onTap: () -> Void
   let onDelete: () -> Void
 
   @State private var isHovering = false
+  @Environment(\.policyCanvasReducedMotion) private var canvasReducedMotion
+  @Environment(\.accessibilityReduceMotion) private var systemReduceMotion
+
+  init(
+    route: PolicyCanvasEdgeRoute,
+    color: Color,
+    strokeWidth: CGFloat,
+    isSelected: Bool,
+    accessibilityLabel: String,
+    isAnimated: Bool = false,
+    onTap: @escaping () -> Void,
+    onDelete: @escaping () -> Void
+  ) {
+    self.route = route
+    self.color = color
+    self.strokeWidth = strokeWidth
+    self.isSelected = isSelected
+    self.accessibilityLabel = accessibilityLabel
+    self.isAnimated = isAnimated
+    self.onTap = onTap
+    self.onDelete = onDelete
+  }
 
   var body: some View {
     ZStack {
@@ -28,15 +51,7 @@ struct PolicyCanvasInteractiveEdge: View {
           .allowsHitTesting(false)
           .blendMode(.plusLighter)
       }
-      PolicyCanvasEdgeShape(route: route)
-        .stroke(
-          color,
-          style: StrokeStyle(
-            lineWidth: effectiveStrokeWidth,
-            lineCap: .round,
-            lineJoin: .round
-          )
-        )
+      strokeLayer
       PolicyCanvasEdgeArrowhead(route: route)
         .fill(color)
     }
@@ -52,6 +67,40 @@ struct PolicyCanvasInteractiveEdge: View {
     .accessibilityAddTraits(.isButton)
   }
 
+  @ViewBuilder
+  private var strokeLayer: some View {
+    if isAnimated, !reducedMotion {
+      TimelineView(.animation) { context in
+        let phase = PolicyCanvasEdgeAnimation.dashPhase(at: context.date)
+        PolicyCanvasEdgeShape(route: route)
+          .stroke(
+            color,
+            style: StrokeStyle(
+              lineWidth: effectiveStrokeWidth,
+              lineCap: .round,
+              lineJoin: .round,
+              dash: PolicyCanvasEdgeAnimation.dashPattern,
+              dashPhase: phase
+            )
+          )
+      }
+    } else {
+      PolicyCanvasEdgeShape(route: route)
+        .stroke(
+          color,
+          style: StrokeStyle(
+            lineWidth: effectiveStrokeWidth,
+            lineCap: .round,
+            lineJoin: .round
+          )
+        )
+    }
+  }
+
+  private var reducedMotion: Bool {
+    canvasReducedMotion ?? systemReduceMotion
+  }
+
   private var effectiveStrokeWidth: CGFloat {
     if isSelected {
       return strokeWidth + 1.0
@@ -60,6 +109,33 @@ struct PolicyCanvasInteractiveEdge: View {
       return strokeWidth + 0.4
     }
     return strokeWidth
+  }
+
+  static var animatedDashPattern: [CGFloat] {
+    PolicyCanvasEdgeAnimation.dashPattern
+  }
+
+  static func animatedDashPhase(at date: Date) -> CGFloat {
+    PolicyCanvasEdgeAnimation.dashPhase(at: date)
+  }
+}
+
+/// Non-View animation helpers for `PolicyCanvasInteractiveEdge`. Lives
+/// outside the View hierarchy so unit tests can call `dashPhase(at:)` from a
+/// non-MainActor context.
+enum PolicyCanvasEdgeAnimation {
+  /// Dash pattern for animated flow edges. 8pt dash + 4pt gap reads as a
+  /// directional flow at default zoom without sliding off the polyline at
+  /// fast frame rates.
+  static let dashPattern: [CGFloat] = [8, 4]
+
+  /// Compute the dash-phase offset for the current TimelineView tick. Phase
+  /// advances 12pt per second (one full dash+gap cycle) so the dash appears
+  /// to march along the polyline at a steady pace.
+  static func dashPhase(at date: Date) -> CGFloat {
+    let cycle = dashPattern.reduce(0, +)
+    let elapsed = date.timeIntervalSinceReferenceDate * 12
+    return -CGFloat(elapsed.truncatingRemainder(dividingBy: Double(cycle)))
   }
 }
 

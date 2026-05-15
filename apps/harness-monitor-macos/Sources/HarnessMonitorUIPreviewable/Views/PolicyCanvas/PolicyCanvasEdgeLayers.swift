@@ -41,6 +41,7 @@ struct PolicyCanvasEdgeLayer: View {
             strokeWidth: severity == nil ? 2.4 : 3.0,
             isSelected: isSelected,
             accessibilityLabel: viewModel.accessibilityLabel(for: edge),
+            isAnimated: edge.isAnimated,
             onTap: { viewModel.select(.edge(edge.id)) },
             onDelete: { viewModel.deleteEdge(edge.id) }
           )
