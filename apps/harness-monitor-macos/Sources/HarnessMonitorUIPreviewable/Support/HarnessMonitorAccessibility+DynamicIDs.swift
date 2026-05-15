@@ -37,6 +37,10 @@ extension HarnessMonitorAccessibility {
     "\(dashboardSessionCard(sessionID)).frame"
   }
 
+  public static func dashboardWindowRoute(_ route: String) -> String {
+    "harness.dashboard.route.\(slug(route))"
+  }
+
   public static func projectHeader(_ projectID: String) -> String {
     "harness.sidebar.project-header.\(slug(projectID))"
   }

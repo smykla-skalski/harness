@@ -25,6 +25,8 @@ extension HarnessMonitorUITestAccessibility {
     "harness.settings.sidebar-session-row-mode"
   static let settingsTimeZoneModePicker = "harness.settings.time-zone-mode"
   static let settingsCustomTimeZonePicker = "harness.settings.custom-time-zone"
+  static let settingsTimelinePersistencePicker =
+    "harness.settings.timeline.filter-persistence"
   static let settingsPendingDecisionBannersToggle =
     "harness.settings.decisions.pending-banners"
   static let settingsPendingBannersFocusModeToggle =
@@ -105,6 +107,8 @@ extension HarnessMonitorUITestAccessibility {
   static let reconnectButton = "harness.settings.action.reconnect"
   static let refreshDiagnosticsButton = "harness.settings.action.refresh-diagnostics"
   static let startDaemonButton = "harness.settings.action.start-daemon"
+  static let settingsLaunchAgentRepairButton =
+    "harness.settings.action.repair-launch-agent"
   static let installLaunchAgentButton = "harness.settings.action.install-launch-agent"
   static let removeLaunchAgentButton = "harness.settings.action.remove-launch-agent"
   static let settingsDaemonLogLevelPicker = "harness.settings.daemon.logLevel"
