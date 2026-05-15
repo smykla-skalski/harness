@@ -178,23 +178,23 @@ private struct DashboardSidebar: View {
         "harness.view.route_count": String(DashboardWindowRoute.allCases.count),
       ]
     ) {
-      List(selection: dashboardSelectionBinding) {
-        ForEach(DashboardWindowRoute.allCases, id: \.id) { route in
-          let isSelected = selectedRoute == route
-          SessionSidebarRow(
-            title: route.title,
-            systemImage: route.systemImage
-          )
-          .tag(route)
-          .accessibilityIdentifier(HarnessMonitorAccessibility.dashboardWindowRoute(route.rawValue))
-          .accessibilityValue(isSelected ? "selected" : "not selected")
+      HarnessMonitorSidebar(
+        accessibilityIdentifier: HarnessMonitorAccessibility.dashboardSidebar,
+        statusModel: statusModel,
+        rowSize: harnessSidebarRowSize(for: textSizeIndex)
+      ) {
+        List(selection: dashboardSelectionBinding) {
+          ForEach(DashboardWindowRoute.allCases, id: \.id) { route in
+            let isSelected = selectedRoute == route
+            SessionSidebarRow(
+              title: route.title,
+              systemImage: route.systemImage
+            )
+            .tag(route)
+            .accessibilityIdentifier(HarnessMonitorAccessibility.dashboardWindowRoute(route.rawValue))
+            .accessibilityValue(isSelected ? "selected" : "not selected")
+          }
         }
-      }
-      .listStyle(.sidebar)
-      .environment(\.sidebarRowSize, harnessSidebarRowSize(for: textSizeIndex))
-      .accessibilityIdentifier(HarnessMonitorAccessibility.dashboardSidebar)
-      .safeAreaInset(edge: .bottom, spacing: 0) {
-        SessionSidebarFooter(model: statusModel)
       }
     }
   }
