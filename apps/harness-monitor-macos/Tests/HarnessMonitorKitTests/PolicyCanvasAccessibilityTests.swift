@@ -120,6 +120,50 @@ struct PolicyCanvasAccessibilityTests {
     #expect(PolicyCanvasLayout.portHitTestExtension >= 8)
   }
 
+  // Phase 3 (Watson R2): the default accessibility activation point on a
+  // SwiftUI accessibility element is the geometric frame center, which sits
+  // in empty canvas for L-shaped or zig-zag routes. The arc-length midpoint
+  // is always on the stroke - VoiceOver and keyboard focus then activate on
+  // a point a sighted user would also click.
+  @Test("arc-length midpoint of a straight segment is its center")
+  func arcLengthMidpointOfStraightSegment() {
+    let route = PolicyCanvasEdgeRoute(
+      points: [CGPoint(x: 0, y: 0), CGPoint(x: 100, y: 0)],
+      labelPosition: .zero
+    )
+    #expect(route.arcLengthMidpoint == CGPoint(x: 50, y: 0))
+  }
+
+  @Test("arc-length midpoint of an L-shape lies on the longer leg")
+  func arcLengthMidpointOfLShape() {
+    // 30pt horizontal + 100pt vertical = 130pt total. Midpoint at 65pt is
+    // on the vertical leg starting at (30,0), so y=35.
+    let route = PolicyCanvasEdgeRoute(
+      points: [
+        CGPoint(x: 0, y: 0),
+        CGPoint(x: 30, y: 0),
+        CGPoint(x: 30, y: 100),
+      ],
+      labelPosition: .zero
+    )
+    let midpoint = route.arcLengthMidpoint
+    #expect(midpoint.x == 30)
+    #expect(midpoint.y == 35)
+  }
+
+  @Test("arc-length midpoint of an empty route is the origin")
+  func arcLengthMidpointOfEmptyRoute() {
+    let route = PolicyCanvasEdgeRoute(points: [], labelPosition: .zero)
+    #expect(route.arcLengthMidpoint == .zero)
+  }
+
+  @Test("arc-length midpoint of a single-point route returns that point")
+  func arcLengthMidpointOfSinglePoint() {
+    let point = CGPoint(x: 42, y: 17)
+    let route = PolicyCanvasEdgeRoute(points: [point], labelPosition: .zero)
+    #expect(route.arcLengthMidpoint == point)
+  }
+
   // P27 focus order: visual top-to-bottom, then left-to-right within the
   // same row (10pt y-axis tolerance). The sample fixture has Source at
   // (120,140), Risk at (360,112), Context at (580,86), Review at (590,220),

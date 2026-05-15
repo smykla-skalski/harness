@@ -85,6 +85,7 @@ struct PolicyCanvasInteractiveEdge: View {
     .accessibilityLabel(accessibilityLabel)
     .accessibilityValue(accessibilityValueString)
     .accessibilityAddTraits(.isButton)
+    .accessibilityActivationPoint(route.arcLengthMidpoint)
   }
 
   /// Hover tooltip surfacing the same kind word a VoiceOver user hears via

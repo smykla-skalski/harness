@@ -9,6 +9,44 @@ struct PolicyCanvasEdgeRoute {
     self.labelPosition = labelPosition
   }
 
+  /// True midpoint along the polyline's arc length. Walks segments
+  /// accumulating length and interpolates within the segment that crosses
+  /// the half-length mark. Used by `PolicyCanvasInteractiveEdge` as the
+  /// `.accessibilityActivationPoint` so VoiceOver and keyboard focus
+  /// activate on a point that is actually on the stroke - default
+  /// frame-center can sit in empty canvas for L-shaped or zig-zag routes,
+  /// per Watson's R2 a11y note.
+  var arcLengthMidpoint: CGPoint {
+    guard points.count >= 2 else {
+      return points.first ?? .zero
+    }
+    var total: CGFloat = 0
+    for index in 0..<(points.count - 1) {
+      total += distance(points[index], points[index + 1])
+    }
+    let halfway = total / 2
+    var traversed: CGFloat = 0
+    for index in 0..<(points.count - 1) {
+      let from = points[index]
+      let to = points[index + 1]
+      let segmentLength = distance(from, to)
+      if traversed + segmentLength >= halfway {
+        let remainder = halfway - traversed
+        let ratio = segmentLength == 0 ? 0 : remainder / segmentLength
+        return CGPoint(
+          x: from.x + (to.x - from.x) * ratio,
+          y: from.y + (to.y - from.y) * ratio
+        )
+      }
+      traversed += segmentLength
+    }
+    return points.last ?? .zero
+  }
+
+  private func distance(_ a: CGPoint, _ b: CGPoint) -> CGFloat {
+    hypot(b.x - a.x, b.y - a.y)
+  }
+
   init(
     source: CGPoint,
     target: CGPoint,
