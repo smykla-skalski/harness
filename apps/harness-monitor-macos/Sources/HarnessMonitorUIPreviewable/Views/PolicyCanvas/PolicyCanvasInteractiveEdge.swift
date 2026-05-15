@@ -77,7 +77,7 @@ struct PolicyCanvasInteractiveEdge: View {
     .contentShape(PolicyCanvasEdgeHitShape(route: route))
     .onHover { isHovering = $0 }
     .onTapGesture(perform: onTap)
-    .help(accessibilityLabel)
+    .help(hoverHelpString)
     .contextMenu {
       Button("Delete edge", role: .destructive, action: onDelete)
     }
@@ -85,6 +85,16 @@ struct PolicyCanvasInteractiveEdge: View {
     .accessibilityLabel(accessibilityLabel)
     .accessibilityValue(accessibilityValueString)
     .accessibilityAddTraits(.isButton)
+  }
+
+  /// Hover tooltip surfacing the same kind word a VoiceOver user hears via
+  /// `.accessibilityValue`. Without this, sighted users hovering an edge got
+  /// only the "from source to target" label while AT users got the kind -
+  /// modality asymmetry that left sighted users to decode the color or dash
+  /// pattern unaided. The kind is named in parentheses so the existing label
+  /// stays the headline.
+  private var hoverHelpString: String {
+    "\(accessibilityLabel) (\(accessibilityKindWord))"
   }
 
   /// VoiceOver value combining the kind word with an "active" suffix when
@@ -98,8 +108,7 @@ struct PolicyCanvasInteractiveEdge: View {
     return accessibilityKindWord
   }
 
-  @ViewBuilder
-  private var strokeLayer: some View {
+  @ViewBuilder private var strokeLayer: some View {
     if isAnimated, !reducedMotion {
       TimelineView(.animation) { context in
         let phase = PolicyCanvasEdgeAnimation.dashPhase(at: context.date)
@@ -147,8 +156,7 @@ struct PolicyCanvasInteractiveEdge: View {
     PolicyCanvasEdgeAnimation.dashPattern
   }
 
-  @MainActor
-  static func animatedDashPhase(at date: Date) -> CGFloat {
+  @MainActor static func animatedDashPhase(at date: Date) -> CGFloat {
     PolicyCanvasEdgeAnimation.dashPhase(at: date)
   }
 }
