@@ -378,5 +378,7 @@ func taskBoardStatusColor(for status: TaskBoardStatus) -> Color {
     HarnessMonitorTheme.accent
   case .done:
     HarnessMonitorTheme.secondaryInk
+  case .unknown:
+    HarnessMonitorTheme.secondaryInk
   }
 }

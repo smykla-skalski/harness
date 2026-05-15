@@ -121,12 +121,31 @@ public struct TaskBoardGitHubProjectConfig: Codable, Equatable, Sendable {
   }
 }
 
-public enum TaskBoardGitHubMergeMethod: String, Codable, CaseIterable, Identifiable, Hashable,
-  Sendable
-{
+public enum TaskBoardGitHubMergeMethod: TaskBoardOpenEnum, CaseIterable, Identifiable {
   case squash
   case merge
   case rebase
+  case unknown(String)
+
+  public static let allCases: [TaskBoardGitHubMergeMethod] = [.squash, .merge, .rebase]
+
+  public var rawValue: String {
+    switch self {
+    case .squash: "squash"
+    case .merge: "merge"
+    case .rebase: "rebase"
+    case .unknown(let raw): raw
+    }
+  }
+
+  public init(rawValue: String) {
+    switch rawValue {
+    case "squash": self = .squash
+    case "merge": self = .merge
+    case "rebase": self = .rebase
+    default: self = .unknown(rawValue)
+    }
+  }
 
   public var id: String { rawValue }
 }

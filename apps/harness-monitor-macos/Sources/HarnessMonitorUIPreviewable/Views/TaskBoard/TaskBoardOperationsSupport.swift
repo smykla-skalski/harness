@@ -34,6 +34,8 @@ enum TaskBoardStatusFilterChoice: String, CaseIterable, Identifiable, Hashable {
       self = .done
     case .blocked:
       self = .blocked
+    case .unknown:
+      self = .all
     }
   }
 

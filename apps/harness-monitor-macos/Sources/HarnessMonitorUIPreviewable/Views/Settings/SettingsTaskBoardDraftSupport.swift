@@ -34,6 +34,8 @@ enum DispatchStatusFilterChoice: String, CaseIterable, Hashable {
       self = .inReview
     case .done:
       self = .done
+    case .unknown:
+      self = .all
     }
   }
 
@@ -75,6 +77,7 @@ extension TaskBoardOrchestratorWorkflow {
     case .prFix: "PR Fix"
     case .prReview: "PR Review"
     case .dependencyUpdate: "Dependency Update"
+    case .unknown(let raw): raw
     }
   }
 }
@@ -85,6 +88,7 @@ extension TaskBoardGitHubMergeMethod {
     case .squash: "Squash"
     case .merge: "Merge Commit"
     case .rebase: "Rebase"
+    case .unknown(let raw): raw
     }
   }
 }
