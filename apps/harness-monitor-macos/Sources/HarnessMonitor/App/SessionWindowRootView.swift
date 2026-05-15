@@ -76,6 +76,7 @@ struct SessionWindowRootView: View {
       mcpWindowCommandRegistrar: mcpWindowCommandRegistrar,
       themeMode: $themeMode,
       appliesPreferredColorScheme: true,
+      windowToolbarBackgroundVisibility: .visible,
       toast: store.toast
     ) {
       SessionWindowView(store: store, token: token, initialRoute: initialRoute)

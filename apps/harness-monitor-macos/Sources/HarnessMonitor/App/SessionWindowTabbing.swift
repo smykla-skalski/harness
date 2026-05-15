@@ -175,6 +175,5 @@ private final class AccessorView: NSView {
   /// the override has to run again on every change.
   private func applyTitlebarChromeOverrides(to window: NSWindow) {
     window.titlebarSeparatorStyle = .none
-    window.titlebarAppearsTransparent = true
   }
 }
