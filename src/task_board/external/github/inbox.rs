@@ -16,6 +16,8 @@ use super::{
     review_request_query, search_label_matches_filter,
 };
 
+const GITHUB_SEARCH_PAGE_CAP: u32 = 10;
+
 #[derive(Clone)]
 pub struct GitHubInboxSyncClient {
     client: octocrab::Octocrab,
@@ -102,6 +104,14 @@ impl GitHubInboxSyncClient {
             let count = response.items.len();
             items.extend(response.items);
             if count < 100 {
+                break;
+            }
+            if page >= GITHUB_SEARCH_PAGE_CAP {
+                tracing::warn!(
+                    target: "harness::task_board::external::github::inbox",
+                    "github search results truncated at {} hits",
+                    GITHUB_SEARCH_PAGE_CAP * 100
+                );
                 break;
             }
             page += 1;
@@ -192,6 +202,7 @@ impl GitHubInboxSyncClient {
             .await?;
         Ok(items
             .into_iter()
+            .filter(|item| search_label_matches_filter(&item.label_names(), &self.import_labels))
             .map(|item| ExternalTask {
                 reference: github_task_ref(repository, item.number, item.html_url),
                 title: item.title,
@@ -334,5 +345,11 @@ mod tests {
             &[" Bug ".into()]
         ));
         assert!(search_label_matches_filter(&["bug".into()], &[]));
+    }
+
+    #[test]
+    fn github_search_page_cap_keeps_total_hits_under_one_thousand() {
+        assert_eq!(GITHUB_SEARCH_PAGE_CAP, 10);
+        // 10 pages * 100 per page = 1000 total hits before truncation.
     }
 }
