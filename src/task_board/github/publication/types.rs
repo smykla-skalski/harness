@@ -66,6 +66,12 @@ pub(super) enum RestCommitSignatureBoundary {
 }
 
 #[derive(Debug, PartialEq, Eq)]
+pub(super) struct NativeSshCommitSignature {
+    pub(super) armored_signature: String,
+    pub(super) rest_boundary: RestCommitSignatureBoundary,
+}
+
+#[derive(Debug, PartialEq, Eq)]
 pub(super) enum NativeGitTransportReason {
     ConfiguredSshSigning,
     ExistingSshSignature,

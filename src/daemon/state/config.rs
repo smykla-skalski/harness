@@ -132,11 +132,13 @@ pub fn task_board_git_runtime_profile(
         .get(&task_board_memory_key())
         .cloned()
         .unwrap_or_default();
-    let passphrase = secrets
-        .resolved_profile(repository)
-        .signing
-        .gpg_private_key_passphrase;
-    profile.signing.gpg_private_key_passphrase = passphrase;
+    let secret_profile = secrets.resolved_profile(repository);
+    profile.ssh_private_key = secret_profile.ssh_private_key;
+    profile.ssh_private_key_passphrase = secret_profile.ssh_private_key_passphrase;
+    profile.signing.ssh_private_key = secret_profile.signing.ssh_private_key;
+    profile.signing.ssh_private_key_passphrase = secret_profile.signing.ssh_private_key_passphrase;
+    profile.signing.gpg_private_key = secret_profile.signing.gpg_private_key;
+    profile.signing.gpg_private_key_passphrase = secret_profile.signing.gpg_private_key_passphrase;
     Ok(profile)
 }
 

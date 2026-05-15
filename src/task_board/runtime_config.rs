@@ -51,6 +51,10 @@ pub struct TaskBoardGitRuntimeProfile {
     pub author_email: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub ssh_key_path: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub ssh_private_key: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub ssh_private_key_passphrase: Option<String>,
     #[serde(default)]
     pub signing: TaskBoardGitSigningConfig,
 }
@@ -61,6 +65,8 @@ impl TaskBoardGitRuntimeProfile {
         self.author_name.is_none()
             && self.author_email.is_none()
             && self.ssh_key_path.is_none()
+            && self.ssh_private_key.is_none()
+            && self.ssh_private_key_passphrase.is_none()
             && self.signing.is_empty()
     }
 
@@ -74,6 +80,14 @@ impl TaskBoardGitRuntimeProfile {
         if override_profile.ssh_key_path.is_some() {
             self.ssh_key_path.clone_from(&override_profile.ssh_key_path);
         }
+        if override_profile.ssh_private_key.is_some() {
+            self.ssh_private_key
+                .clone_from(&override_profile.ssh_private_key);
+        }
+        if override_profile.ssh_private_key_passphrase.is_some() {
+            self.ssh_private_key_passphrase
+                .clone_from(&override_profile.ssh_private_key_passphrase);
+        }
         if !override_profile.signing.is_empty() {
             self.signing.clone_from(&override_profile.signing);
         }
@@ -85,6 +99,10 @@ impl TaskBoardGitRuntimeProfile {
             author_name: normalize_optional_value(self.author_name.as_deref()),
             author_email: normalize_optional_value(self.author_email.as_deref()),
             ssh_key_path: normalize_optional_value(self.ssh_key_path.as_deref()),
+            ssh_private_key: normalize_optional_value(self.ssh_private_key.as_deref()),
+            ssh_private_key_passphrase: normalize_optional_value(
+                self.ssh_private_key_passphrase.as_deref(),
+            ),
             signing: self.signing.normalized(),
         }
     }
@@ -95,6 +113,8 @@ impl TaskBoardGitRuntimeProfile {
             author_name: self.author_name.clone(),
             author_email: self.author_email.clone(),
             ssh_key_path: self.ssh_key_path.clone(),
+            ssh_private_key: None,
+            ssh_private_key_passphrase: None,
             signing: self.signing.without_secrets(),
         }
     }
@@ -107,9 +127,15 @@ pub struct TaskBoardGitSigningConfig {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub ssh_key_path: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub ssh_private_key: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub ssh_private_key_passphrase: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub gpg_key_id: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub gpg_private_key_path: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub gpg_private_key: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub gpg_private_key_passphrase: Option<String>,
 }
@@ -119,8 +145,11 @@ impl TaskBoardGitSigningConfig {
     pub fn is_empty(&self) -> bool {
         self.mode == TaskBoardGitSigningMode::None
             && self.ssh_key_path.is_none()
+            && self.ssh_private_key.is_none()
+            && self.ssh_private_key_passphrase.is_none()
             && self.gpg_key_id.is_none()
             && self.gpg_private_key_path.is_none()
+            && self.gpg_private_key.is_none()
             && self.gpg_private_key_passphrase.is_none()
     }
 
@@ -129,8 +158,13 @@ impl TaskBoardGitSigningConfig {
         Self {
             mode: self.mode,
             ssh_key_path: normalize_optional_value(self.ssh_key_path.as_deref()),
+            ssh_private_key: normalize_optional_value(self.ssh_private_key.as_deref()),
+            ssh_private_key_passphrase: normalize_optional_value(
+                self.ssh_private_key_passphrase.as_deref(),
+            ),
             gpg_key_id: normalize_optional_value(self.gpg_key_id.as_deref()),
             gpg_private_key_path: normalize_optional_value(self.gpg_private_key_path.as_deref()),
+            gpg_private_key: normalize_optional_value(self.gpg_private_key.as_deref()),
             gpg_private_key_passphrase: normalize_optional_value(
                 self.gpg_private_key_passphrase.as_deref(),
             ),
@@ -142,8 +176,11 @@ impl TaskBoardGitSigningConfig {
         Self {
             mode: self.mode,
             ssh_key_path: self.ssh_key_path.clone(),
+            ssh_private_key: None,
+            ssh_private_key_passphrase: None,
             gpg_key_id: self.gpg_key_id.clone(),
             gpg_private_key_path: self.gpg_private_key_path.clone(),
+            gpg_private_key: None,
             gpg_private_key_passphrase: None,
         }
     }
@@ -273,11 +310,16 @@ mod tests {
                 author_name: Some("Global User".into()),
                 author_email: Some("global@example.com".into()),
                 ssh_key_path: Some("/tmp/global".into()),
+                ssh_private_key: Some("global-ssh-private-key".into()),
+                ssh_private_key_passphrase: Some("global-ssh-passphrase".into()),
                 signing: TaskBoardGitSigningConfig {
                     mode: TaskBoardGitSigningMode::Gpg,
                     ssh_key_path: None,
+                    ssh_private_key: None,
+                    ssh_private_key_passphrase: None,
                     gpg_key_id: Some("GLOBAL".into()),
                     gpg_private_key_path: Some("/tmp/global-gpg.asc".into()),
+                    gpg_private_key: Some("global-gpg-private-key".into()),
                     gpg_private_key_passphrase: Some("global-passphrase".into()),
                 },
             },
@@ -287,11 +329,16 @@ mod tests {
                     author_name: None,
                     author_email: Some("repo@example.com".into()),
                     ssh_key_path: Some("/tmp/repo".into()),
+                    ssh_private_key: None,
+                    ssh_private_key_passphrase: None,
                     signing: TaskBoardGitSigningConfig {
                         mode: TaskBoardGitSigningMode::Ssh,
                         ssh_key_path: Some("/tmp/sign".into()),
+                        ssh_private_key: Some("repo-signing-key".into()),
+                        ssh_private_key_passphrase: Some("repo-signing-passphrase".into()),
                         gpg_key_id: None,
                         gpg_private_key_path: None,
+                        gpg_private_key: None,
                         gpg_private_key_passphrase: None,
                     },
                 },
@@ -302,10 +349,51 @@ mod tests {
         assert_eq!(resolved.author_name.as_deref(), Some("Global User"));
         assert_eq!(resolved.author_email.as_deref(), Some("repo@example.com"));
         assert_eq!(resolved.ssh_key_path.as_deref(), Some("/tmp/repo"));
+        assert_eq!(
+            resolved.ssh_private_key.as_deref(),
+            Some("global-ssh-private-key")
+        );
+        assert_eq!(
+            resolved.ssh_private_key_passphrase.as_deref(),
+            Some("global-ssh-passphrase")
+        );
         assert_eq!(resolved.signing.mode, TaskBoardGitSigningMode::Ssh);
         assert_eq!(resolved.signing.ssh_key_path.as_deref(), Some("/tmp/sign"));
+        assert_eq!(
+            resolved.signing.ssh_private_key.as_deref(),
+            Some("repo-signing-key")
+        );
         assert!(resolved.signing.gpg_key_id.is_none());
         assert!(resolved.signing.gpg_private_key_path.is_none());
         assert!(resolved.signing.gpg_private_key_passphrase.is_none());
+    }
+
+    #[test]
+    fn runtime_config_redacts_synced_private_key_material() {
+        let config = TaskBoardGitRuntimeConfig {
+            global: TaskBoardGitRuntimeProfile {
+                ssh_private_key: Some("ssh-secret".into()),
+                ssh_private_key_passphrase: Some("ssh-passphrase".into()),
+                signing: TaskBoardGitSigningConfig {
+                    mode: TaskBoardGitSigningMode::Gpg,
+                    ssh_private_key: Some("signing-ssh-secret".into()),
+                    ssh_private_key_passphrase: Some("signing-ssh-passphrase".into()),
+                    gpg_private_key: Some("gpg-secret".into()),
+                    gpg_private_key_passphrase: Some("gpg-passphrase".into()),
+                    ..Default::default()
+                },
+                ..Default::default()
+            },
+            repository_overrides: vec![],
+        };
+
+        let serialized =
+            serde_json::to_string(&config.without_secrets()).expect("serialize redacted config");
+
+        assert!(!serialized.contains("ssh-secret"));
+        assert!(!serialized.contains("ssh-passphrase"));
+        assert!(!serialized.contains("signing-ssh-secret"));
+        assert!(!serialized.contains("gpg-secret"));
+        assert!(!serialized.contains("gpg-passphrase"));
     }
 }

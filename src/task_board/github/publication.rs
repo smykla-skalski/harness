@@ -29,6 +29,8 @@ use types::{
 };
 
 mod signing;
+#[allow(dead_code)]
+mod ssh_signing;
 mod types;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
