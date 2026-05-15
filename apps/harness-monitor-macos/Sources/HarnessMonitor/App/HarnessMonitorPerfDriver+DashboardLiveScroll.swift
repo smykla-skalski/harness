@@ -42,21 +42,24 @@ extension HarnessMonitorPerfDriver {
       ]
     )
 
-    // First settle so first-frame work clears before the scroll begins, otherwise
-    // the audit captures cold-start churn instead of the scroll path.
-    await settle(.milliseconds(900))
+    // The daemon streams the task-board inbox + supervisor decisions + recent
+    // sessions over the first few seconds. If we scroll before that data lands
+    // the content is shorter than the 928pt viewport and scrollTo(edge:.bottom)
+    // is a documented no-op. Wait at least 4s here so the surface is real-life
+    // scrollable. The bus emits scroll.geometry events that prove the size.
+    await settle(.milliseconds(4_000))
 
     postScrollEvent(.bottom, pass: 1)
-    await settle(.milliseconds(1_400))
+    await settle(.milliseconds(1_500))
 
     postScrollEvent(.top, pass: 1)
-    await settle(.milliseconds(1_000))
+    await settle(.milliseconds(1_200))
 
-    // Second pass exercises the steady-state scroll once the cache is warm. The
-    // audit window stays inside `signposter.beginAnimationInterval` so SwiftUI's
-    // High-severity update / Hitch events get pinned to this scenario interval.
     postScrollEvent(.bottom, pass: 2)
-    await settle(.milliseconds(1_400))
+    await settle(.milliseconds(1_500))
+
+    postScrollEvent(.top, pass: 2)
+    await settle(.milliseconds(1_200))
 
     return .completed
   }

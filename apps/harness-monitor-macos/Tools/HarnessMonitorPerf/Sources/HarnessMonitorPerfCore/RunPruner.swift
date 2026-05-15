@@ -37,6 +37,7 @@ public enum RunPruner {
         }
         if relativePath.hasPrefix("launch-metrics/") { return debugRetention }
         if relativePath.hasPrefix("exports/") { return debugRetention }
+        if relativePath.hasPrefix("app-traces/") { return debugRetention }
         if relativePath.hasPrefix("traces/") { return keepTraces || debugRetention }
         return false
     }
