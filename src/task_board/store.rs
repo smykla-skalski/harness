@@ -25,6 +25,7 @@ pub struct TaskBoardItemPatch {
     pub priority: Option<TaskBoardPriority>,
     pub tags: Option<Vec<String>>,
     pub project_id: OptionalFieldPatch<String>,
+    pub target_project_types: Option<Vec<String>>,
     pub agent_mode: Option<AgentMode>,
     pub external_refs: Option<Vec<ExternalRef>>,
     pub planning: Option<PlanningState>,
@@ -54,6 +55,8 @@ struct TaskBoardFrontmatter {
     tags: Vec<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     project_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    target_project_types: Vec<String>,
     agent_mode: AgentMode,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     external_refs: Vec<ExternalRef>,
@@ -83,6 +86,7 @@ impl From<&TaskBoardItem> for TaskBoardFrontmatter {
             priority: item.priority,
             tags: item.tags.clone(),
             project_id: item.project_id.clone(),
+            target_project_types: item.target_project_types.clone(),
             agent_mode: item.agent_mode,
             external_refs: item.external_refs.clone(),
             planning: item.planning.clone(),
@@ -108,6 +112,7 @@ impl TaskBoardFrontmatter {
             priority: self.priority,
             tags: self.tags,
             project_id: self.project_id,
+            target_project_types: self.target_project_types,
             agent_mode: self.agent_mode,
             external_refs: self.external_refs,
             planning: self.planning,
@@ -269,6 +274,10 @@ fn apply_core_patch(item: &mut TaskBoardItem, patch: &TaskBoardItemPatch) {
     assign_copy_if_some(&mut item.priority, patch.priority);
     assign_copy_if_some(&mut item.agent_mode, patch.agent_mode);
     assign_if_some(&mut item.tags, patch.tags.as_ref());
+    assign_if_some(
+        &mut item.target_project_types,
+        patch.target_project_types.as_ref(),
+    );
     assign_if_some(&mut item.external_refs, patch.external_refs.as_ref());
     if patch.clear_planning {
         item.planning = PlanningState::default();

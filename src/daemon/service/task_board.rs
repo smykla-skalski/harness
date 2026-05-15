@@ -49,6 +49,8 @@ pub fn create_task_board_item(
     item.agent_mode = request.agent_mode;
     item.tags.clone_from(&request.tags);
     item.project_id.clone_from(&request.project_id);
+    item.target_project_types
+        .clone_from(&request.target_project_types);
     item.external_refs.clone_from(&request.external_refs);
     item.planning.clone_from(&request.planning);
     if let Some(workflow) = &request.workflow {
@@ -285,6 +287,7 @@ fn patch_from_request(request: &TaskBoardUpdateItemRequest) -> TaskBoardItemPatc
             request.project_id.as_ref(),
             request.clear_identity.clear_project_id,
         ),
+        target_project_types: request.target_project_types.clone(),
         agent_mode: request.agent_mode,
         external_refs: request.external_refs.clone(),
         planning: request.planning.clone(),

@@ -18,6 +18,8 @@ pub struct TaskBoardItem {
     pub tags: Vec<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub project_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub target_project_types: Vec<String>,
     #[serde(default)]
     pub agent_mode: AgentMode,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
@@ -50,6 +52,7 @@ impl TaskBoardItem {
             priority: TaskBoardPriority::Medium,
             tags: Vec::new(),
             project_id: None,
+            target_project_types: Vec::new(),
             agent_mode: AgentMode::Headless,
             external_refs: Vec::new(),
             planning: PlanningState::default(),

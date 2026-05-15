@@ -190,3 +190,61 @@ fn complete_run_records_evaluation_and_trace_ids() {
     );
     assert_eq!(status.last_run_applied_count(), 1);
 }
+
+#[test]
+fn dispatch_filters_items_that_target_other_machines() {
+    let temp = tempdir().expect("tempdir");
+    let root = temp.path().join("board");
+    let board = TaskBoardStore::new(root.clone());
+
+    let mut mine = TaskBoardItem::new(
+        "for-me".into(),
+        "Mine".into(),
+        String::new(),
+        "2026-05-15T00:00:00Z".into(),
+    );
+    mine.status = TaskBoardStatus::Todo;
+    mine.target_project_types = vec!["web".into()];
+    board.create("Mine", "", mine).expect("create mine");
+
+    let mut other = TaskBoardItem::new(
+        "for-other".into(),
+        "Theirs".into(),
+        String::new(),
+        "2026-05-15T00:00:00Z".into(),
+    );
+    other.status = TaskBoardStatus::Todo;
+    other.target_project_types = vec!["data".into()];
+    board.create("Theirs", "", other).expect("create theirs");
+
+    let mut wildcard = TaskBoardItem::new(
+        "wildcard".into(),
+        "Anyone".into(),
+        String::new(),
+        "2026-05-15T00:00:00Z".into(),
+    );
+    wildcard.status = TaskBoardStatus::Todo;
+    board.create("Anyone", "", wildcard).expect("create wildcard");
+
+    let orchestrator = TaskBoardOrchestrator::new(root);
+    let registry = orchestrator.machine_registry();
+    let mut local = orchestrator.local_machine().expect("ensure local");
+    local.project_types = vec!["web".into()];
+    registry.upsert(&local).expect("declare project types");
+
+    let prepared = orchestrator
+        .prepare_run(&TaskBoardOrchestratorRunOnceRequest::default())
+        .expect("prepare run");
+
+    assert_eq!(
+        prepared.audit.total, 2,
+        "machine should keep web + wildcard, drop data"
+    );
+    let items = orchestrator
+        .items_for_input(&prepared.input)
+        .expect("items for input");
+    let ids: Vec<&str> = items.iter().map(|item| item.id.as_str()).collect();
+    assert!(ids.contains(&"for-me"));
+    assert!(ids.contains(&"wildcard"));
+    assert!(!ids.contains(&"for-other"));
+}
