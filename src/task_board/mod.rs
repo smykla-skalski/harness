@@ -2,6 +2,7 @@ pub mod dispatch;
 pub mod evaluation;
 pub mod external;
 pub mod github;
+pub mod machines;
 pub mod orchestrator;
 pub mod planning;
 pub mod policy;
@@ -31,6 +32,7 @@ pub use external::{
     HARNESS_GITHUB_REPOSITORY_ENV, HARNESS_GITHUB_TOKEN_ENV, HARNESS_TODOIST_TOKEN_ENV,
     TodoistSyncClient, configured_sync_clients, sync_external_tasks,
 };
+pub use machines::{Machine, MachineRegistry};
 pub use orchestrator::{
     TaskBoardGitHubInboxConfig, TaskBoardGitHubProjectConfig, TaskBoardOrchestrator,
     TaskBoardOrchestratorDispatchInput, TaskBoardOrchestratorRunOnceRequest,

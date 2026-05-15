@@ -9,6 +9,7 @@ use crate::workspace::utc_now;
 
 use super::super::dispatch::DispatchExecutionSummary;
 use super::super::evaluation::TaskBoardEvaluationSummary;
+use super::super::machines::Machine;
 use super::super::store::TaskBoardStore;
 use super::super::summary::{TaskBoardAuditSummary, TaskBoardSyncSummary};
 use super::super::types::{TaskBoardItem, TaskBoardStatus, TaskBoardWorkflowStatus};
@@ -77,15 +78,23 @@ pub(super) const fn workflow_statuses() -> [TaskBoardWorkflowStatus; 6] {
     ]
 }
 
-pub(super) fn run_items(
+pub(super) fn run_items_for_machine(
     board: &TaskBoardStore,
     item_id: Option<&str>,
     status: Option<TaskBoardStatus>,
+    machine: Option<&Machine>,
 ) -> Result<Vec<TaskBoardItem>, CliError> {
-    item_id.map_or_else(
+    let items = item_id.map_or_else(
         || board.list(status),
         |id| board.get(id).map(|item| vec![item]),
-    )
+    )?;
+    let Some(machine) = machine else {
+        return Ok(items);
+    };
+    Ok(items
+        .into_iter()
+        .filter(|item| machine.accepts_any(&item.target_project_types))
+        .collect())
 }
 
 pub(super) fn read_or_default<T>(path: &Path) -> Result<T, CliError>

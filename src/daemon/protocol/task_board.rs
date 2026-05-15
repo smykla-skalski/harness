@@ -34,6 +34,8 @@ pub struct TaskBoardCreateItemRequest {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub project_id: Option<String>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub target_project_types: Vec<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub external_refs: Vec<ExternalRef>,
     #[serde(default)]
     pub planning: PlanningState,
@@ -74,6 +76,8 @@ pub struct TaskBoardUpdateItemRequest {
     pub tags: Option<Vec<String>>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub project_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub target_project_types: Option<Vec<String>>,
     #[serde(default, flatten)]
     pub clear_identity: TaskBoardUpdateIdentityClears,
     #[serde(default, skip_serializing_if = "Option::is_none")]

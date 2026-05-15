@@ -62,6 +62,7 @@ pub enum DispatchReadiness {
 pub enum DispatchBlockReason {
     AlreadyLinked { work_item_id: String },
     Deleted,
+    MachineMismatch { required: Vec<String>, declared: Vec<String> },
     PlanApproval { reason: PlanApprovalBlockReason },
     Policy { decision: PolicyDecision },
     Status { status: TaskBoardStatus },

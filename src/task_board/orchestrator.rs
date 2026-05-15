@@ -7,6 +7,7 @@ use crate::workspace::utc_now;
 use super::dispatch::DispatchExecutionSummary;
 use super::evaluation::TaskBoardEvaluationSummary;
 use super::external::ExternalSyncConfig;
+use super::machines::{Machine, MachineRegistry};
 use super::store::TaskBoardStore;
 use super::summary::{build_audit_summary, build_sync_summary};
 use super::types::TaskBoardItem;
@@ -16,7 +17,8 @@ mod settings;
 mod types;
 
 use self::run_record::{
-    RunRecordInput, new_run_id, read_or_default, run_items, run_record, workflow_statuses,
+    RunRecordInput, new_run_id, read_or_default, run_items_for_machine, run_record,
+    workflow_statuses,
 };
 use self::settings::{
     apply_settings_update, dispatch_input, normalize_github_inbox, normalize_todoist_inbox,
@@ -151,7 +153,13 @@ impl TaskBoardOrchestrator {
             input.dry_run,
             TaskBoardOrchestratorTickPhase::Dispatch,
         )?;
-        let items = run_items(&self.board, input.item_id.as_deref(), input.status)?;
+        let machine = self.local_machine().ok();
+        let items = run_items_for_machine(
+            &self.board,
+            input.item_id.as_deref(),
+            input.status,
+            machine.as_ref(),
+        )?;
         Ok(TaskBoardOrchestratorPreparedRun {
             run_id,
             started_at,
@@ -169,7 +177,26 @@ impl TaskBoardOrchestrator {
         &self,
         input: &TaskBoardOrchestratorDispatchInput,
     ) -> Result<Vec<TaskBoardItem>, CliError> {
-        run_items(&self.board, input.item_id.as_deref(), input.status)
+        let machine = self.local_machine().ok();
+        run_items_for_machine(
+            &self.board,
+            input.item_id.as_deref(),
+            input.status,
+            machine.as_ref(),
+        )
+    }
+
+    /// Return the persisted local machine record, creating one if missing.
+    ///
+    /// # Errors
+    /// Returns `CliError` when the registry directory or records cannot be read.
+    pub fn local_machine(&self) -> Result<Machine, CliError> {
+        MachineRegistry::new(self.root.clone()).ensure_local()
+    }
+
+    #[must_use]
+    pub fn machine_registry(&self) -> MachineRegistry {
+        MachineRegistry::new(self.root.clone())
     }
 
     /// Persist a phase transition for an in-flight prepared tick.
