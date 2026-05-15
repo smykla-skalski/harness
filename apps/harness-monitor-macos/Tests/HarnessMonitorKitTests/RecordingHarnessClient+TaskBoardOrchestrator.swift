@@ -24,6 +24,7 @@ extension RecordingHarnessClient {
         priority: request.priority,
         tags: request.tags,
         projectId: request.projectId,
+        targetProjectTypes: request.targetProjectTypes,
         agentMode: request.agentMode,
         externalRefs: request.externalRefs,
         planning: request.planning,
@@ -46,6 +47,9 @@ extension RecordingHarnessClient {
   ) async throws -> TaskBoardItem {
     calls.append(.updateTaskBoardItem(id: id, status: request.status))
     return try lock.withLock {
+      if let error = taskBoardUpdateError {
+        throw error
+      }
       guard let index = taskBoardItemsStorage.firstIndex(where: { $0.id == id }) else {
         throw HarnessMonitorAPIError.server(code: 404, message: "Task board item unavailable.")
       }
@@ -352,6 +356,9 @@ extension RecordingHarnessClient {
         clearDispatchStatusFilter: request.clearDispatchStatusFilter
       )
     )
+    if let error = lock.withLock({ taskBoardOrchestratorSettingsError }) {
+      throw error
+    }
     return TaskBoardOrchestratorSettings(
       enabledWorkflows: request.enabledWorkflows ?? [.defaultTask],
       dryRunDefault: request.dryRunDefault ?? true,
@@ -372,6 +379,9 @@ extension RecordingHarnessClient {
     request: TaskBoardGitRuntimeConfig
   ) async throws -> TaskBoardGitRuntimeConfig {
     calls.append(.updateTaskBoardGitRuntimeConfig(overrideCount: request.repositoryOverrides.count))
+    if let error = lock.withLock({ taskBoardRuntimeConfigError }) {
+      throw error
+    }
     return request
   }
 
@@ -384,6 +394,9 @@ extension RecordingHarnessClient {
         repositoryTokenCount: request.repositoryTokens.count
       )
     )
+    if let error = lock.withLock({ taskBoardGitHubTokensSyncError }) {
+      throw error
+    }
     return TaskBoardGitHubTokensSyncResponse(
       globalTokenConfigured: request.globalToken != nil,
       repositoryTokenCount: request.repositoryTokens.count
@@ -394,6 +407,9 @@ extension RecordingHarnessClient {
     request: TaskBoardTodoistTokenSyncRequest
   ) async throws -> TaskBoardTodoistTokenSyncResponse {
     calls.append(.syncTaskBoardTodoistToken(tokenConfigured: request.token != nil))
+    if let error = lock.withLock({ taskBoardTodoistTokenSyncError }) {
+      throw error
+    }
     return TaskBoardTodoistTokenSyncResponse(tokenConfigured: request.token != nil)
   }
 
@@ -546,6 +562,7 @@ extension TaskBoardItem {
       priority: request.priority ?? priority,
       tags: request.tags ?? tags,
       projectId: request.clearProjectId ? nil : request.projectId ?? projectId,
+      targetProjectTypes: request.targetProjectTypes ?? targetProjectTypes,
       agentMode: request.agentMode ?? agentMode,
       externalRefs: request.externalRefs ?? externalRefs,
       planning: request.planning ?? planning,
@@ -609,6 +626,7 @@ extension TaskBoardItem {
       priority: priority,
       tags: tags,
       projectId: projectId,
+      targetProjectTypes: targetProjectTypes,
       agentMode: agentMode,
       externalRefs: externalRefs,
       planning: planning,

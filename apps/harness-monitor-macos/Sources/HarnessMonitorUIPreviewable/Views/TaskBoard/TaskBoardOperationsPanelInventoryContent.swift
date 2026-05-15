@@ -1,0 +1,231 @@
+import HarnessMonitorKit
+import SwiftUI
+
+/// Renders the operations inventory card (status filter, action buttons,
+/// audit/projects/machines summary). Owns no state; receives bindings and
+/// store from the parent so `TaskBoardOperationsPanel` stays under the
+/// per-file line cap.
+struct TaskBoardOperationsPanelInventoryCard: View {
+  let store: HarnessMonitorStore
+  let dashboard: HarnessMonitorStore.ContentDashboardSlice
+  let metrics: TaskBoardOverviewMetrics
+  @Binding var inventoryStatusChoice: TaskBoardStatusFilterChoice
+
+  var body: some View {
+    TaskBoardOperationsCard(
+      title: "Audit & Inventory",
+      systemImage: "list.bullet.rectangle.portrait",
+      metrics: metrics
+    ) {
+      filterRow
+      actionRow
+      summaryContent
+    }
+  }
+
+  private var filterRow: some View {
+    ViewThatFits(in: .horizontal) {
+      HStack(alignment: .top, spacing: HarnessMonitorTheme.spacingMD) { statusPickerField }
+      VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) { statusPickerField }
+    }
+  }
+
+  private var statusPickerField: some View {
+    VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingXS) {
+      Text("Status filter")
+        .scaledFont(.caption.weight(.semibold))
+        .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+      Picker("Status filter", selection: $inventoryStatusChoice) {
+        ForEach(TaskBoardStatusFilterChoice.allCases) { choice in
+          Text(choice.title).tag(choice)
+        }
+      }
+      .labelsHidden()
+      .harnessNativeFormControl()
+      .accessibilityIdentifier("harness.task-board.inventory.status")
+    }
+  }
+
+  private var actionRow: some View {
+    ViewThatFits(in: .horizontal) {
+      HStack(spacing: HarnessMonitorTheme.spacingSM) { actionButtons }
+      VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) { actionButtons }
+    }
+  }
+
+  @ViewBuilder private var actionButtons: some View {
+    actionButton(
+      title: "Audit",
+      systemImage: "checkmark.shield",
+      accessibilityIdentifier: "harness.task-board.audit.run",
+      help: "Load board status audit counts"
+    ) {
+      Task { @MainActor in
+        await store.auditTaskBoard(status: inventoryStatusChoice.status)
+      }
+    }
+    actionButton(
+      title: "Projects",
+      systemImage: "folder",
+      accessibilityIdentifier: "harness.task-board.projects.run",
+      help: "Load task-board project summary counts"
+    ) {
+      Task { @MainActor in
+        await store.refreshTaskBoardProjects(status: inventoryStatusChoice.status)
+      }
+    }
+    actionButton(
+      title: "Machines",
+      systemImage: "desktopcomputer",
+      accessibilityIdentifier: "harness.task-board.machines.run",
+      help: "Load task-board machine summary counts"
+    ) {
+      Task { @MainActor in
+        await store.refreshTaskBoardMachines(status: inventoryStatusChoice.status)
+      }
+    }
+  }
+
+  private func actionButton(
+    title: String,
+    systemImage: String,
+    accessibilityIdentifier: String,
+    help: String,
+    action: @escaping () -> Void
+  ) -> some View {
+    Button(action: action) {
+      Label(title, systemImage: systemImage)
+        .scaledFont(.caption.weight(.semibold))
+        .lineLimit(1)
+    }
+    .frame(minHeight: metrics.controlMinHeight)
+    .harnessActionButtonStyle(variant: .bordered, tint: .secondary)
+    .controlSize(HarnessMonitorControlMetrics.compactControlSize)
+    .disabled(store.isDaemonActionInFlight)
+    .help(help)
+    .accessibilityIdentifier(accessibilityIdentifier)
+  }
+
+  @ViewBuilder private var summaryContent: some View {
+    auditBlock
+    projectsBlock
+    machinesBlock
+  }
+
+  @ViewBuilder private var auditBlock: some View {
+    block(title: "Audit", systemImage: "checkmark.shield") {
+      if let audit = dashboard.taskBoardItemAuditSummary {
+        auditPillsAndStatuses(audit)
+      } else {
+        placeholder("Load a task-board audit to inspect readiness and status totals.")
+      }
+    }
+  }
+
+  @ViewBuilder
+  private func auditPillsAndStatuses(_ audit: TaskBoardAuditSummary) -> some View {
+    pillRow {
+      TaskBoardSummaryPill(value: "\(audit.total)", label: "Total")
+      TaskBoardSummaryPill(value: "\(audit.ready)", label: "Ready", tint: HarnessMonitorTheme.accent)
+      if audit.blocked != 0 {
+        TaskBoardSummaryPill(
+          value: "\(audit.blocked)",
+          label: "Blocked",
+          tint: HarnessMonitorTheme.danger
+        )
+      }
+      if audit.deleted != 0 {
+        TaskBoardSummaryPill(value: "\(audit.deleted)", label: "Deleted")
+      }
+    }
+    if !audit.byStatus.isEmpty {
+      pillRow {
+        ForEach(audit.byStatus, id: \.status.id) { count in
+          TaskBoardSummaryPill(
+            value: "\(count.count)",
+            label: count.status.title,
+            tint: taskBoardStatusColor(for: count.status)
+          )
+        }
+      }
+    }
+  }
+
+  @ViewBuilder private var projectsBlock: some View {
+    block(title: "Projects", systemImage: "folder") {
+      if let projects = dashboard.taskBoardProjects {
+        if projects.isEmpty {
+          placeholder("No matching projects.")
+        } else {
+          ForEach(projects.prefix(5)) { project in
+            row(
+              title: project.projectId,
+              subtitle: "\(project.readyCount) ready of \(project.itemCount) items"
+            )
+          }
+        }
+      } else {
+        placeholder("Load project summaries for the current board filter.")
+      }
+    }
+  }
+
+  @ViewBuilder private var machinesBlock: some View {
+    block(title: "Machines", systemImage: "desktopcomputer") {
+      if let machines = dashboard.taskBoardMachines {
+        if machines.isEmpty {
+          placeholder("No matching machine modes.")
+        } else {
+          ForEach(machines.prefix(5)) { machine in
+            row(
+              title: machine.mode.title,
+              subtitle: "\(machine.readyCount) ready of \(machine.itemCount) items"
+            )
+          }
+        }
+      } else {
+        placeholder("Load machine summaries for the current board filter.")
+      }
+    }
+  }
+
+  @ViewBuilder
+  private func block<Content: View>(
+    title: String,
+    systemImage: String,
+    @ViewBuilder content: () -> Content
+  ) -> some View {
+    VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingXS) {
+      Label(title, systemImage: systemImage)
+        .scaledFont(.caption.weight(.semibold))
+        .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+        .accessibilityAddTraits(.isHeader)
+      content()
+    }
+  }
+
+  @ViewBuilder
+  private func pillRow<Content: View>(@ViewBuilder content: () -> Content) -> some View {
+    ViewThatFits(in: .horizontal) {
+      HStack(spacing: HarnessMonitorTheme.spacingXS) { content() }
+      VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingXS) { content() }
+    }
+  }
+
+  private func placeholder(_ text: String) -> some View {
+    Text(text)
+      .scaledFont(.caption)
+      .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+  }
+
+  private func row(title: String, subtitle: String) -> some View {
+    HStack(alignment: .firstTextBaseline, spacing: HarnessMonitorTheme.spacingSM) {
+      Text(title)
+        .scaledFont(.caption.weight(.semibold))
+      Spacer(minLength: HarnessMonitorTheme.spacingSM)
+      Text(subtitle)
+        .scaledFont(.caption)
+        .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+    }
+  }
+}

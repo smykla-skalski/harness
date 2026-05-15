@@ -6,6 +6,7 @@ struct TaskBoardItemManagementPanel: View {
   let item: TaskBoardItem?
   let metrics: TaskBoardOverviewMetrics
   let isActionInFlight: Bool
+  let store: HarnessMonitorStore?
   let onCreate: ((TaskBoardCreateItemRequest, TaskBoardStatus) -> Void)?
   let onUpdate: ((String, TaskBoardUpdateItemRequest) -> Void)?
   let onDelete: ((TaskBoardItem) -> Void)?
@@ -18,11 +19,13 @@ struct TaskBoardItemManagementPanel: View {
   let onClose: () -> Void
 
   @State private var draft: TaskBoardItemEditorDraft
+  @State private var projectTypeSuggestions: [String] = []
 
   init(
     item: TaskBoardItem?,
     metrics: TaskBoardOverviewMetrics,
     isActionInFlight: Bool,
+    store: HarnessMonitorStore? = nil,
     onCreate: ((TaskBoardCreateItemRequest, TaskBoardStatus) -> Void)?,
     onUpdate: ((String, TaskBoardUpdateItemRequest) -> Void)?,
     onDelete: ((TaskBoardItem) -> Void)?,
@@ -37,6 +40,7 @@ struct TaskBoardItemManagementPanel: View {
     self.item = item
     self.metrics = metrics
     self.isActionInFlight = isActionInFlight
+    self.store = store
     self.onCreate = onCreate
     self.onUpdate = onUpdate
     self.onDelete = onDelete
@@ -58,6 +62,7 @@ struct TaskBoardItemManagementPanel: View {
       statusPills
       TaskBoardManagementFacts(facts: managementFacts)
       editorFields
+      routesToEditor
       approvalReadout
       externalRefsEditor
       if !externalDestinations.isEmpty {
@@ -75,8 +80,23 @@ struct TaskBoardItemManagementPanel: View {
       RoundedRectangle(cornerRadius: metrics.managementPanelCornerRadius)
         .stroke(HarnessMonitorTheme.controlBorder.opacity(0.62), lineWidth: 1)
     )
+    .task { await loadProjectTypeSuggestions() }
     .accessibilityElement(children: .contain)
     .accessibilityIdentifier("harness.task-board.manage-item.\(item?.id ?? "new")")
+  }
+
+  @MainActor
+  private func loadProjectTypeSuggestions() async {
+    projectTypeSuggestions = await TaskBoardHostProjectTypeSuggestions.load(from: store)
+  }
+
+  private var routesToEditor: some View {
+    TaskBoardItemRoutesToEditor(
+      targetProjectTypes: $draft.targetProjectTypes,
+      suggestions: projectTypeSuggestions,
+      metrics: metrics,
+      isActionInFlight: isActionInFlight
+    )
   }
 
   private var header: some View {

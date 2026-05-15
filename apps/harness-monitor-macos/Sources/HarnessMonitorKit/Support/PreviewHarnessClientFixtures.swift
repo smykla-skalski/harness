@@ -111,6 +111,7 @@ extension PreviewHarnessClient {
       priority: .high,
       tags: ["preview"],
       projectId: "project-6ccf8d0a",
+      targetProjectTypes: ["web"],
       agentMode: .interactive,
       externalRefs: [],
       planning: TaskBoardPlanningState(summary: "Ready for board-only action validation."),

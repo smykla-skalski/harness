@@ -33,6 +33,36 @@ struct TaskBoardItemEditorDraftTests {
     #expect(request.externalRefs.first?.externalId == "T-1")
   }
 
+  @Test("Create request carries target project types from draft")
+  func createRequestCarriesTargetProjectTypes() {
+    var draft = TaskBoardItemEditorDraft()
+    draft.title = "Routed"
+    draft.targetProjectTypes = ["web", "data"]
+
+    let request = draft.createRequest
+
+    #expect(request.targetProjectTypes == ["web", "data"])
+  }
+
+  @Test("Update request carries target project types from draft")
+  func updateRequestCarriesTargetProjectTypes() {
+    var draft = TaskBoardItemEditorDraft(item: sampleTaskBoardItem())
+    draft.targetProjectTypes = ["mobile"]
+
+    let request = draft.updateRequest
+
+    #expect(request.targetProjectTypes == ["mobile"])
+  }
+
+  @Test("Draft seeds target project types from item")
+  func draftSeedsTargetProjectTypesFromItem() {
+    let item = sampleTaskBoardItem(targetProjectTypes: ["web"])
+
+    let draft = TaskBoardItemEditorDraft(item: item)
+
+    #expect(draft.targetProjectTypes == ["web"])
+  }
+
   @Test("Update request clears optional links and preserves approval readout")
   func updateRequestClearsOptionalLinksAndPreservesApprovalReadout() {
     var draft = TaskBoardItemEditorDraft(item: sampleTaskBoardItem())
@@ -51,7 +81,7 @@ struct TaskBoardItemEditorDraftTests {
     #expect(request.planning?.approvedAt == "2026-05-14T10:00:00Z")
   }
 
-  private func sampleTaskBoardItem() -> TaskBoardItem {
+  private func sampleTaskBoardItem(targetProjectTypes: [String] = []) -> TaskBoardItem {
     TaskBoardItem(
       schemaVersion: 1,
       id: "board-1",
@@ -61,6 +91,7 @@ struct TaskBoardItemEditorDraftTests {
       priority: .high,
       tags: ["automation"],
       projectId: "project-1",
+      targetProjectTypes: targetProjectTypes,
       agentMode: .interactive,
       externalRefs: [],
       planning: TaskBoardPlanningState(

@@ -117,6 +117,7 @@ public struct TaskBoardOverviewView: View {
             item: selectedTaskBoardItem,
             metrics: metrics,
             isActionInFlight: isActionInFlight,
+            store: store,
             onCreate: onCreateTaskBoardItem,
             onUpdate: onUpdateTaskBoardItem,
             onDelete: onDeleteTaskBoardItem,

@@ -21,6 +21,7 @@ struct TaskBoardOperationsPanel: View {
 
   @State private var inventoryStatusChoice = TaskBoardStatusFilterChoice.all
   @State private var pendingDispatchConfirmation: TaskBoardDispatchConfirmationPresentation?
+  @State private var localHostProjectTypes: [String] = []
 
   var metrics: TaskBoardOverviewMetrics {
     TaskBoardOverviewMetrics(fontScale: fontScale)
@@ -30,18 +31,42 @@ struct TaskBoardOperationsPanel: View {
     store.contentUI.dashboard
   }
 
+  /// Items the local host's `project_types` accept. Empty `targetProjectTypes`
+  /// on an item routes to every host (mirrors Rust `Machine::accepts_any`).
+  /// An empty result with non-zero source items means the host filtered them
+  /// all out; we surface that to the user via an empty-state hint.
+  fileprivate var dispatchableTaskBoardItems: [TaskBoardItem] {
+    TaskBoardHostMachine.dispatchableItems(
+      taskBoardItems,
+      machineProjectTypes: localHostProjectTypes
+    )
+  }
+
+  fileprivate var didFilterOutItems: Bool {
+    !taskBoardItems.isEmpty && dispatchableTaskBoardItems.isEmpty
+  }
+
+  private var formattedLocalHostProjectTypes: String {
+    let trimmed = localHostProjectTypes
+      .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+      .filter { !$0.isEmpty }
+    return trimmed.isEmpty ? "none declared" : trimmed.joined(separator: ", ")
+  }
+
   private var validDispatchItemID: String? {
     guard let dispatchItemID else {
       return nil
     }
-    return taskBoardItems.contains(where: { $0.id == dispatchItemID }) ? dispatchItemID : nil
+    return dispatchableTaskBoardItems.contains(where: { $0.id == dispatchItemID })
+      ? dispatchItemID
+      : nil
   }
 
   private var selectedDispatchItem: TaskBoardItem? {
     guard let validDispatchItemID else {
       return nil
     }
-    return taskBoardItems.first(where: { $0.id == validDispatchItemID })
+    return dispatchableTaskBoardItems.first(where: { $0.id == validDispatchItemID })
   }
 
   private var dispatchRequest: TaskBoardDispatchRequest {
@@ -87,8 +112,20 @@ struct TaskBoardOperationsPanel: View {
     } message: { confirmation in
       Text(confirmation.message)
     }
+    .task { await loadLocalHostProjectTypes() }
     .accessibilityElement(children: .contain)
     .accessibilityIdentifier("harness.task-board.operations")
+  }
+
+  @MainActor
+  private func loadLocalHostProjectTypes() async {
+    do {
+      let snapshot = try await store.taskBoardHostSnapshot()
+      localHostProjectTypes = snapshot.local.projectTypes
+    } catch {
+      // Fail open: leave project types empty so dispatch shows every item.
+      localHostProjectTypes = []
+    }
   }
 }
 
@@ -226,7 +263,7 @@ extension TaskBoardOperationsPanel {
           accessibilityIdentifier: "harness.task-board.dispatch.item"
         ) {
           Text("All matching items").tag(Optional<String>.none)
-          ForEach(taskBoardItems, id: \.id) { item in
+          ForEach(dispatchableTaskBoardItems, id: \.id) { item in
             Text(item.title).tag(Optional(item.id))
           }
         }
@@ -236,6 +273,16 @@ extension TaskBoardOperationsPanel {
           isOn: $dispatchDryRun,
           accessibilityIdentifier: "harness.task-board.dispatch.dry-run"
         )
+      }
+
+      if didFilterOutItems {
+        Text(
+          "No items match this host's project types (\(formattedLocalHostProjectTypes)). "
+            + "Set host project types in Settings or clear an item's Routes To list."
+        )
+        .scaledFont(.caption)
+        .foregroundStyle(HarnessMonitorTheme.caution)
+        .accessibilityIdentifier("harness.task-board.dispatch.host-mismatch")
       }
 
       controlRows {
@@ -336,130 +383,11 @@ extension TaskBoardOperationsPanel {
   }
 
   private var inventoryCard: some View {
-    TaskBoardOperationsCard(
-      title: "Audit & Inventory",
-      systemImage: "list.bullet.rectangle.portrait",
-      metrics: metrics
-    ) {
-      controlRows {
-        pickerField(
-          "Status filter",
-          selection: $inventoryStatusChoice,
-          accessibilityIdentifier: "harness.task-board.inventory.status"
-        ) {
-          ForEach(TaskBoardStatusFilterChoice.allCases) { choice in
-            Text(choice.title).tag(choice)
-          }
-        }
-      }
-
-      actionRow {
-        actionButton(
-          title: "Audit",
-          systemImage: "checkmark.shield",
-          tint: .secondary,
-          accessibilityIdentifier: "harness.task-board.audit.run",
-          help: "Load board status audit counts"
-        ) {
-          Task { @MainActor in
-            await store.auditTaskBoard(status: inventoryStatusChoice.status)
-          }
-        }
-
-        actionButton(
-          title: "Projects",
-          systemImage: "folder",
-          tint: .secondary,
-          accessibilityIdentifier: "harness.task-board.projects.run",
-          help: "Load task-board project summary counts"
-        ) {
-          Task { @MainActor in
-            await store.refreshTaskBoardProjects(status: inventoryStatusChoice.status)
-          }
-        }
-
-        actionButton(
-          title: "Machines",
-          systemImage: "desktopcomputer",
-          tint: .secondary,
-          accessibilityIdentifier: "harness.task-board.machines.run",
-          help: "Load task-board machine summary counts"
-        ) {
-          Task { @MainActor in
-            await store.refreshTaskBoardMachines(status: inventoryStatusChoice.status)
-          }
-        }
-      }
-
-      inventorySummaryContent
-    }
-  }
-
-  @ViewBuilder private var inventorySummaryContent: some View {
-    inventoryBlock(title: "Audit", systemImage: "checkmark.shield") {
-      if let audit = dashboard.taskBoardItemAuditSummary {
-        summaryPillRow {
-          TaskBoardSummaryPill(value: "\(audit.total)", label: "Total")
-          TaskBoardSummaryPill(value: "\(audit.ready)", label: "Ready", tint: HarnessMonitorTheme.accent)
-          if audit.blocked != 0 {
-            TaskBoardSummaryPill(
-              value: "\(audit.blocked)",
-              label: "Blocked",
-              tint: HarnessMonitorTheme.danger
-            )
-          }
-          if audit.deleted != 0 {
-            TaskBoardSummaryPill(value: "\(audit.deleted)", label: "Deleted")
-          }
-        }
-        if !audit.byStatus.isEmpty {
-          summaryPillRow {
-            ForEach(audit.byStatus, id: \.status.id) { count in
-              TaskBoardSummaryPill(
-                value: "\(count.count)",
-                label: count.status.title,
-                tint: taskBoardStatusColor(for: count.status)
-              )
-            }
-          }
-        }
-      } else {
-        placeholderText("Load a task-board audit to inspect readiness and status totals.")
-      }
-    }
-
-    inventoryBlock(title: "Projects", systemImage: "folder") {
-      if let projects = dashboard.taskBoardProjects {
-        if projects.isEmpty {
-          placeholderText("No matching projects.")
-        } else {
-          ForEach(projects.prefix(5)) { project in
-            keyedSummaryRow(
-              title: project.projectId,
-              subtitle: "\(project.readyCount) ready of \(project.itemCount) items"
-            )
-          }
-        }
-      } else {
-        placeholderText("Load project summaries for the current board filter.")
-      }
-    }
-
-    inventoryBlock(title: "Machines", systemImage: "desktopcomputer") {
-      if let machines = dashboard.taskBoardMachines {
-        if machines.isEmpty {
-          placeholderText("No matching machine modes.")
-        } else {
-          ForEach(machines.prefix(5)) { machine in
-            keyedSummaryRow(
-              title: machine.mode.title,
-              subtitle: "\(machine.readyCount) ready of \(machine.itemCount) items"
-            )
-          }
-        }
-      } else {
-        placeholderText("Load machine summaries for the current board filter.")
-      }
-    }
+    TaskBoardOperationsPanelInventoryCard(
+      store: store,
+      dashboard: dashboard,
+      metrics: metrics,
+      inventoryStatusChoice: $inventoryStatusChoice
+    )
   }
 }

@@ -8,6 +8,7 @@ struct TaskBoardItemEditorDraft: Equatable {
   var priority: TaskBoardPriority = .medium
   var tagsText = ""
   var projectId = ""
+  var targetProjectTypes: [String] = []
   var agentMode: TaskBoardAgentMode = .headless
   var planningSummary = ""
   var externalRefs: [TaskBoardExternalRefDraft] = []
@@ -25,6 +26,7 @@ struct TaskBoardItemEditorDraft: Equatable {
     priority = item.priority
     tagsText = item.tags.joined(separator: ", ")
     projectId = item.projectId ?? ""
+    targetProjectTypes = item.targetProjectTypes
     agentMode = item.agentMode
     planningSummary = item.planning.summary ?? ""
     externalRefs = item.externalRefs.map(TaskBoardExternalRefDraft.init(ref:))
@@ -58,6 +60,7 @@ struct TaskBoardItemEditorDraft: Equatable {
       agentMode: agentMode,
       tags: tags,
       projectId: normalized(projectId),
+      targetProjectTypes: targetProjectTypes,
       externalRefs: materializedExternalRefs,
       planning: planningState,
       sessionId: normalized(sessionId),
@@ -75,6 +78,7 @@ struct TaskBoardItemEditorDraft: Equatable {
       tags: tags,
       projectId: normalized(projectId),
       clearProjectId: normalized(projectId) == nil,
+      targetProjectTypes: targetProjectTypes,
       externalRefs: materializedExternalRefs,
       planning: planningState,
       sessionId: normalized(sessionId),

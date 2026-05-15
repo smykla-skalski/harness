@@ -170,6 +170,36 @@ extension RecordingHarnessClient {
     }
   }
 
+  func configureTaskBoardUpdateError(_ error: (any Error)?) {
+    lock.withLock {
+      taskBoardUpdateError = error
+    }
+  }
+
+  func configureTaskBoardRuntimeConfigError(_ error: (any Error)?) {
+    lock.withLock {
+      taskBoardRuntimeConfigError = error
+    }
+  }
+
+  func configureTaskBoardOrchestratorSettingsError(_ error: (any Error)?) {
+    lock.withLock {
+      taskBoardOrchestratorSettingsError = error
+    }
+  }
+
+  func configureTaskBoardGitHubTokensSyncError(_ error: (any Error)?) {
+    lock.withLock {
+      taskBoardGitHubTokensSyncError = error
+    }
+  }
+
+  func configureTaskBoardTodoistTokenSyncError(_ error: (any Error)?) {
+    lock.withLock {
+      taskBoardTodoistTokenSyncError = error
+    }
+  }
+
   func configureDetailDelay(_ delay: Duration?, for sessionID: String) {
     lock.withLock {
       if let delay {

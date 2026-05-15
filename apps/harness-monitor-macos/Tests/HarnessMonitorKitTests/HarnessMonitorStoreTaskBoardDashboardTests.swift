@@ -191,6 +191,47 @@ struct HarnessMonitorStoreTaskBoardDashboardTests {
     #expect(store.currentSuccessFeedbackMessage == "Created task board item")
   }
 
+  @Test("Update fails after create keeps local item with the created status")
+  func updateFailsAfterCreateKeepsLocalItem() async {
+    let client = RecordingHarnessClient()
+    client.configureTaskBoardUpdateError(
+      HarnessMonitorAPIError.server(code: 503, message: "Status update unavailable.")
+    )
+    let store = await makeBootstrappedStore(client: client)
+
+    let success = await store.createTaskBoardItem(
+      request: TaskBoardCreateItemRequest(
+        title: "New board item",
+        body: "Body",
+        priority: .high,
+        agentMode: .planning,
+        tags: ["monitor"],
+        projectId: "project-1",
+        planning: TaskBoardPlanningState(summary: "Plan first")
+      ),
+      initialStatus: .planReview
+    )
+
+    #expect(success == false)
+    #expect(
+      client.recordedCalls().contains(
+        .createTaskBoardItem(title: "New board item", priority: .high)
+      )
+    )
+    #expect(
+      client.recordedCalls().contains(
+        .updateTaskBoardItem(id: "board-1", status: .planReview)
+      )
+    )
+    #expect(store.globalTaskBoardItems.count == 1)
+    let cached = store.globalTaskBoardItems.first
+    #expect(cached?.id == "board-1")
+    #expect(cached?.title == "New board item")
+    #expect(cached?.status == .new)
+    #expect(store.currentFailureFeedbackMessage?.contains("Created task board item") == true)
+    #expect(store.currentFailureFeedbackMessage?.contains("plan_review") == true)
+  }
+
   @Test("Edit task board item saves full editor fields")
   func editTaskBoardItemSavesFullEditorFields() async {
     let client = RecordingHarnessClient()
