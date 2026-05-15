@@ -80,6 +80,11 @@ public enum HarnessMonitorAccessibility {
     "harness.session.window.tasks.row.\(slug(taskID))"
   }
 
+  public static let dashboardWindowRoot = "harness.dashboard.window"
+  public static let dashboardSidebar = "harness.dashboard.sidebar"
+  public static let dashboardScrollView = "harness.dashboard.scroll"
+  public static let dashboardNewSessionButton = "harness.dashboard.new-session"
+  public static let dashboardOpenFolderButton = "harness.dashboard.open-folder"
   public static let sessionsBoardRoot = "harness.board.root"
   public static let sessionsBoardScrollView = "harness.board.scroll"
   public static let recentSessionsCard = "harness.board.recent-sessions-card"

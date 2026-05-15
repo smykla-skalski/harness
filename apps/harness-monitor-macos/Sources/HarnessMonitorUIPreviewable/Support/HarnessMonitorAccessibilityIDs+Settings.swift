@@ -10,14 +10,12 @@ extension HarnessMonitorAccessibility {
   public static let settingsTitle = "harness.settings.title"
   public static let settingsThemeModePicker = "harness.settings.theme-mode"
   public static let settingsBackdropModePicker = "harness.settings.backdrop-mode"
-  public static let settingsLaunchBehaviorPicker = "harness.settings.launch-behavior"
   public static let settingsBackgroundCollectionPicker =
     "harness.settings.background-collection"
   public static let settingsBackgroundGallery = "harness.settings.background-gallery"
   public static let settingsBackgroundRecentsSection =
     "harness.settings.background.recents-section"
-  public static let settingsBackgroundRecentState =
-    "harness.settings.background.recents-state"
+  public static let settingsBackgroundRecentState = "harness.settings.background.recents-state"
   public static let settingsTextSizePicker = "harness.settings.text-size"
   public static let settingsMenuBarStateColorsToggle =
     "harness.settings.menu-bar.state-colors"
@@ -31,28 +29,40 @@ extension HarnessMonitorAccessibility {
   public static let settingsCustomTimeZonePicker = "harness.settings.custom-time-zone"
   public static let settingsTimelinePersistencePicker =
     "harness.settings.timeline.filter-persistence"
+  public static let settingsLaunchBehaviorPicker = "harness.settings.launch-behavior"
   public static let settingsPendingDecisionBannersToggle =
     "harness.settings.decisions.pending-banners"
   public static let settingsPendingBannersFocusModeToggle =
     "harness.settings.decisions.pending-banners.focus-mode"
+  public static let settingsGeneralSection = "harness.settings.section.general"
+  public static let settingsFocusModeSection = "harness.settings.section.focusmode"
+  public static let settingsBannersSection = "harness.settings.section.banners"
+  public static let settingsAppearanceSection = "harness.settings.section.appearance"
+  public static let settingsNotificationsSection = "harness.settings.section.notifications"
+  public static let settingsSupervisorSection = "harness.settings.section.supervisor"
+  public static let settingsVoiceSection = "harness.settings.section.voice"
+  public static let settingsConnectionSection = "harness.settings.section.connection"
+  public static let settingsTaskBoardSection = "harness.settings.section.taskboard"
+  public static let settingsDatabaseSection = "harness.settings.section.database"
+  public static let settingsDiagnosticsSection = "harness.settings.section.diagnostics"
   public static let settingsMCPSection = "harness.settings.mcp"
-  public static let settingsMCPRegistryHostToggle =
-    "harness.settings.mcp.registry-host"
+  public static let settingsMCPRegistryHostToggle = "harness.settings.mcp.registry-host"
   public static let settingsMCPStatus = "harness.settings.mcp.status"
-  public static let settingsLaunchAgentRepairButton =
-    "harness.settings.diagnostics.launch-agent.repair"
-  public static let settingsVoiceSection = "harness.settings.voice"
+  public static let settingsVoiceRoot = "harness.settings.voice"
   public static let settingsVoiceLocaleField = "harness.settings.voice.locale-field"
   public static let settingsVoiceLocalePicker = "harness.settings.voice.locale-picker"
-  public static let settingsVoiceLocalDaemonToggle = "harness.settings.voice.local-daemon"
-  public static let settingsVoiceAgentBridgeToggle = "harness.settings.voice.agent-bridge"
+  public static let settingsVoiceLocalDaemonToggle =
+    "harness.settings.voice.local-daemon"
+  public static let settingsVoiceAgentBridgeToggle =
+    "harness.settings.voice.agent-bridge"
   public static let settingsVoiceRemoteProcessorToggle =
     "harness.settings.voice.remote-processor"
   public static let settingsVoiceRemoteProcessorURLField =
     "harness.settings.voice.remote-processor-url"
   public static let settingsVoiceInsertionModePicker =
     "harness.settings.voice.insertion-mode"
-  public static let settingsVoiceAudioChunksToggle = "harness.settings.voice.audio-chunks"
+  public static let settingsVoiceAudioChunksToggle =
+    "harness.settings.voice.audio-chunks"
   public static let settingsVoicePendingAudioField =
     "harness.settings.voice.pending-audio-limit"
   public static let settingsVoicePendingTranscriptField =
@@ -63,12 +73,47 @@ extension HarnessMonitorAccessibility {
     "harness.settings.notifications.preset"
   public static let settingsNotificationsCategoryPicker =
     "harness.settings.notifications.category"
-  public static let settingsNotificationsSoundPicker = "harness.settings.notifications.sound"
+  public static let settingsNotificationsSoundPicker =
+    "harness.settings.notifications.sound"
   public static let settingsNotificationsAttachmentPicker =
     "harness.settings.notifications.attachment"
   public static let settingsNotificationsTriggerPicker =
     "harness.settings.notifications.trigger"
-  public static let settingsNotificationsSendButton = "harness.settings.notifications.send"
+  public static let settingsNotificationsSendButton =
+    "harness.settings.notifications.send"
+  public static let settingsAuthorizedFoldersSection =
+    "harness.settings.section.authorizedfolders"
+  public static let refreshStatisticsButton =
+    "harness.settings.action.refresh-statistics"
+  public static let clearSessionCacheButton =
+    "harness.settings.action.clear-session-cache"
+  public static let clearSearchHistoryPrefsButton =
+    "harness.settings.action.clear-search-history"
+  public static let clearUserDataButton = "harness.settings.action.clear-user-data"
+  public static let clearAllDataButton = "harness.settings.action.clear-all-data"
+  public static let revealInFinderButton = "harness.settings.action.reveal-in-finder"
+  public static let persistenceMetric = "harness.settings.metric.persistence"
+  public static let schemaVersionMetric = "harness.settings.metric.schema-version"
+  public static let cachedSessionsMetric = "harness.settings.metric.cached-sessions"
+  public static let cachedProjectsMetric = "harness.settings.metric.cached-projects"
+  public static let settingsEndpointCard = "harness.settings.metric.endpoint"
+  public static let settingsVersionCard = "harness.settings.metric.version"
+  public static let settingsLaunchdCard = "harness.settings.metric.launchd"
+  public static let settingsDatabaseSizeCard = "harness.settings.metric.database-size"
+  public static let settingsLiveSessionsCard = "harness.settings.metric.live-sessions"
+  public static let reconnectButton = "harness.settings.action.reconnect"
+  public static let refreshDiagnosticsButton =
+    "harness.settings.action.refresh-diagnostics"
+  public static let startDaemonButton = "harness.settings.action.start-daemon"
+  public static let settingsLaunchAgentRepairButton =
+    "harness.settings.action.repair-launch-agent"
+  public static let installLaunchAgentButton =
+    "harness.settings.action.install-launch-agent"
+  public static let removeLaunchAgentButton =
+    "harness.settings.action.remove-launch-agent"
+  public static let settingsDaemonLogLevelPicker = "harness.settings.daemon.logLevel"
+  public static let settingsSupervisorLogLevelPicker =
+    "harness.settings.supervisor.logLevel"
 
   public static let settingsTaskBoardRoot = "harness.settings.task-board"
   public static let settingsTaskBoardStatus = "harness.settings.task-board.status"
