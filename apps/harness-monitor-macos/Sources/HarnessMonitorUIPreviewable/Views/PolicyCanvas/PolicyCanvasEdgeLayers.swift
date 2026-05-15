@@ -31,16 +31,16 @@ struct PolicyCanvasEdgeLayer: View {
             targetGroupID: viewModel.node(edge.target.nodeID)?.groupID
           )
           let severity = severityMap[edge.id]
-          PolicyCanvasEdgeShape(route: route)
-            .stroke(
-              strokeColor(for: edge, severity: severity),
-              style: StrokeStyle(
-                lineWidth: severity == nil ? 2.2 : 3.0,
-                lineCap: .round,
-                lineJoin: .round
-              )
-            )
-            .accessibilityHidden(true)
+          let isSelected = viewModel.selection == .edge(edge.id)
+          PolicyCanvasInteractiveEdge(
+            route: route,
+            color: strokeColor(for: edge, severity: severity, isSelected: isSelected),
+            strokeWidth: severity == nil ? 2.4 : 3.0,
+            isSelected: isSelected,
+            accessibilityLabel: viewModel.accessibilityLabel(for: edge),
+            onTap: { viewModel.select(.edge(edge.id)) },
+            onDelete: { viewModel.deleteEdge(edge.id) }
+          )
         }
       }
     }
@@ -53,17 +53,20 @@ struct PolicyCanvasEdgeLayer: View {
   /// Severity-aware stroke color. When the edge has at least one resolved
   /// validation issue the stroke flips to the issue's accent tone (red for
   /// errors, yellow for warnings) so the inline mark stays in sync with the
-  /// panel. Selection still bumps opacity for affordance feedback. Pulls
-  /// severity from the body-local map so per-edge lookups stay O(1).
+  /// panel. Pulls severity from the body-local map so per-edge lookups stay
+  /// O(1). Default opacity 0.78 meets WCAG 1.4.11 (~3:1 on the dark canvas);
+  /// selection emphasis now comes from the halo + stroke-width bump in
+  /// `PolicyCanvasInteractiveEdge`, so the unselected/selected color delta
+  /// stays small.
   private func strokeColor(
     for edge: PolicyCanvasEdge,
-    severity: PolicyCanvasIssueSeverity?
+    severity: PolicyCanvasIssueSeverity?,
+    isSelected: Bool
   ) -> Color {
-    let selected = viewModel.selection == .edge(edge.id)
     if let severity {
-      return severity.accentColor.opacity(selected ? 0.98 : 0.82)
+      return severity.accentColor.opacity(isSelected ? 0.98 : 0.82)
     }
-    return edgeColor(for: edge).opacity(selected ? 0.95 : 0.62)
+    return edgeColor(for: edge).opacity(isSelected ? 0.95 : 0.78)
   }
 }
 
