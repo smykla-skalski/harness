@@ -77,7 +77,8 @@ struct PolicyCanvasEdgeKindLegend: View {
       Spacer(minLength: 0)
     }
     .accessibilityElement(children: .ignore)
-    .accessibilityLabel("\(kind.accessibilityWord), \(dashKey(for: kind))")
+    .accessibilityAddTraits(.isStaticText)
+    .accessibilityLabel("\(kind.accessibilityWord), \(kind.dashKey)")
   }
 
   private func swatch(for kind: PolicyCanvasEdgeKind) -> some View {
@@ -85,28 +86,12 @@ struct PolicyCanvasEdgeKindLegend: View {
       .frame(width: 32, height: 6)
   }
 
+  /// Visible legend label. Sentence-case kind name paired with the same
+  /// `dashKey` vocabulary the hover tooltip and VoiceOver value use, so
+  /// sighted users learn the same words AT users hear.
   private func label(for kind: PolicyCanvasEdgeKind) -> String {
-    switch kind {
-    case .flow:
-      return "Flow · solid"
-    case .control:
-      return "Control · dashed"
-    case .error:
-      return "Error · dense"
-    }
-  }
-
-  /// Same key the hover tooltip surfaces, kept in sync so the legend's
-  /// VoiceOver value matches what AT users hear on the live edges.
-  private func dashKey(for kind: PolicyCanvasEdgeKind) -> String {
-    switch kind {
-    case .flow:
-      return "solid"
-    case .control:
-      return "widely dashed"
-    case .error:
-      return "tightly dashed"
-    }
+    let kindName = kind.accessibilityWord.capitalized
+    return "\(kindName) · \(kind.dashKey)"
   }
 }
 

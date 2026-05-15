@@ -2,6 +2,12 @@ import SwiftUI
 
 struct PolicyCanvasEdgeLayer: View {
   let viewModel: PolicyCanvasViewModel
+  /// Focus binding passed from the canvas root so the stroke layer owns
+  /// the rotor entry per edge. Watson R1 sev1: previously the stroke and
+  /// label both exposed the same accessible name, giving VoiceOver two
+  /// entries per labelled edge; the label is now `.accessibilityHidden`
+  /// and this binding lives on the stroke.
+  let focusedComponent: AccessibilityFocusState<PolicyCanvasSelection?>.Binding
   /// Hoisted from the viewport parent's body. Iterating the parameter-bound
   /// `edges` instead of `viewModel.edges` avoids a second `@Observable`
   /// accessor invocation per render (the parent already read it once when
@@ -43,9 +49,13 @@ struct PolicyCanvasEdgeLayer: View {
             isSelected: isSelected,
             accessibilityLabel: viewModel.accessibilityLabel(for: edge),
             accessibilityKindWord: edge.kind.accessibilityWord,
+            accessibilityDashKey: edge.kind.dashKey,
             kindDashPattern: edge.kind.strokeDashPattern,
             isAnimated: edge.isAnimated,
             canvasZoom: viewModel.zoom,
+            accessibilityIdentifier: HarnessMonitorAccessibility.policyCanvasEdge(edge.id),
+            accessibilityFocusBinding: focusedComponent,
+            accessibilityFocusValue: .edge(edge.id),
             onTap: { viewModel.select(.edge(edge.id)) },
             onDelete: { viewModel.deleteEdge(edge.id) }
           )
@@ -158,9 +168,13 @@ struct PolicyCanvasEdgeLabelLayer: View {
               .frame(width: 4, height: 4)
               .position(route.labelPosition)
               .help(edge.label)
-              .accessibilityFocused(focusedComponent, equals: .edge(edge.id))
-              .accessibilityLabel(viewModel.accessibilityLabel(for: edge))
-              .accessibilityIdentifier(HarnessMonitorAccessibility.policyCanvasEdge(edge.id))
+              // Stroke layer (PolicyCanvasInteractiveEdge) owns the rotor
+              // entry. Hiding the dot from a11y avoids the duplicate
+              // VoiceOver announcement watson R1 flagged: a labelled edge
+              // surfaced two elements with identical accessibility labels
+              // and identifiers, which VoiceOver played back twice in a
+              // row when the user arrowed through the rotor.
+              .accessibilityHidden(true)
           } else {
             Button {
               viewModel.select(.edge(edge.id))
@@ -184,9 +198,11 @@ struct PolicyCanvasEdgeLabelLayer: View {
             }
             .harnessPlainButtonStyle()
             .position(route.labelPosition)
-            .accessibilityFocused(focusedComponent, equals: .edge(edge.id))
-            .accessibilityLabel(viewModel.accessibilityLabel(for: edge))
-            .accessibilityIdentifier(HarnessMonitorAccessibility.policyCanvasEdge(edge.id))
+            // Stroke owns the rotor entry per edge; the capsule stays
+            // clickable for sighted users but the a11y tree only carries
+            // it once (on the stroke). Hiding the Button from a11y
+            // strips its rotor entry without losing the mouse-click path.
+            .accessibilityHidden(true)
             .contextMenu {
               Button("Delete edge", role: .destructive) {
                 viewModel.deleteEdge(edge.id)

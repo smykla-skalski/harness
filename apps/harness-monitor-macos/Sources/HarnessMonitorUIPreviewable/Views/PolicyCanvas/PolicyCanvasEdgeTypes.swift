@@ -62,6 +62,23 @@ enum PolicyCanvasEdgeKind: String, Hashable, CaseIterable {
       "error"
     }
   }
+
+  /// Plain-English name for the stroke's dash pattern. Single source of
+  /// truth for the three surfaces that describe the dash encoding to the
+  /// user: the legend swatch label, the hover tooltip, and the VoiceOver
+  /// accessibility value paired with each legend row. Keeping them
+  /// unified avoids the Nielsen consistency violation where one surface
+  /// said "dense" and another said "tightly dashed" for the same stroke.
+  var dashKey: String {
+    switch self {
+    case .flow:
+      "solid"
+    case .control:
+      "widely dashed"
+    case .error:
+      "tightly dashed"
+    }
+  }
 }
 
 struct PolicyCanvasEdge: Identifiable, Hashable {
