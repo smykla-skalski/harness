@@ -149,7 +149,7 @@ final class PolicyCanvasVoiceOverRotorTests: HarnessMonitorUITestCase {
     let probeCount = min(labelButtons.count, 12)
     for index in 0..<probeCount {
       let label = labelButtons.element(boundBy: index).label
-      for seed in Self.seededEdges where label.contains("Edge \(seed.label)") {
+      for seed in Self.seededEdges where label.hasPrefix("\(seed.label) edge") {
         if !seenOrder.contains(seed.id) {
           seenOrder.append(seed.id)
         }

@@ -11,7 +11,14 @@ import SwiftUI
 /// it can be collapsed via the disclosure header when the user wants the
 /// full canvas area.
 struct PolicyCanvasEdgeKindLegend: View {
-  @State private var isExpanded: Bool = true
+  /// Persist the disclosure state per session so a returning user does
+  /// not have to re-collapse the legend on every launch. Nielsen H8
+  /// (aesthetic & minimalist) — for a user who has internalized the
+  /// color/dash mapping, an always-expanded legend is irrelevant chrome.
+  /// First launch keeps the legend visible so the mapping is learnable;
+  /// subsequent launches honor the user's last choice.
+  @SceneStorage("policyCanvas.edgeLegend.isExpanded")
+  private var isExpanded: Bool = true
 
   var body: some View {
     VStack(alignment: .leading, spacing: 0) {

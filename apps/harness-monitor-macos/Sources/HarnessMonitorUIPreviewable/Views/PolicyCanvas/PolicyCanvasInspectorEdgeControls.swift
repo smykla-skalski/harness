@@ -40,25 +40,48 @@ struct PolicyCanvasInspectorEdgeKindPicker: View {
 /// the same "Port pin" wording the visible field carries (WCAG 2.5.3),
 /// and the help text resolves the gulf of execution: a binary switch
 /// with no visible signifier of the off-state effect.
+///
+/// When the edge's kind is `.error`, the toggle is disabled and the help
+/// text explains the constraint: error edges are always pinned regardless
+/// of this control, so a flex pass cannot silently relocate a deliberately
+/// positioned deny-branch port. This is Norman's forcing-function pattern
+/// applied to the routing layer.
 struct PolicyCanvasInspectorEdgePinToggle: View {
   let pinnedPortSide: Bool
+  let isLockedByKind: Bool
   let commit: (Bool) -> Void
 
   var body: some View {
     Toggle(
       "Port pin",
       isOn: Binding(
-        get: { pinnedPortSide },
+        get: { isLockedByKind ? true : pinnedPortSide },
         set: { commit($0) }
       )
     )
     .toggleStyle(.switch)
     .labelsHidden()
-    .help("On keeps the current port side. Off lets the router pick the lowest-bend side.")
+    .disabled(isLockedByKind)
+    .help(helpText)
     .accessibilityLabel("Port pin")
-    .accessibilityHint("Off lets the router pick the lowest-bend port side")
+    .accessibilityHint(accessibilityHintText)
     .accessibilityIdentifier(
       HarnessMonitorAccessibility.policyCanvasInspectorField("edge-pin")
     )
+  }
+
+  private var helpText: String {
+    if isLockedByKind {
+      return
+        "Error edges are always pinned. Change the edge kind to flow or control to unlock this control."
+    }
+    return "On keeps the current port side. Off lets the router pick the lowest-bend side."
+  }
+
+  private var accessibilityHintText: String {
+    if isLockedByKind {
+      return "Disabled. Error edges are always pinned to prevent the router from relocating them."
+    }
+    return "Off lets the router pick the lowest-bend port side"
   }
 }
