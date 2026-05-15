@@ -124,6 +124,7 @@ struct SessionWindowRouteContentMetricsTests {
   @Test("Overview route embeds the task board")
   func overviewRouteEmbedsTaskBoard() throws {
     let routeContentSource = try sourceFile(named: "SessionWindowRouteContent.swift")
+    let overviewTaskBoardSource = try sourceFile(named: "SessionWindowOverview+TaskBoard.swift")
     let columnsSource = try sourceFile(named: "SessionWindowView+Columns.swift")
 
     #expect(routeContentSource.contains("TaskBoardOverviewView("))
@@ -131,9 +132,9 @@ struct SessionWindowRouteContentMetricsTests {
     #expect(routeContentSource.contains("decisions: decisions"))
     #expect(routeContentSource.contains("onOpenItem: openTaskActions"))
     #expect(routeContentSource.contains("onOpenDecision: openDecision"))
-    #expect(routeContentSource.contains("private func openDecision(_ decision: Decision)"))
-    #expect(routeContentSource.contains("store.supervisorSelectedDecisionID = decision.id"))
-    #expect(routeContentSource.contains("store.requestSessionRoute("))
+    #expect(overviewTaskBoardSource.contains("func openDecision(_ decision: Decision)"))
+    #expect(overviewTaskBoardSource.contains("store.supervisorSelectedDecisionID = decision.id"))
+    #expect(overviewTaskBoardSource.contains("store.requestSessionRoute("))
     #expect(columnsSource.contains("decisions: matchingDecisions"))
   }
 
@@ -156,6 +157,7 @@ struct SessionWindowRouteContentMetricsTests {
   @Test("Overview and dashboard expose task board orchestrator controls")
   func overviewAndDashboardExposeTaskBoardOrchestratorControls() throws {
     let routeContentSource = try sourceFile(named: "SessionWindowRouteContent.swift")
+    let overviewTaskBoardSource = try sourceFile(named: "SessionWindowOverview+TaskBoard.swift")
     let boardSource = try sourceFile(named: "SessionsBoardView.swift")
 
     for source in [routeContentSource, boardSource] {
@@ -167,7 +169,7 @@ struct SessionWindowRouteContentMetricsTests {
     }
 
     #expect(routeContentSource.contains("store.contentUI.dashboard.taskBoardOrchestratorStatus"))
-    #expect(routeContentSource.contains("store.contentUI.dashboard.taskBoardItems"))
+    #expect(overviewTaskBoardSource.contains("store.contentUI.dashboard.taskBoardItems"))
     #expect(boardSource.contains("dashboardUI.taskBoardOrchestratorStatus"))
   }
 
@@ -193,6 +195,7 @@ struct SessionWindowRouteContentMetricsTests {
   func boardOnlyTaskBoardItemsHaveManagementSurface() throws {
     let overviewSource = try taskBoardSourceFile(named: "TaskBoardOverviewView.swift")
     let managementPanelSource = try taskBoardSourceFile(named: "TaskBoardItemManagementPanel.swift")
+    let managementSupportSource = try taskBoardSourceFile(named: "TaskBoardItemManagementSupport.swift")
     let laneSource = try taskBoardSourceFile(named: "TaskBoardLaneViews.swift")
 
     #expect(overviewSource.contains("TaskBoardItemManagementPanel("))
@@ -206,7 +209,7 @@ struct SessionWindowRouteContentMetricsTests {
     #expect(managementPanelSource.contains("Board Only"))
     #expect(managementPanelSource.contains("TaskBoardManagementFacts("))
     #expect(managementPanelSource.contains("TaskBoardExternalLinks("))
-    #expect(managementPanelSource.contains("Link(destination: destination.url)"))
+    #expect(managementSupportSource.contains("Link(destination: destination.url)"))
     #expect(managementPanelSource.contains("Evaluate Item"))
     #expect(!laneSource.contains(".disabled(!isOpenable)"))
     #expect(!laneSource.contains("private var isOpenable"))
