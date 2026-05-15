@@ -29,6 +29,7 @@ enum PolicyCanvasVisibilityAStar {
     openHeap.push(start, priority: initialPriority)
     var gScore: [PolicyCanvasAStarState: CGFloat] = [start: 0]
     var cameFrom: [PolicyCanvasAStarState: PolicyCanvasAStarState] = [:]
+    var closed: Set<PolicyCanvasAStarState> = []
     while let current = openHeap.pop() {
       if current.index == targetIndex {
         return reconstruct(
@@ -38,6 +39,10 @@ enum PolicyCanvasVisibilityAStar {
           gridYs: gridYs
         )
       }
+      if closed.contains(current) {
+        continue
+      }
+      closed.insert(current)
       let currentG = gScore[current] ?? .infinity
       let neighbors = expand(
         state: current,
