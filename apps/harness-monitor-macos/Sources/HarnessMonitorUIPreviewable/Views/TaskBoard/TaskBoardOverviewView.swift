@@ -120,7 +120,7 @@ public struct TaskBoardOverviewView: View {
             store: store,
             onCreate: onCreateTaskBoardItem,
             onUpdate: onUpdateTaskBoardItem,
-            onDelete: onDeleteTaskBoardItem,
+            onDelete: selectionClearingDeleteAction,
             onRunOnce: runOrchestratorOnceForItem,
             onEvaluate: selectedTaskBoardItemEvaluateAction,
             onBeginPlan: onBeginTaskBoardPlan,
@@ -350,6 +350,16 @@ extension TaskBoardOverviewView {
   private func clearSelectedTaskBoardItem() {
     selectedTaskBoardItemID = nil
     isCreatingTaskBoardItem = false
+  }
+
+  private var selectionClearingDeleteAction: ((TaskBoardItem) -> Void)? {
+    guard let delete = onDeleteTaskBoardItem else { return nil }
+    return { item in
+      if selectedTaskBoardItemID == item.id {
+        selectedTaskBoardItemID = nil
+      }
+      delete(item)
+    }
   }
 
   private func startTaskBoardItemCreation() {
