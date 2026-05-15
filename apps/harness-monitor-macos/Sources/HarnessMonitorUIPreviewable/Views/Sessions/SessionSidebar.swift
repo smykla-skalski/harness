@@ -14,7 +14,7 @@ struct SessionSidebar: View {
   @State private var selectionDispatcher = SessionSidebarSelectionDispatcher()
   @State private var listSelection: Set<SessionSelection> = []
   @State private var listSelectionSyncGeneration: UInt64 = 0
-  @State private var mountsNativeSidebarList = false
+  @State private var showsDeferredSidebarSections = false
   @State private var usesNativeListSelection = false
 
   init(
@@ -80,24 +80,18 @@ struct SessionSidebar: View {
   }
 
   private var sidebarList: some View {
-    Group {
-      if mountsNativeSidebarList {
-        nativeSidebarList
-      } else {
-        pendingSidebarList
-      }
-    }
+    nativeSidebarList
     .harnessFocusedSceneValue(\.harnessSessionSidebarSelection, selectionFocus)
     .onChange(of: state.selection) { _, _ in
       deferListSelectionSync(renderedSelectionSet())
     }
     .task(id: state.sessionID) {
-      mountsNativeSidebarList = false
+      showsDeferredSidebarSections = false
       usesNativeListSelection = false
       bindSelectionDispatcher()
       try? await Task.sleep(for: .milliseconds(1_100))
       guard !Task.isCancelled else { return }
-      mountsNativeSidebarList = true
+      showsDeferredSidebarSections = true
       await Task.yield()
       try? await Task.sleep(for: .milliseconds(100))
       guard !Task.isCancelled else { return }
@@ -115,10 +109,14 @@ struct SessionSidebar: View {
 
   private var nativeSidebarList: some View {
     List(selection: nativeSelectionBinding) {
-      routeSection
-      agentsSection
-      decisionsSection
-      tasksSection
+      sidebarRouteSection
+      if showsDeferredSidebarSections {
+        agentsSection
+        decisionsSection
+        tasksSection
+      } else {
+        pendingSidebarLoadingSection
+      }
     }
     .coordinateSpace(name: SessionSidebarCreateButtonOverlayCoordinateSpace.name)
     .overlayPreferenceValue(
@@ -160,12 +158,12 @@ struct SessionSidebar: View {
     }
   }
 
-  private var pendingSidebarList: some View {
-    List {
+  @ViewBuilder private var sidebarRouteSection: some View {
+    if nativeListSelectionEnabled {
+      routeSection
+    } else {
       pendingRouteSection
-      pendingSidebarLoadingSection
     }
-    .listStyle(.sidebar)
   }
 
   private var pendingRouteSection: some View {
