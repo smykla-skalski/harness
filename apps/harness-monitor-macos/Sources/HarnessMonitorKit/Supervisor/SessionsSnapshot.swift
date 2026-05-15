@@ -46,14 +46,15 @@ public struct SessionsSnapshot: Sendable, Hashable {
     now: Date
   ) async -> Self {
     let sessions = await buildSessions(store: store, now: now)
-    let connection = await MainActor.run {
-      ConnectionSnapshot.from(
-        store.connectionState,
-        metrics: store.connectionMetrics,
-        transport: store.activeTransport
-      )
-    }
-    let hash = canonicalHash(sessions: sessions, connection: connection)
+    let connection = ConnectionSnapshot.from(
+      store.connectionState,
+      metrics: store.connectionMetrics,
+      transport: store.activeTransport
+    )
+    let hash = await computeCanonicalHashOffMain(
+      sessions: sessions,
+      connection: connection
+    )
     return Self(
       id: UUID().uuidString,
       createdAt: now,
@@ -61,6 +62,15 @@ public struct SessionsSnapshot: Sendable, Hashable {
       sessions: sessions,
       connection: connection
     )
+  }
+
+  nonisolated private static func computeCanonicalHashOffMain(
+    sessions: [SessionSnapshot],
+    connection: ConnectionSnapshot
+  ) async -> String {
+    await Task.detached(priority: .userInitiated) {
+      canonicalHashSync(sessions: sessions, connection: connection)
+    }.value
   }
 
   @MainActor
@@ -126,7 +136,7 @@ public struct SessionsSnapshot: Sendable, Hashable {
     }
   }
 
-  private static func canonicalHash(
+  nonisolated private static func canonicalHashSync(
     sessions: [SessionSnapshot],
     connection: ConnectionSnapshot
   ) -> String {
