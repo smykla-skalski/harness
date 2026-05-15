@@ -121,3 +121,6 @@ async fn run_task_board_github_automation_with_client(
 
 #[cfg(test)]
 mod tests;
+
+#[cfg(test)]
+mod policy_audit_tests;

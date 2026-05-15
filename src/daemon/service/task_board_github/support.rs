@@ -229,12 +229,31 @@ pub(super) fn action_policy(
         pull_request: pull_request.map(|number| number.to_string()),
         ..PolicySubject::default()
     };
-    if let Ok(document) = PolicyPipelineStore::new(board_root.to_path_buf()).load_or_seed()
-        && document.mode != PolicyPipelineMode::Draft
-    {
-        return GraphPolicyGate::new(document).evaluate(&policy_input);
+    match PolicyPipelineStore::new(board_root.to_path_buf()).load_or_seed() {
+        Ok(document) if document.mode != PolicyPipelineMode::Draft => {
+            return GraphPolicyGate::new(document).evaluate(&policy_input);
+        }
+        Ok(_) => {}
+        Err(error) => {
+            record_policy_load_failure(&error);
+        }
     }
     BuiltInPolicyGate::default().evaluate(&policy_input)
+}
+
+/// Audit hook fired when the policy graph cannot be loaded from disk.
+///
+/// Emits a structured `tracing::error` event with
+/// `event = "harness_audit_policy_load_failure"`. The daemon falls open to the
+/// built-in policy gate, but this log line lets operators alert on persistent
+/// load failures.
+pub(super) fn record_policy_load_failure(error: &CliError) {
+    tracing::error!(
+        target: "harness::policy_audit",
+        event = "harness_audit_policy_load_failure",
+        error = %error,
+        "policy graph failed to load, falling back to built-in",
+    );
 }
 
 pub(super) fn waiting(
