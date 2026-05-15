@@ -265,7 +265,9 @@ mod tests {
             github_token: Some("token".into()),
             github_repository: None,
             github_inbox_repositories: Vec::new(),
+            github_import_labels: Vec::new(),
             todoist_token: None,
+            todoist_import_project_ids: Vec::new(),
         };
 
         let summary = build_sync_summary(&[item], &config);
@@ -293,7 +295,9 @@ mod tests {
             github_token: Some("token".into()),
             github_repository: Some("owner/repo".into()),
             github_inbox_repositories: Vec::new(),
+            github_import_labels: Vec::new(),
             todoist_token: None,
+            todoist_import_project_ids: Vec::new(),
         };
 
         let summary = build_sync_summary(&[item], &config);

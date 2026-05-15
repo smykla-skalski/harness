@@ -54,7 +54,9 @@ fn config_debug_redacts_tokens() {
         github_token: Some("secret".to_owned()),
         github_repository: Some("owner/repo".to_owned()),
         github_inbox_repositories: Vec::new(),
+        github_import_labels: Vec::new(),
         todoist_token: None,
+        todoist_import_project_ids: Vec::new(),
     };
 
     let debug = format!("{config:?}");
@@ -110,7 +112,9 @@ fn github_repository_fallback_is_used_only_when_env_is_missing() {
         github_token: None,
         github_repository: Some("env/repo".to_string()),
         github_inbox_repositories: Vec::new(),
+        github_import_labels: Vec::new(),
         todoist_token: None,
+        todoist_import_project_ids: Vec::new(),
     }
     .with_github_repository_fallback(Some("owner/repo"));
 

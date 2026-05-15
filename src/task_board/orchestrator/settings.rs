@@ -6,7 +6,7 @@ use crate::task_board::normalize_repository_slug;
 use super::types::{
     TaskBoardGitHubInboxConfig, TaskBoardOrchestratorDispatchInput,
     TaskBoardOrchestratorRunOnceRequest, TaskBoardOrchestratorSettings,
-    TaskBoardOrchestratorSettingsUpdateRequest,
+    TaskBoardOrchestratorSettingsUpdateRequest, TaskBoardTodoistInboxConfig,
 };
 
 pub(super) fn apply_settings_update(
@@ -26,6 +26,9 @@ pub(super) fn apply_settings_update(
     }
     if let Some(github_inbox) = &update.github_inbox {
         settings.github_inbox.clone_from(github_inbox);
+    }
+    if let Some(todoist_inbox) = &update.todoist_inbox {
+        settings.todoist_inbox.clone_from(todoist_inbox);
     }
     if let Some(policy_version) = &update.policy_version {
         settings.policy_version.clone_from(policy_version);
@@ -47,7 +50,33 @@ pub(super) fn normalize_github_inbox(
             repositories.push(repository);
         }
     }
-    Ok(TaskBoardGitHubInboxConfig { repositories })
+    Ok(TaskBoardGitHubInboxConfig {
+        repositories,
+        label_filter: normalize_trimmed_unique(&inbox.label_filter),
+    })
+}
+
+pub(super) fn normalize_todoist_inbox(
+    inbox: &TaskBoardTodoistInboxConfig,
+) -> TaskBoardTodoistInboxConfig {
+    TaskBoardTodoistInboxConfig {
+        project_filter: normalize_trimmed_unique(&inbox.project_filter),
+    }
+}
+
+fn normalize_trimmed_unique(values: &[String]) -> Vec<String> {
+    let mut seen = BTreeSet::new();
+    let mut out = Vec::with_capacity(values.len());
+    for value in values {
+        let trimmed = value.trim();
+        if trimmed.is_empty() {
+            continue;
+        }
+        if seen.insert(trimmed.to_owned()) {
+            out.push(trimmed.to_owned());
+        }
+    }
+    out
 }
 
 fn apply_status_filter_update(

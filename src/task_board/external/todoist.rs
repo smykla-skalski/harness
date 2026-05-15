@@ -19,6 +19,7 @@ pub struct TodoistSyncClient {
     token: String,
     api_base: String,
     client: reqwest::Client,
+    import_project_ids: Vec<String>,
 }
 
 impl TodoistSyncClient {
@@ -47,6 +48,7 @@ impl TodoistSyncClient {
             token: normalize_token(ExternalProvider::Todoist, token)?,
             api_base: api_base.to_owned(),
             client: reqwest::Client::new(),
+            import_project_ids: Vec::new(),
         })
     }
 
@@ -55,7 +57,14 @@ impl TodoistSyncClient {
     /// # Errors
     /// Returns an error when no Todoist token is configured.
     pub fn from_config(config: &ExternalSyncConfig) -> Result<Self, CliError> {
-        Self::new(config.require_token(ExternalProvider::Todoist)?)
+        let mut client = Self::new(config.require_token(ExternalProvider::Todoist)?)?;
+        client.import_project_ids = config.todoist_import_project_ids().to_vec();
+        Ok(client)
+    }
+
+    #[must_use]
+    pub fn project_filter(&self) -> &[String] {
+        &self.import_project_ids
     }
 
     #[must_use]
@@ -106,7 +115,12 @@ impl ExternalSyncClient for TodoistSyncClient {
             .json::<Vec<TodoistTask>>()
             .await
             .map_err(todoist_sync_error)?;
-        Ok(tasks.into_iter().map(ExternalTask::from).collect())
+        let project_filter = self.import_project_ids.as_slice();
+        Ok(tasks
+            .into_iter()
+            .filter(|task| todoist_project_matches_filter(task.project_id.as_deref(), project_filter))
+            .map(ExternalTask::from)
+            .collect())
     }
 
     async fn push_task(&self, item: &TaskBoardItem) -> Result<ExternalTaskRef, CliError> {
@@ -254,6 +268,8 @@ struct TodoistTask {
     description: String,
     #[serde(default)]
     url: Option<String>,
+    #[serde(default)]
+    project_id: Option<String>,
 }
 
 impl TodoistTask {
@@ -273,10 +289,22 @@ impl From<TodoistTask> for ExternalTask {
             title: task.content,
             body: task.description,
             status: TaskBoardStatus::Todo,
-            project_id: None,
+            project_id: task.project_id,
             updated_at: None,
         }
     }
+}
+
+fn todoist_project_matches_filter(project_id: Option<&str>, allowed: &[String]) -> bool {
+    if allowed.is_empty() {
+        return true;
+    }
+    let Some(project_id) = project_id else {
+        return false;
+    };
+    allowed
+        .iter()
+        .any(|wanted| wanted.trim().eq_ignore_ascii_case(project_id.trim()))
 }
 
 fn todoist_sync_error(error: reqwest::Error) -> CliError {

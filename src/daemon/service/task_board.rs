@@ -344,16 +344,28 @@ fn run_task_board_sync_blocking(
 }
 
 fn active_external_sync_config() -> ExternalSyncConfig {
-    let (repository, inbox_repositories) = TaskBoardOrchestrator::new(default_board_root())
+    let settings = TaskBoardOrchestrator::new(default_board_root())
         .settings()
-        .ok()
-        .map_or((None, Vec::new()), |settings| {
-            let project = settings.github_project;
-            let repository = (!project.owner.trim().is_empty() && !project.repo.trim().is_empty())
-                .then(|| project.repository_slug());
-            (repository, settings.github_inbox.repositories)
-        });
+        .ok();
+    let (repository, inbox_repositories, github_labels, todoist_projects) = settings
+        .map_or_else(
+            || (None, Vec::new(), Vec::new(), Vec::new()),
+            |settings| {
+                let project = &settings.github_project;
+                let repository =
+                    (!project.owner.trim().is_empty() && !project.repo.trim().is_empty())
+                        .then(|| project.repository_slug());
+                (
+                    repository,
+                    settings.github_inbox.repositories.clone(),
+                    settings.github_inbox.label_filter.clone(),
+                    settings.todoist_inbox.project_filter.clone(),
+                )
+            },
+        );
     external_sync_config_for_repository(repository.as_deref(), &inbox_repositories)
+        .with_github_import_labels_override(&github_labels)
+        .with_todoist_import_project_ids_override(&todoist_projects)
 }
 
 pub(crate) fn run_task_board_sync_blocking_with_config(

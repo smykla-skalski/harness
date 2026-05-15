@@ -69,6 +69,11 @@ pub fn mapped_ws_methods() -> Vec<&'static str> {
         .collect()
 }
 
+/// Return every task-board route's websocket method name.
+///
+/// # Panics
+/// Panics when a task-board route is missing its websocket method mapping;
+/// this is a static-data invariant validated by contract tests.
 #[must_use]
 pub fn task_board_mcp_methods() -> Vec<&'static str> {
     routes_task_board::ROUTES

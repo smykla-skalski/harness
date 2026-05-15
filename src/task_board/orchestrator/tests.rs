@@ -3,7 +3,7 @@ use tempfile::tempdir;
 use super::*;
 use crate::task_board::{
     DispatchAppliedTask, TaskBoardEvaluationRecord, TaskBoardEvaluationSummary, TaskBoardItem,
-    TaskBoardStatus, build_dispatch_plan,
+    TaskBoardStatus, TaskBoardWorkflowStatus, build_dispatch_plan,
 };
 
 #[test]

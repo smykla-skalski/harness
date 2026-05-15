@@ -37,7 +37,7 @@ pub use orchestrator::{
     TaskBoardOrchestratorRunStatus, TaskBoardOrchestratorRunSummary, TaskBoardOrchestratorSettings,
     TaskBoardOrchestratorSettingsUpdateRequest, TaskBoardOrchestratorState,
     TaskBoardOrchestratorStatus, TaskBoardOrchestratorTickInfo, TaskBoardOrchestratorTickPhase,
-    TaskBoardOrchestratorWorkflow, TaskBoardWorkflowExecutionCount,
+    TaskBoardOrchestratorWorkflow, TaskBoardTodoistInboxConfig, TaskBoardWorkflowExecutionCount,
 };
 pub use planning::{
     PlanApprovalBlockReason, PlanApprovalGate, PlanningTransition, approval_gate, approve_plan,
