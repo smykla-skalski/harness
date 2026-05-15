@@ -50,6 +50,102 @@ struct TrackAccessibilityModifierTests {
     )
   }
 
+  @Test("configure publishes geometry-based screen coordinates for visible tracked elements")
+  @MainActor
+  func configurePublishesGeometryBasedScreenCoordinates() async {
+    let registry = AccessibilityRegistry()
+    let host = NSView(frame: NSRect(x: 0, y: 0, width: 320, height: 160))
+    let view = TrackAccessibilityNSView(frame: NSRect(x: 40, y: 24, width: 120, height: 36))
+    let window = NSWindow(
+      contentRect: NSRect(x: 0, y: 0, width: 320, height: 160),
+      styleMask: [.titled, .closable],
+      backing: .buffered,
+      defer: false
+    )
+
+    defer {
+      window.orderOut(nil)
+      window.contentView = nil
+    }
+
+    host.addSubview(view)
+    window.contentView = host
+    window.layoutIfNeeded()
+    host.layoutSubtreeIfNeeded()
+
+    view.configure(
+      elementID: "workspace.geometry",
+      kind: .button,
+      label: "Geometry",
+      value: nil,
+      hint: nil,
+      windowID: nil,
+      enabled: true,
+      semanticActions: .none,
+      semanticActionSink: nil,
+      registry: registry
+    )
+
+    let element = await waitForElement(identifier: "workspace.geometry", registry: registry)
+    let expectedFrame = RegistryRect(window.convertToScreen(view.convert(view.bounds, to: nil)))
+    #expect(element?.frame == expectedFrame)
+  }
+
+  @Test("didUpdate clears tracked elements once scrolling clips them fully off-screen")
+  @MainActor
+  func didUpdateClearsTrackedElementsWhenScrollingClipsThemOffScreen() async {
+    let registry = AccessibilityRegistry()
+    let documentView = NSView(frame: NSRect(x: 0, y: 0, width: 320, height: 640))
+    let view = TrackAccessibilityNSView(frame: NSRect(x: 24, y: 24, width: 120, height: 36))
+    let scrollView = NSScrollView(frame: NSRect(x: 0, y: 0, width: 200, height: 120))
+    let window = NSWindow(
+      contentRect: NSRect(x: 0, y: 0, width: 200, height: 120),
+      styleMask: [.titled, .closable],
+      backing: .buffered,
+      defer: false
+    )
+
+    defer {
+      window.orderOut(nil)
+      window.contentView = nil
+    }
+
+    documentView.addSubview(view)
+    scrollView.documentView = documentView
+    window.contentView = scrollView
+    window.layoutIfNeeded()
+    documentView.layoutSubtreeIfNeeded()
+
+    view.configure(
+      elementID: "workspace.scrolled-away",
+      kind: .button,
+      label: "Scrolled Away",
+      value: nil,
+      hint: nil,
+      windowID: nil,
+      enabled: true,
+      semanticActions: .none,
+      semanticActionSink: nil,
+      registry: registry
+    )
+
+    #expect(
+      await waitUntil {
+        await registry.element(identifier: "workspace.scrolled-away") != nil
+      }
+    )
+
+    scrollView.contentView.scroll(to: NSPoint(x: 0, y: 120))
+    scrollView.reflectScrolledClipView(scrollView.contentView)
+    NotificationCenter.default.post(name: NSWindow.didUpdateNotification, object: window)
+
+    #expect(
+      await waitUntil {
+        await registry.element(identifier: "workspace.scrolled-away") == nil
+      }
+    )
+  }
+
   @MainActor
   private func waitForElement(
     identifier: String,
@@ -63,5 +159,19 @@ struct TrackAccessibilityModifierTests {
       await Task.yield()
     }
     return await registry.element(identifier: identifier)
+  }
+
+  @MainActor
+  private func waitUntil(
+    maxTurns: Int = 20,
+    _ predicate: @escaping @MainActor () async -> Bool
+  ) async -> Bool {
+    for _ in 0..<maxTurns {
+      if await predicate() {
+        return true
+      }
+      await Task.yield()
+    }
+    return await predicate()
   }
 }
