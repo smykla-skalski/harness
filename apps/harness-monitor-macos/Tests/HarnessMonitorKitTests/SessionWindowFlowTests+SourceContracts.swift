@@ -79,7 +79,11 @@ extension SessionWindowFlowTests {
     #expect(scenesSource.contains("id: HarnessMonitorWindowID.dashboard"))
     #expect(scenesSource.contains("id: HarnessMonitorWindowID.sessionScene"))
     #expect(scenesSource.contains("for: SessionWindowToken.self"))
-    #expect(scenesSource.contains(".restorationBehavior(.disabled)"))
+    #expect(
+      scenesSource.contains(
+        ".restorationBehavior(allowsWindowRestoration ? .automatic : .disabled)"
+      )
+    )
     #expect(scenesSource.contains(".commandsRemoved()"))
     #expect(sceneContentSource.contains("SessionWindowTabbing(role: .dashboard)"))
     #expect(commandsSource.contains("@Environment(\\.openWindow)"))
