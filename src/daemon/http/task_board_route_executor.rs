@@ -12,7 +12,6 @@ use crate::daemon::task_board_managed_agents::{
     start_workers_for_applied_dispatch, start_workers_for_run_once_status,
 };
 use crate::errors::{CliError, CliErrorKind};
-use crate::session::types::CONTROL_PLANE_ACTOR_ID;
 use crate::task_board::{DispatchAppliedTask, DispatchFailure, DispatchFailureKind};
 
 use super::DaemonHttpState;
@@ -27,9 +26,8 @@ pub(crate) use policy_ops::*;
 
 pub(crate) async fn dispatch(
     state: &DaemonHttpState,
-    mut request: TaskBoardDispatchRequest,
+    request: TaskBoardDispatchRequest,
 ) -> Result<TaskBoardDispatchResponse, CliError> {
-    request.actor = Some(CONTROL_PLANE_ACTOR_ID.to_string());
     if let Some(async_db) = state.async_db.get() {
         let result = service::dispatch_task_board_async(&request, async_db.as_ref()).await;
         return handle_dispatch_result(state, result, Some(async_db.as_ref())).await;
@@ -66,9 +64,8 @@ pub(crate) async fn evaluate(
 
 pub(crate) async fn run_once(
     state: &DaemonHttpState,
-    mut request: TaskBoardOrchestratorRunOnceRequest,
+    request: TaskBoardOrchestratorRunOnceRequest,
 ) -> Result<TaskBoardOrchestratorRunOnceResponse, CliError> {
-    request.actor = Some(CONTROL_PLANE_ACTOR_ID.to_string());
     if let Some(async_db) = state.async_db.get() {
         let result =
             service::run_task_board_orchestrator_once_async(&request, async_db.as_ref()).await;

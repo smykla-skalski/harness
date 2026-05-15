@@ -78,9 +78,11 @@ fn websocket_task_board_crud_sync_audit_and_orchestrator_routes_use_real_state()
                 plan_approved["transition"]["to_status"].as_str(),
                 Some("todo")
             );
+            // WS plan_approve binds approved_by to the control-plane actor;
+            // caller-supplied values (here "lead") are overridden.
             assert_eq!(
                 plan_approved["item"]["planning"]["approved_by"].as_str(),
-                Some("lead")
+                Some("harness-app")
             );
 
             let updated = call(
