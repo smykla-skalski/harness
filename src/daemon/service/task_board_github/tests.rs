@@ -20,6 +20,7 @@ struct FakeGitHubClient {
     create_calls: std::sync::Mutex<usize>,
     publish_calls: std::sync::Mutex<usize>,
     ready_calls: std::sync::Mutex<usize>,
+    reviewer_requests: std::sync::Mutex<Vec<(Vec<String>, Vec<String>)>>,
     merge_calls: std::sync::Mutex<usize>,
 }
 
@@ -88,6 +89,20 @@ impl GitHubAutomationClient for FakeGitHubClient {
         Ok(ready)
     }
 
+    async fn request_pull_request_reviewers(
+        &self,
+        _config: &GitHubProjectConfig,
+        _pull_request_number: u64,
+        reviewers: &[String],
+        team_reviewers: &[String],
+    ) -> Result<(), crate::errors::CliError> {
+        self.reviewer_requests
+            .lock()
+            .expect("reviewer requests")
+            .push((reviewers.to_vec(), team_reviewers.to_vec()));
+        Ok(())
+    }
+
     async fn sync_pull_request_labels(
         &self,
         _config: &GitHubProjectConfig,
@@ -137,6 +152,7 @@ async fn automation_opens_reviews_and_merges_prs() {
         .enabled_automations
         .enabled
         .push(crate::task_board::github::GitHubAutomation::AutoMerge);
+    config.requested_reviewers.reviewers = vec!["alice".to_string(), "bob".to_string()];
     let input = TaskBoardOrchestratorDispatchInput {
         item_id: None,
         status: Some(TaskBoardStatus::Done),
@@ -160,6 +176,8 @@ async fn automation_opens_reviews_and_merges_prs() {
             draft: true,
             merged: false,
             head_sha: "abc123".to_string(),
+            requested_reviewers: Vec::new(),
+            requested_team_reviewers: Vec::new(),
         },
         evidence: GitHubMergeEvidence {
             pull_request: GitHubPullRequestEvidence {
@@ -181,6 +199,7 @@ async fn automation_opens_reviews_and_merges_prs() {
         create_calls: std::sync::Mutex::new(0),
         publish_calls: std::sync::Mutex::new(0),
         ready_calls: std::sync::Mutex::new(0),
+        reviewer_requests: std::sync::Mutex::new(Vec::new()),
         merge_calls: std::sync::Mutex::new(0),
     };
 
@@ -201,6 +220,14 @@ async fn automation_opens_reviews_and_merges_prs() {
     assert_eq!(*client.publish_calls.lock().expect("publish calls"), 1);
     assert_eq!(*client.create_calls.lock().expect("create calls"), 1);
     assert_eq!(*client.ready_calls.lock().expect("ready calls"), 1);
+    assert_eq!(
+        client
+            .reviewer_requests
+            .lock()
+            .expect("reviewer requests")
+            .as_slice(),
+        &[(vec!["alice".to_string(), "bob".to_string()], Vec::new())]
+    );
     assert_eq!(*client.merge_calls.lock().expect("merge calls"), 1);
     assert_eq!(
         git_ref(&remote, "refs/heads/c/task-1"),
@@ -248,6 +275,8 @@ async fn automation_waits_for_review_when_merge_evidence_is_not_approved() {
             draft: false,
             merged: false,
             head_sha: "abc123".to_string(),
+            requested_reviewers: Vec::new(),
+            requested_team_reviewers: Vec::new(),
         },
         evidence: GitHubMergeEvidence {
             pull_request: GitHubPullRequestEvidence {
@@ -269,6 +298,7 @@ async fn automation_waits_for_review_when_merge_evidence_is_not_approved() {
         create_calls: std::sync::Mutex::new(0),
         publish_calls: std::sync::Mutex::new(0),
         ready_calls: std::sync::Mutex::new(0),
+        reviewer_requests: std::sync::Mutex::new(Vec::new()),
         merge_calls: std::sync::Mutex::new(0),
     };
 
@@ -288,6 +318,13 @@ async fn automation_waits_for_review_when_merge_evidence_is_not_approved() {
         Some(STEP_WAITING_FOR_REVIEW)
     );
     assert_eq!(*client.publish_calls.lock().expect("publish calls"), 0);
+    assert!(
+        client
+            .reviewer_requests
+            .lock()
+            .expect("reviewer requests")
+            .is_empty()
+    );
     assert_eq!(*client.merge_calls.lock().expect("merge calls"), 0);
 }
 
@@ -324,6 +361,8 @@ async fn automation_waits_for_commits_before_opening_a_pull_request() {
             draft: true,
             merged: false,
             head_sha: "abc123".to_string(),
+            requested_reviewers: Vec::new(),
+            requested_team_reviewers: Vec::new(),
         },
         evidence: GitHubMergeEvidence {
             pull_request: GitHubPullRequestEvidence {
@@ -345,6 +384,7 @@ async fn automation_waits_for_commits_before_opening_a_pull_request() {
         create_calls: std::sync::Mutex::new(0),
         publish_calls: std::sync::Mutex::new(0),
         ready_calls: std::sync::Mutex::new(0),
+        reviewer_requests: std::sync::Mutex::new(Vec::new()),
         merge_calls: std::sync::Mutex::new(0),
     };
 

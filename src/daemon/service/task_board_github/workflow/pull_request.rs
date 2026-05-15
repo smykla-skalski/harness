@@ -120,12 +120,25 @@ async fn ready_pull_request(
     pull_request: &mut GitHubPullRequestHandle,
     pr_number: u64,
 ) -> AutomationFlow<()> {
-    if !pull_request.draft
-        || !context
-            .config
-            .enabled_automations
-            .enables(GitHubAutomation::RequestReview)
+    if !context
+        .config
+        .enabled_automations
+        .enables(GitHubAutomation::RequestReview)
     {
+        return AutomationFlow::Continue(());
+    }
+    let mut reviewers = missing_reviewers(
+        context.config.requested_reviewers.normalized_reviewers(),
+        &pull_request.requested_reviewers,
+    );
+    let mut team_reviewers = missing_reviewers(
+        context
+            .config
+            .requested_reviewers
+            .normalized_team_reviewers(),
+        &pull_request.requested_team_reviewers,
+    );
+    if !pull_request.draft && reviewers.is_empty() && team_reviewers.is_empty() {
         return AutomationFlow::Continue(());
     }
     let decision = action_policy(
@@ -143,23 +156,64 @@ async fn ready_pull_request(
             &decision,
         ));
     }
-    match context
-        .client
-        .ready_pull_request_for_review(context.config, pr_number)
-        .await
-    {
-        Ok(updated_pull_request) => {
-            *pull_request = updated_pull_request;
-            update_pull_request_metadata(&mut prepared.workflow, pull_request);
-            step(&mut prepared.workflow, STEP_REVIEW_REQUESTED);
-            prepared
-                .workflow
-                .policy_trace_ids
-                .push(new_policy_trace_id());
-            AutomationFlow::Continue(())
-        }
-        Err(error) => {
-            AutomationFlow::Done(failure(&mut prepared.workflow, STEP_REVIEW_FAILED, &error))
+    if pull_request.draft {
+        match context
+            .client
+            .ready_pull_request_for_review(context.config, pr_number)
+            .await
+        {
+            Ok(updated_pull_request) => {
+                *pull_request = updated_pull_request;
+                reviewers = missing_reviewers(
+                    std::mem::take(&mut reviewers),
+                    &pull_request.requested_reviewers,
+                );
+                team_reviewers = missing_reviewers(
+                    std::mem::take(&mut team_reviewers),
+                    &pull_request.requested_team_reviewers,
+                );
+                update_pull_request_metadata(&mut prepared.workflow, pull_request);
+            }
+            Err(error) => {
+                return AutomationFlow::Done(failure(
+                    &mut prepared.workflow,
+                    STEP_REVIEW_FAILED,
+                    &error,
+                ));
+            }
         }
     }
+    if !reviewers.is_empty() || !team_reviewers.is_empty() {
+        match context
+            .client
+            .request_pull_request_reviewers(context.config, pr_number, &reviewers, &team_reviewers)
+            .await
+        {
+            Ok(()) => {}
+            Err(error) => {
+                return AutomationFlow::Done(failure(
+                    &mut prepared.workflow,
+                    STEP_REVIEW_FAILED,
+                    &error,
+                ));
+            }
+        }
+    }
+    step(&mut prepared.workflow, STEP_REVIEW_REQUESTED);
+    prepared
+        .workflow
+        .policy_trace_ids
+        .push(new_policy_trace_id());
+    AutomationFlow::Continue(())
+}
+
+fn missing_reviewers(configured: Vec<String>, requested: &[String]) -> Vec<String> {
+    let requested = requested
+        .iter()
+        .map(String::as_str)
+        .collect::<BTreeSet<_>>();
+    configured
+        .into_iter()
+        .filter(|reviewer| !requested.contains(reviewer.as_str()))
+        .collect()
 }

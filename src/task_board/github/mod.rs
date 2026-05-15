@@ -15,7 +15,7 @@ mod risk;
 pub use client::{GitHubApiAutomationClient, GitHubCreatePullRequest, GitHubPullRequestHandle};
 pub use config::{
     GitHubAutomation, GitHubAutomationLabels, GitHubAutomationToggles, GitHubMergeMethod,
-    GitHubProjectConfig, ProtectedPathRule,
+    GitHubProjectConfig, GitHubRequestedReviewers, ProtectedPathRule,
 };
 pub use evidence::{
     GitHubBranchProtectionEvidence, GitHubCheckConclusion, GitHubCheckEvidence, GitHubCheckStatus,
@@ -104,6 +104,22 @@ pub trait GitHubAutomationClient: Send + Sync {
     ) -> Result<GitHubPullRequestHandle, CliError> {
         Err(CliError::from(CliErrorKind::workflow_io(
             "task-board github ready_pull_request_for_review is unsupported",
+        )))
+    }
+
+    /// Request GitHub pull-request reviews from configured users or teams.
+    ///
+    /// # Errors
+    /// Returns provider or transport errors surfaced by the implementation.
+    async fn request_pull_request_reviewers(
+        &self,
+        _config: &GitHubProjectConfig,
+        _pull_request_number: u64,
+        _reviewers: &[String],
+        _team_reviewers: &[String],
+    ) -> Result<(), CliError> {
+        Err(CliError::from(CliErrorKind::workflow_io(
+            "task-board github request_pull_request_reviewers is unsupported",
         )))
     }
 
