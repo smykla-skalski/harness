@@ -216,6 +216,7 @@ fn status_counts(items: &[TaskBoardItem]) -> Vec<TaskBoardStatusCount> {
         TaskBoardStatus::New,
         TaskBoardStatus::Planning,
         TaskBoardStatus::PlanReview,
+        TaskBoardStatus::NeedsYou,
         TaskBoardStatus::Todo,
         TaskBoardStatus::InProgress,
         TaskBoardStatus::InReview,
@@ -305,6 +306,26 @@ mod tests {
         assert!(github.configured);
         assert_eq!(github.pushable, 1);
         assert_eq!(github.blocked, 0);
+    }
+
+    #[test]
+    fn audit_summary_counts_needs_you_items() {
+        let mut item = TaskBoardItem::new(
+            "task-1".into(),
+            "Review request".into(),
+            "Needs attention".into(),
+            "2026-05-14T00:00:00Z".into(),
+        );
+        item.status = TaskBoardStatus::NeedsYou;
+
+        let summary = build_audit_summary(&[item]);
+        let count = summary
+            .by_status
+            .iter()
+            .find(|entry| entry.status == TaskBoardStatus::NeedsYou)
+            .expect("needs-you count");
+
+        assert_eq!(count.count, 1);
     }
 
     fn ready_item(id: &str, project_id: &str, mode: AgentMode) -> TaskBoardItem {
