@@ -14,16 +14,17 @@ pub mod transport;
 pub mod types;
 
 pub use dispatch::{
-    DispatchAppliedTask, DispatchBlockReason, DispatchExecutionSummary, DispatchPlan,
-    DispatchReadiness, EvaluatorIntent, FollowUpPhase, ReviewerIntent, SessionIntent,
-    TaskCreationIntent, WorkerIntent, build_dispatch_plan, build_dispatch_plans,
-    build_dispatch_plans_with_policy_root, filter_for_local_machine,
+    DispatchAppliedTask, DispatchBlockReason, DispatchExecutionSummary, DispatchFailure,
+    DispatchFailureKind, DispatchPlan, DispatchReadiness, EvaluatorIntent, FollowUpPhase,
+    ReviewerIntent, SessionIntent, TaskCreationIntent, WorkerIntent, build_dispatch_plan,
+    build_dispatch_plans, build_dispatch_plans_with_policy_root, filter_for_local_machine,
     machine_mismatch_plan_with_policy_root,
 };
 pub use evaluation::{
-    TaskBoardEvaluationDecision, TaskBoardEvaluationOutcome, TaskBoardEvaluationRecord,
-    TaskBoardEvaluationSummary, evaluate_task_board_item, failed_workflow, missing_session_record,
-    missing_task_record, record_from_decision, skipped_unlinked_record,
+    EvaluationSignalFailure, TaskBoardEvaluationDecision, TaskBoardEvaluationOutcome,
+    TaskBoardEvaluationRecord, TaskBoardEvaluationSummary, evaluate_task_board_item,
+    failed_workflow, missing_session_record, missing_task_record, record_from_decision,
+    skipped_unlinked_record,
 };
 pub use external::{
     ExternalProvider, ExternalProviderCapabilities, ExternalSyncAction, ExternalSyncClient,

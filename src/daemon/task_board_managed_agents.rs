@@ -9,21 +9,23 @@ use crate::task_board::{AgentMode, DispatchAppliedTask, TaskBoardItem};
 
 const DEFAULT_INTERACTIVE_RUNTIME: &str = "codex";
 
+/// Spawn workers for every applied dispatch, returning per-task outcomes so the
+/// caller can roll back the board link patch when a worker fails to start.
 pub(crate) async fn start_workers_for_applied_dispatch(
     state: &DaemonHttpState,
     applied: &[DispatchAppliedTask],
-) -> Result<Vec<ManagedAgentSnapshot>, CliError> {
-    let mut snapshots = Vec::new();
+) -> Vec<Result<ManagedAgentSnapshot, CliError>> {
+    let mut results = Vec::with_capacity(applied.len());
     for applied_task in applied {
-        snapshots.push(start_worker_for_applied_task(state, applied_task).await?);
+        results.push(start_worker_for_applied_task(state, applied_task).await);
     }
-    Ok(snapshots)
+    results
 }
 
 pub(crate) async fn start_workers_for_run_once_status(
     state: &DaemonHttpState,
     status: &TaskBoardOrchestratorRunOnceResponse,
-) -> Result<Vec<ManagedAgentSnapshot>, CliError> {
+) -> Vec<Result<ManagedAgentSnapshot, CliError>> {
     let applied = status
         .last_run
         .as_ref()

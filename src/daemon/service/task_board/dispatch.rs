@@ -7,9 +7,9 @@ use crate::errors::{CliError, CliErrorKind};
 use crate::session::types::CONTROL_PLANE_ACTOR_ID;
 use crate::task_board::store::{OptionalFieldPatch, TaskBoardItemPatch};
 use crate::task_board::{
-    DispatchAppliedTask, DispatchExecutionSummary, DispatchPlan, SessionIntent, TaskBoardItem,
-    TaskBoardStatus, TaskBoardStore, TaskBoardWorkflowStatus,
-    build_dispatch_summary_with_policy_root, filter_for_local_machine,
+    DispatchAppliedTask, DispatchExecutionSummary, DispatchFailure, DispatchFailureKind,
+    DispatchPlan, MachineRegistry, SessionIntent, TaskBoardItem, TaskBoardStatus, TaskBoardStore,
+    TaskBoardWorkflowStatus, build_dispatch_summary_with_policy_root, filter_for_local_machine,
     machine_mismatch_plan_with_policy_root,
 };
 
@@ -19,8 +19,11 @@ use super::super::{
 
 /// Build dispatch plans for task-board items.
 ///
+/// Per-plan failures are collected into the response rather than short-circuiting
+/// the loop; callers see both `applied` and `failures` for partial-rollback handling.
+///
 /// # Errors
-/// Returns `CliError` when board items cannot be loaded.
+/// Returns `CliError` only when board items cannot be loaded up front.
 pub fn dispatch_task_board(
     request: &TaskBoardDispatchRequest,
     db: Option<&DaemonDb>,
@@ -31,17 +34,33 @@ pub fn dispatch_task_board(
         return Ok(DispatchExecutionSummary::dry_run(plans));
     }
     let mut applied = Vec::new();
+    let mut failures = Vec::new();
     for plan in plans.iter().filter(|plan| plan.is_ready()) {
-        applied.push(apply_dispatch_plan(request, db, board, plan)?);
+        match apply_dispatch_plan(request, db, board, plan) {
+            Ok(task) => applied.push(task),
+            Err((kind, error)) => {
+                failures.push(DispatchFailure {
+                    board_item_id: plan.board_item_id.clone(),
+                    kind,
+                    message: error.to_string(),
+                });
+            }
+        }
     }
-    Ok(DispatchExecutionSummary { plans, applied })
+    Ok(DispatchExecutionSummary {
+        plans,
+        applied,
+        failures,
+    })
 }
 
 /// Execute ready dispatch plans for task-board items through the async daemon DB.
 ///
+/// Per-plan failures are collected into the response rather than short-circuiting
+/// the loop; callers see both `applied` and `failures` for partial-rollback handling.
+///
 /// # Errors
-/// Returns `CliError` when board items cannot be loaded, a session/task cannot
-/// be created, or linked board items cannot be persisted.
+/// Returns `CliError` only when board items cannot be loaded up front.
 pub async fn dispatch_task_board_async(
     request: &TaskBoardDispatchRequest,
     async_db: &AsyncDaemonDb,
@@ -52,10 +71,24 @@ pub async fn dispatch_task_board_async(
         return Ok(DispatchExecutionSummary::dry_run(plans));
     }
     let mut applied = Vec::new();
+    let mut failures = Vec::new();
     for plan in plans.iter().filter(|plan| plan.is_ready()) {
-        applied.push(apply_dispatch_plan_async(request, async_db, board, plan).await?);
+        match apply_dispatch_plan_async(request, async_db, board, plan).await {
+            Ok(task) => applied.push(task),
+            Err((kind, error)) => {
+                failures.push(DispatchFailure {
+                    board_item_id: plan.board_item_id.clone(),
+                    kind,
+                    message: error.to_string(),
+                });
+            }
+        }
     }
-    Ok(DispatchExecutionSummary { plans, applied })
+    Ok(DispatchExecutionSummary {
+        plans,
+        applied,
+        failures,
+    })
 }
 
 fn build_dispatch_plans_for_request(
@@ -88,9 +121,10 @@ fn apply_dispatch_plan(
     db: Option<&DaemonDb>,
     board: &TaskBoardStore,
     plan: &DispatchPlan,
-) -> Result<DispatchAppliedTask, CliError> {
+) -> Result<DispatchAppliedTask, (DispatchFailureKind, CliError)> {
     let actor = dispatch_actor(request);
-    let session_id = dispatch_session_id(request, db, plan)?;
+    let session_id = dispatch_session_id(request, db, plan)
+        .map_err(|error| (DispatchFailureKind::CreateSession, error))?;
     let detail = create_task(
         &session_id,
         &TaskCreateRequest {
@@ -101,9 +135,12 @@ fn apply_dispatch_plan(
             suggested_fix: plan.task.suggested_fix.clone(),
         },
         db,
-    )?;
-    let work_item_id = newest_task_id(detail)?;
-    let item = link_dispatched_item(board, plan, &session_id, &work_item_id)?;
+    )
+    .map_err(|error| (DispatchFailureKind::CreateTask, error))?;
+    let work_item_id =
+        newest_task_id(detail).map_err(|error| (DispatchFailureKind::CreateTask, error))?;
+    let item = link_dispatched_item(board, plan, &session_id, &work_item_id)
+        .map_err(|error| (DispatchFailureKind::LinkItem, error))?;
     Ok(DispatchAppliedTask {
         board_item_id: plan.board_item_id.clone(),
         session_id,
@@ -118,9 +155,11 @@ async fn apply_dispatch_plan_async(
     async_db: &AsyncDaemonDb,
     board: &TaskBoardStore,
     plan: &DispatchPlan,
-) -> Result<DispatchAppliedTask, CliError> {
+) -> Result<DispatchAppliedTask, (DispatchFailureKind, CliError)> {
     let actor = dispatch_actor(request);
-    let session_id = dispatch_session_id_async(request, async_db, plan).await?;
+    let session_id = dispatch_session_id_async(request, async_db, plan)
+        .await
+        .map_err(|error| (DispatchFailureKind::CreateSession, error))?;
     let detail = create_task_async(
         &session_id,
         &TaskCreateRequest {
@@ -132,9 +171,12 @@ async fn apply_dispatch_plan_async(
         },
         async_db,
     )
-    .await?;
-    let work_item_id = newest_task_id(detail)?;
-    let item = link_dispatched_item(board, plan, &session_id, &work_item_id)?;
+    .await
+    .map_err(|error| (DispatchFailureKind::CreateTask, error))?;
+    let work_item_id =
+        newest_task_id(detail).map_err(|error| (DispatchFailureKind::CreateTask, error))?;
+    let item = link_dispatched_item(board, plan, &session_id, &work_item_id)
+        .map_err(|error| (DispatchFailureKind::LinkItem, error))?;
     Ok(DispatchAppliedTask {
         board_item_id: plan.board_item_id.clone(),
         session_id,
@@ -255,6 +297,35 @@ fn link_dispatched_item(
     )
 }
 
+/// Undo the patch applied by [`link_dispatched_item`] when downstream wiring
+/// (worker spawn) fails. Resets status to `Todo`, clears the session/task link,
+/// and marks the workflow as failed so the row does not appear orphaned in
+/// `InProgress`.
+///
+/// # Errors
+/// Returns `CliError` if the board update fails.
+pub fn unlink_dispatched_item(
+    board: &TaskBoardStore,
+    board_item_id: &str,
+    reason: &str,
+) -> Result<TaskBoardItem, CliError> {
+    let current = board.get(board_item_id)?;
+    let mut workflow = current.workflow;
+    workflow.status = TaskBoardWorkflowStatus::Failed;
+    workflow.current_step_id = Some("worker_spawn".to_string());
+    workflow.last_error = Some(reason.to_string());
+    board.update(
+        board_item_id,
+        TaskBoardItemPatch {
+            status: Some(TaskBoardStatus::Todo),
+            workflow: Some(workflow),
+            session_id: OptionalFieldPatch::Clear,
+            work_item_id: OptionalFieldPatch::Clear,
+            ..TaskBoardItemPatch::default()
+        },
+    )
+}
+
 fn new_workflow_execution_id() -> String {
     format!("workflow-{}", uuid::Uuid::new_v4().simple())
 }
@@ -266,7 +337,8 @@ fn new_policy_trace_id() -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::task_board::{DispatchBlockReason, DispatchReadiness, MachineRegistry};
+    use crate::task_board::{DispatchBlockReason, DispatchReadiness};
+    use crate::task_board::planning::{approve_plan, submit_plan};
     use tempfile::tempdir;
 
     fn seed_item(board: &TaskBoardStore, id: &str, project_type: Option<&str>) {
@@ -280,6 +352,19 @@ mod tests {
         if let Some(project_type) = project_type {
             item.target_project_types = vec![project_type.into()];
         }
+        board.create(id, "", item).expect("create board item");
+    }
+
+    fn seed_ready_item(board: &TaskBoardStore, id: &str) {
+        let mut item = TaskBoardItem::new(
+            id.into(),
+            id.into(),
+            String::new(),
+            "2026-05-15T00:00:00Z".into(),
+        );
+        item.status = TaskBoardStatus::Todo;
+        let item = submit_plan(&item, "Plan summary").apply_to(&item);
+        let item = approve_plan(&item, "lead", "2026-05-15T00:00:00Z").apply_to(&item);
         board.create(id, "", item).expect("create board item");
     }
 
@@ -333,5 +418,86 @@ mod tests {
             }
             other => panic!("expected machine_mismatch, got {other:?}"),
         }
+    }
+
+    #[test]
+    fn dispatch_collects_per_plan_failures_without_short_circuit() {
+        // Two ready plans, no project_dir on the request. Each plan tries to
+        // create a session and fails on the missing project_dir gate; the loop
+        // must surface both failures instead of bailing on the first.
+        let temp = tempdir().expect("tempdir");
+        let root = temp.path().join("board");
+        let board = TaskBoardStore::new(root);
+        seed_ready_item(&board, "ready-1");
+        seed_ready_item(&board, "ready-2");
+
+        let response = dispatch_task_board(
+            &TaskBoardDispatchRequest {
+                item_id: None,
+                status: Some(TaskBoardStatus::Todo),
+                dry_run: false,
+                project_dir: None,
+                actor: None,
+            },
+            None,
+            &board,
+        )
+        .expect("dispatch should not short-circuit");
+
+        assert!(
+            response.applied.is_empty(),
+            "no plan can succeed without project_dir; got applied: {:?}",
+            response.applied
+        );
+        let failure_ids: Vec<&str> = response
+            .failures
+            .iter()
+            .map(|failure| failure.board_item_id.as_str())
+            .collect();
+        assert!(failure_ids.contains(&"ready-1"));
+        assert!(failure_ids.contains(&"ready-2"));
+        for failure in &response.failures {
+            assert_eq!(failure.kind, DispatchFailureKind::CreateSession);
+            assert!(!failure.message.is_empty());
+        }
+    }
+
+    #[test]
+    fn unlink_dispatched_item_clears_session_and_marks_workflow_failed() {
+        let temp = tempdir().expect("tempdir");
+        let root = temp.path().join("board");
+        let board = TaskBoardStore::new(root);
+        seed_ready_item(&board, "linked-1");
+
+        // Simulate the link patch by directly applying the same write the
+        // dispatch loop would have made; this avoids depending on a working
+        // session creation path inside the test.
+        let plan = build_dispatch_summary_with_policy_root(
+            &[board.get("linked-1").expect("seed item")],
+            board.root(),
+        )
+        .into_iter()
+        .next()
+        .expect("plan");
+        let linked = link_dispatched_item(&board, &plan, "session-x", "work-x")
+            .expect("link dispatched item");
+        assert_eq!(linked.status, TaskBoardStatus::InProgress);
+        assert_eq!(linked.session_id.as_deref(), Some("session-x"));
+        assert_eq!(linked.work_item_id.as_deref(), Some("work-x"));
+
+        let undone = unlink_dispatched_item(&board, "linked-1", "worker spawn failed")
+            .expect("unlink dispatched item");
+        assert_eq!(undone.status, TaskBoardStatus::Todo);
+        assert!(undone.session_id.is_none());
+        assert!(undone.work_item_id.is_none());
+        assert_eq!(undone.workflow.status, TaskBoardWorkflowStatus::Failed);
+        assert_eq!(
+            undone.workflow.last_error.as_deref(),
+            Some("worker spawn failed")
+        );
+        assert_eq!(
+            undone.workflow.current_step_id.as_deref(),
+            Some("worker_spawn")
+        );
     }
 }
