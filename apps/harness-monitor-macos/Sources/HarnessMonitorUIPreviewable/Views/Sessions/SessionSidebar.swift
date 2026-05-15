@@ -80,8 +80,7 @@ struct SessionSidebar: View {
     HarnessMonitorSidebar(
       accessibilityIdentifier: HarnessMonitorAccessibility.sessionWindowSidebar,
       accessibilityValue: decisionSelectionAccessibilityValue,
-      statusModel: statusModel,
-      rowSize: sidebarRowSize
+      statusModel: statusModel
     ) {
       nativeSidebarList
     }
@@ -132,6 +131,7 @@ struct SessionSidebar: View {
         )
       }
     }
+    .harnessMonitorSidebarListChrome(rowSize: sidebarRowSize)
     .onChange(of: decisions.map(\.id)) { _, ids in
       state.sidebarSelection.prune(kind: .decision, visibleIDs: Set(ids))
       pruneListSelection(kind: .decision, visibleIDs: Set(ids))
