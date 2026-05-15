@@ -45,6 +45,7 @@ struct PolicyCanvasEdgeLayer: View {
             accessibilityKindWord: edge.kind.accessibilityWord,
             kindDashPattern: edge.kind.strokeDashPattern,
             isAnimated: edge.isAnimated,
+            canvasZoom: viewModel.zoom,
             onTap: { viewModel.select(.edge(edge.id)) },
             onDelete: { viewModel.deleteEdge(edge.id) }
           )
