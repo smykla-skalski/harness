@@ -191,15 +191,12 @@ struct PolicyCanvasNodeCard: View {
             .lineLimit(1)
             .minimumScaleFactor(0.7)
             .allowsTightening(true)
-
-          if let groupID = node.groupID, let group = viewModel.group(groupID) {
-            Text(group.title)
-              .scaledFont(.caption2.weight(.medium))
-              .foregroundStyle(group.tone.color.opacity(0.95))
-              .lineLimit(1)
-              .minimumScaleFactor(0.7)
-              .allowsTightening(true)
-          }
+          // Group title intentionally absent here. The group's own chrome
+          // (`PolicyCanvasGroupViews`) renders the title pinned to the
+          // rectangle's top edge, so duplicating it on every member node
+          // was redundant ink. The a11y value still names the group via
+          // `viewModel.accessibilityValue(for:)` so screen-reader
+          // navigation retains the membership context.
         }
 
         Spacer(minLength: 0)
