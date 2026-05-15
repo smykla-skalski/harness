@@ -133,6 +133,28 @@ extension SessionWindowFlowTests {
     #expect(unavailableSource.contains("openWindow.openHarnessDashboardWindow()"))
   }
 
+  @Test("Dashboard window open-at-quit state is mirrored end-to-end")
+  func dashboardWindowOpenAtQuitStateIsMirroredEndToEnd() throws {
+    let sceneContentSource = try harnessSourceFile(named: "App/HarnessMonitorApp+SceneContent.swift")
+    let modifierSource = try harnessSourceFile(named: "App/DashboardWindowLifecycleModifier.swift")
+    let trackerSource = try harnessSourceFile(named: "App/DashboardWindowLifecycleTracker.swift")
+    let delegateSource = try harnessSourceFile(named: "App/HarnessMonitorAppDelegate.swift")
+    let routerSource = try harnessSourceFile(named: "App/HarnessMonitorInitialWindowRouter.swift")
+
+    #expect(sceneContentSource.contains(".modifier(DashboardWindowLifecycleModifier())"))
+    #expect(modifierSource.contains("DashboardWindowLifecycleTracker.shared.markOpen()"))
+    #expect(modifierSource.contains("DashboardWindowLifecycleTracker.shared.markClosed()"))
+    #expect(trackerSource.contains("static let openAtQuitKey"))
+    #expect(trackerSource.contains("func flushOpenAtQuit()"))
+    #expect(trackerSource.contains("static func wasOpenAtQuit("))
+    #expect(
+      delegateSource.contains(
+        "DashboardWindowLifecycleTracker.shared.flushOpenAtQuit()"
+      )
+    )
+    #expect(routerSource.contains("DashboardWindowLifecycleTracker.wasOpenAtQuit()"))
+  }
+
   @Test("Decision routing reuses an already open session window")
   func decisionRoutingReusesAnAlreadyOpenSessionWindow() throws {
     let source = try previewableSourceFile(named: "Support/SessionWindowOpenAction.swift")

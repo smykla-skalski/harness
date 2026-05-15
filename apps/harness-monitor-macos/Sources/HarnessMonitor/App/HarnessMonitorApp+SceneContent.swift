@@ -52,6 +52,7 @@ extension HarnessMonitorApp {
     if rendersLiveSceneContent {
       dashboardWindowContent
         .modifier(SessionWindowTabbing(role: .dashboard))
+        .modifier(DashboardWindowLifecycleModifier())
         .harnessTrackMCPWindow()
     } else {
       Color.clear.accessibilityHidden(true)

@@ -28,10 +28,21 @@ struct HarnessMonitorInitialWindowRouter {
   static let restorationWaitTimeout: Duration = .milliseconds(1500)
 
   func route() async {
+    // The dashboard window is a singleton `Window` scene; its on-screen
+    // presence at quit is mirrored to user defaults by
+    // `DashboardWindowLifecycleTracker`. Restore it alongside any session
+    // windows when the user had it open last run.
+    let shouldRestoreDashboard =
+      launchBehavior == .restoreSessionWindows
+      && DashboardWindowLifecycleTracker.wasOpenAtQuit()
+
     var restorePlan = HarnessMonitorStore.LaunchWindowRestorePlan()
     if launchBehavior == .restoreSessionWindows {
       await store.prepareOpenRecentSessions()
       if hasVisibleSessionWindows() {
+        if shouldRestoreDashboard {
+          openWelcomeWindow()
+        }
         await replayTabGroupingsIfNeeded(in: restorePlan)
         return
       }
@@ -45,6 +56,9 @@ struct HarnessMonitorInitialWindowRouter {
     // does not appear.
     if launchBehavior == .restoreSessionWindows, !restorePlan.sessionIDs.isEmpty {
       if await waitForVisibleSessionWindowDuringLaunch() {
+        if shouldRestoreDashboard {
+          openWelcomeWindow()
+        }
         await replayTabGroupingsIfNeeded(in: restorePlan)
         return
       }
@@ -58,10 +72,15 @@ struct HarnessMonitorInitialWindowRouter {
 
     switch initialPlan.destination {
     case .none:
-      break
+      if shouldRestoreDashboard {
+        openWelcomeWindow()
+      }
     case .welcome:
       openWelcomeWindow()
     case .sessions(let sessionIDs):
+      if shouldRestoreDashboard {
+        openWelcomeWindow()
+      }
       for sessionID in sessionIDs {
         openSessionWindow(sessionID)
       }
