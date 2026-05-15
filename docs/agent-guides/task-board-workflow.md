@@ -22,8 +22,11 @@ dispatch readiness, and overview reporting.
 | `create` | Create a new board task. |
 | `list` | List active board tasks, optionally filtered by status. |
 | `get` | Show one board task. |
-| `update` | Change task fields, status, priority, project, tags, or planning state. |
+| `update` | Change task fields, status, priority, project, tags, or linked state. |
 | `delete` | Tombstone one board task. |
+| `begin` | Move an item into planning and clear any prior approval. |
+| `submit` | Submit a planning summary for review. |
+| `approve` | Approve a submitted plan and move the item to ready work. |
 | `sync` | Preview or apply external synchronization. |
 | `dispatch` | Print session dispatch plans for board tasks, or apply ready plans. |
 | `evaluate` | Reconcile linked session work back into board workflow state. |
@@ -105,25 +108,23 @@ the inbox state on the next pull sync.
 
 2. Move it into planning.
 
-   ```bash
-   harness task-board update <task-id> --status planning
-   ```
+    ```bash
+    harness task-board begin <task-id>
+    ```
 
 3. Submit the plan for review.
 
-   ```bash
-   harness task-board update <task-id> \
-     --status plan_review \
-     --planning-summary "Cause, fix shape, verification, and rollback notes."
-   ```
+    ```bash
+    harness task-board submit <task-id> \
+      --summary "Cause, fix shape, verification, and rollback notes."
+    ```
 
 4. Approve the plan and make it dispatchable.
 
-   ```bash
-   harness task-board update <task-id> \
-     --status todo \
-     --approved-by <reviewer-or-leader-id>
-   ```
+    ```bash
+    harness task-board approve <task-id> \
+      --approved-by <reviewer-or-leader-id>
+    ```
 
 ## Dispatch, Worker, And Review Loop
 
