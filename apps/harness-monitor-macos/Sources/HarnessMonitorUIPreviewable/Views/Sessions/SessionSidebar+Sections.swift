@@ -100,17 +100,23 @@ extension SessionSidebar {
   var routeSection: some View {
     ForEach(sidebarRoutes) { route in
       let selection = SessionSelection.route(route)
+      let isSelected = displayedSelectionSet.contains(selection)
       SessionSidebarRow(
         title: route.title,
         systemImage: route.systemImage
       )
       .tag(selection)
       .accessibilityIdentifier(HarnessMonitorAccessibility.sessionWindowRoute(route))
+      .accessibilityValue(isSelected ? "selected" : "not selected")
       .contextMenu {
-        Button(SessionSidebarContextMenuScope.unavailableLabel) {}
-          .disabled(true)
+        unavailableRouteContextMenu
       }
     }
+  }
+
+  @ViewBuilder var unavailableRouteContextMenu: some View {
+    Button(SessionSidebarContextMenuScope.unavailableLabel) {}
+      .disabled(true)
   }
 
   private var runtimePresentation: HarnessMonitorStore.AgentRuntimePresentationContext? {

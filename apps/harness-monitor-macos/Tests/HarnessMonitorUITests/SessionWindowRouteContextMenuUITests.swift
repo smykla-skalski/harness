@@ -36,6 +36,45 @@ final class SessionWindowRouteContextMenuUITests: HarnessMonitorUITestCase {
     )
   }
 
+  func testRouteContextMenuIsAvailableBeforeAndAfterNativeSidebarSelectionAttaches() {
+    let app = launchPreviewSessionWindow()
+
+    let overviewRoute = element(in: app, identifier: Accessibility.sessionWindowRoute("overview"))
+    let deferredLoader = element(
+      in: app,
+      identifier: Accessibility.sessionWindowSidebarDeferredLoader
+    )
+    let unavailableItem = app.menuItems["No actions available"].firstMatch
+
+    XCTAssertTrue(waitForElement(overviewRoute, timeout: Self.fastActionTimeout))
+    XCTAssertTrue(waitForElement(deferredLoader, timeout: Self.fastActionTimeout))
+    XCTAssertTrue(
+      rightClickElementReliably(in: app, element: overviewRoute),
+      "Expected route context menu while deferred sidebar sections are still hidden"
+    )
+    XCTAssertTrue(unavailableItem.waitForExistence(timeout: Self.fastActionTimeout))
+    app.typeKey(.escape, modifierFlags: [])
+    XCTAssertTrue(
+      waitUntil(in: app, timeout: Self.fastActionTimeout) { !unavailableItem.exists },
+      "Expected the deferred route context menu to dismiss cleanly"
+    )
+
+    XCTAssertTrue(
+      waitUntil(in: app, timeout: Self.actionTimeout) { !deferredLoader.exists },
+      "Expected deferred sidebar sections to finish mounting"
+    )
+    XCTAssertTrue(
+      rightClickElementReliably(in: app, element: overviewRoute),
+      "Expected route context menu after native sidebar selection attaches"
+    )
+    XCTAssertTrue(unavailableItem.waitForExistence(timeout: Self.fastActionTimeout))
+    app.typeKey(.escape, modifierFlags: [])
+    XCTAssertTrue(
+      waitUntil(in: app, timeout: Self.fastActionTimeout) { !unavailableItem.exists },
+      "Expected the native route context menu to dismiss cleanly"
+    )
+  }
+
   func testTasksRouteContextMenuUsesBatchLabelsForMiddleColumnSelection() {
     let app = launchPreviewSessionWindow()
 
