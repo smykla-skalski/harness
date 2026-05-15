@@ -162,6 +162,10 @@ struct TaskBoardCardPill: View {
   let label: String
   let tint: Color
   var systemImage: String?
+  @Environment(\.fontScale)
+  private var fontScale
+
+  private var metrics: TaskBoardLaneMetrics { TaskBoardLaneMetrics(fontScale: fontScale) }
 
   var body: some View {
     HStack(spacing: HarnessMonitorTheme.spacingXS) {
@@ -175,7 +179,8 @@ struct TaskBoardCardPill: View {
     }
     .foregroundStyle(tint)
     .lineLimit(1)
-    .harnessPillPadding()
+    .padding(.horizontal, metrics.pillHorizontalPadding)
+    .padding(.vertical, metrics.pillVerticalPadding)
     .harnessContentPill(tint: tint)
   }
 }

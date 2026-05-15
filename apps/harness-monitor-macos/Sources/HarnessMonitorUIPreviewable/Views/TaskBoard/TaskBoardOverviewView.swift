@@ -256,7 +256,7 @@ extension TaskBoardOverviewView {
 
   private var taskBoardColumns: some View {
     ScrollView(.horizontal, showsIndicators: true) {
-      HStack(alignment: .top, spacing: HarnessMonitorTheme.spacingMD) {
+      HStack(alignment: .top, spacing: metrics.columnSpacing) {
         ForEach(taskBoardSections) { section in
           if section.lane == .needsYou {
             TaskBoardNeedsYouLaneColumn(
@@ -275,7 +275,7 @@ extension TaskBoardOverviewView {
           }
         }
       }
-      .padding(.vertical, HarnessMonitorTheme.spacingXS)
+      .padding(.vertical, metrics.boardVerticalPadding)
     }
     .scrollClipDisabled()
   }
@@ -288,7 +288,7 @@ extension TaskBoardOverviewView {
 
   private var inboxBoard: some View {
     ScrollView(.horizontal, showsIndicators: true) {
-      HStack(alignment: .top, spacing: HarnessMonitorTheme.spacingMD) {
+      HStack(alignment: .top, spacing: metrics.columnSpacing) {
         ForEach(snapshot.sections) { section in
           TaskBoardInboxLaneColumn(
             section: section,
@@ -297,7 +297,7 @@ extension TaskBoardOverviewView {
           )
         }
       }
-      .padding(.vertical, 2)
+      .padding(.vertical, metrics.boardVerticalPadding)
     }
     .scrollClipDisabled()
   }

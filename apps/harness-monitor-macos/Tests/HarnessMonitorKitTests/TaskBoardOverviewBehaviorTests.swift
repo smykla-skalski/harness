@@ -219,6 +219,26 @@ struct TaskBoardOverviewBehaviorTests {
     #expect(attempts == 2)
   }
 
+  @Test("Lane metrics scale pill padding with font scale")
+  func laneMetricsScalePillPaddingWithFontScale() {
+    let regular = TaskBoardLaneMetrics(fontScale: 1)
+    let large = TaskBoardLaneMetrics(fontScale: 1.8)
+
+    #expect(large.pillHorizontalPadding > regular.pillHorizontalPadding)
+    #expect(large.pillVerticalPadding > regular.pillVerticalPadding)
+  }
+
+  @Test("Overview metrics share scaled board spacing and padding")
+  func overviewMetricsShareScaledBoardSpacingAndPadding() {
+    let regular = TaskBoardOverviewMetrics(fontScale: 1)
+    let large = TaskBoardOverviewMetrics(fontScale: 1.8)
+
+    #expect(large.columnSpacing > regular.columnSpacing)
+    #expect(large.boardVerticalPadding > regular.boardVerticalPadding)
+    #expect(large.summaryPillHorizontalPadding > regular.summaryPillHorizontalPadding)
+    #expect(large.summaryPillVerticalPadding > regular.summaryPillVerticalPadding)
+  }
+
   private func inboxItem(taskID: String) -> TaskBoardInboxItem {
     let item = TaskBoardInboxItem(
       session: PreviewFixtures.summary,
