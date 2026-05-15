@@ -5,8 +5,7 @@ struct TaskBoardLaneMetrics: Equatable {
   let laneSpacing: CGFloat
   let laneInnerPadding: CGFloat
   let laneWidth: CGFloat
-  let laneMinHeight: CGFloat
-  let laneBodyMinHeight: CGFloat
+  let laneFixedHeight: CGFloat
   let laneBodyTopPadding: CGFloat
   let headerIconWidth: CGFloat
   let headerHorizontalPadding: CGFloat
@@ -33,8 +32,7 @@ struct TaskBoardLaneMetrics: Equatable {
     laneSpacing = HarnessMonitorTheme.spacingSM * denseScale
     laneInnerPadding = HarnessMonitorTheme.spacingMD * denseScale
     laneWidth = 288 * broadScale
-    laneMinHeight = 352 * heightScale
-    laneBodyMinHeight = 280 * heightScale
+    laneFixedHeight = 704 * heightScale
     laneBodyTopPadding = HarnessMonitorTheme.spacingSM * denseScale
     headerIconWidth = 18 * min(scale, 1.25)
     headerHorizontalPadding = 0
@@ -288,8 +286,7 @@ private struct TaskBoardLaneColumnChrome: ViewModifier {
     content
       .padding(.horizontal, metrics.laneInnerPadding)
       .padding(.vertical, metrics.laneInnerPadding)
-      .frame(width: metrics.laneWidth, alignment: .topLeading)
-      .frame(minHeight: metrics.laneMinHeight, alignment: .topLeading)
+      .frame(width: metrics.laneWidth, height: metrics.laneFixedHeight, alignment: .topLeading)
       .background {
         RoundedRectangle(cornerRadius: metrics.cardCornerRadius, style: .continuous)
           .fill(laneFill)
@@ -346,7 +343,7 @@ private struct TaskBoardLaneBodyChrome: ViewModifier {
 
   func body(content: Content) -> some View {
     content
-      .frame(maxWidth: .infinity, minHeight: metrics.laneBodyMinHeight, alignment: .top)
+      .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
       .padding(.top, metrics.laneBodyTopPadding)
       .background {
         if isDropTargeted {
