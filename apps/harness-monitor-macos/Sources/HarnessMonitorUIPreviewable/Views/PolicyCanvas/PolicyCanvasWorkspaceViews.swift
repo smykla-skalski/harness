@@ -17,6 +17,22 @@ struct PolicyCanvasViewport: View {
   @State private var magnifyStartZoom: CGFloat?
   @State private var zoomFocusDispatcher = PolicyCanvasZoomFocusDispatcher()
   @State private var zoomFocus: PolicyCanvasZoomFocus?
+  /// Tracks the current keyboard modifiers via `.onModifierKeysChanged` so the
+  /// scroll-geometry handler can gate Cmd+scroll-wheel zoom on the Cmd flag.
+  @State private var currentModifiers: EventModifiers = []
+  /// Last hover position in viewport-local coordinates. Cmd+scroll-wheel zoom
+  /// anchors the new scroll offset on this point so the content under the
+  /// cursor stays under the cursor across the zoom.
+  @State private var hoveredViewportPoint: CGPoint?
+  /// SwiftUI scroll-position binding. Read by `onScrollGeometryChange` to
+  /// detect Cmd-modified scroll deltas; written programmatically when the
+  /// view restores the offset to keep the cursor anchored after a Cmd+scroll
+  /// zoom. Coexists with the existing `ScrollViewReader`-driven centering
+  /// (which still uses `scrollProxy.scrollTo` for id-based anchor restore).
+  @State private var scrollPosition = ScrollPosition()
+  /// Suppresses one geometry-change tick after a programmatic scroll write so
+  /// the restoration write does not re-fire the Cmd+scroll handler in a loop.
+  @State private var isRestoringCommandScrollPosition = false
   @Environment(\.scenePhase)
   private var scenePhase
 
@@ -93,6 +109,25 @@ struct PolicyCanvasViewport: View {
         // `NSEvent.isDirectionInvertedFromDevice`). No app-side direction
         // adjustment needed.
         .scrollIndicators(.visible)
+        .scrollPosition($scrollPosition)
+        .onModifierKeysChanged(mask: .command, initial: true) { _, newModifiers in
+          currentModifiers = newModifiers
+        }
+        .onContinuousHover(coordinateSpace: .local) { phase in
+          switch phase {
+          case .active(let location):
+            hoveredViewportPoint = location
+          case .ended:
+            hoveredViewportPoint = nil
+          }
+        }
+        .onScrollGeometryChange(for: CGPoint.self, of: \.contentOffset) { oldOffset, newOffset in
+          handleScrollOffsetChange(
+            oldOffset: oldOffset,
+            newOffset: newOffset,
+            viewportSize: proxy.size
+          )
+        }
         .background(Color(red: 0.03, green: 0.04, blue: 0.06))
         .clipShape(Rectangle())
         .overlay(alignment: .bottomLeading) {
@@ -193,6 +228,72 @@ struct PolicyCanvasViewport: View {
     if zoomFocus == nil {
       zoomFocus = PolicyCanvasZoomFocus(dispatcher: zoomFocusDispatcher)
     }
+  }
+
+  /// Cmd+scroll-wheel zoom entry. `onScrollGeometryChange` fires whenever the
+  /// ScrollView's content offset moves; when Cmd is held the wheel event was
+  /// meant to zoom rather than scroll, so we revert the scroll and apply a
+  /// proportional zoom anchored on the cursor. The `isRestoringCommandScrollPosition`
+  /// flag swallows the geometry tick that fires from the programmatic offset
+  /// write so the handler does not chase its own tail.
+  private func handleScrollOffsetChange(
+    oldOffset: CGPoint,
+    newOffset: CGPoint,
+    viewportSize: CGSize
+  ) {
+    if isRestoringCommandScrollPosition {
+      isRestoringCommandScrollPosition = false
+      return
+    }
+    guard
+      let deltaY = policyCanvasCommandScrollDeltaY(
+        isCommandModified: currentModifiers.contains(.command),
+        oldOffset: oldOffset,
+        newOffset: newOffset
+      )
+    else {
+      return
+    }
+    let cursor =
+      hoveredViewportPoint
+      ?? CGPoint(x: viewportSize.width / 2, y: viewportSize.height / 2)
+    performCommandScrollZoom(
+      deltaY: deltaY,
+      cursor: cursor,
+      preZoomScrollOffset: oldOffset,
+      viewportSize: viewportSize
+    )
+  }
+
+  /// Apply the pointer-anchored zoom. `preZoomScrollOffset` is the scroll
+  /// offset BEFORE the wheel-triggered move, so it pairs with the cursor's
+  /// viewport-local point to recover the canvas-space anchor. The zoom is
+  /// applied via the pure view-model helper, and the recomputed offset is
+  /// written back through `scrollPosition` so the cursor stays over the same
+  /// canvas point.
+  private func performCommandScrollZoom(
+    deltaY: CGFloat,
+    cursor: CGPoint,
+    preZoomScrollOffset: CGPoint,
+    viewportSize: CGSize
+  ) {
+    let zoomBefore = viewModel.zoom
+    let canvasPoint = CGPoint(
+      x: (preZoomScrollOffset.x + cursor.x) / zoomBefore,
+      y: (preZoomScrollOffset.y + cursor.y) / zoomBefore
+    )
+    guard viewModel.zoomByCommandScroll(deltaY: deltaY) else {
+      isRestoringCommandScrollPosition = true
+      scrollPosition = ScrollPosition(point: preZoomScrollOffset)
+      return
+    }
+    let nextScrollPoint = viewModel.viewportScrollPoint(
+      keepingCanvasPoint: canvasPoint,
+      atViewportPoint: cursor,
+      viewportSize: viewportSize
+    )
+    isRestoringCommandScrollPosition = true
+    scrollPosition = ScrollPosition(point: nextScrollPoint)
   }
 
   /// Trackpad pinch gesture. `MagnifyGesture.Value.startAnchor` carries the
