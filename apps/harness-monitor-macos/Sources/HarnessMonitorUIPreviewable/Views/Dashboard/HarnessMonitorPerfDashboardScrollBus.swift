@@ -75,5 +75,49 @@ public enum HarnessMonitorPerfDashboardScrollBus {
         "container_h": String(Int(containerHeight.rounded())),
       ]
     )
+    latestGeometryState.update(
+      contentHeight: contentHeight,
+      containerHeight: containerHeight
+    )
+  }
+
+  /// Latest geometry observed by the probe. The perf driver polls this so it
+  /// can wait until the live daemon has streamed enough content for the scroll
+  /// surface to actually exceed the viewport before posting scroll events.
+  public static var latestGeometry: LatestGeometry {
+    latestGeometryState.snapshot()
+  }
+
+  public struct LatestGeometry: Equatable, Sendable {
+    public let contentHeight: CGFloat
+    public let containerHeight: CGFloat
+
+    public var isScrollable: Bool {
+      contentHeight > containerHeight && containerHeight > 0
+    }
+  }
+
+  private static let latestGeometryState = LatestGeometryState()
+
+  private final class LatestGeometryState: @unchecked Sendable {
+    private let lock = NSLock()
+    private var contentHeight: CGFloat = 0
+    private var containerHeight: CGFloat = 0
+
+    func update(contentHeight: CGFloat, containerHeight: CGFloat) {
+      lock.lock()
+      defer { lock.unlock() }
+      self.contentHeight = contentHeight
+      self.containerHeight = containerHeight
+    }
+
+    func snapshot() -> LatestGeometry {
+      lock.lock()
+      defer { lock.unlock() }
+      return LatestGeometry(
+        contentHeight: contentHeight,
+        containerHeight: containerHeight
+      )
+    }
   }
 }
