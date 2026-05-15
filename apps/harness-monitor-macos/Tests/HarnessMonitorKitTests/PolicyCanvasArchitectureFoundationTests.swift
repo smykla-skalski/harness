@@ -278,21 +278,39 @@ struct PolicyCanvasArchitectureFoundationTests {
     )
   }
 
-  @Test("routingObstacles returns node frames plus group frames")
-  func routingObstaclesIncludesGroupFrames() {
+  @Test("routingObstacles adds group frames only when both endpoints sit outside every group")
+  func routingObstaclesScopesGroupsByEndpoints() {
     let viewModel = PolicyCanvasViewModel.sample()
-    let obstacles = viewModel.routingObstacles
     let expectedNodeFrames = viewModel.nodes.map { node in
       CGRect(origin: node.position, size: PolicyCanvasLayout.nodeSize)
     }
     let expectedGroupFrames = viewModel.groups.map(\.frame)
+    guard let groupFrame = expectedGroupFrames.first else {
+      Issue.record("sample document is expected to contain at least one group")
+      return
+    }
 
-    #expect(obstacles.count == expectedNodeFrames.count + expectedGroupFrames.count)
+    let insideGroupPoint = CGPoint(x: groupFrame.midX, y: groupFrame.midY)
+    let outsideGroupPoint = CGPoint(x: groupFrame.maxX + 400, y: groupFrame.maxY + 400)
+
+    let insideObstacles = viewModel.routingObstacles(
+      source: insideGroupPoint,
+      target: outsideGroupPoint
+    )
+    #expect(insideObstacles.count == expectedNodeFrames.count)
     for frame in expectedNodeFrames {
-      #expect(obstacles.contains(frame))
+      #expect(insideObstacles.contains(frame))
     }
     for frame in expectedGroupFrames {
-      #expect(obstacles.contains(frame))
+      #expect(!insideObstacles.contains(frame))
+    }
+
+    let farPointA = CGPoint(x: outsideGroupPoint.x, y: outsideGroupPoint.y)
+    let farPointB = CGPoint(x: outsideGroupPoint.x + 200, y: outsideGroupPoint.y + 200)
+    let outsideObstacles = viewModel.routingObstacles(source: farPointA, target: farPointB)
+    #expect(outsideObstacles.count == expectedNodeFrames.count + expectedGroupFrames.count)
+    for frame in expectedGroupFrames {
+      #expect(outsideObstacles.contains(frame))
     }
   }
 

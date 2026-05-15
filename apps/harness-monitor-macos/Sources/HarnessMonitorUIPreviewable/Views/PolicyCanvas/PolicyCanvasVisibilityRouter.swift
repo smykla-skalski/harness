@@ -287,11 +287,20 @@ struct PolicyCanvasVisibilityRouter: PolicyCanvasEdgeRouter {
     guard lane != 0, points.count == 4 else {
       return points
     }
-    let offset = CGFloat(lane) * laneSpreadStep
     let pointA = points[1]
     let pointB = points[2]
     let busHorizontal = abs(pointA.y - pointB.y) < 0.001
+    let offset = CGFloat(lane) * laneSpreadStep
     if busHorizontal {
+      // Horizontal bus runs between two non-aligned endpoints. Skip
+      // the lane shift when source and target are vertically far
+      // apart: A* already routes the bus near one endpoint's Y, and
+      // stacking a perpendicular shift on top forces a zig-zag away
+      // from the target. The natural Y delta gives parallel lanes
+      // distinct entry/exit Ys without help.
+      if abs(source.y - target.y) > 60 {
+        return points
+      }
       let midY = (source.y + target.y) / 2
       let direction: CGFloat = pointA.y >= midY ? 1 : -1
       return [
@@ -300,6 +309,10 @@ struct PolicyCanvasVisibilityRouter: PolicyCanvasEdgeRouter {
         CGPoint(x: pointB.x, y: pointB.y + direction * offset),
         points[3],
       ]
+    }
+    // Vertical bus (the symmetric case). Same logic on the X axis.
+    if abs(source.x - target.x) > 60 {
+      return points
     }
     let midX = (source.x + target.x) / 2
     let direction: CGFloat = pointA.x >= midX ? 1 : -1
