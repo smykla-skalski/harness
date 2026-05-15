@@ -99,6 +99,7 @@ impl TaskBoardUpdateArgs {
             external_refs: self.external_refs_patch(),
             planning: self.fields.planning(),
             clear_planning: self.clear_state.clear_planning,
+            clear_approval: false,
             workflow: self.fields.workflow(current.map(|item| &item.workflow)),
             clear_workflow: self.clear_state.clear_workflow,
             session_id: self.session_patch(),
