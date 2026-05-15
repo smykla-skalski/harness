@@ -162,6 +162,25 @@ struct PolicyCanvasVisibilityRouterTests {
     #expect(flexed.points.last == CGPoint(x: 700, y: 300))
   }
 
+  @Test("Routes around group-style obstacle rects (T4.1)")
+  func routesAroundGroupObstacle() {
+    // T4.1: callers now pass `viewModel.routingObstacles`, which appends
+    // group frames to node frames. The router treats them identically -
+    // a group rect between two endpoints outside any group blocks the
+    // straight-line route just like a node rect would. Edges with one
+    // endpoint inside the group rely on `preparedObstacles`' auto-drop
+    // when the padded rect contains source/target.
+    let groupRect = CGRect(x: 200, y: 50, width: 200, height: 200)
+    let route = PolicyCanvasVisibilityRouter().route(
+      source: CGPoint(x: 0, y: 150),
+      target: CGPoint(x: 600, y: 150),
+      context: context(obstacles: [groupRect])
+    )
+    #expect(!polylineEntersObstacle(route.points, obstacle: groupRect))
+    let bends = bendCount(of: route.points)
+    #expect(bends >= 2)
+  }
+
   @Test("Channel snap rounds intermediate points to 5pt grid")
   func channelSnapAlignsIntermediates() {
     let obstacle = CGRect(x: 100, y: 50, width: 80, height: 120)
