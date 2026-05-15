@@ -17,7 +17,7 @@ use crate::session::types::CONTROL_PLANE_ACTOR_ID;
 use crate::task_board::TaskBoardStatus;
 
 use super::super::DaemonHttpState;
-use super::super::auth::require_auth;
+use super::super::auth::{authorize_control_request, require_auth};
 use super::super::response::{extract_request_id, timed_json};
 use super::super::task_board_route_executor;
 
@@ -53,6 +53,17 @@ macro_rules! authenticated_parts {
             Ok(parts) => parts,
             Err(response) => return *response,
         }
+    }};
+}
+
+macro_rules! authorized_control_parts {
+    ($headers:expr, $state:expr, $request:expr) => {{
+        let start = Instant::now();
+        let request_id = extract_request_id(&$headers);
+        if let Err(response) = authorize_control_request(&$headers, &$state, &mut $request) {
+            return *response;
+        }
+        (start, request_id)
     }};
 }
 
@@ -178,12 +189,12 @@ pub(super) async fn post_task_board_plan_approve(
     State(state): State<DaemonHttpState>,
     Json(body): Json<TaskBoardPlanApproveBody>,
 ) -> Response {
-    let (start, request_id) = authenticated_parts!(headers, state);
-    let request = TaskBoardPlanApproveRequest {
+    let mut request = TaskBoardPlanApproveRequest {
         id: item_id,
         approved_by: body.approved_by,
         approved_at: body.approved_at,
     };
+    let (start, request_id) = authorized_control_parts!(headers, state, request);
     timed_json(
         "POST",
         http_paths::TASK_BOARD_PLAN_APPROVE,
@@ -235,9 +246,9 @@ pub(super) async fn post_task_board_sync(
 pub(super) async fn post_task_board_dispatch(
     headers: HeaderMap,
     State(state): State<DaemonHttpState>,
-    Json(request): Json<TaskBoardDispatchRequest>,
+    Json(mut request): Json<TaskBoardDispatchRequest>,
 ) -> Response {
-    let (start, request_id) = authenticated_parts!(headers, state);
+    let (start, request_id) = authorized_control_parts!(headers, state, request);
     let result = task_board_route_executor::dispatch(&state, request).await;
     timed_json(
         "POST",
@@ -251,9 +262,9 @@ pub(super) async fn post_task_board_dispatch(
 pub(super) async fn post_task_board_evaluate(
     headers: HeaderMap,
     State(state): State<DaemonHttpState>,
-    Json(request): Json<TaskBoardEvaluateRequest>,
+    Json(mut request): Json<TaskBoardEvaluateRequest>,
 ) -> Response {
-    let (start, request_id) = authenticated_parts!(headers, state);
+    let (start, request_id) = authorized_control_parts!(headers, state, request);
     let result = task_board_route_executor::evaluate(&state, request).await;
     timed_json(
         "POST",

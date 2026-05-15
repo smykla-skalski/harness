@@ -13,10 +13,9 @@ use crate::daemon::protocol::{
     TaskBoardPolicyPipelineSimulateRequest, TaskBoardTodoistTokenSyncRequest, http_paths,
 };
 use crate::errors::CliError;
-use crate::session::types::CONTROL_PLANE_ACTOR_ID;
 
 use super::DaemonHttpState;
-use super::auth::require_auth;
+use super::auth::{authorize_control_request, require_auth};
 use super::response::{extract_request_id, timed_json};
 use super::task_board_route_executor;
 
@@ -36,6 +35,17 @@ macro_rules! authenticated_request {
         let start = Instant::now();
         let request_id = extract_request_id(&$headers);
         if let Err(response) = require_auth(&$headers, &$state) {
+            return *response;
+        }
+        (start, request_id)
+    }};
+}
+
+macro_rules! authorized_control_request {
+    ($headers:expr, $state:expr, $request:expr) => {{
+        let start = Instant::now();
+        let request_id = extract_request_id(&$headers);
+        if let Err(response) = authorize_control_request(&$headers, &$state, &mut $request) {
             return *response;
         }
         (start, request_id)
@@ -203,8 +213,7 @@ async fn post_task_board_orchestrator_run_once(
     State(state): State<DaemonHttpState>,
     Json(mut request): Json<TaskBoardOrchestratorRunOnceRequest>,
 ) -> Response {
-    let (start, request_id) = authenticated_request!(headers, state);
-    request.actor = Some(CONTROL_PLANE_ACTOR_ID.to_string());
+    let (start, request_id) = authorized_control_request!(headers, state, request);
     let result = super::task_board_orchestrator_run_once::run(&state, &request).await;
     timed_json(
         "POST",
