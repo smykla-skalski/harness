@@ -1,6 +1,7 @@
 mod acp_inspect_publisher;
 mod background_tasks;
 mod binary_stamp;
+mod machine_heartbeat_loop;
 mod open_db;
 mod shutdown_signals;
 mod task_board_orchestrator_loop;
@@ -118,8 +119,7 @@ pub async fn serve(config: DaemonServeConfig) -> Result<(), CliError> {
         acp_agent_manager,
         managed_agent_mutation_locks: http::ManagedAgentMutationLocks::default(),
     };
-    let (_acp_inspect_push, _task_board_orchestrator_loop) =
-        spawn_background_tasks(&app_state, config.poll_interval, shutdown_rx.clone());
+    let _background = spawn_background_tasks(&app_state, config.poll_interval, shutdown_rx.clone());
 
     let serve_result = http::serve(listener, app_state, shutdown_rx).await;
     let cleanup_result = state::clear_manifest_for_pid(process_id());
