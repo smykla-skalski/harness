@@ -36,6 +36,8 @@ impl PolicyGate for GraphPolicyGate {
 pub struct PolicyPipelineSaveResponse {
     pub document: PolicyGraph,
     pub validation: PolicyGraphValidationReport,
+    #[serde(default)]
+    pub persisted: bool,
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -112,22 +114,48 @@ impl PolicyPipelineStore {
 
     /// Persist a draft policy graph.
     ///
+    /// `if_revision` is a compare-and-swap precondition: when non-zero, it must
+    /// match the currently persisted revision or the save is rejected with
+    /// `concurrent_modification`. A zero value preserves the legacy unchecked
+    /// behavior so older callers keep working.
+    ///
+    /// The draft is written only when `document.validate().is_valid()`.
+    /// An invalid draft returns a response with `persisted: false`, the
+    /// unwritten document, and the validation report; on-disk state stays
+    /// unchanged.
+    ///
     /// # Errors
-    /// Returns `CliError` when graph state cannot be written.
+    /// Returns `CliError` when the revision precondition fails or graph state
+    /// cannot be written.
     pub fn save_draft(
         &self,
         mut document: PolicyGraph,
+        if_revision: u64,
     ) -> Result<PolicyPipelineSaveResponse, CliError> {
         let current_revision = self
             .load_or_seed()
             .map_or(document.revision, |current| current.revision);
-        document.revision = current_revision.max(document.revision).saturating_add(1);
+        if if_revision != 0 && current_revision != if_revision {
+            return Err(CliErrorKind::concurrent_modification(format!(
+                "policy graph draft revision conflict: expected {if_revision}, found {current_revision}"
+            ))
+            .into());
+        }
         document.mode = PolicyGraphMode::Draft;
         let validation = document.validate();
+        if !validation.is_valid() {
+            return Ok(PolicyPipelineSaveResponse {
+                document,
+                validation,
+                persisted: false,
+            });
+        }
+        document.revision = current_revision.max(document.revision).saturating_add(1);
         write_json_pretty(&self.document_path(), &document)?;
         Ok(PolicyPipelineSaveResponse {
             document,
             validation,
+            persisted: true,
         })
     }
 
@@ -170,6 +198,10 @@ impl PolicyPipelineStore {
 
     /// Promote the current policy graph to enforced mode.
     ///
+    /// The `revision` field on the request acts as a compare-and-swap
+    /// precondition. The promotion fails with `concurrent_modification` when
+    /// the on-disk revision has moved past the request's expectation.
+    ///
     /// # Errors
     /// Returns `CliError` when revision preconditions fail or persistence fails.
     pub fn promote(
@@ -178,9 +210,9 @@ impl PolicyPipelineStore {
     ) -> Result<PolicyPipelinePromoteResponse, CliError> {
         let document = self.load_or_seed()?;
         if document.revision != request.revision {
-            return Err(CliErrorKind::invalid_transition(format!(
-                "policy graph revision {} cannot promote request revision {}",
-                document.revision, request.revision
+            return Err(CliErrorKind::concurrent_modification(format!(
+                "policy graph promote revision conflict: expected {}, found {}",
+                request.revision, document.revision
             ))
             .into());
         }

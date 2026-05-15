@@ -520,7 +520,7 @@ mod tests {
                 .iter()
                 .any(|node| matches!(node.kind, PolicyGraphNodeKind::HumanGate { .. }))
         );
-        let saved = store.save_draft(document).expect("save policy graph");
+        let saved = store.save_draft(document, 0).expect("save policy graph");
         store
             .simulate(Some(saved.document.clone()))
             .expect("simulate policy graph");

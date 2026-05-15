@@ -3,6 +3,7 @@ use tempfile::tempdir;
 
 use std::collections::HashMap;
 
+use crate::errors::CliErrorKind;
 use crate::task_board::policy::{
     BuiltInPolicyGate, PolicyAction, PolicyDecision, PolicyEvidence, PolicyGate, PolicyInput,
     PolicyReasonCode,
@@ -153,7 +154,7 @@ fn promotion_requires_exact_successful_simulation_revision() {
             actions.retain(|action| *action != PolicyAction::DeleteWorktree);
         }
     });
-    let saved = store.save_draft(document).expect("save draft");
+    let saved = store.save_draft(document, 0).expect("save draft");
 
     let failed = store.promote(&PolicyPipelinePromoteRequest {
         revision: saved.document.revision,
@@ -239,6 +240,67 @@ fn predicate_passes_is_positive_admits_count_evidence() {
     assert!(
         !predicate_passes(PolicyEvidencePredicate::IsTrue, 2),
         "IsTrue must reject non-one counts to stay bool-only",
+    );
+}
+
+#[test]
+fn save_draft_rejects_stale_revision() {
+    let temp = tempdir().expect("tempdir");
+    let store = PolicyPipelineStore::new(temp.path().to_path_buf());
+    let seeded = store.load_or_seed().expect("seed policy graph");
+    let baseline_revision = seeded.revision;
+    let first = store
+        .save_draft(seeded.clone(), baseline_revision)
+        .expect("save first draft");
+    assert!(first.persisted, "valid draft must persist");
+
+    let stale_attempt = store.save_draft(seeded, baseline_revision);
+    let error = stale_attempt.expect_err("stale revision must be rejected");
+    let detail = error.to_string();
+    let kind = error.kind().clone();
+    assert!(
+        matches!(kind, CliErrorKind::Workflow(_)),
+        "expected workflow error, got {kind:?}",
+    );
+    assert!(
+        detail.contains("revision conflict"),
+        "unexpected error detail: {detail}",
+    );
+}
+
+#[test]
+fn save_draft_rejects_invalid_graph() {
+    let temp = tempdir().expect("tempdir");
+    let store = PolicyPipelineStore::new(temp.path().to_path_buf());
+    let baseline = store.load_or_seed().expect("seed policy graph");
+    let mut invalid = baseline.clone();
+    invalid.edges.push(PolicyGraphEdge {
+        id: "edge:dangling".to_string(),
+        from_node: "no-such-node".to_string(),
+        from_port: "out".to_string(),
+        to_node: "no-such-node".to_string(),
+        to_port: PORT_IN.to_string(),
+        label: None,
+        condition: PolicyGraphEdgeCondition::Always,
+    });
+
+    let response = store.save_draft(invalid, 0).expect("save returns response");
+    assert!(!response.persisted, "invalid drafts must not persist");
+    assert!(
+        !response.validation.is_valid(),
+        "validation must surface issues for invalid drafts",
+    );
+
+    let on_disk = store
+        .load_or_seed()
+        .expect("load policy graph after rejected save");
+    assert_eq!(
+        on_disk.revision, baseline.revision,
+        "rejected drafts must not bump on-disk revision",
+    );
+    assert_eq!(
+        on_disk, baseline,
+        "rejected drafts must leave on-disk graph unchanged",
     );
 }
 
