@@ -141,20 +141,22 @@ struct SessionSidebarMultiSelectTests {
 
   @Test("Sidebar rows remove drag handle and drop target chrome")
   func sidebarRowsRemoveDragHandleAndDropTargetChrome() throws {
-    let source = try sourceFile(named: "SessionSidebarRow.swift")
+    let sessionSource = try sourceFile(named: "SessionSidebarRow.swift")
+    let sharedSource = try sourceFile(named: "HarnessMonitorSidebarRow.swift")
 
-    #expect(!source.contains("showsDragHandle"))
-    #expect(!source.contains("SessionSidebarDragHandle"))
-    #expect(!source.contains("isHoveringDragHandle"))
-    #expect(!source.contains("SessionSidebarDragHandleGlyph"))
-    #expect(!source.contains("path.addEllipse"))
-    #expect(!source.contains("for column in 0..<2"))
-    #expect(!source.contains("for row in 0..<3"))
-    #expect(!source.contains(".overlay(alignment: .trailing)"))
-    #expect(!source.contains(".onHover"))
-    #expect(!source.contains("isDropTargeted"))
-    #expect(!source.contains("dragHandleHitTarget"))
-    #expect(!source.contains("dropCornerRadius"))
+    #expect(sessionSource.contains("HarnessMonitorSidebarRow("))
+    #expect(!sharedSource.contains("showsDragHandle"))
+    #expect(!sharedSource.contains("SessionSidebarDragHandle"))
+    #expect(!sharedSource.contains("isHoveringDragHandle"))
+    #expect(!sharedSource.contains("SessionSidebarDragHandleGlyph"))
+    #expect(!sharedSource.contains("path.addEllipse"))
+    #expect(!sharedSource.contains("for column in 0..<2"))
+    #expect(!sharedSource.contains("for row in 0..<3"))
+    #expect(!sharedSource.contains(".overlay(alignment: .trailing)"))
+    #expect(!sharedSource.contains(".onHover"))
+    #expect(!sharedSource.contains("isDropTargeted"))
+    #expect(!sharedSource.contains("dragHandleHitTarget"))
+    #expect(!sharedSource.contains("dropCornerRadius"))
   }
 
   @Test("Sidebar rows rely on native List selection instead of tap gestures")
@@ -192,8 +194,10 @@ struct SessionSidebarMultiSelectTests {
   func sidebarSourcesNoLongerInstallDragAndDrop() throws {
     let sidebarSource = try sourceFile(named: "SessionSidebar.swift")
     let decisionSource = try sourceFile(named: "SessionSidebarDecisionSection.swift")
-    let rowSource = try sourceFile(named: "SessionSidebarRow.swift")
+    let sessionRowSource = try sourceFile(named: "SessionSidebarRow.swift")
+    let rowSource = try sourceFile(named: "HarnessMonitorSidebarRow.swift")
 
+    #expect(sessionRowSource.contains("HarnessMonitorSidebarRow("))
     #expect(!rowSource.contains("AnyView"))
     #expect(rowSource.contains(".contentShape(Rectangle())"))
     #expect(!sidebarSource.contains(".draggable("))

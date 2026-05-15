@@ -41,6 +41,71 @@ struct SessionStatusSummaryModel: Equatable {
   }
 }
 
+func harnessSidebarStatusSourceTint(for metrics: ConnectionMetrics) -> SessionStatusSourceTint {
+  if metrics.usesMutedConnectionChrome {
+    return .disabledConnection
+  }
+  let quality: ConnectionQuality =
+    if metrics.transportLatencyMs != nil {
+      metrics.transportQuality
+    } else if metrics.requestLatencyMs != nil {
+      metrics.requestQuality
+    } else {
+      .disconnected
+    }
+  switch quality {
+  case .excellent, .good:
+    return .success
+  case .degraded:
+    return .caution
+  case .poor, .disconnected:
+    return .danger
+  }
+}
+
+@MainActor
+func harnessSidebarConnectionTitle(for store: HarnessMonitorStore) -> String {
+  switch store.connectionState {
+  case .idle: "Idle"
+  case .connecting: "Connecting"
+  case .online: "Online"
+  case .offline: "Offline"
+  }
+}
+
+@MainActor
+func harnessSidebarConnectionSummaryText(for store: HarnessMonitorStore) -> String {
+  let metrics = store.connectionMetrics
+  if metrics.connectedSince != nil {
+    if let latency = metrics.transportLatencyMs {
+      return "Connection: \(metrics.transportKind.title), transport latency \(latency) milliseconds"
+    }
+    if let requestLatency = metrics.requestLatencyMs {
+      return [
+        "Connection: \(metrics.transportKind.title)",
+        "transport latency unavailable,",
+        "last request latency \(requestLatency) milliseconds",
+      ].joined(separator: " ")
+    }
+    return "Connection: \(metrics.transportKind.title)"
+  }
+  return "Connection: \(harnessSidebarConnectionTitle(for: store))"
+}
+
+@MainActor
+func harnessSidebarStatusStripState(
+  for store: HarnessMonitorStore,
+  isMCPRegistryHostEnabled: Bool
+) -> SessionStatusStripState {
+  let chrome = store.contentUI.chrome
+  return SessionStatusStripState(
+    daemonOwnership: store.daemonOwnership,
+    bridgeRunning: store.daemonStatus?.manifest?.hostBridge.running == true,
+    mcpStatus: chrome.mcpStatus,
+    isMCPRegistryHostEnabled: isMCPRegistryHostEnabled
+  )
+}
+
 enum SessionStatusSourceTint: Equatable {
   case tertiary
   case success
@@ -64,8 +129,10 @@ enum SessionStatusSourceTint: Equatable {
   }
 }
 
-struct SessionSidebarFooter: View {
+struct HarnessMonitorSidebarStatusFooter: View {
   let model: SessionStatusSummaryModel
+  let accessibilityIdentifier: String
+  let accessibilityLabel: String
   @ScaledMetric(relativeTo: .caption)
   private var horizontalPadding: CGFloat = 12
   @ScaledMetric(relativeTo: .caption)
@@ -96,14 +163,26 @@ struct SessionSidebarFooter: View {
     .padding(.bottom, footerOuterPadding)
     .help(model.helpText)
     .harnessMCPText(
-      HarnessMonitorAccessibility.sessionWindowStatusSurface,
-      label: "Session status",
+      accessibilityIdentifier,
+      label: accessibilityLabel,
       value: model.accessibilityValue,
       hint: model.helpText
     )
     .accessibilityElement(children: .ignore)
-    .accessibilityLabel("Session status")
+    .accessibilityLabel(accessibilityLabel)
     .accessibilityValue(model.accessibilityValue)
+  }
+}
+
+struct SessionSidebarFooter: View {
+  let model: SessionStatusSummaryModel
+
+  var body: some View {
+    HarnessMonitorSidebarStatusFooter(
+      model: model,
+      accessibilityIdentifier: HarnessMonitorAccessibility.sessionWindowStatusSurface,
+      accessibilityLabel: "Session status"
+    )
   }
 }
 

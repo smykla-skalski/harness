@@ -108,12 +108,15 @@ struct HarnessMonitorUITestAccessibilityRegistryMoreTests {
     )
   }
 
-  @Test("Dashboard route buttons stay accessibility-addressable")
-  func dashboardRouteButtonsStayAccessibilityAddressable() throws {
+  @Test("Dashboard route sidebar stays accessibility-addressable")
+  func dashboardRouteSidebarStaysAccessibilityAddressable() throws {
     let dashboardView = try sourceFile(named: "DashboardWindowView.swift")
 
     #expect(dashboardView.contains("HarnessMonitorAccessibility.dashboardSidebar"))
     #expect(dashboardView.contains("HarnessMonitorAccessibility.dashboardWindowRoute(route.rawValue)"))
+    #expect(dashboardView.contains("HarnessMonitorSidebarRow("))
+    #expect(!dashboardView.contains("SessionSidebarRow("))
+    #expect(dashboardView.contains("SessionSidebarFooter(model: statusModel)"))
     #expect(dashboardView.contains(".accessibilityValue(isSelected ? \"selected\" : \"not selected\")"))
   }
 
