@@ -114,6 +114,8 @@ public struct DashboardWindowView: View {
       }
       .accessibilityElement(children: .contain)
       .accessibilityIdentifier(HarnessMonitorAccessibility.dashboardWindowRoot)
+      .toolbar { Spacer() }
+      .toolbarBackground(.visible, for: .windowToolbar)
       .task {
         HarnessMonitorUITestTrace.record(
           component: "dashboard.window",
@@ -180,8 +182,7 @@ private struct DashboardSidebar: View {
     ) {
       HarnessMonitorSidebar(
         accessibilityIdentifier: HarnessMonitorAccessibility.dashboardSidebar,
-        statusModel: statusModel,
-        rowSize: harnessSidebarRowSize(for: textSizeIndex)
+        statusModel: statusModel
       ) {
         List(selection: dashboardSelectionBinding) {
           ForEach(DashboardWindowRoute.allCases, id: \.id) { route in
@@ -195,6 +196,9 @@ private struct DashboardSidebar: View {
             .accessibilityValue(isSelected ? "selected" : "not selected")
           }
         }
+        .harnessMonitorSidebarListChrome(
+          rowSize: harnessSidebarRowSize(for: textSizeIndex)
+        )
       }
     }
   }
