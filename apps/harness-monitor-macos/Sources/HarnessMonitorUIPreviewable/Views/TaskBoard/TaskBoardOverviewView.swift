@@ -109,7 +109,7 @@ public struct TaskBoardOverviewView: View {
         if !hasRouteContent {
           emptyState
         }
-        if !taskBoardItems.isEmpty || !decisions.isEmpty {
+        if hasBoardContent {
           taskBoard
         }
         if isCreatingTaskBoardItem || selectedTaskBoardItem != nil {
@@ -129,9 +129,6 @@ public struct TaskBoardOverviewView: View {
             onClose: clearSelectedTaskBoardItem
           )
           .id(selectedTaskBoardItem?.id ?? "new")
-        }
-        if !snapshot.isEmpty {
-          sessionTaskBoard
         }
       } else {
         emptyState
@@ -260,8 +257,12 @@ extension TaskBoardOverviewView {
     .accessibilityIdentifier("harness.task-board.evaluation-summary")
   }
 
+  private var hasBoardContent: Bool {
+    !taskBoardItems.isEmpty || !decisions.isEmpty || !snapshot.isEmpty
+  }
+
   private var taskBoard: some View {
-    TaskBoardSection(title: "Board Queue") {
+    TaskBoardSection(title: "Board") {
       taskBoardColumns
     }
   }
@@ -269,43 +270,17 @@ extension TaskBoardOverviewView {
   private var taskBoardColumns: some View {
     ScrollView(.horizontal, showsIndicators: true) {
       HStack(alignment: .top, spacing: metrics.columnSpacing) {
-        ForEach(taskBoardSections) { section in
-          if section.lane == .needsYou {
-            TaskBoardNeedsYouLaneColumn(
-              section: section,
-              decisions: decisions,
-              onOpenItem: openTaskBoardItem,
-              onMoveItem: moveTaskBoardItem,
-              onOpenDecision: onOpenDecision
-            )
-          } else {
-            TaskBoardItemLaneColumn(
-              section: section,
-              onOpenItem: openTaskBoardItem,
-              onMoveItem: moveTaskBoardItem
-            )
-          }
-        }
-      }
-      .padding(.vertical, metrics.boardVerticalPadding)
-    }
-    .scrollClipDisabled()
-  }
-
-  private var sessionTaskBoard: some View {
-    TaskBoardSection(title: "Session Tasks") {
-      inboxBoard
-    }
-  }
-
-  private var inboxBoard: some View {
-    ScrollView(.horizontal, showsIndicators: true) {
-      HStack(alignment: .top, spacing: metrics.columnSpacing) {
-        ForEach(snapshot.sections) { section in
-          TaskBoardInboxLaneColumn(
-            section: section,
-            onOpenItem: onOpenItem,
-            onMoveItem: moveInboxItem
+        ForEach(TaskBoardInboxLane.allCases) { lane in
+          TaskBoardLaneUnifiedColumn(
+            lane: lane,
+            apiItems: taskBoardItems.filter { TaskBoardInboxLane(status: $0.status) == lane },
+            inboxItems: snapshot.items.filter { $0.lane == lane },
+            decisions: lane == .needsYou ? decisions : [],
+            onOpenAPIItem: openTaskBoardItem,
+            onOpenInboxItem: onOpenItem,
+            onOpenDecision: onOpenDecision,
+            onMoveAPIItem: moveTaskBoardItem,
+            onMoveInboxItem: moveInboxItem
           )
         }
       }

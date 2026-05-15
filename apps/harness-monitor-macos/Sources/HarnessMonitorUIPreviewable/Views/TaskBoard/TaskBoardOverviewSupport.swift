@@ -1,13 +1,6 @@
 import HarnessMonitorKit
 import SwiftUI
 
-struct TaskBoardItemSection: Identifiable {
-  let lane: TaskBoardInboxLane
-  let items: [TaskBoardItem]
-
-  var id: TaskBoardInboxLane { lane }
-}
-
 struct TaskBoardOverviewMetrics: Equatable {
   let controlMinHeight: CGFloat
   let iconControlMinWidth: CGFloat
@@ -187,15 +180,6 @@ extension TaskBoardInboxLane {
 }
 
 extension TaskBoardOverviewView {
-  var taskBoardSections: [TaskBoardItemSection] {
-    TaskBoardInboxLane.allCases.map { lane in
-      TaskBoardItemSection(
-        lane: lane,
-        items: taskBoardItems.filter { TaskBoardInboxLane(status: $0.status) == lane }
-      )
-    }
-  }
-
   var taskBoardReviewCount: Int {
     taskBoardItems.count { TaskBoardInboxLane(status: $0.status) == .review }
   }

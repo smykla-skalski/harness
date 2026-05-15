@@ -14,6 +14,48 @@ struct TaskBoardItemDragPayload: Codable, Transferable, Sendable {
   var sourceLane: TaskBoardInboxLane? {
     TaskBoardInboxLane(status: status)
   }
+
+  func itemProvider() -> NSItemProvider {
+    let provider = NSItemProvider()
+    guard let encodedPayload = try? JSONEncoder().encode(self) else {
+      return provider
+    }
+    provider.registerDataRepresentation(
+      forTypeIdentifier: UTType.harnessMonitorTaskBoardItem.identifier,
+      visibility: .all
+    ) { completion in
+      completion(encodedPayload, nil)
+      return nil
+    }
+    return provider
+  }
+
+  static func loadFirst(
+    from providers: [NSItemProvider],
+    completion: @escaping @MainActor (TaskBoardItemDragPayload) -> Void
+  ) -> Bool {
+    guard
+      let provider = providers.first(where: {
+        $0.hasItemConformingToTypeIdentifier(UTType.harnessMonitorTaskBoardItem.identifier)
+      })
+    else {
+      return false
+    }
+    provider.loadDataRepresentation(
+      forTypeIdentifier: UTType.harnessMonitorTaskBoardItem.identifier
+    ) { data, _ in
+      guard
+        let data,
+        let payload = try? JSONDecoder().decode(Self.self, from: data)
+      else {
+        return
+      }
+      Task { @MainActor in
+        completion(payload)
+      }
+    }
+    return true
+  }
 }
 
 struct TaskBoardInboxItemDragPayload: Codable, Transferable, Sendable {
@@ -59,6 +101,48 @@ struct TaskBoardInboxItemDragPayload: Codable, Transferable, Sendable {
   var sourceLane: TaskBoardInboxLane? {
     TaskBoardInboxLane(rawValue: laneRawValue)
   }
+
+  func itemProvider() -> NSItemProvider {
+    let provider = NSItemProvider()
+    guard let encodedPayload = try? JSONEncoder().encode(self) else {
+      return provider
+    }
+    provider.registerDataRepresentation(
+      forTypeIdentifier: UTType.harnessMonitorTaskBoardInboxItem.identifier,
+      visibility: .all
+    ) { completion in
+      completion(encodedPayload, nil)
+      return nil
+    }
+    return provider
+  }
+
+  static func loadFirst(
+    from providers: [NSItemProvider],
+    completion: @escaping @MainActor (TaskBoardInboxItemDragPayload) -> Void
+  ) -> Bool {
+    guard
+      let provider = providers.first(where: {
+        $0.hasItemConformingToTypeIdentifier(UTType.harnessMonitorTaskBoardInboxItem.identifier)
+      })
+    else {
+      return false
+    }
+    provider.loadDataRepresentation(
+      forTypeIdentifier: UTType.harnessMonitorTaskBoardInboxItem.identifier
+    ) { data, _ in
+      guard
+        let data,
+        let payload = try? JSONDecoder().decode(Self.self, from: data)
+      else {
+        return
+      }
+      Task { @MainActor in
+        completion(payload)
+      }
+    }
+    return true
+  }
 }
 
 extension UTType {
@@ -71,159 +155,6 @@ extension UTType {
     exportedAs: "io.harnessmonitor.task-board-inbox-item",
     conformingTo: .json
   )
-}
-
-struct TaskBoardItemLaneColumn: View {
-  let section: TaskBoardItemSection
-  let onOpenItem: (TaskBoardItem) -> Void
-  let onMoveItem: (String, TaskBoardInboxLane) -> Bool
-  @Environment(\.fontScale)
-  private var fontScale
-  @State private var isDropTargeted = false
-  @State private var dropDeduper = TaskBoardDropDeduper<TaskBoardItemDropSignature>()
-
-  private var metrics: TaskBoardLaneMetrics { TaskBoardLaneMetrics(fontScale: fontScale) }
-
-  var body: some View {
-    VStack(alignment: .leading, spacing: metrics.laneSpacing) {
-      TaskBoardLaneHeader(lane: section.lane, count: section.items.count)
-
-      Group {
-        if section.items.isEmpty {
-          TaskBoardEmptyLane(lane: section.lane)
-        } else {
-          ScrollView(.vertical, showsIndicators: true) {
-            VStack(spacing: metrics.laneSpacing) {
-              ForEach(section.items) { item in
-                TaskBoardItemRow(item: item, onOpenItem: onOpenItem)
-              }
-            }
-            .frame(maxWidth: .infinity)
-          }
-          .scrollBounceBehavior(.basedOnSize)
-        }
-      }
-      .taskBoardLaneBodyChrome(lane: section.lane, isDropTargeted: isDropTargeted)
-    }
-    .taskBoardLaneColumnChrome(lane: section.lane, isDropTargeted: isDropTargeted)
-    .dropDestination(for: TaskBoardItemDragPayload.self, action: handleDrop) { targeted in
-      updateDropTargeted(targeted)
-    }
-    .accessibilityElement(children: .contain)
-    .accessibilityIdentifier("harness.task-board.api-column.\(section.lane.rawValue)")
-  }
-
-  private func handleDrop(_ payloads: [TaskBoardItemDragPayload], _: CGPoint) -> Bool {
-    guard let payload = payloads.first else {
-      return false
-    }
-    return performDrop(
-      signature: TaskBoardItemDropSignature(itemID: payload.itemID, destination: section.lane)
-    ) {
-      TaskBoardLaneDropPolicy.moveFirstPayload(
-        payloads,
-        to: section.lane,
-        move: onMoveItem
-      )
-    }
-  }
-
-  private func updateDropTargeted(_ targeted: Bool) {
-    isDropTargeted = targeted
-    if !targeted {
-      dropDeduper = TaskBoardDropDeduper()
-    }
-  }
-
-  private func performDrop(
-    signature: TaskBoardItemDropSignature,
-    action: () -> Bool
-  ) -> Bool {
-    var deduper = dropDeduper
-    let handled = deduper.perform(signature, move: action)
-    dropDeduper = deduper
-    return handled
-  }
-}
-
-struct TaskBoardInboxLaneColumn: View {
-  let section: TaskBoardInboxSection
-  let onOpenItem: (TaskBoardInboxItem) -> Void
-  let onMoveItem: (TaskBoardInboxItemDragPayload, TaskBoardInboxLane) -> Bool
-  @Environment(\.fontScale)
-  private var fontScale
-  @State private var isDropTargeted = false
-  @State private var dropDeduper = TaskBoardDropDeduper<TaskBoardInboxItemDropSignature>()
-
-  private var metrics: TaskBoardLaneMetrics { TaskBoardLaneMetrics(fontScale: fontScale) }
-
-  var body: some View {
-    VStack(alignment: .leading, spacing: metrics.laneSpacing) {
-      TaskBoardLaneHeader(lane: section.lane, count: section.items.count)
-
-      Group {
-        if section.items.isEmpty {
-          TaskBoardEmptyLane(lane: section.lane)
-        } else {
-          ScrollView(.vertical, showsIndicators: true) {
-            VStack(spacing: metrics.laneSpacing) {
-              ForEach(section.items) { item in
-                TaskBoardInboxItemRow(
-                  item: item,
-                  onOpenItem: onOpenItem
-                )
-              }
-            }
-            .frame(maxWidth: .infinity)
-          }
-          .scrollBounceBehavior(.basedOnSize)
-        }
-      }
-      .taskBoardLaneBodyChrome(lane: section.lane, isDropTargeted: isDropTargeted)
-    }
-    .taskBoardLaneColumnChrome(lane: section.lane, isDropTargeted: isDropTargeted)
-    .dropDestination(for: TaskBoardInboxItemDragPayload.self, action: handleDrop) { targeted in
-      updateDropTargeted(targeted)
-    }
-    .accessibilityElement(children: .contain)
-    .accessibilityIdentifier("harness.task-board.column.\(section.lane.rawValue)")
-  }
-
-  private func handleDrop(_ payloads: [TaskBoardInboxItemDragPayload], _: CGPoint) -> Bool {
-    guard let payload = payloads.first else {
-      return false
-    }
-    return performDrop(
-      signature: TaskBoardInboxItemDropSignature(
-        sessionID: payload.sessionID,
-        taskID: payload.taskID,
-        destination: section.lane
-      )
-    ) {
-      TaskBoardInboxDropPolicy.moveFirstPayload(
-        payloads,
-        to: section.lane,
-        move: onMoveItem
-      )
-    }
-  }
-
-  private func updateDropTargeted(_ targeted: Bool) {
-    isDropTargeted = targeted
-    if !targeted {
-      dropDeduper = TaskBoardDropDeduper()
-    }
-  }
-
-  private func performDrop(
-    signature: TaskBoardInboxItemDropSignature,
-    action: () -> Bool
-  ) -> Bool {
-    var deduper = dropDeduper
-    let handled = deduper.perform(signature, move: action)
-    dropDeduper = deduper
-    return handled
-  }
 }
 
 struct TaskBoardItemRow: View {
@@ -275,6 +206,9 @@ struct TaskBoardItemRow: View {
     }
     .taskBoardCardChrome()
     .contentShape(.rect)
+    .onDrag {
+      dragPayload.itemProvider()
+    }
     .draggable(dragPayload) {
       TaskBoardItemDragPreviewCard(item: item)
     }
@@ -374,6 +308,9 @@ struct TaskBoardInboxItemRow: View {
     }
     .taskBoardCardChrome()
     .contentShape(.rect)
+    .onDrag {
+      dragPayload.itemProvider()
+    }
     .draggable(dragPayload) {
       TaskBoardInboxItemDragPreviewCard(item: item)
     }

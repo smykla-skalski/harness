@@ -245,29 +245,30 @@ struct SessionWindowRouteContentMetricsTests {
     let overviewSource = try taskBoardSourceFile(named: "TaskBoardOverviewView.swift")
     let laneSource = try taskBoardSourceFile(named: "TaskBoardLaneViews.swift")
     let laneSupportSource = try taskBoardSourceFile(named: "TaskBoardLaneSupport.swift")
-    let needsYouSource = try taskBoardSourceFile(named: "TaskBoardNeedsYouLaneViews.swift")
+    let unifiedSource = try taskBoardSourceFile(named: "TaskBoardLaneUnifiedColumn.swift")
 
     #expect(overviewSource.contains("lane.taskBoardDropStatus"))
     #expect(laneSource.contains("TaskBoardItemDragPayload"))
     #expect(laneSource.contains("TaskBoardInboxItemDragPayload"))
     #expect(laneSource.contains("let status: TaskBoardStatus"))
-    #expect(laneSource.contains("TaskBoardLaneDropPolicy.moveFirstPayload("))
+    #expect(unifiedSource.contains("TaskBoardLaneDropPolicy.moveFirstPayload("))
+    #expect(unifiedSource.contains("TaskBoardInboxDropPolicy.moveFirstPayload("))
     #expect(laneSupportSource.contains("TaskBoardInboxDropPolicy"))
     #expect(laneSupportSource.contains("sourceLane != destination"))
-    #expect(needsYouSource.contains("TaskBoardLaneDropPolicy.moveFirstPayload("))
     #expect(laneSource.contains(".draggable(dragPayload)"))
-    #expect(laneSource.contains(".dropDestination(for: TaskBoardItemDragPayload.self"))
-    #expect(laneSource.contains(".dropDestination(for: TaskBoardInboxItemDragPayload.self"))
-    #expect(needsYouSource.contains(".dropDestination(for: TaskBoardItemDragPayload.self"))
+    #expect(laneSource.contains(".onDrag {"))
+    #expect(unifiedSource.contains(".dropDestination(for: TaskBoardItemDragPayload.self"))
+    #expect(unifiedSource.contains(".dropDestination(for: TaskBoardInboxItemDragPayload.self"))
+    #expect(unifiedSource.contains(".onDrop("))
   }
 
   @Test("Task board lanes keep board column chrome")
   func taskBoardLanesKeepBoardColumnChrome() throws {
-    let laneSource = try taskBoardSourceFile(named: "TaskBoardLaneViews.swift")
+    let unifiedSource = try taskBoardSourceFile(named: "TaskBoardLaneUnifiedColumn.swift")
     let laneSupportSource = try taskBoardSourceFile(named: "TaskBoardLaneSupport.swift")
     let overviewSource = try taskBoardSourceFile(named: "TaskBoardOverviewView.swift")
 
-    #expect(laneSource.contains(".taskBoardLaneColumnChrome("))
+    #expect(unifiedSource.contains(".taskBoardLaneColumnChrome("))
     #expect(laneSupportSource.contains("private struct TaskBoardLaneColumnChrome"))
     #expect(laneSupportSource.contains("private var laneFill: AnyShapeStyle"))
     #expect(
@@ -284,17 +285,16 @@ struct SessionWindowRouteContentMetricsTests {
 
   @Test("Task board lanes render every card instead of hiding overflow")
   func taskBoardLanesRenderEveryCardInsteadOfHidingOverflow() throws {
-    let laneSource = try taskBoardSourceFile(named: "TaskBoardLaneViews.swift")
+    let unifiedSource = try taskBoardSourceFile(named: "TaskBoardLaneUnifiedColumn.swift")
     let laneSupportSource = try taskBoardSourceFile(named: "TaskBoardLaneSupport.swift")
-    let needsYouSource = try taskBoardSourceFile(named: "TaskBoardNeedsYouLaneViews.swift")
 
-    #expect(laneSource.contains("ForEach(section.items)"))
-    #expect(needsYouSource.contains("ForEach(decisions, id: \\.id)"))
-    #expect(!laneSource.contains(".prefix(5)"))
-    #expect(!needsYouSource.contains(".prefix(4)"))
-    #expect(!laneSource.contains("TaskBoardLaneOverflowRow("))
+    #expect(unifiedSource.contains("ForEach(apiItems)"))
+    #expect(unifiedSource.contains("ForEach(inboxItems)"))
+    #expect(unifiedSource.contains("ForEach(decisions, id: \\.id)"))
+    #expect(!unifiedSource.contains(".prefix(5)"))
+    #expect(!unifiedSource.contains(".prefix(4)"))
+    #expect(!unifiedSource.contains("TaskBoardLaneOverflowRow("))
     #expect(!laneSupportSource.contains("TaskBoardLaneOverflowRow"))
-    #expect(!needsYouSource.contains("hiddenItemCount"))
   }
 
   private func sourceFile(named relativePath: String) throws -> String {
