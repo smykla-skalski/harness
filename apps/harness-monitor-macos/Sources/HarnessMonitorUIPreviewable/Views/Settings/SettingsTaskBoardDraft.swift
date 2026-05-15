@@ -290,7 +290,8 @@ struct TaskBoardGitSettingsDraft: Equatable {
   }
 }
 
-struct TaskBoardRepositoryOverrideDraft: Equatable {
+struct TaskBoardRepositoryOverrideDraft: Identifiable, Equatable {
+  let id: UUID
   var repository = ""
   var authorName = ""
   var authorEmail = ""
@@ -308,6 +309,7 @@ struct TaskBoardRepositoryOverrideDraft: Equatable {
   var token = ""
 
   init(
+    id: UUID = UUID(),
     repository: String = "",
     authorName: String = "",
     authorEmail: String = "",
@@ -324,6 +326,7 @@ struct TaskBoardRepositoryOverrideDraft: Equatable {
     gpgPrivateKeyPassphrase: String = "",
     token: String = ""
   ) {
+    self.id = id
     self.repository = repository
     self.authorName = authorName
     self.authorEmail = authorEmail
