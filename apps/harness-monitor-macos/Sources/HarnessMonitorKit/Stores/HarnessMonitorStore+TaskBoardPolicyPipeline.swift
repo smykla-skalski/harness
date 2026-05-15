@@ -51,7 +51,13 @@ extension HarnessMonitorStore {
       recordRequestSuccess()
       globalTaskBoardPolicyPipeline = response.document
       await applyTaskBoardPolicyPipelineSupervisorOverrides(response.document)
-      presentSuccessFeedback("Saved policy draft")
+      if response.validation.isValid {
+        presentSuccessFeedback("Saved policy draft")
+      } else {
+        presentFailureFeedback(
+          response.validation.issues.first?.message ?? "Policy draft is invalid"
+        )
+      }
       return response.validation.isValid
     } catch {
       presentFailureFeedback(error.localizedDescription)
@@ -76,7 +82,13 @@ extension HarnessMonitorStore {
       recordRequestSuccess()
       globalTaskBoardPolicySimulation = simulation
       globalTaskBoardPolicyAudit = await loadTaskBoardPolicyAudit(using: client)
-      presentSuccessFeedback("Simulated policy")
+      if simulation.validation.isValid {
+        presentSuccessFeedback("Simulated policy")
+      } else {
+        presentFailureFeedback(
+          simulation.validation.issues.first?.message ?? "Policy simulation found issues"
+        )
+      }
       return simulation.succeeded
     } catch {
       presentFailureFeedback(error.localizedDescription)
