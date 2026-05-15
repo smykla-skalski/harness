@@ -12,6 +12,34 @@ extension RecordingHarnessClient {
     return items.filter { $0.status == status }
   }
 
+  func createTaskBoardItem(request: TaskBoardCreateItemRequest) async throws -> TaskBoardItem {
+    calls.append(.createTaskBoardItem(title: request.title, priority: request.priority))
+    return lock.withLock {
+      let item = TaskBoardItem(
+        schemaVersion: 1,
+        id: request.id ?? "board-\(taskBoardItemsStorage.count + 1)",
+        title: request.title,
+        body: request.body,
+        status: .new,
+        priority: request.priority,
+        tags: request.tags,
+        projectId: request.projectId,
+        agentMode: request.agentMode,
+        externalRefs: request.externalRefs,
+        planning: request.planning,
+        workflow: request.workflow,
+        sessionId: request.sessionId,
+        workItemId: request.workItemId,
+        usage: TaskBoardUsage(),
+        createdAt: "2026-05-14T10:04:00Z",
+        updatedAt: "2026-05-14T10:04:00Z",
+        deletedAt: nil
+      )
+      taskBoardItemsStorage.append(item)
+      return item
+    }
+  }
+
   func updateTaskBoardItem(
     id: String,
     request: TaskBoardUpdateItemRequest
@@ -25,6 +53,16 @@ extension RecordingHarnessClient {
       let updated = current.applying(request)
       taskBoardItemsStorage[index] = updated
       return updated
+    }
+  }
+
+  func deleteTaskBoardItem(id: String) async throws -> TaskBoardItem {
+    calls.append(.deleteTaskBoardItem(id: id))
+    return try lock.withLock {
+      guard let index = taskBoardItemsStorage.firstIndex(where: { $0.id == id }) else {
+        throw HarnessMonitorAPIError.server(code: 404, message: "Task board item unavailable.")
+      }
+      return taskBoardItemsStorage.remove(at: index)
     }
   }
 

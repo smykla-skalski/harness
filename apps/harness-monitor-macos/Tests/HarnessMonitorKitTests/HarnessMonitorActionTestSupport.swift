@@ -165,10 +165,12 @@ final class RecordingHarnessClient: HarnessMonitorClientProtocol, @unchecked Sen
       status: TaskBoardStatus?,
       itemID: String?
     )
+    case createTaskBoardItem(title: String, priority: TaskBoardPriority)
     case updateTaskBoardItem(
       id: String,
       status: TaskBoardStatus?
     )
+    case deleteTaskBoardItem(id: String)
     case updateTaskBoardOrchestratorSettings(
       policyVersion: String?,
       clearProjectDir: Bool,

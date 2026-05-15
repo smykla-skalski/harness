@@ -15,6 +15,8 @@ struct TaskBoardOverviewMetrics: Equatable {
   let managementPanelSpacing: CGFloat
   let managementPanelCornerRadius: CGFloat
   let managementPillVerticalPadding: CGFloat
+  let editorBodyMinHeight: CGFloat
+  let editorPlanningMinHeight: CGFloat
 
   init(fontScale: CGFloat) {
     let scale = SessionWindowFontScale.metricsScale(for: fontScale)
@@ -24,6 +26,8 @@ struct TaskBoardOverviewMetrics: Equatable {
     managementPanelSpacing = max(8, 8 * min(scale, 1.35))
     managementPanelCornerRadius = HarnessMonitorTheme.cornerRadiusSM * min(scale, 1.2)
     managementPillVerticalPadding = max(3, 3 * min(scale, 1.25))
+    editorBodyMinHeight = max(96, 96 * min(scale, 1.2))
+    editorPlanningMinHeight = max(72, 72 * min(scale, 1.2))
   }
 }
 

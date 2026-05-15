@@ -32,4 +32,43 @@ struct SettingsTaskBoardDraftTests {
     #expect(draft.snapshot.todoistCredentials.token == nil)
     #expect(draft.snapshot.todoistCredentials.isEmpty)
   }
+
+  @Test("Global direct signing key fields round trip through runtime snapshot")
+  func globalDirectSigningKeyFieldsRoundTrip() {
+    var draft = TaskBoardGitSettingsDraft()
+    draft.signingMode = .gpg
+    draft.gpgKeyId = " ABC123 "
+    draft.gpgPrivateKeyPath = " /Users/test/.gnupg/private.asc "
+    draft.gpgPrivateKeyPassphrase = " passphrase "
+
+    let signing = draft.snapshot.runtimeConfig.global.signing
+
+    #expect(signing.mode == .gpg)
+    #expect(signing.gpgKeyId == "ABC123")
+    #expect(signing.gpgPrivateKeyPath == "/Users/test/.gnupg/private.asc")
+    #expect(signing.gpgPrivateKeyPassphrase == "passphrase")
+  }
+
+  @Test("Repository direct signing key fields round trip through override snapshot")
+  func repositoryDirectSigningKeyFieldsRoundTrip() throws {
+    var draft = TaskBoardGitSettingsDraft()
+    draft.repositoryOverrides = [
+      TaskBoardRepositoryOverrideDraft(
+        repository: " KONG/HARNESS ",
+        signingMode: .gpg,
+        gpgKeyId: " DEF456 ",
+        gpgPrivateKeyPath: " /Users/test/.gnupg/repo.asc ",
+        gpgPrivateKeyPassphrase: " repo-passphrase "
+      )
+    ]
+
+    let override = try #require(draft.snapshot.runtimeConfig.repositoryOverrides.first)
+    let signing = override.profile.signing
+
+    #expect(override.repository == "kong/harness")
+    #expect(signing.mode == .gpg)
+    #expect(signing.gpgKeyId == "DEF456")
+    #expect(signing.gpgPrivateKeyPath == "/Users/test/.gnupg/repo.asc")
+    #expect(signing.gpgPrivateKeyPassphrase == "repo-passphrase")
+  }
 }

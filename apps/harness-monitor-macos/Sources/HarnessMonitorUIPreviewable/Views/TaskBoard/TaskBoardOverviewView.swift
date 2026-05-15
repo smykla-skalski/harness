@@ -13,6 +13,9 @@ public struct TaskBoardOverviewView: View {
   let onMoveInboxItem: ((TaskBoardInboxItem, TaskStatus) -> Void)?
   let onMoveTaskBoardItem: ((String, TaskBoardStatus) -> Void)?
   let onOpenDecision: (Decision) -> Void
+  let onCreateTaskBoardItem: ((TaskBoardCreateItemRequest, TaskBoardStatus) -> Void)?
+  let onUpdateTaskBoardItem: ((String, TaskBoardUpdateItemRequest) -> Void)?
+  let onDeleteTaskBoardItem: ((TaskBoardItem) -> Void)?
   let onEvaluateTaskBoard: (() -> Void)?
   let onEvaluateTaskBoardItem: ((TaskBoardItem) -> Void)?
   let onRefreshTaskBoard: (() -> Void)?
@@ -22,6 +25,7 @@ public struct TaskBoardOverviewView: View {
   @Environment(\.fontScale)
   private var fontScale
   @State private var selectedTaskBoardItemID: String?
+  @State private var isCreatingTaskBoardItem = false
 
   private var metrics: TaskBoardOverviewMetrics {
     TaskBoardOverviewMetrics(fontScale: fontScale)
@@ -39,6 +43,9 @@ public struct TaskBoardOverviewView: View {
     onMoveInboxItem: ((TaskBoardInboxItem, TaskStatus) -> Void)? = nil,
     onMoveTaskBoardItem: ((String, TaskBoardStatus) -> Void)? = nil,
     onOpenDecision: @escaping (Decision) -> Void = { _ in },
+    onCreateTaskBoardItem: ((TaskBoardCreateItemRequest, TaskBoardStatus) -> Void)? = nil,
+    onUpdateTaskBoardItem: ((String, TaskBoardUpdateItemRequest) -> Void)? = nil,
+    onDeleteTaskBoardItem: ((TaskBoardItem) -> Void)? = nil,
     onEvaluateTaskBoard: (() -> Void)? = nil,
     onEvaluateTaskBoardItem: ((TaskBoardItem) -> Void)? = nil,
     onRefreshTaskBoard: (() -> Void)? = nil,
@@ -57,6 +64,9 @@ public struct TaskBoardOverviewView: View {
     self.onMoveInboxItem = onMoveInboxItem
     self.onMoveTaskBoardItem = onMoveTaskBoardItem
     self.onOpenDecision = onOpenDecision
+    self.onCreateTaskBoardItem = onCreateTaskBoardItem
+    self.onUpdateTaskBoardItem = onUpdateTaskBoardItem
+    self.onDeleteTaskBoardItem = onDeleteTaskBoardItem
     self.onEvaluateTaskBoard = onEvaluateTaskBoard
     self.onEvaluateTaskBoardItem = onEvaluateTaskBoardItem
     self.onRefreshTaskBoard = onRefreshTaskBoard
@@ -88,16 +98,20 @@ public struct TaskBoardOverviewView: View {
         if !taskBoardItems.isEmpty || !decisions.isEmpty {
           taskBoard
         }
-        if let selectedTaskBoardItem {
+        if isCreatingTaskBoardItem || selectedTaskBoardItem != nil {
           TaskBoardItemManagementPanel(
             item: selectedTaskBoardItem,
             metrics: metrics,
             isActionInFlight: isActionInFlight,
+            onCreate: onCreateTaskBoardItem,
+            onUpdate: onUpdateTaskBoardItem,
+            onDelete: onDeleteTaskBoardItem,
             onRunOnce: runOrchestratorOnceForItem,
             onEvaluate: selectedTaskBoardItemEvaluateAction,
             onRefresh: onRefreshTaskBoard,
             onClose: clearSelectedTaskBoardItem
           )
+          .id(selectedTaskBoardItem?.id ?? "new")
         }
         if !snapshot.isEmpty {
           sessionTaskBoard
@@ -152,6 +166,21 @@ extension TaskBoardOverviewView {
   }
 
   @ViewBuilder private var headerActionButtons: some View {
+    if onCreateTaskBoardItem != nil {
+      Button {
+        startTaskBoardItemCreation()
+      } label: {
+        Label("New Item", systemImage: "plus.circle")
+          .scaledFont(.caption.weight(.semibold))
+      }
+      .frame(minHeight: metrics.controlMinHeight)
+      .harnessActionButtonStyle(variant: .bordered, tint: HarnessMonitorTheme.accent)
+      .controlSize(HarnessMonitorControlMetrics.compactControlSize)
+      .disabled(isActionInFlight)
+      .help("Create board item")
+      .accessibilityIdentifier("harness.task-board.new-item")
+    }
+
     if let onEvaluateTaskBoard {
       Button {
         onEvaluateTaskBoard()
@@ -276,11 +305,13 @@ extension TaskBoardOverviewView {
 
   private func openTaskBoardItem(_ item: TaskBoardItem) {
     if shouldOpenLinkedTask(item) {
+      isCreatingTaskBoardItem = false
       selectedTaskBoardItemID = nil
       onOpenTaskBoardItem(item)
     } else if selectedTaskBoardItemID == item.id {
       selectedTaskBoardItemID = nil
     } else {
+      isCreatingTaskBoardItem = false
       selectedTaskBoardItemID = item.id
     }
   }
@@ -333,6 +364,12 @@ extension TaskBoardOverviewView {
 
   private func clearSelectedTaskBoardItem() {
     selectedTaskBoardItemID = nil
+    isCreatingTaskBoardItem = false
+  }
+
+  private func startTaskBoardItemCreation() {
+    selectedTaskBoardItemID = nil
+    isCreatingTaskBoardItem = true
   }
 
   private func runOrchestratorOnce() {

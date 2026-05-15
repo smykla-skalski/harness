@@ -100,6 +100,9 @@ struct SessionsBoardView: View {
           onMoveInboxItem: moveInboxItem,
           onMoveTaskBoardItem: moveTaskBoardItem,
           onOpenDecision: openDecision,
+          onCreateTaskBoardItem: createTaskBoardItem,
+          onUpdateTaskBoardItem: updateTaskBoardItem,
+          onDeleteTaskBoardItem: deleteTaskBoardItem,
           onEvaluateTaskBoard: evaluateTaskBoard,
           onEvaluateTaskBoardItem: evaluateTaskBoardItem,
           onRefreshTaskBoard: refreshTaskBoard,
@@ -129,6 +132,27 @@ struct SessionsBoardView: View {
   private func moveTaskBoardItem(_ itemID: String, status: TaskBoardStatus) {
     Task { @MainActor in
       await store.updateTaskBoardItemStatus(id: itemID, status: status)
+    }
+  }
+
+  private func createTaskBoardItem(
+    _ request: TaskBoardCreateItemRequest,
+    initialStatus: TaskBoardStatus
+  ) {
+    Task { @MainActor in
+      await store.createTaskBoardItem(request: request, initialStatus: initialStatus)
+    }
+  }
+
+  private func updateTaskBoardItem(_ itemID: String, request: TaskBoardUpdateItemRequest) {
+    Task { @MainActor in
+      await store.updateTaskBoardItem(id: itemID, request: request)
+    }
+  }
+
+  private func deleteTaskBoardItem(_ item: TaskBoardItem) {
+    Task { @MainActor in
+      await store.deleteTaskBoardItem(id: item.id)
     }
   }
 
