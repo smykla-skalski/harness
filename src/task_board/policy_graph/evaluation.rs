@@ -171,10 +171,11 @@ fn risk_value(field: PolicyEvidenceField, input: &PolicyInput) -> Option<u8> {
     }
 }
 
-const fn predicate_passes(predicate: PolicyEvidencePredicate, value: u32) -> bool {
+pub(super) const fn predicate_passes(predicate: PolicyEvidencePredicate, value: u32) -> bool {
     match predicate {
         PolicyEvidencePredicate::IsTrue => value == 1,
         PolicyEvidencePredicate::IsFalse | PolicyEvidencePredicate::IsZero => value == 0,
+        PolicyEvidencePredicate::IsPositive => value > 0,
     }
 }
 
