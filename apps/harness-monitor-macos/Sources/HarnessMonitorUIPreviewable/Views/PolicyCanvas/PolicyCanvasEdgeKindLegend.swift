@@ -1,0 +1,137 @@
+import SwiftUI
+
+/// Three-row legend explaining how edge stroke color + dash pattern map to
+/// the semantic kind (`.flow` / `.control` / `.error`). Closes nielsen H6
+/// "recognition rather than recall" - sighted users no longer have to
+/// memorize the color/dash mapping or hover every edge to learn it.
+///
+/// The legend sits as a viewport overlay aligned with the zoom controls and
+/// shortcut disclosure (per the canvas chrome convention). It floats above
+/// the viewport scrollview so it stays visible regardless of pan/zoom, and
+/// it can be collapsed via the disclosure header when the user wants the
+/// full canvas area.
+struct PolicyCanvasEdgeKindLegend: View {
+  @State private var isExpanded: Bool = true
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      header
+      if isExpanded {
+        VStack(alignment: .leading, spacing: 6) {
+          ForEach(PolicyCanvasEdgeKind.allCases, id: \.self) { kind in
+            row(for: kind)
+          }
+        }
+        .padding(.horizontal, 10)
+        .padding(.bottom, 8)
+        .transition(.opacity.combined(with: .move(edge: .top)))
+      }
+    }
+    .background(
+      RoundedRectangle(cornerRadius: 8, style: .continuous)
+        .fill(Color(red: 0.07, green: 0.09, blue: 0.13).opacity(0.92))
+    )
+    .overlay(
+      RoundedRectangle(cornerRadius: 8, style: .continuous)
+        .stroke(Color.white.opacity(0.08), lineWidth: 1)
+    )
+    .frame(width: 168)
+    .accessibilityElement(children: .contain)
+    .accessibilityLabel("Edge legend")
+    .accessibilityIdentifier(HarnessMonitorAccessibility.policyCanvasEdgeLegend)
+  }
+
+  private var header: some View {
+    Button {
+      withAnimation(.easeInOut(duration: 0.18)) {
+        isExpanded.toggle()
+      }
+    } label: {
+      HStack(spacing: 6) {
+        Image(systemName: "scribble")
+          .imageScale(.small)
+          .foregroundStyle(.secondary)
+        Text("Edges")
+          .scaledFont(.caption.weight(.semibold))
+          .foregroundStyle(.primary)
+        Spacer(minLength: 0)
+        Image(systemName: isExpanded ? "chevron.down" : "chevron.up")
+          .imageScale(.small)
+          .foregroundStyle(.secondary)
+      }
+      .padding(.horizontal, 10)
+      .padding(.vertical, 8)
+      .contentShape(Rectangle())
+    }
+    .harnessPlainButtonStyle()
+    .accessibilityLabel(isExpanded ? "Hide edge legend" : "Show edge legend")
+    .accessibilityIdentifier(HarnessMonitorAccessibility.policyCanvasEdgeLegendToggle)
+  }
+
+  private func row(for kind: PolicyCanvasEdgeKind) -> some View {
+    HStack(spacing: 8) {
+      swatch(for: kind)
+      Text(label(for: kind))
+        .scaledFont(.caption2)
+        .foregroundStyle(.primary.opacity(0.88))
+      Spacer(minLength: 0)
+    }
+    .accessibilityElement(children: .ignore)
+    .accessibilityLabel("\(kind.accessibilityWord), \(dashKey(for: kind))")
+  }
+
+  private func swatch(for kind: PolicyCanvasEdgeKind) -> some View {
+    PolicyCanvasEdgeLegendSwatch(kind: kind)
+      .frame(width: 32, height: 6)
+  }
+
+  private func label(for kind: PolicyCanvasEdgeKind) -> String {
+    switch kind {
+    case .flow:
+      return "Flow · solid"
+    case .control:
+      return "Control · dashed"
+    case .error:
+      return "Error · dense"
+    }
+  }
+
+  /// Same key the hover tooltip surfaces, kept in sync so the legend's
+  /// VoiceOver value matches what AT users hear on the live edges.
+  private func dashKey(for kind: PolicyCanvasEdgeKind) -> String {
+    switch kind {
+    case .flow:
+      return "solid"
+    case .control:
+      return "widely dashed"
+    case .error:
+      return "tightly dashed"
+    }
+  }
+}
+
+/// Single-row dashed swatch that mirrors the production stroke for a given
+/// kind. Renders the kind's accent color with the kind's `strokeDashPattern`
+/// so the legend stays in sync with the canvas - bumping a kind's color or
+/// pattern in `PolicyCanvasEdgeKind` reflects here automatically.
+private struct PolicyCanvasEdgeLegendSwatch: View {
+  let kind: PolicyCanvasEdgeKind
+
+  var body: some View {
+    Canvas { context, size in
+      var path = Path()
+      path.move(to: CGPoint(x: 0, y: size.height / 2))
+      path.addLine(to: CGPoint(x: size.width, y: size.height / 2))
+      context.stroke(
+        path,
+        with: .color(kind.accentColor),
+        style: StrokeStyle(
+          lineWidth: 2.4,
+          lineCap: .round,
+          lineJoin: .round,
+          dash: kind.strokeDashPattern
+        )
+      )
+    }
+  }
+}

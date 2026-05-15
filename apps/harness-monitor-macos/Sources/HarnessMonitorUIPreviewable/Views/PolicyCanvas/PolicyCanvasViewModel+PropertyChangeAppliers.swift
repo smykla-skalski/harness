@@ -145,6 +145,32 @@ extension PolicyCanvasViewModel {
     return .setEdgeLabel(id: id, from: to, to: from)
   }
 
+  func applySetEdgeKind(
+    id: String,
+    from: PolicyCanvasEdgeKind,
+    to: PolicyCanvasEdgeKind
+  ) -> PolicyCanvasChange {
+    guard let index = edges.firstIndex(where: { $0.id == id }) else {
+      return .setEdgeKind(id: id, from: to, to: to)
+    }
+    markEdgeEdited(id)
+    edges[index].kind = to
+    return .setEdgeKind(id: id, from: to, to: from)
+  }
+
+  func applySetEdgePinnedPortSide(
+    id: String,
+    from: Bool,
+    to: Bool
+  ) -> PolicyCanvasChange {
+    guard let index = edges.firstIndex(where: { $0.id == id }) else {
+      return .setEdgePinnedPortSide(id: id, from: to, to: to)
+    }
+    markEdgeEdited(id)
+    edges[index].pinnedPortSide = to
+    return .setEdgePinnedPortSide(id: id, from: to, to: from)
+  }
+
   func applySetGroupTitle(
     id: String,
     from: String,

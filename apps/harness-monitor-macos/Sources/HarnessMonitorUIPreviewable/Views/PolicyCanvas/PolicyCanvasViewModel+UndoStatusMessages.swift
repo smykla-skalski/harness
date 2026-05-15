@@ -31,6 +31,8 @@ extension PolicyCanvasViewModel {
       .setNodePolicyKind,
       .setEdgeCondition,
       .setEdgeLabel,
+      .setEdgeKind,
+      .setEdgePinnedPortSide,
       .setGroupTitle,
       .setGroupTone:
       return propertyStatusMessage(for: change)
@@ -175,6 +177,10 @@ extension PolicyCanvasViewModel {
       return "Condition set to \(to)"
     case .setEdgeLabel(_, _, let to):
       return "Edge label set to \(to)"
+    case .setEdgeKind(_, _, let to):
+      return "Edge kind set to \(to.accessibilityWord)"
+    case .setEdgePinnedPortSide(_, _, let to):
+      return to ? "Edge ports pinned" : "Edge ports flex"
     case .setGroupTitle(_, _, let to):
       return "Group renamed to \(to)"
     case .setGroupTone(_, _, let to):

@@ -90,6 +90,8 @@ extension PolicyCanvasViewModel {
       .setNodePolicyKind,
       .setEdgeCondition,
       .setEdgeLabel,
+      .setEdgeKind,
+      .setEdgePinnedPortSide,
       .setGroupTitle,
       .setGroupTone:
       return applyPropertyChange(change)
@@ -213,6 +215,10 @@ extension PolicyCanvasViewModel {
       return applySetEdgeCondition(id: id, from: from, to: to)
     case .setEdgeLabel(let id, let from, let to):
       return applySetEdgeLabel(id: id, from: from, to: to)
+    case .setEdgeKind(let id, let from, let to):
+      return applySetEdgeKind(id: id, from: from, to: to)
+    case .setEdgePinnedPortSide(let id, let from, let to):
+      return applySetEdgePinnedPortSide(id: id, from: from, to: to)
     case .setGroupTitle(let id, let from, let to):
       return applySetGroupTitle(id: id, from: from, to: to)
     case .setGroupTone(let id, let from, let to):

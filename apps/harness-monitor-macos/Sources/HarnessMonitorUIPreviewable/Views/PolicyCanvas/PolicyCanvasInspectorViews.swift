@@ -262,8 +262,66 @@ struct PolicyCanvasInspector: View {
           commit: { viewModel.commitSelectedEdgeCondition($0) }
         )
       }
+      PolicyCanvasInspectorField(label: "Kind") {
+        edgeKindPicker(for: edge)
+      }
+      PolicyCanvasInspectorField(label: "Port pin") {
+        edgePinnedPortToggle(for: edge)
+      }
       PolicyCanvasInspectorRow(label: "Source", value: edge.source.nodeID)
       PolicyCanvasInspectorRow(label: "Target", value: edge.target.nodeID)
+    }
+  }
+
+  /// Inspector kind picker. Names each kind in plain words so the user can
+  /// override the heuristic-derived `PolicyCanvasEdgeKind.derive(from:)`
+  /// result when the condition string is ambiguous (e.g.
+  /// `deny_list_member` could be a control branch or an error path).
+  private func edgeKindPicker(for edge: PolicyCanvasEdge) -> some View {
+    Picker(
+      "Edge kind",
+      selection: Binding(
+        get: { edge.kind },
+        set: { viewModel.commitSelectedEdgeKind($0) }
+      )
+    ) {
+      ForEach(PolicyCanvasEdgeKind.allCases, id: \.self) { kind in
+        Text(kindTitle(for: kind)).tag(kind)
+      }
+    }
+    .labelsHidden()
+    .pickerStyle(.menu)
+    .accessibilityIdentifier(HarnessMonitorAccessibility.policyCanvasInspectorField("edge-kind"))
+  }
+
+  /// Inspector port-pin toggle. When off, the visibility router walks all
+  /// 4-side anchor combinations and picks the lowest-bend route. Default
+  /// is on so existing documents keep their stable port positions; flipping
+  /// off is an explicit user opt-in.
+  private func edgePinnedPortToggle(for edge: PolicyCanvasEdge) -> some View {
+    Toggle(
+      "Pin ports to their sides",
+      isOn: Binding(
+        get: { edge.pinnedPortSide },
+        set: { viewModel.commitSelectedEdgePinnedPortSide($0) }
+      )
+    )
+    .toggleStyle(.switch)
+    .labelsHidden()
+    .accessibilityLabel("Pin ports to their sides")
+    .accessibilityIdentifier(
+      HarnessMonitorAccessibility.policyCanvasInspectorField("edge-pin")
+    )
+  }
+
+  private func kindTitle(for kind: PolicyCanvasEdgeKind) -> String {
+    switch kind {
+    case .flow:
+      return "Flow"
+    case .control:
+      return "Control"
+    case .error:
+      return "Error"
     }
   }
 

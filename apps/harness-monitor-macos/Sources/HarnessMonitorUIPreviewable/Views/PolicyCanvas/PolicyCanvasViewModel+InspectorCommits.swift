@@ -105,6 +105,34 @@ extension PolicyCanvasViewModel {
     mutate(.setEdgeLabel(id: id, from: edge.label, to: label))
   }
 
+  /// Commit an edge kind override through the undo funnel. Surfaced by
+  /// the inspector kind picker so the user can correct a misclassified
+  /// condition string (e.g. force `.error` when the heuristic landed on
+  /// `.control`).
+  func commitSelectedEdgeKind(_ kind: PolicyCanvasEdgeKind) {
+    guard case .edge(let id) = selection,
+      let edge = edges.first(where: { $0.id == id }),
+      edge.kind != kind
+    else {
+      return
+    }
+    mutate(.setEdgeKind(id: id, from: edge.kind, to: kind))
+  }
+
+  /// Commit an edge port-pin toggle through the undo funnel. Surfaced by
+  /// the inspector port-pin toggle - flipping to `false` lets the
+  /// visibility router walk all 4-side combinations to pick the
+  /// lowest-bend route.
+  func commitSelectedEdgePinnedPortSide(_ pinned: Bool) {
+    guard case .edge(let id) = selection,
+      let edge = edges.first(where: { $0.id == id }),
+      edge.pinnedPortSide != pinned
+    else {
+      return
+    }
+    mutate(.setEdgePinnedPortSide(id: id, from: edge.pinnedPortSide, to: pinned))
+  }
+
   /// Commit a group title edit through the undo funnel.
   func commitSelectedGroupTitle(_ title: String) {
     guard case .group(let id) = selection,

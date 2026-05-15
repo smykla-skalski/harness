@@ -271,6 +271,8 @@ public enum HarnessMonitorAccessibility {
   public static let policyCanvasZoomInButton = "harness.policy-canvas.zoom.in"
   public static let policyCanvasZoomResetButton = "harness.policy-canvas.zoom.reset"
   public static let policyCanvasZoomValue = "harness.policy-canvas.zoom.value"
+  public static let policyCanvasEdgeLegend = "harness.policy-canvas.edge-legend"
+  public static let policyCanvasEdgeLegendToggle = "harness.policy-canvas.edge-legend.toggle"
   public static let policyCanvasInspector = "harness.policy-canvas.inspector"
   public static let policyCanvasValidationPanel = "harness.policy-canvas.validation"
   public static let policyCanvasValidationToggle = "harness.policy-canvas.validation.toggle"

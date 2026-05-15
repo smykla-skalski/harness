@@ -130,6 +130,10 @@ struct PolicyCanvasViewport: View {
         }
         .background(Color(red: 0.03, green: 0.04, blue: 0.06))
         .clipShape(Rectangle())
+        .overlay(alignment: .topLeading) {
+          PolicyCanvasEdgeKindLegend()
+            .padding(14)
+        }
         .overlay(alignment: .bottomLeading) {
           PolicyCanvasZoomControls(viewModel: viewModel)
             .padding(14)
