@@ -172,7 +172,10 @@ private struct TrackAccessibilityProbe: NSViewRepresentable {
 }
 
 final class TrackAccessibilityNSView: NSView {
+  private static let didUpdateRefreshInterval: Duration = .milliseconds(250)
+
   private let registrationOwnerID = UUID()
+  private let clock = ContinuousClock()
   private var trackedElementID = ""
   private var kind: RegistryElementKind = .other
   private var label: String?
@@ -196,6 +199,7 @@ final class TrackAccessibilityNSView: NSView {
   // libdispatch BUG off-main.
   private nonisolated(unsafe) var windowObservers: [NSObjectProtocol] = []
   private var lastPublishedElement: RegistryElement?
+  private var lastDidUpdateRefreshAt: ContinuousClock.Instant?
   var accessibilityFrameProviderOverride: ((TrackAccessibilityNSView) -> NSRect)?
 
   override init(frame frameRect: NSRect) {
@@ -335,7 +339,7 @@ final class TrackAccessibilityNSView: NSView {
         // Hop explicitly: `MainActor.assumeIsolated` would trap if the
         // block ever fires off-main on macOS 26.
         Task { @MainActor [weak self] in
-          self?.schedulePublishCurrentElement()
+          self?.schedulePublishCurrentElement(triggeredByDidUpdate: false)
         }
       },
       center.addObserver(
@@ -346,7 +350,7 @@ final class TrackAccessibilityNSView: NSView {
         // Hop explicitly: `MainActor.assumeIsolated` would trap if the
         // block ever fires off-main on macOS 26.
         Task { @MainActor [weak self] in
-          self?.schedulePublishCurrentElement()
+          self?.schedulePublishCurrentElement(triggeredByDidUpdate: false)
         }
       },
       center.addObserver(
@@ -357,7 +361,7 @@ final class TrackAccessibilityNSView: NSView {
         // Hop explicitly: `MainActor.assumeIsolated` would trap if the
         // block ever fires off-main on macOS 26.
         Task { @MainActor [weak self] in
-          self?.schedulePublishCurrentElement()
+          self?.schedulePublishCurrentElement(triggeredByDidUpdate: true)
         }
       },
       center.addObserver(
@@ -368,7 +372,7 @@ final class TrackAccessibilityNSView: NSView {
         // Hop explicitly: `MainActor.assumeIsolated` would trap if the
         // block ever fires off-main on macOS 26.
         Task { @MainActor [weak self] in
-          self?.schedulePublishCurrentElement()
+          self?.schedulePublishCurrentElement(triggeredByDidUpdate: false)
         }
       },
     ]
@@ -400,15 +404,19 @@ final class TrackAccessibilityNSView: NSView {
     }
   }
 
-  private func schedulePublishCurrentElement() {
+  private func schedulePublishCurrentElement(triggeredByDidUpdate: Bool = false) {
+    if triggeredByDidUpdate, shouldRefreshOnDidUpdate() == false {
+      return
+    }
     deferredPublishTask?.cancel()
     guard registry != nil, !trackedElementID.isEmpty else {
       return
     }
-    // `accessibilityFrame()` re-enters SwiftUI accessibility/layout work for
-    // representable-backed views. Never query it synchronously from
-    // updateNSView/layout/view-move callbacks or the registry probe can form an
-    // AttributeGraph cycle inside the current view-update phase.
+    if triggeredByDidUpdate {
+      lastDidUpdateRefreshAt = clock.now
+    }
+    // Keep frame publication deferred so representable-backed views finish the
+    // current update/layout pass before the registry snapshots screen geometry.
     deferredPublishTask = Task { @MainActor [weak self] in
       guard let self, !Task.isCancelled else {
         return
@@ -418,19 +426,51 @@ final class TrackAccessibilityNSView: NSView {
     }
   }
 
+  private func shouldRefreshOnDidUpdate() -> Bool {
+    guard let lastDidUpdateRefreshAt else {
+      return true
+    }
+    let now = clock.now
+    return lastDidUpdateRefreshAt + Self.didUpdateRefreshInterval <= now
+  }
+
   private func currentAccessibilityFrame() -> NSRect {
     if let accessibilityFrameProviderOverride {
       return accessibilityFrameProviderOverride(self)
     }
-    return accessibilityFrame()
+    guard let window, isHiddenOrHasHiddenAncestor == false else {
+      return .null
+    }
+    let visibleBounds = clippedVisibleBounds()
+    guard visibleBounds.isNull == false, visibleBounds.isEmpty == false else {
+      return .null
+    }
+    return window.convertToScreen(convert(visibleBounds, to: nil))
+  }
+
+  private func clippedVisibleBounds() -> NSRect {
+    var clippedBounds = bounds
+    var ancestor = superview
+
+    while let currentAncestor = ancestor {
+      if let clipView = currentAncestor as? NSClipView {
+        clippedBounds = clippedBounds.intersection(convert(clipView.bounds, from: clipView))
+        if clippedBounds.isEmpty || clippedBounds.isNull {
+          return .null
+        }
+      }
+      ancestor = currentAncestor.superview
+    }
+
+    return clippedBounds
   }
 
   private func publishCurrentElement() {
     guard let registry, !trackedElementID.isEmpty else {
       return
     }
-    // Use the AppKit accessibility frame so manual registrations line up with
-    // the same screen-space coordinates harvested from NSAccessibility.
+    // Derive the on-screen frame directly from view geometry so dense windows
+    // do not re-enter AX layout on every registry refresh.
     let frame = currentAccessibilityFrame()
     guard frame.isNull == false, frame.isInfinite == false, frame.isEmpty == false else {
       guard lastPublishedElement != nil else {
