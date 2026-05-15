@@ -333,7 +333,7 @@ extension TaskBoardOverviewView {
     else {
       return false
     }
-    onMoveTaskBoardItem(itemID, lane.taskBoardDropStatus)
+    onMoveTaskBoardItem(itemID, lane.taskBoardDropStatus(for: item))
     return true
   }
 

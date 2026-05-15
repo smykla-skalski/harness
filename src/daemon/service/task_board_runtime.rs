@@ -51,7 +51,10 @@ pub fn sync_task_board_todoist_token(
     state::replace_task_board_todoist_token(request)
 }
 
-pub(crate) fn external_sync_config_for_repository(repository: Option<&str>) -> ExternalSyncConfig {
+pub(crate) fn external_sync_config_for_repository(
+    repository: Option<&str>,
+    inbox_repositories: &[String],
+) -> ExternalSyncConfig {
     let repository = normalize_repository_slug(repository);
     let mut config = ExternalSyncConfig::from_env();
     if let Some(token) = repository
@@ -70,6 +73,7 @@ pub(crate) fn external_sync_config_for_repository(repository: Option<&str>) -> E
     if let Some(repository) = repository.as_deref() {
         config = config.with_github_repository_override(Some(repository));
     }
+    config = config.with_github_inbox_repositories_override(inbox_repositories);
     if config.token_for(ExternalProvider::Todoist).is_none()
         && let Some(token) = state::task_board_todoist_token()
     {
@@ -347,7 +351,7 @@ mod tests {
                 token: Some(" todoist-token ".into()),
             });
 
-            let config = super::external_sync_config_for_repository(Some("owner/repo"));
+            let config = super::external_sync_config_for_repository(Some("owner/repo"), &[]);
 
             assert_eq!(
                 config.token_for(crate::task_board::ExternalProvider::Todoist),
@@ -369,7 +373,7 @@ mod tests {
                     token: Some("app-token".into()),
                 });
 
-                let config = super::external_sync_config_for_repository(Some("owner/repo"));
+                let config = super::external_sync_config_for_repository(Some("owner/repo"), &[]);
 
                 assert_eq!(
                     config.token_for(crate::task_board::ExternalProvider::Todoist),

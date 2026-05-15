@@ -8,19 +8,21 @@ use crate::workspace::utc_now;
 
 use super::{
     ExternalProvider, ExternalSyncClient, ExternalSyncConfig, ExternalSyncConflictPolicy,
-    ExternalSyncField, ExternalTask, ExternalTaskRef, ExternalTaskUpdate, GitHubSyncClient,
-    TodoistSyncClient,
+    ExternalSyncField, ExternalTask, ExternalTaskRef, ExternalTaskUpdate, GitHubInboxSyncClient,
+    GitHubSyncClient, TodoistSyncClient,
 };
 
 mod import;
 mod merge;
+mod stale_reviews;
 
 use import::{external_item_id, imported_external_planning};
 use merge::{
-    changed_fields, has_reported_conflict, local_update_fields, pull_conflict_fields,
-    pull_create_fields, push_create_fields, replace_synced_ref, split_supported_fields,
-    sync_state_from_task, synced_ref_from_item,
+    changed_fields, external_ref_matches, has_reported_conflict, local_update_fields, matching_ref,
+    pull_conflict_fields, pull_create_fields, push_create_fields, replace_synced_ref,
+    split_supported_fields, sync_state_from_task, synced_ref_from_item,
 };
+use stale_reviews::reconcile_stale_github_review_requests;
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, ValueEnum)]
 #[value(rename_all = "snake_case")]
@@ -97,7 +99,19 @@ pub fn configured_sync_clients(
     for provider in providers {
         match provider {
             ExternalProvider::GitHub if config.token_for(provider).is_some() => {
-                clients.push(Box::new(GitHubSyncClient::from_config(config)?));
+                let pull_enabled = config.github_repository().is_some_and(|repository| {
+                    !config
+                        .github_inbox_repositories()
+                        .iter()
+                        .any(|candidate| candidate.eq_ignore_ascii_case(repository))
+                });
+                clients.push(Box::new(GitHubSyncClient::from_config_with_pull(
+                    config,
+                    pull_enabled,
+                )?));
+                if !config.github_inbox_repositories().is_empty() {
+                    clients.push(Box::new(GitHubInboxSyncClient::from_config(config)?));
+                }
             }
             ExternalProvider::Todoist if config.token_for(provider).is_some() => {
                 clients.push(Box::new(TodoistSyncClient::from_config(config)?));
@@ -138,13 +152,15 @@ async fn sync_client(
     if matches!(
         options.direction,
         ExternalSyncDirection::Pull | ExternalSyncDirection::Both
-    ) {
+    ) && client.allows_pull()
+    {
         pull_provider_tasks(board, options, client, operations).await?;
     }
     if matches!(
         options.direction,
         ExternalSyncDirection::Push | ExternalSyncDirection::Both
-    ) {
+    ) && client.allows_push()
+    {
         push_board_tasks(board, options, client, operations).await?;
     }
     Ok(())
@@ -156,12 +172,14 @@ async fn pull_provider_tasks(
     client: &dyn ExternalSyncClient,
     operations: &mut Vec<ExternalSyncOperation>,
 ) -> Result<(), CliError> {
-    let tasks = client.pull_tasks().await?;
-    for task in tasks {
-        if options.status.is_some_and(|status| task.status != status) {
-            continue;
-        }
-        if let Some(item) = item_for_ref(board, &task.reference)? {
+    let tasks = client
+        .pull_tasks()
+        .await?
+        .into_iter()
+        .filter(|task| options.status.is_none_or(|status| task.status == status))
+        .collect::<Vec<_>>();
+    for task in tasks.iter().cloned() {
+        if let Some(item) = item_for_ref(board, &task.reference, task.project_id.as_deref())? {
             reconcile_existing_item(board, options, client.provider(), &item, task, operations)?;
             continue;
         }
@@ -193,6 +211,7 @@ async fn pull_provider_tasks(
             unsupported_fields: Vec::new(),
         }));
     }
+    reconcile_stale_github_review_requests(board, options, client.provider(), &tasks, operations)?;
     Ok(())
 }
 
@@ -323,13 +342,12 @@ fn create_item_from_external(task: &ExternalTask) -> TaskBoardItem {
 fn item_for_ref(
     board: &TaskBoardStore,
     reference: &ExternalTaskRef,
+    project_id: Option<&str>,
 ) -> Result<Option<TaskBoardItem>, CliError> {
-    let provider = reference.provider.into();
-    Ok(board.list(None)?.into_iter().find(|item| {
-        item.external_refs.iter().any(|candidate| {
-            candidate.provider == provider && candidate.external_id == reference.external_id
-        })
-    }))
+    Ok(board
+        .list(None)?
+        .into_iter()
+        .find(|item| matching_ref(item, reference, project_id).is_some()))
 }
 
 fn reconcile_existing_item(
@@ -418,15 +436,13 @@ fn has_reconciliation_change(patch: &TaskBoardItemPatch) -> bool {
 
 fn reconciled_external_refs(item: &TaskBoardItem, task: &ExternalTask) -> Option<Vec<ExternalRef>> {
     let reference = &task.reference;
-    let provider = reference.provider.into();
     let mut changed = false;
     let next_sync_state = Some(sync_state_from_task(task));
     let refs = item
         .external_refs
         .iter()
         .map(|candidate| {
-            if candidate.provider == provider
-                && candidate.external_id == reference.external_id
+            if external_ref_matches(item, candidate, reference, task.project_id.as_deref())
                 && (candidate.url != reference.url || candidate.sync_state != next_sync_state)
             {
                 changed = true;

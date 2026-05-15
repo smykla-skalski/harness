@@ -17,10 +17,15 @@ use super::{
 
 static RUSTLS_PROVIDER: OnceLock<()> = OnceLock::new();
 
+mod inbox;
+
+pub use inbox::GitHubInboxSyncClient;
+
 #[derive(Clone)]
 pub struct GitHubSyncClient {
     client: octocrab::Octocrab,
     repository: Option<GitHubRepository>,
+    pull_enabled: bool,
 }
 
 impl GitHubSyncClient {
@@ -40,6 +45,18 @@ impl GitHubSyncClient {
         token: impl Into<String>,
         repository: Option<&str>,
     ) -> Result<Self, CliError> {
+        Self::new_with_repository_mode(token, repository, repository.is_some())
+    }
+
+    /// Build a GitHub client with explicit pull behavior.
+    ///
+    /// # Errors
+    /// Returns an error when token or repository values are invalid.
+    pub fn new_with_repository_mode(
+        token: impl Into<String>,
+        repository: Option<&str>,
+        pull_enabled: bool,
+    ) -> Result<Self, CliError> {
         let token = normalize_token(ExternalProvider::GitHub, token)?;
         let repository = repository.map(parse_github_repository).transpose()?;
         ensure_rustls_provider();
@@ -47,7 +64,11 @@ impl GitHubSyncClient {
             .personal_token(token)
             .build()
             .map_err(github_client_error)?;
-        Ok(Self { client, repository })
+        Ok(Self {
+            client,
+            repository,
+            pull_enabled,
+        })
     }
 
     /// Build a GitHub client from external sync config.
@@ -56,9 +77,22 @@ impl GitHubSyncClient {
     /// Returns an error when no GitHub token is configured or the SDK client
     /// cannot be built.
     pub fn from_config(config: &ExternalSyncConfig) -> Result<Self, CliError> {
-        Self::new_with_repository(
+        Self::from_config_with_pull(config, config.github_repository().is_some())
+    }
+
+    /// Build a GitHub client from external sync config with explicit pull behavior.
+    ///
+    /// # Errors
+    /// Returns an error when no GitHub token is configured or the SDK client
+    /// cannot be built.
+    pub fn from_config_with_pull(
+        config: &ExternalSyncConfig,
+        pull_enabled: bool,
+    ) -> Result<Self, CliError> {
+        Self::new_with_repository_mode(
             config.require_token(ExternalProvider::GitHub)?,
             config.github_repository.as_deref(),
+            pull_enabled,
         )
     }
 
@@ -83,6 +117,7 @@ impl fmt::Debug for GitHubSyncClient {
         formatter
             .debug_struct("GitHubSyncClient")
             .field("provider", &ExternalProvider::GitHub)
+            .field("pull_enabled", &self.pull_enabled)
             .finish_non_exhaustive()
     }
 }
@@ -91,6 +126,10 @@ impl fmt::Debug for GitHubSyncClient {
 impl ExternalSyncClient for GitHubSyncClient {
     fn provider(&self) -> ExternalProvider {
         ExternalProvider::GitHub
+    }
+
+    fn allows_pull(&self) -> bool {
+        self.pull_enabled
     }
 
     fn capabilities(&self) -> ExternalProviderCapabilities {
@@ -102,6 +141,9 @@ impl ExternalSyncClient for GitHubSyncClient {
     }
 
     async fn pull_tasks(&self) -> Result<Vec<ExternalTask>, CliError> {
+        if !self.pull_enabled {
+            return Ok(Vec::new());
+        }
         let repository = self.repository_for(None)?;
         let project_id = repository.slug();
         let page = self
@@ -122,8 +164,11 @@ impl ExternalSyncClient for GitHubSyncClient {
             .into_iter()
             .filter(|issue| issue.pull_request.is_none())
             .map(|issue| ExternalTask {
-                reference: ExternalTaskRef::new(ExternalProvider::GitHub, issue.number.to_string())
-                    .with_url(issue.html_url.to_string()),
+                reference: ExternalTaskRef::new(
+                    ExternalProvider::GitHub,
+                    github_external_id(&repository, issue.number),
+                )
+                .with_url(issue.html_url.to_string()),
                 title: issue.title,
                 body: issue.body.unwrap_or_default(),
                 status: github_issue_status(&issue.state),
@@ -143,10 +188,11 @@ impl ExternalSyncClient for GitHubSyncClient {
             request = request.body(body);
         }
         let issue = request.send().await.map_err(github_sync_error)?;
-        Ok(
-            ExternalTaskRef::new(ExternalProvider::GitHub, issue.number.to_string())
-                .with_url(issue.html_url.to_string()),
+        Ok(ExternalTaskRef::new(
+            ExternalProvider::GitHub,
+            github_external_id(&repository, issue.number),
         )
+        .with_url(issue.html_url.to_string()))
     }
 
     async fn update_task(
@@ -171,10 +217,11 @@ impl ExternalSyncClient for GitHubSyncClient {
             request = request.state(github_issue_state(item.status));
         }
         let issue = request.send().await.map_err(github_sync_error)?;
-        Ok(
-            ExternalTaskRef::new(ExternalProvider::GitHub, issue.number.to_string())
-                .with_url(issue.html_url.to_string()),
+        Ok(ExternalTaskRef::new(
+            ExternalProvider::GitHub,
+            github_external_id(&repository, issue.number),
         )
+        .with_url(issue.html_url.to_string()))
     }
 }
 
@@ -221,12 +268,16 @@ fn missing_github_repository_error() -> CliError {
 }
 
 fn parse_issue_number(value: &str) -> Result<u64, CliError> {
-    value.parse::<u64>().map_err(|error| {
-        CliError::new(CliErrorKind::workflow_parse(format!(
-            "task-board github issue number must be numeric, got '{value}'"
-        )))
-        .with_source(error)
-    })
+    value
+        .rsplit_once('#')
+        .map_or(value, |(_, issue_number)| issue_number)
+        .parse::<u64>()
+        .map_err(|error| {
+            CliError::new(CliErrorKind::workflow_parse(format!(
+                "task-board github issue number must be numeric, got '{value}'"
+            )))
+            .with_source(error)
+        })
 }
 
 fn github_issue_status(state: &IssueState) -> TaskBoardStatus {
@@ -241,6 +292,32 @@ fn github_issue_state(status: TaskBoardStatus) -> IssueState {
         TaskBoardStatus::Done => IssueState::Closed,
         _ => IssueState::Open,
     }
+}
+
+fn github_inbox_issue_status(state: &str) -> TaskBoardStatus {
+    if state.eq_ignore_ascii_case("closed") {
+        TaskBoardStatus::Done
+    } else {
+        TaskBoardStatus::NeedsYou
+    }
+}
+
+fn github_external_id(repository: &GitHubRepository, issue_number: u64) -> String {
+    format!("{}#{issue_number}", repository.slug())
+}
+
+fn assigned_issue_query(repository: &GitHubRepository, login: &str) -> String {
+    format!(
+        "repo:{} is:issue assignee:{login} state:all",
+        repository.slug()
+    )
+}
+
+fn review_request_query(repository: &GitHubRepository, login: &str) -> String {
+    format!(
+        "repo:{} is:pr review-requested:{login} state:open",
+        repository.slug()
+    )
 }
 
 fn github_client_error(error: octocrab::Error) -> CliError {

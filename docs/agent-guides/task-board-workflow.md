@@ -86,7 +86,9 @@ Standard GitHub issue sync still imports repo-scoped `todo` items with a
 synthesized planning summary. The separate GitHub inbox flow for selected repos
 imports issues assigned to you and pull requests requesting your review as
 repo-scoped `needs_you` items instead. Inbox items are not dispatch-ready until
-a human moves them into the normal planning/ready flow.
+a human moves them into the normal planning/ready flow. Review-request inbox
+items that GitHub no longer reports for you are automatically resolved out of
+the inbox state on the next pull sync.
 
 ## Intake And Planning
 
