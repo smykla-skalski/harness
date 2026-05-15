@@ -176,7 +176,7 @@ struct PolicyCanvasNode: Identifiable {
   }
 }
 
-enum PolicyCanvasGroupTone: String, CaseIterable {
+enum PolicyCanvasGroupTone: String, CaseIterable, Hashable {
   case intake
   case evaluation
   case release
@@ -204,7 +204,7 @@ enum PolicyCanvasGroupTone: String, CaseIterable {
   }
 }
 
-struct PolicyCanvasGroup: Identifiable {
+struct PolicyCanvasGroup: Identifiable, Hashable {
   let id: String
   var title: String
   var frame: CGRect
