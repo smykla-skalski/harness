@@ -79,7 +79,7 @@ extension PolicyCanvasViewModel {
       notifyStatus("Nothing to paste")
       return false
     }
-    let offset: CGFloat = PolicyCanvasPasteOffset
+    let offset: CGFloat = policyCanvasPasteOffset
     let plan = buildPasteOrDuplicatePlan(
       sourceNodes: clipboard.nodes,
       sourceEdges: clipboard.edges,
@@ -289,4 +289,4 @@ struct PolicyCanvasBulkAddPlan {
 /// source instead of stacking on top. 20pt = 1x grid step, large enough
 /// to feel like a deliberate clone, small enough that the cloned set
 /// stays inside the user's current viewport.
-let PolicyCanvasPasteOffset: CGFloat = 20
+let policyCanvasPasteOffset: CGFloat = 20

@@ -115,7 +115,8 @@ struct PolicyCanvasRoutingTests {
 
     #expect(edge.source.side == .bottom)
     #expect(edge.target.side == .top)
-    #expect(!edgeLabelFrame(route.labelPosition).intersects(nodeFrame("evidence:merge", in: viewModel)))
+    #expect(
+      !edgeLabelFrame(route.labelPosition).intersects(nodeFrame("evidence:merge", in: viewModel)))
     #expect(!edgeLabelFrame(route.labelPosition).intersects(nodeFrame("risk:merge", in: viewModel)))
   }
 

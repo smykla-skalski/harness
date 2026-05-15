@@ -96,7 +96,7 @@ extension PolicyCanvasViewModel {
 
   func parseOutputPortPayload(_ payload: String) -> PolicyCanvasPortEndpoint? {
     let parts = payload.split(separator: "|").map(String.init)
-    guard (parts.count == 3 || parts.count == 4), parts[0] == "policy-canvas-port" else {
+    guard parts.count == 3 || parts.count == 4, parts[0] == "policy-canvas-port" else {
       return nil
     }
     let side = parts.count == 4 ? PolicyCanvasPortSide(rawValue: parts[3]) : nil

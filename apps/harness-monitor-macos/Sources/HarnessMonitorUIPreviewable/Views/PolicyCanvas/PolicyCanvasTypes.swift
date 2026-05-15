@@ -213,7 +213,7 @@ struct PolicyCanvasPortEndpoint: Hashable {
   let nodeID: String
   let portID: String
   let kind: PolicyCanvasPortKind
-  var side: PolicyCanvasPortSide? = nil
+  var side: PolicyCanvasPortSide?
 }
 
 struct PolicyCanvasEdge: Identifiable, Hashable {
@@ -404,4 +404,3 @@ enum PolicyCanvasAutosaveOutcome: Equatable {
   case failed(at: Date)
   case disabled(reason: String)
 }
-

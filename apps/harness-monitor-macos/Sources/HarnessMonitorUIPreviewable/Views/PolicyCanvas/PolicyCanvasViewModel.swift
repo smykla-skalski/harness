@@ -302,7 +302,6 @@ final class PolicyCanvasViewModel {
     return nil
   }
 
-
   /// Single funnel that mutation sites use to mark the document dirty. Sets
   /// `documentDirty = true` and fires the autosave trigger on the clean→dirty
   /// edge. Coalescing to the edge is load-bearing on drag paths: drag
