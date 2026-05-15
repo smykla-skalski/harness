@@ -85,7 +85,13 @@ struct PolicyCanvasEdgeKindLegend: View {
     }
     .accessibilityElement(children: .ignore)
     .accessibilityAddTraits(.isStaticText)
-    .accessibilityLabel("\(kind.accessibilityWord), \(kind.dashDescription)")
+    // Split label + value so VoiceOver announces two semantic slots
+    // ("flow", "solid") instead of one compound string. Matches how
+    // the edge stroke pairs `accessibilityLabel = name` with
+    // `accessibilityValue = kind word` - the legend now follows the
+    // same shape.
+    .accessibilityLabel(kind.accessibilityWord)
+    .accessibilityValue(kind.dashDescription)
   }
 
   private func swatch(for kind: PolicyCanvasEdgeKind) -> some View {

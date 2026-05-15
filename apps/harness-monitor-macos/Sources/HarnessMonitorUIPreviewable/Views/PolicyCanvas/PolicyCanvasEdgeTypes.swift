@@ -70,8 +70,10 @@ enum PolicyCanvasEdgeKind: String, Hashable, CaseIterable {
   /// Keeping them unified avoids the Nielsen consistency violation
   /// where one surface said "dense" and another said "tightly dashed"
   /// for the same stroke. The name is "description" rather than "key"
-  /// because the value is user-facing prose (eligible for
-  /// localization) rather than a stable identifier.
+  /// because the value is user-facing prose, not a stable identifier.
+  /// The strings are English-only today (matching the rest of this
+  /// surface's copy); add localization when the rest of the app
+  /// gains a localization story.
   var dashDescription: String {
     switch self {
     case .flow:

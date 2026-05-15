@@ -25,6 +25,9 @@ struct PolicyCanvasInspectorEdgeKindPicker: View {
     }
     .labelsHidden()
     .pickerStyle(.menu)
+    .help(
+      "Override the heuristic-derived kind. Flow is unconditional, control is a conditional branch, error is a deny path."
+    )
     .accessibilityIdentifier(HarnessMonitorAccessibility.policyCanvasInspectorField("edge-kind"))
   }
 
@@ -80,7 +83,10 @@ struct PolicyCanvasInspectorEdgePinToggle: View {
 
   private var accessibilityHintText: String {
     if isLockedByKind {
-      return "Disabled. Error edges are always pinned to prevent the router from relocating them."
+      // VoiceOver already announces the disabled trait via `.disabled()`;
+      // the hint adds the *reason*, not the state. Leading with "Disabled."
+      // would double-announce.
+      return "Error edges are always pinned to prevent the router from relocating them."
     }
     return "Off lets the router pick the lowest-bend port side"
   }

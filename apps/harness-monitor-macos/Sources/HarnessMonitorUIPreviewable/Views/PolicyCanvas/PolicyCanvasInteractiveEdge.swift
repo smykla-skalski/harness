@@ -70,7 +70,7 @@ struct PolicyCanvasInteractiveEdge: View {
     isSelected: Bool,
     accessibilityLabel: String,
     accessibilityKindWord: String,
-    accessibilityDashDescription: String = "solid",
+    accessibilityDashDescription: String,
     kindDashPattern: [CGFloat] = [],
     isAnimated: Bool = false,
     canvasZoom: CGFloat = 1,
