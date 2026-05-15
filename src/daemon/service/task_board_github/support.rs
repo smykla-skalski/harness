@@ -103,8 +103,18 @@ pub(super) fn is_repo_scoped(item: &TaskBoardItem, config: &GitHubProjectConfig)
     item.project_id.as_deref() == Some(repository.as_str())
 }
 
-pub(super) fn managed_branch_name(config: &GitHubProjectConfig, item_id: &str) -> String {
-    format!("{}{}", config.branch_prefix.trim(), item_id)
+pub(super) fn managed_branch_name(
+    config: &GitHubProjectConfig,
+    item_id: &str,
+    host_id: &str,
+) -> String {
+    let host_suffix = &host_id[..host_id.len().min(8)];
+    format!(
+        "{}{}-{}",
+        config.branch_prefix.trim(),
+        item_id,
+        host_suffix
+    )
 }
 
 pub(super) fn pull_request_request(

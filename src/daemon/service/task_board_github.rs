@@ -8,8 +8,8 @@ use crate::task_board::github::{
 };
 use crate::task_board::store::TaskBoardItemPatch;
 use crate::task_board::{
-    TaskBoardItem, TaskBoardOrchestratorDispatchInput, TaskBoardOrchestratorSettings,
-    TaskBoardStore,
+    MachineRegistry, TaskBoardItem, TaskBoardOrchestratorDispatchInput,
+    TaskBoardOrchestratorSettings, TaskBoardStore,
 };
 
 mod support;
@@ -28,6 +28,7 @@ pub(super) struct AutomationRequest<'a> {
     pub item: &'a TaskBoardItem,
     pub session_worktrees: &'a BTreeMap<String, String>,
     pub client: &'a dyn GitHubAutomationClient,
+    pub host_id: &'a str,
 }
 
 pub(crate) fn run_task_board_github_automation(
@@ -40,6 +41,9 @@ pub(crate) fn run_task_board_github_automation(
     let Some((config, token)) = automation_config(settings) else {
         return Ok(());
     };
+    let host_id = MachineRegistry::new(board_root.to_path_buf())
+        .ensure_local()?
+        .id;
     let session_worktrees = load_session_worktrees(items, db)?;
     let client = GitHubApiAutomationClient::new(token.as_str())?;
     run_blocking(run_task_board_github_automation_with_client(
@@ -49,6 +53,7 @@ pub(crate) fn run_task_board_github_automation(
         items,
         &session_worktrees,
         &client,
+        host_id.as_str(),
     ))
 }
 
@@ -62,6 +67,9 @@ pub(crate) async fn run_task_board_github_automation_async(
     let Some((config, token)) = automation_config(settings) else {
         return Ok(());
     };
+    let host_id = MachineRegistry::new(board_root.to_path_buf())
+        .ensure_local()?
+        .id;
     let session_worktrees = load_session_worktrees_async(items, async_db).await?;
     let client = GitHubApiAutomationClient::new(token.as_str())?;
     run_task_board_github_automation_with_client(
@@ -71,6 +79,7 @@ pub(crate) async fn run_task_board_github_automation_async(
         items,
         &session_worktrees,
         &client,
+        host_id.as_str(),
     )
     .await
 }
@@ -82,6 +91,7 @@ async fn run_task_board_github_automation_with_client(
     items: &[TaskBoardItem],
     session_worktrees: &BTreeMap<String, String>,
     client: &dyn GitHubAutomationClient,
+    host_id: &str,
 ) -> Result<(), CliError> {
     let board = TaskBoardStore::new(board_root.to_path_buf());
     for item in items {
@@ -93,6 +103,7 @@ async fn run_task_board_github_automation_with_client(
             project_dir: input.project_dir.as_deref(),
             dry_run: input.dry_run,
             client,
+            host_id,
         })
         .await;
         if !input.dry_run && workflow != item.workflow {

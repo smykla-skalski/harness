@@ -11,8 +11,10 @@ use crate::task_board::github::{
 use crate::task_board::{TaskBoardItem, TaskBoardOrchestratorDispatchInput, TaskBoardStatus};
 use tempfile::tempdir;
 
-use super::support::{STEP_MERGED, STEP_WAITING_FOR_REVIEW};
+use super::support::{STEP_MERGED, STEP_WAITING_FOR_REVIEW, managed_branch_name};
 use super::{AutomationRequest, automate_item};
+
+const TEST_HOST_ID: &str = "host1234";
 
 struct FakeGitHubClient {
     pull_request: GitHubPullRequestHandle,
@@ -169,6 +171,7 @@ async fn automation_opens_reviews_and_merges_prs() {
     item.status = TaskBoardStatus::Done;
     item.project_id = Some("owner/repo".to_string());
     item.workflow.worktree = Some(repo.to_string_lossy().into_owned());
+    let expected_branch = managed_branch_name(&config, &item.id, TEST_HOST_ID);
     let client = FakeGitHubClient {
         pull_request: GitHubPullRequestHandle {
             number: 42,
@@ -184,7 +187,7 @@ async fn automation_opens_reviews_and_merges_prs() {
                 number: 42,
                 html_url: Some("https://example.test/pull/42".to_string()),
                 base_branch: "main".to_string(),
-                head_branch: "c/task-1".to_string(),
+                head_branch: expected_branch.clone(),
                 draft: false,
                 changed_paths: vec!["feature.txt".to_string()],
             },
@@ -211,10 +214,11 @@ async fn automation_opens_reviews_and_merges_prs() {
         item: &item,
         session_worktrees: &BTreeMap::new(),
         client: &client,
+        host_id: TEST_HOST_ID,
     })
     .await;
 
-    assert_eq!(workflow.branch.as_deref(), Some("c/task-1"));
+    assert_eq!(workflow.branch.as_deref(), Some(expected_branch.as_str()));
     assert_eq!(workflow.pr_number, Some(42));
     assert_eq!(workflow.current_step_id.as_deref(), Some(STEP_MERGED));
     assert_eq!(*client.publish_calls.lock().expect("publish calls"), 1);
@@ -230,7 +234,7 @@ async fn automation_opens_reviews_and_merges_prs() {
     );
     assert_eq!(*client.merge_calls.lock().expect("merge calls"), 1);
     assert_eq!(
-        git_ref(&remote, "refs/heads/c/task-1"),
+        git_ref(&remote, &format!("refs/heads/{expected_branch}")),
         git_ref(&repo, "HEAD")
     );
 }
@@ -250,8 +254,6 @@ async fn automation_waits_for_review_when_merge_evidence_is_not_approved() {
         &["remote", "add", "origin", remote.to_string_lossy().as_ref()],
     );
     run_git(&repo, &["push", "-u", "origin", "HEAD:main"]);
-    run_git(&repo, &["push", "origin", "HEAD:c/task-2"]);
-
     let mut config = GitHubProjectConfig::new("owner", "repo", repo.clone());
     config
         .enabled_automations
@@ -263,10 +265,12 @@ async fn automation_waits_for_review_when_merge_evidence_is_not_approved() {
         String::new(),
         "2026-05-14T00:00:00Z".to_string(),
     );
+    let expected_branch = managed_branch_name(&config, &item.id, TEST_HOST_ID);
+    run_git(&repo, &["push", "origin", &format!("HEAD:{expected_branch}")]);
     item.status = TaskBoardStatus::Done;
     item.project_id = Some("owner/repo".to_string());
     item.workflow.worktree = Some(repo.to_string_lossy().into_owned());
-    item.workflow.branch = Some("c/task-2".to_string());
+    item.workflow.branch = Some(expected_branch.clone());
     item.workflow.pr_number = Some(7);
     let client = FakeGitHubClient {
         pull_request: GitHubPullRequestHandle {
@@ -283,7 +287,7 @@ async fn automation_waits_for_review_when_merge_evidence_is_not_approved() {
                 number: 7,
                 html_url: None,
                 base_branch: "main".to_string(),
-                head_branch: "c/task-2".to_string(),
+                head_branch: expected_branch.clone(),
                 draft: false,
                 changed_paths: vec!["feature.txt".to_string()],
             },
@@ -310,6 +314,7 @@ async fn automation_waits_for_review_when_merge_evidence_is_not_approved() {
         item: &item,
         session_worktrees: &BTreeMap::new(),
         client: &client,
+        host_id: TEST_HOST_ID,
     })
     .await;
 
@@ -354,6 +359,7 @@ async fn automation_waits_for_commits_before_opening_a_pull_request() {
     item.status = TaskBoardStatus::Done;
     item.project_id = Some("owner/repo".to_string());
     item.workflow.worktree = Some(repo.to_string_lossy().into_owned());
+    let expected_branch = managed_branch_name(&config, &item.id, TEST_HOST_ID);
     let client = FakeGitHubClient {
         pull_request: GitHubPullRequestHandle {
             number: 99,
@@ -369,7 +375,7 @@ async fn automation_waits_for_commits_before_opening_a_pull_request() {
                 number: 99,
                 html_url: Some("https://example.test/pull/99".to_string()),
                 base_branch: "main".to_string(),
-                head_branch: "c/task-3".to_string(),
+                head_branch: expected_branch.clone(),
                 draft: true,
                 changed_paths: vec![],
             },
@@ -396,6 +402,7 @@ async fn automation_waits_for_commits_before_opening_a_pull_request() {
         item: &item,
         session_worktrees: &BTreeMap::new(),
         client: &client,
+        host_id: TEST_HOST_ID,
     })
     .await;
 
@@ -405,6 +412,21 @@ async fn automation_waits_for_commits_before_opening_a_pull_request() {
     );
     assert_eq!(*client.publish_calls.lock().expect("publish calls"), 0);
     assert_eq!(*client.create_calls.lock().expect("create calls"), 0);
+}
+
+#[test]
+fn managed_branch_name_includes_host_prefix() {
+    let config = GitHubProjectConfig::new("owner", "repo", PathBuf::new());
+    let branch = managed_branch_name(&config, "dup-1", "abcdef12");
+    assert_eq!(branch, "c/dup-1-abcdef12");
+}
+
+#[test]
+fn managed_branch_name_truncates_long_host_id() {
+    let config = GitHubProjectConfig::new("owner", "repo", PathBuf::new());
+    let long_host = "abcdef0123456789-extra";
+    let branch = managed_branch_name(&config, "dup-1", long_host);
+    assert_eq!(branch, "c/dup-1-abcdef01");
 }
 
 fn init_repo(path: &Path) {
