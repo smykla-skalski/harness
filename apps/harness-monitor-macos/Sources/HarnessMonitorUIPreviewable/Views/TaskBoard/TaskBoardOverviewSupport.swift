@@ -15,17 +15,26 @@ struct TaskBoardOverviewMetrics: Equatable {
   let managementPanelSpacing: CGFloat
   let managementPanelCornerRadius: CGFloat
   let managementPillVerticalPadding: CGFloat
+  let summaryPillHorizontalPadding: CGFloat
+  let summaryPillVerticalPadding: CGFloat
+  let columnSpacing: CGFloat
+  let boardVerticalPadding: CGFloat
   let editorBodyMinHeight: CGFloat
   let editorPlanningMinHeight: CGFloat
 
   init(fontScale: CGFloat) {
     let scale = SessionWindowFontScale.metricsScale(for: fontScale)
+    let denseScale = min(scale, 1.3)
     controlMinHeight = max(30, 30 * min(scale, 1.35))
     iconControlMinWidth = max(32, 32 * min(scale, 1.35))
     managementPanelMinHeight = max(132, 132 * min(scale, 1.25))
     managementPanelSpacing = max(8, 8 * min(scale, 1.35))
     managementPanelCornerRadius = HarnessMonitorTheme.cornerRadiusSM * min(scale, 1.2)
     managementPillVerticalPadding = max(3, 3 * min(scale, 1.25))
+    summaryPillHorizontalPadding = HarnessMonitorTheme.pillPaddingH * denseScale
+    summaryPillVerticalPadding = HarnessMonitorTheme.pillPaddingV * min(scale, 1.2)
+    columnSpacing = HarnessMonitorTheme.spacingMD * min(scale, 1.16)
+    boardVerticalPadding = HarnessMonitorTheme.spacingXS * min(scale, 1.2)
     editorBodyMinHeight = max(96, 96 * min(scale, 1.2))
     editorPlanningMinHeight = max(72, 72 * min(scale, 1.2))
   }
@@ -36,6 +45,12 @@ struct TaskBoardSummaryPill: View {
   let label: String
   let systemImage: String?
   let tint: Color
+  @Environment(\.fontScale)
+  private var fontScale
+
+  private var metrics: TaskBoardOverviewMetrics {
+    TaskBoardOverviewMetrics(fontScale: fontScale)
+  }
 
   init(
     value: String,
@@ -63,7 +78,8 @@ struct TaskBoardSummaryPill: View {
         .monospacedDigit()
     }
     .foregroundStyle(tint)
-    .harnessPillPadding()
+    .padding(.horizontal, metrics.summaryPillHorizontalPadding)
+    .padding(.vertical, metrics.summaryPillVerticalPadding)
     .harnessContentPill(tint: tint)
   }
 }
