@@ -18,7 +18,7 @@ struct PolicyCanvasShortcutsDisclosure: View {
           .scaledFont(.caption.weight(.semibold))
           .foregroundStyle(.white.opacity(0.86))
       }
-      .buttonStyle(.plain)
+      .harnessPlainButtonStyle()
       .accessibilityIdentifier(HarnessMonitorAccessibility.policyCanvasShortcutsToggle)
 
       if expanded {

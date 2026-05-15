@@ -66,34 +66,50 @@ extension PolicyCanvasViewModel {
 
   private func applyChange(_ change: PolicyCanvasChange) -> PolicyCanvasChange {
     switch change {
+    case .addNode,
+      .removeNode,
+      .restoreNode,
+      .addEdge,
+      .removeEdge,
+      .restoreEdge,
+      .removeGroup,
+      .restoreGroup:
+      return applyLifecycleChange(change)
+    case .moveNode,
+      .bulkMove,
+      .moveGroup,
+      .renameNode,
+      .removeNodeFromGroup,
+      .bulkAdd,
+      .bulkRemove:
+      return applySpatialOrBulkChange(change)
+    case .setNodeTitle,
+      .setNodeKind,
+      .setNodeGroup,
+      .setNodeSubtitle,
+      .setNodePolicyKind,
+      .setEdgeCondition,
+      .setEdgeLabel,
+      .setGroupTitle,
+      .setGroupTone:
+      return applyPropertyChange(change)
+    }
+  }
+
+  private func applyLifecycleChange(_ change: PolicyCanvasChange) -> PolicyCanvasChange {
+    switch change {
     case .addNode(let node, let restoreSelection):
       return applyAddNode(node, restoreSelection: restoreSelection)
     case .removeNode(let id, let priorSelection):
       return applyRemoveNode(id: id, priorSelection: priorSelection)
-    case .restoreNode(
-      let node,
-      let incidentEdges,
-      let cleanEphemeralNodeIncluded,
-      let cleanEphemeralEdgeIDs,
-      let restoreSelection
-    ):
+    case .restoreNode(let node, let incidentEdges, let cleanNode, let cleanEdges, let selection):
       return applyRestoreNode(
         node,
         incidentEdges: incidentEdges,
-        cleanEphemeralNodeIncluded: cleanEphemeralNodeIncluded,
-        cleanEphemeralEdgeIDs: cleanEphemeralEdgeIDs,
-        restoreSelection: restoreSelection
+        cleanEphemeralNodeIncluded: cleanNode,
+        cleanEphemeralEdgeIDs: cleanEdges,
+        restoreSelection: selection
       )
-    case .moveNode(let id, let from, let to, let fromGroupID, let toGroupID):
-      return applyMoveNode(
-        id: id,
-        from: from,
-        to: to,
-        fromGroupID: fromGroupID,
-        toGroupID: toGroupID
-      )
-    case .bulkMove(let nodeMoves, let groupMoves):
-      return applyBulkMove(nodeMoves: nodeMoves, groupMoves: groupMoves)
     case .addEdge(let edge, let restoreSelection):
       return applyAddEdge(edge, restoreSelection: restoreSelection)
     case .removeEdge(let id, let priorSelection):
@@ -104,52 +120,65 @@ extension PolicyCanvasViewModel {
         cleanEphemeralEdgeIncluded: cleanEphemeralEdgeIncluded,
         restoreSelection: restoreSelection
       )
-    case .moveGroup(let id, let fromOrigin, let toOrigin, let memberOrigins, let memberDestinations):
+    case .removeGroup(let id, let priorSelection):
+      return applyRemoveGroup(id: id, priorSelection: priorSelection)
+    case .restoreGroup(let group, let memberIDs, let restoreSelection):
+      return applyRestoreGroup(group, memberIDs: memberIDs, restoreSelection: restoreSelection)
+    default:
+      preconditionFailure("Unsupported lifecycle change")
+    }
+  }
+
+  private func applySpatialOrBulkChange(_ change: PolicyCanvasChange) -> PolicyCanvasChange {
+    switch change {
+    case .moveNode(let id, let from, let to, let fromGroupID, let toGroupID):
+      return applyMoveNode(
+        id: id,
+        from: from,
+        to: to,
+        fromGroupID: fromGroupID,
+        toGroupID: toGroupID
+      )
+    case .bulkMove(let nodeMoves, let groupMoves):
+      return applyBulkMove(nodeMoves: nodeMoves, groupMoves: groupMoves)
+    case .moveGroup(let id, let fromOrigin, let toOrigin, let memberOrigins, let destinations):
       return applyMoveGroup(
         id: id,
         fromOrigin: fromOrigin,
         toOrigin: toOrigin,
         memberOrigins: memberOrigins,
-        memberDestinations: memberDestinations
+        memberDestinations: destinations
       )
-    case .removeGroup(let id, let priorSelection):
-      return applyRemoveGroup(id: id, priorSelection: priorSelection)
-    case .restoreGroup(let group, let memberIDs, let restoreSelection):
-      return applyRestoreGroup(group, memberIDs: memberIDs, restoreSelection: restoreSelection)
     case .renameNode(let id, let from, let to):
       return applyRenameNode(id: id, from: from, to: to)
     case .removeNodeFromGroup(let id, let fromGroupID, let toGroupID):
       return applyRemoveNodeFromGroup(id: id, fromGroupID: fromGroupID, toGroupID: toGroupID)
-    case .bulkAdd(
-      let nodes,
-      let edges,
-      let groups,
-      let restoreSelection,
-      let restoreSecondaries,
-      let primarySelection
-    ):
+    case .bulkAdd(let nodes, let edges, let groups, let selection, let secondaries, let primary):
       return applyBulkAdd(
         nodes: nodes,
         edges: edges,
         groups: groups,
-        restoreSelection: restoreSelection,
-        restoreSecondaries: restoreSecondaries,
-        primarySelection: primarySelection
+        restore: PolicyCanvasBulkSelectionRestore(
+          selection: selection,
+          secondaries: secondaries
+        ),
+        primarySelection: primary
       )
-    case .bulkRemove(
-      let nodeIDs,
-      let edgeIDs,
-      let groupIDs,
-      let restoreSelection,
-      let restoreSecondaries
-    ):
+    case .bulkRemove(let nodeIDs, let edgeIDs, let groupIDs, let selection, let secondaries):
       return applyBulkRemove(
         nodeIDs: nodeIDs,
         edgeIDs: edgeIDs,
         groupIDs: groupIDs,
-        restoreSelection: restoreSelection,
-        restoreSecondaries: restoreSecondaries
+        restoreSelection: selection,
+        restoreSecondaries: secondaries
       )
+    default:
+      preconditionFailure("Unsupported spatial or bulk change")
+    }
+  }
+
+  private func applyPropertyChange(_ change: PolicyCanvasChange) -> PolicyCanvasChange {
+    switch change {
     case .setNodeTitle(let id, let from, let to):
       return applySetNodeTitle(id: id, from: from, to: to)
     case .setNodeKind(
@@ -163,14 +192,16 @@ extension PolicyCanvasViewModel {
       let removedEdges
     ):
       return applySetNodeKind(
-        id: id,
-        from: from,
-        to: to,
-        fromSubtitle: fromSubtitle,
-        toSubtitle: toSubtitle,
-        fromPolicyKind: fromPolicyKind,
-        toPolicyKind: toPolicyKind,
-        removedEdges: removedEdges
+        PolicyCanvasNodeKindChange(
+          id: id,
+          from: from,
+          to: to,
+          fromSubtitle: fromSubtitle,
+          toSubtitle: toSubtitle,
+          fromPolicyKind: fromPolicyKind,
+          toPolicyKind: toPolicyKind,
+          removedEdges: removedEdges
+        )
       )
     case .setNodeGroup(let id, let from, let to):
       return applySetNodeGroup(id: id, from: from, to: to)
@@ -186,6 +217,8 @@ extension PolicyCanvasViewModel {
       return applySetGroupTitle(id: id, from: from, to: to)
     case .setGroupTone(let id, let from, let to):
       return applySetGroupTone(id: id, from: from, to: to)
+    default:
+      preconditionFailure("Unsupported property change")
     }
   }
 

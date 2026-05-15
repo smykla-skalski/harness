@@ -1,12 +1,6 @@
 import HarnessMonitorKit
 import SwiftUI
 
-private struct DashboardCanvasSnapshot: Equatable {
-  let document: TaskBoardPolicyPipelineDocument?
-  let simulation: TaskBoardPolicyPipelineSimulationResult?
-  let audit: TaskBoardPolicyPipelineAuditSummary?
-}
-
 extension View {
   /// Apply `.id(_:)` only when `value` is non-nil. The branch fires exactly
   /// once per pipeline load (nil to id), which is the intended identity reset
@@ -24,16 +18,11 @@ extension View {
 }
 
 public struct PolicyCanvasView: View {
-  /// Internal (not `private`) so helpers in companion files
-  /// (`PolicyCanvasView+SceneStorage.swift`, `PolicyCanvasView+Actions.swift`)
-  /// can read viewModel.pipelineIdentity / store / statusLine. The host
-  /// struct is `public` but its init signature is the only API surface; the
-  /// inner state is module-internal by design.
-  @State var viewModel: PolicyCanvasViewModel
-  @State var isShowingPromoteConfirmation = false
-  @State var pendingDeletionRequest: PolicyCanvasDeletionRequest?
-  @State var statusLine: String = "No pending changes"
-  @State var searchPaletteVisible: Bool = false
+  @State private var viewModelState: PolicyCanvasViewModel
+  @State private var isShowingPromoteConfirmationState = false
+  @State private var pendingDeletionRequestState: PolicyCanvasDeletionRequest?
+  @State private var statusLineState: String = "No pending changes"
+  @State private var searchPaletteVisibleState: Bool = false
   /// User-facing override for the simulation overlay. Defaults to nil
   /// (auto-show whenever a simulation exists and the user is on the
   /// simulation tab); the chrome toggle in the top bar flips this to
@@ -45,8 +34,8 @@ public struct PolicyCanvasView: View {
   /// model) keeps document state separate from per-window viewport
   /// preferences, matching how the rest of the canvas treats zoom and
   /// inspector visibility.
-  @State var simulationOverlayOverride: Bool?
-  @FocusState var focusedField: PolicyCanvasFocusedField?
+  @State private var simulationOverlayOverrideState: Bool?
+  @FocusState private var focusedFieldState: PolicyCanvasFocusedField?
   /// VoiceOver focus anchor for the canvas surface. The search palette writes
   /// the just-selected component into this binding after dismiss so VO lands
   /// on the destination node/edge/group instead of the empty space where the
@@ -54,12 +43,15 @@ public struct PolicyCanvasView: View {
   /// `.accessibilityFocused($focusedComponent, equals: ...)` to receive the
   /// shift; 3G's broader a11y focus plumbing will subsume this anchor at
   /// integration time.
-  @AccessibilityFocusState var focusedComponent: PolicyCanvasSelection?
-  @Environment(\.scenePhase) var scenePhase
-  @Environment(\.undoManager) var undoManager
+  @AccessibilityFocusState private var focusedComponentState: PolicyCanvasSelection?
+  @Environment(\.scenePhase)
+  private var scenePhase
+  @Environment(\.undoManager)
+  private var undoManager
   /// P19 root-side system reduce-motion read; rebound onto
   /// `\.policyCanvasReducedMotion` for nested layers (Wave 4K).
-  @Environment(\.accessibilityReduceMotion) var systemReduceMotion
+  @Environment(\.accessibilityReduceMotion)
+  private var systemReduceMotion
 
   /// Scene-scoped storage for viewport state (zoom, selection, scroll
   /// position) keyed by pipeline identity. Before this commit each viewport
@@ -76,12 +68,51 @@ public struct PolicyCanvasView: View {
   /// `PolicyCanvasView+SceneStorage.swift` can read/write the storage from
   /// its extension; the host view struct is only constructable from the same
   /// module so this is not API surface.
-  @SceneStorage("policyCanvas.byPipeline") var storedPipelineStateRaw: String = ""
+  @SceneStorage("policyCanvas.byPipeline")
+  private var storedPipelineStateRawState: String = ""
   let store: HarnessMonitorStore?
   let dashboardUI: HarnessMonitorStore.ContentDashboardSlice?
 
+  var viewModel: PolicyCanvasViewModel {
+    viewModelState
+  }
+
+  var statusLine: String {
+    get { statusLineState }
+    nonmutating set { statusLineState = newValue }
+  }
+
+  var pendingDeletionRequest: PolicyCanvasDeletionRequest? {
+    get { pendingDeletionRequestState }
+    nonmutating set { pendingDeletionRequestState = newValue }
+  }
+
+  var isShowingPromoteConfirmation: Bool {
+    get { isShowingPromoteConfirmationState }
+    nonmutating set { isShowingPromoteConfirmationState = newValue }
+  }
+
+  var searchPaletteVisible: Bool {
+    get { searchPaletteVisibleState }
+    nonmutating set { searchPaletteVisibleState = newValue }
+  }
+
+  var simulationOverlayOverride: Bool? {
+    get { simulationOverlayOverrideState }
+    nonmutating set { simulationOverlayOverrideState = newValue }
+  }
+
+  var focusedField: PolicyCanvasFocusedField? {
+    focusedFieldState
+  }
+
+  var storedPipelineStateRaw: String {
+    get { storedPipelineStateRawState }
+    nonmutating set { storedPipelineStateRawState = newValue }
+  }
+
   public init() {
-    _viewModel = State(initialValue: .sample())
+    _viewModelState = State(initialValue: .sample())
     self.store = nil
     self.dashboardUI = nil
   }
@@ -90,13 +121,13 @@ public struct PolicyCanvasView: View {
     store: HarnessMonitorStore,
     dashboardUI: HarnessMonitorStore.ContentDashboardSlice
   ) {
-    _viewModel = State(initialValue: .sample())
+    _viewModelState = State(initialValue: .sample())
     self.store = store
     self.dashboardUI = dashboardUI
   }
 
   init(viewModel: PolicyCanvasViewModel) {
-    _viewModel = State(initialValue: viewModel)
+    _viewModelState = State(initialValue: viewModel)
     self.store = nil
     self.dashboardUI = nil
   }
@@ -106,7 +137,7 @@ public struct PolicyCanvasView: View {
     store: HarnessMonitorStore,
     dashboardUI: HarnessMonitorStore.ContentDashboardSlice
   ) {
-    _viewModel = State(initialValue: viewModel)
+    _viewModelState = State(initialValue: viewModel)
     self.store = store
     self.dashboardUI = dashboardUI
   }
@@ -137,7 +168,7 @@ public struct PolicyCanvasView: View {
 
         PolicyCanvasViewport(
           viewModel: viewModel,
-          focusedComponent: $focusedComponent,
+          focusedComponent: $focusedComponentState,
           showSimulationOverlay: simulationOverlayResolved
         )
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -145,7 +176,7 @@ public struct PolicyCanvasView: View {
         PolicyCanvasInspector(
           viewModel: viewModel,
           statusLine: statusLine,
-          focusedField: $focusedField
+          focusedField: $focusedFieldState
         )
         .frame(width: 280)
       }
@@ -179,14 +210,14 @@ public struct PolicyCanvasView: View {
     // the responder list on every keypress.
     .policyCanvasPowerEditShortcuts(
       viewModel: viewModel,
-      focusedField: $focusedField
+      focusedField: $focusedFieldState
     )
     .overlay(alignment: .topTrailing) {
       if searchPaletteVisible {
         PolicyCanvasSearchPalette(
           viewModel: viewModel,
-          isVisible: $searchPaletteVisible,
-          postCommitFocus: $focusedComponent
+          isVisible: $searchPaletteVisibleState,
+          postCommitFocus: $focusedComponentState
         )
       }
     }
@@ -259,7 +290,7 @@ public struct PolicyCanvasView: View {
     }
     .confirmationDialog(
       "Promote policy pipeline?",
-      isPresented: $isShowingPromoteConfirmation,
+      isPresented: $isShowingPromoteConfirmationState,
       titleVisibility: .visible
     ) {
       Button("Promote", role: .destructive) {

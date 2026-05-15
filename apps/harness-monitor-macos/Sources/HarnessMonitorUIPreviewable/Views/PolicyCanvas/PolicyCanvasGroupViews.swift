@@ -8,8 +8,10 @@ import SwiftUI
 struct PolicyCanvasGroupLayer: View {
   let viewModel: PolicyCanvasViewModel
   let focusedComponent: AccessibilityFocusState<PolicyCanvasSelection?>.Binding
-  @Environment(\.policyCanvasReducedMotion) private var canvasReducedMotion
-  @Environment(\.accessibilityReduceMotion) private var systemReduceMotion
+  @Environment(\.policyCanvasReducedMotion)
+  private var canvasReducedMotion
+  @Environment(\.accessibilityReduceMotion)
+  private var systemReduceMotion
 
   private var reducedMotion: Bool {
     canvasReducedMotion ?? systemReduceMotion
@@ -67,8 +69,10 @@ struct PolicyCanvasGroupRegion: View {
   /// View-only: the model state lives in `PolicyCanvasViewModel`'s observed
   /// `groupAcceptanceFlashID`. The reduce-motion gate is below in `body`.
   let isFlashing: Bool
-  @Environment(\.policyCanvasReducedMotion) private var canvasReducedMotion
-  @Environment(\.accessibilityReduceMotion) private var systemReduceMotion
+  @Environment(\.policyCanvasReducedMotion)
+  private var canvasReducedMotion
+  @Environment(\.accessibilityReduceMotion)
+  private var systemReduceMotion
 
   private var reducedMotion: Bool {
     canvasReducedMotion ?? systemReduceMotion

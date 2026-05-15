@@ -112,27 +112,58 @@ extension PolicyCanvasViewModel {
     sourceMemberIDs: [String: [String]],
     offset: CGFloat
   ) -> PolicyCanvasBulkAddPlan {
-    var nodeIDRemap: [String: String] = [:]
-    var groupIDRemap: [String: String] = [:]
     let delta = CGSize(width: offset, height: offset)
+    let groupIDRemap = cloneGroupIDRemap(sourceGroups)
+    var nodeIDRemap: [String: String] = [:]
+    let clonedNodes = clonedPasteNodes(
+      sourceNodes,
+      groupIDRemap: groupIDRemap,
+      nodeIDRemap: &nodeIDRemap,
+      delta: delta
+    )
+    let clonedEdges = clonedPasteEdges(sourceEdges, nodeIDRemap: nodeIDRemap)
+    _ = sourceMemberIDs  // member ids are reconstructed by node.groupID during apply.
+    let clonedGroups = clonedPasteGroups(
+      sourceGroups,
+      groupIDRemap: groupIDRemap,
+      delta: delta
+    )
+    return PolicyCanvasBulkAddPlan(
+      nodes: clonedNodes,
+      edges: clonedEdges,
+      groups: clonedGroups,
+      primarySelection: primarySelection(
+        nodes: clonedNodes,
+        edges: clonedEdges,
+        groups: clonedGroups
+      )
+    )
+  }
+
+  private func cloneGroupIDRemap(
+    _ sourceGroups: [PolicyCanvasGroup]
+  ) -> [String: String] {
+    var groupIDRemap: [String: String] = [:]
     for sourceGroup in sourceGroups {
-      let newID = mintFreshGroupID(seed: sourceGroup.id)
-      groupIDRemap[sourceGroup.id] = newID
+      groupIDRemap[sourceGroup.id] = mintFreshGroupID(seed: sourceGroup.id)
     }
-    var clonedNodes: [PolicyCanvasNode] = []
-    for sourceNode in sourceNodes {
+    return groupIDRemap
+  }
+
+  private func clonedPasteNodes(
+    _ sourceNodes: [PolicyCanvasNode],
+    groupIDRemap: [String: String],
+    nodeIDRemap: inout [String: String],
+    delta: CGSize
+  ) -> [PolicyCanvasNode] {
+    sourceNodes.map { sourceNode in
       let newID = mintFreshNodeID(seed: sourceNode.kind.rawValue)
       nodeIDRemap[sourceNode.id] = newID
       var clone = PolicyCanvasNode(
         id: newID,
         title: sourceNode.title,
         kind: sourceNode.kind,
-        position: snapped(
-          CGPoint(
-            x: sourceNode.position.x + delta.width,
-            y: sourceNode.position.y + delta.height
-          )
-        )
+        position: shiftedNodePosition(sourceNode.position, delta: delta)
       )
       clone.subtitle = sourceNode.subtitle
       clone.policyKind = sourceNode.policyKind
@@ -141,79 +172,105 @@ extension PolicyCanvasViewModel {
       if let originalGroup = sourceNode.groupID {
         clone.groupID = groupIDRemap[originalGroup] ?? originalGroup
       }
-      clonedNodes.append(clone)
+      return clone
     }
-    var clonedEdges: [PolicyCanvasEdge] = []
-    for sourceEdge in sourceEdges {
-      guard
-        let newSourceNodeID = nodeIDRemap[sourceEdge.source.nodeID],
-        let newTargetNodeID = nodeIDRemap[sourceEdge.target.nodeID]
-      else {
-        continue
-      }
-      let newEdgeID = mintFreshEdgeID(
-        sourceNodeID: newSourceNodeID,
-        sourcePortID: sourceEdge.source.portID,
-        targetNodeID: newTargetNodeID,
-        targetPortID: sourceEdge.target.portID
+  }
+
+  private func shiftedNodePosition(_ position: CGPoint, delta: CGSize) -> CGPoint {
+    snapped(
+      CGPoint(
+        x: position.x + delta.width,
+        y: position.y + delta.height
       )
-      let newSource = PolicyCanvasPortEndpoint(
-        nodeID: newSourceNodeID,
-        portID: sourceEdge.source.portID,
-        kind: sourceEdge.source.kind,
-        side: sourceEdge.source.side
-      )
-      let newTarget = PolicyCanvasPortEndpoint(
-        nodeID: newTargetNodeID,
-        portID: sourceEdge.target.portID,
-        kind: sourceEdge.target.kind,
-        side: sourceEdge.target.side
-      )
-      clonedEdges.append(
-        PolicyCanvasEdge(
-          id: newEdgeID,
-          source: newSource,
-          target: newTarget,
-          label: sourceEdge.label
-        ))
-    }
-    _ = sourceMemberIDs  // member ids are reconstructed by node.groupID during apply.
-    var clonedGroups: [PolicyCanvasGroup] = []
-    for sourceGroup in sourceGroups {
-      guard let newID = groupIDRemap[sourceGroup.id] else { continue }
-      let shiftedFrame = CGRect(
-        origin: CGPoint(
-          x: sourceGroup.frame.origin.x + delta.width,
-          y: sourceGroup.frame.origin.y + delta.height
-        ),
-        size: sourceGroup.frame.size
-      )
-      clonedGroups.append(
-        PolicyCanvasGroup(
-          id: newID,
-          title: sourceGroup.title,
-          frame: shiftedFrame,
-          tone: sourceGroup.tone
-        ))
-    }
-    let primary: PolicyCanvasSelection? = {
-      if let first = clonedNodes.first {
-        return .node(first.id)
-      }
-      if let first = clonedEdges.first {
-        return .edge(first.id)
-      }
-      if let first = clonedGroups.first {
-        return .group(first.id)
-      }
-      return nil
-    }()
-    return PolicyCanvasBulkAddPlan(
-      nodes: clonedNodes,
-      edges: clonedEdges,
-      groups: clonedGroups,
-      primarySelection: primary
     )
+  }
+
+  private func clonedPasteEdges(
+    _ sourceEdges: [PolicyCanvasEdge],
+    nodeIDRemap: [String: String]
+  ) -> [PolicyCanvasEdge] {
+    sourceEdges.compactMap { sourceEdge in
+      clonedPasteEdge(sourceEdge, nodeIDRemap: nodeIDRemap)
+    }
+  }
+
+  private func clonedPasteEdge(
+    _ sourceEdge: PolicyCanvasEdge,
+    nodeIDRemap: [String: String]
+  ) -> PolicyCanvasEdge? {
+    guard
+      let newSourceNodeID = nodeIDRemap[sourceEdge.source.nodeID],
+      let newTargetNodeID = nodeIDRemap[sourceEdge.target.nodeID]
+    else {
+      return nil
+    }
+    let newEdgeID = mintFreshEdgeID(
+      sourceNodeID: newSourceNodeID,
+      sourcePortID: sourceEdge.source.portID,
+      targetNodeID: newTargetNodeID,
+      targetPortID: sourceEdge.target.portID
+    )
+    return PolicyCanvasEdge(
+      id: newEdgeID,
+      source: clonedEndpoint(sourceEdge.source, nodeID: newSourceNodeID),
+      target: clonedEndpoint(sourceEdge.target, nodeID: newTargetNodeID),
+      label: sourceEdge.label
+    )
+  }
+
+  private func clonedEndpoint(
+    _ endpoint: PolicyCanvasPortEndpoint,
+    nodeID: String
+  ) -> PolicyCanvasPortEndpoint {
+    PolicyCanvasPortEndpoint(
+      nodeID: nodeID,
+      portID: endpoint.portID,
+      kind: endpoint.kind,
+      side: endpoint.side
+    )
+  }
+
+  private func clonedPasteGroups(
+    _ sourceGroups: [PolicyCanvasGroup],
+    groupIDRemap: [String: String],
+    delta: CGSize
+  ) -> [PolicyCanvasGroup] {
+    sourceGroups.compactMap { sourceGroup in
+      guard let newID = groupIDRemap[sourceGroup.id] else { return nil }
+      return PolicyCanvasGroup(
+        id: newID,
+        title: sourceGroup.title,
+        frame: shiftedGroupFrame(sourceGroup.frame, delta: delta),
+        tone: sourceGroup.tone
+      )
+    }
+  }
+
+  private func shiftedGroupFrame(_ frame: CGRect, delta: CGSize) -> CGRect {
+    CGRect(
+      origin: CGPoint(
+        x: frame.origin.x + delta.width,
+        y: frame.origin.y + delta.height
+      ),
+      size: frame.size
+    )
+  }
+
+  private func primarySelection(
+    nodes: [PolicyCanvasNode],
+    edges: [PolicyCanvasEdge],
+    groups: [PolicyCanvasGroup]
+  ) -> PolicyCanvasSelection? {
+    if let first = nodes.first {
+      return .node(first.id)
+    }
+    if let first = edges.first {
+      return .edge(first.id)
+    }
+    if let first = groups.first {
+      return .group(first.id)
+    }
+    return nil
   }
 
   func mintFreshNodeID(seed: String) -> String {

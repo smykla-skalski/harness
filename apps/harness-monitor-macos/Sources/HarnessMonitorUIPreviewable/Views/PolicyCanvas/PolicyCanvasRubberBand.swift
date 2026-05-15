@@ -17,8 +17,10 @@ import SwiftUI
 /// animates implicitly.
 struct PolicyCanvasRubberBandLayer: View {
   let viewModel: PolicyCanvasViewModel
-  @Environment(\.policyCanvasReducedMotion) private var canvasReducedMotion
-  @Environment(\.accessibilityReduceMotion) private var systemReduceMotion
+  @Environment(\.policyCanvasReducedMotion)
+  private var canvasReducedMotion
+  @Environment(\.accessibilityReduceMotion)
+  private var systemReduceMotion
 
   /// Resolved reduce-motion bit. Prefer the canvas-scoped override (set by
   /// `PolicyCanvasView` from the system flag, or by tests via the

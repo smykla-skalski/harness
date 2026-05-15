@@ -33,37 +33,19 @@ extension PolicyCanvasViewModel {
   ///
   /// Without this funnel a kind switch silently destroyed connections that
   /// Cmd-Z could not bring back.
-  func applySetNodeKind(
-    id: String,
-    from: PolicyCanvasNodeKind,
-    to: PolicyCanvasNodeKind,
-    fromSubtitle: String,
-    toSubtitle: String,
-    fromPolicyKind: TaskBoardPolicyPipelineNodeKind?,
-    toPolicyKind: TaskBoardPolicyPipelineNodeKind?,
-    removedEdges: [PolicyCanvasEdge]
-  ) -> PolicyCanvasChange {
-    guard let index = nodes.firstIndex(where: { $0.id == id }) else {
-      return .setNodeKind(
-        id: id,
-        from: to,
-        to: to,
-        fromSubtitle: toSubtitle,
-        toSubtitle: toSubtitle,
-        fromPolicyKind: toPolicyKind,
-        toPolicyKind: toPolicyKind,
-        removedEdges: []
-      )
+  func applySetNodeKind(_ change: PolicyCanvasNodeKindChange) -> PolicyCanvasChange {
+    guard let index = nodes.firstIndex(where: { $0.id == change.id }) else {
+      return change.missingNodeInverse
     }
-    markNodeEdited(id)
-    nodes[index].kind = to
-    nodes[index].subtitle = toSubtitle
-    nodes[index].inputPorts = Self.ports(for: to.inputPortTitles, kind: .input)
-    nodes[index].outputPorts = Self.ports(for: to.outputPortTitles, kind: .output)
-    nodes[index].policyKind = toPolicyKind
+    markNodeEdited(change.id)
+    nodes[index].kind = change.to
+    nodes[index].subtitle = change.toSubtitle
+    nodes[index].inputPorts = Self.ports(for: change.to.inputPortTitles, kind: .input)
+    nodes[index].outputPorts = Self.ports(for: change.to.outputPortTitles, kind: .output)
+    nodes[index].policyKind = change.toPolicyKind
 
     let inverseRemovedEdges: [PolicyCanvasEdge]
-    if removedEdges.isEmpty {
+    if change.removedEdges.isEmpty {
       // Forward direction: prune edges that the new kind's ports cannot
       // host, capture the pruned set as inverse data.
       inverseRemovedEdges = pruneDanglingEdgesAndReturnRemoved()
@@ -73,7 +55,7 @@ extension PolicyCanvasViewModel {
       // valid connections; the prune here is a defensive no-op (the new
       // edges already match the active ports).
       let liveNodeIDs = Set(nodes.map(\.id))
-      for edge in removedEdges where !edges.contains(where: { $0.id == edge.id }) {
+      for edge in change.removedEdges where !edges.contains(where: { $0.id == edge.id }) {
         guard
           liveNodeIDs.contains(edge.source.nodeID),
           liveNodeIDs.contains(edge.target.nodeID)
@@ -86,13 +68,13 @@ extension PolicyCanvasViewModel {
     }
 
     return .setNodeKind(
-      id: id,
-      from: to,
-      to: from,
-      fromSubtitle: toSubtitle,
-      toSubtitle: fromSubtitle,
-      fromPolicyKind: toPolicyKind,
-      toPolicyKind: fromPolicyKind,
+      id: change.id,
+      from: change.to,
+      to: change.from,
+      fromSubtitle: change.toSubtitle,
+      toSubtitle: change.fromSubtitle,
+      fromPolicyKind: change.toPolicyKind,
+      toPolicyKind: change.fromPolicyKind,
       removedEdges: inverseRemovedEdges
     )
   }

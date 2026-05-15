@@ -1,4 +1,75 @@
 extension HarnessMonitorAccessibility {
+  public static let settingsRoot = "harness.settings.root"
+  public static let settingsState = "harness.settings.state"
+  public static let settingsPanel = "harness.settings.panel"
+  public static let settingsToolbarSeparatorSuppressed =
+    "harness.settings.toolbar.separator-suppressed"
+  public static let settingsSidebar = "harness.settings.sidebar"
+  public static let settingsBackButton = "harness.settings.nav.back"
+  public static let settingsForwardButton = "harness.settings.nav.forward"
+  public static let settingsTitle = "harness.settings.title"
+  public static let settingsThemeModePicker = "harness.settings.theme-mode"
+  public static let settingsBackdropModePicker = "harness.settings.backdrop-mode"
+  public static let settingsLaunchBehaviorPicker = "harness.settings.launch-behavior"
+  public static let settingsBackgroundCollectionPicker =
+    "harness.settings.background-collection"
+  public static let settingsBackgroundGallery = "harness.settings.background-gallery"
+  public static let settingsBackgroundRecentsSection =
+    "harness.settings.background.recents-section"
+  public static let settingsBackgroundRecentState =
+    "harness.settings.background.recents-state"
+  public static let settingsTextSizePicker = "harness.settings.text-size"
+  public static let settingsMenuBarStateColorsToggle =
+    "harness.settings.menu-bar.state-colors"
+  public static let settingsSessionShortcutOverlaysToggle =
+    "harness.settings.session.shortcut-overlays"
+  public static let settingsSessionTitleBlurToggle =
+    "harness.settings.session.title-blur"
+  public static let settingsSessionRowModePicker =
+    "harness.settings.sidebar-session-row-mode"
+  public static let settingsTimeZoneModePicker = "harness.settings.time-zone-mode"
+  public static let settingsCustomTimeZonePicker = "harness.settings.custom-time-zone"
+  public static let settingsTimelinePersistencePicker =
+    "harness.settings.timeline.filter-persistence"
+  public static let settingsPendingDecisionBannersToggle =
+    "harness.settings.decisions.pending-banners"
+  public static let settingsPendingBannersFocusModeToggle =
+    "harness.settings.decisions.pending-banners.focus-mode"
+  public static let settingsMCPSection = "harness.settings.mcp"
+  public static let settingsMCPRegistryHostToggle =
+    "harness.settings.mcp.registry-host"
+  public static let settingsMCPStatus = "harness.settings.mcp.status"
+  public static let settingsLaunchAgentRepairButton =
+    "harness.settings.diagnostics.launch-agent.repair"
+  public static let settingsVoiceSection = "harness.settings.voice"
+  public static let settingsVoiceLocaleField = "harness.settings.voice.locale-field"
+  public static let settingsVoiceLocalePicker = "harness.settings.voice.locale-picker"
+  public static let settingsVoiceLocalDaemonToggle = "harness.settings.voice.local-daemon"
+  public static let settingsVoiceAgentBridgeToggle = "harness.settings.voice.agent-bridge"
+  public static let settingsVoiceRemoteProcessorToggle =
+    "harness.settings.voice.remote-processor"
+  public static let settingsVoiceRemoteProcessorURLField =
+    "harness.settings.voice.remote-processor-url"
+  public static let settingsVoiceInsertionModePicker =
+    "harness.settings.voice.insertion-mode"
+  public static let settingsVoiceAudioChunksToggle = "harness.settings.voice.audio-chunks"
+  public static let settingsVoicePendingAudioField =
+    "harness.settings.voice.pending-audio-limit"
+  public static let settingsVoicePendingTranscriptField =
+    "harness.settings.voice.pending-transcript-limit"
+  public static let settingsVoiceStatus = "harness.settings.voice.status"
+  public static let settingsNotificationsStatus = "harness.settings.notifications.status"
+  public static let settingsNotificationsPresetPicker =
+    "harness.settings.notifications.preset"
+  public static let settingsNotificationsCategoryPicker =
+    "harness.settings.notifications.category"
+  public static let settingsNotificationsSoundPicker = "harness.settings.notifications.sound"
+  public static let settingsNotificationsAttachmentPicker =
+    "harness.settings.notifications.attachment"
+  public static let settingsNotificationsTriggerPicker =
+    "harness.settings.notifications.trigger"
+  public static let settingsNotificationsSendButton = "harness.settings.notifications.send"
+
   public static let settingsTaskBoardRoot = "harness.settings.task-board"
   public static let settingsTaskBoardStatus = "harness.settings.task-board.status"
   public static let settingsTaskBoardReloadButton = "harness.settings.task-board.reload"
@@ -70,6 +141,10 @@ extension HarnessMonitorAccessibility {
 
   public static func settingsTaskBoardRepositoryOverrideGPGPassphraseField(_ index: Int) -> String {
     "harness.settings.task-board.override.\(index).gpg-private-key-passphrase"
+  }
+
+  public static func settingsAuthorizedFolderRow(_ id: String) -> String {
+    "harness.settings.authorized-folders.row.\(id)"
   }
 
   public static func segmentedOption(_ controlID: String, option: String) -> String {
