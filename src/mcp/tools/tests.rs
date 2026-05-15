@@ -29,6 +29,7 @@ use super::{
 mod interaction_tests;
 mod registry_tool_tests;
 mod resolve_list_elements_tests;
+mod task_board_tests;
 
 fn socket_path(dir: &TempDir) -> PathBuf {
     session_socket(dir.path(), "testid00", "registry")

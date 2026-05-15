@@ -251,6 +251,11 @@ fn task_board_routes_have_complete_ws_parity() {
             ),
         ]
     );
+    let expected_mcp_methods: Vec<_> = actual
+        .iter()
+        .map(|(_, _, ws_method, _)| *ws_method)
+        .collect();
+    assert_eq!(task_board_mcp_methods(), expected_mcp_methods);
 }
 
 #[test]

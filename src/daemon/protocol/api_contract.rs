@@ -70,6 +70,19 @@ pub fn mapped_ws_methods() -> Vec<&'static str> {
 }
 
 #[must_use]
+pub fn task_board_mcp_methods() -> Vec<&'static str> {
+    routes_task_board::ROUTES
+        .iter()
+        .map(|route| {
+            route
+                .parity
+                .ws_method()
+                .expect("task-board route should map to websocket")
+        })
+        .collect()
+}
+
+#[must_use]
 pub fn explicit_exemptions() -> Vec<&'static HttpApiRouteContract> {
     HTTP_API_CONTRACT
         .iter()
