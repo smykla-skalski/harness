@@ -8,91 +8,86 @@ import os
 /// flips, hover, scene-storage writes, env-key updates - and on every
 /// `TimelineView(.animation)` tick when an animated edge is on screen. Without
 /// memoization that means N route calls per body invocation, and a 60Hz drag
-/// with 50 edges becomes 3000 route calls/sec - antirez's R2 ceiling.
+/// with 50 edges becomes 3000 route calls/sec.
 ///
-/// The cache keys on the full routing input (mode + endpoints + lane + the
-/// hashable `PolicyCanvasRouteContext`) so a re-evaluation that does not move
-/// any node returns the cached polyline without re-running A*. Movement
-/// (drag, paste, layout) changes obstacle frames, which mutates the context
-/// hash and naturally invalidates affected entries.
+/// The cache keys on the routing input as a single value: a `Mode` enum that
+/// carries either the pinned `(source, target)` pair or the flex
+/// `(sourceCandidates, targetCandidates)` pair, plus the routing context.
+/// Because the inputs live inside the enum payload, there are no redundant
+/// "first candidate" fallback fields and pinned calls do not allocate empty
+/// candidate arrays. Movement (drag, paste, layout) changes obstacle frames,
+/// which mutates the context hash and naturally invalidates affected entries.
 ///
-/// Thread safety: cache reads and writes are serialized through an `NSLock`.
-/// In production both bodies run on the main actor so contention is nil; the
-/// lock exists for `@unchecked Sendable` discipline.
+/// **Cache identity invariant:** every public input read by the wrapped
+/// `inner` router must be captured by the `CacheKey` derived here. The
+/// endpoints and candidates are explicit; everything else lives inside
+/// `PolicyCanvasRouteContext`. If you add a field that the inner router
+/// reads, it MUST become part of the context's `Hashable` synthesis or
+/// the cache will silently serve stale polylines. The contract test in
+/// `PolicyCanvasMemoizedRouterContextContractTests.swift` enforces this
+/// for every named context field by mutating one field at a time and
+/// asserting the miss-rate goes to 100%.
 ///
-/// Cache eviction: bounded by `capacity`; oldest entries are dropped first
-/// once the cache crosses the cap. Default cap of 1024 keeps RAM negligible
-/// (each `PolicyCanvasEdgeRoute` is a handful of `CGPoint`s) while covering
-/// far more entries than any realistic canvas size.
+/// Thread safety: state lives behind a single `OSAllocatedUnfairLock<State>`.
+/// In production both render bodies run on the main actor so contention is
+/// nil; the lock exists for `@unchecked Sendable` discipline.
+///
+/// Cache eviction: clear-on-overflow. When `cache.count` would exceed
+/// `capacity` after an insertion, the entire cache is dropped. The next
+/// frame pays a single cold rebuild burst, but eviction stays O(1) instead
+/// of the O(N) Array shift that an in-place LRU would impose on the hot
+/// path. For a 1024-entry cap on a visual edge cache, the simpler policy
+/// is good enough: typical canvases never approach the cap, and the
+/// pathological case (a long drag past 1024 distinct routes) recovers in
+/// one frame.
 final class PolicyCanvasMemoizedRouter: PolicyCanvasEdgeRouter, @unchecked Sendable {
   private struct CacheKey: Hashable {
     let mode: Mode
-    let source: PointKey
-    let target: PointKey
-    let sourceCandidates: [PointKey]
-    let targetCandidates: [PointKey]
     let context: PolicyCanvasRouteContext
   }
 
   private enum Mode: Hashable {
-    case pinned
-    case flex
+    case pinned(source: CGPoint, target: CGPoint)
+    case flex(sourceCandidates: [CGPoint], targetCandidates: [CGPoint])
   }
 
-  /// `CGPoint` is `Hashable` on macOS 26, but goes through `==` comparisons
-  /// that fold floating-point representation edge cases. Wrapping the bit
-  /// pattern explicitly avoids any platform-version drift in the hash and
-  /// keeps the key comparison strictly bit-identical.
-  private struct PointKey: Hashable {
-    let xBits: UInt64
-    let yBits: UInt64
-
-    init(_ point: CGPoint) {
-      self.xBits = Double(point.x).bitPattern
-      self.yBits = Double(point.y).bitPattern
-    }
+  private struct State {
+    var cache: [CacheKey: PolicyCanvasEdgeRoute] = [:]
+    var hits: Int = 0
+    var misses: Int = 0
   }
 
   let inner: any PolicyCanvasEdgeRouter
   let capacity: Int
-  private let lock = NSLock()
-  private var cache: [CacheKey: PolicyCanvasEdgeRoute] = [:]
-  private var insertionOrder: [CacheKey] = []
-  private let hitsCounter = OSAllocatedUnfairLock(initialState: 0)
-  private let missesCounter = OSAllocatedUnfairLock(initialState: 0)
+  private let state = OSAllocatedUnfairLock(initialState: State())
 
   init(inner: any PolicyCanvasEdgeRouter, capacity: Int = 1_024) {
     self.inner = inner
     self.capacity = max(16, capacity)
   }
 
-  /// Number of cache hits since construction (or last `resetStatistics`).
-  /// Useful for the hit-counter assertion in
-  /// `PolicyCanvasAnimationPerfTests.memoizationReusesCachedRoute`.
   var hits: Int {
-    hitsCounter.withLock { $0 }
+    state.withLock { $0.hits }
   }
 
-  /// Number of cache misses (calls that fell through to the inner router).
   var misses: Int {
-    missesCounter.withLock { $0 }
+    state.withLock { $0.misses }
   }
 
   /// Drop all cached routes. Callers should invoke this when a non-input
   /// signal renders cached polylines stale (e.g. the canvas was reloaded
   /// from a document or the router default flipped at runtime).
   func invalidate() {
-    lock.lock()
-    cache.removeAll()
-    insertionOrder.removeAll()
-    lock.unlock()
+    state.withLock { $0.cache.removeAll() }
   }
 
   /// Reset hit/miss counters. Routes stay cached; only the statistics are
   /// cleared.
   func resetStatistics() {
-    hitsCounter.withLock { $0 = 0 }
-    missesCounter.withLock { $0 = 0 }
+    state.withLock {
+      $0.hits = 0
+      $0.misses = 0
+    }
   }
 
   func route(
@@ -100,14 +95,7 @@ final class PolicyCanvasMemoizedRouter: PolicyCanvasEdgeRouter, @unchecked Senda
     target: CGPoint,
     context: PolicyCanvasRouteContext
   ) -> PolicyCanvasEdgeRoute {
-    let key = CacheKey(
-      mode: .pinned,
-      source: PointKey(source),
-      target: PointKey(target),
-      sourceCandidates: [],
-      targetCandidates: [],
-      context: context
-    )
+    let key = CacheKey(mode: .pinned(source: source, target: target), context: context)
     return resolve(key: key) {
       inner.route(source: source, target: target, context: context)
     }
@@ -119,11 +107,10 @@ final class PolicyCanvasMemoizedRouter: PolicyCanvasEdgeRouter, @unchecked Senda
     context: PolicyCanvasRouteContext
   ) -> PolicyCanvasEdgeRoute {
     let key = CacheKey(
-      mode: .flex,
-      source: PointKey(sourceCandidates.first ?? .zero),
-      target: PointKey(targetCandidates.first ?? .zero),
-      sourceCandidates: sourceCandidates.map(PointKey.init),
-      targetCandidates: targetCandidates.map(PointKey.init),
+      mode: .flex(
+        sourceCandidates: sourceCandidates,
+        targetCandidates: targetCandidates
+      ),
       context: context
     )
     return resolve(key: key) {
@@ -139,25 +126,20 @@ final class PolicyCanvasMemoizedRouter: PolicyCanvasEdgeRouter, @unchecked Senda
     key: CacheKey,
     compute: () -> PolicyCanvasEdgeRoute
   ) -> PolicyCanvasEdgeRoute {
-    lock.lock()
-    if let cached = cache[key] {
-      lock.unlock()
-      hitsCounter.withLock { $0 += 1 }
+    if let cached = state.withLock({ $0.cache[key] }) {
+      state.withLock { $0.hits += 1 }
       return cached
     }
-    lock.unlock()
     let computed = compute()
-    lock.lock()
-    if cache[key] == nil {
-      cache[key] = computed
-      insertionOrder.append(key)
-      if insertionOrder.count > capacity {
-        let evicted = insertionOrder.removeFirst()
-        cache.removeValue(forKey: evicted)
+    state.withLock {
+      if $0.cache[key] == nil {
+        if $0.cache.count >= self.capacity {
+          $0.cache.removeAll(keepingCapacity: true)
+        }
+        $0.cache[key] = computed
       }
+      $0.misses += 1
     }
-    lock.unlock()
-    missesCounter.withLock { $0 += 1 }
     return computed
   }
 }
