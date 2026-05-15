@@ -15,6 +15,7 @@ use crate::task_board::{
     AgentMode, TaskBoardItem, TaskBoardStatus, TaskBoardStore, default_board_root,
 };
 
+use super::task_board_managed_worker_assertions::assert_codex_worker_started;
 use super::*;
 
 #[test]
@@ -52,7 +53,7 @@ async fn run_task_board_http_flow(sandbox: &Path) {
     let client = reqwest::Client::new();
 
     run_task_board_http_item_scope_flow(&client, &base_url, &state, &project_dir).await;
-    run_task_board_http_run_once_flow(&client, &base_url, &project_dir).await;
+    run_task_board_http_run_once_flow(&client, &base_url, &state, &project_dir).await;
 
     server.abort();
     let _ = server.await;
@@ -79,6 +80,7 @@ async fn run_task_board_http_item_scope_flow(
         applied["item"]["workflow"]["status"].as_str(),
         Some("running")
     );
+    assert_codex_worker_started(state, &session_id, "board-http-dispatch", &work_item_id);
     assert_board_item_unlinked("board-http-dispatch-other");
     let other_dispatch =
         dispatch_http_item(client, base_url, "board-http-dispatch-other", project_dir).await;
@@ -118,6 +120,7 @@ async fn run_task_board_http_item_scope_flow(
 async fn run_task_board_http_run_once_flow(
     client: &reqwest::Client,
     base_url: &str,
+    state: &crate::daemon::http::DaemonHttpState,
     project_dir: &Path,
 ) {
     seed_ready_board_item("board-http-run-once", "HTTP run once item");
@@ -155,6 +158,13 @@ async fn run_task_board_http_run_once_flow(
         run_once["last_run"]["policy_trace_ids"]
             .as_array()
             .is_some_and(|trace_ids| !trace_ids.is_empty())
+    );
+    let applied = &run_once["last_run"]["dispatch"]["applied"][0];
+    assert_codex_worker_started(
+        state,
+        &required_string(applied, "session_id"),
+        "board-http-run-once",
+        &required_string(applied, "work_item_id"),
     );
     assert_board_item_unlinked("board-http-run-once-other");
 }

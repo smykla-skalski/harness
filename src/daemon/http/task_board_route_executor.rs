@@ -15,6 +15,14 @@ use crate::session::types::CONTROL_PLANE_ACTOR_ID;
 
 use super::DaemonHttpState;
 
+mod item_ops;
+mod orchestrator_ops;
+mod policy_ops;
+
+pub(crate) use item_ops::*;
+pub(crate) use orchestrator_ops::*;
+pub(crate) use policy_ops::*;
+
 pub(crate) async fn dispatch(
     state: &DaemonHttpState,
     mut request: TaskBoardDispatchRequest,

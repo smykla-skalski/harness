@@ -13,7 +13,6 @@ use crate::daemon::protocol::{
     TaskBoardPlanBeginRequest, TaskBoardPlanSubmitRequest, TaskBoardSyncRequest,
     TaskBoardUpdateItemRequest, http_paths,
 };
-use crate::daemon::service;
 use crate::task_board::TaskBoardStatus;
 
 use super::super::DaemonHttpState;
@@ -57,7 +56,7 @@ pub(super) async fn post_task_board_item(
         http_paths::TASK_BOARD_ITEMS,
         &request_id,
         start,
-        service::create_task_board_item(&request),
+        task_board_route_executor::create_item(&request),
     )
 }
 
@@ -75,7 +74,7 @@ pub(super) async fn get_task_board_items(
         http_paths::TASK_BOARD_ITEMS,
         &request_id,
         start,
-        service::list_task_board_items(&request),
+        task_board_route_executor::list_items(&request),
     )
 }
 
@@ -90,7 +89,7 @@ pub(super) async fn get_task_board_item(
         http_paths::TASK_BOARD_ITEM,
         &request_id,
         start,
-        service::get_task_board_item(&TaskBoardGetItemRequest { id: item_id }),
+        task_board_route_executor::get_item(&TaskBoardGetItemRequest { id: item_id }),
     )
 }
 
@@ -106,7 +105,7 @@ pub(super) async fn put_task_board_item(
         http_paths::TASK_BOARD_ITEM,
         &request_id,
         start,
-        service::update_task_board_item(&item_id, &request),
+        task_board_route_executor::update_item(&item_id, &request),
     )
 }
 
@@ -122,7 +121,7 @@ pub(super) async fn delete_task_board_item(
         http_paths::TASK_BOARD_ITEM,
         &request_id,
         start,
-        service::delete_task_board_item(&request),
+        task_board_route_executor::delete_item(&request),
     )
 }
 
@@ -138,7 +137,7 @@ pub(super) async fn post_task_board_plan_begin(
         http_paths::TASK_BOARD_PLAN_BEGIN,
         &request_id,
         start,
-        service::begin_task_board_planning(&request),
+        task_board_route_executor::begin_planning(&request),
     )
 }
 
@@ -158,7 +157,7 @@ pub(super) async fn post_task_board_plan_submit(
         http_paths::TASK_BOARD_PLAN_SUBMIT,
         &request_id,
         start,
-        service::submit_task_board_plan(&request),
+        task_board_route_executor::submit_plan(&request),
     )
 }
 
@@ -179,7 +178,7 @@ pub(super) async fn post_task_board_plan_approve(
         http_paths::TASK_BOARD_PLAN_APPROVE,
         &request_id,
         start,
-        service::approve_task_board_plan(&request),
+        task_board_route_executor::approve_plan(&request),
     )
 }
 
@@ -194,7 +193,7 @@ pub(super) async fn post_task_board_sync(
         http_paths::TASK_BOARD_SYNC,
         &request_id,
         start,
-        service::sync_task_board_async(&request).await,
+        task_board_route_executor::sync(&request).await,
     )
 }
 
@@ -244,7 +243,7 @@ pub(super) async fn get_task_board_audit(
         http_paths::TASK_BOARD_AUDIT,
         &request_id,
         start,
-        service::audit_task_board(&request),
+        task_board_route_executor::audit(&request),
     )
 }
 
@@ -262,7 +261,7 @@ pub(super) async fn get_task_board_projects(
         http_paths::TASK_BOARD_PROJECTS,
         &request_id,
         start,
-        service::list_task_board_projects(&request),
+        task_board_route_executor::projects(&request),
     )
 }
 
@@ -280,7 +279,7 @@ pub(super) async fn get_task_board_machines(
         http_paths::TASK_BOARD_MACHINES,
         &request_id,
         start,
-        service::list_task_board_machines(&request),
+        task_board_route_executor::machines(&request),
     )
 }
 
