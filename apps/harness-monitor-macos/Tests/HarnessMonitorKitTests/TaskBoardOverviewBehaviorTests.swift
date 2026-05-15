@@ -58,24 +58,12 @@ struct TaskBoardOverviewBehaviorTests {
   func boardOnlyItemsSelectManagementSurface() {
     let item = taskBoardItem(id: "board-only", status: .todo)
 
-    #expect(
-      TaskBoardOverviewItemBehavior.selectionAction(
-        for: item,
-        selectedTaskBoardItemID: nil,
-        inboxItems: []
-      ) == .selectBoardItem
-    )
-    #expect(
-      TaskBoardOverviewItemBehavior.selectionAction(
-        for: item,
-        selectedTaskBoardItemID: "board-only",
-        inboxItems: []
-      ) == .clearBoardSelection
-    )
+    #expect(TaskBoardOverviewItemBehavior.selectionAction(for: item) == .selectBoardItem)
+    #expect(TaskBoardOverviewItemBehavior.selectionAction(for: item) == .selectBoardItem)
   }
 
-  @Test("Linked board items select inline when the session task is unavailable")
-  func linkedBoardItemsSelectInlineWhenSessionTaskIsUnavailable() {
+  @Test("Linked board items open directly without inbox snapshot state")
+  func linkedBoardItemsOpenDirectlyWithoutInboxSnapshotState() {
     let item = taskBoardItem(
       id: "linked",
       status: .inProgress,
@@ -83,27 +71,7 @@ struct TaskBoardOverviewBehaviorTests {
       workItemId: "task-linked"
     )
 
-    #expect(
-      TaskBoardOverviewItemBehavior.selectionAction(
-        for: item,
-        selectedTaskBoardItemID: nil,
-        inboxItems: []
-      ) == .selectBoardItem
-    )
-    #expect(
-      TaskBoardOverviewItemBehavior.selectionAction(
-        for: item,
-        selectedTaskBoardItemID: nil,
-        inboxItems: [inboxItem(taskID: "other-task")]
-      ) == .selectBoardItem
-    )
-    #expect(
-      TaskBoardOverviewItemBehavior.selectionAction(
-        for: item,
-        selectedTaskBoardItemID: nil,
-        inboxItems: [inboxItem(taskID: "task-linked")]
-      ) == .openLinkedTask
-    )
+    #expect(TaskBoardOverviewItemBehavior.selectionAction(for: item) == .openLinkedTask)
   }
 
   @Test("Inbox drop policy ignores unknown source lane payloads")
@@ -199,6 +167,56 @@ struct TaskBoardOverviewBehaviorTests {
     )
 
     #expect(TaskBoardInboxLane.needsYou.taskBoardDropStatus(for: manualItem) == .planReview)
+  }
+
+  @Test("Drop deduper suppresses duplicate successful drops until reset")
+  func dropDeduperSuppressesDuplicateSuccessfulDropsUntilReset() {
+    var deduper = TaskBoardDropDeduper<String>()
+    var moves = 0
+
+    #expect(
+      deduper.perform("board-1|running") {
+        moves += 1
+        return true
+      }
+    )
+    #expect(
+      deduper.perform("board-1|running") {
+        moves += 1
+        return true
+      }
+    )
+    #expect(moves == 1)
+
+    deduper.reset()
+
+    #expect(
+      deduper.perform("board-1|running") {
+        moves += 1
+        return true
+      }
+    )
+    #expect(moves == 2)
+  }
+
+  @Test("Drop deduper retries a key after an unsuccessful move")
+  func dropDeduperRetriesKeyAfterUnsuccessfulMove() {
+    var deduper = TaskBoardDropDeduper<String>()
+    var attempts = 0
+
+    #expect(
+      !deduper.perform("board-1|running") {
+        attempts += 1
+        return false
+      }
+    )
+    #expect(
+      deduper.perform("board-1|running") {
+        attempts += 1
+        return true
+      }
+    )
+    #expect(attempts == 2)
   }
 
   private func inboxItem(taskID: String) -> TaskBoardInboxItem {

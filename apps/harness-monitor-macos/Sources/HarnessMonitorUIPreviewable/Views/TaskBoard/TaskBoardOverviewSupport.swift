@@ -102,19 +102,14 @@ extension TaskBoardItem {
 enum TaskBoardOverviewItemSelectionAction: Equatable {
   case openLinkedTask
   case selectBoardItem
-  case clearBoardSelection
 }
 
 enum TaskBoardOverviewItemBehavior {
-  static func selectionAction(
-    for item: TaskBoardItem,
-    selectedTaskBoardItemID: String?,
-    inboxItems: [TaskBoardInboxItem]
-  ) -> TaskBoardOverviewItemSelectionAction {
-    if shouldOpenLinkedTask(item, inboxItems: inboxItems) {
+  static func selectionAction(for item: TaskBoardItem) -> TaskBoardOverviewItemSelectionAction {
+    if shouldOpenLinkedTask(item) {
       return .openLinkedTask
     }
-    return selectedTaskBoardItemID == item.id ? .clearBoardSelection : .selectBoardItem
+    return .selectBoardItem
   }
 
   static func runOnceRequest(for item: TaskBoardItem) -> TaskBoardOrchestratorRunOnceRequest {
@@ -125,17 +120,8 @@ enum TaskBoardOverviewItemBehavior {
     TaskBoardEvaluateRequest(status: item.status, itemId: item.id)
   }
 
-  private static func shouldOpenLinkedTask(
-    _ item: TaskBoardItem,
-    inboxItems: [TaskBoardInboxItem]
-  ) -> Bool {
-    guard item.hasLinkedSessionTask else {
-      return false
-    }
-    return inboxItems.contains { inboxItem in
-      inboxItem.session.sessionId == item.sessionId
-        && inboxItem.task.taskId == item.workItemId
-    }
+  private static func shouldOpenLinkedTask(_ item: TaskBoardItem) -> Bool {
+    item.hasLinkedSessionTask
   }
 }
 

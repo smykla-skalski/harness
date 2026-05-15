@@ -316,11 +316,7 @@ extension TaskBoardOverviewView {
   }
 
   private func openTaskBoardItem(_ item: TaskBoardItem) {
-    switch TaskBoardOverviewItemBehavior.selectionAction(
-      for: item,
-      selectedTaskBoardItemID: selectedTaskBoardItemID,
-      inboxItems: snapshot.items
-    ) {
+    switch TaskBoardOverviewItemBehavior.selectionAction(for: item) {
     case .openLinkedTask:
       isCreatingTaskBoardItem = false
       selectedTaskBoardItemID = nil
@@ -328,9 +324,6 @@ extension TaskBoardOverviewView {
     case .selectBoardItem:
       isCreatingTaskBoardItem = false
       selectedTaskBoardItemID = item.id
-    case .clearBoardSelection:
-      isCreatingTaskBoardItem = false
-      selectedTaskBoardItemID = nil
     }
   }
 

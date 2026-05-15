@@ -11,6 +11,7 @@ struct TaskBoardNeedsYouLaneColumn: View {
   @Environment(\.fontScale)
   private var fontScale
   @State private var isDropTargeted = false
+  @State private var dropDeduper = TaskBoardDropDeduper<TaskBoardItemDropSignature>()
 
   private var metrics: TaskBoardLaneMetrics { TaskBoardLaneMetrics(fontScale: fontScale) }
 
@@ -40,29 +41,49 @@ struct TaskBoardNeedsYouLaneColumn: View {
     }
     .taskBoardLaneColumnChrome(lane: .needsYou, isDropTargeted: isDropTargeted)
     .dropDestination(for: TaskBoardItemDragPayload.self, action: handleDrop) { targeted in
-      isDropTargeted = targeted
+      updateDropTargeted(targeted)
     }
-    .onDrop(
-      of: [.harnessMonitorTaskBoardItem],
-      isTargeted: $isDropTargeted,
-      perform: handleLegacyDrop
-    )
+    .onDrop(of: [.harnessMonitorTaskBoardItem], isTargeted: nil, perform: handleLegacyDrop)
     .accessibilityElement(children: .contain)
     .accessibilityIdentifier("harness.task-board.needs-you-column")
   }
 
   private func handleDrop(_ payloads: [TaskBoardItemDragPayload], _: CGPoint) -> Bool {
-    TaskBoardLaneDropPolicy.moveFirstPayload(
-      payloads,
-      to: .needsYou,
-      move: onMoveItem
-    )
+    guard let payload = payloads.first else {
+      return false
+    }
+    return performDrop(
+      signature: TaskBoardItemDropSignature(itemID: payload.itemID, destination: .needsYou)
+    ) {
+      TaskBoardLaneDropPolicy.moveFirstPayload(
+        payloads,
+        to: .needsYou,
+        move: onMoveItem
+      )
+    }
   }
 
   private func handleLegacyDrop(_ providers: [NSItemProvider]) -> Bool {
     TaskBoardItemDragPayload.loadFirst(from: providers) { payload in
       _ = handleDrop([payload], .zero)
     }
+  }
+
+  private func updateDropTargeted(_ targeted: Bool) {
+    isDropTargeted = targeted
+    if !targeted {
+      dropDeduper = TaskBoardDropDeduper()
+    }
+  }
+
+  private func performDrop(
+    signature: TaskBoardItemDropSignature,
+    action: () -> Bool
+  ) -> Bool {
+    var deduper = dropDeduper
+    let handled = deduper.perform(signature, move: action)
+    dropDeduper = deduper
+    return handled
   }
 }
 

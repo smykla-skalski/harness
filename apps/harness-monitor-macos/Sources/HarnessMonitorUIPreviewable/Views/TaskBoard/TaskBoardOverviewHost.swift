@@ -61,7 +61,10 @@ struct TaskBoardOverviewHost: View {
       guard let workItemID = item.workItemId else {
         return
       }
-      store.presentedSheet = .taskActions(sessionID: sessionID, taskID: workItemID)
+      store.presentedSheet = .taskActions(
+        sessionID: item.sessionId ?? sessionID,
+        taskID: workItemID
+      )
     }
   }
 
