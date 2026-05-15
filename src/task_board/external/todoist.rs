@@ -88,6 +88,7 @@ impl ExternalSyncClient for TodoistSyncClient {
         ExternalProviderCapabilities::with_update_fields([
             ExternalSyncField::Title,
             ExternalSyncField::Body,
+            ExternalSyncField::Status,
             ExternalSyncField::Project,
         ])
     }
@@ -136,6 +137,24 @@ impl ExternalSyncClient for TodoistSyncClient {
         reference: &ExternalTaskRef,
         update: ExternalTaskUpdate,
     ) -> Result<ExternalTaskRef, CliError> {
+        let mut updated_reference = reference.clone();
+        if update.changes_metadata() {
+            updated_reference = self.update_task_metadata(item, reference, &update).await?;
+        }
+        if update.changes_status() {
+            self.update_task_status(item, reference).await?;
+        }
+        Ok(updated_reference)
+    }
+}
+
+impl TodoistSyncClient {
+    async fn update_task_metadata(
+        &self,
+        item: &TaskBoardItem,
+        reference: &ExternalTaskRef,
+        update: &ExternalTaskUpdate,
+    ) -> Result<ExternalTaskRef, CliError> {
         let request = TodoistUpdateTaskRequest {
             content: update
                 .changed_fields
@@ -166,6 +185,46 @@ impl ExternalSyncClient for TodoistSyncClient {
             .map_err(todoist_sync_error)?;
         Ok(task.reference())
     }
+
+    async fn update_task_status(
+        &self,
+        item: &TaskBoardItem,
+        reference: &ExternalTaskRef,
+    ) -> Result<(), CliError> {
+        self.client
+            .post(self.endpoint(status_endpoint(&reference.external_id, item.status).as_str()))
+            .bearer_auth(&self.token)
+            .send()
+            .await
+            .map_err(todoist_sync_error)?
+            .error_for_status()
+            .map_err(todoist_sync_error)?;
+        Ok(())
+    }
+}
+
+impl ExternalTaskUpdate {
+    fn changes_metadata(&self) -> bool {
+        self.changed_fields.iter().any(|field| {
+            matches!(
+                field,
+                ExternalSyncField::Title | ExternalSyncField::Body | ExternalSyncField::Project
+            )
+        })
+    }
+
+    fn changes_status(&self) -> bool {
+        self.changed_fields.contains(&ExternalSyncField::Status)
+    }
+}
+
+fn status_endpoint(external_id: &str, status: TaskBoardStatus) -> String {
+    let action = if status == TaskBoardStatus::Done {
+        "close"
+    } else {
+        "reopen"
+    };
+    format!("tasks/{external_id}/{action}")
 }
 
 #[derive(Debug, Serialize)]
@@ -225,4 +284,44 @@ fn todoist_sync_error(error: reqwest::Error) -> CliError {
         "task-board todoist sync failed: {error}"
     )))
     .with_source(error)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn todoist_capabilities_include_status_updates() {
+        let client = TodoistSyncClient::new_with_api_base("token", "https://todoist.invalid")
+            .expect("client");
+
+        assert!(
+            client
+                .capabilities()
+                .supports_update(ExternalSyncField::Status)
+        );
+    }
+
+    #[test]
+    fn todoist_status_endpoint_closes_done_and_reopens_other_statuses() {
+        assert_eq!(
+            status_endpoint("task-1", TaskBoardStatus::Done),
+            "tasks/task-1/close"
+        );
+        assert_eq!(
+            status_endpoint("task-1", TaskBoardStatus::Todo),
+            "tasks/task-1/reopen"
+        );
+    }
+
+    #[test]
+    fn todoist_update_classifies_metadata_and_status_changes() {
+        let metadata = ExternalTaskUpdate::new(vec![ExternalSyncField::Title]);
+        let status = ExternalTaskUpdate::new(vec![ExternalSyncField::Status]);
+
+        assert!(metadata.changes_metadata());
+        assert!(!metadata.changes_status());
+        assert!(!status.changes_metadata());
+        assert!(status.changes_status());
+    }
 }
