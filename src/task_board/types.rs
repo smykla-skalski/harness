@@ -24,6 +24,8 @@ pub struct TaskBoardItem {
     pub agent_mode: AgentMode,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub external_refs: Vec<ExternalRef>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub imported_from_provider: Option<ExternalRefProvider>,
     #[serde(default)]
     pub planning: PlanningState,
     #[serde(default, skip_serializing_if = "TaskBoardWorkflowState::is_default")]
@@ -55,6 +57,7 @@ impl TaskBoardItem {
             target_project_types: Vec::new(),
             agent_mode: AgentMode::Headless,
             external_refs: Vec::new(),
+            imported_from_provider: None,
             planning: PlanningState::default(),
             workflow: TaskBoardWorkflowState::default(),
             session_id: None,
@@ -187,7 +190,7 @@ pub struct ExternalRef {
     pub sync_state: Option<ExternalRefSyncState>,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ValueEnum)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, ValueEnum)]
 #[value(rename_all = "snake_case")]
 #[serde(rename_all = "snake_case")]
 pub enum ExternalRefProvider {
