@@ -1,3 +1,4 @@
+import Foundation
 import Testing
 
 @testable import HarnessMonitorKit
@@ -73,8 +74,8 @@ struct TaskBoardOverviewBehaviorTests {
     )
   }
 
-  @Test("Linked board items open only when the session task is available")
-  func linkedBoardItemsOpenOnlyWhenSessionTaskIsAvailable() {
+  @Test("Linked board items select inline when the session task is unavailable")
+  func linkedBoardItemsSelectInlineWhenSessionTaskIsUnavailable() {
     let item = taskBoardItem(
       id: "linked",
       status: .inProgress,
@@ -87,7 +88,7 @@ struct TaskBoardOverviewBehaviorTests {
         for: item,
         selectedTaskBoardItemID: nil,
         inboxItems: []
-      ) == .openLinkedTask
+      ) == .selectBoardItem
     )
     #expect(
       TaskBoardOverviewItemBehavior.selectionAction(
@@ -103,6 +104,56 @@ struct TaskBoardOverviewBehaviorTests {
         inboxItems: [inboxItem(taskID: "task-linked")]
       ) == .openLinkedTask
     )
+  }
+
+  @Test("Inbox drop policy ignores unknown source lane payloads")
+  func inboxDropPolicyIgnoresUnknownSourceLanePayloads() throws {
+    let payload = try JSONDecoder().decode(
+      TaskBoardInboxItemDragPayload.self,
+      from: Data(
+        """
+        {
+          "sessionID": "sess-1",
+          "taskID": "task-1",
+          "status": "open",
+          "laneRawValue": "unknown"
+        }
+        """.utf8
+      )
+    )
+
+    #expect(
+      !TaskBoardInboxDropPolicy.moveFirstPayload([payload], to: .running) { _, _ in
+        true
+      }
+    )
+  }
+
+  @Test("Inbox drop policy forwards first cross-lane payload only")
+  func inboxDropPolicyForwardsFirstCrossLanePayloadOnly() {
+    var moves: [(String, TaskBoardInboxLane)] = []
+    let first = TaskBoardInboxItemDragPayload(
+      sessionID: "sess-1",
+      taskID: "task-1",
+      status: .open,
+      lane: .ready
+    )
+    let second = TaskBoardInboxItemDragPayload(
+      sessionID: "sess-2",
+      taskID: "task-2",
+      status: .blocked,
+      lane: .blocked
+    )
+
+    #expect(
+      TaskBoardInboxDropPolicy.moveFirstPayload([first, second], to: .running) { payload, lane in
+        moves.append((payload.taskID, lane))
+        return true
+      }
+    )
+    #expect(moves.count == 1)
+    #expect(moves.first?.0 == "task-1")
+    #expect(moves.first?.1 == .running)
   }
 
   @Test("Board-only Run Once and Evaluate requests carry board item identity")

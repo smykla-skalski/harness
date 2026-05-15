@@ -47,13 +47,11 @@ struct TaskBoardNeedsYouLaneColumn: View {
   }
 
   private func handleDrop(_ payloads: [TaskBoardItemDragPayload], _: CGPoint) -> Bool {
-    guard let payload = payloads.first else {
-      return false
-    }
-    guard payload.sourceLane != .needsYou else {
-      return false
-    }
-    return onMoveItem(payload.itemID, .needsYou)
+    TaskBoardLaneDropPolicy.moveFirstPayload(
+      payloads,
+      to: .needsYou,
+      move: onMoveItem
+    )
   }
 }
 
