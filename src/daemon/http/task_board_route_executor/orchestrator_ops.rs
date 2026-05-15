@@ -47,6 +47,6 @@ pub(crate) fn sync_github_tokens(
 
 pub(crate) fn sync_todoist_token(
     request: &TaskBoardTodoistTokenSyncRequest,
-) -> TaskBoardTodoistTokenSyncResponse {
+) -> Result<TaskBoardTodoistTokenSyncResponse, CliError> {
     service::sync_task_board_todoist_token(request)
 }

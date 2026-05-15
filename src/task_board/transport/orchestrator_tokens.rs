@@ -82,7 +82,7 @@ impl Execute for TaskBoardOrchestratorTodoistTokenArgs {
             return Err(CliErrorKind::workflow_parse("provide --clear or --token-env").into());
         }
         let request = self.sync_request()?;
-        let response = service::sync_task_board_todoist_token(&request);
+        let response = service::sync_task_board_todoist_token(&request)?;
         if self.json {
             print_json(&response)?;
         } else {

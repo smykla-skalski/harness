@@ -44,11 +44,14 @@ pub fn sync_task_board_github_tokens(
 }
 
 /// Replace the in-memory Todoist token snapshot used by the daemon.
-#[must_use]
+///
+/// # Errors
+/// This function is currently infallible but returns a `Result` to keep the
+/// daemon route signatures aligned with `sync_task_board_github_tokens`.
 pub fn sync_task_board_todoist_token(
     request: &TaskBoardTodoistTokenSyncRequest,
-) -> TaskBoardTodoistTokenSyncResponse {
-    state::replace_task_board_todoist_token(request)
+) -> Result<TaskBoardTodoistTokenSyncResponse, CliError> {
+    Ok(state::replace_task_board_todoist_token(request))
 }
 
 pub(crate) fn external_sync_config_for_repository(
