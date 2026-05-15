@@ -19,6 +19,12 @@ struct PolicyCanvasInteractiveEdge: View {
   /// becomes both visible (pattern) and audible (value) - color is no
   /// longer the sole differentiator.
   let accessibilityKindWord: String
+  /// Plain-English name for the static dash pattern, surfaced to sighted
+  /// users in the hover tooltip and to AT users in the legend swatch
+  /// `accessibilityLabel`. Drawn from `PolicyCanvasEdgeKind.dashKey` at the
+  /// call site so the legend and the tooltip share one vocabulary instead
+  /// of three.
+  let accessibilityDashKey: String
   /// Static dash pattern bound to the edge kind. Empty for `.flow` (solid
   /// stroke); wider gaps for `.control` (occasional condition); tighter
   /// dashes for `.error` (urgent). When `isAnimated && !reducedMotion`,
@@ -33,6 +39,21 @@ struct PolicyCanvasInteractiveEdge: View {
   /// the previous behavior; the canvas-mounted call site passes the live
   /// zoom.
   let canvasZoom: CGFloat
+  /// Stable a11y identifier shared with the visible label capsule (or
+  /// collapsed dot) that this stroke layers above. The stroke owns the
+  /// rotor entry per WCAG 4.1.2: previously both the stroke and the label
+  /// exposed the same accessibility label, so VoiceOver announced every
+  /// edge twice. Now the label is `.accessibilityHidden(true)` and this
+  /// identifier sits on the stroke instead.
+  let accessibilityIdentifier: String
+  /// Focus binding the canvas uses to reveal the selected edge to
+  /// VoiceOver. Plumbed onto the stroke (the sole rotor entry) so a focus
+  /// restore from search or selection lands on the same element a rotor
+  /// walk would reach.
+  let accessibilityFocusBinding: AccessibilityFocusState<PolicyCanvasSelection?>.Binding
+  /// Selection value the focus binding is compared against to determine
+  /// whether this stroke owns AT focus.
+  let accessibilityFocusValue: PolicyCanvasSelection
   let onTap: () -> Void
   let onDelete: () -> Void
 
@@ -49,9 +70,13 @@ struct PolicyCanvasInteractiveEdge: View {
     isSelected: Bool,
     accessibilityLabel: String,
     accessibilityKindWord: String,
+    accessibilityDashKey: String = "solid",
     kindDashPattern: [CGFloat] = [],
     isAnimated: Bool = false,
     canvasZoom: CGFloat = 1,
+    accessibilityIdentifier: String,
+    accessibilityFocusBinding: AccessibilityFocusState<PolicyCanvasSelection?>.Binding,
+    accessibilityFocusValue: PolicyCanvasSelection,
     onTap: @escaping () -> Void,
     onDelete: @escaping () -> Void
   ) {
@@ -61,9 +86,13 @@ struct PolicyCanvasInteractiveEdge: View {
     self.isSelected = isSelected
     self.accessibilityLabel = accessibilityLabel
     self.accessibilityKindWord = accessibilityKindWord
+    self.accessibilityDashKey = accessibilityDashKey
     self.kindDashPattern = kindDashPattern
     self.isAnimated = isAnimated
     self.canvasZoom = canvasZoom
+    self.accessibilityIdentifier = accessibilityIdentifier
+    self.accessibilityFocusBinding = accessibilityFocusBinding
+    self.accessibilityFocusValue = accessibilityFocusValue
     self.onTap = onTap
     self.onDelete = onDelete
   }
@@ -91,6 +120,8 @@ struct PolicyCanvasInteractiveEdge: View {
       Button("Delete edge", role: .destructive, action: onDelete)
     }
     .accessibilityElement(children: .ignore)
+    .accessibilityIdentifier(accessibilityIdentifier)
+    .accessibilityFocused(accessibilityFocusBinding, equals: accessibilityFocusValue)
     .accessibilityLabel(accessibilityLabel)
     .accessibilityValue(accessibilityValueString)
     .accessibilityAddTraits(.isButton)
@@ -100,30 +131,13 @@ struct PolicyCanvasInteractiveEdge: View {
   /// Hover tooltip surfacing the kind word + dash-pattern key so sighted
   /// users hovering an edge see what VoiceOver hears AND can decode the
   /// stroke style without a legend lookup. Shape is
-  /// `<source-to-target> (<kind>, <dash-key>)` - the dash key names what
-  /// the visible pattern means in plain words ("solid" for flow,
-  /// "widely dashed" for control, "tightly dashed" for error). Without
-  /// the dash key, the WCAG 1.4.1 non-color signifier shipped in
-  /// Phase 3 still required a separate legend to interpret.
+  /// `<source-to-target> (<kind>, <dash-key>)`. The dash key is passed in
+  /// from `PolicyCanvasEdgeKind.dashKey` at the call site so the tooltip,
+  /// the legend swatch label, and the legend row's a11y label all draw
+  /// from the same vocabulary. Without that single source, the previous
+  /// release shipped three different words for the same stroke pattern.
   private var hoverHelpString: String {
-    let key = dashPatternKey(for: kindDashPattern)
-    return "\(accessibilityLabel) (\(accessibilityKindWord), \(key))"
-  }
-
-  /// Map a stored kind dash pattern to a plain-language label. Matches
-  /// the three patterns shipped by `PolicyCanvasEdgeKind.strokeDashPattern`
-  /// today (empty / `[6, 4]` / `[3, 2]`). Defaults to "dashed" for any
-  /// future pattern so the tooltip stays informative without forcing the
-  /// caller to extend this map every time.
-  private func dashPatternKey(for pattern: [CGFloat]) -> String {
-    if pattern.isEmpty {
-      return "solid"
-    }
-    let first = pattern.first ?? 0
-    if first >= 6 {
-      return "widely dashed"
-    }
-    return "tightly dashed"
+    "\(accessibilityLabel) (\(accessibilityKindWord), \(accessibilityDashKey))"
   }
 
   /// VoiceOver value combining the kind word with an "active" suffix when
@@ -230,11 +244,17 @@ enum PolicyCanvasEdgeAnimation {
   }
 
   /// Resolve the in-route dash velocity that produces a clamped apparent
-  /// on-screen velocity. When `canvasZoom <= 2`, the base 12pt/sec runs
-  /// unchanged - apparent velocity scales linearly to 24pt/sec at zoom
-  /// 2.0 and stays at the cap from there on. The function clamps to
-  /// `0.01` zoom on the low end to keep the division well-defined at
-  /// extreme far-zoom.
+  /// on-screen velocity. The function is the identity (returns
+  /// `baseVelocityPointsPerSecond`) while the unclamped apparent velocity
+  /// `baseVelocityPointsPerSecond * canvasZoom` is below the
+  /// `maxApparentVelocityPointsPerSecond` cap - that holds for every zoom
+  /// `<= 2.0` because base is 12pt/sec and the cap is 24pt/sec. Above
+  /// zoom 2, the apparent velocity is clamped to 24pt/sec and the
+  /// returned in-route velocity scales *down* as zoom climbs so the
+  /// on-screen march stays at the cap. Below zoom 1 the function is also
+  /// the identity: apparent velocity falls below 12pt/sec linearly, which
+  /// is the intended slow-down at far zoom (no vestibular cost). The low
+  /// `0.01` clamp keeps the division well-defined at extreme far-zoom.
   static func effectiveVelocity(canvasZoom: CGFloat) -> CGFloat {
     let zoom = max(0.01, canvasZoom)
     let apparent = min(baseVelocityPointsPerSecond * zoom, maxApparentVelocityPointsPerSecond)

@@ -49,6 +49,18 @@ struct PolicyCanvasAnimationPerfTests {
   @Test("50 animated edges fit a 60fps budget across 60 frames")
   func animationFrameBudget50Edges() {
     guard Self.benchEnabled else {
+      // Make the silent-skip path operator-visible. Without this the test
+      // returns green when the file marker is absent and CI shows no signal
+      // that the perf budget went unmeasured. Issue.record at .warning
+      // surfaces in the test log so a reader can tell "passed" from
+      // "skipped because nobody created the marker file".
+      Issue.record(
+        """
+        Skipped: bench marker \(Self.benchMarkerPath) is absent. \
+        Touch the marker file to run the perf budget on this lane.
+        """,
+        severity: .warning
+      )
       return
     }
     let fixture = AnimationStressFixture(seed: 0x5_2026_05_15, edgeCount: Self.edgeCount)
@@ -119,6 +131,18 @@ struct PolicyCanvasAnimationPerfTests {
   @Test("50 flex-anchor edges fit 2ms per frame across 60 frames")
   func flexAnchorBudget50Edges() {
     guard Self.benchEnabled else {
+      // Make the silent-skip path operator-visible. Without this the test
+      // returns green when the file marker is absent and CI shows no signal
+      // that the perf budget went unmeasured. Issue.record at .warning
+      // surfaces in the test log so a reader can tell "passed" from
+      // "skipped because nobody created the marker file".
+      Issue.record(
+        """
+        Skipped: bench marker \(Self.benchMarkerPath) is absent. \
+        Touch the marker file to run the perf budget on this lane.
+        """,
+        severity: .warning
+      )
       return
     }
     let fixture = AnimationStressFixture(seed: 0x5_2026_05_15, edgeCount: Self.edgeCount)

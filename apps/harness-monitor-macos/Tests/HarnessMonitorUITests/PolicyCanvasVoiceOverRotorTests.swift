@@ -99,31 +99,33 @@ final class PolicyCanvasVoiceOverRotorTests: HarnessMonitorUITestCase {
         labelPrefix
       )
       let candidates = root.descendants(matching: .any).matching(predicate)
-      XCTAssertGreaterThan(
+      // Exactly one rotor entry per labelled edge: WCAG 4.1.2 (Name/Role
+      // /Value). Previously the stroke and the label capsule both exposed
+      // the same accessibility label, so VoiceOver announced every edge
+      // twice. The label is now `.accessibilityHidden(true)` and the
+      // stroke owns the rotor entry; this assertion catches regressions
+      // that re-introduce the duplicate.
+      XCTAssertEqual(
         candidates.count,
-        0,
-        "Edge \(seed.id) should surface at least one a11y element with label prefix '\(labelPrefix)'."
+        1,
+        """
+        Edge \(seed.id) should surface exactly one a11y element with label \
+        prefix '\(labelPrefix)' (the stroke owns the rotor entry). Saw \
+        \(candidates.count); a return to two entries means the label-vs-stroke \
+        duplicate regressed.
+        """
       )
 
-      var sawKindWord = false
-      let scanLimit = min(candidates.count, 4)
-      for index in 0..<scanLimit {
-        let candidate = candidates.element(boundBy: index)
-        let value = candidate.value as? String ?? ""
-        let firstWord = value.split(separator: ",").first.map(String.init)?.trimmingCharacters(
-          in: .whitespaces
-        ) ?? ""
-        if validKindWords.contains(firstWord) {
-          sawKindWord = true
-          break
-        }
-      }
+      let value = candidates.firstMatch.value as? String ?? ""
+      let firstWord = value.split(separator: ",").first.map(String.init)?.trimmingCharacters(
+        in: .whitespaces
+      ) ?? ""
       XCTAssertTrue(
-        sawKindWord,
+        validKindWords.contains(firstWord),
         """
         Edge \(seed.id) should expose 'flow', 'control', or 'error' as the \
         first comma-separated token of its accessibility value so WCAG 1.4.1 \
-        is satisfied (kind not encoded by color alone).
+        is satisfied (kind not encoded by color alone). Saw '\(value)'.
         """
       )
     }

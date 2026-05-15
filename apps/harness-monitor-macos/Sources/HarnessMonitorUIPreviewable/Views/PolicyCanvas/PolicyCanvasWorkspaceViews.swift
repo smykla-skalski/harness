@@ -61,6 +61,7 @@ struct PolicyCanvasViewport: View {
               PolicyCanvasGroupLayer(viewModel: viewModel, focusedComponent: focusedComponent)
               PolicyCanvasEdgeLayer(
                 viewModel: viewModel,
+                focusedComponent: focusedComponent,
                 edges: edges,
                 portAnchors: portAnchors
               )
