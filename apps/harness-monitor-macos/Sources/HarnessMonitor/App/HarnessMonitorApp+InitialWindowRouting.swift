@@ -17,7 +17,7 @@ extension HarnessMonitorApp {
     }
     hasInstalledMainWindowLauncherFlag = true
     HarnessMonitorMainWindowLauncher.shared.installOpenMainWindow {
-      openWindow(id: HarnessMonitorWindowID.dashboard)
+      openWindow.openHarnessDashboardWindow()
     }
   }
 
@@ -65,7 +65,7 @@ extension HarnessMonitorApp {
       launchBehavior: launchBehavior,
       tabbingPreference: tabbingPreference,
       openWelcomeWindow: {
-        openWindow(id: HarnessMonitorWindowID.dashboard)
+        openWindow.openHarnessDashboardWindow()
       },
       openSessionWindow: { sessionID in
         openWindow.openHarnessSessionWindow(sessionID: sessionID)

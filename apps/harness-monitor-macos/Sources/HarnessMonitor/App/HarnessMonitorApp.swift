@@ -32,6 +32,9 @@ struct HarnessMonitorApp: App {
   @State private var settingsSelectedSection: SettingsSection
   @State private var hasInstalledMainWindowLauncher = false
   @State private var hasScheduledInitialWindowRouting = false
+  @State private var hasRunPerfScenario = false
+  @State private var perfScenarioStatus: HarnessMonitorPerfScenarioStatus = .idle
+  @State private var perfScenarioFailureReason: String?
   @AppStorage(HarnessMonitorThemeDefaults.modeKey)
   private var themeMode: HarnessMonitorThemeMode = .auto
   @AppStorage(HarnessMonitorTextSize.storageKey)
@@ -176,6 +179,18 @@ struct HarnessMonitorApp: App {
 
   var settingsSelectedSectionBinding: Binding<SettingsSection> {
     $settingsSelectedSection
+  }
+
+  var hasRunPerfScenarioBinding: Binding<Bool> {
+    $hasRunPerfScenario
+  }
+
+  var perfScenarioStatusBinding: Binding<HarnessMonitorPerfScenarioStatus> {
+    $perfScenarioStatus
+  }
+
+  var perfScenarioFailureReasonBinding: Binding<String?> {
+    $perfScenarioFailureReason
   }
 
   var hasInstalledMainWindowLauncherFlag: Bool {

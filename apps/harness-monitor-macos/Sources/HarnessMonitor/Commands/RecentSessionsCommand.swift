@@ -32,7 +32,7 @@ struct RecentSessionsCommand: Commands {
         }
 
         Button(Self.showWindowTitle) {
-          openWindow(id: HarnessMonitorWindowID.dashboard)
+          openWindow.openHarnessDashboardWindow()
         }
       }
     }

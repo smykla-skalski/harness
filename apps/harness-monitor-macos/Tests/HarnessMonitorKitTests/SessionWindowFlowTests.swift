@@ -233,6 +233,31 @@ struct SessionWindowFlowTests {
     )
   }
 
+  @MainActor
+  @Test("Shared tabbing preparation keeps dashboard and session windows eligible for one tab group")
+  func sharedTabbingPreparationUsesOneIdentifier() {
+    let dashboardWindow = NSWindow(
+      contentRect: .init(x: 0, y: 0, width: 320, height: 240),
+      styleMask: [.titled],
+      backing: .buffered,
+      defer: false
+    )
+    let sessionWindow = NSWindow(
+      contentRect: .init(x: 0, y: 0, width: 320, height: 240),
+      styleMask: [.titled],
+      backing: .buffered,
+      defer: false
+    )
+
+    SessionWindowTabbingSupport.prepareWindowForTabbing(dashboardWindow, preference: .always)
+    SessionWindowTabbingSupport.prepareWindowForTabbing(sessionWindow, preference: .always)
+
+    #expect(dashboardWindow.tabbingIdentifier == SessionWindowTabbingSupport.tabbingIdentifier)
+    #expect(sessionWindow.tabbingIdentifier == SessionWindowTabbingSupport.tabbingIdentifier)
+    #expect(dashboardWindow.tabbingMode == .preferred)
+    #expect(sessionWindow.tabbingMode == .preferred)
+  }
+
   @Test("Session routes expose stable sidebar order")
   func sessionRoutesExposeStableSidebarOrder() {
     #expect(
@@ -521,5 +546,47 @@ struct SessionWindowFlowTests {
     #expect(filters.matches(decision))
   }
 
+}
+
+@Suite("Session window native tabbing")
+struct SessionWindowNativeTabbingTests {
+  @MainActor
+  @Test("Shared tab merge coordinator combines dashboard and session windows as native tabs")
+  func sharedTabMergeCoordinatorCombinesDashboardAndSessionWindows() async {
+    let targetWindow = NSWindow(
+      contentRect: .init(x: 0, y: 0, width: 480, height: 320),
+      styleMask: [.titled, .closable, .resizable],
+      backing: .buffered,
+      defer: false
+    )
+    targetWindow.toolbar = NSToolbar(identifier: "session-window")
+
+    let dashboardWindow = NSWindow(
+      contentRect: .init(x: 32, y: 32, width: 480, height: 320),
+      styleMask: [.titled, .closable, .resizable],
+      backing: .buffered,
+      defer: false
+    )
+    dashboardWindow.toolbar = NSToolbar(identifier: "dashboard-window")
+
+    defer {
+      dashboardWindow.close()
+      targetWindow.close()
+    }
+
+    SessionWindowTabbingSupport.prepareWindowForTabbing(targetWindow, preference: .always)
+    SessionWindowTabbingSupport.prepareWindowForTabbing(dashboardWindow, preference: .always)
+
+    targetWindow.orderFront(nil)
+    dashboardWindow.makeKeyAndOrderFront(nil)
+
+    await SessionWindowTabMergeCoordinator.mergeNewestTabbedWindowIfNeeded(
+      into: targetWindow,
+      preference: .always
+    )
+
+    #expect(targetWindow.tabGroup != nil)
+    #expect(targetWindow.tabGroup === dashboardWindow.tabGroup)
+  }
 }
 // swiftlint:enable type_body_length

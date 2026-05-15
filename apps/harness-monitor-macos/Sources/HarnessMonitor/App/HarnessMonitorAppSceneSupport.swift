@@ -15,14 +15,14 @@ struct DashboardWindowRootView: View {
   @Binding var themeMode: HarnessMonitorThemeMode
   @Binding var settingsSelectedSection: SettingsSection
   let perfScenario: HarnessMonitorPerfScenario?
+  @Binding var hasRunPerfScenario: Bool
+  @Binding var perfScenarioStatus: HarnessMonitorPerfScenarioStatus
+  @Binding var perfScenarioFailureReason: String?
   let defersInitialContentUntilBootstrap: Bool
   @Environment(\.openWindow)
   private var openWindow
   @State private var completedInitialBootstrap = false
   @State private var handledSettingsOpenRequestID = 0
-  @State private var hasRunPerfScenario = false
-  @State private var perfScenarioStatus: HarnessMonitorPerfScenarioStatus = .idle
-  @State private var perfScenarioFailureReason: String?
 
   private var shouldShowBootstrapPlaceholder: Bool {
     defersInitialContentUntilBootstrap
@@ -39,20 +39,12 @@ struct DashboardWindowRootView: View {
   }
 
   private var perfScenarioStateText: String? {
-    guard shouldPublishPerfScenarioState,
-      let perfScenario
-    else {
-      return nil
-    }
-    var fields = [
-      "scenario=\(perfScenario.rawValue)",
-      "status=\(perfScenarioStatus.rawValue)",
-    ]
-    fields.append(contentsOf: perfVisualSettingsStateFields())
-    if let perfScenarioFailureReason {
-      fields.append("reason=\(perfScenarioFailureReason)")
-    }
-    return fields.joined(separator: ", ")
+    resolvedPerfScenarioStateText(
+      perfScenario: perfScenario,
+      status: perfScenarioStatus,
+      failureReason: perfScenarioFailureReason,
+      publishesState: shouldPublishPerfScenarioState
+    )
   }
 
   private var contentReadiness: WindowContentReadiness {
@@ -144,12 +136,32 @@ struct DashboardWindowRootView: View {
   }
 }
 
-private enum HarnessMonitorPerfScenarioStatus: String {
+enum HarnessMonitorPerfScenarioStatus: String {
   case idle
   case bootstrapping
   case running
   case completed
   case failed
+}
+
+func resolvedPerfScenarioStateText(
+  perfScenario: HarnessMonitorPerfScenario?,
+  status: HarnessMonitorPerfScenarioStatus,
+  failureReason: String?,
+  publishesState: Bool
+) -> String? {
+  guard publishesState, let perfScenario else {
+    return nil
+  }
+  var fields = [
+    "scenario=\(perfScenario.rawValue)",
+    "status=\(status.rawValue)",
+  ]
+  fields.append(contentsOf: perfVisualSettingsStateFields())
+  if let failureReason {
+    fields.append("reason=\(failureReason)")
+  }
+  return fields.joined(separator: ", ")
 }
 
 private struct HarnessMonitorPerfScenarioModifier: ViewModifier {
@@ -275,7 +287,7 @@ private func perfBoolLabel(_ value: Bool) -> String {
   value ? "enabled" : "disabled"
 }
 
-private struct PerfScenarioStateMarker: ViewModifier {
+struct PerfScenarioStateMarker: ViewModifier {
   let text: String?
 
   @ViewBuilder

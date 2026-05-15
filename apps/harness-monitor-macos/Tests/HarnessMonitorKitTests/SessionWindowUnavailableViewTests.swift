@@ -17,7 +17,7 @@ struct SessionWindowUnavailableViewTests {
     #expect(
       unavailableExtensionSource.contains("didLoadSnapshot && snapshot == nil && summary == nil"))
     #expect(
-      unavailableExtensionSource.contains("openWindow(id: HarnessMonitorWindowID.dashboard)"))
+      unavailableExtensionSource.contains("openWindow.openHarnessDashboardWindow()"))
   }
 
   @Test("Session windows request native accessibility focus after opening")

@@ -14,6 +14,9 @@ struct HarnessMonitorDashboardWindowContent: View {
   @Binding var themeMode: HarnessMonitorThemeMode
   @Binding var settingsSelectedSection: SettingsSection
   let perfScenario: HarnessMonitorPerfScenario?
+  @Binding var hasRunPerfScenario: Bool
+  @Binding var perfScenarioStatus: HarnessMonitorPerfScenarioStatus
+  @Binding var perfScenarioFailureReason: String?
   let defersInitialContentUntilBootstrap: Bool
   let container: ModelContainer?
 
@@ -40,6 +43,9 @@ struct HarnessMonitorDashboardWindowContent: View {
       themeMode: $themeMode,
       settingsSelectedSection: $settingsSelectedSection,
       perfScenario: perfScenario,
+      hasRunPerfScenario: $hasRunPerfScenario,
+      perfScenarioStatus: $perfScenarioStatus,
+      perfScenarioFailureReason: $perfScenarioFailureReason,
       defersInitialContentUntilBootstrap: defersInitialContentUntilBootstrap
     )
   }

@@ -369,7 +369,11 @@ struct HarnessMonitorMenuBarExtraContent: View {
   }
 
   private func openAppWindow(id: String) {
-    openWindow(id: id)
+    if id == HarnessMonitorWindowID.dashboard {
+      openWindow.openHarnessDashboardWindow()
+    } else {
+      openWindow(id: id)
+    }
     NSApplication.shared.activate(ignoringOtherApps: true)
   }
 

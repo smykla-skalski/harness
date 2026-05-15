@@ -185,9 +185,9 @@ final class PolicyCanvasMemoizedRouter: PolicyCanvasEdgeRouter, @unchecked Senda
       // "wipe-on-overflow caused frame stutter" failure surfaces as a
       // bug report that no log explains. The event carries the cap so
       // future readers can correlate to the bench fixture size.
-      signposter.emitEvent(
+      self.signposter.emitEvent(
         "cache-rebuild-overflow",
-        "capacity=\(capacity)"
+        "capacity=\(self.capacity)"
       )
     }
     return computed

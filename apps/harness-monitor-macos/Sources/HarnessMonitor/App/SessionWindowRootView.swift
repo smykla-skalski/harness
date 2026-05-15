@@ -15,6 +15,9 @@ struct SessionWindowRootView: View {
   let sessionWindowPresenceTracker: SessionWindowPresenceTracker
   let initialRoute: SessionWindowRoute?
   @Binding var themeMode: HarnessMonitorThemeMode
+  let perfScenario: HarnessMonitorPerfScenario?
+  @Binding var perfScenarioStatus: HarnessMonitorPerfScenarioStatus
+  @Binding var perfScenarioFailureReason: String?
 
   private var windowID: String {
     HarnessMonitorWindowID.sessionWindow(token.sessionID)
@@ -47,6 +50,19 @@ struct SessionWindowRootView: View {
     keyWindowObserver.isKey(windowID: windowID)
   }
 
+  private var shouldPublishPerfScenarioState: Bool {
+    HarnessMonitorUITestEnvironment.accessibilityMarkersEnabled
+  }
+
+  private var sessionPerfScenarioStateText: String? {
+    resolvedPerfScenarioStateText(
+      perfScenario: perfScenario,
+      status: perfScenarioStatus,
+      failureReason: perfScenarioFailureReason,
+      publishesState: shouldPublishPerfScenarioState
+    )
+  }
+
   var body: some View {
     HarnessMonitorWindowShell(
       windowID: windowID,
@@ -77,7 +93,7 @@ struct SessionWindowRootView: View {
     .modifier(SessionWindowAppKitBinding(sessionID: token.sessionID))
     .modifier(
       SessionWindowTabbing(
-        isSessionWindow: true,
+        role: .session,
         tabTitle: windowTitle,
         pendingDecisionCount: pendingDecisionCount,
         pendingDecisionSeverity: pendingDecisionSeverity
@@ -103,5 +119,6 @@ struct SessionWindowRootView: View {
       attentionState: acpAttentionState,
       windowID: windowID
     )
+    .modifier(PerfScenarioStateMarker(text: sessionPerfScenarioStateText))
   }
 }
