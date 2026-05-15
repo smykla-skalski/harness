@@ -7,7 +7,8 @@ use super::{
     ObserveSessionRequest, RoleChangeRequest, SessionArchiveRequest, SessionEndRequest,
     SignalCancelRequest, SignalSendRequest, TaskArbitrateRequest, TaskAssignRequest,
     TaskBoardDispatchRequest, TaskBoardEvaluateRequest, TaskBoardOrchestratorRunOnceRequest,
-    TaskBoardPlanApproveRequest, TaskCheckpointRequest, TaskClaimReviewRequest, TaskCreateRequest,
+    TaskBoardPlanApproveRequest, TaskBoardPlanRevokeRequest, TaskCheckpointRequest,
+    TaskClaimReviewRequest, TaskCreateRequest,
     TaskDeleteRequest, TaskDropRequest, TaskQueuePolicyRequest, TaskRespondReviewRequest,
     TaskSubmitForReviewRequest, TaskSubmitReviewRequest, TaskUpdateRequest, VoiceAudioChunkRequest,
     VoiceSessionFinishRequest, VoiceSessionStartRequest, VoiceTranscriptUpdateRequest,
@@ -213,6 +214,12 @@ impl ControlPlaneActorRequest for TaskBoardPlanApproveRequest {
     }
 }
 
+impl ControlPlaneActorRequest for TaskBoardPlanRevokeRequest {
+    fn bind_control_plane_actor(&mut self) {
+        bind_optional_control_plane_actor(&mut self.actor);
+    }
+}
+
 impl ControlPlaneActorRequest for TaskBoardEvaluateRequest {
     fn bind_control_plane_actor(&mut self) {
         // Evaluate carries no actor; authorize via the trait for parity.
@@ -257,6 +264,16 @@ mod tests {
         let mut request = TaskBoardOrchestratorRunOnceRequest {
             actor: Some("imposter".into()),
             ..Default::default()
+        };
+        request.bind_control_plane_actor();
+        assert_eq!(request.actor.as_deref(), Some(CONTROL_PLANE_ACTOR_ID));
+    }
+
+    #[test]
+    fn actor_binding_plan_revoke_clears_caller_supplied_actor() {
+        let mut request = TaskBoardPlanRevokeRequest {
+            id: "item-1".into(),
+            actor: Some("imposter".into()),
         };
         request.bind_control_plane_actor();
         assert_eq!(request.actor.as_deref(), Some(CONTROL_PLANE_ACTOR_ID));
