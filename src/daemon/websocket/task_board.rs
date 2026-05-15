@@ -4,17 +4,15 @@ use crate::daemon::protocol::{
     TaskBoardDeleteItemRequest, TaskBoardDispatchRequest, TaskBoardEvaluateRequest,
     TaskBoardGetItemRequest, TaskBoardGitHubTokensSyncRequest, TaskBoardGitRuntimeConfig,
     TaskBoardListItemsRequest, TaskBoardOrchestratorRunOnceRequest,
-    TaskBoardOrchestratorRunOnceResponse, TaskBoardOrchestratorSettingsUpdateRequest,
-    TaskBoardPlanApproveRequest, TaskBoardPlanBeginRequest, TaskBoardPlanSubmitRequest,
-    TaskBoardPolicyPipelinePromoteRequest, TaskBoardPolicyPipelineSaveDraftRequest,
-    TaskBoardPolicyPipelineSimulateRequest, TaskBoardSyncRequest, TaskBoardTodoistTokenSyncRequest,
-    TaskBoardUpdateItemRequest, WsRequest, WsResponse, ws_methods,
+    TaskBoardOrchestratorSettingsUpdateRequest, TaskBoardPlanApproveRequest,
+    TaskBoardPlanBeginRequest, TaskBoardPlanSubmitRequest, TaskBoardPolicyPipelinePromoteRequest,
+    TaskBoardPolicyPipelineSaveDraftRequest, TaskBoardPolicyPipelineSimulateRequest,
+    TaskBoardSyncRequest, TaskBoardTodoistTokenSyncRequest, TaskBoardUpdateItemRequest, WsRequest,
+    WsResponse, ws_methods,
 };
 use crate::daemon::service;
-use crate::errors::{CliError, CliErrorKind};
-use crate::session::types::CONTROL_PLANE_ACTOR_ID;
+use crate::errors::CliError;
 use serde::de::DeserializeOwned;
-use tokio::task::spawn_blocking;
 
 use super::frames::error_response;
 use super::mutations::dispatch_query_result;
@@ -154,31 +152,10 @@ async fn dispatch_task_board_sync(request: &WsRequest) -> WsResponse {
 }
 
 async fn dispatch_task_board_dispatch(request: &WsRequest, state: &DaemonHttpState) -> WsResponse {
-    let Ok(mut body) = parse_params::<TaskBoardDispatchRequest>(request) else {
+    let Ok(body) = parse_params::<TaskBoardDispatchRequest>(request) else {
         return invalid_params(request);
     };
-    body.actor = Some(CONTROL_PLANE_ACTOR_ID.to_string());
-    let result = if let Some(async_db) = state.async_db.get() {
-        let result = service::dispatch_task_board_async(&body, async_db.as_ref()).await;
-        if result
-            .as_ref()
-            .is_ok_and(|response| !response.applied.is_empty())
-        {
-            service::broadcast_sessions_updated_async(&state.sender, Some(async_db.as_ref())).await;
-        }
-        result
-    } else {
-        let db_guard = state.db.get().map(|db| db.lock().expect("db lock"));
-        let db_ref = db_guard.as_deref();
-        let result = service::dispatch_task_board(&body, db_ref);
-        if result
-            .as_ref()
-            .is_ok_and(|response| !response.applied.is_empty())
-        {
-            service::broadcast_sessions_updated(&state.sender, db_ref);
-        }
-        result
-    };
+    let result = crate::daemon::http::task_board_route_executor::dispatch(state, body).await;
     dispatch_query_result(&request.id, result)
 }
 
@@ -186,21 +163,7 @@ async fn dispatch_task_board_evaluate(request: &WsRequest, state: &DaemonHttpSta
     let Ok(body) = parse_params::<TaskBoardEvaluateRequest>(request) else {
         return invalid_params(request);
     };
-    let result = if let Some(async_db) = state.async_db.get() {
-        let result = service::evaluate_task_board_async(&body, async_db.as_ref()).await;
-        if result.as_ref().is_ok_and(|response| response.updated > 0) {
-            service::broadcast_sessions_updated_async(&state.sender, Some(async_db.as_ref())).await;
-        }
-        result
-    } else {
-        let db_guard = state.db.get().map(|db| db.lock().expect("db lock"));
-        let db_ref = db_guard.as_deref();
-        let result = service::evaluate_task_board(&body, db_ref);
-        if result.as_ref().is_ok_and(|response| response.updated > 0) {
-            service::broadcast_sessions_updated(&state.sender, db_ref);
-        }
-        result
-    };
+    let result = crate::daemon::http::task_board_route_executor::evaluate(state, body).await;
     dispatch_query_result(&request.id, result)
 }
 
@@ -241,52 +204,11 @@ async fn dispatch_task_board_orchestrator_run_once(
     request: &WsRequest,
     state: &DaemonHttpState,
 ) -> WsResponse {
-    let Ok(mut body) = parse_params::<TaskBoardOrchestratorRunOnceRequest>(request) else {
+    let Ok(body) = parse_params::<TaskBoardOrchestratorRunOnceRequest>(request) else {
         return invalid_params(request);
     };
-    body.actor = Some(CONTROL_PLANE_ACTOR_ID.to_string());
-    let result = run_task_board_orchestrator_once_route(state, &body).await;
+    let result = crate::daemon::http::task_board_route_executor::run_once(state, body).await;
     dispatch_query_result(&request.id, result)
-}
-
-async fn run_task_board_orchestrator_once_route(
-    state: &DaemonHttpState,
-    body: &TaskBoardOrchestratorRunOnceRequest,
-) -> Result<TaskBoardOrchestratorRunOnceResponse, CliError> {
-    if let Some(async_db) = state.async_db.get() {
-        let result = service::run_task_board_orchestrator_once_async(body, async_db.as_ref()).await;
-        if result
-            .as_ref()
-            .is_ok_and(|status| status.last_run_applied_count() > 0)
-        {
-            service::broadcast_sessions_updated_async(&state.sender, Some(async_db.as_ref())).await;
-        }
-        result
-    } else {
-        let db = state.db.get().cloned();
-        let body_for_worker = body.clone();
-        let result = spawn_blocking(move || {
-            let db_guard = db.as_ref().map(|db| db.lock().expect("db lock"));
-            let db_ref = db_guard.as_deref();
-            service::run_task_board_orchestrator_once(&body_for_worker, db_ref)
-        })
-        .await
-        .unwrap_or_else(|error| {
-            Err(
-                CliErrorKind::workflow_io(format!("run task-board orchestrator fallback: {error}"))
-                    .into(),
-            )
-        });
-        if result
-            .as_ref()
-            .is_ok_and(|status| status.last_run_applied_count() > 0)
-        {
-            let db_guard = state.db.get().map(|db| db.lock().expect("db lock"));
-            let db_ref = db_guard.as_deref();
-            service::broadcast_sessions_updated(&state.sender, db_ref);
-        }
-        result
-    }
 }
 
 fn dispatch_task_board_orchestrator_settings_get(request: &WsRequest) -> WsResponse {

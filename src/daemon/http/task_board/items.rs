@@ -14,12 +14,12 @@ use crate::daemon::protocol::{
     TaskBoardUpdateItemRequest, http_paths,
 };
 use crate::daemon::service;
-use crate::session::types::CONTROL_PLANE_ACTOR_ID;
 use crate::task_board::TaskBoardStatus;
 
 use super::super::DaemonHttpState;
 use super::super::auth::require_auth;
 use super::super::response::{extract_request_id, timed_json};
+use super::super::task_board_route_executor;
 
 #[derive(Debug, Clone, Default, Deserialize)]
 pub(super) struct TaskBoardListQuery {
@@ -201,31 +201,10 @@ pub(super) async fn post_task_board_sync(
 pub(super) async fn post_task_board_dispatch(
     headers: HeaderMap,
     State(state): State<DaemonHttpState>,
-    Json(mut request): Json<TaskBoardDispatchRequest>,
+    Json(request): Json<TaskBoardDispatchRequest>,
 ) -> Response {
     let (start, request_id) = authenticated_parts!(headers, state);
-    request.actor = Some(CONTROL_PLANE_ACTOR_ID.to_string());
-    let result = if let Some(async_db) = state.async_db.get() {
-        let result = service::dispatch_task_board_async(&request, async_db.as_ref()).await;
-        if result
-            .as_ref()
-            .is_ok_and(|response| !response.applied.is_empty())
-        {
-            service::broadcast_sessions_updated_async(&state.sender, Some(async_db.as_ref())).await;
-        }
-        result
-    } else {
-        let db_guard = state.db.get().map(|db| db.lock().expect("db lock"));
-        let db_ref = db_guard.as_deref();
-        let result = service::dispatch_task_board(&request, db_ref);
-        if result
-            .as_ref()
-            .is_ok_and(|response| !response.applied.is_empty())
-        {
-            service::broadcast_sessions_updated(&state.sender, db_ref);
-        }
-        result
-    };
+    let result = task_board_route_executor::dispatch(&state, request).await;
     timed_json(
         "POST",
         http_paths::TASK_BOARD_DISPATCH,
@@ -241,21 +220,7 @@ pub(super) async fn post_task_board_evaluate(
     Json(request): Json<TaskBoardEvaluateRequest>,
 ) -> Response {
     let (start, request_id) = authenticated_parts!(headers, state);
-    let result = if let Some(async_db) = state.async_db.get() {
-        let result = service::evaluate_task_board_async(&request, async_db.as_ref()).await;
-        if result.as_ref().is_ok_and(|response| response.updated > 0) {
-            service::broadcast_sessions_updated_async(&state.sender, Some(async_db.as_ref())).await;
-        }
-        result
-    } else {
-        let db_guard = state.db.get().map(|db| db.lock().expect("db lock"));
-        let db_ref = db_guard.as_deref();
-        let result = service::evaluate_task_board(&request, db_ref);
-        if result.as_ref().is_ok_and(|response| response.updated > 0) {
-            service::broadcast_sessions_updated(&state.sender, db_ref);
-        }
-        result
-    };
+    let result = task_board_route_executor::evaluate(&state, request).await;
     timed_json(
         "POST",
         http_paths::TASK_BOARD_EVALUATE,
