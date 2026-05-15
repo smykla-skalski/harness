@@ -43,6 +43,7 @@ struct PolicyCanvasEdgeLayer: View {
           PolicyCanvasInteractiveEdge(
             route: route,
             color: strokeColor(for: edge, severity: severity, isSelected: isSelected),
+            arrowheadColor: arrowheadColor(for: edge, severity: severity, isSelected: isSelected),
             strokeWidth: severity == nil ? 2.4 : 3.0,
             isSelected: isSelected,
             accessibilityLabel: viewModel.accessibilityLabel(for: edge),
@@ -116,6 +117,24 @@ struct PolicyCanvasEdgeLayer: View {
       return severity.accentColor.opacity(isSelected ? 0.98 : 0.82)
     }
     return edgeColor(for: edge).opacity(isSelected ? 0.95 : 0.78)
+  }
+
+  /// Arrowhead fill color. Higher opacity than the stroke counterpart so
+  /// the 9pt × 7pt filled triangle reads as visually distinct from the
+  /// line it sits on. A filled shape at the same alpha as a stroke on a
+  /// dark canvas reads ~30% lighter, so the arrowhead would otherwise
+  /// disappear into the stroke at busy-canvas density. The bump (0.95
+  /// for unselected, 1.0 for selected) keeps direction legible without
+  /// shouting.
+  private func arrowheadColor(
+    for edge: PolicyCanvasEdge,
+    severity: PolicyCanvasIssueSeverity?,
+    isSelected: Bool
+  ) -> Color {
+    if let severity {
+      return severity.accentColor.opacity(isSelected ? 1.0 : 0.95)
+    }
+    return edgeColor(for: edge).opacity(isSelected ? 1.0 : 0.95)
   }
 }
 

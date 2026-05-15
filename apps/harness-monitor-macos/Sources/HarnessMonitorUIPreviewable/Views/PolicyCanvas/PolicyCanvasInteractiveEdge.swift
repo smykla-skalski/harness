@@ -9,6 +9,14 @@ import SwiftUI
 struct PolicyCanvasInteractiveEdge: View {
   let route: PolicyCanvasEdgeRoute
   let color: Color
+  /// Fill color for the direction arrowhead. Caller bumps this above the
+  /// stroke alpha so the 9pt × 7pt filled triangle reads as visually
+  /// distinct from the line it terminates. A filled shape on a dark
+  /// canvas needs more alpha than a stroke to land at the same
+  /// perceptual weight (Bertin's retinal-variable weighting), so the
+  /// stroke alpha at 0.78 makes a same-alpha arrowhead feel ~30%
+  /// lighter than the line.
+  let arrowheadColor: Color
   let strokeWidth: CGFloat
   let isSelected: Bool
   let accessibilityLabel: String
@@ -66,6 +74,7 @@ struct PolicyCanvasInteractiveEdge: View {
   init(
     route: PolicyCanvasEdgeRoute,
     color: Color,
+    arrowheadColor: Color? = nil,
     strokeWidth: CGFloat,
     isSelected: Bool,
     accessibilityLabel: String,
@@ -82,6 +91,7 @@ struct PolicyCanvasInteractiveEdge: View {
   ) {
     self.route = route
     self.color = color
+    self.arrowheadColor = arrowheadColor ?? color
     self.strokeWidth = strokeWidth
     self.isSelected = isSelected
     self.accessibilityLabel = accessibilityLabel
@@ -102,7 +112,7 @@ struct PolicyCanvasInteractiveEdge: View {
       if isSelected {
         PolicyCanvasEdgeShape(route: route)
           .stroke(
-            color.opacity(0.35),
+            selectionHaloColor,
             style: StrokeStyle(lineWidth: 6, lineCap: .round, lineJoin: .round)
           )
           .allowsHitTesting(false)
@@ -110,7 +120,7 @@ struct PolicyCanvasInteractiveEdge: View {
       }
       strokeLayer
       PolicyCanvasEdgeArrowhead(route: route)
-        .fill(color)
+        .fill(arrowheadColor)
     }
     .contentShape(PolicyCanvasEdgeHitShape(route: route))
     .onHover { isHovering = $0 }
@@ -126,6 +136,17 @@ struct PolicyCanvasInteractiveEdge: View {
     .accessibilityValue(accessibilityValueString)
     .accessibilityAddTraits(.isButton)
     .accessibilityActivationPoint(route.arcLengthMidpoint)
+  }
+
+  /// Selection halo color. Sourced from the system accent rather than
+  /// the edge's own hue so the highlight reads as "selected" on every
+  /// kind. With the prior `color.opacity(0.35)` formula a selected
+  /// `.error` edge produced a red halo around a red stroke - selection
+  /// was nearly invisible. Pulling from `Color.accentColor` keeps the
+  /// halo distinct from cyan flow, purple control, and red error
+  /// strokes alike.
+  private var selectionHaloColor: Color {
+    Color.accentColor.opacity(0.30)
   }
 
   /// Hover tooltip surfacing the kind word + dash-pattern key so sighted
