@@ -8,15 +8,237 @@ extension PreviewHarnessClientState {
     return taskBoardItems.filter { $0.status == status }
   }
 
+  func currentTaskBoardItem(id: String) throws -> TaskBoardItem {
+    guard let item = taskBoardItems.first(where: { $0.id == id }) else {
+      throw taskBoardItemUnavailable()
+    }
+    return item
+  }
+
+  func createTaskBoardItem(request: TaskBoardCreateItemRequest) -> TaskBoardItem {
+    let item = TaskBoardItem(
+      schemaVersion: 1,
+      id: request.id ?? "preview-board-\(taskBoardItems.count + 1)",
+      title: request.title,
+      body: request.body,
+      status: .new,
+      priority: request.priority,
+      tags: request.tags,
+      projectId: request.projectId,
+      agentMode: request.agentMode,
+      externalRefs: request.externalRefs,
+      planning: request.planning,
+      workflow: request.workflow,
+      sessionId: request.sessionId,
+      workItemId: request.workItemId,
+      usage: TaskBoardUsage(),
+      createdAt: Self.mutationTimestamp,
+      updatedAt: Self.mutationTimestamp,
+      deletedAt: nil
+    )
+    taskBoardItems.append(item)
+    return item
+  }
+
   func updateTaskBoardItem(id: String, request: TaskBoardUpdateItemRequest) throws
     -> TaskBoardItem
   {
     guard let index = taskBoardItems.firstIndex(where: { $0.id == id }) else {
-      throw HarnessMonitorAPIError.server(code: 404, message: "Task board item unavailable.")
+      throw taskBoardItemUnavailable()
     }
     let updated = taskBoardItems[index].applyingPreviewUpdate(request)
     taskBoardItems[index] = updated
     return updated
+  }
+
+  func deleteTaskBoardItem(id: String) throws -> TaskBoardItem {
+    guard let index = taskBoardItems.firstIndex(where: { $0.id == id }) else {
+      throw taskBoardItemUnavailable()
+    }
+    return taskBoardItems.remove(at: index)
+  }
+
+  func beginTaskBoardPlan(id: String) throws -> TaskBoardPlanningResponse {
+    try updateTaskBoardPlanning(
+      id: id,
+      toStatus: .planning,
+      planning: TaskBoardPlanningState()
+    )
+  }
+
+  func submitTaskBoardPlan(
+    id: String,
+    request: TaskBoardPlanSubmitRequest
+  ) throws -> TaskBoardPlanningResponse {
+    try updateTaskBoardPlanning(
+      id: id,
+      toStatus: .planReview,
+      planning: TaskBoardPlanningState(summary: request.summary)
+    )
+  }
+
+  func approveTaskBoardPlan(
+    id: String,
+    request: TaskBoardPlanApproveRequest
+  ) throws -> TaskBoardPlanningResponse {
+    let approvedPlanning = TaskBoardPlanningState(
+      summary: try currentTaskBoardItem(id: id).planning.summary,
+      approvedBy: request.approvedBy,
+      approvedAt: request.approvedAt ?? Self.mutationTimestamp
+    )
+    return try updateTaskBoardPlanning(id: id, toStatus: .todo, planning: approvedPlanning)
+  }
+
+  func syncTaskBoard() -> TaskBoardSyncSummary {
+    TaskBoardSyncSummary(
+      total: taskBoardItems.count,
+      providers: [],
+      operations: taskBoardItems.map { item in
+        TaskBoardExternalSyncOperation(
+          provider: .gitHub,
+          action: .push,
+          boardItemId: item.id,
+          externalId: item.externalRefs.first?.externalId,
+          url: item.externalRefs.first?.url,
+          dryRun: true,
+          applied: false
+        )
+      }
+    )
+  }
+
+  func dispatchTaskBoard(request: TaskBoardDispatchRequest) -> TaskBoardDispatchSummary {
+    var applied: [TaskBoardDispatchAppliedTask] = []
+    let plans = matchingTaskBoardItems(status: request.status, itemId: request.itemId).map { item in
+      let updated = item.applyingPreviewDispatch()
+      if !request.dryRun {
+        replaceTaskBoardItem(updated)
+        applied.append(
+          TaskBoardDispatchAppliedTask(
+            boardItemId: updated.id,
+            sessionId: updated.sessionId ?? "preview-session-\(updated.id)",
+            workItemId: updated.workItemId ?? "preview-task-\(updated.id)",
+            item: updated
+          )
+        )
+      }
+      return TaskBoardDispatchPlan.previewPlan(for: item)
+    }
+    return TaskBoardDispatchSummary(plans: plans, applied: applied)
+  }
+
+  func evaluateTaskBoard(request: TaskBoardEvaluateRequest) -> TaskBoardEvaluationSummary {
+    var records: [TaskBoardEvaluationRecord] = []
+    for item in matchingTaskBoardItems(status: request.status, itemId: request.itemId) {
+      let record = evaluateTaskBoardItem(item, dryRun: request.dryRun)
+      records.append(record)
+    }
+    return TaskBoardEvaluationSummary.previewSummary(records: records)
+  }
+
+  func currentTaskBoardOrchestratorStatus() -> TaskBoardOrchestratorStatus {
+    taskBoardOrchestratorStatus
+  }
+
+  func setTaskBoardOrchestratorRunning(_ running: Bool) -> TaskBoardOrchestratorStatus {
+    taskBoardOrchestratorStatus = taskBoardOrchestratorStatus.replacingPreviewRuntime(
+      running: running
+    )
+    return taskBoardOrchestratorStatus
+  }
+
+  func runTaskBoardOrchestratorOnce(
+    request: TaskBoardOrchestratorRunOnceRequest
+  ) -> TaskBoardOrchestratorStatus {
+    let dryRun = request.dryRun ?? taskBoardOrchestratorSettings.dryRunDefault
+    let dispatch = dispatchTaskBoard(
+      request: TaskBoardDispatchRequest(
+        status: request.status ?? taskBoardOrchestratorSettings.dispatchStatusFilter,
+        itemId: request.itemId,
+        dryRun: dryRun,
+        projectDir: request.projectDir ?? taskBoardOrchestratorSettings.projectDir,
+        actor: request.actor
+      )
+    )
+    let evaluation = evaluateTaskBoard(
+      request: TaskBoardEvaluateRequest(
+        status: request.status,
+        itemId: request.itemId,
+        dryRun: dryRun
+      )
+    )
+    taskBoardOrchestratorStatus = taskBoardOrchestratorStatus.replacingPreviewRun(
+      run: TaskBoardOrchestratorRunSummary.previewRun(
+        dryRun: dryRun,
+        sync: syncTaskBoard(),
+        dispatch: dispatch,
+        evaluation: evaluation
+      )
+    )
+    return taskBoardOrchestratorStatus
+  }
+
+  private func updateTaskBoardPlanning(
+    id: String,
+    toStatus: TaskBoardStatus,
+    planning: TaskBoardPlanningState
+  ) throws -> TaskBoardPlanningResponse {
+    let current = try currentTaskBoardItem(id: id)
+    let updated = current.applyingPreviewPlanning(status: toStatus, planning: planning)
+    replaceTaskBoardItem(updated)
+    return TaskBoardPlanningResponse(
+      transition: TaskBoardPlanningTransition(
+        boardItemId: id,
+        fromStatus: current.status,
+        toStatus: toStatus,
+        planning: planning
+      ),
+      item: updated
+    )
+  }
+
+  private func matchingTaskBoardItems(
+    status: TaskBoardStatus?,
+    itemId: String?
+  ) -> [TaskBoardItem] {
+    taskBoardItems.filter { item in
+      (status == nil || item.status == status) && (itemId == nil || item.id == itemId)
+    }
+  }
+
+  private func evaluateTaskBoardItem(
+    _ item: TaskBoardItem,
+    dryRun: Bool
+  ) -> TaskBoardEvaluationRecord {
+    guard item.sessionId != nil, item.workItemId != nil else {
+      return item.previewEvaluationRecord(outcome: .skippedUnlinked, updated: false)
+    }
+    let boardStatus = item.status.previewEvaluationStatus
+    let workflowStatus = item.status.previewEvaluationWorkflowStatus
+    let updated = boardStatus != item.status || workflowStatus != item.workflow?.status
+    let evaluated = item.applyingPreviewEvaluation(
+      status: boardStatus,
+      workflowStatus: workflowStatus
+    )
+    if updated && !dryRun {
+      replaceTaskBoardItem(evaluated)
+    }
+    return evaluated.previewEvaluationRecord(
+      outcome: boardStatus.previewEvaluationOutcome,
+      updated: updated && !dryRun
+    )
+  }
+
+  private func replaceTaskBoardItem(_ item: TaskBoardItem) {
+    guard let index = taskBoardItems.firstIndex(where: { $0.id == item.id }) else {
+      taskBoardItems.append(item)
+      return
+    }
+    taskBoardItems[index] = item
+  }
+
+  private func taskBoardItemUnavailable() -> HarnessMonitorAPIError {
+    HarnessMonitorAPIError.server(code: 404, message: "Task board item unavailable.")
   }
 }
 
@@ -43,6 +265,74 @@ extension TaskBoardItem {
       createdAt: createdAt,
       updatedAt: PreviewHarnessClientState.mutationTimestamp,
       deletedAt: deletedAt
+    )
+  }
+
+  fileprivate func applyingPreviewPlanning(
+    status: TaskBoardStatus,
+    planning: TaskBoardPlanningState
+  ) -> TaskBoardItem {
+    applyingPreviewUpdate(
+      TaskBoardUpdateItemRequest(status: status, planning: planning)
+    )
+  }
+
+  fileprivate func applyingPreviewDispatch() -> TaskBoardItem {
+    applyingPreviewUpdate(
+      TaskBoardUpdateItemRequest(
+        status: .inProgress,
+        workflow: TaskBoardWorkflowState(
+          executionId: "preview-exec-\(id)",
+          status: .running,
+          currentStepId: "dispatch",
+          attempts: (workflow?.attempts ?? 0) + 1,
+          branch: workflow?.branch ?? "preview/\(id)",
+          worktree: workflow?.worktree,
+          policyTraceIds: ["preview-policy-\(id)"]
+        ),
+        sessionId: sessionId ?? "preview-session-\(id)",
+        workItemId: workItemId ?? "preview-task-\(id)"
+      )
+    )
+  }
+
+  fileprivate func applyingPreviewEvaluation(
+    status: TaskBoardStatus,
+    workflowStatus: TaskBoardWorkflowStatus
+  ) -> TaskBoardItem {
+    applyingPreviewUpdate(
+      TaskBoardUpdateItemRequest(
+        status: status,
+        workflow: TaskBoardWorkflowState(
+          executionId: workflow?.executionId,
+          status: workflowStatus,
+          currentStepId: workflowStatus == .completed ? nil : workflow?.currentStepId,
+          attempts: workflow?.attempts ?? 0,
+          branch: workflow?.branch,
+          worktree: workflow?.worktree,
+          prNumber: workflow?.prNumber,
+          prUrl: workflow?.prUrl,
+          lastError: workflow?.lastError,
+          policyTraceIds: workflow?.policyTraceIds ?? []
+        )
+      )
+    )
+  }
+
+  fileprivate func previewEvaluationRecord(
+    outcome: TaskBoardEvaluationOutcome,
+    updated: Bool
+  ) -> TaskBoardEvaluationRecord {
+    TaskBoardEvaluationRecord(
+      boardItemId: id,
+      sessionId: sessionId,
+      workItemId: workItemId,
+      outcome: outcome,
+      taskStatus: status.previewTaskStatus,
+      boardStatus: status,
+      workflowStatus: workflow?.status,
+      updated: updated,
+      item: self
     )
   }
 }

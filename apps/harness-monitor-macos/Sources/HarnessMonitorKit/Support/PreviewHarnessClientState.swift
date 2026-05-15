@@ -14,6 +14,7 @@ actor PreviewHarnessClientState {
   var acpAgentsBySessionID: [String: [AcpAgentSnapshot]]
   var codexRunsBySessionID: [String: [CodexRunSnapshot]]
   var taskBoardOrchestratorSettings: TaskBoardOrchestratorSettings
+  var taskBoardOrchestratorStatus: TaskBoardOrchestratorStatus
   var taskBoardGitRuntimeConfig: TaskBoardGitRuntimeConfig
   var taskBoardGitHubTokens: TaskBoardGitHubTokensSyncRequest
   var taskBoardTodoistToken: TaskBoardTodoistTokenSyncRequest
@@ -44,6 +45,11 @@ actor PreviewHarnessClientState {
     )
     self.codexRunsBySessionID = fixtures.codexRunsBySessionID
     self.taskBoardOrchestratorSettings = fixtures.taskBoardOrchestratorSettings
+    self.taskBoardOrchestratorStatus = TaskBoardOrchestratorStatus(
+      enabled: !fixtures.taskBoardOrchestratorSettings.enabledWorkflows.isEmpty,
+      running: false,
+      settings: fixtures.taskBoardOrchestratorSettings
+    )
     self.taskBoardGitRuntimeConfig = fixtures.taskBoardGitRuntimeConfig
     self.taskBoardGitHubTokens = TaskBoardGitHubTokensSyncRequest(
       globalToken: nil,

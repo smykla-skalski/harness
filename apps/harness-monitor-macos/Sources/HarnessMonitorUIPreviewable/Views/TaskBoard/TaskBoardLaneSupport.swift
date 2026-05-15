@@ -64,7 +64,7 @@ enum TaskBoardLaneDropPolicy {
     guard let payload = payloads.first else {
       return false
     }
-    guard payload.sourceLane != destination else {
+    guard let sourceLane = payload.sourceLane, sourceLane != destination else {
       return false
     }
     return move(payload.itemID, destination)
@@ -80,7 +80,7 @@ enum TaskBoardInboxDropPolicy {
     guard let payload = payloads.first else {
       return false
     }
-    guard payload.sourceLane != destination else {
+    guard let sourceLane = payload.sourceLane, sourceLane != destination else {
       return false
     }
     return move(payload, destination)

@@ -132,9 +132,6 @@ enum TaskBoardOverviewItemBehavior {
     guard item.hasLinkedSessionTask else {
       return false
     }
-    guard !inboxItems.isEmpty else {
-      return true
-    }
     return inboxItems.contains { inboxItem in
       inboxItem.session.sessionId == item.sessionId
         && inboxItem.task.taskId == item.workItemId
