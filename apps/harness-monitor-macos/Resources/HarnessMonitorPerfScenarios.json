@@ -409,6 +409,25 @@
       "allocationsBudget": {
         "heapTotalBytes": 314572800
       }
+    },
+    {
+      "id": "dashboard-live-scroll",
+      "signpostName": "dashboard-live-scroll",
+      "defaultPreviewScenario": "dashboard",
+      "initialSettingsSection": "general",
+      "disablesVisualOptions": false,
+      "needsPreviewAcpPermissionBatch": false,
+      "includesBootstrapInMeasurement": false,
+      "usesLiveDaemon": true,
+      "durationSeconds": 14,
+      "templates": ["swiftui"],
+      "swiftUIBudget": {
+        "totalUpdates": 60000,
+        "bodyUpdates": 6000,
+        "maxUpdateGroupMilliseconds": 50,
+        "hitches": 0,
+        "potentialHangs": 0
+      }
     }
   ]
 }

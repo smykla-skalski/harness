@@ -29,6 +29,7 @@ enum HarnessMonitorPerfScenario: String, CaseIterable, Sendable {
   case timelineBurst = "timeline-burst"
   case toastOverlayChurn = "toast-overlay-churn"
   case offlineCachedOpen = "offline-cached-open"
+  case dashboardLiveScroll = "dashboard-live-scroll"
 
   init?(environment: HarnessMonitorEnvironment) {
     let rawValue = environment.values[Self.environmentKey]?
@@ -50,6 +51,12 @@ enum HarnessMonitorPerfScenario: String, CaseIterable, Sendable {
 
   func applyingDefaults(to environment: HarnessMonitorEnvironment) -> HarnessMonitorEnvironment {
     var values = environment.values
+    if usesLiveDaemon {
+      // Live-daemon scenarios profile the real app against an external daemon. Do not
+      // seed preview-mode defaults; the audit caller is expected to provide
+      // HARNESS_MONITOR_LAUNCH_MODE=live + HARNESS_MONITOR_EXTERNAL_DAEMON=1.
+      return HarnessMonitorEnvironment(values: values, homeDirectory: environment.homeDirectory)
+    }
     if values[HarnessMonitorLaunchMode.environmentKey]?.trimmingCharacters(
       in: .whitespacesAndNewlines
     )
@@ -91,6 +98,10 @@ enum HarnessMonitorPerfScenario: String, CaseIterable, Sendable {
   private var needsPreviewAcpPermissionBatch: Bool {
     definition.needsPreviewAcpPermissionBatch
   }
+
+  var usesLiveDaemon: Bool {
+    definition.usesLiveDaemon
+  }
 }
 
 extension HarnessMonitorPerfScenario {
@@ -128,6 +139,7 @@ extension HarnessMonitorPerfScenario {
     case .timelineBurst: "timeline-burst"
     case .toastOverlayChurn: "toast-overlay-churn"
     case .offlineCachedOpen: "offline-cached-open"
+    case .dashboardLiveScroll: "dashboard-live-scroll"
     }
   }
 }

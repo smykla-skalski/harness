@@ -319,6 +319,8 @@ private struct DashboardTaskBoardRouteView: View {
     generatedAt: nil,
     isFromCache: true
   )
+  @State private var perfScrollPosition = ScrollPosition()
+  private let perfScrollHookEnabled = HarnessMonitorPerfDashboardScrollBus.isActive()
 
   private var visibleTaskBoardSessions: [SessionSummary] {
     let visible = store.visibleSessions
@@ -337,7 +339,8 @@ private struct DashboardTaskBoardRouteView: View {
       readableWidth: false,
       topScrollEdgeEffect: .soft,
       scrollSurfaceIdentifier: HarnessMonitorAccessibility.dashboardScrollView,
-      scrollSurfaceLabel: "Dashboard"
+      scrollSurfaceLabel: "Dashboard",
+      scrollPosition: perfScrollHookEnabled ? $perfScrollPosition : nil
     ) {
       VStack(alignment: .leading, spacing: 24) {
         DashboardQuickActionsSection()
@@ -360,6 +363,22 @@ private struct DashboardTaskBoardRouteView: View {
     }
     .task(id: taskBoardInboxSessionIDs) {
       await refreshVisibleTaskBoardInboxSnapshot()
+    }
+    .onReceive(
+      NotificationCenter.default.publisher(
+        for: HarnessMonitorPerfDashboardScrollBus.scrollToBottom
+      )
+    ) { _ in
+      guard perfScrollHookEnabled else { return }
+      perfScrollPosition.scrollTo(edge: .bottom)
+    }
+    .onReceive(
+      NotificationCenter.default.publisher(
+        for: HarnessMonitorPerfDashboardScrollBus.scrollToTop
+      )
+    ) { _ in
+      guard perfScrollHookEnabled else { return }
+      perfScrollPosition.scrollTo(edge: .top)
     }
   }
 
