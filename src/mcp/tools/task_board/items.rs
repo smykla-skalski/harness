@@ -8,23 +8,17 @@ use crate::daemon::protocol::{
 };
 use crate::mcp::tool::ToolRegistry;
 
-use crate::mcp::tool::ToolError;
-
 use super::support::{TaskBoardToolDescriptor, register_descriptors, validate_params};
 
+/// Deserialization-only shape that pairs the required `id` with the rest of
+/// the update payload. Only used to validate caller input before forwarding
+/// the raw JSON to the daemon, so the fields are intentionally unread.
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 struct TaskBoardUpdateToolRequest {
     id: String,
     #[serde(flatten)]
     update: TaskBoardUpdateItemRequest,
-}
-
-fn validate_update_params(params: Value) -> Result<Value, ToolError> {
-    let normalized = validate_params::<TaskBoardUpdateToolRequest>(params)?;
-    let TaskBoardUpdateToolRequest { id, update } = serde_json::from_value(normalized.clone())
-        .map_err(|error| ToolError::invalid(error.to_string()))?;
-    let _ = (id, update);
-    Ok(normalized)
 }
 
 pub(super) fn register(registry: &mut ToolRegistry) {
@@ -53,7 +47,7 @@ pub(super) fn register(registry: &mut ToolRegistry) {
                 name: ws_methods::TASK_BOARD_UPDATE,
                 description: "Update a task-board item by id.",
                 input_schema: update_schema,
-                normalize: validate_update_params,
+                normalize: validate_params::<TaskBoardUpdateToolRequest>,
             },
             TaskBoardToolDescriptor {
                 name: ws_methods::TASK_BOARD_DELETE,
