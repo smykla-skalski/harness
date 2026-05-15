@@ -4,14 +4,18 @@
 # Default scope (safe, no source loss, no live-app disruption):
 #   - Repo Rust artifacts:   target/, mcp-servers/*/target, apps/*/target
 #   - Repo Xcode artifacts:  xcode-derived/, xcode-derived-lanes/, tmp/
-#   - Global build caches:   ~/Library/Caches/go-build, Mozilla.sccache, Yarn
+#   - Global build caches:   ~/Library/Caches/go-build, Mozilla.sccache, Yarn,
+#                            ~/.cache/tuist
 #   - Tool caches:           JetBrains, Homebrew prune, swiftpm
 #
 # --aggressive also wipes Xcode UI HarnessMonitor-* DerivedData (slow regen,
 # loses SourcePackages cache - only use when truly desperate for space).
 #
 # --dry-run prints what would be removed plus its size, deletes nothing.
-set -euo pipefail
+#
+# A failure in any single cleanup step is reported as a warning; the script
+# continues with the remaining steps so one wedged path can't strand the rest.
+set -uo pipefail
 
 ROOT="$(CDPATH='' cd -- "$(dirname -- "$0")/.." && pwd)"
 readonly ROOT
@@ -71,7 +75,10 @@ remove_path() {
     printf '  · %-46s %8s  (dry-run)\n' "$label" "$human"
   else
     printf '  · %-46s %8s  removing...\n' "$label" "$human"
-    rm -rf -- "$target"
+    if ! rm -rf -- "$target" 2>/tmp/clean-build-caches-rm.err; then
+      printf '    (warning: rm failed for %s: %s)\n' "$target" "$(tr '\n' ' ' </tmp/clean-build-caches-rm.err)"
+    fi
+    rm -f /tmp/clean-build-caches-rm.err
   fi
 }
 
@@ -127,6 +134,7 @@ remove_path 'swiftpm cache'                         "$HOME/Library/Caches/org.sw
 remove_path 'gopls cache'                           "$HOME/Library/Caches/gopls"
 remove_path 'goimports cache'                       "$HOME/Library/Caches/goimports"
 remove_path 'golangci-lint cache'                   "$HOME/Library/Caches/golangci-lint"
+remove_path 'tuist cache'                           "$HOME/.cache/tuist"
 
 section 'Tool caches'
 remove_path 'JetBrains caches'                      "$HOME/Library/Caches/JetBrains"
@@ -137,6 +145,9 @@ if command -v brew >/dev/null 2>&1; then
 fi
 if command -v go >/dev/null 2>&1; then
   run_cmd 'go clean -cache -modcache -fuzzcache'    go clean -cache -modcache -fuzzcache
+fi
+if command -v mise >/dev/null 2>&1; then
+  run_cmd 'mise prune (unused tool versions)'       mise prune --yes
 fi
 
 if (( AGGRESSIVE )); then
