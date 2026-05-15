@@ -37,9 +37,13 @@ pub(super) struct TaskBoardPlanApproveBody {
     pub approved_at: Option<String>,
 }
 
+/// Optional revoke-plan body. The `actor` field is accepted for forward
+/// compatibility but discarded by the handler — Unit 7 will wire the
+/// binding trait impl and pick up the caller-supplied value instead.
 #[derive(Debug, Clone, Default, Deserialize)]
 pub(super) struct TaskBoardPlanRevokeBody {
     #[serde(default)]
+    #[allow(dead_code)]
     pub actor: Option<String>,
 }
 
