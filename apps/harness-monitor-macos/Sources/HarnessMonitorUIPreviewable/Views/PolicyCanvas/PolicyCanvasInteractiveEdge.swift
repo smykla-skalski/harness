@@ -26,6 +26,13 @@ struct PolicyCanvasInteractiveEdge: View {
   /// otherwise this pattern is what the user sees.
   let kindDashPattern: [CGFloat]
   let isAnimated: Bool
+  /// Canvas zoom factor read from `viewModel.zoom` at the call site. Used
+  /// to clamp the dash-march apparent velocity per
+  /// `PolicyCanvasEdgeAnimation.effectiveVelocity(canvasZoom:)`. Defaults
+  /// to 1.0 so call sites that have not adopted the parameter yet keep
+  /// the previous behavior; the canvas-mounted call site passes the live
+  /// zoom.
+  let canvasZoom: CGFloat
   let onTap: () -> Void
   let onDelete: () -> Void
 
@@ -44,6 +51,7 @@ struct PolicyCanvasInteractiveEdge: View {
     accessibilityKindWord: String,
     kindDashPattern: [CGFloat] = [],
     isAnimated: Bool = false,
+    canvasZoom: CGFloat = 1,
     onTap: @escaping () -> Void,
     onDelete: @escaping () -> Void
   ) {
@@ -55,6 +63,7 @@ struct PolicyCanvasInteractiveEdge: View {
     self.accessibilityKindWord = accessibilityKindWord
     self.kindDashPattern = kindDashPattern
     self.isAnimated = isAnimated
+    self.canvasZoom = canvasZoom
     self.onTap = onTap
     self.onDelete = onDelete
   }
@@ -112,7 +121,10 @@ struct PolicyCanvasInteractiveEdge: View {
   @ViewBuilder private var strokeLayer: some View {
     if isAnimated, !reducedMotion {
       TimelineView(.animation) { context in
-        let phase = PolicyCanvasEdgeAnimation.dashPhase(at: context.date)
+        let phase = PolicyCanvasEdgeAnimation.dashPhase(
+          at: context.date,
+          canvasZoom: canvasZoom
+        )
         PolicyCanvasEdgeShape(route: route)
           .stroke(
             color,
@@ -172,13 +184,39 @@ enum PolicyCanvasEdgeAnimation {
   /// fast frame rates.
   static let dashPattern: [CGFloat] = [8, 4]
 
+  /// Base dash velocity at 1x canvas zoom. 12pt/sec is one full
+  /// dash+gap cycle per second - readable as flow without distracting.
+  static let baseVelocityPointsPerSecond: CGFloat = 12
+
+  /// Apparent on-screen velocity ceiling. Watson's R2 WCAG 2.3.3 note:
+  /// users on system Zoom 4x-8x without reduce-motion would see the dash
+  /// march at 48-96pt/sec without a cap, which approaches the
+  /// vestibular-trigger band. 24pt/sec keeps the cue legible at every
+  /// zoom level while bounding the on-screen distance the eye tracks per
+  /// second.
+  static let maxApparentVelocityPointsPerSecond: CGFloat = 24
+
   /// Compute the dash-phase offset for the current TimelineView tick. Phase
-  /// advances 12pt per second (one full dash+gap cycle) so the dash appears
-  /// to march along the polyline at a steady pace.
-  static func dashPhase(at date: Date) -> CGFloat {
+  /// advances `effectiveVelocity(canvasZoom:)` points per second along the
+  /// polyline so the dash appears to march at a steady on-screen pace
+  /// regardless of canvas zoom level.
+  static func dashPhase(at date: Date, canvasZoom: CGFloat = 1) -> CGFloat {
     let cycle = dashPattern.reduce(0, +)
-    let elapsed = date.timeIntervalSinceReferenceDate * 12
+    let velocity = effectiveVelocity(canvasZoom: canvasZoom)
+    let elapsed = date.timeIntervalSinceReferenceDate * Double(velocity)
     return -CGFloat(elapsed.truncatingRemainder(dividingBy: Double(cycle)))
+  }
+
+  /// Resolve the in-route dash velocity that produces a clamped apparent
+  /// on-screen velocity. When `canvasZoom <= 2`, the base 12pt/sec runs
+  /// unchanged - apparent velocity scales linearly to 24pt/sec at zoom
+  /// 2.0 and stays at the cap from there on. The function clamps to
+  /// `0.01` zoom on the low end to keep the division well-defined at
+  /// extreme far-zoom.
+  static func effectiveVelocity(canvasZoom: CGFloat) -> CGFloat {
+    let zoom = max(0.01, canvasZoom)
+    let apparent = min(baseVelocityPointsPerSecond * zoom, maxApparentVelocityPointsPerSecond)
+    return apparent / zoom
   }
 }
 

@@ -164,6 +164,40 @@ struct PolicyCanvasAccessibilityTests {
     #expect(route.arcLengthMidpoint == point)
   }
 
+  // Phase 3 (Watson R2 WCAG 2.3.3): the dash march advances at 12pt/sec at
+  // 1x canvas zoom, but the apparent on-screen velocity scales linearly
+  // with zoom. At 4x-8x zoom the apparent velocity would be 48-96pt/sec,
+  // approaching the vestibular-trigger band for users on system Zoom who
+  // do not have prefers-reduced-motion enabled. The clamp ensures
+  // apparent velocity never exceeds 24pt/sec regardless of zoom level.
+  @Test("dash march velocity stays at baseline below 2x zoom")
+  func dashVelocityUnclampedBelow2x() {
+    #expect(PolicyCanvasEdgeAnimation.effectiveVelocity(canvasZoom: 1) == 12)
+    #expect(PolicyCanvasEdgeAnimation.effectiveVelocity(canvasZoom: 0.5) == 12)
+    #expect(PolicyCanvasEdgeAnimation.effectiveVelocity(canvasZoom: 2) == 12)
+  }
+
+  @Test("dash march velocity is clamped at 4x and 8x zoom")
+  func dashVelocityClampedAtFarZoom() {
+    // At zoom 4, apparent should be capped at 24pt/sec -> effective 6.
+    #expect(PolicyCanvasEdgeAnimation.effectiveVelocity(canvasZoom: 4) == 6)
+    // At zoom 8, apparent capped at 24 -> effective 3.
+    #expect(PolicyCanvasEdgeAnimation.effectiveVelocity(canvasZoom: 8) == 3)
+  }
+
+  @Test("dash march apparent velocity caps at 24pt/sec across zoom range")
+  func dashApparentVelocityStaysWithinCap() {
+    let zoomLevels: [CGFloat] = [0.25, 0.5, 1, 1.5, 2, 2.5, 4, 8, 16]
+    for zoom in zoomLevels {
+      let effective = PolicyCanvasEdgeAnimation.effectiveVelocity(canvasZoom: zoom)
+      let apparent = effective * zoom
+      #expect(
+        apparent <= PolicyCanvasEdgeAnimation.maxApparentVelocityPointsPerSecond + 0.0001,
+        "Apparent velocity \(apparent)pt/sec exceeded 24pt/sec cap at zoom \(zoom)"
+      )
+    }
+  }
+
   // P27 focus order: visual top-to-bottom, then left-to-right within the
   // same row (10pt y-axis tolerance). The sample fixture has Source at
   // (120,140), Risk at (360,112), Context at (580,86), Review at (590,220),
