@@ -1,0 +1,294 @@
+use std::io::{Read, Write};
+use std::net::{TcpListener, TcpStream};
+use std::sync::{Arc, Mutex};
+use std::thread;
+
+use serde_json::Value;
+
+use super::*;
+
+#[derive(Debug, Default)]
+struct CapturedRequest {
+    path: String,
+    authorization: Option<String>,
+    body: String,
+}
+
+#[test]
+fn todoist_capabilities_include_status_updates() {
+    let client =
+        TodoistSyncClient::new_with_api_base("token", "https://todoist.invalid").expect("client");
+
+    assert!(
+        client
+            .capabilities()
+            .supports_update(ExternalSyncField::Status)
+    );
+}
+
+#[test]
+fn todoist_status_endpoint_closes_done_and_reopens_other_statuses() {
+    assert_eq!(
+        status_endpoint("task-1", TaskBoardStatus::Done),
+        "tasks/task-1/close"
+    );
+    assert_eq!(
+        status_endpoint("task-1", TaskBoardStatus::Todo),
+        "tasks/task-1/reopen"
+    );
+}
+
+#[tokio::test]
+async fn todoist_update_task_closes_remote_when_local_status_is_done() {
+    let (endpoint, captured, handle) = spawn_status_mock();
+    let client = TodoistSyncClient::new_with_api_base("token", endpoint).expect("client");
+    let reference = ExternalTaskRef::new(ExternalProvider::Todoist, "remote-1");
+    let item = local_item_with_status(TaskBoardStatus::Done);
+
+    client
+        .update_task(
+            &item,
+            &reference,
+            ExternalTaskUpdate::new(vec![ExternalSyncField::Status]),
+        )
+        .await
+        .expect("update task status");
+
+    handle.join().expect("mock server");
+    let captured = captured.lock().expect("captured request");
+    assert_eq!(captured.path, "/tasks/remote-1/close");
+    assert_eq!(captured.authorization.as_deref(), Some("Bearer token"));
+    assert!(captured.body.is_empty());
+}
+
+#[tokio::test]
+async fn todoist_update_task_reopens_remote_when_local_status_is_not_done() {
+    let (endpoint, captured, handle) = spawn_status_mock();
+    let client = TodoistSyncClient::new_with_api_base("token", endpoint).expect("client");
+    let reference = ExternalTaskRef::new(ExternalProvider::Todoist, "remote-1");
+    let item = local_item_with_status(TaskBoardStatus::InProgress);
+
+    client
+        .update_task(
+            &item,
+            &reference,
+            ExternalTaskUpdate::new(vec![ExternalSyncField::Status]),
+        )
+        .await
+        .expect("update task status");
+
+    handle.join().expect("mock server");
+    let captured = captured.lock().expect("captured request");
+    assert_eq!(captured.path, "/tasks/remote-1/reopen");
+    assert_eq!(captured.authorization.as_deref(), Some("Bearer token"));
+    assert!(captured.body.is_empty());
+}
+
+#[tokio::test]
+async fn todoist_push_task_posts_metadata_payload() {
+    let (endpoint, captured, handle) = spawn_json_mock(
+        r#"{"id":"remote-1","content":"Remote title","description":"Remote body"}"#,
+    );
+    let client = TodoistSyncClient::new_with_api_base("token", endpoint).expect("client");
+    let item = local_item("Local title", "Local body", Some("project-1"));
+
+    let reference = client.push_task(&item).await.expect("push task");
+
+    assert_eq!(reference.external_id, "remote-1");
+    handle.join().expect("mock server");
+    let captured = captured.lock().expect("captured request");
+    assert_eq!(captured.path, "/tasks");
+    assert_eq!(captured.authorization.as_deref(), Some("Bearer token"));
+    let body = body_json(&captured.body);
+    assert_eq!(body["content"], "Local title");
+    assert_eq!(body["description"], "Local body");
+    assert_eq!(body["project_id"], "project-1");
+}
+
+#[tokio::test]
+async fn todoist_update_task_posts_changed_metadata_payload() {
+    let (endpoint, captured, handle) = spawn_json_mock(
+        r#"{"id":"remote-1","content":"Remote title","description":"Remote body"}"#,
+    );
+    let client = TodoistSyncClient::new_with_api_base("token", endpoint).expect("client");
+    let reference = ExternalTaskRef::new(ExternalProvider::Todoist, "remote-1");
+    let item = local_item("Updated title", "Updated body", Some("project-2"));
+
+    client
+        .update_task(
+            &item,
+            &reference,
+            ExternalTaskUpdate::new(vec![
+                ExternalSyncField::Title,
+                ExternalSyncField::Body,
+                ExternalSyncField::Project,
+            ]),
+        )
+        .await
+        .expect("update task metadata");
+
+    handle.join().expect("mock server");
+    let captured = captured.lock().expect("captured request");
+    assert_eq!(captured.path, "/tasks/remote-1");
+    assert_eq!(captured.authorization.as_deref(), Some("Bearer token"));
+    let body = body_json(&captured.body);
+    assert_eq!(body["content"], "Updated title");
+    assert_eq!(body["description"], "Updated body");
+    assert_eq!(body["project_id"], "project-2");
+}
+
+#[test]
+fn todoist_update_classifies_metadata_and_status_changes() {
+    let metadata = ExternalTaskUpdate::new(vec![ExternalSyncField::Title]);
+    let status = ExternalTaskUpdate::new(vec![ExternalSyncField::Status]);
+
+    assert!(metadata.changes_metadata());
+    assert!(!metadata.changes_status());
+    assert!(!status.changes_metadata());
+    assert!(status.changes_status());
+}
+
+fn local_item_with_status(status: TaskBoardStatus) -> TaskBoardItem {
+    let mut item = local_item("Local task", "", None);
+    item.status = status;
+    item
+}
+
+fn local_item(title: &str, body: &str, project_id: Option<&str>) -> TaskBoardItem {
+    let mut item = TaskBoardItem::new(
+        "task-1".to_string(),
+        title.to_string(),
+        body.to_string(),
+        "2026-05-15T00:00:00Z".to_string(),
+    );
+    item.project_id = project_id.map(ToString::to_string);
+    item
+}
+
+fn spawn_status_mock() -> (String, Arc<Mutex<CapturedRequest>>, thread::JoinHandle<()>) {
+    let listener = TcpListener::bind("127.0.0.1:0").expect("bind");
+    let endpoint = format!("http://{}", listener.local_addr().expect("addr"));
+    let captured = Arc::new(Mutex::new(CapturedRequest::default()));
+    let captured_clone = Arc::clone(&captured);
+    let handle = thread::spawn(move || {
+        let (mut stream, _) = listener.accept().expect("accept");
+        let request = read_http_request(&mut stream);
+        *captured_clone.lock().expect("captured request") = capture_request(&request);
+        write_http_response(&mut stream, "204 No Content", "");
+    });
+    (endpoint, captured, handle)
+}
+
+fn spawn_json_mock(
+    response_body: &'static str,
+) -> (String, Arc<Mutex<CapturedRequest>>, thread::JoinHandle<()>) {
+    let listener = TcpListener::bind("127.0.0.1:0").expect("bind");
+    let endpoint = format!("http://{}", listener.local_addr().expect("addr"));
+    let captured = Arc::new(Mutex::new(CapturedRequest::default()));
+    let captured_clone = Arc::clone(&captured);
+    let handle = thread::spawn(move || {
+        let (mut stream, _) = listener.accept().expect("accept");
+        let request = read_http_request(&mut stream);
+        *captured_clone.lock().expect("captured request") = capture_request(&request);
+        write_json_response(&mut stream, response_body);
+    });
+    (endpoint, captured, handle)
+}
+
+fn capture_request(request: &str) -> CapturedRequest {
+    let path = request
+        .lines()
+        .next()
+        .and_then(|line| line.split_whitespace().nth(1))
+        .unwrap_or_default()
+        .to_string();
+    let authorization = request.lines().find_map(|line| {
+        line.split_once(':').and_then(|(name, value)| {
+            name.eq_ignore_ascii_case("authorization")
+                .then(|| value.trim().to_string())
+        })
+    });
+    let body = request
+        .split("\r\n\r\n")
+        .nth(1)
+        .unwrap_or_default()
+        .to_string();
+    CapturedRequest {
+        path,
+        authorization,
+        body,
+    }
+}
+
+fn read_http_request(stream: &mut TcpStream) -> String {
+    stream
+        .set_read_timeout(Some(std::time::Duration::from_secs(1)))
+        .expect("read timeout");
+    let mut buffer = Vec::new();
+    loop {
+        let mut chunk = [0_u8; 1024];
+        let read = stream.read(&mut chunk).expect("read request");
+        if read == 0 {
+            break;
+        }
+        buffer.extend_from_slice(&chunk[..read]);
+        if buffer.windows(4).any(|window| window == b"\r\n\r\n") {
+            break;
+        }
+    }
+    read_http_request_body(stream, &mut buffer);
+    String::from_utf8(buffer).expect("utf8 request")
+}
+
+fn read_http_request_body(stream: &mut TcpStream, buffer: &mut Vec<u8>) {
+    let header_end = buffer
+        .windows(4)
+        .position(|window| window == b"\r\n\r\n")
+        .map(|position| position + 4)
+        .unwrap_or(buffer.len());
+    let headers = String::from_utf8(buffer[..header_end].to_vec()).expect("utf8 headers");
+    let content_length = headers
+        .lines()
+        .find_map(|line| {
+            line.split_once(':').and_then(|(name, value)| {
+                name.eq_ignore_ascii_case("content-length")
+                    .then(|| value.trim().parse::<usize>().ok())
+                    .flatten()
+            })
+        })
+        .unwrap_or_default();
+    while buffer.len().saturating_sub(header_end) < content_length {
+        let mut chunk = [0_u8; 1024];
+        let read = stream.read(&mut chunk).expect("read request body");
+        if read == 0 {
+            break;
+        }
+        buffer.extend_from_slice(&chunk[..read]);
+    }
+}
+
+fn write_http_response(stream: &mut TcpStream, status: &str, body: &str) {
+    let response = format!(
+        "HTTP/1.1 {status}\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",
+        body.len()
+    );
+    stream
+        .write_all(response.as_bytes())
+        .expect("write response");
+    stream.flush().expect("flush response");
+}
+
+fn write_json_response(stream: &mut TcpStream, body: &str) {
+    let response = format!(
+        "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",
+        body.len()
+    );
+    stream
+        .write_all(response.as_bytes())
+        .expect("write response");
+    stream.flush().expect("flush response");
+}
+
+fn body_json(body: &str) -> Value {
+    serde_json::from_str(body).expect("request body json")
+}

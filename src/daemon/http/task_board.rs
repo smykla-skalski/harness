@@ -12,13 +12,13 @@ use crate::daemon::protocol::{
     TaskBoardPolicyPipelinePromoteRequest, TaskBoardPolicyPipelineSaveDraftRequest,
     TaskBoardPolicyPipelineSimulateRequest, TaskBoardTodoistTokenSyncRequest, http_paths,
 };
-use crate::daemon::service;
 use crate::errors::CliError;
 use crate::session::types::CONTROL_PLANE_ACTOR_ID;
 
 use super::DaemonHttpState;
 use super::auth::require_auth;
 use super::response::{extract_request_id, timed_json};
+use super::task_board_route_executor;
 
 mod items;
 
@@ -144,7 +144,7 @@ async fn get_task_board_orchestrator_status(
         http_paths::TASK_BOARD_ORCHESTRATOR_STATUS,
         &request_id,
         start,
-        service::task_board_orchestrator_status(),
+        task_board_route_executor::orchestrator_status(),
     )
 }
 
@@ -158,7 +158,7 @@ async fn post_task_board_orchestrator_start(
         http_paths::TASK_BOARD_ORCHESTRATOR_START,
         &request_id,
         start,
-        service::start_task_board_orchestrator(),
+        task_board_route_executor::start_orchestrator(),
     )
 }
 
@@ -172,7 +172,7 @@ async fn post_task_board_orchestrator_stop(
         http_paths::TASK_BOARD_ORCHESTRATOR_STOP,
         &request_id,
         start,
-        service::stop_task_board_orchestrator(),
+        task_board_route_executor::stop_orchestrator(),
     )
 }
 
@@ -203,7 +203,7 @@ async fn get_task_board_orchestrator_settings(
         http_paths::TASK_BOARD_ORCHESTRATOR_SETTINGS,
         &request_id,
         start,
-        service::task_board_orchestrator_settings(),
+        task_board_route_executor::orchestrator_settings(),
     )
 }
 
@@ -218,7 +218,7 @@ async fn put_task_board_orchestrator_settings(
         http_paths::TASK_BOARD_ORCHESTRATOR_SETTINGS,
         &request_id,
         start,
-        service::update_task_board_orchestrator_settings(&request),
+        task_board_route_executor::update_orchestrator_settings(&request),
     )
 }
 
@@ -232,7 +232,7 @@ async fn get_task_board_orchestrator_runtime_config(
         http_paths::TASK_BOARD_ORCHESTRATOR_RUNTIME_CONFIG,
         &request_id,
         start,
-        service::task_board_git_runtime_config(),
+        task_board_route_executor::runtime_config(),
     )
 }
 
@@ -247,7 +247,7 @@ async fn put_task_board_orchestrator_runtime_config(
         http_paths::TASK_BOARD_ORCHESTRATOR_RUNTIME_CONFIG,
         &request_id,
         start,
-        service::update_task_board_git_runtime_config(&request),
+        task_board_route_executor::update_runtime_config(&request),
     )
 }
 
@@ -262,7 +262,7 @@ async fn put_task_board_orchestrator_github_tokens(
         http_paths::TASK_BOARD_ORCHESTRATOR_GITHUB_TOKENS,
         &request_id,
         start,
-        service::sync_task_board_github_tokens(&request),
+        task_board_route_executor::sync_github_tokens(&request),
     )
 }
 
@@ -277,7 +277,7 @@ async fn put_task_board_orchestrator_todoist_token(
         http_paths::TASK_BOARD_ORCHESTRATOR_TODOIST_TOKEN,
         &request_id,
         start,
-        Ok::<_, CliError>(service::sync_task_board_todoist_token(&request)),
+        Ok::<_, CliError>(task_board_route_executor::sync_todoist_token(&request)),
     )
 }
 
@@ -291,7 +291,7 @@ async fn get_task_board_policy_pipeline(
         http_paths::TASK_BOARD_POLICY_PIPELINE,
         &request_id,
         start,
-        service::task_board_policy_pipeline(),
+        task_board_route_executor::policy_pipeline(),
     )
 }
 
@@ -306,7 +306,7 @@ async fn put_task_board_policy_pipeline_draft(
         http_paths::TASK_BOARD_POLICY_PIPELINE,
         &request_id,
         start,
-        service::save_task_board_policy_pipeline_draft(&request),
+        task_board_route_executor::save_policy_pipeline_draft(&request),
     )
 }
 
@@ -321,7 +321,7 @@ async fn post_task_board_policy_simulate(
         http_paths::TASK_BOARD_POLICY_SIMULATE,
         &request_id,
         start,
-        service::simulate_task_board_policy_pipeline(&request),
+        task_board_route_executor::simulate_policy_pipeline(&request),
     )
 }
 
@@ -336,7 +336,7 @@ async fn post_task_board_policy_promote(
         http_paths::TASK_BOARD_POLICY_PROMOTE,
         &request_id,
         start,
-        service::promote_task_board_policy_pipeline(&request),
+        task_board_route_executor::promote_policy_pipeline(&request),
     )
 }
 
@@ -350,6 +350,6 @@ async fn get_task_board_policy_audit(
         http_paths::TASK_BOARD_POLICY_AUDIT,
         &request_id,
         start,
-        service::audit_task_board_policy_pipeline(),
+        task_board_route_executor::audit_policy_pipeline(),
     )
 }
