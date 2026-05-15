@@ -42,12 +42,23 @@ extension HarnessMonitorPerfDriver {
       ]
     )
 
-    // The daemon streams the task-board inbox + supervisor decisions + recent
-    // sessions over the first few seconds. If we scroll before that data lands
-    // the content is shorter than the 928pt viewport and scrollTo(edge:.bottom)
-    // is a documented no-op. Wait at least 4s here so the surface is real-life
-    // scrollable. The bus emits scroll.geometry events that prove the size.
-    await settle(.milliseconds(4_000))
+    // The daemon's `connectionState == .online` only means the websocket is up,
+    // not that the task board inbox + recent sessions have been delivered. The
+    // surface stays shorter than the viewport for ~10s after online. Wait until
+    // the geometry probe reports a real overflow, otherwise scrollTo(edge:) is
+    // a no-op and the audit records nothing of value.
+    let scrollable = await waitForScrollableContent(timeout: .seconds(12))
+
+    HarnessMonitorPerfTrace.recordScenarioEvent(
+      component: "perf.dashboard-live-scroll",
+      event: scrollable ? "scrollable" : "non-scrollable",
+      details: [
+        "content_h":
+          String(Int(HarnessMonitorPerfDashboardScrollBus.latestGeometry.contentHeight.rounded())),
+        "container_h":
+          String(Int(HarnessMonitorPerfDashboardScrollBus.latestGeometry.containerHeight.rounded())),
+      ]
+    )
 
     postScrollEvent(.bottom, pass: 1)
     await settle(.milliseconds(1_500))
@@ -62,6 +73,20 @@ extension HarnessMonitorPerfDriver {
     await settle(.milliseconds(1_200))
 
     return .completed
+  }
+
+  private static func waitForScrollableContent(
+    timeout: Duration
+  ) async -> Bool {
+    let clock = ContinuousClock()
+    let deadline = clock.now.advanced(by: timeout)
+    while !HarnessMonitorPerfDashboardScrollBus.latestGeometry.isScrollable {
+      guard clock.now < deadline else {
+        return false
+      }
+      try? await Task.sleep(for: shortDelay)
+    }
+    return true
   }
 
   private enum LiveScrollDirection: String {
