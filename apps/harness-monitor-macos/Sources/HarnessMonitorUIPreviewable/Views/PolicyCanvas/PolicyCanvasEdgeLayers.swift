@@ -84,7 +84,7 @@ struct PolicyCanvasEdgeLayer: View {
   }
 
   private func edgeColor(for edge: PolicyCanvasEdge) -> Color {
-    viewModel.node(edge.source.nodeID)?.kind.accentColor ?? Color.cyan
+    edge.kind.accentColor
   }
 
   /// Severity-aware stroke color. When the edge has at least one resolved
@@ -193,7 +193,7 @@ struct PolicyCanvasEdgeLabelLayer: View {
   }
 
   private func edgeColor(for edge: PolicyCanvasEdge) -> Color {
-    viewModel.node(edge.source.nodeID)?.kind.accentColor ?? Color.cyan
+    edge.kind.accentColor
   }
 
   /// Mirrors `PolicyCanvasEdgeLayer.routeFor` so the label position stays on

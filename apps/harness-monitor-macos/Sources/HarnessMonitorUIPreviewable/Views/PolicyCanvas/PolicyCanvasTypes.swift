@@ -218,6 +218,28 @@ struct PolicyCanvasPortEndpoint: Hashable {
   var side: PolicyCanvasPortSide?
 }
 
+/// Semantic kind of a `PolicyCanvasEdge`. Drives stroke color so the canvas
+/// reader can distinguish unconditional flow, conditional control branches,
+/// and error/deny paths at a glance. Mapped from the daemon `condition`
+/// string in `policyCanvasEdge(_:)`; defaults to `.flow` for `"always"` so
+/// untyped historical edges keep the existing neutral hue.
+enum PolicyCanvasEdgeKind: String, Hashable, CaseIterable {
+  case flow
+  case control
+  case error
+
+  var accentColor: Color {
+    switch self {
+    case .flow:
+      Color.cyan
+    case .control:
+      Color.purple
+    case .error:
+      Color.red
+    }
+  }
+}
+
 struct PolicyCanvasEdge: Identifiable, Hashable {
   let id: String
   var source: PolicyCanvasPortEndpoint
@@ -236,6 +258,11 @@ struct PolicyCanvasEdge: Identifiable, Hashable {
   /// their stable port positions; flips off only when the user opts in via
   /// the inspector toggle (deferred UI surface, T2.2 follow-up).
   var pinnedPortSide: Bool
+  /// Semantic kind used to pick the stroke color. Derived from `condition`
+  /// at construction by `PolicyCanvasEdgeKind.derive(from:)`; can be
+  /// overridden at the model boundary if the daemon ever surfaces an
+  /// explicit kind field.
+  var kind: PolicyCanvasEdgeKind
 
   init(
     id: String,
@@ -243,7 +270,8 @@ struct PolicyCanvasEdge: Identifiable, Hashable {
     target: PolicyCanvasPortEndpoint,
     label: String,
     condition: String = "always",
-    pinnedPortSide: Bool = true
+    pinnedPortSide: Bool = true,
+    kind: PolicyCanvasEdgeKind? = nil
   ) {
     self.id = id
     self.source = source
@@ -251,6 +279,25 @@ struct PolicyCanvasEdge: Identifiable, Hashable {
     self.label = label
     self.condition = condition
     self.pinnedPortSide = pinnedPortSide
+    self.kind = kind ?? PolicyCanvasEdgeKind.derive(from: condition)
+  }
+}
+
+extension PolicyCanvasEdgeKind {
+  /// Map a daemon condition string to a semantic kind. "always" + an empty
+  /// string fall to `.flow`; conditions whose text mentions `denied`,
+  /// `error`, `reject`, `failed`, or `fail` map to `.error`; everything
+  /// else is `.control`.
+  static func derive(from condition: String) -> PolicyCanvasEdgeKind {
+    let lowered = condition.lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
+    if lowered.isEmpty || lowered == "always" {
+      return .flow
+    }
+    let errorMarkers = ["denied", "deny", "error", "reject", "failed", "fail"]
+    if errorMarkers.contains(where: { lowered.contains($0) }) {
+      return .error
+    }
+    return .control
   }
 }
 
