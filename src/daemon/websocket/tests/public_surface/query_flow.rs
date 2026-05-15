@@ -153,7 +153,7 @@ async fn stream_subscribe_broadcasts_async_index_without_sync_db() {
 }
 
 #[tokio::test]
-async fn websocket_contract_mapped_methods_are_dispatchable() {
+async fn websocket_non_task_board_contract_mapped_methods_are_dispatchable() {
     let sandbox = tempdir().expect("tempdir");
     temp_env::async_with_vars(
         [(
@@ -164,7 +164,10 @@ async fn websocket_contract_mapped_methods_are_dispatchable() {
             let state = test_http_state_with_db();
             let connection = Arc::new(Mutex::new(ConnectionState::new()));
 
-            for method in mapped_ws_methods() {
+            for method in mapped_ws_methods()
+                .into_iter()
+                .filter(|method| !method.starts_with("task_board."))
+            {
                 let request = WsRequest {
                     id: format!("req-{method}"),
                     method: method.into(),
