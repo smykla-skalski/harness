@@ -1,4 +1,5 @@
 use std::collections::BTreeMap;
+use std::path::PathBuf;
 use std::sync::{LazyLock, RwLock};
 
 use serde::{Deserialize, Serialize};
@@ -15,12 +16,13 @@ use super::{append_event_best_effort, config_path, ensure_daemon_dirs};
 
 pub const VALID_LOG_LEVELS: &[&str] = &["trace", "debug", "info", "warn", "error"];
 
-static TASK_BOARD_GITHUB_TOKENS: LazyLock<RwLock<TaskBoardGitHubTokenState>> =
-    LazyLock::new(|| RwLock::new(TaskBoardGitHubTokenState::default()));
-static TASK_BOARD_TODOIST_TOKEN: LazyLock<RwLock<Option<String>>> =
-    LazyLock::new(|| RwLock::new(None));
-static TASK_BOARD_GIT_RUNTIME_SECRETS: LazyLock<RwLock<TaskBoardGitRuntimeConfig>> =
-    LazyLock::new(|| RwLock::new(TaskBoardGitRuntimeConfig::default()));
+static TASK_BOARD_GITHUB_TOKENS: LazyLock<RwLock<BTreeMap<PathBuf, TaskBoardGitHubTokenState>>> =
+    LazyLock::new(|| RwLock::new(BTreeMap::new()));
+static TASK_BOARD_TODOIST_TOKENS: LazyLock<RwLock<BTreeMap<PathBuf, String>>> =
+    LazyLock::new(|| RwLock::new(BTreeMap::new()));
+static TASK_BOARD_GIT_RUNTIME_SECRETS: LazyLock<
+    RwLock<BTreeMap<PathBuf, TaskBoardGitRuntimeConfig>>,
+> = LazyLock::new(|| RwLock::new(BTreeMap::new()));
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
 pub struct DaemonRuntimeConfig {
@@ -110,7 +112,7 @@ pub fn replace_task_board_git_runtime_secrets(task_board_config: &TaskBoardGitRu
     let mut state = TASK_BOARD_GIT_RUNTIME_SECRETS
         .write()
         .expect("task-board git runtime secret state lock poisoned");
-    *state = task_board_config.clone();
+    state.insert(task_board_memory_key(), task_board_config.clone());
 }
 
 /// Resolve a task-board Git runtime profile with current process-only secrets.
@@ -124,9 +126,13 @@ pub fn task_board_git_runtime_profile(
     repository: Option<&str>,
 ) -> Result<TaskBoardGitRuntimeProfile, CliError> {
     let mut profile = load_task_board_git_runtime_config()?.resolved_profile(repository);
-    let passphrase = TASK_BOARD_GIT_RUNTIME_SECRETS
+    let secrets = TASK_BOARD_GIT_RUNTIME_SECRETS
         .read()
         .expect("task-board git runtime secret state lock poisoned")
+        .get(&task_board_memory_key())
+        .cloned()
+        .unwrap_or_default();
+    let passphrase = secrets
         .resolved_profile(repository)
         .signing
         .gpg_private_key_passphrase;
@@ -142,9 +148,10 @@ pub fn task_board_git_runtime_profile(
 pub fn replace_task_board_github_tokens(
     request: &TaskBoardGitHubTokensSyncRequest,
 ) -> TaskBoardGitHubTokensSyncResponse {
-    let mut state = TASK_BOARD_GITHUB_TOKENS
+    let mut states = TASK_BOARD_GITHUB_TOKENS
         .write()
         .expect("task-board github token state lock poisoned");
+    let state = states.entry(task_board_memory_key()).or_default();
     state.global_token = normalize_optional_value(request.global_token.as_deref());
     state.repository_tokens = request
         .repository_tokens
@@ -162,9 +169,10 @@ pub fn replace_task_board_github_tokens(
 /// Panics when the in-memory token state lock is poisoned.
 #[must_use]
 pub fn task_board_github_token(repository: Option<&str>) -> Option<String> {
-    let state = TASK_BOARD_GITHUB_TOKENS
+    let states = TASK_BOARD_GITHUB_TOKENS
         .read()
         .expect("task-board github token state lock poisoned");
+    let state = states.get(&task_board_memory_key())?;
     normalize_repository_slug(repository)
         .and_then(|repository| state.repository_tokens.get(&repository).cloned())
         .or_else(|| state.global_token.clone())
@@ -174,9 +182,10 @@ pub fn task_board_github_token(repository: Option<&str>) -> Option<String> {
 /// Panics when the in-memory token state lock is poisoned.
 #[must_use]
 pub fn task_board_github_repository_token(repository: &str) -> Option<String> {
-    let state = TASK_BOARD_GITHUB_TOKENS
+    let states = TASK_BOARD_GITHUB_TOKENS
         .read()
         .expect("task-board github token state lock poisoned");
+    let state = states.get(&task_board_memory_key())?;
     normalize_repository_slug(Some(repository))
         .and_then(|repository| state.repository_tokens.get(&repository).cloned())
 }
@@ -189,23 +198,32 @@ pub fn task_board_github_repository_token(repository: &str) -> Option<String> {
 pub fn replace_task_board_todoist_token(
     request: &TaskBoardTodoistTokenSyncRequest,
 ) -> TaskBoardTodoistTokenSyncResponse {
-    let mut state = TASK_BOARD_TODOIST_TOKEN
+    let mut states = TASK_BOARD_TODOIST_TOKENS
         .write()
         .expect("task-board todoist token state lock poisoned");
-    *state = normalize_optional_value(request.token.as_deref());
-    TaskBoardTodoistTokenSyncResponse {
-        token_configured: state.is_some(),
+    let token = normalize_optional_value(request.token.as_deref());
+    let token_configured = token.is_some();
+    if let Some(token) = token {
+        states.insert(task_board_memory_key(), token);
+    } else {
+        states.remove(&task_board_memory_key());
     }
+    TaskBoardTodoistTokenSyncResponse { token_configured }
 }
 
 /// # Panics
 /// Panics when the in-memory token state lock is poisoned.
 #[must_use]
 pub fn task_board_todoist_token() -> Option<String> {
-    TASK_BOARD_TODOIST_TOKEN
+    TASK_BOARD_TODOIST_TOKENS
         .read()
         .expect("task-board todoist token state lock poisoned")
-        .clone()
+        .get(&task_board_memory_key())
+        .cloned()
+}
+
+fn task_board_memory_key() -> PathBuf {
+    config_path()
 }
 
 /// Normalize and validate a daemon log level.
