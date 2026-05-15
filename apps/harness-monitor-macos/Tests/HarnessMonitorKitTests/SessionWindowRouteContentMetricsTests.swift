@@ -166,6 +166,9 @@ struct SessionWindowRouteContentMetricsTests {
       #expect(source.contains("onRunTaskBoardOrchestratorOnce: runTaskBoardOrchestratorOnce"))
       #expect(source.contains("onMoveTaskBoardItem: moveTaskBoardItem"))
       #expect(source.contains("onEvaluateTaskBoardItem: evaluateTaskBoardItem"))
+      #expect(source.contains("onBeginTaskBoardPlan: beginTaskBoardPlan"))
+      #expect(source.contains("onSubmitTaskBoardPlan: submitTaskBoardPlan"))
+      #expect(source.contains("onApproveTaskBoardPlan: approveTaskBoardPlan"))
     }
 
     #expect(routeContentSource.contains("store.contentUI.dashboard.taskBoardOrchestratorStatus"))
@@ -195,7 +198,9 @@ struct SessionWindowRouteContentMetricsTests {
   func boardOnlyTaskBoardItemsHaveManagementSurface() throws {
     let overviewSource = try taskBoardSourceFile(named: "TaskBoardOverviewView.swift")
     let managementPanelSource = try taskBoardSourceFile(named: "TaskBoardItemManagementPanel.swift")
-    let managementSupportSource = try taskBoardSourceFile(named: "TaskBoardItemManagementSupport.swift")
+    let managementSupportSource = try taskBoardSourceFile(
+      named: "TaskBoardItemManagementSupport.swift"
+    )
     let laneSource = try taskBoardSourceFile(named: "TaskBoardLaneViews.swift")
 
     #expect(overviewSource.contains("TaskBoardItemManagementPanel("))
@@ -211,6 +216,10 @@ struct SessionWindowRouteContentMetricsTests {
     #expect(managementPanelSource.contains("TaskBoardExternalLinks("))
     #expect(managementSupportSource.contains("Link(destination: destination.url)"))
     #expect(managementPanelSource.contains("Evaluate Item"))
+    #expect(managementPanelSource.contains("TaskBoardPlanLifecycleActionButtons("))
+    #expect(managementSupportSource.contains("Label(\"Begin Plan\""))
+    #expect(managementSupportSource.contains("Label(\"Submit Plan\""))
+    #expect(managementSupportSource.contains("Label(\"Approve Plan\""))
     #expect(!laneSource.contains(".disabled(!isOpenable)"))
     #expect(!laneSource.contains("private var isOpenable"))
   }

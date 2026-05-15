@@ -38,6 +38,18 @@ struct TaskBoardItemEditorDraft: Equatable {
     normalized(title) != nil
   }
 
+  var planSummaryForSubmit: String? {
+    normalized(planningSummary)
+  }
+
+  var approverForApproval: String? {
+    normalized(approvedBy)
+  }
+
+  var approvalTimestampForRequest: String? {
+    normalized(approvedAt)
+  }
+
   var createRequest: TaskBoardCreateItemRequest {
     TaskBoardCreateItemRequest(
       title: normalized(title) ?? "",

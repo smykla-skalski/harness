@@ -105,6 +105,9 @@ struct SessionsBoardView: View {
           onDeleteTaskBoardItem: deleteTaskBoardItem,
           onEvaluateTaskBoard: evaluateTaskBoard,
           onEvaluateTaskBoardItem: evaluateTaskBoardItem,
+          onBeginTaskBoardPlan: beginTaskBoardPlan,
+          onSubmitTaskBoardPlan: submitTaskBoardPlan,
+          onApproveTaskBoardPlan: approveTaskBoardPlan,
           onRefreshTaskBoard: refreshTaskBoard,
           onStartTaskBoardOrchestrator: startTaskBoardOrchestrator,
           onStopTaskBoardOrchestrator: stopTaskBoardOrchestrator,
@@ -196,6 +199,32 @@ struct SessionsBoardView: View {
     let request = TaskBoardOverviewItemBehavior.evaluationRequest(for: item)
     Task { @MainActor in
       await store.evaluateTaskBoard(request: request)
+    }
+  }
+
+  private func beginTaskBoardPlan(_ item: TaskBoardItem) {
+    Task { @MainActor in
+      await store.beginTaskBoardPlan(id: item.id)
+    }
+  }
+
+  private func submitTaskBoardPlan(_ item: TaskBoardItem, summary: String) {
+    Task { @MainActor in
+      await store.submitTaskBoardPlan(id: item.id, summary: summary)
+    }
+  }
+
+  private func approveTaskBoardPlan(
+    _ item: TaskBoardItem,
+    approvedBy: String,
+    approvedAt: String?
+  ) {
+    Task { @MainActor in
+      await store.approveTaskBoardPlan(
+        id: item.id,
+        approvedBy: approvedBy,
+        approvedAt: approvedAt
+      )
     }
   }
 

@@ -62,6 +62,23 @@ let sampleTaskBoardEvaluationSummaryText =
   }
   """
 
+let sampleTaskBoardPlanningResponseText =
+  """
+  {
+    "transition": {
+      "board_item_id": "board-1",
+      "from_status": "planning",
+      "to_status": "plan_review",
+      "planning": {
+        "summary": "Use the semantic plan.",
+        "approved_by": null,
+        "approved_at": null
+      }
+    },
+    "item": \(sampleTaskBoardItemJSONString)
+  }
+  """
+
 let sampleOrchestratorSettingsText =
   """
   {

@@ -11,7 +11,9 @@ public struct TaskBoardUpdateItemRequest: Codable, Equatable, Sendable {
   public let clearProjectId: Bool
   public let externalRefs: [TaskBoardExternalRef]?
   public let planning: TaskBoardPlanningState?
+  public let clearPlanning: Bool
   public let workflow: TaskBoardWorkflowState?
+  public let clearWorkflow: Bool
   public let sessionId: String?
   public let clearSessionId: Bool
   public let workItemId: String?
@@ -28,7 +30,9 @@ public struct TaskBoardUpdateItemRequest: Codable, Equatable, Sendable {
     clearProjectId: Bool = false,
     externalRefs: [TaskBoardExternalRef]? = nil,
     planning: TaskBoardPlanningState? = nil,
+    clearPlanning: Bool = false,
     workflow: TaskBoardWorkflowState? = nil,
+    clearWorkflow: Bool = false,
     sessionId: String? = nil,
     clearSessionId: Bool = false,
     workItemId: String? = nil,
@@ -44,7 +48,9 @@ public struct TaskBoardUpdateItemRequest: Codable, Equatable, Sendable {
     self.clearProjectId = clearProjectId
     self.externalRefs = externalRefs
     self.planning = planning
+    self.clearPlanning = clearPlanning
     self.workflow = workflow
+    self.clearWorkflow = clearWorkflow
     self.sessionId = sessionId
     self.clearSessionId = clearSessionId
     self.workItemId = workItemId
@@ -54,4 +60,51 @@ public struct TaskBoardUpdateItemRequest: Codable, Equatable, Sendable {
 
 public struct TaskBoardListItemsResponse: Codable, Equatable, Sendable {
   public let items: [TaskBoardItem]
+}
+
+public struct TaskBoardPlanningTransition: Codable, Equatable, Sendable {
+  public let boardItemId: String
+  public let fromStatus: TaskBoardStatus
+  public let toStatus: TaskBoardStatus
+  public let planning: TaskBoardPlanningState
+
+  public init(
+    boardItemId: String,
+    fromStatus: TaskBoardStatus,
+    toStatus: TaskBoardStatus,
+    planning: TaskBoardPlanningState
+  ) {
+    self.boardItemId = boardItemId
+    self.fromStatus = fromStatus
+    self.toStatus = toStatus
+    self.planning = planning
+  }
+}
+
+public struct TaskBoardPlanningResponse: Codable, Equatable, Sendable {
+  public let transition: TaskBoardPlanningTransition
+  public let item: TaskBoardItem
+
+  public init(transition: TaskBoardPlanningTransition, item: TaskBoardItem) {
+    self.transition = transition
+    self.item = item
+  }
+}
+
+public struct TaskBoardPlanSubmitRequest: Codable, Equatable, Sendable {
+  public let summary: String
+
+  public init(summary: String) {
+    self.summary = summary
+  }
+}
+
+public struct TaskBoardPlanApproveRequest: Codable, Equatable, Sendable {
+  public let approvedBy: String
+  public let approvedAt: String?
+
+  public init(approvedBy: String, approvedAt: String? = nil) {
+    self.approvedBy = approvedBy
+    self.approvedAt = approvedAt
+  }
 }

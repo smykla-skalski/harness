@@ -18,6 +18,9 @@ public struct TaskBoardOverviewView: View {
   let onDeleteTaskBoardItem: ((TaskBoardItem) -> Void)?
   let onEvaluateTaskBoard: (() -> Void)?
   let onEvaluateTaskBoardItem: ((TaskBoardItem) -> Void)?
+  let onBeginTaskBoardPlan: ((TaskBoardItem) -> Void)?
+  let onSubmitTaskBoardPlan: ((TaskBoardItem, String) -> Void)?
+  let onApproveTaskBoardPlan: ((TaskBoardItem, String, String?) -> Void)?
   let onRefreshTaskBoard: (() -> Void)?
   let onStartTaskBoardOrchestrator: (() -> Void)?
   let onStopTaskBoardOrchestrator: (() -> Void)?
@@ -48,6 +51,9 @@ public struct TaskBoardOverviewView: View {
     onDeleteTaskBoardItem: ((TaskBoardItem) -> Void)? = nil,
     onEvaluateTaskBoard: (() -> Void)? = nil,
     onEvaluateTaskBoardItem: ((TaskBoardItem) -> Void)? = nil,
+    onBeginTaskBoardPlan: ((TaskBoardItem) -> Void)? = nil,
+    onSubmitTaskBoardPlan: ((TaskBoardItem, String) -> Void)? = nil,
+    onApproveTaskBoardPlan: ((TaskBoardItem, String, String?) -> Void)? = nil,
     onRefreshTaskBoard: (() -> Void)? = nil,
     onStartTaskBoardOrchestrator: (() -> Void)? = nil,
     onStopTaskBoardOrchestrator: (() -> Void)? = nil,
@@ -69,6 +75,9 @@ public struct TaskBoardOverviewView: View {
     self.onDeleteTaskBoardItem = onDeleteTaskBoardItem
     self.onEvaluateTaskBoard = onEvaluateTaskBoard
     self.onEvaluateTaskBoardItem = onEvaluateTaskBoardItem
+    self.onBeginTaskBoardPlan = onBeginTaskBoardPlan
+    self.onSubmitTaskBoardPlan = onSubmitTaskBoardPlan
+    self.onApproveTaskBoardPlan = onApproveTaskBoardPlan
     self.onRefreshTaskBoard = onRefreshTaskBoard
     self.onStartTaskBoardOrchestrator = onStartTaskBoardOrchestrator
     self.onStopTaskBoardOrchestrator = onStopTaskBoardOrchestrator
@@ -108,6 +117,9 @@ public struct TaskBoardOverviewView: View {
             onDelete: onDeleteTaskBoardItem,
             onRunOnce: runOrchestratorOnceForItem,
             onEvaluate: selectedTaskBoardItemEvaluateAction,
+            onBeginPlan: onBeginTaskBoardPlan,
+            onSubmitPlan: onSubmitTaskBoardPlan,
+            onApprovePlan: onApproveTaskBoardPlan,
             onRefresh: onRefreshTaskBoard,
             onClose: clearSelectedTaskBoardItem
           )

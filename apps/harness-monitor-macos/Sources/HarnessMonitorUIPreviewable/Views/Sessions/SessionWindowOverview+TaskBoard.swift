@@ -103,6 +103,28 @@ extension SessionWindowOverview {
     }
   }
 
+  func beginTaskBoardPlan(_ item: TaskBoardItem) {
+    Task { @MainActor in
+      await store.beginTaskBoardPlan(id: item.id)
+    }
+  }
+
+  func submitTaskBoardPlan(_ item: TaskBoardItem, summary: String) {
+    Task { @MainActor in
+      await store.submitTaskBoardPlan(id: item.id, summary: summary)
+    }
+  }
+
+  func approveTaskBoardPlan(_ item: TaskBoardItem, approvedBy: String, approvedAt: String?) {
+    Task { @MainActor in
+      await store.approveTaskBoardPlan(
+        id: item.id,
+        approvedBy: approvedBy,
+        approvedAt: approvedAt
+      )
+    }
+  }
+
   func refreshTaskBoard() {
     Task { @MainActor in
       await store.refreshTaskBoardDashboard()

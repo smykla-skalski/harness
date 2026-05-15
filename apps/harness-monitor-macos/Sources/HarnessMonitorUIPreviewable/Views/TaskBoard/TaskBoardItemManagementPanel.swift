@@ -11,6 +11,9 @@ struct TaskBoardItemManagementPanel: View {
   let onDelete: ((TaskBoardItem) -> Void)?
   let onRunOnce: ((TaskBoardItem) -> Void)?
   let onEvaluate: ((TaskBoardItem) -> Void)?
+  let onBeginPlan: ((TaskBoardItem) -> Void)?
+  let onSubmitPlan: ((TaskBoardItem, String) -> Void)?
+  let onApprovePlan: ((TaskBoardItem, String, String?) -> Void)?
   let onRefresh: (() -> Void)?
   let onClose: () -> Void
 
@@ -25,6 +28,9 @@ struct TaskBoardItemManagementPanel: View {
     onDelete: ((TaskBoardItem) -> Void)?,
     onRunOnce: ((TaskBoardItem) -> Void)?,
     onEvaluate: ((TaskBoardItem) -> Void)?,
+    onBeginPlan: ((TaskBoardItem) -> Void)?,
+    onSubmitPlan: ((TaskBoardItem, String) -> Void)?,
+    onApprovePlan: ((TaskBoardItem, String, String?) -> Void)?,
     onRefresh: (() -> Void)?,
     onClose: @escaping () -> Void
   ) {
@@ -36,6 +42,9 @@ struct TaskBoardItemManagementPanel: View {
     self.onDelete = onDelete
     self.onRunOnce = onRunOnce
     self.onEvaluate = onEvaluate
+    self.onBeginPlan = onBeginPlan
+    self.onSubmitPlan = onSubmitPlan
+    self.onApprovePlan = onApprovePlan
     self.onRefresh = onRefresh
     self.onClose = onClose
     _draft = State(
@@ -120,6 +129,10 @@ struct TaskBoardItemManagementPanel: View {
         accessibilityLabel: "Planning summary"
       )
       HStack(alignment: .top, spacing: HarnessMonitorTheme.spacingMD) {
+        nativeField("Approver", text: $draft.approvedBy)
+        nativeField("Approved At", text: $draft.approvedAt)
+      }
+      HStack(alignment: .top, spacing: HarnessMonitorTheme.spacingMD) {
         nativeField("Linked Session", text: $draft.sessionId)
         nativeField("Work Item", text: $draft.workItemId)
       }
@@ -203,6 +216,16 @@ struct TaskBoardItemManagementPanel: View {
     .disabled(isActionInFlight || !draft.canSubmit || !canSubmit)
 
     if let item {
+      TaskBoardPlanLifecycleActionButtons(
+        item: item,
+        draft: draft,
+        metrics: metrics,
+        isActionInFlight: isActionInFlight,
+        onBeginPlan: onBeginPlan,
+        onSubmitPlan: onSubmitPlan,
+        onApprovePlan: onApprovePlan
+      )
+
       Button {
         onRunOnce?(item)
       } label: {

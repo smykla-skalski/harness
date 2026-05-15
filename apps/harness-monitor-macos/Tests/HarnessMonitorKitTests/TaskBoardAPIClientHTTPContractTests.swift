@@ -15,8 +15,10 @@ extension TaskBoardAPIClientTests {
     let tokenSync = try await performHTTPGitHubTokenCalls(client)
     let todoistTokenSync = try await performHTTPTodoistTokenCalls(client)
     try await performHTTPDiscoveryCalls(client)
+    let planning = try await performHTTPPlanningCalls(client)
 
     return TaskBoardHTTPContractResult(
+      planning: planning,
       dispatch: workflow.dispatch,
       sync: workflow.sync,
       evaluation: workflow.evaluation,
@@ -136,6 +138,23 @@ extension TaskBoardAPIClientTests {
     _ = try await client.taskBoardMachines(status: .todo)
   }
 
+  private func performHTTPPlanningCalls(
+    _ client: HarnessMonitorAPIClient
+  ) async throws -> TaskBoardPlanningResponse {
+    _ = try await client.beginTaskBoardPlan(id: "board-1")
+    _ = try await client.submitTaskBoardPlan(
+      id: "board-1",
+      request: TaskBoardPlanSubmitRequest(summary: "Use the semantic plan.")
+    )
+    return try await client.approveTaskBoardPlan(
+      id: "board-1",
+      request: TaskBoardPlanApproveRequest(
+        approvedBy: "lead",
+        approvedAt: "2026-05-14T02:00:00Z"
+      )
+    )
+  }
+
   private func httpCreateItemRequest() -> TaskBoardCreateItemRequest {
     TaskBoardCreateItemRequest(
       title: "Board item",
@@ -153,6 +172,8 @@ extension TaskBoardAPIClientTests {
   private func httpUpdateItemRequest() -> TaskBoardUpdateItemRequest {
     TaskBoardUpdateItemRequest(
       status: .inProgress,
+      clearPlanning: true,
+      clearWorkflow: true,
       clearSessionId: true,
       clearWorkItemId: true
     )
@@ -163,7 +184,8 @@ extension TaskBoardAPIClientTests {
       records.map(\.method)
         == [
           "GET", "GET", "POST", "PUT", "DELETE", "POST", "POST", "POST", "GET", "GET", "POST",
-          "POST", "POST", "GET", "PUT", "GET", "PUT", "PUT", "PUT", "GET", "GET",
+          "POST", "POST", "GET", "PUT", "GET", "PUT", "PUT", "PUT", "GET", "GET", "POST",
+          "POST", "POST",
         ]
     )
     #expect(
@@ -190,6 +212,9 @@ extension TaskBoardAPIClientTests {
           "/v1/task-board/orchestrator/todoist-token",
           "/v1/task-board/projects",
           "/v1/task-board/machines",
+          "/v1/task-board/items/board-1/planning/begin",
+          "/v1/task-board/items/board-1/planning/submit",
+          "/v1/task-board/items/board-1/planning/approve",
         ]
     )
   }
@@ -204,6 +229,8 @@ extension TaskBoardAPIClientTests {
     #expect(records[2].body?["work_item_id"] as? String == "task-1")
     #expect(records[2].body?["id"] as? String == "board-1")
     #expect(records[3].body?["status"] as? String == "in_progress")
+    #expect(records[3].body?["clear_planning"] as? Bool == true)
+    #expect(records[3].body?["clear_workflow"] as? Bool == true)
     #expect(records[3].body?["clear_session_id"] as? Bool == true)
     #expect(records[3].body?["clear_work_item_id"] as? Bool == true)
     #expect(records[5].body?["status"] as? String == "todo")
@@ -249,9 +276,15 @@ extension TaskBoardAPIClientTests {
     #expect(records[18].body?["token"] as? String == "todoist-token")
     #expect(records[19].query == "status=todo")
     #expect(records[20].query == "status=todo")
+    #expect(records[21].body?.isEmpty == true)
+    #expect(records[22].body?["summary"] as? String == "Use the semantic plan.")
+    #expect(records[23].body?["approved_by"] as? String == "lead")
+    #expect(records[23].body?["approved_at"] as? String == "2026-05-14T02:00:00Z")
   }
 
   func assertHTTPClientResults(_ result: TaskBoardHTTPContractResult) {
+    #expect(result.planning.transition.boardItemId == "board-1")
+    #expect(result.planning.transition.toStatus == .planReview)
     #expect(result.sync.providers.first?.provider == .gitHub)
     #expect(result.sync.operations.first?.action == .push)
     #expect(result.sync.operations.first?.boardItemId == "board-1")
@@ -294,6 +327,7 @@ extension TaskBoardAPIClientTests {
 }
 
 struct TaskBoardHTTPContractResult {
+  let planning: TaskBoardPlanningResponse
   let dispatch: TaskBoardDispatchSummary
   let sync: TaskBoardSyncSummary
   let evaluation: TaskBoardEvaluationSummary

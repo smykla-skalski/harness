@@ -33,8 +33,10 @@ extension TaskBoardItem {
       projectId: request.clearProjectId ? nil : request.projectId ?? projectId,
       agentMode: request.agentMode ?? agentMode,
       externalRefs: request.externalRefs ?? externalRefs,
-      planning: request.planning ?? planning,
-      workflow: request.workflow ?? workflow,
+      planning: request.clearPlanning
+        ? TaskBoardPlanningState()
+        : request.planning ?? planning,
+      workflow: request.clearWorkflow ? nil : request.workflow ?? workflow,
       sessionId: request.clearSessionId ? nil : request.sessionId ?? sessionId,
       workItemId: request.clearWorkItemId ? nil : request.workItemId ?? workItemId,
       usage: usage,

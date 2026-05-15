@@ -41,6 +41,32 @@ extension WebSocketTransport {
     return try decode(value)
   }
 
+  public func beginTaskBoardPlan(id: String) async throws -> TaskBoardPlanningResponse {
+    let value = try await rpc(
+      method: .taskBoardPlanBegin,
+      params: .object(["id": .string(id)])
+    )
+    return try decode(value)
+  }
+
+  public func submitTaskBoardPlan(
+    id: String,
+    request: TaskBoardPlanSubmitRequest
+  ) async throws -> TaskBoardPlanningResponse {
+    let params = try encodeParams(request, extra: ["id": .string(id)])
+    let value = try await rpc(method: .taskBoardPlanSubmit, params: params)
+    return try decode(value)
+  }
+
+  public func approveTaskBoardPlan(
+    id: String,
+    request: TaskBoardPlanApproveRequest
+  ) async throws -> TaskBoardPlanningResponse {
+    let params = try encodeParams(request, extra: ["id": .string(id)])
+    let value = try await rpc(method: .taskBoardPlanApprove, params: params)
+    return try decode(value)
+  }
+
   public func syncTaskBoard(request: TaskBoardSyncRequest) async throws -> TaskBoardSyncSummary {
     let params = try encodeParams(request, extra: [:])
     let value = try await rpc(method: .taskBoardSync, params: params)
