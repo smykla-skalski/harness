@@ -12,7 +12,6 @@ use crate::daemon::protocol::{
     TaskBoardPolicyPipelinePromoteRequest, TaskBoardPolicyPipelineSaveDraftRequest,
     TaskBoardPolicyPipelineSimulateRequest, TaskBoardTodoistTokenSyncRequest, http_paths,
 };
-use crate::errors::CliError;
 
 use super::DaemonHttpState;
 use super::auth::{authorize_control_request, require_auth};
@@ -308,7 +307,7 @@ async fn put_task_board_orchestrator_todoist_token(
         http_paths::TASK_BOARD_ORCHESTRATOR_TODOIST_TOKEN,
         &request_id,
         start,
-        Ok::<_, CliError>(task_board_route_executor::sync_todoist_token(&request)),
+        task_board_route_executor::sync_todoist_token(&request),
     )
 }
 

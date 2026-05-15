@@ -11,7 +11,6 @@ use crate::daemon::protocol::{
     TaskBoardSyncRequest, TaskBoardTodoistTokenSyncRequest, TaskBoardUpdateItemRequest, WsRequest,
     WsResponse, ws_methods,
 };
-use crate::errors::CliError;
 use crate::session::types::CONTROL_PLANE_ACTOR_ID;
 use serde::de::DeserializeOwned;
 
@@ -301,10 +300,7 @@ fn dispatch_task_board_orchestrator_todoist_token_sync(request: &WsRequest) -> W
     let Ok(body) = parse_params::<TaskBoardTodoistTokenSyncRequest>(request) else {
         return invalid_params(request);
     };
-    dispatch_query_result(
-        &request.id,
-        Ok::<_, CliError>(task_board_route_executor::sync_todoist_token(&body)),
-    )
+    dispatch_query_result(&request.id, task_board_route_executor::sync_todoist_token(&body))
 }
 
 fn dispatch_task_board_policy_pipeline_get(request: &WsRequest) -> WsResponse {
