@@ -115,6 +115,24 @@ extension WebSocketTransport {
     return try decode(value)
   }
 
+  public func taskBoardHostLocal() async throws -> TaskBoardHostMachine {
+    let value = try await rpc(method: .taskBoardHostLocal)
+    return try decode(value)
+  }
+
+  public func taskBoardHostList() async throws -> [TaskBoardHostMachine] {
+    let value = try await rpc(method: .taskBoardHostList)
+    return try decode(value)
+  }
+
+  public func setTaskBoardHostProjectTypes(
+    request: TaskBoardHostSetProjectTypesRequest
+  ) async throws -> TaskBoardHostMachine {
+    let params = try encodeParams(request, extra: [:])
+    let value = try await rpc(method: .taskBoardHostSetProjectTypes, params: params)
+    return try decode(value)
+  }
+
   public func taskBoardOrchestratorStatus() async throws -> TaskBoardOrchestratorStatus {
     let value = try await rpc(method: .taskBoardOrchestratorStatus)
     return try decode(value)

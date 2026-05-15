@@ -304,6 +304,39 @@ extension RecordingHarnessClient {
     }
   }
 
+  func taskBoardHostLocal() async throws -> TaskBoardHostMachine {
+    calls.append(.taskBoardHostLocal)
+    return sampleTaskBoardHostMachine()
+  }
+
+  func taskBoardHostList() async throws -> [TaskBoardHostMachine] {
+    calls.append(.taskBoardHostList)
+    return [sampleTaskBoardHostMachine()]
+  }
+
+  func setTaskBoardHostProjectTypes(
+    request: TaskBoardHostSetProjectTypesRequest
+  ) async throws -> TaskBoardHostMachine {
+    calls.append(.setTaskBoardHostProjectTypes(projectTypes: request.projectTypes))
+    return TaskBoardHostMachine(
+      id: "recording-host-local",
+      label: "Recording Mac",
+      projectTypes: request.projectTypes,
+      agentModes: [],
+      lastSeen: "2026-05-15T19:00:00Z"
+    )
+  }
+
+  func sampleTaskBoardHostMachine() -> TaskBoardHostMachine {
+    TaskBoardHostMachine(
+      id: "recording-host-local",
+      label: "Recording Mac",
+      projectTypes: [],
+      agentModes: [],
+      lastSeen: "2026-05-15T19:00:00Z"
+    )
+  }
+
   func taskBoardOrchestratorSettings() async throws -> TaskBoardOrchestratorSettings {
     recordReadCall(.taskBoardOrchestratorSettings)
     return sampleTaskBoardOrchestratorSettings()

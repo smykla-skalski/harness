@@ -178,6 +178,44 @@ extension PreviewHarnessClientState {
     }
   }
 
+  func taskBoardHostLocal() -> TaskBoardHostMachine {
+    if let first = taskBoardHostRegistry.first {
+      return first
+    }
+    let machine = TaskBoardHostMachine(
+      id: "preview-host-local",
+      label: "Preview Mac",
+      projectTypes: [],
+      agentModes: [],
+      lastSeen: PreviewHarnessClientState.mutationTimestamp
+    )
+    taskBoardHostRegistry.append(machine)
+    return machine
+  }
+
+  func taskBoardHostList() -> [TaskBoardHostMachine] {
+    taskBoardHostRegistry
+  }
+
+  func setTaskBoardHostProjectTypes(
+    request: TaskBoardHostSetProjectTypesRequest
+  ) -> TaskBoardHostMachine {
+    let current = taskBoardHostLocal()
+    let updated = TaskBoardHostMachine(
+      id: current.id,
+      label: current.label,
+      projectTypes: request.projectTypes,
+      agentModes: current.agentModes,
+      lastSeen: PreviewHarnessClientState.mutationTimestamp
+    )
+    if let index = taskBoardHostRegistry.firstIndex(where: { $0.id == updated.id }) {
+      taskBoardHostRegistry[index] = updated
+    } else {
+      taskBoardHostRegistry.append(updated)
+    }
+    return updated
+  }
+
   func evaluateTaskBoard(request: TaskBoardEvaluateRequest) -> TaskBoardEvaluationSummary {
     var records: [TaskBoardEvaluationRecord] = []
     for item in matchingTaskBoardItems(status: request.status, itemId: request.itemId) {

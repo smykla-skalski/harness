@@ -201,6 +201,9 @@ final class RecordingHarnessClient: HarnessMonitorClientProtocol, @unchecked Sen
     case auditTaskBoard(status: TaskBoardStatus?)
     case taskBoardProjects(status: TaskBoardStatus?)
     case taskBoardMachines(status: TaskBoardStatus?)
+    case taskBoardHostLocal
+    case taskBoardHostList
+    case setTaskBoardHostProjectTypes(projectTypes: [String])
     case saveTaskBoardPolicyPipelineDraft(revision: UInt64)
     case simulateTaskBoardPolicyPipeline
     case promoteTaskBoardPolicyPipeline(revision: UInt64)

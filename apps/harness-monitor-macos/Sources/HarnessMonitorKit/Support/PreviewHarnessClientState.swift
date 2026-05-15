@@ -19,6 +19,7 @@ actor PreviewHarnessClientState {
   var taskBoardGitHubTokens: TaskBoardGitHubTokensSyncRequest
   var taskBoardTodoistToken: TaskBoardTodoistTokenSyncRequest
   var taskBoardItems: [TaskBoardItem]
+  var taskBoardHostRegistry: [TaskBoardHostMachine]
   var nextAgentTuiSequence: Int
   var nextCodexRunSequence: Int
   var nextAcpAgentSequence: Int
@@ -57,6 +58,15 @@ actor PreviewHarnessClientState {
     )
     self.taskBoardTodoistToken = TaskBoardTodoistTokenSyncRequest(token: nil)
     self.taskBoardItems = fixtures.taskBoardItems
+    self.taskBoardHostRegistry = [
+      TaskBoardHostMachine(
+        id: "preview-host-local",
+        label: "Preview Mac",
+        projectTypes: [],
+        agentModes: [],
+        lastSeen: Self.mutationTimestamp
+      )
+    ]
     self.nextAgentTuiSequence = max(
       fixtures.agentTuisBySessionID.values.flatMap(\.self).count,
       0

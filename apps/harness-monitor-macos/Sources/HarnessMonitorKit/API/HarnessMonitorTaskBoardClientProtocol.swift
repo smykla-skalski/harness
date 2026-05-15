@@ -25,6 +25,11 @@ public protocol HarnessMonitorTaskBoardClientProtocol: Sendable {
   func auditTaskBoard(status: TaskBoardStatus?) async throws -> TaskBoardAuditSummary
   func taskBoardProjects(status: TaskBoardStatus?) async throws -> [TaskBoardProjectSummary]
   func taskBoardMachines(status: TaskBoardStatus?) async throws -> [TaskBoardMachineSummary]
+  func taskBoardHostLocal() async throws -> TaskBoardHostMachine
+  func taskBoardHostList() async throws -> [TaskBoardHostMachine]
+  func setTaskBoardHostProjectTypes(
+    request: TaskBoardHostSetProjectTypesRequest
+  ) async throws -> TaskBoardHostMachine
   func taskBoardOrchestratorStatus() async throws -> TaskBoardOrchestratorStatus
   func startTaskBoardOrchestrator() async throws -> TaskBoardOrchestratorStatus
   func stopTaskBoardOrchestrator() async throws -> TaskBoardOrchestratorStatus
@@ -162,6 +167,20 @@ extension HarnessMonitorTaskBoardClientProtocol {
     -> [TaskBoardMachineSummary]
   {
     throw HarnessMonitorAPIError.server(code: 501, message: "Task board unavailable.")
+  }
+
+  public func taskBoardHostLocal() async throws -> TaskBoardHostMachine {
+    throw HarnessMonitorAPIError.server(code: 501, message: "Task board host unavailable.")
+  }
+
+  public func taskBoardHostList() async throws -> [TaskBoardHostMachine] {
+    throw HarnessMonitorAPIError.server(code: 501, message: "Task board host unavailable.")
+  }
+
+  public func setTaskBoardHostProjectTypes(
+    request _: TaskBoardHostSetProjectTypesRequest
+  ) async throws -> TaskBoardHostMachine {
+    throw HarnessMonitorAPIError.server(code: 501, message: "Task board host unavailable.")
   }
 
   public func taskBoardOrchestratorStatus() async throws -> TaskBoardOrchestratorStatus {
