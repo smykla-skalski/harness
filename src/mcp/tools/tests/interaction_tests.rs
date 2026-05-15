@@ -3,6 +3,7 @@ use std::sync::Arc;
 use serde_json::{Value, json};
 use tempfile::TempDir;
 
+use crate::daemon::protocol::task_board_mcp_methods;
 use crate::mcp::automation::INPUT_OVERRIDE_ENV;
 use crate::mcp::registry::RegistryClient;
 use crate::mcp::tool::{Tool, ToolRegistry};
@@ -170,30 +171,30 @@ async fn drag_drop_tool_rejects_duration_over_maximum() {
 }
 
 #[test]
-fn register_all_registers_eleven_tools() {
+fn register_all_registers_monitor_and_task_board_tools() {
     let dir = TempDir::new().unwrap();
     let client = Arc::new(RegistryClient::with_socket_path(socket_path(&dir)));
     let mut registry = ToolRegistry::new();
     register_all(&mut registry, &client);
     let metadata = registry.metadata();
-    assert_eq!(metadata.len(), 11);
+    let expected_task_board = task_board_mcp_methods();
+    assert_eq!(metadata.len(), 11 + expected_task_board.len());
     let names: Vec<&str> = metadata.iter().map(|t| t.name).collect();
-    assert_eq!(
-        names,
-        vec![
-            "list_windows",
-            "list_elements",
-            "get_element",
-            "move_mouse",
-            "click",
-            "click_element",
-            "press_element",
-            "scroll",
-            "drag_drop",
-            "type_text",
-            "screenshot_window",
-        ],
-    );
+    let mut expected = vec![
+        "list_windows",
+        "list_elements",
+        "get_element",
+        "move_mouse",
+        "click",
+        "click_element",
+        "press_element",
+        "scroll",
+        "drag_drop",
+        "type_text",
+        "screenshot_window",
+    ];
+    expected.extend(expected_task_board);
+    assert_eq!(names, expected,);
 }
 
 #[test]

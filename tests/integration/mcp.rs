@@ -11,6 +11,7 @@ use std::thread;
 use std::time::{Duration, Instant};
 
 use assert_cmd::cargo::cargo_bin;
+use harness::daemon::protocol::task_board_mcp_methods;
 use serde_json::{Value, json};
 use tempfile::TempDir;
 
@@ -232,22 +233,21 @@ fn mcp_serve_initialize_lists_all_registered_tools() {
         .iter()
         .filter_map(|t| t.get("name").and_then(Value::as_str))
         .collect();
-    assert_eq!(
-        names,
-        vec![
-            "list_windows",
-            "list_elements",
-            "get_element",
-            "move_mouse",
-            "click",
-            "click_element",
-            "press_element",
-            "scroll",
-            "drag_drop",
-            "type_text",
-            "screenshot_window",
-        ],
-    );
+    let mut expected = vec![
+        "list_windows",
+        "list_elements",
+        "get_element",
+        "move_mouse",
+        "click",
+        "click_element",
+        "press_element",
+        "scroll",
+        "drag_drop",
+        "type_text",
+        "screenshot_window",
+    ];
+    expected.extend(task_board_mcp_methods());
+    assert_eq!(names, expected,);
 
     drop(reader);
     drop(stdout);

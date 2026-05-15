@@ -1,4 +1,5 @@
-//! macOS-specific MCP tool handlers that drive the Harness Monitor app.
+//! macOS-specific MCP tool handlers for Harness Monitor automation and the
+//! task-board daemon surface.
 
 use std::sync::Arc;
 
@@ -16,6 +17,7 @@ mod press_element;
 mod screenshot_window;
 mod scroll;
 mod shared;
+mod task_board;
 mod type_text;
 
 #[cfg(test)]
@@ -47,4 +49,5 @@ pub fn register_all(registry: &mut ToolRegistry, client: &Arc<RegistryClient>) {
     registry.register(Box::new(DragDropTool::new(Arc::clone(client))));
     registry.register(Box::new(TypeTextTool));
     registry.register(Box::new(ScreenshotWindowTool::new(Arc::clone(client))));
+    task_board::register_all(registry);
 }
