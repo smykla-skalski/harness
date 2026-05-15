@@ -290,13 +290,32 @@ private struct LiveScrollGeometryProbeModifier: ViewModifier {
   @ViewBuilder
   func body(content: Content) -> some View {
     if active {
-      content.onScrollGeometryChange(for: CGFloat.self) { geometry in
-        geometry.contentOffset.y
-      } action: { _, newY in
-        HarnessMonitorPerfDashboardScrollBus.recordOffset(newY)
-      }
+      content
+        .onScrollGeometryChange(for: CGFloat.self) { geometry in
+          geometry.contentOffset.y
+        } action: { _, newY in
+          HarnessMonitorPerfDashboardScrollBus.recordOffset(newY)
+        }
+        .onScrollGeometryChange(
+          for: ScrollContentDimensions.self
+        ) { geometry in
+          ScrollContentDimensions(
+            contentHeight: geometry.contentSize.height,
+            containerHeight: geometry.containerSize.height
+          )
+        } action: { _, new in
+          HarnessMonitorPerfDashboardScrollBus.recordGeometry(
+            contentHeight: new.contentHeight,
+            containerHeight: new.containerHeight
+          )
+        }
     } else {
       content
     }
   }
+}
+
+private struct ScrollContentDimensions: Equatable {
+  let contentHeight: CGFloat
+  let containerHeight: CGFloat
 }

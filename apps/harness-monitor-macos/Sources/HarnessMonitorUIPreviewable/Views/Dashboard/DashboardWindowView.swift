@@ -375,7 +375,12 @@ private struct DashboardTaskBoardRouteView: View {
     ) { _ in
       guard perfScrollHookEnabled else { return }
       HarnessMonitorPerfDashboardScrollBus.recordTrigger(edge: "bottom")
-      perfScrollPosition.scrollTo(edge: .bottom)
+      // Reassigning the whole value (not the mutating method) is the pattern
+      // PolicyCanvas uses — it writes through @State reliably even when the
+      // binding is consumed inside a wrapped view tree.
+      withAnimation(.easeOut(duration: 0.6)) {
+        perfScrollPosition = ScrollPosition(edge: .bottom)
+      }
     }
     .onReceive(
       NotificationCenter.default.publisher(
@@ -384,7 +389,9 @@ private struct DashboardTaskBoardRouteView: View {
     ) { _ in
       guard perfScrollHookEnabled else { return }
       HarnessMonitorPerfDashboardScrollBus.recordTrigger(edge: "top")
-      perfScrollPosition.scrollTo(edge: .top)
+      withAnimation(.easeOut(duration: 0.6)) {
+        perfScrollPosition = ScrollPosition(edge: .top)
+      }
     }
   }
 
