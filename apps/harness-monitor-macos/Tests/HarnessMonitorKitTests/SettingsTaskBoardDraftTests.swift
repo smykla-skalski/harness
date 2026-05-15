@@ -110,7 +110,7 @@ struct SettingsTaskBoardDraftTests {
     #expect(signing.gpgPrivateKeyPassphrase == "repo-passphrase")
   }
 
-  @Test("GitHub requested reviewers round trip through orchestrator snapshot")
+  @Test("GitHub requested reviewers round trip preserves first-seen order")
   func githubRequestedReviewersRoundTrip() {
     var draft = TaskBoardGitSettingsDraft()
     draft.requestedReviewersText = " bob \n alice \n bob "
@@ -118,7 +118,7 @@ struct SettingsTaskBoardDraftTests {
 
     let reviewers = draft.snapshot.orchestratorSettings.githubProject.requestedReviewers
 
-    #expect(reviewers.reviewers == ["alice", "bob"])
+    #expect(reviewers.reviewers == ["bob", "alice"])
     #expect(reviewers.teamReviewers == ["platform", "security"])
   }
 

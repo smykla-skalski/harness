@@ -242,14 +242,15 @@ struct TaskBoardGitSettingsDraft: Equatable {
   }
 
   private func normalizedUniqueLines(from value: String) -> [String] {
-    Array(
-      Set(
-        value
-          .split(whereSeparator: \.isNewline)
-          .compactMap { normalized(String($0)) }
-      )
-    )
-    .sorted()
+    var entries: [String] = []
+    var seen: Set<String> = []
+    for line in value.split(whereSeparator: \.isNewline) {
+      guard let trimmed = normalized(String(line)) else { continue }
+      if seen.insert(trimmed).inserted {
+        entries.append(trimmed)
+      }
+    }
+    return entries
   }
 
   private func normalized(_ value: String) -> String? {
