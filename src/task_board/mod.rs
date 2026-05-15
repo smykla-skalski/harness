@@ -24,11 +24,12 @@ pub use evaluation::{
     missing_task_record, record_from_decision, skipped_unlinked_record,
 };
 pub use external::{
-    ExternalProvider, ExternalSyncAction, ExternalSyncClient, ExternalSyncConfig,
-    ExternalSyncDirection, ExternalSyncOperation, ExternalSyncOptions, ExternalTask,
-    ExternalTaskRef, GH_TOKEN_ENV, GITHUB_REPOSITORY_ENV, GitHubSyncClient,
-    HARNESS_GITHUB_REPOSITORY_ENV, HARNESS_GITHUB_TOKEN_ENV, HARNESS_TODOIST_TOKEN_ENV,
-    TodoistSyncClient, configured_sync_clients, sync_external_tasks,
+    ExternalProvider, ExternalProviderCapabilities, ExternalSyncAction, ExternalSyncClient,
+    ExternalSyncConfig, ExternalSyncConflictPolicy, ExternalSyncDirection, ExternalSyncField,
+    ExternalSyncOperation, ExternalSyncOptions, ExternalTask, ExternalTaskRef, ExternalTaskUpdate,
+    GH_TOKEN_ENV, GITHUB_REPOSITORY_ENV, GitHubSyncClient, HARNESS_GITHUB_REPOSITORY_ENV,
+    HARNESS_GITHUB_TOKEN_ENV, HARNESS_TODOIST_TOKEN_ENV, TodoistSyncClient,
+    configured_sync_clients, sync_external_tasks,
 };
 pub use orchestrator::{
     TaskBoardGitHubProjectConfig, TaskBoardOrchestrator, TaskBoardOrchestratorDispatchInput,
@@ -73,6 +74,7 @@ pub use summary::{
     build_project_summaries, build_sync_summary,
 };
 pub use types::{
-    AgentMode, ExternalRef, ExternalRefProvider, PlanningState, TaskBoardItem, TaskBoardPriority,
-    TaskBoardStatus, TaskBoardWorkflowState, TaskBoardWorkflowStatus, TaskUsage,
+    AgentMode, ExternalRef, ExternalRefProvider, ExternalRefSyncState, PlanningState,
+    TaskBoardItem, TaskBoardPriority, TaskBoardStatus, TaskBoardWorkflowState,
+    TaskBoardWorkflowStatus, TaskUsage,
 };

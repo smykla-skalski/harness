@@ -367,6 +367,7 @@ fn sync_options(request: &TaskBoardSyncRequest) -> ExternalSyncOptions {
         status: request.status,
         provider: request.provider,
         direction: request.direction,
+        conflict_policy: request.conflict_policy,
         dry_run: request.dry_run,
     }
 }

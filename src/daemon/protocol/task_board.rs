@@ -3,8 +3,8 @@ use serde::{Deserialize, Serialize};
 use crate::task_board::planning::PlanningTransition;
 use crate::task_board::types::TaskBoardWorkflowState;
 use crate::task_board::{
-    AgentMode, DispatchExecutionSummary, ExternalProvider, ExternalRef, ExternalSyncDirection,
-    PlanningState, PolicyPipelineAuditSummary, PolicyPipelineDocument,
+    AgentMode, DispatchExecutionSummary, ExternalProvider, ExternalRef, ExternalSyncConflictPolicy,
+    ExternalSyncDirection, PlanningState, PolicyPipelineAuditSummary, PolicyPipelineDocument,
     PolicyPipelinePromoteRequest, PolicyPipelinePromoteResponse, PolicyPipelineSaveResponse,
     PolicyPipelineSimulationResult, TaskBoardAuditSummary, TaskBoardEvaluationSummary,
     TaskBoardItem, TaskBoardMachineSummary, TaskBoardPriority, TaskBoardProjectSummary,
@@ -135,6 +135,8 @@ pub struct TaskBoardSyncRequest {
     pub provider: Option<ExternalProvider>,
     #[serde(default)]
     pub direction: ExternalSyncDirection,
+    #[serde(default)]
+    pub conflict_policy: ExternalSyncConflictPolicy,
     #[serde(default = "default_sync_dry_run")]
     pub dry_run: bool,
 }
@@ -145,6 +147,7 @@ impl Default for TaskBoardSyncRequest {
             status: None,
             provider: None,
             direction: ExternalSyncDirection::default(),
+            conflict_policy: ExternalSyncConflictPolicy::default(),
             dry_run: true,
         }
     }

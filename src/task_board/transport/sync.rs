@@ -15,6 +15,7 @@ impl Execute for TaskBoardSyncArgs {
         let options = ExternalSyncOptions {
             provider: self.provider,
             direction: self.direction,
+            conflict_policy: self.conflict_policy,
             dry_run: !self.apply,
             ..ExternalSyncOptions::default()
         };

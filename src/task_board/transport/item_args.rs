@@ -138,6 +138,7 @@ impl ExternalRefArg {
             provider: self.provider,
             external_id: self.external_id.clone(),
             url: self.url.clone(),
+            sync_state: None,
         }
     }
 }

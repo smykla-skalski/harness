@@ -9,8 +9,8 @@ use crate::errors::CliError;
 use crate::task_board::github::GitHubAutomation;
 use crate::task_board::orchestrator::TaskBoardOrchestratorPreparedRun;
 use crate::task_board::{
-    ExternalProvider, ExternalSyncConfig, ExternalSyncDirection, TaskBoardOrchestrator,
-    TaskBoardOrchestratorDispatchInput, TaskBoardOrchestratorSettings,
+    ExternalProvider, ExternalSyncConfig, ExternalSyncConflictPolicy, ExternalSyncDirection,
+    TaskBoardOrchestrator, TaskBoardOrchestratorDispatchInput, TaskBoardOrchestratorSettings,
     TaskBoardOrchestratorTickPhase, TaskBoardStatus, build_audit_summary, default_board_root,
 };
 
@@ -263,6 +263,7 @@ fn sync_request(input: &TaskBoardOrchestratorDispatchInput) -> TaskBoardSyncRequ
         status: input.status,
         provider: Some(ExternalProvider::GitHub),
         direction: ExternalSyncDirection::Pull,
+        conflict_policy: ExternalSyncConflictPolicy::Report,
         dry_run: input.dry_run,
     }
 }
@@ -347,6 +348,8 @@ mod tests {
                             url: None,
                             dry_run: true,
                             applied: false,
+                            changed_fields: Vec::new(),
+                            unsupported_fields: Vec::new(),
                         }],
                     })
                 })

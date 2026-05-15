@@ -8,7 +8,9 @@ use uuid::Uuid;
 
 use crate::app::command_context::{AppContext, Execute};
 use crate::errors::{CliError, CliErrorKind};
-use crate::task_board::external::{ExternalProvider, ExternalSyncDirection};
+use crate::task_board::external::{
+    ExternalProvider, ExternalSyncConflictPolicy, ExternalSyncDirection,
+};
 use crate::task_board::store::{
     OptionalFieldPatch, TaskBoardItemPatch, TaskBoardStore, default_board_root,
 };
@@ -173,6 +175,8 @@ pub struct TaskBoardSyncArgs {
     pub provider: Option<ExternalProvider>,
     #[arg(long, value_enum, default_value = "both")]
     pub direction: ExternalSyncDirection,
+    #[arg(long, value_enum, default_value = "report")]
+    pub conflict_policy: ExternalSyncConflictPolicy,
     #[arg(long)]
     pub apply: bool,
     #[arg(long)]

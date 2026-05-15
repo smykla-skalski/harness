@@ -157,6 +157,7 @@ async fn sync_external_tasks_uses_injected_clients_without_network() {
         ExternalSyncOptions {
             provider: Some(ExternalProvider::Todoist),
             direction: ExternalSyncDirection::Both,
+            conflict_policy: ExternalSyncConflictPolicy::Report,
             dry_run: false,
             status: None,
         },
@@ -209,6 +210,7 @@ async fn sync_external_tasks_dry_run_does_not_write_board() {
         ExternalSyncOptions {
             provider: Some(ExternalProvider::Todoist),
             direction: ExternalSyncDirection::Both,
+            conflict_policy: ExternalSyncConflictPolicy::Report,
             dry_run: true,
             status: None,
         },
@@ -279,6 +281,7 @@ async fn sync_external_tasks_reconciles_existing_provider_ref() {
         ExternalSyncOptions {
             provider: Some(ExternalProvider::Todoist),
             direction: ExternalSyncDirection::Pull,
+            conflict_policy: ExternalSyncConflictPolicy::Report,
             dry_run: false,
             status: None,
         },
@@ -330,6 +333,7 @@ async fn sync_external_tasks_dry_run_reports_reconciliation_without_writing() {
         ExternalSyncOptions {
             provider: Some(ExternalProvider::Todoist),
             direction: ExternalSyncDirection::Pull,
+            conflict_policy: ExternalSyncConflictPolicy::Report,
             dry_run: true,
             status: None,
         },
@@ -391,6 +395,7 @@ async fn sync_external_tasks_imports_github_tasks_with_plan_pending_approval() {
         ExternalSyncOptions {
             provider: Some(ExternalProvider::GitHub),
             direction: ExternalSyncDirection::Pull,
+            conflict_policy: ExternalSyncConflictPolicy::Report,
             dry_run: false,
             status: None,
         },
