@@ -22,10 +22,7 @@ extension SessionWindowFlowTests {
       named: "Views/Shared/HarnessMonitorSpinner.swift"
     )
     let timelineSource = try previewableSourceFile(
-      named: "Views/Timeline/MonitorTimelineSection.swift"
-    )
-    let contentSource = try previewableSourceFile(
-      named: "Views/App/ContentSessionSurface.swift"
+      named: "Views/Timeline/SessionTimelineList.swift"
     )
     let connectionSource = try previewableSourceFile(named: "Views/App/ConnectionViews.swift")
     let inlineActionSource = try previewableSourceFile(
@@ -43,7 +40,6 @@ extension SessionWindowFlowTests {
     #expect(!spinnerSource.contains("rotationEffect"))
     #expect(timelineSource.contains("HarnessMonitorSpinner(size: 14)"))
     #expect(!timelineSource.contains("ProgressView()"))
-    #expect(contentSource.contains("HarnessMonitorSpinner(size: 16)"))
     #expect(connectionSource.contains("HarnessMonitorSpinner(size: 14)"))
     #expect(!inlineActionSource.contains(".transition(.opacity)"))
     #expect(!asyncActionSource.contains(".transition(.opacity)"))

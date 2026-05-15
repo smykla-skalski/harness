@@ -3,7 +3,7 @@ import HarnessMonitorUIPreviewable
 import SwiftUI
 
 struct WindowMenuCommands: Commands {
-  nonisolated static let mainTitle = "Open Recent Session"
+  nonisolated static let mainTitle = "Dashboard"
   nonisolated static let newTabTitle = "New Tab"
   nonisolated static let newTabShortcut: KeyEquivalent = "t"
 
@@ -26,7 +26,7 @@ struct WindowMenuCommands: Commands {
       .keyboardShortcut(Self.newTabShortcut, modifiers: .command)
 
       Button(Self.mainTitle) {
-        openWindow(id: HarnessMonitorWindowID.openRecent)
+        openWindow(id: HarnessMonitorWindowID.dashboard)
       }
       .keyboardShortcut("1", modifiers: [.command, .shift])
     }

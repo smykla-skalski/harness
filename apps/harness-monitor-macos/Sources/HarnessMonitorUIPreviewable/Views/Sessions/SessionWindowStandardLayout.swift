@@ -1,6 +1,35 @@
 import HarnessMonitorKit
 import SwiftUI
 
+struct HarnessMonitorSidebarDetailLayout<Sidebar: View, Detail: View>: View {
+  let columnVisibility: Binding<NavigationSplitViewVisibility>
+  let sidebarWidth: Double
+  private let sidebar: Sidebar
+  private let detail: Detail
+
+  init(
+    columnVisibility: Binding<NavigationSplitViewVisibility>,
+    sidebarWidth: Double,
+    @ViewBuilder sidebar: () -> Sidebar,
+    @ViewBuilder detail: () -> Detail
+  ) {
+    self.columnVisibility = columnVisibility
+    self.sidebarWidth = sidebarWidth
+    self.sidebar = sidebar()
+    self.detail = detail()
+  }
+
+  var body: some View {
+    NavigationSplitView(columnVisibility: columnVisibility) {
+      sidebar
+        .navigationSplitViewColumnWidth(min: 190, ideal: sidebarWidth, max: 360)
+    } detail: {
+      detail
+    }
+    .navigationSplitViewStyle(.prominentDetail)
+  }
+}
+
 struct SessionWindowStandardLayout<Sidebar: View, Detail: View>: View {
   let stateCache: SessionWindowStateCache
   let contentDetailBaseWidth: Double
@@ -41,13 +70,14 @@ struct SessionWindowStandardLayout<Sidebar: View, Detail: View>: View {
   }
 
   var body: some View {
-    NavigationSplitView(columnVisibility: columnVisibilityBinding) {
+    HarnessMonitorSidebarDetailLayout(
+      columnVisibility: columnVisibilityBinding,
+      sidebarWidth: sidebarWidth
+    ) {
       sidebar
-        .navigationSplitViewColumnWidth(min: 190, ideal: sidebarWidth, max: 360)
     } detail: {
       detail
     }
-    .navigationSplitViewStyle(.prominentDetail)
     .modifier(
       SessionWindowPlainTapRecorder(
         stateCache: stateCache,

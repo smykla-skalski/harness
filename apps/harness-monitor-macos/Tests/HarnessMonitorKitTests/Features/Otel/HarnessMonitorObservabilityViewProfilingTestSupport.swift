@@ -52,18 +52,14 @@ func renderLaunchDashboardProfiledViews() -> HarnessMonitorStore {
     messagesPerSecond: 7.2
   )
 
-  render(ContentView(store: store), width: 1_440, height: 1_024)
   render(
-    SidebarView(
+    DashboardWindowView(
       store: store,
-      controls: store.sessionIndex.controls,
-      projection: store.sessionIndex.projection,
-      searchResults: store.sessionIndex.searchResults,
-      sidebarUI: store.sidebarUI,
-      canPresentSearch: true
+      dashboardUI: store.contentUI.dashboard,
+      sessionCatalog: store.sessionIndex.catalog
     ),
-    width: 340,
-    height: 900
+    width: 1_440,
+    height: 1_024
   )
   render(ConnectionToolbarBadge(metrics: metrics), width: 140, height: 20)
   return store

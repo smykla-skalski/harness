@@ -53,30 +53,15 @@ struct SessionWindowOverview: View {
           metric("Open tasks", "\(snapshot.summary.metrics.openTaskCount)")
           metric("Source", snapshot.source.rawValue)
         }
-        TaskBoardOverviewView(
+        TaskBoardOverviewHost(
+          scope: .session(sessionID: snapshot.summary.sessionId),
+          store: store,
           snapshot: taskBoardSnapshot,
           taskBoardItems: linkedTaskBoardItems,
+          decisions: decisions,
           orchestratorStatus: store.contentUI.dashboard.taskBoardOrchestratorStatus,
           evaluationSummary: store.contentUI.dashboard.taskBoardEvaluationSummary,
-          decisions: decisions,
-          isActionInFlight: store.contentUI.dashboard.isBusy,
-          onOpenItem: openTaskActions,
-          onOpenTaskBoardItem: openTaskBoardItem,
-          onMoveInboxItem: moveInboxItem,
-          onMoveTaskBoardItem: moveTaskBoardItem,
-          onOpenDecision: openDecision,
-          onCreateTaskBoardItem: createTaskBoardItem,
-          onUpdateTaskBoardItem: updateTaskBoardItem,
-          onDeleteTaskBoardItem: deleteTaskBoardItem,
-          onEvaluateTaskBoard: evaluateTaskBoard,
-          onEvaluateTaskBoardItem: evaluateTaskBoardItem,
-          onBeginTaskBoardPlan: beginTaskBoardPlan,
-          onSubmitTaskBoardPlan: submitTaskBoardPlan,
-          onApproveTaskBoardPlan: approveTaskBoardPlan,
-          onRefreshTaskBoard: refreshTaskBoard,
-          onStartTaskBoardOrchestrator: startTaskBoardOrchestrator,
-          onStopTaskBoardOrchestrator: stopTaskBoardOrchestrator,
-          onRunTaskBoardOrchestratorOnce: runTaskBoardOrchestratorOnce
+          isActionInFlight: store.contentUI.dashboard.isBusy
         )
       }
       .frame(maxWidth: .infinity, alignment: .leading)

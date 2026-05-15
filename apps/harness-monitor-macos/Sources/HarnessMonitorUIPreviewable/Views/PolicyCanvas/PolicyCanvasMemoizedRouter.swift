@@ -32,14 +32,23 @@ import os
 /// In production both render bodies run on the main actor so contention is
 /// nil; the lock exists for `@unchecked Sendable` discipline.
 ///
-/// Cache eviction: clear-on-overflow. When `cache.count` would exceed
+/// Cache eviction: wipe-on-overflow. When `cache.count` would exceed
 /// `capacity` after an insertion, the entire cache is dropped. The next
 /// frame pays a single cold rebuild burst, but eviction stays O(1) instead
 /// of the O(N) Array shift that an in-place LRU would impose on the hot
-/// path. For a 1024-entry cap on a visual edge cache, the simpler policy
-/// is good enough: typical canvases never approach the cap, and the
-/// pathological case (a long drag past 1024 distinct routes) recovers in
-/// one frame.
+/// path. For a 1024-entry cap on a visual edge cache the simpler policy
+/// is good enough at *steady state*: typical canvases never approach the
+/// cap, and dragging past it once recovers on the next frame.
+///
+/// Non-steady-state corner: a long sustained drag that keeps generating
+/// distinct routes (large canvas with continuous obstacle motion) will
+/// thrash - fill, wipe, fill - and the operator sees periodic stutter.
+/// The `cache-rebuild-overflow` OSSignposter event below is the
+/// instrumentation that surfaces that case in an Instruments trace
+/// before it has to be reproduced from a bug report. Two follow-ups
+/// only matter once a real canvas hits the cap: bump capacity, or
+/// move to a real LRU. Today the bench fixture stops at 50 edges so
+/// either intervention is premature.
 final class PolicyCanvasMemoizedRouter: PolicyCanvasEdgeRouter, @unchecked Sendable {
   private struct CacheKey: Hashable {
     let mode: Mode
@@ -60,10 +69,15 @@ final class PolicyCanvasMemoizedRouter: PolicyCanvasEdgeRouter, @unchecked Senda
   let inner: any PolicyCanvasEdgeRouter
   let capacity: Int
   private let state = OSAllocatedUnfairLock(initialState: State())
+  private let signposter = OSSignposter(
+    subsystem: "io.harnessmonitor",
+    category: "policy-canvas.perf"
+  )
 
   init(inner: any PolicyCanvasEdgeRouter, capacity: Int = 1_024) {
+    precondition(capacity > 0, "PolicyCanvasMemoizedRouter capacity must be positive")
     self.inner = inner
-    self.capacity = max(16, capacity)
+    self.capacity = capacity
   }
 
   var hits: Int {
@@ -126,19 +140,48 @@ final class PolicyCanvasMemoizedRouter: PolicyCanvasEdgeRouter, @unchecked Senda
     key: CacheKey,
     compute: () -> PolicyCanvasEdgeRoute
   ) -> PolicyCanvasEdgeRoute {
-    if let cached = state.withLock({ $0.cache[key] }) {
-      state.withLock { $0.hits += 1 }
-      return cached
+    // Fast path: take the lock once, look up, increment, and exit. The
+    // compute closure cannot run under the lock (it calls back into the
+    // inner router, which on the visibility-A* path itself does
+    // non-trivial work) so a hit and a miss take different shapes:
+    // hit -> one withLock, miss -> compute outside, second withLock to
+    // record. The previous 3-call decomposition cost six atomic round
+    // trips per hit instead of the two we need.
+    if let hit = state.withLock({ state -> PolicyCanvasEdgeRoute? in
+      if let cached = state.cache[key] {
+        state.hits += 1
+        return cached
+      }
+      return nil
+    }) {
+      return hit
     }
     let computed = compute()
-    state.withLock {
-      if $0.cache[key] == nil {
-        if $0.cache.count >= self.capacity {
-          $0.cache.removeAll(keepingCapacity: true)
+    let overflowed: Bool = state.withLock { state in
+      let didOverflow: Bool
+      if state.cache[key] == nil {
+        if state.cache.count >= self.capacity {
+          state.cache.removeAll(keepingCapacity: true)
+          didOverflow = true
+        } else {
+          didOverflow = false
         }
-        $0.cache[key] = computed
+        state.cache[key] = computed
+      } else {
+        didOverflow = false
       }
-      $0.misses += 1
+      state.misses += 1
+      return didOverflow
+    }
+    if overflowed {
+      // Operator-visible signal in Instruments. Without this, the
+      // "wipe-on-overflow caused frame stutter" failure surfaces as a
+      // bug report that no log explains. The event carries the cap so
+      // future readers can correlate to the bench fixture size.
+      signposter.emitEvent(
+        "cache-rebuild-overflow",
+        "capacity=\(capacity)"
+      )
     }
     return computed
   }

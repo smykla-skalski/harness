@@ -6,7 +6,7 @@ import XCTest
 @MainActor
 final class WindowMenuCommandsTests: XCTestCase {
   func testOpenRecentSessionTitleStaysStable() {
-    XCTAssertEqual(WindowMenuCommands.mainTitle, "Open Recent Session")
+    XCTAssertEqual(WindowMenuCommands.mainTitle, "Dashboard")
   }
 
   func testNewTabCommandUsesCommandTContract() {
@@ -56,7 +56,7 @@ final class WindowMenuCommandsTests: XCTestCase {
     XCTAssertTrue(source.contains(".keyboardShortcut(\"n\", modifiers: [.command])"))
     XCTAssertTrue(source.contains("let keyWindowObserver: KeyWindowObserver"))
     XCTAssertTrue(source.contains("keyWindowObserver.snapshot.keyWindowIdentifier"))
-    XCTAssertTrue(source.contains("keyWindowIdentifier == HarnessMonitorWindowID.openRecent"))
+    XCTAssertTrue(source.contains("keyWindowIdentifier == HarnessMonitorWindowID.dashboard"))
     XCTAssertTrue(source.contains("keyWindowIdentifier?.hasPrefix(\"session-\") == true"))
     XCTAssertTrue(source.contains("windowCommandRouting.activeScope == .main"))
     XCTAssertTrue(source.contains("windowCommandRouting.activeScope == .session"))
@@ -227,8 +227,8 @@ final class WindowMenuCommandsTests: XCTestCase {
     XCTAssertTrue(commandSetSource.contains("RecentSessionsCommand(store: store)"))
     XCTAssertTrue(source.contains("Menu(Self.menuTitle)"))
     XCTAssertTrue(source.contains("openWindow.openHarnessSessionWindow"))
-    XCTAssertTrue(source.contains("HarnessMonitorWindowID.openRecent"))
-    XCTAssertTrue(source.contains("Show Open Recent Window"))
+    XCTAssertTrue(source.contains("HarnessMonitorWindowID.dashboard"))
+    XCTAssertTrue(source.contains("Show Dashboard"))
   }
 
   private func harnessSourceFile(named relativePath: String) throws -> String {

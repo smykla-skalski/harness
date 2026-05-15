@@ -1,8 +1,9 @@
 extension HarnessMonitorUITestAccessibility {
-  static let openRecentRoot = "harness.open.recent"
+  static let openRecentRoot = HarnessMonitorUITestAccessibility.dashboardWindowRoot
   static let openRecentProjectList = "harness.open.recent.projects"
-  static let openRecentOpenFolderButton = "harness.open.recent.open-folder"
+  static let openRecentOpenFolderButton = HarnessMonitorUITestAccessibility.dashboardOpenFolderButton
   static let openRecentActionState = "harness.open.recent.action-state"
+  static let openRecentNewSessionButton = HarnessMonitorUITestAccessibility.dashboardNewSessionButton
   static let sessionWindowShell = "harness.session.window"
   static let sessionWindowSidebar = "harness.session.window.sidebar"
   static let sessionWindowSidebarDeferredLoader = "harness.session.window.sidebar.loader"

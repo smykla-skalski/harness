@@ -12,7 +12,7 @@ struct HarnessMonitorMenuBarSnapshot: Equatable {
   static let statusItemWarningImageName = "HarnessMonitorMenuBarLighthouseWarning"
   static let statusItemCriticalImageName = "HarnessMonitorMenuBarLighthouseCritical"
   static let openMonitorLabel = "Open Monitor"
-  static let openWorkspaceLabel = "Open Recent Session"
+  static let openWorkspaceLabel = "Open Dashboard"
   static let openSettingsLabel = "Settings..."
   static let refreshLabel = "Refresh"
   static let checkSupervisorLabel = "Check Supervisor Now"
@@ -322,12 +322,12 @@ struct HarnessMonitorMenuBarExtraContent: View {
 
   @ViewBuilder private var windowActions: some View {
     Button(HarnessMonitorMenuBarSnapshot.openMonitorLabel) {
-      openAppWindow(id: HarnessMonitorWindowID.openRecent)
+      openAppWindow(id: HarnessMonitorWindowID.dashboard)
     }
     .accessibilityIdentifier(HarnessMonitorAccessibility.menuBarOpenMonitor)
 
     Button(HarnessMonitorMenuBarSnapshot.openWorkspaceLabel) {
-      openAppWindow(id: HarnessMonitorWindowID.openRecent)
+      openAppWindow(id: HarnessMonitorWindowID.dashboard)
     }
     .accessibilityIdentifier(HarnessMonitorAccessibility.menuBarOpenSession)
 

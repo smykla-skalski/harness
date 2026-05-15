@@ -108,10 +108,12 @@ struct Phase5ViewProfilingTests {
 
   @Test("View signposter can target invalidation logging to selected views")
   func viewSignposterCanTargetInvalidationLoggingToSelectedViews() {
-    let environment = ["HARNESS_MONITOR_LOG_VIEW_UPDATES": "ContentView, SidebarView"]
+    let environment = ["HARNESS_MONITOR_LOG_VIEW_UPDATES": "DashboardWindowView, DashboardSidebar"]
 
-    #expect(ViewBodySignposter.shouldLogChanges(for: "ContentView", environment: environment))
-    #expect(ViewBodySignposter.shouldLogChanges(for: "SidebarView", environment: environment))
+    #expect(
+      ViewBodySignposter.shouldLogChanges(for: "DashboardWindowView", environment: environment)
+    )
+    #expect(ViewBodySignposter.shouldLogChanges(for: "DashboardSidebar", environment: environment))
     #expect(
       !ViewBodySignposter.shouldLogChanges(
         for: "ToolbarAccessoryView",
@@ -124,8 +126,10 @@ struct Phase5ViewProfilingTests {
   func viewSignposterCanEnableInvalidationLoggingForAllViews() {
     let environment = ["HARNESS_MONITOR_LOG_VIEW_UPDATES": " all "]
 
-    #expect(ViewBodySignposter.shouldLogChanges(for: "ContentView", environment: environment))
-    #expect(ViewBodySignposter.shouldLogChanges(for: "SidebarView", environment: environment))
+    #expect(
+      ViewBodySignposter.shouldLogChanges(for: "DashboardWindowView", environment: environment)
+    )
+    #expect(ViewBodySignposter.shouldLogChanges(for: "DashboardSidebar", environment: environment))
   }
 
   @MainActor
@@ -150,19 +154,20 @@ struct Phase5ViewProfilingTests {
     HarnessMonitorTelemetry.shared.shutdown()
 
     try await waitForTraceExport(timeout: .seconds(3)) {
-      viewBodySpanAttributes(in: collector.traceCollector, viewName: "ContentView") != nil
-        && viewBodySpanAttributes(in: collector.traceCollector, viewName: "SidebarView") != nil
+      viewBodySpanAttributes(in: collector.traceCollector, viewName: "DashboardWindowView") != nil
+        && viewBodySpanAttributes(in: collector.traceCollector, viewName: "DashboardSidebar")
+          != nil
         && viewBodySpanAttributes(
           in: collector.traceCollector,
           viewName: "ConnectionToolbarBadge"
         ) != nil
     }
 
-    let contentAttributes = try #require(
-      viewBodySpanAttributes(in: collector.traceCollector, viewName: "ContentView")
+    let dashboardAttributes = try #require(
+      viewBodySpanAttributes(in: collector.traceCollector, viewName: "DashboardWindowView")
     )
     let sidebarAttributes = try #require(
-      viewBodySpanAttributes(in: collector.traceCollector, viewName: "SidebarView")
+      viewBodySpanAttributes(in: collector.traceCollector, viewName: "DashboardSidebar")
     )
     let badgeAttributes = try #require(
       viewBodySpanAttributes(
@@ -175,21 +180,12 @@ struct Phase5ViewProfilingTests {
       || store.sessionFilter != .all
       || store.sessionFocusFilter != .all
       || store.sessionSortOrder != .recentActivity
-    let accessoryAttributes = viewBodySpanAttributes(
-      in: collector.traceCollector,
-      viewName: "SidebarSearchControlsSection"
-    )
-
-    #expect(contentAttributes["harness.view.surface"] == "dashboard")
-    #expect(contentAttributes["harness.view.column_visibility"] == "all")
-    #expect(contentAttributes["harness.view.inspector_presented"] == "false")
-    #expect(contentAttributes["harness.view.search_presented"] == nil)
-    #expect(contentAttributes["harness.view.connection_state"] == nil)
-    #expect(contentAttributes["harness.view.status_message_count"] == nil)
-    #expect(sidebarAttributes["harness.view.session_filter"] == "all")
-    #expect(sidebarAttributes["harness.view.search_presented"] == "false")
+    #expect(dashboardAttributes["harness.view.surface"] == "dashboard")
+    #expect(dashboardAttributes["harness.view.column_visibility"] == "doubleColumn")
+    #expect(dashboardAttributes["harness.view.selected_route"] == "taskBoard")
+    #expect(sidebarAttributes["harness.view.selected_route"] == "taskBoard")
+    #expect(sidebarAttributes["harness.view.route_count"] == "2")
     #expect(hasActiveFilters == false)
-    #expect(accessoryAttributes == nil)
     #expect(
       viewBodySpanAttributes(
         in: collector.traceCollector,

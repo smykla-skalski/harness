@@ -6,7 +6,7 @@ import Testing
 
 @MainActor
 @Suite("ACP bridge banner announcements")
-struct ContentAcpBridgeBannerAnnouncementTests {
+struct AcpBridgeBannerAnnouncementTests {
   @Test("Announcement payload only exists when the banner is visible")
   func announcementPayloadRequiresVisibleBanner() throws {
     let state = AcpBridgeBannerState(
@@ -16,14 +16,14 @@ struct ContentAcpBridgeBannerAnnouncementTests {
     )
 
     #expect(
-      ContentAcpBridgeBannerAnnouncement(
+      AcpBridgeBannerAnnouncement(
         state: state,
         isVisible: false
       ) == nil
     )
 
     let announcement = try #require(
-      ContentAcpBridgeBannerAnnouncement(
+      AcpBridgeBannerAnnouncement(
         state: state,
         isVisible: true
       )
@@ -39,7 +39,7 @@ struct ContentAcpBridgeBannerAnnouncementTests {
     let firstIncidentAt = Date(timeIntervalSince1970: 100)
     let secondIncidentAt = Date(timeIntervalSince1970: 200)
     let firstAnnouncement = try #require(
-      ContentAcpBridgeBannerAnnouncement(
+      AcpBridgeBannerAnnouncement(
         state: AcpBridgeBannerState(
           firstDetectedAt: firstIncidentAt,
           retryCount: 0,
@@ -49,7 +49,7 @@ struct ContentAcpBridgeBannerAnnouncementTests {
       )
     )
     let secondAnnouncement = try #require(
-      ContentAcpBridgeBannerAnnouncement(
+      AcpBridgeBannerAnnouncement(
         state: AcpBridgeBannerState(
           firstDetectedAt: secondIncidentAt,
           retryCount: 1,
@@ -60,19 +60,19 @@ struct ContentAcpBridgeBannerAnnouncementTests {
     )
 
     #expect(
-      ContentAcpBridgeBannerAnnouncement.shouldAnnounce(
+      AcpBridgeBannerAnnouncement.shouldAnnounce(
         firstAnnouncement,
         lastAnnouncedIncidentAt: nil
       )
     )
     #expect(
-      ContentAcpBridgeBannerAnnouncement.shouldAnnounce(
+      AcpBridgeBannerAnnouncement.shouldAnnounce(
         firstAnnouncement,
         lastAnnouncedIncidentAt: firstIncidentAt
       ) == false
     )
     #expect(
-      ContentAcpBridgeBannerAnnouncement.shouldAnnounce(
+      AcpBridgeBannerAnnouncement.shouldAnnounce(
         secondAnnouncement,
         lastAnnouncedIncidentAt: firstIncidentAt
       )

@@ -10,14 +10,14 @@ struct SessionWindowUnavailableViewTests {
     let unavailableExtensionSource = try sourceFile(named: "SessionWindowView+Unavailable.swift")
 
     #expect(unavailableSource.contains("Session is no longer known to the daemon"))
-    #expect(unavailableSource.contains("Label(\"Open Recents\""))
+    #expect(unavailableSource.contains("Label(\"Open Dashboard\""))
     #expect(unavailableSource.contains("Label(\"Close Window\""))
     #expect(unavailableExtensionSource.contains("SessionWindowUnavailableView("))
     #expect(windowSource.contains("if isUnknownSession"))
     #expect(
       unavailableExtensionSource.contains("didLoadSnapshot && snapshot == nil && summary == nil"))
     #expect(
-      unavailableExtensionSource.contains("openWindow(id: HarnessMonitorWindowID.openRecent)"))
+      unavailableExtensionSource.contains("openWindow(id: HarnessMonitorWindowID.dashboard)"))
   }
 
   @Test("Session windows request native accessibility focus after opening")

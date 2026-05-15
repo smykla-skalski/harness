@@ -20,7 +20,7 @@ public struct WindowSurfaceContext: Equatable, Sendable {
 
   @MainActor
   public func openMainWindow() {
-    openWindow(HarnessMonitorWindowID.openRecent)
+    openWindow(HarnessMonitorWindowID.dashboard)
   }
 
   public static func == (lhs: Self, rhs: Self) -> Bool {

@@ -3,24 +3,16 @@ import Testing
 @testable import HarnessMonitorUIPreviewable
 
 extension HarnessMonitorUITestAccessibilityRegistryTests {
-  @Test("Open recent and session window identifiers match UI-test mirror")
-  func openRecentAndSessionWindowIdentifiersMirror() {
-    #expect(HarnessMonitorAccessibility.openRecentRoot == "harness.open.recent")
+  @Test("Dashboard and session window identifiers match UI-test mirror")
+  func dashboardAndSessionWindowIdentifiersMirror() {
+    #expect(HarnessMonitorAccessibility.dashboardWindowRoot == "harness.dashboard.window")
+    #expect(HarnessMonitorAccessibility.dashboardSidebar == "harness.dashboard.sidebar")
+    #expect(HarnessMonitorAccessibility.dashboardScrollView == "harness.dashboard.scroll")
+    #expect(HarnessMonitorAccessibility.dashboardNewSessionButton == "harness.dashboard.new-session")
+    #expect(HarnessMonitorAccessibility.dashboardOpenFolderButton == "harness.dashboard.open-folder")
     #expect(
-      HarnessMonitorAccessibility.openRecentProjectList
-        == "harness.open.recent.projects"
-    )
-    #expect(
-      HarnessMonitorAccessibility.openRecentOpenFolderButton
-        == "harness.open.recent.open-folder"
-    )
-    #expect(
-      HarnessMonitorAccessibility.openRecentActionState
-        == "harness.open.recent.action-state"
-    )
-    #expect(
-      HarnessMonitorAccessibility.openRecentSessionRow("sess alpha")
-        == "harness.open.recent.session.sess-alpha"
+      HarnessMonitorAccessibility.dashboardWindowRoute("taskBoard")
+        == "harness.dashboard.route.taskboard"
     )
     #expect(HarnessMonitorAccessibility.sessionWindowShell == "harness.session.window")
     #expect(
@@ -73,9 +65,9 @@ extension HarnessMonitorUITestAccessibilityRegistryTests {
     )
   }
 
-  @Test("Session window accessibility identifiers are attached by production views")
-  func sessionWindowAccessibilityIdentifiersAreAttachedByProductionViews() throws {
-    let openRecentView = try sourceFile(named: "OpenRecentView.swift")
+  @Test("Dashboard and session window identifiers are attached by production views")
+  func dashboardAndSessionWindowAccessibilityIdentifiersAreAttachedByProductionViews() throws {
+    let dashboardView = try sourceFile(named: "DashboardWindowView.swift")
     let rootView = try sourceFile(named: "SessionWindowRootView.swift")
     let windowView = try sourceFile(named: "SessionWindowView.swift")
     let createRuntimeView = try sourceFile(named: "SessionWindowCreateAgentRuntimePane.swift")
@@ -84,18 +76,16 @@ extension HarnessMonitorUITestAccessibilityRegistryTests {
     let inspectorView = try sourceFile(named: "SessionWindowInspector.swift")
     let toolbarView = try sourceFile(named: "SessionWindowToolbar.swift")
 
-    #expect(openRecentView.contains("HarnessMonitorAccessibility.openRecentRoot"))
-    #expect(openRecentView.contains("HarnessMonitorAccessibility.openRecentSessionRow"))
     #expect(
-      openRecentView.contains(
-        "accessibilityMarkerID: HarnessMonitorAccessibility.openRecentProjectList"
+      dashboardView.contains(
+        ".accessibilityIdentifier(HarnessMonitorAccessibility.dashboardWindowRoot)"
       )
     )
-    #expect(
-      !openRecentView.contains(
-        ".accessibilityIdentifier(HarnessMonitorAccessibility.openRecentProjectList)"
-      )
-    )
+    #expect(dashboardView.contains("HarnessMonitorAccessibility.dashboardSidebar"))
+    #expect(dashboardView.contains("HarnessMonitorAccessibility.dashboardWindowRoute(route.rawValue)"))
+    #expect(dashboardView.contains("HarnessMonitorAccessibility.dashboardScrollView"))
+    #expect(dashboardView.contains("HarnessMonitorAccessibility.dashboardNewSessionButton"))
+    #expect(dashboardView.contains("HarnessMonitorAccessibility.dashboardOpenFolderButton"))
     #expect(windowView.contains("HarnessMonitorAccessibility.sessionWindowShell"))
     #expect(
       rootView.contains(

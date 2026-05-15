@@ -140,7 +140,7 @@ struct HarnessMonitorApp: App {
   }
 
   var body: some Scene {
-    openRecentWindowScene
+    dashboardWindowScene
     sessionWindowScene
     settingsWindowScene
     menuBarExtraScene

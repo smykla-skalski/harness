@@ -3,7 +3,7 @@ import Testing
 @testable import HarnessMonitorUIPreviewable
 
 extension HarnessMonitorUITestAccessibilityRegistryTests {
-  @Test("Sleep prevention toolbar identifier stays mirrored and wired across windows")
+  @Test("Sleep prevention toolbar identifier stays mirrored and wired in the session window toolbar")
   func sleepPreventionToolbarIdentifierAndWiringMirror() throws {
     #expect(
       HarnessMonitorAccessibility.sleepPreventionButton
@@ -11,7 +11,6 @@ extension HarnessMonitorUITestAccessibilityRegistryTests {
     )
 
     let sleepToolbarButton = try sourceFile(named: "SleepPreventionToolbarButton.swift")
-    let contentToolbar = try sourceFile(named: "ContentToolbarItems.swift")
     let sessionToolbar = try sourceFile(named: "SessionWindowToolbar.swift")
 
     #expect(sleepToolbarButton.contains("HarnessMonitorAccessibility.sleepPreventionButton"))
@@ -21,7 +20,6 @@ extension HarnessMonitorUITestAccessibilityRegistryTests {
     #expect(!sleepToolbarButton.contains(".animation(.default"))
     #expect(sleepToolbarButton.contains(".harnessMCPButton("))
     #expect(sleepToolbarButton.contains("SleepPreventionToolbarSymbolLayout.size"))
-    #expect(contentToolbar.contains("SleepPreventionToolbarButton("))
     #expect(sessionToolbar.contains("SleepPreventionToolbarButton("))
   }
 }

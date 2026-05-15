@@ -18,12 +18,12 @@ struct HarnessMonitorUITestAccessibilityRegistryMoreTests {
     #expect(HarnessMonitorAccessibility.settingsMCPStatus == "harness.settings.mcp.status")
     #expect(HarnessMonitorAccessibility.mcpBanner == "harness.content.mcp.banner")
 
-    let contentToolbar = try sourceFile(named: "ContentToolbarItems.swift")
-    let contentChrome = try sourceFile(named: "ContentChromeSupport.swift")
+    let sessionToolbar = try sourceFile(named: "SessionWindowToolbar.swift")
+    let bannerStack = try sourceFile(named: "SessionBannerStack.swift")
     let settingsMCP = try sourceFile(named: "SettingsMCPSection.swift")
 
-    #expect(!contentToolbar.contains("mcpToolbarStatus"))
-    #expect(contentChrome.contains("MCPStatusBanner(status: mcpStatus)"))
+    #expect(!sessionToolbar.contains("mcpToolbarStatus"))
+    #expect(bannerStack.contains("MCPStatusBanner(status: chrome.mcpStatus)"))
     #expect(settingsMCP.contains("settingsMCPStatus"))
   }
 
@@ -108,15 +108,13 @@ struct HarnessMonitorUITestAccessibilityRegistryMoreTests {
     )
   }
 
-  @Test("Sidebar session rows stay MCP-selectable")
-  func sidebarSessionRowsStayMCPSelectable() throws {
-    let sidebarSections = try sourceFile(named: "SidebarView+Sections.swift")
-    let sidebarView = try sourceFile(named: "SidebarView.swift")
+  @Test("Dashboard route buttons stay accessibility-addressable")
+  func dashboardRouteButtonsStayAccessibilityAddressable() throws {
+    let dashboardView = try sourceFile(named: "DashboardWindowView.swift")
 
-    #expect(sidebarSections.contains("HarnessMonitorAccessibility.sessionRow(session.sessionId)"))
-    #expect(sidebarSections.contains("activateSessionRow(session.sessionId)"))
-    #expect(sidebarView.contains("store.selectSessionFromList(sessionID)"))
-    #expect(sidebarSections.contains(".harnessMCPRow("))
+    #expect(dashboardView.contains("HarnessMonitorAccessibility.dashboardSidebar"))
+    #expect(dashboardView.contains("HarnessMonitorAccessibility.dashboardWindowRoute(route.rawValue)"))
+    #expect(dashboardView.contains(".accessibilityValue(isSelected ? \"selected\" : \"not selected\")"))
   }
 
   @Test("Agents runtime identifiers match UI-test mirror")
@@ -194,12 +192,12 @@ struct HarnessMonitorUITestAccessibilityRegistryMoreTests {
   @Test("Shared toolbar and probe views publish MCP tracking")
   func sharedToolbarAndProbeViewsPublishMCPTracking() throws {
     let accessibilitySupport = try sourceFile(named: "HarnessMonitorAccessibilitySupport.swift")
-    let contentToolbar = try sourceFile(named: "ContentChromeToolbarSupport.swift")
+    let sessionToolbar = try sourceFile(named: "SessionWindowToolbar.swift")
     let sleepToolbarButton = try sourceFile(named: "SleepPreventionToolbarButton.swift")
     let sessionAttentionToolbarButton = try sourceFile(named: "SessionAttentionToolbarButton.swift")
 
     #expect(accessibilitySupport.contains(".harnessMCPText("))
-    #expect(contentToolbar.contains(".harnessMCPButton("))
+    #expect(sessionToolbar.contains(".harnessMCPButton("))
     #expect(sleepToolbarButton.contains(".harnessMCPButton("))
     #expect(sessionAttentionToolbarButton.contains(".harnessMCPButton("))
   }

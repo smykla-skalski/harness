@@ -3,7 +3,7 @@ import HarnessMonitorUIPreviewable
 import SwiftData
 import SwiftUI
 
-struct HarnessMonitorOpenRecentWindowContent: View {
+struct HarnessMonitorDashboardWindowContent: View {
   let delegate: HarnessMonitorAppDelegate
   let store: HarnessMonitorStore
   let notifications: HarnessMonitorUserNotificationController
@@ -29,10 +29,10 @@ struct HarnessMonitorOpenRecentWindowContent: View {
   }
 
   private var windowRoot: some View {
-    HarnessMonitorWindowRootView(
-      delegate: delegate,
-      store: store,
-      notifications: notifications,
+      DashboardWindowRootView(
+        delegate: delegate,
+        store: store,
+        notifications: notifications,
       keyWindowObserver: keyWindowObserver,
       acpAttentionState: acpAttentionState,
       windowCommandRouting: windowCommandRouting,

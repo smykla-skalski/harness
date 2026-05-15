@@ -206,14 +206,12 @@ struct HarnessMonitorUITestAccessibilityRegistryTests {
         == "harness.content.acp-bridge.run-doctor"
     )
 
-    let contentBridges = try sourceFile(named: "ContentView+Bridges.swift")
-    #expect(contentBridges.contains("contentAcpBridgeBanner"))
-    #expect(contentBridges.contains("contentAcpBridgeOpenLogButton"))
-    #expect(contentBridges.contains("contentAcpBridgeRunDoctorButton"))
-    let contentChrome = try sourceFile(named: "ContentChromeSupport.swift")
-    let contentView = try sourceFile(named: "ContentView.swift")
-    #expect(contentChrome.contains("ContentAcpBridgeBannerBridge("))
-    #expect(!contentView.contains("ContentAcpBridgeBannerBridge("))
+    let bridgeSource = try sourceFile(named: "Views/Shared/AcpBridgeBannerBridge.swift")
+    let bannerStackSource = try sourceFile(named: "SessionBannerStack.swift")
+    #expect(bridgeSource.contains("contentAcpBridgeBanner"))
+    #expect(bridgeSource.contains("contentAcpBridgeOpenLogButton"))
+    #expect(bridgeSource.contains("contentAcpBridgeRunDoctorButton"))
+    #expect(bannerStackSource.contains("AcpBridgeBannerBridge("))
   }
 
 }

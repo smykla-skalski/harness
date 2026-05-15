@@ -5,7 +5,7 @@ final class HarnessMonitorWindowShellTests: XCTestCase {
   func testMainRootDelegatesSharedChromeToSceneShell() throws {
     let mainRootSource = try appSourceFile(named: "HarnessMonitorAppSceneSupport.swift")
     let mainRoot = try mainRootSource.slice(
-      from: "struct HarnessMonitorWindowRootView",
+      from: "struct DashboardWindowRootView",
       to: "private enum HarnessMonitorPerfScenarioStatus"
     )
 
@@ -21,6 +21,16 @@ final class HarnessMonitorWindowShellTests: XCTestCase {
     for modifier in duplicatedChromeModifiers {
       XCTAssertFalse(mainRoot.contains(modifier), "main root still owns \(modifier)")
     }
+  }
+
+  func testPerfScenariosBypassDeferredDashboardPlaceholder() throws {
+    let source = try appSourceFile(named: "HarnessMonitorAppSceneSupport.swift")
+    let mainRoot = try source.slice(
+      from: "struct DashboardWindowRootView",
+      to: "private enum HarnessMonitorPerfScenarioStatus"
+    )
+
+    XCTAssertTrue(mainRoot.contains("&& perfScenario == nil"))
   }
 
   func testSceneShellOwnsSharedWindowChrome() throws {
