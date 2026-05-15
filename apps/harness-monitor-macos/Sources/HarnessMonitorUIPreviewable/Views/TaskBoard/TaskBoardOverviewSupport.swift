@@ -93,6 +93,49 @@ extension TaskBoardItem {
   }
 }
 
+enum TaskBoardOverviewItemSelectionAction: Equatable {
+  case openLinkedTask
+  case selectBoardItem
+  case clearBoardSelection
+}
+
+enum TaskBoardOverviewItemBehavior {
+  static func selectionAction(
+    for item: TaskBoardItem,
+    selectedTaskBoardItemID: String?,
+    inboxItems: [TaskBoardInboxItem]
+  ) -> TaskBoardOverviewItemSelectionAction {
+    if shouldOpenLinkedTask(item, inboxItems: inboxItems) {
+      return .openLinkedTask
+    }
+    return selectedTaskBoardItemID == item.id ? .clearBoardSelection : .selectBoardItem
+  }
+
+  static func runOnceRequest(for item: TaskBoardItem) -> TaskBoardOrchestratorRunOnceRequest {
+    TaskBoardOrchestratorRunOnceRequest(itemId: item.id, status: item.status)
+  }
+
+  static func evaluationRequest(for item: TaskBoardItem) -> TaskBoardEvaluateRequest {
+    TaskBoardEvaluateRequest(status: item.status, itemId: item.id)
+  }
+
+  private static func shouldOpenLinkedTask(
+    _ item: TaskBoardItem,
+    inboxItems: [TaskBoardInboxItem]
+  ) -> Bool {
+    guard item.hasLinkedSessionTask else {
+      return false
+    }
+    guard !inboxItems.isEmpty else {
+      return true
+    }
+    return inboxItems.contains { inboxItem in
+      inboxItem.session.sessionId == item.sessionId
+        && inboxItem.task.taskId == item.workItemId
+    }
+  }
+}
+
 extension TaskBoardInboxLane {
   var taskDropStatus: TaskStatus? {
     switch self {

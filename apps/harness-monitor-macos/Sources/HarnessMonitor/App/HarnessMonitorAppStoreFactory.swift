@@ -44,6 +44,7 @@ enum HarnessMonitorAppStoreFactory {
     case agentTuiSingle = "agent-tui-single"
     case agentTuiOverflow = "agent-tui-overflow"
     case taskDrop = "task-drop"
+    case taskBoardBoardOnly = "task-board-board-only"
     case offlineCached = "offline-cached"
     case overflow
     case empty
@@ -80,6 +81,8 @@ enum HarnessMonitorAppStoreFactory {
         .agentTuiOverflow
       case .taskDrop:
         .taskDropCockpit
+      case .taskBoardBoardOnly:
+        .taskBoardBoardOnly
       case .offlineCached:
         .offlineCached
       case .overflow:

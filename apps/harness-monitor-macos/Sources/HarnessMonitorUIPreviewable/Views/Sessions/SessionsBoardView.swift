@@ -193,8 +193,9 @@ struct SessionsBoardView: View {
   }
 
   private func evaluateTaskBoardItem(_ item: TaskBoardItem) {
+    let request = TaskBoardOverviewItemBehavior.evaluationRequest(for: item)
     Task { @MainActor in
-      await store.evaluateTaskBoard(status: item.status, itemID: item.id)
+      await store.evaluateTaskBoard(request: request)
     }
   }
 
