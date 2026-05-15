@@ -156,6 +156,18 @@ private enum DashboardWindowRoute: String, CaseIterable, Identifiable {
 private struct DashboardSidebar: View {
   @Binding var selectedRoute: DashboardWindowRoute
   let statusModel: SessionStatusSummaryModel
+  @Environment(\.harnessTextSizeIndex)
+  private var textSizeIndex
+
+  private var dashboardSelectionBinding: Binding<DashboardWindowRoute?> {
+    Binding(
+      get: { selectedRoute },
+      set: { newValue in
+        guard let newValue else { return }
+        selectedRoute = newValue
+      }
+    )
+  }
 
   var body: some View {
     ViewBodySignposter.trace(
@@ -166,29 +178,20 @@ private struct DashboardSidebar: View {
         "harness.view.route_count": String(DashboardWindowRoute.allCases.count),
       ]
     ) {
-      List {
+      List(selection: dashboardSelectionBinding) {
         ForEach(DashboardWindowRoute.allCases, id: \.id) { route in
           let isSelected = selectedRoute == route
-          Button {
-            selectedRoute = route
-          } label: {
-            HarnessMonitorSidebarRow(
-              title: route.title,
-              systemImage: route.systemImage
-            )
-            .background {
-              RoundedRectangle(cornerRadius: 8, style: .continuous)
-                .fill(.selection)
-                .opacity(isSelected ? 0.18 : 0)
-            }
-            .harnessSelectionOutline(isSelected: isSelected, cornerRadius: 8)
-          }
-          .buttonStyle(.borderless)
+          SessionSidebarRow(
+            title: route.title,
+            systemImage: route.systemImage
+          )
+          .tag(route)
           .accessibilityIdentifier(HarnessMonitorAccessibility.dashboardWindowRoute(route.rawValue))
           .accessibilityValue(isSelected ? "selected" : "not selected")
         }
       }
       .listStyle(.sidebar)
+      .environment(\.sidebarRowSize, harnessSidebarRowSize(for: textSizeIndex))
       .accessibilityIdentifier(HarnessMonitorAccessibility.dashboardSidebar)
       .safeAreaInset(edge: .bottom, spacing: 0) {
         SessionSidebarFooter(model: statusModel)

@@ -215,13 +215,6 @@ struct SessionSidebar: View {
   }
 
   private var sidebarRowSize: SidebarRowSize {
-    switch HarnessMonitorTextSize.normalizedIndex(textSizeIndex) {
-    case ..<HarnessMonitorTextSize.defaultIndex:
-      .small
-    case HarnessMonitorTextSize.defaultIndex..<HarnessMonitorTextSize.scales.count - 1:
-      .medium
-    default:
-      .large
-    }
+    harnessSidebarRowSize(for: textSizeIndex)
   }
 }

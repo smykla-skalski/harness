@@ -2,6 +2,7 @@ import Foundation
 import Testing
 
 @testable import HarnessMonitorKit
+@testable import HarnessMonitorUIPreviewable
 
 extension SessionWindowCreateFormMetricsTests {
   @Test("Runtime configuration support is split between catalog and pane sources")
@@ -9,6 +10,8 @@ extension SessionWindowCreateFormMetricsTests {
     let catalogSource = try sourceFile(named: "SessionWindowCreateFormCatalogs.swift")
     let formSource = try sourceFile(named: "SessionWindowCreateForm.swift")
     let runtimePaneSource = try sourceFile(named: "SessionWindowCreateAgentRuntimePane.swift")
+    let runtimePaneSupportSource = try sourceFile(
+      named: "SessionWindowCreateAgentRuntimePane+Support.swift")
     let submissionSource = try sourceFile(named: "SessionWindowCreateForm+Submission.swift")
     let sharedCatalogSource = try agentSourceFile(named: "AgentCapabilityCatalog.swift")
 
@@ -26,11 +29,12 @@ extension SessionWindowCreateFormMetricsTests {
     #expect(!formSource.contains("DisclosureGroup(\""))
     #expect(!formSource.contains("SessionWindowCreateFieldBlock("))
     #expect(!formSource.contains("Picker(\"Create\", selection: useCodex)"))
-    #expect(runtimePaneSource.contains("SessionWindowCreateProviderListRow"))
-    #expect(runtimePaneSource.contains("providerSubtitle(for: option)"))
+    #expect(runtimePaneSource.contains("SessionWindowCreateProviderButtonList("))
+    #expect(runtimePaneSupportSource.contains("SessionWindowCreateProviderListRow"))
+    #expect(runtimePaneSupportSource.contains("providerSubtitle(for: option)"))
     #expect(runtimePaneSource.contains("HarnessMonitorColumnScrollView("))
     #expect(runtimePaneSource.contains("Text(title.uppercased())"))
-    #expect(runtimePaneSource.contains("VStack(spacing: HarnessMonitorTheme.spacingXS)"))
+    #expect(runtimePaneSupportSource.contains("VStack(spacing: HarnessMonitorTheme.spacingXS)"))
     #expect(!runtimePaneSource.contains("List(selection: selectedProviderID)"))
     #expect(!runtimePaneSource.contains("SessionWindowCreateProviderGridCard"))
     #expect(!runtimePaneSource.contains("SessionWindowCreateFieldBlock(title: \"Model\")"))
@@ -122,11 +126,11 @@ extension SessionWindowCreateFormMetricsTests {
     )
   }
 
-  private func sourceFile(named relativePath: String) throws -> String {
+  func sourceFile(named relativePath: String) throws -> String {
     try previewableSourceFile(at: "Views/Sessions/\(relativePath)")
   }
 
-  private func previewableSourceFile(at relativePath: String) throws -> String {
+  func previewableSourceFile(at relativePath: String) throws -> String {
     let testsDirectory = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
     let repoRoot =
       testsDirectory
@@ -141,7 +145,7 @@ extension SessionWindowCreateFormMetricsTests {
     return try String(contentsOf: fileURL, encoding: .utf8)
   }
 
-  private func agentSourceFile(named relativePath: String) throws -> String {
+  func agentSourceFile(named relativePath: String) throws -> String {
     let testsDirectory = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
     let repoRoot =
       testsDirectory
@@ -158,7 +162,7 @@ extension SessionWindowCreateFormMetricsTests {
     return try String(contentsOf: fileURL, encoding: .utf8)
   }
 
-  private func descriptor(id: String, displayName: String) -> AcpAgentDescriptor {
+  func descriptor(id: String, displayName: String) -> AcpAgentDescriptor {
     AcpAgentDescriptor(
       id: id,
       displayName: displayName,
@@ -171,7 +175,7 @@ extension SessionWindowCreateFormMetricsTests {
     )
   }
 
-  private func readyProbeResults(for ids: [String]) -> AcpRuntimeProbeResponse {
+  func readyProbeResults(for ids: [String]) -> AcpRuntimeProbeResponse {
     AcpRuntimeProbeResponse(
       probes: ids.map { id in
         AcpRuntimeProbe(

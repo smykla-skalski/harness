@@ -114,8 +114,9 @@ struct HarnessMonitorUITestAccessibilityRegistryMoreTests {
 
     #expect(dashboardView.contains("HarnessMonitorAccessibility.dashboardSidebar"))
     #expect(dashboardView.contains("HarnessMonitorAccessibility.dashboardWindowRoute(route.rawValue)"))
-    #expect(dashboardView.contains("HarnessMonitorSidebarRow("))
-    #expect(!dashboardView.contains("SessionSidebarRow("))
+    #expect(dashboardView.contains("List(selection: dashboardSelectionBinding)"))
+    #expect(dashboardView.contains("SessionSidebarRow("))
+    #expect(dashboardView.contains("harnessSidebarRowSize(for: textSizeIndex)"))
     #expect(dashboardView.contains("SessionSidebarFooter(model: statusModel)"))
     #expect(dashboardView.contains(".accessibilityValue(isSelected ? \"selected\" : \"not selected\")"))
   }

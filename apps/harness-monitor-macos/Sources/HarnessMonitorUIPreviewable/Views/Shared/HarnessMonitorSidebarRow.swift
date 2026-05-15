@@ -84,3 +84,14 @@ public enum HarnessMonitorSidebarSeverityShape: Hashable, Sendable {
   case ring
   case alert
 }
+
+func harnessSidebarRowSize(for textSizeIndex: Int) -> SidebarRowSize {
+  switch HarnessMonitorTextSize.normalizedIndex(textSizeIndex) {
+  case ..<HarnessMonitorTextSize.defaultIndex:
+    .small
+  case HarnessMonitorTextSize.defaultIndex..<HarnessMonitorTextSize.scales.count - 1:
+    .medium
+  default:
+    .large
+  }
+}

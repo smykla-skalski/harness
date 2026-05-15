@@ -165,26 +165,11 @@ struct SessionWindowCreateAgentRuntimeContent: View {
   }
 
   private var providerRows: some View {
-    VStack(spacing: HarnessMonitorTheme.spacingXS) {
-      ForEach(activeAgentOptions) { option in
-        Button {
-          selectProvider(option)
-        } label: {
-          SessionWindowCreateProviderListRow(
-            option: option,
-            isSelected: selectedProviderID == option.id
-          )
-          .frame(maxWidth: .infinity, alignment: .leading)
-          .contentShape(Rectangle())
-        }
-        .buttonStyle(.borderless)
-        .accessibilityLabel(SessionWindowCreateProviderListRow.accessibilityLabel(for: option))
-        .accessibilityValue(
-          selectedProviderID == option.id ? "Selected" : ""
-        )
-        .accessibilityHint("Chooses \(option.title)")
-      }
-    }
+    SessionWindowCreateProviderButtonList(
+      options: activeAgentOptions,
+      selectedProviderID: selectedProviderID,
+      onSelect: selectProvider
+    )
     .padding(.horizontal, -HarnessMonitorTheme.spacingSM)
   }
 
