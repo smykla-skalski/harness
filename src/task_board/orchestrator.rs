@@ -342,7 +342,8 @@ impl TaskBoardOrchestrator {
     }
 
     fn workflow_execution_counts(&self) -> Result<Vec<TaskBoardWorkflowExecutionCount>, CliError> {
-        let items = self.board.list(None)?;
+        let machine = self.local_machine().ok();
+        let items = run_items_for_machine(&self.board, None, None, machine.as_ref())?;
         Ok(workflow_statuses()
             .into_iter()
             .filter_map(|status| {

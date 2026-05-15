@@ -192,6 +192,52 @@ fn complete_run_records_evaluation_and_trace_ids() {
 }
 
 #[test]
+fn workflow_execution_counts_filter_by_local_machine_project_types() {
+    let temp = tempdir().expect("tempdir");
+    let root = temp.path().join("board");
+    let board = TaskBoardStore::new(root.clone());
+
+    let mut mine = TaskBoardItem::new(
+        "for-me".into(),
+        "Mine".into(),
+        String::new(),
+        "2026-05-15T00:00:00Z".into(),
+    );
+    mine.status = TaskBoardStatus::InProgress;
+    mine.workflow.status = TaskBoardWorkflowStatus::Running;
+    mine.target_project_types = vec!["web".into()];
+    board.create("Mine", "", mine).expect("create mine");
+
+    let mut other = TaskBoardItem::new(
+        "for-other".into(),
+        "Theirs".into(),
+        String::new(),
+        "2026-05-15T00:00:00Z".into(),
+    );
+    other.status = TaskBoardStatus::InProgress;
+    other.workflow.status = TaskBoardWorkflowStatus::Running;
+    other.target_project_types = vec!["mobile".into()];
+    board.create("Theirs", "", other).expect("create theirs");
+
+    let orchestrator = TaskBoardOrchestrator::new(root);
+    let registry = orchestrator.machine_registry();
+    let mut local = orchestrator.local_machine().expect("ensure local");
+    local.project_types = vec!["web".into()];
+    registry.upsert(&local).expect("declare project types");
+
+    let status = orchestrator.status().expect("status");
+
+    assert_eq!(
+        status.workflow_execution_counts,
+        vec![TaskBoardWorkflowExecutionCount {
+            status: TaskBoardWorkflowStatus::Running,
+            count: 1,
+        }],
+        "mobile-only item must not contribute to the host's workflow counts"
+    );
+}
+
+#[test]
 fn dispatch_filters_items_that_target_other_machines() {
     let temp = tempdir().expect("tempdir");
     let root = temp.path().join("board");
