@@ -15,6 +15,8 @@ struct PolicyCanvasInteractiveEdge: View {
   let onTap: () -> Void
   let onDelete: () -> Void
 
+  @State private var isHovering = false
+
   var body: some View {
     ZStack {
       if isSelected {
@@ -30,7 +32,7 @@ struct PolicyCanvasInteractiveEdge: View {
         .stroke(
           color,
           style: StrokeStyle(
-            lineWidth: isSelected ? strokeWidth + 1.0 : strokeWidth,
+            lineWidth: effectiveStrokeWidth,
             lineCap: .round,
             lineJoin: .round
           )
@@ -39,13 +41,25 @@ struct PolicyCanvasInteractiveEdge: View {
         .fill(color)
     }
     .contentShape(PolicyCanvasEdgeHitShape(route: route))
+    .onHover { isHovering = $0 }
     .onTapGesture(perform: onTap)
+    .help(accessibilityLabel)
     .contextMenu {
       Button("Delete edge", role: .destructive, action: onDelete)
     }
     .accessibilityElement(children: .ignore)
     .accessibilityLabel(accessibilityLabel)
     .accessibilityAddTraits(.isButton)
+  }
+
+  private var effectiveStrokeWidth: CGFloat {
+    if isSelected {
+      return strokeWidth + 1.0
+    }
+    if isHovering {
+      return strokeWidth + 0.4
+    }
+    return strokeWidth
   }
 }
 
