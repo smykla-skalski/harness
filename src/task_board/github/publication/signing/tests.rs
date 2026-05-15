@@ -118,7 +118,7 @@ fn publication_rejects_configured_ssh_mode_before_rest_publication() {
     assert!(
         error
             .to_string()
-            .contains("requires native Git object creation and transport")
+            .contains("requires native Git object creation plus smart HTTP send-pack transport")
     );
 }
 

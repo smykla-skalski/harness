@@ -177,13 +177,13 @@ pub(super) fn validate_rest_publication_signature_support(
     }
 }
 
-fn native_git_transport_required_error(reason: NativeGitTransportReason) -> CliError {
+pub(super) fn native_git_transport_required_error(reason: NativeGitTransportReason) -> CliError {
     let reason = match reason {
         NativeGitTransportReason::ConfiguredSshSigning => "configured SSH commit signing",
         NativeGitTransportReason::ExistingSshSignature => "an existing SSH commit signature",
     };
     CliError::from(CliErrorKind::workflow_io(format!(
-        "task-board github REST commit creation accepts only PGP signatures; {reason} requires native Git object creation and transport, which this publisher does not implement"
+        "task-board github REST commit creation accepts only PGP signatures; {reason} requires native Git object creation plus smart HTTP send-pack transport, which this publisher does not implement"
     )))
 }
 

@@ -19,17 +19,18 @@ use crate::task_board::TaskBoardGitSigningMode;
 
 use super::GitHubProjectConfig;
 use signing::{
-    commit_author, local_commit_signature, publication_signature, unsigned_commit_payload,
+    commit_author, local_commit_signature, native_git_transport_required_error,
+    publication_signature, rest_commit_signature_boundary, unsigned_commit_payload,
     validate_rest_publication_signature_support,
 };
 use types::{
     BranchPublicationMode, GitHubCreateBlobRequest, GitHubCreateCommitRequest,
     GitHubCreateTreeRequest, GitHubObjectShaResponse, GitHubTreeEntryRequest,
     GitHubUpdateRefRequest, LocalBranchSnapshot, LocalTreeEntry, LocalTreeSnapshot,
+    NativeGitTransportReason, RestCommitSignatureBoundary,
 };
 
 mod signing;
-#[allow(dead_code)]
 mod ssh_signing;
 mod types;
 
@@ -91,14 +92,38 @@ pub(crate) async fn publish_branch_from_worktree_async(
     let Some(mode) = publication_mode(client, config, branch, &snapshot).await? else {
         return Ok(());
     };
-    validate_rest_publication_signature_support(
-        &snapshot.profile,
-        snapshot.existing_signature.as_ref(),
-    )?;
+    ensure_rest_publication_supported_or_prepare_native_boundary(&snapshot, &mode)?;
     let root_tree_sha = upload_tree(client, config, &snapshot.root_tree).await?;
     let commit_sha =
         create_commit(client, config, &snapshot, &root_tree_sha, mode.parent_sha()).await?;
     update_branch_ref(client, config, branch, commit_sha.as_str(), &mode).await
+}
+
+fn ensure_rest_publication_supported_or_prepare_native_boundary(
+    snapshot: &LocalBranchSnapshot,
+    mode: &BranchPublicationMode,
+) -> Result<(), CliError> {
+    match rest_commit_signature_boundary(&snapshot.profile, snapshot.existing_signature.as_ref())? {
+        RestCommitSignatureBoundary::RestSupported => validate_rest_publication_signature_support(
+            &snapshot.profile,
+            snapshot.existing_signature.as_ref(),
+        ),
+        RestCommitSignatureBoundary::NativeGitTransportRequired(
+            NativeGitTransportReason::ConfiguredSshSigning,
+        ) => {
+            let _native_commit = ssh_signing::native_ssh_commit_object(
+                snapshot,
+                snapshot.head_tree_sha.as_str(),
+                mode.parent_sha(),
+            )?;
+            Err(native_git_transport_required_error(
+                NativeGitTransportReason::ConfiguredSshSigning,
+            ))
+        }
+        RestCommitSignatureBoundary::NativeGitTransportRequired(reason) => {
+            Err(native_git_transport_required_error(reason))
+        }
+    }
 }
 
 async fn load_local_branch_snapshot(
