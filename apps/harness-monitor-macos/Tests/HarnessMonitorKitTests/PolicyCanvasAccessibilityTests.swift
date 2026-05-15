@@ -198,6 +198,38 @@ struct PolicyCanvasAccessibilityTests {
     }
   }
 
+  // Phase 3 (Norman R2 deferred): the canvas applies `.scaleEffect` so a
+  // [3,2] world dash renders at 0.75pt at zoom 0.25, aliasing to solid.
+  // The scaling rule multiplies the pattern by 1/max(0.5, zoom) at and
+  // below 1x so the on-screen dash period stays constant; at zoom >= 1
+  // the world pattern is already at design size and passes through.
+  @Test("dash pattern passes through unchanged at and above 1x zoom")
+  func dashPatternUnchangedAtUnityZoom() {
+    let error = PolicyCanvasEdgeKind.error.strokeDashPattern
+    #expect(PolicyCanvasEdgeAnimation.scaledDashPattern(error, canvasZoom: 1) == error)
+    #expect(PolicyCanvasEdgeAnimation.scaledDashPattern(error, canvasZoom: 2) == error)
+    #expect(PolicyCanvasEdgeAnimation.scaledDashPattern(error, canvasZoom: 4) == error)
+  }
+
+  @Test("dash pattern is scaled to keep on-screen size constant below 1x")
+  func dashPatternScaledBelowUnity() {
+    let error = PolicyCanvasEdgeKind.error.strokeDashPattern // [3, 2]
+    // At zoom 0.5: scale = 1/0.5 = 2 -> [6, 4]
+    let halfZoom = PolicyCanvasEdgeAnimation.scaledDashPattern(error, canvasZoom: 0.5)
+    #expect(halfZoom == [6, 4])
+    // At zoom 0.25: clamp keeps divisor at 0.5 -> scale = 2 -> [6, 4]
+    let quarterZoom = PolicyCanvasEdgeAnimation.scaledDashPattern(error, canvasZoom: 0.25)
+    #expect(quarterZoom == [6, 4])
+  }
+
+  @Test("empty dash pattern stays empty regardless of zoom")
+  func dashPatternEmptyAtAllZoom() {
+    let flow = PolicyCanvasEdgeKind.flow.strokeDashPattern // []
+    #expect(PolicyCanvasEdgeAnimation.scaledDashPattern(flow, canvasZoom: 0.25).isEmpty)
+    #expect(PolicyCanvasEdgeAnimation.scaledDashPattern(flow, canvasZoom: 1).isEmpty)
+    #expect(PolicyCanvasEdgeAnimation.scaledDashPattern(flow, canvasZoom: 4).isEmpty)
+  }
+
   // P27 focus order: visual top-to-bottom, then left-to-right within the
   // same row (10pt y-axis tolerance). The sample fixture has Source at
   // (120,140), Risk at (360,112), Context at (580,86), Review at (590,220),
