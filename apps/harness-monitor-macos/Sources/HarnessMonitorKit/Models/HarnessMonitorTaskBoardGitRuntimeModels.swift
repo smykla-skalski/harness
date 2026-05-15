@@ -142,12 +142,31 @@ public struct TaskBoardGitSigningConfig: Codable, Equatable, Sendable {
   }
 }
 
-public enum TaskBoardGitSigningMode: String, Codable, CaseIterable, Identifiable, Hashable,
-  Sendable
-{
+public enum TaskBoardGitSigningMode: TaskBoardOpenEnum, CaseIterable, Identifiable {
   case none
   case ssh
   case gpg
+  case unknown(String)
+
+  public static let allCases: [TaskBoardGitSigningMode] = [.none, .ssh, .gpg]
+
+  public var rawValue: String {
+    switch self {
+    case .none: "none"
+    case .ssh: "ssh"
+    case .gpg: "gpg"
+    case .unknown(let raw): raw
+    }
+  }
+
+  public init(rawValue: String) {
+    switch rawValue {
+    case "none": self = .none
+    case "ssh": self = .ssh
+    case "gpg": self = .gpg
+    default: self = .unknown(rawValue)
+    }
+  }
 
   public var id: String { rawValue }
 
@@ -156,6 +175,7 @@ public enum TaskBoardGitSigningMode: String, Codable, CaseIterable, Identifiable
     case .none: "None"
     case .ssh: "SSH"
     case .gpg: "GPG"
+    case .unknown(let raw): raw
     }
   }
 }

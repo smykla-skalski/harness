@@ -139,6 +139,8 @@ extension TaskBoardStatus {
       .done
     case .blocked:
       .blocked
+    case .unknown:
+      nil
     }
   }
 

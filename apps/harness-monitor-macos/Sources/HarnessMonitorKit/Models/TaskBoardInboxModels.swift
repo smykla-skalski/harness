@@ -107,6 +107,8 @@ public enum TaskBoardInboxLane: String, CaseIterable, Identifiable, Sendable {
       self = .backlog
     case .done:
       self = .done
+    case .unknown:
+      return nil
     }
   }
 }

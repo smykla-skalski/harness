@@ -1,12 +1,38 @@
 import Foundation
 
-public enum TaskBoardOrchestratorWorkflow: String, Codable, CaseIterable, Identifiable, Hashable,
-  Sendable
-{
-  case defaultTask = "default_task"
-  case prFix = "pr_fix"
-  case prReview = "pr_review"
-  case dependencyUpdate = "dependency_update"
+public enum TaskBoardOrchestratorWorkflow: TaskBoardOpenEnum, CaseIterable, Identifiable {
+  case defaultTask
+  case prFix
+  case prReview
+  case dependencyUpdate
+  case unknown(String)
+
+  public static let allCases: [TaskBoardOrchestratorWorkflow] = [
+    .defaultTask,
+    .prFix,
+    .prReview,
+    .dependencyUpdate,
+  ]
+
+  public var rawValue: String {
+    switch self {
+    case .defaultTask: "default_task"
+    case .prFix: "pr_fix"
+    case .prReview: "pr_review"
+    case .dependencyUpdate: "dependency_update"
+    case .unknown(let raw): raw
+    }
+  }
+
+  public init(rawValue: String) {
+    switch rawValue {
+    case "default_task": self = .defaultTask
+    case "pr_fix": self = .prFix
+    case "pr_review": self = .prReview
+    case "dependency_update": self = .dependencyUpdate
+    default: self = .unknown(rawValue)
+    }
+  }
 
   public var id: String { rawValue }
 }
