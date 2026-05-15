@@ -124,6 +124,8 @@ pub enum TaskBoardStatus {
     Planning,
     #[value(name = "plan_review")]
     PlanReview,
+    #[value(name = "needs_you", alias = "needs-you")]
+    NeedsYou,
     Todo,
     #[value(name = "in_progress", alias = "in-progress")]
     InProgress,

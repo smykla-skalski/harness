@@ -5,8 +5,9 @@ use std::{
 
 use uuid::Uuid;
 
-use crate::errors::CliError;
+use crate::errors::{CliError, CliErrorKind};
 use crate::infra::io::{read_json_typed, write_json_pretty};
+use crate::task_board::normalize_repository_slug;
 use crate::workspace::utc_now;
 
 use super::dispatch::DispatchExecutionSummary;
@@ -58,6 +59,7 @@ impl TaskBoardOrchestrator {
     ) -> Result<TaskBoardOrchestratorSettings, CliError> {
         let mut settings = self.settings()?;
         apply_settings_update(&mut settings, update);
+        settings.github_inbox = normalize_github_inbox(&settings.github_inbox)?;
         write_json_pretty(&self.settings_path(), &settings)?;
         Ok(settings)
     }
@@ -357,9 +359,30 @@ fn apply_settings_update(
     if let Some(github_project) = &update.github_project {
         settings.github_project.clone_from(github_project);
     }
+    if let Some(github_inbox) = &update.github_inbox {
+        settings.github_inbox.clone_from(github_inbox);
+    }
     if let Some(policy_version) = &update.policy_version {
         settings.policy_version.clone_from(policy_version);
     }
+}
+
+fn normalize_github_inbox(
+    inbox: &TaskBoardGitHubInboxConfig,
+) -> Result<TaskBoardGitHubInboxConfig, CliError> {
+    let mut repositories = Vec::with_capacity(inbox.repositories.len());
+    let mut seen = BTreeSet::new();
+    for repository in &inbox.repositories {
+        let Some(repository) = normalize_repository_slug(Some(repository.as_str())) else {
+            return Err(CliError::from(CliErrorKind::workflow_parse(format!(
+                "invalid task-board github inbox repository '{repository}', expected owner/repo"
+            ))));
+        };
+        if seen.insert(repository.clone()) {
+            repositories.push(repository);
+        }
+    }
+    Ok(TaskBoardGitHubInboxConfig { repositories })
 }
 
 fn apply_status_filter_update(

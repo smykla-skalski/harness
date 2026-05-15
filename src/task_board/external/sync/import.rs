@@ -12,11 +12,14 @@ pub(super) fn external_item_id(reference: &ExternalTaskRef) -> String {
 
 pub(super) fn imported_external_planning(task: &ExternalTask) -> Option<PlanningState> {
     match task.reference.provider {
-        ExternalProvider::GitHub => Some(PlanningState {
-            summary: Some(github_import_summary(task)),
-            approved_by: None,
-            approved_at: None,
-        }),
+        ExternalProvider::GitHub if task.status != crate::task_board::TaskBoardStatus::NeedsYou => {
+            Some(PlanningState {
+                summary: Some(github_import_summary(task)),
+                approved_by: None,
+                approved_at: None,
+            })
+        }
+        ExternalProvider::GitHub => None,
         ExternalProvider::Todoist => None,
     }
 }

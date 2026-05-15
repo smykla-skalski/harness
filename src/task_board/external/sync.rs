@@ -166,32 +166,32 @@ async fn pull_provider_tasks(
             continue;
         }
         if options.dry_run {
-            operations.push(operation(
-                client.provider(),
-                ExternalSyncAction::Pull,
-                Some(external_item_id(&task.reference)),
-                task.reference.clone(),
-                true,
-                false,
-                pull_create_fields(&task),
-                Vec::new(),
-            ));
+            operations.push(operation(OperationDraft {
+                provider: client.provider(),
+                action: ExternalSyncAction::Pull,
+                board_item_id: Some(external_item_id(&task.reference)),
+                reference: task.reference.clone(),
+                dry_run: true,
+                applied: false,
+                changed_fields: pull_create_fields(&task),
+                unsupported_fields: Vec::new(),
+            }));
             continue;
         }
         let item = create_item_from_external(&task);
         let title = item.title.clone();
         let body = item.body.clone();
         let item = board.create(&title, &body, item)?;
-        operations.push(operation(
-            client.provider(),
-            ExternalSyncAction::Pull,
-            Some(item.id),
-            task.reference.clone(),
-            false,
-            true,
-            pull_create_fields(&task),
-            Vec::new(),
-        ));
+        operations.push(operation(OperationDraft {
+            provider: client.provider(),
+            action: ExternalSyncAction::Pull,
+            board_item_id: Some(item.id),
+            reference: task.reference.clone(),
+            dry_run: false,
+            applied: true,
+            changed_fields: pull_create_fields(&task),
+            unsupported_fields: Vec::new(),
+        }));
     }
     Ok(())
 }
@@ -224,16 +224,16 @@ async fn create_remote_item(
     operations: &mut Vec<ExternalSyncOperation>,
 ) -> Result<(), CliError> {
     if options.dry_run {
-        operations.push(operation(
-            client.provider(),
-            ExternalSyncAction::Push,
-            Some(item.id.clone()),
-            ExternalTaskRef::new(client.provider(), ""),
-            true,
-            false,
-            push_create_fields(item),
-            Vec::new(),
-        ));
+        operations.push(operation(OperationDraft {
+            provider: client.provider(),
+            action: ExternalSyncAction::Push,
+            board_item_id: Some(item.id.clone()),
+            reference: ExternalTaskRef::new(client.provider(), ""),
+            dry_run: true,
+            applied: false,
+            changed_fields: push_create_fields(item),
+            unsupported_fields: Vec::new(),
+        }));
         return Ok(());
     }
     let reference = client.push_task(item).await?;
@@ -246,16 +246,16 @@ async fn create_remote_item(
             ..TaskBoardItemPatch::default()
         },
     )?;
-    operations.push(operation(
-        client.provider(),
-        ExternalSyncAction::Push,
-        Some(item.id.clone()),
+    operations.push(operation(OperationDraft {
+        provider: client.provider(),
+        action: ExternalSyncAction::Push,
+        board_item_id: Some(item.id.clone()),
         reference,
-        false,
-        true,
-        push_create_fields(item),
-        Vec::new(),
-    ));
+        dry_run: false,
+        applied: true,
+        changed_fields: push_create_fields(item),
+        unsupported_fields: Vec::new(),
+    }));
     Ok(())
 }
 
@@ -274,23 +274,23 @@ async fn update_linked_remote(
     }
     let (supported, unsupported) = split_supported_fields(&changed, &capabilities);
     let can_apply = !supported.is_empty() && !options.dry_run;
-    operations.push(operation(
-        client.provider(),
-        ExternalSyncAction::Push,
-        Some(item.id.clone()),
-        reference.clone(),
-        options.dry_run,
-        can_apply,
-        supported.clone(),
-        unsupported,
-    ));
+    operations.push(operation(OperationDraft {
+        provider: client.provider(),
+        action: ExternalSyncAction::Push,
+        board_item_id: Some(item.id.clone()),
+        reference: reference.clone(),
+        dry_run: options.dry_run,
+        applied: can_apply,
+        changed_fields: supported.clone(),
+        unsupported_fields: unsupported,
+    }));
     if options.dry_run || supported.is_empty() {
         return Ok(());
     }
     let updated_ref = client
         .update_task(item, &reference, ExternalTaskUpdate::new(supported))
         .await?;
-    let refs = replace_synced_ref(item, &reference, updated_ref);
+    let refs = replace_synced_ref(item, &reference, &updated_ref);
     board.update(
         &item.id,
         TaskBoardItemPatch {
@@ -345,16 +345,16 @@ fn reconcile_existing_item(
         && !conflict_fields.is_empty()
         && matches!(options.conflict_policy, ExternalSyncConflictPolicy::Report)
     {
-        operations.push(operation(
+        operations.push(operation(OperationDraft {
             provider,
-            ExternalSyncAction::Conflict,
-            Some(item.id.clone()),
-            task.reference,
-            options.dry_run,
-            false,
-            conflict_fields,
-            Vec::new(),
-        ));
+            action: ExternalSyncAction::Conflict,
+            board_item_id: Some(item.id.clone()),
+            reference: task.reference,
+            dry_run: options.dry_run,
+            applied: false,
+            changed_fields: conflict_fields,
+            unsupported_fields: Vec::new(),
+        }));
         return Ok(());
     }
     if matches!(
@@ -368,16 +368,16 @@ fn reconcile_existing_item(
     if !has_reconciliation_change(&patch) {
         return Ok(());
     }
-    operations.push(operation(
+    operations.push(operation(OperationDraft {
         provider,
-        ExternalSyncAction::Pull,
-        Some(item.id.clone()),
-        task.reference,
-        options.dry_run,
-        !options.dry_run,
-        changed_fields(&patch),
-        Vec::new(),
-    ));
+        action: ExternalSyncAction::Pull,
+        board_item_id: Some(item.id.clone()),
+        reference: task.reference,
+        dry_run: options.dry_run,
+        applied: !options.dry_run,
+        changed_fields: changed_fields(&patch),
+        unsupported_fields: Vec::new(),
+    }));
     if options.dry_run {
         return Ok(());
     }
@@ -402,7 +402,7 @@ fn reconciliation_patch(item: &TaskBoardItem, task: &ExternalTask) -> TaskBoardI
             .clone()
             .map_or(OptionalFieldPatch::Clear, OptionalFieldPatch::Set);
     }
-    if let Some(refs) = reconciled_external_refs(item, &task) {
+    if let Some(refs) = reconciled_external_refs(item, task) {
         patch.external_refs = Some(refs);
     }
     patch
@@ -449,7 +449,7 @@ fn provider_ref(item: &TaskBoardItem, provider: ExternalProvider) -> Option<Exte
         .map(ExternalTaskRef::from)
 }
 
-fn operation(
+struct OperationDraft {
     provider: ExternalProvider,
     action: ExternalSyncAction,
     board_item_id: Option<String>,
@@ -458,17 +458,20 @@ fn operation(
     applied: bool,
     changed_fields: Vec<ExternalSyncField>,
     unsupported_fields: Vec<ExternalSyncField>,
-) -> ExternalSyncOperation {
+}
+
+fn operation(draft: OperationDraft) -> ExternalSyncOperation {
     ExternalSyncOperation {
-        provider,
-        action,
-        board_item_id,
-        external_id: (!reference.external_id.is_empty()).then_some(reference.external_id),
-        url: reference.url,
-        dry_run,
-        applied,
-        changed_fields,
-        unsupported_fields,
+        provider: draft.provider,
+        action: draft.action,
+        board_item_id: draft.board_item_id,
+        external_id: (!draft.reference.external_id.is_empty())
+            .then_some(draft.reference.external_id),
+        url: draft.reference.url,
+        dry_run: draft.dry_run,
+        applied: draft.applied,
+        changed_fields: draft.changed_fields,
+        unsupported_fields: draft.unsupported_fields,
     }
 }
 

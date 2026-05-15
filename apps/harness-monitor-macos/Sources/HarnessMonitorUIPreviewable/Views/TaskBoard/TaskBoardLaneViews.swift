@@ -368,7 +368,7 @@ func taskBoardStatusColor(for status: TaskBoardStatus) -> Color {
   switch status {
   case .blocked:
     HarnessMonitorTheme.danger
-  case .planReview, .inReview:
+  case .planReview, .needsYou, .inReview:
     HarnessMonitorTheme.caution
   case .planning, .inProgress:
     HarnessMonitorTheme.warmAccent

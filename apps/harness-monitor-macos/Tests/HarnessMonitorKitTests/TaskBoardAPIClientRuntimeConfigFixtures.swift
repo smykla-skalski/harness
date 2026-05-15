@@ -13,7 +13,7 @@ func taskBoardRuntimeConfigUpdateRequest() -> TaskBoardGitRuntimeConfig {
     ),
     repositoryOverrides: [
       TaskBoardGitRepositoryOverride(
-        repository: "kong/harness",
+        repository: "example/harness",
         profile: TaskBoardGitRuntimeProfile(
           authorName: "Repo Bot",
           authorEmail: "repo@example.com",

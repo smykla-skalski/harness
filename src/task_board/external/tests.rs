@@ -54,6 +54,7 @@ fn config_debug_redacts_tokens() {
     let config = ExternalSyncConfig {
         github_token: Some("secret".to_owned()),
         github_repository: Some("owner/repo".to_owned()),
+        github_inbox_repositories: Vec::new(),
         todoist_token: None,
     };
 
@@ -372,12 +373,39 @@ fn github_repository_fallback_is_used_only_when_env_is_missing() {
     let from_env = ExternalSyncConfig {
         github_token: None,
         github_repository: Some("env/repo".to_string()),
+        github_inbox_repositories: Vec::new(),
         todoist_token: None,
     }
     .with_github_repository_fallback(Some("owner/repo"));
 
     assert_eq!(from_fallback.github_repository(), Some("owner/repo"));
     assert_eq!(from_env.github_repository(), Some("env/repo"));
+}
+
+#[tokio::test]
+async fn github_inbox_client_is_pull_only() {
+    let repositories = vec!["owner/repo".to_string()];
+    let config = ExternalSyncConfig::default()
+        .with_github_token_override(Some("token"))
+        .with_github_inbox_repositories_override(&repositories);
+
+    let client = GitHubInboxSyncClient::from_config(&config).expect("build inbox client");
+
+    assert!(client.allows_pull());
+    assert!(!client.allows_push());
+}
+
+#[tokio::test]
+async fn github_sync_client_can_disable_pull_for_inbox_overlap() {
+    let config = ExternalSyncConfig::default()
+        .with_github_token_override(Some("token"))
+        .with_github_repository_override(Some("owner/repo"));
+
+    let client =
+        GitHubSyncClient::from_config_with_pull(&config, false).expect("build github client");
+
+    assert!(!client.allows_pull());
+    assert!(client.allows_push());
 }
 
 #[tokio::test]
@@ -421,6 +449,125 @@ async fn sync_external_tasks_imports_github_tasks_with_plan_pending_approval() {
     assert!(!build_dispatch_plan(&item).is_ready());
 }
 
+#[tokio::test]
+async fn sync_external_tasks_imports_github_needs_you_without_planning() {
+    let temp = tempdir().expect("tempdir");
+    let board = TaskBoardStore::new(temp.path().join("board"));
+    let clients: Vec<Box<dyn ExternalSyncClient>> = vec![Box::new(FakeSyncClient {
+        provider: ExternalProvider::GitHub,
+        tasks: vec![github_external_task_with_status(
+            "owner/repo#19",
+            "Review requested",
+            "owner/repo",
+            TaskBoardStatus::NeedsYou,
+        )],
+        pushed: Mutex::new(Vec::new()),
+    })];
+
+    sync_external_tasks(
+        &board,
+        ExternalSyncOptions {
+            provider: Some(ExternalProvider::GitHub),
+            direction: ExternalSyncDirection::Pull,
+            conflict_policy: ExternalSyncConflictPolicy::Report,
+            dry_run: false,
+            status: None,
+        },
+        &clients,
+    )
+    .await
+    .expect("sync external tasks");
+
+    let item = board
+        .get("github-owner-repo-19")
+        .expect("load imported github inbox task");
+    assert_eq!(item.status, TaskBoardStatus::NeedsYou);
+    assert_eq!(item.project_id.as_deref(), Some("owner/repo"));
+    assert!(item.planning.summary.is_none());
+    assert!(item.external_refs.iter().any(|reference| {
+        reference.provider == ExternalRefProvider::GitHub
+            && reference.external_id == "owner/repo#19"
+    }));
+    assert!(!build_dispatch_plan(&item).is_ready());
+}
+
+#[tokio::test]
+async fn sync_external_tasks_reconciles_legacy_github_refs_by_project_scope() {
+    let temp = tempdir().expect("tempdir");
+    let board = TaskBoardStore::new(temp.path().join("board"));
+
+    let mut primary = TaskBoardItem::new(
+        "legacy-owner-repo".to_owned(),
+        "Old title".to_owned(),
+        "Body".to_owned(),
+        "2026-05-14T00:00:00Z".to_owned(),
+    );
+    primary.status = TaskBoardStatus::Todo;
+    primary.project_id = Some("owner/repo".to_owned());
+    primary.external_refs = vec![ExternalTaskRef::new(ExternalProvider::GitHub, "7").into_core_ref()];
+    board
+        .create("Old title", "Body", primary)
+        .expect("create primary task");
+
+    let mut secondary = TaskBoardItem::new(
+        "legacy-other-repo".to_owned(),
+        "Other title".to_owned(),
+        "Body".to_owned(),
+        "2026-05-14T00:00:00Z".to_owned(),
+    );
+    secondary.status = TaskBoardStatus::Todo;
+    secondary.project_id = Some("other/repo".to_owned());
+    secondary.external_refs =
+        vec![ExternalTaskRef::new(ExternalProvider::GitHub, "7").into_core_ref()];
+    board
+        .create("Other title", "Body", secondary)
+        .expect("create secondary task");
+
+    let clients: Vec<Box<dyn ExternalSyncClient>> = vec![Box::new(FakeSyncClient {
+        provider: ExternalProvider::GitHub,
+        tasks: vec![github_external_task(
+            "owner/repo#7",
+            "Updated title",
+            "owner/repo",
+        )],
+        pushed: Mutex::new(Vec::new()),
+    })];
+
+    let operations = sync_external_tasks(
+        &board,
+        ExternalSyncOptions {
+            provider: Some(ExternalProvider::GitHub),
+            direction: ExternalSyncDirection::Pull,
+            conflict_policy: ExternalSyncConflictPolicy::Report,
+            dry_run: false,
+            status: None,
+        },
+        &clients,
+    )
+    .await
+    .expect("sync external tasks");
+
+    assert_eq!(operations.len(), 1);
+    assert_eq!(board.list(None).expect("list items").len(), 2);
+
+    let updated = board
+        .get("legacy-owner-repo")
+        .expect("load reconciled legacy task");
+    assert_eq!(updated.title, "Updated title");
+    assert!(updated.external_refs.iter().any(|reference| {
+        reference.provider == ExternalRefProvider::GitHub
+            && reference.external_id == "owner/repo#7"
+    }));
+
+    let untouched = board
+        .get("legacy-other-repo")
+        .expect("load other repo task");
+    assert_eq!(untouched.title, "Other title");
+    assert!(untouched.external_refs.iter().any(|reference| {
+        reference.provider == ExternalRefProvider::GitHub && reference.external_id == "7"
+    }));
+}
+
 struct FakeSyncClient {
     provider: ExternalProvider,
     tasks: Vec<ExternalTask>,
@@ -458,12 +605,21 @@ fn external_task(external_id: &str, title: &str) -> ExternalTask {
 }
 
 fn github_external_task(external_id: &str, title: &str, project_id: &str) -> ExternalTask {
+    github_external_task_with_status(external_id, title, project_id, TaskBoardStatus::Todo)
+}
+
+fn github_external_task_with_status(
+    external_id: &str,
+    title: &str,
+    project_id: &str,
+    status: TaskBoardStatus,
+) -> ExternalTask {
     ExternalTask {
         reference: ExternalTaskRef::new(ExternalProvider::GitHub, external_id)
             .with_url(format!("https://example.test/issues/{external_id}")),
         title: title.to_owned(),
         body: "Investigate the linked issue.".to_owned(),
-        status: TaskBoardStatus::Todo,
+        status,
         project_id: Some(project_id.to_owned()),
         updated_at: Some("2026-05-14T03:00:00Z".to_string()),
     }

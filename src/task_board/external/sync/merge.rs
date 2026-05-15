@@ -3,8 +3,8 @@ use crate::task_board::types::{ExternalRef, ExternalRefSyncState, TaskBoardItem}
 use crate::workspace::utc_now;
 
 use crate::task_board::external::{
-    ExternalProvider, ExternalProviderCapabilities, ExternalSyncField, ExternalSyncOperation,
-    ExternalTask, ExternalTaskRef,
+    ExternalProvider, ExternalProviderCapabilities, ExternalSyncAction, ExternalSyncField,
+    ExternalSyncOperation, ExternalTask, ExternalTaskRef,
 };
 
 pub(super) fn has_reported_conflict(
@@ -14,10 +14,7 @@ pub(super) fn has_reported_conflict(
 ) -> bool {
     operations.iter().any(|operation| {
         operation.provider == provider
-            && matches!(
-                operation.action,
-                crate::task_board::external::ExternalSyncAction::Conflict
-            )
+            && matches!(operation.action, ExternalSyncAction::Conflict)
             && operation.board_item_id.as_deref() == Some(item_id)
     })
 }
@@ -30,10 +27,11 @@ pub(super) fn pull_conflict_fields(
         return Vec::new();
     };
     match &reference.sync_state {
-        Some(state) => intersect_fields(
-            local_fields_changed_since_sync(item, state),
-            remote_fields_changed_since_sync(task, state),
-        ),
+        Some(state) => {
+            let local = local_fields_changed_since_sync(item, state);
+            let remote = remote_fields_changed_since_sync(task, state);
+            intersect_fields(local, &remote)
+        }
         None => item_remote_diff_fields(item, task),
     }
 }
@@ -64,7 +62,7 @@ pub(super) fn split_supported_fields(
 pub(super) fn replace_synced_ref(
     item: &TaskBoardItem,
     current: &ExternalTaskRef,
-    updated: ExternalTaskRef,
+    updated: &ExternalTaskRef,
 ) -> Vec<ExternalRef> {
     let provider = current.provider.into();
     item.external_refs
@@ -233,7 +231,7 @@ fn remote_fields_changed_since_sync(
 
 fn intersect_fields(
     left: Vec<ExternalSyncField>,
-    right: Vec<ExternalSyncField>,
+    right: &[ExternalSyncField],
 ) -> Vec<ExternalSyncField> {
     left.into_iter()
         .filter(|field| right.contains(field))

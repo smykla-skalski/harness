@@ -30,6 +30,7 @@ use types::{
     NativeGitTransportReason, RestCommitSignatureBoundary,
 };
 
+mod git_ssh_publish;
 mod signing;
 mod ssh_signing;
 mod types;
@@ -87,16 +88,39 @@ pub(crate) async fn publish_branch_from_worktree_async(
     config: &GitHubProjectConfig,
     worktree: &Path,
     branch: &str,
+    github_token: &str,
 ) -> Result<(), CliError> {
     let snapshot = load_local_branch_snapshot(worktree, config.repository_slug()).await?;
     let Some(mode) = publication_mode(client, config, branch, &snapshot).await? else {
         return Ok(());
     };
+    if should_publish_configured_ssh_with_git(&snapshot)? {
+        return git_ssh_publish::publish_configured_ssh_branch(
+            config,
+            worktree,
+            branch,
+            github_token,
+            &snapshot,
+            &mode,
+        )
+        .await;
+    }
     ensure_rest_publication_supported_or_prepare_native_boundary(&snapshot, &mode)?;
     let root_tree_sha = upload_tree(client, config, &snapshot.root_tree).await?;
     let commit_sha =
         create_commit(client, config, &snapshot, &root_tree_sha, mode.parent_sha()).await?;
     update_branch_ref(client, config, branch, commit_sha.as_str(), &mode).await
+}
+
+fn should_publish_configured_ssh_with_git(
+    snapshot: &LocalBranchSnapshot,
+) -> Result<bool, CliError> {
+    match rest_commit_signature_boundary(&snapshot.profile, snapshot.existing_signature.as_ref())? {
+        RestCommitSignatureBoundary::NativeGitTransportRequired(
+            NativeGitTransportReason::ConfiguredSshSigning,
+        ) => Ok(true),
+        _ => Ok(false),
+    }
 }
 
 fn ensure_rest_publication_supported_or_prepare_native_boundary(

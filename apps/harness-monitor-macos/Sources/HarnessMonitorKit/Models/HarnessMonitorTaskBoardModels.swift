@@ -4,6 +4,7 @@ public enum TaskBoardStatus: String, Codable, CaseIterable, Identifiable, Hashab
   case new
   case planning
   case planReview = "plan_review"
+  case needsYou = "needs_you"
   case todo
   case inProgress = "in_progress"
   case inReview = "in_review"
@@ -20,6 +21,8 @@ public enum TaskBoardStatus: String, Codable, CaseIterable, Identifiable, Hashab
       "Planning"
     case .planReview:
       "Plan Review"
+    case .needsYou:
+      "Needs You"
     case .todo:
       "Ready"
     case .inProgress:

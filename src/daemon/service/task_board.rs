@@ -338,15 +338,16 @@ fn run_task_board_sync_blocking(
 }
 
 fn active_external_sync_config() -> ExternalSyncConfig {
-    let repository = TaskBoardOrchestrator::new(default_board_root())
+    let (repository, inbox_repositories) = TaskBoardOrchestrator::new(default_board_root())
         .settings()
         .ok()
-        .and_then(|settings| {
+        .map_or((None, Vec::new()), |settings| {
             let project = settings.github_project;
-            (!project.owner.trim().is_empty() && !project.repo.trim().is_empty())
-                .then(|| project.repository_slug())
+            let repository = (!project.owner.trim().is_empty() && !project.repo.trim().is_empty())
+                .then(|| project.repository_slug());
+            (repository, settings.github_inbox.repositories)
         });
-    external_sync_config_for_repository(repository.as_deref())
+    external_sync_config_for_repository(repository.as_deref(), &inbox_repositories)
 }
 
 pub(crate) fn run_task_board_sync_blocking_with_config(

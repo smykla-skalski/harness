@@ -93,7 +93,7 @@ public enum TaskBoardInboxLane: String, CaseIterable, Identifiable, Sendable {
 
   public init?(status: TaskBoardStatus) {
     switch status {
-    case .planReview:
+    case .planReview, .needsYou:
       self = .needsYou
     case .blocked:
       self = .blocked

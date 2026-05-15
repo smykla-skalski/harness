@@ -2,6 +2,7 @@ use std::fmt;
 use std::sync::OnceLock;
 
 use async_trait::async_trait;
+use octocrab::models::IssueState;
 use octocrab::params::State;
 use rustls::crypto::ring::default_provider;
 
@@ -228,17 +229,17 @@ fn parse_issue_number(value: &str) -> Result<u64, CliError> {
     })
 }
 
-fn github_issue_status(state: &octocrab::models::IssueState) -> TaskBoardStatus {
+fn github_issue_status(state: &IssueState) -> TaskBoardStatus {
     match state {
-        octocrab::models::IssueState::Closed => TaskBoardStatus::Done,
+        IssueState::Closed => TaskBoardStatus::Done,
         _ => TaskBoardStatus::Todo,
     }
 }
 
-fn github_issue_state(status: TaskBoardStatus) -> octocrab::models::IssueState {
+fn github_issue_state(status: TaskBoardStatus) -> IssueState {
     match status {
-        TaskBoardStatus::Done => octocrab::models::IssueState::Closed,
-        _ => octocrab::models::IssueState::Open,
+        TaskBoardStatus::Done => IssueState::Closed,
+        _ => IssueState::Open,
     }
 }
 

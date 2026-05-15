@@ -17,6 +17,7 @@ public struct TaskBoardOrchestratorSettings: Codable, Equatable, Sendable {
   public let dispatchStatusFilter: TaskBoardStatus?
   public let projectDir: String?
   public let githubProject: TaskBoardGitHubProjectConfig
+  public let githubInbox: TaskBoardGitHubInboxConfig
   public let policyVersion: String
 
   public init(
@@ -25,6 +26,7 @@ public struct TaskBoardOrchestratorSettings: Codable, Equatable, Sendable {
     dispatchStatusFilter: TaskBoardStatus? = nil,
     projectDir: String? = nil,
     githubProject: TaskBoardGitHubProjectConfig = TaskBoardGitHubProjectConfig(),
+    githubInbox: TaskBoardGitHubInboxConfig = TaskBoardGitHubInboxConfig(),
     policyVersion: String
   ) {
     self.enabledWorkflows = enabledWorkflows
@@ -32,7 +34,32 @@ public struct TaskBoardOrchestratorSettings: Codable, Equatable, Sendable {
     self.dispatchStatusFilter = dispatchStatusFilter
     self.projectDir = projectDir
     self.githubProject = githubProject
+    self.githubInbox = githubInbox
     self.policyVersion = policyVersion
+  }
+
+  enum CodingKeys: String, CodingKey {
+    case enabledWorkflows
+    case dryRunDefault
+    case dispatchStatusFilter
+    case projectDir
+    case githubProject
+    case githubInbox
+    case policyVersion
+  }
+
+  public init(from decoder: Decoder) throws {
+    let container = try decoder.container(keyedBy: CodingKeys.self)
+    self.init(
+      enabledWorkflows: try container.decode([TaskBoardOrchestratorWorkflow].self, forKey: .enabledWorkflows),
+      dryRunDefault: try container.decode(Bool.self, forKey: .dryRunDefault),
+      dispatchStatusFilter: try container.decodeIfPresent(TaskBoardStatus.self, forKey: .dispatchStatusFilter),
+      projectDir: try container.decodeIfPresent(String.self, forKey: .projectDir),
+      githubProject: try container.decode(TaskBoardGitHubProjectConfig.self, forKey: .githubProject),
+      githubInbox: try container.decodeIfPresent(TaskBoardGitHubInboxConfig.self, forKey: .githubInbox)
+        ?? TaskBoardGitHubInboxConfig(),
+      policyVersion: try container.decode(String.self, forKey: .policyVersion)
+    )
   }
 }
 
@@ -44,6 +71,7 @@ public struct TaskBoardOrchestratorSettingsUpdateRequest: Codable, Equatable, Se
   public let projectDir: String?
   public let clearProjectDir: Bool
   public let githubProject: TaskBoardGitHubProjectConfig?
+  public let githubInbox: TaskBoardGitHubInboxConfig?
   public let policyVersion: String?
 
   public init(
@@ -54,6 +82,7 @@ public struct TaskBoardOrchestratorSettingsUpdateRequest: Codable, Equatable, Se
     projectDir: String? = nil,
     clearProjectDir: Bool = false,
     githubProject: TaskBoardGitHubProjectConfig? = nil,
+    githubInbox: TaskBoardGitHubInboxConfig? = nil,
     policyVersion: String? = nil
   ) {
     self.enabledWorkflows = enabledWorkflows
@@ -63,6 +92,7 @@ public struct TaskBoardOrchestratorSettingsUpdateRequest: Codable, Equatable, Se
     self.projectDir = projectDir
     self.clearProjectDir = clearProjectDir
     self.githubProject = githubProject
+    self.githubInbox = githubInbox
     self.policyVersion = policyVersion
   }
 }

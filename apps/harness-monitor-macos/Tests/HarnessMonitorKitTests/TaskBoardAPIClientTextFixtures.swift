@@ -20,7 +20,7 @@ let sampleTaskBoardItemJSONString =
       "branch": "c/board-1",
       "worktree": "/tmp/harness",
       "pr_number": 42,
-      "pr_url": "https://github.com/kong/harness/pull/42",
+      "pr_url": "https://github.com/example/harness/pull/42",
       "last_error": null,
       "policy_trace_ids": ["trace-1"]
     },
@@ -70,7 +70,7 @@ let sampleOrchestratorSettingsText =
     "dispatch_status_filter": "todo",
     "project_dir": "/tmp/harness",
     "github_project": {
-      "owner": "kong",
+      "owner": "example",
       "repo": "harness",
       "checkout_path": "/tmp/harness",
       "default_branch": "main",
@@ -95,6 +95,9 @@ let sampleOrchestratorSettingsText =
           "auto_merge"
         ]
       }
+    },
+    "github_inbox": {
+      "repositories": ["example/harness", "example/aff"]
     },
     "policy_version": "task-board-policy-v2"
   }
@@ -143,7 +146,7 @@ let sampleTaskBoardGitRuntimeConfigText =
     },
     "repository_overrides": [
       {
-        "repository": "kong/harness",
+        "repository": "example/harness",
         "profile": {
           "author_name": "Repo Bot",
           "author_email": "repo@example.com",

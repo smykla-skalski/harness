@@ -37,6 +37,7 @@ public struct SettingsTaskBoardSection: View {
       } else {
         workflowSection
         projectSection
+        githubInboxSection
         automationSection
         gitDefaultsSection
         credentialsSection
@@ -131,7 +132,28 @@ public struct SettingsTaskBoardSection: View {
       Text("GitHub Project")
         .harnessNativeFormSectionHeader()
     } footer: {
-      Text("These settings control the Task Board repository that the orchestrator targets.")
+      Text("These settings control the automation repository that the orchestrator targets.")
+    }
+  }
+
+  private var githubInboxSection: some View {
+    Section {
+      HarnessMonitorMultilineTextField<Never>(
+        placeholder: "owner/repo, one per line",
+        text: $draft.githubInboxRepositoriesText,
+        minHeight: 88,
+        accessibilityLabel: "GitHub inbox repositories"
+      )
+      .accessibilityIdentifier(
+        HarnessMonitorAccessibility.settingsTaskBoardInboxRepositoriesField
+      )
+    } header: {
+      Text("GitHub Inbox")
+        .harnessNativeFormSectionHeader()
+    } footer: {
+      Text(
+        "List repositories to import issues assigned to you and pull requests requesting your review into Needs You. This does not change the automation repository above."
+      )
     }
   }
 

@@ -163,6 +163,7 @@ extension RecordingHarnessClient {
       dispatchStatusFilter: request.dispatchStatusFilter,
       projectDir: request.projectDir,
       githubProject: request.githubProject ?? TaskBoardGitHubProjectConfig(),
+      githubInbox: request.githubInbox ?? TaskBoardGitHubInboxConfig(),
       policyVersion: request.policyVersion ?? "task-board-policy-v1"
     )
   }
@@ -240,12 +241,13 @@ extension RecordingHarnessClient {
       dispatchStatusFilter: .todo,
       projectDir: "/tmp/harness",
       githubProject: TaskBoardGitHubProjectConfig(
-        owner: "kong",
+        owner: "example",
         repo: "harness",
         checkoutPath: "/tmp/harness",
         protectedPaths: [TaskBoardProtectedPathRule(pattern: "apps/harness-monitor-macos")],
         enabledAutomations: TaskBoardGitHubAutomationToggles(enabled: [.syncTaskBoard, .autoMerge])
       ),
+      githubInbox: TaskBoardGitHubInboxConfig(repositories: ["example/harness", "example/aff"]),
       policyVersion: "task-board-policy-v1"
     )
   }
@@ -263,7 +265,7 @@ extension RecordingHarnessClient {
       ),
       repositoryOverrides: [
         TaskBoardGitRepositoryOverride(
-          repository: "kong/harness",
+          repository: "example/harness",
           profile: TaskBoardGitRuntimeProfile(
             authorName: "Repo Bot",
             authorEmail: "repo@example.com",

@@ -34,7 +34,7 @@ pub enum TaskBoardOrchestratorCommand {
     /// Read or update durable orchestrator settings.
     Settings(TaskBoardOrchestratorSettingsArgs),
     /// Read or update git runtime config.
-    RuntimeConfig(TaskBoardOrchestratorRuntimeConfigArgs),
+    RuntimeConfig(Box<TaskBoardOrchestratorRuntimeConfigArgs>),
     /// Sync process-local GitHub tokens from environment variables.
     GithubTokens(TaskBoardOrchestratorGithubTokensArgs),
     /// Sync the process-local Todoist token from an environment variable.

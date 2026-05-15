@@ -13,6 +13,7 @@ use crate::daemon::protocol::{
     TaskBoardPolicyPipelineSimulateRequest, TaskBoardTodoistTokenSyncRequest, http_paths,
 };
 use crate::daemon::service;
+use crate::errors::CliError;
 use crate::session::types::CONTROL_PLANE_ACTOR_ID;
 
 use super::DaemonHttpState;
@@ -276,7 +277,7 @@ async fn put_task_board_orchestrator_todoist_token(
         http_paths::TASK_BOARD_ORCHESTRATOR_TODOIST_TOKEN,
         &request_id,
         start,
-        Ok::<_, crate::errors::CliError>(service::sync_task_board_todoist_token(&request)),
+        Ok::<_, CliError>(service::sync_task_board_todoist_token(&request)),
     )
 }
 
