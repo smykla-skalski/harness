@@ -1,3 +1,4 @@
+import Foundation
 import HarnessMonitorKit
 import SwiftUI
 import UniformTypeIdentifiers
@@ -12,6 +13,21 @@ struct TaskBoardItemDragPayload: Codable, Transferable {
 
   var sourceLane: TaskBoardInboxLane? {
     TaskBoardInboxLane(status: status)
+  }
+
+  func itemProvider() -> NSItemProvider {
+    legacyDragItemProvider(for: self, contentType: .harnessMonitorTaskBoardItem)
+  }
+
+  static func loadFirst(
+    from providers: [NSItemProvider],
+    completion: @escaping (TaskBoardItemDragPayload) -> Void
+  ) -> Bool {
+    loadFirstPayload(
+      from: providers,
+      contentType: .harnessMonitorTaskBoardItem,
+      completion: completion
+    )
   }
 }
 
@@ -58,6 +74,21 @@ struct TaskBoardInboxItemDragPayload: Codable, Transferable {
   var sourceLane: TaskBoardInboxLane? {
     TaskBoardInboxLane(rawValue: laneRawValue)
   }
+
+  func itemProvider() -> NSItemProvider {
+    legacyDragItemProvider(for: self, contentType: .harnessMonitorTaskBoardInboxItem)
+  }
+
+  static func loadFirst(
+    from providers: [NSItemProvider],
+    completion: @escaping (TaskBoardInboxItemDragPayload) -> Void
+  ) -> Bool {
+    loadFirstPayload(
+      from: providers,
+      contentType: .harnessMonitorTaskBoardInboxItem,
+      completion: completion
+    )
+  }
 }
 
 extension UTType {
@@ -103,6 +134,11 @@ struct TaskBoardItemLaneColumn: View {
     .dropDestination(for: TaskBoardItemDragPayload.self, action: handleDrop) { targeted in
       isDropTargeted = targeted
     }
+    .onDrop(
+      of: [.harnessMonitorTaskBoardItem],
+      isTargeted: $isDropTargeted,
+      perform: handleLegacyDrop
+    )
     .accessibilityElement(children: .contain)
     .accessibilityIdentifier("harness.task-board.api-column.\(section.lane.rawValue)")
   }
@@ -113,6 +149,12 @@ struct TaskBoardItemLaneColumn: View {
       to: section.lane,
       move: onMoveItem
     )
+  }
+
+  private func handleLegacyDrop(_ providers: [NSItemProvider]) -> Bool {
+    TaskBoardItemDragPayload.loadFirst(from: providers) { payload in
+      _ = handleDrop([payload], .zero)
+    }
   }
 }
 
@@ -150,6 +192,11 @@ struct TaskBoardInboxLaneColumn: View {
     .dropDestination(for: TaskBoardInboxItemDragPayload.self, action: handleDrop) { targeted in
       isDropTargeted = targeted
     }
+    .onDrop(
+      of: [.harnessMonitorTaskBoardInboxItem],
+      isTargeted: $isDropTargeted,
+      perform: handleLegacyDrop
+    )
     .accessibilityElement(children: .contain)
     .accessibilityIdentifier("harness.task-board.column.\(section.lane.rawValue)")
   }
@@ -160,6 +207,12 @@ struct TaskBoardInboxLaneColumn: View {
       to: section.lane,
       move: onMoveItem
     )
+  }
+
+  private func handleLegacyDrop(_ providers: [NSItemProvider]) -> Bool {
+    TaskBoardInboxItemDragPayload.loadFirst(from: providers) { payload in
+      _ = handleDrop([payload], .zero)
+    }
   }
 }
 
@@ -211,6 +264,10 @@ struct TaskBoardItemRow: View {
       .padding(metrics.cardPadding)
     }
     .taskBoardCardChrome()
+    .contentShape(.rect)
+    .onDrag {
+      dragPayload.itemProvider()
+    }
     .draggable(dragPayload) {
       TaskBoardItemDragPreviewCard(item: item)
     }
@@ -309,6 +366,10 @@ struct TaskBoardInboxItemRow: View {
       .padding(metrics.cardPadding)
     }
     .taskBoardCardChrome()
+    .contentShape(.rect)
+    .onDrag {
+      dragPayload.itemProvider()
+    }
     .draggable(dragPayload) {
       TaskBoardInboxItemDragPreviewCard(item: item)
     }
@@ -377,4 +438,49 @@ func taskBoardStatusColor(for status: TaskBoardStatus) -> Color {
   case .done:
     HarnessMonitorTheme.secondaryInk
   }
+}
+
+private func legacyDragItemProvider<Payload: Encodable>(
+  for payload: Payload,
+  contentType: UTType
+) -> NSItemProvider {
+  let provider = NSItemProvider()
+  provider.registerDataRepresentation(
+    forTypeIdentifier: contentType.identifier,
+    visibility: .all
+  ) { completion in
+    do {
+      completion(try JSONEncoder().encode(payload), nil)
+    } catch {
+      completion(nil, error)
+    }
+    return nil
+  }
+  return provider
+}
+
+private func loadFirstPayload<Payload: Decodable>(
+  from providers: [NSItemProvider],
+  contentType: UTType,
+  completion: @escaping (Payload) -> Void
+) -> Bool {
+  guard
+    let provider = providers.first(where: {
+      $0.hasItemConformingToTypeIdentifier(contentType.identifier)
+    })
+  else {
+    return false
+  }
+  provider.loadDataRepresentation(forTypeIdentifier: contentType.identifier) { data, _ in
+    guard
+      let data,
+      let payload = try? JSONDecoder().decode(Payload.self, from: data)
+    else {
+      return
+    }
+    DispatchQueue.main.async {
+      completion(payload)
+    }
+  }
+  return true
 }
