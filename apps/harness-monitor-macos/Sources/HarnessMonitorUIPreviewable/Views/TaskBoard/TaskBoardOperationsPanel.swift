@@ -82,7 +82,13 @@ struct TaskBoardOperationsPanel: View {
   private var dispatchSelectionBinding: Binding<String?> {
     Binding(
       get: { validDispatchItemID },
-      set: { dispatchItemID = $0 }
+      set: { newValue in
+        guard let newValue else {
+          dispatchItemID = nil
+          return
+        }
+        dispatchItemID = taskBoardItems.contains(where: { $0.id == newValue }) ? newValue : nil
+      }
     )
   }
 
