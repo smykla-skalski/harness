@@ -49,14 +49,21 @@ public enum HarnessMonitorPerfDashboardScrollBus {
     )
   }
 
-  /// Same routing for geometry-change offset samples. The audit extractor can
-  /// compare trigger events against the offset events to confirm the scroll
-  /// surface really moved.
+  /// Same routing for geometry-change offset samples. Coalesced to >=8pt deltas
+  /// so a 60Hz scroll animation does not flood the os_signpost trace (we ship
+  /// one event per ~half-frame at typical scroll speeds, enough to prove the
+  /// surface moved without blowing the Instruments bundle past the 90s xctrace
+  /// finalize budget).
   public static func recordOffset(_ y: CGFloat) {
+    let rounded = Int(y.rounded())
+    let lastY = lastRecordedOffsetY.swap(rounded)
+    if let lastY, abs(rounded - lastY) < 8 {
+      return
+    }
     HarnessMonitorPerfTrace.recordScenarioEvent(
       component: auditComponent,
       event: "scroll.offset",
-      details: ["y": String(Int(y.rounded()))]
+      details: ["y": String(rounded)]
     )
   }
 
@@ -98,6 +105,7 @@ public enum HarnessMonitorPerfDashboardScrollBus {
   }
 
   private static let latestGeometryState = LatestGeometryState()
+  private static let lastRecordedOffsetY = OptionalIntSlot()
 
   private final class LatestGeometryState: @unchecked Sendable {
     private let lock = NSLock()
@@ -118,6 +126,19 @@ public enum HarnessMonitorPerfDashboardScrollBus {
         contentHeight: contentHeight,
         containerHeight: containerHeight
       )
+    }
+  }
+
+  fileprivate final class OptionalIntSlot: @unchecked Sendable {
+    private let lock = NSLock()
+    private var stored: Int?
+
+    func swap(_ value: Int) -> Int? {
+      lock.lock()
+      defer { lock.unlock() }
+      let previous = stored
+      stored = value
+      return previous
     }
   }
 }
