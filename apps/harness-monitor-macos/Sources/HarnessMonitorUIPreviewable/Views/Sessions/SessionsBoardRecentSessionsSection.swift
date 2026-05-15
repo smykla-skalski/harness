@@ -101,6 +101,7 @@ private struct DashboardSessionCard: View {
       }
       .frame(maxWidth: .infinity, alignment: .leading)
       .padding(HarnessMonitorTheme.cardPadding)
+      .fixedSize(horizontal: false, vertical: true)
     }
     .harnessInteractiveCardButtonStyle()
     .accessibilityIdentifier(HarnessMonitorAccessibility.dashboardSessionCard(session.sessionId))
