@@ -186,6 +186,49 @@ async fn prefer_local_updates_remote_conflict_side() {
 }
 
 #[tokio::test]
+async fn linked_push_surfaces_conflict_when_precondition_fails() {
+    let temp = tempdir().expect("tempdir");
+    let board = TaskBoardStore::new(temp.path().join("board"));
+    board
+        .create(
+            "Local edit",
+            "Old body",
+            linked_item("task-1", "Local edit", "Old body", TaskBoardStatus::Todo),
+        )
+        .expect("create local task");
+    let client = UpdateFakeSyncClient::new(
+        ExternalProvider::Todoist,
+        vec![ExternalSyncField::Title],
+        Vec::new(),
+    )
+    .with_precondition_failure();
+    let updates = client.updates.clone();
+    let clients: Vec<Box<dyn ExternalSyncClient>> = vec![Box::new(client)];
+
+    let operations = sync_external_tasks(
+        &board,
+        ExternalSyncOptions {
+            provider: Some(ExternalProvider::Todoist),
+            direction: ExternalSyncDirection::Push,
+            conflict_policy: ExternalSyncConflictPolicy::Report,
+            dry_run: false,
+            status: None,
+        },
+        &clients,
+    )
+    .await
+    .expect("sync external tasks");
+
+    assert!(
+        operations
+            .iter()
+            .any(|operation| operation.action == ExternalSyncAction::Conflict
+                && operation.board_item_id.as_deref() == Some("task-1"))
+    );
+    assert!(updates.lock().expect("updates").is_empty());
+}
+
+#[tokio::test]
 async fn linked_push_reports_provider_unsupported_fields() {
     let temp = tempdir().expect("tempdir");
     let board = TaskBoardStore::new(temp.path().join("board"));
@@ -229,6 +272,7 @@ struct UpdateFakeSyncClient {
     capabilities: ExternalProviderCapabilities,
     tasks: Vec<ExternalTask>,
     updates: std::sync::Arc<Mutex<Vec<(String, Vec<ExternalSyncField>)>>>,
+    precondition_fails: bool,
 }
 
 impl UpdateFakeSyncClient {
@@ -242,7 +286,13 @@ impl UpdateFakeSyncClient {
             capabilities: ExternalProviderCapabilities::with_update_fields(update_fields),
             tasks,
             updates: std::sync::Arc::new(Mutex::new(Vec::new())),
+            precondition_fails: false,
         }
+    }
+
+    fn with_precondition_failure(mut self) -> Self {
+        self.precondition_fails = true;
+        self
     }
 }
 
@@ -269,12 +319,15 @@ impl ExternalSyncClient for UpdateFakeSyncClient {
         _item: &TaskBoardItem,
         reference: &ExternalTaskRef,
         update: ExternalTaskUpdate,
-    ) -> Result<ExternalTaskRef, CliError> {
+    ) -> Result<ExternalUpdateOutcome, CliError> {
+        if self.precondition_fails && update.precondition_updated_at.is_some() {
+            return Ok(ExternalUpdateOutcome::PreconditionFailed);
+        }
         self.updates
             .lock()
             .expect("updates")
             .push((reference.external_id.clone(), update.changed_fields));
-        Ok(reference.clone())
+        Ok(ExternalUpdateOutcome::Applied(reference.clone()))
     }
 }
 

@@ -2,10 +2,10 @@ use tempfile::tempdir;
 
 use super::support::{FakeSyncClient, external_task};
 use crate::task_board::{
-    ExternalProvider, ExternalRefProvider, ExternalSyncAction, ExternalSyncClient,
-    ExternalSyncConflictPolicy, ExternalSyncDirection, ExternalSyncField, ExternalSyncOptions,
-    ExternalTask, ExternalTaskRef, TaskBoardItem, TaskBoardStatus, TaskBoardStore,
-    sync_external_tasks,
+    ExternalProvider, ExternalRefProvider, ExternalRefSyncState, ExternalSyncAction,
+    ExternalSyncClient, ExternalSyncConflictPolicy, ExternalSyncDirection, ExternalSyncField,
+    ExternalSyncOptions, ExternalTask, ExternalTaskRef, TaskBoardItem, TaskBoardStatus,
+    TaskBoardStore, sync_external_tasks,
 };
 
 #[tokio::test]
@@ -390,4 +390,94 @@ async fn sync_external_tasks_keeps_started_github_review_requests_when_remote_re
         .get("github-owner-repo-73")
         .expect("load unchanged started review request");
     assert_eq!(unchanged.status, TaskBoardStatus::Todo);
+}
+
+#[tokio::test]
+async fn sync_external_tasks_marks_imported_from_provider_on_new_github_items() {
+    let temp = tempdir().expect("tempdir");
+    let board = TaskBoardStore::new(temp.path().join("board"));
+    let clients: Vec<Box<dyn ExternalSyncClient>> = vec![Box::new(FakeSyncClient::new(
+        ExternalProvider::GitHub,
+        vec![super::support::github_external_task(
+            "owner/repo#21",
+            "Imported issue",
+            "owner/repo",
+        )],
+    ))];
+
+    sync_external_tasks(
+        &board,
+        ExternalSyncOptions {
+            provider: Some(ExternalProvider::GitHub),
+            direction: ExternalSyncDirection::Pull,
+            conflict_policy: ExternalSyncConflictPolicy::Report,
+            dry_run: false,
+            status: None,
+        },
+        &clients,
+    )
+    .await
+    .expect("sync external tasks");
+
+    let imported = board
+        .get("github-owner-repo-21")
+        .expect("load imported github task");
+    assert_eq!(
+        imported.imported_from_provider,
+        Some(ExternalRefProvider::GitHub)
+    );
+}
+
+#[tokio::test]
+async fn sync_external_tasks_skips_stale_review_check_when_item_was_not_imported_from_github() {
+    let temp = tempdir().expect("tempdir");
+    let board = TaskBoardStore::new(temp.path().join("board"));
+    let mut item = TaskBoardItem::new(
+        "manual-review-1".to_owned(),
+        "Review requested".to_owned(),
+        String::new(),
+        "2026-05-14T00:00:00Z".to_owned(),
+    );
+    item.status = TaskBoardStatus::PlanReview;
+    item.project_id = Some("owner/repo".to_owned());
+    let mut reference = ExternalTaskRef::new(ExternalProvider::GitHub, "owner/repo#88")
+        .with_url("https://example.test/pull/88".to_owned())
+        .into_core_ref();
+    reference.sync_state = Some(ExternalRefSyncState {
+        title: Some("Review requested".to_owned()),
+        body: Some(String::new()),
+        status: Some(TaskBoardStatus::NeedsYou),
+        project_id: Some("owner/repo".to_owned()),
+        updated_at: Some("2026-05-14T00:00:00Z".to_owned()),
+        synced_at: Some("2026-05-14T00:00:00Z".to_owned()),
+    });
+    item.external_refs = vec![reference];
+    board
+        .create("Review requested", "", item)
+        .expect("create manual review task");
+
+    let clients: Vec<Box<dyn ExternalSyncClient>> = vec![Box::new(FakeSyncClient::new(
+        ExternalProvider::GitHub,
+        Vec::new(),
+    ))];
+
+    let operations = sync_external_tasks(
+        &board,
+        ExternalSyncOptions {
+            provider: Some(ExternalProvider::GitHub),
+            direction: ExternalSyncDirection::Pull,
+            conflict_policy: ExternalSyncConflictPolicy::Report,
+            dry_run: false,
+            status: None,
+        },
+        &clients,
+    )
+    .await
+    .expect("sync external tasks");
+
+    assert!(operations.is_empty());
+    let unchanged = board
+        .get("manual-review-1")
+        .expect("load manual review task");
+    assert_eq!(unchanged.status, TaskBoardStatus::PlanReview);
 }
