@@ -16,6 +16,55 @@ struct TaskBoardAPIClientTests {
     #expect(config.repositoryOverrides.isEmpty)
   }
 
+  @Test("Git runtime config decodes inline key material")
+  func gitRuntimeConfigDecodesInlineKeyMaterial() throws {
+    let data = Data(
+      #"""
+      {
+        "global": {
+          "ssh_private_key": "ssh-secret",
+          "ssh_private_key_passphrase": "ssh-passphrase",
+          "signing": {
+            "mode": "gpg",
+            "ssh_private_key": "signing-ssh-secret",
+            "ssh_private_key_passphrase": "signing-ssh-passphrase",
+            "gpg_private_key": "gpg-secret",
+            "gpg_private_key_passphrase": "gpg-passphrase"
+          }
+        }
+      }
+      """#.utf8
+    )
+
+    let config = try taskBoardDecoder().decode(TaskBoardGitRuntimeConfig.self, from: data)
+
+    #expect(config.global.sshPrivateKey == "ssh-secret")
+    #expect(config.global.sshPrivateKeyPassphrase == "ssh-passphrase")
+    #expect(config.global.signing.sshPrivateKey == "signing-ssh-secret")
+    #expect(config.global.signing.sshPrivateKeyPassphrase == "signing-ssh-passphrase")
+    #expect(config.global.signing.gpgPrivateKey == "gpg-secret")
+    #expect(config.global.signing.gpgPrivateKeyPassphrase == "gpg-passphrase")
+  }
+
+  @Test("GitHub project config decodes requested reviewers")
+  func githubProjectConfigDecodesRequestedReviewers() throws {
+    let data = Data(
+      #"""
+      {
+        "requested_reviewers": {
+          "reviewers": ["alice", "bob"],
+          "team_reviewers": ["platform"]
+        }
+      }
+      """#.utf8
+    )
+
+    let config = try taskBoardDecoder().decode(TaskBoardGitHubProjectConfig.self, from: data)
+
+    #expect(config.requestedReviewers.reviewers == ["alice", "bob"])
+    #expect(config.requestedReviewers.teamReviewers == ["platform"])
+  }
+
   @Test("Task board item decodes omitted daemon default fields")
   func taskBoardItemDecodesOmittedDaemonDefaultFields() throws {
     let data = Data(

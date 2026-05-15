@@ -128,6 +128,19 @@ public struct SettingsTaskBoardSection: View {
         }
       }
       .pickerStyle(.menu)
+      multilineField(
+        title: "Requested Reviewers",
+        placeholder: "usernames, one per line",
+        text: $draft.requestedReviewersText,
+        accessibilityIdentifier: HarnessMonitorAccessibility
+          .settingsTaskBoardRequestedReviewersField
+      )
+      multilineField(
+        title: "Requested Team Reviewers",
+        placeholder: "team slugs, one per line",
+        text: $draft.requestedTeamReviewersText,
+        accessibilityIdentifier: HarnessMonitorAccessibility.settingsTaskBoardTeamReviewersField
+      )
     } header: {
       Text("GitHub Project")
         .harnessNativeFormSectionHeader()
@@ -193,6 +206,16 @@ public struct SettingsTaskBoardSection: View {
         ),
         text: $draft.sshKeyPath
       )
+      multilineField(
+        title: "SSH Private Key",
+        placeholder: "Paste SSH private key material",
+        text: $draft.sshPrivateKey,
+        accessibilityIdentifier: HarnessMonitorAccessibility.settingsTaskBoardSSHPrivateKeyField
+      )
+      SecureField("SSH Key Passphrase", text: $draft.sshPrivateKeyPassphrase)
+        .accessibilityIdentifier(
+          HarnessMonitorAccessibility.settingsTBSSHKeyPassphraseField
+        )
       Picker("Signing Mode", selection: $draft.signingMode) {
         ForEach(TaskBoardGitSigningMode.allCases, id: \.self) { mode in
           Text(mode.title).tag(mode)
@@ -208,6 +231,16 @@ public struct SettingsTaskBoardSection: View {
           ),
           text: $draft.signingSSHKeyPath
         )
+        multilineField(
+          title: "Signing SSH Private Key",
+          placeholder: "Paste signing SSH private key material",
+          text: $draft.signingSSHPrivateKey,
+          accessibilityIdentifier: HarnessMonitorAccessibility.settingsTBSigningSSHKeyField
+        )
+        SecureField("Signing SSH Key Passphrase", text: $draft.signingSSHPrivateKeyPassphrase)
+          .accessibilityIdentifier(
+            HarnessMonitorAccessibility.settingsTBSigningSSHPassphraseField
+          )
       }
       if draft.signingMode == .gpg {
         TextField("GPG Key ID", text: $draft.gpgKeyId)
@@ -219,6 +252,12 @@ public struct SettingsTaskBoardSection: View {
               .settingsTaskBoardGPGPrivateKeyPathField
           ),
           text: $draft.gpgPrivateKeyPath
+        )
+        multilineField(
+          title: "GPG Private Key",
+          placeholder: "Paste ASCII-armored GPG private key",
+          text: $draft.gpgPrivateKey,
+          accessibilityIdentifier: HarnessMonitorAccessibility.settingsTaskBoardGPGPrivateKeyField
         )
         SecureField("GPG Key Passphrase", text: $draft.gpgPrivateKeyPassphrase)
           .accessibilityIdentifier(
@@ -270,53 +309,8 @@ public struct SettingsTaskBoardSection: View {
           .accessibilityIdentifier(
             HarnessMonitorAccessibility.settingsTaskBoardRepositoryOverrideField(index)
           )
-        TextField("Author Name", text: $draft.repositoryOverrides[index].authorName)
-        TextField("Author Email", text: $draft.repositoryOverrides[index].authorEmail)
-        pathField(
-          .keyFile(
-            title: "SSH Key Path",
-            accessibilityIdentifier:
-              HarnessMonitorAccessibility
-              .settingsTaskBoardRepositoryOverrideSSHKeyField(index)
-          ),
-          text: $draft.repositoryOverrides[index].sshKeyPath
-        )
-        Picker("Signing Mode", selection: $draft.repositoryOverrides[index].signingMode) {
-          ForEach(TaskBoardGitSigningMode.allCases, id: \.self) { mode in
-            Text(mode.title).tag(mode)
-          }
-        }
-        .pickerStyle(.menu)
-        if draft.repositoryOverrides[index].signingMode == .ssh {
-          pathField(
-            .keyFile(
-              title: "Signing SSH Key Path",
-              accessibilityIdentifier:
-                HarnessMonitorAccessibility
-                .settingsTaskBoardRepositoryOverrideSigningSSHKeyField(index)
-            ),
-            text: $draft.repositoryOverrides[index].signingSSHKeyPath
-          )
-        }
-        if draft.repositoryOverrides[index].signingMode == .gpg {
-          TextField("GPG Key ID", text: $draft.repositoryOverrides[index].gpgKeyId)
-          pathField(
-            .keyFile(
-              title: "GPG Private Key Path",
-              accessibilityIdentifier:
-                HarnessMonitorAccessibility
-                .settingsTaskBoardRepositoryOverrideGPGPrivateKeyField(index)
-            ),
-            text: $draft.repositoryOverrides[index].gpgPrivateKeyPath
-          )
-          SecureField(
-            "GPG Key Passphrase",
-            text: $draft.repositoryOverrides[index].gpgPrivateKeyPassphrase
-          )
-          .accessibilityIdentifier(
-            HarnessMonitorAccessibility.settingsTaskBoardRepositoryOverrideGPGPassphraseField(index)
-          )
-        }
+        repositoryIdentityFields(index: index, override: $draft.repositoryOverrides[index])
+        repositorySigningFields(index: index, override: $draft.repositoryOverrides[index])
         SecureField("GitHub Token", text: $draft.repositoryOverrides[index].token)
           .accessibilityIdentifier(
             HarnessMonitorAccessibility.settingsTaskBoardRepositoryOverrideTokenField(index)

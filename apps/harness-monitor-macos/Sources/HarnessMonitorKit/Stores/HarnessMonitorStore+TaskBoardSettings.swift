@@ -166,6 +166,7 @@ extension HarnessMonitorStore {
         mergeMethod: githubProject.mergeMethod,
         labels: githubProject.labels,
         protectedPaths: githubProject.protectedPaths,
+        requestedReviewers: githubProject.requestedReviewers,
         enabledAutomations: githubProject.enabledAutomations
       ),
       githubInbox: settings.githubInbox,
@@ -225,11 +226,16 @@ extension HarnessMonitorStore {
         kind: .taskBoardKeyFile,
         isDirectory: false
       ),
+      sshPrivateKey: profile.sshPrivateKey,
+      sshPrivateKeyPassphrase: profile.sshPrivateKeyPassphrase,
       signing: TaskBoardGitSigningConfig(
         mode: signing.mode,
         sshKeyPath: signingSSHKeyPath,
+        sshPrivateKey: signing.mode == .ssh ? signing.sshPrivateKey : nil,
+        sshPrivateKeyPassphrase: signing.mode == .ssh ? signing.sshPrivateKeyPassphrase : nil,
         gpgKeyId: signing.gpgKeyId,
         gpgPrivateKeyPath: signingGPGPrivateKeyPath,
+        gpgPrivateKey: signing.mode == .gpg ? signing.gpgPrivateKey : nil,
         gpgPrivateKeyPassphrase: signing.mode == .gpg ? signing.gpgPrivateKeyPassphrase : nil
       )
     )

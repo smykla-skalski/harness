@@ -39,6 +39,10 @@ struct SettingsTaskBoardDraftTests {
     draft.signingMode = .gpg
     draft.gpgKeyId = " ABC123 "
     draft.gpgPrivateKeyPath = " /Users/test/.gnupg/private.asc "
+    draft.gpgPrivateKey =
+      " -----BEGIN PGP PRIVATE KEY BLOCK-----\n"
+      + "secret\n"
+      + "-----END PGP PRIVATE KEY BLOCK----- "
     draft.gpgPrivateKeyPassphrase = " passphrase "
 
     let signing = draft.snapshot.runtimeConfig.global.signing
@@ -46,7 +50,35 @@ struct SettingsTaskBoardDraftTests {
     #expect(signing.mode == .gpg)
     #expect(signing.gpgKeyId == "ABC123")
     #expect(signing.gpgPrivateKeyPath == "/Users/test/.gnupg/private.asc")
+    #expect(
+      signing.gpgPrivateKey
+        == "-----BEGIN PGP PRIVATE KEY BLOCK-----\nsecret\n-----END PGP PRIVATE KEY BLOCK-----"
+    )
     #expect(signing.gpgPrivateKeyPassphrase == "passphrase")
+  }
+
+  @Test("Global inline SSH material round trips through runtime snapshot")
+  func globalInlineSSHMaterialRoundTrips() {
+    var draft = TaskBoardGitSettingsDraft()
+    draft.sshPrivateKey =
+      " -----BEGIN OPENSSH PRIVATE KEY-----\n"
+      + "secret\n"
+      + "-----END OPENSSH PRIVATE KEY----- "
+    draft.sshPrivateKeyPassphrase = " identity-passphrase "
+    draft.signingMode = .ssh
+    draft.signingSSHPrivateKey = " signing-secret "
+    draft.signingSSHPrivateKeyPassphrase = " signing-passphrase "
+
+    let profile = draft.snapshot.runtimeConfig.global
+
+    #expect(
+      profile.sshPrivateKey
+        == "-----BEGIN OPENSSH PRIVATE KEY-----\nsecret\n-----END OPENSSH PRIVATE KEY-----"
+    )
+    #expect(profile.sshPrivateKeyPassphrase == "identity-passphrase")
+    #expect(profile.signing.sshPrivateKey == "signing-secret")
+    #expect(profile.signing.sshPrivateKeyPassphrase == "signing-passphrase")
+    #expect(profile.signing.sshKeyPath == nil)
   }
 
   @Test("Repository direct signing key fields round trip through override snapshot")
@@ -55,9 +87,12 @@ struct SettingsTaskBoardDraftTests {
     draft.repositoryOverrides = [
       TaskBoardRepositoryOverrideDraft(
         repository: " EXAMPLE/HARNESS ",
+        sshPrivateKey: " repo-identity-secret ",
+        sshPrivateKeyPassphrase: " repo-identity-passphrase ",
         signingMode: .gpg,
         gpgKeyId: " DEF456 ",
         gpgPrivateKeyPath: " /Users/test/.gnupg/repo.asc ",
+        gpgPrivateKey: " repo-gpg-secret ",
         gpgPrivateKeyPassphrase: " repo-passphrase "
       )
     ]
@@ -66,10 +101,25 @@ struct SettingsTaskBoardDraftTests {
     let signing = override.profile.signing
 
     #expect(override.repository == "example/harness")
+    #expect(override.profile.sshPrivateKey == "repo-identity-secret")
+    #expect(override.profile.sshPrivateKeyPassphrase == "repo-identity-passphrase")
     #expect(signing.mode == .gpg)
     #expect(signing.gpgKeyId == "DEF456")
     #expect(signing.gpgPrivateKeyPath == "/Users/test/.gnupg/repo.asc")
+    #expect(signing.gpgPrivateKey == "repo-gpg-secret")
     #expect(signing.gpgPrivateKeyPassphrase == "repo-passphrase")
+  }
+
+  @Test("GitHub requested reviewers round trip through orchestrator snapshot")
+  func githubRequestedReviewersRoundTrip() {
+    var draft = TaskBoardGitSettingsDraft()
+    draft.requestedReviewersText = " bob \n alice \n bob "
+    draft.requestedTeamReviewersText = " platform \n security \n platform "
+
+    let reviewers = draft.snapshot.orchestratorSettings.githubProject.requestedReviewers
+
+    #expect(reviewers.reviewers == ["alice", "bob"])
+    #expect(reviewers.teamReviewers == ["platform", "security"])
   }
 
   @Test("GitHub inbox repositories round trip through orchestrator snapshot")
