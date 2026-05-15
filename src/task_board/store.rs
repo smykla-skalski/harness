@@ -8,8 +8,8 @@ use crate::infra::io;
 use crate::workspace::{harness_data_root, utc_now};
 
 use super::types::{
-    AgentMode, CURRENT_TASK_BOARD_ITEM_VERSION, ExternalRef, PlanningState, TaskBoardItem,
-    TaskBoardPriority, TaskBoardStatus, TaskBoardWorkflowState,
+    AgentMode, CURRENT_TASK_BOARD_ITEM_VERSION, ExternalRef, ExternalRefProvider, PlanningState,
+    TaskBoardItem, TaskBoardPriority, TaskBoardStatus, TaskBoardWorkflowState,
 };
 
 #[derive(Debug, Clone)]
@@ -64,6 +64,8 @@ struct TaskBoardFrontmatter {
     agent_mode: AgentMode,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     external_refs: Vec<ExternalRef>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    imported_from_provider: Option<ExternalRefProvider>,
     #[serde(default)]
     planning: PlanningState,
     #[serde(default, skip_serializing_if = "TaskBoardWorkflowState::is_default")]
@@ -93,6 +95,7 @@ impl From<&TaskBoardItem> for TaskBoardFrontmatter {
             target_project_types: item.target_project_types.clone(),
             agent_mode: item.agent_mode,
             external_refs: item.external_refs.clone(),
+            imported_from_provider: item.imported_from_provider,
             planning: item.planning.clone(),
             workflow: item.workflow.clone(),
             session_id: item.session_id.clone(),
@@ -119,6 +122,7 @@ impl TaskBoardFrontmatter {
             target_project_types: self.target_project_types,
             agent_mode: self.agent_mode,
             external_refs: self.external_refs,
+            imported_from_provider: self.imported_from_provider,
             planning: self.planning,
             workflow: self.workflow,
             session_id: self.session_id,
@@ -202,6 +206,30 @@ impl TaskBoardStore {
             if !item.is_deleted() && status.is_none_or(|target| item.status == target) {
                 items.push(item);
             }
+        }
+        sort_items(&mut items);
+        Ok(items)
+    }
+
+    /// List every board item on disk including tombstoned ones.
+    ///
+    /// # Errors
+    /// Returns `CliError` if the tasks directory cannot be read or an item
+    /// cannot be parsed.
+    pub fn list_including_deleted(&self) -> Result<Vec<TaskBoardItem>, CliError> {
+        let dir = self.tasks_dir();
+        if !dir.exists() {
+            return Ok(Vec::new());
+        }
+        let mut items = Vec::new();
+        for entry in fs::read_dir(&dir).map_err(|error| io_for("read dir", &dir, &error))? {
+            let path = entry
+                .map_err(|error| io_for("read dir entry", &dir, &error))?
+                .path();
+            if path.extension().and_then(|ext| ext.to_str()) != Some("md") {
+                continue;
+            }
+            items.push(read_path(&path)?);
         }
         sort_items(&mut items);
         Ok(items)

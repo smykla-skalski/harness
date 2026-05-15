@@ -8,8 +8,8 @@ use crate::errors::{CliError, CliErrorKind};
 use super::super::types::{TaskBoardItem, TaskBoardStatus};
 use super::{
     ExternalProvider, ExternalProviderCapabilities, ExternalSyncClient, ExternalSyncConfig,
-    ExternalSyncField, ExternalTask, ExternalTaskRef, ExternalTaskUpdate, non_empty_body,
-    normalize_token,
+    ExternalSyncField, ExternalTask, ExternalTaskRef, ExternalTaskUpdate, ExternalUpdateOutcome,
+    non_empty_body, normalize_token,
 };
 
 const TODOIST_API_BASE: &str = "https://api.todoist.com/rest/v2";
@@ -150,7 +150,13 @@ impl ExternalSyncClient for TodoistSyncClient {
         item: &TaskBoardItem,
         reference: &ExternalTaskRef,
         update: ExternalTaskUpdate,
-    ) -> Result<ExternalTaskRef, CliError> {
+    ) -> Result<ExternalUpdateOutcome, CliError> {
+        if let Some(precondition) = update.precondition_updated_at.as_deref() {
+            let current = self.fetch_task(&reference.external_id).await?;
+            if current.updated_at.as_deref() != Some(precondition) {
+                return Ok(ExternalUpdateOutcome::PreconditionFailed);
+            }
+        }
         let mut updated_reference = reference.clone();
         if update.changes_metadata() {
             updated_reference = self.update_task_metadata(item, reference, &update).await?;
@@ -158,11 +164,45 @@ impl ExternalSyncClient for TodoistSyncClient {
         if update.changes_status() {
             self.update_task_status(item, reference).await?;
         }
-        Ok(updated_reference)
+        Ok(ExternalUpdateOutcome::Applied(updated_reference))
+    }
+
+    fn allows_delete(&self) -> bool {
+        true
+    }
+
+    async fn delete_task(
+        &self,
+        _item: &TaskBoardItem,
+        reference: &ExternalTaskRef,
+    ) -> Result<(), CliError> {
+        self.client
+            .post(self.endpoint(format!("tasks/{}/close", reference.external_id).as_str()))
+            .bearer_auth(&self.token)
+            .send()
+            .await
+            .map_err(todoist_sync_error)?
+            .error_for_status()
+            .map_err(todoist_sync_error)?;
+        Ok(())
     }
 }
 
 impl TodoistSyncClient {
+    async fn fetch_task(&self, external_id: &str) -> Result<TodoistTask, CliError> {
+        self.client
+            .get(self.endpoint(format!("tasks/{external_id}").as_str()))
+            .bearer_auth(&self.token)
+            .send()
+            .await
+            .map_err(todoist_sync_error)?
+            .error_for_status()
+            .map_err(todoist_sync_error)?
+            .json::<TodoistTask>()
+            .await
+            .map_err(todoist_sync_error)
+    }
+
     async fn update_task_metadata(
         &self,
         item: &TaskBoardItem,
@@ -270,6 +310,8 @@ struct TodoistTask {
     url: Option<String>,
     #[serde(default)]
     project_id: Option<String>,
+    #[serde(default)]
+    updated_at: Option<String>,
 }
 
 impl TodoistTask {
@@ -290,7 +332,7 @@ impl From<TodoistTask> for ExternalTask {
             body: task.description,
             status: TaskBoardStatus::Todo,
             project_id: task.project_id,
-            updated_at: None,
+            updated_at: task.updated_at,
         }
     }
 }
