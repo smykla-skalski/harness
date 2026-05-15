@@ -258,6 +258,7 @@ mod tests {
             provider: ExternalRefProvider::Todoist,
             external_id: "remote-1".into(),
             url: None,
+            sync_state: None,
         });
         let config = ExternalSyncConfig {
             github_token: Some("token".into()),

@@ -315,6 +315,7 @@ mod tests {
             provider: ExternalRefProvider::GitHub,
             external_id: "123".into(),
             url: Some("https://example.invalid/123".into()),
+            sync_state: None,
         }];
 
         let plan = build_dispatch_plan(&item);

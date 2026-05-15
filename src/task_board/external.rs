@@ -1,19 +1,22 @@
-use std::sync::OnceLock;
 use std::{env, fmt};
 
 use async_trait::async_trait;
 use clap::ValueEnum;
-use octocrab::params::State;
-use rustls::crypto::ring::default_provider;
 use serde::{Deserialize, Serialize};
 
 use crate::errors::{CliError, CliErrorKind};
 
 use super::types::{ExternalRef, ExternalRefProvider, TaskBoardItem, TaskBoardStatus};
 
+mod capabilities;
+mod github;
 mod sync;
 mod todoist;
 
+pub use capabilities::{
+    ExternalProviderCapabilities, ExternalSyncConflictPolicy, ExternalSyncField, ExternalTaskUpdate,
+};
+pub use github::GitHubSyncClient;
 pub use sync::{
     ExternalSyncAction, ExternalSyncDirection, ExternalSyncOperation, ExternalSyncOptions,
     configured_sync_clients, sync_external_tasks,
@@ -25,7 +28,6 @@ pub const GH_TOKEN_ENV: &str = "GH_TOKEN";
 pub const HARNESS_TODOIST_TOKEN_ENV: &str = "HARNESS_TODOIST_TOKEN";
 pub const HARNESS_GITHUB_REPOSITORY_ENV: &str = "HARNESS_GITHUB_REPOSITORY";
 pub const GITHUB_REPOSITORY_ENV: &str = "GITHUB_REPOSITORY";
-static RUSTLS_PROVIDER: OnceLock<()> = OnceLock::new();
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ValueEnum)]
 #[value(rename_all = "snake_case")]
@@ -102,6 +104,7 @@ impl ExternalTaskRef {
             provider: self.provider.into(),
             external_id: self.external_id,
             url: self.url,
+            sync_state: None,
         }
     }
 }
@@ -231,6 +234,11 @@ pub trait ExternalSyncClient: Send + Sync {
     #[must_use]
     fn provider(&self) -> ExternalProvider;
 
+    #[must_use]
+    fn capabilities(&self) -> ExternalProviderCapabilities {
+        ExternalProviderCapabilities::creates_only()
+    }
+
     /// Pull provider-side tasks.
     ///
     /// # Errors
@@ -242,153 +250,28 @@ pub trait ExternalSyncClient: Send + Sync {
     /// # Errors
     /// Returns provider or transport errors surfaced by the implementation.
     async fn push_task(&self, item: &TaskBoardItem) -> Result<ExternalTaskRef, CliError>;
-}
 
-#[derive(Clone)]
-pub struct GitHubSyncClient {
-    client: octocrab::Octocrab,
-    repository: Option<GitHubRepository>,
-}
-
-impl GitHubSyncClient {
-    /// Build a GitHub client from a token using the native GitHub SDK.
+    /// Update one linked provider task.
     ///
     /// # Errors
-    /// Returns an error when the token is empty or the SDK client cannot be built.
-    pub fn new(token: impl Into<String>) -> Result<Self, CliError> {
-        Self::new_with_repository(token, None)
-    }
-
-    /// Build a GitHub client with an optional default repository.
-    ///
-    /// # Errors
-    /// Returns an error when token or repository values are invalid.
-    pub fn new_with_repository(
-        token: impl Into<String>,
-        repository: Option<&str>,
-    ) -> Result<Self, CliError> {
-        let token = normalize_token(ExternalProvider::GitHub, token)?;
-        let repository = repository.map(parse_github_repository).transpose()?;
-        ensure_rustls_provider();
-        let client = octocrab::Octocrab::builder()
-            .personal_token(token)
-            .build()
-            .map_err(github_client_error)?;
-        Ok(Self { client, repository })
-    }
-
-    /// Build a GitHub client from external sync config.
-    ///
-    /// # Errors
-    /// Returns an error when no GitHub token is configured or the SDK client
-    /// cannot be built.
-    pub fn from_config(config: &ExternalSyncConfig) -> Result<Self, CliError> {
-        Self::new_with_repository(
-            config.require_token(ExternalProvider::GitHub)?,
-            config.github_repository.as_deref(),
-        )
-    }
-
-    #[must_use]
-    pub const fn octocrab(&self) -> &octocrab::Octocrab {
-        &self.client
-    }
-
-    fn repository_for(&self, item: Option<&TaskBoardItem>) -> Result<GitHubRepository, CliError> {
-        let candidate = item
-            .and_then(|item| item.project_id.as_deref())
-            .map(parse_github_repository)
-            .transpose()?;
-        candidate
-            .or_else(|| self.repository.clone())
-            .ok_or_else(missing_github_repository_error)
-    }
-}
-
-impl fmt::Debug for GitHubSyncClient {
-    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        formatter
-            .debug_struct("GitHubSyncClient")
-            .field("provider", &ExternalProvider::GitHub)
-            .finish_non_exhaustive()
-    }
-}
-
-#[async_trait]
-impl ExternalSyncClient for GitHubSyncClient {
-    fn provider(&self) -> ExternalProvider {
-        ExternalProvider::GitHub
-    }
-
-    async fn pull_tasks(&self) -> Result<Vec<ExternalTask>, CliError> {
-        let repository = self.repository_for(None)?;
-        let project_id = repository.slug();
-        let page = self
-            .octocrab()
-            .issues(repository.owner.as_str(), repository.repo.as_str())
-            .list()
-            .state(State::Open)
-            .per_page(100_u8)
-            .send()
-            .await
-            .map_err(github_sync_error)?;
-        let issues = self
-            .octocrab()
-            .all_pages(page)
-            .await
-            .map_err(github_sync_error)?;
-        Ok(issues
-            .into_iter()
-            .filter(|issue| issue.pull_request.is_none())
-            .map(|issue| ExternalTask {
-                reference: ExternalTaskRef::new(ExternalProvider::GitHub, issue.number.to_string())
-                    .with_url(issue.html_url.to_string()),
-                title: issue.title,
-                body: issue.body.unwrap_or_default(),
-                status: TaskBoardStatus::Todo,
-                project_id: Some(project_id.clone()),
-                updated_at: Some(issue.updated_at.to_rfc3339()),
-            })
-            .collect())
-    }
-
-    async fn push_task(&self, item: &TaskBoardItem) -> Result<ExternalTaskRef, CliError> {
-        let repository = self.repository_for(Some(item))?;
-        let issues = self
-            .octocrab()
-            .issues(repository.owner.as_str(), repository.repo.as_str());
-        let mut request = issues.create(&item.title);
-        if let Some(body) = non_empty_body(&item.body) {
-            request = request.body(body);
-        }
-        let issue = request.send().await.map_err(github_sync_error)?;
-        Ok(
-            ExternalTaskRef::new(ExternalProvider::GitHub, issue.number.to_string())
-                .with_url(issue.html_url.to_string()),
-        )
-    }
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-struct GitHubRepository {
-    owner: String,
-    repo: String,
-}
-
-impl GitHubRepository {
-    fn slug(&self) -> String {
-        format!("{}/{}", self.owner, self.repo)
+    /// Returns provider or transport errors surfaced by the implementation.
+    async fn update_task(
+        &self,
+        _item: &TaskBoardItem,
+        reference: &ExternalTaskRef,
+        _update: ExternalTaskUpdate,
+    ) -> Result<ExternalTaskRef, CliError> {
+        Err(CliErrorKind::workflow_io(format!(
+            "task-board {} sync does not support updating linked remote items '{}'",
+            self.provider(),
+            reference.external_id
+        ))
+        .into())
     }
 }
 
 fn first_present_env(names: &[&str]) -> Option<String> {
     names.iter().find_map(|name| read_token_env(name))
-}
-
-fn ensure_rustls_provider() {
-    RUSTLS_PROVIDER.get_or_init(|| {
-        let _ = default_provider().install_default();
-    });
 }
 
 fn read_token_env(name: &str) -> Option<String> {
@@ -397,7 +280,7 @@ fn read_token_env(name: &str) -> Option<String> {
     (!token.is_empty()).then(|| token.to_owned())
 }
 
-fn normalize_token(
+pub(super) fn normalize_token(
     provider: ExternalProvider,
     token: impl Into<String>,
 ) -> Result<String, CliError> {
@@ -417,45 +300,7 @@ fn missing_token_error(provider: ExternalProvider) -> CliError {
     .into()
 }
 
-fn parse_github_repository(value: &str) -> Result<GitHubRepository, CliError> {
-    let mut parts = value.split('/');
-    let owner = parts.next().unwrap_or_default().trim();
-    let repo = parts.next().unwrap_or_default().trim();
-    if owner.is_empty() || repo.is_empty() || parts.next().is_some() {
-        return Err(CliErrorKind::workflow_io(format!(
-            "task-board github repository must use owner/repo, got '{value}'"
-        ))
-        .into());
-    }
-    Ok(GitHubRepository {
-        owner: owner.to_owned(),
-        repo: repo.to_owned(),
-    })
-}
-
-fn missing_github_repository_error() -> CliError {
-    CliErrorKind::workflow_io(format!(
-        "task-board github repository missing; set {HARNESS_GITHUB_REPOSITORY_ENV}, \
-         {GITHUB_REPOSITORY_ENV}, or item project_id as owner/repo"
-    ))
-    .into()
-}
-
-fn github_client_error(error: octocrab::Error) -> CliError {
-    CliError::new(CliErrorKind::workflow_io(format!(
-        "create task-board github client: {error}"
-    )))
-    .with_source(error)
-}
-
-fn github_sync_error(error: octocrab::Error) -> CliError {
-    CliError::new(CliErrorKind::workflow_io(format!(
-        "task-board github sync failed: {error}"
-    )))
-    .with_source(error)
-}
-
-fn non_empty_body(body: &str) -> Option<String> {
+pub(super) fn non_empty_body(body: &str) -> Option<String> {
     let body = body.trim();
     (!body.is_empty()).then(|| body.to_owned())
 }
@@ -467,5 +312,7 @@ fn redacted(value: Option<&str>) -> &'static str {
     }
 }
 
+#[cfg(test)]
+mod sync_tests;
 #[cfg(test)]
 mod tests;
