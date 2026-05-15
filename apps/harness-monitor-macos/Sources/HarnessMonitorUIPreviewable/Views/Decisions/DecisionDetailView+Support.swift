@@ -35,6 +35,9 @@ func humanizedWorkspaceLabel(_ raw: String) -> String {
   guard !trimmed.isEmpty else {
     return raw
   }
+  if UUID(uuidString: trimmed) != nil {
+    return String(trimmed.prefix(8))
+  }
 
   let separated =
     trimmed
