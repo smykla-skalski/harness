@@ -106,6 +106,33 @@ final class HarnessMonitorUITests: HarnessMonitorUITestCase {
     XCTAssertFalse(feedback.exists)
   }
 
+  func testTaskBoardBoardOnlyItemOpensManagementPanel() throws {
+    let itemID = "preview-board-only"
+    let app = launch(
+      mode: "preview",
+      additionalEnvironment: [
+        "HARNESS_MONITOR_PREVIEW_SCENARIO": "task-board-board-only",
+        "HARNESS_MONITOR_UI_TEST_SURFACE": "content-dashboard",
+      ]
+    )
+
+    let boardRoot = element(in: app, identifier: Accessibility.sessionsBoardRoot)
+    let boardItem = button(in: app, identifier: "harness.task-board.api-item.\(itemID)")
+    XCTAssertTrue(boardRoot.waitForExistence(timeout: Self.actionTimeout))
+    XCTAssertTrue(boardItem.waitForExistence(timeout: Self.actionTimeout))
+
+    tapButton(in: app, identifier: "harness.task-board.api-item.\(itemID)")
+
+    let managementPanel = element(
+      in: app,
+      identifier: "harness.task-board.manage-item.\(itemID)"
+    )
+    XCTAssertTrue(managementPanel.waitForExistence(timeout: Self.actionTimeout))
+    XCTAssertTrue(app.staticTexts["Manage Board Item"].exists)
+    XCTAssertTrue(app.textFields["Title"].exists)
+    XCTAssertFalse(app.staticTexts["Task Not Available"].exists)
+  }
+
   func testToolbarSurvivesSidebarToggle() throws {
     let app = launch(mode: "preview")
 
