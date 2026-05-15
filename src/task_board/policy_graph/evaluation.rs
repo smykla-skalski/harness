@@ -1,3 +1,7 @@
+use std::collections::HashSet;
+
+use tracing::warn;
+
 use super::{
     PolicyDecision, PolicyEvidenceCheck, PolicyEvidenceField, PolicyEvidencePredicate, PolicyGraph,
     PolicyGraphDecision, PolicyGraphEdgeCondition, PolicyGraphNodeKind, PolicyReasonCode,
@@ -14,7 +18,27 @@ impl PolicyGraph {
         }
         let mut node_id = self.entry_node_id()?;
         let mut visited = Vec::new();
-        for _ in 0..self.nodes.len().saturating_add(1) {
+        let mut visited_ids: HashSet<String> = HashSet::new();
+        let safety_cap = self.nodes.len().saturating_mul(4).max(4);
+        loop {
+            if !visited_ids.insert(node_id.clone()) {
+                warn!(
+                    target: "harness::policy_graph",
+                    visit_path = ?visited,
+                    repeated_node = %node_id,
+                    "policy graph evaluation hit a cycle; bailing to human review",
+                );
+                return Some((require_human(PolicyReasonCode::HumanRequired), visited));
+            }
+            if visited.len() >= safety_cap {
+                warn!(
+                    target: "harness::policy_graph",
+                    visit_path = ?visited,
+                    safety_cap,
+                    "policy graph evaluation exceeded safety cap; bailing to human review",
+                );
+                return Some((require_human(PolicyReasonCode::HumanRequired), visited));
+            }
             let node = self
                 .nodes
                 .iter()
@@ -58,7 +82,6 @@ impl PolicyGraph {
                 }
             }
         }
-        Some((require_human(PolicyReasonCode::HumanRequired), visited))
     }
 
     fn entry_node_id(&self) -> Option<String> {
