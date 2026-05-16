@@ -45,6 +45,18 @@ struct TaskBoardItemRoutesToEditor: View {
   let isActionInFlight: Bool
 
   @State private var draftEntry = ""
+  @Environment(\.fontScale)
+  private var fontScale
+
+  private var captionSemibold: Font {
+    HarnessMonitorTextSize.scaledFont(.caption.weight(.semibold), by: fontScale)
+  }
+  private var caption2Font: Font {
+    HarnessMonitorTextSize.scaledFont(.caption2, by: fontScale)
+  }
+  private var caption2Semibold: Font {
+    HarnessMonitorTextSize.scaledFont(.caption2.weight(.semibold), by: fontScale)
+  }
 
   var body: some View {
     VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingXS) {
@@ -64,7 +76,7 @@ struct TaskBoardItemRoutesToEditor: View {
         "Items with no entries route to every host. Add a project type to limit dispatch to "
           + "hosts that declare it."
       )
-      .scaledFont(.caption2)
+      .font(caption2Font)
       .foregroundStyle(HarnessMonitorTheme.secondaryInk)
     }
     .accessibilityElement(children: .contain)
@@ -74,11 +86,11 @@ struct TaskBoardItemRoutesToEditor: View {
   private var header: some View {
     HStack {
       Text("Routes To")
-        .scaledFont(.caption.weight(.semibold))
+        .font(captionSemibold)
         .foregroundStyle(HarnessMonitorTheme.secondaryInk)
       Spacer()
       Text(routingSummary)
-        .scaledFont(.caption2)
+        .font(caption2Font)
         .foregroundStyle(HarnessMonitorTheme.secondaryInk)
     }
   }
@@ -93,7 +105,7 @@ struct TaskBoardItemRoutesToEditor: View {
         commitDraftEntry()
       } label: {
         Label("Add", systemImage: "plus")
-          .scaledFont(.caption.weight(.semibold))
+          .font(captionSemibold)
       }
       .controlSize(HarnessMonitorControlMetrics.compactControlSize)
       .disabled(isActionInFlight || normalizedDraftEntry == nil)
@@ -104,7 +116,7 @@ struct TaskBoardItemRoutesToEditor: View {
   private var suggestionsSection: some View {
     VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingXS) {
       Text("Suggestions")
-        .scaledFont(.caption2.weight(.semibold))
+        .font(caption2Semibold)
         .foregroundStyle(HarnessMonitorTheme.secondaryInk)
       HarnessMonitorWrapLayout(spacing: HarnessMonitorTheme.spacingXS) {
         ForEach(Array(suggestionPool.enumerated()), id: \.offset) { _, suggestion in
@@ -152,7 +164,7 @@ struct TaskBoardItemRoutesToEditor: View {
   private func projectTypeChip(_ projectType: String) -> some View {
     HStack(spacing: HarnessMonitorTheme.spacingXS) {
       Text(projectType)
-        .scaledFont(.caption.weight(.semibold))
+        .font(captionSemibold)
         .foregroundStyle(HarnessMonitorTheme.accent)
       Button(role: .destructive) {
         targetProjectTypes.removeAll { $0 == projectType }
@@ -181,7 +193,7 @@ struct TaskBoardItemRoutesToEditor: View {
         Image(systemName: "plus.circle")
           .accessibilityHidden(true)
         Text(suggestion)
-          .scaledFont(.caption.weight(.semibold))
+          .font(captionSemibold)
       }
     }
     .controlSize(HarnessMonitorControlMetrics.compactControlSize)
