@@ -50,6 +50,61 @@ public struct ServiceManagementDaemonLaunchAgentManager: DaemonLaunchAgentManagi
   }
 }
 
+/// One-shot cleanup of the pre-coexistence SMAppService plist. The new
+/// layout ships a `.managed`-suffixed plist filename; an upgrade leaves the
+/// old `io.harnessmonitor.daemon.plist` registration orphaned in launchd's
+/// view. We try to unregister it silently on the first launch under the new
+/// layout and accept any failure (typical reason: the plist no longer exists
+/// in the bundle, which is the whole point).
+public enum LegacyManagedLaunchAgentCleanup {
+  private static let lock = NSLock()
+  private static var didAttempt = false
+
+  /// Runs once per process. Subsequent calls are no-ops.
+  public static func runOnce() {
+    lock.lock()
+    let alreadyAttempted = didAttempt
+    didAttempt = true
+    lock.unlock()
+    guard !alreadyAttempted else { return }
+
+    let legacyName = HarnessMonitorPaths.legacyLaunchAgentPlistName
+    let currentName = HarnessMonitorPaths.launchAgentPlistName
+    guard legacyName != currentName else { return }
+
+    let legacyService = SMAppService.agent(plistName: legacyName)
+    switch legacyService.status {
+    case .enabled, .requiresApproval:
+      attemptUnregister(legacyService, name: legacyName)
+    case .notRegistered, .notFound:
+      return
+    @unknown default:
+      return
+    }
+  }
+
+  /// Test-only escape hatch: clears the once-guard so a unit test can verify
+  /// the runOnce path more than once in the same process.
+  public static func resetForTests() {
+    lock.lock()
+    didAttempt = false
+    lock.unlock()
+  }
+
+  private static func attemptUnregister(_ service: SMAppService, name: String) {
+    do {
+      try service.unregister()
+      HarnessMonitorLogger.lifecycle.info(
+        "Auto-unregistered legacy SMAppService plist \(name, privacy: .public)"
+      )
+    } catch {
+      HarnessMonitorLogger.lifecycle.notice(
+        "Could not unregister legacy SMAppService plist \(name, privacy: .public): \(error.localizedDescription, privacy: .public)"
+      )
+    }
+  }
+}
+
 public enum DaemonControlError: Error, LocalizedError, Equatable {
   case harnessBinaryNotFound
   case manifestMissing

@@ -53,14 +53,14 @@ public enum BuildPhases {
                 "$(PROJECT_DIR)/Scripts/lib/daemon-cargo-build.sh",
                 "$(PROJECT_DIR)/Scripts/lib/monitor-lanes.sh",
                 "$(PROJECT_DIR)/Scripts/lib/swift-tool-env.sh",
-                "$(PROJECT_DIR)/Resources/LaunchAgents/io.harnessmonitor.daemon.plist",
+                "$(PROJECT_DIR)/Resources/LaunchAgents/io.harnessmonitor.daemon.managed.plist",
                 "$(PROJECT_DIR)/Resources/LaunchAgents/io.harnessmonitor.daemon.Info.plist",
                 "$(PROJECT_DIR)/HarnessMonitorDaemon.entitlements"
             ],
             outputPaths: [
                 "$(TARGET_BUILD_DIR)/$(CONTENTS_FOLDER_PATH)/Helpers/harness",
                 "$(TARGET_BUILD_DIR)/$(CONTENTS_FOLDER_PATH)/Helpers/harness.cstemp",
-                "$(TARGET_BUILD_DIR)/$(CONTENTS_FOLDER_PATH)/Library/LaunchAgents/io.harnessmonitor.daemon.plist"
+                "$(TARGET_BUILD_DIR)/$(CONTENTS_FOLDER_PATH)/Library/LaunchAgents/io.harnessmonitor.daemon.managed.plist"
             ],
             basedOnDependencyAnalysis: true
         )
