@@ -20,14 +20,17 @@ extension SettingsTaskBoardSection {
     SettingsSecretField(
       title: "SSH Private Key",
       placeholder: "Paste SSH private key material",
-      text: override.sshPrivateKey,
+      field: override.sshPrivateKey,
       accessibilityIdentifier:
         HarnessMonitorAccessibility.settingsTaskBoardRepositoryOverrideSSHPrivateKeyField(index)
     )
-    SecureField("SSH Key Passphrase", text: override.sshPrivateKeyPassphrase)
-      .accessibilityIdentifier(
+    SettingsSecretField(
+      title: "SSH Key Passphrase",
+      placeholder: "Optional passphrase",
+      field: override.sshPrivateKeyPassphrase,
+      accessibilityIdentifier:
         HarnessMonitorAccessibility.settingsTBRepoSSHKeyPassphraseField(index)
-      )
+    )
   }
 
   @ViewBuilder
@@ -65,13 +68,16 @@ extension SettingsTaskBoardSection {
     SettingsSecretField(
       title: "Signing SSH Private Key",
       placeholder: "Paste signing SSH private key material",
-      text: override.signingSSHPrivateKey,
+      field: override.signingSSHPrivateKey,
       accessibilityIdentifier: HarnessMonitorAccessibility.settingsTBRepoSigningSSHKeyField(index)
     )
-    SecureField("Signing SSH Key Passphrase", text: override.signingSSHPrivateKeyPassphrase)
-      .accessibilityIdentifier(
+    SettingsSecretField(
+      title: "Signing SSH Key Passphrase",
+      placeholder: "Optional passphrase",
+      field: override.signingSSHPrivateKeyPassphrase,
+      accessibilityIdentifier:
         HarnessMonitorAccessibility.settingsTBRepoSigningSSHPassphraseField(index)
-      )
+    )
   }
 
   @ViewBuilder
@@ -91,16 +97,19 @@ extension SettingsTaskBoardSection {
     SettingsSecretField(
       title: "GPG Private Key",
       placeholder: "Paste ASCII-armored GPG private key",
-      text: override.gpgPrivateKey,
+      field: override.gpgPrivateKey,
       accessibilityIdentifier:
         HarnessMonitorAccessibility.settingsTaskBoardRepositoryOverrideGPGPrivateKeyMaterialField(
           index
         )
     )
-    SecureField("GPG Key Passphrase", text: override.gpgPrivateKeyPassphrase)
-      .accessibilityIdentifier(
+    SettingsSecretField(
+      title: "GPG Key Passphrase",
+      placeholder: "Optional passphrase",
+      field: override.gpgPrivateKeyPassphrase,
+      accessibilityIdentifier:
         HarnessMonitorAccessibility.settingsTaskBoardRepositoryOverrideGPGPassphraseField(index)
-      )
+    )
   }
 
   func multilineField(

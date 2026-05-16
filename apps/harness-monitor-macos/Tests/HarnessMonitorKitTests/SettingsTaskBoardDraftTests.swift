@@ -15,7 +15,7 @@ struct SettingsTaskBoardDraftTests {
     )
 
     var draft = TaskBoardGitSettingsDraft(snapshot: source)
-    draft.todoistToken = " next-todoist-token "
+    draft.todoistToken = .editing(" next-todoist-token ")
 
     let snapshot = draft.snapshot
 
@@ -27,7 +27,7 @@ struct SettingsTaskBoardDraftTests {
   @Test("Blank Todoist token clears secure credential")
   func blankTodoistTokenClearsCredential() {
     var draft = TaskBoardGitSettingsDraft()
-    draft.todoistToken = "   "
+    draft.todoistToken = .editing("   ")
 
     #expect(draft.snapshot.todoistCredentials.token == nil)
     #expect(draft.snapshot.todoistCredentials.isEmpty)
@@ -39,11 +39,12 @@ struct SettingsTaskBoardDraftTests {
     draft.signingMode = .gpg
     draft.gpgKeyId = " ABC123 "
     draft.gpgPrivateKeyPath = " /Users/test/.gnupg/private.asc "
-    draft.gpgPrivateKey =
+    draft.gpgPrivateKey = .editing(
       " -----BEGIN PGP PRIVATE KEY BLOCK-----\n"
-      + "secret\n"
-      + "-----END PGP PRIVATE KEY BLOCK----- "
-    draft.gpgPrivateKeyPassphrase = " passphrase "
+        + "secret\n"
+        + "-----END PGP PRIVATE KEY BLOCK----- "
+    )
+    draft.gpgPrivateKeyPassphrase = .editing(" passphrase ")
 
     let signing = draft.snapshot.runtimeConfig.global.signing
 
@@ -60,14 +61,15 @@ struct SettingsTaskBoardDraftTests {
   @Test("Global inline SSH material round trips through runtime snapshot")
   func globalInlineSSHMaterialRoundTrips() {
     var draft = TaskBoardGitSettingsDraft()
-    draft.sshPrivateKey =
+    draft.sshPrivateKey = .editing(
       " -----BEGIN OPENSSH PRIVATE KEY-----\n"
-      + "secret\n"
-      + "-----END OPENSSH PRIVATE KEY----- "
-    draft.sshPrivateKeyPassphrase = " identity-passphrase "
+        + "secret\n"
+        + "-----END OPENSSH PRIVATE KEY----- "
+    )
+    draft.sshPrivateKeyPassphrase = .editing(" identity-passphrase ")
     draft.signingMode = .ssh
-    draft.signingSSHPrivateKey = " signing-secret "
-    draft.signingSSHPrivateKeyPassphrase = " signing-passphrase "
+    draft.signingSSHPrivateKey = .editing(" signing-secret ")
+    draft.signingSSHPrivateKeyPassphrase = .editing(" signing-passphrase ")
 
     let profile = draft.snapshot.runtimeConfig.global
 
@@ -87,13 +89,13 @@ struct SettingsTaskBoardDraftTests {
     draft.repositoryOverrides = [
       TaskBoardRepositoryOverrideDraft(
         repository: " EXAMPLE/HARNESS ",
-        sshPrivateKey: " repo-identity-secret ",
-        sshPrivateKeyPassphrase: " repo-identity-passphrase ",
+        sshPrivateKey: .editing(" repo-identity-secret "),
+        sshPrivateKeyPassphrase: .editing(" repo-identity-passphrase "),
         signingMode: .gpg,
         gpgKeyId: " DEF456 ",
         gpgPrivateKeyPath: " /Users/test/.gnupg/repo.asc ",
-        gpgPrivateKey: " repo-gpg-secret ",
-        gpgPrivateKeyPassphrase: " repo-passphrase "
+        gpgPrivateKey: .editing(" repo-gpg-secret "),
+        gpgPrivateKeyPassphrase: .editing(" repo-passphrase ")
       )
     ]
 
