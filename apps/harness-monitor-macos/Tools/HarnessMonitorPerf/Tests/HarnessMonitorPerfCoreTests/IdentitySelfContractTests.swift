@@ -44,6 +44,9 @@ final class IdentitySelfContractTests: XCTestCase {
         // Sorted unique [String] from Foundation's
         // TimeZone.knownTimeZoneIdentifiers; uniqueness is system-guaranteed.
         "knownTimeZoneIdentifiers",
+        // [UUID] derived from filtering TaskBoardItemEditorDraft.externalRefs
+        // by provider visibility; UUID values are inherently duplicate-safe.
+        "monitorVisibleExternalRefIDs",
     ]
 
     func testEveryIdSelfSiteUsesAnAllowlistedCollection() throws {
