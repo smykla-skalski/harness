@@ -69,6 +69,11 @@ public enum Comparator {
             }
         }
 
+        let expectedButAbsent = expectedButAbsentCaptures(
+            currentIndex: currentIndex,
+            baselineIndex: baselineIndex
+        )
+
         let comparison = Comparison(
             currentLabel: current.label,
             baselineLabel: baseline.label,
@@ -78,6 +83,7 @@ public enum Comparator {
             missingFromBaseline: missingFromBaseline,
             currentMissingMetrics: currentMissingMetrics,
             baselineMissingMetrics: baselineMissingMetrics,
+            expectedButAbsent: expectedButAbsent,
             comparisons: comparisons
         )
 
@@ -410,6 +416,31 @@ public enum Comparator {
             template: capture.template,
             reason: capture.warnings?.joined(separator: "; ")
         )
+    }
+
+    private static func expectedButAbsentCaptures(
+        currentIndex: [CaptureKey: RunManifest.Capture],
+        baselineIndex: [CaptureKey: RunManifest.Capture]
+    ) -> [MissingCapture] {
+        var expected: [CaptureKey] = []
+        for scenario in ScenarioCatalog.swiftUI {
+            expected.append(CaptureKey(scenario: scenario, template: "SwiftUI"))
+        }
+        for scenario in ScenarioCatalog.allocations {
+            expected.append(CaptureKey(scenario: scenario, template: "Allocations"))
+        }
+        let absent = expected.filter { key in
+            currentIndex[key] == nil && baselineIndex[key] == nil
+        }
+        return absent
+            .sorted { ($0.scenario, $0.template) < ($1.scenario, $1.template) }
+            .map { key in
+                MissingCapture(
+                    scenario: key.scenario,
+                    template: key.template,
+                    reason: "not present in current or baseline summary"
+                )
+            }
     }
 
     private struct CaptureKey: Hashable {

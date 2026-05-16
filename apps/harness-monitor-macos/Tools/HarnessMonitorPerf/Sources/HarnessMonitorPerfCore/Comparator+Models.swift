@@ -10,6 +10,7 @@ extension Comparator {
         public var missingFromBaseline: [MissingCapture]
         public var currentMissingMetrics: [MissingCapture]
         public var baselineMissingMetrics: [MissingCapture]
+        public var expectedButAbsent: [MissingCapture]
         public var comparisons: [CaptureComparison]
 
         enum CodingKeys: String, CodingKey {
@@ -21,7 +22,70 @@ extension Comparator {
             case missingFromBaseline = "missing_from_baseline"
             case currentMissingMetrics = "current_missing_metrics"
             case baselineMissingMetrics = "baseline_missing_metrics"
+            case expectedButAbsent = "expected_but_absent"
             case comparisons
+        }
+
+        public init(
+            currentLabel: String?,
+            baselineLabel: String?,
+            currentCreatedAtUTC: String?,
+            baselineCreatedAtUTC: String?,
+            missingFromCurrent: [MissingCapture],
+            missingFromBaseline: [MissingCapture],
+            currentMissingMetrics: [MissingCapture],
+            baselineMissingMetrics: [MissingCapture],
+            expectedButAbsent: [MissingCapture] = [],
+            comparisons: [CaptureComparison]
+        ) {
+            self.currentLabel = currentLabel
+            self.baselineLabel = baselineLabel
+            self.currentCreatedAtUTC = currentCreatedAtUTC
+            self.baselineCreatedAtUTC = baselineCreatedAtUTC
+            self.missingFromCurrent = missingFromCurrent
+            self.missingFromBaseline = missingFromBaseline
+            self.currentMissingMetrics = currentMissingMetrics
+            self.baselineMissingMetrics = baselineMissingMetrics
+            self.expectedButAbsent = expectedButAbsent
+            self.comparisons = comparisons
+        }
+
+        public init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            currentLabel = try container.decodeIfPresent(String.self, forKey: .currentLabel)
+            baselineLabel = try container.decodeIfPresent(String.self, forKey: .baselineLabel)
+            currentCreatedAtUTC = try container.decodeIfPresent(
+                String.self,
+                forKey: .currentCreatedAtUTC
+            )
+            baselineCreatedAtUTC = try container.decodeIfPresent(
+                String.self,
+                forKey: .baselineCreatedAtUTC
+            )
+            missingFromCurrent = try container.decodeIfPresent(
+                [MissingCapture].self,
+                forKey: .missingFromCurrent
+            ) ?? []
+            missingFromBaseline = try container.decodeIfPresent(
+                [MissingCapture].self,
+                forKey: .missingFromBaseline
+            ) ?? []
+            currentMissingMetrics = try container.decodeIfPresent(
+                [MissingCapture].self,
+                forKey: .currentMissingMetrics
+            ) ?? []
+            baselineMissingMetrics = try container.decodeIfPresent(
+                [MissingCapture].self,
+                forKey: .baselineMissingMetrics
+            ) ?? []
+            expectedButAbsent = try container.decodeIfPresent(
+                [MissingCapture].self,
+                forKey: .expectedButAbsent
+            ) ?? []
+            comparisons = try container.decodeIfPresent(
+                [CaptureComparison].self,
+                forKey: .comparisons
+            ) ?? []
         }
     }
 
