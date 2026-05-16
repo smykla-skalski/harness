@@ -9,9 +9,11 @@ import XCTest
 ///
 /// Direct `.backgroundExtensionEffect(` callers must live in the documented
 /// helper file. Every other surface routes through the
-/// `sessionWindowBackgroundExtensionEffect()` / `harnessMonitorBackgroundExtensionEffect()`
-/// wrapper so the test-environment opt-out and the
-/// `accessibilityReduceTransparency` / backdrop-mode gating stay centralised.
+/// `sessionWindowBackgroundExtensionEffect()` /
+/// `harnessMonitorToolbarBackgroundExtensionEffect()` /
+/// `harnessMonitorBackgroundExtensionEffect()` wrappers so the test-environment
+/// opt-out and `accessibilityReduceTransparency` handling stay centralised.
+/// General backdrop surfaces also keep the user backdrop-mode gate there.
 final class GlassHostContractTests: XCTestCase {
     /// Files allowed to invoke `.backgroundExtensionEffect(` directly.
     /// Add a comment for each entry explaining why the raw call site is
@@ -20,10 +22,10 @@ final class GlassHostContractTests: XCTestCase {
     private static let allowlistedRelativePaths: [String] = [
         // The wrapper implementation itself; its `content.backgroundExtensionEffect()`
         // body is the single canonical glass-host entry point. Every other
-        // surface should call `sessionWindowBackgroundExtensionEffect()` or
+        // surface should call `sessionWindowBackgroundExtensionEffect()`,
+        // `harnessMonitorToolbarBackgroundExtensionEffect()`, or
         // `harnessMonitorBackgroundExtensionEffect()` instead so the
-        // accessibility, backdrop-mode, and test-environment gating stay
-        // centralised.
+        // accessibility and test-environment gating stay centralised.
         "Sources/HarnessMonitorUIPreviewable/Views/Sessions/SessionWindowBackgroundExtensionEffect.swift",
     ]
 
@@ -52,9 +54,10 @@ final class GlassHostContractTests: XCTestCase {
                 Found \(violations.count) raw `.backgroundExtensionEffect(` \
                 site(s) outside the allowlist. Glass-host placement is \
                 centralised; route the call through \
-                `sessionWindowBackgroundExtensionEffect()` (or its \
-                `harnessMonitorBackgroundExtensionEffect()` alias) so the \
-                accessibility and backdrop-mode gating in \
+                `sessionWindowBackgroundExtensionEffect()`, \
+                `harnessMonitorToolbarBackgroundExtensionEffect()`, or \
+                `harnessMonitorBackgroundExtensionEffect()` so the \
+                accessibility and test-environment gating in \
                 `SessionWindowBackgroundExtensionEffect.swift` stays \
                 authoritative. If a brand-new direct caller is genuinely \
                 required, add its `Sources/...` relative path to \

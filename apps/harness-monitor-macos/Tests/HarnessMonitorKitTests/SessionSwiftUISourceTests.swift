@@ -216,8 +216,17 @@ struct SessionSwiftUISourceTests {
       extensionEffectSource.contains("@AppStorage(HarnessMonitorBackdropDefaults.modeKey)")
     )
     #expect(extensionEffectSource.contains("@Environment(\\.accessibilityReduceTransparency)"))
-    #expect(extensionEffectSource.contains("if reduceTransparency || backdropMode == .none"))
+    #expect(
+      extensionEffectSource.contains(
+        "if reduceTransparency || (respectsBackdropMode && backdropMode == .none)"
+      )
+    )
     #expect(extensionEffectSource.contains("func harnessMonitorBackgroundExtensionEffect()"))
+    #expect(
+      extensionEffectSource.contains("func harnessMonitorToolbarBackgroundExtensionEffect()")
+    )
+    #expect(extensionEffectSource.contains("func sessionWindowBackgroundExtensionEffect()"))
+    #expect(extensionEffectSource.contains("harnessMonitorToolbarBackgroundExtensionEffect()"))
     #expect(extensionEffectSource.contains("content.backgroundExtensionEffect()"))
     #expect(!surfaceSource.contains(".backgroundExtensionEffect()"))
     #expect(surfaceSource.contains("topScrollEdgeEffect: .soft"))
@@ -227,37 +236,30 @@ struct SessionSwiftUISourceTests {
   func dashboardDetailSurfaceReusesSharedToolbarBlurHost() throws {
     let dashboardSource = try sourceFile(at: "Views/Dashboard/DashboardWindowView.swift")
 
-    #expect(dashboardSource.contains(".harnessMonitorBackgroundExtensionEffect()"))
-    #expect(
-      dashboardSource.contains(".windowToolbarBackdropUnderlay(toolbarBackdropModel(route: route))")
-    )
+    #expect(dashboardSource.contains(".harnessMonitorToolbarBackgroundExtensionEffect()"))
     #expect(dashboardSource.contains(".toolbarBackground(.visible, for: .windowToolbar)"))
     #expect(!dashboardSource.contains(".backgroundExtensionEffect()"))
   }
 
-  @Test("Toolbar backdrop underlay stays cheap and wrapper based")
-  func toolbarBackdropUnderlayStaysCheapAndWrapperBased() throws {
-    let underlaySource = try sourceFile(at: "Views/Toolbar/WindowToolbarBackdropUnderlay.swift")
+  @Test("Toolbar backdrop uses native extension without artificial underlays")
+  func toolbarBackdropUsesNativeExtensionWithoutArtificialUnderlays() throws {
+    let dashboardSource = try sourceFile(at: "Views/Dashboard/DashboardWindowView.swift")
     let sessionWindowSource = try sourceFile(at: "Views/Sessions/SessionWindowView.swift")
-    let presentationSource = try sourceFile(
-      at: "Views/Sessions/SessionWindowView+Presentation.swift"
+    let extensionEffectSource = try sourceFile(
+      at: "Views/Sessions/SessionWindowBackgroundExtensionEffect.swift"
     )
     let bannerChromeSource = try sourceFile(at: "Views/Shared/WindowBannerChrome.swift")
 
-    #expect(underlaySource.contains("public struct WindowToolbarBackdropModel"))
-    #expect(underlaySource.contains("public struct WindowToolbarBackdropUnderlay"))
-    #expect(underlaySource.contains("@Environment(\\.accessibilityReduceTransparency)"))
-    #expect(underlaySource.contains("HarnessMonitorUITestEnvironment.disablesVisualOptions"))
-    #expect(underlaySource.contains(".ignoresSafeArea(.container, edges: .top)"))
-    #expect(!underlaySource.contains(".backgroundExtensionEffect()"))
-    #expect(!underlaySource.contains(".blur("))
-    #expect(!underlaySource.contains("NSVisualEffectView"))
-    #expect(
-      sessionWindowSource.contains(".windowToolbarBackdropUnderlay(sessionToolbarBackdropModel)")
-    )
-    #expect(
-      presentationSource.contains("var sessionToolbarBackdropModel: WindowToolbarBackdropModel")
-    )
+    #expect(!dashboardSource.contains("WindowToolbarBackdropUnderlay"))
+    #expect(!dashboardSource.contains("windowToolbarBackdropUnderlay"))
+    #expect(!sessionWindowSource.contains("WindowToolbarBackdropUnderlay"))
+    #expect(!sessionWindowSource.contains("windowToolbarBackdropUnderlay"))
+    #expect(extensionEffectSource.contains("respectsBackdropMode: false"))
+    #expect(extensionEffectSource.contains("content.backgroundExtensionEffect()"))
+    #expect(!extensionEffectSource.contains("Ellipse()"))
+    #expect(!extensionEffectSource.contains("LinearGradient("))
+    #expect(!extensionEffectSource.contains(".blur("))
+    #expect(!extensionEffectSource.contains("NSVisualEffectView"))
     #expect(bannerChromeSource.contains("WindowBannerChromeBackground"))
     #expect(bannerChromeSource.contains("material=softWindowBackground"))
     #expect(!bannerChromeSource.contains(".background(Color(nsColor: .windowBackgroundColor))"))
