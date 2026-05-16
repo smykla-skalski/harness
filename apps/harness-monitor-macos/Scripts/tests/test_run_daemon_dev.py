@@ -10,10 +10,10 @@ import time
 import unittest
 from pathlib import Path
 
+from pty_test_support import collect_until_exit, read_until, spawn_in_pty
 
 APP_ROOT = Path(__file__).resolve().parents[2]
 SCRIPT_PATH = APP_ROOT / "Scripts" / "run-daemon-dev.sh"
-SUPERVISOR_PATH = APP_ROOT / "Scripts" / "run-daemon-dev.py"
 
 
 def write_executable(path: Path, content: str) -> None:
@@ -395,11 +395,48 @@ while True:
             self.assertIn("fake daemon ignored first interrupt", log_text)
             self.assertIn("fake daemon cleaned manifest on second interrupt", log_text)
 
-    def test_supervisor_uses_new_session_and_process_group_forwarding(self) -> None:
-        script = SUPERVISOR_PATH.read_text(encoding="utf-8")
+    def test_ctrl_c_from_tty_exits_zero_and_cleans_manifest(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            temp_root = Path(tmp_dir)
+            fake_harness = temp_root / "fake-harness-tty-interrupt.sh"
+            self.write_fake_harness(fake_harness, "interrupt-cleans")
 
-        self.assertIn("start_new_session=True", script)
-        self.assertIn("os.killpg(process.pid, signum)", script)
+            home_dir = temp_root / "home-monitor-daemon-tty"
+            home_dir.mkdir(parents=True, exist_ok=True)
+            log_dir = temp_root / "logs"
+            log_dir.mkdir(parents=True, exist_ok=True)
+            manifest_path = self.lane_manifest_path(home_dir, "monitor-daemon-tty")
+
+            env = os.environ.copy()
+            env.update(
+                {
+                    "HOME": str(home_dir),
+                    "HARNESS_MONITOR_RUNTIME_LANE": "monitor-daemon-tty",
+                    "HARNESS_MONITOR_DAEMON_DEV_BIN": str(fake_harness),
+                    "HARNESS_MONITOR_DAEMON_DEV_LOG_DIR": str(log_dir),
+                    "TMPDIR": str(temp_root),
+                    "BASH_ENV": "/dev/null",
+                }
+            )
+
+            pid, master_fd = spawn_in_pty(["bash", str(SCRIPT_PATH)], env)
+            try:
+                output = read_until(master_fd, "fake daemon started")
+                self.wait_for_path(manifest_path)
+                os.write(master_fd, b"\x03")
+                exit_code, tail = collect_until_exit(pid, master_fd)
+            finally:
+                os.close(master_fd)
+
+            combined_output = output + tail
+            self.assertEqual(exit_code, 0, combined_output)
+            self.assertFalse(manifest_path.exists(), "manifest should be removed on Ctrl+C")
+            self.assertIn("fake daemon cleaned manifest on interrupt", combined_output)
+            log_path = self.parse_log_path(combined_output)
+            self.assertTrue(log_path.is_file())
+            log_text = log_path.read_text(encoding="utf-8")
+            self.assertIn("fake daemon started", log_text)
+            self.assertIn("fake daemon cleaned manifest on interrupt", log_text)
 
     def test_interrupt_leak_fails_loudly_and_keeps_manifest(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_dir:

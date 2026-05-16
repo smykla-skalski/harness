@@ -263,15 +263,8 @@ run = "apps/harness-monitor-macos/Scripts/run-daemon-dev.sh"
 
 [tasks."monitor:bridge:start"]
 description = "Run `harness bridge start` with the current Harness Monitor runtime lane"
-env = { RUST_LOG = "harness=trace,agent_client_protocol=trace,tokio_tungstenite=debug,info,runtime=warn,tokio=warn,pyroscope=warn,pyroscope_pprofrs=warn,h2=warn,hyper=warn,hyper_util=warn,tower=warn,reqwest=warn,sqlx=warn", HARNESS_RUN_STEP_ACCEPT_STATUSES = "130,143" }
-run = '''
-  mkdir -p tmp/logs
-  log="tmp/logs/$(date +%y%m%d%H%M)-monitor-bridge-start.log"
-  apps/harness-monitor-macos/Scripts/monitor-runtime-env.sh \
-    ./scripts/cargo-local.sh run --quiet -- bridge start \
-    2>&1 | tee "$log"
-  echo "$log"
-'''
+env = { RUST_LOG = "harness=trace,agent_client_protocol=trace,tokio_tungstenite=debug,info,runtime=warn,tokio=warn,pyroscope=warn,pyroscope_pprofrs=warn,h2=warn,hyper=warn,hyper_util=warn,tower=warn,reqwest=warn,sqlx=warn" }
+run = "apps/harness-monitor-macos/Scripts/run-bridge-start.sh"
 
 [tasks."monitor:xcodebuildmcp"]
 description = "Run xcodebuildmcp with the current Harness Monitor runtime lane socket (pass xcodebuildmcp args after --)"
