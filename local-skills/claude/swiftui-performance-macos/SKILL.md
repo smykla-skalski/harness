@@ -321,6 +321,9 @@ GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=safe.bareRepository GIT_CONFIG_VALUE_0=all m
 mise run monitor:test:scripts
 ```
 
+`mise run monitor:audit:validation` runs both suites sequentially with
+fail-fast, which is the convenience entrypoint for "audit confidence".
+
 Test fixtures in `Scripts/tests/fixtures/` are minimal XML samples. Update them when adding new schema parsers.
 
 ## Research backing

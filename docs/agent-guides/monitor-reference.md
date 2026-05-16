@@ -118,6 +118,9 @@ mise run monitor:test:scripts
 mise run monitor:tools:test:perf
 ```
 
+Run both validation suites together with `mise run monitor:audit:validation`
+(fail-fast, prints a summary line at the end).
+
 Artifacts land in `tmp/perf/harness-monitor-instruments/runs/` with
 `manifest.json`, `summary.json`, `summary.csv`, per-scenario metrics, and
 optional comparison reports. The summary model now carries per-capture
