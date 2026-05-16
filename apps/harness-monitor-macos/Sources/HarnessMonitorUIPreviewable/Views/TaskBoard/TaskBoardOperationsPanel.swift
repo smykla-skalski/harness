@@ -9,7 +9,6 @@ struct TaskBoardOperationsPanel: View {
   private var fontScale
 
   @State private var syncStatusChoice = TaskBoardStatusFilterChoice.all
-  @State private var syncProviderChoice = TaskBoardExternalProviderChoice.all
   @State private var syncDirection = TaskBoardExternalSyncDirection.both
   @State private var syncDryRun = true
 
@@ -29,6 +28,10 @@ struct TaskBoardOperationsPanel: View {
 
   private var dashboard: HarnessMonitorStore.ContentDashboardSlice {
     store.contentUI.dashboard
+  }
+
+  private var syncProviderChoice: TaskBoardExternalProviderChoice {
+    .monitorVisibleChoice
   }
 
   /// Items the local host's `project_types` accept. Empty `targetProjectTypes`
@@ -154,15 +157,11 @@ extension TaskBoardOperationsPanel {
           }
         }
 
-        pickerField(
+        staticField(
           "Provider",
-          selection: $syncProviderChoice,
+          value: syncProviderChoice.title,
           accessibilityIdentifier: "harness.task-board.sync.provider"
-        ) {
-          ForEach(TaskBoardExternalProviderChoice.publicCases) { choice in
-            Text(choice.title).tag(choice)
-          }
-        }
+        )
 
         pickerField(
           "Direction",

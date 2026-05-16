@@ -16,6 +16,24 @@ struct TaskBoardManagementNativeField: View {
   }
 }
 
+struct TaskBoardManagementReadOnlyField: View {
+  let label: String
+  let value: String
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingXS) {
+      Text(label)
+        .scaledFont(.caption.weight(.semibold))
+        .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+      Text(value)
+        .scaledFont(.caption)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .accessibilityLabel(label)
+        .accessibilityValue(value)
+    }
+  }
+}
+
 struct TaskBoardManagementPickerField<
   Value: CaseIterable & Hashable & Identifiable & TitledTaskBoardValue
 >: View where Value.AllCases: RandomAccessCollection {

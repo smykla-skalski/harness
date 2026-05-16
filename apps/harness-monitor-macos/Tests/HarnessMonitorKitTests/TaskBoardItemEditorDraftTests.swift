@@ -56,7 +56,7 @@ struct TaskBoardItemEditorDraftTests {
 
   @Test("Monitor public UI hides Todoist provider choices")
   func monitorPublicUIHidesTodoistProviderChoices() {
-    #expect(TaskBoardExternalProviderChoice.publicCases == [.all, .gitHub])
+    #expect(TaskBoardExternalProviderChoice.monitorVisibleChoice == .gitHub)
     #expect(TaskBoardExternalRefProvider.taskBoardCases == [.gitHub])
   }
 
@@ -152,7 +152,7 @@ struct TaskBoardItemEditorDraftTests {
 
     #expect(draft.monitorVisibleExternalRefIDs == [draft.externalRefs[1].id])
     #expect(draft.monitorVisibleExternalRefs.map(\.provider) == [.gitHub])
-    #expect(draft.updateRequest.externalRefs.map(\.provider) == [.todoist, .gitHub])
+    #expect(draft.updateRequest.externalRefs?.map(\.provider) == [.todoist, .gitHub])
   }
 
   private func sampleTaskBoardItem(
