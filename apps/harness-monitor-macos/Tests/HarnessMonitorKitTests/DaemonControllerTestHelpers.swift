@@ -8,6 +8,7 @@ func withTempDaemonFixture(
   pid: UInt32,
   version: String = "19.4.1",
   endpoint: String = "http://127.0.0.1:65534",
+  ownership: DaemonOwnership = .managed,
   binaryStamp: DaemonBinaryStampFixture? = nil,
   tokenPathFactory: ((URL) throws -> URL)? = nil,
   perform: (HarnessMonitorEnvironment) async throws -> Void
@@ -19,6 +20,7 @@ func withTempDaemonFixture(
     daemonHome
     .appendingPathComponent("harness", isDirectory: true)
     .appendingPathComponent("daemon", isDirectory: true)
+    .appendingPathComponent(ownership.rawValue, isDirectory: true)
   try FileManager.default.createDirectory(at: daemonRoot, withIntermediateDirectories: true)
   defer { try? FileManager.default.removeItem(at: root) }
 
@@ -46,8 +48,14 @@ func withTempDaemonFixture(
   let manifestData = try encoder.encode(manifest)
   try manifestData.write(to: daemonRoot.appendingPathComponent("manifest.json"))
 
+  var environmentValues: [String: String] = [
+    HarnessMonitorAppGroup.daemonDataHomeEnvironmentKey: daemonHome.path
+  ]
+  if ownership == .external {
+    environmentValues[DaemonOwnership.environmentKey] = "1"
+  }
   let environment = HarnessMonitorEnvironment(
-    values: [HarnessMonitorAppGroup.daemonDataHomeEnvironmentKey: daemonHome.path],
+    values: environmentValues,
     homeDirectory: URL(fileURLWithPath: "/Users/example", isDirectory: true)
   )
   try await perform(environment)

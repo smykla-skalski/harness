@@ -9,7 +9,7 @@ private let managedLaunchAgentHelperPathFixture =
   + "Harness Monitor.app/Contents/Helpers/harness"
 private let managedLaunchAgentPlistPathFixture =
   "/Users/example/Library/Developer/Xcode/DerivedData/HarnessMonitor/Build/Products/Debug/"
-  + "Harness Monitor.app/Contents/Library/LaunchAgents/io.harnessmonitor.daemon.plist"
+  + "Harness Monitor.app/Contents/Library/LaunchAgents/io.harnessmonitor.daemon.managed.plist"
 
 @Suite("Daemon controller managed launch-agent warm-up")
 struct DaemonControllerManagedLaunchAgentWarmUpTests {
