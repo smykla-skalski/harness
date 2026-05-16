@@ -98,11 +98,12 @@ struct TaskBoardOperationsPanel: View {
 
   var body: some View {
     TaskBoardSection(title: "Operations") {
-      VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingMD) {
-        syncCard
-        dispatchCard
-        inventoryCard
-      }
+      TaskBoardOperationsPanelLayout(
+        metrics: metrics,
+        syncCard: syncCard,
+        dispatchCard: dispatchCard,
+        inventoryCard: inventoryCard
+      )
     }
     .confirmationDialog(
       pendingDispatchConfirmation?.title ?? "Dispatch items?",
