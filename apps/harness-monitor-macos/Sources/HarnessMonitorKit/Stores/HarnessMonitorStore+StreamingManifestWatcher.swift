@@ -66,8 +66,7 @@ extension HarnessMonitorStore {
 
   func refreshExternalManifestDiscoveryTask() {
     guard manifestWatcher != nil,
-      maintainsLiveDaemonObservation,
-      daemonOwnership == .external
+      maintainsLiveDaemonObservation
     else {
       stopExternalManifestDiscoveryTask()
       return
@@ -98,7 +97,7 @@ extension HarnessMonitorStore {
           self.adoptManifestURL(from: refreshedManifestURL.path)
           self.appendConnectionEvent(
             kind: .reconnecting,
-            detail: "Discovered live external daemon manifest, re-bootstrapping"
+            detail: "Discovered live daemon manifest, re-bootstrapping"
           )
           await self.reconnect()
           return

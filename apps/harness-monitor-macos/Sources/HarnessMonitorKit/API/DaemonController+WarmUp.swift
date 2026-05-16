@@ -110,9 +110,7 @@ extension DaemonController {
     after error: DaemonControlError,
     state: inout WarmUpLoopState
   ) async -> WarmUpIterationOutcome? {
-    guard ownership == .external,
-      let refreshedManifestURL = await refreshExternalManifestLocation()
-    else {
+    guard let refreshedManifestURL = await refreshExternalManifestLocation() else {
       return nil
     }
 
@@ -122,7 +120,7 @@ extension DaemonController {
     state.lastLoggedManifestSignature = nil
     state.lastLoggedRetryErrorDescription = nil
     HarnessMonitorLogger.lifecycle.notice(
-      "External daemon discovery switched manifest to \(refreshedManifestURL.path, privacy: .public)"
+      "Daemon discovery switched manifest to \(refreshedManifestURL.path, privacy: .public)"
     )
     return .progressedLoop
   }

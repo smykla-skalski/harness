@@ -23,9 +23,16 @@ final class ExternalDaemonManifestLocator: @unchecked Sendable {
     self.environment = environment
     self.configuredManifestURL = HarnessMonitorPaths.manifestURL(using: environment)
     self.shouldRememberLiveManifest = ownership == .external
+    // Cross-lane manifest re-discovery applies to both ownership modes when
+    // the app's runtime env has no lane override. The managed daemon plist
+    // bakes `HARNESS_DAEMON_DATA_HOME` from the build env, so the daemon
+    // writes to a lane path that the lane-agnostic IDE Run scheme cannot
+    // resolve at store init — the daemon hasn't spawned yet, so cross-lane
+    // discovery falls back to the non-lane base path. Allow re-resolution
+    // during warm-up so the locator picks up the lane path once the daemon
+    // writes its manifest there.
     self.shouldConsultRememberedManifest =
-      ownership == .external
-      && HarnessMonitorPaths.configuredDataHomeRoot(using: environment) == nil
+      HarnessMonitorPaths.configuredDataHomeRoot(using: environment) == nil
       && HarnessMonitorPaths.resolvedRuntimeLane(using: environment) == nil
     self.activeManifestURL = configuredManifestURL
 
@@ -80,7 +87,11 @@ final class ExternalDaemonManifestLocator: @unchecked Sendable {
   }
 
   private var rememberedManifestURL: URL? {
-    guard shouldConsultRememberedManifest else {
+    // Gate on `shouldRememberLiveManifest` (external-only) rather than
+    // `shouldConsultRememberedManifest` so managed mode doesn't read a path
+    // that only external writers populate. The UserDefaults key is shared but
+    // semantically external-only.
+    guard shouldRememberLiveManifest, shouldConsultRememberedManifest else {
       return nil
     }
     guard
@@ -118,10 +129,6 @@ protocol ExternalManifestLocationRefreshing: Sendable {
 
 extension DaemonController: ExternalManifestLocationRefreshing {
   func refreshExternalManifestLocation() async -> URL? {
-    guard ownership == .external else {
-      return nil
-    }
-
     let locator = externalManifestLocator
     return await Task.detached(priority: .utility) {
       locator.refreshDiscoveredManifestURLIfNeeded()
