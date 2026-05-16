@@ -206,8 +206,11 @@ struct TaskBoardItemRow: View {
           }
         }
       }
-      .frame(maxWidth: .infinity, alignment: .leading)
-      .frame(minHeight: metrics.cardMinHeight, alignment: .topLeading)
+      .frame(
+        maxWidth: .infinity,
+        minHeight: metrics.cardMinHeight,
+        alignment: .topLeading
+      )
       .padding(metrics.cardPadding)
     }
     .taskBoardCardChrome()
@@ -314,8 +317,11 @@ struct TaskBoardInboxItemRow: View {
           }
         }
       }
-      .frame(maxWidth: .infinity, alignment: .leading)
-      .frame(minHeight: metrics.cardMinHeight, alignment: .topLeading)
+      .frame(
+        maxWidth: .infinity,
+        minHeight: metrics.cardMinHeight,
+        alignment: .topLeading
+      )
       .padding(metrics.cardPadding)
     }
     .taskBoardCardChrome()
