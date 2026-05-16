@@ -3,6 +3,13 @@
     {
       "scenario": "offline-cached-open",
       "template": "Allocations",
+      "launch_metrics": {
+        "app_init_to_ready_ms": 250,
+        "measured_from": "fixture",
+        "state_label": "fixture",
+        "window_id": "fixture",
+        "includes_bootstrap_in_scenario_measurement": false
+      },
       "metrics": {
         "allocations": {
           "summary_rows": {
