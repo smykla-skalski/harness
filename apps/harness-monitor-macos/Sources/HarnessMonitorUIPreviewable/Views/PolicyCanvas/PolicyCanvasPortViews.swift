@@ -15,17 +15,24 @@ struct PolicyCanvasPortColumn: View {
   var isAuxiliary = false
 
   var body: some View {
-    let portOffsets = computePortOffsets()
+    // Ports are fixed per node-kind (node ports are created once in
+    // `PolicyCanvasNode.init` and never mutated at runtime, only cloned).
+    // Iterating `ports.indices` keeps the offset math inline so we avoid
+    // allocating a fresh `[PolicyCanvasPort.ID: CGSize]` dictionary on
+    // every body call - that allocation was the hot lever feeding the
+    // `External: UInt32 -> PolicyCanvasPort.Evictor` cascade observed in
+    // r23 (14k edges).
+    let count = ports.count
     ZStack(alignment: stackAlignment) {
-      ForEach(ports, id: \.id) { port in
+      ForEach(ports.indices, id: \.self) { index in
         PolicyCanvasPortView(
           node: node,
-          port: port,
+          port: ports[index],
           side: portSide,
           viewModel: viewModel,
           isAuxiliary: isAuxiliary
         )
-        .offset(portOffsets[port.id] ?? .zero)
+        .offset(offset(index: index, count: count))
       }
     }
     .frame(
@@ -94,16 +101,6 @@ struct PolicyCanvasPortColumn: View {
         height: 0
       )
     }
-  }
-
-  private func computePortOffsets() -> [PolicyCanvasPort.ID: CGSize] {
-    let count = ports.count
-    var result: [PolicyCanvasPort.ID: CGSize] = [:]
-    result.reserveCapacity(count)
-    for (index, port) in ports.enumerated() {
-      result[port.id] = offset(index: index, count: count)
-    }
-    return result
   }
 }
 
