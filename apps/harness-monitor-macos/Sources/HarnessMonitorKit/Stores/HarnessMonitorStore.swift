@@ -342,6 +342,7 @@ public final class HarnessMonitorStore {
   @ObservationIgnored var pendingSelectedSessionRefreshFallback: (sessionID: String, token: UInt64)?
   @ObservationIgnored var lastSessionPushFallbackAt: [String: ContinuousClock.Instant] = [:]
   @ObservationIgnored var lastManagedLaunchAgentRefreshAt: ContinuousClock.Instant?
+  @ObservationIgnored var hasRefreshedManagedLaunchAgentOnLaunch = false
   @ObservationIgnored var pendingAgentTuiActionRefresh: (tuiID: String, token: UInt64)?
   var pendingExtensions: SessionExtensionsPayload?
   var isNavigatingHistory = false
