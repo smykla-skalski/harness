@@ -66,17 +66,21 @@ public enum BudgetEnforcer {
 
         let totalUpdates = number(metrics, "swiftui_updates", "total_count")
         let bodyUpdates = number(metrics, "swiftui_updates", "body_update_count")
+        let p95UpdateMillis = number(metrics, "swiftui_updates", "duration_ms_p95")
         let maxGroupMillis = number(metrics, "swiftui_update_groups", "duration_ns_max") / 1_000_000
         let hitches = number(metrics, "hitches", "count")
         let hangs = number(metrics, "potential_hangs", "count")
 
-        let checks: [(String, Double, Double)] = [
+        var checks: [(String, Double, Double)] = [
             ("total_updates", totalUpdates, budget.totalUpdates),
             ("body_updates", bodyUpdates, budget.bodyUpdates),
             ("max_update_group_ms", maxGroupMillis, budget.maxUpdateGroupMilliseconds),
             ("hitches", hitches, budget.hitches),
             ("potential_hangs", hangs, budget.potentialHangs),
         ]
+        if let p95Limit = budget.p95UpdateMilliseconds {
+            checks.append((MetricName.p95UpdateMs, p95UpdateMillis, p95Limit))
+        }
         return checks.compactMap { name, value, limit in
             value > limit
                 ? "\(scenario) SwiftUI \(name) exceeded budget: \(format(value)) > \(format(limit))"
