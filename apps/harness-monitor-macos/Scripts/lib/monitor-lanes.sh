@@ -176,7 +176,10 @@ harness_monitor_runtime_launch_agent_label() {
     return 0
   fi
   lane="$(harness_monitor_runtime_lane "$checkout_root")"
-  printf '%s.%s\n' "$HARNESS_MONITOR_LANE_LABEL_BASE" "$lane"
+  # The label always carries the `.managed` qualifier because the bundled
+  # daemon is the managed side of the coexistence partition. External
+  # daemons (`harness daemon dev`) are not launchd-registered.
+  printf '%s.managed.%s\n' "$HARNESS_MONITOR_LANE_LABEL_BASE" "$lane"
 }
 
 harness_monitor_runtime_xcodebuildmcp_socket_path() {

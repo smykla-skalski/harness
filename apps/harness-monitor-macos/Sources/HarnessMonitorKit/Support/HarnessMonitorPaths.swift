@@ -119,26 +119,28 @@ public enum HarnessMonitorPaths {
   /// Resolution order:
   /// 1. Explicit configured root (`HARNESS_DAEMON_DATA_HOME` / `XDG_DATA_HOME`).
   /// 2. Explicit runtime lane (`HARNESS_MONITOR_RUNTIME_LANE`).
-  /// 3. Cross-lane discovery: pick the live daemon whose manifest pid is alive.
-  ///    Lets Xcode IDE launches always find the user's externally-started daemon
-  ///    without baking a lane into the scheme.
+  /// 3. Cross-lane discovery: pick the live daemon whose ownership-scoped
+  ///    manifest pid is alive. Lets Xcode IDE launches find the user's
+  ///    externally-started daemon without baking a lane into the scheme.
+  ///    Per-ownership: managed mode walks managed/ subtrees; external mode
+  ///    walks external/ subtrees. Cross-checkout attach is preserved for
+  ///    external mode.
   /// 4. Native group-container resolution for the configured or default app group id.
   /// 5. Home-relative app-group fallback via `HARNESS_APP_GROUP_ID`.
   /// 6. External-daemon legacy bypass (`HARNESS_MONITOR_EXTERNAL_DAEMON=1` or a
   ///    persisted external-mode preference injected into the environment):
   ///    returns `~/Library/Application Support` directly so explicit external
   ///    launches can stay symmetric with the legacy CLI-only layout after all
-  ///    app-group and runtime-lane roots have been exhausted. Production
-  ///    external launches should normally resolve earlier through
-  ///    `HARNESS_MONITOR_RUNTIME_LANE`, `HARNESS_DAEMON_DATA_HOME`, or
-  ///    app-group cross-lane discovery.
-  ///    Only evaluated when `preferExternalDaemon` is true.
+  ///    app-group and runtime-lane roots have been exhausted. Only evaluated
+  ///    when `preferExternalDaemon` is true.
   ///
   /// Returns `nil` when none of the above resolves — callers decide how to handle that.
   private static func resolveBaseRoot(
     using environment: HarnessMonitorEnvironment,
     preferExternalDaemon: Bool
   ) -> URL? {
+    let ownership = DaemonOwnership(environment: environment)
+
     if let configuredRoot = configuredDataHomeRoot(using: environment) {
       return configuredRoot
     }
@@ -147,7 +149,10 @@ public enum HarnessMonitorPaths {
       return laneRoot
     }
 
-    if let discoveredRoot = discoverLiveDaemonRoot(using: environment) {
+    if let discoveredRoot = discoverLiveDaemonRoot(
+      ownership: ownership,
+      using: environment
+    ) {
       return discoveredRoot
     }
 
@@ -168,7 +173,7 @@ public enum HarnessMonitorPaths {
       return containerURL
     }
 
-    if preferExternalDaemon, DaemonOwnership(environment: environment) == .external {
+    if preferExternalDaemon, ownership == .external {
       return environment.homeDirectory
         .appendingPathComponent("Library", isDirectory: true)
         .appendingPathComponent("Application Support", isDirectory: true)
@@ -208,6 +213,12 @@ public enum HarnessMonitorPaths {
     return Int(portValue)
   }
 
+  /// Launch-agent label for the bundled (managed) daemon.
+  ///
+  /// External daemons are not launchd-registered (they run from `harness
+  /// daemon dev` in a user shell) so there's no symmetric label for them.
+  /// The label always carries the `.managed` qualifier so it cannot collide
+  /// with a hand-installed legacy plist that used the unqualified base name.
   public static func launchAgentLabel(
     using environment: HarnessMonitorEnvironment = .current
   ) -> String {
@@ -217,6 +228,20 @@ public enum HarnessMonitorPaths {
       return explicitLabel
     }
 
+    let baseManagedLabel =
+      "\(HarnessMonitorRuntimeLane.launchAgentBaseLabel).\(DaemonOwnership.managed.rawValue)"
+    guard let lane = resolvedRuntimeLane(using: environment) else {
+      return baseManagedLabel
+    }
+    return "\(baseManagedLabel).\(lane)"
+  }
+
+  /// The pre-coexistence label, used solely to find and unregister an
+  /// orphaned legacy SMAppService entry on first launch under the new
+  /// layout. Don't use for fresh registrations.
+  public static func legacyManagedLaunchAgentLabel(
+    using environment: HarnessMonitorEnvironment = .current
+  ) -> String {
     guard let lane = resolvedRuntimeLane(using: environment) else {
       return HarnessMonitorRuntimeLane.launchAgentBaseLabel
     }
@@ -274,7 +299,29 @@ public enum HarnessMonitorPaths {
       .appendingPathComponent("harness", isDirectory: true)
   }
 
+  /// Daemon root for the current process's resolved [`DaemonOwnership`].
+  /// Most existing call sites want this default. Pass explicit ownership
+  /// when reading the OTHER side's state (rare; mostly for the coexistence
+  /// status banner).
   public static func daemonRoot(using environment: HarnessMonitorEnvironment = .current) -> URL {
+    daemonRoot(ownership: DaemonOwnership(environment: environment), using: environment)
+  }
+
+  /// Daemon root for an explicit ownership. Path:
+  /// `<harnessRoot>/daemon/<ownership>/`.
+  public static func daemonRoot(
+    ownership: DaemonOwnership,
+    using environment: HarnessMonitorEnvironment = .current
+  ) -> URL {
+    daemonRootBase(using: environment)
+      .appendingPathComponent(ownership.rawValue, isDirectory: true)
+  }
+
+  /// Directory that contains the `managed/` and `external/` subtrees. Used
+  /// when enumerating both sides or migrating legacy single-ownership state.
+  public static func daemonRootBase(
+    using environment: HarnessMonitorEnvironment = .current
+  ) -> URL {
     Self.harnessRoot(using: environment).appendingPathComponent("daemon", isDirectory: true)
   }
 
@@ -289,21 +336,37 @@ public enum HarnessMonitorPaths {
     Self.daemonRoot(using: environment).appendingPathComponent("manifest.json")
   }
 
+  public static func manifestURL(
+    ownership: DaemonOwnership,
+    using environment: HarnessMonitorEnvironment = .current
+  ) -> URL {
+    Self.daemonRoot(ownership: ownership, using: environment)
+      .appendingPathComponent("manifest.json")
+  }
+
   public static func authTokenURL(using environment: HarnessMonitorEnvironment = .current) -> URL {
     Self.daemonRoot(using: environment).appendingPathComponent("auth-token")
+  }
+
+  public static func authTokenURL(
+    ownership: DaemonOwnership,
+    using environment: HarnessMonitorEnvironment = .current
+  ) -> URL {
+    Self.daemonRoot(ownership: ownership, using: environment)
+      .appendingPathComponent("auth-token")
   }
 
   public static func managedLaunchAgentBundleStampURL(
     using environment: HarnessMonitorEnvironment = .current
   ) -> URL {
-    Self.daemonRoot(using: environment)
+    Self.daemonRoot(ownership: .managed, using: environment)
       .appendingPathComponent("managed-launch-agent-bundle-stamp.json")
   }
 
   public static func managedLaunchAgentLockURL(
     using environment: HarnessMonitorEnvironment = .current
   ) -> URL {
-    Self.daemonRoot(using: environment)
+    Self.daemonRoot(ownership: .managed, using: environment)
       .appendingPathComponent("managed-launch-agent.lock")
   }
 
@@ -366,6 +429,13 @@ public enum HarnessMonitorPaths {
   }
 
   public static var launchAgentPlistName: String {
+    "io.harnessmonitor.daemon.managed.plist"
+  }
+
+  /// Pre-coexistence plist filename. Kept solely so the app can attempt to
+  /// unregister an orphaned legacy SMAppService entry on first launch under
+  /// the new layout.
+  public static var legacyLaunchAgentPlistName: String {
     "io.harnessmonitor.daemon.plist"
   }
 

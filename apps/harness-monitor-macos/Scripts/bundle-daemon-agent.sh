@@ -94,7 +94,7 @@ validate_package_version() {
 helpers_dir="$TARGET_BUILD_DIR/$CONTENTS_FOLDER_PATH/Helpers"
 launch_agents_dir="$TARGET_BUILD_DIR/$CONTENTS_FOLDER_PATH/Library/LaunchAgents"
 daemon_target="$helpers_dir/harness"
-plist_target="$launch_agents_dir/io.harnessmonitor.daemon.plist"
+plist_target="$launch_agents_dir/io.harnessmonitor.daemon.managed.plist"
 launch_agent_label="$(harness_monitor_runtime_launch_agent_label "$repo_root")"
 app_group_id="$(harness_monitor_runtime_app_group_id)"
 
@@ -111,7 +111,7 @@ app_group_id="$(harness_monitor_runtime_app_group_id)"
 /bin/chmod 755 "$daemon_target"
 /usr/bin/xattr -dr com.apple.provenance "$daemon_target" 2>/dev/null || true
 /usr/bin/xattr -dr com.apple.quarantine "$daemon_target" 2>/dev/null || true
-/bin/cp "$PROJECT_DIR/Resources/LaunchAgents/io.harnessmonitor.daemon.plist" "$plist_target"
+/bin/cp "$PROJECT_DIR/Resources/LaunchAgents/io.harnessmonitor.daemon.managed.plist" "$plist_target"
 /usr/bin/plutil -replace Label -string "$launch_agent_label" "$plist_target"
 /usr/bin/plutil -replace EnvironmentVariables.HARNESS_APP_GROUP_ID -string "$app_group_id" "$plist_target"
 if [[ -n "${HARNESS_DAEMON_DATA_HOME:-}" ]]; then
@@ -123,6 +123,10 @@ fi
 if [[ -n "${HARNESS_MONITOR_RUNTIME_LANE:-}" ]]; then
   /usr/bin/plutil -replace EnvironmentVariables.HARNESS_MONITOR_RUNTIME_LANE -string "$HARNESS_MONITOR_RUNTIME_LANE" "$plist_target"
 fi
+# Always reassert the ownership env so the bundled daemon writes into the
+# managed/ ownership subtree even if a stray HARNESS_DAEMON_OWNERSHIP override
+# made it into the build environment.
+/usr/bin/plutil -replace EnvironmentVariables.HARNESS_DAEMON_OWNERSHIP -string "managed" "$plist_target"
 /usr/bin/plutil -lint "$plist_target"
 
 if ! /usr/bin/otool -l "$daemon_target" | /usr/bin/grep -q "__info_plist"; then
