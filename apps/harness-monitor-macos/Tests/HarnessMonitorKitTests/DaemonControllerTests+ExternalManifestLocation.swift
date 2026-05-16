@@ -71,6 +71,7 @@ struct DaemonControllerExternalManifestLocationTests {
       appGroupRoot
       .appendingPathComponent("harness", isDirectory: true)
       .appendingPathComponent("daemon", isDirectory: true)
+      .appendingPathComponent(DaemonOwnership.external.rawValue, isDirectory: true)
     try FileManager.default.createDirectory(at: rootDaemonRoot, withIntermediateDirectories: true)
 
     let rootTokenURL = rootDaemonRoot.appendingPathComponent("auth-token")
@@ -103,6 +104,7 @@ struct DaemonControllerExternalManifestLocationTests {
           .appendingPathComponent("late-start", isDirectory: true)
           .appendingPathComponent("harness", isDirectory: true)
           .appendingPathComponent("daemon", isDirectory: true)
+          .appendingPathComponent(DaemonOwnership.external.rawValue, isDirectory: true)
         try FileManager.default.createDirectory(
           at: laneDaemonRoot,
           withIntermediateDirectories: true
@@ -148,6 +150,7 @@ struct DaemonControllerExternalManifestLocationTests {
       appGroupRoot
       .appendingPathComponent("harness", isDirectory: true)
       .appendingPathComponent("daemon", isDirectory: true)
+      .appendingPathComponent(DaemonOwnership.external.rawValue, isDirectory: true)
     try FileManager.default.createDirectory(at: rootDaemonRoot, withIntermediateDirectories: true)
 
     let rootTokenURL = rootDaemonRoot.appendingPathComponent("auth-token")
@@ -182,6 +185,7 @@ struct DaemonControllerExternalManifestLocationTests {
           .appendingPathComponent("late-start", isDirectory: true)
           .appendingPathComponent("harness", isDirectory: true)
           .appendingPathComponent("daemon", isDirectory: true)
+          .appendingPathComponent(DaemonOwnership.external.rawValue, isDirectory: true)
         try FileManager.default.createDirectory(
           at: laneDaemonRoot,
           withIntermediateDirectories: true
@@ -227,6 +231,7 @@ final class DaemonControllerExternalManifestLocationXCTests: XCTestCase {
       appGroupRoot
       .appendingPathComponent("harness", isDirectory: true)
       .appendingPathComponent("daemon", isDirectory: true)
+      .appendingPathComponent(DaemonOwnership.external.rawValue, isDirectory: true)
     try FileManager.default.createDirectory(at: rootDaemonRoot, withIntermediateDirectories: true)
 
     let rootTokenURL = rootDaemonRoot.appendingPathComponent("auth-token")
@@ -262,6 +267,7 @@ final class DaemonControllerExternalManifestLocationXCTests: XCTestCase {
           .appendingPathComponent("late-start", isDirectory: true)
           .appendingPathComponent("harness", isDirectory: true)
           .appendingPathComponent("daemon", isDirectory: true)
+          .appendingPathComponent(DaemonOwnership.external.rawValue, isDirectory: true)
         try FileManager.default.createDirectory(
           at: laneDaemonRoot,
           withIntermediateDirectories: true

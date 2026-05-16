@@ -346,10 +346,10 @@ struct HarnessMonitorPathsTests {
 
   @Test("Launch agent plist path is bundle relative")
   func launchAgentPlistPathIsBundleRelative() {
-    #expect(HarnessMonitorPaths.launchAgentPlistName == "io.harnessmonitor.daemon.plist")
+    #expect(HarnessMonitorPaths.launchAgentPlistName == "io.harnessmonitor.daemon.managed.plist")
     #expect(
       HarnessMonitorPaths.launchAgentBundleRelativePath
-        == "Contents/Library/LaunchAgents/io.harnessmonitor.daemon.plist"
+        == "Contents/Library/LaunchAgents/io.harnessmonitor.daemon.managed.plist"
     )
   }
 }

@@ -177,3 +177,22 @@ else
     --identifier io.harnessmonitor.daemon \
     "$daemon_target"
 fi
+
+# Reseal the app bundle so SMAppService can validate the bundled launch agent
+# plist. Without a `_CodeSignature/CodeResources` manifest, SMAppService refuses
+# to register the plist with `errSecCSUnsigned` (-67056) on first approval, and
+# `Bootstrapping daemon client for managed daemon mode` stalls because
+# `launchAgentRegistrationState()` reports `.notFound`. Xcode normally writes
+# this manifest as part of its bundle-signing phase, but `CODE_SIGNING_ALLOWED=NO`
+# in the dev build wrapper short-circuits it; we replicate the essential part
+# here so the dev flow stays usable without forcing a signing identity.
+app_bundle="$TARGET_BUILD_DIR/$WRAPPER_NAME"
+bundle_identity="$codesign_identity"
+if [ -z "$bundle_identity" ]; then
+  bundle_identity="-"
+fi
+/usr/bin/codesign \
+  --force \
+  --sign "$bundle_identity" \
+  --preserve-metadata=entitlements,flags,identifier \
+  "$app_bundle"
