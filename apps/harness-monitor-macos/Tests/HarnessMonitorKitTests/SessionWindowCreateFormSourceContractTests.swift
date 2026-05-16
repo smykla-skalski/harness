@@ -132,7 +132,8 @@ extension SessionWindowCreateFormMetricsTests {
         ".padding(.horizontal, embeddedInForm ? 0 : HarnessMonitorTheme.spacingXS)"))
     #expect(source.runtimePaneSupport.contains(".truncationMode(.tail)"))
     #expect(!source.runtimePane.contains(".padding(.horizontal, HarnessMonitorTheme.spacingMD)"))
-    #expect(source.runtimePaneSupport.contains(".padding(.vertical, HarnessMonitorTheme.spacingXS)"))
+    #expect(
+      source.runtimePaneSupport.contains(".padding(.vertical, HarnessMonitorTheme.spacingXS)"))
     #expect(!source.runtimePane.contains(".buttonStyle(.plain)"))
   }
 

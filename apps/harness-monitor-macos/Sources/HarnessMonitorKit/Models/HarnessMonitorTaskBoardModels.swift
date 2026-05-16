@@ -12,7 +12,7 @@ public enum TaskBoardStatus: TaskBoardOpenEnum, CaseIterable, Identifiable {
   case blocked
   case unknown(String)
 
-  public static let allCases: [TaskBoardStatus] = [
+  public static let allCases: [Self] = [
     .new,
     .planning,
     .planReview,
@@ -111,7 +111,7 @@ public enum TaskBoardAgentMode: TaskBoardOpenEnum, CaseIterable, Identifiable {
   case evaluate
   case unknown(String)
 
-  public static let allCases: [TaskBoardAgentMode] = [
+  public static let allCases: [Self] = [
     .headless,
     .interactive,
     .planning,

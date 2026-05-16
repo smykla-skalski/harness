@@ -8,8 +8,10 @@ extension HarnessMonitorUITestAccessibilityRegistryTests {
     #expect(HarnessMonitorAccessibility.dashboardWindowRoot == "harness.dashboard.window")
     #expect(HarnessMonitorAccessibility.dashboardSidebar == "harness.dashboard.sidebar")
     #expect(HarnessMonitorAccessibility.dashboardScrollView == "harness.dashboard.scroll")
-    #expect(HarnessMonitorAccessibility.dashboardNewSessionButton == "harness.dashboard.new-session")
-    #expect(HarnessMonitorAccessibility.dashboardOpenFolderButton == "harness.dashboard.open-folder")
+    #expect(
+      HarnessMonitorAccessibility.dashboardNewSessionButton == "harness.dashboard.new-session")
+    #expect(
+      HarnessMonitorAccessibility.dashboardOpenFolderButton == "harness.dashboard.open-folder")
     #expect(
       HarnessMonitorAccessibility.dashboardWindowRoute("taskBoard")
         == "harness.dashboard.route.taskboard"
@@ -84,7 +86,8 @@ extension HarnessMonitorUITestAccessibilityRegistryTests {
       )
     )
     #expect(dashboardView.contains("HarnessMonitorAccessibility.dashboardSidebar"))
-    #expect(dashboardView.contains("HarnessMonitorAccessibility.dashboardWindowRoute(route.rawValue)"))
+    #expect(
+      dashboardView.contains("HarnessMonitorAccessibility.dashboardWindowRoute(route.rawValue)"))
     #expect(dashboardView.contains("HarnessMonitorSidebar("))
     #expect(dashboardView.contains("List(selection: dashboardSelectionBinding)"))
     #expect(dashboardView.contains("SessionSidebarRow("))

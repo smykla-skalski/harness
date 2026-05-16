@@ -70,7 +70,8 @@ extension TaskBoardHostMachine {
     if itemTargetProjectTypes.isEmpty {
       return true
     }
-    let declared = machineProjectTypes
+    let declared =
+      machineProjectTypes
       .map { $0.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() }
       .filter { !$0.isEmpty }
     if declared.isEmpty {

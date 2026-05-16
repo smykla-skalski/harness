@@ -11,7 +11,6 @@ import SwiftUI
 
 struct TaskBoardDecisionRow: View {
   let decision: Decision
-  let now: Date
   let onOpenDecision: (Decision) -> Void
   private let primaryAction: SuggestedAction?
   @Environment(\.fontScale)
@@ -21,11 +20,9 @@ struct TaskBoardDecisionRow: View {
 
   init(
     decision: Decision,
-    now: Date = Date.now,
     onOpenDecision: @escaping (Decision) -> Void
   ) {
     self.decision = decision
-    self.now = now
     self.onOpenDecision = onOpenDecision
     primaryAction = Self.resolvePrimaryAction(for: decision)
   }
@@ -75,11 +72,10 @@ struct TaskBoardDecisionRow: View {
           .foregroundStyle(HarnessMonitorTheme.ink)
           .lineLimit(1)
           .truncationMode(.tail)
-        Text(scopeLine)
-          .scaledFont(.caption)
-          .foregroundStyle(HarnessMonitorTheme.secondaryInk)
-          .lineLimit(1)
-          .truncationMode(.tail)
+        TaskBoardDecisionScopeLine(
+          staticScope: staticScopePart,
+          createdAt: decision.createdAt
+        )
       }
       Spacer(minLength: metrics.laneSpacing)
       TaskBoardCardPill(label: severity.chipLabel, tint: severityColor)
@@ -127,7 +123,7 @@ struct TaskBoardDecisionRow: View {
     humanizedWorkspaceLabel(decision.ruleID)
   }
 
-  private var scopeLine: String {
+  private var staticScopePart: String {
     var parts: [String] = []
     if let agentID = decision.agentID, !agentID.isEmpty {
       parts.append("Agent \(humanizedWorkspaceLabel(agentID))")
@@ -137,12 +133,11 @@ struct TaskBoardDecisionRow: View {
     } else if let sessionID = decision.sessionID, !sessionID.isEmpty {
       parts.append("Session \(humanizedWorkspaceLabel(sessionID))")
     }
-    parts.append(relativeAge)
     return parts.joined(separator: " · ")
   }
 
-  private var relativeAge: String {
-    let interval = now.timeIntervalSince(decision.createdAt)
+  static func relativeAge(now: Date, createdAt: Date) -> String {
+    let interval = now.timeIntervalSince(createdAt)
     return taskBoardDecisionAgeFormatter.localizedString(fromTimeInterval: -interval)
   }
 
@@ -195,7 +190,7 @@ struct TaskBoardDecisionRow: View {
     } else if let sessionID = decision.sessionID, !sessionID.isEmpty {
       pieces.append("session \(humanizedWorkspaceLabel(sessionID))")
     }
-    pieces.append("queued \(relativeAge)")
+    pieces.append("queued \(Self.relativeAge(now: .now, createdAt: decision.createdAt))")
     if !decision.summary.isEmpty {
       pieces.append(decision.summary)
     }
@@ -207,5 +202,30 @@ struct TaskBoardDecisionRow: View {
       return "Activate to review. Suggested action: \(primaryAction.title)."
     }
     return "Activate to review."
+  }
+}
+
+/// Time-dependent text isolated behind its own 15s `TimelineView` so the
+/// surrounding decision row body does not re-evaluate on every clock tick.
+/// "5m ago" granularity does not need second-level precision; 15s keeps the
+/// reading fresh enough for a human glance while collapsing the lane-wide
+/// `External: Time -> Text` fanout that previously hit ~80 updates/second.
+private struct TaskBoardDecisionScopeLine: View {
+  let staticScope: String
+  let createdAt: Date
+
+  var body: some View {
+    TimelineView(.periodic(from: .now, by: 15)) { context in
+      Text(combined(now: context.date))
+        .scaledFont(.caption)
+        .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+        .lineLimit(1)
+        .truncationMode(.tail)
+    }
+  }
+
+  private func combined(now: Date) -> String {
+    let age = TaskBoardDecisionRow.relativeAge(now: now, createdAt: createdAt)
+    return staticScope.isEmpty ? age : "\(staticScope) · \(age)"
   }
 }

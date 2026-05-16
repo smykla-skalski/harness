@@ -126,7 +126,8 @@ struct TaskBoardOperationsPanelInventoryCard: View {
   private func auditPillsAndStatuses(_ audit: TaskBoardAuditSummary) -> some View {
     pillRow {
       TaskBoardSummaryPill(value: "\(audit.total)", label: "Total")
-      TaskBoardSummaryPill(value: "\(audit.ready)", label: "Ready", tint: HarnessMonitorTheme.accent)
+      TaskBoardSummaryPill(
+        value: "\(audit.ready)", label: "Ready", tint: HarnessMonitorTheme.accent)
       if audit.blocked != 0 {
         TaskBoardSummaryPill(
           value: "\(audit.blocked)",

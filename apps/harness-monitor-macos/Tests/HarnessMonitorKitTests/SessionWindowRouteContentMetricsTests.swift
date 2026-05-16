@@ -276,7 +276,8 @@ struct SessionWindowRouteContentMetricsTests {
         "RoundedRectangle(cornerRadius: metrics.cardCornerRadius, style: .continuous)"
       )
     )
-    #expect(laneSupportSource.contains(".strokeBorder(laneStrokeColor, lineWidth: laneStrokeWidth)"))
+    #expect(
+      laneSupportSource.contains(".strokeBorder(laneStrokeColor, lineWidth: laneStrokeWidth)"))
     #expect(laneSupportSource.contains("private var laneStrokeColor: Color"))
     #expect(laneSupportSource.contains("private var laneStrokeWidth: CGFloat"))
     #expect(!overviewSource.contains("Board-owned work awaiting progression."))

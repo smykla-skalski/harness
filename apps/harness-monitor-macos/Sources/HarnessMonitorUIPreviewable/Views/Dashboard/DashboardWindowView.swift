@@ -140,6 +140,35 @@ public struct DashboardWindowView: View {
           ]
         )
       }
+      .modifier(DashboardPerfRouteHook(selectedRouteBinding: selectedRouteBinding))
+    }
+  }
+}
+
+private struct DashboardPerfRouteHook: ViewModifier {
+  let selectedRouteBinding: Binding<DashboardWindowRoute>
+  private let isActive = HarnessMonitorPerfDashboardRouteBus.isActive()
+
+  func body(content: Content) -> some View {
+    if isActive {
+      content
+        .onReceive(
+          NotificationCenter.default.publisher(
+            for: HarnessMonitorPerfDashboardRouteBus.routeChange
+          )
+        ) { note in
+          guard
+            let raw = note.userInfo?[HarnessMonitorPerfDashboardRouteBus.routeRawKey] as? String,
+            let next = DashboardWindowRoute(rawValue: raw)
+          else { return }
+          guard selectedRouteBinding.wrappedValue != next else { return }
+          withAnimation(.easeInOut(duration: 0.15)) {
+            selectedRouteBinding.wrappedValue = next
+          }
+          HarnessMonitorPerfDashboardRouteBus.recordAccepted(raw: raw)
+        }
+    } else {
+      content
     }
   }
 }
@@ -276,7 +305,9 @@ private struct DashboardSidebar: View {
               systemImage: route.systemImage
             )
             .tag(route)
-            .accessibilityIdentifier(HarnessMonitorAccessibility.dashboardWindowRoute(route.rawValue))
+            .accessibilityIdentifier(
+              HarnessMonitorAccessibility.dashboardWindowRoute(route.rawValue)
+            )
             .accessibilityValue(isSelected ? "selected" : "not selected")
           }
         }

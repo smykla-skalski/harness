@@ -114,12 +114,14 @@ struct HarnessMonitorUITestAccessibilityRegistryMoreTests {
     let sharedSidebarView = try sourceFile(named: "HarnessMonitorSidebar.swift")
 
     #expect(dashboardView.contains("HarnessMonitorAccessibility.dashboardSidebar"))
-    #expect(dashboardView.contains("HarnessMonitorAccessibility.dashboardWindowRoute(route.rawValue)"))
+    #expect(
+      dashboardView.contains("HarnessMonitorAccessibility.dashboardWindowRoute(route.rawValue)"))
     #expect(dashboardView.contains("HarnessMonitorSidebar("))
     #expect(dashboardView.contains("List(selection: dashboardSelectionBinding)"))
     #expect(dashboardView.contains("SessionSidebarRow("))
     #expect(dashboardView.contains(".harnessMonitorSidebarListChrome("))
-    #expect(dashboardView.contains(".accessibilityValue(isSelected ? \"selected\" : \"not selected\")"))
+    #expect(
+      dashboardView.contains(".accessibilityValue(isSelected ? \"selected\" : \"not selected\")"))
     #expect(sharedSidebarView.contains("HarnessMonitorSidebarListChromeModifier"))
     #expect(sharedSidebarView.contains("SessionSidebarFooter(model: statusModel)"))
     #expect(sharedSidebarView.contains(".accessibilityIdentifier(accessibilityIdentifier)"))

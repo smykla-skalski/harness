@@ -12,7 +12,8 @@ enum TaskBoardHostProjectTypeSuggestions {
     }
     do {
       let snapshot = try await store.taskBoardHostSnapshot()
-      let hostsInOrder = [snapshot.local]
+      let hostsInOrder =
+        [snapshot.local]
         + snapshot.registered.filter { $0.id != snapshot.local.id }
       var seen = Set<String>()
       var ordered: [String] = []

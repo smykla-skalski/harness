@@ -127,7 +127,7 @@ public enum TaskBoardGitHubMergeMethod: TaskBoardOpenEnum, CaseIterable, Identif
   case rebase
   case unknown(String)
 
-  public static let allCases: [TaskBoardGitHubMergeMethod] = [.squash, .merge, .rebase]
+  public static let allCases: [Self] = [.squash, .merge, .rebase]
 
   public var rawValue: String {
     switch self {

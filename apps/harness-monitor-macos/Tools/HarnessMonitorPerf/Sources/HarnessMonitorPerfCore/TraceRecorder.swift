@@ -69,6 +69,18 @@ public enum TraceRecorder {
         ("/usr/bin/xcrun", ["xctrace", "export", "--input", traceURL.path, "--toc"])
     }
 
+    static func finalizeBudgetSeconds() -> TimeInterval {
+        let envKey = "HARNESS_MONITOR_PERF_TRACE_FINALIZE_BUDGET_S"
+        if
+            let raw = ProcessInfo.processInfo.environment[envKey],
+            let value = TimeInterval(raw.trimmingCharacters(in: .whitespacesAndNewlines)),
+            value >= 30
+        {
+            return value
+        }
+        return 240
+    }
+
     public struct Capture {
         public var record: ManifestBuilder.CaptureRecord
         public var endReason: String
@@ -91,11 +103,18 @@ public enum TraceRecorder {
             fm.createFile(atPath: inputs.logURL.path, contents: nil)
         }
 
+        // xctrace `record --time-limit` waits for the live-process slice plus a
+        // post-stop finalize pass that serialises the in-memory ring to disk. The
+        // finalize step scales with trace volume; live-daemon scenarios with route
+        // flips push it past the 90s default. Allow override via env so individual
+        // runs can extend the budget without rebuilding the perf CLI.
+        let finalizeBudget = TraceRecorder.finalizeBudgetSeconds()
+        let recordTimeout = TimeInterval(inputs.durationSeconds) + finalizeBudget
         let (command, arguments) = recordCommand(inputs)
         let recordResult = try ProcessRunner.run(
             command, arguments: arguments,
             environmentOverrides: ["TMPDIR": inputs.xctraceTempRoot.path + "/"],
-            timeoutSeconds: TimeInterval(inputs.durationSeconds + 90)
+            timeoutSeconds: recordTimeout
         )
 
         try? appendLog(inputs.logURL, label: "[record stdout]", data: recordResult.stdout)
@@ -104,7 +123,7 @@ public enum TraceRecorder {
         if recordResult.timedOut {
             throw Failure(
                 message: "xctrace record timed out for \(inputs.template) / \(inputs.scenario) "
-                    + "after \(inputs.durationSeconds + 90)s"
+                    + "after \(Int(recordTimeout))s"
             )
         }
 

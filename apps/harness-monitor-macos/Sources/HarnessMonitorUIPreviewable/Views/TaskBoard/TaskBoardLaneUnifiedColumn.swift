@@ -19,6 +19,8 @@ struct TaskBoardLaneUnifiedColumn: View {
   @State private var isInboxDropTargeted = false
   @State private var apiDropDeduper = TaskBoardDropDeduper<TaskBoardItemDropSignature>()
   @State private var inboxDropDeduper = TaskBoardDropDeduper<TaskBoardInboxItemDropSignature>()
+  @State private var perfScrollPosition = ScrollPosition()
+  private let perfScrollHookEnabled = HarnessMonitorPerfTaskBoardLaneScrollBus.isActive()
 
   private var metrics: TaskBoardLaneMetrics { TaskBoardLaneMetrics(fontScale: fontScale) }
 
@@ -42,10 +44,7 @@ struct TaskBoardLaneUnifiedColumn: View {
         if isEmpty {
           TaskBoardEmptyLane(lane: lane)
         } else {
-          ScrollView(.vertical, showsIndicators: true) {
-            laneRows
-          }
-          .scrollBounceBehavior(.basedOnSize)
+          laneScrollSurface
         }
       }
       .taskBoardLaneBodyChrome(lane: lane, isDropTargeted: isDropTargeted)
@@ -71,12 +70,50 @@ struct TaskBoardLaneUnifiedColumn: View {
     .accessibilityIdentifier("harness.task-board.column.\(lane.rawValue)")
   }
 
+  @ViewBuilder private var laneScrollSurface: some View {
+    if perfScrollHookEnabled {
+      ScrollView(.vertical, showsIndicators: true) {
+        laneRows
+      }
+      .scrollPosition($perfScrollPosition)
+      .scrollBounceBehavior(.basedOnSize)
+      .onReceive(
+        NotificationCenter.default.publisher(
+          for: HarnessMonitorPerfTaskBoardLaneScrollBus.scrollToBottom
+        )
+      ) { note in
+        handlePerfLaneScroll(note: note, edge: "bottom")
+      }
+      .onReceive(
+        NotificationCenter.default.publisher(
+          for: HarnessMonitorPerfTaskBoardLaneScrollBus.scrollToTop
+        )
+      ) { note in
+        handlePerfLaneScroll(note: note, edge: "top")
+      }
+    } else {
+      ScrollView(.vertical, showsIndicators: true) {
+        laneRows
+      }
+      .scrollBounceBehavior(.basedOnSize)
+    }
+  }
+
+  private func handlePerfLaneScroll(note: Notification, edge: String) {
+    guard
+      let raw = note.userInfo?[HarnessMonitorPerfTaskBoardLaneScrollBus.laneRawKey] as? String,
+      raw == lane.rawValue
+    else { return }
+    withAnimation(.easeOut(duration: 0.5)) {
+      perfScrollPosition = ScrollPosition(edge: edge == "top" ? .top : .bottom)
+    }
+    HarnessMonitorPerfTaskBoardLaneScrollBus.recordAccepted(laneRaw: raw, edge: edge)
+  }
+
   @ViewBuilder private var laneRows: some View {
     VStack(spacing: metrics.laneSpacing) {
       if !decisions.isEmpty {
-        TimelineView(.periodic(from: .now, by: 1)) { context in
-          decisionRows(now: context.date)
-        }
+        decisionRows
       }
       ForEach(apiItems) { item in
         TaskBoardItemRow(item: item, onOpenItem: onOpenAPIItem)
@@ -88,10 +125,10 @@ struct TaskBoardLaneUnifiedColumn: View {
     .frame(maxWidth: .infinity)
   }
 
-  @ViewBuilder private func decisionRows(now: Date) -> some View {
+  @ViewBuilder private var decisionRows: some View {
     VStack(spacing: metrics.laneSpacing) {
       ForEach(decisions, id: \.id) { decision in
-        TaskBoardDecisionRow(decision: decision, now: now, onOpenDecision: onOpenDecision)
+        TaskBoardDecisionRow(decision: decision, onOpenDecision: onOpenDecision)
       }
     }
   }

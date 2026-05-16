@@ -291,7 +291,8 @@ extension RecordingHarnessClient {
       if let summaries = taskBoardMachineSummariesStorage {
         return summaries
       }
-      let grouped = Dictionary(grouping: filteredTaskBoardItems(status: status, itemId: nil), by: \.agentMode)
+      let grouped = Dictionary(
+        grouping: filteredTaskBoardItems(status: status, itemId: nil), by: \.agentMode)
       return grouped.map { mode, items in
         TaskBoardMachineSummary(
           mode: mode,

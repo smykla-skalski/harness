@@ -122,9 +122,10 @@ final class PolicyCanvasVoiceOverRotorTests: HarnessMonitorUITestCase {
       )
 
       let value = candidates.firstMatch.value as? String ?? ""
-      let firstWord = value.split(separator: ",").first.map(String.init)?.trimmingCharacters(
-        in: .whitespaces
-      ) ?? ""
+      let firstWord =
+        value.split(separator: ",").first.map(String.init)?.trimmingCharacters(
+          in: .whitespaces
+        ) ?? ""
       XCTAssertTrue(
         validKindWords.contains(firstWord),
         """

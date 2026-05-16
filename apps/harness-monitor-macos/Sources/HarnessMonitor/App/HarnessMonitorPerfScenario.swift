@@ -30,6 +30,7 @@ enum HarnessMonitorPerfScenario: String, CaseIterable, Sendable {
   case toastOverlayChurn = "toast-overlay-churn"
   case offlineCachedOpen = "offline-cached-open"
   case dashboardLiveScroll = "dashboard-live-scroll"
+  case dashboardLiveInteract = "dashboard-live-interact"
 
   init?(environment: HarnessMonitorEnvironment) {
     let rawValue = environment.values[Self.environmentKey]?
@@ -140,6 +141,7 @@ extension HarnessMonitorPerfScenario {
     case .toastOverlayChurn: "toast-overlay-churn"
     case .offlineCachedOpen: "offline-cached-open"
     case .dashboardLiveScroll: "dashboard-live-scroll"
+    case .dashboardLiveInteract: "dashboard-live-interact"
     }
   }
 }

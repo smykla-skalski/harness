@@ -148,7 +148,7 @@ public enum TaskBoardGitSigningMode: TaskBoardOpenEnum, CaseIterable, Identifiab
   case gpg
   case unknown(String)
 
-  public static let allCases: [TaskBoardGitSigningMode] = [.none, .ssh, .gpg]
+  public static let allCases: [Self] = [.none, .ssh, .gpg]
 
   public var rawValue: String {
     switch self {

@@ -7,7 +7,7 @@ public enum TaskBoardOrchestratorWorkflow: TaskBoardOpenEnum, CaseIterable, Iden
   case dependencyUpdate
   case unknown(String)
 
-  public static let allCases: [TaskBoardOrchestratorWorkflow] = [
+  public static let allCases: [Self] = [
     .defaultTask,
     .prFix,
     .prReview,

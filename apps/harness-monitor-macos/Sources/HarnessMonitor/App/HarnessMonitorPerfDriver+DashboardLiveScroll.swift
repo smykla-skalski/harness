@@ -56,7 +56,8 @@ extension HarnessMonitorPerfDriver {
         "content_h":
           String(Int(HarnessMonitorPerfDashboardScrollBus.latestGeometry.contentHeight.rounded())),
         "container_h":
-          String(Int(HarnessMonitorPerfDashboardScrollBus.latestGeometry.containerHeight.rounded())),
+          String(
+            Int(HarnessMonitorPerfDashboardScrollBus.latestGeometry.containerHeight.rounded())),
       ]
     )
 
