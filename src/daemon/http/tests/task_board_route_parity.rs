@@ -200,6 +200,13 @@ async fn run_task_board_orchestrator_parity() {
         json!({ "token": "todoist-token" }),
     )
     .await;
+    assert_http_ws_get_match(
+        &client,
+        &base_url,
+        http_paths::TASK_BOARD_GIT_IDENTITY_DEFAULTS,
+        ws_methods::TASK_BOARD_GIT_IDENTITY_DEFAULTS,
+    )
+    .await;
     assert_http_ws_post_match(
         &client,
         &base_url,

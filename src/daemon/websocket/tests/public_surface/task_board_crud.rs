@@ -296,6 +296,18 @@ fn websocket_task_board_crud_sync_audit_and_orchestrator_routes_use_real_state()
             )
             .await;
             assert_eq!(todoist["token_configured"].as_bool(), Some(true));
+            let defaults = call(
+                &state,
+                &connection,
+                "req-orch-git-identity-defaults",
+                ws_methods::TASK_BOARD_GIT_IDENTITY_DEFAULTS,
+                json!({}),
+            )
+            .await;
+            assert!(defaults.get("git_config").is_some());
+            assert!(defaults.get("gh_cli").is_some());
+            assert!(defaults.get("discovered_ssh_keys").is_some());
+            assert!(defaults.get("env_overrides").is_some());
             assert_eq!(
                 call(
                     &state,

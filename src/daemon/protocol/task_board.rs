@@ -7,8 +7,9 @@ use crate::task_board::{
     ExternalSyncDirection, Machine, PlanningState, PolicyPipelineAuditSummary,
     PolicyPipelineDocument, PolicyPipelinePromoteRequest, PolicyPipelinePromoteResponse,
     PolicyPipelineSaveResponse, PolicyPipelineSimulationResult, TaskBoardAuditSummary,
-    TaskBoardEvaluationSummary, TaskBoardItem, TaskBoardMachineSummary, TaskBoardPriority,
-    TaskBoardProjectSummary, TaskBoardStatus, TaskBoardSyncSummary,
+    TaskBoardEvaluationSummary, TaskBoardGitIdentityDefaults, TaskBoardItem,
+    TaskBoardMachineSummary, TaskBoardPriority, TaskBoardProjectSummary, TaskBoardStatus,
+    TaskBoardSyncSummary,
 };
 
 pub use crate::task_board::{
@@ -248,6 +249,7 @@ pub type TaskBoardOrchestratorStatusResponse = TaskBoardOrchestratorStatus;
 pub type TaskBoardOrchestratorRunOnceResponse = TaskBoardOrchestratorStatus;
 pub type TaskBoardOrchestratorSettingsResponse = TaskBoardOrchestratorSettings;
 pub type TaskBoardGitRuntimeConfigResponse = TaskBoardGitRuntimeConfig;
+pub type TaskBoardGitIdentityDefaultsResponse = TaskBoardGitIdentityDefaults;
 pub type TaskBoardGitHubTokensSyncResponse = TaskBoardGitHubTokensSyncOutcome;
 pub type TaskBoardTodoistTokenSyncResponse = TaskBoardTodoistTokenSyncOutcome;
 pub type TaskBoardPolicyPipelineResponse = PolicyPipelineDocument;

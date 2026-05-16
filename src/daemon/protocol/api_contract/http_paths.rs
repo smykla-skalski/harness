@@ -65,6 +65,7 @@ pub const TASK_BOARD_ORCHESTRATOR_RUNTIME_CONFIG: &str =
     "/v1/task-board/orchestrator/runtime-config";
 pub const TASK_BOARD_ORCHESTRATOR_GITHUB_TOKENS: &str = "/v1/task-board/orchestrator/github-tokens";
 pub const TASK_BOARD_ORCHESTRATOR_TODOIST_TOKEN: &str = "/v1/task-board/orchestrator/todoist-token";
+pub const TASK_BOARD_GIT_IDENTITY_DEFAULTS: &str = "/v1/task-board/git/identity-defaults";
 pub const TASK_BOARD_POLICY_PIPELINE: &str = "/v1/task-board/policy/pipeline";
 pub const TASK_BOARD_POLICY_SIMULATE: &str = "/v1/task-board/policy/simulate";
 pub const TASK_BOARD_POLICY_PROMOTE: &str = "/v1/task-board/policy/promote";

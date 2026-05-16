@@ -125,6 +125,12 @@ fn task_board_routes_have_complete_ws_parity() {
             ),
             (
                 HttpRouteMethod::Post,
+                http_paths::TASK_BOARD_PLAN_REVOKE,
+                ws_methods::TASK_BOARD_PLAN_REVOKE,
+                true,
+            ),
+            (
+                HttpRouteMethod::Post,
                 http_paths::TASK_BOARD_SYNC,
                 ws_methods::TASK_BOARD_SYNC,
                 true,
@@ -235,6 +241,12 @@ fn task_board_routes_have_complete_ws_parity() {
                 HttpRouteMethod::Put,
                 http_paths::TASK_BOARD_ORCHESTRATOR_TODOIST_TOKEN,
                 ws_methods::TASK_BOARD_ORCHESTRATOR_TODOIST_TOKEN_SYNC,
+                true,
+            ),
+            (
+                HttpRouteMethod::Get,
+                http_paths::TASK_BOARD_GIT_IDENTITY_DEFAULTS,
+                ws_methods::TASK_BOARD_GIT_IDENTITY_DEFAULTS,
                 true,
             ),
             (

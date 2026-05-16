@@ -148,6 +148,10 @@ pub(super) fn task_board_routes() -> Router<DaemonHttpState> {
             put(put_task_board_orchestrator_todoist_token),
         )
         .route(
+            http_paths::TASK_BOARD_GIT_IDENTITY_DEFAULTS,
+            get(get_task_board_git_identity_defaults),
+        )
+        .route(
             http_paths::TASK_BOARD_POLICY_PIPELINE,
             get(get_task_board_policy_pipeline).put(put_task_board_policy_pipeline_draft),
         )
@@ -308,6 +312,20 @@ async fn put_task_board_orchestrator_todoist_token(
         &request_id,
         start,
         task_board_route_executor::sync_todoist_token(&request),
+    )
+}
+
+async fn get_task_board_git_identity_defaults(
+    headers: HeaderMap,
+    State(state): State<DaemonHttpState>,
+) -> Response {
+    let (start, request_id) = authenticated_request!(headers, state);
+    timed_json(
+        "GET",
+        http_paths::TASK_BOARD_GIT_IDENTITY_DEFAULTS,
+        &request_id,
+        start,
+        task_board_route_executor::git_identity_defaults(),
     )
 }
 

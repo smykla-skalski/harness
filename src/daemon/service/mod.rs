@@ -322,7 +322,8 @@ pub use task_board_orchestrator::{
 };
 pub(crate) use task_board_runtime::git_runtime_profile_for_repository;
 pub use task_board_runtime::{
-    sync_task_board_github_tokens, sync_task_board_todoist_token, task_board_git_runtime_config,
+    sync_task_board_github_tokens, sync_task_board_todoist_token,
+    task_board_git_identity_defaults, task_board_git_runtime_config,
     update_task_board_git_runtime_config,
 };
 pub use wake_route::WakeDispatch;

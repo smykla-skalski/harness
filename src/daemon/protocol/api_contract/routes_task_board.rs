@@ -227,6 +227,14 @@ pub(crate) const ROUTES: &[HttpApiRouteContract] = &[
     },
     HttpApiRouteContract {
         method: HttpRouteMethod::Get,
+        path: http_paths::TASK_BOARD_GIT_IDENTITY_DEFAULTS,
+        parity: HttpRouteParity::Rpc {
+            ws_method: ws_methods::TASK_BOARD_GIT_IDENTITY_DEFAULTS,
+        },
+        swift_client_exposed: true,
+    },
+    HttpApiRouteContract {
+        method: HttpRouteMethod::Get,
         path: http_paths::TASK_BOARD_POLICY_PIPELINE,
         parity: HttpRouteParity::Rpc {
             ws_method: ws_methods::TASK_BOARD_POLICY_PIPELINE_GET,
