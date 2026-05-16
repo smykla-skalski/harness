@@ -77,7 +77,6 @@ struct TaskBoardLaneUnifiedColumn: View {
       }
       .scrollPosition($perfScrollPosition)
       .scrollBounceBehavior(.basedOnSize)
-      .harnessScrollPhaseSetsHoverGate()
       .onReceive(
         NotificationCenter.default.publisher(
           for: HarnessMonitorPerfTaskBoardLaneScrollBus.scrollToBottom
@@ -97,7 +96,6 @@ struct TaskBoardLaneUnifiedColumn: View {
         laneRows
       }
       .scrollBounceBehavior(.basedOnSize)
-      .harnessScrollPhaseSetsHoverGate()
     }
   }
 
