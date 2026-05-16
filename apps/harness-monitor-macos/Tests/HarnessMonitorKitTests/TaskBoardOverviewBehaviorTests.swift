@@ -255,6 +255,8 @@ struct TaskBoardOverviewBehaviorTests {
     let regular = TaskBoardOverviewMetrics(fontScale: 1)
     let large = TaskBoardOverviewMetrics(fontScale: 1.8)
 
+    #expect(regular.operationsCardMinWidth >= 280)
+    #expect(large.operationsCardMinWidth > regular.operationsCardMinWidth)
     #expect(large.columnSpacing > regular.columnSpacing)
     #expect(large.boardVerticalPadding > regular.boardVerticalPadding)
     #expect(large.summaryPillHorizontalPadding > regular.summaryPillHorizontalPadding)

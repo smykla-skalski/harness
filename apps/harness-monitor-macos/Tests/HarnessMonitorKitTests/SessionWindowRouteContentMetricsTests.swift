@@ -210,6 +210,23 @@ struct SessionWindowRouteContentMetricsTests {
     #expect(managementPanelSource.contains("Label(\"Refresh\", systemImage: \"arrow.clockwise\")"))
   }
 
+  @Test("Task board operations panel prefers a three-card row")
+  func taskBoardOperationsPanelPrefersThreeCardRow() throws {
+    let operationsSource = try taskBoardSourceFile(named: "TaskBoardOperationsPanel.swift")
+    let layoutSource = try taskBoardSourceFile(named: "TaskBoardOperationsPanelLayout.swift")
+    let supportSource = try taskBoardSourceFile(named: "TaskBoardOverviewSupport.swift")
+
+    #expect(operationsSource.contains("TaskBoardOperationsPanelLayout("))
+    #expect(layoutSource.contains("ViewThatFits(in: .horizontal)"))
+    #expect(layoutSource.contains("HStack(alignment: .top, spacing: metrics.columnSpacing)"))
+    #expect(layoutSource.contains("TaskBoardOperationsPanelColumn("))
+    #expect(layoutSource.contains("minWidth: metrics.operationsCardMinWidth"))
+    #expect(
+      layoutSource.contains("VStack(alignment: .leading, spacing: metrics.columnSpacing)")
+    )
+    #expect(supportSource.contains("let operationsCardMinWidth: CGFloat"))
+  }
+
   @Test("Board-only task board items have a management surface")
   func boardOnlyTaskBoardItemsHaveManagementSurface() throws {
     let overviewSource = try taskBoardSourceFile(named: "TaskBoardOverviewView.swift")

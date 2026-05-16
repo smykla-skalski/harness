@@ -7,6 +7,7 @@ struct TaskBoardOverviewMetrics: Equatable {
   let managementPanelMinHeight: CGFloat
   let managementPanelSpacing: CGFloat
   let managementPanelCornerRadius: CGFloat
+  let operationsCardMinWidth: CGFloat
   let managementPillVerticalPadding: CGFloat
   let summaryPillHorizontalPadding: CGFloat
   let summaryPillVerticalPadding: CGFloat
@@ -23,6 +24,7 @@ struct TaskBoardOverviewMetrics: Equatable {
     managementPanelMinHeight = max(132, 132 * min(scale, 1.25))
     managementPanelSpacing = max(8, 8 * min(scale, 1.35))
     managementPanelCornerRadius = HarnessMonitorTheme.cornerRadiusSM * min(scale, 1.2)
+    operationsCardMinWidth = max(280, 320 * min(scale, 1.15))
     managementPillVerticalPadding = max(3, 3 * min(scale, 1.25))
     summaryPillHorizontalPadding = HarnessMonitorTheme.pillPaddingH * denseScale
     summaryPillVerticalPadding = HarnessMonitorTheme.pillPaddingV * min(scale, 1.2)
