@@ -65,6 +65,8 @@ enum TaskBoardExternalProviderChoice: String, CaseIterable, Identifiable, Hashab
   case gitHub
   case todoist
 
+  static let publicCases: [Self] = [.all, .gitHub]
+
   init(provider: TaskBoardExternalProvider?) {
     switch provider {
     case .none:
@@ -103,6 +105,15 @@ extension TaskBoardExternalProvider {
       "Todoist"
     }
   }
+
+  var isVisibleInMonitorUI: Bool {
+    switch self {
+    case .gitHub:
+      true
+    case .todoist:
+      false
+    }
+  }
 }
 
 extension TaskBoardExternalSyncDirection {
@@ -115,6 +126,16 @@ extension TaskBoardExternalSyncDirection {
     case .both:
       "Bidirectional"
     }
+  }
+}
+
+extension TaskBoardSyncSummary {
+  var monitorVisibleProviders: [TaskBoardProviderSyncSummary] {
+    providers.filter { $0.provider.isVisibleInMonitorUI }
+  }
+
+  var monitorVisibleOperations: [TaskBoardExternalSyncOperation] {
+    operations.filter { $0.provider.isVisibleInMonitorUI }
   }
 }
 
