@@ -32,7 +32,7 @@ struct TaskBoardItemDragPayload: Codable, Transferable, Sendable {
 
   static func loadFirst(
     from providers: [NSItemProvider],
-    completion: @escaping @MainActor (TaskBoardItemDragPayload) -> Void
+    completion: @escaping @MainActor (Self) -> Void
   ) -> Bool {
     guard
       let provider = providers.first(where: {
@@ -119,7 +119,7 @@ struct TaskBoardInboxItemDragPayload: Codable, Transferable, Sendable {
 
   static func loadFirst(
     from providers: [NSItemProvider],
-    completion: @escaping @MainActor (TaskBoardInboxItemDragPayload) -> Void
+    completion: @escaping @MainActor (Self) -> Void
   ) -> Bool {
     guard
       let provider = providers.first(where: {

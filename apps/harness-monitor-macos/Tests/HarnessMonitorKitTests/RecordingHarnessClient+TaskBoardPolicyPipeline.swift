@@ -16,7 +16,8 @@ extension RecordingHarnessClient {
         revision: request.document.revision
       )
     )
-    let validation = lock.withLock { taskBoardPolicyPipelineValidationOverride }
+    let validation =
+      lock.withLock { taskBoardPolicyPipelineValidationOverride }
       ?? TaskBoardPolicyPipelineValidation(isValid: true)
     return TaskBoardPolicyPipelineSaveDraftResponse(
       document: request.document,
@@ -28,7 +29,8 @@ extension RecordingHarnessClient {
     request: TaskBoardPolicyPipelineSimulateRequest
   ) async throws -> TaskBoardPolicyPipelineSimulationResult {
     calls.append(.simulateTaskBoardPolicyPipeline)
-    let validation = lock.withLock { taskBoardPolicyPipelineValidationOverride }
+    let validation =
+      lock.withLock { taskBoardPolicyPipelineValidationOverride }
       ?? TaskBoardPolicyPipelineValidation(isValid: true)
     let succeeded = lock.withLock { taskBoardPolicyPipelineSimulationSucceededOverride } ?? true
     return TaskBoardPolicyPipelineSimulationResult(

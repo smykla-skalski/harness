@@ -47,7 +47,8 @@ struct TaskBoardOperationsPanel: View {
   }
 
   private var formattedLocalHostProjectTypes: String {
-    let trimmed = localHostProjectTypes
+    let trimmed =
+      localHostProjectTypes
       .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
       .filter { !$0.isEmpty }
     return trimmed.isEmpty ? "none declared" : trimmed.joined(separator: ", ")
@@ -235,7 +236,8 @@ extension TaskBoardOperationsPanel {
               .scaledFont(.caption.weight(.semibold))
               .foregroundStyle(HarnessMonitorTheme.secondaryInk)
               .accessibilityAddTraits(.isHeader)
-            ForEach(Array(summary.operations.prefix(4).enumerated()), id: \.offset) { _, operation in
+            ForEach(Array(summary.operations.prefix(4).enumerated()), id: \.offset) {
+              _, operation in
               operationSummaryRow(operation)
             }
           }
@@ -341,7 +343,8 @@ extension TaskBoardOperationsPanel {
         summaryPillRow {
           TaskBoardSummaryPill(value: "\(summary.plans.count)", label: "Plans")
           let readyCount = summary.plans.count { $0.readiness.isReady }
-          TaskBoardSummaryPill(value: "\(readyCount)", label: "Ready", tint: HarnessMonitorTheme.accent)
+          TaskBoardSummaryPill(
+            value: "\(readyCount)", label: "Ready", tint: HarnessMonitorTheme.accent)
           let blockedCount = summary.plans.count { !$0.readiness.isReady }
           if blockedCount != 0 {
             TaskBoardSummaryPill(

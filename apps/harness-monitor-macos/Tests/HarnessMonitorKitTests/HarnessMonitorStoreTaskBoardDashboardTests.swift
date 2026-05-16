@@ -115,8 +115,10 @@ struct HarnessMonitorStoreTaskBoardDashboardTests {
   func auditProjectsAndMachinesUpdateDashboardState() async {
     let client = RecordingHarnessClient()
     client.configureTaskBoardItems([
-      sampleTaskBoardItem(id: "board-1", status: .todo, agentMode: .interactive, projectId: "project-1"),
-      sampleTaskBoardItem(id: "board-2", status: .blocked, agentMode: .planning, projectId: "project-2"),
+      sampleTaskBoardItem(
+        id: "board-1", status: .todo, agentMode: .interactive, projectId: "project-1"),
+      sampleTaskBoardItem(
+        id: "board-2", status: .blocked, agentMode: .planning, projectId: "project-2"),
     ])
     let store = await makeBootstrappedStore(client: client)
 

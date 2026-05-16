@@ -61,7 +61,8 @@ extension SessionWindowFlowTests {
   func sessionTabsUseSwiftUISceneCommands() throws {
     let appSource = try harnessSourceFile(named: "App/HarnessMonitorApp.swift")
     let scenesSource = try harnessSourceFile(named: "App/HarnessMonitorApp+Scenes.swift")
-    let sceneContentSource = try harnessSourceFile(named: "App/HarnessMonitorApp+SceneContent.swift")
+    let sceneContentSource = try harnessSourceFile(
+      named: "App/HarnessMonitorApp+SceneContent.swift")
     let routerSource = try harnessSourceFile(named: "App/HarnessMonitorInitialWindowRouter.swift")
     let rootSource = try harnessSourceFile(named: "App/SessionWindowRootView.swift")
     let commandsSource = try harnessSourceFile(named: "Commands/WindowMenuCommands.swift")
@@ -114,7 +115,8 @@ extension SessionWindowFlowTests {
 
   @Test("Dashboard window routing reuses the shared tab helper")
   func dashboardWindowRoutingUsesSharedTabHelper() throws {
-    let routingSource = try harnessSourceFile(named: "App/HarnessMonitorApp+InitialWindowRouting.swift")
+    let routingSource = try harnessSourceFile(
+      named: "App/HarnessMonitorApp+InitialWindowRouting.swift")
     let menuBarSource = try harnessSourceFile(named: "App/HarnessMonitorMenuBarExtra.swift")
     let windowCommandsSource = try harnessSourceFile(named: "Commands/WindowMenuCommands.swift")
     let recentCommandsSource = try harnessSourceFile(named: "Commands/RecentSessionsCommand.swift")
@@ -124,7 +126,9 @@ extension SessionWindowFlowTests {
     )
 
     #expect(openActionSource.contains("public func openHarnessDashboardWindow()"))
-    #expect(openActionSource.contains("guard let sessionID, !sessionID.isEmpty else {\n      openHarnessDashboardWindow()"))
+    #expect(
+      openActionSource.contains(
+        "guard let sessionID, !sessionID.isEmpty else {\n      openHarnessDashboardWindow()"))
     #expect(openActionSource.contains("mergeNewestTabbedWindowIfNeeded"))
     #expect(windowCommandsSource.contains("openWindow.openHarnessDashboardWindow()"))
     #expect(recentCommandsSource.contains("openWindow.openHarnessDashboardWindow()"))
@@ -135,7 +139,8 @@ extension SessionWindowFlowTests {
 
   @Test("Dashboard window open-at-quit state is mirrored end-to-end")
   func dashboardWindowOpenAtQuitStateIsMirroredEndToEnd() throws {
-    let sceneContentSource = try harnessSourceFile(named: "App/HarnessMonitorApp+SceneContent.swift")
+    let sceneContentSource = try harnessSourceFile(
+      named: "App/HarnessMonitorApp+SceneContent.swift")
     let modifierSource = try harnessSourceFile(named: "App/DashboardWindowLifecycleModifier.swift")
     let trackerSource = try harnessSourceFile(named: "App/DashboardWindowLifecycleTracker.swift")
     let delegateSource = try harnessSourceFile(named: "App/HarnessMonitorAppDelegate.swift")

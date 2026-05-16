@@ -230,8 +230,9 @@ struct TaskBoardSwiftUXCorrectnessTests {
     draft.requestedReviewersText = "bart\nalice\ncasey\nbart\nalice"
 
     let snapshot = draft.snapshot
-    #expect(snapshot.orchestratorSettings.githubProject.requestedReviewers.reviewers
-      == ["bart", "alice", "casey"])
+    #expect(
+      snapshot.orchestratorSettings.githubProject.requestedReviewers.reviewers
+        == ["bart", "alice", "casey"])
   }
 
   @Test("normalizedUniqueLines skips empty entries while keeping order")
@@ -240,8 +241,9 @@ struct TaskBoardSwiftUXCorrectnessTests {
     draft.requestedTeamReviewersText = "  \nplatform\n\nplatform\nsre"
 
     let snapshot = draft.snapshot
-    #expect(snapshot.orchestratorSettings.githubProject.requestedReviewers.teamReviewers
-      == ["platform", "sre"])
+    #expect(
+      snapshot.orchestratorSettings.githubProject.requestedReviewers.teamReviewers
+        == ["platform", "sre"])
   }
 
   // MARK: - sample fixtures

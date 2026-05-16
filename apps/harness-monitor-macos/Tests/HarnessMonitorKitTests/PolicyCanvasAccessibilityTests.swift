@@ -232,7 +232,7 @@ struct PolicyCanvasAccessibilityTests {
 
   @Test("dash pattern is scaled to keep on-screen size constant below 1x")
   func dashPatternScaledBelowUnity() {
-    let error = PolicyCanvasEdgeKind.error.strokeDashPattern // [3, 2]
+    let error = PolicyCanvasEdgeKind.error.strokeDashPattern  // [3, 2]
     // At zoom 0.5: scale = 1/0.5 = 2 -> [6, 4]
     let halfZoom = PolicyCanvasEdgeAnimation.scaledDashPattern(error, canvasZoom: 0.5)
     #expect(halfZoom == [6, 4])
@@ -243,7 +243,7 @@ struct PolicyCanvasAccessibilityTests {
 
   @Test("empty dash pattern stays empty regardless of zoom")
   func dashPatternEmptyAtAllZoom() {
-    let flow = PolicyCanvasEdgeKind.flow.strokeDashPattern // []
+    let flow = PolicyCanvasEdgeKind.flow.strokeDashPattern  // []
     #expect(PolicyCanvasEdgeAnimation.scaledDashPattern(flow, canvasZoom: 0.25).isEmpty)
     #expect(PolicyCanvasEdgeAnimation.scaledDashPattern(flow, canvasZoom: 1).isEmpty)
     #expect(PolicyCanvasEdgeAnimation.scaledDashPattern(flow, canvasZoom: 4).isEmpty)

@@ -32,10 +32,10 @@ struct HarnessMonitorDashboardWindowContent: View {
   }
 
   private var windowRoot: some View {
-      DashboardWindowRootView(
-        delegate: delegate,
-        store: store,
-        notifications: notifications,
+    DashboardWindowRootView(
+      delegate: delegate,
+      store: store,
+      notifications: notifications,
       keyWindowObserver: keyWindowObserver,
       acpAttentionState: acpAttentionState,
       windowCommandRouting: windowCommandRouting,

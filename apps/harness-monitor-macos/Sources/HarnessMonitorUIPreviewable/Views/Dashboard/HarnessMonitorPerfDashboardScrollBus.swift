@@ -24,18 +24,27 @@ public enum HarnessMonitorPerfDashboardScrollBus {
   /// shared `HarnessMonitorColumnScrollView` keeps its default behavior.
   public static let scenarioEnvironmentKey = "HARNESS_MONITOR_PERF_SCENARIO"
 
-  /// Scenario identifier this hook listens for. Other live scenarios that need the
-  /// same scroll affordance can be added here when introduced.
+  /// Scenario identifier this hook listens for. Kept for callers that reference
+  /// the canonical scroll scenario by name; `activeScenarioIDs` is the source of
+  /// truth for `isActive`.
   public static let activeScenarioID = "dashboard-live-scroll"
+
+  /// Every scenario that wants the geometry+offset probe wired. Live-interact
+  /// shares the same surface so it benefits from the same hook.
+  public static let activeScenarioIDs: Set<String> = [
+    "dashboard-live-scroll",
+    "dashboard-live-interact",
+  ]
 
   private static let auditComponent = "perf.dashboard-live-scroll"
 
   public static func isActive(
     environment: [String: String] = ProcessInfo.processInfo.environment
   ) -> Bool {
-    environment[scenarioEnvironmentKey]?
-      .trimmingCharacters(in: .whitespacesAndNewlines)
-      == activeScenarioID
+    let raw =
+      environment[scenarioEnvironmentKey]?
+      .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+    return activeScenarioIDs.contains(raw)
   }
 
   /// Route scroll-trigger events through the shared perf trace bus so the audit

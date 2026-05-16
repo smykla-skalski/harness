@@ -111,7 +111,7 @@ final class HarnessMonitorUITests: HarnessMonitorUITestCase {
     let app = launch(
       mode: "preview",
       additionalEnvironment: [
-        "HARNESS_MONITOR_PREVIEW_SCENARIO": "task-board-board-only",
+        "HARNESS_MONITOR_PREVIEW_SCENARIO": "task-board-board-only"
       ]
     )
 

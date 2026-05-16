@@ -3,7 +3,8 @@ import Testing
 @testable import HarnessMonitorUIPreviewable
 
 extension HarnessMonitorUITestAccessibilityRegistryTests {
-  @Test("Sleep prevention toolbar identifier stays mirrored and wired in the session window toolbar")
+  @Test(
+    "Sleep prevention toolbar identifier stays mirrored and wired in the session window toolbar")
   func sleepPreventionToolbarIdentifierAndWiringMirror() throws {
     #expect(
       HarnessMonitorAccessibility.sleepPreventionButton
