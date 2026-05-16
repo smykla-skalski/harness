@@ -9,6 +9,11 @@ import SwiftUI
   return formatter
 }()
 
+/// Decoder shared by `TaskBoardDecisionRow.resolvePrimaryAction(for:)`, which
+/// runs from the per-row init. A fresh `JSONDecoder()` per init shows up as
+/// steady-state churn while the lane re-renders.
+private let taskBoardNeedsYouSuggestedActionsDecoder = JSONDecoder()
+
 struct TaskBoardDecisionRow: View {
   let decision: Decision
   let onOpenDecision: (Decision) -> Void
@@ -162,7 +167,7 @@ struct TaskBoardDecisionRow: View {
 
   private static func resolvePrimaryAction(for decision: Decision) -> SuggestedAction? {
     guard
-      let actions = try? JSONDecoder().decode(
+      let actions = try? taskBoardNeedsYouSuggestedActionsDecoder.decode(
         [SuggestedAction].self,
         from: Data(decision.suggestedActionsJSON.utf8)
       ),
