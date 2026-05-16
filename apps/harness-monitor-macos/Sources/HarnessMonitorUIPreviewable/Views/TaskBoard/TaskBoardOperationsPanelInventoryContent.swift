@@ -17,33 +17,21 @@ struct TaskBoardOperationsPanelInventoryCard: View {
       systemImage: "list.bullet.rectangle.portrait",
       metrics: metrics
     ) {
-      filterRow
+      statusPickerField
       actionRow
       summaryContent
     }
   }
 
-  private var filterRow: some View {
-    ViewThatFits(in: .horizontal) {
-      HStack(alignment: .top, spacing: HarnessMonitorTheme.spacingMD) { statusPickerField }
-      VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) { statusPickerField }
-    }
-  }
-
   private var statusPickerField: some View {
-    VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingXS) {
-      Text("Status filter")
-        .scaledFont(.caption.weight(.semibold))
-        .foregroundStyle(HarnessMonitorTheme.secondaryInk)
-      Picker("Status filter", selection: $inventoryStatusChoice) {
-        ForEach(TaskBoardStatusFilterChoice.allCases) { choice in
-          Text(choice.title).tag(choice)
-        }
+    Picker("Status filter", selection: $inventoryStatusChoice) {
+      ForEach(TaskBoardStatusFilterChoice.allCases) { choice in
+        Text(choice.title).tag(choice)
       }
-      .labelsHidden()
-      .harnessNativeFormControl()
-      .accessibilityIdentifier("harness.task-board.inventory.status")
     }
+    .pickerStyle(.menu)
+    .harnessNativeFormControl()
+    .accessibilityIdentifier("harness.task-board.inventory.status")
   }
 
   private var actionRow: some View {
@@ -95,7 +83,6 @@ struct TaskBoardOperationsPanelInventoryCard: View {
   ) -> some View {
     Button(action: action) {
       Label(title, systemImage: systemImage)
-        .scaledFont(.caption.weight(.semibold))
         .lineLimit(1)
     }
     .frame(minHeight: metrics.controlMinHeight)

@@ -12,22 +12,15 @@ struct TaskBoardActionButtonDescriptor {
 
 extension TaskBoardOperationsPanel {
   func controlRows<Content: View>(@ViewBuilder content: () -> Content) -> some View {
-    ViewThatFits(in: .horizontal) {
-      HStack(alignment: .top, spacing: HarnessMonitorTheme.spacingMD) {
-        content()
-      }
-      VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
-        content()
-      }
-    }
+    content()
   }
 
   func actionRow<Content: View>(@ViewBuilder content: () -> Content) -> some View {
-    ViewThatFits(in: .horizontal) {
-      HStack(spacing: HarnessMonitorTheme.spacingSM) {
-        content()
-      }
-      VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
+    HarnessMonitorGlassControlGroup(spacing: HarnessMonitorTheme.itemSpacing) {
+      HarnessMonitorWrapLayout(
+        spacing: HarnessMonitorTheme.itemSpacing,
+        lineSpacing: HarnessMonitorTheme.itemSpacing
+      ) {
         content()
       }
     }
@@ -50,20 +43,12 @@ extension TaskBoardOperationsPanel {
     accessibilityIdentifier: String,
     @ViewBuilder content: () -> Content
   ) -> some View {
-    VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingXS) {
-      Text(title)
-        .scaledFont(.caption.weight(.semibold))
-        .foregroundStyle(HarnessMonitorTheme.secondaryInk)
-      Picker(title, selection: selection) {
-        content()
-      }
-      .pickerStyle(.menu)
-      .labelsHidden()
-      .harnessNativeFormControl()
-      .accessibilityLabel(title)
-      .accessibilityIdentifier(accessibilityIdentifier)
+    Picker(title, selection: selection) {
+      content()
     }
-    .frame(maxWidth: .infinity, alignment: .leading)
+    .pickerStyle(.menu)
+    .harnessNativeFormControl()
+    .accessibilityIdentifier(accessibilityIdentifier)
   }
 
   func staticField(
@@ -71,18 +56,11 @@ extension TaskBoardOperationsPanel {
     value: String,
     accessibilityIdentifier: String
   ) -> some View {
-    VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingXS) {
-      Text(title)
-        .scaledFont(.caption.weight(.semibold))
-        .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+    LabeledContent(title) {
       Text(value)
-        .scaledFont(.caption)
-        .frame(maxWidth: .infinity, minHeight: metrics.controlMinHeight, alignment: .leading)
-        .accessibilityLabel(title)
-        .accessibilityValue(value)
         .accessibilityIdentifier(accessibilityIdentifier)
     }
-    .frame(maxWidth: .infinity, alignment: .leading)
+    .accessibilityValue(value)
   }
 
   func textField(
@@ -91,17 +69,11 @@ extension TaskBoardOperationsPanel {
     prompt: String,
     accessibilityIdentifier: String
   ) -> some View {
-    VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingXS) {
-      Text(title)
-        .scaledFont(.caption.weight(.semibold))
-        .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+    LabeledContent(title) {
       TextField(prompt, text: text)
-        .textFieldStyle(.roundedBorder)
         .harnessNativeTextField()
-        .accessibilityLabel(title)
         .accessibilityIdentifier(accessibilityIdentifier)
     }
-    .frame(maxWidth: .infinity, alignment: .leading)
   }
 
   func toggleField(
@@ -109,13 +81,8 @@ extension TaskBoardOperationsPanel {
     isOn: Binding<Bool>,
     accessibilityIdentifier: String
   ) -> some View {
-    Toggle(isOn: isOn) {
-      Text(title)
-        .scaledFont(.caption.weight(.semibold))
-    }
-    .harnessNativeFormControl()
-    .accessibilityIdentifier(accessibilityIdentifier)
-    .frame(maxWidth: .infinity, alignment: .leading)
+    Toggle(title, isOn: isOn)
+      .accessibilityIdentifier(accessibilityIdentifier)
   }
 
   func actionButton(
@@ -124,7 +91,6 @@ extension TaskBoardOperationsPanel {
   ) -> some View {
     Button(action: action) {
       Label(descriptor.title, systemImage: descriptor.systemImage)
-        .scaledFont(.caption.weight(.semibold))
         .lineLimit(1)
     }
     .frame(minHeight: metrics.controlMinHeight)
@@ -239,21 +205,20 @@ struct TaskBoardOperationsCard<Content: View>: View {
   }
 
   var body: some View {
-    VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
-      Label(title, systemImage: systemImage)
-        .scaledFont(.subheadline.weight(.semibold))
-        .accessibilityAddTraits(.isHeader)
-      content
+    Form {
+      Section {
+        content
+      } header: {
+        Text(title)
+          .harnessNativeFormSectionHeader()
+      }
     }
-    .padding(HarnessMonitorTheme.spacingMD)
-    .frame(maxWidth: .infinity, alignment: .leading)
-    .background(
-      .background.opacity(0.56),
-      in: .rect(cornerRadius: metrics.managementPanelCornerRadius)
-    )
-    .overlay(
-      RoundedRectangle(cornerRadius: metrics.managementPanelCornerRadius)
-        .stroke(HarnessMonitorTheme.controlBorder.opacity(0.62), lineWidth: 1)
+    .harnessNativeFormContainer()
+    .scrollDisabled(true)
+    .frame(
+      maxWidth: .infinity,
+      minHeight: metrics.managementPanelMinHeight,
+      alignment: .leading
     )
   }
 }
