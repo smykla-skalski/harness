@@ -569,6 +569,58 @@ struct AccessibilityRegistryTests {
   }
 
   @MainActor
+  @Test("window tracking defers didUpdate element refresh until updates settle")
+  func windowTrackingDefersDidUpdateElementRefreshUntilUpdatesSettle() async {
+    let registry = AccessibilityRegistry()
+    let trackingView = WindowTrackingNSView(
+      registry: registry,
+      didUpdateElementSyncDelay: .milliseconds(25)
+    )
+    let window = NSWindow(
+      contentRect: NSRect(x: 120, y: 180, width: 420, height: 320),
+      styleMask: [.titled, .closable],
+      backing: .buffered,
+      defer: false
+    )
+    let root = NSView(frame: NSRect(x: 0, y: 0, width: 420, height: 320))
+    let button = NSButton(title: "Start", target: nil, action: nil)
+    button.frame = NSRect(x: 40, y: 40, width: 120, height: 32)
+    button.setAccessibilityIdentifier("session.controls.initial")
+    trackingView.frame = .zero
+    root.addSubview(button)
+    root.addSubview(trackingView)
+    window.contentView = root
+    window.layoutIfNeeded()
+    root.layoutSubtreeIfNeeded()
+
+    defer {
+      window.orderOut(nil)
+      window.contentView = nil
+    }
+
+    #expect(
+      await waitUntil {
+        await registry.allElements(windowID: window.windowNumber).map(\.identifier)
+          == ["session.controls.initial"]
+      }
+    )
+
+    button.setAccessibilityIdentifier("session.controls.latest")
+    NotificationCenter.default.post(name: NSWindow.didUpdateNotification, object: window)
+
+    await Task.yield()
+    let immediateElements = await registry.allElements(windowID: window.windowNumber)
+    #expect(immediateElements.map(\.identifier) == ["session.controls.initial"])
+
+    #expect(
+      await waitUntil {
+        await registry.allElements(windowID: window.windowNumber).map(\.identifier)
+          == ["session.controls.latest"]
+      }
+    )
+  }
+
+  @MainActor
   @Test("window element sync ignores non-accessibility array members in accessibilityChildren")
   func windowElementSyncIgnoresNonAccessibilityArrayMembers() async {
     let registry = AccessibilityRegistry()
@@ -786,6 +838,21 @@ struct AccessibilityRegistryTests {
     let elements = await registry.allElements(windowID: window.windowNumber)
     #expect(elements.map(\.identifier) == ["session.controls.latest"])
     #expect(replacementApplyCount == 2)
+  }
+
+  @MainActor
+  private func waitUntil(
+    maxTurns: Int = 40,
+    delay: Duration = .milliseconds(10),
+    _ predicate: @escaping @MainActor () async -> Bool
+  ) async -> Bool {
+    for _ in 0..<maxTurns {
+      if await predicate() {
+        return true
+      }
+      try? await Task.sleep(for: delay)
+    }
+    return await predicate()
   }
 }
 

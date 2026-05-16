@@ -57,6 +57,21 @@ extension SessionWindowFlowTests {
     #expect(!source.contains("openWindow(id: HarnessMonitorWindowID.openRecent)"))
   }
 
+  @Test("New Session success dismisses first and then opens the created session window")
+  func newSessionSuccessUsesSwiftUIWindowRouting() throws {
+    let source = try previewableSourceFile(named: "Views/NewSession/NewSessionSheetView.swift")
+
+    #expect(!source.contains("import AppKit"))
+    #expect(source.contains("@Environment(\\.dismiss)"))
+    #expect(source.contains("@Environment(\\.openWindow)"))
+    #expect(source.contains("openWindow.openHarnessSessionWindow(sessionID: startedSession.sessionId)"))
+    #expect(source.contains("await Task.yield()"))
+    #expect(source.contains("dismiss()"))
+    #expect(!source.contains("NSApplication"))
+    #expect(!source.contains("NSWindow"))
+    #expect(!source.contains("makeKeyAndOrderFront"))
+  }
+
   @Test("Session tabs route through SwiftUI commands plus the tabbing accessor")
   func sessionTabsUseSwiftUISceneCommands() throws {
     let appSource = try harnessSourceFile(named: "App/HarnessMonitorApp.swift")
