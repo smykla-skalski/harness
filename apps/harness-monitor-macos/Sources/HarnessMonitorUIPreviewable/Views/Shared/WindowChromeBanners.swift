@@ -146,6 +146,35 @@ struct SessionDataAvailabilityBanner: View {
   }
 }
 
+struct DaemonWireVersionSkewBanner: View {
+  let observed: Int
+  let expected: Int
+
+  var body: some View {
+    HStack(alignment: .center, spacing: HarnessMonitorTheme.itemSpacing) {
+      Image(systemName: "exclamationmark.triangle.fill")
+        .scaledFont(.caption)
+        .accessibilityHidden(true)
+      Text(message)
+        .scaledFont(.caption.weight(.medium))
+      Spacer(minLength: 0)
+    }
+    .padding(.horizontal, HarnessMonitorTheme.spacingMD)
+    .padding(.vertical, HarnessMonitorTheme.spacingSM)
+    .foregroundStyle(HarnessMonitorTheme.danger)
+    .modifier(ChromeBannerSurfaceModifier(tint: HarnessMonitorTheme.danger))
+    .accessibilityElement(children: .ignore)
+    .accessibilityLabel(Text(message))
+    .accessibilityValue(Text(message))
+    .accessibilityIdentifier(HarnessMonitorAccessibility.daemonWireVersionSkewBanner)
+  }
+
+  private var message: String {
+    "Connected daemon speaks wire version \(observed); this build expects \(expected). "
+      + "Some features will be unavailable until the daemon is upgraded."
+  }
+}
+
 struct PersistenceUnavailableBanner: View {
   let message: String
 
