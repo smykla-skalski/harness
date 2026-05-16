@@ -69,8 +69,12 @@ extension HarnessMonitorStore {
         groupings,
         knownSessionIDs: knownSessionIDs
       )
+      let orderedSessionIDs = orderedRestoreSessionIDs(
+        openAtQuit,
+        groupings: filteredGroupings
+      )
       return LaunchWindowRestorePlan(
-        sessionIDs: openAtQuit,
+        sessionIDs: orderedSessionIDs,
         tabGroupings: filteredGroupings
       )
     }
@@ -111,6 +115,23 @@ extension HarnessMonitorStore {
       )
     }
     return filtered
+  }
+
+  private func orderedRestoreSessionIDs(
+    _ openAtQuit: [String],
+    groupings: [SessionTabGroupSnapshot]
+  ) -> [String] {
+    var ordered: [String] = []
+    var seen: Set<String> = []
+    for grouping in groupings.sorted(by: { $0.ordinal < $1.ordinal }) {
+      for sessionID in grouping.sessionIDs where seen.insert(sessionID).inserted {
+        ordered.append(sessionID)
+      }
+    }
+    for sessionID in openAtQuit where seen.insert(sessionID).inserted {
+      ordered.append(sessionID)
+    }
+    return ordered
   }
 
   private func sessionTabGroupsAtQuit() async -> [SessionTabGroupSnapshot] {

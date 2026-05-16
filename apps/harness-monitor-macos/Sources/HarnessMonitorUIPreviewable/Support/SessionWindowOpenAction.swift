@@ -109,15 +109,23 @@ enum SessionWindowTabMergeCoordinator {
   }
 
   private static func candidateWindow(for targetWindow: NSWindow) -> NSWindow? {
-    if let keyWindow = NSApplication.shared.keyWindow,
-      isTabbedWindowCandidate(keyWindow, excluding: targetWindow)
-    {
-      return keyWindow
+    let keyedCandidates = [NSApplication.shared.keyWindow].compactMap { $0 }
+    var seenWindowIDs: Set<ObjectIdentifier> = []
+    let orderedCandidates = NSApplication.shared.orderedWindows.filter { window in
+      seenWindowIDs.insert(ObjectIdentifier(window)).inserted
     }
 
-    return NSApplication.shared.orderedWindows.first {
-      isTabbedWindowCandidate($0, excluding: targetWindow)
+    for window in keyedCandidates + orderedCandidates {
+      guard isTabbedWindowCandidate(window, excluding: targetWindow) else {
+        continue
+      }
+      guard !sharesTabGroup(window, with: targetWindow) else {
+        continue
+      }
+      return window
     }
+
+    return nil
   }
 
   private static func isTabbedWindowCandidate(
@@ -128,5 +136,15 @@ enum SessionWindowTabMergeCoordinator {
       && window.isVisible
       && !window.isMiniaturized
       && window.tabbingIdentifier == SessionWindowTabbingSupport.tabbingIdentifier
+  }
+
+  private static func sharesTabGroup(
+    _ window: NSWindow,
+    with targetWindow: NSWindow
+  ) -> Bool {
+    guard let targetTabGroup = targetWindow.tabGroup else {
+      return false
+    }
+    return targetTabGroup === window.tabGroup
   }
 }

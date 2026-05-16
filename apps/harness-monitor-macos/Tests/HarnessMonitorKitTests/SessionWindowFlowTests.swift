@@ -588,5 +588,64 @@ struct SessionWindowNativeTabbingTests {
     #expect(targetWindow.tabGroup != nil)
     #expect(targetWindow.tabGroup === dashboardWindow.tabGroup)
   }
+
+  @MainActor
+  @Test("Shared tab merge coordinator waits for a new third window instead of reusing an existing tab")
+  func sharedTabMergeCoordinatorWaitsForThirdWindowToBecomeTabReady() async throws {
+    let targetWindow = NSWindow(
+      contentRect: .init(x: 0, y: 0, width: 480, height: 320),
+      styleMask: [.titled, .closable, .resizable],
+      backing: .buffered,
+      defer: false
+    )
+    targetWindow.toolbar = NSToolbar(identifier: "session-window")
+
+    let existingPeerWindow = NSWindow(
+      contentRect: .init(x: 32, y: 32, width: 480, height: 320),
+      styleMask: [.titled, .closable, .resizable],
+      backing: .buffered,
+      defer: false
+    )
+    existingPeerWindow.toolbar = NSToolbar(identifier: "peer-window")
+
+    let lateWindow = NSWindow(
+      contentRect: .init(x: 64, y: 64, width: 480, height: 320),
+      styleMask: [.titled, .closable, .resizable],
+      backing: .buffered,
+      defer: false
+    )
+
+    defer {
+      lateWindow.orderOut(nil)
+      existingPeerWindow.orderOut(nil)
+      targetWindow.orderOut(nil)
+    }
+
+    SessionWindowTabbingSupport.prepareWindowForTabbing(targetWindow, preference: .always)
+    SessionWindowTabbingSupport.prepareWindowForTabbing(existingPeerWindow, preference: .always)
+
+    targetWindow.orderFront(nil)
+    existingPeerWindow.makeKeyAndOrderFront(nil)
+    targetWindow.addTabbedWindow(existingPeerWindow, ordered: .above)
+    lateWindow.orderFront(nil)
+
+    let mergeTask = Task { @MainActor in
+      await SessionWindowTabMergeCoordinator.mergeNewestTabbedWindowIfNeeded(
+        into: targetWindow,
+        preference: .always
+      )
+    }
+
+    try await Task.sleep(for: .milliseconds(80))
+    lateWindow.toolbar = NSToolbar(identifier: "late-window")
+    SessionWindowTabbingSupport.prepareWindowForTabbing(lateWindow, preference: .always)
+
+    await mergeTask.value
+
+    #expect(targetWindow.tabGroup != nil)
+    #expect(targetWindow.tabGroup === existingPeerWindow.tabGroup)
+    #expect(targetWindow.tabGroup === lateWindow.tabGroup)
+    #expect(targetWindow.tabGroup?.windows.count == 3)
+  }
 }
 // swiftlint:enable type_body_length
