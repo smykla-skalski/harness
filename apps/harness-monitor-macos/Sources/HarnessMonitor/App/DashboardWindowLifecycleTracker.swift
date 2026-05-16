@@ -6,7 +6,8 @@ import HarnessMonitorUIPreviewable
 /// the launch router can reopen it on relaunch. Matches the
 /// `SessionWindowQuitCapture` contract for session windows: in-memory state
 /// is updated by the SwiftUI view lifecycle, then snapshotted to user
-/// defaults during termination before `.onDisappear` tears the view down.
+/// defaults during app inactivity and termination before `.onDisappear`
+/// tears the view down.
 @MainActor
 final class DashboardWindowLifecycleTracker {
   static let openAtQuitKey = "harness.monitor.dashboard.open-at-quit"
@@ -18,7 +19,7 @@ final class DashboardWindowLifecycleTracker {
     let sessionIDs: [String]
     let wasForegroundTab: Bool
 
-    static let empty = TabRestoreState(sessionIDs: [], wasForegroundTab: false)
+    static let empty = Self(sessionIDs: [], wasForegroundTab: false)
   }
 
   private(set) var isOpen = false
@@ -36,22 +37,24 @@ final class DashboardWindowLifecycleTracker {
     isOpen = false
   }
 
-  /// Snapshot the live state to user defaults. Called from
-  /// `applicationShouldTerminate` and the signal-termination path so the
-  /// value persists even when SwiftUI tears the view down after we reply.
+  /// Snapshot the live state to user defaults. Called from app-inactivity
+  /// and termination paths so the value persists even when SwiftUI tears the
+  /// view down after we reply.
   func flushOpenAtQuit(
+    userDefaults: UserDefaults? = nil,
     dashboardWindow: NSWindow? = DashboardWindowAppKitRegistry.shared.window,
     sessionBindings: [(window: NSWindow, sessionID: String)] =
       SessionWindowAppKitRegistry.shared.currentBindings()
   ) {
-    userDefaults.set(isOpen, forKey: Self.openAtQuitKey)
+    let defaults = userDefaults ?? self.userDefaults
+    defaults.set(isOpen, forKey: Self.openAtQuitKey)
     let tabRestoreState = Self.resolveTabRestoreState(
       isOpen: isOpen,
       dashboardWindow: dashboardWindow,
       sessionBindings: sessionBindings
     )
-    userDefaults.set(tabRestoreState.sessionIDs, forKey: Self.tabbedSessionIDsAtQuitKey)
-    userDefaults.set(tabRestoreState.wasForegroundTab, forKey: Self.wasForegroundTabAtQuitKey)
+    defaults.set(tabRestoreState.sessionIDs, forKey: Self.tabbedSessionIDsAtQuitKey)
+    defaults.set(tabRestoreState.wasForegroundTab, forKey: Self.wasForegroundTabAtQuitKey)
   }
 
   static func wasOpenAtQuit(userDefaults: UserDefaults = .standard) -> Bool {
@@ -61,10 +64,14 @@ final class DashboardWindowLifecycleTracker {
   static func tabRestoreStateAtQuit(
     userDefaults: UserDefaults = .standard
   ) -> TabRestoreState {
-    let sessionIDs = userDefaults.array(forKey: tabbedSessionIDsAtQuitKey) as? [String] ?? []
-    let wasForegroundTab = sessionIDs.isEmpty
-      ? false
-      : userDefaults.bool(forKey: wasForegroundTabAtQuitKey)
+    let sessionIDs =
+      userDefaults.array(forKey: tabbedSessionIDsAtQuitKey) as? [String] ?? []
+    let wasForegroundTab: Bool
+    if sessionIDs.isEmpty {
+      wasForegroundTab = false
+    } else {
+      wasForegroundTab = userDefaults.bool(forKey: wasForegroundTabAtQuitKey)
+    }
     return TabRestoreState(
       sessionIDs: sessionIDs,
       wasForegroundTab: wasForegroundTab

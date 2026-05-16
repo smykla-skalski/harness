@@ -190,17 +190,24 @@ extension HarnessMonitorStore {
     await flushSessionWindowsOpenAtQuit(userDefaults: .standard)
   }
 
+  public func persistSessionWindowRestoreSnapshot(
+    _ snapshot: SessionWindowQuitSnapshot,
+    userDefaults: UserDefaults = .standard
+  ) async {
+    guard let cacheService, persistenceError == nil else { return }
+    _ = await cacheService.replaceSessionWindowsOpenAtQuit(snapshot: snapshot)
+    markLaunchWindowBridgeFallbackComplete(userDefaults: userDefaults)
+  }
+
   func flushSessionWindowsOpenAtQuit(userDefaults: UserDefaults) async {
     let sessionIDs = pendingSessionWindowTerminationSnapshot ?? openSessionWindowIDsSnapshot
     let pendingQuit = pendingSessionWindowQuitSnapshot
     pendingSessionWindowTerminationSnapshot = nil
     pendingSessionWindowQuitSnapshot = nil
-    guard let cacheService, persistenceError == nil else { return }
     let snapshot =
       pendingQuit
       ?? SessionWindowQuitSnapshot(sessionIDs: sessionIDs)
-    _ = await cacheService.replaceSessionWindowsOpenAtQuit(snapshot: snapshot)
-    markLaunchWindowBridgeFallbackComplete(userDefaults: userDefaults)
+    await persistSessionWindowRestoreSnapshot(snapshot, userDefaults: userDefaults)
   }
 
   private func sessionWindowIDsOpenAtQuit() async -> [String] {

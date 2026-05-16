@@ -1,5 +1,6 @@
 #if canImport(AppKit)
   import AppKit
+  import SwiftData
   import SwiftUI
   import XCTest
 
@@ -10,7 +11,7 @@
   @MainActor
   final class SessionWindowQuitCaptureTests: XCTestCase {
     private var previousAllowsAutomaticWindowTabbing = NSWindow.allowsAutomaticWindowTabbing
-    private var userDefaults: UserDefaults!
+    var userDefaults: UserDefaults!
     private let suiteName = "io.harnessmonitor.tests.SessionWindowQuitCapture"
 
     override func setUp() async throws {
@@ -120,7 +121,9 @@
             .modifier(SessionWindowTabbing(role: .session, tabTitle: "bart"))
         )
       )
-      defer { cleanUp(windows: [dashboardWindow, sessionWindow], views: [dashboardHost, sessionHost]) }
+      defer {
+        cleanUp(windows: [dashboardWindow, sessionWindow], views: [dashboardHost, sessionHost])
+      }
 
       show([dashboardWindow, sessionWindow])
       drainMainRunLoop()
@@ -143,32 +146,25 @@
     func testSwiftUIHostedReplayRejoinsSingleSessionIntoDashboardTabGroup() async throws {
       let liveDashboard = makeWindow(origin: .zero)
       let liveSession = makeWindow(origin: .init(x: 24, y: 24))
-      let liveDashboardHost = mountHostingContent(
-        liveDashboard,
-        rootView: AnyView(
-          Color.clear
-            .frame(width: 16, height: 16)
-            .modifier(DashboardWindowAppKitBinding())
-            .modifier(SessionWindowTabbing(role: .dashboard))
-            .modifier(DashboardWindowLifecycleModifier())
-        )
-      )
-      let liveSessionHost = mountHostingContent(
+      let liveDashboardHost = mountHostedDashboard(liveDashboard)
+      let liveSessionHost = mountHostedSession(
         liveSession,
-        rootView: AnyView(
-          Color.clear
-            .frame(width: 16, height: 16)
-            .modifier(SessionWindowAppKitBinding(sessionID: "sess-bart"))
-            .modifier(SessionWindowTabbing(role: .session, tabTitle: "bart"))
-        )
+        sessionID: "sess-bart",
+        tabTitle: "bart"
       )
-      defer { cleanUp(windows: [liveDashboard, liveSession], views: [liveDashboardHost, liveSessionHost]) }
+      defer {
+        cleanUp(
+          windows: [liveDashboard, liveSession],
+          views: [liveDashboardHost, liveSessionHost]
+        )
+      }
 
-      show([liveDashboard, liveSession])
-      drainMainRunLoop()
-      liveDashboard.addTabbedWindow(liveSession, ordered: .above)
-      liveDashboard.tabGroup?.selectedWindow = liveSession
-      drainMainRunLoop()
+      showAndDrain([liveDashboard, liveSession])
+      tabTogetherAndDrain(
+        liveDashboard,
+        sessionWindow: liveSession,
+        selectedWindow: liveSession
+      )
 
       DashboardWindowLifecycleTracker.shared.flushOpenAtQuit()
       let dashboardTabRestoreState = DashboardWindowLifecycleTracker.tabRestoreStateAtQuit()
@@ -178,30 +174,15 @@
       )
 
       cleanUp(windows: [liveDashboard, liveSession], views: [liveDashboardHost, liveSessionHost])
-      SessionWindowAppKitRegistry.shared.resetForTesting()
-      DashboardWindowAppKitRegistry.shared.resetForTesting()
-      DashboardWindowLifecycleTracker.shared.markClosed()
+      resetWindowTracking()
 
       let restoredDashboard = makeWindow(origin: .zero)
       let restoredSession = makeWindow(origin: .init(x: 24, y: 24))
-      let restoredDashboardHost = mountHostingContent(
-        restoredDashboard,
-        rootView: AnyView(
-          Color.clear
-            .frame(width: 16, height: 16)
-            .modifier(DashboardWindowAppKitBinding())
-            .modifier(SessionWindowTabbing(role: .dashboard))
-            .modifier(DashboardWindowLifecycleModifier())
-        )
-      )
-      let restoredSessionHost = mountHostingContent(
+      let restoredDashboardHost = mountHostedDashboard(restoredDashboard)
+      let restoredSessionHost = mountHostedSession(
         restoredSession,
-        rootView: AnyView(
-          Color.clear
-            .frame(width: 16, height: 16)
-            .modifier(SessionWindowAppKitBinding(sessionID: "sess-bart"))
-            .modifier(SessionWindowTabbing(role: .session, tabTitle: "bart"))
-        )
+        sessionID: "sess-bart",
+        tabTitle: "bart"
       )
       defer {
         cleanUp(
@@ -217,8 +198,7 @@
       )
       XCTAssertEqual(replayRestorePlan.sessionIDs, ["sess-bart"])
 
-      show([restoredDashboard, restoredSession])
-      drainMainRunLoop()
+      showAndDrain([restoredDashboard, restoredSession])
 
       let replayGroupings = HarnessMonitorInitialWindowRouter.replayGroupings(
         in: replayRestorePlan,
@@ -241,7 +221,7 @@
       XCTAssertEqual(restoredTabGroup.selectedWindow, restoredSession)
     }
 
-    private func makeWindow(origin: NSPoint) -> NSWindow {
+    func makeWindow(origin: NSPoint) -> NSWindow {
       NSWindow(
         contentRect: .init(origin: origin, size: .init(width: 480, height: 320)),
         styleMask: [.titled, .closable, .resizable],
@@ -267,10 +247,39 @@
       return view
     }
 
-    private func mountHostingContent(_ window: NSWindow, rootView: AnyView) -> NSView {
+    func mountHostingContent(_ window: NSWindow, rootView: AnyView) -> NSView {
       let hostingView = NSHostingView(rootView: rootView)
       window.contentView = hostingView
       return hostingView
+    }
+
+    private func mountHostedDashboard(_ window: NSWindow) -> NSView {
+      mountHostingContent(
+        window,
+        rootView: AnyView(
+          Color.clear
+            .frame(width: 16, height: 16)
+            .modifier(DashboardWindowAppKitBinding())
+            .modifier(SessionWindowTabbing(role: .dashboard))
+            .modifier(DashboardWindowLifecycleModifier())
+        )
+      )
+    }
+
+    private func mountHostedSession(
+      _ window: NSWindow,
+      sessionID: String,
+      tabTitle: String
+    ) -> NSView {
+      mountHostingContent(
+        window,
+        rootView: AnyView(
+          Color.clear
+            .frame(width: 16, height: 16)
+            .modifier(SessionWindowAppKitBinding(sessionID: sessionID))
+            .modifier(SessionWindowTabbing(role: .session, tabTitle: tabTitle))
+        )
+      )
     }
 
     private func prepareSharedTabbingIdentity(_ window: NSWindow, toolbarID: String) {
@@ -278,24 +287,63 @@
       SessionWindowTabbingSupport.prepareWindowForTabbing(window, preference: .always)
     }
 
-    private func show(_ windows: [NSWindow]) {
+    func show(_ windows: [NSWindow]) {
       for window in windows.dropLast() {
         window.orderFront(nil)
       }
       windows.last?.makeKeyAndOrderFront(nil)
     }
 
-    private func drainMainRunLoop() {
+    func drainMainRunLoop() {
       RunLoop.main.run(until: Date(timeIntervalSinceNow: 0.1))
+    }
+
+    private func showAndDrain(_ windows: [NSWindow]) {
+      show(windows)
+      drainMainRunLoop()
+    }
+
+    private func tabTogetherAndDrain(
+      _ dashboardWindow: NSWindow,
+      sessionWindow: NSWindow,
+      selectedWindow: NSWindow
+    ) {
+      dashboardWindow.addTabbedWindow(sessionWindow, ordered: .above)
+      dashboardWindow.tabGroup?.selectedWindow = selectedWindow
+      drainMainRunLoop()
     }
 
     private func clearSharedDashboardRestoreState() {
       UserDefaults.standard.removeObject(forKey: DashboardWindowLifecycleTracker.openAtQuitKey)
-      UserDefaults.standard.removeObject(forKey: DashboardWindowLifecycleTracker.tabbedSessionIDsAtQuitKey)
-      UserDefaults.standard.removeObject(forKey: DashboardWindowLifecycleTracker.wasForegroundTabAtQuitKey)
+      UserDefaults.standard.removeObject(
+        forKey: DashboardWindowLifecycleTracker.tabbedSessionIDsAtQuitKey
+      )
+      UserDefaults.standard.removeObject(
+        forKey: DashboardWindowLifecycleTracker.wasForegroundTabAtQuitKey
+      )
     }
 
-    private func cleanUp(windows: [NSWindow], views: [NSView]) {
+    private func resetWindowTracking() {
+      SessionWindowAppKitRegistry.shared.resetForTesting()
+      DashboardWindowAppKitRegistry.shared.resetForTesting()
+      DashboardWindowLifecycleTracker.shared.markClosed()
+    }
+
+    @MainActor
+    func makeStore(
+      modelContainer: ModelContainer,
+      cacheService: SessionCacheService
+    ) -> HarnessMonitorStore {
+      HarnessMonitorStore(
+        daemonController: PreviewDaemonController(mode: .empty),
+        voiceCapture: PreviewVoiceCaptureService(),
+        daemonOwnership: .managed,
+        modelContainer: modelContainer,
+        cacheService: cacheService
+      )
+    }
+
+    func cleanUp(windows: [NSWindow], views: [NSView]) {
       for view in views {
         view.removeFromSuperview()
       }
