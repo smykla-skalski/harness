@@ -31,6 +31,16 @@ public struct TaskBoardOverviewView: View {
   @State private var selectedTaskBoardItemID: String?
   @State private var isCreatingTaskBoardItem = false
 
+  private var captionSemibold: Font {
+    HarnessMonitorTextSize.scaledFont(.caption.weight(.semibold), by: fontScale)
+  }
+  private var bodyFont: Font {
+    HarnessMonitorTextSize.scaledFont(.body, by: fontScale)
+  }
+  private var titleHeaderFont: Font {
+    HarnessMonitorTextSize.scaledFont(.system(.title3, design: .rounded, weight: .semibold), by: fontScale)
+  }
+
   private var metrics: TaskBoardOverviewMetrics {
     TaskBoardOverviewMetrics(fontScale: fontScale)
   }
@@ -159,7 +169,7 @@ extension TaskBoardOverviewView {
 
   private var headerTitle: some View {
     Label("Board", systemImage: "rectangle.3.group")
-      .scaledFont(.system(.title3, design: .rounded, weight: .semibold))
+      .font(titleHeaderFont)
       .accessibilityAddTraits(.isHeader)
   }
 
@@ -208,7 +218,7 @@ extension TaskBoardOverviewView {
         startTaskBoardItemCreation()
       } label: {
         Label("New Item", systemImage: "plus.circle")
-          .scaledFont(.caption.weight(.semibold))
+          .font(captionSemibold)
       }
       .frame(minHeight: metrics.controlMinHeight)
       .harnessActionButtonStyle(variant: .bordered, tint: HarnessMonitorTheme.accent)
@@ -223,7 +233,7 @@ extension TaskBoardOverviewView {
         onEvaluateTaskBoard()
       } label: {
         Label("Evaluate", systemImage: "checkmark.seal")
-          .scaledFont(.caption.weight(.semibold))
+          .font(captionSemibold)
       }
       .frame(minHeight: metrics.controlMinHeight)
       .harnessActionButtonStyle(variant: .bordered, tint: HarnessMonitorTheme.accent)
@@ -238,7 +248,7 @@ extension TaskBoardOverviewView {
         onRefreshTaskBoard()
       } label: {
         Label("Refresh", systemImage: "arrow.clockwise")
-          .scaledFont(.caption.weight(.semibold))
+          .font(captionSemibold)
       }
       .frame(minHeight: metrics.controlMinHeight)
       .harnessActionButtonStyle(variant: .bordered, tint: .secondary)
@@ -318,7 +328,7 @@ extension TaskBoardOverviewView {
 
   private var emptyState: some View {
     ContentUnavailableView("No Open Tasks", systemImage: "tray")
-      .scaledFont(.body)
+      .font(bodyFont)
       .frame(maxWidth: .infinity, minHeight: 180)
       .background(
         .background.opacity(0.45), in: .rect(cornerRadius: HarnessMonitorTheme.cornerRadiusSM))
