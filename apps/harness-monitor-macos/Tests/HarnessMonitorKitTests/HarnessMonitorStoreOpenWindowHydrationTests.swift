@@ -67,9 +67,20 @@ final class HarnessMonitorStoreOpenWindowHydrationTests: XCTestCase {
     )
   }
 
-  func testHydrationIsNoopWhenSessionSummaryUnknown() async throws {
+  func testHydrationFetchesAndRegistersUnknownSessionSummary() async throws {
     let harness = try PersistenceIntegrationTestHarness()
+    let session = makeSession(.freshlyCreatedActive)
+    let detail = makeSessionDetail(
+      summary: session,
+      workerID: "worker-new-session",
+      workerName: "New Session Worker"
+    )
     let client = RecordingHarnessClient()
+    client.configureSessions(
+      summaries: [],
+      detailsByID: [session.sessionId: detail],
+      timelinesBySessionID: [session.sessionId: []]
+    )
     let store = HarnessMonitorStore(
       daemonController: RecordingDaemonController(client: client),
       voiceCapture: NativeVoiceCaptureService(),
@@ -78,9 +89,77 @@ final class HarnessMonitorStoreOpenWindowHydrationTests: XCTestCase {
     store.connectionState = .online
     store.client = client
 
-    await store.ensureSessionDetailHydratedForOpenWindow(sessionID: "sess-unknown")
+    XCTAssertNil(store.sessionIndex.sessionSummary(for: session.sessionId))
 
-    XCTAssertEqual(client.readCallCount(.sessionDetail("sess-unknown")), 0)
+    await store.ensureSessionDetailHydratedForOpenWindow(sessionID: session.sessionId)
+    await store.flushPendingCacheWrite()
+
+    XCTAssertEqual(client.readCallCount(.sessionDetail(session.sessionId)), 1)
+    XCTAssertNotNil(store.sessionIndex.sessionSummary(for: session.sessionId))
+    let cachedDetail = await store.loadCachedSessionDetail(sessionID: session.sessionId)
+    XCTAssertEqual(cachedDetail?.detail.session.sessionId, session.sessionId)
+  }
+
+  func testHydrationKeepsNewSessionInRestartRestorePlan() async throws {
+    let harness = try PersistenceIntegrationTestHarness()
+    let existingSession = makeSession(.unhydratedActive)
+    let newSession = makeSession(.freshlyCreatedActive)
+    let newDetail = makeSessionDetail(
+      summary: newSession,
+      workerID: "worker-restart-new-session",
+      workerName: "Restart New Session Worker"
+    )
+    let client = RecordingHarnessClient()
+    client.configureSessions(
+      summaries: [existingSession],
+      detailsByID: [newSession.sessionId: newDetail],
+      timelinesBySessionID: [newSession.sessionId: []]
+    )
+    let cacheService = SessionCacheService(modelContainer: harness.container)
+    let store = HarnessMonitorStore(
+      daemonController: RecordingDaemonController(client: client),
+      voiceCapture: NativeVoiceCaptureService(),
+      modelContainer: harness.container
+    )
+    store.sessionIndex.replaceSnapshot(projects: [], sessions: [existingSession])
+    store.connectionState = .online
+    store.client = client
+    await store.cacheSessionSummary(existingSession, project: nil)
+
+    await store.ensureSessionDetailHydratedForOpenWindow(sessionID: newSession.sessionId)
+    await store.flushPendingCacheWrite()
+    _ = await cacheService.replaceSessionWindowsOpenAtQuit(
+      snapshot: HarnessMonitorStore.SessionWindowQuitSnapshot(
+        sessionIDs: Set([existingSession.sessionId, newSession.sessionId]),
+        groupings: [
+          HarnessMonitorStore.SessionTabGroupSnapshot(
+            ordinal: 0,
+            sessionIDs: [existingSession.sessionId, newSession.sessionId],
+            foregroundSessionID: existingSession.sessionId
+          )
+        ]
+      )
+    )
+
+    let relaunchedStore = harness.makeStore()
+    await relaunchedStore.prepareOpenRecentSessions()
+
+    let restorePlan = await relaunchedStore.launchWindowRestorePlan()
+
+    XCTAssertEqual(
+      restorePlan.sessionIDs,
+      [existingSession.sessionId, newSession.sessionId]
+    )
+    XCTAssertEqual(
+      restorePlan.tabGroupings,
+      [
+        HarnessMonitorStore.SessionTabGroupSnapshot(
+          ordinal: 0,
+          sessionIDs: [existingSession.sessionId, newSession.sessionId],
+          foregroundSessionID: existingSession.sessionId
+        )
+      ]
+    )
   }
 }
 
@@ -94,5 +173,16 @@ extension SessionFixture {
     inProgressTaskCount: 0,
     blockedTaskCount: 0,
     activeAgentCount: 2
+  )
+
+  fileprivate static let freshlyCreatedActive = SessionFixture(
+    sessionId: "sess-open-window-newly-created",
+    context: "Freshly created session",
+    status: .active,
+    leaderId: "leader-new-session",
+    openTaskCount: 0,
+    inProgressTaskCount: 0,
+    blockedTaskCount: 0,
+    activeAgentCount: 1
   )
 }
