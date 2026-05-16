@@ -18,18 +18,34 @@ struct TaskBoardDecisionRow: View {
   let decision: Decision
   let onOpenDecision: (Decision) -> Void
   private let primaryAction: SuggestedAction?
-  @Environment(\.fontScale)
-  private var fontScale
-
-  private var metrics: TaskBoardLaneMetrics { TaskBoardLaneMetrics(fontScale: fontScale) }
+  private let metrics: TaskBoardLaneMetrics
+  private let summaryFont: Font
+  private let ruleFont: Font
+  private let actionFont: Font
+  private let chevronFont: Font
 
   init(
     decision: Decision,
+    fontScale: CGFloat,
     onOpenDecision: @escaping (Decision) -> Void
   ) {
     self.decision = decision
     self.onOpenDecision = onOpenDecision
     primaryAction = Self.resolvePrimaryAction(for: decision)
+    metrics = TaskBoardLaneMetrics(fontScale: fontScale)
+    summaryFont = HarnessMonitorTextSize.scaledFont(.caption, by: fontScale)
+    ruleFont = HarnessMonitorTextSize.scaledFont(
+      .subheadline.weight(.semibold),
+      by: fontScale
+    )
+    actionFont = HarnessMonitorTextSize.scaledFont(
+      .caption.weight(.semibold),
+      by: fontScale
+    )
+    chevronFont = HarnessMonitorTextSize.scaledFont(
+      .caption2.weight(.semibold),
+      by: fontScale
+    )
   }
 
   var body: some View {
@@ -52,7 +68,7 @@ struct TaskBoardDecisionRow: View {
       headerRow
       if !decision.summary.isEmpty {
         Text(decision.summary)
-          .scaledFont(.caption)
+          .font(summaryFont)
           .foregroundStyle(HarnessMonitorTheme.secondaryInk)
           .lineLimit(3)
           .multilineTextAlignment(.leading)
@@ -73,13 +89,14 @@ struct TaskBoardDecisionRow: View {
         .padding(.top, metrics.cardMarkerTopPadding)
       VStack(alignment: .leading, spacing: 2) {
         Text(ruleDisplayName)
-          .scaledFont(.subheadline.weight(.semibold))
+          .font(ruleFont)
           .foregroundStyle(HarnessMonitorTheme.ink)
           .lineLimit(1)
           .truncationMode(.tail)
         TaskBoardDecisionScopeLine(
           staticScope: staticScopePart,
-          createdAt: decision.createdAt
+          createdAt: decision.createdAt,
+          font: summaryFont
         )
       }
       Spacer(minLength: metrics.laneSpacing)
@@ -92,13 +109,13 @@ struct TaskBoardDecisionRow: View {
   private func primaryActionRow(for action: SuggestedAction) -> some View {
     HStack(spacing: HarnessMonitorTheme.spacingXS) {
       Image(systemName: actionSymbol(for: action.kind))
-        .scaledFont(.caption.weight(.semibold))
+        .font(actionFont)
       Text(action.title)
-        .scaledFont(.caption.weight(.semibold))
+        .font(actionFont)
         .lineLimit(1)
       Spacer(minLength: 0)
       Image(systemName: "chevron.right")
-        .scaledFont(.caption2.weight(.semibold))
+        .font(chevronFont)
         .opacity(0.7)
     }
     .foregroundStyle(actionTint(for: action.kind))
@@ -218,11 +235,12 @@ struct TaskBoardDecisionRow: View {
 private struct TaskBoardDecisionScopeLine: View {
   let staticScope: String
   let createdAt: Date
+  let font: Font
 
   var body: some View {
     TimelineView(.periodic(from: .now, by: 15)) { context in
       Text(combined(now: context.date))
-        .scaledFont(.caption)
+        .font(font)
         .foregroundStyle(HarnessMonitorTheme.secondaryInk)
         .lineLimit(1)
         .truncationMode(.tail)

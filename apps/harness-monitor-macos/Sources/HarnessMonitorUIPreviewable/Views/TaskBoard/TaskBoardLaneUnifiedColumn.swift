@@ -128,7 +128,11 @@ struct TaskBoardLaneUnifiedColumn: View {
   @ViewBuilder private var decisionRows: some View {
     VStack(spacing: metrics.laneSpacing) {
       ForEach(decisions, id: \.id) { decision in
-        TaskBoardDecisionRow(decision: decision, onOpenDecision: onOpenDecision)
+        TaskBoardDecisionRow(
+          decision: decision,
+          fontScale: fontScale,
+          onOpenDecision: onOpenDecision
+        )
       }
     }
   }
