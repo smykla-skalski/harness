@@ -142,12 +142,13 @@ final class HarnessMonitorAppDelegate: NSObject, NSApplicationDelegate {
       guard launchMode == .live, let store else {
         return
       }
-      guard shouldSuspendLiveConnectionOnResignActive() else {
-        return
-      }
 
       Task { @MainActor [weak self] in
-        guard self?.terminationTask == nil else {
+        guard let self, self.terminationTask == nil else {
+          return
+        }
+        await self.persistWindowRestoreStateForAppInactivity(using: store)
+        guard self.shouldSuspendLiveConnectionOnResignActive() else {
           return
         }
         await store.suspendLiveConnectionForAppInactivity()
@@ -186,6 +187,18 @@ final class HarnessMonitorAppDelegate: NSObject, NSApplicationDelegate {
     #else
       body()
     #endif
+  }
+
+  func persistWindowRestoreStateForAppInactivity(
+    using store: HarnessMonitorStore,
+    userDefaults: UserDefaults = .standard
+  ) async {
+    let quitSnapshot = SessionWindowQuitCapture.captureSnapshot()
+    DashboardWindowLifecycleTracker.shared.flushOpenAtQuit(userDefaults: userDefaults)
+    await store.persistSessionWindowRestoreSnapshot(
+      quitSnapshot,
+      userDefaults: userDefaults
+    )
   }
 
   func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
