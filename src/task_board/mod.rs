@@ -1,6 +1,7 @@
 pub mod dispatch;
 pub mod evaluation;
 pub mod external;
+pub mod git_identity_defaults;
 pub mod github;
 pub mod machines;
 pub mod orchestrator;
@@ -33,6 +34,10 @@ pub use external::{
     ExternalUpdateOutcome, GH_TOKEN_ENV, GITHUB_REPOSITORY_ENV, GitHubInboxSyncClient,
     GitHubSyncClient, HARNESS_GITHUB_REPOSITORY_ENV, HARNESS_GITHUB_TOKEN_ENV,
     HARNESS_TODOIST_TOKEN_ENV, TodoistSyncClient, configured_sync_clients, sync_external_tasks,
+};
+pub use git_identity_defaults::{
+    TaskBoardEnvDefaults, TaskBoardGhCliDefaults, TaskBoardGitConfigDefaults,
+    TaskBoardGitIdentityDefaults, TaskBoardSshKeyDiscovery, discover as discover_git_identity_defaults,
 };
 pub use machines::{Machine, MachineRegistry};
 pub use orchestrator::{
