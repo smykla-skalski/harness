@@ -130,7 +130,6 @@ public struct DashboardWindowView: View {
       }
       .accessibilityElement(children: .contain)
       .accessibilityIdentifier(HarnessMonitorAccessibility.dashboardWindowRoot)
-      .windowToolbarBackdropUnderlay(toolbarBackdropModel(route: route))
       .toolbar {
         DashboardWindowToolbar(
           store: store,
@@ -152,17 +151,6 @@ public struct DashboardWindowView: View {
         )
       }
       .modifier(DashboardPerfRouteHook(selectedRouteBinding: selectedRouteBinding))
-    }
-  }
-
-  private func toolbarBackdropModel(
-    route: DashboardWindowRoute
-  ) -> WindowToolbarBackdropModel {
-    switch route {
-    case .taskBoard:
-      .dashboardTaskBoard()
-    case .policyCanvas:
-      .dashboardPolicyCanvas()
     }
   }
 }
@@ -224,7 +212,7 @@ private struct DashboardBannerStack<Content: View>: View {
       isPresented: model.isPresented
     ) {
       content
-        .harnessMonitorBackgroundExtensionEffect()
+        .harnessMonitorToolbarBackgroundExtensionEffect()
     } banners: {
       topChrome
     }

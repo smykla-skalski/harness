@@ -133,13 +133,6 @@ extension SessionWindowView {
     summary?.projectAndWorktreeDisplayLabel(separator: "·") ?? ""
   }
 
-  var sessionToolbarBackdropModel: WindowToolbarBackdropModel {
-    WindowToolbarBackdropModel.session(
-      status: summary?.status ?? .awaitingLeader,
-      isStale: snapshot == nil
-    )
-  }
-
   var allSessionDecisions: [Decision] {
     allSessionDecisionsCache
   }
