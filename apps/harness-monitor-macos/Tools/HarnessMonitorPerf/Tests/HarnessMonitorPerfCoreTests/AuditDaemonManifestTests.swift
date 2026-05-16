@@ -37,9 +37,9 @@ final class AuditDaemonManifestTests: XCTestCase {
         )
 
         let mirrorTokenURL = paths.mirrorDataHome
-            .appendingPathComponent("harness/daemon/auth-token")
+            .appendingPathComponent("harness/daemon/\(AuditRunner.auditTargetOwnershipSegment)/auth-token")
         let mirrorManifestURL = paths.mirrorDataHome
-            .appendingPathComponent("harness/daemon/manifest.json")
+            .appendingPathComponent("harness/daemon/\(AuditRunner.auditTargetOwnershipSegment)/manifest.json")
         let mirrorManifestData = try Data(contentsOf: mirrorManifestURL)
         let mirrorManifest = try XCTUnwrap(
             JSONSerialization.jsonObject(with: mirrorManifestData) as? [String: Any]

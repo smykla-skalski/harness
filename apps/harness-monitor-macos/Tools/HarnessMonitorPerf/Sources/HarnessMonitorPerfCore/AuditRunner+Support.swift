@@ -101,15 +101,11 @@ extension AuditRunner {
         fileManager: FileManager = .default,
         processIsLive: ((Int32) -> Bool)? = nil
     ) throws {
-        let sourceManifestURL = sourceDataHome
-            .appendingPathComponent("harness", isDirectory: true)
-            .appendingPathComponent("daemon", isDirectory: true)
-            .appendingPathComponent("manifest.json")
-        guard fileManager.fileExists(atPath: sourceManifestURL.path) else {
-            throw Failure(
-                message: "External audit daemon manifest missing at \(sourceManifestURL.path)"
-            )
-        }
+        let resolution = try resolveAuditSourceDaemonManifest(
+            sourceDataHome: sourceDataHome,
+            fileManager: fileManager
+        )
+        let sourceManifestURL = resolution.manifestURL
 
         let manifestData = try Data(contentsOf: sourceManifestURL)
         let rawManifest = try JSONSerialization.jsonObject(with: manifestData)
@@ -138,6 +134,7 @@ extension AuditRunner {
         let mirrorDaemonRoot = mirrorDataHome
             .appendingPathComponent("harness", isDirectory: true)
             .appendingPathComponent("daemon", isDirectory: true)
+            .appendingPathComponent(auditTargetOwnershipSegment, isDirectory: true)
         try fileManager.createDirectory(at: mirrorDaemonRoot, withIntermediateDirectories: true)
 
         let mirrorTokenURL = mirrorDaemonRoot.appendingPathComponent("auth-token")
