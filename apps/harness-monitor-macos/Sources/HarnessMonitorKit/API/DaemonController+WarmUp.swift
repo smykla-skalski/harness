@@ -27,9 +27,6 @@ extension DaemonController {
     if let immediateError = state.immediateError {
       throw immediateError
     }
-    if state.skipFinalBootstrapProbe == false, let client = try? await bootstrapClient() {
-      return client
-    }
     if ownership == .external {
       let manifestPath = externalManifestLocator.manifestURL.path
       if state.sawUnreachableManifest {
@@ -47,7 +44,6 @@ extension DaemonController {
     var lastError: (any Error)?
     var sawUnreachableManifest = false
     var immediateError: (any Error)?
-    var skipFinalBootstrapProbe = false
     var managedStaleManifestTracker = ManagedStaleManifestTracker()
     var managedVersionMismatchTracker = ManagedStaleManifestTracker()
     var pendingBundleStampRefresh: ManagedLaunchAgentBundleStamp?
