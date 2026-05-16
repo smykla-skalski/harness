@@ -1,18 +1,19 @@
 //! `harness setup secrets` — diagnostics and writes for task-board secrets.
 //!
-//! Shells out to the macOS `security` CLI so we don't take a heavier dependency.
-//! Secret values never appear on argv at the CLI boundary: callers supply them
-//! via stdin, file, or environment variable (precedence in that order). Only
-//! the `security` subprocess itself sees the secret on its own argv, which is
-//! the smallest atomic exposure we can offer without rewriting the call to use
-//! `Security.framework` directly.
+//! Talks to the macOS Keychain via `security-framework`, so secret values
+//! never reach a subprocess argv: callers supply them via stdin, file, or
+//! environment variable (precedence in that order), and from there the bytes
+//! ride a `SecKeychainItem*` buffer into `Security.framework` directly.
 
 use std::env;
 use std::fs;
 use std::io::{self, Read};
-use std::process::Command;
 
 use clap::{Args, Subcommand, ValueEnum};
+use security_framework::base::Error as SecError;
+use security_framework::passwords::{
+    delete_generic_password, get_generic_password, set_generic_password,
+};
 use sha1::{Digest, Sha1};
 
 use crate::app::command_context::AppContext;
@@ -126,54 +127,24 @@ fn run_set(args: &SecretMutateArgs) -> Result<i32, CliError> {
             "refusing to store an empty secret; use `clear` to remove instead",
         )));
     }
-    let status = Command::new("security")
-        .args([
-            "add-generic-password",
-            "-U",
-            "-s",
-            service,
-            "-a",
-            account.as_str(),
-            "-w",
-            secret.as_str(),
-        ])
-        .status()
-        .map_err(|error| {
-            CliError::from(CliErrorKind::workflow_io(format!(
-                "failed to invoke `security`: {error}"
-            )))
-        })?;
-    if !status.success() {
-        return Err(CliError::from(CliErrorKind::workflow_io(format!(
-            "`security add-generic-password` exited with {status}"
-        ))));
-    }
+    set_generic_password(service, account.as_str(), secret.as_bytes())
+        .map_err(|error| keychain_error("write", service, account.as_str(), &error))?;
     println!("Stored {service} ({account})");
     Ok(0)
 }
 
 fn run_clear(args: &SecretScopeArgs) -> Result<i32, CliError> {
     let (service, account) = resolve_service_account(args)?;
-    let status = Command::new("security")
-        .args([
-            "delete-generic-password",
-            "-s",
-            service,
-            "-a",
-            account.as_str(),
-        ])
-        .status()
-        .map_err(|error| {
-            CliError::from(CliErrorKind::workflow_io(format!(
-                "failed to invoke `security`: {error}"
-            )))
-        })?;
-    if status.success() {
-        println!("Cleared {service} ({account})");
-        Ok(0)
-    } else {
-        println!("Nothing to clear for {service} ({account})");
-        Ok(0)
+    match delete_generic_password(service, account.as_str()) {
+        Ok(()) => {
+            println!("Cleared {service} ({account})");
+            Ok(0)
+        }
+        Err(error) if is_not_found(&error) => {
+            println!("Nothing to clear for {service} ({account})");
+            Ok(0)
+        }
+        Err(error) => Err(keychain_error("clear", service, account.as_str(), &error)),
     }
 }
 
@@ -186,6 +157,19 @@ fn run_test(args: &SecretScopeArgs) -> Result<i32, CliError> {
         println!("missing: {service} ({account})");
         Ok(1)
     }
+}
+
+fn keychain_error(action: &str, service: &str, account: &str, error: &SecError) -> CliError {
+    CliError::from(CliErrorKind::workflow_io(format!(
+        "Keychain {action} failed for {service} ({account}): {error}"
+    )))
+}
+
+/// errSecItemNotFound on macOS.
+const ERR_SEC_ITEM_NOT_FOUND: i32 = -25300;
+
+fn is_not_found(error: &SecError) -> bool {
+    error.code() == ERR_SEC_ITEM_NOT_FOUND
 }
 
 fn resolve_service_account(args: &SecretScopeArgs) -> Result<(&'static str, String), CliError> {
@@ -248,16 +232,7 @@ fn sha1_hex(value: &str) -> String {
 }
 
 fn keychain_item_present(service: &str, account: &str) -> bool {
-    Command::new("security")
-        .args([
-            "find-generic-password",
-            "-s",
-            service,
-            "-a",
-            account,
-        ])
-        .output()
-        .is_ok_and(|out| out.status.success())
+    get_generic_password(service, account).is_ok()
 }
 
 #[cfg(test)]
