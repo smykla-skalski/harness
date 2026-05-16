@@ -1,7 +1,7 @@
 import Foundation
 
-/// Wraps an `xctrace export --xpath ...` payload and exposes the row+id-ref vocabulary the
-/// python extractor relies on.
+/// Wraps an `xctrace export --xpath ...` payload and exposes the row+id-ref
+/// vocabulary the python extractor relies on.
 ///
 /// Each xctrace payload is shaped like:
 ///
@@ -17,30 +17,26 @@ import Foundation
 ///     </node>
 ///   </trace-query-result>
 ///
-/// Elements either carry their own value (text or `fmt` attribute) or a `ref` to another
-/// element identified by `id`. Resolving values therefore walks the id index until landing on
-/// an element with payload.
+/// Elements either carry their own value (text or `fmt` attribute) or a `ref`
+/// to another element identified by `id`. Resolving values therefore walks the
+/// id index until landing on an element with payload.
+///
+/// Memory contract: a full DOM walk on a multi-GB xctrace XML peaked above the
+/// process RSS limit (DOM ~5-10x input). `XctraceQueryParser` streams the
+/// payload with `XMLParser`, materializing only rows, top-level id targets
+/// (e.g. `<backtrace id="…">`), and an id index keyed by the `id` attribute.
 public struct XctraceQueryDocument {
-    public let root: XMLElement
-    public let node: XMLElement
     public let schemaColumns: [String]
-    public let idIndex: [String: XMLElement]
+    public let rows: [XMLElement]
+    let idIndex: [String: XMLElement]
 
     public init(data: Data) throws {
-        let xml = try XMLDocument(
-            data: XMLSanitizer.sanitize(data),
-            options: [.nodePreserveAttributeOrder]
-        )
-        guard let root = xml.rootElement() else {
-            throw ParseError.missingRootElement
-        }
-        guard let node = (try? root.nodes(forXPath: ".//node"))?.compactMap({ $0 as? XMLElement }).first else {
-            throw ParseError.missingNodeElement
-        }
-        self.root = root
-        self.node = node
-        self.idIndex = Self.buildIdIndex(node)
-        self.schemaColumns = Self.readSchemaColumns(node)
+        let sanitized = XMLSanitizer.sanitize(data)
+        let parser = XctraceQueryParser()
+        try parser.parse(data: sanitized)
+        self.schemaColumns = parser.schemaColumns
+        self.rows = parser.rows
+        self.idIndex = parser.idIndex
     }
 
     public init(path: URL) throws {
@@ -48,22 +44,24 @@ public struct XctraceQueryDocument {
     }
 
     public enum ParseError: Error, CustomStringConvertible {
-        case missingRootElement
         case missingNodeElement
+        case parserFailed(String)
+        case parserCancelled
+        /// Retained for source compatibility with the prior `XMLDocument`-backed init.
+        case missingRootElement
         public var description: String {
             switch self {
-            case .missingRootElement: return "xctrace XML missing root element"
             case .missingNodeElement: return "xctrace XML missing <node>"
+            case .parserFailed(let detail): return "xctrace XMLParser failed: \(detail)"
+            case .parserCancelled: return "xctrace XMLParser was cancelled"
+            case .missingRootElement: return "xctrace XML missing root element"
             }
         }
     }
 
-    public var rows: [XMLElement] {
-        node.elements(forName: "row")
-    }
-
-    /// Mirrors `row_to_record` in the python extractor. Each row child is resolved to text and
-    /// keyed by its column mnemonic (or its tag name when the schema is sparse).
+    /// Mirrors `row_to_record` in the python extractor. Each row child is
+    /// resolved to text and keyed by its column mnemonic (or its tag name when
+    /// the schema is sparse).
     public func record(for row: XMLElement) -> [String: String] {
         var record: [String: String] = [:]
         let children = row.children?.compactMap { $0 as? XMLElement } ?? []
@@ -79,8 +77,9 @@ public struct XctraceQueryDocument {
         return record
     }
 
-    /// Resolve `<element ref="N"/>` chains to their backing element, then return that element's
-    /// text content, `fmt` attribute, or the resolved single-child text.
+    /// Resolve `<element ref="N"/>` chains to their backing element, then
+    /// return that element's text content, `fmt` attribute, or the resolved
+    /// single-child text.
     public func resolvedText(of element: XMLElement) -> String {
         guard let resolved = dereference(element) else { return "" }
         if let text = resolved.stringValue?.trimmingCharacters(in: .whitespacesAndNewlines), !text.isEmpty {
@@ -99,8 +98,8 @@ public struct XctraceQueryDocument {
         return ""
     }
 
-    /// Follow `ref="X"` until an element with no `ref` is reached, or `nil` if the chain
-    /// dangles.
+    /// Follow `ref="X"` until an element with no `ref` is reached, or `nil` if
+    /// the chain dangles.
     public func dereference(_ element: XMLElement) -> XMLElement? {
         guard let ref = element.attribute(forName: "ref")?.stringValue else {
             return element
@@ -111,28 +110,11 @@ public struct XctraceQueryDocument {
         }
         return target
     }
-
-    private static func buildIdIndex(_ node: XMLElement) -> [String: XMLElement] {
-        var index: [String: XMLElement] = [:]
-        var stack: [XMLElement] = [node]
-        while let current = stack.popLast() {
-            if let id = current.attribute(forName: "id")?.stringValue { index[id] = current }
-            for child in current.children ?? [] {
-                if let element = child as? XMLElement { stack.append(element) }
-            }
-        }
-        return index
-    }
-
-    private static func readSchemaColumns(_ node: XMLElement) -> [String] {
-        guard let schema = node.elements(forName: "schema").first else { return [] }
-        return schema.elements(forName: "col").map { col in
-            col.elements(forName: "mnemonic").first?.stringValue ?? ""
-        }
-    }
 }
 
-/// Schema/track discovery against a xctrace TOC payload.
+/// Schema/track discovery against a xctrace TOC payload. Kept on the legacy
+/// `XMLDocument` path because TOC payloads are tiny (a few KB) and the XPath
+/// helpers are easier to express that way.
 public struct XctraceTOC {
     public let document: XMLDocument
 
@@ -164,9 +146,9 @@ public struct XctraceTOC {
         return Set(names.filter { !$0.isEmpty })
     }
 
-    /// Returns the first `<process pid != "0">` path - the actual launched-process binary
-    /// xctrace recorded. Mirrors `trace_launched_process_path` in
-    /// run-instruments-audit.sh:411.
+    /// Returns the first `<process pid != "0">` path - the actual
+    /// launched-process binary xctrace recorded. Mirrors
+    /// `trace_launched_process_path` in run-instruments-audit.sh:411.
     public func launchedProcessPath() -> String {
         let processes = (try? document.nodes(forXPath: ".//processes/process"))?
             .compactMap { $0 as? XMLElement } ?? []
@@ -180,8 +162,9 @@ public struct XctraceTOC {
         return ""
     }
 
-    /// Returns the first `<end-reason>` text node, used to disambiguate xctrace exit codes
-    /// vs the natural "Time limit reached" stop. Mirrors run-instruments-audit.sh:1125.
+    /// Returns the first `<end-reason>` text node, used to disambiguate xctrace
+    /// exit codes vs the natural "Time limit reached" stop. Mirrors
+    /// run-instruments-audit.sh:1125.
     public func endReason() -> String {
         let nodes = (try? document.nodes(forXPath: ".//end-reason"))?
             .compactMap { $0 as? XMLElement } ?? []
@@ -210,9 +193,6 @@ enum XMLSanitizer {
         if !needsFiltering {
             return data
         }
-        // Slow path: stream scalars to the output buffer without materializing
-        // the full UnicodeScalarView. Preserves the original semantic filter
-        // (surrogates and U+FFFE/U+FFFF) but stays in bounded memory.
         let text = String(decoding: data, as: UTF8.self)
         var output = Data()
         output.reserveCapacity(data.count)
@@ -225,9 +205,6 @@ enum XMLSanitizer {
         return output
     }
 
-    /// XML 1.0 disallows C0 controls outside `\t \n \r`. Single-byte UTF-8
-    /// match catches every violation that appears in real xctrace traces
-    /// without paying for a unicode pass.
     private static func isInvalidC0Byte(_ byte: UInt8) -> Bool {
         switch byte {
         case 0x00...0x08, 0x0B, 0x0C, 0x0E...0x1F:
