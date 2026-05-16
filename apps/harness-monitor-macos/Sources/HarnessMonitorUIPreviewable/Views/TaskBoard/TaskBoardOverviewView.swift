@@ -111,7 +111,9 @@ public struct TaskBoardOverviewView: View {
         }
       }
       taskBoardDetailRow { boardSection }
-      if (hasRouteContent || store != nil), isCreatingTaskBoardItem || selectedTaskBoardItem != nil {
+      if hasRouteContent || store != nil,
+        isCreatingTaskBoardItem || selectedTaskBoardItem != nil
+      {
         taskBoardDetailRow {
           TaskBoardItemManagementPanel(
             item: selectedTaskBoardItem,

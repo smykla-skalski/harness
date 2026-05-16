@@ -30,7 +30,6 @@ struct TaskBoardOperationsPanelLayout<SyncCard: View, DispatchCard: View, Invent
         inventoryCard
       }
     }
-    .padding(.horizontal, -HarnessMonitorTheme.spacingXS)
   }
 }
 
@@ -40,7 +39,6 @@ private struct TaskBoardOperationsPanelColumn<Content: View>: View {
 
   var body: some View {
     content
-      .padding(.horizontal, -HarnessMonitorTheme.spacingSM)
       .frame(minWidth: minWidth, maxWidth: .infinity, alignment: .leading)
   }
 }
