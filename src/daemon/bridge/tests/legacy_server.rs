@@ -30,8 +30,10 @@ impl LegacyBridgeServer {
         shutdown_behavior: LegacyShutdownBehavior,
     ) -> Self {
         state::ensure_daemon_dirs().expect("dirs");
-        let socket_path = state::daemon_root().join("legacy-bridge-test.sock");
-        let token_path = state::daemon_root().join("legacy-bridge-token");
+        // Short socket name keeps the tempfile + ownership-suffixed daemon
+        // root under the AF_UNIX `sun_path` limit (104 bytes on macOS).
+        let socket_path = state::daemon_root().join("lb.sock");
+        let token_path = state::daemon_root().join("lb-token");
         let token = "legacy-bridge-token".to_string();
         let terminate = Arc::new(AtomicBool::new(false));
         let _ = remove_if_exists(&socket_path);

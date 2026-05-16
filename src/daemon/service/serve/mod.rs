@@ -35,6 +35,7 @@ pub async fn serve(config: DaemonServeConfig) -> Result<(), CliError> {
     log_sandbox_startup(config.sandboxed);
     run_startup_sweep();
 
+    log_legacy_daemon_root_migration(state::migrate_legacy_daemon_root_for_current_process()?);
     state::ensure_daemon_dirs()?;
     super::voice::cleanup_abandoned_sessions()?;
     let daemon_lock = state::acquire_singleton_lock()?;
@@ -62,6 +63,7 @@ pub async fn serve(config: DaemonServeConfig) -> Result<(), CliError> {
         revision: 0,
         updated_at: String::new(),
         binary_stamp,
+        ownership: state::DaemonOwnership::from_env_or_default(),
     };
     state::write_manifest(&manifest)?;
     state::append_event("info", &format!("daemon listening on {endpoint}"))?;
@@ -133,6 +135,57 @@ pub async fn serve(config: DaemonServeConfig) -> Result<(), CliError> {
     match (serve_result, cleanup_result, stop_event_result) {
         (Err(error), _, _) | (Ok(()), Err(error), _) | (Ok(()), Ok(()), Err(error)) => Err(error),
         (Ok(()), Ok(()), Ok(())) => Ok(()),
+    }
+}
+
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "tracing macro expansion; tokio-rs/tracing#553"
+)]
+fn log_legacy_daemon_root_migration(report: state::LegacyDaemonRootMigration) {
+    use state::MigrationDecision;
+    match &report.decision {
+        MigrationDecision::Migrated { count } => {
+            tracing::info!(
+                from = %report.from.display(),
+                to = %report.to.display(),
+                entries = count,
+                "migrated legacy daemon state into ownership-scoped subtree"
+            );
+            let _ = state::append_event(
+                "info",
+                &format!(
+                    "migrated {} legacy daemon entries from {} into {}",
+                    count,
+                    report.from.display(),
+                    report.to.display(),
+                ),
+            );
+        }
+        MigrationDecision::OwnershipMismatch {
+            inferred,
+            current,
+        } => {
+            tracing::info!(
+                from = %report.from.display(),
+                inferred = %inferred,
+                current = %current,
+                "legacy daemon state belongs to other ownership; leaving for sibling daemon to migrate"
+            );
+        }
+        MigrationDecision::LegacyDaemonAlive => {
+            tracing::warn!(
+                from = %report.from.display(),
+                "legacy daemon still running; skipping migration"
+            );
+        }
+        MigrationDecision::UnreadableLegacyManifest => {
+            tracing::warn!(
+                from = %report.from.display(),
+                "legacy daemon manifest is unreadable; skipping migration"
+            );
+        }
+        MigrationDecision::AlreadyMigrated | MigrationDecision::NoLegacyState => {}
     }
 }
 

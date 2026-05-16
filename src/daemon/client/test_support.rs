@@ -44,6 +44,7 @@ pub(crate) fn install_fake_running_xdg_daemon(
             revision: 0,
             updated_at: String::new(),
             binary_stamp: None,
+            ownership: Default::default(),
         })
         .expect("serialize manifest"),
     )

@@ -33,7 +33,7 @@ fn cleanup_legacy_bridge_artifacts_keeps_external_socket_path() {
 fn cleanup_legacy_bridge_artifacts_removes_owned_legacy_socket() {
     with_temp_daemon_root(|| {
         state::ensure_daemon_dirs().expect("dirs");
-        let socket_path = state::daemon_root().join("legacy-agent-tui.sock");
+        let socket_path = state::daemon_root().join("lat.sock");
         let _listener = StdUnixListener::bind(&socket_path).expect("bind legacy agent tui socket");
         fs::write(
             state::daemon_root().join("agent-tui-bridge.json"),

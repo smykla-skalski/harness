@@ -276,7 +276,7 @@ mod logging_tests {
     #[test]
     fn bundled_launch_agent_does_not_pin_daemon_log_level() {
         const LAUNCH_AGENT: &str = include_str!(
-            "../apps/harness-monitor-macos/Resources/LaunchAgents/io.harnessmonitor.daemon.plist"
+            "../apps/harness-monitor-macos/Resources/LaunchAgents/io.harnessmonitor.daemon.managed.plist"
         );
 
         assert!(!LAUNCH_AGENT.contains("<key>RUST_LOG</key>"));

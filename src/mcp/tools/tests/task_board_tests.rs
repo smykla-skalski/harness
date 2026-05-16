@@ -159,6 +159,7 @@ async fn call_task_board_tool(
         revision: 0,
         updated_at: String::new(),
         binary_stamp: None,
+        ownership: Default::default(),
     };
     let _ = state::write_manifest(&manifest).expect("write manifest");
 

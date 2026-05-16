@@ -217,6 +217,7 @@ pub struct DaemonDevArgs {
 /// Describes how `harness daemon dev` resolves its in-process daemon runtime.
 #[derive(Debug, Clone)]
 pub(super) struct DaemonDevExecutionPlan {
+    pub(super) daemon_root_base: PathBuf,
     pub(super) daemon_root: PathBuf,
     pub(super) serve_config: DaemonServeConfig,
     pub(super) log_effective_app_group: Option<String>,
@@ -239,7 +240,9 @@ impl DaemonDevArgs {
             log_effective_app_group = Some(self.app_group_id.clone());
         }
 
-        let daemon_root = if let Some(value) = normalized_env_value(state::DAEMON_DATA_HOME_ENV) {
+        let daemon_root_base = if let Some(value) =
+            normalized_env_value(state::DAEMON_DATA_HOME_ENV)
+        {
             PathBuf::from(value).join("harness").join("daemon")
         } else {
             let effective_app_group = normalized_env_value(state::APP_GROUP_ID_ENV)
@@ -251,6 +254,7 @@ impl DaemonDevArgs {
                 .join("harness")
                 .join("daemon")
         };
+        let daemon_root = daemon_root_base.join(state::DaemonOwnership::External.as_str());
 
         let codex_transport = match self.codex_ws_url.as_deref().map(str::trim) {
             Some(url) if !url.is_empty() => {
@@ -262,6 +266,7 @@ impl DaemonDevArgs {
         };
 
         DaemonDevExecutionPlan {
+            daemon_root_base,
             daemon_root,
             serve_config: DaemonServeConfig {
                 host: self.host.clone(),
@@ -294,11 +299,62 @@ impl Execute for DaemonDevArgs {
         Self::ensure_not_sandboxed()?;
         let plan = self.execution_plan();
         plan.log_effective_app_group();
+        let _ownership_override = state::ScopedOwnershipOverride::set(Some(
+            state::DaemonOwnership::External,
+        ));
+        let migration = state::migrate_legacy_daemon_root_at(
+            &plan.daemon_root_base,
+            &plan.daemon_root,
+            state::DaemonOwnership::External,
+        )?;
+        log_dev_legacy_daemon_root_migration(&migration);
         execute_daemon_service(
             plan.serve_config,
             self.acp_enabled_override(),
             Some(plan.daemon_root),
         )
+    }
+}
+
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "tracing macro expansion; tokio-rs/tracing#553"
+)]
+fn log_dev_legacy_daemon_root_migration(report: &state::LegacyDaemonRootMigration) {
+    use state::MigrationDecision;
+    match &report.decision {
+        MigrationDecision::Migrated { count } => {
+            tracing::info!(
+                from = %report.from.display(),
+                to = %report.to.display(),
+                entries = count,
+                "daemon dev: migrated legacy daemon state into external ownership subtree"
+            );
+        }
+        MigrationDecision::OwnershipMismatch {
+            inferred,
+            current,
+        } => {
+            tracing::info!(
+                from = %report.from.display(),
+                inferred = %inferred,
+                current = %current,
+                "daemon dev: legacy state owned by other side; sibling daemon will migrate it"
+            );
+        }
+        MigrationDecision::LegacyDaemonAlive => {
+            tracing::warn!(
+                from = %report.from.display(),
+                "daemon dev: legacy daemon still running; skipping migration"
+            );
+        }
+        MigrationDecision::UnreadableLegacyManifest => {
+            tracing::warn!(
+                from = %report.from.display(),
+                "daemon dev: legacy manifest is unreadable; skipping migration"
+            );
+        }
+        MigrationDecision::AlreadyMigrated | MigrationDecision::NoLegacyState => {}
     }
 }
 

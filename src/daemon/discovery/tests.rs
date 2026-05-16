@@ -13,6 +13,11 @@ fn reset_override() {
     state::set_daemon_root_override(None);
 }
 
+/// Default ownership subdirectory tests expect under the coexistence
+/// partition. Tests that build daemon roots manually need to append this
+/// to match what `state::default_daemon_root()` returns.
+const MANAGED_OWNERSHIP_DIR: &str = "managed";
+
 /// Build a fake "running daemon" at `root`: create the daemon directory,
 /// write an empty lock file, acquire an exclusive flock, and return the
 /// holding file so the caller can keep it alive for the lifetime of the
@@ -138,7 +143,10 @@ fn running_daemon_location_returns_none_when_no_daemon_is_live() {
 fn running_daemon_location_picks_xdg_when_only_xdg_is_live() {
     let tmp = tempdir().expect("tempdir");
     let home = tmp.path();
-    let xdg_daemon = home.join("harness").join("daemon");
+    let xdg_daemon = home
+        .join("harness")
+        .join("daemon")
+        .join(MANAGED_OWNERSHIP_DIR);
     let _holder = fake_running_daemon(&xdg_daemon);
     temp_env::with_vars(
         [
@@ -170,7 +178,8 @@ fn running_daemon_location_picks_group_container_when_only_it_is_live() {
         .join("Group Containers")
         .join(HARNESS_MONITOR_APP_GROUP_ID)
         .join("harness")
-        .join("daemon");
+        .join("daemon")
+        .join(MANAGED_OWNERSHIP_DIR);
     let _holder = fake_running_daemon(&group_root);
     temp_env::with_vars(
         [
@@ -193,7 +202,10 @@ fn running_daemon_location_picks_group_container_when_only_it_is_live() {
 fn adopt_is_noop_when_default_is_live() {
     let tmp = tempdir().expect("tempdir");
     let home = tmp.path();
-    let xdg_daemon = home.join("harness").join("daemon");
+    let xdg_daemon = home
+        .join("harness")
+        .join("daemon")
+        .join(MANAGED_OWNERSHIP_DIR);
     let _holder = fake_running_daemon(&xdg_daemon);
     temp_env::with_vars(
         [
@@ -235,7 +247,8 @@ fn adopt_switches_override_when_default_is_empty_and_alt_is_live() {
         .join("Group Containers")
         .join(HARNESS_MONITOR_APP_GROUP_ID)
         .join("harness")
-        .join("daemon");
+        .join("daemon")
+        .join(MANAGED_OWNERSHIP_DIR);
     let _holder = fake_running_daemon(&group_root);
     temp_env::with_vars(
         [
@@ -347,7 +360,10 @@ fn adopt_refuses_to_cross_agent_to_non_agent_boundary() {
         .join(HARNESS_MONITOR_APP_GROUP_ID)
         .join(RUNTIME_PROFILES_DIR)
         .join("agent-foo");
-    let agent_daemon_root = agent_data_home.join("harness").join("daemon");
+    let agent_daemon_root = agent_data_home
+        .join("harness")
+        .join("daemon")
+        .join(MANAGED_OWNERSHIP_DIR);
     fs::create_dir_all(&agent_daemon_root).expect("agent root");
     // Non-agent live daemon at the base group container.
     let base_root = home
@@ -355,7 +371,8 @@ fn adopt_refuses_to_cross_agent_to_non_agent_boundary() {
         .join("Group Containers")
         .join(HARNESS_MONITOR_APP_GROUP_ID)
         .join("harness")
-        .join("daemon");
+        .join("daemon")
+        .join(MANAGED_OWNERSHIP_DIR);
     let _holder = fake_running_daemon(&base_root);
     temp_env::with_vars(
         [
@@ -398,7 +415,8 @@ fn adopt_refuses_to_cross_non_agent_to_agent_boundary() {
         .join(RUNTIME_PROFILES_DIR)
         .join("agent-bar")
         .join("harness")
-        .join("daemon");
+        .join("daemon")
+        .join(MANAGED_OWNERSHIP_DIR);
     let _holder = fake_running_daemon(&agent_root);
     temp_env::with_vars(
         [
@@ -424,7 +442,11 @@ fn adopt_refuses_to_cross_non_agent_to_agent_boundary() {
 fn adopt_respects_explicit_env_when_that_root_is_live() {
     let tmp = tempdir().expect("tempdir");
     let home = tmp.path();
-    let explicit_root = home.join("explicit").join("harness").join("daemon");
+    let explicit_root = home
+        .join("explicit")
+        .join("harness")
+        .join("daemon")
+        .join(MANAGED_OWNERSHIP_DIR);
     let _holder = fake_running_daemon(&explicit_root);
     let explicit_data_home = home.join("explicit");
     temp_env::with_vars(

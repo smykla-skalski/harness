@@ -76,6 +76,7 @@ async fn start_test_daemon(db: Option<DaemonDb>) -> TestDaemon {
         revision: 0,
         updated_at: String::new(),
         binary_stamp: None,
+        ownership: Default::default(),
     };
 
     let db_slot = Arc::new(OnceLock::new());

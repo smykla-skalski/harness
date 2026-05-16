@@ -3,7 +3,8 @@ use tempfile::tempdir;
 use crate::workspace::harness_data_root;
 
 use super::super::{
-    ScopedDaemonRootOverride, daemon_root, default_daemon_root, set_daemon_root_override,
+    DaemonOwnership, ScopedDaemonRootOverride, daemon_root, default_daemon_root,
+    set_daemon_root_override,
 };
 use super::reset_override_for_tests;
 
@@ -27,7 +28,10 @@ fn daemon_root_prefers_explicit_daemon_data_home() {
         || {
             assert_eq!(
                 daemon_root(),
-                daemon_data_home.join("harness").join("daemon")
+                daemon_data_home
+                    .join("harness")
+                    .join("daemon")
+                    .join(DaemonOwnership::Managed.as_str())
             );
         },
     );
@@ -57,6 +61,7 @@ fn daemon_root_uses_app_group_without_relocating_session_data() {
                     .join("Q498EB36N4.io.harnessmonitor")
                     .join("harness")
                     .join("daemon")
+                    .join(DaemonOwnership::Managed.as_str())
             );
             assert_ne!(
                 harness_data_root(),

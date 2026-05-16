@@ -5,6 +5,7 @@ use crate::workspace::{
     dirs_home, ensure_non_indexable, harness_data_root, host_home_dir, normalized_env_value,
 };
 
+use super::ownership::DaemonOwnership;
 use super::{
     APP_GROUP_ID_ENV, CURRENT_LAUNCH_AGENT_PLIST, DAEMON_DATA_HOME_ENV, DAEMON_LOCK_FILE,
     DAEMON_ROOT_OVERRIDE, LAUNCH_AGENTS_DIR, LEGACY_LAUNCH_AGENT_PLIST, MANIFEST_LOCK_FILE,
@@ -68,8 +69,25 @@ pub fn daemon_root() -> PathBuf {
     default_daemon_root()
 }
 
+/// Daemon root for the current process's resolved [`DaemonOwnership`].
 #[must_use]
 pub fn default_daemon_root() -> PathBuf {
+    daemon_root_for_ownership(DaemonOwnership::from_env_or_default())
+}
+
+/// Daemon root for an explicit ownership. Use this when you need to inspect
+/// the OTHER side's tree (e.g., the app reading the external manifest while
+/// running in managed mode).
+#[must_use]
+pub fn daemon_root_for_ownership(ownership: DaemonOwnership) -> PathBuf {
+    base_daemon_dir().join(ownership.as_str())
+}
+
+/// Directory that contains the `managed/` and `external/` ownership subtrees.
+/// Used by migration to discover pre-coexistence manifests and by callers
+/// that need to enumerate both sides.
+#[must_use]
+pub fn base_daemon_dir() -> PathBuf {
     if let Some(value) = normalized_env_value(DAEMON_DATA_HOME_ENV) {
         return PathBuf::from(value).join("harness").join("daemon");
     }

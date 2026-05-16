@@ -11,6 +11,8 @@ mod audit;
 mod config;
 mod locks;
 mod manifest;
+mod migration;
+mod ownership;
 mod paths;
 
 #[cfg(test)]
@@ -31,10 +33,16 @@ pub use config::{
 };
 pub use locks::{acquire_singleton_lock, daemon_lock_is_held, daemon_lock_is_held_at};
 pub use manifest::{clear_manifest_for_pid, load_manifest, load_running_manifest, write_manifest};
+pub use migration::{
+    LegacyDaemonRootMigration, MigrationDecision, migrate_legacy_daemon_root_at,
+    migrate_legacy_daemon_root_for_current_process,
+};
+pub use ownership::{DaemonOwnership, ScopedOwnershipOverride};
 pub use paths::{
-    ScopedDaemonRootOverride, auth_token_path, config_path, daemon_root, default_daemon_root,
-    ensure_daemon_dirs, events_path, launch_agent_path, legacy_launch_agent_path, lock_path,
-    manifest_path, set_daemon_root_override,
+    ScopedDaemonRootOverride, auth_token_path, base_daemon_dir, config_path, daemon_root,
+    daemon_root_for_ownership, default_daemon_root, ensure_daemon_dirs, events_path,
+    launch_agent_path, legacy_launch_agent_path, lock_path, manifest_path,
+    set_daemon_root_override,
 };
 
 pub(crate) use locks::{acquire_flock_exclusive, flock_is_held_at};
@@ -47,6 +55,7 @@ pub(crate) const BRIDGE_LOCK_FILE: &str = "bridge.lock";
 const MANIFEST_LOCK_FILE: &str = "manifest.lock";
 pub(crate) const APP_GROUP_ID_ENV: &str = "HARNESS_APP_GROUP_ID";
 pub(crate) const DAEMON_DATA_HOME_ENV: &str = "HARNESS_DAEMON_DATA_HOME";
+pub(crate) const DAEMON_OWNERSHIP_ENV: &str = "HARNESS_DAEMON_OWNERSHIP";
 
 static DAEMON_ROOT_OVERRIDE: Mutex<Option<PathBuf>> = Mutex::new(None);
 
@@ -109,6 +118,10 @@ pub struct DaemonManifest {
     pub updated_at: String,
     #[serde(default)]
     pub binary_stamp: Option<DaemonBinaryStamp>,
+    /// Which entry point launched this daemon. Defaults to `Managed` for
+    /// pre-coexistence manifests so legacy installs deserialize cleanly.
+    #[serde(default)]
+    pub ownership: DaemonOwnership,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

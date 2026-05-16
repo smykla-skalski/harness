@@ -54,6 +54,7 @@ fn config_path_lives_under_daemon_root() {
             tmp.path()
                 .join("harness")
                 .join("daemon")
+                .join(crate::daemon::state::DaemonOwnership::Managed.as_str())
                 .join("config.json")
         );
     });
