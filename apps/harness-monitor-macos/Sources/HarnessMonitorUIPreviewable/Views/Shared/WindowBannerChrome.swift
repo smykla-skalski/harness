@@ -26,7 +26,7 @@ public struct WindowBannerChrome<Content: View, Banners: View>: View {
       .safeAreaInset(edge: .top, spacing: 0) {
         if isPresented {
           banners
-            .background(Color(nsColor: .windowBackgroundColor))
+            .background { WindowBannerChromeBackground() }
             .overlay { chromeContainerMarker }
         }
       }
@@ -51,12 +51,32 @@ public struct WindowBannerChrome<Content: View, Banners: View>: View {
           "windowID=\(windowID)",
           "chrome=shared",
           "placement=safeAreaTop",
-          "material=windowBackground",
+          "material=softWindowBackground",
           "divider=shared",
           "visible=\(isPresented ? "true" : "false")",
         ].joined(separator: ", ")
       )
     }
+  }
+}
+
+private struct WindowBannerChromeBackground: View {
+  @Environment(\.accessibilityReduceTransparency)
+  private var reduceTransparency
+  @Environment(\.colorSchemeContrast)
+  private var colorSchemeContrast
+
+  var body: some View {
+    Color(nsColor: .windowBackgroundColor)
+      .opacity(opacity)
+      .accessibilityHidden(true)
+  }
+
+  private var opacity: Double {
+    if reduceTransparency {
+      return 1.0
+    }
+    return colorSchemeContrast == .increased ? 0.94 : 0.78
   }
 }
 

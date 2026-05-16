@@ -241,6 +241,7 @@ public struct SessionWindowView: View {
         sessionSearchHost
       }
     }
+    .windowToolbarBackdropUnderlay(sessionToolbarBackdropModel)
     .toolbar { sessionToolbar }
     .background {
       sessionWindowBackgroundAnchors(currentModifiers: $currentModifiers)
