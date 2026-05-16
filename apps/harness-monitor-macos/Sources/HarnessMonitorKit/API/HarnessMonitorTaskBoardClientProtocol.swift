@@ -50,6 +50,7 @@ public protocol HarnessMonitorTaskBoardClientProtocol: Sendable {
   func syncTaskBoardTodoistToken(
     request: TaskBoardTodoistTokenSyncRequest
   ) async throws -> TaskBoardTodoistTokenSyncResponse
+  func taskBoardGitIdentityDefaults() async throws -> TaskBoardGitIdentityDefaults
   func taskBoardPolicyPipeline() async throws -> TaskBoardPolicyPipelineDocument
   func saveTaskBoardPolicyPipelineDraft(
     request: TaskBoardPolicyPipelineSaveDraftRequest
@@ -230,6 +231,10 @@ extension HarnessMonitorTaskBoardClientProtocol {
   public func syncTaskBoardTodoistToken(
     request _: TaskBoardTodoistTokenSyncRequest
   ) async throws -> TaskBoardTodoistTokenSyncResponse {
+    throw HarnessMonitorAPIError.server(code: 501, message: "Task board unavailable.")
+  }
+
+  public func taskBoardGitIdentityDefaults() async throws -> TaskBoardGitIdentityDefaults {
     throw HarnessMonitorAPIError.server(code: 501, message: "Task board unavailable.")
   }
 

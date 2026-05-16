@@ -159,6 +159,10 @@ extension HarnessMonitorAPIClient {
     try await put("/v1/task-board/orchestrator/todoist-token", body: request)
   }
 
+  public func taskBoardGitIdentityDefaults() async throws -> TaskBoardGitIdentityDefaults {
+    try await get("/v1/task-board/git/identity-defaults")
+  }
+
   public func taskBoardPolicyPipeline() async throws -> TaskBoardPolicyPipelineDocument {
     try await get("/v1/task-board/policy/pipeline")
   }

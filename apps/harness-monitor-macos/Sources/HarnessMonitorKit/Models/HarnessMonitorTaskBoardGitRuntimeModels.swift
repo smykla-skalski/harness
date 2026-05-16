@@ -301,16 +301,19 @@ public struct TaskBoardGitSettingsSnapshot: Equatable, Sendable {
   public let runtimeConfig: TaskBoardGitRuntimeConfig
   public let githubCredentials: TaskBoardGitHubCredentialSnapshot
   public let todoistCredentials: TaskBoardTodoistCredentialSnapshot
+  public let identityDefaults: TaskBoardGitIdentityDefaults
 
   public init(
     orchestratorSettings: TaskBoardOrchestratorSettings,
     runtimeConfig: TaskBoardGitRuntimeConfig,
     githubCredentials: TaskBoardGitHubCredentialSnapshot,
-    todoistCredentials: TaskBoardTodoistCredentialSnapshot = TaskBoardTodoistCredentialSnapshot()
+    todoistCredentials: TaskBoardTodoistCredentialSnapshot = TaskBoardTodoistCredentialSnapshot(),
+    identityDefaults: TaskBoardGitIdentityDefaults = TaskBoardGitIdentityDefaults()
   ) {
     self.orchestratorSettings = orchestratorSettings
     self.runtimeConfig = runtimeConfig
     self.githubCredentials = githubCredentials
     self.todoistCredentials = todoistCredentials
+    self.identityDefaults = identityDefaults
   }
 }

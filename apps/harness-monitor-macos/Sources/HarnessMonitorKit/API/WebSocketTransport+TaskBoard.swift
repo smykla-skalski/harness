@@ -200,6 +200,11 @@ extension WebSocketTransport {
     return try decode(value)
   }
 
+  public func taskBoardGitIdentityDefaults() async throws -> TaskBoardGitIdentityDefaults {
+    let value = try await rpc(method: .taskBoardGitIdentityDefaults)
+    return try decode(value)
+  }
+
   public func taskBoardPolicyPipeline() async throws -> TaskBoardPolicyPipelineDocument {
     let value = try await rpc(method: .taskBoardPolicyPipelineGet)
     return try decode(value)
