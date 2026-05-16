@@ -100,7 +100,12 @@ plist_target="$launch_agents_dir/io.harnessmonitor.daemon.managed.plist"
 # change. Without this every Cmd+R updates the helper's mtime, which
 # invalidates the Swift-side ManagedLaunchAgentBundleStamp on next launch and
 # forces an unregister/register cycle whose throttle stalls bootstrap.
-daemon_source_hash_stamp="$helpers_dir/.harness-source-hash"
+#
+# The stamp goes under DERIVED_FILE_DIR rather than inside the .app bundle so
+# Xcode's user-script sandbox does not block the write (the helpers dir is
+# only declared as an output for the daemon binary itself), and so codesign
+# never sees a stray dotfile inside Contents/Helpers/.
+daemon_source_hash_stamp="${DERIVED_FILE_DIR:-$TARGET_TEMP_DIR}/harness-daemon-source-hash"
 # The bundled plist's `Label` MUST equal the plist filename without its
 # `.plist` extension or `SMAppService.register()` returns
 # `error: 22 (EINVAL)` on macOS 26 and silently leaves
@@ -115,7 +120,7 @@ daemon_source_hash_stamp="$helpers_dir/.harness-source-hash"
 launch_agent_label="io.harnessmonitor.daemon.managed"
 app_group_id="$(harness_monitor_runtime_app_group_id)"
 
-/bin/mkdir -p "$helpers_dir" "$launch_agents_dir"
+/bin/mkdir -p "$helpers_dir" "$launch_agents_dir" "$(/usr/bin/dirname "$daemon_source_hash_stamp")"
 
 # Bail out early when the cargo output, the source plist, and the runtime
 # lane env all match the last successful run - that way Xcode rebuilds
