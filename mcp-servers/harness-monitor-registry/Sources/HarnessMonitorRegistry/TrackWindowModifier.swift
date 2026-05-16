@@ -49,17 +49,15 @@ private struct WindowTrackingRepresentable: NSViewRepresentable {
 }
 
 final class WindowTrackingNSView: NSView {
-  private static let didUpdateElementRefreshInterval: Duration = .milliseconds(900)
-
   private let syncController: WindowRegistrySyncController
   private let elementSyncController: WindowElementRegistrySyncController
-  private let clock = ContinuousClock()
+  private let didUpdateElementSyncDelay: Duration
   // nonisolated(unsafe) so the nonisolated deinit can read the array and
   // remove observers without `MainActor.assumeIsolated`. Mutations all
   // happen on the MainActor (`startTracking` / `stopTracking`); the deinit
   // only reads after the last write.
   private nonisolated(unsafe) var observations: [NSObjectProtocol] = []
-  private var lastDidUpdateElementRefreshAt: ContinuousClock.Instant?
+  private var didUpdateElementSyncTask: Task<Void, Never>?
 
   deinit {
     // Thread-safe inline cleanup. ARC may release this NSView on any
@@ -68,12 +66,17 @@ final class WindowTrackingNSView: NSView {
     // NotificationCenter.removeObserver is documented thread-safe;
     // syncController/elementSyncController stop happens via
     // `viewDidMoveToWindow(nil)` on the MainActor.
+    didUpdateElementSyncTask?.cancel()
     observations.forEach(NotificationCenter.default.removeObserver)
   }
 
-  init(registry: AccessibilityRegistry) {
+  init(
+    registry: AccessibilityRegistry,
+    didUpdateElementSyncDelay: Duration = .milliseconds(300)
+  ) {
     syncController = WindowRegistrySyncController(registry: registry)
     elementSyncController = WindowElementRegistrySyncController(registry: registry)
+    self.didUpdateElementSyncDelay = didUpdateElementSyncDelay
     super.init(frame: .zero)
   }
 
@@ -120,12 +123,26 @@ final class WindowTrackingNSView: NSView {
         // block ever fires off-main on macOS 26.
         Task { @MainActor [weak self, weak window] in
           guard let self, let window else { return }
-          let includeElements = !isDidUpdate || self.shouldRefreshElementsOnDidUpdate()
+          if isDidUpdate {
+            self.sync(
+              window,
+              windowGeneration: windowGeneration,
+              elementGeneration: elementGeneration,
+              includeElements: false
+            )
+            self.scheduleDidUpdateElementSync(
+              window: window,
+              windowGeneration: windowGeneration,
+              elementGeneration: elementGeneration
+            )
+            return
+          }
+          self.cancelDidUpdateElementSync()
           self.sync(
             window,
             windowGeneration: windowGeneration,
             elementGeneration: elementGeneration,
-            includeElements: includeElements
+            includeElements: true
           )
         }
       }
@@ -134,10 +151,53 @@ final class WindowTrackingNSView: NSView {
   }
 
   private func stopTracking() {
+    cancelDidUpdateElementSync()
     observations.forEach { NotificationCenter.default.removeObserver($0) }
     observations.removeAll()
     syncController.stopTracking()
     elementSyncController.stopTracking()
+  }
+
+  private func scheduleDidUpdateElementSync(
+    window: NSWindow,
+    windowGeneration: UInt64,
+    elementGeneration: UInt64
+  ) {
+    cancelDidUpdateElementSync()
+    guard didUpdateElementSyncDelay > .zero else {
+      sync(
+        window,
+        windowGeneration: windowGeneration,
+        elementGeneration: elementGeneration,
+        includeElements: true
+      )
+      return
+    }
+    let delay = didUpdateElementSyncDelay
+    didUpdateElementSyncTask = Task { @MainActor [weak self, weak window] in
+      do {
+        try await Task.sleep(for: delay)
+      } catch {
+        return
+      }
+      guard let self, let window else {
+        return
+      }
+      self.didUpdateElementSyncTask = nil
+      // AppKit emits `didUpdate` for routine interaction churn. Debounce the
+      // full AX snapshot so UI feedback is not gated on immediate tree harvests.
+      self.sync(
+        window,
+        windowGeneration: windowGeneration,
+        elementGeneration: elementGeneration,
+        includeElements: true
+      )
+    }
+  }
+
+  private func cancelDidUpdateElementSync() {
+    didUpdateElementSyncTask?.cancel()
+    didUpdateElementSyncTask = nil
   }
 
   private func sync(
@@ -157,16 +217,7 @@ final class WindowTrackingNSView: NSView {
     guard includeElements else {
       return
     }
-    lastDidUpdateElementRefreshAt = clock.now
     elementSyncController.sync(window: window, generation: elementGeneration)
-  }
-
-  private func shouldRefreshElementsOnDidUpdate() -> Bool {
-    guard let lastDidUpdateElementRefreshAt else {
-      return true
-    }
-    let now = clock.now
-    return lastDidUpdateElementRefreshAt + Self.didUpdateElementRefreshInterval <= now
   }
 }
 #endif

@@ -14,6 +14,8 @@ struct NewSessionSheetView: View {
   @Bindable var viewModel: NewSessionViewModel
   @Environment(\.dismiss)
   private var dismiss
+  @Environment(\.openWindow)
+  private var openWindow
   @State private var bookmarks: [BookmarkStore.Record] = []
   @State private var availableAcpAgents: [AcpAgentDescriptor] = []
   @State private var runtimeProbeResults: AcpRuntimeProbeResponse?
@@ -327,14 +329,20 @@ struct NewSessionSheetView: View {
     bookmarks.first { $0.id == viewModel.selectedBookmarkId }
   }
 
+  @MainActor
   private func submitAndDismiss() async {
     let result = await viewModel.submit(
       preferredLaunchSelectionStorageKey: selectedLaunchSelection.storageKey
     )
-    if case .success = result {
-      HarnessMonitorAgentLaunchDefaults.persist(selectedLaunchSelection)
-      dismiss()
+    guard case .success(let startedSession) = result else {
+      return
     }
+    HarnessMonitorAgentLaunchDefaults.persist(selectedLaunchSelection)
+    // Release the attached sheet before routing so the created session window
+    // can take focus instead of the presenting window reclaiming it.
+    dismiss()
+    await Task.yield()
+    openWindow.openHarnessSessionWindow(sessionID: startedSession.sessionId)
   }
 
   private func refreshBookmarks() async {
