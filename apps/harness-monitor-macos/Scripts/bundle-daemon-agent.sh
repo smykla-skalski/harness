@@ -95,6 +95,12 @@ helpers_dir="$TARGET_BUILD_DIR/$CONTENTS_FOLDER_PATH/Helpers"
 launch_agents_dir="$TARGET_BUILD_DIR/$CONTENTS_FOLDER_PATH/Library/LaunchAgents"
 daemon_target="$helpers_dir/harness"
 plist_target="$launch_agents_dir/io.harnessmonitor.daemon.managed.plist"
+# Track the cargo-output binary's hash so we can skip the costly re-copy +
+# re-sign cycle when Xcode rebuilds the app but the daemon's source did not
+# change. Without this every Cmd+R updates the helper's mtime, which
+# invalidates the Swift-side ManagedLaunchAgentBundleStamp on next launch and
+# forces an unregister/register cycle whose throttle stalls bootstrap.
+daemon_source_hash_stamp="$helpers_dir/.harness-source-hash"
 # The bundled plist's `Label` MUST equal the plist filename without its
 # `.plist` extension or `SMAppService.register()` returns
 # `error: 22 (EINVAL)` on macOS 26 and silently leaves
@@ -110,6 +116,26 @@ launch_agent_label="io.harnessmonitor.daemon.managed"
 app_group_id="$(harness_monitor_runtime_app_group_id)"
 
 /bin/mkdir -p "$helpers_dir" "$launch_agents_dir"
+
+# Bail out early when the cargo output, the source plist, and the runtime
+# lane env all match the last successful run - that way Xcode rebuilds
+# that produce a byte-identical daemon binary keep the bundled helper +
+# plist mtimes stable, the bundle-stamp on the Swift side continues to
+# match, and SMAppService skips its expensive unregister/register cycle.
+current_source_hash="$(/usr/bin/shasum -a 256 "$daemon_source" | /usr/bin/awk '{print $1}')"
+plist_source="$PROJECT_DIR/Resources/LaunchAgents/io.harnessmonitor.daemon.managed.plist"
+current_plist_hash="$(/usr/bin/shasum -a 256 "$plist_source" | /usr/bin/awk '{print $1}')"
+current_inputs_stamp="src=$current_source_hash plist=$current_plist_hash \
+label=$launch_agent_label group=$app_group_id \
+lane=${HARNESS_MONITOR_RUNTIME_LANE:-} home=${HARNESS_DAEMON_DATA_HOME:-} \
+port=${HARNESS_CODEX_WS_PORT:-}"
+if [ -f "$daemon_target" ] \
+  && [ -f "$plist_target" ] \
+  && [ "$(/bin/cat "$daemon_source_hash_stamp" 2>/dev/null)" = "$current_inputs_stamp" ]; then
+  printf 'Daemon bundle inputs unchanged (helper sha=%s); skipping copy + resign\n' \
+    "${current_source_hash:0:8}" >&2
+  exit 0
+fi
 # `cp -p` preserves the linker-signed cs_mtime alignment from
 # `target/debug/harness` (rustc/lld embeds an ad-hoc CodeDirectory whose
 # cs_mtime is captured at link time). Plain `cp` updates the destination
@@ -238,3 +264,8 @@ if [ "${ENABLE_USER_SCRIPT_SANDBOXING:-}" != "YES" ]; then
   fi
   /usr/bin/codesign "${bundle_codesign_args[@]}" "$app_bundle"
 fi
+
+# Record the inputs hash so the next Xcode rebuild that produces a
+# byte-identical daemon binary + plist + lane env can skip the whole
+# bundle / codesign cycle and keep the helper mtime stable.
+printf '%s' "$current_inputs_stamp" > "$daemon_source_hash_stamp"
