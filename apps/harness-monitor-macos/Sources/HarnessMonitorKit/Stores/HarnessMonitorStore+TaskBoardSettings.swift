@@ -3,10 +3,7 @@ import Foundation
 extension HarnessMonitorStore {
   private static let taskBoardGitHubCredentialStore = TaskBoardGitHubCredentialStore()
   private static let taskBoardTodoistCredentialStore = TaskBoardTodoistCredentialStore()
-  private static let taskBoardSshKeyStore = TaskBoardKeyMaterialStore(kind: .ssh)
-  private static let taskBoardSigningSshKeyStore = TaskBoardKeyMaterialStore(kind: .signingSsh)
-  private static let taskBoardGpgKeyStore = TaskBoardKeyMaterialStore(kind: .gpg)
-  private static let taskBoardRuntimeSecretsMigrationKey =
+  static let taskBoardRuntimeSecretsMigrationKey =
     "io.harnessmonitor.taskboard.runtime-secrets-migrated"
 
   public func taskBoardGitSettingsSnapshot() async throws -> TaskBoardGitSettingsSnapshot {
@@ -33,16 +30,18 @@ extension HarnessMonitorStore {
   }
 
   private static func hydrateKeyMaterial(
-    into runtime: TaskBoardGitRuntimeConfig
+    into runtime: TaskBoardGitRuntimeConfig,
+    keychain: TaskBoardKeyMaterialPersistence = .defaultKeychain
   ) -> TaskBoardGitRuntimeConfig {
     TaskBoardGitRuntimeConfig(
-      global: hydrateProfile(runtime.global, scope: .global),
+      global: hydrateProfile(runtime.global, scope: .global, keychain: keychain),
       repositoryOverrides: runtime.repositoryOverrides.map { override in
         TaskBoardGitRepositoryOverride(
           repository: override.repository,
           profile: hydrateProfile(
             override.profile,
-            scope: .repository(override.repository)
+            scope: .repository(override.repository),
+            keychain: keychain
           )
         )
       }
@@ -51,12 +50,13 @@ extension HarnessMonitorStore {
 
   private static func hydrateProfile(
     _ profile: TaskBoardGitRuntimeProfile,
-    scope: TaskBoardKeyMaterialStore.Scope
+    scope: TaskBoardKeyMaterialStore.Scope,
+    keychain: TaskBoardKeyMaterialPersistence
   ) -> TaskBoardGitRuntimeProfile {
-    let ssh = (try? taskBoardSshKeyStore.load(scope: scope)) ?? TaskBoardKeyMaterialSnapshot()
+    let ssh = (try? keychain.ssh.load(scope: scope)) ?? TaskBoardKeyMaterialSnapshot()
     let signingSsh =
-      (try? taskBoardSigningSshKeyStore.load(scope: scope)) ?? TaskBoardKeyMaterialSnapshot()
-    let gpg = (try? taskBoardGpgKeyStore.load(scope: scope)) ?? TaskBoardKeyMaterialSnapshot()
+      (try? keychain.signingSsh.load(scope: scope)) ?? TaskBoardKeyMaterialSnapshot()
+    let gpg = (try? keychain.gpg.load(scope: scope)) ?? TaskBoardKeyMaterialSnapshot()
 
     let signing = TaskBoardGitSigningConfig(
       mode: profile.signing.mode,
@@ -78,23 +78,26 @@ extension HarnessMonitorStore {
     )
   }
 
-  private static func persistKeyMaterial(
-    runtime: TaskBoardGitRuntimeConfig
+  static func persistKeyMaterial(
+    runtime: TaskBoardGitRuntimeConfig,
+    keychain: TaskBoardKeyMaterialPersistence = .defaultKeychain
   ) throws {
-    try persistProfileKeyMaterial(runtime.global, scope: .global)
+    try persistProfileKeyMaterial(runtime.global, scope: .global, keychain: keychain)
     for override in runtime.repositoryOverrides {
       try persistProfileKeyMaterial(
         override.profile,
-        scope: .repository(override.repository)
+        scope: .repository(override.repository),
+        keychain: keychain
       )
     }
   }
 
   private static func persistProfileKeyMaterial(
     _ profile: TaskBoardGitRuntimeProfile,
-    scope: TaskBoardKeyMaterialStore.Scope
+    scope: TaskBoardKeyMaterialStore.Scope,
+    keychain: TaskBoardKeyMaterialPersistence
   ) throws {
-    try taskBoardSshKeyStore.save(
+    try keychain.ssh.save(
       TaskBoardKeyMaterialSnapshot(
         privateKey: profile.sshPrivateKey,
         passphrase: profile.sshPrivateKeyPassphrase,
@@ -102,7 +105,7 @@ extension HarnessMonitorStore {
       ),
       scope: scope
     )
-    try taskBoardSigningSshKeyStore.save(
+    try keychain.signingSsh.save(
       TaskBoardKeyMaterialSnapshot(
         privateKey: profile.signing.sshPrivateKey,
         passphrase: profile.signing.sshPrivateKeyPassphrase,
@@ -110,7 +113,7 @@ extension HarnessMonitorStore {
       ),
       scope: scope
     )
-    try taskBoardGpgKeyStore.save(
+    try keychain.gpg.save(
       TaskBoardKeyMaterialSnapshot(
         privateKey: profile.signing.gpgPrivateKey,
         passphrase: profile.signing.gpgPrivateKeyPassphrase,
@@ -131,9 +134,10 @@ extension HarnessMonitorStore {
     }
   }
 
-  private static func migrateRuntimeSecretsIfNeeded(
+  static func migrateRuntimeSecretsIfNeeded(
     client: any HarnessMonitorClientProtocol,
-    userDefaults: UserDefaults = .standard
+    userDefaults: UserDefaults = .standard,
+    keychain: TaskBoardKeyMaterialPersistence = .defaultKeychain
   ) async {
     guard !userDefaults.bool(forKey: taskBoardRuntimeSecretsMigrationKey) else {
       return
@@ -141,7 +145,7 @@ extension HarnessMonitorStore {
     do {
       let response = try await client.drainTaskBoardGitRuntimeSecrets()
       if response.drained {
-        try persistKeyMaterial(runtime: response.runtime)
+        try persistKeyMaterial(runtime: response.runtime, keychain: keychain)
       }
       userDefaults.set(true, forKey: taskBoardRuntimeSecretsMigrationKey)
     } catch {

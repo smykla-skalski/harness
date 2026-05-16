@@ -46,7 +46,44 @@ public struct TaskBoardKeyMaterialSnapshot: Codable, Equatable, Sendable {
   }
 }
 
-public struct TaskBoardKeyMaterialStore: Sendable {
+/// Operations every task-board key material store provides. The protocol lets
+/// callers inject an in-memory or recording implementation under test instead
+/// of touching the real Keychain.
+public protocol TaskBoardKeyMaterialPersisting: Sendable {
+  func load(scope: TaskBoardKeyMaterialStore.Scope) throws -> TaskBoardKeyMaterialSnapshot
+  func save(_ snapshot: TaskBoardKeyMaterialSnapshot, scope: TaskBoardKeyMaterialStore.Scope)
+    throws
+  func delete(scope: TaskBoardKeyMaterialStore.Scope) throws
+}
+
+/// Bundle of the three key-material stores the store layer talks to. Tests
+/// can swap these out for in-memory recorders without affecting the rest of
+/// the dependency graph.
+public struct TaskBoardKeyMaterialPersistence: Sendable {
+  public let ssh: any TaskBoardKeyMaterialPersisting
+  public let signingSsh: any TaskBoardKeyMaterialPersisting
+  public let gpg: any TaskBoardKeyMaterialPersisting
+
+  public init(
+    ssh: any TaskBoardKeyMaterialPersisting,
+    signingSsh: any TaskBoardKeyMaterialPersisting,
+    gpg: any TaskBoardKeyMaterialPersisting
+  ) {
+    self.ssh = ssh
+    self.signingSsh = signingSsh
+    self.gpg = gpg
+  }
+
+  public static var defaultKeychain: TaskBoardKeyMaterialPersistence {
+    TaskBoardKeyMaterialPersistence(
+      ssh: TaskBoardKeyMaterialStore(kind: .ssh),
+      signingSsh: TaskBoardKeyMaterialStore(kind: .signingSsh),
+      gpg: TaskBoardKeyMaterialStore(kind: .gpg)
+    )
+  }
+}
+
+public struct TaskBoardKeyMaterialStore: TaskBoardKeyMaterialPersisting, Sendable {
   public enum Kind: String, Sendable {
     case ssh = "io.harnessmonitor.task-board.ssh-key"
     case signingSsh = "io.harnessmonitor.task-board.signing-ssh-key"
