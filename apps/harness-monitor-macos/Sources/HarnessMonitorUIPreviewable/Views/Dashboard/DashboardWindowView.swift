@@ -110,33 +110,22 @@ public struct DashboardWindowView: View {
         columnVisibility: resolvedColumnVisibility
       )
     ) {
-      VStack(spacing: 0) {
-        if let observed = store.health?.wireVersion,
-          observed < HarnessMonitorStore.minimumDaemonWireVersion
-        {
-          DaemonWireVersionSkewBanner(
-            observed: observed,
-            expected: HarnessMonitorStore.minimumDaemonWireVersion
+      HarnessMonitorSidebarDetailLayout(
+        columnVisibility: columnVisibilityBinding,
+        sidebarWidth: sidebarWidth
+      ) {
+        DashboardSidebar(
+          selectedRoute: selectedRouteBinding,
+          statusModel: dashboardStatusSummaryModel(route: route)
+        )
+      } detail: {
+        DashboardBannerStack(store: store) {
+          DashboardRouteContent(
+            route: route,
+            store: store,
+            dashboardUI: dashboardUI,
+            sessionCatalog: sessionCatalog
           )
-          WindowBannerDivider(tint: HarnessMonitorTheme.danger)
-        }
-        HarnessMonitorSidebarDetailLayout(
-          columnVisibility: columnVisibilityBinding,
-          sidebarWidth: sidebarWidth
-        ) {
-          DashboardSidebar(
-            selectedRoute: selectedRouteBinding,
-            statusModel: dashboardStatusSummaryModel(route: route)
-          )
-        } detail: {
-          DashboardBannerStack(store: store) {
-            DashboardRouteContent(
-              route: route,
-              store: store,
-              dashboardUI: dashboardUI,
-              sessionCatalog: sessionCatalog
-            )
-          }
         }
       }
       .accessibilityElement(children: .contain)
@@ -166,6 +155,28 @@ public struct DashboardWindowView: View {
   }
 }
 
+private struct DashboardBannerStackModel: Equatable {
+  let showsContentChrome: Bool
+  let observedDaemonWireVersion: Int?
+
+  init(
+    contentChrome: ContentChromeBannerModel,
+    observedDaemonWireVersion: Int?
+  ) {
+    showsContentChrome = contentChrome.isPresented
+    self.observedDaemonWireVersion = observedDaemonWireVersion
+  }
+
+  var showsDaemonWireVersionSkew: Bool {
+    guard let observedDaemonWireVersion else { return false }
+    return observedDaemonWireVersion < HarnessMonitorStore.minimumDaemonWireVersion
+  }
+
+  var isPresented: Bool {
+    showsContentChrome || showsDaemonWireVersionSkew
+  }
+}
+
 private struct DashboardBannerStack<Content: View>: View {
   let store: HarnessMonitorStore
   private let content: Content
@@ -179,7 +190,7 @@ private struct DashboardBannerStack<Content: View>: View {
     store.contentUI.chrome
   }
 
-  private var bannerModel: ContentChromeBannerModel {
+  private var chromeBannerModel: ContentChromeBannerModel {
     ContentChromeBannerModel(
       persistenceError: chrome.persistenceError,
       sessionDataAvailability: chrome.sessionDataAvailability,
@@ -188,20 +199,44 @@ private struct DashboardBannerStack<Content: View>: View {
     )
   }
 
+  private var model: DashboardBannerStackModel {
+    DashboardBannerStackModel(
+      contentChrome: chromeBannerModel,
+      observedDaemonWireVersion: store.health?.wireVersion
+    )
+  }
+
   var body: some View {
     WindowBannerChrome(
       windowID: HarnessMonitorWindowID.dashboard,
-      isPresented: bannerModel.isPresented
+      isPresented: model.isPresented
     ) {
       content
         .harnessMonitorBackgroundExtensionEffect()
     } banners: {
+      topChrome
+    }
+  }
+
+  @ViewBuilder private var topChrome: some View {
+    VStack(spacing: 0) {
+      if let observed = model.observedDaemonWireVersion, model.showsDaemonWireVersionSkew {
+        DaemonWireVersionSkewBanner(
+          observed: observed,
+          expected: HarnessMonitorStore.minimumDaemonWireVersion
+        )
+        chromeDivider(tint: HarnessMonitorTheme.danger)
+      }
       ContentChromeBannerStack(
         store: store,
         contentChrome: chrome,
         windowID: HarnessMonitorWindowID.dashboard
       )
     }
+  }
+
+  private func chromeDivider(tint: Color) -> some View {
+    WindowBannerDivider(tint: tint)
   }
 }
 
