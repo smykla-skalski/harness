@@ -53,16 +53,34 @@ struct TaskBoardExternalDestination: Identifiable {
 
 struct TaskBoardManagementFacts: View {
   let facts: [TaskBoardManagementFact]
+  @Environment(\.fontScale)
+  private var fontScale
+
+  // Subscribe to `fontScale` once at the view level and precompute fonts
+  // for the row pair. The previous shape stamped `.scaledFont(...)` on
+  // every `Text` inside the `ForEach`, planting a `ScaledFontModifier`
+  // per text node — and that modifier subscribes to `\.fontScale` per
+  // node. In the management panel (2 Text per fact × N facts) that's a
+  // big `EnvironmentWriter: Font?` cascade. Hoisting brings it to one
+  // subscription per `TaskBoardManagementFacts` body.
+  private var labelFont: Font {
+    HarnessMonitorTextSize.scaledFont(.caption.weight(.semibold), by: fontScale)
+  }
+  private var valueFont: Font {
+    HarnessMonitorTextSize.scaledFont(.caption, by: fontScale)
+  }
 
   var body: some View {
-    Grid(alignment: .leading, horizontalSpacing: HarnessMonitorTheme.spacingMD) {
+    let labelFont = labelFont
+    let valueFont = valueFont
+    return Grid(alignment: .leading, horizontalSpacing: HarnessMonitorTheme.spacingMD) {
       ForEach(facts) { fact in
         GridRow {
           Text(fact.label)
-            .scaledFont(.caption.weight(.semibold))
+            .font(labelFont)
             .foregroundStyle(HarnessMonitorTheme.secondaryInk)
           Text(fact.value)
-            .scaledFont(.caption)
+            .font(valueFont)
             .lineLimit(1)
             .truncationMode(.middle)
             .textSelection(.enabled)
