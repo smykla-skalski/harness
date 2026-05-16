@@ -249,10 +249,7 @@ mod tests {
             status: AgentTuiStatus::Running,
             argv: Vec::new(),
             project_dir: "/tmp".into(),
-            size: AgentTuiSize {
-                rows: 24,
-                cols: 80,
-            },
+            size: AgentTuiSize { rows: 24, cols: 80 },
             screen: TerminalScreenSnapshot {
                 rows: 24,
                 cols: 80,
@@ -283,12 +280,14 @@ mod tests {
         ];
         let mut rollback_calls = Vec::new();
 
-        let (kept, failures) =
-            classify_worker_outcomes(&applied, outcomes, |task, error| {
-                rollback_calls.push((task.board_item_id.clone(), error.to_string()));
-            });
+        let (kept, failures) = classify_worker_outcomes(&applied, outcomes, |task, error| {
+            rollback_calls.push((task.board_item_id.clone(), error.to_string()));
+        });
 
-        let kept_ids: Vec<&str> = kept.iter().map(|task| task.board_item_id.as_str()).collect();
+        let kept_ids: Vec<&str> = kept
+            .iter()
+            .map(|task| task.board_item_id.as_str())
+            .collect();
         assert_eq!(kept_ids, vec!["ok-1", "ok-3"]);
         assert_eq!(failures.len(), 1);
         assert_eq!(failures[0].board_item_id, "fail-2");

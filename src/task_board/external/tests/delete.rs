@@ -19,9 +19,8 @@ async fn sync_external_tasks_closes_remote_tasks_for_local_tombstones_when_provi
         "2026-05-14T00:00:00Z".to_owned(),
     );
     local.status = TaskBoardStatus::Todo;
-    local.external_refs = vec![
-        ExternalTaskRef::new(ExternalProvider::Todoist, "remote-9").into_core_ref(),
-    ];
+    local.external_refs =
+        vec![ExternalTaskRef::new(ExternalProvider::Todoist, "remote-9").into_core_ref()];
     board
         .create("Local task", "", local)
         .expect("create local task");
@@ -64,9 +63,8 @@ async fn sync_external_tasks_skips_remote_delete_when_provider_default_disallows
         String::new(),
         "2026-05-14T00:00:00Z".to_owned(),
     );
-    local.external_refs = vec![
-        ExternalTaskRef::new(ExternalProvider::Todoist, "remote-12").into_core_ref(),
-    ];
+    local.external_refs =
+        vec![ExternalTaskRef::new(ExternalProvider::Todoist, "remote-12").into_core_ref()];
     board
         .create("Local task", "", local)
         .expect("create local task");
@@ -108,9 +106,8 @@ async fn sync_external_tasks_records_remote_delete_dry_run_without_calling_provi
         String::new(),
         "2026-05-14T00:00:00Z".to_owned(),
     );
-    local.external_refs = vec![
-        ExternalTaskRef::new(ExternalProvider::Todoist, "remote-13").into_core_ref(),
-    ];
+    local.external_refs =
+        vec![ExternalTaskRef::new(ExternalProvider::Todoist, "remote-13").into_core_ref()];
     board
         .create("Local task", "", local)
         .expect("create local task");
@@ -134,8 +131,6 @@ async fn sync_external_tasks_records_remote_delete_dry_run_without_calling_provi
     .expect("sync external tasks");
 
     assert!(operations.iter().any(|operation| {
-        operation.action == ExternalSyncAction::Delete
-            && operation.dry_run
-            && !operation.applied
+        operation.action == ExternalSyncAction::Delete && operation.dry_run && !operation.applied
     }));
 }

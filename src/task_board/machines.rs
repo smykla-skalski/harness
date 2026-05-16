@@ -273,7 +273,10 @@ mod tests {
             .expect("upsert");
 
         assert_eq!(stored.id, "host-a");
-        assert_eq!(stored.project_types, vec!["web".to_string(), "backend".to_string()]);
+        assert_eq!(
+            stored.project_types,
+            vec!["web".to_string(), "backend".to_string()]
+        );
         let machines = registry.list().expect("list");
         assert_eq!(machines.len(), 1);
         assert_eq!(machines[0].id, "host-a");

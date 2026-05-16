@@ -249,10 +249,9 @@ fn github_sync_config(
         github_repository(&settings).as_deref(),
         &settings.github_inbox.repositories,
     );
+    config = config.with_github_import_labels_override(&settings.github_inbox.label_filter);
     config =
-        config.with_github_import_labels_override(&settings.github_inbox.label_filter);
-    config = config
-        .with_todoist_import_project_ids_override(&settings.todoist_inbox.project_filter);
+        config.with_todoist_import_project_ids_override(&settings.todoist_inbox.project_filter);
     if config.token_for(ExternalProvider::GitHub).is_none()
         || (config.github_repository().is_none() && config.github_inbox_repositories().is_empty())
     {
@@ -286,7 +285,6 @@ fn refresh_prepared_run(
     prepared.audit = build_audit_summary(&orchestrator.items_for_input(&prepared.input)?);
     Ok(())
 }
-
 
 #[cfg(test)]
 mod tests;

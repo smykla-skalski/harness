@@ -292,7 +292,9 @@ fn dispatch_filters_items_that_target_other_machines() {
         "2026-05-15T00:00:00Z".into(),
     );
     wildcard.status = TaskBoardStatus::Todo;
-    board.create("Anyone", "", wildcard).expect("create wildcard");
+    board
+        .create("Anyone", "", wildcard)
+        .expect("create wildcard");
 
     let orchestrator = TaskBoardOrchestrator::new(root);
     let registry = orchestrator.machine_registry();

@@ -118,7 +118,9 @@ impl ExternalSyncClient for TodoistSyncClient {
         let project_filter = self.import_project_ids.as_slice();
         Ok(tasks
             .into_iter()
-            .filter(|task| todoist_project_matches_filter(task.project_id.as_deref(), project_filter))
+            .filter(|task| {
+                todoist_project_matches_filter(task.project_id.as_deref(), project_filter)
+            })
             .map(ExternalTask::from)
             .collect())
     }

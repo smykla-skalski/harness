@@ -30,7 +30,10 @@ pub(super) async fn delete_remote_tombstones(
             continue;
         };
         operations.push(operation(tombstone_draft(
-            provider, &item, reference.clone(), options,
+            provider,
+            &item,
+            reference.clone(),
+            options,
         )));
         if options.dry_run {
             continue;

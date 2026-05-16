@@ -488,7 +488,10 @@ mod tests {
             });
             fs_err::set_permissions(&daemon_root, original).expect("restore daemon root");
 
-            assert!(outcome.is_err(), "persist should fail when path is read-only");
+            assert!(
+                outcome.is_err(),
+                "persist should fail when path is read-only"
+            );
             let after = super::git_runtime_profile_for_repository(None)
                 .expect("post-failure profile")
                 .ssh_private_key

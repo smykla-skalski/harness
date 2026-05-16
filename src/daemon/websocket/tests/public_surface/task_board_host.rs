@@ -33,7 +33,11 @@ fn websocket_task_board_host_routes_round_trip_local_registry() {
 
             let local_before = host_response_result(
                 &dispatch(
-                    &host_request("req-host-local-1", ws_methods::TASK_BOARD_HOST_LOCAL, json!({})),
+                    &host_request(
+                        "req-host-local-1",
+                        ws_methods::TASK_BOARD_HOST_LOCAL,
+                        json!({}),
+                    ),
                     &state,
                     &connection,
                 )
@@ -65,7 +69,11 @@ fn websocket_task_board_host_routes_round_trip_local_registry() {
 
             let local_after = host_response_result(
                 &dispatch(
-                    &host_request("req-host-local-2", ws_methods::TASK_BOARD_HOST_LOCAL, json!({})),
+                    &host_request(
+                        "req-host-local-2",
+                        ws_methods::TASK_BOARD_HOST_LOCAL,
+                        json!({}),
+                    ),
                     &state,
                     &connection,
                 )

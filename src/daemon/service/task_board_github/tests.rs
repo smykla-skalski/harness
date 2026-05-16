@@ -266,7 +266,10 @@ async fn automation_waits_for_review_when_merge_evidence_is_not_approved() {
         "2026-05-14T00:00:00Z".to_string(),
     );
     let expected_branch = managed_branch_name(&config, &item.id, TEST_HOST_ID);
-    run_git(&repo, &["push", "origin", &format!("HEAD:{expected_branch}")]);
+    run_git(
+        &repo,
+        &["push", "origin", &format!("HEAD:{expected_branch}")],
+    );
     item.status = TaskBoardStatus::Done;
     item.project_id = Some("owner/repo".to_string());
     item.workflow.worktree = Some(repo.to_string_lossy().into_owned());
