@@ -148,12 +148,20 @@ stale_scan_orphan_monitor_wrapper_pids() {
 
 stale_scan_root_lock_holder_pids() {
   local root="$1"
-  local lock_path
+  local lock_path partition
   [[ -d "$root" ]] || return 0
-  for lock_path in "$root/daemon.lock" "$root/bridge.lock"; do
-    [[ -e "$lock_path" ]] || continue
-    lsof -t "$lock_path" 2>/dev/null || true
-  done | sort -u
+  {
+    for lock_path in "$root/daemon.lock" "$root/bridge.lock"; do
+      [[ -e "$lock_path" ]] || continue
+      lsof -t "$lock_path" 2>/dev/null || true
+    done
+    for partition in external managed; do
+      for lock_path in "$root/$partition/daemon.lock" "$root/$partition/bridge.lock"; do
+        [[ -e "$lock_path" ]] || continue
+        lsof -t "$lock_path" 2>/dev/null || true
+      done
+    done
+  } | sort -u
 }
 
 # pid -> ppid map from cached snapshot.
@@ -251,7 +259,7 @@ stale_scan_pid_harness_lock_paths() {
   local pid="$1"
   lsof -a -p "$pid" -Fn 2>/dev/null \
     | sed -n 's/^n//p' \
-    | awk '/(^|\/)harness\/daemon\/(daemon|bridge)\.lock$/ { print }'
+    | awk '/(^|\/)harness\/daemon\/(external\/|managed\/)?(daemon|bridge)\.lock$/ { print }'
 }
 
 stale_scan_pid_holds_harness_lock() {
@@ -461,15 +469,17 @@ stale_scan_tmp_bridge_artifacts() {
 stale_scan_orphan_sqlite_sidecars() {
   local root="$1"
   [[ -d "$root" ]] || return 0
-  local db="$root/harness.db"
-  if [[ -e "$db" ]]; then
-    return 0
-  fi
-  local sidecar
-  for sidecar in "$root/harness.db-wal" "$root/harness.db-shm"; do
-    if [[ -e "$sidecar" ]]; then
-      echo "$sidecar"
+  local partition_root sidecar
+  for partition_root in "$root" "$root/external" "$root/managed"; do
+    [[ -d "$partition_root" ]] || continue
+    if [[ -e "$partition_root/harness.db" ]]; then
+      continue
     fi
+    for sidecar in "$partition_root/harness.db-wal" "$partition_root/harness.db-shm"; do
+      if [[ -e "$sidecar" ]]; then
+        echo "$sidecar"
+      fi
+    done
   done
   return 0
 }

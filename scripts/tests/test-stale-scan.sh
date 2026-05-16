@@ -509,6 +509,46 @@ scenario_lock_holding_build_process_not_orphaned() {
 }
 
 # ---------------------------------------------------------------------------
+# Scenario 9c: same as 9b but with the lock under the new ownership partition
+# (harness/daemon/external/daemon.lock). The daemon-coexistence layout writes
+# daemon/bridge locks into external/ or managed/ subdirs instead of the legacy
+# flat path; the stale-scan must still recognise these as live anchors.
+# ---------------------------------------------------------------------------
+scenario_lock_holding_build_process_in_external_partition_not_orphaned() {
+  start_test "lock-holding cargo-built harness in external/ partition is not treated as orphan"
+  local fake_root="$SANDBOX/lane-partition-build-root-$RUN_ID/harness/daemon/external"
+  local lock_path="$fake_root/daemon.lock"
+  spawn_target_harness_with_open_lock "target/debug" daemon "$lock_path" || {
+    fail "spawn failed"
+    return
+  }
+  local pid="$LAST_SPAWN_PID"
+
+  sleep 0.3
+  stale_scan_refresh_ps
+  local orphans
+  orphans="$(stale_scan_orphan_harness_build_pids)"
+  assert_not_in_list "$pid" "orphan build pid (external partition)" "$orphans" && pass
+}
+
+scenario_lock_holding_build_process_in_managed_partition_not_orphaned() {
+  start_test "lock-holding cargo-built harness in managed/ partition is not treated as orphan"
+  local fake_root="$SANDBOX/lane-partition-build-root-managed-$RUN_ID/harness/daemon/managed"
+  local lock_path="$fake_root/daemon.lock"
+  spawn_target_harness_with_open_lock "target/debug" daemon "$lock_path" || {
+    fail "spawn failed"
+    return
+  }
+  local pid="$LAST_SPAWN_PID"
+
+  sleep 0.3
+  stale_scan_refresh_ps
+  local orphans
+  orphans="$(stale_scan_orphan_harness_build_pids)"
+  assert_not_in_list "$pid" "orphan build pid (managed partition)" "$orphans" && pass
+}
+
+# ---------------------------------------------------------------------------
 # Scenario 10: custom-root lock holder detection via lsof
 # ---------------------------------------------------------------------------
 scenario_lock_holder() {
@@ -1894,6 +1934,8 @@ run_all() {
   scenario_lane_scoped_tmp_artifacts_are_ignored
   scenario_lane_scoped_daemon_root
   scenario_lock_holding_build_process_not_orphaned
+  scenario_lock_holding_build_process_in_external_partition_not_orphaned
+  scenario_lock_holding_build_process_in_managed_partition_not_orphaned
   scenario_lock_holder
   scenario_laned_live_lock_holder_not_stale
   scenario_data_home_scoped_live_lock_holder_not_stale
