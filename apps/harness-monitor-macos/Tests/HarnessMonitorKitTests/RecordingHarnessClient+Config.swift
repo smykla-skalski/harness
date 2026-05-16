@@ -204,6 +204,12 @@ extension RecordingHarnessClient {
     }
   }
 
+  func configureTaskBoardGitRuntimeDrainSecretsError(_ error: (any Error)?) {
+    lock.withLock {
+      taskBoardGitRuntimeDrainSecretsError = error
+    }
+  }
+
   func configureDetailDelay(_ delay: Duration?, for sessionID: String) {
     lock.withLock {
       if let delay {

@@ -101,6 +101,9 @@ extension RecordingHarnessClient {
     -> TaskBoardGitRuntimeDrainSecretsResponse
   {
     calls.append(.drainTaskBoardGitRuntimeSecrets)
+    if let error = lock.withLock({ taskBoardGitRuntimeDrainSecretsError }) {
+      throw error
+    }
     return lock.withLock { taskBoardGitRuntimeDrainSecretsValue }
   }
 

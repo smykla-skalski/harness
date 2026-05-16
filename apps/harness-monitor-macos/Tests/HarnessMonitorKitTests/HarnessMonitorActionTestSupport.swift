@@ -277,6 +277,7 @@ final class RecordingHarnessClient: HarnessMonitorClientProtocol, @unchecked Sen
   var taskBoardGitSigningVerifyValue: TaskBoardGitSigningVerifyResponse = .skipped
   var taskBoardGitRuntimeDrainSecretsValue: TaskBoardGitRuntimeDrainSecretsResponse =
     TaskBoardGitRuntimeDrainSecretsResponse(drained: false, runtime: TaskBoardGitRuntimeConfig())
+  var taskBoardGitRuntimeDrainSecretsError: (any Error)?
   var taskBoardPolicyValidationOverride: TaskBoardPolicyPipelineValidation?
   var taskBoardPolicySimulationOverride: Bool?
   var sessionDetailsByID: [String: SessionDetail] = [:]
