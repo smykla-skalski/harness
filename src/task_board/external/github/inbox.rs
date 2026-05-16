@@ -103,21 +103,33 @@ impl GitHubInboxSyncClient {
                 .map_err(github_sync_error)?;
             let count = response.items.len();
             items.extend(response.items);
-            if count < 100 {
-                break;
+            match next_search_page(count, page) {
+                Some(next_page) => page = next_page,
+                None => break,
             }
-            if page >= GITHUB_SEARCH_PAGE_CAP {
-                tracing::warn!(
-                    target: "harness::task_board::external::github::inbox",
-                    "github search results truncated at {} hits",
-                    GITHUB_SEARCH_PAGE_CAP * 100
-                );
-                break;
-            }
-            page += 1;
         }
         Ok(items)
     }
+}
+
+fn next_search_page(count: usize, page: u32) -> Option<u32> {
+    if count < 100 {
+        return None;
+    }
+    if page >= GITHUB_SEARCH_PAGE_CAP {
+        warn_search_results_truncated();
+        return None;
+    }
+    Some(page + 1)
+}
+
+#[allow(clippy::cognitive_complexity)]
+fn warn_search_results_truncated() {
+    tracing::warn!(
+        target: "harness::task_board::external::github::inbox",
+        "github search results truncated at {} hits",
+        GITHUB_SEARCH_PAGE_CAP * 100
+    );
 }
 
 impl fmt::Debug for GitHubInboxSyncClient {
@@ -252,10 +264,7 @@ struct GitHubSearchIssuePullRequestItem {
 
 impl GitHubSearchIssuePullRequestItem {
     fn label_names(&self) -> Vec<String> {
-        self.labels
-            .iter()
-            .map(|label| label.name.clone())
-            .collect()
+        self.labels.iter().map(|label| label.name.clone()).collect()
     }
 }
 

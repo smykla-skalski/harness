@@ -23,8 +23,9 @@ mod stale_reviews;
 use delete::delete_remote_tombstones;
 use import::{external_item_id, imported_external_planning};
 use merge::{
-    has_reported_conflict, local_update_fields, matching_ref, pull_create_fields, push_create_fields,
-    replace_synced_ref, split_supported_fields, sync_state_from_task, synced_ref_from_item,
+    has_reported_conflict, local_update_fields, matching_ref, pull_create_fields,
+    push_create_fields, replace_synced_ref, split_supported_fields, sync_state_from_task,
+    synced_ref_from_item,
 };
 use reconcile::reconcile_existing_item;
 use stale_reviews::reconcile_stale_github_review_requests;
@@ -167,22 +168,28 @@ async fn sync_client(
     client: &dyn ExternalSyncClient,
     operations: &mut Vec<ExternalSyncOperation>,
 ) -> Result<(), CliError> {
-    if matches!(
-        options.direction,
-        ExternalSyncDirection::Pull | ExternalSyncDirection::Both
-    ) && client.allows_pull()
-    {
+    if direction_allows_pull(options.direction) && client.allows_pull() {
         pull_provider_tasks(board, options, client, operations).await?;
     }
-    if matches!(
-        options.direction,
-        ExternalSyncDirection::Push | ExternalSyncDirection::Both
-    ) && client.allows_push()
-    {
+    if direction_allows_push(options.direction) && client.allows_push() {
         push_board_tasks(board, options, client, operations).await?;
         delete_remote_tombstones(board, options, client, operations).await?;
     }
     Ok(())
+}
+
+fn direction_allows_pull(direction: ExternalSyncDirection) -> bool {
+    matches!(
+        direction,
+        ExternalSyncDirection::Pull | ExternalSyncDirection::Both
+    )
+}
+
+fn direction_allows_push(direction: ExternalSyncDirection) -> bool {
+    matches!(
+        direction,
+        ExternalSyncDirection::Push | ExternalSyncDirection::Both
+    )
 }
 
 async fn pull_provider_tasks(
@@ -200,7 +207,12 @@ async fn pull_provider_tasks(
     let board_items = board.list(None)?;
     let item_index = build_external_ref_index(&board_items);
     for task in tasks.iter().cloned() {
-        if let Some(item) = item_for_ref(&board_items, &item_index, &task.reference, task.project_id.as_deref()) {
+        if let Some(item) = item_for_ref(
+            &board_items,
+            &item_index,
+            &task.reference,
+            task.project_id.as_deref(),
+        ) {
             reconcile_existing_item(board, options, client.provider(), item, task, operations)?;
             continue;
         }
@@ -335,8 +347,8 @@ async fn update_linked_remote(
         return Ok(());
     }
     let precondition = remote_precondition(item, &reference);
-    let update = ExternalTaskUpdate::new(supported.clone())
-        .with_precondition_updated_at(precondition);
+    let update =
+        ExternalTaskUpdate::new(supported.clone()).with_precondition_updated_at(precondition);
     let outcome = client.update_task(item, &reference, update).await?;
     let updated_ref = match outcome {
         ExternalUpdateOutcome::Applied(updated_ref) => updated_ref,
