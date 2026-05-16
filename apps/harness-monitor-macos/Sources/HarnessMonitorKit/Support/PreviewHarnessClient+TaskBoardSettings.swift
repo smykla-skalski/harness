@@ -50,4 +50,14 @@ extension PreviewHarnessClient {
     try await performActionDelay()
     return .skipped
   }
+
+  public func drainTaskBoardGitRuntimeSecrets() async throws
+    -> TaskBoardGitRuntimeDrainSecretsResponse
+  {
+    try await performActionDelay()
+    return TaskBoardGitRuntimeDrainSecretsResponse(
+      drained: false,
+      runtime: TaskBoardGitRuntimeConfig()
+    )
+  }
 }

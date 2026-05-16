@@ -91,7 +91,8 @@ struct SessionBannerStackTests {
     isLoading: Bool = false,
     hasSnapshot: Bool = true,
     showsPendingDecisionBanner: Bool = true,
-    pendingDecisionCount: Int = 0
+    pendingDecisionCount: Int = 0,
+    observedDaemonWireVersion: Int? = nil
   ) -> SessionBannerStackModel {
     SessionBannerStackModel(
       persistenceError: persistenceError,
@@ -102,7 +103,7 @@ struct SessionBannerStackTests {
       hasSnapshot: hasSnapshot,
       showsPendingDecisionBanner: showsPendingDecisionBanner,
       pendingDecisionCount: pendingDecisionCount,
-      observedDaemonWireVersion: nil
+      observedDaemonWireVersion: observedDaemonWireVersion
     )
   }
 }

@@ -1,5 +1,33 @@
 import Foundation
 
+public struct TaskBoardGitRuntimeDrainSecretsRequest: Codable, Equatable, Sendable {
+  public init() {}
+}
+
+public struct TaskBoardGitRuntimeDrainSecretsResponse: Codable, Equatable, Sendable {
+  public let drained: Bool
+  public let runtime: TaskBoardGitRuntimeConfig
+
+  public init(drained: Bool, runtime: TaskBoardGitRuntimeConfig) {
+    self.drained = drained
+    self.runtime = runtime
+  }
+
+  enum CodingKeys: String, CodingKey {
+    case drained
+    case runtime
+  }
+
+  public init(from decoder: Decoder) throws {
+    let container = try decoder.container(keyedBy: CodingKeys.self)
+    self.init(
+      drained: try container.decodeIfPresent(Bool.self, forKey: .drained) ?? false,
+      runtime: try container.decodeIfPresent(TaskBoardGitRuntimeConfig.self, forKey: .runtime)
+        ?? TaskBoardGitRuntimeConfig()
+    )
+  }
+}
+
 public struct TaskBoardGitSigningVerifyRequest: Codable, Equatable, Sendable {
   public let repository: String?
 

@@ -134,6 +134,35 @@ pub fn persist_task_board_git_runtime_config(
     write_json_pretty(&config_path(), &config)
 }
 
+/// One-shot migration drain: if the on-disk daemon runtime config still
+/// contains plaintext task-board git secrets (from an older daemon), return
+/// the full unstripped runtime config and persist a stripped version back to
+/// disk. Returns `Ok(None)` when the on-disk config is already stripped.
+///
+/// # Errors
+/// Returns `CliError` when the runtime config exists but cannot be parsed or
+/// the stripped version cannot be written back.
+pub fn drain_task_board_git_runtime_secrets()
+-> Result<Option<TaskBoardGitRuntimeConfig>, CliError> {
+    if !config_path().is_file() {
+        return Ok(None);
+    }
+    let raw = read_json_typed::<DaemonRuntimeConfig>(&config_path())?;
+    let Some(raw_task_board) = raw.task_board_git_runtime_config.clone() else {
+        return Ok(None);
+    };
+    let stripped = raw_task_board.without_secrets();
+    if stripped == raw_task_board {
+        return Ok(None);
+    }
+    ensure_daemon_dirs()?;
+    let mut on_disk = raw;
+    on_disk.task_board_git_runtime_config =
+        (!stripped.is_empty()).then_some(stripped);
+    write_json_pretty(&config_path(), &on_disk)?;
+    Ok(Some(raw_task_board))
+}
+
 /// Replace the daemon's in-memory task-board Git runtime secrets snapshot.
 ///
 /// # Panics

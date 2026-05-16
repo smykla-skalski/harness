@@ -156,6 +156,10 @@ pub(super) fn task_board_routes() -> Router<DaemonHttpState> {
             post(post_task_board_git_signing_verify),
         )
         .route(
+            http_paths::TASK_BOARD_GIT_RUNTIME_DRAIN_SECRETS,
+            post(post_task_board_git_runtime_drain_secrets),
+        )
+        .route(
             http_paths::TASK_BOARD_POLICY_PIPELINE,
             get(get_task_board_policy_pipeline).put(put_task_board_policy_pipeline_draft),
         )
@@ -345,6 +349,20 @@ async fn post_task_board_git_signing_verify(
         &request_id,
         start,
         task_board_route_executor::verify_git_signing(&request),
+    )
+}
+
+async fn post_task_board_git_runtime_drain_secrets(
+    headers: HeaderMap,
+    State(state): State<DaemonHttpState>,
+) -> Response {
+    let (start, request_id) = authenticated_request!(headers, state);
+    timed_json(
+        "POST",
+        http_paths::TASK_BOARD_GIT_RUNTIME_DRAIN_SECRETS,
+        &request_id,
+        start,
+        task_board_route_executor::drain_git_runtime_secrets(),
     )
 }
 

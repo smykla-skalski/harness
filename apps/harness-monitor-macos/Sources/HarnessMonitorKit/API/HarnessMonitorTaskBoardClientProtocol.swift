@@ -54,6 +54,7 @@ public protocol HarnessMonitorTaskBoardClientProtocol: Sendable {
   func verifyTaskBoardGitSigning(
     request: TaskBoardGitSigningVerifyRequest
   ) async throws -> TaskBoardGitSigningVerifyResponse
+  func drainTaskBoardGitRuntimeSecrets() async throws -> TaskBoardGitRuntimeDrainSecretsResponse
   func taskBoardPolicyPipeline() async throws -> TaskBoardPolicyPipelineDocument
   func saveTaskBoardPolicyPipelineDraft(
     request: TaskBoardPolicyPipelineSaveDraftRequest
@@ -244,6 +245,12 @@ extension HarnessMonitorTaskBoardClientProtocol {
   public func verifyTaskBoardGitSigning(
     request _: TaskBoardGitSigningVerifyRequest
   ) async throws -> TaskBoardGitSigningVerifyResponse {
+    throw HarnessMonitorAPIError.server(code: 501, message: "Task board unavailable.")
+  }
+
+  public func drainTaskBoardGitRuntimeSecrets() async throws
+    -> TaskBoardGitRuntimeDrainSecretsResponse
+  {
     throw HarnessMonitorAPIError.server(code: 501, message: "Task board unavailable.")
   }
 
