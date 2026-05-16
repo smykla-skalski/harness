@@ -210,6 +210,8 @@ struct SessionWindowRouteContentMetricsTests {
     )
     #expect(orchestratorSource.contains(".harnessActionButtonStyle(variant: .prominent"))
     #expect(managementPanelSource.contains("Label(\"Refresh\", systemImage: \"arrow.clockwise\")"))
+    #expect(overviewSource.contains("headerAccessoryRow"))
+    #expect(!overviewSource.contains("Spacer(minLength: HarnessMonitorTheme.spacingMD)"))
   }
 
   @Test("Task board operations panel prefers a three-card row")
