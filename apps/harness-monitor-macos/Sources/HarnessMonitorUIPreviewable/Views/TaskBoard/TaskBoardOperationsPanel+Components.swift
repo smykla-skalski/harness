@@ -128,9 +128,10 @@ extension TaskBoardOperationsPanel {
   }
 
   func operationSummaryRow(_ operation: TaskBoardExternalSyncOperation) -> some View {
-    let reference = operation.boardItemId ?? operation.externalId ?? "Unlinked"
     keyedSummaryRow(
-      title: "\(operation.provider.title) \(operation.action.rawValue.capitalized) · \(reference)",
+      title:
+        "\(operation.provider.title) \(operation.action.rawValue.capitalized) · "
+        + "\(operation.boardItemId ?? operation.externalId ?? "Unlinked")",
       subtitle:
         operation.applied ? "Applied" : (operation.dryRun ? "Preview only" : "Pending apply")
     )
