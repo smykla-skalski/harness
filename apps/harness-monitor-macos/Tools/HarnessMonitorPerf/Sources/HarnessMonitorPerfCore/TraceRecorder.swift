@@ -78,7 +78,7 @@ public enum TraceRecorder {
         {
             return value
         }
-        return 240
+        return 1200
     }
 
     public struct Capture {
