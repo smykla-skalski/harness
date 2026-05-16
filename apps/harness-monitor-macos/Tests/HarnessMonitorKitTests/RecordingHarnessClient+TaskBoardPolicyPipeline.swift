@@ -17,7 +17,7 @@ extension RecordingHarnessClient {
       )
     )
     let validation =
-      lock.withLock { taskBoardPolicyPipelineValidationOverride }
+      lock.withLock { taskBoardPolicyValidationOverride }
       ?? TaskBoardPolicyPipelineValidation(isValid: true)
     return TaskBoardPolicyPipelineSaveDraftResponse(
       document: request.document,
@@ -30,9 +30,9 @@ extension RecordingHarnessClient {
   ) async throws -> TaskBoardPolicyPipelineSimulationResult {
     calls.append(.simulateTaskBoardPolicyPipeline)
     let validation =
-      lock.withLock { taskBoardPolicyPipelineValidationOverride }
+      lock.withLock { taskBoardPolicyValidationOverride }
       ?? TaskBoardPolicyPipelineValidation(isValid: true)
-    let succeeded = lock.withLock { taskBoardPolicyPipelineSimulationSucceededOverride } ?? true
+    let succeeded = lock.withLock { taskBoardPolicySimulationOverride } ?? true
     return TaskBoardPolicyPipelineSimulationResult(
       revision: request.document?.revision ?? 7,
       traceId: "trace-policy-1",
@@ -46,11 +46,11 @@ extension RecordingHarnessClient {
   func configureTaskBoardPolicyPipelineValidation(
     _ validation: TaskBoardPolicyPipelineValidation?
   ) {
-    lock.withLock { taskBoardPolicyPipelineValidationOverride = validation }
+    lock.withLock { taskBoardPolicyValidationOverride = validation }
   }
 
   func configureTaskBoardPolicyPipelineSimulationSucceeded(_ succeeded: Bool?) {
-    lock.withLock { taskBoardPolicyPipelineSimulationSucceededOverride = succeeded }
+    lock.withLock { taskBoardPolicySimulationOverride = succeeded }
   }
 
   func promoteTaskBoardPolicyPipeline(

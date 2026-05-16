@@ -12,7 +12,7 @@ final class HarnessMonitorMenuBarTests: HarnessMonitorUITestCase {
   private static let overviewRoute = "overview"
   private static let previewSessionTitle = "Harness Monitor Cockpit"
 
-  override nonisolated class var reuseLaunchedApp: Bool { true }
+  override nonisolated static var reuseLaunchedApp: Bool { true }
 
   func testWindowMenuOpensDashboardWindow() throws {
     let app = launch(

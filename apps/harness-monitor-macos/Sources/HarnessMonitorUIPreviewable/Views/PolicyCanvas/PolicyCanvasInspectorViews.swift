@@ -294,21 +294,6 @@ struct PolicyCanvasInspector: View {
     }
   }
 
-  @ViewBuilder
-  private var edgeKindCountsSection: some View {
-    if !viewModel.edges.isEmpty {
-      let counts = viewModel.edgeCountsByKind
-      PolicyCanvasInspectorSection(title: "Edge kinds") {
-        ForEach(PolicyCanvasEdgeKind.allCases, id: \.self) { kind in
-          PolicyCanvasInspectorRow(
-            label: kind.accessibilityWord.capitalized,
-            value: "\(counts[kind, default: 0])"
-          )
-        }
-      }
-    }
-  }
-
   /// Zoom percentage rendered without trailing decimals. Matches the
   /// canvas chrome's HUD format so the two surfaces don't show
   /// different precisions for the same value.

@@ -183,12 +183,14 @@ extension TaskBoardOperationsPanel {
 
       actionRow {
         actionButton(
-          title: syncDryRun ? "Preview Sync" : "Run Sync",
-          systemImage: syncDryRun ? "eye" : "arrow.triangle.2.circlepath",
-          tint: syncDryRun ? .secondary : nil,
-          prominent: !syncDryRun,
-          accessibilityIdentifier: "harness.task-board.sync.run",
-          help: "Preview or apply external task-board sync operations"
+          TaskBoardActionButtonDescriptor(
+            title: syncDryRun ? "Preview Sync" : "Run Sync",
+            systemImage: syncDryRun ? "eye" : "arrow.triangle.2.circlepath",
+            tint: syncDryRun ? .secondary : nil,
+            prominent: !syncDryRun,
+            accessibilityIdentifier: "harness.task-board.sync.run",
+            help: "Preview or apply external task-board sync operations"
+          )
         ) {
           Task { @MainActor in
             await store.syncTaskBoard(
@@ -236,8 +238,10 @@ extension TaskBoardOperationsPanel {
               .scaledFont(.caption.weight(.semibold))
               .foregroundStyle(HarnessMonitorTheme.secondaryInk)
               .accessibilityAddTraits(.isHeader)
-            ForEach(Array(summary.operations.prefix(4).enumerated()), id: \.offset) {
-              _, operation in
+            ForEach(
+              Array(summary.operations.prefix(4).enumerated()),
+              id: \.offset
+            ) { _, operation in
               operationSummaryRow(operation)
             }
           }
@@ -317,14 +321,16 @@ extension TaskBoardOperationsPanel {
 
       actionRow {
         actionButton(
-          title: dispatchDryRun ? "Preview Dispatch" : "Dispatch Live",
-          systemImage: dispatchDryRun ? "eye" : "paperplane.fill",
-          tint: dispatchDryRun ? .secondary : .orange,
-          prominent: !dispatchDryRun,
-          accessibilityIdentifier: "harness.task-board.dispatch.run",
-          help: dispatchDryRun
-            ? "Preview how task-board items will dispatch"
-            : "Dispatch the selected board scope into live session work"
+          TaskBoardActionButtonDescriptor(
+            title: dispatchDryRun ? "Preview Dispatch" : "Dispatch Live",
+            systemImage: dispatchDryRun ? "eye" : "paperplane.fill",
+            tint: dispatchDryRun ? .secondary : .orange,
+            prominent: !dispatchDryRun,
+            accessibilityIdentifier: "harness.task-board.dispatch.run",
+            help: dispatchDryRun
+              ? "Preview how task-board items will dispatch"
+              : "Dispatch the selected board scope into live session work"
+          )
         ) {
           if dispatchRequest.dryRun {
             Task { @MainActor in

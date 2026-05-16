@@ -12,33 +12,24 @@ enum DispatchStatusFilterChoice: String, CaseIterable, Hashable {
   case inReview
   case done
 
-  init(status: TaskBoardStatus?) {
-    switch status {
-    case .none:
-      self = .all
-    case .new:
-      self = .new
-    case .planning:
-      self = .planning
-    case .planReview:
-      self = .planReview
-    case .needsYou:
-      self = .needsYou
-    case .todo:
-      self = .todo
-    case .inProgress:
-      self = .inProgress
-    case .blocked:
-      self = .blocked
-    case .inReview:
-      self = .inReview
-    case .done:
-      self = .done
-    case .unknown:
-      self = .all
-    }
-  }
+  private static let statusChoices: [TaskBoardStatus: Self] = [
+    .new: .new,
+    .planning: .planning,
+    .planReview: .planReview,
+    .needsYou: .needsYou,
+    .todo: .todo,
+    .inProgress: .inProgress,
+    .blocked: .blocked,
+    .inReview: .inReview,
+    .done: .done,
+  ]
 
+  init(status: TaskBoardStatus?) {
+    self = status.flatMap { Self.statusChoices[$0] } ?? .all
+  }
+}
+
+extension DispatchStatusFilterChoice {
   var title: String {
     switch self {
     case .all: "All Items"

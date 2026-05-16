@@ -126,7 +126,7 @@ extension HarnessMonitorAccessibility {
     "harness.settings.task-board.github-inbox.repositories"
   public static let settingsTaskBoardInboxLabelFilterField =
     "harness.settings.task-board.github-inbox.label-filter"
-  public static let settingsTaskBoardTodoistProjectFilterField =
+  public static let settingsTaskBoardTodoistProjectField =
     "harness.settings.task-board.todoist-inbox.project-filter"
   public static let settingsTaskBoardHostStatus = "harness.settings.task-board.host.status"
   public static let settingsTaskBoardHostLocalIdField =

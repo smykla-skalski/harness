@@ -194,7 +194,7 @@ public struct SettingsTaskBoardSection: View {
         accessibilityLabel: "Todoist inbox project filter"
       )
       .accessibilityIdentifier(
-        HarnessMonitorAccessibility.settingsTaskBoardTodoistProjectFilterField
+        HarnessMonitorAccessibility.settingsTaskBoardTodoistProjectField
       )
     } header: {
       Text("Todoist Inbox")
@@ -362,8 +362,10 @@ public struct SettingsTaskBoardSection: View {
       }
     }
   }
+}
 
-  private func workflowBinding(_ workflow: TaskBoardOrchestratorWorkflow) -> Binding<Bool> {
+extension SettingsTaskBoardSection {
+  fileprivate func workflowBinding(_ workflow: TaskBoardOrchestratorWorkflow) -> Binding<Bool> {
     Binding(
       get: { draft.enabledWorkflows.contains(workflow) },
       set: { isEnabled in
@@ -376,7 +378,7 @@ public struct SettingsTaskBoardSection: View {
     )
   }
 
-  private func automationBinding(_ automation: TaskBoardGitHubAutomation) -> Binding<Bool> {
+  fileprivate func automationBinding(_ automation: TaskBoardGitHubAutomation) -> Binding<Bool> {
     Binding(
       get: { draft.enabledAutomations.contains(automation) },
       set: { isEnabled in
@@ -390,7 +392,7 @@ public struct SettingsTaskBoardSection: View {
   }
 
   @MainActor
-  private func loadSettings() async {
+  fileprivate func loadSettings() async {
     isLoading = true
     defer { isLoading = false }
 
@@ -404,7 +406,7 @@ public struct SettingsTaskBoardSection: View {
   }
 
   @MainActor
-  private func saveSettings() async {
+  fileprivate func saveSettings() async {
     isSaving = true
     defer { isSaving = false }
 
@@ -414,5 +416,4 @@ public struct SettingsTaskBoardSection: View {
       await loadSettings()
     }
   }
-
 }

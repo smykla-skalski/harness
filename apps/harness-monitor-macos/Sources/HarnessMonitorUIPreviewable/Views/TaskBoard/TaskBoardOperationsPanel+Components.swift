@@ -1,6 +1,15 @@
 import HarnessMonitorKit
 import SwiftUI
 
+struct TaskBoardActionButtonDescriptor {
+  let title: String
+  let systemImage: String
+  let tint: Color?
+  let prominent: Bool
+  let accessibilityIdentifier: String
+  let help: String
+}
+
 extension TaskBoardOperationsPanel {
   func controlRows<Content: View>(@ViewBuilder content: () -> Content) -> some View {
     ViewThatFits(in: .horizontal) {
@@ -91,28 +100,23 @@ extension TaskBoardOperationsPanel {
   }
 
   func actionButton(
-    title: String,
-    systemImage: String,
-    tint: Color?,
-    prominent: Bool = false,
-    accessibilityIdentifier: String,
-    help: String,
+    _ descriptor: TaskBoardActionButtonDescriptor,
     action: @escaping () -> Void
   ) -> some View {
     Button(action: action) {
-      Label(title, systemImage: systemImage)
+      Label(descriptor.title, systemImage: descriptor.systemImage)
         .scaledFont(.caption.weight(.semibold))
         .lineLimit(1)
     }
     .frame(minHeight: metrics.controlMinHeight)
     .harnessActionButtonStyle(
-      variant: prominent ? .prominent : .bordered,
-      tint: tint
+      variant: descriptor.prominent ? .prominent : .bordered,
+      tint: descriptor.tint
     )
     .controlSize(HarnessMonitorControlMetrics.compactControlSize)
     .disabled(store.isDaemonActionInFlight)
-    .help(help)
-    .accessibilityIdentifier(accessibilityIdentifier)
+    .help(descriptor.help)
+    .accessibilityIdentifier(descriptor.accessibilityIdentifier)
   }
 
   func providerSummaryRow(_ provider: TaskBoardProviderSyncSummary) -> some View {
@@ -124,9 +128,9 @@ extension TaskBoardOperationsPanel {
   }
 
   func operationSummaryRow(_ operation: TaskBoardExternalSyncOperation) -> some View {
+    let reference = operation.boardItemId ?? operation.externalId ?? "Unlinked"
     keyedSummaryRow(
-      title:
-        "\(operation.provider.title) \(operation.action.rawValue.capitalized) · \(operation.boardItemId ?? operation.externalId ?? "Unlinked")",
+      title: "\(operation.provider.title) \(operation.action.rawValue.capitalized) · \(reference)",
       subtitle:
         operation.applied ? "Applied" : (operation.dryRun ? "Preview only" : "Pending apply")
     )

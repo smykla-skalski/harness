@@ -65,15 +65,6 @@ public struct DashboardWindowView: View {
     )
   }
 
-  private var dashboardToolbarModel: DashboardWindowToolbarModel {
-    DashboardWindowToolbarModel(
-      selectedRoute: selectedRoute,
-      sleepPreventionPresentation: SleepPreventionToolbarPresentation(
-        isEnabled: store.contentUI.toolbar.sleepPreventionEnabled
-      )
-    )
-  }
-
   private var sidebarWidth: Double {
     get { persistedSidebarWidth }
     nonmutating set { persistedSidebarWidth = newValue }
@@ -126,7 +117,10 @@ public struct DashboardWindowView: View {
       .toolbar {
         DashboardWindowToolbar(
           store: store,
-          model: dashboardToolbarModel
+          showsQuickActions: selectedRoute == .taskBoard,
+          sleepPreventionPresentation: SleepPreventionToolbarPresentation(
+            isEnabled: store.contentUI.toolbar.sleepPreventionEnabled
+          )
         )
       }
       .toolbarBackground(.visible, for: .windowToolbar)
@@ -169,76 +163,6 @@ private struct DashboardPerfRouteHook: ViewModifier {
         }
     } else {
       content
-    }
-  }
-}
-
-private struct DashboardWindowToolbarModel: Equatable {
-  let selectedRoute: DashboardWindowRoute
-  let sleepPreventionPresentation: SleepPreventionToolbarPresentation
-
-  var showsQuickActions: Bool {
-    selectedRoute == .taskBoard
-  }
-}
-
-private struct DashboardWindowToolbar: ToolbarContent {
-  let store: HarnessMonitorStore
-  let model: DashboardWindowToolbarModel
-
-  @ToolbarContentBuilder
-  var body: some ToolbarContent {
-    HarnessMonitorWindowToolbar {
-      ToolbarItemGroup(placement: .navigation) {
-        if model.showsQuickActions {
-          Button {
-            store.presentedSheet = .newSession
-          } label: {
-            Label {
-              Text("New Session")
-            } icon: {
-              Image(systemName: "plus.square")
-                .frame(width: 14, height: 14)
-            }
-          }
-          .help("New Session")
-          .accessibilityIdentifier(HarnessMonitorAccessibility.dashboardNewSessionButton)
-          .harnessMCPButton(
-            HarnessMonitorAccessibility.dashboardNewSessionButton,
-            label: "New Session",
-            hint: "Create a new session.",
-            pressAction: { store.presentedSheet = .newSession }
-          )
-
-          Button {
-            store.requestOpenFolder()
-          } label: {
-            Label {
-              Text("Open Folder")
-            } icon: {
-              Image(systemName: "folder")
-                .frame(width: 14, height: 14)
-            }
-          }
-          .help("Open Folder")
-          .accessibilityIdentifier(HarnessMonitorAccessibility.dashboardOpenFolderButton)
-          .harnessMCPButton(
-            HarnessMonitorAccessibility.dashboardOpenFolderButton,
-            label: "Open Folder",
-            hint: "Open a project folder.",
-            pressAction: { store.requestOpenFolder() }
-          )
-        }
-      }
-    } automatic: {
-      ToolbarItemGroup(placement: .automatic) {}
-    } primaryAction: {
-      ToolbarItem(placement: .primaryAction) {
-        SleepPreventionToolbarButton(
-          store: store,
-          presentation: model.sleepPreventionPresentation
-        )
-      }
     }
   }
 }

@@ -19,8 +19,7 @@ import SwiftUI
 }
 
 private enum TaskBoardPreviewFixtures {
-  @MainActor
-  static let store: HarnessMonitorStore = {
+  @MainActor static let store: HarnessMonitorStore = {
     HarnessMonitorPreviewStoreFactory.makeStore(for: .taskBoardBoardOnly)
   }()
 
