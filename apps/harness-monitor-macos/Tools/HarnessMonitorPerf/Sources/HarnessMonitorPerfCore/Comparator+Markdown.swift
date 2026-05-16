@@ -27,6 +27,16 @@ extension Comparator {
             return lines.joined(separator: "\n")
         }
 
+        if !comparison.comparisons.isEmpty {
+            lines.append(
+                "Metrics are grouped into two tiers: **Hard budget metrics** are enforced "
+                    + "by `BudgetEnforcer` and a regression on any of them fails the audit. "
+                    + "**Investigative metrics** are extracted but not gated; they exist to "
+                    + "inform triage when a hard metric regresses."
+            )
+            lines.append("")
+        }
+
         appendMissingSections(comparison, to: &lines)
 
         for item in comparison.comparisons {
