@@ -16,6 +16,12 @@ struct TaskBoardActionButtonDescriptor {
 /// invalidate the others. Helpers that all cards rely on (action buttons,
 /// summary rows, fonts) live on this protocol's extension so we share the
 /// implementation without re-routing through the panel.
+///
+/// `@MainActor` so the helpers can call MainActor-isolated SwiftUI APIs
+/// (`harnessNativeFormControl`, `harnessNativeTextField`, glass control
+/// group, etc.) without a hop - every conformer is a `View`, which is
+/// already MainActor-isolated under Swift 6.2 strict concurrency.
+@MainActor
 protocol TaskBoardOperationsHost {
   var store: HarnessMonitorStore { get }
   var metrics: TaskBoardOverviewMetrics { get }
