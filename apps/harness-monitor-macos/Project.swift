@@ -332,6 +332,10 @@ private let monitorRunEnv: [String: EnvironmentVariable] = [
     "OTEL_EXPORTER_OTLP_ENDPOINT": .environmentVariable(value: "http://127.0.0.1:4317", isEnabled: true),
     "MTL_DEBUG_LAYER": .environmentVariable(value: "0", isEnabled: true),
     "SWIFTUI_VIEW_DEBUG": .environmentVariable(value: "0", isEnabled: true),
+    // Pin the regular scheme to managed daemon mode so it ignores any
+    // persisted external-daemon preference from prior runs of the
+    // sibling scheme or Settings UI.
+    "HARNESS_MONITOR_EXTERNAL_DAEMON": .environmentVariable(value: "0", isEnabled: true),
 ]
 
 private let monitorTestEnv: [String: EnvironmentVariable] = [
