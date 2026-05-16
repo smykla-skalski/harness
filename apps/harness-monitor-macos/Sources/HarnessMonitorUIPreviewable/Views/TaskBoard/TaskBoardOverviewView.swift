@@ -104,10 +104,11 @@ public struct TaskBoardOverviewView: View {
         } else if let evaluationSummary {
           taskBoardDetailRow { evaluationSummaryRow(evaluationSummary) }
         }
-        if let store {
-          taskBoardDetailRow {
-            TaskBoardOperationsPanel(store: store, taskBoardItems: taskBoardItems)
-          }
+      }
+      taskBoardDetailRow { headerTitle }
+      if let store {
+        taskBoardDetailRow {
+          TaskBoardOperationsPanel(store: store, taskBoardItems: taskBoardItems)
         }
       }
       taskBoardDetailRow { boardSection }
@@ -156,27 +157,8 @@ extension TaskBoardOverviewView {
       || evaluationSummary != nil
   }
 
-  private var header: some View {
-    VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
-      ViewThatFits(in: .horizontal) {
-        HStack(alignment: .center, spacing: HarnessMonitorTheme.spacingMD) {
-          headerTitle
-          Spacer(minLength: HarnessMonitorTheme.spacingMD)
-          headerActions
-        }
-        VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
-          headerTitle
-          headerActions
-        }
-      }
-      if hasAggregateSummary {
-        aggregateSummaryRow
-      }
-    }
-  }
-
   private var headerTitle: some View {
-    Label("Task Board", systemImage: "rectangle.3.group")
+    Label("Board", systemImage: "rectangle.3.group")
       .scaledFont(.system(.title3, design: .rounded, weight: .semibold))
       .accessibilityAddTraits(.isHeader)
   }
@@ -190,6 +172,34 @@ extension TaskBoardOverviewView {
         headerActionButtons
       }
     }
+  }
+
+  private var boardAccessoryRow: some View {
+    ViewThatFits(in: .horizontal) {
+      HStack(alignment: .center, spacing: HarnessMonitorTheme.spacingMD) {
+        if hasAggregateSummary {
+          aggregateSummaryRow
+        }
+        if hasAggregateSummary && hasHeaderActions {
+          Spacer(minLength: HarnessMonitorTheme.spacingMD)
+        }
+        if hasHeaderActions {
+          headerActions
+        }
+      }
+      VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
+        if hasAggregateSummary {
+          aggregateSummaryRow
+        }
+        if hasHeaderActions {
+          headerActions
+        }
+      }
+    }
+  }
+
+  private var hasHeaderActions: Bool {
+    onCreateTaskBoardItem != nil || onEvaluateTaskBoard != nil || onRefreshTaskBoard != nil
   }
 
   @ViewBuilder private var headerActionButtons: some View {
@@ -269,12 +279,18 @@ extension TaskBoardOverviewView {
 
   private var boardSection: some View {
     VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
-      header
-      if hasBoardContent {
-        taskBoardColumns
-      } else {
-        emptyState
+      if hasAggregateSummary || hasHeaderActions {
+        boardAccessoryRow
       }
+      boardContent
+    }
+  }
+
+  @ViewBuilder private var boardContent: some View {
+    if hasBoardContent {
+      taskBoardColumns
+    } else {
+      emptyState
     }
   }
 
