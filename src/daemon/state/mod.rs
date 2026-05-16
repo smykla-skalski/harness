@@ -22,12 +22,12 @@ pub use audit::{
     read_recent_events,
 };
 pub use config::{
-    DaemonRuntimeConfig, VALID_LOG_LEVELS, load_persisted_log_level, load_runtime_config,
-    load_task_board_git_runtime_config, parse_log_level, persist_log_level,
-    persist_task_board_git_runtime_config, replace_task_board_git_runtime_secrets,
-    replace_task_board_github_tokens, replace_task_board_todoist_token,
-    task_board_git_runtime_profile, task_board_github_repository_token, task_board_github_token,
-    task_board_todoist_token,
+    DaemonRuntimeConfig, VALID_LOG_LEVELS, drain_task_board_git_runtime_secrets,
+    load_persisted_log_level, load_runtime_config, load_task_board_git_runtime_config,
+    parse_log_level, persist_log_level, persist_task_board_git_runtime_config,
+    replace_task_board_git_runtime_secrets, replace_task_board_github_tokens,
+    replace_task_board_todoist_token, task_board_git_runtime_profile,
+    task_board_github_repository_token, task_board_github_token, task_board_todoist_token,
 };
 pub use locks::{acquire_singleton_lock, daemon_lock_is_held, daemon_lock_is_held_at};
 pub use manifest::{clear_manifest_for_pid, load_manifest, load_running_manifest, write_manifest};

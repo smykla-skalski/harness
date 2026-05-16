@@ -272,6 +272,24 @@ pub enum TaskBoardGitSigningVerifyResponse {
     /// Signing was attempted but rejected by the current profile or library.
     Failed { message: String },
 }
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct TaskBoardGitRuntimeDrainSecretsRequest {}
+
+/// One-shot migration response that returns plaintext task-board git secrets
+/// the daemon found on-disk. Callers must persist the payload into their own
+/// secure store (e.g. macOS Keychain) immediately; the daemon writes the
+/// stripped config back before responding.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct TaskBoardGitRuntimeDrainSecretsResponse {
+    /// `true` when the on-disk config still contained plaintext secrets and
+    /// they were drained into `runtime`. `false` means the on-disk config was
+    /// already stripped and `runtime` carries no secret bytes.
+    pub drained: bool,
+    /// Plaintext runtime config covering all scopes that had secrets. Empty
+    /// profiles are omitted via the wire defaults.
+    pub runtime: TaskBoardGitRuntimeConfig,
+}
+
 pub type TaskBoardGitHubTokensSyncResponse = TaskBoardGitHubTokensSyncOutcome;
 pub type TaskBoardTodoistTokenSyncResponse = TaskBoardTodoistTokenSyncOutcome;
 pub type TaskBoardPolicyPipelineResponse = PolicyPipelineDocument;

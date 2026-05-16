@@ -1,10 +1,11 @@
 use crate::daemon::protocol::{
     TaskBoardGitHubTokensSyncRequest, TaskBoardGitHubTokensSyncResponse,
     TaskBoardGitIdentityDefaultsResponse, TaskBoardGitRuntimeConfig,
-    TaskBoardGitRuntimeConfigResponse, TaskBoardGitSigningVerifyRequest,
-    TaskBoardGitSigningVerifyResponse, TaskBoardOrchestratorSettingsResponse,
-    TaskBoardOrchestratorSettingsUpdateRequest, TaskBoardOrchestratorStatusResponse,
-    TaskBoardTodoistTokenSyncRequest, TaskBoardTodoistTokenSyncResponse,
+    TaskBoardGitRuntimeConfigResponse, TaskBoardGitRuntimeDrainSecretsResponse,
+    TaskBoardGitSigningVerifyRequest, TaskBoardGitSigningVerifyResponse,
+    TaskBoardOrchestratorSettingsResponse, TaskBoardOrchestratorSettingsUpdateRequest,
+    TaskBoardOrchestratorStatusResponse, TaskBoardTodoistTokenSyncRequest,
+    TaskBoardTodoistTokenSyncResponse,
 };
 use crate::daemon::service;
 use crate::errors::CliError;
@@ -61,4 +62,9 @@ pub(crate) fn verify_git_signing(
     request: &TaskBoardGitSigningVerifyRequest,
 ) -> Result<TaskBoardGitSigningVerifyResponse, CliError> {
     service::verify_task_board_git_signing(request)
+}
+
+pub(crate) fn drain_git_runtime_secrets()
+-> Result<TaskBoardGitRuntimeDrainSecretsResponse, CliError> {
+    service::drain_task_board_git_runtime_secrets()
 }

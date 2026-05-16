@@ -1,11 +1,14 @@
+use std::fs;
+
 use harness_testkit::with_isolated_harness_env;
 use tempfile::tempdir;
 
 use super::super::{
-    DaemonRuntimeConfig, config_path, load_persisted_log_level, load_runtime_config,
-    load_task_board_git_runtime_config, persist_log_level, persist_task_board_git_runtime_config,
-    read_recent_events, replace_task_board_github_tokens, replace_task_board_todoist_token,
-    task_board_github_token, task_board_todoist_token,
+    DaemonRuntimeConfig, config_path, drain_task_board_git_runtime_secrets,
+    load_persisted_log_level, load_runtime_config, load_task_board_git_runtime_config,
+    persist_log_level, persist_task_board_git_runtime_config, read_recent_events,
+    replace_task_board_github_tokens, replace_task_board_todoist_token, task_board_github_token,
+    task_board_todoist_token,
 };
 use crate::task_board::{
     TaskBoardGitHubRepositoryToken, TaskBoardGitHubTokensSyncRequest, TaskBoardGitRuntimeConfig,
@@ -182,6 +185,104 @@ fn github_token_snapshot_prefers_repository_override() {
         assert_eq!(
             task_board_github_token(Some("other/repo")).as_deref(),
             Some("global-token")
+        );
+    });
+}
+
+#[test]
+fn drain_returns_none_when_disk_config_is_already_stripped() {
+    let tmp = tempdir().expect("tempdir");
+    with_isolated_harness_env(tmp.path(), || {
+        assert!(
+            drain_task_board_git_runtime_secrets()
+                .expect("drain on missing config")
+                .is_none()
+        );
+
+        persist_task_board_git_runtime_config(&TaskBoardGitRuntimeConfig {
+            global: TaskBoardGitRuntimeProfile {
+                author_name: Some("Bot".into()),
+                ssh_private_key: Some("stripped-on-persist".into()),
+                ..Default::default()
+            },
+            repository_overrides: vec![],
+        })
+        .expect("persist stripped config");
+
+        assert!(
+            drain_task_board_git_runtime_secrets()
+                .expect("drain on stripped config")
+                .is_none()
+        );
+    });
+}
+
+#[test]
+fn drain_returns_secrets_and_persists_stripped_when_disk_has_plaintext() {
+    let tmp = tempdir().expect("tempdir");
+    with_isolated_harness_env(tmp.path(), || {
+        let raw_disk = serde_json::json!({
+            "task_board_git_runtime_config": {
+                "global": {
+                    "author_name": "Bot",
+                    "ssh_private_key": "global-ssh-secret",
+                    "ssh_private_key_passphrase": "global-pass",
+                    "signing": {
+                        "mode": "gpg",
+                        "gpg_private_key": "global-gpg-secret",
+                        "gpg_private_key_passphrase": "gpg-pass"
+                    }
+                },
+                "repository_overrides": [
+                    {
+                        "repository": "owner/repo",
+                        "profile": {
+                            "ssh_private_key": "repo-ssh-secret"
+                        }
+                    }
+                ]
+            }
+        });
+        fs::create_dir_all(config_path().parent().expect("parent")).expect("mkdir");
+        fs::write(
+            config_path(),
+            serde_json::to_string_pretty(&raw_disk).expect("encode"),
+        )
+        .expect("write raw config");
+
+        let drained = drain_task_board_git_runtime_secrets()
+            .expect("drain on plaintext config")
+            .expect("drain returns secrets");
+        assert_eq!(
+            drained.global.ssh_private_key.as_deref(),
+            Some("global-ssh-secret")
+        );
+        assert_eq!(
+            drained.global.signing.gpg_private_key.as_deref(),
+            Some("global-gpg-secret")
+        );
+        assert_eq!(drained.repository_overrides.len(), 1);
+        assert_eq!(
+            drained.repository_overrides[0].profile.ssh_private_key.as_deref(),
+            Some("repo-ssh-secret")
+        );
+
+        let after = load_task_board_git_runtime_config()
+            .expect("load post-drain config");
+        assert!(after.global.ssh_private_key.is_none());
+        assert!(after.global.signing.gpg_private_key.is_none());
+        assert!(
+            after
+                .repository_overrides
+                .iter()
+                .all(|over| over.profile.ssh_private_key.is_none())
+        );
+
+        assert!(
+            drain_task_board_git_runtime_secrets()
+                .expect("drain again")
+                .is_none(),
+            "drain should be idempotent once disk is stripped"
         );
     });
 }

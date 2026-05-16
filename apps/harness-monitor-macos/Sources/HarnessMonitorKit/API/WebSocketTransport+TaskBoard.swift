@@ -213,6 +213,13 @@ extension WebSocketTransport {
     return try decode(value)
   }
 
+  public func drainTaskBoardGitRuntimeSecrets() async throws
+    -> TaskBoardGitRuntimeDrainSecretsResponse
+  {
+    let value = try await rpc(method: .taskBoardGitRuntimeDrainSecrets)
+    return try decode(value)
+  }
+
   public func taskBoardPolicyPipeline() async throws -> TaskBoardPolicyPipelineDocument {
     let value = try await rpc(method: .taskBoardPolicyPipelineGet)
     return try decode(value)

@@ -77,6 +77,9 @@ pub(crate) async fn dispatch_task_board_method(
         ws_methods::TASK_BOARD_GIT_SIGNING_VERIFY => {
             Some(dispatch_task_board_git_signing_verify(request))
         }
+        ws_methods::TASK_BOARD_GIT_RUNTIME_DRAIN_SECRETS => {
+            Some(dispatch_task_board_git_runtime_drain_secrets(request))
+        }
         ws_methods::TASK_BOARD_POLICY_PIPELINE_GET => {
             Some(dispatch_task_board_policy_pipeline_get(request))
         }
@@ -322,6 +325,13 @@ fn dispatch_task_board_git_signing_verify(request: &WsRequest) -> WsResponse {
     )
 }
 
+fn dispatch_task_board_git_runtime_drain_secrets(request: &WsRequest) -> WsResponse {
+    dispatch_query_result(
+        &request.id,
+        task_board_route_executor::drain_git_runtime_secrets(),
+    )
+}
+
 fn dispatch_task_board_policy_pipeline_get(request: &WsRequest) -> WsResponse {
     dispatch_query_result(&request.id, task_board_route_executor::policy_pipeline())
 }
@@ -398,6 +408,7 @@ const TASK_BOARD_WS_METHOD_CATALOG: &[&str] = &[
     ws_methods::TASK_BOARD_ORCHESTRATOR_TODOIST_TOKEN_SYNC,
     ws_methods::TASK_BOARD_GIT_IDENTITY_DEFAULTS,
     ws_methods::TASK_BOARD_GIT_SIGNING_VERIFY,
+    ws_methods::TASK_BOARD_GIT_RUNTIME_DRAIN_SECRETS,
     ws_methods::TASK_BOARD_POLICY_PIPELINE_GET,
     ws_methods::TASK_BOARD_POLICY_PIPELINE_SAVE_DRAFT,
     ws_methods::TASK_BOARD_POLICY_PIPELINE_SIMULATE,

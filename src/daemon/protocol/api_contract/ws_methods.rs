@@ -73,6 +73,7 @@ pub const TASK_BOARD_ORCHESTRATOR_TODOIST_TOKEN_SYNC: &str =
     "task_board.orchestrator_todoist_token_sync";
 pub const TASK_BOARD_GIT_IDENTITY_DEFAULTS: &str = "task_board.git_identity_defaults";
 pub const TASK_BOARD_GIT_SIGNING_VERIFY: &str = "task_board.git_signing_verify";
+pub const TASK_BOARD_GIT_RUNTIME_DRAIN_SECRETS: &str = "task_board.git_runtime_drain_secrets";
 pub const TASK_BOARD_POLICY_PIPELINE_GET: &str = "task_board.policy_pipeline_get";
 pub const TASK_BOARD_POLICY_PIPELINE_SAVE_DRAFT: &str = "task_board.policy_pipeline_save_draft";
 pub const TASK_BOARD_POLICY_PIPELINE_SIMULATE: &str = "task_board.policy_pipeline_simulate";

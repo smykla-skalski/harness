@@ -218,6 +218,14 @@ async fn run_task_board_orchestrator_parity() {
     assert_http_ws_post_match(
         &client,
         &base_url,
+        http_paths::TASK_BOARD_GIT_RUNTIME_DRAIN_SECRETS,
+        ws_methods::TASK_BOARD_GIT_RUNTIME_DRAIN_SECRETS,
+        json!({}),
+    )
+    .await;
+    assert_http_ws_post_match(
+        &client,
+        &base_url,
         http_paths::TASK_BOARD_ORCHESTRATOR_STOP,
         ws_methods::TASK_BOARD_ORCHESTRATOR_STOP,
         json!({}),

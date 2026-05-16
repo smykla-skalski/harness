@@ -242,6 +242,14 @@ pub(crate) const ROUTES: &[HttpApiRouteContract] = &[
         swift_client_exposed: true,
     },
     HttpApiRouteContract {
+        method: HttpRouteMethod::Post,
+        path: http_paths::TASK_BOARD_GIT_RUNTIME_DRAIN_SECRETS,
+        parity: HttpRouteParity::Rpc {
+            ws_method: ws_methods::TASK_BOARD_GIT_RUNTIME_DRAIN_SECRETS,
+        },
+        swift_client_exposed: true,
+    },
+    HttpApiRouteContract {
         method: HttpRouteMethod::Get,
         path: http_paths::TASK_BOARD_POLICY_PIPELINE,
         parity: HttpRouteParity::Rpc {

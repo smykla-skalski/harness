@@ -97,6 +97,13 @@ extension RecordingHarnessClient {
     return lock.withLock { taskBoardGitSigningVerifyValue }
   }
 
+  func drainTaskBoardGitRuntimeSecrets() async throws
+    -> TaskBoardGitRuntimeDrainSecretsResponse
+  {
+    calls.append(.drainTaskBoardGitRuntimeSecrets)
+    return lock.withLock { taskBoardGitRuntimeDrainSecretsValue }
+  }
+
   func sampleTaskBoardOrchestratorStatus(
     enabled: Bool = true,
     running: Bool = false

@@ -1,7 +1,8 @@
 use std::collections::BTreeSet;
 
 use crate::daemon::protocol::{
-    TaskBoardGitSigningVerifyRequest, TaskBoardGitSigningVerifyResponse,
+    TaskBoardGitRuntimeDrainSecretsResponse, TaskBoardGitSigningVerifyRequest,
+    TaskBoardGitSigningVerifyResponse,
 };
 use crate::daemon::state;
 use crate::errors::{CliError, CliErrorKind};
@@ -65,6 +66,28 @@ pub fn verify_task_board_git_signing(
         SigningVerifyOutcome::Failed { message } => {
             TaskBoardGitSigningVerifyResponse::Failed { message }
         }
+    })
+}
+
+/// One-shot migration drain: if the on-disk daemon runtime config still
+/// carries plaintext task-board git secrets, return them so callers (the
+/// macOS app) can move them into the platform secure store, and write a
+/// stripped version back to disk.
+///
+/// # Errors
+/// Returns `CliError` when the daemon runtime config exists but cannot be
+/// parsed or the stripped version cannot be written back.
+pub fn drain_task_board_git_runtime_secrets()
+-> Result<TaskBoardGitRuntimeDrainSecretsResponse, CliError> {
+    Ok(match state::drain_task_board_git_runtime_secrets()? {
+        Some(runtime) => TaskBoardGitRuntimeDrainSecretsResponse {
+            drained: true,
+            runtime,
+        },
+        None => TaskBoardGitRuntimeDrainSecretsResponse {
+            drained: false,
+            runtime: TaskBoardGitRuntimeConfig::default(),
+        },
     })
 }
 

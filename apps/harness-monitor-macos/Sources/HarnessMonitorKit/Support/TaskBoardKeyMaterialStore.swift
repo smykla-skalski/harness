@@ -1,3 +1,4 @@
+import CryptoKit
 import Foundation
 import Security
 
@@ -66,11 +67,9 @@ public struct TaskBoardKeyMaterialStore: Sendable {
     }
 
     private static func hashRepository(_ slug: String) -> String {
-      var hasher = Hasher()
-      hasher.combine(slug.lowercased())
-      let raw = hasher.finalize()
-      let unsigned = UInt64(bitPattern: Int64(raw))
-      return String(unsigned, radix: 16)
+      let normalized = slug.lowercased()
+      let digest = Insecure.SHA1.hash(data: Data(normalized.utf8))
+      return digest.map { String(format: "%02x", $0) }.joined()
     }
   }
 

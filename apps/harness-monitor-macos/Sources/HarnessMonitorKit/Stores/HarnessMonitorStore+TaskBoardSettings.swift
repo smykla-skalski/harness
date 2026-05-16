@@ -6,9 +6,13 @@ extension HarnessMonitorStore {
   private static let taskBoardSshKeyStore = TaskBoardKeyMaterialStore(kind: .ssh)
   private static let taskBoardSigningSshKeyStore = TaskBoardKeyMaterialStore(kind: .signingSsh)
   private static let taskBoardGpgKeyStore = TaskBoardKeyMaterialStore(kind: .gpg)
+  private static let taskBoardRuntimeSecretsMigrationKey =
+    "io.harnessmonitor.taskboard.runtime-secrets-migrated"
 
   public func taskBoardGitSettingsSnapshot() async throws -> TaskBoardGitSettingsSnapshot {
     let client = try await taskBoardSettingsClient()
+
+    await Self.migrateRuntimeSecretsIfNeeded(client: client)
 
     async let orchestratorSettings = client.taskBoardOrchestratorSettings()
     async let runtimeConfig = client.taskBoardGitRuntimeConfig()
@@ -31,60 +35,89 @@ extension HarnessMonitorStore {
   private static func hydrateKeyMaterial(
     into runtime: TaskBoardGitRuntimeConfig
   ) -> TaskBoardGitRuntimeConfig {
-    let ssh = (try? taskBoardSshKeyStore.load(scope: .global)) ?? TaskBoardKeyMaterialSnapshot()
-    let signingSsh =
-      (try? taskBoardSigningSshKeyStore.load(scope: .global)) ?? TaskBoardKeyMaterialSnapshot()
-    let gpg = (try? taskBoardGpgKeyStore.load(scope: .global)) ?? TaskBoardKeyMaterialSnapshot()
-
-    let signing = TaskBoardGitSigningConfig(
-      mode: runtime.global.signing.mode,
-      sshKeyPath: runtime.global.signing.sshKeyPath,
-      sshPrivateKey: signingSsh.privateKey ?? runtime.global.signing.sshPrivateKey,
-      sshPrivateKeyPassphrase: signingSsh.passphrase
-        ?? runtime.global.signing.sshPrivateKeyPassphrase,
-      gpgKeyId: runtime.global.signing.gpgKeyId,
-      gpgPrivateKeyPath: runtime.global.signing.gpgPrivateKeyPath,
-      gpgPrivateKey: gpg.privateKey ?? runtime.global.signing.gpgPrivateKey,
-      gpgPrivateKeyPassphrase: gpg.passphrase ?? runtime.global.signing.gpgPrivateKeyPassphrase
-    )
-    let global = TaskBoardGitRuntimeProfile(
-      authorName: runtime.global.authorName,
-      authorEmail: runtime.global.authorEmail,
-      sshKeyPath: runtime.global.sshKeyPath,
-      sshPrivateKey: ssh.privateKey ?? runtime.global.sshPrivateKey,
-      sshPrivateKeyPassphrase: ssh.passphrase ?? runtime.global.sshPrivateKeyPassphrase,
-      signing: signing
-    )
-    return TaskBoardGitRuntimeConfig(
-      global: global,
-      repositoryOverrides: runtime.repositoryOverrides
+    TaskBoardGitRuntimeConfig(
+      global: hydrateProfile(runtime.global, scope: .global),
+      repositoryOverrides: runtime.repositoryOverrides.map { override in
+        TaskBoardGitRepositoryOverride(
+          repository: override.repository,
+          profile: hydrateProfile(
+            override.profile,
+            scope: .repository(override.repository)
+          )
+        )
+      }
     )
   }
 
-  private static func persistGlobalKeyMaterial(
+  private static func hydrateProfile(
+    _ profile: TaskBoardGitRuntimeProfile,
+    scope: TaskBoardKeyMaterialStore.Scope
+  ) -> TaskBoardGitRuntimeProfile {
+    let ssh = (try? taskBoardSshKeyStore.load(scope: scope)) ?? TaskBoardKeyMaterialSnapshot()
+    let signingSsh =
+      (try? taskBoardSigningSshKeyStore.load(scope: scope)) ?? TaskBoardKeyMaterialSnapshot()
+    let gpg = (try? taskBoardGpgKeyStore.load(scope: scope)) ?? TaskBoardKeyMaterialSnapshot()
+
+    let signing = TaskBoardGitSigningConfig(
+      mode: profile.signing.mode,
+      sshKeyPath: profile.signing.sshKeyPath,
+      sshPrivateKey: signingSsh.privateKey ?? profile.signing.sshPrivateKey,
+      sshPrivateKeyPassphrase: signingSsh.passphrase ?? profile.signing.sshPrivateKeyPassphrase,
+      gpgKeyId: profile.signing.gpgKeyId,
+      gpgPrivateKeyPath: profile.signing.gpgPrivateKeyPath,
+      gpgPrivateKey: gpg.privateKey ?? profile.signing.gpgPrivateKey,
+      gpgPrivateKeyPassphrase: gpg.passphrase ?? profile.signing.gpgPrivateKeyPassphrase
+    )
+    return TaskBoardGitRuntimeProfile(
+      authorName: profile.authorName,
+      authorEmail: profile.authorEmail,
+      sshKeyPath: profile.sshKeyPath,
+      sshPrivateKey: ssh.privateKey ?? profile.sshPrivateKey,
+      sshPrivateKeyPassphrase: ssh.passphrase ?? profile.sshPrivateKeyPassphrase,
+      signing: signing
+    )
+  }
+
+  private static func persistKeyMaterial(
     runtime: TaskBoardGitRuntimeConfig
+  ) throws {
+    try persistProfileKeyMaterial(runtime.global, scope: .global)
+    for override in runtime.repositoryOverrides {
+      try persistProfileKeyMaterial(
+        override.profile,
+        scope: .repository(override.repository)
+      )
+    }
+  }
+
+  private static func persistProfileKeyMaterial(
+    _ profile: TaskBoardGitRuntimeProfile,
+    scope: TaskBoardKeyMaterialStore.Scope
   ) throws {
     try taskBoardSshKeyStore.save(
       TaskBoardKeyMaterialSnapshot(
-        privateKey: runtime.global.sshPrivateKey,
-        passphrase: runtime.global.sshPrivateKeyPassphrase,
-        keyPath: runtime.global.sshKeyPath
-      )
+        privateKey: profile.sshPrivateKey,
+        passphrase: profile.sshPrivateKeyPassphrase,
+        keyPath: profile.sshKeyPath
+      ),
+      scope: scope
     )
     try taskBoardSigningSshKeyStore.save(
       TaskBoardKeyMaterialSnapshot(
-        privateKey: runtime.global.signing.sshPrivateKey,
-        passphrase: runtime.global.signing.sshPrivateKeyPassphrase,
-        keyPath: runtime.global.signing.sshKeyPath
-      )
+        privateKey: profile.signing.sshPrivateKey,
+        passphrase: profile.signing.sshPrivateKeyPassphrase,
+        keyPath: profile.signing.sshKeyPath
+      ),
+      scope: scope
     )
     try taskBoardGpgKeyStore.save(
       TaskBoardKeyMaterialSnapshot(
-        privateKey: runtime.global.signing.gpgPrivateKey,
-        passphrase: runtime.global.signing.gpgPrivateKeyPassphrase,
-        keyPath: runtime.global.signing.gpgPrivateKeyPath,
-        keyId: runtime.global.signing.gpgKeyId
-      )
+        privateKey: profile.signing.gpgPrivateKey,
+        passphrase: profile.signing.gpgPrivateKeyPassphrase,
+        keyPath: profile.signing.gpgPrivateKeyPath,
+        keyId: profile.signing.gpgKeyId
+      ),
+      scope: scope
     )
   }
 
@@ -95,6 +128,26 @@ extension HarnessMonitorStore {
       return try await client.taskBoardGitIdentityDefaults()
     } catch {
       return TaskBoardGitIdentityDefaults()
+    }
+  }
+
+  private static func migrateRuntimeSecretsIfNeeded(
+    client: any HarnessMonitorClientProtocol,
+    userDefaults: UserDefaults = .standard
+  ) async {
+    guard !userDefaults.bool(forKey: taskBoardRuntimeSecretsMigrationKey) else {
+      return
+    }
+    do {
+      let response = try await client.drainTaskBoardGitRuntimeSecrets()
+      if response.drained {
+        try persistKeyMaterial(runtime: response.runtime)
+      }
+      userDefaults.set(true, forKey: taskBoardRuntimeSecretsMigrationKey)
+    } catch {
+      // Older daemons (wire version 1) don't expose the drain endpoint; the
+      // version-skew banner already tells the user to upgrade. Leave the
+      // migration flag unset so we retry on the next snapshot fetch.
     }
   }
 
@@ -165,7 +218,7 @@ extension HarnessMonitorStore {
       do {
         try Self.taskBoardGitHubCredentialStore.save(materializedSnapshot.githubCredentials)
         try Self.taskBoardTodoistCredentialStore.save(materializedSnapshot.todoistCredentials)
-        try Self.persistGlobalKeyMaterial(runtime: materializedSnapshot.runtimeConfig)
+        try Self.persistKeyMaterial(runtime: materializedSnapshot.runtimeConfig)
       } catch {
         presentFailureFeedback(
           """
