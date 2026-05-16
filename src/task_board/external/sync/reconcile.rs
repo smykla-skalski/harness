@@ -1,7 +1,5 @@
 use crate::errors::CliError;
-use crate::task_board::external::{
-    ExternalProvider, ExternalSyncConflictPolicy, ExternalTask,
-};
+use crate::task_board::external::{ExternalProvider, ExternalSyncConflictPolicy, ExternalTask};
 use crate::task_board::store::{OptionalFieldPatch, TaskBoardItemPatch, TaskBoardStore};
 use crate::task_board::types::{ExternalRef, TaskBoardItem};
 
@@ -97,10 +95,7 @@ fn has_reconciliation_change(patch: &TaskBoardItemPatch) -> bool {
         || patch.external_refs.is_some()
 }
 
-fn reconciled_external_refs(
-    item: &TaskBoardItem,
-    task: &ExternalTask,
-) -> Option<Vec<ExternalRef>> {
+fn reconciled_external_refs(item: &TaskBoardItem, task: &ExternalTask) -> Option<Vec<ExternalRef>> {
     let reference = &task.reference;
     let mut changed = false;
     let next_sync_state = Some(sync_state_from_task(task));

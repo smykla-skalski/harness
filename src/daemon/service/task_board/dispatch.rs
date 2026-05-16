@@ -98,11 +98,9 @@ fn build_dispatch_plans_for_request(
     let items = selected_items(board, request)?;
     let (kept, rejected) = filter_for_local_machine(items, board);
     let mut plans = build_dispatch_summary_with_policy_root(&kept, board.root());
-    plans.extend(
-        rejected
-            .iter()
-            .map(|(item, machine)| machine_mismatch_plan_with_policy_root(item, machine, board.root())),
-    );
+    plans.extend(rejected.iter().map(|(item, machine)| {
+        machine_mismatch_plan_with_policy_root(item, machine, board.root())
+    }));
     Ok(plans)
 }
 
@@ -337,8 +335,8 @@ fn new_policy_trace_id() -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::task_board::{DispatchBlockReason, DispatchReadiness, MachineRegistry};
     use crate::task_board::planning::{approve_plan, submit_plan};
+    use crate::task_board::{DispatchBlockReason, DispatchReadiness, MachineRegistry};
     use tempfile::tempdir;
 
     fn seed_item(board: &TaskBoardStore, id: &str, project_type: Option<&str>) {

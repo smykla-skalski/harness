@@ -60,7 +60,10 @@ where
             captured: &mut captured,
         };
         event.record(&mut visitor);
-        self.events.lock().expect("event capture lock").push(captured);
+        self.events
+            .lock()
+            .expect("event capture lock")
+            .push(captured);
     }
 }
 

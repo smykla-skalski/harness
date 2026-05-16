@@ -305,7 +305,10 @@ fn dispatch_task_board_orchestrator_todoist_token_sync(request: &WsRequest) -> W
     let Ok(body) = parse_params::<TaskBoardTodoistTokenSyncRequest>(request) else {
         return invalid_params(request);
     };
-    dispatch_query_result(&request.id, task_board_route_executor::sync_todoist_token(&body))
+    dispatch_query_result(
+        &request.id,
+        task_board_route_executor::sync_todoist_token(&body),
+    )
 }
 
 fn dispatch_task_board_git_identity_defaults(request: &WsRequest) -> WsResponse {

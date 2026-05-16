@@ -187,8 +187,7 @@ mod tests {
     use crate::daemon::codex_controller::CodexControllerHandle;
     use crate::daemon::db::DaemonDb;
     use crate::daemon::http::{
-        AsyncDaemonDbSlot, DaemonHttpState, ManagedAgentMutationLocks,
-        connect_async_db_for_tests,
+        AsyncDaemonDbSlot, DaemonHttpState, ManagedAgentMutationLocks, connect_async_db_for_tests,
     };
     use crate::daemon::state::{DaemonManifest, HostBridgeManifest};
     use crate::daemon::websocket::ReplayBuffer;

@@ -23,7 +23,9 @@ use crate::task_board::{
     build_project_summaries, build_sync_summary, configured_sync_clients, default_board_root,
     sync_external_tasks,
 };
-use crate::task_board::{PlanningTransition, approve_plan, begin_planning, revoke_plan, submit_plan};
+use crate::task_board::{
+    PlanningTransition, approve_plan, begin_planning, revoke_plan, submit_plan,
+};
 use crate::workspace::utc_now;
 
 use super::task_board_runtime::external_sync_config_for_repository;
@@ -388,22 +390,20 @@ fn active_external_sync_config() -> ExternalSyncConfig {
     let settings = TaskBoardOrchestrator::new(default_board_root())
         .settings()
         .ok();
-    let (repository, inbox_repositories, github_labels, todoist_projects) = settings
-        .map_or_else(
-            || (None, Vec::new(), Vec::new(), Vec::new()),
-            |settings| {
-                let project = &settings.github_project;
-                let repository =
-                    (!project.owner.trim().is_empty() && !project.repo.trim().is_empty())
-                        .then(|| project.repository_slug());
-                (
-                    repository,
-                    settings.github_inbox.repositories.clone(),
-                    settings.github_inbox.label_filter.clone(),
-                    settings.todoist_inbox.project_filter.clone(),
-                )
-            },
-        );
+    let (repository, inbox_repositories, github_labels, todoist_projects) = settings.map_or_else(
+        || (None, Vec::new(), Vec::new(), Vec::new()),
+        |settings| {
+            let project = &settings.github_project;
+            let repository = (!project.owner.trim().is_empty() && !project.repo.trim().is_empty())
+                .then(|| project.repository_slug());
+            (
+                repository,
+                settings.github_inbox.repositories.clone(),
+                settings.github_inbox.label_filter.clone(),
+                settings.todoist_inbox.project_filter.clone(),
+            )
+        },
+    );
     external_sync_config_for_repository(repository.as_deref(), &inbox_repositories)
         .with_github_import_labels_override(&github_labels)
         .with_todoist_import_project_ids_override(&todoist_projects)

@@ -15,8 +15,8 @@ mod sync;
 mod todoist;
 
 pub use capabilities::{
-    ExternalProviderCapabilities, ExternalSyncConflictPolicy, ExternalSyncField, ExternalTaskUpdate,
-    ExternalUpdateOutcome,
+    ExternalProviderCapabilities, ExternalSyncConflictPolicy, ExternalSyncField,
+    ExternalTaskUpdate, ExternalUpdateOutcome,
 };
 pub use github::{GitHubInboxSyncClient, GitHubSyncClient};
 pub use sync::{
