@@ -19,13 +19,23 @@ private struct SessionPendingDecisionBannerPreferenceState: Equatable {
 }
 
 struct SessionBannerStackModel: Equatable {
-  let showsPersistenceError: Bool
-  let showsStaleData: Bool
-  let showsMCPStatus: Bool
-  let showsACPBridge: Bool
+  let showsContentChrome: Bool
   let showsLoading: Bool
   let showsPendingDecisionBanner: Bool
   let pendingDecisionCount: Int
+
+  init(
+    contentChrome: ContentChromeBannerModel,
+    isLoading: Bool,
+    hasSnapshot: Bool,
+    showsPendingDecisionBanner: Bool,
+    pendingDecisionCount: Int
+  ) {
+    showsContentChrome = contentChrome.isPresented
+    showsLoading = isLoading && !hasSnapshot
+    self.showsPendingDecisionBanner = showsPendingDecisionBanner
+    self.pendingDecisionCount = pendingDecisionCount
+  }
 
   init(
     persistenceError: String?,
@@ -37,20 +47,22 @@ struct SessionBannerStackModel: Equatable {
     showsPendingDecisionBanner: Bool,
     pendingDecisionCount: Int
   ) {
-    showsPersistenceError = persistenceError != nil
-    showsStaleData = sessionDataAvailability != .live
-    showsMCPStatus = mcpStatus.shouldShowChromeBanner
-    showsACPBridge = hasACPBridgeBanner
-    showsLoading = isLoading && !hasSnapshot
-    self.showsPendingDecisionBanner = showsPendingDecisionBanner
-    self.pendingDecisionCount = pendingDecisionCount
+    self.init(
+      contentChrome: ContentChromeBannerModel(
+        persistenceError: persistenceError,
+        sessionDataAvailability: sessionDataAvailability,
+        mcpStatus: mcpStatus,
+        hasACPBridgeBanner: hasACPBridgeBanner
+      ),
+      isLoading: isLoading,
+      hasSnapshot: hasSnapshot,
+      showsPendingDecisionBanner: showsPendingDecisionBanner,
+      pendingDecisionCount: pendingDecisionCount
+    )
   }
 
   var isPresented: Bool {
-    showsPersistenceError
-      || showsStaleData
-      || showsMCPStatus
-      || showsACPBridge
+    showsContentChrome
       || showsLoading
       || (showsPendingDecisionBanner && pendingDecisionCount > 0)
   }
@@ -108,12 +120,18 @@ public struct SessionBannerStack<Content: View>: View {
     store.contentUI.chrome
   }
 
-  private var model: SessionBannerStackModel {
-    SessionBannerStackModel(
+  private var chromeBannerModel: ContentChromeBannerModel {
+    ContentChromeBannerModel(
       persistenceError: chrome.persistenceError,
       sessionDataAvailability: chrome.sessionDataAvailability,
       mcpStatus: chrome.mcpStatus,
-      hasACPBridgeBanner: chrome.acpBridgeBanner != nil,
+      hasACPBridgeBanner: chrome.acpBridgeBanner != nil
+    )
+  }
+
+  private var model: SessionBannerStackModel {
+    SessionBannerStackModel(
+      contentChrome: chromeBannerModel,
       isLoading: isLoading,
       hasSnapshot: hasSnapshot,
       showsPendingDecisionBanner:
@@ -151,30 +169,14 @@ public struct SessionBannerStack<Content: View>: View {
 
   @ViewBuilder private var topChrome: some View {
     VStack(spacing: 0) {
-      if let persistenceError = chrome.persistenceError {
-        PersistenceUnavailableBanner(message: persistenceError)
-        chromeDivider(tint: HarnessMonitorTheme.caution)
-      }
-      if chrome.sessionDataAvailability != .live {
-        SessionDataAvailabilityBanner(availability: chrome.sessionDataAvailability)
-        chromeDivider(tint: HarnessMonitorTheme.caution)
-      }
+      ContentChromeBannerStack(
+        store: store,
+        contentChrome: chrome,
+        windowID: HarnessMonitorWindowID.sessionWindow(sessionID)
+      )
       if model.showsLoading {
         SessionLoadingBanner()
         chromeDivider(tint: HarnessMonitorTheme.accent)
-      }
-      if chrome.mcpStatus.shouldShowChromeBanner {
-        MCPStatusBanner(status: chrome.mcpStatus)
-        chromeDivider(tint: MCPStatusViewSupport.tint(for: chrome.mcpStatus.tone))
-      }
-      if chrome.acpBridgeBanner != nil {
-        AcpBridgeBannerBridge(
-          store: store,
-          contentChrome: chrome,
-          keyWindowObserver: nil,
-          windowID: HarnessMonitorWindowID.sessionWindow(sessionID)
-        )
-        chromeDivider(tint: HarnessMonitorTheme.caution)
       }
       if model.showsPendingDecisionBanner && pendingDecisionCount > 0 {
         SessionDecisionAttentionBanner(

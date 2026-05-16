@@ -29,7 +29,8 @@ final class HarnessMonitorUITests: HarnessMonitorUITestCase {
     )
 
     let persistenceBanner = element(in: app, identifier: Accessibility.persistenceBanner)
-    let sessionRow = previewSessionTrigger(in: app)
+    let sessionCardIdentifier = Accessibility.dashboardSessionCard("sess1234")
+    let sessionRow = sessionTrigger(in: app, identifier: sessionCardIdentifier)
     let clearSearchHistoryButton = element(
       in: app,
       identifier: Accessibility.sidebarClearSearchHistoryButton
@@ -39,7 +40,7 @@ final class HarnessMonitorUITests: HarnessMonitorUITestCase {
     XCTAssertTrue(sessionRow.waitForExistence(timeout: Self.actionTimeout))
     XCTAssertFalse(clearSearchHistoryButton.exists)
 
-    tapPreviewSession(in: app)
+    tapSession(in: app, identifier: sessionCardIdentifier)
     tapButton(in: app, identifier: Accessibility.taskUICard)
 
     let notesUnavailable = element(in: app, identifier: Accessibility.sessionTaskNotesUnavailable)
