@@ -192,6 +192,7 @@ final class AuditRunnerEnvironmentTests: AuditTempDirectoryTestCase {
         let mirrorDaemonRoot = dataHome.launchDataHome
             .appendingPathComponent("harness", isDirectory: true)
             .appendingPathComponent("daemon", isDirectory: true)
+            .appendingPathComponent(AuditRunner.auditTargetOwnershipSegment, isDirectory: true)
         let mirrorManifestURL = mirrorDaemonRoot.appendingPathComponent("manifest.json")
         let mirrorTokenURL = mirrorDaemonRoot.appendingPathComponent("auth-token")
         let mirrorManifestData = try Data(contentsOf: mirrorManifestURL)
@@ -205,6 +206,54 @@ final class AuditRunnerEnvironmentTests: AuditTempDirectoryTestCase {
         let permissions = try FileManager.default
             .attributesOfItem(atPath: mirrorTokenURL.path)[.posixPermissions] as? NSNumber
         XCTAssertEqual(permissions?.intValue ?? 0, 0o600)
+    }
+
+    func testAuditDaemonDataHomeMirrorsExternalManifestFromPartitionedSource() throws {
+        let sourceDataHome = workDir.appendingPathComponent("source-data-home", isDirectory: true)
+        let sourceDaemonRoot = sourceDataHome
+            .appendingPathComponent("harness", isDirectory: true)
+            .appendingPathComponent("daemon", isDirectory: true)
+            .appendingPathComponent("external", isDirectory: true)
+        try FileManager.default.createDirectory(at: sourceDaemonRoot, withIntermediateDirectories: true)
+        let sourceTokenURL = sourceDaemonRoot.appendingPathComponent("auth-token")
+        try Data("secret-token".utf8).write(to: sourceTokenURL)
+        let sourceManifestURL = sourceDaemonRoot.appendingPathComponent("manifest.json")
+        try Data("""
+        {
+          "endpoint": "http://127.0.0.1:60385",
+          "ownership": "external",
+          "pid": 123,
+          "started_at": "2026-05-16T15:55:53Z",
+          "token_path": "\(sourceTokenURL.path)",
+          "version": "35.3.0"
+        }
+        """.utf8).write(to: sourceManifestURL)
+
+        let runDir = workDir.appendingPathComponent("audit-run", isDirectory: true)
+        let dataHome = try AuditRunner.auditDaemonDataHome(
+            runDir: runDir,
+            templateSlug: "swiftui",
+            scenario: "dashboard-live-interact",
+            defaultEnvironment: [
+                "HARNESS_MONITOR_LAUNCH_MODE": "live",
+                "HARNESS_MONITOR_EXTERNAL_DAEMON": "1",
+            ],
+            processEnvironment: [
+                AuditRunner.daemonDataHomeOverrideEnvironmentKey: sourceDataHome.path,
+            ]
+        )
+
+        XCTAssertTrue(dataHome.mirroredManifest)
+        let mirrorDaemonRoot = dataHome.launchDataHome
+            .appendingPathComponent("harness", isDirectory: true)
+            .appendingPathComponent("daemon", isDirectory: true)
+            .appendingPathComponent(AuditRunner.auditTargetOwnershipSegment, isDirectory: true)
+        let mirrorManifestURL = mirrorDaemonRoot.appendingPathComponent("manifest.json")
+        XCTAssertTrue(FileManager.default.fileExists(atPath: mirrorManifestURL.path))
+        let mirrorManifest = try XCTUnwrap(
+            JSONSerialization.jsonObject(with: Data(contentsOf: mirrorManifestURL)) as? [String: Any]
+        )
+        XCTAssertEqual(mirrorManifest["endpoint"] as? String, "http://127.0.0.1:60385")
     }
 
     func testDaemonDataHomeProbeCapturesRealDatabaseEvidence() throws {
