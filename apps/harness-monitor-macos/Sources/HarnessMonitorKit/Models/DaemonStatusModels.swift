@@ -80,6 +80,10 @@ public struct HealthResponse: Codable, Equatable, Sendable {
   public let projectCount: Int
   public let worktreeCount: Int
   public let sessionCount: Int
+  /// Daemon HTTP/WS wire-protocol version. Old daemons that predate the field
+  /// decode as `1`; new daemons emit the current value of
+  /// `DAEMON_WIRE_VERSION`. The app uses this to detect version skew.
+  public let wireVersion: Int
 
   public init(
     status: String,
@@ -90,7 +94,8 @@ public struct HealthResponse: Codable, Equatable, Sendable {
     logLevel: String? = nil,
     projectCount: Int,
     worktreeCount: Int = 0,
-    sessionCount: Int
+    sessionCount: Int,
+    wireVersion: Int = 1
   ) {
     self.status = status
     self.version = version
@@ -101,11 +106,12 @@ public struct HealthResponse: Codable, Equatable, Sendable {
     self.projectCount = projectCount
     self.worktreeCount = worktreeCount
     self.sessionCount = sessionCount
+    self.wireVersion = wireVersion
   }
 
   enum CodingKeys: String, CodingKey {
     case status, version, pid, endpoint, startedAt, logLevel, projectCount, worktreeCount,
-      sessionCount
+      sessionCount, wireVersion
   }
 
   public init(from decoder: Decoder) throws {
@@ -119,7 +125,8 @@ public struct HealthResponse: Codable, Equatable, Sendable {
       logLevel: try container.decodeIfPresent(String.self, forKey: .logLevel),
       projectCount: try container.decode(Int.self, forKey: .projectCount),
       worktreeCount: try container.decodeIfPresent(Int.self, forKey: .worktreeCount) ?? 0,
-      sessionCount: try container.decode(Int.self, forKey: .sessionCount)
+      sessionCount: try container.decode(Int.self, forKey: .sessionCount),
+      wireVersion: try container.decodeIfPresent(Int.self, forKey: .wireVersion) ?? 1
     )
   }
 }

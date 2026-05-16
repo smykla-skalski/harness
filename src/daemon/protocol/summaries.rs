@@ -12,6 +12,10 @@ use crate::session::types::{
     WorkItem,
 };
 
+/// Daemon HTTP/WS wire-protocol version. Increment on a breaking schema
+/// change so the Mac app can detect version skew on connect.
+pub const DAEMON_WIRE_VERSION: u32 = 2;
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct HealthResponse {
     pub status: String,
@@ -23,6 +27,12 @@ pub struct HealthResponse {
     pub project_count: usize,
     pub worktree_count: usize,
     pub session_count: usize,
+    #[serde(default = "default_wire_version")]
+    pub wire_version: u32,
+}
+
+fn default_wire_version() -> u32 {
+    1
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
