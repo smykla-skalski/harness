@@ -103,6 +103,12 @@ struct TaskBoardSummaryPill: View {
 struct TaskBoardSection<Content: View>: View {
   let title: String
   let content: Content
+  @Environment(\.fontScale)
+  private var fontScale
+
+  private var headerFont: Font {
+    HarnessMonitorTextSize.scaledFont(.headline.weight(.semibold), by: fontScale)
+  }
 
   init(title: String, @ViewBuilder content: () -> Content) {
     self.title = title
@@ -112,7 +118,7 @@ struct TaskBoardSection<Content: View>: View {
   var body: some View {
     VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
       Text(title)
-        .scaledFont(.headline.weight(.semibold))
+        .font(headerFont)
         .accessibilityAddTraits(.isHeader)
       content
     }

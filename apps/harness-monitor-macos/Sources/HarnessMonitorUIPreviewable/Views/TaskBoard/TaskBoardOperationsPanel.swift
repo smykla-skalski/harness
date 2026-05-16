@@ -25,6 +25,12 @@ struct TaskBoardOperationsPanel: View {
   var metrics: TaskBoardOverviewMetrics {
     TaskBoardOverviewMetrics(fontScale: fontScale)
   }
+  private var captionFont: Font {
+    HarnessMonitorTextSize.scaledFont(.caption, by: fontScale)
+  }
+  private var captionSemibold: Font {
+    HarnessMonitorTextSize.scaledFont(.caption.weight(.semibold), by: fontScale)
+  }
 
   private var dashboard: HarnessMonitorStore.ContentDashboardSlice {
     store.contentUI.dashboard
@@ -225,7 +231,7 @@ extension TaskBoardOperationsPanel {
         if !visibleProviders.isEmpty {
           VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingXS) {
             Text("Providers")
-              .scaledFont(.caption.weight(.semibold))
+              .font(captionSemibold)
               .foregroundStyle(HarnessMonitorTheme.secondaryInk)
               .accessibilityAddTraits(.isHeader)
             ForEach(visibleProviders, id: \.provider.rawValue) { provider in
@@ -237,7 +243,7 @@ extension TaskBoardOperationsPanel {
         if !visibleOperations.isEmpty {
           VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingXS) {
             Text("Recent operations")
-              .scaledFont(.caption.weight(.semibold))
+              .font(captionSemibold)
               .foregroundStyle(HarnessMonitorTheme.secondaryInk)
               .accessibilityAddTraits(.isHeader)
             ForEach(
@@ -294,7 +300,7 @@ extension TaskBoardOperationsPanel {
           "No items match this host's project types (\(formattedLocalHostProjectTypes)). "
             + "Set host project types in Settings or clear an item's Routes To list."
         )
-        .scaledFont(.caption)
+        .font(captionFont)
         .foregroundStyle(HarnessMonitorTheme.caution)
         .accessibilityIdentifier("harness.task-board.dispatch.host-mismatch")
       }
@@ -317,7 +323,7 @@ extension TaskBoardOperationsPanel {
 
       if !dispatchDryRun {
         Text("Live dispatch creates session work and requires confirmation.")
-          .scaledFont(.caption)
+          .font(captionFont)
           .foregroundStyle(HarnessMonitorTheme.caution)
       }
 
@@ -373,7 +379,7 @@ extension TaskBoardOperationsPanel {
         if !summary.applied.isEmpty {
           VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingXS) {
             Text("Applied")
-              .scaledFont(.caption.weight(.semibold))
+              .font(captionSemibold)
               .foregroundStyle(HarnessMonitorTheme.secondaryInk)
               .accessibilityAddTraits(.isHeader)
             ForEach(summary.applied.prefix(4)) { applied in
@@ -383,7 +389,7 @@ extension TaskBoardOperationsPanel {
         } else if !summary.plans.isEmpty {
           VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingXS) {
             Text("Plans")
-              .scaledFont(.caption.weight(.semibold))
+              .font(captionSemibold)
               .foregroundStyle(HarnessMonitorTheme.secondaryInk)
               .accessibilityAddTraits(.isHeader)
             ForEach(summary.plans.prefix(4)) { plan in
