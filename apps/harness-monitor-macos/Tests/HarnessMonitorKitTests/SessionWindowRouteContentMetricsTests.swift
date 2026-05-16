@@ -231,8 +231,11 @@ struct SessionWindowRouteContentMetricsTests {
     )
     #expect(componentsSource.contains("Form {"))
     #expect(componentsSource.contains(".harnessNativeFormContainer()"))
+    #expect(componentsSource.contains(".contentMargins(.horizontal, 0, for: .scrollContent)"))
+    #expect(componentsSource.contains(".scrollContentBackground(.hidden)"))
     #expect(componentsSource.contains(".scrollDisabled(true)"))
-    #expect(layoutSource.contains(".padding(.horizontal, -HarnessMonitorTheme.spacingSM)"))
+    #expect(!componentsSource.contains(".padding(.horizontal, -HarnessMonitorTheme.spacingXS)"))
+    #expect(!layoutSource.contains(".padding(.horizontal, -HarnessMonitorTheme.spacingSM)"))
     #expect(supportSource.contains("let operationsCardMinWidth: CGFloat"))
   }
 

@@ -214,6 +214,8 @@ struct TaskBoardOperationsCard<Content: View>: View {
       }
     }
     .harnessNativeFormContainer()
+    .contentMargins(.horizontal, 0, for: .scrollContent)
+    .scrollContentBackground(.hidden)
     .scrollDisabled(true)
     .frame(
       maxWidth: .infinity,
