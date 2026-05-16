@@ -51,6 +51,7 @@ extension HarnessMonitorApp {
   @ViewBuilder var dashboardWindowSceneContent: some View {
     if rendersLiveSceneContent {
       dashboardWindowContent
+        .modifier(DashboardWindowAppKitBinding())
         .modifier(SessionWindowTabbing(role: .dashboard))
         .modifier(DashboardWindowLifecycleModifier())
         .harnessTrackMCPWindow()
