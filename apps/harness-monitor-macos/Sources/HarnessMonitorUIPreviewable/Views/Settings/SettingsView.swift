@@ -57,6 +57,8 @@ public struct SettingsView: View {
           )
         case .taskBoard:
           SettingsTaskBoardSection(store: store)
+        case .policies:
+          SettingsPoliciesSection()
         case .codex:
           SettingsHostBridgeSection(store: store)
         case .mcp:

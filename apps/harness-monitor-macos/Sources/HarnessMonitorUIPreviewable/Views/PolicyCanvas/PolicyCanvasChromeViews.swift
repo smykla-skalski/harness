@@ -38,10 +38,11 @@ struct PolicyCanvasTopBar: View {
   }
 
   private var mainRow: some View {
-    HStack(spacing: 12) {
-      Label("Configurable Policy Canvas", systemImage: "rectangle.3.group.bubble")
+    HStack(spacing: 0) {
+      Image(systemName: "rectangle.3.group.bubble")
         .scaledFont(.headline.weight(.semibold))
         .foregroundStyle(.white)
+        .accessibilityHidden(true)
 
       Picker("Canvas mode", selection: $viewModel.selectedTab) {
         ForEach(PolicyCanvasTab.allCases) { tab in
@@ -49,6 +50,8 @@ struct PolicyCanvasTopBar: View {
         }
       }
       .pickerStyle(.segmented)
+      .labelsHidden()
+      .accessibilityLabel("Canvas mode")
       .frame(width: 290)
       .accessibilityIdentifier(HarnessMonitorAccessibility.policyCanvasTabs)
 
@@ -96,34 +99,19 @@ struct PolicyCanvasTopBar: View {
         }
       )
 
-      VStack(alignment: .trailing, spacing: 2) {
-        PolicyCanvasActionButton(
-          title: "Promote",
-          systemImage: "arrow.up.right.circle",
-          tint: Color.green,
-          isDisabled: !canPromote,
-          disabledReason: viewModel.promoteDisabledReason,
-          isBusy: viewModel.isPromoting,
-          accessibilityIdentifier: HarnessMonitorAccessibility.policyCanvasPromoteButton,
-          action: {
-            viewModel.promote()
-            promote()
-          }
-        )
-
-        if let reason = viewModel.promoteDisabledReason {
-          // White at 78% opacity reads ~5.6:1 on the top bar backdrop
-          // `#14171F` — clears WCAG AA for small text without competing with
-          // the action button glyph color.
-          Text(reason)
-            .scaledFont(.caption2.weight(.medium))
-            .foregroundStyle(.white.opacity(0.78))
-            .lineLimit(1)
-            .accessibilityIdentifier(
-              HarnessMonitorAccessibility.policyCanvasPromoteDisabledReason
-            )
+      PolicyCanvasActionButton(
+        title: "Promote",
+        systemImage: "arrow.up.right.circle",
+        tint: Color.green,
+        isDisabled: !canPromote,
+        disabledReason: viewModel.promoteDisabledReason,
+        isBusy: viewModel.isPromoting,
+        accessibilityIdentifier: HarnessMonitorAccessibility.policyCanvasPromoteButton,
+        action: {
+          viewModel.promote()
+          promote()
         }
-      }
+      )
     }
     .padding(.horizontal, 14)
     .padding(.vertical, 10)

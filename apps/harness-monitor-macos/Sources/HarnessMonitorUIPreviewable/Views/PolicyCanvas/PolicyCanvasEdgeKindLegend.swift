@@ -1,5 +1,10 @@
 import SwiftUI
 
+enum PolicyCanvasEdgeLegendDefaults {
+  static let isVisibleKey = "policyCanvas.edgeLegend.isVisible"
+  static let isVisibleDefault = true
+}
+
 /// Three-row legend explaining how edge stroke color + dash pattern map to
 /// the semantic kind (`.flow` / `.control` / `.error`). Closes nielsen H6
 /// "recognition rather than recall" - sighted users no longer have to
@@ -11,6 +16,8 @@ import SwiftUI
 /// it can be collapsed via the disclosure header when the user wants the
 /// full canvas area.
 struct PolicyCanvasEdgeKindLegend: View {
+  @AppStorage(PolicyCanvasEdgeLegendDefaults.isVisibleKey)
+  private var isVisible = PolicyCanvasEdgeLegendDefaults.isVisibleDefault
   /// Persist the disclosure state per session so a returning user does
   /// not have to re-collapse the legend on every launch. Nielsen H8
   /// (aesthetic & minimalist) — for a user who has internalized the
@@ -21,31 +28,33 @@ struct PolicyCanvasEdgeKindLegend: View {
   private var isExpanded: Bool = true
 
   var body: some View {
-    VStack(alignment: .leading, spacing: 0) {
-      header
-      if isExpanded {
-        VStack(alignment: .leading, spacing: 6) {
-          ForEach(PolicyCanvasEdgeKind.allCases, id: \.self) { kind in
-            row(for: kind)
+    if isVisible {
+      VStack(alignment: .leading, spacing: 0) {
+        header
+        if isExpanded {
+          VStack(alignment: .leading, spacing: 6) {
+            ForEach(PolicyCanvasEdgeKind.allCases, id: \.self) { kind in
+              row(for: kind)
+            }
           }
+          .padding(.horizontal, 10)
+          .padding(.bottom, 8)
+          .transition(.opacity.combined(with: .move(edge: .top)))
         }
-        .padding(.horizontal, 10)
-        .padding(.bottom, 8)
-        .transition(.opacity.combined(with: .move(edge: .top)))
       }
+      .background(
+        RoundedRectangle(cornerRadius: 8, style: .continuous)
+          .fill(Color(red: 0.07, green: 0.09, blue: 0.13).opacity(0.92))
+      )
+      .overlay(
+        RoundedRectangle(cornerRadius: 8, style: .continuous)
+          .stroke(Color.white.opacity(0.08), lineWidth: 1)
+      )
+      .frame(width: 168)
+      .accessibilityElement(children: .contain)
+      .accessibilityLabel("Edge legend")
+      .accessibilityIdentifier(HarnessMonitorAccessibility.policyCanvasEdgeLegend)
     }
-    .background(
-      RoundedRectangle(cornerRadius: 8, style: .continuous)
-        .fill(Color(red: 0.07, green: 0.09, blue: 0.13).opacity(0.92))
-    )
-    .overlay(
-      RoundedRectangle(cornerRadius: 8, style: .continuous)
-        .stroke(Color.white.opacity(0.08), lineWidth: 1)
-    )
-    .frame(width: 168)
-    .accessibilityElement(children: .contain)
-    .accessibilityLabel("Edge legend")
-    .accessibilityIdentifier(HarnessMonitorAccessibility.policyCanvasEdgeLegend)
   }
 
   private var header: some View {

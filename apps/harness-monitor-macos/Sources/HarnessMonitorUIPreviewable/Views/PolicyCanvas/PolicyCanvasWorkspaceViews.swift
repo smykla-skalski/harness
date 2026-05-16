@@ -105,7 +105,8 @@ struct PolicyCanvasViewport: View {
         // it routes through AppKit's standard scroll machinery (which reads
         // `NSEvent.isDirectionInvertedFromDevice`). No app-side direction
         // adjustment needed.
-        .scrollIndicators(.visible)
+        .scrollDisabled(viewModel.isEmpty)
+        .scrollIndicators(viewModel.isEmpty ? .hidden : .visible)
         .scrollPosition($scrollPosition)
         .onModifierKeysChanged(mask: .command, initial: true) { _, newModifiers in
           currentModifiers = newModifiers

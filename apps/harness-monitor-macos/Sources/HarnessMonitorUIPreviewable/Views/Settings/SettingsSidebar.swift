@@ -9,6 +9,7 @@ public enum SettingsSection: String, CaseIterable, Identifiable, Hashable {
   case voice
   case connection
   case taskBoard
+  case policies
   case codex
   case mcp
   case authorizedFolders
@@ -28,6 +29,7 @@ public enum SettingsSection: String, CaseIterable, Identifiable, Hashable {
     case .voice: "Voice"
     case .connection: "Connection"
     case .taskBoard: "Task Board"
+    case .policies: "Policies"
     case .codex: "Codex"
     case .mcp: "MCP"
     case .authorizedFolders: "Authorized Folders"
@@ -54,6 +56,7 @@ public enum SettingsSection: String, CaseIterable, Identifiable, Hashable {
     case .voice: "mic"
     case .connection: "bolt.horizontal.circle"
     case .taskBoard: "list.bullet.rectangle"
+    case .policies: "point.3.connected.trianglepath.dotted"
     case .codex: "terminal"
     case .mcp: "bolt.shield"
     case .authorizedFolders: "folder.badge.person.crop"

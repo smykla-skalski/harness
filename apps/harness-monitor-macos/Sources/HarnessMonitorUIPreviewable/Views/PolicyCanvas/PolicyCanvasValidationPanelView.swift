@@ -14,43 +14,36 @@ struct PolicyCanvasValidationPanel: View {
   @State private var isExpanded: Bool = false
 
   var body: some View {
-    DisclosureGroup(isExpanded: $isExpanded) {
-      content
-        .padding(.top, 6)
-    } label: {
-      header
+    let issues = viewModel.allValidationIssues
+    if !issues.isEmpty {
+      DisclosureGroup(isExpanded: $isExpanded) {
+        content(issues: issues)
+          .padding(.top, 6)
+      } label: {
+        header(issues: issues)
+      }
+      .padding(.horizontal, 14)
+      .padding(.vertical, 8)
+      .background(Color(red: 0.05, green: 0.06, blue: 0.09).opacity(0.96))
+      .overlay(alignment: .bottom) {
+        Rectangle()
+          .fill(.white.opacity(0.06))
+          .frame(height: 1)
+      }
+      .accessibilityElement(children: .contain)
+      .accessibilityIdentifier(HarnessMonitorAccessibility.policyCanvasValidationPanel)
     }
-    .padding(.horizontal, 14)
-    .padding(.vertical, 8)
-    .background(Color(red: 0.05, green: 0.06, blue: 0.09).opacity(0.96))
-    .overlay(alignment: .bottom) {
-      Rectangle()
-        .fill(.white.opacity(0.06))
-        .frame(height: 1)
-    }
-    .accessibilityElement(children: .contain)
-    .accessibilityIdentifier(HarnessMonitorAccessibility.policyCanvasValidationPanel)
   }
 
-  @ViewBuilder private var content: some View {
-    let issues = viewModel.allValidationIssues
-    if issues.isEmpty {
-      Text("No validation issues detected")
-        .scaledFont(.caption)
-        .foregroundStyle(.white.opacity(0.78))
-        .padding(.vertical, 4)
-        .accessibilityIdentifier(HarnessMonitorAccessibility.policyCanvasValidationEmpty)
-    } else {
-      VStack(alignment: .leading, spacing: 6) {
-        ForEach(issues) { issue in
-          PolicyCanvasValidationRow(issue: issue, focus: focus)
-        }
+  private func content(issues: [PolicyCanvasResolvedIssue]) -> some View {
+    VStack(alignment: .leading, spacing: 6) {
+      ForEach(issues) { issue in
+        PolicyCanvasValidationRow(issue: issue, focus: focus)
       }
     }
   }
 
-  private var header: some View {
-    let issues = viewModel.allValidationIssues
+  private func header(issues: [PolicyCanvasResolvedIssue]) -> some View {
     let errorCount = issues.filter { $0.severity == .error }.count
     let warningCount = issues.filter { $0.severity == .warning }.count
     return HStack(spacing: 10) {
@@ -71,9 +64,6 @@ struct PolicyCanvasValidationPanel: View {
   }
 
   private func labelTitle(errorCount: Int, warningCount: Int) -> String {
-    if errorCount == 0 && warningCount == 0 {
-      return "Validation - no issues"
-    }
     var parts: [String] = []
     if errorCount > 0 {
       parts.append("\(errorCount) error\(errorCount == 1 ? "" : "s")")
@@ -87,7 +77,7 @@ struct PolicyCanvasValidationPanel: View {
   private func headerSystemImage(errorCount: Int) -> String {
     errorCount > 0
       ? PolicyCanvasIssueSeverity.error.systemImage
-      : "checkmark.circle"
+      : "exclamationmark.triangle"
   }
 
   private func headerTone(errorCount: Int, warningCount: Int) -> Color {

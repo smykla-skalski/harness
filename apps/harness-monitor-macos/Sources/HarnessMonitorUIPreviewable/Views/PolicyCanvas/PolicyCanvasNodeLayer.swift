@@ -44,6 +44,7 @@ struct PolicyCanvasNodeLayer: View {
       )
       .offset(x: node.position.x, y: node.position.y)
       .focusable()
+      .focusEffectDisabled()
       .focused($focusedNodeID, equals: node.id)
       .accessibilityFocused($accessibilityFocusedNodeID, equals: node.id)
       .accessibilityFocused(focusedComponent, equals: .node(node.id))
@@ -130,13 +131,22 @@ struct PolicyCanvasNodeCard: View {
     canvasReducedMotion ?? systemReduceMotion
   }
 
+  private var focusTint: Color {
+    Color(nsColor: .keyboardFocusIndicatorColor)
+  }
+
+  private var borderLineWidth: CGFloat {
+    let base = severity == nil ? 1.2 : 1.8
+    return isFocused ? base * 3 : base
+  }
+
   var body: some View {
     ZStack {
       RoundedRectangle(cornerRadius: 8)
         .fill(Color(red: 0.10, green: 0.12, blue: 0.16).opacity(0.95))
         .overlay {
           RoundedRectangle(cornerRadius: 8)
-            .stroke(strokeColor, lineWidth: severity == nil ? 1.2 : 1.8)
+            .stroke(strokeColor, lineWidth: borderLineWidth)
             // P18 selection-mark: a short ease-out fade on the stroke color
             // when `isSelected` flips. Keyed on `isSelected` only — the
             // stroke also varies with severity (validation), but severity
@@ -146,17 +156,6 @@ struct PolicyCanvasNodeCard: View {
             // `Animation?` value out of the body so the per-frame
             // construction collapses to a `static let` lookup.
             .policyCanvasSelectionMark(value: isSelected, reducedMotion: reducedMotion)
-        }
-        .overlay {
-          // P27 focus ring: 1.5pt accent stroke when keyboard focus lands on
-          // this card. Rendered above the severity/selection stroke so the
-          // ring is always visible when focus exists, even on validation-
-          // error nodes whose severity stroke would otherwise dominate.
-          if isFocused {
-            RoundedRectangle(cornerRadius: 8)
-              .stroke(node.kind.accentColor.opacity(0.98), lineWidth: 1.5)
-              .padding(-1)
-          }
         }
         .shadow(color: .black.opacity(0.34), radius: 12, x: 0, y: 8)
 
@@ -257,6 +256,9 @@ struct PolicyCanvasNodeCard: View {
   }
 
   private var strokeColor: Color {
+    if isFocused {
+      return focusTint
+    }
     if let severity {
       return severity.accentColor.opacity(isSelected ? 0.98 : 0.82)
     }
