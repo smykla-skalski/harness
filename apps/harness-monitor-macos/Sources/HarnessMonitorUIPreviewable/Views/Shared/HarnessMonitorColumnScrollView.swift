@@ -215,6 +215,7 @@ public struct HarnessMonitorColumnScrollView<
     }
     .scrollClipDisabled(underlay != nil)
     .contentMargins(.bottom, bottomScrollContentMargin, for: .scrollContent)
+    .harnessScrollPhaseSetsHoverGate()
     .modifier(TopScrollEdgeEffectModifier(effect: topScrollEdgeEffect))
     .modifier(ExternalScrollPositionModifier(binding: externalScrollPosition))
     .modifier(LiveScrollGeometryProbeModifier(active: externalScrollPosition != nil))

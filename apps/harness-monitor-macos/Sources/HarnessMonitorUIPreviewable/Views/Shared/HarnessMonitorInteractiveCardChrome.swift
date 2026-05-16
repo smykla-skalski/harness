@@ -1,5 +1,14 @@
 import SwiftUI
 
+extension EnvironmentValues {
+  /// True while an ancestor scroll surface is actively tracking or decelerating.
+  /// Per-card `.onHover` registration is suppressed during this window so the
+  /// cursor-responder retarget cascade does not fan out across N visible cards
+  /// per scroll tick (r18 audit: View Transform → View Responders 66k edges
+  /// dominated by per-card tracking-area recomputes during scroll).
+  @Entry var harnessIsScrolling: Bool = false
+}
+
 enum InteractiveCardHoverState {
   static func resolve(current: Bool, isHovering: Bool) -> Bool? {
     current == isHovering ? nil : isHovering
@@ -41,6 +50,8 @@ private struct InteractiveCardHoverModifier: ViewModifier {
   let tint: Color?
   let extraHoverHint: Bool
   @State private var isHovered = false
+  @Environment(\.harnessIsScrolling)
+  private var isScrolling
 
   func body(content: Content) -> some View {
     content
@@ -51,7 +62,34 @@ private struct InteractiveCardHoverModifier: ViewModifier {
           isHovered: isHovered || extraHoverHint
         )
       )
-      .onHover { isHovering in
+      .modifier(
+        InteractiveCardHoverGate(
+          isScrolling: isScrolling,
+          isHovered: $isHovered
+        )
+      )
+      .harnessUITestValue("chrome=content-card")
+  }
+}
+
+/// Conditionally installs `.onHover` based on the ancestor scroll phase. While
+/// a scroll is active the modifier branch resolves to a no-op so SwiftUI tears
+/// down the tracking responder for the duration of the gesture; when the scroll
+/// idles the responder is reattached and SwiftUI fires the current hover state
+/// on the next layout pass. Hover state is intentionally left at its last
+/// resolved value during the scroll - the cards are in motion so the lingering
+/// fill blends with the gesture, and `.onHover` re-evaluates against the
+/// current pointer location once the surface settles.
+private struct InteractiveCardHoverGate: ViewModifier {
+  let isScrolling: Bool
+  @Binding var isHovered: Bool
+
+  @ViewBuilder
+  func body(content: Content) -> some View {
+    if isScrolling {
+      content
+    } else {
+      content.onHover { isHovering in
         guard
           let nextHoverState = InteractiveCardHoverState.resolve(
             current: isHovered,
@@ -62,7 +100,7 @@ private struct InteractiveCardHoverModifier: ViewModifier {
         }
         isHovered = nextHoverState
       }
-      .harnessUITestValue("chrome=content-card")
+    }
   }
 }
 
@@ -79,5 +117,26 @@ extension View {
         extraHoverHint: extraHoverHint
       )
     )
+  }
+
+  /// Publishes the scroll phase of the receiver (which must be a ScrollView)
+  /// into the `harnessIsScrolling` environment so descendants can suppress
+  /// hit-test-heavy responders while the surface is in motion.
+  func harnessScrollPhaseSetsHoverGate() -> some View {
+    modifier(HarnessScrollPhaseHoverGateModifier())
+  }
+}
+
+private struct HarnessScrollPhaseHoverGateModifier: ViewModifier {
+  @State private var isScrolling = false
+
+  func body(content: Content) -> some View {
+    content
+      .environment(\.harnessIsScrolling, isScrolling)
+      .onScrollPhaseChange { _, newPhase in
+        let nextIsScrolling = newPhase.isScrolling
+        guard nextIsScrolling != isScrolling else { return }
+        isScrolling = nextIsScrolling
+      }
   }
 }
