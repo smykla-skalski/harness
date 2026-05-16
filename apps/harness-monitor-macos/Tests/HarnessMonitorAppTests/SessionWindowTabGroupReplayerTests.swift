@@ -8,15 +8,41 @@
 
   @MainActor
   final class SessionWindowTabGroupReplayerTests: XCTestCase {
-    func testAttemptMergeLeavesLateSessionUnresolvedUntilItIsTabReady() throws {
+    func testAccessorAppliesSharedTabbingIdentityBeforeToolbarExists() throws {
+      let window = try XCTUnwrap(makeSessionWindows(count: 1).first)
+      let accessor = SessionWindowTabbingAccessorView()
+      let contentView = try XCTUnwrap(window.contentView)
+      accessor.configuration = .init(
+        role: .session,
+        preference: .always,
+        tabTitle: "Session Alpha",
+        pendingDecisionCount: 1,
+        pendingDecisionSeverity: .warn
+      )
+      defer {
+        accessor.removeFromSuperview()
+        window.orderOut(nil)
+      }
+
+      contentView.addSubview(accessor)
+      accessor.applyWindowTabbing()
+
+      XCTAssertNil(window.toolbar)
+      XCTAssertEqual(window.tabbingIdentifier, SessionWindowTabbingSupport.tabbingIdentifier)
+      XCTAssertEqual(window.tabbingMode, .preferred)
+      XCTAssertEqual(window.titlebarSeparatorStyle, .none)
+      XCTAssertNotNil(window.tab.attributedTitle)
+    }
+
+    func testAttemptMergeLeavesLateSessionUnresolvedUntilItHasSharedTabbingIdentity() throws {
       let registry = SessionWindowAppKitRegistry()
       let windows = makeSessionWindows(count: 3)
       defer { cleanUp(windows, registry: registry) }
 
       let sessionIDs = ["sess-a", "sess-b", "sess-c"]
       bind(windows, to: sessionIDs, registry: registry)
-      prepareTabReady(windows[0], toolbarID: "toolbar-a")
-      prepareTabReady(windows[1], toolbarID: "toolbar-b")
+      prepareSharedTabbingIdentity(windows[0])
+      prepareSharedTabbingIdentity(windows[1])
       show(windows)
 
       let grouping = HarnessMonitorStore.SessionTabGroupSnapshot(
@@ -38,15 +64,15 @@
       XCTAssertFalse(partialGroup === windows[2].tabGroup)
     }
 
-    func testReplayRetriesLateThirdSessionUntilTheGroupConverges() async throws {
+    func testReplayRetriesLateThirdSessionUntilItHasSharedTabbingIdentity() async throws {
       let registry = SessionWindowAppKitRegistry()
       let windows = makeSessionWindows(count: 3)
       defer { cleanUp(windows, registry: registry) }
 
       let sessionIDs = ["sess-a", "sess-b", "sess-c"]
       bind(windows, to: sessionIDs, registry: registry)
-      prepareTabReady(windows[0], toolbarID: "toolbar-a")
-      prepareTabReady(windows[1], toolbarID: "toolbar-b")
+      prepareSharedTabbingIdentity(windows[0])
+      prepareSharedTabbingIdentity(windows[1])
       show(windows)
 
       let grouping = HarnessMonitorStore.SessionTabGroupSnapshot(
@@ -65,7 +91,7 @@
       }
 
       try await Task.sleep(for: .milliseconds(80))
-      prepareTabReady(windows[2], toolbarID: "toolbar-c")
+      prepareSharedTabbingIdentity(windows[2])
 
       let outcome = await replayTask.value
       let resolvedGroup = try XCTUnwrap(windows[0].tabGroup)
@@ -73,6 +99,7 @@
       XCTAssertEqual(outcome.resolvedGroupCount, 1)
       XCTAssertEqual(outcome.foregroundResolvedCount, 1)
       XCTAssertEqual(outcome.tabReadySessionIDCount, 3)
+      XCTAssertFalse(outcome.toolbarsReady)
       XCTAssertGreaterThan(outcome.attempts, 1)
       XCTAssertTrue(resolvedGroup === windows[1].tabGroup)
       XCTAssertTrue(resolvedGroup === windows[2].tabGroup)
@@ -83,6 +110,79 @@
         )
       )
       XCTAssertEqual(resolvedGroup.selectedWindow, windows[1])
+    }
+
+    func testReplayMixedDashboardGroupingKeepsDashboardFirst() async throws {
+      let registry = SessionWindowAppKitRegistry()
+      let windows = makeSessionWindows(count: 3)
+      let dashboardWindow = windows[0]
+      let sessionWindows = Array(windows.dropFirst())
+      defer { cleanUp(windows, registry: registry) }
+
+      let sessionIDs = ["sess-a", "sess-b"]
+      bind(sessionWindows, to: sessionIDs, registry: registry)
+      prepareSharedTabbingIdentity(dashboardWindow)
+      prepareSharedTabbingIdentity(sessionWindows[0])
+      prepareSharedTabbingIdentity(sessionWindows[1])
+      show(windows)
+
+      let grouping = HarnessMonitorStore.SessionTabGroupSnapshot(
+        ordinal: 0,
+        sessionIDs: sessionIDs,
+        foregroundSessionID: "sess-b",
+        includesDashboard: true
+      )
+
+      let outcome = await SessionWindowTabGroupReplayer.replay(
+        [grouping],
+        registry: registry,
+        dashboardWindowProvider: { dashboardWindow },
+        timeout: .milliseconds(400),
+        pollInterval: .milliseconds(20)
+      )
+
+      let resolvedGroup = try XCTUnwrap(dashboardWindow.tabGroup)
+      XCTAssertEqual(outcome.resolvedGroupCount, 1)
+      XCTAssertEqual(outcome.foregroundResolvedCount, 1)
+      XCTAssertTrue(resolvedGroup === sessionWindows[0].tabGroup)
+      XCTAssertTrue(resolvedGroup === sessionWindows[1].tabGroup)
+      XCTAssertEqual(resolvedGroup.windows.first, dashboardWindow)
+      XCTAssertEqual(resolvedGroup.selectedWindow, sessionWindows[1])
+    }
+
+    func testReplayMixedDashboardGroupingRestoresDashboardForeground() async throws {
+      let registry = SessionWindowAppKitRegistry()
+      let windows = makeSessionWindows(count: 2)
+      let dashboardWindow = windows[0]
+      let sessionWindow = windows[1]
+      defer { cleanUp(windows, registry: registry) }
+
+      bind([sessionWindow], to: ["sess-a"], registry: registry)
+      prepareSharedTabbingIdentity(dashboardWindow)
+      prepareSharedTabbingIdentity(sessionWindow)
+      show(windows)
+
+      let grouping = HarnessMonitorStore.SessionTabGroupSnapshot(
+        ordinal: 0,
+        sessionIDs: ["sess-a"],
+        includesDashboard: true,
+        dashboardWasForeground: true
+      )
+
+      let outcome = await SessionWindowTabGroupReplayer.replay(
+        [grouping],
+        registry: registry,
+        dashboardWindowProvider: { dashboardWindow },
+        timeout: .milliseconds(400),
+        pollInterval: .milliseconds(20)
+      )
+
+      let resolvedGroup = try XCTUnwrap(dashboardWindow.tabGroup)
+      XCTAssertEqual(outcome.resolvedGroupCount, 1)
+      XCTAssertEqual(outcome.foregroundResolvedCount, 1)
+      XCTAssertTrue(resolvedGroup === sessionWindow.tabGroup)
+      XCTAssertEqual(resolvedGroup.windows.first, dashboardWindow)
+      XCTAssertEqual(resolvedGroup.selectedWindow, dashboardWindow)
     }
 
     private func makeSessionWindows(count: Int) -> [NSWindow] {
@@ -106,11 +206,7 @@
       }
     }
 
-    private func prepareTabReady(
-      _ window: NSWindow,
-      toolbarID: String
-    ) {
-      window.toolbar = NSToolbar(identifier: toolbarID)
+    private func prepareSharedTabbingIdentity(_ window: NSWindow) {
       SessionWindowTabbingSupport.prepareWindowForTabbing(window, preference: .always)
     }
 

@@ -12,15 +12,21 @@ extension HarnessMonitorStore {
     public let ordinal: Int
     public let sessionIDs: [String]
     public let foregroundSessionID: String?
+    public let includesDashboard: Bool
+    public let dashboardWasForeground: Bool
 
     public init(
       ordinal: Int,
       sessionIDs: [String],
-      foregroundSessionID: String? = nil
+      foregroundSessionID: String? = nil,
+      includesDashboard: Bool = false,
+      dashboardWasForeground: Bool = false
     ) {
       self.ordinal = ordinal
       self.sessionIDs = sessionIDs
       self.foregroundSessionID = foregroundSessionID
+      self.includesDashboard = includesDashboard
+      self.dashboardWasForeground = dashboardWasForeground
     }
   }
 
