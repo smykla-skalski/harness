@@ -276,6 +276,7 @@ private struct DashboardTaskBoardRouteView: View {
   )
   @State private var perfScrollPosition = ScrollPosition()
   private let perfScrollHookEnabled = HarnessMonitorPerfDashboardScrollBus.isActive()
+  private let detailRowHorizontalPadding: CGFloat = 24
 
   private var visibleTaskBoardSessions: [SessionSummary] {
     let visible = store.visibleSessions
@@ -288,7 +289,7 @@ private struct DashboardTaskBoardRouteView: View {
 
   var body: some View {
     HarnessMonitorColumnScrollView(
-      horizontalPadding: 24,
+      horizontalPadding: 0,
       verticalPadding: 24,
       constrainContentWidth: true,
       readableWidth: false,
@@ -298,7 +299,6 @@ private struct DashboardTaskBoardRouteView: View {
       scrollPosition: perfScrollHookEnabled ? $perfScrollPosition : nil
     ) {
       VStack(alignment: .leading, spacing: 24) {
-        DashboardQuickActionsSection()
         TaskBoardOverviewHost(
           scope: .dashboard,
           store: store,
@@ -309,10 +309,8 @@ private struct DashboardTaskBoardRouteView: View {
           evaluationSummary: dashboardUI.taskBoardEvaluationSummary,
           isActionInFlight: dashboardUI.isBusy
         )
-        SessionsBoardRecentSessionsSection(
-          store: store,
-          sessions: sessionCatalog.recentSessions
-        )
+        SessionsBoardRecentSessionsSection(store: store, sessions: sessionCatalog.recentSessions)
+          .padding(.horizontal, detailRowHorizontalPadding)
       }
       .frame(maxWidth: .infinity, alignment: .leading)
     }
@@ -357,14 +355,5 @@ private struct DashboardTaskBoardRouteView: View {
     )
     guard !Task.isCancelled else { return }
     taskBoardInboxSnapshot = snapshot
-  }
-}
-
-private struct DashboardQuickActionsSection: View {
-  var body: some View {
-    Text("Dashboard")
-      .scaledFont(.system(.title2, design: .rounded, weight: .semibold))
-      .accessibilityAddTraits(.isHeader)
-      .frame(maxWidth: .infinity, alignment: .leading)
   }
 }

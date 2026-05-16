@@ -164,6 +164,8 @@ struct SessionWindowRouteContentMetricsTests {
     #expect(dashboardSource.contains("dashboardUI.taskBoardEvaluationSummary"))
     #expect(dashboardSource.contains("dashboardUI.taskBoardOrchestratorStatus"))
     #expect(dashboardSource.contains("decisions: store.supervisorOpenDecisions"))
+    #expect(dashboardSource.contains("horizontalPadding: 0"))
+    #expect(dashboardSource.contains(".padding(.horizontal, detailRowHorizontalPadding)"))
   }
 
   @Test("Overview and dashboard expose task board orchestrator controls")
@@ -214,6 +216,9 @@ struct SessionWindowRouteContentMetricsTests {
   func taskBoardOperationsPanelPrefersThreeCardRow() throws {
     let operationsSource = try taskBoardSourceFile(named: "TaskBoardOperationsPanel.swift")
     let layoutSource = try taskBoardSourceFile(named: "TaskBoardOperationsPanelLayout.swift")
+    let componentsSource = try taskBoardSourceFile(
+      named: "TaskBoardOperationsPanel+Components.swift"
+    )
     let supportSource = try taskBoardSourceFile(named: "TaskBoardOverviewSupport.swift")
 
     #expect(operationsSource.contains("TaskBoardOperationsPanelLayout("))
@@ -224,6 +229,10 @@ struct SessionWindowRouteContentMetricsTests {
     #expect(
       layoutSource.contains("VStack(alignment: .leading, spacing: metrics.columnSpacing)")
     )
+    #expect(componentsSource.contains("Form {"))
+    #expect(componentsSource.contains(".harnessNativeFormContainer()"))
+    #expect(componentsSource.contains(".scrollDisabled(true)"))
+    #expect(layoutSource.contains(".padding(.horizontal, -HarnessMonitorTheme.spacingSM)"))
     #expect(supportSource.contains("let operationsCardMinWidth: CGFloat"))
   }
 
