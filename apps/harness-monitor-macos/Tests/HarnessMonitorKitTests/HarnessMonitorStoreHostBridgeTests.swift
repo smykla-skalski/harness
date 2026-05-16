@@ -184,4 +184,38 @@ struct HarnessMonitorStoreHostBridgeTests {
     )
   }
 
+  @Test("Unsandboxed daemon bypasses host bridge capability gating")
+  func unsandboxedDaemonBypassesHostBridgeCapabilityGating() {
+    let store = HarnessMonitorStore(
+      daemonController: RecordingDaemonController(),
+      daemonOwnership: .external
+    )
+    store.daemonStatus = unsandboxedStatus(
+      hostBridge: HostBridgeManifest(
+        running: true,
+        socketPath: "/tmp/bridge.sock",
+        capabilities: [
+          "acp": HostBridgeCapabilityManifest(
+            healthy: false,
+            transport: "websocket",
+            endpoint: "ws://127.0.0.1:4501"
+          ),
+          "codex": HostBridgeCapabilityManifest(
+            healthy: false,
+            transport: "websocket",
+            endpoint: "ws://127.0.0.1:4500"
+          )
+        ]
+      )
+    )
+    store.hostBridgeCapabilityIssues["acp"] = .unavailable
+    store.hostBridgeCapabilityIssues["codex"] = .unavailable
+
+    #expect(store.hostBridgeCapabilityState(for: "acp") == .ready)
+    #expect(store.hostBridgeCapabilityState(for: "codex") == .ready)
+    #expect(store.acpUnavailable == false)
+    #expect(store.codexUnavailable == false)
+    #expect(store.acpBridgeBannerState == nil)
+  }
+
 }

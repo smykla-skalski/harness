@@ -38,6 +38,50 @@ final class DecisionActionHandlerSupervisorCustomTests: XCTestCase {
     XCTAssertEqual(resolved?.statusRaw, "resolved")
   }
 
+  func test_restartDaemonCustomActionReconnectsExternalDaemonWithoutStopCall() async throws {
+    let manifestPath = "/tmp/harness/daemon/manifest.json"
+    let daemon = RecordingDaemonController(
+      warmUpError: DaemonControlError.externalDaemonOffline(manifestPath: manifestPath)
+    )
+    let store = HarnessMonitorStore(
+      daemonController: daemon,
+      daemonOwnership: .external
+    )
+    let decisions = try DecisionStore.makeInMemory()
+    let handler = StoreDecisionActionHandler(store: store, decisions: decisions)
+    try await decisions.insert(
+      draft(
+        id: "daemon-restart-external",
+        action: SuggestedAction(
+          id: "restart-daemon-external",
+          title: "Restart daemon",
+          kind: .custom,
+          payloadJSON: #"{"mode":"restartDaemon"}"#
+        )
+      )
+    )
+
+    await handler.resolve(
+      decisionID: "daemon-restart-external",
+      outcome: DecisionOutcome(chosenActionID: "restart-daemon-external", note: nil)
+    )
+
+    let stopCallCount = await daemon.recordedStopDaemonCallCount()
+    let warmUpCallCount = await daemon.recordedWarmUpCallCount()
+    XCTAssertEqual(stopCallCount, 0)
+    XCTAssertEqual(warmUpCallCount, 1)
+    XCTAssertEqual(
+      store.connectionState,
+      .offline("Background helper is not running. Start it to load live sessions.")
+    )
+    let feedback = try XCTUnwrap(store.toast.activeFeedback.first)
+    XCTAssertEqual(feedback.title, "Start background helper")
+    XCTAssertEqual(feedback.severity, .warning)
+    XCTAssertTrue(feedback.details?.command?.contains("harness daemon dev") == true)
+    let resolved = try await decisions.decision(id: "daemon-restart-external")
+    XCTAssertEqual(resolved?.statusRaw, "resolved")
+  }
+
   func test_openDaemonLogsCustomActionUsesResolvedDaemonLogURL() async throws {
     let daemon = RecordingDaemonController()
     let fileViewer = RecordingSupervisorActionFileViewer()
