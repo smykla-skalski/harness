@@ -14,9 +14,12 @@ final class HarnessMonitorInitialWindowPlanTests: XCTestCase {
     try await super.setUp()
     previousAllowsAutomaticWindowTabbing = NSWindow.allowsAutomaticWindowTabbing
     NSWindow.allowsAutomaticWindowTabbing = false
+    HarnessMonitorInitialWindowRouter.resetReplayRecoveryForTesting()
   }
 
   override func tearDown() async throws {
+    await HarnessMonitorInitialWindowRouter.waitForReplayRecoveryForTesting()
+    HarnessMonitorInitialWindowRouter.resetReplayRecoveryForTesting()
     NSWindow.allowsAutomaticWindowTabbing = previousAllowsAutomaticWindowTabbing
     try await super.tearDown()
   }
@@ -302,6 +305,21 @@ final class HarnessMonitorInitialWindowPlanTests: XCTestCase {
   }
 
   @MainActor
+  func testEffectiveReplayRestorePlanAddsDashboardStateSessionsWhenRestorePlanMissesThem() {
+    let effectivePlan = HarnessMonitorInitialWindowRouter.effectiveReplayRestorePlan(
+      in: .init(sessionIDs: []),
+      dashboardTabRestoreState: .init(
+        sessionIDs: ["sess-bart"],
+        wasForegroundTab: false
+      ),
+      liveBoundSessionIDs: []
+    )
+
+    XCTAssertEqual(effectivePlan.sessionIDs, ["sess-bart"])
+    XCTAssertTrue(effectivePlan.tabGroupings.isEmpty)
+  }
+
+  @MainActor
   func testPersistedDashboardTabRestoreReplaysMixedGroupEndToEnd() async throws {
     let suiteName = "io.harnessmonitor.tests.MixedDashboardRestore"
     let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
@@ -415,6 +433,78 @@ final class HarnessMonitorInitialWindowPlanTests: XCTestCase {
     XCTAssertEqual(restoredGroup.windows.first, restoredDashboard)
     XCTAssertEqual(restoredGroup.selectedWindow, restoredDashboard)
     XCTAssertEqual(restoredSessionIDs, groupedSessionIDs)
+  }
+
+  @MainActor
+  func testRouteRecoversMixedReplayWhenSessionBecomesTabReadyAfterInitialPass() async throws {
+    let registry = SessionWindowAppKitRegistry.shared
+    registry.resetForTesting()
+    DashboardWindowAppKitRegistry.shared.resetForTesting()
+    let defaults = UserDefaults.standard
+    let sessionID = PreviewFixtures.summary.sessionId
+    defaults.set(true, forKey: DashboardWindowLifecycleTracker.openAtQuitKey)
+    defaults.set([sessionID], forKey: DashboardWindowLifecycleTracker.tabbedSessionIDsAtQuitKey)
+    defaults.set(false, forKey: DashboardWindowLifecycleTracker.wasForegroundTabAtQuitKey)
+
+    let container = try HarnessMonitorModelContainer.preview()
+    let cacheService = SessionCacheService(modelContainer: container)
+    let store = makeStore(modelContainer: container, cacheService: cacheService)
+    XCTAssertTrue(store.sessionIndex.applySessionSummary(PreviewFixtures.summary))
+    _ = await cacheService.replaceSessionWindowsOpenAtQuit(
+      snapshot: HarnessMonitorStore.SessionWindowQuitSnapshot(sessionIDs: [sessionID])
+    )
+
+    var dashboardWindow: NSWindow?
+    var sessionWindow: NSWindow?
+    defer {
+      if let sessionWindow {
+        registry.unbind(window: sessionWindow)
+      }
+      if let dashboardWindow {
+        DashboardWindowAppKitRegistry.shared.unbind(window: dashboardWindow)
+      }
+      cleanUpWindows([dashboardWindow, sessionWindow].compactMap { $0 })
+      registry.resetForTesting()
+      DashboardWindowAppKitRegistry.shared.resetForTesting()
+      defaults.removeObject(forKey: DashboardWindowLifecycleTracker.openAtQuitKey)
+      defaults.removeObject(forKey: DashboardWindowLifecycleTracker.tabbedSessionIDsAtQuitKey)
+      defaults.removeObject(forKey: DashboardWindowLifecycleTracker.wasForegroundTabAtQuitKey)
+    }
+
+    let router = HarnessMonitorInitialWindowRouter(
+      store: store,
+      launchBehavior: .restoreSessionWindows,
+      tabbingPreference: .always,
+      openWelcomeWindow: { _ in
+        let window = self.makeRestoredWindow()
+        dashboardWindow = window
+        DashboardWindowAppKitRegistry.shared.bind(window: window)
+        self.prepareSharedTabbingIdentity(window)
+        self.show([window])
+      },
+      openSessionWindow: { restoredSessionID, _ in
+        let window = self.makeRestoredWindow()
+        sessionWindow = window
+        registry.bind(window: window, sessionID: restoredSessionID)
+        self.show([window])
+        Task { @MainActor in
+          try? await Task.sleep(for: .milliseconds(1700))
+          self.prepareSharedTabbingIdentity(window)
+        }
+      }
+    )
+
+    await router.route()
+    try? await Task.sleep(for: .milliseconds(700))
+    await HarnessMonitorInitialWindowRouter.waitForReplayRecoveryForTesting()
+
+    let resolvedDashboardWindow = try XCTUnwrap(dashboardWindow)
+    let resolvedSessionWindow = try XCTUnwrap(sessionWindow)
+    let resolvedTabGroup = try XCTUnwrap(resolvedDashboardWindow.tabGroup)
+
+    XCTAssertTrue(resolvedSessionWindow.tabGroup === resolvedTabGroup)
+    XCTAssertEqual(resolvedTabGroup.windows, [resolvedDashboardWindow, resolvedSessionWindow])
+    XCTAssertEqual(resolvedTabGroup.selectedWindow, resolvedSessionWindow)
   }
 
   private func uiPreviewableSourceFile(named relativePath: String) throws -> String {

@@ -21,6 +21,10 @@ struct HarnessMonitorInitialWindowRouter {
   // prefer collapsing the two registries (or finding a SwiftUI
   // restoration-complete signal) over raising the timeout further.
   static let restorationWaitTimeout: Duration = .milliseconds(1500)
+  static let restorationRecoveryTimeout: Duration = .seconds(10)
+  static let restorationRecoveryPollInterval: Duration = .milliseconds(100)
+  private static var replayRecoveryTask: Task<Void, Never>?
+  private static var replayRecoveryTaskGeneration = 0
 
   func route() async {
     let shouldRestoreDashboard =
@@ -82,7 +86,10 @@ struct HarnessMonitorInitialWindowRouter {
     dashboardTabRestoreState: DashboardWindowLifecycleTracker.TabRestoreState,
     restorePlan: HarnessMonitorStore.LaunchWindowRestorePlan
   ) async -> Bool {
-    guard launchBehavior == .restoreSessionWindows, !restorePlan.sessionIDs.isEmpty else {
+    guard
+      launchBehavior == .restoreSessionWindows,
+      !restorePlan.sessionIDs.isEmpty || !dashboardTabRestoreState.sessionIDs.isEmpty
+    else {
       return false
     }
     guard await waitForVisibleSessionWindowDuringLaunch() else {
@@ -143,15 +150,20 @@ struct HarnessMonitorInitialWindowRouter {
     dashboardTabRestoreState: DashboardWindowLifecycleTracker.TabRestoreState
   ) async {
     guard tabbingPreference != .never else { return }
-    let replayGroupings = Self.replayGroupings(
-      in: restorePlan,
-      shouldRestoreDashboard: shouldRestoreDashboard,
-      dashboardTabRestoreState: dashboardTabRestoreState
-    )
-    guard !replayGroupings.isEmpty else { return }
     #if canImport(AppKit)
-      let expectedSessionIDs = Set(replayGroupings.flatMap { $0.sessionIDs })
       let registry = SessionWindowAppKitRegistry.shared
+      let replayRestorePlan = Self.effectiveReplayRestorePlan(
+        in: restorePlan,
+        dashboardTabRestoreState: dashboardTabRestoreState,
+        liveBoundSessionIDs: registry.currentBindings().map(\.sessionID)
+      )
+      let replayGroupings = Self.replayGroupings(
+        in: replayRestorePlan,
+        shouldRestoreDashboard: shouldRestoreDashboard,
+        dashboardTabRestoreState: dashboardTabRestoreState
+      )
+      guard !replayGroupings.isEmpty else { return }
+      let expectedSessionIDs = Set(replayGroupings.flatMap { $0.sessionIDs })
       // Edge-triggered: returns as soon as every expected sessionID has an
       // NSWindow bound, falling back to the timeout. Replaces the previous
       // 30 x 50 ms polling loop.
@@ -159,13 +171,86 @@ struct HarnessMonitorInitialWindowRouter {
         satisfying: { sessionIDs in expectedSessionIDs.isSubset(of: sessionIDs) },
         timeout: Self.restorationWaitTimeout
       )
-      _ = await SessionWindowTabGroupReplayer.replay(
+      let replayOutcome = await SessionWindowTabGroupReplayer.replay(
         replayGroupings,
         registry: registry,
         dashboardWindowProvider: { DashboardWindowAppKitRegistry.shared.window },
         timeout: Self.restorationWaitTimeout
       )
+      guard replayOutcome.resolvedGroupCount < replayGroupings.count else {
+        return
+      }
+      Self.scheduleReplayRecovery(
+        replayGroupings,
+        registry: registry
+      )
+    #else
+      let replayGroupings = Self.replayGroupings(
+        in: restorePlan,
+        shouldRestoreDashboard: shouldRestoreDashboard,
+        dashboardTabRestoreState: dashboardTabRestoreState
+      )
+      guard !replayGroupings.isEmpty else { return }
     #endif
+  }
+
+  private static func scheduleReplayRecovery(
+    _ replayGroupings: [HarnessMonitorStore.SessionTabGroupSnapshot],
+    registry: SessionWindowAppKitRegistry
+  ) {
+    replayRecoveryTask?.cancel()
+    replayRecoveryTaskGeneration += 1
+    let generation = replayRecoveryTaskGeneration
+    replayRecoveryTask = Task { @MainActor in
+      defer {
+        if replayRecoveryTaskGeneration == generation {
+          replayRecoveryTask = nil
+        }
+      }
+      _ = await SessionWindowTabGroupReplayer.replay(
+        replayGroupings,
+        registry: registry,
+        dashboardWindowProvider: { DashboardWindowAppKitRegistry.shared.window },
+        timeout: restorationRecoveryTimeout,
+        pollInterval: restorationRecoveryPollInterval
+      )
+    }
+  }
+
+  static func waitForReplayRecoveryForTesting() async {
+    await replayRecoveryTask?.value
+  }
+
+  static func resetReplayRecoveryForTesting() {
+    replayRecoveryTask?.cancel()
+    replayRecoveryTask = nil
+    replayRecoveryTaskGeneration = 0
+  }
+
+  static func effectiveReplayRestorePlan(
+    in restorePlan: HarnessMonitorStore.LaunchWindowRestorePlan,
+    dashboardTabRestoreState: DashboardWindowLifecycleTracker.TabRestoreState,
+    liveBoundSessionIDs: [String]
+  ) -> HarnessMonitorStore.LaunchWindowRestorePlan {
+    var orderedSessionIDs = restorePlan.sessionIDs
+    var seen = Set(orderedSessionIDs)
+
+    for sessionID in dashboardTabRestoreState.sessionIDs where seen.insert(sessionID).inserted {
+      orderedSessionIDs.append(sessionID)
+    }
+    for sessionID in liveBoundSessionIDs where seen.insert(sessionID).inserted {
+      orderedSessionIDs.append(sessionID)
+    }
+
+    guard orderedSessionIDs != restorePlan.sessionIDs else {
+      return restorePlan
+    }
+
+    return HarnessMonitorStore.LaunchWindowRestorePlan(
+      sessionIDs: orderedSessionIDs,
+      usedBridgeFallback: restorePlan.usedBridgeFallback,
+      tabGroupings: restorePlan.tabGroupings
+    )
   }
 
   static func replayGroupings(
@@ -387,7 +472,11 @@ struct HarnessMonitorInitialWindowRouter {
           return replayOutcome
         }
 
-        try? await Task.sleep(for: pollInterval)
+        do {
+          try await Task.sleep(for: pollInterval)
+        } catch {
+          return replayOutcome
+        }
       }
     }
 
