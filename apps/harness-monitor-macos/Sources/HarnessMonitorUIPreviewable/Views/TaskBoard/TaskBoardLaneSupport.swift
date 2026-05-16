@@ -229,11 +229,20 @@ struct TaskBoardLaneHeader: View {
   private var fontScale
 
   private var metrics: TaskBoardLaneMetrics { TaskBoardLaneMetrics(fontScale: fontScale) }
+  private var iconFont: Font {
+    HarnessMonitorTextSize.scaledFont(.caption.weight(.semibold), by: fontScale)
+  }
+  private var titleFont: Font {
+    HarnessMonitorTextSize.scaledFont(.subheadline.weight(.semibold), by: fontScale)
+  }
+  private var countFont: Font {
+    HarnessMonitorTextSize.scaledFont(.caption.weight(.bold), by: fontScale)
+  }
 
   var body: some View {
     HStack(spacing: metrics.laneSpacing) {
       Image(systemName: lane.systemImage)
-        .scaledFont(.caption.weight(.semibold))
+        .font(iconFont)
         .foregroundStyle(taskBoardLaneColor(for: lane))
         .frame(
           width: metrics.headerIconWidth + HarnessMonitorTheme.spacingMD,
@@ -242,11 +251,11 @@ struct TaskBoardLaneHeader: View {
         .background(taskBoardLaneColor(for: lane).opacity(0.14), in: Circle())
         .accessibilityHidden(true)
       Text(lane.title)
-        .scaledFont(.subheadline.weight(.semibold))
+        .font(titleFont)
         .foregroundStyle(HarnessMonitorTheme.ink)
       Spacer(minLength: metrics.laneSpacing)
       Text("\(count)")
-        .scaledFont(.caption.weight(.bold))
+        .font(countFont)
         .foregroundStyle(taskBoardLaneColor(for: lane))
         .monospacedDigit()
         .padding(.horizontal, metrics.countHorizontalPadding)

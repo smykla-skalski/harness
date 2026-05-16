@@ -168,6 +168,12 @@ struct TaskBoardItemRow: View {
   }
 
   private var metrics: TaskBoardLaneMetrics { TaskBoardLaneMetrics(fontScale: fontScale) }
+  private var titleFont: Font {
+    HarnessMonitorTextSize.scaledFont(.subheadline.weight(.semibold), by: fontScale)
+  }
+  private var subtitleFont: Font {
+    HarnessMonitorTextSize.scaledFont(.caption, by: fontScale)
+  }
 
   var body: some View {
     Button {
@@ -179,12 +185,12 @@ struct TaskBoardItemRow: View {
             .padding(.top, metrics.cardMarkerTopPadding)
           VStack(alignment: .leading, spacing: metrics.rowTextSpacing) {
             Text(item.title)
-              .scaledFont(.subheadline.weight(.semibold))
+              .font(titleFont)
               .foregroundStyle(HarnessMonitorTheme.ink)
               .lineLimit(2)
               .multilineTextAlignment(.leading)
             Text(item.projectId ?? item.agentMode.title)
-              .scaledFont(.caption)
+              .font(subtitleFont)
               .foregroundStyle(HarnessMonitorTheme.secondaryInk)
               .lineLimit(1)
               .truncationMode(.middle)
@@ -261,6 +267,12 @@ struct TaskBoardInboxItemRow: View {
   private var fontScale
 
   private var metrics: TaskBoardLaneMetrics { TaskBoardLaneMetrics(fontScale: fontScale) }
+  private var titleFont: Font {
+    HarnessMonitorTextSize.scaledFont(.subheadline.weight(.semibold), by: fontScale)
+  }
+  private var subtitleFont: Font {
+    HarnessMonitorTextSize.scaledFont(.caption, by: fontScale)
+  }
 
   private var dragPayload: TaskBoardInboxItemDragPayload {
     TaskBoardInboxItemDragPayload(
@@ -281,12 +293,12 @@ struct TaskBoardInboxItemRow: View {
             .padding(.top, metrics.cardMarkerTopPadding)
           VStack(alignment: .leading, spacing: metrics.rowTextSpacing) {
             Text(item.task.title)
-              .scaledFont(.subheadline.weight(.semibold))
+              .font(titleFont)
               .foregroundStyle(HarnessMonitorTheme.ink)
               .lineLimit(2)
               .multilineTextAlignment(.leading)
             Text(item.subtitle)
-              .scaledFont(.caption)
+              .font(subtitleFont)
               .foregroundStyle(HarnessMonitorTheme.secondaryInk)
               .lineLimit(1)
               .truncationMode(.middle)
