@@ -153,7 +153,6 @@ extension DaemonController {
           state: &state
         )
       }
-      state.skipFinalBootstrapProbe = true
       state.immediateError = DaemonControlError.daemonDidNotStart
       let pid = manifest.pid
       HarnessMonitorLogger.lifecycle.error(
@@ -200,7 +199,6 @@ extension DaemonController {
     )
     switch observation {
     case .expired:
-      state.skipFinalBootstrapProbe = true
       state.immediateError = DaemonControlError.daemonDidNotStart
       let timeoutMessage = Self.warmUpManagedReplacementManifestTimeoutMessage(
         path: path,
