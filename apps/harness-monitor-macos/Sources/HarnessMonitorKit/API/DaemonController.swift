@@ -318,6 +318,56 @@ public struct DaemonController: DaemonControlling {
     }
   }
 
+  /// Tear down and re-register the bundled SMAppService launch agent at app
+  /// launch so each session starts with a fresh BTM disposition record and
+  /// a fresh Launch Constraint Record. Recovers transparently from the
+  /// `xpcproxy exit(78)` / `Unable to get updated LWCR` crash loops that
+  /// appear after Xcode rebuilds shift the helper's `cs_mtime` without
+  /// triggering BTM to re-validate. No-op in `.external` ownership so the
+  /// `harness daemon dev` flow is unaffected.
+  ///
+  /// Returns `true` if a refresh actually happened, `false` if skipped
+  /// (external mode or registration not present).
+  public func refreshManagedLaunchAgentForLaunch() async throws -> Bool {
+    guard ownership == .managed else {
+      return false
+    }
+    let preState = launchAgentManager.registrationState()
+    switch preState {
+    case .enabled, .requiresApproval:
+      try launchAgentManager.unregister()
+      clearManagedLaunchAgentBundleStamp()
+      clearManagedLaunchAgentOwner()
+      // BTM needs a moment after `unregister()` to evict the prior
+      // disposition record; without this delay the immediate `register()`
+      // can land on a half-cleared row and the next launchd spawn still
+      // fails to fetch the updated LWCR.
+      try? await Task.sleep(for: .milliseconds(500))
+    case .notRegistered, .notFound:
+      break
+    }
+    try launchAgentManager.register()
+    let postState = launchAgentManager.registrationState()
+    switch postState {
+    case .enabled:
+      try persistCurrentManagedLaunchAgentBundleStamp()
+      try persistCurrentManagedLaunchAgentOwner()
+      HarnessMonitorLogger.lifecycle.notice(
+        "Refreshed managed launch agent registration on app launch (pre_state=\(String(describing: preState), privacy: .public))"
+      )
+      return true
+    case .requiresApproval:
+      HarnessMonitorLogger.lifecycle.notice(
+        "Managed launch agent refresh awaiting user approval in System Settings"
+      )
+      return true
+    case .notRegistered, .notFound:
+      throw DaemonControlError.commandFailed(
+        "launch agent refresh did not complete"
+      )
+    }
+  }
+
   /// Force re-registration of the SMAppService launch agent to recover from
   /// stale BTM uuid records (xpcproxy `EX_CONFIG` spawn-fail loops). Always
   /// unregisters first, regardless of `ownership`, so external-daemon users

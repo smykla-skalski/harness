@@ -136,6 +136,8 @@ extension HarnessMonitorStore {
   }
 
   func bootstrapManagedDaemon() async {
+    await refreshManagedLaunchAgentOnFirstLaunchIfNeeded()
+
     let registrationState: DaemonLaunchAgentRegistrationState
     do {
       registrationState = try await withBootstrapTelemetryPhase(.managedLaunchAgentReady) {

@@ -258,6 +258,45 @@ extension DaemonControllerTests {
     #expect(offlineSnapshot.loaded == false)
   }
 
+  @Test("refreshManagedLaunchAgentForLaunch unregisters and re-registers an enabled managed agent")
+  func refreshManagedLaunchAgentForLaunchRecyclesEnabledRegistration() async throws {
+    let manager = RecordingLaunchAgentManager(state: .enabled)
+    let controller = DaemonController(launchAgentManager: manager, ownership: .managed)
+
+    let refreshed = try await controller.refreshManagedLaunchAgentForLaunch()
+
+    #expect(refreshed)
+    #expect(manager.unregisterCallCount == 1)
+    #expect(manager.registerCallCount == 1)
+    #expect(manager.state == .enabled)
+  }
+
+  @Test("refreshManagedLaunchAgentForLaunch registers when nothing is currently bound")
+  func refreshManagedLaunchAgentForLaunchRegistersWhenAbsent() async throws {
+    let manager = RecordingLaunchAgentManager(state: .notRegistered)
+    let controller = DaemonController(launchAgentManager: manager, ownership: .managed)
+
+    let refreshed = try await controller.refreshManagedLaunchAgentForLaunch()
+
+    #expect(refreshed)
+    #expect(manager.unregisterCallCount == 0)
+    #expect(manager.registerCallCount == 1)
+    #expect(manager.state == .enabled)
+  }
+
+  @Test("refreshManagedLaunchAgentForLaunch is a no-op in external ownership")
+  func refreshManagedLaunchAgentForLaunchSkipsInExternalOwnership() async throws {
+    let manager = RecordingLaunchAgentManager(state: .enabled)
+    let controller = DaemonController(launchAgentManager: manager, ownership: .external)
+
+    let refreshed = try await controller.refreshManagedLaunchAgentForLaunch()
+
+    #expect(refreshed == false)
+    #expect(manager.unregisterCallCount == 0)
+    #expect(manager.registerCallCount == 0)
+    #expect(manager.state == .enabled)
+  }
+
   @Test("launchAgentSnapshot uses the lane launch-agent label")
   func launchAgentSnapshotUsesLaneLaunchAgentLabel() async {
     let manager = RecordingLaunchAgentManager(state: .enabled)
