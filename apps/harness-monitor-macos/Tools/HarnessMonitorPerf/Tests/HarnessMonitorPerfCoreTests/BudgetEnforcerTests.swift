@@ -87,16 +87,36 @@ final class BudgetEnforcerTests: XCTestCase {
         ]
         let data = try! JSONSerialization.data(withJSONObject: payload)
         let failures = BudgetEnforcer.collectFailures(summaryJSON: data)
-        XCTAssertEqual(failures.count, 3)
+        XCTAssertEqual(failures.count, 4)
         XCTAssertTrue(failures.contains("open-recent-window Launch metrics missing from summary"))
         XCTAssertTrue(failures.contains("open-recent-window SwiftUI metrics missing from summary"))
+        XCTAssertTrue(failures.contains("offline-cached-open Launch metrics missing from summary"))
         XCTAssertTrue(failures.contains("offline-cached-open Allocations metrics missing from summary"))
     }
 
     func testCatalogParityWithAuditDefinitions() {
         XCTAssertEqual(Set(Budgets.swiftUIByScenario.keys), ScenarioCatalog.swiftUI)
         XCTAssertEqual(Set(Budgets.allocationsByScenario.keys), ScenarioCatalog.allocations)
-        XCTAssertEqual(Set(Budgets.launchByScenario.keys), ["open-recent-window"])
+        XCTAssertEqual(
+            Set(Budgets.launchByScenario.keys),
+            [
+                "open-recent-window",
+                "open-session-window",
+                "open-session-window-visual-options-disabled",
+                "policy-canvas",
+                "agent-detail-form",
+                "agent-detail-form-visual-options-disabled",
+                "decision-detail-form",
+                "decision-detail-form-visual-options-disabled",
+                "task-detail-form",
+                "task-detail-form-visual-options-disabled",
+                "session-search-full",
+                "session-search-full-visual-options-disabled",
+                "timeline-filter-form",
+                "timeline-filter-form-visual-options-disabled",
+                "offline-cached-open",
+            ]
+        )
         XCTAssertEqual(Budgets.defaultSwiftUI.totalUpdates, 35_000)
         XCTAssertEqual(Budgets.retainedRunSizeKiB, 10_240)
     }
