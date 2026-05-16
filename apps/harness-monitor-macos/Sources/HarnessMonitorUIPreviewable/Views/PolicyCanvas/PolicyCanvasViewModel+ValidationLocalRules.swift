@@ -1,4 +1,5 @@
 import Foundation
+import HarnessMonitorKit
 
 extension PolicyCanvasViewModel {
   // MARK: - Local validators
@@ -10,7 +11,7 @@ extension PolicyCanvasViewModel {
   /// not on the current path) are ignored. The stack stores both the node
   /// id and a mutable frontier so we can preserve neighbor ordering and
   /// avoid recomputing adjacency lookups.
-  private func detectCycle() -> [String]? {
+  func detectCycle() -> [String]? {
     var adjacency: [String: [String]] = [:]
     for edge in edges {
       adjacency[edge.source.nodeID, default: []].append(edge.target.nodeID)
@@ -45,7 +46,7 @@ extension PolicyCanvasViewModel {
     return nil
   }
 
-  private struct ErrorIntoAllowMatch {
+  struct ErrorIntoAllowMatch {
     let edgeId: String
     let edgeLabel: String
     let targetNodeId: String
@@ -57,7 +58,7 @@ extension PolicyCanvasViewModel {
     "default-allow", "allow", "permit",
   ]
 
-  private func detectErrorIntoAllowEdges() -> [ErrorIntoAllowMatch] {
+  func detectErrorIntoAllowEdges() -> [ErrorIntoAllowMatch] {
     edges.compactMap { edge -> ErrorIntoAllowMatch? in
       guard edge.kind == .error,
         let target = node(edge.target.nodeID),
@@ -78,12 +79,12 @@ extension PolicyCanvasViewModel {
     }
   }
 
-  private struct DuplicateTitleGroup {
+  struct DuplicateTitleGroup {
     let title: String
     let nodeIds: [String]
   }
 
-  private func detectDuplicateTitles() -> [DuplicateTitleGroup] {
+  func detectDuplicateTitles() -> [DuplicateTitleGroup] {
     let bucketed = Dictionary(grouping: nodes, by: \.title)
     return
       bucketed
@@ -100,7 +101,7 @@ extension PolicyCanvasViewModel {
       .sorted { $0.title < $1.title }
   }
 
-  private func detectOrphanNodes() -> [String] {
+  func detectOrphanNodes() -> [String] {
     var hasEdge = Set<String>()
     for edge in edges {
       hasEdge.insert(edge.source.nodeID)
@@ -114,7 +115,7 @@ extension PolicyCanvasViewModel {
       .map(\.id)
   }
 
-  private func resolvedIssue(
+  func resolvedIssue(
     issue: TaskBoardPolicyPipelineValidationIssue,
     origin: String,
     index: Int
