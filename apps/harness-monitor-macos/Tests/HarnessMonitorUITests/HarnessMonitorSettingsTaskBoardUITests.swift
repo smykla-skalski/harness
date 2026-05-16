@@ -17,6 +17,10 @@ final class HarnessMonitorSettingsTaskBoardUITests: HarnessMonitorUITestCase {
       in: app,
       identifier: Accessibility.settingsTaskBoardTodoistTokenField
     )
+    let todoistProjectField = element(
+      in: app,
+      identifier: "harness.settings.task-board.todoist-inbox.project-filter"
+    )
     let status = element(in: app, identifier: Accessibility.settingsTaskBoardStatus)
 
     XCTAssertTrue(saveButton.waitForExistence(timeout: Self.actionTimeout))
@@ -25,7 +29,14 @@ final class HarnessMonitorSettingsTaskBoardUITests: HarnessMonitorUITestCase {
       ownerField.waitForExistence(timeout: Self.actionTimeout),
       "Task Board settings should load editable fields"
     )
-    XCTAssertTrue(todoistTokenField.exists, "Task Board settings should expose Todoist token")
+    XCTAssertFalse(
+      todoistTokenField.exists,
+      "Task Board settings should hide Todoist token while the integration is disabled"
+    )
+    XCTAssertFalse(
+      todoistProjectField.exists,
+      "Task Board settings should hide Todoist inbox controls while the integration is disabled"
+    )
     XCTAssertFalse(status.exists, "Task Board preview should not settle on a status error")
   }
 }

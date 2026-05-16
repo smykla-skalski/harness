@@ -38,7 +38,6 @@ public struct SettingsTaskBoardSection: View {
         workflowSection
         projectSection
         githubInboxSection
-        todoistInboxSection
         SettingsTaskBoardHostSection(store: store)
         automationSection
         gitDefaultsSection
@@ -185,30 +184,6 @@ public struct SettingsTaskBoardSection: View {
     }
   }
 
-  private var todoistInboxSection: some View {
-    Section {
-      HarnessMonitorMultilineTextField<Never>(
-        placeholder: "project id, one per line (leave empty for all projects)",
-        text: $draft.todoistInboxProjectFilterText,
-        minHeight: 66,
-        accessibilityLabel: "Todoist inbox project filter"
-      )
-      .accessibilityIdentifier(
-        HarnessMonitorAccessibility.settingsTaskBoardTodoistProjectField
-      )
-    } header: {
-      Text("Todoist Inbox")
-        .harnessNativeFormSectionHeader()
-    } footer: {
-      Text(
-        """
-        Add Todoist project ids to restrict imports to tasks in those projects. \
-        Leave empty to import every task on the account.
-        """
-      )
-    }
-  }
-
   private var automationSection: some View {
     Section {
       TextField("Managed Label", text: $draft.managedLabel)
@@ -312,8 +287,6 @@ public struct SettingsTaskBoardSection: View {
     Section {
       SecureField("GitHub Token", text: $draft.globalToken)
         .accessibilityIdentifier(HarnessMonitorAccessibility.settingsTaskBoardGlobalTokenField)
-      SecureField("Todoist Token", text: $draft.todoistToken)
-        .accessibilityIdentifier(HarnessMonitorAccessibility.settingsTaskBoardTodoistTokenField)
     } header: {
       Text("Credentials")
         .harnessNativeFormSectionHeader()

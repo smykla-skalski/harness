@@ -11,7 +11,7 @@ extension TaskBoardPriority: TitledTaskBoardValue {}
 extension TaskBoardAgentMode: TitledTaskBoardValue {}
 
 extension TaskBoardExternalRefProvider {
-  static let taskBoardCases: [TaskBoardExternalRefProvider] = [.gitHub, .todoist]
+  static let taskBoardCases: [TaskBoardExternalRefProvider] = [.gitHub]
 
   var title: String {
     switch self {
@@ -19,6 +19,15 @@ extension TaskBoardExternalRefProvider {
       "GitHub"
     case .todoist:
       "Todoist"
+    }
+  }
+
+  var isVisibleInMonitorUI: Bool {
+    switch self {
+    case .gitHub:
+      true
+    case .todoist:
+      false
     }
   }
 }

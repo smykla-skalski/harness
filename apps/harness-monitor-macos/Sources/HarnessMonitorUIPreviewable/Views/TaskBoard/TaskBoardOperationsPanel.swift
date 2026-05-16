@@ -159,7 +159,7 @@ extension TaskBoardOperationsPanel {
           selection: $syncProviderChoice,
           accessibilityIdentifier: "harness.task-board.sync.provider"
         ) {
-          ForEach(TaskBoardExternalProviderChoice.allCases) { choice in
+          ForEach(TaskBoardExternalProviderChoice.publicCases) { choice in
             Text(choice.title).tag(choice)
           }
         }
@@ -206,11 +206,13 @@ extension TaskBoardOperationsPanel {
       }
 
       if let summary = dashboard.taskBoardSyncSummary {
+        let visibleProviders = summary.monitorVisibleProviders
+        let visibleOperations = summary.monitorVisibleOperations
         summaryPillRow {
           TaskBoardSummaryPill(value: "\(summary.total)", label: "Items")
-          TaskBoardSummaryPill(value: "\(summary.providers.count)", label: "Providers")
-          TaskBoardSummaryPill(value: "\(summary.operations.count)", label: "Ops")
-          let appliedCount = summary.operations.count { $0.applied }
+          TaskBoardSummaryPill(value: "\(visibleProviders.count)", label: "Providers")
+          TaskBoardSummaryPill(value: "\(visibleOperations.count)", label: "Ops")
+          let appliedCount = visibleOperations.count { $0.applied }
           if appliedCount != 0 {
             TaskBoardSummaryPill(
               value: "\(appliedCount)",
@@ -220,26 +222,26 @@ extension TaskBoardOperationsPanel {
           }
         }
 
-        if !summary.providers.isEmpty {
+        if !visibleProviders.isEmpty {
           VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingXS) {
             Text("Providers")
               .scaledFont(.caption.weight(.semibold))
               .foregroundStyle(HarnessMonitorTheme.secondaryInk)
               .accessibilityAddTraits(.isHeader)
-            ForEach(summary.providers, id: \.provider.rawValue) { provider in
+            ForEach(visibleProviders, id: \.provider.rawValue) { provider in
               providerSummaryRow(provider)
             }
           }
         }
 
-        if !summary.operations.isEmpty {
+        if !visibleOperations.isEmpty {
           VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingXS) {
             Text("Recent operations")
               .scaledFont(.caption.weight(.semibold))
               .foregroundStyle(HarnessMonitorTheme.secondaryInk)
               .accessibilityAddTraits(.isHeader)
             ForEach(
-              Array(summary.operations.prefix(4).enumerated()),
+              Array(visibleOperations.prefix(4).enumerated()),
               id: \.offset
             ) { _, operation in
               operationSummaryRow(operation)
