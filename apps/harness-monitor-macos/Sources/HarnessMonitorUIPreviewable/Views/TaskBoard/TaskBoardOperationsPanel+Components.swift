@@ -192,6 +192,9 @@ struct TaskBoardOperationsCard<Content: View>: View {
   let metrics: TaskBoardOverviewMetrics
   let content: Content
 
+  @Environment(\.fontScale)
+  private var fontScale
+
   init(
     title: String,
     systemImage: String,
@@ -204,19 +207,39 @@ struct TaskBoardOperationsCard<Content: View>: View {
     self.content = content()
   }
 
+  // Lightweight VStack chrome replacing the previous Form { Section }
+  // wrapper. Form's grouped style instantiates a scroll view + per-row
+  // _FlexFrameLayout / UnaryLayoutEngine machinery that dominated main-
+  // thread CPU during dashboard scroll (Time Profiler trace 2026-05-16:
+  // ~10-15% across layout engines + metadata cache lookups). The VStack
+  // path keeps the rounded grouped visual using a single background
+  // shape and lets each row's LabeledContent do its own simple HStack
+  // layout - no DisplayList property churn.
   var body: some View {
-    Form {
-      Section {
+    VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
+      Text(title)
+        .harnessNativeFormSectionHeader()
+
+      VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
         content
-      } header: {
-        Text(title)
-          .harnessNativeFormSectionHeader()
+      }
+      .padding(HarnessMonitorTheme.spacingMD)
+      .background(
+        RoundedRectangle(
+          cornerRadius: HarnessMonitorTheme.cornerRadiusMD,
+          style: .continuous
+        )
+        .fill(.background.opacity(0.5))
+      )
+      .overlay {
+        RoundedRectangle(
+          cornerRadius: HarnessMonitorTheme.cornerRadiusMD,
+          style: .continuous
+        )
+        .strokeBorder(HarnessMonitorTheme.controlBorder.opacity(0.4), lineWidth: 0.5)
       }
     }
-    .harnessNativeFormContainer()
-    .contentMargins(.horizontal, 0, for: .scrollContent)
-    .scrollContentBackground(.hidden)
-    .scrollDisabled(true)
+    .font(HarnessMonitorTextSize.scaledFont(.body, by: fontScale))
     .frame(
       maxWidth: .infinity,
       minHeight: metrics.managementPanelMinHeight,
