@@ -44,5 +44,7 @@
 	</array>
 	<key>RunAtLoad</key>
 	<true/>
+	<key>ThrottleInterval</key>
+	<integer>1</integer>
 </dict>
 </plist>
