@@ -1,8 +1,6 @@
 import SwiftUI
 
 private struct HarnessMonitorBackgroundExtensionEffectModifier: ViewModifier {
-  let respectsBackdropMode: Bool
-
   @AppStorage(HarnessMonitorBackdropDefaults.modeKey)
   private var backdropModeRawValue = HarnessMonitorBackdropMode.none.rawValue
   @Environment(\.accessibilityReduceTransparency)
@@ -13,7 +11,7 @@ private struct HarnessMonitorBackgroundExtensionEffectModifier: ViewModifier {
   }
 
   func body(content: Content) -> some View {
-    if reduceTransparency || (respectsBackdropMode && backdropMode == .none) {
+    if reduceTransparency || backdropMode == .none {
       content
     } else {
       content.backgroundExtensionEffect()
@@ -27,21 +25,7 @@ extension View {
     if HarnessMonitorUITestEnvironment.disablesVisualOptions {
       self
     } else {
-      modifier(HarnessMonitorBackgroundExtensionEffectModifier(respectsBackdropMode: true))
+      modifier(HarnessMonitorBackgroundExtensionEffectModifier())
     }
-  }
-
-  @ViewBuilder
-  func harnessMonitorToolbarBackgroundExtensionEffect() -> some View {
-    if HarnessMonitorUITestEnvironment.disablesVisualOptions {
-      self
-    } else {
-      modifier(HarnessMonitorBackgroundExtensionEffectModifier(respectsBackdropMode: false))
-    }
-  }
-
-  @ViewBuilder
-  func sessionWindowBackgroundExtensionEffect() -> some View {
-    harnessMonitorToolbarBackgroundExtensionEffect()
   }
 }

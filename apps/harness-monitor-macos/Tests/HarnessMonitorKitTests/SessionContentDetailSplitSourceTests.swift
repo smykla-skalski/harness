@@ -24,22 +24,23 @@ struct SessionContentDetailSplitSourceTests {
     #expect(splitSource.contains(".onMoveCommand"))
   }
 
-  @Test("Session split uses one stable background extension host")
-  func sessionSplitUsesOneStableBackgroundExtensionHost() throws {
+  @Test("Session split relies on owned scroll edge surfaces")
+  func sessionSplitReliesOnOwnedScrollEdgeSurfaces() throws {
     let columnsSource = try previewableSourceFile(
       named: "Views/Sessions/SessionWindowView+Columns.swift"
     )
-
-    #expect(
-      columnsSource.components(separatedBy: ".sessionWindowBackgroundExtensionEffect()").count
-        - 1 == 2
+    let surfaceSource = try previewableSourceFile(
+      named: "Views/Sessions/SessionDetailSurface.swift"
     )
+
+    #expect(!columnsSource.contains(".sessionWindowBackgroundExtensionEffect()"))
+    #expect(surfaceSource.contains("topScrollEdgeEffect: .soft"))
     #expect(
       !columnsSource.contains(
         """
         SessionContentDetailSplitView(contentWidth: contentColumnWidthBinding) {
                 contentColumn
-                  .sessionWindowBackgroundExtensionEffect()
+                  .scrollEdgeEffectStyle
         """
       )
     )
@@ -48,7 +49,7 @@ struct SessionContentDetailSplitSourceTests {
         """
               } detail: {
                 detailColumn
-                  .sessionWindowBackgroundExtensionEffect()
+                  .scrollEdgeEffectStyle
               }
         """
       )

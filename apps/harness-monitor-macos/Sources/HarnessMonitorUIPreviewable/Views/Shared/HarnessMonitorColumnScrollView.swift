@@ -260,7 +260,7 @@ private struct TopScrollEdgeEffectModifier: ViewModifier {
     case .soft:
       content.scrollEdgeEffectStyle(.soft, for: .top)
     case .hard:
-      content.scrollEdgeEffectStyle(.soft, for: .top)
+      content.scrollEdgeEffectStyle(.hard, for: .top)
     }
   }
 }
