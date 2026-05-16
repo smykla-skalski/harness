@@ -41,15 +41,20 @@ public struct DashboardWindowView: View {
     return decodedVisibility == .all ? .doubleColumn : decodedVisibility
   }
 
-  private var profilingAttributes: [String: String] {
+  private func makeProfilingAttributes(
+    route: DashboardWindowRoute,
+    columnVisibility: NavigationSplitViewVisibility
+  ) -> [String: String] {
     [
       "harness.view.surface": "dashboard",
       "harness.view.column_visibility": SessionColumnVisibilityCodec.encode(columnVisibility),
-      "harness.view.selected_route": selectedRoute.rawValue,
+      "harness.view.selected_route": route.rawValue,
     ]
   }
 
-  private var dashboardStatusSummaryModel: SessionStatusSummaryModel {
+  private func dashboardStatusSummaryModel(
+    route: DashboardWindowRoute
+  ) -> SessionStatusSummaryModel {
     let metrics = store.connectionMetrics
     return SessionStatusSummaryModel(
       metrics: metrics,
@@ -61,7 +66,7 @@ public struct DashboardWindowView: View {
         isMCPRegistryHostEnabled: mcpRegistryHostEnabled
       ),
       connectionSummaryText: harnessSidebarConnectionSummaryText(for: store),
-      sessionStatusTitle: selectedRoute.title
+      sessionStatusTitle: route.title
     )
   }
 
@@ -91,10 +96,19 @@ public struct DashboardWindowView: View {
   }
 
   public var body: some View {
-    ViewBodySignposter.trace(
+    // Resolve once per body eval and reuse — the computed properties decode
+    // the SceneStorage raw strings and `profilingAttributes` would re-encode
+    // them. During audit scroll the dashboard body re-runs hundreds of
+    // times per second, so deduping these decode/encode pairs is real work.
+    let route = selectedRoute
+    let resolvedColumnVisibility = columnVisibility
+    return ViewBodySignposter.trace(
       Self.self,
       "DashboardWindowView",
-      attributes: profilingAttributes
+      attributes: makeProfilingAttributes(
+        route: route,
+        columnVisibility: resolvedColumnVisibility
+      )
     ) {
       VStack(spacing: 0) {
         if let observed = store.health?.wireVersion,
@@ -112,12 +126,12 @@ public struct DashboardWindowView: View {
         ) {
           DashboardSidebar(
             selectedRoute: selectedRouteBinding,
-            statusModel: dashboardStatusSummaryModel
+            statusModel: dashboardStatusSummaryModel(route: route)
           )
         } detail: {
           DashboardBannerStack(store: store) {
             DashboardRouteContent(
-              route: selectedRoute,
+              route: route,
               store: store,
               dashboardUI: dashboardUI,
               sessionCatalog: sessionCatalog
