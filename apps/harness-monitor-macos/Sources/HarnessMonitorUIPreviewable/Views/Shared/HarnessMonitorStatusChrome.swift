@@ -63,6 +63,12 @@ struct HarnessMonitorLoadingStateView: View {
 
   let title: String
   let chrome: Chrome
+  @Environment(\.fontScale)
+  private var fontScale
+
+  private var footnoteFont: Font {
+    HarnessMonitorTextSize.scaledFont(.system(.footnote, design: .rounded, weight: .semibold), by: fontScale)
+  }
 
   init(title: String) {
     self.init(title: title, chrome: .content)
@@ -77,7 +83,7 @@ struct HarnessMonitorLoadingStateView: View {
     HStack(spacing: HarnessMonitorTheme.itemSpacing) {
       HarnessMonitorSpinner(size: 14)
       Text(title)
-        .scaledFont(.system(.footnote, design: .rounded, weight: .semibold))
+        .font(footnoteFont)
     }
     .harnessCellPadding()
     .modifier(
@@ -160,14 +166,23 @@ private struct HarnessMonitorSelectionOutlineModifier: ViewModifier {
 struct HarnessMonitorActionHeader: View {
   let title: String
   let subtitle: String
+  @Environment(\.fontScale)
+  private var fontScale
+
+  private var titleFont: Font {
+    HarnessMonitorTextSize.scaledFont(.system(.headline, design: .rounded, weight: .semibold), by: fontScale)
+  }
+  private var subtitleFont: Font {
+    HarnessMonitorTextSize.scaledFont(.system(.subheadline, design: .rounded, weight: .medium), by: fontScale)
+  }
 
   var body: some View {
     VStack(alignment: .leading, spacing: 4) {
       Text(title)
-        .scaledFont(.system(.headline, design: .rounded, weight: .semibold))
+        .font(titleFont)
         .accessibilityAddTraits(.isHeader)
       Text(subtitle)
-        .scaledFont(.system(.subheadline, design: .rounded, weight: .medium))
+        .font(subtitleFont)
         .foregroundStyle(HarnessMonitorTheme.secondaryInk)
     }
   }
@@ -175,10 +190,16 @@ struct HarnessMonitorActionHeader: View {
 
 struct HarnessMonitorBadge: View {
   let value: String
+  @Environment(\.fontScale)
+  private var fontScale
+
+  private var valueFont: Font {
+    HarnessMonitorTextSize.scaledFont(.caption.bold(), by: fontScale)
+  }
 
   var body: some View {
     Text(value)
-      .scaledFont(.caption.bold())
+      .font(valueFont)
       .harnessPillPadding()
       .harnessContentPill(tint: HarnessMonitorTheme.accent)
   }
