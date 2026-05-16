@@ -1,17 +1,5 @@
 import CoreGraphics
 import Foundation
-import os
-
-/// Router-decision log. Only the *fallback* path emits a line - A* success
-/// is the expected case and a per-frame "solved" log would flood Console.
-/// The fallback line names the reason so an operator looking at a
-/// misshapen polyline can grep the log and confirm which path produced it
-/// (silent supervision becomes observable supervision).
-private let policyCanvasRouterLog = Logger(
-  subsystem: "io.harnessmonitor",
-  category: "policy-canvas.router"
-)
-
 /// Orthogonal visibility-graph router with A* pathfinding. Produces
 /// axis-aligned polylines that avoid node-frame obstacles while minimizing a
 /// `length + bendPenalty * bends` cost. Falls back to the hand-coded router
@@ -119,17 +107,23 @@ struct PolicyCanvasVisibilityRouter: PolicyCanvasEdgeRouter {
     target: CGPoint,
     context: PolicyCanvasRouteContext
   ) -> (route: PolicyCanvasEdgeRoute, cost: CGFloat?) {
-    let prepared = preparedObstacles(source: source, target: target, raw: context.obstacles)
+    let prepared = preparedObstacles(
+      source: source,
+      target: target,
+      sourceActual: context.sourceActual,
+      targetActual: context.targetActual,
+      raw: context.obstacles
+    )
     let gridXs = sortedAxisCoordinates(
       anchor1: source.x,
       anchor2: target.x,
-      laneOffset: laneOffsetX(lane: context.lane),
+      laneOffset: laneOffsetX(lane: context.lane, spacing: context.lineSpacing),
       bounds: prepared.map { ($0.minX, $0.maxX) }
     )
     let gridYs = sortedAxisCoordinates(
       anchor1: source.y,
       anchor2: target.y,
-      laneOffset: laneOffsetY(lane: context.lane),
+      laneOffset: laneOffsetY(lane: context.lane, spacing: context.lineSpacing),
       bounds: prepared.map { ($0.minY, $0.maxY) }
     )
     guard
@@ -185,7 +179,8 @@ struct PolicyCanvasVisibilityRouter: PolicyCanvasEdgeRouter {
       compressed,
       lane: context.lane,
       source: source,
-      target: target
+      target: target,
+      lineSpacing: context.lineSpacing
     )
     let snapped = Self.snapToChannels(spread, source: source, target: target)
     let polyline = PolicyCanvasEdgeRoute(
@@ -195,13 +190,21 @@ struct PolicyCanvasVisibilityRouter: PolicyCanvasEdgeRouter {
     return (polyline, aStarResult.cost)
   }
 
-  private func preparedObstacles(source: CGPoint, target: CGPoint, raw: [CGRect]) -> [CGRect] {
-    raw.compactMap { rect in
+  private func preparedObstacles(
+    source: CGPoint,
+    target: CGPoint,
+    sourceActual: CGPoint?,
+    targetActual: CGPoint?,
+    raw: [CGRect]
+  ) -> [CGRect] {
+    let sourceDropPoint = sourceActual ?? source
+    let targetDropPoint = targetActual ?? target
+    return raw.reduce(into: [CGRect]()) { result, rect in
       let padded = rect.insetBy(dx: -Self.obstaclePadding, dy: -Self.obstaclePadding)
-      if padded.contains(source) || padded.contains(target) {
-        return nil
+      if padded.contains(sourceDropPoint) || padded.contains(targetDropPoint) {
+        return
       }
-      return padded
+      result.append(padded)
     }
   }
 
@@ -221,12 +224,12 @@ struct PolicyCanvasVisibilityRouter: PolicyCanvasEdgeRouter {
     return values.sorted()
   }
 
-  private func laneOffsetX(lane: Int) -> CGFloat {
-    CGFloat(((lane % 12) - 6)) * Self.channelStep
+  private func laneOffsetX(lane: Int, spacing: CGFloat) -> CGFloat {
+    CGFloat(((lane % 12) - 6)) * spacing
   }
 
-  private func laneOffsetY(lane: Int) -> CGFloat {
-    CGFloat(((lane / 12) - 6)) * Self.channelStep
+  private func laneOffsetY(lane: Int, spacing: CGFloat) -> CGFloat {
+    CGFloat(((lane / 12) - 6)) * spacing
   }
 
   private func fallback(
@@ -241,7 +244,10 @@ struct PolicyCanvasVisibilityRouter: PolicyCanvasEdgeRouter {
         lane: context.lane,
         groups: context.groups,
         sourceGroupID: context.sourceGroupID,
-        targetGroupID: context.targetGroupID
+        targetGroupID: context.targetGroupID,
+        sourceActual: context.sourceActual,
+        targetActual: context.targetActual,
+        lineSpacing: context.lineSpacing
       )
     )
   }
@@ -271,57 +277,47 @@ struct PolicyCanvasVisibilityRouter: PolicyCanvasEdgeRouter {
     return result
   }
 
-  /// Shift a 4-point detour route's bus segment perpendicular to itself by
-  /// `lane * channelStep`, pushing each lane's bus into its own visual track.
-  /// A* picks the shortest detour line for every lane; without this spread
-  /// step parallel edges between the same column pair stack on top of one
-  /// another. Only applies to the simple `[source, A, B, target]` shape - more
-  /// complex multi-bend routes are left untouched and rely on lane-anchored
-  /// midX/midY grid coordinates instead.
+  /// Shift the longest internal bus segment perpendicular to itself by
+  /// `lane * laneSpreadStep`, pushing each lane's shared corridor into its own
+  /// visual track. Simple 4-point detours keep the older "skip large endpoint
+  /// deltas" guard, while longer multi-bend routes spread their dominant
+  /// interior run unconditionally because the offset no longer creates a
+  /// visible endpoint zig-zag.
   static func applyLaneSpread(
     _ points: [CGPoint],
     lane: Int,
     source: CGPoint,
-    target: CGPoint
+    target: CGPoint,
+    lineSpacing: CGFloat = PolicyCanvasLayout.defaultEdgeLineSpacing
   ) -> [CGPoint] {
-    guard lane != 0, points.count == 4 else {
+    guard lane != 0, points.count >= 4 else {
       return points
     }
-    let pointA = points[1]
-    let pointB = points[2]
-    let busHorizontal = abs(pointA.y - pointB.y) < 0.001
-    let offset = CGFloat(lane) * laneSpreadStep
-    if busHorizontal {
-      // Horizontal bus runs between two non-aligned endpoints. Skip
-      // the lane shift when source and target are vertically far
-      // apart: A* already routes the bus near one endpoint's Y, and
-      // stacking a perpendicular shift on top forces a zig-zag away
-      // from the target. The natural Y delta gives parallel lanes
-      // distinct entry/exit Ys without help.
-      if abs(source.y - target.y) > 60 {
+    guard let segment = dominantInternalBusSegment(in: points) else {
+      return points
+    }
+    let pointA = points[segment.startIndex]
+    let offset = CGFloat(lane) * lineSpacing
+    if segment.isHorizontal {
+      if points.count == 4, abs(source.y - target.y) > 60 {
         return points
       }
       let midY = (source.y + target.y) / 2
       let direction: CGFloat = pointA.y >= midY ? 1 : -1
-      return [
-        points[0],
-        CGPoint(x: pointA.x, y: pointA.y + direction * offset),
-        CGPoint(x: pointB.x, y: pointB.y + direction * offset),
-        points[3],
-      ]
+      var spread = points
+      spread[segment.startIndex].y += direction * offset
+      spread[segment.endIndex].y += direction * offset
+      return spread
     }
-    // Vertical bus (the symmetric case). Same logic on the X axis.
-    if abs(source.x - target.x) > 60 {
+    if points.count == 4, abs(source.x - target.x) > 60 {
       return points
     }
     let midX = (source.x + target.x) / 2
     let direction: CGFloat = pointA.x >= midX ? 1 : -1
-    return [
-      points[0],
-      CGPoint(x: pointA.x + direction * offset, y: pointA.y),
-      CGPoint(x: pointB.x + direction * offset, y: pointB.y),
-      points[3],
-    ]
+    var spread = points
+    spread[segment.startIndex].x += direction * offset
+    spread[segment.endIndex].x += direction * offset
+    return spread
   }
 
   static func snapToChannels(_ points: [CGPoint], source: CGPoint, target: CGPoint) -> [CGPoint] {
@@ -375,23 +371,41 @@ struct PolicyCanvasVisibilityRouter: PolicyCanvasEdgeRouter {
     let right = points[bestIndex + 1]
     return CGPoint(x: (left.x + right.x) / 2, y: (left.y + right.y) / 2)
   }
-}
 
-/// Grid coordinate as (xIndex, yIndex) into the router's sorted axis arrays.
-struct PolicyCanvasGridIndex: Hashable {
-  let x: Int
-  let y: Int
-}
+  private struct InternalBusSegment {
+    let startIndex: Int
+    let endIndex: Int
+    let isHorizontal: Bool
+    let length: CGFloat
+  }
 
-/// A* state for orthogonal routing. Direction tracks how the path arrived at
-/// the current cell so bend penalties only apply on actual axis changes.
-struct PolicyCanvasAStarState: Hashable {
-  let index: PolicyCanvasGridIndex
-  let direction: PolicyCanvasAStarDirection
-}
-
-enum PolicyCanvasAStarDirection: Hashable {
-  case start
-  case horizontal
-  case vertical
+  private static func dominantInternalBusSegment(in points: [CGPoint]) -> InternalBusSegment? {
+    guard points.count >= 4 else {
+      return nil
+    }
+    return (1..<(points.count - 2)).compactMap { index in
+      let start = points[index]
+      let end = points[index + 1]
+      if abs(start.y - end.y) < 0.001 {
+        return InternalBusSegment(
+          startIndex: index,
+          endIndex: index + 1,
+          isHorizontal: true,
+          length: abs(end.x - start.x)
+        )
+      }
+      if abs(start.x - end.x) < 0.001 {
+        return InternalBusSegment(
+          startIndex: index,
+          endIndex: index + 1,
+          isHorizontal: false,
+          length: abs(end.y - start.y)
+        )
+      }
+      return nil
+    }
+    .max { left, right in
+      left.length < right.length
+    }
+  }
 }

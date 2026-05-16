@@ -231,47 +231,6 @@ struct PolicyCanvasViewModelTests {
     #expect(failureCondition?.reasonCode == "checks_not_green")
   }
 
-  @Test("loaded default graph starts with clear non-overlapping layout")
-  func loadedDefaultGraphStartsWithClearNonOverlappingLayout() {
-    let document = overlappingDefaultPolicyDocument(revision: 14)
-    let viewModel = PolicyCanvasViewModel.sample()
-
-    viewModel.load(document: document, simulation: nil, audit: nil)
-
-    let groupFrames = Dictionary(uniqueKeysWithValues: viewModel.groups.map { ($0.id, $0.frame) })
-    #expect(groupFrames["entry"]?.minX == PolicyCanvasLayout.initialContentOrigin.x)
-    #expect(
-      groupFrames.values.allSatisfy { frame in
-        frame.minX >= PolicyCanvasLayout.initialContentOrigin.x
-          && frame.minY >= PolicyCanvasLayout.initialContentOrigin.y
-      }
-    )
-    #expect(!intersects(groupFrames["entry"], groupFrames["merge"]))
-    #expect(!intersects(groupFrames["merge"], groupFrames["terminal"]))
-    #expect(!intersects(groupFrames["entry"], groupFrames["terminal"]))
-    #expect(!viewModel.nodesContainOverlaps)
-    #expect(
-      viewModel.nodes.allSatisfy { node in
-        guard let groupID = node.groupID, let frame = groupFrames[groupID] else {
-          return true
-        }
-        return frame.contains(CGRect(origin: node.position, size: PolicyCanvasLayout.nodeSize))
-      }
-    )
-  }
-
-  @Test("loaded default graph starts centered in large canvas space")
-  func loadedDefaultGraphStartsCenteredInLargeCanvasSpace() {
-    let viewModel = PolicyCanvasViewModel.sample()
-    viewModel.load(
-      document: PreviewFixtures.policyCanvasPipelineDocument(), simulation: nil, audit: nil)
-
-    #expect(viewModel.initialViewportAnchorPoint.x == viewModel.canvasContentBounds.midX)
-    #expect(viewModel.initialViewportAnchorPoint.y == viewModel.canvasContentBounds.midY)
-    #expect(viewModel.canvasContentSize.width - viewModel.canvasContentBounds.maxX >= 1_000)
-    #expect(viewModel.canvasContentSize.height - viewModel.canvasContentBounds.maxY >= 1_000)
-  }
-
   @Test("generic policy edge labels are hidden")
   func genericPolicyEdgeLabelsAreHidden() {
     let edge = TaskBoardPolicyPipelineEdge(

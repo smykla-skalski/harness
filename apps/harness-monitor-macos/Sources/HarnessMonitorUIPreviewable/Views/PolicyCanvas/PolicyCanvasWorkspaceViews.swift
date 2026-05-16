@@ -35,25 +35,52 @@ struct PolicyCanvasViewport: View {
   @State private var isRestoringCommandScrollPosition = false
   @Environment(\.scenePhase)
   private var scenePhase
+  @Environment(\.policyCanvasEdgeRouter)
+  private var router
+  @Environment(\.fontScale)
+  private var fontScale
 
   var body: some View {
     GeometryReader { proxy in
       ScrollViewReader { scrollProxy in
+        let edges = viewModel.edges
+        let portAnchors = viewModel.portAnchors(for: edges)
+        let routes = policyCanvasDisplayedRoutes(
+          viewModel: viewModel,
+          edges: edges,
+          portAnchors: portAnchors,
+          router: router
+        )
+        let labelMetrics = PolicyCanvasEdgeLabelMetrics(fontScale: fontScale)
+        let labelPositions = policyCanvasResolvedLabelPositions(
+          viewModel: viewModel,
+          edges: edges,
+          routes: routes,
+          fontScale: fontScale
+        )
+        let visibleBounds = policyCanvasVisibleBounds(
+          viewModel: viewModel,
+          edges: edges,
+          routes: routes,
+          labelPositions: labelPositions,
+          labelSize: CGSize(
+            width: PolicyCanvasLayout.edgeLabelMaxWidth,
+            height: labelMetrics.height
+          )
+        )
+        let contentSize = policyCanvasVisibleContentSize(visibleBounds: visibleBounds)
         ScrollView([.horizontal, .vertical]) {
-          // Hoist the edges array and the bulk port-anchor map once per
-          // viewport body run, then pass both into the edge layers. Before
-          // this hoist, `PolicyCanvasEdgeLayer` and `PolicyCanvasEdgeLabelLayer`
-          // each rebuilt the same dictionary, doubling the cost per render
-          // cycle. Each layer's body also read `viewModel.edges` twice via
-          // the `@Observable` accessor.
-          let edges = viewModel.edges
-          let portAnchors = viewModel.portAnchors(for: edges)
           ZStack(alignment: .topLeading) {
             PolicyCanvasDottedGrid(spacing: PolicyCanvasLayout.gridSize * viewModel.zoom)
 
             Color.clear
               .frame(width: 1, height: 1)
-              .position(viewModel.initialViewportAnchorPoint)
+              .position(
+                policyCanvasInitialViewportAnchorPoint(
+                  visibleBounds: visibleBounds,
+                  zoom: viewModel.zoom
+                )
+              )
               .id(PolicyCanvasLayout.initialViewportAnchorID)
               .accessibilityHidden(true)
 
@@ -63,7 +90,7 @@ struct PolicyCanvasViewport: View {
                 viewModel: viewModel,
                 focusedComponent: focusedComponent,
                 edges: edges,
-                portAnchors: portAnchors
+                routes: routes
               )
               PolicyCanvasRubberBandLayer(viewModel: viewModel)
               PolicyCanvasNodeLayer(viewModel: viewModel, focusedComponent: focusedComponent)
@@ -74,7 +101,8 @@ struct PolicyCanvasViewport: View {
                 viewModel: viewModel,
                 focusedComponent: focusedComponent,
                 edges: edges,
-                portAnchors: portAnchors
+                routes: routes,
+                labelPositions: labelPositions
               )
             }
             // Pinch zoom uses the unit-space anchor captured on pinch start so
@@ -86,8 +114,8 @@ struct PolicyCanvasViewport: View {
             .coordinateSpace(.named(PolicyCanvasCoordinateSpaces.canvas))
           }
           .frame(
-            width: max(proxy.size.width, viewModel.canvasContentSize.width * viewModel.zoom),
-            height: max(proxy.size.height, viewModel.canvasContentSize.height * viewModel.zoom),
+            width: max(proxy.size.width, contentSize.width * viewModel.zoom),
+            height: max(proxy.size.height, contentSize.height * viewModel.zoom),
             alignment: .topLeading
           )
           .contentShape(Rectangle())
@@ -149,11 +177,19 @@ struct PolicyCanvasViewport: View {
         }
         .simultaneousGesture(magnifyGesture(in: proxy.size))
         .onAppear {
-          centerViewportIfNeeded(scrollProxy)
+          centerViewportIfNeeded(
+            scrollProxy,
+            viewportSize: proxy.size,
+            visibleBounds: visibleBounds
+          )
           bindZoomFocusDispatcher()
         }
         .onChange(of: viewModel.viewportCenteringGeneration, initial: false) {
-          centerViewportIfNeeded(scrollProxy)
+          centerViewportIfNeeded(
+            scrollProxy,
+            viewportSize: proxy.size,
+            visibleBounds: visibleBounds
+          )
         }
         .onChange(of: scenePhase) { _, newPhase in
           // When the scene leaves .active mid-pinch (Cmd-Tab, Mission
@@ -207,11 +243,24 @@ struct PolicyCanvasViewport: View {
     .accessibilityFrameMarker(HarnessMonitorAccessibility.policyCanvasViewport)
   }
 
-  private func centerViewportIfNeeded(_ scrollProxy: ScrollViewProxy) {
+  private func centerViewportIfNeeded(
+    _ scrollProxy: ScrollViewProxy,
+    viewportSize: CGSize,
+    visibleBounds: CGRect
+  ) {
     guard viewModel.consumeViewportCenteringRequest() else {
       return
     }
+    let fittedZoom = viewModel.fittedInitialZoom(
+      for: viewportSize,
+      contentBounds: visibleBounds
+    )
+    let targetZoom = viewModel.isEmpty ? viewModel.zoom : min(viewModel.zoom, fittedZoom)
+    if abs(targetZoom - viewModel.zoom) > 0.001 {
+      viewModel.setZoom(targetZoom)
+    }
     Task { @MainActor in
+      await Task.yield()
       await Task.yield()
       scrollProxy.scrollTo(PolicyCanvasLayout.initialViewportAnchorID, anchor: .center)
     }

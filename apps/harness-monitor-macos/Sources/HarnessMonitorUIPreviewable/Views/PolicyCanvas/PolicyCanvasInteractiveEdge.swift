@@ -283,10 +283,11 @@ enum PolicyCanvasEdgeAnimation {
     return apparent / zoom
   }
 
-  /// Adapt a static kind-dash pattern (`[3,2]` for error, `[6,4]` for
+  /// Adapt a static kind-dash pattern (`[4,5]` for error, `[6,4]` for
   /// control) for far-zoom rendering. The canvas applies
   /// `.scaleEffect(viewModel.zoom)` over the whole edge layer, so a
-  /// `[3,2]` world pattern renders as `~0.75pt` dashes at zoom 0.25 -
+  /// `[4,5]` world pattern renders as `~1pt / 1.25pt` on-screen lengths at
+  /// zoom 0.25 -
   /// approaching the device-pixel limit where dashes alias to solid.
   /// Multiplying the pattern by `1 / max(0.5, zoom)` keeps the on-screen
   /// dash period constant across zoom levels at and below 1x.
