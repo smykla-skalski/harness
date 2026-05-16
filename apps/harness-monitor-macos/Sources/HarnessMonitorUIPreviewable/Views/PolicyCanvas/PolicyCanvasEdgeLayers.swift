@@ -11,32 +11,17 @@ struct PolicyCanvasEdgeLayer: View {
   /// Hoisted from the viewport parent's body. Iterating the parameter-bound
   /// `edges` instead of `viewModel.edges` avoids a second `@Observable`
   /// accessor invocation per render (the parent already read it once when
-  /// building the `portAnchors` map).
+  /// building the displayed-route map).
   let edges: [PolicyCanvasEdge]
-  /// Bulk port-anchor map computed once in the viewport parent and shared
-  /// with `PolicyCanvasEdgeLabelLayer` so the two layers do not each rebuild
-  /// the same dictionary per render cycle.
-  let portAnchors: [PolicyCanvasPortEndpoint: CGPoint]
-  @Environment(\.policyCanvasEdgeRouter)
-  private var router
+  let routes: [String: PolicyCanvasEdgeRoute]
 
   var body: some View {
     // Severity map and edge-lane assignments stay local to this layer:
     // both are layer-specific and the label layer does not need them.
     let severityMap = viewModel.edgeSeverityMap
-    let edgeLanes = viewModel.edgeRouteLanes
     ZStack(alignment: .topLeading) {
       ForEach(edges) { edge in
-        if let source = portAnchors[edge.source],
-          let target = portAnchors[edge.target]
-        {
-          let route = routeFor(
-            edge: edge,
-            source: source,
-            target: target,
-            lane: edgeLanes[edge.id, default: 0],
-            obstacles: viewModel.routingObstacles(source: source, target: target)
-          )
+        if let route = routes[edge.id] {
           let severity = severityMap[edge.id]
           let isSelected = viewModel.selection == .edge(edge.id)
           PolicyCanvasInteractiveEdge(
@@ -60,39 +45,6 @@ struct PolicyCanvasEdgeLayer: View {
         }
       }
     }
-  }
-
-  /// Pick the route per edge. Pinned edges (the default) go straight to the
-  /// single-anchor router path; unpinned edges expand to the 4-side
-  /// candidate list so T2.2 can pick the lowest-bend combination.
-  private func routeFor(
-    edge: PolicyCanvasEdge,
-    source: CGPoint,
-    target: CGPoint,
-    lane: Int,
-    obstacles: [CGRect]
-  ) -> PolicyCanvasEdgeRoute {
-    let sourceGroupID = viewModel.node(edge.source.nodeID)?.groupID
-    let targetGroupID = viewModel.node(edge.target.nodeID)?.groupID
-    let context = PolicyCanvasRouteContext(
-      lane: lane,
-      groups: viewModel.groups,
-      sourceGroupID: sourceGroupID,
-      targetGroupID: targetGroupID,
-      obstacles: obstacles
-    )
-    if edge.effectivePinnedPortSide {
-      return router.route(
-        source: source,
-        target: target,
-        context: context
-      )
-    }
-    return router.route(
-      sourceCandidates: viewModel.portAnchorCandidates(for: edge.source),
-      targetCandidates: viewModel.portAnchorCandidates(for: edge.target),
-      context: context
-    )
   }
 
   private func edgeColor(for edge: PolicyCanvasEdge) -> Color {
@@ -144,13 +96,10 @@ struct PolicyCanvasEdgeLabelLayer: View {
   /// layers iterate the same hoisted array (one `@Observable` read instead
   /// of one read per layer).
   let edges: [PolicyCanvasEdge]
-  /// Shared bulk port-anchor map built once in the viewport parent — see
-  /// `PolicyCanvasEdgeLayer` for the dedup rationale.
-  let portAnchors: [PolicyCanvasPortEndpoint: CGPoint]
+  let routes: [String: PolicyCanvasEdgeRoute]
+  let labelPositions: [String: CGPoint]
   @Environment(\.fontScale)
   private var fontScale
-  @Environment(\.policyCanvasEdgeRouter)
-  private var router
 
   /// Below this zoom, capsule labels collapse to a 4pt accent-colored dot
   /// at the label anchor. React Flow's threshold is 0.6; matches the
@@ -160,26 +109,16 @@ struct PolicyCanvasEdgeLabelLayer: View {
 
   var body: some View {
     let metrics = PolicyCanvasEdgeLabelMetrics(fontScale: fontScale)
-    let edgeLanes = viewModel.edgeRouteLanes
     let collapsed = viewModel.zoom < Self.labelCollapseThreshold
     ZStack(alignment: .topLeading) {
       ForEach(edges) { edge in
-        if !edge.label.isEmpty,
-          let source = portAnchors[edge.source],
-          let target = portAnchors[edge.target]
-        {
-          let route = labelRouteFor(
-            edge: edge,
-            source: source,
-            target: target,
-            lane: edgeLanes[edge.id, default: 0],
-            obstacles: viewModel.routingObstacles(source: source, target: target)
-          )
+        if !edge.label.isEmpty, let route = routes[edge.id] {
+          let labelPosition = labelPositions[edge.id] ?? route.labelPosition
           if collapsed {
             Circle()
               .fill(edgeColor(for: edge).opacity(0.72))
               .frame(width: 4, height: 4)
-              .position(route.labelPosition)
+              .position(labelPosition)
               .help(edge.label)
               // Stroke layer (PolicyCanvasInteractiveEdge) owns the rotor
               // entry. Hiding the dot from a11y avoids the duplicate
@@ -210,7 +149,7 @@ struct PolicyCanvasEdgeLabelLayer: View {
                 }
             }
             .harnessPlainButtonStyle()
-            .position(route.labelPosition)
+            .position(labelPosition)
             // Stroke owns the rotor entry per edge; the capsule stays
             // clickable for sighted users but the a11y tree only carries
             // it once (on the stroke). Hiding the Button from a11y
@@ -229,54 +168,6 @@ struct PolicyCanvasEdgeLabelLayer: View {
 
   private func edgeColor(for edge: PolicyCanvasEdge) -> Color {
     edge.kind.accentColor
-  }
-
-  /// Mirrors `PolicyCanvasEdgeLayer.routeFor` so the label position stays on
-  /// the same polyline the stroke layer draws.
-  private func labelRouteFor(
-    edge: PolicyCanvasEdge,
-    source: CGPoint,
-    target: CGPoint,
-    lane: Int,
-    obstacles: [CGRect]
-  ) -> PolicyCanvasEdgeRoute {
-    let sourceGroupID = viewModel.node(edge.source.nodeID)?.groupID
-    let targetGroupID = viewModel.node(edge.target.nodeID)?.groupID
-    let context = PolicyCanvasRouteContext(
-      lane: lane,
-      groups: viewModel.groups,
-      sourceGroupID: sourceGroupID,
-      targetGroupID: targetGroupID,
-      obstacles: obstacles
-    )
-    if edge.effectivePinnedPortSide {
-      return router.route(
-        source: source,
-        target: target,
-        context: context
-      )
-    }
-    return router.route(
-      sourceCandidates: viewModel.portAnchorCandidates(for: edge.source),
-      targetCandidates: viewModel.portAnchorCandidates(for: edge.target),
-      context: context
-    )
-  }
-}
-
-struct PolicyCanvasEdgeLabelMetrics {
-  let horizontalPadding: CGFloat
-  let minWidth: CGFloat
-  let height: CGFloat
-
-  init(fontScale: CGFloat) {
-    let scale = min(SessionWindowFontScale.metricsScale(for: fontScale), 1.45)
-    horizontalPadding = (12 * scale).rounded(.up)
-    minWidth = (88 * scale).rounded(.up)
-    height = max(
-      PolicyCanvasLayout.edgeLabelHeight,
-      (PolicyCanvasLayout.edgeLabelHeight * scale).rounded(.up)
-    )
   }
 }
 

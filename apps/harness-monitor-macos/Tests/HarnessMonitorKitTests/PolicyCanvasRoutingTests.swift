@@ -151,6 +151,39 @@ struct PolicyCanvasRoutingTests {
     }
   }
 
+  @Test("display label placement separates overlapping capsules")
+  func displayLabelPlacementSeparatesOverlappingCapsules() {
+    let positions = policyCanvasResolvedLabelPositions(
+      routes: [
+        (
+          id: "edge-a",
+          route: PolicyCanvasEdgeRoute(
+            points: [CGPoint(x: 0, y: 0), CGPoint(x: 220, y: 0)],
+            labelPosition: CGPoint(x: 110, y: 100)
+          )
+        ),
+        (
+          id: "edge-b",
+          route: PolicyCanvasEdgeRoute(
+            points: [CGPoint(x: 20, y: 0), CGPoint(x: 240, y: 0)],
+            labelPosition: CGPoint(x: 110, y: 100)
+          )
+        ),
+      ],
+      nodeFrames: [],
+      labelSize: CGSize(
+        width: PolicyCanvasLayout.edgeLabelMaxWidth,
+        height: PolicyCanvasLayout.edgeLabelHeight
+      )
+    )
+
+    guard let first = positions["edge-a"], let second = positions["edge-b"] else {
+      Issue.record("expected both label positions")
+      return
+    }
+    #expect(!edgeLabelFrame(first).intersects(edgeLabelFrame(second)))
+  }
+
   private var defaultGroups: [PolicyCanvasGroup] {
     [entryGroup, mergeGroup, terminalGroup]
   }

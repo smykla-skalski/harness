@@ -2,9 +2,10 @@ import HarnessMonitorKit
 import SwiftUI
 
 /// Default-layout helpers + overlap detection used by
-/// `policyCanvasCleanInitialLayout(nodes:groups:)`. Pulled out of
-/// `PolicyCanvasModelMapping.swift` so the mapping file stays under the
-/// 420-line cap; the helpers themselves are unchanged.
+/// `policyCanvasCleanInitialLayout(nodes:groups:)`. The default policy graph
+/// gets a computed, centered arrangement instead of the older fixed
+/// coordinates so dense terminal groups can fan out horizontally and the first
+/// paint lands with balanced whitespace inside the minimum canvas.
 func policyCanvasUsesDefaultPolicyGroups(_ groups: [PolicyCanvasGroup]) -> Bool {
   let groupIDs = Set(groups.map(\.id))
   return ["entry", "merge", "terminal"].allSatisfy(groupIDs.contains)
@@ -24,14 +25,46 @@ func applyDefaultPolicyCanvasLayout(
   nodes: inout [PolicyCanvasNode],
   groups: inout [PolicyCanvasGroup]
 ) {
+  var groupsByID = Dictionary(uniqueKeysWithValues: groups.map { ($0.id, $0) })
+  let nodeIndexByID = Dictionary(uniqueKeysWithValues: nodes.enumerated().map { ($1.id, $0) })
+  var nextGroupMinX: CGFloat = 0
+
+  for layout in defaultPolicyCanvasGroupLayouts {
+    let memberIndices = orderedDefaultPolicyMemberIndices(
+      for: layout,
+      nodes: nodes,
+      nodeIndexByID: nodeIndexByID
+    )
+    guard !memberIndices.isEmpty else {
+      continue
+    }
+    let columnCount = min(max(layout.maxColumns, 1), memberIndices.count)
+    for (offset, nodeIndex) in memberIndices.enumerated() {
+      let row = offset / columnCount
+      let column = offset % columnCount
+      nodes[nodeIndex].position = CGPoint(
+        x: nextGroupMinX
+          + PolicyCanvasLayout.groupHorizontalPadding
+          + (CGFloat(column) * defaultPolicyCanvasColumnStep),
+        y: PolicyCanvasLayout.groupVerticalPadding
+          + (CGFloat(row) * defaultPolicyCanvasRowStep)
+      )
+    }
+    let members = memberIndices.map { nodes[$0] }
+    guard let frame = policyCanvasGroupFrame(containing: members) else {
+      continue
+    }
+    groupsByID[layout.id]?.frame = frame
+    nextGroupMinX = frame.maxX + defaultPolicyCanvasInterGroupSpacing
+  }
+
   for index in groups.indices {
-    guard let frame = defaultPolicyCanvasGroupFrames[groups[index].id] else { continue }
-    groups[index].frame = frame
+    if let frame = groupsByID[groups[index].id]?.frame {
+      groups[index].frame = frame
+    }
   }
-  for index in nodes.indices {
-    guard let position = defaultPolicyCanvasNodePositions[nodes[index].id] else { continue }
-    nodes[index].position = position
-  }
+
+  policyCanvasCenterInMinimumCanvas(nodes: &nodes, groups: &groups)
 }
 
 func policyCanvasNormalizeMinimumOrigin(
@@ -138,22 +171,105 @@ extension CGRect {
   }
 }
 
-let defaultPolicyCanvasGroupFrames: [String: CGRect] = [
-  "entry": CGRect(x: 520, y: 520, width: 256, height: 220),
-  "merge": CGRect(x: 1_060, y: 520, width: 256, height: 480),
-  "terminal": CGRect(x: 2_140, y: 480, width: 256, height: 1_220),
+private let defaultPolicyCanvasInterGroupSpacing: CGFloat = 220
+private let defaultPolicyCanvasColumnGap: CGFloat = 140
+private let defaultPolicyCanvasRowGap: CGFloat = 140
+private let defaultPolicyCanvasColumnStep =
+  PolicyCanvasLayout.nodeSize.width + defaultPolicyCanvasColumnGap
+private let defaultPolicyCanvasRowStep =
+  PolicyCanvasLayout.nodeSize.height + defaultPolicyCanvasRowGap
+
+private struct DefaultPolicyCanvasGroupLayout {
+  let id: String
+  let maxColumns: Int
+  let preferredNodeOrder: [String]
+}
+
+private let defaultPolicyCanvasGroupLayouts: [DefaultPolicyCanvasGroupLayout] = [
+  DefaultPolicyCanvasGroupLayout(
+    id: "entry",
+    maxColumns: 1,
+    preferredNodeOrder: ["action:router"]
+  ),
+  DefaultPolicyCanvasGroupLayout(
+    id: "merge",
+    maxColumns: 1,
+    preferredNodeOrder: ["evidence:merge", "risk:merge"]
+  ),
+  DefaultPolicyCanvasGroupLayout(
+    id: "terminal",
+    maxColumns: 2,
+    preferredNodeOrder: [
+      "supervisor:default-allow",
+      "dry_run:mutate_repo",
+      "human:unsafe-action",
+      "consensus:protected-path",
+      "human:missing-merge-evidence",
+      "supervisor:merge-deny",
+      "dry_run:high-risk-merge",
+      "supervisor:auto-merge",
+    ]
+  ),
 ]
 
-let defaultPolicyCanvasNodePositions: [String: CGPoint] = [
-  "action:router": CGPoint(x: 564, y: 572),
-  "evidence:merge": CGPoint(x: 1_104, y: 572),
-  "risk:merge": CGPoint(x: 1_104, y: 852),
-  "supervisor:default-allow": CGPoint(x: 2_184, y: 532),
-  "dry_run:mutate_repo": CGPoint(x: 2_184, y: 672),
-  "human:unsafe-action": CGPoint(x: 2_184, y: 812),
-  "human:missing-merge-evidence": CGPoint(x: 2_184, y: 952),
-  "consensus:protected-path": CGPoint(x: 2_184, y: 1_092),
-  "dry_run:high-risk-merge": CGPoint(x: 2_184, y: 1_232),
-  "supervisor:merge-deny": CGPoint(x: 2_184, y: 1_372),
-  "supervisor:auto-merge": CGPoint(x: 2_184, y: 1_512),
-]
+private func orderedDefaultPolicyMemberIndices(
+  for layout: DefaultPolicyCanvasGroupLayout,
+  nodes: [PolicyCanvasNode],
+  nodeIndexByID: [String: Int]
+) -> [Int] {
+  let memberIndices = nodes.indices.filter { nodes[$0].groupID == layout.id }
+  guard !memberIndices.isEmpty else {
+    return []
+  }
+  let preferredOrder = Dictionary(
+    uniqueKeysWithValues: layout.preferredNodeOrder.enumerated().map { ($1, $0) }
+  )
+  return memberIndices.sorted { left, right in
+    let leftNode = nodes[left]
+    let rightNode = nodes[right]
+    let leftPreferred = preferredOrder[leftNode.id] ?? Int.max
+    let rightPreferred = preferredOrder[rightNode.id] ?? Int.max
+    if leftPreferred != rightPreferred {
+      return leftPreferred < rightPreferred
+    }
+    return (nodeIndexByID[leftNode.id] ?? left) < (nodeIndexByID[rightNode.id] ?? right)
+  }
+}
+
+private func policyCanvasCenterInMinimumCanvas(
+  nodes: inout [PolicyCanvasNode],
+  groups: inout [PolicyCanvasGroup]
+) {
+  let bounds = policyCanvasBounds(nodes: nodes, groups: groups)
+  guard !bounds.isNull else {
+    return
+  }
+  let targetCanvasWidth = max(
+    PolicyCanvasLayout.minimumCanvasSize.width,
+    bounds.width + (PolicyCanvasLayout.canvasTrailingPadding * 2)
+  )
+  let targetCanvasHeight = max(
+    PolicyCanvasLayout.minimumCanvasSize.height,
+    bounds.height + (PolicyCanvasLayout.canvasBottomPadding * 2)
+  )
+  let centeredMinX = max(
+    PolicyCanvasLayout.initialContentOrigin.x,
+    (targetCanvasWidth - bounds.width) / 2
+  )
+  let centeredMinY = max(
+    PolicyCanvasLayout.initialContentOrigin.y,
+    (targetCanvasHeight - bounds.height) / 2
+  )
+  let dx = centeredMinX - bounds.minX
+  let dy = centeredMinY - bounds.minY
+  guard dx != 0 || dy != 0 else {
+    return
+  }
+  for index in nodes.indices {
+    nodes[index].position.x += dx
+    nodes[index].position.y += dy
+  }
+  for index in groups.indices {
+    groups[index].frame = groups[index].frame.offsetBy(dx: dx, dy: dy)
+  }
+}

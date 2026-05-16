@@ -45,31 +45,46 @@ extension PolicyCanvasViewModel {
     )
   }
 
+  func fittedInitialZoom(
+    for viewportSize: CGSize,
+    contentBounds: CGRect? = nil
+  ) -> CGFloat {
+    guard viewportSize.width > 0, viewportSize.height > 0 else {
+      return zoom
+    }
+    let bounds = contentBounds ?? canvasContentBounds
+    guard !bounds.isNull else {
+      return zoom
+    }
+    let inset = PolicyCanvasLayout.initialViewportInset * 2
+    let width = bounds.width + inset
+    let height = bounds.height + inset
+    guard width > 0, height > 0 else {
+      return zoom
+    }
+    let fittedZoom = min(viewportSize.width / width, viewportSize.height / height)
+    return max(
+      PolicyCanvasLayout.minimumZoom,
+      min(PolicyCanvasLayout.maximumZoom, fittedZoom)
+    )
+  }
+
   /// Node-only obstacles. Always part of the router's obstacle set; the
   /// per-edge `routingObstacles(source:target:)` overlay adds group
-  /// frames only when both endpoints are outside every group.
+  /// frames too so intervening group shells keep long cross-canvas routes
+  /// out of other groups' interior whitespace.
   var nodeRoutingObstacles: [CGRect] {
     nodes.map { node in
       CGRect(origin: node.position, size: PolicyCanvasLayout.nodeSize)
     }
   }
 
-  /// Per-edge obstacle list. Always includes every node frame; adds
-  /// group frames only when neither source nor target lives inside any
-  /// group. Edges that originate or terminate inside a group cross a
-  /// group boundary by nature - constraining them to skirt OTHER groups
-  /// produces long backward loops with no perceptual gain. Edges
-  /// between ungrouped nodes still see groups as obstacles so they
-  /// route around the rectangles instead of cutting through.
+  /// Per-edge obstacle list. Always includes every node and group frame.
+  /// `PolicyCanvasVisibilityRouter.preparedObstacles(...)` drops only the
+  /// source/target-containing rects, so grouped endpoints can still exit
+  /// their own shells while intervening groups remain solid blockers.
   func routingObstacles(source: CGPoint, target: CGPoint) -> [CGRect] {
-    let nodeObstacles = nodeRoutingObstacles
-    let endpointInsideAnyGroup = groups.contains { group in
-      group.frame.contains(source) || group.frame.contains(target)
-    }
-    guard !endpointInsideAnyGroup else {
-      return nodeObstacles
-    }
-    return nodeObstacles + groups.map(\.frame)
+    nodeRoutingObstacles + groups.map(\.frame)
   }
 
   /// Per-kind edge counts for the inspector empty-state breakdown.
@@ -88,9 +103,28 @@ extension PolicyCanvasViewModel {
   }
 
   var edgeRouteLanes: [String: Int] {
+    laneAssignments(bucket: edgeRouteBucket, sortKey: edgeRouteSortKey)
+  }
+
+  var edgeSourceFanoutLanes: [String: Int] {
+    laneAssignments(bucket: edgeSourceFanoutBucket, sortKey: edgeSourceFanoutSortKey)
+  }
+
+  var edgeTargetFanoutLanes: [String: Int] {
+    laneAssignments(bucket: edgeTargetFanoutBucket, sortKey: edgeTargetFanoutSortKey)
+  }
+
+  func edgeLineSpacing(for edge: PolicyCanvasEdge) -> CGFloat {
+    max(portSpacing(for: edge.source), portSpacing(for: edge.target))
+  }
+
+  private func laneAssignments(
+    bucket: (PolicyCanvasEdge) -> String,
+    sortKey: (PolicyCanvasEdge) -> String
+  ) -> [String: Int] {
     let sortedEdges = edges.sorted { left, right in
-      let leftKey = edgeLaneSortKey(left)
-      let rightKey = edgeLaneSortKey(right)
+      let leftKey = sortKey(left)
+      let rightKey = sortKey(right)
       if leftKey != rightKey {
         return leftKey < rightKey
       }
@@ -99,10 +133,10 @@ extension PolicyCanvasViewModel {
     var nextLaneByBucket: [String: Int] = [:]
     var lanes: [String: Int] = [:]
     for edge in sortedEdges {
-      let bucket = edgeLaneBucket(edge)
-      let lane = nextLaneByBucket[bucket, default: 0]
+      let edgeBucket = bucket(edge)
+      let lane = nextLaneByBucket[edgeBucket, default: 0]
       lanes[edge.id] = lane
-      nextLaneByBucket[bucket] = lane + 1
+      nextLaneByBucket[edgeBucket] = lane + 1
     }
     return lanes
   }
@@ -305,12 +339,80 @@ extension PolicyCanvasViewModel {
 
   private func edgeLaneSortKey(_ edge: PolicyCanvasEdge) -> String {
     let targetY = portAnchor(for: edge.target)?.y ?? 0
-    return "\(edgeLaneBucket(edge))|\(Int(targetY.rounded()))|\(edge.source.portID)"
+    return
+      "\(edgeRouteBucket(edge))|\(Int(targetY.rounded()))|\(edge.source.portID)|\(edge.target.portID)"
   }
 
-  private func edgeLaneBucket(_ edge: PolicyCanvasEdge) -> String {
-    let sourceGroup = node(edge.source.nodeID)?.groupID ?? "ungrouped"
-    let targetGroup = node(edge.target.nodeID)?.groupID ?? "ungrouped"
-    return "\(sourceGroup)->\(targetGroup)"
+  private func edgeRouteBucket(_ edge: PolicyCanvasEdge) -> String {
+    "\(edgeSourceFanoutBucket(edge))->\(edgeTargetFanoutBucket(edge))"
+  }
+
+  private func edgeRouteSortKey(_ edge: PolicyCanvasEdge) -> String {
+    edgeLaneSortKey(edge)
+  }
+
+  private func edgeSourceFanoutBucket(_ edge: PolicyCanvasEdge) -> String {
+    let side = resolvedPortSide(for: edge.source).rawValue
+    return "\(edge.source.nodeID)|\(edge.source.portID)|\(side)"
+  }
+
+  private func edgeTargetFanoutBucket(_ edge: PolicyCanvasEdge) -> String {
+    let side = resolvedPortSide(for: edge.target).rawValue
+    return "\(edge.target.nodeID)|\(edge.target.portID)|\(side)"
+  }
+
+  private func edgeSourceFanoutSortKey(_ edge: PolicyCanvasEdge) -> String {
+    fanoutSortKey(
+      bucket: edgeSourceFanoutBucket(edge),
+      anchor: portAnchor(for: edge.target) ?? .zero,
+      nodeID: edge.target.nodeID,
+      portID: edge.target.portID
+    )
+  }
+
+  private func edgeTargetFanoutSortKey(_ edge: PolicyCanvasEdge) -> String {
+    fanoutSortKey(
+      bucket: edgeTargetFanoutBucket(edge),
+      anchor: portAnchor(for: edge.source) ?? .zero,
+      nodeID: edge.source.nodeID,
+      portID: edge.source.portID
+    )
+  }
+
+  private func fanoutSortKey(
+    bucket: String,
+    anchor: CGPoint,
+    nodeID: String,
+    portID: String
+  ) -> String {
+    [bucket, String(Int(anchor.y.rounded())), String(Int(anchor.x.rounded())), nodeID, portID]
+      .joined(separator: "|")
+  }
+
+  private func portSpacing(for endpoint: PolicyCanvasPortEndpoint) -> CGFloat {
+    guard let node = node(endpoint.nodeID) else {
+      return PolicyCanvasLayout.defaultEdgeLineSpacing
+    }
+    let ports = endpoint.kind == .input ? node.inputPorts : node.outputPorts
+    guard ports.count > 1 else {
+      return PolicyCanvasLayout.defaultEdgeLineSpacing
+    }
+    let side = resolvedPortSide(for: endpoint)
+    switch side {
+    case .leading, .trailing:
+      return abs(
+        PolicyCanvasLayout.portY(index: 1, count: ports.count)
+          - PolicyCanvasLayout.portY(index: 0, count: ports.count)
+      )
+    case .top, .bottom:
+      return abs(
+        PolicyCanvasLayout.portX(index: 1, count: ports.count)
+          - PolicyCanvasLayout.portX(index: 0, count: ports.count)
+      )
+    }
+  }
+
+  private func resolvedPortSide(for endpoint: PolicyCanvasPortEndpoint) -> PolicyCanvasPortSide {
+    endpoint.side ?? defaultPortSide(for: endpoint.kind)
   }
 }

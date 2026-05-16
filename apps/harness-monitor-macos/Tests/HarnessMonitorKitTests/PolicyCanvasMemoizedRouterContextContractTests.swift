@@ -92,6 +92,54 @@ struct PolicyCanvasMemoizedRouterContextContractTests {
     assertFieldIsInCacheKey(baseline: baseline, mutated: mutated, named: "obstacles")
   }
 
+  @Test("Mutating `sourceActual` defeats the cache")
+  func mutatingSourceActualMisses() {
+    let baseline = makeBaselineContext()
+    let mutated = PolicyCanvasRouteContext(
+      lane: baseline.lane,
+      groups: baseline.groups,
+      sourceGroupID: baseline.sourceGroupID,
+      targetGroupID: baseline.targetGroupID,
+      obstacles: baseline.obstacles,
+      sourceActual: CGPoint(x: 120, y: 200),
+      targetActual: baseline.targetActual,
+      lineSpacing: baseline.lineSpacing
+    )
+    assertFieldIsInCacheKey(baseline: baseline, mutated: mutated, named: "sourceActual")
+  }
+
+  @Test("Mutating `targetActual` defeats the cache")
+  func mutatingTargetActualMisses() {
+    let baseline = makeBaselineContext()
+    let mutated = PolicyCanvasRouteContext(
+      lane: baseline.lane,
+      groups: baseline.groups,
+      sourceGroupID: baseline.sourceGroupID,
+      targetGroupID: baseline.targetGroupID,
+      obstacles: baseline.obstacles,
+      sourceActual: baseline.sourceActual,
+      targetActual: CGPoint(x: 520, y: 200),
+      lineSpacing: baseline.lineSpacing
+    )
+    assertFieldIsInCacheKey(baseline: baseline, mutated: mutated, named: "targetActual")
+  }
+
+  @Test("Mutating `lineSpacing` defeats the cache")
+  func mutatingLineSpacingMisses() {
+    let baseline = makeBaselineContext()
+    let mutated = PolicyCanvasRouteContext(
+      lane: baseline.lane,
+      groups: baseline.groups,
+      sourceGroupID: baseline.sourceGroupID,
+      targetGroupID: baseline.targetGroupID,
+      obstacles: baseline.obstacles,
+      sourceActual: baseline.sourceActual,
+      targetActual: baseline.targetActual,
+      lineSpacing: baseline.lineSpacing + 4
+    )
+    assertFieldIsInCacheKey(baseline: baseline, mutated: mutated, named: "lineSpacing")
+  }
+
   @Test("Mutating flex `sourceCandidates` defeats the cache")
   func mutatingFlexSourceCandidatesMisses() {
     let context = makeBaselineContext()
@@ -209,7 +257,10 @@ struct PolicyCanvasMemoizedRouterContextContractTests {
       groups: [makeGroup(id: "g-base")],
       sourceGroupID: "g-base",
       targetGroupID: "g-base",
-      obstacles: [CGRect(x: 200, y: 100, width: 80, height: 60)]
+      obstacles: [CGRect(x: 200, y: 100, width: 80, height: 60)],
+      sourceActual: Self.endpoint.source,
+      targetActual: Self.endpoint.target,
+      lineSpacing: PolicyCanvasLayout.defaultEdgeLineSpacing
     )
   }
 

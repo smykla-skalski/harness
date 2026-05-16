@@ -218,7 +218,8 @@ struct PolicyCanvasAccessibilityTests {
   }
 
   // Phase 3 (Norman R2 deferred): the canvas applies `.scaleEffect` so a
-  // [3,2] world dash renders at 0.75pt at zoom 0.25, aliasing to solid.
+  // [4,5] world dash shrinks at far zoom, reducing legibility if left
+  // unscaled.
   // The scaling rule multiplies the pattern by 1/max(0.5, zoom) at and
   // below 1x so the on-screen dash period stays constant; at zoom >= 1
   // the world pattern is already at design size and passes through.
@@ -232,13 +233,13 @@ struct PolicyCanvasAccessibilityTests {
 
   @Test("dash pattern is scaled to keep on-screen size constant below 1x")
   func dashPatternScaledBelowUnity() {
-    let error = PolicyCanvasEdgeKind.error.strokeDashPattern  // [3, 2]
-    // At zoom 0.5: scale = 1/0.5 = 2 -> [6, 4]
+    let error = PolicyCanvasEdgeKind.error.strokeDashPattern  // [4, 5]
+    // At zoom 0.5: scale = 1/0.5 = 2 -> [8, 10]
     let halfZoom = PolicyCanvasEdgeAnimation.scaledDashPattern(error, canvasZoom: 0.5)
-    #expect(halfZoom == [6, 4])
-    // At zoom 0.25: clamp keeps divisor at 0.5 -> scale = 2 -> [6, 4]
+    #expect(halfZoom == [8, 10])
+    // At zoom 0.25: clamp keeps divisor at 0.5 -> scale = 2 -> [8, 10]
     let quarterZoom = PolicyCanvasEdgeAnimation.scaledDashPattern(error, canvasZoom: 0.25)
-    #expect(quarterZoom == [6, 4])
+    #expect(quarterZoom == [8, 10])
   }
 
   @Test("empty dash pattern stays empty regardless of zoom")

@@ -43,7 +43,7 @@ enum PolicyCanvasEdgeKind: String, Hashable, CaseIterable {
     case .control:
       [6, 4]
     case .error:
-      [3, 2]
+      [4, 5]
     }
   }
 

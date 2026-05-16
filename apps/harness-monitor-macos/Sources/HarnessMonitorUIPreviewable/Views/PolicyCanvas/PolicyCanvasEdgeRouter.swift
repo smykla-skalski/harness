@@ -23,19 +23,28 @@ struct PolicyCanvasRouteContext: Hashable {
   let sourceGroupID: String?
   let targetGroupID: String?
   let obstacles: [CGRect]
+  let sourceActual: CGPoint?
+  let targetActual: CGPoint?
+  let lineSpacing: CGFloat
 
   init(
     lane: Int,
     groups: [PolicyCanvasGroup],
     sourceGroupID: String?,
     targetGroupID: String?,
-    obstacles: [CGRect] = []
+    obstacles: [CGRect] = [],
+    sourceActual: CGPoint? = nil,
+    targetActual: CGPoint? = nil,
+    lineSpacing: CGFloat = PolicyCanvasLayout.defaultEdgeLineSpacing
   ) {
     self.lane = lane
     self.groups = groups
     self.sourceGroupID = sourceGroupID
     self.targetGroupID = targetGroupID
     self.obstacles = obstacles
+    self.sourceActual = sourceActual
+    self.targetActual = targetActual
+    self.lineSpacing = lineSpacing
   }
 }
 
@@ -140,4 +149,203 @@ extension EnvironmentValues {
     get { self[PolicyCanvasEdgeRouterKey.self] }
     set { self[PolicyCanvasEdgeRouterKey.self] = newValue }
   }
+}
+
+typealias PolicyCanvasRouteAnchorCandidate = (point: CGPoint, side: PolicyCanvasPortSide)
+
+struct PolicyCanvasPinnedDisplayedRouteRequest {
+  let router: any PolicyCanvasEdgeRouter
+  let source: PolicyCanvasRouteAnchorCandidate
+  let sourceFanoutLane: Int
+  let target: PolicyCanvasRouteAnchorCandidate
+  let targetFanoutLane: Int
+  let context: PolicyCanvasRouteContext
+}
+
+struct PolicyCanvasFlexibleDisplayedRouteRequest {
+  let router: any PolicyCanvasEdgeRouter
+  let sourceCandidates: [PolicyCanvasRouteAnchorCandidate]
+  let sourceFanoutLane: Int
+  let targetCandidates: [PolicyCanvasRouteAnchorCandidate]
+  let targetFanoutLane: Int
+  let context: PolicyCanvasRouteContext
+}
+
+func policyCanvasPortLeadDistance(lane: Int) -> CGFloat {
+  policyCanvasPortLeadDistance(lane: lane, lineSpacing: PolicyCanvasLayout.defaultEdgeLineSpacing)
+}
+
+func policyCanvasPortLeadDistance(lane: Int, lineSpacing: CGFloat) -> CGFloat {
+  PolicyCanvasLayout.edgePortTurnMinimumLead
+    + (CGFloat(max(0, lane)) * lineSpacing)
+}
+
+func policyCanvasSignedLaneOffset(index: Int, spacing: CGFloat) -> CGFloat {
+  guard index > 0 else {
+    return 0
+  }
+  let magnitude = CGFloat((index + 1) / 2) * spacing
+  return index.isMultiple(of: 2) ? -magnitude : magnitude
+}
+
+func policyCanvasPortEscapeCandidate(
+  from point: CGPoint,
+  side: PolicyCanvasPortSide,
+  lane: Int,
+  lineSpacing: CGFloat
+) -> PolicyCanvasEscapeCandidate {
+  let distance = policyCanvasPortLeadDistance(lane: lane, lineSpacing: lineSpacing)
+  let offset = policyCanvasSignedLaneOffset(index: lane, spacing: lineSpacing)
+  switch side {
+  case .leading:
+    let exit = CGPoint(x: point.x - distance, y: point.y)
+    return PolicyCanvasEscapeCandidate(
+      actual: point,
+      exit: exit,
+      routed: CGPoint(x: exit.x, y: exit.y + offset)
+    )
+  case .trailing:
+    let exit = CGPoint(x: point.x + distance, y: point.y)
+    return PolicyCanvasEscapeCandidate(
+      actual: point,
+      exit: exit,
+      routed: CGPoint(x: exit.x, y: exit.y + offset)
+    )
+  case .top:
+    let exit = CGPoint(x: point.x, y: point.y - distance)
+    return PolicyCanvasEscapeCandidate(
+      actual: point,
+      exit: exit,
+      routed: CGPoint(x: exit.x + offset, y: exit.y)
+    )
+  case .bottom:
+    let exit = CGPoint(x: point.x, y: point.y + distance)
+    return PolicyCanvasEscapeCandidate(
+      actual: point,
+      exit: exit,
+      routed: CGPoint(x: exit.x + offset, y: exit.y)
+    )
+  }
+}
+
+func policyCanvasDisplayedRoute(
+  _ request: PolicyCanvasPinnedDisplayedRouteRequest
+) -> PolicyCanvasEdgeRoute {
+  let source = request.source.point
+  let target = request.target.point
+  let sourceCandidate = policyCanvasPortEscapeCandidate(
+    from: source,
+    side: request.source.side,
+    lane: request.sourceFanoutLane,
+    lineSpacing: request.context.lineSpacing
+  )
+  let targetCandidate = policyCanvasPortEscapeCandidate(
+    from: target,
+    side: request.target.side,
+    lane: request.targetFanoutLane,
+    lineSpacing: request.context.lineSpacing
+  )
+  let routingContext = PolicyCanvasRouteContext(
+    lane: request.context.lane,
+    groups: request.context.groups,
+    sourceGroupID: request.context.sourceGroupID,
+    targetGroupID: request.context.targetGroupID,
+    obstacles: request.context.obstacles,
+    sourceActual: request.context.sourceActual ?? source,
+    targetActual: request.context.targetActual ?? target,
+    lineSpacing: request.context.lineSpacing
+  )
+  let baseRoute = request.router.route(
+    source: sourceCandidate.routed,
+    target: targetCandidate.routed,
+    context: routingContext
+  )
+  return policyCanvasBridgedRoute(
+    baseRoute: baseRoute,
+    source: sourceCandidate,
+    target: targetCandidate
+  )
+}
+
+func policyCanvasDisplayedRoute(
+  _ request: PolicyCanvasFlexibleDisplayedRouteRequest
+) -> PolicyCanvasEdgeRoute {
+  let sourceCandidates = request.sourceCandidates
+  let targetCandidates = request.targetCandidates
+  guard !sourceCandidates.isEmpty, !targetCandidates.isEmpty else {
+    return PolicyCanvasEdgeRoute(points: [], labelPosition: .zero)
+  }
+  let routedSources = sourceCandidates.map {
+    policyCanvasPortEscapeCandidate(
+      from: $0.point,
+      side: $0.side,
+      lane: request.sourceFanoutLane,
+      lineSpacing: request.context.lineSpacing
+    )
+  }
+  let routedTargets = targetCandidates.map {
+    policyCanvasPortEscapeCandidate(
+      from: $0.point,
+      side: $0.side,
+      lane: request.targetFanoutLane,
+      lineSpacing: request.context.lineSpacing
+    )
+  }
+  let routingContext = PolicyCanvasRouteContext(
+    lane: request.context.lane,
+    groups: request.context.groups,
+    sourceGroupID: request.context.sourceGroupID,
+    targetGroupID: request.context.targetGroupID,
+    obstacles: request.context.obstacles,
+    sourceActual: request.context.sourceActual ?? sourceCandidates.first?.point,
+    targetActual: request.context.targetActual ?? targetCandidates.first?.point,
+    lineSpacing: request.context.lineSpacing
+  )
+  let baseRoute = request.router.route(
+    sourceCandidates: routedSources.map(\.routed),
+    targetCandidates: routedTargets.map(\.routed),
+    context: routingContext
+  )
+  let matchedSource =
+    routedSources.first(where: { $0.routed == baseRoute.points.first }) ?? routedSources[0]
+  let matchedTarget =
+    routedTargets.first(where: { $0.routed == baseRoute.points.last }) ?? routedTargets[0]
+  return policyCanvasBridgedRoute(
+    baseRoute: baseRoute,
+    source: matchedSource,
+    target: matchedTarget
+  )
+}
+
+struct PolicyCanvasEscapeCandidate {
+  let actual: CGPoint
+  let exit: CGPoint
+  let routed: CGPoint
+}
+
+private func policyCanvasBridgedRoute(
+  baseRoute: PolicyCanvasEdgeRoute,
+  source: PolicyCanvasEscapeCandidate,
+  target: PolicyCanvasEscapeCandidate
+) -> PolicyCanvasEdgeRoute {
+  var points: [CGPoint] = []
+  policyCanvasAppendUniquePoint(source.actual, to: &points)
+  policyCanvasAppendUniquePoint(source.exit, to: &points)
+  policyCanvasAppendUniquePoint(source.routed, to: &points)
+  for point in baseRoute.points.dropFirst() {
+    policyCanvasAppendUniquePoint(point, to: &points)
+  }
+  policyCanvasAppendUniquePoint(target.exit, to: &points)
+  policyCanvasAppendUniquePoint(target.actual, to: &points)
+  return PolicyCanvasEdgeRoute(
+    points: points,
+    labelPosition: baseRoute.labelPosition
+  )
+}
+
+private func policyCanvasAppendUniquePoint(_ point: CGPoint, to points: inout [CGPoint]) {
+  guard points.last != point else {
+    return
+  }
+  points.append(point)
 }
