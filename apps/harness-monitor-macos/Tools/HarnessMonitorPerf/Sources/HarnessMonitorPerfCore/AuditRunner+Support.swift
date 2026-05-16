@@ -154,6 +154,48 @@ extension AuditRunner {
             options: [.prettyPrinted, .sortedKeys]
         )
         try mirroredManifestData.write(to: mirrorManifestURL, options: .atomic)
+
+        try mirrorAuditSwiftDataCache(
+            sourceDataHome: sourceDataHome,
+            mirrorDataHome: mirrorDataHome,
+            fileManager: fileManager
+        )
+    }
+
+    /// Copies the SwiftData cache (`harness-cache.store` + `-shm` + `-wal`) from
+    /// the source daemon data home into the mirror so the audit app starts with
+    /// the user's actual session/decision state. Without this the audit app
+    /// boots an empty cache and only sees whatever the daemon streams in the
+    /// 20s scenario window — wildly unrepresentative of real usage.
+    public static func mirrorAuditSwiftDataCache(
+        sourceDataHome: URL,
+        mirrorDataHome: URL,
+        fileManager: FileManager = .default
+    ) throws {
+        let sourceHarnessRoot = sourceDataHome
+            .appendingPathComponent("harness", isDirectory: true)
+        let mirrorHarnessRoot = mirrorDataHome
+            .appendingPathComponent("harness", isDirectory: true)
+        try fileManager.createDirectory(
+            at: mirrorHarnessRoot,
+            withIntermediateDirectories: true
+        )
+        let cacheStems = [
+            "harness-cache.store",
+            "harness-cache.store-shm",
+            "harness-cache.store-wal",
+        ]
+        for stem in cacheStems {
+            let source = sourceHarnessRoot.appendingPathComponent(stem)
+            let mirror = mirrorHarnessRoot.appendingPathComponent(stem)
+            guard fileManager.fileExists(atPath: source.path) else {
+                continue
+            }
+            if fileManager.fileExists(atPath: mirror.path) {
+                try fileManager.removeItem(at: mirror)
+            }
+            try fileManager.copyItem(at: source, to: mirror)
+        }
     }
 
     public static func validateProvenance(
