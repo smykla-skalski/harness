@@ -14,6 +14,15 @@ struct TaskBoardOrchestratorSummaryView: View {
   private var metrics: TaskBoardOverviewMetrics {
     TaskBoardOverviewMetrics(fontScale: fontScale)
   }
+  private var captionFont: Font {
+    HarnessMonitorTextSize.scaledFont(.caption, by: fontScale)
+  }
+  private var captionSemibold: Font {
+    HarnessMonitorTextSize.scaledFont(.caption.weight(.semibold), by: fontScale)
+  }
+  private var captionBold: Font {
+    HarnessMonitorTextSize.scaledFont(.caption.weight(.bold), by: fontScale)
+  }
 
   init(
     status: TaskBoardOrchestratorStatus,
@@ -91,7 +100,7 @@ struct TaskBoardOrchestratorSummaryView: View {
           onStop()
         } label: {
           Label("Stop", systemImage: "stop.circle")
-            .scaledFont(.caption.weight(.semibold))
+            .font(captionSemibold)
         }
         .frame(minHeight: metrics.controlMinHeight)
         .harnessActionButtonStyle(variant: .bordered, tint: HarnessMonitorTheme.danger)
@@ -105,7 +114,7 @@ struct TaskBoardOrchestratorSummaryView: View {
         onStart()
       } label: {
         Label("Start", systemImage: "play.circle")
-          .scaledFont(.caption.weight(.semibold))
+          .font(captionSemibold)
       }
       .frame(minHeight: metrics.controlMinHeight)
       .harnessActionButtonStyle(variant: .prominent, tint: HarnessMonitorTheme.accent)
@@ -120,7 +129,7 @@ struct TaskBoardOrchestratorSummaryView: View {
         onRunOnce()
       } label: {
         Label("Run Once", systemImage: "playpause")
-          .scaledFont(.caption.weight(.semibold))
+          .font(captionSemibold)
       }
       .frame(minHeight: metrics.controlMinHeight)
       .harnessActionButtonStyle(variant: .bordered, tint: HarnessMonitorTheme.accent)
@@ -161,9 +170,9 @@ struct TaskBoardOrchestratorSummaryView: View {
   private func summaryPill(_ label: String, _ value: String, tint: Color? = nil) -> some View {
     HStack(spacing: 4) {
       Text(label)
-        .scaledFont(.caption)
+        .font(captionFont)
       Text(value)
-        .scaledFont(.caption.weight(.bold))
+        .font(captionBold)
     }
     .foregroundStyle(tint ?? HarnessMonitorTheme.secondaryInk)
     .lineLimit(1)
