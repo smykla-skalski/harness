@@ -154,6 +154,7 @@ pub enum AdoptionOutcome {
 #[must_use]
 pub fn candidate_daemon_locations() -> Vec<DaemonLocation> {
     let mut candidates: Vec<DaemonLocation> = Vec::with_capacity(3);
+    let ownership = state::DaemonOwnership::from_env_or_default();
 
     candidates.push(DaemonLocation {
         root: state::default_daemon_root(),
@@ -166,7 +167,8 @@ pub fn candidate_daemon_locations() -> Vec<DaemonLocation> {
             .join("Group Containers")
             .join(HARNESS_MONITOR_APP_GROUP_ID)
             .join("harness")
-            .join("daemon");
+            .join("daemon")
+            .join(ownership.as_str());
         if !candidates
             .iter()
             .any(|candidate| candidate.root == group_root)
@@ -180,7 +182,9 @@ pub fn candidate_daemon_locations() -> Vec<DaemonLocation> {
         }
     }
 
-    let xdg_root = harness_data_root().join("daemon");
+    let xdg_root = harness_data_root()
+        .join("daemon")
+        .join(ownership.as_str());
     if !candidates
         .iter()
         .any(|candidate| candidate.root == xdg_root)

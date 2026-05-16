@@ -36,6 +36,7 @@ fn sample_manifest(endpoint: &str) -> state::DaemonManifest {
         revision: 0,
         updated_at: String::new(),
         binary_stamp: None,
+        ownership: Default::default(),
     }
 }
 

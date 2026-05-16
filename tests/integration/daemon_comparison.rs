@@ -23,6 +23,7 @@ fn seed_workspace(tmp: &std::path::Path) {
         revision: 0,
         updated_at: String::new(),
         binary_stamp: None,
+        ownership: Default::default(),
     };
     state::write_manifest(&manifest).expect("write manifest");
     state::append_event("info", "comparison test started").expect("event");

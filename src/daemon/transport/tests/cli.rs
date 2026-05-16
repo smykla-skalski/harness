@@ -291,10 +291,17 @@ fn daemon_dev_execution_plan_uses_explicit_daemon_data_home_when_present() {
             };
             let plan = dev.execution_plan();
             assert_eq!(
+                plan.daemon_root_base,
+                PathBuf::from("/tmp/custom-daemon-home")
+                    .join("harness")
+                    .join("daemon")
+            );
+            assert_eq!(
                 plan.daemon_root,
                 PathBuf::from("/tmp/custom-daemon-home")
                     .join("harness")
                     .join("daemon")
+                    .join("external")
             );
         },
     );
@@ -327,6 +334,7 @@ fn daemon_dev_execution_plan_uses_env_app_group_when_present() {
                     .join("com.user.preset")
                     .join("harness")
                     .join("daemon")
+                    .join("external")
             );
         },
     );
