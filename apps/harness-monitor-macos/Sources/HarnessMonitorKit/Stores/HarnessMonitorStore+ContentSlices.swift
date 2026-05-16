@@ -320,51 +320,26 @@ extension HarnessMonitorStore {
     public init() {}
 
     internal func apply(_ state: ContentDashboardState) {
-      if connectionState != state.connectionState {
-        connectionState = state.connectionState
-      }
-      if isBusy != state.isBusy {
-        isBusy = state.isBusy
-      }
-      if isRefreshing != state.isRefreshing {
-        isRefreshing = state.isRefreshing
-      }
-      if isLaunchAgentInstalled != state.isLaunchAgentInstalled {
-        isLaunchAgentInstalled = state.isLaunchAgentInstalled
-      }
-      if taskBoardItems != state.taskBoardItems {
-        taskBoardItems = state.taskBoardItems
-      }
-      if taskBoardOrchestratorStatus != state.taskBoardOrchestratorStatus {
-        taskBoardOrchestratorStatus = state.taskBoardOrchestratorStatus
-      }
-      if taskBoardSyncSummary != state.taskBoardSyncSummary {
-        taskBoardSyncSummary = state.taskBoardSyncSummary
-      }
-      if taskBoardDispatchSummary != state.taskBoardDispatchSummary {
-        taskBoardDispatchSummary = state.taskBoardDispatchSummary
-      }
-      if taskBoardEvaluationSummary != state.taskBoardEvaluationSummary {
-        taskBoardEvaluationSummary = state.taskBoardEvaluationSummary
-      }
-      if taskBoardItemAuditSummary != state.taskBoardItemAuditSummary {
-        taskBoardItemAuditSummary = state.taskBoardItemAuditSummary
-      }
-      if taskBoardProjects != state.taskBoardProjects {
-        taskBoardProjects = state.taskBoardProjects
-      }
-      if taskBoardMachines != state.taskBoardMachines {
-        taskBoardMachines = state.taskBoardMachines
-      }
-      if taskBoardPolicyPipeline != state.taskBoardPolicyPipeline {
-        taskBoardPolicyPipeline = state.taskBoardPolicyPipeline
-      }
-      if taskBoardPolicySimulation != state.taskBoardPolicySimulation {
-        taskBoardPolicySimulation = state.taskBoardPolicySimulation
-      }
-      if taskBoardPolicyAudit != state.taskBoardPolicyAudit {
-        taskBoardPolicyAudit = state.taskBoardPolicyAudit
-      }
+      Self.assign(&connectionState, state.connectionState)
+      Self.assign(&isBusy, state.isBusy)
+      Self.assign(&isRefreshing, state.isRefreshing)
+      Self.assign(&isLaunchAgentInstalled, state.isLaunchAgentInstalled)
+      Self.assign(&taskBoardItems, state.taskBoardItems)
+      Self.assign(&taskBoardOrchestratorStatus, state.taskBoardOrchestratorStatus)
+      Self.assign(&taskBoardSyncSummary, state.taskBoardSyncSummary)
+      Self.assign(&taskBoardDispatchSummary, state.taskBoardDispatchSummary)
+      Self.assign(&taskBoardEvaluationSummary, state.taskBoardEvaluationSummary)
+      Self.assign(&taskBoardItemAuditSummary, state.taskBoardItemAuditSummary)
+      Self.assign(&taskBoardProjects, state.taskBoardProjects)
+      Self.assign(&taskBoardMachines, state.taskBoardMachines)
+      Self.assign(&taskBoardPolicyPipeline, state.taskBoardPolicyPipeline)
+      Self.assign(&taskBoardPolicySimulation, state.taskBoardPolicySimulation)
+      Self.assign(&taskBoardPolicyAudit, state.taskBoardPolicyAudit)
+    }
+
+    private static func assign<Value: Equatable>(_ current: inout Value, _ next: Value) {
+      guard current != next else { return }
+      current = next
     }
   }
 

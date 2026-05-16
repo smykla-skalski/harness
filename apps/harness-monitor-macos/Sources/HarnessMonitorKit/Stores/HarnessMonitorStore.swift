@@ -217,12 +217,6 @@ public final class HarnessMonitorStore {
       reconcileAcpRuntimeClock()
     }
   }
-  public var selectedAcpInspectAgents: [AcpAgentInspectSnapshot] {
-    selectedAcpInspectState?.agents ?? []
-  }
-  public var selectedAcpInspectObservedAt: Date? {
-    selectedAcpInspectState?.sampledAt
-  }
   @ObservationIgnored public var acpRuntimeClockTick = Date.now
   var selectedAcpInspectSyncEntries: [AcpRuntimeIdentity: AcpInspectSyncEntry] = [:]
   public var liveToolCallAnnouncementRowIDs: Set<String> = []
@@ -247,10 +241,6 @@ public final class HarnessMonitorStore {
   @ObservationIgnored var acpDeadlineResolutionTokens: [String: UInt64] = [:]
   @ObservationIgnored var acpPermissionShutdownResolutionTasks: [String: Task<Void, Never>] = [:]
   @ObservationIgnored var acpShutdownResolutionTokens: [String: UInt64] = [:]
-  public var showConfirmation: Bool {
-    get { pendingConfirmation != nil }
-    set { if !newValue { cancelConfirmation() } }
-  }
   public var sleepPreventionEnabled = false {
     didSet {
       guard oldValue != sleepPreventionEnabled else { return }
@@ -366,29 +356,6 @@ public final class HarnessMonitorStore {
   @ObservationIgnored var isApplyingUISyncBatch = false
   @ObservationIgnored var debugUISyncCounts: [UISyncArea: Int] = [:]
 
-  var maintainsLiveDaemonObservation: Bool {
-    !(daemonController is PreviewDaemonController)
-  }
-
-  public convenience init(
-    daemonController: any DaemonControlling,
-    fileViewer: any FileViewerActivating = WorkspaceFileViewer(),
-    daemonOwnership: DaemonOwnership = .managed,
-    modelContainer: ModelContainer? = nil,
-    persistenceError: String? = nil,
-    cacheService: SessionCacheService? = nil
-  ) {
-    self.init(
-      daemonController: daemonController,
-      fileViewer: fileViewer,
-      voiceCapture: NativeVoiceCaptureService(),
-      daemonOwnership: daemonOwnership,
-      modelContainer: modelContainer,
-      persistenceError: persistenceError,
-      cacheService: cacheService
-    )
-  }
-
   public init(
     daemonController: any DaemonControlling,
     fileViewer: any FileViewerActivating = WorkspaceFileViewer(),
@@ -439,11 +406,4 @@ public final class HarnessMonitorStore {
     syncAllUI()
   }
 
-}
-
-extension HarnessMonitorStore {
-  func setSupervisorRuntimeState(_ state: SupervisorRuntimeState) {
-    guard supervisorRuntimeState != state else { return }
-    supervisorRuntimeState = state
-  }
 }

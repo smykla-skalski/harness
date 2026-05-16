@@ -123,15 +123,27 @@ struct TaskBoardItemManagementPanel: View {
 
   private var statusPills: some View {
     HStack(spacing: HarnessMonitorTheme.spacingXS) {
-      managementPill(draft.status.title, tint: taskBoardStatusColor(for: draft.status))
-      managementPill(draft.priority.title, tint: priorityColor(for: draft.priority))
-      managementPill(linkLabel, tint: linkTint)
+      TaskBoardManagementPill(
+        label: draft.status.title,
+        tint: taskBoardStatusColor(for: draft.status),
+        verticalPadding: metrics.managementPillVerticalPadding
+      )
+      TaskBoardManagementPill(
+        label: draft.priority.title,
+        tint: priorityColor(for: draft.priority),
+        verticalPadding: metrics.managementPillVerticalPadding
+      )
+      TaskBoardManagementPill(
+        label: linkLabel,
+        tint: linkTint,
+        verticalPadding: metrics.managementPillVerticalPadding
+      )
     }
   }
 
   private var editorFields: some View {
     VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
-      nativeField("Title", text: $draft.title)
+      TaskBoardManagementNativeField(label: "Title", text: $draft.title)
       HarnessMonitorMultilineTextField<Never>(
         placeholder: "Body",
         text: $draft.body,
@@ -139,12 +151,24 @@ struct TaskBoardItemManagementPanel: View {
         accessibilityLabel: "Body"
       )
       HStack(alignment: .top, spacing: HarnessMonitorTheme.spacingMD) {
-        pickerField("Status", selection: $draft.status, values: TaskBoardStatus.allCases)
-        pickerField("Priority", selection: $draft.priority, values: TaskBoardPriority.allCases)
-        pickerField("Agent Mode", selection: $draft.agentMode, values: TaskBoardAgentMode.allCases)
+        TaskBoardManagementPickerField(
+          label: "Status",
+          selection: $draft.status,
+          values: TaskBoardStatus.allCases
+        )
+        TaskBoardManagementPickerField(
+          label: "Priority",
+          selection: $draft.priority,
+          values: TaskBoardPriority.allCases
+        )
+        TaskBoardManagementPickerField(
+          label: "Agent Mode",
+          selection: $draft.agentMode,
+          values: TaskBoardAgentMode.allCases
+        )
       }
-      nativeField("Tags", text: $draft.tagsText)
-      nativeField("Project", text: $draft.projectId)
+      TaskBoardManagementNativeField(label: "Tags", text: $draft.tagsText)
+      TaskBoardManagementNativeField(label: "Project", text: $draft.projectId)
       HarnessMonitorMultilineTextField<Never>(
         placeholder: "Planning summary",
         text: $draft.planningSummary,
@@ -152,12 +176,12 @@ struct TaskBoardItemManagementPanel: View {
         accessibilityLabel: "Planning summary"
       )
       HStack(alignment: .top, spacing: HarnessMonitorTheme.spacingMD) {
-        nativeField("Approver", text: $draft.approvedBy)
-        nativeField("Approved At", text: $draft.approvedAt)
+        TaskBoardManagementNativeField(label: "Approver", text: $draft.approvedBy)
+        TaskBoardManagementNativeField(label: "Approved At", text: $draft.approvedAt)
       }
       HStack(alignment: .top, spacing: HarnessMonitorTheme.spacingMD) {
-        nativeField("Linked Session", text: $draft.sessionId)
-        nativeField("Work Item", text: $draft.workItemId)
+        TaskBoardManagementNativeField(label: "Linked Session", text: $draft.sessionId)
+        TaskBoardManagementNativeField(label: "Work Item", text: $draft.workItemId)
       }
     }
   }
@@ -190,28 +214,8 @@ struct TaskBoardItemManagementPanel: View {
         .controlSize(HarnessMonitorControlMetrics.compactControlSize)
         .disabled(isActionInFlight)
       }
-      ForEach($draft.externalRefs) { $ref in
-        HStack(alignment: .top, spacing: HarnessMonitorTheme.spacingSM) {
-          Picker("Provider", selection: $ref.provider) {
-            ForEach(TaskBoardExternalRefProvider.taskBoardCases, id: \.self) { provider in
-              Text(provider.title).tag(provider)
-            }
-          }
-          .labelsHidden()
-          .harnessNativeFormControl()
-          nativeField("External ID", text: $ref.externalId)
-          nativeField("URL", text: $ref.url)
-          Button(role: .destructive) {
-            draft.externalRefs.removeAll { $0.id == ref.id }
-          } label: {
-            Image(systemName: "trash")
-              .accessibilityHidden(true)
-          }
-          .buttonStyle(.borderless)
-          .frame(minWidth: metrics.iconControlMinWidth, minHeight: metrics.controlMinHeight)
-          .help("Remove external ref")
-          .accessibilityLabel("Remove external ref")
-        }
+      ForEach(draft.monitorVisibleExternalRefIDs, id: \.self) { refID in
+        externalRefEditorRow(refID: refID)
       }
     }
   }
@@ -345,11 +349,47 @@ struct TaskBoardItemManagementPanel: View {
   }
 
   private var externalDestinations: [TaskBoardExternalDestination] {
-    var destinations = draft.materializedExternalRefs.compactMap(externalDestination)
+    var destinations = draft.monitorVisibleExternalRefs.compactMap(externalDestination)
     if let prUrl = item?.workflow?.prUrl, let url = URL(string: prUrl) {
       destinations.append(TaskBoardExternalDestination(label: "Pull Request", url: url))
     }
     return destinations
+  }
+
+  @ViewBuilder
+  private func externalRefEditorRow(refID: UUID) -> some View {
+    if let ref = externalRefBinding(for: refID) {
+      HStack(alignment: .top, spacing: HarnessMonitorTheme.spacingSM) {
+        Picker("Provider", selection: ref.provider) {
+          ForEach(TaskBoardExternalRefProvider.taskBoardCases, id: \.self) { provider in
+            Text(provider.title).tag(provider)
+          }
+        }
+        .labelsHidden()
+        .harnessNativeFormControl()
+        TaskBoardManagementNativeField(label: "External ID", text: ref.externalId)
+        TaskBoardManagementNativeField(label: "URL", text: ref.url)
+        Button(role: .destructive) {
+          draft.externalRefs.removeAll { $0.id == ref.wrappedValue.id }
+        } label: {
+          Image(systemName: "trash")
+            .accessibilityHidden(true)
+        }
+        .buttonStyle(.borderless)
+        .frame(minWidth: metrics.iconControlMinWidth, minHeight: metrics.controlMinHeight)
+        .help("Remove external ref")
+        .accessibilityLabel("Remove external ref")
+      }
+    }
+  }
+
+  private func externalRefBinding(
+    for refID: UUID
+  ) -> Binding<TaskBoardExternalRefDraft>? {
+    guard let index = draft.externalRefs.firstIndex(where: { $0.id == refID }) else {
+      return nil
+    }
+    return $draft.externalRefs[index]
   }
 
   private func externalDestination(for ref: TaskBoardExternalRef) -> TaskBoardExternalDestination? {
@@ -369,44 +409,5 @@ struct TaskBoardItemManagementPanel: View {
 
   private func externalLabel(for ref: TaskBoardExternalRef) -> String {
     "\(ref.provider.title) \(ref.externalId)"
-  }
-
-  private func nativeField(_ label: String, text: Binding<String>) -> some View {
-    VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingXS) {
-      Text(label)
-        .scaledFont(.caption.weight(.semibold))
-        .foregroundStyle(HarnessMonitorTheme.secondaryInk)
-      TextField(label, text: text)
-        .harnessNativeTextField()
-    }
-  }
-
-  private func pickerField<Value: CaseIterable & Hashable & Identifiable & TitledTaskBoardValue>(
-    _ label: String,
-    selection: Binding<Value>,
-    values: Value.AllCases
-  ) -> some View where Value.AllCases: RandomAccessCollection {
-    VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingXS) {
-      Text(label)
-        .scaledFont(.caption.weight(.semibold))
-        .foregroundStyle(HarnessMonitorTheme.secondaryInk)
-      Picker(label, selection: selection) {
-        ForEach(values) { value in
-          Text(value.title).tag(value)
-        }
-      }
-      .labelsHidden()
-      .harnessNativeFormControl()
-    }
-  }
-
-  private func managementPill(_ label: String, tint: Color) -> some View {
-    Text(label)
-      .scaledFont(.caption2.weight(.bold))
-      .foregroundStyle(tint)
-      .lineLimit(1)
-      .padding(.horizontal, HarnessMonitorTheme.spacingSM)
-      .padding(.vertical, metrics.managementPillVerticalPadding)
-      .background(tint.opacity(0.12), in: .capsule)
   }
 }
