@@ -68,6 +68,7 @@ public enum BudgetEnforcer {
         let bodyUpdates = number(metrics, "swiftui_updates", "body_update_count")
         let p95UpdateMillis = number(metrics, "swiftui_updates", "duration_ms_p95")
         let maxGroupMillis = number(metrics, "swiftui_update_groups", "duration_ns_max") / 1_000_000
+        let groupP95Millis = number(metrics, "swiftui_update_groups", "duration_ms_p95")
         let hitches = number(metrics, "hitches", "count")
         let hangs = number(metrics, "potential_hangs", "count")
 
@@ -80,6 +81,9 @@ public enum BudgetEnforcer {
         ]
         if let p95Limit = budget.p95UpdateMilliseconds {
             checks.append((MetricName.p95UpdateMs, p95UpdateMillis, p95Limit))
+        }
+        if let groupP95Limit = budget.updateGroupP95Milliseconds {
+            checks.append((MetricName.updateGroupP95Ms, groupP95Millis, groupP95Limit))
         }
         return checks.compactMap { name, value, limit in
             value > limit

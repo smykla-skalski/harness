@@ -12,7 +12,7 @@
       },
       "metrics": {
         "swiftui_updates": {"total_count": 30000, "body_update_count": 4000, "duration_ms_p95": 15.0},
-        "swiftui_update_groups": {"duration_ns_max": 75000000},
+        "swiftui_update_groups": {"duration_ns_max": 75000000, "duration_ms_p95": 50.0},
         "hitches": {"count": 2},
         "potential_hangs": {"count": 1}
       }
