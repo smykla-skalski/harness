@@ -24,7 +24,7 @@ use crate::run::{
 };
 use crate::session::transport::SessionCommand;
 use crate::setup::{
-    AgentsSetupCommand, BootstrapArgs, CapabilitiesArgs, GatewayArgs, KumaSetupArgs,
+    AgentsSetupCommand, BootstrapArgs, CapabilitiesArgs, GatewayArgs, KumaSetupArgs, SecretsArgs,
     PreCompactArgs, SessionStartArgs, SessionStopArgs,
 };
 use crate::task_board::transport::TaskBoardCommand;
@@ -95,6 +95,8 @@ pub enum SetupCommand {
     Kuma(Box<KumaSetupArgs>),
     Gateway(GatewayArgs),
     Capabilities(CapabilitiesArgs),
+    /// Inspect task-board secret state in your macOS Keychain.
+    Secrets(SecretsArgs),
 }
 
 /// Top-level commands.
@@ -268,6 +270,7 @@ fn dispatch_setup(ctx: &AppContext, command: &SetupCommand) -> Result<i32, CliEr
         SetupCommand::Kuma(args) => args.execute(ctx),
         SetupCommand::Gateway(args) => args.execute(ctx),
         SetupCommand::Capabilities(args) => args.execute(ctx),
+        SetupCommand::Secrets(args) => args.execute(ctx),
     }
 }
 
