@@ -169,17 +169,20 @@ harness_monitor_runtime_codex_ws_port() {
 }
 
 harness_monitor_runtime_launch_agent_label() {
-  local checkout_root="$1"
-  local lane
+  # `checkout_root` is accepted to preserve the call signature for older
+  # call sites; it is no longer used because the label is lane-independent.
+  local _checkout_root="${1:-}"
   if [[ -n "${HARNESS_MONITOR_DAEMON_LAUNCH_AGENT_LABEL:-}" ]]; then
     printf '%s\n' "$HARNESS_MONITOR_DAEMON_LAUNCH_AGENT_LABEL"
     return 0
   fi
-  lane="$(harness_monitor_runtime_lane "$checkout_root")"
-  # The label always carries the `.managed` qualifier because the bundled
-  # daemon is the managed side of the coexistence partition. External
-  # daemons (`harness daemon dev`) are not launchd-registered.
-  printf '%s.managed.%s\n' "$HARNESS_MONITOR_LANE_LABEL_BASE" "$lane"
+  # The label MUST equal the bundled plist filename without `.plist`. On
+  # macOS 26 SMAppService.register returns error 22 (EINVAL) when they
+  # diverge, which leaves the managed daemon stuck "Bootstrapping" forever.
+  # Lane identity flows via `HARNESS_MONITOR_RUNTIME_LANE` in the plist's
+  # EnvironmentVariables, not the launchd label itself.
+  : "$_checkout_root"
+  printf '%s.managed\n' "$HARNESS_MONITOR_LANE_LABEL_BASE"
 }
 
 harness_monitor_runtime_xcodebuildmcp_socket_path() {
