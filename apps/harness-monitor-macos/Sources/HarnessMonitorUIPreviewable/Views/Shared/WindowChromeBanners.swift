@@ -18,6 +18,65 @@ struct ChromeBannerSurfaceModifier: ViewModifier {
   }
 }
 
+struct ContentChromeBannerModel: Equatable {
+  let showsPersistenceError: Bool
+  let showsStaleData: Bool
+  let showsMCPStatus: Bool
+  let showsACPBridge: Bool
+
+  init(
+    persistenceError: String?,
+    sessionDataAvailability: HarnessMonitorStore.SessionDataAvailability,
+    mcpStatus: HarnessMonitorMCPStatusSnapshot,
+    hasACPBridgeBanner: Bool
+  ) {
+    showsPersistenceError = persistenceError != nil
+    showsStaleData = sessionDataAvailability != .live
+    showsMCPStatus = mcpStatus.shouldShowChromeBanner
+    showsACPBridge = hasACPBridgeBanner
+  }
+
+  var isPresented: Bool {
+    showsPersistenceError || showsStaleData || showsMCPStatus || showsACPBridge
+  }
+}
+
+struct ContentChromeBannerStack: View {
+  let store: HarnessMonitorStore
+  let contentChrome: HarnessMonitorStore.ContentChromeSlice
+  let windowID: String
+
+  var body: some View {
+    VStack(spacing: 0) {
+      if let persistenceError = contentChrome.persistenceError {
+        PersistenceUnavailableBanner(message: persistenceError)
+        chromeDivider(tint: HarnessMonitorTheme.caution)
+      }
+      if contentChrome.sessionDataAvailability != .live {
+        SessionDataAvailabilityBanner(availability: contentChrome.sessionDataAvailability)
+        chromeDivider(tint: HarnessMonitorTheme.caution)
+      }
+      if contentChrome.mcpStatus.shouldShowChromeBanner {
+        MCPStatusBanner(status: contentChrome.mcpStatus)
+        chromeDivider(tint: MCPStatusViewSupport.tint(for: contentChrome.mcpStatus.tone))
+      }
+      if contentChrome.acpBridgeBanner != nil {
+        AcpBridgeBannerBridge(
+          store: store,
+          contentChrome: contentChrome,
+          keyWindowObserver: nil,
+          windowID: windowID
+        )
+        chromeDivider(tint: HarnessMonitorTheme.caution)
+      }
+    }
+  }
+
+  private func chromeDivider(tint: Color) -> some View {
+    WindowBannerDivider(tint: tint)
+  }
+}
+
 struct SessionDataAvailabilityBanner: View {
   let availability: HarnessMonitorStore.SessionDataAvailability
 

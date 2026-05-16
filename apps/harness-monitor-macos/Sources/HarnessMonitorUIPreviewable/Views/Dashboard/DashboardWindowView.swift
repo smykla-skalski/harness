@@ -13,6 +13,7 @@ public struct DashboardWindowView: View {
   private var persistedColumnVisibilityRaw = SessionColumnVisibilityCodec.encode(.doubleColumn)
   @SceneStorage("dashboard.sidebarWidth")
   private var persistedSidebarWidth = 220.0
+  @State private var inspectorVisible = true
 
   public init(
     store: HarnessMonitorStore,
@@ -105,12 +106,18 @@ public struct DashboardWindowView: View {
           statusModel: dashboardStatusSummaryModel
         )
       } detail: {
-        DashboardRouteContent(
-          route: selectedRoute,
-          store: store,
-          dashboardUI: dashboardUI,
-          sessionCatalog: sessionCatalog
-        )
+        DashboardBannerStack(store: store) {
+          DashboardRouteContent(
+            route: selectedRoute,
+            store: store,
+            dashboardUI: dashboardUI,
+            sessionCatalog: sessionCatalog
+          )
+        }
+        .inspector(isPresented: $inspectorVisible) {
+          dashboardInspector
+            .inspectorColumnWidth(min: 220, ideal: 260, max: 320)
+        }
       }
       .accessibilityElement(children: .contain)
       .accessibilityIdentifier(HarnessMonitorAccessibility.dashboardWindowRoot)
@@ -135,6 +142,54 @@ public struct DashboardWindowView: View {
         )
       }
       .modifier(DashboardPerfRouteHook(selectedRouteBinding: selectedRouteBinding))
+    }
+  }
+
+  private var dashboardInspector: some View {
+    VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
+      Text("Dashboard inspector placeholder")
+        .scaledFont(.body)
+      Spacer(minLength: 0)
+    }
+    .padding(HarnessMonitorTheme.spacingMD)
+    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+  }
+}
+
+private struct DashboardBannerStack<Content: View>: View {
+  let store: HarnessMonitorStore
+  private let content: Content
+
+  init(store: HarnessMonitorStore, @ViewBuilder content: () -> Content) {
+    self.store = store
+    self.content = content()
+  }
+
+  private var chrome: HarnessMonitorStore.ContentChromeSlice {
+    store.contentUI.chrome
+  }
+
+  private var bannerModel: ContentChromeBannerModel {
+    ContentChromeBannerModel(
+      persistenceError: chrome.persistenceError,
+      sessionDataAvailability: chrome.sessionDataAvailability,
+      mcpStatus: chrome.mcpStatus,
+      hasACPBridgeBanner: chrome.acpBridgeBanner != nil
+    )
+  }
+
+  var body: some View {
+    WindowBannerChrome(
+      windowID: HarnessMonitorWindowID.dashboard,
+      isPresented: bannerModel.isPresented
+    ) {
+      content
+    } banners: {
+      ContentChromeBannerStack(
+        store: store,
+        contentChrome: chrome,
+        windowID: HarnessMonitorWindowID.dashboard
+      )
     }
   }
 }
