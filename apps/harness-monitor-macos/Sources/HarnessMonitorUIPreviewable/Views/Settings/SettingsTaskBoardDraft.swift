@@ -26,21 +26,25 @@ struct TaskBoardGitSettingsDraft: Equatable {
   var authorName = ""
   var authorEmail = ""
   var sshKeyPath = ""
-  var sshPrivateKey = ""
-  var sshPrivateKeyPassphrase = ""
+  var sshPrivateKey: TaskBoardSecretField = .notConfigured
+  var sshPrivateKeyPassphrase: TaskBoardSecretField = .notConfigured
   var signingMode: TaskBoardGitSigningMode = .none
   var signingSSHKeyPath = ""
-  var signingSSHPrivateKey = ""
-  var signingSSHPrivateKeyPassphrase = ""
+  var signingSSHPrivateKey: TaskBoardSecretField = .notConfigured
+  var signingSSHPrivateKeyPassphrase: TaskBoardSecretField = .notConfigured
   var gpgKeyId = ""
   var gpgPrivateKeyPath = ""
-  var gpgPrivateKey = ""
-  var gpgPrivateKeyPassphrase = ""
-  var globalToken = ""
-  var todoistToken = ""
+  var gpgPrivateKey: TaskBoardSecretField = .notConfigured
+  var gpgPrivateKeyPassphrase: TaskBoardSecretField = .notConfigured
+  var globalToken: TaskBoardSecretField = .notConfigured
+  var todoistToken: TaskBoardSecretField = .notConfigured
   var repositoryOverrides: [TaskBoardRepositoryOverrideDraft] = []
   var policyVersion = ""
   var identityDefaults = TaskBoardGitIdentityDefaults()
+  /// Snapshot of the configured secret material loaded with the draft. Save
+  /// uses this to re-emit untouched (`.configured`) secrets back to the
+  /// daemon so the existing key material is preserved.
+  var loadedSecrets = TaskBoardLoadedSecrets()
 
   init() {}
 
@@ -73,20 +77,23 @@ struct TaskBoardGitSettingsDraft: Equatable {
     authorName = runtime.global.authorName ?? ""
     authorEmail = runtime.global.authorEmail ?? ""
     sshKeyPath = runtime.global.sshKeyPath ?? ""
-    sshPrivateKey = runtime.global.sshPrivateKey ?? ""
-    sshPrivateKeyPassphrase = runtime.global.sshPrivateKeyPassphrase ?? ""
+    sshPrivateKey = .secretFromLoaded(runtime.global.sshPrivateKey)
+    sshPrivateKeyPassphrase = .secretFromLoaded(runtime.global.sshPrivateKeyPassphrase)
     signingMode = runtime.global.signing.mode
     signingSSHKeyPath = runtime.global.signing.sshKeyPath ?? ""
-    signingSSHPrivateKey = runtime.global.signing.sshPrivateKey ?? ""
-    signingSSHPrivateKeyPassphrase = runtime.global.signing.sshPrivateKeyPassphrase ?? ""
+    signingSSHPrivateKey = .secretFromLoaded(runtime.global.signing.sshPrivateKey)
+    signingSSHPrivateKeyPassphrase = .secretFromLoaded(
+      runtime.global.signing.sshPrivateKeyPassphrase
+    )
     gpgKeyId = runtime.global.signing.gpgKeyId ?? ""
     gpgPrivateKeyPath = runtime.global.signing.gpgPrivateKeyPath ?? ""
-    gpgPrivateKey = runtime.global.signing.gpgPrivateKey ?? ""
-    gpgPrivateKeyPassphrase = runtime.global.signing.gpgPrivateKeyPassphrase ?? ""
-    globalToken = snapshot.githubCredentials.globalToken ?? ""
-    todoistToken = snapshot.todoistCredentials.token ?? ""
+    gpgPrivateKey = .secretFromLoaded(runtime.global.signing.gpgPrivateKey)
+    gpgPrivateKeyPassphrase = .secretFromLoaded(runtime.global.signing.gpgPrivateKeyPassphrase)
+    globalToken = .secretFromLoaded(snapshot.githubCredentials.globalToken)
+    todoistToken = .secretFromLoaded(snapshot.todoistCredentials.token)
     policyVersion = orchestrator.policyVersion
     identityDefaults = snapshot.identityDefaults
+    loadedSecrets = TaskBoardLoadedSecrets(snapshot: snapshot)
 
     let tokensByRepository = Dictionary(
       snapshot.githubCredentials.repositoryTokens.map { ($0.repository, $0.token) },
@@ -106,17 +113,19 @@ struct TaskBoardGitSettingsDraft: Equatable {
         authorName: override.profile.authorName ?? "",
         authorEmail: override.profile.authorEmail ?? "",
         sshKeyPath: override.profile.sshKeyPath ?? "",
-        sshPrivateKey: override.profile.sshPrivateKey ?? "",
-        sshPrivateKeyPassphrase: override.profile.sshPrivateKeyPassphrase ?? "",
+        sshPrivateKey: .secretFromLoaded(override.profile.sshPrivateKey),
+        sshPrivateKeyPassphrase: .secretFromLoaded(override.profile.sshPrivateKeyPassphrase),
         signingMode: override.profile.signing.mode,
         signingSSHKeyPath: override.profile.signing.sshKeyPath ?? "",
-        signingSSHPrivateKey: override.profile.signing.sshPrivateKey ?? "",
-        signingSSHPrivateKeyPassphrase: override.profile.signing.sshPrivateKeyPassphrase ?? "",
+        signingSSHPrivateKey: .secretFromLoaded(override.profile.signing.sshPrivateKey),
+        signingSSHPrivateKeyPassphrase: .secretFromLoaded(
+          override.profile.signing.sshPrivateKeyPassphrase
+        ),
         gpgKeyId: override.profile.signing.gpgKeyId ?? "",
         gpgPrivateKeyPath: override.profile.signing.gpgPrivateKeyPath ?? "",
-        gpgPrivateKey: override.profile.signing.gpgPrivateKey ?? "",
-        gpgPrivateKeyPassphrase: override.profile.signing.gpgPrivateKeyPassphrase ?? "",
-        token: tokensByRepository[override.repository] ?? ""
+        gpgPrivateKey: .secretFromLoaded(override.profile.signing.gpgPrivateKey),
+        gpgPrivateKeyPassphrase: .secretFromLoaded(override.profile.signing.gpgPrivateKeyPassphrase),
+        token: .secretFromLoaded(tokensByRepository[override.repository])
       )
     }
 
@@ -126,14 +135,16 @@ struct TaskBoardGitSettingsDraft: Equatable {
       .map { token in
         TaskBoardRepositoryOverrideDraft(
           repository: token.repository,
-          token: token.token
+          token: .secretFromLoaded(token.token)
         )
       }
     repositoryOverrides.append(contentsOf: tokenOnlyOverrides)
   }
 
   var snapshot: TaskBoardGitSettingsSnapshot {
-    let repositoryOverrides = repositoryOverrides.compactMap(\.runtimeOverride)
+    let repositoryOverrides = repositoryOverrides.compactMap { override in
+      override.runtimeOverride(loaded: loadedSecrets)
+    }
     let repositoryTokens = repositoryOverridesForTokens
 
     return TaskBoardGitSettingsSnapshot(
@@ -176,31 +187,41 @@ struct TaskBoardGitSettingsDraft: Equatable {
           authorName: normalized(authorName),
           authorEmail: normalized(authorEmail),
           sshKeyPath: normalized(sshKeyPath),
-          sshPrivateKey: normalized(sshPrivateKey),
-          sshPrivateKeyPassphrase: normalized(sshPrivateKeyPassphrase),
+          sshPrivateKey: sshPrivateKey.materialized(loaded: loadedSecrets.globalSSHPrivateKey),
+          sshPrivateKeyPassphrase: sshPrivateKeyPassphrase.materialized(
+            loaded: loadedSecrets.globalSSHPrivateKeyPassphrase
+          ),
           signing: TaskBoardGitSigningConfig(
             mode: signingMode,
             sshKeyPath: signingMode == .ssh ? normalized(signingSSHKeyPath) : nil,
-            sshPrivateKey: signingMode == .ssh ? normalized(signingSSHPrivateKey) : nil,
+            sshPrivateKey: signingMode == .ssh
+              ? signingSSHPrivateKey.materialized(loaded: loadedSecrets.globalSigningSSHPrivateKey)
+              : nil,
             sshPrivateKeyPassphrase: signingMode == .ssh
-              ? normalized(signingSSHPrivateKeyPassphrase)
+              ? signingSSHPrivateKeyPassphrase.materialized(
+                loaded: loadedSecrets.globalSigningSSHPrivateKeyPassphrase
+              )
               : nil,
             gpgKeyId: signingMode == .gpg ? normalized(gpgKeyId) : nil,
             gpgPrivateKeyPath: signingMode == .gpg ? normalized(gpgPrivateKeyPath) : nil,
-            gpgPrivateKey: signingMode == .gpg ? normalized(gpgPrivateKey) : nil,
+            gpgPrivateKey: signingMode == .gpg
+              ? gpgPrivateKey.materialized(loaded: loadedSecrets.globalGPGPrivateKey)
+              : nil,
             gpgPrivateKeyPassphrase: signingMode == .gpg
-              ? normalized(gpgPrivateKeyPassphrase)
+              ? gpgPrivateKeyPassphrase.materialized(
+                loaded: loadedSecrets.globalGPGPrivateKeyPassphrase
+              )
               : nil
           )
         ),
         repositoryOverrides: repositoryOverrides
       ),
       githubCredentials: TaskBoardGitHubCredentialSnapshot(
-        globalToken: normalized(globalToken),
+        globalToken: globalToken.materialized(loaded: loadedSecrets.globalGitHubToken),
         repositoryTokens: repositoryTokens
       ),
       todoistCredentials: TaskBoardTodoistCredentialSnapshot(
-        token: normalized(todoistToken)
+        token: todoistToken.materialized(loaded: loadedSecrets.todoistToken)
       )
     )
   }
@@ -214,7 +235,7 @@ struct TaskBoardGitSettingsDraft: Equatable {
   }
 
   private var repositoryOverridesForTokens: [TaskBoardGitHubRepositoryToken] {
-    repositoryOverrides.compactMap(\.tokenOverride)
+    repositoryOverrides.compactMap { $0.tokenOverride(loaded: loadedSecrets) }
   }
 
   private var githubInboxRepositories: [String] {
@@ -299,17 +320,17 @@ struct TaskBoardRepositoryOverrideDraft: Identifiable, Equatable {
   var authorName = ""
   var authorEmail = ""
   var sshKeyPath = ""
-  var sshPrivateKey = ""
-  var sshPrivateKeyPassphrase = ""
+  var sshPrivateKey: TaskBoardSecretField = .notConfigured
+  var sshPrivateKeyPassphrase: TaskBoardSecretField = .notConfigured
   var signingMode: TaskBoardGitSigningMode = .none
   var signingSSHKeyPath = ""
-  var signingSSHPrivateKey = ""
-  var signingSSHPrivateKeyPassphrase = ""
+  var signingSSHPrivateKey: TaskBoardSecretField = .notConfigured
+  var signingSSHPrivateKeyPassphrase: TaskBoardSecretField = .notConfigured
   var gpgKeyId = ""
   var gpgPrivateKeyPath = ""
-  var gpgPrivateKey = ""
-  var gpgPrivateKeyPassphrase = ""
-  var token = ""
+  var gpgPrivateKey: TaskBoardSecretField = .notConfigured
+  var gpgPrivateKeyPassphrase: TaskBoardSecretField = .notConfigured
+  var token: TaskBoardSecretField = .notConfigured
 
   init(
     id: UUID = UUID(),
@@ -317,17 +338,17 @@ struct TaskBoardRepositoryOverrideDraft: Identifiable, Equatable {
     authorName: String = "",
     authorEmail: String = "",
     sshKeyPath: String = "",
-    sshPrivateKey: String = "",
-    sshPrivateKeyPassphrase: String = "",
+    sshPrivateKey: TaskBoardSecretField = .notConfigured,
+    sshPrivateKeyPassphrase: TaskBoardSecretField = .notConfigured,
     signingMode: TaskBoardGitSigningMode = .none,
     signingSSHKeyPath: String = "",
-    signingSSHPrivateKey: String = "",
-    signingSSHPrivateKeyPassphrase: String = "",
+    signingSSHPrivateKey: TaskBoardSecretField = .notConfigured,
+    signingSSHPrivateKeyPassphrase: TaskBoardSecretField = .notConfigured,
     gpgKeyId: String = "",
     gpgPrivateKeyPath: String = "",
-    gpgPrivateKey: String = "",
-    gpgPrivateKeyPassphrase: String = "",
-    token: String = ""
+    gpgPrivateKey: TaskBoardSecretField = .notConfigured,
+    gpgPrivateKeyPassphrase: TaskBoardSecretField = .notConfigured,
+    token: TaskBoardSecretField = .notConfigured
   ) {
     self.id = id
     self.repository = repository
@@ -347,61 +368,104 @@ struct TaskBoardRepositoryOverrideDraft: Identifiable, Equatable {
     self.token = token
   }
 
-  var runtimeOverride: TaskBoardGitRepositoryOverride? {
-    guard let repository = normalized(repository), hasRuntimeOverride else {
+  func runtimeOverride(loaded: TaskBoardLoadedSecrets) -> TaskBoardGitRepositoryOverride? {
+    guard let repository = normalized(repository), hasRuntimeOverride(loaded: loaded) else {
       return nil
     }
+    let lowered = repository.lowercased()
+    let perRepo = loaded.repositorySecrets(for: lowered)
     return TaskBoardGitRepositoryOverride(
-      repository: repository.lowercased(),
+      repository: lowered,
       profile: TaskBoardGitRuntimeProfile(
         authorName: normalized(authorName),
         authorEmail: normalized(authorEmail),
         sshKeyPath: normalized(sshKeyPath),
-        sshPrivateKey: normalized(sshPrivateKey),
-        sshPrivateKeyPassphrase: normalized(sshPrivateKeyPassphrase),
+        sshPrivateKey: sshPrivateKey.materialized(loaded: perRepo.sshPrivateKey),
+        sshPrivateKeyPassphrase: sshPrivateKeyPassphrase.materialized(
+          loaded: perRepo.sshPrivateKeyPassphrase
+        ),
         signing: TaskBoardGitSigningConfig(
           mode: signingMode,
           sshKeyPath: signingMode == .ssh ? normalized(signingSSHKeyPath) : nil,
-          sshPrivateKey: signingMode == .ssh ? normalized(signingSSHPrivateKey) : nil,
+          sshPrivateKey: signingMode == .ssh
+            ? signingSSHPrivateKey.materialized(loaded: perRepo.signingSSHPrivateKey)
+            : nil,
           sshPrivateKeyPassphrase: signingMode == .ssh
-            ? normalized(signingSSHPrivateKeyPassphrase)
+            ? signingSSHPrivateKeyPassphrase.materialized(
+              loaded: perRepo.signingSSHPrivateKeyPassphrase
+            )
             : nil,
           gpgKeyId: signingMode == .gpg ? normalized(gpgKeyId) : nil,
           gpgPrivateKeyPath: signingMode == .gpg ? normalized(gpgPrivateKeyPath) : nil,
-          gpgPrivateKey: signingMode == .gpg ? normalized(gpgPrivateKey) : nil,
+          gpgPrivateKey: signingMode == .gpg
+            ? gpgPrivateKey.materialized(loaded: perRepo.gpgPrivateKey)
+            : nil,
           gpgPrivateKeyPassphrase: signingMode == .gpg
-            ? normalized(gpgPrivateKeyPassphrase)
+            ? gpgPrivateKeyPassphrase.materialized(loaded: perRepo.gpgPrivateKeyPassphrase)
             : nil
         )
       )
     )
   }
 
-  var tokenOverride: TaskBoardGitHubRepositoryToken? {
-    guard let repository = normalized(repository)?.lowercased(), let token = normalized(token)
-    else {
+  func tokenOverride(loaded: TaskBoardLoadedSecrets) -> TaskBoardGitHubRepositoryToken? {
+    guard let repository = normalized(repository)?.lowercased() else { return nil }
+    let stored = loaded.repositoryToken(for: repository)
+    guard let materialized = token.materialized(loaded: stored), !materialized.isEmpty else {
       return nil
     }
-    return TaskBoardGitHubRepositoryToken(repository: repository, token: token)
+    return TaskBoardGitHubRepositoryToken(repository: repository, token: materialized)
   }
 
-  private var hasRuntimeOverride: Bool {
-    normalized(authorName) != nil
+  private func hasRuntimeOverride(loaded: TaskBoardLoadedSecrets) -> Bool {
+    let lowered = normalized(repository)?.lowercased()
+    let perRepo = lowered.map { loaded.repositorySecrets(for: $0) }
+    let hasAnySecret =
+      sshPrivateKey.materialized(loaded: perRepo?.sshPrivateKey) != nil
+      || sshPrivateKeyPassphrase.materialized(loaded: perRepo?.sshPrivateKeyPassphrase) != nil
+      || (signingMode == .ssh
+        && signingSSHPrivateKey.materialized(loaded: perRepo?.signingSSHPrivateKey) != nil)
+      || (signingMode == .ssh
+        && signingSSHPrivateKeyPassphrase.materialized(
+          loaded: perRepo?.signingSSHPrivateKeyPassphrase
+        ) != nil)
+      || (signingMode == .gpg
+        && gpgPrivateKey.materialized(loaded: perRepo?.gpgPrivateKey) != nil)
+      || (signingMode == .gpg
+        && gpgPrivateKeyPassphrase.materialized(loaded: perRepo?.gpgPrivateKeyPassphrase) != nil)
+    return normalized(authorName) != nil
       || normalized(authorEmail) != nil
       || normalized(sshKeyPath) != nil
-      || normalized(sshPrivateKey) != nil
-      || normalized(sshPrivateKeyPassphrase) != nil
+      || hasAnySecret
       || (signingMode == .ssh && normalized(signingSSHKeyPath) != nil)
-      || (signingMode == .ssh && normalized(signingSSHPrivateKey) != nil)
-      || (signingMode == .ssh && normalized(signingSSHPrivateKeyPassphrase) != nil)
       || (signingMode == .gpg && normalized(gpgKeyId) != nil)
       || (signingMode == .gpg && normalized(gpgPrivateKeyPath) != nil)
-      || (signingMode == .gpg && normalized(gpgPrivateKey) != nil)
-      || (signingMode == .gpg && normalized(gpgPrivateKeyPassphrase) != nil)
   }
 
   private func normalized(_ value: String) -> String? {
     let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
     return trimmed.isEmpty ? nil : trimmed
+  }
+}
+
+extension TaskBoardSecretField {
+  static func secretFromLoaded(_ value: String?) -> Self {
+    guard let value, !value.isEmpty else { return .notConfigured }
+    return .configured
+  }
+
+  /// Convert a `TaskBoardSecretField` to the wire string the runtime config
+  /// expects. `.configured` re-uses the loaded value so the daemon does not
+  /// silently drop the existing secret when the user did not touch the field.
+  func materialized(loaded: String?) -> String? {
+    switch self {
+    case .notConfigured:
+      return nil
+    case .configured:
+      return loaded
+    case .editing(let value):
+      let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+      return trimmed.isEmpty ? nil : trimmed
+    }
   }
 }

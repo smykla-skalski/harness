@@ -84,7 +84,7 @@ struct TaskBoardSwiftUXCorrectnessTests {
   func repositoryOverrideDraftIdentifierSurvivesMutation() {
     var draft = TaskBoardRepositoryOverrideDraft(repository: "owner/repo")
     let originalID = draft.id
-    draft.token = "ghp_replaced"
+    draft.token = .editing("ghp_replaced")
     #expect(draft.id == originalID)
   }
 

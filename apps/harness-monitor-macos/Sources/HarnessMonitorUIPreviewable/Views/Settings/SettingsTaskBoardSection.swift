@@ -40,7 +40,8 @@ public struct SettingsTaskBoardSection: View {
         githubInboxSection
         SettingsTaskBoardHostSection(store: store)
         automationSection
-        gitDefaultsSection
+        gitIdentitySection
+        gitSigningSection
         credentialsSection
         repositoryOverridesHeader
         repositoryOverrideSections
@@ -206,7 +207,7 @@ public struct SettingsTaskBoardSection: View {
     }
   }
 
-  private var gitDefaultsSection: some View {
+  private var gitIdentitySection: some View {
     Section {
       TextField(
         "Author Name",
@@ -232,13 +233,28 @@ public struct SettingsTaskBoardSection: View {
       SettingsSecretField(
         title: "SSH Private Key",
         placeholder: "Paste SSH private key material",
-        text: $draft.sshPrivateKey,
+        field: $draft.sshPrivateKey,
         accessibilityIdentifier: HarnessMonitorAccessibility.settingsTaskBoardSSHPrivateKeyField
       )
-      SecureField("SSH Key Passphrase", text: $draft.sshPrivateKeyPassphrase)
-        .accessibilityIdentifier(
-          HarnessMonitorAccessibility.settingsTBSSHKeyPassphraseField
-        )
+      SettingsSecretField(
+        title: "SSH Key Passphrase",
+        placeholder: "Optional passphrase",
+        field: $draft.sshPrivateKeyPassphrase,
+        accessibilityIdentifier: HarnessMonitorAccessibility.settingsTBSSHKeyPassphraseField
+      )
+    } header: {
+      Text("Git Identity")
+        .harnessNativeFormSectionHeader()
+    } footer: {
+      VStack(alignment: .leading, spacing: 4) {
+        Text("These values affect daemon-managed git operations only.")
+        Text("Empty = use your git config defaults.")
+      }
+    }
+  }
+
+  private var gitSigningSection: some View {
+    Section {
       Picker("Signing Mode", selection: $draft.signingMode) {
         ForEach(TaskBoardGitSigningMode.allCases, id: \.self) { mode in
           Text(mode.title).tag(mode)
@@ -257,13 +273,15 @@ public struct SettingsTaskBoardSection: View {
         SettingsSecretField(
           title: "Signing SSH Private Key",
           placeholder: "Paste signing SSH private key material",
-          text: $draft.signingSSHPrivateKey,
+          field: $draft.signingSSHPrivateKey,
           accessibilityIdentifier: HarnessMonitorAccessibility.settingsTBSigningSSHKeyField
         )
-        SecureField("Signing SSH Key Passphrase", text: $draft.signingSSHPrivateKeyPassphrase)
-          .accessibilityIdentifier(
-            HarnessMonitorAccessibility.settingsTBSigningSSHPassphraseField
-          )
+        SettingsSecretField(
+          title: "Signing SSH Key Passphrase",
+          placeholder: "Optional passphrase",
+          field: $draft.signingSSHPrivateKeyPassphrase,
+          accessibilityIdentifier: HarnessMonitorAccessibility.settingsTBSigningSSHPassphraseField
+        )
       }
       if draft.signingMode == .gpg {
         TextField("GPG Key ID", text: $draft.gpgKeyId)
@@ -279,22 +297,23 @@ public struct SettingsTaskBoardSection: View {
         SettingsSecretField(
           title: "GPG Private Key",
           placeholder: "Paste ASCII-armored GPG private key",
-          text: $draft.gpgPrivateKey,
+          field: $draft.gpgPrivateKey,
           accessibilityIdentifier: HarnessMonitorAccessibility.settingsTaskBoardGPGPrivateKeyField
         )
-        SecureField("GPG Key Passphrase", text: $draft.gpgPrivateKeyPassphrase)
-          .accessibilityIdentifier(
-            HarnessMonitorAccessibility.settingsTaskBoardGPGPassphraseField
-          )
+        SettingsSecretField(
+          title: "GPG Key Passphrase",
+          placeholder: "Optional passphrase",
+          field: $draft.gpgPrivateKeyPassphrase,
+          accessibilityIdentifier: HarnessMonitorAccessibility.settingsTaskBoardGPGPassphraseField
+        )
       }
     } header: {
-      Text("Git Identity Defaults")
+      Text("Signing")
         .harnessNativeFormSectionHeader()
     } footer: {
-      VStack(alignment: .leading, spacing: 4) {
-        Text("These values affect daemon-managed git operations only.")
-        Text("Empty = use your git config defaults.")
-      }
+      Text(
+        "Choose how the daemon signs commits and tags it creates on your behalf."
+      )
     }
   }
 
@@ -323,13 +342,27 @@ public struct SettingsTaskBoardSection: View {
 
   private var credentialsSection: some View {
     Section {
-      SecureField("GitHub Token", text: $draft.globalToken)
-        .accessibilityIdentifier(HarnessMonitorAccessibility.settingsTaskBoardGlobalTokenField)
+      SettingsSecretField(
+        title: "GitHub Token",
+        placeholder: "Personal access token",
+        field: $draft.globalToken,
+        accessibilityIdentifier: HarnessMonitorAccessibility.settingsTaskBoardGlobalTokenField
+      )
+      SettingsSecretField(
+        title: "Todoist Token",
+        placeholder: "Optional Todoist API token",
+        field: $draft.todoistToken,
+        accessibilityIdentifier: HarnessMonitorAccessibility.settingsTaskBoardGlobalTokenField
+          + ".todoist"
+      )
     } header: {
       Text("Credentials")
         .harnessNativeFormSectionHeader()
     } footer: {
-      Text("Tokens are stored in your macOS Keychain. Leaving a token blank clears it.")
+      Text(
+        "Tokens are stored in your macOS Keychain. "
+          + "Click the trash icon to clear a stored value."
+      )
     }
   }
 
@@ -352,26 +385,37 @@ public struct SettingsTaskBoardSection: View {
   @ViewBuilder private var repositoryOverrideSections: some View {
     ForEach(Array(draft.repositoryOverrides.enumerated()), id: \.element.id) { index, _ in
       Section {
-        TextField("owner/repo", text: $draft.repositoryOverrides[index].repository)
-          .accessibilityIdentifier(
-            HarnessMonitorAccessibility.settingsTaskBoardRepositoryOverrideField(index)
+        DisclosureGroup(repositoryOverrideTitle(index: index)) {
+          TextField("owner/repo", text: $draft.repositoryOverrides[index].repository)
+            .accessibilityIdentifier(
+              HarnessMonitorAccessibility.settingsTaskBoardRepositoryOverrideField(index)
+            )
+          repositoryIdentityFields(index: index, override: $draft.repositoryOverrides[index])
+          repositorySigningFields(index: index, override: $draft.repositoryOverrides[index])
+          SettingsSecretField(
+            title: "GitHub Token",
+            placeholder: "Repository-specific token",
+            field: $draft.repositoryOverrides[index].token,
+            accessibilityIdentifier:
+              HarnessMonitorAccessibility.settingsTaskBoardRepositoryOverrideTokenField(index)
           )
-        repositoryIdentityFields(index: index, override: $draft.repositoryOverrides[index])
-        repositorySigningFields(index: index, override: $draft.repositoryOverrides[index])
-        SecureField("GitHub Token", text: $draft.repositoryOverrides[index].token)
-          .accessibilityIdentifier(
-            HarnessMonitorAccessibility.settingsTaskBoardRepositoryOverrideTokenField(index)
-          )
-        Button(role: .destructive) {
-          draft.repositoryOverrides.remove(at: index)
-        } label: {
-          Label("Remove Override", systemImage: "trash")
+          Button(role: .destructive) {
+            draft.repositoryOverrides.remove(at: index)
+          } label: {
+            Label("Remove Override", systemImage: "trash")
+          }
         }
-      } header: {
-        Text("Repository Override \(index + 1)")
-          .harnessNativeFormSectionHeader()
       }
     }
+  }
+
+  private func repositoryOverrideTitle(index: Int) -> String {
+    let slug = draft.repositoryOverrides[index].repository
+      .trimmingCharacters(in: .whitespacesAndNewlines)
+    if slug.isEmpty {
+      return "Repository Override \(index + 1)"
+    }
+    return slug
   }
 }
 
