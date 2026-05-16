@@ -3495,6 +3495,7 @@ dependencies = [
  "serde-sarif",
  "serde_json",
  "serde_yml",
+ "sha1",
  "sha2 0.11.0",
  "shell-words",
  "signal-hook 0.4.4",
