@@ -20,6 +20,18 @@ struct TaskBoardItemManagementPanel: View {
 
   @State private var draft: TaskBoardItemEditorDraft
   @State private var projectTypeSuggestions: [String] = []
+  @Environment(\.fontScale)
+  private var fontScale
+
+  private var subheadlineSemibold: Font {
+    HarnessMonitorTextSize.scaledFont(.subheadline.weight(.semibold), by: fontScale)
+  }
+  private var captionFont: Font {
+    HarnessMonitorTextSize.scaledFont(.caption, by: fontScale)
+  }
+  private var captionSemibold: Font {
+    HarnessMonitorTextSize.scaledFont(.caption.weight(.semibold), by: fontScale)
+  }
 
   init(
     item: TaskBoardItem?,
@@ -108,7 +120,7 @@ struct TaskBoardItemManagementPanel: View {
         isCreating ? "Create Board Item" : "Manage Board Item",
         systemImage: "slider.horizontal.3"
       )
-      .scaledFont(.subheadline.weight(.semibold))
+      .font(subheadlineSemibold)
       Spacer(minLength: HarnessMonitorTheme.spacingSM)
       Button(action: onClose) {
         Image(systemName: "xmark")
@@ -189,10 +201,10 @@ struct TaskBoardItemManagementPanel: View {
   private var approvalReadout: some View {
     VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingXS) {
       Text("Approval")
-        .scaledFont(.caption.weight(.semibold))
+        .font(captionSemibold)
         .foregroundStyle(HarnessMonitorTheme.secondaryInk)
       Text(approvalSummary)
-        .scaledFont(.caption)
+        .font(captionFont)
         .foregroundStyle(HarnessMonitorTheme.secondaryInk)
         .textSelection(.enabled)
     }
@@ -202,14 +214,14 @@ struct TaskBoardItemManagementPanel: View {
     VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
       HStack {
         Text("External Refs")
-          .scaledFont(.caption.weight(.semibold))
+          .font(captionSemibold)
           .foregroundStyle(HarnessMonitorTheme.secondaryInk)
         Spacer()
         Button {
           draft.externalRefs.append(TaskBoardExternalRefDraft())
         } label: {
           Label("Add Ref", systemImage: "plus")
-            .scaledFont(.caption.weight(.semibold))
+            .font(captionSemibold)
         }
         .controlSize(HarnessMonitorControlMetrics.compactControlSize)
         .disabled(isActionInFlight)
@@ -235,7 +247,7 @@ struct TaskBoardItemManagementPanel: View {
         isCreating ? "Create Item" : "Save Item",
         systemImage: isCreating ? "plus.circle" : "checkmark.circle"
       )
-      .scaledFont(.caption.weight(.semibold))
+      .font(captionSemibold)
     }
     .frame(minHeight: metrics.controlMinHeight)
     .harnessActionButtonStyle(variant: .bordered, tint: HarnessMonitorTheme.accent)
@@ -257,7 +269,7 @@ struct TaskBoardItemManagementPanel: View {
         onRunOnce?(item)
       } label: {
         Label("Run Once", systemImage: "play.circle")
-          .scaledFont(.caption.weight(.semibold))
+          .font(captionSemibold)
       }
       .frame(minHeight: metrics.controlMinHeight)
       .harnessActionButtonStyle(variant: .bordered, tint: HarnessMonitorTheme.accent)
@@ -268,7 +280,7 @@ struct TaskBoardItemManagementPanel: View {
         onEvaluate?(item)
       } label: {
         Label("Evaluate Item", systemImage: "checkmark.seal")
-          .scaledFont(.caption.weight(.semibold))
+          .font(captionSemibold)
       }
       .frame(minHeight: metrics.controlMinHeight)
       .harnessActionButtonStyle(variant: .bordered, tint: HarnessMonitorTheme.accent)
@@ -281,7 +293,7 @@ struct TaskBoardItemManagementPanel: View {
         onClose()
       } label: {
         Label("Delete", systemImage: "trash")
-          .scaledFont(.caption.weight(.semibold))
+          .font(captionSemibold)
       }
       .frame(minHeight: metrics.controlMinHeight)
       .controlSize(HarnessMonitorControlMetrics.compactControlSize)
@@ -292,7 +304,7 @@ struct TaskBoardItemManagementPanel: View {
       onRefresh?()
     } label: {
       Label("Refresh", systemImage: "arrow.clockwise")
-        .scaledFont(.caption.weight(.semibold))
+        .font(captionSemibold)
     }
     .frame(minHeight: metrics.controlMinHeight)
     .harnessActionButtonStyle(variant: .bordered, tint: .secondary)
