@@ -13,7 +13,6 @@ public struct DashboardWindowView: View {
   private var persistedColumnVisibilityRaw = SessionColumnVisibilityCodec.encode(.doubleColumn)
   @SceneStorage("dashboard.sidebarWidth")
   private var persistedSidebarWidth = 220.0
-  @State private var inspectorVisible = true
 
   public init(
     store: HarnessMonitorStore,
@@ -124,10 +123,6 @@ public struct DashboardWindowView: View {
               sessionCatalog: sessionCatalog
             )
           }
-          .inspector(isPresented: $inspectorVisible) {
-            dashboardInspector
-              .inspectorColumnWidth(min: 220, ideal: 260, max: 320)
-          }
         }
       }
       .accessibilityElement(children: .contain)
@@ -154,16 +149,6 @@ public struct DashboardWindowView: View {
       }
       .modifier(DashboardPerfRouteHook(selectedRouteBinding: selectedRouteBinding))
     }
-  }
-
-  private var dashboardInspector: some View {
-    VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
-      Text("Dashboard inspector placeholder")
-        .scaledFont(.body)
-      Spacer(minLength: 0)
-    }
-    .padding(HarnessMonitorTheme.spacingMD)
-    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
   }
 }
 
