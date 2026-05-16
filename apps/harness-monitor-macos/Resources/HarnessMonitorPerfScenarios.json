@@ -442,6 +442,25 @@
         "hitches": 0,
         "potentialHangs": 0
       }
+    },
+    {
+      "id": "dashboard-live-interact",
+      "signpostName": "dashboard-live-interact",
+      "defaultPreviewScenario": "dashboard",
+      "initialSettingsSection": "general",
+      "disablesVisualOptions": false,
+      "needsPreviewAcpPermissionBatch": false,
+      "includesBootstrapInMeasurement": false,
+      "usesLiveDaemon": true,
+      "durationSeconds": 20,
+      "templates": ["swiftui"],
+      "swiftUIBudget": {
+        "totalUpdates": 60000,
+        "bodyUpdates": 6000,
+        "maxUpdateGroupMilliseconds": 50,
+        "hitches": 0,
+        "potentialHangs": 0
+      }
     }
   ]
 }
