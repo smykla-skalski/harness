@@ -271,34 +271,43 @@ struct HarnessMonitorInitialWindowRouter {
 
       let deadline = ContinuousClock.now + timeout
       var attempts = 0
+      // Once a grouping resolves, skip it in subsequent polls — otherwise the
+      // tabGroup.selectedWindow write inside attemptMerge fires on every tick
+      // and cascades through AppKit's KVO into SwiftUI's MergedEnvironment
+      // graph (see r16 audit: 34k MergedEnvironment edges traced back to
+      // pencil.and.list.clipboard fanout during the polling window).
+      var resolvedOrdinals: Set<Int> = []
+      var foregroundResolvedOrdinals: Set<Int> = []
 
       while true {
         attempts += 1
 
-        let boundSessionIDCount = expectedSessionIDs.reduce(into: 0) { count, sessionID in
-          if registry.window(forSessionID: sessionID) != nil {
-            count += 1
+        var boundSessionIDCount = 0
+        var tabReadySessionIDCount = 0
+        var toolbarsReady = true
+        // Single pass over expectedSessionIDs replaces three independent
+        // reduce/allSatisfy walks; the registry lookup is O(1) but the loop
+        // overhead and three closures per attempt added up across 30 polls.
+        for sessionID in expectedSessionIDs {
+          guard let window = registry.window(forSessionID: sessionID) else {
+            toolbarsReady = false
+            continue
           }
-        }
-        let toolbarsReady = expectedSessionIDs.allSatisfy { sessionID in
-          registry.window(forSessionID: sessionID)?.toolbar != nil
-        }
-        let tabReadySessionIDCount = expectedSessionIDs.reduce(into: 0) { count, sessionID in
-          guard let window = registry.window(forSessionID: sessionID), isWindowTabReady(window) else {
-            return
+          boundSessionIDCount += 1
+          if window.toolbar == nil {
+            toolbarsReady = false
+          } else if isWindowTabReady(window) {
+            tabReadySessionIDCount += 1
           }
-          count += 1
         }
 
-        var resolvedGroupCount = 0
-        var foregroundResolvedCount = 0
-        for grouping in groupings {
+        for grouping in groupings where !resolvedOrdinals.contains(grouping.ordinal) {
           let mergeOutcome = attemptMerge(grouping, registry: registry)
           if mergeOutcome.resolved {
-            resolvedGroupCount += 1
+            resolvedOrdinals.insert(grouping.ordinal)
           }
           if mergeOutcome.foregroundResolved {
-            foregroundResolvedCount += 1
+            foregroundResolvedOrdinals.insert(grouping.ordinal)
           }
         }
 
@@ -307,10 +316,10 @@ struct HarnessMonitorInitialWindowRouter {
           boundSessionIDCount: boundSessionIDCount,
           tabReadySessionIDCount: tabReadySessionIDCount,
           toolbarsReady: toolbarsReady,
-          resolvedGroupCount: resolvedGroupCount,
-          foregroundResolvedCount: foregroundResolvedCount
+          resolvedGroupCount: resolvedOrdinals.count,
+          foregroundResolvedCount: foregroundResolvedOrdinals.count
         )
-        if resolvedGroupCount == groupings.count || ContinuousClock.now >= deadline {
+        if resolvedOrdinals.count == groupings.count || ContinuousClock.now >= deadline {
           return replayOutcome
         }
 
@@ -359,7 +368,12 @@ struct HarnessMonitorInitialWindowRouter {
         let foregroundWindow = registry.window(forSessionID: foregroundID),
         let tabGroup = foregroundWindow.tabGroup
       {
-        tabGroup.selectedWindow = foregroundWindow
+        // Idempotent: NSTabGroup posts KVO on selectedWindow assignment even
+        // when the value is unchanged, which fans into SwiftUI's
+        // MergedEnvironment graph during the polling window.
+        if tabGroup.selectedWindow !== foregroundWindow {
+          tabGroup.selectedWindow = foregroundWindow
+        }
         foregroundResolved = true
       }
 

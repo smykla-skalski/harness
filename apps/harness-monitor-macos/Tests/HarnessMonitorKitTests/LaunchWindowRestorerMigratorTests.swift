@@ -164,6 +164,59 @@ struct LaunchWindowRestorerMigratorTests {
     #expect(groupC?.foregroundSessionID == nil)
   }
 
+  @Test("Restore plan opens grouped sessions in saved tab order before standalone windows")
+  func restorePlanUsesSavedTabOrderForGroupedSessions() async throws {
+    let groupedLeader = PreviewFixtures.summary
+    let groupedFollower = PreviewFixtures.signalRegressionSecondarySummary
+    let groupedTail = try #require(
+      PreviewFixtures.overflowSessions.first {
+        $0.sessionId != groupedLeader.sessionId
+          && $0.sessionId != groupedFollower.sessionId
+      }
+    )
+    let standalone = try #require(
+      PreviewFixtures.overflowSessions.first {
+        $0.sessionId != groupedLeader.sessionId
+          && $0.sessionId != groupedFollower.sessionId
+          && $0.sessionId != groupedTail.sessionId
+      }
+    )
+    let store = makeStore(cacheService: cacheService)
+
+    for summary in [groupedLeader, groupedFollower, groupedTail, standalone] {
+      #expect(store.sessionIndex.applySessionSummary(summary))
+    }
+
+    let groupedIDs = [
+      groupedTail.sessionId,
+      groupedLeader.sessionId,
+      groupedFollower.sessionId,
+    ]
+    _ = await cacheService.replaceSessionWindowsOpenAtQuit(
+      snapshot: HarnessMonitorStore.SessionWindowQuitSnapshot(
+        sessionIDs: Set(groupedIDs + [standalone.sessionId]),
+        groupings: [
+          HarnessMonitorStore.SessionTabGroupSnapshot(
+            ordinal: 0,
+            sessionIDs: groupedIDs,
+            foregroundSessionID: groupedLeader.sessionId
+          )
+        ]
+      )
+    )
+
+    let plan = await store.launchWindowRestorePlan()
+
+    #expect(plan.sessionIDs == groupedIDs + [standalone.sessionId])
+    #expect(plan.tabGroupings == [
+      HarnessMonitorStore.SessionTabGroupSnapshot(
+        ordinal: 0,
+        sessionIDs: groupedIDs,
+        foregroundSessionID: groupedLeader.sessionId
+      )
+    ])
+  }
+
   @Test("Standalone session windows survive the snapshot without a grouping entry")
   func standaloneWindowsHaveNoGrouping() async {
     let snapshot = HarnessMonitorStore.SessionWindowQuitSnapshot(
