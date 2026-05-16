@@ -12,6 +12,12 @@ enum TaskBoardStatusFilterChoice: String, CaseIterable, Identifiable, Hashable {
   case done
   case blocked
 
+  /// Stable storage for `allCases` so `ForEach` pickers do not see a new
+  /// array identity on every parent body re-evaluation. CaseIterable's
+  /// synthesized `allCases` allocates a fresh array on each call which
+  /// fanned a UInt32 source into ForEachState<…>.Evictor every render.
+  static let stableAllCases: [Self] = Self.allCases
+
   private static let statusChoices: [TaskBoardStatus: Self] = [
     .new: .new,
     .planning: .planning,

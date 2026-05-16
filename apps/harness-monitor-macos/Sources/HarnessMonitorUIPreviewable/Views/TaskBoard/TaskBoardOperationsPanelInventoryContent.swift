@@ -25,7 +25,7 @@ struct TaskBoardOperationsPanelInventoryCard: View {
 
   private var statusPickerField: some View {
     Picker("Status filter", selection: $inventoryStatusChoice) {
-      ForEach(TaskBoardStatusFilterChoice.allCases) { choice in
+      ForEach(TaskBoardStatusFilterChoice.stableAllCases) { choice in
         Text(choice.title).tag(choice)
       }
     }
