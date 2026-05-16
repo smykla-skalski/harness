@@ -228,8 +228,39 @@ struct SessionSwiftUISourceTests {
     let dashboardSource = try sourceFile(at: "Views/Dashboard/DashboardWindowView.swift")
 
     #expect(dashboardSource.contains(".harnessMonitorBackgroundExtensionEffect()"))
+    #expect(
+      dashboardSource.contains(".windowToolbarBackdropUnderlay(toolbarBackdropModel(route: route))")
+    )
     #expect(dashboardSource.contains(".toolbarBackground(.visible, for: .windowToolbar)"))
     #expect(!dashboardSource.contains(".backgroundExtensionEffect()"))
+  }
+
+  @Test("Toolbar backdrop underlay stays cheap and wrapper based")
+  func toolbarBackdropUnderlayStaysCheapAndWrapperBased() throws {
+    let underlaySource = try sourceFile(at: "Views/Toolbar/WindowToolbarBackdropUnderlay.swift")
+    let sessionWindowSource = try sourceFile(at: "Views/Sessions/SessionWindowView.swift")
+    let presentationSource = try sourceFile(
+      at: "Views/Sessions/SessionWindowView+Presentation.swift"
+    )
+    let bannerChromeSource = try sourceFile(at: "Views/Shared/WindowBannerChrome.swift")
+
+    #expect(underlaySource.contains("public struct WindowToolbarBackdropModel"))
+    #expect(underlaySource.contains("public struct WindowToolbarBackdropUnderlay"))
+    #expect(underlaySource.contains("@Environment(\\.accessibilityReduceTransparency)"))
+    #expect(underlaySource.contains("HarnessMonitorUITestEnvironment.disablesVisualOptions"))
+    #expect(underlaySource.contains(".ignoresSafeArea(.container, edges: .top)"))
+    #expect(!underlaySource.contains(".backgroundExtensionEffect()"))
+    #expect(!underlaySource.contains(".blur("))
+    #expect(!underlaySource.contains("NSVisualEffectView"))
+    #expect(
+      sessionWindowSource.contains(".windowToolbarBackdropUnderlay(sessionToolbarBackdropModel)")
+    )
+    #expect(
+      presentationSource.contains("var sessionToolbarBackdropModel: WindowToolbarBackdropModel")
+    )
+    #expect(bannerChromeSource.contains("WindowBannerChromeBackground"))
+    #expect(bannerChromeSource.contains("material=softWindowBackground"))
+    #expect(!bannerChromeSource.contains(".background(Color(nsColor: .windowBackgroundColor))"))
   }
 
   @Test("Settings detail surface reuses the shared toolbar blur host")
@@ -250,7 +281,7 @@ struct SessionSwiftUISourceTests {
       at: "Views/Sessions/SessionWindowView+Presentation.swift")
     let standardLayoutSource = try sourceFile(
       at: "Views/Sessions/SessionWindowStandardLayout.swift")
-    let sidebarSearchSource = try sourceFile(at: "Views/Sidebar/SidebarSearchHost.swift")
+    let searchHostSource = try sourceFile(at: "Views/Search/AppSearchHost.swift")
 
     #expect(!presentationSource.contains("let encodedVisibility ="))
     #expect(standardLayoutSource.contains("let encodedVisibility ="))
@@ -262,20 +293,19 @@ struct SessionSwiftUISourceTests {
     #expect(
       widthPersistenceSource.contains("guard abs(contentColumnWidth - newValue) > 0.5 else")
     )
-    #expect(sidebarSearchSource.contains("guard store.searchText != newValue else { return }"))
+    #expect(searchHostSource.contains("if query != command.query"))
     #expect(
-      sidebarSearchSource.contains(
-        "guard searchPresentationState.isPresented != newValue else { return }"
+      searchHostSource.contains("if isSearchFocused != command.isPresented")
+    )
+    #expect(searchHostSource.contains("guard suggestionSnapshot != snapshot else { return }"))
+    #expect(searchHostSource.contains("AppSearchFieldSurface("))
+    #expect(searchHostSource.contains(".task(id: shouldKeepSearchIndexActive)"))
+    #expect(
+      searchHostSource.contains(
+        "setPresented(shouldKeepSearchIndexActive)"
       )
     )
-    #expect(sidebarSearchSource.contains("SidebarSearchableModifier("))
-    #expect(sidebarSearchSource.contains(".task(id: canPresentSearch)"))
-    #expect(
-      sidebarSearchSource.contains(
-        "requestPresentation(canPresent: canPresentSearch)"
-      )
-    )
-    #expect(!sidebarSearchSource.contains("private var mcpRegistryHostEnabled"))
+    #expect(!searchHostSource.contains("private var mcpRegistryHostEnabled"))
   }
 
   @Test("Decision rows keep deadline churn scoped to the deadline chip")
