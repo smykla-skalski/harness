@@ -345,6 +345,17 @@ run = "swift build -c release --package-path apps/harness-monitor-macos/Tools/Ha
 description = "Run unit tests for the harness-monitor-perf Swift CLI"
 run = "swift test --package-path apps/harness-monitor-macos/Tools/HarnessMonitorPerf"
 
+[tasks."monitor:audit:validation"]
+description = "Run both Harness Monitor audit validation suites (wrapper scripts + Swift perf tool tests) in sequence with fail-fast"
+run = '''
+  set -e
+  echo "==> monitor:audit:validation: running monitor:test:scripts"
+  mise run monitor:test:scripts
+  echo "==> monitor:audit:validation: running monitor:tools:test:perf"
+  mise run monitor:tools:test:perf
+  echo "==> monitor:audit:validation: both validation suites passed"
+'''
+
 [tasks."monitor:tools:generate:schemas"]
 description = "Regenerate the HarnessMonitorPerf JSON schema snapshots"
 depends = ["monitor:tools:build:perf"]
