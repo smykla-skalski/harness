@@ -1,7 +1,7 @@
 import Foundation
 
 extension HarnessMonitorStore {
-  private func mutateTaskBoardPlanning(
+  func mutateTaskBoardPlanning(
     actionName: String,
     mutation:
       @escaping @Sendable (any HarnessMonitorClientProtocol) async throws
@@ -28,7 +28,7 @@ extension HarnessMonitorStore {
     }
   }
 
-  private func mutateTaskBoardOrchestrator(
+  func mutateTaskBoardOrchestrator(
     actionName: String,
     mutation:
       @escaping @Sendable (any HarnessMonitorClientProtocol) async throws
@@ -55,7 +55,7 @@ extension HarnessMonitorStore {
     }
   }
 
-  private func refreshTaskBoardDashboardSnapshot(
+  func refreshTaskBoardDashboardSnapshot(
     using client: any HarnessMonitorClientProtocol,
     fallbackStatus: TaskBoardOrchestratorStatus? = nil
   ) async {
@@ -101,7 +101,7 @@ extension HarnessMonitorStore {
     }
   }
 
-  private func mergeTaskBoardItem(_ item: TaskBoardItem) {
+  func mergeTaskBoardItem(_ item: TaskBoardItem) {
     guard let index = globalTaskBoardItems.firstIndex(where: { $0.id == item.id }) else {
       globalTaskBoardItems.append(item)
       return

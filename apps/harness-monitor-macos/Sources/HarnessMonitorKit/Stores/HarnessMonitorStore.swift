@@ -37,7 +37,7 @@ public final class HarnessMonitorStore {
   public var supervisorOpenDecisions: [Decision] = []
   public var supervisorDecisionRefreshTick: Int = 0
   public internal(set) var supervisorLiveTickRefreshTick: Int = 0
-  public private(set) var supervisorRuntimeState: SupervisorRuntimeState = .stopped
+  public internal(set) var supervisorRuntimeState: SupervisorRuntimeState = .stopped
   public var globalTaskBoardItems: [TaskBoardItem] = [] {
     didSet {
       guard oldValue != globalTaskBoardItems else { return }
