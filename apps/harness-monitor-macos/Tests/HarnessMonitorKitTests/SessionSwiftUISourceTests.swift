@@ -223,6 +223,15 @@ struct SessionSwiftUISourceTests {
     #expect(surfaceSource.contains("topScrollEdgeEffect: .soft"))
   }
 
+  @Test("Dashboard detail surface reuses the shared toolbar blur host")
+  func dashboardDetailSurfaceReusesSharedToolbarBlurHost() throws {
+    let dashboardSource = try sourceFile(at: "Views/Dashboard/DashboardWindowView.swift")
+
+    #expect(dashboardSource.contains(".harnessMonitorBackgroundExtensionEffect()"))
+    #expect(!dashboardSource.contains(".toolbarBackground(.visible, for: .windowToolbar)"))
+    #expect(!dashboardSource.contains(".backgroundExtensionEffect()"))
+  }
+
   @Test("Session split view and search bindings ignore redundant writes")
   func sessionSplitViewAndSearchBindingsIgnoreRedundantWrites() throws {
     let sessionWindowSource = try sourceFile(at: "Views/Sessions/SessionWindowView.swift")

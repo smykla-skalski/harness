@@ -82,6 +82,8 @@ public enum HarnessMonitorAccessibility {
   }
 
   public static let dashboardWindowRoot = "harness.dashboard.window"
+  public static let dashboardWindowToolbarSeparatorSuppressed =
+    "harness.dashboard.window.toolbar.separator-suppressed"
   public static let dashboardSidebar = "harness.dashboard.sidebar"
   public static let dashboardScrollView = "harness.dashboard.scroll"
   public static let dashboardNewSessionButton = "harness.dashboard.new-session"
