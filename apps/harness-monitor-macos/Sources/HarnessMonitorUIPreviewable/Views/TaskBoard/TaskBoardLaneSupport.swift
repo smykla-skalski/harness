@@ -121,6 +121,9 @@ struct TaskBoardEmptyLane: View {
   private var fontScale
 
   private var metrics: TaskBoardLaneMetrics { TaskBoardLaneMetrics(fontScale: fontScale) }
+  private var captionSemibold: Font {
+    HarnessMonitorTextSize.scaledFont(.caption.weight(.semibold), by: fontScale)
+  }
 
   var body: some View {
     VStack(spacing: metrics.laneSpacing) {
@@ -129,7 +132,7 @@ struct TaskBoardEmptyLane: View {
         tint: taskBoardLaneColor(for: lane)
       )
       Text("Nothing here")
-        .scaledFont(.caption.weight(.semibold))
+        .font(captionSemibold)
         .foregroundStyle(HarnessMonitorTheme.secondaryInk)
     }
     .frame(maxWidth: .infinity, minHeight: metrics.emptyLaneMinHeight)
@@ -145,10 +148,13 @@ struct TaskBoardCardLeadingIcon: View {
   private var fontScale
 
   private var metrics: TaskBoardLaneMetrics { TaskBoardLaneMetrics(fontScale: fontScale) }
+  private var iconFont: Font {
+    HarnessMonitorTextSize.scaledFont(.caption.weight(.semibold), by: fontScale)
+  }
 
   var body: some View {
     Image(systemName: systemImage)
-      .scaledFont(.caption.weight(.semibold))
+      .font(iconFont)
       .foregroundStyle(tint)
       .frame(width: metrics.cardMarkerSize, height: metrics.cardMarkerSize)
       .background(tint.opacity(0.16), in: Circle())
@@ -164,16 +170,20 @@ struct TaskBoardCardPill: View {
   private var fontScale
 
   private var metrics: TaskBoardLaneMetrics { TaskBoardLaneMetrics(fontScale: fontScale) }
+  private var pillFont: Font {
+    HarnessMonitorTextSize.scaledFont(.caption2.weight(.bold), by: fontScale)
+  }
 
   var body: some View {
-    HStack(spacing: HarnessMonitorTheme.spacingXS) {
+    let pillFont = pillFont
+    return HStack(spacing: HarnessMonitorTheme.spacingXS) {
       if let systemImage {
         Image(systemName: systemImage)
-          .scaledFont(.caption2.weight(.bold))
+          .font(pillFont)
           .accessibilityHidden(true)
       }
       Text(label)
-        .scaledFont(.caption2.weight(.bold))
+        .font(pillFont)
     }
     .foregroundStyle(tint)
     .lineLimit(1)
