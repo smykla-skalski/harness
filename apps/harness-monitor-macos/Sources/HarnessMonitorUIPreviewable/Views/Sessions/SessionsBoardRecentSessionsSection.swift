@@ -49,9 +49,33 @@ private struct DashboardSessionCard: View {
   private var openWindow
   @Environment(\.harnessDateTimeConfiguration)
   private var dateTimeConfiguration
+  @Environment(\.fontScale)
+  private var fontScale
 
   private var presentation: HarnessMonitorStore.SessionSummaryPresentation {
     store.sessionSummaryPresentation(for: session)
+  }
+
+  // Precomputed fonts reading `fontScale` directly. Replaces `.scaledFont(...)`
+  // modifier instances - each of those was its own `ScaledFontModifier` view
+  // wrapper subscribing to the `fontScale` environment, and 8 recent-session
+  // cards x 5 fonts = 40 nested `_EnvironmentKeyWritingModifier` cascades on
+  // first paint. Reading the env once per card and computing the Font here
+  // collapses that to a single env subscription per card.
+  private var titleFont: Font {
+    HarnessMonitorTextSize.scaledFont(
+      .system(.headline, design: .rounded, weight: .semibold),
+      by: fontScale
+    )
+  }
+  private var statusFont: Font {
+    HarnessMonitorTextSize.scaledFont(.caption2.weight(.bold), by: fontScale)
+  }
+  private var metadataFont: Font {
+    HarnessMonitorTextSize.scaledFont(.caption.monospaced(), by: fontScale)
+  }
+  private var timestampFont: Font {
+    HarnessMonitorTextSize.scaledFont(.caption.weight(.semibold), by: fontScale)
   }
 
   var body: some View {
@@ -66,7 +90,7 @@ private struct DashboardSessionCard: View {
         VStack(alignment: .leading, spacing: 4) {
           HStack(alignment: .top, spacing: HarnessMonitorTheme.itemSpacing) {
             Text(session.displayTitle)
-              .scaledFont(.system(.headline, design: .rounded, weight: .semibold))
+              .font(titleFont)
               .italic(session.title.isEmpty)
               .foregroundStyle(
                 session.title.isEmpty
@@ -78,17 +102,17 @@ private struct DashboardSessionCard: View {
               .truncationMode(.tail)
             Spacer(minLength: 12)
             Text(presentation.statusText)
-              .scaledFont(.caption2.weight(.bold))
+              .font(statusFont)
               .foregroundStyle(statusColor(for: presentation.statusTone))
           }
           HStack(spacing: HarnessMonitorTheme.sectionSpacing) {
             Text(sessionMetadata(session))
-              .scaledFont(.caption.monospaced())
+              .font(metadataFont)
               .truncationMode(.middle)
               .foregroundStyle(HarnessMonitorTheme.secondaryInk)
             Spacer(minLength: 0)
             Text(formatTimestamp(session.lastActivityAt, configuration: dateTimeConfiguration))
-              .scaledFont(.caption.weight(.semibold))
+              .font(timestampFont)
               .foregroundStyle(
                 isHovered
                   ? HarnessMonitorTheme.secondaryInk
@@ -103,7 +127,10 @@ private struct DashboardSessionCard: View {
       .padding(HarnessMonitorTheme.cardPadding)
       .fixedSize(horizontal: false, vertical: true)
     }
-    .harnessInteractiveCardButtonStyle()
+    // `respondsToHover: false` drops the button-style's own hover region;
+    // the local `.onHover` below remains to drive the timestamp opacity
+    // fade. Net: one hover region per card instead of two.
+    .harnessInteractiveCardButtonStyle(respondsToHover: false)
     .accessibilityIdentifier(HarnessMonitorAccessibility.dashboardSessionCard(session.sessionId))
     .accessibilityFrameMarker(
       HarnessMonitorAccessibility.dashboardSessionCardFrame(session.sessionId)
