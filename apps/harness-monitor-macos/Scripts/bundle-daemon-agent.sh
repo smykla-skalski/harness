@@ -174,7 +174,7 @@ if [ -n "$codesign_identity" ]; then
     --sign "$codesign_identity" \
     --options runtime \
     "$timestamp_flag" \
-    --identifier io.harnessmonitor.daemon \
+    --identifier io.harnessmonitor.daemon.managed \
     --entitlements "$PROJECT_DIR/HarnessMonitorDaemon.entitlements" \
     "$daemon_target"
   /usr/bin/codesign --verify --verbose=2 "$daemon_target"
@@ -185,7 +185,7 @@ else
   /usr/bin/codesign \
     --force \
     --sign - \
-    --identifier io.harnessmonitor.daemon \
+    --identifier io.harnessmonitor.daemon.managed \
     "$daemon_target"
 fi
 

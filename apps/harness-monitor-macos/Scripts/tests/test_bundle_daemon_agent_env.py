@@ -158,7 +158,7 @@ class BuildDaemonBinaryTests(unittest.TestCase):
 <plist version="1.0">
 <dict>
     <key>CFBundleIdentifier</key>
-    <string>io.harnessmonitor.daemon</string>
+    <string>io.harnessmonitor.daemon.managed</string>
 </dict>
 </plist>
 """
