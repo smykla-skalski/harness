@@ -95,7 +95,18 @@ helpers_dir="$TARGET_BUILD_DIR/$CONTENTS_FOLDER_PATH/Helpers"
 launch_agents_dir="$TARGET_BUILD_DIR/$CONTENTS_FOLDER_PATH/Library/LaunchAgents"
 daemon_target="$helpers_dir/harness"
 plist_target="$launch_agents_dir/io.harnessmonitor.daemon.managed.plist"
-launch_agent_label="$(harness_monitor_runtime_launch_agent_label "$repo_root")"
+# The bundled plist's `Label` MUST equal the plist filename without its
+# `.plist` extension or `SMAppService.register()` returns
+# `error: 22 (EINVAL)` on macOS 26 and silently leaves
+# `Service status: 3 (.notFound)` — the daemon never registers and
+# `Bootstrapping daemon client for managed daemon mode` then stalls
+# forever. The lane name still flows into the daemon via the
+# `HARNESS_MONITOR_RUNTIME_LANE` env entry below; we do not need it on
+# the launchd label as well. The pre-coexistence label format
+# `<base>.<lane>` worked by accident because the legacy plist was
+# registered on a much earlier macOS where SMAppService did not yet
+# enforce this match.
+launch_agent_label="io.harnessmonitor.daemon.managed"
 app_group_id="$(harness_monitor_runtime_app_group_id)"
 
 /bin/mkdir -p "$helpers_dir" "$launch_agents_dir"

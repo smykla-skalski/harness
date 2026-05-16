@@ -219,6 +219,14 @@ public enum HarnessMonitorPaths {
   /// daemon dev` in a user shell) so there's no symmetric label for them.
   /// The label always carries the `.managed` qualifier so it cannot collide
   /// with a hand-installed legacy plist that used the unqualified base name.
+  ///
+  /// The label MUST equal the bundled plist filename without its `.plist`
+  /// extension — macOS 26's `SMAppService.register()` returns
+  /// `error: 22 (EINVAL)` and `Service status: 3 (.notFound)` whenever the
+  /// two diverge, which manifests as a managed-daemon bootstrap that loops
+  /// on `Bootstrapping daemon client for managed daemon mode` without ever
+  /// spawning a daemon process. Lane identity therefore flows through the
+  /// `HARNESS_MONITOR_RUNTIME_LANE` env entry in the plist, not the label.
   public static func launchAgentLabel(
     using environment: HarnessMonitorEnvironment = .current
   ) -> String {
@@ -227,13 +235,8 @@ public enum HarnessMonitorPaths {
     ) {
       return explicitLabel
     }
-
-    let baseManagedLabel =
+    return
       "\(HarnessMonitorRuntimeLane.launchAgentBaseLabel).\(DaemonOwnership.managed.rawValue)"
-    guard let lane = resolvedRuntimeLane(using: environment) else {
-      return baseManagedLabel
-    }
-    return "\(baseManagedLabel).\(lane)"
   }
 
   /// The pre-coexistence label, used solely to find and unregister an
