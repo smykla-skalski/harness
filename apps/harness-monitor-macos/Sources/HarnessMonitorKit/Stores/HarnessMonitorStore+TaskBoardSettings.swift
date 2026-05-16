@@ -3,13 +3,21 @@ import Foundation
 extension HarnessMonitorStore {
   private static let taskBoardGitHubCredentialStore = TaskBoardGitHubCredentialStore()
   private static let taskBoardTodoistCredentialStore = TaskBoardTodoistCredentialStore()
-  static let taskBoardRuntimeSecretsMigrationKey =
-    "io.harnessmonitor.taskboard.runtime-secrets-migrated"
+
+  /// Per-ownership migration flag. Managed and external daemons each carry
+  /// their own on-disk config, so each one needs its own one-shot drain.
+  /// Sharing a single flag would skip the drain on whichever daemon the user
+  /// connected to second.
+  public static func taskBoardRuntimeSecretsMigrationKey(
+    for ownership: DaemonOwnership
+  ) -> String {
+    "io.harnessmonitor.taskboard.runtime-secrets-migrated.\(ownership.rawValue)"
+  }
 
   public func taskBoardGitSettingsSnapshot() async throws -> TaskBoardGitSettingsSnapshot {
     let client = try await taskBoardSettingsClient()
 
-    await Self.migrateRuntimeSecretsIfNeeded(client: client)
+    await Self.migrateRuntimeSecretsIfNeeded(client: client, ownership: daemonOwnership)
 
     async let orchestratorSettings = client.taskBoardOrchestratorSettings()
     async let runtimeConfig = client.taskBoardGitRuntimeConfig()
@@ -136,10 +144,12 @@ extension HarnessMonitorStore {
 
   static func migrateRuntimeSecretsIfNeeded(
     client: any HarnessMonitorClientProtocol,
+    ownership: DaemonOwnership,
     userDefaults: UserDefaults = .standard,
     keychain: TaskBoardKeyMaterialPersistence = .defaultKeychain
   ) async {
-    guard !userDefaults.bool(forKey: taskBoardRuntimeSecretsMigrationKey) else {
+    let flagKey = taskBoardRuntimeSecretsMigrationKey(for: ownership)
+    guard !userDefaults.bool(forKey: flagKey) else {
       return
     }
     do {
@@ -147,7 +157,7 @@ extension HarnessMonitorStore {
       if response.drained {
         try persistKeyMaterial(runtime: response.runtime, keychain: keychain)
       }
-      userDefaults.set(true, forKey: taskBoardRuntimeSecretsMigrationKey)
+      userDefaults.set(true, forKey: flagKey)
     } catch {
       // Older daemons (wire version 1) don't expose the drain endpoint; the
       // version-skew banner already tells the user to upgrade. Leave the

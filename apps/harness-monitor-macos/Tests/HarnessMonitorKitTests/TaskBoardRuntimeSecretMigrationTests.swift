@@ -6,16 +6,20 @@ import Testing
 @MainActor
 @Suite("Task-board runtime-secret migration")
 struct TaskBoardRuntimeSecretMigrationTests {
-  @Test("Skips drain when the migration flag is already set")
+  @Test("Skips drain when the managed-ownership flag is already set")
   func skipsWhenFlagAlreadySet() async {
     let client = RecordingHarnessClient()
     let defaults = makeEmptyDefaults()
-    defaults.set(true, forKey: HarnessMonitorStore.taskBoardRuntimeSecretsMigrationKey)
+    defaults.set(
+      true,
+      forKey: HarnessMonitorStore.taskBoardRuntimeSecretsMigrationKey(for: .managed)
+    )
     let keychain = InMemoryKeychainBundle()
 
     let baseline = client.recordedCalls().count
     await HarnessMonitorStore.migrateRuntimeSecretsIfNeeded(
       client: client,
+      ownership: .managed,
       userDefaults: defaults,
       keychain: keychain.persistence
     )
@@ -30,7 +34,7 @@ struct TaskBoardRuntimeSecretMigrationTests {
     #expect(keychain.savedSnapshots.isEmpty)
   }
 
-  @Test("Sets the flag without writing to Keychain when drained == false")
+  @Test("Sets the per-ownership flag without writing to Keychain when drained == false")
   func recordsFlagWhenNothingToDrain() async {
     let client = RecordingHarnessClient()
     let defaults = makeEmptyDefaults()
@@ -38,11 +42,16 @@ struct TaskBoardRuntimeSecretMigrationTests {
 
     await HarnessMonitorStore.migrateRuntimeSecretsIfNeeded(
       client: client,
+      ownership: .managed,
       userDefaults: defaults,
       keychain: keychain.persistence
     )
 
-    #expect(defaults.bool(forKey: HarnessMonitorStore.taskBoardRuntimeSecretsMigrationKey))
+    #expect(
+      defaults.bool(
+        forKey: HarnessMonitorStore.taskBoardRuntimeSecretsMigrationKey(for: .managed)
+      )
+    )
     #expect(keychain.savedSnapshots.isEmpty)
     let calls = client.recordedCalls()
     #expect(
@@ -85,11 +94,16 @@ struct TaskBoardRuntimeSecretMigrationTests {
 
     await HarnessMonitorStore.migrateRuntimeSecretsIfNeeded(
       client: client,
+      ownership: .managed,
       userDefaults: defaults,
       keychain: keychain.persistence
     )
 
-    #expect(defaults.bool(forKey: HarnessMonitorStore.taskBoardRuntimeSecretsMigrationKey))
+    #expect(
+      defaults.bool(
+        forKey: HarnessMonitorStore.taskBoardRuntimeSecretsMigrationKey(for: .managed)
+      )
+    )
     let globalSSH = keychain.ssh.snapshots[.global]
     #expect(globalSSH?.privateKey == "global-ssh-secret")
     #expect(globalSSH?.passphrase == "global-ssh-pass")
@@ -100,10 +114,10 @@ struct TaskBoardRuntimeSecretMigrationTests {
     let repoSSH = keychain.ssh.snapshots[.repository("owner/repo")]
     #expect(repoSSH?.privateKey == "repo-ssh-secret")
 
-    // Second invocation must be a no-op now that the flag is set.
     let preSecondCount = client.recordedCalls().count
     await HarnessMonitorStore.migrateRuntimeSecretsIfNeeded(
       client: client,
+      ownership: .managed,
       userDefaults: defaults,
       keychain: keychain.persistence
     )
@@ -121,12 +135,56 @@ struct TaskBoardRuntimeSecretMigrationTests {
 
     await HarnessMonitorStore.migrateRuntimeSecretsIfNeeded(
       client: client,
+      ownership: .managed,
       userDefaults: defaults,
       keychain: keychain.persistence
     )
 
-    #expect(defaults.bool(forKey: HarnessMonitorStore.taskBoardRuntimeSecretsMigrationKey) == false)
+    #expect(
+      defaults.bool(forKey: HarnessMonitorStore.taskBoardRuntimeSecretsMigrationKey(for: .managed))
+        == false
+    )
     #expect(keychain.savedSnapshots.isEmpty)
+  }
+
+  @Test("Managed-side migration does not block external-side migration")
+  func managedFlagDoesNotBlockExternal() async {
+    let client = RecordingHarnessClient()
+    client.taskBoardGitRuntimeDrainSecretsValue = TaskBoardGitRuntimeDrainSecretsResponse(
+      drained: true,
+      runtime: TaskBoardGitRuntimeConfig(
+        global: TaskBoardGitRuntimeProfile(sshPrivateKey: "external-only-secret")
+      )
+    )
+    let defaults = makeEmptyDefaults()
+    defaults.set(
+      true,
+      forKey: HarnessMonitorStore.taskBoardRuntimeSecretsMigrationKey(for: .managed)
+    )
+    let keychain = InMemoryKeychainBundle()
+
+    await HarnessMonitorStore.migrateRuntimeSecretsIfNeeded(
+      client: client,
+      ownership: .external,
+      userDefaults: defaults,
+      keychain: keychain.persistence
+    )
+
+    #expect(
+      defaults.bool(
+        forKey: HarnessMonitorStore.taskBoardRuntimeSecretsMigrationKey(for: .external)
+      )
+    )
+    #expect(keychain.ssh.snapshots[.global]?.privateKey == "external-only-secret")
+  }
+
+  @Test("Managed and external ownership produce distinct flag keys")
+  func keysAreDistinctPerOwnership() {
+    let managedKey = HarnessMonitorStore.taskBoardRuntimeSecretsMigrationKey(for: .managed)
+    let externalKey = HarnessMonitorStore.taskBoardRuntimeSecretsMigrationKey(for: .external)
+    #expect(managedKey != externalKey)
+    #expect(managedKey.hasSuffix(".managed"))
+    #expect(externalKey.hasSuffix(".external"))
   }
 
   private func makeEmptyDefaults() -> UserDefaults {
