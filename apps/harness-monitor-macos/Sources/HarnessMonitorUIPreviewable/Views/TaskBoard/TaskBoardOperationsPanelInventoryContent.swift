@@ -10,6 +10,15 @@ struct TaskBoardOperationsPanelInventoryCard: View {
   let dashboard: HarnessMonitorStore.ContentDashboardSlice
   let metrics: TaskBoardOverviewMetrics
   @Binding var inventoryStatusChoice: TaskBoardStatusFilterChoice
+  @Environment(\.fontScale)
+  private var fontScale
+
+  private var captionFont: Font {
+    HarnessMonitorTextSize.scaledFont(.caption, by: fontScale)
+  }
+  private var captionSemibold: Font {
+    HarnessMonitorTextSize.scaledFont(.caption.weight(.semibold), by: fontScale)
+  }
 
   var body: some View {
     TaskBoardOperationsCard(
@@ -185,7 +194,7 @@ struct TaskBoardOperationsPanelInventoryCard: View {
   ) -> some View {
     VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingXS) {
       Label(title, systemImage: systemImage)
-        .scaledFont(.caption.weight(.semibold))
+        .font(captionSemibold)
         .foregroundStyle(HarnessMonitorTheme.secondaryInk)
         .accessibilityAddTraits(.isHeader)
       content()
@@ -202,17 +211,17 @@ struct TaskBoardOperationsPanelInventoryCard: View {
 
   private func placeholder(_ text: String) -> some View {
     Text(text)
-      .scaledFont(.caption)
+      .font(captionFont)
       .foregroundStyle(HarnessMonitorTheme.secondaryInk)
   }
 
   private func row(title: String, subtitle: String) -> some View {
     HStack(alignment: .firstTextBaseline, spacing: HarnessMonitorTheme.spacingSM) {
       Text(title)
-        .scaledFont(.caption.weight(.semibold))
+        .font(captionSemibold)
       Spacer(minLength: HarnessMonitorTheme.spacingSM)
       Text(subtitle)
-        .scaledFont(.caption)
+        .font(captionFont)
         .foregroundStyle(HarnessMonitorTheme.secondaryInk)
     }
   }

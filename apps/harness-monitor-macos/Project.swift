@@ -4,6 +4,8 @@ import ProjectDescriptionHelpers
 private let macOSDestinations: Destinations = [.mac]
 private let macOSDeploymentTargets: DeploymentTargets = .macOS("26.0")
 private let xcodeVisibleAppEntitlementsPath: Path = "HarnessMonitorBase.entitlements"
+private let xcodeVisibleExternalDaemonEntitlementsPath: Path =
+    "HarnessMonitorExternalDaemon.entitlements"
 private let generatedAppEntitlements: SettingValue =
     "$(PROJECT_TEMP_DIR)/GeneratedAppEntitlements/$(TARGET_NAME).codesign.entitlements"
 
@@ -172,6 +174,58 @@ private let monitorAppTarget: Target = .target(
     ],
     dependencies: monitorAppDependencies,
     settings: monitorAppSettings,
+    metadata: .metadata(tags: ["tag:feature:monitor", "tag:layer:app"])
+)
+
+// External-daemon variant: same sources and dependencies as `HarnessMonitor`
+// but built without the macOS app sandbox so the running app can reach a
+// developer-launched `harness daemon dev` outside its own container. SMAppService
+// registration is skipped at runtime via `HARNESS_MONITOR_EXTERNAL_DAEMON=1`, so
+// the bundled managed plist stays inert; we still ship the helper binary in the
+// .app to keep the layout identical to the sandboxed product.
+// Reuse the regular app's bundle ID so the existing automatic-signing
+// provisioning profile covers both variants and so user defaults / app-group
+// containers stay shared. The two products live side-by-side in DerivedData
+// thanks to their distinct PRODUCT_NAME values, and `HARNESS_MONITOR_EXTERNAL_DAEMON=1`
+// is what actually selects external-daemon runtime behavior at launch.
+private let externalDaemonAppSettings: Settings = .settings(
+    base: [
+        "CODE_SIGN_ENTITLEMENTS": generatedAppEntitlements,
+        "CODE_SIGN_IDENTITY[sdk=macosx*]": "Apple Development",
+        "CODE_SIGN_STYLE": "Automatic",
+        "ENABLE_APP_SANDBOX": "NO",
+        "ENABLE_INCOMING_NETWORK_CONNECTIONS": "NO",
+        "ENABLE_OUTGOING_NETWORK_CONNECTIONS": "YES",
+        "GENERATE_INFOPLIST_FILE": "NO",
+        "INFOPLIST_FILE": "Resources/HarnessMonitor-Info.plist",
+        "PRODUCT_BUNDLE_IDENTIFIER": "io.harnessmonitor.app",
+        "PRODUCT_MODULE_NAME": "HarnessMonitor",
+        "PRODUCT_NAME": "Harness Monitor (External Daemon)",
+        "REGISTER_APP_GROUPS": "YES",
+        "SWIFT_ACTIVE_COMPILATION_CONDITIONS": FeatureFlags.compilationConditionSetting()
+    ]
+)
+
+private let externalDaemonAppTarget: Target = .target(
+    name: "HarnessMonitorExternalDaemon",
+    destinations: macOSDestinations,
+    product: .app,
+    bundleId: "io.harnessmonitor.app",
+    deploymentTargets: macOSDeploymentTargets,
+    infoPlist: .file(path: "Resources/HarnessMonitor-Info.plist"),
+    sources: monitorAppSources,
+    resources: [
+        "Sources/HarnessMonitor/Assets.xcassets",
+        "Resources/HarnessMonitorPerfScenarios.json",
+        "Resources/PrivacyInfo.xcprivacy",
+    ],
+    entitlements: .file(path: xcodeVisibleExternalDaemonEntitlementsPath),
+    scripts: [
+        BuildPhases.bundleDaemonAgent(),
+        BuildPhases.clearGatekeeperMetadata(variant: .monitorApp)
+    ],
+    dependencies: monitorAppDependencies,
+    settings: externalDaemonAppSettings,
     metadata: .metadata(tags: ["tag:feature:monitor", "tag:layer:app"])
 )
 
@@ -394,13 +448,13 @@ private let externalDaemonScheme: Scheme = .scheme(
     name: "HarnessMonitor (External Daemon)",
     shared: true,
     buildAction: .buildAction(targets: [
-        .target("HarnessMonitor"),
+        .target("HarnessMonitorExternalDaemon"),
         .target("HarnessMonitorKit"),
         .target("HarnessMonitorUIPreviewable")
     ], preActions: [BuildPhases.prepareAppEntitlementsPreAction()]),
     runAction: .runAction(
         configuration: "Debug",
-        executable: .target("HarnessMonitor"),
+        executable: .target("HarnessMonitorExternalDaemon"),
         arguments: Arguments.arguments(environmentVariables: externalDaemonRunEnv)
     )
 )
@@ -485,6 +539,7 @@ let project = Project(
         uiPreviewableTarget,
         previewHostTarget,
         monitorAppTarget,
+        externalDaemonAppTarget,
         uiTestHostTarget,
         appTestsTarget,
         kitTestsTarget,
