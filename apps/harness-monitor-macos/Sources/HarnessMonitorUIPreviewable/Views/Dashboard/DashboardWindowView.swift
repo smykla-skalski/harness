@@ -139,7 +139,6 @@ public struct DashboardWindowView: View {
           )
         )
       }
-      .toolbarBackground(.visible, for: .windowToolbar)
       .task {
         HarnessMonitorUITestTrace.record(
           component: "dashboard.window",
@@ -212,7 +211,6 @@ private struct DashboardBannerStack<Content: View>: View {
       isPresented: model.isPresented
     ) {
       content
-        .harnessMonitorToolbarBackgroundExtensionEffect()
     } banners: {
       topChrome
     }

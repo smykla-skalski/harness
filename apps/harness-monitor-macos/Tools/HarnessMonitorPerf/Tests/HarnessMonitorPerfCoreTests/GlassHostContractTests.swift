@@ -2,18 +2,15 @@ import Foundation
 import XCTest
 
 /// Contract test that pins where `.backgroundExtensionEffect()` may be
-/// applied. The modifier extends the window's chrome glass into the content
-/// area, so nesting it under another glass host or applying it inside content
-/// rows produces "glass on glass" stacking that washes out the underlying
-/// material and adds redundant blur passes.
+/// applied. The modifier mirrors and blurs edge content, so it is only suitable
+/// for intentional backdrop surfaces. It is not the toolbar blur mechanism;
+/// toolbar/content separation should come from scroll-edge effects.
 ///
 /// Direct `.backgroundExtensionEffect(` callers must live in the documented
 /// helper file. Every other surface routes through the
-/// `sessionWindowBackgroundExtensionEffect()` /
-/// `harnessMonitorToolbarBackgroundExtensionEffect()` /
-/// `harnessMonitorBackgroundExtensionEffect()` wrappers so the test-environment
-/// opt-out and `accessibilityReduceTransparency` handling stay centralised.
-/// General backdrop surfaces also keep the user backdrop-mode gate there.
+/// `harnessMonitorBackgroundExtensionEffect()` wrapper so the test-environment
+/// opt-out, `accessibilityReduceTransparency` handling, and user backdrop-mode
+/// gate stay centralised.
 final class GlassHostContractTests: XCTestCase {
     /// Files allowed to invoke `.backgroundExtensionEffect(` directly.
     /// Add a comment for each entry explaining why the raw call site is
@@ -21,11 +18,10 @@ final class GlassHostContractTests: XCTestCase {
     /// `*BackgroundExtensionEffect()` wrappers defined in the helper.
     private static let allowlistedRelativePaths: [String] = [
         // The wrapper implementation itself; its `content.backgroundExtensionEffect()`
-        // body is the single canonical glass-host entry point. Every other
-        // surface should call `sessionWindowBackgroundExtensionEffect()`,
-        // `harnessMonitorToolbarBackgroundExtensionEffect()`, or
-        // `harnessMonitorBackgroundExtensionEffect()` instead so the
-        // accessibility and test-environment gating stay centralised.
+        // body is the single canonical background-extension entry point. Every
+        // other surface should call `harnessMonitorBackgroundExtensionEffect()`
+        // instead so accessibility, backdrop-mode, and test-environment gating
+        // stay centralised.
         "Sources/HarnessMonitorUIPreviewable/Views/Sessions/SessionWindowBackgroundExtensionEffect.swift",
     ]
 
@@ -52,12 +48,10 @@ final class GlassHostContractTests: XCTestCase {
             XCTFail(
                 """
                 Found \(violations.count) raw `.backgroundExtensionEffect(` \
-                site(s) outside the allowlist. Glass-host placement is \
+                site(s) outside the allowlist. Background-extension placement is \
                 centralised; route the call through \
-                `sessionWindowBackgroundExtensionEffect()`, \
-                `harnessMonitorToolbarBackgroundExtensionEffect()`, or \
                 `harnessMonitorBackgroundExtensionEffect()` so the \
-                accessibility and test-environment gating in \
+                accessibility, backdrop-mode, and test-environment gating in \
                 `SessionWindowBackgroundExtensionEffect.swift` stays \
                 authoritative. If a brand-new direct caller is genuinely \
                 required, add its `Sources/...` relative path to \

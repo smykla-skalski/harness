@@ -199,50 +199,44 @@ struct SessionSwiftUISourceTests {
     #expect(!createFormSource.contains("@FocusState var focusedField"))
   }
 
-  @Test("Session content columns extend behind toolbar glass with soft scroll edge")
-  func sessionContentColumnsExtendBehindToolbarGlassWithSoftScrollEdge() throws {
+  @Test("Session content columns use native scroll edge without mirrored toolbar hosts")
+  func sessionContentColumnsUseNativeScrollEdgeWithoutMirroredToolbarHosts() throws {
     let columnsSource = try sourceFile(at: "Views/Sessions/SessionWindowView+Columns.swift")
     let extensionEffectSource = try sourceFile(
       at: "Views/Sessions/SessionWindowBackgroundExtensionEffect.swift"
     )
     let surfaceSource = try sourceFile(at: "Views/Sessions/SessionDetailSurface.swift")
+    let columnScrollSource = try sourceFile(at: "Views/Shared/HarnessMonitorColumnScrollView.swift")
 
     #expect(!columnsSource.contains("SessionBackgroundExtensionSurface()"))
-    #expect(
-      columnsSource.components(separatedBy: ".sessionWindowBackgroundExtensionEffect()").count
-        - 1 == 2
-    )
+    #expect(!columnsSource.contains(".sessionWindowBackgroundExtensionEffect()"))
     #expect(
       extensionEffectSource.contains("@AppStorage(HarnessMonitorBackdropDefaults.modeKey)")
     )
     #expect(extensionEffectSource.contains("@Environment(\\.accessibilityReduceTransparency)"))
-    #expect(
-      extensionEffectSource.contains(
-        "if reduceTransparency || (respectsBackdropMode && backdropMode == .none)"
-      )
-    )
+    #expect(extensionEffectSource.contains("if reduceTransparency || backdropMode == .none"))
     #expect(extensionEffectSource.contains("func harnessMonitorBackgroundExtensionEffect()"))
     #expect(
-      extensionEffectSource.contains("func harnessMonitorToolbarBackgroundExtensionEffect()")
-    )
-    #expect(extensionEffectSource.contains("func sessionWindowBackgroundExtensionEffect()"))
-    #expect(extensionEffectSource.contains("harnessMonitorToolbarBackgroundExtensionEffect()"))
+      !extensionEffectSource.contains("func harnessMonitorToolbarBackgroundExtensionEffect()"))
+    #expect(!extensionEffectSource.contains("func sessionWindowBackgroundExtensionEffect()"))
     #expect(extensionEffectSource.contains("content.backgroundExtensionEffect()"))
     #expect(!surfaceSource.contains(".backgroundExtensionEffect()"))
     #expect(surfaceSource.contains("topScrollEdgeEffect: .soft"))
+    #expect(columnScrollSource.contains("content.scrollEdgeEffectStyle(.soft, for: .top)"))
+    #expect(columnScrollSource.contains("content.scrollEdgeEffectStyle(.hard, for: .top)"))
   }
 
-  @Test("Dashboard detail surface reuses the shared toolbar blur host")
-  func dashboardDetailSurfaceReusesSharedToolbarBlurHost() throws {
+  @Test("Dashboard detail surface avoids mirrored toolbar extension hosts")
+  func dashboardDetailSurfaceAvoidsMirroredToolbarExtensionHosts() throws {
     let dashboardSource = try sourceFile(at: "Views/Dashboard/DashboardWindowView.swift")
 
-    #expect(dashboardSource.contains(".harnessMonitorToolbarBackgroundExtensionEffect()"))
-    #expect(dashboardSource.contains(".toolbarBackground(.visible, for: .windowToolbar)"))
+    #expect(!dashboardSource.contains(".harnessMonitorToolbarBackgroundExtensionEffect()"))
+    #expect(!dashboardSource.contains(".toolbarBackground(.visible, for: .windowToolbar)"))
     #expect(!dashboardSource.contains(".backgroundExtensionEffect()"))
   }
 
-  @Test("Toolbar backdrop uses native extension without artificial underlays")
-  func toolbarBackdropUsesNativeExtensionWithoutArtificialUnderlays() throws {
+  @Test("Toolbar backdrop uses scroll edge without artificial underlays")
+  func toolbarBackdropUsesScrollEdgeWithoutArtificialUnderlays() throws {
     let dashboardSource = try sourceFile(at: "Views/Dashboard/DashboardWindowView.swift")
     let sessionWindowSource = try sourceFile(at: "Views/Sessions/SessionWindowView.swift")
     let extensionEffectSource = try sourceFile(
@@ -254,7 +248,8 @@ struct SessionSwiftUISourceTests {
     #expect(!dashboardSource.contains("windowToolbarBackdropUnderlay"))
     #expect(!sessionWindowSource.contains("WindowToolbarBackdropUnderlay"))
     #expect(!sessionWindowSource.contains("windowToolbarBackdropUnderlay"))
-    #expect(extensionEffectSource.contains("respectsBackdropMode: false"))
+    #expect(!extensionEffectSource.contains("respectsBackdropMode: false"))
+    #expect(!extensionEffectSource.contains("harnessMonitorToolbarBackgroundExtensionEffect"))
     #expect(extensionEffectSource.contains("content.backgroundExtensionEffect()"))
     #expect(!extensionEffectSource.contains("Ellipse()"))
     #expect(!extensionEffectSource.contains("LinearGradient("))
@@ -265,8 +260,8 @@ struct SessionSwiftUISourceTests {
     #expect(!bannerChromeSource.contains(".background(Color(nsColor: .windowBackgroundColor))"))
   }
 
-  @Test("Settings detail surface reuses the shared toolbar blur host")
-  func settingsDetailSurfaceReusesSharedToolbarBlurHost() throws {
+  @Test("Settings detail surface reuses the shared backdrop extension host")
+  func settingsDetailSurfaceReusesSharedBackdropExtensionHost() throws {
     let settingsSource = try sourceFile(at: "Views/Settings/SettingsView.swift")
 
     #expect(settingsSource.contains(".harnessMonitorBackgroundExtensionEffect()"))

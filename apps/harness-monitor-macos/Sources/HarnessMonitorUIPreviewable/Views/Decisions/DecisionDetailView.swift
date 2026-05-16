@@ -121,7 +121,7 @@ public struct DecisionDetailView: View {
   }
 
   public var body: some View {
-    // The owning column already applies `.backgroundExtensionEffect()`.
+    // The owning scroll column already applies the top scroll-edge effect.
     detailBody
       .frame(maxWidth: .infinity, maxHeight: .infinity)
       .accessibilityElement(children: .contain)
