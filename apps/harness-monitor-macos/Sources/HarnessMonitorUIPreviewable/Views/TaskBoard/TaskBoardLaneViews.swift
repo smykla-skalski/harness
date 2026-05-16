@@ -247,14 +247,20 @@ private struct TaskBoardItemDragPreviewCard: View {
   private var fontScale
 
   private var metrics: TaskBoardLaneMetrics { TaskBoardLaneMetrics(fontScale: fontScale) }
+  private var titleFont: Font {
+    HarnessMonitorTextSize.scaledFont(.subheadline.weight(.semibold), by: fontScale)
+  }
+  private var statusFont: Font {
+    HarnessMonitorTextSize.scaledFont(.caption.weight(.semibold), by: fontScale)
+  }
 
   var body: some View {
     VStack(alignment: .leading, spacing: metrics.laneBodyTopPadding) {
       Text(item.title)
-        .scaledFont(.subheadline.weight(.semibold))
+        .font(titleFont)
         .lineLimit(2)
       Text(item.status.title)
-        .scaledFont(.caption.weight(.semibold))
+        .font(statusFont)
         .foregroundStyle(taskBoardStatusColor(for: item.status))
     }
     .frame(width: metrics.dragPreviewWidth, alignment: .leading)
@@ -355,14 +361,20 @@ private struct TaskBoardInboxItemDragPreviewCard: View {
   private var fontScale
 
   private var metrics: TaskBoardLaneMetrics { TaskBoardLaneMetrics(fontScale: fontScale) }
+  private var titleFont: Font {
+    HarnessMonitorTextSize.scaledFont(.subheadline.weight(.semibold), by: fontScale)
+  }
+  private var statusFont: Font {
+    HarnessMonitorTextSize.scaledFont(.caption.weight(.semibold), by: fontScale)
+  }
 
   var body: some View {
     VStack(alignment: .leading, spacing: metrics.laneBodyTopPadding) {
       Text(item.task.title)
-        .scaledFont(.subheadline.weight(.semibold))
+        .font(titleFont)
         .lineLimit(2)
       Text(item.task.status.title)
-        .scaledFont(.caption.weight(.semibold))
+        .font(statusFont)
         .foregroundStyle(taskStatusColor(for: item.task.status))
     }
     .frame(width: metrics.dragPreviewWidth, alignment: .leading)
