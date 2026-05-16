@@ -115,6 +115,34 @@ final class HarnessMonitorAppConfigurationTests: XCTestCase {
     XCTAssertEqual(configuration.store.daemonOwnership, .external)
   }
 
+  @MainActor
+  func testResolveExplicitDaemonOwnershipEnvOverridesPersistedExternalPreference() throws {
+    let suiteName = "io.harnessmonitor.app-tests.daemon-ownership-env.\(UUID().uuidString)"
+    let isolated = try XCTUnwrap(UserDefaults(suiteName: suiteName))
+    defer { isolated.removePersistentDomain(forName: suiteName) }
+
+    isolated.set(DaemonOwnership.external.rawValue, forKey: DaemonOwnership.preferenceKey)
+
+    let daemonDataHome = FileManager.default.temporaryDirectory
+      .appendingPathComponent("harness-monitor-daemon-env-\(UUID().uuidString)", isDirectory: true)
+    let testEnv = HarnessMonitorEnvironment(
+      values: [
+        DaemonOwnership.environmentKey: "0",
+        HarnessMonitorAppGroup.daemonDataHomeEnvironmentKey: daemonDataHome.path,
+        "HARNESS_MONITOR_FORCE_PERSISTENCE_FAILURE": "1",
+      ],
+      homeDirectory: FileManager.default.homeDirectoryForCurrentUser
+    )
+
+    let configuration = HarnessMonitorAppConfiguration.resolve(
+      defaults: isolated,
+      baseEnvironment: testEnv
+    )
+
+    XCTAssertEqual(configuration.environment.values[DaemonOwnership.environmentKey], "0")
+    XCTAssertEqual(configuration.store.daemonOwnership, .managed)
+  }
+
   func testDetailPerfScenarioVisualOptionsDisabledDefaultsDisableChrome() {
     let environment = HarnessMonitorEnvironment(
       values: [
