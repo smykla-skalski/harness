@@ -4,9 +4,15 @@ use tracing::warn;
 
 use super::{
     PolicyDecision, PolicyEvidenceCheck, PolicyEvidenceField, PolicyEvidencePredicate, PolicyGraph,
-    PolicyGraphDecision, PolicyGraphEdgeCondition, PolicyGraphNodeKind, PolicyReasonCode,
+    PolicyGraphDecision, PolicyGraphEdgeCondition, PolicyGraphNode, PolicyGraphNodeKind,
+    PolicyReasonCode,
 };
 use crate::task_board::policy::{PolicyAction, PolicyInput, TASK_BOARD_POLICY_VERSION};
+
+enum EvaluationStep {
+    Continue(String),
+    Terminal(PolicyDecision),
+}
 
 impl PolicyGraph {
     pub(super) fn evaluate_graph(
@@ -21,66 +27,88 @@ impl PolicyGraph {
         let mut visited_ids: HashSet<String> = HashSet::new();
         let safety_cap = self.nodes.len().saturating_mul(4).max(4);
         loop {
-            if !visited_ids.insert(node_id.clone()) {
-                warn!(
-                    target: "harness::policy_graph",
-                    visit_path = ?visited,
-                    repeated_node = %node_id,
-                    "policy graph evaluation hit a cycle; bailing to human review",
-                );
-                return Some((require_human(PolicyReasonCode::HumanRequired), visited));
-            }
-            if visited.len() >= safety_cap {
-                warn!(
-                    target: "harness::policy_graph",
-                    visit_path = ?visited,
-                    safety_cap,
-                    "policy graph evaluation exceeded safety cap; bailing to human review",
-                );
-                return Some((require_human(PolicyReasonCode::HumanRequired), visited));
+            if let Some(bailout) =
+                Self::traversal_bailout(node_id.as_str(), &visited, &mut visited_ids, safety_cap)
+            {
+                return Some(bailout);
             }
             let node = self
                 .nodes
                 .iter()
                 .find(|candidate| candidate.id == node_id)?;
             visited.push(node.id.clone());
-            match &node.kind {
-                PolicyGraphNodeKind::Trigger { .. } => {
-                    node_id = self.next_node(&node.id, &PolicyGraphEdgeCondition::Always)?;
-                }
-                PolicyGraphNodeKind::ActionGate { .. } => {
-                    node_id = self.next_node_for_action(&node.id, input.action)?;
-                }
-                PolicyGraphNodeKind::EvidenceCheck { checks } => {
-                    let condition = evidence_condition(checks, input);
-                    node_id = self.next_node(&node.id, &condition)?;
-                }
-                PolicyGraphNodeKind::RiskClassifier {
-                    field, threshold, ..
-                } => {
-                    let condition = risk_condition(*field, *threshold, input);
-                    node_id = self.next_node(&node.id, &condition)?;
-                }
-                PolicyGraphNodeKind::HumanGate { reason_code } => {
-                    return Some((require_human(*reason_code), visited));
-                }
-                PolicyGraphNodeKind::ConsensusGate { reason_code } => {
-                    return Some((require_consensus(*reason_code), visited));
-                }
-                PolicyGraphNodeKind::DryRunGate { reason_code } => {
-                    return Some((dry_run_only(*reason_code), visited));
-                }
-                PolicyGraphNodeKind::SupervisorRule {
-                    decision,
-                    reason_codes,
-                } => {
-                    let reason_code = reason_codes
-                        .first()
-                        .copied()
-                        .unwrap_or(PolicyReasonCode::DefaultAllow);
-                    return Some((supervisor_decision(*decision, reason_code), visited));
-                }
+            match self.evaluation_step(node, input)? {
+                EvaluationStep::Continue(next_node_id) => node_id = next_node_id,
+                EvaluationStep::Terminal(decision) => return Some((decision, visited)),
             }
+        }
+    }
+
+    fn traversal_bailout(
+        node_id: &str,
+        visited: &[String],
+        visited_ids: &mut HashSet<String>,
+        safety_cap: usize,
+    ) -> Option<(PolicyDecision, Vec<String>)> {
+        if !visited_ids.insert(node_id.to_owned()) {
+            warn_cycle(visited, node_id);
+            return Some((
+                require_human(PolicyReasonCode::HumanRequired),
+                visited.to_vec(),
+            ));
+        }
+        if visited.len() >= safety_cap {
+            warn_safety_cap(visited, safety_cap);
+            return Some((
+                require_human(PolicyReasonCode::HumanRequired),
+                visited.to_vec(),
+            ));
+        }
+        None
+    }
+
+    fn evaluation_step(
+        &self,
+        node: &PolicyGraphNode,
+        input: &PolicyInput,
+    ) -> Option<EvaluationStep> {
+        match &node.kind {
+            PolicyGraphNodeKind::Trigger { .. } => Some(EvaluationStep::Continue(
+                self.next_node(&node.id, &PolicyGraphEdgeCondition::Always)?,
+            )),
+            PolicyGraphNodeKind::ActionGate { .. } => Some(EvaluationStep::Continue(
+                self.next_node_for_action(&node.id, input.action)?,
+            )),
+            PolicyGraphNodeKind::EvidenceCheck { checks } => {
+                let condition = evidence_condition(checks, input);
+                Some(EvaluationStep::Continue(
+                    self.next_node(&node.id, &condition)?,
+                ))
+            }
+            PolicyGraphNodeKind::RiskClassifier {
+                field, threshold, ..
+            } => {
+                let condition = risk_condition(*field, *threshold, input);
+                Some(EvaluationStep::Continue(
+                    self.next_node(&node.id, &condition)?,
+                ))
+            }
+            PolicyGraphNodeKind::HumanGate { reason_code } => {
+                Some(EvaluationStep::Terminal(require_human(*reason_code)))
+            }
+            PolicyGraphNodeKind::ConsensusGate { reason_code } => {
+                Some(EvaluationStep::Terminal(require_consensus(*reason_code)))
+            }
+            PolicyGraphNodeKind::DryRunGate { reason_code } => {
+                Some(EvaluationStep::Terminal(dry_run_only(*reason_code)))
+            }
+            PolicyGraphNodeKind::SupervisorRule {
+                decision,
+                reason_codes,
+            } => Some(EvaluationStep::Terminal(supervisor_decision(
+                *decision,
+                supervisor_reason_code(reason_codes),
+            ))),
         }
     }
 
@@ -231,6 +259,33 @@ fn edge_condition_matches(
         ) => candidate == target,
         _ => false,
     }
+}
+
+#[allow(clippy::cognitive_complexity)]
+fn warn_cycle(visited: &[String], node_id: &str) {
+    warn!(
+        target: "harness::policy_graph",
+        visit_path = ?visited,
+        repeated_node = %node_id,
+        "policy graph evaluation hit a cycle; bailing to human review",
+    );
+}
+
+#[allow(clippy::cognitive_complexity)]
+fn warn_safety_cap(visited: &[String], safety_cap: usize) {
+    warn!(
+        target: "harness::policy_graph",
+        visit_path = ?visited,
+        safety_cap,
+        "policy graph evaluation exceeded safety cap; bailing to human review",
+    );
+}
+
+fn supervisor_reason_code(reason_codes: &[PolicyReasonCode]) -> PolicyReasonCode {
+    reason_codes
+        .first()
+        .copied()
+        .unwrap_or(PolicyReasonCode::DefaultAllow)
 }
 
 fn supervisor_decision(

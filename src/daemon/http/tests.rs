@@ -41,6 +41,7 @@ mod task_board_managed_worker_assertions;
 mod task_board_parity;
 mod task_board_route_parity;
 mod task_board_route_parity_support;
+mod task_board_support;
 mod task_review;
 mod telemetry;
 

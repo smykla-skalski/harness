@@ -109,12 +109,7 @@ pub(super) fn managed_branch_name(
     host_id: &str,
 ) -> String {
     let host_suffix = &host_id[..host_id.len().min(8)];
-    format!(
-        "{}{}-{}",
-        config.branch_prefix.trim(),
-        item_id,
-        host_suffix
-    )
+    format!("{}{}-{}", config.branch_prefix.trim(), item_id, host_suffix)
 }
 
 pub(super) fn pull_request_request(
@@ -247,11 +242,13 @@ pub(super) fn action_policy(
 /// `event = "harness_audit_policy_load_failure"`. The daemon falls open to the
 /// built-in policy gate, but this log line lets operators alert on persistent
 /// load failures.
+#[allow(clippy::cognitive_complexity)]
 pub(super) fn record_policy_load_failure(error: &CliError) {
+    let error = error.to_string();
     tracing::error!(
         target: "harness::policy_audit",
         event = "harness_audit_policy_load_failure",
-        error = %error,
+        error,
         "policy graph failed to load, falling back to built-in",
     );
 }
