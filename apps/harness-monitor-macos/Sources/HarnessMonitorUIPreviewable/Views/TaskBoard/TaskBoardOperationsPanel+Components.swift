@@ -139,10 +139,10 @@ extension TaskBoardOperationsPanel {
   func keyedSummaryRow(title: String, subtitle: String) -> some View {
     VStack(alignment: .leading, spacing: 2) {
       Text(title)
-        .scaledFont(.caption.weight(.semibold))
+        .font(captionSemibold)
         .lineLimit(1)
       Text(subtitle)
-        .scaledFont(.caption)
+        .font(captionFont)
         .foregroundStyle(HarnessMonitorTheme.secondaryInk)
         .lineLimit(2)
     }
@@ -158,7 +158,7 @@ extension TaskBoardOperationsPanel {
   ) -> some View {
     VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingXS) {
       Label(title, systemImage: systemImage)
-        .scaledFont(.caption.weight(.semibold))
+        .font(captionSemibold)
         .foregroundStyle(HarnessMonitorTheme.secondaryInk)
         .accessibilityAddTraits(.isHeader)
       content()
@@ -167,7 +167,7 @@ extension TaskBoardOperationsPanel {
 
   func placeholderText(_ text: String) -> some View {
     Text(text)
-      .scaledFont(.caption)
+      .font(captionFont)
       .foregroundStyle(HarnessMonitorTheme.secondaryInk)
       .frame(maxWidth: .infinity, alignment: .leading)
   }

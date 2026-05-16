@@ -25,10 +25,10 @@ struct TaskBoardOperationsPanel: View {
   var metrics: TaskBoardOverviewMetrics {
     TaskBoardOverviewMetrics(fontScale: fontScale)
   }
-  private var captionFont: Font {
+  var captionFont: Font {
     HarnessMonitorTextSize.scaledFont(.caption, by: fontScale)
   }
-  private var captionSemibold: Font {
+  var captionSemibold: Font {
     HarnessMonitorTextSize.scaledFont(.caption.weight(.semibold), by: fontScale)
   }
 

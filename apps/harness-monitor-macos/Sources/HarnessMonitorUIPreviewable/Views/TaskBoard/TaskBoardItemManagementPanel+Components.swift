@@ -4,11 +4,17 @@ import SwiftUI
 struct TaskBoardManagementNativeField: View {
   let label: String
   @Binding var text: String
+  @Environment(\.fontScale)
+  private var fontScale
+
+  private var captionSemibold: Font {
+    HarnessMonitorTextSize.scaledFont(.caption.weight(.semibold), by: fontScale)
+  }
 
   var body: some View {
     VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingXS) {
       Text(label)
-        .scaledFont(.caption.weight(.semibold))
+        .font(captionSemibold)
         .foregroundStyle(HarnessMonitorTheme.secondaryInk)
       TextField(label, text: $text)
         .harnessNativeTextField()
@@ -19,14 +25,23 @@ struct TaskBoardManagementNativeField: View {
 struct TaskBoardManagementReadOnlyField: View {
   let label: String
   let value: String
+  @Environment(\.fontScale)
+  private var fontScale
+
+  private var captionFont: Font {
+    HarnessMonitorTextSize.scaledFont(.caption, by: fontScale)
+  }
+  private var captionSemibold: Font {
+    HarnessMonitorTextSize.scaledFont(.caption.weight(.semibold), by: fontScale)
+  }
 
   var body: some View {
     VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingXS) {
       Text(label)
-        .scaledFont(.caption.weight(.semibold))
+        .font(captionSemibold)
         .foregroundStyle(HarnessMonitorTheme.secondaryInk)
       Text(value)
-        .scaledFont(.caption)
+        .font(captionFont)
         .frame(maxWidth: .infinity, alignment: .leading)
         .accessibilityLabel(label)
         .accessibilityValue(value)
@@ -40,11 +55,17 @@ struct TaskBoardManagementPickerField<
   let label: String
   @Binding var selection: Value
   let values: Value.AllCases
+  @Environment(\.fontScale)
+  private var fontScale
+
+  private var captionSemibold: Font {
+    HarnessMonitorTextSize.scaledFont(.caption.weight(.semibold), by: fontScale)
+  }
 
   var body: some View {
     VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingXS) {
       Text(label)
-        .scaledFont(.caption.weight(.semibold))
+        .font(captionSemibold)
         .foregroundStyle(HarnessMonitorTheme.secondaryInk)
       Picker(label, selection: $selection) {
         ForEach(values) { value in
@@ -61,10 +82,16 @@ struct TaskBoardManagementPill: View {
   let label: String
   let tint: Color
   let verticalPadding: CGFloat
+  @Environment(\.fontScale)
+  private var fontScale
+
+  private var pillFont: Font {
+    HarnessMonitorTextSize.scaledFont(.caption2.weight(.bold), by: fontScale)
+  }
 
   var body: some View {
     Text(label)
-      .scaledFont(.caption2.weight(.bold))
+      .font(pillFont)
       .foregroundStyle(tint)
       .lineLimit(1)
       .padding(.horizontal, HarnessMonitorTheme.spacingSM)
