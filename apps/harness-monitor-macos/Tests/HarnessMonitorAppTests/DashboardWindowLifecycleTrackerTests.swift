@@ -7,15 +7,19 @@ import XCTest
 @MainActor
 final class DashboardWindowLifecycleTrackerTests: XCTestCase {
   private var userDefaults: UserDefaults!
+  private var previousAllowsAutomaticWindowTabbing = NSWindow.allowsAutomaticWindowTabbing
   private let suiteName = "io.harnessmonitor.tests.DashboardWindowLifecycleTracker"
 
   override func setUp() async throws {
     try await super.setUp()
+    previousAllowsAutomaticWindowTabbing = NSWindow.allowsAutomaticWindowTabbing
+    NSWindow.allowsAutomaticWindowTabbing = false
     userDefaults = UserDefaults(suiteName: suiteName)
     userDefaults.removePersistentDomain(forName: suiteName)
   }
 
   override func tearDown() async throws {
+    NSWindow.allowsAutomaticWindowTabbing = previousAllowsAutomaticWindowTabbing
     userDefaults.removePersistentDomain(forName: suiteName)
     userDefaults = nil
     try await super.tearDown()

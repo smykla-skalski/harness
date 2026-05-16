@@ -8,6 +8,19 @@
 
   @MainActor
   final class SessionWindowTabGroupReplayerTests: XCTestCase {
+    private var previousAllowsAutomaticWindowTabbing = NSWindow.allowsAutomaticWindowTabbing
+
+    override func setUp() async throws {
+      try await super.setUp()
+      previousAllowsAutomaticWindowTabbing = NSWindow.allowsAutomaticWindowTabbing
+      NSWindow.allowsAutomaticWindowTabbing = false
+    }
+
+    override func tearDown() async throws {
+      NSWindow.allowsAutomaticWindowTabbing = previousAllowsAutomaticWindowTabbing
+      try await super.tearDown()
+    }
+
     func testAccessorAppliesSharedTabbingIdentityBeforeToolbarExists() throws {
       let window = try XCTUnwrap(makeSessionWindows(count: 1).first)
       let accessor = SessionWindowTabbingAccessorView()
@@ -109,6 +122,19 @@
           registry: registry
         )
       )
+      let resolvedSessionIDs: [String] = resolvedGroup.windows.compactMap { window in
+        switch window {
+        case windows[0]:
+          "sess-a"
+        case windows[1]:
+          "sess-b"
+        case windows[2]:
+          "sess-c"
+        default:
+          nil
+        }
+      }
+      XCTAssertEqual(resolvedSessionIDs, sessionIDs)
       XCTAssertEqual(resolvedGroup.selectedWindow, windows[1])
     }
 
@@ -147,6 +173,17 @@
       XCTAssertTrue(resolvedGroup === sessionWindows[0].tabGroup)
       XCTAssertTrue(resolvedGroup === sessionWindows[1].tabGroup)
       XCTAssertEqual(resolvedGroup.windows.first, dashboardWindow)
+      let resolvedSessionIDs: [String] = resolvedGroup.windows.compactMap { window in
+        switch window {
+        case sessionWindows[0]:
+          "sess-a"
+        case sessionWindows[1]:
+          "sess-b"
+        default:
+          nil
+        }
+      }
+      XCTAssertEqual(resolvedSessionIDs, sessionIDs)
       XCTAssertEqual(resolvedGroup.selectedWindow, sessionWindows[1])
     }
 

@@ -10,8 +10,8 @@ struct HarnessMonitorInitialWindowRouter {
   let store: HarnessMonitorStore
   let launchBehavior: HarnessMonitorLaunchBehavior
   let tabbingPreference: SessionWindowTabbingPreference
-  let openWelcomeWindow: () -> Void
-  let openSessionWindow: (String) -> Void
+  let openWelcomeWindow: (Bool) -> Void
+  let openSessionWindow: (String, Bool) -> Void
 
   // Upper bound for SwiftUI's `WindowGroup(id:for:)` restoration to bind
   // every restored session window. 1.5 s was sized against Apple Silicon
@@ -72,7 +72,7 @@ struct HarnessMonitorInitialWindowRouter {
       return false
     }
     if shouldRestoreDashboard {
-      openWelcomeWindow()
+      openWelcomeWindow(false)
     }
     await replayTabGroupingsIfNeeded(
       in: restorePlan,
@@ -94,7 +94,7 @@ struct HarnessMonitorInitialWindowRouter {
       return false
     }
     if shouldRestoreDashboard {
-      openWelcomeWindow()
+      openWelcomeWindow(false)
     }
     await replayTabGroupingsIfNeeded(
       in: restorePlan,
@@ -118,16 +118,16 @@ struct HarnessMonitorInitialWindowRouter {
     switch initialPlan.destination {
     case .none:
       if shouldRestoreDashboard {
-        openWelcomeWindow()
+        openWelcomeWindow(false)
       }
     case .welcome:
-      openWelcomeWindow()
+      openWelcomeWindow(launchBehavior != .restoreSessionWindows)
     case .sessions(let sessionIDs):
       if shouldRestoreDashboard {
-        openWelcomeWindow()
+        openWelcomeWindow(false)
       }
       for sessionID in sessionIDs {
-        openSessionWindow(sessionID)
+        openSessionWindow(sessionID, false)
       }
       await waitForRestoredSessionWindowsToRegister(sessionIDs: sessionIDs)
       await replayTabGroupingsIfNeeded(
@@ -463,24 +463,13 @@ struct HarnessMonitorInitialWindowRouter {
 
       if grouping.includesDashboard {
         if let dashboardWindow, isWindowTabReady(dashboardWindow) {
-          for next in tabReadyWindows {
-            guard dashboardWindow !== next else { continue }
-            if let group = dashboardWindow.tabGroup, group === next.tabGroup {
-              continue
-            }
-            dashboardWindow.addTabbedWindow(next, ordered: .above)
-          }
+          normalizeTabOrder(
+            anchor: dashboardWindow,
+            desiredWindows: [dashboardWindow] + tabReadyWindows
+          )
         }
       } else if let anchor = tabReadyWindows.first, tabReadyWindows.count > 1 {
-        for next in tabReadyWindows.dropFirst() {
-          guard next !== anchor else { continue }
-          // Skip if AppKit already merged them (matching tabbingIdentifier
-          // + user pref Always reaches us with a tab group already formed).
-          if let group = anchor.tabGroup, group === next.tabGroup {
-            continue
-          }
-          anchor.addTabbedWindow(next, ordered: .above)
-        }
+        normalizeTabOrder(anchor: anchor, desiredWindows: tabReadyWindows)
       }
 
       let resolved = isGroupingResolved(
@@ -539,15 +528,39 @@ struct HarnessMonitorInitialWindowRouter {
           return false
         }
         return windows.allSatisfy { $0.tabGroup === anchorTabGroup }
+          && tabOrderMatches(
+            expectedWindows: [dashboardWindow] + windows,
+            in: anchorTabGroup
+          )
       }
       guard let anchorTabGroup = windows.first?.tabGroup else {
         return false
       }
       return windows.allSatisfy { $0.tabGroup === anchorTabGroup }
+        && tabOrderMatches(expectedWindows: windows, in: anchorTabGroup)
     }
 
     static func isWindowTabReady(_ window: NSWindow) -> Bool {
       window.tabbingIdentifier == SessionWindowTabbingSupport.tabbingIdentifier
+    }
+
+    private static func normalizeTabOrder(
+      anchor: NSWindow,
+      desiredWindows: [NSWindow]
+    ) {
+      guard desiredWindows.count > 1 else { return }
+      for next in desiredWindows.dropFirst().reversed() {
+        guard next !== anchor else { continue }
+        anchor.tabGroup?.selectedWindow = anchor
+        anchor.addTabbedWindow(next, ordered: .above)
+      }
+    }
+
+    private static func tabOrderMatches(
+      expectedWindows: [NSWindow],
+      in tabGroup: NSWindowTabGroup
+    ) -> Bool {
+      tabGroup.windows.elementsEqual(expectedWindows, by: { $0 === $1 })
     }
   }
 #endif

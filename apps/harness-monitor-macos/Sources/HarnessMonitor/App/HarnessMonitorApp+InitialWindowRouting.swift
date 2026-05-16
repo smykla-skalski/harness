@@ -64,11 +64,14 @@ extension HarnessMonitorApp {
       store: appStore,
       launchBehavior: launchBehavior,
       tabbingPreference: tabbingPreference,
-      openWelcomeWindow: {
-        openWindow.openHarnessDashboardWindow()
+      openWelcomeWindow: { mergeIfNeeded in
+        openWindow.openHarnessDashboardWindow(mergeIfNeeded: mergeIfNeeded)
       },
-      openSessionWindow: { sessionID in
-        openWindow.openHarnessSessionWindow(sessionID: sessionID)
+      openSessionWindow: { sessionID, mergeIfNeeded in
+        openWindow.openHarnessSessionWindow(
+          sessionID: sessionID,
+          mergeIfNeeded: mergeIfNeeded
+        )
       }
     )
     await router.route()

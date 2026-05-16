@@ -6,7 +6,21 @@ import XCTest
 @testable import HarnessMonitorKit
 @testable import HarnessMonitorUIPreviewable
 
+@MainActor
 final class HarnessMonitorInitialWindowPlanTests: XCTestCase {
+  private var previousAllowsAutomaticWindowTabbing = NSWindow.allowsAutomaticWindowTabbing
+
+  override func setUp() async throws {
+    try await super.setUp()
+    previousAllowsAutomaticWindowTabbing = NSWindow.allowsAutomaticWindowTabbing
+    NSWindow.allowsAutomaticWindowTabbing = false
+  }
+
+  override func tearDown() async throws {
+    NSWindow.allowsAutomaticWindowTabbing = previousAllowsAutomaticWindowTabbing
+    try await super.tearDown()
+  }
+
   func testVisibleSessionWindowsSuppressRestoreLaunchActions() {
     let plan = HarnessMonitorInitialWindowPlan.resolve(
       launchBehavior: .restoreSessionWindows,
@@ -97,6 +111,8 @@ final class HarnessMonitorInitialWindowPlanTests: XCTestCase {
     )
 
     var openOrder: [String] = []
+    var dashboardMergeFlags: [Bool] = []
+    var sessionMergeFlags: [Bool] = []
     var windows: [NSWindow] = []
     defer {
       for window in windows.reversed() {
@@ -113,10 +129,12 @@ final class HarnessMonitorInitialWindowPlanTests: XCTestCase {
       store: store,
       launchBehavior: .restoreSessionWindows,
       tabbingPreference: .never,
-      openWelcomeWindow: {
+      openWelcomeWindow: { mergeIfNeeded in
+        dashboardMergeFlags.append(mergeIfNeeded)
         openOrder.append("dashboard")
       },
-      openSessionWindow: { sessionID in
+      openSessionWindow: { sessionID, mergeIfNeeded in
+        sessionMergeFlags.append(mergeIfNeeded)
         openOrder.append(sessionID)
         let window = self.makeRestoredWindow()
         registry.bind(window: window, sessionID: sessionID)
@@ -127,6 +145,32 @@ final class HarnessMonitorInitialWindowPlanTests: XCTestCase {
     await router.route()
 
     XCTAssertEqual(openOrder, ["dashboard"] + sessionIDs)
+    XCTAssertEqual(dashboardMergeFlags, [false])
+    XCTAssertEqual(sessionMergeFlags, Array(repeating: false, count: sessionIDs.count))
+  }
+
+  @MainActor
+  func testAlwaysOpenRecentKeepsNormalDashboardOpenBehavior() async throws {
+    let container = try HarnessMonitorModelContainer.preview()
+    let cacheService = SessionCacheService(modelContainer: container)
+    let store = makeStore(modelContainer: container, cacheService: cacheService)
+    var dashboardMergeFlags: [Bool] = []
+
+    let router = HarnessMonitorInitialWindowRouter(
+      store: store,
+      launchBehavior: .alwaysOpenRecent,
+      tabbingPreference: .always,
+      openWelcomeWindow: { mergeIfNeeded in
+        dashboardMergeFlags.append(mergeIfNeeded)
+      },
+      openSessionWindow: { _, _ in
+        XCTFail("Always-open-recent should not restore session windows")
+      }
+    )
+
+    await router.route()
+
+    XCTAssertEqual(dashboardMergeFlags, [true])
   }
 
   @MainActor
