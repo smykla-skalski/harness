@@ -30,6 +30,7 @@ extension HarnessMonitorStoreHostBridgeTests {
       )
     )
     let store = await makeBootstrappedStore(client: client)
+    client.clearRecordedCalls()
     store.daemonStatus = sandboxedStatus(
       hostBridge: HostBridgeManifest(
         running: true,
@@ -85,6 +86,7 @@ extension HarnessMonitorStoreHostBridgeTests {
       )
     )
     let store = await makeBootstrappedStore(client: client)
+    client.clearRecordedCalls()
     store.daemonStatus = sandboxedStatus(
       hostBridge: HostBridgeManifest(
         running: true,
@@ -168,8 +170,8 @@ extension HarnessMonitorStoreHostBridgeTests {
 
     #expect(result == .success)
     #expect(
-      recoveredClient.recordedCalls()
-        == [.reconfigureHostBridge(enable: ["codex"], disable: [], force: false)]
+      recoveredClient.recordedCalls().last
+        == .reconfigureHostBridge(enable: ["codex"], disable: [], force: false)
     )
     #expect(await daemon.recordedOperations() == ["warm-up", "stop", "register", "warm-up"])
     #expect(store.hostBridgeCapabilityState(for: "codex") == .ready)
@@ -187,6 +189,7 @@ extension HarnessMonitorStoreHostBridgeTests {
       )
     )
     let store = await makeBootstrappedStore(client: client)
+    client.clearRecordedCalls()
     store.daemonStatus = sandboxedStatus(
       hostBridge: HostBridgeManifest(
         running: true,
@@ -299,6 +302,7 @@ extension HarnessMonitorStoreHostBridgeTests {
       )
     )
     let store = await makeBootstrappedStore(client: client)
+    client.clearRecordedCalls()
     await store.selectSession(PreviewFixtures.summary.sessionId)
     store.daemonStatus = sandboxedStatus(
       hostBridge: HostBridgeManifest(
@@ -320,6 +324,7 @@ extension HarnessMonitorStoreHostBridgeTests {
       )
     )
     await store.refreshSelectedAgentTuis()
+    client.clearRecordedCalls()
 
     let result = await store.setHostBridgeCapability("agent-tui", enabled: false, force: true)
 

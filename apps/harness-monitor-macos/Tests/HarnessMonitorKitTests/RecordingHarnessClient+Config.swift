@@ -7,6 +7,10 @@ extension RecordingHarnessClient {
     calls
   }
 
+  func clearRecordedCalls() {
+    calls.removeAll()
+  }
+
   func configureHealthDelay(_ delay: Duration?) {
     lock.withLock {
       healthDelay = delay

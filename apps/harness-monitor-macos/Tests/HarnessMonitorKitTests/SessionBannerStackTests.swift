@@ -101,7 +101,8 @@ struct SessionBannerStackTests {
       isLoading: isLoading,
       hasSnapshot: hasSnapshot,
       showsPendingDecisionBanner: showsPendingDecisionBanner,
-      pendingDecisionCount: pendingDecisionCount
+      pendingDecisionCount: pendingDecisionCount,
+      observedDaemonWireVersion: nil
     )
   }
 }
