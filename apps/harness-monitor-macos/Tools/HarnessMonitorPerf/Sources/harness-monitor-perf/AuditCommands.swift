@@ -29,9 +29,13 @@ struct Audit: ParsableCommand {
 
     @Flag(
         name: [.long, .customLong("debug-retention")],
-        help: "Keep traces, launch sidecars, and raw export XML for diagnosis."
+        inversion: .prefixedNo,
+        help: ArgumentHelp(
+            "Retain traces, launch sidecars, app-trace.jsonl, and export XML for diagnosis.",
+            discussion: "Default: enabled. Pass --no-debug-retention to prune diagnostic sidecars on success."
+        )
     )
-    var debugRetention: Bool = false
+    var debugRetention: Bool = true
 
     @Option(name: [.long, .customLong("checkout-root")], help: "Repo checkout root.")
     var checkoutRoot: String
