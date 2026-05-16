@@ -93,19 +93,29 @@ struct TaskBoardManagementFacts: View {
 struct TaskBoardExternalLinks: View {
   let destinations: [TaskBoardExternalDestination]
   let metrics: TaskBoardOverviewMetrics
+  @Environment(\.fontScale)
+  private var fontScale
+
+  private var labelFont: Font {
+    HarnessMonitorTextSize.scaledFont(.caption.weight(.semibold), by: fontScale)
+  }
 
   var body: some View {
-    ViewThatFits(in: .horizontal) {
-      HStack(spacing: HarnessMonitorTheme.spacingSM) { links }
-      VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) { links }
+    let labelFont = labelFont
+    return ViewThatFits(in: .horizontal) {
+      HStack(spacing: HarnessMonitorTheme.spacingSM) { links(labelFont: labelFont) }
+      VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
+        links(labelFont: labelFont)
+      }
     }
   }
 
-  @ViewBuilder private var links: some View {
+  @ViewBuilder
+  private func links(labelFont: Font) -> some View {
     ForEach(destinations) { destination in
       Link(destination: destination.url) {
         Label(destination.label, systemImage: "arrow.up.right.square")
-          .scaledFont(.caption.weight(.semibold))
+          .font(labelFont)
       }
       .frame(minHeight: metrics.controlMinHeight)
       .harnessActionButtonStyle(variant: .bordered, tint: HarnessMonitorTheme.accent)
@@ -123,19 +133,26 @@ struct TaskBoardPlanLifecycleActionButtons: View {
   let onBeginPlan: ((TaskBoardItem) -> Void)?
   let onSubmitPlan: ((TaskBoardItem, String) -> Void)?
   let onApprovePlan: ((TaskBoardItem, String, String?) -> Void)?
+  @Environment(\.fontScale)
+  private var fontScale
 
-  var body: some View {
-    beginPlanButton
-    submitPlanButton
-    approvePlanButton
+  private var labelFont: Font {
+    HarnessMonitorTextSize.scaledFont(.caption.weight(.semibold), by: fontScale)
   }
 
-  private var beginPlanButton: some View {
+  var body: some View {
+    let labelFont = labelFont
+    beginPlanButton(labelFont: labelFont)
+    submitPlanButton(labelFont: labelFont)
+    approvePlanButton(labelFont: labelFont)
+  }
+
+  private func beginPlanButton(labelFont: Font) -> some View {
     Button {
       onBeginPlan?(item)
     } label: {
       Label("Begin Plan", systemImage: "pencil.and.list.clipboard")
-        .scaledFont(.caption.weight(.semibold))
+        .font(labelFont)
     }
     .frame(minHeight: metrics.controlMinHeight)
     .harnessActionButtonStyle(variant: .bordered, tint: HarnessMonitorTheme.accent)
@@ -145,13 +162,13 @@ struct TaskBoardPlanLifecycleActionButtons: View {
     .accessibilityIdentifier("harness.task-board.manage-item.begin-plan")
   }
 
-  private var submitPlanButton: some View {
+  private func submitPlanButton(labelFont: Font) -> some View {
     Button {
       guard let summary = draft.planSummaryForSubmit else { return }
       onSubmitPlan?(item, summary)
     } label: {
       Label("Submit Plan", systemImage: "paperplane")
-        .scaledFont(.caption.weight(.semibold))
+        .font(labelFont)
     }
     .frame(minHeight: metrics.controlMinHeight)
     .harnessActionButtonStyle(variant: .bordered, tint: HarnessMonitorTheme.accent)
@@ -161,13 +178,13 @@ struct TaskBoardPlanLifecycleActionButtons: View {
     .accessibilityIdentifier("harness.task-board.manage-item.submit-plan")
   }
 
-  private var approvePlanButton: some View {
+  private func approvePlanButton(labelFont: Font) -> some View {
     Button {
       guard let approvedBy = draft.approverForApproval else { return }
       onApprovePlan?(item, approvedBy, draft.approvalTimestampForRequest)
     } label: {
       Label("Approve Plan", systemImage: "checkmark.seal")
-        .scaledFont(.caption.weight(.semibold))
+        .font(labelFont)
     }
     .frame(minHeight: metrics.controlMinHeight)
     .harnessActionButtonStyle(variant: .bordered, tint: HarnessMonitorTheme.accent)
