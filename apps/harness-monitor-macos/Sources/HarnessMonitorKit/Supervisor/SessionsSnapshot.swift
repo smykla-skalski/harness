@@ -68,9 +68,17 @@ public struct SessionsSnapshot: Sendable, Hashable {
     sessions: [SessionSnapshot],
     connection: ConnectionSnapshot
   ) async -> String {
-    await Task.detached(priority: .userInitiated) {
-      canonicalHashSync(sessions: sessions, connection: connection)
-    }.value
+    // `Task.detached(priority: .userInitiated)` schedules on the cooperative
+    // pool, which may pick the main slot if other workers are busy — r17
+    // traces still showed AccelerateCrypto_SHA256_compress on the main thread
+    // during scroll hangs. GCD's global queue gives a hard guarantee that the
+    // work lands off main; `withCheckedContinuation` bridges back to async.
+    await withCheckedContinuation { (continuation: CheckedContinuation<String, Never>) in
+      DispatchQueue.global(qos: .userInitiated).async {
+        let hash = canonicalHashSync(sessions: sessions, connection: connection)
+        continuation.resume(returning: hash)
+      }
+    }
   }
 
   @MainActor
