@@ -10,7 +10,20 @@ struct TaskBoardActionButtonDescriptor {
   let help: String
 }
 
-extension TaskBoardOperationsPanel {
+/// Shared capability surface for the Operations sub-cards (Sync, Dispatch).
+/// Each card is its own `View` struct so a `@State` change inside one card
+/// (Sync's status filter, Dispatch's dry-run toggle, etc.) does not
+/// invalidate the others. Helpers that all cards rely on (action buttons,
+/// summary rows, fonts) live on this protocol's extension so we share the
+/// implementation without re-routing through the panel.
+protocol TaskBoardOperationsHost {
+  var store: HarnessMonitorStore { get }
+  var metrics: TaskBoardOverviewMetrics { get }
+  var captionFont: Font { get }
+  var captionSemibold: Font { get }
+}
+
+extension TaskBoardOperationsHost {
   func controlRows<Content: View>(@ViewBuilder content: () -> Content) -> some View {
     content()
   }
@@ -151,20 +164,6 @@ extension TaskBoardOperationsPanel {
     .accessibilityElement(children: .combine)
   }
 
-  func inventoryBlock<Content: View>(
-    title: String,
-    systemImage: String,
-    @ViewBuilder content: () -> Content
-  ) -> some View {
-    VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingXS) {
-      Label(title, systemImage: systemImage)
-        .font(captionSemibold)
-        .foregroundStyle(HarnessMonitorTheme.secondaryInk)
-        .accessibilityAddTraits(.isHeader)
-      content()
-    }
-  }
-
   func placeholderText(_ text: String) -> some View {
     Text(text)
       .font(captionFont)
@@ -207,14 +206,8 @@ struct TaskBoardOperationsCard<Content: View>: View {
     self.content = content()
   }
 
-  // Lightweight VStack chrome replacing the previous Form { Section }
-  // wrapper. Form's grouped style instantiates a scroll view + per-row
-  // _FlexFrameLayout / UnaryLayoutEngine machinery that dominated main-
-  // thread CPU during dashboard scroll (Time Profiler trace 2026-05-16:
-  // ~10-15% across layout engines + metadata cache lookups). The VStack
-  // path keeps the rounded grouped visual using a single background
-  // shape and lets each row's LabeledContent do its own simple HStack
-  // layout - no DisplayList property churn.
+  // Lightweight VStack chrome (no Form / .formStyle(.grouped) machinery).
+  // See commit 65cac5448 for the trace-driven rationale.
   var body: some View {
     VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
       Text(title)
