@@ -229,7 +229,7 @@ public struct SettingsTaskBoardSection: View {
         ),
         text: $draft.sshKeyPath
       )
-      multilineField(
+      SettingsSecretField(
         title: "SSH Private Key",
         placeholder: "Paste SSH private key material",
         text: $draft.sshPrivateKey,
@@ -254,7 +254,7 @@ public struct SettingsTaskBoardSection: View {
           ),
           text: $draft.signingSSHKeyPath
         )
-        multilineField(
+        SettingsSecretField(
           title: "Signing SSH Private Key",
           placeholder: "Paste signing SSH private key material",
           text: $draft.signingSSHPrivateKey,
@@ -276,7 +276,7 @@ public struct SettingsTaskBoardSection: View {
           ),
           text: $draft.gpgPrivateKeyPath
         )
-        multilineField(
+        SettingsSecretField(
           title: "GPG Private Key",
           placeholder: "Paste ASCII-armored GPG private key",
           text: $draft.gpgPrivateKey,

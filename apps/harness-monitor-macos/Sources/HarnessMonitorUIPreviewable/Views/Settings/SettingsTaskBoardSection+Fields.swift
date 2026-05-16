@@ -17,7 +17,7 @@ extension SettingsTaskBoardSection {
       ),
       text: override.sshKeyPath
     )
-    multilineField(
+    SettingsSecretField(
       title: "SSH Private Key",
       placeholder: "Paste SSH private key material",
       text: override.sshPrivateKey,
@@ -62,7 +62,7 @@ extension SettingsTaskBoardSection {
       ),
       text: override.signingSSHKeyPath
     )
-    multilineField(
+    SettingsSecretField(
       title: "Signing SSH Private Key",
       placeholder: "Paste signing SSH private key material",
       text: override.signingSSHPrivateKey,
@@ -88,7 +88,7 @@ extension SettingsTaskBoardSection {
       ),
       text: override.gpgPrivateKeyPath
     )
-    multilineField(
+    SettingsSecretField(
       title: "GPG Private Key",
       placeholder: "Paste ASCII-armored GPG private key",
       text: override.gpgPrivateKey,
