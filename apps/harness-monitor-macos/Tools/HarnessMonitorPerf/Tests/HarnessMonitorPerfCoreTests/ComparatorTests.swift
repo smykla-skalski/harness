@@ -231,6 +231,11 @@ final class ComparatorTests: XCTestCase {
 
         let markdown = try String(contentsOf: outputDir.appendingPathComponent("comparison.md"), encoding: .utf8)
         XCTAssertTrue(markdown.contains("Instruments Comparison: baseline -> current"))
+        XCTAssertTrue(
+            markdown.contains(
+                "**Hard budget metrics** are enforced by `BudgetEnforcer`"
+            )
+        )
         XCTAssertTrue(markdown.contains("## Missing from current"))
         XCTAssertTrue(markdown.contains("## Missing from baseline"))
         XCTAssertTrue(markdown.contains("## open-recent-window (SwiftUI)"))
