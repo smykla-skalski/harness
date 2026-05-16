@@ -1,6 +1,13 @@
 import HarnessMonitorKit
 import SwiftUI
 
+/// Thin orchestrator: composes the Sync / Dispatch / Inventory cards in a
+/// 3-column layout and resolves the local host's `project_types` once for
+/// Dispatch's host-aware filter. Each card is its own `View` struct with
+/// isolated `@State` so a change inside one card no longer invalidates
+/// the other two during scroll - the structural lever that the live Time
+/// Profiler trace 2026-05-16 surfaced as the cold-launch + scroll hot
+/// path (see commits f364dc4d1, 65cac5448, 325db2264, this commit).
 struct TaskBoardOperationsPanel: View {
   let store: HarnessMonitorStore
   let taskBoardItems: [TaskBoardItem]
@@ -8,126 +15,40 @@ struct TaskBoardOperationsPanel: View {
   @Environment(\.fontScale)
   private var fontScale
 
-  @State private var syncStatusChoice = TaskBoardStatusFilterChoice.all
-  @State private var syncDirection = TaskBoardExternalSyncDirection.both
-  @State private var syncDryRun = true
-
-  @State private var dispatchStatusChoice = TaskBoardStatusFilterChoice.all
-  @State private var dispatchItemID: String?
-  @State private var dispatchDryRun = true
-  @State private var dispatchProjectDir = ""
-  @State private var dispatchActor = ""
-
   @State private var inventoryStatusChoice = TaskBoardStatusFilterChoice.all
-  @State private var pendingDispatchConfirmation: TaskBoardDispatchConfirmationPresentation?
   @State private var localHostProjectTypes: [String] = []
 
-  var metrics: TaskBoardOverviewMetrics {
+  private var metrics: TaskBoardOverviewMetrics {
     TaskBoardOverviewMetrics(fontScale: fontScale)
-  }
-  var captionFont: Font {
-    HarnessMonitorTextSize.scaledFont(.caption, by: fontScale)
-  }
-  var captionSemibold: Font {
-    HarnessMonitorTextSize.scaledFont(.caption.weight(.semibold), by: fontScale)
   }
 
   private var dashboard: HarnessMonitorStore.ContentDashboardSlice {
     store.contentUI.dashboard
   }
 
-  private var syncProviderChoice: TaskBoardExternalProviderChoice {
-    .monitorVisibleChoice
-  }
-
-  /// Items the local host's `project_types` accept. Empty `targetProjectTypes`
-  /// on an item routes to every host (mirrors Rust `Machine::accepts_any`).
-  /// An empty result with non-zero source items means the host filtered them
-  /// all out; we surface that to the user via an empty-state hint.
-  fileprivate var dispatchableTaskBoardItems: [TaskBoardItem] {
-    TaskBoardHostMachine.dispatchableItems(
-      taskBoardItems,
-      machineProjectTypes: localHostProjectTypes
-    )
-  }
-
-  fileprivate var didFilterOutItems: Bool {
-    !taskBoardItems.isEmpty && dispatchableTaskBoardItems.isEmpty
-  }
-
-  private var formattedLocalHostProjectTypes: String {
-    let trimmed =
-      localHostProjectTypes
-      .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
-      .filter { !$0.isEmpty }
-    return trimmed.isEmpty ? "none declared" : trimmed.joined(separator: ", ")
-  }
-
-  private var validDispatchItemID: String? {
-    guard let dispatchItemID else {
-      return nil
-    }
-    return dispatchableTaskBoardItems.contains(where: { $0.id == dispatchItemID })
-      ? dispatchItemID
-      : nil
-  }
-
-  private var selectedDispatchItem: TaskBoardItem? {
-    guard let validDispatchItemID else {
-      return nil
-    }
-    return dispatchableTaskBoardItems.first(where: { $0.id == validDispatchItemID })
-  }
-
-  private var dispatchRequest: TaskBoardDispatchRequest {
-    TaskBoardDispatchRequest(
-      status: validDispatchItemID == nil ? dispatchStatusChoice.status : nil,
-      itemId: validDispatchItemID,
-      dryRun: dispatchDryRun,
-      projectDir: dispatchProjectDir.taskBoardNilIfEmpty,
-      actor: dispatchActor.taskBoardNilIfEmpty
-    )
-  }
-
-  private var dispatchSelectionBinding: Binding<String?> {
-    Binding(
-      get: { validDispatchItemID },
-      set: { newValue in
-        guard let newValue else {
-          dispatchItemID = nil
-          return
-        }
-        dispatchItemID = taskBoardItems.contains(where: { $0.id == newValue }) ? newValue : nil
-      }
-    )
-  }
-
   var body: some View {
     TaskBoardSection(title: "Operations") {
       TaskBoardOperationsPanelLayout(
         metrics: metrics,
-        syncCard: syncCard,
-        dispatchCard: dispatchCard,
-        inventoryCard: inventoryCard
+        syncCard: TaskBoardOperationsSyncCard(
+          store: store,
+          metrics: metrics,
+          dashboard: dashboard
+        ),
+        dispatchCard: TaskBoardOperationsDispatchCard(
+          store: store,
+          metrics: metrics,
+          dashboard: dashboard,
+          taskBoardItems: taskBoardItems,
+          localHostProjectTypes: localHostProjectTypes
+        ),
+        inventoryCard: TaskBoardOperationsPanelInventoryCard(
+          store: store,
+          dashboard: dashboard,
+          metrics: metrics,
+          inventoryStatusChoice: $inventoryStatusChoice
+        )
       )
-    }
-    .confirmationDialog(
-      pendingDispatchConfirmation?.title ?? "Dispatch items?",
-      isPresented: Binding(
-        get: { pendingDispatchConfirmation != nil },
-        set: { if !$0 { pendingDispatchConfirmation = nil } }
-      ),
-      presenting: pendingDispatchConfirmation
-    ) { confirmation in
-      Button("Dispatch", role: .destructive) {
-        pendingDispatchConfirmation = nil
-        Task { @MainActor in
-          await store.dispatchTaskBoard(request: confirmation.request)
-        }
-      }
-      Button("Cancel", role: .cancel) {}
-    } message: { confirmation in
-      Text(confirmation.message)
     }
     .task { await loadLocalHostProjectTypes() }
     .accessibilityElement(children: .contain)
@@ -143,274 +64,5 @@ struct TaskBoardOperationsPanel: View {
       // Fail open: leave project types empty so dispatch shows every item.
       localHostProjectTypes = []
     }
-  }
-}
-
-extension TaskBoardOperationsPanel {
-  private var syncCard: some View {
-    TaskBoardOperationsCard(
-      title: "Sync",
-      systemImage: "arrow.triangle.2.circlepath",
-      metrics: metrics
-    ) {
-      controlRows {
-        pickerField(
-          "Status filter",
-          selection: $syncStatusChoice,
-          accessibilityIdentifier: "harness.task-board.sync.status"
-        ) {
-          ForEach(TaskBoardStatusFilterChoice.stableAllCases) { choice in
-            Text(choice.title).tag(choice)
-          }
-        }
-
-        staticField(
-          "Provider",
-          value: syncProviderChoice.title,
-          accessibilityIdentifier: "harness.task-board.sync.provider"
-        )
-
-        pickerField(
-          "Direction",
-          selection: $syncDirection,
-          accessibilityIdentifier: "harness.task-board.sync.direction"
-        ) {
-          ForEach(TaskBoardExternalSyncDirection.allCases, id: \.rawValue) { direction in
-            Text(direction.title).tag(direction)
-          }
-        }
-
-        toggleField(
-          "Dry run",
-          isOn: $syncDryRun,
-          accessibilityIdentifier: "harness.task-board.sync.dry-run"
-        )
-      }
-
-      actionRow {
-        actionButton(
-          TaskBoardActionButtonDescriptor(
-            title: syncDryRun ? "Preview Sync" : "Run Sync",
-            systemImage: syncDryRun ? "eye" : "arrow.triangle.2.circlepath",
-            tint: syncDryRun ? .secondary : nil,
-            prominent: !syncDryRun,
-            accessibilityIdentifier: "harness.task-board.sync.run",
-            help: "Preview or apply external task-board sync operations"
-          )
-        ) {
-          Task { @MainActor in
-            await store.syncTaskBoard(
-              request: TaskBoardSyncRequest(
-                status: syncStatusChoice.status,
-                provider: syncProviderChoice.provider,
-                direction: syncDirection,
-                dryRun: syncDryRun
-              )
-            )
-          }
-        }
-      }
-
-      if let summary = dashboard.taskBoardSyncSummary {
-        let visibleProviders = summary.monitorVisibleProviders
-        let visibleOperations = summary.monitorVisibleOperations
-        summaryPillRow {
-          TaskBoardSummaryPill(value: "\(summary.total)", label: "Items")
-          TaskBoardSummaryPill(value: "\(visibleProviders.count)", label: "Providers")
-          TaskBoardSummaryPill(value: "\(visibleOperations.count)", label: "Ops")
-          let appliedCount = visibleOperations.count { $0.applied }
-          if appliedCount != 0 {
-            TaskBoardSummaryPill(
-              value: "\(appliedCount)",
-              label: "Applied",
-              tint: HarnessMonitorTheme.accent
-            )
-          }
-        }
-
-        if !visibleProviders.isEmpty {
-          VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingXS) {
-            Text("Providers")
-              .font(captionSemibold)
-              .foregroundStyle(HarnessMonitorTheme.secondaryInk)
-              .accessibilityAddTraits(.isHeader)
-            ForEach(visibleProviders, id: \.provider.rawValue) { provider in
-              providerSummaryRow(provider)
-            }
-          }
-        }
-
-        if !visibleOperations.isEmpty {
-          VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingXS) {
-            Text("Recent operations")
-              .font(captionSemibold)
-              .foregroundStyle(HarnessMonitorTheme.secondaryInk)
-              .accessibilityAddTraits(.isHeader)
-            ForEach(
-              Array(visibleOperations.prefix(4).enumerated()),
-              id: \.offset
-            ) { _, operation in
-              operationSummaryRow(operation)
-            }
-          }
-        }
-      } else {
-        placeholderText("Run sync to preview or apply external pull and push operations.")
-      }
-    }
-  }
-
-  private var dispatchCard: some View {
-    TaskBoardOperationsCard(
-      title: "Dispatch",
-      systemImage: "paperplane",
-      metrics: metrics
-    ) {
-      controlRows {
-        pickerField(
-          "Status filter",
-          selection: $dispatchStatusChoice,
-          accessibilityIdentifier: "harness.task-board.dispatch.status"
-        ) {
-          ForEach(TaskBoardStatusFilterChoice.stableAllCases) { choice in
-            Text(choice.title).tag(choice)
-          }
-        }
-
-        pickerField(
-          "Board item",
-          selection: dispatchSelectionBinding,
-          accessibilityIdentifier: "harness.task-board.dispatch.item"
-        ) {
-          Text("All matching items").tag(Optional<String>.none)
-          ForEach(dispatchableTaskBoardItems, id: \.id) { item in
-            Text(item.title).tag(Optional(item.id))
-          }
-        }
-
-        toggleField(
-          "Dry run",
-          isOn: $dispatchDryRun,
-          accessibilityIdentifier: "harness.task-board.dispatch.dry-run"
-        )
-      }
-
-      if didFilterOutItems {
-        Text(
-          "No items match this host's project types (\(formattedLocalHostProjectTypes)). "
-            + "Set host project types in Settings or clear an item's Routes To list."
-        )
-        .font(captionFont)
-        .foregroundStyle(HarnessMonitorTheme.caution)
-        .accessibilityIdentifier("harness.task-board.dispatch.host-mismatch")
-      }
-
-      controlRows {
-        textField(
-          "Project directory",
-          text: $dispatchProjectDir,
-          prompt: "/path/to/project",
-          accessibilityIdentifier: "harness.task-board.dispatch.project-dir"
-        )
-
-        textField(
-          "Actor",
-          text: $dispatchActor,
-          prompt: "Optional actor",
-          accessibilityIdentifier: "harness.task-board.dispatch.actor"
-        )
-      }
-
-      if !dispatchDryRun {
-        Text("Live dispatch creates session work and requires confirmation.")
-          .font(captionFont)
-          .foregroundStyle(HarnessMonitorTheme.caution)
-      }
-
-      actionRow {
-        actionButton(
-          TaskBoardActionButtonDescriptor(
-            title: dispatchDryRun ? "Preview Dispatch" : "Dispatch Live",
-            systemImage: dispatchDryRun ? "eye" : "paperplane.fill",
-            tint: dispatchDryRun ? .secondary : .orange,
-            prominent: !dispatchDryRun,
-            accessibilityIdentifier: "harness.task-board.dispatch.run",
-            help: dispatchDryRun
-              ? "Preview how task-board items will dispatch"
-              : "Dispatch the selected board scope into live session work"
-          )
-        ) {
-          if dispatchRequest.dryRun {
-            Task { @MainActor in
-              await store.dispatchTaskBoard(request: dispatchRequest)
-            }
-          } else {
-            pendingDispatchConfirmation = TaskBoardDispatchConfirmationPresentation(
-              request: dispatchRequest,
-              itemTitle: selectedDispatchItem?.title
-            )
-          }
-        }
-      }
-
-      if let summary = dashboard.taskBoardDispatchSummary {
-        summaryPillRow {
-          TaskBoardSummaryPill(value: "\(summary.plans.count)", label: "Plans")
-          let readyCount = summary.plans.count { $0.readiness.isReady }
-          TaskBoardSummaryPill(
-            value: "\(readyCount)", label: "Ready", tint: HarnessMonitorTheme.accent)
-          let blockedCount = summary.plans.count { !$0.readiness.isReady }
-          if blockedCount != 0 {
-            TaskBoardSummaryPill(
-              value: "\(blockedCount)",
-              label: "Blocked",
-              tint: HarnessMonitorTheme.danger
-            )
-          }
-          if !summary.applied.isEmpty {
-            TaskBoardSummaryPill(
-              value: "\(summary.applied.count)",
-              label: "Applied",
-              tint: HarnessMonitorTheme.accent
-            )
-          }
-        }
-
-        if !summary.applied.isEmpty {
-          VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingXS) {
-            Text("Applied")
-              .font(captionSemibold)
-              .foregroundStyle(HarnessMonitorTheme.secondaryInk)
-              .accessibilityAddTraits(.isHeader)
-            ForEach(summary.applied.prefix(4)) { applied in
-              appliedSummaryRow(applied)
-            }
-          }
-        } else if !summary.plans.isEmpty {
-          VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingXS) {
-            Text("Plans")
-              .font(captionSemibold)
-              .foregroundStyle(HarnessMonitorTheme.secondaryInk)
-              .accessibilityAddTraits(.isHeader)
-            ForEach(summary.plans.prefix(4)) { plan in
-              planSummaryRow(plan)
-            }
-          }
-        } else {
-          placeholderText("No board items matched the current dispatch filter.")
-        }
-      } else {
-        placeholderText("Preview dispatch to inspect readiness and resulting session work.")
-      }
-    }
-  }
-
-  private var inventoryCard: some View {
-    TaskBoardOperationsPanelInventoryCard(
-      store: store,
-      dashboard: dashboard,
-      metrics: metrics,
-      inventoryStatusChoice: $inventoryStatusChoice
-    )
   }
 }
