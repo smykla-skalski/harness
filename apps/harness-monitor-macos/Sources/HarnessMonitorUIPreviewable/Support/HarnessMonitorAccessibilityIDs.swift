@@ -22,6 +22,7 @@ public enum HarnessMonitorAccessibility {
   public static let toolbarBaselineDivider = "harness.toolbar.baseline-divider"
   public static let persistenceBanner = "harness.persistence.banner"
   public static let persistedDataBanner = "harness.persisted-data.banner"
+  public static let daemonWireVersionSkewBanner = "harness.daemon.wire-version-skew.banner"
   public static let persistedDataBannerFrame = "\(persistedDataBanner).frame"
   public static let sessionStatusCorner = "harness.session-status.corner"
   public static let sessionStatusCornerFrame = "\(sessionStatusCorner).frame"

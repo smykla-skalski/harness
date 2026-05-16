@@ -97,26 +97,37 @@ public struct DashboardWindowView: View {
       "DashboardWindowView",
       attributes: profilingAttributes
     ) {
-      HarnessMonitorSidebarDetailLayout(
-        columnVisibility: columnVisibilityBinding,
-        sidebarWidth: sidebarWidth
-      ) {
-        DashboardSidebar(
-          selectedRoute: selectedRouteBinding,
-          statusModel: dashboardStatusSummaryModel
-        )
-      } detail: {
-        DashboardBannerStack(store: store) {
-          DashboardRouteContent(
-            route: selectedRoute,
-            store: store,
-            dashboardUI: dashboardUI,
-            sessionCatalog: sessionCatalog
+      VStack(spacing: 0) {
+        if let observed = store.health?.wireVersion,
+          observed < HarnessMonitorStore.minimumDaemonWireVersion
+        {
+          DaemonWireVersionSkewBanner(
+            observed: observed,
+            expected: HarnessMonitorStore.minimumDaemonWireVersion
           )
+          WindowBannerDivider(tint: HarnessMonitorTheme.danger)
         }
-        .inspector(isPresented: $inspectorVisible) {
-          dashboardInspector
-            .inspectorColumnWidth(min: 220, ideal: 260, max: 320)
+        HarnessMonitorSidebarDetailLayout(
+          columnVisibility: columnVisibilityBinding,
+          sidebarWidth: sidebarWidth
+        ) {
+          DashboardSidebar(
+            selectedRoute: selectedRouteBinding,
+            statusModel: dashboardStatusSummaryModel
+          )
+        } detail: {
+          DashboardBannerStack(store: store) {
+            DashboardRouteContent(
+              route: selectedRoute,
+              store: store,
+              dashboardUI: dashboardUI,
+              sessionCatalog: sessionCatalog
+            )
+          }
+          .inspector(isPresented: $inspectorVisible) {
+            dashboardInspector
+              .inspectorColumnWidth(min: 220, ideal: 260, max: 320)
+          }
         }
       }
       .accessibilityElement(children: .contain)

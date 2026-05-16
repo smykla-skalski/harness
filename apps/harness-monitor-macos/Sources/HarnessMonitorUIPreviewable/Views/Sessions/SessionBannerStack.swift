@@ -23,18 +23,21 @@ struct SessionBannerStackModel: Equatable {
   let showsLoading: Bool
   let showsPendingDecisionBanner: Bool
   let pendingDecisionCount: Int
+  let observedDaemonWireVersion: Int?
 
   init(
     contentChrome: ContentChromeBannerModel,
     isLoading: Bool,
     hasSnapshot: Bool,
     showsPendingDecisionBanner: Bool,
-    pendingDecisionCount: Int
+    pendingDecisionCount: Int,
+    observedDaemonWireVersion: Int?
   ) {
     showsContentChrome = contentChrome.isPresented
     showsLoading = isLoading && !hasSnapshot
     self.showsPendingDecisionBanner = showsPendingDecisionBanner
     self.pendingDecisionCount = pendingDecisionCount
+    self.observedDaemonWireVersion = observedDaemonWireVersion
   }
 
   init(
@@ -45,7 +48,8 @@ struct SessionBannerStackModel: Equatable {
     isLoading: Bool,
     hasSnapshot: Bool,
     showsPendingDecisionBanner: Bool,
-    pendingDecisionCount: Int
+    pendingDecisionCount: Int,
+    observedDaemonWireVersion: Int?
   ) {
     self.init(
       contentChrome: ContentChromeBannerModel(
@@ -57,14 +61,21 @@ struct SessionBannerStackModel: Equatable {
       isLoading: isLoading,
       hasSnapshot: hasSnapshot,
       showsPendingDecisionBanner: showsPendingDecisionBanner,
-      pendingDecisionCount: pendingDecisionCount
+      pendingDecisionCount: pendingDecisionCount,
+      observedDaemonWireVersion: observedDaemonWireVersion
     )
+  }
+
+  var showsDaemonWireVersionSkew: Bool {
+    guard let observedDaemonWireVersion else { return false }
+    return observedDaemonWireVersion < HarnessMonitorStore.minimumDaemonWireVersion
   }
 
   var isPresented: Bool {
     showsContentChrome
       || showsLoading
       || (showsPendingDecisionBanner && pendingDecisionCount > 0)
+      || showsDaemonWireVersionSkew
   }
 }
 
@@ -137,7 +148,8 @@ public struct SessionBannerStack<Content: View>: View {
       showsPendingDecisionBanner:
         preferenceState.showsPendingDecisionBanners
         && (!isFocusMode || preferenceState.showsPendingDecisionBannersInFocusMode),
-      pendingDecisionCount: pendingDecisionCount
+      pendingDecisionCount: pendingDecisionCount,
+      observedDaemonWireVersion: store.health?.wireVersion
     )
   }
 
@@ -169,6 +181,13 @@ public struct SessionBannerStack<Content: View>: View {
 
   @ViewBuilder private var topChrome: some View {
     VStack(spacing: 0) {
+      if let observed = model.observedDaemonWireVersion, model.showsDaemonWireVersionSkew {
+        DaemonWireVersionSkewBanner(
+          observed: observed,
+          expected: HarnessMonitorStore.minimumDaemonWireVersion
+        )
+        chromeDivider(tint: HarnessMonitorTheme.danger)
+      }
       ContentChromeBannerStack(
         store: store,
         contentChrome: chrome,
