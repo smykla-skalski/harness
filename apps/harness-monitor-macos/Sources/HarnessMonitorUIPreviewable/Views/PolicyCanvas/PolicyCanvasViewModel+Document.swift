@@ -104,7 +104,7 @@ extension PolicyCanvasViewModel {
     edges = document.edges.map { edge in
       policyCanvasEdge(edge, nodes: cleanLayout.nodes)
     }
-    zoom = CGFloat(document.layout.zoom)
+    zoom = Self.sanitizedZoom(CGFloat(document.layout.zoom), fallback: 1)
     reconcileGroupFrames()
     resetNextNodeNumber()
     markLoadedDocumentRevision(document.revision)

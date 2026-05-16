@@ -48,6 +48,7 @@ public struct SessionWindowView: View {
   @State private var startupSearchParticipationEnabledStorage =
     HarnessMonitorUITestEnvironment.isEnabled
 
+  @MainActor
   public init(
     store: HarnessMonitorStore,
     token: SessionWindowToken,
@@ -61,7 +62,13 @@ public struct SessionWindowView: View {
         selection: .route(initialRoute ?? .overview)
       )
     )
-    _policyCanvasViewModelStorage = State(wrappedValue: .sample())
+    _policyCanvasViewModelStorage = State(
+      wrappedValue: PolicyCanvasViewModel.liveStartupState(
+        document: store.contentUI.dashboard.taskBoardPolicyPipeline,
+        simulation: store.contentUI.dashboard.taskBoardPolicySimulation,
+        audit: store.contentUI.dashboard.taskBoardPolicyAudit
+      )
+    )
   }
   var stateCache: SessionWindowStateCache {
     stateCacheStorage

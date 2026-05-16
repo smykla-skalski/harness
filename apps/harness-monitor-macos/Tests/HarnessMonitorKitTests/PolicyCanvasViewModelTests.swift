@@ -78,6 +78,30 @@ struct PolicyCanvasViewModelTests {
     #expect(viewModel.zoom == 1)
   }
 
+  @Test("empty canvas content size stays finite at higher zoom levels")
+  func emptyCanvasContentSizeStaysFiniteAtHigherZoomLevels() {
+    let viewModel = PolicyCanvasViewModel(nodes: [], groups: [], edges: [])
+
+    viewModel.setZoom(PolicyCanvasLayout.maximumZoom)
+
+    #expect(viewModel.canvasContentBounds.isNull)
+    #expect(viewModel.canvasContentSize == PolicyCanvasLayout.minimumCanvasSize)
+    #expect((viewModel.canvasContentSize.width * viewModel.zoom).isFinite)
+    #expect((viewModel.canvasContentSize.height * viewModel.zoom).isFinite)
+  }
+
+  @Test("view model init sanitizes non-finite zoom")
+  func viewModelInitSanitizesNonFiniteZoom() {
+    let viewModel = PolicyCanvasViewModel(
+      nodes: [],
+      groups: [],
+      edges: [],
+      zoom: .infinity
+    )
+
+    #expect(viewModel.zoom == PolicyCanvasLayout.defaultZoom)
+  }
+
   @Test("clean empty palette node deletes without confirmation")
   func cleanEmptyPaletteNodeDeletesWithoutConfirmation() {
     let viewModel = PolicyCanvasViewModel.sample()

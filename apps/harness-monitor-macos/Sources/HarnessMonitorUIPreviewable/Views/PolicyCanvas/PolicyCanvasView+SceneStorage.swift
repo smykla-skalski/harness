@@ -27,7 +27,10 @@ extension PolicyCanvasView {
     guard let state = map[identity] else {
       return
     }
-    viewModel.zoom = CGFloat(state.zoom)
+    viewModel.zoom = PolicyCanvasViewModel.sanitizedZoom(
+      CGFloat(state.zoom),
+      fallback: viewModel.zoom
+    )
     if let restoredSelection = PolicyCanvasView.decodeSelection(state.selectionRaw) {
       viewModel.selection = restoredSelection
     } else if state.selectionRaw.isEmpty {

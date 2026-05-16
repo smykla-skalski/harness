@@ -100,10 +100,6 @@ struct PolicyCanvasViewport: View {
           .onTapGesture {
             viewModel.select(nil)
           }
-          .overlay {
-            PolicyCanvasEmptyStatePlaceholder(viewModel: viewModel)
-              .allowsHitTesting(false)
-          }
         }
         // ScrollView pan respects the user's natural-scroll setting because
         // it routes through AppKit's standard scroll machinery (which reads
@@ -131,6 +127,13 @@ struct PolicyCanvasViewport: View {
         }
         .background(Color(red: 0.03, green: 0.04, blue: 0.06))
         .clipShape(Rectangle())
+        .overlay {
+          // Center the empty-state in the visible viewport, not in the scroll
+          // content's full extent, so the placeholder stays visually centered
+          // even when the canvas spans beyond the clipped viewport bounds.
+          PolicyCanvasEmptyStatePlaceholder(viewModel: viewModel)
+            .allowsHitTesting(false)
+        }
         .overlay(alignment: .topLeading) {
           PolicyCanvasEdgeKindLegend()
             .padding(14)

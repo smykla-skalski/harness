@@ -14,17 +14,19 @@ struct PolicyCanvasEmptyStatePlaceholder: View {
 
   var body: some View {
     if viewModel.isEmpty {
-      VStack(spacing: 14) {
+      VStack(spacing: 18) {
         Image(systemName: "rectangle.3.group.bubble")
           .scaledFont(.system(size: 48, weight: .light))
           .foregroundStyle(.white.opacity(0.88))
           .accessibilityHidden(true)
 
-        VStack(spacing: 6) {
+        VStack(spacing: 8) {
           Text("Empty policy canvas")
             .scaledFont(.title2.weight(.semibold))
             .foregroundStyle(.white)
             .multilineTextAlignment(.center)
+            .lineLimit(2)
+            .fixedSize(horizontal: false, vertical: true)
 
           Text("Compose a policy graph by adding nodes from the palette.")
             .scaledFont(.callout)
@@ -33,18 +35,28 @@ struct PolicyCanvasEmptyStatePlaceholder: View {
             // per the contrast audit cited in the Wave 1B accessibility plan.
             .foregroundStyle(.white.opacity(0.78))
             .multilineTextAlignment(.center)
+            .lineLimit(3)
+            .fixedSize(horizontal: false, vertical: true)
         }
 
         Text("Tip: drag a tool from the left rail onto the canvas to start.")
           .scaledFont(.caption.weight(.medium))
           .foregroundStyle(.white.opacity(0.78))
+          .multilineTextAlignment(.center)
+          .lineLimit(2)
+          .fixedSize(horizontal: false, vertical: true)
+          .frame(maxWidth: 360)
           .padding(.horizontal, 16)
           .padding(.vertical, 8)
-          .background(.black.opacity(0.36), in: Capsule())
+          .background(
+            .black.opacity(0.36),
+            in: RoundedRectangle(cornerRadius: 18, style: .continuous)
+          )
       }
-      .padding(.horizontal, 32)
-      .padding(.vertical, 24)
-      .frame(maxWidth: 420)
+      .frame(width: 440)
+      .frame(minHeight: 280)
+      .padding(.horizontal, 40)
+      .padding(.vertical, 32)
       .accessibilityElement(children: .combine)
       .accessibilityIdentifier(HarnessMonitorAccessibility.policyCanvasEmptyState)
     }

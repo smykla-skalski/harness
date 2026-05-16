@@ -117,11 +117,18 @@ public struct PolicyCanvasView: View {
     self.dashboardUI = nil
   }
 
+  @MainActor
   public init(
     store: HarnessMonitorStore,
     dashboardUI: HarnessMonitorStore.ContentDashboardSlice
   ) {
-    _viewModelState = State(initialValue: .sample())
+    _viewModelState = State(
+      initialValue: PolicyCanvasViewModel.liveStartupState(
+        document: dashboardUI.taskBoardPolicyPipeline,
+        simulation: dashboardUI.taskBoardPolicySimulation,
+        audit: dashboardUI.taskBoardPolicyAudit
+      )
+    )
     self.store = store
     self.dashboardUI = dashboardUI
   }
