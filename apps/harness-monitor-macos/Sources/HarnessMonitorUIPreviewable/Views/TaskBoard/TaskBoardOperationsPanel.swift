@@ -153,7 +153,7 @@ extension TaskBoardOperationsPanel {
           selection: $syncStatusChoice,
           accessibilityIdentifier: "harness.task-board.sync.status"
         ) {
-          ForEach(TaskBoardStatusFilterChoice.allCases) { choice in
+          ForEach(TaskBoardStatusFilterChoice.stableAllCases) { choice in
             Text(choice.title).tag(choice)
           }
         }
@@ -266,7 +266,7 @@ extension TaskBoardOperationsPanel {
           selection: $dispatchStatusChoice,
           accessibilityIdentifier: "harness.task-board.dispatch.status"
         ) {
-          ForEach(TaskBoardStatusFilterChoice.allCases) { choice in
+          ForEach(TaskBoardStatusFilterChoice.stableAllCases) { choice in
             Text(choice.title).tag(choice)
           }
         }
