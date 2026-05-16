@@ -258,30 +258,38 @@ extension DaemonControllerTests {
     #expect(offlineSnapshot.loaded == false)
   }
 
-  @Test("refreshManagedLaunchAgentForLaunch unregisters and re-registers an enabled managed agent")
-  func refreshManagedLaunchAgentForLaunchRecyclesEnabledRegistration() async throws {
+  @Test("refreshManagedLaunchAgentForLaunch skips when the helper stamp is unchanged")
+  func refreshManagedLaunchAgentForLaunchSkipsWhenStampUnchanged() async throws {
     let manager = RecordingLaunchAgentManager(state: .enabled)
-    let controller = DaemonController(launchAgentManager: manager, ownership: .managed)
+    let controller = DaemonController(
+      launchAgentManager: manager,
+      ownership: .managed,
+      // Returning nil keeps the comparison at the no-stamp branch which
+      // is treated as "no rebuild detected" — refresh must NOT run.
+      managedLaunchAgentCurrentBundleStamp: { nil }
+    )
 
     let refreshed = try await controller.refreshManagedLaunchAgentForLaunch()
 
-    #expect(refreshed)
-    #expect(manager.unregisterCallCount == 1)
-    #expect(manager.registerCallCount == 1)
+    #expect(refreshed == false)
+    #expect(manager.unregisterCallCount == 0)
+    #expect(manager.registerCallCount == 0)
     #expect(manager.state == .enabled)
   }
 
-  @Test("refreshManagedLaunchAgentForLaunch registers when nothing is currently bound")
-  func refreshManagedLaunchAgentForLaunchRegistersWhenAbsent() async throws {
+  @Test("refreshManagedLaunchAgentForLaunch skips when nothing is currently bound")
+  func refreshManagedLaunchAgentForLaunchSkipsWhenAbsent() async throws {
     let manager = RecordingLaunchAgentManager(state: .notRegistered)
     let controller = DaemonController(launchAgentManager: manager, ownership: .managed)
 
     let refreshed = try await controller.refreshManagedLaunchAgentForLaunch()
 
-    #expect(refreshed)
+    // No tear-down work to do when there's no prior registration; the
+    // standard bootstrap path will call `registerLaunchAgent()` and
+    // SMAppService will write a fresh BTM record from that.
+    #expect(refreshed == false)
     #expect(manager.unregisterCallCount == 0)
-    #expect(manager.registerCallCount == 1)
-    #expect(manager.state == .enabled)
+    #expect(manager.registerCallCount == 0)
   }
 
   @Test("refreshManagedLaunchAgentForLaunch is a no-op in external ownership")
