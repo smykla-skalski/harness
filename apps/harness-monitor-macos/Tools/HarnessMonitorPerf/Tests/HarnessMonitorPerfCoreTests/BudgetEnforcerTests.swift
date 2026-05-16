@@ -18,13 +18,14 @@ final class BudgetEnforcerTests: XCTestCase {
     func testSwiftUIBudgetsFlagAllOverages() throws {
         let data = try fixtureData("summary-fail-swiftui")
         let failures = BudgetEnforcer.collectFailures(summaryJSON: data)
-        XCTAssertEqual(failures.count, 6)
+        XCTAssertEqual(failures.count, 7)
         XCTAssertTrue(failures.contains { $0.contains(MetricName.launchAppInitToReadyMs) })
         XCTAssertTrue(failures.contains { $0.contains("total_updates exceeded") })
         XCTAssertTrue(failures.contains { $0.contains("body_updates exceeded") })
         XCTAssertTrue(failures.contains { $0.contains("max_update_group_ms exceeded") })
         XCTAssertTrue(failures.contains { $0.contains("hitches exceeded") })
         XCTAssertTrue(failures.contains { $0.contains("potential_hangs exceeded") })
+        XCTAssertTrue(failures.contains { $0.contains("p95_update_ms exceeded") })
         XCTAssertThrowsError(try BudgetEnforcer.enforce(summaryJSON: data))
     }
 

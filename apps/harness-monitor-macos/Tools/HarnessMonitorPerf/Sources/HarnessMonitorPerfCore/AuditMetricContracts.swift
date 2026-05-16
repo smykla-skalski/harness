@@ -69,6 +69,9 @@ enum MetricTierCatalog {
 
         switch template {
         case "SwiftUI":
+            let p95HasBudget =
+                (Budgets.swiftUIByScenario[scenario] ?? Budgets.defaultSwiftUI)
+                .p95UpdateMilliseconds != nil
             hardBudget.append(
                 contentsOf: [
                     MetricName.totalUpdates,
@@ -78,9 +81,13 @@ enum MetricTierCatalog {
                     MetricName.potentialHangs,
                 ]
             )
+            if p95HasBudget {
+                hardBudget.append(MetricName.p95UpdateMs)
+            } else {
+                investigative.append(MetricName.p95UpdateMs)
+            }
             investigative.append(
                 contentsOf: [
-                    MetricName.p95UpdateMs,
                     MetricName.maxUpdateMs,
                     MetricName.updateGroupP95Ms,
                     MetricName.timeProfileSampleCount,

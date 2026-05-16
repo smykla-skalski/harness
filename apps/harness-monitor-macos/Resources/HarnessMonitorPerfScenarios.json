@@ -16,7 +16,8 @@
         "bodyUpdates": 2500,
         "maxUpdateGroupMilliseconds": 50,
         "hitches": 0,
-        "potentialHangs": 0
+        "potentialHangs": 0,
+        "p95UpdateMilliseconds": 8
       }
     },
     {
@@ -35,7 +36,8 @@
         "bodyUpdates": 3500,
         "maxUpdateGroupMilliseconds": 50,
         "hitches": 0,
-        "potentialHangs": 0
+        "potentialHangs": 0,
+        "p95UpdateMilliseconds": 8
       }
     },
     {
@@ -54,7 +56,8 @@
         "bodyUpdates": 3500,
         "maxUpdateGroupMilliseconds": 50,
         "hitches": 0,
-        "potentialHangs": 0
+        "potentialHangs": 0,
+        "p95UpdateMilliseconds": 8
       }
     },
     {
@@ -73,7 +76,8 @@
         "bodyUpdates": 4000,
         "maxUpdateGroupMilliseconds": 50,
         "hitches": 0,
-        "potentialHangs": 0
+        "potentialHangs": 0,
+        "p95UpdateMilliseconds": 12
       }
     },
     {
@@ -92,7 +96,8 @@
         "bodyUpdates": 3500,
         "maxUpdateGroupMilliseconds": 50,
         "hitches": 0,
-        "potentialHangs": 0
+        "potentialHangs": 0,
+        "p95UpdateMilliseconds": 8
       }
     },
     {
@@ -111,7 +116,8 @@
         "bodyUpdates": 3500,
         "maxUpdateGroupMilliseconds": 50,
         "hitches": 0,
-        "potentialHangs": 0
+        "potentialHangs": 0,
+        "p95UpdateMilliseconds": 8
       }
     },
     {
@@ -130,7 +136,8 @@
         "bodyUpdates": 3500,
         "maxUpdateGroupMilliseconds": 50,
         "hitches": 0,
-        "potentialHangs": 0
+        "potentialHangs": 0,
+        "p95UpdateMilliseconds": 8
       }
     },
     {
@@ -149,7 +156,8 @@
         "bodyUpdates": 3500,
         "maxUpdateGroupMilliseconds": 50,
         "hitches": 0,
-        "potentialHangs": 0
+        "potentialHangs": 0,
+        "p95UpdateMilliseconds": 8
       }
     },
     {
@@ -168,7 +176,8 @@
         "bodyUpdates": 3500,
         "maxUpdateGroupMilliseconds": 50,
         "hitches": 0,
-        "potentialHangs": 0
+        "potentialHangs": 0,
+        "p95UpdateMilliseconds": 8
       }
     },
     {
@@ -187,7 +196,8 @@
         "bodyUpdates": 3500,
         "maxUpdateGroupMilliseconds": 50,
         "hitches": 0,
-        "potentialHangs": 0
+        "potentialHangs": 0,
+        "p95UpdateMilliseconds": 8
       }
     },
     {
@@ -206,7 +216,8 @@
         "bodyUpdates": 3500,
         "maxUpdateGroupMilliseconds": 50,
         "hitches": 0,
-        "potentialHangs": 0
+        "potentialHangs": 0,
+        "p95UpdateMilliseconds": 8
       }
     },
     {
@@ -225,7 +236,8 @@
         "bodyUpdates": 3500,
         "maxUpdateGroupMilliseconds": 50,
         "hitches": 0,
-        "potentialHangs": 0
+        "potentialHangs": 0,
+        "p95UpdateMilliseconds": 8
       }
     },
     {
@@ -243,7 +255,8 @@
         "bodyUpdates": 3500,
         "maxUpdateGroupMilliseconds": 50,
         "hitches": 0,
-        "potentialHangs": 0
+        "potentialHangs": 0,
+        "p95UpdateMilliseconds": 8
       }
     },
     {
@@ -261,7 +274,8 @@
         "bodyUpdates": 3500,
         "maxUpdateGroupMilliseconds": 50,
         "hitches": 0,
-        "potentialHangs": 0
+        "potentialHangs": 0,
+        "p95UpdateMilliseconds": 8
       }
     },
     {
@@ -280,7 +294,8 @@
         "bodyUpdates": 3500,
         "maxUpdateGroupMilliseconds": 50,
         "hitches": 0,
-        "potentialHangs": 0
+        "potentialHangs": 0,
+        "p95UpdateMilliseconds": 8
       }
     },
     {
@@ -299,7 +314,8 @@
         "bodyUpdates": 3500,
         "maxUpdateGroupMilliseconds": 50,
         "hitches": 0,
-        "potentialHangs": 0
+        "potentialHangs": 0,
+        "p95UpdateMilliseconds": 8
       }
     },
     {
@@ -317,7 +333,8 @@
         "bodyUpdates": 3500,
         "maxUpdateGroupMilliseconds": 50,
         "hitches": 0,
-        "potentialHangs": 0
+        "potentialHangs": 0,
+        "p95UpdateMilliseconds": 8
       }
     },
     {
@@ -335,7 +352,8 @@
         "bodyUpdates": 3500,
         "maxUpdateGroupMilliseconds": 50,
         "hitches": 0,
-        "potentialHangs": 0
+        "potentialHangs": 0,
+        "p95UpdateMilliseconds": 8
       }
     },
     {
@@ -381,7 +399,8 @@
         "bodyUpdates": 3000,
         "maxUpdateGroupMilliseconds": 50,
         "hitches": 0,
-        "potentialHangs": 0
+        "potentialHangs": 0,
+        "p95UpdateMilliseconds": 12
       }
     },
     {
@@ -399,7 +418,8 @@
         "bodyUpdates": 3500,
         "maxUpdateGroupMilliseconds": 50,
         "hitches": 0,
-        "potentialHangs": 0
+        "potentialHangs": 0,
+        "p95UpdateMilliseconds": 8
       }
     },
     {
@@ -418,7 +438,8 @@
         "bodyUpdates": 3000,
         "maxUpdateGroupMilliseconds": 50,
         "hitches": 0,
-        "potentialHangs": 0
+        "potentialHangs": 0,
+        "p95UpdateMilliseconds": 8
       },
       "allocationsBudget": {
         "heapTotalBytes": 314572800
@@ -440,7 +461,8 @@
         "bodyUpdates": 6000,
         "maxUpdateGroupMilliseconds": 50,
         "hitches": 0,
-        "potentialHangs": 0
+        "potentialHangs": 0,
+        "p95UpdateMilliseconds": 12
       }
     },
     {

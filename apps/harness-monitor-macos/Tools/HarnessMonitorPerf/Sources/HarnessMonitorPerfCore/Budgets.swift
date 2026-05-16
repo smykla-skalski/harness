@@ -8,19 +8,24 @@ public enum Budgets {
         public var maxUpdateGroupMilliseconds: Double
         public var hitches: Double
         public var potentialHangs: Double
+        /// Hard budget for the 95th percentile SwiftUI update duration in milliseconds.
+        /// `nil` means the scenario opts out; the enforcer skips the check.
+        public var p95UpdateMilliseconds: Double?
 
         public init(
             totalUpdates: Double,
             bodyUpdates: Double,
             maxUpdateGroupMilliseconds: Double,
             hitches: Double,
-            potentialHangs: Double
+            potentialHangs: Double,
+            p95UpdateMilliseconds: Double? = nil
         ) {
             self.totalUpdates = totalUpdates
             self.bodyUpdates = bodyUpdates
             self.maxUpdateGroupMilliseconds = maxUpdateGroupMilliseconds
             self.hitches = hitches
             self.potentialHangs = potentialHangs
+            self.p95UpdateMilliseconds = p95UpdateMilliseconds
         }
     }
 
@@ -34,7 +39,8 @@ public enum Budgets {
         bodyUpdates: 3_500,
         maxUpdateGroupMilliseconds: 50,
         hitches: 0,
-        potentialHangs: 0
+        potentialHangs: 0,
+        p95UpdateMilliseconds: 8
     )
 
     public static let swiftUIByScenario: [String: SwiftUIBudget] = Dictionary(
