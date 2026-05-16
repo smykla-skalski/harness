@@ -2,6 +2,11 @@ import Foundation
 import HarnessMonitorKit
 import SwiftUI
 
+/// Shared decoder used by `HarnessMonitorJSONPresentation.formatted(rawJSON:)`.
+/// The presentation is built on every parent body re-evaluation, so a per-call
+/// `JSONDecoder()` would show up as steady-state allocations in Instruments.
+private let jsonPresentationDecoder = JSONDecoder()
+
 struct HarnessMonitorJSONCodeBlock: View {
   enum Chrome {
     case card
@@ -174,7 +179,7 @@ struct HarnessMonitorJSONPresentation: Equatable {
   static func formatted(rawJSON: String) -> Self {
     guard
       let data = rawJSON.data(using: .utf8),
-      let jsonValue = try? JSONDecoder().decode(JSONValue.self, from: data)
+      let jsonValue = try? jsonPresentationDecoder.decode(JSONValue.self, from: data)
     else {
       return Self(
         displayText: rawJSON,
