@@ -20,6 +20,7 @@ extension Comparator {
             && comparison.missingFromBaseline.isEmpty
             && comparison.currentMissingMetrics.isEmpty
             && comparison.baselineMissingMetrics.isEmpty
+            && comparison.expectedButAbsent.isEmpty
         {
             lines.append("No overlapping scenario/template captures were found between the two runs.")
             lines.append("")
@@ -67,6 +68,11 @@ extension Comparator {
         appendMissingSection(
             title: "Baseline captures without metrics",
             items: comparison.baselineMissingMetrics,
+            to: &lines
+        )
+        appendMissingSection(
+            title: "Expected scenarios not captured in either run",
+            items: comparison.expectedButAbsent,
             to: &lines
         )
     }

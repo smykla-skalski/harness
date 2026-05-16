@@ -263,6 +263,76 @@ final class ComparatorTests: XCTestCase {
         XCTAssertLessThan(updateGroupIndex, causeIndex)
     }
 
+    func testCompareDoesNotFlagOverlappingScenarioAsExpectedButAbsent() throws {
+        let baseline = try writeSummary(Self.baselinePayload, name: "baseline-overlap.json")
+        let current = try writeSummary(Self.currentPayload, name: "current-overlap.json")
+        let outputDir = workDir.appendingPathComponent("out-overlap")
+
+        let comparison = try Comparator.compare(.init(
+            current: current, baseline: baseline, outputDir: outputDir
+        ))
+
+        XCTAssertFalse(
+            comparison.expectedButAbsent.contains {
+                $0.scenario == "open-recent-window" && $0.template == "SwiftUI"
+            },
+            "scenarios captured in both runs must not appear in expectedButAbsent"
+        )
+        XCTAssertFalse(
+            comparison.expectedButAbsent.contains {
+                $0.scenario == "offline-cached-open" && $0.template == "Allocations"
+            },
+            "scenarios captured in both runs must not appear in expectedButAbsent"
+        )
+    }
+
+    func testCompareReportsCatalogScenarioMissingFromBothRuns() throws {
+        // Pick a scenario from ScenarioCatalog.swiftUI that is not in either payload.
+        let baselineScenarios: Set<String> = [
+            "open-recent-window", "offline-cached-open", "baseline-only-scenario",
+        ]
+        let currentScenarios: Set<String> = [
+            "open-recent-window", "offline-cached-open", "scenario-not-in-baseline",
+        ]
+        let presentInBoth = baselineScenarios.union(currentScenarios)
+        guard
+            let absentSwiftUIScenario = ScenarioCatalog.swiftUI
+                .subtracting(presentInBoth)
+                .sorted()
+                .first
+        else {
+            return XCTFail("expected at least one SwiftUI scenario absent from fixtures")
+        }
+
+        let baseline = try writeSummary(Self.baselinePayload, name: "baseline-absent.json")
+        let current = try writeSummary(Self.currentPayload, name: "current-absent.json")
+        let outputDir = workDir.appendingPathComponent("out-absent")
+
+        let comparison = try Comparator.compare(.init(
+            current: current, baseline: baseline, outputDir: outputDir
+        ))
+
+        XCTAssertTrue(
+            comparison.expectedButAbsent.contains {
+                $0.scenario == absentSwiftUIScenario
+                    && $0.template == "SwiftUI"
+                    && $0.reason == "not present in current or baseline summary"
+            },
+            "expected SwiftUI scenario absent from both runs to surface in expectedButAbsent"
+        )
+
+        let markdown = try String(
+            contentsOf: outputDir.appendingPathComponent("comparison.md"),
+            encoding: .utf8
+        )
+        XCTAssertTrue(markdown.contains("## Expected scenarios not captured in either run"))
+        XCTAssertTrue(
+            markdown.contains(
+                "- `\(absentSwiftUIScenario)` (SwiftUI) - not present in current or baseline summary"
+            )
+        )
+    }
+
     func testCompareAppTraceHandlesAsymmetricPresence() throws {
         let baseline = try writeSummary(
             """
@@ -317,9 +387,13 @@ final class ComparatorTests: XCTestCase {
             current: current, baseline: baseline, outputDir: outputDir
         ))
         XCTAssertTrue(comparison.comparisons.isEmpty)
+        XCTAssertFalse(
+            comparison.expectedButAbsent.isEmpty,
+            "expected the scenario catalog to surface as not captured when both runs are empty"
+        )
 
         let markdown = try String(contentsOf: outputDir.appendingPathComponent("comparison.md"), encoding: .utf8)
-        XCTAssertTrue(markdown.contains("No overlapping scenario/template captures"))
+        XCTAssertTrue(markdown.contains("## Expected scenarios not captured in either run"))
     }
 
     func testCompareReportsCapturesWithoutMetrics() throws {
