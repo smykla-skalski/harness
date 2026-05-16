@@ -208,8 +208,20 @@ public struct SettingsTaskBoardSection: View {
 
   private var gitDefaultsSection: some View {
     Section {
-      TextField("Author Name", text: $draft.authorName)
-      TextField("Author Email", text: $draft.authorEmail)
+      TextField(
+        "Author Name",
+        text: $draft.authorName,
+        prompt: identityPrompt(draft.identityDefaults.gitConfig.userName)
+      )
+      TextField(
+        "Author Email",
+        text: $draft.authorEmail,
+        prompt: identityPrompt(draft.identityDefaults.gitConfig.userEmail)
+      )
+      if shouldOfferAdoptDefaults {
+        Button("Use my git config defaults", action: adoptGitConfigDefaults)
+          .buttonStyle(.borderless)
+      }
       pathField(
         .keyFile(
           title: "SSH Key Path",
@@ -279,7 +291,33 @@ public struct SettingsTaskBoardSection: View {
       Text("Git Identity Defaults")
         .harnessNativeFormSectionHeader()
     } footer: {
-      Text("These values affect daemon-managed git operations only.")
+      VStack(alignment: .leading, spacing: 4) {
+        Text("These values affect daemon-managed git operations only.")
+        Text("Empty = use your git config defaults.")
+      }
+    }
+  }
+
+  private func identityPrompt(_ detected: String?) -> Text? {
+    guard let detected, !detected.isEmpty else { return nil }
+    return Text(detected)
+  }
+
+  private var shouldOfferAdoptDefaults: Bool {
+    let gitConfig = draft.identityDefaults.gitConfig
+    let hasDetectedName = gitConfig.userName?.isEmpty == false
+    let hasDetectedEmail = gitConfig.userEmail?.isEmpty == false
+    guard hasDetectedName || hasDetectedEmail else { return false }
+    return draft.authorName.isEmpty || draft.authorEmail.isEmpty
+  }
+
+  private func adoptGitConfigDefaults() {
+    let gitConfig = draft.identityDefaults.gitConfig
+    if draft.authorName.isEmpty, let name = gitConfig.userName {
+      draft.authorName = name
+    }
+    if draft.authorEmail.isEmpty, let email = gitConfig.userEmail {
+      draft.authorEmail = email
     }
   }
 

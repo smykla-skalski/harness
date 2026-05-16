@@ -51,4 +51,8 @@ extension PreviewHarnessClientState {
     taskBoardTodoistToken = request
     return TaskBoardTodoistTokenSyncResponse(tokenConfigured: request.token?.isEmpty == false)
   }
+
+  func currentTaskBoardGitIdentityDefaults() -> TaskBoardGitIdentityDefaults {
+    taskBoardGitIdentityDefaults
+  }
 }

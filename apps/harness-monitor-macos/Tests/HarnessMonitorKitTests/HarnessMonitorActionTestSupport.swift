@@ -192,6 +192,7 @@ final class RecordingHarnessClient: HarnessMonitorClientProtocol, @unchecked Sen
       repositoryTokenCount: Int
     )
     case syncTaskBoardTodoistToken(tokenConfigured: Bool)
+    case taskBoardGitIdentityDefaults
     case syncTaskBoard(
       direction: TaskBoardExternalSyncDirection,
       dryRun: Bool,
@@ -270,6 +271,7 @@ final class RecordingHarnessClient: HarnessMonitorClientProtocol, @unchecked Sen
   var taskBoardOrchestratorSettingsError: (any Error)?
   var taskBoardGitHubTokensSyncError: (any Error)?
   var taskBoardTodoistTokenSyncError: (any Error)?
+  var taskBoardGitIdentityDefaultsValue: TaskBoardGitIdentityDefaults = TaskBoardGitIdentityDefaults()
   var taskBoardPolicyValidationOverride: TaskBoardPolicyPipelineValidation?
   var taskBoardPolicySimulationOverride: Bool?
   var sessionDetailsByID: [String: SessionDetail] = [:]

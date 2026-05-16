@@ -9,6 +9,7 @@ extension HarnessMonitorStore {
 
     async let orchestratorSettings = client.taskBoardOrchestratorSettings()
     async let runtimeConfig = client.taskBoardGitRuntimeConfig()
+    async let identityDefaults = Self.fetchIdentityDefaults(client: client)
     let githubCredentials = try Self.taskBoardGitHubCredentialStore.load()
     let todoistCredentials = try Self.taskBoardTodoistCredentialStore.load()
 
@@ -16,8 +17,19 @@ extension HarnessMonitorStore {
       orchestratorSettings: orchestratorSettings,
       runtimeConfig: runtimeConfig,
       githubCredentials: githubCredentials,
-      todoistCredentials: todoistCredentials
+      todoistCredentials: todoistCredentials,
+      identityDefaults: identityDefaults
     )
+  }
+
+  private static func fetchIdentityDefaults(
+    client: any HarnessMonitorClientProtocol
+  ) async -> TaskBoardGitIdentityDefaults {
+    do {
+      return try await client.taskBoardGitIdentityDefaults()
+    } catch {
+      return TaskBoardGitIdentityDefaults()
+    }
   }
 
   public func authorizeTaskBoardPath(

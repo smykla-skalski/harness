@@ -18,6 +18,7 @@ actor PreviewHarnessClientState {
   var taskBoardGitRuntimeConfig: TaskBoardGitRuntimeConfig
   var taskBoardGitHubTokens: TaskBoardGitHubTokensSyncRequest
   var taskBoardTodoistToken: TaskBoardTodoistTokenSyncRequest
+  var taskBoardGitIdentityDefaults: TaskBoardGitIdentityDefaults
   var taskBoardItems: [TaskBoardItem]
   var taskBoardHostRegistry: [TaskBoardHostMachine]
   var nextAgentTuiSequence: Int
@@ -57,6 +58,7 @@ actor PreviewHarnessClientState {
       repositoryTokens: []
     )
     self.taskBoardTodoistToken = TaskBoardTodoistTokenSyncRequest(token: nil)
+    self.taskBoardGitIdentityDefaults = fixtures.taskBoardGitIdentityDefaults
     self.taskBoardItems = fixtures.taskBoardItems
     self.taskBoardHostRegistry = [
       TaskBoardHostMachine(

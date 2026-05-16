@@ -40,6 +40,7 @@ struct TaskBoardGitSettingsDraft: Equatable {
   var todoistToken = ""
   var repositoryOverrides: [TaskBoardRepositoryOverrideDraft] = []
   var policyVersion = ""
+  var identityDefaults = TaskBoardGitIdentityDefaults()
 
   init() {}
 
@@ -85,6 +86,7 @@ struct TaskBoardGitSettingsDraft: Equatable {
     globalToken = snapshot.githubCredentials.globalToken ?? ""
     todoistToken = snapshot.todoistCredentials.token ?? ""
     policyVersion = orchestrator.policyVersion
+    identityDefaults = snapshot.identityDefaults
 
     let tokensByRepository = Dictionary(
       snapshot.githubCredentials.repositoryTokens.map { ($0.repository, $0.token) },

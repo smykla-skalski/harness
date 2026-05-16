@@ -15,6 +15,7 @@ extension PreviewHarnessClient {
     let codexRunsBySessionID: [String: [CodexRunSnapshot]]
     let taskBoardOrchestratorSettings: TaskBoardOrchestratorSettings
     let taskBoardGitRuntimeConfig: TaskBoardGitRuntimeConfig
+    let taskBoardGitIdentityDefaults: TaskBoardGitIdentityDefaults
     let taskBoardItems: [TaskBoardItem]
 
     public init(
@@ -32,6 +33,8 @@ extension PreviewHarnessClient {
       taskBoardOrchestratorSettings: TaskBoardOrchestratorSettings = Self
         .defaultTaskBoardOrchestratorSettings,
       taskBoardGitRuntimeConfig: TaskBoardGitRuntimeConfig = Self.defaultTaskBoardGitRuntimeConfig,
+      taskBoardGitIdentityDefaults: TaskBoardGitIdentityDefaults = Self
+        .defaultTaskBoardGitIdentityDefaults,
       taskBoardItems: [TaskBoardItem] = []
     ) {
       self.health = health
@@ -47,8 +50,29 @@ extension PreviewHarnessClient {
       self.codexRunsBySessionID = codexRunsBySessionID
       self.taskBoardOrchestratorSettings = taskBoardOrchestratorSettings
       self.taskBoardGitRuntimeConfig = taskBoardGitRuntimeConfig
+      self.taskBoardGitIdentityDefaults = taskBoardGitIdentityDefaults
       self.taskBoardItems = taskBoardItems
     }
+
+    public static let defaultTaskBoardGitIdentityDefaults = TaskBoardGitIdentityDefaults(
+      gitConfig: TaskBoardGitConfigDefaults(
+        userName: "Bart Smykla",
+        userEmail: "bartek@smykla.com",
+        userSigningkey: "/Users/example/.ssh/id_ed25519.pub",
+        gpgFormat: "ssh",
+        commitGpgsign: true,
+        coreSshCommand: nil
+      ),
+      ghCli: TaskBoardGhCliDefaults(githubTokenPresent: true, username: "bartsmykla"),
+      discoveredSshKeys: [
+        TaskBoardSshKeyDiscovery(
+          path: "~/.ssh/id_ed25519",
+          mode: "0600",
+          format: "ed25519"
+        )
+      ],
+      envOverrides: TaskBoardEnvDefaults()
+    )
 
     public static let defaultTaskBoardOrchestratorSettings = TaskBoardOrchestratorSettings(
       enabledWorkflows: [.defaultTask, .prFix, .prReview],

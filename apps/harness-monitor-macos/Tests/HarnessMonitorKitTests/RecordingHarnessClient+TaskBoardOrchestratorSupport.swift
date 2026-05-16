@@ -85,7 +85,12 @@ extension RecordingHarnessClient {
     return TaskBoardTodoistTokenSyncResponse(tokenConfigured: request.token != nil)
   }
 
-  private func sampleTaskBoardOrchestratorStatus(
+  func taskBoardGitIdentityDefaults() async throws -> TaskBoardGitIdentityDefaults {
+    calls.append(.taskBoardGitIdentityDefaults)
+    return lock.withLock { taskBoardGitIdentityDefaultsValue }
+  }
+
+  func sampleTaskBoardOrchestratorStatus(
     enabled: Bool = true,
     running: Bool = false
   ) -> TaskBoardOrchestratorStatus {
@@ -117,7 +122,7 @@ extension RecordingHarnessClient {
     )
   }
 
-  private func sampleTaskBoardOrchestratorSettings() -> TaskBoardOrchestratorSettings {
+  func sampleTaskBoardOrchestratorSettings() -> TaskBoardOrchestratorSettings {
     TaskBoardOrchestratorSettings(
       enabledWorkflows: [.defaultTask, .prFix],
       dryRunDefault: false,
@@ -135,7 +140,7 @@ extension RecordingHarnessClient {
     )
   }
 
-  private func sampleTaskBoardGitRuntimeConfig() -> TaskBoardGitRuntimeConfig {
+  func sampleTaskBoardGitRuntimeConfig() -> TaskBoardGitRuntimeConfig {
     TaskBoardGitRuntimeConfig(
       global: TaskBoardGitRuntimeProfile(
         authorName: "Harness Bot",
@@ -160,7 +165,7 @@ extension RecordingHarnessClient {
     )
   }
 
-  private func filteredTaskBoardItems(
+  func filteredTaskBoardItems(
     status: TaskBoardStatus?,
     itemId: String?
   ) -> [TaskBoardItem] {
@@ -169,7 +174,7 @@ extension RecordingHarnessClient {
     }
   }
 
-  private func replaceTaskBoardItem(_ item: TaskBoardItem) {
+  func replaceTaskBoardItem(_ item: TaskBoardItem) {
     guard let index = taskBoardItemsStorage.firstIndex(where: { $0.id == item.id }) else {
       taskBoardItemsStorage.append(item)
       return
@@ -177,7 +182,7 @@ extension RecordingHarnessClient {
     taskBoardItemsStorage[index] = item
   }
 
-  private func statusCounts(for items: [TaskBoardItem]) -> [TaskBoardStatusCount] {
+  func statusCounts(for items: [TaskBoardItem]) -> [TaskBoardStatusCount] {
     let totals = Dictionary(grouping: items, by: \.status)
     return TaskBoardStatus.allCases.compactMap { status in
       guard let itemsForStatus = totals[status], !itemsForStatus.isEmpty else {
@@ -187,7 +192,7 @@ extension RecordingHarnessClient {
     }
   }
 
-  private func sampleDispatchPlan(for item: TaskBoardItem) -> TaskBoardDispatchPlan {
+  func sampleDispatchPlan(for item: TaskBoardItem) -> TaskBoardDispatchPlan {
     TaskBoardDispatchPlan(
       boardItemId: item.id,
       readiness: TaskBoardDispatchReadiness(state: "ready", reason: nil),
