@@ -301,6 +301,10 @@ extension HarnessMonitorStore {
     if let client {
       return client
     }
+    await bootstrapIfNeeded()
+    if let client {
+      return client
+    }
 
     let bootstrappedClient = try await daemonController.bootstrapClient()
     self.client = bootstrappedClient
