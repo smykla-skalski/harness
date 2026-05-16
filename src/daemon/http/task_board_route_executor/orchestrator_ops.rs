@@ -1,7 +1,8 @@
 use crate::daemon::protocol::{
     TaskBoardGitHubTokensSyncRequest, TaskBoardGitHubTokensSyncResponse,
     TaskBoardGitIdentityDefaultsResponse, TaskBoardGitRuntimeConfig,
-    TaskBoardGitRuntimeConfigResponse, TaskBoardOrchestratorSettingsResponse,
+    TaskBoardGitRuntimeConfigResponse, TaskBoardGitSigningVerifyRequest,
+    TaskBoardGitSigningVerifyResponse, TaskBoardOrchestratorSettingsResponse,
     TaskBoardOrchestratorSettingsUpdateRequest, TaskBoardOrchestratorStatusResponse,
     TaskBoardTodoistTokenSyncRequest, TaskBoardTodoistTokenSyncResponse,
 };
@@ -54,4 +55,10 @@ pub(crate) fn sync_todoist_token(
 
 pub(crate) fn git_identity_defaults() -> Result<TaskBoardGitIdentityDefaultsResponse, CliError> {
     service::task_board_git_identity_defaults()
+}
+
+pub(crate) fn verify_git_signing(
+    request: &TaskBoardGitSigningVerifyRequest,
+) -> Result<TaskBoardGitSigningVerifyResponse, CliError> {
+    service::verify_task_board_git_signing(request)
 }

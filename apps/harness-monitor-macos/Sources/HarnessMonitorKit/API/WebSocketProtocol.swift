@@ -107,6 +107,7 @@ enum WebSocketRPCMethod: String, CaseIterable, Equatable, Sendable {
   case taskBoardOrchestratorGitHubTokensSync = "task_board.orchestrator_github_tokens_sync"
   case taskBoardOrchestratorTodoistTokenSync = "task_board.orchestrator_todoist_token_sync"
   case taskBoardGitIdentityDefaults = "task_board.git_identity_defaults"
+  case taskBoardGitSigningVerify = "task_board.git_signing_verify"
   case taskBoardPolicyPipelineGet = "task_board.policy_pipeline_get"
   case taskBoardPolicyPipelineSaveDraft = "task_board.policy_pipeline_save_draft"
   case taskBoardPolicyPipelineSimulate = "task_board.policy_pipeline_simulate"

@@ -22,6 +22,7 @@ pub use evidence::{
     GitHubMergeEvidence, GitHubPullRequestEvidence, GitHubReviewEvidence, GitHubReviewState,
 };
 pub use publication::GitHubBranchState;
+pub(crate) use publication::{SigningVerifyOutcome, verify_signing_for_profile};
 pub use risk::{GitHubRiskClassification, GitHubRiskReason, classify_github_merge_risk};
 
 #[async_trait]

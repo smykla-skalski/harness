@@ -205,6 +205,14 @@ extension WebSocketTransport {
     return try decode(value)
   }
 
+  public func verifyTaskBoardGitSigning(
+    request: TaskBoardGitSigningVerifyRequest
+  ) async throws -> TaskBoardGitSigningVerifyResponse {
+    let params = try encodeParams(request, extra: [:])
+    let value = try await rpc(method: .taskBoardGitSigningVerify, params: params)
+    return try decode(value)
+  }
+
   public func taskBoardPolicyPipeline() async throws -> TaskBoardPolicyPipelineDocument {
     let value = try await rpc(method: .taskBoardPolicyPipelineGet)
     return try decode(value)

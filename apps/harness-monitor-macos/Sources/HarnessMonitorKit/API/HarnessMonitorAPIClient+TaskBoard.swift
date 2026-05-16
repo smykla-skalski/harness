@@ -163,6 +163,12 @@ extension HarnessMonitorAPIClient {
     try await get("/v1/task-board/git/identity-defaults")
   }
 
+  public func verifyTaskBoardGitSigning(
+    request: TaskBoardGitSigningVerifyRequest
+  ) async throws -> TaskBoardGitSigningVerifyResponse {
+    try await post("/v1/task-board/git/signing/verify", body: request)
+  }
+
   public func taskBoardPolicyPipeline() async throws -> TaskBoardPolicyPipelineDocument {
     try await get("/v1/task-board/policy/pipeline")
   }

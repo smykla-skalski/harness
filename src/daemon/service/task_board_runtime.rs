@@ -1,7 +1,11 @@
 use std::collections::BTreeSet;
 
+use crate::daemon::protocol::{
+    TaskBoardGitSigningVerifyRequest, TaskBoardGitSigningVerifyResponse,
+};
 use crate::daemon::state;
 use crate::errors::{CliError, CliErrorKind};
+use crate::task_board::github::{SigningVerifyOutcome, verify_signing_for_profile};
 use crate::task_board::{
     ExternalProvider, ExternalSyncConfig, TaskBoardGitHubRepositoryToken,
     TaskBoardGitHubTokensSyncRequest, TaskBoardGitHubTokensSyncResponse,
@@ -28,6 +32,40 @@ pub fn task_board_git_runtime_config() -> Result<TaskBoardGitRuntimeConfig, CliE
 /// uniform.
 pub fn task_board_git_identity_defaults() -> Result<TaskBoardGitIdentityDefaults, CliError> {
     Ok(discover_git_identity_defaults())
+}
+
+/// Run a dry-run signing test against the currently-configured profile so
+/// the UI can confirm key + passphrase + mode line up after Save.
+///
+/// # Errors
+/// Returns `CliError` only when the requested repository slug is malformed.
+/// Signing failures are surfaced inside [`TaskBoardGitSigningVerifyResponse::Failed`]
+/// so the UI can render them as a banner without crashing the call.
+pub fn verify_task_board_git_signing(
+    request: &TaskBoardGitSigningVerifyRequest,
+) -> Result<TaskBoardGitSigningVerifyResponse, CliError> {
+    let repository = request.repository.as_deref();
+    if let Some(repository) = repository
+        && normalize_repository_slug(Some(repository)).is_none()
+    {
+        return Err(CliError::from(CliErrorKind::workflow_parse(format!(
+            "invalid task-board repository '{repository}', expected owner/repo"
+        ))));
+    }
+    let profile = state::task_board_git_runtime_profile(repository)?;
+    Ok(match verify_signing_for_profile(&profile) {
+        SigningVerifyOutcome::Skipped => TaskBoardGitSigningVerifyResponse::Skipped,
+        SigningVerifyOutcome::Signed {
+            mode,
+            signature_kind,
+        } => TaskBoardGitSigningVerifyResponse::Signed {
+            mode,
+            signature_kind,
+        },
+        SigningVerifyOutcome::Failed { message } => {
+            TaskBoardGitSigningVerifyResponse::Failed { message }
+        }
+    })
 }
 
 /// Persist the task-board git runtime config after validation and normalization.

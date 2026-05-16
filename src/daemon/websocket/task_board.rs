@@ -3,13 +3,13 @@ use crate::daemon::protocol::{
     ControlPlaneActorRequest, TaskBoardAuditRequest, TaskBoardCatalogRequest,
     TaskBoardCreateItemRequest, TaskBoardDeleteItemRequest, TaskBoardDispatchRequest,
     TaskBoardEvaluateRequest, TaskBoardGetItemRequest, TaskBoardGitHubTokensSyncRequest,
-    TaskBoardGitRuntimeConfig, TaskBoardHostSetProjectTypesRequest, TaskBoardListItemsRequest,
-    TaskBoardOrchestratorRunOnceRequest, TaskBoardOrchestratorSettingsUpdateRequest,
-    TaskBoardPlanApproveRequest, TaskBoardPlanBeginRequest, TaskBoardPlanRevokeRequest,
-    TaskBoardPlanSubmitRequest, TaskBoardPolicyPipelinePromoteRequest,
-    TaskBoardPolicyPipelineSaveDraftRequest, TaskBoardPolicyPipelineSimulateRequest,
-    TaskBoardSyncRequest, TaskBoardTodoistTokenSyncRequest, TaskBoardUpdateItemRequest, WsRequest,
-    WsResponse, ws_methods,
+    TaskBoardGitRuntimeConfig, TaskBoardGitSigningVerifyRequest, TaskBoardHostSetProjectTypesRequest,
+    TaskBoardListItemsRequest, TaskBoardOrchestratorRunOnceRequest,
+    TaskBoardOrchestratorSettingsUpdateRequest, TaskBoardPlanApproveRequest,
+    TaskBoardPlanBeginRequest, TaskBoardPlanRevokeRequest, TaskBoardPlanSubmitRequest,
+    TaskBoardPolicyPipelinePromoteRequest, TaskBoardPolicyPipelineSaveDraftRequest,
+    TaskBoardPolicyPipelineSimulateRequest, TaskBoardSyncRequest, TaskBoardTodoistTokenSyncRequest,
+    TaskBoardUpdateItemRequest, WsRequest, WsResponse, ws_methods,
 };
 use serde::de::DeserializeOwned;
 
@@ -73,6 +73,9 @@ pub(crate) async fn dispatch_task_board_method(
         }
         ws_methods::TASK_BOARD_GIT_IDENTITY_DEFAULTS => {
             Some(dispatch_task_board_git_identity_defaults(request))
+        }
+        ws_methods::TASK_BOARD_GIT_SIGNING_VERIFY => {
+            Some(dispatch_task_board_git_signing_verify(request))
         }
         ws_methods::TASK_BOARD_POLICY_PIPELINE_GET => {
             Some(dispatch_task_board_policy_pipeline_get(request))
@@ -309,6 +312,16 @@ fn dispatch_task_board_git_identity_defaults(request: &WsRequest) -> WsResponse 
     )
 }
 
+fn dispatch_task_board_git_signing_verify(request: &WsRequest) -> WsResponse {
+    let Ok(body) = parse_params::<TaskBoardGitSigningVerifyRequest>(request) else {
+        return invalid_params(request);
+    };
+    dispatch_query_result(
+        &request.id,
+        task_board_route_executor::verify_git_signing(&body),
+    )
+}
+
 fn dispatch_task_board_policy_pipeline_get(request: &WsRequest) -> WsResponse {
     dispatch_query_result(&request.id, task_board_route_executor::policy_pipeline())
 }
@@ -384,6 +397,7 @@ const TASK_BOARD_WS_METHOD_CATALOG: &[&str] = &[
     ws_methods::TASK_BOARD_ORCHESTRATOR_GITHUB_TOKENS_SYNC,
     ws_methods::TASK_BOARD_ORCHESTRATOR_TODOIST_TOKEN_SYNC,
     ws_methods::TASK_BOARD_GIT_IDENTITY_DEFAULTS,
+    ws_methods::TASK_BOARD_GIT_SIGNING_VERIFY,
     ws_methods::TASK_BOARD_POLICY_PIPELINE_GET,
     ws_methods::TASK_BOARD_POLICY_PIPELINE_SAVE_DRAFT,
     ws_methods::TASK_BOARD_POLICY_PIPELINE_SIMULATE,

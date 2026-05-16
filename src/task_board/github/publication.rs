@@ -23,6 +23,7 @@ use signing::{
     publication_signature, rest_commit_signature_boundary, unsigned_commit_payload,
     validate_rest_publication_signature_support,
 };
+pub(crate) use signing::{SigningVerifyOutcome, verify_signing_for_profile};
 use types::{
     BranchPublicationMode, GitHubCreateBlobRequest, GitHubCreateCommitRequest,
     GitHubCreateTreeRequest, GitHubObjectShaResponse, GitHubTreeEntryRequest,

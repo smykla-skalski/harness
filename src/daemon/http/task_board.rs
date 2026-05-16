@@ -7,7 +7,7 @@ use axum::routing::{get, post, put};
 use axum::{Json, Router};
 
 use crate::daemon::protocol::{
-    TaskBoardGitHubTokensSyncRequest, TaskBoardGitRuntimeConfig,
+    TaskBoardGitHubTokensSyncRequest, TaskBoardGitRuntimeConfig, TaskBoardGitSigningVerifyRequest,
     TaskBoardOrchestratorRunOnceRequest, TaskBoardOrchestratorSettingsUpdateRequest,
     TaskBoardPolicyPipelinePromoteRequest, TaskBoardPolicyPipelineSaveDraftRequest,
     TaskBoardPolicyPipelineSimulateRequest, TaskBoardTodoistTokenSyncRequest, http_paths,
@@ -150,6 +150,10 @@ pub(super) fn task_board_routes() -> Router<DaemonHttpState> {
         .route(
             http_paths::TASK_BOARD_GIT_IDENTITY_DEFAULTS,
             get(get_task_board_git_identity_defaults),
+        )
+        .route(
+            http_paths::TASK_BOARD_GIT_SIGNING_VERIFY,
+            post(post_task_board_git_signing_verify),
         )
         .route(
             http_paths::TASK_BOARD_POLICY_PIPELINE,
@@ -326,6 +330,21 @@ async fn get_task_board_git_identity_defaults(
         &request_id,
         start,
         task_board_route_executor::git_identity_defaults(),
+    )
+}
+
+async fn post_task_board_git_signing_verify(
+    headers: HeaderMap,
+    State(state): State<DaemonHttpState>,
+    Json(request): Json<TaskBoardGitSigningVerifyRequest>,
+) -> Response {
+    let (start, request_id) = authenticated_request!(headers, state);
+    timed_json(
+        "POST",
+        http_paths::TASK_BOARD_GIT_SIGNING_VERIFY,
+        &request_id,
+        start,
+        task_board_route_executor::verify_git_signing(&request),
     )
 }
 
