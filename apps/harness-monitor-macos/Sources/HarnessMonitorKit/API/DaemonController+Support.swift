@@ -58,7 +58,7 @@ public struct ServiceManagementDaemonLaunchAgentManager: DaemonLaunchAgentManagi
 /// in the bundle, which is the whole point).
 public enum LegacyManagedLaunchAgentCleanup {
   private static let lock = NSLock()
-  private static var didAttempt = false
+  nonisolated(unsafe) private static var didAttempt = false
 
   /// Runs once per process. Subsequent calls are no-ops.
   public static func runOnce() {
