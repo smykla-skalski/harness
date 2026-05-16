@@ -85,11 +85,13 @@ public struct SettingsView: View {
           )
         }
       }
+      .harnessMonitorBackgroundExtensionEffect()
     }
     .navigationSplitViewStyle(.balanced)
     .toolbarBaselineOverlay()
     .suppressToolbarBaselineSeparator(
-      markedAs: HarnessMonitorAccessibility.settingsToolbarSeparatorSuppressed
+      markedAs: HarnessMonitorAccessibility.settingsToolbarSeparatorSuppressed,
+      titlebarAppearsTransparent: true
     )
     .toolbarBackgroundVisibility(.automatic, for: .windowToolbar)
     .toolbar {

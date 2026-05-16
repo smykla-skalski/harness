@@ -68,6 +68,10 @@ extension SessionWindowFlowTests {
     let commandsSource = try harnessSourceFile(named: "Commands/WindowMenuCommands.swift")
     let tabbingAccessorPath = harnessSourceURL(named: "App/SessionWindowTabbing.swift").path
     let tabbingSource = try harnessSourceFile(named: "App/SessionWindowTabbing.swift")
+    let toolbarGlassSource = try previewableSourceFile(
+      named: "Support/ToolbarGlassStateMonitor.swift"
+    )
+    let settingsSource = try previewableSourceFile(named: "Views/Settings/SettingsView.swift")
     let tabbingSupportSource = try previewableSourceFile(
       named: "Support/SessionWindowTabbingSupport.swift"
     )
@@ -96,6 +100,9 @@ extension SessionWindowFlowTests {
     #expect(rootSource.contains("HarnessMonitorSheetModifier("))
     #expect(rootSource.contains("isEnabled: hostsSharedShellPresentation"))
     #expect(rootSource.contains("CGSize(width: 920, height: 620)"))
+    #expect(!rootSource.contains("windowToolbarBackgroundVisibility: .visible"))
+    #expect(!rootSource.contains("windowToolbarBackgroundVisibility: .automatic"))
+    #expect(rootSource.contains("titlebarAppearsTransparent: true"))
     #expect(
       rootSource.contains(
         "HarnessMonitorAccessibility.sessionWindowToolbarSeparatorSuppressed"
@@ -103,8 +110,20 @@ extension SessionWindowFlowTests {
     )
     #expect(tabbingSource.contains("scheduleWindowTabbingApplication()"))
     #expect(tabbingSource.contains("await Task.yield()"))
-    #expect(tabbingSource.contains("guard window.toolbar != nil else"))
+    #expect(tabbingSource.contains("SessionWindowTabbingSupport.prepareWindowForTabbing("))
+    #expect(!tabbingSource.contains("guard window.toolbar != nil else"))
+    #expect(tabbingSource.contains("window.tab.attributedTitle"))
     #expect(tabbingSource.contains("titlebarSeparatorStyle"))
+    #expect(tabbingSource.contains("titlebarAppearsTransparent"))
+    #expect(toolbarGlassSource.contains("let titlebarAppearsTransparent: Bool"))
+    #expect(
+      toolbarGlassSource.contains(
+        "window?.titlebarAppearsTransparent = titlebarAppearsTransparent"
+      )
+    )
+    #expect(settingsSource.contains("settingsToolbarSeparatorSuppressed"))
+    #expect(settingsSource.contains("titlebarAppearsTransparent: true"))
+    #expect(settingsSource.contains(".harnessMonitorBackgroundExtensionEffect()"))
     #expect(routerSource.contains("SessionWindowTabGroupReplayer.replay("))
     #expect(routerSource.contains("let tabReadyWindows = grouping.sessionIDs.compactMap"))
     #expect(routerSource.contains("isWindowTabReady"))
@@ -143,23 +162,31 @@ extension SessionWindowFlowTests {
   func dashboardWindowOpenAtQuitStateIsMirroredEndToEnd() throws {
     let sceneContentSource = try harnessSourceFile(
       named: "App/HarnessMonitorApp+SceneContent.swift")
+    let bindingSource = try harnessSourceFile(named: "App/DashboardWindowAppKitBinding.swift")
     let modifierSource = try harnessSourceFile(named: "App/DashboardWindowLifecycleModifier.swift")
     let trackerSource = try harnessSourceFile(named: "App/DashboardWindowLifecycleTracker.swift")
     let delegateSource = try harnessSourceFile(named: "App/HarnessMonitorAppDelegate.swift")
     let routerSource = try harnessSourceFile(named: "App/HarnessMonitorInitialWindowRouter.swift")
 
+    #expect(sceneContentSource.contains(".modifier(DashboardWindowAppKitBinding())"))
     #expect(sceneContentSource.contains(".modifier(DashboardWindowLifecycleModifier())"))
+    #expect(bindingSource.contains("DashboardWindowAppKitRegistry.shared.bind(window: window)"))
+    #expect(bindingSource.contains("DashboardWindowAppKitRegistry.shared.unbind(window: currentWindow)"))
     #expect(modifierSource.contains("DashboardWindowLifecycleTracker.shared.markOpen()"))
     #expect(modifierSource.contains("DashboardWindowLifecycleTracker.shared.markClosed()"))
     #expect(trackerSource.contains("static let openAtQuitKey"))
-    #expect(trackerSource.contains("func flushOpenAtQuit()"))
+    #expect(trackerSource.contains("static let tabbedSessionIDsAtQuitKey"))
+    #expect(trackerSource.contains("static let wasForegroundTabAtQuitKey"))
+    #expect(trackerSource.contains("func flushOpenAtQuit("))
     #expect(trackerSource.contains("static func wasOpenAtQuit("))
+    #expect(trackerSource.contains("static func tabRestoreStateAtQuit("))
     #expect(
       delegateSource.contains(
         "DashboardWindowLifecycleTracker.shared.flushOpenAtQuit()"
       )
     )
     #expect(routerSource.contains("DashboardWindowLifecycleTracker.wasOpenAtQuit()"))
+    #expect(routerSource.contains("DashboardWindowLifecycleTracker.tabRestoreStateAtQuit()"))
   }
 
   @Test("Decision routing reuses an already open session window")

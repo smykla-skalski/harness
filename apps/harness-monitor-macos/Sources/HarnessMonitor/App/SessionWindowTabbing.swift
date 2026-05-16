@@ -38,7 +38,7 @@ struct SessionWindowTabbing: ViewModifier {
   }
 }
 
-private struct SessionWindowTabbingAccessor: NSViewRepresentable {
+struct SessionWindowTabbingAccessor: NSViewRepresentable {
   struct Configuration: Equatable {
     let role: SessionWindowTabbing.Role
     let preference: SessionWindowTabbingPreference
@@ -49,23 +49,23 @@ private struct SessionWindowTabbingAccessor: NSViewRepresentable {
 
   let configuration: Configuration
 
-  func makeNSView(context: Context) -> AccessorView {
-    let view = AccessorView()
+  func makeNSView(context: Context) -> SessionWindowTabbingAccessorView {
+    let view = SessionWindowTabbingAccessorView()
     view.configuration = configuration
     return view
   }
 
-  func updateNSView(_ nsView: AccessorView, context: Context) {
+  func updateNSView(_ nsView: SessionWindowTabbingAccessorView, context: Context) {
     nsView.configuration = configuration
     nsView.scheduleWindowTabbingApplication()
   }
 
-  static func dismantleNSView(_ nsView: AccessorView, coordinator: ()) {
+  static func dismantleNSView(_ nsView: SessionWindowTabbingAccessorView, coordinator: ()) {
     nsView.cancelWindowTabbingUpdates()
   }
 }
 
-private final class AccessorView: NSView {
+final class SessionWindowTabbingAccessorView: NSView {
   private static let log = Logger(
     subsystem: "io.harnessmonitor",
     category: "SessionWindowTabbing"
@@ -141,9 +141,9 @@ private final class AccessorView: NSView {
     guard let window else {
       return
     }
-    guard window.toolbar != nil else {
-      return
-    }
+    // AppKit groups restored windows by `tabbingIdentifier`; SwiftUI's unified
+    // toolbar can attach later than the NSWindow itself during restoration, so
+    // tab identity must be installed before toolbar chrome is ready.
     SessionWindowTabbingSupport.prepareWindowForTabbing(
       window,
       preference: configuration.preference
@@ -168,12 +168,13 @@ private final class AccessorView: NSView {
     )
   }
 
-  /// Setting `tabbingIdentifier` flips AppKit into a tabbable-window toolbar
-  /// mode that draws an opaque titlebar with a baseline separator under the
-  /// tab strip, masking the Liquid Glass blur in the unified toolbar. AppKit
-  /// also re-applies its defaults whenever a new tab is added or removed, so
-  /// the override has to run again on every change.
+  /// `NSWindowTab` properties are configurable before a window visibly joins a
+  /// tab strip, and AppKit can re-apply its titlebar defaults whenever tabs are
+  /// added or removed, so keep reasserting the override on window updates. The
+  /// transparent titlebar lets the unified toolbar sample the banner/detail
+  /// chrome beneath it instead of falling back to AppKit's opaque fill.
   private func applyTitlebarChromeOverrides(to window: NSWindow) {
     window.titlebarSeparatorStyle = .none
+    window.titlebarAppearsTransparent = true
   }
 }

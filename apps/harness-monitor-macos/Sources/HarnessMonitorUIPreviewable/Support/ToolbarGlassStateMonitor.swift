@@ -14,29 +14,53 @@ import SwiftUI
 // because makeNSView is called before SwiftUI inserts the view into the window
 // hierarchy. The async dispatch fires while window is still nil and the call
 // silently no-ops. viewDidMoveToWindow() is the guaranteed AppKit callback that
-// fires with a non-nil window.
+// fires with a non-nil window. Titlebar transparency is opt-in because only the
+// tabbed dashboard/session windows should sample through to their blur hosts.
 private final class _TitlebarSeparatorSuppressorView: NSView {
+  var titlebarAppearsTransparent = false
+
   override func viewDidMoveToWindow() {
     super.viewDidMoveToWindow()
+    applyWindowOverrides()
+  }
+
+  func applyWindowOverrides() {
     window?.titlebarSeparatorStyle = .none
+    window?.titlebarAppearsTransparent = titlebarAppearsTransparent
   }
 }
 
 private struct ToolbarBaselineSeparatorSuppressor: NSViewRepresentable {
+  let titlebarAppearsTransparent: Bool
+
   func makeNSView(context: Context) -> _TitlebarSeparatorSuppressorView {
-    _TitlebarSeparatorSuppressorView()
+    let view = _TitlebarSeparatorSuppressorView()
+    view.titlebarAppearsTransparent = titlebarAppearsTransparent
+    return view
   }
 
-  func updateNSView(_ nsView: _TitlebarSeparatorSuppressorView, context: Context) {}
+  func updateNSView(_ nsView: _TitlebarSeparatorSuppressorView, context: Context) {
+    nsView.titlebarAppearsTransparent = titlebarAppearsTransparent
+    nsView.applyWindowOverrides()
+  }
 }
 
 extension View {
-  public func suppressToolbarBaselineSeparator() -> some View {
-    background(ToolbarBaselineSeparatorSuppressor())
+  public func suppressToolbarBaselineSeparator(
+    titlebarAppearsTransparent: Bool = false
+  ) -> some View {
+    background(
+      ToolbarBaselineSeparatorSuppressor(
+        titlebarAppearsTransparent: titlebarAppearsTransparent
+      )
+    )
   }
 
-  public func suppressToolbarBaselineSeparator(markedAs identifier: String) -> some View {
-    suppressToolbarBaselineSeparator()
+  public func suppressToolbarBaselineSeparator(
+    markedAs identifier: String,
+    titlebarAppearsTransparent: Bool = false
+  ) -> some View {
+    suppressToolbarBaselineSeparator(titlebarAppearsTransparent: titlebarAppearsTransparent)
       .overlay {
         AccessibilityTextMarker(identifier: identifier, text: "suppressed")
       }
