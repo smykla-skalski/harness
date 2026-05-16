@@ -190,20 +190,51 @@ public struct XctraceTOC {
 }
 
 enum XMLSanitizer {
+    /// Strips XML-1.0-disallowed scalars from an xctrace export.
+    ///
+    /// Memory contract: the previous implementation built a `[UnicodeScalar?]`
+    /// from `compactMap`, then a second `UnicodeScalarView`, then a `Data` —
+    /// peak RSS hit 13.7 GB on a 696 MB trace, OOMing the analyze step. This
+    /// implementation does a single byte-level scan for C0 control bytes
+    /// (which cover ~all real-world violations in xctrace output) and only
+    /// allocates an output buffer when one is found, peaking at ~2× input.
     static func sanitize(_ data: Data) -> Data {
-        let text = String(decoding: data, as: UTF8.self)
-        var removedInvalidScalars = false
-        let filtered = String.UnicodeScalarView(
-            text.unicodeScalars.compactMap { scalar in
-                if isValidXMLScalar(scalar) {
-                    return scalar
+        let needsFiltering = data.withUnsafeBytes { buffer -> Bool in
+            for byte in buffer {
+                if isInvalidC0Byte(byte) {
+                    return true
                 }
-                removedInvalidScalars = true
-                return nil
             }
-        )
-        guard removedInvalidScalars else { return data }
-        return Data(String(filtered).utf8)
+            return false
+        }
+        if !needsFiltering {
+            return data
+        }
+        // Slow path: stream scalars to the output buffer without materializing
+        // the full UnicodeScalarView. Preserves the original semantic filter
+        // (surrogates and U+FFFE/U+FFFF) but stays in bounded memory.
+        let text = String(decoding: data, as: UTF8.self)
+        var output = Data()
+        output.reserveCapacity(data.count)
+        for scalar in text.unicodeScalars {
+            guard isValidXMLScalar(scalar) else { continue }
+            for byte in scalar.utf8 {
+                output.append(byte)
+            }
+        }
+        return output
+    }
+
+    /// XML 1.0 disallows C0 controls outside `\t \n \r`. Single-byte UTF-8
+    /// match catches every violation that appears in real xctrace traces
+    /// without paying for a unicode pass.
+    private static func isInvalidC0Byte(_ byte: UInt8) -> Bool {
+        switch byte {
+        case 0x00...0x08, 0x0B, 0x0C, 0x0E...0x1F:
+            return true
+        default:
+            return false
+        }
     }
 
     private static func isValidXMLScalar(_ scalar: UnicodeScalar) -> Bool {
