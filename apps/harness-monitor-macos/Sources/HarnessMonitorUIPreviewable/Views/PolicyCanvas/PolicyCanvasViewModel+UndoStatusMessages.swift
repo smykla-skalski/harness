@@ -162,6 +162,19 @@ extension PolicyCanvasViewModel {
   }
 
   private func propertyStatusMessage(for change: PolicyCanvasChange) -> String {
+    if let message = nodePropertyStatusMessage(for: change) {
+      return message
+    }
+    if let message = edgePropertyStatusMessage(for: change) {
+      return message
+    }
+    if let message = groupPropertyStatusMessage(for: change) {
+      return message
+    }
+    preconditionFailure("Unsupported property status")
+  }
+
+  private func nodePropertyStatusMessage(for change: PolicyCanvasChange) -> String? {
     switch change {
     case .setNodeTitle(_, _, let to):
       return "Title set to \(to)"
@@ -172,10 +185,14 @@ extension PolicyCanvasViewModel {
     case .setNodeSubtitle(_, _, let to):
       return "Subtitle set to \(to)"
     case .setNodePolicyKind(_, _, let to):
-      if let to {
-        return "Node binding set to \(to.kind)"
-      }
-      return "Node binding cleared"
+      return to.map { "Node binding set to \($0.kind)" } ?? "Node binding cleared"
+    default:
+      return nil
+    }
+  }
+
+  private func edgePropertyStatusMessage(for change: PolicyCanvasChange) -> String? {
+    switch change {
     case .setEdgeCondition(_, _, let to):
       return "Condition set to \(to)"
     case .setEdgeLabel(_, _, let to):
@@ -184,12 +201,19 @@ extension PolicyCanvasViewModel {
       return "Edge kind set to \(to.accessibilityWord)"
     case .setEdgePinnedPortSide(_, _, let to):
       return to ? "Edge ports pinned" : "Edge ports unpinned"
+    default:
+      return nil
+    }
+  }
+
+  private func groupPropertyStatusMessage(for change: PolicyCanvasChange) -> String? {
+    switch change {
     case .setGroupTitle(_, _, let to):
       return "Group renamed to \(to)"
     case .setGroupTone(_, _, let to):
       return "Group tone set to \(to.policyCanvasTitle)"
     default:
-      preconditionFailure("Unsupported property status")
+      return nil
     }
   }
 

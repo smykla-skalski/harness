@@ -36,7 +36,6 @@ opt_in_rules:
   - prefer_self_in_static_references
   - redundant_nil_coalescing
   - redundant_type_annotation
-  - sorted_imports
   - sorted_first_last
   - toggle_bool
   - vertical_parameter_alignment_on_call

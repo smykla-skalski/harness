@@ -180,6 +180,19 @@ extension PolicyCanvasViewModel {
   }
 
   private func applyPropertyChange(_ change: PolicyCanvasChange) -> PolicyCanvasChange {
+    if let nodeChange = applyNodePropertyChange(change) {
+      return nodeChange
+    }
+    if let edgeChange = applyEdgePropertyChange(change) {
+      return edgeChange
+    }
+    if let groupChange = applyGroupPropertyChange(change) {
+      return groupChange
+    }
+    preconditionFailure("Unsupported property change")
+  }
+
+  private func applyNodePropertyChange(_ change: PolicyCanvasChange) -> PolicyCanvasChange? {
     switch change {
     case .setNodeTitle(let id, let from, let to):
       return applySetNodeTitle(id: id, from: from, to: to)
@@ -211,6 +224,13 @@ extension PolicyCanvasViewModel {
       return applySetNodeSubtitle(id: id, from: from, to: to)
     case .setNodePolicyKind(let id, let from, let to):
       return applySetNodePolicyKind(id: id, from: from, to: to)
+    default:
+      return nil
+    }
+  }
+
+  private func applyEdgePropertyChange(_ change: PolicyCanvasChange) -> PolicyCanvasChange? {
+    switch change {
     case .setEdgeCondition(let id, let from, let to):
       return applySetEdgeCondition(id: id, from: from, to: to)
     case .setEdgeLabel(let id, let from, let to):
@@ -219,12 +239,19 @@ extension PolicyCanvasViewModel {
       return applySetEdgeKind(id: id, from: from, to: to)
     case .setEdgePinnedPortSide(let id, let from, let to):
       return applySetEdgePinnedPortSide(id: id, from: from, to: to)
+    default:
+      return nil
+    }
+  }
+
+  private func applyGroupPropertyChange(_ change: PolicyCanvasChange) -> PolicyCanvasChange? {
+    switch change {
     case .setGroupTitle(let id, let from, let to):
       return applySetGroupTitle(id: id, from: from, to: to)
     case .setGroupTone(let id, let from, let to):
       return applySetGroupTone(id: id, from: from, to: to)
     default:
-      preconditionFailure("Unsupported property change")
+      return nil
     }
   }
 

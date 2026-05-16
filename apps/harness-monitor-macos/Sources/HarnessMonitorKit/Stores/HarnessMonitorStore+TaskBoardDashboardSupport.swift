@@ -1,0 +1,111 @@
+import Foundation
+
+extension HarnessMonitorStore {
+  private func mutateTaskBoardPlanning(
+    actionName: String,
+    mutation:
+      @escaping @Sendable (any HarnessMonitorClientProtocol) async throws
+      -> TaskBoardPlanningResponse
+  ) async -> Bool {
+    guard let client else {
+      return false
+    }
+    isDaemonActionInFlight = true
+    defer { isDaemonActionInFlight = false }
+
+    do {
+      let measuredResponse = try await Self.measureOperation {
+        try await mutation(client)
+      }
+      recordRequestSuccess()
+      mergeTaskBoardItem(measuredResponse.value.item)
+      await refreshTaskBoardDashboardSnapshot(using: client)
+      presentSuccessFeedback(actionName)
+      return true
+    } catch {
+      presentFailureFeedback(error.localizedDescription)
+      return false
+    }
+  }
+
+  private func mutateTaskBoardOrchestrator(
+    actionName: String,
+    mutation:
+      @escaping @Sendable (any HarnessMonitorClientProtocol) async throws
+      -> TaskBoardOrchestratorStatus
+  ) async -> Bool {
+    guard let client else {
+      return false
+    }
+    isDaemonActionInFlight = true
+    defer { isDaemonActionInFlight = false }
+
+    do {
+      let measuredStatus = try await Self.measureOperation {
+        try await mutation(client)
+      }
+      recordRequestSuccess()
+      globalTaskBoardOrchestratorStatus = measuredStatus.value
+      await refreshTaskBoardDashboardSnapshot(using: client, fallbackStatus: measuredStatus.value)
+      presentSuccessFeedback(actionName)
+      return true
+    } catch {
+      presentFailureFeedback(error.localizedDescription)
+      return false
+    }
+  }
+
+  private func refreshTaskBoardDashboardSnapshot(
+    using client: any HarnessMonitorClientProtocol,
+    fallbackStatus: TaskBoardOrchestratorStatus? = nil
+  ) async {
+    async let items = Self.loadTaskBoardItemsSnapshot(using: client)
+    async let status = Self.loadTaskBoardOrchestratorStatusSnapshot(using: client)
+    let measuredItems = await items
+    let measuredStatus = await status
+
+    withUISyncBatch {
+      globalTaskBoardItems = measuredItems.value
+      globalTaskBoardOrchestratorStatus = measuredStatus.value ?? fallbackStatus
+    }
+  }
+
+  @discardableResult
+  func syncAndRefreshTaskBoardDashboard(
+    using client: any HarnessMonitorClientProtocol,
+    request: TaskBoardSyncRequest,
+    successMessage: String? = nil,
+    failureMessagePrefix: String? = nil
+  ) async -> Bool {
+    do {
+      let measuredSummary = try await Self.measureOperation {
+        try await client.syncTaskBoard(request: request)
+      }
+      recordRequestSuccess()
+      globalTaskBoardSyncSummary = measuredSummary.value
+      await refreshTaskBoardDashboardSnapshot(using: client)
+      if let successMessage {
+        presentSuccessFeedback(successMessage)
+      }
+      return true
+    } catch {
+      await refreshTaskBoardDashboardSnapshot(using: client)
+      let failureDescription =
+        if let failureMessagePrefix {
+          "\(failureMessagePrefix): \(error.localizedDescription)"
+        } else {
+          error.localizedDescription
+        }
+      presentFailureFeedback(failureDescription)
+      return false
+    }
+  }
+
+  private func mergeTaskBoardItem(_ item: TaskBoardItem) {
+    guard let index = globalTaskBoardItems.firstIndex(where: { $0.id == item.id }) else {
+      globalTaskBoardItems.append(item)
+      return
+    }
+    globalTaskBoardItems[index] = item
+  }
+}

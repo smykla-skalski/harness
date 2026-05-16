@@ -28,42 +28,72 @@ struct HarnessMonitorInitialWindowRouter {
   static let restorationWaitTimeout: Duration = .milliseconds(1500)
 
   func route() async {
-    // The dashboard window is a singleton `Window` scene; its on-screen
-    // presence at quit is mirrored to user defaults by
-    // `DashboardWindowLifecycleTracker`. Restore it alongside any session
-    // windows when the user had it open last run.
     let shouldRestoreDashboard =
       launchBehavior == .restoreSessionWindows
       && DashboardWindowLifecycleTracker.wasOpenAtQuit()
+    let restorePlan = await prepareRestorePlan()
 
-    var restorePlan = HarnessMonitorStore.LaunchWindowRestorePlan()
-    if launchBehavior == .restoreSessionWindows {
-      await store.prepareOpenRecentSessions()
-      if hasVisibleSessionWindows() {
-        if shouldRestoreDashboard {
-          openWelcomeWindow()
-        }
-        await replayTabGroupingsIfNeeded(in: restorePlan)
-        return
-      }
-      restorePlan = await store.launchWindowRestorePlan()
+    if await restoreVisibleWindowsIfNeeded(
+      shouldRestoreDashboard: shouldRestoreDashboard,
+      restorePlan: restorePlan
+    ) {
+      return
     }
-
-    // Only wait for SwiftUI auto-restoration when there is something the
-    // system might restore. Fresh users with an empty plan skip the wait
-    // and reach Welcome immediately; users with a non-empty plan let
-    // SwiftUI win so the briefly-stacked Open Recent + sessions overlap
-    // does not appear.
-    if launchBehavior == .restoreSessionWindows, !restorePlan.sessionIDs.isEmpty {
-      if await waitForVisibleSessionWindowDuringLaunch() {
-        if shouldRestoreDashboard {
-          openWelcomeWindow()
-        }
-        await replayTabGroupingsIfNeeded(in: restorePlan)
-        return
-      }
+    if await restoreAutoRestoredWindowsIfNeeded(
+      shouldRestoreDashboard: shouldRestoreDashboard,
+      restorePlan: restorePlan
+    ) {
+      return
     }
+    await routeInitialPlan(
+      shouldRestoreDashboard: shouldRestoreDashboard,
+      restorePlan: restorePlan
+    )
+  }
 
+  private func prepareRestorePlan() async -> HarnessMonitorStore.LaunchWindowRestorePlan {
+    guard launchBehavior == .restoreSessionWindows else {
+      return HarnessMonitorStore.LaunchWindowRestorePlan()
+    }
+    await store.prepareOpenRecentSessions()
+    return await store.launchWindowRestorePlan()
+  }
+
+  private func restoreVisibleWindowsIfNeeded(
+    shouldRestoreDashboard: Bool,
+    restorePlan: HarnessMonitorStore.LaunchWindowRestorePlan
+  ) async -> Bool {
+    guard launchBehavior == .restoreSessionWindows, hasVisibleSessionWindows() else {
+      return false
+    }
+    if shouldRestoreDashboard {
+      openWelcomeWindow()
+    }
+    await replayTabGroupingsIfNeeded(in: restorePlan)
+    return true
+  }
+
+  private func restoreAutoRestoredWindowsIfNeeded(
+    shouldRestoreDashboard: Bool,
+    restorePlan: HarnessMonitorStore.LaunchWindowRestorePlan
+  ) async -> Bool {
+    guard launchBehavior == .restoreSessionWindows, !restorePlan.sessionIDs.isEmpty else {
+      return false
+    }
+    guard await waitForVisibleSessionWindowDuringLaunch() else {
+      return false
+    }
+    if shouldRestoreDashboard {
+      openWelcomeWindow()
+    }
+    await replayTabGroupingsIfNeeded(in: restorePlan)
+    return true
+  }
+
+  private func routeInitialPlan(
+    shouldRestoreDashboard: Bool,
+    restorePlan: HarnessMonitorStore.LaunchWindowRestorePlan
+  ) async {
     let initialPlan = HarnessMonitorInitialWindowPlan.resolve(
       launchBehavior: launchBehavior,
       hasVisibleSessionWindows: hasVisibleSessionWindows(),
