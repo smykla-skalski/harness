@@ -72,15 +72,25 @@ public enum LegacyManagedLaunchAgentCleanup {
     let currentName = HarnessMonitorPaths.launchAgentPlistName
     guard legacyName != currentName else { return }
 
+    // Always attempt the unregister, even when `SMAppService.status` reports
+    // `.notFound`. After the bundle rename to `.managed`, the legacy plist
+    // file no longer exists inside the .app, so `status` is structurally
+    // `.notFound` for everyone — but BTM may still hold a disposition record
+    // for the old label from a prior install, which can make SMAppService
+    // reject the new registration with `Register error: 22`. Calling
+    // `unregister()` regardless gives the framework one chance to evict
+    // a lingering record; if there is truly nothing registered, the throw
+    // is silenced and logged at `notice`, not `error`, so this stays a
+    // best-effort cleanup.
     let legacyService = SMAppService.agent(plistName: legacyName)
-    switch legacyService.status {
-    case .enabled, .requiresApproval:
-      attemptUnregister(legacyService, name: legacyName)
-    case .notRegistered, .notFound:
-      return
-    @unknown default:
-      return
-    }
+    HarnessMonitorLogger.lifecycle.info(
+      """
+      Legacy SMAppService cleanup: legacy_plist=\(legacyName, privacy: .public) \
+      current_plist=\(currentName, privacy: .public) \
+      status_raw=\(String(describing: legacyService.status), privacy: .public)
+      """
+    )
+    attemptUnregister(legacyService, name: legacyName)
   }
 
   /// Test-only escape hatch: clears the once-guard so a unit test can verify
