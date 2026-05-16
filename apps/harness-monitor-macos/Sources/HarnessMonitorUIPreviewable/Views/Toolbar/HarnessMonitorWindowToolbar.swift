@@ -19,8 +19,7 @@ struct HarnessMonitorWindowToolbar<
     primaryActionItems = primaryAction()
   }
 
-  @ToolbarContentBuilder
-  var body: some ToolbarContent {
+  @ToolbarContentBuilder var body: some ToolbarContent {
     navigationItems
     automaticItems
     primaryActionItems

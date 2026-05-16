@@ -12,31 +12,20 @@ enum TaskBoardStatusFilterChoice: String, CaseIterable, Identifiable, Hashable {
   case done
   case blocked
 
+  private static let statusChoices: [TaskBoardStatus: Self] = [
+    .new: .new,
+    .planning: .planning,
+    .planReview: .planReview,
+    .needsYou: .needsYou,
+    .todo: .todo,
+    .inProgress: .inProgress,
+    .inReview: .inReview,
+    .done: .done,
+    .blocked: .blocked,
+  ]
+
   init(status: TaskBoardStatus?) {
-    switch status {
-    case .none:
-      self = .all
-    case .new:
-      self = .new
-    case .planning:
-      self = .planning
-    case .planReview:
-      self = .planReview
-    case .needsYou:
-      self = .needsYou
-    case .todo:
-      self = .todo
-    case .inProgress:
-      self = .inProgress
-    case .inReview:
-      self = .inReview
-    case .done:
-      self = .done
-    case .blocked:
-      self = .blocked
-    case .unknown:
-      self = .all
-    }
+    self = status.flatMap { Self.statusChoices[$0] } ?? .all
   }
 
   var id: String { rawValue }
@@ -145,10 +134,14 @@ struct TaskBoardDispatchConfirmationPresentation: Equatable {
 
   var message: String {
     if request.itemId != nil {
-      return
-        "This creates live session work for the selected board item and cannot be undone from the task board."
+      return """
+        This creates live session work for the selected board item and cannot be \
+        undone from the task board.
+        """
     }
-    return
-      "This creates live session work for every board item matching the current filter and cannot be undone from the task board."
+    return """
+      This creates live session work for every board item matching the current \
+      filter and cannot be undone from the task board.
+      """
   }
 }

@@ -4,7 +4,7 @@ private typealias Accessibility = HarnessMonitorUITestAccessibility
 
 @MainActor
 final class HarnessMonitorSheetUITests: HarnessMonitorUITestCase {
-  override nonisolated class var reuseLaunchedApp: Bool { true }
+  override nonisolated static var reuseLaunchedApp: Bool { true }
 
   func testSendSignalSheetSupportsDismissalAndPreviewVoiceCapture() throws {
     let app = launchInCockpitPreview()

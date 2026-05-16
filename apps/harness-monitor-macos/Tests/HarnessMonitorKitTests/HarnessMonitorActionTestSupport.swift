@@ -270,8 +270,8 @@ final class RecordingHarnessClient: HarnessMonitorClientProtocol, @unchecked Sen
   var taskBoardOrchestratorSettingsError: (any Error)?
   var taskBoardGitHubTokensSyncError: (any Error)?
   var taskBoardTodoistTokenSyncError: (any Error)?
-  var taskBoardPolicyPipelineValidationOverride: TaskBoardPolicyPipelineValidation?
-  var taskBoardPolicyPipelineSimulationSucceededOverride: Bool?
+  var taskBoardPolicyValidationOverride: TaskBoardPolicyPipelineValidation?
+  var taskBoardPolicySimulationOverride: Bool?
   var sessionDetailsByID: [String: SessionDetail] = [:]
   var detailDelaysBySessionID: [String: Duration] = [:]
   var sessionDetailErrorsByID: [String: any Error] = [:]

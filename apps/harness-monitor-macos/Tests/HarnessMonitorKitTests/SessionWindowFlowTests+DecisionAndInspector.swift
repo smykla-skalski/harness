@@ -65,15 +65,28 @@ extension SessionWindowFlowTests {
     #expect(sectionsSource.contains(".padding(.trailing, HarnessMonitorTheme.spacingSM)"))
     #expect(sidebarSource.contains("currentModifiers: currentModifiers"))
     #expect(sectionsSource.contains("let shortcut = kind.createShortcut"))
-    let agentButtonSource =
-      "SessionSidebarHeaderCreateButton(\n        state: state,\n        kind: .agent,\n        accessibilityLabel: \"New Agent\""
-    let taskButtonSource =
-      "SessionSidebarHeaderCreateButton(\n        state: state,\n        kind: .task,\n        accessibilityLabel: \"New Task\""
+    let agentButtonSource = """
+      SessionSidebarHeaderCreateButton(
+        state: state,
+        kind: .agent,
+        accessibilityLabel: "New Agent"
+      """
+    let taskButtonSource = """
+      SessionSidebarHeaderCreateButton(
+        state: state,
+        kind: .task,
+        accessibilityLabel: "New Task"
+      """
     #expect(sectionsSource.contains(agentButtonSource))
     #expect(sectionsSource.contains(taskButtonSource))
     #expect(
       decisionsSource.contains(
-        "SessionSidebarHeaderCreateButton(\n        state: state,\n        kind: .decision,\n        accessibilityLabel: \"New Decision\""
+        """
+        SessionSidebarHeaderCreateButton(
+        state: state,
+        kind: .decision,
+        accessibilityLabel: "New Decision"
+        """
       ))
   }
 
