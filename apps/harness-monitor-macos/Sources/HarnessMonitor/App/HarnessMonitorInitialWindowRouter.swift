@@ -138,73 +138,35 @@ struct HarnessMonitorInitialWindowRouter {
         satisfying: { sessionIDs in expectedSessionIDs.isSubset(of: sessionIDs) },
         timeout: Self.restorationWaitTimeout
       )
-      let toolbarsReady = await waitForSessionWindowToolbars(
-        sessionIDs: expectedSessionIDs,
-        registry: registry
+      let replayOutcome = await SessionWindowTabGroupReplayer.replay(
+        restorePlan.tabGroupings,
+        registry: registry,
+        timeout: Self.restorationWaitTimeout
       )
 
-      let boundSessionIDCount = expectedSessionIDs.reduce(into: 0) { count, sessionID in
-        if registry.window(forSessionID: sessionID) != nil {
-          count += 1
-        }
-      }
       let foregroundExpectedCount = restorePlan.tabGroupings.reduce(into: 0) { count, grouping in
         if grouping.foregroundSessionID != nil {
           count += 1
         }
       }
-      let foregroundResolvedCount = restorePlan.tabGroupings.reduce(into: 0) { count, grouping in
-        guard let foregroundID = grouping.foregroundSessionID,
-          registry.window(forSessionID: foregroundID) != nil
-        else {
-          return
-        }
-        count += 1
-      }
       HarnessMonitorLogger.lifecycle.info(
         """
         tab-grouping replay groups=\(restorePlan.tabGroupings.count, privacy: .public) \
         expected_members=\(expectedSessionIDs.count, privacy: .public) \
-        bound_members=\(boundSessionIDCount, privacy: .public) \
-        missed_members=\(expectedSessionIDs.count - boundSessionIDCount, privacy: .public) \
-        toolbars_ready=\(toolbarsReady, privacy: .public) \
-        foreground_resolved=\(foregroundResolvedCount, privacy: .public)/\
+        bound_members=\(replayOutcome.boundSessionIDCount, privacy: .public) \
+        missed_members=\(expectedSessionIDs.count - replayOutcome.boundSessionIDCount, privacy: .public) \
+        toolbars_ready=\(replayOutcome.toolbarsReady, privacy: .public) \
+        tab_ready_members=\(replayOutcome.tabReadySessionIDCount, privacy: .public) \
+        groups_resolved=\(replayOutcome.resolvedGroupCount, privacy: .public)/\
+        \(restorePlan.tabGroupings.count, privacy: .public) \
+        foreground_resolved=\(replayOutcome.foregroundResolvedCount, privacy: .public)/\
         \(foregroundExpectedCount, privacy: .public) \
+        attempts=\(replayOutcome.attempts, privacy: .public) \
         converged=\(converged, privacy: .public)
         """
       )
-
-      for grouping in restorePlan.tabGroupings {
-        Self.mergeTabGroup(grouping)
-      }
     #endif
   }
-
-  #if canImport(AppKit)
-    private func waitForSessionWindowToolbars(
-      sessionIDs: Set<String>,
-      registry: SessionWindowAppKitRegistry
-    ) async -> Bool {
-      guard !sessionIDs.isEmpty else {
-        return true
-      }
-
-      let deadline = ContinuousClock.now + Self.restorationWaitTimeout
-      while ContinuousClock.now < deadline {
-        let allToolbarsReady = sessionIDs.allSatisfy { sessionID in
-          registry.window(forSessionID: sessionID)?.toolbar != nil
-        }
-        if allToolbarsReady {
-          return true
-        }
-        try? await Task.sleep(for: .milliseconds(50))
-      }
-
-      return sessionIDs.allSatisfy { sessionID in
-        registry.window(forSessionID: sessionID)?.toolbar != nil
-      }
-    }
-  #endif
 
   private func waitForRestoredSessionWindowsToRegister(sessionIDs: [String]) async {
     let expected = Set(sessionIDs)
@@ -230,34 +192,6 @@ struct HarnessMonitorInitialWindowRouter {
       }
     #endif
   }
-
-  #if canImport(AppKit)
-    private static func mergeTabGroup(
-      _ grouping: HarnessMonitorStore.SessionTabGroupSnapshot
-    ) {
-      let registry = SessionWindowAppKitRegistry.shared
-      let windows = grouping.sessionIDs.compactMap { sessionID in
-        registry.window(forSessionID: sessionID)
-      }
-      let tabReadyWindows = windows.filter { $0.toolbar != nil }
-      guard let anchor = tabReadyWindows.first, tabReadyWindows.count > 1 else { return }
-      for next in tabReadyWindows.dropFirst() {
-        guard next !== anchor else { continue }
-        // Skip if AppKit already merged them (matching tabbingIdentifier
-        // + user pref Always reaches us with a tab group already formed).
-        if let group = anchor.tabGroup, group === next.tabGroup {
-          continue
-        }
-        anchor.addTabbedWindow(next, ordered: .above)
-      }
-      if let foregroundID = grouping.foregroundSessionID,
-        let foregroundWindow = registry.window(forSessionID: foregroundID),
-        let tabGroup = foregroundWindow.tabGroup
-      {
-        tabGroup.selectedWindow = foregroundWindow
-      }
-    }
-  #endif
 
   private func waitForVisibleSessionWindowDuringLaunch() async -> Bool {
     if hasVisibleSessionWindows() { return true }
@@ -298,3 +232,162 @@ struct HarnessMonitorInitialWindowRouter {
     !store.openSessionWindowIDsSnapshot.isEmpty
   }
 }
+
+#if canImport(AppKit)
+  @MainActor
+  enum SessionWindowTabGroupReplayer {
+    struct ReplayOutcome: Equatable {
+      let attempts: Int
+      let boundSessionIDCount: Int
+      let tabReadySessionIDCount: Int
+      let toolbarsReady: Bool
+      let resolvedGroupCount: Int
+      let foregroundResolvedCount: Int
+    }
+
+    struct MergeOutcome: Equatable {
+      let resolved: Bool
+      let foregroundResolved: Bool
+      let missingTabReadySessionIDs: [String]
+    }
+
+    static func replay(
+      _ groupings: [HarnessMonitorStore.SessionTabGroupSnapshot],
+      registry: SessionWindowAppKitRegistry = .shared,
+      timeout: Duration,
+      pollInterval: Duration = .milliseconds(50)
+    ) async -> ReplayOutcome {
+      let expectedSessionIDs = Set(groupings.flatMap { $0.sessionIDs })
+      guard !expectedSessionIDs.isEmpty else {
+        return ReplayOutcome(
+          attempts: 0,
+          boundSessionIDCount: 0,
+          tabReadySessionIDCount: 0,
+          toolbarsReady: true,
+          resolvedGroupCount: 0,
+          foregroundResolvedCount: 0
+        )
+      }
+
+      let deadline = ContinuousClock.now + timeout
+      var attempts = 0
+
+      while true {
+        attempts += 1
+
+        let boundSessionIDCount = expectedSessionIDs.reduce(into: 0) { count, sessionID in
+          if registry.window(forSessionID: sessionID) != nil {
+            count += 1
+          }
+        }
+        let toolbarsReady = expectedSessionIDs.allSatisfy { sessionID in
+          registry.window(forSessionID: sessionID)?.toolbar != nil
+        }
+        let tabReadySessionIDCount = expectedSessionIDs.reduce(into: 0) { count, sessionID in
+          guard let window = registry.window(forSessionID: sessionID), isWindowTabReady(window) else {
+            return
+          }
+          count += 1
+        }
+
+        var resolvedGroupCount = 0
+        var foregroundResolvedCount = 0
+        for grouping in groupings {
+          let mergeOutcome = attemptMerge(grouping, registry: registry)
+          if mergeOutcome.resolved {
+            resolvedGroupCount += 1
+          }
+          if mergeOutcome.foregroundResolved {
+            foregroundResolvedCount += 1
+          }
+        }
+
+        let replayOutcome = ReplayOutcome(
+          attempts: attempts,
+          boundSessionIDCount: boundSessionIDCount,
+          tabReadySessionIDCount: tabReadySessionIDCount,
+          toolbarsReady: toolbarsReady,
+          resolvedGroupCount: resolvedGroupCount,
+          foregroundResolvedCount: foregroundResolvedCount
+        )
+        if resolvedGroupCount == groupings.count || ContinuousClock.now >= deadline {
+          return replayOutcome
+        }
+
+        try? await Task.sleep(for: pollInterval)
+      }
+    }
+
+    static func attemptMerge(
+      _ grouping: HarnessMonitorStore.SessionTabGroupSnapshot,
+      registry: SessionWindowAppKitRegistry = .shared
+    ) -> MergeOutcome {
+      let windowsBySessionID = Dictionary(
+        uniqueKeysWithValues: grouping.sessionIDs.compactMap { sessionID in
+          registry.window(forSessionID: sessionID).map { (sessionID, $0) }
+        }
+      )
+      let tabReadyWindows = grouping.sessionIDs.compactMap { sessionID -> NSWindow? in
+        guard let window = windowsBySessionID[sessionID], isWindowTabReady(window) else {
+          return nil
+        }
+        return window
+      }
+      let missingTabReadySessionIDs = grouping.sessionIDs.filter { sessionID in
+        guard let window = windowsBySessionID[sessionID] else {
+          return true
+        }
+        return !isWindowTabReady(window)
+      }
+
+      if let anchor = tabReadyWindows.first, tabReadyWindows.count > 1 {
+        for next in tabReadyWindows.dropFirst() {
+          guard next !== anchor else { continue }
+          // Skip if AppKit already merged them (matching tabbingIdentifier
+          // + user pref Always reaches us with a tab group already formed).
+          if let group = anchor.tabGroup, group === next.tabGroup {
+            continue
+          }
+          anchor.addTabbedWindow(next, ordered: .above)
+        }
+      }
+
+      let resolved = isGroupingResolved(grouping, registry: registry)
+      var foregroundResolved = false
+      if resolved,
+        let foregroundID = grouping.foregroundSessionID,
+        let foregroundWindow = registry.window(forSessionID: foregroundID),
+        let tabGroup = foregroundWindow.tabGroup
+      {
+        tabGroup.selectedWindow = foregroundWindow
+        foregroundResolved = true
+      }
+
+      return MergeOutcome(
+        resolved: resolved,
+        foregroundResolved: foregroundResolved,
+        missingTabReadySessionIDs: missingTabReadySessionIDs
+      )
+    }
+
+    static func isGroupingResolved(
+      _ grouping: HarnessMonitorStore.SessionTabGroupSnapshot,
+      registry: SessionWindowAppKitRegistry = .shared
+    ) -> Bool {
+      let windows = grouping.sessionIDs.compactMap { sessionID in
+        registry.window(forSessionID: sessionID)
+      }
+      guard windows.count == grouping.sessionIDs.count,
+        let anchorTabGroup = windows.first?.tabGroup
+      else {
+        return false
+      }
+      return windows.allSatisfy { $0.tabGroup === anchorTabGroup }
+    }
+
+    static func isWindowTabReady(_ window: NSWindow) -> Bool {
+      window.toolbar != nil
+        && window.tabbingIdentifier == SessionWindowTabbingSupport.tabbingIdentifier
+    }
+  }
+#endif
