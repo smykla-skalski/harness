@@ -49,6 +49,15 @@ extension SettingsTaskBoardSection {
           .accessibilityIdentifier(config.accessibilityIdentifier)
         Button("Choose...") {
           guard let url = selectPath(config) else { return }
+          if config.bookmarkKind == .taskBoardKeyFile {
+            let decision = SettingsTaskBoardKeyFilePermissionGuard.evaluate(
+              url: url,
+              fileName: config.title
+            )
+            if case .cancelled = decision {
+              return
+            }
+          }
           Task { @MainActor in
             do {
               text.wrappedValue = try await store.authorizeTaskBoardPath(
