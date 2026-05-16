@@ -360,13 +360,10 @@ struct TaskBoardItemManagementPanel: View {
   private func externalRefEditorRow(refID: UUID) -> some View {
     if let ref = externalRefBinding(for: refID) {
       HStack(alignment: .top, spacing: HarnessMonitorTheme.spacingSM) {
-        Picker("Provider", selection: ref.provider) {
-          ForEach(TaskBoardExternalRefProvider.taskBoardCases, id: \.self) { provider in
-            Text(provider.title).tag(provider)
-          }
-        }
-        .labelsHidden()
-        .harnessNativeFormControl()
+        TaskBoardManagementReadOnlyField(
+          label: "Provider",
+          value: ref.wrappedValue.provider.title
+        )
         TaskBoardManagementNativeField(label: "External ID", text: ref.externalId)
         TaskBoardManagementNativeField(label: "URL", text: ref.url)
         Button(role: .destructive) {

@@ -65,7 +65,7 @@ enum TaskBoardExternalProviderChoice: String, CaseIterable, Identifiable, Hashab
   case gitHub
   case todoist
 
-  static let publicCases: [Self] = [.all, .gitHub]
+  static let monitorVisibleChoice: Self = .gitHub
 
   init(provider: TaskBoardExternalProvider?) {
     switch provider {

@@ -66,6 +66,25 @@ extension TaskBoardOperationsPanel {
     .frame(maxWidth: .infinity, alignment: .leading)
   }
 
+  func staticField(
+    _ title: String,
+    value: String,
+    accessibilityIdentifier: String
+  ) -> some View {
+    VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingXS) {
+      Text(title)
+        .scaledFont(.caption.weight(.semibold))
+        .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+      Text(value)
+        .scaledFont(.caption)
+        .frame(maxWidth: .infinity, minHeight: metrics.controlMinHeight, alignment: .leading)
+        .accessibilityLabel(title)
+        .accessibilityValue(value)
+        .accessibilityIdentifier(accessibilityIdentifier)
+    }
+    .frame(maxWidth: .infinity, alignment: .leading)
+  }
+
   func textField(
     _ title: String,
     text: Binding<String>,
