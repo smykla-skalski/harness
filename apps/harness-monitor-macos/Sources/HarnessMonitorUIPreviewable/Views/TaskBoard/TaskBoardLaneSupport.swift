@@ -205,7 +205,15 @@ private struct TaskBoardCardChrome: ViewModifier {
 
   func body(content: Content) -> some View {
     content
-      .harnessInteractiveCardButtonStyle(cornerRadius: metrics.cardCornerRadius)
+      // Lane cards live inside a scrolling column with many siblings;
+      // attaching `.onHover` to each card produces a hover-region
+      // cascade during scroll that dominates the lane-scroll hot path
+      // (see r23 cause graph + InteractiveCardHoverModifier comment).
+      // The press affordance from the button style is preserved.
+      .harnessInteractiveCardButtonStyle(
+        cornerRadius: metrics.cardCornerRadius,
+        respondsToHover: false
+      )
       .background(
         RoundedRectangle(cornerRadius: metrics.cardCornerRadius, style: .continuous)
           .fill(

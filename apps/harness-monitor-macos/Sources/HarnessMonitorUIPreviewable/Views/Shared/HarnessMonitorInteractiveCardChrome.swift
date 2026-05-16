@@ -40,29 +40,44 @@ private struct InteractiveCardHoverModifier: ViewModifier {
   let cornerRadius: CGFloat
   let tint: Color?
   let extraHoverHint: Bool
+  let respondsToHover: Bool
   @State private var isHovered = false
 
+  @ViewBuilder
   func body(content: Content) -> some View {
-    content
-      .buttonStyle(
-        InteractiveCardButtonStyle(
-          cornerRadius: cornerRadius,
-          tint: tint,
-          isHovered: isHovered || extraHoverHint
-        )
+    let styled = content.buttonStyle(
+      InteractiveCardButtonStyle(
+        cornerRadius: cornerRadius,
+        tint: tint,
+        isHovered: (respondsToHover && isHovered) || extraHoverHint
       )
-      .onHover { isHovering in
-        guard
-          let nextHoverState = InteractiveCardHoverState.resolve(
-            current: isHovered,
-            isHovering: isHovering
-          )
-        else {
-          return
+    )
+    // Conditionally skip `.onHover`. The modifier inserts a
+    // `_HoverRegionModifier` into the responder chain; with N cards in
+    // a scrolling lane that's N hover regions that Apple retargets per
+    // frame as cards move under the cursor. The r23 cause graph showed
+    // 10,868 `View Transform -> HoverResponderChild.UpdateBindingManagerChild`
+    // edges traced to those hover regions. Cards inside scrolling lanes
+    // pass `respondsToHover: false` so the hover region is never
+    // attached - the visual hover bump (0.04 -> 0.08 fill opacity) was
+    // sub-perceptible against the chrome background anyway.
+    if respondsToHover {
+      styled
+        .onHover { isHovering in
+          guard
+            let nextHoverState = InteractiveCardHoverState.resolve(
+              current: isHovered,
+              isHovering: isHovering
+            )
+          else {
+            return
+          }
+          isHovered = nextHoverState
         }
-        isHovered = nextHoverState
-      }
-      .harnessUITestValue("chrome=content-card")
+        .harnessUITestValue("chrome=content-card")
+    } else {
+      styled.harnessUITestValue("chrome=content-card")
+    }
   }
 }
 
@@ -70,13 +85,15 @@ extension View {
   func harnessInteractiveCardButtonStyle(
     cornerRadius: CGFloat = HarnessMonitorTheme.cornerRadiusMD,
     tint: Color? = nil,
-    extraHoverHint: Bool = false
+    extraHoverHint: Bool = false,
+    respondsToHover: Bool = true
   ) -> some View {
     modifier(
       InteractiveCardHoverModifier(
         cornerRadius: cornerRadius,
         tint: tint,
-        extraHoverHint: extraHoverHint
+        extraHoverHint: extraHoverHint,
+        respondsToHover: respondsToHover
       )
     )
   }
