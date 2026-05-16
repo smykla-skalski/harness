@@ -314,19 +314,42 @@ private struct DashboardRouteContent: View {
   let store: HarnessMonitorStore
   let dashboardUI: HarnessMonitorStore.ContentDashboardSlice
   let sessionCatalog: HarnessMonitorStore.SessionCatalogSlice
+  /// Tracks whether the PolicyCanvas surface has been mounted at least once in
+  /// this window's lifetime. The first route flip to `.policyCanvas` is a
+  /// ~900ms hang in r18 because SwiftUI tears down the TaskBoard tree and
+  /// builds PolicyCanvas's full surface (top bar + viewport + inspector +
+  /// view-model bootstrap) synchronously on the main thread. Once mounted,
+  /// keep PolicyCanvas alive behind an opacity-0 mask so subsequent route
+  /// flips back to it are an opacity toggle, not a remount. TaskBoard stays
+  /// the eager surface because users land on it; PolicyCanvas only mounts on
+  /// first visit and stays warm thereafter.
+  @State private var policyCanvasHasBeenMounted = false
+
+  private var isTaskBoardVisible: Bool { route == .taskBoard }
+  private var isPolicyCanvasVisible: Bool { route == .policyCanvas }
 
   var body: some View {
-    Group {
-      switch route {
-      case .taskBoard:
-        DashboardTaskBoardRouteView(
-          store: store,
-          dashboardUI: dashboardUI,
-          sessionCatalog: sessionCatalog
-        )
-      case .policyCanvas:
+    ZStack {
+      DashboardTaskBoardRouteView(
+        store: store,
+        dashboardUI: dashboardUI,
+        sessionCatalog: sessionCatalog
+      )
+      .opacity(isTaskBoardVisible ? 1 : 0)
+      .allowsHitTesting(isTaskBoardVisible)
+      .accessibilityHidden(!isTaskBoardVisible)
+
+      if policyCanvasHasBeenMounted || isPolicyCanvasVisible {
         PolicyCanvasView(store: store, dashboardUI: dashboardUI)
           .frame(maxWidth: .infinity, maxHeight: .infinity)
+          .opacity(isPolicyCanvasVisible ? 1 : 0)
+          .allowsHitTesting(isPolicyCanvasVisible)
+          .accessibilityHidden(!isPolicyCanvasVisible)
+          .onAppear {
+            // First mount paid the 900ms cost; mark the surface persistent so
+            // future flips skip the remount. Setting the flag is idempotent.
+            policyCanvasHasBeenMounted = true
+          }
       }
     }
   }
