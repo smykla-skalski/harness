@@ -3,6 +3,9 @@ import Foundation
 extension HarnessMonitorStore {
   private static let taskBoardGitHubCredentialStore = TaskBoardGitHubCredentialStore()
   private static let taskBoardTodoistCredentialStore = TaskBoardTodoistCredentialStore()
+  private static let taskBoardSshKeyStore = TaskBoardKeyMaterialStore(kind: .ssh)
+  private static let taskBoardSigningSshKeyStore = TaskBoardKeyMaterialStore(kind: .signingSsh)
+  private static let taskBoardGpgKeyStore = TaskBoardKeyMaterialStore(kind: .gpg)
 
   public func taskBoardGitSettingsSnapshot() async throws -> TaskBoardGitSettingsSnapshot {
     let client = try await taskBoardSettingsClient()
@@ -13,12 +16,75 @@ extension HarnessMonitorStore {
     let githubCredentials = try Self.taskBoardGitHubCredentialStore.load()
     let todoistCredentials = try Self.taskBoardTodoistCredentialStore.load()
 
-    return try await TaskBoardGitSettingsSnapshot(
-      orchestratorSettings: orchestratorSettings,
-      runtimeConfig: runtimeConfig,
+    let baseRuntime = try await runtimeConfig
+    let hydratedRuntime = Self.hydrateKeyMaterial(into: baseRuntime)
+
+    return await TaskBoardGitSettingsSnapshot(
+      orchestratorSettings: try orchestratorSettings,
+      runtimeConfig: hydratedRuntime,
       githubCredentials: githubCredentials,
       todoistCredentials: todoistCredentials,
       identityDefaults: identityDefaults
+    )
+  }
+
+  private static func hydrateKeyMaterial(
+    into runtime: TaskBoardGitRuntimeConfig
+  ) -> TaskBoardGitRuntimeConfig {
+    let ssh = (try? taskBoardSshKeyStore.load(scope: .global)) ?? TaskBoardKeyMaterialSnapshot()
+    let signingSsh =
+      (try? taskBoardSigningSshKeyStore.load(scope: .global)) ?? TaskBoardKeyMaterialSnapshot()
+    let gpg = (try? taskBoardGpgKeyStore.load(scope: .global)) ?? TaskBoardKeyMaterialSnapshot()
+
+    let signing = TaskBoardGitSigningConfig(
+      mode: runtime.global.signing.mode,
+      sshKeyPath: runtime.global.signing.sshKeyPath,
+      sshPrivateKey: signingSsh.privateKey ?? runtime.global.signing.sshPrivateKey,
+      sshPrivateKeyPassphrase: signingSsh.passphrase
+        ?? runtime.global.signing.sshPrivateKeyPassphrase,
+      gpgKeyId: runtime.global.signing.gpgKeyId,
+      gpgPrivateKeyPath: runtime.global.signing.gpgPrivateKeyPath,
+      gpgPrivateKey: gpg.privateKey ?? runtime.global.signing.gpgPrivateKey,
+      gpgPrivateKeyPassphrase: gpg.passphrase ?? runtime.global.signing.gpgPrivateKeyPassphrase
+    )
+    let global = TaskBoardGitRuntimeProfile(
+      authorName: runtime.global.authorName,
+      authorEmail: runtime.global.authorEmail,
+      sshKeyPath: runtime.global.sshKeyPath,
+      sshPrivateKey: ssh.privateKey ?? runtime.global.sshPrivateKey,
+      sshPrivateKeyPassphrase: ssh.passphrase ?? runtime.global.sshPrivateKeyPassphrase,
+      signing: signing
+    )
+    return TaskBoardGitRuntimeConfig(
+      global: global,
+      repositoryOverrides: runtime.repositoryOverrides
+    )
+  }
+
+  private static func persistGlobalKeyMaterial(
+    runtime: TaskBoardGitRuntimeConfig
+  ) throws {
+    try taskBoardSshKeyStore.save(
+      TaskBoardKeyMaterialSnapshot(
+        privateKey: runtime.global.sshPrivateKey,
+        passphrase: runtime.global.sshPrivateKeyPassphrase,
+        keyPath: runtime.global.sshKeyPath
+      )
+    )
+    try taskBoardSigningSshKeyStore.save(
+      TaskBoardKeyMaterialSnapshot(
+        privateKey: runtime.global.signing.sshPrivateKey,
+        passphrase: runtime.global.signing.sshPrivateKeyPassphrase,
+        keyPath: runtime.global.signing.sshKeyPath
+      )
+    )
+    try taskBoardGpgKeyStore.save(
+      TaskBoardKeyMaterialSnapshot(
+        privateKey: runtime.global.signing.gpgPrivateKey,
+        passphrase: runtime.global.signing.gpgPrivateKeyPassphrase,
+        keyPath: runtime.global.signing.gpgPrivateKeyPath,
+        keyId: runtime.global.signing.gpgKeyId
+      )
     )
   }
 
@@ -99,6 +165,7 @@ extension HarnessMonitorStore {
       do {
         try Self.taskBoardGitHubCredentialStore.save(materializedSnapshot.githubCredentials)
         try Self.taskBoardTodoistCredentialStore.save(materializedSnapshot.todoistCredentials)
+        try Self.persistGlobalKeyMaterial(runtime: materializedSnapshot.runtimeConfig)
       } catch {
         presentFailureFeedback(
           """
