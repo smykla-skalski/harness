@@ -199,7 +199,9 @@ mod tests {
                         gpg_private_key_path: None,
                         gpg_private_key: None,
                         gpg_private_key_passphrase: None,
+                        ..Default::default()
                     },
+                    ..Default::default()
                 },
                 repository_overrides: vec![TaskBoardGitRepositoryOverride {
                     repository: " Owner/Repo ".into(),
@@ -210,6 +212,7 @@ mod tests {
                         ssh_private_key: None,
                         ssh_private_key_passphrase: None,
                         signing: TaskBoardGitSigningConfig::default(),
+                        ..Default::default()
                     },
                 }],
             })

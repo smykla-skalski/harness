@@ -121,7 +121,9 @@ fn runtime_config_round_trips_task_board_git_runtime_config() {
                     gpg_private_key_path: Some("/tmp/private.asc".into()),
                     gpg_private_key: Some("gpg-secret".into()),
                     gpg_private_key_passphrase: Some("secret".into()),
+                    ..Default::default()
                 },
+                ..Default::default()
             },
             repository_overrides: vec![],
         })
@@ -136,6 +138,8 @@ fn runtime_config_round_trips_task_board_git_runtime_config() {
                     ssh_key_path: Some("/tmp/id_ed25519".into()),
                     ssh_private_key: None,
                     ssh_private_key_passphrase: None,
+                    ssh_private_key_configured: true,
+                    ssh_private_key_passphrase_configured: true,
                     signing: TaskBoardGitSigningConfig {
                         mode: TaskBoardGitSigningMode::Gpg,
                         ssh_key_path: None,
@@ -145,6 +149,10 @@ fn runtime_config_round_trips_task_board_git_runtime_config() {
                         gpg_private_key_path: Some("/tmp/private.asc".into()),
                         gpg_private_key: None,
                         gpg_private_key_passphrase: None,
+                        ssh_private_key_configured: true,
+                        ssh_private_key_passphrase_configured: true,
+                        gpg_private_key_configured: true,
+                        gpg_private_key_passphrase_configured: true,
                     },
                 },
                 repository_overrides: vec![],

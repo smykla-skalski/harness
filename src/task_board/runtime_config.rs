@@ -55,6 +55,16 @@ pub struct TaskBoardGitRuntimeProfile {
     pub ssh_private_key: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub ssh_private_key_passphrase: Option<String>,
+    /// Wire-only indicator that the daemon currently holds an SSH private key
+    /// for this profile. Always reflects the secret presence at response time;
+    /// inbound payloads may set it but it will be recomputed on the next GET.
+    #[serde(default, skip_serializing_if = "is_false_ref")]
+    pub ssh_private_key_configured: bool,
+    /// Wire-only indicator that the daemon currently holds a passphrase for
+    /// the SSH private key. See [`Self::ssh_private_key_configured`] for the
+    /// inbound-payload caveat.
+    #[serde(default, skip_serializing_if = "is_false_ref")]
+    pub ssh_private_key_passphrase_configured: bool,
     #[serde(default)]
     pub signing: TaskBoardGitSigningConfig,
 }
@@ -95,14 +105,17 @@ impl TaskBoardGitRuntimeProfile {
 
     #[must_use]
     pub fn normalized(&self) -> Self {
+        let ssh_private_key = normalize_optional_value(self.ssh_private_key.as_deref());
+        let ssh_private_key_passphrase =
+            normalize_optional_value(self.ssh_private_key_passphrase.as_deref());
         Self {
             author_name: normalize_optional_value(self.author_name.as_deref()),
             author_email: normalize_optional_value(self.author_email.as_deref()),
             ssh_key_path: normalize_optional_value(self.ssh_key_path.as_deref()),
-            ssh_private_key: normalize_optional_value(self.ssh_private_key.as_deref()),
-            ssh_private_key_passphrase: normalize_optional_value(
-                self.ssh_private_key_passphrase.as_deref(),
-            ),
+            ssh_private_key_configured: ssh_private_key.is_some(),
+            ssh_private_key_passphrase_configured: ssh_private_key_passphrase.is_some(),
+            ssh_private_key,
+            ssh_private_key_passphrase,
             signing: self.signing.normalized(),
         }
     }
@@ -115,6 +128,10 @@ impl TaskBoardGitRuntimeProfile {
             ssh_key_path: self.ssh_key_path.clone(),
             ssh_private_key: None,
             ssh_private_key_passphrase: None,
+            ssh_private_key_configured: self.ssh_private_key.is_some()
+                || self.ssh_private_key_configured,
+            ssh_private_key_passphrase_configured: self.ssh_private_key_passphrase.is_some()
+                || self.ssh_private_key_passphrase_configured,
             signing: self.signing.without_secrets(),
         }
     }
@@ -138,6 +155,17 @@ pub struct TaskBoardGitSigningConfig {
     pub gpg_private_key: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub gpg_private_key_passphrase: Option<String>,
+    /// Wire-only indicator that the daemon currently holds the SSH signing
+    /// private key. See [`TaskBoardGitRuntimeProfile::ssh_private_key_configured`]
+    /// for the inbound-payload caveat.
+    #[serde(default, skip_serializing_if = "is_false_ref")]
+    pub ssh_private_key_configured: bool,
+    #[serde(default, skip_serializing_if = "is_false_ref")]
+    pub ssh_private_key_passphrase_configured: bool,
+    #[serde(default, skip_serializing_if = "is_false_ref")]
+    pub gpg_private_key_configured: bool,
+    #[serde(default, skip_serializing_if = "is_false_ref")]
+    pub gpg_private_key_passphrase_configured: bool,
 }
 
 impl TaskBoardGitSigningConfig {
@@ -155,19 +183,25 @@ impl TaskBoardGitSigningConfig {
 
     #[must_use]
     pub fn normalized(&self) -> Self {
+        let ssh_private_key = normalize_optional_value(self.ssh_private_key.as_deref());
+        let ssh_private_key_passphrase =
+            normalize_optional_value(self.ssh_private_key_passphrase.as_deref());
+        let gpg_private_key = normalize_optional_value(self.gpg_private_key.as_deref());
+        let gpg_private_key_passphrase =
+            normalize_optional_value(self.gpg_private_key_passphrase.as_deref());
         Self {
             mode: self.mode,
             ssh_key_path: normalize_optional_value(self.ssh_key_path.as_deref()),
-            ssh_private_key: normalize_optional_value(self.ssh_private_key.as_deref()),
-            ssh_private_key_passphrase: normalize_optional_value(
-                self.ssh_private_key_passphrase.as_deref(),
-            ),
+            ssh_private_key_configured: ssh_private_key.is_some(),
+            ssh_private_key,
+            ssh_private_key_passphrase_configured: ssh_private_key_passphrase.is_some(),
+            ssh_private_key_passphrase,
             gpg_key_id: normalize_optional_value(self.gpg_key_id.as_deref()),
             gpg_private_key_path: normalize_optional_value(self.gpg_private_key_path.as_deref()),
-            gpg_private_key: normalize_optional_value(self.gpg_private_key.as_deref()),
-            gpg_private_key_passphrase: normalize_optional_value(
-                self.gpg_private_key_passphrase.as_deref(),
-            ),
+            gpg_private_key_configured: gpg_private_key.is_some(),
+            gpg_private_key,
+            gpg_private_key_passphrase_configured: gpg_private_key_passphrase.is_some(),
+            gpg_private_key_passphrase,
         }
     }
 
@@ -182,8 +216,21 @@ impl TaskBoardGitSigningConfig {
             gpg_private_key_path: self.gpg_private_key_path.clone(),
             gpg_private_key: None,
             gpg_private_key_passphrase: None,
+            ssh_private_key_configured: self.ssh_private_key.is_some()
+                || self.ssh_private_key_configured,
+            ssh_private_key_passphrase_configured: self.ssh_private_key_passphrase.is_some()
+                || self.ssh_private_key_passphrase_configured,
+            gpg_private_key_configured: self.gpg_private_key.is_some()
+                || self.gpg_private_key_configured,
+            gpg_private_key_passphrase_configured: self.gpg_private_key_passphrase.is_some()
+                || self.gpg_private_key_passphrase_configured,
         }
     }
+}
+
+#[allow(clippy::trivially_copy_pass_by_ref)]
+fn is_false_ref(value: &bool) -> bool {
+    !*value
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
@@ -321,7 +368,9 @@ mod tests {
                     gpg_private_key_path: Some("/tmp/global-gpg.asc".into()),
                     gpg_private_key: Some("global-gpg-private-key".into()),
                     gpg_private_key_passphrase: Some("global-passphrase".into()),
+                    ..Default::default()
                 },
+                ..Default::default()
             },
             repository_overrides: vec![TaskBoardGitRepositoryOverride {
                 repository: "owner/repo".into(),
@@ -340,7 +389,9 @@ mod tests {
                         gpg_private_key_path: None,
                         gpg_private_key: None,
                         gpg_private_key_passphrase: None,
+                        ..Default::default()
                     },
+                    ..Default::default()
                 },
             }],
         };

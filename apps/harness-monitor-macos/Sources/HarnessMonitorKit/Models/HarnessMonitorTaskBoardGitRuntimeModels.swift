@@ -36,6 +36,8 @@ public struct TaskBoardGitRuntimeProfile: Codable, Equatable, Sendable {
   public let sshKeyPath: String?
   public let sshPrivateKey: String?
   public let sshPrivateKeyPassphrase: String?
+  public let sshPrivateKeyConfigured: Bool
+  public let sshPrivateKeyPassphraseConfigured: Bool
   public let signing: TaskBoardGitSigningConfig
 
   public init(
@@ -44,6 +46,8 @@ public struct TaskBoardGitRuntimeProfile: Codable, Equatable, Sendable {
     sshKeyPath: String? = nil,
     sshPrivateKey: String? = nil,
     sshPrivateKeyPassphrase: String? = nil,
+    sshPrivateKeyConfigured: Bool = false,
+    sshPrivateKeyPassphraseConfigured: Bool = false,
     signing: TaskBoardGitSigningConfig = TaskBoardGitSigningConfig()
   ) {
     self.authorName = authorName
@@ -51,6 +55,8 @@ public struct TaskBoardGitRuntimeProfile: Codable, Equatable, Sendable {
     self.sshKeyPath = sshKeyPath
     self.sshPrivateKey = sshPrivateKey
     self.sshPrivateKeyPassphrase = sshPrivateKeyPassphrase
+    self.sshPrivateKeyConfigured = sshPrivateKeyConfigured
+    self.sshPrivateKeyPassphraseConfigured = sshPrivateKeyPassphraseConfigured
     self.signing = signing
   }
 
@@ -60,6 +66,8 @@ public struct TaskBoardGitRuntimeProfile: Codable, Equatable, Sendable {
     case sshKeyPath
     case sshPrivateKey
     case sshPrivateKeyPassphrase
+    case sshPrivateKeyConfigured
+    case sshPrivateKeyPassphraseConfigured
     case signing
   }
 
@@ -74,6 +82,14 @@ public struct TaskBoardGitRuntimeProfile: Codable, Equatable, Sendable {
         String.self,
         forKey: .sshPrivateKeyPassphrase
       ),
+      sshPrivateKeyConfigured: try container.decodeIfPresent(
+        Bool.self,
+        forKey: .sshPrivateKeyConfigured
+      ) ?? false,
+      sshPrivateKeyPassphraseConfigured: try container.decodeIfPresent(
+        Bool.self,
+        forKey: .sshPrivateKeyPassphraseConfigured
+      ) ?? false,
       signing: try container.decodeIfPresent(TaskBoardGitSigningConfig.self, forKey: .signing)
         ?? TaskBoardGitSigningConfig()
     )
@@ -89,6 +105,10 @@ public struct TaskBoardGitSigningConfig: Codable, Equatable, Sendable {
   public let gpgPrivateKeyPath: String?
   public let gpgPrivateKey: String?
   public let gpgPrivateKeyPassphrase: String?
+  public let sshPrivateKeyConfigured: Bool
+  public let sshPrivateKeyPassphraseConfigured: Bool
+  public let gpgPrivateKeyConfigured: Bool
+  public let gpgPrivateKeyPassphraseConfigured: Bool
 
   public init(
     mode: TaskBoardGitSigningMode = .none,
@@ -98,7 +118,11 @@ public struct TaskBoardGitSigningConfig: Codable, Equatable, Sendable {
     gpgKeyId: String? = nil,
     gpgPrivateKeyPath: String? = nil,
     gpgPrivateKey: String? = nil,
-    gpgPrivateKeyPassphrase: String? = nil
+    gpgPrivateKeyPassphrase: String? = nil,
+    sshPrivateKeyConfigured: Bool = false,
+    sshPrivateKeyPassphraseConfigured: Bool = false,
+    gpgPrivateKeyConfigured: Bool = false,
+    gpgPrivateKeyPassphraseConfigured: Bool = false
   ) {
     self.mode = mode
     self.sshKeyPath = sshKeyPath
@@ -108,6 +132,10 @@ public struct TaskBoardGitSigningConfig: Codable, Equatable, Sendable {
     self.gpgPrivateKeyPath = gpgPrivateKeyPath
     self.gpgPrivateKey = gpgPrivateKey
     self.gpgPrivateKeyPassphrase = gpgPrivateKeyPassphrase
+    self.sshPrivateKeyConfigured = sshPrivateKeyConfigured
+    self.sshPrivateKeyPassphraseConfigured = sshPrivateKeyPassphraseConfigured
+    self.gpgPrivateKeyConfigured = gpgPrivateKeyConfigured
+    self.gpgPrivateKeyPassphraseConfigured = gpgPrivateKeyPassphraseConfigured
   }
 
   enum CodingKeys: String, CodingKey {
@@ -119,6 +147,10 @@ public struct TaskBoardGitSigningConfig: Codable, Equatable, Sendable {
     case gpgPrivateKeyPath
     case gpgPrivateKey
     case gpgPrivateKeyPassphrase
+    case sshPrivateKeyConfigured
+    case sshPrivateKeyPassphraseConfigured
+    case gpgPrivateKeyConfigured
+    case gpgPrivateKeyPassphraseConfigured
   }
 
   public init(from decoder: Decoder) throws {
@@ -137,7 +169,23 @@ public struct TaskBoardGitSigningConfig: Codable, Equatable, Sendable {
       gpgPrivateKeyPassphrase: try container.decodeIfPresent(
         String.self,
         forKey: .gpgPrivateKeyPassphrase
-      )
+      ),
+      sshPrivateKeyConfigured: try container.decodeIfPresent(
+        Bool.self,
+        forKey: .sshPrivateKeyConfigured
+      ) ?? false,
+      sshPrivateKeyPassphraseConfigured: try container.decodeIfPresent(
+        Bool.self,
+        forKey: .sshPrivateKeyPassphraseConfigured
+      ) ?? false,
+      gpgPrivateKeyConfigured: try container.decodeIfPresent(
+        Bool.self,
+        forKey: .gpgPrivateKeyConfigured
+      ) ?? false,
+      gpgPrivateKeyPassphraseConfigured: try container.decodeIfPresent(
+        Bool.self,
+        forKey: .gpgPrivateKeyPassphraseConfigured
+      ) ?? false
     )
   }
 }

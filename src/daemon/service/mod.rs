@@ -40,7 +40,8 @@ use super::launchd::{self, LaunchAgentStatus};
 #[cfg(test)]
 use super::protocol::TimelineCursor;
 use super::protocol::{
-    AgentRemoveRequest, DaemonControlResponse, DaemonDiagnosticsReport, HealthResponse,
+    AgentRemoveRequest, DAEMON_WIRE_VERSION, DaemonControlResponse, DaemonDiagnosticsReport,
+    HealthResponse,
     LeaderTransferRequest, LogLevelResponse, ObserveSessionRequest, ProjectSummary,
     ReadyEventPayload, RoleChangeRequest, SessionDetail, SessionEndRequest,
     SessionExtensionsPayload, SessionLeaveRequest, SessionSummary, SessionUpdatedPayload,

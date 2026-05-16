@@ -83,10 +83,40 @@ pub fn persist_log_level(level: Option<&str>) -> Result<(), CliError> {
 /// # Errors
 /// Returns `CliError` when the daemon runtime config exists but cannot be parsed.
 pub fn load_task_board_git_runtime_config() -> Result<TaskBoardGitRuntimeConfig, CliError> {
-    Ok(load_runtime_config()?
+    let mut config = load_runtime_config()?
         .and_then(|config| config.task_board_git_runtime_config)
         .map(|config| config.without_secrets())
-        .unwrap_or_default())
+        .unwrap_or_default();
+    overlay_runtime_secret_flags(&mut config);
+    Ok(config)
+}
+
+fn overlay_runtime_secret_flags(config: &mut TaskBoardGitRuntimeConfig) {
+    let secrets = TASK_BOARD_GIT_RUNTIME_SECRETS
+        .read()
+        .expect("task-board git runtime secret state lock poisoned")
+        .get(&task_board_memory_key())
+        .cloned()
+        .unwrap_or_default();
+    overlay_profile_flags(&mut config.global, &secrets.global);
+    for override_config in &mut config.repository_overrides {
+        let secret_profile = secrets.resolved_profile(Some(&override_config.repository));
+        overlay_profile_flags(&mut override_config.profile, &secret_profile);
+    }
+}
+
+fn overlay_profile_flags(
+    target: &mut TaskBoardGitRuntimeProfile,
+    secrets: &TaskBoardGitRuntimeProfile,
+) {
+    target.ssh_private_key_configured |= secrets.ssh_private_key.is_some();
+    target.ssh_private_key_passphrase_configured |= secrets.ssh_private_key_passphrase.is_some();
+    target.signing.ssh_private_key_configured |= secrets.signing.ssh_private_key.is_some();
+    target.signing.ssh_private_key_passphrase_configured |=
+        secrets.signing.ssh_private_key_passphrase.is_some();
+    target.signing.gpg_private_key_configured |= secrets.signing.gpg_private_key.is_some();
+    target.signing.gpg_private_key_passphrase_configured |=
+        secrets.signing.gpg_private_key_passphrase.is_some();
 }
 
 /// Persist the task-board git runtime config inside the daemon runtime config file.

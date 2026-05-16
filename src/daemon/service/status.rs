@@ -1,7 +1,7 @@
 use super::{
-    CliError, CliErrorKind, DaemonControlResponse, DaemonDiagnosticsReport, DaemonManifest,
-    DaemonStatusReport, HealthResponse, LogLevelResponse, SHUTDOWN_SIGNAL, SetLogLevelRequest,
-    StreamEvent, bridge, broadcast, index, launchd, state, utc_now,
+    CliError, CliErrorKind, DAEMON_WIRE_VERSION, DaemonControlResponse, DaemonDiagnosticsReport,
+    DaemonManifest, DaemonStatusReport, HealthResponse, LogLevelResponse, SHUTDOWN_SIGNAL,
+    SetLogLevelRequest, StreamEvent, bridge, broadcast, index, launchd, state, utc_now,
 };
 use crate::agents::acp::probe::probe_acp_agents_cached;
 use crate::daemon::db::DaemonDb;
@@ -50,6 +50,7 @@ pub fn health_response(
         project_count,
         worktree_count,
         session_count,
+        wire_version: DAEMON_WIRE_VERSION,
     })
 }
 
@@ -77,6 +78,7 @@ pub(crate) async fn health_response_async(
         project_count,
         worktree_count,
         session_count,
+        wire_version: DAEMON_WIRE_VERSION,
     })
 }
 
