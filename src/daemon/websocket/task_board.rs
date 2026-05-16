@@ -71,6 +71,9 @@ pub(crate) async fn dispatch_task_board_method(
         ws_methods::TASK_BOARD_ORCHESTRATOR_TODOIST_TOKEN_SYNC => {
             Some(dispatch_task_board_orchestrator_todoist_token_sync(request))
         }
+        ws_methods::TASK_BOARD_GIT_IDENTITY_DEFAULTS => {
+            Some(dispatch_task_board_git_identity_defaults(request))
+        }
         ws_methods::TASK_BOARD_POLICY_PIPELINE_GET => {
             Some(dispatch_task_board_policy_pipeline_get(request))
         }
@@ -299,6 +302,13 @@ fn dispatch_task_board_orchestrator_todoist_token_sync(request: &WsRequest) -> W
     dispatch_query_result(&request.id, task_board_route_executor::sync_todoist_token(&body))
 }
 
+fn dispatch_task_board_git_identity_defaults(request: &WsRequest) -> WsResponse {
+    dispatch_query_result(
+        &request.id,
+        task_board_route_executor::git_identity_defaults(),
+    )
+}
+
 fn dispatch_task_board_policy_pipeline_get(request: &WsRequest) -> WsResponse {
     dispatch_query_result(&request.id, task_board_route_executor::policy_pipeline())
 }
@@ -373,6 +383,7 @@ const TASK_BOARD_WS_METHOD_CATALOG: &[&str] = &[
     ws_methods::TASK_BOARD_ORCHESTRATOR_RUNTIME_CONFIG_UPDATE,
     ws_methods::TASK_BOARD_ORCHESTRATOR_GITHUB_TOKENS_SYNC,
     ws_methods::TASK_BOARD_ORCHESTRATOR_TODOIST_TOKEN_SYNC,
+    ws_methods::TASK_BOARD_GIT_IDENTITY_DEFAULTS,
     ws_methods::TASK_BOARD_POLICY_PIPELINE_GET,
     ws_methods::TASK_BOARD_POLICY_PIPELINE_SAVE_DRAFT,
     ws_methods::TASK_BOARD_POLICY_PIPELINE_SIMULATE,

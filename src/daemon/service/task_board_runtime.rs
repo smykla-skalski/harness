@@ -5,8 +5,9 @@ use crate::errors::{CliError, CliErrorKind};
 use crate::task_board::{
     ExternalProvider, ExternalSyncConfig, TaskBoardGitHubRepositoryToken,
     TaskBoardGitHubTokensSyncRequest, TaskBoardGitHubTokensSyncResponse,
-    TaskBoardGitRepositoryOverride, TaskBoardGitRuntimeConfig, TaskBoardGitRuntimeProfile,
-    TaskBoardTodoistTokenSyncRequest, TaskBoardTodoistTokenSyncResponse, normalize_repository_slug,
+    TaskBoardGitIdentityDefaults, TaskBoardGitRepositoryOverride, TaskBoardGitRuntimeConfig,
+    TaskBoardGitRuntimeProfile, TaskBoardTodoistTokenSyncRequest, TaskBoardTodoistTokenSyncResponse,
+    discover_git_identity_defaults, normalize_repository_slug,
 };
 
 /// Load the persisted task-board git runtime config.
@@ -15,6 +16,18 @@ use crate::task_board::{
 /// Returns `CliError` when the daemon runtime config cannot be read.
 pub fn task_board_git_runtime_config() -> Result<TaskBoardGitRuntimeConfig, CliError> {
     state::load_task_board_git_runtime_config()
+}
+
+/// Discover the system-level git identity defaults (git config, gh CLI,
+/// `~/.ssh/id_*`, env vars). Used by the UI as placeholder values; never
+/// returns secret material.
+///
+/// # Errors
+/// This function is currently infallible but returns a `Result` for parity
+/// with the rest of the task-board service surface, so route wiring stays
+/// uniform.
+pub fn task_board_git_identity_defaults() -> Result<TaskBoardGitIdentityDefaults, CliError> {
+    Ok(discover_git_identity_defaults())
 }
 
 /// Persist the task-board git runtime config after validation and normalization.

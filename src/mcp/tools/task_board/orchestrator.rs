@@ -75,6 +75,12 @@ pub(super) fn register(registry: &mut ToolRegistry) {
                 input_schema: todoist_token_schema,
                 normalize: validate_params::<TaskBoardTodoistTokenSyncRequest>,
             },
+            TaskBoardToolDescriptor {
+                name: ws_methods::TASK_BOARD_GIT_IDENTITY_DEFAULTS,
+                description: "Discover system-level git identity defaults (git config, gh CLI, ~/.ssh, env vars).",
+                input_schema: empty_schema,
+                normalize: validate_empty_object,
+            },
         ],
     );
 }
