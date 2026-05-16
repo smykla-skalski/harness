@@ -9,17 +9,27 @@ extension OpenWindowAction {
       openHarnessDashboardWindow()
       return
     }
+    openHarnessSessionWindow(sessionID: sessionID, mergeIfNeeded: true)
+  }
+
+  @MainActor
+  public func openHarnessSessionWindow(
+    sessionID: String,
+    mergeIfNeeded: Bool
+  ) {
     let tabbingPreference = SessionWindowTabbingPreference.resolved(
       rawValue: UserDefaults.standard.string(forKey: SessionWindowTabbingPreference.storageKey)
     )
-    let tabTargetWindow = SessionWindowTabbingSupport.visibleTabTargetWindow(
-      preference: tabbingPreference
-    )
+    let tabTargetWindow = mergeIfNeeded
+      ? SessionWindowTabbingSupport.visibleTabTargetWindow(
+        preference: tabbingPreference
+      )
+      : nil
     self(
       id: HarnessMonitorWindowID.sessionScene,
       value: SessionWindowToken(sessionID: sessionID)
     )
-    guard let tabTargetWindow else {
+    guard mergeIfNeeded, let tabTargetWindow else {
       return
     }
     Task { @MainActor in
@@ -32,14 +42,21 @@ extension OpenWindowAction {
 
   @MainActor
   public func openHarnessDashboardWindow() {
+    openHarnessDashboardWindow(mergeIfNeeded: true)
+  }
+
+  @MainActor
+  public func openHarnessDashboardWindow(mergeIfNeeded: Bool) {
     let tabbingPreference = SessionWindowTabbingPreference.resolved(
       rawValue: UserDefaults.standard.string(forKey: SessionWindowTabbingPreference.storageKey)
     )
-    let tabTargetWindow = SessionWindowTabbingSupport.visibleTabTargetWindow(
-      preference: tabbingPreference
-    )
+    let tabTargetWindow = mergeIfNeeded
+      ? SessionWindowTabbingSupport.visibleTabTargetWindow(
+        preference: tabbingPreference
+      )
+      : nil
     self(id: HarnessMonitorWindowID.dashboard)
-    guard let tabTargetWindow else {
+    guard mergeIfNeeded, let tabTargetWindow else {
       return
     }
     Task { @MainActor in

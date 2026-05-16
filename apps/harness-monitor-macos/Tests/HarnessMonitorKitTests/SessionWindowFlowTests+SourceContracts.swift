@@ -147,13 +147,21 @@ extension SessionWindowFlowTests {
     )
 
     #expect(openActionSource.contains("public func openHarnessDashboardWindow()"))
+    #expect(openActionSource.contains("public func openHarnessDashboardWindow(mergeIfNeeded: Bool)"))
+    #expect(
+      openActionSource.contains("public func openHarnessSessionWindow(\n    sessionID: String,\n    mergeIfNeeded: Bool"))
     #expect(
       openActionSource.contains(
         "guard let sessionID, !sessionID.isEmpty else {\n      openHarnessDashboardWindow()"))
     #expect(openActionSource.contains("mergeNewestTabbedWindowIfNeeded"))
     #expect(windowCommandsSource.contains("openWindow.openHarnessDashboardWindow()"))
     #expect(recentCommandsSource.contains("openWindow.openHarnessDashboardWindow()"))
-    #expect(routingSource.contains("openWindow.openHarnessDashboardWindow()"))
+    #expect(
+      routingSource.contains("openWindow.openHarnessDashboardWindow(mergeIfNeeded: mergeIfNeeded)")
+    )
+    #expect(
+      routingSource.contains(
+        "openWindow.openHarnessSessionWindow(\n          sessionID: sessionID,\n          mergeIfNeeded: mergeIfNeeded"))
     #expect(menuBarSource.contains("openWindow.openHarnessDashboardWindow()"))
     #expect(unavailableSource.contains("openWindow.openHarnessDashboardWindow()"))
   }
