@@ -1,6 +1,13 @@
 import SwiftUI
 
 extension PolicyCanvasViewModel {
+  static func sanitizedZoom(_ candidate: CGFloat, fallback: CGFloat) -> CGFloat {
+    guard candidate.isFinite else {
+      return fallback
+    }
+    return min(PolicyCanvasLayout.maximumZoom, max(PolicyCanvasLayout.minimumZoom, candidate))
+  }
+
   /// Single-click selection: replaces the primary selection and drops any
   /// secondary picks. Shift-click goes through `extendSelection(_:)` instead
   /// to layer onto the existing set.
@@ -75,7 +82,7 @@ extension PolicyCanvasViewModel {
   /// writes against their current values drops the bottom-of-range and
   /// top-of-range storms entirely.
   func setZoom(_ nextZoom: CGFloat) {
-    let clamped = min(1.4, max(0.6, nextZoom))
+    let clamped = Self.sanitizedZoom(nextZoom, fallback: zoom)
     guard clamped != zoom else {
       return
     }

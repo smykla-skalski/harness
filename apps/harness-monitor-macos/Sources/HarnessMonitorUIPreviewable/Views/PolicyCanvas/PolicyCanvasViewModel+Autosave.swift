@@ -40,9 +40,9 @@ extension PolicyCanvasViewModel {
   ///   reactivates the scheduler.
   /// - `autosaveSuppressed`: a rollback just fired. Reset the flag and let
   ///   the next dirty flip schedule afresh.
-  /// - `backingDocument == nil`: the canvas is showing the sample document
-  ///   (or initial-load has not completed). There is nothing on the daemon
-  ///   to update; the user must save manually first.
+  /// - `backingDocument == nil`: no daemon-backed document has loaded yet.
+  ///   The live canvas may still be on its empty startup state, so there is
+  ///   nothing on the daemon to update; the user must save manually first.
   /// - `isSavingDraft`: a foreground save is in flight. The autosave task
   ///   we'd schedule here would race the foreground reload; the foreground
   ///   save already covers the same dirty payload.

@@ -3,6 +3,13 @@ import SwiftUI
 extension PolicyCanvasViewModel {
   var canvasContentSize: CGSize {
     let bounds = canvasContentBounds
+    guard !bounds.isNull else {
+      // `CGRect.null` carries `greatestFiniteMagnitude` coordinates. Feeding
+      // those through the viewport's `contentSize * zoom` math overflows to
+      // infinity once zoom exceeds 1.0, which is the runtime warning the
+      // canvas was logging on empty/live startup paths.
+      return PolicyCanvasLayout.minimumCanvasSize
+    }
     return CGSize(
       width: max(
         PolicyCanvasLayout.minimumCanvasSize.width,

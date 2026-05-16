@@ -67,6 +67,21 @@ struct PolicyCanvasZoomEqualityDampingTests {
     #expect(viewModel.viewportDirty == true)
   }
 
+  @Test("setZoom ignores non-finite writes")
+  func nonFiniteWritesAreIgnored() {
+    let viewModel = PolicyCanvasViewModel.sample()
+    viewModel.viewportDirty = false
+    let originalZoom = viewModel.zoom
+
+    viewModel.setZoom(.nan)
+    #expect(viewModel.zoom == originalZoom)
+    #expect(viewModel.viewportDirty == false)
+
+    viewModel.setZoom(.infinity)
+    #expect(viewModel.zoom == originalZoom)
+    #expect(viewModel.viewportDirty == false)
+  }
+
   @Test("viewportDirty stays true on a second genuine change without flicker")
   func consecutiveGenuineChangesKeepViewportDirty() {
     let viewModel = PolicyCanvasViewModel.sample()

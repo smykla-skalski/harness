@@ -207,7 +207,7 @@ final class PolicyCanvasViewModel {
     groups: [PolicyCanvasGroup],
     edges: [PolicyCanvasEdge],
     selection: PolicyCanvasSelection? = nil,
-    zoom: CGFloat = 0.92,
+    zoom: CGFloat = PolicyCanvasLayout.defaultZoom,
     nextNodeNumber: Int = 10
   ) {
     self.selectedTab = selectedTab
@@ -216,7 +216,7 @@ final class PolicyCanvasViewModel {
     self.edges = edges
     self.selection = selection
     self.secondarySelections = []
-    self.zoom = zoom
+    self.zoom = Self.sanitizedZoom(zoom, fallback: PolicyCanvasLayout.defaultZoom)
     self.pinchAnchorUnit = nil
     self.backingDocument = nil
     self.latestSimulation = nil
