@@ -186,13 +186,44 @@ fi
 # this manifest as part of its bundle-signing phase, but `CODE_SIGNING_ALLOWED=NO`
 # in the dev build wrapper short-circuits it; we replicate the essential part
 # here so the dev flow stays usable without forcing a signing identity.
-app_bundle="$TARGET_BUILD_DIR/$WRAPPER_NAME"
-bundle_identity="$codesign_identity"
-if [ -z "$bundle_identity" ]; then
-  bundle_identity="-"
+#
+# Skipped when the Xcode user script sandbox is active: codesign would need to
+# read every file under the .app and write `_CodeSignature/CodeResources`, none
+# of which are in this phase's declared outputs, so the kernel sandbox would
+# block it with `Sandbox: codesign(...) deny(1) file-read-data` against
+# Contents/Info.plist and Contents/MacOS/<name>. The Xcode UI build path that
+# enables this sandbox also signs the bundle itself via the standard signing
+# phase, so the manifest still ends up correct there.
+if [ "${ENABLE_USER_SCRIPT_SANDBOXING:-}" != "YES" ]; then
+  app_bundle="$TARGET_BUILD_DIR/$WRAPPER_NAME"
+  bundle_identity="$codesign_identity"
+  if [ -z "$bundle_identity" ]; then
+    bundle_identity="-"
+  fi
+  # Sign loose Mach-O subcomponents under MacOS/ first. Xcode would normally do
+  # this as part of its bundle-signing phase, but `CODE_SIGNING_ALLOWED=NO` (or a
+  # missing signature on a fresh target) leaves `__preview.dylib` and
+  # `<exec>.debug.dylib` unsigned, which makes the parent bundle sign fail with
+  # "code object is not signed at all / In subcomponent: ... __preview.dylib".
+  for sub in "$app_bundle/Contents/MacOS"/*.dylib; do
+    if [ -f "$sub" ]; then
+      /usr/bin/codesign --force --sign "$bundle_identity" "$sub"
+    fi
+  done
+  # Use `--entitlements` instead of `--preserve-metadata=entitlements` so the
+  # step works on fresh builds where Xcode has not yet attached a signature.
+  # `--preserve-metadata=entitlements` fails with "code object is not signed at
+  # all" on first build of a new target (no existing CodeSignature to inherit
+  # from), and that is exactly the situation for the `HarnessMonitorExternalDaemon`
+  # target on a clean tree. Xcode resolves `CODE_SIGN_ENTITLEMENTS` to the
+  # per-target generated entitlements that `prepare-app-entitlements.sh` writes
+  # ahead of the build, so this produces the same effective entitlements set.
+  bundle_codesign_args=(
+    --force
+    --sign "$bundle_identity"
+  )
+  if [ -n "${CODE_SIGN_ENTITLEMENTS:-}" ] && [ -f "$CODE_SIGN_ENTITLEMENTS" ]; then
+    bundle_codesign_args+=(--entitlements "$CODE_SIGN_ENTITLEMENTS")
+  fi
+  /usr/bin/codesign "${bundle_codesign_args[@]}" "$app_bundle"
 fi
-/usr/bin/codesign \
-  --force \
-  --sign "$bundle_identity" \
-  --preserve-metadata=entitlements,flags,identifier \
-  "$app_bundle"

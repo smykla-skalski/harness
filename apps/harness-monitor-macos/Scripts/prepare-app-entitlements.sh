@@ -24,4 +24,5 @@ copy_entitlements() {
 
 /bin/mkdir -p "$output_dir"
 copy_entitlements "HarnessMonitor" "HarnessMonitor.entitlements"
+copy_entitlements "HarnessMonitorExternalDaemon" "HarnessMonitorExternalDaemon.entitlements"
 copy_entitlements "HarnessMonitorUITestHost" "HarnessMonitorUITestHost.entitlements"
