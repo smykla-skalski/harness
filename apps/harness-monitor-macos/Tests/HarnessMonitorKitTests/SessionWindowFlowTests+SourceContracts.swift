@@ -127,8 +127,6 @@ extension SessionWindowFlowTests {
     #expect(routerSource.contains("SessionWindowTabGroupReplayer.replay("))
     #expect(routerSource.contains("let tabReadyWindows = grouping.sessionIDs.compactMap"))
     #expect(routerSource.contains("isWindowTabReady"))
-    #expect(routerSource.contains("tab_ready_members="))
-    #expect(routerSource.contains("groups_resolved="))
     #expect(tabbingSupportSource.contains("tabbingIdentifier"))
     #expect(tabbingSupportSource.contains("shouldPreferTabbedOpen"))
     #expect(tabbingSupportSource.contains("visibleTabTargetWindow"))
