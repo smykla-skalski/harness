@@ -15,8 +15,9 @@ struct PolicyCanvasPortColumn: View {
   var isAuxiliary = false
 
   var body: some View {
+    let portOffsets = computePortOffsets()
     ZStack(alignment: stackAlignment) {
-      ForEach(Array(ports.enumerated()), id: \.element.id) { index, port in
+      ForEach(ports, id: \.id) { port in
         PolicyCanvasPortView(
           node: node,
           port: port,
@@ -24,7 +25,7 @@ struct PolicyCanvasPortColumn: View {
           viewModel: viewModel,
           isAuxiliary: isAuxiliary
         )
-        .offset(offset(index: index, count: ports.count))
+        .offset(portOffsets[port.id] ?? .zero)
       }
     }
     .frame(
@@ -93,6 +94,16 @@ struct PolicyCanvasPortColumn: View {
         height: 0
       )
     }
+  }
+
+  private func computePortOffsets() -> [PolicyCanvasPort.ID: CGSize] {
+    let count = ports.count
+    var result: [PolicyCanvasPort.ID: CGSize] = [:]
+    result.reserveCapacity(count)
+    for (index, port) in ports.enumerated() {
+      result[port.id] = offset(index: index, count: count)
+    }
+    return result
   }
 }
 
