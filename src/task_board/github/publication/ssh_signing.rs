@@ -18,6 +18,29 @@ use super::types::{
 
 const GIT_SSHSIG_NAMESPACE: &str = "git";
 
+/// Smaller variant of [`ssh_commit_signature`] used by the daemon's signing
+/// verify endpoint: parses the configured private key and signs a canned
+/// payload, returning `Ok(())` on success without producing a full
+/// [`NativeSshCommitSignature`].
+pub(super) fn ssh_commit_signature_for_verify(
+    profile: &TaskBoardGitRuntimeProfile,
+    payload: &[u8],
+) -> Result<(), CliError> {
+    let private_key_material = ssh_private_key_material(profile)?;
+    let private_key = parse_ssh_private_key(
+        private_key_material.as_str(),
+        profile.signing.ssh_private_key_passphrase.as_deref(),
+    )?;
+    private_key
+        .sign(GIT_SSHSIG_NAMESPACE, HashAlg::Sha512, payload)
+        .map_err(|error| {
+            CliErrorKind::workflow_io(format!(
+                "task-board github sign verify payload with SSH key: {error}"
+            ))
+        })?;
+    Ok(())
+}
+
 pub(super) fn ssh_commit_signature(
     profile: &TaskBoardGitRuntimeProfile,
     payload: &[u8],

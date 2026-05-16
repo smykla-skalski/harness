@@ -141,6 +141,56 @@ pub(super) fn publication_signature(
     }
 }
 
+/// Dry-run the configured signing setup against a canned payload. Used by
+/// the UI's "Verify…" action after the user saves new key material so the
+/// daemon can confirm the key, passphrase, and mode all line up without
+/// pushing a real commit.
+pub(crate) fn verify_signing_for_profile(
+    profile: &TaskBoardGitRuntimeProfile,
+) -> SigningVerifyOutcome {
+    const PAYLOAD: &[u8] = b"harness-signing-verify\n";
+    match profile.signing.mode {
+        TaskBoardGitSigningMode::None => SigningVerifyOutcome::Skipped,
+        TaskBoardGitSigningMode::Gpg => match configured_gpg_signature(profile, PAYLOAD) {
+            Ok(Some(_)) => SigningVerifyOutcome::Signed {
+                mode: "gpg".into(),
+                signature_kind: "pgp".into(),
+            },
+            Ok(None) => SigningVerifyOutcome::Failed {
+                message:
+                    "task-board github GPG signing requires configured private key material or path"
+                        .into(),
+            },
+            Err(error) => SigningVerifyOutcome::Failed {
+                message: error.message().to_string(),
+            },
+        },
+        TaskBoardGitSigningMode::Ssh => match super::ssh_signing::ssh_commit_signature_for_verify(
+            profile, PAYLOAD,
+        ) {
+            Ok(()) => SigningVerifyOutcome::Signed {
+                mode: "ssh".into(),
+                signature_kind: "ssh".into(),
+            },
+            Err(error) => SigningVerifyOutcome::Failed {
+                message: error.message().to_string(),
+            },
+        },
+    }
+}
+
+#[derive(Debug, Clone)]
+pub(crate) enum SigningVerifyOutcome {
+    Skipped,
+    Signed {
+        mode: String,
+        signature_kind: String,
+    },
+    Failed {
+        message: String,
+    },
+}
+
 pub(super) fn rest_commit_signature_boundary(
     profile: &TaskBoardGitRuntimeProfile,
     signature: Option<&LocalCommitSignature>,

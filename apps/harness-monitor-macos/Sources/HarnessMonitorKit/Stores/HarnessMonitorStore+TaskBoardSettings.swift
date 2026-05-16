@@ -186,6 +186,19 @@ extension HarnessMonitorStore {
           settings: orchestratorSettings
         )
       }
+
+      let verifyOutcome = await verifyTaskBoardSigning(client: client, repository: nil)
+      switch verifyOutcome {
+      case .skipped:
+        break
+      case .signed:
+        break
+      case .failed(let message):
+        presentFailureFeedback(
+          "Saved task board settings, but signing dry-run failed: \(message)"
+        )
+      }
+
       recordRequestSuccess()
       guard
         await syncAndRefreshTaskBoardDashboard(
@@ -201,6 +214,19 @@ extension HarnessMonitorStore {
     } catch {
       presentFailureFeedback(error.localizedDescription)
       return false
+    }
+  }
+
+  private func verifyTaskBoardSigning(
+    client: any HarnessMonitorClientProtocol,
+    repository: String?
+  ) async -> TaskBoardGitSigningVerifyResponse {
+    do {
+      return try await client.verifyTaskBoardGitSigning(
+        request: TaskBoardGitSigningVerifyRequest(repository: repository)
+      )
+    } catch {
+      return .failed(message: error.localizedDescription)
     }
   }
 

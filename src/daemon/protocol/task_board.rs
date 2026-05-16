@@ -250,6 +250,28 @@ pub type TaskBoardOrchestratorRunOnceResponse = TaskBoardOrchestratorStatus;
 pub type TaskBoardOrchestratorSettingsResponse = TaskBoardOrchestratorSettings;
 pub type TaskBoardGitRuntimeConfigResponse = TaskBoardGitRuntimeConfig;
 pub type TaskBoardGitIdentityDefaultsResponse = TaskBoardGitIdentityDefaults;
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct TaskBoardGitSigningVerifyRequest {
+    /// Repository slug (`owner/repo`) to scope the verify call to. Omit for
+    /// the global profile.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub repository: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case", tag = "outcome")]
+pub enum TaskBoardGitSigningVerifyResponse {
+    /// No signing is configured for the resolved profile.
+    Skipped,
+    /// A signature was produced from the resolved profile.
+    Signed {
+        mode: String,
+        signature_kind: String,
+    },
+    /// Signing was attempted but rejected by the current profile or library.
+    Failed { message: String },
+}
 pub type TaskBoardGitHubTokensSyncResponse = TaskBoardGitHubTokensSyncOutcome;
 pub type TaskBoardTodoistTokenSyncResponse = TaskBoardTodoistTokenSyncOutcome;
 pub type TaskBoardPolicyPipelineResponse = PolicyPipelineDocument;

@@ -43,4 +43,11 @@ extension PreviewHarnessClient {
     try await performActionDelay()
     return await state.currentTaskBoardGitIdentityDefaults()
   }
+
+  public func verifyTaskBoardGitSigning(
+    request _: TaskBoardGitSigningVerifyRequest
+  ) async throws -> TaskBoardGitSigningVerifyResponse {
+    try await performActionDelay()
+    return .skipped
+  }
 }
