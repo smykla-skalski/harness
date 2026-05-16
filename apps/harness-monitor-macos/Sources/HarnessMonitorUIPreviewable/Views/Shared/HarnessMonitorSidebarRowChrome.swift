@@ -53,14 +53,9 @@ private struct SidebarRowHoverModifier: ViewModifier {
           isHovered: isHovered
         )
       )
-      .onContinuousHover { phase in
+      .onHover { hovering in
         withAnimation(.easeOut(duration: 0.15)) {
-          switch phase {
-          case .active:
-            isHovered = true
-          case .ended:
-            isHovered = false
-          }
+          isHovered = hovering
         }
       }
   }
