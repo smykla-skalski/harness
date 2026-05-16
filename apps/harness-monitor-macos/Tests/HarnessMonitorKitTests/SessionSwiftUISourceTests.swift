@@ -228,8 +228,16 @@ struct SessionSwiftUISourceTests {
     let dashboardSource = try sourceFile(at: "Views/Dashboard/DashboardWindowView.swift")
 
     #expect(dashboardSource.contains(".harnessMonitorBackgroundExtensionEffect()"))
-    #expect(!dashboardSource.contains(".toolbarBackground(.visible, for: .windowToolbar)"))
+    #expect(dashboardSource.contains(".toolbarBackground(.visible, for: .windowToolbar)"))
     #expect(!dashboardSource.contains(".backgroundExtensionEffect()"))
+  }
+
+  @Test("Settings detail surface reuses the shared toolbar blur host")
+  func settingsDetailSurfaceReusesSharedToolbarBlurHost() throws {
+    let settingsSource = try sourceFile(at: "Views/Settings/SettingsView.swift")
+
+    #expect(settingsSource.contains(".harnessMonitorBackgroundExtensionEffect()"))
+    #expect(!settingsSource.contains(".backgroundExtensionEffect()"))
   }
 
   @Test("Session split view and search bindings ignore redundant writes")
