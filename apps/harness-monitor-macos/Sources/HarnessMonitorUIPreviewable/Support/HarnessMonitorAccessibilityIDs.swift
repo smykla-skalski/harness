@@ -248,6 +248,8 @@ public enum HarnessMonitorAccessibility {
   public static let sendSignalSheetSubmitButton = "harness.sheet.send-signal.submit"
   public static let settingsCodexSection = "harness.settings.codex"
   public static let settingsAgentsSection = settingsCodexSection
+  public static let settingsPoliciesEdgeLegendToggle =
+    "harness.settings.policies.edge-legend"
   public static let settingsCodexCopyStartButton = "harness.settings.codex.copy-start"
   public static let settingsCodexCopyInstallButton = "harness.settings.codex.copy-install"
   public static let settingsAgentsCopyStartButton = settingsCodexCopyStartButton
@@ -284,9 +286,6 @@ public enum HarnessMonitorAccessibility {
   public static let policyCanvasInspector = "harness.policy-canvas.inspector"
   public static let policyCanvasValidationPanel = "harness.policy-canvas.validation"
   public static let policyCanvasValidationToggle = "harness.policy-canvas.validation.toggle"
-  public static let policyCanvasValidationEmpty = "harness.policy-canvas.validation.empty"
-  public static let policyCanvasPromoteDisabledReason =
-    "harness.policy-canvas.action.promote.reason"
   public static let policyCanvasEmptyState = "harness.policy-canvas.empty-state"
   public static let policyCanvasSearchPalette = "harness.policy-canvas.search.palette"
   public static let policyCanvasSearchField = "harness.policy-canvas.search.field"
