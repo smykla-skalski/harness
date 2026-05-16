@@ -47,6 +47,24 @@ struct TaskBoardSummaryPill: View {
     TaskBoardOverviewMetrics(fontScale: fontScale)
   }
 
+  // Pills are rendered in dense clusters across the dashboard
+  // (`TaskBoardOperationsPanel` lays them out as Items / Providers /
+  // Ops / Plans summary chips, repeated per row). Each `.scaledFont`
+  // call plants a `ScaledFontModifier` that subscribes per text node
+  // to `\.fontScale`, and r17 traced this as a contributor to the
+  // `Conditional View Value square.split.diagonal` 18,956-edge
+  // self-loop fanned via `EnvironmentWriter: Font?`. Subscribe once
+  // and apply precomputed fonts.
+  private var captionFont: Font {
+    HarnessMonitorTextSize.scaledFont(.caption, by: fontScale)
+  }
+  private var captionSemibold: Font {
+    HarnessMonitorTextSize.scaledFont(.caption.weight(.semibold), by: fontScale)
+  }
+  private var captionBold: Font {
+    HarnessMonitorTextSize.scaledFont(.caption.weight(.bold), by: fontScale)
+  }
+
   init(
     value: String,
     label: String,
@@ -60,16 +78,19 @@ struct TaskBoardSummaryPill: View {
   }
 
   var body: some View {
-    HStack(spacing: HarnessMonitorTheme.spacingXS) {
+    let captionFont = captionFont
+    let captionSemibold = captionSemibold
+    let captionBold = captionBold
+    return HStack(spacing: HarnessMonitorTheme.spacingXS) {
       if let systemImage {
         Image(systemName: systemImage)
-          .scaledFont(.caption.weight(.semibold))
+          .font(captionSemibold)
           .accessibilityHidden(true)
       }
       Text(label)
-        .scaledFont(.caption)
+        .font(captionFont)
       Text(value)
-        .scaledFont(.caption.weight(.bold))
+        .font(captionBold)
         .monospacedDigit()
     }
     .foregroundStyle(tint)
