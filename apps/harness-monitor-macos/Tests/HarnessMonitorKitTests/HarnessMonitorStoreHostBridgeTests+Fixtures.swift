@@ -32,6 +32,38 @@ func sandboxedStatus(hostBridge: HostBridgeManifest) -> DaemonStatusReport {
   )
 }
 
+func unsandboxedStatus(hostBridge: HostBridgeManifest) -> DaemonStatusReport {
+  DaemonStatusReport(
+    manifest: DaemonManifest(
+      version: "19.3.0",
+      pid: 111,
+      endpoint: "http://127.0.0.1:9999",
+      startedAt: "2026-04-11T09:00:00Z",
+      tokenPath: "/tmp/token",
+      sandboxed: false,
+      hostBridge: hostBridge
+    ),
+    launchAgent: LaunchAgentStatus(
+      installed: false,
+      loaded: false,
+      label: "io.harness.daemon",
+      path: "/tmp/io.harness.daemon.plist"
+    ),
+    projectCount: 1,
+    sessionCount: 1,
+    diagnostics: DaemonDiagnostics(
+      daemonRoot: "/tmp/harness/daemon",
+      manifestPath: "/tmp/harness/daemon/manifest.json",
+      authTokenPath: "/tmp/token",
+      authTokenPresent: true,
+      eventsPath: "/tmp/harness/daemon/events.jsonl",
+      databasePath: "/tmp/harness/daemon/harness.db",
+      databaseSizeBytes: 1_024,
+      lastEvent: nil
+    )
+  )
+}
+
 actor HostBridgeRecoveryDaemonController: DaemonControlling {
   private let initialClient: any HarnessMonitorClientProtocol
   private let restartedClient: (any HarnessMonitorClientProtocol)?

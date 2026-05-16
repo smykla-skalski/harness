@@ -12,8 +12,16 @@ extension StoreDecisionActionHandler {
     )
     switch payload.mode {
     case "restartDaemon":
-      await store.stopDaemon()
-      await store.startDaemon()
+      switch store.daemonOwnership {
+      case .managed:
+        await store.stopDaemon()
+        await store.startDaemon()
+      case .external:
+        // External daemons are owned by a Terminal process, so the best in-app
+        // recovery is to retry discovery and reconnect. That path surfaces the
+        // correct restart guidance when the helper is still offline.
+        await store.reconnect()
+      }
     case "openDaemonLogs":
       guard store.openDaemonLog() else {
         throw StoreDecisionActionError.daemonLogUnavailable
