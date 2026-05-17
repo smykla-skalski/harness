@@ -1,5 +1,10 @@
 import SwiftUI
 
+enum HarnessMonitorWrapRowAlignment {
+  case leading
+  case trailing
+}
+
 struct HarnessMonitorWrapLayout: Layout {
   struct Cache {
     var rows: [HarnessMonitorWrapLayoutRow] = []
@@ -15,10 +20,16 @@ struct HarnessMonitorWrapLayout: Layout {
 
   let spacing: CGFloat
   let lineSpacing: CGFloat
+  let rowAlignment: HarnessMonitorWrapRowAlignment
 
-  init(spacing: CGFloat = 8, lineSpacing: CGFloat? = nil) {
+  init(
+    spacing: CGFloat = 8,
+    lineSpacing: CGFloat? = nil,
+    rowAlignment: HarnessMonitorWrapRowAlignment = .leading
+  ) {
     self.spacing = spacing
     self.lineSpacing = lineSpacing ?? spacing
+    self.rowAlignment = rowAlignment
   }
 
   func makeCache(subviews _: Subviews) -> Cache {
@@ -70,7 +81,7 @@ struct HarnessMonitorWrapLayout: Layout {
     var y = bounds.minY
 
     for row in rows {
-      var x = bounds.minX
+      var x = rowLeadingX(for: row, in: bounds)
 
       for item in row.items {
         subviews[item.index].place(
@@ -82,6 +93,18 @@ struct HarnessMonitorWrapLayout: Layout {
       }
 
       y += row.height + lineSpacing
+    }
+  }
+
+  private func rowLeadingX(
+    for row: HarnessMonitorWrapLayoutRow,
+    in bounds: CGRect
+  ) -> CGFloat {
+    switch rowAlignment {
+    case .leading:
+      bounds.minX
+    case .trailing:
+      max(bounds.minX, bounds.maxX - row.width)
     }
   }
 
