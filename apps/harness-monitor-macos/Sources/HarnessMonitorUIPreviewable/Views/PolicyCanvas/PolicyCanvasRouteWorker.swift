@@ -130,15 +130,20 @@ struct PolicyCanvasRouteWorkerInput: Equatable, Sendable {
   fileprivate func displayedRoutes(
     router: any PolicyCanvasEdgeRouter
   ) -> [String: PolicyCanvasEdgeRoute] {
-    let portAnchors = portAnchors()
-    let edgeLanes = laneAssignments(bucket: edgeRouteBucket, sortKey: edgeRouteSortKey)
+    let nodeIndex = nodeIndex
+    let obstacles = routingObstacles()
+    let portAnchors = portAnchors(nodeIndex: nodeIndex)
+    let edgeLanes = laneAssignments(
+      bucket: edgeRouteBucket,
+      sortKey: { edgeRouteSortKey($0, nodeIndex: nodeIndex) }
+    )
     let sourceFanoutLanes = laneAssignments(
       bucket: edgeSourceFanoutBucket,
-      sortKey: edgeSourceFanoutSortKey
+      sortKey: { edgeSourceFanoutSortKey($0, nodeIndex: nodeIndex) }
     )
     let targetFanoutLanes = laneAssignments(
       bucket: edgeTargetFanoutBucket,
-      sortKey: edgeTargetFanoutSortKey
+      sortKey: { edgeTargetFanoutSortKey($0, nodeIndex: nodeIndex) }
     )
     var routes: [String: PolicyCanvasEdgeRoute] = [:]
     routes.reserveCapacity(edges.count)
@@ -153,6 +158,8 @@ struct PolicyCanvasRouteWorkerInput: Equatable, Sendable {
         routeLane: edgeLanes[edge.id, default: 0],
         sourceFanoutLane: sourceFanoutLanes[edge.id, default: 0],
         targetFanoutLane: targetFanoutLanes[edge.id, default: 0],
+        nodeIndex: nodeIndex,
+        obstacles: obstacles,
         router: router
       )
     }
@@ -182,26 +189,27 @@ struct PolicyCanvasRouteWorkerInput: Equatable, Sendable {
     routeLane: Int,
     sourceFanoutLane: Int,
     targetFanoutLane: Int,
+    nodeIndex: [String: PolicyCanvasRouteNode],
+    obstacles: [CGRect],
     router: any PolicyCanvasEdgeRouter
   ) -> PolicyCanvasEdgeRoute {
-    let nodeIndex = nodeIndex
     let context = PolicyCanvasRouteContext(
       lane: routeLane,
       groups: groups,
       sourceGroupID: nodeIndex[edge.source.nodeID]?.groupID,
       targetGroupID: nodeIndex[edge.target.nodeID]?.groupID,
-      obstacles: routingObstacles(),
+      obstacles: obstacles,
       sourceActual: source,
       targetActual: target,
-      lineSpacing: edgeLineSpacing(for: edge)
+      lineSpacing: edgeLineSpacing(for: edge, nodeIndex: nodeIndex)
     )
     if edge.effectivePinnedPortSide {
       return policyCanvasDisplayedRoute(
         PolicyCanvasPinnedDisplayedRouteRequest(
           router: router,
-          source: (point: source, side: resolvedPortSide(for: edge.source)),
-          sourceFanoutLane: sourceFanoutLane,
-          target: (point: target, side: resolvedPortSide(for: edge.target)),
+        source: (point: source, side: resolvedPortSide(for: edge.source)),
+        sourceFanoutLane: sourceFanoutLane,
+        target: (point: target, side: resolvedPortSide(for: edge.target)),
           targetFanoutLane: targetFanoutLane,
           context: context
         )
@@ -210,9 +218,9 @@ struct PolicyCanvasRouteWorkerInput: Equatable, Sendable {
     return policyCanvasDisplayedRoute(
       PolicyCanvasFlexibleDisplayedRouteRequest(
         router: router,
-        sourceCandidates: routeAnchorCandidates(for: edge.source),
+        sourceCandidates: routeAnchorCandidates(for: edge.source, nodeIndex: nodeIndex),
         sourceFanoutLane: sourceFanoutLane,
-        targetCandidates: routeAnchorCandidates(for: edge.target),
+        targetCandidates: routeAnchorCandidates(for: edge.target, nodeIndex: nodeIndex),
         targetFanoutLane: targetFanoutLane,
         context: context
       )
@@ -227,8 +235,9 @@ struct PolicyCanvasRouteWorkerInput: Equatable, Sendable {
     nodes.map(\.frame) + groups.map(\.frame)
   }
 
-  private func portAnchors() -> [PolicyCanvasPortEndpoint: CGPoint] {
-    let nodeIndex = nodeIndex
+  private func portAnchors(
+    nodeIndex: [String: PolicyCanvasRouteNode]
+  ) -> [PolicyCanvasPortEndpoint: CGPoint] {
     var anchors: [PolicyCanvasPortEndpoint: CGPoint] = [:]
     anchors.reserveCapacity(edges.count * 2)
     for edge in edges {
@@ -262,15 +271,19 @@ struct PolicyCanvasRouteWorkerInput: Equatable, Sendable {
   }
 
   private func routeAnchorCandidates(
-    for endpoint: PolicyCanvasPortEndpoint
+    for endpoint: PolicyCanvasPortEndpoint,
+    nodeIndex: [String: PolicyCanvasRouteNode]
   ) -> [PolicyCanvasRouteAnchorCandidate] {
-    let points = portAnchorCandidates(for: endpoint)
+    let points = portAnchorCandidates(for: endpoint, nodeIndex: nodeIndex)
     return zip(PolicyCanvasPortSide.allSides, points).map { side, point in
       (point: point, side: side)
     }
   }
 
-  private func portAnchorCandidates(for endpoint: PolicyCanvasPortEndpoint) -> [CGPoint] {
+  private func portAnchorCandidates(
+    for endpoint: PolicyCanvasPortEndpoint,
+    nodeIndex: [String: PolicyCanvasRouteNode]
+  ) -> [CGPoint] {
     guard let node = nodeIndex[endpoint.nodeID] else {
       return []
     }
@@ -336,7 +349,10 @@ struct PolicyCanvasRouteWorkerInput: Equatable, Sendable {
     return lanes
   }
 
-  private func edgeLaneSortKey(_ edge: PolicyCanvasEdge) -> String {
+  private func edgeLaneSortKey(
+    _ edge: PolicyCanvasEdge,
+    nodeIndex: [String: PolicyCanvasRouteNode]
+  ) -> String {
     let targetY = portAnchor(for: edge.target, nodeIndex: nodeIndex)?.y ?? 0
     return
       "\(edgeRouteBucket(edge))|\(Int(targetY.rounded()))|\(edge.source.portID)|\(edge.target.portID)"
@@ -346,8 +362,11 @@ struct PolicyCanvasRouteWorkerInput: Equatable, Sendable {
     "\(edgeSourceFanoutBucket(edge))->\(edgeTargetFanoutBucket(edge))"
   }
 
-  private func edgeRouteSortKey(_ edge: PolicyCanvasEdge) -> String {
-    edgeLaneSortKey(edge)
+  private func edgeRouteSortKey(
+    _ edge: PolicyCanvasEdge,
+    nodeIndex: [String: PolicyCanvasRouteNode]
+  ) -> String {
+    edgeLaneSortKey(edge, nodeIndex: nodeIndex)
   }
 
   private func edgeSourceFanoutBucket(_ edge: PolicyCanvasEdge) -> String {
@@ -360,7 +379,10 @@ struct PolicyCanvasRouteWorkerInput: Equatable, Sendable {
     return "\(edge.target.nodeID)|\(edge.target.portID)|\(side)"
   }
 
-  private func edgeSourceFanoutSortKey(_ edge: PolicyCanvasEdge) -> String {
+  private func edgeSourceFanoutSortKey(
+    _ edge: PolicyCanvasEdge,
+    nodeIndex: [String: PolicyCanvasRouteNode]
+  ) -> String {
     fanoutSortKey(
       bucket: edgeSourceFanoutBucket(edge),
       anchor: portAnchor(for: edge.target, nodeIndex: nodeIndex) ?? .zero,
@@ -369,7 +391,10 @@ struct PolicyCanvasRouteWorkerInput: Equatable, Sendable {
     )
   }
 
-  private func edgeTargetFanoutSortKey(_ edge: PolicyCanvasEdge) -> String {
+  private func edgeTargetFanoutSortKey(
+    _ edge: PolicyCanvasEdge,
+    nodeIndex: [String: PolicyCanvasRouteNode]
+  ) -> String {
     fanoutSortKey(
       bucket: edgeTargetFanoutBucket(edge),
       anchor: portAnchor(for: edge.source, nodeIndex: nodeIndex) ?? .zero,
@@ -388,11 +413,20 @@ struct PolicyCanvasRouteWorkerInput: Equatable, Sendable {
       .joined(separator: "|")
   }
 
-  private func edgeLineSpacing(for edge: PolicyCanvasEdge) -> CGFloat {
-    max(portSpacing(for: edge.source), portSpacing(for: edge.target))
+  private func edgeLineSpacing(
+    for edge: PolicyCanvasEdge,
+    nodeIndex: [String: PolicyCanvasRouteNode]
+  ) -> CGFloat {
+    max(
+      portSpacing(for: edge.source, nodeIndex: nodeIndex),
+      portSpacing(for: edge.target, nodeIndex: nodeIndex)
+    )
   }
 
-  private func portSpacing(for endpoint: PolicyCanvasPortEndpoint) -> CGFloat {
+  private func portSpacing(
+    for endpoint: PolicyCanvasPortEndpoint,
+    nodeIndex: [String: PolicyCanvasRouteNode]
+  ) -> CGFloat {
     guard let node = nodeIndex[endpoint.nodeID] else {
       return PolicyCanvasLayout.defaultEdgeLineSpacing
     }
