@@ -39,7 +39,8 @@ extension TaskBoardOperationsHost {
       HarnessMonitorGlassControlGroup(spacing: HarnessMonitorTheme.itemSpacing) {
         HarnessMonitorWrapLayout(
           spacing: HarnessMonitorTheme.itemSpacing,
-          lineSpacing: HarnessMonitorTheme.itemSpacing
+          lineSpacing: HarnessMonitorTheme.itemSpacing,
+          rowAlignment: .trailing
         ) {
           content()
         }
@@ -104,6 +105,7 @@ extension TaskBoardOperationsHost {
     TaskBoardOperationsFormRow(title) {
       TextField(prompt, text: text)
         .harnessNativeTextField()
+        .multilineTextAlignment(.trailing)
         .accessibilityLabel(title)
         .accessibilityIdentifier(accessibilityIdentifier)
     }
@@ -257,17 +259,18 @@ struct TaskBoardOperationsFormSection<Content: View>: View {
       Text(title)
         .harnessNativeFormSectionHeader()
         .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+        .padding(.leading, TaskBoardOperationsFormMetrics.sectionPadding)
 
       VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
         content
       }
-      .padding(HarnessMonitorTheme.spacingMD)
+      .padding(TaskBoardOperationsFormMetrics.sectionPadding)
       .background(
         RoundedRectangle(
           cornerRadius: HarnessMonitorTheme.cornerRadiusMD,
           style: .continuous
         )
-        .fill(Color(nsColor: .controlBackgroundColor))
+        .fill(Color(nsColor: .underPageBackgroundColor))
       )
       .overlay {
         RoundedRectangle(
@@ -287,6 +290,7 @@ struct TaskBoardOperationsFormSection<Content: View>: View {
 }
 
 private enum TaskBoardOperationsFormMetrics {
+  static let sectionPadding: CGFloat = HarnessMonitorTheme.spacingMD
   static let labelWidth: CGFloat = 112
   static let contentMaxWidth: CGFloat = 420
   static let rowMinHeight: CGFloat = 28
@@ -322,6 +326,11 @@ struct TaskBoardOperationsFormRow<Content: View>: View {
       minHeight: TaskBoardOperationsFormMetrics.rowMinHeight,
       alignment: .leading
     )
+    .overlay(alignment: .bottom) {
+      Rectangle()
+        .fill(Color(nsColor: .separatorColor))
+        .frame(height: 0.5)
+    }
   }
 }
 
