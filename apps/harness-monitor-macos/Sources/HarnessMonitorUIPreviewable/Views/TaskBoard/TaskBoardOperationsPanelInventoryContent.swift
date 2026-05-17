@@ -23,7 +23,6 @@ struct TaskBoardOperationsPanelInventoryCard: View {
   var body: some View {
     TaskBoardOperationsCard(
       title: "Audit & Inventory",
-      systemImage: "list.bullet.rectangle.portrait",
       metrics: metrics
     ) {
       statusPickerField
@@ -33,20 +32,26 @@ struct TaskBoardOperationsPanelInventoryCard: View {
   }
 
   private var statusPickerField: some View {
-    Picker("Status filter", selection: $inventoryStatusChoice) {
-      ForEach(TaskBoardStatusFilterChoice.stableAllCases) { choice in
-        Text(choice.title).tag(choice)
+    TaskBoardOperationsFormRow("Status filter") {
+      Picker("", selection: $inventoryStatusChoice) {
+        ForEach(TaskBoardStatusFilterChoice.stableAllCases) { choice in
+          Text(choice.title).tag(choice)
+        }
       }
+      .labelsHidden()
+      .pickerStyle(.menu)
+      .harnessNativeFormControl()
+      .accessibilityLabel("Status filter")
+      .accessibilityIdentifier("harness.task-board.inventory.status")
     }
-    .pickerStyle(.menu)
-    .harnessNativeFormControl()
-    .accessibilityIdentifier("harness.task-board.inventory.status")
   }
 
   private var actionRow: some View {
-    ViewThatFits(in: .horizontal) {
-      HStack(spacing: HarnessMonitorTheme.spacingSM) { actionButtons }
-      VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) { actionButtons }
+    TaskBoardOperationsFormRow("Actions") {
+      ViewThatFits(in: .horizontal) {
+        HStack(spacing: HarnessMonitorTheme.spacingSM) { actionButtons }
+        VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) { actionButtons }
+      }
     }
   }
 
@@ -216,13 +221,11 @@ struct TaskBoardOperationsPanelInventoryCard: View {
   }
 
   private func row(title: String, subtitle: String) -> some View {
-    HStack(alignment: .firstTextBaseline, spacing: HarnessMonitorTheme.spacingSM) {
-      Text(title)
-        .font(captionSemibold)
-      Spacer(minLength: HarnessMonitorTheme.spacingSM)
+    TaskBoardOperationsFormRow(title) {
       Text(subtitle)
         .font(captionFont)
         .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+        .lineLimit(1)
     }
   }
 }

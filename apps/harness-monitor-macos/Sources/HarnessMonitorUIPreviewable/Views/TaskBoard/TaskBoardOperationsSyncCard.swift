@@ -28,7 +28,6 @@ struct TaskBoardOperationsSyncCard: View, TaskBoardOperationsHost {
   var body: some View {
     TaskBoardOperationsCard(
       title: "Sync",
-      systemImage: "arrow.triangle.2.circlepath",
       metrics: metrics
     ) {
       controlRows {

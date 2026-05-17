@@ -35,12 +35,14 @@ extension TaskBoardOperationsHost {
   }
 
   func actionRow<Content: View>(@ViewBuilder content: () -> Content) -> some View {
-    HarnessMonitorGlassControlGroup(spacing: HarnessMonitorTheme.itemSpacing) {
-      HarnessMonitorWrapLayout(
-        spacing: HarnessMonitorTheme.itemSpacing,
-        lineSpacing: HarnessMonitorTheme.itemSpacing
-      ) {
-        content()
+    TaskBoardOperationsFormRow("Actions") {
+      HarnessMonitorGlassControlGroup(spacing: HarnessMonitorTheme.itemSpacing) {
+        HarnessMonitorWrapLayout(
+          spacing: HarnessMonitorTheme.itemSpacing,
+          lineSpacing: HarnessMonitorTheme.itemSpacing
+        ) {
+          content()
+        }
       }
     }
   }
@@ -62,12 +64,16 @@ extension TaskBoardOperationsHost {
     accessibilityIdentifier: String,
     @ViewBuilder content: () -> Content
   ) -> some View {
-    Picker(title, selection: selection) {
-      content()
+    TaskBoardOperationsFormRow(title) {
+      Picker("", selection: selection) {
+        content()
+      }
+      .labelsHidden()
+      .pickerStyle(.menu)
+      .harnessNativeFormControl()
+      .accessibilityLabel(title)
+      .accessibilityIdentifier(accessibilityIdentifier)
     }
-    .pickerStyle(.menu)
-    .harnessNativeFormControl()
-    .accessibilityIdentifier(accessibilityIdentifier)
   }
 
   func staticField(
@@ -75,8 +81,11 @@ extension TaskBoardOperationsHost {
     value: String,
     accessibilityIdentifier: String
   ) -> some View {
-    LabeledContent(title) {
+    TaskBoardOperationsFormRow(title) {
       Text(value)
+        .lineLimit(1)
+        .truncationMode(.middle)
+        .foregroundStyle(HarnessMonitorTheme.secondaryInk)
         .accessibilityIdentifier(accessibilityIdentifier)
     }
     .accessibilityValue(value)
@@ -88,9 +97,10 @@ extension TaskBoardOperationsHost {
     prompt: String,
     accessibilityIdentifier: String
   ) -> some View {
-    LabeledContent(title) {
+    TaskBoardOperationsFormRow(title) {
       TextField(prompt, text: text)
         .harnessNativeTextField()
+        .accessibilityLabel(title)
         .accessibilityIdentifier(accessibilityIdentifier)
     }
   }
@@ -100,8 +110,12 @@ extension TaskBoardOperationsHost {
     isOn: Binding<Bool>,
     accessibilityIdentifier: String
   ) -> some View {
-    Toggle(title, isOn: isOn)
-      .accessibilityIdentifier(accessibilityIdentifier)
+    TaskBoardOperationsFormRow(title) {
+      Toggle("", isOn: isOn)
+        .labelsHidden()
+        .accessibilityLabel(title)
+        .accessibilityIdentifier(accessibilityIdentifier)
+    }
   }
 
   func actionButton(
@@ -156,17 +170,12 @@ extension TaskBoardOperationsHost {
   }
 
   func keyedSummaryRow(title: String, subtitle: String) -> some View {
-    VStack(alignment: .leading, spacing: 2) {
-      Text(title)
-        .font(captionSemibold)
-        .lineLimit(1)
+    TaskBoardOperationsFormRow(title) {
       Text(subtitle)
         .font(captionFont)
         .foregroundStyle(HarnessMonitorTheme.secondaryInk)
-        .lineLimit(2)
+        .lineLimit(1)
     }
-    .frame(maxWidth: .infinity, alignment: .leading)
-    .padding(.vertical, 2)
     .accessibilityElement(children: .combine)
   }
 
@@ -193,7 +202,6 @@ extension TaskBoardOperationsHost {
 
 struct TaskBoardOperationsCard<Content: View>: View {
   let title: String
-  let systemImage: String
   let metrics: TaskBoardOverviewMetrics
   let content: Content
 
@@ -202,22 +210,47 @@ struct TaskBoardOperationsCard<Content: View>: View {
 
   init(
     title: String,
-    systemImage: String,
     metrics: TaskBoardOverviewMetrics,
     @ViewBuilder content: () -> Content
   ) {
     self.title = title
-    self.systemImage = systemImage
     self.metrics = metrics
     self.content = content()
   }
 
-  // Lightweight VStack chrome (no Form / .formStyle(.grouped) machinery).
-  // See commit 65cac5448 for the trace-driven rationale.
+  var body: some View {
+    TaskBoardOperationsFormSection(
+      title: title,
+      metrics: metrics
+    ) {
+      content
+    }
+  }
+}
+
+struct TaskBoardOperationsFormSection<Content: View>: View {
+  let title: String
+  let metrics: TaskBoardOverviewMetrics
+  let content: Content
+
+  @Environment(\.fontScale)
+  private var fontScale
+
+  init(
+    title: String,
+    metrics: TaskBoardOverviewMetrics,
+    @ViewBuilder content: () -> Content
+  ) {
+    self.title = title
+    self.metrics = metrics
+    self.content = content()
+  }
+
   var body: some View {
     VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
       Text(title)
         .harnessNativeFormSectionHeader()
+        .foregroundStyle(HarnessMonitorTheme.secondaryInk)
 
       VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
         content
@@ -244,6 +277,34 @@ struct TaskBoardOperationsCard<Content: View>: View {
       minHeight: metrics.managementPanelMinHeight,
       alignment: .leading
     )
+  }
+}
+
+struct TaskBoardOperationsFormRow<Content: View>: View {
+  private let labelWidth: CGFloat = 112
+  private let rowMinHeight: CGFloat = 28
+
+  let title: String
+  let content: Content
+
+  init(_ title: String, @ViewBuilder content: () -> Content) {
+    self.title = title
+    self.content = content()
+  }
+
+  var body: some View {
+    HStack(alignment: .center, spacing: HarnessMonitorTheme.spacingMD) {
+      Text(title)
+        .font(.body)
+        .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+        .lineLimit(2)
+        .multilineTextAlignment(.trailing)
+        .frame(width: labelWidth, alignment: .trailing)
+
+      content
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+    .frame(maxWidth: .infinity, minHeight: rowMinHeight, alignment: .leading)
   }
 }
 
