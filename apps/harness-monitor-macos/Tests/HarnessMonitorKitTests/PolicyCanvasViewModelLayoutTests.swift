@@ -114,6 +114,93 @@ struct PolicyCanvasViewModelLayoutTests {
     #expect(fittedZoom >= PolicyCanvasLayout.minimumZoom)
   }
 
+  @Test("presentation bounds normalize leading whitespace for routed content")
+  func presentationBoundsNormalizeLeadingWhitespaceForRoutedContent() {
+    let visibleBounds = CGRect(x: 180, y: 120, width: 1_060, height: 740)
+    let presentedBounds = policyCanvasViewportPresentedBounds(visibleBounds: visibleBounds)
+    let presentationOffset = policyCanvasViewportPresentationOffset(
+      visibleBounds: visibleBounds
+    )
+    let contentSize = policyCanvasVisibleContentSize(visibleBounds: visibleBounds)
+
+    #expect(presentedBounds.minX == 1_370)
+    #expect(presentedBounds.minY == 1_200)
+    #expect(presentationOffset.x == 1_190)
+    #expect(presentationOffset.y == 1_080)
+    #expect(contentSize.width == 3_800)
+    #expect(contentSize.height == 3_140)
+  }
+
+  @Test("initial viewport anchor follows presented visible bounds")
+  func initialViewportAnchorFollowsPresentedVisibleBounds() {
+    let visibleBounds = CGRect(x: 180, y: 120, width: 1_060, height: 740)
+    let anchor = policyCanvasInitialViewportAnchorPoint(
+      visibleBounds: visibleBounds,
+      zoom: 0.6
+    )
+
+    #expect(anchor.x == 1_140)
+    #expect(anchor.y == 942)
+  }
+
+  @Test("viewport content origin centers fitted content inside a larger viewport")
+  func viewportContentOriginCentersFittedContentInsideLargerViewport() {
+    let origin = policyCanvasViewportContentOrigin(
+      viewportSize: CGSize(width: 1_640, height: 980),
+      contentSize: CGSize(width: 1_000, height: 700),
+      zoom: 0.6
+    )
+
+    #expect(origin.x == 520)
+    #expect(origin.y == 280)
+  }
+
+  @Test("viewport content origin stays pinned on overflowing axes")
+  func viewportContentOriginStaysPinnedOnOverflowingAxes() {
+    let origin = policyCanvasViewportContentOrigin(
+      viewportSize: CGSize(width: 1_280, height: 820),
+      contentSize: CGSize(width: 2_100, height: 900),
+      zoom: 0.7
+    )
+
+    #expect(origin.x == 0)
+    #expect(origin.y == 95)
+  }
+
+  @Test("rendered content size clamps to the viewport on fitted axes")
+  func renderedContentSizeClampsToTheViewportOnFittedAxes() {
+    let renderedSize = policyCanvasRenderedContentSize(
+      viewportSize: CGSize(width: 1_280, height: 820),
+      contentSize: CGSize(width: 2_100, height: 900),
+      zoom: 0.7
+    )
+
+    #expect(renderedSize.width == 1_470)
+    #expect(renderedSize.height == 820)
+  }
+
+  @Test("centered scroll point offsets the anchor by half the viewport")
+  func centeredScrollPointOffsetsTheAnchorByHalfTheViewport() {
+    let scrollPoint = policyCanvasCenteredScrollPoint(
+      anchorPoint: CGPoint(x: 900, y: 680),
+      viewportSize: CGSize(width: 640, height: 480)
+    )
+
+    #expect(scrollPoint.x == 580)
+    #expect(scrollPoint.y == 440)
+  }
+
+  @Test("centered scroll point clamps negative offsets to zero")
+  func centeredScrollPointClampsNegativeOffsetsToZero() {
+    let scrollPoint = policyCanvasCenteredScrollPoint(
+      anchorPoint: CGPoint(x: 180, y: 120),
+      viewportSize: CGSize(width: 640, height: 480)
+    )
+
+    #expect(scrollPoint.x == 0)
+    #expect(scrollPoint.y == 0)
+  }
+
   @Test("grouped endpoint routes still include intervening groups as obstacles")
   func groupedEndpointRoutesStillIncludeInterveningGroupsAsObstacles() {
     let viewModel = PolicyCanvasViewModel.sample()

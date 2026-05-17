@@ -133,8 +133,15 @@ extension PolicyCanvasViewModel {
     return "policy-canvas-port|\(nodeID)|\(portID)"
   }
 
-  func canvasPoint(for viewportPoint: CGPoint) -> CGPoint {
-    CGPoint(x: viewportPoint.x / zoom, y: viewportPoint.y / zoom)
+  func canvasPoint(
+    for viewportPoint: CGPoint,
+    scaledCanvasOffset: CGPoint = .zero
+  ) -> CGPoint {
+    policyCanvasCanvasPoint(
+      presentedPoint: viewportPoint,
+      zoom: zoom,
+      scaledCanvasOffset: scaledCanvasOffset
+    )
   }
 
   func requestViewportCentering() {
