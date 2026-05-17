@@ -239,6 +239,28 @@ final class WindowMenuCommandsTests: XCTestCase {
     XCTAssertTrue(source.contains("Show Dashboard"))
   }
 
+  func testViewMenuShortcutsStayExclusiveAcrossTextSizeAndCanvasZoomScopes() throws {
+    let source = try harnessSourceFile(named: "App/HarnessMonitorAppCommands.swift")
+
+    XCTAssertTrue(source.contains("private var hasPolicyCanvasZoomFocus: Bool"))
+    XCTAssertTrue(source.contains("if hasPolicyCanvasZoomFocus {"))
+    XCTAssertTrue(
+      source.contains("Button(\"Decrease Text Size\", action: decreaseTextSize)\n          .disabled(true)")
+    )
+    XCTAssertTrue(
+      source.contains("Button(\"Decrease Text Size\", action: decreaseTextSize)\n          .keyboardShortcut(\"-\", modifiers: .command)")
+    )
+    XCTAssertTrue(source.contains("if let zoomFocus = policyCanvasZoomFocus {"))
+    XCTAssertTrue(
+      source.contains("zoomFocus.dispatcher.performZoomOut()")
+    )
+    XCTAssertTrue(
+      source.contains("Button(\"Reset Zoom\") {\n          zoomFocus.dispatcher.performResetZoom()\n        }\n        .keyboardShortcut(\"0\", modifiers: .command)")
+    )
+    XCTAssertFalse(source.contains(".disabled(!canDecreaseTextSize || policyCanvasZoomFocus != nil)"))
+    XCTAssertFalse(source.contains(".disabled(policyCanvasZoomFocus == nil)"))
+  }
+
   private func harnessSourceFile(named relativePath: String) throws -> String {
     let testsDirectory = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
     let repoRoot =

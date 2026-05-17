@@ -34,6 +34,10 @@ struct HarnessMonitorAppCommands: Commands {
     HarnessMonitorTextSize.canDecrease(textSizeIndex)
   }
 
+  private var hasPolicyCanvasZoomFocus: Bool {
+    policyCanvasZoomFocus != nil
+  }
+
   private var searchCommandTitle: LocalizedStringKey {
     searchFocusAction?.menuLabel.localizedTitle ?? "Find"
   }
@@ -106,19 +110,35 @@ struct HarnessMonitorAppCommands: Commands {
 
   @CommandsBuilder private var viewCommands: some Commands {
     CommandGroup(after: .toolbar) {
-      Button("Increase Text Size", action: increaseTextSize)
-        .keyboardShortcut("+", modifiers: .command)
-        .disabled(!canIncreaseTextSize || policyCanvasZoomFocus != nil)
+      // Keep inactive menu items visible, but only the active surface owns the
+      // key equivalents. AppKit can resolve Cmd-- / Cmd-0 against a disabled
+      // duplicate before the dashboard text-size action sees the chord.
+      if hasPolicyCanvasZoomFocus {
+        Button("Increase Text Size", action: increaseTextSize)
+          .disabled(true)
+      } else {
+        Button("Increase Text Size", action: increaseTextSize)
+          .keyboardShortcut("+", modifiers: .command)
+          .disabled(!canIncreaseTextSize)
+      }
 
-      Button("Decrease Text Size", action: decreaseTextSize)
-        .keyboardShortcut("-", modifiers: .command)
-        .disabled(!canDecreaseTextSize || policyCanvasZoomFocus != nil)
+      if hasPolicyCanvasZoomFocus {
+        Button("Decrease Text Size", action: decreaseTextSize)
+          .disabled(true)
+      } else {
+        Button("Decrease Text Size", action: decreaseTextSize)
+          .keyboardShortcut("-", modifiers: .command)
+          .disabled(!canDecreaseTextSize)
+      }
 
-      Button("Reset Text Size", action: resetTextSize)
-        .keyboardShortcut("0", modifiers: .command)
-        .disabled(
-          textSizeIndex == HarnessMonitorTextSize.defaultIndex
-            || policyCanvasZoomFocus != nil)
+      if hasPolicyCanvasZoomFocus {
+        Button("Reset Text Size", action: resetTextSize)
+          .disabled(true)
+      } else {
+        Button("Reset Text Size", action: resetTextSize)
+          .keyboardShortcut("0", modifiers: .command)
+          .disabled(textSizeIndex == HarnessMonitorTextSize.defaultIndex)
+      }
 
       Divider()
 
@@ -127,12 +147,10 @@ struct HarnessMonitorAppCommands: Commands {
     }
   }
 
-  /// Scene-level keyboard shortcuts for canvas zoom. All three primary zoom
-  /// chords (Cmd-=, Cmd--, Cmd-0) plus the Mac-standard alternate Cmd-= live
-  /// here, gated on `policyCanvasZoomFocus != nil` so the chords only
-  /// intercept when a canvas owns scene focus. Non-canvas scenes leave the
-  /// chords for the text-size shortcuts above (which themselves gate off
-  /// when a canvas is focused, so the two paths never fire together).
+  /// Scene-level keyboard shortcuts for canvas zoom. Bind Cmd-=, Cmd--, and
+  /// Cmd-0 only when a canvas owns scene focus. The inactive menu items stay
+  /// visible but unbound so AppKit does not route those chords into a disabled
+  /// duplicate before the active command handles them.
   ///
   /// The visible zoom HUD buttons on `PolicyCanvasZoomControls` stay
   /// clickable but no longer carry `.keyboardShortcut` modifiers; one source
@@ -140,23 +158,41 @@ struct HarnessMonitorAppCommands: Commands {
   /// auditable from a single file.
   @CommandsBuilder private var policyCanvasZoomCommands: some Commands {
     CommandGroup(after: .toolbar) {
-      Button("Zoom In") {
-        policyCanvasZoomFocus?.dispatcher.performZoomIn()
+      if let zoomFocus = policyCanvasZoomFocus {
+        Button("Zoom In") {
+          zoomFocus.dispatcher.performZoomIn()
+        }
+        .keyboardShortcut("=", modifiers: .command)
+      } else {
+        Button("Zoom In") {
+          policyCanvasZoomFocus?.dispatcher.performZoomIn()
+        }
+        .disabled(true)
       }
-      .keyboardShortcut("=", modifiers: .command)
-      .disabled(policyCanvasZoomFocus == nil)
 
-      Button("Zoom Out") {
-        policyCanvasZoomFocus?.dispatcher.performZoomOut()
+      if let zoomFocus = policyCanvasZoomFocus {
+        Button("Zoom Out") {
+          zoomFocus.dispatcher.performZoomOut()
+        }
+        .keyboardShortcut("-", modifiers: .command)
+      } else {
+        Button("Zoom Out") {
+          policyCanvasZoomFocus?.dispatcher.performZoomOut()
+        }
+        .disabled(true)
       }
-      .keyboardShortcut("-", modifiers: .command)
-      .disabled(policyCanvasZoomFocus == nil)
 
-      Button("Reset Zoom") {
-        policyCanvasZoomFocus?.dispatcher.performResetZoom()
+      if let zoomFocus = policyCanvasZoomFocus {
+        Button("Reset Zoom") {
+          zoomFocus.dispatcher.performResetZoom()
+        }
+        .keyboardShortcut("0", modifiers: .command)
+      } else {
+        Button("Reset Zoom") {
+          policyCanvasZoomFocus?.dispatcher.performResetZoom()
+        }
+        .disabled(true)
       }
-      .keyboardShortcut("0", modifiers: .command)
-      .disabled(policyCanvasZoomFocus == nil)
     }
   }
 
