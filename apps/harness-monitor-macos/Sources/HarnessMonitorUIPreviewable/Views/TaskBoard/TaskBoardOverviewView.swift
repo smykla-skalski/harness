@@ -159,6 +159,16 @@ public struct TaskBoardOverviewView: View {
     .accessibilityElement(children: .contain)
     .accessibilityIdentifier("harness.task-board.overview")
   }
+
+  var selectedTaskBoardItemIDValue: String? {
+    get { selectedTaskBoardItemID }
+    nonmutating set { selectedTaskBoardItemID = newValue }
+  }
+
+  var isCreatingTaskBoardItemValue: Bool {
+    get { isCreatingTaskBoardItem }
+    nonmutating set { isCreatingTaskBoardItem = newValue }
+  }
 }
 
 extension TaskBoardOverviewView {
@@ -371,100 +381,6 @@ extension TaskBoardOverviewView {
       .frame(maxWidth: .infinity, minHeight: 180)
       .background(
         .background.opacity(0.45), in: .rect(cornerRadius: HarnessMonitorTheme.cornerRadiusSM))
-  }
-
-  private var selectedTaskBoardItem: TaskBoardItem? {
-    guard let selectedTaskBoardItemID else { return nil }
-    return taskBoardItems.first { $0.id == selectedTaskBoardItemID }
-  }
-
-  private func openTaskBoardItem(_ item: TaskBoardItem) {
-    switch TaskBoardOverviewItemBehavior.selectionAction(for: item) {
-    case .openLinkedTask:
-      isCreatingTaskBoardItem = false
-      selectedTaskBoardItemID = nil
-      onOpenTaskBoardItem(item)
-    case .selectBoardItem:
-      isCreatingTaskBoardItem = false
-      selectedTaskBoardItemID = item.id
-    }
-  }
-
-  private func moveTaskBoardItem(_ itemID: String, to lane: TaskBoardInboxLane) -> Bool {
-    guard let onMoveTaskBoardItem else {
-      return false
-    }
-    guard
-      let item = taskBoardItems.first(where: { $0.id == itemID }),
-      let currentLane = TaskBoardInboxLane(status: item.status),
-      currentLane != lane
-    else {
-      return false
-    }
-    onMoveTaskBoardItem(itemID, lane.taskBoardDropStatus(for: item))
-    return true
-  }
-
-  private func moveInboxItem(
-    _ payload: TaskBoardInboxItemDragPayload,
-    to lane: TaskBoardInboxLane
-  ) -> Bool {
-    guard
-      let onMoveInboxItem,
-      let status = lane.taskDropStatus,
-      let item = snapshot.items.first(where: {
-        $0.session.sessionId == payload.sessionID && $0.task.taskId == payload.taskID
-      }),
-      item.lane != lane
-    else {
-      return false
-    }
-    onMoveInboxItem(item, status)
-    return true
-  }
-
-  private func clearSelectedTaskBoardItem() {
-    selectedTaskBoardItemID = nil
-    isCreatingTaskBoardItem = false
-  }
-
-  private var selectionClearingDeleteAction: ((TaskBoardItem) -> Void)? {
-    guard let delete = onDeleteTaskBoardItem else { return nil }
-    return { item in
-      if selectedTaskBoardItemID == item.id {
-        selectedTaskBoardItemID = nil
-      }
-      delete(item)
-    }
-  }
-
-  private func startTaskBoardItemCreation() {
-    selectedTaskBoardItemID = nil
-    isCreatingTaskBoardItem = true
-  }
-
-  private func runOrchestratorOnce() {
-    onRunTaskBoardOrchestratorOnce?(TaskBoardOrchestratorRunOnceRequest())
-  }
-
-  private func runOrchestratorOnceForItem(_ item: TaskBoardItem) {
-    onRunTaskBoardOrchestratorOnce?(TaskBoardOverviewItemBehavior.runOnceRequest(for: item))
-  }
-
-  private var selectedTaskBoardItemEvaluateAction: ((TaskBoardItem) -> Void)? {
-    guard onEvaluateTaskBoardItem != nil || onEvaluateTaskBoard != nil else {
-      return nil
-    }
-    return evaluateSelectedTaskBoardItem
-  }
-
-  private func evaluateSelectedTaskBoardItem(_ item: TaskBoardItem) {
-    if let onEvaluateTaskBoardItem {
-      onEvaluateTaskBoardItem(item)
-    } else {
-      onEvaluateTaskBoard?()
-    }
-    selectedTaskBoardItemID = item.id
   }
 
 }

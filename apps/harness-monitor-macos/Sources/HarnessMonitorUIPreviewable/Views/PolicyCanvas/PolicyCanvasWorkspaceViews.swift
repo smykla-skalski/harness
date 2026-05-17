@@ -43,9 +43,14 @@ struct PolicyCanvasViewport: View {
   @Environment(\.fontScale)
   private var fontScale
 
+  var magnifyStartZoomValue: CGFloat? {
+    get { magnifyStartZoom }
+    nonmutating set { magnifyStartZoom = newValue }
+  }
+
   var body: some View {
     GeometryReader { proxy in
-      ScrollViewReader { scrollProxy in
+      ScrollViewReader { _ in
         let edges = viewModel.edges
         let portAnchors = viewModel.portAnchors(for: edges)
         let routes = policyCanvasDisplayedRoutes(
@@ -193,7 +198,6 @@ struct PolicyCanvasViewport: View {
         .simultaneousGesture(magnifyGesture(in: proxy.size))
         .onAppear {
           centerViewportIfNeeded(
-            scrollProxy,
             viewportSize: proxy.size,
             visibleBounds: visibleBounds
           )
@@ -201,7 +205,6 @@ struct PolicyCanvasViewport: View {
         }
         .onChange(of: viewModel.viewportCenteringGeneration, initial: false) {
           centerViewportIfNeeded(
-            scrollProxy,
             viewportSize: proxy.size,
             visibleBounds: visibleBounds
           )
@@ -259,18 +262,19 @@ struct PolicyCanvasViewport: View {
   }
 
   private func centerViewportIfNeeded(
-    _ scrollProxy: ScrollViewProxy,
     viewportSize: CGSize,
     visibleBounds: CGRect
   ) {
     guard viewModel.consumeViewportCenteringRequest() else {
       return
     }
+    let contentSize = policyCanvasVisibleContentSize(visibleBounds: visibleBounds)
     let restoredSceneState = PolicyCanvasView.sceneState(
       for: viewModel.pipelineIdentity,
       raw: storedPipelineStateRaw,
       suppressesSceneStorage: suppressesSceneStorage
     )
+    var targetZoom = viewModel.zoom
     if let restoredSceneState, !hasAppliedRestoredSceneZoom {
       let restoredZoom = PolicyCanvasViewModel.sanitizedZoom(
         CGFloat(restoredSceneState.zoom),
@@ -279,21 +283,42 @@ struct PolicyCanvasViewport: View {
       if abs(restoredZoom - viewModel.zoom) > 0.001 {
         viewModel.setZoom(restoredZoom)
       }
+      targetZoom = restoredZoom
       hasAppliedRestoredSceneZoom = true
     } else if restoredSceneState == nil {
       let fittedZoom = viewModel.fittedInitialZoom(
         for: viewportSize,
         contentBounds: visibleBounds
       )
-      let targetZoom = viewModel.isEmpty ? viewModel.zoom : min(viewModel.zoom, fittedZoom)
+      targetZoom = viewModel.isEmpty ? viewModel.zoom : min(viewModel.zoom, fittedZoom)
       if abs(targetZoom - viewModel.zoom) > 0.001 {
         viewModel.setZoom(targetZoom)
       }
     }
+    let targetContentOrigin = policyCanvasViewportContentOrigin(
+      viewportSize: viewportSize,
+      contentSize: contentSize,
+      zoom: targetZoom
+    )
+    let targetAnchorPoint =
+      policyCanvasInitialViewportAnchorPoint(
+        contentBounds: viewModel.canvasContentBounds,
+        zoom: targetZoom
+      )
+      .applying(
+        CGAffineTransform(
+          translationX: targetContentOrigin.x,
+          y: targetContentOrigin.y
+        )
+      )
+    let targetScrollPoint = policyCanvasCenteredScrollPoint(
+      anchorPoint: targetAnchorPoint,
+      viewportSize: viewportSize
+    )
     Task { @MainActor in
       await Task.yield()
-      await Task.yield()
-      scrollProxy.scrollTo(PolicyCanvasLayout.initialViewportAnchorID, anchor: .center)
+      isRestoringCommandScrollPosition = true
+      scrollPosition = ScrollPosition(point: targetScrollPoint)
     }
   }
 
@@ -385,36 +410,6 @@ struct PolicyCanvasViewport: View {
     scrollPosition = ScrollPosition(point: nextScrollPoint)
   }
 
-  /// Trackpad pinch gesture. `MagnifyGesture.Value.startAnchor` carries the
-  /// focal point as a unit-space `UnitPoint` over the gesture view's bounds,
-  /// which matches what `.scaleEffect(_:anchor:)` expects. Routing the same
-  /// `UnitPoint` into the view-model's `pinchAnchorUnit` keeps the content
-  /// under the user's fingers stationary in screen space across the pinch.
-  ///
-  /// `magnifyStartZoom` is captured on first `.onChanged` (the value is the
-  /// gesture's baseline zoom, not the running scale), so the per-tick math
-  /// is `baseZoom * value.magnification`. `value.magnification` is 1.0 at
-  /// pinch start and varies from there.
-  private func magnifyGesture(in viewportSize: CGSize) -> some Gesture {
-    MagnifyGesture(minimumScaleDelta: 0.01)
-      .onChanged { value in
-        let baseZoom = magnifyStartZoom ?? viewModel.zoom
-        if magnifyStartZoom == nil {
-          magnifyStartZoom = baseZoom
-        }
-        viewModel.setZoom(baseZoom * value.magnification, anchor: value.startAnchor)
-      }
-      .onEnded { _ in
-        magnifyStartZoom = nil
-        // Drop the anchor at end-of-gesture so subsequent chrome-button
-        // zooms render from the canvas top-leading origin (matching the
-        // visual contract of Cmd-+ / Cmd-= / Cmd-- / Cmd-0). The viewport
-        // size is captured here only as a future hook — anchors are unit
-        // space, so the dimension is not needed for the clear path.
-        _ = viewportSize
-        viewModel.clearPinchAnchor()
-      }
-  }
 }
 
 // `PolicyCanvasDottedGrid` lives in `PolicyCanvasGridLayers.swift`;

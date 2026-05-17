@@ -253,73 +253,13 @@ public struct SettingsTaskBoardSection: View {
     }
   }
 
-  private var gitSigningSection: some View {
-    Section {
-      Picker("Signing Mode", selection: $draft.signingMode) {
-        ForEach(TaskBoardGitSigningMode.allCases, id: \.self) { mode in
-          Text(mode.title).tag(mode)
-        }
-      }
-      .pickerStyle(.menu)
-      if draft.signingMode == .ssh {
-        pathField(
-          .keyFile(
-            title: "Signing SSH Key Path",
-            accessibilityIdentifier: HarnessMonitorAccessibility
-              .settingsTaskBoardSigningSSHKeyPathField
-          ),
-          text: $draft.signingSSHKeyPath
-        )
-        SettingsSecretField(
-          title: "Signing SSH Private Key",
-          placeholder: "Paste signing SSH private key material",
-          field: $draft.signingSSHPrivateKey,
-          accessibilityIdentifier: HarnessMonitorAccessibility.settingsTBSigningSSHKeyField
-        )
-        SettingsSecretField(
-          title: "Signing SSH Key Passphrase",
-          placeholder: "Optional passphrase",
-          field: $draft.signingSSHPrivateKeyPassphrase,
-          accessibilityIdentifier: HarnessMonitorAccessibility.settingsTBSigningSSHPassphraseField
-        )
-      }
-      if draft.signingMode == .gpg {
-        TextField("GPG Key ID", text: $draft.gpgKeyId)
-          .accessibilityIdentifier(HarnessMonitorAccessibility.settingsTaskBoardGPGKeyIDField)
-        pathField(
-          .keyFile(
-            title: "GPG Private Key Path",
-            accessibilityIdentifier: HarnessMonitorAccessibility
-              .settingsTaskBoardGPGPrivateKeyPathField
-          ),
-          text: $draft.gpgPrivateKeyPath
-        )
-        SettingsSecretField(
-          title: "GPG Private Key",
-          placeholder: "Paste ASCII-armored GPG private key",
-          field: $draft.gpgPrivateKey,
-          accessibilityIdentifier: HarnessMonitorAccessibility.settingsTaskBoardGPGPrivateKeyField
-        )
-        SettingsSecretField(
-          title: "GPG Key Passphrase",
-          placeholder: "Optional passphrase",
-          field: $draft.gpgPrivateKeyPassphrase,
-          accessibilityIdentifier: HarnessMonitorAccessibility.settingsTaskBoardGPGPassphraseField
-        )
-      }
-    } header: {
-      Text("Signing")
-        .harnessNativeFormSectionHeader()
-    } footer: {
-      Text(
-        "Choose how the daemon signs commits and tags it creates on your behalf."
-      )
-    }
-  }
-
   private func identityPrompt(_ detected: String?) -> Text? {
     guard let detected, !detected.isEmpty else { return nil }
     return Text(detected)
+  }
+
+  var draftBinding: Binding<TaskBoardGitSettingsDraft> {
+    $draft
   }
 
   private var shouldOfferAdoptDefaults: Bool {
