@@ -83,6 +83,7 @@ extension SessionWindowFlowTests {
     let sceneContentSource = try harnessSourceFile(
       named: "App/HarnessMonitorApp+SceneContent.swift")
     let routerSource = try harnessSourceFile(named: "App/HarnessMonitorInitialWindowRouter.swift")
+    let replayerSource = try harnessSourceFile(named: "App/SessionWindowTabGroupReplayer.swift")
     let rootSource = try harnessSourceFile(named: "App/SessionWindowRootView.swift")
     let commandsSource = try harnessSourceFile(named: "Commands/WindowMenuCommands.swift")
     let tabbingAccessorPath = harnessSourceURL(named: "App/SessionWindowTabbing.swift").path
@@ -145,8 +146,8 @@ extension SessionWindowFlowTests {
     #expect(settingsSource.contains("titlebarAppearsTransparent: true"))
     #expect(settingsSource.contains(".harnessMonitorBackgroundExtensionEffect()"))
     #expect(routerSource.contains("SessionWindowTabGroupReplayer.replay("))
-    #expect(routerSource.contains("let tabReadyWindows = grouping.sessionIDs.compactMap"))
-    #expect(routerSource.contains("isWindowTabReady"))
+    #expect(replayerSource.contains("let tabReadyWindows = grouping.sessionIDs.compactMap"))
+    #expect(replayerSource.contains("isWindowTabReady"))
     #expect(tabbingSupportSource.contains("tabbingIdentifier"))
     #expect(tabbingSupportSource.contains("shouldPreferTabbedOpen"))
     #expect(tabbingSupportSource.contains("visibleTabTargetWindow"))

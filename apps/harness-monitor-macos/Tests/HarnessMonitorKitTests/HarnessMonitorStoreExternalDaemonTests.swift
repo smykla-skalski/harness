@@ -256,14 +256,6 @@ struct HarnessMonitorStoreExternalDaemonTests {
   func manifestWatcherFiresOnFirstWrite() async throws {
     let tempRoot = FileManager.default.temporaryDirectory
       .appendingPathComponent("harness-monitor-watcher-\(UUID().uuidString)", isDirectory: true)
-    let daemonDir =
-      tempRoot
-      .appendingPathComponent("harness", isDirectory: true)
-      .appendingPathComponent("daemon", isDirectory: true)
-    try FileManager.default.createDirectory(
-      at: daemonDir,
-      withIntermediateDirectories: true
-    )
     defer {
       try? FileManager.default.removeItem(at: tempRoot)
     }
@@ -275,6 +267,11 @@ struct HarnessMonitorStoreExternalDaemonTests {
     )
 
     let manifestURL = HarnessMonitorPaths.manifestURL(using: environment)
+    let daemonDir = HarnessMonitorPaths.daemonRoot(using: environment)
+    try FileManager.default.createDirectory(
+      at: daemonDir,
+      withIntermediateDirectories: true
+    )
     #expect(manifestURL.path.hasPrefix(tempRoot.path))
 
     let recorder = ManifestChangeRecorder()

@@ -142,7 +142,7 @@ struct SessionSidebarMultiSelectTests {
   @Test("Sidebar rows remove drag handle and drop target chrome")
   func sidebarRowsRemoveDragHandleAndDropTargetChrome() throws {
     let sessionSource = try sourceFile(named: "SessionSidebarRow.swift")
-    let sharedSource = try sourceFile(named: "HarnessMonitorSidebarRow.swift")
+    let sharedSource = try sharedSourceFile(named: "HarnessMonitorSidebarRow.swift")
 
     #expect(sessionSource.contains("HarnessMonitorSidebarRow("))
     #expect(!sharedSource.contains("showsDragHandle"))
@@ -169,7 +169,7 @@ struct SessionSidebarMultiSelectTests {
 
   @Test("Sidebar collapse helpers resync stored list selection")
   func sidebarCollapseHelpersResyncStoredListSelection() throws {
-    let source = try sourceFile(named: "SessionSidebar.swift")
+    let source = try sourceFile(named: "SessionSidebar+Selection.swift")
 
     #expect(source.contains("setListSelection([selection])"))
     #expect(source.contains("setListSelection([state.selection])"))
@@ -195,7 +195,7 @@ struct SessionSidebarMultiSelectTests {
     let sidebarSource = try sourceFile(named: "SessionSidebar.swift")
     let decisionSource = try sourceFile(named: "SessionSidebarDecisionSection.swift")
     let sessionRowSource = try sourceFile(named: "SessionSidebarRow.swift")
-    let rowSource = try sourceFile(named: "HarnessMonitorSidebarRow.swift")
+    let rowSource = try sharedSourceFile(named: "HarnessMonitorSidebarRow.swift")
 
     #expect(sessionRowSource.contains("HarnessMonitorSidebarRow("))
     #expect(!rowSource.contains("AnyView"))
@@ -219,6 +219,23 @@ struct SessionSidebarMultiSelectTests {
       repoRoot
       .appendingPathComponent(
         "apps/harness-monitor-macos/Sources/HarnessMonitorUIPreviewable/Views/Sessions"
+      )
+      .appendingPathComponent(name)
+    return try String(contentsOf: fileURL, encoding: .utf8)
+  }
+
+  private func sharedSourceFile(named name: String) throws -> String {
+    let testsDirectory = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
+    let repoRoot =
+      testsDirectory
+      .deletingLastPathComponent()
+      .deletingLastPathComponent()
+      .deletingLastPathComponent()
+      .deletingLastPathComponent()
+    let fileURL =
+      repoRoot
+      .appendingPathComponent(
+        "apps/harness-monitor-macos/Sources/HarnessMonitorUIPreviewable/Views/Shared"
       )
       .appendingPathComponent(name)
     return try String(contentsOf: fileURL, encoding: .utf8)

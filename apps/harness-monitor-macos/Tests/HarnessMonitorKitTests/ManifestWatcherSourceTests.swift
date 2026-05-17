@@ -17,8 +17,8 @@ struct ManifestWatcherSourceTests {
   func externalDaemonReleaseOptInStaysAuditScoped() throws {
     let source = try sourceFile(named: "Support/HarnessMonitorDaemonOwnership.swift")
 
-    #expect(source.contains("#if DEBUG || HARNESS_MONITOR_AUDIT_EXTERNAL_DAEMON"))
-    #expect(source.contains("#else\n      _ = environment\n      self = .managed"))
+    #expect(source.contains("Supported in development and production"))
+    #expect(!source.contains("HARNESS_MONITOR_AUDIT_EXTERNAL_DAEMON"))
   }
 
   private func sourceFile(named relativePath: String) throws -> String {

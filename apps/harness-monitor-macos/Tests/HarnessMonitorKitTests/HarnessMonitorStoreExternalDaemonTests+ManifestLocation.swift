@@ -7,7 +7,7 @@ import Testing
 extension HarnessMonitorStoreExternalDaemonTests {
   @Test("External bootstrap adopts the live diagnostics manifest path")
   func externalBootstrapAdoptsResolvedManifestPath() async {
-    let manifestPath = "/tmp/runtime-lanes/copilot-relaunch/harness/daemon/manifest.json"
+    let manifestPath = "/tmp/runtime-lanes/copilot-relaunch/harness/daemon/external/manifest.json"
     let daemonRoot = URL(fileURLWithPath: manifestPath)
       .deletingLastPathComponent()
       .path
@@ -72,8 +72,8 @@ extension HarnessMonitorStoreExternalDaemonTests {
 
   @Test("External bootstrap rediscovers a manifest that appears after startup failure")
   func externalBootstrapRediscoversManifestAfterStartupFailure() async throws {
-    let staleManifestPath = "/tmp/harness/daemon/manifest.json"
-    let liveManifestPath = "/tmp/runtime-lanes/late-start/harness/daemon/manifest.json"
+    let staleManifestPath = "/tmp/harness/daemon/external/manifest.json"
+    let liveManifestPath = "/tmp/runtime-lanes/late-start/harness/daemon/external/manifest.json"
     let liveDaemonRoot = URL(fileURLWithPath: liveManifestPath).deletingLastPathComponent().path
     let liveTokenPath = "\(liveDaemonRoot)/auth-token"
 
@@ -152,7 +152,7 @@ extension HarnessMonitorStoreExternalDaemonTests {
     #expect(await daemon.recordedWarmUpCallCount() >= 2)
     #expect(
       store.connectionEvents.contains { event in
-        event.detail == "Discovered live external daemon manifest, re-bootstrapping"
+        event.detail == "Discovered live daemon manifest, re-bootstrapping"
       }
     )
   }

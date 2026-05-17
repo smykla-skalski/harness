@@ -12,9 +12,10 @@ struct SessionWindowRouteContentSelectionTests {
 
     #expect(
       sections.contains(
-        "ForEach([SessionWindowRoute.overview, .timeline, .agents, .decisions])"
+        "[.overview, .policyCanvas, .timeline, .agents, .decisions]"
       )
     )
+    #expect(sections.contains("ForEach(sidebarRoutes)"))
     #expect(sidebar.contains("sidebarRouteSection"))
     #expect(sidebar.contains("if showsDeferredSidebarSections {"))
     #expect(sidebar.contains("pendingSidebarLoadingSection"))
@@ -110,7 +111,7 @@ struct SessionWindowRouteContentSelectionTests {
     #expect(routeContent.contains("SessionTaskRouteSelectionPolicy.preferredRouteDetailTaskID"))
     #expect(routeContent.contains("state.selectRoute(.tasks)"))
     #expect(detailFocus.contains("case .route(.tasks):"))
-    #expect(detailFocus.contains("routeTaskDetailContent()"))
+    #expect(detailFocus.contains("SessionTaskDetailPane("))
   }
 
   @Test("Session layouts follow the rendered route when switching route-only surfaces")

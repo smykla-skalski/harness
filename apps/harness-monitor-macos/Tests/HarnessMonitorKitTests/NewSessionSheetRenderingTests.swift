@@ -107,7 +107,7 @@ final class NewSessionSheetRenderingTests {
 
     #expect(
       HarnessMonitorAgentLaunchDefaults.preferredSelection(userDefaults: defaults)
-        == .tui(.codex)
+        == .codex
     )
   }
 
@@ -118,7 +118,7 @@ final class NewSessionSheetRenderingTests {
 
     #expect(
       HarnessMonitorAgentLaunchDefaults.preferredSelection(userDefaults: defaults)
-        == .tui(.codex)
+        == .codex
     )
   }
 
@@ -133,7 +133,7 @@ final class NewSessionSheetRenderingTests {
 
     #expect(
       HarnessMonitorAgentLaunchDefaults.preferredSelection(userDefaults: defaults)
-        == .tui(.codex)
+        == .codex
     )
     #expect(
       !HarnessMonitorAgentLaunchDefaults.hasExplicitPreferredSelection(userDefaults: defaults))

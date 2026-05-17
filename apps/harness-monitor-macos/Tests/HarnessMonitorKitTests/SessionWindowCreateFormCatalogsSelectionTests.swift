@@ -124,7 +124,7 @@ struct SessionWindowCreateFormCatalogsSelectionTests {
 
   @Test("Provider mode badges use static footer-style font and flat chrome")
   func providerModeBadgesUseStaticFooterStyleFontAndFlatChrome() throws {
-    let source = try sessionSourceFile(named: "SessionWindowCreateAgentRuntimePane.swift")
+    let source = try sessionSourceFile(named: "SessionWindowCreateAgentRuntimePane+Support.swift")
 
     #expect(
       source.contains(
