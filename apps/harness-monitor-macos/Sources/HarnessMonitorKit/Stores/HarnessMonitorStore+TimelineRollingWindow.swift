@@ -1,64 +1,13 @@
 import Foundation
 
-extension HarnessMonitorStore {
-  func resolvedSelectedTimelineWindow(
-    _ response: TimelineWindowResponse,
-    request: TimelineWindowRequest,
-    retainedLimit: Int?
-  ) -> (timeline: [TimelineEntry], timelineWindow: TimelineWindowResponse) {
-    if retainedLimit != nil {
-      if let rollingResolution = TimelineRollingWindowResolver.resolve(
-        existingTimeline: timeline,
-        currentWindow: timelineWindow,
-        response: response,
-        request: request,
-        retainedLimit: retainedLimit
-      ) {
-        return (rollingResolution.timeline, rollingResolution.timelineWindow)
-      }
-    }
-
-    let resolvedTimeline = response.entries ?? timeline
-    let resolvedWindow =
-      normalizedTimelineWindow(response.metadataOnly, loadedTimeline: resolvedTimeline)
-      ?? response.metadataOnly
-    return (resolvedTimeline, resolvedWindow)
-  }
-
-  func resolvedSelectedTimelinePage(
-    _ response: TimelineWindowResponse,
-    currentRevision: Int64?,
-    retainedLimit: Int?
-  ) -> (timeline: [TimelineEntry], timelineWindow: TimelineWindowResponse?) {
-    if response.windowStart == 0 || response.revision != currentRevision {
-      let resolvedTimeline = response.entries ?? timeline
-      return (
-        resolvedTimeline,
-        normalizedTimelineWindow(response.metadataOnly, loadedTimeline: resolvedTimeline)
-      )
-    }
-
-    if let responseEntries = response.entries {
-      let resolution = TimelineRollingWindowResolver.appendingOlder(
-        existingTimeline: timeline,
-        currentWindow: timelineWindow,
-        response: response,
-        olderEntries: responseEntries,
-        retainedLimit: retainedLimit
-      )
-      return (resolution.timeline, resolution.timelineWindow)
-    }
-
-    return (
-      timeline,
-      normalizedTimelineWindow(response.metadataOnly, loadedTimeline: timeline)
-    )
-  }
-}
-
-struct TimelineRollingWindowResolution {
+struct TimelineRollingWindowResolution: Sendable {
   let timeline: [TimelineEntry]
   let timelineWindow: TimelineWindowResponse
+}
+
+struct TimelineWindowResolutionOutput: Sendable {
+  let timeline: [TimelineEntry]
+  let timelineWindow: TimelineWindowResponse?
 }
 
 enum TimelineRollingWindowResolver {
@@ -219,4 +168,150 @@ private struct TimelineEntryKey: Hashable {
     recordedAt = entry.recordedAt
     entryID = entry.entryId
   }
+}
+
+actor TimelineWindowWorker {
+  func resolveSelectedWindow(
+    existingTimeline: [TimelineEntry],
+    currentWindow: TimelineWindowResponse?,
+    response: TimelineWindowResponse,
+    request: TimelineWindowRequest,
+    retainedLimit: Int?
+  ) -> TimelineWindowResolutionOutput {
+    if retainedLimit != nil {
+      if let rollingResolution = TimelineRollingWindowResolver.resolve(
+        existingTimeline: existingTimeline,
+        currentWindow: currentWindow,
+        response: response,
+        request: request,
+        retainedLimit: retainedLimit
+      ) {
+        return TimelineWindowResolutionOutput(
+          timeline: rollingResolution.timeline,
+          timelineWindow: rollingResolution.timelineWindow
+        )
+      }
+    }
+
+    let resolvedTimeline = response.entries ?? existingTimeline
+    let resolvedWindow =
+      HarnessMonitorStore.normalizedTimelineWindow(
+        response.metadataOnly,
+        loadedTimeline: resolvedTimeline
+      )
+      ?? response.metadataOnly
+    return TimelineWindowResolutionOutput(
+      timeline: resolvedTimeline,
+      timelineWindow: resolvedWindow
+    )
+  }
+
+  func resolveSelectedPage(
+    existingTimeline: [TimelineEntry],
+    currentWindow: TimelineWindowResponse?,
+    response: TimelineWindowResponse,
+    currentRevision: Int64?,
+    retainedLimit: Int?
+  ) -> TimelineWindowResolutionOutput {
+    if response.windowStart == 0 || response.revision != currentRevision {
+      let resolvedTimeline = response.entries ?? existingTimeline
+      return TimelineWindowResolutionOutput(
+        timeline: resolvedTimeline,
+        timelineWindow: HarnessMonitorStore.normalizedTimelineWindow(
+          response.metadataOnly,
+          loadedTimeline: resolvedTimeline
+        )
+      )
+    }
+
+    if let responseEntries = response.entries {
+      let resolution = TimelineRollingWindowResolver.appendingOlder(
+        existingTimeline: existingTimeline,
+        currentWindow: currentWindow,
+        response: response,
+        olderEntries: responseEntries,
+        retainedLimit: retainedLimit
+      )
+      return TimelineWindowResolutionOutput(
+        timeline: resolution.timeline,
+        timelineWindow: resolution.timelineWindow
+      )
+    }
+
+    return TimelineWindowResolutionOutput(
+      timeline: existingTimeline,
+      timelineWindow: HarnessMonitorStore.normalizedTimelineWindow(
+        response.metadataOnly,
+        loadedTimeline: existingTimeline
+      )
+    )
+  }
+
+  func resolveSessionWindow(
+    existingTimeline: [TimelineEntry],
+    currentWindow: TimelineWindowResponse?,
+    response: TimelineWindowResponse,
+    request: TimelineWindowRequest,
+    retainedLimit: Int?
+  ) -> TimelineWindowResolutionOutput {
+    if let rollingResolution = TimelineRollingWindowResolver.resolve(
+      existingTimeline: existingTimeline,
+      currentWindow: currentWindow,
+      response: response,
+      request: request,
+      retainedLimit: retainedLimit
+    ) {
+      return TimelineWindowResolutionOutput(
+        timeline: rollingResolution.timeline,
+        timelineWindow: rollingResolution.timelineWindow
+      )
+    }
+
+    let resolvedTimeline = response.entries ?? existingTimeline
+    let resolvedWindow =
+      HarnessMonitorStore.normalizedTimelineWindow(
+        response.metadataOnly,
+        loadedTimeline: resolvedTimeline
+      )
+      ?? response.metadataOnly
+    return TimelineWindowResolutionOutput(
+      timeline: resolvedTimeline,
+      timelineWindow: resolvedWindow
+    )
+  }
+
+  func prependNewer(
+    existingTimeline: [TimelineEntry],
+    currentWindow: TimelineWindowResponse,
+    response: TimelineWindowResponse,
+    newerEntries: [TimelineEntry],
+    retainedLimit: Int?
+  ) -> TimelineWindowResolutionOutput {
+    let resolution = TimelineRollingWindowResolver.prependingNewer(
+      existingTimeline: existingTimeline,
+      currentWindow: currentWindow,
+      response: response,
+      newerEntries: newerEntries,
+      retainedLimit: retainedLimit
+    )
+    return TimelineWindowResolutionOutput(
+      timeline: resolution.timeline,
+      timelineWindow: resolution.timelineWindow
+    )
+  }
+
+  func normalize(
+    timeline: [TimelineEntry],
+    timelineWindow: TimelineWindowResponse?
+  ) -> TimelineWindowResolutionOutput {
+    TimelineWindowResolutionOutput(
+      timeline: timeline,
+      timelineWindow: HarnessMonitorStore.normalizedTimelineWindow(
+        timelineWindow,
+        loadedTimeline: timeline
+      )
+    )
+  }
+
+  func waitForIdle() {}
 }

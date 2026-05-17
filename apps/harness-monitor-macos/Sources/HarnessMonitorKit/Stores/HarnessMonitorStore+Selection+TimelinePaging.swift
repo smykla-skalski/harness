@@ -129,7 +129,7 @@ extension HarnessMonitorStore {
         else {
           return
         }
-        self.applySelectedTimelinePageResponse(
+        await self.applySelectedTimelinePageResponse(
           response,
           currentRevision: context.currentRevision,
           retainedLimit: context.retainedLimit,

@@ -2,10 +2,7 @@ import Foundation
 
 extension HarnessMonitorStore {
   func fallbackTimelineWindow(for timeline: [TimelineEntry]) -> TimelineWindowResponse? {
-    guard !timeline.isEmpty else {
-      return nil
-    }
-    return TimelineWindowResponse.fallbackMetadata(for: timeline)
+    Self.fallbackTimelineWindow(for: timeline)
   }
 
   func selectedTimelineRequestLimit(
@@ -39,6 +36,22 @@ extension HarnessMonitorStore {
   }
 
   func normalizedTimelineWindow(
+    _ timelineWindow: TimelineWindowResponse?,
+    loadedTimeline: [TimelineEntry]
+  ) -> TimelineWindowResponse? {
+    Self.normalizedTimelineWindow(timelineWindow, loadedTimeline: loadedTimeline)
+  }
+
+  nonisolated static func fallbackTimelineWindow(
+    for timeline: [TimelineEntry]
+  ) -> TimelineWindowResponse? {
+    guard !timeline.isEmpty else {
+      return nil
+    }
+    return TimelineWindowResponse.fallbackMetadata(for: timeline)
+  }
+
+  nonisolated static func normalizedTimelineWindow(
     _ timelineWindow: TimelineWindowResponse?,
     loadedTimeline: [TimelineEntry]
   ) -> TimelineWindowResponse? {

@@ -56,14 +56,14 @@ extension HarnessMonitorStore {
         return (latestTimeline, normalizedWindow)
       }
 
-      let merged = TimelineRollingWindowResolver.prependingNewer(
+      let merged = await timelineWindowWorker.prependNewer(
         existingTimeline: loadedTimeline,
         currentWindow: loadedWindow,
         response: deltaResponse,
         newerEntries: deltaEntries,
         retainedLimit: limit
       )
-      return (merged.timeline, merged.timelineWindow)
+      return (merged.timeline, merged.timelineWindow ?? loadedWindow)
     }
 
     if deltaResponse.unchanged || deltaResponse.revision == loadedWindow.revision {
@@ -105,9 +105,13 @@ extension HarnessMonitorStore {
     currentRevision: Int64?,
     retainedLimit: Int? = nil,
     selectedSession: SessionDetail
-  ) {
-    let resolved = resolvedSelectedTimelinePage(
-      response,
+  ) async {
+    let currentTimeline = timeline
+    let currentWindow = timelineWindow
+    let resolved = await timelineWindowWorker.resolveSelectedPage(
+      existingTimeline: currentTimeline,
+      currentWindow: currentWindow,
+      response: response,
       currentRevision: currentRevision,
       retainedLimit: retainedLimit
     )
