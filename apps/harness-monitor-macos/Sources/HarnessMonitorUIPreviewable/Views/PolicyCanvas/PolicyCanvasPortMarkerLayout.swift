@@ -1,5 +1,20 @@
 import SwiftUI
 
+enum PolicyCanvasRouteEndpointRole: Hashable, Sendable {
+  case source
+  case target
+}
+
+struct PolicyCanvasRouteTerminalKey: Hashable, Sendable {
+  let edgeID: String
+  let role: PolicyCanvasRouteEndpointRole
+}
+
+struct PolicyCanvasPortTerminal: Equatable, Sendable {
+  let side: PolicyCanvasPortSide
+  let axisOffset: CGFloat
+}
+
 struct PolicyCanvasPortMarker: Identifiable, Hashable, Sendable {
   let id: String
   let axisOffset: CGFloat
@@ -7,14 +22,34 @@ struct PolicyCanvasPortMarker: Identifiable, Hashable, Sendable {
 }
 
 struct PolicyCanvasPortMarkerLayout: Equatable, Sendable {
+  private let terminalsByKey: [PolicyCanvasRouteTerminalKey: PolicyCanvasPortTerminal]
   private let offsetsByEndpoint: [PolicyCanvasPortEndpoint: [PolicyCanvasPortSide: [CGFloat]]]
 
-  static let empty = Self(offsetsByEndpoint: [:])
+  static let empty = Self(terminalsByKey: [:], endpointsByKey: [:])
 
-  init(offsetsByEndpoint: [PolicyCanvasPortEndpoint: [PolicyCanvasPortSide: [CGFloat]]]) {
-    self.offsetsByEndpoint = offsetsByEndpoint.mapValues { offsetsBySide in
-      offsetsBySide.mapValues(policyCanvasSortedUniquePortMarkerOffsets)
+  init(
+    terminalsByKey: [PolicyCanvasRouteTerminalKey: PolicyCanvasPortTerminal],
+    endpointsByKey: [PolicyCanvasRouteTerminalKey: PolicyCanvasPortEndpoint]
+  ) {
+    self.terminalsByKey = terminalsByKey
+    var offsets: [PolicyCanvasPortEndpoint: [PolicyCanvasPortSide: [CGFloat]]] = [:]
+    for (key, terminal) in terminalsByKey {
+      guard let endpoint = endpointsByKey[key] else {
+        continue
+      }
+      let endpointKey = policyCanvasCanonicalPortEndpoint(endpoint)
+      offsets[endpointKey, default: [:]][terminal.side, default: []].append(terminal.axisOffset)
     }
+    offsetsByEndpoint = offsets.mapValues { sideMap in
+      sideMap.mapValues(policyCanvasSortedUniquePortMarkerOffsets)
+    }
+  }
+
+  func terminal(
+    edgeID: String,
+    role: PolicyCanvasRouteEndpointRole
+  ) -> PolicyCanvasPortTerminal? {
+    terminalsByKey[PolicyCanvasRouteTerminalKey(edgeID: edgeID, role: role)]
   }
 
   func markers(
@@ -25,8 +60,7 @@ struct PolicyCanvasPortMarkerLayout: Equatable, Sendable {
     guard isVisible else {
       return []
     }
-    let key = policyCanvasCanonicalPortEndpoint(endpoint)
-    let offsets = offsetsByEndpoint[key]?[side] ?? [0]
+    let offsets = offsetsByEndpoint[policyCanvasCanonicalPortEndpoint(endpoint)]?[side] ?? [0]
     let primaryIndex = offsets.indices.min { left, right in
       abs(offsets[left]) < abs(offsets[right])
     } ?? offsets.startIndex
@@ -50,87 +84,236 @@ func policyCanvasCanonicalPortEndpoint(
   )
 }
 
-extension PolicyCanvasRouteWorkerInput {
+func policyCanvasRoutablePortSides(for kind: PolicyCanvasPortKind) -> [PolicyCanvasPortSide] {
+  switch kind {
+  case .input:
+    [.leading, .top]
+  case .output:
+    [.trailing, .bottom]
+  }
+}
+
+func policyCanvasShiftedRouteAnchor(
+  _ point: CGPoint,
+  side: PolicyCanvasPortSide,
+  terminal: PolicyCanvasPortTerminal
+) -> CGPoint {
+  switch side {
+  case .leading, .trailing:
+    CGPoint(x: point.x, y: point.y + terminal.axisOffset)
+  case .top, .bottom:
+    CGPoint(x: point.x + terminal.axisOffset, y: point.y)
+  }
+}
+
+extension PolicyCanvasPreparedRouteInput {
   func portMarkerLayout(
     routes: [String: PolicyCanvasEdgeRoute],
     nodeIndex: [String: PolicyCanvasRouteNode]
   ) -> PolicyCanvasPortMarkerLayout {
-    let orderedEdges = policyCanvasRouteBuildOrder(
-      edges: edges,
-      portAnchors: portAnchors(nodeIndex: nodeIndex)
-    )
-    let terminalSlots = policyCanvasRouteEndpointSlots(edges: orderedEdges)
-    var offsetsByEndpoint: [PolicyCanvasPortEndpoint: [PolicyCanvasPortSide: [CGFloat]]] = [:]
-    for edge in orderedEdges {
-      guard let route = routes[edge.id] else {
-        continue
-      }
-      insertMarkerOffset(
-        for: edge.source,
-        side: policyCanvasRouteSourceSide(route) ?? policyCanvasResolvedPortSide(for: edge.source),
-        slot: terminalSlots[edge.id]?.source ?? .single,
+    let entries = portMarkerEntries(routes: routes)
+    let groups = Dictionary(grouping: entries) { $0.endpointKey }
+    var terminals: [PolicyCanvasRouteTerminalKey: PolicyCanvasPortTerminal] = [:]
+    for groupEntries in groups.values {
+      assignPortMarkerTerminals(
+        entries: groupEntries.sorted(),
         nodeIndex: nodeIndex,
-        offsetsByEndpoint: &offsetsByEndpoint
-      )
-      insertMarkerOffset(
-        for: edge.target,
-        side: policyCanvasRouteTargetSide(route) ?? policyCanvasResolvedPortSide(for: edge.target),
-        slot: terminalSlots[edge.id]?.target ?? .single,
-        nodeIndex: nodeIndex,
-        offsetsByEndpoint: &offsetsByEndpoint
+        terminals: &terminals
       )
     }
-    return PolicyCanvasPortMarkerLayout(offsetsByEndpoint: offsetsByEndpoint)
+    return PolicyCanvasPortMarkerLayout(
+      terminalsByKey: terminals,
+      endpointsByKey: Dictionary(uniqueKeysWithValues: entries.map { ($0.key, $0.endpoint) })
+    )
   }
 
-  private func insertMarkerOffset(
-    for endpoint: PolicyCanvasPortEndpoint,
-    side: PolicyCanvasPortSide,
-    slot: PolicyCanvasRouteEndpointSlot,
+  private func portMarkerEntries(
+    routes: [String: PolicyCanvasEdgeRoute]
+  ) -> [PolicyCanvasPortMarkerEntry] {
+    edges.flatMap { edge -> [PolicyCanvasPortMarkerEntry] in
+      guard let route = routes[edge.id] else {
+        return []
+      }
+      return [
+        PolicyCanvasPortMarkerEntry(
+          key: PolicyCanvasRouteTerminalKey(edgeID: edge.id, role: .source),
+          endpoint: edge.source,
+          preferredSide: policyCanvasRouteSourceSide(route)
+            ?? policyCanvasResolvedPortSide(for: edge.source),
+          sortKey: policyCanvasPortMarkerSortKey(edge: edge, role: .source)
+        ),
+        PolicyCanvasPortMarkerEntry(
+          key: PolicyCanvasRouteTerminalKey(edgeID: edge.id, role: .target),
+          endpoint: edge.target,
+          preferredSide: policyCanvasRouteTargetSide(route)
+            ?? policyCanvasResolvedPortSide(for: edge.target),
+          sortKey: policyCanvasPortMarkerSortKey(edge: edge, role: .target)
+        ),
+      ]
+    }
+  }
+
+  private func assignPortMarkerTerminals(
+    entries: [PolicyCanvasPortMarkerEntry],
     nodeIndex: [String: PolicyCanvasRouteNode],
-    offsetsByEndpoint: inout [PolicyCanvasPortEndpoint: [PolicyCanvasPortSide: [CGFloat]]]
+    terminals: inout [PolicyCanvasRouteTerminalKey: PolicyCanvasPortTerminal]
   ) {
-    guard let offset = portMarkerOffset(
-      for: endpoint,
-      side: side,
-      slot: slot,
-      nodeIndex: nodeIndex
-    ) else {
+    guard let endpoint = entries.first?.endpoint else {
       return
     }
-    let key = policyCanvasCanonicalPortEndpoint(endpoint)
-    offsetsByEndpoint[key, default: [:]][side, default: []].append(offset)
+    let sides = policyCanvasRoutablePortSides(for: endpoint.kind)
+    var entriesBySide = Dictionary(
+      uniqueKeysWithValues: sides.map { ($0, [PolicyCanvasPortMarkerEntry]()) }
+    )
+    let capacities = Dictionary(uniqueKeysWithValues: sides.map { side in
+      (side, portMarkerCapacity(for: endpoint, side: side, nodeIndex: nodeIndex))
+    })
+    for entry in entries {
+      let preferred = sides.contains(entry.preferredSide) ? entry.preferredSide : sides[0]
+      let side = firstAvailableSide(
+        preferred: preferred,
+        sides: sides,
+        capacities: capacities,
+        counts: entriesBySide
+      )
+      entriesBySide[side, default: []].append(entry)
+    }
+    for side in sides {
+      assignPortMarkerOffsets(
+        entries: entriesBySide[side, default: []],
+        side: side,
+        nodeIndex: nodeIndex,
+        terminals: &terminals
+      )
+    }
   }
 
-  private func portMarkerOffset(
+  private func firstAvailableSide(
+    preferred: PolicyCanvasPortSide,
+    sides: [PolicyCanvasPortSide],
+    capacities: [PolicyCanvasPortSide: Int],
+    counts: [PolicyCanvasPortSide: [PolicyCanvasPortMarkerEntry]]
+  ) -> PolicyCanvasPortSide {
+    let orderedSides = [preferred] + sides.filter { $0 != preferred }
+    return orderedSides.first { side in
+      counts[side, default: []].count < capacities[side, default: 1]
+    } ?? orderedSides.min { left, right in
+      counts[left, default: []].count < counts[right, default: []].count
+    } ?? preferred
+  }
+
+  private func assignPortMarkerOffsets(
+    entries: [PolicyCanvasPortMarkerEntry],
+    side: PolicyCanvasPortSide,
+    nodeIndex: [String: PolicyCanvasRouteNode],
+    terminals: inout [PolicyCanvasRouteTerminalKey: PolicyCanvasPortTerminal]
+  ) {
+    guard
+      let endpoint = entries.first?.endpoint,
+      let node = nodeIndex[endpoint.nodeID],
+      let basePoint = portAnchor(for: endpoint, side: side, nodeIndex: nodeIndex)
+    else {
+      return
+    }
+    let base = policyCanvasLocalAxisCoordinate(basePoint, side: side, frame: node.frame)
+    let coordinates = policyCanvasPortMarkerCoordinates(
+      count: entries.count,
+      base: base,
+      spacing: portMarkerSpacing(for: endpoint, side: side, nodeIndex: nodeIndex),
+      extent: policyCanvasSideExtent(side: side),
+      inset: PolicyCanvasLayout.portDiameter / 2 + 4
+    )
+    for (entry, coordinate) in zip(entries, coordinates) {
+      terminals[entry.key] = PolicyCanvasPortTerminal(side: side, axisOffset: coordinate - base)
+    }
+  }
+
+  private func portMarkerCapacity(
     for endpoint: PolicyCanvasPortEndpoint,
     side: PolicyCanvasPortSide,
-    slot: PolicyCanvasRouteEndpointSlot,
     nodeIndex: [String: PolicyCanvasRouteNode]
-  ) -> CGFloat? {
-    guard
-      let node = nodeIndex[endpoint.nodeID],
-      let point = portAnchor(for: endpoint, side: side, nodeIndex: nodeIndex)
-    else {
-      return nil
-    }
-    let spacing = max(
+  ) -> Int {
+    let inset = PolicyCanvasLayout.portDiameter / 2 + 4
+    let available = max(0, policyCanvasSideExtent(side: side) - (inset * 2))
+    let spacing = portMarkerSpacing(for: endpoint, side: side, nodeIndex: nodeIndex)
+    return max(1, Int(floor(available / spacing)) + 1)
+  }
+
+  private func portMarkerSpacing(
+    for endpoint: PolicyCanvasPortEndpoint,
+    side: PolicyCanvasPortSide,
+    nodeIndex: [String: PolicyCanvasRouteNode]
+  ) -> CGFloat {
+    max(
       portSpacing(for: endpoint, side: side, nodeIndex: nodeIndex),
       PolicyCanvasLayout.defaultEdgeLineSpacing + PolicyCanvasVisibilityRouter.channelStep
     )
-    let shifted = policyCanvasShiftedRouteAnchor(
-      point,
-      side: side,
-      frame: node.frame,
-      spacing: spacing,
-      terminalSlot: slot
-    )
-    switch side {
-    case .leading, .trailing:
-      return shifted.y - point.y
-    case .top, .bottom:
-      return shifted.x - point.x
-    }
+  }
+}
+
+private struct PolicyCanvasPortMarkerEntry: Comparable {
+  let key: PolicyCanvasRouteTerminalKey
+  let endpoint: PolicyCanvasPortEndpoint
+  let preferredSide: PolicyCanvasPortSide
+  let sortKey: String
+
+  var endpointKey: PolicyCanvasPortEndpoint {
+    policyCanvasCanonicalPortEndpoint(endpoint)
+  }
+
+  static func < (lhs: Self, rhs: Self) -> Bool {
+    lhs.sortKey == rhs.sortKey ? lhs.key.edgeID < rhs.key.edgeID : lhs.sortKey < rhs.sortKey
+  }
+}
+
+private func policyCanvasPortMarkerSortKey(
+  edge: PolicyCanvasEdge,
+  role: PolicyCanvasRouteEndpointRole
+) -> String {
+  switch role {
+  case .source:
+    [edge.target.nodeID, edge.target.portID, edge.label, edge.id].joined(separator: "|")
+  case .target:
+    [edge.source.nodeID, edge.source.portID, edge.label, edge.id].joined(separator: "|")
+  }
+}
+
+private func policyCanvasPortMarkerCoordinates(
+  count: Int,
+  base: CGFloat,
+  spacing: CGFloat,
+  extent: CGFloat,
+  inset: CGFloat
+) -> [CGFloat] {
+  guard count > 1 else {
+    return [min(max(base, inset), extent - inset)]
+  }
+  let available = max(0, extent - (inset * 2))
+  let step = min(spacing, available / CGFloat(count - 1))
+  let span = step * CGFloat(count - 1)
+  let start = min(max(base - (span / 2), inset), extent - inset - span)
+  return (0..<count).map { start + (CGFloat($0) * step) }
+}
+
+private func policyCanvasSideExtent(side: PolicyCanvasPortSide) -> CGFloat {
+  switch side {
+  case .leading, .trailing:
+    PolicyCanvasLayout.nodeSize.height
+  case .top, .bottom:
+    PolicyCanvasLayout.nodeSize.width
+  }
+}
+
+private func policyCanvasLocalAxisCoordinate(
+  _ point: CGPoint,
+  side: PolicyCanvasPortSide,
+  frame: CGRect
+) -> CGFloat {
+  switch side {
+  case .leading, .trailing:
+    point.y - frame.minY
+  case .top, .bottom:
+    point.x - frame.minX
   }
 }
 

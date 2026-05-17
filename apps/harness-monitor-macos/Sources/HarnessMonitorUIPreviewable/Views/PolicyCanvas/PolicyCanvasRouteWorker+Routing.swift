@@ -1,8 +1,9 @@
 import SwiftUI
 
-extension PolicyCanvasRouteWorkerInput {
+extension PolicyCanvasPreparedRouteInput {
   func displayedRoutes(
-    router: any PolicyCanvasEdgeRouter
+    router: any PolicyCanvasEdgeRouter,
+    portMarkerLayout: PolicyCanvasPortMarkerLayout? = nil
   ) -> [String: PolicyCanvasEdgeRoute] {
     let nodeIndex = nodeIndex
     let obstacles = routingObstacles()
@@ -39,6 +40,7 @@ extension PolicyCanvasRouteWorkerInput {
         targetFanoutLane: targetFanoutLanes[edge.id, default: 0],
         sourceTerminalSlot: edgeTerminalSlots?.source ?? .single,
         targetTerminalSlot: edgeTerminalSlots?.target ?? .single,
+        portMarkerLayout: portMarkerLayout,
         nodeIndex: nodeIndex,
         obstacles: obstacles,
         router: router
@@ -76,22 +78,27 @@ extension PolicyCanvasRouteWorkerInput {
     targetFanoutLane: Int,
     sourceTerminalSlot: PolicyCanvasRouteEndpointSlot,
     targetTerminalSlot: PolicyCanvasRouteEndpointSlot,
+    portMarkerLayout: PolicyCanvasPortMarkerLayout?,
     nodeIndex: [String: PolicyCanvasRouteNode],
     obstacles: [CGRect],
     router: any PolicyCanvasEdgeRouter
   ) -> PolicyCanvasResolvedDisplayedRouteRequest {
+    let sourceTerminal = portMarkerLayout?.terminal(edgeID: edge.id, role: .source)
+    let targetTerminal = portMarkerLayout?.terminal(edgeID: edge.id, role: .target)
     let sourceCandidates = routeAnchorCandidates(
       for: edge.source,
       nodeIndex: nodeIndex,
-      terminalSlot: sourceTerminalSlot
+      terminalSlot: sourceTerminalSlot,
+      terminal: sourceTerminal
     )
     let targetCandidates = routeAnchorCandidates(
       for: edge.target,
       nodeIndex: nodeIndex,
-      terminalSlot: targetTerminalSlot
+      terminalSlot: targetTerminalSlot,
+      terminal: targetTerminal
     )
-    let sourceSide = policyCanvasResolvedPortSide(for: edge.source)
-    let targetSide = policyCanvasResolvedPortSide(for: edge.target)
+    let sourceSide = sourceTerminal?.side ?? policyCanvasResolvedPortSide(for: edge.source)
+    let targetSide = targetTerminal?.side ?? policyCanvasResolvedPortSide(for: edge.target)
     return PolicyCanvasResolvedDisplayedRouteRequest(
       router: router,
       edge: edge,
@@ -109,13 +116,15 @@ extension PolicyCanvasRouteWorkerInput {
         for: edge.source,
         side: sourceSide,
         nodeIndex: nodeIndex,
-        terminalSlot: sourceTerminalSlot
+        terminalSlot: sourceTerminalSlot,
+        terminal: sourceTerminal
       ) ?? (point: source, side: sourceSide),
       targetAnchor: routeAnchorCandidate(
         for: edge.target,
         side: targetSide,
         nodeIndex: nodeIndex,
-        terminalSlot: targetTerminalSlot
+        terminalSlot: targetTerminalSlot,
+        terminal: targetTerminal
       ) ?? (point: target, side: targetSide),
       sourceCandidates: sourceCandidates,
       targetCandidates: targetCandidates,
@@ -147,14 +156,17 @@ extension PolicyCanvasRouteWorkerInput {
   private func routeAnchorCandidates(
     for endpoint: PolicyCanvasPortEndpoint,
     nodeIndex: [String: PolicyCanvasRouteNode],
-    terminalSlot: PolicyCanvasRouteEndpointSlot = .single
+    terminalSlot: PolicyCanvasRouteEndpointSlot = .single,
+    terminal: PolicyCanvasPortTerminal? = nil
   ) -> [PolicyCanvasRouteAnchorCandidate] {
-    routablePortSides(for: endpoint.kind).compactMap { side in
+    let sides = terminal.map { [$0.side] } ?? policyCanvasRoutablePortSides(for: endpoint.kind)
+    return sides.compactMap { side in
       routeAnchorCandidate(
         for: endpoint,
         side: side,
         nodeIndex: nodeIndex,
-        terminalSlot: terminalSlot
+        terminalSlot: terminalSlot,
+        terminal: terminal
       )
     }
   }
@@ -163,13 +175,17 @@ extension PolicyCanvasRouteWorkerInput {
     for endpoint: PolicyCanvasPortEndpoint,
     side: PolicyCanvasPortSide,
     nodeIndex: [String: PolicyCanvasRouteNode],
-    terminalSlot: PolicyCanvasRouteEndpointSlot
+    terminalSlot: PolicyCanvasRouteEndpointSlot,
+    terminal: PolicyCanvasPortTerminal? = nil
   ) -> PolicyCanvasRouteAnchorCandidate? {
     guard
       let point = portAnchor(for: endpoint, side: side, nodeIndex: nodeIndex),
       let node = nodeIndex[endpoint.nodeID]
     else {
       return nil
+    }
+    if let terminal {
+      return (point: policyCanvasShiftedRouteAnchor(point, side: side, terminal: terminal), side: side)
     }
     let spacing = max(
       portSpacing(for: endpoint, side: side, nodeIndex: nodeIndex),
@@ -381,15 +397,6 @@ extension PolicyCanvasRouteWorkerInput {
         PolicyCanvasLayout.portX(index: 1, count: ports.count)
           - PolicyCanvasLayout.portX(index: 0, count: ports.count)
       )
-    }
-  }
-
-  private func routablePortSides(for kind: PolicyCanvasPortKind) -> [PolicyCanvasPortSide] {
-    switch kind {
-    case .input:
-      [.leading, .top]
-    case .output:
-      [.trailing, .bottom]
     }
   }
 }

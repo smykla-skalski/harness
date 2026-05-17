@@ -40,11 +40,17 @@ func policyCanvasRouteEndpointSlots(
 func policyCanvasRouteAnchorCandidates(
   for endpoint: PolicyCanvasPortEndpoint,
   in viewModel: PolicyCanvasViewModel,
-  terminalSlot: PolicyCanvasRouteEndpointSlot
+  terminalSlot: PolicyCanvasRouteEndpointSlot,
+  terminal: PolicyCanvasPortTerminal? = nil
 ) -> [PolicyCanvasRouteAnchorCandidate] {
-  viewModel.portAnchorCandidates(for: endpoint).map { candidate in
+  let candidates = terminal.map { terminal in
+    viewModel.portAnchorCandidates(for: endpoint).filter { $0.side == terminal.side }
+  } ?? viewModel.portAnchorCandidates(for: endpoint)
+  return candidates.map { candidate in
     (
-      point: policyCanvasShiftedRouteAnchor(
+      point: terminal.map {
+        policyCanvasShiftedRouteAnchor(candidate.point, side: candidate.side, terminal: $0)
+      } ?? policyCanvasShiftedRouteAnchor(
         candidate.point,
         side: candidate.side,
         endpoint: endpoint,
