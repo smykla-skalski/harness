@@ -22,6 +22,10 @@ struct TaskBoardOperationsPanel: View {
     TaskBoardOverviewMetrics(fontScale: fontScale)
   }
 
+  private var rowLabelFont: Font {
+    HarnessMonitorTextSize.scaledFont(.body, by: fontScale)
+  }
+
   private var dashboard: HarnessMonitorStore.ContentDashboardSlice {
     store.contentUI.dashboard
   }
@@ -49,6 +53,8 @@ struct TaskBoardOperationsPanel: View {
           inventoryStatusChoice: $inventoryStatusChoice
         )
       )
+      .font(rowLabelFont)
+      .environment(\.taskBoardOperationsRowLabelFont, rowLabelFont)
     }
     .task { await loadLocalHostProjectTypes() }
     .accessibilityElement(children: .contain)
