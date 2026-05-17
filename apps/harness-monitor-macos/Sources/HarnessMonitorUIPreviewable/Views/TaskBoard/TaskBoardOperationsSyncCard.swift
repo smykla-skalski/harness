@@ -115,6 +115,7 @@ struct TaskBoardOperationsSyncCard: View, TaskBoardOperationsHost {
               providerSummaryRow(provider)
             }
           }
+          .padding(.top, HarnessMonitorTheme.spacingSM)
         }
 
         if !visibleOperations.isEmpty {
@@ -130,6 +131,7 @@ struct TaskBoardOperationsSyncCard: View, TaskBoardOperationsHost {
               operationSummaryRow(operation)
             }
           }
+          .padding(.top, HarnessMonitorTheme.spacingSM)
         }
       } else {
         placeholderText("Run sync to preview or apply external pull and push operations.")

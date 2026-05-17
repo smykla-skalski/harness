@@ -103,6 +103,7 @@ struct TaskBoardOperationsDispatchCard: View, TaskBoardOperationsHost {
         )
         .font(captionFont)
         .foregroundStyle(HarnessMonitorTheme.caution)
+        .padding(.top, HarnessMonitorTheme.spacingSM)
         .accessibilityIdentifier("harness.task-board.dispatch.host-mismatch")
       }
 
@@ -126,6 +127,7 @@ struct TaskBoardOperationsDispatchCard: View, TaskBoardOperationsHost {
         Text("Live dispatch creates session work and requires confirmation.")
           .font(captionFont)
           .foregroundStyle(HarnessMonitorTheme.caution)
+          .padding(.top, HarnessMonitorTheme.spacingSM)
       }
 
       actionRow {
@@ -187,6 +189,7 @@ struct TaskBoardOperationsDispatchCard: View, TaskBoardOperationsHost {
               appliedSummaryRow(applied)
             }
           }
+          .padding(.top, HarnessMonitorTheme.spacingSM)
         } else if !summary.plans.isEmpty {
           VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingXS) {
             Text("Plans")
@@ -197,6 +200,7 @@ struct TaskBoardOperationsDispatchCard: View, TaskBoardOperationsHost {
               planSummaryRow(plan)
             }
           }
+          .padding(.top, HarnessMonitorTheme.spacingSM)
         } else {
           placeholderText("No board items matched the current dispatch filter.")
         }

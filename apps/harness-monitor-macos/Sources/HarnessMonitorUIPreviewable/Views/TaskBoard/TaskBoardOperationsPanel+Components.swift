@@ -59,6 +59,7 @@ extension TaskBoardOperationsHost {
     ) {
       content()
     }
+    .padding(.top, HarnessMonitorTheme.spacingSM)
   }
 
   func pickerField<SelectionValue: Hashable, Content: View>(
@@ -190,6 +191,7 @@ extension TaskBoardOperationsHost {
       .font(captionFont)
       .foregroundStyle(HarnessMonitorTheme.secondaryInk)
       .frame(maxWidth: .infinity, alignment: .leading)
+      .padding(.top, HarnessMonitorTheme.spacingSM)
   }
 
   func dispatchReadinessSubtitle(for plan: TaskBoardDispatchPlan) -> String {
@@ -259,7 +261,7 @@ struct TaskBoardOperationsFormSection<Content: View>: View {
         .foregroundStyle(HarnessMonitorTheme.secondaryInk)
         .padding(.leading, TaskBoardOperationsFormMetrics.sectionPadding)
 
-      VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
+      VStack(alignment: .leading, spacing: 0) {
         content
       }
       .padding(TaskBoardOperationsFormMetrics.sectionPadding)
@@ -292,8 +294,8 @@ private enum TaskBoardOperationsFormMetrics {
   static let sectionCornerRadius: CGFloat = 10
   static let labelWidth: CGFloat = 112
   static let contentMaxWidth: CGFloat = 420
-  static let rowMinHeight: CGFloat = 28
-  static let rowVerticalPadding: CGFloat = 0
+  static let rowMinHeight: CGFloat = 34
+  static let rowVerticalPadding: CGFloat = 5
 }
 
 struct TaskBoardOperationsFormRow<Content: View>: View {
