@@ -182,9 +182,7 @@ pub fn candidate_daemon_locations() -> Vec<DaemonLocation> {
         }
     }
 
-    let xdg_root = harness_data_root()
-        .join("daemon")
-        .join(ownership.as_str());
+    let xdg_root = harness_data_root().join("daemon").join(ownership.as_str());
     if !candidates
         .iter()
         .any(|candidate| candidate.root == xdg_root)
