@@ -128,7 +128,7 @@ extension PolicyCanvasRouteWorkerInput {
     nodes.map(\.frame) + policyCanvasGroupTitleFrames(groups)
   }
 
-  private func portAnchors(
+  func portAnchors(
     nodeIndex: [String: PolicyCanvasRouteNode]
   ) -> [PolicyCanvasPortEndpoint: CGPoint] {
     var anchors: [PolicyCanvasPortEndpoint: CGPoint] = [:]
@@ -187,7 +187,7 @@ extension PolicyCanvasRouteWorkerInput {
     )
   }
 
-  private func portAnchor(
+  func portAnchor(
     for endpoint: PolicyCanvasPortEndpoint,
     nodeIndex: [String: PolicyCanvasRouteNode]
   ) -> CGPoint? {
@@ -198,7 +198,7 @@ extension PolicyCanvasRouteWorkerInput {
     )
   }
 
-  private func portAnchor(
+  func portAnchor(
     for endpoint: PolicyCanvasPortEndpoint,
     side: PolicyCanvasPortSide,
     nodeIndex: [String: PolicyCanvasRouteNode]
@@ -213,7 +213,7 @@ extension PolicyCanvasRouteWorkerInput {
     return portAnchor(for: node, side: side, index: index, count: ports.count)
   }
 
-  private func portAnchor(
+  func portAnchor(
     for node: PolicyCanvasRouteNode,
     side: PolicyCanvasPortSide,
     index: Int,
@@ -357,7 +357,7 @@ extension PolicyCanvasRouteWorkerInput {
     })
   }
 
-  private func portSpacing(
+  func portSpacing(
     for endpoint: PolicyCanvasPortEndpoint,
     side overrideSide: PolicyCanvasPortSide? = nil,
     nodeIndex: [String: PolicyCanvasRouteNode]

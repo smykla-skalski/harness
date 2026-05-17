@@ -43,6 +43,7 @@ actor PolicyCanvasRouteWorker {
     )
     let nodeIndex = input.nodeIndex
     let portVisibility = input.portVisibility(routes: routes, nodeIndex: nodeIndex)
+    let portMarkerLayout = input.portMarkerLayout(routes: routes, nodeIndex: nodeIndex)
     let accessibilityEdgeEntries = input.accessibilityEdgeEntries(nodeIndex: nodeIndex)
     let nodeAccessibilityValuesByID = input.nodeAccessibilityValuesByID(nodeIndex: nodeIndex)
     cachedInput = input
@@ -50,6 +51,7 @@ actor PolicyCanvasRouteWorker {
       routes: routes,
       labelPositions: labelPositions,
       portVisibility: portVisibility,
+      portMarkerLayout: portMarkerLayout,
       visibleBounds: visibleBounds,
       contentSize: policyCanvasVisibleContentSize(visibleBounds: visibleBounds),
       accessibilityEdgeLabelsByID: Self.edgeLabelsByID(accessibilityEdgeEntries),
@@ -170,6 +172,7 @@ struct PolicyCanvasRouteWorkerOutput: Equatable, Sendable {
   let routes: [String: PolicyCanvasEdgeRoute]
   let labelPositions: [String: CGPoint]
   let portVisibility: PolicyCanvasPortVisibilityMap
+  let portMarkerLayout: PolicyCanvasPortMarkerLayout
   let visibleBounds: CGRect
   let contentSize: CGSize
   let accessibilityEdgeLabelsByID: [String: String]
@@ -182,6 +185,7 @@ struct PolicyCanvasRouteWorkerOutput: Equatable, Sendable {
     routes: [:],
     labelPositions: [:],
     portVisibility: [:],
+    portMarkerLayout: .empty,
     visibleBounds: CGRect(origin: .zero, size: PolicyCanvasLayout.minimumCanvasSize),
     contentSize: PolicyCanvasLayout.minimumCanvasSize,
     accessibilityEdgeLabelsByID: [:],
@@ -200,6 +204,7 @@ struct PolicyCanvasRouteWorkerOutput: Equatable, Sendable {
       routes: [:],
       labelPositions: [:],
       portVisibility: [:],
+      portMarkerLayout: .empty,
       visibleBounds: visibleBounds,
       contentSize: policyCanvasVisibleContentSize(visibleBounds: visibleBounds),
       accessibilityEdgeLabelsByID: Dictionary(

@@ -19,6 +19,7 @@ struct PolicyCanvasNodeLayer: View {
   let connectTargetsByNodeID: [String: [PolicyCanvasAccessibilityConnectTarget]]
   let nodeValidationIssueMessagesByID: [String: String]
   let portVisibility: PolicyCanvasPortVisibilityMap
+  let portMarkerLayout: PolicyCanvasPortMarkerLayout
   /// P19 reduce-motion handle; mirrors the canvas-root system flag so the
   /// drop-end spring (P18) collapses to instant when the user has the
   /// system-wide reduce-motion accessibility setting on. The canvas-scoped
@@ -46,7 +47,8 @@ struct PolicyCanvasNodeLayer: View {
         validationIssueMessages: nodeValidationIssueMessagesByID[node.id],
         connectTargets: connectTargetsByNodeID[node.id] ?? [],
         hasClipboard: hasClipboard,
-        portVisibility: portVisibility
+        portVisibility: portVisibility,
+        portMarkerLayout: portMarkerLayout
       )
       .offset(x: node.position.x, y: node.position.y)
       .focusable()
@@ -128,6 +130,7 @@ struct PolicyCanvasNodeCard: View {
   let connectTargets: [PolicyCanvasAccessibilityConnectTarget]
   let hasClipboard: Bool
   let portVisibility: PolicyCanvasPortVisibilityMap
+  let portMarkerLayout: PolicyCanvasPortMarkerLayout
   /// P19 reduce-motion handle for the P18 selection-mark transition. Pulled
   /// from the environment so the animation gating uses the same root-seeded
   /// bit the rest of the canvas reads. Canvas-scoped override is optional
@@ -218,7 +221,8 @@ struct PolicyCanvasNodeCard: View {
         ports: node.inputPorts,
         alignment: .leading,
         viewModel: viewModel,
-        visibleSides: portVisibility
+        visibleSides: portVisibility,
+        markerLayout: portMarkerLayout
       )
 
       PolicyCanvasPortColumn(
@@ -226,7 +230,8 @@ struct PolicyCanvasNodeCard: View {
         ports: node.outputPorts,
         alignment: .trailing,
         viewModel: viewModel,
-        visibleSides: portVisibility
+        visibleSides: portVisibility,
+        markerLayout: portMarkerLayout
       )
 
       PolicyCanvasPortColumn(
@@ -235,6 +240,7 @@ struct PolicyCanvasNodeCard: View {
         alignment: .top,
         viewModel: viewModel,
         visibleSides: portVisibility,
+        markerLayout: portMarkerLayout,
         isAuxiliary: true
       )
 
@@ -244,6 +250,7 @@ struct PolicyCanvasNodeCard: View {
         alignment: .bottom,
         viewModel: viewModel,
         visibleSides: portVisibility,
+        markerLayout: portMarkerLayout,
         isAuxiliary: true
       )
 
@@ -308,113 +315,6 @@ struct PolicyCanvasNodeCard: View {
           .accessibilityHidden(true)
       }
       Spacer()
-    }
-  }
-}
-
-/// P28 per-node accessibility actions modifier. Stamps Delete / Duplicate /
-/// Open Inspector / per-target Connect actions onto every node card so
-/// VoiceOver users get the same commands the mouse drag/context-menu paths
-/// expose. Built as a `ViewModifier` instead of inline `.accessibilityAction`
-/// calls so the action closures don't allocate on every node card update.
-///
-/// The Connect surface enumerates up to
-/// `accessibilityConnectableTargetActionCap` reachable inputs as separately
-/// named rotor entries (e.g. "Connect to Risk score event") so the VoiceOver
-/// user knows which target an invocation wires before committing — the prior
-/// single "Connect" action silently picked the first reachable input.
-///
-/// Per-target Connect actions live in the `.accessibilityActions { ForEach }`
-/// block. The `ForEach` block accepts the ViewBuilder shape the per-target
-/// enumeration needs without falling back to `AnyView` type-erasure (which
-/// would re-erase the modifier chain on every node card update).
-private struct PolicyCanvasNodeAccessibilityActions: ViewModifier {
-  let viewModel: PolicyCanvasViewModel
-  let nodeID: String
-  let connectTargets: [PolicyCanvasAccessibilityConnectTarget]
-  let canPaste: Bool
-
-  func body(content: Content) -> some View {
-    return
-      content
-      .accessibilityAction(named: Text("Delete")) {
-        viewModel.select(.node(nodeID))
-        viewModel.deleteNode(nodeID)
-      }
-      .accessibilityAction(named: Text("Duplicate")) {
-        _ = viewModel.duplicateNode(nodeID)
-      }
-      .accessibilityAction(named: Text("Open inspector")) {
-        viewModel.accessibilityOpenInspector(forNodeID: nodeID)
-      }
-      .accessibilityAction(named: Text("Copy")) {
-        // Targets the multi-selection if one exists, otherwise picks this
-        // node so VO users get the same behavior as Cmd+C on the canvas.
-        if !viewModel.isSelected(.node(nodeID)) {
-          viewModel.select(.node(nodeID))
-        }
-        _ = viewModel.copySelectionToClipboard()
-      }
-      .accessibilityAction(named: Text("Rename")) {
-        viewModel.accessibilityOpenInspector(forNodeID: nodeID)
-      }
-      // Plain nudge actions reuse the 10pt shift step the keyboard
-      // shortcut surfaces; a 2pt bare-arrow step would be below the JND
-      // for VO users who only get audio feedback "moved" without seeing
-      // motion. The action set stays compact (4 directions) — finer
-      // movement still routes through the rename / position field path.
-      .accessibilityAction(named: Text("Nudge Up")) {
-        if !viewModel.isSelected(.node(nodeID)) {
-          viewModel.select(.node(nodeID))
-        }
-        _ = viewModel.nudgeSelection(by: CGSize(width: 0, height: -10))
-      }
-      .accessibilityAction(named: Text("Nudge Down")) {
-        if !viewModel.isSelected(.node(nodeID)) {
-          viewModel.select(.node(nodeID))
-        }
-        _ = viewModel.nudgeSelection(by: CGSize(width: 0, height: 10))
-      }
-      .accessibilityAction(named: Text("Nudge Left")) {
-        if !viewModel.isSelected(.node(nodeID)) {
-          viewModel.select(.node(nodeID))
-        }
-        _ = viewModel.nudgeSelection(by: CGSize(width: -10, height: 0))
-      }
-      .accessibilityAction(named: Text("Nudge Right")) {
-        if !viewModel.isSelected(.node(nodeID)) {
-          viewModel.select(.node(nodeID))
-        }
-        _ = viewModel.nudgeSelection(by: CGSize(width: 10, height: 0))
-      }
-      .modifier(
-        PolicyCanvasNodePasteAccessibilityAction(viewModel: viewModel, canPaste: canPaste)
-      )
-      .accessibilityActions {
-        ForEach(connectTargets) { target in
-          Button("Connect to \(target.displayName)") {
-            _ = viewModel.accessibilityConnect(fromNodeID: nodeID, to: target.endpoint)
-          }
-        }
-      }
-  }
-}
-
-/// Per-node Paste action, gated on a non-empty clipboard. Built as a
-/// separate ViewModifier so the action is only stamped when there is
-/// something to paste — VO users do not see a "Paste" rotor entry that
-/// does nothing.
-private struct PolicyCanvasNodePasteAccessibilityAction: ViewModifier {
-  let viewModel: PolicyCanvasViewModel
-  let canPaste: Bool
-
-  func body(content: Content) -> some View {
-    if canPaste {
-      content.accessibilityAction(named: Text("Paste")) {
-        _ = viewModel.pasteFromClipboard()
-      }
-    } else {
-      content
     }
   }
 }

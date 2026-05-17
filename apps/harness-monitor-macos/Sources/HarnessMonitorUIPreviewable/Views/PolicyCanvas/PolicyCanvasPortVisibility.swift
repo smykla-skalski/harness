@@ -45,7 +45,7 @@ func policyCanvasVisiblePortSides(
   for endpoint: PolicyCanvasPortEndpoint,
   visibility: PolicyCanvasPortVisibilityMap
 ) -> Set<PolicyCanvasPortSide> {
-  if let visibleSides = visibility[policyCanvasCanonicalEndpoint(endpoint)],
+  if let visibleSides = visibility[policyCanvasCanonicalPortEndpoint(endpoint)],
     !visibleSides.isEmpty
   {
     return visibleSides
@@ -122,18 +122,8 @@ private func policyCanvasInsertVisibleSide(
   for endpoint: PolicyCanvasPortEndpoint,
   into visibility: inout PolicyCanvasPortVisibilityMap
 ) {
-  let key = policyCanvasCanonicalEndpoint(endpoint)
+  let key = policyCanvasCanonicalPortEndpoint(endpoint)
   visibility[key, default: []].insert(side)
-}
-
-private func policyCanvasCanonicalEndpoint(
-  _ endpoint: PolicyCanvasPortEndpoint
-) -> PolicyCanvasPortEndpoint {
-  PolicyCanvasPortEndpoint(
-    nodeID: endpoint.nodeID,
-    portID: endpoint.portID,
-    kind: endpoint.kind
-  )
 }
 
 private func policyCanvasDefaultPortSide(for kind: PolicyCanvasPortKind) -> PolicyCanvasPortSide {

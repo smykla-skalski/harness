@@ -34,6 +34,7 @@ struct PolicyCanvasViewport: View {
     let routes = routeOutput.routes
     let labelPositions = routeOutput.labelPositions
     let portVisibility = routeOutput.portVisibility
+    let portMarkerLayout = routeOutput.portMarkerLayout
     let visibleBounds = routeOutput.visibleBounds
     let edgeAccessibilityLabelsByID = routeOutput.accessibilityEdgeLabelsByID
     let accessibilityNodeEntries = routeOutput.accessibilityNodeEntries
@@ -103,7 +104,8 @@ struct PolicyCanvasViewport: View {
                 nodeAccessibilityValuesByID: nodeAccessibilityValuesByID,
                 connectTargetsByNodeID: connectTargetsByNodeID,
                 nodeValidationIssueMessagesByID: nodeValidationIssueMessagesByID,
-                portVisibility: portVisibility
+                portVisibility: portVisibility,
+                portMarkerLayout: portMarkerLayout
               )
               if showSimulationOverlay {
                 PolicyCanvasSimulationLayer(viewModel: viewModel)
