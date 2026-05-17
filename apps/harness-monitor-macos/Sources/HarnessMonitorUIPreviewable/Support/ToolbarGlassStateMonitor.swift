@@ -33,7 +33,7 @@ private final class _TitlebarSeparatorSuppressorView: NSView {
   }
 }
 
-private final class _NativeToolbarScrollEdgeAccessoryView: NSView {
+private final class _NativeToolbarScrollEdgeAccessoryView: NSVisualEffectView {
   var accessoryHeight: CGFloat {
     didSet {
       if oldValue != accessoryHeight {
@@ -47,6 +47,7 @@ private final class _NativeToolbarScrollEdgeAccessoryView: NSView {
     accessoryHeight = height
     super.init(frame: NSRect(x: 0, y: 0, width: 0, height: height))
     translatesAutoresizingMaskIntoConstraints = false
+    configureToolbarBackdropMaterial()
     setContentHuggingPriority(.defaultLow, for: .horizontal)
     setContentHuggingPriority(.required, for: .vertical)
     setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
@@ -64,6 +65,27 @@ private final class _NativeToolbarScrollEdgeAccessoryView: NSView {
 
   override var isFlipped: Bool {
     true
+  }
+}
+
+private final class _NativeToolbarVisualEffectBackdropView: NSVisualEffectView {
+  override init(frame frameRect: NSRect) {
+    super.init(frame: frameRect)
+    configureToolbarBackdropMaterial()
+  }
+
+  @available(*, unavailable)
+  required init?(coder: NSCoder) {
+    nil
+  }
+}
+
+private extension NSVisualEffectView {
+  func configureToolbarBackdropMaterial() {
+    material = .titlebar
+    blendingMode = .withinWindow
+    state = .active
+    isEmphasized = true
   }
 }
 
@@ -124,19 +146,14 @@ private final class _NativeToolbarScrollEdgeBackdropInstallerView: NSView {
       controller.layoutAttribute = .bottom
       controller.view = accessoryView
       controller.fullScreenMinHeight = accessoryHeight
-      if #available(macOS 26.1, *) {
-        controller.preferredScrollEdgeEffectStyle = .soft
-      }
       accessoryController = controller
       window.addTitlebarAccessoryViewController(controller)
-    } else if #available(macOS 26.1, *) {
-      accessoryController?.preferredScrollEdgeEffectStyle = .soft
     }
   }
 }
 
 private struct NativeToolbarScrollEdgeBackdropInstaller: NSViewRepresentable {
-  static let defaultHeight: CGFloat = 64
+  static let defaultHeight: CGFloat = 104
   let accessoryHeight: CGFloat
 
   func makeNSView(context: Context) -> _NativeToolbarScrollEdgeBackdropInstallerView {
@@ -158,6 +175,16 @@ private struct NativeToolbarScrollEdgeBackdropInstaller: NSViewRepresentable {
   }
 }
 
+private struct NativeToolbarVisualEffectBackdrop: NSViewRepresentable {
+  func makeNSView(context: Context) -> _NativeToolbarVisualEffectBackdropView {
+    _NativeToolbarVisualEffectBackdropView()
+  }
+
+  func updateNSView(_ nsView: _NativeToolbarVisualEffectBackdropView, context: Context) {
+    nsView.configureToolbarBackdropMaterial()
+  }
+}
+
 private struct NativeToolbarScrollEdgeBackdropModifier: ViewModifier {
   let toolbarBackgroundVisibility: Visibility?
 
@@ -171,11 +198,20 @@ private struct NativeToolbarScrollEdgeBackdropModifier: ViewModifier {
   @ViewBuilder
   func body(content: Content) -> some View {
     if isEnabled {
-      content.background(
-        NativeToolbarScrollEdgeBackdropInstaller(
-          accessoryHeight: NativeToolbarScrollEdgeBackdropInstaller.defaultHeight
+      content
+        .background(
+          NativeToolbarScrollEdgeBackdropInstaller(
+            accessoryHeight: NativeToolbarScrollEdgeBackdropInstaller.defaultHeight
+          )
         )
-      )
+        .overlay(alignment: .top) {
+          NativeToolbarVisualEffectBackdrop()
+            .frame(height: NativeToolbarScrollEdgeBackdropInstaller.defaultHeight)
+            .frame(maxWidth: .infinity)
+            .ignoresSafeArea(.container, edges: .top)
+            .allowsHitTesting(false)
+            .accessibilityHidden(true)
+        )
     } else {
       content
     }
