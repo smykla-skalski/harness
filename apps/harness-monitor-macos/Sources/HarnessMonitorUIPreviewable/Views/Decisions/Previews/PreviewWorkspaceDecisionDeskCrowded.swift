@@ -337,7 +337,7 @@ private func crowdedAuditEvents() -> [SupervisorEvent] {
   @Previewable @State var detailTab: DecisionDetailTab = .context
   @Previewable @State var inspectorVisible: Bool = true
   let decisions = crowdedDecisions()
-  let auditEvents = crowdedAuditEvents()
+  let auditEvents = crowdedAuditEvents().map(SupervisorEventSnapshot.init(event:))
   let liveTick = DecisionLiveTickSnapshot(
     lastSnapshotID: "snap-8821",
     tickLatencyP50Ms: 94,

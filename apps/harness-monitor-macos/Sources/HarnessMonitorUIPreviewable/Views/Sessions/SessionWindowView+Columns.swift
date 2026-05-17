@@ -12,8 +12,8 @@ extension SessionWindowView {
     if allIDs != allSessionDecisionIDsCache {
       allSessionDecisionIDsCache = allIDs
     }
-    stateCache.decisionRuntime.reloadAuditEvents(
-      from: store.modelContext,
+    await stateCache.decisionRuntime.reloadAuditEvents(
+      from: store.supervisorAuditRepository,
       sessionID: token.sessionID,
       decisions: all
     )
@@ -45,7 +45,7 @@ extension SessionWindowView {
     guard !Task.isCancelled else { return }
     let matching = stateCache.decisionRuntime.filteredDecisions(from: all)
     let matchingIDsInOrder = matching.map(\.id)
-    let matchingIDs = Set(matching.map(\.id))
+    let matchingIDs = stateCache.decisionRuntime.filteredDecisionIDSet
     if matching.map(\.id) != matchingDecisionsCache.map(\.id) {
       matchingDecisionsCache = matching
     }

@@ -55,6 +55,25 @@ struct NoOpSupervisorAuditWriter: SupervisorAuditWriter {
   }
 }
 
+public actor SupervisorAuditRepository {
+  private let container: ModelContainer
+
+  public init(container: ModelContainer) {
+    self.container = container
+  }
+
+  public func fetchEvents(limit: Int = 128) throws -> [SupervisorEventSnapshot] {
+    let context = ModelContext(container)
+    var descriptor = FetchDescriptor<SupervisorEvent>(
+      sortBy: [SortDescriptor(\.createdAt, order: .reverse)]
+    )
+    descriptor.fetchLimit = limit
+    return try context.fetch(descriptor).map(SupervisorEventSnapshot.init(event:))
+  }
+
+  public func waitForIdle() async {}
+}
+
 extension HarnessMonitorStore {
   func seedSupervisorDecisionsIfNeeded(_ decisionStore: DecisionStore) async throws {
     let environmentKey = "HARNESS_MONITOR_SUPERVISOR_SEED_DECISIONS"
@@ -145,6 +164,20 @@ extension HarnessMonitorStore {
       )
       descriptor.fetchLimit = limit
       return try modelContext.fetch(descriptor)
+    } catch {
+      HarnessMonitorLogger.supervisorWarning(
+        "supervisor.audit_event_load_failed error=\(String(describing: error))"
+      )
+      return []
+    }
+  }
+
+  public func loadSupervisorAuditEventSnapshots(limit: Int = 128) async -> [SupervisorEventSnapshot] {
+    guard let supervisorAuditRepository else {
+      return []
+    }
+    do {
+      return try await supervisorAuditRepository.fetchEvents(limit: limit)
     } catch {
       HarnessMonitorLogger.supervisorWarning(
         "supervisor.audit_event_load_failed error=\(String(describing: error))"

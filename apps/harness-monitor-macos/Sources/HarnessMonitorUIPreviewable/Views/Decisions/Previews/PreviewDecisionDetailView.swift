@@ -62,7 +62,7 @@ import SwiftUI
 
   return DecisionDetailView(
     decision: decision,
-    auditEvents: [first, second]
+    auditEvents: [first, second].map(SupervisorEventSnapshot.init(event:))
   )
   .frame(width: 700, height: 640)
 }

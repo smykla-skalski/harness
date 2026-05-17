@@ -26,6 +26,6 @@ import SwiftUI
   )
   second.createdAt = Date(timeIntervalSince1970: 20)
 
-  return DecisionAuditTrailTab(events: [first, second])
+  return DecisionAuditTrailTab(events: [first, second].map(SupervisorEventSnapshot.init(event:)))
     .frame(width: 420, height: 320)
 }

@@ -7,15 +7,15 @@ public struct DecisionAuditTrailTab: View {
   @Environment(\.harnessDateTimeConfiguration)
   private var dateTimeConfiguration
 
-  private let events: [SupervisorEvent]
+  private let events: [SupervisorEventSnapshot]
   private let payloadPresentations: [String: DecisionAuditTrailPayloadPresentation]
 
-  public init(events: [SupervisorEvent] = []) {
+  public init(events: [SupervisorEventSnapshot] = []) {
     self.init(events: events, payloadPresentations: [:])
   }
 
   init(
-    events: [SupervisorEvent],
+    events: [SupervisorEventSnapshot],
     payloadPresentations: [String: DecisionAuditTrailPayloadPresentation]
   ) {
     self.events = events
@@ -66,7 +66,7 @@ public struct DecisionAuditTrailTab: View {
   }
 
   private func payloadPresentation(
-    for event: SupervisorEvent
+    for event: SupervisorEventSnapshot
   ) -> DecisionAuditTrailPayloadPresentation {
     payloadPresentations[event.id]
       ?? DecisionAuditTrailPayloadPresentation(payloadJSON: event.payloadJSON)
@@ -74,7 +74,7 @@ public struct DecisionAuditTrailTab: View {
 }
 
 private struct AuditTrailTimelineRow: View {
-  let event: SupervisorEvent
+  let event: SupervisorEventSnapshot
   let payloadPresentation: DecisionAuditTrailPayloadPresentation
   let timestamp: String
 
@@ -167,12 +167,12 @@ private struct AuditTrailTimelineRow: View {
   }
 }
 
-enum DecisionAuditTrailPayloadDetails: Equatable {
+enum DecisionAuditTrailPayloadDetails: Equatable, Sendable {
   case json(HarnessMonitorJSONPresentation)
   case raw(String)
 }
 
-struct DecisionAuditTrailPayloadPresentation: Equatable {
+struct DecisionAuditTrailPayloadPresentation: Equatable, Sendable {
   let summary: String?
   let details: DecisionAuditTrailPayloadDetails?
 
