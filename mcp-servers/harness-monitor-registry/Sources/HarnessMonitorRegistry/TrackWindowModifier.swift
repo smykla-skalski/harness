@@ -72,7 +72,7 @@ final class WindowTrackingNSView: NSView {
 
   init(
     registry: AccessibilityRegistry,
-    didUpdateElementSyncDelay: Duration = .milliseconds(300)
+    didUpdateElementSyncDelay: Duration = .milliseconds(1500)
   ) {
     syncController = WindowRegistrySyncController(registry: registry)
     elementSyncController = WindowElementRegistrySyncController(registry: registry)
