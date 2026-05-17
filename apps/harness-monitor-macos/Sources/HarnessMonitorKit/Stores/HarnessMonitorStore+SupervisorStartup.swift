@@ -142,6 +142,7 @@ extension HarnessMonitorStore {
       ?? .empty
     supervisorOpenDecisions = snapshot.decisions
     supervisorOpenDecisionsByID = snapshot.decisionsByID
+    supervisorOpenDecisionsBySession = snapshot.decisionsBySession
     supervisorOpenDecisionPresentationItems = snapshot.presentationItems
     supervisorOpenDecisionPresentationItemsBySession = snapshot.presentationItemsBySession
     supervisorOpenDecisionSearchProjections = snapshot.searchProjections

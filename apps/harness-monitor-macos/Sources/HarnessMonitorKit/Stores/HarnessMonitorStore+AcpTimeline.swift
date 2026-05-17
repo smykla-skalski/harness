@@ -161,22 +161,25 @@ extension HarnessMonitorStore {
     acpTranscriptMergeTask?.cancel()
     acpTranscriptMergeGeneration &+= 1
     let generation = acpTranscriptMergeGeneration
+    let currentEntries = selectedAcpTranscriptEntries
     let historyEntries = selectedAcpTranscriptHistoryEntries
     let liveEntries = selectedAcpTranscriptLiveEntries
     let transcriptSource = selectedAcpTranscriptSource
     acpTranscriptMergeTask = Task { @MainActor [weak self] in
       guard let self else { return }
-      let mergedEntries = await self.acpTimelineWorker.merge(
-        current: historyEntries,
+      let output = await self.acpTimelineWorker.mergeTranscript(
+        currentEntries: currentEntries,
+        historyEntries: historyEntries,
         incoming: liveEntries
       )
       guard !Task.isCancelled, self.acpTranscriptMergeGeneration == generation else {
         return
       }
-      self.replaceSelectedAcpTranscriptIfNeeded(
-        mergedEntries,
-        transcriptSource: transcriptSource
-      )
+      if output.changed {
+        self.replaceSelectedAcpTranscript(output.entries, transcriptSource: transcriptSource)
+      } else if self.selectedAcpTranscriptSource != transcriptSource {
+        self.replaceSelectedAcpTranscript(currentEntries, transcriptSource: transcriptSource)
+      }
       self.acpTranscriptMergeTask = nil
     }
   }
@@ -205,14 +208,16 @@ extension HarnessMonitorStore {
     let currentTimeline = timeline
     acpTimelineMergeTask = Task { @MainActor [weak self] in
       guard let self else { return }
-      let mergedTimeline = await self.acpTimelineWorker.merge(
+      let output = await self.acpTimelineWorker.merge(
         current: currentTimeline,
         incoming: entries
       )
       guard !Task.isCancelled, self.acpTimelineMergeGeneration == generation else {
         return
       }
-      self.replaceSelectedTimelineIfNeeded(mergedTimeline)
+      if output.changed {
+        self.replaceSelectedTimeline(output.entries)
+      }
       self.acpTimelineMergeTask = nil
     }
   }
@@ -229,7 +234,7 @@ extension HarnessMonitorStore {
     let snapshots = selectedAcpAgents
     acpTranscriptLiveMergeTask = Task { @MainActor [weak self] in
       guard let self else { return }
-      let updatedLiveEntries = await self.acpTimelineWorker.mergeAndReattribute(
+      let output = await self.acpTimelineWorker.mergeAndReattribute(
         current: currentLiveEntries,
         incoming: entries,
         using: snapshots
@@ -237,7 +242,9 @@ extension HarnessMonitorStore {
       guard !Task.isCancelled, self.acpTranscriptLiveMergeGeneration == generation else {
         return
       }
-      self.replaceSelectedAcpTranscriptLiveIfNeeded(updatedLiveEntries)
+      if output.changed {
+        self.selectedAcpTranscriptLiveEntries = output.entries
+      }
       self.acpTranscriptLiveMergeTask = nil
     }
   }
@@ -253,12 +260,14 @@ extension HarnessMonitorStore {
     acpTranscriptHistoryTask?.cancel()
     acpTranscriptHistoryGeneration &+= 1
     let generation = acpTranscriptHistoryGeneration
+    let currentHistoryEntries = selectedAcpTranscriptHistoryEntries
     let responseEntries = response.entries
     let liveEntries = selectedAcpTranscriptLiveEntries
     let snapshots = selectedAcpAgents
     acpTranscriptHistoryTask = Task { @MainActor [weak self] in
       guard let self else { return }
       let output = await self.acpTimelineWorker.prepareTranscriptHistory(
+        currentHistoryEntries: currentHistoryEntries,
         responseEntries: responseEntries,
         liveEntries: liveEntries,
         using: snapshots
@@ -266,8 +275,12 @@ extension HarnessMonitorStore {
       guard !Task.isCancelled, self.acpTranscriptHistoryGeneration == generation else {
         return
       }
-      self.replaceSelectedAcpTranscriptHistoryIfNeeded(output.historyEntries)
-      self.replaceSelectedAcpTranscriptLiveIfNeeded(output.liveEntries)
+      if output.historyChanged {
+        self.selectedAcpTranscriptHistoryEntries = output.historyEntries
+      }
+      if output.liveChanged {
+        self.selectedAcpTranscriptLiveEntries = output.liveEntries
+      }
       self.acpTranscriptHistoryTask = nil
     }
   }
@@ -282,14 +295,16 @@ extension HarnessMonitorStore {
     let currentTimeline = timeline
     acpTimelineReattributeTask = Task { @MainActor [weak self] in
       guard let self else { return }
-      let updatedTimeline = await self.acpTimelineWorker.reattribute(
+      let output = await self.acpTimelineWorker.reattribute(
         currentTimeline,
         using: snapshots
       )
       guard !Task.isCancelled, self.acpTimelineReattributeGeneration == generation else {
         return
       }
-      self.replaceSelectedTimelineIfNeeded(updatedTimeline)
+      if output.changed {
+        self.replaceSelectedTimeline(output.entries)
+      }
       self.acpTimelineReattributeTask = nil
     }
   }
@@ -321,8 +336,12 @@ extension HarnessMonitorStore {
       guard !Task.isCancelled, self.acpTranscriptReattributeGeneration == generation else {
         return
       }
-      self.replaceSelectedAcpTranscriptHistoryIfNeeded(updatedHistory)
-      self.replaceSelectedAcpTranscriptLiveIfNeeded(updatedLive)
+      if updatedHistory.changed {
+        self.selectedAcpTranscriptHistoryEntries = updatedHistory.entries
+      }
+      if updatedLive.changed {
+        self.selectedAcpTranscriptLiveEntries = updatedLive.entries
+      }
       self.acpTranscriptReattributeTask = nil
     }
   }
@@ -369,10 +388,7 @@ extension HarnessMonitorStore {
     return mergedTimelineEntries([], with: updatedTimeline)
   }
 
-  private func replaceSelectedTimelineIfNeeded(_ updatedTimeline: [TimelineEntry]) {
-    guard updatedTimeline != timeline else {
-      return
-    }
+  private func replaceSelectedTimeline(_ updatedTimeline: [TimelineEntry]) {
     timeline = updatedTimeline
     let resolvedWindow = normalizedTimelineWindow(
       timelineWindow,
@@ -390,18 +406,12 @@ extension HarnessMonitorStore {
     )
   }
 
-  private func replaceSelectedAcpTranscriptIfNeeded(
+  private func replaceSelectedAcpTranscript(
     _ updatedTimeline: [TimelineEntry],
     transcriptSource: HarnessMonitorSessionWindowTranscriptSource?
   ) {
-    let sourceDidChange = selectedAcpTranscriptSource != transcriptSource
-    guard updatedTimeline != selectedAcpTranscriptEntries || sourceDidChange else {
-      return
-    }
     selectedAcpTranscriptSource = transcriptSource
-    if updatedTimeline != selectedAcpTranscriptEntries {
-      selectedAcpTranscriptEntries = updatedTimeline
-    }
+    selectedAcpTranscriptEntries = updatedTimeline
     guard !suppressSelectedAcpTranscriptCacheWrite else {
       return
     }
@@ -418,20 +428,6 @@ extension HarnessMonitorStore {
       transcriptSource: transcriptSource,
       timelineWindow: currentTimelineWindow
     )
-  }
-
-  private func replaceSelectedAcpTranscriptHistoryIfNeeded(_ updatedTimeline: [TimelineEntry]) {
-    guard updatedTimeline != selectedAcpTranscriptHistoryEntries else {
-      return
-    }
-    selectedAcpTranscriptHistoryEntries = updatedTimeline
-  }
-
-  private func replaceSelectedAcpTranscriptLiveIfNeeded(_ updatedTimeline: [TimelineEntry]) {
-    guard updatedTimeline != selectedAcpTranscriptLiveEntries else {
-      return
-    }
-    selectedAcpTranscriptLiveEntries = updatedTimeline
   }
 
   public func waitForAcpTimelineIdle() async {
@@ -480,38 +476,58 @@ private enum AcpToolCallPhaseLocation {
   case incoming(Int)
 }
 
+struct AcpTimelineEntriesOutput: Sendable {
+  let entries: [TimelineEntry]
+  let changed: Bool
+}
+
 struct AcpTranscriptHistoryPreparationOutput: Sendable {
   let historyEntries: [TimelineEntry]
+  let historyChanged: Bool
   let liveEntries: [TimelineEntry]
+  let liveChanged: Bool
 }
 
 actor AcpTimelineWorker {
   func merge(
     current: [TimelineEntry],
     incoming: [TimelineEntry]
-  ) -> [TimelineEntry] {
-    HarnessMonitorStore.mergedTimelineEntries(current, with: incoming)
+  ) -> AcpTimelineEntriesOutput {
+    let entries = HarnessMonitorStore.mergedTimelineEntries(current, with: incoming)
+    return AcpTimelineEntriesOutput(entries: entries, changed: entries != current)
+  }
+
+  func mergeTranscript(
+    currentEntries: [TimelineEntry],
+    historyEntries: [TimelineEntry],
+    incoming liveEntries: [TimelineEntry]
+  ) -> AcpTimelineEntriesOutput {
+    let entries = HarnessMonitorStore.mergedTimelineEntries(historyEntries, with: liveEntries)
+    return AcpTimelineEntriesOutput(entries: entries, changed: entries != currentEntries)
   }
 
   func mergeAndReattribute(
     current: [TimelineEntry],
     incoming: [TimelineEntry],
     using snapshots: [AcpAgentSnapshot]
-  ) -> [TimelineEntry] {
-    HarnessMonitorStore.reattributedAcpEntries(
+  ) -> AcpTimelineEntriesOutput {
+    let entries = HarnessMonitorStore.reattributedAcpEntries(
       HarnessMonitorStore.mergedTimelineEntries(current, with: incoming),
       using: snapshots
     )
+    return AcpTimelineEntriesOutput(entries: entries, changed: entries != current)
   }
 
   func reattribute(
     _ entries: [TimelineEntry],
     using snapshots: [AcpAgentSnapshot]
-  ) -> [TimelineEntry] {
-    HarnessMonitorStore.reattributedAcpEntries(entries, using: snapshots)
+  ) -> AcpTimelineEntriesOutput {
+    let updated = HarnessMonitorStore.reattributedAcpEntries(entries, using: snapshots)
+    return AcpTimelineEntriesOutput(entries: updated, changed: updated != entries)
   }
 
   func prepareTranscriptHistory(
+    currentHistoryEntries: [TimelineEntry],
     responseEntries: [TimelineEntry],
     liveEntries: [TimelineEntry],
     using snapshots: [AcpAgentSnapshot]
@@ -521,9 +537,12 @@ actor AcpTimelineWorker {
       using: snapshots
     )
     let historyEntryIDs = Set(historyEntries.map(\.entryId))
+    let updatedLiveEntries = liveEntries.filter { !historyEntryIDs.contains($0.entryId) }
     return AcpTranscriptHistoryPreparationOutput(
       historyEntries: historyEntries,
-      liveEntries: liveEntries.filter { !historyEntryIDs.contains($0.entryId) }
+      historyChanged: historyEntries != currentHistoryEntries,
+      liveEntries: updatedLiveEntries,
+      liveChanged: updatedLiveEntries != liveEntries
     )
   }
 

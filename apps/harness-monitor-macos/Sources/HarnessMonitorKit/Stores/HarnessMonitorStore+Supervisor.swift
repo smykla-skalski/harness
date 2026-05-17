@@ -209,6 +209,7 @@ extension HarnessMonitorStore {
     supervisorToolbarSlice.stop()
     supervisorOpenDecisions = []
     supervisorOpenDecisionsByID = [:]
+    supervisorOpenDecisionsBySession = [:]
     supervisorOpenDecisionPresentationItems = []
     supervisorOpenDecisionPresentationItemsBySession = [:]
     supervisorOpenDecisionSearchProjections = []

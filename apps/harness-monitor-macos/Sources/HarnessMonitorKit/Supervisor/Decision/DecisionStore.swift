@@ -35,6 +35,7 @@ public actor DecisionStore {
   public struct OpenSurfaceSnapshot {
     public let decisions: [Decision]
     public let decisionsByID: [String: Decision]
+    public let decisionsBySession: [String: [Decision]]
     public let presentationItems: [DecisionPresentationSnapshot]
     public let presentationItemsBySession: [String: [DecisionPresentationSnapshot]]
     public let searchProjections: [DecisionSearchProjection]
@@ -46,6 +47,7 @@ public actor DecisionStore {
       Self(
         decisions: [],
         decisionsByID: [:],
+        decisionsBySession: [:],
         presentationItems: [],
         presentationItemsBySession: [:],
         searchProjections: [],
@@ -211,8 +213,23 @@ public actor DecisionStore {
     }
   }
 
+  nonisolated public func openSurfaceSnapshot() async throws -> OpenSurfaceSnapshot {
+    try await openSurfaceSnapshot(including: { _ in true })
+  }
+
   nonisolated public func openSupervisorSurfaceSnapshot(
     includeDaemonDisconnect: Bool
+  ) async throws -> OpenSurfaceSnapshot {
+    try await openSurfaceSnapshot(including: { decision in
+      Self.isSupervisorSurfaceDecision(
+        decision,
+        includeDaemonDisconnect: includeDaemonDisconnect
+      )
+    })
+  }
+
+  nonisolated private func openSurfaceSnapshot(
+    including includeDecision: @escaping @Sendable (Decision) -> Bool
   ) async throws -> OpenSurfaceSnapshot {
     try await withReadContext { context in
       let descriptor = FetchDescriptor<Decision>(
@@ -222,6 +239,7 @@ public actor DecisionStore {
       let now = self.now()
       var decisions: [Decision] = []
       var decisionsByID: [String: Decision] = [:]
+      var decisionsBySession: [String: [Decision]] = [:]
       var presentationItems: [DecisionPresentationSnapshot] = []
       var presentationItemsBySession: [String: [DecisionPresentationSnapshot]] = [:]
       var searchProjections: [DecisionSearchProjection] = []
@@ -235,10 +253,7 @@ public actor DecisionStore {
 
       for decision in rows {
         guard self.isOpen(decision, now: now) else { continue }
-        guard Self.isSupervisorSurfaceDecision(
-          decision,
-          includeDaemonDisconnect: includeDaemonDisconnect
-        ) else {
+        guard includeDecision(decision) else {
           continue
         }
 
@@ -252,6 +267,7 @@ public actor DecisionStore {
         searchProjections.append(projection)
 
         if let sessionID = item.sessionID {
+          decisionsBySession[sessionID, default: []].append(decision)
           presentationItemsBySession[sessionID, default: []].append(item)
           searchProjectionsBySession[sessionID, default: []].append(projection)
           decisionIDsBySession[sessionID, default: []].append(item.id)
@@ -265,6 +281,7 @@ public actor DecisionStore {
       return OpenSurfaceSnapshot(
         decisions: decisions,
         decisionsByID: decisionsByID,
+        decisionsBySession: decisionsBySession,
         presentationItems: presentationItems,
         presentationItemsBySession: presentationItemsBySession,
         searchProjections: searchProjections,

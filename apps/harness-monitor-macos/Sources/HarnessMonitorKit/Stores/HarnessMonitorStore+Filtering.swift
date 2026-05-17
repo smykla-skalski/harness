@@ -39,7 +39,10 @@ extension HarnessMonitorStore {
       get { catalog.projects }
       set {
         refreshCatalogIfNeeded(
-          newValue != catalog.projects, projects: newValue, sessions: catalog.sessions)
+          !Self.sameArrayStorage(newValue, catalog.projects),
+          projects: newValue,
+          sessions: catalog.sessions
+        )
       }
     }
 
@@ -47,7 +50,10 @@ extension HarnessMonitorStore {
       get { catalog.sessions }
       set {
         refreshCatalogIfNeeded(
-          newValue != catalog.sessions, projects: catalog.projects, sessions: newValue)
+          !Self.sameArrayStorage(newValue, catalog.sessions),
+          projects: catalog.projects,
+          sessions: newValue
+        )
       }
     }
 
@@ -115,7 +121,9 @@ extension HarnessMonitorStore {
       projects: [ProjectSummary],
       sessions: [SessionSummary]
     ) -> Bool {
-      guard catalog.projects != projects || catalog.sessions != sessions else {
+      guard !Self.sameArrayStorage(catalog.projects, projects)
+        || !Self.sameArrayStorage(catalog.sessions, sessions)
+      else {
         return false
       }
 
