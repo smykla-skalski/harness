@@ -1,6 +1,8 @@
 import HarnessMonitorKit
 import SwiftUI
 
+private let decisionAuditScopeWorker = DecisionAuditScopeWorker()
+
 /// Decisions detail column with header, suggested actions, context, audit trail, and live tick.
 @MainActor
 public struct DecisionDetailView: View {
@@ -11,6 +13,8 @@ public struct DecisionDetailView: View {
   @AccessibilityFocusState private var focusedPrimaryActionDecisionID: String?
   @FocusState private var keyboardFocusedPrimaryActionDecisionID: String?
   @State private var handledPrimaryActionFocusTick = 0
+  @State private var scopedAuditEvents: [SupervisorEventSnapshot] = []
+  @State private var scopedAuditInput: DecisionDetailViewModel.AuditScopeInput?
 
   private let viewModel: DecisionDetailViewModel?
   private let store: HarnessMonitorStore?
@@ -173,6 +177,17 @@ public struct DecisionDetailView: View {
       .onChange(of: primaryActionFocusRequestTick) { _, _ in
         applyPrimaryActionFocusIfNeeded()
       }
+      .task(id: auditScopeInput) {
+        await syncScopedAuditEvents()
+      }
+  }
+
+  private var auditScopeInput: DecisionDetailViewModel.AuditScopeInput? {
+    guard let viewModel else { return nil }
+    return DecisionDetailViewModel.AuditScopeInput(
+      decision: viewModel.decision,
+      events: auditEvents
+    )
   }
 
   @ViewBuilder private var detailBody: some View {
@@ -338,9 +353,30 @@ public struct DecisionDetailView: View {
       )
     case .audit:
       DecisionAuditTrailTab(
-        events: viewModel.scopedAuditTrail(from: auditEvents),
+        events: scopedAuditEvents,
         payloadPresentations: auditEventPayloadPresentations
       )
+    }
+  }
+
+  @MainActor
+  private func syncScopedAuditEvents() async {
+    guard let input = auditScopeInput else {
+      scopedAuditInput = nil
+      if !scopedAuditEvents.isEmpty {
+        scopedAuditEvents = []
+      }
+      return
+    }
+    guard scopedAuditInput != input else { return }
+    if !scopedAuditEvents.isEmpty {
+      scopedAuditEvents = []
+    }
+    let output = await decisionAuditScopeWorker.scopedAuditTrail(input: input)
+    guard !Task.isCancelled, auditScopeInput == input else { return }
+    scopedAuditInput = input
+    if scopedAuditEvents != output {
+      scopedAuditEvents = output
     }
   }
 

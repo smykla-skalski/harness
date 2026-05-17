@@ -90,6 +90,34 @@ public final class DecisionDetailViewModel {
     }
   }
 
+  public struct AuditScope: Equatable, Sendable {
+    public let decisionID: String
+    public let ruleID: String
+    public let sessionID: String?
+    public let agentID: String?
+    public let taskID: String?
+
+    @MainActor
+    public init(decision: Decision) {
+      decisionID = decision.id
+      ruleID = decision.ruleID
+      sessionID = decision.sessionID
+      agentID = decision.agentID
+      taskID = decision.taskID
+    }
+  }
+
+  public struct AuditScopeInput: Equatable, Sendable {
+    public let scope: AuditScope
+    public let events: [SupervisorEventSnapshot]
+
+    @MainActor
+    public init(decision: Decision, events: [SupervisorEventSnapshot]) {
+      scope = AuditScope(decision: decision)
+      self.events = events
+    }
+  }
+
   public let decision: Decision
   public private(set) var suggestedActions: [SuggestedAction]
   public private(set) var contextSections: [ContextSection]
@@ -138,13 +166,10 @@ public final class DecisionDetailViewModel {
   public func scopedAuditTrail(
     from events: [SupervisorEventSnapshot]
   ) -> [SupervisorEventSnapshot] {
-    events
-      .filter { event in
-        Self.matchesAuditEvent(event, decision: decision)
-      }
-      .sorted { lhs, rhs in
-        lhs.createdAt < rhs.createdAt
-      }
+    Self.scopedAuditTrail(
+      events: events,
+      scope: AuditScope(decision: decision)
+    )
   }
 
   /// Invoke the user-selected action. Terminal kinds (`.dismiss`) and `.snooze` route through
@@ -274,15 +299,28 @@ public final class DecisionDetailViewModel {
     }
   }
 
-  private static func matchesAuditEvent(
+  nonisolated static func scopedAuditTrail(
+    events: [SupervisorEventSnapshot],
+    scope: AuditScope
+  ) -> [SupervisorEventSnapshot] {
+    events
+      .filter { event in
+        matchesAuditEvent(event, scope: scope)
+      }
+      .sorted { lhs, rhs in
+        lhs.createdAt < rhs.createdAt
+      }
+  }
+
+  nonisolated private static func matchesAuditEvent(
     _ event: SupervisorEventSnapshot,
-    decision: Decision
+    scope: AuditScope
   ) -> Bool {
-    guard event.ruleID == nil || event.ruleID == decision.ruleID else {
+    guard event.ruleID == nil || event.ruleID == scope.ruleID else {
       return false
     }
     let payloadScope = AuditPayloadScope(payloadJSON: event.payloadJSON)
-    return payloadScope.matches(decision: decision)
+    return payloadScope.matches(decision: scope)
   }
 
   @MainActor private static let ageFormatter: RelativeDateTimeFormatter = {
@@ -332,6 +370,18 @@ public actor DecisionDetailPreparationWorker {
   public func waitForIdle() async {}
 }
 
+public actor DecisionAuditScopeWorker {
+  public init() {}
+
+  public func scopedAuditTrail(
+    input: DecisionDetailViewModel.AuditScopeInput
+  ) -> [SupervisorEventSnapshot] {
+    DecisionDetailViewModel.scopedAuditTrail(events: input.events, scope: input.scope)
+  }
+
+  public func waitForIdle() async {}
+}
+
 private struct AuditPayloadScope {
   let sessionID: String?
   let agentID: String?
@@ -365,8 +415,8 @@ private struct AuditPayloadScope {
     )
   }
 
-  func matches(decision: Decision) -> Bool {
-    matches(expected: decision.id, actual: decisionID)
+  func matches(decision: DecisionDetailViewModel.AuditScope) -> Bool {
+    matches(expected: decision.decisionID, actual: decisionID)
       && matches(expected: decision.sessionID, actual: sessionID)
       && matches(expected: decision.agentID, actual: agentID)
       && matches(expected: decision.taskID, actual: taskID)
