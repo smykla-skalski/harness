@@ -129,6 +129,8 @@ mise run monitor:xcodebuild -- \
 - Clippy is strict (`pedantic` plus extra denies), and `build.rs` makes `cargo clippy --lib` fail when tracked Rust files under `src/`, `tests/`, or `testkit/` exceed 520 lines.
 - Evaluate semver whenever shipped behavior changes. `Cargo.toml` is the canonical version source; use `mise run version:set -- <version>` and `mise run version:sync` to update derived surfaces.
 - Commit and PR titles should follow `type(scope): description`.
+- Every commit must be signed and signed-off: `git commit -sS` with the trailer `Signed-off-by: Bart Smykla <bartek@smykla.com>`. Never bypass signing (`--no-gpg-sign`, `--no-verify`).
+- Commit with explicit paths passed directly to `git commit`: `git commit -sS -- <paths>`. Do not pre-stage with `git add`, and never use `git add -A`, `git add .`, or `git commit -a`. Parallel Copilot/agent sessions routinely leave unrelated edits in the working tree; path-limited commits keep them out of the signed history. Run `git diff -- <paths>` before committing to confirm the per-file scope.
 - Finished tasks must be integrated through `main` with clean, flat history. Rebase or cherry-pick; never create merge commits. Resolve conflicts by triaging current `main` behavior against the task intent, keep unrelated edits out of conflict resolution, and rerun the smallest relevant validation after conflicts are resolved.
 - For Harness Monitor SwiftUI work, prefer existing shared layout/control primitives and existing UI-test helpers instead of inventing one-off patterns.
 - If a macOS UI test cannot find or tap a control that looks correct, fix the test query/interaction path before changing product UI.

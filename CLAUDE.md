@@ -16,6 +16,10 @@ fully landed there remove the temporary worktree and branch afterward.
 
 Parallel Claude sessions that edit, generate, build, test, run daemons, or use XcodeBuildMCP need separate full git worktrees. Lanes and env vars isolate build/runtime side effects inside a worktree; they do not make concurrent write/build work in one checkout acceptable.
 
+## Path-limited commits
+
+Commit with explicit paths passed straight to `git commit`: `git commit -sS -- <paths>`. Do not pre-stage with `git add`, and never use `git add -A`, `git add .`, or `git commit -a`. Git stages exactly the listed paths for this commit and leaves the rest of the index and working tree untouched. Even with the worktree rule above, parallel agents and background tooling routinely drop unrelated edits into the working tree; path-limited commits keep them out of the signed history. Run `git diff -- <paths>` before committing to confirm the per-file scope.
+
 ## Hook system (Claude Code dispatch)
 
 Claude Code uses these hook constants in `cli.rs` (Codex maps the same triggers to its unified `tool-guard` / `tool-result` / `tool-failure` constants - see `AGENTS.md`):
