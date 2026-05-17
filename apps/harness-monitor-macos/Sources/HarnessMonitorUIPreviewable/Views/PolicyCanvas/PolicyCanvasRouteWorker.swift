@@ -43,6 +43,7 @@ actor PolicyCanvasRouteWorker {
     )
     let nodeIndex = input.nodeIndex
     let accessibilityEdgeEntries = input.accessibilityEdgeEntries(nodeIndex: nodeIndex)
+    let nodeAccessibilityValuesByID = input.nodeAccessibilityValuesByID(nodeIndex: nodeIndex)
     cachedInput = input
     cachedOutput = PolicyCanvasRouteWorkerOutput(
       routes: routes,
@@ -51,7 +52,9 @@ actor PolicyCanvasRouteWorker {
       contentSize: policyCanvasVisibleContentSize(visibleBounds: visibleBounds),
       accessibilityEdgeLabelsByID: Self.edgeLabelsByID(accessibilityEdgeEntries),
       accessibilityNodeEntries: input.accessibilityNodeEntries(),
-      accessibilityEdgeEntries: accessibilityEdgeEntries
+      accessibilityEdgeEntries: accessibilityEdgeEntries,
+      nodeAccessibilityValuesByID: nodeAccessibilityValuesByID,
+      connectTargetsByNodeID: input.connectTargetsByNodeID()
     )
     return cachedOutput
   }
@@ -265,6 +268,98 @@ struct PolicyCanvasRouteWorkerInput: Equatable, Sendable {
         label: accessibilityLabel(for: edge, nodeIndex: nodeIndex)
       )
     }
+  }
+
+  fileprivate func nodeAccessibilityValuesByID(
+    nodeIndex: [String: PolicyCanvasRouteNode]
+  ) -> [String: String] {
+    let groupsByID = Dictionary(uniqueKeysWithValues: groups.map { ($0.id, $0.title) })
+    var outgoingTitlesByNodeID: [String: [String]] = [:]
+    var incomingTitlesByNodeID: [String: [String]] = [:]
+    for edge in edges {
+      if let targetTitle = nodeIndex[edge.target.nodeID]?.title {
+        outgoingTitlesByNodeID[edge.source.nodeID, default: []].append(targetTitle)
+      }
+      if let sourceTitle = nodeIndex[edge.source.nodeID]?.title {
+        incomingTitlesByNodeID[edge.target.nodeID, default: []].append(sourceTitle)
+      }
+    }
+
+    var values: [String: String] = [:]
+    values.reserveCapacity(nodes.count)
+    for node in nodes {
+      var parts: [String] = []
+      if let groupID = node.groupID, let groupTitle = groupsByID[groupID] {
+        parts.append("group \(groupTitle)")
+      }
+      if let outgoing = outgoingTitlesByNodeID[node.id], !outgoing.isEmpty {
+        parts.append("connects to: \(outgoing.joined(separator: ", "))")
+      }
+      if let incoming = incomingTitlesByNodeID[node.id], !incoming.isEmpty {
+        parts.append("receives from: \(incoming.joined(separator: ", "))")
+      }
+      let value = parts.joined(separator: ", ")
+      if !value.isEmpty {
+        values[node.id] = value
+      }
+    }
+    return values
+  }
+
+  fileprivate func connectTargetsByNodeID() -> [String: [PolicyCanvasAccessibilityConnectTarget]] {
+    var connectedPairs = Set<String>()
+    connectedPairs.reserveCapacity(edges.count)
+    for edge in edges {
+      connectedPairs.insert(connectPairKey(source: edge.source, target: edge.target))
+    }
+
+    var targetsByNodeID: [String: [PolicyCanvasAccessibilityConnectTarget]] = [:]
+    targetsByNodeID.reserveCapacity(nodes.count)
+    for source in nodes {
+      guard let sourcePort = source.outputPorts.first else {
+        continue
+      }
+      let sourceEndpoint = PolicyCanvasPortEndpoint(
+        nodeID: source.id,
+        portID: sourcePort.id,
+        kind: .output
+      )
+      var targets: [PolicyCanvasAccessibilityConnectTarget] = []
+      targets.reserveCapacity(PolicyCanvasAccessibility.connectableTargetActionCap)
+      targetLoop: for target in nodes where target.id != source.id {
+        for port in target.inputPorts {
+          let candidate = PolicyCanvasPortEndpoint(
+            nodeID: target.id,
+            portID: port.id,
+            kind: .input
+          )
+          guard !connectedPairs.contains(connectPairKey(source: sourceEndpoint, target: candidate))
+          else {
+            continue
+          }
+          targets.append(
+            PolicyCanvasAccessibilityConnectTarget(
+              endpoint: candidate,
+              displayName: "\(target.title) \(port.title)"
+            )
+          )
+          if targets.count >= PolicyCanvasAccessibility.connectableTargetActionCap {
+            break targetLoop
+          }
+        }
+      }
+      if !targets.isEmpty {
+        targetsByNodeID[source.id] = targets
+      }
+    }
+    return targetsByNodeID
+  }
+
+  private func connectPairKey(
+    source: PolicyCanvasPortEndpoint,
+    target: PolicyCanvasPortEndpoint
+  ) -> String {
+    "\(source.nodeID)|\(source.portID)->\(target.nodeID)|\(target.portID)"
   }
 
   private func accessibilityLabel(
@@ -523,6 +618,8 @@ struct PolicyCanvasRouteWorkerOutput: Equatable, Sendable {
   let accessibilityEdgeLabelsByID: [String: String]
   let accessibilityNodeEntries: [PolicyCanvasAccessibilityNodeEntry]
   let accessibilityEdgeEntries: [PolicyCanvasAccessibilityEdgeEntry]
+  let nodeAccessibilityValuesByID: [String: String]
+  let connectTargetsByNodeID: [String: [PolicyCanvasAccessibilityConnectTarget]]
 
   static let empty = Self(
     routes: [:],
@@ -531,13 +628,16 @@ struct PolicyCanvasRouteWorkerOutput: Equatable, Sendable {
     contentSize: PolicyCanvasLayout.minimumCanvasSize,
     accessibilityEdgeLabelsByID: [:],
     accessibilityNodeEntries: [],
-    accessibilityEdgeEntries: []
+    accessibilityEdgeEntries: [],
+    nodeAccessibilityValuesByID: [:],
+    connectTargetsByNodeID: [:]
   )
 
   static func fallback(for input: PolicyCanvasRouteWorkerInput) -> Self {
     let visibleBounds = input.contentBounds
     let nodeIndex = input.nodeIndex
     let accessibilityEdgeEntries = input.accessibilityEdgeEntries(nodeIndex: nodeIndex)
+    let nodeAccessibilityValuesByID = input.nodeAccessibilityValuesByID(nodeIndex: nodeIndex)
     return Self(
       routes: [:],
       labelPositions: [:],
@@ -547,7 +647,9 @@ struct PolicyCanvasRouteWorkerOutput: Equatable, Sendable {
         uniqueKeysWithValues: accessibilityEdgeEntries.map { ($0.id, $0.label) }
       ),
       accessibilityNodeEntries: input.accessibilityNodeEntries(),
-      accessibilityEdgeEntries: accessibilityEdgeEntries
+      accessibilityEdgeEntries: accessibilityEdgeEntries,
+      nodeAccessibilityValuesByID: nodeAccessibilityValuesByID,
+      connectTargetsByNodeID: input.connectTargetsByNodeID()
     )
   }
 }

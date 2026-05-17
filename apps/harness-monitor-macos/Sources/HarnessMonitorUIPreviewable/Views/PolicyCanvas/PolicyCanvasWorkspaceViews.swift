@@ -38,6 +38,9 @@ struct PolicyCanvasViewport: View {
     let edgeAccessibilityLabelsByID = routeOutput.accessibilityEdgeLabelsByID
     let accessibilityNodeEntries = routeOutput.accessibilityNodeEntries
     let accessibilityEdgeEntries = routeOutput.accessibilityEdgeEntries
+    let nodeAccessibilityValuesByID = routeOutput.nodeAccessibilityValuesByID
+    let connectTargetsByNodeID = routeOutput.connectTargetsByNodeID
+    let nodeValidationIssueMessagesByID = viewModel.nodeValidationIssueMessagesByID
     let contentSize = policyCanvasVisibleContentSize(visibleBounds: visibleBounds)
     GeometryReader { proxy in
       ScrollViewReader { _ in
@@ -94,7 +97,13 @@ struct PolicyCanvasViewport: View {
                 accessibilityLabelsByEdgeID: edgeAccessibilityLabelsByID
               )
               PolicyCanvasRubberBandLayer(viewModel: viewModel)
-              PolicyCanvasNodeLayer(viewModel: viewModel, focusedComponent: focusedComponent)
+              PolicyCanvasNodeLayer(
+                viewModel: viewModel,
+                focusedComponent: focusedComponent,
+                nodeAccessibilityValuesByID: nodeAccessibilityValuesByID,
+                connectTargetsByNodeID: connectTargetsByNodeID,
+                nodeValidationIssueMessagesByID: nodeValidationIssueMessagesByID
+              )
               if showSimulationOverlay {
                 PolicyCanvasSimulationLayer(viewModel: viewModel)
               }

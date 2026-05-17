@@ -109,13 +109,6 @@ final class PolicyCanvasViewModel {
   @ObservationIgnored var nextPaletteDropAnchor: CGPoint =
     PolicyCanvasLayout.initialPaletteDropAnchor
 
-  /// Severity-map cache for the validator hot path. `@ObservationIgnored` is
-  /// load-bearing: if SwiftUI observed this slot, every body that reads
-  /// `nodeSeverityMap` / `edgeSeverityMap` would re-run on cache write
-  /// (which itself is triggered by the same body reading the map) and the
-  /// cache would defeat itself. Writes go through `cachedSeverityMaps()`.
-  @ObservationIgnored var validationCacheStorage: PolicyCanvasValidationCacheEntry?
-
   /// Bumped by `invalidateValidationCache()` from every mutation site that
   /// can change validator output without touching the count-style token
   /// fields (drag end, position adjustment, group reflow). Folded into
@@ -196,8 +189,9 @@ final class PolicyCanvasViewModel {
   var hasRecoverableEdits: Bool
 
   /// Cache slot for the per-node simulation outcome map. `@ObservationIgnored`
-  /// for the same reason as `validationCacheStorage` — observed storage would
-  /// make every body that reads the map invalidate on its own cache write.
+  /// for the same reason as the validation worker's cached output: observed
+  /// storage would make every body that reads the map invalidate on its own
+  /// cache write.
   /// Token keyed on simulation revision + decisions count (see
   /// `SimulationOutcomeCacheToken`); writes flow through
   /// `simulationOutcomeMap()`.

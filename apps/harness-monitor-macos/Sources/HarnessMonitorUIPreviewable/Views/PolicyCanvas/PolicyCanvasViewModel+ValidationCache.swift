@@ -2,21 +2,19 @@ import Foundation
 import HarnessMonitorKit
 import Observation
 
-// SHIM: validation result caching is keyed on a coarse graph token that the
-// view model bumps from every mutation site. Once the daemon emits structured
-// per-node severity (see P11 shim notes in `+Validation.swift`), the entire
-// `validateGraph()` path can go away and this cache reduces to passing daemon
-// payloads straight through. Until then, this storage is the only thing
-// keeping a drag gesture off the O(N) DFS hot path on every frame.
+// SHIM: validation presentation now builds in `PolicyCanvasValidationWorker`,
+// keyed by a coarse graph token that the view model bumps from every mutation
+// site. Once the daemon emits structured per-node severity (see P11 shim notes
+// in `+Validation.swift`), the entire `validateGraph()` path can go away and
+// this worker can pass daemon payloads straight through. Until then, the worker
+// keeps drag gestures off the O(N) DFS and issue-map hot paths.
 
 extension PolicyCanvasViewModel {
-  /// Snapshot of the inputs the validator reads. Two reads with the same
-  /// snapshot must produce the same `[String: PolicyCanvasIssueSeverity]`
-  /// maps, so we use it as the cache key. Hashable on `(nodes.count,
-  /// edges.count, groups.count, latestSimulation?.revision, validation
-  /// issue count, validation isValid)` — coarse but cheap, and the
-  /// `invalidateValidationCache()` callsites cover every shape-mutating
-  /// path.
+  /// Snapshot of the inputs the validator reads. Two snapshots with the same
+  /// token must produce the same validation presentation. Hashable on
+  /// `(nodes.count, edges.count, groups.count, latestSimulation?.revision,
+  /// validation issue count, validation isValid)` - coarse but cheap, and the
+  /// `invalidateValidationCache()` callsites cover every shape-mutating path.
   struct ValidationCacheToken: Hashable {
     let nodeCount: Int
     let edgeCount: Int
@@ -32,9 +30,9 @@ extension PolicyCanvasViewModel {
   }
 
   /// Returns the cache token for the current graph state. Reads through the
-  /// observed `nodes`/`edges`/`groups`/`latestSimulation` storage; safe to
-  /// call from a body, but should be paired with `cachedSeverityMaps()` so
-  /// the per-body computation happens once instead of twice.
+  /// observed `nodes`/`edges`/`groups`/`latestSimulation` storage; use it as a
+  /// task id so validation presentation work runs off-main only when inputs
+  /// change.
   func validationCacheToken() -> ValidationCacheToken {
     ValidationCacheToken(
       nodeCount: nodes.count,
@@ -62,15 +60,9 @@ extension PolicyCanvasViewModel {
     routeComputationGeneration &+= 1
   }
 
-  /// Read the cached severity maps, rebuilding them when the cache token
-  /// no longer matches. The maps are returned together because every hot
-  /// caller (node layer body, edge layer body, inspector issues section)
-  /// reads both, and rebuilding both at once amortizes a single
-  /// `allValidationIssues` walk over two outputs.
-  ///
-  /// Returned tuples are by value; callers must hoist into a body-local
-  /// `let` so per-row `nodeSeverityMap[id]` reads stay O(1) and don't
-  /// touch the cache token on every iteration.
+  /// Read the latest worker-applied severity maps. The maps are returned
+  /// together because every hot caller reads both, and the worker builds both
+  /// from a single issue walk.
   func cachedSeverityMaps() -> (
     nodes: [String: PolicyCanvasIssueSeverity],
     edges: [String: PolicyCanvasIssueSeverity]
@@ -82,16 +74,10 @@ extension PolicyCanvasViewModel {
     guard validationPresentation != presentation else { return }
     validationPresentation = presentation
   }
-}
 
-/// One-shot record of a built severity map pair plus the token they were
-/// built against. Kept as a struct so the cache write is a single
-/// assignment to the `@ObservationIgnored` storage slot — no
-/// per-field mutation path is exposed.
-struct PolicyCanvasValidationCacheEntry {
-  let token: PolicyCanvasViewModel.ValidationCacheToken
-  let nodeSeverityMap: [String: PolicyCanvasIssueSeverity]
-  let edgeSeverityMap: [String: PolicyCanvasIssueSeverity]
+  var nodeValidationIssueMessagesByID: [String: String] {
+    validationPresentation.nodeIssueMessagesByID
+  }
 }
 
 struct PolicyCanvasValidationWorkerKey: Equatable {
@@ -105,11 +91,17 @@ struct PolicyCanvasValidationWorkerKey: Equatable {
 }
 
 struct PolicyCanvasValidationPresentation: Equatable, Sendable {
-  static let empty = Self(issues: [], nodeSeverityMap: [:], edgeSeverityMap: [:])
+  static let empty = Self(
+    issues: [],
+    nodeSeverityMap: [:],
+    edgeSeverityMap: [:],
+    nodeIssueMessagesByID: [:]
+  )
 
   let issues: [PolicyCanvasResolvedIssue]
   let nodeSeverityMap: [String: PolicyCanvasIssueSeverity]
   let edgeSeverityMap: [String: PolicyCanvasIssueSeverity]
+  let nodeIssueMessagesByID: [String: String]
 }
 
 actor PolicyCanvasValidationWorker {
@@ -125,7 +117,8 @@ actor PolicyCanvasValidationWorker {
     cachedOutput = PolicyCanvasValidationPresentation(
       issues: resolved,
       nodeSeverityMap: Self.nodeSeverityMap(for: resolved),
-      edgeSeverityMap: Self.edgeSeverityMap(for: resolved)
+      edgeSeverityMap: Self.edgeSeverityMap(for: resolved),
+      nodeIssueMessagesByID: Self.nodeIssueMessagesByID(for: resolved)
     )
     return cachedOutput
   }
@@ -359,6 +352,23 @@ actor PolicyCanvasValidationWorker {
     return edgeMap
   }
 
+  private static func nodeIssueMessagesByID(
+    for resolved: [PolicyCanvasResolvedIssue]
+  ) -> [String: String] {
+    var messagesByNodeID: [String: [String]] = [:]
+    for issue in resolved {
+      var nodeIDs: [String] = []
+      if let nodeID = issue.issue.nodeId {
+        nodeIDs.append(nodeID)
+      }
+      nodeIDs.append(contentsOf: issue.issue.nodeIds)
+      for nodeID in nodeIDs {
+        messagesByNodeID[nodeID, default: []].append(issue.issue.message)
+      }
+    }
+    return messagesByNodeID.mapValues { $0.joined(separator: "; ") }
+  }
+
   private static let allowingPolicyKinds: Set<String> = ["supervisor_rule"]
   private static let allowingRuleSuffixes: [String] = [
     "default-allow", "allow", "permit",
@@ -412,8 +422,4 @@ private struct PolicyCanvasErrorIntoAllowMatch {
   let edgeLabel: String
   let targetNodeId: String
   let targetLabel: String
-}
-
-extension PolicyCanvasViewModel {
-  typealias ValidationCacheEntry = PolicyCanvasValidationCacheEntry
 }

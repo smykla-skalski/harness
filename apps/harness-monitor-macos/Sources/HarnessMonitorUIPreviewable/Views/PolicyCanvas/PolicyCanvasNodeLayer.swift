@@ -15,6 +15,9 @@ struct PolicyCanvasNodeLayer: View {
   /// both `.accessibilityFocused(...)` modifiers apply; whichever binding
   /// flips first wins on a given tick and the other is benign.
   let focusedComponent: AccessibilityFocusState<PolicyCanvasSelection?>.Binding
+  let nodeAccessibilityValuesByID: [String: String]
+  let connectTargetsByNodeID: [String: [PolicyCanvasAccessibilityConnectTarget]]
+  let nodeValidationIssueMessagesByID: [String: String]
   /// P19 reduce-motion handle; mirrors the canvas-root system flag so the
   /// drop-end spring (P18) collapses to instant when the user has the
   /// system-wide reduce-motion accessibility setting on. The canvas-scoped
@@ -30,17 +33,18 @@ struct PolicyCanvasNodeLayer: View {
 
   var body: some View {
     let severityMap = viewModel.nodeSeverityMap
-    let focusOrder = viewModel.accessibilityNodeFocusOrder()
-    let orderedNodes = focusOrder.compactMap { id in
-      viewModel.nodes.first { $0.id == id }
-    }
-    ForEach(orderedNodes) { node in
+    let hasClipboard = viewModel.clipboard != nil
+    ForEach(viewModel.nodes) { node in
       PolicyCanvasNodeCard(
         node: node,
         isSelected: viewModel.isSelected(.node(node.id)),
         isFocused: focusedNodeID == node.id || accessibilityFocusedNodeID == node.id,
         severity: severityMap[node.id],
-        viewModel: viewModel
+        viewModel: viewModel,
+        accessibilityValue: nodeAccessibilityValuesByID[node.id] ?? "",
+        validationIssueMessages: nodeValidationIssueMessagesByID[node.id],
+        connectTargets: connectTargetsByNodeID[node.id] ?? [],
+        hasClipboard: hasClipboard
       )
       .offset(x: node.position.x, y: node.position.y)
       .focusable()
@@ -117,6 +121,10 @@ struct PolicyCanvasNodeCard: View {
   let isFocused: Bool
   let severity: PolicyCanvasIssueSeverity?
   let viewModel: PolicyCanvasViewModel
+  let accessibilityValue: String
+  let validationIssueMessages: String?
+  let connectTargets: [PolicyCanvasAccessibilityConnectTarget]
+  let hasClipboard: Bool
   /// P19 reduce-motion handle for the P18 selection-mark transition. Pulled
   /// from the environment so the animation gating uses the same root-seeded
   /// bit the rest of the canvas reads. Canvas-scoped override is optional
@@ -244,12 +252,14 @@ struct PolicyCanvasNodeCard: View {
     // own their labels).
     .accessibilityElement(children: .ignore)
     .accessibilityLabel(viewModel.accessibilityLabel(for: node))
-    .accessibilityValue(accessibilityValue)
+    .accessibilityValue(nodeAccessibilityValue)
     .accessibilityIdentifier(HarnessMonitorAccessibility.policyCanvasNode(node.id))
     .modifier(
       PolicyCanvasNodeAccessibilityActions(
         viewModel: viewModel,
-        nodeID: node.id
+        nodeID: node.id,
+        connectTargets: connectTargets,
+        canPaste: hasClipboard
       )
     )
   }
@@ -264,19 +274,12 @@ struct PolicyCanvasNodeCard: View {
     return node.kind.accentColor.opacity(isSelected ? 0.95 : 0.34)
   }
 
-  private var accessibilityValue: String {
-    let base = viewModel.accessibilityValue(for: node)
+  private var nodeAccessibilityValue: String {
+    let base = accessibilityValue
     guard let severity else {
       return base
     }
-    let issues = viewModel.allValidationIssues
-      .filter { resolved in
-        resolved.issue.nodeId == node.id || resolved.issue.nodeIds.contains(node.id)
-      }
-      .map { resolved in
-        resolved.issue.message
-      }
-      .joined(separator: "; ")
+    let issues = validationIssueMessages ?? ""
     let prefix = "invalid: \(severity.displayLabel) - \(issues)"
     return base.isEmpty ? prefix : "\(prefix). \(base)"
   }
@@ -321,10 +324,10 @@ struct PolicyCanvasNodeCard: View {
 private struct PolicyCanvasNodeAccessibilityActions: ViewModifier {
   let viewModel: PolicyCanvasViewModel
   let nodeID: String
+  let connectTargets: [PolicyCanvasAccessibilityConnectTarget]
+  let canPaste: Bool
 
   func body(content: Content) -> some View {
-    let connectTargets = viewModel.accessibilityConnectableNamedTargets(fromNodeID: nodeID)
-    let canPaste = viewModel.clipboard != nil
     return
       content
       .accessibilityAction(named: Text("Delete")) {

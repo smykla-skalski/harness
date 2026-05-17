@@ -5,19 +5,17 @@ import Testing
 @testable import HarnessMonitorKit
 @testable import HarnessMonitorUIPreviewable
 
-/// Covers the severity-map cache that sits between `allValidationIssues`
-/// and the hot-path node/edge layer bodies. Two contracts matter:
-///   1. Repeated reads with no intervening mutation must reuse the
-///      cached storage — a graph drag would otherwise rebuild the maps
-///      twice per render on a 100-node canvas.
+/// Covers the validation worker presentation that sits between raw validation
+/// issues and the hot-path node/edge layer bodies. Two contracts matter:
+///   1. Repeated reads with no intervening mutation must reuse the applied
+///      presentation instead of rebuilding from body access.
 ///   2. Every mutation that can change validator output must bump the
-///      invalidation generation so the next read rebuilds from a fresh
-///      `allValidationIssues` walk.
+///      invalidation generation so the next worker run reads fresh inputs.
 @Suite("Policy canvas validation cache")
 @MainActor
 struct PolicyCanvasValidationCacheTests {
-  @Test("repeated reads reuse the cached storage without bumping generation")
-  func repeatedReadsReuseCache() {
+  @Test("repeated reads reuse applied presentation without bumping generation")
+  func repeatedReadsReuseCache() async {
     let viewModel = PolicyCanvasViewModel.sample()
     viewModel.latestSimulation = makeSimulation(
       issues: [
@@ -30,17 +28,14 @@ struct PolicyCanvasValidationCacheTests {
     )
 
     let initialGeneration = viewModel.validationInvalidationGeneration
-    // First read populates the storage slot from nil; subsequent reads
-    // must token-match and return the cached maps without rebuilding.
-    #expect(viewModel.validationCacheStorage == nil)
+    await applyValidationPresentation(viewModel)
     let first = viewModel.cachedSeverityMaps()
-    let primedToken = viewModel.validationCacheStorage?.token
-    #expect(primedToken != nil)
     let second = viewModel.cachedSeverityMaps()
 
     #expect(first.nodes == second.nodes)
     #expect(first.edges == second.edges)
-    #expect(viewModel.validationCacheStorage?.token == primedToken)
+    #expect(first.nodes["risk-score"] == .error)
+    #expect(viewModel.nodeValidationIssueMessagesByID["risk-score"] == "cycle")
     #expect(viewModel.validationInvalidationGeneration == initialGeneration)
   }
 
@@ -103,9 +98,9 @@ struct PolicyCanvasValidationCacheTests {
   }
 
   @Test("installing a new simulation rebuilds the cache with fresh severities")
-  func simulationInstallRebuildsMaps() {
+  func simulationInstallRebuildsMaps() async {
     let viewModel = PolicyCanvasViewModel.sample()
-    // Prime the cache with no issues.
+    await applyValidationPresentation(viewModel)
     let initialMaps = viewModel.cachedSeverityMaps()
     #expect(initialMaps.nodes.isEmpty)
     #expect(initialMaps.edges.isEmpty)
@@ -130,6 +125,7 @@ struct PolicyCanvasValidationCacheTests {
     // so this read would also miss on the count delta even without the
     // explicit bump, but we keep the assertion narrow.
     viewModel.invalidateValidationCache()
+    await applyValidationPresentation(viewModel)
 
     let rebuilt = viewModel.cachedSeverityMaps()
     #expect(rebuilt.edges["edge-intake-risk"] == .error)
@@ -137,7 +133,7 @@ struct PolicyCanvasValidationCacheTests {
   }
 
   @Test("nodeSeverityMap reader returns the same values across two reads")
-  func nodeSeverityMapStableAcrossReads() {
+  func nodeSeverityMapStableAcrossReads() async {
     let viewModel = PolicyCanvasViewModel.sample()
     viewModel.latestSimulation = makeSimulation(
       issues: [
@@ -149,6 +145,7 @@ struct PolicyCanvasValidationCacheTests {
       ]
     )
     viewModel.invalidateValidationCache()
+    await applyValidationPresentation(viewModel)
 
     let first = viewModel.nodeSeverityMap
     let second = viewModel.nodeSeverityMap
@@ -185,5 +182,17 @@ struct PolicyCanvasValidationCacheTests {
         issues: issues
       )
     )
+  }
+
+  private func applyValidationPresentation(_ viewModel: PolicyCanvasViewModel) async {
+    let worker = PolicyCanvasValidationWorker()
+    let output = await worker.compute(
+      input: PolicyCanvasValidationWorkerInput(
+        nodes: viewModel.nodes,
+        edges: viewModel.edges,
+        daemonIssues: viewModel.daemonValidationIssues
+      )
+    )
+    viewModel.applyValidationPresentation(output)
   }
 }
