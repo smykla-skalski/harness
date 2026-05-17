@@ -5,8 +5,8 @@ import Testing
 @MainActor
 @Suite("Harness Monitor store filtering projection patches")
 struct HarnessMonitorStoreProjectionPatchTests {
-  @Test("Session summary patch updates projection without a full catalog rebuild")
-  func sessionSummaryPatchUpdatesProjectionWithoutCatalogRebuild() {
+  @Test("Session summary patch updates catalog and projection through the worker")
+  func sessionSummaryPatchUpdatesCatalogAndProjectionThroughWorker() async {
     let store = HarnessMonitorStore(daemonController: RecordingDaemonController())
     store.projects = [makeProject(totalSessionCount: 2, activeSessionCount: 2)]
 
@@ -40,6 +40,7 @@ struct HarnessMonitorStoreProjectionPatchTests {
       makeSession(older),
       makeSession(updated),
     ]
+    await store.waitForSessionIndexIdle()
 
     let initialCatalogRebuilds = store.sessionIndex.debugCatalogRebuildCount
     let initialProjectionRebuilds = store.sessionIndex.debugProjectionRebuildCount
@@ -49,17 +50,18 @@ struct HarnessMonitorStoreProjectionPatchTests {
     updated.lastActivityAt = "2026-03-28T14:30:00Z"
 
     let didChange = store.sessionIndex.applySessionSummary(makeSession(updated))
+    await store.waitForSessionIndexIdle()
 
     #expect(didChange)
-    #expect(store.sessionIndex.debugCatalogRebuildCount == initialCatalogRebuilds)
+    #expect(store.sessionIndex.debugCatalogRebuildCount == initialCatalogRebuilds + 1)
     #expect(store.sessionIndex.debugProjectionRebuildCount == initialProjectionRebuilds + 1)
     #expect(store.sessionIndex.sessionSummary(for: "updated")?.context == updated.context)
     #expect(store.totalOpenWorkCount == 5)
     #expect(store.recentSessions.first?.sessionId == "updated")
   }
 
-  @Test("Projection summary patch refreshes search ordering without a full catalog rebuild")
-  func projectionSummaryPatchRefreshesSearchOrderingWithoutCatalogRebuild() {
+  @Test("Projection summary patch refreshes search ordering through the worker")
+  func projectionSummaryPatchRefreshesSearchOrderingThroughWorker() async {
     let store = HarnessMonitorStore(daemonController: RecordingDaemonController())
     store.projects = [makeProject(totalSessionCount: 2, activeSessionCount: 2)]
 
@@ -95,8 +97,10 @@ struct HarnessMonitorStoreProjectionPatchTests {
       makeSession(first),
       makeSession(second),
     ]
+    await store.waitForSessionIndexIdle()
     store.searchText = "shared"
     store.flushPendingSearchRebuild()
+    await store.waitForSessionIndexIdle()
 
     #expect(store.visibleSessionIDs == ["first", "second"])
 
@@ -115,9 +119,10 @@ struct HarnessMonitorStoreProjectionPatchTests {
     )
 
     let didChange = store.sessionIndex.applySessionSummary(updated)
+    await store.waitForSessionIndexIdle()
 
     #expect(didChange)
-    #expect(store.sessionIndex.debugCatalogRebuildCount == initialCatalogRebuilds)
+    #expect(store.sessionIndex.debugCatalogRebuildCount == initialCatalogRebuilds + 1)
     #expect(store.sessionIndex.debugProjectionRebuildCount == initialProjectionRebuilds + 1)
     #expect(store.visibleSessionIDs == ["second", "first"])
   }

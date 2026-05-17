@@ -138,6 +138,7 @@ extension HarnessMonitorStore.SessionIndexSlice {
     catalog.sessionSummariesByID = output.sessionSummariesByID
     catalog.recentSessions = output.recentSessions
     sessionIndicesByID = output.sessionIndicesByID
+    recentSessionIndicesByID = output.recentSessionIndicesByID
     sessionRecordsByID = output.sessionRecordsByID
     projectCatalogs = output.projectCatalogs
     orderedSessionIDsBySortOrder = output.orderedSessionIDsBySortOrder
@@ -201,28 +202,6 @@ extension HarnessMonitorStore.SessionIndexSlice {
     }
   }
 
-  func rebuildCatalog() {
-    debugCatalogRebuildCount += 1
-    catalog.totalSessionCount = catalog.sessions.count
-    catalog.totalOpenWorkCount = catalog.sessions.reduce(0) { $0 + $1.metrics.openTaskCount }
-    catalog.totalBlockedCount = catalog.sessions.reduce(0) { $0 + $1.metrics.blockedTaskCount }
-    catalog.sessionSummariesByID = Dictionary(
-      uniqueKeysWithValues: catalog.sessions.map { ($0.sessionId, $0) }
-    )
-
-    sessionIndicesByID.removeAll(keepingCapacity: true)
-    sessionRecordsByID.removeAll(keepingCapacity: true)
-
-    for (index, summary) in catalog.sessions.enumerated() {
-      sessionIndicesByID[summary.sessionId] = index
-      sessionRecordsByID[summary.sessionId] = SessionRecord(summary: summary)
-    }
-
-    projectCatalogs = buildProjectCatalogs()
-    rebuildOrderedSessionIDs()
-    catalog.recentSessions = sortRecentSessions(catalog.sessions)
-  }
-
   func patchCatalog(
     existingSummary: SessionSummary,
     updatedSummary: SessionSummary
@@ -235,80 +214,11 @@ extension HarnessMonitorStore.SessionIndexSlice {
     catalog.totalBlockedCount +=
       updatedSummary.metrics.blockedTaskCount
       - existingSummary.metrics.blockedTaskCount
-    if existingSummary.updatedAt != updatedSummary.updatedAt {
-      catalog.recentSessions = sortRecentSessions(catalog.sessions)
-    } else {
-      catalog.recentSessions = replacingSession(updatedSummary, in: catalog.recentSessions)
+    if let recentIndex = recentSessionIndicesByID[updatedSummary.sessionId],
+      catalog.recentSessions.indices.contains(recentIndex)
+    {
+      catalog.recentSessions[recentIndex] = updatedSummary
     }
-    if requiresOrderingRefresh(from: existingSummary, to: updatedSummary) {
-      patchProjectCatalogOrderings(for: updatedSummary)
-      rebuildOrderedSessionIDs()
-    }
-  }
-
-  func buildProjectCatalogs() -> [ProjectCatalog] {
-    var checkoutsByProject: [String: [String: CheckoutAccumulator]] = [:]
-
-    for summary in catalog.sessions {
-      let checkout = CheckoutAccumulator(
-        checkoutId: summary.checkoutId,
-        title: summary.checkoutDisplayName,
-        isWorktree: summary.isWorktree,
-        sessionIDs: [summary.sessionId]
-      )
-
-      if var existing = checkoutsByProject[summary.projectId]?[summary.checkoutId] {
-        existing.sessionIDs.append(summary.sessionId)
-        checkoutsByProject[summary.projectId]?[summary.checkoutId] = existing
-      } else {
-        checkoutsByProject[summary.projectId, default: [:]][summary.checkoutId] = checkout
-      }
-    }
-
-    return catalog.projects.map { project in
-      let checkouts = (checkoutsByProject[project.projectId] ?? [:]).values
-        .map { checkout in
-          CheckoutCatalog(
-            checkoutId: checkout.checkoutId,
-            title: checkout.title,
-            isWorktree: checkout.isWorktree,
-            recentActivitySessionIDs: sortedSessionIDs(
-              checkout.sessionIDs,
-              using: .recentActivity
-            ),
-            nameSessionIDs: sortedSessionIDs(
-              checkout.sessionIDs,
-              using: .name
-            ),
-            statusSessionIDs: sortedSessionIDs(
-              checkout.sessionIDs,
-              using: .status
-            )
-          )
-        }
-        .sorted { lhs, rhs in
-          if lhs.isWorktree != rhs.isWorktree {
-            return lhs.isWorktree == false
-          }
-          return lhs.title.localizedStandardCompare(rhs.title) == .orderedAscending
-        }
-      return ProjectCatalog(project: project, checkouts: checkouts)
-    }
-  }
-
-  func rebuildOrderedSessionIDs() {
-    orderedSessionIDsBySortOrder = Dictionary(
-      uniqueKeysWithValues: SessionSortOrder.allCases.map { sortOrder in
-        (
-          sortOrder,
-          projectCatalogs.flatMap { projectCatalog in
-            projectCatalog.checkouts.flatMap { checkout in
-              checkout.orderedSessionIDs(for: sortOrder)
-            }
-          }
-        )
-      }
-    )
   }
 
   func rebuildProjection(change: Change) {
@@ -317,33 +227,4 @@ extension HarnessMonitorStore.SessionIndexSlice {
     rebuildProjectionAsync(change: change)
   }
 
-  func buildGroupedSessions(
-    visibleSessionIDSet: Set<String>
-  ) -> [HarnessMonitorStore.SessionGroup] {
-    projectCatalogs.compactMap { projectCatalog -> HarnessMonitorStore.SessionGroup? in
-      let checkoutGroups =
-        projectCatalog.checkouts.compactMap { checkout -> HarnessMonitorStore.CheckoutGroup? in
-          let checkoutSessionIDs =
-            checkout
-            .orderedSessionIDs(for: controls.sessionSortOrder)
-            .filter { visibleSessionIDSet.contains($0) }
-          guard !checkoutSessionIDs.isEmpty else {
-            return nil
-          }
-          return HarnessMonitorStore.CheckoutGroup(
-            checkoutId: checkout.checkoutId,
-            title: checkout.title,
-            isWorktree: checkout.isWorktree,
-            sessionIDs: checkoutSessionIDs
-          )
-        }
-      guard !checkoutGroups.isEmpty else {
-        return nil
-      }
-      return HarnessMonitorStore.SessionGroup(
-        project: projectCatalog.project,
-        checkoutGroups: checkoutGroups
-      )
-    }
-  }
 }

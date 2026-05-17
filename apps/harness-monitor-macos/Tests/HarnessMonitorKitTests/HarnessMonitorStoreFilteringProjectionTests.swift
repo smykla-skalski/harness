@@ -51,6 +51,7 @@ struct HarnessMonitorStoreProjectionTests {
       after: {
         store.searchText = "preview"
         store.flushPendingSearchRebuild()
+        await store.waitForSessionIndexIdle()
       }
     )
 
@@ -60,13 +61,15 @@ struct HarnessMonitorStoreProjectionTests {
   }
 
   @Test("Projection-only changes do not rebuild the session catalog")
-  func projectionOnlyChangesDoNotRebuildTheSessionCatalog() {
+  func projectionOnlyChangesDoNotRebuildTheSessionCatalog() async {
     let store = HarnessMonitorStoreFilteringTestSupport.storeWithStatusFixtures()
+    await store.waitForSessionIndexIdle()
     let initialCatalogRebuilds = store.sessionIndex.debugCatalogRebuildCount
     let initialProjectionRebuilds = store.sessionIndex.debugProjectionRebuildCount
 
     store.searchText = "active"
     store.flushPendingSearchRebuild()
+    await store.waitForSessionIndexIdle()
 
     #expect(store.sessionIndex.debugCatalogRebuildCount == initialCatalogRebuilds)
     #expect(store.sessionIndex.debugProjectionRebuildCount == initialProjectionRebuilds + 1)
@@ -75,6 +78,7 @@ struct HarnessMonitorStoreProjectionTests {
   @Test("Search projection skips publishing projection slice changes")
   func searchProjectionSkipsPublishingProjectionSliceChanges() async {
     let store = HarnessMonitorStoreFilteringTestSupport.storeWithStatusFixtures()
+    await store.waitForSessionIndexIdle()
     let initialGroupedSessions = store.sessionIndex.projection.groupedSessions
     let initialFilteredSessionCount = store.sessionIndex.projection.filteredSessionCount
     let initialTotalSessionCount = store.sessionIndex.projection.totalSessionCount
@@ -92,6 +96,7 @@ struct HarnessMonitorStoreProjectionTests {
       after: {
         store.searchText = "active"
         store.flushPendingSearchRebuild()
+        await store.waitForSessionIndexIdle()
       }
     )
 
@@ -107,8 +112,10 @@ struct HarnessMonitorStoreProjectionTests {
   @Test("Search list-facing state ignores count-only churn")
   func searchListFacingStateIgnoresCountOnlyChurn() async {
     let store = HarnessMonitorStoreFilteringTestSupport.storeWithStatusFixtures()
+    await store.waitForSessionIndexIdle()
     store.searchText = "active"
     store.flushPendingSearchRebuild()
+    await store.waitForSessionIndexIdle()
 
     let hiddenSession = makeSession(
       .init(
@@ -137,6 +144,7 @@ struct HarnessMonitorStoreProjectionTests {
         var sessions = store.sessions
         sessions.append(hiddenSession)
         store.sessions = sessions
+        await store.waitForSessionIndexIdle()
       }
     )
 
@@ -146,7 +154,7 @@ struct HarnessMonitorStoreProjectionTests {
   }
 
   @Test("Sort order changes update projection without rebuilding the catalog")
-  func sortOrderChangesUpdateProjectionWithoutCatalogRebuild() {
+  func sortOrderChangesUpdateProjectionWithoutCatalogRebuild() async {
     let store = HarnessMonitorStore(daemonController: RecordingDaemonController())
     store.projects = [makeProject(totalSessionCount: 3, activeSessionCount: 2)]
 
@@ -198,6 +206,7 @@ struct HarnessMonitorStoreProjectionTests {
       makeSession(bravo),
     ]
     store.sessionFilter = .all
+    await store.waitForSessionIndexIdle()
 
     // Main-checkout sessions share one checkout group, so default ordering follows
     // recent activity inside that group.
@@ -210,6 +219,7 @@ struct HarnessMonitorStoreProjectionTests {
     let initialProjectionRebuilds = store.sessionIndex.debugProjectionRebuildCount
 
     store.sessionSortOrder = .name
+    await store.waitForSessionIndexIdle()
 
     #expect(
       HarnessMonitorStoreFilteringTestSupport.orderedVisibleIDs(from: store)
@@ -221,6 +231,7 @@ struct HarnessMonitorStoreProjectionTests {
     let projectionAfterNameSort = store.sessionIndex.debugProjectionRebuildCount
 
     store.sessionSortOrder = .status
+    await store.waitForSessionIndexIdle()
 
     #expect(
       HarnessMonitorStoreFilteringTestSupport.orderedVisibleIDs(from: store)
@@ -231,7 +242,7 @@ struct HarnessMonitorStoreProjectionTests {
   }
 
   @Test("Main-checkout sessions collapse into one sidebar checkout group")
-  func mainCheckoutSessionsShareOneCheckoutGroup() {
+  func mainCheckoutSessionsShareOneCheckoutGroup() async {
     let store = HarnessMonitorStore(daemonController: RecordingDaemonController())
     store.projects = [makeProject(totalSessionCount: 2, activeSessionCount: 2)]
 
@@ -265,6 +276,7 @@ struct HarnessMonitorStoreProjectionTests {
       makeSession(first),
       makeSession(second),
     ]
+    await store.waitForSessionIndexIdle()
 
     guard
       let projectGroup = store.groupedSessions.first,
@@ -281,7 +293,7 @@ struct HarnessMonitorStoreProjectionTests {
   }
 
   @Test("Linked-worktree sessions reuse one named sidebar checkout group")
-  func linkedWorktreeSessionsReuseOneCheckoutGroup() {
+  func linkedWorktreeSessionsReuseOneCheckoutGroup() async {
     let store = HarnessMonitorStore(daemonController: RecordingDaemonController())
     store.projects = [makeProject(totalSessionCount: 2, activeSessionCount: 2)]
     let worktreeRoot = "/Users/example/Projects/harness/.claude/worktrees/feature-branch"
@@ -318,6 +330,7 @@ struct HarnessMonitorStoreProjectionTests {
       makeSession(first),
       makeSession(second),
     ]
+    await store.waitForSessionIndexIdle()
 
     guard
       let projectGroup = store.groupedSessions.first,

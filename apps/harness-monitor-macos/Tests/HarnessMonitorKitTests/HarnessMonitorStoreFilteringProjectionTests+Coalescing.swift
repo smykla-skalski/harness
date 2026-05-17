@@ -5,7 +5,7 @@ import Testing
 @MainActor
 extension HarnessMonitorStoreProjectionTests {
   @Test("Summary-only updates skip projection rebuilds")
-  func summaryOnlyUpdatesSkipProjectionRebuilds() {
+  func summaryOnlyUpdatesSkipProjectionRebuilds() async {
     let store = HarnessMonitorStore(daemonController: RecordingDaemonController())
     store.projects = [makeProject(totalSessionCount: 1, activeSessionCount: 1)]
     let session = makeSession(
@@ -22,6 +22,7 @@ extension HarnessMonitorStoreProjectionTests {
       )
     )
     store.sessions = [session]
+    await store.waitForSessionIndexIdle()
 
     let initialCatalogRebuilds = store.sessionIndex.debugCatalogRebuildCount
     let initialProjectionRebuilds = store.sessionIndex.debugProjectionRebuildCount
@@ -55,6 +56,7 @@ extension HarnessMonitorStoreProjectionTests {
     )
 
     let didChange = store.sessionIndex.applySessionSummary(updated)
+    await store.waitForSessionIndexIdle()
 
     #expect(didChange)
     #expect(store.sessionIndex.debugCatalogRebuildCount == initialCatalogRebuilds)
@@ -66,8 +68,9 @@ extension HarnessMonitorStoreProjectionTests {
   }
 
   @Test("Projection-affecting summary updates only resync the toolbar when no session is selected")
-  func projectionSummaryUpdateOnlyResyncsToolbarWhenSelectionIsEmpty() {
+  func projectionSummaryUpdateOnlyResyncsToolbarWhenSelectionIsEmpty() async {
     let store = HarnessMonitorStoreFilteringTestSupport.storeWithStatusFixtures()
+    await store.waitForSessionIndexIdle()
     store.debugResetUISyncCounts()
 
     guard let active = store.sessionIndex.sessionSummary(for: "active") else {
@@ -105,6 +108,7 @@ extension HarnessMonitorStoreProjectionTests {
     )
 
     let didChange = store.sessionIndex.applySessionSummary(updated)
+    await store.waitForSessionIndexIdle()
 
     #expect(didChange)
     #expect(store.debugUISyncCount(for: .contentToolbar) == 1)
@@ -116,8 +120,9 @@ extension HarnessMonitorStoreProjectionTests {
   }
 
   @Test("Summary-only updates skip all content resync when the selected session is elsewhere")
-  func summaryOnlyUpdateSkipsContentResyncForUnselectedSession() {
+  func summaryOnlyUpdateSkipsContentResyncForUnselectedSession() async {
     let store = HarnessMonitorStoreFilteringTestSupport.storeWithStatusFixtures()
+    await store.waitForSessionIndexIdle()
     store.debugResetUISyncCounts()
 
     guard let paused = store.sessionIndex.sessionSummary(for: "paused") else {
@@ -165,7 +170,7 @@ extension HarnessMonitorStoreProjectionTests {
   }
 
   @Test("Recent sessions stay sorted by activity outside the visible filter")
-  func recentSessionsStaySortedByActivityOutsideVisibleFilter() {
+  func recentSessionsStaySortedByActivityOutsideVisibleFilter() async {
     let store = HarnessMonitorStore(daemonController: RecordingDaemonController())
     store.projects = [makeProject(totalSessionCount: 3, activeSessionCount: 2)]
 
@@ -213,8 +218,10 @@ extension HarnessMonitorStoreProjectionTests {
       makeSession(paused),
       makeSession(ended),
     ]
+    await store.waitForSessionIndexIdle()
 
     store.sessionFilter = .ended
+    await store.waitForSessionIndexIdle()
 
     #expect(store.visibleSessionIDs == ["ended"])
     #expect(store.recentSessions.map(\.sessionId) == ["ended", "paused", "active"])
@@ -223,6 +230,7 @@ extension HarnessMonitorStoreProjectionTests {
   @Test("Rapid search updates coalesce to a single projection rebuild")
   func rapidSearchUpdatesCoalesceToSingleProjectionRebuild() async {
     let store = HarnessMonitorStoreFilteringTestSupport.storeWithStatusFixtures()
+    await store.waitForSessionIndexIdle()
     let initialProjectionRebuilds = store.sessionIndex.debugProjectionRebuildCount
 
     store.searchText = "a"
@@ -235,6 +243,7 @@ extension HarnessMonitorStoreProjectionTests {
     #expect(store.sessionIndex.debugProjectionRebuildCount == initialProjectionRebuilds)
 
     try? await Task.sleep(nanoseconds: 300_000_000)
+    await store.waitForSessionIndexIdle()
 
     #expect(store.sessionIndex.debugProjectionRebuildCount == initialProjectionRebuilds + 1)
     #expect(store.visibleSessionIDs == ["active"])
@@ -243,12 +252,14 @@ extension HarnessMonitorStoreProjectionTests {
   @Test("Filter change cancels pending search rebuild debounce")
   func filterChangeCancelsPendingSearchRebuild() async {
     let store = HarnessMonitorStoreFilteringTestSupport.storeWithStatusFixtures()
+    await store.waitForSessionIndexIdle()
     let initialProjectionRebuilds = store.sessionIndex.debugProjectionRebuildCount
 
     store.searchText = "active"
     #expect(store.sessionIndex.debugProjectionRebuildCount == initialProjectionRebuilds)
 
     store.sessionFilter = .active
+    await store.waitForSessionIndexIdle()
     #expect(store.sessionIndex.debugProjectionRebuildCount == initialProjectionRebuilds + 1)
 
     try? await Task.sleep(nanoseconds: 300_000_000)
@@ -256,23 +267,26 @@ extension HarnessMonitorStoreProjectionTests {
     #expect(store.sessionIndex.debugProjectionRebuildCount == initialProjectionRebuilds + 1)
   }
 
-  @Test("Flush runs pending search rebuild synchronously")
-  func flushRunsPendingSearchRebuildSynchronously() {
+  @Test("Flush runs pending search rebuild without debounce")
+  func flushRunsPendingSearchRebuildWithoutDebounce() async {
     let store = HarnessMonitorStoreFilteringTestSupport.storeWithStatusFixtures()
+    await store.waitForSessionIndexIdle()
     let initialProjectionRebuilds = store.sessionIndex.debugProjectionRebuildCount
 
     store.searchText = "active"
     #expect(store.sessionIndex.debugProjectionRebuildCount == initialProjectionRebuilds)
 
     store.flushPendingSearchRebuild()
+    await store.waitForSessionIndexIdle()
 
     #expect(store.sessionIndex.debugProjectionRebuildCount == initialProjectionRebuilds + 1)
     #expect(store.visibleSessionIDs == ["active"])
   }
 
   @Test("Flush is a no-op when no search rebuild is pending")
-  func flushIsNoOpWhenNoPendingSearchRebuild() {
+  func flushIsNoOpWhenNoPendingSearchRebuild() async {
     let store = HarnessMonitorStoreFilteringTestSupport.storeWithStatusFixtures()
+    await store.waitForSessionIndexIdle()
     let initialProjectionRebuilds = store.sessionIndex.debugProjectionRebuildCount
 
     store.flushPendingSearchRebuild()
@@ -283,6 +297,7 @@ extension HarnessMonitorStoreProjectionTests {
   @Test("Stale async search results do not overwrite a newer committed projection")
   func staleAsyncSearchResultsDoNotOverwriteNewerProjection() async {
     let store = HarnessMonitorStoreFilteringTestSupport.storeWithStatusFixtures()
+    await store.waitForSessionIndexIdle()
     store.sessionIndex.debugProjectionDelayNanoseconds = 250_000_000
 
     store.searchText = "active"
@@ -291,6 +306,7 @@ extension HarnessMonitorStoreProjectionTests {
 
     store.searchText = "ended"
     store.flushPendingSearchRebuild()
+    await store.waitForSessionIndexIdle()
 
     #expect(store.visibleSessionIDs == ["ended"])
 
