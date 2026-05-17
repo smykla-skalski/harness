@@ -217,7 +217,19 @@ extension HarnessMonitorStore {
     }
 
     selectedAcpInspectSyncEntries = nextEntries
-    guard hasRecoverableMissingAcpInspectEntries(sessionID: sessionID) else {
+    finishAcpInspectSyncReconciliation(
+      sessionID: sessionID,
+      hasRecoverableMissingEntries: hasRecoverableMissingAcpInspectEntries(sessionID: sessionID),
+      shouldScheduleRecovery: shouldScheduleRecovery
+    )
+  }
+
+  func finishAcpInspectSyncReconciliation(
+    sessionID: String,
+    hasRecoverableMissingEntries: Bool,
+    shouldScheduleRecovery: Bool
+  ) {
+    guard hasRecoverableMissingEntries else {
       cancelAcpInspectRecovery(for: sessionID)
       return
     }

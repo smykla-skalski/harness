@@ -27,7 +27,7 @@ extension HarnessMonitorStore {
               await recoverGlobalPushOnlyState(using: client)
               continue
             }
-            applyGlobalPushEvent(event)
+            await applyGlobalPushEventFromStream(event)
           }
         } catch {
           if Task.isCancelled {
@@ -83,7 +83,7 @@ extension HarnessMonitorStore {
               )
               continue
             }
-            applySessionPushEvent(event)
+            await applySessionPushEventFromStream(event)
           }
         } catch {
           if Task.isCancelled {
@@ -297,12 +297,36 @@ extension HarnessMonitorStore {
     }
   }
 
+  private func applyGlobalPushEventFromStream(_ event: DaemonPushEvent) async {
+    if await applyManagedAgentPushEventFromStream(event) {
+      scheduleSupervisorTick(reason: "global-managed-agent")
+      return
+    }
+    applyGlobalPushEvent(event)
+  }
+
+  private func applySessionPushEventFromStream(_ event: DaemonPushEvent) async {
+    if await applyManagedAgentPushEventFromStream(event) {
+      scheduleSupervisorTick(reason: "session-managed-agent")
+      return
+    }
+    applySessionPushEvent(event)
+  }
+
   @discardableResult
   private func applyManagedAgentPushEvent(_ event: DaemonPushEvent) -> Bool {
     if applyCoreManagedAgentPushEvent(event) {
       return true
     }
     return applyAcpManagedAgentPushEvent(event)
+  }
+
+  @discardableResult
+  private func applyManagedAgentPushEventFromStream(_ event: DaemonPushEvent) async -> Bool {
+    if applyCoreManagedAgentPushEvent(event) {
+      return true
+    }
+    return await applyAcpManagedAgentPushEventFromStream(event)
   }
 
   @discardableResult
@@ -355,6 +379,26 @@ extension HarnessMonitorStore {
       removeAcpPermissionBatch(removal.batch, reason: removal.reason)
     default:
       return false
+    }
+    return true
+  }
+
+  @discardableResult
+  private func applyAcpManagedAgentPushEventFromStream(_ event: DaemonPushEvent) async -> Bool {
+    switch event.kind {
+    case .acpInspect(let response):
+      guard let sessionID = event.sessionId else {
+        return false
+      }
+      await replaceAcpInspectFromStream(
+        response,
+        sessionID: sessionID,
+        sampledAt: Self.acpInspectSampledAt(from: event.recordedAt)
+      )
+    case .acpEvents(let payload):
+      await applyAcpEventsFromStream(payload, recordedAt: event.recordedAt)
+    default:
+      return applyAcpManagedAgentPushEvent(event)
     }
     return true
   }
