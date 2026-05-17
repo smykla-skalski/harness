@@ -338,13 +338,25 @@ extension PolicyCanvasViewModel {
   }
 
   private func edgeLaneSortKey(_ edge: PolicyCanvasEdge) -> String {
-    let targetY = portAnchor(for: edge.target)?.y ?? 0
-    return
-      "\(edgeRouteBucket(edge))|\(Int(targetY.rounded()))|\(edge.source.portID)|\(edge.target.portID)"
+    let sourceAnchor = portAnchor(for: edge.source) ?? .zero
+    let targetAnchor = portAnchor(for: edge.target) ?? .zero
+    return [
+      edgeRouteBucket(edge),
+      String(Int(sourceAnchor.y.rounded())),
+      String(Int(targetAnchor.y.rounded())),
+      String(Int(targetAnchor.x.rounded())),
+      edge.source.portID,
+      edge.target.nodeID,
+      edge.target.portID,
+    ]
+    .joined(separator: "|")
   }
 
   private func edgeRouteBucket(_ edge: PolicyCanvasEdge) -> String {
-    "\(edgeSourceFanoutBucket(edge))->\(edgeTargetFanoutBucket(edge))"
+    let sourceSide = resolvedPortSide(for: edge.source).rawValue
+    let targetSide = resolvedPortSide(for: edge.target).rawValue
+    let targetScope = node(edge.target.nodeID)?.groupID ?? edge.target.nodeID
+    return "\(edge.source.nodeID)|\(sourceSide)->\(targetScope)|\(targetSide)"
   }
 
   private func edgeRouteSortKey(_ edge: PolicyCanvasEdge) -> String {
@@ -353,12 +365,12 @@ extension PolicyCanvasViewModel {
 
   private func edgeSourceFanoutBucket(_ edge: PolicyCanvasEdge) -> String {
     let side = resolvedPortSide(for: edge.source).rawValue
-    return "\(edge.source.nodeID)|\(edge.source.portID)|\(side)"
+    return "\(edge.source.nodeID)|\(side)"
   }
 
   private func edgeTargetFanoutBucket(_ edge: PolicyCanvasEdge) -> String {
     let side = resolvedPortSide(for: edge.target).rawValue
-    return "\(edge.target.nodeID)|\(edge.target.portID)|\(side)"
+    return "\(edge.target.nodeID)|\(side)"
   }
 
   private func edgeSourceFanoutSortKey(_ edge: PolicyCanvasEdge) -> String {

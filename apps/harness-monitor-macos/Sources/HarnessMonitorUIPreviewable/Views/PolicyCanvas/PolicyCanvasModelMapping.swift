@@ -74,12 +74,15 @@ func policyCanvasEdge(
     kind: .input
   )
   policyCanvasAssignPreferredPortSides(source: &source, target: &target, nodes: nodes)
+  let kind = PolicyCanvasEdgeKind.derive(from: edge.condition.condition)
   return PolicyCanvasEdge(
     id: edge.id,
     source: source,
     target: target,
     label: policyCanvasEdgeLabel(edge),
-    condition: edge.condition.condition
+    condition: edge.condition.condition,
+    pinnedPortSide: source.side != nil || target.side != nil,
+    kind: kind
   )
 }
 
