@@ -14,7 +14,7 @@ final class HarnessMonitorWindowShellTests: XCTestCase {
     XCTAssertTrue(mainRoot.contains("windowToolbarBackgroundVisibility: .hidden"))
     XCTAssertTrue(mainRoot.contains(".suppressToolbarBaselineSeparator("))
     XCTAssertTrue(
-      mainRoot.contains("HarnessMonitorAccessibility.dashboardWindowToolbarSeparatorSuppressed")
+      mainRoot.contains("HarnessMonitorAccessibility.dashboardToolbarSeparatorSuppressed")
     )
     XCTAssertTrue(mainRoot.contains("titlebarAppearsTransparent: true"))
     XCTAssertTrue(mainRoot.contains(".toolbar {"))

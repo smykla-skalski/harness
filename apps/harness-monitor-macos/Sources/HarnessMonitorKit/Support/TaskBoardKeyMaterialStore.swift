@@ -74,8 +74,8 @@ public struct TaskBoardKeyMaterialPersistence: Sendable {
     self.gpg = gpg
   }
 
-  public static var defaultKeychain: TaskBoardKeyMaterialPersistence {
-    TaskBoardKeyMaterialPersistence(
+  public static var defaultKeychain: Self {
+    Self(
       ssh: TaskBoardKeyMaterialStore(kind: .ssh),
       signingSsh: TaskBoardKeyMaterialStore(kind: .signingSsh),
       gpg: TaskBoardKeyMaterialStore(kind: .gpg)

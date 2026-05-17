@@ -109,7 +109,10 @@ public enum LegacyManagedLaunchAgentCleanup {
       )
     } catch {
       HarnessMonitorLogger.lifecycle.notice(
-        "Could not unregister legacy SMAppService plist \(name, privacy: .public): \(error.localizedDescription, privacy: .public)"
+        """
+        Could not unregister legacy SMAppService plist \(name, privacy: .public): \
+        \(error.localizedDescription, privacy: .public)
+        """
       )
     }
   }

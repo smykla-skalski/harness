@@ -72,6 +72,11 @@ struct PolicyCanvasViewport: View {
           )
         )
         let contentSize = policyCanvasVisibleContentSize(visibleBounds: visibleBounds)
+        let contentOrigin = policyCanvasViewportContentOrigin(
+          viewportSize: proxy.size,
+          contentSize: contentSize,
+          zoom: viewModel.zoom
+        )
         ScrollView([.horizontal, .vertical]) {
           ZStack(alignment: .topLeading) {
             PolicyCanvasDottedGrid(spacing: PolicyCanvasLayout.gridSize * viewModel.zoom)
@@ -80,8 +85,14 @@ struct PolicyCanvasViewport: View {
               .frame(width: 1, height: 1)
               .position(
                 policyCanvasInitialViewportAnchorPoint(
-                  visibleBounds: visibleBounds,
+                  contentBounds: viewModel.canvasContentBounds,
                   zoom: viewModel.zoom
+                )
+                .applying(
+                  CGAffineTransform(
+                    translationX: contentOrigin.x,
+                    y: contentOrigin.y
+                  )
                 )
               )
               .id(PolicyCanvasLayout.initialViewportAnchorID)
@@ -114,6 +125,7 @@ struct PolicyCanvasViewport: View {
             // Cmd-0) leave `pinchAnchorUnit` nil and fall through to the
             // canvas top-leading origin, matching the prior visual behavior.
             .scaleEffect(viewModel.zoom, anchor: viewModel.pinchAnchorUnit ?? .topLeading)
+            .offset(x: contentOrigin.x, y: contentOrigin.y)
             .coordinateSpace(.named(PolicyCanvasCoordinateSpaces.canvas))
           }
           .frame(
