@@ -268,7 +268,7 @@ struct TaskBoardOperationsFormSection<Content: View>: View {
       Text(title)
         .harnessNativeFormSectionHeader()
         .foregroundStyle(HarnessMonitorTheme.secondaryInk)
-        .padding(.leading, TaskBoardOperationsFormMetrics.textInset)
+        .padding(.leading, TaskBoardOperationsFormMetrics.sectionPadding)
 
       VStack(alignment: .leading, spacing: 0) {
         content
@@ -287,7 +287,7 @@ struct TaskBoardOperationsFormSection<Content: View>: View {
           .harnessNativeFormSectionFooter()
           .foregroundStyle(HarnessMonitorTheme.secondaryInk)
           .fixedSize(horizontal: false, vertical: true)
-          .padding(.leading, TaskBoardOperationsFormMetrics.textInset)
+          .padding(.leading, TaskBoardOperationsFormMetrics.sectionPadding)
           .frame(maxWidth: .infinity, alignment: .leading)
       }
     }
@@ -309,8 +309,6 @@ struct TaskBoardOperationsFormSection<Content: View>: View {
 
 private enum TaskBoardOperationsFormMetrics {
   static let sectionPadding: CGFloat = HarnessMonitorTheme.spacingMD
-  static let rowHorizontalPadding: CGFloat = HarnessMonitorTheme.spacingSM
-  static let textInset: CGFloat = sectionPadding + rowHorizontalPadding
   static let sectionCornerRadius: CGFloat = 10
   static let contentMaxWidth: CGFloat = 420
   static let rowMinHeight: CGFloat = 34
@@ -354,7 +352,6 @@ struct TaskBoardOperationsFormRow<Content: View>: View {
         .frame(maxWidth: .infinity, alignment: .trailing)
     }
     .padding(.vertical, TaskBoardOperationsFormMetrics.rowVerticalPadding)
-    .padding(.horizontal, TaskBoardOperationsFormMetrics.rowHorizontalPadding)
     .frame(
       maxWidth: .infinity,
       minHeight: TaskBoardOperationsFormMetrics.rowMinHeight,
