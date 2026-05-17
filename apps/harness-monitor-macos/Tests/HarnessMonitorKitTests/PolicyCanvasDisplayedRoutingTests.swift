@@ -65,21 +65,24 @@ struct PolicyCanvasDisplayedRoutingTests {
       return
     }
 
-    #expect(policyCanvasVisiblePortSides(for: evidencePass.source, visibility: visibility) == [
-      .bottom
-    ])
-    #expect(policyCanvasVisiblePortSides(for: evidencePass.target, visibility: visibility) == [
-      .top
-    ])
+    #expect(
+      policyCanvasVisiblePortSides(for: evidencePass.source, visibility: visibility) == [
+        .bottom
+      ])
+    #expect(
+      policyCanvasVisiblePortSides(for: evidencePass.target, visibility: visibility) == [
+        .top
+      ])
 
     let unconnectedActionInput = PolicyCanvasPortEndpoint(
       nodeID: "action:router",
       portID: "in",
       kind: .input
     )
-    #expect(policyCanvasVisiblePortSides(for: unconnectedActionInput, visibility: visibility) == [
-      .leading
-    ])
+    #expect(
+      policyCanvasVisiblePortSides(for: unconnectedActionInput, visibility: visibility) == [
+        .leading
+      ])
   }
 
   @Test("default graph displayed routes do not share collision corridors")
@@ -123,6 +126,42 @@ struct PolicyCanvasDisplayedRoutingTests {
             length >= minimumSegmentLength,
             "\(edge.id) rendered short segment \(segmentIndex): \(start) -> \(end)"
           )
+        }
+      }
+    }
+  }
+
+  @Test("default graph evidence failure routes avoid seven-bend target doglegs")
+  func defaultGraphEvidenceFailureRoutesAvoidSevenBendTargetDoglegs() {
+    let (_, routes) = defaultDisplayedRoutes()
+
+    guard let route = routes["edge:evidence-fail:unresolved-requested-changes"] else {
+      Issue.record("Expected unresolved requested changes route")
+      return
+    }
+
+    #expect(policyCanvasRouteMetrics(route).bends <= 5)
+    #expect(policyCanvasRouteTargetSide(route) == .top)
+  }
+
+  @Test("default graph route interiors avoid node bodies")
+  func defaultGraphRouteInteriorsAvoidNodeBodies() {
+    let (viewModel, routes) = defaultDisplayedRoutes()
+    let nodeBodies = viewModel.nodes.map { node in
+      (
+        id: node.id,
+        frame: CGRect(origin: node.position, size: PolicyCanvasLayout.nodeSize)
+          .insetBy(dx: 0.5, dy: 0.5)
+      )
+    }
+
+    for edge in viewModel.edges {
+      guard let route = routes[edge.id] else {
+        continue
+      }
+      for segment in policyCanvasInteriorSegments(route) {
+        for node in nodeBodies where segment.intersects(node.frame) {
+          #expect(Bool(false), "\(edge.id) interior segment crosses \(node.id)")
         }
       }
     }
@@ -203,8 +242,8 @@ struct PolicyCanvasDisplayedRoutingTests {
   }
 }
 
-private extension [PolicyCanvasRouteAnchorCandidate] {
-  func containsSide(_ side: PolicyCanvasPortSide?) -> Bool {
+extension [PolicyCanvasRouteAnchorCandidate] {
+  fileprivate func containsSide(_ side: PolicyCanvasPortSide?) -> Bool {
     guard let side else {
       return false
     }
@@ -236,6 +275,20 @@ private struct PolicyCanvasDisplayedRouteTestSegment {
         min(start.y, end.y)...max(start.y, end.y),
         min(other.start.y, other.end.y)...max(other.start.y, other.end.y)
       ) > 0.001
+    }
+    return false
+  }
+
+  func intersects(_ rect: CGRect) -> Bool {
+    if isHorizontal {
+      let xRange = min(start.x, end.x)...max(start.x, end.x)
+      return rect.minY < start.y && rect.maxY > start.y
+        && overlap(xRange, rect.minX...rect.maxX) > 0.001
+    }
+    if isVertical {
+      let yRange = min(start.y, end.y)...max(start.y, end.y)
+      return rect.minX < start.x && rect.maxX > start.x
+        && overlap(yRange, rect.minY...rect.maxY) > 0.001
     }
     return false
   }
