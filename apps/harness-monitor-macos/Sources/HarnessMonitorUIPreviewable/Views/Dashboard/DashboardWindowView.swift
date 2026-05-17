@@ -436,6 +436,8 @@ private struct DashboardTaskBoardRouteView: View {
       }
       .frame(maxWidth: .infinity, alignment: .leading)
     }
+    .frame(maxWidth: .infinity, maxHeight: .infinity)
+    .ignoresSafeArea(.container, edges: .top)
     .onAppear {
       guard perfScrollHookEnabled else { return }
       HarnessMonitorPerfDashboardScrollBus.recordTrigger(edge: "view.appear")

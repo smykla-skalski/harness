@@ -165,6 +165,7 @@ struct SessionWindowRouteContentMetricsTests {
     #expect(dashboardSource.contains("dashboardUI.taskBoardOrchestratorStatus"))
     #expect(dashboardSource.contains("decisions: store.supervisorOpenDecisions"))
     #expect(dashboardSource.contains("horizontalPadding: 0"))
+    #expect(dashboardSource.contains(".ignoresSafeArea(.container, edges: .top)"))
     #expect(dashboardSource.contains(".padding(.horizontal, detailRowHorizontalPadding)"))
   }
 

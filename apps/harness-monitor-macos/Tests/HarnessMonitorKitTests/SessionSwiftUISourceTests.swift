@@ -233,6 +233,8 @@ struct SessionSwiftUISourceTests {
     #expect(!dashboardSource.contains(".harnessMonitorToolbarBackgroundExtensionEffect()"))
     #expect(!dashboardSource.contains(".toolbarBackground(.visible, for: .windowToolbar)"))
     #expect(!dashboardSource.contains(".backgroundExtensionEffect()"))
+    #expect(dashboardSource.contains(".frame(maxWidth: .infinity, maxHeight: .infinity)"))
+    #expect(dashboardSource.contains(".ignoresSafeArea(.container, edges: .top)"))
   }
 
   @Test("Toolbar backdrop uses scroll edge without artificial underlays")
