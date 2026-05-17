@@ -114,12 +114,10 @@ struct PolicyCanvasLabWindowView: View {
       windowToolbarBackgroundVisibility: .hidden,
       toast: store.toast
     ) {
-      PolicyCanvasView(
-        store: store,
-        dashboardUI: dashboardUI,
-        suppressesAutosave: true,
-        suppressesSceneStorage: true,
-        allowsRemoteActions: false
+      PolicyCanvasViewportSurface(
+        document: dashboardUI.taskBoardPolicyPipeline,
+        simulation: dashboardUI.taskBoardPolicySimulation,
+        audit: dashboardUI.taskBoardPolicyAudit
       )
       .toolbar {}
     }
