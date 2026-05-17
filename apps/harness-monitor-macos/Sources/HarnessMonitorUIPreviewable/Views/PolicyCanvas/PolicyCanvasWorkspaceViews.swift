@@ -95,6 +95,7 @@ struct PolicyCanvasViewport: View {
                 focusedComponent: focusedComponent,
                 edges: edges,
                 routes: routes,
+                labelPositions: labelPositions,
                 accessibilityLabelsByEdgeID: edgeAccessibilityLabelsByID
               )
               PolicyCanvasRubberBandLayer(viewModel: viewModel)

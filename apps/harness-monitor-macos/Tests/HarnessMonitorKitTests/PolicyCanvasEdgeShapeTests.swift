@@ -82,6 +82,26 @@ struct PolicyCanvasEdgeShapeTests {
     // 5 points → 3 interior bends → 3 quad curves.
     #expect(curveCount == 3)
   }
+
+  @Test("Label gap splits stroke path")
+  func labelGapSplitsStrokePath() {
+    let route = PolicyCanvasEdgeRoute(
+      points: [CGPoint(x: 0, y: 0), CGPoint(x: 200, y: 0)],
+      labelPosition: CGPoint(x: 100, y: 0)
+    )
+    let path = PolicyCanvasEdgeShape(
+      route: route,
+      gapFrames: [CGRect(x: 80, y: -10, width: 40, height: 20)]
+    ).path(in: .zero)
+    let points = pathPoints(of: path)
+
+    #expect(points == [
+      CGPoint(x: 0, y: 0),
+      CGPoint(x: 80, y: 0),
+      CGPoint(x: 120, y: 0),
+      CGPoint(x: 200, y: 0),
+    ])
+  }
 }
 
 /// Drains a `Path`'s underlying `CGPath` into a kind-only summary. Uses

@@ -8,6 +8,7 @@ import SwiftUI
 /// 3. Direction was not encoded; arrowhead now carries it.
 struct PolicyCanvasInteractiveEdge: View {
   let route: PolicyCanvasEdgeRoute
+  let labelGapFrames: [CGRect]
   let color: Color
   /// Fill color for the direction arrowhead. Caller bumps this above the
   /// stroke alpha so the 9pt × 7pt filled triangle reads as visually
@@ -47,7 +48,7 @@ struct PolicyCanvasInteractiveEdge: View {
   /// the previous behavior; the canvas-mounted call site passes the live
   /// zoom.
   let canvasZoom: CGFloat
-  /// Stable a11y identifier shared with the visible label capsule (or
+  /// Stable a11y identifier shared with the visible label text (or
   /// collapsed dot) that this stroke layers above. The stroke owns the
   /// rotor entry per WCAG 4.1.2: previously both the stroke and the label
   /// exposed the same accessibility label, so VoiceOver announced every
@@ -73,6 +74,7 @@ struct PolicyCanvasInteractiveEdge: View {
 
   init(
     route: PolicyCanvasEdgeRoute,
+    labelGapFrames: [CGRect] = [],
     color: Color,
     arrowheadColor: Color? = nil,
     strokeWidth: CGFloat,
@@ -90,6 +92,7 @@ struct PolicyCanvasInteractiveEdge: View {
     onDelete: @escaping () -> Void
   ) {
     self.route = route
+    self.labelGapFrames = labelGapFrames
     self.color = color
     self.arrowheadColor = arrowheadColor ?? color
     self.strokeWidth = strokeWidth
@@ -110,7 +113,7 @@ struct PolicyCanvasInteractiveEdge: View {
   var body: some View {
     ZStack {
       if isSelected {
-        PolicyCanvasEdgeShape(route: route)
+        PolicyCanvasEdgeShape(route: route, gapFrames: labelGapFrames)
           .stroke(
             selectionHaloColor,
             style: StrokeStyle(lineWidth: 6, lineCap: .round, lineJoin: .round)
@@ -179,7 +182,7 @@ struct PolicyCanvasInteractiveEdge: View {
           at: context.date,
           canvasZoom: canvasZoom
         )
-        PolicyCanvasEdgeShape(route: route)
+        PolicyCanvasEdgeShape(route: route, gapFrames: labelGapFrames)
           .stroke(
             color,
             style: StrokeStyle(
@@ -192,7 +195,7 @@ struct PolicyCanvasInteractiveEdge: View {
           )
       }
     } else {
-      PolicyCanvasEdgeShape(route: route)
+      PolicyCanvasEdgeShape(route: route, gapFrames: labelGapFrames)
         .stroke(
           color,
           style: StrokeStyle(

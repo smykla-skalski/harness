@@ -7,7 +7,7 @@ func policyCanvasVisibleBounds(
   edges: [PolicyCanvasEdge],
   routes: [String: PolicyCanvasEdgeRoute],
   labelPositions: [String: CGPoint],
-  labelSize: CGSize
+  labelMetrics: PolicyCanvasEdgeLabelMetrics
 ) -> CGRect {
   var bounds = viewModel.canvasContentBounds
   for route in routes.values {
@@ -20,12 +20,7 @@ func policyCanvasVisibleBounds(
     guard !edge.label.isEmpty, let position = labelPositions[edge.id] else {
       continue
     }
-    let frame = CGRect(
-      x: position.x - (labelSize.width / 2),
-      y: position.y - (labelSize.height / 2),
-      width: labelSize.width,
-      height: labelSize.height
-    )
+    let frame = labelMetrics.frame(for: edge.label, center: position)
     bounds = bounds.isNull ? frame : bounds.union(frame)
   }
   guard !bounds.isNull else {
