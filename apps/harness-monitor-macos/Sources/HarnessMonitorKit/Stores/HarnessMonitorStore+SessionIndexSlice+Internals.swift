@@ -105,6 +105,17 @@ extension HarnessMonitorStore.SessionIndexSlice {
     )
   }
 
+  func catalogComputationInput() -> CatalogComputationInput {
+    CatalogComputationInput(
+      projects: catalog.projects,
+      sessions: catalog.sessions,
+      sessionFilter: controls.sessionFilter,
+      sessionFocusFilter: controls.sessionFocusFilter,
+      sessionSortOrder: controls.sessionSortOrder,
+      queryTokens: Self.normalizedQueryTokens(for: controls.searchText)
+    )
+  }
+
   func applyProjectionOutput(
     _ output: ProjectionComputationOutput,
     change: Change
@@ -115,6 +126,22 @@ extension HarnessMonitorStore.SessionIndexSlice {
     }
     searchResults.apply(output.searchResultsState)
     onChanged?(change)
+  }
+
+  func applyCatalogOutput(
+    _ output: CatalogComputationOutput,
+    change: Change
+  ) {
+    catalog.totalSessionCount = output.totalSessionCount
+    catalog.totalOpenWorkCount = output.totalOpenWorkCount
+    catalog.totalBlockedCount = output.totalBlockedCount
+    catalog.sessionSummariesByID = output.sessionSummariesByID
+    catalog.recentSessions = output.recentSessions
+    sessionIndicesByID = output.sessionIndicesByID
+    sessionRecordsByID = output.sessionRecordsByID
+    projectCatalogs = output.projectCatalogs
+    orderedSessionIDsBySortOrder = output.orderedSessionIDsBySortOrder
+    applyProjectionOutput(output.projectionOutput, change: change)
   }
 
   func rebuildProjectionAsync(change: Change) {
@@ -146,8 +173,32 @@ extension HarnessMonitorStore.SessionIndexSlice {
   }
 
   func rebuildCatalogAndProjection(change: Change) {
-    rebuildCatalog()
-    rebuildProjection(change: change)
+    searchRebuildTask?.cancel()
+    searchRebuildTask = nil
+    cancelPendingProjectionRebuild()
+
+    let generation = advanceProjectionGeneration()
+    let request = catalogComputationInput()
+    let delayNanoseconds = debugProjectionDelayNanoseconds
+
+    projectionComputationTask = Task { @MainActor [weak self] in
+      let output = await self?.sessionIndexWorker.computeCatalog(
+        from: request,
+        delayNanoseconds: delayNanoseconds
+      )
+
+      guard !Task.isCancelled, let self, let output else {
+        return
+      }
+      guard self.projectionGeneration == generation else {
+        return
+      }
+
+      self.debugCatalogRebuildCount += 1
+      self.debugProjectionRebuildCount += 1
+      self.applyCatalogOutput(output, change: change)
+      self.projectionComputationTask = nil
+    }
   }
 
   func rebuildCatalog() {
@@ -263,11 +314,7 @@ extension HarnessMonitorStore.SessionIndexSlice {
   func rebuildProjection(change: Change) {
     searchRebuildTask?.cancel()
     searchRebuildTask = nil
-    cancelPendingProjectionRebuild()
-    _ = advanceProjectionGeneration()
-    debugProjectionRebuildCount += 1
-    let output = Self.computeProjectionOutput(from: projectionComputationInput())
-    applyProjectionOutput(output, change: change)
+    rebuildProjectionAsync(change: change)
   }
 
   func buildGroupedSessions(

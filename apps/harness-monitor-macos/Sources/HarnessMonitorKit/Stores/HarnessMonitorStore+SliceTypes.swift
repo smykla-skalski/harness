@@ -215,17 +215,20 @@ extension HarnessMonitorStore {
     public var filteredSessionCount = 0
     public var totalSessionCount = 0
     public var list = SessionSearchResultsListState()
+    public var groupedSessions: [SessionGroup] = []
 
     public init(
       presentation: SessionSearchPresentationState = SessionSearchPresentationState(),
       filteredSessionCount: Int = 0,
       totalSessionCount: Int = 0,
-      list: SessionSearchResultsListState = SessionSearchResultsListState()
+      list: SessionSearchResultsListState = SessionSearchResultsListState(),
+      groupedSessions: [SessionGroup] = []
     ) {
       self.presentation = presentation
       self.filteredSessionCount = filteredSessionCount
       self.totalSessionCount = totalSessionCount
       self.list = list
+      self.groupedSessions = groupedSessions
     }
   }
 }

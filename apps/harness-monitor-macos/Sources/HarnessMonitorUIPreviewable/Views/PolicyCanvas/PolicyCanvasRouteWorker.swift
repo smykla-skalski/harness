@@ -54,6 +54,14 @@ actor PolicyCanvasRouteWorker {
   func waitForIdle() async {}
 }
 
+struct PolicyCanvasRouteWorkerKey: Equatable {
+  let graphGeneration: UInt64
+  let nodeCount: Int
+  let groupCount: Int
+  let edgeCount: Int
+  let fontScale: CGFloat
+}
+
 struct PolicyCanvasRouteWorkerInput: Equatable, Sendable {
   fileprivate let nodes: [PolicyCanvasRouteNode]
   let groups: [PolicyCanvasGroup]

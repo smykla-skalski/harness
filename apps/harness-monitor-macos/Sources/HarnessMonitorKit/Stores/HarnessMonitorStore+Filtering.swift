@@ -72,9 +72,7 @@ extension HarnessMonitorStore {
 
     public var groupedSessions: [SessionGroup] {
       guard queryTokens.isEmpty else {
-        return buildGroupedSessions(
-          visibleSessionIDSet: Set(searchResults.visibleSessionIDs)
-        )
+        return searchResults.groupedSessions
       }
       return projection.groupedSessions
     }
@@ -149,8 +147,7 @@ extension HarnessMonitorStore {
           rebuildCatalogAndProjection(change: .snapshot)
         case .projection:
           cancelPendingSearchRebuild()
-          patchCatalog(existingSummary: existing, updatedSummary: summary)
-          rebuildProjection(change: .summaryProjection(sessionID: summary.sessionId))
+          rebuildCatalogAndProjection(change: .summaryProjection(sessionID: summary.sessionId))
         case .summaryOnly:
           patchCatalog(existingSummary: existing, updatedSummary: summary)
           onChanged?(.summaryMetadata(sessionID: summary.sessionId))

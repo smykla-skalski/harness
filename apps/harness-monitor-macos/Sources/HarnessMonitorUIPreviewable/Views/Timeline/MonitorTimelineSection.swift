@@ -82,6 +82,22 @@ struct SessionTimelineView: View {
     )
   }
 
+  private var presentationTaskKey: SessionTimelinePresentationTaskKey {
+    SessionTimelinePresentationTaskKey(
+      sessionID: sessionID,
+      timelineRevision: store.presentedTimelineRevision,
+      timelineWindowRevision: store.presentedTimelineWindowRevision,
+      timelineFallbackSignature: .init(timeline),
+      timelineWindowSignature: .init(timelineWindow),
+      decisionsRevision: store.supervisorDecisionRefreshTick,
+      decisionsCount: decisions.count,
+      signalsRevision: store.selectedSessionSignalsRevision,
+      filters: normalizedFilters(filters),
+      isTimelineLoading: isTimelineLoading,
+      dateTimeConfiguration: dateTimeConfiguration
+    )
+  }
+
   var filterPersistenceMode: SessionTimelineFilterPersistenceMode {
     SessionTimelineFilterPersistenceMode(rawValue: filterPersistenceModeRawValue)
       ?? SessionTimelineFilterDefaults.defaultPersistenceMode
@@ -108,7 +124,7 @@ struct SessionTimelineView: View {
 
   var body: some View {
     let presentation = cachedPresentation
-    let input = presentationInput
+    let taskKey = presentationTaskKey
     Group {
       switch style {
       case .cockpitSection:
@@ -121,8 +137,8 @@ struct SessionTimelineView: View {
       hydrateFilters(for: filterHydrationInput)
       applyPerfScenarioFiltersIfNeeded()
     }
-    .task(id: input) {
-      await rebuildPresentation(for: input)
+    .task(id: taskKey) {
+      await rebuildPresentation()
     }
     .task(id: HarnessMonitorUITestEnvironment.perfScenarioRawValue ?? "") {
       applyPerfScenarioFiltersIfNeeded()
@@ -147,9 +163,10 @@ struct SessionTimelineView: View {
   }
 
   @MainActor
-  private func rebuildPresentation(for input: SessionTimelineSectionPresentationInput) async {
+  private func rebuildPresentation() async {
     presentationGeneration &+= 1
     let generation = presentationGeneration
+    let input = presentationInput
     let presentation = await presentationWorker.compute(input)
     guard !Task.isCancelled, presentationGeneration == generation else {
       return
