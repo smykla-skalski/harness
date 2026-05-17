@@ -112,9 +112,9 @@ extension HarnessMonitorStore {
       cacheCounts = .zero
     }
 
-    let storeURL = HarnessMonitorPaths.harnessRoot()
+    let storeURL = HarnessMonitorPaths.harnessRootWithoutLiveDiscovery()
       .appendingPathComponent("harness-cache.store")
-    let appCacheSizeBytes = Self.swiftDataStoreSize(at: storeURL)
+    let appCacheSizeBytes = await Self.swiftDataStoreSizeAsync(at: storeURL)
 
     let daemonDiagnostics = diagnostics?.workspace ?? daemonStatus?.diagnostics
     let daemonDatabaseSizeBytes = daemonDiagnostics?.databaseSizeBytes ?? 0
@@ -263,5 +263,11 @@ extension HarnessMonitorStore {
       }
     }
     return total
+  }
+
+  nonisolated static func swiftDataStoreSizeAsync(at url: URL) async -> Int64 {
+    await Task.detached(priority: .utility) {
+      swiftDataStoreSize(at: url)
+    }.value
   }
 }
