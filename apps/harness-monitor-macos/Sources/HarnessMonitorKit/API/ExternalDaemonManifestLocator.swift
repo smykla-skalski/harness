@@ -75,7 +75,30 @@ final class ExternalDaemonManifestLocator: @unchecked Sendable {
       return nil
     }
 
-    let discoveredManifestURL = HarnessMonitorPaths.manifestURL(using: environment)
+    // Only adopt a refreshed manifest URL when cross-lane discovery actually
+    // picked a live daemon root. `HarnessMonitorPaths.manifestURL()` resolves
+    // to the non-lane group-container fallback the moment the lane daemon is
+    // briefly dead (e.g. during a launch-agent refresh). Adopting that
+    // fallback flips the watcher path lane -> base -> lane on every refresh
+    // cycle, which tears down the WebSocket and floods the store with
+    // reconnect attempts. Staying with the previously-cached URL until
+    // discovery finds a live daemon at a different root keeps the connection
+    // stable across daemon restarts.
+    let ownership = DaemonOwnership(environment: environment)
+    guard
+      let discoveredRoot = HarnessMonitorPaths.discoverLiveDaemonRoot(
+        ownership: ownership,
+        using: environment
+      )
+    else {
+      return nil
+    }
+    let discoveredManifestURL =
+      discoveredRoot
+      .appendingPathComponent("harness", isDirectory: true)
+      .appendingPathComponent("daemon", isDirectory: true)
+      .appendingPathComponent(ownership.rawValue, isDirectory: true)
+      .appendingPathComponent("manifest.json")
       .standardizedFileURL
     return lock.withLock {
       guard activeManifestURL != discoveredManifestURL else {
