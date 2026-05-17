@@ -209,7 +209,7 @@ extension HarnessMonitorStore {
     actionName: String,
     client: any HarnessMonitorClientProtocol
   ) async -> Bool {
-    let localSnapshot = applyLocalSessionRemoval(sessionID: sessionID)
+    let localSnapshot = await applyLocalSessionRemoval(sessionID: sessionID)
     HarnessMonitorUITestTrace.record(
       component: "store.remove-session",
       event: "local-removal-applied",

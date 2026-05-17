@@ -34,7 +34,7 @@ extension HarnessMonitorStore {
       \(sessionID, privacy: .public): \(err, privacy: .public)
       """
     )
-    let localSnapshot = applyLocalSessionRemoval(sessionID: sessionID)
+    let localSnapshot = await applyLocalSessionRemoval(sessionID: sessionID)
     await pruneRemovedSessionFromCache(
       sessions: localSnapshot.sessions,
       projects: localSnapshot.projects

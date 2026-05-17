@@ -262,48 +262,10 @@ extension HarnessMonitorStore {
     projects: [ProjectSummary],
     sessions: [SessionSummary]
   ) {
-    let filteredSnapshot = sessionIndexSnapshotApplyingRemovedSessionSuppression(
-      projects: projects,
-      sessions: sessions
+    let preparedSnapshot = Self.prepareSessionSnapshot(
+      from: sessionSnapshotWorkerInput(projects: projects, sessions: sessions)
     )
-    let selectionMissingFromSnapshot =
-      selectedSessionID.map { selectedSessionID in
-        filteredSnapshot.sessions.contains { $0.sessionId == selectedSessionID } == false
-      } ?? false
-    let presentedDetailMissingFromSnapshot =
-      contentUI.sessionDetail.presentedSessionDetail.map { presentedDetail in
-        filteredSnapshot.sessions.contains { $0.sessionId == presentedDetail.session.sessionId }
-          == false
-      } ?? false
-    if selectionMissingFromSnapshot || presentedDetailMissingFromSnapshot {
-      primeSessionSelection(nil, retainPresentedDetailWhenSelectionClears: false)
-      stopSessionStream()
-    }
-
-    var didChange = false
-    withUISyncBatch {
-      didChange = sessionIndex.replaceSnapshot(
-        projects: filteredSnapshot.projects,
-        sessions: filteredSnapshot.sessions
-      )
-      isShowingCachedCatalog = false
-    }
-    if didChange {
-      scheduleCacheWrite { service in
-        await service.cacheSessionList(
-          filteredSnapshot.sessions,
-          projects: filteredSnapshot.projects
-        )
-      }
-    }
-    #if HARNESS_FEATURE_OTEL
-      recordActiveTaskGauge()
-    #endif
-
-    if let selectedSessionID, sessionIndex.sessionSummary(for: selectedSessionID) == nil {
-      primeSessionSelection(nil, retainPresentedDetailWhenSelectionClears: false)
-      stopSessionStream()
-    }
+    applyPreparedSessionIndexSnapshot(preparedSnapshot)
   }
 
   func applySessionSummaryUpdate(_ summary: SessionSummary) {
