@@ -16,6 +16,7 @@ struct TaskBoardOperationsTextField: View {
         .focused($isFocused)
         .accessibilityLabel(title)
         .accessibilityIdentifier(accessibilityIdentifier)
+        .frame(minWidth: 0, maxWidth: .infinity, alignment: .trailing)
         .layoutPriority(1)
 
       if !text.isEmpty {
@@ -30,6 +31,7 @@ struct TaskBoardOperationsTextField: View {
         .accessibilityLabel("Clear \(title)")
       }
     }
+    .frame(minWidth: 0, maxWidth: .infinity, alignment: .trailing)
     .modifier(TaskBoardOperationsTextFieldChrome(isFocused: isFocused))
     .contentShape(Rectangle())
     .onTapGesture {

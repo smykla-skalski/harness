@@ -49,13 +49,17 @@ struct TaskBoardOperationsPanelInventoryCard: View {
   private var actionRow: some View {
     TaskBoardOperationsFormRow(
       "Actions",
+      contentMaxWidth: nil,
       minHeight: nil
     ) {
       HarnessMonitorGlassControlGroup(spacing: HarnessMonitorTheme.itemSpacing) {
-        HStack(spacing: HarnessMonitorTheme.itemSpacing) {
+        HarnessMonitorWrapLayout(
+          spacing: HarnessMonitorTheme.itemSpacing,
+          lineSpacing: HarnessMonitorTheme.itemSpacing,
+          rowAlignment: .trailing
+        ) {
           actionButtons
         }
-        .fixedSize(horizontal: true, vertical: false)
       }
       .frame(maxWidth: .infinity, alignment: .trailing)
     }

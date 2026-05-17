@@ -46,6 +46,7 @@ extension TaskBoardOperationsHost {
     TaskBoardOperationsFormRow(
       "Actions",
       showsSeparator: showsSeparator,
+      contentMaxWidth: nil,
       minHeight: nil
     ) {
       HarnessMonitorGlassControlGroup(spacing: HarnessMonitorTheme.itemSpacing) {
@@ -336,6 +337,7 @@ struct TaskBoardOperationsFormRow<Content: View>: View {
   let title: String
   let showsSeparator: Bool
   let verticalPadding: CGFloat
+  let contentMaxWidth: CGFloat?
   let minHeight: CGFloat?
   let content: Content
   @Environment(\.taskBoardOperationsRowLabelFont)
@@ -347,12 +349,14 @@ struct TaskBoardOperationsFormRow<Content: View>: View {
     _ title: String,
     showsSeparator: Bool = true,
     verticalPadding: CGFloat = TaskBoardOperationsFormMetrics.rowVerticalPadding,
+    contentMaxWidth: CGFloat? = TaskBoardOperationsFormMetrics.contentMaxWidth,
     minHeight: CGFloat? = TaskBoardOperationsFormMetrics.rowMinHeight,
     @ViewBuilder content: () -> Content
   ) {
     self.title = title
     self.showsSeparator = showsSeparator
     self.verticalPadding = verticalPadding
+    self.contentMaxWidth = contentMaxWidth
     self.minHeight = minHeight
     self.content = content()
   }
@@ -368,10 +372,11 @@ struct TaskBoardOperationsFormRow<Content: View>: View {
 
       content
         .frame(
-          maxWidth: TaskBoardOperationsFormMetrics.contentMaxWidth,
+          minWidth: 0,
+          maxWidth: contentMaxWidth,
           alignment: .trailing
         )
-        .frame(maxWidth: .infinity, alignment: .trailing)
+        .frame(minWidth: 0, maxWidth: .infinity, alignment: .trailing)
     }
     .padding(.vertical, verticalPadding)
     .frame(

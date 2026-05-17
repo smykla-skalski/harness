@@ -257,6 +257,7 @@ struct TaskBoardOverviewBehaviorTests {
 
     #expect(regular.operationsCardMinWidth >= 280)
     #expect(large.operationsCardMinWidth > regular.operationsCardMinWidth)
+    #expect(large.operationsCardMaxWidth > regular.operationsCardMaxWidth)
     #expect(large.columnSpacing > regular.columnSpacing)
     #expect(large.boardVerticalPadding > regular.boardVerticalPadding)
     #expect(large.summaryPillHorizontalPadding > regular.summaryPillHorizontalPadding)
