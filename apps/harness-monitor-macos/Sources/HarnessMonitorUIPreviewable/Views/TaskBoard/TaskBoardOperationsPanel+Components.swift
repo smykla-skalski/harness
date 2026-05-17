@@ -43,7 +43,11 @@ extension TaskBoardOperationsHost {
     showsSeparator: Bool = true,
     @ViewBuilder content: () -> Content
   ) -> some View {
-    TaskBoardOperationsFormRow("Actions", showsSeparator: showsSeparator) {
+    TaskBoardOperationsFormRow(
+      "Actions",
+      showsSeparator: showsSeparator,
+      minHeight: nil
+    ) {
       HarnessMonitorGlassControlGroup(spacing: HarnessMonitorTheme.itemSpacing) {
         HStack(spacing: HarnessMonitorTheme.itemSpacing) {
           content()
@@ -142,12 +146,12 @@ extension TaskBoardOperationsHost {
       Label(descriptor.title, systemImage: descriptor.systemImage)
         .lineLimit(1)
     }
-    .frame(minHeight: metrics.controlMinHeight)
     .harnessActionButtonStyle(
       variant: descriptor.prominent ? .prominent : .bordered,
       tint: descriptor.tint
     )
-    .controlSize(HarnessMonitorControlMetrics.compactControlSize)
+    .harnessNativeFormControl()
+    .fixedSize(horizontal: true, vertical: true)
     .disabled(store.isDaemonActionInFlight)
     .help(descriptor.help)
     .accessibilityIdentifier(descriptor.accessibilityIdentifier)
@@ -310,7 +314,7 @@ struct TaskBoardOperationsFormSection<Content: View>: View {
   private var contentBottomPadding: CGFloat {
     footer == nil
       ? TaskBoardOperationsFormMetrics.sectionPadding
-      : TaskBoardOperationsFormMetrics.footerSectionBottomPadding
+      : 0
   }
 
   private var sectionMinHeight: CGFloat? {
@@ -321,7 +325,6 @@ struct TaskBoardOperationsFormSection<Content: View>: View {
 
 private enum TaskBoardOperationsFormMetrics {
   static let sectionPadding: CGFloat = HarnessMonitorTheme.spacingMD
-  static let footerSectionBottomPadding: CGFloat = HarnessMonitorTheme.spacingXS
   static let sectionCornerRadius: CGFloat = 10
   static let contentMaxWidth: CGFloat = 420
   static let rowMinHeight: CGFloat = 34
@@ -332,6 +335,8 @@ private enum TaskBoardOperationsFormMetrics {
 struct TaskBoardOperationsFormRow<Content: View>: View {
   let title: String
   let showsSeparator: Bool
+  let verticalPadding: CGFloat
+  let minHeight: CGFloat?
   let content: Content
   @Environment(\.taskBoardOperationsRowLabelFont)
   private var labelFont
@@ -341,10 +346,14 @@ struct TaskBoardOperationsFormRow<Content: View>: View {
   init(
     _ title: String,
     showsSeparator: Bool = true,
+    verticalPadding: CGFloat = TaskBoardOperationsFormMetrics.rowVerticalPadding,
+    minHeight: CGFloat? = TaskBoardOperationsFormMetrics.rowMinHeight,
     @ViewBuilder content: () -> Content
   ) {
     self.title = title
     self.showsSeparator = showsSeparator
+    self.verticalPadding = verticalPadding
+    self.minHeight = minHeight
     self.content = content()
   }
 
@@ -364,10 +373,10 @@ struct TaskBoardOperationsFormRow<Content: View>: View {
         )
         .frame(maxWidth: .infinity, alignment: .trailing)
     }
-    .padding(.vertical, TaskBoardOperationsFormMetrics.rowVerticalPadding)
+    .padding(.vertical, verticalPadding)
     .frame(
       maxWidth: .infinity,
-      minHeight: TaskBoardOperationsFormMetrics.rowMinHeight,
+      minHeight: minHeight,
       alignment: .leading
     )
     .overlay(alignment: .bottom) {
