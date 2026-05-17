@@ -203,7 +203,7 @@ extension SessionWindowView {
       ]
     return DecisionsSidebarViewModel.VisibleSnapshot(
       groups: groups,
-      decisionIDs: matchingDecisionsCache.map(\.id),
+      decisionIDs: matchingDecisionIDsInOrderCache,
       signature: signature
     )
   }
@@ -211,6 +211,7 @@ extension SessionWindowView {
   var sessionDecisionScope: DecisionWorkspaceScope {
     DecisionWorkspaceScope(
       decisions: allSessionDecisionsCache,
+      decisionsByID: store.supervisorOpenDecisionsByID,
       filters: stateCache.decisionFilters.decisionWorkspaceFilters,
       visibleSnapshot: sessionDecisionVisibleSnapshot,
       selectedDecisionID: sessionDecisionDetailID

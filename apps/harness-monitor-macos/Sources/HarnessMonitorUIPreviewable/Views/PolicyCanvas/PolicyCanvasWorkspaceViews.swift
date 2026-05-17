@@ -31,6 +31,14 @@ struct PolicyCanvasViewport: View {
   }
 
   var body: some View {
+    let routeOutput = cachedRouteOutput
+    let routes = routeOutput.routes
+    let labelPositions = routeOutput.labelPositions
+    let visibleBounds = routeOutput.visibleBounds
+    let edgeAccessibilityLabelsByID = routeOutput.accessibilityEdgeLabelsByID
+    let accessibilityNodeEntries = routeOutput.accessibilityNodeEntries
+    let accessibilityEdgeEntries = routeOutput.accessibilityEdgeEntries
+    let contentSize = policyCanvasVisibleContentSize(visibleBounds: visibleBounds)
     GeometryReader { proxy in
       ScrollViewReader { _ in
         let edges = viewModel.edges
@@ -50,11 +58,6 @@ struct PolicyCanvasViewport: View {
           simulationIssueCount: viewModel.latestSimulation?.validation.issues.count ?? 0,
           simulationValid: viewModel.latestSimulation?.validation.isValid ?? true
         )
-        let routeOutput = cachedRouteOutput
-        let routes = routeOutput.routes
-        let labelPositions = routeOutput.labelPositions
-        let visibleBounds = routeOutput.visibleBounds
-        let contentSize = policyCanvasVisibleContentSize(visibleBounds: visibleBounds)
         let contentOrigin = policyCanvasViewportContentOrigin(
           viewportSize: proxy.size,
           contentSize: contentSize,
@@ -87,7 +90,8 @@ struct PolicyCanvasViewport: View {
                 viewModel: viewModel,
                 focusedComponent: focusedComponent,
                 edges: edges,
-                routes: routes
+                routes: routes,
+                accessibilityLabelsByEdgeID: edgeAccessibilityLabelsByID
               )
               PolicyCanvasRubberBandLayer(viewModel: viewModel)
               PolicyCanvasNodeLayer(viewModel: viewModel, focusedComponent: focusedComponent)
@@ -192,21 +196,13 @@ struct PolicyCanvasViewport: View {
     }
     .accessibilityElement(children: .contain)
     .accessibilityRotor("Nodes") {
-      ForEach(viewModel.accessibilityNodeFocusOrder(), id: \.self) { nodeID in
-        if let node = viewModel.node(nodeID) {
-          AccessibilityRotorEntry(
-            viewModel.accessibilityLabel(for: node),
-            id: nodeID
-          )
-        }
+      ForEach(accessibilityNodeEntries) { entry in
+        AccessibilityRotorEntry(entry.label, id: entry.id)
       }
     }
     .accessibilityRotor("Edges") {
-      ForEach(viewModel.edges, id: \.id) { edge in
-        AccessibilityRotorEntry(
-          viewModel.accessibilityLabel(for: edge),
-          id: edge.id
-        )
+      ForEach(accessibilityEdgeEntries) { entry in
+        AccessibilityRotorEntry(entry.label, id: entry.id)
       }
     }
     .accessibilityFrameMarker(HarnessMonitorAccessibility.policyCanvasViewport)

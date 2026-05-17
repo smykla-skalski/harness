@@ -98,6 +98,7 @@ struct SessionSidebarMultiSelectTests {
       snapshot: nil,
       sessionCodexRuns: [],
       decisions: [],
+      decisionIDs: [],
       statusModel: SessionStatusSummaryModel(
         metrics: store.connectionMetrics,
         sourceTitle: "Test",

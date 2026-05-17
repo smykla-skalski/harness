@@ -23,6 +23,9 @@ struct SessionTaskListSection: View {
   let inspectTask: (String) -> Void
 
   private var taskStateMarkerText: String {
+    guard HarnessMonitorUITestEnvironment.accessibilityMarkersEnabled else {
+      return ""
+    }
     let taskIDs = tasks.map(\.taskId).joined(separator: ",")
     return "taskCount=\(tasks.count), taskIDs=\(taskIDs)"
   }
