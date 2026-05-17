@@ -280,8 +280,8 @@ public final class SessionSidebarOrderingState {
   }
 
   /// Reconcile the persisted agent ordering against the live agent list.
-  /// Call from `.onChange(of: agents.map(\.agentId))` or a similar lifecycle
-  /// hook — never from a view body, since this mutates an `@Observable`
+  /// Call from an ID-based lifecycle hook — never from a view body, since this
+  /// mutates an `@Observable`
   /// property and would feed back into the next render.
   public func reconcileAgentOrder(with agents: [AgentRegistration]) {
     reconcileAgentIDs(with: agents.map(\.agentId))
@@ -297,7 +297,7 @@ public final class SessionSidebarOrderingState {
     undoManager?.setActionName("Move Agent")
   }
 
-  private func reconcileAgentIDs(with liveIDs: [String]) {
+  public func reconcileAgentIDs(with liveIDs: [String]) {
     let liveSet = Set(liveIDs)
     let retained = agentIDs.filter { liveSet.contains($0) }
     let retainedSet = Set(retained)

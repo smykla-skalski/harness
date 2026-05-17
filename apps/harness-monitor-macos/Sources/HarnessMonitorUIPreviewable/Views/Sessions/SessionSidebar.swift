@@ -6,6 +6,7 @@ struct SessionSidebar: View {
   let snapshot: HarnessMonitorSessionWindowSnapshot?
   let sessionCodexRuns: [CodexRunSnapshot]
   let decisions: [Decision]
+  let decisionIDs: [String]
   let statusModel: SessionStatusSummaryModel
   let currentModifiers: EventModifiers
   @Bindable var state: SessionWindowStateCache
@@ -16,12 +17,18 @@ struct SessionSidebar: View {
   @State private var listSelectionSyncGeneration: UInt64 = 0
   @State private var showsDeferredSidebarSections = false
   @State private var usesNativeListSelection = false
+  @State private var presentationWorker = SessionRouteListPresentationWorker()
+  @State var cachedAgentPresentation = SessionAgentListPresentation.empty
+  @State var cachedTaskPresentation = SessionTaskListPresentation.empty
+  @State private var agentPresentationGeneration: UInt64 = 0
+  @State private var taskPresentationGeneration: UInt64 = 0
 
   init(
     store: HarnessMonitorStore,
     snapshot: HarnessMonitorSessionWindowSnapshot?,
     sessionCodexRuns: [CodexRunSnapshot],
     decisions: [Decision],
+    decisionIDs: [String],
     statusModel: SessionStatusSummaryModel,
     currentModifiers: EventModifiers,
     state: SessionWindowStateCache
@@ -30,6 +37,7 @@ struct SessionSidebar: View {
     self.snapshot = snapshot
     self.sessionCodexRuns = sessionCodexRuns
     self.decisions = decisions
+    self.decisionIDs = decisionIDs
     self.statusModel = statusModel
     self.currentModifiers = currentModifiers
     self.state = state
@@ -61,6 +69,14 @@ struct SessionSidebar: View {
 
   var nativeListSelectionEnabled: Bool {
     usesNativeListSelection
+  }
+
+  var visibleAgentIDs: [String] {
+    cachedAgentPresentation.agentIDs
+  }
+
+  var visibleTaskIDs: [String] {
+    cachedTaskPresentation.taskIDs
   }
 
   func storeListSelection(_ selection: Set<SessionSelection>) {
@@ -108,6 +124,21 @@ struct SessionSidebar: View {
     }
   }
 
+  private var agentPresentationInput: SessionAgentListPresentationInput {
+    SessionAgentListPresentationInput(
+      agents: snapshot?.detail?.agents ?? [],
+      query: "",
+      agentOrderIDs: state.sidebarOrdering.agentIDs
+    )
+  }
+
+  private var taskPresentationInput: SessionTaskListPresentationInput {
+    SessionTaskListPresentationInput(
+      tasks: snapshot?.detail?.tasks ?? [],
+      query: ""
+    )
+  }
+
   private var nativeSidebarList: some View {
     List(selection: nativeSelectionBinding) {
       sidebarRouteSection
@@ -132,22 +163,31 @@ struct SessionSidebar: View {
       }
     }
     .harnessMonitorSidebarListChrome(rowSize: sidebarRowSize)
-    .onChange(of: decisions.map(\.id)) { _, ids in
+    .task(id: agentPresentationInput) {
+      await rebuildAgentPresentation(input: agentPresentationInput)
+    }
+    .task(id: taskPresentationInput) {
+      await rebuildTaskPresentation(input: taskPresentationInput)
+    }
+    .onChange(of: decisionIDs) { _, ids in
       state.sidebarSelection.prune(kind: .decision, visibleIDs: Set(ids))
       pruneListSelection(kind: .decision, visibleIDs: Set(ids))
+      bindSelectionDispatcher()
     }
-    .onChange(of: (snapshot?.detail?.agents ?? []).map(\.agentId)) { _, ids in
+    .onChange(of: visibleAgentIDs) { _, ids in
       state.sidebarSelection.prune(kind: .agent, visibleIDs: Set(ids))
       pruneListSelection(kind: .agent, visibleIDs: Set(ids))
+      bindSelectionDispatcher()
     }
-    .onChange(of: (snapshot?.detail?.tasks ?? []).map(\.taskId)) { _, ids in
+    .onChange(of: visibleTaskIDs) { _, ids in
       state.sidebarSelection.prune(kind: .task, visibleIDs: Set(ids))
       pruneListSelection(kind: .task, visibleIDs: Set(ids))
+      bindSelectionDispatcher()
     }
-    .task(id: (snapshot?.detail?.agents ?? []).map(\.agentId)) {
+    .task(id: visibleAgentIDs) {
       try? await Task.sleep(for: .milliseconds(650))
       guard !Task.isCancelled else { return }
-      state.sidebarOrdering.reconcileAgentOrder(with: snapshot?.detail?.agents ?? [])
+      state.sidebarOrdering.reconcileAgentIDs(with: visibleAgentIDs)
     }
     .onChange(of: state.lastPlainClick) { _, signal in
       collapseSelectionFromApplicationTap(signal)
@@ -212,5 +252,31 @@ struct SessionSidebar: View {
 
   private var sidebarRowSize: SidebarRowSize {
     harnessSidebarRowSize(for: textSizeIndex)
+  }
+
+  @MainActor
+  private func rebuildAgentPresentation(input: SessionAgentListPresentationInput) async {
+    agentPresentationGeneration &+= 1
+    let generation = agentPresentationGeneration
+    let presentation = await presentationWorker.computeAgents(input: input)
+    guard !Task.isCancelled, agentPresentationGeneration == generation else {
+      return
+    }
+    if cachedAgentPresentation != presentation {
+      cachedAgentPresentation = presentation
+    }
+  }
+
+  @MainActor
+  private func rebuildTaskPresentation(input: SessionTaskListPresentationInput) async {
+    taskPresentationGeneration &+= 1
+    let generation = taskPresentationGeneration
+    let presentation = await presentationWorker.computeTasks(input: input)
+    guard !Task.isCancelled, taskPresentationGeneration == generation else {
+      return
+    }
+    if cachedTaskPresentation != presentation {
+      cachedTaskPresentation = presentation
+    }
   }
 }

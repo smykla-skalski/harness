@@ -26,13 +26,13 @@ extension SessionSidebar {
   /// snapshot was current when this method was last called.
   func bindSelectionDispatcher() {
     let agentIDsProvider: () -> [String] = { [self] in
-      (self.snapshot?.detail?.agents ?? []).map(\.agentId)
+      self.visibleAgentIDs
     }
     let taskIDsProvider: () -> [String] = { [self] in
-      (self.snapshot?.detail?.tasks ?? []).map(\.taskId)
+      self.visibleTaskIDs
     }
     let decisionIDsProvider: () -> [String] = { [self] in
-      self.decisions.map(\.id)
+      self.decisionIDs
     }
     sidebarSelectionDispatcher.selectAll =
       { [self, state, agentIDsProvider, taskIDsProvider, decisionIDsProvider] in

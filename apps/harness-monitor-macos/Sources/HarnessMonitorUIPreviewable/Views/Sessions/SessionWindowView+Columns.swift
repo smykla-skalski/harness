@@ -181,6 +181,7 @@ extension SessionWindowView {
         snapshot: snapshot,
         sessionCodexRuns: sessionCodexRuns,
         decisions: allSessionDecisions,
+        decisionIDs: allSessionDecisionIDsInOrderCache,
         statusModel: sessionStatusSummaryModel,
         currentModifiers: presentedModifiers,
         state: stateCache

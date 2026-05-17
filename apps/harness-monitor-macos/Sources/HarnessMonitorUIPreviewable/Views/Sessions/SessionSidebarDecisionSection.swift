@@ -4,7 +4,6 @@ import SwiftUI
 extension SessionSidebar {
   @ViewBuilder var decisionsSection: some View {
     Section {
-      let orderedDecisionIDs = decisions.map(\.id)
       ForEach(decisions) { decision in
         let selection = SessionSelection.decision(
           sessionID: state.sessionID,
@@ -35,7 +34,7 @@ extension SessionSidebar {
               listSelection: displayedSelectionSet
             ),
             selectedIDs: state.sidebarSelection.selectedDecisionIDs,
-            orderedVisibleIDs: orderedDecisionIDs
+            orderedVisibleIDs: decisionIDs
           )
           SessionDecisionContextMenuActions(resolution: resolution)
         }
