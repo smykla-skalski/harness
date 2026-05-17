@@ -92,6 +92,7 @@ struct SessionCockpitView: View {
               timeline: timeline,
               timelineWindow: timelineWindow,
               decisions: store.supervisorOpenDecisions,
+              decisionSnapshots: store.supervisorOpenDecisionPresentationItems,
               isTimelineLoading: isTimelineLoading,
               store: store
             )

@@ -84,7 +84,7 @@ extension AgentDetailSection {
   }
 
   func openPendingDecisions() {
-    let oldestOpenDecisionID = store.supervisorOpenDecisions
+    let oldestOpenDecisionID = store.supervisorOpenDecisionPresentationItems
       .filter { $0.agentID == agent.agentId }
       .min {
         if $0.createdAt != $1.createdAt {

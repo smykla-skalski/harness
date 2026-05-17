@@ -336,8 +336,8 @@ struct SessionAgentDetailSection: View {
   }
 
   private func openPendingDecisions() {
-    let oldestOpenDecisionID = store.supervisorOpenDecisions
-      .filter { $0.sessionID == sessionID && $0.agentID == agent.agentId }
+    let oldestOpenDecisionID = (store.supervisorOpenDecisionPresentationItemsBySession[sessionID] ?? [])
+      .filter { $0.agentID == agent.agentId }
       .min {
         if $0.createdAt != $1.createdAt {
           return $0.createdAt < $1.createdAt

@@ -58,6 +58,7 @@ public final class SessionDecisionRuntime {
   private(set) var auditEventPayloadPresentations: [String: DecisionAuditTrailPayloadPresentation] =
     [:]
   public private(set) var filteredDecisionIDs: [String] = []
+  public private(set) var filteredDecisionItems: [DecisionPresentationSnapshot] = []
   public private(set) var filteredDecisionIDSet: Set<String> = []
   public private(set) var hasFilteredDecisions = false
   public private(set) var isFilteringDecisions = false
@@ -98,6 +99,7 @@ public final class SessionDecisionRuntime {
     guard !input.items.isEmpty else {
       filterTask = nil
       filteredDecisionIDs = []
+      filteredDecisionItems = []
       filteredDecisionIDSet = []
       hasFilteredDecisions = true
       isFilteringDecisions = false
@@ -112,16 +114,17 @@ public final class SessionDecisionRuntime {
         id: signpostID,
         "session=\(input.sessionID, privacy: .public) count=\(input.items.count, privacy: .public)"
       )
-      let ids = await sessionDecisionFilterWorker.filteredIDs(input: input)
+      let output = await sessionDecisionFilterWorker.filteredOutput(input: input)
       Self.filterSignposter.endInterval(
         "session_decision_filter.apply",
         interval,
-        "matches=\(ids.count, privacy: .public)"
+        "matches=\(output.decisionIDs.count, privacy: .public)"
       )
       guard !Task.isCancelled else { return }
       guard let self, latestFilterInput == input else { return }
-      filteredDecisionIDs = ids
-      filteredDecisionIDSet = Set(ids)
+      filteredDecisionIDs = output.decisionIDs
+      filteredDecisionItems = output.decisionItems
+      filteredDecisionIDSet = Set(output.decisionIDs)
       hasFilteredDecisions = true
       isFilteringDecisions = false
     }
@@ -139,7 +142,7 @@ public final class SessionDecisionRuntime {
   public func reloadAuditEvents(
     from repository: SupervisorAuditRepository?,
     sessionID: String,
-    decisions: [Decision]
+    decisionItems: [DecisionPresentationSnapshot]
   ) async {
     auditReloadGeneration &+= 1
     let generation = auditReloadGeneration
@@ -149,7 +152,7 @@ public final class SessionDecisionRuntime {
     }
     let input = SessionDecisionAuditInput(
       sessionID: sessionID,
-      decisions: decisions
+      decisionItems: decisionItems
     )
     let loadedEvents = (try? await repository.fetchEvents(limit: 256)) ?? []
     let output = await sessionDecisionAuditWorker.scopedOutput(
@@ -157,6 +160,18 @@ public final class SessionDecisionRuntime {
       input: input
     )
     applyAuditReloadOutput(output, generation: generation)
+  }
+
+  public func reloadAuditEvents(
+    from repository: SupervisorAuditRepository?,
+    sessionID: String,
+    decisions: [Decision]
+  ) async {
+    await reloadAuditEvents(
+      from: repository,
+      sessionID: sessionID,
+      decisionItems: decisions.map(DecisionPresentationSnapshot.init)
+    )
   }
 
   private func applyAuditReloadOutput(
@@ -329,12 +344,19 @@ private struct SessionDecisionAuditInput: Equatable, Sendable {
   let agentIDs: Set<String>
   let taskIDs: Set<String>
 
+  init(sessionID: String, decisionItems: [DecisionPresentationSnapshot]) {
+    self.sessionID = sessionID
+    decisionIDs = Set(decisionItems.map(\.id))
+    agentIDs = Set(decisionItems.compactMap(\.agentID))
+    taskIDs = Set(decisionItems.compactMap(\.taskID))
+  }
+
   @MainActor
   init(sessionID: String, decisions: [Decision]) {
-    self.sessionID = sessionID
-    decisionIDs = Set(decisions.map(\.id))
-    agentIDs = Set(decisions.compactMap(\.agentID))
-    taskIDs = Set(decisions.compactMap(\.taskID))
+    self.init(
+      sessionID: sessionID,
+      decisionItems: decisions.map(DecisionPresentationSnapshot.init)
+    )
   }
 }
 

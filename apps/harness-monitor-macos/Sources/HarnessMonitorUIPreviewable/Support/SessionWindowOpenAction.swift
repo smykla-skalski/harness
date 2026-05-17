@@ -75,7 +75,7 @@ extension OpenWindowAction {
     store: HarnessMonitorStore
   ) {
     let sessionID =
-      store.supervisorOpenDecisions.first { $0.id == decisionID }?.sessionID
+      store.supervisorOpenDecisionsByID[decisionID]?.sessionID
       ?? store.acpPermissionDecisionPayload(for: decisionID)?.rawBatch.sessionId
       ?? store.selectedSessionID
     if let sessionID, store.openSessionWindowIDsSnapshot.contains(sessionID) {

@@ -117,6 +117,7 @@ public struct DecisionDeskPreviewView: View {
       DecisionsSidebar(
         decisions: runtime.decisions,
         decisionsByID: runtime.decisionsByID,
+        decisionItems: runtime.decisionItems,
         decisionsRevision: runtime.decisionsRevision,
         presentation: cachedPresentation,
         selection: $selection,

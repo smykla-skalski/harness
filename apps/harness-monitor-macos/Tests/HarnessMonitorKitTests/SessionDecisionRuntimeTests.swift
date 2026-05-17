@@ -129,10 +129,10 @@ struct SessionDecisionRuntimeTests {
     #expect(firstKey != secondKey)
   }
 
-  @Test("Decision data key changes when decision searchable fields change")
-  func decisionDataKeyChangesWhenDecisionSearchableFieldsChange() {
-    let first = makeDecision(id: "d1", summary: "Old summary")
-    let second = makeDecision(id: "d1", summary: "New summary")
+  @Test("Decision data key changes when decision identity changes")
+  func decisionDataKeyChangesWhenDecisionIdentityChanges() {
+    let first = makeDecision(id: "d1", summary: "Same summary")
+    let second = makeDecision(id: "d2", summary: "Same summary")
 
     let firstKey = SessionDecisionDataKey(sessionID: "s1", decisions: [first])
     let secondKey = SessionDecisionDataKey(sessionID: "s1", decisions: [second])
@@ -154,7 +154,8 @@ struct SessionDecisionRuntimeTests {
     let source = try sourceFile(named: "SessionDecisionRuntime.swift")
 
     #expect(source.contains("private(set) var auditEventPayloadPresentations"))
-    #expect(source.contains("guard auditEvents != scopedEvents else { return }"))
+    #expect(source.contains("auditEvents != output.events"))
+    #expect(source.contains("auditEventPayloadPresentations != output.payloadPresentations"))
     #expect(source.contains("let decoder = JSONDecoder()"))
     #expect(source.contains("scopedEvents.map {"))
     #expect(source.contains("payloadJSON: $0.payloadJSON"))

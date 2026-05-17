@@ -42,7 +42,9 @@ struct TaskBoardOverviewHost: View {
       onRefreshTaskBoard: refreshTaskBoard,
       onStartTaskBoardOrchestrator: startTaskBoardOrchestrator,
       onStopTaskBoardOrchestrator: stopTaskBoardOrchestrator,
-      onRunTaskBoardOrchestratorOnce: runTaskBoardOrchestratorOnce
+      onRunTaskBoardOrchestratorOnce: runTaskBoardOrchestratorOnce,
+      decisionItems: store.supervisorOpenDecisionPresentationItems,
+      decisionsByID: store.supervisorOpenDecisionsByID
     )
   }
   private func openTaskBoardItem(_ item: TaskBoardItem) {

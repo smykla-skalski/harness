@@ -122,29 +122,7 @@ struct SessionTimelineAction: Identifiable, Equatable, Sendable {
   }
 }
 
-struct SessionTimelineDecisionInput: Equatable, Sendable {
-  let id: String
-  let severityRaw: String
-  let ruleID: String
-  let sessionID: String?
-  let agentID: String?
-  let taskID: String?
-  let summary: String
-  let suggestedActionsJSON: String
-  let createdAt: Date
-
-  init(decision: Decision) {
-    id = decision.id
-    severityRaw = decision.severityRaw
-    ruleID = decision.ruleID
-    sessionID = decision.sessionID
-    agentID = decision.agentID
-    taskID = decision.taskID
-    summary = decision.summary
-    suggestedActionsJSON = decision.suggestedActionsJSON
-    createdAt = decision.createdAt
-  }
-}
+typealias SessionTimelineDecisionInput = DecisionPresentationSnapshot
 
 struct SessionTimelineDecisionSnapshot: Identifiable, Equatable, Sendable {
   let id: String

@@ -15,7 +15,7 @@ public struct SessionDecisionFilterSnapshot: Hashable, Sendable {
     scopeRawValue = filters.scope.rawValue
   }
 
-  fileprivate func matches(_ item: SessionDecisionFilterItem) -> Bool {
+  fileprivate func matches(_ item: DecisionPresentationSnapshot) -> Bool {
     if !severityRawValues.isEmpty, !severityRawValues.contains(item.severityRaw) {
       return false
     }
@@ -25,24 +25,8 @@ public struct SessionDecisionFilterSnapshot: Hashable, Sendable {
   }
 }
 
-public struct SessionDecisionFilterItem: Hashable, Sendable {
-  public let id: String
-  public let severityRaw: String
-  public let summary: String
-  public let ruleID: String
-  public let agentID: String?
-  public let taskID: String?
-
-  public init(decision: Decision) {
-    id = decision.id
-    severityRaw = decision.severityRaw
-    summary = decision.summary
-    ruleID = decision.ruleID
-    agentID = decision.agentID
-    taskID = decision.taskID
-  }
-
-  fileprivate func searchValue(scopeRawValue: String) -> String? {
+private extension DecisionPresentationSnapshot {
+  func searchValue(scopeRawValue: String) -> String? {
     switch scopeRawValue {
     case DecisionsSidebarSearchScope.summary.rawValue:
       summary
@@ -60,15 +44,33 @@ public struct SessionDecisionFilterItem: Hashable, Sendable {
 
 public struct SessionDecisionFilterInput: Equatable, Sendable {
   public let sessionID: String
-  public let items: [SessionDecisionFilterItem]
+  public let items: [DecisionPresentationSnapshot]
   public let filters: SessionDecisionFilterSnapshot
 
   @MainActor
   public init(sessionID: String, decisions: [Decision], filters: SessionDecisionFilterState) {
     self.sessionID = sessionID
-    items = decisions.map(SessionDecisionFilterItem.init)
+    items = decisions.map(DecisionPresentationSnapshot.init)
     self.filters = SessionDecisionFilterSnapshot(filters: filters)
   }
+
+  @MainActor
+  public init(
+    sessionID: String,
+    items: [DecisionPresentationSnapshot],
+    filters: SessionDecisionFilterState
+  ) {
+    self.sessionID = sessionID
+    self.items = items
+    self.filters = SessionDecisionFilterSnapshot(filters: filters)
+  }
+}
+
+public struct SessionDecisionFilterOutput: Equatable, Sendable {
+  public static let empty = Self(decisionIDs: [], decisionItems: [])
+
+  public let decisionIDs: [String]
+  public let decisionItems: [DecisionPresentationSnapshot]
 }
 
 public struct SessionDecisionFilterKey: Hashable, Sendable {
@@ -86,11 +88,15 @@ public struct SessionDecisionFilterKey: Hashable, Sendable {
 
 public struct SessionDecisionDataKey: Hashable, Sendable {
   public let sessionID: String
-  public let decisionFingerprint: Int
+  public let decisionIDs: [String]
+
+  public init(sessionID: String, decisionIDs: [String]) {
+    self.sessionID = sessionID
+    self.decisionIDs = decisionIDs
+  }
 
   public init(sessionID: String, decisions: [Decision]) {
-    self.sessionID = sessionID
-    decisionFingerprint = SessionDecisionFingerprint.hash(decisions: decisions)
+    self.init(sessionID: sessionID, decisionIDs: decisions.map(\.id))
   }
 }
 
@@ -113,7 +119,11 @@ private enum SessionDecisionFingerprint {
 let sessionDecisionFilterWorker = SessionDecisionFilterWorker()
 
 actor SessionDecisionFilterWorker {
-  func filteredIDs(input: SessionDecisionFilterInput) -> [String] {
-    input.items.lazy.filter { input.filters.matches($0) }.map(\.id)
+  func filteredOutput(input: SessionDecisionFilterInput) -> SessionDecisionFilterOutput {
+    let items = input.items.filter { input.filters.matches($0) }
+    return SessionDecisionFilterOutput(
+      decisionIDs: items.map(\.id),
+      decisionItems: items
+    )
   }
 }

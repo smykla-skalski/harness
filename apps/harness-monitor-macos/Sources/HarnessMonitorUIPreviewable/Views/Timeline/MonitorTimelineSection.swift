@@ -7,6 +7,7 @@ struct SessionTimelineView: View {
   let timeline: [TimelineEntry]
   let timelineWindow: TimelineWindowResponse?
   let decisions: [Decision]
+  let decisionSnapshots: [DecisionPresentationSnapshot]?
   let isTimelineLoading: Bool
   let store: HarnessMonitorStore
   let timelineLoading: SessionTimelineLoading?
@@ -19,6 +20,7 @@ struct SessionTimelineView: View {
     timeline: [TimelineEntry],
     timelineWindow: TimelineWindowResponse?,
     decisions: [Decision],
+    decisionSnapshots: [DecisionPresentationSnapshot]? = nil,
     isTimelineLoading: Bool,
     store: HarnessMonitorStore,
     timelineLoading: SessionTimelineLoading? = nil
@@ -28,6 +30,7 @@ struct SessionTimelineView: View {
     self.timeline = timeline
     self.timelineWindow = timelineWindow
     self.decisions = decisions
+    self.decisionSnapshots = decisionSnapshots
     self.isTimelineLoading = isTimelineLoading
     self.store = store
     self.timelineLoading = timelineLoading
@@ -74,7 +77,7 @@ struct SessionTimelineView: View {
       sessionID: sessionID,
       timeline: timeline,
       timelineWindow: timelineWindow,
-      decisions: decisions.map(SessionTimelineDecisionInput.init(decision:)),
+      decisions: decisionSnapshots ?? decisions.map(SessionTimelineDecisionInput.init(decision:)),
       signals: store.selectedSessionSignals,
       filters: normalizedFilters(filters),
       isTimelineLoading: isTimelineLoading,
@@ -90,7 +93,7 @@ struct SessionTimelineView: View {
       timelineFallbackSignature: .init(timeline),
       timelineWindowSignature: .init(timelineWindow),
       decisionsRevision: store.supervisorDecisionRefreshTick,
-      decisionsCount: decisions.count,
+      decisionsCount: decisionSnapshots?.count ?? decisions.count,
       signalsRevision: store.selectedSessionSignalsRevision,
       filters: normalizedFilters(filters),
       isTimelineLoading: isTimelineLoading,

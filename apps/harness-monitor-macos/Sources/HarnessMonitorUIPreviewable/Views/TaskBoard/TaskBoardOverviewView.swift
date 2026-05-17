@@ -89,7 +89,9 @@ public struct TaskBoardOverviewView: View {
     onRefreshTaskBoard: (() -> Void)? = nil,
     onStartTaskBoardOrchestrator: (() -> Void)? = nil,
     onStopTaskBoardOrchestrator: (() -> Void)? = nil,
-    onRunTaskBoardOrchestratorOnce: ((TaskBoardOrchestratorRunOnceRequest) -> Void)? = nil
+    onRunTaskBoardOrchestratorOnce: ((TaskBoardOrchestratorRunOnceRequest) -> Void)? = nil,
+    decisionItems: [DecisionPresentationSnapshot]? = nil,
+    decisionsByID: [String: Decision]? = nil
   ) {
     self.snapshot = snapshot
     self.taskBoardItems = taskBoardItems
@@ -98,8 +100,9 @@ public struct TaskBoardOverviewView: View {
     self.evaluationSummary = evaluationSummary
     self.taskBoardSessionID = taskBoardSessionID
     self.decisions = decisions
-    decisionsByID = Dictionary(uniqueKeysWithValues: decisions.map { ($0.id, $0) })
-    decisionItems = decisions.map(DecisionPresentationItem.init)
+    self.decisionsByID =
+      decisionsByID ?? Dictionary(uniqueKeysWithValues: decisions.map { ($0.id, $0) })
+    self.decisionItems = decisionItems ?? decisions.map(DecisionPresentationItem.init)
     self.isActionInFlight = isActionInFlight
     self.onOpenItem = onOpenItem
     self.onOpenTaskBoardItem = onOpenTaskBoardItem

@@ -10,6 +10,7 @@ public struct DecisionsSidebar: View {
   @Binding private var filters: DecisionsSidebarViewModel.FilterState
   private let decisions: [Decision]
   private let decisionsByIDOverride: [String: Decision]?
+  private let decisionItemsOverride: [DecisionPresentationSnapshot]?
   private let decisionsRevision: UInt64
   private let presentationOverride: DecisionsSidebarPresentation?
   private let store: HarnessMonitorStore?
@@ -35,6 +36,7 @@ public struct DecisionsSidebar: View {
   public init(
     decisions: [Decision] = [],
     decisionsByID: [String: Decision]? = nil,
+    decisionItems: [DecisionPresentationSnapshot]? = nil,
     decisionsRevision: UInt64 = 0,
     presentation: DecisionsSidebarPresentation? = nil,
     selection: Binding<String?> = .constant(nil),
@@ -45,6 +47,7 @@ public struct DecisionsSidebar: View {
   ) {
     self.decisions = decisions
     decisionsByIDOverride = decisionsByID
+    decisionItemsOverride = decisionItems
     self.decisionsRevision = decisionsRevision
     presentationOverride = presentation
     self.store = store
@@ -144,9 +147,10 @@ public struct DecisionsSidebar: View {
     }
     presentationGeneration &+= 1
     let generation = presentationGeneration
-    let localDecisionsByID = Dictionary(uniqueKeysWithValues: decisions.map { ($0.id, $0) })
+    let localDecisionsByID =
+      decisionsByIDOverride ?? Dictionary(uniqueKeysWithValues: decisions.map { ($0.id, $0) })
     let input = DecisionsSidebarPresentationInput(
-      items: decisions.map(DecisionPresentationItem.init),
+      items: decisionItemsOverride ?? decisions.map(DecisionPresentationItem.init),
       filters: currentFilters
     )
     let presentation = await presentationWorker.compute(input: input)
