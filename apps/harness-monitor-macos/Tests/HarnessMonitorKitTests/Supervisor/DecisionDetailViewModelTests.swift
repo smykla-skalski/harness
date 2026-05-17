@@ -280,7 +280,7 @@ final class DecisionDetailViewModelTests: XCTestCase {
     wrongDecision.createdAt = Date(timeIntervalSince1970: 18)
 
     let scoped = viewModel.scopedAuditTrail(
-      from: [nestedMatch, wrongAgent, wrongRule, wrongDecision, oldest]
+      from: snapshotEvents([nestedMatch, wrongAgent, wrongRule, wrongDecision, oldest])
     )
 
     XCTAssertEqual(scoped.map(\.id), ["evt-older", "evt-match"])
@@ -325,7 +325,7 @@ final class DecisionDetailViewModelTests: XCTestCase {
     )
 
     let scoped = DecisionDetailViewModel.explicitlySessionScopedAuditEvents(
-      from: [unscopedRuleEvent, sessionMatch, decisionMatch, wrongSession],
+      from: snapshotEvents([unscopedRuleEvent, sessionMatch, decisionMatch, wrongSession]),
       sessionID: "sess-1",
       decisions: decisions
     )
@@ -363,12 +363,16 @@ final class DecisionDetailViewModelTests: XCTestCase {
     )
 
     let scoped = DecisionDetailViewModel.explicitlySessionScopedAuditEvents(
-      from: [contradictorySession, contradictoryAgent, matchingDecision],
+      from: snapshotEvents([contradictorySession, contradictoryAgent, matchingDecision]),
       sessionID: "sess-1",
       decisions: decisions
     )
 
     XCTAssertEqual(scoped.map(\.id), ["evt-matching-decision"])
+  }
+
+  private func snapshotEvents(_ events: [SupervisorEvent]) -> [SupervisorEventSnapshot] {
+    events.map(SupervisorEventSnapshot.init(event:))
   }
 }
 
