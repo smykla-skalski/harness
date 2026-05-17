@@ -31,6 +31,9 @@ common root, so linked worktrees share one default CLI DerivedData tree unless a
 lane is set. Set `HARNESS_MONITOR_BUILD_LANE=<name>` for an isolated lock/build
 database under `xcode-derived-lanes/<name>`.
 
+There are no `monitor:agent:*` tasks. Use `mise run monitor:*` tasks with
+explicit lane env vars for agent/session isolation.
+
 Runtime state is separate from build state. Set
 `HARNESS_MONITOR_RUNTIME_LANE=<name>` for isolated daemon/bridge/MCP state.
 Runtime lanes write daemon data under the app-group `runtime-lanes/<lane>`,
