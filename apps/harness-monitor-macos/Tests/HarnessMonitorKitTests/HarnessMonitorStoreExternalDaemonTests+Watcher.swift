@@ -9,14 +9,6 @@ extension HarnessMonitorStoreExternalDaemonTests {
   func manifestWatcherFiresWhenStartedAtChanges() async throws {
     let tempRoot = FileManager.default.temporaryDirectory
       .appendingPathComponent("harness-monitor-watcher-\(UUID().uuidString)", isDirectory: true)
-    let daemonDir =
-      tempRoot
-      .appendingPathComponent("harness", isDirectory: true)
-      .appendingPathComponent("daemon", isDirectory: true)
-    try FileManager.default.createDirectory(
-      at: daemonDir,
-      withIntermediateDirectories: true
-    )
     defer {
       try? FileManager.default.removeItem(at: tempRoot)
     }
@@ -28,6 +20,11 @@ extension HarnessMonitorStoreExternalDaemonTests {
     )
 
     let manifestURL = HarnessMonitorPaths.manifestURL(using: environment)
+    let daemonDir = HarnessMonitorPaths.daemonRoot(using: environment)
+    try FileManager.default.createDirectory(
+      at: daemonDir,
+      withIntermediateDirectories: true
+    )
     let initialPayload =
       ManifestWatcherTestPayloads.daemonManifest(
         endpoint: "http://127.0.0.1:8765",
@@ -87,14 +84,6 @@ extension HarnessMonitorStoreExternalDaemonTests {
   func manifestWatcherFiresInPlaceUpdateWhenRevisionBumps() async throws {
     let tempRoot = FileManager.default.temporaryDirectory
       .appendingPathComponent("harness-monitor-watcher-\(UUID().uuidString)", isDirectory: true)
-    let daemonDir =
-      tempRoot
-      .appendingPathComponent("harness", isDirectory: true)
-      .appendingPathComponent("daemon", isDirectory: true)
-    try FileManager.default.createDirectory(
-      at: daemonDir,
-      withIntermediateDirectories: true
-    )
     defer {
       try? FileManager.default.removeItem(at: tempRoot)
     }
@@ -106,6 +95,11 @@ extension HarnessMonitorStoreExternalDaemonTests {
     )
 
     let manifestURL = HarnessMonitorPaths.manifestURL(using: environment)
+    let daemonDir = HarnessMonitorPaths.daemonRoot(using: environment)
+    try FileManager.default.createDirectory(
+      at: daemonDir,
+      withIntermediateDirectories: true
+    )
     // Seed the file on disk matching the watcher's initial state so the
     // first fs-event fires only because we then bump the revision.
     let initial = ManifestWatcherTestPayloads.daemonManifest(
@@ -168,14 +162,6 @@ extension HarnessMonitorStoreExternalDaemonTests {
   func manifestWatcherIgnoresRewritesThatKeepFieldsStable() async throws {
     let tempRoot = FileManager.default.temporaryDirectory
       .appendingPathComponent("harness-monitor-watcher-\(UUID().uuidString)", isDirectory: true)
-    let daemonDir =
-      tempRoot
-      .appendingPathComponent("harness", isDirectory: true)
-      .appendingPathComponent("daemon", isDirectory: true)
-    try FileManager.default.createDirectory(
-      at: daemonDir,
-      withIntermediateDirectories: true
-    )
     defer {
       try? FileManager.default.removeItem(at: tempRoot)
     }
@@ -187,6 +173,11 @@ extension HarnessMonitorStoreExternalDaemonTests {
     )
 
     let manifestURL = HarnessMonitorPaths.manifestURL(using: environment)
+    let daemonDir = HarnessMonitorPaths.daemonRoot(using: environment)
+    try FileManager.default.createDirectory(
+      at: daemonDir,
+      withIntermediateDirectories: true
+    )
     // Seed the watcher's initial state and the on-disk manifest to match.
     let seed = ManifestWatcherTestPayloads.daemonManifest(
       endpoint: "http://127.0.0.1:8765",

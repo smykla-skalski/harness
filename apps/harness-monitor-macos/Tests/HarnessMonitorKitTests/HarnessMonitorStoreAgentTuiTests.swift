@@ -168,5 +168,6 @@ struct HarnessMonitorStoreAgentTuiTests {
 func selectedStore(client: RecordingHarnessClient) async -> HarnessMonitorStore {
   let store = await makeBootstrappedStore(client: client)
   await store.selectSession(PreviewFixtures.summary.sessionId)
+  clearRecordedCallsIfNeeded(for: client)
   return store
 }

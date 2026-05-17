@@ -207,7 +207,7 @@ struct HarnessMonitorUITestAccessibilityRegistryTests {
     )
 
     let bridgeSource = try sourceFile(named: "Views/Shared/AcpBridgeBannerBridge.swift")
-    let bannerStackSource = try sourceFile(named: "SessionBannerStack.swift")
+    let bannerStackSource = try sourceFile(named: "WindowChromeBanners.swift")
     #expect(bridgeSource.contains("contentAcpBridgeBanner"))
     #expect(bridgeSource.contains("contentAcpBridgeOpenLogButton"))
     #expect(bridgeSource.contains("contentAcpBridgeRunDoctorButton"))

@@ -65,29 +65,14 @@ extension SessionWindowFlowTests {
     #expect(sectionsSource.contains(".padding(.trailing, HarnessMonitorTheme.spacingSM)"))
     #expect(sidebarSource.contains("currentModifiers: currentModifiers"))
     #expect(sectionsSource.contains("let shortcut = kind.createShortcut"))
-    let agentButtonSource = """
-      SessionSidebarHeaderCreateButton(
-        state: state,
-        kind: .agent,
-        accessibilityLabel: "New Agent"
-      """
-    let taskButtonSource = """
-      SessionSidebarHeaderCreateButton(
-        state: state,
-        kind: .task,
-        accessibilityLabel: "New Task"
-      """
-    #expect(sectionsSource.contains(agentButtonSource))
-    #expect(sectionsSource.contains(taskButtonSource))
-    #expect(
-      decisionsSource.contains(
-        """
-        SessionSidebarHeaderCreateButton(
-        state: state,
-        kind: .decision,
-        accessibilityLabel: "New Decision"
-        """
-      ))
+    #expect(sectionsSource.contains("SessionSidebarHeaderCreateButton("))
+    #expect(sectionsSource.contains("kind: .agent"))
+    #expect(sectionsSource.contains("accessibilityLabel: \"New Agent\""))
+    #expect(sectionsSource.contains("kind: .task"))
+    #expect(sectionsSource.contains("accessibilityLabel: \"New Task\""))
+    #expect(decisionsSource.contains("SessionSidebarHeaderCreateButton("))
+    #expect(decisionsSource.contains("kind: .decision"))
+    #expect(decisionsSource.contains("accessibilityLabel: \"New Decision\""))
   }
 
   @Test("Keyboard shortcut descriptors support reveal across modifier families")

@@ -17,6 +17,7 @@ extension HarnessMonitorStoreCodexTests {
     let store = HarnessMonitorStore(daemonController: daemon)
     await store.bootstrap()
     await store.selectSession(PreviewFixtures.summary.sessionId)
+    clearRecordedCallsIfNeeded(for: client)
     store.daemonStatus = sandboxedStatus(hostBridge: HostBridgeManifest())
 
     let started = await store.startCodexRun(prompt: "Test.", mode: .report)
@@ -54,6 +55,7 @@ extension HarnessMonitorStoreCodexTests {
     let store = HarnessMonitorStore(daemonController: daemon)
     await store.bootstrap()
     await store.selectSession(PreviewFixtures.summary.sessionId)
+    clearRecordedCallsIfNeeded(for: client)
     store.daemonStatus = sandboxedStatus(hostBridge: HostBridgeManifest())
 
     let started = await store.startCodexRun(prompt: "Test.", mode: .report)
@@ -112,6 +114,7 @@ extension HarnessMonitorStoreCodexTests {
     let store = HarnessMonitorStore(daemonController: daemon)
     await store.bootstrap()
     await store.selectSession(PreviewFixtures.summary.sessionId)
+    clearRecordedCallsIfNeeded(for: client)
     store.daemonStatus = sandboxedStatus(hostBridge: HostBridgeManifest())
 
     let started = await store.startCodexRun(prompt: "Test.", mode: .report)
@@ -175,6 +178,7 @@ extension HarnessMonitorStoreCodexTests {
     let store = HarnessMonitorStore(daemonController: daemon)
     await store.bootstrap()
     await store.selectSession(PreviewFixtures.summary.sessionId)
+    clearRecordedCallsIfNeeded(for: client)
     store.daemonStatus = sandboxedStatus(hostBridge: HostBridgeManifest())
 
     let started = await store.startCodexRun(prompt: "Test.", mode: .report)

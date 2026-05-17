@@ -69,7 +69,9 @@ extension HarnessMonitorUITestAccessibilityRegistryTests {
 
   @Test("Dashboard and session window identifiers are attached by production views")
   func dashboardAndSessionWindowAccessibilityIdentifiersAreAttachedByProductionViews() throws {
-    let dashboardView = try sourceFile(named: "DashboardWindowView.swift")
+    let dashboardRoot = try sourceFile(named: "DashboardWindowView.swift")
+    let dashboardView = try sourceFile(named: "DashboardWindowSupport.swift")
+    let dashboardToolbar = try sourceFile(named: "DashboardWindowToolbar.swift")
     let rootView = try sourceFile(named: "SessionWindowRootView.swift")
     let windowView = try sourceFile(named: "SessionWindowView.swift")
     let createRuntimeView = try sourceFile(named: "SessionWindowCreateAgentRuntimePane.swift")
@@ -81,7 +83,7 @@ extension HarnessMonitorUITestAccessibilityRegistryTests {
     let sharedToolbarView = try sourceFile(named: "HarnessMonitorWindowToolbar.swift")
 
     #expect(
-      dashboardView.contains(
+      dashboardRoot.contains(
         ".accessibilityIdentifier(HarnessMonitorAccessibility.dashboardWindowRoot)"
       )
     )
@@ -93,10 +95,9 @@ extension HarnessMonitorUITestAccessibilityRegistryTests {
     #expect(dashboardView.contains("SessionSidebarRow("))
     #expect(dashboardView.contains(".harnessMonitorSidebarListChrome("))
     #expect(dashboardView.contains("HarnessMonitorAccessibility.dashboardScrollView"))
-    #expect(dashboardView.contains("HarnessMonitorAccessibility.dashboardNewSessionButton"))
-    #expect(dashboardView.contains("HarnessMonitorAccessibility.dashboardOpenFolderButton"))
-    #expect(dashboardView.contains("DashboardWindowToolbar("))
-    #expect(dashboardView.contains("SleepPreventionToolbarButton("))
+    #expect(dashboardToolbar.contains("HarnessMonitorAccessibility.dashboardNewSessionButton"))
+    #expect(dashboardToolbar.contains("HarnessMonitorAccessibility.dashboardOpenFolderButton"))
+    #expect(dashboardToolbar.contains("SleepPreventionToolbarButton("))
     #expect(windowView.contains("HarnessMonitorAccessibility.sessionWindowShell"))
     #expect(
       rootView.contains(

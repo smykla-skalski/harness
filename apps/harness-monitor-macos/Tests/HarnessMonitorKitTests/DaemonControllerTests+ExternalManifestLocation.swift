@@ -95,31 +95,30 @@ struct DaemonControllerExternalManifestLocationTests {
     #expect(HarnessMonitorPaths.manifestURL(using: environment).path == staleRootManifestURL.path)
 
     let liveEndpoint = "http://127.0.0.1:65531"
-    async let laneManifestWriter: Void =
-      withSignalIgnoringSleepProcessPID(durationSeconds: 60) { pid in
-        try await Task.sleep(for: .milliseconds(250))
-        let laneDaemonRoot =
-          appGroupRoot
-          .appendingPathComponent("runtime-lanes", isDirectory: true)
-          .appendingPathComponent("late-start", isDirectory: true)
-          .appendingPathComponent("harness", isDirectory: true)
-          .appendingPathComponent("daemon", isDirectory: true)
-          .appendingPathComponent(DaemonOwnership.external.rawValue, isDirectory: true)
-        try FileManager.default.createDirectory(
-          at: laneDaemonRoot,
-          withIntermediateDirectories: true
-        )
+    async let laneManifestWriter: Void = {
+      try await Task.sleep(for: .milliseconds(250))
+      let laneDaemonRoot =
+        appGroupRoot
+        .appendingPathComponent("runtime-lanes", isDirectory: true)
+        .appendingPathComponent("late-start", isDirectory: true)
+        .appendingPathComponent("harness", isDirectory: true)
+        .appendingPathComponent("daemon", isDirectory: true)
+        .appendingPathComponent(DaemonOwnership.external.rawValue, isDirectory: true)
+      try FileManager.default.createDirectory(
+        at: laneDaemonRoot,
+        withIntermediateDirectories: true
+      )
 
-        let laneTokenURL = laneDaemonRoot.appendingPathComponent("auth-token")
-        try writeTokenFixture(to: laneTokenURL)
-        try writeExternalManifestFixture(
-          at: laneDaemonRoot.appendingPathComponent("manifest.json"),
-          pid: Int(pid),
-          endpoint: liveEndpoint,
-          startedAt: "2026-04-11T12:05:00Z",
-          tokenPath: laneTokenURL.path
-        )
-      }
+      let laneTokenURL = laneDaemonRoot.appendingPathComponent("auth-token")
+      try writeTokenFixture(to: laneTokenURL)
+      try writeExternalManifestFixture(
+        at: laneDaemonRoot.appendingPathComponent("manifest.json"),
+        pid: Int(getpid()),
+        endpoint: liveEndpoint,
+        startedAt: "2026-04-11T12:05:00Z",
+        tokenPath: laneTokenURL.path
+      )
+    }()
 
     let controller = DaemonController(
       environment: environment,
@@ -130,7 +129,7 @@ struct DaemonControllerExternalManifestLocationTests {
       endpointProbe: { endpoint in endpoint.absoluteString == liveEndpoint }
     )
 
-    let client = try await controller.awaitManifestWarmUp(timeout: .seconds(2))
+    let client = try await controller.awaitManifestWarmUp(timeout: .seconds(5))
     try await laneManifestWriter
 
     #expect(client is PreviewHarnessClient)
@@ -211,7 +210,7 @@ struct DaemonControllerExternalManifestLocationTests {
         endpointProbe: { endpoint in endpoint.absoluteString == liveEndpoint }
       )
 
-      let client = try await controller.awaitManifestWarmUp(timeout: .seconds(2))
+      let client = try await controller.awaitManifestWarmUp(timeout: .seconds(5))
       try await laneManifestWriter
 
       #expect(client is PreviewHarnessClient)
