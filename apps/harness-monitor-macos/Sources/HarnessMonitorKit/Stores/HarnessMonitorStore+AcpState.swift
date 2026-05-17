@@ -142,7 +142,7 @@ extension HarnessMonitorStore {
     )
   }
 
-  func replaceAcpInspectFromStream(
+  func replaceAcpInspectAsync(
     _ response: AcpAgentInspectResponse,
     sessionID: String,
     sampledAt: Date,
