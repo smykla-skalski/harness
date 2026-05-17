@@ -7,6 +7,7 @@ struct HarnessMonitorAppConfiguration {
   private static let uiTestingBundleIdentifier = "io.harnessmonitor.app.ui-testing"
   private static let uiTestsEnvironmentKey = "HARNESS_MONITOR_UI_TESTS"
   private static let uiTestDefaultDataRootName = "HarnessMonitorUITestHost"
+  static let policyCanvasLabEnvironmentKey = "HARNESS_MONITOR_POLICY_CANVAS_LAB"
   private static let resetBackgroundRecentsOverrideKey = "HARNESS_MONITOR_RESET_BACKGROUND_RECENTS"
   private static let openRecentCloseAfterPickOverrideKey =
     "HARNESS_MONITOR_OPEN_RECENT_CLOSE_AFTER_PICK_OVERRIDE"
@@ -28,6 +29,7 @@ struct HarnessMonitorAppConfiguration {
   let mainWindowDefaultSize: CGSize
   let perfScenario: HarnessMonitorPerfScenario?
   let settingsInitialSection: SettingsSection
+  let showsPolicyCanvasLab: Bool
   let environment: HarnessMonitorEnvironment
 
   @MainActor
@@ -90,6 +92,9 @@ struct HarnessMonitorAppConfiguration {
       ),
       perfScenario: perfScenario,
       settingsInitialSection: perfScenario?.initialSettingsSection ?? .general,
+      showsPolicyCanvasLab: uiTestBoolOverride(
+        from: resolvedEnvironment.values[policyCanvasLabEnvironmentKey]
+      ) ?? false,
       environment: resolvedEnvironment
     )
   }

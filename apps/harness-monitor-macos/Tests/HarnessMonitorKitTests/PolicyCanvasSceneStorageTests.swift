@@ -56,4 +56,37 @@ struct PolicyCanvasSceneStorageTests {
     #expect(PolicyCanvasView.encodeSelection(.edge("b")) == "edge:b")
     #expect(PolicyCanvasView.encodeSelection(.group("c")) == "group:c")
   }
+
+  @Test("scene state lookup returns the current pipeline slot")
+  func sceneStateLookupReturnsStoredPipelineSlot() {
+    let raw = PolicyCanvasView.encodePipelineStateMap([
+      "trace-policy": PolicyCanvasPipelineSceneState(
+        zoom: 1.2,
+        selectionRaw: PolicyCanvasView.encodeSelection(.edge("edge-1"))
+      )
+    ])
+
+    let state = PolicyCanvasView.sceneState(
+      for: "trace-policy",
+      raw: raw
+    )
+
+    #expect(state?.zoom == 1.2)
+    #expect(state?.selectionRaw == "edge:edge-1")
+  }
+
+  @Test("scene state lookup respects suppression")
+  func sceneStateLookupRespectsSuppression() {
+    let raw = PolicyCanvasView.encodePipelineStateMap([
+      "trace-policy": PolicyCanvasPipelineSceneState(zoom: 0.9, selectionRaw: "")
+    ])
+
+    let state = PolicyCanvasView.sceneState(
+      for: "trace-policy",
+      raw: raw,
+      suppressesSceneStorage: true
+    )
+
+    #expect(state == nil)
+  }
 }

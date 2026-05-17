@@ -69,6 +69,20 @@ final class HarnessMonitorAppConfigurationTests: XCTestCase {
   }
 
   @MainActor
+  func testResolveReadsPolicyCanvasLabLaunchFlag() {
+    let testEnv = HarnessMonitorEnvironment(
+      values: [
+        HarnessMonitorAppConfiguration.policyCanvasLabEnvironmentKey: "1",
+      ],
+      homeDirectory: FileManager.default.homeDirectoryForCurrentUser
+    )
+
+    let configuration = HarnessMonitorAppConfiguration.resolve(baseEnvironment: testEnv)
+
+    XCTAssertTrue(configuration.showsPolicyCanvasLab)
+  }
+
+  @MainActor
   func testResolveTaskBoardSettingsPerfScenarioSeedsPreviewScenarioAndInitialSection() {
     let testEnv = HarnessMonitorEnvironment(
       values: [
