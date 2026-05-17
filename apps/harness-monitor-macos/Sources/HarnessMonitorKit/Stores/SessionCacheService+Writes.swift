@@ -224,19 +224,6 @@ extension SessionCacheService {
       context,
       operation: "replace session windows open at quit"
     )
-    let foregroundCount = snapshot.groupings.reduce(into: 0) { count, grouping in
-      if grouping.foregroundSessionID != nil {
-        count += 1
-      }
-    }
-    HarnessMonitorLogger.lifecycle.trace(
-      """
-      session-window quit snapshot persisted=\(didPersist, privacy: .public) \
-      sessions=\(snapshot.sessionIDs.count, privacy: .public) \
-      groups=\(snapshot.groupings.count, privacy: .public) \
-      foreground_marked=\(foregroundCount, privacy: .public)
-      """
-    )
     return WriteResult(didPersist: didPersist, metadataUpdate: .refresh)
   }
 }

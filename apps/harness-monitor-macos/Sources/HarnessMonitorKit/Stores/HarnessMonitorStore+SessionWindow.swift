@@ -135,14 +135,6 @@ extension HarnessMonitorStore {
       guard !(error is CancellationError) else {
         return nil
       }
-      let errorDescription = String(describing: error)
-      HarnessMonitorLogger.store.debug(
-        """
-        session window live load failed \
-        sessionID=\(sessionID, privacy: .public) \
-        error=\(errorDescription, privacy: .public)
-        """
-      )
       return nil
     }
   }
@@ -155,10 +147,6 @@ extension HarnessMonitorStore {
     } catch is CancellationError {
       return nil
     } catch {
-      let errorDescription = String(describing: error)
-      HarnessMonitorLogger.store.debug(
-        "session window task board load failed error=\(errorDescription, privacy: .public)"
-      )
       return nil
     }
   }
@@ -172,14 +160,6 @@ extension HarnessMonitorStore {
     } catch is CancellationError {
       return nil
     } catch {
-      let errorDescription = String(describing: error)
-      HarnessMonitorLogger.store.debug(
-        """
-        session window transcript load failed \
-        sessionID=\(sessionID, privacy: .public) \
-        error=\(errorDescription, privacy: .public)
-        """
-      )
       return nil
     }
   }
@@ -193,14 +173,6 @@ extension HarnessMonitorStore {
     } catch is CancellationError {
       return nil
     } catch {
-      let errorDescription = String(describing: error)
-      HarnessMonitorLogger.store.debug(
-        """
-        session window Codex transcript load failed \
-        sessionID=\(sessionID, privacy: .public) \
-        error=\(errorDescription, privacy: .public)
-        """
-      )
       return nil
     }
   }
@@ -269,14 +241,6 @@ extension HarnessMonitorStore {
     } catch is CancellationError {
       return []
     } catch {
-      let errorDescription = String(describing: error)
-      HarnessMonitorLogger.store.debug(
-        """
-        session window ACP agents load failed \
-        sessionID=\(sessionID, privacy: .public) \
-        error=\(errorDescription, privacy: .public)
-        """
-      )
       return []
     }
   }
@@ -296,14 +260,6 @@ extension HarnessMonitorStore {
     } catch is CancellationError {
       return nil
     } catch {
-      let errorDescription = String(describing: error)
-      HarnessMonitorLogger.store.debug(
-        """
-        session window ACP inspect load failed \
-        sessionID=\(sessionID, privacy: .public) \
-        error=\(errorDescription, privacy: .public)
-        """
-      )
       return nil
     }
   }
