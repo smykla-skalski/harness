@@ -65,7 +65,6 @@ struct TaskBoardOperationsDispatchCard: View, TaskBoardOperationsHost {
 
     return TaskBoardOperationsCard(
       title: "Dispatch",
-      systemImage: "paperplane",
       metrics: metrics
     ) {
       controlRows {
