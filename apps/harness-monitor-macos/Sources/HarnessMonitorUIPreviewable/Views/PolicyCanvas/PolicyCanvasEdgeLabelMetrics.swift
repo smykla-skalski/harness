@@ -12,10 +12,8 @@ struct PolicyCanvasEdgeLabelMetrics {
     let scale = min(SessionWindowFontScale.metricsScale(for: fontScale), 1.45)
     spaceWidth = (3.5 * scale).rounded(.up)
     horizontalPadding = spaceWidth
-    height = max(
-      PolicyCanvasLayout.edgeLabelHeight,
-      (PolicyCanvasLayout.edgeLabelHeight * scale).rounded(.up)
-    )
+    let textHeight = (11 * scale).rounded(.up)
+    height = textHeight + (spaceWidth * 2)
     defaultGlyphWidth = 5.8 * scale
     narrowGlyphWidth = 3.7 * scale
     wideGlyphWidth = 7.2 * scale

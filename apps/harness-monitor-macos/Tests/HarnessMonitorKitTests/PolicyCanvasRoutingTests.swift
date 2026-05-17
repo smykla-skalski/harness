@@ -287,6 +287,35 @@ struct PolicyCanvasRoutingTests {
     #expect(position.y == base.y)
   }
 
+  @Test("display label placement avoids route corners")
+  func displayLabelPlacementAvoidsRouteCorners() {
+    let labelSize = CGSize(width: 56, height: PolicyCanvasLayout.edgeLabelHeight)
+    let positions = policyCanvasResolvedLabelPositions(
+      routes: [
+        (
+          id: "edge-a",
+          route: PolicyCanvasEdgeRoute(
+            points: [
+              CGPoint(x: 0, y: 0),
+              CGPoint(x: 220, y: 0),
+              CGPoint(x: 220, y: 120),
+            ],
+            labelPosition: CGPoint(x: 216, y: 0)
+          )
+        )
+      ],
+      nodeFrames: [],
+      labelSize: labelSize
+    )
+
+    guard let position = positions["edge-a"] else {
+      Issue.record("expected label position")
+      return
+    }
+    #expect(position.y == 0)
+    #expect(position.x <= 140)
+  }
+
   private var defaultGroups: [PolicyCanvasGroup] {
     [entryGroup, mergeGroup, terminalGroup]
   }

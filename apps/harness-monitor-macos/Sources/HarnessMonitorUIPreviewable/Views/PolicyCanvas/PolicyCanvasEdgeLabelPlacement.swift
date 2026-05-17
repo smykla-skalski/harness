@@ -119,9 +119,24 @@ private func policyCanvasLabelCandidates(
 ) -> [CGPoint] {
   let base = policyCanvasClosestRoutePoint(to: route.labelPosition, route: route)
   let segments = policyCanvasRankedLabelSegments(route: route, base: base)
-  var candidates: [CGPoint] = [base]
+  var candidates: [CGPoint] = []
   for segment in segments {
-    candidates.append(contentsOf: policyCanvasLabelCandidates(on: segment, base: base, size: labelSize))
+    candidates.append(
+      contentsOf: policyCanvasLabelCandidates(
+        on: segment,
+        base: base,
+        size: labelSize,
+        keepsCornerClearance: true
+      ))
+  }
+  for segment in segments {
+    candidates.append(
+      contentsOf: policyCanvasLabelCandidates(
+        on: segment,
+        base: base,
+        size: labelSize,
+        keepsCornerClearance: false
+      ))
   }
   var seen: Set<CGPoint> = []
   return candidates.filter { seen.insert($0).inserted }
@@ -152,14 +167,23 @@ private func policyCanvasRankedLabelSegments(
 private func policyCanvasLabelCandidates(
   on segment: PolicyCanvasLabelRouteSegment,
   base: CGPoint,
-  size: CGSize
+  size: CGSize,
+  keepsCornerClearance: Bool
 ) -> [CGPoint] {
   let labelAxisLength = segment.isHorizontal ? size.width : size.height
-  let tRange = segment.safeRange(for: labelAxisLength)
+  let tRange: ClosedRange<CGFloat>?
+  if keepsCornerClearance {
+    tRange = segment.cornerClearRange(for: labelAxisLength)
+  } else {
+    tRange = segment.safeRange(for: labelAxisLength)
+  }
+  guard let tRange else {
+    return []
+  }
   let baseT = min(max(segment.parameter(for: base), tRange.lowerBound), tRange.upperBound)
   let step = max(labelAxisLength + 12, PolicyCanvasLayout.gridSize * 2)
   let stepT = segment.length > 0 ? step / segment.length : 0
-  var values: [CGFloat] = [baseT, 0.5, tRange.lowerBound, tRange.upperBound, 0.25, 0.75]
+  var values: [CGFloat] = [0.5, baseT, tRange.lowerBound, tRange.upperBound, 0.25, 0.75]
   for index in 1..<6 {
     values.append(baseT + (policyCanvasSignedLaneOffset(index: index, spacing: stepT)))
   }
@@ -185,7 +209,7 @@ private func policyCanvasLabelFrame(center: CGPoint, size: CGSize) -> CGRect {
     y: center.y - (size.height / 2),
     width: size.width,
     height: size.height
-  ).insetBy(dx: -4, dy: -2)
+  )
 }
 
 private struct PolicyCanvasLabelRouteSegment {
@@ -216,6 +240,15 @@ private struct PolicyCanvasLabelRouteSegment {
       return 0.5...0.5
     }
     let inset = (labelAxisLength / 2) / length
+    return inset...(1 - inset)
+  }
+
+  func cornerClearRange(for labelAxisLength: CGFloat) -> ClosedRange<CGFloat>? {
+    let endpointClearance = (labelAxisLength / 2) + PolicyCanvasLayout.gridSize
+    guard length > endpointClearance * 2 else {
+      return nil
+    }
+    let inset = endpointClearance / length
     return inset...(1 - inset)
   }
 
