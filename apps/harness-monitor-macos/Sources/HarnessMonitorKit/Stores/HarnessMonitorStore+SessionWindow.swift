@@ -105,7 +105,7 @@ extension HarnessMonitorStore {
       let transcriptResponse = await transcriptTask
       let codexTranscriptResponse = await codexTranscriptTask
       guard !Task.isCancelled else { return nil }
-      let transcript = resolvedSessionWindowTranscript(
+      let transcript = await sessionWindowPresentationWorker.resolveTranscript(
         detail: detail,
         timeline: timelineWindow?.entries ?? [],
         acpTranscript: transcriptResponse,
@@ -200,7 +200,7 @@ extension HarnessMonitorStore {
       return nil
     }
 
-    let transcript = resolvedSessionWindowTranscript(
+    let transcript = await sessionWindowPresentationWorker.resolveTranscript(
       detail: detail,
       timeline: snapshot.timeline,
       acpTranscript: transcriptResponse,
@@ -264,7 +264,7 @@ extension HarnessMonitorStore {
     }
   }
 
-  private func resolvedSessionWindowTranscript(
+  nonisolated static func resolvedSessionWindowTranscript(
     detail: SessionDetail,
     timeline: [TimelineEntry],
     acpTranscript: AcpTranscriptResponse?,
@@ -281,7 +281,7 @@ extension HarnessMonitorStore {
     return (derivedSessionWindowTranscriptEntries(detail: detail, timeline: timeline), .derived)
   }
 
-  func derivedSessionWindowTranscriptEntries(
+  nonisolated static func derivedSessionWindowTranscriptEntries(
     detail: SessionDetail,
     timeline: [TimelineEntry]
   ) -> [TimelineEntry] {
@@ -292,7 +292,7 @@ extension HarnessMonitorStore {
     return normalizedSessionWindowTranscriptEntries(derivedEntries, agents: detail.agents)
   }
 
-  private func normalizedSessionWindowTranscriptEntries(
+  nonisolated static func normalizedSessionWindowTranscriptEntries(
     _ entries: [TimelineEntry],
     agents: [AgentRegistration]
   ) -> [TimelineEntry] {
@@ -336,7 +336,7 @@ extension HarnessMonitorStore {
     return mergedTimelineEntries([], with: updatedEntries)
   }
 
-  private func sessionWindowTranscriptIdentity(
+  nonisolated static func sessionWindowTranscriptIdentity(
     for entry: TimelineEntry,
     identitiesByManagedAgentID: [String: (sessionAgentID: String, displayName: String)]
   ) -> (sessionAgentID: String, displayName: String)? {
@@ -357,4 +357,32 @@ extension HarnessMonitorStore {
     }
     return nil
   }
+}
+
+actor SessionWindowPresentationWorker {
+  func resolveTranscript(
+    detail: SessionDetail,
+    timeline: [TimelineEntry],
+    acpTranscript: AcpTranscriptResponse?,
+    codexTranscript: CodexTranscriptResponse?
+  ) -> (entries: [TimelineEntry], source: HarnessMonitorSessionWindowTranscriptSource) {
+    HarnessMonitorStore.resolvedSessionWindowTranscript(
+      detail: detail,
+      timeline: timeline,
+      acpTranscript: acpTranscript,
+      codexTranscript: codexTranscript
+    )
+  }
+
+  func derivedTranscriptEntries(
+    detail: SessionDetail,
+    timeline: [TimelineEntry]
+  ) -> [TimelineEntry] {
+    HarnessMonitorStore.derivedSessionWindowTranscriptEntries(
+      detail: detail,
+      timeline: timeline
+    )
+  }
+
+  func waitForIdle() {}
 }

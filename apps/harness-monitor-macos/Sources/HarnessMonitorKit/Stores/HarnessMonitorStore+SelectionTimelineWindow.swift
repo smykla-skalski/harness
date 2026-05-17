@@ -45,7 +45,7 @@ extension HarnessMonitorStore {
         guard self.isCurrentSelectedTimelineWindowLoad(token, key: loadKey) else {
           return
         }
-        self.applySelectedTimelineWindowResponse(
+        await self.applySelectedTimelineWindowResponse(
           response.value,
           request: request,
           retainedLimit: retainedLimit,
@@ -82,9 +82,13 @@ extension HarnessMonitorStore {
     request: TimelineWindowRequest,
     retainedLimit: Int? = nil,
     selectedSession: SessionDetail
-  ) {
-    let resolved = resolvedSelectedTimelineWindow(
-      response,
+  ) async {
+    let currentTimeline = timeline
+    let currentWindow = timelineWindow
+    let resolved = await timelineWindowWorker.resolveSelectedWindow(
+      existingTimeline: currentTimeline,
+      currentWindow: currentWindow,
+      response: response,
       request: request,
       retainedLimit: retainedLimit
     )

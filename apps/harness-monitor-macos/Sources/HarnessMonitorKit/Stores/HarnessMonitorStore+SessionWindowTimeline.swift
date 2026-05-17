@@ -16,8 +16,9 @@ extension HarnessMonitorStore {
         try await client.timelineWindow(sessionID: sessionID, request: request)
       }
       recordRequestSuccess()
-      let resolved = resolvedSessionWindowTimeline(
-        snapshot: snapshot,
+      let resolved = await timelineWindowWorker.resolveSessionWindow(
+        existingTimeline: snapshot.timeline,
+        currentWindow: snapshot.timelineWindow,
         response: response.value,
         request: request,
         retainedLimit: retainedLimit
@@ -26,7 +27,10 @@ extension HarnessMonitorStore {
         if let detail = snapshot.detail,
           snapshot.transcriptSource == .derived
         {
-          derivedSessionWindowTranscriptEntries(detail: detail, timeline: resolved.timeline)
+          await sessionWindowPresentationWorker.derivedTranscriptEntries(
+            detail: detail,
+            timeline: resolved.timeline
+          )
         } else {
           snapshot.transcript
         }
@@ -63,28 +67,5 @@ extension HarnessMonitorStore {
       )
       return nil
     }
-  }
-
-  private func resolvedSessionWindowTimeline(
-    snapshot: HarnessMonitorSessionWindowSnapshot,
-    response: TimelineWindowResponse,
-    request: TimelineWindowRequest,
-    retainedLimit: Int?
-  ) -> (timeline: [TimelineEntry], timelineWindow: TimelineWindowResponse?) {
-    if let rollingResolution = TimelineRollingWindowResolver.resolve(
-      existingTimeline: snapshot.timeline,
-      currentWindow: snapshot.timelineWindow,
-      response: response,
-      request: request,
-      retainedLimit: retainedLimit
-    ) {
-      return (rollingResolution.timeline, rollingResolution.timelineWindow)
-    }
-
-    let resolvedTimeline = response.entries ?? snapshot.timeline
-    let resolvedTimelineWindow =
-      normalizedTimelineWindow(response.metadataOnly, loadedTimeline: resolvedTimeline)
-      ?? response.metadataOnly
-    return (resolvedTimeline, resolvedTimelineWindow)
   }
 }
