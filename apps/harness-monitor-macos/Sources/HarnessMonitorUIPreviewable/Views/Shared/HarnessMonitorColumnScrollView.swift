@@ -216,7 +216,6 @@ public struct HarnessMonitorColumnScrollView<
     .scrollClipDisabled(underlay != nil)
     .contentMargins(.bottom, bottomScrollContentMargin, for: .scrollContent)
     .modifier(TopScrollEdgeEffectModifier(effect: topScrollEdgeEffect))
-    .modifier(TopScrollUnderlapModifier(effect: topScrollEdgeEffect))
     .modifier(ExternalScrollPositionModifier(binding: externalScrollPosition))
     .modifier(LiveScrollGeometryProbeModifier(active: externalScrollPosition != nil))
     .harnessPrimaryContentScrollSurface(
@@ -262,20 +261,6 @@ private struct TopScrollEdgeEffectModifier: ViewModifier {
       content.scrollEdgeEffectStyle(.soft, for: .top)
     case .hard:
       content.scrollEdgeEffectStyle(.hard, for: .top)
-    }
-  }
-}
-
-private struct TopScrollUnderlapModifier: ViewModifier {
-  let effect: HarnessMonitorColumnTopScrollEdgeEffect
-
-  @ViewBuilder
-  func body(content: Content) -> some View {
-    switch effect {
-    case .none:
-      content
-    case .soft, .hard:
-      content.ignoresSafeArea(.container, edges: .top)
     }
   }
 }
