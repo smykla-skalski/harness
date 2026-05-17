@@ -56,7 +56,9 @@ struct TaskBoardOperationsPanelInventoryCard: View {
         ) {
           actionButtons
         }
+        .frame(maxWidth: .infinity, alignment: .trailing)
       }
+      .frame(maxWidth: .infinity, alignment: .trailing)
     }
   }
 

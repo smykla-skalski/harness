@@ -44,7 +44,9 @@ extension TaskBoardOperationsHost {
         ) {
           content()
         }
+        .frame(maxWidth: .infinity, alignment: .trailing)
       }
+      .frame(maxWidth: .infinity, alignment: .trailing)
     }
   }
 
@@ -103,7 +105,7 @@ extension TaskBoardOperationsHost {
     accessibilityIdentifier: String
   ) -> some View {
     TaskBoardOperationsFormRow(title) {
-      TextField(prompt, text: text)
+      TextField("", text: text, prompt: Text(prompt))
         .harnessNativeTextField()
         .multilineTextAlignment(.trailing)
         .accessibilityLabel(title)
@@ -154,12 +156,11 @@ extension TaskBoardOperationsHost {
   }
 
   func operationSummaryRow(_ operation: TaskBoardExternalSyncOperation) -> some View {
-    keyedSummaryRow(
-      title:
-        "\(operation.provider.title) \(operation.action.rawValue.capitalized) · "
-        + "\(operation.boardItemId ?? operation.externalId ?? "Unlinked")",
-      subtitle:
-        operation.applied ? "Applied" : (operation.dryRun ? "Preview only" : "Pending apply")
+    let status = operation.applied ? "Applied" : (operation.dryRun ? "Preview only" : "Pending")
+    let item = operation.boardItemId ?? operation.externalId ?? "Unlinked"
+    return keyedSummaryRow(
+      title: "\(operation.provider.title) \(operation.action.rawValue.capitalized)",
+      subtitle: "\(status) · \(item)"
     )
   }
 
@@ -183,6 +184,8 @@ extension TaskBoardOperationsHost {
         .font(captionFont)
         .foregroundStyle(HarnessMonitorTheme.secondaryInk)
         .lineLimit(1)
+        .truncationMode(.middle)
+        .frame(maxWidth: .infinity, alignment: .trailing)
     }
     .accessibilityElement(children: .combine)
   }
@@ -267,17 +270,17 @@ struct TaskBoardOperationsFormSection<Content: View>: View {
       .padding(TaskBoardOperationsFormMetrics.sectionPadding)
       .background(
         RoundedRectangle(
-          cornerRadius: HarnessMonitorTheme.cornerRadiusMD,
+          cornerRadius: TaskBoardOperationsFormMetrics.sectionCornerRadius,
           style: .continuous
         )
         .fill(Color(nsColor: .underPageBackgroundColor))
       )
       .overlay {
         RoundedRectangle(
-          cornerRadius: HarnessMonitorTheme.cornerRadiusMD,
+          cornerRadius: TaskBoardOperationsFormMetrics.sectionCornerRadius,
           style: .continuous
         )
-        .strokeBorder(HarnessMonitorTheme.controlBorder.opacity(0.4), lineWidth: 0.5)
+        .strokeBorder(HarnessMonitorTheme.controlBorder.opacity(0.24), lineWidth: 0.5)
       }
     }
     .font(HarnessMonitorTextSize.scaledFont(.body, by: fontScale))
@@ -291,9 +294,11 @@ struct TaskBoardOperationsFormSection<Content: View>: View {
 
 private enum TaskBoardOperationsFormMetrics {
   static let sectionPadding: CGFloat = HarnessMonitorTheme.spacingMD
+  static let sectionCornerRadius: CGFloat = 10
   static let labelWidth: CGFloat = 112
   static let contentMaxWidth: CGFloat = 420
   static let rowMinHeight: CGFloat = 28
+  static let rowVerticalPadding: CGFloat = 6
 }
 
 struct TaskBoardOperationsFormRow<Content: View>: View {
@@ -321,6 +326,7 @@ struct TaskBoardOperationsFormRow<Content: View>: View {
         )
         .frame(maxWidth: .infinity, alignment: .trailing)
     }
+    .padding(.vertical, TaskBoardOperationsFormMetrics.rowVerticalPadding)
     .frame(
       maxWidth: .infinity,
       minHeight: TaskBoardOperationsFormMetrics.rowMinHeight,

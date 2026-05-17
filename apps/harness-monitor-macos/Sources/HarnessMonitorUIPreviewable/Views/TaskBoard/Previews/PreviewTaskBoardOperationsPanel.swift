@@ -1,10 +1,11 @@
+import Foundation
 import HarnessMonitorKit
 import SwiftUI
 
 #Preview("Operations - Loaded") {
   TaskBoardOperationsPreviewSurface(mode: .loaded)
     .padding(24)
-    .frame(width: 1_320, alignment: .topLeading)
+    .frame(width: 1_320, height: 760, alignment: .topLeading)
     .harnessPreviewSceneAppearance()
 }
 
@@ -18,7 +19,7 @@ import SwiftUI
 #Preview("Operations - Stacked") {
   TaskBoardOperationsPreviewSurface(mode: .loaded)
     .padding(24)
-    .frame(width: 540, alignment: .topLeading)
+    .frame(width: 540, height: 1_120, alignment: .topLeading)
     .harnessPreviewSceneAppearance()
 }
 
@@ -40,14 +41,11 @@ private struct TaskBoardOperationsPreviewSurface: View {
   }
 
   var body: some View {
-    ScrollView {
-      TaskBoardOperationsPanel(
-        store: store,
-        taskBoardItems: store.globalTaskBoardItems
-      )
-      .frame(maxWidth: .infinity, alignment: .topLeading)
-    }
-    .frame(maxHeight: 820, alignment: .topLeading)
+    TaskBoardOperationsPanel(
+      store: store,
+      taskBoardItems: store.globalTaskBoardItems
+    )
+    .frame(maxWidth: .infinity, alignment: .topLeading)
     .task {
       await seedSummariesIfNeeded()
     }
@@ -73,6 +71,7 @@ private struct TaskBoardOperationsPreviewSurface: View {
         dryRun: true
       )
     )
+    store.globalTaskBoardSyncSummary = TaskBoardOperationsPreviewFixtures.syncSummary
     await store.dispatchTaskBoard(
       request: TaskBoardDispatchRequest(
         dryRun: true,
@@ -83,5 +82,45 @@ private struct TaskBoardOperationsPreviewSurface: View {
     await store.auditTaskBoard()
     await store.refreshTaskBoardProjects()
     await store.refreshTaskBoardMachines()
+  }
+}
+
+private enum TaskBoardOperationsPreviewFixtures {
+  static let syncSummary: TaskBoardSyncSummary = decode(
+    TaskBoardSyncSummary.self,
+    json: """
+      {
+        "total": 1,
+        "providers": [
+          {
+            "provider": "git_hub",
+            "configured": true,
+            "linked": 1,
+            "pushable": 1,
+            "blocked": 0,
+            "tokenEnv": ["GITHUB_TOKEN"]
+          }
+        ],
+        "operations": [
+          {
+            "provider": "git_hub",
+            "action": "push",
+            "boardItemId": "preview-board-only",
+            "externalId": null,
+            "url": null,
+            "dryRun": true,
+            "applied": false
+          }
+        ]
+      }
+      """
+  )
+
+  private static func decode<T: Decodable>(_ type: T.Type, json: String) -> T {
+    do {
+      return try JSONDecoder().decode(type, from: Data(json.utf8))
+    } catch {
+      fatalError("Failed to decode task-board operations preview fixture: \(error)")
+    }
   }
 }
