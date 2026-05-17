@@ -240,20 +240,19 @@ impl DaemonDevArgs {
             log_effective_app_group = Some(self.app_group_id.clone());
         }
 
-        let daemon_root_base = if let Some(value) =
-            normalized_env_value(state::DAEMON_DATA_HOME_ENV)
-        {
-            PathBuf::from(value).join("harness").join("daemon")
-        } else {
-            let effective_app_group = normalized_env_value(state::APP_GROUP_ID_ENV)
-                .unwrap_or_else(|| self.app_group_id.clone());
-            host_home_dir()
-                .join("Library")
-                .join("Group Containers")
-                .join(effective_app_group)
-                .join("harness")
-                .join("daemon")
-        };
+        let daemon_root_base =
+            if let Some(value) = normalized_env_value(state::DAEMON_DATA_HOME_ENV) {
+                PathBuf::from(value).join("harness").join("daemon")
+            } else {
+                let effective_app_group = normalized_env_value(state::APP_GROUP_ID_ENV)
+                    .unwrap_or_else(|| self.app_group_id.clone());
+                host_home_dir()
+                    .join("Library")
+                    .join("Group Containers")
+                    .join(effective_app_group)
+                    .join("harness")
+                    .join("daemon")
+            };
         let daemon_root = daemon_root_base.join(state::DaemonOwnership::External.as_str());
 
         let codex_transport = match self.codex_ws_url.as_deref().map(str::trim) {
@@ -299,9 +298,8 @@ impl Execute for DaemonDevArgs {
         Self::ensure_not_sandboxed()?;
         let plan = self.execution_plan();
         plan.log_effective_app_group();
-        let _ownership_override = state::ScopedOwnershipOverride::set(Some(
-            state::DaemonOwnership::External,
-        ));
+        let _ownership_override =
+            state::ScopedOwnershipOverride::set(Some(state::DaemonOwnership::External));
         let migration = state::migrate_legacy_daemon_root_at(
             &plan.daemon_root_base,
             &plan.daemon_root,
@@ -331,10 +329,7 @@ fn log_dev_legacy_daemon_root_migration(report: &state::LegacyDaemonRootMigratio
                 "daemon dev: migrated legacy daemon state into external ownership subtree"
             );
         }
-        MigrationDecision::OwnershipMismatch {
-            inferred,
-            current,
-        } => {
+        MigrationDecision::OwnershipMismatch { inferred, current } => {
             tracing::info!(
                 from = %report.from.display(),
                 inferred = %inferred,

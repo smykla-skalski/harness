@@ -24,8 +24,8 @@ use crate::run::{
 };
 use crate::session::transport::SessionCommand;
 use crate::setup::{
-    AgentsSetupCommand, BootstrapArgs, CapabilitiesArgs, GatewayArgs, KumaSetupArgs, SecretsArgs,
-    PreCompactArgs, SessionStartArgs, SessionStopArgs,
+    AgentsSetupCommand, BootstrapArgs, CapabilitiesArgs, GatewayArgs, KumaSetupArgs,
+    PreCompactArgs, SecretsArgs, SessionStartArgs, SessionStopArgs,
 };
 use crate::task_board::transport::TaskBoardCommand;
 use crate::telemetry::{current_trace_id, runtime_service_from_current_process};

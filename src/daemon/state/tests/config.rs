@@ -264,12 +264,14 @@ fn drain_returns_secrets_and_persists_stripped_when_disk_has_plaintext() {
         );
         assert_eq!(drained.repository_overrides.len(), 1);
         assert_eq!(
-            drained.repository_overrides[0].profile.ssh_private_key.as_deref(),
+            drained.repository_overrides[0]
+                .profile
+                .ssh_private_key
+                .as_deref(),
             Some("repo-ssh-secret")
         );
 
-        let after = load_task_board_git_runtime_config()
-            .expect("load post-drain config");
+        let after = load_task_board_git_runtime_config().expect("load post-drain config");
         assert!(after.global.ssh_private_key.is_none());
         assert!(after.global.signing.gpg_private_key.is_none());
         assert!(

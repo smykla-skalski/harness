@@ -37,7 +37,8 @@ pub use external::{
 };
 pub use git_identity_defaults::{
     TaskBoardEnvDefaults, TaskBoardGhCliDefaults, TaskBoardGitConfigDefaults,
-    TaskBoardGitIdentityDefaults, TaskBoardSshKeyDiscovery, discover as discover_git_identity_defaults,
+    TaskBoardGitIdentityDefaults, TaskBoardSshKeyDiscovery,
+    discover as discover_git_identity_defaults,
 };
 pub use machines::{Machine, MachineRegistry};
 pub use orchestrator::{

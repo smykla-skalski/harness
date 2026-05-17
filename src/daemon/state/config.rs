@@ -142,8 +142,8 @@ pub fn persist_task_board_git_runtime_config(
 /// # Errors
 /// Returns `CliError` when the runtime config exists but cannot be parsed or
 /// the stripped version cannot be written back.
-pub fn drain_task_board_git_runtime_secrets()
--> Result<Option<TaskBoardGitRuntimeConfig>, CliError> {
+pub fn drain_task_board_git_runtime_secrets() -> Result<Option<TaskBoardGitRuntimeConfig>, CliError>
+{
     if !config_path().is_file() {
         return Ok(None);
     }
@@ -157,8 +157,7 @@ pub fn drain_task_board_git_runtime_secrets()
     }
     ensure_daemon_dirs()?;
     let mut on_disk = raw;
-    on_disk.task_board_git_runtime_config =
-        (!stripped.is_empty()).then_some(stripped);
+    on_disk.task_board_git_runtime_config = (!stripped.is_empty()).then_some(stripped);
     write_json_pretty(&config_path(), &on_disk)?;
     Ok(Some(raw_task_board))
 }
