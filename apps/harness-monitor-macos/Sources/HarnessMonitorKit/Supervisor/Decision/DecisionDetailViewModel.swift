@@ -53,6 +53,43 @@ public final class DecisionDetailViewModel {
     }
   }
 
+  public struct PreparationInput: Equatable, Sendable {
+    public let id: String
+    public let ruleID: String
+    public let sessionID: String?
+    public let agentID: String?
+    public let taskID: String?
+    public let contextJSON: String
+    public let suggestedActionsJSON: String
+
+    @MainActor
+    public init(decision: Decision) {
+      id = decision.id
+      ruleID = decision.ruleID
+      sessionID = decision.sessionID
+      agentID = decision.agentID
+      taskID = decision.taskID
+      contextJSON = decision.contextJSON
+      suggestedActionsJSON = decision.suggestedActionsJSON
+    }
+  }
+
+  public struct PreparedContent: Equatable, Sendable {
+    public let suggestedActions: [SuggestedAction]
+    public let contextSections: [ContextSection]
+    public let deeplinks: [Deeplink]
+
+    public init(
+      suggestedActions: [SuggestedAction],
+      contextSections: [ContextSection],
+      deeplinks: [Deeplink]
+    ) {
+      self.suggestedActions = suggestedActions
+      self.contextSections = contextSections
+      self.deeplinks = deeplinks
+    }
+  }
+
   public let decision: Decision
   public private(set) var suggestedActions: [SuggestedAction]
   public private(set) var contextSections: [ContextSection]
@@ -61,13 +98,24 @@ public final class DecisionDetailViewModel {
 
   @ObservationIgnored private let handler: any DecisionActionHandler
 
-  public init(decision: Decision, handler: any DecisionActionHandler) {
+  public convenience init(decision: Decision, handler: any DecisionActionHandler) {
+    self.init(
+      decision: decision,
+      handler: handler,
+      preparedContent: Self.prepareContent(input: PreparationInput(decision: decision))
+    )
+  }
+
+  public init(
+    decision: Decision,
+    handler: any DecisionActionHandler,
+    preparedContent: PreparedContent
+  ) {
     self.decision = decision
     self.handler = handler
-    let parsedActions = Self.parseActions(from: decision.suggestedActionsJSON)
-    self.suggestedActions = Self.effectiveActions(for: decision, parsedActions: parsedActions)
-    self.contextSections = Self.parseContext(from: decision.contextJSON)
-    self.deeplinks = Self.buildDeeplinks(from: decision)
+    self.suggestedActions = preparedContent.suggestedActions
+    self.contextSections = preparedContent.contextSections
+    self.deeplinks = preparedContent.deeplinks
   }
 
   public var severity: DecisionSeverity {
@@ -150,7 +198,16 @@ public final class DecisionDetailViewModel {
 
   // MARK: Parsing
 
-  private static func parseActions(from json: String) -> [SuggestedAction] {
+  nonisolated public static func prepareContent(input: PreparationInput) -> PreparedContent {
+    let parsedActions = parseActions(from: input.suggestedActionsJSON)
+    return PreparedContent(
+      suggestedActions: effectiveActions(for: input, parsedActions: parsedActions),
+      contextSections: parseContext(from: input.contextJSON),
+      deeplinks: buildDeeplinks(from: input)
+    )
+  }
+
+  nonisolated private static func parseActions(from json: String) -> [SuggestedAction] {
     guard let data = json.data(using: .utf8),
       let actions = try? JSONDecoder().decode([SuggestedAction].self, from: data)
     else {
@@ -159,11 +216,11 @@ public final class DecisionDetailViewModel {
     return actions
   }
 
-  private static func effectiveActions(
-    for decision: Decision,
+  nonisolated private static func effectiveActions(
+    for input: PreparationInput,
     parsedActions: [SuggestedAction]
   ) -> [SuggestedAction] {
-    guard decision.ruleID != AcpPermissionDecisionPayload.ruleID else {
+    guard input.ruleID != AcpPermissionDecisionPayload.ruleID else {
       return parsedActions
     }
     if parsedActions.contains(where: { $0.kind == .dismiss }) {
@@ -171,7 +228,7 @@ public final class DecisionDetailViewModel {
     }
     return parsedActions + [
       SuggestedAction(
-        id: "dismiss-\(decision.id)",
+        id: "dismiss-\(input.id)",
         title: "Dismiss",
         kind: .dismiss,
         payloadJSON: "{}"
@@ -179,7 +236,7 @@ public final class DecisionDetailViewModel {
     ]
   }
 
-  private static func parseContext(from json: String) -> [ContextSection] {
+  nonisolated private static func parseContext(from json: String) -> [ContextSection] {
     guard let data = json.data(using: .utf8) else {
       return [ContextSection(title: "Raw context", lines: [json])]
     }
@@ -194,21 +251,21 @@ public final class DecisionDetailViewModel {
     return [ContextSection(title: "Raw context", lines: [trimmed])]
   }
 
-  private static func buildDeeplinks(from decision: Decision) -> [Deeplink] {
+  nonisolated private static func buildDeeplinks(from input: PreparationInput) -> [Deeplink] {
     var links: [Deeplink] = []
-    if let sessionID = decision.sessionID {
+    if let sessionID = input.sessionID {
       links.append(Deeplink(kind: .session, id: sessionID))
     }
-    if let agentID = decision.agentID {
+    if let agentID = input.agentID {
       links.append(Deeplink(kind: .agent, id: agentID))
     }
-    if let taskID = decision.taskID {
+    if let taskID = input.taskID {
       links.append(Deeplink(kind: .task, id: taskID))
     }
     return links
   }
 
-  private static func isProminentActionCandidate(_ action: SuggestedAction) -> Bool {
+  nonisolated private static func isProminentActionCandidate(_ action: SuggestedAction) -> Bool {
     switch action.kind {
     case .dismiss, .snooze:
       false
@@ -261,6 +318,18 @@ private struct ContextBlob: Decodable {
     }
     return sections
   }
+}
+
+public actor DecisionDetailPreparationWorker {
+  public init() {}
+
+  public func prepare(
+    input: DecisionDetailViewModel.PreparationInput
+  ) -> DecisionDetailViewModel.PreparedContent {
+    DecisionDetailViewModel.prepareContent(input: input)
+  }
+
+  public func waitForIdle() async {}
 }
 
 private struct AuditPayloadScope {
