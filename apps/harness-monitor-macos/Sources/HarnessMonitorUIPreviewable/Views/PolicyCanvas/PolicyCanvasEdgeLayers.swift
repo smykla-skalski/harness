@@ -14,19 +14,29 @@ struct PolicyCanvasEdgeLayer: View {
   /// building the displayed-route map).
   let edges: [PolicyCanvasEdge]
   let routes: [String: PolicyCanvasEdgeRoute]
+  let labelPositions: [String: CGPoint]
   let accessibilityLabelsByEdgeID: [String: String]
+  @Environment(\.fontScale)
+  private var fontScale
 
   var body: some View {
     // Severity map and edge-lane assignments stay local to this layer:
     // both are layer-specific and the label layer does not need them.
     let severityMap = viewModel.edgeSeverityMap
+    let metrics = PolicyCanvasEdgeLabelMetrics(fontScale: fontScale)
     ZStack(alignment: .topLeading) {
       ForEach(edges) { edge in
         if let route = routes[edge.id] {
           let severity = severityMap[edge.id]
           let isSelected = viewModel.selection == .edge(edge.id)
+          let labelGapFrames = policyCanvasLabelGapFrames(
+            edge: edge,
+            position: labelPositions[edge.id],
+            metrics: metrics
+          )
           PolicyCanvasInteractiveEdge(
             route: route,
+            labelGapFrames: labelGapFrames,
             color: strokeColor(for: edge, severity: severity, isSelected: isSelected),
             arrowheadColor: arrowheadColor(for: edge, severity: severity, isSelected: isSelected),
             strokeWidth: severity == nil ? 2.4 : 3.0,
@@ -89,6 +99,17 @@ struct PolicyCanvasEdgeLayer: View {
     }
     return edgeColor(for: edge).opacity(isSelected ? 1.0 : 0.95)
   }
+
+  private func policyCanvasLabelGapFrames(
+    edge: PolicyCanvasEdge,
+    position: CGPoint?,
+    metrics: PolicyCanvasEdgeLabelMetrics
+  ) -> [CGRect] {
+    guard !edge.label.isEmpty, let position else {
+      return []
+    }
+    return [metrics.frame(for: edge.label, center: position)]
+  }
 }
 
 struct PolicyCanvasEdgeLabelLayer: View {
@@ -103,9 +124,9 @@ struct PolicyCanvasEdgeLabelLayer: View {
   @Environment(\.fontScale)
   private var fontScale
 
-  /// Below this zoom, capsule labels collapse to a 4pt accent-colored dot
+  /// Below this zoom, edge labels collapse to a 4pt accent-colored dot
   /// at the label anchor. React Flow's threshold is 0.6; matches the
-  /// far-zoom legibility cliff where the capsule text becomes ineligible
+  /// far-zoom legibility cliff where label text becomes ineligible
   /// to read anyway.
   private static let labelCollapseThreshold: CGFloat = 0.6
 
@@ -130,6 +151,7 @@ struct PolicyCanvasEdgeLabelLayer: View {
               // row when the user arrowed through the rotor.
               .accessibilityHidden(true)
           } else {
+            let labelSize = metrics.size(for: edge.label)
             Button {
               viewModel.select(.edge(edge.id))
             } label: {
@@ -140,19 +162,14 @@ struct PolicyCanvasEdgeLabelLayer: View {
                 .truncationMode(.middle)
                 .padding(.horizontal, metrics.horizontalPadding)
                 .frame(
-                  minWidth: metrics.minWidth,
-                  maxWidth: PolicyCanvasLayout.edgeLabelMaxWidth,
-                  minHeight: metrics.height
+                  width: labelSize.width,
+                  height: labelSize.height
                 )
-                .background(Color(red: 0.04, green: 0.05, blue: 0.08).opacity(0.96), in: Capsule())
-                .overlay {
-                  Capsule()
-                    .stroke(edgeColor(for: edge).opacity(0.72), lineWidth: 1.2)
-                }
+                .contentShape(Rectangle())
             }
             .harnessPlainButtonStyle()
             .position(labelPosition)
-            // Stroke owns the rotor entry per edge; the capsule stays
+            // Stroke owns the rotor entry per edge; the label stays
             // clickable for sighted users but the a11y tree only carries
             // it once (on the stroke). Hiding the Button from a11y
             // strips its rotor entry without losing the mouse-click path.
@@ -175,9 +192,17 @@ struct PolicyCanvasEdgeLabelLayer: View {
 
 struct PolicyCanvasEdgeShape: Shape {
   let route: PolicyCanvasEdgeRoute
+  var gapFrames: [CGRect] = []
   var cornerRadius: CGFloat = 7
 
   func path(in rect: CGRect) -> Path {
+    if !gapFrames.isEmpty {
+      return policyCanvasGappedEdgePath(
+        route: route,
+        gapFrames: gapFrames,
+        cornerRadius: cornerRadius
+      )
+    }
     var path = Path()
     let points = route.points
     guard let first = points.first else {

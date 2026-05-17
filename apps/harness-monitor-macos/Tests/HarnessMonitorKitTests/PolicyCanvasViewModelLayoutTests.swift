@@ -209,10 +209,7 @@ struct PolicyCanvasViewModelLayoutTests {
       edges: edges,
       routes: routes,
       labelPositions: labelPositions,
-      labelSize: CGSize(
-        width: PolicyCanvasLayout.edgeLabelMaxWidth,
-        height: labelMetrics.height
-      )
+      labelMetrics: labelMetrics
     )
     let nodeBounds = viewModel.canvasContentBounds
     let fittedZoom = viewModel.fittedInitialZoom(

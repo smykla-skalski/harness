@@ -186,41 +186,43 @@ struct PolicyCanvasRoutingTests {
     #expect(Int(defaultBus.rounded()) != Int(mutateBus.rounded()))
   }
 
-  @Test("display label placement separates overlapping capsules")
-  func displayLabelPlacementSeparatesOverlappingCapsules() {
+  @Test("display label placement separates labels along the route")
+  func displayLabelPlacementSeparatesLabelsAlongRoute() {
+    let labelSize = CGSize(width: 56, height: PolicyCanvasLayout.edgeLabelHeight)
     let positions = policyCanvasResolvedLabelPositions(
       routes: [
         (
           id: "edge-a",
           route: PolicyCanvasEdgeRoute(
-            points: [CGPoint(x: 0, y: 0), CGPoint(x: 220, y: 0)],
+            points: [CGPoint(x: 0, y: 0), CGPoint(x: 360, y: 0)],
             labelPosition: CGPoint(x: 110, y: 100)
           )
         ),
         (
           id: "edge-b",
           route: PolicyCanvasEdgeRoute(
-            points: [CGPoint(x: 20, y: 0), CGPoint(x: 240, y: 0)],
+            points: [CGPoint(x: 20, y: 0), CGPoint(x: 380, y: 0)],
             labelPosition: CGPoint(x: 110, y: 100)
           )
         ),
       ],
       nodeFrames: [],
-      labelSize: CGSize(
-        width: PolicyCanvasLayout.edgeLabelMaxWidth,
-        height: PolicyCanvasLayout.edgeLabelHeight
-      )
+      labelSize: labelSize
     )
 
     guard let first = positions["edge-a"], let second = positions["edge-b"] else {
       Issue.record("expected both label positions")
       return
     }
-    #expect(!edgeLabelFrame(first).intersects(edgeLabelFrame(second)))
+    #expect(first.y == 0)
+    #expect(second.y == 0)
+    #expect(
+      !edgeLabelFrame(first, size: labelSize).intersects(
+        edgeLabelFrame(second, size: labelSize)))
   }
 
-  @Test("display label placement falls back horizontally when vertical lanes are blocked")
-  func displayLabelPlacementFallsBackHorizontallyWhenVerticalLanesAreBlocked() {
+  @Test("display label placement keeps fallback on route when lanes are blocked")
+  func displayLabelPlacementKeepsFallbackOnRouteWhenLanesAreBlocked() {
     let base = CGPoint(x: 110, y: 100)
     let positions = policyCanvasResolvedLabelPositions(
       routes: [
@@ -245,38 +247,36 @@ struct PolicyCanvasRoutingTests {
       Issue.record("expected label position")
       return
     }
-    #expect(position.x != base.x)
-    #expect(position.y == base.y)
+    #expect(position.x == 110)
+    #expect(position.y == 0)
   }
 
   @Test("display label placement avoids other route segments")
   func displayLabelPlacementAvoidsOtherRouteSegments() {
-    let base = CGPoint(x: 110, y: 100)
+    let base = CGPoint(x: 180, y: 100)
+    let labelSize = CGSize(width: 56, height: PolicyCanvasLayout.edgeLabelHeight)
     let positions = policyCanvasResolvedLabelPositions(
       routes: [
         (
           id: "edge-a",
           route: PolicyCanvasEdgeRoute(
-            points: [CGPoint(x: 0, y: 100), CGPoint(x: 220, y: 100)],
+            points: [CGPoint(x: 0, y: 100), CGPoint(x: 360, y: 100)],
             labelPosition: base
           )
         ),
         (
           id: "edge-b",
           route: PolicyCanvasEdgeRoute(
-            points: [CGPoint(x: 110, y: -60), CGPoint(x: 110, y: 260)],
+            points: [CGPoint(x: 180, y: -60), CGPoint(x: 180, y: 260)],
             labelPosition: CGPoint(x: 110, y: 180)
           )
         ),
       ],
       nodeFrames: [],
       routeFrames: [
-        "edge-b": [CGRect(x: 100, y: -60, width: 20, height: 320)]
+        "edge-b": [CGRect(x: 170, y: -60, width: 20, height: 320)]
       ],
-      labelSize: CGSize(
-        width: PolicyCanvasLayout.edgeLabelMaxWidth,
-        height: PolicyCanvasLayout.edgeLabelHeight
-      )
+      labelSize: labelSize
     )
 
     guard let position = positions["edge-a"] else {
@@ -284,6 +284,7 @@ struct PolicyCanvasRoutingTests {
       return
     }
     #expect(position.x != base.x)
+    #expect(position.y == base.y)
   }
 
   private var defaultGroups: [PolicyCanvasGroup] {
@@ -323,12 +324,18 @@ struct PolicyCanvasRoutingTests {
     }
   }
 
-  private func edgeLabelFrame(_ position: CGPoint) -> CGRect {
-    CGRect(
-      x: position.x - PolicyCanvasLayout.edgeLabelMaxWidth / 2,
-      y: position.y - PolicyCanvasLayout.edgeLabelHeight / 2,
+  private func edgeLabelFrame(
+    _ position: CGPoint,
+    size: CGSize = CGSize(
       width: PolicyCanvasLayout.edgeLabelMaxWidth,
       height: PolicyCanvasLayout.edgeLabelHeight
+    )
+  ) -> CGRect {
+    CGRect(
+      x: position.x - size.width / 2,
+      y: position.y - size.height / 2,
+      width: size.width,
+      height: size.height
     )
   }
 

@@ -242,141 +242,26 @@ func policyCanvasResolvedLabelPositions(
   fontScale: CGFloat
 ) -> [String: CGPoint] {
   let metrics = PolicyCanvasEdgeLabelMetrics(fontScale: fontScale)
-  let labelledRoutes: [(id: String, route: PolicyCanvasEdgeRoute)] = edges.compactMap { edge in
+  let labelledRoutes: [PolicyCanvasLabelPlacementRoute] = edges.compactMap { edge in
     guard !edge.label.isEmpty, let route = routes[edge.id] else {
       return nil
     }
-    return (id: edge.id, route: route)
+    return PolicyCanvasLabelPlacementRoute(
+      id: edge.id,
+      label: edge.label,
+      route: route,
+      size: metrics.size(for: edge.label)
+    )
   }
   return policyCanvasResolvedLabelPositions(
     routes: labelledRoutes,
     nodeFrames: viewModel.nodes.map {
       CGRect(origin: $0.position, size: PolicyCanvasLayout.nodeSize)
     } + policyCanvasGroupTitleFrames(viewModel.groups),
-    routeFrames: policyCanvasRouteFrames(labelledRoutes),
-    labelSize: CGSize(width: PolicyCanvasLayout.edgeLabelMaxWidth, height: metrics.height)
+    routeFrames: policyCanvasRouteFrames(labelledRoutes)
   )
 }
 
 func policyCanvasResolvedPortSide(for endpoint: PolicyCanvasPortEndpoint) -> PolicyCanvasPortSide {
   endpoint.side ?? (endpoint.kind == .input ? .leading : .trailing)
-}
-
-func policyCanvasResolvedLabelPositions(
-  routes: [(id: String, route: PolicyCanvasEdgeRoute)],
-  nodeFrames: [CGRect],
-  labelSize: CGSize
-) -> [String: CGPoint] {
-  policyCanvasResolvedLabelPositions(
-    routes: routes,
-    nodeFrames: nodeFrames,
-    routeFrames: [:],
-    labelSize: labelSize
-  )
-}
-
-func policyCanvasResolvedLabelPositions(
-  routes: [(id: String, route: PolicyCanvasEdgeRoute)],
-  nodeFrames: [CGRect],
-  routeFrames: [String: [CGRect]],
-  labelSize: CGSize
-) -> [String: CGPoint] {
-  var occupiedFrames: [CGRect] = []
-  var positions: [String: CGPoint] = [:]
-  let sortedRoutes = routes.sorted { left, right in
-    if left.route.labelPosition.y != right.route.labelPosition.y {
-      return left.route.labelPosition.y < right.route.labelPosition.y
-    }
-    if left.route.labelPosition.x != right.route.labelPosition.x {
-      return left.route.labelPosition.x < right.route.labelPosition.x
-    }
-    return left.id < right.id
-  }
-  for entry in sortedRoutes {
-    let base = entry.route.labelPosition
-    let blockingRouteFrames = routeFrames.reduce(into: [CGRect]()) { result, element in
-      guard element.key != entry.id else {
-        return
-      }
-      result.append(contentsOf: element.value)
-    }
-    let position = policyCanvasResolvedLabelPosition(
-      base: base,
-      occupiedFrames: occupiedFrames,
-      nodeFrames: nodeFrames,
-      routeFrames: blockingRouteFrames,
-      labelSize: labelSize
-    )
-    positions[entry.id] = position
-    occupiedFrames.append(policyCanvasLabelFrame(center: position, size: labelSize))
-  }
-  return positions
-}
-
-private func policyCanvasResolvedLabelPosition(
-  base: CGPoint,
-  occupiedFrames: [CGRect],
-  nodeFrames: [CGRect],
-  routeFrames: [CGRect],
-  labelSize: CGSize
-) -> CGPoint {
-  for candidate in policyCanvasLabelCandidates(base: base, labelSize: labelSize) {
-    let frame = policyCanvasLabelFrame(center: candidate, size: labelSize)
-    if !occupiedFrames.contains(where: { $0.intersects(frame) })
-      && !nodeFrames.contains(where: { $0.intersects(frame) })
-      && !routeFrames.contains(where: { $0.intersects(frame) })
-    {
-      return candidate
-    }
-  }
-  return base
-}
-
-private func policyCanvasLabelCandidates(
-  base: CGPoint,
-  labelSize: CGSize
-) -> [CGPoint] {
-  let verticalStep = labelSize.height + 6
-  let horizontalStep = max(labelSize.width + 24, 160)
-  var candidates: [CGPoint] = [base]
-
-  for index in 1..<6 {
-    candidates.append(
-      CGPoint(
-        x: base.x,
-        y: base.y + policyCanvasSignedLaneOffset(index: index, spacing: verticalStep)
-      )
-    )
-  }
-
-  for index in 1..<5 {
-    candidates.append(
-      CGPoint(
-        x: base.x + policyCanvasSignedLaneOffset(index: index, spacing: horizontalStep),
-        y: base.y
-      )
-    )
-  }
-
-  for verticalIndex in 1..<4 {
-    let yOffset = policyCanvasSignedLaneOffset(index: verticalIndex, spacing: verticalStep)
-    for horizontalIndex in 1..<4 {
-      let xOffset = policyCanvasSignedLaneOffset(index: horizontalIndex, spacing: horizontalStep)
-      candidates.append(CGPoint(x: base.x + xOffset, y: base.y + yOffset))
-    }
-  }
-
-  var seen: Set<CGPoint> = []
-  return candidates.filter { candidate in
-    seen.insert(candidate).inserted
-  }
-}
-
-private func policyCanvasLabelFrame(center: CGPoint, size: CGSize) -> CGRect {
-  CGRect(
-    x: center.x - (size.width / 2),
-    y: center.y - (size.height / 2),
-    width: size.width,
-    height: size.height
-  )
 }

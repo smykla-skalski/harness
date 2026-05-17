@@ -142,20 +142,11 @@ struct PolicyCanvasPreparedRouteInput: Equatable, Sendable {
       }
     }
     let labelMetrics = PolicyCanvasEdgeLabelMetrics(fontScale: fontScale)
-    let labelSize = CGSize(
-      width: PolicyCanvasLayout.edgeLabelMaxWidth,
-      height: labelMetrics.height
-    )
     for edge in edges {
       guard !edge.label.isEmpty, let position = labelPositions[edge.id] else {
         continue
       }
-      let frame = CGRect(
-        x: position.x - (labelSize.width / 2),
-        y: position.y - (labelSize.height / 2),
-        width: labelSize.width,
-        height: labelSize.height
-      )
+      let frame = labelMetrics.frame(for: edge.label, center: position)
       bounds = bounds.isNull ? frame : bounds.union(frame)
     }
     guard !bounds.isNull else {
@@ -168,17 +159,21 @@ struct PolicyCanvasPreparedRouteInput: Equatable, Sendable {
     routes: [String: PolicyCanvasEdgeRoute]
   ) -> [String: CGPoint] {
     let metrics = PolicyCanvasEdgeLabelMetrics(fontScale: fontScale)
-    let labelledRoutes: [(id: String, route: PolicyCanvasEdgeRoute)] = edges.compactMap { edge in
+    let labelledRoutes: [PolicyCanvasLabelPlacementRoute] = edges.compactMap { edge in
       guard !edge.label.isEmpty, let route = routes[edge.id] else {
         return nil
       }
-      return (id: edge.id, route: route)
+      return PolicyCanvasLabelPlacementRoute(
+        id: edge.id,
+        label: edge.label,
+        route: route,
+        size: metrics.size(for: edge.label)
+      )
     }
     return policyCanvasResolvedLabelPositions(
       routes: labelledRoutes,
       nodeFrames: nodes.map(\.frame) + policyCanvasGroupTitleFrames(groups),
-      routeFrames: policyCanvasRouteFrames(labelledRoutes),
-      labelSize: CGSize(width: PolicyCanvasLayout.edgeLabelMaxWidth, height: metrics.height)
+      routeFrames: policyCanvasRouteFrames(labelledRoutes)
     )
   }
 
