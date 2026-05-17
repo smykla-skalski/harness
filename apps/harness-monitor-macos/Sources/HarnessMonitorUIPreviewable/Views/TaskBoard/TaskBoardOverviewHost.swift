@@ -23,6 +23,7 @@ struct TaskBoardOverviewHost: View {
       store: store,
       orchestratorStatus: orchestratorStatus,
       evaluationSummary: evaluationSummary,
+      taskBoardSessionID: scope.sessionID,
       decisions: decisions,
       isActionInFlight: isActionInFlight,
       onOpenItem: openInboxItem,
@@ -44,7 +45,6 @@ struct TaskBoardOverviewHost: View {
       onRunTaskBoardOrchestratorOnce: runTaskBoardOrchestratorOnce
     )
   }
-
   private func openTaskBoardItem(_ item: TaskBoardItem) {
     switch scope {
     case .dashboard:
@@ -205,6 +205,17 @@ struct TaskBoardOverviewHost: View {
   private func runTaskBoardOrchestratorOnce(_ request: TaskBoardOrchestratorRunOnceRequest) {
     Task { @MainActor in
       await store.runTaskBoardOrchestratorOnce(request: request)
+    }
+  }
+}
+
+private extension TaskBoardOverviewHost.Scope {
+  var sessionID: String? {
+    switch self {
+    case .dashboard:
+      nil
+    case .session(let sessionID):
+      sessionID
     }
   }
 }

@@ -7,6 +7,7 @@ public struct TaskBoardOverviewView: View {
   let store: HarnessMonitorStore?
   let orchestratorStatus: TaskBoardOrchestratorStatus?
   let evaluationSummary: TaskBoardEvaluationSummary?
+  let taskBoardSessionID: String?
   let decisions: [Decision]
   private let decisionsByID: [String: Decision]
   private let decisionItems: [DecisionPresentationItem]
@@ -58,7 +59,8 @@ public struct TaskBoardOverviewView: View {
     TaskBoardOverviewPresentationInput(
       snapshot: snapshot,
       taskBoardItems: taskBoardItems,
-      decisionItems: decisionItems
+      decisionItems: decisionItems,
+      scopeSessionID: taskBoardSessionID
     )
   }
 
@@ -68,6 +70,7 @@ public struct TaskBoardOverviewView: View {
     store: HarnessMonitorStore? = nil,
     orchestratorStatus: TaskBoardOrchestratorStatus? = nil,
     evaluationSummary: TaskBoardEvaluationSummary? = nil,
+    taskBoardSessionID: String? = nil,
     decisions: [Decision] = [],
     isActionInFlight: Bool = false,
     onOpenItem: @escaping (TaskBoardInboxItem) -> Void = { _ in },
@@ -93,6 +96,7 @@ public struct TaskBoardOverviewView: View {
     self.store = store
     self.orchestratorStatus = orchestratorStatus
     self.evaluationSummary = evaluationSummary
+    self.taskBoardSessionID = taskBoardSessionID
     self.decisions = decisions
     decisionsByID = Dictionary(uniqueKeysWithValues: decisions.map { ($0.id, $0) })
     decisionItems = decisions.map(DecisionPresentationItem.init)
@@ -137,7 +141,7 @@ public struct TaskBoardOverviewView: View {
       taskBoardDetailRow { headerTitle }
       if let store {
         taskBoardDetailRow {
-          TaskBoardOperationsPanel(store: store, taskBoardItems: taskBoardItems)
+          TaskBoardOperationsPanel(store: store, taskBoardItems: cachedPresentation.taskBoardItems)
         }
       }
       taskBoardDetailRow { boardSection }
