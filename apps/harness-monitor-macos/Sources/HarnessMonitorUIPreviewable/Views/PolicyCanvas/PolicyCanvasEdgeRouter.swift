@@ -224,6 +224,7 @@ func policyCanvasPortEscapeCandidate(
   case .leading:
     let exit = CGPoint(x: point.x - distance, y: point.y)
     return PolicyCanvasEscapeCandidate(
+      side: side,
       actual: point,
       exit: exit,
       routed: CGPoint(x: exit.x, y: exit.y + offset)
@@ -231,6 +232,7 @@ func policyCanvasPortEscapeCandidate(
   case .trailing:
     let exit = CGPoint(x: point.x + distance, y: point.y)
     return PolicyCanvasEscapeCandidate(
+      side: side,
       actual: point,
       exit: exit,
       routed: CGPoint(x: exit.x, y: exit.y + offset)
@@ -238,6 +240,7 @@ func policyCanvasPortEscapeCandidate(
   case .top:
     let exit = CGPoint(x: point.x, y: point.y - distance)
     return PolicyCanvasEscapeCandidate(
+      side: side,
       actual: point,
       exit: exit,
       routed: CGPoint(x: exit.x + offset, y: exit.y)
@@ -245,6 +248,7 @@ func policyCanvasPortEscapeCandidate(
   case .bottom:
     let exit = CGPoint(x: point.x, y: point.y + distance)
     return PolicyCanvasEscapeCandidate(
+      side: side,
       actual: point,
       exit: exit,
       routed: CGPoint(x: exit.x + offset, y: exit.y)
@@ -325,23 +329,45 @@ func policyCanvasDisplayedRoute(
     targetActual: request.context.targetActual ?? targetCandidates.first?.point,
     lineSpacing: request.context.lineSpacing
   )
-  let baseRoute = request.router.route(
-    sourceCandidates: routedSources.map(\.routed),
-    targetCandidates: routedTargets.map(\.routed),
-    context: routingContext
-  )
-  let matchedSource =
-    routedSources.first(where: { $0.routed == baseRoute.points.first }) ?? routedSources[0]
-  let matchedTarget =
-    routedTargets.first(where: { $0.routed == baseRoute.points.last }) ?? routedTargets[0]
-  return policyCanvasBridgedRoute(
-    baseRoute: baseRoute,
-    source: matchedSource,
-    target: matchedTarget
-  )
+  var bestRoute: PolicyCanvasEdgeRoute?
+  var bestScore: CGFloat = .infinity
+  for source in routedSources {
+    for target in routedTargets {
+      let baseRoute = request.router.route(
+        source: source.routed,
+        target: target.routed,
+        context: routingContext
+      )
+      let displayedRoute = policyCanvasBridgedRoute(
+        baseRoute: baseRoute,
+        source: source,
+        target: target
+      )
+      let score = policyCanvasDisplayedRouteScore(
+        displayedRoute,
+        source: source,
+        target: target
+      )
+      if score < bestScore {
+        bestScore = score
+        bestRoute = displayedRoute
+      }
+    }
+  }
+  return bestRoute
+    ?? policyCanvasBridgedRoute(
+      baseRoute: request.router.route(
+        source: routedSources[0].routed,
+        target: routedTargets[0].routed,
+        context: routingContext
+      ),
+      source: routedSources[0],
+      target: routedTargets[0]
+    )
 }
 
 struct PolicyCanvasEscapeCandidate {
+  let side: PolicyCanvasPortSide
   let actual: CGPoint
   let exit: CGPoint
   let routed: CGPoint
@@ -372,4 +398,119 @@ private func policyCanvasAppendUniquePoint(_ point: CGPoint, to points: inout [C
     return
   }
   points.append(point)
+}
+
+private func policyCanvasDisplayedRouteScore(
+  _ route: PolicyCanvasEdgeRoute,
+  source: PolicyCanvasEscapeCandidate,
+  target: PolicyCanvasEscapeCandidate
+) -> CGFloat {
+  guard route.points.count >= 2 else {
+    return 0
+  }
+  var length: CGFloat = 0
+  var bends = 0
+  var previousAxis: PolicyCanvasSegmentAxis?
+  for index in 0..<(route.points.count - 1) {
+    let start = route.points[index]
+    let end = route.points[index + 1]
+    let dx = end.x - start.x
+    let dy = end.y - start.y
+    length += abs(dx) + abs(dy)
+    let axis: PolicyCanvasSegmentAxis?
+    if abs(dx) > 0.001 {
+      axis = .horizontal
+    } else if abs(dy) > 0.001 {
+      axis = .vertical
+    } else {
+      axis = nil
+    }
+    if let axis {
+      if let previousAxis, previousAxis != axis {
+        bends += 1
+      }
+      previousAxis = axis
+    }
+  }
+  return
+    length
+    + (CGFloat(bends) * PolicyCanvasVisibilityRouter.bendPenalty)
+    + policyCanvasPortAlignmentPenalty(route: route, endpoint: source)
+    + policyCanvasPortAlignmentPenalty(route: route, endpoint: target)
+}
+
+private enum PolicyCanvasSegmentAxis {
+  case horizontal
+  case vertical
+}
+
+private func policyCanvasPortAlignmentPenalty(
+  route: PolicyCanvasEdgeRoute,
+  endpoint: PolicyCanvasEscapeCandidate
+) -> CGFloat {
+  guard
+    let dominantBus = policyCanvasDominantInternalBus(route),
+    let preferredSide = policyCanvasPreferredPortSide(
+      for: endpoint.actual,
+      dominantBus: dominantBus
+    ),
+    preferredSide != endpoint.side
+  else {
+    return 0
+  }
+  return PolicyCanvasVisibilityRouter.bendPenalty * 0.75
+}
+
+private func policyCanvasPreferredPortSide(
+  for point: CGPoint,
+  dominantBus: (axis: PolicyCanvasSegmentAxis, coordinate: CGFloat)
+) -> PolicyCanvasPortSide? {
+  switch dominantBus.axis {
+  case .horizontal:
+    if dominantBus.coordinate < point.y - 0.001 {
+      return .top
+    }
+    if dominantBus.coordinate > point.y + 0.001 {
+      return .bottom
+    }
+  case .vertical:
+    if dominantBus.coordinate < point.x - 0.001 {
+      return .leading
+    }
+    if dominantBus.coordinate > point.x + 0.001 {
+      return .trailing
+    }
+  }
+  return nil
+}
+
+private func policyCanvasDominantInternalBus(
+  _ route: PolicyCanvasEdgeRoute
+) -> (axis: PolicyCanvasSegmentAxis, coordinate: CGFloat)? {
+  guard route.points.count >= 4 else {
+    return nil
+  }
+  var best: (length: CGFloat, axis: PolicyCanvasSegmentAxis, coordinate: CGFloat)?
+  for index in 1..<(route.points.count - 2) {
+    let start = route.points[index]
+    let end = route.points[index + 1]
+    let length: CGFloat
+    let axis: PolicyCanvasSegmentAxis
+    let coordinate: CGFloat
+    if abs(start.y - end.y) < 0.001 {
+      length = abs(end.x - start.x)
+      axis = .horizontal
+      coordinate = start.y
+    } else if abs(start.x - end.x) < 0.001 {
+      length = abs(end.y - start.y)
+      axis = .vertical
+      coordinate = start.x
+    } else {
+      continue
+    }
+    if best.map({ length > $0.length }) ?? true {
+      best = (length, axis, coordinate)
+    }
+  }
+  return best.map { ($0.axis, $0.coordinate) }
 }

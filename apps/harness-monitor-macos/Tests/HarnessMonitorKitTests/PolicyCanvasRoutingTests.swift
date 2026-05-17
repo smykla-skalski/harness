@@ -151,6 +151,41 @@ struct PolicyCanvasRoutingTests {
     }
   }
 
+  @Test("default graph action routes use separate perimeter buses")
+  func defaultGraphActionRoutesUseSeparatePerimeterBuses() {
+    let document = PreviewFixtures.policyCanvasPipelineDocument()
+    let viewModel = PolicyCanvasViewModel.sample()
+
+    viewModel.load(document: document, simulation: nil, audit: nil)
+
+    let edges = viewModel.edges
+    let portAnchors = viewModel.portAnchors(for: edges)
+    let routes = policyCanvasDisplayedRoutes(
+      viewModel: viewModel,
+      edges: edges,
+      portAnchors: portAnchors,
+      router: PolicyCanvasVisibilityRouter()
+    )
+
+    guard
+      let mergeFrame = viewModel.group("merge")?.frame,
+      let defaultRoute = routes["edge:default"],
+      let mutateRoute = routes["edge:mutate"],
+      let unsafeRoute = routes["edge:unsafe"],
+      let defaultBus = dominantInternalBusCoordinate(defaultRoute),
+      let mutateBus = dominantInternalBusCoordinate(mutateRoute),
+      let unsafeBus = dominantInternalBusCoordinate(unsafeRoute)
+    else {
+      Issue.record("Expected merge frame and action routes")
+      return
+    }
+
+    #expect(defaultBus < mergeFrame.minY)
+    #expect(mutateBus < mergeFrame.minY)
+    #expect(unsafeBus > mergeFrame.maxY)
+    #expect(Int(defaultBus.rounded()) != Int(mutateBus.rounded()))
+  }
+
   @Test("display label placement separates overlapping capsules")
   func displayLabelPlacementSeparatesOverlappingCapsules() {
     let positions = policyCanvasResolvedLabelPositions(
@@ -265,5 +300,31 @@ struct PolicyCanvasRoutingTests {
       return .null
     }
     return CGRect(origin: node.position, size: PolicyCanvasLayout.nodeSize)
+  }
+
+  private func dominantInternalBusCoordinate(_ route: PolicyCanvasEdgeRoute) -> CGFloat? {
+    guard route.points.count >= 4 else {
+      return nil
+    }
+    var best: (length: CGFloat, coordinate: CGFloat)?
+    for index in 1..<(route.points.count - 2) {
+      let start = route.points[index]
+      let end = route.points[index + 1]
+      let length: CGFloat
+      let coordinate: CGFloat
+      if abs(start.y - end.y) < 0.001 {
+        length = abs(end.x - start.x)
+        coordinate = start.y
+      } else if abs(start.x - end.x) < 0.001 {
+        length = abs(end.y - start.y)
+        coordinate = start.x
+      } else {
+        continue
+      }
+      if best.map({ length > $0.length }) ?? true {
+        best = (length, coordinate)
+      }
+    }
+    return best?.coordinate
   }
 }

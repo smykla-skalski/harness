@@ -68,6 +68,96 @@ struct PolicyCanvasViewModelLayoutTests {
     )
   }
 
+  @Test(
+    "loaded default graph keeps cross-group routes flexible while same-group vertical routes stay pinned"
+  )
+  func loadedDefaultGraphKeepsCrossGroupRoutesFlexibleWhileSameGroupVerticalRoutesStayPinned() {
+    let viewModel = PolicyCanvasViewModel.sample()
+    viewModel.load(
+      document: PreviewFixtures.policyCanvasPipelineDocument(),
+      simulation: nil,
+      audit: nil
+    )
+
+    let edgesByID = Dictionary(uniqueKeysWithValues: viewModel.edges.map { ($0.id, $0) })
+
+    #expect(edgesByID["edge:evidence-pass"]?.pinnedPortSide == true)
+    #expect(edgesByID["edge:default"]?.pinnedPortSide == false)
+    #expect(edgesByID["edge:mutate"]?.pinnedPortSide == false)
+    #expect(edgesByID["edge:unsafe"]?.pinnedPortSide == false)
+    #expect(edgesByID["edge:evidence-consensus"]?.pinnedPortSide == false)
+    #expect(edgesByID["edge:evidence-fail:checks-not-green"]?.pinnedPortSide == false)
+  }
+
+  @Test("loaded default graph assigns distinct route lanes within terminal bundles")
+  func loadedDefaultGraphAssignsDistinctRouteLanesWithinTerminalBundles() {
+    let viewModel = PolicyCanvasViewModel.sample()
+    viewModel.load(
+      document: PreviewFixtures.policyCanvasPipelineDocument(),
+      simulation: nil,
+      audit: nil
+    )
+
+    let lanes = viewModel.edgeRouteLanes
+    let actionTerminal = ["edge:default", "edge:mutate", "edge:unsafe"].compactMap { lanes[$0] }
+    let riskTerminal = ["edge:risk-low", "edge:risk-high", "edge:risk-missing"].compactMap {
+      lanes[$0]
+    }
+    let evidenceTerminal = [
+      "edge:evidence-consensus",
+      "edge:evidence-missing",
+      "edge:evidence-fail:checks-not-green",
+      "edge:evidence-fail:branch-protection-blocked",
+      "edge:evidence-fail:reviewer-not-approved",
+      "edge:evidence-fail:unresolved-requested-changes",
+    ]
+    .compactMap { lanes[$0] }
+
+    #expect(actionTerminal.sorted() == [0, 1, 2])
+    #expect(riskTerminal.sorted() == [0, 1, 2])
+    #expect(evidenceTerminal.sorted() == [0, 1, 2, 3, 4, 5])
+  }
+
+  @Test("loaded default graph assigns distinct fanout lanes across each node side")
+  func loadedDefaultGraphAssignsDistinctFanoutLanesAcrossEachNodeSide() {
+    let viewModel = PolicyCanvasViewModel.sample()
+    viewModel.load(
+      document: PreviewFixtures.policyCanvasPipelineDocument(),
+      simulation: nil,
+      audit: nil
+    )
+
+    let sourceLanes = viewModel.edgeSourceFanoutLanes
+    let targetLanes = viewModel.edgeTargetFanoutLanes
+    let actionSide = ["edge:default", "edge:mutate", "edge:merge", "edge:unsafe"].compactMap {
+      sourceLanes[$0]
+    }
+    let evidenceSide = [
+      "edge:evidence-consensus",
+      "edge:evidence-missing",
+      "edge:evidence-fail:checks-not-green",
+      "edge:evidence-fail:branch-protection-blocked",
+      "edge:evidence-fail:reviewer-not-approved",
+      "edge:evidence-fail:unresolved-requested-changes",
+    ]
+    .compactMap { sourceLanes[$0] }
+    let riskSide = ["edge:risk-low", "edge:risk-high", "edge:risk-missing"].compactMap {
+      sourceLanes[$0]
+    }
+    let mergeDenySide = [
+      "edge:evidence-fail:checks-not-green",
+      "edge:evidence-fail:branch-protection-blocked",
+      "edge:evidence-fail:reviewer-not-approved",
+      "edge:evidence-fail:unresolved-requested-changes",
+    ]
+    .compactMap { targetLanes[$0] }
+
+    #expect(actionSide.sorted() == [0, 1, 2, 3])
+    #expect(evidenceSide.sorted() == [0, 1, 2, 3, 4, 5])
+    #expect(riskSide.sorted() == [0, 1, 2])
+    #expect(mergeDenySide.sorted() == [0, 1, 2, 3])
+  }
+
   @Test("route-aware visible bounds drive tighter initial fit")
   func routeAwareVisibleBoundsDriveTighterInitialFit() {
     let viewModel = PolicyCanvasViewModel.sample()
