@@ -52,6 +52,7 @@ public final class HarnessMonitorStore {
   public var supervisorSelectedDecisionID: String?
   public var supervisorOpenDecisions: [Decision] = []
   public var supervisorOpenDecisionsByID: [String: Decision] = [:]
+  public var supervisorOpenDecisionsBySession: [String: [Decision]] = [:]
   public var supervisorOpenDecisionPresentationItems: [DecisionPresentationSnapshot] = []
   public var supervisorOpenDecisionPresentationItemsBySession:
     [String: [DecisionPresentationSnapshot]] = [:]

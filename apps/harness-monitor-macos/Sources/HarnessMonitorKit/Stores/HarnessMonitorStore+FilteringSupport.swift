@@ -443,6 +443,23 @@ extension HarnessMonitorStore.SessionIndexSlice {
   nonisolated static func normalizedQueryTokens(for rawValue: String) -> [String] {
     rawValue.sessionSearchTokens
   }
+
+  nonisolated static func sameArrayStorage<Element>(
+    _ lhs: [Element],
+    _ rhs: [Element]
+  ) -> Bool {
+    guard lhs.count == rhs.count else {
+      return false
+    }
+    guard !lhs.isEmpty else {
+      return true
+    }
+    return lhs.withUnsafeBufferPointer { lhsBuffer in
+      rhs.withUnsafeBufferPointer { rhsBuffer in
+        lhsBuffer.baseAddress == rhsBuffer.baseAddress
+      }
+    }
+  }
 }
 
 actor SessionIndexWorker {

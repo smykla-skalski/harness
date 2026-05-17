@@ -7,7 +7,7 @@ extension SessionWindowView {
     let sessionDecisionIDs = store.supervisorOpenDecisionIDsBySession[token.sessionID] ?? []
     let sessionDecisionItems =
       store.supervisorOpenDecisionPresentationItemsBySession[token.sessionID] ?? []
-    let all = sessionDecisionIDs.compactMap { store.supervisorOpenDecisionsByID[$0] }
+    let all = store.supervisorOpenDecisionsBySession[token.sessionID] ?? []
     let allIDs = Set(sessionDecisionIDs)
     if sessionDecisionIDs != allSessionDecisionIDsInOrderCache {
       allSessionDecisionsCache = all

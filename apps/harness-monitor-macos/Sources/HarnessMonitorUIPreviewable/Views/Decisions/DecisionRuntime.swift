@@ -13,7 +13,7 @@ final class DecisionRuntime {
 
   func reload(from store: HarnessMonitorStore?) async {
     guard let store else {
-      applyDecisions([])
+      applyDecisionSurfaceSnapshot(.empty)
       auditEvents = []
       liveTick = .placeholder
       return
@@ -21,13 +21,13 @@ final class DecisionRuntime {
 
     let decisionStore = await resolveDecisionStore(from: store)
     guard let decisionStore else {
-      applyDecisions([])
+      applyDecisionSurfaceSnapshot(.empty)
       auditEvents = []
       liveTick = .placeholder
       return
     }
 
-    applyDecisions((try? await decisionStore.openDecisions()) ?? [])
+    applyDecisionSurfaceSnapshot((try? await decisionStore.openSurfaceSnapshot()) ?? .empty)
     auditEvents = await store.loadSupervisorAuditEventSnapshots()
     await refreshLiveTick(from: store)
   }
@@ -49,10 +49,10 @@ final class DecisionRuntime {
     return store.supervisorDecisionStore
   }
 
-  private func applyDecisions(_ nextDecisions: [Decision]) {
-    decisions = nextDecisions
-    decisionsByID = Dictionary(uniqueKeysWithValues: nextDecisions.map { ($0.id, $0) })
-    decisionItems = nextDecisions.map(DecisionPresentationItem.init)
+  private func applyDecisionSurfaceSnapshot(_ snapshot: DecisionStore.OpenSurfaceSnapshot) {
+    decisions = snapshot.decisions
+    decisionsByID = snapshot.decisionsByID
+    decisionItems = snapshot.presentationItems
     decisionsRevision &+= 1
   }
 }
