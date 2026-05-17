@@ -134,8 +134,8 @@ struct PolicyCanvasEdgeShapeTests {
     #expect(
       points == [
         CGPoint(x: 100, y: 0),
-        CGPoint(x: 82, y: 7),
-        CGPoint(x: 82, y: -7),
+        CGPoint(x: 88, y: 4.5),
+        CGPoint(x: 88, y: -4.5),
       ])
   }
 }

@@ -1,12 +1,12 @@
 import SwiftUI
 
 /// Solid triangle at the route's last point, oriented along the final
-/// segment. 18pt long × 14pt wide so the direction stays readable at
+/// segment. 12pt long × 9pt wide so the direction stays readable at
 /// 0.5x-2x zoom while the trimmed route keeps the tip outside the port bubble.
 struct PolicyCanvasEdgeArrowhead: Shape {
   let route: PolicyCanvasEdgeRoute
-  var length: CGFloat = 18
-  var halfWidth: CGFloat = 7
+  var length: CGFloat = 12
+  var halfWidth: CGFloat = 4.5
 
   func path(in rect: CGRect) -> Path {
     var path = Path()
