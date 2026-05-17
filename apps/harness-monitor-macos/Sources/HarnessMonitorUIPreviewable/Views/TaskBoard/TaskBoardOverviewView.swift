@@ -30,12 +30,6 @@ public struct TaskBoardOverviewView: View {
   private var fontScale
   @State private var selectedTaskBoardItemID: String?
   @State private var isCreatingTaskBoardItem = false
-  // Width-gated header layouts. Each row used to be a `ViewThatFits` that
-  // built BOTH HStack + VStack candidate subtrees on every body update;
-  // during a live AppKit resize the AttributeGraph thrash dominated.
-  @State private var accessoryFitsHorizontally = true
-  @State private var headerActionsFitHorizontally = true
-  @State private var aggregateSummaryFitsHorizontally = true
   @State private var evaluationSummaryFitsHorizontally = true
 
   private var captionSemibold: Font {
@@ -179,58 +173,22 @@ extension TaskBoardOverviewView {
   }
 
   private var headerActions: some View {
-    Group {
-      if headerActionsFitHorizontally {
-        HStack(spacing: HarnessMonitorTheme.spacingSM) {
-          headerActionButtons
-        }
-      } else {
-        VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
-          headerActionButtons
-        }
-      }
+    HStack(spacing: HarnessMonitorTheme.spacingSM) {
+      headerActionButtons
     }
-    .onGeometryChange(for: CGFloat.self) { proxy in
-      proxy.size.width
-    } action: { width in
-      let next = width >= 300
-      if headerActionsFitHorizontally != next {
-        headerActionsFitHorizontally = next
-      }
-    }
+    .fixedSize(horizontal: true, vertical: false)
   }
 
   private var boardAccessoryRow: some View {
-    Group {
-      if accessoryFitsHorizontally {
-        HStack(alignment: .center, spacing: HarnessMonitorTheme.spacingMD) {
-          if hasAggregateSummary {
-            aggregateSummaryRow
-          }
-          if hasAggregateSummary && hasHeaderActions {
-            Spacer(minLength: HarnessMonitorTheme.spacingMD)
-          }
-          if hasHeaderActions {
-            headerActions
-          }
-        }
-      } else {
-        VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
-          if hasAggregateSummary {
-            aggregateSummaryRow
-          }
-          if hasHeaderActions {
-            headerActions
-          }
-        }
+    HStack(alignment: .center, spacing: HarnessMonitorTheme.spacingMD) {
+      if hasAggregateSummary {
+        aggregateSummaryRow
       }
-    }
-    .onGeometryChange(for: CGFloat.self) { proxy in
-      proxy.size.width
-    } action: { width in
-      let next = width >= 760
-      if accessoryFitsHorizontally != next {
-        accessoryFitsHorizontally = next
+      if hasAggregateSummary && hasHeaderActions {
+        Spacer(minLength: HarnessMonitorTheme.spacingMD)
+      }
+      if hasHeaderActions {
+        headerActions
       }
     }
   }
@@ -287,25 +245,10 @@ extension TaskBoardOverviewView {
   }
 
   private var aggregateSummaryRow: some View {
-    Group {
-      if aggregateSummaryFitsHorizontally {
-        HStack(spacing: HarnessMonitorTheme.spacingSM) {
-          aggregateSummaryContent
-        }
-      } else {
-        VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
-          aggregateSummaryContent
-        }
-      }
+    HStack(spacing: HarnessMonitorTheme.spacingSM) {
+      aggregateSummaryContent
     }
-    .onGeometryChange(for: CGFloat.self) { proxy in
-      proxy.size.width
-    } action: { width in
-      let next = width >= 500
-      if aggregateSummaryFitsHorizontally != next {
-        aggregateSummaryFitsHorizontally = next
-      }
-    }
+    .fixedSize(horizontal: true, vertical: false)
   }
 
   private func evaluationSummaryRow(_ summary: TaskBoardEvaluationSummary) -> some View {

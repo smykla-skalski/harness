@@ -24,15 +24,11 @@ struct TaskBoardOrchestratorSummaryView: View {
     HarnessMonitorTextSize.scaledFont(.caption.weight(.bold), by: fontScale)
   }
 
-  // Width-gated layouts: each ViewThatFits in this file used to build BOTH
-  // candidate subtrees on every body update, and the orchestrator strip is
-  // re-evaluated on every live-resize tick. Switching to onGeometryChange
-  // width gates keeps only the active branch in the tree.
+  // Keep the expensive summary-vs-controls layout width-gated while action
+  // buttons stay in a single row.
   @State private var bodyFitsHorizontally = true
-  @State private var controlsFitHorizontally = true
 
   private var bodyHorizontalMinWidth: CGFloat { 640 }
-  private var controlsHorizontalMinWidth: CGFloat { 180 }
 
   init(
     status: TaskBoardOrchestratorStatus,
@@ -104,25 +100,10 @@ struct TaskBoardOrchestratorSummaryView: View {
   }
 
   private var controls: some View {
-    Group {
-      if controlsFitHorizontally {
-        HStack(spacing: HarnessMonitorTheme.spacingSM) {
-          controlButtons
-        }
-      } else {
-        VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
-          controlButtons
-        }
-      }
+    HStack(spacing: HarnessMonitorTheme.spacingSM) {
+      controlButtons
     }
-    .onGeometryChange(for: CGFloat.self) { proxy in
-      proxy.size.width
-    } action: { width in
-      let next = width >= controlsHorizontalMinWidth
-      if controlsFitHorizontally != next {
-        controlsFitHorizontally = next
-      }
-    }
+    .fixedSize(horizontal: true, vertical: false)
   }
 
   @ViewBuilder private var controlButtons: some View {

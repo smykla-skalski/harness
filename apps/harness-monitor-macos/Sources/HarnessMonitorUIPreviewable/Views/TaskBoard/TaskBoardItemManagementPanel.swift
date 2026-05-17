@@ -239,10 +239,10 @@ struct TaskBoardItemManagementPanel: View {
   }
 
   private var actionButtons: some View {
-    ViewThatFits(in: .horizontal) {
-      HStack(spacing: HarnessMonitorTheme.spacingSM) { actionButtonContent }
-      VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) { actionButtonContent }
+    HStack(spacing: HarnessMonitorTheme.spacingSM) {
+      actionButtonContent
     }
+    .fixedSize(horizontal: true, vertical: false)
   }
 
   @ViewBuilder private var actionButtonContent: some View {
