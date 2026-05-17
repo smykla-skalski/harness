@@ -48,13 +48,17 @@ extension TaskBoardOperationsHost {
   }
 
   func summaryPillRow<Content: View>(@ViewBuilder content: () -> Content) -> some View {
-    ViewThatFits(in: .horizontal) {
-      HStack(spacing: HarnessMonitorTheme.spacingXS) {
-        content()
-      }
-      VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingXS) {
-        content()
-      }
+    // One-tree wrap-flow layout. The previous `ViewThatFits` built both an
+    // HStack and a VStack candidate subtree on every body update; in the
+    // operations cards this fanned out across multiple pill rows, so a
+    // single live-resize tick rebuilt the AttributeGraph for every pill
+    // twice. `HarnessMonitorWrapLayout` measures the same subviews once
+    // and flows them onto rows as width permits.
+    HarnessMonitorWrapLayout(
+      spacing: HarnessMonitorTheme.spacingXS,
+      lineSpacing: HarnessMonitorTheme.spacingXS
+    ) {
+      content()
     }
   }
 

@@ -197,13 +197,11 @@ struct TaskBoardItemRow: View {
           }
           Spacer(minLength: 0)
         }
-        ViewThatFits(in: .horizontal) {
-          HStack(spacing: metrics.laneBodyTopPadding) {
-            badgeContent
-          }
-          VStack(alignment: .leading, spacing: metrics.laneBodyTopPadding) {
-            badgeContent
-          }
+        HarnessMonitorWrapLayout(
+          spacing: metrics.laneBodyTopPadding,
+          lineSpacing: metrics.laneBodyTopPadding
+        ) {
+          badgeContent
         }
       }
       .frame(
@@ -314,13 +312,11 @@ struct TaskBoardInboxItemRow: View {
           }
           Spacer(minLength: 0)
         }
-        ViewThatFits(in: .horizontal) {
-          HStack(spacing: metrics.laneBodyTopPadding) {
-            badgeContent
-          }
-          VStack(alignment: .leading, spacing: metrics.laneBodyTopPadding) {
-            badgeContent
-          }
+        HarnessMonitorWrapLayout(
+          spacing: metrics.laneBodyTopPadding,
+          lineSpacing: metrics.laneBodyTopPadding
+        ) {
+          badgeContent
         }
       }
       .frame(
