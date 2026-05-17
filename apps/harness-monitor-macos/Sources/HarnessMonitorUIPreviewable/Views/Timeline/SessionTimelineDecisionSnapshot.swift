@@ -122,6 +122,30 @@ struct SessionTimelineAction: Identifiable, Equatable, Sendable {
   }
 }
 
+struct SessionTimelineDecisionInput: Equatable, Sendable {
+  let id: String
+  let severityRaw: String
+  let ruleID: String
+  let sessionID: String?
+  let agentID: String?
+  let taskID: String?
+  let summary: String
+  let suggestedActionsJSON: String
+  let createdAt: Date
+
+  init(decision: Decision) {
+    id = decision.id
+    severityRaw = decision.severityRaw
+    ruleID = decision.ruleID
+    sessionID = decision.sessionID
+    agentID = decision.agentID
+    taskID = decision.taskID
+    summary = decision.summary
+    suggestedActionsJSON = decision.suggestedActionsJSON
+    createdAt = decision.createdAt
+  }
+}
+
 struct SessionTimelineDecisionSnapshot: Identifiable, Equatable, Sendable {
   let id: String
   let severity: DecisionSeverity
@@ -134,15 +158,19 @@ struct SessionTimelineDecisionSnapshot: Identifiable, Equatable, Sendable {
   let actions: [SessionTimelineAction]
 
   init(decision: Decision, actionsDecoder: JSONDecoder = JSONDecoder()) {
-    id = decision.id
-    severity = DecisionSeverity(rawValue: decision.severityRaw) ?? .info
-    ruleID = decision.ruleID
-    sessionID = decision.sessionID
-    agentID = decision.agentID
-    taskID = decision.taskID
-    summary = decision.summary
-    createdAt = decision.createdAt
-    actions = Self.actions(for: decision, decoder: actionsDecoder)
+    self.init(input: SessionTimelineDecisionInput(decision: decision), actionsDecoder: actionsDecoder)
+  }
+
+  init(input: SessionTimelineDecisionInput, actionsDecoder: JSONDecoder = JSONDecoder()) {
+    id = input.id
+    severity = DecisionSeverity(rawValue: input.severityRaw) ?? .info
+    ruleID = input.ruleID
+    sessionID = input.sessionID
+    agentID = input.agentID
+    taskID = input.taskID
+    summary = input.summary
+    createdAt = input.createdAt
+    actions = Self.actions(for: input, decoder: actionsDecoder)
   }
 
   var severityLabel: String {
@@ -159,7 +187,7 @@ struct SessionTimelineDecisionSnapshot: Identifiable, Equatable, Sendable {
   }
 
   private static func actions(
-    for decision: Decision,
+    for decision: SessionTimelineDecisionInput,
     decoder: JSONDecoder
   ) -> [SessionTimelineAction] {
     let parsedActions = parseActions(from: decision.suggestedActionsJSON, decoder: decoder)
@@ -188,7 +216,7 @@ struct SessionTimelineDecisionSnapshot: Identifiable, Equatable, Sendable {
   }
 
   private static func effectiveActions(
-    for decision: Decision,
+    for decision: SessionTimelineDecisionInput,
     parsedActions: [SuggestedAction]
   ) -> [SuggestedAction] {
     guard decision.ruleID != AcpPermissionDecisionPayload.ruleID else {

@@ -87,6 +87,8 @@ struct SettingsBackgroundGallery: View {
   private var previewHeight = 96.0
   @AppStorage(HarnessMonitorBackgroundDefaults.recentKey)
   private var recentStorageValues = ""
+  @State private var systemBackgroundOptions: [HarnessMonitorBackgroundSelection] =
+    HarnessMonitorBackgroundSelection.systemLibrary
 
   private static let maxRecents = 8
   private static let recentTileWidth: CGFloat = 140
@@ -102,7 +104,7 @@ struct SettingsBackgroundGallery: View {
   private var options: [HarnessMonitorBackgroundSelection] {
     switch collection {
     case .featured: HarnessMonitorBackgroundSelection.bundledLibrary
-    case .native: HarnessMonitorBackgroundSelection.systemLibrary
+    case .native: systemBackgroundOptions
     }
   }
 
@@ -200,6 +202,16 @@ struct SettingsBackgroundGallery: View {
         )
       }
     }
+    .task(id: collection) {
+      await refreshSystemBackgroundOptionsIfNeeded()
+    }
+  }
+
+  @MainActor
+  private func refreshSystemBackgroundOptionsIfNeeded() async {
+    guard collection == .native else { return }
+    let wallpapers = await HarnessMonitorSystemWallpaper.loadAvailable()
+    systemBackgroundOptions = wallpapers.map(HarnessMonitorBackgroundSelection.system)
   }
 
   private var recentBackgroundsRow: some View {

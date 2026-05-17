@@ -13,14 +13,13 @@ struct PolicyCanvasViewport: View {
   @State private var currentModifiers: EventModifiers = []
   @State private var hoveredViewportPoint: CGPoint?
   @State private var scrollPosition = ScrollPosition()
-  @State private var measuredScrollContentSize: CGSize = .zero
-  @State private var pendingCenteredScrollPoint: CGPoint?
-  @State private var pendingCenteredContentSize: CGSize?
   @State private var isRestoringCommandScrollPosition = false
+  @State private var routeWorker = PolicyCanvasRouteWorker()
+  @State private var routeGeneration: UInt64 = 0
+  @State private var cachedRouteInput: PolicyCanvasRouteWorkerInput?
+  @State private var cachedRouteOutput = PolicyCanvasRouteWorkerOutput.empty
   @Environment(\.scenePhase)
   private var scenePhase
-  @Environment(\.policyCanvasEdgeRouter)
-  private var router
   @Environment(\.fontScale)
   private var fontScale
 
@@ -33,47 +32,27 @@ struct PolicyCanvasViewport: View {
     GeometryReader { proxy in
       ScrollViewReader { _ in
         let edges = viewModel.edges
-        let portAnchors = viewModel.portAnchors(for: edges)
-        let routes = policyCanvasDisplayedRoutes(
-          viewModel: viewModel,
+        let routeInput = PolicyCanvasRouteWorkerInput(
+          nodes: viewModel.nodes,
+          groups: viewModel.groups,
           edges: edges,
-          portAnchors: portAnchors,
-          router: router
-        )
-        let labelMetrics = PolicyCanvasEdgeLabelMetrics(fontScale: fontScale)
-        let labelPositions = policyCanvasResolvedLabelPositions(
-          viewModel: viewModel,
-          edges: edges,
-          routes: routes,
           fontScale: fontScale
         )
-        let visibleBounds = policyCanvasVisibleBounds(
-          viewModel: viewModel,
-          edges: edges,
-          routes: routes,
-          labelPositions: labelPositions,
-          labelSize: CGSize(
-            width: PolicyCanvasLayout.edgeLabelMaxWidth,
-            height: labelMetrics.height
-          )
-        )
-        let presentationOffset = policyCanvasViewportPresentationOffset(
-          visibleBounds: visibleBounds
-        )
+        let routeOutput =
+          cachedRouteOutput == .empty
+          ? PolicyCanvasRouteWorkerOutput.fallback(for: routeInput)
+          : cachedRouteOutput
+        let routes = routeOutput.routes
+        let labelPositions = routeOutput.labelPositions
+        let visibleBounds =
+          cachedRouteInput == routeInput
+          ? routeOutput.visibleBounds
+          : routeInput.visibleBounds(routes: routes, labelPositions: labelPositions)
         let contentSize = policyCanvasVisibleContentSize(visibleBounds: visibleBounds)
         let contentOrigin = policyCanvasViewportContentOrigin(
           viewportSize: proxy.size,
           contentSize: contentSize,
           zoom: viewModel.zoom
-        )
-        let renderedContentSize = policyCanvasRenderedContentSize(
-          viewportSize: proxy.size,
-          contentSize: contentSize,
-          zoom: viewModel.zoom
-        )
-        let scaledCanvasOffset = CGPoint(
-          x: (presentationOffset.x * viewModel.zoom) + contentOrigin.x,
-          y: (presentationOffset.y * viewModel.zoom) + contentOrigin.y
         )
         ScrollView([.horizontal, .vertical]) {
           ZStack(alignment: .topLeading) {
@@ -118,22 +97,19 @@ struct PolicyCanvasViewport: View {
               )
             }
             .scaleEffect(viewModel.zoom, anchor: viewModel.pinchAnchorUnit ?? .topLeading)
-            .offset(x: scaledCanvasOffset.x, y: scaledCanvasOffset.y)
+            .offset(x: contentOrigin.x, y: contentOrigin.y)
             .coordinateSpace(.named(PolicyCanvasCoordinateSpaces.canvas))
           }
           .frame(
-            width: renderedContentSize.width,
-            height: renderedContentSize.height,
+            width: max(proxy.size.width, contentSize.width * viewModel.zoom),
+            height: max(proxy.size.height, contentSize.height * viewModel.zoom),
             alignment: .topLeading
           )
           .contentShape(Rectangle())
           .dropDestination(for: String.self) { payloads, location in
             viewModel.dropPalettePayloads(
               payloads,
-              at: viewModel.canvasPoint(
-                for: location,
-                scaledCanvasOffset: scaledCanvasOffset
-              )
+              at: viewModel.canvasPoint(for: location)
             )
           }
           .onTapGesture {
@@ -158,16 +134,8 @@ struct PolicyCanvasViewport: View {
           handleScrollOffsetChange(
             oldOffset: oldOffset,
             newOffset: newOffset,
-            viewportSize: proxy.size,
-            contentSize: contentSize,
-            presentationOffset: presentationOffset
+            viewportSize: proxy.size
           )
-        }
-        .onScrollGeometryChange(for: CGSize.self) { geometry in
-          geometry.contentSize
-        } action: { _, newContentSize in
-          measuredScrollContentSize = newContentSize
-          applyPendingCenteredScrollIfNeeded()
         }
         .background(Color(red: 0.03, green: 0.04, blue: 0.06))
         .clipShape(Rectangle())
@@ -208,6 +176,9 @@ struct PolicyCanvasViewport: View {
           }
         }
         .focusedSceneValue(\.harnessPolicyCanvasZoomFocus, zoomFocus)
+        .task(id: routeInput) {
+          await rebuildRoutes(for: routeInput)
+        }
       }
     }
     .accessibilityElement(children: .contain)
@@ -234,7 +205,21 @@ struct PolicyCanvasViewport: View {
 }
 
 extension PolicyCanvasViewport {
-  fileprivate func centerViewportIfNeeded(
+  @MainActor
+  private func rebuildRoutes(for input: PolicyCanvasRouteWorkerInput) async {
+    routeGeneration &+= 1
+    let generation = routeGeneration
+    let output = await routeWorker.compute(input: input)
+    guard !Task.isCancelled, routeGeneration == generation else {
+      return
+    }
+    cachedRouteInput = input
+    if cachedRouteOutput != output {
+      cachedRouteOutput = output
+    }
+  }
+
+  private func centerViewportIfNeeded(
     viewportSize: CGSize,
     visibleBounds: CGRect
   ) {
@@ -288,17 +273,14 @@ extension PolicyCanvasViewport {
       anchorPoint: targetAnchorPoint,
       viewportSize: viewportSize
     )
-    let targetRenderedContentSize = policyCanvasRenderedContentSize(
-      viewportSize: viewportSize,
-      contentSize: contentSize,
-      zoom: targetZoom
-    )
-    pendingCenteredScrollPoint = targetScrollPoint
-    pendingCenteredContentSize = targetRenderedContentSize
-    applyPendingCenteredScrollIfNeeded()
+    Task { @MainActor in
+      await Task.yield()
+      isRestoringCommandScrollPosition = true
+      scrollPosition = ScrollPosition(point: targetScrollPoint)
+    }
   }
 
-  fileprivate func bindZoomFocusDispatcher() {
+  private func bindZoomFocusDispatcher() {
     zoomFocusDispatcher.zoomIn = { @MainActor [viewModel] in
       viewModel.clearPinchAnchor()
       viewModel.zoomIn()
@@ -316,12 +298,10 @@ extension PolicyCanvasViewport {
     }
   }
 
-  fileprivate func handleScrollOffsetChange(
+  private func handleScrollOffsetChange(
     oldOffset: CGPoint,
     newOffset: CGPoint,
-    viewportSize: CGSize,
-    contentSize: CGSize,
-    presentationOffset: CGPoint
+    viewportSize: CGSize
   ) {
     if isRestoringCommandScrollPosition {
       isRestoringCommandScrollPosition = false
@@ -340,55 +320,36 @@ extension PolicyCanvasViewport {
       hoveredViewportPoint
       ?? CGPoint(x: viewportSize.width / 2, y: viewportSize.height / 2)
     performCommandScrollZoom(
-      PolicyCanvasCommandScrollContext(
-        deltaY: deltaY,
-        cursor: cursor,
-        preZoomScrollOffset: oldOffset,
-        viewportSize: viewportSize,
-        contentSize: contentSize,
-        presentationOffset: presentationOffset
-      )
+      deltaY: deltaY,
+      cursor: cursor,
+      preZoomScrollOffset: oldOffset,
+      viewportSize: viewportSize
     )
   }
 
-  fileprivate func performCommandScrollZoom(_ context: PolicyCanvasCommandScrollContext) {
-    let canvasPoint = policyCanvasCommandScrollCanvasPoint(
-      context: context,
-      zoom: viewModel.zoom
+  private func performCommandScrollZoom(
+    deltaY: CGFloat,
+    cursor: CGPoint,
+    preZoomScrollOffset: CGPoint,
+    viewportSize: CGSize
+  ) {
+    let zoomBefore = viewModel.zoom
+    let canvasPoint = CGPoint(
+      x: (preZoomScrollOffset.x + cursor.x) / zoomBefore,
+      y: (preZoomScrollOffset.y + cursor.y) / zoomBefore
     )
-    guard viewModel.zoomByCommandScroll(deltaY: context.deltaY) else {
+    guard viewModel.zoomByCommandScroll(deltaY: deltaY) else {
       isRestoringCommandScrollPosition = true
-      scrollPosition = ScrollPosition(point: context.preZoomScrollOffset)
+      scrollPosition = ScrollPosition(point: preZoomScrollOffset)
       return
     }
-    let nextScrollPoint = policyCanvasCommandScrollPoint(
-      viewModel: viewModel,
-      context: context,
-      canvasPoint: canvasPoint
+    let nextScrollPoint = viewModel.viewportScrollPoint(
+      keepingCanvasPoint: canvasPoint,
+      atViewportPoint: cursor,
+      viewportSize: viewportSize
     )
     isRestoringCommandScrollPosition = true
     scrollPosition = ScrollPosition(point: nextScrollPoint)
-  }
-
-  fileprivate func applyPendingCenteredScrollIfNeeded() {
-    guard
-      let pendingCenteredScrollPoint,
-      let pendingCenteredContentSize,
-      measuredScrollContentSize.width > 0,
-      measuredScrollContentSize.height > 0
-    else {
-      return
-    }
-    guard
-      abs(measuredScrollContentSize.width - pendingCenteredContentSize.width) <= 1,
-      abs(measuredScrollContentSize.height - pendingCenteredContentSize.height) <= 1
-    else {
-      return
-    }
-    isRestoringCommandScrollPosition = true
-    scrollPosition = ScrollPosition(point: pendingCenteredScrollPoint)
-    self.pendingCenteredScrollPoint = nil
-    self.pendingCenteredContentSize = nil
   }
 
 }

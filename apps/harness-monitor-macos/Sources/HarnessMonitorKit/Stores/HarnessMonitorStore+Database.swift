@@ -98,10 +98,12 @@ public struct DatabaseStatistics: Sendable {
 
 extension HarnessMonitorStore {
   public func gatherDatabaseStatistics() async -> DatabaseStatistics {
-    let bookmarkCount = countModel(SessionBookmark.self)
-    let noteCount = countModel(UserNote.self)
-    let searchCount = countModel(RecentSearch.self)
-    let filterPreferenceCount = countModel(ProjectFilterPreference.self)
+    let userRecordCounts: UserDataPersistenceService.RecordCounts
+    if let userDataService, persistenceError == nil {
+      userRecordCounts = await userDataService.recordCounts()
+    } else {
+      userRecordCounts = .zero
+    }
 
     let cacheCounts: SessionCacheService.CacheCounts
     if let cacheService, persistenceError == nil {
@@ -128,10 +130,10 @@ extension HarnessMonitorStore {
       transcriptCount: cacheCounts.transcript,
       observerCount: cacheCounts.observers,
       activityCount: cacheCounts.activities,
-      bookmarkCount: bookmarkCount,
-      noteCount: noteCount,
-      searchCount: searchCount,
-      filterPreferenceCount: filterPreferenceCount,
+      bookmarkCount: userRecordCounts.bookmarks,
+      noteCount: userRecordCounts.notes,
+      searchCount: userRecordCounts.searches,
+      filterPreferenceCount: userRecordCounts.filterPreferences,
       appCacheSizeBytes: appCacheSizeBytes,
       daemonDatabaseSizeBytes: daemonDatabaseSizeBytes,
       lastCachedAt: lastPersistedSnapshotAt,
@@ -164,9 +166,9 @@ extension HarnessMonitorStore {
   }
 
   @discardableResult
-  public func clearAllUserData() -> Bool {
+  public func clearAllUserData() async -> Bool {
     guard
-      let modelContext = unavailablePersistenceContext(
+      let userDataService = unavailablePersistenceService(
         for: "User data could not be cleared."
       )
     else {
@@ -174,16 +176,11 @@ extension HarnessMonitorStore {
     }
 
     do {
-      try deleteAllRecords(SessionBookmark.self, in: modelContext)
-      try deleteAllRecords(UserNote.self, in: modelContext)
-      try deleteAllRecords(RecentSearch.self, in: modelContext)
-      try deleteAllRecords(ProjectFilterPreference.self, in: modelContext)
-      try modelContext.save()
+      try await userDataService.clearAllUserData()
       bookmarkedSessionIds = []
       presentSuccessFeedback("User data cleared")
       return true
     } catch {
-      modelContext.rollback()
       recordPersistenceFailure(
         action: "User data could not be cleared.",
         underlyingError: error
@@ -195,7 +192,7 @@ extension HarnessMonitorStore {
   @discardableResult
   public func clearAllDatabaseData() async -> Bool {
     let cacheCleared = await clearSessionCache()
-    let userDataCleared = clearAllUserData()
+    let userDataCleared = await clearAllUserData()
     if cacheCleared && userDataCleared {
       presentSuccessFeedback("All database data cleared")
     }
@@ -250,21 +247,6 @@ extension HarnessMonitorStore {
       return nil
     }
     return URL(fileURLWithPath: rawPath)
-  }
-
-  private func countModel<T: PersistentModel>(_ type: T.Type) -> Int {
-    guard let modelContext, persistenceError == nil else { return 0 }
-    return (try? modelContext.fetchCount(FetchDescriptor<T>())) ?? 0
-  }
-
-  private func deleteAllRecords<T: PersistentModel>(
-    _ type: T.Type,
-    in context: ModelContext
-  ) throws {
-    let items = try context.fetch(FetchDescriptor<T>())
-    for item in items {
-      context.delete(item)
-    }
   }
 
   nonisolated static func swiftDataStoreSize(at url: URL) -> Int64 {

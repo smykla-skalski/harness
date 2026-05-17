@@ -52,7 +52,7 @@ struct SessionTimelineFilterTests {
     let nodes = SessionTimelineNodeBuilder(
       sessionID: "session-1",
       entries: [entry],
-      decisions: [decision]
+      decisions: [SessionTimelineDecisionInput(decision: decision)]
     )
     .build()
 

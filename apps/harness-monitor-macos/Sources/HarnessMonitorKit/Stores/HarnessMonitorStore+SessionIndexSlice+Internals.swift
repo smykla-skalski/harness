@@ -127,16 +127,10 @@ extension HarnessMonitorStore.SessionIndexSlice {
     let delayNanoseconds = debugProjectionDelayNanoseconds
 
     projectionComputationTask = Task { @MainActor [weak self] in
-      let output = await Task.detached(priority: .userInitiated) {
-        () -> ProjectionComputationOutput? in
-        if delayNanoseconds > 0 {
-          try? await Task.sleep(nanoseconds: delayNanoseconds)
-        }
-        guard !Task.isCancelled else {
-          return nil
-        }
-        return Self.computeProjectionOutput(from: request)
-      }.value
+      let output = await self?.sessionIndexWorker.computeProjection(
+        from: request,
+        delayNanoseconds: delayNanoseconds
+      )
 
       guard !Task.isCancelled, let self, let output else {
         return

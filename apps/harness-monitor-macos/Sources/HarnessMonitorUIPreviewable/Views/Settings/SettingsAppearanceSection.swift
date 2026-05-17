@@ -188,7 +188,7 @@ private enum BackgroundCollectionTab: String, CaseIterable, Identifiable {
   }
 }
 
-enum BackgroundCollection {
+enum BackgroundCollection: Equatable {
   case featured
   case native
 }

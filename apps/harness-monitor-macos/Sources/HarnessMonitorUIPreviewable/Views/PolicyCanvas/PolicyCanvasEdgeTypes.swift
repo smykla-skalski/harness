@@ -1,6 +1,6 @@
 import SwiftUI
 
-struct PolicyCanvasPortEndpoint: Hashable {
+struct PolicyCanvasPortEndpoint: Hashable, Sendable {
   let nodeID: String
   let portID: String
   let kind: PolicyCanvasPortKind
@@ -12,7 +12,7 @@ struct PolicyCanvasPortEndpoint: Hashable {
 /// and error/deny paths at a glance. Mapped from the daemon `condition`
 /// string in `policyCanvasEdge(_:)`; defaults to `.flow` for `"always"` so
 /// untyped historical edges keep the existing neutral hue.
-enum PolicyCanvasEdgeKind: String, Hashable, CaseIterable {
+enum PolicyCanvasEdgeKind: String, Hashable, CaseIterable, Sendable {
   case flow
   case control
   case error
@@ -86,7 +86,7 @@ enum PolicyCanvasEdgeKind: String, Hashable, CaseIterable {
   }
 }
 
-struct PolicyCanvasEdge: Identifiable, Hashable {
+struct PolicyCanvasEdge: Identifiable, Hashable, Sendable {
   let id: String
   var source: PolicyCanvasPortEndpoint
   var target: PolicyCanvasPortEndpoint

@@ -121,18 +121,18 @@ extension HarnessMonitorStoreDatabaseTests {
       ))
 
     await store.cacheSessionList([session], projects: [project])
-    store.toggleBookmark(sessionId: "sess-clear-user", projectId: "project-a")
-    store.addNote(
+    await store.toggleBookmark(sessionId: "sess-clear-user", projectId: "project-a")
+    await store.addNote(
       text: "Remove me",
       targetKind: "task",
       targetId: "task-1",
       sessionId: "sess-clear-user"
     )
-    store.recordSearch("doomed query")
+    await store.recordSearch("doomed query")
     store.sessionFilter = .ended
-    store.saveFilterPreference(for: "project-a")
+    await store.saveFilterPreference(for: "project-a")
 
-    let success = store.clearAllUserData()
+    let success = await store.clearAllUserData()
     #expect(success)
     #expect(store.bookmarkedSessionIds.isEmpty)
 
@@ -146,13 +146,13 @@ extension HarnessMonitorStoreDatabaseTests {
   }
 
   @Test("clearAllUserData fails gracefully without persistence")
-  func clearAllUserDataNoPersistence() {
+  func clearAllUserDataNoPersistence() async {
     let store = HarnessMonitorStore(
       daemonController: RecordingDaemonController(),
       persistenceError: "Local persistence is unavailable."
     )
 
-    let success = store.clearAllUserData()
+    let success = await store.clearAllUserData()
     #expect(!success)
     #expect(store.currentFailureFeedbackMessage != nil)
   }
@@ -197,14 +197,14 @@ extension HarnessMonitorStoreDatabaseTests {
         )
       ]
     )
-    store.toggleBookmark(sessionId: "sess-clear-all", projectId: "project-a")
-    store.addNote(
+    await store.toggleBookmark(sessionId: "sess-clear-all", projectId: "project-a")
+    await store.addNote(
       text: "Gone",
       targetKind: "task",
       targetId: "task-1",
       sessionId: "sess-clear-all"
     )
-    store.recordSearch("gone query")
+    await store.recordSearch("gone query")
 
     let success = await store.clearAllDatabaseData()
     #expect(success)

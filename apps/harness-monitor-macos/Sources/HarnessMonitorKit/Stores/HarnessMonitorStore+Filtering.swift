@@ -24,6 +24,7 @@ extension HarnessMonitorStore {
     @ObservationIgnored var projectCatalogs: [ProjectCatalog] = []
     @ObservationIgnored var orderedSessionIDsBySortOrder: [SessionSortOrder: [String]] = [:]
     @ObservationIgnored var queryTokens: [String] = []
+    @ObservationIgnored let sessionIndexWorker = SessionIndexWorker()
     @ObservationIgnored var searchRebuildTask: Task<Void, Never>?
     @ObservationIgnored var projectionComputationTask: Task<Void, Never>?
     @ObservationIgnored var projectionGeneration: UInt64 = 0

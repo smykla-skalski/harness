@@ -90,8 +90,10 @@ struct DatabaseConfirmationPopover: View {
         await refreshStatistics()
       }
     case .clearUserData:
-      store.clearAllUserData()
-      Task { await refreshStatistics() }
+      Task {
+        await store.clearAllUserData()
+        await refreshStatistics()
+      }
     case .clearAllData:
       Task {
         await store.clearAllDatabaseData()

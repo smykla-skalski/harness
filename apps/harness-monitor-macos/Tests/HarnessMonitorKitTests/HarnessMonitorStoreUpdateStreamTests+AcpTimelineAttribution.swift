@@ -5,7 +5,7 @@ import Testing
 
 extension HarnessMonitorStoreUpdateStreamTests {
   @Test("ACP transcript rows reattribute when a live snapshot arrives after the event")
-  func acpTranscriptRowsReattributeWhenSnapshotArrivesLater() throws {
+  func acpTranscriptRowsReattributeWhenSnapshotArrivesLater() async throws {
     let store = HarnessMonitorStore(daemonController: RecordingDaemonController())
     store.selectedSessionID = "sess-acp-reattribute"
 
@@ -24,6 +24,7 @@ extension HarnessMonitorStoreUpdateStreamTests {
         pendingBatches: []
       )
     )
+    await store.waitForAcpTimelineIdle()
 
     let entry = try #require(store.timeline.first)
     #expect(entry.entryId == "acp-worker-acp-assistant_text-9")
@@ -34,7 +35,7 @@ extension HarnessMonitorStoreUpdateStreamTests {
   }
 
   @Test("ACP transcript rows reattribute when refresh reconciles ACP agents after the event")
-  func acpTranscriptRowsReattributeWhenRefreshArrivesLater() throws {
+  func acpTranscriptRowsReattributeWhenRefreshArrivesLater() async throws {
     let store = HarnessMonitorStore(daemonController: RecordingDaemonController())
     store.selectedSessionID = "sess-acp-refresh"
 
@@ -55,6 +56,7 @@ extension HarnessMonitorStoreUpdateStreamTests {
         inspect: nil
       )
     )
+    await store.waitForAcpTimelineIdle()
 
     let entry = try #require(store.timeline.first)
     #expect(entry.entryId == "acp-worker-acp-assistant_text-9")
@@ -65,7 +67,7 @@ extension HarnessMonitorStoreUpdateStreamTests {
   }
 
   @Test("ACP tool rows repair their visible actor label after delayed attribution")
-  func acpToolRowsRepairSummaryWhenSnapshotArrivesLater() throws {
+  func acpToolRowsRepairSummaryWhenSnapshotArrivesLater() async throws {
     let store = HarnessMonitorStore(daemonController: RecordingDaemonController())
     store.selectedSessionID = "sess-acp-tool-reattribute"
 
@@ -81,6 +83,7 @@ extension HarnessMonitorStoreUpdateStreamTests {
         pendingBatches: []
       )
     )
+    await store.waitForAcpTimelineIdle()
 
     let entry = try #require(store.timeline.first)
     #expect(entry.entryId == "acp-worker-acp-tool_invocation-9")

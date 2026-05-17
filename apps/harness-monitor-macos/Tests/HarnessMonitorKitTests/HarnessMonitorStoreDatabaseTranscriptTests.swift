@@ -111,14 +111,14 @@ extension HarnessMonitorStoreDatabaseTests {
 
     await store.cacheSessionList([session], projects: [project])
     await store.cacheSessionDetail(detail, timeline: [])
-    store.toggleBookmark(sessionId: "sess-clear-cache", projectId: "project-a")
-    store.addNote(
+    await store.toggleBookmark(sessionId: "sess-clear-cache", projectId: "project-a")
+    await store.addNote(
       text: "Keep me",
       targetKind: "task",
       targetId: "task-1",
       sessionId: "sess-clear-cache"
     )
-    store.recordSearch("preserved query")
+    await store.recordSearch("preserved query")
 
     let success = await store.clearSessionCache()
     #expect(success)

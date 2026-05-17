@@ -191,7 +191,7 @@ public struct SettingsDatabaseSection: View {
               "Clear Search History"
             ),
             action: {
-              store.clearSearchHistory()
+              await store.clearSearchHistory()
               await refreshStatistics()
             }
           )

@@ -1,7 +1,7 @@
 import Foundation
 import SwiftUI
 
-public enum HarnessMonitorDateTimeZoneMode: String, CaseIterable, Identifiable {
+public enum HarnessMonitorDateTimeZoneMode: String, CaseIterable, Identifiable, Sendable {
   case local
   case utc
   case custom
@@ -20,7 +20,7 @@ public enum HarnessMonitorDateTimeZoneMode: String, CaseIterable, Identifiable {
   }
 }
 
-public struct HarnessMonitorDateTimeConfiguration: Equatable {
+public struct HarnessMonitorDateTimeConfiguration: Equatable, Sendable {
   public static let timeZoneModeKey = "harnessDateTimeTimeZoneMode"
   public static let customTimeZoneIdentifierKey = "harnessDateTimeCustomTimeZoneIdentifier"
   public static let uiTestTimeZoneModeOverrideKey = "HARNESS_MONITOR_TIME_ZONE_MODE_OVERRIDE"

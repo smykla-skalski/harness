@@ -339,7 +339,7 @@ extension HarnessMonitorStoreUpdateStreamTests {
   }
 
   @Test("ACP synthetic transcript rows attach to the selected agent via ACP identity")
-  func acpSyntheticTranscriptRowsAttachToSelectedAgent() throws {
+  func acpSyntheticTranscriptRowsAttachToSelectedAgent() async throws {
     let store = HarnessMonitorStore(daemonController: RecordingDaemonController())
     store.selectedSessionID = "sess-acp-synthetic"
     store.applyAcpAgent(
@@ -379,6 +379,7 @@ extension HarnessMonitorStoreUpdateStreamTests {
         )
       )
     )
+    await store.waitForAcpTimelineIdle()
 
     let entry = try #require(store.acpTranscript(forAgent: "worker-acp").first)
     #expect(entry.kind == "agent_watchdog_state")

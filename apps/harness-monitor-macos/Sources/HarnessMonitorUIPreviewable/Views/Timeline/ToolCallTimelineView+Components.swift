@@ -9,7 +9,7 @@ struct ToolCallTimelineRowFramePreferenceKey: PreferenceKey {
   }
 }
 
-struct ToolCallTimelineSection: Identifiable, Equatable {
+struct ToolCallTimelineSection: Identifiable, Equatable, Sendable {
   let id: String
   let acpAgentID: String?
   let agentDisplayName: String?
@@ -165,7 +165,7 @@ struct ToolCallTimelineRowView: View {
   }
 }
 
-struct ToolCallTimelineRow: Identifiable, Equatable {
+struct ToolCallTimelineRow: Identifiable, Equatable, Sendable {
   let id: String
   let toolCallID: String
   let entryId: String
@@ -179,7 +179,7 @@ struct ToolCallTimelineRow: Identifiable, Equatable {
   let capabilityTags: [String]
   let stopReason: String?
 
-  enum Status: String, Equatable {
+  enum Status: String, Equatable, Sendable {
     case started
     case completed
     case failed

@@ -237,15 +237,15 @@ struct PersistenceOfflineDurabilityTests {
   }
 
   @Test("Offline mode keeps local bookmarks notes filters and search history editable")
-  func offlineModeKeepsLocalOnlyDataEditable() throws {
+  func offlineModeKeepsLocalOnlyDataEditable() async throws {
     let store = makeStore()
     store.connectionState = .offline("daemon down")
 
-    #expect(store.toggleBookmark(sessionId: "sess-offline", projectId: "proj-1"))
+    #expect(await store.toggleBookmark(sessionId: "sess-offline", projectId: "proj-1"))
     #expect(store.isBookmarked(sessionId: "sess-offline"))
 
     #expect(
-      store.addNote(
+      await store.addNote(
         text: "Offline note",
         targetKind: "task",
         targetId: "task-offline",
@@ -254,12 +254,12 @@ struct PersistenceOfflineDurabilityTests {
 
     store.sessionFilter = .ended
     store.sessionFocusFilter = .blocked
-    store.saveFilterPreference(for: "proj-offline")
+    await store.saveFilterPreference(for: "proj-offline")
     store.sessionFilter = .active
     store.sessionFocusFilter = .all
-    store.loadFilterPreference(for: "proj-offline")
+    await store.loadFilterPreference(for: "proj-offline")
 
-    #expect(store.recordSearch("offline cockpit"))
+    #expect(await store.recordSearch("offline cockpit"))
 
     let notes = try fetchNotes(targetId: "task-offline", sessionId: "sess-offline")
     let searches = try fetchRecentSearches()

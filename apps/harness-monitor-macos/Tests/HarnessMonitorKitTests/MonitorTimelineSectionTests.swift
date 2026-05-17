@@ -30,7 +30,7 @@ struct MonitorTimelineSectionTests {
           payload: .object(["decisionID": .string(decision.id)])
         ),
       ],
-      decisions: [decision]
+      decisions: [SessionTimelineDecisionInput(decision: decision)]
     )
     .build()
 
@@ -102,7 +102,7 @@ struct MonitorTimelineSectionTests {
     #expect(nodeBuilderSource.contains("let actionsDecoder = JSONDecoder()"))
     #expect(
       nodeBuilderSource.contains(
-        "SessionTimelineDecisionSnapshot(decision: $0, actionsDecoder: actionsDecoder)"
+        "SessionTimelineDecisionSnapshot(input: $0, actionsDecoder: actionsDecoder)"
       )
     )
     #expect(
@@ -132,7 +132,7 @@ struct MonitorTimelineSectionTests {
           payload: .object(["supervisor": .object(["decision_id": .string(decision.id)])])
         ),
       ],
-      decisions: [decision]
+      decisions: [SessionTimelineDecisionInput(decision: decision)]
     )
     .build()
     let linkedEntries = nodes.filter { $0.kind == .linkedDecision }
@@ -160,7 +160,7 @@ struct MonitorTimelineSectionTests {
           payload: .object(["ruleID": .string("rule.heuristic")])
         )
       ],
-      decisions: [decision]
+      decisions: [SessionTimelineDecisionInput(decision: decision)]
     )
     .build()
     let event = nodes.first { $0.id == "entry:plain-event" }

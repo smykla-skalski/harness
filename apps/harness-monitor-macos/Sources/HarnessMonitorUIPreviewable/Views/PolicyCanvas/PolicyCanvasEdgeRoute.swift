@@ -1,6 +1,6 @@
 import SwiftUI
 
-struct PolicyCanvasEdgeRoute {
+struct PolicyCanvasEdgeRoute: Equatable, Sendable {
   let points: [CGPoint]
   let labelPosition: CGPoint
 
