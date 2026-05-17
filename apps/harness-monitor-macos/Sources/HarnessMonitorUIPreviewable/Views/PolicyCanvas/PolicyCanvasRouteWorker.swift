@@ -21,6 +21,7 @@ actor PolicyCanvasRouteWorker {
     guard input != cachedInput else {
       return cachedOutput
     }
+    let prepared = PolicyCanvasPreparedRouteInput(input: input)
     let signpostID = Self.signposter.makeSignpostID()
     let interval = Self.signposter.beginInterval(
       "policy_canvas.routes.compute",
@@ -35,17 +36,21 @@ actor PolicyCanvasRouteWorker {
       )
     }
 
-    let routes = input.displayedRoutes(router: router)
-    let labelPositions = input.resolvedLabelPositions(routes: routes)
-    let visibleBounds = input.visibleBounds(
+    let nodeIndex = prepared.nodeIndex
+    let initialRoutes = prepared.displayedRoutes(router: router)
+    let portMarkerLayout = prepared.portMarkerLayout(routes: initialRoutes, nodeIndex: nodeIndex)
+    let routes = prepared.displayedRoutes(router: router, portMarkerLayout: portMarkerLayout)
+    let labelPositions = prepared.resolvedLabelPositions(routes: routes)
+    let visibleBounds = prepared.visibleBounds(
       routes: routes,
       labelPositions: labelPositions
     )
-    let nodeIndex = input.nodeIndex
-    let portVisibility = input.portVisibility(routes: routes, nodeIndex: nodeIndex)
-    let portMarkerLayout = input.portMarkerLayout(routes: routes, nodeIndex: nodeIndex)
-    let accessibilityEdgeEntries = input.accessibilityEdgeEntries(nodeIndex: nodeIndex)
-    let nodeAccessibilityValuesByID = input.nodeAccessibilityValuesByID(nodeIndex: nodeIndex)
+    let portVisibility = prepared.portVisibility(routes: routes, nodeIndex: nodeIndex)
+    let accessibilityEdgeEntries = prepared.accessibilityEdgeEntries(nodeIndex: nodeIndex)
+    let nodeAccessibilityValuesByID = prepared.nodeAccessibilityValuesByID(nodeIndex: nodeIndex)
+    let accessibilityNodeEntries = prepared.accessibilityNodeEntries()
+    let connectTargetsByNodeID = prepared.connectTargetsByNodeID()
+    let contentSize = policyCanvasVisibleContentSize(visibleBounds: visibleBounds)
     cachedInput = input
     cachedOutput = PolicyCanvasRouteWorkerOutput(
       routes: routes,
@@ -53,12 +58,12 @@ actor PolicyCanvasRouteWorker {
       portVisibility: portVisibility,
       portMarkerLayout: portMarkerLayout,
       visibleBounds: visibleBounds,
-      contentSize: policyCanvasVisibleContentSize(visibleBounds: visibleBounds),
+      contentSize: contentSize,
       accessibilityEdgeLabelsByID: Self.edgeLabelsByID(accessibilityEdgeEntries),
-      accessibilityNodeEntries: input.accessibilityNodeEntries(),
+      accessibilityNodeEntries: accessibilityNodeEntries,
       accessibilityEdgeEntries: accessibilityEdgeEntries,
       nodeAccessibilityValuesByID: nodeAccessibilityValuesByID,
-      connectTargetsByNodeID: input.connectTargetsByNodeID()
+      connectTargetsByNodeID: connectTargetsByNodeID
     )
     return cachedOutput
   }
@@ -81,7 +86,7 @@ struct PolicyCanvasRouteWorkerKey: Equatable {
 }
 
 struct PolicyCanvasRouteWorkerInput: Equatable, Sendable {
-  let nodes: [PolicyCanvasRouteNode]
+  let nodes: [PolicyCanvasNode]
   let groups: [PolicyCanvasGroup]
   let edges: [PolicyCanvasEdge]
   let fontScale: CGFloat
@@ -92,10 +97,24 @@ struct PolicyCanvasRouteWorkerInput: Equatable, Sendable {
     edges: [PolicyCanvasEdge],
     fontScale: CGFloat
   ) {
-    self.nodes = nodes.map(PolicyCanvasRouteNode.init(node:))
+    self.nodes = nodes
     self.groups = groups
     self.edges = edges
     self.fontScale = fontScale
+  }
+}
+
+struct PolicyCanvasPreparedRouteInput: Equatable, Sendable {
+  let nodes: [PolicyCanvasRouteNode]
+  let groups: [PolicyCanvasGroup]
+  let edges: [PolicyCanvasEdge]
+  let fontScale: CGFloat
+
+  init(input: PolicyCanvasRouteWorkerInput) {
+    nodes = input.nodes.map(PolicyCanvasRouteNode.init(node:))
+    groups = input.groups
+    edges = input.edges
+    fontScale = input.fontScale
   }
 
   var contentBounds: CGRect {
@@ -169,6 +188,7 @@ struct PolicyCanvasRouteWorkerInput: Equatable, Sendable {
 }
 
 struct PolicyCanvasRouteWorkerOutput: Equatable, Sendable {
+  let signature: PolicyCanvasRouteWorkerOutputSignature
   let routes: [String: PolicyCanvasEdgeRoute]
   let labelPositions: [String: CGPoint]
   let portVisibility: PolicyCanvasPortVisibilityMap
@@ -182,6 +202,7 @@ struct PolicyCanvasRouteWorkerOutput: Equatable, Sendable {
   let connectTargetsByNodeID: [String: [PolicyCanvasAccessibilityConnectTarget]]
 
   static let empty = Self(
+    signature: .empty,
     routes: [:],
     labelPositions: [:],
     portVisibility: [:],
@@ -196,24 +217,106 @@ struct PolicyCanvasRouteWorkerOutput: Equatable, Sendable {
   )
 
   static func fallback(for input: PolicyCanvasRouteWorkerInput) -> Self {
-    let visibleBounds = input.contentBounds
-    let nodeIndex = input.nodeIndex
-    let accessibilityEdgeEntries = input.accessibilityEdgeEntries(nodeIndex: nodeIndex)
-    let nodeAccessibilityValuesByID = input.nodeAccessibilityValuesByID(nodeIndex: nodeIndex)
+    let prepared = PolicyCanvasPreparedRouteInput(input: input)
+    let visibleBounds = prepared.contentBounds
+    let nodeIndex = prepared.nodeIndex
+    let accessibilityEdgeEntries = prepared.accessibilityEdgeEntries(nodeIndex: nodeIndex)
+    let nodeAccessibilityValuesByID = prepared.nodeAccessibilityValuesByID(nodeIndex: nodeIndex)
+    let accessibilityNodeEntries = prepared.accessibilityNodeEntries()
+    let connectTargetsByNodeID = prepared.connectTargetsByNodeID()
+    let contentSize = policyCanvasVisibleContentSize(visibleBounds: visibleBounds)
     return Self(
+      signature: PolicyCanvasRouteWorkerOutputSignature(
+        routes: [:],
+        labelPositions: [:],
+        portVisibility: [:],
+        visibleBounds: visibleBounds,
+        contentSize: contentSize,
+        accessibilityNodeEntries: accessibilityNodeEntries,
+        accessibilityEdgeEntries: accessibilityEdgeEntries,
+        nodeAccessibilityValuesByID: nodeAccessibilityValuesByID,
+        connectTargetsByNodeID: connectTargetsByNodeID
+      ),
       routes: [:],
       labelPositions: [:],
       portVisibility: [:],
       portMarkerLayout: .empty,
       visibleBounds: visibleBounds,
-      contentSize: policyCanvasVisibleContentSize(visibleBounds: visibleBounds),
+      contentSize: contentSize,
       accessibilityEdgeLabelsByID: Dictionary(
         uniqueKeysWithValues: accessibilityEdgeEntries.map { ($0.id, $0.label) }
       ),
-      accessibilityNodeEntries: input.accessibilityNodeEntries(),
+      accessibilityNodeEntries: accessibilityNodeEntries,
       accessibilityEdgeEntries: accessibilityEdgeEntries,
       nodeAccessibilityValuesByID: nodeAccessibilityValuesByID,
-      connectTargetsByNodeID: input.connectTargetsByNodeID()
+      connectTargetsByNodeID: connectTargetsByNodeID
+    )
+  }
+
+  init(
+    signature: PolicyCanvasRouteWorkerOutputSignature,
+    routes: [String: PolicyCanvasEdgeRoute],
+    labelPositions: [String: CGPoint],
+    portVisibility: PolicyCanvasPortVisibilityMap,
+    portMarkerLayout: PolicyCanvasPortMarkerLayout,
+    visibleBounds: CGRect,
+    contentSize: CGSize,
+    accessibilityEdgeLabelsByID: [String: String],
+    accessibilityNodeEntries: [PolicyCanvasAccessibilityNodeEntry],
+    accessibilityEdgeEntries: [PolicyCanvasAccessibilityEdgeEntry],
+    nodeAccessibilityValuesByID: [String: String],
+    connectTargetsByNodeID: [String: [PolicyCanvasAccessibilityConnectTarget]]
+  ) {
+    self.signature = signature
+    self.routes = routes
+    self.labelPositions = labelPositions
+    self.portVisibility = portVisibility
+    self.portMarkerLayout = portMarkerLayout
+    self.visibleBounds = visibleBounds
+    self.contentSize = contentSize
+    self.accessibilityEdgeLabelsByID = accessibilityEdgeLabelsByID
+    self.accessibilityNodeEntries = accessibilityNodeEntries
+    self.accessibilityEdgeEntries = accessibilityEdgeEntries
+    self.nodeAccessibilityValuesByID = nodeAccessibilityValuesByID
+    self.connectTargetsByNodeID = connectTargetsByNodeID
+  }
+
+  init(
+    routes: [String: PolicyCanvasEdgeRoute],
+    labelPositions: [String: CGPoint],
+    portVisibility: PolicyCanvasPortVisibilityMap,
+    portMarkerLayout: PolicyCanvasPortMarkerLayout,
+    visibleBounds: CGRect,
+    contentSize: CGSize,
+    accessibilityEdgeLabelsByID: [String: String],
+    accessibilityNodeEntries: [PolicyCanvasAccessibilityNodeEntry],
+    accessibilityEdgeEntries: [PolicyCanvasAccessibilityEdgeEntry],
+    nodeAccessibilityValuesByID: [String: String],
+    connectTargetsByNodeID: [String: [PolicyCanvasAccessibilityConnectTarget]]
+  ) {
+    self.init(
+      signature: PolicyCanvasRouteWorkerOutputSignature(
+        routes: routes,
+        labelPositions: labelPositions,
+        portVisibility: portVisibility,
+        visibleBounds: visibleBounds,
+        contentSize: contentSize,
+        accessibilityNodeEntries: accessibilityNodeEntries,
+        accessibilityEdgeEntries: accessibilityEdgeEntries,
+        nodeAccessibilityValuesByID: nodeAccessibilityValuesByID,
+        connectTargetsByNodeID: connectTargetsByNodeID
+      ),
+      routes: routes,
+      labelPositions: labelPositions,
+      portVisibility: portVisibility,
+      portMarkerLayout: portMarkerLayout,
+      visibleBounds: visibleBounds,
+      contentSize: contentSize,
+      accessibilityEdgeLabelsByID: accessibilityEdgeLabelsByID,
+      accessibilityNodeEntries: accessibilityNodeEntries,
+      accessibilityEdgeEntries: accessibilityEdgeEntries,
+      nodeAccessibilityValuesByID: nodeAccessibilityValuesByID,
+      connectTargetsByNodeID: connectTargetsByNodeID
     )
   }
 }

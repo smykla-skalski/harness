@@ -236,7 +236,7 @@ extension PolicyCanvasViewport {
     guard !Task.isCancelled, routeGeneration == generation else {
       return
     }
-    if cachedRouteOutput != output {
+    if cachedRouteOutput.signature != output.signature {
       cachedRouteOutput = output
     }
   }

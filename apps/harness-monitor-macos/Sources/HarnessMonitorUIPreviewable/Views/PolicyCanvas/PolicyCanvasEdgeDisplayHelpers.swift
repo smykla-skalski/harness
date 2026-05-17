@@ -11,6 +11,7 @@ struct PolicyCanvasDisplayedEdgeRouteRequest {
   let targetFanoutLane: Int
   let sourceTerminalSlot: PolicyCanvasRouteEndpointSlot
   let targetTerminalSlot: PolicyCanvasRouteEndpointSlot
+  let portMarkerLayout: PolicyCanvasPortMarkerLayout?
   let lineSpacing: CGFloat
   let obstacles: [CGRect]
 }
@@ -43,11 +44,49 @@ func policyCanvasDisplayedRoutes(
   portAnchors: [PolicyCanvasPortEndpoint: CGPoint],
   router: any PolicyCanvasEdgeRouter
 ) -> [String: PolicyCanvasEdgeRoute] {
+  let orderedEdges = policyCanvasRouteBuildOrder(edges: edges, portAnchors: portAnchors)
+  let terminalSlots = policyCanvasRouteEndpointSlots(edges: orderedEdges)
+  let initialRoutes = policyCanvasDisplayedRoutes(
+    viewModel: viewModel,
+    orderedEdges: orderedEdges,
+    portAnchors: portAnchors,
+    terminalSlots: terminalSlots,
+    portMarkerLayout: nil,
+    router: router
+  )
+  let markerInput = PolicyCanvasRouteWorkerInput(
+    nodes: viewModel.nodes,
+    groups: viewModel.groups,
+    edges: edges,
+    fontScale: 1
+  )
+  let preparedMarkerInput = PolicyCanvasPreparedRouteInput(input: markerInput)
+  let portMarkerLayout = preparedMarkerInput.portMarkerLayout(
+    routes: initialRoutes,
+    nodeIndex: preparedMarkerInput.nodeIndex
+  )
+  return policyCanvasDisplayedRoutes(
+    viewModel: viewModel,
+    orderedEdges: orderedEdges,
+    portAnchors: portAnchors,
+    terminalSlots: terminalSlots,
+    portMarkerLayout: portMarkerLayout,
+    router: router
+  )
+}
+
+@MainActor
+private func policyCanvasDisplayedRoutes(
+  viewModel: PolicyCanvasViewModel,
+  orderedEdges: [PolicyCanvasEdge],
+  portAnchors: [PolicyCanvasPortEndpoint: CGPoint],
+  terminalSlots: [String: PolicyCanvasRouteEndpointSlots],
+  portMarkerLayout: PolicyCanvasPortMarkerLayout?,
+  router: any PolicyCanvasEdgeRouter
+) -> [String: PolicyCanvasEdgeRoute] {
   let edgeLanes = viewModel.edgeRouteLanes
   let sourceFanoutLanes = viewModel.edgeSourceFanoutLanes
   let targetFanoutLanes = viewModel.edgeTargetFanoutLanes
-  let orderedEdges = policyCanvasRouteBuildOrder(edges: edges, portAnchors: portAnchors)
-  let terminalSlots = policyCanvasRouteEndpointSlots(edges: orderedEdges)
   var routes: [String: PolicyCanvasEdgeRoute] = [:]
   var previousRoutes: [PolicyCanvasDisplayedRouteClearance] = []
   for edge in orderedEdges {
@@ -67,6 +106,7 @@ func policyCanvasDisplayedRoutes(
         targetFanoutLane: targetFanoutLanes[edge.id, default: 0],
         sourceTerminalSlot: edgeTerminalSlots?.source ?? .single,
         targetTerminalSlot: edgeTerminalSlots?.target ?? .single,
+        portMarkerLayout: portMarkerLayout,
         lineSpacing: viewModel.edgeLineSpacing(for: edge),
         obstacles: viewModel.routingObstacles(source: source, target: target)
       )
@@ -92,17 +132,21 @@ func policyCanvasResolvedDisplayedRouteRequest(
 ) -> PolicyCanvasResolvedDisplayedRouteRequest {
   let sourceGroupID = request.viewModel.node(request.edge.source.nodeID)?.groupID
   let targetGroupID = request.viewModel.node(request.edge.target.nodeID)?.groupID
-  let sourceSide = policyCanvasResolvedPortSide(for: request.edge.source)
-  let targetSide = policyCanvasResolvedPortSide(for: request.edge.target)
+  let sourceTerminal = request.portMarkerLayout?.terminal(edgeID: request.edge.id, role: .source)
+  let targetTerminal = request.portMarkerLayout?.terminal(edgeID: request.edge.id, role: .target)
+  let sourceSide = sourceTerminal?.side ?? policyCanvasResolvedPortSide(for: request.edge.source)
+  let targetSide = targetTerminal?.side ?? policyCanvasResolvedPortSide(for: request.edge.target)
   let sourceCandidates = policyCanvasRouteAnchorCandidates(
     for: request.edge.source,
     in: request.viewModel,
-    terminalSlot: request.sourceTerminalSlot
+    terminalSlot: request.sourceTerminalSlot,
+    terminal: sourceTerminal
   )
   let targetCandidates = policyCanvasRouteAnchorCandidates(
     for: request.edge.target,
     in: request.viewModel,
-    terminalSlot: request.targetTerminalSlot
+    terminalSlot: request.targetTerminalSlot,
+    terminal: targetTerminal
   )
   return PolicyCanvasResolvedDisplayedRouteRequest(
     router: request.router,

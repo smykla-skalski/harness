@@ -60,7 +60,8 @@ struct PolicyCanvasRoutingTerminalTests {
       edges: edges,
       fontScale: 1
     )
-    let markerLayout = input.portMarkerLayout(routes: routes, nodeIndex: input.nodeIndex)
+    let prepared = PolicyCanvasPreparedRouteInput(input: input)
+    let markerLayout = prepared.portMarkerLayout(routes: routes, nodeIndex: prepared.nodeIndex)
 
     assertMarkerOffsets(
       viewModel: viewModel,

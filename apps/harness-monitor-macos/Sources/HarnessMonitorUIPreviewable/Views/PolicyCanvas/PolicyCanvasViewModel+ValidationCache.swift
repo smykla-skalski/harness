@@ -112,7 +112,8 @@ actor PolicyCanvasValidationWorker {
     guard input != cachedInput else {
       return cachedOutput
     }
-    let resolved = Self.resolvedIssues(input: input)
+    let prepared = PolicyCanvasPreparedValidationInput(input: input)
+    let resolved = Self.resolvedIssues(input: prepared)
     cachedInput = input
     cachedOutput = PolicyCanvasValidationPresentation(
       issues: resolved,
@@ -126,7 +127,7 @@ actor PolicyCanvasValidationWorker {
   func waitForIdle() async {}
 
   private static func resolvedIssues(
-    input: PolicyCanvasValidationWorkerInput
+    input: PolicyCanvasPreparedValidationInput
   ) -> [PolicyCanvasResolvedIssue] {
     let daemon = input.daemonIssues.enumerated().map { offset, issue in
       resolvedIssue(issue: issue, origin: "daemon", index: offset, input: input)
@@ -146,7 +147,7 @@ actor PolicyCanvasValidationWorker {
   }
 
   private static func validateGraph(
-    input: PolicyCanvasValidationWorkerInput
+    input: PolicyCanvasPreparedValidationInput
   ) -> [TaskBoardPolicyPipelineValidationIssue] {
     var issues: [TaskBoardPolicyPipelineValidationIssue] = []
     if let cycle = detectCycle(input: input) {
@@ -191,7 +192,7 @@ actor PolicyCanvasValidationWorker {
     return issues
   }
 
-  private static func detectCycle(input: PolicyCanvasValidationWorkerInput) -> [String]? {
+  private static func detectCycle(input: PolicyCanvasPreparedValidationInput) -> [String]? {
     var adjacency: [String: [String]] = [:]
     for edge in input.edges {
       adjacency[edge.source.nodeID, default: []].append(edge.target.nodeID)
@@ -227,7 +228,7 @@ actor PolicyCanvasValidationWorker {
   }
 
   private static func detectDuplicateTitles(
-    input: PolicyCanvasValidationWorkerInput
+    input: PolicyCanvasPreparedValidationInput
   ) -> [PolicyCanvasDuplicateTitleGroup] {
     let bucketed = Dictionary(grouping: input.nodes, by: \.title)
     return
@@ -245,7 +246,7 @@ actor PolicyCanvasValidationWorker {
       .sorted { $0.title < $1.title }
   }
 
-  private static func detectOrphanNodes(input: PolicyCanvasValidationWorkerInput) -> [String] {
+  private static func detectOrphanNodes(input: PolicyCanvasPreparedValidationInput) -> [String] {
     var hasEdge = Set<String>()
     for edge in input.edges {
       hasEdge.insert(edge.source.nodeID)
@@ -260,7 +261,7 @@ actor PolicyCanvasValidationWorker {
   }
 
   private static func detectErrorIntoAllowEdges(
-    input: PolicyCanvasValidationWorkerInput
+    input: PolicyCanvasPreparedValidationInput
   ) -> [PolicyCanvasErrorIntoAllowMatch] {
     input.edges.compactMap { edge -> PolicyCanvasErrorIntoAllowMatch? in
       guard edge.kind == .error,
@@ -286,7 +287,7 @@ actor PolicyCanvasValidationWorker {
     issue: TaskBoardPolicyPipelineValidationIssue,
     origin: String,
     index: Int,
-    input: PolicyCanvasValidationWorkerInput
+    input: PolicyCanvasPreparedValidationInput
   ) -> PolicyCanvasResolvedIssue {
     let severity = PolicyCanvasIssueSeverity.from(code: issue.code)
     let stableID = [
@@ -373,43 +374,6 @@ actor PolicyCanvasValidationWorker {
   private static let allowingRuleSuffixes: [String] = [
     "default-allow", "allow", "permit",
   ]
-}
-
-struct PolicyCanvasValidationWorkerInput: Equatable, Sendable {
-  let nodes: [PolicyCanvasValidationNode]
-  let edges: [PolicyCanvasEdge]
-  let daemonIssues: [TaskBoardPolicyPipelineValidationIssue]
-  let nodeIndex: [String: PolicyCanvasValidationNode]
-  let nodeIDs: Set<String>
-  let edgeIDs: Set<String>
-
-  @MainActor
-  init(
-    nodes: [PolicyCanvasNode],
-    edges: [PolicyCanvasEdge],
-    daemonIssues: [TaskBoardPolicyPipelineValidationIssue]
-  ) {
-    self.nodes = nodes.map(PolicyCanvasValidationNode.init(node:))
-    self.edges = edges
-    self.daemonIssues = daemonIssues
-    nodeIndex = Dictionary(uniqueKeysWithValues: self.nodes.map { ($0.id, $0) })
-    nodeIDs = Set(self.nodes.map(\.id))
-    edgeIDs = Set(edges.map(\.id))
-  }
-}
-
-struct PolicyCanvasValidationNode: Equatable, Sendable {
-  let id: String
-  let title: String
-  let groupID: String?
-  let policyKind: TaskBoardPolicyPipelineNodeKind?
-
-  init(node: PolicyCanvasNode) {
-    id = node.id
-    title = node.title
-    groupID = node.groupID
-    policyKind = node.policyKind
-  }
 }
 
 private struct PolicyCanvasDuplicateTitleGroup {

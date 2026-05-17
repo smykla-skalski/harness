@@ -1,6 +1,6 @@
 import SwiftUI
 
-extension PolicyCanvasRouteWorkerInput {
+extension PolicyCanvasPreparedRouteInput {
   func accessibilityNodeEntries() -> [PolicyCanvasAccessibilityNodeEntry] {
     nodes
       .sorted { left, right in
