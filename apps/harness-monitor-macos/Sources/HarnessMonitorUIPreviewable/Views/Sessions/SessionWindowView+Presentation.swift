@@ -36,6 +36,7 @@ struct SessionWindowDecisionCacheStorage {
   var matchingDecisions: [Decision] = []
   var matchingDecisionPresentationItems: [DecisionPresentationSnapshot] = []
   var allSessionDecisionIDs: Set<String> = []
+  var allSessionDecisionIDsInOrder: [String] = []
   var matchingDecisionIDs: Set<String> = []
   var matchingDecisionIDsInOrder: [String] = []
   var detailRenderedSelection: SessionSelection?

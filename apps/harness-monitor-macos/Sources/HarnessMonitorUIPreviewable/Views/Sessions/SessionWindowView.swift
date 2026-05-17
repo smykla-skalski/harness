@@ -226,6 +226,11 @@ public struct SessionWindowView: View {
     nonmutating set { decisionCacheStorage.allSessionDecisionIDs = newValue }
   }
 
+  var allSessionDecisionIDsInOrderCache: [String] {
+    get { decisionCacheStorage.allSessionDecisionIDsInOrder }
+    nonmutating set { decisionCacheStorage.allSessionDecisionIDsInOrder = newValue }
+  }
+
   var matchingDecisionIDsCache: Set<String> {
     get { decisionCacheStorage.matchingDecisionIDs }
     nonmutating set { decisionCacheStorage.matchingDecisionIDs = newValue }
@@ -320,7 +325,7 @@ public struct SessionWindowView: View {
         guard newRoute.layoutStyle == .sidebarDetail else { return }
         detailColumnWidth = 0
       }
-      .onChange(of: allSessionDecisions.map(\.id)) { _, _ in
+      .onChange(of: allSessionDecisionIDsInOrderCache) { _, _ in
         reconcileInspectorVisibility(
           visibleBinding: inspectorVisibleBinding,
           preferredBinding: inspectorPreferredBinding
