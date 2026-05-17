@@ -3,7 +3,7 @@ import SwiftUI
 
 /// Scope the Decisions sidebar search field matches against. Persisted between sessions so
 /// the last scope the operator picked comes back the way they left it.
-public enum DecisionsSidebarSearchScope: String, CaseIterable, Identifiable {
+public enum DecisionsSidebarSearchScope: String, CaseIterable, Identifiable, Sendable {
   case summary
   case ruleID
   case agent

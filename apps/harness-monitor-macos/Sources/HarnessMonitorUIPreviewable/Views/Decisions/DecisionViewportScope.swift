@@ -3,19 +3,45 @@ import HarnessMonitorKit
 
 public struct DecisionWorkspaceScope: Equatable {
   let decisions: [Decision]
+  let decisionsByID: [String: Decision]
   let filters: DecisionsSidebarViewModel.FilterState
   let visibleSnapshot: DecisionsSidebarViewModel.VisibleSnapshot
+  let presentation: DecisionsSidebarPresentation?
   let selectedDecisionID: String?
 
   public init(
     decisions: [Decision],
+    decisionsByID: [String: Decision]? = nil,
     filters: DecisionsSidebarViewModel.FilterState,
     visibleSnapshot: DecisionsSidebarViewModel.VisibleSnapshot,
     selectedDecisionID: String? = nil
   ) {
     self.decisions = decisions
+    self.decisionsByID = decisionsByID ?? Dictionary(uniqueKeysWithValues: decisions.map {
+      ($0.id, $0)
+    })
     self.filters = filters
     self.visibleSnapshot = visibleSnapshot
+    presentation = nil
+    self.selectedDecisionID = selectedDecisionID
+  }
+
+  public init(
+    decisions: [Decision],
+    decisionsByID: [String: Decision],
+    filters: DecisionsSidebarViewModel.FilterState,
+    presentation: DecisionsSidebarPresentation,
+    selectedDecisionID: String? = nil
+  ) {
+    self.decisions = decisions
+    self.decisionsByID = decisionsByID
+    self.filters = filters
+    visibleSnapshot = DecisionsSidebarViewModel.VisibleSnapshot(
+      groups: [],
+      decisionIDs: presentation.decisionIDs,
+      signature: presentation.signature
+    )
+    self.presentation = presentation
     self.selectedDecisionID = selectedDecisionID
   }
 
@@ -40,18 +66,24 @@ public struct DecisionWorkspaceScope: Equatable {
   }
 
   var visibleDecisionIDs: [String] {
-    visibleSnapshot.decisionIDs
+    if let presentation {
+      return presentation.decisionIDs
+    }
+    return visibleSnapshot.decisionIDs
   }
 
   var visibleDecisions: [Decision] {
-    groups.flatMap(\.decisions)
+    if let presentation {
+      return presentation.decisionIDs.compactMap { decisionsByID[$0] }
+    }
+    return groups.flatMap(\.decisions)
   }
 
   var selectedDecision: Decision? {
     guard let selectedDecisionID else {
       return nil
     }
-    return decisions.first { $0.id == selectedDecisionID }
+    return decisionsByID[selectedDecisionID]
   }
 
   var totalCount: Int {
@@ -59,23 +91,38 @@ public struct DecisionWorkspaceScope: Equatable {
   }
 
   var visibleCount: Int {
-    visibleDecisionIDs.count
+    if let presentation {
+      return presentation.visibleCount
+    }
+    return visibleDecisionIDs.count
   }
 
   var criticalCount: Int {
-    visibleDecisions.count(whereSeverityIs: .critical)
+    if let presentation {
+      return presentation.criticalCount
+    }
+    return visibleDecisions.count(whereSeverityIs: .critical)
   }
 
   var needsUserCount: Int {
-    visibleDecisions.count(whereSeverityIs: .needsUser)
+    if let presentation {
+      return presentation.needsUserCount
+    }
+    return visibleDecisions.count(whereSeverityIs: .needsUser)
   }
 
   var visibleCriticalDecisionIDs: [String] {
-    visibleDecisions.ids(whereSeverityIs: .critical)
+    if let presentation {
+      return presentation.visibleCriticalDecisionIDs
+    }
+    return visibleDecisions.ids(whereSeverityIs: .critical)
   }
 
   var visibleInfoDecisionIDs: [String] {
-    visibleDecisions.ids(whereSeverityIs: .info)
+    if let presentation {
+      return presentation.visibleInfoDecisionIDs
+    }
+    return visibleDecisions.ids(whereSeverityIs: .info)
   }
 
   var hasActiveFilters: Bool {
@@ -83,10 +130,16 @@ public struct DecisionWorkspaceScope: Equatable {
   }
 
   var countLabel: String {
-    hasActiveFilters ? "\(visibleCount)/\(totalCount)" : "\(totalCount)"
+    if let presentation {
+      return presentation.countLabel
+    }
+    return hasActiveFilters ? "\(visibleCount)/\(totalCount)" : "\(totalCount)"
   }
 
   var resultSummary: String {
+    if let presentation {
+      return presentation.resultSummary
+    }
     guard totalCount > 0 else {
       return "Decisions and related activity"
     }
@@ -100,6 +153,9 @@ public struct DecisionWorkspaceScope: Equatable {
   }
 
   var scopeDescription: String {
+    if let presentation {
+      return presentation.scopeDescription
+    }
     var segments: [String] = []
     if hasSearchQuery {
       segments.append("\(filters.scope.label) matching \"\(trimmedQuery)\"")
@@ -115,10 +171,16 @@ public struct DecisionWorkspaceScope: Equatable {
   }
 
   var emptyStateTitle: String {
-    totalCount == 0 ? "No active decisions" : "No matching decisions"
+    if let presentation {
+      return presentation.emptyStateTitle
+    }
+    return totalCount == 0 ? "No active decisions" : "No matching decisions"
   }
 
   var emptyStateDescription: String {
+    if let presentation {
+      return presentation.emptyStateDescription
+    }
     if totalCount == 0 {
       return "This area fills in when the workspace needs attention."
     }

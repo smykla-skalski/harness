@@ -214,6 +214,36 @@ final class DecisionsSidebarViewModelTests: XCTestCase {
     XCTAssertTrue(snapshot.signature.contains("scope=agent"))
   }
 
+  func test_presentationWorkerMatchesVisibleSnapshotOrdering() async {
+    let decisions = [
+      makeDecision(id: "d1", severity: .warn, summary: "agent warning", sessionID: "s1"),
+      makeDecision(id: "d2", severity: .critical, summary: "critical", sessionID: "s1"),
+      makeDecision(id: "d3", severity: .info, summary: "quiet", sessionID: "s2"),
+    ]
+    let filters = DecisionsSidebarViewModel.FilterState(
+      query: "",
+      severities: [],
+      scope: .summary
+    )
+    let expected = DecisionsSidebarViewModel.visibleSnapshot(
+      decisions: decisions,
+      filters: filters
+    )
+    let worker = DecisionsSidebarPresentationWorker()
+
+    let presentation = await worker.compute(
+      input: DecisionsSidebarPresentationInput(
+        items: decisions.map(DecisionPresentationItem.init),
+        filters: filters
+      )
+    )
+
+    XCTAssertEqual(presentation.decisionIDs, expected.decisionIDs)
+    XCTAssertEqual(presentation.signature, expected.signature)
+    XCTAssertEqual(presentation.visibleCount, expected.decisionIDs.count)
+    XCTAssertEqual(presentation.criticalCount, 1)
+  }
+
   func test_grouped_stableSessionOrderingByEarliestCreatedAt() {
     // Two sessions — seed in reverse insertion order, still expect sorted by first createdAt.
     let later = makeDecision(id: "later", severity: .warn, summary: "x", sessionID: "s-late")

@@ -5,12 +5,15 @@ import SwiftUI
 @Observable
 final class DecisionRuntime {
   var decisions: [Decision] = []
+  var decisionsByID: [String: Decision] = [:]
+  var decisionItems: [DecisionPresentationItem] = []
+  var decisionsRevision: UInt64 = 0
   var auditEvents: [SupervisorEventSnapshot] = []
   var liveTick: DecisionLiveTickSnapshot = .placeholder
 
   func reload(from store: HarnessMonitorStore?) async {
     guard let store else {
-      decisions = []
+      applyDecisions([])
       auditEvents = []
       liveTick = .placeholder
       return
@@ -18,13 +21,13 @@ final class DecisionRuntime {
 
     let decisionStore = await resolveDecisionStore(from: store)
     guard let decisionStore else {
-      decisions = []
+      applyDecisions([])
       auditEvents = []
       liveTick = .placeholder
       return
     }
 
-    decisions = (try? await decisionStore.openDecisions()) ?? []
+    applyDecisions((try? await decisionStore.openDecisions()) ?? [])
     auditEvents = await store.loadSupervisorAuditEventSnapshots()
     await refreshLiveTick(from: store)
   }
@@ -44,5 +47,12 @@ final class DecisionRuntime {
 
     await store.startSupervisor()
     return store.supervisorDecisionStore
+  }
+
+  private func applyDecisions(_ nextDecisions: [Decision]) {
+    decisions = nextDecisions
+    decisionsByID = Dictionary(uniqueKeysWithValues: nextDecisions.map { ($0.id, $0) })
+    decisionItems = nextDecisions.map(DecisionPresentationItem.init)
+    decisionsRevision &+= 1
   }
 }

@@ -9,9 +9,16 @@ public struct DecisionsSidebar: View {
   @Binding private var selectedDecisionID: String?
   @Binding private var filters: DecisionsSidebarViewModel.FilterState
   private let decisions: [Decision]
+  private let decisionsByIDOverride: [String: Decision]?
+  private let decisionsRevision: UInt64
+  private let presentationOverride: DecisionsSidebarPresentation?
   private let store: HarnessMonitorStore?
 
   @State private var query: String = ""
+  @State private var presentationWorker = DecisionsSidebarPresentationWorker()
+  @State private var cachedPresentation = DecisionsSidebarPresentation.empty
+  @State private var cachedDecisionsByID: [String: Decision] = [:]
+  @State private var presentationGeneration: UInt64 = 0
 
   @AppStorage("harness.decisions.sidebar.filterExpanded")
   private var filterExpanded: Bool = true
@@ -27,6 +34,9 @@ public struct DecisionsSidebar: View {
 
   public init(
     decisions: [Decision] = [],
+    decisionsByID: [String: Decision]? = nil,
+    decisionsRevision: UInt64 = 0,
+    presentation: DecisionsSidebarPresentation? = nil,
     selection: Binding<String?> = .constant(nil),
     filters: Binding<DecisionsSidebarViewModel.FilterState> = .constant(
       .init(query: "", severities: [], scope: .summary)
@@ -34,6 +44,9 @@ public struct DecisionsSidebar: View {
     store: HarnessMonitorStore? = nil
   ) {
     self.decisions = decisions
+    decisionsByIDOverride = decisionsByID
+    self.decisionsRevision = decisionsRevision
+    presentationOverride = presentation
     self.store = store
     _selectedDecisionID = selection
     _filters = filters
@@ -55,15 +68,28 @@ public struct DecisionsSidebar: View {
     severitiesCSV = newValue.map(\.rawValue).sorted().joined(separator: ",")
   }
 
-  private var visibleSnapshot: DecisionsSidebarViewModel.VisibleSnapshot {
-    DecisionsSidebarViewModel.visibleSnapshot(
+  private var presentationTaskKey: DecisionsSidebarPresentationTaskKey {
+    DecisionsSidebarPresentationTaskKey(
+      decisionsRevision: decisionsRevision,
       decisions: decisions,
-      filters: .init(
-        query: query,
-        severities: selectedSeverities,
-        scope: searchScope
-      )
+      filters: currentFilters
     )
+  }
+
+  private var currentFilters: DecisionsSidebarViewModel.FilterState {
+    .init(
+      query: query,
+      severities: selectedSeverities,
+      scope: searchScope
+    )
+  }
+
+  private var activePresentation: DecisionsSidebarPresentation {
+    presentationOverride ?? cachedPresentation
+  }
+
+  private var activeDecisionsByID: [String: Decision] {
+    decisionsByIDOverride ?? cachedDecisionsByID
   }
 
   private func lastAcpMessageAt(
@@ -105,6 +131,31 @@ public struct DecisionsSidebar: View {
     }
     .onChange(of: filters) { _, newValue in
       applyExternalFilters(newValue)
+    }
+    .task(id: presentationTaskKey) {
+      await rebuildPresentationIfNeeded()
+    }
+  }
+
+  @MainActor
+  private func rebuildPresentationIfNeeded() async {
+    guard presentationOverride == nil else {
+      return
+    }
+    presentationGeneration &+= 1
+    let generation = presentationGeneration
+    let localDecisionsByID = Dictionary(uniqueKeysWithValues: decisions.map { ($0.id, $0) })
+    let input = DecisionsSidebarPresentationInput(
+      items: decisions.map(DecisionPresentationItem.init),
+      filters: currentFilters
+    )
+    let presentation = await presentationWorker.compute(input: input)
+    guard !Task.isCancelled, presentationGeneration == generation else {
+      return
+    }
+    cachedDecisionsByID = localDecisionsByID
+    if cachedPresentation != presentation {
+      cachedPresentation = presentation
     }
   }
 
@@ -246,7 +297,7 @@ public struct DecisionsSidebar: View {
   }
 
   @ViewBuilder private var content: some View {
-    let visibleGroups = visibleSnapshot.groups
+    let visibleGroups = activePresentation.groups
     if visibleGroups.isEmpty {
       emptyState
     } else {
@@ -256,7 +307,7 @@ public struct DecisionsSidebar: View {
           spacing: HarnessMonitorTheme.spacingMD,
           pinnedViews: [.sectionHeaders]
         ) {
-          ForEach(visibleGroups, id: \.sessionID) { group in
+          ForEach(visibleGroups) { group in
             sessionSection(group)
           }
         }
@@ -279,18 +330,21 @@ public struct DecisionsSidebar: View {
   }
 
   private func sessionSection(
-    _ group: DecisionsSidebarViewModel.SessionGroup
+    _ group: DecisionsSidebarPresentationGroup
   ) -> some View {
     Section {
-      ForEach(group.decisions, id: \.id) { decision in
-        DecisionRow(
-          decision: decision,
-          selection: $selectedDecisionID,
-          selectionValue: decision.id,
-          fontScale: fontScale,
-          acpPayload: acpPayload(for: decision),
-          lastMessageAt: lastAcpMessageAt(for: decision)
-        )
+      let decisionsByID = activeDecisionsByID
+      ForEach(group.decisionIDs, id: \.self) { decisionID in
+        if let decision = decisionsByID[decisionID] {
+          DecisionRow(
+            decision: decision,
+            selection: $selectedDecisionID,
+            selectionValue: decision.id,
+            fontScale: fontScale,
+            acpPayload: acpPayload(for: decision),
+            lastMessageAt: lastAcpMessageAt(for: decision)
+          )
+        }
       }
     } header: {
       sessionHeader(group)
@@ -298,14 +352,14 @@ public struct DecisionsSidebar: View {
   }
 
   private func sessionHeader(
-    _ group: DecisionsSidebarViewModel.SessionGroup
+    _ group: DecisionsSidebarPresentationGroup
   ) -> some View {
     HStack {
       Text(group.sessionID.map(humanizedWorkspaceLabel) ?? "Shared context")
         .scaledFont(.caption.weight(.semibold))
         .foregroundStyle(.secondary)
       Spacer()
-      Text("\(group.decisions.count)")
+      Text("\(group.decisionIDs.count)")
         .scaledFont(.caption)
         .foregroundStyle(.secondary)
         .monospacedDigit()
