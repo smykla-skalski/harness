@@ -229,7 +229,7 @@ extension SessionCacheService {
         count += 1
       }
     }
-    HarnessMonitorLogger.lifecycle.info(
+    HarnessMonitorLogger.lifecycle.debug(
       """
       session-window quit snapshot persisted=\(didPersist, privacy: .public) \
       sessions=\(snapshot.sessionIDs.count, privacy: .public) \
