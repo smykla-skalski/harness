@@ -125,6 +125,24 @@ struct PolicyCanvasDisplayedRouteBridgeTests {
     #expect(lane2.points[2].x < lane3.points[2].x)
   }
 
+  @Test("Bottom-side fanout does not add lateral doglegs")
+  func bottomSideFanoutDoesNotAddLateralDoglegs() {
+    let route = policyCanvasDisplayedRoute(
+      PolicyCanvasPinnedDisplayedRouteRequest(
+        router: StubRouteRouter(),
+        source: (point: CGPoint(x: 100, y: 100), side: .bottom),
+        sourceFanoutLane: 2,
+        target: (point: CGPoint(x: 400, y: 240), side: .top),
+        targetFanoutLane: 0,
+        context: context(lane: 2)
+      )
+    )
+
+    #expect(route.points[0] == CGPoint(x: 100, y: 100))
+    #expect(route.points[1].x == route.points[0].x)
+    #expect(route.points[1].y > route.points[0].y)
+  }
+
   @Test("Displayed routes keep final bridge segments out of obstacles")
   func displayedRoutesKeepFinalBridgeSegmentsOutOfObstacles() {
     let obstacle = CGRect(x: 280, y: 50, width: 120, height: 120)
