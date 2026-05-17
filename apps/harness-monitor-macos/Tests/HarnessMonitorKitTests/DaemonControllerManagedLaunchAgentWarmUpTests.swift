@@ -48,6 +48,7 @@ struct DaemonControllerManagedLaunchAgentWarmUpTests {
       let probedEndpoints = EndpointProbeRecorder()
       let controller = DaemonController(
         environment: environment,
+        transportPreference: .http,
         launchAgentManager: manager,
         ownership: .managed,
         sessionFactory: { _ in client },
@@ -106,6 +107,7 @@ struct DaemonControllerManagedLaunchAgentWarmUpTests {
         let probedEndpoints = EndpointProbeRecorder()
         let controller = DaemonController(
           environment: environment,
+          transportPreference: .http,
           launchAgentManager: manager,
           ownership: .managed,
           sessionFactory: { _ in client },
@@ -192,6 +194,7 @@ struct DaemonControllerManagedLaunchAgentWarmUpTests {
         let probedEndpoints = EndpointProbeRecorder()
         let controller = DaemonController(
           environment: environment,
+          transportPreference: .http,
           launchAgentManager: manager,
           ownership: .managed,
           sessionFactory: { _ in client },
@@ -268,6 +271,7 @@ struct DaemonControllerManagedLaunchAgentWarmUpTests {
         let probedEndpoints = EndpointProbeRecorder()
         let controller = DaemonController(
           environment: environment,
+          transportPreference: .http,
           launchAgentManager: manager,
           ownership: .managed,
           sessionFactory: { _ in client },
@@ -350,6 +354,7 @@ struct DaemonControllerManagedLaunchAgentWarmUpTests {
         let probedEndpoints = EndpointProbeRecorder()
         let controller = DaemonController(
           environment: environment,
+          transportPreference: .http,
           launchAgentManager: manager,
           ownership: .managed,
           sessionFactory: { _ in client },

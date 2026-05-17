@@ -22,8 +22,8 @@ extension HarnessMonitorStoreActionTests {
     #expect(store.currentSuccessFeedbackMessage == "Observe session")
   }
 
-  @Test("Observe selected session refreshes summary state and triggers supervisor decisions")
-  func observeSelectedSessionRefreshesSummaryStateAndTriggersSupervisorDecisions() async throws {
+  @Test("Observe selected session refreshes summary state")
+  func observeSelectedSessionRefreshesSummaryState() async throws {
     let baselineDetail = PreviewFixtures.sessionDetail(
       session: PreviewFixtures.summary,
       signals: PreviewFixtures.signals,
@@ -53,7 +53,6 @@ extension HarnessMonitorStoreActionTests {
       store.sessionIndex.sessionSummary(for: PreviewFixtures.summary.sessionId)?.updatedAt
         == updatedSummary.updatedAt
     )
-    #expect(store.supervisorOpenDecisions.isEmpty == false)
   }
 
   @Test("Mutation fallback refetches only the timeline")

@@ -152,7 +152,7 @@ struct SessionWindowRouteContentMetricsTests {
   func dashboardStartsFromGlobalTaskBoard() throws {
     let dashboardSource = try previewableSourceFile(
       domain: "Dashboard",
-      named: "DashboardWindowView.swift"
+      named: "DashboardWindowSupport.swift"
     )
 
     #expect(dashboardSource.contains("TaskBoardOverviewHost("))
@@ -165,7 +165,7 @@ struct SessionWindowRouteContentMetricsTests {
     #expect(dashboardSource.contains("dashboardUI.taskBoardOrchestratorStatus"))
     #expect(dashboardSource.contains("decisions: store.supervisorOpenDecisions"))
     #expect(dashboardSource.contains("horizontalPadding: 0"))
-    #expect(dashboardSource.contains(".ignoresSafeArea(.container, edges: .top)"))
+    #expect(!dashboardSource.contains(".ignoresSafeArea(.container, edges: .top)"))
     #expect(dashboardSource.contains(".padding(.horizontal, detailRowHorizontalPadding)"))
   }
 
@@ -174,7 +174,7 @@ struct SessionWindowRouteContentMetricsTests {
     let routeContentSource = try sourceFile(named: "SessionWindowRouteContent.swift")
     let dashboardSource = try previewableSourceFile(
       domain: "Dashboard",
-      named: "DashboardWindowView.swift"
+      named: "DashboardWindowSupport.swift"
     )
     let hostSource = try taskBoardSourceFile(named: "TaskBoardOverviewHost.swift")
 
@@ -197,7 +197,7 @@ struct SessionWindowRouteContentMetricsTests {
 
   @Test("Task board controls stay explicit after chrome cleanup")
   func taskBoardControlsStayExplicitAfterChromeCleanup() throws {
-    let overviewSource = try taskBoardSourceFile(named: "TaskBoardOverviewView.swift")
+    let overviewSource = try taskBoardOverviewSource()
     let orchestratorSource = try taskBoardSourceFile(
       named: "TaskBoardOrchestratorSummaryView.swift"
     )
@@ -211,8 +211,8 @@ struct SessionWindowRouteContentMetricsTests {
     )
     #expect(orchestratorSource.contains(".harnessActionButtonStyle(variant: .prominent"))
     #expect(managementPanelSource.contains("Label(\"Refresh\", systemImage: \"arrow.clockwise\")"))
-    #expect(overviewSource.contains("headerAccessoryRow"))
-    #expect(!overviewSource.contains("Spacer(minLength: HarnessMonitorTheme.spacingMD)"))
+    #expect(overviewSource.contains("boardAccessoryRow"))
+    #expect(overviewSource.contains("headerActionButtons"))
   }
 
   @Test("Task board operations panel prefers a three-card row")
@@ -225,7 +225,7 @@ struct SessionWindowRouteContentMetricsTests {
     let supportSource = try taskBoardSourceFile(named: "TaskBoardOverviewSupport.swift")
 
     #expect(operationsSource.contains("TaskBoardOperationsPanelLayout("))
-    #expect(layoutSource.contains("ViewThatFits(in: .horizontal)"))
+    #expect(layoutSource.contains("@State private var fitsHorizontally = true"))
     #expect(layoutSource.contains("HStack(alignment: .top, spacing: metrics.columnSpacing)"))
     #expect(layoutSource.contains("TaskBoardOperationsPanelColumn("))
     #expect(layoutSource.contains("minWidth: metrics.operationsCardMinWidth"))
@@ -237,7 +237,7 @@ struct SessionWindowRouteContentMetricsTests {
     #expect(componentsSource.contains("Picker(\"\", selection: selection)"))
     #expect(componentsSource.contains(".labelsHidden()"))
     #expect(componentsSource.contains(".toggleStyle(.switch)"))
-    #expect(componentsSource.contains("Color(nsColor: .controlBackgroundColor)"))
+    #expect(componentsSource.contains("TextField(\"\", text: text, prompt: Text(prompt))"))
     #expect(componentsSource.contains("alignment: .trailing"))
     #expect(componentsSource.contains("alignment: .leading"))
     #expect(!componentsSource.contains("Form {"))
@@ -249,7 +249,7 @@ struct SessionWindowRouteContentMetricsTests {
 
   @Test("Board-only task board items have a management surface")
   func boardOnlyTaskBoardItemsHaveManagementSurface() throws {
-    let overviewSource = try taskBoardSourceFile(named: "TaskBoardOverviewView.swift")
+    let overviewSource = try taskBoardOverviewSource()
     let managementPanelSource = try taskBoardSourceFile(named: "TaskBoardItemManagementPanel.swift")
     let managementSupportSource = try taskBoardSourceFile(
       named: "TaskBoardItemManagementSupport.swift"
@@ -279,7 +279,7 @@ struct SessionWindowRouteContentMetricsTests {
 
   @Test("Task board lanes expose card drag and lane drop")
   func taskBoardLanesExposeCardDragAndLaneDrop() throws {
-    let overviewSource = try taskBoardSourceFile(named: "TaskBoardOverviewView.swift")
+    let overviewSource = try taskBoardOverviewSource()
     let laneSource = try taskBoardSourceFile(named: "TaskBoardLaneViews.swift")
     let laneSupportSource = try taskBoardSourceFile(named: "TaskBoardLaneSupport.swift")
     let unifiedSource = try taskBoardSourceFile(named: "TaskBoardLaneUnifiedColumn.swift")
@@ -341,6 +341,13 @@ struct SessionWindowRouteContentMetricsTests {
 
   private func taskBoardSourceFile(named relativePath: String) throws -> String {
     try previewableSourceFile(domain: "TaskBoard", named: relativePath)
+  }
+
+  private func taskBoardOverviewSource() throws -> String {
+    try [
+      taskBoardSourceFile(named: "TaskBoardOverviewView.swift"),
+      taskBoardSourceFile(named: "TaskBoardOverviewView+Support.swift"),
+    ].joined(separator: "\n")
   }
 
   private func previewableSourceFile(domain: String, named relativePath: String) throws -> String {

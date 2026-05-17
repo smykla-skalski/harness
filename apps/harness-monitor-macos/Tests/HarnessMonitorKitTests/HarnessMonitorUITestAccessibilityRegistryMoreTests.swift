@@ -19,11 +19,11 @@ struct HarnessMonitorUITestAccessibilityRegistryMoreTests {
     #expect(HarnessMonitorAccessibility.mcpBanner == "harness.content.mcp.banner")
 
     let sessionToolbar = try sourceFile(named: "SessionWindowToolbar.swift")
-    let bannerStack = try sourceFile(named: "SessionBannerStack.swift")
+    let windowChromeBanners = try sourceFile(named: "WindowChromeBanners.swift")
     let settingsMCP = try sourceFile(named: "SettingsMCPSection.swift")
 
     #expect(!sessionToolbar.contains("mcpToolbarStatus"))
-    #expect(bannerStack.contains("MCPStatusBanner(status: chrome.mcpStatus)"))
+    #expect(windowChromeBanners.contains("MCPStatusBanner(status: contentChrome.mcpStatus)"))
     #expect(settingsMCP.contains("settingsMCPStatus"))
   }
 
@@ -110,7 +110,7 @@ struct HarnessMonitorUITestAccessibilityRegistryMoreTests {
 
   @Test("Dashboard route sidebar stays accessibility-addressable")
   func dashboardRouteSidebarStaysAccessibilityAddressable() throws {
-    let dashboardView = try sourceFile(named: "DashboardWindowView.swift")
+    let dashboardView = try sourceFile(named: "DashboardWindowSupport.swift")
     let sharedSidebarView = try sourceFile(named: "HarnessMonitorSidebar.swift")
 
     #expect(dashboardView.contains("HarnessMonitorAccessibility.dashboardSidebar"))
@@ -203,13 +203,13 @@ struct HarnessMonitorUITestAccessibilityRegistryMoreTests {
   @Test("Shared toolbar and probe views publish MCP tracking")
   func sharedToolbarAndProbeViewsPublishMCPTracking() throws {
     let accessibilitySupport = try sourceFile(named: "HarnessMonitorAccessibilitySupport.swift")
-    let dashboardView = try sourceFile(named: "DashboardWindowView.swift")
+    let dashboardToolbar = try sourceFile(named: "DashboardWindowToolbar.swift")
     let sessionToolbar = try sourceFile(named: "SessionWindowToolbar.swift")
     let sleepToolbarButton = try sourceFile(named: "SleepPreventionToolbarButton.swift")
     let sessionAttentionToolbarButton = try sourceFile(named: "SessionAttentionToolbarButton.swift")
 
     #expect(accessibilitySupport.contains(".harnessMCPText("))
-    #expect(dashboardView.contains(".harnessMCPButton("))
+    #expect(dashboardToolbar.contains(".harnessMCPButton("))
     #expect(sessionToolbar.contains(".harnessMCPButton("))
     #expect(sleepToolbarButton.contains(".harnessMCPButton("))
     #expect(sessionAttentionToolbarButton.contains(".harnessMCPButton("))

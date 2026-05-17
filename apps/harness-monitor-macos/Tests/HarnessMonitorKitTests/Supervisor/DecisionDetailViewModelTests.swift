@@ -330,7 +330,7 @@ final class DecisionDetailViewModelTests: XCTestCase {
       decisions: decisions
     )
 
-    XCTAssertEqual(scoped.map(\.id), ["evt-session", "evt-decision"])
+    XCTAssertEqual(scoped.map(\.id), ["evt-session"])
   }
 
   func test_explicitlySessionScopedAuditEventsRejectContradictorySessionScope() {

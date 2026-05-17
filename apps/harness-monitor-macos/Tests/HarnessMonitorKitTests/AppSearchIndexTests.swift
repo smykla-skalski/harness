@@ -101,7 +101,7 @@ struct AppSearchIndexTests {
     await index.reindex(decisions: [makeDecisionProjection(id: "d1", summary: "alpha decision")])
     await index.reindex(tasks: [makeTask(id: "t1", title: "alpha task")])
     await index.reindex(events: [makeEvent(id: "e1", summary: "alpha event")])
-    let results = await index.search(query: "alpha", primary: nil)
+    let results = await index.search(query: "alpha", primary: nil, fallbackK: 2)
     let domains = results.sections.map(\.domain)
     #expect(domains == [.tasks, .agents, .timeline, .decisions])
   }
@@ -235,7 +235,7 @@ struct AppSearchIndexTests {
       makeDecisionProjection(id: "d1", summary: "alpha decision one"),
       makeDecisionProjection(id: "d2", summary: "alpha decision two"),
     ])
-    let results = await index.search(query: "alpha", primary: nil)
+    let results = await index.search(query: "alpha", primary: nil, fallbackK: 2)
     #expect(results.totalHitCount == 3)
     #expect(results.isEmpty == false)
   }
