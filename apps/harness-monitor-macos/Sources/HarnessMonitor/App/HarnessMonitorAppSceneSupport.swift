@@ -74,7 +74,7 @@ struct DashboardWindowRootView: View {
       liveContent
     }
     .suppressToolbarBaselineSeparator(
-      markedAs: HarnessMonitorAccessibility.dashboardWindowToolbarSeparatorSuppressed,
+      markedAs: HarnessMonitorAccessibility.dashboardToolbarSeparatorSuppressed,
       titlebarAppearsTransparent: true
     )
     .modifier(WorkspaceToolbarUITestForceTickModifier(store: store))

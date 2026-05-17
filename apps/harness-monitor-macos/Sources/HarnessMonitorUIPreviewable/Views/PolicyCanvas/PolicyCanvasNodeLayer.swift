@@ -44,7 +44,6 @@ struct PolicyCanvasNodeLayer: View {
       )
       .offset(x: node.position.x, y: node.position.y)
       .focusable()
-      .focusEffectDisabled()
       .focused($focusedNodeID, equals: node.id)
       .accessibilityFocused($accessibilityFocusedNodeID, equals: node.id)
       .accessibilityFocused(focusedComponent, equals: .node(node.id))

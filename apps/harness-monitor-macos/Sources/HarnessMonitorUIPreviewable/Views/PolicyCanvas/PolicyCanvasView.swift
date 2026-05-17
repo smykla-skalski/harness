@@ -18,8 +18,8 @@ extension View {
 }
 
 public struct PolicyCanvasView: View {
-  private static let labRemoteActionDisabledReason = "Disabled in Policy Canvas Lab"
-  private static let missingStoreRemoteActionDisabledReason =
+  static let labRemoteActionDisabledReason = "Disabled in Policy Canvas Lab"
+  static let missingStoreRemoteActionDisabledReason =
     "Unavailable without a live policy store"
   @State private var viewModelState: PolicyCanvasViewModel
   @State private var isShowingPromoteConfirmationState = false
@@ -383,85 +383,4 @@ public struct PolicyCanvasView: View {
     applyDashboardSnapshot()
   }
 
-  /// Hashable snapshot of the dashboard slices that feed the canvas. Changing
-  /// any of the three fields triggers a single `.onChange` instead of two
-  /// separate `.onChange` blocks that both clobbered local edits.
-  private var dashboardSnapshot: DashboardCanvasSnapshot {
-    DashboardCanvasSnapshot(
-      document: dashboardUI?.taskBoardPolicyPipeline,
-      simulation: dashboardUI?.taskBoardPolicySimulation,
-      audit: dashboardUI?.taskBoardPolicyAudit
-    )
-  }
-
-  var remoteActionsEnabled: Bool {
-    allowsRemoteActions && store != nil
-  }
-
-  var remoteActionDisabledReason: String {
-    if !allowsRemoteActions {
-      return Self.labRemoteActionDisabledReason
-    }
-    return Self.missingStoreRemoteActionDisabledReason
-  }
-
-  /// True when there is a simulation result the user could view. Toggle is
-  /// disabled when this is false — there's nothing to show.
-  private var simulationOverlayAvailable: Bool {
-    viewModel.latestSimulation != nil
-  }
-
-  /// Effective overlay visibility. The user's explicit override wins when
-  /// set; otherwise auto-show whenever the user is on the simulation tab
-  /// and a simulation is available. The default-on-simulation-tab heuristic
-  /// makes the overlay self-explaining: the user clicks Simulate, the tab
-  /// flips to Simulation, and the canvas immediately shows verdicts. The
-  /// override path lets advanced users pin or hide the overlay across tab
-  /// switches.
-  private var simulationOverlayResolved: Bool {
-    guard simulationOverlayAvailable else {
-      return false
-    }
-    if let override = simulationOverlayOverride {
-      return override
-    }
-    return viewModel.selectedTab == .simulation
-  }
-
-  /// Flip the explicit override. We don't try to be clever about returning
-  /// to the auto path — the user clicked, so they want a sticky choice.
-  /// They can drop the override by re-running a simulation (which clears it
-  /// implicitly via `applyDashboardSnapshot` -> dropOverride is not yet
-  /// auto-driven; we keep the override sticky on purpose for now).
-  private func toggleSimulationOverlay() {
-    simulationOverlayOverride = !simulationOverlayResolved
-  }
-
-  /// Bind the view model's status callback to the local `@State` status line.
-  /// Captured `_statusLine` is reference-backed by SwiftUI, so closure writes
-  /// land in the same storage even though the view struct is a value.
-  private func bindStatusLine() {
-    viewModel.statusCallback = { @MainActor newStatus in
-      statusLine = newStatus
-    }
-  }
-
-  /// Bind the view model's autosave trigger. The view-model fires it from
-  /// every dirty-flipping mutation site (via `markDocumentDirty()`); the
-  /// trigger schedules a debounced save through the same daemon path as
-  /// the foreground Save button. Suppression cases (no backing document,
-  /// foreground save in flight, rollback armed) are owned by
-  /// `scheduleAutosave` inside the view-model.
-  private func bindAutosaveTrigger() {
-    if suppressesAutosave || !remoteActionsEnabled {
-      viewModel.cancelAutosave()
-      viewModel.autosaveTrigger = nil
-      return
-    }
-    viewModel.autosaveTrigger = { @MainActor in
-      viewModel.scheduleAutosave {
-        performSave(reason: .autosave)
-      }
-    }
-  }
 }

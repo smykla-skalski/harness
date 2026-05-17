@@ -37,7 +37,7 @@ extension HarnessMonitorStore {
   /// Minimum daemon wire version this build of the app is compatible with.
   /// Bumped in lockstep with the daemon's `DAEMON_WIRE_VERSION` when a
   /// breaking schema change ships.
-  public nonisolated static let minimumDaemonWireVersion: Int = 2
+  nonisolated public static let minimumDaemonWireVersion: Int = 2
 
   /// True when the connected daemon's `wire_version` predates the
   /// [`Self.minimumDaemonWireVersion`] this app expects.

@@ -105,13 +105,41 @@ struct TaskBoardItemManagementPanel: View {
     projectTypeSuggestions = await TaskBoardHostProjectTypeSuggestions.load(from: store)
   }
 
-  private var routesToEditor: some View {
-    TaskBoardItemRoutesToEditor(
-      targetProjectTypes: $draft.targetProjectTypes,
-      suggestions: projectTypeSuggestions,
-      metrics: metrics,
-      isActionInFlight: isActionInFlight
-    )
+  var panelCaptionSemibold: Font {
+    captionSemibold
+  }
+
+  var targetProjectTypesBinding: Binding<[String]> {
+    $draft.targetProjectTypes
+  }
+
+  var projectTypeSuggestionValues: [String] {
+    projectTypeSuggestions
+  }
+
+  var visibleExternalRefIDs: [UUID] {
+    draft.monitorVisibleExternalRefIDs
+  }
+
+  var visibleExternalRefs: [TaskBoardExternalRef] {
+    draft.monitorVisibleExternalRefs
+  }
+
+  func appendExternalRefDraft() {
+    draft.externalRefs.append(TaskBoardExternalRefDraft())
+  }
+
+  func removeExternalRefDraft(id: UUID) {
+    draft.externalRefs.removeAll { $0.id == id }
+  }
+
+  func externalRefBinding(
+    for refID: UUID
+  ) -> Binding<TaskBoardExternalRefDraft>? {
+    guard let index = draft.externalRefs.firstIndex(where: { $0.id == refID }) else {
+      return nil
+    }
+    return $draft.externalRefs[index]
   }
 
   private var header: some View {
@@ -207,28 +235,6 @@ struct TaskBoardItemManagementPanel: View {
         .font(captionFont)
         .foregroundStyle(HarnessMonitorTheme.secondaryInk)
         .textSelection(.enabled)
-    }
-  }
-
-  private var externalRefsEditor: some View {
-    VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
-      HStack {
-        Text("External Refs")
-          .font(captionSemibold)
-          .foregroundStyle(HarnessMonitorTheme.secondaryInk)
-        Spacer()
-        Button {
-          draft.externalRefs.append(TaskBoardExternalRefDraft())
-        } label: {
-          Label("Add Ref", systemImage: "plus")
-            .font(captionSemibold)
-        }
-        .controlSize(HarnessMonitorControlMetrics.compactControlSize)
-        .disabled(isActionInFlight)
-      }
-      ForEach(draft.monitorVisibleExternalRefIDs, id: \.self) { refID in
-        externalRefEditorRow(refID: refID)
-      }
     }
   }
 
@@ -360,63 +366,11 @@ struct TaskBoardItemManagementPanel: View {
     return facts
   }
 
-  private var externalDestinations: [TaskBoardExternalDestination] {
-    var destinations = draft.monitorVisibleExternalRefs.compactMap(externalDestination)
-    if let prUrl = item?.workflow?.prUrl, let url = URL(string: prUrl) {
-      destinations.append(TaskBoardExternalDestination(label: "Pull Request", url: url))
-    }
-    return destinations
-  }
-
-  @ViewBuilder
-  private func externalRefEditorRow(refID: UUID) -> some View {
-    if let ref = externalRefBinding(for: refID) {
-      HStack(alignment: .top, spacing: HarnessMonitorTheme.spacingSM) {
-        TaskBoardManagementReadOnlyField(
-          label: "Provider",
-          value: ref.wrappedValue.provider.title
-        )
-        TaskBoardManagementNativeField(label: "External ID", text: ref.externalId)
-        TaskBoardManagementNativeField(label: "URL", text: ref.url)
-        Button(role: .destructive) {
-          draft.externalRefs.removeAll { $0.id == ref.wrappedValue.id }
-        } label: {
-          Image(systemName: "trash")
-            .accessibilityHidden(true)
-        }
-        .buttonStyle(.borderless)
-        .frame(minWidth: metrics.iconControlMinWidth, minHeight: metrics.controlMinHeight)
-        .help("Remove external ref")
-        .accessibilityLabel("Remove external ref")
-      }
-    }
-  }
-
-  private func externalRefBinding(
-    for refID: UUID
-  ) -> Binding<TaskBoardExternalRefDraft>? {
-    guard let index = draft.externalRefs.firstIndex(where: { $0.id == refID }) else {
-      return nil
-    }
-    return $draft.externalRefs[index]
-  }
-
-  private func externalDestination(for ref: TaskBoardExternalRef) -> TaskBoardExternalDestination? {
-    guard let rawURL = ref.url, let url = URL(string: rawURL) else {
-      return nil
-    }
-    return TaskBoardExternalDestination(label: externalLabel(for: ref), url: url)
-  }
-
   private func submitDraft() {
     if let item {
       onUpdate?(item.id, draft.updateRequest)
     } else {
       onCreate?(draft.createRequest, draft.status)
     }
-  }
-
-  private func externalLabel(for ref: TaskBoardExternalRef) -> String {
-    "\(ref.provider.title) \(ref.externalId)"
   }
 }

@@ -404,18 +404,4 @@ extension RecordingHarnessClient {
     }
   }
 
-  func configureCodexStartError(_ error: (any Error)?) {
-    lock.withLock {
-      codexStartError = error
-      queuedCodexStartErrors = []
-    }
-  }
-
-  func configureCodexStartErrors(_ errors: [any Error]) {
-    lock.withLock {
-      queuedCodexStartErrors = errors
-      codexStartError = nil
-    }
-  }
-
 }

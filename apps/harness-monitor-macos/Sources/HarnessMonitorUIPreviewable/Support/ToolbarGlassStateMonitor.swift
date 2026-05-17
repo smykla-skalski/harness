@@ -27,6 +27,158 @@ private final class _TitlebarSeparatorSuppressorView: NSView {
   func applyWindowOverrides() {
     window?.titlebarSeparatorStyle = .none
     window?.titlebarAppearsTransparent = titlebarAppearsTransparent
+    if titlebarAppearsTransparent {
+      window?.styleMask.insert(.fullSizeContentView)
+    }
+  }
+}
+
+private final class _NativeToolbarScrollEdgeAccessoryView: NSView {
+  var accessoryHeight: CGFloat {
+    didSet {
+      if oldValue != accessoryHeight {
+        invalidateIntrinsicContentSize()
+        frame.size.height = accessoryHeight
+      }
+    }
+  }
+
+  init(height: CGFloat) {
+    accessoryHeight = height
+    super.init(frame: NSRect(x: 0, y: 0, width: 0, height: height))
+    translatesAutoresizingMaskIntoConstraints = false
+    setContentHuggingPriority(.defaultLow, for: .horizontal)
+    setContentHuggingPriority(.required, for: .vertical)
+    setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+    setContentCompressionResistancePriority(.required, for: .vertical)
+  }
+
+  @available(*, unavailable)
+  required init?(coder: NSCoder) {
+    nil
+  }
+
+  override var intrinsicContentSize: NSSize {
+    NSSize(width: NSView.noIntrinsicMetric, height: accessoryHeight)
+  }
+
+  override var isFlipped: Bool {
+    true
+  }
+}
+
+private final class _NativeToolbarScrollEdgeBackdropInstallerView: NSView {
+  var accessoryHeight: CGFloat
+  private let accessoryView: _NativeToolbarScrollEdgeAccessoryView
+  private var accessoryController: NSTitlebarAccessoryViewController?
+  private weak var installedWindow: NSWindow?
+
+  init(accessoryHeight: CGFloat) {
+    self.accessoryHeight = accessoryHeight
+    accessoryView = _NativeToolbarScrollEdgeAccessoryView(height: accessoryHeight)
+    super.init(frame: .zero)
+  }
+
+  @available(*, unavailable)
+  required init?(coder: NSCoder) {
+    nil
+  }
+
+  override func viewDidMoveToWindow() {
+    super.viewDidMoveToWindow()
+    applyWindowAccessory()
+  }
+
+  func update(accessoryHeight: CGFloat) {
+    self.accessoryHeight = accessoryHeight
+    accessoryView.accessoryHeight = accessoryHeight
+    accessoryController?.fullScreenMinHeight = accessoryHeight
+    applyWindowAccessory()
+  }
+
+  func uninstallAccessory() {
+    if let accessoryController, let installedWindow {
+      if let index = installedWindow.titlebarAccessoryViewControllers.firstIndex(where: {
+        $0 === accessoryController
+      }) {
+        installedWindow.removeTitlebarAccessoryViewController(at: index)
+      }
+    }
+    accessoryController = nil
+    installedWindow = nil
+  }
+
+  private func applyWindowAccessory() {
+    guard let window else {
+      uninstallAccessory()
+      return
+    }
+    window.titlebarSeparatorStyle = .none
+    window.titlebarAppearsTransparent = true
+    window.styleMask.insert(.fullSizeContentView)
+
+    if installedWindow !== window {
+      uninstallAccessory()
+      installedWindow = window
+      let controller = NSTitlebarAccessoryViewController()
+      controller.layoutAttribute = .bottom
+      controller.view = accessoryView
+      controller.fullScreenMinHeight = accessoryHeight
+      if #available(macOS 26.1, *) {
+        controller.preferredScrollEdgeEffectStyle = .soft
+      }
+      accessoryController = controller
+      window.addTitlebarAccessoryViewController(controller)
+    } else if #available(macOS 26.1, *) {
+      accessoryController?.preferredScrollEdgeEffectStyle = .soft
+    }
+  }
+}
+
+private struct NativeToolbarScrollEdgeBackdropInstaller: NSViewRepresentable {
+  static let defaultHeight: CGFloat = 64
+  let accessoryHeight: CGFloat
+
+  func makeNSView(context: Context) -> _NativeToolbarScrollEdgeBackdropInstallerView {
+    _NativeToolbarScrollEdgeBackdropInstallerView(accessoryHeight: accessoryHeight)
+  }
+
+  func updateNSView(
+    _ nsView: _NativeToolbarScrollEdgeBackdropInstallerView,
+    context: Context
+  ) {
+    nsView.update(accessoryHeight: accessoryHeight)
+  }
+
+  static func dismantleNSView(
+    _ nsView: _NativeToolbarScrollEdgeBackdropInstallerView,
+    coordinator: ()
+  ) {
+    nsView.uninstallAccessory()
+  }
+}
+
+private struct NativeToolbarScrollEdgeBackdropModifier: ViewModifier {
+  let toolbarBackgroundVisibility: Visibility?
+
+  private var isEnabled: Bool {
+    if case .hidden? = toolbarBackgroundVisibility {
+      return true
+    }
+    return false
+  }
+
+  @ViewBuilder
+  func body(content: Content) -> some View {
+    if isEnabled {
+      content.background(
+        NativeToolbarScrollEdgeBackdropInstaller(
+          accessoryHeight: NativeToolbarScrollEdgeBackdropInstaller.defaultHeight
+        )
+      )
+    } else {
+      content
+    }
   }
 }
 
@@ -46,6 +198,16 @@ private struct ToolbarBaselineSeparatorSuppressor: NSViewRepresentable {
 }
 
 extension View {
+  public func nativeToolbarScrollEdgeBackdrop(
+    toolbarBackgroundVisibility: Visibility?
+  ) -> some View {
+    modifier(
+      NativeToolbarScrollEdgeBackdropModifier(
+        toolbarBackgroundVisibility: toolbarBackgroundVisibility
+      )
+    )
+  }
+
   public func suppressToolbarBaselineSeparator(
     titlebarAppearsTransparent: Bool = false
   ) -> some View {

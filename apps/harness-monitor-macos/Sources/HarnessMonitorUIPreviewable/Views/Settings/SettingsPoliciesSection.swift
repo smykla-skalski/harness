@@ -20,7 +20,10 @@ public struct SettingsPoliciesSection: View {
         Text("Policies")
       } footer: {
         Text(
-          "Controls Policy Canvas reference chrome. When edge legend is disabled, the legend card is removed entirely from the canvas."
+          """
+          Controls Policy Canvas reference chrome. When edge legend is disabled,
+          the legend card is removed entirely from the canvas.
+          """
         )
       }
     }
