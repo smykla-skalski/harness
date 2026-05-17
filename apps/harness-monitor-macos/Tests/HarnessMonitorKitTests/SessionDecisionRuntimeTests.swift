@@ -8,22 +8,26 @@ import Testing
 @Suite("Session decision runtime")
 struct SessionDecisionRuntimeTests {
   @Test("Context rows omit detail-owned fields and keep orthogonal context")
-  func contextRowsOmitDetailOwnedFieldsAndKeepOrthogonalContext() {
+  func contextRowsOmitDetailOwnedFieldsAndKeepOrthogonalContext() async {
     let runtime = SessionDecisionRuntime()
+    let decision = makeDecision(
+      contextJSON: #"""
+        {
+          "zone":"dev",
+          "attempt":2,
+          "status":"open",
+          "ruleID":"stuck-agent",
+          "agentID":"a1",
+          "taskID":"t1",
+          "summary":"Agent stalled"
+        }
+        """#
+    )
+    runtime.prepareInspectorRows(for: decision)
+    await runtime.waitForInspectorRowsIdle()
+
     let rows = runtime.contextRows(
-      for: makeDecision(
-        contextJSON: #"""
-          {
-            "zone":"dev",
-            "attempt":2,
-            "status":"open",
-            "ruleID":"stuck-agent",
-            "agentID":"a1",
-            "taskID":"t1",
-            "summary":"Agent stalled"
-          }
-          """#
-      )
+      for: decision
     )
 
     #expect(rows.contains(.init(id: "session", value: "Session: s1")))
@@ -37,25 +41,31 @@ struct SessionDecisionRuntimeTests {
   }
 
   @Test("Context rows are empty when only detail-owned values remain")
-  func contextRowsAreEmptyWhenOnlyDetailOwnedValuesRemain() {
-    let rows = SessionDecisionRuntime().contextRows(
-      for: makeDecision(
-        sessionID: nil,
-        contextJSON: #"""
-          {"status":"open","ruleID":"stuck-agent","agentID":"a1","taskID":"t1"}
-          """#
-      )
+  func contextRowsAreEmptyWhenOnlyDetailOwnedValuesRemain() async {
+    let runtime = SessionDecisionRuntime()
+    let decision = makeDecision(
+      sessionID: nil,
+      contextJSON: #"""
+        {"status":"open","ruleID":"stuck-agent","agentID":"a1","taskID":"t1"}
+        """#
     )
+    runtime.prepareInspectorRows(for: decision)
+    await runtime.waitForInspectorRowsIdle()
+
+    let rows = runtime.contextRows(for: decision)
 
     #expect(rows.isEmpty)
   }
 
   @Test("History rows include status and optional resolution data")
-  func historyRowsIncludeStatusAndResolutionData() {
+  func historyRowsIncludeStatusAndResolutionData() async {
     let decision = makeDecision()
     decision.resolutionJSON = #"{"outcome":"dismissed"}"#
+    let runtime = SessionDecisionRuntime()
+    runtime.prepareInspectorRows(for: decision)
+    await runtime.waitForInspectorRowsIdle()
 
-    let rows = SessionDecisionRuntime().historyRows(for: decision)
+    let rows = runtime.historyRows(for: decision)
 
     #expect(rows.contains { $0.id == "created" })
     #expect(rows.contains(.init(id: "status", title: "Status", value: "open")))
@@ -160,6 +170,21 @@ struct SessionDecisionRuntimeTests {
     #expect(source.contains("scopedEvents.map {"))
     #expect(source.contains("payloadJSON: $0.payloadJSON"))
     #expect(source.contains("decoder: decoder"))
+  }
+
+  @Test("Inspector rows are prepared by a worker before body reads cached rows")
+  func inspectorRowsArePreparedByWorkerBeforeBodyReadsCachedRows() throws {
+    let runtimeSource = try sourceFile(named: "SessionDecisionRuntime.swift")
+    let contentSource = try sourceFile(named: "SessionDecisionInspectorContent.swift")
+
+    #expect(runtimeSource.contains("actor SessionDecisionInspectorRowWorker"))
+    #expect(runtimeSource.contains("session_decision_inspector.compute"))
+    #expect(runtimeSource.contains("session_decision_inspector.apply"))
+    #expect(runtimeSource.contains("waitForInspectorRowsIdle"))
+    #expect(contentSource.contains("runtime.prepareInspectorRows(for: decision)"))
+    #expect(contentSource.contains("runtime.inspectorRows(for: decision.id)"))
+    #expect(!contentSource.contains("runtime.contextRows(for: decision)"))
+    #expect(!contentSource.contains("runtime.historyRows(for: decision)"))
   }
 
   private func makeDecision(
