@@ -201,6 +201,11 @@ public struct SessionWindowView: View {
     nonmutating set { decisionCacheStorage.allSessionDecisions = newValue }
   }
 
+  var allSessionDecisionSearchProjectionsCache: [DecisionSearchProjection] {
+    get { decisionCacheStorage.allSessionDecisionSearchProjections }
+    nonmutating set { decisionCacheStorage.allSessionDecisionSearchProjections = newValue }
+  }
+
   var matchingDecisionsCache: [Decision] {
     get { decisionCacheStorage.matchingDecisions }
     nonmutating set { decisionCacheStorage.matchingDecisions = newValue }
@@ -214,6 +219,11 @@ public struct SessionWindowView: View {
   var matchingDecisionIDsCache: Set<String> {
     get { decisionCacheStorage.matchingDecisionIDs }
     nonmutating set { decisionCacheStorage.matchingDecisionIDs = newValue }
+  }
+
+  var matchingDecisionIDsInOrderCache: [String] {
+    get { decisionCacheStorage.matchingDecisionIDsInOrder }
+    nonmutating set { decisionCacheStorage.matchingDecisionIDsInOrder = newValue }
   }
 
   var detailRenderedSelection: SessionSelection? {

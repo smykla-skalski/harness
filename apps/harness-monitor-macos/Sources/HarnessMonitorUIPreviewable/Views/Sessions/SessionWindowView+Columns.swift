@@ -9,6 +9,10 @@ extension SessionWindowView {
     if all.map(\.id) != allSessionDecisionsCache.map(\.id) {
       allSessionDecisionsCache = all
     }
+    let searchProjections = all.map(DecisionSearchProjection.init)
+    if searchProjections != allSessionDecisionSearchProjectionsCache {
+      allSessionDecisionSearchProjectionsCache = searchProjections
+    }
     if allIDs != allSessionDecisionIDsCache {
       allSessionDecisionIDsCache = allIDs
     }
@@ -48,6 +52,9 @@ extension SessionWindowView {
     let matchingIDs = stateCache.decisionRuntime.filteredDecisionIDSet
     if matching.map(\.id) != matchingDecisionsCache.map(\.id) {
       matchingDecisionsCache = matching
+    }
+    if matchingIDsInOrder != matchingDecisionIDsInOrderCache {
+      matchingDecisionIDsInOrderCache = matchingIDsInOrder
     }
     if matchingIDs != matchingDecisionIDsCache {
       matchingDecisionIDsCache = matchingIDs
@@ -305,6 +312,7 @@ extension SessionWindowView {
       case .decisions:
         SessionWindowDecisionsList(
           decisions: matchingDecisions,
+          decisionIDs: matchingDecisionIDsInOrderCache,
           currentModifiers: presentedModifiers,
           state: stateCache
         )

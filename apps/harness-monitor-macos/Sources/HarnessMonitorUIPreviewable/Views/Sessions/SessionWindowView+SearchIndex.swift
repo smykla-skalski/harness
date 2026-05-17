@@ -9,7 +9,7 @@ extension SessionWindowView {
       model: stateCache.appSearchModel,
       index: stateCache.appSearchIndex,
       agents: snapshot?.detail?.agents ?? [],
-      decisions: allSessionDecisions,
+      decisionProjections: allSessionDecisionSearchProjectionsCache,
       tasks: snapshot?.detail?.tasks ?? [],
       events: snapshot?.timeline ?? []
     )

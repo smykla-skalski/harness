@@ -26,6 +26,16 @@ public struct DecisionSearchProjection: Hashable, Sendable {
     self.agentID = agentID
     self.taskID = taskID
   }
+
+  public init(decision: Decision) {
+    self.init(
+      id: decision.id,
+      summary: decision.summary,
+      ruleID: decision.ruleID,
+      agentID: decision.agentID,
+      taskID: decision.taskID
+    )
+  }
 }
 
 /// Cross-domain text-search index for the session window.
