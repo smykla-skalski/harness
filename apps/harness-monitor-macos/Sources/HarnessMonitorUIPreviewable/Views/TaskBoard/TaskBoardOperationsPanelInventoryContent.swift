@@ -207,6 +207,7 @@ struct TaskBoardOperationsPanelInventoryCard: View {
         .accessibilityAddTraits(.isHeader)
       content()
     }
+    .padding(.top, HarnessMonitorTheme.spacingSM)
   }
 
   @ViewBuilder
