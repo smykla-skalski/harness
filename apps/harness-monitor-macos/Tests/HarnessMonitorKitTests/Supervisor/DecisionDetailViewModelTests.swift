@@ -251,7 +251,7 @@ final class DecisionDetailViewModelTests: XCTestCase {
     XCTAssertTrue(age.contains("1") && (age.contains("min") || age.contains("m")))
   }
 
-  func test_scopedAuditTrailFiltersByRuleAndPayloadScopeAndSortsChronologically() {
+  func test_scopedAuditTrailFiltersByRuleAndPayloadScopeAndSortsChronologically() async {
     let decision = makeDecision(
       ruleID: "stuck-agent",
       sessionID: "sess-1",
@@ -311,11 +311,14 @@ final class DecisionDetailViewModelTests: XCTestCase {
     )
     wrongDecision.createdAt = Date(timeIntervalSince1970: 18)
 
-    let scoped = viewModel.scopedAuditTrail(
-      from: snapshotEvents([nestedMatch, wrongAgent, wrongRule, wrongDecision, oldest])
+    let snapshots = snapshotEvents([nestedMatch, wrongAgent, wrongRule, wrongDecision, oldest])
+    let scoped = viewModel.scopedAuditTrail(from: snapshots)
+    let workerScoped = await DecisionAuditScopeWorker().scopedAuditTrail(
+      input: DecisionDetailViewModel.AuditScopeInput(decision: decision, events: snapshots)
     )
 
     XCTAssertEqual(scoped.map(\.id), ["evt-older", "evt-match"])
+    XCTAssertEqual(workerScoped, scoped)
   }
 
   func test_explicitlySessionScopedAuditEventsExcludeRuleOnlyHistory() {
