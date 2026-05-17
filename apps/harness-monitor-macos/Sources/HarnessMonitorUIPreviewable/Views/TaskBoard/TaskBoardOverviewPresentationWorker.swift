@@ -1,0 +1,200 @@
+import Foundation
+import HarnessMonitorKit
+import OSLog
+
+struct TaskBoardOverviewPresentationInput: Equatable, Sendable {
+  let snapshot: TaskBoardInboxSnapshot
+  let taskBoardItems: [TaskBoardItem]
+  let decisionItems: [DecisionPresentationItem]
+}
+
+struct TaskBoardOverviewPresentation: Equatable, Sendable {
+  static let empty = Self(
+    taskBoardItems: [],
+    taskBoardItemsByID: [:],
+    apiItemsByLane: [:],
+    inboxItemsByLane: [:],
+    decisionIDsByLane: [:],
+    aggregateNeedsYouCount: 0,
+    aggregateOpenCount: 0,
+    aggregateReviewCount: 0,
+    aggregateBlockedCount: 0,
+    aggregateDoneCount: 0
+  )
+
+  let taskBoardItems: [TaskBoardItem]
+  let taskBoardItemsByID: [String: TaskBoardItem]
+  let apiItemsByLane: [TaskBoardInboxLane: [TaskBoardItem]]
+  let inboxItemsByLane: [TaskBoardInboxLane: [TaskBoardInboxItem]]
+  let decisionIDsByLane: [TaskBoardInboxLane: [String]]
+  let aggregateNeedsYouCount: Int
+  let aggregateOpenCount: Int
+  let aggregateReviewCount: Int
+  let aggregateBlockedCount: Int
+  let aggregateDoneCount: Int
+
+  var hasBoardContent: Bool {
+    !taskBoardItems.isEmpty
+      || inboxItemsByLane.values.contains { !$0.isEmpty }
+      || decisionIDsByLane.values.contains { !$0.isEmpty }
+  }
+
+  var hasAggregateSummary: Bool {
+    aggregateNeedsYouCount != 0
+      || aggregateOpenCount != 0
+      || aggregateReviewCount != 0
+      || aggregateBlockedCount != 0
+      || aggregateDoneCount != 0
+  }
+
+  func apiItems(in lane: TaskBoardInboxLane) -> [TaskBoardItem] {
+    apiItemsByLane[lane] ?? []
+  }
+
+  func inboxItems(in lane: TaskBoardInboxLane) -> [TaskBoardInboxItem] {
+    inboxItemsByLane[lane] ?? []
+  }
+
+  func decisionIDs(in lane: TaskBoardInboxLane) -> [String] {
+    decisionIDsByLane[lane] ?? []
+  }
+
+  func taskBoardItem(id: String) -> TaskBoardItem? {
+    taskBoardItemsByID[id]
+  }
+}
+
+actor TaskBoardOverviewPresentationWorker {
+  private static let signposter = OSSignposter(
+    subsystem: "io.harnessmonitor",
+    category: "perf"
+  )
+
+  private var cachedInput: TaskBoardOverviewPresentationInput?
+  private var cachedOutput = TaskBoardOverviewPresentation.empty
+
+  func compute(input: TaskBoardOverviewPresentationInput) -> TaskBoardOverviewPresentation {
+    guard input != cachedInput else {
+      return cachedOutput
+    }
+
+    let signpostID = Self.signposter.makeSignpostID()
+    let interval = Self.signposter.beginInterval(
+      "task_board_overview.presentation.compute",
+      id: signpostID,
+      """
+      api=\(input.taskBoardItems.count, privacy: .public) \
+      inbox=\(input.snapshot.items.count, privacy: .public) \
+      decisions=\(input.decisionItems.count, privacy: .public)
+      """
+    )
+    defer {
+      Self.signposter.endInterval(
+        "task_board_overview.presentation.compute",
+        interval,
+        "api_visible=\(self.cachedOutput.taskBoardItems.count, privacy: .public)"
+      )
+    }
+
+    cachedInput = input
+    cachedOutput = Self.presentation(from: input)
+    return cachedOutput
+  }
+
+  func waitForIdle() async {}
+
+  private static func presentation(
+    from input: TaskBoardOverviewPresentationInput
+  ) -> TaskBoardOverviewPresentation {
+    let taskBoardItems = sortedTaskBoardItems(input.taskBoardItems)
+    let apiItemsByLane = Dictionary(grouping: taskBoardItems) { item in
+      TaskBoardInboxLane(status: item.status) ?? .backlog
+    }
+    let inboxItemsByLane = Dictionary(grouping: input.snapshot.items, by: \.lane)
+    let decisionIDs = sortedOpenDecisionIDs(input.decisionItems)
+    let decisionIDsByLane: [TaskBoardInboxLane: [String]] =
+      decisionIDs.isEmpty ? [:] : [.needsYou: decisionIDs]
+
+    let taskBoardNeedsYouCount = apiItemsByLane[.needsYou]?.count ?? 0
+    let taskBoardReviewCount = apiItemsByLane[.review]?.count ?? 0
+    let taskBoardBlockedCount = apiItemsByLane[.blocked]?.count ?? 0
+    let taskBoardDoneCount = apiItemsByLane[.done]?.count ?? 0
+    let taskBoardOpenCount = taskBoardItems.count - taskBoardDoneCount
+
+    return TaskBoardOverviewPresentation(
+      taskBoardItems: taskBoardItems,
+      taskBoardItemsByID: Dictionary(uniqueKeysWithValues: taskBoardItems.map { ($0.id, $0) }),
+      apiItemsByLane: apiItemsByLane,
+      inboxItemsByLane: inboxItemsByLane,
+      decisionIDsByLane: decisionIDsByLane,
+      aggregateNeedsYouCount: taskBoardNeedsYouCount
+        + (inboxItemsByLane[.needsYou]?.count ?? 0)
+        + decisionIDs.count,
+      aggregateOpenCount: taskBoardOpenCount
+        + input.snapshot.openItemCount
+        + decisionIDs.count,
+      aggregateReviewCount: taskBoardReviewCount + (inboxItemsByLane[.review]?.count ?? 0),
+      aggregateBlockedCount: taskBoardBlockedCount + (inboxItemsByLane[.blocked]?.count ?? 0),
+      aggregateDoneCount: taskBoardDoneCount + (inboxItemsByLane[.done]?.count ?? 0)
+    )
+  }
+
+  private static func sortedTaskBoardItems(_ items: [TaskBoardItem]) -> [TaskBoardItem] {
+    items
+      .filter { TaskBoardInboxLane(status: $0.status) != nil && $0.deletedAt == nil }
+      .sorted { left, right in
+        if left.priority != right.priority {
+          return priorityRank(left.priority) > priorityRank(right.priority)
+        }
+        if left.updatedAt != right.updatedAt {
+          return left.updatedAt > right.updatedAt
+        }
+        return left.id < right.id
+      }
+  }
+
+  private static func sortedOpenDecisionIDs(_ decisions: [DecisionPresentationItem]) -> [String] {
+    decisions
+      .filter { $0.statusRaw == "open" }
+      .sorted { left, right in
+        let leftRank = severityRank(left.severityRaw)
+        let rightRank = severityRank(right.severityRaw)
+        if leftRank != rightRank {
+          return leftRank > rightRank
+        }
+        if left.createdAt != right.createdAt {
+          return left.createdAt < right.createdAt
+        }
+        return left.id < right.id
+      }
+      .map(\.id)
+  }
+
+  private static func priorityRank(_ priority: TaskBoardPriority) -> Int {
+    switch priority {
+    case .critical:
+      3
+    case .high:
+      2
+    case .medium:
+      1
+    case .low:
+      0
+    }
+  }
+
+  private static func severityRank(_ severity: String) -> Int {
+    switch DecisionSeverity(rawValue: severity) {
+    case .critical:
+      3
+    case .needsUser:
+      2
+    case .warn:
+      1
+    case .info:
+      0
+    case .none:
+      0
+    }
+  }
+}

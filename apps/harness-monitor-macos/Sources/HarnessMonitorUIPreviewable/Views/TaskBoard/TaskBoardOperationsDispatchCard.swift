@@ -3,10 +3,10 @@ import SwiftUI
 
 /// Dispatch operations card. Owns its own filter/project-dir/actor @State
 /// and hosts the dispatch confirmation dialog. Receives the unfiltered
-/// `taskBoardItems` plus the parent's resolved `localHostProjectTypes` -
-/// the host-aware dispatchable subset is computed once at the top of
-/// `body` and reused by every reader to avoid the 3-4 redundant filter
-/// passes the inline-computed-property version did.
+/// `taskBoardItems` plus the parent's resolved `localHostProjectTypes`.
+/// Host-aware filtering runs in a presentation worker so the operations
+/// card can update controls without scanning the whole board on the
+/// main actor.
 struct TaskBoardOperationsDispatchCard: View, TaskBoardOperationsHost {
   let store: HarnessMonitorStore
   let metrics: TaskBoardOverviewMetrics
@@ -23,6 +23,9 @@ struct TaskBoardOperationsDispatchCard: View, TaskBoardOperationsHost {
   @State private var projectDir = ""
   @State private var actor = ""
   @State private var pendingConfirmation: TaskBoardDispatchConfirmationPresentation?
+  @State private var presentationWorker = TaskBoardOperationsDispatchPresentationWorker()
+  @State private var cachedPresentation = TaskBoardOperationsDispatchPresentation.empty
+  @State private var presentationGeneration: UInt64 = 0
 
   var captionFont: Font {
     HarnessMonitorTextSize.scaledFont(.caption, by: fontScale)
@@ -31,18 +34,20 @@ struct TaskBoardOperationsDispatchCard: View, TaskBoardOperationsHost {
     HarnessMonitorTextSize.scaledFont(.caption.weight(.semibold), by: fontScale)
   }
 
-  var body: some View {
-    let dispatchableItems = TaskBoardHostMachine.dispatchableItems(
-      taskBoardItems,
-      machineProjectTypes: localHostProjectTypes
+  private var presentationInput: TaskBoardOperationsDispatchPresentationInput {
+    TaskBoardOperationsDispatchPresentationInput(
+      taskBoardItems: taskBoardItems,
+      localHostProjectTypes: localHostProjectTypes
     )
+  }
+
+  var body: some View {
     let validID = itemID.flatMap { id in
-      dispatchableItems.contains(where: { $0.id == id }) ? id : nil
+      cachedPresentation.item(id: id) == nil ? nil : id
     }
     let selectedItem = validID.flatMap { id in
-      dispatchableItems.first(where: { $0.id == id })
+      cachedPresentation.item(id: id)
     }
-    let didFilterOut = !taskBoardItems.isEmpty && dispatchableItems.isEmpty
 
     let request = TaskBoardDispatchRequest(
       status: validID == nil ? statusChoice.status : nil,
@@ -59,7 +64,7 @@ struct TaskBoardOperationsDispatchCard: View, TaskBoardOperationsHost {
           itemID = nil
           return
         }
-        itemID = taskBoardItems.contains(where: { $0.id == newValue }) ? newValue : nil
+        itemID = cachedPresentation.item(id: newValue) == nil ? nil : newValue
       }
     )
 
@@ -87,7 +92,7 @@ struct TaskBoardOperationsDispatchCard: View, TaskBoardOperationsHost {
           accessibilityIdentifier: "harness.task-board.dispatch.item"
         ) {
           Text("All matching items").tag(Optional<String>.none)
-          ForEach(dispatchableItems, id: \.id) { item in
+          ForEach(cachedPresentation.dispatchableItems, id: \.id) { item in
             Text(item.title).tag(Optional(item.id))
           }
         }
@@ -99,7 +104,7 @@ struct TaskBoardOperationsDispatchCard: View, TaskBoardOperationsHost {
         )
       }
 
-      if didFilterOut {
+      if cachedPresentation.didFilterOut {
         Text(
           "No items match this host's project types (\(formattedLocalHostProjectTypes)). "
             + "Set host project types in Settings or clear an item's Routes To list."
@@ -209,6 +214,9 @@ struct TaskBoardOperationsDispatchCard: View, TaskBoardOperationsHost {
         }
       }
     }
+    .task(id: presentationInput) {
+      await rebuildPresentation(input: presentationInput)
+    }
     .confirmationDialog(
       pendingConfirmation?.title ?? "Dispatch items?",
       isPresented: Binding(
@@ -226,6 +234,21 @@ struct TaskBoardOperationsDispatchCard: View, TaskBoardOperationsHost {
       Button("Cancel", role: .cancel) {}
     } message: { confirmation in
       Text(confirmation.message)
+    }
+  }
+
+  @MainActor
+  private func rebuildPresentation(
+    input: TaskBoardOperationsDispatchPresentationInput
+  ) async {
+    presentationGeneration &+= 1
+    let generation = presentationGeneration
+    let presentation = await presentationWorker.compute(input: input)
+    guard !Task.isCancelled, presentationGeneration == generation else {
+      return
+    }
+    if cachedPresentation != presentation {
+      cachedPresentation = presentation
     }
   }
 

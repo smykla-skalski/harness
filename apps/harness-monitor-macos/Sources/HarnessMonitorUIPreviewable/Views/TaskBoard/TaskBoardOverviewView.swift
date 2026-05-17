@@ -8,6 +8,8 @@ public struct TaskBoardOverviewView: View {
   let orchestratorStatus: TaskBoardOrchestratorStatus?
   let evaluationSummary: TaskBoardEvaluationSummary?
   let decisions: [Decision]
+  private let decisionsByID: [String: Decision]
+  private let decisionItems: [DecisionPresentationItem]
   let isActionInFlight: Bool
   let onOpenItem: (TaskBoardInboxItem) -> Void
   let onOpenTaskBoardItem: (TaskBoardItem) -> Void
@@ -31,6 +33,9 @@ public struct TaskBoardOverviewView: View {
   @State private var selectedTaskBoardItemID: String?
   @State private var isCreatingTaskBoardItem = false
   @State private var evaluationSummaryFitsHorizontally = true
+  @State private var presentationWorker = TaskBoardOverviewPresentationWorker()
+  @State var cachedPresentation = TaskBoardOverviewPresentation.empty
+  @State private var presentationGeneration: UInt64 = 0
 
   private var captionSemibold: Font {
     HarnessMonitorTextSize.scaledFont(.caption.weight(.semibold), by: fontScale)
@@ -47,6 +52,14 @@ public struct TaskBoardOverviewView: View {
 
   private var metrics: TaskBoardOverviewMetrics {
     TaskBoardOverviewMetrics(fontScale: fontScale)
+  }
+
+  private var presentationInput: TaskBoardOverviewPresentationInput {
+    TaskBoardOverviewPresentationInput(
+      snapshot: snapshot,
+      taskBoardItems: taskBoardItems,
+      decisionItems: decisionItems
+    )
   }
 
   public init(
@@ -76,11 +89,13 @@ public struct TaskBoardOverviewView: View {
     onRunTaskBoardOrchestratorOnce: ((TaskBoardOrchestratorRunOnceRequest) -> Void)? = nil
   ) {
     self.snapshot = snapshot
-    self.taskBoardItems = Self.sortedTaskBoardItems(taskBoardItems)
+    self.taskBoardItems = taskBoardItems
     self.store = store
     self.orchestratorStatus = orchestratorStatus
     self.evaluationSummary = evaluationSummary
-    self.decisions = Self.sortedDecisions(decisions)
+    self.decisions = decisions
+    decisionsByID = Dictionary(uniqueKeysWithValues: decisions.map { ($0.id, $0) })
+    decisionItems = decisions.map(DecisionPresentationItem.init)
     self.isActionInFlight = isActionInFlight
     self.onOpenItem = onOpenItem
     self.onOpenTaskBoardItem = onOpenTaskBoardItem
@@ -152,6 +167,9 @@ public struct TaskBoardOverviewView: View {
     .frame(maxWidth: .infinity, alignment: .leading)
     .accessibilityElement(children: .contain)
     .accessibilityIdentifier("harness.task-board.overview")
+    .task(id: presentationInput) {
+      await rebuildPresentation(input: presentationInput)
+    }
   }
 
   var selectedTaskBoardItemIDValue: String? {
@@ -276,7 +294,7 @@ extension TaskBoardOverviewView {
   }
 
   private var hasBoardContent: Bool {
-    !taskBoardItems.isEmpty || !decisions.isEmpty || !snapshot.isEmpty
+    cachedPresentation.hasBoardContent
   }
 
   private var boardSection: some View {
@@ -302,9 +320,9 @@ extension TaskBoardOverviewView {
         ForEach(TaskBoardInboxLane.allCases) { lane in
           TaskBoardLaneUnifiedColumn(
             lane: lane,
-            apiItems: taskBoardItems.filter { TaskBoardInboxLane(status: $0.status) == lane },
-            inboxItems: snapshot.items.filter { $0.lane == lane },
-            decisions: lane == .needsYou ? decisions : [],
+            apiItems: cachedPresentation.apiItems(in: lane),
+            inboxItems: cachedPresentation.inboxItems(in: lane),
+            decisions: decisions(in: lane),
             onOpenAPIItem: openTaskBoardItem,
             onOpenInboxItem: onOpenItem,
             onOpenDecision: onOpenDecision,
@@ -326,4 +344,20 @@ extension TaskBoardOverviewView {
         .background.opacity(0.45), in: .rect(cornerRadius: HarnessMonitorTheme.cornerRadiusSM))
   }
 
+  private func decisions(in lane: TaskBoardInboxLane) -> [Decision] {
+    cachedPresentation.decisionIDs(in: lane).compactMap { decisionsByID[$0] }
+  }
+
+  @MainActor
+  private func rebuildPresentation(input: TaskBoardOverviewPresentationInput) async {
+    presentationGeneration &+= 1
+    let generation = presentationGeneration
+    let presentation = await presentationWorker.compute(input: input)
+    guard !Task.isCancelled, presentationGeneration == generation else {
+      return
+    }
+    if cachedPresentation != presentation {
+      cachedPresentation = presentation
+    }
+  }
 }

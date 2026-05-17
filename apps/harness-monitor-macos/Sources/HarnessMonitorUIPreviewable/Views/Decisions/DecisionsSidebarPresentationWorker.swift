@@ -11,6 +11,7 @@ struct DecisionPresentationItem: Equatable, Sendable, Identifiable {
   let agentID: String?
   let taskID: String?
   let createdAt: Date
+  let statusRaw: String
 
   init(decision: Decision) {
     id = decision.id
@@ -21,6 +22,7 @@ struct DecisionPresentationItem: Equatable, Sendable, Identifiable {
     agentID = decision.agentID
     taskID = decision.taskID
     createdAt = decision.createdAt
+    statusRaw = decision.statusRaw
   }
 }
 
