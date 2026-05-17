@@ -134,6 +134,161 @@ struct AcpEventBatchCoalesceTests {
     #expect(!output.hasRecoverableMissingEntries)
   }
 
+  @Test("ACP agent state worker matches synchronous apply")
+  func acpAgentStateWorkerMatchesSynchronousApply() async {
+    let store = HarnessMonitorStore(daemonController: RecordingDaemonController())
+    store.selectedSessionID = "sess-acp-worker"
+    let previous = makeAcpSnapshot(
+      acpID: "acp-old",
+      sessionID: "sess-acp-worker",
+      agentID: "worker",
+      displayName: "Worker",
+      pendingBatches: []
+    )
+    let incoming = makeAcpSnapshot(
+      acpID: "acp-new",
+      sessionID: "sess-acp-worker",
+      agentID: "worker",
+      displayName: "Worker",
+      pendingBatches: []
+    )
+    let staleBatch = makeAcpPermissionBatch(
+      batchID: "batch-stale",
+      acpID: "acp-old",
+      sessionID: "sess-acp-worker",
+      createdAt: "2026-04-28T00:00:01Z"
+    )
+    let pendingBatch = makeAcpPermissionBatch(
+      batchID: "batch-pending",
+      acpID: "acp-new",
+      sessionID: "sess-acp-worker",
+      createdAt: "2026-04-28T00:00:02Z"
+    )
+    store.selectedAcpAgents = [previous]
+    store.standaloneAcpPermissionBatches = [staleBatch, pendingBatch]
+
+    let output = await store.acpRuntimeWorker.agentUpdate(
+      snapshot: incoming,
+      currentAgents: store.selectedAcpAgents,
+      standalonePermissionBatches: store.standaloneAcpPermissionBatches,
+      currentInspectSample: store.selectedAcpInspectState,
+      currentInspectSyncEntries: store.selectedAcpInspectSyncEntries
+    )
+    store.applyAcpAgent(incoming)
+
+    #expect(output.selectedAgents == store.selectedAcpAgents)
+    #expect(output.standalonePermissionBatches == store.standaloneAcpPermissionBatches)
+    #expect(output.selectedAgents.first?.pendingPermissionBatches == [pendingBatch])
+    #expect(output.staleRestartDecisionIDs == ["acp-permission:batch-stale"])
+  }
+
+  @Test("ACP agents replacement worker matches synchronous reconcile")
+  func acpAgentsReplacementWorkerMatchesSynchronousReconcile() async {
+    let store = HarnessMonitorStore(daemonController: RecordingDaemonController())
+    store.selectedSessionID = "sess-acp-worker"
+    let pendingBatch = makeAcpPermissionBatch(
+      batchID: "batch-alpha",
+      acpID: "acp-alpha",
+      sessionID: "sess-acp-worker",
+      createdAt: "2026-04-28T00:00:02Z"
+    )
+    let payload = AcpAgentsReconciledPayload(
+      sessionId: "sess-acp-worker",
+      agents: [
+        makeAcpSnapshot(
+          acpID: "acp-zeta",
+          sessionID: "sess-acp-worker",
+          agentID: "zeta-agent",
+          displayName: "Zeta",
+          pendingBatches: []
+        ),
+        makeAcpSnapshot(
+          acpID: "acp-alpha",
+          sessionID: "sess-acp-worker",
+          agentID: "alpha-agent",
+          displayName: "Alpha",
+          pendingBatches: []
+        ),
+      ],
+      inspect: AcpAgentInspectResponse(
+        agents: [
+          makeAcpInspectSnapshot(
+            acpID: "acp-zeta",
+            sessionID: "sess-acp-worker",
+            agentID: "zeta-agent",
+            displayName: "Zeta"
+          ),
+          makeAcpInspectSnapshot(
+            acpID: "acp-alpha",
+            sessionID: "sess-acp-worker",
+            agentID: "alpha-agent",
+            displayName: "Alpha"
+          ),
+        ],
+        available: true,
+        issueMessage: nil
+      )
+    )
+    let sampledAt = Date(timeIntervalSince1970: 42)
+    store.standaloneAcpPermissionBatches = [pendingBatch]
+
+    let output = await store.acpRuntimeWorker.agentsReplacement(
+      payload: payload,
+      sampledAt: sampledAt,
+      standalonePermissionBatches: store.standaloneAcpPermissionBatches,
+      currentInspectSample: store.selectedAcpInspectState,
+      currentInspectSyncEntries: store.selectedAcpInspectSyncEntries
+    )
+    store.replaceAcpAgents(payload, sampledAt: sampledAt)
+
+    #expect(output.selectedAgents == store.selectedAcpAgents)
+    #expect(output.standalonePermissionBatches == store.standaloneAcpPermissionBatches)
+    #expect(output.inspectSample == store.selectedAcpInspectState)
+    #expect(output.inspectSyncEntries == store.selectedAcpInspectSyncEntries)
+    #expect(output.selectedAgents.map(\.displayName) == ["Alpha", "Zeta"])
+    #expect(output.selectedAgents.first?.pendingPermissionBatches == [pendingBatch])
+  }
+
+  @Test("ACP permission batch worker matches synchronous apply and removal")
+  func acpPermissionBatchWorkerMatchesSynchronousApplyAndRemoval() async {
+    let store = HarnessMonitorStore(daemonController: RecordingDaemonController())
+    store.selectedSessionID = "sess-acp-worker"
+    let agent = makeAcpSnapshot(
+      acpID: "acp-1",
+      sessionID: "sess-acp-worker",
+      agentID: "worker",
+      displayName: "Worker",
+      pendingBatches: []
+    )
+    let batch = makeAcpPermissionBatch(
+      batchID: "batch-1",
+      acpID: "acp-1",
+      sessionID: "sess-acp-worker",
+      createdAt: "2026-04-28T00:00:01Z"
+    )
+    store.selectedAcpAgents = [agent]
+
+    let applyOutput = await store.acpRuntimeWorker.permissionBatchApply(
+      batch: batch,
+      currentAgents: store.selectedAcpAgents,
+      standalonePermissionBatches: store.standaloneAcpPermissionBatches
+    )
+    store.applyAcpPermissionBatch(batch)
+
+    #expect(applyOutput.selectedAgents == store.selectedAcpAgents)
+    #expect(applyOutput.standalonePermissionBatches == store.standaloneAcpPermissionBatches)
+
+    let removalOutput = await store.acpRuntimeWorker.permissionBatchRemoval(
+      batch: batch,
+      currentAgents: store.selectedAcpAgents,
+      standalonePermissionBatches: store.standaloneAcpPermissionBatches
+    )
+    store.removeAcpPermissionBatch(batch)
+
+    #expect(removalOutput.selectedAgents == store.selectedAcpAgents)
+    #expect(removalOutput.standalonePermissionBatches == store.standaloneAcpPermissionBatches)
+  }
+
   private func measureApplyAcpEvents(
     batchSize: Int,
     warmupSamples: Int,
