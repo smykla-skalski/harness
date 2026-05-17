@@ -16,7 +16,7 @@ import SwiftUI
 /// the user having to read each issue code. Order is significant: `.error`
 /// sorts above `.warning` in the panel and dominates the inline severity tone
 /// when a node carries both.
-enum PolicyCanvasIssueSeverity: Int, Comparable {
+enum PolicyCanvasIssueSeverity: Int, Comparable, Sendable {
   case error = 0
   case warning = 1
 
@@ -85,7 +85,7 @@ enum PolicyCanvasIssueSeverity: Int, Comparable {
 /// severity classification, a stable identifier the SwiftUI list can use, and
 /// the focus selection the click-to-jump action should apply. Stays equatable
 /// for diffing in tests.
-struct PolicyCanvasResolvedIssue: Identifiable, Equatable {
+struct PolicyCanvasResolvedIssue: Identifiable, Equatable, Sendable {
   let issue: TaskBoardPolicyPipelineValidationIssue
   let severity: PolicyCanvasIssueSeverity
   let id: String
@@ -116,21 +116,7 @@ extension PolicyCanvasViewModel {
   /// dedupe-by-best-guess is silently swallowing one side. We pay the UX
   /// cost until the daemon side improves.
   var allValidationIssues: [PolicyCanvasResolvedIssue] {
-    let daemon = daemonValidationIssues.enumerated().map { offset, issue in
-      resolvedIssue(issue: issue, origin: "daemon", index: offset)
-    }
-    let local = validateGraph().enumerated().map { offset, issue in
-      resolvedIssue(issue: issue, origin: "local", index: offset)
-    }
-    return (daemon + local).sorted { left, right in
-      if left.severity != right.severity {
-        return left.severity < right.severity
-      }
-      if left.issue.code != right.issue.code {
-        return left.issue.code < right.issue.code
-      }
-      return left.id < right.id
-    }
+    validationPresentation.issues
   }
 
   /// True when at least one resolved issue targets this node id (directly via
@@ -169,12 +155,12 @@ extension PolicyCanvasViewModel {
   /// reflow, simulation install) call `invalidateValidationCache()` to
   /// bump the generation counter.
   var nodeSeverityMap: [String: PolicyCanvasIssueSeverity] {
-    cachedSeverityMaps().nodes
+    validationPresentation.nodeSeverityMap
   }
 
   /// Pre-rolled `[edgeID: severity]` map. See `nodeSeverityMap`.
   var edgeSeverityMap: [String: PolicyCanvasIssueSeverity] {
-    cachedSeverityMaps().edges
+    validationPresentation.edgeSeverityMap
   }
 
   /// Resolved issues affecting the currently selected node or edge. Used by

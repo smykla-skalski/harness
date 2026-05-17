@@ -211,7 +211,7 @@ struct PolicyCanvasGroup: Identifiable, Hashable, Sendable {
   var tone: PolicyCanvasGroupTone
 }
 
-enum PolicyCanvasSelection: Hashable {
+enum PolicyCanvasSelection: Hashable, Sendable {
   case node(String)
   case group(String)
   case edge(String)

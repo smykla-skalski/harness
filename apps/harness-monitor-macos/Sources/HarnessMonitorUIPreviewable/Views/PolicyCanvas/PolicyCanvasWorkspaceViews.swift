@@ -16,6 +16,8 @@ struct PolicyCanvasViewport: View {
   @State private var isRestoringCommandScrollPosition = false
   @State private var routeWorker = PolicyCanvasRouteWorker()
   @State private var routeGeneration: UInt64 = 0
+  @State private var validationWorker = PolicyCanvasValidationWorker()
+  @State private var validationGeneration: UInt64 = 0
   @State private var cachedRouteInput: PolicyCanvasRouteWorkerInput?
   @State private var cachedRouteOutput = PolicyCanvasRouteWorkerOutput.empty
   @Environment(\.scenePhase)
@@ -38,6 +40,15 @@ struct PolicyCanvasViewport: View {
           groupCount: viewModel.groups.count,
           edgeCount: edges.count,
           fontScale: fontScale
+        )
+        let validationKey = PolicyCanvasValidationWorkerKey(
+          graphGeneration: viewModel.routeComputationGeneration,
+          nodeCount: viewModel.nodes.count,
+          edgeCount: edges.count,
+          groupCount: viewModel.groups.count,
+          simulationRevision: viewModel.latestSimulation?.revision,
+          simulationIssueCount: viewModel.latestSimulation?.validation.issues.count ?? 0,
+          simulationValid: viewModel.latestSimulation?.validation.isValid ?? true
         )
         let routeOutput = cachedRouteOutput
         let routes = routeOutput.routes
@@ -174,6 +185,9 @@ struct PolicyCanvasViewport: View {
         .task(id: routeKey) {
           await rebuildRoutes()
         }
+        .task(id: validationKey) {
+          await rebuildValidation()
+        }
       }
     }
     .accessibilityElement(children: .contain)
@@ -218,6 +232,22 @@ extension PolicyCanvasViewport {
     if cachedRouteOutput != output {
       cachedRouteOutput = output
     }
+  }
+
+  @MainActor
+  private func rebuildValidation() async {
+    validationGeneration &+= 1
+    let generation = validationGeneration
+    let input = PolicyCanvasValidationWorkerInput(
+      nodes: viewModel.nodes,
+      edges: viewModel.edges,
+      daemonIssues: viewModel.daemonValidationIssues
+    )
+    let output = await validationWorker.compute(input: input)
+    guard !Task.isCancelled, validationGeneration == generation else {
+      return
+    }
+    viewModel.applyValidationPresentation(output)
   }
 
   private func centerViewportIfNeeded(
