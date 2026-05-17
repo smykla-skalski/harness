@@ -9,7 +9,7 @@ extension SessionWindowView {
       store.supervisorOpenDecisionPresentationItemsBySession[token.sessionID] ?? []
     let all = sessionDecisionIDs.compactMap { store.supervisorOpenDecisionsByID[$0] }
     let allIDs = Set(sessionDecisionIDs)
-    if all.map(\.id) != allSessionDecisionsCache.map(\.id) {
+    if sessionDecisionIDs != allSessionDecisionIDsInOrderCache {
       allSessionDecisionsCache = all
     }
     if sessionDecisionItems != allSessionDecisionPresentationItemsCache {
@@ -40,9 +40,12 @@ extension SessionWindowView {
 
   @MainActor
   func refilterDecisionsCache() async {
+    let cachedItems =
+      store.supervisorOpenDecisionPresentationItemsBySession[token.sessionID]
+      ?? allSessionDecisionPresentationItemsCache
     await refilterDecisionsCache(
       decisions: allSessionDecisionsCache,
-      decisionItems: store.supervisorOpenDecisionPresentationItemsBySession[token.sessionID],
+      decisionItems: cachedItems.isEmpty && !allSessionDecisionsCache.isEmpty ? nil : cachedItems,
       allDecisionIDs: allSessionDecisionIDsCache
     )
   }
@@ -68,7 +71,7 @@ extension SessionWindowView {
     let matching = matchingIDsInOrder.compactMap { store.supervisorOpenDecisionsByID[$0] }
     let matchingItems = stateCache.decisionRuntime.filteredDecisionItems
     let matchingIDs = stateCache.decisionRuntime.filteredDecisionIDSet
-    if matching.map(\.id) != matchingDecisionsCache.map(\.id) {
+    if matchingIDsInOrder != matchingDecisionIDsInOrderCache {
       matchingDecisionsCache = matching
     }
     if matchingItems != matchingDecisionPresentationItemsCache {

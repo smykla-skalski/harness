@@ -214,6 +214,9 @@ struct SessionAgentListSection: View {
   }
 
   private var agentStateMarkerText: String {
+    guard HarnessMonitorUITestEnvironment.accessibilityMarkersEnabled else {
+      return ""
+    }
     let agentIDs = agents.map(\.agentId).joined(separator: ",")
     let runtimes = Array(Set(agents.map(\.runtime))).sorted().joined(separator: ",")
     return """

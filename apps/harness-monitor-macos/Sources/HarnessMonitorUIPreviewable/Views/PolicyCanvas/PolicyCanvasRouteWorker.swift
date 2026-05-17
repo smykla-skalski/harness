@@ -41,17 +41,28 @@ actor PolicyCanvasRouteWorker {
       routes: routes,
       labelPositions: labelPositions
     )
+    let nodeIndex = input.nodeIndex
+    let accessibilityEdgeEntries = input.accessibilityEdgeEntries(nodeIndex: nodeIndex)
     cachedInput = input
     cachedOutput = PolicyCanvasRouteWorkerOutput(
       routes: routes,
       labelPositions: labelPositions,
       visibleBounds: visibleBounds,
-      contentSize: policyCanvasVisibleContentSize(visibleBounds: visibleBounds)
+      contentSize: policyCanvasVisibleContentSize(visibleBounds: visibleBounds),
+      accessibilityEdgeLabelsByID: Self.edgeLabelsByID(accessibilityEdgeEntries),
+      accessibilityNodeEntries: input.accessibilityNodeEntries(),
+      accessibilityEdgeEntries: accessibilityEdgeEntries
     )
     return cachedOutput
   }
 
   func waitForIdle() async {}
+
+  private static func edgeLabelsByID(
+    _ entries: [PolicyCanvasAccessibilityEdgeEntry]
+  ) -> [String: String] {
+    Dictionary(uniqueKeysWithValues: entries.map { ($0.id, $0.label) })
+  }
 }
 
 struct PolicyCanvasRouteWorkerKey: Equatable {
@@ -227,8 +238,54 @@ struct PolicyCanvasRouteWorkerInput: Equatable, Sendable {
     )
   }
 
-  private var nodeIndex: [String: PolicyCanvasRouteNode] {
+  fileprivate var nodeIndex: [String: PolicyCanvasRouteNode] {
     Dictionary(uniqueKeysWithValues: nodes.map { ($0.id, $0) })
+  }
+
+  fileprivate func accessibilityNodeEntries() -> [PolicyCanvasAccessibilityNodeEntry] {
+    nodes
+      .sorted { left, right in
+        let rowDelta = left.position.y - right.position.y
+        if abs(rowDelta) >= 10 {
+          return rowDelta < 0
+        }
+        return left.position.x < right.position.x
+      }
+      .map { node in
+        PolicyCanvasAccessibilityNodeEntry(id: node.id, label: node.accessibilityLabel)
+      }
+  }
+
+  fileprivate func accessibilityEdgeEntries(
+    nodeIndex: [String: PolicyCanvasRouteNode]
+  ) -> [PolicyCanvasAccessibilityEdgeEntry] {
+    edges.map { edge in
+      PolicyCanvasAccessibilityEdgeEntry(
+        id: edge.id,
+        label: accessibilityLabel(for: edge, nodeIndex: nodeIndex)
+      )
+    }
+  }
+
+  private func accessibilityLabel(
+    for edge: PolicyCanvasEdge,
+    nodeIndex: [String: PolicyCanvasRouteNode]
+  ) -> String {
+    let sourceNode = nodeIndex[edge.source.nodeID]
+    let targetNode = nodeIndex[edge.target.nodeID]
+    let sourcePort = sourceNode?.outputPorts.first { $0.id == edge.source.portID }
+    let targetPort = targetNode?.inputPorts.first { $0.id == edge.target.portID }
+    let sourcePiece = [sourceNode?.title, sourcePort?.title]
+      .compactMap { $0 }
+      .joined(separator: " ")
+    let targetPiece = [targetNode?.title, targetPort?.title]
+      .compactMap { $0 }
+      .joined(separator: " ")
+    let edgeName = edge.label.isEmpty ? "connection" : edge.label
+    if sourcePiece.isEmpty || targetPiece.isEmpty {
+      return "\(edgeName) edge"
+    }
+    return "\(edgeName) edge, from \(sourcePiece) to \(targetPiece)"
   }
 
   private func routingObstacles() -> [CGRect] {
@@ -463,27 +520,52 @@ struct PolicyCanvasRouteWorkerOutput: Equatable, Sendable {
   let labelPositions: [String: CGPoint]
   let visibleBounds: CGRect
   let contentSize: CGSize
+  let accessibilityEdgeLabelsByID: [String: String]
+  let accessibilityNodeEntries: [PolicyCanvasAccessibilityNodeEntry]
+  let accessibilityEdgeEntries: [PolicyCanvasAccessibilityEdgeEntry]
 
   static let empty = Self(
     routes: [:],
     labelPositions: [:],
     visibleBounds: CGRect(origin: .zero, size: PolicyCanvasLayout.minimumCanvasSize),
-    contentSize: PolicyCanvasLayout.minimumCanvasSize
+    contentSize: PolicyCanvasLayout.minimumCanvasSize,
+    accessibilityEdgeLabelsByID: [:],
+    accessibilityNodeEntries: [],
+    accessibilityEdgeEntries: []
   )
 
   static func fallback(for input: PolicyCanvasRouteWorkerInput) -> Self {
     let visibleBounds = input.contentBounds
+    let nodeIndex = input.nodeIndex
+    let accessibilityEdgeEntries = input.accessibilityEdgeEntries(nodeIndex: nodeIndex)
     return Self(
       routes: [:],
       labelPositions: [:],
       visibleBounds: visibleBounds,
-      contentSize: policyCanvasVisibleContentSize(visibleBounds: visibleBounds)
+      contentSize: policyCanvasVisibleContentSize(visibleBounds: visibleBounds),
+      accessibilityEdgeLabelsByID: Dictionary(
+        uniqueKeysWithValues: accessibilityEdgeEntries.map { ($0.id, $0.label) }
+      ),
+      accessibilityNodeEntries: input.accessibilityNodeEntries(),
+      accessibilityEdgeEntries: accessibilityEdgeEntries
     )
   }
 }
 
+struct PolicyCanvasAccessibilityNodeEntry: Equatable, Sendable, Identifiable {
+  let id: String
+  let label: String
+}
+
+struct PolicyCanvasAccessibilityEdgeEntry: Equatable, Sendable, Identifiable {
+  let id: String
+  let label: String
+}
+
 private struct PolicyCanvasRouteNode: Equatable, Sendable {
   let id: String
+  let title: String
+  let accessibilityLabel: String
   let position: CGPoint
   let groupID: String?
   let inputPorts: [PolicyCanvasPort]
@@ -491,6 +573,8 @@ private struct PolicyCanvasRouteNode: Equatable, Sendable {
 
   init(node: PolicyCanvasNode) {
     id = node.id
+    title = node.title
+    accessibilityLabel = "\(node.kind.title) \(node.title)"
     position = node.position
     groupID = node.groupID
     inputPorts = node.inputPorts

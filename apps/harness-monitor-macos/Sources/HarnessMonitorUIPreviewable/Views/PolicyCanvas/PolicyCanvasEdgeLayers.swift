@@ -14,6 +14,7 @@ struct PolicyCanvasEdgeLayer: View {
   /// building the displayed-route map).
   let edges: [PolicyCanvasEdge]
   let routes: [String: PolicyCanvasEdgeRoute]
+  let accessibilityLabelsByEdgeID: [String: String]
 
   var body: some View {
     // Severity map and edge-lane assignments stay local to this layer:
@@ -30,7 +31,8 @@ struct PolicyCanvasEdgeLayer: View {
             arrowheadColor: arrowheadColor(for: edge, severity: severity, isSelected: isSelected),
             strokeWidth: severity == nil ? 2.4 : 3.0,
             isSelected: isSelected,
-            accessibilityLabel: viewModel.accessibilityLabel(for: edge),
+            accessibilityLabel: accessibilityLabelsByEdgeID[edge.id]
+              ?? viewModel.accessibilityLabel(for: edge),
             accessibilityKindWord: edge.kind.accessibilityWord,
             accessibilityDashDescription: edge.kind.dashDescription,
             kindDashPattern: edge.kind.strokeDashPattern,
