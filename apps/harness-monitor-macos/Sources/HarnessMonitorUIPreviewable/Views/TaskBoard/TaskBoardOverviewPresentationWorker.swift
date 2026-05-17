@@ -6,6 +6,7 @@ struct TaskBoardOverviewPresentationInput: Equatable, Sendable {
   let snapshot: TaskBoardInboxSnapshot
   let taskBoardItems: [TaskBoardItem]
   let decisionItems: [DecisionPresentationItem]
+  let scopeSessionID: String?
 }
 
 struct TaskBoardOverviewPresentation: Equatable, Sendable {
@@ -106,7 +107,13 @@ actor TaskBoardOverviewPresentationWorker {
   private static func presentation(
     from input: TaskBoardOverviewPresentationInput
   ) -> TaskBoardOverviewPresentation {
-    let taskBoardItems = sortedTaskBoardItems(input.taskBoardItems)
+    let scopedTaskBoardItems =
+      if let scopeSessionID = input.scopeSessionID {
+        input.taskBoardItems.filter { $0.sessionId == scopeSessionID }
+      } else {
+        input.taskBoardItems
+      }
+    let taskBoardItems = sortedTaskBoardItems(scopedTaskBoardItems)
     let apiItemsByLane = Dictionary(grouping: taskBoardItems) { item in
       TaskBoardInboxLane(status: item.status) ?? .backlog
     }

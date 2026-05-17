@@ -17,11 +17,8 @@ extension SessionWindowOverview {
     )
   }
 
-  var linkedTaskBoardItems: [TaskBoardItem] {
+  var taskBoardSourceItems: [TaskBoardItem] {
     let dashboardItems = store.contentUI.dashboard.taskBoardItems
-    let sourceItems = dashboardItems.isEmpty ? snapshot.taskBoardItems ?? [] : dashboardItems
-    return sourceItems.filter { item in
-      item.sessionId == snapshot.summary.sessionId
-    }
+    return dashboardItems.isEmpty ? snapshot.taskBoardItems ?? [] : dashboardItems
   }
 }

@@ -177,7 +177,8 @@ struct TaskBoardOverviewBehaviorTests {
       input: TaskBoardOverviewPresentationInput(
         snapshot: TaskBoardInboxSnapshot(items: [inbox]),
         taskBoardItems: [ready, deleted, needsYou],
-        decisionItems: [criticalDecision, dismissedDecision].map(DecisionPresentationItem.init)
+        decisionItems: [criticalDecision, dismissedDecision].map(DecisionPresentationItem.init),
+        scopeSessionID: nil
       )
     )
 
@@ -188,6 +189,25 @@ struct TaskBoardOverviewBehaviorTests {
     #expect(presentation.decisionIDs(in: .needsYou) == ["decision-critical"])
     #expect(presentation.aggregateNeedsYouCount == 2)
     #expect(presentation.aggregateOpenCount == 4)
+  }
+
+  @Test("Overview presentation scopes session board items off main")
+  func overviewPresentationScopesSessionBoardItems() async {
+    let worker = TaskBoardOverviewPresentationWorker()
+    let scoped = taskBoardItem(id: "session-item", status: .todo, sessionId: "sess-current")
+    let other = taskBoardItem(id: "other-item", status: .todo, sessionId: "sess-other")
+
+    let presentation = await worker.compute(
+      input: TaskBoardOverviewPresentationInput(
+        snapshot: TaskBoardInboxSnapshot(),
+        taskBoardItems: [scoped, other],
+        decisionItems: [],
+        scopeSessionID: "sess-current"
+      )
+    )
+
+    #expect(presentation.taskBoardItems.map(\.id) == ["session-item"])
+    #expect(presentation.apiItems(in: .ready).map(\.id) == ["session-item"])
   }
 
   @Test("Dispatch presentation filters host project types off main")

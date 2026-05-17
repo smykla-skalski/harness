@@ -57,7 +57,7 @@ struct SessionWindowOverview: View {
           scope: .session(sessionID: snapshot.summary.sessionId),
           store: store,
           snapshot: taskBoardSnapshot,
-          taskBoardItems: linkedTaskBoardItems,
+          taskBoardItems: taskBoardSourceItems,
           decisions: decisions,
           orchestratorStatus: store.contentUI.dashboard.taskBoardOrchestratorStatus,
           evaluationSummary: store.contentUI.dashboard.taskBoardEvaluationSummary,
