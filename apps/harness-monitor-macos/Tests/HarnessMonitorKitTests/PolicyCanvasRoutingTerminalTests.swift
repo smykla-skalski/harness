@@ -51,6 +51,39 @@ struct PolicyCanvasRoutingTerminalTests {
     )
   }
 
+  @Test("port marker layout matches route terminal offsets")
+  func portMarkerLayoutMatchesRouteTerminalOffsets() {
+    let (viewModel, edges, routes) = defaultDisplayedRoutes()
+    let input = PolicyCanvasRouteWorkerInput(
+      nodes: viewModel.nodes,
+      groups: viewModel.groups,
+      edges: edges,
+      fontScale: 1
+    )
+    let markerLayout = input.portMarkerLayout(routes: routes, nodeIndex: input.nodeIndex)
+
+    assertMarkerOffsets(
+      viewModel: viewModel,
+      edges: edges,
+      routes: routes,
+      markerLayout: markerLayout,
+      endpoint: \.source,
+      routePoint: { $0.points.first },
+      routeSide: policyCanvasRouteSourceSide,
+      label: "source"
+    )
+    assertMarkerOffsets(
+      viewModel: viewModel,
+      edges: edges,
+      routes: routes,
+      markerLayout: markerLayout,
+      endpoint: \.target,
+      routePoint: { $0.points.last },
+      routeSide: policyCanvasRouteTargetSide,
+      label: "target"
+    )
+  }
+
   @Test("default graph displayed routes keep port spacing between route edges")
   func defaultGraphDisplayedRoutesKeepPortSpacingBetweenRouteEdges() {
     let (viewModel, edges, routes) = defaultDisplayedRoutes()
@@ -187,6 +220,52 @@ struct PolicyCanvasRoutingTerminalTests {
         Set(points).count == groupEdges.count,
         "\(label) endpoint routes should not share the same physical anchor"
       )
+    }
+  }
+
+  private func assertMarkerOffsets(
+    viewModel: PolicyCanvasViewModel,
+    edges: [PolicyCanvasEdge],
+    routes: [String: PolicyCanvasEdgeRoute],
+    markerLayout: PolicyCanvasPortMarkerLayout,
+    endpoint: KeyPath<PolicyCanvasEdge, PolicyCanvasPortEndpoint>,
+    routePoint: (PolicyCanvasEdgeRoute) -> CGPoint?,
+    routeSide: (PolicyCanvasEdgeRoute) -> PolicyCanvasPortSide?,
+    label: String
+  ) {
+    for edge in edges {
+      guard
+        let route = routes[edge.id],
+        let point = routePoint(route),
+        let side = routeSide(route),
+        let base = viewModel.portAnchorCandidates(for: edge[keyPath: endpoint])
+          .first(where: { $0.side == side })?.point
+      else {
+        continue
+      }
+      let offset = axisOffset(from: base, to: point, side: side)
+      let markers = markerLayout.markers(
+        for: edge[keyPath: endpoint],
+        side: side,
+        isVisible: true
+      )
+      #expect(
+        markers.contains { abs($0.axisOffset - offset) < 0.5 },
+        "\(label) marker missing \(edge.id) terminal offset \(offset)"
+      )
+    }
+  }
+
+  private func axisOffset(
+    from base: CGPoint,
+    to point: CGPoint,
+    side: PolicyCanvasPortSide
+  ) -> CGFloat {
+    switch side {
+    case .leading, .trailing:
+      point.y - base.y
+    case .top, .bottom:
+      point.x - base.x
     }
   }
 

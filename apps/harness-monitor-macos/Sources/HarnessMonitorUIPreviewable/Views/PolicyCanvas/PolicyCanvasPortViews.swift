@@ -13,6 +13,7 @@ struct PolicyCanvasPortColumn: View {
   let alignment: PolicyCanvasPortColumnAlignment
   let viewModel: PolicyCanvasViewModel
   let visibleSides: PolicyCanvasPortVisibilityMap
+  let markerLayout: PolicyCanvasPortMarkerLayout
   var isAuxiliary = false
 
   var body: some View {
@@ -26,15 +27,16 @@ struct PolicyCanvasPortColumn: View {
     let count = ports.count
     ZStack(alignment: stackAlignment) {
       ForEach(ports.indices, id: \.self) { index in
-        if shouldRenderPort(ports[index]) {
+        ForEach(markers(for: ports[index]), id: \.id) { marker in
           PolicyCanvasPortView(
             node: node,
             port: ports[index],
             side: portSide,
             viewModel: viewModel,
-            isAuxiliary: isAuxiliary
+            isAuxiliary: isAuxiliary || !marker.allowsInteraction,
+            allowsInteraction: marker.allowsInteraction
           )
-          .offset(offset(index: index, count: count))
+          .offset(offset(index: index, count: count, marker: marker))
         }
       }
     }
@@ -76,17 +78,18 @@ struct PolicyCanvasPortColumn: View {
     }
   }
 
-  private func shouldRenderPort(_ port: PolicyCanvasPort) -> Bool {
+  private func markers(for port: PolicyCanvasPort) -> [PolicyCanvasPortMarker] {
     let endpoint = PolicyCanvasPortEndpoint(
       nodeID: node.id,
       portID: port.id,
       kind: port.kind
     )
-    return policyCanvasVisiblePortSides(
+    let isVisible = policyCanvasVisiblePortSides(
       for: endpoint,
       visibility: visibleSides
     )
     .contains(portSide)
+    return markerLayout.markers(for: endpoint, side: portSide, isVisible: isVisible)
   }
 
   private var frameOffset: CGSize {
@@ -102,18 +105,24 @@ struct PolicyCanvasPortColumn: View {
     }
   }
 
-  private func offset(index: Int, count: Int) -> CGSize {
+  private func offset(
+    index: Int,
+    count: Int,
+    marker: PolicyCanvasPortMarker
+  ) -> CGSize {
     switch alignment {
     case .leading, .trailing:
       CGSize(
         width: 0,
         height: PolicyCanvasLayout.portY(index: index, count: count)
           - PolicyCanvasLayout.portDiameter / 2
+          + marker.axisOffset
       )
     case .top, .bottom:
       CGSize(
         width: PolicyCanvasLayout.portX(index: index, count: count)
-          - PolicyCanvasLayout.portDiameter / 2,
+          - PolicyCanvasLayout.portDiameter / 2
+          + marker.axisOffset,
         height: 0
       )
     }
@@ -126,9 +135,14 @@ private struct PolicyCanvasPortView: View {
   let side: PolicyCanvasPortSide
   let viewModel: PolicyCanvasViewModel
   let isAuxiliary: Bool
+  let allowsInteraction: Bool
 
   var body: some View {
-    if port.kind == .output {
+    if !allowsInteraction {
+      portMarker
+        .allowsHitTesting(false)
+        .accessibilityHidden(true)
+    } else if port.kind == .output {
       // Gesture protocol between `.draggable()` and `.simultaneousGesture(...)`
       // on the same view:
       //
