@@ -142,7 +142,7 @@ extension HarnessMonitorStore {
           sessionID: sessionID,
           detail: measuredMutation.value
         )
-        _ = sessionIndex.applySessionSummary(detail.session)
+        applySessionSummaryUpdate(detail.session)
         guard selectedSessionID == sessionID else {
           presentSuccessFeedback(actionName)
           return true

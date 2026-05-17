@@ -297,12 +297,12 @@ struct PolicyCanvasArchitectureFoundationTests {
       source: insideGroupPoint,
       target: outsideGroupPoint
     )
-    #expect(insideObstacles.count == expectedNodeFrames.count)
+    #expect(insideObstacles.count == expectedNodeFrames.count + expectedGroupFrames.count)
     for frame in expectedNodeFrames {
       #expect(insideObstacles.contains(frame))
     }
     for frame in expectedGroupFrames {
-      #expect(!insideObstacles.contains(frame))
+      #expect(insideObstacles.contains(frame))
     }
 
     let farPointA = CGPoint(x: outsideGroupPoint.x, y: outsideGroupPoint.y)

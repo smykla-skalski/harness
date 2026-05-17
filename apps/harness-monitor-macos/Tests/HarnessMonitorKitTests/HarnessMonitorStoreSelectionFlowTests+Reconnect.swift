@@ -111,7 +111,7 @@ extension HarnessMonitorStoreSelectionFlowTests {
       store.acpTranscript(forAgent: "worker-reconnect-acp").map(\.summary)
         == ["Refreshed ACP transcript row"]
     )
-    #expect(client.readCallCount(.acpTranscript(summary.sessionId)) >= 2)
+    #expect(client.acpTranscriptCallCount(for: summary.sessionId) >= 2)
   }
 
   @Test("Reconnect-ready events refresh push-only global and session state")

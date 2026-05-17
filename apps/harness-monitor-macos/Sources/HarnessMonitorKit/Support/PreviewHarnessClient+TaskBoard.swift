@@ -52,6 +52,14 @@ extension PreviewHarnessClient {
     return try await state.approveTaskBoardPlan(id: id, request: request)
   }
 
+  public func revokeTaskBoardPlan(
+    id: String,
+    request: TaskBoardPlanRevokeRequest
+  ) async throws -> TaskBoardPlanningResponse {
+    try await performActionDelay()
+    return try await state.revokeTaskBoardPlan(id: id, request: request)
+  }
+
   public func syncTaskBoard(request _: TaskBoardSyncRequest) async throws -> TaskBoardSyncSummary {
     try await performActionDelay()
     return await state.syncTaskBoard()

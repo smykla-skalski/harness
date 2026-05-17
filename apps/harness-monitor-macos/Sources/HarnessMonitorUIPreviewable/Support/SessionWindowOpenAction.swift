@@ -161,6 +161,15 @@ enum SessionWindowTabMergeCoordinator {
     _ window: NSWindow,
     with targetWindow: NSWindow
   ) -> Bool {
+    // `tabGroup` can lag immediately after `addTabbedWindow(_:ordered:)`, but
+    // `tabbedWindows` already reflects the native-tab relationship. Treat both
+    // signals as equivalent so we never try to tab an existing peer again.
+    if targetWindow.tabbedWindows?.contains(where: { $0 === window }) == true {
+      return true
+    }
+    if window.tabbedWindows?.contains(where: { $0 === targetWindow }) == true {
+      return true
+    }
     guard let targetTabGroup = targetWindow.tabGroup else {
       return false
     }

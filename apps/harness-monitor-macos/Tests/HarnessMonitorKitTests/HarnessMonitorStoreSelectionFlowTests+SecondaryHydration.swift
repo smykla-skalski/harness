@@ -141,7 +141,7 @@ extension HarnessMonitorStoreSelectionFlowTests {
       store.acpTranscript(forAgent: "worker-acp-secondary").map(\.summary)
         == ["Dedicated ACP transcript row"]
     )
-    #expect(client.readCallCount(.acpTranscript(summary.sessionId)) == 1)
+    #expect(client.acpTranscriptCallCount(for: summary.sessionId) == 1)
   }
 
   @Test("Selecting a session keeps managed native-runtime ACP transcript history")
@@ -211,7 +211,7 @@ extension HarnessMonitorStoreSelectionFlowTests {
       store.acpTranscript(forAgent: "worker-acp-native").map(\.summary)
         == ["Dedicated Gemini transcript row"]
     )
-    #expect(client.readCallCount(.acpTranscript(summary.sessionId)) == 1)
+    #expect(client.acpTranscriptCallCount(for: summary.sessionId) == 1)
   }
 
   @Test("Recording client derives managed native ACP transcript fallback from timeline")

@@ -111,3 +111,11 @@ public struct TaskBoardPlanApproveRequest: Codable, Equatable, Sendable {
     self.approvedAt = approvedAt
   }
 }
+
+public struct TaskBoardPlanRevokeRequest: Codable, Equatable, Sendable {
+  public let actor: String?
+
+  public init(actor: String? = nil) {
+    self.actor = actor
+  }
+}

@@ -42,6 +42,8 @@ struct WorkspaceAcpSessionContextRecoveryTests {
     )
     let store = HarnessMonitorStore(daemonController: daemon, daemonOwnership: .managed)
     await store.bootstrap()
+    clearRecordedCallsIfNeeded(for: staleClient)
+    clearRecordedCallsIfNeeded(for: recoveredClient)
     store.toast.dismissAll()
     store.selectedSessionID = nil
     store.daemonStatus = sandboxedStatus(
@@ -75,6 +77,8 @@ struct WorkspaceAcpSessionContextRecoveryTests {
     #expect(
       recoveredClient.recordedCalls()
         == [
+          .syncTaskBoardGitHubTokens(globalTokenConfigured: false, repositoryTokenCount: 0),
+          .syncTaskBoardTodoistToken(tokenConfigured: false),
           expectedHostBridgeReconfigureCall(),
           expectedAcpStartCall(),
         ]
