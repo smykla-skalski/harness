@@ -197,6 +197,9 @@ private struct SessionRouteAgentDetailFocus<Detail: View, Empty: View>: View {
   let empty: (Bool) -> Empty
   @Environment(\.appSearchModel)
   private var appSearchModel: AppSearchModel?
+  @State private var presentationWorker = SessionRouteListPresentationWorker()
+  @State private var cachedPresentation = SessionAgentListPresentation.empty
+  @State private var presentationGeneration: UInt64 = 0
 
   init(
     agents: [AgentRegistration],
@@ -218,18 +221,40 @@ private struct SessionRouteAgentDetailFocus<Detail: View, Empty: View>: View {
     !query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
   }
 
-  private var visibleAgentIDs: [String] {
-    SessionWindowAgentFilter.filteredAgents(agents, query: query).map(\.agentId)
+  private var presentationInput: SessionAgentListPresentationInput {
+    SessionAgentListPresentationInput(
+      agents: agents,
+      query: query,
+      agentOrderIDs: state.sidebarOrdering.agentIDs
+    )
   }
 
   var body: some View {
-    if let agentID = SessionAgentRouteSelectionPolicy.preferredRouteDetailAgentID(
-      rememberedAgentID: state.sectionState.agentID,
-      visibleAgentIDs: visibleAgentIDs
-    ) {
-      detail(agentID)
-    } else {
-      empty(hasQuery)
+    Group {
+      if let agentID = SessionAgentRouteSelectionPolicy.preferredRouteDetailAgentID(
+        rememberedAgentID: state.sectionState.agentID,
+        visibleAgentIDs: cachedPresentation.agentIDs
+      ) {
+        detail(agentID)
+      } else {
+        empty(cachedPresentation.hasQuery || hasQuery)
+      }
+    }
+    .task(id: presentationInput) {
+      await rebuildPresentation(input: presentationInput)
+    }
+  }
+
+  @MainActor
+  private func rebuildPresentation(input: SessionAgentListPresentationInput) async {
+    presentationGeneration &+= 1
+    let generation = presentationGeneration
+    let presentation = await presentationWorker.computeAgents(input: input)
+    guard !Task.isCancelled, presentationGeneration == generation else {
+      return
+    }
+    if cachedPresentation != presentation {
+      cachedPresentation = presentation
     }
   }
 }
@@ -241,6 +266,9 @@ private struct SessionRouteTaskDetailFocus<Detail: View, Empty: View>: View {
   let empty: (Bool) -> Empty
   @Environment(\.appSearchModel)
   private var appSearchModel: AppSearchModel?
+  @State private var presentationWorker = SessionRouteListPresentationWorker()
+  @State private var cachedPresentation = SessionTaskListPresentation.empty
+  @State private var presentationGeneration: UInt64 = 0
 
   init(
     tasks: [WorkItem],
@@ -264,33 +292,36 @@ private struct SessionRouteTaskDetailFocus<Detail: View, Empty: View>: View {
     !trimmedQuery.isEmpty
   }
 
-  private var visibleTaskIDs: [String] {
-    filteredTasks.map(\.taskId)
-  }
-
-  private var filteredTasks: [WorkItem] {
-    guard !trimmedQuery.isEmpty else { return tasks }
-    return tasks.filter { task in
-      if task.title.lowercased().contains(trimmedQuery) { return true }
-      if let context = task.context?.lowercased(), context.contains(trimmedQuery) {
-        return true
-      }
-      if let fix = task.suggestedFix?.lowercased(), fix.contains(trimmedQuery) {
-        return true
-      }
-      if task.taskId.lowercased().contains(trimmedQuery) { return true }
-      return false
-    }
+  private var presentationInput: SessionTaskListPresentationInput {
+    SessionTaskListPresentationInput(tasks: tasks, query: trimmedQuery)
   }
 
   var body: some View {
-    if let taskID = SessionTaskRouteSelectionPolicy.preferredRouteDetailTaskID(
-      rememberedTaskID: state.sectionState.taskID,
-      visibleTaskIDs: visibleTaskIDs
-    ) {
-      detail(taskID)
-    } else {
-      empty(hasQuery)
+    Group {
+      if let taskID = SessionTaskRouteSelectionPolicy.preferredRouteDetailTaskID(
+        rememberedTaskID: state.sectionState.taskID,
+        visibleTaskIDs: cachedPresentation.taskIDs
+      ) {
+        detail(taskID)
+      } else {
+        empty(cachedPresentation.hasQuery || hasQuery)
+      }
+    }
+    .task(id: presentationInput) {
+      await rebuildPresentation(input: presentationInput)
+    }
+  }
+
+  @MainActor
+  private func rebuildPresentation(input: SessionTaskListPresentationInput) async {
+    presentationGeneration &+= 1
+    let generation = presentationGeneration
+    let presentation = await presentationWorker.computeTasks(input: input)
+    guard !Task.isCancelled, presentationGeneration == generation else {
+      return
+    }
+    if cachedPresentation != presentation {
+      cachedPresentation = presentation
     }
   }
 }

@@ -12,6 +12,9 @@ struct SessionWindowTasksList: View {
   @Environment(\.appSearchModel)
   private var appSearchModel: AppSearchModel?
   @State private var routeSelection = SessionRouteListSelectionState()
+  @State private var presentationWorker = SessionRouteListPresentationWorker()
+  @State private var cachedPresentation = SessionTaskListPresentation.empty
+  @State private var presentationGeneration: UInt64 = 0
 
   private var metrics: SessionWindowRouteContentMetrics {
     SessionWindowRouteContentMetrics(fontScale: fontScale)
@@ -21,7 +24,7 @@ struct SessionWindowTasksList: View {
     if case .route(.tasks) = state.selection {
       return SessionTaskRouteSelectionPolicy.preferredRouteDetailTaskID(
         rememberedTaskID: state.sectionState.taskID,
-        visibleTaskIDs: filteredTasks.map(\.taskId)
+        visibleTaskIDs: cachedPresentation.taskIDs
       )
     }
     return state.selection.taskID
@@ -38,31 +41,15 @@ struct SessionWindowTasksList: View {
     )
   }
 
-  private var trimmedQuery: String {
-    (appSearchModel?.query ?? "")
-      .trimmingCharacters(in: .whitespacesAndNewlines)
-      .lowercased()
-  }
-
-  private var filteredTasks: [WorkItem] {
-    let tasks = detail?.tasks ?? []
-    let needle = trimmedQuery
-    guard !needle.isEmpty else { return tasks }
-    return tasks.filter { task in
-      if task.title.lowercased().contains(needle) { return true }
-      if let context = task.context?.lowercased(), context.contains(needle) {
-        return true
-      }
-      if let fix = task.suggestedFix?.lowercased(), fix.contains(needle) {
-        return true
-      }
-      if task.taskId.lowercased().contains(needle) { return true }
-      return false
-    }
+  private var presentationInput: SessionTaskListPresentationInput {
+    SessionTaskListPresentationInput(
+      tasks: detail?.tasks ?? [],
+      query: appSearchModel?.query ?? ""
+    )
   }
 
   var body: some View {
-    let tasks = filteredTasks
+    let tasks = cachedPresentation.tasks
     List(selection: selectedTaskIDs) {
       Section("Tasks") {
         if !tasks.isEmpty {
@@ -97,13 +84,13 @@ struct SessionWindowTasksList: View {
                     kind: .task,
                     rowID: task.taskId,
                     selectedIDs: selectedTaskIDs.wrappedValue,
-                    orderedVisibleIDs: tasks.map(\.taskId)
+                    orderedVisibleIDs: cachedPresentation.taskIDs
                   )
                 )
               )
             }
           }
-        } else if !trimmedQuery.isEmpty {
+        } else if cachedPresentation.hasQuery {
           ContentUnavailableView(
             "No Matching Tasks",
             systemImage: "checklist",
@@ -115,7 +102,10 @@ struct SessionWindowTasksList: View {
       }
     }
     .listStyle(.inset)
-    .onChange(of: filteredTasks.map(\.taskId)) { _, ids in
+    .task(id: presentationInput) {
+      await rebuildPresentation(input: presentationInput)
+    }
+    .onChange(of: cachedPresentation.taskIDs) { _, ids in
       let primaryID = routeSelection.prune(
         visibleIDs: Set(ids),
         fallbackPrimaryID: preferredRouteDetailTaskID
@@ -128,6 +118,19 @@ struct SessionWindowTasksList: View {
     }
     .onChange(of: state.lastPlainClick) { _, signal in
       collapseSelectionFromApplicationTap(signal)
+    }
+  }
+
+  @MainActor
+  private func rebuildPresentation(input: SessionTaskListPresentationInput) async {
+    presentationGeneration &+= 1
+    let generation = presentationGeneration
+    let presentation = await presentationWorker.computeTasks(input: input)
+    guard !Task.isCancelled, presentationGeneration == generation else {
+      return
+    }
+    if cachedPresentation != presentation {
+      cachedPresentation = presentation
     }
   }
 
