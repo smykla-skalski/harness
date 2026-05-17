@@ -1,43 +1,81 @@
 import Foundation
 
+actor ManifestWatcherStartupWorker {
+  func loadSeed(
+    environment: HarnessMonitorEnvironment
+  ) -> ManifestWatcherStartupSeed {
+    let manifestURL = HarnessMonitorPaths.manifestURL(using: environment).standardizedFileURL
+    let daemonRoot = manifestURL.deletingLastPathComponent()
+    try? FileManager.default.createDirectory(
+      at: daemonRoot,
+      withIntermediateDirectories: true
+    )
+
+    guard
+      let data = FileManager.default.contents(atPath: manifestURL.path),
+      let manifest = Self.decodeManifest(from: data)
+    else {
+      return ManifestWatcherStartupSeed(
+        manifestURL: manifestURL,
+        currentEndpoint: "",
+        currentStartedAt: nil,
+        currentRevision: 0
+      )
+    }
+
+    return ManifestWatcherStartupSeed(
+      manifestURL: manifestURL,
+      currentEndpoint: manifest.endpoint,
+      currentStartedAt: manifest.startedAt,
+      currentRevision: manifest.revision
+    )
+  }
+
+  func waitForIdle() async {}
+
+  private static func decodeManifest(from data: Data) -> DaemonManifest? {
+    let decoder = JSONDecoder()
+    decoder.keyDecodingStrategy = .convertFromSnakeCase
+    return try? decoder.decode(DaemonManifest.self, from: data)
+  }
+}
+
+struct ManifestWatcherStartupSeed: Sendable {
+  let manifestURL: URL
+  let currentEndpoint: String
+  let currentStartedAt: String?
+  let currentRevision: UInt64
+}
+
 extension HarnessMonitorStore {
   func startManifestWatcher() {
     stopManifestWatcher()
     guard maintainsLiveDaemonObservation else {
       return
     }
-    let daemonRoot = manifestURL.deletingLastPathComponent()
-    // The dispatch source opens the daemon directory; create it first so the
-    // watcher still starts when the dev daemon has never run yet. This is
-    // required for external daemon mode where the app may launch before the
-    // terminal daemon exists.
-    try? FileManager.default.createDirectory(
-      at: daemonRoot,
-      withIntermediateDirectories: true
-    )
-    let decoder = JSONDecoder()
-    decoder.keyDecodingStrategy = .convertFromSnakeCase
-    let currentEndpoint: String
-    let currentStartedAt: String?
-    let currentRevision: UInt64
-    if let data = FileManager.default.contents(atPath: manifestURL.path),
-      let manifest = try? decoder.decode(DaemonManifest.self, from: data)
-    {
-      currentEndpoint = manifest.endpoint
-      currentStartedAt = manifest.startedAt
-      currentRevision = manifest.revision
-    } else {
-      // Manifest missing or undecodable; start with an empty sentinel so the
-      // first valid manifest write triggers reconnect.
-      currentEndpoint = ""
-      currentStartedAt = nil
-      currentRevision = 0
+    let worker = manifestWatcherStartupWorker
+    let environment = HarnessMonitorEnvironment.current
+    manifestWatcherStartTask = Task { @MainActor [weak self] in
+      let seed = await worker.loadSeed(environment: environment)
+      guard
+        !Task.isCancelled,
+        let self,
+        self.maintainsLiveDaemonObservation
+      else {
+        return
+      }
+      self.manifestWatcherStartTask = nil
+      self.installManifestWatcher(seed)
     }
+  }
+
+  private func installManifestWatcher(_ seed: ManifestWatcherStartupSeed) {
+    manifestURL = seed.manifestURL
     let watcher = ManifestWatcher(
-      manifestURL: manifestURL,
-      currentEndpoint: currentEndpoint,
-      currentStartedAt: currentStartedAt,
-      currentRevision: currentRevision
+      manifestURL: seed.manifestURL,
+      currentEndpoint: seed.currentEndpoint,
+      currentStartedAt: seed.currentStartedAt,
+      currentRevision: seed.currentRevision
     ) { [weak self] change in
       Task { @MainActor [weak self] in
         guard let self else { return }
@@ -59,6 +97,8 @@ extension HarnessMonitorStore {
   }
 
   func stopManifestWatcher() {
+    manifestWatcherStartTask?.cancel()
+    manifestWatcherStartTask = nil
     stopExternalManifestDiscoveryTask()
     manifestWatcher?.stop()
     manifestWatcher = nil
