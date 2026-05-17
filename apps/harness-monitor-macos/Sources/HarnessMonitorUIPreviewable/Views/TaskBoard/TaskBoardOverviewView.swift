@@ -30,6 +30,13 @@ public struct TaskBoardOverviewView: View {
   private var fontScale
   @State private var selectedTaskBoardItemID: String?
   @State private var isCreatingTaskBoardItem = false
+  // Width-gated header layouts. Each row used to be a `ViewThatFits` that
+  // built BOTH HStack + VStack candidate subtrees on every body update;
+  // during a live AppKit resize the AttributeGraph thrash dominated.
+  @State private var accessoryFitsHorizontally = true
+  @State private var headerActionsFitHorizontally = true
+  @State private var aggregateSummaryFitsHorizontally = true
+  @State private var evaluationSummaryFitsHorizontally = true
 
   private var captionSemibold: Font {
     HarnessMonitorTextSize.scaledFont(.caption.weight(.semibold), by: fontScale)
@@ -177,36 +184,58 @@ extension TaskBoardOverviewView {
   }
 
   private var headerActions: some View {
-    ViewThatFits(in: .horizontal) {
-      HStack(spacing: HarnessMonitorTheme.spacingSM) {
-        headerActionButtons
+    Group {
+      if headerActionsFitHorizontally {
+        HStack(spacing: HarnessMonitorTheme.spacingSM) {
+          headerActionButtons
+        }
+      } else {
+        VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
+          headerActionButtons
+        }
       }
-      VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
-        headerActionButtons
+    }
+    .onGeometryChange(for: CGFloat.self) { proxy in
+      proxy.size.width
+    } action: { width in
+      let next = width >= 300
+      if headerActionsFitHorizontally != next {
+        headerActionsFitHorizontally = next
       }
     }
   }
 
   private var boardAccessoryRow: some View {
-    ViewThatFits(in: .horizontal) {
-      HStack(alignment: .center, spacing: HarnessMonitorTheme.spacingMD) {
-        if hasAggregateSummary {
-          aggregateSummaryRow
+    Group {
+      if accessoryFitsHorizontally {
+        HStack(alignment: .center, spacing: HarnessMonitorTheme.spacingMD) {
+          if hasAggregateSummary {
+            aggregateSummaryRow
+          }
+          if hasAggregateSummary && hasHeaderActions {
+            Spacer(minLength: HarnessMonitorTheme.spacingMD)
+          }
+          if hasHeaderActions {
+            headerActions
+          }
         }
-        if hasAggregateSummary && hasHeaderActions {
-          Spacer(minLength: HarnessMonitorTheme.spacingMD)
-        }
-        if hasHeaderActions {
-          headerActions
+      } else {
+        VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
+          if hasAggregateSummary {
+            aggregateSummaryRow
+          }
+          if hasHeaderActions {
+            headerActions
+          }
         }
       }
-      VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
-        if hasAggregateSummary {
-          aggregateSummaryRow
-        }
-        if hasHeaderActions {
-          headerActions
-        }
+    }
+    .onGeometryChange(for: CGFloat.self) { proxy in
+      proxy.size.width
+    } action: { width in
+      let next = width >= 760
+      if accessoryFitsHorizontally != next {
+        accessoryFitsHorizontally = next
       }
     }
   }
@@ -263,26 +292,48 @@ extension TaskBoardOverviewView {
   }
 
   private var aggregateSummaryRow: some View {
-    ViewThatFits(in: .horizontal) {
-      HStack(spacing: HarnessMonitorTheme.spacingSM) {
-        aggregateSummaryContent
+    Group {
+      if aggregateSummaryFitsHorizontally {
+        HStack(spacing: HarnessMonitorTheme.spacingSM) {
+          aggregateSummaryContent
+        }
+      } else {
+        VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
+          aggregateSummaryContent
+        }
       }
-      VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
-        aggregateSummaryContent
+    }
+    .onGeometryChange(for: CGFloat.self) { proxy in
+      proxy.size.width
+    } action: { width in
+      let next = width >= 500
+      if aggregateSummaryFitsHorizontally != next {
+        aggregateSummaryFitsHorizontally = next
       }
     }
   }
 
   private func evaluationSummaryRow(_ summary: TaskBoardEvaluationSummary) -> some View {
-    ViewThatFits(in: .horizontal) {
-      HStack(spacing: HarnessMonitorTheme.spacingSM) {
-        evaluationSummaryContent(summary)
-      }
-      VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
-        evaluationSummaryContent(summary)
+    Group {
+      if evaluationSummaryFitsHorizontally {
+        HStack(spacing: HarnessMonitorTheme.spacingSM) {
+          evaluationSummaryContent(summary)
+        }
+      } else {
+        VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
+          evaluationSummaryContent(summary)
+        }
       }
     }
     .frame(maxWidth: .infinity, alignment: .leading)
+    .onGeometryChange(for: CGFloat.self) { proxy in
+      proxy.size.width
+    } action: { width in
+      let next = width >= 420
+      if evaluationSummaryFitsHorizontally != next {
+        evaluationSummaryFitsHorizontally = next
+      }
+    }
     .accessibilityIdentifier("harness.task-board.evaluation-summary")
   }
 
