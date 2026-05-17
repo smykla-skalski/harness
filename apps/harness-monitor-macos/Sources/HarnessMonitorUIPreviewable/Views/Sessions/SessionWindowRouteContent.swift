@@ -119,6 +119,9 @@ struct SessionWindowAgentsList: View {
   @Environment(\.appSearchModel)
   private var appSearchModel: AppSearchModel?
   @State private var routeSelection = SessionRouteListSelectionState()
+  @State private var presentationWorker = SessionRouteListPresentationWorker()
+  @State private var cachedPresentation = SessionAgentListPresentation.empty
+  @State private var presentationGeneration: UInt64 = 0
 
   private var metrics: SessionWindowRouteContentMetrics {
     SessionWindowRouteContentMetrics(fontScale: fontScale)
@@ -128,7 +131,7 @@ struct SessionWindowAgentsList: View {
     if case .route(.agents) = state.selection {
       return SessionAgentRouteSelectionPolicy.preferredRouteDetailAgentID(
         rememberedAgentID: state.sectionState.agentID,
-        visibleAgentIDs: orderedFilteredAgents.map(\.agentId)
+        visibleAgentIDs: cachedPresentation.agentIDs
       )
     }
     return state.selection.agentID
@@ -149,16 +152,12 @@ struct SessionWindowAgentsList: View {
     appSearchModel?.query ?? ""
   }
 
-  private var hasQuery: Bool {
-    !searchQuery.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-  }
-
-  private var filteredAgents: [AgentRegistration] {
-    SessionWindowAgentFilter.filteredAgents(snapshot.detail?.agents ?? [], query: searchQuery)
-  }
-
-  private var orderedFilteredAgents: [AgentRegistration] {
-    state.sidebarOrdering.orderedAgents(filteredAgents)
+  private var presentationInput: SessionAgentListPresentationInput {
+    SessionAgentListPresentationInput(
+      agents: snapshot.detail?.agents ?? [],
+      query: searchQuery,
+      agentOrderIDs: state.sidebarOrdering.agentIDs
+    )
   }
 
   private var runtimePresentation: HarnessMonitorStore.AgentRuntimePresentationContext? {
@@ -177,7 +176,7 @@ struct SessionWindowAgentsList: View {
   }
 
   var body: some View {
-    let agents = orderedFilteredAgents
+    let agents = cachedPresentation.agents
     List(selection: selectedAgentIDs) {
       Section("Agents") {
         if !agents.isEmpty {
@@ -223,13 +222,13 @@ struct SessionWindowAgentsList: View {
                     kind: .agent,
                     rowID: agent.agentId,
                     selectedIDs: selectedAgentIDs.wrappedValue,
-                    orderedVisibleIDs: agents.map(\.agentId)
+                    orderedVisibleIDs: cachedPresentation.agentIDs
                   )
                 )
               )
             }
           }
-        } else if hasQuery {
+        } else if cachedPresentation.hasQuery {
           ContentUnavailableView(
             "No Matching Agents",
             systemImage: SessionWindowRoute.agents.systemImage,
@@ -241,7 +240,10 @@ struct SessionWindowAgentsList: View {
       }
     }
     .listStyle(.inset)
-    .onChange(of: filteredAgents.map(\.agentId)) { _, ids in
+    .task(id: presentationInput) {
+      await rebuildPresentation(input: presentationInput)
+    }
+    .onChange(of: cachedPresentation.agentIDs) { _, ids in
       let primaryID = routeSelection.prune(
         visibleIDs: Set(ids),
         fallbackPrimaryID: preferredRouteDetailAgentID
@@ -254,6 +256,19 @@ struct SessionWindowAgentsList: View {
     }
     .onChange(of: state.lastPlainClick) { _, signal in
       collapseSelectionFromApplicationTap(signal)
+    }
+  }
+
+  @MainActor
+  private func rebuildPresentation(input: SessionAgentListPresentationInput) async {
+    presentationGeneration &+= 1
+    let generation = presentationGeneration
+    let presentation = await presentationWorker.computeAgents(input: input)
+    guard !Task.isCancelled, presentationGeneration == generation else {
+      return
+    }
+    if cachedPresentation != presentation {
+      cachedPresentation = presentation
     }
   }
 

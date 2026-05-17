@@ -1,6 +1,7 @@
 import Foundation
 import Testing
 
+@testable import HarnessMonitorKit
 @testable import HarnessMonitorUIPreviewable
 
 @Suite("Session window route content selection")
@@ -112,6 +113,46 @@ struct SessionWindowRouteContentSelectionTests {
     #expect(routeContent.contains("state.selectRoute(.tasks)"))
     #expect(detailFocus.contains("case .route(.tasks):"))
     #expect(detailFocus.contains("SessionTaskDetailPane("))
+  }
+
+  @Test("Route list presentation worker filters and orders agents and tasks")
+  func routeListPresentationWorkerFiltersAndOrdersAgentsAndTasks() async {
+    let worker = SessionRouteListPresentationWorker()
+    let agents = [
+      agent(id: "worker-b", name: "Bravo Agent"),
+      agent(id: "worker-a", name: "Alpha Agent"),
+    ]
+
+    let orderedAgents = await worker.computeAgents(
+      input: SessionAgentListPresentationInput(
+        agents: agents,
+        query: "",
+        agentOrderIDs: ["worker-a", "worker-b"]
+      )
+    )
+    let filteredAgents = await worker.computeAgents(
+      input: SessionAgentListPresentationInput(
+        agents: agents,
+        query: "bravo",
+        agentOrderIDs: ["worker-a", "worker-b"]
+      )
+    )
+    let filteredTasks = await worker.computeTasks(
+      input: SessionTaskListPresentationInput(
+        tasks: [
+          task(id: "task-build", title: "Build app", context: "Compile monitor"),
+          task(id: "task-fix", title: "Fix freeze", context: "Main thread"),
+        ],
+        query: "freeze"
+      )
+    )
+
+    #expect(orderedAgents.agentIDs == ["worker-a", "worker-b"])
+    #expect(!orderedAgents.hasQuery)
+    #expect(filteredAgents.agentIDs == ["worker-b"])
+    #expect(filteredAgents.hasQuery)
+    #expect(filteredTasks.taskIDs == ["task-fix"])
+    #expect(filteredTasks.hasQuery)
   }
 
   @Test("Session layouts follow the rendered route when switching route-only surfaces")
@@ -361,6 +402,52 @@ struct SessionWindowRouteContentSelectionTests {
     return try String(
       contentsOf: sourceURL,
       encoding: .utf8
+    )
+  }
+
+  private func agent(id: String, name: String) -> AgentRegistration {
+    AgentRegistration(
+      agentId: id,
+      name: name,
+      runtime: "codex",
+      role: .worker,
+      capabilities: [],
+      joinedAt: "2026-05-01T17:00:00Z",
+      updatedAt: "2026-05-01T17:00:01Z",
+      status: .active,
+      agentSessionId: nil,
+      managedAgent: nil,
+      lastActivityAt: nil,
+      currentTaskId: nil,
+      runtimeCapabilities: RuntimeCapabilities(
+        runtime: "codex",
+        supportsNativeTranscript: true,
+        supportsSignalDelivery: true,
+        supportsContextInjection: true,
+        typicalSignalLatencySeconds: 5,
+        hookPoints: []
+      ),
+      persona: nil
+    )
+  }
+
+  private func task(id: String, title: String, context: String?) -> WorkItem {
+    WorkItem(
+      taskId: id,
+      title: title,
+      context: context,
+      severity: .medium,
+      status: .open,
+      assignedTo: nil,
+      createdAt: "2026-05-01T17:00:00Z",
+      updatedAt: "2026-05-01T17:00:01Z",
+      createdBy: nil,
+      notes: [],
+      suggestedFix: nil,
+      source: .manual,
+      blockedReason: nil,
+      completedAt: nil,
+      checkpointSummary: nil
     )
   }
 }
