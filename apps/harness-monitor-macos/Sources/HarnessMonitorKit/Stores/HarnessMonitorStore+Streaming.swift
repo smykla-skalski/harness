@@ -390,7 +390,7 @@ extension HarnessMonitorStore {
       guard let sessionID = event.sessionId else {
         return false
       }
-      await replaceAcpInspectFromStream(
+      await replaceAcpInspectAsync(
         response,
         sessionID: sessionID,
         sampledAt: Self.acpInspectSampledAt(from: event.recordedAt)

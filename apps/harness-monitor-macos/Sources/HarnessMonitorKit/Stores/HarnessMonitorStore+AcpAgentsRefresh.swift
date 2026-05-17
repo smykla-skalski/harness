@@ -198,7 +198,7 @@ extension HarnessMonitorStore {
       } else if daemonStatus?.manifest?.sandboxed == true {
         markHostBridgeIssue(for: "acp", statusCode: 503)
       }
-      replaceAcpInspect(
+      await replaceAcpInspectAsync(
         response,
         sessionID: sessionID,
         sampledAt: Date(),
