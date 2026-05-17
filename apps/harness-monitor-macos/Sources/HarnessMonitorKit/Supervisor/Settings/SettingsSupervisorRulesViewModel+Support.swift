@@ -1,6 +1,49 @@
 import Foundation
 
 extension SettingsSupervisorRulesViewModel {
+  func applyPreparedRows(_ output: SettingsSupervisorRulesPreparedRows) {
+    overridesByRuleID = output.overridesByRuleID
+    editorStates = output.editorStates
+  }
+
+  nonisolated static func prepareRows(
+    _ rows: [PolicyConfigRowSnapshot],
+    rules: [SettingsSupervisorRuleDescriptor]
+  ) -> SettingsSupervisorRulesPreparedRows {
+    let overridesByRuleID = Dictionary(
+      uniqueKeysWithValues: rows.map {
+        (
+          $0.ruleID,
+          RuleOverrideState(
+            enabled: $0.enabled,
+            defaultBehavior: RuleDefaultBehavior(rawValue: $0.defaultBehaviorRaw) ?? .cautious,
+            parameters: decodeParameters(from: $0.parametersJSON)
+          )
+        )
+      }
+    )
+    let editorStates = Dictionary(
+      uniqueKeysWithValues: rules.map { rule in
+        if let override = overridesByRuleID[rule.id] {
+          return (
+            rule.id,
+            RuleEditorState(
+              enabled: override.enabled,
+              defaultBehavior: override.defaultBehavior,
+              parameterValues: defaultParameters(for: rule)
+                .merging(override.parameters) { _, overrideValue in overrideValue }
+            )
+          )
+        }
+        return (rule.id, builtInEditorState(for: rule))
+      }
+    )
+    return SettingsSupervisorRulesPreparedRows(
+      overridesByRuleID: overridesByRuleID,
+      editorStates: editorStates
+    )
+  }
+
   func loadSelectedRule() {
     guard let selectedRule else {
       enabled = true
@@ -37,7 +80,7 @@ extension SettingsSupervisorRulesViewModel {
     parameterValuesByKey = state.parameterValues
   }
 
-  static func builtInEditorState(
+  nonisolated static func builtInEditorState(
     for rule: SettingsSupervisorRuleDescriptor
   ) -> RuleEditorState {
     RuleEditorState(
@@ -47,13 +90,13 @@ extension SettingsSupervisorRulesViewModel {
     )
   }
 
-  static func defaultParameters(
+  nonisolated static func defaultParameters(
     for rule: SettingsSupervisorRuleDescriptor
   ) -> [String: String] {
     Dictionary(uniqueKeysWithValues: rule.parameters.fields.map { ($0.key, $0.default) })
   }
 
-  static func decodeParameters(from json: String) -> [String: String] {
+  nonisolated static func decodeParameters(from json: String) -> [String: String] {
     guard
       let data = json.data(using: .utf8),
       let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
@@ -75,17 +118,33 @@ extension SettingsSupervisorRulesViewModel {
     return parameters
   }
 
-  struct RuleOverrideState {
+  struct RuleOverrideState: Sendable {
     let enabled: Bool
     let defaultBehavior: RuleDefaultBehavior
     let parameters: [String: String]
   }
 
-  struct RuleEditorState: Equatable {
+  struct RuleEditorState: Equatable, Sendable {
     var enabled: Bool
     var defaultBehavior: RuleDefaultBehavior
     var parameterValues: [String: String]
   }
+}
+
+struct SettingsSupervisorRulesPreparedRows: Sendable {
+  let overridesByRuleID: [String: SettingsSupervisorRulesViewModel.RuleOverrideState]
+  let editorStates: [String: SettingsSupervisorRulesViewModel.RuleEditorState]
+}
+
+actor SettingsSupervisorRulesWorker {
+  func prepareRows(
+    _ rows: [PolicyConfigRowSnapshot],
+    rules: [SettingsSupervisorRuleDescriptor]
+  ) -> SettingsSupervisorRulesPreparedRows {
+    SettingsSupervisorRulesViewModel.prepareRows(rows, rules: rules)
+  }
+
+  func waitForIdle() async {}
 }
 
 public enum SettingsSupervisorRulesViewModelError: Error {

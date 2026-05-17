@@ -9,12 +9,14 @@ final class DecisionRuntime {
   var decisionItems: [DecisionPresentationItem] = []
   var decisionsRevision: UInt64 = 0
   var auditEvents: [SupervisorEventSnapshot] = []
+  var auditEventPayloadPresentations: [String: DecisionAuditTrailPayloadPresentation] = [:]
   var liveTick: DecisionLiveTickSnapshot = .placeholder
 
   func reload(from store: HarnessMonitorStore?) async {
     guard let store else {
       applyDecisionSurfaceSnapshot(.empty)
       auditEvents = []
+      auditEventPayloadPresentations = [:]
       liveTick = .placeholder
       return
     }
@@ -23,12 +25,18 @@ final class DecisionRuntime {
     guard let decisionStore else {
       applyDecisionSurfaceSnapshot(.empty)
       auditEvents = []
+      auditEventPayloadPresentations = [:]
       liveTick = .placeholder
       return
     }
 
     applyDecisionSurfaceSnapshot((try? await decisionStore.openSurfaceSnapshot()) ?? .empty)
-    auditEvents = await store.loadSupervisorAuditEventSnapshots()
+    let loadedAuditEvents = await store.loadSupervisorAuditEventSnapshots()
+    let loadedPayloadPresentations = await decisionAuditPayloadWorker.presentations(
+      for: loadedAuditEvents
+    )
+    auditEvents = loadedAuditEvents
+    auditEventPayloadPresentations = loadedPayloadPresentations
     await refreshLiveTick(from: store)
   }
 
@@ -55,4 +63,27 @@ final class DecisionRuntime {
     decisionItems = snapshot.presentationItems
     decisionsRevision &+= 1
   }
+}
+
+private let decisionAuditPayloadWorker = DecisionAuditPayloadWorker()
+
+private actor DecisionAuditPayloadWorker {
+  func presentations(
+    for events: [SupervisorEventSnapshot]
+  ) -> [String: DecisionAuditTrailPayloadPresentation] {
+    let decoder = JSONDecoder()
+    return Dictionary(
+      uniqueKeysWithValues: events.map {
+        (
+          $0.id,
+          DecisionAuditTrailPayloadPresentation(
+            payloadJSON: $0.payloadJSON,
+            decoder: decoder
+          )
+        )
+      }
+    )
+  }
+
+  func waitForIdle() async {}
 }

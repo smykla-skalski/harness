@@ -120,6 +120,41 @@ public struct DecisionDetailView: View {
     }
   }
 
+  init(
+    decision: Decision?,
+    store: HarnessMonitorStore? = nil,
+    handler: any DecisionActionHandler = NullDecisionActionHandler(),
+    auditEvents: [SupervisorEventSnapshot] = [],
+    auditEventPayloadPresentations: [String: DecisionAuditTrailPayloadPresentation],
+    selectedTab: Binding<DecisionDetailTab> = .constant(.context),
+    observer: ObserverSummary? = nil,
+    decisionScope: DecisionWorkspaceScope? = nil,
+    primaryActionFocusDecisionID: String? = nil,
+    primaryActionFocusRequestTick: Int = 0
+  ) {
+    if let decision {
+      self.init(
+        viewModel: DecisionDetailViewModel(decision: decision, handler: handler),
+        store: store,
+        auditEvents: auditEvents,
+        auditEventPayloadPresentations: auditEventPayloadPresentations,
+        selectedTab: selectedTab,
+        observer: observer,
+        decisionScope: decisionScope,
+        primaryActionFocusDecisionID: primaryActionFocusDecisionID,
+        primaryActionFocusRequestTick: primaryActionFocusRequestTick
+      )
+    } else {
+      self.init(
+        selectedTab: selectedTab,
+        observer: observer,
+        decisionScope: decisionScope,
+        primaryActionFocusDecisionID: primaryActionFocusDecisionID,
+        primaryActionFocusRequestTick: primaryActionFocusRequestTick
+      )
+    }
+  }
+
   public var body: some View {
     // The owning scroll column already applies the top scroll-edge effect.
     detailBody

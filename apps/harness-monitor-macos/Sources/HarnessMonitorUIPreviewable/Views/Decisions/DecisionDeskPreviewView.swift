@@ -97,6 +97,7 @@ public struct DecisionDeskPreviewView: View {
         store: store,
         handler: actionHandler,
         auditEvents: runtime.auditEvents,
+        auditEventPayloadPresentations: runtime.auditEventPayloadPresentations,
         selectedTab: $detailTab,
         observer: sessionObserver,
         decisionScope: decisionWorkspaceScope,
