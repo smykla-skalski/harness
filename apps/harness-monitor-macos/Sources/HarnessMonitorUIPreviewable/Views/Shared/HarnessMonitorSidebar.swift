@@ -19,6 +19,8 @@ struct HarnessMonitorSidebar<Content: View>: View {
   private let accessibilityValue: Text
   private let statusModel: SessionStatusSummaryModel
   private let content: Content
+  @Environment(\.fontScale)
+  private var fontScale
 
   init(
     accessibilityIdentifier: String,
@@ -32,13 +34,31 @@ struct HarnessMonitorSidebar<Content: View>: View {
     self.content = content()
   }
 
+  private var metrics: HarnessMonitorSidebarChromeMetrics {
+    HarnessMonitorSidebarChromeMetrics(fontScale: fontScale)
+  }
+
   var body: some View {
     content
+      .safeAreaInset(edge: .top, spacing: 0) {
+        Color.clear
+          .frame(height: metrics.toolbarAvoidanceTopInset)
+          .accessibilityHidden(true)
+      }
       .safeAreaInset(edge: .bottom, spacing: 0) {
         SessionSidebarFooter(model: statusModel)
       }
       .accessibilityIdentifier(accessibilityIdentifier)
       .accessibilityValue(accessibilityValue)
+  }
+}
+
+struct HarnessMonitorSidebarChromeMetrics: Equatable {
+  let toolbarAvoidanceTopInset: CGFloat
+
+  init(fontScale: CGFloat) {
+    let scale = min(SessionWindowFontScale.metricsScale(for: fontScale), 1.35)
+    toolbarAvoidanceTopInset = (44 * scale).rounded(.up)
   }
 }
 
