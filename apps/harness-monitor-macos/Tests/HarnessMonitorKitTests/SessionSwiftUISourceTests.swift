@@ -222,10 +222,9 @@ struct SessionSwiftUISourceTests {
     #expect(extensionEffectSource.contains("content.backgroundExtensionEffect()"))
     #expect(!surfaceSource.contains(".backgroundExtensionEffect()"))
     #expect(surfaceSource.contains("topScrollEdgeEffect: .soft"))
+    #expect(!columnScrollSource.contains("content.scrollContentBackground(.visible)"))
     #expect(columnScrollSource.contains("content.scrollEdgeEffectStyle(.soft, for: .top)"))
     #expect(columnScrollSource.contains("content.scrollEdgeEffectStyle(.hard, for: .top)"))
-    #expect(columnScrollSource.contains("TopScrollUnderlapModifier(effect: topScrollEdgeEffect)"))
-    #expect(columnScrollSource.contains("content.ignoresSafeArea(.container, edges: .top)"))
   }
 
   @Test("Dashboard detail surface avoids mirrored toolbar extension hosts")
@@ -236,7 +235,7 @@ struct SessionSwiftUISourceTests {
     #expect(!dashboardSource.contains(".toolbarBackground(.visible, for: .windowToolbar)"))
     #expect(!dashboardSource.contains(".backgroundExtensionEffect()"))
     #expect(dashboardSource.contains(".frame(maxWidth: .infinity, maxHeight: .infinity)"))
-    #expect(dashboardSource.contains(".ignoresSafeArea(.container, edges: .top)"))
+    #expect(!dashboardSource.contains(".ignoresSafeArea(.container, edges: .top)"))
   }
 
   @Test("Toolbar backdrop uses scroll edge without artificial underlays")

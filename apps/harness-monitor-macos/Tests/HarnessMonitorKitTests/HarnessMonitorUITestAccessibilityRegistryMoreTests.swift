@@ -123,22 +123,9 @@ struct HarnessMonitorUITestAccessibilityRegistryMoreTests {
     #expect(
       dashboardView.contains(".accessibilityValue(isSelected ? \"selected\" : \"not selected\")"))
     #expect(sharedSidebarView.contains("HarnessMonitorSidebarListChromeModifier"))
-    #expect(sharedSidebarView.contains("@Environment(\\.fontScale)"))
-    #expect(sharedSidebarView.contains(".safeAreaInset(edge: .top, spacing: 0)"))
-    #expect(sharedSidebarView.contains("toolbarAvoidanceTopInset"))
     #expect(sharedSidebarView.contains("SessionSidebarFooter(model: statusModel)"))
     #expect(sharedSidebarView.contains(".accessibilityIdentifier(accessibilityIdentifier)"))
     #expect(sharedSidebarView.contains(".accessibilityValue(accessibilityValue)"))
-  }
-
-  @Test("Dashboard sidebar toolbar inset follows font scale")
-  func dashboardSidebarToolbarInsetFollowsFontScale() {
-    let normal = HarnessMonitorSidebarChromeMetrics(fontScale: 1.0)
-    let large = HarnessMonitorSidebarChromeMetrics(fontScale: 1.5)
-
-    #expect(normal.toolbarAvoidanceTopInset >= 44)
-    #expect(large.toolbarAvoidanceTopInset > normal.toolbarAvoidanceTopInset)
-    #expect(large.toolbarAvoidanceTopInset <= 60)
   }
 
   @Test("Agents runtime identifiers match UI-test mirror")

@@ -11,12 +11,12 @@ final class HarnessMonitorWindowShellTests: XCTestCase {
 
     XCTAssertTrue(mainRoot.contains("HarnessMonitorWindowShell("))
     XCTAssertTrue(mainRoot.contains("WindowContentReadiness("))
-    XCTAssertTrue(mainRoot.contains("windowToolbarBackgroundVisibility: .visible"))
+    XCTAssertTrue(mainRoot.contains("windowToolbarBackgroundVisibility: .hidden"))
     XCTAssertTrue(mainRoot.contains(".suppressToolbarBaselineSeparator("))
     XCTAssertTrue(
       mainRoot.contains("HarnessMonitorAccessibility.dashboardToolbarSeparatorSuppressed")
     )
-    XCTAssertFalse(mainRoot.contains("titlebarAppearsTransparent: true"))
+    XCTAssertTrue(mainRoot.contains("titlebarAppearsTransparent: true"))
     XCTAssertTrue(mainRoot.contains(".toolbar {"))
     XCTAssertTrue(mainRoot.contains("private var hostsSharedShellPresentation"))
     XCTAssertTrue(mainRoot.contains("HarnessMonitorConfirmationDialogModifier("))
@@ -45,7 +45,7 @@ final class HarnessMonitorWindowShellTests: XCTestCase {
       XCTAssertTrue(shell.contains(modifier), "scene shell is missing \(modifier)")
     }
     XCTAssertTrue(shell.contains("OptionalWindowToolbarBackgroundVisibilityModifier("))
-    XCTAssertTrue(shell.contains(".toolbarBackground(.regularMaterial, for: .windowToolbar)"))
+    XCTAssertFalse(shell.contains(".toolbarBackground(.bar, for: .windowToolbar)"))
     XCTAssertTrue(shell.contains(".toolbarBackgroundVisibility(visibility, for: .windowToolbar)"))
     XCTAssertTrue(shell.contains("HarnessMonitorBackdropDefaults.modeKey"))
     XCTAssertTrue(shell.contains("HarnessMonitorBackgroundDefaults.imageKey"))

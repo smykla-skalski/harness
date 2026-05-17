@@ -68,13 +68,14 @@ struct DashboardWindowRootView: View {
       mcpWindowCommandRegistrar: mcpWindowCommandRegistrar,
       themeMode: $themeMode,
       contentReadiness: contentReadiness,
-      windowToolbarBackgroundVisibility: .visible,
+      windowToolbarBackgroundVisibility: .hidden,
       toast: store.toast
     ) {
       liveContent
     }
     .suppressToolbarBaselineSeparator(
-      markedAs: HarnessMonitorAccessibility.dashboardToolbarSeparatorSuppressed
+      markedAs: HarnessMonitorAccessibility.dashboardToolbarSeparatorSuppressed,
+      titlebarAppearsTransparent: true
     )
     .modifier(WorkspaceToolbarUITestForceTickModifier(store: store))
     .modifier(
