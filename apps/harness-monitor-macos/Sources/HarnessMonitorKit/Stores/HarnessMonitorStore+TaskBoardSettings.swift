@@ -1,14 +1,64 @@
 import Foundation
 
-extension HarnessMonitorStore {
-  private static let taskBoardGitHubCredentialStore = TaskBoardGitHubCredentialStore()
-  private static let taskBoardTodoistCredentialStore = TaskBoardTodoistCredentialStore()
+struct TaskBoardStoredCredentialSnapshot: Sendable {
+  let githubCredentials: TaskBoardGitHubCredentialSnapshot
+  let todoistCredentials: TaskBoardTodoistCredentialSnapshot
+}
 
+actor TaskBoardSettingsWorker {
+  private let githubCredentialStore = TaskBoardGitHubCredentialStore()
+  private let todoistCredentialStore = TaskBoardTodoistCredentialStore()
+
+  func loadStoredCredentials() throws -> TaskBoardStoredCredentialSnapshot {
+    try TaskBoardStoredCredentialSnapshot(
+      githubCredentials: githubCredentialStore.load(),
+      todoistCredentials: todoistCredentialStore.load()
+    )
+  }
+
+  func hydrateKeyMaterial(
+    into runtime: TaskBoardGitRuntimeConfig,
+    keychain: TaskBoardKeyMaterialPersistence = .defaultKeychain
+  ) -> TaskBoardGitRuntimeConfig {
+    HarnessMonitorStore.hydrateKeyMaterial(into: runtime, keychain: keychain)
+  }
+
+  func persistLocalSecrets(snapshot: TaskBoardGitSettingsSnapshot) throws {
+    try githubCredentialStore.save(snapshot.githubCredentials)
+    try todoistCredentialStore.save(snapshot.todoistCredentials)
+    try HarnessMonitorStore.persistKeyMaterial(runtime: snapshot.runtimeConfig)
+  }
+
+  func persistKeyMaterial(
+    runtime: TaskBoardGitRuntimeConfig,
+    keychain: TaskBoardKeyMaterialPersistence = .defaultKeychain
+  ) throws {
+    try HarnessMonitorStore.persistKeyMaterial(runtime: runtime, keychain: keychain)
+  }
+
+  func drainRuntimeSecretsIfNeeded(
+    client: any HarnessMonitorClientProtocol
+  ) async -> Bool {
+    do {
+      let response = try await client.drainTaskBoardGitRuntimeSecrets()
+      if response.drained {
+        try persistKeyMaterial(runtime: response.runtime)
+      }
+      return true
+    } catch {
+      return false
+    }
+  }
+
+  func waitForIdle() {}
+}
+
+extension HarnessMonitorStore {
   /// Per-ownership migration flag. Managed and external daemons each carry
   /// their own on-disk config, so each one needs its own one-shot drain.
   /// Sharing a single flag would skip the drain on whichever daemon the user
   /// connected to second.
-  public static func taskBoardRuntimeSecretsMigrationKey(
+  nonisolated public static func taskBoardRuntimeSecretsMigrationKey(
     for ownership: DaemonOwnership
   ) -> String {
     "io.harnessmonitor.taskboard.runtime-secrets-migrated.\(ownership.rawValue)"
@@ -17,27 +67,27 @@ extension HarnessMonitorStore {
   public func taskBoardGitSettingsSnapshot() async throws -> TaskBoardGitSettingsSnapshot {
     let client = try await taskBoardSettingsClient()
 
-    await Self.migrateRuntimeSecretsIfNeeded(client: client, ownership: daemonOwnership)
+    await migrateRuntimeSecretsUsingWorkerIfNeeded(client: client, ownership: daemonOwnership)
 
     async let orchestratorSettings = client.taskBoardOrchestratorSettings()
     async let runtimeConfig = client.taskBoardGitRuntimeConfig()
     async let identityDefaults = Self.fetchIdentityDefaults(client: client)
-    let githubCredentials = try Self.taskBoardGitHubCredentialStore.load()
-    let todoistCredentials = try Self.taskBoardTodoistCredentialStore.load()
+    async let storedCredentials = taskBoardSettingsWorker.loadStoredCredentials()
 
     let baseRuntime = try await runtimeConfig
-    let hydratedRuntime = Self.hydrateKeyMaterial(into: baseRuntime)
+    let hydratedRuntime = await taskBoardSettingsWorker.hydrateKeyMaterial(into: baseRuntime)
+    let credentials = try await storedCredentials
 
     return await TaskBoardGitSettingsSnapshot(
       orchestratorSettings: try orchestratorSettings,
       runtimeConfig: hydratedRuntime,
-      githubCredentials: githubCredentials,
-      todoistCredentials: todoistCredentials,
+      githubCredentials: credentials.githubCredentials,
+      todoistCredentials: credentials.todoistCredentials,
       identityDefaults: identityDefaults
     )
   }
 
-  private static func hydrateKeyMaterial(
+  nonisolated static func hydrateKeyMaterial(
     into runtime: TaskBoardGitRuntimeConfig,
     keychain: TaskBoardKeyMaterialPersistence = .defaultKeychain
   ) -> TaskBoardGitRuntimeConfig {
@@ -56,7 +106,7 @@ extension HarnessMonitorStore {
     )
   }
 
-  private static func hydrateProfile(
+  nonisolated private static func hydrateProfile(
     _ profile: TaskBoardGitRuntimeProfile,
     scope: TaskBoardKeyMaterialStore.Scope,
     keychain: TaskBoardKeyMaterialPersistence
@@ -86,7 +136,7 @@ extension HarnessMonitorStore {
     )
   }
 
-  static func persistKeyMaterial(
+  nonisolated static func persistKeyMaterial(
     runtime: TaskBoardGitRuntimeConfig,
     keychain: TaskBoardKeyMaterialPersistence = .defaultKeychain
   ) throws {
@@ -100,7 +150,7 @@ extension HarnessMonitorStore {
     }
   }
 
-  private static func persistProfileKeyMaterial(
+  nonisolated private static func persistProfileKeyMaterial(
     _ profile: TaskBoardGitRuntimeProfile,
     scope: TaskBoardKeyMaterialStore.Scope,
     keychain: TaskBoardKeyMaterialPersistence
@@ -132,7 +182,7 @@ extension HarnessMonitorStore {
     )
   }
 
-  private static func fetchIdentityDefaults(
+  nonisolated private static func fetchIdentityDefaults(
     client: any HarnessMonitorClientProtocol
   ) async -> TaskBoardGitIdentityDefaults {
     do {
@@ -162,6 +212,21 @@ extension HarnessMonitorStore {
       // Older daemons (wire version 1) don't expose the drain endpoint; the
       // version-skew banner already tells the user to upgrade. Leave the
       // migration flag unset so we retry on the next snapshot fetch.
+    }
+  }
+
+  private func migrateRuntimeSecretsUsingWorkerIfNeeded(
+    client: any HarnessMonitorClientProtocol,
+    ownership: DaemonOwnership,
+    userDefaults: UserDefaults = .standard
+  ) async {
+    let flagKey = Self.taskBoardRuntimeSecretsMigrationKey(for: ownership)
+    guard !userDefaults.bool(forKey: flagKey) else {
+      return
+    }
+    let succeeded = await taskBoardSettingsWorker.drainRuntimeSecretsIfNeeded(client: client)
+    if succeeded {
+      userDefaults.set(true, forKey: flagKey)
     }
   }
 
@@ -217,9 +282,7 @@ extension HarnessMonitorStore {
       }
 
       do {
-        try Self.taskBoardGitHubCredentialStore.save(materializedSnapshot.githubCredentials)
-        try Self.taskBoardTodoistCredentialStore.save(materializedSnapshot.todoistCredentials)
-        try Self.persistKeyMaterial(runtime: materializedSnapshot.runtimeConfig)
+        try await taskBoardSettingsWorker.persistLocalSecrets(snapshot: materializedSnapshot)
       } catch {
         presentFailureFeedback(
           """
@@ -323,10 +386,13 @@ extension HarnessMonitorStore {
 
   func syncStoredTaskBoardCredentials(using client: any HarnessMonitorClientProtocol) async {
     do {
-      let githubCredentials = try Self.taskBoardGitHubCredentialStore.load()
-      let todoistCredentials = try Self.taskBoardTodoistCredentialStore.load()
-      _ = try await client.syncTaskBoardGitHubTokens(request: githubCredentials.syncRequest)
-      _ = try await client.syncTaskBoardTodoistToken(request: todoistCredentials.syncRequest)
+      let credentials = try await taskBoardSettingsWorker.loadStoredCredentials()
+      _ = try await client.syncTaskBoardGitHubTokens(
+        request: credentials.githubCredentials.syncRequest
+      )
+      _ = try await client.syncTaskBoardTodoistToken(
+        request: credentials.todoistCredentials.syncRequest
+      )
     } catch {
       let description = RefreshSnapshotErrorFormatting.describeUnderlying(error)
       HarnessMonitorLogger.store.error(
