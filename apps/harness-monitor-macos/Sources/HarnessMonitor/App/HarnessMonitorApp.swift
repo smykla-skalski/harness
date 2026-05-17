@@ -67,20 +67,7 @@ struct HarnessMonitorApp: App {
     // (libdispatch BUG, NSAssertion) when these touch sandboxed services.
     let runsLiveSideEffects = configuration.launchMode == .live && !isTestRun
     if runsLiveSideEffects {
-      do {
-        try HarnessMonitorPaths.ensureHarnessRootNonIndexable(using: configuration.environment)
-      } catch {
-        HarnessMonitorLogger.store.warning(
-          "Failed to mark harness root non-indexable: \(String(describing: error), privacy: .public)"
-        )
-      }
-      do {
-        try HarnessMonitorPaths.migrateLegacyGeneratedCaches(using: configuration.environment)
-      } catch {
-        HarnessMonitorLogger.store.warning(
-          "Failed to migrate generated caches: \(String(describing: error), privacy: .public)"
-        )
-      }
+      Self.scheduleLaunchFilesystemMaintenance(environment: configuration.environment)
     }
     #if HARNESS_FEATURE_OTEL
       if runsLiveSideEffects {
@@ -142,6 +129,27 @@ struct HarnessMonitorApp: App {
     )
     _settingsSelectedSection = State(initialValue: configuration.settingsInitialSection)
     delegate.bind(store: store)
+  }
+
+  private static func scheduleLaunchFilesystemMaintenance(
+    environment: HarnessMonitorEnvironment
+  ) {
+    Task.detached(priority: .utility) {
+      do {
+        try HarnessMonitorPaths.ensureHarnessRootNonIndexable(using: environment)
+      } catch {
+        HarnessMonitorLogger.store.warning(
+          "Failed to mark harness root non-indexable: \(String(describing: error), privacy: .public)"
+        )
+      }
+      do {
+        try HarnessMonitorPaths.migrateLegacyGeneratedCaches(using: environment)
+      } catch {
+        HarnessMonitorLogger.store.warning(
+          "Failed to migrate generated caches: \(String(describing: error), privacy: .public)"
+        )
+      }
+    }
   }
 
   var body: some Scene {
