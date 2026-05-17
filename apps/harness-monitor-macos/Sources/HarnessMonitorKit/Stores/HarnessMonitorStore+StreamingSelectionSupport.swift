@@ -2,9 +2,25 @@ import Foundation
 
 extension HarnessMonitorStore {
   func refreshSelectedSessionIfSummaryChanged(sessions: [SessionSummary]) {
+    guard let selectedSessionID else {
+      return
+    }
+    refreshSelectedSessionIfSummaryChanged(
+      updatedSummary: sessions.first { $0.sessionId == selectedSessionID }
+    )
+  }
+
+  func refreshSelectedSessionIfSummaryChanged(updatedSummary: SessionSummary?) {
+    guard let updatedSummary else {
+      return
+    }
+    refreshSelectedSessionIfSummaryChanged(updatedSummary: updatedSummary)
+  }
+
+  private func refreshSelectedSessionIfSummaryChanged(updatedSummary: SessionSummary) {
     guard let client,
       let selectedSessionID,
-      let updatedSummary = sessions.first(where: { $0.sessionId == selectedSessionID }),
+      updatedSummary.sessionId == selectedSessionID,
       selectedSession?.session != updatedSummary
     else {
       return

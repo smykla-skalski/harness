@@ -39,17 +39,18 @@ extension HarnessMonitorStore {
     guard connectionState == .connecting else { return }
 
     if sessions.isEmpty, let cached = await loadCachedSessionList() {
-      let filteredCached = sessionIndexSnapshotApplyingRemovedSessionSuppression(
-        projects: cached.projects,
-        sessions: cached.sessions
-      )
-      guard connectionState == .connecting else { return }
-      withUISyncBatch {
-        sessionIndex.replaceSnapshot(
-          projects: filteredCached.projects,
-          sessions: filteredCached.sessions
+      let generation = beginSessionIndexSnapshotApply()
+      guard
+        let filteredCached = await preparedSessionIndexSnapshot(
+          projects: cached.projects,
+          sessions: cached.sessions,
+          generation: generation
         )
+      else {
+        return
       }
+      guard connectionState == .connecting else { return }
+      replaceCachedSessionIndexSnapshot(filteredCached, updateCachedCatalogFlag: false)
     }
 
     guard connectionState == .connecting else { return }
@@ -168,16 +169,17 @@ extension HarnessMonitorStore {
     await refreshPersistedSessionMetadata()
 
     if sessions.isEmpty, let cached = await loadCachedSessionList() {
-      let filteredCached = sessionIndexSnapshotApplyingRemovedSessionSuppression(
-        projects: cached.projects,
-        sessions: cached.sessions
-      )
-      withUISyncBatch {
-        sessionIndex.replaceSnapshot(
-          projects: filteredCached.projects,
-          sessions: filteredCached.sessions
+      let generation = beginSessionIndexSnapshotApply()
+      guard
+        let filteredCached = await preparedSessionIndexSnapshot(
+          projects: cached.projects,
+          sessions: cached.sessions,
+          generation: generation
         )
+      else {
+        return
       }
+      replaceCachedSessionIndexSnapshot(filteredCached, updateCachedCatalogFlag: false)
     }
 
     if case .offline = connectionState {

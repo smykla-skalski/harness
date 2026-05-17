@@ -33,6 +33,10 @@ extension HarnessMonitorStore {
   }
 
   public func waitForSessionIndexIdle() async {
+    while let task = sessionIndexSnapshotApplyTask {
+      await task.value
+    }
+    await sessionSnapshotWorker.waitForIdle()
     await sessionIndex.waitForIdle()
   }
 

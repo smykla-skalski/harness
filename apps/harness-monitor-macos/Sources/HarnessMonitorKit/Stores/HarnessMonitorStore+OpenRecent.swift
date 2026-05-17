@@ -57,16 +57,16 @@ extension HarnessMonitorStore {
       return
     }
 
-    let filteredCached = sessionIndexSnapshotApplyingRemovedSessionSuppression(
-      projects: cached.projects,
-      sessions: cached.sessions
-    )
-    withUISyncBatch {
-      sessionIndex.replaceSnapshot(
-        projects: filteredCached.projects,
-        sessions: filteredCached.sessions
+    let generation = beginSessionIndexSnapshotApply()
+    guard
+      let filteredCached = await preparedSessionIndexSnapshot(
+        projects: cached.projects,
+        sessions: cached.sessions,
+        generation: generation
       )
-      isShowingCachedCatalog = persistedSessionCount > 0 || !sessions.isEmpty
+    else {
+      return
     }
+    replaceCachedSessionIndexSnapshot(filteredCached, updateCachedCatalogFlag: true)
   }
 }

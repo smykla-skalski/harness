@@ -163,7 +163,7 @@ extension HarnessMonitorStore {
     recordConnectionTelemetry: Bool = true
   ) async throws {
     let refreshSnapshot = try await Self.loadRefreshSnapshot(using: client)
-    applyRefreshSnapshot(
+    await applyRefreshSnapshot(
       refreshSnapshot,
       using: client,
       preserveSelection: preserveSelection,
@@ -178,25 +178,31 @@ extension HarnessMonitorStore {
     preserveSelection: Bool,
     allowPreviewReadySelection: Bool,
     recordConnectionTelemetry: Bool
-  ) {
+  ) async {
     let measuredDiagnostics = refreshSnapshot.diagnostics
     let measuredProjects = refreshSnapshot.projects
     let measuredSessions = refreshSnapshot.sessions
     let measuredTaskBoardItems = refreshSnapshot.taskBoardItems
     let measuredTaskBoardOrchestratorStatus = refreshSnapshot.taskBoardOrchestratorStatus
-    let filteredSnapshot = sessionIndexSnapshotApplyingRemovedSessionSuppression(
-      projects: measuredProjects.value,
-      sessions: measuredSessions.value
-    )
+    let generation = beginSessionIndexSnapshotApply()
+    guard
+      let filteredSnapshot = await preparedSessionIndexSnapshot(
+        projects: measuredProjects.value,
+        sessions: measuredSessions.value,
+        generation: generation
+      )
+    else {
+      return
+    }
 
     withUISyncBatch {
       diagnostics = measuredDiagnostics.value
       health = measuredDiagnostics.value.health
       daemonStatus = DaemonStatusReport(
         diagnosticsReport: measuredDiagnostics.value,
-        fallbackProjectCount: filteredSnapshot.projects.count,
-        fallbackWorktreeCount: filteredSnapshot.projects.reduce(0) { $0 + $1.worktrees.count },
-        fallbackSessionCount: filteredSnapshot.sessions.count
+        fallbackProjectCount: filteredSnapshot.projectCount,
+        fallbackWorktreeCount: filteredSnapshot.worktreeCount,
+        fallbackSessionCount: filteredSnapshot.sessionCount
       )
       daemonLogLevel =
         measuredDiagnostics.value.health?.logLevel
@@ -215,10 +221,7 @@ extension HarnessMonitorStore {
       recordRequestSuccess()
     }
 
-    applySessionIndexSnapshot(
-      projects: filteredSnapshot.projects,
-      sessions: filteredSnapshot.sessions
-    )
+    applyPreparedSessionIndexSnapshot(filteredSnapshot)
 
     if preserveSelection, let selectedSessionID, selectedSessionSummary != nil {
       let requestID = beginSessionLoad()
@@ -248,7 +251,7 @@ extension HarnessMonitorStore {
     preserveSelection: Bool
   ) async throws {
     let refreshSnapshot = try await Self.loadRefreshSnapshot(using: client)
-    applyRefreshSnapshot(
+    await applyRefreshSnapshot(
       refreshSnapshot,
       using: client,
       preserveSelection: preserveSelection,

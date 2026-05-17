@@ -140,11 +140,11 @@ extension HarnessMonitorStore {
     case .ready:
       break
     case .sessionsUpdated(let payload):
-      applySessionIndexSnapshot(
+      scheduleSessionIndexSnapshotApply(
         projects: payload.projects,
-        sessions: payload.sessions
+        sessions: payload.sessions,
+        refreshSelectedSession: true
       )
-      refreshSelectedSessionIfSummaryChanged(sessions: payload.sessions)
       shouldTickSupervisor = true
     case .sessionUpdated(let payload):
       guard let sessionID = event.sessionId else {
