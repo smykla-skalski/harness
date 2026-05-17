@@ -26,14 +26,15 @@ private struct AppSearchDomainSignature: Hashable {
 /// never reach this updater. Sharing the @Observable model sidesteps
 /// the env-direction trap entirely.
 ///
-/// The decisions snapshot crosses the actor boundary as
-/// ``DecisionSearchProjection`` values built on the MainActor before
-/// the actor hop. `Decision` is an `@Model` class and is not Sendable.
+/// The decisions snapshot crosses the actor boundary as prebuilt
+/// ``DecisionSearchProjection`` values captured during the session
+/// decision-cache refresh. `Decision` is an `@Model` class and is not
+/// Sendable, so this view never maps decision rows while search opens.
 struct AppSearchIndexUpdater: View {
   let model: AppSearchModel
   let index: AppSearchIndex
   let agents: [AgentRegistration]
-  let decisions: [Decision]
+  let decisionProjections: [DecisionSearchProjection]
   let tasks: [WorkItem]
   let events: [TimelineEntry]
 
@@ -46,16 +47,7 @@ struct AppSearchIndexUpdater: View {
           await index.reindex(agents: agents)
         }
         .task(id: decisionSignature) {
-          let projections = decisions.map { decision in
-            DecisionSearchProjection(
-              id: decision.id,
-              summary: decision.summary,
-              ruleID: decision.ruleID,
-              agentID: decision.agentID,
-              taskID: decision.taskID
-            )
-          }
-          await index.reindex(decisions: projections)
+          await index.reindex(decisions: decisionProjections)
         }
         .task(id: taskSignature) {
           await index.reindex(tasks: tasks)
@@ -75,7 +67,10 @@ struct AppSearchIndexUpdater: View {
   }
 
   private var decisionSignature: AppSearchDomainSignature {
-    AppSearchDomainSignature(count: decisions.count, lastID: decisions.last?.id)
+    AppSearchDomainSignature(
+      count: decisionProjections.count,
+      lastID: decisionProjections.last?.id
+    )
   }
 
   private var taskSignature: AppSearchDomainSignature {

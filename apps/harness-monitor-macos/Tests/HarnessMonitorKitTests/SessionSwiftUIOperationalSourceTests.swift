@@ -37,6 +37,8 @@ struct SessionSwiftUIOperationalSourceTests {
     #expect(searchUpdaterSource.contains(".task(id: decisionSignature)"))
     #expect(searchUpdaterSource.contains(".task(id: taskSignature)"))
     #expect(searchUpdaterSource.contains(".task(id: eventSignature)"))
+    #expect(searchUpdaterSource.contains("decisionProjections"))
+    #expect(!searchUpdaterSource.contains("decisions.map"))
     #expect(!searchUpdaterSource.contains("AppSearchReindexTrigger(active:"))
     #expect(!searchUpdaterSource.contains("guard model.isPresented else { return }"))
   }

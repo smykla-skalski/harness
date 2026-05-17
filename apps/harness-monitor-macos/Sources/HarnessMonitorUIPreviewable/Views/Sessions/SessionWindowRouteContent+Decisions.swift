@@ -3,6 +3,7 @@ import SwiftUI
 
 struct SessionWindowDecisionsList: View {
   let decisions: [Decision]
+  let decisionIDs: [String]
   let currentModifiers: EventModifiers
   @Bindable var state: SessionWindowStateCache
   @Environment(\.fontScale)
@@ -17,8 +18,8 @@ struct SessionWindowDecisionsList: View {
     if case .route(.decisions) = state.selection {
       return SessionDecisionAutoSelectionPolicy.preferredRouteDetailDecisionID(
         rememberedDecisionID: state.sectionState.decisionID,
-        allDecisionIDs: Set(decisions.map(\.id)),
-        visibleDecisionIDs: decisions.map(\.id)
+        allDecisionIDs: Set(decisionIDs),
+        visibleDecisionIDs: decisionIDs
       )
     }
     return state.selection.decisionID
@@ -72,7 +73,7 @@ struct SessionWindowDecisionsList: View {
                   kind: .decision,
                   rowID: decision.id,
                   selectedIDs: selectedDecisionIDs.wrappedValue,
-                  orderedVisibleIDs: decisions.map(\.id)
+                  orderedVisibleIDs: decisionIDs
                 )
               )
             )
@@ -90,7 +91,7 @@ struct SessionWindowDecisionsList: View {
       }
     }
     .listStyle(.inset)
-    .onChange(of: decisions.map(\.id)) { _, ids in
+    .onChange(of: decisionIDs) { _, ids in
       let primaryID = routeSelection.prune(
         visibleIDs: Set(ids),
         fallbackPrimaryID: preferredRouteDetailDecisionID
