@@ -28,7 +28,7 @@ final class SupervisorHistoryWindowTests: XCTestCase {
     )
     try context.save()
 
-    let history = SupervisorService.historyWindow(from: context, ruleIDs: ["stuck-agent"])
+    let history = SupervisorService.historyWindow(from: container, ruleIDs: ["stuck-agent"])
 
     XCTAssertTrue(history.recentEvents.contains { $0.id == "stuck-old" })
   }
