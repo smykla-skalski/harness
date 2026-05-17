@@ -135,8 +135,10 @@ extension HarnessMonitorStore.SessionIndexSlice {
     catalog.totalSessionCount = output.totalSessionCount
     catalog.totalOpenWorkCount = output.totalOpenWorkCount
     catalog.totalBlockedCount = output.totalBlockedCount
+    catalog.sessionIDs = output.sessionIDs
     catalog.sessionSummariesByID = output.sessionSummariesByID
     catalog.recentSessions = output.recentSessions
+    catalog.recentSessionIDs = output.recentSessionIDs
     sessionIndicesByID = output.sessionIndicesByID
     recentSessionIndicesByID = output.recentSessionIndicesByID
     sessionRecordsByID = output.sessionRecordsByID
@@ -207,6 +209,7 @@ extension HarnessMonitorStore.SessionIndexSlice {
     updatedSummary: SessionSummary
   ) {
     catalog.sessionSummariesByID[updatedSummary.sessionId] = updatedSummary
+    catalog.sessionIDs.insert(updatedSummary.sessionId)
     sessionRecordsByID[updatedSummary.sessionId] = SessionRecord(summary: updatedSummary)
     catalog.totalOpenWorkCount +=
       updatedSummary.metrics.openTaskCount
@@ -218,6 +221,7 @@ extension HarnessMonitorStore.SessionIndexSlice {
       catalog.recentSessions.indices.contains(recentIndex)
     {
       catalog.recentSessions[recentIndex] = updatedSummary
+      catalog.recentSessionIDs[recentIndex] = updatedSummary.sessionId
     }
   }
 

@@ -28,6 +28,8 @@ public final class HarnessMonitorStore {
   @ObservationIgnored let acpTimelineWorker = AcpTimelineWorker()
   @ObservationIgnored let acpRuntimeWorker = AcpRuntimeWorker()
   @ObservationIgnored let sessionSnapshotWorker = SessionSnapshotWorker()
+  @ObservationIgnored let launchWindowRestoreWorker = LaunchWindowRestoreWorker()
+  @ObservationIgnored let sessionCacheWriteWorker = SessionCacheWriteWorker()
   @ObservationIgnored var sessionIndexSnapshotApplyTask: Task<Void, Never>?
   @ObservationIgnored var sessionIndexSnapshotApplyGeneration: UInt64 = 0
   @ObservationIgnored var acpTimelineMergeTask: Task<Void, Never>?
