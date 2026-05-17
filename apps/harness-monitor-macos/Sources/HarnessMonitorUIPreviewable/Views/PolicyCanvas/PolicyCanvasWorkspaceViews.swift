@@ -1,18 +1,8 @@
 import SwiftUI
 
-// Minimum platform target for the trackpad and gesture APIs below
-// (`MagnifyGesture`, `.scrollIndicators(.visible)`, `.dropDestination(for:)`):
-// macOS 14 / iOS 17. The Monitor app targets macOS 26, so the gestures
-// compile unconditionally; if the deployment target ever drops below 14,
-// these surfaces need an availability gate or AppKit fallback.
 struct PolicyCanvasViewport: View {
   let viewModel: PolicyCanvasViewModel
   let focusedComponent: AccessibilityFocusState<PolicyCanvasSelection?>.Binding
-  /// View-only flag from the host. The host (`PolicyCanvasView`) auto-flips
-  /// this on when a simulation is available and the user is on the
-  /// simulation tab; the chrome toggle in the top bar lets the user hide
-  /// the overlay even when both conditions hold. Simulation visibility is
-  /// purely viewport state — never set `documentDirty` from this seam.
   var showSimulationOverlay: Bool = false
   var suppressesSceneStorage = false
   var storedPipelineStateRaw = ""
@@ -20,21 +10,12 @@ struct PolicyCanvasViewport: View {
   @State private var zoomFocusDispatcher = PolicyCanvasZoomFocusDispatcher()
   @State private var zoomFocus: PolicyCanvasZoomFocus?
   @State private var hasAppliedRestoredSceneZoom = false
-  /// Tracks the current keyboard modifiers via `.onModifierKeysChanged` so the
-  /// scroll-geometry handler can gate Cmd+scroll-wheel zoom on the Cmd flag.
   @State private var currentModifiers: EventModifiers = []
-  /// Last hover position in viewport-local coordinates. Cmd+scroll-wheel zoom
-  /// anchors the new scroll offset on this point so the content under the
-  /// cursor stays under the cursor across the zoom.
   @State private var hoveredViewportPoint: CGPoint?
-  /// SwiftUI scroll-position binding. Read by `onScrollGeometryChange` to
-  /// detect Cmd-modified scroll deltas; written programmatically when the
-  /// view restores the offset to keep the cursor anchored after a Cmd+scroll
-  /// zoom. Coexists with the existing `ScrollViewReader`-driven centering
-  /// (which still uses `scrollProxy.scrollTo` for id-based anchor restore).
   @State private var scrollPosition = ScrollPosition()
-  /// Suppresses one geometry-change tick after a programmatic scroll write so
-  /// the restoration write does not re-fire the Cmd+scroll handler in a loop.
+  @State private var measuredScrollContentSize: CGSize = .zero
+  @State private var pendingCenteredScrollPoint: CGPoint?
+  @State private var pendingCenteredContentSize: CGSize?
   @State private var isRestoringCommandScrollPosition = false
   @Environment(\.scenePhase)
   private var scenePhase
@@ -76,11 +57,23 @@ struct PolicyCanvasViewport: View {
             height: labelMetrics.height
           )
         )
+        let presentationOffset = policyCanvasViewportPresentationOffset(
+          visibleBounds: visibleBounds
+        )
         let contentSize = policyCanvasVisibleContentSize(visibleBounds: visibleBounds)
         let contentOrigin = policyCanvasViewportContentOrigin(
           viewportSize: proxy.size,
           contentSize: contentSize,
           zoom: viewModel.zoom
+        )
+        let renderedContentSize = policyCanvasRenderedContentSize(
+          viewportSize: proxy.size,
+          contentSize: contentSize,
+          zoom: viewModel.zoom
+        )
+        let scaledCanvasOffset = CGPoint(
+          x: (presentationOffset.x * viewModel.zoom) + contentOrigin.x,
+          y: (presentationOffset.y * viewModel.zoom) + contentOrigin.y
         )
         ScrollView([.horizontal, .vertical]) {
           ZStack(alignment: .topLeading) {
@@ -90,7 +83,7 @@ struct PolicyCanvasViewport: View {
               .frame(width: 1, height: 1)
               .position(
                 policyCanvasInitialViewportAnchorPoint(
-                  contentBounds: viewModel.canvasContentBounds,
+                  visibleBounds: visibleBounds,
                   zoom: viewModel.zoom
                 )
                 .applying(
@@ -124,35 +117,29 @@ struct PolicyCanvasViewport: View {
                 labelPositions: labelPositions
               )
             }
-            // Pinch zoom uses the unit-space anchor captured on pinch start so
-            // the content under the user's fingers stays under their fingers
-            // as the scale changes. Chrome buttons (Cmd-+, Cmd-=, Cmd--,
-            // Cmd-0) leave `pinchAnchorUnit` nil and fall through to the
-            // canvas top-leading origin, matching the prior visual behavior.
             .scaleEffect(viewModel.zoom, anchor: viewModel.pinchAnchorUnit ?? .topLeading)
-            .offset(x: contentOrigin.x, y: contentOrigin.y)
+            .offset(x: scaledCanvasOffset.x, y: scaledCanvasOffset.y)
             .coordinateSpace(.named(PolicyCanvasCoordinateSpaces.canvas))
           }
           .frame(
-            width: max(proxy.size.width, contentSize.width * viewModel.zoom),
-            height: max(proxy.size.height, contentSize.height * viewModel.zoom),
+            width: renderedContentSize.width,
+            height: renderedContentSize.height,
             alignment: .topLeading
           )
           .contentShape(Rectangle())
           .dropDestination(for: String.self) { payloads, location in
             viewModel.dropPalettePayloads(
               payloads,
-              at: viewModel.canvasPoint(for: location)
+              at: viewModel.canvasPoint(
+                for: location,
+                scaledCanvasOffset: scaledCanvasOffset
+              )
             )
           }
           .onTapGesture {
             viewModel.select(nil)
           }
         }
-        // ScrollView pan respects the user's natural-scroll setting because
-        // it routes through AppKit's standard scroll machinery (which reads
-        // `NSEvent.isDirectionInvertedFromDevice`). No app-side direction
-        // adjustment needed.
         .scrollDisabled(viewModel.isEmpty)
         .scrollIndicators(viewModel.isEmpty ? .hidden : .visible)
         .scrollPosition($scrollPosition)
@@ -171,15 +158,20 @@ struct PolicyCanvasViewport: View {
           handleScrollOffsetChange(
             oldOffset: oldOffset,
             newOffset: newOffset,
-            viewportSize: proxy.size
+            viewportSize: proxy.size,
+            contentSize: contentSize,
+            presentationOffset: presentationOffset
           )
+        }
+        .onScrollGeometryChange(for: CGSize.self) { geometry in
+          geometry.contentSize
+        } action: { _, newContentSize in
+          measuredScrollContentSize = newContentSize
+          applyPendingCenteredScrollIfNeeded()
         }
         .background(Color(red: 0.03, green: 0.04, blue: 0.06))
         .clipShape(Rectangle())
         .overlay {
-          // Center the empty-state in the visible viewport, not in the scroll
-          // content's full extent, so the placeholder stays visually centered
-          // even when the canvas spans beyond the clipped viewport bounds.
           PolicyCanvasEmptyStatePlaceholder(viewModel: viewModel)
             .allowsHitTesting(false)
         }
@@ -210,37 +202,16 @@ struct PolicyCanvasViewport: View {
           )
         }
         .onChange(of: scenePhase) { _, newPhase in
-          // When the scene leaves .active mid-pinch (Cmd-Tab, Mission
-          // Control, modal sheet, window minimize), MagnifyGesture's
-          // .onEnded does not always fire — `magnifyStartZoom` would
-          // otherwise stay non-nil and the next pinch would compute its
-          // baseline against a stale value. Clear the in-flight gesture
-          // state on every transition off .active.
           if newPhase != .active {
             magnifyStartZoom = nil
             viewModel.clearPinchAnchor()
           }
         }
-        // Publish the zoom-focus dispatcher into the scene's FocusedValues so
-        // a scene-level CommandGroup can route View-menu items and keyboard
-        // chords (Cmd-+, Cmd-=, Cmd-0) at the live canvas. Identity-based
-        // equality on the dispatcher keeps this from re-publishing on every
-        // viewport body run.
         .focusedSceneValue(\.harnessPolicyCanvasZoomFocus, zoomFocus)
       }
     }
-    // P57: `.contain` is paired only with `.accessibilityIdentifier` here (no
-    // parent label) so the rotor + children stay exposed without the
-    // VoiceOver "stops on every child of a labelled element" footgun. Two
-    // rotors live below: "Nodes" walks the visual focus order so VO users
-    // can hop across the graph; "Edges" lists every wired connection.
     .accessibilityElement(children: .contain)
     .accessibilityRotor("Nodes") {
-      // P25: rotor entries built lazily from the focus-order id list; we map
-      // ids to labels per-iteration so the rotor content closure never
-      // captures live node values across frames. Anchoring the rotor entry
-      // on the node's identifier delegates ring focus to the
-      // `.accessibilityFocused` modifier on the matching node card.
       ForEach(viewModel.accessibilityNodeFocusOrder(), id: \.self) { nodeID in
         if let node = viewModel.node(nodeID) {
           AccessibilityRotorEntry(
@@ -260,8 +231,10 @@ struct PolicyCanvasViewport: View {
     }
     .accessibilityFrameMarker(HarnessMonitorAccessibility.policyCanvasViewport)
   }
+}
 
-  private func centerViewportIfNeeded(
+extension PolicyCanvasViewport {
+  fileprivate func centerViewportIfNeeded(
     viewportSize: CGSize,
     visibleBounds: CGRect
   ) {
@@ -302,7 +275,7 @@ struct PolicyCanvasViewport: View {
     )
     let targetAnchorPoint =
       policyCanvasInitialViewportAnchorPoint(
-        contentBounds: viewModel.canvasContentBounds,
+        visibleBounds: visibleBounds,
         zoom: targetZoom
       )
       .applying(
@@ -315,18 +288,17 @@ struct PolicyCanvasViewport: View {
       anchorPoint: targetAnchorPoint,
       viewportSize: viewportSize
     )
-    Task { @MainActor in
-      await Task.yield()
-      isRestoringCommandScrollPosition = true
-      scrollPosition = ScrollPosition(point: targetScrollPoint)
-    }
+    let targetRenderedContentSize = policyCanvasRenderedContentSize(
+      viewportSize: viewportSize,
+      contentSize: contentSize,
+      zoom: targetZoom
+    )
+    pendingCenteredScrollPoint = targetScrollPoint
+    pendingCenteredContentSize = targetRenderedContentSize
+    applyPendingCenteredScrollIfNeeded()
   }
 
-  /// Wire the in-viewport closures to the dispatcher and publish the focus
-  /// value. Runs once on appear — chrome buttons still mutate the same view
-  /// model methods directly, so a transient nil dispatcher binding is not
-  /// observable from the UI.
-  private func bindZoomFocusDispatcher() {
+  fileprivate func bindZoomFocusDispatcher() {
     zoomFocusDispatcher.zoomIn = { @MainActor [viewModel] in
       viewModel.clearPinchAnchor()
       viewModel.zoomIn()
@@ -344,16 +316,12 @@ struct PolicyCanvasViewport: View {
     }
   }
 
-  /// Cmd+scroll-wheel zoom entry. `onScrollGeometryChange` fires whenever the
-  /// ScrollView's content offset moves; when Cmd is held the wheel event was
-  /// meant to zoom rather than scroll, so we revert the scroll and apply a
-  /// proportional zoom anchored on the cursor. The `isRestoringCommandScrollPosition`
-  /// flag swallows the geometry tick that fires from the programmatic offset
-  /// write so the handler does not chase its own tail.
-  private func handleScrollOffsetChange(
+  fileprivate func handleScrollOffsetChange(
     oldOffset: CGPoint,
     newOffset: CGPoint,
-    viewportSize: CGSize
+    viewportSize: CGSize,
+    contentSize: CGSize,
+    presentationOffset: CGPoint
   ) {
     if isRestoringCommandScrollPosition {
       isRestoringCommandScrollPosition = false
@@ -372,49 +340,55 @@ struct PolicyCanvasViewport: View {
       hoveredViewportPoint
       ?? CGPoint(x: viewportSize.width / 2, y: viewportSize.height / 2)
     performCommandScrollZoom(
-      deltaY: deltaY,
-      cursor: cursor,
-      preZoomScrollOffset: oldOffset,
-      viewportSize: viewportSize
+      PolicyCanvasCommandScrollContext(
+        deltaY: deltaY,
+        cursor: cursor,
+        preZoomScrollOffset: oldOffset,
+        viewportSize: viewportSize,
+        contentSize: contentSize,
+        presentationOffset: presentationOffset
+      )
     )
   }
 
-  /// Apply the pointer-anchored zoom. `preZoomScrollOffset` is the scroll
-  /// offset BEFORE the wheel-triggered move, so it pairs with the cursor's
-  /// viewport-local point to recover the canvas-space anchor. The zoom is
-  /// applied via the pure view-model helper, and the recomputed offset is
-  /// written back through `scrollPosition` so the cursor stays over the same
-  /// canvas point.
-  private func performCommandScrollZoom(
-    deltaY: CGFloat,
-    cursor: CGPoint,
-    preZoomScrollOffset: CGPoint,
-    viewportSize: CGSize
-  ) {
-    let zoomBefore = viewModel.zoom
-    let canvasPoint = CGPoint(
-      x: (preZoomScrollOffset.x + cursor.x) / zoomBefore,
-      y: (preZoomScrollOffset.y + cursor.y) / zoomBefore
+  fileprivate func performCommandScrollZoom(_ context: PolicyCanvasCommandScrollContext) {
+    let canvasPoint = policyCanvasCommandScrollCanvasPoint(
+      context: context,
+      zoom: viewModel.zoom
     )
-    guard viewModel.zoomByCommandScroll(deltaY: deltaY) else {
+    guard viewModel.zoomByCommandScroll(deltaY: context.deltaY) else {
       isRestoringCommandScrollPosition = true
-      scrollPosition = ScrollPosition(point: preZoomScrollOffset)
+      scrollPosition = ScrollPosition(point: context.preZoomScrollOffset)
       return
     }
-    let nextScrollPoint = viewModel.viewportScrollPoint(
-      keepingCanvasPoint: canvasPoint,
-      atViewportPoint: cursor,
-      viewportSize: viewportSize
+    let nextScrollPoint = policyCanvasCommandScrollPoint(
+      viewModel: viewModel,
+      context: context,
+      canvasPoint: canvasPoint
     )
     isRestoringCommandScrollPosition = true
     scrollPosition = ScrollPosition(point: nextScrollPoint)
   }
 
-}
+  fileprivate func applyPendingCenteredScrollIfNeeded() {
+    guard
+      let pendingCenteredScrollPoint,
+      let pendingCenteredContentSize,
+      measuredScrollContentSize.width > 0,
+      measuredScrollContentSize.height > 0
+    else {
+      return
+    }
+    guard
+      abs(measuredScrollContentSize.width - pendingCenteredContentSize.width) <= 1,
+      abs(measuredScrollContentSize.height - pendingCenteredContentSize.height) <= 1
+    else {
+      return
+    }
+    isRestoringCommandScrollPosition = true
+    scrollPosition = ScrollPosition(point: pendingCenteredScrollPoint)
+    self.pendingCenteredScrollPoint = nil
+    self.pendingCenteredContentSize = nil
+  }
 
-// `PolicyCanvasDottedGrid` lives in `PolicyCanvasGridLayers.swift`;
-// `PolicyCanvasGroupLayer` + `PolicyCanvasGroupRegion` in
-// `PolicyCanvasGroupViews.swift`; `PolicyCanvasEdgeLayer`,
-// `PolicyCanvasEdgeLabelLayer`, `PolicyCanvasEdgeLabelMetrics`, and
-// `PolicyCanvasEdgeShape` in `PolicyCanvasEdgeLayers.swift`. All extractions
-// keep this file under the 420-line cap.
+}

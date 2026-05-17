@@ -29,17 +29,19 @@ extension PolicyCanvasViewModel {
   func viewportScrollPoint(
     keepingCanvasPoint canvasPoint: CGPoint,
     atViewportPoint viewportPoint: CGPoint,
-    viewportSize: CGSize
+    viewportSize: CGSize,
+    scaledCanvasOffset: CGPoint = .zero,
+    contentSize: CGSize? = nil
   ) -> CGPoint {
-    let contentSize = scaledCanvasContentSize(for: viewportSize)
+    let contentSize = contentSize ?? scaledCanvasContentSize(for: viewportSize)
     return CGPoint(
       x: clampedScrollOffset(
-        (canvasPoint.x * zoom) - viewportPoint.x,
+        scaledCanvasOffset.x + (canvasPoint.x * zoom) - viewportPoint.x,
         contentLength: contentSize.width,
         viewportLength: viewportSize.width
       ),
       y: clampedScrollOffset(
-        (canvasPoint.y * zoom) - viewportPoint.y,
+        scaledCanvasOffset.y + (canvasPoint.y * zoom) - viewportPoint.y,
         contentLength: contentSize.height,
         viewportLength: viewportSize.height
       )

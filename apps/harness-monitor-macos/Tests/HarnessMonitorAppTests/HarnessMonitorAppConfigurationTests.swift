@@ -69,15 +69,24 @@ final class HarnessMonitorAppConfigurationTests: XCTestCase {
   }
 
   @MainActor
-  func testResolveReadsPolicyCanvasLabLaunchFlag() {
+  func testResolveReadsPolicyCanvasLabLaunchFlag() throws {
+    let suiteName = "io.harnessmonitor.app-tests.policy-canvas-lab.\(UUID().uuidString)"
+    let isolated = try XCTUnwrap(UserDefaults(suiteName: suiteName))
+    defer { isolated.removePersistentDomain(forName: suiteName) }
+
     let testEnv = HarnessMonitorEnvironment(
       values: [
+        "HARNESS_MONITOR_FORCE_PERSISTENCE_FAILURE": "1",
+        "HARNESS_MONITOR_LAUNCH_MODE": HarnessMonitorLaunchMode.preview.rawValue,
         HarnessMonitorAppConfiguration.policyCanvasLabEnvironmentKey: "1",
       ],
       homeDirectory: FileManager.default.homeDirectoryForCurrentUser
     )
 
-    let configuration = HarnessMonitorAppConfiguration.resolve(baseEnvironment: testEnv)
+    let configuration = HarnessMonitorAppConfiguration.resolve(
+      defaults: isolated,
+      baseEnvironment: testEnv
+    )
 
     XCTAssertTrue(configuration.showsPolicyCanvasLab)
   }
