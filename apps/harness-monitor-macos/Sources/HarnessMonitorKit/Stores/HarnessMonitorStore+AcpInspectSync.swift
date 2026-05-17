@@ -299,7 +299,7 @@ extension HarnessMonitorStore {
     guard isCurrentAcpInspectRecovery(sequence, sessionID: sessionID) else {
       return false
     }
-    promoteAcpInspectEntriesToStalled(sessionID: sessionID, phases: [.waiting])
+    await promoteAcpInspectEntriesToStalled(sessionID: sessionID, phases: [.waiting])
     return true
   }
 
@@ -313,7 +313,7 @@ extension HarnessMonitorStore {
         return
       }
 
-      markAcpInspectEntriesRetrying(sessionID: sessionID)
+      await markAcpInspectEntriesRetrying(sessionID: sessionID)
       _ = await refreshAcpInspect(
         using: client,
         sessionID: sessionID,
@@ -324,7 +324,10 @@ extension HarnessMonitorStore {
         return
       }
 
-      promoteAcpInspectEntriesToStalled(sessionID: sessionID, phases: [.waiting, .retrying])
+      await promoteAcpInspectEntriesToStalled(
+        sessionID: sessionID,
+        phases: [.waiting, .retrying]
+      )
       do {
         try await Task.sleep(for: delay)
       } catch {
@@ -347,22 +350,18 @@ extension HarnessMonitorStore {
     }
   }
 
-  private func markAcpInspectEntriesRetrying(sessionID: String) {
+  private func markAcpInspectEntriesRetrying(sessionID: String) async {
     guard selectedSessionID == sessionID else {
       return
     }
 
     let attemptedAt = Date()
-    var nextEntries = selectedAcpInspectSyncEntries
-    for identity in nextEntries.keys.sorted(by: { $0.id < $1.id }) {
-      guard var entry = nextEntries[identity], entry.phase != .unavailable else {
-        continue
-      }
-      entry.phase = .retrying
-      entry.lastAttemptAt = attemptedAt
-      entry.retryCount += 1
-      entry.message = nil
-      nextEntries[identity] = entry
+    let nextEntries = await acpRuntimeWorker.markInspectEntriesRetrying(
+      entries: selectedAcpInspectSyncEntries,
+      attemptedAt: attemptedAt
+    )
+    guard selectedSessionID == sessionID, !Task.isCancelled else {
+      return
     }
     selectedAcpInspectSyncEntries = nextEntries
   }
@@ -370,19 +369,17 @@ extension HarnessMonitorStore {
   private func promoteAcpInspectEntriesToStalled(
     sessionID: String,
     phases: Set<AcpRuntimeInspectPhase>
-  ) {
+  ) async {
     guard selectedSessionID == sessionID else {
       return
     }
 
-    var nextEntries = selectedAcpInspectSyncEntries
-    for identity in nextEntries.keys.sorted(by: { $0.id < $1.id }) {
-      guard var entry = nextEntries[identity], phases.contains(entry.phase) else {
-        continue
-      }
-      entry.phase = .stalled
-      entry.message = nil
-      nextEntries[identity] = entry
+    let nextEntries = await acpRuntimeWorker.promoteInspectEntriesToStalled(
+      entries: selectedAcpInspectSyncEntries,
+      phases: phases
+    )
+    guard selectedSessionID == sessionID, !Task.isCancelled else {
+      return
     }
     selectedAcpInspectSyncEntries = nextEntries
   }
