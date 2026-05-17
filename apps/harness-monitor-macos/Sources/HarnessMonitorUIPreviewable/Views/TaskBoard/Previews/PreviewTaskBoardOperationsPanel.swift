@@ -23,6 +23,13 @@ import SwiftUI
     .harnessPreviewSceneAppearance()
 }
 
+#Preview("Operations - Largest Text") {
+  TaskBoardOperationsPreviewSurface(mode: .loaded)
+    .padding(24)
+    .frame(width: 1_320, height: 860, alignment: .topLeading)
+    .harnessPreviewSceneAppearance(textSizeIndex: 6)
+}
+
 @MainActor
 private struct TaskBoardOperationsPreviewSurface: View {
   enum Mode {

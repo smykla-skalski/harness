@@ -28,7 +28,10 @@ struct TaskBoardOperationsSyncCard: View, TaskBoardOperationsHost {
   var body: some View {
     TaskBoardOperationsCard(
       title: "Sync",
-      metrics: metrics
+      metrics: metrics,
+      footer: dashboard.taskBoardSyncSummary == nil
+        ? "Run sync to preview or apply external pull and push operations"
+        : nil
     ) {
       controlRows {
         pickerField(
@@ -64,7 +67,7 @@ struct TaskBoardOperationsSyncCard: View, TaskBoardOperationsHost {
         )
       }
 
-      actionRow {
+      actionRow(showsSeparator: dashboard.taskBoardSyncSummary != nil) {
         actionButton(
           TaskBoardActionButtonDescriptor(
             title: dryRun ? "Preview Sync" : "Run Sync",
@@ -133,8 +136,6 @@ struct TaskBoardOperationsSyncCard: View, TaskBoardOperationsHost {
           }
           .padding(.top, HarnessMonitorTheme.spacingSM)
         }
-      } else {
-        placeholderText("Run sync to preview or apply external pull and push operations.")
       }
     }
   }
