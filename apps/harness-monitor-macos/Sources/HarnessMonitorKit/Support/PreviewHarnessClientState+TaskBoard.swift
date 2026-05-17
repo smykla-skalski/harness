@@ -90,6 +90,24 @@ extension PreviewHarnessClientState {
     return try updateTaskBoardPlanning(id: id, toStatus: .todo, planning: approvedPlanning)
   }
 
+  func revokeTaskBoardPlan(
+    id: String,
+    request: TaskBoardPlanRevokeRequest
+  ) throws -> TaskBoardPlanningResponse {
+    let currentPlanning = try currentTaskBoardItem(id: id).planning
+    let revokedPlanning = TaskBoardPlanningState(
+      summary: currentPlanning.summary,
+      approvedBy: nil,
+      approvedAt: nil
+    )
+    _ = request
+    return try updateTaskBoardPlanning(
+      id: id,
+      toStatus: .planReview,
+      planning: revokedPlanning
+    )
+  }
+
   func syncTaskBoard() -> TaskBoardSyncSummary {
     TaskBoardSyncSummary(
       total: taskBoardItems.count,

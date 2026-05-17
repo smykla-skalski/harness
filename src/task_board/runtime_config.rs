@@ -138,6 +138,10 @@ impl TaskBoardGitRuntimeProfile {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[expect(
+    clippy::struct_excessive_bools,
+    reason = "wire model exposes per-secret configured flags for multiple signing backends"
+)]
 pub struct TaskBoardGitSigningConfig {
     #[serde(default)]
     pub mode: TaskBoardGitSigningMode,

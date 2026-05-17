@@ -570,8 +570,8 @@ struct SessionWindowNativeTabbingTests {
     dashboardWindow.toolbar = NSToolbar(identifier: "dashboard-window")
 
     defer {
-      dashboardWindow.close()
-      targetWindow.close()
+      dashboardWindow.orderOut(nil)
+      targetWindow.orderOut(nil)
     }
 
     SessionWindowTabbingSupport.prepareWindowForTabbing(targetWindow, preference: .always)
@@ -630,6 +630,19 @@ struct SessionWindowNativeTabbingTests {
     existingPeerWindow.makeKeyAndOrderFront(nil)
     targetWindow.addTabbedWindow(existingPeerWindow, ordered: .above)
     lateWindow.orderFront(nil)
+    for _ in 0..<20 {
+      if targetWindow.tabbedWindows?.contains(where: { $0 === existingPeerWindow }) == true
+        || targetWindow.tabGroup === existingPeerWindow.tabGroup
+      {
+        break
+      }
+      await Task.yield()
+      try await Task.sleep(for: .milliseconds(10))
+    }
+    #expect(
+      targetWindow.tabbedWindows?.contains(where: { $0 === existingPeerWindow }) == true
+        || targetWindow.tabGroup === existingPeerWindow.tabGroup
+    )
 
     let mergeTask = Task { @MainActor in
       await SessionWindowTabMergeCoordinator.mergeNewestTabbedWindowIfNeeded(

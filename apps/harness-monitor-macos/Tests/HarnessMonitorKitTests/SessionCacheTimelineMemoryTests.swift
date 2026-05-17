@@ -96,7 +96,12 @@ struct SessionCacheTimelineMemoryTests {
     let initialEntries = (0..<250).map { index in
       TimelineEntry(
         entryId: "old-\(index)",
-        recordedAt: "2026-04-01T00:00:\(String(format: "%02d", index % 60))Z",
+        recordedAt: String(
+          format: "2026-04-01T%02d:%02d:%02dZ",
+          index / 3600,
+          (index / 60) % 60,
+          index % 60
+        ),
         kind: "task_checkpoint",
         sessionId: "sess-trim",
         agentId: "leader-trim",
@@ -110,7 +115,12 @@ struct SessionCacheTimelineMemoryTests {
     let updatedEntries = (0..<350).map { index in
       TimelineEntry(
         entryId: "new-\(index)",
-        recordedAt: "2026-04-02T00:00:\(String(format: "%02d", index % 60))Z",
+        recordedAt: String(
+          format: "2026-04-02T%02d:%02d:%02dZ",
+          index / 3600,
+          (index / 60) % 60,
+          index % 60
+        ),
         kind: "task_checkpoint",
         sessionId: "sess-trim",
         agentId: "leader-trim",

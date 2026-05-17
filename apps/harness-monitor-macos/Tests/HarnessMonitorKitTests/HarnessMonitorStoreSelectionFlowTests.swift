@@ -272,6 +272,7 @@ struct HarnessMonitorStoreSelectionFlowTests {
     let refreshLimit = HarnessMonitorStoreSelectionTestSupport.timelineRefreshLimit(
       loadedCount: cachedTimeline.count
     )
+    let refreshedWindow = Array(fullTimeline.prefix(cachedTimeline.count))
     let client = HarnessMonitorStoreSelectionTestSupport.configuredClient(
       summaries: [summary],
       detailsByID: [summary.sessionId: detail],
@@ -305,9 +306,9 @@ struct HarnessMonitorStoreSelectionFlowTests {
           after: newestCursor
         )
       ])
-    #expect(store.timeline == fullTimeline)
+    #expect(store.timeline == refreshedWindow)
     #expect(store.timelineWindow?.totalCount == fullTimeline.count)
-    #expect(store.timelineWindow?.windowEnd == fullTimeline.count)
+    #expect(store.timelineWindow?.windowEnd == refreshedWindow.count)
   }
 
   @Test("Selecting an uncached session requests only the latest timeline window")

@@ -67,6 +67,10 @@ fn task_board_host_routes() -> Router<DaemonHttpState> {
         )
 }
 
+#[expect(
+    clippy::too_many_lines,
+    reason = "route table wires every task-board endpoint in one place"
+)]
 pub(super) fn task_board_routes() -> Router<DaemonHttpState> {
     Router::new()
         .route(

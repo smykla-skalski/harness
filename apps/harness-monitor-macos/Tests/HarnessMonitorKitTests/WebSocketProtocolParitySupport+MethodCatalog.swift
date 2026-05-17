@@ -6,17 +6,18 @@ extension WebSocketProtocolParityTests {
   func daemonRPCMethodValues() throws -> Set<String> {
     let daemonCatalog = try daemonRPCMethodCatalogPath()
     let contents = try String(contentsOf: daemonCatalog, encoding: .utf8)
-    let values = contents.split(separator: "\n").compactMap { line -> String? in
-      guard line.contains("pub const"),
-        let prefixRange = line.range(of: #"&str = ""#)
+    let regex = try NSRegularExpression(
+      pattern: #"pub const\s+[A-Z0-9_]+:\s*&str\s*=\s*"([^"]+)";"#
+    )
+    let range = NSRange(contents.startIndex..<contents.endIndex, in: contents)
+    let values = regex.matches(in: contents, range: range).compactMap { match -> String? in
+      guard
+        match.numberOfRanges == 2,
+        let valueRange = Range(match.range(at: 1), in: contents)
       else {
         return nil
       }
-      let suffix = line[prefixRange.upperBound...]
-      guard let end = suffix.firstIndex(of: "\"") else {
-        return nil
-      }
-      return String(suffix[..<end])
+      return String(contents[valueRange])
     }
     return Set(values)
   }

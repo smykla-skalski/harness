@@ -104,64 +104,33 @@ extension HarnessMonitorMCPContractTests {
     )
 
     controller.start()
-    await waitForCondition {
-      controller.recoveryStatus
-        == HarnessMonitorMCPRecoveryStatus(
-          completedRetryCount: 0,
-          maximumRetryCount: 2,
-          nextRetryDelay: .seconds(5)
-        )
-    }
-
-    #expect(
-      controller.recoveryStatus
-        == HarnessMonitorMCPRecoveryStatus(
-          completedRetryCount: 0,
-          maximumRetryCount: 2,
-          nextRetryDelay: .seconds(5)
-        )
+    await waitForRecoveryStatus(
+      retryStatus(completedRetryCount: 0, maximumRetryCount: 2, nextRetryDelay: .seconds(5)),
+      controller: controller
     )
+    await waitForPendingSleeps(1, clock: clock)
 
     await clock.advance(by: .seconds(5))
-    await waitForCondition {
-      controller.recoveryStatus
-        == HarnessMonitorMCPRecoveryStatus(
-          completedRetryCount: 1,
-          maximumRetryCount: 2,
-          nextRetryDelay: .seconds(5)
-        )
-    }
-
-    #expect(
-      controller.recoveryStatus
-        == HarnessMonitorMCPRecoveryStatus(
-          completedRetryCount: 1,
-          maximumRetryCount: 2,
-          nextRetryDelay: .seconds(5)
-        )
+    await waitForRecoveryStatus(
+      retryStatus(completedRetryCount: 1, maximumRetryCount: 2, nextRetryDelay: .seconds(5)),
+      controller: controller
     )
+    await waitForPendingSleeps(1, clock: clock)
 
     await clock.advance(by: .seconds(5))
+    let terminalStatus = retryStatus(
+      completedRetryCount: 2,
+      maximumRetryCount: 2,
+      nextRetryDelay: nil
+    )
     await waitForCondition {
       service.recordedEnabledStates == [true, true, true]
-        && controller.recoveryStatus
-          == HarnessMonitorMCPRecoveryStatus(
-            completedRetryCount: 2,
-            maximumRetryCount: 2,
-            nextRetryDelay: nil
-          )
+        && controller.recoveryStatus == terminalStatus
     }
 
     #expect(service.recordedEnabledStates == [true, true, true])
     #expect(controller.runtimeState == degradedState)
-    #expect(
-      controller.recoveryStatus
-        == HarnessMonitorMCPRecoveryStatus(
-          completedRetryCount: 2,
-          maximumRetryCount: 2,
-          nextRetryDelay: nil
-        )
-    )
+    #expect(controller.recoveryStatus == terminalStatus)
     #expect(clock.pendingSleepCount == 0)
 
     await controller.stop()
@@ -392,5 +361,34 @@ extension HarnessMonitorMCPContractTests {
     #expect(controller.recoveryStatus == nil)
 
     await controller.stop()
+  }
+
+  private func retryStatus(
+    completedRetryCount: Int,
+    maximumRetryCount: Int,
+    nextRetryDelay: Duration?
+  ) -> HarnessMonitorMCPRecoveryStatus {
+    HarnessMonitorMCPRecoveryStatus(
+      completedRetryCount: completedRetryCount,
+      maximumRetryCount: maximumRetryCount,
+      nextRetryDelay: nextRetryDelay
+    )
+  }
+
+  private func waitForRecoveryStatus(
+    _ expected: HarnessMonitorMCPRecoveryStatus,
+    controller: HarnessMonitorMCPStartupController
+  ) async {
+    await waitForCondition {
+      controller.recoveryStatus == expected
+    }
+    #expect(controller.recoveryStatus == expected)
+  }
+
+  private func waitForPendingSleeps(_ expectedCount: Int, clock: TestClock) async {
+    await waitForCondition {
+      clock.pendingSleepCount == expectedCount
+    }
+    #expect(clock.pendingSleepCount == expectedCount)
   }
 }

@@ -18,6 +18,10 @@ public protocol HarnessMonitorTaskBoardClientProtocol: Sendable {
     id: String,
     request: TaskBoardPlanApproveRequest
   ) async throws -> TaskBoardPlanningResponse
+  func revokeTaskBoardPlan(
+    id: String,
+    request: TaskBoardPlanRevokeRequest
+  ) async throws -> TaskBoardPlanningResponse
   func syncTaskBoard(request: TaskBoardSyncRequest) async throws -> TaskBoardSyncSummary
   func dispatchTaskBoard(request: TaskBoardDispatchRequest) async throws -> TaskBoardDispatchSummary
   func evaluateTaskBoard(request: TaskBoardEvaluateRequest) async throws
@@ -108,6 +112,13 @@ extension HarnessMonitorTaskBoardClientProtocol {
   public func approveTaskBoardPlan(
     id _: String,
     request _: TaskBoardPlanApproveRequest
+  ) async throws -> TaskBoardPlanningResponse {
+    throw HarnessMonitorAPIError.server(code: 501, message: "Task board planning unavailable.")
+  }
+
+  public func revokeTaskBoardPlan(
+    id _: String,
+    request _: TaskBoardPlanRevokeRequest
   ) async throws -> TaskBoardPlanningResponse {
     throw HarnessMonitorAPIError.server(code: 501, message: "Task board planning unavailable.")
   }

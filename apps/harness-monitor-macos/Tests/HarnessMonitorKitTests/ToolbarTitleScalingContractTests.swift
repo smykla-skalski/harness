@@ -4,8 +4,8 @@ import Testing
 struct ToolbarTitleScalingContractTests {
   @Test("Monitor windows use native navigation titles instead of a custom toolbar title item")
   func monitorWindowsUseNativeNavigationTitles() throws {
-    let contentSource = try previewableSourceFile(
-      named: "Views/App/ContentViewSupport.swift"
+    let dashboardSource = try previewableSourceFile(
+      named: "Views/Dashboard/DashboardWindowView.swift"
     )
     let sessionChromeSource = try previewableSourceFile(
       named: "Views/Sessions/SessionWindowView.swift"
@@ -15,9 +15,7 @@ struct ToolbarTitleScalingContractTests {
     )
     let sessionRootSource = try appSourceFile(named: "SessionWindowRootView.swift")
 
-    #expect(contentSource.contains(".navigationTitle(navigationTitleText)"))
-    #expect(contentSource.contains(".navigationSubtitle(navigationSubtitleText ?? \"\")"))
-    #expect(!contentSource.contains("HarnessMonitorToolbarTitleToolbarItem("))
+    #expect(!dashboardSource.contains("HarnessMonitorToolbarTitleToolbarItem("))
     #expect(sessionPresentationSource.contains("var navigationTitleText: String"))
     #expect(sessionPresentationSource.contains("var navigationSubtitleText: String"))
     #expect(sessionPresentationSource.contains(".navigationTitle(navigationTitleText)"))
@@ -32,15 +30,15 @@ struct ToolbarTitleScalingContractTests {
     let toolbarSource = try previewableSourceFile(
       named: "Views/Sessions/SessionWindowToolbar.swift"
     )
-    let sidebarSource = try previewableSourceFile(
-      named: "Views/Sessions/SessionSidebar.swift"
+    let sharedSidebarSource = try previewableSourceFile(
+      named: "Views/Shared/HarnessMonitorSidebar.swift"
     )
     let footerSource = try previewableSourceFile(
       named: "Views/Sessions/SessionSidebarFooter.swift"
     )
 
-    #expect(sidebarSource.contains(".safeAreaInset(edge: .bottom, spacing: 0)"))
-    #expect(sidebarSource.contains("SessionSidebarFooter(model: statusModel)"))
+    #expect(sharedSidebarSource.contains(".safeAreaInset(edge: .bottom, spacing: 0)"))
+    #expect(sharedSidebarSource.contains("SessionSidebarFooter(model: statusModel)"))
     #expect(footerSource.contains("struct SessionSidebarFooter"))
     #expect(footerSource.contains("SessionStatusStripState"))
     #expect(footerSource.contains("SessionStatusSourceIcon(source: source)"))

@@ -1,6 +1,10 @@
 import HarnessMonitorKit
 import SwiftUI
 
+extension EnvironmentValues {
+  @Entry var taskBoardOperationsRowLabelFont: Font = .body
+}
+
 struct TaskBoardActionButtonDescriptor {
   let title: String
   let systemImage: String
@@ -213,9 +217,6 @@ struct TaskBoardOperationsCard<Content: View>: View {
   let metrics: TaskBoardOverviewMetrics
   let content: Content
 
-  @Environment(\.fontScale)
-  private var fontScale
-
   init(
     title: String,
     metrics: TaskBoardOverviewMetrics,
@@ -241,9 +242,6 @@ struct TaskBoardOperationsFormSection<Content: View>: View {
   let metrics: TaskBoardOverviewMetrics
   let content: Content
 
-  @Environment(\.fontScale)
-  private var fontScale
-
   init(
     title: String,
     metrics: TaskBoardOverviewMetrics,
@@ -264,7 +262,8 @@ struct TaskBoardOperationsFormSection<Content: View>: View {
       VStack(alignment: .leading, spacing: 0) {
         content
       }
-      .padding(TaskBoardOperationsFormMetrics.sectionPadding)
+      .padding(.horizontal, TaskBoardOperationsFormMetrics.sectionPadding)
+      .padding(.bottom, TaskBoardOperationsFormMetrics.sectionPadding)
       .background(
         RoundedRectangle(
           cornerRadius: TaskBoardOperationsFormMetrics.sectionCornerRadius,
@@ -280,7 +279,6 @@ struct TaskBoardOperationsFormSection<Content: View>: View {
         .strokeBorder(HarnessMonitorTheme.controlBorder.opacity(0.24), lineWidth: 0.5)
       }
     }
-    .font(HarnessMonitorTextSize.scaledFont(.body, by: fontScale))
     .frame(
       maxWidth: .infinity,
       minHeight: metrics.managementPanelMinHeight,
@@ -301,6 +299,8 @@ private enum TaskBoardOperationsFormMetrics {
 struct TaskBoardOperationsFormRow<Content: View>: View {
   let title: String
   let content: Content
+  @Environment(\.taskBoardOperationsRowLabelFont)
+  private var labelFont
 
   init(_ title: String, @ViewBuilder content: () -> Content) {
     self.title = title
@@ -310,7 +310,7 @@ struct TaskBoardOperationsFormRow<Content: View>: View {
   var body: some View {
     HStack(alignment: .center, spacing: HarnessMonitorTheme.spacingMD) {
       Text(title)
-        .font(.body)
+        .font(labelFont)
         .foregroundStyle(HarnessMonitorTheme.secondaryInk)
         .lineLimit(2)
         .multilineTextAlignment(.leading)

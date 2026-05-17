@@ -61,7 +61,7 @@ extension SessionWindowCreateFormMetricsTests {
     #expect(source.helper.contains("LabeledContent(\"Custom model\")"))
     #expect(source.helper.contains("LabeledContent(\"Model (optional)\")"))
     #expect(source.helper.contains("LabeledContent(\"Effort (optional)\")"))
-    #expect(source.theme.contains(".multilineTextAlignment(.leading)"))
+    #expect(source.theme.contains(".multilineTextAlignment(alignment)"))
     #expect(!source.theme.contains("HarnessMonitorNativeTextFieldChromeMetrics"))
     #expect(!source.theme.contains("HarnessMonitorNativeTextFieldConfiguration"))
     #expect(!source.theme.contains(".introspect("))
