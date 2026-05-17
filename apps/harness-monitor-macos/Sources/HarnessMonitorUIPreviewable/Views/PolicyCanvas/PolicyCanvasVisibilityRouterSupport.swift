@@ -1,15 +1,3 @@
-import os
-
-/// Router-decision log. Only the *fallback* path emits a line - A* success
-/// is the expected case and a per-frame "solved" log would flood Console.
-/// The fallback line names the reason so an operator looking at a
-/// misshapen polyline can grep the log and confirm which path produced it
-/// (silent supervision becomes observable supervision).
-let policyCanvasRouterLog = Logger(
-  subsystem: "io.harnessmonitor",
-  category: "policy-canvas.router"
-)
-
 /// Grid coordinate as (xIndex, yIndex) into the router's sorted axis arrays.
 struct PolicyCanvasGridIndex: Hashable {
   let x: Int
