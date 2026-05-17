@@ -23,6 +23,9 @@ extension SessionWindowView {
     if allIDs != allSessionDecisionIDsCache {
       allSessionDecisionIDsCache = allIDs
     }
+    if sessionDecisionIDs != allSessionDecisionIDsInOrderCache {
+      allSessionDecisionIDsInOrderCache = sessionDecisionIDs
+    }
     await stateCache.decisionRuntime.reloadAuditEvents(
       from: store.supervisorAuditRepository,
       sessionID: token.sessionID,
@@ -169,7 +172,7 @@ extension SessionWindowView {
       perfContentDividerWidth: perfContentDividerWidthBinding,
       sessionID: token.sessionID,
       snapshot: snapshot,
-      decisionIDs: allSessionDecisions.map(\.id),
+      decisionIDs: allSessionDecisionIDsInOrderCache,
       sidebarWidth: sidebarWidth,
       recordsPlainTaps: recordsPlainTaps
     ) {
