@@ -241,6 +241,8 @@ struct TaskBoardOperationsFormSection<Content: View>: View {
   let title: String
   let metrics: TaskBoardOverviewMetrics
   let content: Content
+  @Environment(\.colorScheme)
+  private var colorScheme
 
   init(
     title: String,
@@ -265,18 +267,18 @@ struct TaskBoardOperationsFormSection<Content: View>: View {
       .padding(.horizontal, TaskBoardOperationsFormMetrics.sectionPadding)
       .padding(.bottom, TaskBoardOperationsFormMetrics.sectionPadding)
       .background(
-        RoundedRectangle(
-          cornerRadius: TaskBoardOperationsFormMetrics.sectionCornerRadius,
-          style: .continuous
-        )
-        .fill(Color(nsColor: .underPageBackgroundColor))
+        sectionShape
+          .fill(sectionBackground)
+          .overlay {
+            if colorScheme == .dark {
+              sectionShape.fill(
+                Color.white.opacity(TaskBoardOperationsFormMetrics.darkSectionHighlightOpacity)
+              )
+            }
+          }
       )
       .overlay {
-        RoundedRectangle(
-          cornerRadius: TaskBoardOperationsFormMetrics.sectionCornerRadius,
-          style: .continuous
-        )
-        .strokeBorder(HarnessMonitorTheme.controlBorder.opacity(0.24), lineWidth: 0.5)
+        sectionShape.strokeBorder(HarnessMonitorTheme.controlBorder.opacity(0.24), lineWidth: 0.5)
       }
     }
     .frame(
@@ -284,6 +286,17 @@ struct TaskBoardOperationsFormSection<Content: View>: View {
       minHeight: metrics.managementPanelMinHeight,
       alignment: .leading
     )
+  }
+
+  private var sectionShape: RoundedRectangle {
+    RoundedRectangle(
+      cornerRadius: TaskBoardOperationsFormMetrics.sectionCornerRadius,
+      style: .continuous
+    )
+  }
+
+  private var sectionBackground: Color {
+    Color(nsColor: .controlBackgroundColor)
   }
 }
 
@@ -294,6 +307,7 @@ private enum TaskBoardOperationsFormMetrics {
   static let contentMaxWidth: CGFloat = 420
   static let rowMinHeight: CGFloat = 34
   static let rowVerticalPadding: CGFloat = 5
+  static let darkSectionHighlightOpacity = 0.035
 }
 
 struct TaskBoardOperationsFormRow<Content: View>: View {
