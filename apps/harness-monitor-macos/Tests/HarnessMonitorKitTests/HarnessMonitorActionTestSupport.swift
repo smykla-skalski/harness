@@ -273,7 +273,8 @@ final class RecordingHarnessClient: HarnessMonitorClientProtocol, @unchecked Sen
   var taskBoardOrchestratorSettingsError: (any Error)?
   var taskBoardGitHubTokensSyncError: (any Error)?
   var taskBoardTodoistTokenSyncError: (any Error)?
-  var taskBoardGitIdentityDefaultsValue: TaskBoardGitIdentityDefaults = TaskBoardGitIdentityDefaults()
+  var taskBoardGitIdentityDefaultsValue: TaskBoardGitIdentityDefaults =
+    TaskBoardGitIdentityDefaults()
   var taskBoardGitSigningVerifyValue: TaskBoardGitSigningVerifyResponse = .skipped
   var taskBoardGitRuntimeDrainSecretsValue: TaskBoardGitRuntimeDrainSecretsResponse =
     TaskBoardGitRuntimeDrainSecretsResponse(drained: false, runtime: TaskBoardGitRuntimeConfig())

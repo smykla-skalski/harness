@@ -82,8 +82,8 @@ class TuistPackageSettingsTests(unittest.TestCase):
                 self.assertIn(setting, manifest)
         self.assertEqual(
             manifest.count('"REGISTER_APP_GROUPS": "YES"'),
-            2,
-            "REGISTER_APP_GROUPS=YES must be set on monitorAppSettings and uiTestHostSettings",
+            3,
+            "REGISTER_APP_GROUPS=YES must be set on monitorAppSettings, externalDaemonAppSettings, and uiTestHostSettings",
         )
         self.assertNotIn('"REGISTER_APP_GROUPS": "NO"', manifest)
         self.assertEqual(

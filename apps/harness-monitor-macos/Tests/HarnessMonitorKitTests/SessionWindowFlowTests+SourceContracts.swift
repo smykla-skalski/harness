@@ -64,7 +64,11 @@ extension SessionWindowFlowTests {
     #expect(!source.contains("import AppKit"))
     #expect(source.contains("@Environment(\\.dismiss)"))
     #expect(source.contains("@Environment(\\.openWindow)"))
-    #expect(source.contains("openWindow.openHarnessSessionWindow(sessionID: startedSession.sessionId)"))
+    #expect(
+      source.contains(
+        "openWindow.openHarnessSessionWindow(sessionID: startedSession.sessionId)"
+      )
+    )
     #expect(source.contains("await Task.yield()"))
     #expect(source.contains("dismiss()"))
     #expect(!source.contains("NSApplication"))
@@ -161,21 +165,45 @@ extension SessionWindowFlowTests {
     )
 
     #expect(openActionSource.contains("public func openHarnessDashboardWindow()"))
-    #expect(openActionSource.contains("public func openHarnessDashboardWindow(mergeIfNeeded: Bool)"))
-    #expect(
-      openActionSource.contains("public func openHarnessSessionWindow(\n    sessionID: String,\n    mergeIfNeeded: Bool"))
     #expect(
       openActionSource.contains(
-        "guard let sessionID, !sessionID.isEmpty else {\n      openHarnessDashboardWindow()"))
+        "public func openHarnessDashboardWindow(mergeIfNeeded: Bool)"
+      )
+    )
+    #expect(
+      openActionSource.contains(
+        """
+        public func openHarnessSessionWindow(
+            sessionID: String,
+            mergeIfNeeded: Bool
+        """
+      )
+    )
+    #expect(
+      openActionSource.contains(
+        """
+        guard let sessionID, !sessionID.isEmpty else {
+              openHarnessDashboardWindow()
+        """
+      )
+    )
     #expect(openActionSource.contains("mergeNewestTabbedWindowIfNeeded"))
     #expect(windowCommandsSource.contains("openWindow.openHarnessDashboardWindow()"))
     #expect(recentCommandsSource.contains("openWindow.openHarnessDashboardWindow()"))
     #expect(
-      routingSource.contains("openWindow.openHarnessDashboardWindow(mergeIfNeeded: mergeIfNeeded)")
+      routingSource.contains(
+        "openWindow.openHarnessDashboardWindow(mergeIfNeeded: mergeIfNeeded)"
+      )
     )
     #expect(
       routingSource.contains(
-        "openWindow.openHarnessSessionWindow(\n          sessionID: sessionID,\n          mergeIfNeeded: mergeIfNeeded"))
+        """
+        openWindow.openHarnessSessionWindow(
+                  sessionID: sessionID,
+                  mergeIfNeeded: mergeIfNeeded
+        """
+      )
+    )
     #expect(menuBarSource.contains("openWindow.openHarnessDashboardWindow()"))
     #expect(unavailableSource.contains("openWindow.openHarnessDashboardWindow()"))
   }
@@ -193,7 +221,11 @@ extension SessionWindowFlowTests {
     #expect(sceneContentSource.contains(".modifier(DashboardWindowAppKitBinding())"))
     #expect(sceneContentSource.contains(".modifier(DashboardWindowLifecycleModifier())"))
     #expect(bindingSource.contains("DashboardWindowAppKitRegistry.shared.bind(window: window)"))
-    #expect(bindingSource.contains("DashboardWindowAppKitRegistry.shared.unbind(window: currentWindow)"))
+    #expect(
+      bindingSource.contains(
+        "DashboardWindowAppKitRegistry.shared.unbind(window: currentWindow)"
+      )
+    )
     #expect(modifierSource.contains("DashboardWindowLifecycleTracker.shared.markOpen()"))
     #expect(modifierSource.contains("DashboardWindowLifecycleTracker.shared.markClosed()"))
     #expect(trackerSource.contains("static let openAtQuitKey"))

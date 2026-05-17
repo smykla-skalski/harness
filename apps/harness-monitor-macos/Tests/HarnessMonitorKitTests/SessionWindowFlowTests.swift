@@ -590,7 +590,9 @@ struct SessionWindowNativeTabbingTests {
   }
 
   @MainActor
-  @Test("Shared tab merge coordinator waits for a new third window instead of reusing an existing tab")
+  @Test(
+    "Shared tab merge coordinator waits for a new third window instead of reusing an existing tab"
+  )
   func sharedTabMergeCoordinatorWaitsForThirdWindowToBecomeTabReady() async throws {
     let targetWindow = NSWindow(
       contentRect: .init(x: 0, y: 0, width: 480, height: 320),

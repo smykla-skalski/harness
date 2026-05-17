@@ -124,7 +124,9 @@ struct TaskBoardGitSettingsDraft: Equatable {
         gpgKeyId: override.profile.signing.gpgKeyId ?? "",
         gpgPrivateKeyPath: override.profile.signing.gpgPrivateKeyPath ?? "",
         gpgPrivateKey: .secretFromLoaded(override.profile.signing.gpgPrivateKey),
-        gpgPrivateKeyPassphrase: .secretFromLoaded(override.profile.signing.gpgPrivateKeyPassphrase),
+        gpgPrivateKeyPassphrase: .secretFromLoaded(
+          override.profile.signing.gpgPrivateKeyPassphrase
+        ),
         token: .secretFromLoaded(tokensByRepository[override.repository])
       )
     }

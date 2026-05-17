@@ -73,12 +73,19 @@ class PostGenerateScriptTests(unittest.TestCase):
                 "com.apple.security.application-groups": ["Q498EB36N4.io.harnessmonitor"],
                 "monitor": True,
             }
+            external_daemon_entitlements = {
+                "com.apple.security.application-groups": ["Q498EB36N4.io.harnessmonitor"],
+                "external-daemon": True,
+            }
             ui_test_host_entitlements = {
                 "com.apple.security.application-groups": ["Q498EB36N4.io.harnessmonitor"],
                 "ui-test-host": True,
             }
             (app_root / "HarnessMonitor.entitlements").write_bytes(
                 plistlib.dumps(monitor_entitlements)
+            )
+            (app_root / "HarnessMonitorExternalDaemon.entitlements").write_bytes(
+                plistlib.dumps(external_daemon_entitlements)
             )
             (app_root / "HarnessMonitorUITestHost.entitlements").write_bytes(
                 plistlib.dumps(ui_test_host_entitlements)
@@ -154,6 +161,15 @@ class PostGenerateScriptTests(unittest.TestCase):
                 plistlib.loads(
                     (
                         generated_entitlements_dir
+                        / "HarnessMonitorExternalDaemon.codesign.entitlements"
+                    ).read_bytes()
+                ),
+                external_daemon_entitlements,
+            )
+            self.assertEqual(
+                plistlib.loads(
+                    (
+                        generated_entitlements_dir
                         / "HarnessMonitorUITestHost.codesign.entitlements"
                     ).read_bytes()
                 ),
@@ -205,12 +221,19 @@ class PostGenerateScriptTests(unittest.TestCase):
                 "com.apple.security.application-groups": ["Q498EB36N4.io.harnessmonitor"],
                 "monitor": True,
             }
+            external_daemon_entitlements = {
+                "com.apple.security.application-groups": ["Q498EB36N4.io.harnessmonitor"],
+                "external-daemon": True,
+            }
             ui_test_host_entitlements = {
                 "com.apple.security.application-groups": ["Q498EB36N4.io.harnessmonitor"],
                 "ui-test-host": True,
             }
             (app_root / "HarnessMonitor.entitlements").write_bytes(
                 plistlib.dumps(monitor_entitlements)
+            )
+            (app_root / "HarnessMonitorExternalDaemon.entitlements").write_bytes(
+                plistlib.dumps(external_daemon_entitlements)
             )
             (app_root / "HarnessMonitorUITestHost.entitlements").write_bytes(
                 plistlib.dumps(ui_test_host_entitlements)
@@ -280,6 +303,15 @@ class PostGenerateScriptTests(unittest.TestCase):
                     ).read_bytes()
                 ),
                 monitor_entitlements,
+            )
+            self.assertEqual(
+                plistlib.loads(
+                    (
+                        generated_entitlements_dir
+                        / "HarnessMonitorExternalDaemon.codesign.entitlements"
+                    ).read_bytes()
+                ),
+                external_daemon_entitlements,
             )
             self.assertEqual(
                 plistlib.loads(

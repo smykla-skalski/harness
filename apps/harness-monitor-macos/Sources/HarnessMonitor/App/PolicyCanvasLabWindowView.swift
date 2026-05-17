@@ -140,10 +140,12 @@ struct PolicyCanvasLabWindowView: View {
 
   @MainActor
   private func adoptLiveSnapshotIfNeeded(_ snapshot: PolicyCanvasLabLiveSnapshot) {
-    guard PolicyCanvasLabSnapshotSupport.shouldAdoptLiveSnapshot(
-      document: snapshot.document,
-      allowsEmptyLiveSnapshot: allowsEmptyLiveSnapshot
-    ) else {
+    guard
+      PolicyCanvasLabSnapshotSupport.shouldAdoptLiveSnapshot(
+        document: snapshot.document,
+        allowsEmptyLiveSnapshot: allowsEmptyLiveSnapshot
+      )
+    else {
       return
     }
 

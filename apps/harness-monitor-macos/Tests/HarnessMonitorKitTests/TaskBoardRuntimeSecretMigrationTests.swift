@@ -7,9 +7,9 @@ import Testing
 @Suite("Task-board runtime-secret migration")
 struct TaskBoardRuntimeSecretMigrationTests {
   @Test("Skips drain when the managed-ownership flag is already set")
-  func skipsWhenFlagAlreadySet() async {
+  func skipsWhenFlagAlreadySet() async throws {
     let client = RecordingHarnessClient()
-    let defaults = makeEmptyDefaults()
+    let defaults = try makeEmptyDefaults()
     defaults.set(
       true,
       forKey: HarnessMonitorStore.taskBoardRuntimeSecretsMigrationKey(for: .managed)
@@ -35,9 +35,9 @@ struct TaskBoardRuntimeSecretMigrationTests {
   }
 
   @Test("Sets the per-ownership flag without writing to Keychain when drained == false")
-  func recordsFlagWhenNothingToDrain() async {
+  func recordsFlagWhenNothingToDrain() async throws {
     let client = RecordingHarnessClient()
-    let defaults = makeEmptyDefaults()
+    let defaults = try makeEmptyDefaults()
     let keychain = InMemoryKeychainBundle()
 
     await HarnessMonitorStore.migrateRuntimeSecretsIfNeeded(
@@ -63,7 +63,7 @@ struct TaskBoardRuntimeSecretMigrationTests {
   }
 
   @Test("Mirrors drained secrets into Keychain and flips the flag exactly once")
-  func mirrorsDrainedSecretsAndSetsFlag() async {
+  func mirrorsDrainedSecretsAndSetsFlag() async throws {
     let client = RecordingHarnessClient()
     client.taskBoardGitRuntimeDrainSecretsValue = TaskBoardGitRuntimeDrainSecretsResponse(
       drained: true,
@@ -89,7 +89,7 @@ struct TaskBoardRuntimeSecretMigrationTests {
         ]
       )
     )
-    let defaults = makeEmptyDefaults()
+    let defaults = try makeEmptyDefaults()
     let keychain = InMemoryKeychainBundle()
 
     await HarnessMonitorStore.migrateRuntimeSecretsIfNeeded(
@@ -125,12 +125,12 @@ struct TaskBoardRuntimeSecretMigrationTests {
   }
 
   @Test("Drain failure leaves the flag unset so the next snapshot retries")
-  func drainFailureKeepsRetrying() async {
+  func drainFailureKeepsRetrying() async throws {
     let client = RecordingHarnessClient()
     client.configureTaskBoardGitRuntimeDrainSecretsError(
       HarnessMonitorAPIError.server(code: 404, message: "older daemon")
     )
-    let defaults = makeEmptyDefaults()
+    let defaults = try makeEmptyDefaults()
     let keychain = InMemoryKeychainBundle()
 
     await HarnessMonitorStore.migrateRuntimeSecretsIfNeeded(
@@ -148,7 +148,7 @@ struct TaskBoardRuntimeSecretMigrationTests {
   }
 
   @Test("Managed-side migration does not block external-side migration")
-  func managedFlagDoesNotBlockExternal() async {
+  func managedFlagDoesNotBlockExternal() async throws {
     let client = RecordingHarnessClient()
     client.taskBoardGitRuntimeDrainSecretsValue = TaskBoardGitRuntimeDrainSecretsResponse(
       drained: true,
@@ -156,7 +156,7 @@ struct TaskBoardRuntimeSecretMigrationTests {
         global: TaskBoardGitRuntimeProfile(sshPrivateKey: "external-only-secret")
       )
     )
-    let defaults = makeEmptyDefaults()
+    let defaults = try makeEmptyDefaults()
     defaults.set(
       true,
       forKey: HarnessMonitorStore.taskBoardRuntimeSecretsMigrationKey(for: .managed)
@@ -187,9 +187,9 @@ struct TaskBoardRuntimeSecretMigrationTests {
     #expect(externalKey.hasSuffix(".external"))
   }
 
-  private func makeEmptyDefaults() -> UserDefaults {
+  private func makeEmptyDefaults() throws -> UserDefaults {
     let suite = "harness.migration.\(UUID().uuidString)"
-    let defaults = UserDefaults(suiteName: suite)!
+    let defaults = try #require(UserDefaults(suiteName: suite))
     defaults.removePersistentDomain(forName: suite)
     return defaults
   }

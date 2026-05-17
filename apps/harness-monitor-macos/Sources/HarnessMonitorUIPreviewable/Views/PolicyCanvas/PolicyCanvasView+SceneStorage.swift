@@ -20,11 +20,13 @@ extension PolicyCanvasView {
   /// `.onChange(of: viewModel.pipelineIdentity)` (load completes after
   /// mount). If neither call has the right identity yet, the next one will.
   func restoreSceneStorageIfNeeded() {
-    guard let state = PolicyCanvasView.sceneState(
-      for: viewModel.pipelineIdentity,
-      raw: storedPipelineStateRaw,
-      suppressesSceneStorage: suppressesSceneStorage
-    ) else {
+    guard
+      let state = PolicyCanvasView.sceneState(
+        for: viewModel.pipelineIdentity,
+        raw: storedPipelineStateRaw,
+        suppressesSceneStorage: suppressesSceneStorage
+      )
+    else {
       return
     }
     viewModel.zoom = PolicyCanvasViewModel.sanitizedZoom(
