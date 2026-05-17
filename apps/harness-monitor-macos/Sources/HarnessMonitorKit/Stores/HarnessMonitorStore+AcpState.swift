@@ -142,6 +142,37 @@ extension HarnessMonitorStore {
     )
   }
 
+  func replaceAcpInspectFromStream(
+    _ response: AcpAgentInspectResponse,
+    sessionID: String,
+    sampledAt: Date,
+    shouldScheduleRecovery: Bool = true
+  ) async {
+    guard sessionID == selectedSessionID else {
+      return
+    }
+    noteAcpSessionActivity(sessionID: sessionID, at: sampledAt)
+    let activeAgents = selectedAcpAgents
+    let currentSyncEntries = selectedAcpInspectSyncEntries
+    let output = await acpRuntimeWorker.inspectReplacement(
+      response: response,
+      sessionID: sessionID,
+      sampledAt: sampledAt,
+      activeAgents: activeAgents,
+      currentSyncEntries: currentSyncEntries
+    )
+    guard sessionID == selectedSessionID, !Task.isCancelled else {
+      return
+    }
+    selectedAcpInspectState = output.sample
+    selectedAcpInspectSyncEntries = output.syncEntries
+    finishAcpInspectSyncReconciliation(
+      sessionID: sessionID,
+      hasRecoverableMissingEntries: output.hasRecoverableMissingEntries,
+      shouldScheduleRecovery: shouldScheduleRecovery
+    )
+  }
+
   func applyAcpEvents(_ payload: AcpEventBatchPayload, recordedAt: String) {
     guard payload.sessionId == selectedSessionID else {
       return
@@ -172,6 +203,37 @@ extension HarnessMonitorStore {
     }
     applyAcpTranscriptEntries(entries)
     applyAcpTimelineEntries(entries)
+  }
+
+  func applyAcpEventsFromStream(_ payload: AcpEventBatchPayload, recordedAt: String) async {
+    guard payload.sessionId == selectedSessionID else {
+      return
+    }
+    noteAcpSessionActivity(sessionID: payload.sessionId)
+    let selectedSessionID = selectedSessionID
+    let descriptorsByID = acpAgentDescriptorsByID
+    let sessionRegistrations = selectedSession?.agents ?? []
+    let snapshots = selectedAcpAgents
+    let inspectSample = selectedAcpInspectState
+    let output = await acpRuntimeWorker.eventPresentation(
+      payload: payload,
+      recordedAt: recordedAt,
+      selectedSessionID: selectedSessionID,
+      descriptorsByID: descriptorsByID,
+      sessionRegistrations: sessionRegistrations,
+      snapshots: snapshots,
+      inspectSample: inspectSample
+    )
+    guard payload.sessionId == self.selectedSessionID, !Task.isCancelled else {
+      return
+    }
+    toolCallTimelineOverflowNotice = output.overflowNotice
+    liveToolCallAnnouncementRowIDs = output.liveToolCallRowIDs
+    guard !output.entries.isEmpty else {
+      return
+    }
+    applyAcpTranscriptEntries(output.entries)
+    applyAcpTimelineEntries(output.entries)
   }
 
   func applyAcpPermissionBatch(_ batch: AcpPermissionBatch) {

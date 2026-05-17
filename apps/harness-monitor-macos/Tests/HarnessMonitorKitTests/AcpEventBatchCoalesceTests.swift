@@ -61,6 +61,79 @@ struct AcpEventBatchCoalesceTests {
     #expect(!burstMeasurement.histogramDescription.isEmpty)
   }
 
+  @Test("ACP event presentation worker matches synchronous materialization")
+  func acpEventPresentationWorkerMatchesSynchronousMaterialization() async {
+    let store = HarnessMonitorStore(daemonController: RecordingDaemonController())
+    store.selectedSessionID = "sess-acp-worker"
+    store.applyAcpAgent(
+      makeAcpSnapshot(
+        acpID: "acp-1",
+        sessionID: "sess-acp-worker",
+        pendingBatches: []
+      )
+    )
+    store.acpAgentDescriptorsByID["copilot"] = AcpAgentDescriptor(
+      id: "copilot",
+      displayName: "Copilot",
+      capabilities: ["filesystem", "terminal"],
+      launchCommand: "copilot",
+      launchArgs: [],
+      envPassthrough: [],
+      doctorProbe: AcpDoctorProbe(command: "copilot", args: ["--version"])
+    )
+    let payload = Self.makePayload(batchSize: 8, rawCount: 10)
+    let recordedAt = "2026-04-28T00:00:01Z"
+    let expectedEntries = payload.timelineEntries(
+      fallbackRecordedAt: recordedAt,
+      toolCallMetadata: store.acpToolCallTimelineMetadata(for: payload)
+    )
+
+    let output = await store.acpRuntimeWorker.eventPresentation(
+      payload: payload,
+      recordedAt: recordedAt,
+      selectedSessionID: store.selectedSessionID,
+      descriptorsByID: store.acpAgentDescriptorsByID,
+      sessionRegistrations: store.selectedSession?.agents ?? [],
+      snapshots: store.selectedAcpAgents,
+      inspectSample: store.selectedAcpInspectState
+    )
+
+    #expect(output.entries == expectedEntries)
+    #expect(output.liveToolCallRowIDs.count == 8)
+    #expect(output.overflowNotice?.rawUpdateCount == 10)
+    #expect(output.overflowNotice?.displayedEventCount == 8)
+  }
+
+  @Test("ACP inspect replacement worker prepares missing runtime state")
+  func acpInspectReplacementWorkerPreparesMissingRuntimeState() async {
+    let store = HarnessMonitorStore(daemonController: RecordingDaemonController())
+    let activeAgent = makeAcpSnapshot(
+      acpID: "acp-1",
+      sessionID: "sess-acp-worker",
+      agentID: "worker",
+      displayName: "Worker",
+      pendingBatches: []
+    )
+
+    let output = await store.acpRuntimeWorker.inspectReplacement(
+      response: AcpAgentInspectResponse(
+        agents: [],
+        available: false,
+        issueMessage: "ACP inspect unavailable."
+      ),
+      sessionID: "sess-acp-worker",
+      sampledAt: Date(timeIntervalSince1970: 15),
+      activeAgents: [activeAgent],
+      currentSyncEntries: [:]
+    )
+
+    let identity = AcpRuntimeIdentity(snapshot: activeAgent)
+    #expect(output.sample.agents.isEmpty)
+    #expect(output.syncEntries[identity]?.phase == .unavailable)
+    #expect(output.syncEntries[identity]?.message == "ACP inspect unavailable.")
+    #expect(!output.hasRecoverableMissingEntries)
+  }
+
   private func measureApplyAcpEvents(
     batchSize: Int,
     warmupSamples: Int,
@@ -96,10 +169,19 @@ struct AcpEventBatchCoalesceTests {
       doctorProbe: AcpDoctorProbe(command: "copilot", args: ["--version"])
     )
 
-    let payload = AcpEventBatchPayload(
+    let payload = Self.makePayload(batchSize: batchSize, rawCount: batchSize)
+
+    let clock = ContinuousClock()
+    let start = clock.now
+    store.applyAcpEvents(payload, recordedAt: "2026-04-28T00:00:01Z")
+    return nanoseconds(for: start.duration(to: clock.now))
+  }
+
+  private static func makePayload(batchSize: Int, rawCount: Int) -> AcpEventBatchPayload {
+    AcpEventBatchPayload(
       acpId: "acp-1",
       sessionId: "sess-acp-perf",
-      rawCount: batchSize,
+      rawCount: rawCount,
       events: (0..<batchSize).map { index in
         AcpConversationEvent(
           timestamp: "2026-04-28T00:00:00Z",
@@ -114,11 +196,6 @@ struct AcpEventBatchCoalesceTests {
         )
       }
     )
-
-    let clock = ContinuousClock()
-    let start = clock.now
-    store.applyAcpEvents(payload, recordedAt: "2026-04-28T00:00:01Z")
-    return nanoseconds(for: start.duration(to: clock.now))
   }
 
   private func nanoseconds(for duration: Duration) -> UInt64 {
