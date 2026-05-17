@@ -1,6 +1,5 @@
 import Foundation
 import SwiftData
-import Synchronization
 
 /// SwiftData-backed store for Monitor supervisor decisions.
 ///
@@ -60,11 +59,12 @@ public actor DecisionStore {
 
   let container: ModelContainer
   nonisolated private let now: @Sendable () -> Date
-  let readContextLock = Mutex(())
+  nonisolated let readQueue: DispatchQueue
 
   public init(container: ModelContainer, now: @escaping @Sendable () -> Date = { Date() }) {
     self.container = container
     self.now = now
+    readQueue = DispatchQueue(label: "io.harnessmonitor.decision-store.reads", qos: .userInitiated)
     (events, eventsContinuation) = AsyncStream<DecisionEvent>.makeStream(
       bufferingPolicy: .bufferingNewest(64)
     )
@@ -158,18 +158,18 @@ public actor DecisionStore {
   }
 
   func previewUpsertOpen(_ draft: DecisionDraft) async throws -> UpsertResult {
-    try withReadContext { context in
-      if let decision = try fetchDecision(id: draft.id, context: context) {
-        guard !hasTerminalResolutionOutcome(decision) else {
+    try await withReadContext { context in
+      if let decision = try self.fetchDecision(id: draft.id, context: context) {
+        guard !self.hasTerminalResolutionOutcome(decision) else {
           return .unchanged
         }
         guard decision.statusRaw != Status.resolved else {
           return .unchanged
         }
-        return upsertResult(
+        return self.upsertResult(
           draft,
           for: decision,
-          reopen: shouldReopen(decision, now: now())
+          reopen: self.shouldReopen(decision, now: self.now())
         )
       }
       return .inserted
@@ -177,19 +177,19 @@ public actor DecisionStore {
   }
 
   nonisolated public func openDecisions() async throws -> [Decision] {
-    try withReadContext { context in
+    try await withReadContext { context in
       let descriptor = FetchDescriptor<Decision>(
         sortBy: [SortDescriptor(\.createdAt, order: .reverse)]
       )
       let rows = try context.fetch(descriptor)
-      let now = now()
-      return rows.filter { isOpen($0, now: now) }
+      let now = self.now()
+      return rows.filter { self.isOpen($0, now: now) }
     }
   }
 
   nonisolated public func decision(id: String) async throws -> Decision? {
-    try withReadContext { context in
-      try fetchDecision(id: id, context: context)
+    try await withReadContext { context in
+      try self.fetchDecision(id: id, context: context)
     }
   }
 

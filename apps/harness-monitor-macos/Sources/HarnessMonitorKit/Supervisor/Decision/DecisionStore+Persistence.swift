@@ -67,10 +67,21 @@ extension DecisionStore {
     eventsContinuation.yield(event)
   }
 
-  nonisolated func withReadContext<T>(_ operation: (ModelContext) throws -> T) throws -> T {
-    try readContextLock.withLock { _ in
-      let context = ModelContext(container)
-      return try operation(context)
+  nonisolated func withReadContext<T>(
+    _ operation: @escaping @Sendable (ModelContext) throws -> T
+  ) async throws -> T {
+    let container = container
+    let readQueue = readQueue
+    return try await withCheckedThrowingContinuation { continuation in
+      readQueue.async {
+        do {
+          let context = ModelContext(container)
+          let result = try operation(context)
+          continuation.resume(returning: result)
+        } catch {
+          continuation.resume(throwing: error)
+        }
+      }
     }
   }
 
