@@ -112,7 +112,9 @@ extension TaskBoardOperationsHost {
   ) -> some View {
     TaskBoardOperationsFormRow(title) {
       Toggle("", isOn: isOn)
+        .toggleStyle(.switch)
         .labelsHidden()
+        .controlSize(.small)
         .accessibilityLabel(title)
         .accessibilityIdentifier(accessibilityIdentifier)
     }
@@ -261,7 +263,7 @@ struct TaskBoardOperationsFormSection<Content: View>: View {
           cornerRadius: HarnessMonitorTheme.cornerRadiusMD,
           style: .continuous
         )
-        .fill(.background.opacity(0.5))
+        .fill(Color(nsColor: .controlBackgroundColor))
       )
       .overlay {
         RoundedRectangle(
@@ -280,10 +282,13 @@ struct TaskBoardOperationsFormSection<Content: View>: View {
   }
 }
 
-struct TaskBoardOperationsFormRow<Content: View>: View {
-  private let labelWidth: CGFloat = 112
-  private let rowMinHeight: CGFloat = 28
+private enum TaskBoardOperationsFormMetrics {
+  static let labelWidth: CGFloat = 112
+  static let contentMaxWidth: CGFloat = 420
+  static let rowMinHeight: CGFloat = 28
+}
 
+struct TaskBoardOperationsFormRow<Content: View>: View {
   let title: String
   let content: Content
 
@@ -298,13 +303,21 @@ struct TaskBoardOperationsFormRow<Content: View>: View {
         .font(.body)
         .foregroundStyle(HarnessMonitorTheme.secondaryInk)
         .lineLimit(2)
-        .multilineTextAlignment(.trailing)
-        .frame(width: labelWidth, alignment: .trailing)
+        .multilineTextAlignment(.leading)
+        .frame(width: TaskBoardOperationsFormMetrics.labelWidth, alignment: .leading)
 
       content
-        .frame(maxWidth: .infinity, alignment: .leading)
+        .frame(
+          maxWidth: TaskBoardOperationsFormMetrics.contentMaxWidth,
+          alignment: .trailing
+        )
+        .frame(maxWidth: .infinity, alignment: .trailing)
     }
-    .frame(maxWidth: .infinity, minHeight: rowMinHeight, alignment: .leading)
+    .frame(
+      maxWidth: .infinity,
+      minHeight: TaskBoardOperationsFormMetrics.rowMinHeight,
+      alignment: .leading
+    )
   }
 }
 
