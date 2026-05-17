@@ -4,7 +4,10 @@ struct PolicyCanvasEdgeLabelMetrics {
   let horizontalPadding: CGFloat
   let height: CGFloat
   private let defaultGlyphWidth: CGFloat
+  private let tallGlyphWidth: CGFloat
   private let narrowGlyphWidth: CGFloat
+  private let thinGlyphWidth: CGFloat
+  private let mediumWideGlyphWidth: CGFloat
   private let wideGlyphWidth: CGFloat
   private let spaceWidth: CGFloat
 
@@ -14,9 +17,12 @@ struct PolicyCanvasEdgeLabelMetrics {
     horizontalPadding = spaceWidth
     let textHeight = (11 * scale).rounded(.up)
     height = textHeight + (spaceWidth * 2)
-    defaultGlyphWidth = 5.8 * scale
-    narrowGlyphWidth = 3.7 * scale
-    wideGlyphWidth = 7.2 * scale
+    defaultGlyphWidth = 6.6 * scale
+    tallGlyphWidth = 7.1 * scale
+    narrowGlyphWidth = 4.7 * scale
+    thinGlyphWidth = 3.2 * scale
+    mediumWideGlyphWidth = 9.2 * scale
+    wideGlyphWidth = 10.2 * scale
   }
 
   func size(for label: String) -> CGSize {
@@ -44,12 +50,22 @@ struct PolicyCanvasEdgeLabelMetrics {
 
   private func estimatedWidth(for scalar: Unicode.Scalar) -> CGFloat {
     switch scalar.value {
-    case 32, 45, 46, 47, 58:
+    case 32:
       return spaceWidth
-    case 73, 102, 105, 108, 114, 116:
+    case 46, 47, 58:
+      return thinGlyphWidth
+    case 45:
       return narrowGlyphWidth
-    case 77, 87, 109, 119:
+    case 73, 105, 108:
+      return thinGlyphWidth
+    case 102, 114, 116:
+      return narrowGlyphWidth
+    case 98, 100, 103, 104, 107, 110, 112, 113, 117, 121:
+      return tallGlyphWidth
+    case 77, 87, 109:
       return wideGlyphWidth
+    case 119:
+      return mediumWideGlyphWidth
     default:
       return defaultGlyphWidth
     }

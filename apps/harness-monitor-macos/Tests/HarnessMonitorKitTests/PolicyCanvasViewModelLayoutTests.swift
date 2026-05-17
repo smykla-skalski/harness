@@ -1,3 +1,4 @@
+import AppKit
 import Foundation
 import SwiftUI
 import Testing
@@ -220,6 +221,30 @@ struct PolicyCanvasViewModelLayoutTests {
     #expect(visibleBounds.width > nodeBounds.width || visibleBounds.height > nodeBounds.height)
     #expect(fittedZoom < viewModel.zoom)
     #expect(fittedZoom >= PolicyCanvasLayout.minimumZoom)
+  }
+
+  @Test("edge label metrics fit rendered caption text")
+  func edgeLabelMetricsFitRenderedCaptionText() {
+    let labels = [
+      "default",
+      "mutate",
+      "unsafe",
+      "checks pass",
+      "missing risk",
+      "fail: reviewer verdict",
+    ]
+    for fontScale in [CGFloat(1), CGFloat(1.3)] {
+      let metrics = PolicyCanvasEdgeLabelMetrics(fontScale: fontScale)
+      let font = NSFont.systemFont(ofSize: 11 * fontScale, weight: .semibold)
+      for label in labels {
+        let availableTextWidth = metrics.size(for: label).width - (metrics.horizontalPadding * 2)
+        let renderedTextWidth = (label as NSString).size(withAttributes: [.font: font]).width
+        #expect(
+          availableTextWidth >= renderedTextWidth.rounded(.up),
+          "\(label) estimated width \(availableTextWidth) below rendered \(renderedTextWidth)"
+        )
+      }
+    }
   }
 
   @Test("presentation bounds normalize leading whitespace for routed content")
