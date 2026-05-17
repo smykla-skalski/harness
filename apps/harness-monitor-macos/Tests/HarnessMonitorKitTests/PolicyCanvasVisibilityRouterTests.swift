@@ -181,6 +181,21 @@ struct PolicyCanvasVisibilityRouterTests {
     #expect(bends >= 2)
   }
 
+  @Test("Axis grid inserts near-obstacle corridor waypoints")
+  func axisGridInsertsNearObstacleCorridorWaypoints() {
+    let coordinates = PolicyCanvasVisibilityRouter.sortedAxisCoordinates(
+      anchor1: 0,
+      anchor2: 400,
+      laneOffset: 0,
+      bounds: [(100, 180)],
+      corridorBounds: [(100, 180)],
+      corridorStep: 40
+    )
+
+    #expect(coordinates.contains(60))
+    #expect(coordinates.contains(220))
+  }
+
   @Test("8 parallel edges spread at least 80pt across the bus column")
   func eightParallelEdgesSpreadWidely() {
     let obstacle = CGRect(x: 150, y: 50, width: 100, height: 100)
@@ -231,6 +246,36 @@ struct PolicyCanvasVisibilityRouterTests {
     #expect(spread[3] == CGPoint(x: 320, y: 40 - (2 * PolicyCanvasLayout.defaultEdgeLineSpacing)))
     #expect(spread[4] == points[4])
     #expect(spread[5] == target)
+  }
+
+  @Test("Lane spread shifts every interior point on the dominant bus track")
+  func laneSpreadShiftsEveryInteriorPointOnDominantBusTrack() {
+    let source = CGPoint(x: 0, y: 100)
+    let target = CGPoint(x: 500, y: 140)
+    let points = [
+      source,
+      CGPoint(x: 80, y: 100),
+      CGPoint(x: 80, y: 40),
+      CGPoint(x: 200, y: 40),
+      CGPoint(x: 320, y: 40),
+      CGPoint(x: 440, y: 40),
+      CGPoint(x: 440, y: 140),
+      target,
+    ]
+
+    let spread = PolicyCanvasVisibilityRouter.applyLaneSpread(
+      points,
+      lane: 2,
+      source: source,
+      target: target,
+      lineSpacing: PolicyCanvasLayout.defaultEdgeLineSpacing
+    )
+
+    let shiftedY = 40 - (2 * PolicyCanvasLayout.defaultEdgeLineSpacing)
+    #expect(spread[2] == CGPoint(x: 80, y: shiftedY))
+    #expect(spread[3] == CGPoint(x: 200, y: shiftedY))
+    #expect(spread[4] == CGPoint(x: 320, y: shiftedY))
+    #expect(spread[5] == CGPoint(x: 440, y: shiftedY))
   }
 
   @Test("Displayed routes keep a minimum straight run before the first turn")
@@ -293,6 +338,45 @@ struct PolicyCanvasVisibilityRouterTests {
     #expect(lane1.points[2] != lane0.points[2])
   }
 
+  @Test("Displayed routes use monotonic trailing-side fanout offsets")
+  func displayedRoutesUseMonotonicTrailingSideFanoutOffsets() {
+    let lane1 = policyCanvasDisplayedRoute(
+      PolicyCanvasPinnedDisplayedRouteRequest(
+        router: StubRouteRouter(),
+        source: (point: CGPoint(x: 100, y: 100), side: .trailing),
+        sourceFanoutLane: 1,
+        target: (point: CGPoint(x: 400, y: 240), side: .leading),
+        targetFanoutLane: 1,
+        context: context(lane: 1)
+      )
+    )
+    let lane2 = policyCanvasDisplayedRoute(
+      PolicyCanvasPinnedDisplayedRouteRequest(
+        router: StubRouteRouter(),
+        source: (point: CGPoint(x: 100, y: 100), side: .trailing),
+        sourceFanoutLane: 2,
+        target: (point: CGPoint(x: 400, y: 240), side: .leading),
+        targetFanoutLane: 2,
+        context: context(lane: 2)
+      )
+    )
+    let lane3 = policyCanvasDisplayedRoute(
+      PolicyCanvasPinnedDisplayedRouteRequest(
+        router: StubRouteRouter(),
+        source: (point: CGPoint(x: 100, y: 100), side: .trailing),
+        sourceFanoutLane: 3,
+        target: (point: CGPoint(x: 400, y: 240), side: .leading),
+        targetFanoutLane: 3,
+        context: context(lane: 3)
+      )
+    )
+
+    #expect(lane1.points[2].y < lane2.points[2].y)
+    #expect(lane2.points[2].y < lane3.points[2].y)
+    #expect(lane1.points[2].x < lane2.points[2].x)
+    #expect(lane2.points[2].x < lane3.points[2].x)
+  }
+
   @Test("Displayed routes keep final bridge segments out of obstacles")
   func displayedRoutesKeepFinalBridgeSegmentsOutOfObstacles() {
     let obstacle = CGRect(x: 280, y: 50, width: 120, height: 120)
@@ -304,6 +388,23 @@ struct PolicyCanvasVisibilityRouterTests {
         target: (point: CGPoint(x: 600, y: 100), side: .leading),
         targetFanoutLane: 0,
         context: context(obstacles: [obstacle])
+      )
+    )
+
+    #expect(!polylineEntersObstacle(route.points, obstacle: obstacle))
+  }
+
+  @Test("Displayed routes keep higher-lane bridge segments out of obstacles")
+  func displayedRoutesKeepHigherLaneBridgeSegmentsOutOfObstacles() {
+    let obstacle = CGRect(x: 280, y: 50, width: 120, height: 120)
+    let route = policyCanvasDisplayedRoute(
+      PolicyCanvasPinnedDisplayedRouteRequest(
+        router: PolicyCanvasVisibilityRouter(),
+        source: (point: CGPoint(x: 100, y: 100), side: .trailing),
+        sourceFanoutLane: 3,
+        target: (point: CGPoint(x: 600, y: 100), side: .leading),
+        targetFanoutLane: 3,
+        context: context(lane: 3, obstacles: [obstacle])
       )
     )
 
