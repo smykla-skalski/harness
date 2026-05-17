@@ -52,7 +52,8 @@ struct HarnessMonitorPathsTests {
       homeDirectory: homeDirectory
     )
     let expectedRoot = expectedDaemonRoot(
-      in: homeDirectory
+      in:
+        homeDirectory
         .appendingPathComponent("Library", isDirectory: true)
         .appendingPathComponent("Application Support", isDirectory: true),
       ownership: .external
