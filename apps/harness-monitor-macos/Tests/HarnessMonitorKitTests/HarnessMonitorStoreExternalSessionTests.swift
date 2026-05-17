@@ -162,9 +162,13 @@ struct HarnessMonitorStoreExternalSessionTests {
     )
 
     let snapshot = SettingsDiagnosticsSnapshot(store: store)
+    let workerSnapshot = await SettingsDiagnosticsSnapshotWorker().prepare(
+      input: SettingsDiagnosticsSnapshotInput(store: store)
+    )
 
     #expect(snapshot.acpPermissionLogRuns.map(\.sessionID) == ["sess-shared", "sess-shared"])
     #expect(snapshot.acpPermissionLogRuns.map(\.id) == ["acp-worker-1", "acp-worker-2"])
+    #expect(workerSnapshot.acpPermissionLogRuns == snapshot.acpPermissionLogRuns)
     #expect(
       Set(snapshot.acpPermissionLogRuns.map(\.id)).count == snapshot.acpPermissionLogRuns.count)
   }

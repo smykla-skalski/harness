@@ -1,6 +1,6 @@
 import SwiftUI
 
-public struct SettingsDiagnosticsPaths {
+public struct SettingsDiagnosticsPaths: Sendable {
   public let launchAgentPath: String
   public let launchAgentDomain: String?
   public let launchAgentService: String?
