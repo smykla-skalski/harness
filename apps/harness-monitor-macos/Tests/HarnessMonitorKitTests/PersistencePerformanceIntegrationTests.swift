@@ -203,12 +203,12 @@ struct PersistencePerformanceIntegrationTests {
       )
     }
     try harness.container.mainContext.save()
-    store.refreshBookmarkedSessionIds()
+    await store.refreshBookmarkedSessionIds()
 
     let medianMs = await harness.medianRuntimeMs {
-      #expect(store.toggleBookmark(sessionId: "sess-bm-40", projectId: "proj-4"))
+      #expect(await store.toggleBookmark(sessionId: "sess-bm-40", projectId: "proj-4"))
       #expect(store.isBookmarked(sessionId: "sess-bm-40") == false)
-      #expect(store.toggleBookmark(sessionId: "sess-bm-40", projectId: "proj-4"))
+      #expect(await store.toggleBookmark(sessionId: "sess-bm-40", projectId: "proj-4"))
       #expect(store.isBookmarked(sessionId: "sess-bm-40"))
     }
 

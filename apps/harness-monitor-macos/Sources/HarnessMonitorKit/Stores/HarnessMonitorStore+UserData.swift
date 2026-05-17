@@ -2,7 +2,7 @@ import Foundation
 import SwiftData
 
 extension HarnessMonitorStore {
-  private static let maxRecentSearches = 20
+  static let maxRecentSearches = 20
 
   public var bookmarkedSessionIds: Set<String> {
     get { userData.bookmarkedSessionIds }
@@ -10,15 +10,15 @@ extension HarnessMonitorStore {
   }
 
   public var isPersistenceAvailable: Bool {
-    modelContext != nil && persistenceError == nil
+    userDataService != nil && persistenceError == nil
   }
 
   // MARK: - Bookmarks
 
   @discardableResult
-  public func toggleBookmark(sessionId: String, projectId: String) -> Bool {
+  public func toggleBookmark(sessionId: String, projectId: String) async -> Bool {
     guard
-      let modelContext = unavailablePersistenceContext(
+      let userDataService = unavailablePersistenceService(
         for: "Bookmark changes could not be saved."
       )
     else {
@@ -26,25 +26,13 @@ extension HarnessMonitorStore {
     }
 
     do {
-      var descriptor = FetchDescriptor<SessionBookmark>(
-        predicate: #Predicate { $0.sessionId == sessionId }
+      let isAddingBookmark = try await userDataService.toggleBookmark(
+        sessionId: sessionId,
+        projectId: projectId
       )
-      descriptor.fetchLimit = 1
-      let isAddingBookmark: Bool
-
-      if let existing = try modelContext.fetch(descriptor).first {
-        modelContext.delete(existing)
-        isAddingBookmark = false
-      } else {
-        modelContext.insert(SessionBookmark(sessionId: sessionId, projectId: projectId))
-        isAddingBookmark = true
-      }
-
-      try modelContext.save()
       updateBookmarkedSessionIds(sessionId: sessionId, isBookmarked: isAddingBookmark)
       return true
     } catch {
-      modelContext.rollback()
       recordPersistenceFailure(
         action: "Bookmark changes could not be saved.",
         underlyingError: error
@@ -57,15 +45,14 @@ extension HarnessMonitorStore {
     bookmarkedSessionIds.contains(sessionId)
   }
 
-  public func refreshBookmarkedSessionIds() {
-    guard let modelContext, persistenceError == nil else {
+  public func refreshBookmarkedSessionIds() async {
+    guard let userDataService, persistenceError == nil else {
       bookmarkedSessionIds = []
       return
     }
 
     do {
-      let bookmarks = try modelContext.fetch(FetchDescriptor<SessionBookmark>())
-      bookmarkedSessionIds = Set(bookmarks.map(\.sessionId))
+      bookmarkedSessionIds = try await userDataService.bookmarkIDs()
     } catch {
       bookmarkedSessionIds = []
       recordPersistenceFailure(
@@ -91,28 +78,24 @@ extension HarnessMonitorStore {
     targetKind: String,
     targetId: String,
     sessionId: String
-  ) -> Bool {
+  ) async -> Bool {
     guard
-      let modelContext = unavailablePersistenceContext(
+      let userDataService = unavailablePersistenceService(
         for: "Note changes could not be saved."
       )
     else {
       return false
     }
 
-    let note = UserNote(
-      targetKind: targetKind,
-      targetId: targetId,
-      sessionId: sessionId,
-      text: text
-    )
-
     do {
-      modelContext.insert(note)
-      try modelContext.save()
+      try await userDataService.addNote(
+        text: text,
+        targetKind: targetKind,
+        targetId: targetId,
+        sessionId: sessionId
+      )
       return true
     } catch {
-      modelContext.rollback()
       recordPersistenceFailure(
         action: "Note changes could not be saved.",
         underlyingError: error
@@ -122,9 +105,9 @@ extension HarnessMonitorStore {
   }
 
   @discardableResult
-  public func deleteNote(_ note: UserNote) -> Bool {
+  public func deleteNote(_ note: UserNote) async -> Bool {
     guard
-      let modelContext = unavailablePersistenceContext(
+      let userDataService = unavailablePersistenceService(
         for: "Note changes could not be saved."
       )
     else {
@@ -132,11 +115,8 @@ extension HarnessMonitorStore {
     }
 
     do {
-      modelContext.delete(note)
-      try modelContext.save()
-      return true
+      return try await userDataService.deleteNote(.init(note))
     } catch {
-      modelContext.rollback()
       recordPersistenceFailure(
         action: "Note changes could not be saved.",
         underlyingError: error
@@ -148,11 +128,11 @@ extension HarnessMonitorStore {
   // MARK: - Recent searches
 
   @discardableResult
-  public func recordSearch(_ query: String) -> Bool {
+  public func recordSearch(_ query: String) async -> Bool {
     let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
     guard !trimmed.isEmpty else { return false }
     guard
-      let modelContext = unavailablePersistenceContext(
+      let userDataService = unavailablePersistenceService(
         for: "Search history could not be updated."
       )
     else {
@@ -160,23 +140,8 @@ extension HarnessMonitorStore {
     }
 
     do {
-      var descriptor = FetchDescriptor<RecentSearch>(
-        predicate: #Predicate { $0.query == trimmed }
-      )
-      descriptor.fetchLimit = 1
-
-      if let existing = try modelContext.fetch(descriptor).first {
-        existing.lastUsedAt = .now
-        existing.useCount += 1
-      } else {
-        modelContext.insert(RecentSearch(query: trimmed))
-      }
-
-      try modelContext.save()
-      try evictOldSearches(in: modelContext)
-      return true
+      return try await userDataService.recordSearch(trimmed)
     } catch {
-      modelContext.rollback()
       recordPersistenceFailure(
         action: "Search history could not be updated.",
         underlyingError: error
@@ -186,9 +151,9 @@ extension HarnessMonitorStore {
   }
 
   @discardableResult
-  public func clearSearchHistory() -> Bool {
+  public func clearSearchHistory() async -> Bool {
     guard
-      let modelContext = unavailablePersistenceContext(
+      let userDataService = unavailablePersistenceService(
         for: "Search history could not be cleared."
       )
     else {
@@ -196,14 +161,9 @@ extension HarnessMonitorStore {
     }
 
     do {
-      let searches = try modelContext.fetch(FetchDescriptor<RecentSearch>())
-      for search in searches {
-        modelContext.delete(search)
-      }
-      try modelContext.save()
+      try await userDataService.clearSearchHistory()
       return true
     } catch {
-      modelContext.rollback()
       recordPersistenceFailure(
         action: "Search history could not be cleared.",
         underlyingError: error
@@ -214,30 +174,16 @@ extension HarnessMonitorStore {
 
   // MARK: - Filter settings
 
-  public func saveFilterPreference(for projectId: String) {
-    guard let modelContext, persistenceError == nil else { return }
+  public func saveFilterPreference(for projectId: String) async {
+    guard let userDataService, persistenceError == nil else { return }
 
     do {
-      var descriptor = FetchDescriptor<ProjectFilterPreference>(
-        predicate: #Predicate { $0.projectId == projectId }
+      try await userDataService.saveFilterPreference(
+        projectId: projectId,
+        sessionFilterRaw: sessionFilter.rawValue,
+        sessionFocusFilterRaw: sessionFocusFilter.rawValue
       )
-      descriptor.fetchLimit = 1
-
-      if let existing = try modelContext.fetch(descriptor).first {
-        existing.sessionFilterRaw = sessionFilter.rawValue
-        existing.sessionFocusFilterRaw = sessionFocusFilter.rawValue
-      } else {
-        let preference = ProjectFilterPreference(
-          projectId: projectId,
-          sessionFilterRaw: sessionFilter.rawValue,
-          sessionFocusFilterRaw: sessionFocusFilter.rawValue
-        )
-        modelContext.insert(preference)
-      }
-
-      try modelContext.save()
     } catch {
-      modelContext.rollback()
       recordPersistenceFailure(
         action: "Filter settings could not be saved.",
         underlyingError: error
@@ -245,16 +191,12 @@ extension HarnessMonitorStore {
     }
   }
 
-  public func loadFilterPreference(for projectId: String) {
-    guard let modelContext, persistenceError == nil else { return }
+  public func loadFilterPreference(for projectId: String) async {
+    guard let userDataService, persistenceError == nil else { return }
 
     do {
-      var descriptor = FetchDescriptor<ProjectFilterPreference>(
-        predicate: #Predicate { $0.projectId == projectId }
-      )
-      descriptor.fetchLimit = 1
-
-      guard let preference = try modelContext.fetch(descriptor).first else {
+      guard let preference = try await userDataService.loadFilterPreference(projectId: projectId)
+      else {
         return
       }
 
@@ -270,23 +212,6 @@ extension HarnessMonitorStore {
         underlyingError: error
       )
     }
-  }
-
-  private func evictOldSearches(in context: ModelContext) throws {
-    var descriptor = FetchDescriptor<RecentSearch>(
-      sortBy: [SortDescriptor(\.lastUsedAt, order: .reverse)]
-    )
-    descriptor.fetchOffset = Self.maxRecentSearches
-
-    let stale = try context.fetch(descriptor)
-    guard !stale.isEmpty else {
-      return
-    }
-
-    for search in stale {
-      context.delete(search)
-    }
-    try context.save()
   }
 
   func persistenceFailureMessage(
@@ -316,10 +241,10 @@ extension HarnessMonitorStore {
     bookmarkedSessionIds = []
   }
 
-  func unavailablePersistenceContext(
+  func unavailablePersistenceService(
     for action: String
-  ) -> ModelContext? {
-    guard let modelContext, persistenceError == nil else {
+  ) -> UserDataPersistenceService? {
+    guard let userDataService, persistenceError == nil else {
       presentFailureFeedback(
         persistenceError
           ?? persistenceFailureMessage(
@@ -329,6 +254,16 @@ extension HarnessMonitorStore {
       )
       return nil
     }
-    return modelContext
+    return userDataService
+  }
+
+  func scheduleBookmarkedSessionRefresh() {
+    guard userDataService != nil else {
+      bookmarkedSessionIds = []
+      return
+    }
+    Task { @MainActor [weak self] in
+      await self?.refreshBookmarkedSessionIds()
+    }
   }
 }

@@ -1,7 +1,7 @@
 import HarnessMonitorKit
 import SwiftUI
 
-struct SessionTimelineSectionPresentation {
+struct SessionTimelineSectionPresentation: Equatable, Sendable {
   let navigation: SessionTimelineWindowNavigation
   let filterSnapshot: SessionTimelineFilterSnapshot
   let rows: [SessionTimelineRow]
@@ -26,12 +26,11 @@ struct SessionTimelineSectionPresentation {
     rows: []
   )
 
-  @MainActor
   init(
     sessionID: String,
     timeline: [TimelineEntry],
     timelineWindow: TimelineWindowResponse?,
-    decisions: [Decision],
+    decisions: [SessionTimelineDecisionInput],
     signals: [SessionSignalRecord],
     filters: SessionTimelineFilterState,
     isTimelineLoading: Bool,

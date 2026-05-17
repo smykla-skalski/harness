@@ -4,13 +4,13 @@ import HarnessMonitorKit
 struct SessionTimelineNodeBuilder {
   let sessionID: String
   let entries: [TimelineEntry]
-  let decisions: [Decision]
+  let decisions: [SessionTimelineDecisionInput]
   let context: TimelineFeatureContext
 
   init(
     sessionID: String,
     entries: [TimelineEntry],
-    decisions: [Decision],
+    decisions: [SessionTimelineDecisionInput],
     context: TimelineFeatureContext = .empty
   ) {
     self.sessionID = sessionID
@@ -255,10 +255,10 @@ private struct SessionTimelineDecisionIndex {
   let decisionsByID: [String: SessionTimelineDecisionSnapshot]
   let decisionsBySessionID: [String: [SessionTimelineDecisionSnapshot]]
 
-  init(decisions: [Decision]) {
+  init(decisions: [SessionTimelineDecisionInput]) {
     let actionsDecoder = JSONDecoder()
     let snapshots = decisions.map {
-      SessionTimelineDecisionSnapshot(decision: $0, actionsDecoder: actionsDecoder)
+      SessionTimelineDecisionSnapshot(input: $0, actionsDecoder: actionsDecoder)
     }
     decisionsByID = Dictionary(uniqueKeysWithValues: snapshots.map { ($0.id, $0) })
     let pairs = snapshots.compactMap { snapshot in

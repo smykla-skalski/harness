@@ -1,6 +1,9 @@
 import AppKit
 import HarnessMonitorKit
+import OSLog
 import SwiftUI
+
+private let toolCallTimelinePresentationWorker = ToolCallTimelinePresentationWorker()
 
 struct ToolCallTimelineView: View {
   let entries: [TimelineEntry]
@@ -13,6 +16,7 @@ struct ToolCallTimelineView: View {
   @State private var cachedVisibleOverflowToolCallCount = 0
   @State private var cachedOverflowAnnouncement: ToolCallTimelineOverflowAnnouncement?
   @State private var cachedRowFrames: [String: CGRect] = [:]
+  @State private var presentationGeneration: UInt64 = 0
 
   @AppStorage(
     HarnessMonitorToolCallAnnouncementSettings.verboseAnnouncementsKey
@@ -28,39 +32,33 @@ struct ToolCallTimelineView: View {
     self.entries = entries
     self.liveAnnouncementRowIDs = liveAnnouncementRowIDs
     self.overflowNotice = overflowNotice
-    let presentation = Self.materialisePresentation(from: entries)
-    _cachedPresentation = State(initialValue: presentation)
-    _cachedVirtualizedLayout = State(
-      initialValue: ToolCallTimelineVirtualizedLayout(
-        presentation: presentation,
-        scrollMetrics: .zero
-      )
-    )
-    _cachedAnnouncementSnapshot = State(
-      initialValue: ToolCallTimelineAnnouncementSnapshot(
-        rows: presentation.rows,
-        liveRowIDs: liveAnnouncementRowIDs
-      )
-    )
-    let initialVisibleCount = presentation.rows.reduce(into: 0) { count, row in
-      if liveAnnouncementRowIDs.contains(row.id) {
-        count += 1
-      }
-    }
-    _cachedVisibleOverflowToolCallCount = State(initialValue: initialVisibleCount)
+    _cachedPresentation = State(initialValue: .empty)
+    _cachedVirtualizedLayout = State(initialValue: .empty)
+    _cachedAnnouncementSnapshot = State(initialValue: .empty)
+    _cachedVisibleOverflowToolCallCount = State(initialValue: 0)
     if let overflowNotice {
       _cachedOverflowAnnouncement = State(
         initialValue: ToolCallTimelineOverflowAnnouncement(
           id: overflowNotice.recordedAt,
           text: Self.overflowNoticeText(
             rawUpdateCount: overflowNotice.rawUpdateCount,
-            visibleToolCallCount: initialVisibleCount
+            visibleToolCallCount: overflowNotice.displayedEventCount
           )
         )
       )
     } else {
       _cachedOverflowAnnouncement = State(initialValue: nil)
     }
+  }
+
+  private var presentationInput: ToolCallTimelinePresentationInput {
+    ToolCallTimelinePresentationInput(
+      entries: entries,
+      liveAnnouncementRowIDs: liveAnnouncementRowIDs,
+      overflowNotice: overflowNotice,
+      scrollMetrics: cachedScrollMetrics,
+      rowFrames: cachedRowFrames
+    )
   }
 
   private var overflowToolCallCount: Int {
@@ -121,7 +119,6 @@ struct ToolCallTimelineView: View {
         .onPreferenceChange(ToolCallTimelineRowFramePreferenceKey.self) { newFrames in
           if cachedRowFrames != newFrames {
             cachedRowFrames = newFrames
-            rebuildVirtualizedLayout()
           }
         }
       }
@@ -136,20 +133,8 @@ struct ToolCallTimelineView: View {
         text: Self.accessibilityStateMarkerText
       )
     }
-    .onAppear {
-      rebuildCachedPresentation()
-    }
-    .onChange(of: entries) { _, _ in
-      rebuildCachedPresentation()
-    }
-    .onChange(of: liveAnnouncementRowIDs) { _, _ in
-      rebuildCachedPresentation()
-    }
-    .onChange(of: overflowNotice) { _, _ in
-      rebuildCachedPresentation()
-    }
-    .onChange(of: cachedScrollMetrics) { _, _ in
-      rebuildVirtualizedLayout()
+    .task(id: presentationInput) {
+      await rebuildCachedPresentation(for: presentationInput)
     }
     .onChange(of: cachedAnnouncementSnapshot) { oldValue, newValue in
       announceToolCallStateChanges(
@@ -165,54 +150,28 @@ struct ToolCallTimelineView: View {
     }
   }
 
-  private func rebuildCachedPresentation() {
-    let presentation = Self.materialisePresentation(from: entries)
-    if cachedPresentation != presentation {
-      cachedPresentation = presentation
+  @MainActor
+  private func rebuildCachedPresentation(for input: ToolCallTimelinePresentationInput) async {
+    presentationGeneration &+= 1
+    let generation = presentationGeneration
+    let output = await toolCallTimelinePresentationWorker.compute(input: input)
+    guard !Task.isCancelled, presentationGeneration == generation else {
+      return
     }
-    rebuildVirtualizedLayout()
-  }
-
-  private func rebuildVirtualizedLayout() {
-    let layout = ToolCallTimelineVirtualizedLayout(
-      presentation: cachedPresentation,
-      scrollMetrics: cachedScrollMetrics
-    )
-    if cachedVirtualizedLayout != layout {
-      cachedVirtualizedLayout = layout
+    if cachedPresentation != output.presentation {
+      cachedPresentation = output.presentation
     }
-    let viewportVisibleRowIDs = visibleViewportRowIDs(in: layout)
-    let visibleOverflowToolCallCount = viewportVisibleRowIDs.reduce(into: 0) { count, rowID in
-      if liveAnnouncementRowIDs.contains(rowID) {
-        count += 1
-      }
+    if cachedVirtualizedLayout != output.layout {
+      cachedVirtualizedLayout = output.layout
     }
-    if cachedVisibleOverflowToolCallCount != visibleOverflowToolCallCount {
-      cachedVisibleOverflowToolCallCount = visibleOverflowToolCallCount
+    if cachedVisibleOverflowToolCallCount != output.visibleOverflowToolCallCount {
+      cachedVisibleOverflowToolCallCount = output.visibleOverflowToolCallCount
     }
-
-    let snapshot = ToolCallTimelineAnnouncementSnapshot(
-      rows: cachedPresentation.rows,
-      liveRowIDs: liveAnnouncementRowIDs
-    )
-    if cachedAnnouncementSnapshot != snapshot {
-      cachedAnnouncementSnapshot = snapshot
+    if cachedAnnouncementSnapshot != output.announcementSnapshot {
+      cachedAnnouncementSnapshot = output.announcementSnapshot
     }
-
-    let overflowAnnouncement: ToolCallTimelineOverflowAnnouncement? =
-      if let overflowNotice {
-        ToolCallTimelineOverflowAnnouncement(
-          id: overflowNotice.recordedAt,
-          text: Self.overflowNoticeText(
-            rawUpdateCount: overflowNotice.rawUpdateCount,
-            visibleToolCallCount: overflowNotice.displayedEventCount
-          )
-        )
-      } else {
-        nil
-      }
-    if cachedOverflowAnnouncement != overflowAnnouncement {
-      cachedOverflowAnnouncement = overflowAnnouncement
+    if cachedOverflowAnnouncement != output.overflowAnnouncement {
+      cachedOverflowAnnouncement = output.overflowAnnouncement
     }
   }
 
@@ -224,7 +183,7 @@ struct ToolCallTimelineView: View {
     )
   }
 
-  static func viewportVisibleRowIDs(
+  nonisolated static func viewportVisibleRowIDs(
     renderedRowIDs: Set<String>,
     rowFrames: [String: CGRect],
     visibleRect: CGRect
@@ -243,7 +202,7 @@ struct ToolCallTimelineView: View {
     materialisePresentation(from: entries).rows
   }
 
-  static func materialisePresentation(
+  nonisolated static func materialisePresentation(
     from entries: [TimelineEntry]
   ) -> ToolCallTimelinePresentation {
     let sortedRows =
@@ -261,20 +220,7 @@ struct ToolCallTimelineView: View {
     }
 
     let rows = rowsByID.values.sorted(by: reverseRowSortOrder)
-    var sections: [ToolCallTimelineSection] = []
-    for row in rows {
-      if let lastSection = sections.last,
-        lastSection.canAppend(row)
-      {
-        sections[sections.count - 1].rows.append(row)
-      } else {
-        sections.append(ToolCallTimelineSection(firstRow: row))
-      }
-    }
-
-    return ToolCallTimelinePresentation(
-      sections: sections
-    )
+    return ToolCallTimelinePresentation(sections: ToolCallTimelinePresentation.sections(for: rows))
   }
 
   static func shouldAnnounceToolCallStatusChange(
@@ -344,7 +290,7 @@ struct ToolCallTimelineView: View {
     }
   }
 
-  static func overflowNoticeText(
+  nonisolated static func overflowNoticeText(
     rawUpdateCount: Int,
     visibleToolCallCount: Int
   ) -> String {
@@ -380,12 +326,12 @@ struct ToolCallTimelineView: View {
   }
 }
 
-private struct ToolCallTimelineOverflowAnnouncement: Equatable {
+private struct ToolCallTimelineOverflowAnnouncement: Equatable, Sendable {
   let id: String
   let text: String
 }
 
-struct ToolCallTimelinePresentation: Equatable {
+struct ToolCallTimelinePresentation: Equatable, Sendable {
   let sections: [ToolCallTimelineSection]
 
   var rows: [ToolCallTimelineRow] {
@@ -393,9 +339,23 @@ struct ToolCallTimelinePresentation: Equatable {
   }
 
   static let empty = Self(sections: [])
+
+  static func sections(for rows: [ToolCallTimelineRow]) -> [ToolCallTimelineSection] {
+    var sections: [ToolCallTimelineSection] = []
+    for row in rows {
+      if let lastSection = sections.last,
+        lastSection.canAppend(row)
+      {
+        sections[sections.count - 1].rows.append(row)
+      } else {
+        sections.append(ToolCallTimelineSection(firstRow: row))
+      }
+    }
+    return sections
+  }
 }
 
-struct ToolCallTimelineAnnouncementSnapshot: Equatable {
+struct ToolCallTimelineAnnouncementSnapshot: Equatable, Sendable {
   let rows: [ToolCallTimelineRow]
   let liveRowIDs: Set<String>
 
@@ -404,4 +364,96 @@ struct ToolCallTimelineAnnouncementSnapshot: Equatable {
   }
 
   static let empty = Self(rows: [], liveRowIDs: [])
+}
+
+private struct ToolCallTimelinePresentationInput: Equatable, Sendable {
+  let entries: [TimelineEntry]
+  let liveAnnouncementRowIDs: Set<String>
+  let overflowNotice: HarnessMonitorStore.ToolCallTimelineOverflowNotice?
+  let scrollMetrics: ToolCallTimelineScrollMetrics
+  let rowFrames: [String: CGRect]
+}
+
+private struct ToolCallTimelinePresentationOutput: Equatable, Sendable {
+  let presentation: ToolCallTimelinePresentation
+  let layout: ToolCallTimelineVirtualizedLayout
+  let visibleOverflowToolCallCount: Int
+  let announcementSnapshot: ToolCallTimelineAnnouncementSnapshot
+  let overflowAnnouncement: ToolCallTimelineOverflowAnnouncement?
+}
+
+private actor ToolCallTimelinePresentationWorker {
+  private static let signposter = OSSignposter(
+    subsystem: "io.harnessmonitor",
+    category: "perf"
+  )
+  private var cachedInput: ToolCallTimelinePresentationInput?
+  private var cachedOutput = ToolCallTimelinePresentationOutput(
+    presentation: .empty,
+    layout: .empty,
+    visibleOverflowToolCallCount: 0,
+    announcementSnapshot: .empty,
+    overflowAnnouncement: nil
+  )
+
+  func compute(input: ToolCallTimelinePresentationInput) -> ToolCallTimelinePresentationOutput {
+    guard input != cachedInput else {
+      return cachedOutput
+    }
+    let signpostID = Self.signposter.makeSignpostID()
+    let interval = Self.signposter.beginInterval(
+      "tool_call_timeline.presentation.compute",
+      id: signpostID,
+      "entries=\(input.entries.count, privacy: .public)"
+    )
+    defer {
+      Self.signposter.endInterval(
+        "tool_call_timeline.presentation.compute",
+        interval,
+        "rows=\(self.cachedOutput.presentation.rows.count, privacy: .public)"
+      )
+    }
+    let presentation = ToolCallTimelineView.materialisePresentation(from: input.entries)
+    let layout = ToolCallTimelineVirtualizedLayout(
+      presentation: presentation,
+      scrollMetrics: input.scrollMetrics
+    )
+    let viewportVisibleRowIDs = ToolCallTimelineView.viewportVisibleRowIDs(
+      renderedRowIDs: layout.renderedRowIDs,
+      rowFrames: input.rowFrames,
+      visibleRect: input.scrollMetrics.visibleRect
+    )
+    let visibleOverflowToolCallCount = viewportVisibleRowIDs.reduce(into: 0) { count, rowID in
+      if input.liveAnnouncementRowIDs.contains(rowID) {
+        count += 1
+      }
+    }
+    let announcementSnapshot = ToolCallTimelineAnnouncementSnapshot(
+      rows: presentation.rows,
+      liveRowIDs: input.liveAnnouncementRowIDs
+    )
+    let overflowAnnouncement: ToolCallTimelineOverflowAnnouncement? =
+      if let overflowNotice = input.overflowNotice {
+        ToolCallTimelineOverflowAnnouncement(
+          id: overflowNotice.recordedAt,
+          text: ToolCallTimelineView.overflowNoticeText(
+            rawUpdateCount: overflowNotice.rawUpdateCount,
+            visibleToolCallCount: overflowNotice.displayedEventCount
+          )
+        )
+      } else {
+        nil
+      }
+    cachedInput = input
+    cachedOutput = ToolCallTimelinePresentationOutput(
+      presentation: presentation,
+      layout: layout,
+      visibleOverflowToolCallCount: visibleOverflowToolCallCount,
+      announcementSnapshot: announcementSnapshot,
+      overflowAnnouncement: overflowAnnouncement
+    )
+    return cachedOutput
+  }
+
+  func waitForIdle() async {}
 }

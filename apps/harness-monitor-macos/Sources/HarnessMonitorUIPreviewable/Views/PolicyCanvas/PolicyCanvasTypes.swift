@@ -120,12 +120,12 @@ enum PolicyCanvasNodeKind: String, CaseIterable, Identifiable {
   }
 }
 
-enum PolicyCanvasPortKind: String {
+enum PolicyCanvasPortKind: String, Sendable {
   case input
   case output
 }
 
-enum PolicyCanvasPortSide: String, Hashable {
+enum PolicyCanvasPortSide: String, Hashable, Sendable {
   case leading
   case trailing
   case top
@@ -134,7 +134,7 @@ enum PolicyCanvasPortSide: String, Hashable {
   static let allSides: [Self] = [.leading, .trailing, .top, .bottom]
 }
 
-struct PolicyCanvasPort: Identifiable, Hashable {
+struct PolicyCanvasPort: Identifiable, Hashable, Sendable {
   let id: String
   let title: String
   let kind: PolicyCanvasPortKind
@@ -176,7 +176,7 @@ struct PolicyCanvasNode: Identifiable {
   }
 }
 
-enum PolicyCanvasGroupTone: String, CaseIterable, Hashable {
+enum PolicyCanvasGroupTone: String, CaseIterable, Hashable, Sendable {
   case intake
   case evaluation
   case release
@@ -204,7 +204,7 @@ enum PolicyCanvasGroupTone: String, CaseIterable, Hashable {
   }
 }
 
-struct PolicyCanvasGroup: Identifiable, Hashable {
+struct PolicyCanvasGroup: Identifiable, Hashable, Sendable {
   let id: String
   var title: String
   var frame: CGRect

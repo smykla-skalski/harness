@@ -69,7 +69,9 @@ extension HarnessMonitorStore {
       selectedSession?.session.projectId
       ?? sessions.first(where: { $0.sessionId == sessionID })?.projectId
       ?? ""
-    toggleBookmark(sessionId: sessionID, projectId: projectID)
+    Task { @MainActor [weak self] in
+      await self?.toggleBookmark(sessionId: sessionID, projectId: projectID)
+    }
   }
 
   public func copySelectedItemID() {

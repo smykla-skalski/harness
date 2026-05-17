@@ -280,7 +280,7 @@ private struct HarnessMonitorPreviewOverrideFile: Decodable, Equatable {
     case generatedAt = "generated_at"
   }
 
-  static func load() -> Self? {
+  static func loadFromDisk() -> Self? {
     for url in HarnessMonitorPreviewSceneOverrides.overrideFileURLs {
       guard let data = try? Data(contentsOf: url),
         let override = try? JSONDecoder().decode(Self.self, from: data),
@@ -302,11 +302,21 @@ private struct HarnessMonitorPreviewOverrideFile: Decodable, Equatable {
   }
 }
 
+private actor HarnessMonitorPreviewOverrideLoader {
+  static let shared = HarnessMonitorPreviewOverrideLoader()
+
+  func load() -> HarnessMonitorPreviewOverrideFile? {
+    HarnessMonitorPreviewOverrideFile.loadFromDisk()
+  }
+
+  func waitForIdle() {}
+}
+
 private struct HarnessMonitorPreviewSceneAppearanceModifier: ViewModifier {
   let defaultThemeMode: HarnessMonitorThemeMode
   let defaultTextSizeIndex: Int
   let defaultDateTimeConfiguration: HarnessMonitorDateTimeConfiguration
-  @State private var fileOverride = HarnessMonitorPreviewOverrideFile.load()
+  @State private var fileOverride: HarnessMonitorPreviewOverrideFile?
 
   private var environment: [String: String] {
     ProcessInfo.processInfo.environment
@@ -376,7 +386,7 @@ private struct HarnessMonitorPreviewSceneAppearanceModifier: ViewModifier {
   @MainActor
   private func refreshFileOverrideLoop() async {
     while !Task.isCancelled {
-      let nextOverride = HarnessMonitorPreviewOverrideFile.load()
+      let nextOverride = await HarnessMonitorPreviewOverrideLoader.shared.load()
       if fileOverride != nextOverride {
         fileOverride = nextOverride
       }

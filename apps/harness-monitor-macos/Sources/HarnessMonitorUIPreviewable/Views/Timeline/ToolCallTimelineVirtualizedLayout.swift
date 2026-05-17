@@ -1,6 +1,6 @@
 import SwiftUI
 
-struct ToolCallTimelineScrollMetrics: Equatable {
+struct ToolCallTimelineScrollMetrics: Equatable, Sendable {
   static let coordinateSpaceName = "tool-call-timeline-scroll-space"
 
   var contentOffsetY: CGFloat
@@ -24,7 +24,7 @@ struct ToolCallTimelineScrollMetrics: Equatable {
   }
 }
 
-struct ToolCallTimelineVirtualizedLayout: Equatable {
+struct ToolCallTimelineVirtualizedLayout: Equatable, Sendable {
   let sections: [ToolCallTimelineSection]
   let topSpacerHeight: CGFloat
   let bottomSpacerHeight: CGFloat
@@ -53,14 +53,32 @@ struct ToolCallTimelineVirtualizedLayout: Equatable {
     self.renderedRowIDs = renderedRowIDs
   }
 
-  init(presentation: ToolCallTimelinePresentation, scrollMetrics _: ToolCallTimelineScrollMetrics) {
-    let renderedSections = presentation.sections
-    let renderedRowIDs = Set(renderedSections.flatMap(\.rows).map(\.id))
+  init(presentation: ToolCallTimelinePresentation, scrollMetrics: ToolCallTimelineScrollMetrics) {
+    let rows = presentation.rows
+    guard !rows.isEmpty else {
+      self = .empty
+      return
+    }
+
+    let estimatedRowHeight: CGFloat = 54
+    let fallbackViewportHeight: CGFloat = 260
+    let viewportHeight = max(scrollMetrics.viewportHeight, fallbackViewportHeight)
+    let overscanHeight = viewportHeight
+    let lowerBound = max(0, scrollMetrics.contentOffsetY - overscanHeight)
+    let upperBound = scrollMetrics.contentOffsetY + viewportHeight + overscanHeight
+    let startIndex = max(0, Int((lowerBound / estimatedRowHeight).rounded(.down)))
+    let endIndex = min(
+      rows.count,
+      max(startIndex + 1, Int((upperBound / estimatedRowHeight).rounded(.up)))
+    )
+    let renderedRows = Array(rows[startIndex..<endIndex])
+    let renderedSections = ToolCallTimelinePresentation.sections(for: renderedRows)
+    let renderedRowIDs = Set(renderedRows.map(\.id))
 
     self.init(
       sections: renderedSections,
-      topSpacerHeight: 0,
-      bottomSpacerHeight: 0,
+      topSpacerHeight: CGFloat(startIndex) * estimatedRowHeight,
+      bottomSpacerHeight: CGFloat(rows.count - endIndex) * estimatedRowHeight,
       renderedRowIDs: renderedRowIDs
     )
   }

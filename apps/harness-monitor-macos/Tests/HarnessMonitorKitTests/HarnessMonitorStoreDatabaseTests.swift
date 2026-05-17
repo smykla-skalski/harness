@@ -109,14 +109,14 @@ struct HarnessMonitorStoreDatabaseTests {
     await store.cacheSessionList([sessionA, sessionB], projects: [project])
     await store.cacheSessionDetail(detailA, timeline: timelineA, transcript: transcriptA)
 
-    store.toggleBookmark(sessionId: "sess-db-a", projectId: "project-a")
-    store.addNote(
+    await store.toggleBookmark(sessionId: "sess-db-a", projectId: "project-a")
+    await store.addNote(
       text: "Test note",
       targetKind: "task",
       targetId: "task-1",
       sessionId: "sess-db-a"
     )
-    store.recordSearch("test query")
+    await store.recordSearch("test query")
 
     let stats = await store.gatherDatabaseStatistics()
 

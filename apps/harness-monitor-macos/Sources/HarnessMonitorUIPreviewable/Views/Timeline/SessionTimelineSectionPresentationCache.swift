@@ -1,13 +1,17 @@
 import Foundation
 import HarnessMonitorKit
+import OSLog
 
-@MainActor
-final class SessionTimelineSectionPresentationCache {
+actor SessionTimelinePresentationWorker {
+  private static let signposter = OSSignposter(
+    subsystem: "io.harnessmonitor",
+    category: "perf"
+  )
   private var cachedKey: SessionTimelineSectionPresentationCacheKey?
   private var cachedPresentation: SessionTimelineSectionPresentation = .empty
   private(set) var rebuildCount = 0
 
-  func presentation(
+  func compute(
     _ input: SessionTimelineSectionPresentationInput
   ) -> SessionTimelineSectionPresentation {
     let key = SessionTimelineSectionPresentationCacheKey(
@@ -22,7 +26,49 @@ final class SessionTimelineSectionPresentationCache {
       now: input.now
     )
     if key != cachedKey {
+      let signpostID = Self.signposter.makeSignpostID()
+      let interval = Self.signposter.beginInterval(
+        "session_timeline.presentation.compute",
+        id: signpostID,
+        "session=\(input.sessionID, privacy: .public) entries=\(input.timeline.count, privacy: .public)"
+      )
+      defer {
+        Self.signposter.endInterval(
+          "session_timeline.presentation.compute",
+          interval,
+          "rows=\(self.cachedPresentation.rows.count, privacy: .public)"
+        )
+      }
       cachedKey = key
+      cachedPresentation = SessionTimelineSectionPresentation(
+        sessionID: input.sessionID,
+        timeline: input.timeline,
+        timelineWindow: input.timelineWindow,
+        decisions: input.decisions,
+        signals: input.signals,
+        filters: input.filters,
+        isTimelineLoading: input.isTimelineLoading,
+        dateTimeConfiguration: input.dateTimeConfiguration,
+        now: input.now
+      )
+      rebuildCount += 1
+    }
+    return cachedPresentation
+  }
+
+  func waitForIdle() async {}
+}
+
+final class SessionTimelineSectionPresentationCache {
+  private var cachedInput: SessionTimelineSectionPresentationInput?
+  private var cachedPresentation: SessionTimelineSectionPresentation = .empty
+  private(set) var rebuildCount = 0
+
+  func presentation(
+    _ input: SessionTimelineSectionPresentationInput
+  ) -> SessionTimelineSectionPresentation {
+    if cachedInput != input {
+      cachedInput = input
       cachedPresentation = SessionTimelineSectionPresentation(
         sessionID: input.sessionID,
         timeline: input.timeline,
@@ -40,11 +86,11 @@ final class SessionTimelineSectionPresentationCache {
   }
 }
 
-struct SessionTimelineSectionPresentationInput {
+struct SessionTimelineSectionPresentationInput: Equatable, Sendable {
   let sessionID: String
   let timeline: [TimelineEntry]
   let timelineWindow: TimelineWindowResponse?
-  let decisions: [Decision]
+  let decisions: [SessionTimelineDecisionInput]
   let signals: [SessionSignalRecord]
   let filters: SessionTimelineFilterState
   let isTimelineLoading: Bool
@@ -55,7 +101,7 @@ struct SessionTimelineSectionPresentationInput {
     sessionID: String,
     timeline: [TimelineEntry],
     timelineWindow: TimelineWindowResponse?,
-    decisions: [Decision],
+    decisions: [SessionTimelineDecisionInput],
     signals: [SessionSignalRecord],
     filters: SessionTimelineFilterState,
     isTimelineLoading: Bool,
@@ -72,13 +118,24 @@ struct SessionTimelineSectionPresentationInput {
     self.dateTimeConfiguration = dateTimeConfiguration
     self.now = now
   }
+
+  static func == (lhs: Self, rhs: Self) -> Bool {
+    lhs.sessionID == rhs.sessionID
+      && lhs.timeline == rhs.timeline
+      && lhs.timelineWindow == rhs.timelineWindow
+      && lhs.decisions == rhs.decisions
+      && lhs.signals == rhs.signals
+      && lhs.filters == rhs.filters
+      && lhs.isTimelineLoading == rhs.isTimelineLoading
+      && lhs.dateTimeConfiguration == rhs.dateTimeConfiguration
+  }
 }
 
 private struct SessionTimelineSectionPresentationCacheKey: Equatable {
   let sessionID: String
   let timeline: [TimelineEntry]
   let timelineWindow: TimelineWindowResponse?
-  let decisions: [DecisionSignature]
+  let decisions: [SessionTimelineDecisionInput]
   let signals: [SignalSignature]
   let filters: SessionTimelineFilterState
   let isTimelineLoading: Bool
@@ -88,7 +145,7 @@ private struct SessionTimelineSectionPresentationCacheKey: Equatable {
     sessionID: String,
     timeline: [TimelineEntry],
     timelineWindow: TimelineWindowResponse?,
-    decisions: [Decision],
+    decisions: [SessionTimelineDecisionInput],
     signals: [SessionSignalRecord],
     filters: SessionTimelineFilterState,
     isTimelineLoading: Bool,
@@ -98,35 +155,11 @@ private struct SessionTimelineSectionPresentationCacheKey: Equatable {
     self.sessionID = sessionID
     self.timeline = timeline
     self.timelineWindow = timelineWindow
-    self.decisions = decisions.map(DecisionSignature.init(decision:))
+    self.decisions = decisions
     self.signals = signals.map { SignalSignature(record: $0, now: now) }
     self.filters = filters
     self.isTimelineLoading = isTimelineLoading
     self.dateTimeConfiguration = dateTimeConfiguration
-  }
-}
-
-private struct DecisionSignature: Equatable {
-  let id: String
-  let severityRaw: String
-  let ruleID: String
-  let sessionID: String?
-  let agentID: String?
-  let taskID: String?
-  let summary: String
-  let suggestedActionsJSON: String
-  let createdAt: Date
-
-  init(decision: Decision) {
-    id = decision.id
-    severityRaw = decision.severityRaw
-    ruleID = decision.ruleID
-    sessionID = decision.sessionID
-    agentID = decision.agentID
-    taskID = decision.taskID
-    summary = decision.summary
-    suggestedActionsJSON = decision.suggestedActionsJSON
-    createdAt = decision.createdAt
   }
 }
 

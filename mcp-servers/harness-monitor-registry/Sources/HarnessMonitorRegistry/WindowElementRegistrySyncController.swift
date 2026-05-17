@@ -9,6 +9,7 @@ final class WindowElementRegistrySyncController {
   }
 
   private let registry: AccessibilityRegistry
+  private let payloadWorker = WindowElementRegistryPayloadWorker()
   private let minimumReplacementInterval: Duration
   private let onReplacementApplied: @MainActor () -> Void
   private let clock = ContinuousClock()
@@ -109,7 +110,10 @@ final class WindowElementRegistrySyncController {
         return
       }
       lastReplacementAppliedAt = clock.now
-      let elements = WindowAccessibilityElementSnapshotter.elements(in: window)
+      let elements = await WindowAccessibilityElementSnapshotter.elements(
+        in: window,
+        payloadWorker: payloadWorker
+      )
       onReplacementApplied()
       await registry.replaceTrackedWindowElements(
         windowID: window.windowNumber,
@@ -194,14 +198,21 @@ enum WindowAccessibilityChildNodeCollector {
 @MainActor
 private enum WindowAccessibilityElementSnapshotter {
   private static let maximumVisitedNodes = 700
+  private static let traversalBatchSize = 40
 
-  static func elements(in window: NSWindow) -> [RegistryElement] {
+  static func elements(
+    in window: NSWindow,
+    payloadWorker: WindowElementRegistryPayloadWorker
+  ) async -> [RegistryElement] {
     var queue: [any NSAccessibilityProtocol] = [window]
     var index = 0
     var visited: Set<ObjectIdentifier> = []
-    var harvested: [String: RegistryElement] = [:]
+    var harvested: [RegistryElement] = []
 
     while index < queue.count, visited.count < maximumVisitedNodes {
+      if Task.isCancelled {
+        return []
+      }
       let node = queue[index]
       index += 1
 
@@ -215,10 +226,14 @@ private enum WindowAccessibilityElementSnapshotter {
       guard let element = registryElement(from: node, windowID: window.windowNumber) else {
         continue
       }
-      harvested[element.identifier] = element
+      harvested.append(element)
+
+      if index.isMultiple(of: traversalBatchSize) {
+        await Task.yield()
+      }
     }
 
-    return harvested.values.sorted { $0.identifier < $1.identifier }
+    return await payloadWorker.replacementPayload(from: harvested)
   }
 
   private static func childNodes(
@@ -302,7 +317,7 @@ private enum WindowAccessibilityElementSnapshotter {
       return nil
     }
 
-    let frame = node.accessibilityFrame()
+    let frame = registryFrame(from: node)
     guard frame.isNull == false, frame.isInfinite == false, frame.isEmpty == false else {
       return nil
     }
@@ -410,6 +425,38 @@ private enum WindowAccessibilityElementSnapshotter {
     default:
       return normalizedString(String(describing: value))
     }
+  }
+
+  private static func registryFrame(from node: any NSAccessibilityProtocol) -> NSRect {
+    guard let view = node as? NSView else {
+      return node.accessibilityFrame()
+    }
+    guard let window = view.window, view.isHiddenOrHasHiddenAncestor == false else {
+      return .null
+    }
+    var clippedBounds = view.bounds
+    var ancestor = view.superview
+    while let currentAncestor = ancestor {
+      if let clipView = currentAncestor as? NSClipView {
+        clippedBounds = clippedBounds.intersection(view.convert(clipView.bounds, from: clipView))
+        if clippedBounds.isEmpty || clippedBounds.isNull {
+          return .null
+        }
+      }
+      ancestor = currentAncestor.superview
+    }
+    return window.convertToScreen(view.convert(clippedBounds, to: nil))
+  }
+}
+
+actor WindowElementRegistryPayloadWorker {
+  func replacementPayload(from elements: [RegistryElement]) -> [RegistryElement] {
+    var harvested: [String: RegistryElement] = [:]
+    harvested.reserveCapacity(elements.count)
+    for element in elements {
+      harvested[element.identifier] = element
+    }
+    return harvested.values.sorted { $0.identifier < $1.identifier }
   }
 }
 #endif

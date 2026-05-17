@@ -2,7 +2,7 @@ import Foundation
 
 extension HarnessMonitorStore {
   public func prepareOpenRecentSessions() async {
-    refreshBookmarkedSessionIds()
+    await refreshBookmarkedSessionIds()
     await restoreOpenRecentSessionCatalog()
   }
 
@@ -38,7 +38,7 @@ extension HarnessMonitorStore {
       replayQueuedReconnectAfterBootstrapIfNeeded()
     }
 
-    refreshBookmarkedSessionIds()
+    await refreshBookmarkedSessionIds()
     await refreshPersistedSessionMetadata()
 
     switch daemonOwnership {

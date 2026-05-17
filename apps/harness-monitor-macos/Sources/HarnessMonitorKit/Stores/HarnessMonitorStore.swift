@@ -25,6 +25,13 @@ public final class HarnessMonitorStore {
   @ObservationIgnored var supervisorStartTask: Task<Void, Never>?
   @ObservationIgnored var supervisorStopTask: Task<Void, Never>?
   @ObservationIgnored let supervisorTickTrigger = SupervisorTickTrigger()
+  @ObservationIgnored let acpTimelineWorker = AcpTimelineWorker()
+  @ObservationIgnored var acpTimelineReattributeTask: Task<Void, Never>?
+  @ObservationIgnored var acpTranscriptReattributeTask: Task<Void, Never>?
+  @ObservationIgnored var acpTranscriptPartitionTask: Task<Void, Never>?
+  @ObservationIgnored var acpTimelineReattributeGeneration: UInt64 = 0
+  @ObservationIgnored var acpTranscriptReattributeGeneration: UInt64 = 0
+  @ObservationIgnored var acpTranscriptPartitionGeneration: UInt64 = 0
   @ObservationIgnored var cachedNullActionHandler: NullDecisionActionHandler?
   @ObservationIgnored var openSessionWindowsByID: [ObjectIdentifier: String] = [:]
   @ObservationIgnored var pendingSessionWindowTerminationSnapshot: Set<String>?
@@ -290,6 +297,7 @@ public final class HarnessMonitorStore {
     HarnessMonitorResourceMetrics.shared
   public let modelContext: ModelContext?
   let cacheService: SessionCacheService?
+  let userDataService: UserDataPersistenceService?
   var client: (any HarnessMonitorClientProtocol)?
   var globalStreamTask: Task<Void, Never>?
   var sessionStreamTask: Task<Void, Never>?
@@ -380,6 +388,12 @@ public final class HarnessMonitorStore {
     self.fileViewer = fileViewer
     self.voiceCapture = voiceCapture
     self.modelContext = modelContainer?.mainContext
+    self.userDataService = modelContainer.map {
+      UserDataPersistenceService(
+        modelContainer: $0,
+        maxRecentSearches: Self.maxRecentSearches
+      )
+    }
     if let cacheService {
       self.cacheService = cacheService
     } else if let modelContainer {
@@ -403,8 +417,8 @@ public final class HarnessMonitorStore {
     self.hostBridgeCapabilityIssues = seeded
     self.forcedHostBridgeCapabilities = Set(seeded.keys)
     bindUISlices()
-    refreshBookmarkedSessionIds()
     syncAllUI()
+    scheduleBookmarkedSessionRefresh()
   }
 
 }

@@ -1,12 +1,24 @@
 import Foundation
-import SwiftData
-
 extension HarnessMonitorStore {
   public func requestDeleteTaskConfirmation(
     sessionID: String,
     taskID: String,
     taskTitle: String
   ) {
+    Task { @MainActor [weak self] in
+      await self?.requestDeleteTaskConfirmationAsync(
+        sessionID: sessionID,
+        taskID: taskID,
+        taskTitle: taskTitle
+      )
+    }
+  }
+
+  private func requestDeleteTaskConfirmationAsync(
+    sessionID: String,
+    taskID: String,
+    taskTitle: String
+  ) async {
     let actionName = "Delete task"
     guard prepareSessionAction(named: actionName, sessionID: sessionID) != nil else { return }
     pendingConfirmation = .deleteTask(
@@ -14,7 +26,7 @@ extension HarnessMonitorStore {
       taskID: taskID,
       taskTitle: taskTitle,
       actorID: controlPlaneActionActor(for: "harness-app"),
-      noteCount: taskUserNoteCount(taskID: taskID, sessionID: sessionID)
+      noteCount: await taskUserNoteCount(taskID: taskID, sessionID: sessionID)
     )
   }
 
@@ -23,6 +35,24 @@ extension HarnessMonitorStore {
     taskIDs: [String],
     taskTitleProvider: (String) -> String
   ) {
+    var titlesByID: [String: String] = [:]
+    for taskID in taskIDs where titlesByID[taskID] == nil {
+      titlesByID[taskID] = taskTitleProvider(taskID)
+    }
+    Task { @MainActor [weak self] in
+      await self?.requestDeleteTaskConfirmationAsync(
+        sessionID: sessionID,
+        taskIDs: taskIDs,
+        taskTitleProvider: { titlesByID[$0] ?? $0 }
+      )
+    }
+  }
+
+  private func requestDeleteTaskConfirmationAsync(
+    sessionID: String,
+    taskIDs: [String],
+    taskTitleProvider: (String) -> String
+  ) async {
     let normalized = orderedUniqueDeletionTaskIDs(taskIDs)
     guard !normalized.isEmpty else { return }
     let actionName = "Delete task"
@@ -35,7 +65,7 @@ extension HarnessMonitorStore {
         taskID: id,
         taskTitle: taskTitleProvider(id),
         actorID: actorID,
-        noteCount: taskUserNoteCount(taskID: id, sessionID: sessionID)
+        noteCount: await taskUserNoteCount(taskID: id, sessionID: sessionID)
       )
     } else {
       pendingConfirmation = .deleteTasks(
@@ -59,7 +89,7 @@ extension HarnessMonitorStore {
     guard !taskIDs.isEmpty else { return false }
     var succeeded = 0
     for (index, taskID) in taskIDs.enumerated() {
-      let noteCount = taskUserNoteCount(taskID: taskID, sessionID: sessionID)
+      let noteCount = await taskUserNoteCount(taskID: taskID, sessionID: sessionID)
       let didDelete = await deleteTask(
         sessionID: sessionID,
         taskID: taskID,
@@ -116,7 +146,7 @@ extension HarnessMonitorStore {
       return false
     }
     dismissDeletedTaskSheetIfNeeded(sessionID: sessionID, taskID: taskID)
-    let didDeleteNotes = deleteTaskUserNotes(
+    let didDeleteNotes = await deleteTaskUserNotes(
       taskID: taskID,
       sessionID: sessionID,
       requiresPurge: expectedNoteCount > 0
@@ -140,13 +170,12 @@ extension HarnessMonitorStore {
     dismissSheet()
   }
 
-  private func taskUserNoteCount(taskID: String, sessionID: String) -> Int {
-    guard let modelContext, persistenceError == nil else {
+  private func taskUserNoteCount(taskID: String, sessionID: String) async -> Int {
+    guard let userDataService, persistenceError == nil else {
       return 0
     }
     do {
-      return try modelContext.fetch(taskUserNoteDescriptor(taskID: taskID, sessionID: sessionID))
-        .count
+      return try await userDataService.taskUserNoteCount(taskID: taskID, sessionID: sessionID)
     } catch {
       recordPersistenceFailure(
         action: "Task note count could not be loaded.",
@@ -160,45 +189,19 @@ extension HarnessMonitorStore {
     taskID: String,
     sessionID: String,
     requiresPurge: Bool
-  ) -> Bool {
-    guard let modelContext, persistenceError == nil else {
+  ) async -> Bool {
+    guard let userDataService, persistenceError == nil else {
       return !requiresPurge
     }
     do {
-      let notes = try modelContext.fetch(
-        taskUserNoteDescriptor(taskID: taskID, sessionID: sessionID)
-      )
-      guard !notes.isEmpty else {
-        return true
-      }
-      for note in notes {
-        modelContext.delete(note)
-      }
-      try modelContext.save()
+      _ = try await userDataService.deleteTaskUserNotes(taskID: taskID, sessionID: sessionID)
       return true
     } catch {
-      modelContext.rollback()
       recordPersistenceFailure(
         action: "Task note changes could not be saved.",
         underlyingError: error
       )
       return false
     }
-  }
-
-  private func taskUserNoteDescriptor(
-    taskID: String,
-    sessionID: String
-  ) -> FetchDescriptor<UserNote> {
-    let targetKind = "task"
-    let targetID = taskID
-    let selectedSessionID = sessionID
-    return FetchDescriptor<UserNote>(
-      predicate: #Predicate<UserNote> { note in
-        note.targetKind == targetKind
-          && note.targetId == targetID
-          && note.sessionId == selectedSessionID
-      }
-    )
   }
 }

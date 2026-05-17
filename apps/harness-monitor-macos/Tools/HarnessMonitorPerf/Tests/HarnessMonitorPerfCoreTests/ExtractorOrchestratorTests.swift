@@ -29,6 +29,7 @@ final class ExtractorOrchestratorTests: XCTestCase {
         let toc: Data
         let swiftUIQueries: [String: Data]
         let allocationsQuery: Data?
+        private(set) var requestedQueryNames: [String] = []
 
         init(toc: Data, swiftUIQueries: [String: Data] = [:], allocationsQuery: Data? = nil) {
             self.toc = toc
@@ -40,12 +41,17 @@ final class ExtractorOrchestratorTests: XCTestCase {
 
         func exportQuery(tracePath: URL, xpath: String) throws -> Data {
             for (name, payload) in swiftUIQueries where xpath.contains("\"\(name)\"") {
+                requestedQueryNames.append(name)
                 return payload
             }
             if let allocationsQuery, xpath == ExtractorOrchestrator.allocationsXPath {
+                requestedQueryNames.append("allocations")
                 return allocationsQuery
             }
-            return Data("<?xml version=\"1.0\"?><trace-query-result><node><schema/></node></trace-query-result>".utf8)
+            let emptyResult = """
+            <?xml version="1.0"?><trace-query-result><node><schema/></node></trace-query-result>
+            """
+            return Data(emptyResult.utf8)
         }
     }
 
@@ -142,6 +148,89 @@ final class ExtractorOrchestratorTests: XCTestCase {
                     .appendingPathComponent("open-recent-window/swiftui/time-profile.xml")
                     .path
             )
+        )
+    }
+
+    func testExtractSkipsTimeProfileForLargeSwiftUITrace() throws {
+        let tracesRoot = runDir.appendingPathComponent("traces", isDirectory: true)
+        try FileManager.default.createDirectory(at: tracesRoot, withIntermediateDirectories: true)
+        let tracePath = tracesRoot.appendingPathComponent("large.trace")
+        try Data("large trace placeholder".utf8).write(to: tracePath, options: .atomic)
+
+        let manifest = """
+        {
+          "label": "perf",
+          "created_at_utc": "2026-04-25T00:00:00Z",
+          "captures": [
+            {
+              "scenario": "session-search-full",
+              "template": "SwiftUI",
+              "trace_relpath": "traces/large.trace",
+              "duration_seconds": 5,
+              "exit_status": 0,
+              "end_reason": "completed"
+            }
+          ]
+        }
+        """
+        try Data(manifest.utf8).write(
+            to: runDir.appendingPathComponent("manifest.json"),
+            options: .atomic
+        )
+
+        let exporter = FixtureExporter(
+            toc: try fixtureData("toc-minimal"),
+            swiftUIQueries: [
+                "swiftui-updates": try fixtureData("swiftui-updates-minimal"),
+                "swiftui-update-groups": try fixtureData("swiftui-update-groups-minimal"),
+                "swiftui-causes": try fixtureData("swiftui-causes-minimal"),
+                "hitches": try fixtureData("hitches-minimal"),
+                "potential-hangs": try fixtureData("hitches-minimal"),
+                "time-profile": try fixtureData("time-profile-minimal"),
+            ]
+        )
+        let debugRoot = runDir.appendingPathComponent("exports", isDirectory: true)
+
+        let summary = try ExtractorOrchestrator.extract(
+            runDir: runDir,
+            exporter: exporter,
+            debugExportsRoot: debugRoot,
+            maximumTimeProfileTraceBytes: 1
+        )
+
+        XCTAssertFalse(exporter.requestedQueryNames.contains("time-profile"))
+        XCTAssertTrue(exporter.requestedQueryNames.contains("swiftui-updates"))
+        XCTAssertFalse(
+            FileManager.default.fileExists(
+                atPath: debugRoot
+                    .appendingPathComponent("session-search-full/swiftui/time-profile.xml")
+                    .path
+            )
+        )
+
+        let metricsPath = runDir.appendingPathComponent("metrics/session-search-full/swiftui.json")
+        let metrics = try JSONValue.fromFile(metricsPath)
+        guard case .array(let warnings) = metrics["extractor_warnings"] else {
+            return XCTFail("expected extractor_warnings")
+        }
+        XCTAssertTrue(
+            warnings.contains {
+                $0.stringValue?.contains("skipped time-profile export") == true
+            }
+        )
+        XCTAssertEqual(metrics["time_profile"], .object([:]))
+        XCTAssertEqual(metrics["top_frames"], .array([]))
+
+        let captureWarnings = summary.captures.first?.warnings ?? []
+        XCTAssertTrue(
+            captureWarnings.contains {
+                $0.contains("skipped time-profile export")
+            }
+        )
+        XCTAssertTrue(
+            summary.warnings?.contains {
+                $0.contains("session-search-full (SwiftUI): skipped time-profile export")
+            } == true
         )
     }
 }

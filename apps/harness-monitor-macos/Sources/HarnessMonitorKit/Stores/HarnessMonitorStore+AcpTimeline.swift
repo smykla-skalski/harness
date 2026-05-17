@@ -39,6 +39,13 @@ extension HarnessMonitorStore {
     _ current: [TimelineEntry],
     with incoming: [TimelineEntry]
   ) -> [TimelineEntry] {
+    Self.mergedTimelineEntries(current, with: incoming)
+  }
+
+  nonisolated static func mergedTimelineEntries(
+    _ current: [TimelineEntry],
+    with incoming: [TimelineEntry]
+  ) -> [TimelineEntry] {
     let currentByEntryID = Dictionary(uniqueKeysWithValues: current.map { ($0.entryId, $0) })
     var phaseLocations: [AcpToolCallPhaseKey: AcpToolCallPhaseLocation] = [:]
     var replacementsByCurrentEntryID: [String: TimelineEntry] = [:]
@@ -99,7 +106,7 @@ extension HarnessMonitorStore {
       .map(\.entry)
   }
 
-  private static func timelineEntrySortOrder(
+  nonisolated private static func timelineEntrySortOrder(
     lhs: TimelineEntrySortKey,
     rhs: TimelineEntrySortKey
   ) -> Bool {
@@ -115,7 +122,7 @@ extension HarnessMonitorStore {
     return lhs.entry.entryId < rhs.entry.entryId
   }
 
-  static func preferredTimelineEntry(
+  nonisolated static func preferredTimelineEntry(
     _ lhs: TimelineEntry,
     over rhs: TimelineEntry
   ) -> TimelineEntry {
@@ -126,7 +133,7 @@ extension HarnessMonitorStore {
       ? lhs : rhs
   }
 
-  static func parsedAcpInspectRecordedAt(_ recordedAt: String?) -> Date? {
+  nonisolated static func parsedAcpInspectRecordedAt(_ recordedAt: String?) -> Date? {
     guard let recordedAt else {
       return nil
     }
@@ -135,13 +142,19 @@ extension HarnessMonitorStore {
   }
 
   func rebuildAcpTranscriptPartition() {
-    var partition: [String: [TimelineEntry]] = [:]
-    partition.reserveCapacity(selectedAcpTranscriptEntries.count)
-    for entry in selectedAcpTranscriptEntries {
-      guard let agentID = entry.agentId else { continue }
-      partition[agentID, default: []].append(entry)
+    acpTranscriptPartitionTask?.cancel()
+    acpTranscriptPartitionGeneration &+= 1
+    let generation = acpTranscriptPartitionGeneration
+    let entries = selectedAcpTranscriptEntries
+    acpTranscriptPartitionTask = Task { @MainActor [weak self] in
+      guard let self else { return }
+      let partition = await self.acpTimelineWorker.partitionByAgentID(entries)
+      guard !Task.isCancelled, self.acpTranscriptPartitionGeneration == generation else {
+        return
+      }
+      self.acpTranscriptByAgentID = partition
+      self.acpTranscriptPartitionTask = nil
     }
-    acpTranscriptByAgentID = partition
   }
 
   func rebuildSelectedAcpTranscriptEntries() {
@@ -212,7 +225,22 @@ extension HarnessMonitorStore {
     guard !timeline.isEmpty, !snapshots.isEmpty else {
       return
     }
-    replaceSelectedTimelineIfNeeded(reattributedAcpEntries(timeline, using: snapshots))
+    acpTimelineReattributeTask?.cancel()
+    acpTimelineReattributeGeneration &+= 1
+    let generation = acpTimelineReattributeGeneration
+    let currentTimeline = timeline
+    acpTimelineReattributeTask = Task { @MainActor [weak self] in
+      guard let self else { return }
+      let updatedTimeline = await self.acpTimelineWorker.reattribute(
+        currentTimeline,
+        using: snapshots
+      )
+      guard !Task.isCancelled, self.acpTimelineReattributeGeneration == generation else {
+        return
+      }
+      self.replaceSelectedTimelineIfNeeded(updatedTimeline)
+      self.acpTimelineReattributeTask = nil
+    }
   }
 
   func reattributeAcpTranscriptEntries(using snapshots: [AcpAgentSnapshot]) {
@@ -223,15 +251,39 @@ extension HarnessMonitorStore {
     else {
       return
     }
-    replaceSelectedAcpTranscriptHistoryIfNeeded(
-      reattributedAcpEntries(selectedAcpTranscriptHistoryEntries, using: snapshots)
-    )
-    replaceSelectedAcpTranscriptLiveIfNeeded(
-      reattributedAcpEntries(selectedAcpTranscriptLiveEntries, using: snapshots)
-    )
+    acpTranscriptReattributeTask?.cancel()
+    acpTranscriptReattributeGeneration &+= 1
+    let generation = acpTranscriptReattributeGeneration
+    let historyEntries = selectedAcpTranscriptHistoryEntries
+    let liveEntries = selectedAcpTranscriptLiveEntries
+    acpTranscriptReattributeTask = Task { @MainActor [weak self] in
+      guard let self else { return }
+      async let reattributedHistory = self.acpTimelineWorker.reattribute(
+        historyEntries,
+        using: snapshots
+      )
+      async let reattributedLive = self.acpTimelineWorker.reattribute(
+        liveEntries,
+        using: snapshots
+      )
+      let (updatedHistory, updatedLive) = await (reattributedHistory, reattributedLive)
+      guard !Task.isCancelled, self.acpTranscriptReattributeGeneration == generation else {
+        return
+      }
+      self.replaceSelectedAcpTranscriptHistoryIfNeeded(updatedHistory)
+      self.replaceSelectedAcpTranscriptLiveIfNeeded(updatedLive)
+      self.acpTranscriptReattributeTask = nil
+    }
   }
 
   private func reattributedAcpEntries(
+    _ entries: [TimelineEntry],
+    using snapshots: [AcpAgentSnapshot]
+  ) -> [TimelineEntry] {
+    Self.reattributedAcpEntries(entries, using: snapshots)
+  }
+
+  nonisolated static func reattributedAcpEntries(
     _ entries: [TimelineEntry],
     using snapshots: [AcpAgentSnapshot]
   ) -> [TimelineEntry] {
@@ -331,7 +383,26 @@ extension HarnessMonitorStore {
     selectedAcpTranscriptLiveEntries = updatedTimeline
   }
 
-  private static func timelineEntrySortKey(for entry: TimelineEntry) -> TimelineEntrySortKey {
+  public func waitForAcpTimelineIdle() async {
+    while true {
+      let pendingTasks = [
+        acpTimelineReattributeTask,
+        acpTranscriptReattributeTask,
+        acpTranscriptPartitionTask,
+      ].compactMap(\.self)
+
+      guard !pendingTasks.isEmpty else {
+        await acpTimelineWorker.waitForIdle()
+        return
+      }
+
+      for task in pendingTasks {
+        await task.value
+      }
+    }
+  }
+
+  nonisolated private static func timelineEntrySortKey(for entry: TimelineEntry) -> TimelineEntrySortKey {
     TimelineEntrySortKey(
       entry: entry,
       toolCallSequence: entry.toolCallTimelineEntryMetadata()?.sequence
@@ -352,4 +423,28 @@ private struct AcpToolCallPhaseKey: Hashable {
 private enum AcpToolCallPhaseLocation {
   case current(String)
   case incoming(Int)
+}
+
+actor AcpTimelineWorker {
+  func merge(
+    current: [TimelineEntry],
+    incoming: [TimelineEntry]
+  ) -> [TimelineEntry] {
+    HarnessMonitorStore.mergedTimelineEntries(current, with: incoming)
+  }
+
+  func reattribute(
+    _ entries: [TimelineEntry],
+    using snapshots: [AcpAgentSnapshot]
+  ) -> [TimelineEntry] {
+    HarnessMonitorStore.reattributedAcpEntries(entries, using: snapshots)
+  }
+
+  func partitionByAgentID(
+    _ entries: [TimelineEntry]
+  ) -> [String: [TimelineEntry]] {
+    entries.partitionedByAgentID()
+  }
+
+  func waitForIdle() async {}
 }

@@ -372,3 +372,20 @@ extension HarnessMonitorStore.SessionIndexSlice {
     rawValue.sessionSearchTokens
   }
 }
+
+actor SessionIndexWorker {
+  func computeProjection(
+    from input: HarnessMonitorStore.SessionIndexSlice.ProjectionComputationInput,
+    delayNanoseconds: UInt64 = 0
+  ) async -> HarnessMonitorStore.SessionIndexSlice.ProjectionComputationOutput? {
+    if delayNanoseconds > 0 {
+      try? await Task.sleep(nanoseconds: delayNanoseconds)
+    }
+    guard !Task.isCancelled else {
+      return nil
+    }
+    return HarnessMonitorStore.SessionIndexSlice.computeProjectionOutput(from: input)
+  }
+
+  func waitForIdle() async {}
+}

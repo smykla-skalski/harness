@@ -48,7 +48,9 @@ struct SessionTimelineView: View {
   var sceneStoredFilterRegistryRawValue = ""
 
   @State private var filters = SessionTimelineFilterState()
-  @State private var presentationCache = SessionTimelineSectionPresentationCache()
+  @State private var presentationWorker = SessionTimelinePresentationWorker()
+  @State private var cachedPresentation = SessionTimelineSectionPresentation.empty
+  @State private var presentationGeneration: UInt64 = 0
   @State private var loadOlderInFlight = false
   @State private var didInitialFreshFetch = false
   @State private var measuredContainerHeight: CGFloat = 0
@@ -67,18 +69,16 @@ struct SessionTimelineView: View {
     measuredContainerHeight = height
   }
 
-  private var presentation: SessionTimelineSectionPresentation {
-    presentationCache.presentation(
-      SessionTimelineSectionPresentationInput(
-        sessionID: sessionID,
-        timeline: timeline,
-        timelineWindow: timelineWindow,
-        decisions: decisions,
-        signals: store.selectedSessionSignals,
-        filters: normalizedFilters(filters),
-        isTimelineLoading: isTimelineLoading,
-        dateTimeConfiguration: dateTimeConfiguration
-      )
+  private var presentationInput: SessionTimelineSectionPresentationInput {
+    SessionTimelineSectionPresentationInput(
+      sessionID: sessionID,
+      timeline: timeline,
+      timelineWindow: timelineWindow,
+      decisions: decisions.map(SessionTimelineDecisionInput.init(decision:)),
+      signals: store.selectedSessionSignals,
+      filters: normalizedFilters(filters),
+      isTimelineLoading: isTimelineLoading,
+      dateTimeConfiguration: dateTimeConfiguration
     )
   }
 
@@ -107,7 +107,8 @@ struct SessionTimelineView: View {
   }
 
   var body: some View {
-    let presentation = self.presentation
+    let presentation = cachedPresentation
+    let input = presentationInput
     Group {
       switch style {
       case .cockpitSection:
@@ -120,10 +121,13 @@ struct SessionTimelineView: View {
       hydrateFilters(for: filterHydrationInput)
       applyPerfScenarioFiltersIfNeeded()
     }
+    .task(id: input) {
+      await rebuildPresentation(for: input)
+    }
     .task(id: HarnessMonitorUITestEnvironment.perfScenarioRawValue ?? "") {
       applyPerfScenarioFiltersIfNeeded()
     }
-    .onAppear { requestLatestWindowIfNeeded(presentation) }
+    .onAppear { requestLatestWindowIfNeeded(cachedPresentation) }
     .onGeometryChange(for: CGFloat.self, of: \.size.height) { _, height in
       updateMeasuredContainerHeight(height)
     }
@@ -140,6 +144,20 @@ struct SessionTimelineView: View {
         isEnabled: style == .routePage
       )
     )
+  }
+
+  @MainActor
+  private func rebuildPresentation(for input: SessionTimelineSectionPresentationInput) async {
+    presentationGeneration &+= 1
+    let generation = presentationGeneration
+    let presentation = await presentationWorker.compute(input)
+    guard !Task.isCancelled, presentationGeneration == generation else {
+      return
+    }
+    if cachedPresentation != presentation {
+      cachedPresentation = presentation
+    }
+    requestLatestWindowIfNeeded(presentation)
   }
 
   @ViewBuilder

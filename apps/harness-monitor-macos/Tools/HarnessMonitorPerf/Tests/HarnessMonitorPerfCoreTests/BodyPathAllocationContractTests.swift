@@ -119,7 +119,17 @@ final class BodyPathAllocationContractTests: XCTestCase {
         KnownSite(
             relativePath:
                 "Sources/HarnessMonitorUIPreviewable/Views/Timeline/SessionTimelineDecisionSnapshot.swift",
-            line: 136,
+            line: 160,
+            constructor: "JSONDecoder"
+        ),
+        // Same default-parameter sentinel on the plain-input initializer.
+        // Production timeline presentation uses `SessionTimelineNodeBuilder`,
+        // which injects one decoder per worker compute; this default is for
+        // direct tests and non-hot helper construction.
+        KnownSite(
+            relativePath:
+                "Sources/HarnessMonitorUIPreviewable/Views/Timeline/SessionTimelineDecisionSnapshot.swift",
+            line: 164,
             constructor: "JSONDecoder"
         ),
         // Local decoder threaded into N snapshot inits during a one-shot data
@@ -136,7 +146,7 @@ final class BodyPathAllocationContractTests: XCTestCase {
         KnownSite(
             relativePath:
                 "Sources/HarnessMonitorUIPreviewable/Views/PolicyCanvas/PolicyCanvasView+SceneStorage.swift",
-            line: 118,
+            line: 134,
             constructor: "JSONDecoder"
         ),
         // Same SceneStorage codec, encode side. Fires on scene-state writes,
@@ -144,8 +154,18 @@ final class BodyPathAllocationContractTests: XCTestCase {
         KnownSite(
             relativePath:
                 "Sources/HarnessMonitorUIPreviewable/Views/PolicyCanvas/PolicyCanvasView+SceneStorage.swift",
-            line: 131,
+            line: 147,
             constructor: "JSONEncoder"
+        ),
+        // Date formatting cache for timeline row materialisation. This struct
+        // is created inside the presentation worker compute, not from SwiftUI
+        // `body`, and each formatter is then reused across all rows in that
+        // worker pass.
+        KnownSite(
+            relativePath:
+                "Sources/HarnessMonitorUIPreviewable/Views/Timeline/SessionTimelineDayDivider.swift",
+            line: 140,
+            constructor: "DateFormatter"
         ),
         // Local decoder threaded into N snapshot inits inside the timeline
         // index build. Allocated once per index construction, then shared

@@ -64,12 +64,17 @@ public enum ExtractorOrchestrator {
     public static let allocationsXPath =
         "/trace-toc/run[@number=\"1\"]/tracks/track[@name=\"Allocations\"]/details/detail[@name=\"Statistics\"]"
 
+    public static let defaultMaximumTimeProfileTraceBytes: Int64 = 128 * 1024 * 1024
+    public static let defaultMaximumDebugExportBytes = 64 * 1024 * 1024
+
     /// Runs the full extractor pipeline against `runDir`, then invokes Summarizer.
     @discardableResult
     public static func extract(
         runDir: URL,
         exporter: XctraceExporting,
-        debugExportsRoot: URL? = nil
+        debugExportsRoot: URL? = nil,
+        maximumTimeProfileTraceBytes: Int64? = defaultMaximumTimeProfileTraceBytes,
+        maximumDebugExportBytes: Int? = defaultMaximumDebugExportBytes
     ) throws -> RunManifest {
         let manifestURL = runDir.appendingPathComponent("manifest.json")
         guard FileManager.default.fileExists(atPath: manifestURL.path) else {
@@ -95,7 +100,9 @@ public enum ExtractorOrchestrator {
                     .appendingPathComponent(
                         Summarizer.templateSlug(capture.template),
                         isDirectory: true
-                    )
+                    ),
+                maximumTimeProfileTraceBytes: maximumTimeProfileTraceBytes,
+                maximumDebugExportBytes: maximumDebugExportBytes
             )
             let scenarioRoot = metricsRoot.appendingPathComponent(capture.scenario, isDirectory: true)
             try FileManager.default.createDirectory(at: scenarioRoot, withIntermediateDirectories: true)
@@ -122,7 +129,9 @@ public enum ExtractorOrchestrator {
         capture: RunManifest.Capture,
         tracePath: URL,
         exporter: XctraceExporting,
-        debugExportsRoot: URL? = nil
+        debugExportsRoot: URL? = nil,
+        maximumTimeProfileTraceBytes: Int64? = defaultMaximumTimeProfileTraceBytes,
+        maximumDebugExportBytes: Int? = defaultMaximumDebugExportBytes
     ) throws -> JSONValue {
         let tocData = try exporter.exportTOC(tracePath: tracePath)
         let toc = try XctraceTOC(data: tocData)
@@ -136,14 +145,17 @@ public enum ExtractorOrchestrator {
                 tracePath: tracePath, exporter: exporter,
                 availableSchemas: availableSchemas,
                 maximumValidDurationNs: maximumValidDurationNs,
-                debugExportsRoot: debugExportsRoot
+                debugExportsRoot: debugExportsRoot,
+                maximumTimeProfileTraceBytes: maximumTimeProfileTraceBytes,
+                maximumDebugExportBytes: maximumDebugExportBytes
             )
         case "Allocations":
             return try extractAllocations(
                 tracePath: tracePath, exporter: exporter,
                 availableAllocDetails: availableAllocDetails,
                 availableSchemas: availableSchemas,
-                debugExportsRoot: debugExportsRoot
+                debugExportsRoot: debugExportsRoot,
+                maximumDebugExportBytes: maximumDebugExportBytes
             )
         default:
             throw Failure(message: "Unsupported template \(capture.template)")
@@ -153,36 +165,71 @@ public enum ExtractorOrchestrator {
     private static func extractSwiftUI(
         tracePath: URL, exporter: XctraceExporting, availableSchemas: Set<String>,
         maximumValidDurationNs: Int,
-        debugExportsRoot: URL?
+        debugExportsRoot: URL?,
+        maximumTimeProfileTraceBytes: Int64?,
+        maximumDebugExportBytes: Int?
     ) throws -> JSONValue {
-        var documents: [String: XctraceQueryDocument] = [:]
+        var warnings: [String] = []
+        var updates: MetricsExtractor.SwiftUIUpdates?
+        var updateGroups: MetricsExtractor.UpdateGroups?
+        var updateGroupsDocument: XctraceQueryDocument?
+        var causes: MetricsExtractor.Causes?
+        var hitches: MetricsExtractor.EventTable?
+        var hangs: MetricsExtractor.EventTable?
+        var profile: MetricsExtractor.TimeProfile?
+
         for schema in swiftUISchemaXPaths {
             guard availableSchemas.contains(schema.name) else { continue }
+            if let warning = shouldSkipTimeProfile(
+                schemaName: schema.name,
+                tracePath: tracePath,
+                maximumTraceBytes: maximumTimeProfileTraceBytes
+            ) {
+                warnings.append(warning)
+                continue
+            }
             let data = try exporter.exportQuery(tracePath: tracePath, xpath: schema.xpath)
-            try retainDebugExportIfNeeded(
+            if let warning = try retainDebugExportIfNeeded(
                 data,
                 root: debugExportsRoot,
-                filename: "\(schema.name).xml"
-            )
-            documents[schema.name] = try XctraceQueryDocument(data: data)
+                filename: "\(schema.name).xml",
+                maximumBytes: maximumDebugExportBytes
+            ) {
+                warnings.append(warning)
+            }
+            let document = try XctraceQueryDocument(data: data)
+            switch schema.name {
+            case "swiftui-updates":
+                updates = MetricsExtractor.parseSwiftUIUpdates(
+                    document,
+                    maximumValidDurationNs: maximumValidDurationNs
+                )
+            case "swiftui-update-groups":
+                updateGroupsDocument = document
+                updateGroups = MetricsExtractor.parseSwiftUIUpdateGroups(
+                    document,
+                    maximumValidDurationNs: maximumValidDurationNs
+                )
+            case "swiftui-causes":
+                causes = MetricsExtractor.parseSwiftUICauses(document)
+            case "hitches":
+                hitches = MetricsExtractor.parseEventTable(
+                    document,
+                    maximumValidDurationNs: maximumValidDurationNs
+                )
+            case "potential-hangs":
+                hangs = MetricsExtractor.parseEventTable(
+                    document,
+                    maximumValidDurationNs: maximumValidDurationNs
+                )
+            case "time-profile":
+                profile = MetricsExtractor.parseTimeProfile(document)
+            default:
+                break
+            }
         }
-
-        let updates = documents["swiftui-updates"].map {
-            MetricsExtractor.parseSwiftUIUpdates($0, maximumValidDurationNs: maximumValidDurationNs)
-        }
-        let updateGroups = documents["swiftui-update-groups"].map {
-            MetricsExtractor.parseSwiftUIUpdateGroups($0, maximumValidDurationNs: maximumValidDurationNs)
-        }
-        let causes = documents["swiftui-causes"].map { MetricsExtractor.parseSwiftUICauses($0) }
-        let hitches = documents["hitches"].map {
-            MetricsExtractor.parseEventTable($0, maximumValidDurationNs: maximumValidDurationNs)
-        }
-        let hangs = documents["potential-hangs"].map {
-            MetricsExtractor.parseEventTable($0, maximumValidDurationNs: maximumValidDurationNs)
-        }
-        let profile = documents["time-profile"].map { MetricsExtractor.parseTimeProfile($0) }
         let findings = MetricsExtractor.deriveSwiftUIFindings(
-            updateGroupsDocument: documents["swiftui-update-groups"],
+            updateGroupsDocument: updateGroupsDocument,
             causes: causes
         )
 
@@ -199,6 +246,9 @@ public enum ExtractorOrchestrator {
         root["top_frames"] = profile.map { encodeJSON($0.topFrames) } ?? .array([])
         root["findings"] = encodeJSON(findings)
         root["available_schemas"] = .array(availableSchemas.sorted().map(JSONValue.string))
+        if !warnings.isEmpty {
+            root["extractor_warnings"] = .array(warnings.map(JSONValue.string))
+        }
         return .object(root)
     }
 
@@ -206,16 +256,21 @@ public enum ExtractorOrchestrator {
         tracePath: URL, exporter: XctraceExporting,
         availableAllocDetails: Set<String>,
         availableSchemas: Set<String>,
-        debugExportsRoot: URL?
+        debugExportsRoot: URL?,
+        maximumDebugExportBytes: Int?
     ) throws -> JSONValue {
         var rootObject: [String: JSONValue] = [:]
+        var warnings: [String] = []
         if availableAllocDetails.contains("Statistics") {
             let data = try exporter.exportQuery(tracePath: tracePath, xpath: allocationsXPath)
-            try retainDebugExportIfNeeded(
+            if let warning = try retainDebugExportIfNeeded(
                 data,
                 root: debugExportsRoot,
-                filename: "allocations-statistics.xml"
-            )
+                filename: "allocations-statistics.xml",
+                maximumBytes: maximumDebugExportBytes
+            ) {
+                warnings.append(warning)
+            }
             let parsed = try MetricsExtractor.parseAllocationsStatistics(data: data)
             rootObject["allocations"] = encodeJSON(parsed.allocations)
             rootObject["top_offenders"] = encodeJSON(parsed.topOffenders)
@@ -229,6 +284,9 @@ public enum ExtractorOrchestrator {
             rootObject["top_offenders"] = .array([])
         }
         rootObject["available_schemas"] = .array(availableSchemas.sorted().map(JSONValue.string))
+        if !warnings.isEmpty {
+            rootObject["extractor_warnings"] = .array(warnings.map(JSONValue.string))
+        }
         return .object(rootObject)
     }
 
@@ -252,14 +310,45 @@ public enum ExtractorOrchestrator {
     private static func retainDebugExportIfNeeded(
         _ data: Data,
         root: URL?,
-        filename: String
-    ) throws {
-        guard let root else { return }
+        filename: String,
+        maximumBytes: Int?
+    ) throws -> String? {
+        guard let root else { return nil }
+        if let maximumBytes, data.count > maximumBytes {
+            return [
+                "skipped debug export \(filename): payload \(data.count) bytes",
+                "exceeds limit \(maximumBytes) bytes",
+            ].joined(separator: " ")
+        }
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
         try data.write(
             to: root.appendingPathComponent(filename),
             options: .atomic
         )
+        return nil
+    }
+
+    private static func shouldSkipTimeProfile(
+        schemaName: String,
+        tracePath: URL,
+        maximumTraceBytes: Int64?
+    ) -> String? {
+        guard schemaName == "time-profile", let maximumTraceBytes else { return nil }
+        guard let traceBytes = fileSizeBytes(at: tracePath), traceBytes > maximumTraceBytes else {
+            return nil
+        }
+        return [
+            "skipped time-profile export for \(tracePath.lastPathComponent):",
+            "trace \(traceBytes) bytes exceeds limit \(maximumTraceBytes) bytes",
+        ].joined(separator: " ")
+    }
+
+    private static func fileSizeBytes(at url: URL) -> Int64? {
+        guard
+            let attributes = try? FileManager.default.attributesOfItem(atPath: url.path),
+            let size = attributes[.size] as? NSNumber
+        else { return nil }
+        return size.int64Value
     }
 
     private static func maximumValidDurationNs(for capture: RunManifest.Capture) -> Int {

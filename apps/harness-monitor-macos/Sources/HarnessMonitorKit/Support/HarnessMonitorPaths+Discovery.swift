@@ -33,6 +33,15 @@ extension HarnessMonitorPaths {
   ) -> URL? {
     let containerRoot = appGroupContainerCandidate(using: environment)
     guard let containerRoot else { return nil }
+    let cacheKey = LiveDaemonDiscoveryCache.Key(
+      ownership: ownership.rawValue,
+      containerRootPath: containerRoot.standardizedFileURL.path
+    )
+    if !environment.isXCTestProcess,
+      let cachedRoot = LiveDaemonDiscoveryCache.shared.cachedRoot(for: cacheKey, now: now)
+    {
+      return cachedRoot
+    }
 
     var candidates: [LiveDaemonCandidate] = []
     if let rootCandidate = liveDaemonCandidate(
@@ -66,7 +75,12 @@ extension HarnessMonitorPaths {
       }
     }
 
-    guard !candidates.isEmpty else { return nil }
+    guard !candidates.isEmpty else {
+      if !environment.isXCTestProcess {
+        LiveDaemonDiscoveryCache.shared.store(root: nil, for: cacheKey, now: now)
+      }
+      return nil
+    }
     let chosen = candidates.max { lhs, rhs in lhs.startedAt < rhs.startedAt }
     if candidates.count > 1 {
       let pids = candidates.map { String($0.pid) }.joined(separator: ",")
@@ -79,8 +93,11 @@ extension HarnessMonitorPaths {
         """
       )
     }
-    _ = now
-    return chosen?.dataHomeRoot
+    let chosenRoot = chosen?.dataHomeRoot
+    if !environment.isXCTestProcess {
+      LiveDaemonDiscoveryCache.shared.store(root: chosenRoot, for: cacheKey, now: now)
+    }
+    return chosenRoot
   }
 
   static func defaultPidIsLive(_ pid: Int32) -> Bool {
@@ -145,6 +162,41 @@ private struct LiveDaemonCandidate {
   let dataHomeRoot: URL
   let pid: Int32
   let startedAt: String
+}
+
+private final class LiveDaemonDiscoveryCache: @unchecked Sendable {
+  struct Key: Hashable {
+    let ownership: String
+    let containerRootPath: String
+  }
+
+  static let shared = LiveDaemonDiscoveryCache()
+
+  private struct Entry {
+    let root: URL?
+    let expiresAt: Date
+  }
+
+  private let lock = NSLock()
+  private var entries: [Key: Entry] = [:]
+  private let timeToLive: TimeInterval = 1.0
+
+  func cachedRoot(for key: Key, now: Date) -> URL?? {
+    lock.withLock {
+      guard let entry = entries[key] else { return nil }
+      guard entry.expiresAt > now else {
+        entries[key] = nil
+        return nil
+      }
+      return entry.root
+    }
+  }
+
+  func store(root: URL?, for key: Key, now: Date) {
+    lock.withLock {
+      entries[key] = Entry(root: root, expiresAt: now.addingTimeInterval(timeToLive))
+    }
+  }
 }
 
 private struct DaemonManifestProbe: Decodable {

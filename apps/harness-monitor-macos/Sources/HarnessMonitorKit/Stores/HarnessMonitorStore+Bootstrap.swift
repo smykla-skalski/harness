@@ -94,7 +94,7 @@ extension HarnessMonitorStore {
       guard self.hasBootstrapped == false else {
         return
       }
-      self.refreshBookmarkedSessionIds()
+      await self.refreshBookmarkedSessionIds()
       await self.refreshPersistedSessionMetadata()
       await self.bootstrap()
       self.hasBootstrapped = true

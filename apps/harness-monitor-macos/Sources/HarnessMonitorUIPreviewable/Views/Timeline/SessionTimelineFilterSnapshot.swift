@@ -178,7 +178,6 @@ struct SessionTimelineFilterSnapshot: Equatable, Sendable {
     summary: .empty
   )
 
-  @MainActor
   init(
     nodes sourceNodes: [SessionTimelineNode],
     filters: SessionTimelineFilterState,

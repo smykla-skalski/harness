@@ -17,7 +17,7 @@ import SwiftUI
 /// guards the second failure mode by mutating each field one at a time
 /// and asserting the wrapped router miss-rate flips to 100%. New fields
 /// must extend that test in the same change.
-struct PolicyCanvasRouteContext: Hashable {
+struct PolicyCanvasRouteContext: Hashable, Sendable {
   let lane: Int
   let groups: [PolicyCanvasGroup]
   let sourceGroupID: String?

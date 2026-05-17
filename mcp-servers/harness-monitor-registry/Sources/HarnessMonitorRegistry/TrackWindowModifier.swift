@@ -51,6 +51,7 @@ private struct WindowTrackingRepresentable: NSViewRepresentable {
 final class WindowTrackingNSView: NSView {
   private let syncController: WindowRegistrySyncController
   private let elementSyncController: WindowElementRegistrySyncController
+  private let elementSyncDelay: Duration
   private let didUpdateElementSyncDelay: Duration
   // nonisolated(unsafe) so the nonisolated deinit can read the array and
   // remove observers without `MainActor.assumeIsolated`. Mutations all
@@ -72,10 +73,12 @@ final class WindowTrackingNSView: NSView {
 
   init(
     registry: AccessibilityRegistry,
+    elementSyncDelay: Duration = .milliseconds(250),
     didUpdateElementSyncDelay: Duration = .milliseconds(1500)
   ) {
     syncController = WindowRegistrySyncController(registry: registry)
     elementSyncController = WindowElementRegistrySyncController(registry: registry)
+    self.elementSyncDelay = elementSyncDelay
     self.didUpdateElementSyncDelay = didUpdateElementSyncDelay
     super.init(frame: .zero)
   }
@@ -142,7 +145,13 @@ final class WindowTrackingNSView: NSView {
             window,
             windowGeneration: windowGeneration,
             elementGeneration: elementGeneration,
-            includeElements: true
+            includeElements: false
+          )
+          self.scheduleElementSync(
+            window: window,
+            windowGeneration: windowGeneration,
+            elementGeneration: elementGeneration,
+            delay: self.elementSyncDelay
           )
         }
       }
@@ -173,7 +182,20 @@ final class WindowTrackingNSView: NSView {
       )
       return
     }
-    let delay = didUpdateElementSyncDelay
+    scheduleElementSync(
+      window: window,
+      windowGeneration: windowGeneration,
+      elementGeneration: elementGeneration,
+      delay: didUpdateElementSyncDelay
+    )
+  }
+
+  private func scheduleElementSync(
+    window: NSWindow,
+    windowGeneration: UInt64,
+    elementGeneration: UInt64,
+    delay: Duration
+  ) {
     didUpdateElementSyncTask = Task { @MainActor [weak self, weak window] in
       do {
         try await Task.sleep(for: delay)

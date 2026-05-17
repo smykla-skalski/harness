@@ -36,6 +36,14 @@ public enum Summarizer {
                 let metrics = try JSONValue.fromFile(metricsURL)
                 enriched.metrics = metrics
                 enriched.findings = decode(metrics["findings"], as: [CaptureFinding].self)
+                for warning in stringArray(metrics["extractor_warnings"]) {
+                    appendWarning(
+                        warning,
+                        capture: capture,
+                        captureWarnings: &warnings,
+                        manifestWarnings: &manifestWarnings
+                    )
+                }
             } else {
                 let warning = "metrics file missing: \(metricsURL.path)"
                 warnings.append(warning)
@@ -210,6 +218,26 @@ public enum Summarizer {
             return nil
         }
         return decoded
+    }
+
+    private static func stringArray(_ value: JSONValue?) -> [String] {
+        guard case .array(let values) = value else { return [] }
+        return values.compactMap(\.stringValue)
+    }
+
+    private static func appendWarning(
+        _ warning: String,
+        capture: RunManifest.Capture,
+        captureWarnings: inout [String],
+        manifestWarnings: inout [String]
+    ) {
+        if !captureWarnings.contains(warning) {
+            captureWarnings.append(warning)
+        }
+        let manifestWarning = "\(capture.scenario) (\(capture.template)): \(warning)"
+        if !manifestWarnings.contains(manifestWarning) {
+            manifestWarnings.append(manifestWarning)
+        }
     }
 }
 

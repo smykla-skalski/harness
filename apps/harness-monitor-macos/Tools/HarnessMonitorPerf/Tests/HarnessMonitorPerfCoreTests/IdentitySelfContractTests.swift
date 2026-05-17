@@ -47,6 +47,12 @@ final class IdentitySelfContractTests: XCTestCase {
         // [UUID] derived from filtering TaskBoardItemEditorDraft.externalRefs
         // by provider visibility; UUID values are inherently duplicate-safe.
         "monitorVisibleExternalRefIDs",
+        // Wrapper property over monitorVisibleExternalRefIDs used by the
+        // external refs editor; still UUID-backed and duplicate-safe.
+        "visibleExternalRefIDs",
+        // Policy canvas port indices are stable because ports are fixed for a
+        // node kind and only cloned as a complete ordered list.
+        "ports.indices",
     ]
 
     func testEveryIdSelfSiteUsesAnAllowlistedCollection() throws {

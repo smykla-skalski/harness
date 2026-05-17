@@ -53,7 +53,9 @@ public struct HarnessMonitorBackgroundSelection: Equatable, Identifiable, Sendab
 
   public static let defaultSelection = Self.bundled(.defaultSelection)
   public static let bundledLibrary = HarnessMonitorBackgroundImage.allCases.map(Self.bundled)
-  public static let systemLibrary = HarnessMonitorSystemWallpaper.available.map(Self.system)
+  public static var systemLibrary: [Self] {
+    HarnessMonitorSystemWallpaper.available.map(Self.system)
+  }
 
   public var id: String { storageValue }
 
@@ -109,13 +111,19 @@ public struct HarnessMonitorSystemWallpaper: Equatable, Identifiable, Sendable {
     "system:\(id)"
   }
 
-  public static let available: [Self] = loadAvailable()
+  public static var available: [Self] {
+    HarnessMonitorSystemWallpaperCache.shared.snapshot()
+  }
+
+  public static func loadAvailable() async -> [Self] {
+    await HarnessMonitorSystemWallpaperLoader.shared.available()
+  }
 
   public static func wallpaper(for selectionToken: String) -> Self? {
     available.first { $0.selectionToken == selectionToken }
   }
 
-  private static func loadAvailable() -> [Self] {
+  fileprivate static func loadAvailableFromDisk() -> [Self] {
     let desktopPicturesURL = URL(
       fileURLWithPath: "/System/Library/Desktop Pictures", isDirectory: true)
     guard
@@ -211,6 +219,42 @@ public struct HarnessMonitorSystemWallpaper: Equatable, Identifiable, Sendable {
     let collapsed = mapped.replacingOccurrences(of: "--+", with: "-", options: .regularExpression)
     return collapsed.trimmingCharacters(in: CharacterSet(charactersIn: "-"))
   }
+}
+
+private final class HarnessMonitorSystemWallpaperCache: @unchecked Sendable {
+  static let shared = HarnessMonitorSystemWallpaperCache()
+
+  private let lock = NSLock()
+  private var wallpapers: [HarnessMonitorSystemWallpaper] = []
+
+  func snapshot() -> [HarnessMonitorSystemWallpaper] {
+    lock.withLock { wallpapers }
+  }
+
+  func replace(with nextWallpapers: [HarnessMonitorSystemWallpaper]) {
+    lock.withLock {
+      wallpapers = nextWallpapers
+    }
+  }
+}
+
+public actor HarnessMonitorSystemWallpaperLoader {
+  public static let shared = HarnessMonitorSystemWallpaperLoader()
+
+  private var loadedWallpapers: [HarnessMonitorSystemWallpaper]?
+
+  public func available() -> [HarnessMonitorSystemWallpaper] {
+    if let loadedWallpapers {
+      return loadedWallpapers
+    }
+
+    let loaded = HarnessMonitorSystemWallpaper.loadAvailableFromDisk()
+    loadedWallpapers = loaded
+    HarnessMonitorSystemWallpaperCache.shared.replace(with: loaded)
+    return loaded
+  }
+
+  public func waitForIdle() {}
 }
 
 extension String {
