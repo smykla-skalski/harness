@@ -3,6 +3,7 @@ import SwiftUI
 
 extension EnvironmentValues {
   @Entry var taskBoardOperationsRowLabelFont: Font = .body
+  @Entry var taskBoardOperationsRowLabelWidth: CGFloat = 112
 }
 
 struct TaskBoardActionButtonDescriptor {
@@ -38,8 +39,11 @@ extension TaskBoardOperationsHost {
     content()
   }
 
-  func actionRow<Content: View>(@ViewBuilder content: () -> Content) -> some View {
-    TaskBoardOperationsFormRow("Actions") {
+  func actionRow<Content: View>(
+    showsSeparator: Bool = true,
+    @ViewBuilder content: () -> Content
+  ) -> some View {
+    TaskBoardOperationsFormRow("Actions", showsSeparator: showsSeparator) {
       HarnessMonitorGlassControlGroup(spacing: HarnessMonitorTheme.itemSpacing) {
         HStack(spacing: HarnessMonitorTheme.itemSpacing) {
           content()
@@ -215,22 +219,26 @@ extension TaskBoardOperationsHost {
 struct TaskBoardOperationsCard<Content: View>: View {
   let title: String
   let metrics: TaskBoardOverviewMetrics
+  let footer: String?
   let content: Content
 
   init(
     title: String,
     metrics: TaskBoardOverviewMetrics,
+    footer: String? = nil,
     @ViewBuilder content: () -> Content
   ) {
     self.title = title
     self.metrics = metrics
+    self.footer = footer
     self.content = content()
   }
 
   var body: some View {
     TaskBoardOperationsFormSection(
       title: title,
-      metrics: metrics
+      metrics: metrics,
+      footer: footer
     ) {
       content
     }
@@ -240,17 +248,18 @@ struct TaskBoardOperationsCard<Content: View>: View {
 struct TaskBoardOperationsFormSection<Content: View>: View {
   let title: String
   let metrics: TaskBoardOverviewMetrics
+  let footer: String?
   let content: Content
-  @Environment(\.colorScheme)
-  private var colorScheme
 
   init(
     title: String,
     metrics: TaskBoardOverviewMetrics,
+    footer: String? = nil,
     @ViewBuilder content: () -> Content
   ) {
     self.title = title
     self.metrics = metrics
+    self.footer = footer
     self.content = content()
   }
 
@@ -259,7 +268,7 @@ struct TaskBoardOperationsFormSection<Content: View>: View {
       Text(title)
         .harnessNativeFormSectionHeader()
         .foregroundStyle(HarnessMonitorTheme.secondaryInk)
-        .padding(.leading, TaskBoardOperationsFormMetrics.sectionPadding)
+        .padding(.leading, TaskBoardOperationsFormMetrics.textInset)
 
       VStack(alignment: .leading, spacing: 0) {
         content
@@ -267,18 +276,19 @@ struct TaskBoardOperationsFormSection<Content: View>: View {
       .padding(.horizontal, TaskBoardOperationsFormMetrics.sectionPadding)
       .padding(.bottom, TaskBoardOperationsFormMetrics.sectionPadding)
       .background(
-        sectionShape
-          .fill(sectionBackground)
-          .overlay {
-            if colorScheme == .dark {
-              sectionShape.fill(
-                Color.white.opacity(TaskBoardOperationsFormMetrics.darkSectionHighlightOpacity)
-              )
-            }
-          }
+        sectionShape.fill(TaskBoardOperationsFormMetrics.sectionSurface)
       )
       .overlay {
         sectionShape.strokeBorder(HarnessMonitorTheme.controlBorder.opacity(0.24), lineWidth: 0.5)
+      }
+
+      if let footer {
+        Text(footer)
+          .harnessNativeFormSectionFooter()
+          .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+          .fixedSize(horizontal: false, vertical: true)
+          .padding(.leading, TaskBoardOperationsFormMetrics.textInset)
+          .frame(maxWidth: .infinity, alignment: .leading)
       }
     }
     .frame(
@@ -295,29 +305,35 @@ struct TaskBoardOperationsFormSection<Content: View>: View {
     )
   }
 
-  private var sectionBackground: Color {
-    Color(nsColor: .controlBackgroundColor)
-  }
 }
 
 private enum TaskBoardOperationsFormMetrics {
   static let sectionPadding: CGFloat = HarnessMonitorTheme.spacingMD
+  static let rowHorizontalPadding: CGFloat = HarnessMonitorTheme.spacingSM
+  static let textInset: CGFloat = sectionPadding + rowHorizontalPadding
   static let sectionCornerRadius: CGFloat = 10
-  static let labelWidth: CGFloat = 112
   static let contentMaxWidth: CGFloat = 420
   static let rowMinHeight: CGFloat = 34
   static let rowVerticalPadding: CGFloat = 5
-  static let darkSectionHighlightOpacity = 0.035
+  static let sectionSurface = Color.primary.opacity(0.045)
 }
 
 struct TaskBoardOperationsFormRow<Content: View>: View {
   let title: String
+  let showsSeparator: Bool
   let content: Content
   @Environment(\.taskBoardOperationsRowLabelFont)
   private var labelFont
+  @Environment(\.taskBoardOperationsRowLabelWidth)
+  private var labelWidth
 
-  init(_ title: String, @ViewBuilder content: () -> Content) {
+  init(
+    _ title: String,
+    showsSeparator: Bool = true,
+    @ViewBuilder content: () -> Content
+  ) {
     self.title = title
+    self.showsSeparator = showsSeparator
     self.content = content()
   }
 
@@ -328,7 +344,7 @@ struct TaskBoardOperationsFormRow<Content: View>: View {
         .foregroundStyle(HarnessMonitorTheme.secondaryInk)
         .lineLimit(2)
         .multilineTextAlignment(.leading)
-        .frame(width: TaskBoardOperationsFormMetrics.labelWidth, alignment: .leading)
+        .frame(width: labelWidth, alignment: .leading)
 
       content
         .frame(
@@ -338,15 +354,18 @@ struct TaskBoardOperationsFormRow<Content: View>: View {
         .frame(maxWidth: .infinity, alignment: .trailing)
     }
     .padding(.vertical, TaskBoardOperationsFormMetrics.rowVerticalPadding)
+    .padding(.horizontal, TaskBoardOperationsFormMetrics.rowHorizontalPadding)
     .frame(
       maxWidth: .infinity,
       minHeight: TaskBoardOperationsFormMetrics.rowMinHeight,
       alignment: .leading
     )
     .overlay(alignment: .bottom) {
-      Rectangle()
-        .fill(Color(nsColor: .separatorColor))
-        .frame(height: 0.5)
+      if showsSeparator {
+        Rectangle()
+          .fill(Color(nsColor: .separatorColor))
+          .frame(height: 0.5)
+      }
     }
   }
 }

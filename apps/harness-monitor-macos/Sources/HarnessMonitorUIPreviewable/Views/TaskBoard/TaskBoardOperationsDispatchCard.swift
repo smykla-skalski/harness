@@ -65,7 +65,10 @@ struct TaskBoardOperationsDispatchCard: View, TaskBoardOperationsHost {
 
     return TaskBoardOperationsCard(
       title: "Dispatch",
-      metrics: metrics
+      metrics: metrics,
+      footer: dashboard.taskBoardDispatchSummary == nil
+        ? "Preview dispatch to inspect readiness and resulting session work"
+        : nil
     ) {
       controlRows {
         pickerField(
@@ -130,7 +133,7 @@ struct TaskBoardOperationsDispatchCard: View, TaskBoardOperationsHost {
           .padding(.top, HarnessMonitorTheme.spacingSM)
       }
 
-      actionRow {
+      actionRow(showsSeparator: dashboard.taskBoardDispatchSummary != nil) {
         actionButton(
           TaskBoardActionButtonDescriptor(
             title: dryRun ? "Preview Dispatch" : "Dispatch Live",
@@ -202,10 +205,8 @@ struct TaskBoardOperationsDispatchCard: View, TaskBoardOperationsHost {
           }
           .padding(.top, HarnessMonitorTheme.spacingSM)
         } else {
-          placeholderText("No board items matched the current dispatch filter.")
+          placeholderText("No board items matched the current dispatch filter")
         }
-      } else {
-        placeholderText("Preview dispatch to inspect readiness and resulting session work.")
       }
     }
     .confirmationDialog(
