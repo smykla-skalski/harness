@@ -88,6 +88,7 @@ extension HarnessMonitorStore.SessionIndexSlice {
     let totalBlockedCount: Int
     let sessionSummariesByID: [String: SessionSummary]
     let sessionIndicesByID: [String: Int]
+    let recentSessionIndicesByID: [String: Int]
     let sessionRecordsByID: [String: SessionRecord]
     let projectCatalogs: [ProjectCatalog]
     let orderedSessionIDsBySortOrder: [SessionSortOrder: [String]]
@@ -175,6 +176,7 @@ extension HarnessMonitorStore.SessionIndexSlice {
       sessionRecordsByID: sessionRecordsByID
     )
     let orderedSessionIDsBySortOrder = orderedSessionIDsBySortOrder(from: projectCatalogs)
+    let recentSessions = sortRecentSessions(input.sessions)
     let projectionInput = ProjectionComputationInput(
       projectCatalogs: projectCatalogs,
       sessionRecordsByID: sessionRecordsByID,
@@ -194,46 +196,17 @@ extension HarnessMonitorStore.SessionIndexSlice {
         ($0.sessionId, $0)
       }),
       sessionIndicesByID: sessionIndicesByID,
+      recentSessionIndicesByID: Dictionary(
+        uniqueKeysWithValues: recentSessions.enumerated().map { index, summary in
+          (summary.sessionId, index)
+        }
+      ),
       sessionRecordsByID: sessionRecordsByID,
       projectCatalogs: projectCatalogs,
       orderedSessionIDsBySortOrder: orderedSessionIDsBySortOrder,
-      recentSessions: sortRecentSessions(input.sessions),
+      recentSessions: recentSessions,
       projectionOutput: computeProjectionOutput(from: projectionInput)
     )
-  }
-
-  func sortedSessionIDs(
-    _ sessionIDs: [String],
-    using sortOrder: SessionSortOrder
-  ) -> [String] {
-    sessionIDs.sorted { lhsID, rhsID in
-      guard let lhs = sessionRecordsByID[lhsID],
-        let rhs = sessionRecordsByID[rhsID]
-      else {
-        return lhsID < rhsID
-      }
-
-      switch sortOrder {
-      case .recentActivity:
-        if lhs.recentActivitySortKey != rhs.recentActivitySortKey {
-          return lhs.recentActivitySortKey > rhs.recentActivitySortKey
-        }
-      case .name:
-        let nameComparison = lhs.normalizedName.localizedStandardCompare(rhs.normalizedName)
-        if nameComparison != .orderedSame {
-          return nameComparison == .orderedAscending
-        }
-      case .status:
-        if lhs.statusSortKey != rhs.statusSortKey {
-          return lhs.statusSortKey < rhs.statusSortKey
-        }
-        if lhs.recentActivitySortKey != rhs.recentActivitySortKey {
-          return lhs.recentActivitySortKey > rhs.recentActivitySortKey
-        }
-      }
-
-      return lhs.summary.sessionId < rhs.summary.sessionId
-    }
   }
 
   nonisolated static func sortedSessionIDs(
@@ -269,10 +242,6 @@ extension HarnessMonitorStore.SessionIndexSlice {
 
       return lhs.summary.sessionId < rhs.summary.sessionId
     }
-  }
-
-  func sortRecentSessions(_ sessions: [SessionSummary]) -> [SessionSummary] {
-    Self.sortRecentSessions(sessions)
   }
 
   nonisolated static func sortRecentSessions(_ sessions: [SessionSummary]) -> [SessionSummary] {
@@ -358,28 +327,6 @@ extension HarnessMonitorStore.SessionIndexSlice {
     )
   }
 
-  func replacingSession(
-    _ updatedSummary: SessionSummary,
-    in sessions: [SessionSummary]
-  ) -> [SessionSummary] {
-    sessions.map { session in
-      session.sessionId == updatedSummary.sessionId ? updatedSummary : session
-    }
-  }
-
-  func matchesCurrentFilters(_ record: SessionRecord) -> Bool {
-    controls.sessionFilter.includes(record.summary.status)
-      && controls.sessionFocusFilter.includes(record.summary)
-      && searchMatches(record)
-  }
-
-  func searchMatches(_ record: SessionRecord) -> Bool {
-    guard !queryTokens.isEmpty else {
-      return true
-    }
-    return queryTokens.allSatisfy(record.normalizedSearchCorpus.contains)
-  }
-
   nonisolated static func matchesFilters(
     _ record: SessionRecord,
     using input: ProjectionComputationInput
@@ -449,17 +396,6 @@ extension HarnessMonitorStore.SessionIndexSlice {
       || existing.isWorktree != updated.isWorktree
   }
 
-  func requiresOrderingRefresh(
-    from existing: SessionSummary,
-    to updated: SessionSummary
-  ) -> Bool {
-    let existingRecord = SessionRecord(summary: existing)
-    let updatedRecord = SessionRecord(summary: updated)
-    return existingRecord.normalizedName != updatedRecord.normalizedName
-      || existingRecord.statusSortKey != updatedRecord.statusSortKey
-      || existingRecord.recentActivitySortKey != updatedRecord.recentActivitySortKey
-  }
-
   func summaryChangeImpact(
     from existing: SessionSummary,
     to updated: SessionSummary
@@ -481,55 +417,6 @@ extension HarnessMonitorStore.SessionIndexSlice {
       || existing.metrics.blockedTaskCount != updated.metrics.blockedTaskCount
 
     return affectsProjection ? .projection : .summaryOnly
-  }
-
-  func patchProjectCatalogOrderings(
-    for updatedSummary: SessionSummary
-  ) {
-    guard
-      let projectIndex = projectCatalogs.firstIndex(where: {
-        $0.project.projectId == updatedSummary.projectId
-      })
-    else {
-      return
-    }
-    guard
-      let checkoutIndex = projectCatalogs[projectIndex].checkouts.firstIndex(where: {
-        $0.checkoutId == updatedSummary.checkoutId
-      })
-    else {
-      return
-    }
-
-    let projectCatalog = projectCatalogs[projectIndex]
-    let checkout = projectCatalog.checkouts[checkoutIndex]
-    let memberSessionIDs = checkout.recentActivitySessionIDs
-
-    var updatedCheckouts = projectCatalog.checkouts
-    updatedCheckouts[checkoutIndex] = CheckoutCatalog(
-      checkoutId: checkout.checkoutId,
-      title: checkout.title,
-      isWorktree: checkout.isWorktree,
-      recentActivitySessionIDs: sortedSessionIDs(
-        memberSessionIDs,
-        using: .recentActivity
-      ),
-      nameSessionIDs: sortedSessionIDs(
-        memberSessionIDs,
-        using: .name
-      ),
-      statusSessionIDs: sortedSessionIDs(
-        memberSessionIDs,
-        using: .status
-      )
-    )
-
-    var updatedProjectCatalogs = projectCatalogs
-    updatedProjectCatalogs[projectIndex] = ProjectCatalog(
-      project: projectCatalog.project,
-      checkouts: updatedCheckouts
-    )
-    projectCatalogs = updatedProjectCatalogs
   }
 
   nonisolated static func normalizedSearchCorpus(for summary: SessionSummary) -> String {

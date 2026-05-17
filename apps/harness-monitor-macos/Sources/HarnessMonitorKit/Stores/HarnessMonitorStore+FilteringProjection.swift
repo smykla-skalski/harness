@@ -32,6 +32,10 @@ extension HarnessMonitorStore {
     sessionIndex.flushPendingSearchRebuild()
   }
 
+  public func waitForSessionIndexIdle() async {
+    await sessionIndex.waitForIdle()
+  }
+
   public var sessionFilter: SessionFilter {
     get { sessionIndex.sessionFilter }
     set { sessionIndex.sessionFilter = newValue }

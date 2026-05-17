@@ -21,6 +21,7 @@ extension HarnessMonitorStore {
     @ObservationIgnored var suppressRefresh = false
     @ObservationIgnored var sessionRecordsByID: [String: SessionRecord] = [:]
     @ObservationIgnored var sessionIndicesByID: [String: Int] = [:]
+    @ObservationIgnored var recentSessionIndicesByID: [String: Int] = [:]
     @ObservationIgnored var projectCatalogs: [ProjectCatalog] = []
     @ObservationIgnored var orderedSessionIDsBySortOrder: [SessionSortOrder: [String]] = [:]
     @ObservationIgnored var queryTokens: [String] = []
@@ -135,10 +136,8 @@ extension HarnessMonitorStore {
           return false
         }
 
-        var updated = catalog.sessions
-        updated[index] = summary
         suppressRefresh = true
-        catalog.sessions = updated
+        catalog.sessions[index] = summary
         suppressRefresh = false
 
         switch summaryChangeImpact(from: existing, to: summary) {
@@ -155,10 +154,8 @@ extension HarnessMonitorStore {
         return true
       }
 
-      var updated = catalog.sessions
-      updated.append(summary)
       suppressRefresh = true
-      catalog.sessions = updated
+      catalog.sessions.append(summary)
       suppressRefresh = false
       cancelPendingSearchRebuild()
       rebuildCatalogAndProjection(change: .snapshot)
@@ -171,6 +168,22 @@ extension HarnessMonitorStore {
       }
       cancelPendingSearchRebuild()
       rebuildProjection(change: .projection)
+    }
+
+    public func waitForIdle() async {
+      while true {
+        let pendingTasks = [
+          searchRebuildTask,
+          projectionComputationTask,
+        ].compactMap(\.self)
+        guard !pendingTasks.isEmpty else {
+          await sessionIndexWorker.waitForIdle()
+          return
+        }
+        for task in pendingTasks {
+          await task.value
+        }
+      }
     }
 
     public func sessionSummary(for sessionID: String?) -> SessionSummary? {
