@@ -39,7 +39,8 @@ extension HarnessMonitorStore {
     protectedDecisionIDs: Set<String>,
     generation: UInt64
   ) async {
-    let payloads = await acpRuntimeWorker.sortedPermissionDecisionPayloads(payloads)
+    let payloadState = await acpRuntimeWorker.permissionDecisionSyncPayloadState(payloads)
+    let payloads = payloadState.sortedPayloads
     var didPresentFailure = false
     let isCurrentGeneration = {
       generation == self.acpPermissionDecisionSyncGeneration
@@ -69,11 +70,11 @@ extension HarnessMonitorStore {
     guard !Task.isCancelled, isCurrentGeneration() else {
       return
     }
-    let staleACPDecisionIDs: Set<String>
+    let staleACPDecisionIDs: [String]
     do {
       staleACPDecisionIDs = try await staleAcpDecisionIDs(
         in: decisionStore,
-        activeDecisionIDs: Set(payloads.map { $0.decisionID }),
+        activeDecisionIDs: payloadState.activeDecisionIDs,
         staleDecisionIDs: staleDecisionIDs,
         protectedDecisionIDs: protectedDecisionIDs
       )
@@ -125,19 +126,19 @@ extension HarnessMonitorStore {
     activeDecisionIDs: Set<String>,
     staleDecisionIDs: Set<String>,
     protectedDecisionIDs: Set<String>
-  ) async throws -> Set<String> {
-    let openDecisions = try await decisionStore.openDecisions()
-    return Set(
-      openDecisions
-        .filter { $0.ruleID == AcpPermissionDecisionPayload.ruleID }
-        .map(\.id)
+  ) async throws -> [String] {
+    let openACPDecisionIDs = try await decisionStore.openDecisionIDs(
+      ruleID: AcpPermissionDecisionPayload.ruleID
     )
-    .subtracting(activeDecisionIDs)
-    .union(staleDecisionIDs)
-    .subtracting(protectedDecisionIDs)
-    .subtracting(acpPermissionPendingTimeoutDecisionIDs)
-    .subtracting(acpPermissionPendingShutdownDecisionIDs)
-    .subtracting(Set(acpPermissionTerminalOutcomesByID.keys))
+    return await acpRuntimeWorker.stalePermissionDecisionIDs(
+      openDecisionIDs: openACPDecisionIDs,
+      activeDecisionIDs: activeDecisionIDs,
+      staleDecisionIDs: staleDecisionIDs,
+      protectedDecisionIDs: protectedDecisionIDs,
+      pendingTimeoutDecisionIDs: acpPermissionPendingTimeoutDecisionIDs,
+      pendingShutdownDecisionIDs: acpPermissionPendingShutdownDecisionIDs,
+      terminalDecisionIDs: Set(acpPermissionTerminalOutcomesByID.keys)
+    )
   }
 
   func invalidateAcpPermissionDecisionSync() {

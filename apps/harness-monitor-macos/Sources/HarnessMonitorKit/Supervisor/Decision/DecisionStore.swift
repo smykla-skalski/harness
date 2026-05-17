@@ -213,6 +213,25 @@ public actor DecisionStore {
     }
   }
 
+  nonisolated public func openDecisionIDs(ruleID: String) async throws -> Set<String> {
+    try await withReadContext { context in
+      let descriptor = FetchDescriptor<Decision>(
+        sortBy: [SortDescriptor(\.createdAt, order: .reverse)]
+      )
+      let rows = try context.fetch(descriptor)
+      let now = self.now()
+      var ids = Set<String>()
+      ids.reserveCapacity(rows.count)
+      for decision in rows {
+        guard decision.ruleID == ruleID, self.isOpen(decision, now: now) else {
+          continue
+        }
+        ids.insert(decision.id)
+      }
+      return ids
+    }
+  }
+
   nonisolated public func openSurfaceSnapshot() async throws -> OpenSurfaceSnapshot {
     try await openSurfaceSnapshot(including: { _ in true })
   }
