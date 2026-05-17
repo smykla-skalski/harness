@@ -1,12 +1,16 @@
 import HarnessMonitorKit
 import SwiftUI
 
+private let settingsDiagnosticsSnapshotWorker = SettingsDiagnosticsSnapshotWorker()
+
 public struct SettingsView: View {
   let store: HarnessMonitorStore
   let notifications: HarnessMonitorUserNotificationController
   @Binding var themeMode: HarnessMonitorThemeMode
   @Binding var selectedSection: SettingsSection
   @State private var selectedSupervisorPane: SupervisorPaneKey = .rules
+  @State private var preparedDiagnosticsInput: SettingsDiagnosticsSnapshotInput?
+  @State private var preparedDiagnosticsSnapshot: SettingsDiagnosticsSnapshot?
 
   public init(
     store: HarnessMonitorStore,
@@ -74,17 +78,28 @@ public struct SettingsView: View {
         case .database:
           SettingsDatabaseSection(store: store)
         case .diagnostics:
-          let snapshot = SettingsDiagnosticsSnapshot(store: store)
-          SettingsDiagnosticsSection(
-            snapshot: snapshot,
-            revealPermissionLog: { runID, path in
-              guard let path, !path.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
-                return .unavailable
-              }
-              return store.revealAcpPermissionLogInFinder(runID: runID, rawPath: path)
-            },
-            repairLaunchAgent: { await store.repairLaunchAgent() }
-          )
+          let input = SettingsDiagnosticsSnapshotInput(store: store)
+          Group {
+            if preparedDiagnosticsInput == input, let snapshot = preparedDiagnosticsSnapshot {
+              SettingsDiagnosticsSection(
+                snapshot: snapshot,
+                revealPermissionLog: { runID, path in
+                  guard let path, !path.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                  else {
+                    return .unavailable
+                  }
+                  return store.revealAcpPermissionLogInFinder(runID: runID, rawPath: path)
+                },
+                repairLaunchAgent: { await store.repairLaunchAgent() }
+              )
+            } else {
+              ProgressView("Loading diagnostics...")
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            }
+          }
+          .task(id: input) {
+            await syncDiagnosticsSnapshot(input: input)
+          }
         }
       }
       .harnessMonitorBackgroundExtensionEffect()
@@ -109,6 +124,15 @@ public struct SettingsView: View {
       )
     }
     .accessibilityFrameMarker(HarnessMonitorAccessibility.settingsPanel)
+  }
+
+  @MainActor
+  private func syncDiagnosticsSnapshot(input: SettingsDiagnosticsSnapshotInput) async {
+    guard preparedDiagnosticsInput != input else { return }
+    let snapshot = await settingsDiagnosticsSnapshotWorker.prepare(input: input)
+    guard !Task.isCancelled else { return }
+    preparedDiagnosticsInput = input
+    preparedDiagnosticsSnapshot = snapshot
   }
 
   @ToolbarContentBuilder private var settingsToolbarItems: some ToolbarContent {

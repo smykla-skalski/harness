@@ -1,8 +1,8 @@
 import HarnessMonitorKit
 import SwiftUI
 
-public struct SettingsDiagnosticsSnapshot {
-  public struct AcpPermissionLogRun: Equatable, Identifiable {
+public struct SettingsDiagnosticsSnapshot: Sendable {
+  public struct AcpPermissionLogRun: Equatable, Identifiable, Sendable {
     public let id: String
     public let sessionID: String
     public let displayName: String
@@ -23,34 +23,30 @@ public struct SettingsDiagnosticsSnapshot {
   public let recentEvents: [DaemonAuditEvent]
   public let acpPermissionLogRuns: [AcpPermissionLogRun]
 
-  @MainActor
-  public init(store: HarnessMonitorStore) {
-    let workspaceDiagnostics = store.diagnostics?.workspace ?? store.daemonStatus?.diagnostics
-    let launchAgent = store.daemonStatus?.launchAgent
-
-    self.launchAgent = launchAgent
-    mcpStatus = store.mcpStatus
-    tokenPresent = workspaceDiagnostics?.authTokenPresent ?? false
-    projectCount = store.daemonStatus?.projectCount ?? store.projects.count
+  public init(input: SettingsDiagnosticsSnapshotInput) {
+    launchAgent = input.launchAgent
+    mcpStatus = input.mcpStatus
+    tokenPresent = input.workspaceDiagnostics?.authTokenPresent ?? false
+    projectCount = input.daemonProjectCount ?? input.projects.count
     worktreeCount =
-      store.daemonStatus?.worktreeCount
-      ?? store.projects.reduce(0) { $0 + $1.worktrees.count }
-    sessionCount = store.daemonStatus?.sessionCount ?? store.sessions.count
-    externalSessionCount = store.sessions.filter { $0.externalOrigin != nil }.count
-    lastExternalSessionAttachOutcome = store.lastExternalSessionAttachOutcome?.message
-    lastExternalSessionAttachSucceeded = store.lastExternalSessionAttachOutcome?.succeeded
-    lastEvent = workspaceDiagnostics?.lastEvent
+      input.daemonWorktreeCount
+      ?? input.projects.reduce(0) { $0 + $1.worktrees.count }
+    sessionCount = input.daemonSessionCount ?? input.sessions.count
+    externalSessionCount = input.sessions.filter { $0.externalOrigin != nil }.count
+    lastExternalSessionAttachOutcome = input.lastExternalSessionAttachOutcome
+    lastExternalSessionAttachSucceeded = input.lastExternalSessionAttachSucceeded
+    lastEvent = input.workspaceDiagnostics?.lastEvent
     paths = SettingsDiagnosticsPaths(
-      launchAgentPath: launchAgent?.path ?? "Unavailable",
-      launchAgentDomain: launchAgent?.domainTarget,
-      launchAgentService: launchAgent?.serviceTarget,
-      manifestPath: workspaceDiagnostics?.manifestPath ?? "Unavailable",
-      authTokenPath: workspaceDiagnostics?.authTokenPath ?? "Unavailable",
-      eventsPath: workspaceDiagnostics?.eventsPath ?? "Unavailable",
-      databasePath: workspaceDiagnostics?.databasePath ?? "Unavailable"
+      launchAgentPath: input.launchAgent?.path ?? "Unavailable",
+      launchAgentDomain: input.launchAgent?.domainTarget,
+      launchAgentService: input.launchAgent?.serviceTarget,
+      manifestPath: input.workspaceDiagnostics?.manifestPath ?? "Unavailable",
+      authTokenPath: input.workspaceDiagnostics?.authTokenPath ?? "Unavailable",
+      eventsPath: input.workspaceDiagnostics?.eventsPath ?? "Unavailable",
+      databasePath: input.workspaceDiagnostics?.databasePath ?? "Unavailable"
     )
-    recentEvents = Array((store.diagnostics?.recentEvents ?? []).prefix(10))
-    acpPermissionLogRuns = store.selectedAcpInspectAgents
+    recentEvents = Array(input.recentEvents.prefix(10))
+    acpPermissionLogRuns = input.selectedAcpInspectAgents
       .map { snapshot in
         AcpPermissionLogRun(
           id: snapshot.acpId,
@@ -66,6 +62,96 @@ public struct SettingsDiagnosticsSnapshot {
         return left.id < right.id
       }
   }
+
+  @MainActor
+  public init(store: HarnessMonitorStore) {
+    let workspaceDiagnostics = store.diagnostics?.workspace ?? store.daemonStatus?.diagnostics
+    self.init(
+      input: SettingsDiagnosticsSnapshotInput(
+        workspaceDiagnostics: workspaceDiagnostics,
+        launchAgent: store.daemonStatus?.launchAgent,
+        mcpStatus: store.mcpStatus,
+        daemonProjectCount: store.daemonStatus?.projectCount,
+        daemonWorktreeCount: store.daemonStatus?.worktreeCount,
+        daemonSessionCount: store.daemonStatus?.sessionCount,
+        projects: store.projects,
+        sessions: store.sessions,
+        lastExternalSessionAttachOutcome: store.lastExternalSessionAttachOutcome?.message,
+        lastExternalSessionAttachSucceeded: store.lastExternalSessionAttachOutcome?.succeeded,
+        recentEvents: store.diagnostics?.recentEvents ?? [],
+        selectedAcpInspectAgents: store.selectedAcpInspectAgents
+      )
+    )
+  }
+}
+
+public struct SettingsDiagnosticsSnapshotInput: Equatable, Sendable {
+  public let workspaceDiagnostics: DaemonDiagnostics?
+  public let launchAgent: LaunchAgentStatus?
+  public let mcpStatus: HarnessMonitorMCPStatusSnapshot
+  public let daemonProjectCount: Int?
+  public let daemonWorktreeCount: Int?
+  public let daemonSessionCount: Int?
+  public let projects: [ProjectSummary]
+  public let sessions: [SessionSummary]
+  public let lastExternalSessionAttachOutcome: String?
+  public let lastExternalSessionAttachSucceeded: Bool?
+  public let recentEvents: [DaemonAuditEvent]
+  public let selectedAcpInspectAgents: [AcpAgentInspectSnapshot]
+
+  @MainActor
+  public init(store: HarnessMonitorStore) {
+    self.init(
+      workspaceDiagnostics: store.diagnostics?.workspace ?? store.daemonStatus?.diagnostics,
+      launchAgent: store.daemonStatus?.launchAgent,
+      mcpStatus: store.mcpStatus,
+      daemonProjectCount: store.daemonStatus?.projectCount,
+      daemonWorktreeCount: store.daemonStatus?.worktreeCount,
+      daemonSessionCount: store.daemonStatus?.sessionCount,
+      projects: store.projects,
+      sessions: store.sessions,
+      lastExternalSessionAttachOutcome: store.lastExternalSessionAttachOutcome?.message,
+      lastExternalSessionAttachSucceeded: store.lastExternalSessionAttachOutcome?.succeeded,
+      recentEvents: store.diagnostics?.recentEvents ?? [],
+      selectedAcpInspectAgents: store.selectedAcpInspectAgents
+    )
+  }
+
+  public init(
+    workspaceDiagnostics: DaemonDiagnostics?,
+    launchAgent: LaunchAgentStatus?,
+    mcpStatus: HarnessMonitorMCPStatusSnapshot,
+    daemonProjectCount: Int?,
+    daemonWorktreeCount: Int?,
+    daemonSessionCount: Int?,
+    projects: [ProjectSummary],
+    sessions: [SessionSummary],
+    lastExternalSessionAttachOutcome: String?,
+    lastExternalSessionAttachSucceeded: Bool?,
+    recentEvents: [DaemonAuditEvent],
+    selectedAcpInspectAgents: [AcpAgentInspectSnapshot]
+  ) {
+    self.workspaceDiagnostics = workspaceDiagnostics
+    self.launchAgent = launchAgent
+    self.mcpStatus = mcpStatus
+    self.daemonProjectCount = daemonProjectCount
+    self.daemonWorktreeCount = daemonWorktreeCount
+    self.daemonSessionCount = daemonSessionCount
+    self.projects = projects
+    self.sessions = sessions
+    self.lastExternalSessionAttachOutcome = lastExternalSessionAttachOutcome
+    self.lastExternalSessionAttachSucceeded = lastExternalSessionAttachSucceeded
+    self.recentEvents = recentEvents
+    self.selectedAcpInspectAgents = selectedAcpInspectAgents
+  }
+}
+
+actor SettingsDiagnosticsSnapshotWorker {
+  func prepare(input: SettingsDiagnosticsSnapshotInput) -> SettingsDiagnosticsSnapshot {
+    SettingsDiagnosticsSnapshot(input: input)
+  }
+
+  func waitForIdle() async {}
 }
 
 public struct SettingsDiagnosticsSection: View {
