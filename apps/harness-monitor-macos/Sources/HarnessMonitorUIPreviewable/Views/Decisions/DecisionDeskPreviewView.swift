@@ -1,6 +1,8 @@
 import HarnessMonitorKit
 import SwiftUI
 
+private let decisionDeskDetailPreparationWorker = DecisionDetailPreparationWorker()
+
 public struct DecisionDeskPreviewView: View {
   private let store: HarnessMonitorStore?
 
@@ -19,6 +21,8 @@ public struct DecisionDeskPreviewView: View {
   @State private var pendingDismissBatch: DecisionDismissBatchSnapshot?
   @State private var showDismissAllVisibleConfirmation = false
   @State private var reopenBatch: DecisionReopenBatchState?
+  @State private var cachedDetailViewModel: DecisionDetailViewModel?
+  @State private var cachedDetailViewModelInput: DecisionDetailViewModel.PreparationInput?
 
   @State private var inspectorVisible = false
 
@@ -50,6 +54,17 @@ public struct DecisionDeskPreviewView: View {
 
   private var selectedDecision: Decision? {
     decisionWorkspaceScope.selectedDecision
+  }
+
+  private var selectedDecisionPreparationInput: DecisionDetailViewModel.PreparationInput? {
+    selectedDecision.map(DecisionDetailViewModel.PreparationInput.init(decision:))
+  }
+
+  private var currentDetailViewModel: DecisionDetailViewModel? {
+    guard cachedDetailViewModelInput == selectedDecisionPreparationInput else {
+      return nil
+    }
+    return cachedDetailViewModel
   }
 
   private var openDecisionCount: Int { decisionWorkspaceScope.totalCount }
@@ -91,11 +106,10 @@ public struct DecisionDeskPreviewView: View {
   }
 
   @ViewBuilder private var detailColumn: some View {
-    if let selectedDecision {
+    if selectedDecision != nil {
       DecisionDetailView(
-        decision: selectedDecision,
+        viewModel: currentDetailViewModel,
         store: store,
-        handler: actionHandler,
         auditEvents: runtime.auditEvents,
         auditEventPayloadPresentations: runtime.auditEventPayloadPresentations,
         selectedTab: $detailTab,
@@ -153,6 +167,9 @@ public struct DecisionDeskPreviewView: View {
     }
     .task(id: presentationTaskKey) {
       await rebuildPresentation()
+    }
+    .task(id: selectedDecisionPreparationInput) {
+      await syncSelectedDecisionViewModel()
     }
     .onChange(of: store?.supervisorSelectedDecisionID) { _, requestedID in
       guard let requestedID else {
@@ -436,6 +453,33 @@ public struct DecisionDeskPreviewView: View {
     let firstDecisionID = runtime.decisions.first?.id
     selection = firstDecisionID
     store?.supervisorSelectedDecisionID = firstDecisionID
+  }
+
+  @MainActor
+  private func syncSelectedDecisionViewModel() async {
+    guard let selectedDecision, let input = selectedDecisionPreparationInput else {
+      if cachedDetailViewModel != nil {
+        cachedDetailViewModel = nil
+        cachedDetailViewModelInput = nil
+      }
+      return
+    }
+    guard
+      cachedDetailViewModel?.decision.id != selectedDecision.id
+        || cachedDetailViewModelInput != input
+    else {
+      return
+    }
+    let preparedContent = await decisionDeskDetailPreparationWorker.prepare(input: input)
+    guard !Task.isCancelled else {
+      return
+    }
+    cachedDetailViewModel = DecisionDetailViewModel(
+      decision: selectedDecision,
+      handler: actionHandler,
+      preparedContent: preparedContent
+    )
+    cachedDetailViewModelInput = input
   }
 
   @MainActor

@@ -50,6 +50,38 @@ final class DecisionDetailViewModelTests: XCTestCase {
     XCTAssertEqual(viewModel.suggestedActions.last?.title, "Dismiss")
   }
 
+  func test_preparationWorkerMatchesSynchronousParsing() async {
+    let actions = [
+      SuggestedAction(id: "accept", title: "Accept", kind: .custom, payloadJSON: "{}")
+    ]
+    let contextJSON = """
+      {
+        "snapshotExcerpt": "agent=agent-1 idle=720s",
+        "relatedTimeline": ["signal.sent: 12:01"]
+      }
+      """
+    let decision = makeDecision(
+      sessionID: "sess-12",
+      agentID: "agent-7",
+      taskID: "task-99",
+      contextJSON: contextJSON,
+      suggestedActionsJSON: encodedActions(actions)
+    )
+    let worker = DecisionDetailPreparationWorker()
+
+    let prepared = await worker.prepare(
+      input: DecisionDetailViewModel.PreparationInput(decision: decision)
+    )
+    let viewModel = DecisionDetailViewModel(
+      decision: decision,
+      handler: RecordingDecisionActionHandler()
+    )
+
+    XCTAssertEqual(prepared.suggestedActions, viewModel.suggestedActions)
+    XCTAssertEqual(prepared.contextSections, viewModel.contextSections)
+    XCTAssertEqual(prepared.deeplinks, viewModel.deeplinks)
+  }
+
   func test_parsesContextSectionsFromJSON() {
     let contextJSON = """
       {

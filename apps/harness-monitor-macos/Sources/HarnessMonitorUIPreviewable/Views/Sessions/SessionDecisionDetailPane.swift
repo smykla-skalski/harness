@@ -1,6 +1,8 @@
 import HarnessMonitorKit
 import SwiftUI
 
+private let sessionDecisionDetailPreparationWorker = DecisionDetailPreparationWorker()
+
 // Detail owns the decision body, routing, and suggested actions users act on.
 // The inspector stays supplementary: orthogonal context and prior touches only.
 struct SessionDecisionDetailPane: View {
@@ -30,6 +32,18 @@ struct SessionDecisionDetailPane: View {
   // evictor (191 incoming edges in the post-fix trace), and (b) defeat the
   // fine-grained property tracking @Observable is supposed to provide.
   @State private var cachedViewModel: DecisionDetailViewModel?
+  @State private var cachedViewModelInput: DecisionDetailViewModel.PreparationInput?
+
+  private var preparationInput: DecisionDetailViewModel.PreparationInput? {
+    decision.map(DecisionDetailViewModel.PreparationInput.init(decision:))
+  }
+
+  private var currentViewModel: DecisionDetailViewModel? {
+    guard cachedViewModelInput == preparationInput else {
+      return nil
+    }
+    return cachedViewModel
+  }
 
   var body: some View {
     VStack(alignment: .leading, spacing: metrics.sectionSpacing) {
@@ -43,7 +57,7 @@ struct SessionDecisionDetailPane: View {
       // previously produced `_ConditionalContent<DecisionDetailView,
       // DecisionDetailView>` and tore down @FocusState on every flip.
       DecisionDetailView(
-        viewModel: cachedViewModel,
+        viewModel: currentViewModel,
         store: store,
         auditEvents: auditEvents,
         auditEventPayloadPresentations: auditEventPayloadPresentations,
@@ -56,24 +70,33 @@ struct SessionDecisionDetailPane: View {
     }
     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     .dynamicTypeSize(.xSmall ... .accessibility5)
-    .task(id: decision?.id) {
-      syncCachedViewModel()
+    .task(id: preparationInput) {
+      await syncCachedViewModel()
     }
   }
 
-  private func syncCachedViewModel() {
-    guard let decision else {
+  @MainActor
+  private func syncCachedViewModel() async {
+    guard let decision, let input = preparationInput else {
       if cachedViewModel != nil {
         cachedViewModel = nil
+        cachedViewModelInput = nil
       }
       return
     }
-    if cachedViewModel?.decision.id != decision.id {
-      cachedViewModel = DecisionDetailViewModel(
-        decision: decision,
-        handler: actionHandler
-      )
+    guard cachedViewModel?.decision.id != decision.id || cachedViewModelInput != input else {
+      return
     }
+    let preparedContent = await sessionDecisionDetailPreparationWorker.prepare(input: input)
+    guard !Task.isCancelled else {
+      return
+    }
+    cachedViewModel = DecisionDetailViewModel(
+      decision: decision,
+      handler: actionHandler,
+      preparedContent: preparedContent
+    )
+    cachedViewModelInput = input
   }
 }
 
