@@ -50,6 +50,14 @@ public final class HarnessMonitorStore {
   public var lastExternalSessionAttachOutcome: ExternalSessionAttachOutcome?
   public var supervisorSelectedDecisionID: String?
   public var supervisorOpenDecisions: [Decision] = []
+  public var supervisorOpenDecisionsByID: [String: Decision] = [:]
+  public var supervisorOpenDecisionPresentationItems: [DecisionPresentationSnapshot] = []
+  public var supervisorOpenDecisionPresentationItemsBySession:
+    [String: [DecisionPresentationSnapshot]] = [:]
+  public var supervisorOpenDecisionSearchProjections: [DecisionSearchProjection] = []
+  public var supervisorOpenDecisionSearchProjectionsBySession:
+    [String: [DecisionSearchProjection]] = [:]
+  public var supervisorOpenDecisionIDsBySession: [String: [String]] = [:]
   public var supervisorDecisionRefreshTick: Int = 0
   public internal(set) var supervisorLiveTickRefreshTick: Int = 0
   public internal(set) var supervisorRuntimeState: SupervisorRuntimeState = .stopped

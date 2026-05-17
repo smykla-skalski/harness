@@ -31,8 +31,10 @@ struct SessionWindowCodexRunTranscriptRefreshKey: Equatable {
 
 struct SessionWindowDecisionCacheStorage {
   var allSessionDecisions: [Decision] = []
+  var allSessionDecisionPresentationItems: [DecisionPresentationSnapshot] = []
   var allSessionDecisionSearchProjections: [DecisionSearchProjection] = []
   var matchingDecisions: [Decision] = []
+  var matchingDecisionPresentationItems: [DecisionPresentationSnapshot] = []
   var allSessionDecisionIDs: Set<String> = []
   var matchingDecisionIDs: Set<String> = []
   var matchingDecisionIDsInOrder: [String] = []

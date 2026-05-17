@@ -2,29 +2,7 @@ import Foundation
 import HarnessMonitorKit
 import OSLog
 
-struct DecisionPresentationItem: Equatable, Sendable, Identifiable {
-  let id: String
-  let sessionID: String?
-  let severityRaw: String
-  let summary: String
-  let ruleID: String
-  let agentID: String?
-  let taskID: String?
-  let createdAt: Date
-  let statusRaw: String
-
-  init(decision: Decision) {
-    id = decision.id
-    sessionID = decision.sessionID
-    severityRaw = decision.severityRaw
-    summary = decision.summary
-    ruleID = decision.ruleID
-    agentID = decision.agentID
-    taskID = decision.taskID
-    createdAt = decision.createdAt
-    statusRaw = decision.statusRaw
-  }
-}
+typealias DecisionPresentationItem = DecisionPresentationSnapshot
 
 public struct DecisionsSidebarPresentationGroup: Equatable, Sendable, Identifiable {
   public let sessionID: String?

@@ -11,8 +11,27 @@ struct MonitorTimelineSection: View {
   let timeline: [TimelineEntry]
   let timelineWindow: TimelineWindowResponse?
   let decisions: [Decision]
+  let decisionSnapshots: [DecisionPresentationSnapshot]?
   let isTimelineLoading: Bool
   let store: HarnessMonitorStore
+
+  init(
+    host: MonitorTimelineHost,
+    timeline: [TimelineEntry],
+    timelineWindow: TimelineWindowResponse?,
+    decisions: [Decision],
+    decisionSnapshots: [DecisionPresentationSnapshot]? = nil,
+    isTimelineLoading: Bool,
+    store: HarnessMonitorStore
+  ) {
+    self.host = host
+    self.timeline = timeline
+    self.timelineWindow = timelineWindow
+    self.decisions = decisions
+    self.decisionSnapshots = decisionSnapshots
+    self.isTimelineLoading = isTimelineLoading
+    self.store = store
+  }
 
   var body: some View {
     SessionTimelineView(
@@ -21,6 +40,7 @@ struct MonitorTimelineSection: View {
       timeline: timeline,
       timelineWindow: timelineWindow,
       decisions: decisions,
+      decisionSnapshots: decisionSnapshots,
       isTimelineLoading: isTimelineLoading,
       store: store
     )

@@ -135,25 +135,26 @@ extension HarnessMonitorStore {
   }
 
   private func refreshSupervisorDecisionSurfaces(decisions: DecisionStore) async {
-    let openDecisions =
-      ((try? await decisions.openDecisions()) ?? [])
-      .filter { isSupervisorSurfaceDecision($0) }
-    var counts: [DecisionSeverity: Int] = [:]
-    for decision in openDecisions {
-      guard let severity = DecisionSeverity(rawValue: decision.severityRaw) else {
-        continue
-      }
-      counts[severity, default: 0] += 1
-    }
-    supervisorOpenDecisions = openDecisions
-    supervisorToolbarSlice.refresh(counts: counts)
-    supervisorBindings.pendingDecisionsBadgeSync?(openDecisions.count)
+    let snapshot =
+      (try? await decisions.openSupervisorSurfaceSnapshot(
+        includeDaemonDisconnect: connectionState.isSupervisorDisconnectedState
+      ))
+      ?? .empty
+    supervisorOpenDecisions = snapshot.decisions
+    supervisorOpenDecisionsByID = snapshot.decisionsByID
+    supervisorOpenDecisionPresentationItems = snapshot.presentationItems
+    supervisorOpenDecisionPresentationItemsBySession = snapshot.presentationItemsBySession
+    supervisorOpenDecisionSearchProjections = snapshot.searchProjections
+    supervisorOpenDecisionSearchProjectionsBySession = snapshot.searchProjectionsBySession
+    supervisorOpenDecisionIDsBySession = snapshot.decisionIDsBySession
+    supervisorToolbarSlice.refresh(counts: snapshot.countsBySeverity)
+    supervisorBindings.pendingDecisionsBadgeSync?(snapshot.decisions.count)
     supervisorBindings.pendingDecisionsStatusSync?(
       supervisorToolbarSlice.count,
       supervisorToolbarSlice.maxSeverity
     )
     if let controller = supervisorBindings.notificationController {
-      await controller.syncAppBadgeCount(openDecisions.count)
+      await controller.syncAppBadgeCount(snapshot.decisions.count)
     }
     supervisorDecisionRefreshTick &+= 1
   }

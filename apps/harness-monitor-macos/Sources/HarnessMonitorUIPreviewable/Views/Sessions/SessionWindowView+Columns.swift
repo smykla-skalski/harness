@@ -4,12 +4,19 @@ import SwiftUI
 extension SessionWindowView {
   @MainActor
   func refreshDecisionsCache() async {
-    let all = store.supervisorOpenDecisions.filter { $0.sessionID == token.sessionID }
-    let allIDs = Set(all.map(\.id))
+    let sessionDecisionIDs = store.supervisorOpenDecisionIDsBySession[token.sessionID] ?? []
+    let sessionDecisionItems =
+      store.supervisorOpenDecisionPresentationItemsBySession[token.sessionID] ?? []
+    let all = sessionDecisionIDs.compactMap { store.supervisorOpenDecisionsByID[$0] }
+    let allIDs = Set(sessionDecisionIDs)
     if all.map(\.id) != allSessionDecisionsCache.map(\.id) {
       allSessionDecisionsCache = all
     }
-    let searchProjections = all.map(DecisionSearchProjection.init)
+    if sessionDecisionItems != allSessionDecisionPresentationItemsCache {
+      allSessionDecisionPresentationItemsCache = sessionDecisionItems
+    }
+    let searchProjections =
+      store.supervisorOpenDecisionSearchProjectionsBySession[token.sessionID] ?? []
     if searchProjections != allSessionDecisionSearchProjectionsCache {
       allSessionDecisionSearchProjectionsCache = searchProjections
     }
@@ -19,15 +26,20 @@ extension SessionWindowView {
     await stateCache.decisionRuntime.reloadAuditEvents(
       from: store.supervisorAuditRepository,
       sessionID: token.sessionID,
-      decisions: all
+      decisionItems: sessionDecisionItems
     )
-    await refilterDecisionsCache(decisions: all, allDecisionIDs: allIDs)
+    await refilterDecisionsCache(
+      decisions: all,
+      decisionItems: sessionDecisionItems,
+      allDecisionIDs: allIDs
+    )
   }
 
   @MainActor
   func refilterDecisionsCache() async {
     await refilterDecisionsCache(
       decisions: allSessionDecisionsCache,
+      decisionItems: store.supervisorOpenDecisionPresentationItemsBySession[token.sessionID],
       allDecisionIDs: allSessionDecisionIDsCache
     )
   }
@@ -35,23 +47,29 @@ extension SessionWindowView {
   @MainActor
   private func refilterDecisionsCache(
     decisions all: [Decision],
+    decisionItems: [DecisionPresentationSnapshot]? = nil,
     allDecisionIDs allIDs: Set<String>
   ) async {
-    let decisionsByID = Dictionary(uniqueKeysWithValues: all.map { ($0.id, $0) })
+    let items = decisionItems
+      ?? all.map(DecisionPresentationSnapshot.init)
     stateCache.decisionRuntime.updateFilteredDecisions(
       input: SessionDecisionFilterInput(
         sessionID: token.sessionID,
-        decisions: all,
+        items: items,
         filters: stateCache.decisionFilters
       )
     )
     await stateCache.decisionRuntime.waitForDecisionFilterIdle()
     guard !Task.isCancelled else { return }
-    let matching = stateCache.decisionRuntime.filteredDecisions(from: all)
-    let matchingIDsInOrder = matching.map(\.id)
+    let matchingIDsInOrder = stateCache.decisionRuntime.filteredDecisionIDs
+    let matching = matchingIDsInOrder.compactMap { store.supervisorOpenDecisionsByID[$0] }
+    let matchingItems = stateCache.decisionRuntime.filteredDecisionItems
     let matchingIDs = stateCache.decisionRuntime.filteredDecisionIDSet
     if matching.map(\.id) != matchingDecisionsCache.map(\.id) {
       matchingDecisionsCache = matching
+    }
+    if matchingItems != matchingDecisionPresentationItemsCache {
+      matchingDecisionPresentationItemsCache = matchingItems
     }
     if matchingIDsInOrder != matchingDecisionIDsInOrderCache {
       matchingDecisionIDsInOrderCache = matchingIDsInOrder
@@ -79,7 +97,7 @@ extension SessionWindowView {
       stateCache.autoSelectDecision(autoSelectedDecisionID)
       announceDecisionSelectionChange(
         to: autoSelectedDecisionID,
-        decisionsByID: decisionsByID,
+        decisionsByID: store.supervisorOpenDecisionsByID,
         reason: .advancedToVisible
       )
     } else if case .route(.decisions) = stateCache.selection,
@@ -88,7 +106,7 @@ extension SessionWindowView {
     {
       announceDecisionSelectionChange(
         to: routeDecisionID,
-        decisionsByID: decisionsByID,
+        decisionsByID: store.supervisorOpenDecisionsByID,
         reason: previousRouteDecisionID == nil ? .openedRoute : .advancedToVisible
       )
     }
@@ -323,6 +341,7 @@ extension SessionWindowView {
           timeline: snapshot.timeline,
           timelineWindow: snapshot.timelineWindow,
           decisions: matchingDecisions,
+          decisionSnapshots: matchingDecisionPresentationItemsCache,
           isTimelineLoading: isLoading,
           store: store,
           timelineLoading: sessionTimelineLoading

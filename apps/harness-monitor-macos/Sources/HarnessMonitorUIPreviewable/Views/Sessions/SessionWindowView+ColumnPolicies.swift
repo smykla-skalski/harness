@@ -86,7 +86,7 @@ extension SessionWindowView {
   var decisionsRefreshTrigger: SessionDecisionDataKey {
     SessionDecisionDataKey(
       sessionID: token.sessionID,
-      decisions: store.supervisorOpenDecisions.filter { $0.sessionID == token.sessionID }
+      decisionIDs: store.supervisorOpenDecisionIDsBySession[token.sessionID] ?? []
     )
   }
 

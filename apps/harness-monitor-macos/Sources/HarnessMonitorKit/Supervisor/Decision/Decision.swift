@@ -62,3 +62,60 @@ public final class Decision {
     self.resolutionJSON = nil
   }
 }
+
+/// Value snapshot for decision presentation/indexing work.
+///
+/// `Decision` is a SwiftData model, so Monitor views should capture the fields
+/// they need once at the persistence/store boundary and hand this value type to
+/// worker actors for filtering, grouping, sorting, and indexing.
+public struct DecisionPresentationSnapshot: Equatable, Hashable, Sendable, Identifiable {
+  public let id: String
+  public let sessionID: String?
+  public let severityRaw: String
+  public let summary: String
+  public let ruleID: String
+  public let agentID: String?
+  public let taskID: String?
+  public let suggestedActionsJSON: String
+  public let createdAt: Date
+  public let statusRaw: String
+
+  public init(
+    id: String,
+    sessionID: String?,
+    severityRaw: String,
+    summary: String,
+    ruleID: String,
+    agentID: String?,
+    taskID: String?,
+    suggestedActionsJSON: String,
+    createdAt: Date,
+    statusRaw: String
+  ) {
+    self.id = id
+    self.sessionID = sessionID
+    self.severityRaw = severityRaw
+    self.summary = summary
+    self.ruleID = ruleID
+    self.agentID = agentID
+    self.taskID = taskID
+    self.suggestedActionsJSON = suggestedActionsJSON
+    self.createdAt = createdAt
+    self.statusRaw = statusRaw
+  }
+
+  public init(decision: Decision) {
+    self.init(
+      id: decision.id,
+      sessionID: decision.sessionID,
+      severityRaw: decision.severityRaw,
+      summary: decision.summary,
+      ruleID: decision.ruleID,
+      agentID: decision.agentID,
+      taskID: decision.taskID,
+      suggestedActionsJSON: decision.suggestedActionsJSON,
+      createdAt: decision.createdAt,
+      statusRaw: decision.statusRaw
+    )
+  }
+}

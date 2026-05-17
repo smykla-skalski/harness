@@ -208,6 +208,12 @@ extension HarnessMonitorStore {
     await stack.service.stop()
     supervisorToolbarSlice.stop()
     supervisorOpenDecisions = []
+    supervisorOpenDecisionsByID = [:]
+    supervisorOpenDecisionPresentationItems = []
+    supervisorOpenDecisionPresentationItemsBySession = [:]
+    supervisorOpenDecisionSearchProjections = []
+    supervisorOpenDecisionSearchProjectionsBySession = [:]
+    supervisorOpenDecisionIDsBySession = [:]
     supervisorSelectedDecisionID = nil
     supervisorPrimaryActionFocusDecisionID = nil
     resetSupervisorLiveTick()
