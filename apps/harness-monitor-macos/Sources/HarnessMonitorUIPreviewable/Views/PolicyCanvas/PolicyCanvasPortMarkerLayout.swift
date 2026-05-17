@@ -170,15 +170,19 @@ extension PolicyCanvasPreparedRouteInput {
       uniqueKeysWithValues: sides.map { side in
         (side, portMarkerCapacity(for: endpoint, side: side, nodeIndex: nodeIndex))
       })
-    for entry in entries {
-      let preferred = sides.contains(entry.preferredSide) ? entry.preferredSide : sides[0]
-      let side = firstAvailableSide(
-        preferred: preferred,
-        sides: sides,
-        capacities: capacities,
-        counts: entriesBySide
-      )
-      entriesBySide[side, default: []].append(entry)
+    if let side = dominantSideThatFits(entries: entries, sides: sides, capacities: capacities) {
+      entriesBySide[side] = entries
+    } else {
+      for entry in entries {
+        let preferred = sides.contains(entry.preferredSide) ? entry.preferredSide : sides[0]
+        let side = firstAvailableSide(
+          preferred: preferred,
+          sides: sides,
+          capacities: capacities,
+          counts: entriesBySide
+        )
+        entriesBySide[side, default: []].append(entry)
+      }
     }
     for side in sides {
       assignPortMarkerOffsets(
@@ -202,6 +206,28 @@ extension PolicyCanvasPreparedRouteInput {
     } ?? orderedSides.min { left, right in
       counts[left, default: []].count < counts[right, default: []].count
     } ?? preferred
+  }
+
+  private func dominantSideThatFits(
+    entries: [PolicyCanvasPortMarkerEntry],
+    sides: [PolicyCanvasPortSide],
+    capacities: [PolicyCanvasPortSide: Int]
+  ) -> PolicyCanvasPortSide? {
+    guard entries.count > 1 else {
+      return nil
+    }
+    let preferredCounts = Dictionary(grouping: entries) { entry in
+      sides.contains(entry.preferredSide) ? entry.preferredSide : sides[0]
+    }
+    return
+      sides
+      .filter { side in
+        preferredCounts[side, default: []].count > entries.count / 2
+          && capacities[side, default: 1] >= entries.count
+      }
+      .max { left, right in
+        preferredCounts[left, default: []].count < preferredCounts[right, default: []].count
+      }
   }
 
   private func assignPortMarkerOffsets(

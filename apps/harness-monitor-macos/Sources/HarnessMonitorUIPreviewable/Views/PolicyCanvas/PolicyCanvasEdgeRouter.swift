@@ -279,8 +279,6 @@ func policyCanvasDisplayedRoute(
     sourceGroupID: request.context.sourceGroupID,
     targetGroupID: request.context.targetGroupID,
     obstacles: request.context.obstacles,
-    sourceActual: request.context.sourceActual ?? source,
-    targetActual: request.context.targetActual ?? target,
     lineSpacing: request.context.lineSpacing
   )
   let baseRoute = request.router.route(
@@ -325,8 +323,6 @@ func policyCanvasDisplayedRoute(
     sourceGroupID: request.context.sourceGroupID,
     targetGroupID: request.context.targetGroupID,
     obstacles: request.context.obstacles,
-    sourceActual: request.context.sourceActual ?? sourceCandidates.first?.point,
-    targetActual: request.context.targetActual ?? targetCandidates.first?.point,
     lineSpacing: request.context.lineSpacing
   )
   var bestRoute: PolicyCanvasEdgeRoute?
