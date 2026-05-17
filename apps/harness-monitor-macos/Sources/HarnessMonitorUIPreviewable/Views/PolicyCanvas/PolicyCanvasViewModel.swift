@@ -38,6 +38,7 @@ final class PolicyCanvasViewModel {
   var hasRequestedInitialRemoteLoad: Bool
   var viewportCenteringGeneration: UInt64
   var routeComputationGeneration: UInt64
+  var validationPresentation: PolicyCanvasValidationPresentation
 
   /// Observed flag the chrome reads to surface the "Remote changes available"
   /// affordance. Kept separate from the underlying `PolicyCanvasPendingUpdate`
@@ -226,6 +227,7 @@ final class PolicyCanvasViewModel {
     self.hasRequestedInitialRemoteLoad = false
     self.viewportCenteringGeneration = 0
     self.routeComputationGeneration = 0
+    self.validationPresentation = .empty
     self.hasPendingDocumentUpdate = false
     self.pendingDocumentUpdate = nil
     self.pendingEdgePreview = nil
