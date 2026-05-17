@@ -14,7 +14,9 @@ struct HarnessMonitorPathsTests {
 
     #expect(
       HarnessMonitorPaths.manifestURL(using: environment).path
-        == "/tmp/harness-xdg/harness/daemon/manifest.json"
+        == expectedManifestURL(
+          in: URL(fileURLWithPath: "/tmp/harness-xdg", isDirectory: true)
+        ).path
     )
     #expect(
       HarnessMonitorPaths.sharedObservabilityConfigURL(using: environment).path
@@ -34,7 +36,9 @@ struct HarnessMonitorPathsTests {
 
     #expect(
       HarnessMonitorPaths.daemonRoot(using: environment).path
-        == "/tmp/harness-daemon-home/harness/daemon"
+        == expectedDaemonRoot(
+          in: URL(fileURLWithPath: "/tmp/harness-daemon-home", isDirectory: true)
+        ).path
     )
   }
 
@@ -42,12 +46,17 @@ struct HarnessMonitorPathsTests {
     "External daemon mode defaults to the shared monitor data root when no explicit data home is set"
   )
   func externalDaemonModeDefaultsToSharedMonitorDataRoot() {
+    let homeDirectory = URL(fileURLWithPath: "/Users/example", isDirectory: true)
     let environment = HarnessMonitorEnvironment(
       values: [DaemonOwnership.environmentKey: "1"],
-      homeDirectory: URL(fileURLWithPath: "/Users/example", isDirectory: true)
+      homeDirectory: homeDirectory
     )
-    let expectedRoot: String
-    expectedRoot = "/Users/example/Library/Application Support/harness/daemon"
+    let expectedRoot = expectedDaemonRoot(
+      in: homeDirectory
+        .appendingPathComponent("Library", isDirectory: true)
+        .appendingPathComponent("Application Support", isDirectory: true),
+      ownership: .external
+    ).path
 
     #expect(
       HarnessMonitorPaths.daemonRoot(using: environment).path
@@ -68,10 +77,10 @@ struct HarnessMonitorPathsTests {
 
     #expect(
       HarnessMonitorPaths.daemonRoot(using: environment).path
-        == expectedDefaultAppGroupRoot(homeDirectory: homeDirectory)
-        .appendingPathComponent("harness", isDirectory: true)
-        .appendingPathComponent("daemon", isDirectory: true)
-        .path
+        == expectedDaemonRoot(
+          in: expectedDefaultAppGroupRoot(homeDirectory: homeDirectory),
+          ownership: .external
+        ).path
     )
   }
 
@@ -86,14 +95,12 @@ struct HarnessMonitorPathsTests {
 
     #expect(
       HarnessMonitorPaths.authTokenURL(using: environment).path
-        == expectedAppGroupRoot(
-          identifier: fallbackGroupIdentifier,
-          homeDirectory: homeDirectory
-        )
-        .appendingPathComponent("harness", isDirectory: true)
-        .appendingPathComponent("daemon", isDirectory: true)
-        .appendingPathComponent("auth-token")
-        .path
+        == expectedAuthTokenURL(
+          in: expectedAppGroupRoot(
+            identifier: fallbackGroupIdentifier,
+            homeDirectory: homeDirectory
+          )
+        ).path
     )
   }
 
@@ -108,13 +115,12 @@ struct HarnessMonitorPathsTests {
     #expect(HarnessMonitorPaths.runtimeLane(using: environment) == "bart-dev")
     #expect(
       HarnessMonitorPaths.daemonRoot(using: environment).path
-        == expectedRuntimeLaneRoot(
-          homeDirectory: homeDirectory,
-          lane: "bart-dev"
-        )
-        .appendingPathComponent("harness", isDirectory: true)
-        .appendingPathComponent("daemon", isDirectory: true)
-        .path
+        == expectedDaemonRoot(
+          in: expectedRuntimeLaneRoot(
+            homeDirectory: homeDirectory,
+            lane: "bart-dev"
+          )
+        ).path
     )
   }
 
@@ -319,10 +325,9 @@ struct HarnessMonitorPathsTests {
 
     #expect(
       HarnessMonitorPaths.daemonRoot(using: environment).path
-        == expectedDefaultAppGroupRoot(homeDirectory: homeDirectory)
-        .appendingPathComponent("harness", isDirectory: true)
-        .appendingPathComponent("daemon", isDirectory: true)
-        .path
+        == expectedDaemonRoot(
+          in: expectedDefaultAppGroupRoot(homeDirectory: homeDirectory)
+        ).path
     )
   }
 
@@ -372,4 +377,33 @@ private func expectedRuntimeLaneRoot(homeDirectory: URL, lane: String) -> URL {
   expectedDefaultAppGroupRoot(homeDirectory: homeDirectory)
     .appendingPathComponent("runtime-lanes", isDirectory: true)
     .appendingPathComponent(lane, isDirectory: true)
+}
+
+private func expectedHarnessRoot(in dataHomeRoot: URL) -> URL {
+  dataHomeRoot.appendingPathComponent("harness", isDirectory: true)
+}
+
+private func expectedDaemonRoot(
+  in dataHomeRoot: URL,
+  ownership: DaemonOwnership = .managed
+) -> URL {
+  expectedHarnessRoot(in: dataHomeRoot)
+    .appendingPathComponent("daemon", isDirectory: true)
+    .appendingPathComponent(ownership.rawValue, isDirectory: true)
+}
+
+private func expectedManifestURL(
+  in dataHomeRoot: URL,
+  ownership: DaemonOwnership = .managed
+) -> URL {
+  expectedDaemonRoot(in: dataHomeRoot, ownership: ownership)
+    .appendingPathComponent("manifest.json")
+}
+
+private func expectedAuthTokenURL(
+  in dataHomeRoot: URL,
+  ownership: DaemonOwnership = .managed
+) -> URL {
+  expectedDaemonRoot(in: dataHomeRoot, ownership: ownership)
+    .appendingPathComponent("auth-token")
 }

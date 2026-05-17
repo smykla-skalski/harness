@@ -35,8 +35,8 @@ extension HarnessMonitorStoreLifecyclePresentationTests {
     let sessionAgentComputed = try previewableSourceFile(
       at: "Views/Sessions/SessionAgentDetailSection+Computed.swift"
     )
-    let columnsSource = try previewableSourceFile(
-      at: "Views/Sessions/SessionWindowView+Columns.swift"
+    let detailFocusSource = try previewableSourceFile(
+      at: "Views/Sessions/SessionWindowView+DetailFocus.swift"
     )
 
     XCTAssertTrue(routeContent.contains("acpSnapshots: snapshot.acpAgents"))
@@ -44,7 +44,7 @@ extension HarnessMonitorStoreLifecyclePresentationTests {
     XCTAssertTrue(sidebarSource.contains("acpSnapshots: snapshot.acpAgents"))
     XCTAssertTrue(sidebarSource.contains("runtimePresentation: runtimePresentation"))
     XCTAssertTrue(sessionAgentComputed.contains("runtimePresentation: runtimePresentation"))
-    XCTAssertTrue(columnsSource.contains("acpSnapshots: snapshot.acpAgents"))
+    XCTAssertTrue(detailFocusSource.contains("acpSnapshots: snapshot.acpAgents"))
   }
 
   func testDisconnectedAndCachedAgentsDoNotShowReadyActivity() {

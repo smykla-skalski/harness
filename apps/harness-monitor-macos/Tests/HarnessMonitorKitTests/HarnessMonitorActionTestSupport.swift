@@ -373,6 +373,7 @@ final class RecordingHarnessClient: HarnessMonitorClientProtocol, @unchecked Sen
 func selectedActionStore(client: RecordingHarnessClient) async -> HarnessMonitorStore {
   let store = await makeBootstrappedStore(client: client)
   await store.selectSession(PreviewFixtures.summary.sessionId)
+  clearRecordedCallsIfNeeded(for: client)
   return store
 }
 
@@ -390,6 +391,7 @@ func actorlessActionClient() -> RecordingHarnessClient {
 func actorlessActionStore(client: RecordingHarnessClient) async -> HarnessMonitorStore {
   let store = await makeBootstrappedStore(client: client)
   await store.selectSession(PreviewFixtures.emptyCockpitSummary.sessionId)
+  clearRecordedCallsIfNeeded(for: client)
   return store
 }
 

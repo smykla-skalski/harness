@@ -152,7 +152,7 @@ extension HarnessMonitorAgentModelsTests {
     #expect(terminal.sessionAgentIdentity == SessionAgentID(rawValue: "agent-tui-typed"))
     #expect(codex.sessionIdentity == sessionID)
     #expect(codex.managedAgentIdentity == ManagedAgentID(rawValue: "codex-typed"))
-    #expect(codex.sessionAgentIdentity == nil)
+    #expect(codex.sessionAgentIdentity == Optional(SessionAgentID(rawValue: "codex-worker")))
     #expect(codex.threadIdentity == Optional(CodexThreadID(rawValue: "thread-codex-typed")))
     #expect(approval.approvalIdentity == CodexApprovalID(rawValue: "approval-typed"))
     #expect(approval.requestIdentity == CodexApprovalRequestID(rawValue: "json-rpc-approval-1"))

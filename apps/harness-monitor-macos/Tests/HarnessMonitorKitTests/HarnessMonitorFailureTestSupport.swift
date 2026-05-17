@@ -260,7 +260,13 @@ func makeBootstrappedStore(
   let daemon = RecordingDaemonController(client: client)
   let store = HarnessMonitorStore(daemonController: daemon)
   await store.bootstrap()
+  clearRecordedCallsIfNeeded(for: client)
   return store
+}
+
+@MainActor
+func clearRecordedCallsIfNeeded(for client: any HarnessMonitorClientProtocol) {
+  (client as? RecordingHarnessClient)?.calls = []
 }
 
 @MainActor
