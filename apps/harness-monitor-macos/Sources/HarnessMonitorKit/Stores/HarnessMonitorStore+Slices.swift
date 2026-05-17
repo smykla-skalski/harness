@@ -268,6 +268,7 @@ extension HarnessMonitorStore {
     public internal(set) var listState = SessionSearchResultsListState()
     public internal(set) var filteredSessionCount = 0
     public internal(set) var totalSessionCount = 0
+    public internal(set) var groupedSessions: [SessionGroup] = []
 
     public var isSearchActive: Bool { presentationState.isSearchActive }
     public var visibleSessionIDs: [String] { listState.visibleSessionIDs }
@@ -287,6 +288,9 @@ extension HarnessMonitorStore {
       }
       if totalSessionCount != state.totalSessionCount {
         totalSessionCount = state.totalSessionCount
+      }
+      if groupedSessions != state.groupedSessions {
+        groupedSessions = state.groupedSessions
       }
     }
   }

@@ -73,6 +73,28 @@ extension HarnessMonitorStore.SessionIndexSlice {
     let searchResultsState: HarnessMonitorStore.SessionSearchResultsState
   }
 
+  struct CatalogComputationInput: Sendable {
+    let projects: [ProjectSummary]
+    let sessions: [SessionSummary]
+    let sessionFilter: HarnessMonitorStore.SessionFilter
+    let sessionFocusFilter: SessionFocusFilter
+    let sessionSortOrder: SessionSortOrder
+    let queryTokens: [String]
+  }
+
+  struct CatalogComputationOutput: Sendable {
+    let totalSessionCount: Int
+    let totalOpenWorkCount: Int
+    let totalBlockedCount: Int
+    let sessionSummariesByID: [String: SessionSummary]
+    let sessionIndicesByID: [String: Int]
+    let sessionRecordsByID: [String: SessionRecord]
+    let projectCatalogs: [ProjectCatalog]
+    let orderedSessionIDsBySortOrder: [SessionSortOrder: [String]]
+    let recentSessions: [SessionSummary]
+    let projectionOutput: ProjectionComputationOutput
+  }
+
   func orderedVisibleSessionIDs(in visibleSessionIDSet: Set<String>) -> [String] {
     orderedSessionIDsBySortOrder[controls.sessionSortOrder, default: []]
       .filter { visibleSessionIDSet.contains($0) }
@@ -125,8 +147,58 @@ extension HarnessMonitorStore.SessionIndexSlice {
         totalSessionCount: input.totalSessionCount,
         list: HarnessMonitorStore.SessionSearchResultsListState(
           visibleSessionIDs: orderedVisibleSessionIDs
+        ),
+        groupedSessions: buildGroupedSessions(
+          from: input,
+          visibleSessionIDSet: visibleSessionIDSet
         )
       )
+    )
+  }
+
+  nonisolated static func computeCatalogOutput(
+    from input: CatalogComputationInput
+  ) -> CatalogComputationOutput {
+    var sessionIndicesByID: [String: Int] = [:]
+    var sessionRecordsByID: [String: SessionRecord] = [:]
+    sessionIndicesByID.reserveCapacity(input.sessions.count)
+    sessionRecordsByID.reserveCapacity(input.sessions.count)
+
+    for (index, summary) in input.sessions.enumerated() {
+      sessionIndicesByID[summary.sessionId] = index
+      sessionRecordsByID[summary.sessionId] = SessionRecord(summary: summary)
+    }
+
+    let projectCatalogs = buildProjectCatalogs(
+      projects: input.projects,
+      sessions: input.sessions,
+      sessionRecordsByID: sessionRecordsByID
+    )
+    let orderedSessionIDsBySortOrder = orderedSessionIDsBySortOrder(from: projectCatalogs)
+    let projectionInput = ProjectionComputationInput(
+      projectCatalogs: projectCatalogs,
+      sessionRecordsByID: sessionRecordsByID,
+      orderedSessionIDsBySortOrder: orderedSessionIDsBySortOrder,
+      sessionFilter: input.sessionFilter,
+      sessionFocusFilter: input.sessionFocusFilter,
+      sessionSortOrder: input.sessionSortOrder,
+      queryTokens: input.queryTokens,
+      totalSessionCount: input.sessions.count
+    )
+
+    return CatalogComputationOutput(
+      totalSessionCount: input.sessions.count,
+      totalOpenWorkCount: input.sessions.reduce(0) { $0 + $1.metrics.openTaskCount },
+      totalBlockedCount: input.sessions.reduce(0) { $0 + $1.metrics.blockedTaskCount },
+      sessionSummariesByID: Dictionary(uniqueKeysWithValues: input.sessions.map {
+        ($0.sessionId, $0)
+      }),
+      sessionIndicesByID: sessionIndicesByID,
+      sessionRecordsByID: sessionRecordsByID,
+      projectCatalogs: projectCatalogs,
+      orderedSessionIDsBySortOrder: orderedSessionIDsBySortOrder,
+      recentSessions: sortRecentSessions(input.sessions),
+      projectionOutput: computeProjectionOutput(from: projectionInput)
     )
   }
 
@@ -164,13 +236,126 @@ extension HarnessMonitorStore.SessionIndexSlice {
     }
   }
 
+  nonisolated static func sortedSessionIDs(
+    _ sessionIDs: [String],
+    using sortOrder: SessionSortOrder,
+    sessionRecordsByID: [String: SessionRecord]
+  ) -> [String] {
+    sessionIDs.sorted { lhsID, rhsID in
+      guard let lhs = sessionRecordsByID[lhsID],
+        let rhs = sessionRecordsByID[rhsID]
+      else {
+        return lhsID < rhsID
+      }
+
+      switch sortOrder {
+      case .recentActivity:
+        if lhs.recentActivitySortKey != rhs.recentActivitySortKey {
+          return lhs.recentActivitySortKey > rhs.recentActivitySortKey
+        }
+      case .name:
+        let nameComparison = lhs.normalizedName.localizedStandardCompare(rhs.normalizedName)
+        if nameComparison != .orderedSame {
+          return nameComparison == .orderedAscending
+        }
+      case .status:
+        if lhs.statusSortKey != rhs.statusSortKey {
+          return lhs.statusSortKey < rhs.statusSortKey
+        }
+        if lhs.recentActivitySortKey != rhs.recentActivitySortKey {
+          return lhs.recentActivitySortKey > rhs.recentActivitySortKey
+        }
+      }
+
+      return lhs.summary.sessionId < rhs.summary.sessionId
+    }
+  }
+
   func sortRecentSessions(_ sessions: [SessionSummary]) -> [SessionSummary] {
+    Self.sortRecentSessions(sessions)
+  }
+
+  nonisolated static func sortRecentSessions(_ sessions: [SessionSummary]) -> [SessionSummary] {
     sessions.sorted { lhs, rhs in
       if lhs.updatedAt != rhs.updatedAt {
         return lhs.updatedAt > rhs.updatedAt
       }
       return lhs.sessionId < rhs.sessionId
     }
+  }
+
+  nonisolated static func buildProjectCatalogs(
+    projects: [ProjectSummary],
+    sessions: [SessionSummary],
+    sessionRecordsByID: [String: SessionRecord]
+  ) -> [ProjectCatalog] {
+    var checkoutsByProject: [String: [String: CheckoutAccumulator]] = [:]
+
+    for summary in sessions {
+      let checkout = CheckoutAccumulator(
+        checkoutId: summary.checkoutId,
+        title: summary.checkoutDisplayName,
+        isWorktree: summary.isWorktree,
+        sessionIDs: [summary.sessionId]
+      )
+
+      if var existing = checkoutsByProject[summary.projectId]?[summary.checkoutId] {
+        existing.sessionIDs.append(summary.sessionId)
+        checkoutsByProject[summary.projectId]?[summary.checkoutId] = existing
+      } else {
+        checkoutsByProject[summary.projectId, default: [:]][summary.checkoutId] = checkout
+      }
+    }
+
+    return projects.map { project in
+      let checkouts = (checkoutsByProject[project.projectId] ?? [:]).values
+        .map { checkout in
+          CheckoutCatalog(
+            checkoutId: checkout.checkoutId,
+            title: checkout.title,
+            isWorktree: checkout.isWorktree,
+            recentActivitySessionIDs: sortedSessionIDs(
+              checkout.sessionIDs,
+              using: .recentActivity,
+              sessionRecordsByID: sessionRecordsByID
+            ),
+            nameSessionIDs: sortedSessionIDs(
+              checkout.sessionIDs,
+              using: .name,
+              sessionRecordsByID: sessionRecordsByID
+            ),
+            statusSessionIDs: sortedSessionIDs(
+              checkout.sessionIDs,
+              using: .status,
+              sessionRecordsByID: sessionRecordsByID
+            )
+          )
+        }
+        .sorted { lhs, rhs in
+          if lhs.isWorktree != rhs.isWorktree {
+            return lhs.isWorktree == false
+          }
+          return lhs.title.localizedStandardCompare(rhs.title) == .orderedAscending
+        }
+      return ProjectCatalog(project: project, checkouts: checkouts)
+    }
+  }
+
+  nonisolated static func orderedSessionIDsBySortOrder(
+    from projectCatalogs: [ProjectCatalog]
+  ) -> [SessionSortOrder: [String]] {
+    Dictionary(
+      uniqueKeysWithValues: SessionSortOrder.allCases.map { sortOrder in
+        (
+          sortOrder,
+          projectCatalogs.flatMap { projectCatalog in
+            projectCatalog.checkouts.flatMap { checkout in
+              checkout.orderedSessionIDs(for: sortOrder)
+            }
+          }
+        )
+      }
+    )
   }
 
   func replacingSession(
@@ -374,6 +559,19 @@ extension HarnessMonitorStore.SessionIndexSlice {
 }
 
 actor SessionIndexWorker {
+  func computeCatalog(
+    from input: HarnessMonitorStore.SessionIndexSlice.CatalogComputationInput,
+    delayNanoseconds: UInt64 = 0
+  ) async -> HarnessMonitorStore.SessionIndexSlice.CatalogComputationOutput? {
+    if delayNanoseconds > 0 {
+      try? await Task.sleep(nanoseconds: delayNanoseconds)
+    }
+    guard !Task.isCancelled else {
+      return nil
+    }
+    return HarnessMonitorStore.SessionIndexSlice.computeCatalogOutput(from: input)
+  }
+
   func computeProjection(
     from input: HarnessMonitorStore.SessionIndexSlice.ProjectionComputationInput,
     delayNanoseconds: UInt64 = 0

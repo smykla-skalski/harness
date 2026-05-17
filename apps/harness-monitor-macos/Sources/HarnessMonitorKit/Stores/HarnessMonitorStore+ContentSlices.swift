@@ -109,6 +109,9 @@ extension HarnessMonitorStore {
     public var selectedSessionAgentActivity: [AgentToolActivitySummary] = []
     public var timeline: [TimelineEntry] = []
     public var timelineWindow: TimelineWindowResponse?
+    public private(set) var presentedTimelineRevision: UInt64 = 0
+    public private(set) var presentedTimelineWindowRevision: UInt64 = 0
+    public private(set) var selectedSessionSignalsRevision: UInt64 = 0
     public var tuiStatusByAgent: [String: AgentTuiStatus] = [:]
     public var isTimelineLoading = false
     public var presentedSessionDetail: SessionDetail?
@@ -261,6 +264,7 @@ extension HarnessMonitorStore {
       }
       if selectedSessionSignals != nextSignals {
         selectedSessionSignals = nextSignals
+        selectedSessionSignalsRevision &+= 1
       }
       if selectedSessionObserver != nextObserver {
         selectedSessionObserver = nextObserver
@@ -285,10 +289,12 @@ extension HarnessMonitorStore {
       if presentedTimelineIdentity != nextTimelineIdentity {
         presentedTimeline = timeline
         presentedTimelineIdentity = nextTimelineIdentity
+        presentedTimelineRevision &+= 1
       }
       if presentedTimelineWindowIdentity != nextTimelineWindowIdentity {
         presentedTimelineWindow = timelineWindow
         presentedTimelineWindowIdentity = nextTimelineWindowIdentity
+        presentedTimelineWindowRevision &+= 1
       }
       let nextArbitrationTasks =
         sessionDetail?.tasks.filter(\.requiresArbitrationBanner) ?? []

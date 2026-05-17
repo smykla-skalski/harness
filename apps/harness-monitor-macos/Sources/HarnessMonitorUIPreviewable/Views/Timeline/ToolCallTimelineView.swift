@@ -16,6 +16,7 @@ struct ToolCallTimelineView: View {
   @State private var cachedVisibleOverflowToolCallCount = 0
   @State private var cachedOverflowAnnouncement: ToolCallTimelineOverflowAnnouncement?
   @State private var cachedRowFrames: [String: CGRect] = [:]
+  @State private var cachedRowFramesRevision: UInt64 = 0
   @State private var presentationGeneration: UInt64 = 0
 
   @AppStorage(
@@ -58,6 +59,16 @@ struct ToolCallTimelineView: View {
       overflowNotice: overflowNotice,
       scrollMetrics: cachedScrollMetrics,
       rowFrames: cachedRowFrames
+    )
+  }
+
+  private var presentationTaskKey: ToolCallTimelinePresentationTaskKey {
+    ToolCallTimelinePresentationTaskKey(
+      entries: entries,
+      liveAnnouncementRowIDs: liveAnnouncementRowIDs,
+      overflowNotice: overflowNotice,
+      scrollMetrics: cachedScrollMetrics,
+      rowFramesRevision: cachedRowFramesRevision
     )
   }
 
@@ -119,6 +130,7 @@ struct ToolCallTimelineView: View {
         .onPreferenceChange(ToolCallTimelineRowFramePreferenceKey.self) { newFrames in
           if cachedRowFrames != newFrames {
             cachedRowFrames = newFrames
+            cachedRowFramesRevision &+= 1
           }
         }
       }
@@ -133,8 +145,8 @@ struct ToolCallTimelineView: View {
         text: Self.accessibilityStateMarkerText
       )
     }
-    .task(id: presentationInput) {
-      await rebuildCachedPresentation(for: presentationInput)
+    .task(id: presentationTaskKey) {
+      await rebuildCachedPresentation()
     }
     .onChange(of: cachedAnnouncementSnapshot) { oldValue, newValue in
       announceToolCallStateChanges(
@@ -151,9 +163,10 @@ struct ToolCallTimelineView: View {
   }
 
   @MainActor
-  private func rebuildCachedPresentation(for input: ToolCallTimelinePresentationInput) async {
+  private func rebuildCachedPresentation() async {
     presentationGeneration &+= 1
     let generation = presentationGeneration
+    let input = presentationInput
     let output = await toolCallTimelinePresentationWorker.compute(input: input)
     guard !Task.isCancelled, presentationGeneration == generation else {
       return
@@ -358,9 +371,12 @@ struct ToolCallTimelinePresentation: Equatable, Sendable {
 struct ToolCallTimelineAnnouncementSnapshot: Equatable, Sendable {
   let rows: [ToolCallTimelineRow]
   let liveRowIDs: Set<String>
+  let statusesByRowID: [String: ToolCallTimelineRow.Status]
 
-  var statusesByRowID: [String: ToolCallTimelineRow.Status] {
-    Dictionary(uniqueKeysWithValues: rows.map { ($0.id, $0.status) })
+  init(rows: [ToolCallTimelineRow], liveRowIDs: Set<String>) {
+    self.rows = rows
+    self.liveRowIDs = liveRowIDs
+    statusesByRowID = Dictionary(uniqueKeysWithValues: rows.map { ($0.id, $0.status) })
   }
 
   static let empty = Self(rows: [], liveRowIDs: [])
@@ -372,6 +388,44 @@ private struct ToolCallTimelinePresentationInput: Equatable, Sendable {
   let overflowNotice: HarnessMonitorStore.ToolCallTimelineOverflowNotice?
   let scrollMetrics: ToolCallTimelineScrollMetrics
   let rowFrames: [String: CGRect]
+}
+
+private struct ToolCallTimelinePresentationTaskKey: Equatable {
+  let entriesSignature: ToolCallTimelineEntriesBoundarySignature
+  let liveAnnouncementRowIDsCount: Int
+  let overflowNotice: HarnessMonitorStore.ToolCallTimelineOverflowNotice?
+  let scrollMetrics: ToolCallTimelineScrollMetrics
+  let rowFramesRevision: UInt64
+
+  init(
+    entries: [TimelineEntry],
+    liveAnnouncementRowIDs: Set<String>,
+    overflowNotice: HarnessMonitorStore.ToolCallTimelineOverflowNotice?,
+    scrollMetrics: ToolCallTimelineScrollMetrics,
+    rowFramesRevision: UInt64
+  ) {
+    entriesSignature = ToolCallTimelineEntriesBoundarySignature(entries)
+    liveAnnouncementRowIDsCount = liveAnnouncementRowIDs.count
+    self.overflowNotice = overflowNotice
+    self.scrollMetrics = scrollMetrics
+    self.rowFramesRevision = rowFramesRevision
+  }
+}
+
+private struct ToolCallTimelineEntriesBoundarySignature: Equatable {
+  let count: Int
+  let firstEntryID: String?
+  let lastEntryID: String?
+  let lastRecordedAt: String?
+  let lastSummary: String?
+
+  init(_ entries: [TimelineEntry]) {
+    count = entries.count
+    firstEntryID = entries.first?.entryId
+    lastEntryID = entries.last?.entryId
+    lastRecordedAt = entries.last?.recordedAt
+    lastSummary = entries.last?.summary
+  }
 }
 
 private struct ToolCallTimelinePresentationOutput: Equatable, Sendable {

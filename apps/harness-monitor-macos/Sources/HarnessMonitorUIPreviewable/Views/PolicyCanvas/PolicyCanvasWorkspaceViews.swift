@@ -32,22 +32,17 @@ struct PolicyCanvasViewport: View {
     GeometryReader { proxy in
       ScrollViewReader { _ in
         let edges = viewModel.edges
-        let routeInput = PolicyCanvasRouteWorkerInput(
-          nodes: viewModel.nodes,
-          groups: viewModel.groups,
-          edges: edges,
+        let routeKey = PolicyCanvasRouteWorkerKey(
+          graphGeneration: viewModel.routeComputationGeneration,
+          nodeCount: viewModel.nodes.count,
+          groupCount: viewModel.groups.count,
+          edgeCount: edges.count,
           fontScale: fontScale
         )
-        let routeOutput =
-          cachedRouteOutput == .empty
-          ? PolicyCanvasRouteWorkerOutput.fallback(for: routeInput)
-          : cachedRouteOutput
+        let routeOutput = cachedRouteOutput
         let routes = routeOutput.routes
         let labelPositions = routeOutput.labelPositions
-        let visibleBounds =
-          cachedRouteInput == routeInput
-          ? routeOutput.visibleBounds
-          : routeInput.visibleBounds(routes: routes, labelPositions: labelPositions)
+        let visibleBounds = routeOutput.visibleBounds
         let contentSize = policyCanvasVisibleContentSize(visibleBounds: visibleBounds)
         let contentOrigin = policyCanvasViewportContentOrigin(
           viewportSize: proxy.size,
@@ -176,8 +171,8 @@ struct PolicyCanvasViewport: View {
           }
         }
         .focusedSceneValue(\.harnessPolicyCanvasZoomFocus, zoomFocus)
-        .task(id: routeInput) {
-          await rebuildRoutes(for: routeInput)
+        .task(id: routeKey) {
+          await rebuildRoutes()
         }
       }
     }
@@ -206,9 +201,15 @@ struct PolicyCanvasViewport: View {
 
 extension PolicyCanvasViewport {
   @MainActor
-  private func rebuildRoutes(for input: PolicyCanvasRouteWorkerInput) async {
+  private func rebuildRoutes() async {
     routeGeneration &+= 1
     let generation = routeGeneration
+    let input = PolicyCanvasRouteWorkerInput(
+      nodes: viewModel.nodes,
+      groups: viewModel.groups,
+      edges: viewModel.edges,
+      fontScale: fontScale
+    )
     let output = await routeWorker.compute(input: input)
     guard !Task.isCancelled, routeGeneration == generation else {
       return

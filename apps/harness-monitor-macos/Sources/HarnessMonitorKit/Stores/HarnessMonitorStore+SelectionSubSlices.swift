@@ -17,6 +17,18 @@ extension HarnessMonitorStore {
     contentUI.sessionDetail.selectedSessionSignals
   }
 
+  public var selectedSessionSignalsRevision: UInt64 {
+    contentUI.sessionDetail.selectedSessionSignalsRevision
+  }
+
+  public var presentedTimelineRevision: UInt64 {
+    contentUI.sessionDetail.presentedTimelineRevision
+  }
+
+  public var presentedTimelineWindowRevision: UInt64 {
+    contentUI.sessionDetail.presentedTimelineWindowRevision
+  }
+
   public var selectedSessionObserver: ObserverSummary? {
     contentUI.sessionDetail.selectedSessionObserver
   }

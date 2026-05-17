@@ -58,6 +58,7 @@ extension PolicyCanvasViewModel {
   /// touch the counter directly.
   func invalidateValidationCache() {
     validationInvalidationGeneration &+= 1
+    routeComputationGeneration &+= 1
   }
 
   /// Read the cached severity maps, rebuilding them when the cache token

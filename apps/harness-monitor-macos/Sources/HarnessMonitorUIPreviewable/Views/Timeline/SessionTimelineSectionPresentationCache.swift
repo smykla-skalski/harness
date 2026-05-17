@@ -163,6 +163,57 @@ private struct SessionTimelineSectionPresentationCacheKey: Equatable {
   }
 }
 
+struct SessionTimelinePresentationTaskKey: Equatable {
+  let sessionID: String
+  let timelineRevision: UInt64
+  let timelineWindowRevision: UInt64
+  let timelineFallbackSignature: SessionTimelineEntriesBoundarySignature
+  let timelineWindowSignature: SessionTimelineWindowSignature?
+  let decisionsRevision: Int
+  let decisionsCount: Int
+  let signalsRevision: UInt64
+  let filters: SessionTimelineFilterState
+  let isTimelineLoading: Bool
+  let dateTimeConfiguration: HarnessMonitorDateTimeConfiguration
+}
+
+struct SessionTimelineEntriesBoundarySignature: Equatable {
+  let count: Int
+  let firstEntryID: String?
+  let lastEntryID: String?
+  let lastRecordedAt: String?
+  let lastSummary: String?
+
+  init(_ timeline: [TimelineEntry]) {
+    count = timeline.count
+    firstEntryID = timeline.first?.entryId
+    lastEntryID = timeline.last?.entryId
+    lastRecordedAt = timeline.last?.recordedAt
+    lastSummary = timeline.last?.summary
+  }
+}
+
+struct SessionTimelineWindowSignature: Equatable {
+  let revision: Int64
+  let totalCount: Int
+  let windowStart: Int
+  let windowEnd: Int
+  let hasOlder: Bool
+  let hasNewer: Bool
+
+  init?(_ window: TimelineWindowResponse?) {
+    guard let window else {
+      return nil
+    }
+    revision = window.revision
+    totalCount = window.totalCount
+    windowStart = window.windowStart
+    windowEnd = window.windowEnd
+    hasOlder = window.hasOlder
+    hasNewer = window.hasNewer
+  }
+}
+
 private struct SignalSignature: Equatable {
   let record: SessionSignalRecord
   let effectiveStatus: SessionSignalStatus
