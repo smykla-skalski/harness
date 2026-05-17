@@ -26,3 +26,31 @@ public final class PolicyConfigRow {
     self.updatedAt = Date()
   }
 }
+
+public struct PolicyConfigRowSnapshot: Equatable, Sendable {
+  public let ruleID: String
+  public let enabled: Bool
+  public let defaultBehaviorRaw: String
+  public let parametersJSON: String
+
+  public init(
+    ruleID: String,
+    enabled: Bool,
+    defaultBehaviorRaw: String,
+    parametersJSON: String
+  ) {
+    self.ruleID = ruleID
+    self.enabled = enabled
+    self.defaultBehaviorRaw = defaultBehaviorRaw
+    self.parametersJSON = parametersJSON
+  }
+
+  public init(row: PolicyConfigRow) {
+    self.init(
+      ruleID: row.ruleID,
+      enabled: row.enabled,
+      defaultBehaviorRaw: row.defaultBehaviorRaw,
+      parametersJSON: row.parametersJSON
+    )
+  }
+}

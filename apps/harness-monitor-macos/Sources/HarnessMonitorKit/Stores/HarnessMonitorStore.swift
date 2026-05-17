@@ -306,6 +306,7 @@ public final class HarnessMonitorStore {
   public let modelContext: ModelContext?
   let cacheService: SessionCacheService?
   let userDataService: UserDataPersistenceService?
+  public let supervisorPolicyConfigRepository: SupervisorPolicyConfigRepository?
   var client: (any HarnessMonitorClientProtocol)?
   var globalStreamTask: Task<Void, Never>?
   var sessionStreamTask: Task<Void, Never>?
@@ -402,6 +403,7 @@ public final class HarnessMonitorStore {
         maxRecentSearches: Self.maxRecentSearches
       )
     }
+    self.supervisorPolicyConfigRepository = modelContainer.map(SupervisorPolicyConfigRepository.init)
     if let cacheService {
       self.cacheService = cacheService
     } else if let modelContainer {

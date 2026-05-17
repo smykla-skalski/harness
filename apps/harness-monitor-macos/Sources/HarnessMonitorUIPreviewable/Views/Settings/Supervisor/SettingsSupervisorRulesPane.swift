@@ -1,5 +1,4 @@
 import HarnessMonitorKit
-import SwiftData
 import SwiftUI
 
 public struct SettingsSupervisorRulesPane: View {
@@ -9,7 +8,7 @@ public struct SettingsSupervisorRulesPane: View {
   private static let statusDisplayDuration: Duration = .seconds(2)
 
   @State private var viewModel = SettingsSupervisorRulesViewModel()
-  @State private var persistedRowsByRuleID: [String: PolicyConfigRow] = [:]
+  @State private var persistedRowsByRuleID: [String: PolicyConfigRowSnapshot] = [:]
   @State private var statusMessages: [String: String] = [:]
   @State private var errorMessages: [String: String] = [:]
   @State private var pendingPersistTasks: [String: Task<Void, Never>] = [:]
@@ -18,13 +17,13 @@ public struct SettingsSupervisorRulesPane: View {
     self.store = store
   }
 
-  private var modelContext: ModelContext? {
-    store.modelContext
+  private var repository: SupervisorPolicyConfigRepository? {
+    store.supervisorPolicyConfigRepository
   }
 
   public var body: some View {
     Form {
-      if modelContext == nil {
+      if repository == nil {
         Section {
           ContentUnavailableView(
             "Rules unavailable",
@@ -40,53 +39,46 @@ public struct SettingsSupervisorRulesPane: View {
             status: statusMessages[rule.id],
             error: errorMessages[rule.id],
             onCommit: { schedulePersist(for: rule) },
-            onReset: { resetRule(rule) }
+            onReset: { Task { await resetRule(rule) } }
           )
         }
       }
     }
     .settingsDetailFormStyle()
     .accessibilityIdentifier(HarnessMonitorAccessibility.settingsSupervisorPane("rules"))
-    .task { reloadRows() }
+    .task { await reloadRows() }
     .onDisappear(perform: cancelPendingPersists)
   }
 
-  private func reloadRows() {
-    guard let modelContext else {
+  @MainActor
+  private func reloadRows() async {
+    guard let repository else {
       persistedRowsByRuleID = [:]
-      viewModel.applyRows([])
+      viewModel.applyRowSnapshots([])
       return
     }
     do {
-      let descriptor = FetchDescriptor<PolicyConfigRow>(sortBy: [SortDescriptor(\.ruleID)])
-      let rows = try modelContext.fetch(descriptor)
+      let rows = try await repository.fetchRows()
       persistedRowsByRuleID = Dictionary(uniqueKeysWithValues: rows.map { ($0.ruleID, $0) })
-      viewModel.applyRows(rows)
+      viewModel.applyRowSnapshots(rows)
       errorMessages = [:]
     } catch {
       persistedRowsByRuleID = [:]
-      viewModel.applyRows([])
+      viewModel.applyRowSnapshots([])
       errorMessages = Dictionary(
         uniqueKeysWithValues: viewModel.rules.map { ($0.id, error.localizedDescription) }
       )
     }
   }
 
-  private func persistRule(_ rule: SettingsSupervisorRuleDescriptor) {
-    guard let modelContext else { return }
+  @MainActor
+  private func persistRule(_ rule: SettingsSupervisorRuleDescriptor) async {
+    guard let repository else { return }
     cancelPendingPersist(for: rule.id)
     do {
-      let row = try viewModel.makePolicyConfigRow(forRuleID: rule.id)
-      if let persistedRow = persistedRowsByRuleID[rule.id] {
-        persistedRow.enabled = row.enabled
-        persistedRow.defaultBehaviorRaw = row.defaultBehaviorRaw
-        persistedRow.parametersJSON = row.parametersJSON
-        persistedRow.updatedAt = Date()
-      } else {
-        modelContext.insert(row)
-      }
-      try modelContext.save()
-      reloadRows()
+      let row = try viewModel.makePolicyConfigRowSnapshot(forRuleID: rule.id)
+      try await repository.save(row)
+      await reloadRows()
       showTransientStatus("Saved rule override", for: rule.id)
       errorMessages[rule.id] = nil
       Task { await store.refreshSupervisorPolicyOverrides() }
@@ -101,9 +93,7 @@ public struct SettingsSupervisorRulesPane: View {
     pendingPersistTasks[rule.id] = Task {
       try? await Task.sleep(for: Self.persistDebounceDuration)
       guard !Task.isCancelled else { return }
-      await MainActor.run {
-        persistRule(rule)
-      }
+      await persistRule(rule)
     }
   }
 
@@ -117,13 +107,13 @@ public struct SettingsSupervisorRulesPane: View {
     }
   }
 
-  private func resetRule(_ rule: SettingsSupervisorRuleDescriptor) {
-    guard let modelContext else { return }
+  @MainActor
+  private func resetRule(_ rule: SettingsSupervisorRuleDescriptor) async {
+    guard let repository else { return }
     cancelPendingPersist(for: rule.id)
-    if let persistedRow = persistedRowsByRuleID[rule.id] {
-      modelContext.delete(persistedRow)
+    if persistedRowsByRuleID[rule.id] != nil {
       do {
-        try modelContext.save()
+        try await repository.delete(ruleID: rule.id)
       } catch {
         statusMessages[rule.id] = nil
         errorMessages[rule.id] = error.localizedDescription
@@ -131,7 +121,7 @@ public struct SettingsSupervisorRulesPane: View {
       }
     }
     viewModel.resetRule(ruleID: rule.id)
-    reloadRows()
+    await reloadRows()
     showTransientStatus("Reset to built-in defaults", for: rule.id)
     errorMessages[rule.id] = nil
     Task { await store.refreshSupervisorPolicyOverrides() }

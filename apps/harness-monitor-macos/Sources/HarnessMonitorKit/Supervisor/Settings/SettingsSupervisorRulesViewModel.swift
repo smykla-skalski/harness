@@ -62,6 +62,10 @@ public final class SettingsSupervisorRulesViewModel {
   }
 
   public func applyRows(_ rows: [PolicyConfigRow]) {
+    applyRowSnapshots(rows.map(PolicyConfigRowSnapshot.init(row:)))
+  }
+
+  public func applyRowSnapshots(_ rows: [PolicyConfigRowSnapshot]) {
     overridesByRuleID = Dictionary(
       uniqueKeysWithValues: rows.map {
         (
@@ -145,6 +149,16 @@ public final class SettingsSupervisorRulesViewModel {
   }
 
   public func makePolicyConfigRow(forRuleID ruleID: String) throws -> PolicyConfigRow {
+    let snapshot = try makePolicyConfigRowSnapshot(forRuleID: ruleID)
+    return PolicyConfigRow(
+      ruleID: snapshot.ruleID,
+      enabled: snapshot.enabled,
+      defaultBehavior: snapshot.defaultBehaviorRaw,
+      parametersJSON: snapshot.parametersJSON
+    )
+  }
+
+  public func makePolicyConfigRowSnapshot(forRuleID ruleID: String) throws -> PolicyConfigRowSnapshot {
     guard
       let rule = rules.first(where: { $0.id == ruleID }),
       let state = editorStates[ruleID]
@@ -160,10 +174,10 @@ public final class SettingsSupervisorRulesViewModel {
     guard let json = String(bytes: data, encoding: .utf8) else {
       throw SettingsSupervisorRulesViewModelError.invalidParametersEncoding
     }
-    return PolicyConfigRow(
+    return PolicyConfigRowSnapshot(
       ruleID: rule.id,
       enabled: state.enabled,
-      defaultBehavior: state.defaultBehavior.rawValue,
+      defaultBehaviorRaw: state.defaultBehavior.rawValue,
       parametersJSON: json
     )
   }
