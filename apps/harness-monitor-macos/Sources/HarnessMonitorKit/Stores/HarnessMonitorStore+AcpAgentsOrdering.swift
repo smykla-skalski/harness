@@ -170,16 +170,50 @@ extension AcpAgentSnapshot {
   }
 }
 
+struct AcpPermissionDecisionSyncPayloadState: Sendable {
+  let sortedPayloads: [AcpPermissionDecisionPayload]
+  let activeDecisionIDs: Set<String>
+}
+
 actor AcpRuntimeWorker {
-  func sortedPermissionDecisionPayloads(
+  func permissionDecisionSyncPayloadState(
     _ payloads: [AcpPermissionDecisionPayload]
-  ) -> [AcpPermissionDecisionPayload] {
-    payloads.sorted {
+  ) -> AcpPermissionDecisionSyncPayloadState {
+    let sortedPayloads = payloads.sorted {
       if $0.rawBatch.createdAt != $1.rawBatch.createdAt {
         return $0.rawBatch.createdAt < $1.rawBatch.createdAt
       }
       return $0.decisionID < $1.decisionID
     }
+    return AcpPermissionDecisionSyncPayloadState(
+      sortedPayloads: sortedPayloads,
+      activeDecisionIDs: Set(sortedPayloads.map(\.decisionID))
+    )
+  }
+
+  func sortedPermissionDecisionPayloads(
+    _ payloads: [AcpPermissionDecisionPayload]
+  ) -> [AcpPermissionDecisionPayload] {
+    permissionDecisionSyncPayloadState(payloads).sortedPayloads
+  }
+
+  func stalePermissionDecisionIDs(
+    openDecisionIDs: Set<String>,
+    activeDecisionIDs: Set<String>,
+    staleDecisionIDs: Set<String>,
+    protectedDecisionIDs: Set<String>,
+    pendingTimeoutDecisionIDs: Set<String>,
+    pendingShutdownDecisionIDs: Set<String>,
+    terminalDecisionIDs: Set<String>
+  ) -> [String] {
+    openDecisionIDs
+      .subtracting(activeDecisionIDs)
+      .union(staleDecisionIDs)
+      .subtracting(protectedDecisionIDs)
+      .subtracting(pendingTimeoutDecisionIDs)
+      .subtracting(pendingShutdownDecisionIDs)
+      .subtracting(terminalDecisionIDs)
+      .sorted()
   }
 
   func markInspectEntriesRetrying(
