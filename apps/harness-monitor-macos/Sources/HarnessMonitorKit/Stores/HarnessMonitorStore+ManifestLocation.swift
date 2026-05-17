@@ -1,6 +1,10 @@
 import Foundation
 
 extension HarnessMonitorStore {
+  public var currentManifestPath: String {
+    manifestURL.path
+  }
+
   func adoptManifestURL(from path: String) {
     guard
       let normalizedPath = HarnessMonitorPaths.normalizedNonEmpty(path),

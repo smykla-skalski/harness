@@ -343,8 +343,10 @@ public final class HarnessMonitorStore {
   @ObservationIgnored var suppressSelectedAcpTranscriptCacheWrite = false
   @ObservationIgnored var agentTuiActionRefreshTask: Task<Void, Never>?
   var manifestWatcher: ManifestWatcher?
+  @ObservationIgnored let manifestWatcherStartupWorker = ManifestWatcherStartupWorker()
+  @ObservationIgnored var manifestWatcherStartTask: Task<Void, Never>?
   @ObservationIgnored var externalManifestDiscoveryTask: Task<Void, Never>?
-  @ObservationIgnored var manifestURL = HarnessMonitorPaths.manifestURL()
+  @ObservationIgnored var manifestURL = HarnessMonitorPaths.manifestURLWithoutLiveDiscovery()
   var transportLatencySamplesMs: [Int] = []
   var requestLatencySamplesMs: [Int] = []
   var trafficSampleTimes: [Date] = []

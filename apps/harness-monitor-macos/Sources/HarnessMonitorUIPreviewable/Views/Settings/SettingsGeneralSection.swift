@@ -41,7 +41,7 @@ public struct SettingsGeneralOverviewState {
     databaseSize = DatabaseStatistics.formatByteCount(Int64(databaseSizeBytes))
     sessionCount = store.daemonStatus?.sessionCount ?? store.sessions.count
     startedAt = effectiveHealth?.startedAt ?? manifest?.startedAt
-    externalDaemonManifestPath = HarnessMonitorPaths.manifestURL().path
+    externalDaemonManifestPath = store.currentManifestPath
     externalDaemonProcessSummary =
       if let manifest {
         "pid \(manifest.pid) · \(manifest.endpoint)"

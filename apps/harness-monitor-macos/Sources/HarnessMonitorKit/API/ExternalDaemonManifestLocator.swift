@@ -21,7 +21,9 @@ final class ExternalDaemonManifestLocator: @unchecked Sendable {
   ) {
     self.defaults = defaults
     self.environment = environment
-    self.configuredManifestURL = HarnessMonitorPaths.manifestURL(using: environment)
+    self.configuredManifestURL = HarnessMonitorPaths.manifestURLWithoutLiveDiscovery(
+      using: environment
+    )
     self.shouldRememberLiveManifest = ownership == .external
     // Cross-lane manifest re-discovery applies to both ownership modes when
     // the app's runtime env has no lane override. The managed daemon plist

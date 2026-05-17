@@ -48,7 +48,8 @@ public enum HarnessMonitorPaths {
   /// Returns `nil` when none of the above resolves — callers decide how to handle that.
   private static func resolveBaseRoot(
     using environment: HarnessMonitorEnvironment,
-    preferExternalDaemon: Bool
+    preferExternalDaemon: Bool,
+    discoverLiveDaemon: Bool = true
   ) -> URL? {
     let ownership = DaemonOwnership(environment: environment)
 
@@ -60,7 +61,8 @@ public enum HarnessMonitorPaths {
       return laneRoot
     }
 
-    if let discoveredRoot = discoverLiveDaemonRoot(
+    if discoverLiveDaemon,
+      let discoveredRoot = discoverLiveDaemonRoot(
       ownership: ownership,
       using: environment
     ) {
@@ -188,7 +190,24 @@ public enum HarnessMonitorPaths {
   }
 
   public static func harnessRoot(using environment: HarnessMonitorEnvironment = .current) -> URL {
-    if let base = resolveBaseRoot(using: environment, preferExternalDaemon: true) {
+    harnessRoot(using: environment, discoverLiveDaemon: true)
+  }
+
+  static func harnessRootWithoutLiveDiscovery(
+    using environment: HarnessMonitorEnvironment = .current
+  ) -> URL {
+    harnessRoot(using: environment, discoverLiveDaemon: false)
+  }
+
+  private static func harnessRoot(
+    using environment: HarnessMonitorEnvironment,
+    discoverLiveDaemon: Bool
+  ) -> URL {
+    if let base = resolveBaseRoot(
+      using: environment,
+      preferExternalDaemon: true,
+      discoverLiveDaemon: discoverLiveDaemon
+    ) {
       return base.appendingPathComponent("harness", isDirectory: true)
     }
 
@@ -221,6 +240,14 @@ public enum HarnessMonitorPaths {
     daemonRoot(ownership: DaemonOwnership(environment: environment), using: environment)
   }
 
+  static func daemonRootWithoutLiveDiscovery(
+    using environment: HarnessMonitorEnvironment = .current
+  ) -> URL {
+    harnessRootWithoutLiveDiscovery(using: environment)
+      .appendingPathComponent("daemon", isDirectory: true)
+      .appendingPathComponent(DaemonOwnership(environment: environment).rawValue, isDirectory: true)
+  }
+
   /// Daemon root for an explicit ownership. Path:
   /// `<harnessRoot>/daemon/<ownership>/`.
   public static func daemonRoot(
@@ -248,6 +275,13 @@ public enum HarnessMonitorPaths {
 
   public static func manifestURL(using environment: HarnessMonitorEnvironment = .current) -> URL {
     Self.daemonRoot(using: environment).appendingPathComponent("manifest.json")
+  }
+
+  public static func manifestURLWithoutLiveDiscovery(
+    using environment: HarnessMonitorEnvironment = .current
+  ) -> URL {
+    Self.daemonRootWithoutLiveDiscovery(using: environment)
+      .appendingPathComponent("manifest.json")
   }
 
   public static func manifestURL(
