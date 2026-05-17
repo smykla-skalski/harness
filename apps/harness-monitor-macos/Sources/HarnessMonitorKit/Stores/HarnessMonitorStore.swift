@@ -26,6 +26,7 @@ public final class HarnessMonitorStore {
   @ObservationIgnored var supervisorStopTask: Task<Void, Never>?
   @ObservationIgnored let supervisorTickTrigger = SupervisorTickTrigger()
   @ObservationIgnored let acpTimelineWorker = AcpTimelineWorker()
+  @ObservationIgnored let acpRuntimeWorker = AcpRuntimeWorker()
   @ObservationIgnored var acpTimelineMergeTask: Task<Void, Never>?
   @ObservationIgnored var acpTranscriptMergeTask: Task<Void, Never>?
   @ObservationIgnored var acpTranscriptLiveMergeTask: Task<Void, Never>?

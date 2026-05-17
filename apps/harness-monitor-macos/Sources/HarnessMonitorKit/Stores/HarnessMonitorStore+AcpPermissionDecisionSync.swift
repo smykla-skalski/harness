@@ -12,12 +12,7 @@ extension HarnessMonitorStore {
     guard let decisionStore = supervisorDecisionStore else {
       return
     }
-    let payloads = acpPermissionPayloadsByDecisionID.values.sorted {
-      if $0.rawBatch.createdAt != $1.rawBatch.createdAt {
-        return $0.rawBatch.createdAt < $1.rawBatch.createdAt
-      }
-      return $0.decisionID < $1.decisionID
-    }
+    let payloads = Array(acpPermissionPayloadsByDecisionID.values)
     acpPermissionDecisionSyncGeneration &+= 1
     let generation = acpPermissionDecisionSyncGeneration
     let task = makeCancellationAwareAcpPermissionTask { store in
@@ -44,6 +39,7 @@ extension HarnessMonitorStore {
     protectedDecisionIDs: Set<String>,
     generation: UInt64
   ) async {
+    let payloads = await acpRuntimeWorker.sortedPermissionDecisionPayloads(payloads)
     var didPresentFailure = false
     let isCurrentGeneration = {
       generation == self.acpPermissionDecisionSyncGeneration
@@ -77,7 +73,7 @@ extension HarnessMonitorStore {
     do {
       staleACPDecisionIDs = try await staleAcpDecisionIDs(
         in: decisionStore,
-        activeDecisionIDs: Set(payloads.map(\.decisionID)),
+        activeDecisionIDs: Set(payloads.map { $0.decisionID }),
         staleDecisionIDs: staleDecisionIDs,
         protectedDecisionIDs: protectedDecisionIDs
       )

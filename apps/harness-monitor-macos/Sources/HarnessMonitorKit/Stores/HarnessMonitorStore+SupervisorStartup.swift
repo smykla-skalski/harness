@@ -162,12 +162,9 @@ extension HarnessMonitorStore {
   private func seedPendingAcpPermissionDecisionsIfNeeded(
     _ decisionStore: DecisionStore
   ) async throws {
-    let payloads = acpPermissionPayloadsByDecisionID.values.sorted {
-      if $0.rawBatch.createdAt != $1.rawBatch.createdAt {
-        return $0.rawBatch.createdAt < $1.rawBatch.createdAt
-      }
-      return $0.decisionID < $1.decisionID
-    }
+    let payloads = await acpRuntimeWorker.sortedPermissionDecisionPayloads(
+      Array(acpPermissionPayloadsByDecisionID.values)
+    )
     HarnessMonitorUITestTrace.record(
       component: "supervisor.startup",
       event: "seed-acp-decisions",

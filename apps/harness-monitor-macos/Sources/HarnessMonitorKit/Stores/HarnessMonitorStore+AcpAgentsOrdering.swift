@@ -169,3 +169,52 @@ extension AcpAgentSnapshot {
     )
   }
 }
+
+actor AcpRuntimeWorker {
+  func sortedPermissionDecisionPayloads(
+    _ payloads: [AcpPermissionDecisionPayload]
+  ) -> [AcpPermissionDecisionPayload] {
+    payloads.sorted {
+      if $0.rawBatch.createdAt != $1.rawBatch.createdAt {
+        return $0.rawBatch.createdAt < $1.rawBatch.createdAt
+      }
+      return $0.decisionID < $1.decisionID
+    }
+  }
+
+  func markInspectEntriesRetrying(
+    entries: [AcpRuntimeIdentity: AcpInspectSyncEntry],
+    attemptedAt: Date
+  ) -> [AcpRuntimeIdentity: AcpInspectSyncEntry] {
+    var nextEntries = entries
+    for identity in nextEntries.keys.sorted(by: { $0.id < $1.id }) {
+      guard var entry = nextEntries[identity], entry.phase != .unavailable else {
+        continue
+      }
+      entry.phase = .retrying
+      entry.lastAttemptAt = attemptedAt
+      entry.retryCount += 1
+      entry.message = nil
+      nextEntries[identity] = entry
+    }
+    return nextEntries
+  }
+
+  func promoteInspectEntriesToStalled(
+    entries: [AcpRuntimeIdentity: AcpInspectSyncEntry],
+    phases: Set<AcpRuntimeInspectPhase>
+  ) -> [AcpRuntimeIdentity: AcpInspectSyncEntry] {
+    var nextEntries = entries
+    for identity in nextEntries.keys.sorted(by: { $0.id < $1.id }) {
+      guard var entry = nextEntries[identity], phases.contains(entry.phase) else {
+        continue
+      }
+      entry.phase = .stalled
+      entry.message = nil
+      nextEntries[identity] = entry
+    }
+    return nextEntries
+  }
+
+  func waitForIdle() async {}
+}
