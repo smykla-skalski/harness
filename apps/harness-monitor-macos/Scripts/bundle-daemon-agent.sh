@@ -110,6 +110,29 @@ launch_agent_label="io.harnessmonitor.daemon.managed"
 app_group_id="$(harness_monitor_runtime_app_group_id)"
 
 /bin/mkdir -p "$helpers_dir" "$launch_agents_dir"
+
+# Stage every mutation through `*.staging` paths in the destination
+# directory and finish each bundled file with an atomic `mv`.
+# In-place rewrites of `daemon_target` while a managed daemon was running
+# triggered `OS_REASON_CODESIGNING` SIGKILLs on the live process whenever
+# kernel page validation re-checked the now-mismatched signature, which
+# produced visible WebSocket reconnect cycles each time anyone rebuilt
+# the app. `mv` allocates a new inode for the destination, so the running
+# process keeps mapping its original (now-unlinked) inode with the
+# original signature until it exits cleanly.
+#
+# The staging suffix is a fixed string (not `$$`) so the paths can be
+# declared in this script phase's `outputPaths` — Xcode's user-script
+# sandbox (`ENABLE_USER_SCRIPT_SANDBOXING=YES` in IDE-driven builds)
+# blocks any write outside the declared output set. See
+# `Tuist/ProjectDescriptionHelpers/BuildPhases.swift::bundleDaemonAgent`.
+daemon_target_staging="$daemon_target.staging"
+plist_target_staging="$plist_target.staging"
+cleanup_staging() {
+  /bin/rm -f "$daemon_target_staging" "$plist_target_staging" 2>/dev/null || true
+}
+trap cleanup_staging EXIT
+
 # `cp -p` preserves the linker-signed cs_mtime alignment from
 # `target/debug/harness` (rustc/lld embeds an ad-hoc CodeDirectory whose
 # cs_mtime is captured at link time). Plain `cp` updates the destination
@@ -118,30 +141,30 @@ app_group_id="$(harness_monitor_runtime_app_group_id)"
 # launch with "cs_mtime != mtime" (SIGKILL CODESIGNING) before our
 # resign step below has a chance to run, racing against `launchctl
 # kickstart` retries while the daemon is being rebuilt.
-/bin/cp -p "$daemon_source" "$daemon_target"
-/bin/chmod 755 "$daemon_target"
-/usr/bin/xattr -dr com.apple.provenance "$daemon_target" 2>/dev/null || true
-/usr/bin/xattr -dr com.apple.quarantine "$daemon_target" 2>/dev/null || true
-/bin/cp "$PROJECT_DIR/Resources/LaunchAgents/io.harnessmonitor.daemon.managed.plist" "$plist_target"
-/usr/bin/plutil -replace Label -string "$launch_agent_label" "$plist_target"
-/usr/bin/plutil -replace EnvironmentVariables.HARNESS_APP_GROUP_ID -string "$app_group_id" "$plist_target"
+/bin/cp -p "$daemon_source" "$daemon_target_staging"
+/bin/chmod 755 "$daemon_target_staging"
+/usr/bin/xattr -dr com.apple.provenance "$daemon_target_staging" 2>/dev/null || true
+/usr/bin/xattr -dr com.apple.quarantine "$daemon_target_staging" 2>/dev/null || true
+/bin/cp "$PROJECT_DIR/Resources/LaunchAgents/io.harnessmonitor.daemon.managed.plist" "$plist_target_staging"
+/usr/bin/plutil -replace Label -string "$launch_agent_label" "$plist_target_staging"
+/usr/bin/plutil -replace EnvironmentVariables.HARNESS_APP_GROUP_ID -string "$app_group_id" "$plist_target_staging"
 if [[ -n "${HARNESS_DAEMON_DATA_HOME:-}" ]]; then
-  /usr/bin/plutil -replace EnvironmentVariables.HARNESS_DAEMON_DATA_HOME -string "$HARNESS_DAEMON_DATA_HOME" "$plist_target"
+  /usr/bin/plutil -replace EnvironmentVariables.HARNESS_DAEMON_DATA_HOME -string "$HARNESS_DAEMON_DATA_HOME" "$plist_target_staging"
 fi
 if [[ -n "${HARNESS_CODEX_WS_PORT:-}" ]]; then
-  /usr/bin/plutil -replace EnvironmentVariables.HARNESS_CODEX_WS_PORT -string "$HARNESS_CODEX_WS_PORT" "$plist_target"
+  /usr/bin/plutil -replace EnvironmentVariables.HARNESS_CODEX_WS_PORT -string "$HARNESS_CODEX_WS_PORT" "$plist_target_staging"
 fi
 if [[ -n "${HARNESS_MONITOR_RUNTIME_LANE:-}" ]]; then
-  /usr/bin/plutil -replace EnvironmentVariables.HARNESS_MONITOR_RUNTIME_LANE -string "$HARNESS_MONITOR_RUNTIME_LANE" "$plist_target"
+  /usr/bin/plutil -replace EnvironmentVariables.HARNESS_MONITOR_RUNTIME_LANE -string "$HARNESS_MONITOR_RUNTIME_LANE" "$plist_target_staging"
 fi
 # Always reassert the ownership env so the bundled daemon writes into the
 # managed/ ownership subtree even if a stray HARNESS_DAEMON_OWNERSHIP override
 # made it into the build environment.
-/usr/bin/plutil -replace EnvironmentVariables.HARNESS_DAEMON_OWNERSHIP -string "managed" "$plist_target"
-/usr/bin/plutil -lint "$plist_target"
+/usr/bin/plutil -replace EnvironmentVariables.HARNESS_DAEMON_OWNERSHIP -string "managed" "$plist_target_staging"
+/usr/bin/plutil -lint "$plist_target_staging"
 
-if ! /usr/bin/otool -l "$daemon_target" | /usr/bin/grep -q "__info_plist"; then
-  printf 'Harness daemon helper is missing embedded Info.plist metadata: %s\n' "$daemon_target" >&2
+if ! /usr/bin/otool -l "$daemon_target_staging" | /usr/bin/grep -q "__info_plist"; then
+  printf 'Harness daemon helper is missing embedded Info.plist metadata: %s\n' "$daemon_target_staging" >&2
   exit 1
 fi
 
@@ -176,8 +199,8 @@ if [ -n "$codesign_identity" ]; then
     "$timestamp_flag" \
     --identifier io.harnessmonitor.daemon.managed \
     --entitlements "$PROJECT_DIR/HarnessMonitorDaemon.entitlements" \
-    "$daemon_target"
-  /usr/bin/codesign --verify --verbose=2 "$daemon_target"
+    "$daemon_target_staging"
+  /usr/bin/codesign --verify --verbose=2 "$daemon_target_staging"
 else
   # No usable identity (CI without keychain). Refresh the ad-hoc
   # signature so cs_mtime aligns with the post-cp file mtime, giving
@@ -186,8 +209,15 @@ else
     --force \
     --sign - \
     --identifier io.harnessmonitor.daemon.managed \
-    "$daemon_target"
+    "$daemon_target_staging"
 fi
+
+# Atomically replace the destination paths. `mv` on the same filesystem
+# is `rename(2)` and leaves any process that has the old inode mapped
+# (the running managed daemon) untouched, so the kernel keeps validating
+# pages against the original signature and never raises CODESIGNING.
+/bin/mv -f "$daemon_target_staging" "$daemon_target"
+/bin/mv -f "$plist_target_staging" "$plist_target"
 
 # Reseal the app bundle so SMAppService can validate the bundled launch agent
 # plist. Without a `_CodeSignature/CodeResources` manifest, SMAppService refuses

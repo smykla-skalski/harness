@@ -183,6 +183,29 @@ extension WebSocketTransport {
   /// (which re-reads the daemon manifest and discovers the new port).
   private static let maxReconnectAttempts = reconnectDelays.count
 
+  /// True when the error means the remote port is gone (daemon process
+  /// died or was killed). Retrying the same endpoint will never succeed —
+  /// the manifest watcher's re-bootstrap path is the only thing that can
+  /// recover, so yield to the store immediately instead of looping for
+  /// ~15 seconds against a closed loopback port.
+  static func errorIndicatesEndpointGone(_ error: any Error) -> Bool {
+    if let urlError = error as? URLError {
+      switch urlError.code {
+      case .cannotConnectToHost, .networkConnectionLost:
+        return true
+      default:
+        break
+      }
+    }
+    let nsError = error as NSError
+    if nsError.domain == NSPOSIXErrorDomain {
+      // ECONNREFUSED is the canonical "no one is listening on that port"
+      // signal we get when the daemon has exited.
+      return nsError.code == Int(ECONNREFUSED)
+    }
+    return false
+  }
+
   func startReceiveLoop() {
     receiveTask?.cancel()
     receiveTask = Task { [weak self] in
@@ -204,6 +227,12 @@ extension WebSocketTransport {
           await self.clearResponseBatchHandlers()
           await self.clearPartialFrames()
           await self.terminateAllStreams()
+          if Self.errorIndicatesEndpointGone(error) {
+            HarnessMonitorLogger.websocket.info(
+              "WebSocket endpoint is gone, yielding to store for manifest-driven re-bootstrap"
+            )
+            break
+          }
           if attempt >= Self.maxReconnectAttempts {
             HarnessMonitorLogger.websocket.warning(
               "WebSocket reconnection exhausted after \(attempt) attempts, yielding to store"
