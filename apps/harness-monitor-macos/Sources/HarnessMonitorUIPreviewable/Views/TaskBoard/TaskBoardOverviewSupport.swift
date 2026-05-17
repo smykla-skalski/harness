@@ -216,44 +216,43 @@ extension TaskBoardInboxLane {
 
 extension TaskBoardOverviewView {
   var taskBoardReviewCount: Int {
-    taskBoardItems.count { TaskBoardInboxLane(status: $0.status) == .review }
+    cachedPresentation.apiItems(in: .review).count
   }
 
   var taskBoardNeedsYouCount: Int {
-    taskBoardItems.count { TaskBoardInboxLane(status: $0.status) == .needsYou }
+    cachedPresentation.apiItems(in: .needsYou).count
   }
 
   var taskBoardBlockedCount: Int {
-    taskBoardItems.count { TaskBoardInboxLane(status: $0.status) == .blocked }
+    cachedPresentation.apiItems(in: .blocked).count
   }
 
   var taskBoardDoneCount: Int {
-    taskBoardItems.count { TaskBoardInboxLane(status: $0.status) == .done }
+    cachedPresentation.apiItems(in: .done).count
   }
 
   var aggregateNeedsYouCount: Int {
-    taskBoardNeedsYouCount + snapshot.needsYouItemCount + decisions.count
+    cachedPresentation.aggregateNeedsYouCount
   }
 
   var aggregateOpenCount: Int {
-    taskBoardItems.count { $0.status != .done } + snapshot.openItemCount + decisions.count
+    cachedPresentation.aggregateOpenCount
   }
 
   var aggregateReviewCount: Int {
-    taskBoardReviewCount + snapshot.reviewItemCount
+    cachedPresentation.aggregateReviewCount
   }
 
   var aggregateBlockedCount: Int {
-    taskBoardBlockedCount + snapshot.blockedItemCount
+    cachedPresentation.aggregateBlockedCount
   }
 
   var aggregateDoneCount: Int {
-    taskBoardDoneCount + snapshot.completedItemCount
+    cachedPresentation.aggregateDoneCount
   }
 
   var hasAggregateSummary: Bool {
-    aggregateNeedsYouCount != 0 || aggregateOpenCount != 0 || aggregateReviewCount != 0
-      || aggregateBlockedCount != 0 || aggregateDoneCount != 0
+    cachedPresentation.hasAggregateSummary
   }
 
   @ViewBuilder var aggregateSummaryContent: some View {
@@ -322,59 +321,6 @@ extension TaskBoardOverviewView {
         systemImage: TaskBoardInboxLane.blocked.systemImage,
         tint: HarnessMonitorTheme.danger
       )
-    }
-  }
-
-  static func sortedTaskBoardItems(_ items: [TaskBoardItem]) -> [TaskBoardItem] {
-    items
-      .filter { TaskBoardInboxLane(status: $0.status) != nil && $0.deletedAt == nil }
-      .sorted { left, right in
-        if left.priority != right.priority {
-          return priorityRank(left.priority) > priorityRank(right.priority)
-        }
-        if left.updatedAt != right.updatedAt {
-          return left.updatedAt > right.updatedAt
-        }
-        return left.id < right.id
-      }
-  }
-
-  static func priorityRank(_ priority: TaskBoardPriority) -> Int {
-    switch priority {
-    case .critical:
-      3
-    case .high:
-      2
-    case .medium:
-      1
-    case .low:
-      0
-    }
-  }
-
-  static func sortedDecisions(_ decisions: [Decision]) -> [Decision] {
-    decisions
-      .filter { $0.statusRaw == "open" }
-      .sorted { left, right in
-        if severityRank(left.severityRaw) != severityRank(right.severityRaw) {
-          return severityRank(left.severityRaw) > severityRank(right.severityRaw)
-        }
-        return left.createdAt < right.createdAt
-      }
-  }
-
-  static func severityRank(_ severity: String) -> Int {
-    switch DecisionSeverity(rawValue: severity) {
-    case .critical:
-      3
-    case .needsUser:
-      2
-    case .warn:
-      1
-    case .info:
-      0
-    case .none:
-      0
     }
   }
 }

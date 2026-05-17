@@ -278,7 +278,7 @@ struct SessionWindowRouteContentMetricsTests {
     #expect(overviewSource.contains("onEvaluateTaskBoardItem(item)"))
     #expect(!overviewSource.contains("if !item.hasLinkedSessionTask"))
     #expect(overviewSource.contains("TaskBoardOverviewItemBehavior.selectionAction("))
-    #expect(overviewSource.contains("inboxItems: snapshot.items"))
+    #expect(overviewSource.contains("inboxItems: cachedPresentation.inboxItems(in: lane)"))
     #expect(managementPanelSource.contains("Session Task"))
     #expect(managementPanelSource.contains("Board Only"))
     #expect(managementPanelSource.contains("TaskBoardManagementFacts("))

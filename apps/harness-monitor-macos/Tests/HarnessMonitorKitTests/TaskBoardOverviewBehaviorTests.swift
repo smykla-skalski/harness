@@ -162,6 +162,61 @@ struct TaskBoardOverviewBehaviorTests {
     #expect(evaluation.dryRun == false)
   }
 
+  @Test("Overview presentation buckets task board lanes and decisions off main")
+  @MainActor
+  func overviewPresentationBucketsTaskBoardLanesAndDecisions() async {
+    let worker = TaskBoardOverviewPresentationWorker()
+    let ready = taskBoardItem(id: "ready", status: .todo, priority: .high)
+    let needsYou = taskBoardItem(id: "needs-you", status: .needsYou, priority: .critical)
+    let deleted = taskBoardItem(id: "deleted", status: .blocked, deletedAt: "2026-05-14T11:00:00Z")
+    let inbox = inboxItem(taskID: "running-inbox", status: .inProgress)
+    let criticalDecision = decision(id: "decision-critical", severity: .critical)
+    let dismissedDecision = decision(id: "decision-dismissed", severity: .info, statusRaw: "dismissed")
+
+    let presentation = await worker.compute(
+      input: TaskBoardOverviewPresentationInput(
+        snapshot: TaskBoardInboxSnapshot(items: [inbox]),
+        taskBoardItems: [ready, deleted, needsYou],
+        decisionItems: [criticalDecision, dismissedDecision].map(DecisionPresentationItem.init)
+      )
+    )
+
+    #expect(presentation.apiItems(in: .needsYou).map(\.id) == ["needs-you"])
+    #expect(presentation.apiItems(in: .ready).map(\.id) == ["ready"])
+    #expect(presentation.apiItems(in: .blocked).isEmpty)
+    #expect(presentation.inboxItems(in: .running).map(\.task.taskId) == ["running-inbox"])
+    #expect(presentation.decisionIDs(in: .needsYou) == ["decision-critical"])
+    #expect(presentation.aggregateNeedsYouCount == 2)
+    #expect(presentation.aggregateOpenCount == 4)
+  }
+
+  @Test("Dispatch presentation filters host project types off main")
+  func dispatchPresentationFiltersHostProjectTypes() async {
+    let worker = TaskBoardOperationsDispatchPresentationWorker()
+    let accepted = taskBoardItem(
+      id: "swift",
+      status: .todo,
+      targetProjectTypes: ["swift"]
+    )
+    let rejected = taskBoardItem(
+      id: "rust",
+      status: .todo,
+      targetProjectTypes: ["rust"]
+    )
+
+    let presentation = await worker.compute(
+      input: TaskBoardOperationsDispatchPresentationInput(
+        taskBoardItems: [accepted, rejected],
+        localHostProjectTypes: ["swift"]
+      )
+    )
+
+    #expect(presentation.dispatchableItems.map(\.id) == ["swift"])
+    #expect(presentation.item(id: "swift")?.id == "swift")
+    #expect(presentation.item(id: "rust") == nil)
+    #expect(!presentation.didFilterOut)
+  }
+
   @Test("Needs You lane preserves explicit inbox status for imported GitHub inbox items")
   func needsYouLanePreservesImportedGitHubInboxStatus() {
     let inboxItem = taskBoardItem(
@@ -264,7 +319,10 @@ struct TaskBoardOverviewBehaviorTests {
     #expect(large.summaryPillVerticalPadding > regular.summaryPillVerticalPadding)
   }
 
-  private func inboxItem(taskID: String) -> TaskBoardInboxItem {
+  private func inboxItem(
+    taskID: String,
+    status: TaskStatus = .inProgress
+  ) -> TaskBoardInboxItem {
     let item = TaskBoardInboxItem(
       session: PreviewFixtures.summary,
       task: WorkItem(
@@ -272,7 +330,7 @@ struct TaskBoardOverviewBehaviorTests {
         title: "Linked task",
         context: nil,
         severity: .medium,
-        status: .inProgress,
+        status: status,
         assignedTo: nil,
         createdAt: "2026-05-14T10:00:00Z",
         updatedAt: "2026-05-14T10:01:00Z",
@@ -294,10 +352,13 @@ struct TaskBoardOverviewBehaviorTests {
   private func taskBoardItem(
     id: String,
     status: TaskBoardStatus,
+    priority: TaskBoardPriority = .medium,
+    targetProjectTypes: [String] = [],
     externalRefs: [TaskBoardExternalRef] = [],
     planning: TaskBoardPlanningState = TaskBoardPlanningState(),
     sessionId: String? = nil,
-    workItemId: String? = nil
+    workItemId: String? = nil,
+    deletedAt: String? = nil
   ) -> TaskBoardItem {
     TaskBoardItem(
       schemaVersion: 1,
@@ -305,9 +366,10 @@ struct TaskBoardOverviewBehaviorTests {
       title: "Board item",
       body: "Body",
       status: status,
-      priority: .medium,
+      priority: priority,
       tags: [],
       projectId: "project-1",
+      targetProjectTypes: targetProjectTypes,
       agentMode: .interactive,
       externalRefs: externalRefs,
       planning: planning,
@@ -317,7 +379,28 @@ struct TaskBoardOverviewBehaviorTests {
       usage: TaskBoardUsage(),
       createdAt: "2026-05-14T10:00:00Z",
       updatedAt: "2026-05-14T10:01:00Z",
-      deletedAt: nil
+      deletedAt: deletedAt
     )
+  }
+
+  private func decision(
+    id: String,
+    severity: DecisionSeverity,
+    statusRaw: String = "open"
+  ) -> Decision {
+    let decision = Decision(
+      id: id,
+      severity: severity,
+      ruleID: "rule-\(id)",
+      sessionID: PreviewFixtures.summary.sessionId,
+      agentID: nil,
+      taskID: nil,
+      summary: id,
+      contextJSON: "{}",
+      suggestedActionsJSON: "[]",
+      createdAt: Date(timeIntervalSinceReferenceDate: 801_000_000)
+    )
+    decision.statusRaw = statusRaw
+    return decision
   }
 }

@@ -19,7 +19,8 @@ extension TaskBoardOverviewView {
 
   var selectedTaskBoardItem: TaskBoardItem? {
     guard let selectedTaskBoardItemIDValue else { return nil }
-    return taskBoardItems.first { $0.id == selectedTaskBoardItemIDValue }
+    return cachedPresentation.taskBoardItem(id: selectedTaskBoardItemIDValue)
+      ?? taskBoardItems.first { $0.id == selectedTaskBoardItemIDValue }
   }
 
   func openTaskBoardItem(_ item: TaskBoardItem) {
@@ -39,7 +40,8 @@ extension TaskBoardOverviewView {
       return false
     }
     guard
-      let item = taskBoardItems.first(where: { $0.id == itemID }),
+      let item = cachedPresentation.taskBoardItem(id: itemID)
+        ?? taskBoardItems.first(where: { $0.id == itemID }),
       let currentLane = TaskBoardInboxLane(status: item.status),
       currentLane != lane
     else {
