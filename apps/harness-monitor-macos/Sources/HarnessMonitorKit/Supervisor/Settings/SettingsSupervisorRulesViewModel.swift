@@ -1,7 +1,7 @@
 import Foundation
 import Observation
 
-public struct SettingsSupervisorRuleDescriptor: Identifiable, Hashable {
+public struct SettingsSupervisorRuleDescriptor: Identifiable, Hashable, Sendable {
   public let id: String
   public let name: String
   public let version: Int
@@ -26,6 +26,7 @@ public final class SettingsSupervisorRulesViewModel {
 
   public let rules: [SettingsSupervisorRuleDescriptor]
 
+  @ObservationIgnored private let worker = SettingsSupervisorRulesWorker()
   @ObservationIgnored var overridesByRuleID: [String: RuleOverrideState] = [:]
   @ObservationIgnored var parameterValuesByKey: [String: String] = [:]
   var editorStates: [String: RuleEditorState] = [:]
@@ -66,30 +67,14 @@ public final class SettingsSupervisorRulesViewModel {
   }
 
   public func applyRowSnapshots(_ rows: [PolicyConfigRowSnapshot]) {
-    overridesByRuleID = Dictionary(
-      uniqueKeysWithValues: rows.map {
-        (
-          $0.ruleID,
-          RuleOverrideState(
-            enabled: $0.enabled,
-            defaultBehavior: RuleDefaultBehavior(rawValue: $0.defaultBehaviorRaw) ?? .cautious,
-            parameters: Self.decodeParameters(from: $0.parametersJSON)
-          )
-        )
-      }
-    )
-    for rule in rules {
-      if let override = overridesByRuleID[rule.id] {
-        editorStates[rule.id] = RuleEditorState(
-          enabled: override.enabled,
-          defaultBehavior: override.defaultBehavior,
-          parameterValues: Self.defaultParameters(for: rule)
-            .merging(override.parameters) { _, overrideValue in overrideValue }
-        )
-      } else {
-        editorStates[rule.id] = Self.builtInEditorState(for: rule)
-      }
-    }
+    applyPreparedRows(Self.prepareRows(rows, rules: rules))
+    loadSelectedRule()
+  }
+
+  public func applyRowSnapshotsAsync(_ rows: [PolicyConfigRowSnapshot]) async {
+    let output = await worker.prepareRows(rows, rules: rules)
+    guard !Task.isCancelled else { return }
+    applyPreparedRows(output)
     loadSelectedRule()
   }
 

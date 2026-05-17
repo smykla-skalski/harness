@@ -54,17 +54,17 @@ public struct SettingsSupervisorRulesPane: View {
   private func reloadRows() async {
     guard let repository else {
       persistedRowsByRuleID = [:]
-      viewModel.applyRowSnapshots([])
+      await viewModel.applyRowSnapshotsAsync([])
       return
     }
     do {
       let rows = try await repository.fetchRows()
       persistedRowsByRuleID = Dictionary(uniqueKeysWithValues: rows.map { ($0.ruleID, $0) })
-      viewModel.applyRowSnapshots(rows)
+      await viewModel.applyRowSnapshotsAsync(rows)
       errorMessages = [:]
     } catch {
       persistedRowsByRuleID = [:]
-      viewModel.applyRowSnapshots([])
+      await viewModel.applyRowSnapshotsAsync([])
       errorMessages = Dictionary(
         uniqueKeysWithValues: viewModel.rules.map { ($0.id, error.localizedDescription) }
       )

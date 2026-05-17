@@ -24,6 +24,26 @@ final class SettingsSupervisorRulesViewModelTests: XCTestCase {
     XCTAssertEqual(viewModel.parameterValue(for: "nudgeRetryInterval"), "240")
   }
 
+  func test_applyRowSnapshotsAsyncLoadsPersistedOverrideForSelectedRule() async {
+    let row = PolicyConfigRowSnapshot(
+      ruleID: "stuck-agent",
+      enabled: false,
+      defaultBehaviorRaw: RuleDefaultBehavior.aggressive.rawValue,
+      parametersJSON: #"{"nudgeMaxRetries":"5","nudgeRetryInterval":"240","stuckThreshold":"180"}"#
+    )
+    let viewModel = SettingsSupervisorRulesViewModel()
+
+    await viewModel.applyRowSnapshotsAsync([row])
+    viewModel.selectRule(id: "stuck-agent")
+
+    XCTAssertEqual(viewModel.selectedRuleID, "stuck-agent")
+    XCTAssertFalse(viewModel.enabled)
+    XCTAssertEqual(viewModel.defaultBehavior, .aggressive)
+    XCTAssertEqual(viewModel.parameterValue(for: "stuckThreshold"), "180")
+    XCTAssertEqual(viewModel.parameterValue(for: "nudgeMaxRetries"), "5")
+    XCTAssertEqual(viewModel.parameterValue(for: "nudgeRetryInterval"), "240")
+  }
+
   func test_makePolicyConfigRowRoundTripsEditsThroughPolicyConfigRow() throws {
     let viewModel = SettingsSupervisorRulesViewModel()
 
