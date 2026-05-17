@@ -1,6 +1,6 @@
 import SwiftUI
 
-private struct PolicyCanvasDisplayedEdgeRouteRequest {
+struct PolicyCanvasDisplayedEdgeRouteRequest {
   let router: any PolicyCanvasEdgeRouter
   let viewModel: PolicyCanvasViewModel
   let edge: PolicyCanvasEdge
@@ -9,8 +9,31 @@ private struct PolicyCanvasDisplayedEdgeRouteRequest {
   let routeLane: Int
   let sourceFanoutLane: Int
   let targetFanoutLane: Int
+  let sourceTerminalSlot: PolicyCanvasRouteEndpointSlot
+  let targetTerminalSlot: PolicyCanvasRouteEndpointSlot
   let lineSpacing: CGFloat
   let obstacles: [CGRect]
+}
+
+struct PolicyCanvasResolvedDisplayedRouteRequest {
+  let router: any PolicyCanvasEdgeRouter
+  let edge: PolicyCanvasEdge
+  let source: CGPoint
+  let target: CGPoint
+  let routeLane: Int
+  let sourceFanoutLane: Int
+  let targetFanoutLane: Int
+  let lineSpacing: CGFloat
+  let obstacles: [CGRect]
+  let groups: [PolicyCanvasGroup]
+  let sourceGroupID: String?
+  let targetGroupID: String?
+  let sourceAnchor: PolicyCanvasRouteAnchorCandidate
+  let targetAnchor: PolicyCanvasRouteAnchorCandidate
+  let sourceCandidates: [PolicyCanvasRouteAnchorCandidate]
+  let targetCandidates: [PolicyCanvasRouteAnchorCandidate]
+  let sourceSpacingBySide: [PolicyCanvasPortSide: CGFloat]
+  let targetSpacingBySide: [PolicyCanvasPortSide: CGFloat]
 }
 
 @MainActor
@@ -23,11 +46,16 @@ func policyCanvasDisplayedRoutes(
   let edgeLanes = viewModel.edgeRouteLanes
   let sourceFanoutLanes = viewModel.edgeSourceFanoutLanes
   let targetFanoutLanes = viewModel.edgeTargetFanoutLanes
-  return edges.reduce(into: [String: PolicyCanvasEdgeRoute]()) { routes, edge in
+  let orderedEdges = policyCanvasRouteBuildOrder(edges: edges, portAnchors: portAnchors)
+  let terminalSlots = policyCanvasRouteEndpointSlots(edges: orderedEdges)
+  var routes: [String: PolicyCanvasEdgeRoute] = [:]
+  var previousRoutes: [PolicyCanvasDisplayedRouteClearance] = []
+  for edge in orderedEdges {
     guard let source = portAnchors[edge.source], let target = portAnchors[edge.target] else {
-      return
+      continue
     }
-    routes[edge.id] = policyCanvasDisplayedRoute(
+    let edgeTerminalSlots = terminalSlots[edge.id]
+    let request = policyCanvasResolvedDisplayedRouteRequest(
       PolicyCanvasDisplayedEdgeRouteRequest(
         router: router,
         viewModel: viewModel,
@@ -37,11 +65,129 @@ func policyCanvasDisplayedRoutes(
         routeLane: edgeLanes[edge.id, default: 0],
         sourceFanoutLane: sourceFanoutLanes[edge.id, default: 0],
         targetFanoutLane: targetFanoutLanes[edge.id, default: 0],
+        sourceTerminalSlot: edgeTerminalSlots?.source ?? .single,
+        targetTerminalSlot: edgeTerminalSlots?.target ?? .single,
         lineSpacing: viewModel.edgeLineSpacing(for: edge),
         obstacles: viewModel.routingObstacles(source: source, target: target)
       )
     )
+    let route = policyCanvasCollisionAwareDisplayedRoute(
+      request,
+      previousRoutes: previousRoutes
+    )
+    routes[edge.id] = route
+    previousRoutes.append(
+      PolicyCanvasDisplayedRouteClearance(
+        route: route,
+        minimumSpacing: policyCanvasRouteMinimumSpacing(request: request, route: route)
+      )
+    )
   }
+  return routes
+}
+
+@MainActor
+func policyCanvasResolvedDisplayedRouteRequest(
+  _ request: PolicyCanvasDisplayedEdgeRouteRequest
+) -> PolicyCanvasResolvedDisplayedRouteRequest {
+  let sourceGroupID = request.viewModel.node(request.edge.source.nodeID)?.groupID
+  let targetGroupID = request.viewModel.node(request.edge.target.nodeID)?.groupID
+  let sourceSide = policyCanvasResolvedPortSide(for: request.edge.source)
+  let targetSide = policyCanvasResolvedPortSide(for: request.edge.target)
+  let sourceCandidates = policyCanvasRouteAnchorCandidates(
+    for: request.edge.source,
+    in: request.viewModel,
+    terminalSlot: request.sourceTerminalSlot
+  )
+  let targetCandidates = policyCanvasRouteAnchorCandidates(
+    for: request.edge.target,
+    in: request.viewModel,
+    terminalSlot: request.targetTerminalSlot
+  )
+  return PolicyCanvasResolvedDisplayedRouteRequest(
+    router: request.router,
+    edge: request.edge,
+    source: request.source,
+    target: request.target,
+    routeLane: request.routeLane,
+    sourceFanoutLane: request.sourceFanoutLane,
+    targetFanoutLane: request.targetFanoutLane,
+    lineSpacing: request.lineSpacing,
+    obstacles: request.obstacles,
+    groups: request.viewModel.groups,
+    sourceGroupID: sourceGroupID,
+    targetGroupID: targetGroupID,
+    sourceAnchor: sourceCandidates.first(where: { $0.side == sourceSide })
+      ?? (point: request.source, side: sourceSide),
+    targetAnchor: targetCandidates.first(where: { $0.side == targetSide })
+      ?? (point: request.target, side: targetSide),
+    sourceCandidates: sourceCandidates,
+    targetCandidates: targetCandidates,
+    sourceSpacingBySide: policyCanvasPortSpacingBySide(
+      viewModel: request.viewModel,
+      endpoint: request.edge.source
+    ),
+    targetSpacingBySide: policyCanvasPortSpacingBySide(
+      viewModel: request.viewModel,
+      endpoint: request.edge.target
+    )
+  )
+}
+
+@MainActor
+private func policyCanvasPortSpacingBySide(
+  viewModel: PolicyCanvasViewModel,
+  endpoint: PolicyCanvasPortEndpoint
+) -> [PolicyCanvasPortSide: CGFloat] {
+  Dictionary(
+    uniqueKeysWithValues: PolicyCanvasPortSide.allSides.map { side in
+      (side, viewModel.portSpacing(for: endpoint, side: side))
+    }
+  )
+}
+
+@MainActor
+func policyCanvasDisplayedRoute(
+  _ request: PolicyCanvasDisplayedEdgeRouteRequest
+) -> PolicyCanvasEdgeRoute {
+  policyCanvasDisplayedRoute(policyCanvasResolvedDisplayedRouteRequest(request))
+}
+
+func policyCanvasDisplayedRoute(
+  _ request: PolicyCanvasResolvedDisplayedRouteRequest
+) -> PolicyCanvasEdgeRoute {
+  let context = PolicyCanvasRouteContext(
+    lane: request.routeLane,
+    groups: request.groups,
+    sourceGroupID: request.sourceGroupID,
+    targetGroupID: request.targetGroupID,
+    obstacles: request.obstacles,
+    sourceActual: request.source,
+    targetActual: request.target,
+    lineSpacing: request.lineSpacing
+  )
+  if request.edge.effectivePinnedPortSide {
+    return policyCanvasDisplayedRoute(
+      PolicyCanvasPinnedDisplayedRouteRequest(
+        router: request.router,
+        source: request.sourceAnchor,
+        sourceFanoutLane: request.sourceFanoutLane,
+        target: request.targetAnchor,
+        targetFanoutLane: request.targetFanoutLane,
+        context: context
+      )
+    )
+  }
+  return policyCanvasDisplayedRoute(
+    PolicyCanvasFlexibleDisplayedRouteRequest(
+      router: request.router,
+      sourceCandidates: request.sourceCandidates,
+      sourceFanoutLane: request.sourceFanoutLane,
+      targetCandidates: request.targetCandidates,
+      targetFanoutLane: request.targetFanoutLane,
+      context: context
+    )
+  )
 }
 
 @MainActor
@@ -52,78 +198,43 @@ func policyCanvasResolvedLabelPositions(
   fontScale: CGFloat
 ) -> [String: CGPoint] {
   let metrics = PolicyCanvasEdgeLabelMetrics(fontScale: fontScale)
+  let labelledRoutes: [(id: String, route: PolicyCanvasEdgeRoute)] = edges.compactMap { edge in
+    guard !edge.label.isEmpty, let route = routes[edge.id] else {
+      return nil
+    }
+    return (id: edge.id, route: route)
+  }
   return policyCanvasResolvedLabelPositions(
-    routes: edges.compactMap { edge in
-      guard !edge.label.isEmpty, let route = routes[edge.id] else {
-        return nil
-      }
-      return (id: edge.id, route: route)
-    },
+    routes: labelledRoutes,
     nodeFrames: viewModel.nodes.map {
       CGRect(origin: $0.position, size: PolicyCanvasLayout.nodeSize)
-    },
+    } + policyCanvasGroupTitleFrames(viewModel.groups),
+    routeFrames: policyCanvasRouteFrames(labelledRoutes),
     labelSize: CGSize(width: PolicyCanvasLayout.edgeLabelMaxWidth, height: metrics.height)
   )
 }
 
-@MainActor
-private func policyCanvasDisplayedRoute(
-  _ request: PolicyCanvasDisplayedEdgeRouteRequest
-) -> PolicyCanvasEdgeRoute {
-  let sourceGroupID = request.viewModel.node(request.edge.source.nodeID)?.groupID
-  let targetGroupID = request.viewModel.node(request.edge.target.nodeID)?.groupID
-  let context = PolicyCanvasRouteContext(
-    lane: request.routeLane,
-    groups: request.viewModel.groups,
-    sourceGroupID: sourceGroupID,
-    targetGroupID: targetGroupID,
-    obstacles: request.obstacles,
-    sourceActual: request.source,
-    targetActual: request.target,
-    lineSpacing: request.lineSpacing
-  )
-  if request.edge.effectivePinnedPortSide {
-    return policyCanvasDisplayedRoute(
-      PolicyCanvasPinnedDisplayedRouteRequest(
-        router: request.router,
-        source: (point: request.source, side: resolvedPortSide(for: request.edge.source)),
-        sourceFanoutLane: request.sourceFanoutLane,
-        target: (point: request.target, side: resolvedPortSide(for: request.edge.target)),
-        targetFanoutLane: request.targetFanoutLane,
-        context: context
-      )
-    )
-  }
-  return policyCanvasDisplayedRoute(
-    PolicyCanvasFlexibleDisplayedRouteRequest(
-      router: request.router,
-      sourceCandidates: routeAnchorCandidates(for: request.edge.source, in: request.viewModel),
-      sourceFanoutLane: request.sourceFanoutLane,
-      targetCandidates: routeAnchorCandidates(for: request.edge.target, in: request.viewModel),
-      targetFanoutLane: request.targetFanoutLane,
-      context: context
-    )
-  )
-}
-
-private func resolvedPortSide(for endpoint: PolicyCanvasPortEndpoint) -> PolicyCanvasPortSide {
+func policyCanvasResolvedPortSide(for endpoint: PolicyCanvasPortEndpoint) -> PolicyCanvasPortSide {
   endpoint.side ?? (endpoint.kind == .input ? .leading : .trailing)
-}
-
-@MainActor
-private func routeAnchorCandidates(
-  for endpoint: PolicyCanvasPortEndpoint,
-  in viewModel: PolicyCanvasViewModel
-) -> [PolicyCanvasRouteAnchorCandidate] {
-  let points = viewModel.portAnchorCandidates(for: endpoint)
-  return zip(PolicyCanvasPortSide.allSides, points).map { side, point in
-    (point: point, side: side)
-  }
 }
 
 func policyCanvasResolvedLabelPositions(
   routes: [(id: String, route: PolicyCanvasEdgeRoute)],
   nodeFrames: [CGRect],
+  labelSize: CGSize
+) -> [String: CGPoint] {
+  policyCanvasResolvedLabelPositions(
+    routes: routes,
+    nodeFrames: nodeFrames,
+    routeFrames: [:],
+    labelSize: labelSize
+  )
+}
+
+func policyCanvasResolvedLabelPositions(
+  routes: [(id: String, route: PolicyCanvasEdgeRoute)],
+  nodeFrames: [CGRect],
+  routeFrames: [String: [CGRect]],
   labelSize: CGSize
 ) -> [String: CGPoint] {
   var occupiedFrames: [CGRect] = []
@@ -139,10 +250,17 @@ func policyCanvasResolvedLabelPositions(
   }
   for entry in sortedRoutes {
     let base = entry.route.labelPosition
+    let blockingRouteFrames = routeFrames.reduce(into: [CGRect]()) { result, element in
+      guard element.key != entry.id else {
+        return
+      }
+      result.append(contentsOf: element.value)
+    }
     let position = policyCanvasResolvedLabelPosition(
       base: base,
       occupiedFrames: occupiedFrames,
       nodeFrames: nodeFrames,
+      routeFrames: blockingRouteFrames,
       labelSize: labelSize
     )
     positions[entry.id] = position
@@ -155,12 +273,14 @@ private func policyCanvasResolvedLabelPosition(
   base: CGPoint,
   occupiedFrames: [CGRect],
   nodeFrames: [CGRect],
+  routeFrames: [CGRect],
   labelSize: CGSize
 ) -> CGPoint {
   for candidate in policyCanvasLabelCandidates(base: base, labelSize: labelSize) {
     let frame = policyCanvasLabelFrame(center: candidate, size: labelSize)
     if !occupiedFrames.contains(where: { $0.intersects(frame) })
       && !nodeFrames.contains(where: { $0.intersects(frame) })
+      && !routeFrames.contains(where: { $0.intersects(frame) })
     {
       return candidate
     }
@@ -215,20 +335,4 @@ private func policyCanvasLabelFrame(center: CGPoint, size: CGSize) -> CGRect {
     width: size.width,
     height: size.height
   )
-}
-
-struct PolicyCanvasEdgeLabelMetrics {
-  let horizontalPadding: CGFloat
-  let minWidth: CGFloat
-  let height: CGFloat
-
-  init(fontScale: CGFloat) {
-    let scale = min(SessionWindowFontScale.metricsScale(for: fontScale), 1.45)
-    horizontalPadding = (12 * scale).rounded(.up)
-    minWidth = (88 * scale).rounded(.up)
-    height = max(
-      PolicyCanvasLayout.edgeLabelHeight,
-      (PolicyCanvasLayout.edgeLabelHeight * scale).rounded(.up)
-    )
-  }
 }

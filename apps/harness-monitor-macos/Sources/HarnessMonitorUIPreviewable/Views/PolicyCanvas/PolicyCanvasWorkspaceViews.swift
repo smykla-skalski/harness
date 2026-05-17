@@ -18,7 +18,6 @@ struct PolicyCanvasViewport: View {
   @State private var routeGeneration: UInt64 = 0
   @State private var validationWorker = PolicyCanvasValidationWorker()
   @State private var validationGeneration: UInt64 = 0
-  @State private var cachedRouteInput: PolicyCanvasRouteWorkerInput?
   @State private var cachedRouteOutput = PolicyCanvasRouteWorkerOutput.empty
   @Environment(\.scenePhase)
   private var scenePhase
@@ -34,6 +33,7 @@ struct PolicyCanvasViewport: View {
     let routeOutput = cachedRouteOutput
     let routes = routeOutput.routes
     let labelPositions = routeOutput.labelPositions
+    let portVisibility = routeOutput.portVisibility
     let visibleBounds = routeOutput.visibleBounds
     let edgeAccessibilityLabelsByID = routeOutput.accessibilityEdgeLabelsByID
     let accessibilityNodeEntries = routeOutput.accessibilityNodeEntries
@@ -41,7 +41,7 @@ struct PolicyCanvasViewport: View {
     let nodeAccessibilityValuesByID = routeOutput.nodeAccessibilityValuesByID
     let connectTargetsByNodeID = routeOutput.connectTargetsByNodeID
     let nodeValidationIssueMessagesByID = viewModel.nodeValidationIssueMessagesByID
-    let contentSize = policyCanvasVisibleContentSize(visibleBounds: visibleBounds)
+    let contentSize = routeOutput.contentSize
     GeometryReader { proxy in
       ScrollViewReader { _ in
         let edges = viewModel.edges
@@ -102,7 +102,8 @@ struct PolicyCanvasViewport: View {
                 focusedComponent: focusedComponent,
                 nodeAccessibilityValuesByID: nodeAccessibilityValuesByID,
                 connectTargetsByNodeID: connectTargetsByNodeID,
-                nodeValidationIssueMessagesByID: nodeValidationIssueMessagesByID
+                nodeValidationIssueMessagesByID: nodeValidationIssueMessagesByID,
+                portVisibility: portVisibility
               )
               if showSimulationOverlay {
                 PolicyCanvasSimulationLayer(viewModel: viewModel)
@@ -233,7 +234,6 @@ extension PolicyCanvasViewport {
     guard !Task.isCancelled, routeGeneration == generation else {
       return
     }
-    cachedRouteInput = input
     if cachedRouteOutput != output {
       cachedRouteOutput = output
     }

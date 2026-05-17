@@ -1,0 +1,395 @@
+import SwiftUI
+
+extension PolicyCanvasRouteWorkerInput {
+  func displayedRoutes(
+    router: any PolicyCanvasEdgeRouter
+  ) -> [String: PolicyCanvasEdgeRoute] {
+    let nodeIndex = nodeIndex
+    let obstacles = routingObstacles()
+    let portAnchors = portAnchors(nodeIndex: nodeIndex)
+    let orderedEdges = policyCanvasRouteBuildOrder(edges: edges, portAnchors: portAnchors)
+    let terminalSlots = policyCanvasRouteEndpointSlots(edges: orderedEdges)
+    let edgeLanes = laneAssignments(
+      bucket: { edgeRouteBucket($0, nodeIndex: nodeIndex) },
+      sortKey: { edgeRouteSortKey($0, nodeIndex: nodeIndex) }
+    )
+    let sourceFanoutLanes = laneAssignments(
+      bucket: edgeSourceFanoutBucket,
+      sortKey: { edgeSourceFanoutSortKey($0, nodeIndex: nodeIndex) }
+    )
+    let targetFanoutLanes = laneAssignments(
+      bucket: edgeTargetFanoutBucket,
+      sortKey: { edgeTargetFanoutSortKey($0, nodeIndex: nodeIndex) }
+    )
+    var routes: [String: PolicyCanvasEdgeRoute] = [:]
+    var previousRoutes: [PolicyCanvasDisplayedRouteClearance] = []
+    routes.reserveCapacity(edges.count)
+    previousRoutes.reserveCapacity(edges.count)
+    for edge in orderedEdges {
+      guard let source = portAnchors[edge.source], let target = portAnchors[edge.target] else {
+        continue
+      }
+      let edgeTerminalSlots = terminalSlots[edge.id]
+      let request = resolvedDisplayedRouteRequest(
+        edge: edge,
+        source: source,
+        target: target,
+        routeLane: edgeLanes[edge.id, default: 0],
+        sourceFanoutLane: sourceFanoutLanes[edge.id, default: 0],
+        targetFanoutLane: targetFanoutLanes[edge.id, default: 0],
+        sourceTerminalSlot: edgeTerminalSlots?.source ?? .single,
+        targetTerminalSlot: edgeTerminalSlots?.target ?? .single,
+        nodeIndex: nodeIndex,
+        obstacles: obstacles,
+        router: router
+      )
+      let route = policyCanvasCollisionAwareDisplayedRoute(
+        request,
+        previousRoutes: previousRoutes
+      )
+      routes[edge.id] = route
+      previousRoutes.append(
+        PolicyCanvasDisplayedRouteClearance(
+          route: route,
+          minimumSpacing: policyCanvasRouteMinimumSpacing(request: request, route: route)
+        )
+      )
+    }
+    return routes
+  }
+
+  func portVisibility(
+    routes: [String: PolicyCanvasEdgeRoute],
+    nodeIndex: [String: PolicyCanvasRouteNode]
+  ) -> PolicyCanvasPortVisibilityMap {
+    policyCanvasPortVisibility(edges: edges, routes: routes) { endpoint in
+      routeAnchorCandidates(for: endpoint, nodeIndex: nodeIndex)
+    }
+  }
+
+  private func resolvedDisplayedRouteRequest(
+    edge: PolicyCanvasEdge,
+    source: CGPoint,
+    target: CGPoint,
+    routeLane: Int,
+    sourceFanoutLane: Int,
+    targetFanoutLane: Int,
+    sourceTerminalSlot: PolicyCanvasRouteEndpointSlot,
+    targetTerminalSlot: PolicyCanvasRouteEndpointSlot,
+    nodeIndex: [String: PolicyCanvasRouteNode],
+    obstacles: [CGRect],
+    router: any PolicyCanvasEdgeRouter
+  ) -> PolicyCanvasResolvedDisplayedRouteRequest {
+    let sourceCandidates = routeAnchorCandidates(
+      for: edge.source,
+      nodeIndex: nodeIndex,
+      terminalSlot: sourceTerminalSlot
+    )
+    let targetCandidates = routeAnchorCandidates(
+      for: edge.target,
+      nodeIndex: nodeIndex,
+      terminalSlot: targetTerminalSlot
+    )
+    let sourceSide = policyCanvasResolvedPortSide(for: edge.source)
+    let targetSide = policyCanvasResolvedPortSide(for: edge.target)
+    return PolicyCanvasResolvedDisplayedRouteRequest(
+      router: router,
+      edge: edge,
+      source: source,
+      target: target,
+      routeLane: routeLane,
+      sourceFanoutLane: sourceFanoutLane,
+      targetFanoutLane: targetFanoutLane,
+      lineSpacing: edgeLineSpacing(for: edge, nodeIndex: nodeIndex),
+      obstacles: obstacles,
+      groups: groups,
+      sourceGroupID: nodeIndex[edge.source.nodeID]?.groupID,
+      targetGroupID: nodeIndex[edge.target.nodeID]?.groupID,
+      sourceAnchor: routeAnchorCandidate(
+        for: edge.source,
+        side: sourceSide,
+        nodeIndex: nodeIndex,
+        terminalSlot: sourceTerminalSlot
+      ) ?? (point: source, side: sourceSide),
+      targetAnchor: routeAnchorCandidate(
+        for: edge.target,
+        side: targetSide,
+        nodeIndex: nodeIndex,
+        terminalSlot: targetTerminalSlot
+      ) ?? (point: target, side: targetSide),
+      sourceCandidates: sourceCandidates,
+      targetCandidates: targetCandidates,
+      sourceSpacingBySide: portSpacingBySide(for: edge.source, nodeIndex: nodeIndex),
+      targetSpacingBySide: portSpacingBySide(for: edge.target, nodeIndex: nodeIndex)
+    )
+  }
+
+  private func routingObstacles() -> [CGRect] {
+    nodes.map(\.frame) + policyCanvasGroupTitleFrames(groups)
+  }
+
+  private func portAnchors(
+    nodeIndex: [String: PolicyCanvasRouteNode]
+  ) -> [PolicyCanvasPortEndpoint: CGPoint] {
+    var anchors: [PolicyCanvasPortEndpoint: CGPoint] = [:]
+    anchors.reserveCapacity(edges.count * 2)
+    for edge in edges {
+      if let point = portAnchor(for: edge.source, nodeIndex: nodeIndex) {
+        anchors[edge.source] = point
+      }
+      if let point = portAnchor(for: edge.target, nodeIndex: nodeIndex) {
+        anchors[edge.target] = point
+      }
+    }
+    return anchors
+  }
+
+  private func routeAnchorCandidates(
+    for endpoint: PolicyCanvasPortEndpoint,
+    nodeIndex: [String: PolicyCanvasRouteNode],
+    terminalSlot: PolicyCanvasRouteEndpointSlot = .single
+  ) -> [PolicyCanvasRouteAnchorCandidate] {
+    routablePortSides(for: endpoint.kind).compactMap { side in
+      routeAnchorCandidate(
+        for: endpoint,
+        side: side,
+        nodeIndex: nodeIndex,
+        terminalSlot: terminalSlot
+      )
+    }
+  }
+
+  private func routeAnchorCandidate(
+    for endpoint: PolicyCanvasPortEndpoint,
+    side: PolicyCanvasPortSide,
+    nodeIndex: [String: PolicyCanvasRouteNode],
+    terminalSlot: PolicyCanvasRouteEndpointSlot
+  ) -> PolicyCanvasRouteAnchorCandidate? {
+    guard
+      let point = portAnchor(for: endpoint, side: side, nodeIndex: nodeIndex),
+      let node = nodeIndex[endpoint.nodeID]
+    else {
+      return nil
+    }
+    let spacing = max(
+      portSpacing(for: endpoint, side: side, nodeIndex: nodeIndex),
+      PolicyCanvasLayout.defaultEdgeLineSpacing + PolicyCanvasVisibilityRouter.channelStep
+    )
+    return (
+      point: policyCanvasShiftedRouteAnchor(
+        point,
+        side: side,
+        frame: node.frame,
+        spacing: spacing,
+        terminalSlot: terminalSlot
+      ),
+      side: side
+    )
+  }
+
+  private func portAnchor(
+    for endpoint: PolicyCanvasPortEndpoint,
+    nodeIndex: [String: PolicyCanvasRouteNode]
+  ) -> CGPoint? {
+    portAnchor(
+      for: endpoint,
+      side: policyCanvasResolvedPortSide(for: endpoint),
+      nodeIndex: nodeIndex
+    )
+  }
+
+  private func portAnchor(
+    for endpoint: PolicyCanvasPortEndpoint,
+    side: PolicyCanvasPortSide,
+    nodeIndex: [String: PolicyCanvasRouteNode]
+  ) -> CGPoint? {
+    guard let node = nodeIndex[endpoint.nodeID] else {
+      return nil
+    }
+    let ports = endpoint.kind == .input ? node.inputPorts : node.outputPorts
+    guard let index = ports.firstIndex(where: { $0.id == endpoint.portID }) else {
+      return nil
+    }
+    return portAnchor(for: node, side: side, index: index, count: ports.count)
+  }
+
+  private func portAnchor(
+    for node: PolicyCanvasRouteNode,
+    side: PolicyCanvasPortSide,
+    index: Int,
+    count: Int
+  ) -> CGPoint {
+    switch side {
+    case .leading:
+      CGPoint(x: node.position.x, y: node.position.y + PolicyCanvasLayout.portY(index: index, count: count))
+    case .trailing:
+      CGPoint(
+        x: node.position.x + PolicyCanvasLayout.nodeSize.width,
+        y: node.position.y + PolicyCanvasLayout.portY(index: index, count: count)
+      )
+    case .top:
+      CGPoint(x: node.position.x + PolicyCanvasLayout.portX(index: index, count: count), y: node.position.y)
+    case .bottom:
+      CGPoint(
+        x: node.position.x + PolicyCanvasLayout.portX(index: index, count: count),
+        y: node.position.y + PolicyCanvasLayout.nodeSize.height
+      )
+    }
+  }
+
+  private func laneAssignments(
+    bucket: (PolicyCanvasEdge) -> String,
+    sortKey: (PolicyCanvasEdge) -> String
+  ) -> [String: Int] {
+    let sortedEdges = edges.sorted { left, right in
+      let leftKey = sortKey(left)
+      let rightKey = sortKey(right)
+      if leftKey != rightKey {
+        return leftKey < rightKey
+      }
+      return left.id < right.id
+    }
+    var nextLaneByBucket: [String: Int] = [:]
+    var lanes: [String: Int] = [:]
+    for edge in sortedEdges {
+      let edgeBucket = bucket(edge)
+      let lane = nextLaneByBucket[edgeBucket, default: 0]
+      lanes[edge.id] = lane
+      nextLaneByBucket[edgeBucket] = lane + 1
+    }
+    return lanes
+  }
+
+  private func edgeLaneSortKey(
+    _ edge: PolicyCanvasEdge,
+    nodeIndex: [String: PolicyCanvasRouteNode]
+  ) -> String {
+    let sourceAnchor = portAnchor(for: edge.source, nodeIndex: nodeIndex) ?? .zero
+    let targetAnchor = portAnchor(for: edge.target, nodeIndex: nodeIndex) ?? .zero
+    return [
+      edgeRouteBucket(edge, nodeIndex: nodeIndex),
+      String(Int(sourceAnchor.y.rounded())),
+      String(Int(targetAnchor.y.rounded())),
+      String(Int(targetAnchor.x.rounded())),
+      edge.source.portID,
+      edge.target.nodeID,
+      edge.target.portID,
+    ].joined(separator: "|")
+  }
+
+  private func edgeRouteBucket(
+    _ edge: PolicyCanvasEdge,
+    nodeIndex: [String: PolicyCanvasRouteNode]
+  ) -> String {
+    let sourceSide = policyCanvasResolvedPortSide(for: edge.source).rawValue
+    let targetSide = policyCanvasResolvedPortSide(for: edge.target).rawValue
+    let targetScope = nodeIndex[edge.target.nodeID]?.groupID ?? edge.target.nodeID
+    return "\(edge.source.nodeID)|\(sourceSide)->\(targetScope)|\(targetSide)"
+  }
+
+  private func edgeRouteSortKey(
+    _ edge: PolicyCanvasEdge,
+    nodeIndex: [String: PolicyCanvasRouteNode]
+  ) -> String {
+    edgeLaneSortKey(edge, nodeIndex: nodeIndex)
+  }
+
+  private func edgeSourceFanoutBucket(_ edge: PolicyCanvasEdge) -> String {
+    let side = policyCanvasResolvedPortSide(for: edge.source).rawValue
+    return "\(edge.source.nodeID)|\(side)"
+  }
+
+  private func edgeTargetFanoutBucket(_ edge: PolicyCanvasEdge) -> String {
+    let side = policyCanvasResolvedPortSide(for: edge.target).rawValue
+    return "\(edge.target.nodeID)|\(side)"
+  }
+
+  private func edgeSourceFanoutSortKey(
+    _ edge: PolicyCanvasEdge,
+    nodeIndex: [String: PolicyCanvasRouteNode]
+  ) -> String {
+    fanoutSortKey(
+      bucket: edgeSourceFanoutBucket(edge),
+      anchor: portAnchor(for: edge.target, nodeIndex: nodeIndex) ?? .zero,
+      nodeID: edge.target.nodeID,
+      portID: edge.target.portID
+    )
+  }
+
+  private func edgeTargetFanoutSortKey(
+    _ edge: PolicyCanvasEdge,
+    nodeIndex: [String: PolicyCanvasRouteNode]
+  ) -> String {
+    fanoutSortKey(
+      bucket: edgeTargetFanoutBucket(edge),
+      anchor: portAnchor(for: edge.source, nodeIndex: nodeIndex) ?? .zero,
+      nodeID: edge.source.nodeID,
+      portID: edge.source.portID
+    )
+  }
+
+  private func fanoutSortKey(
+    bucket: String,
+    anchor: CGPoint,
+    nodeID: String,
+    portID: String
+  ) -> String {
+    [bucket, String(Int(anchor.y.rounded())), String(Int(anchor.x.rounded())), nodeID, portID]
+      .joined(separator: "|")
+  }
+
+  private func edgeLineSpacing(
+    for edge: PolicyCanvasEdge,
+    nodeIndex: [String: PolicyCanvasRouteNode]
+  ) -> CGFloat {
+    max(
+      portSpacing(for: edge.source, nodeIndex: nodeIndex),
+      portSpacing(for: edge.target, nodeIndex: nodeIndex)
+    )
+  }
+
+  private func portSpacingBySide(
+    for endpoint: PolicyCanvasPortEndpoint,
+    nodeIndex: [String: PolicyCanvasRouteNode]
+  ) -> [PolicyCanvasPortSide: CGFloat] {
+    Dictionary(uniqueKeysWithValues: PolicyCanvasPortSide.allSides.map { side in
+      (side, portSpacing(for: endpoint, side: side, nodeIndex: nodeIndex))
+    })
+  }
+
+  private func portSpacing(
+    for endpoint: PolicyCanvasPortEndpoint,
+    side overrideSide: PolicyCanvasPortSide? = nil,
+    nodeIndex: [String: PolicyCanvasRouteNode]
+  ) -> CGFloat {
+    guard let node = nodeIndex[endpoint.nodeID] else {
+      return PolicyCanvasLayout.defaultEdgeLineSpacing
+    }
+    let ports = endpoint.kind == .input ? node.inputPorts : node.outputPorts
+    guard ports.count > 1 else {
+      return PolicyCanvasLayout.defaultEdgeLineSpacing
+    }
+    let side = overrideSide ?? policyCanvasResolvedPortSide(for: endpoint)
+    switch side {
+    case .leading, .trailing:
+      return abs(
+        PolicyCanvasLayout.portY(index: 1, count: ports.count)
+          - PolicyCanvasLayout.portY(index: 0, count: ports.count)
+      )
+    case .top, .bottom:
+      return abs(
+        PolicyCanvasLayout.portX(index: 1, count: ports.count)
+          - PolicyCanvasLayout.portX(index: 0, count: ports.count)
+      )
+    }
+  }
+
+  private func routablePortSides(for kind: PolicyCanvasPortKind) -> [PolicyCanvasPortSide] {
+    switch kind {
+    case .input:
+      [.leading, .top]
+    case .output:
+      [.trailing, .bottom]
+    }
+  }
+}

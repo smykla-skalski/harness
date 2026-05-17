@@ -18,6 +18,7 @@ struct PolicyCanvasNodeLayer: View {
   let nodeAccessibilityValuesByID: [String: String]
   let connectTargetsByNodeID: [String: [PolicyCanvasAccessibilityConnectTarget]]
   let nodeValidationIssueMessagesByID: [String: String]
+  let portVisibility: PolicyCanvasPortVisibilityMap
   /// P19 reduce-motion handle; mirrors the canvas-root system flag so the
   /// drop-end spring (P18) collapses to instant when the user has the
   /// system-wide reduce-motion accessibility setting on. The canvas-scoped
@@ -44,7 +45,8 @@ struct PolicyCanvasNodeLayer: View {
         accessibilityValue: nodeAccessibilityValuesByID[node.id] ?? "",
         validationIssueMessages: nodeValidationIssueMessagesByID[node.id],
         connectTargets: connectTargetsByNodeID[node.id] ?? [],
-        hasClipboard: hasClipboard
+        hasClipboard: hasClipboard,
+        portVisibility: portVisibility
       )
       .offset(x: node.position.x, y: node.position.y)
       .focusable()
@@ -125,6 +127,7 @@ struct PolicyCanvasNodeCard: View {
   let validationIssueMessages: String?
   let connectTargets: [PolicyCanvasAccessibilityConnectTarget]
   let hasClipboard: Bool
+  let portVisibility: PolicyCanvasPortVisibilityMap
   /// P19 reduce-motion handle for the P18 selection-mark transition. Pulled
   /// from the environment so the animation gating uses the same root-seeded
   /// bit the rest of the canvas reads. Canvas-scoped override is optional
@@ -214,14 +217,16 @@ struct PolicyCanvasNodeCard: View {
         node: node,
         ports: node.inputPorts,
         alignment: .leading,
-        viewModel: viewModel
+        viewModel: viewModel,
+        visibleSides: portVisibility
       )
 
       PolicyCanvasPortColumn(
         node: node,
         ports: node.outputPorts,
         alignment: .trailing,
-        viewModel: viewModel
+        viewModel: viewModel,
+        visibleSides: portVisibility
       )
 
       PolicyCanvasPortColumn(
@@ -229,6 +234,7 @@ struct PolicyCanvasNodeCard: View {
         ports: node.inputPorts,
         alignment: .top,
         viewModel: viewModel,
+        visibleSides: portVisibility,
         isAuxiliary: true
       )
 
@@ -237,6 +243,7 @@ struct PolicyCanvasNodeCard: View {
         ports: node.outputPorts,
         alignment: .bottom,
         viewModel: viewModel,
+        visibleSides: portVisibility,
         isAuxiliary: true
       )
 

@@ -278,14 +278,14 @@ struct PolicyCanvasArchitectureFoundationTests {
     )
   }
 
-  @Test("routingObstacles adds group frames only when both endpoints sit outside every group")
+  @Test("routingObstacles keeps nodes and group titles as hard obstacles")
   func routingObstaclesScopesGroupsByEndpoints() {
     let viewModel = PolicyCanvasViewModel.sample()
     let expectedNodeFrames = viewModel.nodes.map { node in
       CGRect(origin: node.position, size: PolicyCanvasLayout.nodeSize)
     }
-    let expectedGroupFrames = viewModel.groups.map(\.frame)
-    guard let groupFrame = expectedGroupFrames.first else {
+    let expectedTitleFrames = policyCanvasGroupTitleFrames(viewModel.groups)
+    guard let groupFrame = viewModel.groups.first?.frame else {
       Issue.record("sample document is expected to contain at least one group")
       return
     }
@@ -297,21 +297,23 @@ struct PolicyCanvasArchitectureFoundationTests {
       source: insideGroupPoint,
       target: outsideGroupPoint
     )
-    #expect(insideObstacles.count == expectedNodeFrames.count + expectedGroupFrames.count)
+    #expect(insideObstacles.count == expectedNodeFrames.count + expectedTitleFrames.count)
     for frame in expectedNodeFrames {
       #expect(insideObstacles.contains(frame))
     }
-    for frame in expectedGroupFrames {
+    for frame in expectedTitleFrames {
       #expect(insideObstacles.contains(frame))
     }
+    #expect(!insideObstacles.contains(groupFrame))
 
     let farPointA = CGPoint(x: outsideGroupPoint.x, y: outsideGroupPoint.y)
     let farPointB = CGPoint(x: outsideGroupPoint.x + 200, y: outsideGroupPoint.y + 200)
     let outsideObstacles = viewModel.routingObstacles(source: farPointA, target: farPointB)
-    #expect(outsideObstacles.count == expectedNodeFrames.count + expectedGroupFrames.count)
-    for frame in expectedGroupFrames {
+    #expect(outsideObstacles.count == expectedNodeFrames.count + expectedTitleFrames.count)
+    for frame in expectedTitleFrames {
       #expect(outsideObstacles.contains(frame))
     }
+    #expect(!outsideObstacles.contains(groupFrame))
   }
 
   private func archSimulation(revision: UInt64) -> TaskBoardPolicyPipelineSimulationResult {

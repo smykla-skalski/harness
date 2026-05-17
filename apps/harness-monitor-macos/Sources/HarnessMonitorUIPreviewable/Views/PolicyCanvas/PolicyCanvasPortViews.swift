@@ -12,6 +12,7 @@ struct PolicyCanvasPortColumn: View {
   let ports: [PolicyCanvasPort]
   let alignment: PolicyCanvasPortColumnAlignment
   let viewModel: PolicyCanvasViewModel
+  let visibleSides: PolicyCanvasPortVisibilityMap
   var isAuxiliary = false
 
   var body: some View {
@@ -25,14 +26,16 @@ struct PolicyCanvasPortColumn: View {
     let count = ports.count
     ZStack(alignment: stackAlignment) {
       ForEach(ports.indices, id: \.self) { index in
-        PolicyCanvasPortView(
-          node: node,
-          port: ports[index],
-          side: portSide,
-          viewModel: viewModel,
-          isAuxiliary: isAuxiliary
-        )
-        .offset(offset(index: index, count: count))
+        if shouldRenderPort(ports[index]) {
+          PolicyCanvasPortView(
+            node: node,
+            port: ports[index],
+            side: portSide,
+            viewModel: viewModel,
+            isAuxiliary: isAuxiliary
+          )
+          .offset(offset(index: index, count: count))
+        }
       }
     }
     .frame(
@@ -71,6 +74,19 @@ struct PolicyCanvasPortColumn: View {
     case .bottom:
       .bottom
     }
+  }
+
+  private func shouldRenderPort(_ port: PolicyCanvasPort) -> Bool {
+    let endpoint = PolicyCanvasPortEndpoint(
+      nodeID: node.id,
+      portID: port.id,
+      kind: port.kind
+    )
+    return policyCanvasVisiblePortSides(
+      for: endpoint,
+      visibility: visibleSides
+    )
+    .contains(portSide)
   }
 
   private var frameOffset: CGSize {
