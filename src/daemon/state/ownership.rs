@@ -1,3 +1,4 @@
+use std::fmt::{self, Display, Formatter};
 use std::sync::Mutex;
 
 use serde::{Deserialize, Serialize};
@@ -21,9 +22,10 @@ fn ownership_override() -> Option<DaemonOwnership> {
 /// CLI shell. The two kinds run side-by-side without colliding because they
 /// keep their state in separate `<root>/daemon/<ownership>/` subtrees and use
 /// distinct launchd labels and bridge ports.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum DaemonOwnership {
+    #[default]
     Managed,
     External,
 }
@@ -99,14 +101,8 @@ impl Drop for ScopedOwnershipOverride {
     }
 }
 
-impl Default for DaemonOwnership {
-    fn default() -> Self {
-        Self::Managed
-    }
-}
-
-impl std::fmt::Display for DaemonOwnership {
-    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl Display for DaemonOwnership {
+    fn fmt(&self, formatter: &mut Formatter<'_>) -> fmt::Result {
         formatter.write_str(self.as_str())
     }
 }
@@ -117,14 +113,26 @@ mod tests {
 
     #[test]
     fn parses_canonical_strings() {
-        assert_eq!(DaemonOwnership::parse("managed"), Some(DaemonOwnership::Managed));
-        assert_eq!(DaemonOwnership::parse("external"), Some(DaemonOwnership::External));
+        assert_eq!(
+            DaemonOwnership::parse("managed"),
+            Some(DaemonOwnership::Managed)
+        );
+        assert_eq!(
+            DaemonOwnership::parse("external"),
+            Some(DaemonOwnership::External)
+        );
     }
 
     #[test]
     fn parses_case_insensitively_and_trims() {
-        assert_eq!(DaemonOwnership::parse("  Managed\n"), Some(DaemonOwnership::Managed));
-        assert_eq!(DaemonOwnership::parse("EXTERNAL"), Some(DaemonOwnership::External));
+        assert_eq!(
+            DaemonOwnership::parse("  Managed\n"),
+            Some(DaemonOwnership::Managed)
+        );
+        assert_eq!(
+            DaemonOwnership::parse("EXTERNAL"),
+            Some(DaemonOwnership::External)
+        );
     }
 
     #[test]
@@ -150,8 +158,14 @@ mod tests {
 
     #[test]
     fn serializes_to_lowercase_string() {
-        assert_eq!(serde_json::to_string(&DaemonOwnership::Managed).unwrap(), "\"managed\"");
-        assert_eq!(serde_json::to_string(&DaemonOwnership::External).unwrap(), "\"external\"");
+        assert_eq!(
+            serde_json::to_string(&DaemonOwnership::Managed).unwrap(),
+            "\"managed\""
+        );
+        assert_eq!(
+            serde_json::to_string(&DaemonOwnership::External).unwrap(),
+            "\"external\""
+        );
     }
 
     #[test]

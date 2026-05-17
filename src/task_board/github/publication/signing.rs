@@ -162,20 +162,20 @@ pub(crate) fn verify_signing_for_profile(
                         .into(),
             },
             Err(error) => SigningVerifyOutcome::Failed {
-                message: error.message().to_string(),
+                message: error.message(),
             },
         },
-        TaskBoardGitSigningMode::Ssh => match super::ssh_signing::ssh_commit_signature_for_verify(
-            profile, PAYLOAD,
-        ) {
-            Ok(()) => SigningVerifyOutcome::Signed {
-                mode: "ssh".into(),
-                signature_kind: "ssh".into(),
-            },
-            Err(error) => SigningVerifyOutcome::Failed {
-                message: error.message().to_string(),
-            },
-        },
+        TaskBoardGitSigningMode::Ssh => {
+            match super::ssh_signing::ssh_commit_signature_for_verify(profile, PAYLOAD) {
+                Ok(()) => SigningVerifyOutcome::Signed {
+                    mode: "ssh".into(),
+                    signature_kind: "ssh".into(),
+                },
+                Err(error) => SigningVerifyOutcome::Failed {
+                    message: error.message(),
+                },
+            }
+        }
     }
 }
 
