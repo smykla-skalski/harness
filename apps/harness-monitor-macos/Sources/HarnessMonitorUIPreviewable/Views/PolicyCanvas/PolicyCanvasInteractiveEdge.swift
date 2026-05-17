@@ -111,9 +111,13 @@ struct PolicyCanvasInteractiveEdge: View {
   }
 
   var body: some View {
+    let renderedRoute = policyCanvasEndpointTrimmedRoute(
+      route,
+      endpointInset: PolicyCanvasLayout.portDiameter / 2
+    )
     ZStack {
       if isSelected {
-        PolicyCanvasEdgeShape(route: route, gapFrames: labelGapFrames)
+        PolicyCanvasEdgeShape(route: renderedRoute, gapFrames: labelGapFrames)
           .stroke(
             selectionHaloColor,
             style: StrokeStyle(lineWidth: 6, lineCap: .round, lineJoin: .round)
@@ -121,8 +125,8 @@ struct PolicyCanvasInteractiveEdge: View {
           .allowsHitTesting(false)
           .blendMode(.plusLighter)
       }
-      strokeLayer
-      PolicyCanvasEdgeArrowhead(route: route)
+      strokeLayer(route: renderedRoute)
+      PolicyCanvasEdgeArrowhead(route: renderedRoute)
         .fill(arrowheadColor)
     }
     .contentShape(PolicyCanvasEdgeHitShape(route: route))
@@ -175,7 +179,7 @@ struct PolicyCanvasInteractiveEdge: View {
     return accessibilityKindWord
   }
 
-  @ViewBuilder private var strokeLayer: some View {
+  @ViewBuilder private func strokeLayer(route: PolicyCanvasEdgeRoute) -> some View {
     if isAnimated, !reducedMotion {
       TimelineView(.animation) { context in
         let phase = PolicyCanvasEdgeAnimation.dashPhase(

@@ -95,12 +95,30 @@ struct PolicyCanvasEdgeShapeTests {
     ).path(in: .zero)
     let points = pathPoints(of: path)
 
-    #expect(points == [
-      CGPoint(x: 0, y: 0),
-      CGPoint(x: 80, y: 0),
-      CGPoint(x: 120, y: 0),
-      CGPoint(x: 200, y: 0),
-    ])
+    #expect(
+      points == [
+        CGPoint(x: 0, y: 0),
+        CGPoint(x: 80, y: 0),
+        CGPoint(x: 120, y: 0),
+        CGPoint(x: 200, y: 0),
+      ])
+  }
+
+  @Test("Endpoint trim stops rendered edge before port centers")
+  func endpointTrimStopsRenderedEdgeBeforePortCenters() {
+    let route = PolicyCanvasEdgeRoute(
+      points: [
+        CGPoint(x: 0, y: 0),
+        CGPoint(x: 100, y: 0),
+        CGPoint(x: 100, y: 100),
+      ],
+      labelPosition: CGPoint(x: 100, y: 50)
+    )
+
+    let trimmed = policyCanvasEndpointTrimmedRoute(route, endpointInset: 9)
+
+    #expect(trimmed.points.first == CGPoint(x: 9, y: 0))
+    #expect(trimmed.points.last == CGPoint(x: 100, y: 91))
   }
 }
 
