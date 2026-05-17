@@ -2,7 +2,6 @@
   import AppKit
   import HarnessMonitorKit
   import HarnessMonitorUIPreviewable
-  import HarnessMonitorUIPreviewable
 
   @MainActor
   enum SessionWindowTabGroupReplayer {
