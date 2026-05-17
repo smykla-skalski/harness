@@ -7,6 +7,9 @@ public struct DecisionDeskPreviewView: View {
   @State private var selection: String?
   @State private var detailTab: DecisionDetailTab = .context
   @State private var runtime = DecisionRuntime()
+  @State private var presentationWorker = DecisionsSidebarPresentationWorker()
+  @State private var cachedPresentation = DecisionsSidebarPresentation.empty
+  @State private var presentationGeneration: UInt64 = 0
   @State private var sidebarFilters = DecisionsSidebarViewModel.FilterState(
     query: "",
     severities: [],
@@ -30,8 +33,18 @@ public struct DecisionDeskPreviewView: View {
   private var decisionWorkspaceScope: DecisionWorkspaceScope {
     DecisionWorkspaceScope(
       decisions: runtime.decisions,
+      decisionsByID: runtime.decisionsByID,
       filters: sidebarFilters,
+      presentation: cachedPresentation,
       selectedDecisionID: selection
+    )
+  }
+
+  private var presentationTaskKey: DecisionsSidebarPresentationTaskKey {
+    DecisionsSidebarPresentationTaskKey(
+      decisionsRevision: runtime.decisionsRevision,
+      decisions: runtime.decisions,
+      filters: sidebarFilters
     )
   }
 
@@ -103,6 +116,9 @@ public struct DecisionDeskPreviewView: View {
     NavigationSplitView {
       DecisionsSidebar(
         decisions: runtime.decisions,
+        decisionsByID: runtime.decisionsByID,
+        decisionsRevision: runtime.decisionsRevision,
+        presentation: cachedPresentation,
         selection: $selection,
         filters: $sidebarFilters,
         store: store
@@ -132,6 +148,9 @@ public struct DecisionDeskPreviewView: View {
     .task(id: store?.supervisorDecisionRefreshTick ?? -1) {
       await reload()
       syncSelectionFromStoreIfNeeded()
+    }
+    .task(id: presentationTaskKey) {
+      await rebuildPresentation()
     }
     .onChange(of: store?.supervisorSelectedDecisionID) { _, requestedID in
       guard let requestedID else {
@@ -399,6 +418,7 @@ public struct DecisionDeskPreviewView: View {
 
   private func reload() async {
     await runtime.reload(from: store)
+    await rebuildPresentation()
 
     if let requestedID = store?.supervisorSelectedDecisionID,
       runtime.decisions.contains(where: { $0.id == requestedID })
@@ -414,5 +434,22 @@ public struct DecisionDeskPreviewView: View {
     let firstDecisionID = runtime.decisions.first?.id
     selection = firstDecisionID
     store?.supervisorSelectedDecisionID = firstDecisionID
+  }
+
+  @MainActor
+  private func rebuildPresentation() async {
+    presentationGeneration &+= 1
+    let generation = presentationGeneration
+    let input = DecisionsSidebarPresentationInput(
+      items: runtime.decisionItems,
+      filters: sidebarFilters
+    )
+    let presentation = await presentationWorker.compute(input: input)
+    guard !Task.isCancelled, presentationGeneration == generation else {
+      return
+    }
+    if cachedPresentation != presentation {
+      cachedPresentation = presentation
+    }
   }
 }

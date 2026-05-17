@@ -35,7 +35,7 @@ extension DecisionSeverity {
 }
 
 public enum DecisionsSidebarViewModel {
-  public struct FilterState: Equatable {
+  public struct FilterState: Equatable, Sendable {
     public let query: String
     public let severities: Set<DecisionSeverity>
     public let scope: DecisionsSidebarSearchScope
@@ -108,9 +108,20 @@ public enum DecisionsSidebarViewModel {
       severities: filters.severities
     )
     let ids = groups.flatMap(\.decisions).map(\.id)
-    let severitySignature = filters.severities.map(\.rawValue).sorted().joined(separator: ",")
-    let signature = "scope=\(filters.scope.rawValue);query=\(trimmed);sev=\(severitySignature)"
+    let signature = filterSignature(filters: filters, trimmedQuery: trimmed)
     return VisibleSnapshot(groups: groups, decisionIDs: ids, signature: signature)
+  }
+
+  public static func filterSignature(filters: FilterState) -> String {
+    filterSignature(
+      filters: filters,
+      trimmedQuery: filters.query.trimmingCharacters(in: .whitespacesAndNewlines)
+    )
+  }
+
+  static func filterSignature(filters: FilterState, trimmedQuery: String) -> String {
+    let severitySignature = filters.severities.map(\.rawValue).sorted().joined(separator: ",")
+    return "scope=\(filters.scope.rawValue);query=\(trimmedQuery);sev=\(severitySignature)"
   }
 
   private static func sortedBySeverity(_ decisions: [Decision]) -> [Decision] {

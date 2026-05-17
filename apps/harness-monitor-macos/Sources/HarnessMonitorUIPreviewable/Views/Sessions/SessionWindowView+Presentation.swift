@@ -188,10 +188,7 @@ extension SessionWindowView {
 
   var sessionDecisionVisibleSnapshot: DecisionsSidebarViewModel.VisibleSnapshot {
     let filters = stateCache.decisionFilters.decisionWorkspaceFilters
-    let signature = DecisionsSidebarViewModel.visibleSnapshot(
-      decisions: allSessionDecisionsCache,
-      filters: filters
-    ).signature
+    let signature = DecisionsSidebarViewModel.filterSignature(filters: filters)
     let groups =
       matchingDecisionsCache.isEmpty
       ? []
