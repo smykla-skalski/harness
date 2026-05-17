@@ -120,6 +120,24 @@ struct PolicyCanvasEdgeShapeTests {
     #expect(trimmed.points.first == CGPoint(x: 9, y: 0))
     #expect(trimmed.points.last == CGPoint(x: 100, y: 91))
   }
+
+  @Test("Arrowhead defaults render at readable canvas scale")
+  func arrowheadDefaultsRenderAtReadableCanvasScale() {
+    let route = PolicyCanvasEdgeRoute(
+      points: [CGPoint(x: 0, y: 0), CGPoint(x: 100, y: 0)],
+      labelPosition: CGPoint(x: 50, y: 0)
+    )
+
+    let path = PolicyCanvasEdgeArrowhead(route: route).path(in: .zero)
+    let points = pathPoints(of: path)
+
+    #expect(
+      points == [
+        CGPoint(x: 100, y: 0),
+        CGPoint(x: 82, y: 7),
+        CGPoint(x: 82, y: -7),
+      ])
+  }
 }
 
 /// Drains a `Path`'s underlying `CGPath` into a kind-only summary. Uses

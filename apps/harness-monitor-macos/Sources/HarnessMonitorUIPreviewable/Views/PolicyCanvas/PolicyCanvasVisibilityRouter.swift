@@ -1,5 +1,6 @@
 import CoreGraphics
 import Foundation
+
 /// Orthogonal visibility-graph router with A* pathfinding. Produces
 /// axis-aligned polylines that avoid node-frame obstacles while minimizing a
 /// `length + bendPenalty * bends` cost. Falls back to the hand-coded router
@@ -126,14 +127,6 @@ struct PolicyCanvasVisibilityRouter: PolicyCanvasEdgeRouter {
       let tx = gridAxes.xs.firstIndex(of: target.x),
       let ty = gridAxes.ys.firstIndex(of: target.y)
     else {
-      policyCanvasRouterLog.debug(
-        """
-        visibility router fallback (grid-miss): obstacles=\
-        \(prepared.count, privacy: .public) gridX=\
-        \(gridAxes.xs.count, privacy: .public) gridY=\
-        \(gridAxes.ys.count, privacy: .public)
-        """
-      )
       return (
         fallback(
           source: source,
@@ -151,14 +144,6 @@ struct PolicyCanvasVisibilityRouter: PolicyCanvasEdgeRouter {
       obstacles: prepared
     )
     guard let aStarResult, aStarResult.points.count >= 2 else {
-      policyCanvasRouterLog.debug(
-        """
-        visibility router fallback (astar-no-path): obstacles=\
-        \(prepared.count, privacy: .public) gridX=\
-        \(gridAxes.xs.count, privacy: .public) gridY=\
-        \(gridAxes.ys.count, privacy: .public)
-        """
-      )
       return (
         fallback(
           source: source,
