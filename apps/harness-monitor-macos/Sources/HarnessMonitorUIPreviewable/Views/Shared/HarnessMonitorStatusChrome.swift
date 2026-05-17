@@ -67,7 +67,10 @@ struct HarnessMonitorLoadingStateView: View {
   private var fontScale
 
   private var footnoteFont: Font {
-    HarnessMonitorTextSize.scaledFont(.system(.footnote, design: .rounded, weight: .semibold), by: fontScale)
+    HarnessMonitorTextSize.scaledFont(
+      .system(.footnote, design: .rounded, weight: .semibold),
+      by: fontScale
+    )
   }
 
   init(title: String) {
@@ -170,10 +173,16 @@ struct HarnessMonitorActionHeader: View {
   private var fontScale
 
   private var titleFont: Font {
-    HarnessMonitorTextSize.scaledFont(.system(.headline, design: .rounded, weight: .semibold), by: fontScale)
+    HarnessMonitorTextSize.scaledFont(
+      .system(.headline, design: .rounded, weight: .semibold),
+      by: fontScale
+    )
   }
   private var subtitleFont: Font {
-    HarnessMonitorTextSize.scaledFont(.system(.subheadline, design: .rounded, weight: .medium), by: fontScale)
+    HarnessMonitorTextSize.scaledFont(
+      .system(.subheadline, design: .rounded, weight: .medium),
+      by: fontScale
+    )
   }
 
   var body: some View {

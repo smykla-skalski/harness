@@ -110,7 +110,9 @@ struct PolicyCanvasTopBar: View {
         systemImage: "arrow.up.right.circle",
         tint: Color.green,
         isDisabled: !remoteActionsEnabled || !canPromote,
-        disabledReason: remoteActionsEnabled ? viewModel.promoteDisabledReason : remoteActionDisabledReason,
+        disabledReason: remoteActionsEnabled
+          ? viewModel.promoteDisabledReason
+          : remoteActionDisabledReason,
         isBusy: viewModel.isPromoting,
         accessibilityIdentifier: HarnessMonitorAccessibility.policyCanvasPromoteButton,
         action: {

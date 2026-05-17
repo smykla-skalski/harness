@@ -20,7 +20,8 @@ extension OpenWindowAction {
     let tabbingPreference = SessionWindowTabbingPreference.resolved(
       rawValue: UserDefaults.standard.string(forKey: SessionWindowTabbingPreference.storageKey)
     )
-    let tabTargetWindow = mergeIfNeeded
+    let tabTargetWindow =
+      mergeIfNeeded
       ? SessionWindowTabbingSupport.visibleTabTargetWindow(
         preference: tabbingPreference
       )
@@ -50,7 +51,8 @@ extension OpenWindowAction {
     let tabbingPreference = SessionWindowTabbingPreference.resolved(
       rawValue: UserDefaults.standard.string(forKey: SessionWindowTabbingPreference.storageKey)
     )
-    let tabTargetWindow = mergeIfNeeded
+    let tabTargetWindow =
+      mergeIfNeeded
       ? SessionWindowTabbingSupport.visibleTabTargetWindow(
         preference: tabbingPreference
       )

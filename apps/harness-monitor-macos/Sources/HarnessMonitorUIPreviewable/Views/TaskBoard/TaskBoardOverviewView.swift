@@ -38,7 +38,10 @@ public struct TaskBoardOverviewView: View {
     HarnessMonitorTextSize.scaledFont(.body, by: fontScale)
   }
   private var titleHeaderFont: Font {
-    HarnessMonitorTextSize.scaledFont(.system(.title3, design: .rounded, weight: .semibold), by: fontScale)
+    HarnessMonitorTextSize.scaledFont(
+      .system(.title3, design: .rounded, weight: .semibold),
+      by: fontScale
+    )
   }
 
   private var metrics: TaskBoardOverviewMetrics {

@@ -208,13 +208,15 @@ struct LaunchWindowRestorerMigratorTests {
     let plan = await store.launchWindowRestorePlan()
 
     #expect(plan.sessionIDs == groupedIDs + [standalone.sessionId])
-    #expect(plan.tabGroupings == [
-      HarnessMonitorStore.SessionTabGroupSnapshot(
-        ordinal: 0,
-        sessionIDs: groupedIDs,
-        foregroundSessionID: groupedLeader.sessionId
-      )
-    ])
+    #expect(
+      plan.tabGroupings == [
+        HarnessMonitorStore.SessionTabGroupSnapshot(
+          ordinal: 0,
+          sessionIDs: groupedIDs,
+          foregroundSessionID: groupedLeader.sessionId
+        )
+      ]
+    )
   }
 
   @Test("Standalone session windows survive the snapshot without a grouping entry")
