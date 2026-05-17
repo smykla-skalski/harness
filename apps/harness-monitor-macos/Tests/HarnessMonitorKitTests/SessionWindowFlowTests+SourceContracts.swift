@@ -119,10 +119,10 @@ extension SessionWindowFlowTests {
     #expect(rootSource.contains("HarnessMonitorSheetModifier("))
     #expect(rootSource.contains("isEnabled: hostsSharedShellPresentation"))
     #expect(rootSource.contains("CGSize(width: 920, height: 620)"))
-    #expect(rootSource.contains("windowToolbarBackgroundVisibility: .hidden"))
-    #expect(!rootSource.contains("windowToolbarBackgroundVisibility: .visible"))
+    #expect(rootSource.contains("windowToolbarBackgroundVisibility: .visible"))
+    #expect(!rootSource.contains("windowToolbarBackgroundVisibility: .hidden"))
     #expect(!rootSource.contains("windowToolbarBackgroundVisibility: .automatic"))
-    #expect(rootSource.contains("titlebarAppearsTransparent: true"))
+    #expect(!rootSource.contains("titlebarAppearsTransparent: true"))
     #expect(
       rootSource.contains(
         "HarnessMonitorAccessibility.sessionWindowToolbarSeparatorSuppressed"

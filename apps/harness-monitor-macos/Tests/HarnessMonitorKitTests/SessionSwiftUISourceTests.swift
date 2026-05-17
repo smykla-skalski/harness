@@ -224,11 +224,13 @@ struct SessionSwiftUISourceTests {
     #expect(surfaceSource.contains("topScrollEdgeEffect: .soft"))
     #expect(columnScrollSource.contains("content.scrollEdgeEffectStyle(.soft, for: .top)"))
     #expect(columnScrollSource.contains("content.scrollEdgeEffectStyle(.hard, for: .top)"))
+    #expect(columnScrollSource.contains("TopScrollUnderlapModifier(effect: topScrollEdgeEffect)"))
+    #expect(columnScrollSource.contains("content.ignoresSafeArea(.container, edges: .top)"))
   }
 
   @Test("Dashboard detail surface avoids mirrored toolbar extension hosts")
   func dashboardDetailSurfaceAvoidsMirroredToolbarExtensionHosts() throws {
-    let dashboardSource = try sourceFile(at: "Views/Dashboard/DashboardWindowView.swift")
+    let dashboardSource = try sourceFile(at: "Views/Dashboard/DashboardWindowSupport.swift")
 
     #expect(!dashboardSource.contains(".harnessMonitorToolbarBackgroundExtensionEffect()"))
     #expect(!dashboardSource.contains(".toolbarBackground(.visible, for: .windowToolbar)"))
@@ -239,12 +241,13 @@ struct SessionSwiftUISourceTests {
 
   @Test("Toolbar backdrop uses scroll edge without artificial underlays")
   func toolbarBackdropUsesScrollEdgeWithoutArtificialUnderlays() throws {
-    let dashboardSource = try sourceFile(at: "Views/Dashboard/DashboardWindowView.swift")
+    let dashboardSource = try sourceFile(at: "Views/Dashboard/DashboardWindowSupport.swift")
     let sessionWindowSource = try sourceFile(at: "Views/Sessions/SessionWindowView.swift")
     let extensionEffectSource = try sourceFile(
       at: "Views/Sessions/SessionWindowBackgroundExtensionEffect.swift"
     )
     let bannerChromeSource = try sourceFile(at: "Views/Shared/WindowBannerChrome.swift")
+    let toolbarGlassSource = try sourceFile(at: "Support/ToolbarGlassStateMonitor.swift")
 
     #expect(!dashboardSource.contains("WindowToolbarBackdropUnderlay"))
     #expect(!dashboardSource.contains("windowToolbarBackdropUnderlay"))
@@ -257,6 +260,9 @@ struct SessionSwiftUISourceTests {
     #expect(!extensionEffectSource.contains("LinearGradient("))
     #expect(!extensionEffectSource.contains(".blur("))
     #expect(!extensionEffectSource.contains("NSVisualEffectView"))
+    #expect(!toolbarGlassSource.contains("NSVisualEffectView"))
+    #expect(!toolbarGlassSource.contains("NSTitlebarAccessoryViewController"))
+    #expect(!toolbarGlassSource.contains("nativeToolbarScrollEdgeBackdrop"))
     #expect(bannerChromeSource.contains("WindowBannerChromeBackground"))
     #expect(bannerChromeSource.contains("material=softWindowBackground"))
     #expect(!bannerChromeSource.contains(".background(Color(nsColor: .windowBackgroundColor))"))
