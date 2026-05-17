@@ -60,7 +60,8 @@ pub struct LegacyDaemonRootMigration {
 /// Returns [`CliError`] only on filesystem failures encountered during the
 /// move itself. All other reasons to skip migration return as
 /// [`MigrationDecision`] variants embedded in the success result.
-pub fn migrate_legacy_daemon_root_for_current_process() -> Result<LegacyDaemonRootMigration, CliError> {
+pub fn migrate_legacy_daemon_root_for_current_process()
+-> Result<LegacyDaemonRootMigration, CliError> {
     migrate_legacy_daemon_root(DaemonOwnership::from_env_or_default())
 }
 
@@ -107,20 +108,16 @@ pub fn migrate_legacy_daemon_root_at(
         return Ok(report);
     }
 
-    let manifest: DaemonManifest = match read_json_typed(&legacy_manifest) {
-        Ok(manifest) => manifest,
-        Err(_) => {
-            report.decision = MigrationDecision::UnreadableLegacyManifest;
-            return Ok(report);
-        }
+    let manifest: DaemonManifest = if let Ok(manifest) = read_json_typed(&legacy_manifest) {
+        manifest
+    } else {
+        report.decision = MigrationDecision::UnreadableLegacyManifest;
+        return Ok(report);
     };
 
     let inferred = infer_legacy_ownership(&manifest);
     if inferred != current {
-        report.decision = MigrationDecision::OwnershipMismatch {
-            inferred,
-            current,
-        };
+        report.decision = MigrationDecision::OwnershipMismatch { inferred, current };
         return Ok(report);
     }
 
@@ -150,9 +147,7 @@ pub fn migrate_legacy_daemon_root_at(
         moved.push(to);
     }
 
-    report.decision = MigrationDecision::Migrated {
-        count: moved.len(),
-    };
+    report.decision = MigrationDecision::Migrated { count: moved.len() };
     report.moved = moved;
     Ok(report)
 }
@@ -224,9 +219,8 @@ mod tests {
 
     #[test]
     fn infers_managed_when_helper_lives_under_app_bundle() {
-        let manifest = manifest_with_helper(
-            "/Applications/Harness Monitor.app/Contents/Helpers/harness",
-        );
+        let manifest =
+            manifest_with_helper("/Applications/Harness Monitor.app/Contents/Helpers/harness");
         assert_eq!(infer_legacy_ownership(&manifest), DaemonOwnership::Managed);
     }
 
@@ -287,7 +281,10 @@ mod tests {
                 current: DaemonOwnership::External,
             }
         );
-        assert!(parent.join("manifest.json").exists(), "untouched on mismatch");
+        assert!(
+            parent.join("manifest.json").exists(),
+            "untouched on mismatch"
+        );
     }
 
     #[test]
@@ -308,7 +305,10 @@ mod tests {
         assert!(target.join("auth-token").is_file());
         assert!(target.join("harness.db").is_file());
         assert!(!parent.join("manifest.json").exists());
-        assert!(parent.join("daemon.lock").exists(), "lock file is left behind");
+        assert!(
+            parent.join("daemon.lock").exists(),
+            "lock file is left behind"
+        );
     }
 
     #[test]

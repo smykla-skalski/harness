@@ -36,9 +36,9 @@ impl SecretsArgs {
     ///
     /// # Errors
     /// Returns `CliError` only when the underlying subcommand returns one.
-    pub fn execute(&self, ctx: &AppContext) -> Result<i32, CliError> {
+    pub fn execute(&self, _ctx: &AppContext) -> Result<i32, CliError> {
         match &self.command {
-            SecretsCommand::List => run_list(ctx),
+            SecretsCommand::List => Ok(run_list()),
             SecretsCommand::Set(args) => run_set(args),
             SecretsCommand::Clear(args) => run_clear(args),
             SecretsCommand::Test(args) => run_test(args),
@@ -99,7 +99,7 @@ pub struct SecretMutateArgs {
     pub env_var: Option<String>,
 }
 
-fn run_list(_ctx: &AppContext) -> Result<i32, CliError> {
+fn run_list() -> i32 {
     let entries = [
         ("GitHub token", SERVICE_GITHUB, "default"),
         ("Todoist token", SERVICE_TODOIST, "default"),
@@ -116,7 +116,7 @@ fn run_list(_ctx: &AppContext) -> Result<i32, CliError> {
         };
         println!("  {label}: {status}");
     }
-    Ok(0)
+    0
 }
 
 fn run_set(args: &SecretMutateArgs) -> Result<i32, CliError> {
@@ -128,7 +128,7 @@ fn run_set(args: &SecretMutateArgs) -> Result<i32, CliError> {
         )));
     }
     set_generic_password(service, account.as_str(), secret.as_bytes())
-        .map_err(|error| keychain_error("write", service, account.as_str(), &error))?;
+        .map_err(|error| keychain_error("write", service, account.as_str(), error))?;
     println!("Stored {service} ({account})");
     Ok(0)
 }
@@ -140,11 +140,11 @@ fn run_clear(args: &SecretScopeArgs) -> Result<i32, CliError> {
             println!("Cleared {service} ({account})");
             Ok(0)
         }
-        Err(error) if is_not_found(&error) => {
+        Err(error) if is_not_found(error) => {
             println!("Nothing to clear for {service} ({account})");
             Ok(0)
         }
-        Err(error) => Err(keychain_error("clear", service, account.as_str(), &error)),
+        Err(error) => Err(keychain_error("clear", service, account.as_str(), error)),
     }
 }
 
@@ -159,7 +159,7 @@ fn run_test(args: &SecretScopeArgs) -> Result<i32, CliError> {
     }
 }
 
-fn keychain_error(action: &str, service: &str, account: &str, error: &SecError) -> CliError {
+fn keychain_error(action: &str, service: &str, account: &str, error: SecError) -> CliError {
     CliError::from(CliErrorKind::workflow_io(format!(
         "Keychain {action} failed for {service} ({account}): {error}"
     )))
@@ -168,7 +168,7 @@ fn keychain_error(action: &str, service: &str, account: &str, error: &SecError) 
 /// errSecItemNotFound on macOS.
 const ERR_SEC_ITEM_NOT_FOUND: i32 = -25300;
 
-fn is_not_found(error: &SecError) -> bool {
+fn is_not_found(error: SecError) -> bool {
     error.code() == ERR_SEC_ITEM_NOT_FOUND
 }
 
@@ -241,12 +241,18 @@ mod tests {
 
     #[test]
     fn sha1_matches_swift_insecure_sha1_hex() {
-        assert_eq!(sha1_hex("owner/repo"), "b0a93768b870824e04990d714ca1b761394528c1");
+        assert_eq!(
+            sha1_hex("owner/repo"),
+            "b0a93768b870824e04990d714ca1b761394528c1"
+        );
     }
 
     #[test]
     fn normalize_repository_slug_lowercases_and_validates() {
-        assert_eq!(normalize_repository_slug("OWNER/REPO").unwrap(), "owner/repo");
+        assert_eq!(
+            normalize_repository_slug("OWNER/REPO").unwrap(),
+            "owner/repo"
+        );
         assert!(normalize_repository_slug("no-slash").is_err());
         assert!(normalize_repository_slug("  ").is_err());
     }
