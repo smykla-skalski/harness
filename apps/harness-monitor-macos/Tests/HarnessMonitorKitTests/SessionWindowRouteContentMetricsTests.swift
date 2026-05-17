@@ -222,24 +222,37 @@ struct SessionWindowRouteContentMetricsTests {
     let componentsSource = try taskBoardSourceFile(
       named: "TaskBoardOperationsPanel+Components.swift"
     )
+    let inventorySource = try taskBoardSourceFile(
+      named: "TaskBoardOperationsPanelInventoryContent.swift"
+    )
+    let textFieldSource = try taskBoardSourceFile(named: "TaskBoardOperationsTextField.swift")
     let supportSource = try taskBoardSourceFile(named: "TaskBoardOverviewSupport.swift")
 
     #expect(operationsSource.contains("TaskBoardOperationsPanelLayout("))
     #expect(layoutSource.contains("TaskBoardOperationsResponsiveLayout("))
     #expect(layoutSource.contains("private struct TaskBoardOperationsResponsiveLayout: Layout"))
+    #expect(layoutSource.contains("maxColumnWidth: metrics.operationsCardMaxWidth"))
     #expect(layoutSource.contains("minColumnWidth * 3 + spacing * 2"))
+    #expect(layoutSource.contains("private var horizontalMaxWidth"))
     #expect(layoutSource.contains("if width >= horizontalMinWidth"))
     #expect(layoutSource.contains("placeHorizontal(in: bounds, subviews: subviews)"))
     #expect(layoutSource.contains("placeVertical(in: bounds, subviews: subviews)"))
+    #expect(layoutSource.contains("bounds.midX - (layoutWidth / 2)"))
     #expect(
       layoutSource.contains("return max(minColumnWidth, (width - totalSpacing) / CGFloat(count))")
     )
     #expect(componentsSource.contains("TaskBoardOperationsFormSection("))
     #expect(componentsSource.contains("TaskBoardOperationsFormRow("))
+    #expect(componentsSource.contains("contentMaxWidth: nil"))
+    #expect(componentsSource.contains("minWidth: 0"))
     #expect(componentsSource.contains("Picker(\"\", selection: selection)"))
     #expect(componentsSource.contains(".labelsHidden()"))
     #expect(componentsSource.contains(".toggleStyle(.switch)"))
-    #expect(componentsSource.contains("TextField(\"\", text: text, prompt: Text(prompt))"))
+    #expect(componentsSource.contains("TaskBoardOperationsTextField("))
+    #expect(textFieldSource.contains("TextField(\"\", text: $text, prompt: Text(prompt))"))
+    #expect(textFieldSource.contains(".frame(minWidth: 0, maxWidth: .infinity"))
+    #expect(inventorySource.contains("HarnessMonitorWrapLayout("))
+    #expect(inventorySource.contains("rowAlignment: .trailing"))
     #expect(componentsSource.contains("alignment: .trailing"))
     #expect(componentsSource.contains("alignment: .leading"))
     #expect(!componentsSource.contains("Form {"))
@@ -247,6 +260,7 @@ struct SessionWindowRouteContentMetricsTests {
     #expect(!componentsSource.contains(".padding(.horizontal, -HarnessMonitorTheme.spacingXS)"))
     #expect(!layoutSource.contains(".padding(.horizontal, -HarnessMonitorTheme.spacingSM)"))
     #expect(supportSource.contains("let operationsCardMinWidth: CGFloat"))
+    #expect(supportSource.contains("let operationsCardMaxWidth: CGFloat"))
   }
 
   @Test("Board-only task board items have a management surface")

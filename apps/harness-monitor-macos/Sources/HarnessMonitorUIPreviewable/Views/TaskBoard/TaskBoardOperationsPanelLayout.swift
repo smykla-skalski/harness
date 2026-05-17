@@ -11,6 +11,7 @@ struct TaskBoardOperationsPanelLayout<SyncCard: View, DispatchCard: View, Invent
   var body: some View {
     TaskBoardOperationsResponsiveLayout(
       minColumnWidth: metrics.operationsCardMinWidth,
+      maxColumnWidth: metrics.operationsCardMaxWidth,
       spacing: metrics.columnSpacing
     ) {
       syncCard
@@ -22,10 +23,15 @@ struct TaskBoardOperationsPanelLayout<SyncCard: View, DispatchCard: View, Invent
 
 private struct TaskBoardOperationsResponsiveLayout: Layout {
   let minColumnWidth: CGFloat
+  let maxColumnWidth: CGFloat
   let spacing: CGFloat
 
   private var horizontalMinWidth: CGFloat {
     minColumnWidth * 3 + spacing * 2
+  }
+
+  private var horizontalMaxWidth: CGFloat {
+    max(minColumnWidth, maxColumnWidth) * 3 + spacing * 2
   }
 
   func sizeThatFits(
@@ -34,7 +40,7 @@ private struct TaskBoardOperationsResponsiveLayout: Layout {
     cache _: inout ()
   ) -> CGSize {
     guard let width = proposal.width else {
-      return horizontalSize(proposalWidth: horizontalMinWidth, subviews: subviews)
+      return horizontalSize(proposalWidth: horizontalMaxWidth, subviews: subviews)
     }
     if width >= horizontalMinWidth {
       return horizontalSize(proposalWidth: width, subviews: subviews)
@@ -56,7 +62,8 @@ private struct TaskBoardOperationsResponsiveLayout: Layout {
   }
 
   private func horizontalSize(proposalWidth: CGFloat, subviews: Subviews) -> CGSize {
-    let columnWidth = horizontalColumnWidth(for: proposalWidth, count: subviews.count)
+    let layoutWidth = horizontalLayoutWidth(for: proposalWidth)
+    let columnWidth = horizontalColumnWidth(for: layoutWidth, count: subviews.count)
     let heights = subviews.map { subview in
       subview.sizeThatFits(ProposedViewSize(width: columnWidth, height: nil)).height
     }
@@ -72,9 +79,11 @@ private struct TaskBoardOperationsResponsiveLayout: Layout {
   }
 
   private func placeHorizontal(in bounds: CGRect, subviews: Subviews) {
-    let columnWidth = horizontalColumnWidth(for: bounds.width, count: subviews.count)
+    let layoutWidth = horizontalLayoutWidth(for: bounds.width)
+    let columnWidth = horizontalColumnWidth(for: layoutWidth, count: subviews.count)
+    let leadingX = bounds.midX - (layoutWidth / 2)
     for (index, subview) in subviews.enumerated() {
-      let x = bounds.minX + CGFloat(index) * (columnWidth + spacing)
+      let x = leadingX + CGFloat(index) * (columnWidth + spacing)
       subview.place(
         at: CGPoint(x: x, y: bounds.minY),
         anchor: .topLeading,
@@ -94,6 +103,10 @@ private struct TaskBoardOperationsResponsiveLayout: Layout {
       )
       y += size.height + spacing
     }
+  }
+
+  private func horizontalLayoutWidth(for availableWidth: CGFloat) -> CGFloat {
+    min(max(availableWidth, horizontalMinWidth), horizontalMaxWidth)
   }
 
   private func horizontalColumnWidth(for width: CGFloat, count: Int) -> CGFloat {

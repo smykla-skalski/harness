@@ -30,10 +30,6 @@ struct TaskBoardOperationsPanel: View {
     112 * min(fontScale, 1.3)
   }
 
-  private var rowTrailingGutter: CGFloat {
-    HarnessMonitorTheme.spacingXXL
-  }
-
   private var dashboard: HarnessMonitorStore.ContentDashboardSlice {
     store.contentUI.dashboard
   }
@@ -61,7 +57,6 @@ struct TaskBoardOperationsPanel: View {
           inventoryStatusChoice: $inventoryStatusChoice
         )
       )
-      .padding(.trailing, rowTrailingGutter)
       .font(rowLabelFont)
       .environment(\.taskBoardOperationsRowLabelFont, rowLabelFont)
       .environment(\.taskBoardOperationsRowLabelWidth, rowLabelWidth)
