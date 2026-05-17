@@ -8,6 +8,10 @@ Read `AGENTS.md` first - it is the canonical cross-runtime guide for this direct
 
 Parallel Claude sessions must use separate full git worktrees for any Monitor edit/generate/build/test/daemon/XcodeBuildMCP work. Build/runtime lanes are still required for side-effect isolation, but they do not make one shared checkout safe for concurrent work.
 
+Do not look for `monitor:agent:*` tasks. The repo uses the normal `monitor:*`
+tasks; agent isolation comes from `HARNESS_MONITOR_BUILD_LANE` and
+`HARNESS_MONITOR_RUNTIME_LANE`.
+
 ```bash
 HARNESS_MONITOR_BUILD_LANE=agent-<uuid> rtk mise run monitor:build
 HARNESS_MONITOR_BUILD_LANE=agent-<uuid> XCODE_ONLY_TESTING=Target/Class rtk mise run monitor:test

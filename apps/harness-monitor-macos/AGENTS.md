@@ -52,6 +52,10 @@ Inside a worktree:
 - `HARNESS_MONITOR_RUNTIME_LANE=<name>` isolates daemon roots, ports, launchd
   labels, bridge state, and MCP runtime state.
 
+There are no agent-specific `monitor:agent:*` tasks. Use the normal
+`mise run monitor:*` tasks and add the lane env vars above when an agent needs
+isolated build or runtime state.
+
 Do not use legacy runtime-profile env vars. Do not hardcode shared lane names
 such as `claude-main`.
 
