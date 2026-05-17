@@ -183,10 +183,11 @@ extension HarnessMonitorStore {
       else {
         return
       }
-      let writes = self.pendingSessionDetailCacheWrites
-        .sorted { $0.key < $1.key }
-        .map(\.value)
+      let pendingWrites = self.pendingSessionDetailCacheWrites
       self.pendingSessionDetailCacheWrites.removeAll()
+      let writes = await self.sessionCacheWriteWorker.sortedPendingSessionDetailWrites(
+        pendingWrites
+      )
       for write in writes {
         let result = await cacheService.cacheSessionDetail(
           write.snapshot.detail,
@@ -274,4 +275,16 @@ extension HarnessMonitorStore {
       )
     }
   }
+}
+
+actor SessionCacheWriteWorker {
+  func sortedPendingSessionDetailWrites(
+    _ writes: [String: PendingSessionDetailCacheWrite]
+  ) -> [PendingSessionDetailCacheWrite] {
+    writes
+      .sorted { $0.key < $1.key }
+      .map(\.value)
+  }
+
+  func waitForIdle() {}
 }

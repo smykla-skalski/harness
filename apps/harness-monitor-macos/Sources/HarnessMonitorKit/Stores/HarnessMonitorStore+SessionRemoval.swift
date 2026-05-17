@@ -11,6 +11,7 @@ struct SessionSnapshotWorkerInput: Sendable {
 struct SessionSnapshotWorkerOutput: Sendable {
   let projects: [ProjectSummary]
   let sessions: [SessionSummary]
+  let sessionIDs: Set<String>
   let sessionSummariesByID: [String: SessionSummary]
   let sessionIndicesByID: [String: Int]
   let selectedSessionSummary: SessionSummary?
@@ -244,10 +245,13 @@ extension HarnessMonitorStore {
     }
 
     var summariesByID: [String: SessionSummary] = [:]
+    var sessionIDs: Set<String> = []
     var indicesByID: [String: Int] = [:]
     summariesByID.reserveCapacity(filteredSessions.count)
+    sessionIDs.reserveCapacity(filteredSessions.count)
     indicesByID.reserveCapacity(filteredSessions.count)
     for (index, summary) in filteredSessions.enumerated() {
+      sessionIDs.insert(summary.sessionId)
       summariesByID[summary.sessionId] = summary
       indicesByID[summary.sessionId] = index
     }
@@ -263,6 +267,7 @@ extension HarnessMonitorStore {
     return SessionSnapshotWorkerOutput(
       projects: filteredProjects,
       sessions: filteredSessions,
+      sessionIDs: sessionIDs,
       sessionSummariesByID: summariesByID,
       sessionIndicesByID: indicesByID,
       selectedSessionSummary: selectedSessionSummary,
@@ -277,6 +282,7 @@ extension HarnessMonitorStore {
   }
 
   private func applyPreparedSessionLookupState(_ preparedSnapshot: SessionSnapshotWorkerOutput) {
+    sessionIndex.catalog.sessionIDs = preparedSnapshot.sessionIDs
     sessionIndex.catalog.sessionSummariesByID = preparedSnapshot.sessionSummariesByID
     sessionIndex.catalog.totalSessionCount = preparedSnapshot.sessionCount
     sessionIndex.catalog.totalOpenWorkCount = preparedSnapshot.openWorkCount

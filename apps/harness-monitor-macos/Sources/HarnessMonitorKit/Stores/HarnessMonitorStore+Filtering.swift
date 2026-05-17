@@ -164,6 +164,9 @@ extension HarnessMonitorStore {
 
       suppressRefresh = true
       catalog.sessions.append(summary)
+      catalog.sessionIDs.insert(summary.sessionId)
+      catalog.sessionSummariesByID[summary.sessionId] = summary
+      sessionIndicesByID[summary.sessionId] = catalog.sessions.count - 1
       suppressRefresh = false
       cancelPendingSearchRebuild()
       rebuildCatalogAndProjection(change: .snapshot)

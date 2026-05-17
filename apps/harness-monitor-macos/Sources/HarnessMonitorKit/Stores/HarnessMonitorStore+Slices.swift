@@ -210,11 +210,13 @@ extension HarnessMonitorStore {
   public final class SessionCatalogSlice {
     public internal(set) var projects: [ProjectSummary] = []
     public internal(set) var sessions: [SessionSummary] = []
+    public internal(set) var sessionIDs: Set<String> = []
     public internal(set) var sessionSummariesByID: [String: SessionSummary] = [:]
     public internal(set) var totalSessionCount = 0
     public internal(set) var totalOpenWorkCount = 0
     public internal(set) var totalBlockedCount = 0
     public internal(set) var recentSessions: [SessionSummary] = []
+    public internal(set) var recentSessionIDs: [String] = []
 
     public init() {}
 

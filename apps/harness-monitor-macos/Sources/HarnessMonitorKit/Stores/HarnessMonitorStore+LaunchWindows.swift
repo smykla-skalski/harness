@@ -67,32 +67,26 @@ extension HarnessMonitorStore {
   public func launchWindowRestorePlan(
     userDefaults: UserDefaults = .standard
   ) async -> LaunchWindowRestorePlan {
-    let openAtQuit = await sessionWindowIDsOpenAtQuit()
+    let knownSessionIDs = sessionIndex.catalog.sessionIDs
+    let fallbackRecentSessionIDs = sessionIndex.catalog.recentSessionIDs
+    let openAtQuit = await rawSessionWindowIDsOpenAtQuit()
     if !openAtQuit.isEmpty {
       let groupings = await sessionTabGroupsAtQuit()
-      let knownSessionIDs = Set(openAtQuit)
-      let filteredGroupings = filterTabGroupings(
-        groupings,
+      return await launchWindowRestoreWorker.openAtQuitPlan(
+        openAtQuit: openAtQuit,
+        groupings: groupings,
         knownSessionIDs: knownSessionIDs
-      )
-      let orderedSessionIDs = orderedRestoreSessionIDs(
-        openAtQuit,
-        groupings: filteredGroupings
-      )
-      return LaunchWindowRestorePlan(
-        sessionIDs: orderedSessionIDs,
-        tabGroupings: filteredGroupings
       )
     }
     let hasPriorWindowState = await rawSessionWindowsOpenAtQuitExist()
     if hasPriorWindowState || hasCompletedLaunchWindowBridgeFallback(userDefaults: userDefaults) {
       return LaunchWindowRestorePlan()
     }
-    var bridgedIDs = await recentlyViewedSessionIDs()
-    appendFallbackRecentSessionIDs(to: &bridgedIDs)
-    return LaunchWindowRestorePlan(
-      sessionIDs: bridgedIDs,
-      usedBridgeFallback: true
+    let bridgedIDs = await rawRecentlyViewedSessionIDs()
+    return await launchWindowRestoreWorker.bridgeFallbackPlan(
+      recentlyViewedSessionIDs: bridgedIDs,
+      fallbackRecentSessionIDs: fallbackRecentSessionIDs,
+      knownSessionIDs: knownSessionIDs
     )
   }
 
@@ -100,7 +94,7 @@ extension HarnessMonitorStore {
   /// after a recent-sessions cleanup). Drop members that no longer have a
   /// session in the active catalog and discard groups whose surviving
   /// members would be <2 - those are effectively standalone now.
-  private func filterTabGroupings(
+  nonisolated static func filterTabGroupings(
     _ groupings: [SessionTabGroupSnapshot],
     knownSessionIDs: Set<String>
   ) -> [SessionTabGroupSnapshot] {
@@ -123,7 +117,7 @@ extension HarnessMonitorStore {
     return filtered
   }
 
-  private func orderedRestoreSessionIDs(
+  nonisolated static func orderedRestoreSessionIDs(
     _ openAtQuit: [String],
     groupings: [SessionTabGroupSnapshot]
   ) -> [String] {
@@ -210,28 +204,14 @@ extension HarnessMonitorStore {
     await persistSessionWindowRestoreSnapshot(snapshot, userDefaults: userDefaults)
   }
 
-  private func sessionWindowIDsOpenAtQuit() async -> [String] {
+  private func rawSessionWindowIDsOpenAtQuit() async -> [String] {
     guard let cacheService else { return [] }
-    let knownSessionIDs = Set(sessionIndex.catalog.sessions.map(\.sessionId))
     return await cacheService.sessionWindowIDsOpenAtQuit()
-      .filter { knownSessionIDs.contains($0) }
   }
 
-  private func recentlyViewedSessionIDs() async -> [String] {
+  private func rawRecentlyViewedSessionIDs() async -> [String] {
     guard let cacheService else { return [] }
-    let knownSessionIDs = Set(sessionIndex.catalog.sessions.map(\.sessionId))
     return await cacheService.recentlyViewedSessionIDs()
-      .filter { knownSessionIDs.contains($0) }
-  }
-
-  private func appendFallbackRecentSessionIDs(to sessionIDs: inout [String]) {
-    var seen = Set(sessionIDs)
-    for summary in sessionIndex.catalog.recentSessions {
-      guard seen.insert(summary.sessionId).inserted else {
-        continue
-      }
-      sessionIDs.append(summary.sessionId)
-    }
   }
 
   private func hasCompletedLaunchWindowBridgeFallback(
@@ -245,4 +225,46 @@ extension HarnessMonitorStore {
   ) {
     userDefaults.set(true, forKey: Self.launchWindowBridgeFallbackKey)
   }
+}
+
+actor LaunchWindowRestoreWorker {
+  func openAtQuitPlan(
+    openAtQuit: [String],
+    groupings: [HarnessMonitorStore.SessionTabGroupSnapshot],
+    knownSessionIDs: Set<String>
+  ) -> HarnessMonitorStore.LaunchWindowRestorePlan {
+    let filteredOpenAtQuit = openAtQuit.filter { knownSessionIDs.contains($0) }
+    let filteredGroupings = HarnessMonitorStore.filterTabGroupings(
+      groupings,
+      knownSessionIDs: knownSessionIDs
+    )
+    return HarnessMonitorStore.LaunchWindowRestorePlan(
+      sessionIDs: HarnessMonitorStore.orderedRestoreSessionIDs(
+        filteredOpenAtQuit,
+        groupings: filteredGroupings
+      ),
+      tabGroupings: filteredGroupings
+    )
+  }
+
+  func bridgeFallbackPlan(
+    recentlyViewedSessionIDs: [String],
+    fallbackRecentSessionIDs: [String],
+    knownSessionIDs: Set<String>
+  ) -> HarnessMonitorStore.LaunchWindowRestorePlan {
+    var sessionIDs = recentlyViewedSessionIDs.filter { knownSessionIDs.contains($0) }
+    var seen = Set(sessionIDs)
+    for sessionID in fallbackRecentSessionIDs where knownSessionIDs.contains(sessionID) {
+      guard seen.insert(sessionID).inserted else {
+        continue
+      }
+      sessionIDs.append(sessionID)
+    }
+    return HarnessMonitorStore.LaunchWindowRestorePlan(
+      sessionIDs: sessionIDs,
+      usedBridgeFallback: true
+    )
+  }
+
+  func waitForIdle() {}
 }

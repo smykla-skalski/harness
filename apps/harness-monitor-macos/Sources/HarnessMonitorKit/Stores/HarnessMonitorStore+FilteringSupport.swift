@@ -86,6 +86,7 @@ extension HarnessMonitorStore.SessionIndexSlice {
     let totalSessionCount: Int
     let totalOpenWorkCount: Int
     let totalBlockedCount: Int
+    let sessionIDs: Set<String>
     let sessionSummariesByID: [String: SessionSummary]
     let sessionIndicesByID: [String: Int]
     let recentSessionIndicesByID: [String: Int]
@@ -93,6 +94,7 @@ extension HarnessMonitorStore.SessionIndexSlice {
     let projectCatalogs: [ProjectCatalog]
     let orderedSessionIDsBySortOrder: [SessionSortOrder: [String]]
     let recentSessions: [SessionSummary]
+    let recentSessionIDs: [String]
     let projectionOutput: ProjectionComputationOutput
   }
 
@@ -161,11 +163,14 @@ extension HarnessMonitorStore.SessionIndexSlice {
     from input: CatalogComputationInput
   ) -> CatalogComputationOutput {
     var sessionIndicesByID: [String: Int] = [:]
+    var sessionIDs: Set<String> = []
     var sessionRecordsByID: [String: SessionRecord] = [:]
     sessionIndicesByID.reserveCapacity(input.sessions.count)
+    sessionIDs.reserveCapacity(input.sessions.count)
     sessionRecordsByID.reserveCapacity(input.sessions.count)
 
     for (index, summary) in input.sessions.enumerated() {
+      sessionIDs.insert(summary.sessionId)
       sessionIndicesByID[summary.sessionId] = index
       sessionRecordsByID[summary.sessionId] = SessionRecord(summary: summary)
     }
@@ -192,6 +197,7 @@ extension HarnessMonitorStore.SessionIndexSlice {
       totalSessionCount: input.sessions.count,
       totalOpenWorkCount: input.sessions.reduce(0) { $0 + $1.metrics.openTaskCount },
       totalBlockedCount: input.sessions.reduce(0) { $0 + $1.metrics.blockedTaskCount },
+      sessionIDs: sessionIDs,
       sessionSummariesByID: Dictionary(uniqueKeysWithValues: input.sessions.map {
         ($0.sessionId, $0)
       }),
@@ -205,6 +211,7 @@ extension HarnessMonitorStore.SessionIndexSlice {
       projectCatalogs: projectCatalogs,
       orderedSessionIDsBySortOrder: orderedSessionIDsBySortOrder,
       recentSessions: recentSessions,
+      recentSessionIDs: recentSessions.map(\.sessionId),
       projectionOutput: computeProjectionOutput(from: projectionInput)
     )
   }
