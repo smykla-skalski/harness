@@ -143,7 +143,7 @@ struct HarnessMonitorJSONCodeBlock: View {
   }
 }
 
-struct HarnessMonitorJSONPresentation: Equatable {
+struct HarnessMonitorJSONPresentation: Equatable, Sendable {
   let displayText: String
   let tokens: [HarnessMonitorJSONToken]
   let attributedText: AttributedString
@@ -201,8 +201,8 @@ struct HarnessMonitorJSONPresentation: Equatable {
   }
 }
 
-struct HarnessMonitorJSONToken: Equatable {
-  enum Kind: Equatable {
+struct HarnessMonitorJSONToken: Equatable, Sendable {
+  enum Kind: Equatable, Sendable {
     case boolean
     case key
     case null

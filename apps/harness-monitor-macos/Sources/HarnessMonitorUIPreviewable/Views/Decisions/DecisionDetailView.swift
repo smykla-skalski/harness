@@ -14,7 +14,7 @@ public struct DecisionDetailView: View {
 
   private let viewModel: DecisionDetailViewModel?
   private let store: HarnessMonitorStore?
-  private let auditEvents: [SupervisorEvent]
+  private let auditEvents: [SupervisorEventSnapshot]
   private let auditEventPayloadPresentations: [String: DecisionAuditTrailPayloadPresentation]
   private let observer: ObserverSummary?
   private let decisionScope: DecisionWorkspaceScope?
@@ -43,7 +43,7 @@ public struct DecisionDetailView: View {
   public init(
     viewModel: DecisionDetailViewModel?,
     store: HarnessMonitorStore? = nil,
-    auditEvents: [SupervisorEvent] = [],
+    auditEvents: [SupervisorEventSnapshot] = [],
     selectedTab: Binding<DecisionDetailTab> = .constant(.context),
     observer: ObserverSummary? = nil,
     decisionScope: DecisionWorkspaceScope? = nil,
@@ -66,7 +66,7 @@ public struct DecisionDetailView: View {
   init(
     viewModel: DecisionDetailViewModel?,
     store: HarnessMonitorStore? = nil,
-    auditEvents: [SupervisorEvent] = [],
+    auditEvents: [SupervisorEventSnapshot] = [],
     auditEventPayloadPresentations: [String: DecisionAuditTrailPayloadPresentation] = [:],
     selectedTab: Binding<DecisionDetailTab> = .constant(.context),
     observer: ObserverSummary? = nil,
@@ -90,7 +90,7 @@ public struct DecisionDetailView: View {
     decision: Decision?,
     store: HarnessMonitorStore? = nil,
     handler: any DecisionActionHandler = NullDecisionActionHandler(),
-    auditEvents: [SupervisorEvent] = [],
+    auditEvents: [SupervisorEventSnapshot] = [],
     selectedTab: Binding<DecisionDetailTab> = .constant(.context),
     observer: ObserverSummary? = nil,
     decisionScope: DecisionWorkspaceScope? = nil,

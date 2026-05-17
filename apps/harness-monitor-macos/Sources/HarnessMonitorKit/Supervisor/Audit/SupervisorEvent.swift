@@ -41,3 +41,43 @@ public final class SupervisorEvent {
     self.createdAt = createdAt
   }
 }
+
+public struct SupervisorEventSnapshot: Equatable, Hashable, Identifiable, Sendable {
+  public let id: String
+  public let tickID: String
+  public let kind: String
+  public let ruleID: String?
+  public let severityRaw: String?
+  public let payloadJSON: String
+  public let createdAt: Date
+
+  public init(
+    id: String,
+    tickID: String,
+    kind: String,
+    ruleID: String?,
+    severityRaw: String?,
+    payloadJSON: String,
+    createdAt: Date
+  ) {
+    self.id = id
+    self.tickID = tickID
+    self.kind = kind
+    self.ruleID = ruleID
+    self.severityRaw = severityRaw
+    self.payloadJSON = payloadJSON
+    self.createdAt = createdAt
+  }
+
+  public init(event: SupervisorEvent) {
+    self.init(
+      id: event.id,
+      tickID: event.tickID,
+      kind: event.kind,
+      ruleID: event.ruleID,
+      severityRaw: event.severityRaw,
+      payloadJSON: event.payloadJSON,
+      createdAt: event.createdAt
+    )
+  }
+}

@@ -307,6 +307,7 @@ public final class HarnessMonitorStore {
   let cacheService: SessionCacheService?
   let userDataService: UserDataPersistenceService?
   public let supervisorPolicyConfigRepository: SupervisorPolicyConfigRepository?
+  public let supervisorAuditRepository: SupervisorAuditRepository?
   var client: (any HarnessMonitorClientProtocol)?
   var globalStreamTask: Task<Void, Never>?
   var sessionStreamTask: Task<Void, Never>?
@@ -406,6 +407,7 @@ public final class HarnessMonitorStore {
       )
     }
     self.supervisorPolicyConfigRepository = modelContainer.map(SupervisorPolicyConfigRepository.init)
+    self.supervisorAuditRepository = modelContainer.map(SupervisorAuditRepository.init)
     if let cacheService {
       self.cacheService = cacheService
     } else if let modelContainer {

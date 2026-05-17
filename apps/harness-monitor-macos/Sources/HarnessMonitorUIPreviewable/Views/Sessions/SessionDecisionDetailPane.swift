@@ -6,7 +6,7 @@ import SwiftUI
 struct SessionDecisionDetailPane: View {
   let decision: Decision?
   let store: HarnessMonitorStore
-  let auditEvents: [SupervisorEvent]
+  let auditEvents: [SupervisorEventSnapshot]
   let auditEventPayloadPresentations: [String: DecisionAuditTrailPayloadPresentation]
   let observer: ObserverSummary?
   let decisionScope: DecisionWorkspaceScope

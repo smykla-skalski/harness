@@ -87,7 +87,9 @@ public final class DecisionDetailViewModel {
   /// Chronological audit trail scoped to this decision's rule and optional session / agent /
   /// task identifiers. Payloads that do not carry scope identifiers still match when the rule
   /// matches because phase-1 audit rows do not persist full target metadata yet.
-  public func scopedAuditTrail(from events: [SupervisorEvent]) -> [SupervisorEvent] {
+  public func scopedAuditTrail(
+    from events: [SupervisorEventSnapshot]
+  ) -> [SupervisorEventSnapshot] {
     events
       .filter { event in
         Self.matchesAuditEvent(event, decision: decision)
@@ -129,10 +131,10 @@ public final class DecisionDetailViewModel {
   }
 
   public static func explicitlySessionScopedAuditEvents(
-    from events: [SupervisorEvent],
+    from events: [SupervisorEventSnapshot],
     sessionID: String,
     decisions: [Decision]
-  ) -> [SupervisorEvent] {
+  ) -> [SupervisorEventSnapshot] {
     let decisionIDs = Set(decisions.map(\.id))
     let agentIDs = Set(decisions.compactMap(\.agentID))
     let taskIDs = Set(decisions.compactMap(\.taskID))
@@ -215,7 +217,10 @@ public final class DecisionDetailViewModel {
     }
   }
 
-  private static func matchesAuditEvent(_ event: SupervisorEvent, decision: Decision) -> Bool {
+  private static func matchesAuditEvent(
+    _ event: SupervisorEventSnapshot,
+    decision: Decision
+  ) -> Bool {
     guard event.ruleID == nil || event.ruleID == decision.ruleID else {
       return false
     }

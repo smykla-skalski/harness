@@ -5,7 +5,7 @@ import SwiftUI
 @Observable
 final class DecisionRuntime {
   var decisions: [Decision] = []
-  var auditEvents: [SupervisorEvent] = []
+  var auditEvents: [SupervisorEventSnapshot] = []
   var liveTick: DecisionLiveTickSnapshot = .placeholder
 
   func reload(from store: HarnessMonitorStore?) async {
@@ -25,7 +25,7 @@ final class DecisionRuntime {
     }
 
     decisions = (try? await decisionStore.openDecisions()) ?? []
-    auditEvents = HarnessMonitorStore.loadSupervisorAuditEvents(from: store.modelContext)
+    auditEvents = await store.loadSupervisorAuditEventSnapshots()
     await refreshLiveTick(from: store)
   }
 

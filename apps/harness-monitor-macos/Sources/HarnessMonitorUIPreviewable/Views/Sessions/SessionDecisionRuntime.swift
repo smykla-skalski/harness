@@ -2,7 +2,6 @@ import Foundation
 import HarnessMonitorKit
 import OSLog
 import Observation
-import SwiftData
 
 public enum SessionDecisionInspectorTab: String, CaseIterable, Codable, Hashable, Sendable {
   case context
@@ -55,10 +54,11 @@ public enum SessionInspectorVisibilityPolicy {
 @Observable
 public final class SessionDecisionRuntime {
   public var inspectorTab: SessionDecisionInspectorTab = .context
-  public private(set) var auditEvents: [SupervisorEvent] = []
+  public private(set) var auditEvents: [SupervisorEventSnapshot] = []
   private(set) var auditEventPayloadPresentations: [String: DecisionAuditTrailPayloadPresentation] =
     [:]
   public private(set) var filteredDecisionIDs: [String] = []
+  public private(set) var filteredDecisionIDSet: Set<String> = []
   public private(set) var hasFilteredDecisions = false
   public private(set) var isFilteringDecisions = false
 
@@ -68,6 +68,7 @@ public final class SessionDecisionRuntime {
   @ObservationIgnored private var historyRowKeyOrder: [String] = []
   @ObservationIgnored nonisolated(unsafe) private var filterTask: Task<Void, Never>?
   @ObservationIgnored private var latestFilterInput: SessionDecisionFilterInput?
+  @ObservationIgnored private var auditReloadGeneration: UInt64 = 0
 
   private static let cacheLimit = 32
   private static let filterSignposter = OSSignposter(
@@ -97,6 +98,7 @@ public final class SessionDecisionRuntime {
     guard !input.items.isEmpty else {
       filterTask = nil
       filteredDecisionIDs = []
+      filteredDecisionIDSet = []
       hasFilteredDecisions = true
       isFilteringDecisions = false
       return
@@ -119,6 +121,7 @@ public final class SessionDecisionRuntime {
       guard !Task.isCancelled else { return }
       guard let self, latestFilterInput == input else { return }
       filteredDecisionIDs = ids
+      filteredDecisionIDSet = Set(ids)
       hasFilteredDecisions = true
       isFilteringDecisions = false
     }
@@ -126,8 +129,7 @@ public final class SessionDecisionRuntime {
 
   public func filteredDecisions(from decisions: [Decision]) -> [Decision] {
     guard hasFilteredDecisions else { return decisions }
-    let decisionsByID = Dictionary(uniqueKeysWithValues: decisions.map { ($0.id, $0) })
-    return filteredDecisionIDs.compactMap { decisionsByID[$0] }
+    return decisions.filter { filteredDecisionIDSet.contains($0.id) }
   }
 
   public func waitForDecisionFilterIdle() async {
@@ -135,30 +137,41 @@ public final class SessionDecisionRuntime {
   }
 
   public func reloadAuditEvents(
-    from modelContext: ModelContext?,
+    from repository: SupervisorAuditRepository?,
     sessionID: String,
     decisions: [Decision]
-  ) {
-    let loadedEvents = HarnessMonitorStore.loadSupervisorAuditEvents(from: modelContext, limit: 256)
-    let scopedEvents = DecisionDetailViewModel.explicitlySessionScopedAuditEvents(
-      from: loadedEvents,
+  ) async {
+    auditReloadGeneration &+= 1
+    let generation = auditReloadGeneration
+    guard let repository else {
+      applyAuditReloadOutput(.empty, generation: generation)
+      return
+    }
+    let input = SessionDecisionAuditInput(
       sessionID: sessionID,
       decisions: decisions
     )
-    guard auditEvents != scopedEvents else { return }
-    let decoder = JSONDecoder()
-    auditEvents = scopedEvents
-    auditEventPayloadPresentations = Dictionary(
-      uniqueKeysWithValues: scopedEvents.map {
-        (
-          $0.id,
-          DecisionAuditTrailPayloadPresentation(
-            payloadJSON: $0.payloadJSON,
-            decoder: decoder
-          )
-        )
-      }
+    let loadedEvents = (try? await repository.fetchEvents(limit: 256)) ?? []
+    let output = await sessionDecisionAuditWorker.scopedOutput(
+      events: loadedEvents,
+      input: input
     )
+    applyAuditReloadOutput(output, generation: generation)
+  }
+
+  private func applyAuditReloadOutput(
+    _ output: SessionDecisionAuditOutput,
+    generation: UInt64
+  ) {
+    guard auditReloadGeneration == generation else { return }
+    guard
+      auditEvents != output.events
+        || auditEventPayloadPresentations != output.payloadPresentations
+    else {
+      return
+    }
+    auditEvents = output.events
+    auditEventPayloadPresentations = output.payloadPresentations
   }
 
   public func contextRows(for decision: Decision) -> [SessionDecisionContextRow] {
@@ -272,4 +285,158 @@ public final class SessionDecisionRuntime {
     "task",
     "taskid",
   ]
+}
+
+private let sessionDecisionAuditWorker = SessionDecisionAuditWorker()
+
+private actor SessionDecisionAuditWorker {
+  func scopedOutput(
+    events: [SupervisorEventSnapshot],
+    input: SessionDecisionAuditInput
+  ) -> SessionDecisionAuditOutput {
+    let scopedEvents = events.filter { event in
+      SessionDecisionAuditPayloadScope(payloadJSON: event.payloadJSON)
+        .matchesExplicitSessionScope(
+          sessionID: input.sessionID,
+          decisionIDs: input.decisionIDs,
+          agentIDs: input.agentIDs,
+          taskIDs: input.taskIDs
+        )
+    }
+    let decoder = JSONDecoder()
+    return SessionDecisionAuditOutput(
+      events: scopedEvents,
+      payloadPresentations: Dictionary(
+        uniqueKeysWithValues: scopedEvents.map {
+          (
+            $0.id,
+            DecisionAuditTrailPayloadPresentation(
+              payloadJSON: $0.payloadJSON,
+              decoder: decoder
+            )
+          )
+        }
+      )
+    )
+  }
+
+  func waitForIdle() async {}
+}
+
+private struct SessionDecisionAuditInput: Equatable, Sendable {
+  let sessionID: String
+  let decisionIDs: Set<String>
+  let agentIDs: Set<String>
+  let taskIDs: Set<String>
+
+  @MainActor
+  init(sessionID: String, decisions: [Decision]) {
+    self.sessionID = sessionID
+    decisionIDs = Set(decisions.map(\.id))
+    agentIDs = Set(decisions.compactMap(\.agentID))
+    taskIDs = Set(decisions.compactMap(\.taskID))
+  }
+}
+
+private struct SessionDecisionAuditOutput: Equatable, Sendable {
+  static let empty = Self(events: [], payloadPresentations: [:])
+
+  let events: [SupervisorEventSnapshot]
+  let payloadPresentations: [String: DecisionAuditTrailPayloadPresentation]
+}
+
+private struct SessionDecisionAuditPayloadScope {
+  let sessionID: String?
+  let agentID: String?
+  let taskID: String?
+  let decisionID: String?
+
+  init(payloadJSON: String) {
+    guard let data = payloadJSON.data(using: .utf8) else {
+      sessionID = nil
+      agentID = nil
+      taskID = nil
+      decisionID = nil
+      return
+    }
+    let object = try? JSONSerialization.jsonObject(with: data)
+    sessionID = Self.firstString(
+      forKeys: ["sessionID", "sessionId", "session_id"],
+      in: object
+    )
+    agentID = Self.firstString(
+      forKeys: ["agentID", "agentId", "agent_id"],
+      in: object
+    )
+    taskID = Self.firstString(
+      forKeys: ["taskID", "taskId", "task_id"],
+      in: object
+    )
+    decisionID = Self.firstString(
+      forKeys: ["decisionID", "decisionId", "decision_id"],
+      in: object
+    )
+  }
+
+  func matchesExplicitSessionScope(
+    sessionID expectedSessionID: String,
+    decisionIDs: Set<String>,
+    agentIDs: Set<String>,
+    taskIDs: Set<String>
+  ) -> Bool {
+    let sessionMatches = self.sessionID.map { $0 == expectedSessionID }
+    if sessionMatches == false {
+      return false
+    }
+
+    let decisionMatches = decisionID.map { decisionIDs.contains($0) }
+    if decisionMatches == false {
+      return false
+    }
+
+    let taskMatches = taskID.map { taskIDs.contains($0) }
+    if taskMatches == false {
+      return false
+    }
+
+    let agentMatches = agentID.map { agentIDs.contains($0) }
+    if agentMatches == false {
+      return false
+    }
+
+    return decisionMatches == true
+      || taskMatches == true
+      || agentMatches == true
+      || sessionMatches == true
+  }
+
+  private static func firstString(forKeys keys: [String], in object: Any?) -> String? {
+    if let dictionary = object as? [String: Any] {
+      for key in keys {
+        if let value = stringValue(dictionary[key]) {
+          return value
+        }
+      }
+      for value in dictionary.values {
+        if let nested = firstString(forKeys: keys, in: value) {
+          return nested
+        }
+      }
+    }
+    if let array = object as? [Any] {
+      for value in array {
+        if let nested = firstString(forKeys: keys, in: value) {
+          return nested
+        }
+      }
+    }
+    return nil
+  }
+
+  private static func stringValue(_ value: Any?) -> String? {
+    guard let value = value as? String, !value.isEmpty else {
+      return nil
+    }
+    return value
+  }
 }
