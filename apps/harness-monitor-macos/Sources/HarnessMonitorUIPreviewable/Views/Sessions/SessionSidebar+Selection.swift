@@ -113,9 +113,9 @@ extension SessionSidebar {
 
   func visibleCount(for kind: SessionSidebarSelectionKind) -> Int {
     switch kind {
-    case .agent: (snapshot?.detail?.agents ?? []).count
-    case .task: (snapshot?.detail?.tasks ?? []).count
-    case .decision: decisions.count
+    case .agent: visibleAgentIDs.count
+    case .task: visibleTaskIDs.count
+    case .decision: decisionIDs.count
     }
   }
 

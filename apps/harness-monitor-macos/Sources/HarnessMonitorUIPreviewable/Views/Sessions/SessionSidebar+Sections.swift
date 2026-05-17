@@ -139,8 +139,8 @@ extension SessionSidebar {
 
   @ViewBuilder var agentsSection: some View {
     Section {
-      let orderedAgents = state.sidebarOrdering.orderedAgents(snapshot?.detail?.agents ?? [])
-      let orderedAgentIDs = orderedAgents.map(\.agentId)
+      let orderedAgents = cachedAgentPresentation.agents
+      let orderedAgentIDs = cachedAgentPresentation.agentIDs
       ForEach(orderedAgents) { agent in
         agentRow(agent, orderedAgentIDs: orderedAgentIDs)
       }
@@ -164,7 +164,7 @@ extension SessionSidebar {
           }
         }
       }
-      if (snapshot?.detail?.agents ?? []).isEmpty && sessionCodexRuns.isEmpty {
+      if orderedAgents.isEmpty && sessionCodexRuns.isEmpty {
         Text("No agents")
           .foregroundStyle(.secondary)
       }
@@ -175,12 +175,12 @@ extension SessionSidebar {
 
   @ViewBuilder var tasksSection: some View {
     Section {
-      let tasks = snapshot?.detail?.tasks ?? []
-      let orderedTaskIDs = tasks.map(\.taskId)
+      let tasks = cachedTaskPresentation.tasks
+      let orderedTaskIDs = cachedTaskPresentation.taskIDs
       ForEach(tasks) { task in
         taskRow(task, orderedTaskIDs: orderedTaskIDs)
       }
-      if (snapshot?.detail?.tasks ?? []).isEmpty {
+      if tasks.isEmpty {
         Text("No tasks")
           .foregroundStyle(.secondary)
       }
@@ -290,7 +290,7 @@ extension SessionSidebar {
     SessionTaskContextMenuActions(
       store: store,
       state: state,
-      tasks: snapshot?.detail?.tasks ?? [],
+      tasks: cachedTaskPresentation.tasks,
       decisions: decisions,
       resolution: resolution
     )

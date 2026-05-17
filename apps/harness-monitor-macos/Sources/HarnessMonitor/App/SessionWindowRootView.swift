@@ -28,14 +28,12 @@ struct SessionWindowRootView: View {
   }
 
   private var pendingDecisionCount: Int {
-    store.supervisorOpenDecisions.reduce(into: 0) { count, decision in
-      if decision.sessionID == token.sessionID { count += 1 }
-    }
+    store.supervisorOpenDecisionIDsBySession[token.sessionID]?.count ?? 0
   }
 
   private var pendingDecisionSeverity: DecisionSeverity? {
     var seen: Set<DecisionSeverity> = []
-    for decision in store.supervisorOpenDecisions where decision.sessionID == token.sessionID {
+    for decision in store.supervisorOpenDecisionPresentationItemsBySession[token.sessionID] ?? [] {
       if let severity = DecisionSeverity(rawValue: decision.severityRaw) {
         seen.insert(severity)
       }
