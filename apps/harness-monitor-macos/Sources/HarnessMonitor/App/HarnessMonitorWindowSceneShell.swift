@@ -232,7 +232,9 @@ private struct OptionalWindowToolbarBackgroundVisibilityModifier: ViewModifier {
   @ViewBuilder
   func body(content: Content) -> some View {
     if let visibility {
-      content.toolbarBackgroundVisibility(visibility, for: .windowToolbar)
+      content
+        .toolbarBackground(.regularMaterial, for: .windowToolbar)
+        .toolbarBackgroundVisibility(visibility, for: .windowToolbar)
     } else {
       content
     }
