@@ -249,6 +249,43 @@ struct PolicyCanvasRoutingTests {
     #expect(position.y == base.y)
   }
 
+  @Test("display label placement avoids other route segments")
+  func displayLabelPlacementAvoidsOtherRouteSegments() {
+    let base = CGPoint(x: 110, y: 100)
+    let positions = policyCanvasResolvedLabelPositions(
+      routes: [
+        (
+          id: "edge-a",
+          route: PolicyCanvasEdgeRoute(
+            points: [CGPoint(x: 0, y: 100), CGPoint(x: 220, y: 100)],
+            labelPosition: base
+          )
+        ),
+        (
+          id: "edge-b",
+          route: PolicyCanvasEdgeRoute(
+            points: [CGPoint(x: 110, y: -60), CGPoint(x: 110, y: 260)],
+            labelPosition: CGPoint(x: 110, y: 180)
+          )
+        ),
+      ],
+      nodeFrames: [],
+      routeFrames: [
+        "edge-b": [CGRect(x: 100, y: -60, width: 20, height: 320)]
+      ],
+      labelSize: CGSize(
+        width: PolicyCanvasLayout.edgeLabelMaxWidth,
+        height: PolicyCanvasLayout.edgeLabelHeight
+      )
+    )
+
+    guard let position = positions["edge-a"] else {
+      Issue.record("expected label position")
+      return
+    }
+    #expect(position.x != base.x)
+  }
+
   private var defaultGroups: [PolicyCanvasGroup] {
     [entryGroup, mergeGroup, terminalGroup]
   }

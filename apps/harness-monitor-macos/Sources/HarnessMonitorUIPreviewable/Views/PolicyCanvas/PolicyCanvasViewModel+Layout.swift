@@ -69,22 +69,21 @@ extension PolicyCanvasViewModel {
     )
   }
 
-  /// Node-only obstacles. Always part of the router's obstacle set; the
-  /// per-edge `routingObstacles(source:target:)` overlay adds group
-  /// frames too so intervening group shells keep long cross-canvas routes
-  /// out of other groups' interior whitespace.
+  /// Node obstacles are hard blockers for the router. Group backgrounds are not:
+  /// they are visual containers, not shapes, and treating them as walls forces
+  /// long loop-like detours around whole sections of the canvas.
   var nodeRoutingObstacles: [CGRect] {
     nodes.map { node in
       CGRect(origin: node.position, size: PolicyCanvasLayout.nodeSize)
     }
   }
 
-  /// Per-edge obstacle list. Always includes every node and group frame.
-  /// `PolicyCanvasVisibilityRouter.preparedObstacles(...)` drops only the
-  /// source/target-containing rects, so grouped endpoints can still exit
-  /// their own shells while intervening groups remain solid blockers.
+  /// Per-edge obstacle list. Includes nodes and compact group-title strips as
+  /// hard obstacles, but leaves group bodies passable. This follows the
+  /// visibility-router model: route around shapes first; score or nudge softer
+  /// cluster/group interactions later instead of making them maze walls.
   func routingObstacles(source: CGPoint, target: CGPoint) -> [CGRect] {
-    nodeRoutingObstacles + groups.map(\.frame)
+    nodeRoutingObstacles + policyCanvasGroupTitleFrames(groups)
   }
 
   /// Per-kind edge counts for the inspector empty-state breakdown.
@@ -153,23 +152,20 @@ extension PolicyCanvasViewModel {
     return portAnchor(for: node, side: side, index: index, count: ports.count)
   }
 
-  /// All four side anchors for the endpoint's port, used by T2.2 flex
-  /// routing. Returns at most four points (leading/trailing/top/bottom) so
-  /// the router can pick the combination that yields the fewest bends.
+  /// Semantic side anchors for the endpoint's port, used by flex routing.
+  /// Output ports can route from trailing or bottom; input ports can route
+  /// into leading or top. Those are the sides that the node renderer exposes
+  /// as visible/interactive ports for each kind, so flex routing cannot choose
+  /// an impossible side that reads as a wrong port in the rendered canvas.
   /// Returns an empty array when the endpoint cannot resolve.
   ///
   /// **Order is load-bearing for the fallback path.**
-  /// `PolicyCanvasPortSide.allSides` returns `[.leading, .trailing, .top,
-  /// .bottom]`, and `PolicyCanvasVisibilityRouter.route(sourceCandidates:
-  /// targetCandidates:context:)` falls back to `sourceCandidates[0]` paired
-  /// with `targetCandidates[0]` when every combo's A* call reports no path
-  /// (the degenerate "all candidates fall back" case). With the current
-  /// order that degenerate fallback is `leading → leading`, the canonical
-  /// node side for inbound flow. Reordering this list silently changes
-  /// which side gets picked when routing cannot solve, so any caller
-  /// touching `allSides` must consider whether the new `[0]` is still the
-  /// right default geometry.
-  func portAnchorCandidates(for endpoint: PolicyCanvasPortEndpoint) -> [CGPoint] {
+  /// Output sides are `[.trailing, .bottom]` and input sides are `[.leading,
+  /// .top]`, so a degenerate flex fallback still yields the natural
+  /// trailing-output to leading-input pair.
+  func portAnchorCandidates(
+    for endpoint: PolicyCanvasPortEndpoint
+  ) -> [PolicyCanvasRouteAnchorCandidate] {
     guard let node = node(endpoint.nodeID) else {
       return []
     }
@@ -177,8 +173,8 @@ extension PolicyCanvasViewModel {
     guard let index = ports.firstIndex(where: { $0.id == endpoint.portID }) else {
       return []
     }
-    return PolicyCanvasPortSide.allSides.map { side in
-      portAnchor(for: node, side: side, index: index, count: ports.count)
+    return routablePortSides(for: endpoint.kind).map { side in
+      (point: portAnchor(for: node, side: side, index: index, count: ports.count), side: side)
     }
   }
 
@@ -250,36 +246,6 @@ extension PolicyCanvasViewModel {
     nodes.filter { $0.groupID == groupID }
   }
 
-  func reconcileGroupFrames() {
-    for index in groups.indices {
-      let members = nodes(in: groups[index].id)
-      guard let frame = policyCanvasGroupFrame(containing: members) else {
-        continue
-      }
-      groups[index].frame = frame
-    }
-  }
-
-  func seedGroupDrag(groupID: String, group: PolicyCanvasGroup) {
-    if groupDragOrigins[groupID] == nil {
-      groupDragOrigins[groupID] = group.frame
-      let origins = nodes(in: groupID).map { ($0.id, $0.position) }
-      groupNodeDragOrigins[groupID] = Dictionary(uniqueKeysWithValues: origins)
-    }
-  }
-
-  func moveNodes(in groupID: String, by delta: CGSize) {
-    let origins = groupNodeDragOrigins[groupID] ?? [:]
-    for index in nodes.indices where nodes[index].groupID == groupID {
-      guard let origin = origins[nodes[index].id] else {
-        continue
-      }
-      nodes[index].position = snapped(
-        CGPoint(x: origin.x + delta.width, y: origin.y + delta.height)
-      )
-    }
-  }
-
   func nodeCenter(_ node: PolicyCanvasNode) -> CGPoint {
     CGPoint(
       x: node.position.x + PolicyCanvasLayout.nodeSize.width / 2,
@@ -287,24 +253,17 @@ extension PolicyCanvasViewModel {
     )
   }
 
-  func containingGroupID(
-    for point: CGPoint,
-    excluding excludedID: String? = nil
-  ) -> String? {
-    groups.first { group in
-      group.id != excludedID && group.frame.contains(point)
-    }?.id
-  }
-
-  func snapped(_ point: CGPoint) -> CGPoint {
-    CGPoint(
-      x: (point.x / PolicyCanvasLayout.gridSize).rounded() * PolicyCanvasLayout.gridSize,
-      y: (point.y / PolicyCanvasLayout.gridSize).rounded() * PolicyCanvasLayout.gridSize
-    )
-  }
-
   private func defaultPortSide(for kind: PolicyCanvasPortKind) -> PolicyCanvasPortSide {
     kind == .input ? .leading : .trailing
+  }
+
+  private func routablePortSides(for kind: PolicyCanvasPortKind) -> [PolicyCanvasPortSide] {
+    switch kind {
+    case .input:
+      [.leading, .top]
+    case .output:
+      [.trailing, .bottom]
+    }
   }
 
   private func portAnchor(
@@ -401,7 +360,10 @@ extension PolicyCanvasViewModel {
       .joined(separator: "|")
   }
 
-  private func portSpacing(for endpoint: PolicyCanvasPortEndpoint) -> CGFloat {
+  func portSpacing(
+    for endpoint: PolicyCanvasPortEndpoint,
+    side overrideSide: PolicyCanvasPortSide? = nil
+  ) -> CGFloat {
     guard let node = node(endpoint.nodeID) else {
       return PolicyCanvasLayout.defaultEdgeLineSpacing
     }
@@ -409,7 +371,7 @@ extension PolicyCanvasViewModel {
     guard ports.count > 1 else {
       return PolicyCanvasLayout.defaultEdgeLineSpacing
     }
-    let side = resolvedPortSide(for: endpoint)
+    let side = overrideSide ?? resolvedPortSide(for: endpoint)
     switch side {
     case .leading, .trailing:
       return abs(

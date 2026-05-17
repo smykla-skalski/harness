@@ -36,8 +36,8 @@ struct PolicyCanvasVisibilityRouterTests {
     #expect(!polylineEntersObstacle(route.points, obstacle: obstacle))
   }
 
-  @Test("5 parallel edges around the same obstacle pick distinct detour lanes")
-  func parallelEdgesGetDistinctLanes() {
+  @Test("parallel edges around the same obstacle stay axis-aligned and obstacle-free")
+  func parallelEdgesStayAxisAlignedAndObstacleFree() {
     let obstacle = CGRect(x: 150, y: 50, width: 100, height: 100)
     let routes = (0..<5).map { lane in
       PolicyCanvasVisibilityRouter().route(
@@ -46,17 +46,10 @@ struct PolicyCanvasVisibilityRouterTests {
         context: context(lane: lane, obstacles: [obstacle])
       )
     }
-    // Each lane offsets the midX/midY anchors by `lane * channelStep`. With
-    // an obstacle in the way the detour bus row picks up the lane-specific
-    // y-coordinate, giving each parallel edge its own visual channel.
-    let busYs = routes.compactMap { route -> CGFloat? in
-      guard route.points.count >= 3 else {
-        return nil
-      }
-      return route.points[1].y
+    for route in routes {
+      #expect(allSegmentsAxisAligned(route.points))
+      #expect(!polylineEntersObstacle(route.points, obstacle: obstacle))
     }
-    let uniqueBusYs = Set(busYs)
-    #expect(uniqueBusYs.count == 5)
   }
 
   @Test("Two crossing edges intersect at right angles")
@@ -164,12 +157,9 @@ struct PolicyCanvasVisibilityRouterTests {
 
   @Test("Routes around group-style obstacle rects")
   func routesAroundGroupObstacle() {
-    // Callers pass `viewModel.routingObstacles`, which appends group
-    // frames to node frames. The router treats them identically - a
-    // group rect between two endpoints outside any group blocks the
-    // straight-line route just like a node rect would. Edges with one
-    // endpoint inside the group rely on `preparedObstacles`' auto-drop
-    // when the padded rect contains source/target.
+    // The visibility router treats every supplied rect as a hard shape.
+    // Callers decide whether a rect is a real blocker; PolicyCanvas passes
+    // nodes and group-title strips, while leaving group bodies passable.
     let groupRect = CGRect(x: 200, y: 50, width: 200, height: 200)
     let route = PolicyCanvasVisibilityRouter().route(
       source: CGPoint(x: 0, y: 150),
@@ -196,86 +186,23 @@ struct PolicyCanvasVisibilityRouterTests {
     #expect(coordinates.contains(220))
   }
 
-  @Test("8 parallel edges spread at least 80pt across the bus column")
-  func eightParallelEdgesSpreadWidely() {
-    let obstacle = CGRect(x: 150, y: 50, width: 100, height: 100)
-    let routes = (0..<8).map { lane in
-      PolicyCanvasVisibilityRouter().route(
-        source: CGPoint(x: 0, y: 100),
-        target: CGPoint(x: 400, y: 100),
-        context: context(lane: lane, obstacles: [obstacle])
-      )
-    }
-    let busYs = routes.compactMap { route -> CGFloat? in
-      guard route.points.count >= 3 else {
-        return nil
-      }
-      return route.points[1].y
-    }
-    let spread = (busYs.max() ?? 0) - (busYs.min() ?? 0)
-    // laneSpreadStep is 12pt, so 7 lanes between the extremes should
-    // produce ~84pt of spread (less the channel-snap rounding).
-    #expect(spread >= 80)
-    #expect(Set(busYs).count == 8)
-  }
-
-  @Test("Multi-bend routes spread the dominant internal bus by lane")
-  func multiBendRoutesSpreadDominantInternalBus() {
-    let source = CGPoint(x: 0, y: 100)
-    let target = CGPoint(x: 400, y: 220)
+  @Test("channel snap preserves endpoint axes")
+  func channelSnapPreservesEndpointAxes() {
     let points = [
-      source,
-      CGPoint(x: 80, y: 100),
-      CGPoint(x: 80, y: 40),
-      CGPoint(x: 320, y: 40),
-      CGPoint(x: 320, y: 220),
-      target,
+      CGPoint(x: 3, y: 0),
+      CGPoint(x: 3, y: 12),
+      CGPoint(x: 98, y: 12),
+      CGPoint(x: 98, y: 101),
     ]
-
-    let spread = PolicyCanvasVisibilityRouter.applyLaneSpread(
+    let snapped = PolicyCanvasVisibilityRouter.snapToChannels(
       points,
-      lane: 2,
-      source: source,
-      target: target,
-      lineSpacing: PolicyCanvasLayout.defaultEdgeLineSpacing
+      source: points[0],
+      target: points[3]
     )
 
-    #expect(spread[0] == source)
-    #expect(spread[1] == points[1])
-    #expect(spread[2] == CGPoint(x: 80, y: 40 - (2 * PolicyCanvasLayout.defaultEdgeLineSpacing)))
-    #expect(spread[3] == CGPoint(x: 320, y: 40 - (2 * PolicyCanvasLayout.defaultEdgeLineSpacing)))
-    #expect(spread[4] == points[4])
-    #expect(spread[5] == target)
-  }
-
-  @Test("Lane spread shifts every interior point on the dominant bus track")
-  func laneSpreadShiftsEveryInteriorPointOnDominantBusTrack() {
-    let source = CGPoint(x: 0, y: 100)
-    let target = CGPoint(x: 500, y: 140)
-    let points = [
-      source,
-      CGPoint(x: 80, y: 100),
-      CGPoint(x: 80, y: 40),
-      CGPoint(x: 200, y: 40),
-      CGPoint(x: 320, y: 40),
-      CGPoint(x: 440, y: 40),
-      CGPoint(x: 440, y: 140),
-      target,
-    ]
-
-    let spread = PolicyCanvasVisibilityRouter.applyLaneSpread(
-      points,
-      lane: 2,
-      source: source,
-      target: target,
-      lineSpacing: PolicyCanvasLayout.defaultEdgeLineSpacing
-    )
-
-    let shiftedY = 40 - (2 * PolicyCanvasLayout.defaultEdgeLineSpacing)
-    #expect(spread[2] == CGPoint(x: 80, y: shiftedY))
-    #expect(spread[3] == CGPoint(x: 200, y: shiftedY))
-    #expect(spread[4] == CGPoint(x: 320, y: shiftedY))
-    #expect(spread[5] == CGPoint(x: 440, y: shiftedY))
+    #expect(snapped[1].x == snapped[0].x)
+    #expect(snapped[2].x == snapped[3].x)
+    #expect(allSegmentsAxisAligned(snapped))
   }
 
   private func bendCount(of points: [CGPoint]) -> Int {

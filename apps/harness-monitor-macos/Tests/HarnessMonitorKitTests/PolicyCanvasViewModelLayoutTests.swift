@@ -89,6 +89,27 @@ struct PolicyCanvasViewModelLayoutTests {
     #expect(edgesByID["edge:evidence-fail:checks-not-green"]?.pinnedPortSide == false)
   }
 
+  @Test("flex routing only offers semantic visible port sides")
+  func flexRoutingOnlyOffersSemanticVisiblePortSides() {
+    let viewModel = PolicyCanvasViewModel.sample()
+    viewModel.load(
+      document: PreviewFixtures.policyCanvasPipelineDocument(),
+      simulation: nil,
+      audit: nil
+    )
+
+    guard let edge = viewModel.edges.first(where: { $0.id == "edge:default" }) else {
+      Issue.record("Expected default edge")
+      return
+    }
+
+    let sourceSides = viewModel.portAnchorCandidates(for: edge.source).map { $0.side }
+    let targetSides = viewModel.portAnchorCandidates(for: edge.target).map { $0.side }
+
+    #expect(sourceSides == [.trailing, .bottom])
+    #expect(targetSides == [.leading, .top])
+  }
+
   @Test("loaded default graph assigns distinct route lanes within terminal bundles")
   func loadedDefaultGraphAssignsDistinctRouteLanesWithinTerminalBundles() {
     let viewModel = PolicyCanvasViewModel.sample()
@@ -291,8 +312,8 @@ struct PolicyCanvasViewModelLayoutTests {
     #expect(scrollPoint.y == 0)
   }
 
-  @Test("grouped endpoint routes still include intervening groups as obstacles")
-  func groupedEndpointRoutesStillIncludeInterveningGroupsAsObstacles() {
+  @Test("grouped endpoint routes keep group titles but not group bodies as obstacles")
+  func groupedEndpointRoutesKeepGroupTitlesAsObstacles() {
     let viewModel = PolicyCanvasViewModel.sample()
     viewModel.load(
       document: PreviewFixtures.policyCanvasPipelineDocument(),
@@ -303,14 +324,16 @@ struct PolicyCanvasViewModelLayoutTests {
     guard let edge = viewModel.edges.first(where: { $0.id == "edge:default" }),
       let source = viewModel.portAnchor(for: edge.source),
       let target = viewModel.portAnchor(for: edge.target),
-      let mergeFrame = viewModel.group("merge")?.frame
+      let mergeGroup = viewModel.group("merge")
     else {
-      Issue.record("Expected default graph anchors and merge group frame")
+      Issue.record("Expected default graph anchors and merge group")
       return
     }
 
     let obstacles = viewModel.routingObstacles(source: source, target: target)
+    let titleFrame = policyCanvasGroupTitleFrames([mergeGroup])[0]
 
-    #expect(obstacles.contains(mergeFrame))
+    #expect(obstacles.contains(titleFrame))
+    #expect(!obstacles.contains(mergeGroup.frame))
   }
 }
