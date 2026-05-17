@@ -36,6 +36,22 @@ struct SessionDecisionInspectorContent: View {
     }
     .onAppear {
       hydrateInspectorTabFromPersistedStorage()
+      runtime.prepareInspectorRows(for: decision)
+    }
+    .onChange(of: decision.id) { _, _ in
+      runtime.prepareInspectorRows(for: decision)
+    }
+    .onChange(of: decision.contextJSON) { _, _ in
+      runtime.prepareInspectorRows(for: decision)
+    }
+    .onChange(of: decision.statusRaw) { _, _ in
+      runtime.prepareInspectorRows(for: decision)
+    }
+    .onChange(of: decision.snoozedUntil) { _, _ in
+      runtime.prepareInspectorRows(for: decision)
+    }
+    .onChange(of: decision.resolutionJSON) { _, _ in
+      runtime.prepareInspectorRows(for: decision)
     }
     .onChange(of: runtime.inspectorTab) { _, newValue in
       guard persistedInspectorTabRaw != newValue.rawValue else { return }
@@ -50,15 +66,20 @@ struct SessionDecisionInspectorContent: View {
   }
 
   private var contextRows: some View {
-    let rows = runtime.contextRows(for: decision)
+    let presentation = runtime.inspectorRows(for: decision.id)
     return VStack(alignment: .leading, spacing: metrics.rowSpacing) {
-      if rows.isEmpty {
+      if presentation.isLoading {
+        ProgressView()
+          .controlSize(.small)
+          .frame(maxWidth: .infinity, alignment: .leading)
+          .accessibilityLabel("Loading decision context")
+      } else if presentation.contextRows.isEmpty {
         Text("No additional context")
           .scaledFont(.caption)
           .foregroundStyle(.secondary)
           .frame(maxWidth: .infinity, alignment: .leading)
       } else {
-        ForEach(rows) { row in
+        ForEach(presentation.contextRows) { row in
           Text(row.value)
             .scaledFont(.caption)
             .textSelection(.enabled)
@@ -69,17 +90,25 @@ struct SessionDecisionInspectorContent: View {
   }
 
   private var historyRows: some View {
-    VStack(alignment: .leading, spacing: metrics.rowSpacing) {
-      ForEach(runtime.historyRows(for: decision)) { row in
-        VStack(alignment: .leading, spacing: metrics.historyTitleSpacing) {
-          Text(row.title)
-            .scaledFont(.caption.weight(.semibold))
-          Text(row.value)
-            .scaledFont(.caption)
-            .foregroundStyle(.secondary)
-            .textSelection(.enabled)
+    let presentation = runtime.inspectorRows(for: decision.id)
+    return VStack(alignment: .leading, spacing: metrics.rowSpacing) {
+      if presentation.isLoading {
+        ProgressView()
+          .controlSize(.small)
+          .frame(maxWidth: .infinity, alignment: .leading)
+          .accessibilityLabel("Loading decision history")
+      } else {
+        ForEach(presentation.historyRows) { row in
+          VStack(alignment: .leading, spacing: metrics.historyTitleSpacing) {
+            Text(row.title)
+              .scaledFont(.caption.weight(.semibold))
+            Text(row.value)
+              .scaledFont(.caption)
+              .foregroundStyle(.secondary)
+              .textSelection(.enabled)
+          }
+          .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
       }
     }
   }

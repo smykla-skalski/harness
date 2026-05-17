@@ -26,6 +26,86 @@ public struct SessionDecisionHistoryRow: Identifiable, Hashable, Sendable {
   public let value: String
 }
 
+struct SessionDecisionInspectorRowKey: Hashable, Sendable {
+  let decisionID: String
+  let sessionID: String?
+  let contextHash: Int
+  let createdAt: TimeInterval
+  let statusRaw: String
+  let snoozedUntil: TimeInterval?
+  let resolutionHash: Int?
+}
+
+struct SessionDecisionInspectorRowInput: Equatable, Sendable {
+  let key: SessionDecisionInspectorRowKey
+  let decisionID: String
+  let sessionID: String?
+  let contextJSON: String
+  let createdAt: Date
+  let statusRaw: String
+  let snoozedUntil: Date?
+  let resolutionJSON: String?
+
+  @MainActor
+  init(decision: Decision) {
+    decisionID = decision.id
+    sessionID = decision.sessionID
+    contextJSON = decision.contextJSON
+    createdAt = decision.createdAt
+    statusRaw = decision.statusRaw
+    snoozedUntil = decision.snoozedUntil
+    resolutionJSON = decision.resolutionJSON
+    key = SessionDecisionInspectorRowKey(
+      decisionID: decision.id,
+      sessionID: decision.sessionID,
+      contextHash: decision.contextJSON.hashValue,
+      createdAt: decision.createdAt.timeIntervalSince1970,
+      statusRaw: decision.statusRaw,
+      snoozedUntil: decision.snoozedUntil?.timeIntervalSince1970,
+      resolutionHash: decision.resolutionJSON?.hashValue
+    )
+  }
+}
+
+struct SessionDecisionInspectorRows: Equatable, Sendable {
+  static let empty = Self(
+    key: nil,
+    decisionID: nil,
+    contextRows: [],
+    historyRows: [],
+    isLoading: false
+  )
+
+  static func loading(
+    key: SessionDecisionInspectorRowKey,
+    decisionID: String
+  ) -> Self {
+    Self(
+      key: key,
+      decisionID: decisionID,
+      contextRows: [],
+      historyRows: [],
+      isLoading: true
+    )
+  }
+
+  static func loading(decisionID: String) -> Self {
+    Self(
+      key: nil,
+      decisionID: decisionID,
+      contextRows: [],
+      historyRows: [],
+      isLoading: true
+    )
+  }
+
+  let key: SessionDecisionInspectorRowKey?
+  let decisionID: String?
+  let contextRows: [SessionDecisionContextRow]
+  let historyRows: [SessionDecisionHistoryRow]
+  let isLoading: Bool
+}
+
 public enum SessionInspectorVisibilityPolicy {
   public static let collapseThreshold: CGFloat = 1100
 
@@ -62,19 +142,26 @@ public final class SessionDecisionRuntime {
   public private(set) var filteredDecisionIDSet: Set<String> = []
   public private(set) var hasFilteredDecisions = false
   public private(set) var isFilteringDecisions = false
+  private(set) var preparedInspectorRows = SessionDecisionInspectorRows.empty
 
-  @ObservationIgnored private var contextRowCache: [String: [SessionDecisionContextRow]] = [:]
-  @ObservationIgnored private var contextRowKeyOrder: [String] = []
-  @ObservationIgnored private var historyRowCache: [String: [SessionDecisionHistoryRow]] = [:]
-  @ObservationIgnored private var historyRowKeyOrder: [String] = []
+  @ObservationIgnored private var inspectorRowCache:
+    [SessionDecisionInspectorRowKey: SessionDecisionInspectorRows] = [:]
+  @ObservationIgnored private var inspectorRowKeyOrder: [SessionDecisionInspectorRowKey] = []
   @ObservationIgnored nonisolated(unsafe) private var filterTask: Task<Void, Never>?
+  @ObservationIgnored nonisolated(unsafe) private var inspectorRowTask: Task<Void, Never>?
   @ObservationIgnored private var latestFilterInput: SessionDecisionFilterInput?
+  @ObservationIgnored private var latestInspectorRowKey: SessionDecisionInspectorRowKey?
+  @ObservationIgnored private var inspectorRowGeneration: UInt64 = 0
   @ObservationIgnored private var auditReloadGeneration: UInt64 = 0
 
   private static let cacheLimit = 32
   private static let filterSignposter = OSSignposter(
     subsystem: "io.harnessmonitor",
     category: "perf/session-decision-filter"
+  )
+  private static let inspectorSignposter = OSSignposter(
+    subsystem: "io.harnessmonitor",
+    category: "perf/session-decision-inspector"
   )
 
   public init() {}
@@ -89,6 +176,8 @@ public final class SessionDecisionRuntime {
   deinit {
     filterTask?.cancel()
     filterTask = nil
+    inspectorRowTask?.cancel()
+    inspectorRowTask = nil
   }
 
   public func updateFilteredDecisions(input: SessionDecisionFilterInput) {
@@ -137,6 +226,69 @@ public final class SessionDecisionRuntime {
 
   public func waitForDecisionFilterIdle() async {
     await filterTask?.value
+  }
+
+  public func prepareInspectorRows(for decision: Decision) {
+    let input = SessionDecisionInspectorRowInput(decision: decision)
+    if latestInspectorRowKey == input.key,
+      let cachedRows = inspectorRowCache[input.key],
+      preparedInspectorRows == cachedRows
+    {
+      return
+    }
+
+    latestInspectorRowKey = input.key
+    inspectorRowGeneration &+= 1
+    let generation = inspectorRowGeneration
+
+    if let cachedRows = inspectorRowCache[input.key] {
+      inspectorRowTask?.cancel()
+      preparedInspectorRows = cachedRows
+      return
+    }
+
+    if preparedInspectorRows.key != input.key || !preparedInspectorRows.isLoading {
+      preparedInspectorRows = .loading(key: input.key, decisionID: input.decisionID)
+    }
+    inspectorRowTask?.cancel()
+    inspectorRowTask = Task { @MainActor [weak self, input, generation] in
+      let signpostID = Self.inspectorSignposter.makeSignpostID()
+      let computeInterval = Self.inspectorSignposter.beginInterval(
+        "session_decision_inspector.compute",
+        id: signpostID,
+        "decision=\(input.decisionID, privacy: .public)"
+      )
+      let rows = await sessionDecisionInspectorRowWorker.compute(input: input)
+      Self.inspectorSignposter.endInterval(
+        "session_decision_inspector.compute",
+        computeInterval,
+        "contextRows=\(rows.contextRows.count, privacy: .public) historyRows=\(rows.historyRows.count, privacy: .public)"
+      )
+      guard !Task.isCancelled else { return }
+      guard let self, inspectorRowGeneration == generation, latestInspectorRowKey == input.key
+      else {
+        return
+      }
+      let applyInterval = Self.inspectorSignposter.beginInterval(
+        "session_decision_inspector.apply",
+        id: signpostID,
+        "decision=\(input.decisionID, privacy: .public)"
+      )
+      storeInspectorRows(rows, forKey: input.key)
+      if preparedInspectorRows != rows {
+        preparedInspectorRows = rows
+      }
+      Self.inspectorSignposter.endInterval(
+        "session_decision_inspector.apply",
+        applyInterval,
+        "decision=\(input.decisionID, privacy: .public)"
+      )
+    }
+  }
+
+  public func waitForInspectorRowsIdle() async {
+    await inspectorRowTask?.value
+    await sessionDecisionInspectorRowWorker.waitForIdle()
   }
 
   public func reloadAuditEvents(
@@ -190,83 +342,84 @@ public final class SessionDecisionRuntime {
   }
 
   public func contextRows(for decision: Decision) -> [SessionDecisionContextRow] {
-    let key = contextCacheKey(for: decision)
-    if let cached = contextRowCache[key] {
-      return cached
-    }
-    var rows: [SessionDecisionContextRow] = []
-    if let sessionID = decision.sessionID {
-      rows.append(.init(id: "session", value: "Session: \(sessionID)"))
-    }
-    rows.append(contentsOf: flattenedContextRows(from: decision.contextJSON))
-    storeContextRows(rows, forKey: key)
-    return rows
+    let key = SessionDecisionInspectorRowInput(decision: decision).key
+    return inspectorRowCache[key]?.contextRows ?? []
   }
 
   public func historyRows(for decision: Decision) -> [SessionDecisionHistoryRow] {
-    let key = historyCacheKey(for: decision)
-    if let cached = historyRowCache[key] {
-      return cached
+    let key = SessionDecisionInspectorRowInput(decision: decision).key
+    return inspectorRowCache[key]?.historyRows ?? []
+  }
+
+  func inspectorRows(for decisionID: String) -> SessionDecisionInspectorRows {
+    guard preparedInspectorRows.decisionID == decisionID else {
+      return .loading(decisionID: decisionID)
     }
-    var rows: [SessionDecisionHistoryRow] = [
-      .init(id: "created", title: "Created", value: decision.createdAt.formatted()),
-      .init(id: "status", title: "Status", value: decision.statusRaw),
-    ]
-    if let snoozedUntil = decision.snoozedUntil {
-      rows.append(.init(id: "snoozed", title: "Snoozed Until", value: snoozedUntil.formatted()))
-    }
-    if let resolutionJSON = decision.resolutionJSON, !resolutionJSON.isEmpty {
-      rows.append(.init(id: "resolution", title: "Resolution", value: resolutionJSON))
-    }
-    storeHistoryRows(rows, forKey: key)
-    return rows
+    return preparedInspectorRows
   }
 
   public func allowsInspector(width: CGFloat) -> Bool {
     SessionInspectorVisibilityPolicy.allowsInspector(width: width)
   }
 
-  private func contextCacheKey(for decision: Decision) -> String {
-    "\(decision.id):\(decision.sessionID ?? ""):\(decision.contextJSON.hashValue)"
-  }
-
-  private func historyCacheKey(for decision: Decision) -> String {
-    let snoozed = decision.snoozedUntil?.timeIntervalSince1970 ?? 0
-    let resolution = decision.resolutionJSON?.hashValue ?? 0
-    let created = decision.createdAt.timeIntervalSince1970
-    return "\(decision.id):\(decision.statusRaw):\(created):\(snoozed):\(resolution)"
-  }
-
-  private func storeContextRows(_ rows: [SessionDecisionContextRow], forKey key: String) {
-    if contextRowCache[key] == nil {
-      contextRowKeyOrder.append(key)
+  private func storeInspectorRows(
+    _ rows: SessionDecisionInspectorRows,
+    forKey key: SessionDecisionInspectorRowKey
+  ) {
+    if inspectorRowCache[key] == nil {
+      inspectorRowKeyOrder.append(key)
     }
-    contextRowCache[key] = rows
-    while contextRowKeyOrder.count > Self.cacheLimit {
-      let evicted = contextRowKeyOrder.removeFirst()
-      contextRowCache.removeValue(forKey: evicted)
+    inspectorRowCache[key] = rows
+    while inspectorRowKeyOrder.count > Self.cacheLimit {
+      let evicted = inspectorRowKeyOrder.removeFirst()
+      inspectorRowCache.removeValue(forKey: evicted)
     }
   }
+}
 
-  private func storeHistoryRows(_ rows: [SessionDecisionHistoryRow], forKey key: String) {
-    if historyRowCache[key] == nil {
-      historyRowKeyOrder.append(key)
+private let sessionDecisionInspectorRowWorker = SessionDecisionInspectorRowWorker()
+private let sessionDecisionAuditWorker = SessionDecisionAuditWorker()
+
+actor SessionDecisionInspectorRowWorker {
+  func compute(input: SessionDecisionInspectorRowInput) -> SessionDecisionInspectorRows {
+    var contextRows: [SessionDecisionContextRow] = []
+    if let sessionID = input.sessionID {
+      contextRows.append(.init(id: "session", value: "Session: \(sessionID)"))
     }
-    historyRowCache[key] = rows
-    while historyRowKeyOrder.count > Self.cacheLimit {
-      let evicted = historyRowKeyOrder.removeFirst()
-      historyRowCache.removeValue(forKey: evicted)
+    contextRows.append(contentsOf: Self.flattenedContextRows(from: input.contextJSON))
+
+    var historyRows: [SessionDecisionHistoryRow] = [
+      .init(id: "created", title: "Created", value: input.createdAt.formatted()),
+      .init(id: "status", title: "Status", value: input.statusRaw),
+    ]
+    if let snoozedUntil = input.snoozedUntil {
+      historyRows.append(
+        .init(id: "snoozed", title: "Snoozed Until", value: snoozedUntil.formatted())
+      )
     }
+    if let resolutionJSON = input.resolutionJSON, !resolutionJSON.isEmpty {
+      historyRows.append(.init(id: "resolution", title: "Resolution", value: resolutionJSON))
+    }
+
+    return SessionDecisionInspectorRows(
+      key: input.key,
+      decisionID: input.decisionID,
+      contextRows: contextRows,
+      historyRows: historyRows,
+      isLoading: false
+    )
   }
 
-  private func flattenedContextRows(from json: String) -> [SessionDecisionContextRow] {
+  func waitForIdle() async {}
+
+  private static func flattenedContextRows(from json: String) -> [SessionDecisionContextRow] {
     guard let data = json.data(using: .utf8),
       let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
     else {
       return []
     }
     return object.keys.sorted()
-      .filter { !Self.isDetailOwnedContextKey($0) }
+      .filter { !isDetailOwnedContextKey($0) }
       .prefix(12)
       .map { key in
         SessionDecisionContextRow(id: "context.\(key)", value: "\(key): \(object[key] ?? "")")
@@ -301,8 +454,6 @@ public final class SessionDecisionRuntime {
     "taskid",
   ]
 }
-
-private let sessionDecisionAuditWorker = SessionDecisionAuditWorker()
 
 private actor SessionDecisionAuditWorker {
   func scopedOutput(
