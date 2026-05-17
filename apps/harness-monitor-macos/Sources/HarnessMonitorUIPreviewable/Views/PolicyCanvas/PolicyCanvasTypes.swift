@@ -20,7 +20,7 @@ enum PolicyCanvasTab: String, CaseIterable, Identifiable {
   }
 }
 
-enum PolicyCanvasNodeKind: String, CaseIterable, Identifiable {
+enum PolicyCanvasNodeKind: String, CaseIterable, Identifiable, Sendable {
   case source
   case condition
   case review
@@ -140,7 +140,7 @@ struct PolicyCanvasPort: Identifiable, Hashable, Sendable {
   let kind: PolicyCanvasPortKind
 }
 
-struct PolicyCanvasNode: Identifiable {
+struct PolicyCanvasNode: Equatable, Identifiable, Sendable {
   let id: String
   var title: String
   var subtitle: String

@@ -142,13 +142,10 @@ extension PolicyCanvasViewModel {
     edgeSeverityMap[edgeID]
   }
 
-  /// Pre-rolled `[nodeID: severity]` map. Backed by an `@ObservationIgnored`
-  /// cache keyed on `ValidationCacheToken` (node/edge/group counts +
-  /// simulation revision + invalidation generation). First read after any
-  /// mutation rebuilds the map by walking `allValidationIssues` once;
-  /// subsequent reads return the cached storage in O(1). Hot-path callers
-  /// (`PolicyCanvasNodeCard`, `PolicyCanvasEdgeLayer`) must hoist this into
-  /// a body-local `let` so per-row lookups skip the token comparison.
+  /// Pre-rolled `[nodeID: severity]` map produced by
+  /// `PolicyCanvasValidationWorker` and applied as one presentation update.
+  /// Hot-path callers (`PolicyCanvasNodeCard`, `PolicyCanvasEdgeLayer`) must
+  /// hoist this into a body-local `let` so per-row lookups stay O(1).
   ///
   /// Cache invalidation lives in `+ValidationCache.swift`; mutation sites
   /// that bypass the count token (drag-end position changes, group

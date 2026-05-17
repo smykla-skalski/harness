@@ -1,6 +1,18 @@
 import SwiftUI
 
+enum PolicyCanvasAccessibility {
+  /// Maximum per-target Connect actions stamped onto a single node card. Six
+  /// is the VoiceOver rotor floor where the rotor stays usable - beyond that
+  /// the action list becomes a navigation problem instead of a shortcut. The
+  /// dropped tail is reachable through edge-drag or by selecting a different
+  /// source node, so this is a discoverability cap, not a feature cap.
+  static let connectableTargetActionCap: Int = 6
+}
+
 extension PolicyCanvasViewModel {
+  static let accessibilityConnectableTargetActionCap =
+    PolicyCanvasAccessibility.connectableTargetActionCap
+
   func accessibilityLabel(for node: PolicyCanvasNode) -> String {
     "\(node.kind.title) \(node.title)"
   }
@@ -169,24 +181,13 @@ extension PolicyCanvasViewModel {
       }
   }
 
-  /// Maximum per-target Connect actions stamped onto a single node card. Six
-  /// is the VoiceOver rotor floor where the rotor stays usable — beyond that
-  /// the action list becomes a navigation problem instead of a shortcut. The
-  /// dropped tail is reachable through edge-drag or by selecting a different
-  /// source node, so this is a discoverability cap, not a feature cap.
-  static let accessibilityConnectableTargetActionCap: Int = 6
-
   /// Display name plus endpoint pair for the per-target Connect actions on a
   /// node card. The display name is `"<target node title> <target port title>"`
   /// so VoiceOver announces "Connect to Risk score event" (not just "Connect")
   /// when the user invokes the rotor entry. `id` is stable across renders
   /// because it composes the target node + port id, both of which the data
   /// model treats as document-stable strings.
-  struct AccessibilityConnectTarget: Identifiable, Hashable {
-    let endpoint: PolicyCanvasPortEndpoint
-    let displayName: String
-    var id: String { "\(endpoint.nodeID)|\(endpoint.portID)" }
-  }
+  typealias AccessibilityConnectTarget = PolicyCanvasAccessibilityConnectTarget
 
   /// Per-target reachable inputs, decorated with display names for the
   /// accessibility action rotor. Capped at the configured action-cap above to
@@ -238,4 +239,13 @@ extension PolicyCanvasViewModel {
     selectedTab = .draft
     select(.node(nodeID))
   }
+}
+
+/// Display name plus endpoint pair for per-target Connect actions on a node
+/// card. Top-level so the route worker can precompute the action payloads
+/// off-main while preserving the historical view-model API via typealias.
+struct PolicyCanvasAccessibilityConnectTarget: Equatable, Hashable, Identifiable, Sendable {
+  let endpoint: PolicyCanvasPortEndpoint
+  let displayName: String
+  var id: String { "\(endpoint.nodeID)|\(endpoint.portID)" }
 }
