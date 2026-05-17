@@ -117,6 +117,20 @@ extension HarnessMonitorStore {
     }
   }
 
+  func loadPolicyOverrides() async -> [PolicyConfigOverride] {
+    guard let supervisorPolicyConfigRepository else {
+      return []
+    }
+    do {
+      return try await supervisorPolicyConfigRepository.fetchOverrides()
+    } catch {
+      HarnessMonitorLogger.supervisorWarning(
+        "supervisor.policy_config_load_failed error=\(String(describing: error))"
+      )
+      return []
+    }
+  }
+
   public static func loadSupervisorAuditEvents(
     from modelContext: ModelContext?,
     limit: Int = 128

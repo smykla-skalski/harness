@@ -143,7 +143,7 @@ extension HarnessMonitorStore {
     if let document, document.mode == .enforced {
       await registry.applyOverrides(document.supervisorPolicyOverrides())
     } else {
-      await registry.applyOverrides(Self.loadPolicyOverrides(from: modelContext))
+      await registry.applyOverrides(await loadPolicyOverrides())
     }
   }
 }

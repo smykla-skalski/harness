@@ -117,7 +117,7 @@ extension HarnessMonitorStore {
   private func makeSupervisorRegistry() async -> PolicyRegistry {
     let registry = PolicyRegistry()
     await registry.registerDefaults()
-    await registry.applyOverrides(Self.loadPolicyOverrides(from: modelContext))
+    await registry.applyOverrides(await loadPolicyOverrides())
     return registry
   }
 
