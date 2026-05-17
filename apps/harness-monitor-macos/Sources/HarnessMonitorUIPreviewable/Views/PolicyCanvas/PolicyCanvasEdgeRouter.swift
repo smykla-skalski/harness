@@ -243,7 +243,7 @@ func policyCanvasPortEscapeCandidate(
       side: side,
       actual: point,
       exit: exit,
-      routed: CGPoint(x: exit.x + offset, y: exit.y)
+      routed: exit
     )
   case .bottom:
     let exit = CGPoint(x: point.x, y: point.y + distance)
@@ -251,7 +251,7 @@ func policyCanvasPortEscapeCandidate(
       side: side,
       actual: point,
       exit: exit,
-      routed: CGPoint(x: exit.x + offset, y: exit.y)
+      routed: exit
     )
   }
 }
