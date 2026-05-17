@@ -37,14 +37,10 @@ extension TaskBoardOperationsHost {
   func actionRow<Content: View>(@ViewBuilder content: () -> Content) -> some View {
     TaskBoardOperationsFormRow("Actions") {
       HarnessMonitorGlassControlGroup(spacing: HarnessMonitorTheme.itemSpacing) {
-        HarnessMonitorWrapLayout(
-          spacing: HarnessMonitorTheme.itemSpacing,
-          lineSpacing: HarnessMonitorTheme.itemSpacing,
-          rowAlignment: .trailing
-        ) {
+        HStack(spacing: HarnessMonitorTheme.itemSpacing) {
           content()
         }
-        .frame(maxWidth: .infinity, alignment: .trailing)
+        .fixedSize(horizontal: true, vertical: false)
       }
       .frame(maxWidth: .infinity, alignment: .trailing)
     }
@@ -106,8 +102,7 @@ extension TaskBoardOperationsHost {
   ) -> some View {
     TaskBoardOperationsFormRow(title) {
       TextField("", text: text, prompt: Text(prompt))
-        .harnessNativeTextField()
-        .multilineTextAlignment(.trailing)
+        .harnessNativeTextField(alignment: .trailing)
         .accessibilityLabel(title)
         .accessibilityIdentifier(accessibilityIdentifier)
     }
@@ -298,7 +293,7 @@ private enum TaskBoardOperationsFormMetrics {
   static let labelWidth: CGFloat = 112
   static let contentMaxWidth: CGFloat = 420
   static let rowMinHeight: CGFloat = 28
-  static let rowVerticalPadding: CGFloat = 6
+  static let rowVerticalPadding: CGFloat = 0
 }
 
 struct TaskBoardOperationsFormRow<Content: View>: View {

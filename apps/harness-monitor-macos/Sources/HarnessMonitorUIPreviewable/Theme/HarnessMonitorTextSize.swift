@@ -153,12 +153,14 @@ private struct HarnessMonitorNativeFormControlModifier: ViewModifier {
 }
 
 private struct HarnessMonitorNativeTextFieldModifier: ViewModifier {
+  let alignment: TextAlignment
+
   @Environment(\.harnessTextSizeIndex)
   private var textSizeIndex
 
   func body(content: Content) -> some View {
     content
-      .multilineTextAlignment(.leading)
+      .multilineTextAlignment(alignment)
       .font(HarnessMonitorTextSize.nativeInputFont(at: textSizeIndex))
       .controlSize(HarnessMonitorTextSize.nativeInputControlSize(at: textSizeIndex))
       .textFieldStyle(.roundedBorder)
@@ -205,8 +207,8 @@ extension View {
     modifier(HarnessMonitorNativeFormControlModifier())
   }
 
-  public func harnessNativeTextField() -> some View {
-    modifier(HarnessMonitorNativeTextFieldModifier())
+  public func harnessNativeTextField(alignment: TextAlignment = .leading) -> some View {
+    modifier(HarnessMonitorNativeTextFieldModifier(alignment: alignment))
   }
 
   public func harnessNativeFormSectionHeader() -> some View {
