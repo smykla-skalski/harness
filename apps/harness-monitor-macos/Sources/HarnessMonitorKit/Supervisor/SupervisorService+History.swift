@@ -10,14 +10,18 @@ extension SupervisorService {
     guard let store else {
       return PolicyHistoryWindow(recentEvents: [], recentDecisions: [])
     }
-    return await MainActor.run {
-      Self.historyWindow(from: store.modelContext, ruleIDs: ruleIDs)
+    // Hop to main JUST to read the store's modelContainer reference. The
+    // actual SwiftData fetch runs back on the supervisor actor with a fresh
+    // ephemeral context so it does not block the main thread.
+    let container = await MainActor.run { store.modelContext?.container }
+    guard let container else {
+      return PolicyHistoryWindow(recentEvents: [], recentDecisions: [])
     }
+    return Self.historyWindow(from: container, ruleIDs: ruleIDs)
   }
 
-  @MainActor
   static func historyWindow(
-    from context: ModelContext?,
+    from container: ModelContainer,
     ruleIDs: [String] = []
   ) -> PolicyHistoryWindow {
     // Each tick fetches up to `globalEventHistoryLimit + perRuleEventHistoryLimit *
@@ -25,11 +29,9 @@ extension SupervisorService {
     // each. SwiftData's main `ModelContext` keeps every materialized row in its
     // identity map for the lifetime of the context, so reusing the store's main
     // context here causes the heap to grow ~6 MB per supervisor tick and never
-    // shrink. Use an ephemeral child context per call so the materialized rows
-    // are released as soon as we have copied the POD summary fields out.
-    guard let container = context?.container else {
-      return PolicyHistoryWindow(recentEvents: [], recentDecisions: [])
-    }
+    // shrink. Use an ephemeral context per call so the materialized rows are
+    // released as soon as we have copied the POD summary fields out. The
+    // context is created and used locally, never crossing isolation boundaries.
     let ephemeralContext = ModelContext(container)
 
     do {
@@ -63,7 +65,6 @@ extension SupervisorService {
     }
   }
 
-  @MainActor
   private static func recentEventSummaries(
     in context: ModelContext,
     ruleIDs: [String]
@@ -89,7 +90,6 @@ extension SupervisorService {
     }
   }
 
-  @MainActor
   private static func mergeEventSummaries(
     from descriptor: FetchDescriptor<SupervisorEvent>,
     into summariesByID: inout [String: SupervisorEventSummary],
