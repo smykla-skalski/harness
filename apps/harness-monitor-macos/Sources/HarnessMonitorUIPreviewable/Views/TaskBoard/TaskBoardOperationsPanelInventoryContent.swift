@@ -47,7 +47,10 @@ struct TaskBoardOperationsPanelInventoryCard: View {
   }
 
   private var actionRow: some View {
-    TaskBoardOperationsFormRow("Actions") {
+    TaskBoardOperationsFormRow(
+      "Actions",
+      minHeight: nil
+    ) {
       HarnessMonitorGlassControlGroup(spacing: HarnessMonitorTheme.itemSpacing) {
         HStack(spacing: HarnessMonitorTheme.itemSpacing) {
           actionButtons
@@ -102,9 +105,9 @@ struct TaskBoardOperationsPanelInventoryCard: View {
       Label(title, systemImage: systemImage)
         .lineLimit(1)
     }
-    .frame(minHeight: metrics.controlMinHeight)
     .harnessActionButtonStyle(variant: .bordered, tint: .secondary)
-    .controlSize(HarnessMonitorControlMetrics.compactControlSize)
+    .harnessNativeFormControl()
+    .fixedSize(horizontal: true, vertical: true)
     .disabled(store.isDaemonActionInFlight)
     .help(help)
     .accessibilityIdentifier(accessibilityIdentifier)
