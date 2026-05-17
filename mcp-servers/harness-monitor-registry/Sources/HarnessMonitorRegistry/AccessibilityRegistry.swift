@@ -211,6 +211,12 @@ public actor AccessibilityRegistry {
     scheduleRemoteSnapshotFlush()
   }
 
+  public func hasExplicitElements(windowID: Int) -> Bool {
+    elements.values.contains { stored in
+      stored.element.windowID == windowID && hasExplicitManualOwnership(stored.ownership)
+    }
+  }
+
   public func upsertClientSnapshot(_ clientSnapshot: RegistryClientSnapshot) -> RegistryAckResult {
     pruneExpiredClientSnapshots()
     let normalizedSnapshot = normalizedClientSnapshot(clientSnapshot)

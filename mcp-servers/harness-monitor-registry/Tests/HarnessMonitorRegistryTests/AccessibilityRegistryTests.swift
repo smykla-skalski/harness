@@ -621,6 +621,56 @@ struct AccessibilityRegistryTests {
   }
 
   @MainActor
+  @Test("routine didUpdate skips full harvest when explicit tracked elements exist")
+  func routineDidUpdateSkipsFullHarvestWhenExplicitTrackedElementsExist() async {
+    let registry = AccessibilityRegistry()
+    let controller = WindowElementRegistrySyncController(
+      registry: registry,
+      minimumReplacementInterval: .zero
+    )
+    let window = NSWindow(
+      contentRect: NSRect(x: 120, y: 180, width: 420, height: 320),
+      styleMask: [.titled, .closable],
+      backing: .buffered,
+      defer: false
+    )
+    let root = NSView(frame: NSRect(x: 0, y: 0, width: 420, height: 320))
+    let snapshotButton = NSButton(title: "Snapshot", target: nil, action: nil)
+    snapshotButton.frame = NSRect(x: 40, y: 40, width: 120, height: 32)
+    snapshotButton.setAccessibilityIdentifier("session.controls.snapshot")
+    root.addSubview(snapshotButton)
+    window.contentView = root
+    window.layoutIfNeeded()
+    root.layoutSubtreeIfNeeded()
+
+    let generation = controller.beginTracking(windowID: window.windowNumber)
+    controller.sync(window: window, generation: generation)
+    await controller.waitForIdle()
+
+    let ownerID = UUID()
+    let explicitElement = RegistryElement(
+      identifier: "session.controls.explicit",
+      label: "Explicit",
+      kind: .button,
+      frame: RegistryRect(x: 10, y: 10, width: 120, height: 32),
+      windowID: window.windowNumber
+    )
+    await registry.claimTrackedElement(identifier: explicitElement.identifier, ownerID: ownerID)
+    await registry.registerTrackedElement(explicitElement, ownerID: ownerID)
+
+    snapshotButton.setAccessibilityIdentifier("session.controls.latest-snapshot")
+    controller.sync(
+      window: window,
+      generation: generation,
+      reason: .routineDidUpdate
+    )
+    await controller.waitForIdle()
+
+    let identifiers = await registry.allElements(windowID: window.windowNumber).map(\.identifier)
+    #expect(identifiers == ["session.controls.explicit"])
+  }
+
+  @MainActor
   @Test("window element sync ignores non-accessibility array members in accessibilityChildren")
   func windowElementSyncIgnoresNonAccessibilityArrayMembers() async {
     let registry = AccessibilityRegistry()

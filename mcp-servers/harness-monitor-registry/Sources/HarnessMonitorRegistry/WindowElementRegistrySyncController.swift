@@ -1,10 +1,20 @@
 #if canImport(AppKit)
 import AppKit
 
+enum WindowElementRegistrySyncReason {
+  case structural
+  case routineDidUpdate
+}
+
 @MainActor
 final class WindowElementRegistrySyncController {
   private enum PendingAction {
-    case replace(window: NSWindow, generation: UInt64, ownerID: UUID)
+    case replace(
+      window: NSWindow,
+      generation: UInt64,
+      ownerID: UUID,
+      reason: WindowElementRegistrySyncReason
+    )
     case clear(Int, ownerID: UUID)
   }
 
@@ -20,6 +30,7 @@ final class WindowElementRegistrySyncController {
   private var pendingReplacement: PendingAction?
   private var flushTask: Task<Void, Never>?
   private var lastReplacementAppliedAt: ContinuousClock.Instant?
+  private var lastAppliedPayloadSignature: WindowElementRegistryPayloadSignature?
 
   init(
     registry: AccessibilityRegistry,
@@ -38,11 +49,22 @@ final class WindowElementRegistrySyncController {
     return trackingGeneration
   }
 
-  func sync(window: NSWindow, generation: UInt64) {
+  func sync(
+    window: NSWindow,
+    generation: UInt64,
+    reason: WindowElementRegistrySyncReason = .structural
+  ) {
     guard generation == trackingGeneration, trackedWindowID == window.windowNumber else {
       return
     }
-    enqueue(.replace(window: window, generation: generation, ownerID: trackingOwnerID))
+    enqueue(
+      .replace(
+        window: window,
+        generation: generation,
+        ownerID: trackingOwnerID,
+        reason: reason
+      )
+    )
   }
 
   func stopTracking() {
@@ -51,6 +73,7 @@ final class WindowElementRegistrySyncController {
     trackingGeneration &+= 1
     trackedWindowID = nil
     trackingOwnerID = UUID()
+    lastAppliedPayloadSignature = nil
     enqueue(.clear(windowID, ownerID: ownerID))
   }
 
@@ -94,7 +117,7 @@ final class WindowElementRegistrySyncController {
 
   private func apply(_ action: PendingAction, to registry: AccessibilityRegistry) async {
     switch action {
-    case .replace(let window, let generation, let ownerID):
+    case .replace(let window, let generation, let ownerID, let reason):
       if let delay = replacementDelay() {
         do {
           try await Task.sleep(for: delay)
@@ -110,14 +133,33 @@ final class WindowElementRegistrySyncController {
         return
       }
       lastReplacementAppliedAt = clock.now
-      let elements = await WindowAccessibilityElementSnapshotter.elements(
+
+      let hasExplicitElements = await registry.hasExplicitElements(windowID: window.windowNumber)
+      if reason == .routineDidUpdate, hasExplicitElements {
+        lastAppliedPayloadSignature = nil
+        await registry.unregisterTrackedWindowElements(
+          windowID: window.windowNumber,
+          ownerID: ownerID
+        )
+        return
+      }
+
+      let payload = await WindowAccessibilityElementSnapshotter.payload(
         in: window,
         payloadWorker: payloadWorker
       )
+      if hasExplicitElements == false {
+        guard payload.signature != lastAppliedPayloadSignature else {
+          return
+        }
+        lastAppliedPayloadSignature = payload.signature
+      } else {
+        lastAppliedPayloadSignature = nil
+      }
       onReplacementApplied()
       await registry.replaceTrackedWindowElements(
         windowID: window.windowNumber,
-        elements: elements,
+        elements: payload.elements,
         ownerID: ownerID
       )
     case .clear(let windowID, let ownerID):
@@ -200,10 +242,10 @@ private enum WindowAccessibilityElementSnapshotter {
   private static let maximumVisitedNodes = 700
   private static let traversalBatchSize = 40
 
-  static func elements(
+  static func payload(
     in window: NSWindow,
     payloadWorker: WindowElementRegistryPayloadWorker
-  ) async -> [RegistryElement] {
+  ) async -> WindowElementRegistryPayload {
     var queue: [any NSAccessibilityProtocol] = [window]
     var index = 0
     var visited: Set<ObjectIdentifier> = []
@@ -211,7 +253,7 @@ private enum WindowAccessibilityElementSnapshotter {
 
     while index < queue.count, visited.count < maximumVisitedNodes {
       if Task.isCancelled {
-        return []
+        return .empty
       }
       let node = queue[index]
       index += 1
@@ -431,7 +473,10 @@ private enum WindowAccessibilityElementSnapshotter {
     guard let view = node as? NSView else {
       return node.accessibilityFrame()
     }
-    guard let window = view.window, view.isHiddenOrHasHiddenAncestor == false else {
+    guard let window = view.window else {
+      return node.accessibilityFrame()
+    }
+    guard view.isHiddenOrHasHiddenAncestor == false else {
       return .null
     }
     var clippedBounds = view.bounds
@@ -450,13 +495,112 @@ private enum WindowAccessibilityElementSnapshotter {
 }
 
 actor WindowElementRegistryPayloadWorker {
-  func replacementPayload(from elements: [RegistryElement]) -> [RegistryElement] {
+  func replacementPayload(from elements: [RegistryElement]) -> WindowElementRegistryPayload {
     var harvested: [String: RegistryElement] = [:]
     harvested.reserveCapacity(elements.count)
     for element in elements {
       harvested[element.identifier] = element
     }
-    return harvested.values.sorted { $0.identifier < $1.identifier }
+    let sorted = harvested.values.sorted { $0.identifier < $1.identifier }
+    return WindowElementRegistryPayload(
+      elements: sorted,
+      signature: WindowElementRegistryPayloadSignature(elements: sorted)
+    )
+  }
+}
+
+struct WindowElementRegistryPayload: Sendable, Equatable {
+  static let empty = WindowElementRegistryPayload(
+    elements: [],
+    signature: WindowElementRegistryPayloadSignature(count: 0, checksum: Self.emptyChecksum)
+  )
+
+  private static let emptyChecksum: UInt64 = 14_695_981_039_346_656_037
+
+  let elements: [RegistryElement]
+  let signature: WindowElementRegistryPayloadSignature
+}
+
+struct WindowElementRegistryPayloadSignature: Sendable, Equatable {
+  let count: Int
+  let checksum: UInt64
+
+  init(count: Int, checksum: UInt64) {
+    self.count = count
+    self.checksum = checksum
+  }
+
+  init(elements: [RegistryElement]) {
+    var hasher = WindowElementRegistryPayloadHasher()
+    for element in elements {
+      hasher.combine(element.identifier)
+      hasher.combine(element.label)
+      hasher.combine(element.value)
+      hasher.combine(element.hint)
+      hasher.combine(element.kind.rawValue)
+      hasher.combine(element.actions.map(\.rawValue).joined(separator: "\u{1f}"))
+      hasher.combine(element.frame.x)
+      hasher.combine(element.frame.y)
+      hasher.combine(element.frame.width)
+      hasher.combine(element.frame.height)
+      hasher.combine(element.windowID)
+      hasher.combine(element.enabled)
+      hasher.combine(element.selected)
+      hasher.combine(element.focused)
+    }
+    self.count = elements.count
+    checksum = hasher.value
+  }
+}
+
+private struct WindowElementRegistryPayloadHasher {
+  private static let offsetBasis: UInt64 = 14_695_981_039_346_656_037
+  private static let prime: UInt64 = 1_099_511_628_211
+
+  private(set) var value = Self.offsetBasis
+
+  mutating func combine(_ value: String?) {
+    guard let value else {
+      combineByte(0)
+      return
+    }
+    combineByte(1)
+    for byte in value.utf8 {
+      combineByte(byte)
+    }
+    combineByte(0xff)
+  }
+
+  mutating func combine(_ value: String) {
+    combine(Optional(value))
+  }
+
+  mutating func combine(_ value: Int?) {
+    guard let value else {
+      combineByte(0)
+      return
+    }
+    combineByte(1)
+    combine(UInt64(bitPattern: Int64(value)))
+  }
+
+  mutating func combine(_ value: Bool) {
+    combineByte(value ? 1 : 0)
+  }
+
+  mutating func combine(_ value: Double) {
+    combine(value.bitPattern)
+  }
+
+  private mutating func combine(_ value: UInt64) {
+    for shift in stride(from: 0, through: 56, by: 8) {
+      combineByte(UInt8(truncatingIfNeeded: value >> UInt64(shift)))
+    }
+  }
+
+  private mutating func combineByte(_ byte: UInt8) {
+    value ^= UInt64(byte)
+    value &*= Self.prime
   }
 }
 #endif
