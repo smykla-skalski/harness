@@ -31,3 +31,41 @@ struct PolicyCanvasEdgeArrowhead: Shape {
     return path
   }
 }
+
+func policyCanvasEndpointTrimmedRoute(
+  _ route: PolicyCanvasEdgeRoute,
+  endpointInset: CGFloat
+) -> PolicyCanvasEdgeRoute {
+  let startTrimmed = policyCanvasTrimStart(route.points, inset: endpointInset)
+  let endTrimmed = policyCanvasTrimStart(Array(startTrimmed.reversed()), inset: endpointInset)
+    .reversed()
+  return PolicyCanvasEdgeRoute(points: Array(endTrimmed), labelPosition: route.labelPosition)
+}
+
+private func policyCanvasTrimStart(
+  _ points: [CGPoint],
+  inset: CGFloat
+) -> [CGPoint] {
+  guard inset > 0, points.count > 1 else {
+    return points
+  }
+  var remaining = inset
+  var trimmed = points
+  while trimmed.count > 1, remaining > 0 {
+    let start = trimmed[0]
+    let next = trimmed[1]
+    let vector = next - start
+    let length = vector.length
+    guard length > 0.001 else {
+      trimmed.removeFirst()
+      continue
+    }
+    if remaining < length {
+      trimmed[0] = start + vector.normalized * remaining
+      return trimmed
+    }
+    remaining -= length
+    trimmed.removeFirst()
+  }
+  return trimmed
+}
