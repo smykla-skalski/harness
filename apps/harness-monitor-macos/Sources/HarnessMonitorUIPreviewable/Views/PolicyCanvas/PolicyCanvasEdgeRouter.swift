@@ -188,6 +188,26 @@ func policyCanvasSignedLaneOffset(index: Int, spacing: CGFloat) -> CGFloat {
   return index.isMultiple(of: 2) ? -magnitude : magnitude
 }
 
+func policyCanvasMonotonicLaneOffset(index: Int, spacing: CGFloat) -> CGFloat {
+  guard index > 0 else {
+    return 0
+  }
+  return CGFloat(index) * spacing
+}
+
+func policyCanvasPortLaneOffset(
+  index: Int,
+  side: PolicyCanvasPortSide,
+  spacing: CGFloat
+) -> CGFloat {
+  switch side {
+  case .leading, .trailing:
+    policyCanvasMonotonicLaneOffset(index: index, spacing: spacing)
+  case .top, .bottom:
+    policyCanvasSignedLaneOffset(index: index, spacing: spacing)
+  }
+}
+
 func policyCanvasPortEscapeCandidate(
   from point: CGPoint,
   side: PolicyCanvasPortSide,
@@ -195,7 +215,11 @@ func policyCanvasPortEscapeCandidate(
   lineSpacing: CGFloat
 ) -> PolicyCanvasEscapeCandidate {
   let distance = policyCanvasPortLeadDistance(lane: lane, lineSpacing: lineSpacing)
-  let offset = policyCanvasSignedLaneOffset(index: lane, spacing: lineSpacing)
+  let offset = policyCanvasPortLaneOffset(
+    index: lane,
+    side: side,
+    spacing: lineSpacing
+  )
   switch side {
   case .leading:
     let exit = CGPoint(x: point.x - distance, y: point.y)

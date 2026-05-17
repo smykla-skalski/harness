@@ -184,6 +184,36 @@ struct PolicyCanvasRoutingTests {
     #expect(!edgeLabelFrame(first).intersects(edgeLabelFrame(second)))
   }
 
+  @Test("display label placement falls back horizontally when vertical lanes are blocked")
+  func displayLabelPlacementFallsBackHorizontallyWhenVerticalLanesAreBlocked() {
+    let base = CGPoint(x: 110, y: 100)
+    let positions = policyCanvasResolvedLabelPositions(
+      routes: [
+        (
+          id: "edge-a",
+          route: PolicyCanvasEdgeRoute(
+            points: [CGPoint(x: 0, y: 0), CGPoint(x: 220, y: 0)],
+            labelPosition: base
+          )
+        )
+      ],
+      nodeFrames: [
+        CGRect(x: 0, y: -200, width: 220, height: 400)
+      ],
+      labelSize: CGSize(
+        width: PolicyCanvasLayout.edgeLabelMaxWidth,
+        height: PolicyCanvasLayout.edgeLabelHeight
+      )
+    )
+
+    guard let position = positions["edge-a"] else {
+      Issue.record("expected label position")
+      return
+    }
+    #expect(position.x != base.x)
+    #expect(position.y == base.y)
+  }
+
   private var defaultGroups: [PolicyCanvasGroup] {
     [entryGroup, mergeGroup, terminalGroup]
   }

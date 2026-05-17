@@ -114,17 +114,30 @@ struct PolicyCanvasVisibilityRouter: PolicyCanvasEdgeRouter {
       targetActual: context.targetActual,
       raw: context.obstacles
     )
-    let gridXs = sortedAxisCoordinates(
+    let corridorObstacles = prepared.filter {
+      max($0.width, $0.height) >= 220
+    }
+    let gridXs = Self.sortedAxisCoordinates(
       anchor1: source.x,
       anchor2: target.x,
       laneOffset: laneOffsetX(lane: context.lane, spacing: context.lineSpacing),
-      bounds: prepared.map { ($0.minX, $0.maxX) }
+      bounds: prepared.map { ($0.minX, $0.maxX) },
+      corridorBounds: corridorObstacles.map { ($0.minX, $0.maxX) },
+      corridorStep: max(
+        PolicyCanvasLayout.edgePortTurnMinimumLead,
+        context.lineSpacing * 2
+      )
     )
-    let gridYs = sortedAxisCoordinates(
+    let gridYs = Self.sortedAxisCoordinates(
       anchor1: source.y,
       anchor2: target.y,
       laneOffset: laneOffsetY(lane: context.lane, spacing: context.lineSpacing),
-      bounds: prepared.map { ($0.minY, $0.maxY) }
+      bounds: prepared.map { ($0.minY, $0.maxY) },
+      corridorBounds: corridorObstacles.map { ($0.minY, $0.maxY) },
+      corridorStep: max(
+        PolicyCanvasLayout.edgePortTurnMinimumLead,
+        context.lineSpacing * 2
+      )
     )
     guard
       let sx = gridXs.firstIndex(of: source.x),
@@ -208,15 +221,21 @@ struct PolicyCanvasVisibilityRouter: PolicyCanvasEdgeRouter {
     }
   }
 
-  private func sortedAxisCoordinates(
+  static func sortedAxisCoordinates(
     anchor1: CGFloat,
     anchor2: CGFloat,
     laneOffset: CGFloat,
-    bounds: [(CGFloat, CGFloat)]
+    bounds: [(CGFloat, CGFloat)],
+    corridorBounds: [(CGFloat, CGFloat)] = [],
+    corridorStep: CGFloat
   ) -> [CGFloat] {
     var values: Set<CGFloat> = [anchor1, anchor2]
     let mid = (anchor1 + anchor2) / 2 + laneOffset
     values.insert(mid)
+    for bound in corridorBounds {
+      values.insert(bound.0 - corridorStep)
+      values.insert(bound.1 + corridorStep)
+    }
     for bound in bounds {
       values.insert(bound.0)
       values.insert(bound.1)
@@ -305,8 +324,9 @@ struct PolicyCanvasVisibilityRouter: PolicyCanvasEdgeRouter {
       let midY = (source.y + target.y) / 2
       let direction: CGFloat = pointA.y >= midY ? 1 : -1
       var spread = points
-      spread[segment.startIndex].y += direction * offset
-      spread[segment.endIndex].y += direction * offset
+      for index in dominantTrackIndices(in: points, segment: segment) {
+        spread[index].y += direction * offset
+      }
       return spread
     }
     if points.count == 4, abs(source.x - target.x) > 60 {
@@ -315,8 +335,9 @@ struct PolicyCanvasVisibilityRouter: PolicyCanvasEdgeRouter {
     let midX = (source.x + target.x) / 2
     let direction: CGFloat = pointA.x >= midX ? 1 : -1
     var spread = points
-    spread[segment.startIndex].x += direction * offset
-    spread[segment.endIndex].x += direction * offset
+    for index in dominantTrackIndices(in: points, segment: segment) {
+      spread[index].x += direction * offset
+    }
     return spread
   }
 
@@ -377,6 +398,7 @@ struct PolicyCanvasVisibilityRouter: PolicyCanvasEdgeRouter {
     let endIndex: Int
     let isHorizontal: Bool
     let length: CGFloat
+    let coordinate: CGFloat
   }
 
   private static func dominantInternalBusSegment(in points: [CGPoint]) -> InternalBusSegment? {
@@ -391,7 +413,8 @@ struct PolicyCanvasVisibilityRouter: PolicyCanvasEdgeRouter {
           startIndex: index,
           endIndex: index + 1,
           isHorizontal: true,
-          length: abs(end.x - start.x)
+          length: abs(end.x - start.x),
+          coordinate: start.y
         )
       }
       if abs(start.x - end.x) < 0.001 {
@@ -399,7 +422,8 @@ struct PolicyCanvasVisibilityRouter: PolicyCanvasEdgeRouter {
           startIndex: index,
           endIndex: index + 1,
           isHorizontal: false,
-          length: abs(end.y - start.y)
+          length: abs(end.y - start.y),
+          coordinate: start.x
         )
       }
       return nil
@@ -407,5 +431,41 @@ struct PolicyCanvasVisibilityRouter: PolicyCanvasEdgeRouter {
     .max { left, right in
       left.length < right.length
     }
+  }
+
+  private static func dominantTrackIndices(
+    in points: [CGPoint],
+    segment: InternalBusSegment
+  ) -> ClosedRange<Int> {
+    var startIndex = segment.startIndex
+    var endIndex = segment.endIndex
+    if segment.isHorizontal {
+      while startIndex > 1,
+        abs(points[startIndex - 1].y - segment.coordinate) < 0.001,
+        abs(points[startIndex].y - segment.coordinate) < 0.001
+      {
+        startIndex -= 1
+      }
+      while endIndex < points.count - 2,
+        abs(points[endIndex].y - segment.coordinate) < 0.001,
+        abs(points[endIndex + 1].y - segment.coordinate) < 0.001
+      {
+        endIndex += 1
+      }
+      return startIndex...endIndex
+    }
+    while startIndex > 1,
+      abs(points[startIndex - 1].x - segment.coordinate) < 0.001,
+      abs(points[startIndex].x - segment.coordinate) < 0.001
+    {
+      startIndex -= 1
+    }
+    while endIndex < points.count - 2,
+      abs(points[endIndex].x - segment.coordinate) < 0.001,
+      abs(points[endIndex + 1].x - segment.coordinate) < 0.001
+    {
+      endIndex += 1
+    }
+    return startIndex...endIndex
   }
 }
