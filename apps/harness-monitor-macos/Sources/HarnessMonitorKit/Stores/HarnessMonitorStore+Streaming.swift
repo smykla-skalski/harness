@@ -386,6 +386,8 @@ extension HarnessMonitorStore {
   @discardableResult
   private func applyAcpManagedAgentPushEventFromStream(_ event: DaemonPushEvent) async -> Bool {
     switch event.kind {
+    case .acpAgentUpdated(let snapshot):
+      await applyAcpAgentFromStream(snapshot)
     case .acpInspect(let response):
       guard let sessionID = event.sessionId else {
         return false
@@ -395,8 +397,17 @@ extension HarnessMonitorStore {
         sessionID: sessionID,
         sampledAt: Self.acpInspectSampledAt(from: event.recordedAt)
       )
+    case .acpAgentsReconciled(let payload):
+      await replaceAcpAgentsFromStream(
+        payload,
+        sampledAt: Self.acpInspectSampledAt(from: event.recordedAt)
+      )
     case .acpEvents(let payload):
       await applyAcpEventsFromStream(payload, recordedAt: event.recordedAt)
+    case .acpPermissionBatch(let batch):
+      await applyAcpPermissionBatchFromStream(batch)
+    case .acpPermissionBatchRemoved(let removal):
+      await removeAcpPermissionBatchFromStream(removal.batch, reason: removal.reason)
     default:
       return applyAcpManagedAgentPushEvent(event)
     }

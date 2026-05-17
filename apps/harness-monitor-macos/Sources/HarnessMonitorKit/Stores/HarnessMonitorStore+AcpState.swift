@@ -12,6 +12,16 @@ public enum AcpAgentApplyOutcome: Equatable, Sendable {
 
 extension HarnessMonitorStore {
   @discardableResult
+  func advanceAcpRuntimeStateGeneration() -> UInt64 {
+    acpRuntimeStateGeneration &+= 1
+    return acpRuntimeStateGeneration
+  }
+
+  func isCurrentAcpRuntimeStateGeneration(_ generation: UInt64) -> Bool {
+    acpRuntimeStateGeneration == generation
+  }
+
+  @discardableResult
   func applyAcpAgent(_ snapshot: AcpAgentSnapshot) -> AcpAgentApplyOutcome {
     guard !shouldIgnoreLocallyRemovedSession(snapshot.sessionId) else {
       return .droppedSessionMismatch
@@ -28,6 +38,7 @@ extension HarnessMonitorStore {
       )
       return .droppedSessionMismatch
     }
+    advanceAcpRuntimeStateGeneration()
     noteAcpSessionActivity(sessionID: snapshot.sessionId)
     let staleRestartDecisionIDs = staleDecisionIDsForRestartedAcpRuntime(
       replacedBy: snapshot
@@ -59,6 +70,55 @@ extension HarnessMonitorStore {
     return AcpAgentApplyOutcome.applied
   }
 
+  @discardableResult
+  func applyAcpAgentFromStream(_ snapshot: AcpAgentSnapshot) async -> AcpAgentApplyOutcome {
+    guard !shouldIgnoreLocallyRemovedSession(snapshot.sessionId) else {
+      return .droppedSessionMismatch
+    }
+    guard snapshot.sessionId == selectedSessionID else {
+      HarnessMonitorLogger.store.warning(
+        """
+        applyAcpAgentFromStream dropped snapshot for inactive session \
+        snapshotSession=\(snapshot.sessionId, privacy: .public) \
+        selectedSession=\(self.selectedSessionID ?? "<nil>", privacy: .public) \
+        sessionAgent=\(snapshot.sessionAgentID, privacy: .public) \
+        managedAgent=\(snapshot.managedAgentID, privacy: .public)
+        """
+      )
+      return .droppedSessionMismatch
+    }
+    let generation = advanceAcpRuntimeStateGeneration()
+    noteAcpSessionActivity(sessionID: snapshot.sessionId)
+    let output = await acpRuntimeWorker.agentUpdate(
+      snapshot: snapshot,
+      currentAgents: selectedAcpAgents,
+      standalonePermissionBatches: standaloneAcpPermissionBatches,
+      currentInspectSample: selectedAcpInspectState,
+      currentInspectSyncEntries: selectedAcpInspectSyncEntries
+    )
+    guard
+      snapshot.sessionId == selectedSessionID,
+      isCurrentAcpRuntimeStateGeneration(generation),
+      !Task.isCancelled
+    else {
+      return .droppedSessionMismatch
+    }
+    standaloneAcpPermissionBatches = output.standalonePermissionBatches
+    selectedAcpAgents = output.selectedAgents
+    selectedAcpInspectState = output.inspectSample
+    selectedAcpInspectSyncEntries = output.inspectSyncEntries
+    reattributeAcpTranscriptEntries(using: selectedAcpAgents)
+    reattributeAcpTimelineEntries(using: selectedAcpAgents)
+    finishAcpInspectSyncReconciliation(
+      sessionID: snapshot.sessionId,
+      hasRecoverableMissingEntries: output.hasRecoverableMissingInspectEntries,
+      shouldScheduleRecovery: true
+    )
+    reconcilePresentedAcpPermissionBatch()
+    reconcileAcpPermissionDecisions(extraStaleDecisionIDs: output.staleRestartDecisionIDs)
+    return .applied
+  }
+
   func replaceAcpAgents(
     _ payload: AcpAgentsReconciledPayload,
     sampledAt: Date? = nil,
@@ -68,6 +128,7 @@ extension HarnessMonitorStore {
     guard payload.sessionId == selectedSessionID else {
       return
     }
+    advanceAcpRuntimeStateGeneration()
     noteAcpSessionActivity(sessionID: payload.sessionId)
     let hadPresentedBatch = presentingAcpPermissionBatch != nil
     selectedAcpAgents =
@@ -113,6 +174,50 @@ extension HarnessMonitorStore {
     reconcileAcpPermissionDecisions()
   }
 
+  func replaceAcpAgentsFromStream(
+    _ payload: AcpAgentsReconciledPayload,
+    sampledAt: Date? = nil,
+    allowAutoPresentation: Bool = true,
+    shouldScheduleRecovery: Bool = true
+  ) async {
+    guard payload.sessionId == selectedSessionID else {
+      return
+    }
+    let generation = advanceAcpRuntimeStateGeneration()
+    let sampledAt = sampledAt ?? Date()
+    noteAcpSessionActivity(sessionID: payload.sessionId)
+    let hadPresentedBatch = presentingAcpPermissionBatch != nil
+    let output = await acpRuntimeWorker.agentsReplacement(
+      payload: payload,
+      sampledAt: sampledAt,
+      standalonePermissionBatches: standaloneAcpPermissionBatches,
+      currentInspectSample: selectedAcpInspectState,
+      currentInspectSyncEntries: selectedAcpInspectSyncEntries
+    )
+    guard
+      payload.sessionId == selectedSessionID,
+      isCurrentAcpRuntimeStateGeneration(generation),
+      !Task.isCancelled
+    else {
+      return
+    }
+    standaloneAcpPermissionBatches = output.standalonePermissionBatches
+    selectedAcpAgents = output.selectedAgents
+    selectedAcpInspectState = output.inspectSample
+    selectedAcpInspectSyncEntries = output.inspectSyncEntries
+    reattributeAcpTranscriptEntries(using: selectedAcpAgents)
+    reattributeAcpTimelineEntries(using: selectedAcpAgents)
+    finishAcpInspectSyncReconciliation(
+      sessionID: payload.sessionId,
+      hasRecoverableMissingEntries: output.hasRecoverableMissingInspectEntries,
+      shouldScheduleRecovery: shouldScheduleRecovery
+    )
+    reconcilePresentedAcpPermissionBatch(
+      allowAutoPresentation: allowAutoPresentation || hadPresentedBatch
+    )
+    reconcileAcpPermissionDecisions()
+  }
+
   func replaceAcpInspect(
     _ response: AcpAgentInspectResponse,
     sessionID: String,
@@ -122,6 +227,7 @@ extension HarnessMonitorStore {
     guard sessionID == selectedSessionID else {
       return
     }
+    advanceAcpRuntimeStateGeneration()
     noteAcpSessionActivity(sessionID: sessionID, at: sampledAt)
     let daemonObservedAt = response.daemonPerceivedNowDate ?? sampledAt
     let nextSample = AcpInspectSample(
@@ -151,6 +257,7 @@ extension HarnessMonitorStore {
     guard sessionID == selectedSessionID else {
       return
     }
+    let generation = advanceAcpRuntimeStateGeneration()
     noteAcpSessionActivity(sessionID: sessionID, at: sampledAt)
     let activeAgents = selectedAcpAgents
     let currentSyncEntries = selectedAcpInspectSyncEntries
@@ -161,7 +268,11 @@ extension HarnessMonitorStore {
       activeAgents: activeAgents,
       currentSyncEntries: currentSyncEntries
     )
-    guard sessionID == selectedSessionID, !Task.isCancelled else {
+    guard
+      sessionID == selectedSessionID,
+      isCurrentAcpRuntimeStateGeneration(generation),
+      !Task.isCancelled
+    else {
       return
     }
     selectedAcpInspectState = output.sample
@@ -245,6 +356,7 @@ extension HarnessMonitorStore {
     if acpPermissionTerminalOutcomesByID[decisionID] != nil {
       return
     }
+    advanceAcpRuntimeStateGeneration()
 
     if !selectedAcpAgents.contains(where: { $0.acpId == batch.acpId }) {
       standaloneAcpPermissionBatches = upsertingAcpPermissionBatch(
@@ -269,10 +381,40 @@ extension HarnessMonitorStore {
     reconcileAcpPermissionDecisions()
   }
 
+  func applyAcpPermissionBatchFromStream(_ batch: AcpPermissionBatch) async {
+    guard batch.sessionId == selectedSessionID else {
+      return
+    }
+    noteAcpSessionActivity(sessionID: batch.sessionId)
+    let decisionID = AcpPermissionDecisionPayload.decisionID(for: batch.batchId)
+    if acpPermissionTerminalOutcomesByID[decisionID] != nil {
+      return
+    }
+
+    let generation = advanceAcpRuntimeStateGeneration()
+    let output = await acpRuntimeWorker.permissionBatchApply(
+      batch: batch,
+      currentAgents: selectedAcpAgents,
+      standalonePermissionBatches: standaloneAcpPermissionBatches
+    )
+    guard
+      batch.sessionId == selectedSessionID,
+      isCurrentAcpRuntimeStateGeneration(generation),
+      !Task.isCancelled
+    else {
+      return
+    }
+    selectedAcpAgents = output.selectedAgents
+    standaloneAcpPermissionBatches = output.standalonePermissionBatches
+    reconcilePresentedAcpPermissionBatch()
+    reconcileAcpPermissionDecisions()
+  }
+
   func removeAcpPermissionBatch(
     _ batch: AcpPermissionBatch,
     reason: AcpPermissionBatchRemovalReason = .resolved
   ) {
+    advanceAcpRuntimeStateGeneration()
     let decisionID = AcpPermissionDecisionPayload.decisionID(for: batch.batchId)
     noteAcpSessionActivity(sessionID: batch.sessionId)
     let isTerminalRemoval = reason == .timeout || reason == .shutdown
@@ -319,7 +461,64 @@ extension HarnessMonitorStore {
     scheduleAcpPermissionDecisionSync(staleDecisionIDs: [decisionID])
   }
 
+  func removeAcpPermissionBatchFromStream(
+    _ batch: AcpPermissionBatch,
+    reason: AcpPermissionBatchRemovalReason = .resolved
+  ) async {
+    let generation = advanceAcpRuntimeStateGeneration()
+    let decisionID = AcpPermissionDecisionPayload.decisionID(for: batch.batchId)
+    noteAcpSessionActivity(sessionID: batch.sessionId)
+    let isTerminalRemoval = reason == .timeout || reason == .shutdown
+    if isTerminalRemoval {
+      let outcome = terminalOutcome(for: reason)
+      acpPermissionTerminalOutcomesByID[decisionID] = outcome
+    } else {
+      acpPermissionTerminalOutcomesByID.removeValue(forKey: decisionID)
+    }
+    if reason == .timeout {
+      cancelAcpPermissionShutdownResolutionTask(for: decisionID)
+      acpPermissionPendingShutdownDecisionIDs.remove(decisionID)
+      let inserted = acpPermissionPendingTimeoutDecisionIDs.insert(decisionID).inserted
+      if inserted {
+        scheduleAcpPermissionDeadlineResolution(for: batch, decisionID: decisionID)
+      }
+    } else if reason == .shutdown {
+      cancelAcpPermissionDeadlineResolutionTask(for: decisionID)
+      acpPermissionPendingTimeoutDecisionIDs.remove(decisionID)
+      let inserted = acpPermissionPendingShutdownDecisionIDs.insert(decisionID).inserted
+      if inserted {
+        scheduleAcpPermissionShutdownResolution(for: batch, decisionID: decisionID)
+      }
+    } else {
+      acpPermissionPendingTimeoutDecisionIDs.remove(decisionID)
+      acpPermissionPendingShutdownDecisionIDs.remove(decisionID)
+      cancelAcpPermissionTerminalResolutionTasks(for: decisionID)
+    }
+
+    let output = await acpRuntimeWorker.permissionBatchRemoval(
+      batch: batch,
+      currentAgents: selectedAcpAgents,
+      standalonePermissionBatches: standaloneAcpPermissionBatches
+    )
+    guard isCurrentAcpRuntimeStateGeneration(generation), !Task.isCancelled else {
+      return
+    }
+    standaloneAcpPermissionBatches = output.standalonePermissionBatches
+    selectedAcpAgents = output.selectedAgents
+    if presentingAcpPermissionBatch?.batchId == batch.batchId {
+      presentingAcpPermissionBatch = nil
+    }
+    reconcilePresentedAcpPermissionBatch()
+    if isTerminalRemoval {
+      invalidateAcpPermissionDecisionSync()
+      return
+    }
+    reconcileAcpPermissionDecisions()
+    scheduleAcpPermissionDecisionSync(staleDecisionIDs: [decisionID])
+  }
+
   func resetSelectedAcpAgents() {
+    advanceAcpRuntimeStateGeneration()
     suppressSelectedAcpTranscriptCacheWrite = true
     defer { suppressSelectedAcpTranscriptCacheWrite = false }
     selectedAcpAgents = []

@@ -187,7 +187,171 @@ struct AcpInspectReplacementOutput: Sendable {
   let hasRecoverableMissingEntries: Bool
 }
 
+struct AcpAgentStateMutationOutput: Sendable {
+  let selectedAgents: [AcpAgentSnapshot]
+  let standalonePermissionBatches: [AcpPermissionBatch]
+  let inspectSample: AcpInspectSample?
+  let inspectSyncEntries: [AcpRuntimeIdentity: AcpInspectSyncEntry]
+  let hasRecoverableMissingInspectEntries: Bool
+  let staleRestartDecisionIDs: Set<String>
+}
+
+struct AcpPermissionBatchStateOutput: Sendable {
+  let selectedAgents: [AcpAgentSnapshot]
+  let standalonePermissionBatches: [AcpPermissionBatch]
+}
+
 actor AcpRuntimeWorker {
+  func agentUpdate(
+    snapshot: AcpAgentSnapshot,
+    currentAgents: [AcpAgentSnapshot],
+    standalonePermissionBatches: [AcpPermissionBatch],
+    currentInspectSample: AcpInspectSample?,
+    currentInspectSyncEntries: [AcpRuntimeIdentity: AcpInspectSyncEntry]
+  ) -> AcpAgentStateMutationOutput {
+    var standaloneBatches = standalonePermissionBatches
+    let staleDecisionIDs = Self.staleDecisionIDsForRestartedRuntime(
+      replacedBy: snapshot,
+      currentAgents: currentAgents,
+      standalonePermissionBatches: &standaloneBatches
+    )
+
+    let pendingStandaloneBatches = standaloneBatches.filter { $0.acpId == snapshot.acpId }
+    standaloneBatches.removeAll { $0.acpId == snapshot.acpId }
+    let updatedSnapshot = snapshot.withPermissionBatches(
+      Self.mergedPermissionBatches(
+        primary: snapshot.pendingPermissionBatches,
+        secondary: pendingStandaloneBatches,
+        preferSecondary: false
+      )
+    )
+    let selectedAgents = Self.upsertingAgent(updatedSnapshot, into: currentAgents)
+    let inspectSample = Self.reconciledInspectSample(currentInspectSample, with: snapshot)
+    let syncEntries = Self.reconciledInspectSyncEntries(
+      activeAgents: selectedAgents,
+      inspectedAgents: inspectSample?.agents ?? [],
+      currentEntries: currentInspectSyncEntries,
+      response: nil,
+      sampledAt: Date()
+    )
+
+    return AcpAgentStateMutationOutput(
+      selectedAgents: selectedAgents,
+      standalonePermissionBatches: standaloneBatches,
+      inspectSample: inspectSample,
+      inspectSyncEntries: syncEntries,
+      hasRecoverableMissingInspectEntries: Self.hasRecoverableMissingInspectEntries(syncEntries),
+      staleRestartDecisionIDs: staleDecisionIDs
+    )
+  }
+
+  func agentsReplacement(
+    payload: AcpAgentsReconciledPayload,
+    sampledAt: Date,
+    standalonePermissionBatches: [AcpPermissionBatch],
+    currentInspectSample: AcpInspectSample?,
+    currentInspectSyncEntries: [AcpRuntimeIdentity: AcpInspectSyncEntry]
+  ) -> AcpAgentStateMutationOutput {
+    var standaloneBatches = standalonePermissionBatches
+    let selectedAgents = Self.sortedAgents(
+      payload.agents.map { snapshot in
+        let pendingStandaloneBatches = standaloneBatches.filter {
+          $0.acpId == snapshot.acpId
+        }
+        return snapshot.withPermissionBatches(
+          Self.mergedPermissionBatches(
+            primary: snapshot.pendingPermissionBatches,
+            secondary: pendingStandaloneBatches,
+            preferSecondary: false
+          )
+        )
+      }
+    )
+    standaloneBatches.removeAll { $0.sessionId == payload.sessionId }
+
+    let activeIdentities = Set(selectedAgents.map(AcpRuntimeIdentity.init(snapshot:)))
+    let inspectSample: AcpInspectSample?
+    if let response = payload.inspect {
+      let daemonObservedAt = response.daemonPerceivedNowDate ?? sampledAt
+      inspectSample = AcpInspectSample(
+        sessionID: payload.sessionId,
+        sampledAt: daemonObservedAt,
+        receivedAt: sampledAt,
+        agents: Self.sortedInspectSnapshots(
+          response.agents.filter { $0.sessionId == payload.sessionId }
+        )
+      )
+      .filtered(keeping: activeIdentities)
+    } else if let currentInspectSample, currentInspectSample.sessionID == payload.sessionId {
+      inspectSample = currentInspectSample.filtered(keeping: activeIdentities)
+    } else {
+      inspectSample = currentInspectSample
+    }
+
+    let syncEntries = Self.reconciledInspectSyncEntries(
+      activeAgents: selectedAgents,
+      inspectedAgents: inspectSample?.agents ?? [],
+      currentEntries: currentInspectSyncEntries,
+      response: payload.inspect,
+      sampledAt: sampledAt
+    )
+
+    return AcpAgentStateMutationOutput(
+      selectedAgents: selectedAgents,
+      standalonePermissionBatches: standaloneBatches,
+      inspectSample: inspectSample,
+      inspectSyncEntries: syncEntries,
+      hasRecoverableMissingInspectEntries: Self.hasRecoverableMissingInspectEntries(syncEntries),
+      staleRestartDecisionIDs: []
+    )
+  }
+
+  func permissionBatchApply(
+    batch: AcpPermissionBatch,
+    currentAgents: [AcpAgentSnapshot],
+    standalonePermissionBatches: [AcpPermissionBatch]
+  ) -> AcpPermissionBatchStateOutput {
+    guard currentAgents.contains(where: { $0.acpId == batch.acpId }) else {
+      return AcpPermissionBatchStateOutput(
+        selectedAgents: currentAgents,
+        standalonePermissionBatches: Self.upsertingPermissionBatch(
+          batch,
+          into: standalonePermissionBatches
+        )
+      )
+    }
+    return AcpPermissionBatchStateOutput(
+      selectedAgents: currentAgents.map { snapshot in
+        guard snapshot.acpId == batch.acpId else { return snapshot }
+        return snapshot.withPermissionBatches(
+          Self.mergedPermissionBatches(
+            primary: snapshot.pendingPermissionBatches,
+            secondary: [batch],
+            preferSecondary: false
+          )
+        )
+      },
+      standalonePermissionBatches: standalonePermissionBatches
+    )
+  }
+
+  func permissionBatchRemoval(
+    batch: AcpPermissionBatch,
+    currentAgents: [AcpAgentSnapshot],
+    standalonePermissionBatches: [AcpPermissionBatch]
+  ) -> AcpPermissionBatchStateOutput {
+    AcpPermissionBatchStateOutput(
+      selectedAgents: currentAgents.map { snapshot in
+        guard snapshot.acpId == batch.acpId else { return snapshot }
+        let batches = snapshot.pendingPermissionBatches.filter { $0.batchId != batch.batchId }
+        return snapshot.withPermissionBatches(batches)
+      },
+      standalonePermissionBatches: standalonePermissionBatches.filter {
+        $0.batchId != batch.batchId
+      }
+    )
+  }
+
   func eventPresentation(
     payload: AcpEventBatchPayload,
     recordedAt: String,
@@ -371,6 +535,137 @@ actor AcpRuntimeWorker {
       }
       return $0.acpId < $1.acpId
     }
+  }
+
+  private static func sortedAgents(_ snapshots: [AcpAgentSnapshot]) -> [AcpAgentSnapshot] {
+    snapshots.sorted(by: agentPrecedes)
+  }
+
+  private static func upsertingAgent(
+    _ snapshot: AcpAgentSnapshot,
+    into snapshots: [AcpAgentSnapshot]
+  ) -> [AcpAgentSnapshot] {
+    var result = snapshots.filter { $0.sessionAgentID != snapshot.sessionAgentID }
+    let index = result.firstIndex { existing in agentPrecedes(snapshot, existing) }
+      ?? result.endIndex
+    result.insert(snapshot, at: index)
+    return result
+  }
+
+  private static func agentPrecedes(
+    _ lhs: AcpAgentSnapshot,
+    _ rhs: AcpAgentSnapshot
+  ) -> Bool {
+    if lhs.displayName != rhs.displayName {
+      return lhs.displayName.localizedStandardCompare(rhs.displayName) == .orderedAscending
+    }
+    return lhs.sessionAgentID < rhs.sessionAgentID
+  }
+
+  private static func mergedPermissionBatches(
+    primary: [AcpPermissionBatch],
+    secondary: [AcpPermissionBatch],
+    preferSecondary: Bool
+  ) -> [AcpPermissionBatch] {
+    var byBatchID: [String: AcpPermissionBatch] = [:]
+    for batch in primary {
+      byBatchID[batch.batchId] = batch
+    }
+    for batch in secondary
+    where shouldReplacePermissionBatch(
+      existing: byBatchID[batch.batchId],
+      incoming: batch,
+      preferSecondary: preferSecondary
+    ) {
+      byBatchID[batch.batchId] = batch
+    }
+    return Array(byBatchID.values)
+  }
+
+  private static func shouldReplacePermissionBatch(
+    existing: AcpPermissionBatch?,
+    incoming: AcpPermissionBatch,
+    preferSecondary: Bool
+  ) -> Bool {
+    guard let existing else {
+      return true
+    }
+    if preferSecondary {
+      return true
+    }
+    return incoming.createdAt >= existing.createdAt
+  }
+
+  private static func upsertingPermissionBatch(
+    _ batch: AcpPermissionBatch,
+    into batches: [AcpPermissionBatch]
+  ) -> [AcpPermissionBatch] {
+    var result = batches.filter { $0.batchId != batch.batchId }
+    let index = result.firstIndex { existing in permissionBatchPrecedes(batch, existing) }
+      ?? result.endIndex
+    result.insert(batch, at: index)
+    return result
+  }
+
+  private static func permissionBatchPrecedes(
+    _ lhs: AcpPermissionBatch,
+    _ rhs: AcpPermissionBatch
+  ) -> Bool {
+    if lhs.createdAt != rhs.createdAt {
+      return lhs.createdAt < rhs.createdAt
+    }
+    return lhs.batchId < rhs.batchId
+  }
+
+  private static func staleDecisionIDsForRestartedRuntime(
+    replacedBy snapshot: AcpAgentSnapshot,
+    currentAgents: [AcpAgentSnapshot],
+    standalonePermissionBatches: inout [AcpPermissionBatch]
+  ) -> Set<String> {
+    guard
+      let previousSnapshot = currentAgents.first(where: {
+        $0.sessionAgentID == snapshot.sessionAgentID
+      }),
+      previousSnapshot.managedAgentID != snapshot.managedAgentID
+    else {
+      return []
+    }
+
+    let staleBatches = standalonePermissionBatches.filter {
+      $0.acpId == previousSnapshot.managedAgentID
+    }
+    guard !staleBatches.isEmpty else {
+      return []
+    }
+
+    standalonePermissionBatches.removeAll {
+      $0.acpId == previousSnapshot.managedAgentID
+    }
+    return Set(staleBatches.map { AcpPermissionDecisionPayload.decisionID(for: $0.batchId) })
+  }
+
+  private static func reconciledInspectSample(
+    _ sample: AcpInspectSample?,
+    with snapshot: AcpAgentSnapshot
+  ) -> AcpInspectSample? {
+    guard let sample else {
+      return nil
+    }
+    let incomingIdentity = AcpRuntimeIdentity(snapshot: snapshot)
+    guard sample.snapshot(for: incomingIdentity) == nil else {
+      return sample
+    }
+    return sample.filtered(removingMatching: { identity in
+      identity != incomingIdentity
+        && (identity.managedAgentID == snapshot.managedAgentID
+          || identity.sessionAgentID == snapshot.sessionAgentID)
+    })
+  }
+
+  private static func hasRecoverableMissingInspectEntries(
+    _ entries: [AcpRuntimeIdentity: AcpInspectSyncEntry]
+  ) -> Bool {
+    entries.values.contains { $0.phase != .unavailable }
   }
 
   private static func reconciledInspectSyncEntries(

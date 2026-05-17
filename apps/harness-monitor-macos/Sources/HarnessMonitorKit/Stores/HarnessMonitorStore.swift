@@ -49,6 +49,7 @@ public final class HarnessMonitorStore {
   @ObservationIgnored var acpTimelineReattributeGeneration: UInt64 = 0
   @ObservationIgnored var acpTranscriptReattributeGeneration: UInt64 = 0
   @ObservationIgnored var acpTranscriptPartitionGeneration: UInt64 = 0
+  @ObservationIgnored var acpRuntimeStateGeneration: UInt64 = 0
   @ObservationIgnored var cachedNullActionHandler: NullDecisionActionHandler?
   @ObservationIgnored var openSessionWindowsByID: [ObjectIdentifier: String] = [:]
   @ObservationIgnored var pendingSessionWindowTerminationSnapshot: Set<String>?
