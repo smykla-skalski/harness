@@ -24,6 +24,7 @@ struct HarnessMonitorApp: App {
   private let pendingDecisionsDockBadgeController: PendingDecisionsDockBadgeController
   let perfScenario: HarnessMonitorPerfScenario?
   let initialSessionWindowRoute: SessionWindowRoute?
+  let showsPolicyCanvasLab: Bool
   @State private var store: HarnessMonitorStore
   @State private var menuBarStatusController: HarnessMonitorMenuBarStatusController
   @State private var sessionWindowPresenceTracker: SessionWindowPresenceTracker
@@ -120,6 +121,7 @@ struct HarnessMonitorApp: App {
       values: configuration.environment.values,
       isUITesting: configuration.isUITesting
     )
+    showsPolicyCanvasLab = configuration.showsPolicyCanvasLab
     let store = configuration.store
     Self.bindSupervisorSurfaces(
       to: store,
@@ -145,6 +147,7 @@ struct HarnessMonitorApp: App {
   var body: some Scene {
     dashboardWindowScene
     sessionWindowScene
+    policyCanvasLabWindowScene
     settingsWindowScene
     menuBarExtraScene
   }

@@ -20,11 +20,11 @@ extension PolicyCanvasView {
   /// `.onChange(of: viewModel.pipelineIdentity)` (load completes after
   /// mount). If neither call has the right identity yet, the next one will.
   func restoreSceneStorageIfNeeded() {
-    guard let identity = viewModel.pipelineIdentity else {
-      return
-    }
-    let map = PolicyCanvasView.decodePipelineStateMap(storedPipelineStateRaw)
-    guard let state = map[identity] else {
+    guard let state = PolicyCanvasView.sceneState(
+      for: viewModel.pipelineIdentity,
+      raw: storedPipelineStateRaw,
+      suppressesSceneStorage: suppressesSceneStorage
+    ) else {
       return
     }
     viewModel.zoom = PolicyCanvasViewModel.sanitizedZoom(
@@ -46,7 +46,7 @@ extension PolicyCanvasView {
     zoom: Double? = nil,
     selection: PolicyCanvasSelection?? = nil
   ) {
-    guard let identity = viewModel.pipelineIdentity else {
+    guard !suppressesSceneStorage, let identity = viewModel.pipelineIdentity else {
       return
     }
     var map = PolicyCanvasView.decodePipelineStateMap(storedPipelineStateRaw)
@@ -105,6 +105,17 @@ extension PolicyCanvasView {
     default:
       return nil
     }
+  }
+
+  static func sceneState(
+    for identity: String?,
+    raw: String,
+    suppressesSceneStorage: Bool = false
+  ) -> PolicyCanvasPipelineSceneState? {
+    guard !suppressesSceneStorage, let identity else {
+      return nil
+    }
+    return decodePipelineStateMap(raw)[identity]
   }
 
   /// Decode the JSON-encoded `pipelineID -> PolicyCanvasPipelineSceneState`

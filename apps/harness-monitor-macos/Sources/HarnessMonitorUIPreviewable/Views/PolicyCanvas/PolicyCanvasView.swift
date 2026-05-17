@@ -18,6 +18,9 @@ extension View {
 }
 
 public struct PolicyCanvasView: View {
+  private static let labRemoteActionDisabledReason = "Disabled in Policy Canvas Lab"
+  private static let missingStoreRemoteActionDisabledReason =
+    "Unavailable without a live policy store"
   @State private var viewModelState: PolicyCanvasViewModel
   @State private var isShowingPromoteConfirmationState = false
   @State private var pendingDeletionRequestState: PolicyCanvasDeletionRequest?
@@ -72,6 +75,9 @@ public struct PolicyCanvasView: View {
   private var storedPipelineStateRawState: String = ""
   let store: HarnessMonitorStore?
   let dashboardUI: HarnessMonitorStore.ContentDashboardSlice?
+  let suppressesAutosave: Bool
+  let suppressesSceneStorage: Bool
+  let allowsRemoteActions: Bool
 
   var viewModel: PolicyCanvasViewModel {
     viewModelState
@@ -115,12 +121,18 @@ public struct PolicyCanvasView: View {
     _viewModelState = State(initialValue: .sample())
     self.store = nil
     self.dashboardUI = nil
+    suppressesAutosave = false
+    suppressesSceneStorage = false
+    allowsRemoteActions = true
   }
 
   @MainActor
   public init(
     store: HarnessMonitorStore,
-    dashboardUI: HarnessMonitorStore.ContentDashboardSlice
+    dashboardUI: HarnessMonitorStore.ContentDashboardSlice,
+    suppressesAutosave: Bool = false,
+    suppressesSceneStorage: Bool = false,
+    allowsRemoteActions: Bool = true
   ) {
     _viewModelState = State(
       initialValue: PolicyCanvasViewModel.liveStartupState(
@@ -131,22 +143,34 @@ public struct PolicyCanvasView: View {
     )
     self.store = store
     self.dashboardUI = dashboardUI
+    self.suppressesAutosave = suppressesAutosave
+    self.suppressesSceneStorage = suppressesSceneStorage
+    self.allowsRemoteActions = allowsRemoteActions
   }
 
   init(viewModel: PolicyCanvasViewModel) {
     _viewModelState = State(initialValue: viewModel)
     self.store = nil
     self.dashboardUI = nil
+    suppressesAutosave = false
+    suppressesSceneStorage = false
+    allowsRemoteActions = true
   }
 
   init(
     viewModel: PolicyCanvasViewModel,
     store: HarnessMonitorStore,
-    dashboardUI: HarnessMonitorStore.ContentDashboardSlice
+    dashboardUI: HarnessMonitorStore.ContentDashboardSlice,
+    suppressesAutosave: Bool = false,
+    suppressesSceneStorage: Bool = false,
+    allowsRemoteActions: Bool = true
   ) {
     _viewModelState = State(initialValue: viewModel)
     self.store = store
     self.dashboardUI = dashboardUI
+    self.suppressesAutosave = suppressesAutosave
+    self.suppressesSceneStorage = suppressesSceneStorage
+    self.allowsRemoteActions = allowsRemoteActions
   }
 
   public var body: some View {
@@ -154,6 +178,8 @@ public struct PolicyCanvasView: View {
       PolicyCanvasTopBar(
         viewModel: viewModel,
         canPromote: viewModel.canPromote,
+        remoteActionsEnabled: remoteActionsEnabled,
+        remoteActionDisabledReason: remoteActionDisabledReason,
         simulationOverlayAvailable: simulationOverlayAvailable,
         simulationOverlayVisible: simulationOverlayResolved,
         toggleSimulationOverlay: toggleSimulationOverlay,
@@ -176,7 +202,9 @@ public struct PolicyCanvasView: View {
         PolicyCanvasViewport(
           viewModel: viewModel,
           focusedComponent: $focusedComponentState,
-          showSimulationOverlay: simulationOverlayResolved
+          showSimulationOverlay: simulationOverlayResolved,
+          suppressesSceneStorage: suppressesSceneStorage,
+          storedPipelineStateRaw: storedPipelineStateRaw
         )
         .frame(maxWidth: .infinity, maxHeight: .infinity)
 
@@ -289,7 +317,8 @@ public struct PolicyCanvasView: View {
       if newPhase != .active {
         viewModel.clearTransientGestureState()
       }
-      if newPhase == .background, viewModel.documentDirty,
+      if newPhase == .background, !suppressesAutosave, remoteActionsEnabled,
+        viewModel.documentDirty,
         viewModel.autosaveTask != nil
       {
         flushPendingAutosaveBeforeBackground()
@@ -365,6 +394,17 @@ public struct PolicyCanvasView: View {
     )
   }
 
+  var remoteActionsEnabled: Bool {
+    allowsRemoteActions && store != nil
+  }
+
+  var remoteActionDisabledReason: String {
+    if !allowsRemoteActions {
+      return Self.labRemoteActionDisabledReason
+    }
+    return Self.missingStoreRemoteActionDisabledReason
+  }
+
   /// True when there is a simulation result the user could view. Toggle is
   /// disabled when this is false — there's nothing to show.
   private var simulationOverlayAvailable: Bool {
@@ -413,6 +453,11 @@ public struct PolicyCanvasView: View {
   /// foreground save in flight, rollback armed) are owned by
   /// `scheduleAutosave` inside the view-model.
   private func bindAutosaveTrigger() {
+    if suppressesAutosave || !remoteActionsEnabled {
+      viewModel.cancelAutosave()
+      viewModel.autosaveTrigger = nil
+      return
+    }
     viewModel.autosaveTrigger = { @MainActor in
       viewModel.scheduleAutosave {
         performSave(reason: .autosave)

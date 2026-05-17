@@ -12,6 +12,10 @@ extension PolicyCanvasView {
   }
 
   func saveDraft() {
+    guard remoteActionsEnabled else {
+      statusLine = remoteActionDisabledReason
+      return
+    }
     // Foreground save races autosave when both fire close together (e.g.
     // user types, autosave schedules, user clicks Save before the 1.5s
     // window elapses). `beginForegroundSave()` cancels the pending autosave
@@ -23,6 +27,10 @@ extension PolicyCanvasView {
   }
 
   func simulate() {
+    guard remoteActionsEnabled else {
+      statusLine = remoteActionDisabledReason
+      return
+    }
     // `beginForegroundSave` is autosave-specific; simulate uses its own
     // in-flight flag but should still cancel the pending autosave for the
     // same race-window reason. Set `isSimulating` synchronously here
@@ -106,6 +114,10 @@ extension PolicyCanvasView {
   }
 
   func requestPromote() {
+    guard remoteActionsEnabled else {
+      statusLine = remoteActionDisabledReason
+      return
+    }
     guard viewModel.canPromote, let revision = viewModel.backingDocument?.revision else {
       statusLine = "Promote requires a saved matching simulation"
       return
@@ -115,6 +127,10 @@ extension PolicyCanvasView {
   }
 
   func confirmPromote() {
+    guard remoteActionsEnabled else {
+      statusLine = remoteActionDisabledReason
+      return
+    }
     guard viewModel.canPromote, let revision = viewModel.backingDocument?.revision else {
       statusLine = "Promote requires a saved matching simulation"
       return

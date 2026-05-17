@@ -5,6 +5,8 @@ import SwiftUI
 struct PolicyCanvasTopBar: View {
   @Bindable var viewModel: PolicyCanvasViewModel
   let canPromote: Bool
+  let remoteActionsEnabled: Bool
+  let remoteActionDisabledReason: String
   /// True when there is a simulation payload to visualize. The toggle is
   /// disabled when this is false so the user doesn't get a button that
   /// does nothing.
@@ -80,6 +82,8 @@ struct PolicyCanvasTopBar: View {
       PolicyCanvasActionButton(
         title: "Save",
         systemImage: "square.and.arrow.down",
+        isDisabled: !remoteActionsEnabled,
+        disabledReason: remoteActionDisabledReason,
         isBusy: viewModel.isSavingDraft,
         accessibilityIdentifier: HarnessMonitorAccessibility.policyCanvasSaveButton,
         action: {
@@ -91,6 +95,8 @@ struct PolicyCanvasTopBar: View {
       PolicyCanvasActionButton(
         title: "Simulate",
         systemImage: "play.circle",
+        isDisabled: !remoteActionsEnabled,
+        disabledReason: remoteActionDisabledReason,
         isBusy: viewModel.isSimulating,
         accessibilityIdentifier: HarnessMonitorAccessibility.policyCanvasSimulateButton,
         action: {
@@ -103,8 +109,8 @@ struct PolicyCanvasTopBar: View {
         title: "Promote",
         systemImage: "arrow.up.right.circle",
         tint: Color.green,
-        isDisabled: !canPromote,
-        disabledReason: viewModel.promoteDisabledReason,
+        isDisabled: !remoteActionsEnabled || !canPromote,
+        disabledReason: remoteActionsEnabled ? viewModel.promoteDisabledReason : remoteActionDisabledReason,
         isBusy: viewModel.isPromoting,
         accessibilityIdentifier: HarnessMonitorAccessibility.policyCanvasPromoteButton,
         action: {

@@ -14,9 +14,12 @@ struct PolicyCanvasViewport: View {
   /// the overlay even when both conditions hold. Simulation visibility is
   /// purely viewport state — never set `documentDirty` from this seam.
   var showSimulationOverlay: Bool = false
+  var suppressesSceneStorage = false
+  var storedPipelineStateRaw = ""
   @State private var magnifyStartZoom: CGFloat?
   @State private var zoomFocusDispatcher = PolicyCanvasZoomFocusDispatcher()
   @State private var zoomFocus: PolicyCanvasZoomFocus?
+  @State private var hasAppliedRestoredSceneZoom = false
   /// Tracks the current keyboard modifiers via `.onModifierKeysChanged` so the
   /// scroll-geometry handler can gate Cmd+scroll-wheel zoom on the Cmd flag.
   @State private var currentModifiers: EventModifiers = []
@@ -251,13 +254,29 @@ struct PolicyCanvasViewport: View {
     guard viewModel.consumeViewportCenteringRequest() else {
       return
     }
-    let fittedZoom = viewModel.fittedInitialZoom(
-      for: viewportSize,
-      contentBounds: visibleBounds
+    let restoredSceneState = PolicyCanvasView.sceneState(
+      for: viewModel.pipelineIdentity,
+      raw: storedPipelineStateRaw,
+      suppressesSceneStorage: suppressesSceneStorage
     )
-    let targetZoom = viewModel.isEmpty ? viewModel.zoom : min(viewModel.zoom, fittedZoom)
-    if abs(targetZoom - viewModel.zoom) > 0.001 {
-      viewModel.setZoom(targetZoom)
+    if let restoredSceneState, !hasAppliedRestoredSceneZoom {
+      let restoredZoom = PolicyCanvasViewModel.sanitizedZoom(
+        CGFloat(restoredSceneState.zoom),
+        fallback: viewModel.zoom
+      )
+      if abs(restoredZoom - viewModel.zoom) > 0.001 {
+        viewModel.setZoom(restoredZoom)
+      }
+      hasAppliedRestoredSceneZoom = true
+    } else if restoredSceneState == nil {
+      let fittedZoom = viewModel.fittedInitialZoom(
+        for: viewportSize,
+        contentBounds: visibleBounds
+      )
+      let targetZoom = viewModel.isEmpty ? viewModel.zoom : min(viewModel.zoom, fittedZoom)
+      if abs(targetZoom - viewModel.zoom) > 0.001 {
+        viewModel.setZoom(targetZoom)
+      }
     }
     Task { @MainActor in
       await Task.yield()

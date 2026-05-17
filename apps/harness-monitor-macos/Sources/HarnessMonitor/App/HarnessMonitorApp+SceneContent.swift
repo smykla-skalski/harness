@@ -77,6 +77,21 @@ extension HarnessMonitorApp {
     }
   }
 
+  @ViewBuilder var policyCanvasLabWindowSceneContent: some View {
+    if rendersLiveSceneContent {
+      PolicyCanvasLabWindowView(
+        store: appStore,
+        keyWindowObserver: keyWindowObserver,
+        windowCommandRouting: appWindowCommandRouting,
+        mcpWindowCommandRegistrar: appMCPWindowCommandRegistrar,
+        themeMode: themeModeBinding
+      )
+      .harnessTrackMCPWindow()
+    } else {
+      Color.clear.accessibilityHidden(true)
+    }
+  }
+
   @ViewBuilder private var dashboardWindowContent: some View {
     HarnessMonitorDashboardWindowContent(
       delegate: appDelegate,
