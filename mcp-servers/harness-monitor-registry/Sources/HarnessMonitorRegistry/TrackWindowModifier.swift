@@ -178,7 +178,8 @@ final class WindowTrackingNSView: NSView {
         window,
         windowGeneration: windowGeneration,
         elementGeneration: elementGeneration,
-        includeElements: true
+        includeElements: true,
+        elementSyncReason: .routineDidUpdate
       )
       return
     }
@@ -186,7 +187,8 @@ final class WindowTrackingNSView: NSView {
       window: window,
       windowGeneration: windowGeneration,
       elementGeneration: elementGeneration,
-      delay: didUpdateElementSyncDelay
+      delay: didUpdateElementSyncDelay,
+      elementSyncReason: .routineDidUpdate
     )
   }
 
@@ -194,7 +196,8 @@ final class WindowTrackingNSView: NSView {
     window: NSWindow,
     windowGeneration: UInt64,
     elementGeneration: UInt64,
-    delay: Duration
+    delay: Duration,
+    elementSyncReason: WindowElementRegistrySyncReason = .structural
   ) {
     didUpdateElementSyncTask = Task { @MainActor [weak self, weak window] in
       do {
@@ -212,7 +215,8 @@ final class WindowTrackingNSView: NSView {
         window,
         windowGeneration: windowGeneration,
         elementGeneration: elementGeneration,
-        includeElements: true
+        includeElements: true,
+        elementSyncReason: elementSyncReason
       )
     }
   }
@@ -226,7 +230,8 @@ final class WindowTrackingNSView: NSView {
     _ window: NSWindow,
     windowGeneration: UInt64,
     elementGeneration: UInt64,
-    includeElements: Bool
+    includeElements: Bool,
+    elementSyncReason: WindowElementRegistrySyncReason = .structural
   ) {
     let entry = RegistryWindow(
       id: window.windowNumber,
@@ -239,7 +244,11 @@ final class WindowTrackingNSView: NSView {
     guard includeElements else {
       return
     }
-    elementSyncController.sync(window: window, generation: elementGeneration)
+    elementSyncController.sync(
+      window: window,
+      generation: elementGeneration,
+      reason: elementSyncReason
+    )
   }
 }
 #endif
