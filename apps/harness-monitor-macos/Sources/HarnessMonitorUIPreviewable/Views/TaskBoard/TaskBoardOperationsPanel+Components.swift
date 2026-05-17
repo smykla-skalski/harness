@@ -110,10 +110,12 @@ extension TaskBoardOperationsHost {
     accessibilityIdentifier: String
   ) -> some View {
     TaskBoardOperationsFormRow(title) {
-      TextField("", text: text, prompt: Text(prompt))
-        .harnessNativeTextField(alignment: .trailing)
-        .accessibilityLabel(title)
-        .accessibilityIdentifier(accessibilityIdentifier)
+      TaskBoardOperationsTextField(
+        title: title,
+        text: text,
+        prompt: prompt,
+        accessibilityIdentifier: accessibilityIdentifier
+      )
     }
   }
 
@@ -274,7 +276,7 @@ struct TaskBoardOperationsFormSection<Content: View>: View {
         content
       }
       .padding(.horizontal, TaskBoardOperationsFormMetrics.sectionPadding)
-      .padding(.bottom, TaskBoardOperationsFormMetrics.sectionPadding)
+      .padding(.bottom, contentBottomPadding)
       .background(
         sectionShape.fill(TaskBoardOperationsFormMetrics.sectionSurface)
       )
@@ -293,7 +295,7 @@ struct TaskBoardOperationsFormSection<Content: View>: View {
     }
     .frame(
       maxWidth: .infinity,
-      minHeight: metrics.managementPanelMinHeight,
+      minHeight: sectionMinHeight,
       alignment: .leading
     )
   }
@@ -305,10 +307,21 @@ struct TaskBoardOperationsFormSection<Content: View>: View {
     )
   }
 
+  private var contentBottomPadding: CGFloat {
+    footer == nil
+      ? TaskBoardOperationsFormMetrics.sectionPadding
+      : TaskBoardOperationsFormMetrics.footerSectionBottomPadding
+  }
+
+  private var sectionMinHeight: CGFloat? {
+    footer == nil ? metrics.managementPanelMinHeight : nil
+  }
+
 }
 
 private enum TaskBoardOperationsFormMetrics {
   static let sectionPadding: CGFloat = HarnessMonitorTheme.spacingMD
+  static let footerSectionBottomPadding: CGFloat = HarnessMonitorTheme.spacingXS
   static let sectionCornerRadius: CGFloat = 10
   static let contentMaxWidth: CGFloat = 420
   static let rowMinHeight: CGFloat = 34
