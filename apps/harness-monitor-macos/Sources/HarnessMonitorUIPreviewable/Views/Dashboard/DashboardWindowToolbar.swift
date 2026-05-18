@@ -8,10 +8,14 @@ struct DashboardWindowToolbar: ToolbarContent {
 
   @ToolbarContentBuilder var body: some ToolbarContent {
     if showsQuickActions {
-      ToolbarItemGroup(placement: .secondaryAction) {
+      ToolbarItem(placement: .primaryAction) {
         newSessionButton
+      }
+      ToolbarSpacer(.fixed, placement: .primaryAction)
+      ToolbarItem(placement: .primaryAction) {
         openFolderButton
       }
+      ToolbarSpacer(.fixed, placement: .primaryAction)
     }
 
     ToolbarItem(placement: .primaryAction) {

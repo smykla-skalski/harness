@@ -215,17 +215,17 @@ struct HarnessMonitorUITestAccessibilityRegistryMoreTests {
     #expect(sessionAttentionToolbarButton.contains(".harnessMCPButton("))
   }
 
-  @Test("Dashboard toolbar keeps quick actions in a separate trailing group")
-  func dashboardToolbarKeepsQuickActionsInSeparateTrailingGroup() throws {
+  @Test("Dashboard toolbar splits trailing actions into separate glass capsules")
+  func dashboardToolbarSplitsTrailingActionsIntoSeparateGlassCapsules() throws {
     let dashboardToolbar = try sourceFile(named: "DashboardWindowToolbar.swift")
     let dashboardWindow = try sourceFile(named: "DashboardWindowView.swift")
 
     #expect(dashboardWindow.contains(".toolbar {"))
     #expect(dashboardToolbar.contains("struct DashboardWindowToolbar: ToolbarContent"))
-    #expect(dashboardToolbar.contains("ToolbarItemGroup(placement: .secondaryAction)"))
     #expect(dashboardToolbar.contains("ToolbarItem(placement: .primaryAction)"))
+    #expect(dashboardToolbar.contains("ToolbarSpacer(.fixed, placement: .primaryAction)"))
+    #expect(!dashboardToolbar.contains("ToolbarItemGroup(placement: .secondaryAction)"))
     #expect(!dashboardToolbar.contains(".sharedBackgroundVisibility(.hidden)"))
-    #expect(!dashboardToolbar.contains("ToolbarSpacer(.fixed"))
     #expect(!dashboardToolbar.contains("Divider()"))
   }
 
