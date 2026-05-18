@@ -28,6 +28,9 @@ extension HarnessMonitorStore {
 
   public func bindSupervisorNotifications(_ controller: HarnessMonitorUserNotificationController) {
     supervisorBindings.notificationController = controller
+    controller.attachHistoryEventSink { [weak self] event in
+      self?.handleNotificationHistoryEvent(event)
+    }
     controller.attachResolveHandler { [weak self] decisionID, outcome in
       guard let self else {
         return
@@ -39,6 +42,7 @@ extension HarnessMonitorStore {
   }
 
   public func unbindSupervisorNotifications() {
+    supervisorBindings.notificationController?.detachHistoryEventSink()
     supervisorBindings.notificationController?.detachResolveHandler()
     supervisorBindings.notificationController = nil
   }

@@ -32,8 +32,8 @@ struct HarnessMonitorStoreDatabaseTests {
   @Test("Current schema alias stays aligned with the latest cache schema")
   func currentSchemaAliasTracksLatestVersion() {
     #expect(
-      HarnessMonitorCurrentSchema.versionIdentifier == HarnessMonitorSchemaV14.versionIdentifier)
-    #expect(HarnessMonitorCurrentSchema.versionString == "14.0.0")
+      HarnessMonitorCurrentSchema.versionIdentifier == HarnessMonitorSchemaV15.versionIdentifier)
+    #expect(HarnessMonitorCurrentSchema.versionString == "15.0.0")
   }
 
   @Test("gatherDatabaseStatistics returns correct counts for empty store")
@@ -52,6 +52,7 @@ struct HarnessMonitorStoreDatabaseTests {
     #expect(stats.noteCount == 0)
     #expect(stats.searchCount == 0)
     #expect(stats.filterPreferenceCount == 0)
+    #expect(stats.notificationCount == 0)
     #expect(stats.totalCacheRecords == 0)
     #expect(stats.totalUserRecords == 0)
   }
@@ -128,6 +129,7 @@ struct HarnessMonitorStoreDatabaseTests {
     #expect(stats.bookmarkCount == 1)
     #expect(stats.noteCount == 1)
     #expect(stats.searchCount == 1)
+    #expect(stats.notificationCount == 0)
     #expect(stats.totalCacheRecords > 0)
     #expect(stats.totalUserRecords == 3)
   }
@@ -236,6 +238,7 @@ struct HarnessMonitorStoreDatabaseTests {
     #expect(stats.bookmarkCount == 0)
     #expect(stats.noteCount == 0)
     #expect(stats.searchCount == 0)
+    #expect(stats.notificationCount == 0)
   }
 
   // MARK: - Cache write reliability

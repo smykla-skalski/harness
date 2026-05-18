@@ -311,6 +311,7 @@ extension HarnessMonitorStore {
     public var isBusy = false
     public var isRefreshing = false
     public var isLaunchAgentInstalled = false
+    public var notificationHistory: [NotificationHistoryEntry] = []
     public var taskBoardItems: [TaskBoardItem] = []
     public var taskBoardOrchestratorStatus: TaskBoardOrchestratorStatus?
     public var taskBoardSyncSummary: TaskBoardSyncSummary?
@@ -330,6 +331,7 @@ extension HarnessMonitorStore {
       Self.assign(&isBusy, state.isBusy)
       Self.assign(&isRefreshing, state.isRefreshing)
       Self.assign(&isLaunchAgentInstalled, state.isLaunchAgentInstalled)
+      Self.assign(&notificationHistory, state.notificationHistory)
       Self.assign(&taskBoardItems, state.taskBoardItems)
       Self.assign(&taskBoardOrchestratorStatus, state.taskBoardOrchestratorStatus)
       Self.assign(&taskBoardSyncSummary, state.taskBoardSyncSummary)

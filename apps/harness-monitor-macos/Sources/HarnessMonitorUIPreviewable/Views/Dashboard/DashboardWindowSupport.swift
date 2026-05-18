@@ -116,15 +116,18 @@ struct DashboardPerfRouteHook: ViewModifier {
 enum DashboardWindowRoute: String, CaseIterable, Identifiable {
   case taskBoard
   case policyCanvas
+  case notifications
 
   var id: String { rawValue }
 
   var title: String {
     switch self {
     case .taskBoard:
-      "Task Board"
+      "Board"
     case .policyCanvas:
-      "Policy Canvas"
+      "Policy"
+    case .notifications:
+      "Notifications"
     }
   }
 
@@ -134,6 +137,8 @@ enum DashboardWindowRoute: String, CaseIterable, Identifiable {
       "square.grid.2x2"
     case .policyCanvas:
       "point.3.connected.trianglepath.dotted"
+    case .notifications:
+      "bell.badge"
     }
   }
 }
@@ -194,9 +199,11 @@ struct DashboardRouteContent: View {
   let store: HarnessMonitorStore
   let dashboardUI: HarnessMonitorStore.ContentDashboardSlice
   let sessionCatalog: HarnessMonitorStore.SessionCatalogSlice
+  @State private var notificationsHasBeenMounted = false
   @State private var policyCanvasHasBeenMounted = false
 
   private var isTaskBoardVisible: Bool { route == .taskBoard }
+  private var isNotificationsVisible: Bool { route == .notifications }
   private var isPolicyCanvasVisible: Bool { route == .policyCanvas }
 
   var body: some View {
@@ -209,6 +216,19 @@ struct DashboardRouteContent: View {
       .opacity(isTaskBoardVisible ? 1 : 0)
       .allowsHitTesting(isTaskBoardVisible)
       .accessibilityHidden(!isTaskBoardVisible)
+
+      if notificationsHasBeenMounted || isNotificationsVisible {
+        DashboardNotificationsRouteView(
+          store: store,
+          dashboardUI: dashboardUI
+        )
+        .opacity(isNotificationsVisible ? 1 : 0)
+        .allowsHitTesting(isNotificationsVisible)
+        .accessibilityHidden(!isNotificationsVisible)
+        .onAppear {
+          notificationsHasBeenMounted = true
+        }
+      }
 
       if policyCanvasHasBeenMounted || isPolicyCanvasVisible {
         PolicyCanvasView(store: store, dashboardUI: dashboardUI)

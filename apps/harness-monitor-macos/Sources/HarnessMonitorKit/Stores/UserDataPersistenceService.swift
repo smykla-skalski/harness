@@ -8,12 +8,14 @@ public actor UserDataPersistenceService {
     public let notes: Int
     public let searches: Int
     public let filterPreferences: Int
+    public let notifications: Int
 
     public static let zero = RecordCounts(
       bookmarks: 0,
       notes: 0,
       searches: 0,
-      filterPreferences: 0
+      filterPreferences: 0,
+      notifications: 0
     )
   }
 
@@ -198,6 +200,75 @@ public actor UserDataPersistenceService {
     }
   }
 
+  public func loadNotificationHistory() throws -> [NotificationHistoryEntry] {
+    try withPersistenceSignpost("user_data.notifications.fetch") {
+      let context = makeContext()
+      let records = try context.fetch(
+        FetchDescriptor<NotificationHistoryRecord>(
+          sortBy: [
+            SortDescriptor(\.recordedAt, order: .reverse),
+            SortDescriptor(\.updatedAt, order: .reverse),
+          ]
+        ))
+      var entries: [NotificationHistoryEntry] = []
+      var invalidRecords: [NotificationHistoryRecord] = []
+      entries.reserveCapacity(records.count)
+      for record in records {
+        do {
+          entries.append(try record.decodedEntry())
+        } catch {
+          invalidRecords.append(record)
+          HarnessMonitorLogger.store.warning(
+            "notification history decode failed for \(record.entryID, privacy: .public): \(error.localizedDescription, privacy: .public)"
+          )
+        }
+      }
+      if !invalidRecords.isEmpty {
+        for record in invalidRecords {
+          context.delete(record)
+        }
+        try saveChanges(context)
+      }
+      return entries
+    }
+  }
+
+  public func upsertNotificationHistory(_ entry: NotificationHistoryEntry) throws {
+    try withPersistenceSignpost("user_data.notifications.upsert") {
+      let context = makeContext()
+      let entryID = entry.id
+      var descriptor = FetchDescriptor<NotificationHistoryRecord>(
+        predicate: #Predicate { $0.entryID == entryID }
+      )
+      descriptor.fetchLimit = 1
+      if let existing = try context.fetch(descriptor).first {
+        try existing.update(from: entry)
+      } else {
+        context.insert(try NotificationHistoryRecord.make(from: entry))
+      }
+      try saveChanges(context)
+    }
+  }
+
+  @discardableResult
+  public func purgeNonRestorableNotificationHistory() throws -> Int {
+    try withPersistenceSignpost("user_data.notifications.purge_non_restorable") {
+      let context = makeContext()
+      let records = try context.fetch(
+        FetchDescriptor<NotificationHistoryRecord>(
+          predicate: #Predicate { $0.dropsOnRelaunch == true }
+        ))
+      guard !records.isEmpty else {
+        return 0
+      }
+      for record in records {
+        context.delete(record)
+      }
+      try saveChanges(context)
+      return records.count
+    }
+  }
+
   public func taskUserNoteCount(taskID: String, sessionID: String) throws -> Int {
     try withPersistenceSignpost("user_data.task_notes.count") {
       let context = makeContext()
@@ -225,7 +296,8 @@ public actor UserDataPersistenceService {
         bookmarks: count(SessionBookmark.self, in: context),
         notes: count(UserNote.self, in: context),
         searches: count(RecentSearch.self, in: context),
-        filterPreferences: count(ProjectFilterPreference.self, in: context)
+        filterPreferences: count(ProjectFilterPreference.self, in: context),
+        notifications: count(NotificationHistoryRecord.self, in: context)
       )
     }
   }
@@ -237,6 +309,7 @@ public actor UserDataPersistenceService {
       try deleteAllRecords(UserNote.self, in: context)
       try deleteAllRecords(RecentSearch.self, in: context)
       try deleteAllRecords(ProjectFilterPreference.self, in: context)
+      try deleteAllRecords(NotificationHistoryRecord.self, in: context)
       try saveChanges(context)
     }
   }

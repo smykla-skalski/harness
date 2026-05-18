@@ -37,6 +37,7 @@ public final class HarnessMonitorUserNotificationController: NSObject,
     HarnessMonitorNotificationSettingsSnapshot?
   @ObservationIgnored private var isActivated = false
   @ObservationIgnored private var resolveHandler: DecisionResolveHandler?
+  @ObservationIgnored private var historyEventSink: (@MainActor (NotificationHistorySystemEvent) -> Void)?
 
   public init(
     center: any HarnessMonitorUserNotificationCenter = UNUserNotificationCenter.current(),
@@ -113,6 +114,16 @@ public final class HarnessMonitorUserNotificationController: NSObject,
     resolveHandler = nil
   }
 
+  public func attachHistoryEventSink(
+    _ sink: @escaping @MainActor (NotificationHistorySystemEvent) -> Void
+  ) {
+    historyEventSink = sink
+  }
+
+  public func detachHistoryEventSink() {
+    historyEventSink = nil
+  }
+
   /// Schedules a supervisor decision notification for the given severity and decision id.
   /// Registers the supervisor categories on first call so action icons and titles match the
   /// category lookup in Notification Center.
@@ -122,9 +133,11 @@ public final class HarnessMonitorUserNotificationController: NSObject,
     decisionID: String
   ) async -> Bool {
     await deliverSupervisorNotification(
+      source: .supervisorDecision,
       severity: severity,
       successMessage: "Scheduled supervisor decision \(decisionID).",
-      failureMessage: "Scheduling supervisor decision failed"
+      failureMessage: "Scheduling supervisor decision failed",
+      actions: decisionActions(decisionID: decisionID)
     ) {
       try await HarnessMonitorNotificationRequestFactory.makeSupervisorRequest(
         severity: severity,
@@ -140,9 +153,11 @@ public final class HarnessMonitorUserNotificationController: NSObject,
     ruleID: String
   ) async -> Bool {
     await deliverSupervisorNotification(
+      source: .supervisorNotice,
       severity: severity,
       successMessage: "Scheduled supervisor notice for \(ruleID).",
-      failureMessage: "Scheduling supervisor notice failed"
+      failureMessage: "Scheduling supervisor notice failed",
+      actions: []
     ) {
       try await HarnessMonitorNotificationRequestFactory.makeSupervisorNoticeRequest(
         severity: severity,
@@ -153,9 +168,11 @@ public final class HarnessMonitorUserNotificationController: NSObject,
   }
 
   private func deliverSupervisorNotification(
+    source: NotificationHistoryEntry.Source,
     severity: DecisionSeverity,
     successMessage: String,
     failureMessage: String,
+    actions: [NotificationHistoryAction],
     makeRequest: () async throws -> UNNotificationRequest
   ) async -> Bool {
     await performNotificationOperation {
@@ -168,6 +185,13 @@ public final class HarnessMonitorUserNotificationController: NSObject,
         registerCategories()
         let request = try await makeRequest()
         try await centerBox.base.add(request)
+        historyEventSink?(
+          .scheduled(
+            request: NotificationHistoryRequestSnapshot(request: request),
+            source: source,
+            severity: .init(severity),
+            actions: actions
+          ))
         lastResult = successMessage
         await refreshStatus()
         return true
@@ -176,6 +200,23 @@ public final class HarnessMonitorUserNotificationController: NSObject,
         return false
       }
     } ?? false
+  }
+
+  private func decisionActions(decisionID: String) -> [NotificationHistoryAction] {
+    [
+      NotificationHistoryAction(
+        id: "open",
+        title: "Open",
+        systemImage: "arrow.up.forward.app",
+        kind: .openDecision(decisionID: decisionID)
+      ),
+      NotificationHistoryAction(
+        id: "acknowledge",
+        title: "Acknowledge",
+        systemImage: "checkmark.circle",
+        kind: .acknowledgeDecision(decisionID: decisionID)
+      ),
+    ]
   }
 
   public func applyPreset(_ preset: HarnessMonitorNotificationPreset) {
@@ -239,6 +280,13 @@ public final class HarnessMonitorUserNotificationController: NSObject,
           decisionID: attention.decisionID
         )
         try await centerBox.base.add(request)
+        historyEventSink?(
+          .scheduled(
+            request: NotificationHistoryRequestSnapshot(request: request),
+            source: .acpPermission,
+            severity: .attention,
+            actions: decisionActions(decisionID: attention.decisionID)
+          ))
         didSchedule = true
         lastResult = "Scheduled ACP permission \(attention.batchID)."
         await refreshStatus()
@@ -258,6 +306,13 @@ public final class HarnessMonitorUserNotificationController: NSObject,
           assetWriter: assetWriter
         )
         try await centerBox.base.add(request)
+        historyEventSink?(
+          .scheduled(
+            request: NotificationHistoryRequestSnapshot(request: request),
+            source: .settingsDraft,
+            severity: .info,
+            actions: []
+          ))
         lastResult = "Scheduled notification \(request.identifier)."
         await refreshStatus()
       } catch {
@@ -385,6 +440,7 @@ public final class HarnessMonitorUserNotificationController: NSObject,
   ) {
     lastResponse = snapshot
     lastResult = "Handled notification action \(snapshot.actionIdentifier)."
+    historyEventSink?(.responded(.init(snapshot: snapshot, decisionID: decisionID)))
     routeSupervisorAction(actionIdentifier: actionIdentifier, decisionID: decisionID)
   }
 
@@ -403,6 +459,21 @@ public final class HarnessMonitorUserNotificationController: NSObject,
     registeredCategoryCount = HarnessMonitorNotificationRequestFactory.categories().count
   }
 
+  @discardableResult
+  public func openDecisionRequest(decisionID: String) -> Bool {
+    publishDecisionRequest(decisionID: decisionID)
+    return true
+  }
+
+  @discardableResult
+  public func acknowledgeDecision(decisionID: String) -> Bool {
+    guard resolveHandler != nil else {
+      return false
+    }
+    dismissDecision(decisionID: decisionID)
+    return true
+  }
+
   private func performNotificationOperation<Result>(
     _ operation: @MainActor () async -> Result
   ) async -> Result? {
@@ -413,4 +484,5 @@ public final class HarnessMonitorUserNotificationController: NSObject,
     defer { isWorking = false }
     return await operation()
   }
+
 }

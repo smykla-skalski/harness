@@ -140,4 +140,39 @@ final class NotificationRoutingTests: XCTestCase {
     let pendingRequests = await center.pendingNotificationRequests()
     XCTAssertTrue(pendingRequests.isEmpty)
   }
+
+  func test_deliverSupervisorDecision_emitsHistoryEvent() async {
+    let center = NotificationRoutingTestCenter()
+    let recorder = NotificationHistoryEventRecorder()
+    let controller = HarnessMonitorUserNotificationController(
+      center: center,
+      previewSettingsSnapshot: .preview
+    )
+    controller.attachHistoryEventSink { event in
+      Task {
+        await recorder.record(event)
+      }
+    }
+
+    let didSchedule = await controller.deliverSupervisorDecision(
+      severity: .needsUser,
+      summary: "Review required",
+      decisionID: "decision-history"
+    )
+
+    XCTAssertTrue(didSchedule)
+    for _ in 0..<20 {
+      if await recorder.events.count == 1 { break }
+      await Task.yield()
+    }
+    let events = await recorder.events
+    XCTAssertEqual(events.count, 1)
+    guard case .scheduled(let request, let source, let severity, let actions) = events[0] else {
+      return XCTFail("expected scheduled event")
+    }
+    XCTAssertEqual(request.identifier, "io.harnessmonitor.supervisor.decision.decision-history")
+    XCTAssertEqual(source, .supervisorDecision)
+    XCTAssertEqual(severity, .attention)
+    XCTAssertEqual(actions.count, 2)
+  }
 }

@@ -127,6 +127,55 @@ struct PersistenceUserDataIntegrationTests {
     #expect(store.sessionFocusFilter == .blocked)
   }
 
+  @Test("Notification history persists toast events")
+  func notificationHistoryPersistsToastEvents() async throws {
+    let store = harness.makeStore()
+
+    store.presentSuccessFeedback("Notification history captured")
+
+    for _ in 0..<20 {
+      if !(try harness.fetchNotificationHistory()).isEmpty {
+        break
+      }
+      await Task.yield()
+    }
+
+    let history = try harness.fetchNotificationHistory()
+    #expect(history.count == 1)
+    #expect(history.first?.source == .toast)
+    #expect(history.first?.message == "Notification history captured")
+    #expect(history.first?.status == .active)
+  }
+
+  @Test("Notification history drops runtime-only rows on relaunch refresh")
+  func notificationHistoryDropsRuntimeOnlyRowsOnRefresh() async throws {
+    let store = harness.makeStore()
+    let feedback = ActionFeedback(
+      title: "Task removed",
+      message: "Undo is still available",
+      severity: .undoable,
+      details: nil,
+      primaryAction: nil,
+      accessibilityIdentifier: nil,
+      issuedAt: ContinuousClock.now
+    )
+
+    await store.recordToastHistoryEvent(
+      ToastHistoryEvent(
+        feedback: feedback,
+        recordedAt: .now,
+        kind: .presented,
+        hasUndoAction: true
+      ))
+
+    #expect(try harness.fetchNotificationHistory().count == 1)
+
+    await store.refreshNotificationHistory()
+
+    #expect(store.notificationHistoryEntries.isEmpty)
+    #expect(try harness.fetchNotificationHistory().isEmpty)
+  }
+
   @Test("Degraded persistence mode fails safely")
   func degradedPersistenceModeFailsSafely() async {
     let store = HarnessMonitorStore(

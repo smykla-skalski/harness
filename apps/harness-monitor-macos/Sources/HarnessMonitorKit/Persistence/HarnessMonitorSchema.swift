@@ -71,6 +71,37 @@ public enum HarnessMonitorSchemaV14: VersionedSchema {
   }
 }
 
+/// V15 is purely additive: notification history rows persist app-global toast/system
+/// notification history in their own table keyed by `entryID`. Existing user/cache rows
+/// are untouched, so lightweight migration is correct.
+public enum HarnessMonitorSchemaV15: VersionedSchema {
+  public static var versionIdentifier: Schema.Version { Schema.Version(15, 0, 0) }
+
+  public static var models: [any PersistentModel.Type] {
+    [
+      HarnessMonitorSchemaV14.CachedProject.self,
+      HarnessMonitorSchemaV14.CachedSession.self,
+      HarnessMonitorSchemaV14.CachedAgent.self,
+      HarnessMonitorSchemaV14.CachedWorkItem.self,
+      HarnessMonitorSchemaV14.CachedSignalRecord.self,
+      HarnessMonitorSchemaV14.CachedTimelineEntry.self,
+      HarnessMonitorSchemaV14.CachedObserver.self,
+      HarnessMonitorSchemaV14.CachedAgentActivity.self,
+      SessionBookmark.self,
+      UserNote.self,
+      RecentSearch.self,
+      ProjectFilterPreference.self,
+      NotificationHistoryRecord.self,
+      Decision.self,
+      SupervisorEvent.self,
+      PolicyConfigRow.self,
+      HarnessMonitorSchemaV8.CachedTaskReviewMetadata.self,
+      HarnessMonitorSchemaV10.CachedSessionWindowState.self,
+      HarnessMonitorSchemaV12.CachedSessionTranscriptEntry.self,
+    ]
+  }
+}
+
 public enum HarnessMonitorMigrationPlan: SchemaMigrationPlan {
   public static var schemas: [any VersionedSchema.Type] {
     [
@@ -88,6 +119,7 @@ public enum HarnessMonitorMigrationPlan: SchemaMigrationPlan {
       HarnessMonitorSchemaV12.self,
       HarnessMonitorSchemaV13.self,
       HarnessMonitorSchemaV14.self,
+      HarnessMonitorSchemaV15.self,
     ]
   }
 
@@ -106,6 +138,7 @@ public enum HarnessMonitorMigrationPlan: SchemaMigrationPlan {
       migrateV11toV12,
       migrateV12toV13,
       migrateV13toV14,
+      migrateV14toV15,
     ]
   }
 
@@ -212,6 +245,11 @@ public enum HarnessMonitorMigrationPlan: SchemaMigrationPlan {
     fromVersion: HarnessMonitorSchemaV13.self,
     toVersion: HarnessMonitorSchemaV14.self
   )
+
+  static let migrateV14toV15 = MigrationStage.lightweight(
+    fromVersion: HarnessMonitorSchemaV14.self,
+    toVersion: HarnessMonitorSchemaV15.self
+  )
 }
 
-public typealias HarnessMonitorCurrentSchema = HarnessMonitorSchemaV14
+public typealias HarnessMonitorCurrentSchema = HarnessMonitorSchemaV15

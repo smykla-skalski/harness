@@ -42,6 +42,14 @@ struct PersistenceIntegrationTestHarness {
       ))
   }
 
+  func fetchNotificationHistory() throws -> [NotificationHistoryEntry] {
+    let records = try container.mainContext.fetch(
+      FetchDescriptor<NotificationHistoryRecord>(
+        sortBy: [SortDescriptor(\NotificationHistoryRecord.recordedAt, order: .reverse)]
+      ))
+    return try records.map { try $0.decodedEntry() }
+  }
+
   func largeSnapshotFixture(
     projectCount: Int = 6,
     sessionsPerProject: Int = 12

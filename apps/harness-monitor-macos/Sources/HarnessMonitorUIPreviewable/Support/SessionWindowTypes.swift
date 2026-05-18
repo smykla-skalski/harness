@@ -28,7 +28,7 @@ public enum SessionWindowRoute: String, CaseIterable, Codable, Hashable, Identif
     case .overview: "Overview"
     case .agents: "Agents"
     case .tasks: "Tasks"
-    case .policyCanvas: "Policy Canvas"
+    case .policyCanvas: "Policy"
     case .decisions: "Decisions"
     case .timeline: "Timeline"
     }
@@ -39,7 +39,7 @@ public enum SessionWindowRoute: String, CaseIterable, Codable, Hashable, Identif
     case .overview: "rectangle.grid.2x2"
     case .agents: "person.2"
     case .tasks: "checklist"
-    case .policyCanvas: "slider.horizontal.2.square"
+    case .policyCanvas: "point.3.connected.trianglepath.dotted"
     case .decisions: "exclamationmark.bubble"
     case .timeline: "clock"
     }

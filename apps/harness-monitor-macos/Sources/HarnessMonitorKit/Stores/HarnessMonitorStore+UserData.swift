@@ -220,7 +220,7 @@ extension HarnessMonitorStore {
   ) -> String {
     let base = """
       Local persistence is unavailable. Harness Monitor will keep running, but bookmarks, notes, and \
-      search history are disabled.
+      search history, filter preferences, and notification history are disabled.
       """
     guard let underlyingError else {
       return "\(base) \(action)"
