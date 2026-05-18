@@ -83,6 +83,7 @@ extension HarnessMonitorStore.SessionIndexSlice {
   }
 
   struct CatalogComputationOutput: Sendable {
+    let sessions: [SessionSummary]
     let totalSessionCount: Int
     let totalOpenWorkCount: Int
     let totalBlockedCount: Int
@@ -162,14 +163,15 @@ extension HarnessMonitorStore.SessionIndexSlice {
   nonisolated static func computeCatalogOutput(
     from input: CatalogComputationInput
   ) -> CatalogComputationOutput {
+    let sessions = deduplicatedSessions(input.sessions)
     var sessionIndicesByID: [String: Int] = [:]
     var sessionIDs: Set<String> = []
     var sessionRecordsByID: [String: SessionRecord] = [:]
-    sessionIndicesByID.reserveCapacity(input.sessions.count)
-    sessionIDs.reserveCapacity(input.sessions.count)
-    sessionRecordsByID.reserveCapacity(input.sessions.count)
+    sessionIndicesByID.reserveCapacity(sessions.count)
+    sessionIDs.reserveCapacity(sessions.count)
+    sessionRecordsByID.reserveCapacity(sessions.count)
 
-    for (index, summary) in input.sessions.enumerated() {
+    for (index, summary) in sessions.enumerated() {
       sessionIDs.insert(summary.sessionId)
       sessionIndicesByID[summary.sessionId] = index
       sessionRecordsByID[summary.sessionId] = SessionRecord(summary: summary)
@@ -177,11 +179,11 @@ extension HarnessMonitorStore.SessionIndexSlice {
 
     let projectCatalogs = buildProjectCatalogs(
       projects: input.projects,
-      sessions: input.sessions,
+      sessions: sessions,
       sessionRecordsByID: sessionRecordsByID
     )
     let orderedSessionIDsBySortOrder = orderedSessionIDsBySortOrder(from: projectCatalogs)
-    let recentSessions = sortRecentSessions(input.sessions)
+    let recentSessions = sortRecentSessions(sessions)
     let projectionInput = ProjectionComputationInput(
       projectCatalogs: projectCatalogs,
       sessionRecordsByID: sessionRecordsByID,
@@ -190,15 +192,16 @@ extension HarnessMonitorStore.SessionIndexSlice {
       sessionFocusFilter: input.sessionFocusFilter,
       sessionSortOrder: input.sessionSortOrder,
       queryTokens: input.queryTokens,
-      totalSessionCount: input.sessions.count
+      totalSessionCount: sessions.count
     )
 
     return CatalogComputationOutput(
-      totalSessionCount: input.sessions.count,
-      totalOpenWorkCount: input.sessions.reduce(0) { $0 + $1.metrics.openTaskCount },
-      totalBlockedCount: input.sessions.reduce(0) { $0 + $1.metrics.blockedTaskCount },
+      sessions: sessions,
+      totalSessionCount: sessions.count,
+      totalOpenWorkCount: sessions.reduce(0) { $0 + $1.metrics.openTaskCount },
+      totalBlockedCount: sessions.reduce(0) { $0 + $1.metrics.blockedTaskCount },
       sessionIDs: sessionIDs,
-      sessionSummariesByID: Dictionary(uniqueKeysWithValues: input.sessions.map {
+      sessionSummariesByID: Dictionary(uniqueKeysWithValues: sessions.map {
         ($0.sessionId, $0)
       }),
       sessionIndicesByID: sessionIndicesByID,
@@ -213,124 +216,6 @@ extension HarnessMonitorStore.SessionIndexSlice {
       recentSessions: recentSessions,
       recentSessionIDs: recentSessions.map(\.sessionId),
       projectionOutput: computeProjectionOutput(from: projectionInput)
-    )
-  }
-
-  nonisolated static func sortedSessionIDs(
-    _ sessionIDs: [String],
-    using sortOrder: SessionSortOrder,
-    sessionRecordsByID: [String: SessionRecord]
-  ) -> [String] {
-    sessionIDs.sorted { lhsID, rhsID in
-      guard let lhs = sessionRecordsByID[lhsID],
-        let rhs = sessionRecordsByID[rhsID]
-      else {
-        return lhsID < rhsID
-      }
-
-      switch sortOrder {
-      case .recentActivity:
-        if lhs.recentActivitySortKey != rhs.recentActivitySortKey {
-          return lhs.recentActivitySortKey > rhs.recentActivitySortKey
-        }
-      case .name:
-        let nameComparison = lhs.normalizedName.localizedStandardCompare(rhs.normalizedName)
-        if nameComparison != .orderedSame {
-          return nameComparison == .orderedAscending
-        }
-      case .status:
-        if lhs.statusSortKey != rhs.statusSortKey {
-          return lhs.statusSortKey < rhs.statusSortKey
-        }
-        if lhs.recentActivitySortKey != rhs.recentActivitySortKey {
-          return lhs.recentActivitySortKey > rhs.recentActivitySortKey
-        }
-      }
-
-      return lhs.summary.sessionId < rhs.summary.sessionId
-    }
-  }
-
-  nonisolated static func sortRecentSessions(_ sessions: [SessionSummary]) -> [SessionSummary] {
-    sessions.sorted { lhs, rhs in
-      if lhs.updatedAt != rhs.updatedAt {
-        return lhs.updatedAt > rhs.updatedAt
-      }
-      return lhs.sessionId < rhs.sessionId
-    }
-  }
-
-  nonisolated static func buildProjectCatalogs(
-    projects: [ProjectSummary],
-    sessions: [SessionSummary],
-    sessionRecordsByID: [String: SessionRecord]
-  ) -> [ProjectCatalog] {
-    var checkoutsByProject: [String: [String: CheckoutAccumulator]] = [:]
-
-    for summary in sessions {
-      let checkout = CheckoutAccumulator(
-        checkoutId: summary.checkoutId,
-        title: summary.checkoutDisplayName,
-        isWorktree: summary.isWorktree,
-        sessionIDs: [summary.sessionId]
-      )
-
-      if var existing = checkoutsByProject[summary.projectId]?[summary.checkoutId] {
-        existing.sessionIDs.append(summary.sessionId)
-        checkoutsByProject[summary.projectId]?[summary.checkoutId] = existing
-      } else {
-        checkoutsByProject[summary.projectId, default: [:]][summary.checkoutId] = checkout
-      }
-    }
-
-    return projects.map { project in
-      let checkouts = (checkoutsByProject[project.projectId] ?? [:]).values
-        .map { checkout in
-          CheckoutCatalog(
-            checkoutId: checkout.checkoutId,
-            title: checkout.title,
-            isWorktree: checkout.isWorktree,
-            recentActivitySessionIDs: sortedSessionIDs(
-              checkout.sessionIDs,
-              using: .recentActivity,
-              sessionRecordsByID: sessionRecordsByID
-            ),
-            nameSessionIDs: sortedSessionIDs(
-              checkout.sessionIDs,
-              using: .name,
-              sessionRecordsByID: sessionRecordsByID
-            ),
-            statusSessionIDs: sortedSessionIDs(
-              checkout.sessionIDs,
-              using: .status,
-              sessionRecordsByID: sessionRecordsByID
-            )
-          )
-        }
-        .sorted { lhs, rhs in
-          if lhs.isWorktree != rhs.isWorktree {
-            return lhs.isWorktree == false
-          }
-          return lhs.title.localizedStandardCompare(rhs.title) == .orderedAscending
-        }
-      return ProjectCatalog(project: project, checkouts: checkouts)
-    }
-  }
-
-  nonisolated static func orderedSessionIDsBySortOrder(
-    from projectCatalogs: [ProjectCatalog]
-  ) -> [SessionSortOrder: [String]] {
-    Dictionary(
-      uniqueKeysWithValues: SessionSortOrder.allCases.map { sortOrder in
-        (
-          sortOrder,
-          projectCatalogs.flatMap { projectCatalog in
-            projectCatalog.checkouts.flatMap { checkout in
-              checkout.orderedSessionIDs(for: sortOrder)
-            }
-          }
-        )
-      }
     )
   }
 

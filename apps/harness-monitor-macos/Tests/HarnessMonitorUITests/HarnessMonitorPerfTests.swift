@@ -4,7 +4,7 @@ private typealias Accessibility = HarnessMonitorUITestAccessibility
 
 @MainActor
 final class HarnessMonitorPerfTests: HarnessMonitorUITestCase {
-  private static let previewSessionID = "sess1234"
+  private static let previewSessionID = Accessibility.previewSessionID
 
   func testOpenRecentWindowScenarioState() {
     let app = XCUIApplication(bundleIdentifier: Self.uiTestHostBundleIdentifier)

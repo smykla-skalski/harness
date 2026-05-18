@@ -45,11 +45,11 @@ final class HarnessMonitorLayoutUITests: HarnessMonitorUITestCase {
     let boardRoot = element(in: app, identifier: Accessibility.sessionsBoardRoot)
     let sessionCard = sessionTrigger(
       in: app,
-      identifier: Accessibility.dashboardSessionCard("sess1234")
+      identifier: Accessibility.dashboardSessionCard(Accessibility.previewSessionID)
     )
     let sessionCardFrame = frameElement(
       in: app,
-      identifier: Accessibility.dashboardSessionCardFrame("sess1234")
+      identifier: Accessibility.dashboardSessionCardFrame(Accessibility.previewSessionID)
     )
     let cockpitScrollView = frameElement(
       in: app,
@@ -119,13 +119,13 @@ final class HarnessMonitorLayoutUITests: HarnessMonitorUITestCase {
     )
     let sessionCard = sessionTrigger(
       in: app,
-      identifier: Accessibility.dashboardSessionCard("sess1234")
+      identifier: Accessibility.dashboardSessionCard(Accessibility.previewSessionID)
     )
 
     XCTAssertTrue(sessionCard.waitForExistence(timeout: Self.actionTimeout))
     XCTAssertEqual(
       sessionCard.descendants(matching: .any).matching(
-        NSPredicate(format: "label CONTAINS %@", "sess1234")
+        NSPredicate(format: "label CONTAINS %@", Accessibility.previewSessionID)
       ).count,
       0,
       "Dashboard session cards should not surface raw session IDs below the session title"
@@ -213,7 +213,7 @@ final class HarnessMonitorLayoutUITests: HarnessMonitorUITestCase {
     XCTAssertTrue(waitForElement(headerCard, timeout: Self.actionTimeout))
     XCTAssertEqual(
       headerCard.descendants(matching: .any).matching(
-        NSPredicate(format: "label CONTAINS %@", "sess1234")
+        NSPredicate(format: "label CONTAINS %@", Accessibility.previewSessionID)
       ).count,
       0,
       "Cockpit header should not surface raw session IDs below the session title"

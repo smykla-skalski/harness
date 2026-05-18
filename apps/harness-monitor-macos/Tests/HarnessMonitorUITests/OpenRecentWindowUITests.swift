@@ -3,7 +3,7 @@ import XCTest
 private typealias Accessibility = HarnessMonitorUITestAccessibility
 
 final class OpenRecentWindowUITests: HarnessMonitorUITestCase {
-  private static let previewSessionID = "sess1234"
+  private static let previewSessionID = Accessibility.previewSessionID
   private static let previewScenarioKey = "HARNESS_MONITOR_PREVIEW_SCENARIO"
   private static let dashboardLandingScenario = "dashboard-landing"
 

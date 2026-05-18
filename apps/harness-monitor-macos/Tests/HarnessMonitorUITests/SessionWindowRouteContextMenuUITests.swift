@@ -6,7 +6,7 @@ private typealias Accessibility = HarnessMonitorUITestAccessibility
 final class SessionWindowRouteContextMenuUITests: HarnessMonitorUITestCase {
   private static let previewScenarioKey = "HARNESS_MONITOR_PREVIEW_SCENARIO"
   private static let dashboardLandingScenario = "dashboard-landing"
-  private static let previewSessionID = "sess1234"
+  private static let previewSessionID = Accessibility.previewSessionID
 
   func testSidebarShowsRoutesWhileDeferredSectionsLoad() {
     let app = launchPreviewSessionWindow()
