@@ -111,7 +111,7 @@ struct PolicyCanvasLabWindowView: View {
       mcpWindowCommandRegistrar: mcpWindowCommandRegistrar,
       themeMode: $themeMode,
       appliesPreferredColorScheme: true,
-      windowToolbarBackgroundVisibility: .hidden,
+      windowToolbarBackgroundVisibility: .automatic,
       toast: store.toast
     ) {
       PolicyCanvasViewportSurface(

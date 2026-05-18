@@ -170,11 +170,12 @@ final class SessionWindowTabbingAccessorView: NSView {
 
   /// `NSWindowTab` properties are configurable before a window visibly joins a
   /// tab strip, and AppKit can re-apply its titlebar defaults whenever tabs are
-  /// added or removed, so keep reasserting the override on window updates. The
-  /// transparent titlebar lets the unified toolbar sample the banner/detail
-  /// chrome beneath it instead of falling back to AppKit's opaque fill.
+  /// added or removed, so keep reasserting the override on window updates.
+  /// Leave `titlebarAppearsTransparent` at the AppKit default (false) so the
+  /// native NSToolbar visual-effect material paints behind toolbar items and
+  /// scroll content is blurred as it travels under the toolbar edge.
   private func applyTitlebarChromeOverrides(to window: NSWindow) {
     window.titlebarSeparatorStyle = .none
-    window.titlebarAppearsTransparent = true
+    window.titlebarAppearsTransparent = false
   }
 }

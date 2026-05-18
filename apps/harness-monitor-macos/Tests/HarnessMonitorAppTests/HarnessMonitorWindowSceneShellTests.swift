@@ -11,12 +11,12 @@ final class HarnessMonitorWindowShellTests: XCTestCase {
 
     XCTAssertTrue(mainRoot.contains("HarnessMonitorWindowShell("))
     XCTAssertTrue(mainRoot.contains("WindowContentReadiness("))
-    XCTAssertTrue(mainRoot.contains("windowToolbarBackgroundVisibility: .hidden"))
+    XCTAssertTrue(mainRoot.contains("windowToolbarBackgroundVisibility: .automatic"))
     XCTAssertTrue(mainRoot.contains(".suppressToolbarBaselineSeparator("))
     XCTAssertTrue(
       mainRoot.contains("HarnessMonitorAccessibility.dashboardToolbarSeparatorSuppressed")
     )
-    XCTAssertTrue(mainRoot.contains("titlebarAppearsTransparent: true"))
+    XCTAssertFalse(mainRoot.contains("titlebarAppearsTransparent: true"))
     XCTAssertTrue(mainRoot.contains(".toolbar {"))
     XCTAssertTrue(mainRoot.contains("private var hostsSharedShellPresentation"))
     XCTAssertTrue(mainRoot.contains("HarnessMonitorConfirmationDialogModifier("))
