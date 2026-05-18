@@ -1,18 +1,20 @@
 import Foundation
 
 public enum PreviewFixtures {
+  public static let previewSessionID = "9f62b1d4-0c8a-4c2f-9f4f-4d6cf6a13e9b"
+  private static let previewSessionRoot =
+    "/Users/example/Library/Application Support/harness/sessions/harness/\(previewSessionID)"
+
   public static let summary = SessionSummary(
     projectId: "project-6ccf8d0a",
     projectName: "harness",
     projectDir: "/Users/example/Projects/harness",
     contextRoot: "/Users/example/Library/Application Support/harness/sessions/harness",
-    sessionId: "sess1234",
-    worktreePath:
-      "/Users/example/Library/Application Support/harness/sessions/harness/sess1234/workspace",
-    sharedPath:
-      "/Users/example/Library/Application Support/harness/sessions/harness/sess1234/memory",
+    sessionId: previewSessionID,
+    worktreePath: "\(previewSessionRoot)/workspace",
+    sharedPath: "\(previewSessionRoot)/memory",
     originPath: "/Users/example/Projects/harness",
-    branchRef: "harness/sess1234",
+    branchRef: "harness/\(previewSessionID)",
     title: "Harness Monitor Cockpit",
     context: "Track all live multi-agent harness sessions from a macOS cockpit",
     status: .active,
@@ -20,7 +22,7 @@ public enum PreviewFixtures {
     updatedAt: "2026-03-28T14:18:00Z",
     lastActivityAt: "2026-03-28T14:18:00Z",
     leaderId: "leader-claude",
-    observeId: "observe-sess1234",
+    observeId: "observe-\(previewSessionID)",
     pendingLeaderTransfer: nil,
     metrics: SessionMetrics(
       agentCount: 4,

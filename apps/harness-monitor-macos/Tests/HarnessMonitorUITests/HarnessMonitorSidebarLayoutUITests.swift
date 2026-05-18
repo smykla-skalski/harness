@@ -197,7 +197,7 @@ final class HarnessMonitorSidebarLayoutUITests: HarnessMonitorUITestCase {
   func testSidebarSessionRowDoesNotExposeRawSessionID() throws {
     let app = launch(mode: "preview")
     let rawSessionIDMatches = app.descendants(matching: .any).matching(
-      NSPredicate(format: "label CONTAINS %@", "sess1234")
+      NSPredicate(format: "label CONTAINS %@", Accessibility.previewSessionID)
     )
 
     XCTAssertTrue(

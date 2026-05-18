@@ -230,7 +230,9 @@ extension HarnessMonitorUITestCase {
       return [identifier]
     }
     return [
-      HarnessMonitorUITestAccessibility.openRecentSessionRow("sess1234"),
+      HarnessMonitorUITestAccessibility.openRecentSessionRow(
+        HarnessMonitorUITestAccessibility.previewSessionID
+      ),
       identifier,
     ]
   }

@@ -107,29 +107,35 @@ struct HarnessMonitorStoreSheetTests {
 
   @Test("createTask sheet id encodes session id")
   func createTaskSheetIdEncodesSession() {
-    let sheet = HarnessMonitorStore.PresentedSheet.createTask(sessionID: "sess1234")
-    #expect(sheet.id == "createTask:sess1234")
+    let sheet = HarnessMonitorStore.PresentedSheet.createTask(
+      sessionID: PreviewFixtures.previewSessionID
+    )
+    #expect(sheet.id == "createTask:\(PreviewFixtures.previewSessionID)")
   }
 
   @Test("taskActions sheet id encodes session and task ids")
   func taskActionsSheetIdEncodesSessionAndTask() {
     let sheet = HarnessMonitorStore.PresentedSheet.taskActions(
-      sessionID: "sess1234",
+      sessionID: PreviewFixtures.previewSessionID,
       taskID: "task-ui"
     )
-    #expect(sheet.id == "taskActions:sess1234:task-ui")
+    #expect(sheet.id == "taskActions:\(PreviewFixtures.previewSessionID):task-ui")
   }
 
   @Test("leaderTransfer sheet id encodes session id")
   func leaderTransferSheetIdEncodesSession() {
-    let sheet = HarnessMonitorStore.PresentedSheet.leaderTransfer(sessionID: "sess1234")
-    #expect(sheet.id == "leaderTransfer:sess1234")
+    let sheet = HarnessMonitorStore.PresentedSheet.leaderTransfer(
+      sessionID: PreviewFixtures.previewSessionID
+    )
+    #expect(sheet.id == "leaderTransfer:\(PreviewFixtures.previewSessionID)")
   }
 
   @Test("newCodexAgent sheet id encodes session id")
   func newCodexAgentSheetIdEncodesSession() {
-    let sheet = HarnessMonitorStore.PresentedSheet.newCodexAgent(sessionID: "sess1234")
-    #expect(sheet.id == "newCodexAgent:sess1234")
+    let sheet = HarnessMonitorStore.PresentedSheet.newCodexAgent(
+      sessionID: PreviewFixtures.previewSessionID
+    )
+    #expect(sheet.id == "newCodexAgent:\(PreviewFixtures.previewSessionID)")
   }
 
   @Test("Setting createTask sheet replaces a prior sendSignal sheet")

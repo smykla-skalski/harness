@@ -132,6 +132,7 @@ extension HarnessMonitorStore.SessionIndexSlice {
     _ output: CatalogComputationOutput,
     change: Change
   ) {
+    catalog.sessions = output.sessions
     catalog.totalSessionCount = output.totalSessionCount
     catalog.totalOpenWorkCount = output.totalOpenWorkCount
     catalog.totalBlockedCount = output.totalBlockedCount

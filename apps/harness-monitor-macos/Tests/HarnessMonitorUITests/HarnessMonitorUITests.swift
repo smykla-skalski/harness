@@ -29,7 +29,7 @@ final class HarnessMonitorUITests: HarnessMonitorUITestCase {
     )
 
     let persistenceBanner = element(in: app, identifier: Accessibility.persistenceBanner)
-    let sessionCardIdentifier = Accessibility.dashboardSessionCard("sess1234")
+    let sessionCardIdentifier = Accessibility.dashboardSessionCard(Accessibility.previewSessionID)
     let sessionRow = sessionTrigger(in: app, identifier: sessionCardIdentifier)
     let clearSearchHistoryButton = element(
       in: app,

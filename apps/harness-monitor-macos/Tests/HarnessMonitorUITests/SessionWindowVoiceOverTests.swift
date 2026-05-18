@@ -9,7 +9,7 @@ final class SessionWindowVoiceOverTests: HarnessMonitorUITestCase {
   private static let dashboardLandingScenario = "dashboard-landing"
   private static let uiTestsKey = "HARNESS_MONITOR_UI_TESTS"
   private static let mainWindowWidthKey = "HARNESS_MONITOR_UI_MAIN_WINDOW_WIDTH"
-  private static let previewSessionID = "sess1234"
+  private static let previewSessionID = Accessibility.previewSessionID
   private static let decisionSummary = "Seeded session-window decision"
 
   func testFocusModeKeepsRouteContentVisibleWithoutMirroringSidebarFooter() throws {
