@@ -226,6 +226,19 @@ final class HarnessMonitorToolbarUITests: HarnessMonitorUITestCase {
       XCTAssertGreaterThanOrEqual(button.frame.minY, toolbar.frame.minY - 4)
       XCTAssertLessThanOrEqual(button.frame.maxY, toolbar.frame.maxY + 4)
     }
+
+    for button in [newSessionButton, openFolderButton] {
+      XCTAssertGreaterThan(
+        button.frame.midX,
+        toolbar.frame.midX,
+        "Dashboard quick actions should sit on the trailing side of the toolbar"
+      )
+      XCTAssertLessThan(
+        button.frame.maxX,
+        sleepPreventionButton.frame.minX,
+        "Dashboard quick actions should remain grouped before the trailing sleep control"
+      )
+    }
   }
 
   func testCockpitCreateMenuOpensNewTaskSheet() throws {
