@@ -253,24 +253,27 @@ async fn dispatch_read_query_managed_agent_acp_inspect_uses_session_id_scope() {
 
 #[tokio::test]
 async fn dispatch_read_query_managed_agent_acp_inspect_rejects_legacy_require_session_id() {
-    let state = test_http_state_with_db();
-    let request = WsRequest {
-        id: "req-acp-inspect-legacy-scope".into(),
-        method: "managed_agent.acp_inspect".into(),
-        params: serde_json::json!({
-            "require_session_id": "f9d5e4d8-cbf0-5a86-a4fb-7ea71f7116e4",
-        }),
-        trace_context: None,
-    };
+    temp_env::async_with_vars([("HARNESS_FEATURE_ACP", Some("1"))], async {
+        let state = test_http_state_with_db();
+        let request = WsRequest {
+            id: "req-acp-inspect-legacy-scope".into(),
+            method: "managed_agent.acp_inspect".into(),
+            params: serde_json::json!({
+                "require_session_id": "f9d5e4d8-cbf0-5a86-a4fb-7ea71f7116e4",
+            }),
+            trace_context: None,
+        };
 
-    let response = dispatch_read_query(&request, &state).await;
+        let response = dispatch_read_query(&request, &state).await;
 
-    let error = response.error.expect("invalid params error");
-    assert_eq!(error.code, "INVALID_PARAMS");
-    assert_eq!(
-        error.message,
-        "require_session_id is no longer supported; use session_id"
-    );
+        let error = response.error.expect("invalid params error");
+        assert_eq!(error.code, "INVALID_PARAMS");
+        assert_eq!(
+            error.message,
+            "require_session_id is no longer supported; use session_id"
+        );
+    })
+    .await;
 }
 
 #[tokio::test]
@@ -335,24 +338,27 @@ async fn dispatch_read_query_managed_agent_acp_transcript_uses_session_id_scope(
 
 #[tokio::test]
 async fn dispatch_read_query_managed_agent_acp_transcript_rejects_legacy_require_session_id() {
-    let state = test_http_state_with_db();
-    let request = WsRequest {
-        id: "req-acp-transcript-legacy-scope".into(),
-        method: "managed_agent.acp_transcript".into(),
-        params: serde_json::json!({
-            "require_session_id": "f9d5e4d8-cbf0-5a86-a4fb-7ea71f7116e4",
-        }),
-        trace_context: None,
-    };
+    temp_env::async_with_vars([("HARNESS_FEATURE_ACP", Some("1"))], async {
+        let state = test_http_state_with_db();
+        let request = WsRequest {
+            id: "req-acp-transcript-legacy-scope".into(),
+            method: "managed_agent.acp_transcript".into(),
+            params: serde_json::json!({
+                "require_session_id": "f9d5e4d8-cbf0-5a86-a4fb-7ea71f7116e4",
+            }),
+            trace_context: None,
+        };
 
-    let response = dispatch_read_query(&request, &state).await;
+        let response = dispatch_read_query(&request, &state).await;
 
-    let error = response.error.expect("invalid params error");
-    assert_eq!(error.code, "INVALID_PARAMS");
-    assert_eq!(
-        error.message,
-        "require_session_id is no longer supported; use session_id"
-    );
+        let error = response.error.expect("invalid params error");
+        assert_eq!(error.code, "INVALID_PARAMS");
+        assert_eq!(
+            error.message,
+            "require_session_id is no longer supported; use session_id"
+        );
+    })
+    .await;
 }
 
 #[tokio::test]

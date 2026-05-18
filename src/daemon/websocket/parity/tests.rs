@@ -65,41 +65,44 @@ async fn sync_session_title_reports_poisoned_db_lock_as_ws_error() {
 
 #[tokio::test]
 async fn parity_concurrent_mutation_serializes_acp_start_by_session_and_agent() {
-    let state = super::super::test_support::test_http_state_with_db();
-    super::super::test_support::seed_sample_session(&state);
-    let mutation_guard = state
-        .managed_agent_mutation_locks
-        .lock("f9d5e4d8-cbf0-5a86-a4fb-7ea71f7116e4", "copilot")
-        .await;
+    temp_env::async_with_vars([("HARNESS_FEATURE_ACP", Some("1"))], async {
+        let state = super::super::test_support::test_http_state_with_db();
+        super::super::test_support::seed_sample_session(&state);
+        let mutation_guard = state
+            .managed_agent_mutation_locks
+            .lock("f9d5e4d8-cbf0-5a86-a4fb-7ea71f7116e4", "copilot")
+            .await;
 
-    let request = WsRequest {
-        id: "req-start-acp".into(),
-        method: "managed_agent.start_acp".into(),
-        params: json!({
-            "session_id": "f9d5e4d8-cbf0-5a86-a4fb-7ea71f7116e4",
-            "descriptor_id": "copilot",
-        }),
-        trace_context: None,
-    };
-    let future = dispatch_managed_agent_start_acp(&request, &state);
-    tokio::pin!(future);
+        let request = WsRequest {
+            id: "req-start-acp".into(),
+            method: "managed_agent.start_acp".into(),
+            params: json!({
+                "session_id": "f9d5e4d8-cbf0-5a86-a4fb-7ea71f7116e4",
+                "descriptor_id": "copilot",
+            }),
+            trace_context: None,
+        };
+        let future = dispatch_managed_agent_start_acp(&request, &state);
+        tokio::pin!(future);
 
-    assert!(
-        timeout(Duration::from_millis(50), future.as_mut())
+        assert!(
+            timeout(Duration::from_millis(50), future.as_mut())
+                .await
+                .is_err(),
+            "ACP start should wait for the existing session+agent mutation guard",
+        );
+
+        drop(mutation_guard);
+
+        let response = timeout(Duration::from_secs(1), future)
             .await
-            .is_err(),
-        "ACP start should wait for the existing session+agent mutation guard",
-    );
-
-    drop(mutation_guard);
-
-    let response = timeout(Duration::from_secs(1), future)
-        .await
-        .expect("ACP start should resume after the guard is released");
-    assert!(
-        response.result.is_some() || response.error.is_some(),
-        "ACP start should complete with a websocket response once unblocked",
-    );
+            .expect("ACP start should resume after the guard is released");
+        assert!(
+            response.result.is_some() || response.error.is_some(),
+            "ACP start should complete with a websocket response once unblocked",
+        );
+    })
+    .await;
 }
 
 #[tokio::test]
