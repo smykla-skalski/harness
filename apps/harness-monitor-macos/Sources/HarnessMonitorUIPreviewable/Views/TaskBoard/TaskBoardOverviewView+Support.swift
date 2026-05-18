@@ -3,7 +3,7 @@ import SwiftUI
 
 extension TaskBoardOverviewView {
   private var detailRowHorizontalPadding: CGFloat {
-    24
+    contentHorizontalPadding
   }
 
   func taskBoardDetailRow<Content: View>(@ViewBuilder content: () -> Content) -> some View {

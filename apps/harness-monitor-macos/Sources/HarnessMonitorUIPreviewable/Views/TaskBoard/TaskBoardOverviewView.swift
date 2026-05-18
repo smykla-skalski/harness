@@ -8,6 +8,7 @@ public struct TaskBoardOverviewView: View {
   let orchestratorStatus: TaskBoardOrchestratorStatus?
   let evaluationSummary: TaskBoardEvaluationSummary?
   let taskBoardSessionID: String?
+  let contentHorizontalPadding: CGFloat
   let decisions: [Decision]
   private let decisionsByID: [String: Decision]
   private let decisionItems: [DecisionPresentationItem]
@@ -71,6 +72,7 @@ public struct TaskBoardOverviewView: View {
     orchestratorStatus: TaskBoardOrchestratorStatus? = nil,
     evaluationSummary: TaskBoardEvaluationSummary? = nil,
     taskBoardSessionID: String? = nil,
+    contentHorizontalPadding: CGFloat = 24,
     decisions: [Decision] = [],
     isActionInFlight: Bool = false,
     onOpenItem: @escaping (TaskBoardInboxItem) -> Void = { _ in },
@@ -99,6 +101,7 @@ public struct TaskBoardOverviewView: View {
     self.orchestratorStatus = orchestratorStatus
     self.evaluationSummary = evaluationSummary
     self.taskBoardSessionID = taskBoardSessionID
+    self.contentHorizontalPadding = contentHorizontalPadding
     self.decisions = decisions
     self.decisionsByID =
       decisionsByID ?? Dictionary(uniqueKeysWithValues: decisions.map { ($0.id, $0) })
