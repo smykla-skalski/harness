@@ -74,14 +74,13 @@ struct SessionWindowRootView: View {
       mcpWindowCommandRegistrar: mcpWindowCommandRegistrar,
       themeMode: $themeMode,
       appliesPreferredColorScheme: true,
-      windowToolbarBackgroundVisibility: .hidden,
+      windowToolbarBackgroundVisibility: .automatic,
       toast: store.toast
     ) {
       SessionWindowView(store: store, token: token, initialRoute: initialRoute)
     }
     .suppressToolbarBaselineSeparator(
-      markedAs: HarnessMonitorAccessibility.sessionWindowToolbarSeparatorSuppressed,
-      titlebarAppearsTransparent: true
+      markedAs: HarnessMonitorAccessibility.sessionWindowToolbarSeparatorSuppressed
     )
     .modifier(
       SessionWindowLifecycleModifier(
