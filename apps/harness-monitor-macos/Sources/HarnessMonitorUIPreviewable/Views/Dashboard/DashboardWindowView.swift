@@ -127,6 +127,8 @@ public struct DashboardWindowView: View {
             sessionCatalog: sessionCatalog
           )
         }
+        .navigationTitle("Dashboard")
+        .navigationSubtitle(route.title)
       }
       .accessibilityElement(children: .contain)
       .accessibilityIdentifier(HarnessMonitorAccessibility.dashboardWindowRoot)
