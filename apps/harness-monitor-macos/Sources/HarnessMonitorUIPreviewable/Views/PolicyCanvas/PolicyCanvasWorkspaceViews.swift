@@ -44,7 +44,7 @@ struct PolicyCanvasViewport: View {
     let nodeValidationIssueMessagesByID = viewModel.nodeValidationIssueMessagesByID
     let contentSize = routeOutput.contentSize
     GeometryReader { proxy in
-      ScrollViewReader { _ in
+      ScrollViewReader { scrollProxy in
         let edges = viewModel.edges
         let routeKey = PolicyCanvasRouteWorkerKey(
           graphGeneration: viewModel.routeComputationGeneration,
@@ -182,14 +182,23 @@ struct PolicyCanvasViewport: View {
         .onAppear {
           centerViewportIfNeeded(
             viewportSize: proxy.size,
-            visibleBounds: visibleBounds
+            routeOutput: routeOutput,
+            scrollProxy: scrollProxy
           )
           bindZoomFocusDispatcher()
         }
         .onChange(of: viewModel.viewportCenteringGeneration, initial: false) {
           centerViewportIfNeeded(
             viewportSize: proxy.size,
-            visibleBounds: visibleBounds
+            routeOutput: routeOutput,
+            scrollProxy: scrollProxy
+          )
+        }
+        .onChange(of: routeOutput.signature, initial: false) {
+          centerViewportIfNeeded(
+            viewportSize: proxy.size,
+            routeOutput: cachedRouteOutput,
+            scrollProxy: scrollProxy
           )
         }
         .onChange(of: scenePhase) { _, newPhase in
@@ -260,12 +269,22 @@ extension PolicyCanvasViewport {
 
   private func centerViewportIfNeeded(
     viewportSize: CGSize,
-    visibleBounds: CGRect
+    routeOutput: PolicyCanvasRouteWorkerOutput,
+    scrollProxy: ScrollViewProxy
   ) {
+    guard
+      viewModel.hasPendingViewportCenteringRequest,
+      policyCanvasCanCenterViewport(
+        isCanvasEmpty: viewModel.isEmpty,
+        routeOutputSignature: routeOutput.signature
+      )
+    else {
+      return
+    }
     guard viewModel.consumeViewportCenteringRequest() else {
       return
     }
-    let contentSize = policyCanvasVisibleContentSize(visibleBounds: visibleBounds)
+    let visibleBounds = routeOutput.visibleBounds
     let restoredSceneState = PolicyCanvasView.sceneState(
       for: viewModel.pipelineIdentity,
       raw: storedPipelineStateRaw,
@@ -292,30 +311,11 @@ extension PolicyCanvasViewport {
         viewModel.setZoom(targetZoom)
       }
     }
-    let targetContentOrigin = policyCanvasViewportContentOrigin(
-      viewportSize: viewportSize,
-      contentSize: contentSize,
-      zoom: targetZoom
-    )
-    let targetAnchorPoint =
-      policyCanvasInitialViewportAnchorPoint(
-        visibleBounds: visibleBounds,
-        zoom: targetZoom
-      )
-      .applying(
-        CGAffineTransform(
-          translationX: targetContentOrigin.x,
-          y: targetContentOrigin.y
-        )
-      )
-    let targetScrollPoint = policyCanvasCenteredScrollPoint(
-      anchorPoint: targetAnchorPoint,
-      viewportSize: viewportSize
-    )
     Task { @MainActor in
       await Task.yield()
+      await Task.yield()
       isRestoringCommandScrollPosition = true
-      scrollPosition = ScrollPosition(point: targetScrollPoint)
+      scrollProxy.scrollTo(PolicyCanvasLayout.initialViewportAnchorID, anchor: .center)
     }
   }
 
