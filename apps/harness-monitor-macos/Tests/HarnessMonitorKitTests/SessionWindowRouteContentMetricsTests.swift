@@ -14,6 +14,9 @@ struct SessionWindowRouteContentMetricsTests {
     #expect(large.overviewSpacing > regular.overviewSpacing)
     #expect(large.gridHorizontalSpacing > regular.gridHorizontalSpacing)
     #expect(large.gridVerticalSpacing > regular.gridVerticalSpacing)
+    #expect(large.overviewCardMinWidth > regular.overviewCardMinWidth)
+    #expect(large.overviewCardMinHeight > regular.overviewCardMinHeight)
+    #expect(large.overviewCardTextSpacing > regular.overviewCardTextSpacing)
     #expect(large.rowTextSpacing > regular.rowTextSpacing)
   }
 
@@ -144,8 +147,20 @@ struct SessionWindowRouteContentMetricsTests {
     #expect(hostSource.contains("onOpenDecision: openDecision"))
     #expect(hostSource.contains("store.supervisorSelectedDecisionID = decision.id"))
     #expect(hostSource.contains("store.requestSessionRoute("))
+    #expect(hostSource.contains("contentHorizontalPadding: scope.taskBoardContentHorizontalPadding"))
+    #expect(hostSource.contains("case .session:\n      0"))
     #expect(overviewTaskBoardSource.contains("store.contentUI.dashboard.taskBoardItems"))
     #expect(columnsSource.contains("decisions: matchingDecisions"))
+  }
+
+  @Test("Overview route presents summary cards instead of a duplicate title header")
+  func overviewRoutePresentsSummaryCardsInsteadOfDuplicateTitleHeader() throws {
+    let routeContentSource = try sourceFile(named: "SessionWindowRouteContent.swift")
+
+    #expect(routeContentSource.contains("SessionOverviewInfoStrip(facts: overviewFacts, metrics: metrics)"))
+    #expect(routeContentSource.contains("ViewThatFits(in: .horizontal)"))
+    #expect(routeContentSource.contains("SessionOverviewFactCard"))
+    #expect(!routeContentSource.contains("Text(snapshot.summary.displayTitle)"))
   }
 
   @Test("Dashboard starts from the global task board")

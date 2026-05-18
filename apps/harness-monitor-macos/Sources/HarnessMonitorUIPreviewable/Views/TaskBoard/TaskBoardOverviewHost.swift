@@ -24,6 +24,7 @@ struct TaskBoardOverviewHost: View {
       orchestratorStatus: orchestratorStatus,
       evaluationSummary: evaluationSummary,
       taskBoardSessionID: scope.sessionID,
+      contentHorizontalPadding: scope.taskBoardContentHorizontalPadding,
       decisions: decisions,
       isActionInFlight: isActionInFlight,
       onOpenItem: openInboxItem,
@@ -218,6 +219,15 @@ private extension TaskBoardOverviewHost.Scope {
       nil
     case .session(let sessionID):
       sessionID
+    }
+  }
+
+  var taskBoardContentHorizontalPadding: CGFloat {
+    switch self {
+    case .dashboard:
+      24
+    case .session:
+      0
     }
   }
 }

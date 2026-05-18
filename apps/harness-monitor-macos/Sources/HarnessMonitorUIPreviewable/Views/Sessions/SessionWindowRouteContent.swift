@@ -39,20 +39,7 @@ struct SessionWindowOverview: View {
       scrollSurfaceLabel: "Session overview"
     ) {
       VStack(alignment: .leading, spacing: metrics.overviewSpacing) {
-        Text(snapshot.summary.displayTitle)
-          .scaledFont(.system(.title2, design: .rounded, weight: .semibold))
-        Grid(
-          alignment: .leading,
-          horizontalSpacing: metrics.gridHorizontalSpacing,
-          verticalSpacing: metrics.gridVerticalSpacing
-        ) {
-          metric("Status", snapshot.summary.status.title)
-          metric("Project", snapshot.summary.projectName)
-          metric("Worktree", snapshot.summary.worktreeDisplayName)
-          metric("Agents", agentCountText)
-          metric("Open tasks", "\(snapshot.summary.metrics.openTaskCount)")
-          metric("Source", snapshot.source.rawValue)
-        }
+        SessionOverviewInfoStrip(facts: overviewFacts, metrics: metrics)
         TaskBoardOverviewHost(
           scope: .session(sessionID: snapshot.summary.sessionId),
           store: store,
@@ -68,15 +55,23 @@ struct SessionWindowOverview: View {
     }
   }
 
-  private func metric(_ title: String, _ value: String) -> some View {
-    GridRow {
-      Text(title)
-        .scaledFont(.body)
-        .foregroundStyle(.secondary)
-      Text(value)
-        .scaledFont(.body)
-        .textSelection(.enabled)
-    }
+  private var overviewFacts: [SessionOverviewFact] {
+    [
+      SessionOverviewFact(title: "Status", value: snapshot.summary.status.title),
+      SessionOverviewFact(title: "Project", value: snapshot.summary.projectName),
+      SessionOverviewFact(title: "Worktree", value: snapshot.summary.worktreeDisplayName),
+      SessionOverviewFact(
+        title: "Agents",
+        value: agentCountText,
+        usesMonospacedDigits: true
+      ),
+      SessionOverviewFact(
+        title: "Open Tasks",
+        value: "\(snapshot.summary.metrics.openTaskCount)",
+        usesMonospacedDigits: true
+      ),
+      SessionOverviewFact(title: "Source", value: snapshot.source.rawValue),
+    ]
   }
 
   private var agentCount: Int {
@@ -106,6 +101,114 @@ struct SessionWindowOverview: View {
     return "\(summary.activeCount) active of \(summary.registeredCount)"
   }
 
+}
+
+private struct SessionOverviewFact: Identifiable {
+  let title: String
+  let value: String
+  let usesMonospacedDigits: Bool
+  var id: String { title }
+
+  init(
+    title: String,
+    value: String,
+    usesMonospacedDigits: Bool = false
+  ) {
+    self.title = title
+    self.value = value
+    self.usesMonospacedDigits = usesMonospacedDigits
+  }
+}
+
+private struct SessionOverviewInfoStrip: View {
+  let facts: [SessionOverviewFact]
+  let metrics: SessionWindowRouteContentMetrics
+
+  var body: some View {
+    ViewThatFits(in: .horizontal) {
+      cardsRow(expandsToFill: true)
+      ScrollView(.horizontal, showsIndicators: true) {
+        cardsRow(expandsToFill: false)
+          .padding(.vertical, 1)
+      }
+      .scrollClipDisabled()
+    }
+    .frame(maxWidth: .infinity, alignment: .leading)
+  }
+
+  private func cardsRow(expandsToFill: Bool) -> some View {
+    HStack(alignment: .top, spacing: metrics.gridVerticalSpacing) {
+      ForEach(facts) { fact in
+        SessionOverviewFactCard(fact: fact, metrics: metrics)
+          .frame(
+            minWidth: metrics.overviewCardMinWidth,
+            maxWidth: expandsToFill ? .infinity : nil,
+            alignment: .leading
+          )
+      }
+    }
+    .frame(maxWidth: .infinity, alignment: .leading)
+  }
+}
+
+private struct SessionOverviewFactCard: View {
+  let fact: SessionOverviewFact
+  let metrics: SessionWindowRouteContentMetrics
+  @Environment(\.fontScale)
+  private var fontScale
+
+  private var titleFont: Font {
+    HarnessMonitorTextSize.scaledFont(.caption.weight(.bold), by: fontScale)
+  }
+
+  private var valueFont: Font {
+    HarnessMonitorTextSize.scaledFont(
+      .system(.title3, design: .rounded, weight: .semibold),
+      by: fontScale
+    )
+  }
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: metrics.overviewCardTextSpacing) {
+      Text(fact.title.uppercased())
+        .font(titleFont)
+        .tracking(HarnessMonitorTheme.uppercaseTracking)
+        .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+      valueView
+        .font(valueFont)
+        .foregroundStyle(HarnessMonitorTheme.ink)
+        .textSelection(.enabled)
+        .multilineTextAlignment(.leading)
+        .lineLimit(3)
+        .fixedSize(horizontal: false, vertical: true)
+    }
+    .frame(
+      maxWidth: .infinity,
+      minHeight: metrics.overviewCardMinHeight,
+      alignment: .leading
+    )
+    .padding(HarnessMonitorTheme.cardPadding)
+    .background {
+      RoundedRectangle(cornerRadius: HarnessMonitorTheme.cornerRadiusMD, style: .continuous)
+        .fill(HarnessMonitorTheme.ink.opacity(0.04))
+    }
+    .overlay {
+      RoundedRectangle(cornerRadius: HarnessMonitorTheme.cornerRadiusMD, style: .continuous)
+        .strokeBorder(HarnessMonitorTheme.controlBorder.opacity(0.32), lineWidth: 1)
+    }
+    .accessibilityElement(children: .combine)
+    .accessibilityLabel(fact.title)
+    .accessibilityValue(fact.value)
+  }
+
+  @ViewBuilder private var valueView: some View {
+    if fact.usesMonospacedDigits {
+      Text(verbatim: fact.value)
+        .monospacedDigit()
+    } else {
+      Text(verbatim: fact.value)
+    }
+  }
 }
 
 struct SessionWindowAgentsList: View {

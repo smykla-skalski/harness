@@ -6,6 +6,9 @@ struct SessionWindowRouteContentMetrics: Equatable {
   let overviewSpacing: CGFloat
   let gridHorizontalSpacing: CGFloat
   let gridVerticalSpacing: CGFloat
+  let overviewCardMinWidth: CGFloat
+  let overviewCardMinHeight: CGFloat
+  let overviewCardTextSpacing: CGFloat
   let rowTextSpacing: CGFloat
 
   init(fontScale: CGFloat) {
@@ -14,6 +17,9 @@ struct SessionWindowRouteContentMetrics: Equatable {
     overviewSpacing = 16 * min(scale, 1.35)
     gridHorizontalSpacing = 24 * min(scale, 1.25)
     gridVerticalSpacing = 10 * min(scale, 1.35)
+    overviewCardMinWidth = 136 * min(scale, 1.25)
+    overviewCardMinHeight = 72 * min(scale, 1.2)
+    overviewCardTextSpacing = 6 * min(scale, 1.25)
     rowTextSpacing = 2 * min(scale, 1.45)
   }
 }
