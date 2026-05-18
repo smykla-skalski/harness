@@ -133,7 +133,7 @@ public struct DashboardWindowView: View {
       .toolbar {
         DashboardWindowToolbar(
           store: store,
-          showsQuickActions: selectedRoute == .taskBoard,
+          showsQuickActions: route == .taskBoard,
           sleepPreventionPresentation: SleepPreventionToolbarPresentation(
             isEnabled: store.contentUI.toolbar.sleepPreventionEnabled
           )
