@@ -97,12 +97,12 @@ security-framework = "3"
 core-foundation = "0.10"
 
 [dev-dependencies]
-assert_cmd = "2.2.0"
-predicates = "3.1.4"
-tempfile = "3.27.0"
-insta = "1.46.3"
+assert_cmd = "=2.2.0"
+predicates = "=3.1.4"
+tempfile = "=3.27.0"
+insta = "=1.46.3"
 harness-testkit = { path = "testkit" }
-temp-env = { version = "0.3.6", features = ["async_closure"] }
+temp-env = { version = "=0.3.6", features = ["async_closure"] }
 
 [features]
 default = ["all-adapters"]
