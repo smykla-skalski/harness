@@ -78,3 +78,57 @@ public final class ProjectFilterPreference {
     self.sessionFocusFilterRaw = sessionFocusFilterRaw
   }
 }
+
+@Model
+public final class NotificationHistoryRecord {
+  #Unique<NotificationHistoryRecord>([\.entryID])
+  #Index<NotificationHistoryRecord>([\.recordedAt], [\.updatedAt], [\.sourceRaw])
+
+  public var entryID: String
+  public var sourceRaw: String
+  public var recordedAt: Date
+  public var updatedAt: Date
+  public var dropsOnRelaunch: Bool
+  public var snapshotData: Data
+
+  public init(
+    entryID: String,
+    sourceRaw: String,
+    recordedAt: Date,
+    updatedAt: Date,
+    dropsOnRelaunch: Bool,
+    snapshotData: Data
+  ) {
+    self.entryID = entryID
+    self.sourceRaw = sourceRaw
+    self.recordedAt = recordedAt
+    self.updatedAt = updatedAt
+    self.dropsOnRelaunch = dropsOnRelaunch
+    self.snapshotData = snapshotData
+  }
+}
+
+extension NotificationHistoryRecord {
+  static func make(from entry: NotificationHistoryEntry) throws -> NotificationHistoryRecord {
+    NotificationHistoryRecord(
+      entryID: entry.id,
+      sourceRaw: entry.source.rawValue,
+      recordedAt: entry.recordedAt,
+      updatedAt: entry.updatedAt,
+      dropsOnRelaunch: entry.dropsOnRelaunch,
+      snapshotData: try Codecs.encoder.encode(entry)
+    )
+  }
+
+  func update(from entry: NotificationHistoryEntry) throws {
+    sourceRaw = entry.source.rawValue
+    recordedAt = entry.recordedAt
+    updatedAt = entry.updatedAt
+    dropsOnRelaunch = entry.dropsOnRelaunch
+    snapshotData = try Codecs.encoder.encode(entry)
+  }
+
+  func decodedEntry() throws -> NotificationHistoryEntry {
+    try Codecs.decoder.decode(NotificationHistoryEntry.self, from: snapshotData)
+  }
+}

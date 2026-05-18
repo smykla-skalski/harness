@@ -50,6 +50,7 @@ public struct DatabaseStatistics: Sendable {
   public let noteCount: Int
   public let searchCount: Int
   public let filterPreferenceCount: Int
+  public let notificationCount: Int
   public let appCacheSizeBytes: Int64
   public let daemonDatabaseSizeBytes: Int
   public let lastCachedAt: Date?
@@ -92,7 +93,7 @@ public struct DatabaseStatistics: Sendable {
   }
 
   public var totalUserRecords: Int {
-    bookmarkCount + noteCount + searchCount + filterPreferenceCount
+    bookmarkCount + noteCount + searchCount + filterPreferenceCount + notificationCount
   }
 }
 
@@ -134,6 +135,7 @@ extension HarnessMonitorStore {
       noteCount: userRecordCounts.notes,
       searchCount: userRecordCounts.searches,
       filterPreferenceCount: userRecordCounts.filterPreferences,
+      notificationCount: userRecordCounts.notifications,
       appCacheSizeBytes: appCacheSizeBytes,
       daemonDatabaseSizeBytes: daemonDatabaseSizeBytes,
       lastCachedAt: lastPersistedSnapshotAt,
@@ -178,7 +180,11 @@ extension HarnessMonitorStore {
     do {
       try await userDataService.clearAllUserData()
       bookmarkedSessionIds = []
-      presentSuccessFeedback("User data cleared")
+      notificationHistoryEntries = []
+      notificationHistoryRuntimeActions.removeAll()
+      withNotificationHistoryToastSuppressed {
+        presentSuccessFeedback("User data cleared")
+      }
       return true
     } catch {
       recordPersistenceFailure(
@@ -191,6 +197,12 @@ extension HarnessMonitorStore {
 
   @discardableResult
   public func clearAllDatabaseData() async -> Bool {
+    let wasSuppressingNotificationHistoryToast = isSuppressingNotificationHistoryToast
+    isSuppressingNotificationHistoryToast = true
+    defer {
+      isSuppressingNotificationHistoryToast = wasSuppressingNotificationHistoryToast
+    }
+
     let cacheCleared = await clearSessionCache()
     let userDataCleared = await clearAllUserData()
     if cacheCleared && userDataCleared {

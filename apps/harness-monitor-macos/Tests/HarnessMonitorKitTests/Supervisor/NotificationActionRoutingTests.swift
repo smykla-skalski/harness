@@ -151,4 +151,39 @@ final class NotificationActionRoutingTests: XCTestCase {
     let entries = await recorder.entries
     XCTAssertTrue(entries.isEmpty)
   }
+
+  func test_notificationResponsesEmitHistoryUpdates() async throws {
+    let recorder = NotificationHistoryEventRecorder()
+    let controller = makeNotificationRoutingController()
+    controller.attachHistoryEventSink { event in
+      Task {
+        await recorder.record(event)
+      }
+    }
+    let decisionID = "codex-approval:sess-7:history-open"
+    let request = try await makeNotificationRoutingSupervisorRequest(
+      decisionID: decisionID,
+      severity: .warn
+    )
+    let response = NotificationRoutingResponseFactory.make(
+      request: request,
+      actionIdentifier: HarnessMonitorNotificationActionID.open
+    )
+
+    controller.handleNotificationResponseForTesting(response)
+
+    for _ in 0..<20 {
+      if await recorder.events.count == 1 { break }
+      await Task.yield()
+    }
+
+    let events = await recorder.events
+    XCTAssertEqual(events.count, 1)
+    guard case .responded(let update) = events[0] else {
+      return XCTFail("expected response event")
+    }
+    XCTAssertEqual(update.requestIdentifier, request.identifier)
+    XCTAssertEqual(update.actionIdentifier, HarnessMonitorNotificationActionID.open)
+    XCTAssertEqual(update.decisionID, decisionID)
+  }
 }

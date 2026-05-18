@@ -16,6 +16,14 @@ actor NotificationRoutingResolveRecorder {
   }
 }
 
+actor NotificationHistoryEventRecorder {
+  private(set) var events: [NotificationHistorySystemEvent] = []
+
+  func record(_ event: NotificationHistorySystemEvent) {
+    events.append(event)
+  }
+}
+
 final class NotificationRoutingTestCenter: HarnessMonitorUserNotificationCenter,
   @unchecked Sendable
 {

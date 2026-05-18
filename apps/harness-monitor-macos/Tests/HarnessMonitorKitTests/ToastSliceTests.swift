@@ -322,6 +322,55 @@ struct ToastSliceTests {
 
     #expect(store.toast.activeFeedback.isEmpty)
   }
+
+  @Test("History sink records lifecycle transitions")
+  func historySinkRecordsLifecycleTransitions() async {
+    let clock = ManualClock()
+    let slice = ToastSlice(clock: clock)
+    var events: [ToastHistoryEvent] = []
+    slice.onHistoryEvent = { events.append($0) }
+
+    _ = slice.presentSuccess("repeated", rollupDuplicates: true)
+    clock.advance(by: .seconds(1))
+    _ = slice.presentSuccess("repeated", rollupDuplicates: true)
+    let activeID = try? #require(slice.activeFeedback.first?.id)
+    if let activeID {
+      slice.dismiss(id: activeID)
+    }
+
+    #expect(events.count == 3)
+    #expect({
+      guard case .presented = events[0].kind else { return false }
+      return true
+    }())
+    #expect({
+      guard case .refreshed = events[1].kind else { return false }
+      return true
+    }())
+    #expect(events[1].feedback.repeatCount == 2)
+    #expect({
+      guard case .dismissed(.manual) = events[2].kind else { return false }
+      return true
+    }())
+  }
+
+  @Test("Undo history events mark runtime state until invocation")
+  func undoHistoryEventsMarkRuntimeStateUntilInvocation() async {
+    let slice = ToastSlice(clock: ManualClock())
+    var events: [ToastHistoryEvent] = []
+    slice.onHistoryEvent = { events.append($0) }
+
+    let id = slice.enqueueUndoable("Task removed") {}
+    slice.invokeUndo(id: id)
+
+    #expect(events.count == 2)
+    #expect(events[0].hasUndoAction)
+    #expect({
+      guard case .dismissed(.undoInvoked) = events[1].kind else { return false }
+      return true
+    }())
+    #expect(events[1].hasUndoAction == false)
+  }
 }
 
 // MARK: - Test helpers

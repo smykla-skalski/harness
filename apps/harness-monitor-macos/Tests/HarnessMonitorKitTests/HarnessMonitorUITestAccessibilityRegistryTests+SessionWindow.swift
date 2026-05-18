@@ -16,6 +16,18 @@ extension HarnessMonitorUITestAccessibilityRegistryTests {
       HarnessMonitorAccessibility.dashboardWindowRoute("taskBoard")
         == "harness.dashboard.route.taskboard"
     )
+    #expect(
+      HarnessMonitorAccessibility.dashboardNotificationsRoot
+        == "harness.dashboard.notifications"
+    )
+    #expect(
+      HarnessMonitorAccessibility.dashboardNotificationsScrollView
+        == "harness.dashboard.notifications.scroll"
+    )
+    #expect(
+      HarnessMonitorAccessibility.dashboardNotificationRow("toast-success")
+        == "harness.dashboard.notifications.row.toast-success"
+    )
     #expect(HarnessMonitorAccessibility.sessionWindowShell == "harness.session.window")
     #expect(
       HarnessMonitorAccessibility.sessionWindowSidebar
@@ -71,6 +83,7 @@ extension HarnessMonitorUITestAccessibilityRegistryTests {
   func dashboardAndSessionWindowAccessibilityIdentifiersAreAttachedByProductionViews() throws {
     let dashboardRoot = try sourceFile(named: "DashboardWindowView.swift")
     let dashboardView = try sourceFile(named: "DashboardWindowSupport.swift")
+    let notificationsView = try sourceFile(named: "DashboardNotificationsRouteView.swift")
     let dashboardToolbar = try sourceFile(named: "DashboardWindowToolbar.swift")
     let rootView = try sourceFile(named: "SessionWindowRootView.swift")
     let windowView = try sourceFile(named: "SessionWindowView.swift")
@@ -90,13 +103,20 @@ extension HarnessMonitorUITestAccessibilityRegistryTests {
     #expect(dashboardView.contains("HarnessMonitorAccessibility.dashboardSidebar"))
     #expect(
       dashboardView.contains("HarnessMonitorAccessibility.dashboardWindowRoute(route.rawValue)"))
+    #expect(
+      notificationsView.contains("HarnessMonitorAccessibility.dashboardNotificationsRoot")
+    )
     #expect(dashboardView.contains("HarnessMonitorSidebar("))
     #expect(dashboardView.contains("List(selection: dashboardSelectionBinding)"))
     #expect(dashboardView.contains("SessionSidebarRow("))
     #expect(dashboardView.contains(".harnessMonitorSidebarListChrome("))
     #expect(dashboardView.contains("HarnessMonitorAccessibility.dashboardScrollView"))
+    #expect(notificationsView.contains("HarnessMonitorAccessibility.dashboardNotificationsScrollView"))
     #expect(dashboardToolbar.contains("HarnessMonitorAccessibility.dashboardNewSessionButton"))
     #expect(dashboardToolbar.contains("HarnessMonitorAccessibility.dashboardOpenFolderButton"))
+    #expect(
+      dashboardView.contains("DashboardNotificationsRouteView(")
+    )
     #expect(dashboardToolbar.contains("SleepPreventionToolbarButton("))
     #expect(windowView.contains("HarnessMonitorAccessibility.sessionWindowShell"))
     #expect(

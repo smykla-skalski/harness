@@ -54,6 +54,8 @@ public final class HarnessMonitorStore {
   @ObservationIgnored var openSessionWindowsByID: [ObjectIdentifier: String] = [:]
   @ObservationIgnored var pendingSessionWindowTerminationSnapshot: Set<String>?
   @ObservationIgnored var pendingSessionWindowQuitSnapshot: SessionWindowQuitSnapshot?
+  @ObservationIgnored var isSuppressingNotificationHistoryToast = false
+  @ObservationIgnored var suppressedNotificationHistoryToastIDs: Set<UUID> = []
 
   public var openFolderRequest = 0
   public var attachSessionRequest = 0
@@ -135,6 +137,12 @@ public final class HarnessMonitorStore {
   public var globalTaskBoardPolicyAudit: TaskBoardPolicyPipelineAuditSummary? {
     didSet {
       guard oldValue != globalTaskBoardPolicyAudit else { return }
+      scheduleUISync([.contentDashboard])
+    }
+  }
+  public var notificationHistoryEntries: [NotificationHistoryEntry] = [] {
+    didSet {
+      guard oldValue != notificationHistoryEntries else { return }
       scheduleUISync([.contentDashboard])
     }
   }
@@ -395,6 +403,7 @@ public final class HarnessMonitorStore {
   @ObservationIgnored var pendingUISyncAreas: Set<UISyncArea> = []
   @ObservationIgnored var isApplyingUISyncBatch = false
   @ObservationIgnored var debugUISyncCounts: [UISyncArea: Int] = [:]
+  @ObservationIgnored var notificationHistoryRuntimeActions: [String: @MainActor () async -> Void] = [:]
 
   public init(
     daemonController: any DaemonControlling,
@@ -449,9 +458,11 @@ public final class HarnessMonitorStore {
     )
     self.hostBridgeCapabilityIssues = seeded
     self.forcedHostBridgeCapabilities = Set(seeded.keys)
+    configureToastHistoryEvents()
     bindUISlices()
     syncAllUI()
     scheduleBookmarkedSessionRefresh()
+    scheduleNotificationHistoryRefresh()
   }
 
 }

@@ -41,6 +41,14 @@ extension HarnessMonitorAccessibility {
     "harness.dashboard.route.\(slug(route))"
   }
 
+  public static func dashboardNotificationRow(_ entryID: String) -> String {
+    "harness.dashboard.notifications.row.\(slug(entryID))"
+  }
+
+  public static func dashboardNotificationAction(_ entryID: String, actionID: String) -> String {
+    "\(dashboardNotificationRow(entryID)).action.\(slug(actionID))"
+  }
+
   public static func projectHeader(_ projectID: String) -> String {
     "harness.sidebar.project-header.\(slug(projectID))"
   }

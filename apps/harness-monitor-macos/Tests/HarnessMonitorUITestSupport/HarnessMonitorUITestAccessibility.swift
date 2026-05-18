@@ -150,6 +150,9 @@ enum HarnessMonitorUITestAccessibility {
   static let dashboardWindowRoot = "harness.dashboard.window"
   static let dashboardSidebar = "harness.dashboard.sidebar"
   static let dashboardScrollView = "harness.dashboard.scroll"
+  static let dashboardNotificationsRoot = "harness.dashboard.notifications"
+  static let dashboardNotificationsScrollView = "harness.dashboard.notifications.scroll"
+  static let dashboardNotificationsEmptyState = "harness.dashboard.notifications.empty-state"
   static let dashboardNewSessionButton = "harness.dashboard.new-session"
   static let dashboardOpenFolderButton = "harness.dashboard.open-folder"
   static let sessionsBoardRoot = dashboardWindowRoot
@@ -301,6 +304,14 @@ enum HarnessMonitorUITestAccessibility {
 
   static func dashboardWindowRoute(_ route: String) -> String {
     "harness.dashboard.route.\(slug(route))"
+  }
+
+  static func dashboardNotificationRow(_ entryID: String) -> String {
+    "harness.dashboard.notifications.row.\(slug(entryID))"
+  }
+
+  static func dashboardNotificationAction(_ entryID: String, actionID: String) -> String {
+    "\(dashboardNotificationRow(entryID)).action.\(slug(actionID))"
   }
 
   static let policyCanvasRoot = "harness.policy-canvas.root"
