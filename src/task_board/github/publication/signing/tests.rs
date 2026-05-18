@@ -1,5 +1,6 @@
 use super::*;
 use pgp::composed::{KeyType, SecretKeyParamsBuilder};
+use rand_core06::OsRng;
 
 #[test]
 fn publication_preserves_existing_pgp_signature() {
@@ -223,7 +224,7 @@ fn generated_private_key(passphrase: Option<&str>) -> (String, String, String) {
     let key = builder
         .build()
         .expect("build secret key params")
-        .generate(thread_rng())
+        .generate(OsRng)
         .expect("generate secret key");
     let key_id = format!("{}", key.primary_key.legacy_key_id());
     let fingerprint = format!("{:x}", key.primary_key.fingerprint());
