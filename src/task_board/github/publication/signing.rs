@@ -6,7 +6,7 @@ use gix::actor::SignatureRef;
 use pgp::composed::{ArmorOptions, Deserializable, DetachedSignature, SignedSecretKey};
 use pgp::crypto::hash::HashAlgorithm;
 use pgp::types::{KeyDetails, Password};
-use rand::thread_rng;
+use rand_core06::OsRng;
 
 use crate::errors::{CliError, CliErrorKind};
 use crate::sandbox;
@@ -302,7 +302,7 @@ fn pgp_detached_signature(
     validate_configured_key_id(&private_key, expected_key_id)?;
     let password = passphrase.map_or_else(Password::empty, Password::from);
     let signature = DetachedSignature::sign_binary_data(
-        thread_rng(),
+        OsRng,
         &private_key.primary_key,
         &password,
         HashAlgorithm::Sha256,

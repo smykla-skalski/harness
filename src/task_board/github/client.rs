@@ -189,7 +189,7 @@ impl GitHubAutomationClient for GitHubApiAutomationClient {
             .await
             .map_err(operation_error)?;
         if let Some(existing) = existing.into_iter().next() {
-            return Ok(handle_from_pull_request(&existing));
+            return Ok(handle_from_simple_pull_request(&existing));
         }
         let mut builder = pulls
             .create(
@@ -325,22 +325,64 @@ fn ensure_rustls_provider() {
 }
 
 fn handle_from_pull_request(pull_request: &models::pulls::PullRequest) -> GitHubPullRequestHandle {
-    GitHubPullRequestHandle {
-        number: pull_request.number,
-        html_url: Some(pull_request.html_url.to_string()),
-        draft: pull_request.draft.unwrap_or(false),
-        merged: pull_request.merged,
-        head_sha: pull_request.head.sha.clone(),
-        requested_reviewers: pull_request
+    build_pull_request_handle(
+        pull_request.number,
+        pull_request.html_url.to_string(),
+        pull_request.draft.unwrap_or(false),
+        pull_request.merged,
+        pull_request.head.sha.clone(),
+        pull_request
             .requested_reviewers
             .iter()
             .map(|reviewer| reviewer.login.clone())
             .collect(),
-        requested_team_reviewers: pull_request
+        pull_request
             .requested_teams
             .iter()
             .map(|team| team.slug.clone())
             .collect(),
+    )
+}
+
+fn handle_from_simple_pull_request(
+    pull_request: &models::pulls::SimplePullRequest,
+) -> GitHubPullRequestHandle {
+    build_pull_request_handle(
+        pull_request.number,
+        pull_request.html_url.to_string(),
+        pull_request.draft.unwrap_or(false),
+        pull_request.merged_at.is_some(),
+        pull_request.head.sha.clone(),
+        pull_request
+            .requested_reviewers
+            .iter()
+            .map(|reviewer| reviewer.login.clone())
+            .collect(),
+        pull_request
+            .requested_teams
+            .iter()
+            .map(|team| team.slug.clone())
+            .collect(),
+    )
+}
+
+fn build_pull_request_handle(
+    number: u64,
+    html_url: String,
+    draft: bool,
+    merged: bool,
+    head_sha: String,
+    requested_reviewers: Vec<String>,
+    requested_team_reviewers: Vec<String>,
+) -> GitHubPullRequestHandle {
+    GitHubPullRequestHandle {
+        number,
+        html_url: Some(html_url),
+        draft,
+        merged,
+        head_sha,
+        requested_reviewers,
+        requested_team_reviewers,
     }
 }
 
@@ -412,6 +454,77 @@ mod tests {
         );
     }
 
+    #[test]
+    fn handle_from_simple_pull_request_maps_listing_entries() {
+        let pull_request: models::pulls::SimplePullRequest =
+            serde_json::from_value(json!({
+                "url": "https://api.github.invalid/repos/owner/repo/pulls/42",
+                "id": 42,
+                "node_id": "PR_kwDOExample",
+                "html_url": "https://github.invalid/owner/repo/pull/42",
+                "diff_url": "https://github.invalid/owner/repo/pull/42.diff",
+                "patch_url": "https://github.invalid/owner/repo/pull/42.patch",
+                "issue_url": "https://api.github.invalid/repos/owner/repo/issues/42",
+                "commits_url": "https://api.github.invalid/repos/owner/repo/pulls/42/commits",
+                "review_comments_url": "https://api.github.invalid/repos/owner/repo/pulls/comments{/number}",
+                "review_comment_url": "https://api.github.invalid/repos/owner/repo/pulls/comments{/number}",
+                "comments_url": "https://api.github.invalid/repos/owner/repo/issues/42/comments",
+                "statuses_url": "https://api.github.invalid/repos/owner/repo/statuses/deadbeef",
+                "number": 42,
+                "state": "open",
+                "locked": false,
+                "title": "Keep existing pull request",
+                "user": simple_user_json("author", 1),
+                "body": null,
+                "labels": [],
+                "milestone": null,
+                "active_lock_reason": null,
+                "created_at": "2026-05-18T00:00:00Z",
+                "updated_at": "2026-05-18T00:00:00Z",
+                "closed_at": null,
+                "merged_at": null,
+                "merge_commit_sha": null,
+                "assignee": null,
+                "assignees": null,
+                "requested_reviewers": [simple_user_json("reviewer", 2)],
+                "requested_teams": [],
+                "head": {
+                    "label": null,
+                    "ref": "feature-branch",
+                    "sha": "deadbeef",
+                    "user": null,
+                    "repo": null
+                },
+                "base": {
+                    "label": null,
+                    "ref": "main",
+                    "sha": "cafebabe",
+                    "user": null,
+                    "repo": null
+                },
+                "_links": {},
+                "author_association": "MEMBER",
+                "auto_merge": null,
+                "draft": true
+            }))
+            .expect("simple pull request");
+
+        let handle = handle_from_simple_pull_request(&pull_request);
+
+        assert_eq!(
+            handle,
+            GitHubPullRequestHandle {
+                number: 42,
+                html_url: Some("https://github.invalid/owner/repo/pull/42".into()),
+                draft: true,
+                merged: false,
+                head_sha: "deadbeef".into(),
+                requested_reviewers: vec!["reviewer".into()],
+                requested_team_reviewers: vec![],
+            }
+        );
+    }
+
     fn automation_client_with_base_uri(base_uri: String) -> GitHubApiAutomationClient {
         ensure_rustls_provider();
         let client = octocrab::Octocrab::builder()
@@ -440,6 +553,34 @@ mod tests {
             write_http_response(&mut stream, response_body.to_string().as_str());
         });
         (endpoint, captured, handle)
+    }
+
+    fn simple_user_json(login: &str, id: u64) -> serde_json::Value {
+        let base = format!("https://api.github.invalid/users/{login}");
+        json!({
+            "name": null,
+            "email": null,
+            "login": login,
+            "id": id,
+            "node_id": format!("MDQ6VXNlcj{id}"),
+            "avatar_url": format!("{base}/avatar"),
+            "gravatar_id": "",
+            "url": base,
+            "html_url": format!("https://github.invalid/{login}"),
+            "followers_url": format!("{base}/followers"),
+            "following_url": format!("{base}/following{{/other_user}}"),
+            "gists_url": format!("{base}/gists{{/gist_id}}"),
+            "starred_url": format!("{base}/starred{{/owner}}{{/repo}}"),
+            "subscriptions_url": format!("{base}/subscriptions"),
+            "organizations_url": format!("{base}/orgs"),
+            "repos_url": format!("{base}/repos"),
+            "events_url": format!("{base}/events{{/privacy}}"),
+            "received_events_url": format!("{base}/received_events"),
+            "type": "User",
+            "site_admin": false,
+            "starred_at": null,
+            "user_view_type": null
+        })
     }
 
     fn capture_request(request: &str) -> CapturedRequest {
