@@ -334,6 +334,42 @@ struct PolicyCanvasViewModelLayoutTests {
     #expect(scrollPoint.y == 0)
   }
 
+  @Test("initial centering waits for computed route output")
+  func initialCenteringWaitsForComputedRouteOutput() async {
+    let viewModel = PolicyCanvasViewModel.sample()
+    viewModel.load(
+      document: PreviewFixtures.policyCanvasPipelineDocument(),
+      simulation: nil,
+      audit: nil
+    )
+
+    #expect(viewModel.hasPendingViewportCenteringRequest)
+    #expect(
+      !policyCanvasCanCenterViewport(
+        isCanvasEmpty: viewModel.isEmpty,
+        routeOutputSignature: .empty
+      )
+    )
+
+    let output = await PolicyCanvasRouteWorker(router: PolicyCanvasVisibilityRouter())
+      .compute(
+        input: PolicyCanvasRouteWorkerInput(
+          nodes: viewModel.nodes,
+          groups: viewModel.groups,
+          edges: viewModel.edges,
+          fontScale: 1
+        )
+      )
+
+    #expect(
+      policyCanvasCanCenterViewport(
+        isCanvasEmpty: viewModel.isEmpty,
+        routeOutputSignature: output.signature
+      )
+    )
+    #expect(viewModel.hasPendingViewportCenteringRequest)
+  }
+
   @Test("grouped endpoint routes keep group titles but not group bodies as obstacles")
   func groupedEndpointRoutesKeepGroupTitlesAsObstacles() {
     let viewModel = PolicyCanvasViewModel.sample()
