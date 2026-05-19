@@ -189,30 +189,25 @@ private struct TaskBoardOperationsSyncWarning: View {
 
   var body: some View {
     VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingXS) {
-      HStack(alignment: .top, spacing: HarnessMonitorTheme.spacingXS) {
-        Image(systemName: "exclamationmark.triangle.fill")
-          .foregroundStyle(HarnessMonitorTheme.caution)
-          .imageScale(.small)
-          .padding(.top, 1)
-        Text(message)
-          .foregroundStyle(HarnessMonitorTheme.secondaryInk)
-          .multilineTextAlignment(.leading)
-          .fixedSize(horizontal: false, vertical: true)
-          .layoutPriority(1)
-      }
-      .frame(maxWidth: .infinity, alignment: .leading)
+      Text(message)
+        .foregroundStyle(HarnessMonitorTheme.caution)
+        .multilineTextAlignment(.leading)
+        .fixedSize(horizontal: false, vertical: true)
+        .layoutPriority(1)
+        .frame(maxWidth: .infinity, alignment: .leading)
 
       Button {
         openSettings()
       } label: {
-        Label("Settings", systemImage: "gearshape")
-          .labelStyle(.titleAndIcon)
+        Text("Settings")
           .lineLimit(1)
+          .font(warningFont.weight(.semibold))
+          .foregroundStyle(HarnessMonitorTheme.caution)
       }
-      .harnessActionButtonStyle(variant: .bordered, tint: .secondary)
-      .harnessNativeFormControl()
-      .fixedSize(horizontal: true, vertical: true)
+      .harnessPlainButtonStyle()
+      .fixedSize(horizontal: true, vertical: false)
       .frame(maxWidth: .infinity, alignment: .trailing)
+      .accessibilityLabel("Open Task Board Settings")
       .accessibilityIdentifier("harness.task-board.sync.open-settings")
     }
     .font(warningFont)
