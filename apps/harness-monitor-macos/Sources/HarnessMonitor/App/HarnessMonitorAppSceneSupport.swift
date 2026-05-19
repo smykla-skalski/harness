@@ -14,6 +14,7 @@ struct DashboardWindowRootView: View {
   let mcpWindowCommandRegistrar: HarnessMonitorMCPWindowCommandRegistrar
   @Binding var themeMode: HarnessMonitorThemeMode
   @Binding var settingsSelectedSection: SettingsSection
+  @Binding var settingsNavigationRequest: SettingsNavigationRequest?
   let perfScenario: HarnessMonitorPerfScenario?
   @Binding var hasRunPerfScenario: Bool
   @Binding var perfScenarioStatus: HarnessMonitorPerfScenarioStatus
@@ -118,6 +119,7 @@ struct DashboardWindowRootView: View {
       \.openTaskBoardSettings,
       OpenTaskBoardSettingsAction {
         settingsSelectedSection = .taskBoard
+        settingsNavigationRequest = SettingsNavigationRequest(target: .taskBoard($0))
         openWindow(id: HarnessMonitorWindowID.settings)
       }
     )
@@ -323,6 +325,7 @@ struct HarnessMonitorSettingsRootView: View {
   let mcpWindowCommandRegistrar: HarnessMonitorMCPWindowCommandRegistrar
   @Binding var themeMode: HarnessMonitorThemeMode
   @Binding var selectedSection: SettingsSection
+  @Binding var navigationRequest: SettingsNavigationRequest?
   @AppStorage(HarnessMonitorBackdropDefaults.modeKey)
   private var backdropModeRawValue = HarnessMonitorBackdropMode.none.rawValue
   @AppStorage(HarnessMonitorBackgroundDefaults.imageKey)
@@ -336,7 +339,8 @@ struct HarnessMonitorSettingsRootView: View {
     windowCommandRouting: WindowCommandRoutingState,
     mcpWindowCommandRegistrar: HarnessMonitorMCPWindowCommandRegistrar,
     themeMode: Binding<HarnessMonitorThemeMode>,
-    selectedSection: Binding<SettingsSection>
+    selectedSection: Binding<SettingsSection>,
+    navigationRequest: Binding<SettingsNavigationRequest?>
   ) {
     self.store = store
     self.notifications = notifications
@@ -345,6 +349,7 @@ struct HarnessMonitorSettingsRootView: View {
     self.mcpWindowCommandRegistrar = mcpWindowCommandRegistrar
     _themeMode = themeMode
     _selectedSection = selectedSection
+    _navigationRequest = navigationRequest
   }
 
   private var backdropMode: HarnessMonitorBackdropMode {
@@ -360,7 +365,8 @@ struct HarnessMonitorSettingsRootView: View {
       store: store,
       notifications: notifications,
       themeMode: $themeMode,
-      selectedSection: $selectedSection
+      selectedSection: $selectedSection,
+      navigationRequest: $navigationRequest
     )
     .writingToolsBehavior(.disabled)
     .frame(minWidth: 680, minHeight: 440)

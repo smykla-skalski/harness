@@ -80,7 +80,7 @@ struct TaskBoardOperationsSyncCard: View, TaskBoardOperationsHost {
         accessory: {
           if let warning = availability.warning {
             TaskBoardOperationsSyncWarning(message: warning) {
-              openTaskBoardSettings()
+              openTaskBoardSettings(.githubProject)
             }
           }
         },

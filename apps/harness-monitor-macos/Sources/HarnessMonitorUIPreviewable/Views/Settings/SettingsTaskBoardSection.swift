@@ -3,53 +3,72 @@ import SwiftUI
 
 public struct SettingsTaskBoardSection: View {
   public let store: HarnessMonitorStore
+  @Binding var navigationRequest: SettingsNavigationRequest?
 
   @State private var draft = TaskBoardGitSettingsDraft()
   @State private var isLoading = false
   @State private var isSaving = false
   @State private var loadError: String?
+  @State private var hasLoadedSettings = false
+  @State private var pendingNavigationRequestID: UUID?
 
-  public init(store: HarnessMonitorStore) {
+  public init(
+    store: HarnessMonitorStore,
+    navigationRequest: Binding<SettingsNavigationRequest?> = .constant(nil)
+  ) {
     self.store = store
+    _navigationRequest = navigationRequest
   }
 
   public var body: some View {
-    Form {
-      actionsSection
+    ScrollViewReader { proxy in
+      Form {
+        actionsSection
 
-      if let loadError {
-        Section {
-          Text(loadError)
-            .foregroundStyle(.red)
-            .accessibilityIdentifier(HarnessMonitorAccessibility.settingsTaskBoardStatus)
-        } header: {
-          Text("Status")
-            .harnessNativeFormSectionHeader()
+        if let loadError {
+          Section {
+            Text(loadError)
+              .foregroundStyle(.red)
+              .accessibilityIdentifier(HarnessMonitorAccessibility.settingsTaskBoardStatus)
+          } header: {
+            Text("Status")
+              .harnessNativeFormSectionHeader()
+          }
+        } else if isLoading {
+          Section {
+            ProgressView("Loading Task Board settings...")
+              .accessibilityIdentifier(HarnessMonitorAccessibility.settingsTaskBoardStatus)
+          } header: {
+            Text("Status")
+              .harnessNativeFormSectionHeader()
+          }
+        } else {
+          workflowSection
+          projectSection
+            .id(SettingsTaskBoardAnchor.githubProject)
+          githubInboxSection
+            .id(SettingsTaskBoardAnchor.githubInbox)
+          SettingsTaskBoardHostSection(store: store)
+          automationSection
+          gitIdentitySection
+          gitSigningSection
+          credentialsSection
+            .id(SettingsTaskBoardAnchor.credentials)
+          repositoryOverridesHeader
+          repositoryOverrideSections
         }
-      } else if isLoading {
-        Section {
-          ProgressView("Loading Task Board settings...")
-            .accessibilityIdentifier(HarnessMonitorAccessibility.settingsTaskBoardStatus)
-        } header: {
-          Text("Status")
-            .harnessNativeFormSectionHeader()
-        }
-      } else {
-        workflowSection
-        projectSection
-        githubInboxSection
-        SettingsTaskBoardHostSection(store: store)
-        automationSection
-        gitIdentitySection
-        gitSigningSection
-        credentialsSection
-        repositoryOverridesHeader
-        repositoryOverrideSections
+      }
+      .settingsDetailFormStyle()
+      .accessibilityIdentifier(HarnessMonitorAccessibility.settingsTaskBoardRoot)
+      .task { await loadSettings() }
+      .onChange(of: navigationRequest, initial: true) { _, request in
+        scrollToNavigationRequest(request, proxy: proxy)
+      }
+      .onChange(of: isLoading) { _, isLoading in
+        guard !isLoading else { return }
+        scrollToNavigationRequest(navigationRequest, proxy: proxy)
       }
     }
-    .settingsDetailFormStyle()
-    .accessibilityIdentifier(HarnessMonitorAccessibility.settingsTaskBoardRoot)
-    .task { await loadSettings() }
   }
 
   private var actionsSection: some View {
@@ -262,6 +281,30 @@ public struct SettingsTaskBoardSection: View {
     $draft
   }
 
+  var isLoadingBinding: Binding<Bool> {
+    $isLoading
+  }
+
+  var isSavingBinding: Binding<Bool> {
+    $isSaving
+  }
+
+  var loadErrorBinding: Binding<String?> {
+    $loadError
+  }
+
+  var hasLoadedSettingsBinding: Binding<Bool> {
+    $hasLoadedSettings
+  }
+
+  var navigationRequestBinding: Binding<SettingsNavigationRequest?> {
+    $navigationRequest
+  }
+
+  var pendingNavigationRequestIDBinding: Binding<UUID?> {
+    $pendingNavigationRequestID
+  }
+
   private var shouldOfferAdoptDefaults: Bool {
     let gitConfig = draft.identityDefaults.gitConfig
     let hasDetectedName = gitConfig.userName?.isEmpty == false
@@ -356,59 +399,5 @@ public struct SettingsTaskBoardSection: View {
       return "Repository Override \(index + 1)"
     }
     return slug
-  }
-}
-
-extension SettingsTaskBoardSection {
-  fileprivate func workflowBinding(_ workflow: TaskBoardOrchestratorWorkflow) -> Binding<Bool> {
-    Binding(
-      get: { draft.enabledWorkflows.contains(workflow) },
-      set: { isEnabled in
-        if isEnabled {
-          draft.enabledWorkflows.insert(workflow)
-        } else {
-          draft.enabledWorkflows.remove(workflow)
-        }
-      }
-    )
-  }
-
-  fileprivate func automationBinding(_ automation: TaskBoardGitHubAutomation) -> Binding<Bool> {
-    Binding(
-      get: { draft.enabledAutomations.contains(automation) },
-      set: { isEnabled in
-        if isEnabled {
-          draft.enabledAutomations.insert(automation)
-        } else {
-          draft.enabledAutomations.remove(automation)
-        }
-      }
-    )
-  }
-
-  @MainActor
-  fileprivate func loadSettings() async {
-    isLoading = true
-    defer { isLoading = false }
-
-    do {
-      let snapshot = try await store.taskBoardGitSettingsSnapshot()
-      draft = TaskBoardGitSettingsDraft(snapshot: snapshot)
-      loadError = nil
-    } catch {
-      loadError = error.localizedDescription
-    }
-  }
-
-  @MainActor
-  fileprivate func saveSettings() async {
-    isSaving = true
-    defer { isSaving = false }
-
-    let succeeded = await store.updateTaskBoardGitSettings(snapshot: draft.snapshot)
-    if succeeded {
-      loadError = nil
-      await loadSettings()
-    }
   }
 }

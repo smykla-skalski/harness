@@ -1,6 +1,6 @@
 import SwiftUI
 
-public enum SettingsSection: String, CaseIterable, Identifiable, Hashable {
+public enum SettingsSection: String, CaseIterable, Identifiable, Hashable, Sendable {
   case general
   case focusMode
   case banners

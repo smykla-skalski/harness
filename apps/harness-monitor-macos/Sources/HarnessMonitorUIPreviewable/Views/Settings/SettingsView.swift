@@ -8,6 +8,7 @@ public struct SettingsView: View {
   let notifications: HarnessMonitorUserNotificationController
   @Binding var themeMode: HarnessMonitorThemeMode
   @Binding var selectedSection: SettingsSection
+  @Binding var navigationRequest: SettingsNavigationRequest?
   @State private var selectedSupervisorPane: SupervisorPaneKey = .rules
   @State private var preparedDiagnosticsInput: SettingsDiagnosticsSnapshotInput?
   @State private var preparedDiagnosticsSnapshot: SettingsDiagnosticsSnapshot?
@@ -16,12 +17,14 @@ public struct SettingsView: View {
     store: HarnessMonitorStore,
     notifications: HarnessMonitorUserNotificationController,
     themeMode: Binding<HarnessMonitorThemeMode>,
-    selectedSection: Binding<SettingsSection>
+    selectedSection: Binding<SettingsSection>,
+    navigationRequest: Binding<SettingsNavigationRequest?> = .constant(nil)
   ) {
     self.store = store
     self.notifications = notifications
     _themeMode = themeMode
     _selectedSection = selectedSection
+    _navigationRequest = navigationRequest
   }
 
   public var body: some View {
@@ -60,7 +63,10 @@ public struct SettingsView: View {
             refreshDiagnostics: { await store.refreshDiagnostics() }
           )
         case .taskBoard:
-          SettingsTaskBoardSection(store: store)
+          SettingsTaskBoardSection(
+            store: store,
+            navigationRequest: $navigationRequest
+          )
         case .policies:
           SettingsPoliciesSection()
         case .codex:
@@ -117,6 +123,10 @@ public struct SettingsView: View {
     .containerBackground(.windowBackground, for: .window)
     .accessibilityElement(children: .contain)
     .accessibilityIdentifier(HarnessMonitorAccessibility.settingsRoot)
+    .onChange(of: navigationRequest, initial: true) { _, request in
+      guard let request else { return }
+      selectedSection = request.target.section
+    }
     .overlay {
       SettingsOverlayMarkers(
         themeMode: themeMode,

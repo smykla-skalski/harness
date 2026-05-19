@@ -13,6 +13,7 @@ struct HarnessMonitorDashboardWindowContent: View {
   let mcpWindowCommandRegistrar: HarnessMonitorMCPWindowCommandRegistrar
   @Binding var themeMode: HarnessMonitorThemeMode
   @Binding var settingsSelectedSection: SettingsSection
+  @Binding var settingsNavigationRequest: SettingsNavigationRequest?
   let perfScenario: HarnessMonitorPerfScenario?
   @Binding var hasRunPerfScenario: Bool
   @Binding var perfScenarioStatus: HarnessMonitorPerfScenarioStatus
@@ -42,6 +43,7 @@ struct HarnessMonitorDashboardWindowContent: View {
       mcpWindowCommandRegistrar: mcpWindowCommandRegistrar,
       themeMode: $themeMode,
       settingsSelectedSection: $settingsSelectedSection,
+      settingsNavigationRequest: $settingsNavigationRequest,
       perfScenario: perfScenario,
       hasRunPerfScenario: $hasRunPerfScenario,
       perfScenarioStatus: $perfScenarioStatus,
