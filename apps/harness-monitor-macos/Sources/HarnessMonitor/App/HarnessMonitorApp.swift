@@ -31,6 +31,7 @@ struct HarnessMonitorApp: App {
   @State private var windowCommandRouting: WindowCommandRoutingState
   @State private var mcpWindowCommandRegistrar: HarnessMonitorMCPWindowCommandRegistrar
   @State private var settingsSelectedSection: SettingsSection
+  @State private var settingsNavigationRequest: SettingsNavigationRequest?
   @State private var hasInstalledMainWindowLauncher = false
   @State private var hasScheduledInitialWindowRouting = false
   @State private var hasRunPerfScenario = false
@@ -190,6 +191,10 @@ struct HarnessMonitorApp: App {
 
   var settingsSelectedSectionBinding: Binding<SettingsSection> {
     $settingsSelectedSection
+  }
+
+  var settingsNavigationRequestBinding: Binding<SettingsNavigationRequest?> {
+    $settingsNavigationRequest
   }
 
   var hasRunPerfScenarioBinding: Binding<Bool> {

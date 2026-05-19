@@ -38,15 +38,17 @@ public struct WindowSurfaceContext: Equatable, Sendable {
 }
 
 public struct OpenTaskBoardSettingsAction: Sendable {
-  private let action: @MainActor @Sendable () -> Void
+  private let action: @MainActor @Sendable (SettingsTaskBoardAnchor) -> Void
 
-  public init(_ action: @escaping @MainActor @Sendable () -> Void = {}) {
+  public init(
+    _ action: @escaping @MainActor @Sendable (SettingsTaskBoardAnchor) -> Void = { _ in }
+  ) {
     self.action = action
   }
 
   @MainActor
-  public func callAsFunction() {
-    action()
+  public func callAsFunction(_ anchor: SettingsTaskBoardAnchor = .githubProject) {
+    action(anchor)
   }
 }
 

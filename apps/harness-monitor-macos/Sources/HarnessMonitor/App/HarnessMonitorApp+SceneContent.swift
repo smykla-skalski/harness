@@ -69,7 +69,8 @@ extension HarnessMonitorApp {
         windowCommandRouting: appWindowCommandRouting,
         mcpWindowCommandRegistrar: appMCPWindowCommandRegistrar,
         themeMode: themeModeBinding,
-        selectedSection: settingsSelectedSectionBinding
+        selectedSection: settingsSelectedSectionBinding,
+        navigationRequest: settingsNavigationRequestBinding
       )
       .harnessTrackMCPWindow()
     } else {
@@ -103,6 +104,7 @@ extension HarnessMonitorApp {
       mcpWindowCommandRegistrar: appMCPWindowCommandRegistrar,
       themeMode: themeModeBinding,
       settingsSelectedSection: settingsSelectedSectionBinding,
+      settingsNavigationRequest: settingsNavigationRequestBinding,
       perfScenario: perfScenario,
       hasRunPerfScenario: hasRunPerfScenarioBinding,
       perfScenarioStatus: perfScenarioStatusBinding,
