@@ -39,23 +39,37 @@ extension TaskBoardOperationsHost {
     content()
   }
 
-  func actionRow<Content: View>(
+  func actionRow<Content: View, Accessory: View>(
     showsSeparator: Bool = true,
+    @ViewBuilder accessory: () -> Accessory,
     @ViewBuilder content: () -> Content
   ) -> some View {
-    TaskBoardOperationsFormRow(
-      "Actions",
-      showsSeparator: showsSeparator,
-      contentMaxWidth: nil,
-      minHeight: nil
-    ) {
+    HStack(alignment: .center, spacing: HarnessMonitorTheme.spacingMD) {
       HarnessMonitorGlassControlGroup(spacing: HarnessMonitorTheme.itemSpacing) {
         HStack(spacing: HarnessMonitorTheme.itemSpacing) {
           content()
         }
         .fixedSize(horizontal: true, vertical: false)
       }
-      .frame(maxWidth: .infinity, alignment: .trailing)
+      .frame(alignment: .leading)
+
+      Spacer(minLength: HarnessMonitorTheme.spacingMD)
+
+      accessory()
+        .frame(maxWidth: .infinity, alignment: .trailing)
+    }
+    .padding(.vertical, TaskBoardOperationsFormMetrics.rowVerticalPadding)
+    .frame(
+      maxWidth: .infinity,
+      minHeight: TaskBoardOperationsFormMetrics.rowMinHeight,
+      alignment: .leading
+    )
+    .overlay(alignment: .bottom) {
+      if showsSeparator {
+        Rectangle()
+          .fill(Color(nsColor: .separatorColor))
+          .frame(height: 0.5)
+      }
     }
   }
 

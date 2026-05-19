@@ -138,31 +138,35 @@ struct TaskBoardOperationsDispatchCard: View, TaskBoardOperationsHost {
           .padding(.top, HarnessMonitorTheme.spacingSM)
       }
 
-      actionRow(showsSeparator: dashboard.taskBoardDispatchSummary != nil) {
-        actionButton(
-          TaskBoardActionButtonDescriptor(
-            title: dryRun ? "Preview Dispatch" : "Dispatch Live",
-            systemImage: dryRun ? "eye" : "paperplane.fill",
-            tint: dryRun ? .secondary : .orange,
-            prominent: !dryRun,
-            accessibilityIdentifier: "harness.task-board.dispatch.run",
-            help: dryRun
-              ? "Preview how task-board items will dispatch"
-              : "Dispatch the selected board scope into live session work"
-          )
-        ) {
-          if request.dryRun {
-            Task { @MainActor in
-              await store.dispatchTaskBoard(request: request)
-            }
-          } else {
-            pendingConfirmation = TaskBoardDispatchConfirmationPresentation(
-              request: request,
-              itemTitle: selectedItem?.title
+      actionRow(
+        showsSeparator: dashboard.taskBoardDispatchSummary != nil,
+        accessory: { EmptyView() },
+        content: {
+          actionButton(
+            TaskBoardActionButtonDescriptor(
+              title: dryRun ? "Preview Dispatch" : "Dispatch Live",
+              systemImage: dryRun ? "eye" : "paperplane.fill",
+              tint: dryRun ? .secondary : .orange,
+              prominent: !dryRun,
+              accessibilityIdentifier: "harness.task-board.dispatch.run",
+              help: dryRun
+                ? "Preview how task-board items will dispatch"
+                : "Dispatch the selected board scope into live session work"
             )
+          ) {
+            if request.dryRun {
+              Task { @MainActor in
+                await store.dispatchTaskBoard(request: request)
+              }
+            } else {
+              pendingConfirmation = TaskBoardDispatchConfirmationPresentation(
+                request: request,
+                itemTitle: selectedItem?.title
+              )
+            }
           }
         }
-      }
+      )
 
       if let summary = dashboard.taskBoardDispatchSummary {
         summaryPillRow {
