@@ -37,11 +37,33 @@ public struct WindowSurfaceContext: Equatable, Sendable {
   }
 }
 
+public struct OpenTaskBoardSettingsAction: Sendable {
+  private let action: @MainActor @Sendable () -> Void
+
+  public init(_ action: @escaping @MainActor @Sendable () -> Void = {}) {
+    self.action = action
+  }
+
+  @MainActor
+  public func callAsFunction() {
+    action()
+  }
+}
+
+private struct OpenTaskBoardSettingsActionKey: EnvironmentKey {
+  static let defaultValue = OpenTaskBoardSettingsAction()
+}
+
 private struct WindowSurfaceContextKey: EnvironmentKey {
   static let defaultValue = WindowSurfaceContext()
 }
 
 extension EnvironmentValues {
+  public var openTaskBoardSettings: OpenTaskBoardSettingsAction {
+    get { self[OpenTaskBoardSettingsActionKey.self] }
+    set { self[OpenTaskBoardSettingsActionKey.self] = newValue }
+  }
+
   public var windowSurfaceContext: WindowSurfaceContext {
     get { self[WindowSurfaceContextKey.self] }
     set { self[WindowSurfaceContextKey.self] = newValue }
