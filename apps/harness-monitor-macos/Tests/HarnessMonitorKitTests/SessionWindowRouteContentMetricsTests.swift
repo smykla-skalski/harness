@@ -284,7 +284,7 @@ struct SessionWindowRouteContentMetricsTests {
     #expect(supportSource.contains("let operationsCardMaxWidth: CGFloat"))
   }
 
-  @Test("Board-only task board items have a management surface")
+  @Test("Board-only task board items open in a management sheet")
   func boardOnlyTaskBoardItemsHaveManagementSurface() throws {
     let overviewSource = try taskBoardOverviewSource()
     let managementPanelSource = try taskBoardSourceFile(named: "TaskBoardItemManagementPanel.swift")
@@ -294,6 +294,7 @@ struct SessionWindowRouteContentMetricsTests {
     let laneSource = try taskBoardSourceFile(named: "TaskBoardLaneViews.swift")
 
     #expect(overviewSource.contains("TaskBoardItemManagementPanel("))
+    #expect(overviewSource.contains(".sheet(item: taskBoardManagementSheet)"))
     #expect(managementPanelSource.contains("harness.task-board.manage-item"))
     #expect(overviewSource.contains("TaskBoardOverviewItemBehavior.runOnceRequest(for: item)"))
     #expect(overviewSource.contains("onEvaluateTaskBoardItem(item)"))
