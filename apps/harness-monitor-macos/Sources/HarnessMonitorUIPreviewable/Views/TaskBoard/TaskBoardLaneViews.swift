@@ -194,8 +194,8 @@ struct TaskBoardItemRow: View {
       )
       .padding(metrics.cardPadding)
       .taskBoardCardBackgroundGlyph(
-        systemImage: statusSymbol,
-        tint: statusTint,
+        systemImage: cardGlyph.systemImage,
+        tint: cardGlyph.tint,
         cornerRadius: metrics.cardCornerRadius
       )
     }
@@ -212,6 +212,11 @@ struct TaskBoardItemRow: View {
 
   private var statusTint: Color {
     taskBoardStatusColor(for: item.status)
+  }
+
+  private var cardGlyph: TaskBoardCardGlyph {
+    TaskBoardGitHubCardGlyph.resolve(for: item)
+      ?? TaskBoardCardGlyph(systemImage: statusSymbol, tint: statusTint)
   }
 
   private var statusSymbol: String {
