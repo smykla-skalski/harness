@@ -165,6 +165,7 @@ private struct TaskBoardDescriptionEditor: View {
       title: "Description",
       text: $text,
       prompt: "Description",
+      hasVisibleLabel: true,
       accessibilityIdentifier: "harness.task-board.manage-item.body",
       minHeight: minHeight,
       maxHeight: minHeight
