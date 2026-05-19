@@ -78,10 +78,7 @@ public struct SettingsTaskBoardSection: View {
       HStack {
         Spacer(minLength: 0)
         HarnessMonitorGlassControlGroup(spacing: HarnessMonitorTheme.itemSpacing) {
-          HarnessMonitorWrapLayout(
-            spacing: HarnessMonitorTheme.itemSpacing,
-            lineSpacing: HarnessMonitorTheme.itemSpacing
-          ) {
+          HStack(spacing: HarnessMonitorTheme.itemSpacing) {
             HarnessMonitorAsyncActionButton(
               title: "Reload",
               tint: .secondary,
@@ -105,9 +102,9 @@ public struct SettingsTaskBoardSection: View {
       .padding(.horizontal, HarnessMonitorTheme.spacingXL)
       .padding(.vertical, HarnessMonitorTheme.spacingSM)
       .frame(maxWidth: .infinity, alignment: .trailing)
-      .background(.background)
     }
     .frame(maxWidth: .infinity, alignment: .trailing)
+    .background(.background)
   }
 
   private var workflowSection: some View {
