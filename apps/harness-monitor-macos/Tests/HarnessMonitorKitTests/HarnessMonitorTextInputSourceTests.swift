@@ -78,6 +78,22 @@ struct HarnessMonitorTextInputSourceTests {
     }
   }
 
+  @Test("Shared inline multiline inputs use native TextEditor chrome")
+  func sharedInlineMultilineInputsUseNativeTextEditorChrome() throws {
+    let source = try previewableSourceFile(at: "Views/Shared/HarnessMonitorInlineTextField.swift")
+
+    #expect(source.contains("struct HarnessMonitorInlineTextField"))
+    #expect(source.contains("struct HarnessMonitorInlineMultilineTextField"))
+    #expect(source.contains("TextEditor(text: $text)"))
+    #expect(source.contains(".scrollContentBackground(.hidden)"))
+    #expect(source.contains("ZStack(alignment: .topLeading)"))
+    #expect(source.contains(".allowsHitTesting(false)"))
+    #expect(source.contains(".clipped()"))
+    #expect(source.contains("colorSchemeContrast == .increased ? 4 : 3"))
+    #expect(!source.contains("TextField(\"\", text: $text, prompt: Text(prompt), axis: .vertical)"))
+    #expect(!source.contains(".lineLimit(lineLimit)"))
+  }
+
   private func previewableSourceFile(at relativePath: String) throws -> String {
     try repoFile(
       at: "apps/harness-monitor-macos/Sources/HarnessMonitorUIPreviewable/\(relativePath)")

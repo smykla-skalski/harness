@@ -129,7 +129,7 @@ extension TaskBoardOperationsHost {
     accessibilityIdentifier: String
   ) -> some View {
     TaskBoardOperationsFormRow(title) {
-      TaskBoardOperationsTextField(
+      HarnessMonitorInlineTextField(
         title: title,
         text: text,
         prompt: prompt,

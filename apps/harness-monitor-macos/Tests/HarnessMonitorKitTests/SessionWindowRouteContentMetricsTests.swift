@@ -243,7 +243,10 @@ struct SessionWindowRouteContentMetricsTests {
     let inventorySource = try taskBoardSourceFile(
       named: "TaskBoardOperationsPanelInventoryContent.swift"
     )
-    let textFieldSource = try taskBoardSourceFile(named: "TaskBoardOperationsTextField.swift")
+    let textFieldSource = try previewableSourceFile(
+      domain: "Shared",
+      named: "HarnessMonitorInlineTextField.swift"
+    )
     let supportSource = try taskBoardSourceFile(named: "TaskBoardOverviewSupport.swift")
 
     #expect(operationsSource.contains("TaskBoardOperationsPanelLayout("))
@@ -269,7 +272,7 @@ struct SessionWindowRouteContentMetricsTests {
     #expect(componentsSource.contains("Picker(\"\", selection: selection)"))
     #expect(componentsSource.contains(".labelsHidden()"))
     #expect(componentsSource.contains(".toggleStyle(.switch)"))
-    #expect(componentsSource.contains("TaskBoardOperationsTextField("))
+    #expect(componentsSource.contains("HarnessMonitorInlineTextField("))
     #expect(textFieldSource.contains("TextField(\"\", text: $text, prompt: Text(prompt))"))
     #expect(textFieldSource.contains(".frame(minWidth: 0, maxWidth: .infinity"))
     #expect(inventorySource.contains("HarnessMonitorWrapLayout("))
@@ -291,7 +294,10 @@ struct SessionWindowRouteContentMetricsTests {
     let managementComponentsSource = try taskBoardSourceFile(
       named: "TaskBoardItemManagementPanel+Components.swift"
     )
-    let operationsTextFieldSource = try taskBoardSourceFile(named: "TaskBoardOperationsTextField.swift")
+    let inlineTextFieldSource = try previewableSourceFile(
+      domain: "Shared",
+      named: "HarnessMonitorInlineTextField.swift"
+    )
     let managementSupportSource = try taskBoardSourceFile(
       named: "TaskBoardItemManagementSupport.swift"
     )
@@ -314,11 +320,11 @@ struct SessionWindowRouteContentMetricsTests {
     #expect(managementPanelSource.contains("xmark.circle.fill"))
     #expect(!managementPanelSource.contains(".harnessAccessoryButtonStyle(tint: .secondary)"))
     #expect(managementPanelSource.contains("HarnessMonitorTextSize.scaledFont(.title2.weight(.semibold), by: fontScale)"))
-    #expect(managementComponentsSource.contains("TaskBoardOperationsTextField("))
+    #expect(managementComponentsSource.contains("HarnessMonitorInlineTextField("))
     #expect(managementComponentsSource.contains("showsClearButton: false"))
     #expect(managementComponentsSource.contains(".pickerStyle(.menu)"))
     #expect(managementComponentsSource.contains("TaskBoardManagementMultilineField("))
-    #expect(operationsTextFieldSource.contains("struct TaskBoardOperationsMultilineTextField"))
+    #expect(inlineTextFieldSource.contains("struct HarnessMonitorInlineMultilineTextField"))
     #expect(overviewSource.contains(".padding(HarnessMonitorTheme.spacingLG)"))
     #expect(managementSupportSource.contains("Link(destination: destination.url)"))
     #expect(managementSupportSource.contains("Text(\"Description\")"))
@@ -326,7 +332,7 @@ struct SessionWindowRouteContentMetricsTests {
     #expect(managementSupportSource.contains("HarnessMonitorSegmentedPicker("))
     #expect(managementSupportSource.contains("HarnessMonitorMarkdownText("))
     #expect(managementSupportSource.contains("TaskBoardDescriptionEditor("))
-    #expect(managementSupportSource.contains("TaskBoardOperationsMultilineTextField("))
+    #expect(managementSupportSource.contains("HarnessMonitorInlineMultilineTextField("))
     #expect(managementSupportSource.contains("maxHeight: minHeight"))
     #expect(managementSupportSource.contains("harness.task-board.manage-item.body-preview"))
     #expect(managementPanelSource.contains("Evaluate Item"))

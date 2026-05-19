@@ -58,7 +58,7 @@ struct TaskBoardManagementNativeField: View {
       Text(label)
         .font(captionSemibold)
         .foregroundStyle(HarnessMonitorTheme.secondaryInk)
-      TaskBoardOperationsTextField(
+      HarnessMonitorInlineTextField(
         title: label,
         text: $text,
         prompt: label,
@@ -145,7 +145,7 @@ struct TaskBoardManagementMultilineField: View {
       Text(label)
         .font(captionSemibold)
         .foregroundStyle(HarnessMonitorTheme.secondaryInk)
-      TaskBoardOperationsMultilineTextField(
+      HarnessMonitorInlineMultilineTextField(
         title: label,
         text: $text,
         prompt: label,
