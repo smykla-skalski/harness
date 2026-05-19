@@ -165,11 +165,7 @@ private struct SettingsTaskBoardInboxEntryList: View {
   private var addRow: some View {
     HStack(alignment: .firstTextBaseline, spacing: HarnessMonitorTheme.spacingSM) {
       TextField("", text: $input, prompt: Text(inputPlaceholder))
-        .font(bodyFont)
-        .multilineTextAlignment(.leading)
-        .textFieldStyle(.roundedBorder)
-        .harnessNativeFormControl()
-        .frame(maxWidth: .infinity, alignment: .leading)
+        .harnessNativeTextField(alignment: .leading)
         .onSubmit(addIfPossible)
         .accessibilityLabel(inputPlaceholder)
         .accessibilityIdentifier(inputAccessibilityIdentifier)
@@ -317,21 +313,13 @@ private struct SettingsTaskBoardInboxRepositoryList: View {
   private var addRow: some View {
     HStack(alignment: .firstTextBaseline, spacing: HarnessMonitorTheme.spacingSM) {
       TextField("", text: $ownerInput, prompt: Text("owner"))
-        .font(bodyFont)
-        .multilineTextAlignment(.leading)
-        .textFieldStyle(.roundedBorder)
-        .harnessNativeFormControl()
-        .frame(maxWidth: .infinity, alignment: .leading)
+        .harnessNativeTextField(alignment: .leading)
         .onSubmit(addIfPossible)
         .accessibilityLabel("owner")
         .accessibilityIdentifier(HarnessMonitorAccessibility.settingsTBInboxRepoOwnerField)
 
       TextField("", text: $repoInput, prompt: Text("repository"))
-        .font(bodyFont)
-        .multilineTextAlignment(.leading)
-        .textFieldStyle(.roundedBorder)
-        .harnessNativeFormControl()
-        .frame(maxWidth: .infinity, alignment: .leading)
+        .harnessNativeTextField(alignment: .leading)
         .onSubmit(addIfPossible)
         .accessibilityLabel("repository")
         .accessibilityIdentifier(HarnessMonitorAccessibility.settingsTBInboxRepoNameField)
