@@ -371,6 +371,8 @@ public final class HarnessMonitorStore {
   @ObservationIgnored var selectedTimelineWindowLoadSequence: UInt64 = 0
   var pendingCacheWriteTask: Task<Void, Never>?
   @ObservationIgnored var pendingCacheWriteTaskToken: UInt64 = 0
+  @ObservationIgnored var pendingTaskBoardSnapshotCacheWriteTask: Task<Void, Never>?
+  @ObservationIgnored var pendingTaskBoardSnapshotCacheWriteTaskToken: UInt64 = 0
   @ObservationIgnored var pendingSessionDetailCacheWriteTask: Task<Void, Never>?
   @ObservationIgnored var pendingSessionDetailCacheWriteTaskToken: UInt64 = 0
   @ObservationIgnored var pendingSessionDetailCacheWrites:

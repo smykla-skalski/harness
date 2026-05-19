@@ -81,6 +81,7 @@ extension HarnessMonitorStore {
     orchestratorStatus: TaskBoardOrchestratorStatus?
   ) async {
     guard let cacheService, persistenceError == nil else { return }
+    cancelPendingTaskBoardSnapshotCacheWriteTask()
     let result = await cacheService.cacheTaskBoardSnapshot(
       items: items,
       orchestratorStatus: orchestratorStatus
@@ -92,11 +93,29 @@ extension HarnessMonitorStore {
     items: [TaskBoardItem],
     orchestratorStatus: TaskBoardOrchestratorStatus?
   ) {
-    scheduleCacheWrite { cacheService in
-      await cacheService.cacheTaskBoardSnapshot(
+    guard let cacheService, persistenceError == nil else { return }
+    cancelPendingTaskBoardSnapshotCacheWriteTask()
+    pendingTaskBoardSnapshotCacheWriteTaskToken &+= 1
+    let taskToken = pendingTaskBoardSnapshotCacheWriteTaskToken
+    pendingTaskBoardSnapshotCacheWriteTask = Task { @MainActor [weak self] in
+      guard let self else { return }
+      defer {
+        if self.pendingTaskBoardSnapshotCacheWriteTaskToken == taskToken {
+          self.pendingTaskBoardSnapshotCacheWriteTask = nil
+        }
+      }
+      try? await Task.sleep(for: .milliseconds(250))
+      guard
+        !Task.isCancelled,
+        self.pendingTaskBoardSnapshotCacheWriteTaskToken == taskToken
+      else {
+        return
+      }
+      let result = await cacheService.cacheTaskBoardSnapshot(
         items: items,
         orchestratorStatus: orchestratorStatus
       )
+      await self.applyPersistedCacheWriteResult(result)
     }
   }
 
@@ -260,11 +279,26 @@ extension HarnessMonitorStore {
   }
 
   func flushPendingCacheWrite() async {
-    if let task = pendingSessionDetailCacheWriteTask {
-      await task.value
-    }
-    if let task = pendingCacheWriteTask {
-      await task.value
+    let sessionDetailTask = pendingSessionDetailCacheWriteTask
+    let genericTask = pendingCacheWriteTask
+    let taskBoardSnapshotTask = pendingTaskBoardSnapshotCacheWriteTask
+
+    await withTaskGroup(of: Void.self) { group in
+      if let sessionDetailTask {
+        group.addTask {
+          await sessionDetailTask.value
+        }
+      }
+      if let genericTask {
+        group.addTask {
+          await genericTask.value
+        }
+      }
+      if let taskBoardSnapshotTask {
+        group.addTask {
+          await taskBoardSnapshotTask.value
+        }
+      }
     }
   }
 
@@ -275,6 +309,7 @@ extension HarnessMonitorStore {
 
   func cancelPendingCacheWrite() {
     cancelPendingGenericCacheWrite()
+    cancelPendingTaskBoardSnapshotCacheWriteTask()
     cancelPendingSessionDetailCacheWriteTask()
     pendingSessionDetailCacheWrites.removeAll()
   }
@@ -283,6 +318,12 @@ extension HarnessMonitorStore {
     pendingCacheWriteTask?.cancel()
     pendingCacheWriteTask = nil
     pendingCacheWriteTaskToken &+= 1
+  }
+
+  private func cancelPendingTaskBoardSnapshotCacheWriteTask() {
+    pendingTaskBoardSnapshotCacheWriteTask?.cancel()
+    pendingTaskBoardSnapshotCacheWriteTask = nil
+    pendingTaskBoardSnapshotCacheWriteTaskToken &+= 1
   }
 
   private func cancelPendingSessionDetailCacheWriteTask() {

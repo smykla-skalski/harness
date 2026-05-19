@@ -31,8 +31,8 @@ extension HarnessMonitorStore {
     cancelSelectedSessionRefreshFallback()
     cancelSessionPushFallback()
     cancelSessionLoad()
-    cancelPendingCacheWrite()
     cancelInitialTaskBoardConfirmationRefresh()
+    cancelPendingCacheWrite()
     sessionSnapshotHydrationTask?.cancel()
     sessionSnapshotHydrationTask = nil
   }
