@@ -18,7 +18,7 @@ final class TaskBoardSyncAvailabilityTests: XCTestCase {
     XCTAssertFalse(availability.canRun)
     XCTAssertEqual(
       availability.warning,
-      "Configure a GitHub repository or inbox repository before running sync."
+      "Configure a GitHub repository or inbox repository before running sync"
     )
   }
 

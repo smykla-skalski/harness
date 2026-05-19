@@ -168,7 +168,7 @@ struct TaskBoardGitHubSyncAvailability: Equatable {
       warning = nil
       return
     }
-    warning = "Configure a GitHub repository or inbox repository before running sync."
+    warning = "Configure a GitHub repository or inbox repository before running sync"
   }
 
   var canRun: Bool {
@@ -179,6 +179,12 @@ struct TaskBoardGitHubSyncAvailability: Equatable {
 private struct TaskBoardOperationsSyncWarning: View {
   let message: String
   let openSettings: @MainActor () -> Void
+  @Environment(\.fontScale)
+  private var fontScale
+
+  private var warningFont: Font {
+    HarnessMonitorTextSize.scaledFont(.caption, by: fontScale)
+  }
 
   var body: some View {
     HStack(alignment: .firstTextBaseline, spacing: HarnessMonitorTheme.spacingXS) {
@@ -187,8 +193,9 @@ private struct TaskBoardOperationsSyncWarning: View {
         .imageScale(.small)
       Text(message)
         .foregroundStyle(HarnessMonitorTheme.secondaryInk)
-        .lineLimit(1)
-        .truncationMode(.tail)
+        .lineLimit(2)
+        .multilineTextAlignment(.leading)
+        .fixedSize(horizontal: false, vertical: true)
         .layoutPriority(1)
       Button {
         openSettings()
@@ -202,7 +209,7 @@ private struct TaskBoardOperationsSyncWarning: View {
       .fixedSize(horizontal: true, vertical: true)
       .accessibilityIdentifier("harness.task-board.sync.open-settings")
     }
-    .font(.caption)
+    .font(warningFont)
     .frame(maxWidth: .infinity, alignment: .trailing)
     .accessibilityIdentifier("harness.task-board.sync.configuration-warning")
   }
