@@ -198,15 +198,13 @@ private struct TaskBoardOperationsSyncWarning: View {
       Button {
         openSettings()
       } label: {
-        Label("Settings", systemImage: "gearshape")
+        Label("Task Board Settings", systemImage: "gearshape")
           .labelStyle(.titleAndIcon)
           .lineLimit(1)
-          .font(warningFont.weight(.semibold))
-          .foregroundStyle(HarnessMonitorTheme.caution)
-          .underline()
       }
-      .harnessPlainButtonStyle()
-      .fixedSize(horizontal: true, vertical: false)
+      .harnessActionButtonStyle(variant: .bordered, tint: .secondary)
+      .harnessNativeFormControl()
+      .fixedSize(horizontal: true, vertical: true)
       .accessibilityLabel("Open Task Board Settings")
       .accessibilityIdentifier("harness.task-board.sync.open-settings")
     }
