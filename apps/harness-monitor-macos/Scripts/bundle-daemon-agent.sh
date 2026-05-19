@@ -45,10 +45,10 @@ harness_monitor_apply_runtime_lane_environment "$repo_root"
 
 daemon_source="${HARNESS_MONITOR_DAEMON_BINARY:-}"
 if [ -z "$daemon_source" ]; then
-  daemon_source="$(daemon_binary_output_path)"
-  if [ ! -x "$daemon_source" ]; then
-    daemon_source="$(build_daemon_binary | /usr/bin/tail -n 1)"
-  fi
+  # The scheme pre-action usually starts this build early, but some xcodebuild
+  # lanes do not run it. Always let cargo refresh or validate the helper here;
+  # otherwise a stale cached binary can be rebundled after Rust changes.
+  daemon_source="$(build_daemon_binary | /usr/bin/tail -n 1)"
 fi
 
 if [ ! -x "$daemon_source" ]; then
