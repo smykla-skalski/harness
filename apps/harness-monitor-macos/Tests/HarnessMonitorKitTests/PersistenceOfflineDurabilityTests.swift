@@ -399,6 +399,64 @@ struct PersistenceOfflineDurabilityTests {
     #expect(store.globalTaskBoardOrchestratorStatus == orchestratorStatus)
   }
 
+  @Test("Refresh persists task-board snapshots even when session list caching also runs")
+  func refreshPersistsTaskBoardSnapshotsAlongsideSessionListCaching() async {
+    let client = RecordingHarnessClient()
+    client.configureSessions(
+      summaries: [PreviewFixtures.summary],
+      detailsByID: [PreviewFixtures.summary.sessionId: PreviewFixtures.detail]
+    )
+    let githubItem = makeTaskBoardItem(
+      id: "board-refresh-github",
+      provider: .gitHub,
+      externalId: "refresh-123"
+    )
+    let orchestratorStatus = client.sampleTaskBoardOrchestratorStatus()
+    client.configureTaskBoardItems([githubItem])
+    let store = HarnessMonitorStore(
+      daemonController: RecordingDaemonController(client: client),
+      modelContainer: previewContainer
+    )
+
+    await store.refresh(using: client, preserveSelection: false)
+    await store.flushPendingCacheWrite()
+
+    let cachedSessions = await store.loadCachedSessionList()
+    let cachedTaskBoard = await store.loadCachedTaskBoardSnapshot()
+
+    #expect(cachedSessions?.sessions.map(\.sessionId) == [PreviewFixtures.summary.sessionId])
+    #expect(cachedTaskBoard?.items.map(\.id) == ["board-refresh-github"])
+    #expect(cachedTaskBoard?.items.map(\.externalRefs.first?.provider) == [.gitHub])
+    #expect(cachedTaskBoard?.orchestratorStatus == orchestratorStatus)
+  }
+
+  @Test("Task-board snapshot caching survives a later generic cache write")
+  func taskBoardSnapshotCachingSurvivesLaterGenericCacheWrite() async {
+    let store = makeStore()
+    let githubItem = makeTaskBoardItem(
+      id: "board-queue-github",
+      provider: .gitHub,
+      externalId: "queue-123"
+    )
+    let orchestratorStatus = makeTaskBoardOrchestratorStatus()
+
+    store.scheduleTaskBoardSnapshotCacheWrite(
+      items: [githubItem],
+      orchestratorStatus: orchestratorStatus
+    )
+    store.scheduleCacheWrite { service in
+      await service.cacheSessionList([PreviewFixtures.summary], projects: PreviewFixtures.projects)
+    }
+    await store.flushPendingCacheWrite()
+
+    let cachedSessions = await store.loadCachedSessionList()
+    let cachedTaskBoard = await store.loadCachedTaskBoardSnapshot()
+
+    #expect(cachedSessions?.sessions.map(\.sessionId) == [PreviewFixtures.summary.sessionId])
+    #expect(cachedTaskBoard?.items.map(\.id) == ["board-queue-github"])
+    #expect(cachedTaskBoard?.orchestratorStatus == orchestratorStatus)
+  }
+
   @Test("Restore keeps live task-board items when the persisted snapshot is stale")
   func restoreKeepsLiveTaskBoardItemsWhenPersistedSnapshotIsStale() async throws {
     let persistedItem = makeTaskBoardItem(
