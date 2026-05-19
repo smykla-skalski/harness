@@ -77,39 +77,41 @@ struct TaskBoardOperationsSyncCard: View, TaskBoardOperationsHost {
       }
 
       if let warning = availability.warning {
-        TaskBoardOperationsSyncWarning(message: warning) {
+        TaskBoardOperationsSyncWarning(
+          message: warning,
+          showsSeparator: dashboard.taskBoardSyncSummary != nil
+        ) {
           openTaskBoardSettings(.githubProject)
         }
-      }
-
-      actionRow(
-        showsSeparator: dashboard.taskBoardSyncSummary != nil,
-        accessory: { EmptyView() },
-        content: {
-          actionButton(
-            TaskBoardActionButtonDescriptor(
-              title: dryRun ? "Preview Sync" : "Run Sync",
-              systemImage: dryRun ? "eye" : "arrow.triangle.2.circlepath",
-              tint: dryRun ? .secondary : nil,
-              prominent: !dryRun,
-              accessibilityIdentifier: "harness.task-board.sync.run",
-              help: availability.warning ?? "Preview or apply external task-board sync operations"
-            ),
-            isDisabled: !availability.canRun
-          ) {
-            Task { @MainActor in
-              await store.syncTaskBoard(
-                request: TaskBoardSyncRequest(
-                  status: statusChoice.status,
-                  provider: providerChoice.provider,
-                  direction: direction,
-                  dryRun: dryRun
-                )
+      } else {
+        actionRow(
+          showsSeparator: dashboard.taskBoardSyncSummary != nil,
+          accessory: { EmptyView() },
+          content: {
+            actionButton(
+              TaskBoardActionButtonDescriptor(
+                title: dryRun ? "Preview Sync" : "Run Sync",
+                systemImage: dryRun ? "eye" : "arrow.triangle.2.circlepath",
+                tint: dryRun ? .secondary : nil,
+                prominent: !dryRun,
+                accessibilityIdentifier: "harness.task-board.sync.run",
+                help: "Preview or apply external task-board sync operations"
               )
+            ) {
+              Task { @MainActor in
+                await store.syncTaskBoard(
+                  request: TaskBoardSyncRequest(
+                    status: statusChoice.status,
+                    provider: providerChoice.provider,
+                    direction: direction,
+                    dryRun: dryRun
+                  )
+                )
+              }
             }
           }
-        }
-      )
+        )
+      }
 
       if let summary = dashboard.taskBoardSyncSummary {
         let visibleProviders = summary.monitorVisibleProviders
@@ -179,6 +181,7 @@ struct TaskBoardGitHubSyncAvailability: Equatable {
 
 private struct TaskBoardOperationsSyncWarning: View {
   let message: String
+  let showsSeparator: Bool
   let openSettings: @MainActor () -> Void
   @Environment(\.fontScale)
   private var fontScale
@@ -214,9 +217,11 @@ private struct TaskBoardOperationsSyncWarning: View {
     .padding(.vertical, TaskBoardOperationsFormMetrics.rowVerticalPadding)
     .frame(maxWidth: .infinity, alignment: .leading)
     .overlay(alignment: .bottom) {
-      Rectangle()
-        .fill(Color(nsColor: .separatorColor))
-        .frame(height: 0.5)
+      if showsSeparator {
+        Rectangle()
+          .fill(Color(nsColor: .separatorColor))
+          .frame(height: 0.5)
+      }
     }
     .accessibilityIdentifier("harness.task-board.sync.configuration-warning")
   }
