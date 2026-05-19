@@ -75,15 +75,15 @@ struct TaskBoardOperationsSyncCard: View, TaskBoardOperationsHost {
         )
       }
 
+      if let warning = availability.warning {
+        TaskBoardOperationsSyncWarning(message: warning) {
+          openTaskBoardSettings(.githubProject)
+        }
+      }
+
       actionRow(
         showsSeparator: dashboard.taskBoardSyncSummary != nil,
-        accessory: {
-          if let warning = availability.warning {
-            TaskBoardOperationsSyncWarning(message: warning) {
-              openTaskBoardSettings(.githubProject)
-            }
-          }
-        },
+        accessory: { EmptyView() },
         content: {
           actionButton(
             TaskBoardActionButtonDescriptor(
@@ -187,16 +187,20 @@ private struct TaskBoardOperationsSyncWarning: View {
   }
 
   var body: some View {
-    HStack(alignment: .firstTextBaseline, spacing: HarnessMonitorTheme.spacingXS) {
-      Image(systemName: "exclamationmark.triangle.fill")
-        .foregroundStyle(.orange)
-        .imageScale(.small)
-      Text(message)
-        .foregroundStyle(HarnessMonitorTheme.secondaryInk)
-        .lineLimit(2)
-        .multilineTextAlignment(.leading)
-        .fixedSize(horizontal: false, vertical: true)
-        .layoutPriority(1)
+    VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingXS) {
+      HStack(alignment: .top, spacing: HarnessMonitorTheme.spacingXS) {
+        Image(systemName: "exclamationmark.triangle.fill")
+          .foregroundStyle(.orange)
+          .imageScale(.small)
+          .padding(.top, 1)
+        Text(message)
+          .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+          .multilineTextAlignment(.leading)
+          .fixedSize(horizontal: false, vertical: true)
+          .layoutPriority(1)
+      }
+      .frame(maxWidth: .infinity, alignment: .leading)
+
       Button {
         openSettings()
       } label: {
@@ -207,10 +211,17 @@ private struct TaskBoardOperationsSyncWarning: View {
       .harnessActionButtonStyle(variant: .bordered, tint: .secondary)
       .harnessNativeFormControl()
       .fixedSize(horizontal: true, vertical: true)
+      .frame(maxWidth: .infinity, alignment: .trailing)
       .accessibilityIdentifier("harness.task-board.sync.open-settings")
     }
     .font(warningFont)
-    .frame(maxWidth: .infinity, alignment: .trailing)
+    .padding(.vertical, 5)
+    .frame(maxWidth: .infinity, alignment: .leading)
+    .overlay(alignment: .bottom) {
+      Rectangle()
+        .fill(Color(nsColor: .separatorColor))
+        .frame(height: 0.5)
+    }
     .accessibilityIdentifier("harness.task-board.sync.configuration-warning")
   }
 }
