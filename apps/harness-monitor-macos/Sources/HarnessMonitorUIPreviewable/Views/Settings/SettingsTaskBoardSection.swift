@@ -57,9 +57,6 @@ public struct SettingsTaskBoardSection: View {
         }
       }
       .settingsDetailFormStyle()
-      .safeAreaInset(edge: .bottom, alignment: .trailing, spacing: 0) {
-        actionsComposer
-      }
       .accessibilityIdentifier(HarnessMonitorAccessibility.settingsTaskBoardRoot)
       .task { await loadSettings() }
       .onChange(of: navigationRequest, initial: true) { _, request in
@@ -70,39 +67,47 @@ public struct SettingsTaskBoardSection: View {
         scrollToNavigationRequest(navigationRequest, proxy: proxy)
       }
     }
+    .safeAreaInset(edge: .bottom, spacing: 0) {
+      actionsComposer
+    }
   }
 
   private var actionsComposer: some View {
     VStack(spacing: 0) {
       Divider()
-      HarnessMonitorGlassControlGroup(spacing: HarnessMonitorTheme.itemSpacing) {
-        HarnessMonitorWrapLayout(
-          spacing: HarnessMonitorTheme.itemSpacing,
-          lineSpacing: HarnessMonitorTheme.itemSpacing
-        ) {
-          HarnessMonitorAsyncActionButton(
-            title: "Reload",
-            tint: .secondary,
-            variant: .bordered,
-            isLoading: isLoading,
-            accessibilityIdentifier: HarnessMonitorAccessibility.settingsTaskBoardReloadButton,
-            action: loadSettings
-          )
-          HarnessMonitorAsyncActionButton(
-            title: "Save",
-            tint: nil,
-            variant: .prominent,
-            isLoading: isSaving,
-            accessibilityIdentifier: HarnessMonitorAccessibility.settingsTaskBoardSaveButton,
-            action: saveSettings
-          )
-          .disabled(isLoading || loadError != nil)
+      HStack {
+        Spacer(minLength: 0)
+        HarnessMonitorGlassControlGroup(spacing: HarnessMonitorTheme.itemSpacing) {
+          HarnessMonitorWrapLayout(
+            spacing: HarnessMonitorTheme.itemSpacing,
+            lineSpacing: HarnessMonitorTheme.itemSpacing
+          ) {
+            HarnessMonitorAsyncActionButton(
+              title: "Reload",
+              tint: .secondary,
+              variant: .bordered,
+              isLoading: isLoading,
+              accessibilityIdentifier: HarnessMonitorAccessibility.settingsTaskBoardReloadButton,
+              action: loadSettings
+            )
+            HarnessMonitorAsyncActionButton(
+              title: "Save",
+              tint: nil,
+              variant: .prominent,
+              isLoading: isSaving,
+              accessibilityIdentifier: HarnessMonitorAccessibility.settingsTaskBoardSaveButton,
+              action: saveSettings
+            )
+            .disabled(isLoading || loadError != nil)
+          }
         }
       }
       .padding(.horizontal, HarnessMonitorTheme.spacingXL)
       .padding(.vertical, HarnessMonitorTheme.spacingSM)
+      .frame(maxWidth: .infinity, alignment: .trailing)
       .background(.background)
     }
+    .frame(maxWidth: .infinity, alignment: .trailing)
   }
 
   private var workflowSection: some View {

@@ -180,22 +180,17 @@ struct TaskBoardItemRow: View {
       onOpenItem(item)
     } label: {
       VStack(alignment: .leading, spacing: metrics.laneSpacing) {
-        HStack(alignment: .top, spacing: metrics.laneSpacing) {
-          TaskBoardCardLeadingIcon(systemImage: statusSymbol, tint: statusTint)
-            .padding(.top, metrics.cardMarkerTopPadding)
-          VStack(alignment: .leading, spacing: metrics.rowTextSpacing) {
-            Text(item.title)
-              .font(titleFont)
-              .foregroundStyle(HarnessMonitorTheme.ink)
-              .lineLimit(2)
-              .multilineTextAlignment(.leading)
-            Text(item.projectId ?? item.agentMode.title)
-              .font(subtitleFont)
-              .foregroundStyle(HarnessMonitorTheme.secondaryInk)
-              .lineLimit(1)
-              .truncationMode(.middle)
-          }
-          Spacer(minLength: 0)
+        VStack(alignment: .leading, spacing: metrics.rowTextSpacing) {
+          Text(item.title)
+            .font(titleFont)
+            .foregroundStyle(HarnessMonitorTheme.ink)
+            .lineLimit(2)
+            .multilineTextAlignment(.leading)
+          Text(item.projectId ?? item.agentMode.title)
+            .font(subtitleFont)
+            .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+            .lineLimit(1)
+            .truncationMode(.middle)
         }
         HarnessMonitorWrapLayout(
           spacing: metrics.laneBodyTopPadding,
@@ -210,6 +205,11 @@ struct TaskBoardItemRow: View {
         alignment: .topLeading
       )
       .padding(metrics.cardPadding)
+      .taskBoardCardBackgroundGlyph(
+        systemImage: statusSymbol,
+        tint: statusTint,
+        cornerRadius: metrics.cardCornerRadius
+      )
     }
     .taskBoardCardChrome()
     .contentShape(.rect)
@@ -295,22 +295,17 @@ struct TaskBoardInboxItemRow: View {
       onOpenItem(item)
     } label: {
       VStack(alignment: .leading, spacing: metrics.laneSpacing) {
-        HStack(alignment: .top, spacing: metrics.laneSpacing) {
-          TaskBoardCardLeadingIcon(systemImage: statusSymbol, tint: statusTint)
-            .padding(.top, metrics.cardMarkerTopPadding)
-          VStack(alignment: .leading, spacing: metrics.rowTextSpacing) {
-            Text(item.task.title)
-              .font(titleFont)
-              .foregroundStyle(HarnessMonitorTheme.ink)
-              .lineLimit(2)
-              .multilineTextAlignment(.leading)
-            Text(item.subtitle)
-              .font(subtitleFont)
-              .foregroundStyle(HarnessMonitorTheme.secondaryInk)
-              .lineLimit(1)
-              .truncationMode(.middle)
-          }
-          Spacer(minLength: 0)
+        VStack(alignment: .leading, spacing: metrics.rowTextSpacing) {
+          Text(item.task.title)
+            .font(titleFont)
+            .foregroundStyle(HarnessMonitorTheme.ink)
+            .lineLimit(2)
+            .multilineTextAlignment(.leading)
+          Text(item.subtitle)
+            .font(subtitleFont)
+            .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+            .lineLimit(1)
+            .truncationMode(.middle)
         }
         HarnessMonitorWrapLayout(
           spacing: metrics.laneBodyTopPadding,
@@ -325,6 +320,11 @@ struct TaskBoardInboxItemRow: View {
         alignment: .topLeading
       )
       .padding(metrics.cardPadding)
+      .taskBoardCardBackgroundGlyph(
+        systemImage: statusSymbol,
+        tint: statusTint,
+        cornerRadius: metrics.cardCornerRadius
+      )
     }
     .taskBoardCardChrome()
     .contentShape(.rect)
