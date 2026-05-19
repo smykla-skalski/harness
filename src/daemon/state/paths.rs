@@ -128,6 +128,11 @@ pub fn events_path() -> PathBuf {
 }
 
 #[must_use]
+pub fn log_path() -> PathBuf {
+    daemon_root().join("daemon.log")
+}
+
+#[must_use]
 pub fn launch_agent_path() -> PathBuf {
     launch_agents_dir().join(CURRENT_LAUNCH_AGENT_PLIST)
 }

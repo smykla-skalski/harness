@@ -41,7 +41,7 @@ pub use ownership::{DaemonOwnership, ScopedOwnershipOverride};
 pub use paths::{
     ScopedDaemonRootOverride, auth_token_path, base_daemon_dir, config_path, daemon_root,
     daemon_root_for_ownership, default_daemon_root, ensure_daemon_dirs, events_path,
-    launch_agent_path, legacy_launch_agent_path, lock_path, manifest_path,
+    launch_agent_path, legacy_launch_agent_path, lock_path, log_path, manifest_path,
     set_daemon_root_override,
 };
 

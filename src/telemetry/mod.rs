@@ -1,5 +1,6 @@
 mod config;
 mod console_fields;
+mod daemon_file;
 mod guard;
 mod metrics;
 mod profiler;
