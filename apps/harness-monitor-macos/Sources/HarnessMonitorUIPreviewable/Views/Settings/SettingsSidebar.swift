@@ -76,7 +76,9 @@ public enum SettingsChromeMetrics {
 
 struct SettingsDetailFormModifier: ViewModifier {
   func body(content: Content) -> some View {
-    content.harnessNativeFormContainer()
+    content
+      .harnessNativeFormContainer()
+      .modifier(SettingsScrollRestorationModifier())
   }
 }
 
