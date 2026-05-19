@@ -184,6 +184,9 @@ extension HarnessMonitorStore {
     let measuredSessions = refreshSnapshot.sessions
     let measuredTaskBoardItems = refreshSnapshot.taskBoardItems
     let measuredTaskBoardOrchestratorStatus = refreshSnapshot.taskBoardOrchestratorStatus
+    let didChangeTaskBoardSnapshot =
+      globalTaskBoardItems != measuredTaskBoardItems.value
+      || globalTaskBoardOrchestratorStatus != measuredTaskBoardOrchestratorStatus.value
     let generation = beginSessionIndexSnapshotApply()
     guard
       let filteredSnapshot = await preparedSessionIndexSnapshot(
@@ -210,6 +213,12 @@ extension HarnessMonitorStore {
       adoptManifestURL(from: measuredDiagnostics.value.workspace.manifestPath)
       globalTaskBoardItems = measuredTaskBoardItems.value
       globalTaskBoardOrchestratorStatus = measuredTaskBoardOrchestratorStatus.value
+    }
+    if didChangeTaskBoardSnapshot {
+      scheduleTaskBoardSnapshotCacheWrite(
+        items: measuredTaskBoardItems.value,
+        orchestratorStatus: measuredTaskBoardOrchestratorStatus.value
+      )
     }
     clearTransientHostBridgeIssues()
     if recordConnectionTelemetry {

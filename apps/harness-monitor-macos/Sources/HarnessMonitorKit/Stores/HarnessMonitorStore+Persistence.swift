@@ -3,7 +3,8 @@ import SwiftData
 
 extension HarnessMonitorStore {
   private func cancelSupersededPersistenceWork() {
-    cancelPendingCacheWrite()
+    cancelPendingSessionDetailCacheWriteTask()
+    pendingSessionDetailCacheWrites.removeAll()
     sessionSnapshotHydrationTask?.cancel()
     sessionSnapshotHydrationTask = nil
   }
@@ -75,6 +76,30 @@ extension HarnessMonitorStore {
     await applyPersistedCacheWriteResult(result)
   }
 
+  func cacheTaskBoardSnapshot(
+    items: [TaskBoardItem],
+    orchestratorStatus: TaskBoardOrchestratorStatus?
+  ) async {
+    guard let cacheService, persistenceError == nil else { return }
+    let result = await cacheService.cacheTaskBoardSnapshot(
+      items: items,
+      orchestratorStatus: orchestratorStatus
+    )
+    await applyPersistedCacheWriteResult(result)
+  }
+
+  func scheduleTaskBoardSnapshotCacheWrite(
+    items: [TaskBoardItem],
+    orchestratorStatus: TaskBoardOrchestratorStatus?
+  ) {
+    scheduleCacheWrite { cacheService in
+      await cacheService.cacheTaskBoardSnapshot(
+        items: items,
+        orchestratorStatus: orchestratorStatus
+      )
+    }
+  }
+
   func pruneRemovedSessionFromCache(
     sessions: [SessionSummary],
     projects: [ProjectSummary]
@@ -98,6 +123,11 @@ extension HarnessMonitorStore {
   ) async -> SessionCacheService.CachedSessionSnapshot? {
     guard let cacheService, persistenceError == nil else { return nil }
     return await cacheService.loadSessionDetail(sessionID: sessionID)
+  }
+
+  func loadCachedTaskBoardSnapshot() async -> SessionCacheService.CachedTaskBoardState? {
+    guard let cacheService, persistenceError == nil else { return nil }
+    return await cacheService.loadTaskBoardSnapshot()
   }
 
   func refreshPersistedSessionMetadata() async {
@@ -267,6 +297,8 @@ extension HarnessMonitorStore {
     }
 
     switch result.metadataUpdate {
+    case .none:
+      break
     case .refresh:
       await refreshPersistedSessionMetadata()
     case .advance(let insertedSessionCount):

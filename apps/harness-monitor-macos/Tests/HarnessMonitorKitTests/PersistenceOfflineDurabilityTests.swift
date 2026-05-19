@@ -40,6 +40,53 @@ struct PersistenceOfflineDurabilityTests {
       ))
   }
 
+  private func makeTaskBoardItem(
+    id: String,
+    provider: TaskBoardExternalRefProvider,
+    externalId: String
+  ) -> TaskBoardItem {
+    TaskBoardItem(
+      schemaVersion: 1,
+      id: id,
+      title: "Cache \(id)",
+      body: "Persist external task-board entries",
+      status: .todo,
+      priority: .high,
+      tags: ["cache"],
+      projectId: "proj-task-board",
+      agentMode: .interactive,
+      externalRefs: [
+        TaskBoardExternalRef(
+          provider: provider,
+          externalId: externalId,
+          url: "https://example.invalid/\(externalId)"
+        )
+      ],
+      planning: TaskBoardPlanningState(summary: "Cache external items"),
+      workflow: nil,
+      sessionId: nil,
+      workItemId: nil,
+      usage: TaskBoardUsage(),
+      createdAt: "2026-05-19T10:00:00Z",
+      updatedAt: "2026-05-19T10:05:00Z",
+      deletedAt: nil
+    )
+  }
+
+  private func makeTaskBoardOrchestratorStatus() -> TaskBoardOrchestratorStatus {
+    TaskBoardOrchestratorStatus(
+      enabled: true,
+      running: false,
+      workflowExecutionCounts: [TaskBoardWorkflowExecutionCount(status: .completed, count: 2)],
+      settings: TaskBoardOrchestratorSettings(
+        enabledWorkflows: [.defaultTask],
+        dryRunDefault: false,
+        dispatchStatusFilter: .todo,
+        policyVersion: "2026-05-19"
+      )
+    )
+  }
+
   private func makeV1Container(at url: URL) throws -> ModelContainer {
     let schema = Schema(versionedSchema: HarnessMonitorSchemaV1.self)
     let config = ModelConfiguration("HarnessMonitorStore", schema: schema, url: url)
@@ -236,6 +283,78 @@ struct PersistenceOfflineDurabilityTests {
     #expect(relaunchedStore.isShowingCachedData)
   }
 
+  @Test("Offline bootstrap restores cached task-board items after relaunch")
+  func offlineBootstrapRestoresCachedTaskBoardItemsAfterRelaunch() async throws {
+    let githubItem = makeTaskBoardItem(
+      id: "board-github",
+      provider: .gitHub,
+      externalId: "123"
+    )
+    let todoistItem = makeTaskBoardItem(
+      id: "board-todoist",
+      provider: .todoist,
+      externalId: "456"
+    )
+    let orchestratorStatus = makeTaskBoardOrchestratorStatus()
+
+    do {
+      let liveStore = HarnessMonitorStore(
+        daemonController: RecordingDaemonController(),
+        modelContainer: previewContainer
+      )
+      await liveStore.cacheTaskBoardSnapshot(
+        items: [githubItem, todoistItem],
+        orchestratorStatus: orchestratorStatus
+      )
+    }
+
+    let relaunchedStore = HarnessMonitorStore(
+      daemonController: FailingDaemonController(
+        bootstrapError: DaemonControlError.daemonOffline
+      ),
+      modelContainer: previewContainer
+    )
+
+    await relaunchedStore.bootstrap()
+
+    #expect(
+      relaunchedStore.connectionState
+        == .offline(DaemonControlError.daemonOffline.localizedDescription)
+    )
+    #expect(relaunchedStore.globalTaskBoardItems.map(\.id) == ["board-github", "board-todoist"])
+    #expect(
+      relaunchedStore.globalTaskBoardItems.map(\.externalRefs.first?.provider)
+        == [.gitHub, .todoist]
+    )
+    #expect(relaunchedStore.globalTaskBoardOrchestratorStatus == orchestratorStatus)
+  }
+
+  @Test("Restore keeps live task-board items when the persisted snapshot is stale")
+  func restoreKeepsLiveTaskBoardItemsWhenPersistedSnapshotIsStale() async throws {
+    let persistedItem = makeTaskBoardItem(
+      id: "board-persisted",
+      provider: .gitHub,
+      externalId: "persisted"
+    )
+    let liveItem = makeTaskBoardItem(
+      id: "board-live",
+      provider: .todoist,
+      externalId: "live"
+    )
+    let store = makeStore()
+    await store.cacheTaskBoardSnapshot(
+      items: [persistedItem],
+      orchestratorStatus: makeTaskBoardOrchestratorStatus()
+    )
+    store.globalTaskBoardItems = [liveItem]
+    store.connectionState = .offline("daemon down")
+
+    await store.restorePersistedSessionState()
+
+    #expect(store.globalTaskBoardItems.map(\.id) == ["board-live"])
+    #expect(store.globalTaskBoardItems.first?.externalRefs.first?.provider == .todoist)
+  }
+
   @Test("Offline mode keeps local bookmarks notes filters and search history editable")
   func offlineModeKeepsLocalOnlyDataEditable() async throws {
     let store = makeStore()
@@ -315,6 +434,54 @@ struct PersistenceOfflineDurabilityTests {
     await reopenedStore.refreshPersistedSessionMetadata()
     #expect(reopenedStore.persistedSessionCount == 1)
     #expect(reopenedStore.lastPersistedSnapshotAt != nil)
+  }
+
+  @Test("Live SwiftData store reopens persisted task-board snapshots across store recreation")
+  func liveStoreReopensPersistedTaskBoardSnapshotsAcrossStoreRecreation() async throws {
+    let root = FileManager.default.temporaryDirectory
+      .appendingPathComponent(UUID().uuidString, isDirectory: true)
+    defer { try? FileManager.default.removeItem(at: root) }
+
+    let environment = HarnessMonitorEnvironment(
+      values: ["XDG_DATA_HOME": root.path],
+      homeDirectory: root
+    )
+    let githubItem = makeTaskBoardItem(
+      id: "board-live-github",
+      provider: .gitHub,
+      externalId: "321"
+    )
+    let todoistItem = makeTaskBoardItem(
+      id: "board-live-todoist",
+      provider: .todoist,
+      externalId: "654"
+    )
+    let orchestratorStatus = makeTaskBoardOrchestratorStatus()
+
+    do {
+      let firstContainer = try HarnessMonitorModelContainer.live(using: environment)
+      let firstStore = HarnessMonitorStore(
+        daemonController: RecordingDaemonController(),
+        modelContainer: firstContainer
+      )
+      await firstStore.cacheTaskBoardSnapshot(
+        items: [githubItem, todoistItem],
+        orchestratorStatus: orchestratorStatus
+      )
+    }
+
+    let reopenedContainer = try HarnessMonitorModelContainer.live(using: environment)
+    let reopenedStore = HarnessMonitorStore(
+      daemonController: RecordingDaemonController(),
+      modelContainer: reopenedContainer
+    )
+
+    let cached = await reopenedStore.loadCachedTaskBoardSnapshot()
+
+    #expect(cached?.items.map(\.id) == ["board-live-github", "board-live-todoist"])
+    #expect(cached?.items.map(\.externalRefs.first?.provider) == [.gitHub, .todoist])
+    #expect(cached?.orchestratorStatus == orchestratorStatus)
+    #expect(cached?.cachedAt != nil)
   }
 
   @Test("Live SwiftData store migrates V1 cache records into the current repo and worktree schema")

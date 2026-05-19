@@ -158,6 +158,58 @@ extension SessionCacheService {
     return result
   }
 
+  func loadTaskBoardSnapshot() -> CachedTaskBoardState? {
+    let startedAt = ContinuousClock.now
+    let context = makeContext()
+    let snapshotID = CachedTaskBoardSnapshot.globalSnapshotID
+    var descriptor = FetchDescriptor<CachedTaskBoardSnapshot>(
+      predicate: #Predicate { $0.snapshotID == snapshotID }
+    )
+    descriptor.fetchLimit = 1
+
+    guard let cached = try? context.fetch(descriptor).first else {
+      #if HARNESS_FEATURE_OTEL
+        let durationMs = harnessMonitorDurationMilliseconds(startedAt.duration(to: .now))
+        HarnessMonitorTelemetry.shared.recordCacheRead(
+          operation: "load_task_board_snapshot", hit: false, durationMs: durationMs
+        )
+      #else
+        _ = startedAt
+      #endif
+      return nil
+    }
+
+    do {
+      let result = CachedTaskBoardState(
+        items: try cached.decodedItems(),
+        orchestratorStatus: try cached.decodedOrchestratorStatus(),
+        cachedAt: cached.cachedAt
+      )
+      #if HARNESS_FEATURE_OTEL
+        let durationMs = harnessMonitorDurationMilliseconds(startedAt.duration(to: .now))
+        HarnessMonitorTelemetry.shared.recordCacheRead(
+          operation: "load_task_board_snapshot", hit: true, durationMs: durationMs
+        )
+      #else
+        _ = startedAt
+      #endif
+      return result
+    } catch {
+      HarnessMonitorLogger.store.warning(
+        "load task board snapshot failed: \(error.localizedDescription, privacy: .public)"
+      )
+      #if HARNESS_FEATURE_OTEL
+        let durationMs = harnessMonitorDurationMilliseconds(startedAt.duration(to: .now))
+        HarnessMonitorTelemetry.shared.recordCacheRead(
+          operation: "load_task_board_snapshot", hit: false, durationMs: durationMs
+        )
+      #else
+        _ = startedAt
+      #endif
+      return nil
+    }
+  }
+
   func recentlyViewedSessionIDs(limit: Int? = nil) -> [String] {
     let startedAt = ContinuousClock.now
     let context = makeContext()

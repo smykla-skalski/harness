@@ -36,11 +36,13 @@ extension HarnessMonitorStore {
     if let cached = await loadCachedSessionDetail(sessionID: sessionID) {
       guard !Task.isCancelled else { return nil }
       let cachedTranscript = cached.transcript ?? []
+      let cachedTaskBoardItems = await loadCachedTaskBoardSnapshot()?.items
       return HarnessMonitorSessionWindowSnapshot(
         summary: cached.detail.session,
         detail: cached.detail,
         acpAgents: [],
         acpInspectSample: nil,
+        taskBoardItems: cachedTaskBoardItems,
         timeline: cached.timeline,
         transcript: cachedTranscript,
         transcriptSource: cached.transcriptSource

@@ -3,6 +3,7 @@ import SwiftData
 
 public actor SessionCacheService {
   enum MetadataUpdate: Sendable {
+    case none
     case refresh
     case advance(insertedSessionCount: Int)
   }
@@ -56,6 +57,12 @@ public actor SessionCacheService {
       self.transcript = transcript
       self.transcriptSource = transcriptSource
     }
+  }
+
+  struct CachedTaskBoardState: Sendable {
+    let items: [TaskBoardItem]
+    let orchestratorStatus: TaskBoardOrchestratorStatus?
+    let cachedAt: Date
   }
 
   func makeContext() -> ModelContext {

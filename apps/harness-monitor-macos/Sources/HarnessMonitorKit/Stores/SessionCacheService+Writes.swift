@@ -175,6 +175,38 @@ extension SessionCacheService {
     )
   }
 
+  func cacheTaskBoardSnapshot(
+    items: [TaskBoardItem],
+    orchestratorStatus: TaskBoardOrchestratorStatus?
+  ) async -> WriteResult {
+    let context = makeContext()
+    let snapshotID = CachedTaskBoardSnapshot.globalSnapshotID
+    do {
+      var descriptor = FetchDescriptor<CachedTaskBoardSnapshot>(
+        predicate: #Predicate { $0.snapshotID == snapshotID }
+      )
+      descriptor.fetchLimit = 1
+      if let existing = try context.fetch(descriptor).first {
+        try existing.update(items: items, orchestratorStatus: orchestratorStatus)
+      } else {
+        context.insert(
+          try CachedTaskBoardSnapshot.make(
+            items: items,
+            orchestratorStatus: orchestratorStatus
+          )
+        )
+      }
+    } catch {
+      HarnessMonitorLogger.store.warning(
+        "cache task board snapshot failed: \(error.localizedDescription, privacy: .public)"
+      )
+      return WriteResult(didPersist: false, metadataUpdate: .none)
+    }
+
+    let didPersist = await persist(context, operation: "cache task board snapshot")
+    return WriteResult(didPersist: didPersist, metadataUpdate: .none)
+  }
+
   func replaceSessionWindowsOpenAtQuit(
     sessionIDs: Set<String>
   ) async -> WriteResult {
