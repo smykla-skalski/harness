@@ -5,9 +5,18 @@ public enum FeatureFlag: String, CaseIterable, Sendable {
     case otel = "HARNESS_FEATURE_OTEL"
     case textual = "HARNESS_FEATURE_TEXTUAL"
 
+    private var enabledByDefault: Bool {
+        switch self {
+        case .otel:
+            false
+        case .textual:
+            false
+        }
+    }
+
     public var isEnabled: Bool {
         guard let raw = ProcessInfo.processInfo.environment[rawValue]?.lowercased() else {
-            return false
+            return enabledByDefault
         }
         return ["1", "true", "yes", "on"].contains(raw)
     }
