@@ -163,7 +163,7 @@ private struct SettingsTaskBoardInboxEntryList: View {
   }
 
   private var addRow: some View {
-    HStack(alignment: .firstTextBaseline, spacing: HarnessMonitorTheme.spacingSM) {
+    HStack(alignment: .center, spacing: HarnessMonitorTheme.spacingSM) {
       SettingsTaskBoardInboxTextField(
         placeholder: inputPlaceholder,
         text: $input,
@@ -312,7 +312,7 @@ private struct SettingsTaskBoardInboxRepositoryList: View {
   }
 
   private var addRow: some View {
-    HStack(alignment: .firstTextBaseline, spacing: HarnessMonitorTheme.spacingSM) {
+    HStack(alignment: .center, spacing: HarnessMonitorTheme.spacingSM) {
       SettingsTaskBoardInboxTextField(
         placeholder: "owner",
         text: $ownerInput,
@@ -360,49 +360,5 @@ private struct SettingsTaskBoardInboxRepositoryList: View {
       return (entry, "")
     }
     return (String(parts[0]), String(parts[1]))
-  }
-}
-
-private struct SettingsTaskBoardInboxTextField: View {
-  let placeholder: String
-  @Binding var text: String
-  let accessibilityIdentifier: String
-  let onSubmit: () -> Void
-
-  @Environment(\.fontScale)
-  private var fontScale
-
-  private var bodyFont: Font {
-    HarnessMonitorTextSize.scaledFont(.body, by: fontScale)
-  }
-
-  var body: some View {
-    ZStack(alignment: .leading) {
-      if text.isEmpty {
-        Text(placeholder)
-          .font(bodyFont)
-          .foregroundStyle(HarnessMonitorTheme.tertiaryInk)
-          .allowsHitTesting(false)
-      }
-
-      TextField("", text: $text)
-        .font(bodyFont)
-        .textFieldStyle(.plain)
-        .multilineTextAlignment(.leading)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .onSubmit(onSubmit)
-    }
-    .padding(.horizontal, HarnessMonitorTheme.spacingSM)
-    .frame(maxWidth: .infinity, minHeight: 34, alignment: .leading)
-    .background {
-      RoundedRectangle(cornerRadius: 8, style: .continuous)
-        .fill(Color(nsColor: .textBackgroundColor).opacity(0.42))
-    }
-    .overlay {
-      RoundedRectangle(cornerRadius: 8, style: .continuous)
-        .stroke(Color(nsColor: .separatorColor).opacity(0.62), lineWidth: 1)
-    }
-    .accessibilityLabel(placeholder)
-    .accessibilityIdentifier(accessibilityIdentifier)
   }
 }
