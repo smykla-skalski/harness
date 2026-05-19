@@ -5,6 +5,7 @@ struct HarnessMonitorInlineTextField: View {
   let title: String
   @Binding var text: String
   let prompt: String
+  let hasVisibleLabel: Bool
   let accessibilityIdentifier: String?
   let fieldAlignment: Alignment
   let textAlignment: TextAlignment
@@ -15,6 +16,7 @@ struct HarnessMonitorInlineTextField: View {
     title: String,
     text: Binding<String>,
     prompt: String,
+    hasVisibleLabel: Bool = false,
     accessibilityIdentifier: String? = nil,
     fieldAlignment: Alignment = .leading,
     textAlignment: TextAlignment = .leading,
@@ -22,7 +24,8 @@ struct HarnessMonitorInlineTextField: View {
   ) {
     self.title = title
     _text = text
-    self.prompt = prompt
+    self.prompt = hasVisibleLabel && prompt == title ? "" : prompt
+    self.hasVisibleLabel = hasVisibleLabel
     self.accessibilityIdentifier = accessibilityIdentifier
     self.fieldAlignment = fieldAlignment
     self.textAlignment = textAlignment
@@ -68,6 +71,7 @@ struct HarnessMonitorInlineMultilineTextField: View {
   let title: String
   @Binding var text: String
   let prompt: String
+  let hasVisibleLabel: Bool
   let accessibilityIdentifier: String?
   let minHeight: CGFloat
   private let maxHeight: CGFloat?
@@ -82,13 +86,15 @@ struct HarnessMonitorInlineMultilineTextField: View {
     title: String,
     text: Binding<String>,
     prompt: String,
+    hasVisibleLabel: Bool = false,
     accessibilityIdentifier: String? = nil,
     minHeight: CGFloat,
     maxHeight: CGFloat? = nil
   ) {
     self.title = title
     _text = text
-    self.prompt = prompt
+    self.prompt = hasVisibleLabel && prompt == title ? "" : prompt
+    self.hasVisibleLabel = hasVisibleLabel
     self.accessibilityIdentifier = accessibilityIdentifier
     self.minHeight = minHeight
     self.maxHeight = maxHeight.map { max(minHeight, $0) }
@@ -96,7 +102,7 @@ struct HarnessMonitorInlineMultilineTextField: View {
 
   var body: some View {
     ZStack(alignment: .topLeading) {
-      if text.isEmpty {
+      if text.isEmpty && !prompt.isEmpty {
         Text(prompt)
           .font(HarnessMonitorTextSize.nativeInputFont(at: textSizeIndex))
           .foregroundStyle(HarnessMonitorTheme.tertiaryInk)

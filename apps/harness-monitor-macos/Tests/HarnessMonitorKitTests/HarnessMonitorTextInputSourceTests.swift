@@ -84,9 +84,11 @@ struct HarnessMonitorTextInputSourceTests {
 
     #expect(source.contains("struct HarnessMonitorInlineTextField"))
     #expect(source.contains("struct HarnessMonitorInlineMultilineTextField"))
+    #expect(source.contains("self.prompt = hasVisibleLabel && prompt == title ? \"\" : prompt"))
     #expect(source.contains("TextEditor(text: $text)"))
     #expect(source.contains(".scrollContentBackground(.hidden)"))
     #expect(source.contains("ZStack(alignment: .topLeading)"))
+    #expect(source.contains("if text.isEmpty && !prompt.isEmpty"))
     #expect(source.contains(".allowsHitTesting(false)"))
     #expect(source.contains(".clipped()"))
     #expect(source.contains("colorSchemeContrast == .increased ? 4 : 3"))

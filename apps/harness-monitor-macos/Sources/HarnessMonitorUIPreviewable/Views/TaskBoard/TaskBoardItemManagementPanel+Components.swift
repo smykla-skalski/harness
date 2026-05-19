@@ -62,6 +62,7 @@ struct TaskBoardManagementNativeField: View {
         title: label,
         text: $text,
         prompt: label,
+        hasVisibleLabel: true,
         accessibilityIdentifier: nil,
         fieldAlignment: .leading,
         textAlignment: .leading,
@@ -149,6 +150,7 @@ struct TaskBoardManagementMultilineField: View {
         title: label,
         text: $text,
         prompt: label,
+        hasVisibleLabel: true,
         accessibilityIdentifier: accessibilityIdentifier,
         minHeight: minHeight,
         maxHeight: minHeight

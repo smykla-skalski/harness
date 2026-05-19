@@ -230,7 +230,6 @@ struct TaskBoardItemRow: View {
   }
 
   @ViewBuilder private var badgeContent: some View {
-    TaskBoardCardPill(label: item.status.title, tint: statusTint)
     TaskBoardCardPill(label: item.priority.title, tint: priorityColor(for: item.priority))
     if let policyTraceCount = item.workflow?.policyTraceIds.count, policyTraceCount > 0 {
       TaskBoardCardPill(label: "\(policyTraceCount) policy", tint: HarnessMonitorTheme.secondaryInk)
