@@ -161,7 +161,7 @@ private struct TaskBoardDescriptionEditor: View {
   let minHeight: CGFloat
 
   var body: some View {
-    TaskBoardOperationsMultilineTextField(
+    HarnessMonitorInlineMultilineTextField(
       title: "Description",
       text: $text,
       prompt: "Description",

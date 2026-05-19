@@ -1,6 +1,7 @@
 import SwiftUI
 
-struct TaskBoardOperationsTextField: View {
+/// Shared painted text field for dense panels that need inline chrome.
+struct HarnessMonitorInlineTextField: View {
   let title: String
   @Binding var text: String
   let prompt: String
@@ -15,8 +16,8 @@ struct TaskBoardOperationsTextField: View {
     text: Binding<String>,
     prompt: String,
     accessibilityIdentifier: String? = nil,
-    fieldAlignment: Alignment = .trailing,
-    textAlignment: TextAlignment = .trailing,
+    fieldAlignment: Alignment = .leading,
+    textAlignment: TextAlignment = .leading,
     showsClearButton: Bool = true
   ) {
     self.title = title
@@ -53,7 +54,7 @@ struct TaskBoardOperationsTextField: View {
       }
     }
     .frame(minWidth: 0, maxWidth: .infinity, alignment: fieldAlignment)
-    .modifier(TaskBoardOperationsTextFieldChrome(isFocused: isFocused))
+    .modifier(HarnessMonitorInlineFieldChromeModifier(isFocused: isFocused))
     .contentShape(Rectangle())
     .onTapGesture {
       isFocused = true
@@ -61,7 +62,9 @@ struct TaskBoardOperationsTextField: View {
   }
 }
 
-struct TaskBoardOperationsMultilineTextField: View {
+/// Shared painted multiline editor for dense panels that need inline chrome
+/// instead of the default rounded-border field.
+struct HarnessMonitorInlineMultilineTextField: View {
   let title: String
   @Binding var text: String
   let prompt: String
@@ -113,7 +116,7 @@ struct TaskBoardOperationsMultilineTextField: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     }
     .modifier(
-      TaskBoardOperationsTextFieldChrome(
+      HarnessMonitorInlineFieldChromeModifier(
         isFocused: isFocused,
         usesFixedHeight: false,
         minHeight: minHeight,
@@ -140,7 +143,7 @@ struct TaskBoardOperationsMultilineTextField: View {
   }
 }
 
-private struct TaskBoardOperationsTextFieldChrome: ViewModifier {
+private struct HarnessMonitorInlineFieldChromeModifier: ViewModifier {
   let isFocused: Bool
   let usesFixedHeight: Bool
   let minHeight: CGFloat?
@@ -227,7 +230,7 @@ private struct TaskBoardOperationsTextFieldChrome: ViewModifier {
   }
 
   private var focusedStrokeWidth: CGFloat {
-    colorSchemeContrast == .increased ? 2 : 1.5
+    colorSchemeContrast == .increased ? 4 : 3
   }
 
   func body(content: Content) -> some View {

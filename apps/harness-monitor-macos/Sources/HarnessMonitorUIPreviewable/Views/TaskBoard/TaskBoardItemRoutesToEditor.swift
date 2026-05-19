@@ -97,17 +97,23 @@ struct TaskBoardItemRoutesToEditor: View {
 
   private var addRow: some View {
     HStack(spacing: HarnessMonitorTheme.spacingSM) {
-      TextField("Add project type", text: $draftEntry)
-        .harnessNativeTextField()
-        .accessibilityIdentifier("harness.task-board.manage-item.routes-to.input")
+      HarnessMonitorInlineTextField(
+        title: "Add project type",
+        text: $draftEntry,
+        prompt: "Add project type",
+        accessibilityIdentifier: "harness.task-board.manage-item.routes-to.input",
+        fieldAlignment: .leading,
+        textAlignment: .leading,
+        showsClearButton: false
+      )
         .onSubmit { commitDraftEntry() }
       Button {
         commitDraftEntry()
       } label: {
         Label("Add", systemImage: "plus")
-          .font(captionSemibold)
       }
       .controlSize(HarnessMonitorControlMetrics.compactControlSize)
+      .harnessActionButtonStyle(variant: .bordered, tint: .secondary)
       .disabled(isActionInFlight || normalizedDraftEntry == nil)
       .accessibilityIdentifier("harness.task-board.manage-item.routes-to.add")
     }
