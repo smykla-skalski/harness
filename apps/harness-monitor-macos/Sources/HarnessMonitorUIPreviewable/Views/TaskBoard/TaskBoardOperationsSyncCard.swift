@@ -188,11 +188,12 @@ private struct TaskBoardOperationsSyncWarning: View {
   }
 
   var body: some View {
-    HStack(alignment: .firstTextBaseline, spacing: HarnessMonitorTheme.spacingXS) {
+    VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingXS) {
       Text(message)
         .foregroundStyle(HarnessMonitorTheme.caution)
         .multilineTextAlignment(.leading)
         .fixedSize(horizontal: false, vertical: true)
+        .frame(maxWidth: .infinity, alignment: .leading)
         .layoutPriority(1)
 
       Button {
@@ -202,9 +203,10 @@ private struct TaskBoardOperationsSyncWarning: View {
           .labelStyle(.titleAndIcon)
           .lineLimit(1)
       }
-      .harnessActionButtonStyle(variant: .bordered, tint: .secondary)
+      .harnessActionButtonStyle(variant: .prominent, tint: HarnessMonitorTheme.accent)
       .harnessNativeFormControl()
       .fixedSize(horizontal: true, vertical: true)
+      .frame(maxWidth: .infinity, alignment: .leading)
       .accessibilityLabel("Open Task Board Settings")
       .accessibilityIdentifier("harness.task-board.sync.open-settings")
     }
