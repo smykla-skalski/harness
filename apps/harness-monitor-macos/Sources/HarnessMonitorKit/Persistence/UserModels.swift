@@ -132,3 +132,77 @@ extension NotificationHistoryRecord {
     try Codecs.decoder.decode(NotificationHistoryEntry.self, from: snapshotData)
   }
 }
+
+@Model
+public final class CachedTaskBoardSnapshot {
+  #Unique<CachedTaskBoardSnapshot>([\.snapshotID])
+  #Index<CachedTaskBoardSnapshot>([\.cachedAt])
+
+  public var snapshotID: String
+  public var cachedAt: Date
+  public var itemsData: Data
+  public var orchestratorStatusData: Data
+
+  public init(
+    snapshotID: String = "global-task-board",
+    cachedAt: Date = .now,
+    itemsData: Data = Data(),
+    orchestratorStatusData: Data = Data()
+  ) {
+    self.snapshotID = snapshotID
+    self.cachedAt = cachedAt
+    self.itemsData = itemsData
+    self.orchestratorStatusData = orchestratorStatusData
+  }
+}
+
+extension CachedTaskBoardSnapshot {
+  public static var globalSnapshotID: String {
+    "global-task-board"
+  }
+
+  static func make(
+    items: [TaskBoardItem],
+    orchestratorStatus: TaskBoardOrchestratorStatus?
+  ) throws -> CachedTaskBoardSnapshot {
+    try CachedTaskBoardSnapshot(
+      itemsData: Codecs.encoder.encode(items),
+      orchestratorStatusData: encodedOrchestratorStatus(orchestratorStatus)
+    )
+  }
+
+  func update(
+    items: [TaskBoardItem],
+    orchestratorStatus: TaskBoardOrchestratorStatus?
+  ) throws {
+    cachedAt = .now
+    itemsData = try Codecs.encoder.encode(items)
+    orchestratorStatusData = try encodedOrchestratorStatus(orchestratorStatus)
+  }
+
+  func decodedItems() throws -> [TaskBoardItem] {
+    guard !itemsData.isEmpty else {
+      return []
+    }
+    return try Codecs.decoder.decode([TaskBoardItem].self, from: itemsData)
+  }
+
+  func decodedOrchestratorStatus() throws -> TaskBoardOrchestratorStatus? {
+    guard !orchestratorStatusData.isEmpty else {
+      return nil
+    }
+    return try Codecs.decoder.decode(
+      TaskBoardOrchestratorStatus.self,
+      from: orchestratorStatusData
+    )
+  }
+}
+
+private func encodedOrchestratorStatus(
+  _ orchestratorStatus: TaskBoardOrchestratorStatus?
+) throws -> Data {
+  guard let orchestratorStatus else {
+    return Data()
+  }
+  return try Codecs.encoder.encode(orchestratorStatus)
+}

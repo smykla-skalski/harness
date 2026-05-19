@@ -73,7 +73,7 @@ struct SessionWindowRouteContentMetricsTests {
 
     #expect(large.laneWidth > regular.laneWidth)
     #expect(large.laneFixedHeight > regular.laneFixedHeight)
-    #expect(large.cardMinHeight > regular.cardMinHeight)
+    #expect(large.cardMarkerSize > regular.cardMarkerSize)
     #expect(large.cardPadding > regular.cardPadding)
     #expect(large.pillHorizontalPadding > regular.pillHorizontalPadding)
     #expect(large.headerIconWidth > regular.headerIconWidth)

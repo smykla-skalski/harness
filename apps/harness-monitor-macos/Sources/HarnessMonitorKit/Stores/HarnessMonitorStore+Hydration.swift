@@ -55,6 +55,9 @@ extension HarnessMonitorStore {
 
     guard connectionState == .connecting else { return }
 
+    await restorePersistedTaskBoardState()
+    guard connectionState == .connecting else { return }
+
     withUISyncBatch {
       isShowingCachedCatalog = persistedSessionCount > 0 || !sessions.isEmpty
     }
@@ -138,6 +141,26 @@ extension HarnessMonitorStore {
     }
   }
 
+  func restorePersistedTaskBoardState() async {
+    let shouldRestoreItems = globalTaskBoardItems.isEmpty
+    let shouldRestoreStatus = globalTaskBoardOrchestratorStatus == nil
+    guard shouldRestoreItems || shouldRestoreStatus else {
+      return
+    }
+    guard let cached = await loadCachedTaskBoardSnapshot() else {
+      return
+    }
+
+    withUISyncBatch {
+      if shouldRestoreItems {
+        globalTaskBoardItems = cached.items
+      }
+      if shouldRestoreStatus {
+        globalTaskBoardOrchestratorStatus = cached.orchestratorStatus
+      }
+    }
+  }
+
   func restorePersistedSessionSelection(sessionID: String) async {
     if let cached = await loadCachedSessionDetail(sessionID: sessionID) {
       applyCachedSelectedSessionSnapshot(
@@ -181,6 +204,8 @@ extension HarnessMonitorStore {
       }
       replaceCachedSessionIndexSnapshot(filteredCached, updateCachedCatalogFlag: false)
     }
+
+    await restorePersistedTaskBoardState()
 
     if case .offline = connectionState {
       withUISyncBatch {

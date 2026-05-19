@@ -63,10 +63,20 @@ extension HarnessMonitorStore {
     async let status = Self.loadTaskBoardOrchestratorStatusSnapshot(using: client)
     let measuredItems = await items
     let measuredStatus = await status
+    let resolvedStatus = measuredStatus.value ?? fallbackStatus
+    let didChangeTaskBoardSnapshot =
+      globalTaskBoardItems != measuredItems.value
+      || globalTaskBoardOrchestratorStatus != resolvedStatus
 
     withUISyncBatch {
       globalTaskBoardItems = measuredItems.value
-      globalTaskBoardOrchestratorStatus = measuredStatus.value ?? fallbackStatus
+      globalTaskBoardOrchestratorStatus = resolvedStatus
+    }
+    if didChangeTaskBoardSnapshot {
+      scheduleTaskBoardSnapshotCacheWrite(
+        items: measuredItems.value,
+        orchestratorStatus: resolvedStatus
+      )
     }
   }
 

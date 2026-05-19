@@ -102,6 +102,38 @@ public enum HarnessMonitorSchemaV15: VersionedSchema {
   }
 }
 
+/// V16 is purely additive: task-board items and orchestrator status persist in a
+/// single app-global snapshot row keyed by `snapshotID`. Existing user/cache rows
+/// remain untouched, so lightweight migration is correct.
+public enum HarnessMonitorSchemaV16: VersionedSchema {
+  public static var versionIdentifier: Schema.Version { Schema.Version(16, 0, 0) }
+
+  public static var models: [any PersistentModel.Type] {
+    [
+      HarnessMonitorSchemaV14.CachedProject.self,
+      HarnessMonitorSchemaV14.CachedSession.self,
+      HarnessMonitorSchemaV14.CachedAgent.self,
+      HarnessMonitorSchemaV14.CachedWorkItem.self,
+      HarnessMonitorSchemaV14.CachedSignalRecord.self,
+      HarnessMonitorSchemaV14.CachedTimelineEntry.self,
+      HarnessMonitorSchemaV14.CachedObserver.self,
+      HarnessMonitorSchemaV14.CachedAgentActivity.self,
+      SessionBookmark.self,
+      UserNote.self,
+      RecentSearch.self,
+      ProjectFilterPreference.self,
+      NotificationHistoryRecord.self,
+      CachedTaskBoardSnapshot.self,
+      Decision.self,
+      SupervisorEvent.self,
+      PolicyConfigRow.self,
+      HarnessMonitorSchemaV8.CachedTaskReviewMetadata.self,
+      HarnessMonitorSchemaV10.CachedSessionWindowState.self,
+      HarnessMonitorSchemaV12.CachedSessionTranscriptEntry.self,
+    ]
+  }
+}
+
 public enum HarnessMonitorMigrationPlan: SchemaMigrationPlan {
   public static var schemas: [any VersionedSchema.Type] {
     [
@@ -120,6 +152,7 @@ public enum HarnessMonitorMigrationPlan: SchemaMigrationPlan {
       HarnessMonitorSchemaV13.self,
       HarnessMonitorSchemaV14.self,
       HarnessMonitorSchemaV15.self,
+      HarnessMonitorSchemaV16.self,
     ]
   }
 
@@ -139,6 +172,7 @@ public enum HarnessMonitorMigrationPlan: SchemaMigrationPlan {
       migrateV12toV13,
       migrateV13toV14,
       migrateV14toV15,
+      migrateV15toV16,
     ]
   }
 
@@ -250,6 +284,11 @@ public enum HarnessMonitorMigrationPlan: SchemaMigrationPlan {
     fromVersion: HarnessMonitorSchemaV14.self,
     toVersion: HarnessMonitorSchemaV15.self
   )
+
+  static let migrateV15toV16 = MigrationStage.lightweight(
+    fromVersion: HarnessMonitorSchemaV15.self,
+    toVersion: HarnessMonitorSchemaV16.self
+  )
 }
 
-public typealias HarnessMonitorCurrentSchema = HarnessMonitorSchemaV15
+public typealias HarnessMonitorCurrentSchema = HarnessMonitorSchemaV16

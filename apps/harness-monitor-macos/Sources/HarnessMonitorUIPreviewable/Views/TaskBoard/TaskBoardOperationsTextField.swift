@@ -4,11 +4,29 @@ struct TaskBoardOperationsTextField: View {
   let title: String
   @Binding var text: String
   let prompt: String
-  let accessibilityIdentifier: String? = nil
-  let fieldAlignment: Alignment = .trailing
-  let textAlignment: TextAlignment = .trailing
-  let showsClearButton: Bool = true
+  let accessibilityIdentifier: String?
+  let fieldAlignment: Alignment
+  let textAlignment: TextAlignment
+  let showsClearButton: Bool
   @FocusState private var isFocused: Bool
+
+  init(
+    title: String,
+    text: Binding<String>,
+    prompt: String,
+    accessibilityIdentifier: String? = nil,
+    fieldAlignment: Alignment = .trailing,
+    textAlignment: TextAlignment = .trailing,
+    showsClearButton: Bool = true
+  ) {
+    self.title = title
+    _text = text
+    self.prompt = prompt
+    self.accessibilityIdentifier = accessibilityIdentifier
+    self.fieldAlignment = fieldAlignment
+    self.textAlignment = textAlignment
+    self.showsClearButton = showsClearButton
+  }
 
   var body: some View {
     HStack(alignment: .center, spacing: 7) {
@@ -49,8 +67,7 @@ struct TaskBoardOperationsMultilineTextField: View {
   let prompt: String
   let accessibilityIdentifier: String?
   let minHeight: CGFloat
-  private let maxHeightOverride: CGFloat?
-  private let lineLimit: ClosedRange<Int>
+  private let maxHeight: CGFloat?
 
   @Environment(\.harnessTextSizeIndex)
   private var textSizeIndex
@@ -64,51 +81,51 @@ struct TaskBoardOperationsMultilineTextField: View {
     prompt: String,
     accessibilityIdentifier: String? = nil,
     minHeight: CGFloat,
-    maxHeight: CGFloat? = nil,
-    lineLimit: ClosedRange<Int>? = nil
+    maxHeight: CGFloat? = nil
   ) {
     self.title = title
     _text = text
     self.prompt = prompt
     self.accessibilityIdentifier = accessibilityIdentifier
     self.minHeight = minHeight
-    maxHeightOverride = maxHeight
-    self.lineLimit = lineLimit ?? Self.recommendedLineLimit(for: minHeight)
+    self.maxHeight = maxHeight.map { max(minHeight, $0) }
   }
 
   var body: some View {
-    TextField("", text: $text, prompt: Text(prompt), axis: .vertical)
-      .textFieldStyle(.plain)
-      .multilineTextAlignment(.leading)
-      .font(HarnessMonitorTextSize.nativeInputFont(at: textSizeIndex))
-      .controlSize(HarnessMonitorTextSize.nativeInputControlSize(at: textSizeIndex))
-      .lineLimit(lineLimit)
-      .focused($isFocused)
-      .accessibilityLabel(title)
-      .accessibilityIdentifier(accessibilityIdentifier ?? "")
-      .modifier(
-        TaskBoardOperationsTextFieldChrome(
-          isFocused: isFocused,
-          usesFixedHeight: false,
-          minHeight: minHeight,
-          maxHeight: maxHeight,
-          verticalPadding: verticalPadding,
-          contentAlignment: .topLeading
-        )
-      )
-      .contentShape(Rectangle())
-      .onTapGesture {
-        isFocused = true
+    ZStack(alignment: .topLeading) {
+      if text.isEmpty {
+        Text(prompt)
+          .font(HarnessMonitorTextSize.nativeInputFont(at: textSizeIndex))
+          .foregroundStyle(HarnessMonitorTheme.tertiaryInk)
+          .padding(.horizontal, 5)
+          .padding(.vertical, 6)
+          .allowsHitTesting(false)
+          .accessibilityHidden(true)
       }
-  }
 
-  private var maxHeight: CGFloat {
-    if let maxHeightOverride {
-      return maxHeightOverride
+      TextEditor(text: $text)
+        .scrollContentBackground(.hidden)
+        .font(HarnessMonitorTextSize.nativeInputFont(at: textSizeIndex))
+        .controlSize(HarnessMonitorTextSize.nativeInputControlSize(at: textSizeIndex))
+        .focused($isFocused)
+        .accessibilityLabel(title)
+        .accessibilityIdentifier(accessibilityIdentifier ?? "")
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     }
-    let estimatedLineHeight: CGFloat = 22
-    let preferredHeight = CGFloat(lineLimit.upperBound) * estimatedLineHeight
-    return max(minHeight, preferredHeight)
+    .modifier(
+      TaskBoardOperationsTextFieldChrome(
+        isFocused: isFocused,
+        usesFixedHeight: false,
+        minHeight: minHeight,
+        maxHeight: maxHeight,
+        verticalPadding: verticalPadding,
+        contentAlignment: .topLeading
+      )
+    )
+    .contentShape(Rectangle())
+    .onTapGesture {
+      isFocused = true
+    }
   }
 
   private var verticalPadding: CGFloat {
@@ -121,26 +138,37 @@ struct TaskBoardOperationsMultilineTextField: View {
       8
     }
   }
-
-  private static func recommendedLineLimit(for minHeight: CGFloat) -> ClosedRange<Int> {
-    let minimumVisibleLines = max(3, Int((minHeight / 22).rounded(.up)))
-    return minimumVisibleLines...(minimumVisibleLines * 2)
-  }
 }
 
 private struct TaskBoardOperationsTextFieldChrome: ViewModifier {
   let isFocused: Bool
-  let usesFixedHeight: Bool = true
-  let minHeight: CGFloat? = nil
-  let maxHeight: CGFloat? = nil
-  let verticalPadding: CGFloat = 0
-  let contentAlignment: Alignment = .center
+  let usesFixedHeight: Bool
+  let minHeight: CGFloat?
+  let maxHeight: CGFloat?
+  let verticalPadding: CGFloat
+  let contentAlignment: Alignment
   @Environment(\.harnessNativeFormControlSize)
   private var controlSize
   @Environment(\.fontScale)
   private var fontScale
   @Environment(\.colorSchemeContrast)
   private var colorSchemeContrast
+
+  init(
+    isFocused: Bool,
+    usesFixedHeight: Bool = true,
+    minHeight: CGFloat? = nil,
+    maxHeight: CGFloat? = nil,
+    verticalPadding: CGFloat = 0,
+    contentAlignment: Alignment = .center
+  ) {
+    self.isFocused = isFocused
+    self.usesFixedHeight = usesFixedHeight
+    self.minHeight = minHeight
+    self.maxHeight = maxHeight
+    self.verticalPadding = verticalPadding
+    self.contentAlignment = contentAlignment
+  }
 
   private var controlHeight: CGFloat {
     if usesExpandedZoomMetrics {
@@ -166,6 +194,10 @@ private struct TaskBoardOperationsTextFieldChrome: ViewModifier {
     case .regular, .large, .extraLarge: 12
     @unknown default: 12
     }
+  }
+
+  private var multilineHorizontalPadding: CGFloat {
+    verticalPadding
   }
 
   private var cornerRadius: CGFloat {
@@ -212,7 +244,7 @@ private struct TaskBoardOperationsTextFieldChrome: ViewModifier {
         }
     } else {
       content
-        .padding(.horizontal, horizontalPadding)
+        .padding(.horizontal, multilineHorizontalPadding)
         .padding(.vertical, verticalPadding)
         .frame(
           maxWidth: .infinity,
@@ -220,6 +252,7 @@ private struct TaskBoardOperationsTextFieldChrome: ViewModifier {
           maxHeight: maxHeight,
           alignment: contentAlignment
         )
+        .clipped()
         .background {
           controlFill
         }
