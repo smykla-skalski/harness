@@ -18,10 +18,10 @@ use crate::daemon::protocol::{
 use crate::errors::{CliError, CliErrorKind};
 use crate::task_board::store::{OptionalFieldPatch, TaskBoardItemPatch};
 use crate::task_board::{
-    ExternalSyncConfig, ExternalSyncOptions, PolicyPipelineStore, TaskBoardItem,
-    TaskBoardOrchestrator, TaskBoardStore, build_audit_summary, build_machine_summaries,
-    build_project_summaries, build_sync_summary, configured_sync_clients, default_board_root,
-    sync_external_tasks,
+    ExternalProvider, ExternalSyncClient, ExternalSyncConfig, ExternalSyncDirection,
+    ExternalSyncOptions, PolicyPipelineStore, TaskBoardItem, TaskBoardOrchestrator, TaskBoardStore,
+    build_audit_summary, build_machine_summaries, build_project_summaries, build_sync_summary,
+    configured_sync_clients, default_board_root, sync_external_tasks,
 };
 use crate::task_board::{
     PlanningTransition, approve_plan, begin_planning, revoke_plan, submit_plan,
@@ -190,10 +190,29 @@ pub(crate) async fn sync_task_board_async_with_config(
 ) -> Result<TaskBoardSyncResponse, CliError> {
     let board = store();
     let clients = configured_sync_clients(&config, request.provider)?;
+    tracing::info!(
+        provider = ?request.provider,
+        direction = ?request.direction,
+        dry_run = request.dry_run,
+        status = ?request.status,
+        client_count = clients.len(),
+        github_token_configured = config.token_for(ExternalProvider::GitHub).is_some(),
+        github_repository_configured = config.github_repository().is_some(),
+        github_inbox_repositories = config.github_inbox_repositories().len(),
+        todoist_token_configured = config.token_for(ExternalProvider::Todoist).is_some(),
+        "task-board sync requested"
+    );
+    ensure_sync_request_can_run(request, &config, &clients)?;
     let operations = sync_external_tasks(&board, sync_options(request), &clients).await?;
     let items = board.list(request.status)?;
     let mut summary = build_sync_summary(&items, &config);
     summary.operations = operations;
+    tracing::info!(
+        total = summary.total,
+        providers = summary.providers.len(),
+        operations = summary.operations.len(),
+        "task-board sync completed"
+    );
     Ok(summary)
 }
 
@@ -430,6 +449,61 @@ fn sync_options(request: &TaskBoardSyncRequest) -> ExternalSyncOptions {
         conflict_policy: request.conflict_policy,
         dry_run: request.dry_run,
     }
+}
+
+fn ensure_sync_request_can_run(
+    request: &TaskBoardSyncRequest,
+    config: &ExternalSyncConfig,
+    clients: &[Box<dyn ExternalSyncClient>],
+) -> Result<(), CliError> {
+    if clients.is_empty()
+        || clients
+            .iter()
+            .any(|client| client_can_run(request, client.as_ref()))
+    {
+        return Ok(());
+    }
+    let message = sync_request_unavailable_message(request, config);
+    tracing::warn!(%message, "task-board sync cannot run");
+    Err(CliErrorKind::workflow_io(message).into())
+}
+
+fn client_can_run(request: &TaskBoardSyncRequest, client: &dyn ExternalSyncClient) -> bool {
+    if request
+        .provider
+        .is_some_and(|provider| provider != client.provider())
+    {
+        return false;
+    }
+    match request.direction {
+        ExternalSyncDirection::Pull => client.allows_pull(),
+        ExternalSyncDirection::Push => client.allows_push(),
+        ExternalSyncDirection::Both => client.allows_pull() || client.allows_push(),
+    }
+}
+
+fn sync_request_unavailable_message(
+    request: &TaskBoardSyncRequest,
+    config: &ExternalSyncConfig,
+) -> String {
+    if matches!(
+        request.direction,
+        ExternalSyncDirection::Pull | ExternalSyncDirection::Both
+    ) && request
+        .provider
+        .is_none_or(|provider| provider == ExternalProvider::GitHub)
+        && config.token_for(ExternalProvider::GitHub).is_some()
+        && config.github_repository().is_none()
+        && config.github_inbox_repositories().is_empty()
+    {
+        return "GitHub pull sync requires a configured repository or inbox repository. \
+Set Task Board GitHub owner/repo or add a GitHub inbox repository in Settings."
+            .to_string();
+    }
+    format!(
+        "task-board {:?} sync has no configured {:?} provider client",
+        request.direction, request.provider
+    )
 }
 
 fn new_task_id() -> String {
