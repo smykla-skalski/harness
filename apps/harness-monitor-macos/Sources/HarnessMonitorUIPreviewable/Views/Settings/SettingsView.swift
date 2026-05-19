@@ -109,6 +109,7 @@ public struct SettingsView: View {
           }
         }
       }
+      .environment(\.settingsScrollRestorationSection, selectedSection)
       .harnessMonitorBackgroundExtensionEffect()
     }
     .navigationSplitViewStyle(.balanced)

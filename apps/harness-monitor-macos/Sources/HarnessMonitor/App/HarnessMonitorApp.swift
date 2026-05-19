@@ -128,7 +128,12 @@ struct HarnessMonitorApp: App {
         descriptors: HarnessMonitorMCPWindowCommandDescriptors.all
       )
     )
-    _settingsSelectedSection = State(initialValue: configuration.settingsInitialSection)
+    _settingsSelectedSection = State(
+      initialValue: SettingsRestorationDefaults.initialSelectedSection(
+        fallback: configuration.settingsInitialSection,
+        ignoresStoredValue: configuration.isUITesting || configuration.perfScenario != nil
+      )
+    )
     delegate.bind(store: store)
   }
 
@@ -190,7 +195,12 @@ struct HarnessMonitorApp: App {
   }
 
   var settingsSelectedSectionBinding: Binding<SettingsSection> {
-    $settingsSelectedSection
+    Binding {
+      settingsSelectedSection
+    } set: { newValue in
+      settingsSelectedSection = newValue
+      SettingsRestorationDefaults.storeSelectedSection(newValue)
+    }
   }
 
   var settingsNavigationRequestBinding: Binding<SettingsNavigationRequest?> {
