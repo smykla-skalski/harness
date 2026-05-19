@@ -110,6 +110,10 @@ public struct SettingsView: View {
         }
       }
       .environment(\.settingsScrollRestorationSection, selectedSection)
+      .environment(
+        \.settingsScrollRestorationSuspended,
+        navigationRequest?.target.section == selectedSection
+      )
       .harnessMonitorBackgroundExtensionEffect()
     }
     .navigationSplitViewStyle(.balanced)
