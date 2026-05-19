@@ -164,11 +164,12 @@ private struct SettingsTaskBoardInboxEntryList: View {
 
   private var addRow: some View {
     HStack(alignment: .firstTextBaseline, spacing: HarnessMonitorTheme.spacingSM) {
-      TextField(inputPlaceholder, text: $input)
+      TextField("", text: $input, prompt: Text(inputPlaceholder))
         .font(bodyFont)
         .textFieldStyle(.roundedBorder)
         .harnessNativeFormControl()
         .onSubmit(addIfPossible)
+        .accessibilityLabel(inputPlaceholder)
         .accessibilityIdentifier(inputAccessibilityIdentifier)
 
       Button(action: addIfPossible) {
@@ -313,18 +314,20 @@ private struct SettingsTaskBoardInboxRepositoryList: View {
 
   private var addRow: some View {
     HStack(alignment: .firstTextBaseline, spacing: HarnessMonitorTheme.spacingSM) {
-      TextField("owner", text: $ownerInput)
+      TextField("", text: $ownerInput, prompt: Text("owner"))
         .font(bodyFont)
         .textFieldStyle(.roundedBorder)
         .harnessNativeFormControl()
         .onSubmit(addIfPossible)
+        .accessibilityLabel("owner")
         .accessibilityIdentifier(HarnessMonitorAccessibility.settingsTBInboxRepoOwnerField)
 
-      TextField("repository", text: $repoInput)
+      TextField("", text: $repoInput, prompt: Text("repository"))
         .font(bodyFont)
         .textFieldStyle(.roundedBorder)
         .harnessNativeFormControl()
         .onSubmit(addIfPossible)
+        .accessibilityLabel("repository")
         .accessibilityIdentifier(HarnessMonitorAccessibility.settingsTBInboxRepoNameField)
 
       Button(action: addIfPossible) {
