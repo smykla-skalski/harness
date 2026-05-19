@@ -39,7 +39,8 @@ struct TaskBoardOperationsSyncCard: View, TaskBoardOperationsHost {
       metrics: metrics,
       footer: dashboard.taskBoardSyncSummary == nil
         ? "Run sync to preview or apply external pull and push operations"
-        : nil
+        : nil,
+      background: availability.warning == nil ? .standard : .warning
     ) {
       controlRows {
         pickerField(
@@ -186,13 +187,6 @@ private struct TaskBoardOperationsSyncWarning: View {
     HarnessMonitorTextSize.scaledFont(.caption, by: fontScale)
   }
 
-  private var warningShape: some Shape {
-    RoundedRectangle(
-      cornerRadius: HarnessMonitorTheme.cornerRadiusLG,
-      style: .continuous
-    )
-  }
-
   var body: some View {
     VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingXS) {
       HStack(alignment: .top, spacing: HarnessMonitorTheme.spacingXS) {
@@ -222,31 +216,14 @@ private struct TaskBoardOperationsSyncWarning: View {
       .accessibilityIdentifier("harness.task-board.sync.open-settings")
     }
     .font(warningFont)
-    .padding(.horizontal, HarnessMonitorTheme.spacingMD)
-    .padding(.vertical, HarnessMonitorTheme.spacingSM)
-    .background(alignment: .bottomTrailing) {
-      backgroundGlyph
-    }
-    .clipShape(warningShape)
-    .harnessFeedbackToastGlass(
-      cornerRadius: HarnessMonitorTheme.cornerRadiusLG,
-      tint: HarnessMonitorTheme.caution
-    )
-    .contentShape(warningShape)
-    .padding(.vertical, HarnessMonitorTheme.spacingXS)
+    .padding(.vertical, TaskBoardOperationsFormMetrics.rowVerticalPadding)
     .frame(maxWidth: .infinity, alignment: .leading)
+    .overlay(alignment: .bottom) {
+      Rectangle()
+        .fill(Color(nsColor: .separatorColor))
+        .frame(height: 0.5)
+    }
     .accessibilityIdentifier("harness.task-board.sync.configuration-warning")
-  }
-
-  private var backgroundGlyph: some View {
-    Image(systemName: "exclamationmark.triangle.fill")
-      .font(.system(size: 96, weight: .black, design: .rounded))
-      .symbolRenderingMode(.hierarchical)
-      .foregroundStyle(HarnessMonitorTheme.caution.opacity(0.42))
-      .rotationEffect(.degrees(-8))
-      .offset(x: 26, y: 28)
-      .accessibilityHidden(true)
-      .allowsHitTesting(false)
   }
 }
 
