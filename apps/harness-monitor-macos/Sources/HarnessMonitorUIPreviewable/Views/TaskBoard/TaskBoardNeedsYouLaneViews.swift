@@ -83,12 +83,15 @@ struct TaskBoardDecisionRow: View {
       alignment: .topLeading
     )
     .padding(metrics.cardPadding)
+    .taskBoardCardBackgroundGlyph(
+      systemImage: severitySystemImage,
+      tint: severityColor,
+      cornerRadius: metrics.cardCornerRadius
+    )
   }
 
   private var headerRow: some View {
     HStack(alignment: .top, spacing: metrics.laneSpacing) {
-      TaskBoardCardLeadingIcon(systemImage: severitySystemImage, tint: severityColor)
-        .padding(.top, metrics.cardMarkerTopPadding)
       VStack(alignment: .leading, spacing: 2) {
         Text(ruleDisplayName)
           .font(ruleFont)
