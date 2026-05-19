@@ -20,8 +20,10 @@ struct TaskBoardDecisionRow: View {
   private let primaryAction: SuggestedAction?
   private let metrics: TaskBoardLaneMetrics
   private let summaryFont: Font
+  private let summaryCodeFont: Font
   private let ruleFont: Font
   private let actionFont: Font
+  private let actionCodeFont: Font
   private let chevronFont: Font
 
   init(
@@ -34,12 +36,17 @@ struct TaskBoardDecisionRow: View {
     primaryAction = Self.resolvePrimaryAction(for: decision)
     metrics = TaskBoardLaneMetrics(fontScale: fontScale)
     summaryFont = HarnessMonitorTextSize.scaledFont(.caption, by: fontScale)
+    summaryCodeFont = HarnessMonitorTextSize.scaledFont(.caption.monospaced(), by: fontScale)
     ruleFont = HarnessMonitorTextSize.scaledFont(
       .subheadline.weight(.semibold),
       by: fontScale
     )
     actionFont = HarnessMonitorTextSize.scaledFont(
       .caption.weight(.semibold),
+      by: fontScale
+    )
+    actionCodeFont = HarnessMonitorTextSize.scaledFont(
+      .caption.monospaced().weight(.semibold),
       by: fontScale
     )
     chevronFont = HarnessMonitorTextSize.scaledFont(
@@ -67,11 +74,13 @@ struct TaskBoardDecisionRow: View {
     VStack(alignment: .leading, spacing: metrics.rowTextSpacing) {
       headerRow
       if !decision.summary.isEmpty {
-        Text(decision.summary)
-          .font(summaryFont)
-          .foregroundStyle(HarnessMonitorTheme.secondaryInk)
-          .lineLimit(3)
-          .multilineTextAlignment(.leading)
+        TaskBoardInlineCodeText(
+          decision.summary,
+          font: summaryFont,
+          codeFont: summaryCodeFont,
+          foregroundStyle: HarnessMonitorTheme.secondaryInk,
+          lineLimit: 3
+        )
       }
       if let primaryAction {
         primaryActionRow(for: primaryAction)
@@ -114,9 +123,14 @@ struct TaskBoardDecisionRow: View {
     HStack(spacing: HarnessMonitorTheme.spacingXS) {
       Image(systemName: actionSymbol(for: action.kind))
         .font(actionFont)
-      Text(action.title)
-        .font(actionFont)
-        .lineLimit(1)
+      TaskBoardInlineCodeText(
+        action.title,
+        font: actionFont,
+        codeFont: actionCodeFont,
+        foregroundStyle: actionTint(for: action.kind),
+        codeForeground: actionTint(for: action.kind),
+        lineLimit: 1
+      )
       Spacer(minLength: 0)
       Image(systemName: "chevron.right")
         .font(chevronFont)
@@ -218,14 +232,17 @@ struct TaskBoardDecisionRow: View {
     }
     pieces.append("queued \(Self.relativeAge(now: .now, createdAt: decision.createdAt))")
     if !decision.summary.isEmpty {
-      pieces.append(decision.summary)
+      pieces.append(TaskBoardInlineCodeFormatter.displayText(for: decision.summary))
     }
     return pieces.joined(separator: ", ")
   }
 
   private var accessibilityHint: String {
     if let primaryAction {
-      return "Activate to review. Suggested action: \(primaryAction.title)."
+      return """
+        Activate to review. Suggested action: \
+        \(TaskBoardInlineCodeFormatter.displayText(for: primaryAction.title)).
+        """
     }
     return "Activate to review."
   }

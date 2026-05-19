@@ -171,6 +171,9 @@ struct TaskBoardItemRow: View {
   private var titleFont: Font {
     HarnessMonitorTextSize.scaledFont(.subheadline.weight(.semibold), by: fontScale)
   }
+  private var titleCodeFont: Font {
+    HarnessMonitorTextSize.scaledFont(.subheadline.monospaced().weight(.semibold), by: fontScale)
+  }
 
   var body: some View {
     Button {
@@ -178,11 +181,13 @@ struct TaskBoardItemRow: View {
     } label: {
       VStack(alignment: .leading, spacing: metrics.laneSpacing) {
         VStack(alignment: .leading, spacing: metrics.rowTextSpacing) {
-          Text(item.title)
-            .font(titleFont)
-            .foregroundStyle(HarnessMonitorTheme.ink)
-            .lineLimit(2)
-            .multilineTextAlignment(.leading)
+          TaskBoardInlineCodeText(
+            item.title,
+            font: titleFont,
+            codeFont: titleCodeFont,
+            foregroundStyle: HarnessMonitorTheme.ink,
+            lineLimit: 2
+          )
         }
         TaskBoardCardFooter(repository: item.projectId ?? item.agentMode.title) {
           badgeContent
@@ -240,15 +245,21 @@ private struct TaskBoardItemDragPreviewCard: View {
   private var titleFont: Font {
     HarnessMonitorTextSize.scaledFont(.subheadline.weight(.semibold), by: fontScale)
   }
+  private var titleCodeFont: Font {
+    HarnessMonitorTextSize.scaledFont(.subheadline.monospaced().weight(.semibold), by: fontScale)
+  }
   private var statusFont: Font {
     HarnessMonitorTextSize.scaledFont(.caption.weight(.semibold), by: fontScale)
   }
 
   var body: some View {
     VStack(alignment: .leading, spacing: metrics.laneBodyTopPadding) {
-      Text(item.title)
-        .font(titleFont)
-        .lineLimit(2)
+      TaskBoardInlineCodeText(
+        item.title,
+        font: titleFont,
+        codeFont: titleCodeFont,
+        lineLimit: 2
+      )
       Text(item.status.title)
         .font(statusFont)
         .foregroundStyle(taskBoardStatusColor(for: item.status))
@@ -269,6 +280,9 @@ struct TaskBoardInboxItemRow: View {
   private var titleFont: Font {
     HarnessMonitorTextSize.scaledFont(.subheadline.weight(.semibold), by: fontScale)
   }
+  private var titleCodeFont: Font {
+    HarnessMonitorTextSize.scaledFont(.subheadline.monospaced().weight(.semibold), by: fontScale)
+  }
 
   private var dragPayload: TaskBoardInboxItemDragPayload {
     TaskBoardInboxItemDragPayload(
@@ -285,11 +299,13 @@ struct TaskBoardInboxItemRow: View {
     } label: {
       VStack(alignment: .leading, spacing: metrics.laneSpacing) {
         VStack(alignment: .leading, spacing: metrics.rowTextSpacing) {
-          Text(item.task.title)
-            .font(titleFont)
-            .foregroundStyle(HarnessMonitorTheme.ink)
-            .lineLimit(2)
-            .multilineTextAlignment(.leading)
+          TaskBoardInlineCodeText(
+            item.task.title,
+            font: titleFont,
+            codeFont: titleCodeFont,
+            foregroundStyle: HarnessMonitorTheme.ink,
+            lineLimit: 2
+          )
         }
         TaskBoardCardFooter(repository: item.subtitle) {
           badgeContent
@@ -340,15 +356,21 @@ private struct TaskBoardInboxItemDragPreviewCard: View {
   private var titleFont: Font {
     HarnessMonitorTextSize.scaledFont(.subheadline.weight(.semibold), by: fontScale)
   }
+  private var titleCodeFont: Font {
+    HarnessMonitorTextSize.scaledFont(.subheadline.monospaced().weight(.semibold), by: fontScale)
+  }
   private var statusFont: Font {
     HarnessMonitorTextSize.scaledFont(.caption.weight(.semibold), by: fontScale)
   }
 
   var body: some View {
     VStack(alignment: .leading, spacing: metrics.laneBodyTopPadding) {
-      Text(item.task.title)
-        .font(titleFont)
-        .lineLimit(2)
+      TaskBoardInlineCodeText(
+        item.task.title,
+        font: titleFont,
+        codeFont: titleCodeFont,
+        lineLimit: 2
+      )
       Text(item.task.status.title)
         .font(statusFont)
         .foregroundStyle(taskStatusColor(for: item.task.status))
