@@ -243,6 +243,8 @@ mod task_board_github;
 mod task_board_host;
 mod task_board_orchestrator;
 mod task_board_runtime;
+#[cfg(test)]
+mod task_board_sync_tests;
 mod wake_route;
 
 pub use adopt::adopt_session_record;
