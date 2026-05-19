@@ -201,7 +201,6 @@ struct TaskBoardItemRow: View {
       }
       .frame(
         maxWidth: .infinity,
-        minHeight: metrics.cardMinHeight,
         alignment: .topLeading
       )
       .padding(metrics.cardPadding)
@@ -316,7 +315,6 @@ struct TaskBoardInboxItemRow: View {
       }
       .frame(
         maxWidth: .infinity,
-        minHeight: metrics.cardMinHeight,
         alignment: .topLeading
       )
       .padding(metrics.cardPadding)
