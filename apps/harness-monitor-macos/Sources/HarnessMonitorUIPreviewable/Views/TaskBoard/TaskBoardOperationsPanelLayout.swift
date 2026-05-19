@@ -106,7 +106,7 @@ private struct TaskBoardOperationsResponsiveLayout: Layout {
   }
 
   private func horizontalLayoutWidth(for availableWidth: CGFloat) -> CGFloat {
-    min(max(availableWidth, horizontalMinWidth), horizontalMaxWidth)
+    max(availableWidth, horizontalMinWidth)
   }
 
   private func horizontalColumnWidth(for width: CGFloat, count: Int) -> CGFloat {

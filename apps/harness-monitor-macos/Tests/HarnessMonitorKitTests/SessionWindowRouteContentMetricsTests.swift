@@ -253,6 +253,8 @@ struct SessionWindowRouteContentMetricsTests {
     #expect(layoutSource.contains("placeHorizontal(in: bounds, subviews: subviews)"))
     #expect(layoutSource.contains("placeVertical(in: bounds, subviews: subviews)"))
     #expect(layoutSource.contains("bounds.midX - (layoutWidth / 2)"))
+    #expect(layoutSource.contains("max(availableWidth, horizontalMinWidth)"))
+    #expect(!layoutSource.contains("min(max(availableWidth, horizontalMinWidth), horizontalMaxWidth)"))
     #expect(
       layoutSource.contains("return max(minColumnWidth, (width - totalSpacing) / CGFloat(count))")
     )
