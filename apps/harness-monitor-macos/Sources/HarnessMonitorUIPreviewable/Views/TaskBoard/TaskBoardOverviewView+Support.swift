@@ -19,7 +19,7 @@ extension TaskBoardOverviewView {
 
   var selectedTaskBoardItem: TaskBoardItem? {
     guard let selectedTaskBoardItemIDValue else { return nil }
-    return cachedPresentation.taskBoardItem(id: selectedTaskBoardItemIDValue)
+    return currentPresentation.taskBoardItem(id: selectedTaskBoardItemIDValue)
       ?? taskBoardItems.first { $0.id == selectedTaskBoardItemIDValue }
   }
 
@@ -40,7 +40,7 @@ extension TaskBoardOverviewView {
       return false
     }
     guard
-      let item = cachedPresentation.taskBoardItem(id: itemID)
+      let item = currentPresentation.taskBoardItem(id: itemID)
         ?? taskBoardItems.first(where: { $0.id == itemID }),
       let currentLane = TaskBoardInboxLane(status: item.status),
       currentLane != lane

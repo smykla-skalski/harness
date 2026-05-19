@@ -288,43 +288,43 @@ extension TaskBoardInboxLane {
 
 extension TaskBoardOverviewView {
   var taskBoardReviewCount: Int {
-    cachedPresentation.apiItems(in: .review).count
+    currentPresentation.apiItems(in: .review).count
   }
 
   var taskBoardNeedsYouCount: Int {
-    cachedPresentation.apiItems(in: .needsYou).count
+    currentPresentation.apiItems(in: .needsYou).count
   }
 
   var taskBoardBlockedCount: Int {
-    cachedPresentation.apiItems(in: .blocked).count
+    currentPresentation.apiItems(in: .blocked).count
   }
 
   var taskBoardDoneCount: Int {
-    cachedPresentation.apiItems(in: .done).count
+    currentPresentation.apiItems(in: .done).count
   }
 
   var aggregateNeedsYouCount: Int {
-    cachedPresentation.aggregateNeedsYouCount
+    currentPresentation.aggregateNeedsYouCount
   }
 
   var aggregateOpenCount: Int {
-    cachedPresentation.aggregateOpenCount
+    currentPresentation.aggregateOpenCount
   }
 
   var aggregateReviewCount: Int {
-    cachedPresentation.aggregateReviewCount
+    currentPresentation.aggregateReviewCount
   }
 
   var aggregateBlockedCount: Int {
-    cachedPresentation.aggregateBlockedCount
+    currentPresentation.aggregateBlockedCount
   }
 
   var aggregateDoneCount: Int {
-    cachedPresentation.aggregateDoneCount
+    currentPresentation.aggregateDoneCount
   }
 
   var hasAggregateSummary: Bool {
-    cachedPresentation.hasAggregateSummary
+    currentPresentation.hasAggregateSummary
   }
 
   @ViewBuilder var aggregateSummaryContent: some View {

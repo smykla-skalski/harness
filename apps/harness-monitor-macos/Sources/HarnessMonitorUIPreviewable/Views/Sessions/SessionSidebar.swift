@@ -79,6 +79,14 @@ struct SessionSidebar: View {
     cachedTaskPresentation.taskIDs
   }
 
+  var currentAgentPresentation: SessionAgentListPresentation {
+    cachedAgentPresentation
+  }
+
+  var currentTaskPresentation: SessionTaskListPresentation {
+    cachedTaskPresentation
+  }
+
   func storeListSelection(_ selection: Set<SessionSelection>) {
     listSelection = selection
   }
