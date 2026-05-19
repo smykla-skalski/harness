@@ -94,7 +94,8 @@ validate_package_version() {
 helpers_dir="$TARGET_BUILD_DIR/$CONTENTS_FOLDER_PATH/Helpers"
 launch_agents_dir="$TARGET_BUILD_DIR/$CONTENTS_FOLDER_PATH/Library/LaunchAgents"
 daemon_target="$helpers_dir/harness"
-plist_target="$launch_agents_dir/io.harnessmonitor.daemon.managed.plist"
+plist_name="Q498EB36N4.io.harnessmonitor.daemon.plist"
+plist_target="$launch_agents_dir/$plist_name"
 # The bundled plist's `Label` MUST equal the plist filename without its
 # `.plist` extension or `SMAppService.register()` returns
 # `error: 22 (EINVAL)` on macOS 26 and silently leaves
@@ -106,7 +107,7 @@ plist_target="$launch_agents_dir/io.harnessmonitor.daemon.managed.plist"
 # `<base>.<lane>` worked by accident because the legacy plist was
 # registered on a much earlier macOS where SMAppService did not yet
 # enforce this match.
-launch_agent_label="io.harnessmonitor.daemon.managed"
+launch_agent_label="Q498EB36N4.io.harnessmonitor.daemon"
 app_group_id="$(harness_monitor_runtime_app_group_id)"
 
 /bin/mkdir -p "$helpers_dir" "$launch_agents_dir"
@@ -145,7 +146,7 @@ trap cleanup_staging EXIT
 /bin/chmod 755 "$daemon_target_staging"
 /usr/bin/xattr -dr com.apple.provenance "$daemon_target_staging" 2>/dev/null || true
 /usr/bin/xattr -dr com.apple.quarantine "$daemon_target_staging" 2>/dev/null || true
-/bin/cp "$PROJECT_DIR/Resources/LaunchAgents/io.harnessmonitor.daemon.managed.plist" "$plist_target_staging"
+/bin/cp "$PROJECT_DIR/Resources/LaunchAgents/$plist_name" "$plist_target_staging"
 /usr/bin/plutil -replace Label -string "$launch_agent_label" "$plist_target_staging"
 /usr/bin/plutil -replace EnvironmentVariables.HARNESS_APP_GROUP_ID -string "$app_group_id" "$plist_target_staging"
 if [[ -n "${HARNESS_DAEMON_DATA_HOME:-}" ]]; then
@@ -162,6 +163,17 @@ fi
 # made it into the build environment.
 /usr/bin/plutil -replace EnvironmentVariables.HARNESS_DAEMON_OWNERSHIP -string "managed" "$plist_target_staging"
 /usr/bin/plutil -lint "$plist_target_staging"
+
+for legacy_plist_name in \
+  io.harnessmonitor.daemon.managed.plist \
+  io.harnessmonitor.daemon.plist; do
+  legacy_source="$PROJECT_DIR/Resources/LaunchAgents/$legacy_plist_name"
+  legacy_target="$launch_agents_dir/$legacy_plist_name"
+  if [ -f "$legacy_source" ]; then
+    /bin/cp "$legacy_source" "$legacy_target"
+    /usr/bin/plutil -lint "$legacy_target"
+  fi
+done
 
 if ! /usr/bin/otool -l "$daemon_target_staging" | /usr/bin/grep -q "__info_plist"; then
   printf 'Harness daemon helper is missing embedded Info.plist metadata: %s\n' "$daemon_target_staging" >&2
@@ -197,7 +209,7 @@ if [ -n "$codesign_identity" ]; then
     --sign "$codesign_identity" \
     --options runtime \
     "$timestamp_flag" \
-    --identifier io.harnessmonitor.daemon.managed \
+    --identifier "$launch_agent_label" \
     --entitlements "$PROJECT_DIR/HarnessMonitorDaemon.entitlements" \
     "$daemon_target_staging"
   /usr/bin/codesign --verify --verbose=2 "$daemon_target_staging"
@@ -208,7 +220,7 @@ else
   /usr/bin/codesign \
     --force \
     --sign - \
-    --identifier io.harnessmonitor.daemon.managed \
+    --identifier "$launch_agent_label" \
     "$daemon_target_staging"
 fi
 

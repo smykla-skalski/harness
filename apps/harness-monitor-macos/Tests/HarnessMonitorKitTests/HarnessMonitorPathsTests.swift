@@ -352,10 +352,26 @@ struct HarnessMonitorPathsTests {
 
   @Test("Launch agent plist path is bundle relative")
   func launchAgentPlistPathIsBundleRelative() {
-    #expect(HarnessMonitorPaths.launchAgentPlistName == "io.harnessmonitor.daemon.managed.plist")
+    #expect(
+      HarnessMonitorPaths.launchAgentPlistName
+        == "Q498EB36N4.io.harnessmonitor.daemon.plist"
+    )
     #expect(
       HarnessMonitorPaths.launchAgentBundleRelativePath
-        == "Contents/Library/LaunchAgents/io.harnessmonitor.daemon.managed.plist"
+        == "Contents/Library/LaunchAgents/Q498EB36N4.io.harnessmonitor.daemon.plist"
+    )
+  }
+
+  @Test("Launch agent label is the bundled app-group child service")
+  func launchAgentLabelIsBundledAppGroupChildService() {
+    let environment = HarnessMonitorEnvironment(
+      values: [HarnessMonitorAppGroup.environmentKey: "TEAMID.com.example.group"],
+      homeDirectory: URL(fileURLWithPath: "/Users/example", isDirectory: true)
+    )
+
+    #expect(
+      HarnessMonitorPaths.launchAgentLabel(using: environment)
+        == "Q498EB36N4.io.harnessmonitor.daemon"
     )
   }
 }

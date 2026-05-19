@@ -129,7 +129,7 @@ class MonitorLaneHelperTests(unittest.TestCase):
             # without `.plist` or SMAppService.register on macOS 26 returns
             # `error: 22 (EINVAL)`. Lane identity flows via the
             # `HARNESS_MONITOR_RUNTIME_LANE` plist env entry, not the label.
-            self.assertEqual(label, "io.harnessmonitor.daemon.managed")
+            self.assertEqual(label, "Q498EB36N4.io.harnessmonitor.daemon")
 
     def test_legacy_profile_env_is_rejected(self) -> None:
         env = base_env()

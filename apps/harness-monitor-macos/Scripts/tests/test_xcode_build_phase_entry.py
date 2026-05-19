@@ -52,7 +52,9 @@ class XcodeBuildPhaseEntryTests(unittest.TestCase):
         source = BUILD_PHASES_SOURCE.read_text()
 
         required_inputs = (
+            '"$(PROJECT_DIR)/Resources/LaunchAgents/Q498EB36N4.io.harnessmonitor.daemon.plist"',
             '"$(PROJECT_DIR)/Resources/LaunchAgents/io.harnessmonitor.daemon.managed.plist"',
+            '"$(PROJECT_DIR)/Resources/LaunchAgents/io.harnessmonitor.daemon.plist"',
             '"$(PROJECT_DIR)/Resources/LaunchAgents/io.harnessmonitor.daemon.Info.plist"',
             '"$(PROJECT_DIR)/HarnessMonitorDaemon.entitlements"',
             '"$(TARGET_BUILD_DIR)/$(CONTENTS_FOLDER_PATH)/Helpers/harness.cstemp"',
