@@ -18,7 +18,7 @@ Parallel Claude sessions that edit, generate, build, test, run daemons, or use X
 
 ## Path-limited commits
 
-Commit with explicit paths passed straight to `git commit`: `git commit -sS -- <paths>`. Do not pre-stage with `git add`, and never use `git add -A`, `git add .`, or `git commit -a`. Git stages exactly the listed paths for this commit and leaves the rest of the index and working tree untouched. Even with the worktree rule above, parallel agents and background tooling routinely drop unrelated edits into the working tree; path-limited commits keep them out of the signed history. Run `git diff -- <paths>` before committing to confirm the per-file scope.
+Commit with explicit paths passed straight to `git commit`: `git commit -sS -- <paths>`. Git stages exactly the listed paths for this commit and leaves the rest of the index and working tree untouched. For brand-new files, first run `git add -N -- <new-paths>` so Git can see them, then include those paths in the same path-limited commit. Do not pre-stage with plain `git add`, and never use `git add -A`, `git add .`, `git commit -a`, or `git commit -i`. Even with the worktree rule above, parallel agents and background tooling routinely drop unrelated edits into the working tree; path-limited commits keep them out of the signed history. Run `git diff -- <paths>` before committing to confirm the per-file scope.
 
 ## Hook system (Claude Code dispatch)
 
