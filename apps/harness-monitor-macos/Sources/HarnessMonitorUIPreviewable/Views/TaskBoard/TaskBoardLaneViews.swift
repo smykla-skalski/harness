@@ -171,9 +171,6 @@ struct TaskBoardItemRow: View {
   private var titleFont: Font {
     HarnessMonitorTextSize.scaledFont(.subheadline.weight(.semibold), by: fontScale)
   }
-  private var subtitleFont: Font {
-    HarnessMonitorTextSize.scaledFont(.caption, by: fontScale)
-  }
 
   var body: some View {
     Button {
@@ -186,16 +183,8 @@ struct TaskBoardItemRow: View {
             .foregroundStyle(HarnessMonitorTheme.ink)
             .lineLimit(2)
             .multilineTextAlignment(.leading)
-          Text(item.projectId ?? item.agentMode.title)
-            .font(subtitleFont)
-            .foregroundStyle(HarnessMonitorTheme.secondaryInk)
-            .lineLimit(1)
-            .truncationMode(.middle)
         }
-        HarnessMonitorWrapLayout(
-          spacing: metrics.laneBodyTopPadding,
-          lineSpacing: metrics.laneBodyTopPadding
-        ) {
+        TaskBoardCardFooter(repository: item.projectId ?? item.agentMode.title) {
           badgeContent
         }
       }
@@ -275,9 +264,6 @@ struct TaskBoardInboxItemRow: View {
   private var titleFont: Font {
     HarnessMonitorTextSize.scaledFont(.subheadline.weight(.semibold), by: fontScale)
   }
-  private var subtitleFont: Font {
-    HarnessMonitorTextSize.scaledFont(.caption, by: fontScale)
-  }
 
   private var dragPayload: TaskBoardInboxItemDragPayload {
     TaskBoardInboxItemDragPayload(
@@ -299,16 +285,8 @@ struct TaskBoardInboxItemRow: View {
             .foregroundStyle(HarnessMonitorTheme.ink)
             .lineLimit(2)
             .multilineTextAlignment(.leading)
-          Text(item.subtitle)
-            .font(subtitleFont)
-            .foregroundStyle(HarnessMonitorTheme.secondaryInk)
-            .lineLimit(1)
-            .truncationMode(.middle)
         }
-        HarnessMonitorWrapLayout(
-          spacing: metrics.laneBodyTopPadding,
-          lineSpacing: metrics.laneBodyTopPadding
-        ) {
+        TaskBoardCardFooter(repository: item.subtitle) {
           badgeContent
         }
       }

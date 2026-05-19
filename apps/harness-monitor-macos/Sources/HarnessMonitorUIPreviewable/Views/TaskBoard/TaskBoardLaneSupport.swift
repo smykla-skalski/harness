@@ -30,7 +30,7 @@ struct TaskBoardLaneMetrics: Equatable {
     let heightScale = min(scale, 1.18)
     laneSpacing = HarnessMonitorTheme.spacingSM * denseScale
     laneInnerPadding = HarnessMonitorTheme.spacingMD * denseScale
-    laneWidth = 288 * broadScale
+    laneWidth = 420 * broadScale
     laneFixedHeight = 704 * heightScale
     laneBodyTopPadding = HarnessMonitorTheme.spacingSM * denseScale
     headerIconWidth = 18 * min(scale, 1.25)
@@ -126,6 +126,43 @@ struct TaskBoardCardPill: View {
     .padding(.horizontal, metrics.pillHorizontalPadding)
     .padding(.vertical, metrics.pillVerticalPadding)
     .harnessContentPill(tint: tint)
+  }
+}
+
+struct TaskBoardCardFooter<Badges: View>: View {
+  let repository: String
+  let badges: Badges
+  @Environment(\.fontScale)
+  private var fontScale
+
+  init(repository: String, @ViewBuilder badges: () -> Badges) {
+    self.repository = repository
+    self.badges = badges()
+  }
+
+  private var metrics: TaskBoardLaneMetrics { TaskBoardLaneMetrics(fontScale: fontScale) }
+  private var repositoryFont: Font {
+    HarnessMonitorTextSize.scaledFont(.caption, by: fontScale)
+  }
+
+  var body: some View {
+    HStack(alignment: .bottom, spacing: metrics.laneBodyTopPadding) {
+      HarnessMonitorWrapLayout(
+        spacing: metrics.laneBodyTopPadding,
+        lineSpacing: metrics.laneBodyTopPadding
+      ) {
+        badges
+      }
+      .layoutPriority(1)
+      Spacer(minLength: metrics.laneBodyTopPadding)
+      Text(repository)
+        .font(repositoryFont)
+        .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+        .lineLimit(1)
+        .truncationMode(.middle)
+        .multilineTextAlignment(.trailing)
+        .layoutPriority(2)
+    }
   }
 }
 
