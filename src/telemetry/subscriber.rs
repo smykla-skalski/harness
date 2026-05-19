@@ -80,7 +80,7 @@ fn init_disabled_subscriber(
     service: RuntimeService,
     log_message: Option<&str>,
 ) -> Result<TelemetryGuard, CliError> {
-    init_subscriber_without_telemetry(filter_layer, use_json_format)?;
+    init_subscriber_without_telemetry(filter_layer, use_json_format, service)?;
     log_message.into_iter().for_each(log_telemetry_disable);
     Ok(TelemetryGuard::disabled(service))
 }
@@ -120,17 +120,24 @@ where
 fn init_subscriber_without_telemetry(
     filter_layer: reload::Layer<tracing_subscriber::EnvFilter, tracing_subscriber::Registry>,
     use_json_format: bool,
+    service: RuntimeService,
 ) -> Result<(), CliError> {
     #[cfg(feature = "tokio-console")]
     let console_layer: Option<Box<dyn tracing_subscriber::Layer<_> + Send + Sync>> =
         build_console_layer();
     #[cfg(not(feature = "tokio-console"))]
     let console_layer: Option<Box<dyn tracing_subscriber::Layer<_> + Send + Sync>> = None;
+    let daemon_file_layer = super::daemon_file::layer(
+        service,
+        use_json_format,
+        show_console_observability_fields(service),
+    );
 
     if use_json_format {
         tracing_subscriber::registry()
             .with(filter_layer)
             .with(console_layer)
+            .with(daemon_file_layer)
             .with(
                 fmt::layer()
                     .json()
@@ -143,6 +150,7 @@ fn init_subscriber_without_telemetry(
         tracing_subscriber::registry()
             .with(filter_layer)
             .with(console_layer)
+            .with(daemon_file_layer)
             .with(
                 fmt::layer()
                     .fmt_fields(FilteredDefaultFields::new())
@@ -170,6 +178,8 @@ fn init_json_telemetry_subscriber(
         build_console_layer();
     #[cfg(not(feature = "tokio-console"))]
     let console_layer: Option<Box<dyn tracing_subscriber::Layer<_> + Send + Sync>> = None;
+    let daemon_file_layer =
+        super::daemon_file::layer(service, true, show_console_observability_fields(service));
 
     let otel_trace_layer =
         tracing_opentelemetry::layer().with_tracer(tracer_provider.tracer(service.service_name()));
@@ -181,6 +191,7 @@ fn init_json_telemetry_subscriber(
     tracing_subscriber::registry()
         .with(filter_layer)
         .with(console_layer)
+        .with(daemon_file_layer)
         .with(fmt::layer().json().with_writer(io::stderr))
         .with(otel_trace_layer)
         .with(otel_log_layer)
@@ -199,6 +210,8 @@ fn init_filtered_json_telemetry_subscriber(
         build_console_layer();
     #[cfg(not(feature = "tokio-console"))]
     let console_layer: Option<Box<dyn tracing_subscriber::Layer<_> + Send + Sync>> = None;
+    let daemon_file_layer =
+        super::daemon_file::layer(service, true, show_console_observability_fields(service));
 
     let otel_trace_layer =
         tracing_opentelemetry::layer().with_tracer(tracer_provider.tracer(service.service_name()));
@@ -210,6 +223,7 @@ fn init_filtered_json_telemetry_subscriber(
     tracing_subscriber::registry()
         .with(filter_layer)
         .with(console_layer)
+        .with(daemon_file_layer)
         .with(
             fmt::layer()
                 .json()
@@ -233,6 +247,8 @@ fn init_text_telemetry_subscriber(
         build_console_layer();
     #[cfg(not(feature = "tokio-console"))]
     let console_layer: Option<Box<dyn tracing_subscriber::Layer<_> + Send + Sync>> = None;
+    let daemon_file_layer =
+        super::daemon_file::layer(service, false, show_console_observability_fields(service));
 
     let otel_trace_layer =
         tracing_opentelemetry::layer().with_tracer(tracer_provider.tracer(service.service_name()));
@@ -244,6 +260,7 @@ fn init_text_telemetry_subscriber(
     tracing_subscriber::registry()
         .with(filter_layer)
         .with(console_layer)
+        .with(daemon_file_layer)
         .with(
             fmt::layer()
                 .with_writer(io::stderr)
@@ -267,6 +284,8 @@ fn init_filtered_text_telemetry_subscriber(
         build_console_layer();
     #[cfg(not(feature = "tokio-console"))]
     let console_layer: Option<Box<dyn tracing_subscriber::Layer<_> + Send + Sync>> = None;
+    let daemon_file_layer =
+        super::daemon_file::layer(service, false, show_console_observability_fields(service));
 
     let otel_trace_layer =
         tracing_opentelemetry::layer().with_tracer(tracer_provider.tracer(service.service_name()));
@@ -278,6 +297,7 @@ fn init_filtered_text_telemetry_subscriber(
     tracing_subscriber::registry()
         .with(filter_layer)
         .with(console_layer)
+        .with(daemon_file_layer)
         .with(
             fmt::layer()
                 .fmt_fields(FilteredDefaultFields::new())
