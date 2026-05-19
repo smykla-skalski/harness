@@ -139,8 +139,8 @@ extension SessionSidebar {
 
   @ViewBuilder var agentsSection: some View {
     Section {
-      let orderedAgents = cachedAgentPresentation.agents
-      let orderedAgentIDs = cachedAgentPresentation.agentIDs
+      let orderedAgents = currentAgentPresentation.agents
+      let orderedAgentIDs = currentAgentPresentation.agentIDs
       ForEach(orderedAgents) { agent in
         agentRow(agent, orderedAgentIDs: orderedAgentIDs)
       }
@@ -175,8 +175,8 @@ extension SessionSidebar {
 
   @ViewBuilder var tasksSection: some View {
     Section {
-      let tasks = cachedTaskPresentation.tasks
-      let orderedTaskIDs = cachedTaskPresentation.taskIDs
+      let tasks = currentTaskPresentation.tasks
+      let orderedTaskIDs = currentTaskPresentation.taskIDs
       ForEach(tasks) { task in
         taskRow(task, orderedTaskIDs: orderedTaskIDs)
       }
@@ -290,7 +290,7 @@ extension SessionSidebar {
     SessionTaskContextMenuActions(
       store: store,
       state: state,
-      tasks: cachedTaskPresentation.tasks,
+      tasks: currentTaskPresentation.tasks,
       decisions: decisions,
       resolution: resolution
     )

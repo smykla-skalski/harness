@@ -76,6 +76,10 @@ public struct TaskBoardOverviewView: View {
     )
   }
 
+  var currentPresentation: TaskBoardOverviewPresentation {
+    cachedPresentation
+  }
+
   public init(
     snapshot: TaskBoardInboxSnapshot,
     taskBoardItems: [TaskBoardItem] = [],
