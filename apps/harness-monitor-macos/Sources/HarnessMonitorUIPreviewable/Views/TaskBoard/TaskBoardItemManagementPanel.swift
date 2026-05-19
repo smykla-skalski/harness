@@ -23,8 +23,11 @@ struct TaskBoardItemManagementPanel: View {
   @Environment(\.fontScale)
   private var fontScale
 
-  private var subheadlineSemibold: Font {
-    HarnessMonitorTextSize.scaledFont(.subheadline.weight(.semibold), by: fontScale)
+  private var headerTitleFont: Font {
+    HarnessMonitorTextSize.scaledFont(.title2.weight(.semibold), by: fontScale)
+  }
+  private var headerSymbolFont: Font {
+    HarnessMonitorTextSize.scaledFont(.title3.weight(.semibold), by: fontScale)
   }
   private var captionFont: Font {
     HarnessMonitorTextSize.scaledFont(.caption, by: fontScale)
@@ -135,20 +138,29 @@ struct TaskBoardItemManagementPanel: View {
   }
 
   private var header: some View {
-    HStack(alignment: .firstTextBaseline, spacing: HarnessMonitorTheme.spacingSM) {
-      Label(
-        isCreating ? "Create Board Item" : "Manage Board Item",
-        systemImage: "slider.horizontal.3"
-      )
-      .font(subheadlineSemibold)
+    HStack(alignment: .center, spacing: HarnessMonitorTheme.spacingSM) {
+      HStack(alignment: .firstTextBaseline, spacing: HarnessMonitorTheme.spacingSM) {
+        Image(systemName: "slider.horizontal.3")
+          .font(headerSymbolFont)
+          .accessibilityHidden(true)
+        Text(isCreating ? "Create Board Item" : "Manage Board Item")
+          .font(headerTitleFont)
+      }
+      .accessibilityElement(children: .combine)
+      .accessibilityAddTraits(.isHeader)
       Spacer(minLength: HarnessMonitorTheme.spacingSM)
       Button(action: onClose) {
-        Image(systemName: "xmark")
-          .font(captionSemibold)
+        Image(systemName: "xmark.circle.fill")
+          .scaledFont(.title3)
+          .foregroundStyle(.secondary)
+          .frame(
+            width: max(metrics.iconControlMinWidth, metrics.controlMinHeight),
+            height: max(metrics.iconControlMinWidth, metrics.controlMinHeight)
+          )
+          .contentShape(.circle)
           .accessibilityHidden(true)
       }
-      .harnessAccessoryButtonStyle(tint: .secondary)
-      .controlSize(HarnessMonitorControlMetrics.compactControlSize)
+      .harnessDismissButtonStyle()
       .frame(minWidth: metrics.iconControlMinWidth, minHeight: metrics.controlMinHeight)
       .help("Close board item")
       .accessibilityLabel("Close item panel")
