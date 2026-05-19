@@ -11,7 +11,8 @@ struct TaskBoardGitSettingsDraft: Equatable {
   var checkoutPath = ""
   var githubInboxRepositoriesText = ""
   var githubInboxLabelFilterText = ""
-  var githubInboxRepositoryInput = ""
+  var githubInboxRepositoryOwnerInput = ""
+  var githubInboxRepositoryNameInput = ""
   var githubInboxLabelInput = ""
   var todoistInboxProjectFilterText = ""
   var defaultBranch = "main"
@@ -251,7 +252,7 @@ struct TaskBoardGitSettingsDraft: Equatable {
   }
 
   var canAddGitHubInboxRepository: Bool {
-    normalizedRepositoryInputEntry(githubInboxRepositoryInput) != nil
+    normalizedGitHubInboxRepositoryInput != nil
   }
 
   var canAddGitHubInboxLabel: Bool {
@@ -259,7 +260,7 @@ struct TaskBoardGitSettingsDraft: Equatable {
   }
 
   mutating func addGitHubInboxRepositoryInput() {
-    guard let repository = normalizedRepositoryInputEntry(githubInboxRepositoryInput) else {
+    guard let repository = normalizedGitHubInboxRepositoryInput else {
       return
     }
     let repositories = appendingUnique(
@@ -268,7 +269,8 @@ struct TaskBoardGitSettingsDraft: Equatable {
       caseInsensitive: true
     )
     githubInboxRepositoriesText = repositories.joined(separator: "\n")
-    githubInboxRepositoryInput = ""
+    githubInboxRepositoryOwnerInput = ""
+    githubInboxRepositoryNameInput = ""
   }
 
   mutating func removeGitHubInboxRepository(_ repository: String) {
@@ -331,6 +333,13 @@ struct TaskBoardGitSettingsDraft: Equatable {
     return trimmed.isEmpty ? nil : trimmed
   }
 
+  private var normalizedGitHubInboxRepositoryInput: String? {
+    normalizedRepository(
+      owner: githubInboxRepositoryOwnerInput,
+      repo: githubInboxRepositoryNameInput
+    )
+  }
+
   private func normalizedRepositories(from value: String) -> [String] {
     var repositories: [String] = []
     var seen: Set<String> = []
@@ -357,21 +366,14 @@ struct TaskBoardGitSettingsDraft: Equatable {
     }
     let owner = parts[0].trimmingCharacters(in: .whitespacesAndNewlines)
     let repo = parts[1].trimmingCharacters(in: .whitespacesAndNewlines)
-    guard !owner.isEmpty, !repo.isEmpty, !repo.contains("/") else {
+    guard let repository = normalizedRepository(owner: owner, repo: repo) else {
       return trimmed
     }
-    return "\(owner.lowercased())/\(repo.lowercased())"
+    return repository
   }
 
-  private func normalizedRepositoryInputEntry(_ value: String) -> String? {
-    let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
-    let parts = trimmed.split(separator: "/", maxSplits: 2, omittingEmptySubsequences: false)
-    guard parts.count == 2 else {
-      return nil
-    }
-    let owner = parts[0].trimmingCharacters(in: .whitespacesAndNewlines)
-    let repo = parts[1].trimmingCharacters(in: .whitespacesAndNewlines)
-    guard !owner.isEmpty, !repo.isEmpty, !repo.contains("/") else {
+  private func normalizedRepository(owner: String, repo: String) -> String? {
+    guard let owner = normalized(owner), let repo = normalized(repo), !repo.contains("/") else {
       return nil
     }
     return "\(owner.lowercased())/\(repo.lowercased())"
