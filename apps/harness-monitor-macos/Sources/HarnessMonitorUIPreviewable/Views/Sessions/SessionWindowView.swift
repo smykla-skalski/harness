@@ -1,6 +1,8 @@
+// swiftlint:disable file_length
 import HarnessMonitorKit
 import SwiftUI
 
+// swiftlint:disable:next type_body_length
 public struct SessionWindowView: View {
   public let store: HarnessMonitorStore
   public let token: SessionWindowToken

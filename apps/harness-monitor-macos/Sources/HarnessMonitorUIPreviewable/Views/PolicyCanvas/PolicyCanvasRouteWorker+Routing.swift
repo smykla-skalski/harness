@@ -69,6 +69,7 @@ extension PolicyCanvasPreparedRouteInput {
     }
   }
 
+  // swiftlint:disable:next function_parameter_count
   private func resolvedDisplayedRouteRequest(
     edge: PolicyCanvasEdge,
     source: CGPoint,
@@ -185,7 +186,9 @@ extension PolicyCanvasPreparedRouteInput {
       return nil
     }
     if let terminal {
-      return (point: policyCanvasShiftedRouteAnchor(point, side: side, terminal: terminal), side: side)
+      return (
+        point: policyCanvasShiftedRouteAnchor(point, side: side, terminal: terminal), side: side
+      )
     }
     let spacing = max(
       portSpacing(for: endpoint, side: side, nodeIndex: nodeIndex),
@@ -237,14 +240,18 @@ extension PolicyCanvasPreparedRouteInput {
   ) -> CGPoint {
     switch side {
     case .leading:
-      CGPoint(x: node.position.x, y: node.position.y + PolicyCanvasLayout.portY(index: index, count: count))
+      CGPoint(
+        x: node.position.x,
+        y: node.position.y + PolicyCanvasLayout.portY(index: index, count: count))
     case .trailing:
       CGPoint(
         x: node.position.x + PolicyCanvasLayout.nodeSize.width,
         y: node.position.y + PolicyCanvasLayout.portY(index: index, count: count)
       )
     case .top:
-      CGPoint(x: node.position.x + PolicyCanvasLayout.portX(index: index, count: count), y: node.position.y)
+      CGPoint(
+        x: node.position.x + PolicyCanvasLayout.portX(index: index, count: count),
+        y: node.position.y)
     case .bottom:
       CGPoint(
         x: node.position.x + PolicyCanvasLayout.portX(index: index, count: count),
@@ -368,9 +375,10 @@ extension PolicyCanvasPreparedRouteInput {
     for endpoint: PolicyCanvasPortEndpoint,
     nodeIndex: [String: PolicyCanvasRouteNode]
   ) -> [PolicyCanvasPortSide: CGFloat] {
-    Dictionary(uniqueKeysWithValues: PolicyCanvasPortSide.allSides.map { side in
-      (side, portSpacing(for: endpoint, side: side, nodeIndex: nodeIndex))
-    })
+    Dictionary(
+      uniqueKeysWithValues: PolicyCanvasPortSide.allSides.map { side in
+        (side, portSpacing(for: endpoint, side: side, nodeIndex: nodeIndex))
+      })
   }
 
   func portSpacing(

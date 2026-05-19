@@ -1,3 +1,4 @@
+// swiftlint:disable file_length
 import CryptoKit
 import Foundation
 
@@ -63,9 +64,10 @@ public enum HarnessMonitorPaths {
 
     if discoverLiveDaemon,
       let discoveredRoot = discoverLiveDaemonRoot(
-      ownership: ownership,
-      using: environment
-    ) {
+        ownership: ownership,
+        using: environment
+      )
+    {
       return discoveredRoot
     }
 

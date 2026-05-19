@@ -36,7 +36,7 @@ public struct TaskBoardOverviewView: View {
   @State private var isCreatingTaskBoardItem = false
   @State private var evaluationSummaryFitsHorizontally = true
   @State private var presentationWorker = TaskBoardOverviewPresentationWorker()
-  @State var cachedPresentation = TaskBoardOverviewPresentation.empty
+  @State private var cachedPresentation = TaskBoardOverviewPresentation.empty
   @State private var presentationGeneration: UInt64 = 0
 
   private var captionSemibold: Font {

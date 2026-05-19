@@ -201,9 +201,10 @@ extension HarnessMonitorStore.SessionIndexSlice {
       totalOpenWorkCount: sessions.reduce(0) { $0 + $1.metrics.openTaskCount },
       totalBlockedCount: sessions.reduce(0) { $0 + $1.metrics.blockedTaskCount },
       sessionIDs: sessionIDs,
-      sessionSummariesByID: Dictionary(uniqueKeysWithValues: sessions.map {
-        ($0.sessionId, $0)
-      }),
+      sessionSummariesByID: Dictionary(
+        uniqueKeysWithValues: sessions.map {
+          ($0.sessionId, $0)
+        }),
       sessionIndicesByID: sessionIndicesByID,
       recentSessionIndicesByID: Dictionary(
         uniqueKeysWithValues: recentSessions.enumerated().map { index, summary in

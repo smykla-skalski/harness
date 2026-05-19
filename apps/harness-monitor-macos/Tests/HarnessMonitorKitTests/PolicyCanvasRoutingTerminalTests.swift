@@ -138,6 +138,7 @@ struct PolicyCanvasRoutingTerminalTests {
     }
   }
 
+  // swiftlint:disable:next large_tuple
   private func defaultDisplayedRoutes() -> (
     viewModel: PolicyCanvasViewModel,
     edges: [PolicyCanvasEdge],
@@ -159,6 +160,7 @@ struct PolicyCanvasRoutingTerminalTests {
     )
   }
 
+  // swiftlint:disable:next function_parameter_count
   private func assertTerminalAnchorSpacing(
     viewModel: PolicyCanvasViewModel,
     edges: [PolicyCanvasEdge],
@@ -172,7 +174,9 @@ struct PolicyCanvasRoutingTerminalTests {
       PolicyCanvasRouteEndpointTestKey(edge[keyPath: endpoint])
     }
     for groupEdges in groups.values where groupEdges.count > 1 {
-      let entries = groupEdges.compactMap { edge -> (String, CGPoint, CGFloat, PolicyCanvasPortSide?)? in
+      let entries = groupEdges.compactMap {
+        // swiftlint:disable:next closure_parameter_position large_tuple
+        edge -> (String, CGPoint, CGFloat, PolicyCanvasPortSide?)? in
         guard let route = routes[edge.id], let point = routePoint(route) else {
           return nil
         }
@@ -224,6 +228,7 @@ struct PolicyCanvasRoutingTerminalTests {
     }
   }
 
+  // swiftlint:disable:next function_parameter_count
   private func assertMarkerOffsets(
     viewModel: PolicyCanvasViewModel,
     edges: [PolicyCanvasEdge],
@@ -325,7 +330,7 @@ private struct PolicyCanvasTerminalTestSegment {
     abs(start.x - end.x) < 0.001
   }
 
-  func sharesCollinearRange(with other: PolicyCanvasTerminalTestSegment) -> Bool {
+  func sharesCollinearRange(with other: Self) -> Bool {
     if isHorizontal, other.isHorizontal, abs(start.y - other.start.y) < 0.001 {
       return overlap(
         min(start.x, end.x)...max(start.x, end.x),

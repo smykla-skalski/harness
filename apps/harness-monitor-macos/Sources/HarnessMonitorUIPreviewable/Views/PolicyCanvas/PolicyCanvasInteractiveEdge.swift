@@ -179,7 +179,8 @@ struct PolicyCanvasInteractiveEdge: View {
     return accessibilityKindWord
   }
 
-  @ViewBuilder private func strokeLayer(route: PolicyCanvasEdgeRoute) -> some View {
+  @ViewBuilder
+  private func strokeLayer(route: PolicyCanvasEdgeRoute) -> some View {
     if isAnimated, !reducedMotion {
       TimelineView(.animation) { context in
         let phase = PolicyCanvasEdgeAnimation.dashPhase(

@@ -1,3 +1,4 @@
+// swiftlint:disable file_length
 import Foundation
 
 /// Outcome of `HarnessMonitorStore.applyAcpAgent`.

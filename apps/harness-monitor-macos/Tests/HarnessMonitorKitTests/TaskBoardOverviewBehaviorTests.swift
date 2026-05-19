@@ -1,3 +1,4 @@
+// swiftlint:disable file_length
 import Foundation
 import Testing
 
@@ -5,6 +6,7 @@ import Testing
 @testable import HarnessMonitorUIPreviewable
 
 @Suite("Task board overview behavior")
+// swiftlint:disable:next type_body_length attributes
 struct TaskBoardOverviewBehaviorTests {
   @Test("Lane drop policy ignores empty and same-lane payloads")
   func laneDropPolicyIgnoresEmptyAndSameLanePayloads() {
@@ -171,7 +173,8 @@ struct TaskBoardOverviewBehaviorTests {
     let deleted = taskBoardItem(id: "deleted", status: .blocked, deletedAt: "2026-05-14T11:00:00Z")
     let inbox = inboxItem(taskID: "running-inbox", status: .inProgress)
     let criticalDecision = decision(id: "decision-critical", severity: .critical)
-    let dismissedDecision = decision(id: "decision-dismissed", severity: .info, statusRaw: "dismissed")
+    let dismissedDecision = decision(
+      id: "decision-dismissed", severity: .info, statusRaw: "dismissed")
 
     let presentation = await worker.compute(
       input: TaskBoardOverviewPresentationInput(

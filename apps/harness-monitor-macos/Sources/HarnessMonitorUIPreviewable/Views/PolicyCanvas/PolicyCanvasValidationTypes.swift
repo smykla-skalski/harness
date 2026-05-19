@@ -4,16 +4,6 @@ struct PolicyCanvasValidationWorkerInput: Equatable, Sendable {
   let nodes: [PolicyCanvasNode]
   let edges: [PolicyCanvasEdge]
   let daemonIssues: [TaskBoardPolicyPipelineValidationIssue]
-
-  init(
-    nodes: [PolicyCanvasNode],
-    edges: [PolicyCanvasEdge],
-    daemonIssues: [TaskBoardPolicyPipelineValidationIssue]
-  ) {
-    self.nodes = nodes
-    self.edges = edges
-    self.daemonIssues = daemonIssues
-  }
 }
 
 struct PolicyCanvasPreparedValidationInput: Equatable, Sendable {

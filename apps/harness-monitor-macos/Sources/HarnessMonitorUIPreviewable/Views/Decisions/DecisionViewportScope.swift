@@ -17,9 +17,12 @@ public struct DecisionWorkspaceScope: Equatable {
     selectedDecisionID: String? = nil
   ) {
     self.decisions = decisions
-    self.decisionsByID = decisionsByID ?? Dictionary(uniqueKeysWithValues: decisions.map {
-      ($0.id, $0)
-    })
+    self.decisionsByID =
+      decisionsByID
+      ?? Dictionary(
+        uniqueKeysWithValues: decisions.map {
+          ($0.id, $0)
+        })
     self.filters = filters
     self.visibleSnapshot = visibleSnapshot
     presentation = nil

@@ -76,6 +76,7 @@ func policyCanvasDisplayedRoutes(
 }
 
 @MainActor
+// swiftlint:disable:next function_parameter_count attributes
 private func policyCanvasDisplayedRoutes(
   viewModel: PolicyCanvasViewModel,
   orderedEdges: [PolicyCanvasEdge],

@@ -1,3 +1,4 @@
+// swiftlint:disable file_length
 import Foundation
 
 extension HarnessMonitorStore {
@@ -453,7 +454,9 @@ extension HarnessMonitorStore {
     }
   }
 
-  nonisolated private static func timelineEntrySortKey(for entry: TimelineEntry) -> TimelineEntrySortKey {
+  nonisolated private static func timelineEntrySortKey(for entry: TimelineEntry)
+    -> TimelineEntrySortKey
+  {
     TimelineEntrySortKey(
       entry: entry,
       toolCallSequence: entry.toolCallTimelineEntryMetadata()?.sequence

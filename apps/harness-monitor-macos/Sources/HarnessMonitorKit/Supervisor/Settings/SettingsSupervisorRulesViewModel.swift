@@ -143,7 +143,9 @@ public final class SettingsSupervisorRulesViewModel {
     )
   }
 
-  public func makePolicyConfigRowSnapshot(forRuleID ruleID: String) throws -> PolicyConfigRowSnapshot {
+  public func makePolicyConfigRowSnapshot(forRuleID ruleID: String) throws
+    -> PolicyConfigRowSnapshot
+  {
     guard
       let rule = rules.first(where: { $0.id == ruleID }),
       let state = editorStates[ruleID]

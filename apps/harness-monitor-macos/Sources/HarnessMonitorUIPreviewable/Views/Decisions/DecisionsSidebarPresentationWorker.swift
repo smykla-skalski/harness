@@ -302,8 +302,8 @@ actor DecisionsSidebarPresentationWorker {
   }
 }
 
-private extension Array where Element == DecisionPresentationItem {
-  func count(whereSeverityIs severity: DecisionSeverity) -> Int {
+extension Array where Element == DecisionPresentationItem {
+  fileprivate func count(whereSeverityIs severity: DecisionSeverity) -> Int {
     reduce(into: 0) { count, item in
       if item.severityRaw == severity.rawValue {
         count += 1
@@ -311,7 +311,7 @@ private extension Array where Element == DecisionPresentationItem {
     }
   }
 
-  func ids(whereSeverityIs severity: DecisionSeverity) -> [String] {
+  fileprivate func ids(whereSeverityIs severity: DecisionSeverity) -> [String] {
     filter { $0.severityRaw == severity.rawValue }.map(\.id)
   }
 }

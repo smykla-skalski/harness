@@ -1,8 +1,10 @@
+// swiftlint:disable file_length
 import HarnessMonitorKit
 import SwiftUI
 
 private let decisionDeskDetailPreparationWorker = DecisionDetailPreparationWorker()
 
+// swiftlint:disable:next type_body_length
 public struct DecisionDeskPreviewView: View {
   private let store: HarnessMonitorStore?
 

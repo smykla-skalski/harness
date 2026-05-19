@@ -172,7 +172,8 @@ extension HarnessMonitorStore {
     }
   }
 
-  public func loadSupervisorAuditEventSnapshots(limit: Int = 128) async -> [SupervisorEventSnapshot] {
+  public func loadSupervisorAuditEventSnapshots(limit: Int = 128) async -> [SupervisorEventSnapshot]
+  {
     guard let supervisorAuditRepository else {
       return []
     }

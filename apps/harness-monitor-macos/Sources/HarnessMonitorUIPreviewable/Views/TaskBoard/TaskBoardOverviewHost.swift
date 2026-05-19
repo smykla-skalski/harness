@@ -212,8 +212,8 @@ struct TaskBoardOverviewHost: View {
   }
 }
 
-private extension TaskBoardOverviewHost.Scope {
-  var sessionID: String? {
+extension TaskBoardOverviewHost.Scope {
+  fileprivate var sessionID: String? {
     switch self {
     case .dashboard:
       nil
@@ -222,7 +222,7 @@ private extension TaskBoardOverviewHost.Scope {
     }
   }
 
-  var taskBoardContentHorizontalPadding: CGFloat {
+  fileprivate var taskBoardContentHorizontalPadding: CGFloat {
     switch self {
     case .dashboard:
       24

@@ -1,9 +1,11 @@
+// swiftlint:disable file_length
 import Foundation
 import Observation
 import UserNotifications
 
 @MainActor
 @Observable
+// swiftlint:disable:next type_body_length attributes
 public final class HarnessMonitorUserNotificationController: NSObject,
   UNUserNotificationCenterDelegate
 {
@@ -37,7 +39,8 @@ public final class HarnessMonitorUserNotificationController: NSObject,
     HarnessMonitorNotificationSettingsSnapshot?
   @ObservationIgnored private var isActivated = false
   @ObservationIgnored private var resolveHandler: DecisionResolveHandler?
-  @ObservationIgnored private var historyEventSink: (@MainActor (NotificationHistorySystemEvent) -> Void)?
+  @ObservationIgnored private var historyEventSink:
+    (@MainActor (NotificationHistorySystemEvent) -> Void)?
 
   public init(
     center: any HarnessMonitorUserNotificationCenter = UNUserNotificationCenter.current(),
@@ -167,6 +170,7 @@ public final class HarnessMonitorUserNotificationController: NSObject,
     }
   }
 
+  // swiftlint:disable:next function_parameter_count
   private func deliverSupervisorNotification(
     source: NotificationHistoryEntry.Source,
     severity: DecisionSeverity,

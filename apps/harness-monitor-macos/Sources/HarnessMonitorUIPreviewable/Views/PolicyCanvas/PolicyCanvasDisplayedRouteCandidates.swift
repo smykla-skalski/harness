@@ -9,7 +9,7 @@ struct PolicyCanvasRouteRetryOffset: Hashable {
   let sourceFanoutDelta: Int
   let targetFanoutDelta: Int
 
-  static let zero = PolicyCanvasRouteRetryOffset()
+  static let zero = Self()
 
   init(
     routeLaneDelta: Int = 0,
@@ -114,7 +114,7 @@ private func policyCanvasRetryRouteContext(
   _ request: PolicyCanvasResolvedDisplayedRouteRequest,
   offset: PolicyCanvasRouteRetryOffset
 ) -> PolicyCanvasRouteContext {
-  return PolicyCanvasRouteContext(
+  PolicyCanvasRouteContext(
     lane: max(0, request.routeLane + offset.routeLaneDelta),
     groups: request.groups,
     sourceGroupID: request.sourceGroupID,

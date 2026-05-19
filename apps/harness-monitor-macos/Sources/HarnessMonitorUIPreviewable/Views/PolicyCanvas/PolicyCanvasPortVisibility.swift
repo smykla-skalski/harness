@@ -101,7 +101,9 @@ private func policyCanvasMatchedPortSide(
   }?.side
 }
 
-private func policyCanvasRouteSide(from point: CGPoint, to adjacent: CGPoint) -> PolicyCanvasPortSide? {
+private func policyCanvasRouteSide(from point: CGPoint, to adjacent: CGPoint)
+  -> PolicyCanvasPortSide?
+{
   if adjacent.x > point.x + 0.001 {
     return .trailing
   }

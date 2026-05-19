@@ -12,8 +12,7 @@ struct PolicyCanvasNodeAccessibilityActions: ViewModifier {
   let canPaste: Bool
 
   func body(content: Content) -> some View {
-    return
-      content
+    content
       .accessibilityAction(named: Text("Delete")) {
         viewModel.select(.node(nodeID))
         viewModel.deleteNode(nodeID)

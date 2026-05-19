@@ -147,7 +147,8 @@ struct SessionWindowRouteContentMetricsTests {
     #expect(hostSource.contains("onOpenDecision: openDecision"))
     #expect(hostSource.contains("store.supervisorSelectedDecisionID = decision.id"))
     #expect(hostSource.contains("store.requestSessionRoute("))
-    #expect(hostSource.contains("contentHorizontalPadding: scope.taskBoardContentHorizontalPadding"))
+    #expect(
+      hostSource.contains("contentHorizontalPadding: scope.taskBoardContentHorizontalPadding"))
     #expect(hostSource.contains("case .session:\n      0"))
     #expect(overviewTaskBoardSource.contains("store.contentUI.dashboard.taskBoardItems"))
     #expect(columnsSource.contains("decisions: matchingDecisions"))
@@ -157,7 +158,9 @@ struct SessionWindowRouteContentMetricsTests {
   func overviewRoutePresentsSummaryCardsInsteadOfDuplicateTitleHeader() throws {
     let routeContentSource = try sourceFile(named: "SessionWindowRouteContent.swift")
 
-    #expect(routeContentSource.contains("SessionOverviewInfoStrip(facts: overviewFacts, metrics: metrics)"))
+    #expect(
+      routeContentSource.contains(
+        "SessionOverviewInfoStrip(facts: overviewFacts, metrics: metrics)"))
     #expect(routeContentSource.contains("ViewThatFits(in: .horizontal)"))
     #expect(routeContentSource.contains("SessionOverviewFactCard"))
     #expect(!routeContentSource.contains("Text(snapshot.summary.displayTitle)"))
@@ -254,7 +257,8 @@ struct SessionWindowRouteContentMetricsTests {
     #expect(layoutSource.contains("placeVertical(in: bounds, subviews: subviews)"))
     #expect(layoutSource.contains("bounds.midX - (layoutWidth / 2)"))
     #expect(layoutSource.contains("max(availableWidth, horizontalMinWidth)"))
-    #expect(!layoutSource.contains("min(max(availableWidth, horizontalMinWidth), horizontalMaxWidth)"))
+    #expect(
+      !layoutSource.contains("min(max(availableWidth, horizontalMinWidth), horizontalMaxWidth)"))
     #expect(
       layoutSource.contains("return max(minColumnWidth, (width - totalSpacing) / CGFloat(count))")
     )

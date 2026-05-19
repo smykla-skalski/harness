@@ -1,3 +1,4 @@
+// swiftlint:disable file_length
 import Foundation
 import SwiftData
 
@@ -10,7 +11,7 @@ import SwiftData
 ///
 /// Mutations fan out through `events` (an `AsyncStream<DecisionEvent>`) so downstream consumers
 /// (toolbar slice, notification controller) can react without repolling SwiftData.
-public actor DecisionStore {
+public actor DecisionStore {  // swiftlint:disable:this type_body_length
   static let outcomeEncoder = JSONEncoder()
 
   public struct DecisionEvent: Sendable, Hashable {

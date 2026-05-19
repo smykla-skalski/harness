@@ -111,7 +111,8 @@ extension HarnessMonitorUITestAccessibilityRegistryTests {
     #expect(dashboardView.contains("SessionSidebarRow("))
     #expect(dashboardView.contains(".harnessMonitorSidebarListChrome("))
     #expect(dashboardView.contains("HarnessMonitorAccessibility.dashboardScrollView"))
-    #expect(notificationsView.contains("HarnessMonitorAccessibility.dashboardNotificationsScrollView"))
+    #expect(
+      notificationsView.contains("HarnessMonitorAccessibility.dashboardNotificationsScrollView"))
     #expect(dashboardToolbar.contains("HarnessMonitorAccessibility.dashboardNewSessionButton"))
     #expect(dashboardToolbar.contains("HarnessMonitorAccessibility.dashboardOpenFolderButton"))
     #expect(

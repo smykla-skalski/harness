@@ -219,6 +219,7 @@ public actor UserDataPersistenceService {
         } catch {
           invalidRecords.append(record)
           HarnessMonitorLogger.store.warning(
+            // swiftlint:disable:next line_length
             "notification history decode failed for \(record.entryID, privacy: .public): \(error.localizedDescription, privacy: .public)"
           )
         }
