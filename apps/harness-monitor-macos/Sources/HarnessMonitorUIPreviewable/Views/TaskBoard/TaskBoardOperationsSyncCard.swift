@@ -11,6 +11,8 @@ struct TaskBoardOperationsSyncCard: View, TaskBoardOperationsHost {
 
   @Environment(\.fontScale)
   private var fontScale
+  @Environment(\.openTaskBoardSettings)
+  private var openTaskBoardSettings
 
   @State private var statusChoice = TaskBoardStatusFilterChoice.all
   @State private var direction = TaskBoardExternalSyncDirection.both
@@ -24,8 +26,14 @@ struct TaskBoardOperationsSyncCard: View, TaskBoardOperationsHost {
   }
 
   private var providerChoice: TaskBoardExternalProviderChoice { .monitorVisibleChoice }
+  private var syncAvailability: TaskBoardGitHubSyncAvailability {
+    TaskBoardGitHubSyncAvailability(
+      settings: dashboard.taskBoardOrchestratorStatus?.settings
+    )
+  }
 
   var body: some View {
+    let availability = syncAvailability
     TaskBoardOperationsCard(
       title: "Sync",
       metrics: metrics,
@@ -67,6 +75,12 @@ struct TaskBoardOperationsSyncCard: View, TaskBoardOperationsHost {
         )
       }
 
+      if let warning = availability.warning {
+        TaskBoardOperationsSyncWarning(message: warning) {
+          openTaskBoardSettings()
+        }
+      }
+
       actionRow(showsSeparator: dashboard.taskBoardSyncSummary != nil) {
         actionButton(
           TaskBoardActionButtonDescriptor(
@@ -75,8 +89,9 @@ struct TaskBoardOperationsSyncCard: View, TaskBoardOperationsHost {
             tint: dryRun ? .secondary : nil,
             prominent: !dryRun,
             accessibilityIdentifier: "harness.task-board.sync.run",
-            help: "Preview or apply external task-board sync operations"
-          )
+            help: availability.warning ?? "Preview or apply external task-board sync operations"
+          ),
+          isDisabled: !availability.canRun
         ) {
           Task { @MainActor in
             await store.syncTaskBoard(
@@ -138,5 +153,71 @@ struct TaskBoardOperationsSyncCard: View, TaskBoardOperationsHost {
         }
       }
     }
+  }
+}
+
+struct TaskBoardGitHubSyncAvailability: Equatable {
+  let warning: String?
+
+  init(settings: TaskBoardOrchestratorSettings?) {
+    guard let settings, !settings.hasConfiguredGitHubSyncRepository else {
+      warning = nil
+      return
+    }
+    warning = "Configure a GitHub repository or inbox repository before running sync."
+  }
+
+  var canRun: Bool {
+    warning == nil
+  }
+}
+
+private struct TaskBoardOperationsSyncWarning: View {
+  let message: String
+  let openSettings: @MainActor () -> Void
+
+  var body: some View {
+    HStack(alignment: .firstTextBaseline, spacing: HarnessMonitorTheme.spacingXS) {
+      Image(systemName: "exclamationmark.triangle.fill")
+        .foregroundStyle(.orange)
+        .imageScale(.small)
+      Text(message)
+        .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+        .lineLimit(2)
+      Button {
+        openSettings()
+      } label: {
+        Label("Task Board Settings", systemImage: "gearshape")
+          .labelStyle(.titleAndIcon)
+          .lineLimit(1)
+      }
+      .buttonStyle(.link)
+      .controlSize(.small)
+      .accessibilityIdentifier("harness.task-board.sync.open-settings")
+    }
+    .font(.caption)
+    .frame(maxWidth: .infinity, alignment: .leading)
+    .accessibilityIdentifier("harness.task-board.sync.configuration-warning")
+  }
+}
+
+extension TaskBoardOrchestratorSettings {
+  fileprivate var hasConfiguredGitHubSyncRepository: Bool {
+    hasConfiguredGitHubProjectRepository || hasConfiguredGitHubInboxRepository
+  }
+
+  fileprivate var hasConfiguredGitHubProjectRepository: Bool {
+    !githubProject.owner.trimmedForTaskBoardSync.isEmpty
+      && !githubProject.repo.trimmedForTaskBoardSync.isEmpty
+  }
+
+  fileprivate var hasConfiguredGitHubInboxRepository: Bool {
+    githubInbox.repositories.contains { !$0.trimmedForTaskBoardSync.isEmpty }
+  }
+}
+
+extension String {
+  fileprivate var trimmedForTaskBoardSync: String {
+    trimmingCharacters(in: .whitespacesAndNewlines)
   }
 }

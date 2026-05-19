@@ -141,6 +141,7 @@ extension TaskBoardOperationsHost {
 
   func actionButton(
     _ descriptor: TaskBoardActionButtonDescriptor,
+    isDisabled: Bool = false,
     action: @escaping () -> Void
   ) -> some View {
     Button(action: action) {
@@ -153,7 +154,7 @@ extension TaskBoardOperationsHost {
     )
     .harnessNativeFormControl()
     .fixedSize(horizontal: true, vertical: true)
-    .disabled(store.isDaemonActionInFlight)
+    .disabled(store.isDaemonActionInFlight || isDisabled)
     .help(descriptor.help)
     .accessibilityIdentifier(descriptor.accessibilityIdentifier)
   }

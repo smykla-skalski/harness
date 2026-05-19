@@ -114,6 +114,13 @@ struct DashboardWindowRootView: View {
       dashboardUI: store.contentUI.dashboard,
       sessionCatalog: store.sessionIndex.catalog
     )
+    .environment(
+      \.openTaskBoardSettings,
+      OpenTaskBoardSettingsAction {
+        settingsSelectedSection = .taskBoard
+        openWindow(id: HarnessMonitorWindowID.settings)
+      }
+    )
     .modifier(
       HarnessMonitorPerfScenarioModifier(
         delegate: delegate,
