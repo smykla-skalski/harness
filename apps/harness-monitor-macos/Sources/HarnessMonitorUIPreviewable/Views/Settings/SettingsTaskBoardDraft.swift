@@ -11,6 +11,8 @@ struct TaskBoardGitSettingsDraft: Equatable {
   var checkoutPath = ""
   var githubInboxRepositoriesText = ""
   var githubInboxLabelFilterText = ""
+  var githubInboxRepositoryInput = ""
+  var githubInboxLabelInput = ""
   var todoistInboxProjectFilterText = ""
   var defaultBranch = "main"
   var branchPrefix = "c/"
@@ -178,8 +180,8 @@ struct TaskBoardGitSettingsDraft: Equatable {
           )
         ),
         githubInbox: TaskBoardGitHubInboxConfig(
-          repositories: githubInboxRepositories,
-          labelFilter: githubInboxLabels
+          repositories: githubInboxRepositoryEntries,
+          labelFilter: githubInboxLabelEntries
         ),
         todoistInbox: TaskBoardTodoistInboxConfig(projectFilter: todoistInboxProjects),
         policyVersion: policyVersion
@@ -240,12 +242,58 @@ struct TaskBoardGitSettingsDraft: Equatable {
     repositoryOverrides.compactMap { $0.tokenOverride(loaded: loadedSecrets) }
   }
 
-  private var githubInboxRepositories: [String] {
+  var githubInboxRepositoryEntries: [String] {
     normalizedRepositories(from: githubInboxRepositoriesText)
   }
 
-  private var githubInboxLabels: [String] {
+  var githubInboxLabelEntries: [String] {
     normalizedFilterEntries(from: githubInboxLabelFilterText)
+  }
+
+  var canAddGitHubInboxRepository: Bool {
+    normalizedRepositoryInputEntry(githubInboxRepositoryInput) != nil
+  }
+
+  var canAddGitHubInboxLabel: Bool {
+    normalized(githubInboxLabelInput) != nil
+  }
+
+  mutating func addGitHubInboxRepositoryInput() {
+    guard let repository = normalizedRepositoryInputEntry(githubInboxRepositoryInput) else {
+      return
+    }
+    let repositories = appendingUnique(
+      repository,
+      to: githubInboxRepositoryEntries,
+      caseInsensitive: true
+    )
+    githubInboxRepositoriesText = repositories.joined(separator: "\n")
+    githubInboxRepositoryInput = ""
+  }
+
+  mutating func removeGitHubInboxRepository(_ repository: String) {
+    let target = repository.lowercased()
+    githubInboxRepositoriesText =
+      githubInboxRepositoryEntries
+      .filter { $0.lowercased() != target }
+      .joined(separator: "\n")
+  }
+
+  mutating func addGitHubInboxLabelInput() {
+    guard let label = normalized(githubInboxLabelInput) else {
+      return
+    }
+    let labels = appendingUnique(label, to: githubInboxLabelEntries, caseInsensitive: true)
+    githubInboxLabelFilterText = labels.joined(separator: "\n")
+    githubInboxLabelInput = ""
+  }
+
+  mutating func removeGitHubInboxLabel(_ label: String) {
+    let target = label.lowercased()
+    githubInboxLabelFilterText =
+      githubInboxLabelEntries
+      .filter { $0.lowercased() != target }
+      .joined(separator: "\n")
   }
 
   private var todoistInboxProjects: [String] {
@@ -313,5 +361,32 @@ struct TaskBoardGitSettingsDraft: Equatable {
       return trimmed
     }
     return "\(owner.lowercased())/\(repo.lowercased())"
+  }
+
+  private func normalizedRepositoryInputEntry(_ value: String) -> String? {
+    let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+    let parts = trimmed.split(separator: "/", maxSplits: 2, omittingEmptySubsequences: false)
+    guard parts.count == 2 else {
+      return nil
+    }
+    let owner = parts[0].trimmingCharacters(in: .whitespacesAndNewlines)
+    let repo = parts[1].trimmingCharacters(in: .whitespacesAndNewlines)
+    guard !owner.isEmpty, !repo.isEmpty, !repo.contains("/") else {
+      return nil
+    }
+    return "\(owner.lowercased())/\(repo.lowercased())"
+  }
+
+  private func appendingUnique(
+    _ value: String,
+    to entries: [String],
+    caseInsensitive: Bool
+  ) -> [String] {
+    let key = caseInsensitive ? value.lowercased() : value
+    let existingKeys = Set(entries.map { caseInsensitive ? $0.lowercased() : $0 })
+    guard !existingKeys.contains(key) else {
+      return entries
+    }
+    return entries + [value]
   }
 }

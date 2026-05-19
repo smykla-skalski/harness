@@ -134,6 +134,25 @@ struct SettingsTaskBoardDraftTests {
     #expect(repositories == ["example/harness", "example/aff"])
   }
 
+  @Test("GitHub inbox repository editor adds, dedupes, and removes entries")
+  func githubInboxRepositoryEditorMutations() {
+    var draft = TaskBoardGitSettingsDraft()
+    draft.githubInboxRepositoryInput = " EXAMPLE/HARNESS "
+
+    #expect(draft.canAddGitHubInboxRepository)
+    draft.addGitHubInboxRepositoryInput()
+    draft.githubInboxRepositoryInput = "example/harness"
+    draft.addGitHubInboxRepositoryInput()
+
+    #expect(draft.githubInboxRepositoryEntries == ["example/harness"])
+
+    draft.githubInboxRepositoryInput = "missing-repo"
+    #expect(!draft.canAddGitHubInboxRepository)
+
+    draft.removeGitHubInboxRepository("EXAMPLE/HARNESS")
+    #expect(draft.githubInboxRepositoryEntries.isEmpty)
+  }
+
   @Test("GitHub inbox label filter trims, dedupes case-insensitively, preserves first casing")
   func githubInboxLabelFilterRoundTrip() {
     var draft = TaskBoardGitSettingsDraft()
@@ -142,6 +161,25 @@ struct SettingsTaskBoardDraftTests {
     let labels = draft.snapshot.orchestratorSettings.githubInbox.labelFilter
 
     #expect(labels == ["Bug", "triage", "needs-design"])
+  }
+
+  @Test("GitHub inbox label editor leaves all labels when empty")
+  func githubInboxLabelEditorMutations() {
+    var draft = TaskBoardGitSettingsDraft()
+
+    #expect(draft.githubInboxLabelEntries.isEmpty)
+    #expect(draft.snapshot.orchestratorSettings.githubInbox.labelFilter.isEmpty)
+
+    draft.githubInboxLabelInput = " Bug "
+    draft.addGitHubInboxLabelInput()
+    draft.githubInboxLabelInput = "bug"
+    draft.addGitHubInboxLabelInput()
+
+    #expect(draft.githubInboxLabelEntries == ["Bug"])
+
+    draft.removeGitHubInboxLabel("BUG")
+    #expect(draft.githubInboxLabelEntries.isEmpty)
+    #expect(draft.snapshot.orchestratorSettings.githubInbox.labelFilter.isEmpty)
   }
 
   @Test("Todoist inbox project filter trims and dedupes through orchestrator snapshot")

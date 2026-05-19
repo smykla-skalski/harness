@@ -171,37 +171,7 @@ public struct SettingsTaskBoardSection: View {
   }
 
   private var githubInboxSection: some View {
-    Section {
-      HarnessMonitorMultilineTextField<Never>(
-        placeholder: "owner/repo, one per line",
-        text: $draft.githubInboxRepositoriesText,
-        minHeight: 88,
-        accessibilityLabel: "GitHub inbox repositories"
-      )
-      .accessibilityIdentifier(
-        HarnessMonitorAccessibility.settingsTaskBoardInboxRepositoriesField
-      )
-      HarnessMonitorMultilineTextField<Never>(
-        placeholder: "label, one per line (leave empty for all labels)",
-        text: $draft.githubInboxLabelFilterText,
-        minHeight: 66,
-        accessibilityLabel: "GitHub inbox label filter"
-      )
-      .accessibilityIdentifier(
-        HarnessMonitorAccessibility.settingsTaskBoardInboxLabelFilterField
-      )
-    } header: {
-      Text("GitHub Inbox")
-        .harnessNativeFormSectionHeader()
-    } footer: {
-      Text(
-        """
-        List repositories to import issues assigned to you and pull requests requesting your \
-        review into Needs You. Add labels to restrict imports to issues that carry any of those \
-        labels (case-insensitive). Leave the label list empty to import everything.
-        """
-      )
-    }
+    SettingsTaskBoardInboxSection(draft: $draft)
   }
 
   private var automationSection: some View {
