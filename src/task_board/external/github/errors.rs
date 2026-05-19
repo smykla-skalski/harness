@@ -47,10 +47,12 @@ fn github_api_error_summary_parts(
     message: &str,
     errors: Option<&[serde_json::Value]>,
 ) -> String {
+    let message = trimmed_terminal_period(message);
     let mut summary = format!("GitHub API returned {status_code}: {message}");
     if let Some(detail) = first_github_api_error_message(errors)
-        && detail != message
+        && trimmed_terminal_period(&detail) != message
     {
+        let detail = trimmed_terminal_period(&detail);
         summary.push_str(": ");
         summary.push_str(&detail);
     }
@@ -112,6 +114,10 @@ fn github_api_error_value_message(error: &serde_json::Value) -> String {
         .get("message")
         .and_then(serde_json::Value::as_str)
         .map_or_else(|| error.to_string(), ToOwned::to_owned)
+}
+
+fn trimmed_terminal_period(value: &str) -> String {
+    value.trim_end().trim_end_matches('.').trim_end().to_owned()
 }
 
 fn github_api_error_guidance(
@@ -189,6 +195,7 @@ mod tests {
         assert!(summary.contains("422 Unprocessable Entity"));
         assert!(summary.contains("cannot be searched"));
         assert!(summary.contains("GitHub token can read it"));
+        assert!(!summary.contains(".. Check"));
     }
 
     #[test]

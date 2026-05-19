@@ -165,15 +165,36 @@ impl ExternalSyncClient for GitHubInboxSyncClient {
         }
         let login = self.current_user_login().await?;
         let mut tasks = Vec::new();
+        let mut failures = Vec::new();
+        let mut pulled_repository_count = 0_usize;
         for repository in &self.repositories {
-            tasks.extend(
-                self.assigned_issue_tasks(repository, login.as_str())
-                    .await?,
-            );
-            tasks.extend(
-                self.review_request_tasks(repository, login.as_str())
-                    .await?,
-            );
+            let assigned_tasks = match self.assigned_issue_tasks(repository, login.as_str()).await {
+                Ok(assigned_tasks) => assigned_tasks,
+                Err(error) => {
+                    record_repository_failure(
+                        &mut failures,
+                        repository,
+                        "assigned issue search",
+                        &error,
+                    );
+                    continue;
+                }
+            };
+            pulled_repository_count += 1;
+            tasks.extend(assigned_tasks);
+
+            match self.review_request_tasks(repository, login.as_str()).await {
+                Ok(review_tasks) => tasks.extend(review_tasks),
+                Err(error) => record_repository_failure(
+                    &mut failures,
+                    repository,
+                    "review request search",
+                    &error,
+                ),
+            }
+        }
+        if pulled_repository_count == 0 && !failures.is_empty() {
+            return Err(all_inbox_repositories_failed(failures));
         }
         Ok(tasks)
     }
@@ -232,6 +253,31 @@ impl GitHubInboxSyncClient {
             })
             .collect())
     }
+}
+
+fn record_repository_failure(
+    failures: &mut Vec<String>,
+    repository: &GitHubRepository,
+    operation: &str,
+    error: &CliError,
+) {
+    let failure = format!(
+        "{} {operation} failed: {}",
+        repository.slug(),
+        error.message()
+    );
+    warn_github_message(&format!("skipping GitHub inbox repository {failure}"));
+    failures.push(failure);
+}
+
+fn all_inbox_repositories_failed(failures: Vec<String>) -> CliError {
+    let details = failures
+        .into_iter()
+        .map(|failure| format!("- {failure}"))
+        .collect::<Vec<_>>()
+        .join("\n");
+    CliErrorKind::workflow_io("task-board github inbox sync failed for all configured repositories")
+        .with_details(details)
 }
 
 fn github_task_ref(
@@ -310,84 +356,4 @@ struct GitHubSearchIssuePullRequestQuery {
 }
 
 #[cfg(test)]
-mod tests {
-    use serde_json::json;
-
-    use super::*;
-
-    #[test]
-    fn github_inbox_search_queries_scope_assigned_issues_and_review_requests() {
-        let repository = parse_github_repository("owner/repo").expect("repository");
-
-        assert_eq!(
-            assigned_issue_query(&repository, "octo-user"),
-            "repo:owner/repo is:issue assignee:octo-user state:all"
-        );
-        assert_eq!(
-            review_request_query(&repository, "octo-user"),
-            "repo:owner/repo is:pr review-requested:octo-user state:open"
-        );
-    }
-
-    #[test]
-    fn github_inbox_search_payload_serializes_query_page_and_page_size() {
-        let payload = GitHubSearchIssuePullRequestQuery {
-            q: "repo:owner/repo is:pr review-requested:octo-user state:open".into(),
-            per_page: 100,
-            page: 2,
-        };
-
-        assert_eq!(
-            serde_json::to_value(payload).expect("serialize payload"),
-            json!({
-                "q": "repo:owner/repo is:pr review-requested:octo-user state:open",
-                "per_page": 100,
-                "page": 2
-            })
-        );
-    }
-
-    #[test]
-    fn github_inbox_search_item_deserializes_label_names() {
-        let payload = json!({
-            "number": 42,
-            "title": "Fix bug",
-            "body": null,
-            "html_url": "https://example.com/i/42",
-            "state": "open",
-            "updated_at": "2026-05-15T00:00:00Z",
-            "labels": [{ "name": "needs-fix" }, { "name": "automation" }]
-        });
-
-        let item: GitHubSearchIssuePullRequestItem =
-            serde_json::from_value(payload).expect("deserialize search item");
-
-        assert_eq!(
-            item.label_names(),
-            vec!["needs-fix".to_string(), "automation".to_string()]
-        );
-    }
-
-    #[test]
-    fn search_label_filter_admits_only_matching_labels() {
-        assert!(search_label_matches_filter(
-            &["bug".into(), "automation".into()],
-            &["automation".into()]
-        ));
-        assert!(!search_label_matches_filter(
-            &["docs".into()],
-            &["automation".into()]
-        ));
-        assert!(search_label_matches_filter(
-            &["bug".into()],
-            &[" Bug ".into()]
-        ));
-        assert!(search_label_matches_filter(&["bug".into()], &[]));
-    }
-
-    #[test]
-    fn github_search_page_cap_keeps_total_hits_under_one_thousand() {
-        assert_eq!(GITHUB_SEARCH_PAGE_CAP, 10);
-        // 10 pages * 100 per page = 1000 total hits before truncation.
-    }
-}
+mod tests;
