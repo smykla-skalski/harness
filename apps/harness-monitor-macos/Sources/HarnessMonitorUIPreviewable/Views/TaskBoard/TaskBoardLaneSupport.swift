@@ -313,7 +313,13 @@ private struct TaskBoardLaneColumnChrome: ViewModifier {
     content
       .padding(.horizontal, metrics.laneInnerPadding)
       .padding(.vertical, metrics.laneInnerPadding)
-      .frame(width: metrics.laneWidth, height: metrics.laneFixedHeight, alignment: .topLeading)
+      .frame(
+        minWidth: metrics.laneWidth,
+        maxWidth: .infinity,
+        minHeight: metrics.laneFixedHeight,
+        maxHeight: metrics.laneFixedHeight,
+        alignment: .topLeading
+      )
       .background {
         RoundedRectangle(cornerRadius: metrics.cardCornerRadius, style: .continuous)
           .fill(laneFill)
