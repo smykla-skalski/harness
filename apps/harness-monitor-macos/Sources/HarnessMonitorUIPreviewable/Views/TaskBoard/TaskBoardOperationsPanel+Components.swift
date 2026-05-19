@@ -133,7 +133,10 @@ extension TaskBoardOperationsHost {
         title: title,
         text: text,
         prompt: prompt,
-        accessibilityIdentifier: accessibilityIdentifier
+        accessibilityIdentifier: accessibilityIdentifier,
+        fieldAlignment: .trailing,
+        textAlignment: .trailing,
+        showsClearButton: true
       )
     }
   }
