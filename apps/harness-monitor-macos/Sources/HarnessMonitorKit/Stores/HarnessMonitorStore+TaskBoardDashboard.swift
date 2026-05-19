@@ -1,6 +1,17 @@
 import Foundation
 
 extension HarnessMonitorStore {
+  struct TaskBoardSnapshotLoad<Value: Sendable>: Sendable {
+    let measured: MeasuredOperation<Value>?
+
+    var value: Value? { measured?.value }
+  }
+
+  struct TaskBoardRefreshSnapshot: Sendable {
+    let items: TaskBoardSnapshotLoad<[TaskBoardItem]>
+    let orchestratorStatus: TaskBoardSnapshotLoad<TaskBoardOrchestratorStatus?>
+  }
+
   private static let taskBoardDashboardSyncRequest = TaskBoardSyncRequest(
     direction: .pull,
     dryRun: false
@@ -8,35 +19,49 @@ extension HarnessMonitorStore {
 
   nonisolated static func loadTaskBoardItemsSnapshot(
     using client: any HarnessMonitorClientProtocol
-  ) async -> MeasuredOperation<[TaskBoardItem]> {
+  ) async -> TaskBoardSnapshotLoad<[TaskBoardItem]> {
     do {
-      return try await measureOperation {
-        try await client.taskBoardItems(status: nil)
-      }
+      return TaskBoardSnapshotLoad(
+        measured: try await measureOperation {
+          try await client.taskBoardItems(status: nil)
+        }
+      )
     } catch {
       let description = RefreshSnapshotErrorFormatting.describeUnderlying(error)
       HarnessMonitorLogger.store.debug(
         "task-board snapshot unavailable during refresh: \(description, privacy: .public)"
       )
-      return MeasuredOperation(value: [], latencyMs: 0)
+      return TaskBoardSnapshotLoad(measured: nil)
     }
   }
 
   nonisolated static func loadTaskBoardOrchestratorStatusSnapshot(
     using client: any HarnessMonitorClientProtocol
-  ) async -> MeasuredOperation<TaskBoardOrchestratorStatus?> {
+  ) async -> TaskBoardSnapshotLoad<TaskBoardOrchestratorStatus?> {
     do {
-      let measuredStatus = try await measureOperation {
-        try await client.taskBoardOrchestratorStatus()
-      }
-      return MeasuredOperation(value: measuredStatus.value, latencyMs: measuredStatus.latencyMs)
+      return TaskBoardSnapshotLoad(
+        measured: try await measureOperation {
+          try await client.taskBoardOrchestratorStatus()
+        }
+      )
     } catch {
       let description = RefreshSnapshotErrorFormatting.describeUnderlying(error)
       HarnessMonitorLogger.store.debug(
         "task-board orchestrator snapshot unavailable during refresh: \(description, privacy: .public)"
       )
-      return MeasuredOperation(value: nil, latencyMs: 0)
+      return TaskBoardSnapshotLoad(measured: nil)
     }
+  }
+
+  nonisolated static func loadTaskBoardRefreshSnapshot(
+    using client: any HarnessMonitorClientProtocol
+  ) async -> TaskBoardRefreshSnapshot {
+    async let items = loadTaskBoardItemsSnapshot(using: client)
+    async let orchestratorStatus = loadTaskBoardOrchestratorStatusSnapshot(using: client)
+    return TaskBoardRefreshSnapshot(
+      items: await items,
+      orchestratorStatus: await orchestratorStatus
+    )
   }
 
   public func refreshTaskBoardDashboard() async {

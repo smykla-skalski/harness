@@ -35,6 +35,10 @@ extension HarnessMonitorStore {
   func restorePersistedSessionStateWhileConnecting() async {
     guard connectionState == .connecting else { return }
 
+    // Restore global task-board content first so external items are visible on
+    // launch even if the daemon reconnects before session-list hydration ends.
+    await restorePersistedTaskBoardState()
+
     await refreshPersistedSessionMetadata()
     guard connectionState == .connecting else { return }
 
@@ -53,9 +57,6 @@ extension HarnessMonitorStore {
       replaceCachedSessionIndexSnapshot(filteredCached, updateCachedCatalogFlag: false)
     }
 
-    guard connectionState == .connecting else { return }
-
-    await restorePersistedTaskBoardState()
     guard connectionState == .connecting else { return }
 
     withUISyncBatch {
@@ -189,6 +190,7 @@ extension HarnessMonitorStore {
   }
 
   func restorePersistedSessionState() async {
+    await restorePersistedTaskBoardState()
     await refreshPersistedSessionMetadata()
 
     if sessions.isEmpty, let cached = await loadCachedSessionList() {
@@ -204,8 +206,6 @@ extension HarnessMonitorStore {
       }
       replaceCachedSessionIndexSnapshot(filteredCached, updateCachedCatalogFlag: false)
     }
-
-    await restorePersistedTaskBoardState()
 
     if case .offline = connectionState {
       withUISyncBatch {

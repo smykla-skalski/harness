@@ -5,7 +5,12 @@ import Foundation
 extension RecordingHarnessClient {
   func taskBoardItems(status: TaskBoardStatus?) async throws -> [TaskBoardItem] {
     recordReadCall(.taskBoardItems(status))
-    let items = lock.withLock { taskBoardItemsStorage }
+    if let error = dequeueTaskBoardItemsError() {
+      throw error
+    }
+    let items =
+      dequeueTaskBoardItemSnapshot()
+      ?? lock.withLock { taskBoardItemsStorage }
     guard let status else {
       return items
     }

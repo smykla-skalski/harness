@@ -329,6 +329,76 @@ struct PersistenceOfflineDurabilityTests {
     #expect(relaunchedStore.globalTaskBoardOrchestratorStatus == orchestratorStatus)
   }
 
+  @Test("External bootstrap restores cached task-board items before daemon warm-up finishes")
+  func externalBootstrapRestoresCachedTaskBoardItemsBeforeWarmUpFinishes() async throws {
+    let githubItem = makeTaskBoardItem(
+      id: "board-external-github",
+      provider: .gitHub,
+      externalId: "999"
+    )
+    let orchestratorStatus = makeTaskBoardOrchestratorStatus()
+
+    do {
+      let liveStore = HarnessMonitorStore(
+        daemonController: RecordingDaemonController(),
+        daemonOwnership: .external,
+        modelContainer: previewContainer
+      )
+      await liveStore.cacheTaskBoardSnapshot(
+        items: [githubItem],
+        orchestratorStatus: orchestratorStatus
+      )
+    }
+
+    let daemon = DelayedWarmUpDaemonController(warmUpDelay: .milliseconds(250))
+    let relaunchedStore = HarnessMonitorStore(
+      daemonController: daemon,
+      daemonOwnership: .external,
+      modelContainer: previewContainer
+    )
+
+    let bootstrapTask = Task { @MainActor in
+      await relaunchedStore.bootstrap()
+    }
+
+    for _ in 0..<20 where relaunchedStore.globalTaskBoardItems.isEmpty {
+      try await Task.sleep(for: .milliseconds(10))
+    }
+
+    #expect(relaunchedStore.connectionState == .connecting)
+    #expect(relaunchedStore.globalTaskBoardItems.map(\.id) == ["board-external-github"])
+    #expect(relaunchedStore.globalTaskBoardOrchestratorStatus == orchestratorStatus)
+
+    await bootstrapTask.value
+  }
+
+  @Test("Connecting restore keeps cached task-board items when connection state flips idle mid-hydration")
+  func connectingRestoreKeepsCachedTaskBoardItemsWhenConnectionTurnsIdle() async throws {
+    let githubItem = makeTaskBoardItem(
+      id: "board-connecting-github",
+      provider: .gitHub,
+      externalId: "321"
+    )
+    let orchestratorStatus = makeTaskBoardOrchestratorStatus()
+    let store = makeStore()
+    await store.cacheTaskBoardSnapshot(
+      items: [githubItem],
+      orchestratorStatus: orchestratorStatus
+    )
+    store.connectionState = .connecting
+
+    let idleFlipTask = Task { @MainActor in
+      await Task.yield()
+      store.connectionState = .idle
+    }
+
+    await store.restorePersistedSessionStateWhileConnecting()
+    await idleFlipTask.value
+
+    #expect(store.globalTaskBoardItems.map(\.id) == ["board-connecting-github"])
+    #expect(store.globalTaskBoardOrchestratorStatus == orchestratorStatus)
+  }
+
   @Test("Restore keeps live task-board items when the persisted snapshot is stale")
   func restoreKeepsLiveTaskBoardItemsWhenPersistedSnapshotIsStale() async throws {
     let persistedItem = makeTaskBoardItem(

@@ -316,6 +316,8 @@ public final class HarnessMonitorStore {
   var bootstrapWarmUpTimeout: Duration = .seconds(15)
   var initialConnectRefreshRetryGracePeriod: Duration = .seconds(2)
   var initialConnectRefreshRetryInterval: Duration = .milliseconds(200)
+  var initialTaskBoardConfirmationGracePeriod: Duration = .seconds(5)
+  var initialTaskBoardConfirmationRetryInterval: Duration = .milliseconds(250)
   var acpInspectGracePeriod: Duration = .seconds(2)
   var acpInspectRecoveryDelays: [Duration] = [.seconds(1), .seconds(2), .seconds(4)]
   var managedLaunchAgentRefreshMinimumInterval: Duration = .seconds(10)
@@ -345,6 +347,7 @@ public final class HarnessMonitorStore {
   var connectionProbeTask: Task<Void, Never>?
   var sessionPushFallbackTask: Task<Void, Never>?
   @ObservationIgnored var appInactivitySuspendTask: Task<Void, Never>?
+  @ObservationIgnored var initialTaskBoardConfirmationTask: Task<Void, Never>?
   @ObservationIgnored var selectedSessionRefreshFallbackTask: Task<Void, Never>?
   var sessionSnapshotHydrationTask: Task<Void, Never>?
   @ObservationIgnored var sessionLoadTask: Task<Void, Never>?

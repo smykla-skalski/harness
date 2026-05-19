@@ -257,12 +257,14 @@ final class RecordingHarnessClient: HarnessMonitorClientProtocol, @unchecked Sen
   var queuedDiagnosticsErrors: [any Error] = []
   var queuedProjectsErrors: [any Error] = []
   var queuedSessionsErrors: [any Error] = []
+  var queuedTaskBoardItemsErrors: [any Error] = []
   var mutationDelay: Duration?
   var archiveSessionMutatesReadSnapshots = true
   var archiveSessionError: (any Error)?
   var projectSummariesStorage: [ProjectSummary]?
   var sessionSummariesStorage: [SessionSummary]?
   var taskBoardItemsStorage: [TaskBoardItem] = []
+  var queuedTaskBoardItemSnapshots: [[TaskBoardItem]] = []
   var taskBoardItemsAfterSyncStorage: [TaskBoardItem]?
   var taskBoardSyncSummaryStorage = TaskBoardSyncSummary(total: 0, providers: [])
   var taskBoardAuditSummaryStorage: TaskBoardAuditSummary?
