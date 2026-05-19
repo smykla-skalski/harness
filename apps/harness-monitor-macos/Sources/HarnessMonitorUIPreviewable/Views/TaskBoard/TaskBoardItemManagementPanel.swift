@@ -192,13 +192,10 @@ struct TaskBoardItemManagementPanel: View {
   private var editorFields: some View {
     VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
       TaskBoardManagementNativeField(label: "Title", text: $draft.title)
-      HarnessMonitorMultilineTextField<Never>(
-        placeholder: "Body",
+      TaskBoardDescriptionSection(
         text: $draft.body,
-        minHeight: metrics.editorBodyMinHeight,
-        accessibilityLabel: "Body"
+        minHeight: metrics.editorBodyMinHeight
       )
-      .taskBoardManagementFieldChrome()
       HStack(alignment: .top, spacing: HarnessMonitorTheme.spacingMD) {
         TaskBoardManagementPickerField(
           label: "Status",
@@ -218,13 +215,12 @@ struct TaskBoardItemManagementPanel: View {
       }
       TaskBoardManagementNativeField(label: "Tags", text: $draft.tagsText)
       TaskBoardManagementNativeField(label: "Project", text: $draft.projectId)
-      HarnessMonitorMultilineTextField<Never>(
-        placeholder: "Planning summary",
+      TaskBoardManagementMultilineField(
+        label: "Planning summary",
         text: $draft.planningSummary,
         minHeight: metrics.editorPlanningMinHeight,
-        accessibilityLabel: "Planning summary"
+        accessibilityIdentifier: "harness.task-board.manage-item.planning-summary"
       )
-      .taskBoardManagementFieldChrome()
       HStack(alignment: .top, spacing: HarnessMonitorTheme.spacingMD) {
         TaskBoardManagementNativeField(label: "Approver", text: $draft.approvedBy)
         TaskBoardManagementNativeField(label: "Approved At", text: $draft.approvedAt)

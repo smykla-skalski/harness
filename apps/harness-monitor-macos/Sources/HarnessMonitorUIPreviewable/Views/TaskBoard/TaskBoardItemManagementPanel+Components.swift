@@ -12,7 +12,7 @@ private struct TaskBoardManagementFieldChrome: ViewModifier {
 
   private var fillColor: Color {
     let base = Color(nsColor: .textBackgroundColor)
-    return reduceTransparency ? base : base.opacity(0.88)
+    return reduceTransparency ? base : base.opacity(0.42)
   }
 
   private var strokeColor: Color {
@@ -58,9 +58,15 @@ struct TaskBoardManagementNativeField: View {
       Text(label)
         .font(captionSemibold)
         .foregroundStyle(HarnessMonitorTheme.secondaryInk)
-      TextField(label, text: $text)
-        .harnessNativeTextField()
-        .taskBoardManagementFieldChrome()
+      TaskBoardOperationsTextField(
+        title: label,
+        text: $text,
+        prompt: label,
+        accessibilityIdentifier: nil,
+        fieldAlignment: .leading,
+        textAlignment: .leading,
+        showsClearButton: false
+      )
     }
   }
 }
@@ -116,8 +122,37 @@ struct TaskBoardManagementPickerField<
         }
       }
       .labelsHidden()
+      .pickerStyle(.menu)
       .harnessNativeFormControl()
-      .taskBoardManagementFieldChrome()
+    }
+  }
+}
+
+struct TaskBoardManagementMultilineField: View {
+  let label: String
+  @Binding var text: String
+  let minHeight: CGFloat
+  let accessibilityIdentifier: String?
+  @Environment(\.fontScale)
+  private var fontScale
+
+  private var captionSemibold: Font {
+    HarnessMonitorTextSize.scaledFont(.caption.weight(.semibold), by: fontScale)
+  }
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingXS) {
+      Text(label)
+        .font(captionSemibold)
+        .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+      TaskBoardOperationsMultilineTextField(
+        title: label,
+        text: $text,
+        prompt: label,
+        accessibilityIdentifier: accessibilityIdentifier,
+        minHeight: minHeight,
+        maxHeight: minHeight
+      )
     }
   }
 }
