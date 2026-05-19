@@ -59,22 +59,28 @@ extension HarnessMonitorStore {
     using client: any HarnessMonitorClientProtocol,
     fallbackStatus: TaskBoardOrchestratorStatus? = nil
   ) async {
-    async let items = Self.loadTaskBoardItemsSnapshot(using: client)
-    async let status = Self.loadTaskBoardOrchestratorStatusSnapshot(using: client)
-    let measuredItems = await items
-    let measuredStatus = await status
-    let resolvedStatus = measuredStatus.value ?? fallbackStatus
+    cancelInitialTaskBoardConfirmationRefresh()
+    let snapshot = await Self.loadTaskBoardRefreshSnapshot(using: client)
+    let resolvedItems = snapshot.items.value ?? globalTaskBoardItems
+    let resolvedStatus =
+      if let measuredStatus = snapshot.orchestratorStatus.measured {
+        measuredStatus.value ?? fallbackStatus
+      } else {
+        fallbackStatus ?? globalTaskBoardOrchestratorStatus
+      }
     let didChangeTaskBoardSnapshot =
-      globalTaskBoardItems != measuredItems.value
+      globalTaskBoardItems != resolvedItems
       || globalTaskBoardOrchestratorStatus != resolvedStatus
 
     withUISyncBatch {
-      globalTaskBoardItems = measuredItems.value
+      // Explicit task-board refreshes may clear an authoritative empty result, but
+      // unavailable endpoints must not erase the last visible board snapshot.
+      globalTaskBoardItems = resolvedItems
       globalTaskBoardOrchestratorStatus = resolvedStatus
     }
     if didChangeTaskBoardSnapshot {
       scheduleTaskBoardSnapshotCacheWrite(
-        items: measuredItems.value,
+        items: resolvedItems,
         orchestratorStatus: resolvedStatus
       )
     }

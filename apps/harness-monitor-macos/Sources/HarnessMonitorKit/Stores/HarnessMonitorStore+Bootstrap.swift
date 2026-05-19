@@ -190,6 +190,9 @@ extension HarnessMonitorStore {
       )
     }
     do {
+      // External daemon warm-up can lag behind app launch as well; surface the
+      // last persisted snapshot immediately while we wait for the manifest.
+      restorePersistedSessionStateWhileConnectingInBackground()
       let client = try await withBootstrapTelemetryPhase(.externalDaemonWarmUp) {
         try await daemonController.awaitManifestWarmUp(timeout: bootstrapWarmUpTimeout)
       }

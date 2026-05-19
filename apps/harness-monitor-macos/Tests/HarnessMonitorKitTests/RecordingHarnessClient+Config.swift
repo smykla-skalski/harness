@@ -71,6 +71,12 @@ extension RecordingHarnessClient {
     }
   }
 
+  func configureTaskBoardItemsErrors(_ errors: [any Error]) {
+    lock.withLock {
+      queuedTaskBoardItemsErrors = errors
+    }
+  }
+
   func configureMutationDelay(_ delay: Duration?) {
     lock.withLock {
       mutationDelay = delay
@@ -143,6 +149,12 @@ extension RecordingHarnessClient {
   func configureTaskBoardItems(_ items: [TaskBoardItem]) {
     lock.withLock {
       taskBoardItemsStorage = items
+    }
+  }
+
+  func configureTaskBoardItemSnapshots(_ snapshots: [[TaskBoardItem]]) {
+    lock.withLock {
+      queuedTaskBoardItemSnapshots = snapshots
     }
   }
 
