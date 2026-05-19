@@ -130,8 +130,6 @@ public enum HarnessMonitorPaths {
   ///
   /// External daemons are not launchd-registered (they run from `harness
   /// daemon dev` in a user shell) so there's no symmetric label for them.
-  /// The label always carries the `.managed` qualifier so it cannot collide
-  /// with a hand-installed legacy plist that used the unqualified base name.
   ///
   /// The label MUST equal the bundled plist filename without its `.plist`
   /// extension — macOS 26's `SMAppService.register()` returns
@@ -140,6 +138,12 @@ public enum HarnessMonitorPaths {
   /// on `Bootstrapping daemon client for managed daemon mode` without ever
   /// spawning a daemon process. Lane identity therefore flows through the
   /// `HARNESS_MONITOR_RUNTIME_LANE` env entry in the plist, not the label.
+  ///
+  /// For sandboxed SMAppService launch agents, the service name must be an
+  /// immediate child of the app group. Keep this as
+  /// `<app-group>.<single-component>` so backgroundtaskmanagementd can resolve
+  /// the helper's full path instead of rejecting registration with a
+  /// `job-creation` sandbox denial.
   public static func launchAgentLabel(
     using environment: HarnessMonitorEnvironment = .current
   ) -> String {
@@ -148,8 +152,11 @@ public enum HarnessMonitorPaths {
     ) {
       return explicitLabel
     }
-    return
-      "\(HarnessMonitorRuntimeLane.launchAgentBaseLabel).\(DaemonOwnership.managed.rawValue)"
+    return managedLaunchAgentLabelBase()
+  }
+
+  static func managedLaunchAgentLabelBase() -> String {
+    HarnessMonitorRuntimeLane.launchAgentBaseLabel
   }
 
   /// The pre-coexistence label, used solely to find and unregister an
@@ -377,12 +384,20 @@ public enum HarnessMonitorPaths {
   }
 
   public static var launchAgentPlistName: String {
-    "io.harnessmonitor.daemon.managed.plist"
+    "\(HarnessMonitorRuntimeLane.launchAgentBaseLabel).plist"
   }
 
-  /// Pre-coexistence plist filename. Kept solely so the app can attempt to
-  /// unregister an orphaned legacy SMAppService entry on first launch under
-  /// the new layout.
+  /// Old plist filenames. Kept solely so the app can attempt to unregister
+  /// orphaned SMAppService entries on first launch under the new layout.
+  public static var legacyLaunchAgentPlistNames: [String] {
+    [
+      "io.harnessmonitor.daemon.managed.plist",
+      "io.harnessmonitor.daemon.plist",
+    ]
+  }
+
+  /// Pre-coexistence plist filename. Prefer `legacyLaunchAgentPlistNames` for
+  /// cleanup; kept for callers/tests that still need the original singleton.
   public static var legacyLaunchAgentPlistName: String {
     "io.harnessmonitor.daemon.plist"
   }

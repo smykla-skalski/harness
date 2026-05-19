@@ -6,7 +6,7 @@ if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
 fi
 
 HARNESS_MONITOR_LANE_APP_GROUP_DEFAULT="Q498EB36N4.io.harnessmonitor"
-HARNESS_MONITOR_LANE_LABEL_BASE="io.harnessmonitor.daemon"
+HARNESS_MONITOR_LANE_LABEL="Q498EB36N4.io.harnessmonitor.daemon"
 HARNESS_MONITOR_LANE_CODEX_PORT_BASE=4600
 HARNESS_MONITOR_LANE_CODEX_PORT_SPAN=20000
 
@@ -179,10 +179,13 @@ harness_monitor_runtime_launch_agent_label() {
   # The label MUST equal the bundled plist filename without `.plist`. On
   # macOS 26 SMAppService.register returns error 22 (EINVAL) when they
   # diverge, which leaves the managed daemon stuck "Bootstrapping" forever.
+  # Sandboxed SMAppService also requires the service name to be an immediate
+  # child of the app group, so the default is the fixed bundled app-group
+  # child service name.
   # Lane identity flows via `HARNESS_MONITOR_RUNTIME_LANE` in the plist's
   # EnvironmentVariables, not the launchd label itself.
   : "$_checkout_root"
-  printf '%s.managed\n' "$HARNESS_MONITOR_LANE_LABEL_BASE"
+  printf '%s\n' "$HARNESS_MONITOR_LANE_LABEL"
 }
 
 harness_monitor_runtime_xcodebuildmcp_socket_path() {

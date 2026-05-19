@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>AssociatedBundleIdentifiers</key>
+	<array>
+		<string>io.harnessmonitor.app</string>
+	</array>
+	<key>BundleProgram</key>
+	<string>Contents/Helpers/harness</string>
+	<key>EnvironmentVariables</key>
+	<dict>
+		<key>HARNESS_APP_GROUP_ID</key>
+		<string>Q498EB36N4.io.harnessmonitor</string>
+		<key>HARNESS_DAEMON_OWNERSHIP</key>
+		<string>managed</string>
+		<key>HARNESS_SANDBOXED</key>
+		<string>1</string>
+	</dict>
+	<key>KeepAlive</key>
+	<dict>
+		<key>SuccessfulExit</key>
+		<false/>
+		<key>Crashed</key>
+		<true/>
+	</dict>
+	<key>Label</key>
+	<string>io.harnessmonitor.daemon</string>
+	<key>LimitLoadToSessionType</key>
+	<string>Aqua</string>
+	<key>ProcessType</key>
+	<string>Interactive</string>
+	<key>ProgramArguments</key>
+	<array>
+		<string>harness</string>
+		<string>daemon</string>
+		<string>serve</string>
+		<string>--host</string>
+		<string>127.0.0.1</string>
+		<string>--port</string>
+		<string>0</string>
+	</array>
+	<key>RunAtLoad</key>
+	<true/>
+</dict>
+</plist>
