@@ -67,6 +67,7 @@ public struct SettingsView: View {
             store: store,
             navigationRequest: $navigationRequest
           )
+          .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         case .policies:
           SettingsPoliciesSection()
         case .codex:
