@@ -1,3 +1,4 @@
+// swiftlint:disable file_length
 import HarnessMonitorKit
 import SwiftUI
 
@@ -413,7 +414,9 @@ private struct DashboardNotificationRowView: View {
     }
   }
 
-  private func actionVariant(for action: NotificationHistoryAction) -> HarnessMonitorAsyncActionButton.Variant {
+  private func actionVariant(for action: NotificationHistoryAction)
+    -> HarnessMonitorAsyncActionButton.Variant
+  {
     switch action.kind {
     case .openDecision, .runtimeUndo:
       .prominent
@@ -462,8 +465,8 @@ private struct DashboardNotificationDetailsView: View {
   }
 }
 
-private extension NotificationHistoryEntry.Severity {
-  var label: String {
+extension NotificationHistoryEntry.Severity {
+  fileprivate var label: String {
     switch self {
     case .info:
       return "Info"
@@ -478,7 +481,7 @@ private extension NotificationHistoryEntry.Severity {
     }
   }
 
-  var timelineTone: SessionTimelineTone {
+  fileprivate var timelineTone: SessionTimelineTone {
     switch self {
     case .info, .attention:
       return .info

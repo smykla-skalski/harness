@@ -263,7 +263,7 @@ private struct PolicyCanvasDisplayedRouteTestSegment {
     abs(start.x - end.x) < 0.001
   }
 
-  func sharesCollinearRange(with other: PolicyCanvasDisplayedRouteTestSegment) -> Bool {
+  func sharesCollinearRange(with other: Self) -> Bool {
     if isHorizontal, other.isHorizontal, abs(start.y - other.start.y) < 0.001 {
       return overlap(
         min(start.x, end.x)...max(start.x, end.x),

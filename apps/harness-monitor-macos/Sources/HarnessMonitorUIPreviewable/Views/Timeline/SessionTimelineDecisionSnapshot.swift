@@ -136,7 +136,8 @@ struct SessionTimelineDecisionSnapshot: Identifiable, Equatable, Sendable {
   let actions: [SessionTimelineAction]
 
   init(decision: Decision, actionsDecoder: JSONDecoder = JSONDecoder()) {
-    self.init(input: SessionTimelineDecisionInput(decision: decision), actionsDecoder: actionsDecoder)
+    self.init(
+      input: SessionTimelineDecisionInput(decision: decision), actionsDecoder: actionsDecoder)
   }
 
   init(input: SessionTimelineDecisionInput, actionsDecoder: JSONDecoder = JSONDecoder()) {

@@ -121,8 +121,9 @@ extension HarnessMonitorStore {
       projects: [ProjectSummary],
       sessions: [SessionSummary]
     ) -> Bool {
-      guard !Self.sameArrayStorage(catalog.projects, projects)
-        || !Self.sameArrayStorage(catalog.sessions, sessions)
+      guard
+        !Self.sameArrayStorage(catalog.projects, projects)
+          || !Self.sameArrayStorage(catalog.sessions, sessions)
       else {
         return false
       }

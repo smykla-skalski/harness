@@ -29,7 +29,8 @@ private func policyCanvasVisibleEdgeSubroutes(
   var current: [CGPoint] = []
   for (start, end) in zip(points, points.dropFirst()) {
     for range in policyCanvasVisibleSegmentRanges(start: start, end: end, gapFrames: gapFrames) {
-      let visibleStart = policyCanvasInterpolate(start: start, end: end, parameter: range.lowerBound)
+      let visibleStart = policyCanvasInterpolate(
+        start: start, end: end, parameter: range.lowerBound)
       let visibleEnd = policyCanvasInterpolate(start: start, end: end, parameter: range.upperBound)
       guard policyCanvasDistance(visibleStart, visibleEnd) > 0.5 else {
         continue

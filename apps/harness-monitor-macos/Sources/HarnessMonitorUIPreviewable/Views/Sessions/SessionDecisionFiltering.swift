@@ -25,8 +25,8 @@ public struct SessionDecisionFilterSnapshot: Hashable, Sendable {
   }
 }
 
-private extension DecisionPresentationSnapshot {
-  func searchValue(scopeRawValue: String) -> String? {
+extension DecisionPresentationSnapshot {
+  fileprivate func searchValue(scopeRawValue: String) -> String? {
     switch scopeRawValue {
     case DecisionsSidebarSearchScope.summary.rawValue:
       summary

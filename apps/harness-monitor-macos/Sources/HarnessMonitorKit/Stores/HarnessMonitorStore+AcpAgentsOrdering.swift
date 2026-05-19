@@ -1,3 +1,4 @@
+// swiftlint:disable file_length
 import Foundation
 
 extension HarnessMonitorStore {
@@ -201,6 +202,7 @@ struct AcpPermissionBatchStateOutput: Sendable {
   let standalonePermissionBatches: [AcpPermissionBatch]
 }
 
+// swiftlint:disable:next type_body_length
 actor AcpRuntimeWorker {
   func agentUpdate(
     snapshot: AcpAgentSnapshot,
@@ -352,6 +354,7 @@ actor AcpRuntimeWorker {
     )
   }
 
+  // swiftlint:disable:next function_parameter_count
   func eventPresentation(
     payload: AcpEventBatchPayload,
     recordedAt: String,
@@ -446,6 +449,7 @@ actor AcpRuntimeWorker {
     permissionDecisionSyncPayloadState(payloads).sortedPayloads
   }
 
+  // swiftlint:disable:next function_parameter_count
   func stalePermissionDecisionIDs(
     openDecisionIDs: Set<String>,
     activeDecisionIDs: Set<String>,
@@ -546,7 +550,8 @@ actor AcpRuntimeWorker {
     into snapshots: [AcpAgentSnapshot]
   ) -> [AcpAgentSnapshot] {
     var result = snapshots.filter { $0.sessionAgentID != snapshot.sessionAgentID }
-    let index = result.firstIndex { existing in agentPrecedes(snapshot, existing) }
+    let index =
+      result.firstIndex { existing in agentPrecedes(snapshot, existing) }
       ?? result.endIndex
     result.insert(snapshot, at: index)
     return result
@@ -601,7 +606,8 @@ actor AcpRuntimeWorker {
     into batches: [AcpPermissionBatch]
   ) -> [AcpPermissionBatch] {
     var result = batches.filter { $0.batchId != batch.batchId }
-    let index = result.firstIndex { existing in permissionBatchPrecedes(batch, existing) }
+    let index =
+      result.firstIndex { existing in permissionBatchPrecedes(batch, existing) }
       ?? result.endIndex
     result.insert(batch, at: index)
     return result

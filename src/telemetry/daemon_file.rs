@@ -7,6 +7,8 @@ use tracing_subscriber::fmt::time::ChronoUtc;
 use tracing_subscriber::fmt::writer::MakeWriter;
 use tracing_subscriber::registry::LookupSpan;
 
+use crate::daemon::state::{ensure_daemon_dirs, log_path};
+
 use super::config::RuntimeService;
 use super::console_fields::{FilteredDefaultFields, FilteredJsonFields};
 
@@ -64,8 +66,8 @@ enum DaemonLogFile {
 
 impl DaemonLogFile {
     fn open() -> Self {
-        let path = crate::daemon::state::log_path();
-        if crate::daemon::state::ensure_daemon_dirs().is_ok()
+        let path = log_path();
+        if ensure_daemon_dirs().is_ok()
             && let Ok(file) = fs_err::OpenOptions::new()
                 .create(true)
                 .append(true)

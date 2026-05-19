@@ -1,3 +1,4 @@
+// swiftlint:disable file_length
 import SwiftUI
 
 func policyCanvasRouteBuildOrder(
@@ -57,10 +58,12 @@ func policyCanvasRouteViolatesMinimumSpacing(
   return previousRoutes.contains { previousRoute in
     policyCanvasRouteSegments(previousRoute).contains { previousSegment in
       segments.contains { segment in
-        guard let distance = segment.spacingDistance(
-          to: previousSegment,
-          minimumSpacing: threshold
-        ) else {
+        guard
+          let distance = segment.spacingDistance(
+            to: previousSegment,
+            minimumSpacing: threshold
+          )
+        else {
           return false
         }
         return distance < threshold
@@ -79,28 +82,30 @@ func policyCanvasRouteSpacingPenalty(
     return 0
   }
   return previousRoutes.reduce(0) { total, previousRoute in
-    total + policyCanvasRouteSegments(previousRoute).reduce(0) { routeTotal, previousSegment in
-      routeTotal + segments.reduce(0) { segmentTotal, segment in
-        guard
-          let distance = segment.spacingDistance(
-            to: previousSegment,
-            minimumSpacing: minimumSpacing
-          )
-        else {
-          return segmentTotal
-        }
-        guard distance < minimumSpacing else {
-          return segmentTotal
-        }
-        let overlapPenalty =
-          segment.isSameAxis(as: previousSegment)
-            ? segment.overlap(with: previousSegment) * 250
-            : 0
-        return segmentTotal
-          + ((minimumSpacing - distance) * 10_000)
-          + overlapPenalty
+    total
+      + policyCanvasRouteSegments(previousRoute).reduce(0) { routeTotal, previousSegment in
+        routeTotal
+          + segments.reduce(0) { segmentTotal, segment in
+            guard
+              let distance = segment.spacingDistance(
+                to: previousSegment,
+                minimumSpacing: minimumSpacing
+              )
+            else {
+              return segmentTotal
+            }
+            guard distance < minimumSpacing else {
+              return segmentTotal
+            }
+            let overlapPenalty =
+              segment.isSameAxis(as: previousSegment)
+              ? segment.overlap(with: previousSegment) * 250
+              : 0
+            return segmentTotal
+              + ((minimumSpacing - distance) * 10_000)
+              + overlapPenalty
+          }
       }
-    }
   }
 }
 
@@ -162,8 +167,10 @@ func policyCanvasRouteMinimumSpacing(
   sourceSpacingBySide: [PolicyCanvasPortSide: CGFloat],
   targetSpacingBySide: [PolicyCanvasPortSide: CGFloat]
 ) -> CGFloat {
-  let sourceSide = policyCanvasRouteSourceSide(route) ?? policyCanvasResolvedPortSide(for: edge.source)
-  let targetSide = policyCanvasRouteTargetSide(route) ?? policyCanvasResolvedPortSide(for: edge.target)
+  let sourceSide =
+    policyCanvasRouteSourceSide(route) ?? policyCanvasResolvedPortSide(for: edge.source)
+  let targetSide =
+    policyCanvasRouteTargetSide(route) ?? policyCanvasResolvedPortSide(for: edge.target)
   return min(
     sourceSpacingBySide[sourceSide] ?? PolicyCanvasLayout.defaultEdgeLineSpacing,
     targetSpacingBySide[targetSide] ?? PolicyCanvasLayout.defaultEdgeLineSpacing
@@ -184,15 +191,16 @@ func policyCanvasGroupTitleFrames(_ groups: [PolicyCanvasGroup]) -> [CGRect] {
 func policyCanvasRouteFrames(
   _ routes: [(id: String, route: PolicyCanvasEdgeRoute)]
 ) -> [String: [CGRect]] {
-  Dictionary(uniqueKeysWithValues: routes.map { entry in
-    (entry.id, policyCanvasRouteSegmentFrames(entry.route))
-  })
+  Dictionary(
+    uniqueKeysWithValues: routes.map { entry in
+      (entry.id, policyCanvasRouteSegmentFrames(entry.route))
+    })
 }
 
 private func policyCanvasRouteBuildSortValues(
   edge: PolicyCanvasEdge,
   portAnchors: [PolicyCanvasPortEndpoint: CGPoint]
-) -> (span: CGFloat, source: CGPoint, target: CGPoint) {
+) -> (span: CGFloat, source: CGPoint, target: CGPoint) {  // swiftlint:disable:this large_tuple
   let source = portAnchors[edge.source] ?? .zero
   let target = portAnchors[edge.target] ?? .zero
   return (abs(target.x - source.x) + abs(target.y - source.y), source, target)
@@ -265,7 +273,7 @@ private struct PolicyCanvasRouteSegment {
     abs(end.x - start.x) + abs(end.y - start.y)
   }
 
-  func sharesCollinearRange(with other: PolicyCanvasRouteSegment) -> Bool {
+  func sharesCollinearRange(with other: Self) -> Bool {
     if isHorizontal, other.isHorizontal, abs(start.y - other.start.y) < 0.001 {
       return overlap(
         min(start.x, end.x)...max(start.x, end.x),
@@ -281,11 +289,11 @@ private struct PolicyCanvasRouteSegment {
     return false
   }
 
-  func isSameAxis(as other: PolicyCanvasRouteSegment) -> Bool {
+  func isSameAxis(as other: Self) -> Bool {
     (isHorizontal && other.isHorizontal) || (isVertical && other.isVertical)
   }
 
-  func overlap(with other: PolicyCanvasRouteSegment) -> CGFloat {
+  func overlap(with other: Self) -> CGFloat {
     if isHorizontal, other.isHorizontal {
       return overlap(
         min(start.x, end.x)...max(start.x, end.x),
@@ -301,11 +309,11 @@ private struct PolicyCanvasRouteSegment {
     return 0
   }
 
-  func axisDistance(to other: PolicyCanvasRouteSegment) -> CGFloat {
+  func axisDistance(to other: Self) -> CGFloat {
     abs(axisCoordinate - other.axisCoordinate)
   }
 
-  func distance(to other: PolicyCanvasRouteSegment) -> CGFloat {
+  func distance(to other: Self) -> CGFloat {
     if intersects(other) {
       return 0
     }
@@ -318,7 +326,7 @@ private struct PolicyCanvasRouteSegment {
   }
 
   func spacingDistance(
-    to other: PolicyCanvasRouteSegment,
+    to other: Self,
     minimumSpacing: CGFloat
   ) -> CGFloat? {
     if isCleanRightAngleCrossing(with: other, minimumArmLength: minimumSpacing) {
@@ -328,7 +336,7 @@ private struct PolicyCanvasRouteSegment {
   }
 
   private func isCleanRightAngleCrossing(
-    with other: PolicyCanvasRouteSegment,
+    with other: Self,
     minimumArmLength: CGFloat
   ) -> Bool {
     guard isSameAxis(as: other) == false else {
@@ -352,7 +360,7 @@ private struct PolicyCanvasRouteSegment {
       && verticalArm >= minimumArmLength - tolerance
   }
 
-  private func rightAngleCrossingPoint(with other: PolicyCanvasRouteSegment) -> CGPoint? {
+  private func rightAngleCrossingPoint(with other: Self) -> CGPoint? {
     if isHorizontal, other.isVertical {
       let point = CGPoint(x: other.start.x, y: start.y)
       return contains(value: point.x, in: xRange) && contains(value: point.y, in: other.yRange)
@@ -368,7 +376,7 @@ private struct PolicyCanvasRouteSegment {
     return nil
   }
 
-  private func intersects(_ other: PolicyCanvasRouteSegment) -> Bool {
+  private func intersects(_ other: Self) -> Bool {
     if isHorizontal, other.isVertical {
       return contains(value: other.start.x, in: xRange)
         && contains(value: start.y, in: other.yRange)
@@ -404,7 +412,7 @@ private struct PolicyCanvasRouteSegment {
 
   private func distance(
     from point: CGPoint,
-    to segment: PolicyCanvasRouteSegment
+    to segment: Self
   ) -> CGFloat {
     let minX = min(segment.start.x, segment.end.x)
     let maxX = max(segment.start.x, segment.end.x)

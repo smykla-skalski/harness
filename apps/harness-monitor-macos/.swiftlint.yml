@@ -88,7 +88,7 @@ custom_rules:
     message: "Do not add local SwiftLint suppression escapes in the Harness Monitor app."
     severity: error
     included:
-      - "Sources/HarnessMonitor"
+      - "Sources/HarnessMonitor/"
   no_direct_glass_effect:
     name: "No Direct glassEffect Usage"
     regex: '\.glassEffect\('

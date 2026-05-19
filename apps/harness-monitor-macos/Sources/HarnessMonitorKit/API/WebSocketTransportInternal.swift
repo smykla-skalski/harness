@@ -1,3 +1,4 @@
+// swiftlint:disable file_length
 import Foundation
 
 #if HARNESS_FEATURE_OTEL

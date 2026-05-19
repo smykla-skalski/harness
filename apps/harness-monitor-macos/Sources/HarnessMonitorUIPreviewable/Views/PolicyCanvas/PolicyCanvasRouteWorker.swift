@@ -11,9 +11,11 @@ actor PolicyCanvasRouteWorker {
   private var cachedInput: PolicyCanvasRouteWorkerInput?
   private var cachedOutput: PolicyCanvasRouteWorkerOutput = .empty
 
-  init(router: any PolicyCanvasEdgeRouter = PolicyCanvasMemoizedRouter(
-    inner: PolicyCanvasVisibilityRouter()
-  )) {
+  init(
+    router: any PolicyCanvasEdgeRouter = PolicyCanvasMemoizedRouter(
+      inner: PolicyCanvasVisibilityRouter()
+    )
+  ) {
     self.router = router
   }
 
@@ -90,18 +92,6 @@ struct PolicyCanvasRouteWorkerInput: Equatable, Sendable {
   let groups: [PolicyCanvasGroup]
   let edges: [PolicyCanvasEdge]
   let fontScale: CGFloat
-
-  init(
-    nodes: [PolicyCanvasNode],
-    groups: [PolicyCanvasGroup],
-    edges: [PolicyCanvasEdge],
-    fontScale: CGFloat
-  ) {
-    self.nodes = nodes
-    self.groups = groups
-    self.edges = edges
-    self.fontScale = fontScale
-  }
 }
 
 struct PolicyCanvasPreparedRouteInput: Equatable, Sendable {

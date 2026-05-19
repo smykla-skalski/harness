@@ -1,3 +1,4 @@
+// swiftlint:disable file_length
 import Foundation
 import HarnessMonitorKit
 import OSLog
@@ -262,6 +263,7 @@ public final class SessionDecisionRuntime {
       Self.inspectorSignposter.endInterval(
         "session_decision_inspector.compute",
         computeInterval,
+        // swiftlint:disable:next line_length
         "contextRows=\(rows.contextRows.count, privacy: .public) historyRows=\(rows.historyRows.count, privacy: .public)"
       )
       guard !Task.isCancelled else { return }

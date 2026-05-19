@@ -4,7 +4,7 @@ struct PolicyCanvasRouteEndpointSlot: Hashable {
   let index: Int
   let count: Int
 
-  static let single = PolicyCanvasRouteEndpointSlot(index: 0, count: 1)
+  static let single = Self(index: 0, count: 1)
 }
 
 struct PolicyCanvasRouteEndpointSlots: Hashable {
@@ -25,15 +25,16 @@ func policyCanvasRouteEndpointSlots(
     endpoint: \.target,
     sortKey: policyCanvasTargetEndpointSlotSortKey
   )
-  return Dictionary(uniqueKeysWithValues: edges.map { edge in
-    (
-      edge.id,
-      PolicyCanvasRouteEndpointSlots(
-        source: sourceSlots[edge.id, default: .single],
-        target: targetSlots[edge.id, default: .single]
+  return Dictionary(
+    uniqueKeysWithValues: edges.map { edge in
+      (
+        edge.id,
+        PolicyCanvasRouteEndpointSlots(
+          source: sourceSlots[edge.id, default: .single],
+          target: targetSlots[edge.id, default: .single]
+        )
       )
-    )
-  })
+    })
 }
 
 @MainActor
@@ -43,20 +44,22 @@ func policyCanvasRouteAnchorCandidates(
   terminalSlot: PolicyCanvasRouteEndpointSlot,
   terminal: PolicyCanvasPortTerminal? = nil
 ) -> [PolicyCanvasRouteAnchorCandidate] {
-  let candidates = terminal.map { terminal in
-    viewModel.portAnchorCandidates(for: endpoint).filter { $0.side == terminal.side }
-  } ?? viewModel.portAnchorCandidates(for: endpoint)
+  let candidates =
+    terminal.map { terminal in
+      viewModel.portAnchorCandidates(for: endpoint).filter { $0.side == terminal.side }
+    } ?? viewModel.portAnchorCandidates(for: endpoint)
   return candidates.map { candidate in
     (
       point: terminal.map {
         policyCanvasShiftedRouteAnchor(candidate.point, side: candidate.side, terminal: $0)
-      } ?? policyCanvasShiftedRouteAnchor(
-        candidate.point,
-        side: candidate.side,
-        endpoint: endpoint,
-        viewModel: viewModel,
-        terminalSlot: terminalSlot
-      ),
+      }
+        ?? policyCanvasShiftedRouteAnchor(
+          candidate.point,
+          side: candidate.side,
+          endpoint: endpoint,
+          viewModel: viewModel,
+          terminalSlot: terminalSlot
+        ),
       side: candidate.side
     )
   }

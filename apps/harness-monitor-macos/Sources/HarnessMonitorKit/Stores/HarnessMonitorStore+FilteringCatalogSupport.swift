@@ -23,8 +23,7 @@ extension HarnessMonitorStore.SessionIndexSlice {
     var deduplicated: [SessionSummary] = []
     deduplicated.reserveCapacity(lastIndexBySessionID.count)
     for (index, summary) in sessions.enumerated()
-      where lastIndexBySessionID[summary.sessionId] == index
-    {
+    where lastIndexBySessionID[summary.sessionId] == index {
       deduplicated.append(summary)
     }
     return deduplicated

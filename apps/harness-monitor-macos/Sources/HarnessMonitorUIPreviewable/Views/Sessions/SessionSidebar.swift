@@ -18,8 +18,8 @@ struct SessionSidebar: View {
   @State private var showsDeferredSidebarSections = false
   @State private var usesNativeListSelection = false
   @State private var presentationWorker = SessionRouteListPresentationWorker()
-  @State var cachedAgentPresentation = SessionAgentListPresentation.empty
-  @State var cachedTaskPresentation = SessionTaskListPresentation.empty
+  @State private var cachedAgentPresentation = SessionAgentListPresentation.empty
+  @State private var cachedTaskPresentation = SessionTaskListPresentation.empty
   @State private var agentPresentationGeneration: UInt64 = 0
   @State private var taskPresentationGeneration: UInt64 = 0
 

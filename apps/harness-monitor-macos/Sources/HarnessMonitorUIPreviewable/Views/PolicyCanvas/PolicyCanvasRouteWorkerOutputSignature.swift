@@ -65,7 +65,9 @@ struct PolicyCanvasRouteWorkerOutputSignature: Equatable, Sendable {
     for key in routes.keys.sorted() {
       hasher.combine(key)
       guard let route = routes[key] else { continue }
-      route.points.forEach { combine(point: $0, into: &hasher) }
+      for point in route.points {
+        combine(point: point, into: &hasher)
+      }
       combine(point: route.labelPosition, into: &hasher)
     }
   }

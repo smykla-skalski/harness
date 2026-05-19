@@ -27,7 +27,7 @@ struct DashboardWindowToolbar: ToolbarContent {
   }
 }
 
-private extension DashboardWindowToolbar {
+extension DashboardWindowToolbar {
   private var newSessionButton: some View {
     Button {
       store.presentedSheet = .newSession

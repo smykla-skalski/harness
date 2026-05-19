@@ -98,7 +98,9 @@ extension HarnessMonitorStore {
       }
       return true
     case .openDecision(let decisionID):
-      guard supervisorBindings.notificationController?.openDecisionRequest(decisionID: decisionID) == true
+      guard
+        supervisorBindings.notificationController?.openDecisionRequest(decisionID: decisionID)
+          == true
       else {
         presentFailureFeedback("Notification actions are unavailable.")
         return false
@@ -110,7 +112,9 @@ extension HarnessMonitorStore {
       }
       return true
     case .acknowledgeDecision(let decisionID):
-      guard supervisorBindings.notificationController?.acknowledgeDecision(decisionID: decisionID) == true
+      guard
+        supervisorBindings.notificationController?.acknowledgeDecision(decisionID: decisionID)
+          == true
       else {
         presentFailureFeedback("Notification actions are unavailable.")
         return false
@@ -191,9 +195,11 @@ extension HarnessMonitorStore {
   }
 
   private func applyNotificationHistoryResponse(_ update: NotificationHistoryResponseUpdate) async {
-    guard let index = notificationHistoryEntries.firstIndex(where: {
-      $0.requestIdentifier == update.requestIdentifier || $0.id == update.requestIdentifier
-    }) else {
+    guard
+      let index = notificationHistoryEntries.firstIndex(where: {
+        $0.requestIdentifier == update.requestIdentifier || $0.id == update.requestIdentifier
+      })
+    else {
       return
     }
 
@@ -221,7 +227,8 @@ extension HarnessMonitorStore {
       entry.actions = []
     case HarnessMonitorNotificationActionID.reply:
       entry.status = .acted
-      entry.statusText = update.textInput?.isEmpty == false
+      entry.statusText =
+        update.textInput?.isEmpty == false
         ? "Reply sent"
         : "Reply selected"
       entry.actions = []
@@ -304,7 +311,9 @@ extension HarnessMonitorStore {
     isSuppressingNotificationHistoryToast = wasSuppressing
   }
 
-  private func status(for reason: ToastHistoryEvent.DismissReason) -> NotificationHistoryEntry.Status {
+  private func status(for reason: ToastHistoryEvent.DismissReason)
+    -> NotificationHistoryEntry.Status
+  {
     switch reason {
     case .manual, .timedOut:
       .dismissed
@@ -340,8 +349,8 @@ extension HarnessMonitorStore {
   }
 }
 
-private extension String {
-  var nilIfEmpty: String? {
+extension String {
+  fileprivate var nilIfEmpty: String? {
     let trimmed = trimmingCharacters(in: .whitespacesAndNewlines)
     return trimmed.isEmpty ? nil : trimmed
   }

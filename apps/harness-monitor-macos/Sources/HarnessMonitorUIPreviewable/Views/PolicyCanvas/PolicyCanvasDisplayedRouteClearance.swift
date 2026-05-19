@@ -23,11 +23,13 @@ func policyCanvasCollisionAwareDisplayedRoute(
     baseMetrics: baseMetrics
   )
   var best = (route: baseRoute, score: baseScore)
-  guard policyCanvasDisplayedRouteHasHardDefect(
-    baseRoute,
-    request: request,
-    previousRoutes: previousRoutes
-  ) else {
+  guard
+    policyCanvasDisplayedRouteHasHardDefect(
+      baseRoute,
+      request: request,
+      previousRoutes: previousRoutes
+    )
+  else {
     return best.route
   }
 
@@ -74,11 +76,12 @@ private func policyCanvasDisplayedRouteCandidateScore(
   let minimumSpacing = policyCanvasRouteMinimumSpacing(request: request, route: route)
   let previousPolylines = previousRoutes.map(\.route)
   let spacingPenalty = previousRoutes.reduce(0) { total, previousRoute in
-    total + policyCanvasRouteSpacingPenalty(
-      route,
-      with: [previousRoute.route],
-      minimumSpacing: min(minimumSpacing, previousRoute.minimumSpacing)
-    )
+    total
+      + policyCanvasRouteSpacingPenalty(
+        route,
+        with: [previousRoute.route],
+        minimumSpacing: min(minimumSpacing, previousRoute.minimumSpacing)
+      )
   }
   let hardViolationPenalty: CGFloat =
     policyCanvasRouteViolatesMinimumSpacing(
@@ -90,8 +93,8 @@ private func policyCanvasDisplayedRouteCandidateScore(
     : 0
   let sharedPathPenalty: CGFloat =
     policyCanvasRouteSharesInteriorCorridor(route, with: previousPolylines)
-      ? 12_000_000
-      : 0
+    ? 12_000_000
+    : 0
   return policyCanvasRouteIntrinsicScore(route)
     + spacingPenalty
     + hardViolationPenalty

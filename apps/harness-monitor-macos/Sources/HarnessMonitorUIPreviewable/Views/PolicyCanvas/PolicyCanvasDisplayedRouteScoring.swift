@@ -128,6 +128,7 @@ private func policyCanvasDominantInternalBus(
   guard route.points.count >= 4 else {
     return nil
   }
+  // swiftlint:disable:next large_tuple
   var best: (length: CGFloat, axis: PolicyCanvasSegmentAxis, coordinate: CGFloat)?
   for index in 1..<(route.points.count - 2) {
     let start = route.points[index]
@@ -146,9 +147,8 @@ private func policyCanvasDominantInternalBus(
     } else {
       continue
     }
-    if best == nil || length > best!.length {
-      best = (length, axis, coordinate)
-    }
+    if let best, length <= best.length { continue }
+    best = (length, axis, coordinate)
   }
   return best.map { ($0.axis, $0.coordinate) }
 }

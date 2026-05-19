@@ -1,3 +1,4 @@
+// swiftlint:disable file_length
 import Foundation
 import Testing
 
@@ -5,6 +6,7 @@ import Testing
 @testable import HarnessMonitorUIPreviewable
 
 @Suite("Session window route content selection")
+// swiftlint:disable:next type_body_length attributes
 struct SessionWindowRouteContentSelectionTests {
   @Test("Session sidebar routes include the session decisions queue")
   func sessionSidebarRoutesIncludeSessionDecisionsQueue() throws {

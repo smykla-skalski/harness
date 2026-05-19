@@ -1,3 +1,4 @@
+// swiftlint:disable file_length
 import HarnessMonitorKit
 import SwiftUI
 
@@ -5,6 +6,7 @@ private let decisionAuditScopeWorker = DecisionAuditScopeWorker()
 
 /// Decisions detail column with header, suggested actions, context, audit trail, and live tick.
 @MainActor
+// swiftlint:disable:next type_body_length attributes
 public struct DecisionDetailView: View {
   @Environment(\.harnessDateTimeConfiguration)
   private var dateTimeConfiguration

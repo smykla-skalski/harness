@@ -286,7 +286,8 @@ public struct NotificationHistoryRequestSnapshot: Equatable, Sendable {
     self.threadIdentifier = request.content.threadIdentifier
     self.categoryIdentifier = request.content.categoryIdentifier
     self.userInfo = request.content.userInfo.reduce(into: [:]) { partialResult, pair in
-      partialResult[String(describing: pair.key)] = pair.value as? String
+      partialResult[String(describing: pair.key)] =
+        pair.value as? String
         ?? String(describing: pair.value)
     }
     self.scheduledAt = scheduledAt

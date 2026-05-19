@@ -56,7 +56,8 @@ extension SessionWindowView {
     decisionItems: [DecisionPresentationSnapshot]? = nil,
     allDecisionIDs allIDs: Set<String>
   ) async {
-    let items = decisionItems
+    let items =
+      decisionItems
       ?? all.map(DecisionPresentationSnapshot.init)
     stateCache.decisionRuntime.updateFilteredDecisions(
       input: SessionDecisionFilterInput(

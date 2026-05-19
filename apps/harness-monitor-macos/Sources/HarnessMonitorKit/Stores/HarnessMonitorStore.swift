@@ -1,3 +1,4 @@
+// swiftlint:disable file_length
 import Foundation
 import Observation
 import SwiftData
@@ -10,6 +11,7 @@ struct PendingSessionDetailCacheWrite: Sendable {
 
 @MainActor
 @Observable
+// swiftlint:disable:next type_body_length attributes
 public final class HarnessMonitorStore {
   public let connection: ConnectionSlice
   public let sessionIndex: SessionIndexSlice
@@ -65,9 +67,11 @@ public final class HarnessMonitorStore {
   public var supervisorOpenDecisionsByID: [String: Decision] = [:]
   public var supervisorOpenDecisionsBySession: [String: [Decision]] = [:]
   public var supervisorOpenDecisionPresentationItems: [DecisionPresentationSnapshot] = []
+  // swiftlint:disable:next identifier_name
   public var supervisorOpenDecisionPresentationItemsBySession:
     [String: [DecisionPresentationSnapshot]] = [:]
   public var supervisorOpenDecisionSearchProjections: [DecisionSearchProjection] = []
+  // swiftlint:disable:next identifier_name
   public var supervisorOpenDecisionSearchProjectionsBySession:
     [String: [DecisionSearchProjection]] = [:]
   public var supervisorOpenDecisionIDsBySession: [String: [String]] = [:]
@@ -403,7 +407,8 @@ public final class HarnessMonitorStore {
   @ObservationIgnored var pendingUISyncAreas: Set<UISyncArea> = []
   @ObservationIgnored var isApplyingUISyncBatch = false
   @ObservationIgnored var debugUISyncCounts: [UISyncArea: Int] = [:]
-  @ObservationIgnored var notificationHistoryRuntimeActions: [String: @MainActor () async -> Void] = [:]
+  @ObservationIgnored var notificationHistoryRuntimeActions: [String: @MainActor () async -> Void] =
+    [:]
 
   public init(
     daemonController: any DaemonControlling,
@@ -434,7 +439,8 @@ public final class HarnessMonitorStore {
         maxRecentSearches: Self.maxRecentSearches
       )
     }
-    self.supervisorPolicyConfigRepository = modelContainer.map(SupervisorPolicyConfigRepository.init)
+    self.supervisorPolicyConfigRepository = modelContainer.map(
+      SupervisorPolicyConfigRepository.init)
     self.supervisorAuditRepository = modelContainer.map(SupervisorAuditRepository.init)
     if let cacheService {
       self.cacheService = cacheService

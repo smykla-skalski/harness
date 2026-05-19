@@ -339,19 +339,22 @@ struct ToastSliceTests {
     }
 
     #expect(events.count == 3)
-    #expect({
-      guard case .presented = events[0].kind else { return false }
-      return true
-    }())
-    #expect({
-      guard case .refreshed = events[1].kind else { return false }
-      return true
-    }())
+    #expect(
+      {
+        guard case .presented = events[0].kind else { return false }
+        return true
+      }())
+    #expect(
+      {
+        guard case .refreshed = events[1].kind else { return false }
+        return true
+      }())
     #expect(events[1].feedback.repeatCount == 2)
-    #expect({
-      guard case .dismissed(.manual) = events[2].kind else { return false }
-      return true
-    }())
+    #expect(
+      {
+        guard case .dismissed(.manual) = events[2].kind else { return false }
+        return true
+      }())
   }
 
   @Test("Undo history events mark runtime state until invocation")
@@ -365,10 +368,11 @@ struct ToastSliceTests {
 
     #expect(events.count == 2)
     #expect(events[0].hasUndoAction)
-    #expect({
-      guard case .dismissed(.undoInvoked) = events[1].kind else { return false }
-      return true
-    }())
+    #expect(
+      {
+        guard case .dismissed(.undoInvoked) = events[1].kind else { return false }
+        return true
+      }())
     #expect(events[1].hasUndoAction == false)
   }
 }
