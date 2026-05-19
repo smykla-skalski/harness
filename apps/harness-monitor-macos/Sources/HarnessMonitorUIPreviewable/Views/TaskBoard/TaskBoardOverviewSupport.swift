@@ -132,8 +132,8 @@ struct TaskBoardSummaryPill: View {
   private var captionFont: Font {
     HarnessMonitorTextSize.scaledFont(.caption, by: fontScale)
   }
-  private var captionSemibold: Font {
-    HarnessMonitorTextSize.scaledFont(.caption.weight(.semibold), by: fontScale)
+  private var iconFont: Font {
+    HarnessMonitorTextSize.scaledFont(.system(size: 8.6, weight: .semibold), by: fontScale)
   }
   private var captionBold: Font {
     HarnessMonitorTextSize.scaledFont(.caption.weight(.bold), by: fontScale)
@@ -153,12 +153,12 @@ struct TaskBoardSummaryPill: View {
 
   var body: some View {
     let captionFont = captionFont
-    let captionSemibold = captionSemibold
+    let iconFont = iconFont
     let captionBold = captionBold
-    return HStack(spacing: HarnessMonitorTheme.spacingXS) {
+    return HStack(alignment: .firstTextBaseline, spacing: HarnessMonitorTheme.spacingXS) {
       if let systemImage {
-        Image(systemName: systemImage)
-          .font(captionSemibold)
+        Text(Image(systemName: systemImage))
+          .font(iconFont)
           .accessibilityHidden(true)
       }
       Text(label)
