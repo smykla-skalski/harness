@@ -128,6 +128,10 @@ extension HarnessMonitorAccessibility {
     "harness.settings.task-board.github-inbox.label-filter"
   public static let settingsTBInboxRepoAddButton =
     "harness.settings.task-board.github-inbox.repositories.add"
+  public static let settingsTBInboxRepoOwnerField =
+    "harness.settings.task-board.github-inbox.repositories.owner"
+  public static let settingsTBInboxRepoNameField =
+    "harness.settings.task-board.github-inbox.repositories.repo"
   public static let settingsTBInboxLabelAddButton =
     "harness.settings.task-board.github-inbox.label-filter.add"
   public static let settingsTaskBoardTodoistProjectField =

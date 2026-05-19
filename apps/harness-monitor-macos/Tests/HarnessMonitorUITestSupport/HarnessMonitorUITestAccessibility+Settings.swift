@@ -53,6 +53,10 @@ extension HarnessMonitorUITestAccessibility {
     "harness.settings.task-board.github-inbox.label-filter"
   static let settingsTBInboxRepoAddButton =
     "harness.settings.task-board.github-inbox.repositories.add"
+  static let settingsTBInboxRepoOwnerField =
+    "harness.settings.task-board.github-inbox.repositories.owner"
+  static let settingsTBInboxRepoNameField =
+    "harness.settings.task-board.github-inbox.repositories.repo"
   static let settingsTBInboxLabelAddButton =
     "harness.settings.task-board.github-inbox.label-filter.add"
   static let settingsTaskBoardGlobalTokenField = "harness.settings.task-board.global-token"

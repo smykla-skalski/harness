@@ -137,16 +137,19 @@ struct SettingsTaskBoardDraftTests {
   @Test("GitHub inbox repository editor adds, dedupes, and removes entries")
   func githubInboxRepositoryEditorMutations() {
     var draft = TaskBoardGitSettingsDraft()
-    draft.githubInboxRepositoryInput = " EXAMPLE/HARNESS "
+    draft.githubInboxRepositoryOwnerInput = " EXAMPLE "
+    draft.githubInboxRepositoryNameInput = " HARNESS "
 
     #expect(draft.canAddGitHubInboxRepository)
     draft.addGitHubInboxRepositoryInput()
-    draft.githubInboxRepositoryInput = "example/harness"
+    draft.githubInboxRepositoryOwnerInput = "example"
+    draft.githubInboxRepositoryNameInput = "harness"
     draft.addGitHubInboxRepositoryInput()
 
     #expect(draft.githubInboxRepositoryEntries == ["example/harness"])
 
-    draft.githubInboxRepositoryInput = "missing-repo"
+    draft.githubInboxRepositoryOwnerInput = "example"
+    draft.githubInboxRepositoryNameInput = "nested/repo"
     #expect(!draft.canAddGitHubInboxRepository)
 
     draft.removeGitHubInboxRepository("EXAMPLE/HARNESS")
