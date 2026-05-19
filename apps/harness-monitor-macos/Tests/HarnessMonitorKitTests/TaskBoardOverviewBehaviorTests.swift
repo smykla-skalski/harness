@@ -1,5 +1,6 @@
 // swiftlint:disable file_length
 import Foundation
+import SwiftUI
 import Testing
 
 @testable import HarnessMonitorKit
@@ -256,6 +257,39 @@ struct TaskBoardOverviewBehaviorTests {
     #expect(presentation.item(id: "swift")?.id == "swift")
     #expect(presentation.item(id: "rust") == nil)
     #expect(!presentation.didFilterOut)
+  }
+
+  @Test("Inline code formatter strips matched backticks and styles code spans")
+  func inlineCodeFormatterStylesMatchedBackticks() {
+    let raw = "feat(matches): add `matches` to shared `inbound.Rule` struct"
+    let attributed = TaskBoardInlineCodeFormatter.attributedText(
+      for: raw,
+      codeFont: .body.monospaced()
+    )
+
+    #expect(
+      TaskBoardInlineCodeFormatter.displayText(for: raw)
+        == "feat(matches): add matches to shared inbound.Rule struct"
+    )
+
+    let codeRuns = attributed.runs.compactMap { run -> String? in
+      guard run.backgroundColor != nil else { return nil }
+      return String(attributed[run.range].characters)
+    }
+
+    #expect(codeRuns == ["matches", "inbound.Rule"])
+  }
+
+  @Test("Inline code formatter keeps unmatched backticks as plain text")
+  func inlineCodeFormatterPreservesUnmatchedBackticks() {
+    let raw = "Investigate `open span"
+    let attributed = TaskBoardInlineCodeFormatter.attributedText(
+      for: raw,
+      codeFont: .body.monospaced()
+    )
+
+    #expect(TaskBoardInlineCodeFormatter.displayText(for: raw) == raw)
+    #expect(!attributed.runs.contains(where: { $0.backgroundColor != nil }))
   }
 
   @Test("Needs You lane preserves explicit inbox status for imported GitHub inbox items")
