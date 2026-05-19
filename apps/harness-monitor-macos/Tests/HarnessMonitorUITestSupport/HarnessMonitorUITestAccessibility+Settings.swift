@@ -47,6 +47,14 @@ extension HarnessMonitorUITestAccessibility {
   static let settingsTaskBoardSaveButton = "harness.settings.task-board.save"
   static let settingsTaskBoardOwnerField = "harness.settings.task-board.owner"
   static let settingsTaskBoardRepoField = "harness.settings.task-board.repo"
+  static let settingsTaskBoardInboxRepositoriesField =
+    "harness.settings.task-board.github-inbox.repositories"
+  static let settingsTaskBoardInboxLabelFilterField =
+    "harness.settings.task-board.github-inbox.label-filter"
+  static let settingsTBInboxRepoAddButton =
+    "harness.settings.task-board.github-inbox.repositories.add"
+  static let settingsTBInboxLabelAddButton =
+    "harness.settings.task-board.github-inbox.label-filter.add"
   static let settingsTaskBoardGlobalTokenField = "harness.settings.task-board.global-token"
   static let settingsTaskBoardTodoistTokenField = "harness.settings.task-board.todoist-token"
   static let settingsTaskBoardAddOverrideButton = "harness.settings.task-board.override.add"
@@ -116,6 +124,22 @@ extension HarnessMonitorUITestAccessibility {
 
   static func settingsAuthorizedFolderRow(_ id: String) -> String {
     "harness.settings.authorized-folders.row.\(id)"
+  }
+
+  static func settingsTBInboxRepoRow(_ index: Int) -> String {
+    "harness.settings.task-board.github-inbox.repositories.\(index).row"
+  }
+
+  static func settingsTBInboxRepoRemoveButton(_ index: Int) -> String {
+    "harness.settings.task-board.github-inbox.repositories.\(index).remove"
+  }
+
+  static func settingsTBInboxLabelRow(_ index: Int) -> String {
+    "harness.settings.task-board.github-inbox.label-filter.\(index).row"
+  }
+
+  static func settingsTBInboxLabelRemoveButton(_ index: Int) -> String {
+    "harness.settings.task-board.github-inbox.label-filter.\(index).remove"
   }
 
   static func settingsSectionButton(_ key: String) -> String {
