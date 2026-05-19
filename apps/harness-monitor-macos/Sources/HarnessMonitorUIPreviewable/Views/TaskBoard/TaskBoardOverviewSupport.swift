@@ -25,7 +25,7 @@ struct TaskBoardOverviewMetrics: Equatable {
     managementPanelMinHeight = max(132, 132 * min(scale, 1.25))
     managementPanelSpacing = max(8, 8 * min(scale, 1.35))
     managementPanelCornerRadius = HarnessMonitorTheme.cornerRadiusSM * min(scale, 1.2)
-    operationsCardMinWidth = max(280, 320 * min(scale, 1.15))
+    operationsCardMinWidth = max(260, 300 * min(scale, 1.15))
     operationsCardMaxWidth = max(560, 620 * min(scale, 1.1))
     managementPillVerticalPadding = max(3, 3 * min(scale, 1.25))
     summaryPillHorizontalPadding = HarnessMonitorTheme.pillPaddingH * denseScale
