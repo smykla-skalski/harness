@@ -1,5 +1,47 @@
+import AppKit
 import HarnessMonitorKit
 import SwiftUI
+
+private struct TaskBoardManagementFieldChrome: ViewModifier {
+  @Environment(\.accessibilityReduceTransparency)
+  private var reduceTransparency
+  @Environment(\.colorSchemeContrast)
+  private var colorSchemeContrast
+
+  private var cornerRadius: CGFloat { 8 }
+
+  private var fillColor: Color {
+    let base = Color(nsColor: .textBackgroundColor)
+    return reduceTransparency ? base : base.opacity(0.88)
+  }
+
+  private var strokeColor: Color {
+    let opacity = colorSchemeContrast == .increased ? 0.9 : 0.72
+    return Color(nsColor: .separatorColor).opacity(opacity)
+  }
+
+  private var lineWidth: CGFloat {
+    colorSchemeContrast == .increased ? 2 : 1
+  }
+
+  func body(content: Content) -> some View {
+    content
+      .background {
+        RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+          .fill(fillColor)
+      }
+      .overlay {
+        RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+          .stroke(strokeColor, lineWidth: lineWidth)
+      }
+    }
+}
+
+extension View {
+  func taskBoardManagementFieldChrome() -> some View {
+    modifier(TaskBoardManagementFieldChrome())
+  }
+}
 
 struct TaskBoardManagementNativeField: View {
   let label: String
@@ -18,6 +60,7 @@ struct TaskBoardManagementNativeField: View {
         .foregroundStyle(HarnessMonitorTheme.secondaryInk)
       TextField(label, text: $text)
         .harnessNativeTextField()
+        .taskBoardManagementFieldChrome()
     }
   }
 }
@@ -74,6 +117,7 @@ struct TaskBoardManagementPickerField<
       }
       .labelsHidden()
       .harnessNativeFormControl()
+      .taskBoardManagementFieldChrome()
     }
   }
 }

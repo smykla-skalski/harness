@@ -144,12 +144,16 @@ struct TaskBoardItemManagementPanel: View {
       Spacer(minLength: HarnessMonitorTheme.spacingSM)
       Button(action: onClose) {
         Image(systemName: "xmark")
+          .font(captionSemibold)
           .accessibilityHidden(true)
       }
-      .buttonStyle(.borderless)
+      .harnessAccessoryButtonStyle(tint: .secondary)
+      .controlSize(HarnessMonitorControlMetrics.compactControlSize)
       .frame(minWidth: metrics.iconControlMinWidth, minHeight: metrics.controlMinHeight)
       .help("Close board item")
       .accessibilityLabel("Close item panel")
+      .accessibilityHint("Dismiss the board item sheet")
+      .keyboardShortcut(.cancelAction)
     }
   }
 
@@ -182,6 +186,7 @@ struct TaskBoardItemManagementPanel: View {
         minHeight: metrics.editorBodyMinHeight,
         accessibilityLabel: "Body"
       )
+      .taskBoardManagementFieldChrome()
       HStack(alignment: .top, spacing: HarnessMonitorTheme.spacingMD) {
         TaskBoardManagementPickerField(
           label: "Status",
@@ -207,6 +212,7 @@ struct TaskBoardItemManagementPanel: View {
         minHeight: metrics.editorPlanningMinHeight,
         accessibilityLabel: "Planning summary"
       )
+      .taskBoardManagementFieldChrome()
       HStack(alignment: .top, spacing: HarnessMonitorTheme.spacingMD) {
         TaskBoardManagementNativeField(label: "Approver", text: $draft.approvedBy)
         TaskBoardManagementNativeField(label: "Approved At", text: $draft.approvedAt)
