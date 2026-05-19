@@ -200,7 +200,7 @@ private struct TaskBoardOperationsSyncWarning: View {
       Button {
         openSettings()
       } label: {
-        Label("Task Board Settings", systemImage: "gearshape")
+        Label("Settings", systemImage: "gearshape")
           .labelStyle(.titleAndIcon)
           .lineLimit(1)
       }
