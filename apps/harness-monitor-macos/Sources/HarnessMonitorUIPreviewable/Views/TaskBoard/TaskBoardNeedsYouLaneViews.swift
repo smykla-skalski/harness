@@ -79,7 +79,6 @@ struct TaskBoardDecisionRow: View {
     }
     .frame(
       maxWidth: .infinity,
-      minHeight: metrics.cardMinHeight,
       alignment: .topLeading
     )
     .padding(metrics.cardPadding)
