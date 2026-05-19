@@ -308,6 +308,7 @@ struct SessionWindowRouteContentMetricsTests {
     #expect(managementSupportSource.contains("Link(destination: destination.url)"))
     #expect(managementPanelSource.contains("Evaluate Item"))
     #expect(managementPanelSource.contains("TaskBoardPlanLifecycleActionButtons("))
+    #expect(!managementPanelSource.contains("metrics.managementPanelCornerRadius"))
     #expect(managementSupportSource.contains("Label(\"Begin Plan\""))
     #expect(managementSupportSource.contains("Label(\"Submit Plan\""))
     #expect(managementSupportSource.contains("Label(\"Approve Plan\""))

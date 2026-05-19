@@ -75,9 +75,14 @@ extension TaskBoardOverviewView {
         onClose: clearSelectedTaskBoardItem
       )
       .frame(maxWidth: .infinity, alignment: .leading)
-      .padding(HarnessMonitorTheme.spacingMD)
     }
-    .frame(minWidth: 940, idealWidth: 1_040, minHeight: 760, alignment: .topLeading)
+    .frame(
+      minWidth: 1_120,
+      idealWidth: 1_240,
+      minHeight: 760,
+      maxHeight: .infinity,
+      alignment: .topLeading
+    )
   }
 
   func openTaskBoardItem(_ item: TaskBoardItem) {
