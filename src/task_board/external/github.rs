@@ -17,8 +17,10 @@ use super::{
 
 static RUSTLS_PROVIDER: OnceLock<()> = OnceLock::new();
 
+mod errors;
 mod inbox;
 
+use errors::{github_client_error, github_sync_error_with_context, warn_github_message};
 pub use inbox::GitHubInboxSyncClient;
 
 #[derive(Clone)]
@@ -157,12 +159,18 @@ impl ExternalSyncClient for GitHubSyncClient {
         if !self.import_labels.is_empty() {
             request = request.labels(&self.import_labels);
         }
-        let page = request.send().await.map_err(github_sync_error)?;
-        let issues = self
-            .octocrab()
-            .all_pages(page)
-            .await
-            .map_err(github_sync_error)?;
+        let page = request.send().await.map_err(|error| {
+            github_sync_error_with_context(
+                format!("listing issues in {}", repository.slug()),
+                error,
+            )
+        })?;
+        let issues = self.octocrab().all_pages(page).await.map_err(|error| {
+            github_sync_error_with_context(
+                format!("loading issue pages from {}", repository.slug()),
+                error,
+            )
+        })?;
         Ok(issues
             .into_iter()
             .filter(|issue| issue.pull_request.is_none())
@@ -190,7 +198,12 @@ impl ExternalSyncClient for GitHubSyncClient {
         if let Some(body) = non_empty_body(&item.body) {
             request = request.body(body);
         }
-        let issue = request.send().await.map_err(github_sync_error)?;
+        let issue = request.send().await.map_err(|error| {
+            github_sync_error_with_context(
+                format!("creating issue in {}", repository.slug()),
+                error,
+            )
+        })?;
         Ok(ExternalTaskRef::new(
             ExternalProvider::GitHub,
             github_external_id(&repository, issue.number),
@@ -210,7 +223,12 @@ impl ExternalSyncClient for GitHubSyncClient {
             .octocrab()
             .issues(repository.owner.as_str(), repository.repo.as_str());
         if let Some(precondition) = update.precondition_updated_at.as_deref() {
-            let current = issues.get(issue_number).await.map_err(github_sync_error)?;
+            let current = issues.get(issue_number).await.map_err(|error| {
+                github_sync_error_with_context(
+                    format!("loading issue {issue_number} in {}", repository.slug()),
+                    error,
+                )
+            })?;
             if current.updated_at.to_rfc3339() != precondition {
                 return Ok(ExternalUpdateOutcome::PreconditionFailed);
             }
@@ -225,7 +243,12 @@ impl ExternalSyncClient for GitHubSyncClient {
         if update.changed_fields.contains(&ExternalSyncField::Status) {
             request = request.state(github_issue_state(item.status));
         }
-        let issue = request.send().await.map_err(github_sync_error)?;
+        let issue = request.send().await.map_err(|error| {
+            github_sync_error_with_context(
+                format!("updating issue {issue_number} in {}", repository.slug()),
+                error,
+            )
+        })?;
         Ok(ExternalUpdateOutcome::Applied(
             ExternalTaskRef::new(
                 ExternalProvider::GitHub,
@@ -254,7 +277,12 @@ impl ExternalSyncClient for GitHubSyncClient {
             .state(IssueState::Closed)
             .send()
             .await
-            .map_err(github_sync_error)?;
+            .map_err(|error| {
+                github_sync_error_with_context(
+                    format!("closing issue {issue_number} in {}", repository.slug()),
+                    error,
+                )
+            })?;
         Ok(())
     }
 }
@@ -366,18 +394,4 @@ pub(super) fn search_label_matches_filter(
             .iter()
             .any(|wanted| name.eq_ignore_ascii_case(wanted.trim()))
     })
-}
-
-fn github_client_error(error: octocrab::Error) -> CliError {
-    CliError::new(CliErrorKind::workflow_io(format!(
-        "create task-board github client: {error}"
-    )))
-    .with_source(error)
-}
-
-fn github_sync_error(error: octocrab::Error) -> CliError {
-    CliError::new(CliErrorKind::workflow_io(format!(
-        "task-board github sync failed: {error}"
-    )))
-    .with_source(error)
 }
