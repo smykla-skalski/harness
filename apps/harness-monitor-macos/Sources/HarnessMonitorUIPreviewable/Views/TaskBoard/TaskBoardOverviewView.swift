@@ -52,7 +52,7 @@ public struct TaskBoardOverviewView: View {
     )
   }
 
-  private var metrics: TaskBoardOverviewMetrics {
+  var metrics: TaskBoardOverviewMetrics {
     TaskBoardOverviewMetrics(fontScale: fontScale)
   }
 
@@ -166,32 +166,13 @@ public struct TaskBoardOverviewView: View {
         }
       }
       taskBoardDetailRow { boardSection }
-      if hasRouteContent || store != nil,
-        isCreatingTaskBoardItem || selectedTaskBoardItem != nil
-      {
-        taskBoardDetailRow {
-          TaskBoardItemManagementPanel(
-            item: selectedTaskBoardItem,
-            metrics: metrics,
-            isActionInFlight: isActionInFlight,
-            store: store,
-            onCreate: onCreateTaskBoardItem,
-            onUpdate: onUpdateTaskBoardItem,
-            onDelete: selectionClearingDeleteAction,
-            onRunOnce: runOrchestratorOnceForItem,
-            onEvaluate: selectedTaskBoardItemEvaluateAction,
-            onBeginPlan: onBeginTaskBoardPlan,
-            onSubmitPlan: onSubmitTaskBoardPlan,
-            onApprovePlan: onApproveTaskBoardPlan,
-            onRefresh: onRefreshTaskBoard,
-            onClose: clearSelectedTaskBoardItem
-          )
-        }
-      }
     }
     .frame(maxWidth: .infinity, alignment: .leading)
     .accessibilityElement(children: .contain)
     .accessibilityIdentifier("harness.task-board.overview")
+    .sheet(item: taskBoardManagementSheet) { taskBoardManagementSheet in
+      taskBoardManagementSheetContent(taskBoardManagementSheet)
+    }
     .task(id: presentationInput) {
       await rebuildPresentation(input: presentationInput)
     }

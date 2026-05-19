@@ -107,7 +107,7 @@ final class HarnessMonitorUITests: HarnessMonitorUITestCase {
     XCTAssertFalse(feedback.exists)
   }
 
-  func testTaskBoardBoardOnlyItemOpensManagementPanel() throws {
+  func testTaskBoardBoardOnlyItemOpensManagementSheet() throws {
     let itemID = "preview-board-only"
     let app = launch(
       mode: "preview",
@@ -131,6 +131,12 @@ final class HarnessMonitorUITests: HarnessMonitorUITestCase {
     XCTAssertTrue(app.staticTexts["Manage Board Item"].exists)
     XCTAssertTrue(app.textFields["Title"].exists)
     XCTAssertFalse(app.staticTexts["Task Not Available"].exists)
+
+    app.typeKey(.escape, modifierFlags: [])
+    XCTAssertTrue(
+      waitUntil(timeout: Self.actionTimeout) { !managementPanel.exists },
+      "Manage Board Item should dismiss with Escape when presented as a sheet."
+    )
   }
 
   func testToolbarSurvivesSidebarToggle() throws {
