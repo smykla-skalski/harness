@@ -56,6 +56,17 @@ public struct TaskBoardOverviewView: View {
     TaskBoardOverviewMetrics(fontScale: fontScale)
   }
 
+  private var laneMetrics: TaskBoardLaneMetrics {
+    TaskBoardLaneMetrics(fontScale: fontScale)
+  }
+
+  private var laneStripSizing: TaskBoardLaneStripSizing {
+    TaskBoardLaneStripSizing(
+      minColumnWidth: laneMetrics.laneWidth,
+      spacing: metrics.columnSpacing
+    )
+  }
+
   private var presentationInput: TaskBoardOverviewPresentationInput {
     TaskBoardOverviewPresentationInput(
       snapshot: snapshot,
@@ -325,25 +336,36 @@ extension TaskBoardOverviewView {
   }
 
   private var taskBoardColumns: some View {
-    ScrollView(.horizontal, showsIndicators: true) {
-      HStack(alignment: .top, spacing: metrics.columnSpacing) {
-        ForEach(TaskBoardInboxLane.allCases) { lane in
-          TaskBoardLaneUnifiedColumn(
-            lane: lane,
-            apiItems: cachedPresentation.apiItems(in: lane),
-            inboxItems: cachedPresentation.inboxItems(in: lane),
-            decisions: decisions(in: lane),
-            onOpenAPIItem: openTaskBoardItem,
-            onOpenInboxItem: onOpenItem,
-            onOpenDecision: onOpenDecision,
-            onMoveAPIItem: moveTaskBoardItem,
-            onMoveInboxItem: moveInboxItem
-          )
-        }
+    ViewThatFits(in: .horizontal) {
+      TaskBoardLaneStripLayout(sizing: laneStripSizing) {
+        taskBoardLaneColumns
       }
       .padding(.vertical, metrics.boardVerticalPadding)
+
+      ScrollView(.horizontal, showsIndicators: true) {
+        TaskBoardLaneStripLayout(sizing: laneStripSizing) {
+          taskBoardLaneColumns
+        }
+        .padding(.vertical, metrics.boardVerticalPadding)
+      }
+      .scrollClipDisabled()
     }
-    .scrollClipDisabled()
+  }
+
+  @ViewBuilder private var taskBoardLaneColumns: some View {
+    ForEach(TaskBoardInboxLane.allCases) { lane in
+      TaskBoardLaneUnifiedColumn(
+        lane: lane,
+        apiItems: cachedPresentation.apiItems(in: lane),
+        inboxItems: cachedPresentation.inboxItems(in: lane),
+        decisions: decisions(in: lane),
+        onOpenAPIItem: openTaskBoardItem,
+        onOpenInboxItem: onOpenItem,
+        onOpenDecision: onOpenDecision,
+        onMoveAPIItem: moveTaskBoardItem,
+        onMoveInboxItem: moveInboxItem
+      )
+    }
   }
 
   private var emptyState: some View {

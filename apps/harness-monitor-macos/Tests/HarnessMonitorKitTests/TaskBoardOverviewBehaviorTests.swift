@@ -210,6 +210,24 @@ struct TaskBoardOverviewBehaviorTests {
     #expect(presentation.apiItems(in: .ready).map(\.id) == ["session-item"])
   }
 
+  @Test("Lane strip sizing keeps the current minimum width until the board can expand")
+  func laneStripSizingKeepsMinimumWidthUntilExpansion() {
+    let sizing = TaskBoardLaneStripSizing(minColumnWidth: 288, spacing: 16)
+
+    #expect(sizing.minimumWidth(for: 3) == 896)
+    #expect(sizing.columnWidth(for: 760, columnCount: 3) == 288)
+    #expect(sizing.resolvedWidth(for: 760, columnCount: 3) == 896)
+  }
+
+  @Test("Lane strip sizing shares extra board width equally across columns")
+  func laneStripSizingSharesExtraWidthEqually() {
+    let sizing = TaskBoardLaneStripSizing(minColumnWidth: 288, spacing: 16)
+    let width = sizing.columnWidth(for: 1_120, columnCount: 3)
+
+    #expect(abs(width - 362.6666666666667) < 0.001)
+    #expect(sizing.resolvedWidth(for: 1_120, columnCount: 3) == 1_120)
+  }
+
   @Test("Dispatch presentation filters host project types off main")
   func dispatchPresentationFiltersHostProjectTypes() async {
     let worker = TaskBoardOperationsDispatchPresentationWorker()

@@ -37,6 +37,77 @@ struct TaskBoardOverviewMetrics: Equatable {
   }
 }
 
+struct TaskBoardLaneStripSizing: Equatable {
+  let minColumnWidth: CGFloat
+  let spacing: CGFloat
+
+  func minimumWidth(for columnCount: Int) -> CGFloat {
+    guard columnCount > 0 else { return 0 }
+    return minColumnWidth * CGFloat(columnCount) + totalSpacing(for: columnCount)
+  }
+
+  func resolvedWidth(for availableWidth: CGFloat?, columnCount: Int) -> CGFloat {
+    max(availableWidth ?? 0, minimumWidth(for: columnCount))
+  }
+
+  func columnWidth(for availableWidth: CGFloat?, columnCount: Int) -> CGFloat {
+    guard columnCount > 0 else { return 0 }
+    let resolvedWidth = resolvedWidth(for: availableWidth, columnCount: columnCount)
+    return max(
+      minColumnWidth,
+      (resolvedWidth - totalSpacing(for: columnCount)) / CGFloat(columnCount)
+    )
+  }
+
+  private func totalSpacing(for columnCount: Int) -> CGFloat {
+    spacing * CGFloat(max(columnCount - 1, 0))
+  }
+}
+
+struct TaskBoardLaneStripLayout: Layout {
+  let sizing: TaskBoardLaneStripSizing
+
+  func sizeThatFits(
+    proposal: ProposedViewSize,
+    subviews: Subviews,
+    cache _: inout ()
+  ) -> CGSize {
+    let columnCount = subviews.count
+    guard columnCount > 0 else { return .zero }
+
+    let columnWidth = sizing.columnWidth(for: proposal.width, columnCount: columnCount)
+    let height = subviews.map { subview in
+      subview.sizeThatFits(ProposedViewSize(width: columnWidth, height: nil)).height
+    }.max() ?? 0
+
+    return CGSize(
+      width: sizing.resolvedWidth(for: proposal.width, columnCount: columnCount),
+      height: height
+    )
+  }
+
+  func placeSubviews(
+    in bounds: CGRect,
+    proposal _: ProposedViewSize,
+    subviews: Subviews,
+    cache _: inout ()
+  ) {
+    let columnCount = subviews.count
+    guard columnCount > 0 else { return }
+
+    let columnWidth = sizing.columnWidth(for: bounds.width, columnCount: columnCount)
+    var x = bounds.minX
+    for subview in subviews {
+      subview.place(
+        at: CGPoint(x: x, y: bounds.minY),
+        anchor: .topLeading,
+        proposal: ProposedViewSize(width: columnWidth, height: bounds.height)
+      )
+      x += columnWidth + sizing.spacing
+    }
+  }
+}
+
 struct TaskBoardSummaryPill: View {
   let value: String
   let label: String
