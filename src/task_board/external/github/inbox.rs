@@ -12,8 +12,9 @@ use crate::task_board::types::{TaskBoardItem, TaskBoardStatus};
 
 use super::{
     GitHubRepository, assigned_issue_query, ensure_rustls_provider, github_client_error,
-    github_external_id, github_inbox_issue_status, github_sync_error, parse_github_repository,
-    review_request_query, search_label_matches_filter,
+    github_external_id, github_inbox_issue_status, github_sync_error_with_context,
+    parse_github_repository, review_request_query, search_label_matches_filter,
+    warn_github_message,
 };
 
 const GITHUB_SEARCH_PAGE_CAP: u32 = 10;
@@ -77,15 +78,23 @@ impl GitHubInboxSyncClient {
     }
 
     async fn current_user_login(&self) -> Result<String, CliError> {
-        let user: GitHubCurrentUser = self
-            .client
-            .get("/user", None::<&()>)
-            .await
-            .map_err(github_sync_error)?;
+        let user: GitHubCurrentUser =
+            self.client
+                .get("/user", None::<&()>)
+                .await
+                .map_err(|error| {
+                    github_sync_error_with_context("loading authenticated GitHub user", error)
+                })?;
         Ok(user.login)
     }
 
-    async fn search(&self, query: &str) -> Result<Vec<GitHubSearchIssuePullRequestItem>, CliError> {
+    async fn search(
+        &self,
+        repository: &GitHubRepository,
+        kind: GitHubInboxSearchKind,
+        login: &str,
+    ) -> Result<Vec<GitHubSearchIssuePullRequestItem>, CliError> {
+        let query = kind.query(repository, login);
         let mut page = 1_u32;
         let mut items = Vec::new();
         loop {
@@ -94,13 +103,13 @@ impl GitHubInboxSyncClient {
                 .get(
                     "/search/issues",
                     Some(&GitHubSearchIssuePullRequestQuery {
-                        q: query.to_owned(),
+                        q: query.clone(),
                         per_page: 100,
                         page,
                     }),
                 )
                 .await
-                .map_err(github_sync_error)?;
+                .map_err(|error| github_sync_error_with_context(kind.context(repository), error))?;
             let count = response.items.len();
             items.extend(response.items);
             match next_search_page(count, page) {
@@ -123,13 +132,11 @@ fn next_search_page(count: usize, page: u32) -> Option<u32> {
     Some(page + 1)
 }
 
-#[allow(clippy::cognitive_complexity)]
 fn warn_search_results_truncated() {
-    tracing::warn!(
-        target: "harness::task_board::external::github::inbox",
+    warn_github_message(&format!(
         "github search results truncated at {} hits",
         GITHUB_SEARCH_PAGE_CAP * 100
-    );
+    ));
 }
 
 impl fmt::Debug for GitHubInboxSyncClient {
@@ -187,7 +194,7 @@ impl GitHubInboxSyncClient {
     ) -> Result<Vec<ExternalTask>, CliError> {
         let project_id = repository.slug();
         let items = self
-            .search(assigned_issue_query(repository, login).as_str())
+            .search(repository, GitHubInboxSearchKind::AssignedIssues, login)
             .await?;
         Ok(items
             .into_iter()
@@ -210,7 +217,7 @@ impl GitHubInboxSyncClient {
     ) -> Result<Vec<ExternalTask>, CliError> {
         let project_id = repository.slug();
         let items = self
-            .search(review_request_query(repository, login).as_str())
+            .search(repository, GitHubInboxSearchKind::ReviewRequests, login)
             .await?;
         Ok(items
             .into_iter()
@@ -237,6 +244,28 @@ fn github_task_ref(
         github_external_id(repository, number),
     )
     .with_url(html_url)
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum GitHubInboxSearchKind {
+    AssignedIssues,
+    ReviewRequests,
+}
+
+impl GitHubInboxSearchKind {
+    fn query(self, repository: &GitHubRepository, login: &str) -> String {
+        match self {
+            Self::AssignedIssues => assigned_issue_query(repository, login),
+            Self::ReviewRequests => review_request_query(repository, login),
+        }
+    }
+
+    fn context(self, repository: &GitHubRepository) -> String {
+        match self {
+            Self::AssignedIssues => format!("searching assigned issues in {}", repository.slug()),
+            Self::ReviewRequests => format!("searching review requests in {}", repository.slug()),
+        }
+    }
 }
 
 #[derive(Debug, Clone, Deserialize)]
