@@ -140,12 +140,14 @@ a dated feature flag in `src/feature_flags.rs` with a tracking issue.
 
 ## Commit signing
 
-Every commit must use path-limited `git commit -sS -- <paths>`. Do not pre-stage
-with `git add` and do not use `git add -A`, `git add .`, or `git commit -a`.
-Pass the file list directly to `git commit`; git stages exactly those paths for
-this commit and leaves the rest of the index and working tree alone. Parallel
-agents on the same worktree routinely have unrelated edits in flight, and
-path-limited commits keep them out of the signed history. Verify after
+Every commit must use path-limited `git commit -sS -- <paths>`. Pass the file
+list directly to `git commit`; git stages exactly those paths for this commit
+and leaves the rest of the index and working tree alone. For brand-new files,
+first run `git add -N -- <new-paths>` so Git can see them, then include those
+paths in the same path-limited commit. Do not pre-stage with plain `git add`,
+and do not use `git add -A`, `git add .`, `git commit -a`, or `git commit -i`.
+Parallel agents on the same worktree routinely have unrelated edits in flight,
+and path-limited commits keep them out of the signed history. Verify after
 committing:
 
 ```bash
