@@ -84,14 +84,6 @@ struct TaskBoardItemManagementPanel: View {
     }
     .padding(HarnessMonitorTheme.spacingMD)
     .frame(maxWidth: .infinity, minHeight: metrics.managementPanelMinHeight, alignment: .leading)
-    .background(
-      .background.opacity(0.56),
-      in: .rect(cornerRadius: metrics.managementPanelCornerRadius)
-    )
-    .overlay(
-      RoundedRectangle(cornerRadius: metrics.managementPanelCornerRadius)
-        .stroke(HarnessMonitorTheme.controlBorder.opacity(0.62), lineWidth: 1)
-    )
     .task { await loadProjectTypeSuggestions() }
     .accessibilityElement(children: .contain)
     .accessibilityIdentifier("harness.task-board.manage-item.\(item?.id ?? "new")")
