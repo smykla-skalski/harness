@@ -74,6 +74,7 @@ extension TaskBoardOverviewView {
         onRefresh: onRefreshTaskBoard,
         onClose: clearSelectedTaskBoardItem
       )
+      .padding(HarnessMonitorTheme.spacingLG)
       .frame(maxWidth: .infinity, alignment: .leading)
     }
     .frame(

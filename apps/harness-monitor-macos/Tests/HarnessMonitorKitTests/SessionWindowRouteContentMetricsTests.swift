@@ -288,6 +288,9 @@ struct SessionWindowRouteContentMetricsTests {
   func boardOnlyTaskBoardItemsHaveManagementSurface() throws {
     let overviewSource = try taskBoardOverviewSource()
     let managementPanelSource = try taskBoardSourceFile(named: "TaskBoardItemManagementPanel.swift")
+    let managementComponentsSource = try taskBoardSourceFile(
+      named: "TaskBoardItemManagementPanel+Components.swift"
+    )
     let managementSupportSource = try taskBoardSourceFile(
       named: "TaskBoardItemManagementSupport.swift"
     )
@@ -305,6 +308,10 @@ struct SessionWindowRouteContentMetricsTests {
     #expect(managementPanelSource.contains("Board Only"))
     #expect(managementPanelSource.contains("TaskBoardManagementFacts("))
     #expect(managementPanelSource.contains("TaskBoardExternalLinks("))
+    #expect(managementPanelSource.contains(".harnessAccessoryButtonStyle(tint: .secondary)"))
+    #expect(!managementPanelSource.contains(".buttonStyle(.borderless)"))
+    #expect(managementComponentsSource.contains("taskBoardManagementFieldChrome()"))
+    #expect(overviewSource.contains(".padding(HarnessMonitorTheme.spacingLG)"))
     #expect(managementSupportSource.contains("Link(destination: destination.url)"))
     #expect(managementPanelSource.contains("Evaluate Item"))
     #expect(managementPanelSource.contains("TaskBoardPlanLifecycleActionButtons("))
