@@ -23,8 +23,6 @@ public struct SettingsTaskBoardSection: View {
   public var body: some View {
     ScrollViewReader { proxy in
       Form {
-        actionsSection
-
         if let loadError {
           Section {
             Text(loadError)
@@ -59,6 +57,9 @@ public struct SettingsTaskBoardSection: View {
         }
       }
       .settingsDetailFormStyle()
+      .safeAreaInset(edge: .bottom, alignment: .trailing, spacing: 0) {
+        actionsComposer
+      }
       .accessibilityIdentifier(HarnessMonitorAccessibility.settingsTaskBoardRoot)
       .task { await loadSettings() }
       .onChange(of: navigationRequest, initial: true) { _, request in
@@ -71,8 +72,9 @@ public struct SettingsTaskBoardSection: View {
     }
   }
 
-  private var actionsSection: some View {
-    Section {
+  private var actionsComposer: some View {
+    VStack(spacing: 0) {
+      Divider()
       HarnessMonitorGlassControlGroup(spacing: HarnessMonitorTheme.itemSpacing) {
         HarnessMonitorWrapLayout(
           spacing: HarnessMonitorTheme.itemSpacing,
@@ -87,7 +89,7 @@ public struct SettingsTaskBoardSection: View {
             action: loadSettings
           )
           HarnessMonitorAsyncActionButton(
-            title: "Save Settings",
+            title: "Save",
             tint: nil,
             variant: .prominent,
             isLoading: isSaving,
@@ -97,9 +99,9 @@ public struct SettingsTaskBoardSection: View {
           .disabled(isLoading || loadError != nil)
         }
       }
-    } header: {
-      Text("Actions")
-        .harnessNativeFormSectionHeader()
+      .padding(.horizontal, HarnessMonitorTheme.spacingXL)
+      .padding(.vertical, HarnessMonitorTheme.spacingSM)
+      .background(.background)
     }
   }
 
