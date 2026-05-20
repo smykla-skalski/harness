@@ -36,15 +36,24 @@ pub struct DaemonRuntimeConfig {
 }
 
 impl DaemonRuntimeConfig {
-    fn without_secrets(mut self) -> Self {
+    /// Strip both secret values and the wire-only `*_configured` indicators
+    /// from the embedded task-board git runtime config. Used on the load path
+    /// so the daemon never trusts stale secret-presence metadata read off
+    /// disk; the in-memory secret state alone drives the configured flags.
+    fn without_secret_metadata(mut self) -> Self {
         self.task_board_git_runtime_config = self
             .task_board_git_runtime_config
-            .map(|config| config.without_secrets());
+            .map(|config| config.without_secret_metadata());
         self
     }
 }
 
 /// Load the persisted daemon runtime config, if present.
+///
+/// Strips both secret values and the wire-only `*_configured` indicators so
+/// callers never observe disk-side secret material or stale secret-presence
+/// metadata. Live secret presence is overlaid from the in-memory secret state
+/// by [`load_task_board_git_runtime_config`].
 ///
 /// # Errors
 /// Returns `CliError` when the config file exists but cannot be parsed.
@@ -53,7 +62,7 @@ pub fn load_runtime_config() -> Result<Option<DaemonRuntimeConfig>, CliError> {
         return Ok(None);
     }
     read_json_typed::<DaemonRuntimeConfig>(&config_path())
-        .map(DaemonRuntimeConfig::without_secrets)
+        .map(DaemonRuntimeConfig::without_secret_metadata)
         .map(Some)
 }
 
@@ -88,7 +97,7 @@ pub fn persist_log_level(level: Option<&str>) -> Result<(), CliError> {
 pub fn load_task_board_git_runtime_config() -> Result<TaskBoardGitRuntimeConfig, CliError> {
     let mut config = load_runtime_config()?
         .and_then(|config| config.task_board_git_runtime_config)
-        .map(|config| config.without_secrets())
+        .map(|config| config.without_secret_metadata())
         .unwrap_or_default();
     overlay_runtime_secret_flags(&mut config);
     Ok(config)
@@ -124,6 +133,9 @@ fn overlay_profile_flags(
 
 /// Persist the task-board git runtime config inside the daemon runtime config file.
 ///
+/// Strips both secret values and the wire-only `*_configured` indicators so
+/// neither secret material nor secret-presence metadata ever reaches the disk.
+///
 /// # Errors
 /// Returns `CliError` when the runtime config cannot be written.
 pub fn persist_task_board_git_runtime_config(
@@ -131,16 +143,18 @@ pub fn persist_task_board_git_runtime_config(
 ) -> Result<(), CliError> {
     ensure_daemon_dirs()?;
     let mut config = load_runtime_config_for_persist();
-    let task_board_config = task_board_config.without_secrets();
+    let task_board_config = task_board_config.without_secret_metadata();
     config.task_board_git_runtime_config =
         (!task_board_config.is_empty()).then_some(task_board_config);
     write_json_pretty(&config_path(), &config)
 }
 
 /// One-shot migration drain: if the on-disk daemon runtime config still
-/// contains plaintext task-board git secrets (from an older daemon), return
-/// the full unstripped runtime config and persist a stripped version back to
-/// disk. Returns `Ok(None)` when the on-disk config is already stripped.
+/// contains plaintext task-board git secrets (from an older daemon) or stale
+/// `*_configured` indicators (from a daemon that pre-dated the metadata
+/// strip), return the full unstripped runtime config and persist a stripped
+/// version back to disk. Returns `Ok(None)` when the on-disk config is
+/// already free of secret material and wire-only metadata.
 ///
 /// # Errors
 /// Returns `CliError` when the runtime config exists but cannot be parsed or
@@ -154,7 +168,7 @@ pub fn drain_task_board_git_runtime_secrets() -> Result<Option<TaskBoardGitRunti
     let Some(raw_task_board) = raw.task_board_git_runtime_config.clone() else {
         return Ok(None);
     };
-    let stripped = raw_task_board.without_secrets();
+    let stripped = raw_task_board.without_secret_metadata();
     if stripped == raw_task_board {
         return Ok(None);
     }
