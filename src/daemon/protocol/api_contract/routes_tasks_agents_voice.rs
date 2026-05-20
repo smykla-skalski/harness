@@ -282,6 +282,14 @@ pub(crate) const ROUTES: &[HttpApiRouteContract] = &[
         swift_client_exposed: true,
     },
     HttpApiRouteContract {
+        method: HttpRouteMethod::Get,
+        path: http_paths::OPENROUTER_MODELS,
+        parity: HttpRouteParity::Rpc {
+            ws_method: ws_methods::OPENROUTER_LIST_MODELS,
+        },
+        swift_client_exposed: true,
+    },
+    HttpApiRouteContract {
         method: HttpRouteMethod::Post,
         path: http_paths::SESSION_SIGNAL_SEND,
         parity: HttpRouteParity::Rpc {

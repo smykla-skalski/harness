@@ -238,6 +238,7 @@ mod signals_async_send;
 mod status;
 mod sync_support;
 mod dependency_updates;
+mod openrouter_models;
 mod task_board;
 mod task_board_evaluation;
 mod task_board_github;
@@ -283,6 +284,7 @@ pub use observe_stream::{
     observe_session, ready_event, session_extensions_event, session_stream_initial_events,
     session_updated_core_event, session_updated_event, sessions_updated_event,
 };
+pub use openrouter_models::list_openrouter_models;
 pub use review_mutations::{
     arbitrate as arbitrate_review, claim_review, respond_review, submit_for_review, submit_review,
 };
