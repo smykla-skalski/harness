@@ -12,6 +12,7 @@ use crate::task_board::{
     TaskBoardWorkflowStatus, build_dispatch_summary_with_policy_root, filter_for_local_machine,
     machine_mismatch_plan_with_policy_root,
 };
+use tokio::task::spawn_blocking;
 
 use super::super::{
     create_task, create_task_async, start_session_direct, start_session_direct_async,
@@ -66,7 +67,7 @@ pub async fn dispatch_task_board_async(
     async_db: &AsyncDaemonDb,
     board: &TaskBoardStore,
 ) -> Result<TaskBoardDispatchResponse, CliError> {
-    let plans = build_dispatch_plans_for_request(board, request)?;
+    let plans = build_dispatch_plans_for_request_async(board, request).await?;
     if request.dry_run {
         return Ok(DispatchExecutionSummary::dry_run(plans));
     }
@@ -173,7 +174,8 @@ async fn apply_dispatch_plan_async(
     .map_err(|error| (DispatchFailureKind::CreateTask, error))?;
     let work_item_id =
         newest_task_id(detail).map_err(|error| (DispatchFailureKind::CreateTask, error))?;
-    let item = link_dispatched_item(board, plan, &session_id, &work_item_id)
+    let item = link_dispatched_item_async(board, plan, &session_id, &work_item_id)
+        .await
         .map_err(|error| (DispatchFailureKind::LinkItem, error))?;
     Ok(DispatchAppliedTask {
         board_item_id: plan.board_item_id.clone(),
@@ -322,6 +324,52 @@ pub fn unlink_dispatched_item(
             ..TaskBoardItemPatch::default()
         },
     )
+}
+
+async fn build_dispatch_plans_for_request_async(
+    board: &TaskBoardStore,
+    request: &TaskBoardDispatchRequest,
+) -> Result<Vec<DispatchPlan>, CliError> {
+    let request = request.clone();
+    run_board_blocking(board, "build dispatch plans", move |board| {
+        build_dispatch_plans_for_request(&board, &request)
+    })
+    .await
+}
+
+async fn link_dispatched_item_async(
+    board: &TaskBoardStore,
+    plan: &DispatchPlan,
+    session_id: &str,
+    work_item_id: &str,
+) -> Result<TaskBoardItem, CliError> {
+    let plan = plan.clone();
+    let session_id = session_id.to_string();
+    let work_item_id = work_item_id.to_string();
+    run_board_blocking(board, "link dispatched item", move |board| {
+        link_dispatched_item(&board, &plan, &session_id, &work_item_id)
+    })
+    .await
+}
+
+async fn run_board_blocking<T, F>(
+    board: &TaskBoardStore,
+    operation: &'static str,
+    work: F,
+) -> Result<T, CliError>
+where
+    T: Send + 'static,
+    F: FnOnce(TaskBoardStore) -> Result<T, CliError> + Send + 'static,
+{
+    let board = board.clone();
+    spawn_blocking(move || work(board))
+        .await
+        .unwrap_or_else(|error| {
+            Err(CliErrorKind::workflow_io(format!(
+                "task-board dispatch {operation} worker failed: {error}"
+            ))
+            .into())
+        })
 }
 
 fn new_workflow_execution_id() -> String {

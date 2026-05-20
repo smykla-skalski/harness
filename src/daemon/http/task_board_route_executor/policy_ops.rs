@@ -7,28 +7,47 @@ use crate::daemon::protocol::{
 use crate::daemon::service;
 use crate::errors::CliError;
 
-pub(crate) fn policy_pipeline() -> Result<TaskBoardPolicyPipelineResponse, CliError> {
-    service::task_board_policy_pipeline()
+use super::run_blocking;
+
+pub(crate) async fn policy_pipeline() -> Result<TaskBoardPolicyPipelineResponse, CliError> {
+    run_blocking("policy pipeline", service::task_board_policy_pipeline).await
 }
 
-pub(crate) fn save_policy_pipeline_draft(
+pub(crate) async fn save_policy_pipeline_draft(
     request: &TaskBoardPolicyPipelineSaveDraftRequest,
 ) -> Result<TaskBoardPolicyPipelineSaveDraftResponse, CliError> {
-    service::save_task_board_policy_pipeline_draft(request)
+    let request = request.clone();
+    run_blocking("policy pipeline save draft", move || {
+        service::save_task_board_policy_pipeline_draft(&request)
+    })
+    .await
 }
 
-pub(crate) fn simulate_policy_pipeline(
+pub(crate) async fn simulate_policy_pipeline(
     request: &TaskBoardPolicyPipelineSimulateRequest,
 ) -> Result<TaskBoardPolicyPipelineSimulationResponse, CliError> {
-    service::simulate_task_board_policy_pipeline(request)
+    let request = request.clone();
+    run_blocking("policy pipeline simulate", move || {
+        service::simulate_task_board_policy_pipeline(&request)
+    })
+    .await
 }
 
-pub(crate) fn promote_policy_pipeline(
+pub(crate) async fn promote_policy_pipeline(
     request: &TaskBoardPolicyPipelinePromoteRequest,
 ) -> Result<TaskBoardPolicyPipelinePromoteResponse, CliError> {
-    service::promote_task_board_policy_pipeline(request)
+    let request = request.clone();
+    run_blocking("policy pipeline promote", move || {
+        service::promote_task_board_policy_pipeline(&request)
+    })
+    .await
 }
 
-pub(crate) fn audit_policy_pipeline() -> Result<TaskBoardPolicyPipelineAuditResponse, CliError> {
-    service::audit_task_board_policy_pipeline()
+pub(crate) async fn audit_policy_pipeline() -> Result<TaskBoardPolicyPipelineAuditResponse, CliError>
+{
+    run_blocking(
+        "policy pipeline audit",
+        service::audit_task_board_policy_pipeline,
+    )
+    .await
 }

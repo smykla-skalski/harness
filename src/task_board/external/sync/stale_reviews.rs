@@ -7,9 +7,9 @@ use crate::task_board::types::{ExternalRefProvider, TaskBoardItem, TaskBoardStat
 use crate::workspace::utc_now;
 
 use super::merge::{external_ref_matches, matching_ref};
-use super::{ExternalSyncAction, ExternalSyncOperation, ExternalSyncOptions};
+use super::{ExternalSyncAction, ExternalSyncOperation, ExternalSyncOptions, run_board_blocking};
 
-pub(super) fn reconcile_stale_github_review_requests(
+pub(super) async fn reconcile_stale_github_review_requests(
     board: &TaskBoardStore,
     options: ExternalSyncOptions,
     provider: ExternalProvider,
@@ -37,7 +37,12 @@ pub(super) fn reconcile_stale_github_review_requests(
         if options.dry_run {
             continue;
         }
-        board.update(&item.id, stale_review_request_patch(&item, &reference))?;
+        let item_id = item.id.clone();
+        let patch = stale_review_request_patch(&item, &reference);
+        run_board_blocking(board, "reconcile stale github review", move |board| {
+            board.update(&item_id, patch)
+        })
+        .await?;
     }
 
     Ok(())

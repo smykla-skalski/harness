@@ -24,6 +24,19 @@ pub(crate) use item_ops::*;
 pub(crate) use orchestrator_ops::*;
 pub(crate) use policy_ops::*;
 
+pub(super) async fn run_blocking<T, F>(operation: &'static str, work: F) -> Result<T, CliError>
+where
+    T: Send + 'static,
+    F: FnOnce() -> Result<T, CliError> + Send + 'static,
+{
+    spawn_blocking(work).await.unwrap_or_else(|error| {
+        Err(
+            CliErrorKind::workflow_io(format!("task-board {operation} worker failed: {error}"))
+                .into(),
+        )
+    })
+}
+
 pub(crate) async fn dispatch(
     state: &DaemonHttpState,
     request: TaskBoardDispatchRequest,

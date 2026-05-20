@@ -7,7 +7,7 @@ use crate::task_board::types::TaskBoardItem;
 
 use super::{
     ExternalSyncAction, ExternalSyncOperation, ExternalSyncOptions, OperationDraft, operation,
-    provider_ref,
+    provider_ref, run_board_blocking,
 };
 
 pub(super) async fn delete_remote_tombstones(
@@ -20,11 +20,15 @@ pub(super) async fn delete_remote_tombstones(
         return Ok(());
     }
     let provider = client.provider();
-    let tombstones = board
-        .list_including_deleted()?
-        .into_iter()
-        .filter(|item| item.is_deleted() && !item.external_refs.is_empty())
-        .collect::<Vec<_>>();
+    let tombstones = run_board_blocking(board, "list tombstones", |board| {
+        board.list_including_deleted().map(|items| {
+            items
+                .into_iter()
+                .filter(|item| item.is_deleted() && !item.external_refs.is_empty())
+                .collect::<Vec<_>>()
+        })
+    })
+    .await?;
     for item in tombstones {
         let Some(reference) = provider_ref(&item, provider) else {
             continue;

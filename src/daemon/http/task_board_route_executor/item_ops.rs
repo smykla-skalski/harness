@@ -12,53 +12,93 @@ use crate::daemon::service;
 use crate::errors::CliError;
 use crate::task_board::TaskBoardItem;
 
-pub(crate) fn create_item(request: &TaskBoardCreateItemRequest) -> Result<TaskBoardItem, CliError> {
-    service::create_task_board_item(request)
+use super::run_blocking;
+
+pub(crate) async fn create_item(
+    request: &TaskBoardCreateItemRequest,
+) -> Result<TaskBoardItem, CliError> {
+    let request = request.clone();
+    run_blocking("create item", move || {
+        service::create_task_board_item(&request)
+    })
+    .await
 }
 
-pub(crate) fn list_items(
+pub(crate) async fn list_items(
     request: &TaskBoardListItemsRequest,
 ) -> Result<TaskBoardListItemsResponse, CliError> {
-    service::list_task_board_items(request)
+    let request = request.clone();
+    run_blocking("list items", move || {
+        service::list_task_board_items(&request)
+    })
+    .await
 }
 
-pub(crate) fn get_item(request: &TaskBoardGetItemRequest) -> Result<TaskBoardItem, CliError> {
-    service::get_task_board_item(request)
+pub(crate) async fn get_item(request: &TaskBoardGetItemRequest) -> Result<TaskBoardItem, CliError> {
+    let request = request.clone();
+    run_blocking("get item", move || service::get_task_board_item(&request)).await
 }
 
-pub(crate) fn update_item(
+pub(crate) async fn update_item(
     id: &str,
     request: &TaskBoardUpdateItemRequest,
 ) -> Result<TaskBoardItem, CliError> {
-    service::update_task_board_item(id, request)
+    let id = id.to_string();
+    let request = request.clone();
+    run_blocking("update item", move || {
+        service::update_task_board_item(&id, &request)
+    })
+    .await
 }
 
-pub(crate) fn delete_item(request: &TaskBoardDeleteItemRequest) -> Result<TaskBoardItem, CliError> {
-    service::delete_task_board_item(request)
+pub(crate) async fn delete_item(
+    request: &TaskBoardDeleteItemRequest,
+) -> Result<TaskBoardItem, CliError> {
+    let request = request.clone();
+    run_blocking("delete item", move || {
+        service::delete_task_board_item(&request)
+    })
+    .await
 }
 
-pub(crate) fn begin_planning(
+pub(crate) async fn begin_planning(
     request: &TaskBoardPlanBeginRequest,
 ) -> Result<TaskBoardPlanningResponse, CliError> {
-    service::begin_task_board_planning(request)
+    let request = request.clone();
+    run_blocking("begin planning", move || {
+        service::begin_task_board_planning(&request)
+    })
+    .await
 }
 
-pub(crate) fn submit_plan(
+pub(crate) async fn submit_plan(
     request: &TaskBoardPlanSubmitRequest,
 ) -> Result<TaskBoardPlanningResponse, CliError> {
-    service::submit_task_board_plan(request)
+    let request = request.clone();
+    run_blocking("submit plan", move || {
+        service::submit_task_board_plan(&request)
+    })
+    .await
 }
 
-pub(crate) fn approve_plan(
+pub(crate) async fn approve_plan(
     request: &TaskBoardPlanApproveRequest,
 ) -> Result<TaskBoardPlanningResponse, CliError> {
-    service::approve_task_board_plan(request)
+    let request = request.clone();
+    run_blocking("approve plan", move || {
+        service::approve_task_board_plan(&request)
+    })
+    .await
 }
 
-pub(crate) fn revoke_plan(
+pub(crate) async fn revoke_plan(
     request: &TaskBoardPlanRevokeRequest,
 ) -> Result<TaskBoardPlanningResponse, CliError> {
-    service::revoke_task_board_plan(request)
+    let request = request.clone();
+    run_blocking("revoke plan", move || {
+        service::revoke_task_board_plan(&request)
+    })
+    .await
 }
 
 pub(crate) async fn sync(
@@ -67,32 +107,47 @@ pub(crate) async fn sync(
     service::sync_task_board_async(request).await
 }
 
-pub(crate) fn audit(request: &TaskBoardAuditRequest) -> Result<TaskBoardAuditResponse, CliError> {
-    service::audit_task_board(request)
+pub(crate) async fn audit(
+    request: &TaskBoardAuditRequest,
+) -> Result<TaskBoardAuditResponse, CliError> {
+    let request = request.clone();
+    run_blocking("audit", move || service::audit_task_board(&request)).await
 }
 
-pub(crate) fn projects(
+pub(crate) async fn projects(
     request: &TaskBoardCatalogRequest,
 ) -> Result<TaskBoardProjectsResponse, CliError> {
-    service::list_task_board_projects(request)
+    let request = request.clone();
+    run_blocking("projects", move || {
+        service::list_task_board_projects(&request)
+    })
+    .await
 }
 
-pub(crate) fn machines(
+pub(crate) async fn machines(
     request: &TaskBoardCatalogRequest,
 ) -> Result<TaskBoardMachinesResponse, CliError> {
-    service::list_task_board_machines(request)
+    let request = request.clone();
+    run_blocking("machines", move || {
+        service::list_task_board_machines(&request)
+    })
+    .await
 }
 
-pub(crate) fn host_local() -> Result<TaskBoardHostLocalResponse, CliError> {
-    service::task_board_host_local()
+pub(crate) async fn host_local() -> Result<TaskBoardHostLocalResponse, CliError> {
+    run_blocking("host local", service::task_board_host_local).await
 }
 
-pub(crate) fn host_list() -> Result<TaskBoardHostListResponse, CliError> {
-    service::task_board_host_list()
+pub(crate) async fn host_list() -> Result<TaskBoardHostListResponse, CliError> {
+    run_blocking("host list", service::task_board_host_list).await
 }
 
-pub(crate) fn host_set_project_types(
+pub(crate) async fn host_set_project_types(
     request: &TaskBoardHostSetProjectTypesRequest,
 ) -> Result<TaskBoardHostSetProjectTypesResponse, CliError> {
-    service::task_board_host_set_project_types(request)
+    let request = request.clone();
+    run_blocking("host set project types", move || {
+        service::task_board_host_set_project_types(&request)
+    })
+    .await
 }

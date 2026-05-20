@@ -3,10 +3,11 @@ use std::collections::HashMap;
 use clap::ValueEnum;
 use serde::{Deserialize, Serialize};
 
-use crate::errors::CliError;
+use crate::errors::{CliError, CliErrorKind};
 use crate::task_board::store::{TaskBoardItemPatch, TaskBoardStore};
 use crate::task_board::types::{ExternalRefProvider, TaskBoardItem, TaskBoardStatus};
 use crate::workspace::utc_now;
+use tokio::task::spawn_blocking;
 
 use super::{
     ExternalProvider, ExternalSyncClient, ExternalSyncConfig, ExternalSyncConflictPolicy,
@@ -204,7 +205,8 @@ async fn pull_provider_tasks(
         .into_iter()
         .filter(|task| options.status.is_none_or(|status| task.status == status))
         .collect::<Vec<_>>();
-    let board_items = board.list(None)?;
+    let board_items =
+        run_board_blocking(board, "list pull items", |board| board.list(None)).await?;
     let item_index = build_external_ref_index(&board_items);
     for task in tasks.iter().cloned() {
         if let Some(item) = item_for_ref(
@@ -213,7 +215,8 @@ async fn pull_provider_tasks(
             &task.reference,
             task.project_id.as_deref(),
         ) {
-            reconcile_existing_item(board, options, client.provider(), item, task, operations)?;
+            reconcile_existing_item(board, options, client.provider(), item, task, operations)
+                .await?;
             continue;
         }
         if options.dry_run {
@@ -232,7 +235,10 @@ async fn pull_provider_tasks(
         let item = create_item_from_external(&task);
         let title = item.title.clone();
         let body = item.body.clone();
-        let item = board.create(&title, &body, item)?;
+        let item = run_board_blocking(board, "create pulled item", move |board| {
+            board.create(&title, &body, item)
+        })
+        .await?;
         operations.push(operation(OperationDraft {
             provider: client.provider(),
             action: ExternalSyncAction::Pull,
@@ -251,7 +257,8 @@ async fn pull_provider_tasks(
         &board_items,
         &tasks,
         operations,
-    )?;
+    )
+    .await?;
     Ok(())
 }
 
@@ -261,7 +268,10 @@ async fn push_board_tasks(
     client: &dyn ExternalSyncClient,
     operations: &mut Vec<ExternalSyncOperation>,
 ) -> Result<(), CliError> {
-    let items = board.list(options.status)?;
+    let items = run_board_blocking(board, "list push items", move |board| {
+        board.list(options.status)
+    })
+    .await?;
     for item in &items {
         if has_reported_conflict(operations, client.provider(), &item.id) {
             continue;
@@ -298,13 +308,17 @@ async fn create_remote_item(
     let reference = client.push_task(item).await?;
     let mut refs = item.external_refs.clone();
     refs.push(synced_ref_from_item(reference.clone(), item));
-    board.update(
-        &item.id,
-        TaskBoardItemPatch {
-            external_refs: Some(refs),
-            ..TaskBoardItemPatch::default()
-        },
-    )?;
+    let item_id = item.id.clone();
+    run_board_blocking(board, "record pushed item ref", move |board| {
+        board.update(
+            &item_id,
+            TaskBoardItemPatch {
+                external_refs: Some(refs),
+                ..TaskBoardItemPatch::default()
+            },
+        )
+    })
+    .await?;
     operations.push(operation(OperationDraft {
         provider: client.provider(),
         action: ExternalSyncAction::Push,
@@ -377,14 +391,38 @@ async fn update_linked_remote(
         unsupported_fields: unsupported,
     }));
     let refs = replace_synced_ref(item, &reference, &updated_ref);
-    board.update(
-        &item.id,
-        TaskBoardItemPatch {
-            external_refs: Some(refs),
-            ..TaskBoardItemPatch::default()
-        },
-    )?;
+    let item_id = item.id.clone();
+    run_board_blocking(board, "record updated remote ref", move |board| {
+        board.update(
+            &item_id,
+            TaskBoardItemPatch {
+                external_refs: Some(refs),
+                ..TaskBoardItemPatch::default()
+            },
+        )
+    })
+    .await?;
     Ok(())
+}
+
+pub(super) async fn run_board_blocking<T, F>(
+    board: &TaskBoardStore,
+    operation: &'static str,
+    work: F,
+) -> Result<T, CliError>
+where
+    T: Send + 'static,
+    F: FnOnce(TaskBoardStore) -> Result<T, CliError> + Send + 'static,
+{
+    let board = board.clone();
+    spawn_blocking(move || work(board))
+        .await
+        .unwrap_or_else(|error| {
+            Err(CliErrorKind::workflow_io(format!(
+                "task-board external sync {operation} worker failed: {error}"
+            ))
+            .into())
+        })
 }
 
 fn remote_precondition(item: &TaskBoardItem, reference: &ExternalTaskRef) -> Option<String> {

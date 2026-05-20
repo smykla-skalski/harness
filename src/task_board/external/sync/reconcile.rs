@@ -8,10 +8,10 @@ use super::merge::{
 };
 use super::{
     ExternalSyncAction, ExternalSyncDirection, ExternalSyncOperation, ExternalSyncOptions,
-    OperationDraft, operation,
+    OperationDraft, operation, run_board_blocking,
 };
 
-pub(super) fn reconcile_existing_item(
+pub(super) async fn reconcile_existing_item(
     board: &TaskBoardStore,
     options: ExternalSyncOptions,
     provider: ExternalProvider,
@@ -60,7 +60,11 @@ pub(super) fn reconcile_existing_item(
     if options.dry_run {
         return Ok(());
     }
-    board.update(&item.id, patch)?;
+    let item_id = item.id.clone();
+    run_board_blocking(board, "reconcile pulled item", move |board| {
+        board.update(&item_id, patch)
+    })
+    .await?;
     Ok(())
 }
 
