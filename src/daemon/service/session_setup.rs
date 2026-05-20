@@ -118,9 +118,9 @@ pub(super) fn prepare_session(
         let _ = WorktreeController::destroy(&canonical_origin, &layout);
         return Err(error);
     }
-    let _ = session_storage::record_project_origin(&canonical_origin);
-    if !project_context_dir(&canonical_origin).exists() {
-        let _ = fs::create_dir_all(project_context_dir(&canonical_origin));
+    if let Err(error) = record_project_origin_for_session(&canonical_origin) {
+        rollback_session_artifacts(&canonical_origin, &layout);
+        return Err(error);
     }
 
     drop(project_scope);
@@ -133,6 +133,17 @@ pub(super) fn prepare_session(
 
 fn validate_explicit_session_id(session_id: &str) -> Result<(), CliError> {
     session_storage::validate_new_session_id(session_id)
+}
+
+fn record_project_origin_for_session(canonical_origin: &Path) -> Result<(), CliError> {
+    let context_root = project_context_dir(canonical_origin);
+    fs::create_dir_all(&context_root).map_err(|error| {
+        CliError::from(CliErrorKind::workflow_io(format!(
+            "create project context root '{}': {error}",
+            context_root.display()
+        )))
+    })?;
+    session_storage::record_project_origin(canonical_origin)
 }
 
 pub(super) fn rollback_session_artifacts(origin: &Path, layout: &SessionLayout) {

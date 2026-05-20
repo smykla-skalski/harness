@@ -142,6 +142,11 @@ fn start_session_direct_creates_worktree() {
             state.project_name,
             project.file_name().expect("file_name").to_string_lossy()
         );
+        let origin = crate::session::storage::load_project_origin(&project_context_dir(project))
+            .expect("project origin");
+        let origin_path = state.origin_path.to_string_lossy();
+        assert_eq!(origin.recorded_from_dir, origin_path.as_ref());
+        assert_eq!(origin.checkout_root.as_deref(), Some(origin_path.as_ref()));
     });
 }
 

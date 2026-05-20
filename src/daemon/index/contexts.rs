@@ -7,7 +7,9 @@ use fs_err as fs;
 use crate::errors::{CliError, CliErrorKind};
 use crate::infra::io::{read_json_typed, write_json_pretty};
 use crate::session::storage;
-use crate::workspace::{project_context_dir, resolve_git_checkout_identity};
+use crate::session::types::SessionState;
+use crate::workspace::layout::sessions_root as workspace_sessions_root;
+use crate::workspace::{harness_data_root, project_context_dir, resolve_git_checkout_identity};
 
 use super::io::read_last_nonempty_line;
 use super::projects::discovered_project_for_context_root;
@@ -55,28 +57,14 @@ pub(super) fn infer_checkout_identity(context_root: &Path) -> Option<InferredChe
     if let Some(origin) = storage::load_project_origin(context_root)
         && let Some(checkout_root) = origin_checkout_root(&origin)
     {
-        if let Some(identity) = resolve_git_checkout_identity(&checkout_root) {
-            let is_worktree = identity.is_worktree();
-            let worktree_name = identity.worktree_name().map(ToString::to_string);
-            return Some(InferredCheckout {
-                repository_root: identity.repository_root,
-                checkout_root: identity.checkout_root,
-                is_worktree,
-                worktree_name,
-            });
-        }
-        // TODO(b-task-8): is_worktree and worktree_name are no longer stored in
-        // ProjectOriginRecord; resolve via git identity when available.
-        let repository_root = origin
-            .repository_root
-            .as_deref()
-            .map_or_else(|| checkout_root.clone(), PathBuf::from);
-        return Some(InferredCheckout {
-            repository_root,
+        return Some(inferred_checkout_from_root(
             checkout_root,
-            is_worktree: false,
-            worktree_name: None,
-        });
+            origin.repository_root.as_deref(),
+        ));
+    }
+
+    if let Some(checkout_root) = infer_state_origin(context_root) {
+        return Some(inferred_checkout_from_root(checkout_root, None));
     }
 
     let cwd = infer_ledger_cwd(context_root)?;
@@ -138,6 +126,66 @@ fn origin_checkout_root(origin: &storage::ProjectOriginRecord) -> Option<PathBuf
         .map(str::trim)
         .filter(|value| !value.is_empty())
         .map(PathBuf::from)
+}
+
+fn inferred_checkout_from_root(
+    checkout_root: PathBuf,
+    repository_root_hint: Option<&str>,
+) -> InferredCheckout {
+    if let Some(identity) = resolve_git_checkout_identity(&checkout_root) {
+        let is_worktree = identity.is_worktree();
+        let worktree_name = identity.worktree_name().map(ToString::to_string);
+        return InferredCheckout {
+            repository_root: identity.repository_root,
+            checkout_root: identity.checkout_root,
+            is_worktree,
+            worktree_name,
+        };
+    }
+
+    // TODO(b-task-8): is_worktree and worktree_name are no longer stored in
+    // ProjectOriginRecord; resolve via git identity when available.
+    let repository_root = repository_root_hint.map_or_else(|| checkout_root.clone(), PathBuf::from);
+    InferredCheckout {
+        repository_root,
+        checkout_root,
+        is_worktree: false,
+        worktree_name: None,
+    }
+}
+
+fn infer_state_origin(context_root: &Path) -> Option<PathBuf> {
+    for project_dir in sorted_child_dirs(&workspace_sessions_root(&harness_data_root())) {
+        for session_dir in sorted_child_dirs(&project_dir) {
+            let state_path = session_dir.join("state.json");
+            if !state_path.is_file() {
+                continue;
+            }
+            let Ok(state) = read_json_typed::<SessionState>(&state_path) else {
+                continue;
+            };
+            if state.origin_path.as_os_str().is_empty() {
+                continue;
+            }
+            if project_context_dir(&state.origin_path) == context_root {
+                return Some(state.origin_path);
+            }
+        }
+    }
+    None
+}
+
+fn sorted_child_dirs(root: &Path) -> Vec<PathBuf> {
+    let Ok(entries) = fs::read_dir(root) else {
+        return Vec::new();
+    };
+    let mut dirs: Vec<_> = entries
+        .flatten()
+        .filter(|entry| entry.file_type().ok().is_some_and(|kind| kind.is_dir()))
+        .map(|entry| entry.path())
+        .collect();
+    dirs.sort();
+    dirs
 }
 
 fn context_has_sessions(context_root: &Path) -> Result<bool, CliError> {
