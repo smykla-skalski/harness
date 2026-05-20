@@ -387,8 +387,29 @@ async fn stop_non_codex_managed_agent(
     {
         return stop_acp_managed_agent(state, &session_id, agent_id).await;
     }
+    if let Ok(session_id) = state
+        .openrouter_agent_manager
+        .get(agent_id)
+        .map(|snapshot| snapshot.session_id)
+    {
+        return stop_openrouter_managed_agent(state, &session_id, agent_id).await;
+    }
     let session_id = terminal_session_id(state, agent_id)?;
     stop_terminal_managed_agent(state, &session_id, agent_id).await
+}
+
+async fn stop_openrouter_managed_agent(
+    state: &DaemonHttpState,
+    session_id: &str,
+    agent_id: &str,
+) -> Result<ManagedAgentSnapshot, CliError> {
+    with_managed_agent_lock(state, session_id, agent_id, || {
+        state
+            .openrouter_agent_manager
+            .cancel(agent_id)
+            .map(ManagedAgentSnapshot::OpenRouter)
+    })
+    .await
 }
 
 async fn stop_codex_managed_agent(
@@ -492,5 +513,6 @@ const fn managed_agent_snapshot_kind(snapshot: &ManagedAgentSnapshot) -> &'stati
         ManagedAgentSnapshot::Terminal(_) => "terminal",
         ManagedAgentSnapshot::Codex(_) => "codex",
         ManagedAgentSnapshot::Acp(_) => "acp",
+        ManagedAgentSnapshot::OpenRouter(_) => "openrouter",
     }
 }

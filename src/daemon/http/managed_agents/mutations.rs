@@ -141,6 +141,15 @@ pub(super) async fn post_terminal_agent_stop(
                     .acp_agent_manager
                     .stop(&managed_agent_id)
                     .map(ManagedAgentSnapshot::Acp)
+            } else if state
+                .openrouter_agent_manager
+                .get(&managed_agent_id)
+                .is_ok()
+            {
+                state
+                    .openrouter_agent_manager
+                    .cancel(&managed_agent_id)
+                    .map(ManagedAgentSnapshot::OpenRouter)
             } else {
                 ensure_terminal_agent(&state, &managed_agent_id)
                     .and_then(|()| state.agent_tui_manager.stop(&managed_agent_id))
