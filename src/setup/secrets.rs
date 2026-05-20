@@ -24,6 +24,7 @@ const SERVICE_TODOIST: &str = "io.harnessmonitor.task-board.todoist-credentials"
 const SERVICE_SSH: &str = "io.harnessmonitor.task-board.ssh-key";
 const SERVICE_SIGNING_SSH: &str = "io.harnessmonitor.task-board.signing-ssh-key";
 const SERVICE_GPG: &str = "io.harnessmonitor.task-board.gpg-key";
+const SERVICE_OPENROUTER: &str = "io.harnessmonitor.task-board.openrouter-credentials";
 
 #[derive(Debug, Clone, Args)]
 pub struct SecretsArgs {
@@ -72,6 +73,8 @@ pub enum SecretKindArg {
     SigningSsh,
     /// GPG private key used for commit/tag signing.
     Gpg,
+    /// `OpenRouter` API key for the in-daemon `OpenRouter` agent backend.
+    OpenRouter,
 }
 
 #[derive(Debug, Clone, Args)]
@@ -106,6 +109,7 @@ fn run_list() -> i32 {
         ("SSH key (global)", SERVICE_SSH, "global"),
         ("Signing SSH key (global)", SERVICE_SIGNING_SSH, "global"),
         ("GPG key (global)", SERVICE_GPG, "global"),
+        ("OpenRouter token", SERVICE_OPENROUTER, "default"),
     ];
     println!("Task-board credential status (Keychain):");
     for (label, service, account) in entries {
@@ -179,6 +183,7 @@ fn resolve_service_account(args: &SecretScopeArgs) -> Result<(&'static str, Stri
         SecretKindArg::Ssh => (SERVICE_SSH, "global"),
         SecretKindArg::SigningSsh => (SERVICE_SIGNING_SSH, "global"),
         SecretKindArg::Gpg => (SERVICE_GPG, "global"),
+        SecretKindArg::OpenRouter => (SERVICE_OPENROUTER, "default"),
     };
     let account = if let Some(slug) = args.repository.as_deref() {
         let normalized = normalize_repository_slug(slug)?;
@@ -277,5 +282,16 @@ mod tests {
         let (service, account) = resolve_service_account(&args).unwrap();
         assert_eq!(service, SERVICE_SSH);
         assert_eq!(account, "repo.b0a93768b870824e04990d714ca1b761394528c1");
+    }
+
+    #[test]
+    fn resolve_service_account_supports_openrouter() {
+        let args = SecretScopeArgs {
+            kind: SecretKindArg::OpenRouter,
+            repository: None,
+        };
+        let (service, account) = resolve_service_account(&args).unwrap();
+        assert_eq!(service, SERVICE_OPENROUTER);
+        assert_eq!(account, "default");
     }
 }
