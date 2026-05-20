@@ -29,19 +29,19 @@ struct SessionWindowFlowTests {
 
   @Test("Current schema includes session window restoration state")
   func currentSchemaIncludesSessionWindowRestorationState() {
-    #expect(HarnessMonitorCurrentSchema.versionString == "15.0.0")
+    #expect(HarnessMonitorCurrentSchema.versionString == "16.0.0")
     #expect(
-      HarnessMonitorSchemaV15.models.contains {
+      HarnessMonitorSchemaV16.models.contains {
         String(describing: $0) == "CachedSessionWindowState"
       }
     )
     #expect(
-      HarnessMonitorSchemaV15.models.contains {
+      HarnessMonitorSchemaV16.models.contains {
         String(describing: $0) == "CachedSessionTranscriptEntry"
       }
     )
     #expect(
-      HarnessMonitorSchemaV15.models.contains {
+      HarnessMonitorSchemaV16.models.contains {
         String(describing: $0) == "NotificationHistoryRecord"
       }
     )
@@ -283,7 +283,7 @@ struct SessionWindowFlowTests {
   func dashboardRoutesExposeStableSidebarOrder() {
     #expect(
       DashboardWindowRoute.allCases.map(\.rawValue)
-        == ["taskBoard", "policyCanvas", "notifications"]
+        == ["taskBoard", "policyCanvas", "notifications", "dependencies"]
     )
     #expect(DashboardWindowRoute.taskBoard.title == "Board")
     #expect(DashboardWindowRoute.policyCanvas.title == "Policy")
@@ -293,6 +293,8 @@ struct SessionWindowFlowTests {
     )
     #expect(DashboardWindowRoute.notifications.title == "Notifications")
     #expect(DashboardWindowRoute.notifications.systemImage == "bell.badge")
+    #expect(DashboardWindowRoute.dependencies.title == "Dependencies")
+    #expect(DashboardWindowRoute.dependencies.systemImage == "shippingbox.circle")
   }
 
   @Test("Session routes expose stable layout policy")

@@ -21,6 +21,7 @@ actor PreviewHarnessClientState {
   var taskBoardOpenRouterToken: TaskBoardOpenRouterTokenSyncRequest
   var taskBoardGitIdentityDefaults: TaskBoardGitIdentityDefaults
   var taskBoardItems: [TaskBoardItem]
+  var dependencyUpdateItems: [DependencyUpdateItem]
   var taskBoardHostRegistry: [TaskBoardHostMachine]
   var nextAgentTuiSequence: Int
   var nextCodexRunSequence: Int
@@ -62,6 +63,7 @@ actor PreviewHarnessClientState {
     self.taskBoardOpenRouterToken = TaskBoardOpenRouterTokenSyncRequest(token: nil)
     self.taskBoardGitIdentityDefaults = fixtures.taskBoardGitIdentityDefaults
     self.taskBoardItems = fixtures.taskBoardItems
+    self.dependencyUpdateItems = fixtures.dependencyUpdatesResponse.items
     self.taskBoardHostRegistry = [
       TaskBoardHostMachine(
         id: "preview-host-local",

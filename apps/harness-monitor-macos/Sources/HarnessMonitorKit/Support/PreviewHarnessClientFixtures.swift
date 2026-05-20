@@ -17,6 +17,7 @@ extension PreviewHarnessClient {
     let taskBoardGitRuntimeConfig: TaskBoardGitRuntimeConfig
     let taskBoardGitIdentityDefaults: TaskBoardGitIdentityDefaults
     let taskBoardItems: [TaskBoardItem]
+    let dependencyUpdatesResponse: DependencyUpdatesQueryResponse
 
     public init(
       health: HealthResponse,
@@ -35,7 +36,8 @@ extension PreviewHarnessClient {
       taskBoardGitRuntimeConfig: TaskBoardGitRuntimeConfig = Self.defaultTaskBoardGitRuntimeConfig,
       taskBoardGitIdentityDefaults: TaskBoardGitIdentityDefaults = Self
         .defaultTaskBoardGitIdentityDefaults,
-      taskBoardItems: [TaskBoardItem] = []
+      taskBoardItems: [TaskBoardItem] = [],
+      dependencyUpdatesResponse: DependencyUpdatesQueryResponse = Self.defaultDependencyUpdates
     ) {
       self.health = health
       self.projects = projects
@@ -52,6 +54,7 @@ extension PreviewHarnessClient {
       self.taskBoardGitRuntimeConfig = taskBoardGitRuntimeConfig
       self.taskBoardGitIdentityDefaults = taskBoardGitIdentityDefaults
       self.taskBoardItems = taskBoardItems
+      self.dependencyUpdatesResponse = dependencyUpdatesResponse
     }
 
     public static let defaultTaskBoardGitIdentityDefaults = TaskBoardGitIdentityDefaults(
@@ -125,6 +128,136 @@ extension PreviewHarnessClient {
         )
       ]
     )
+
+    public static let defaultDependencyUpdates = DependencyUpdatesQueryResponse(
+      fetchedAt: "2026-03-28T14:20:30Z",
+      fromCache: false,
+      summary: DependencyUpdatesSummary(items: sampleDependencyUpdateItems),
+      items: sampleDependencyUpdateItems
+    )
+
+    private static let sampleDependencyUpdateItems: [DependencyUpdateItem] = [
+      DependencyUpdateItem(
+        pullRequestID: "preview-deps-1",
+        repositoryID: "repo-preview-1",
+        repository: "smykla-skalski/harness",
+        number: 412,
+        title: "chore(deps): update octocrab to 0.46.0",
+        url: "https://github.com/smykla-skalski/harness/pull/412",
+        authorLogin: "renovate[bot]",
+        state: .open,
+        mergeable: .mergeable,
+        reviewStatus: .approved,
+        checkStatus: .success,
+        policyBlocked: false,
+        isDraft: false,
+        headSha: "abc412",
+        labels: ["dependencies", "renovate"],
+        checks: [
+          DependencyUpdateCheck(
+            name: "ci / test",
+            status: .completed,
+            conclusion: .success,
+            checkSuiteID: "suite-412"
+          )
+        ],
+        reviews: [DependencyUpdateReview(author: "teammate", state: .approved)],
+        additions: 12,
+        deletions: 8,
+        createdAt: "2026-03-27T10:00:00Z",
+        updatedAt: "2026-03-28T14:18:00Z"
+      ),
+      DependencyUpdateItem(
+        pullRequestID: "preview-deps-2",
+        repositoryID: "repo-preview-2",
+        repository: "smykla-skalski/harness-monitor",
+        number: 91,
+        title: "chore(deps): update swiftlint to 0.58.0",
+        url: "https://github.com/smykla-skalski/harness-monitor/pull/91",
+        authorLogin: "renovate[bot]",
+        state: .open,
+        mergeable: .mergeable,
+        reviewStatus: .reviewRequired,
+        checkStatus: .success,
+        policyBlocked: false,
+        isDraft: false,
+        headSha: "abc091",
+        labels: ["dependencies"],
+        checks: [
+          DependencyUpdateCheck(
+            name: "ci / lint",
+            status: .completed,
+            conclusion: .success,
+            checkSuiteID: "suite-91"
+          )
+        ],
+        reviews: [],
+        additions: 4,
+        deletions: 4,
+        createdAt: "2026-03-28T08:40:00Z",
+        updatedAt: "2026-03-28T13:45:00Z"
+      ),
+      DependencyUpdateItem(
+        pullRequestID: "preview-deps-3",
+        repositoryID: "repo-preview-3",
+        repository: "smykla-skalski/gh-renovate-helper",
+        number: 55,
+        title: "chore(deps): update bubbletea to 2.1.0",
+        url: "https://github.com/smykla-skalski/gh-renovate-helper/pull/55",
+        authorLogin: "renovate[bot]",
+        state: .open,
+        mergeable: .mergeable,
+        reviewStatus: .approved,
+        checkStatus: .pending,
+        policyBlocked: false,
+        isDraft: false,
+        headSha: "abc055",
+        labels: ["dependencies", "automerge"],
+        checks: [
+          DependencyUpdateCheck(
+            name: "ci / test",
+            status: .inProgress,
+            conclusion: .none,
+            checkSuiteID: "suite-55"
+          )
+        ],
+        reviews: [DependencyUpdateReview(author: "teammate", state: .approved)],
+        additions: 7,
+        deletions: 3,
+        createdAt: "2026-03-28T09:20:00Z",
+        updatedAt: "2026-03-28T13:30:00Z"
+      ),
+      DependencyUpdateItem(
+        pullRequestID: "preview-deps-4",
+        repositoryID: "repo-preview-4",
+        repository: "smykla-skalski/harness",
+        number: 413,
+        title: "chore(deps): update serde_json to 1.0.138",
+        url: "https://github.com/smykla-skalski/harness/pull/413",
+        authorLogin: "renovate[bot]",
+        state: .open,
+        mergeable: .conflicting,
+        reviewStatus: .changesRequested,
+        checkStatus: .failure,
+        policyBlocked: true,
+        isDraft: false,
+        headSha: "abc413",
+        labels: ["dependencies", "needs-human"],
+        checks: [
+          DependencyUpdateCheck(
+            name: "ci / test",
+            status: .completed,
+            conclusion: .failure,
+            checkSuiteID: "suite-413"
+          )
+        ],
+        reviews: [DependencyUpdateReview(author: "reviewer", state: .changesRequested)],
+        additions: 10,
+        deletions: 6,
+        createdAt: "2026-03-27T16:00:00Z",
+        updatedAt: "2026-03-28T11:05:00Z"
+      ),
+    ]
 
     private static let boardOnlyTaskBoardItem = TaskBoardItem(
       schemaVersion: 1,

@@ -52,6 +52,7 @@ pub struct HttpApiRouteContract {
 
 pub mod http_paths;
 mod routes;
+mod routes_dependency_updates;
 mod routes_sessions_infra;
 mod routes_task_board;
 mod routes_tasks_agents_voice;

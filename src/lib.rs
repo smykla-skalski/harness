@@ -11,6 +11,7 @@ pub mod app;
 #[cfg(test)]
 mod codec;
 pub mod create;
+pub mod dependency_updates;
 pub mod daemon;
 pub mod errors;
 pub mod feature_flags;

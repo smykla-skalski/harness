@@ -73,6 +73,10 @@ public enum HarnessMonitorAccessibility {
     "harness.session.window.route.\(slug(route.rawValue))"
   }
 
+  public static func dashboardWindowRoute(_ route: String) -> String {
+    "harness.dashboard.route.\(slug(route))"
+  }
+
   public static func sessionWindowAgentRow(_ agentID: String) -> String {
     "harness.session.window.agents.row.\(slug(agentID))"
   }
@@ -89,6 +93,13 @@ public enum HarnessMonitorAccessibility {
   public static let dashboardNotificationsRoot = "harness.dashboard.notifications"
   public static let dashboardNotificationsScrollView = "harness.dashboard.notifications.scroll"
   public static let dashboardNotificationsEmptyState = "harness.dashboard.notifications.empty-state"
+  public static let dashboardDependenciesRoot = "harness.dashboard.dependencies"
+  public static let dashboardDependenciesList = "harness.dashboard.dependencies.list"
+  public static let dashboardDependenciesDetail = "harness.dashboard.dependencies.detail"
+  public static let dashboardDependenciesRefreshButton = "harness.dashboard.dependencies.refresh"
+  public static let dashboardDependenciesConfigureButton = "harness.dashboard.dependencies.configure"
+  public static let dashboardDependenciesFixCIButton = "harness.dashboard.dependencies.fix-ci"
+  public static let dashboardDependenciesSelectionStatus = "harness.dashboard.dependencies.selection"
   public static let dashboardNewSessionButton = "harness.dashboard.new-session"
   public static let dashboardOpenFolderButton = "harness.dashboard.open-folder"
   public static let sessionsBoardRoot = "harness.board.root"

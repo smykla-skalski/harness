@@ -117,6 +117,7 @@ enum DashboardWindowRoute: String, CaseIterable, Identifiable {
   case taskBoard
   case policyCanvas
   case notifications
+  case dependencies
 
   var id: String { rawValue }
 
@@ -128,6 +129,8 @@ enum DashboardWindowRoute: String, CaseIterable, Identifiable {
       "Policy"
     case .notifications:
       "Notifications"
+    case .dependencies:
+      "Dependencies"
     }
   }
 
@@ -139,6 +142,8 @@ enum DashboardWindowRoute: String, CaseIterable, Identifiable {
       "point.3.connected.trianglepath.dotted"
     case .notifications:
       "bell.badge"
+    case .dependencies:
+      "shippingbox.circle"
     }
   }
 }
@@ -247,15 +252,18 @@ struct DashboardSidebar: View {
 
 struct DashboardRouteContent: View {
   let route: DashboardWindowRoute
+  @Binding var selectedRoute: DashboardWindowRoute
   let store: HarnessMonitorStore
   let dashboardUI: HarnessMonitorStore.ContentDashboardSlice
   let sessionCatalog: HarnessMonitorStore.SessionCatalogSlice
   @State private var notificationsHasBeenMounted = false
   @State private var policyCanvasHasBeenMounted = false
+  @State private var dependenciesHasBeenMounted = false
 
   private var isTaskBoardVisible: Bool { route == .taskBoard }
   private var isNotificationsVisible: Bool { route == .notifications }
   private var isPolicyCanvasVisible: Bool { route == .policyCanvas }
+  private var isDependenciesVisible: Bool { route == .dependencies }
 
   var body: some View {
     ZStack {
@@ -290,6 +298,19 @@ struct DashboardRouteContent: View {
           .onAppear {
             policyCanvasHasBeenMounted = true
           }
+      }
+
+      if dependenciesHasBeenMounted || isDependenciesVisible {
+        DashboardDependenciesRouteView(
+          store: store,
+          selectedRoute: $selectedRoute
+        )
+        .opacity(isDependenciesVisible ? 1 : 0)
+        .allowsHitTesting(isDependenciesVisible)
+        .accessibilityHidden(!isDependenciesVisible)
+        .onAppear {
+          dependenciesHasBeenMounted = true
+        }
       }
     }
   }

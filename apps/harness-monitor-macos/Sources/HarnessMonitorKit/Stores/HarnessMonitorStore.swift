@@ -342,6 +342,7 @@ public final class HarnessMonitorStore {
   public let supervisorPolicyConfigRepository: SupervisorPolicyConfigRepository?
   public let supervisorAuditRepository: SupervisorAuditRepository?
   var client: (any HarnessMonitorClientProtocol)?
+  public var apiClient: (any HarnessMonitorClientProtocol)? { client }
   var globalStreamTask: Task<Void, Never>?
   var sessionStreamTask: Task<Void, Never>?
   var connectionProbeTask: Task<Void, Never>?

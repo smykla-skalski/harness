@@ -119,6 +119,14 @@ final class TaskBoardURLProtocol: URLProtocol, @unchecked Sendable {
     Route("/v1/task-board/policy/simulate"): samplePolicySimulationText,
     Route("/v1/task-board/policy/promote"): samplePolicyPromotionText,
     Route("/v1/task-board/policy/audit"): samplePolicyAuditText,
+    Route("/v1/dependency-updates/query"): sampleDependencyUpdatesQueryResponseText,
+    Route("/v1/dependency-updates/approve"): sampleDependencyUpdatesApproveResponseText,
+    Route("/v1/dependency-updates/merge"): sampleDependencyUpdatesMergeResponseText,
+    Route("/v1/dependency-updates/rerun-checks"): sampleDependencyUpdatesRerunResponseText,
+    Route("/v1/dependency-updates/labels"): sampleDependencyUpdatesLabelResponseText,
+    Route("/v1/dependency-updates/auto"): sampleDependencyUpdatesAutoResponseText,
+    Route("/v1/dependency-updates/cache", method: "DELETE"):
+      sampleDependencyUpdatesCacheClearResponseText,
   ]
 
   static var records: [RecordedRequest] {

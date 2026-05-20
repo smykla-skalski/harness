@@ -17,12 +17,44 @@ extension HarnessMonitorUITestAccessibilityRegistryTests {
         == "harness.dashboard.route.taskboard"
     )
     #expect(
+      HarnessMonitorAccessibility.dashboardWindowRoute("dependencies")
+        == "harness.dashboard.route.dependencies"
+    )
+    #expect(
       HarnessMonitorAccessibility.dashboardNotificationsRoot
         == "harness.dashboard.notifications"
     )
     #expect(
       HarnessMonitorAccessibility.dashboardNotificationsScrollView
         == "harness.dashboard.notifications.scroll"
+    )
+    #expect(
+      HarnessMonitorAccessibility.dashboardDependenciesRoot
+        == "harness.dashboard.dependencies"
+    )
+    #expect(
+      HarnessMonitorAccessibility.dashboardDependenciesList
+        == "harness.dashboard.dependencies.list"
+    )
+    #expect(
+      HarnessMonitorAccessibility.dashboardDependenciesDetail
+        == "harness.dashboard.dependencies.detail"
+    )
+    #expect(
+      HarnessMonitorAccessibility.dashboardDependenciesRefreshButton
+        == "harness.dashboard.dependencies.refresh"
+    )
+    #expect(
+      HarnessMonitorAccessibility.dashboardDependenciesConfigureButton
+        == "harness.dashboard.dependencies.configure"
+    )
+    #expect(
+      HarnessMonitorAccessibility.dashboardDependenciesFixCIButton
+        == "harness.dashboard.dependencies.fix-ci"
+    )
+    #expect(
+      HarnessMonitorAccessibility.dashboardDependenciesSelectionStatus
+        == "harness.dashboard.dependencies.selection"
     )
     #expect(
       HarnessMonitorAccessibility.dashboardNotificationRow("toast-success")
@@ -87,6 +119,7 @@ extension HarnessMonitorUITestAccessibilityRegistryTests {
       named: "DashboardSidebarRecentSessionsSection.swift"
     )
     let notificationsView = try sourceFile(named: "DashboardNotificationsRouteView.swift")
+    let dependenciesView = try sourceFile(named: "DashboardDependenciesRouteView.swift")
     let dashboardToolbar = try sourceFile(named: "DashboardWindowToolbar.swift")
     let rootView = try sourceFile(named: "SessionWindowRootView.swift")
     let windowView = try sourceFile(named: "SessionWindowView.swift")
@@ -127,10 +160,34 @@ extension HarnessMonitorUITestAccessibilityRegistryTests {
     #expect(dashboardView.contains("HarnessMonitorAccessibility.dashboardScrollView"))
     #expect(
       notificationsView.contains("HarnessMonitorAccessibility.dashboardNotificationsScrollView"))
+    #expect(
+      dependenciesView.contains("HarnessMonitorAccessibility.dashboardDependenciesRoot")
+    )
+    #expect(
+      dependenciesView.contains("HarnessMonitorAccessibility.dashboardDependenciesList")
+    )
+    #expect(
+      dependenciesView.contains("HarnessMonitorAccessibility.dashboardDependenciesDetail")
+    )
+    #expect(
+      dependenciesView.contains("HarnessMonitorAccessibility.dashboardDependenciesRefreshButton")
+    )
+    #expect(
+      dependenciesView.contains("HarnessMonitorAccessibility.dashboardDependenciesConfigureButton")
+    )
+    #expect(
+      dependenciesView.contains("HarnessMonitorAccessibility.dashboardDependenciesFixCIButton")
+    )
+    #expect(
+      dependenciesView.contains("HarnessMonitorAccessibility.dashboardDependenciesSelectionStatus")
+    )
     #expect(dashboardToolbar.contains("HarnessMonitorAccessibility.dashboardNewSessionButton"))
     #expect(dashboardToolbar.contains("HarnessMonitorAccessibility.dashboardOpenFolderButton"))
     #expect(
       dashboardView.contains("DashboardNotificationsRouteView(")
+    )
+    #expect(
+      dashboardView.contains("DashboardDependenciesRouteView(")
     )
     #expect(dashboardToolbar.contains("SleepPreventionToolbarButton("))
     #expect(windowView.contains("HarnessMonitorAccessibility.sessionWindowShell"))

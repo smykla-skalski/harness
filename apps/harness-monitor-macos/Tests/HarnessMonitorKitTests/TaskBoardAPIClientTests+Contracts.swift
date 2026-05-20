@@ -14,6 +14,16 @@ extension TaskBoardAPIClientTests {
     assertHTTPClientResults(result)
   }
 
+  @Test("HTTP client uses dependency-updates route contract")
+  func httpClientUsesDependencyUpdatesRoutes() async throws {
+    let result = try await performDependencyUpdatesHTTPClientContractCalls()
+    let records = TaskBoardURLProtocol.records
+
+    assertDependencyUpdatesHTTPRouteContract(records)
+    assertDependencyUpdatesHTTPBodyContract(records)
+    assertDependencyUpdatesHTTPClientResults(result)
+  }
+
   @Test("WebSocket transport uses task-board RPC contract")
   func webSocketTransportUsesTaskBoardRPCContract() async throws {
     let result = try await performWebSocketContractCalls()

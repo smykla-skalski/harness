@@ -155,6 +155,51 @@ extension TaskBoardAPIClientTests {
     )
   }
 
+  func performDependencyUpdatesHTTPClientContractCalls() async throws
+    -> DependencyUpdatesHTTPContractResult
+  {
+    TaskBoardURLProtocol.reset()
+    let client = try makeClient()
+    let target = dependencyUpdatesTarget()
+
+    let query = try await client.queryDependencyUpdates(
+      request: DependencyUpdatesQueryRequest(
+        authors: ["renovate[bot]"],
+        organizations: ["example"],
+        repositories: ["example/harness"],
+        excludeRepositories: ["example/archive"],
+        forceRefresh: true,
+        cacheMaxAgeSeconds: 120
+      )
+    )
+    let approve = try await client.approveDependencyUpdates(
+      request: DependencyUpdatesApproveRequest(targets: [target])
+    )
+    let merge = try await client.mergeDependencyUpdates(
+      request: DependencyUpdatesMergeRequest(targets: [target], method: .rebase)
+    )
+    let rerun = try await client.rerunDependencyUpdateChecks(
+      request: DependencyUpdatesRerunChecksRequest(targets: [target])
+    )
+    let label = try await client.addDependencyUpdateLabel(
+      request: DependencyUpdatesLabelRequest(targets: [target], label: "dependencies:ready")
+    )
+    let auto = try await client.autoDependencyUpdates(
+      request: DependencyUpdatesAutoRequest(targets: [target], method: .squash)
+    )
+    let cacheClear = try await client.clearDependencyUpdatesCache()
+
+    return DependencyUpdatesHTTPContractResult(
+      query: query,
+      approve: approve,
+      merge: merge,
+      rerun: rerun,
+      label: label,
+      auto: auto,
+      cacheClear: cacheClear
+    )
+  }
+
   private func httpCreateItemRequest() -> TaskBoardCreateItemRequest {
     TaskBoardCreateItemRequest(
       title: "Board item",
@@ -282,6 +327,45 @@ extension TaskBoardAPIClientTests {
     #expect(records[23].body?["approved_at"] as? String == "2026-05-14T02:00:00Z")
   }
 
+  func assertDependencyUpdatesHTTPRouteContract(_ records: [TaskBoardURLProtocol.RecordedRequest]) {
+    #expect(
+      records.map(\.method)
+        == ["POST", "POST", "POST", "POST", "POST", "POST", "DELETE"]
+    )
+    #expect(
+      records.map(\.path)
+        == [
+          "/v1/dependency-updates/query",
+          "/v1/dependency-updates/approve",
+          "/v1/dependency-updates/merge",
+          "/v1/dependency-updates/rerun-checks",
+          "/v1/dependency-updates/labels",
+          "/v1/dependency-updates/auto",
+          "/v1/dependency-updates/cache",
+        ]
+    )
+  }
+
+  func assertDependencyUpdatesHTTPBodyContract(_ records: [TaskBoardURLProtocol.RecordedRequest]) {
+    #expect(records[0].body?["authors"] as? [String] == ["renovate[bot]"])
+    #expect(records[0].body?["organizations"] as? [String] == ["example"])
+    #expect(records[0].body?["repositories"] as? [String] == ["example/harness"])
+    #expect(records[0].body?["exclude_repositories"] as? [String] == ["example/archive"])
+    #expect(records[0].body?["force_refresh"] as? Bool == true)
+    #expect(records[0].body?["cache_max_age_seconds"] as? Int == 120)
+
+    let approveTarget = (records[1].body?["targets"] as? [[String: Any]])?.first
+    #expect(approveTarget?["pull_request_id"] as? String == "pr-42")
+    #expect(approveTarget?["repository"] as? String == "example/harness")
+    #expect(approveTarget?["check_suite_ids"] as? [String] == ["suite-1"])
+
+    #expect(records[2].body?["method"] as? String == "rebase")
+    #expect(records[3].body?["targets"] as? [[String: Any]] != nil)
+    #expect(records[4].body?["label"] as? String == "dependencies:ready")
+    #expect(records[5].body?["method"] as? String == "squash")
+    #expect(records[6].body == nil)
+  }
+
   func assertHTTPClientResults(_ result: TaskBoardHTTPContractResult) {
     #expect(result.planning.transition.boardItemId == "board-1")
     #expect(result.planning.transition.toStatus == .planReview)
@@ -312,6 +396,19 @@ extension TaskBoardAPIClientTests {
     #expect(result.todoistTokenSync.tokenConfigured == true)
   }
 
+  func assertDependencyUpdatesHTTPClientResults(_ result: DependencyUpdatesHTTPContractResult) {
+    #expect(result.query.summary.total == 1)
+    #expect(result.query.summary.autoApprovable == 1)
+    #expect(result.query.items.first?.repository == "example/harness")
+    #expect(result.query.items.first?.reviewStatus == .reviewRequired)
+    #expect(result.approve.results.first?.action == .approve)
+    #expect(result.merge.results.first?.action == .merge)
+    #expect(result.rerun.results.first?.action == .rerunChecks)
+    #expect(result.label.results.first?.action == .addLabel)
+    #expect(result.auto.results.first?.action == .autoMerge)
+    #expect(result.cacheClear.clearedEntries == 2)
+  }
+
   private func makeClient() throws -> HarnessMonitorAPIClient {
     let configuration = URLSessionConfiguration.ephemeral
     configuration.protocolClasses = [TaskBoardURLProtocol.self]
@@ -322,6 +419,22 @@ extension TaskBoardAPIClientTests {
         token: "token"
       ),
       session: session
+    )
+  }
+
+  private func dependencyUpdatesTarget() -> DependencyUpdateTarget {
+    DependencyUpdateTarget(
+      pullRequestID: "pr-42",
+      repositoryID: "repo-1",
+      repository: "example/harness",
+      number: 42,
+      url: "https://github.com/example/harness/pull/42",
+      headSha: "abc123",
+      mergeable: .mergeable,
+      reviewStatus: .reviewRequired,
+      checkStatus: .success,
+      policyBlocked: false,
+      checkSuiteIDs: ["suite-1"]
     )
   }
 }
@@ -338,6 +451,16 @@ struct TaskBoardHTTPContractResult {
   let updatedRuntimeConfig: TaskBoardGitRuntimeConfig
   let tokenSync: TaskBoardGitHubTokensSyncResponse
   let todoistTokenSync: TaskBoardTodoistTokenSyncResponse
+}
+
+struct DependencyUpdatesHTTPContractResult {
+  let query: DependencyUpdatesQueryResponse
+  let approve: DependencyUpdatesActionResponse
+  let merge: DependencyUpdatesActionResponse
+  let rerun: DependencyUpdatesActionResponse
+  let label: DependencyUpdatesActionResponse
+  let auto: DependencyUpdatesActionResponse
+  let cacheClear: DependencyUpdatesCacheClearResponse
 }
 
 private struct TaskBoardHTTPWorkflowResult {
