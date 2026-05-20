@@ -19,6 +19,7 @@
 
 pub mod manager;
 pub mod snapshot;
+pub mod tools;
 
 pub use manager::{
     OpenRouterAgentManagerHandle, OpenRouterRunListResponse, OpenRouterStartRequest,

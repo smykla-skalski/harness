@@ -1,5 +1,12 @@
+use std::collections::BTreeSet;
+use std::path::PathBuf;
+use std::sync::Arc;
+
+use tempfile::TempDir;
 use tokio::sync::broadcast;
 
+use crate::agents::acp::client::HarnessAcpClient;
+use crate::agents::acp::permission::PermissionMode;
 use crate::agents::openrouter::AgentConfig as OpenRouterAgentConfig;
 use crate::daemon::protocol::StreamEvent;
 use crate::workspace::utc_now;
@@ -53,6 +60,22 @@ fn cancel_marks_status_cancelled() {
 
 fn seed_entry(run_id: &str, harness_session: &str) -> SessionEntry {
     let now = utc_now();
+    let tmpdir = TempDir::new().expect("tmpdir");
+    let project_dir: PathBuf = tmpdir.path().to_path_buf();
+    let tool_client = Arc::new(HarnessAcpClient::new(
+        project_dir.clone(),
+        project_dir.clone(),
+        None,
+        BTreeSet::new(),
+        PermissionMode::Recording {
+            log_path: project_dir.join("permission-log.ndjson"),
+        },
+    ));
+    // The TempDir guard would clean up the project directory as soon as this
+    // helper returns. The integration tests below only inspect snapshot
+    // state, so we intentionally leak the guard to keep paths valid for the
+    // life of the test process.
+    std::mem::forget(tmpdir);
     SessionEntry {
         snapshot: OpenRouterRunSnapshot {
             run_id: run_id.to_owned(),
@@ -80,5 +103,7 @@ fn seed_entry(run_id: &str, harness_session: &str) -> SessionEntry {
         temperature: None,
         max_tokens: None,
         reasoning_effort: None,
+        project_dir,
+        tool_client,
     }
 }
