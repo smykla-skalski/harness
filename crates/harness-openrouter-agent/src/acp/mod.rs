@@ -16,6 +16,8 @@
 pub mod bridge;
 pub mod model_catalog;
 pub mod session;
+pub mod tool_dispatch;
 pub mod tool_translator;
+pub mod turn;
 
 pub use bridge::run_stdio;
