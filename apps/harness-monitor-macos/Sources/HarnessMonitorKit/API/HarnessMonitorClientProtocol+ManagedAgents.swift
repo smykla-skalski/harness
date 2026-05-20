@@ -52,6 +52,13 @@ extension HarnessMonitorClientProtocol {
     try await stopManagedAcpAgent(agentID: agentID.rawValue)
   }
 
+  public func promptManagedAcpAgent(
+    agentID: ManagedAgentID,
+    prompt: String
+  ) async throws -> ManagedAgentSnapshot {
+    try await promptManagedAcpAgent(agentID: agentID.rawValue, prompt: prompt)
+  }
+
   public func steerManagedCodexAgent(
     agentID: ManagedAgentID,
     request: CodexSteerRequest

@@ -61,6 +61,13 @@ extension HarnessMonitorClientProtocol {
     throw HarnessMonitorAPIError.server(code: 501, message: "Managed agent unavailable.")
   }
 
+  public func promptManagedAcpAgent(
+    agentID _: String,
+    prompt _: String
+  ) async throws -> ManagedAgentSnapshot {
+    throw HarnessMonitorAPIError.server(code: 501, message: "Managed agent unavailable.")
+  }
+
   public func steerManagedCodexAgent(
     agentID: String,
     request: CodexSteerRequest
