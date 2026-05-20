@@ -79,6 +79,7 @@ public struct OpenRouterModelBrowserSheet: View {
         ) {
           selectedProvider = nil
         }
+        .equatable()
         ForEach(cachedPresentation.providers, id: \.self) { provider in
           OpenRouterBrowserProviderChip(
             label: provider,
@@ -86,6 +87,7 @@ public struct OpenRouterModelBrowserSheet: View {
           ) {
             selectedProvider = (selectedProvider == provider) ? nil : provider
           }
+          .equatable()
         }
       }
       .padding(.horizontal, HarnessMonitorTheme.spacingLG)
@@ -115,6 +117,7 @@ public struct OpenRouterModelBrowserSheet: View {
               onTogglePin: { togglePin(model.id) },
               onSelect: { selectModel(model.id) }
             )
+            .equatable()
           }
         }
         .listStyle(.inset)
