@@ -205,6 +205,7 @@ mod tests {
             final_message: None,
             error: None,
             turn_count: 0,
+            pending_permission_batches: Vec::new(),
             created_at: "2026-05-20T00:00:00Z".into(),
             updated_at: "2026-05-20T00:00:00Z".into(),
         });
@@ -238,6 +239,7 @@ mod tests {
             final_message: None,
             error: None,
             turn_count: 0,
+            pending_permission_batches: Vec::new(),
             created_at: "2026-05-20T00:00:00Z".into(),
             updated_at: "2026-05-20T00:00:00Z".into(),
         });
