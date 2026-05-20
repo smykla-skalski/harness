@@ -130,16 +130,18 @@ struct SessionWindowCreateForm: View {
     .scrollContentBackground(.hidden)
     .dynamicTypeSize(.xSmall ... .accessibility5)
     .task {
-      if focusedField == nil {
-        focusedField = .name
-      }
       prefillAgentNameIfEligible()
-      if draft.kind == .agent, embedsRuntimeConfiguration {
+      if draft.kind == .agent {
         await SessionWindowCreateFormCatalogs.loadAgentCatalogStateIfNeeded(
           store: store,
           state: state,
           draft: draft
         )
+      }
+      guard focusedField == nil else { return }
+      await SessionGeometryWritebackDeferral.nextMainActorTurn()
+      if focusedField == nil {
+        focusedField = .name
       }
     }
     .onChange(of: draft.runtime) { _, _ in
