@@ -26,7 +26,8 @@ use std::sync::LazyLock;
 use serde::{Deserialize, Serialize};
 
 use self::catalogs::{
-    claude_catalog, codex_catalog, copilot_catalog, gemini_catalog, opencode_catalog, vibe_catalog,
+    claude_catalog, codex_catalog, copilot_catalog, gemini_catalog, opencode_catalog,
+    openrouter_catalog, vibe_catalog,
 };
 
 /// Coarse cost/speed tier used by the UI for ordering and by E2E tests for
@@ -108,6 +109,7 @@ static REGISTRY: LazyLock<BTreeMap<&'static str, RuntimeModelCatalog>> = LazyLoc
     map.insert("copilot", copilot_catalog());
     map.insert("vibe", vibe_catalog());
     map.insert("opencode", opencode_catalog());
+    map.insert("openrouter", openrouter_catalog());
     map
 });
 
@@ -159,7 +161,15 @@ mod tests {
 
     #[test]
     fn every_known_runtime_has_a_catalog() {
-        for runtime in ["claude", "codex", "gemini", "copilot", "vibe", "opencode"] {
+        for runtime in [
+            "claude",
+            "codex",
+            "gemini",
+            "copilot",
+            "vibe",
+            "opencode",
+            "openrouter",
+        ] {
             assert!(
                 catalog_for(runtime).is_some(),
                 "missing catalog for runtime '{runtime}'"

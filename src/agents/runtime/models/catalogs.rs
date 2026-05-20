@@ -215,3 +215,30 @@ pub(super) fn opencode_catalog() -> RuntimeModelCatalog {
         cheapest_fastest: "anthropic/claude-haiku-4-5".into(),
     }
 }
+
+pub(super) fn openrouter_catalog() -> RuntimeModelCatalog {
+    // OpenRouter proxies many providers. The curated default list mirrors the
+    // shim's tool-loop happy path; the daemon refreshes the live `/models/user`
+    // list at session start, so this is only the fallback. Effort categories
+    // follow the underlying family the OpenRouter id points at.
+    use RuntimeModelTier::{Balanced, Fast, Max};
+    RuntimeModelCatalog {
+        runtime: "openrouter".into(),
+        models: vec![
+            thinking("anthropic/claude-haiku-4-5", "Claude Haiku 4.5", Fast),
+            reasoning("openai/gpt-5.4-mini", "GPT-5.4 mini", Fast),
+            thinking("google/gemini-2.5-flash", "Gemini 2.5 Flash", Fast),
+            thinking("anthropic/claude-sonnet-4-6", "Claude Sonnet 4.6", Balanced),
+            reasoning("openai/gpt-5.5", "GPT-5.5", Balanced),
+            thinking("google/gemini-2.5-pro", "Gemini 2.5 Pro", Balanced),
+            thinking("anthropic/claude-opus-4-7", "Claude Opus 4.7", Max),
+            thinking(
+                "google/gemini-3.1-pro-preview",
+                "Gemini 3.1 Pro (preview)",
+                Max,
+            ),
+        ],
+        default: "anthropic/claude-sonnet-4-6".into(),
+        cheapest_fastest: "anthropic/claude-haiku-4-5".into(),
+    }
+}
