@@ -88,6 +88,10 @@ pub(super) fn managed_agent_routes() -> Router<DaemonHttpState> {
             post(mutations::post_acp_permission),
         )
         .route(
+            http_paths::MANAGED_AGENT_ACP_PROMPT,
+            post(mutations::post_acp_agent_prompt),
+        )
+        .route(
             http_paths::MANAGED_AGENTS_CODEX_INSPECT,
             get(codex_inspect::get_codex_inspect),
         )

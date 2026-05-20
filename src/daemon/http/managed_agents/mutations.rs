@@ -293,6 +293,36 @@ fn codex_session_id(state: &DaemonHttpState, agent_id: &str) -> Result<String, C
     Ok(state.codex_controller.run(agent_id)?.session_id)
 }
 
+#[derive(serde::Deserialize)]
+pub(super) struct AcpPromptRequestBody {
+    pub prompt: String,
+}
+
+pub(super) async fn post_acp_agent_prompt(
+    Path(agent_id): Path<String>,
+    headers: HeaderMap,
+    State(state): State<DaemonHttpState>,
+    Json(request): Json<AcpPromptRequestBody>,
+) -> Response {
+    let start = Instant::now();
+    let request_id = extract_request_id(&headers);
+    if let Err(response) = require_auth(&headers, &state) {
+        return *response;
+    }
+    let result = ensure_acp_enabled().and_then(|()| {
+        ensure_acp_agent(&state, &agent_id)
+            .and_then(|()| state.acp_agent_manager.send_prompt(&agent_id, &request.prompt))
+            .map(ManagedAgentSnapshot::Acp)
+    });
+    timed_json(
+        "POST",
+        http_paths::MANAGED_AGENT_ACP_PROMPT,
+        &request_id,
+        start,
+        result,
+    )
+}
+
 pub(super) async fn post_acp_permission(
     Path((agent_id, batch_id)): Path<(String, String)>,
     headers: HeaderMap,
