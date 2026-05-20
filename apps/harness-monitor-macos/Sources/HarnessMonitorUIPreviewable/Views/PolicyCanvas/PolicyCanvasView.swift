@@ -227,7 +227,7 @@ public struct PolicyCanvasView: View {
     // gesture state across pipelines). The single nil→non-nil flip on first
     // load resets local @State once, matching the load semantics.
     .optionalID(viewModel.pipelineIdentity)
-    .frame(minWidth: 980, minHeight: 620)
+    .frame(minHeight: 620)
     .background(Color(red: 0.05, green: 0.06, blue: 0.08))
     .accessibilityElement(children: .contain)
     .accessibilityIdentifier(HarnessMonitorAccessibility.policyCanvasRoot)

@@ -55,7 +55,7 @@ private struct PolicyCanvasLabLiveSnapshot: Equatable {
 }
 
 struct PolicyCanvasLabWindowView: View {
-  private static let minimumSize = CGSize(width: 980, height: 620)
+  private static let minimumSize = CGSize(width: 0, height: 620)
 
   let store: HarnessMonitorStore
   let keyWindowObserver: KeyWindowObserver
