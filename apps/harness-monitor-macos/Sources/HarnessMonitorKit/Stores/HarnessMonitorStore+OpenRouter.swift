@@ -120,12 +120,16 @@ extension HarnessMonitorStore {
     }
   }
 
-  /// The OpenRouter sheet's model picker.
+  /// The OpenRouter sheet's model picker source.
   ///
-  /// The daemon's openrouter descriptor carries an authored model catalog via
-  /// the standard ACP descriptors endpoint; surface that catalog here so the
-  /// sheet keeps its existing picker without a dedicated transport call.
+  /// Calls the daemon's dynamic openrouter.list_models endpoint, which
+  /// caches the OpenRouter /api/v1/models response for 30 minutes. Falls
+  /// back to the static descriptor catalog when the dynamic fetch fails
+  /// (typically: no API key configured, or upstream unreachable).
   public func fetchOpenRouterModels() async -> [OpenRouterModelEntry] {
+    if let dynamic = try? await client?.openRouterModelCatalog(), !dynamic.models.isEmpty {
+      return dynamic.models
+    }
     let descriptors = await fetchAcpAgentDescriptors()
     guard
       let descriptor = descriptors.first(where: { $0.id == Self.openRouterDescriptorID }),
