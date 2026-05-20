@@ -8,9 +8,9 @@ public enum TaskBoardTodoistCredentialStoreError: LocalizedError, Equatable {
   public var errorDescription: String? {
     switch self {
     case .unexpectedStatus(let status):
-      "Todoist credential store failed with Keychain status \(status)."
+      "Todoist credential store failed with Keychain status \(status)"
     case .invalidPayload:
-      "Stored Todoist credentials are unreadable."
+      "Stored Todoist credentials are unreadable"
     }
   }
 }

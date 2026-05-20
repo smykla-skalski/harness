@@ -8,9 +8,9 @@ public enum TaskBoardOpenRouterCredentialStoreError: LocalizedError, Equatable {
   public var errorDescription: String? {
     switch self {
     case .unexpectedStatus(let status):
-      "OpenRouter credential store failed with Keychain status \(status)."
+      "OpenRouter credential store failed with Keychain status \(status)"
     case .invalidPayload:
-      "Stored OpenRouter credentials are unreadable."
+      "Stored OpenRouter credentials are unreadable"
     }
   }
 }

@@ -8,7 +8,7 @@ extension PreviewFixtures {
     contextRoot: summary.contextRoot,
     sessionId: "sess-harness-solo",
     title: "Solo agent session",
-    context: "A session with only one agent to test single-agent UI states.",
+    context: "A session with only one agent to test single-agent UI states",
     status: .active,
     createdAt: "2026-03-28T14:05:00Z",
     updatedAt: "2026-03-28T14:18:00Z",

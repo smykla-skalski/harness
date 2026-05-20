@@ -8,9 +8,9 @@ public enum TaskBoardGitHubCredentialStoreError: LocalizedError, Equatable {
   public var errorDescription: String? {
     switch self {
     case .unexpectedStatus(let status):
-      "GitHub credential store failed with Keychain status \(status)."
+      "GitHub credential store failed with Keychain status \(status)"
     case .invalidPayload:
-      "Stored GitHub credentials are unreadable."
+      "Stored GitHub credentials are unreadable"
     }
   }
 }

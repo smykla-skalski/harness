@@ -16,7 +16,7 @@ public final class HarnessMonitorUserNotificationController: NSObject,
   public private(set) var registeredCategoryCount = 0
   public private(set) var appBadgeCount = 0
   public private(set) var isWorking = false
-  public private(set) var lastResult = "Notifications not checked yet."
+  public private(set) var lastResult = "Notifications not checked yet"
   public private(set) var lastResponse: HarnessMonitorNotificationResponseSnapshot?
   public private(set) var settingsOpenRequestID = 0
 
@@ -70,7 +70,7 @@ public final class HarnessMonitorUserNotificationController: NSObject,
     controller.pendingRequestCount = 0
     controller.deliveredNotificationCount = 0
     controller.registeredCategoryCount = HarnessMonitorNotificationRequestFactory.categories().count
-    controller.lastResult = "Preview notification controls are ready."
+    controller.lastResult = "Preview notification controls are ready"
     return controller
   }
 
@@ -138,7 +138,7 @@ public final class HarnessMonitorUserNotificationController: NSObject,
     await deliverSupervisorNotification(
       source: .supervisorDecision,
       severity: severity,
-      successMessage: "Scheduled supervisor decision \(decisionID).",
+      successMessage: "Scheduled supervisor decision \(decisionID)",
       failureMessage: "Scheduling supervisor decision failed",
       actions: decisionActions(decisionID: decisionID)
     ) {
@@ -158,7 +158,7 @@ public final class HarnessMonitorUserNotificationController: NSObject,
     await deliverSupervisorNotification(
       source: .supervisorNotice,
       severity: severity,
-      successMessage: "Scheduled supervisor notice for \(ruleID).",
+      successMessage: "Scheduled supervisor notice for \(ruleID)",
       failureMessage: "Scheduling supervisor notice failed",
       actions: []
     ) {
@@ -182,7 +182,7 @@ public final class HarnessMonitorUserNotificationController: NSObject,
     await performNotificationOperation {
       let settings = SupervisorNotificationSettings.load()
       guard settings.allowsAnyDelivery(for: severity) else {
-        lastResult = "Supervisor notification suppressed by settings."
+        lastResult = "Supervisor notification suppressed by settings"
         return false
       }
       do {
@@ -225,7 +225,7 @@ public final class HarnessMonitorUserNotificationController: NSObject,
 
   public func applyPreset(_ preset: HarnessMonitorNotificationPreset) {
     draft = preset.draft
-    lastResult = "Loaded \(preset.title) preset."
+    lastResult = "Loaded \(preset.title) preset"
   }
 
   public func requestAuthorization(
@@ -235,9 +235,9 @@ public final class HarnessMonitorUserNotificationController: NSObject,
       do {
         let granted = try await centerBox.base.requestAuthorization(options: profile.options)
         if granted {
-          lastResult = "Notification authorization granted."
+          lastResult = "Notification authorization granted"
         } else {
-          lastResult = "Authorization was not granted."
+          lastResult = "Authorization was not granted"
         }
         await refreshStatus()
       } catch {
@@ -271,7 +271,7 @@ public final class HarnessMonitorUserNotificationController: NSObject,
     )
     guard authorizationStatus.allowsUserNotificationDelivery else {
       lastResult =
-        "ACP permission notification skipped: \(authorizationStatus.rawValue)."
+        "ACP permission notification skipped: \(authorizationStatus.rawValue)"
       return false
     }
 
@@ -292,7 +292,7 @@ public final class HarnessMonitorUserNotificationController: NSObject,
             actions: decisionActions(decisionID: attention.decisionID)
           ))
         didSchedule = true
-        lastResult = "Scheduled ACP permission \(attention.batchID)."
+        lastResult = "Scheduled ACP permission \(attention.batchID)"
         await refreshStatus()
       } catch {
         lastResult = "Scheduling ACP permission failed: \(error.localizedDescription)"
@@ -317,7 +317,7 @@ public final class HarnessMonitorUserNotificationController: NSObject,
             severity: .info,
             actions: []
           ))
-        lastResult = "Scheduled notification \(request.identifier)."
+        lastResult = "Scheduled notification \(request.identifier)"
         await refreshStatus()
       } catch {
         lastResult = "Scheduling failed: \(error.localizedDescription)"
@@ -327,13 +327,13 @@ public final class HarnessMonitorUserNotificationController: NSObject,
 
   public func removeAllPendingRequests() async {
     centerBox.base.removeAllPendingNotificationRequests()
-    lastResult = "Removed pending notification requests."
+    lastResult = "Removed pending notification requests"
     await refreshStatus()
   }
 
   public func removeAllDeliveredNotifications() async {
     centerBox.base.removeAllDeliveredNotifications()
-    lastResult = "Removed delivered notifications."
+    lastResult = "Removed delivered notifications"
     await refreshStatus()
   }
 
@@ -443,7 +443,7 @@ public final class HarnessMonitorUserNotificationController: NSObject,
     decisionID: String?
   ) {
     lastResponse = snapshot
-    lastResult = "Handled notification action \(snapshot.actionIdentifier)."
+    lastResult = "Handled notification action \(snapshot.actionIdentifier)"
     historyEventSink?(.responded(.init(snapshot: snapshot, decisionID: decisionID)))
     routeSupervisorAction(actionIdentifier: actionIdentifier, decisionID: decisionID)
   }
@@ -454,7 +454,7 @@ public final class HarnessMonitorUserNotificationController: NSObject,
   ) {
     Task { @MainActor in
       settingsOpenRequestID += 1
-      lastResult = "Opening notification settings."
+      lastResult = "Opening notification settings"
     }
   }
 

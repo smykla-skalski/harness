@@ -6,13 +6,13 @@ extension PreviewHarnessClient {
       identifier: "reviewer",
       name: "Reviewer",
       symbol: .sfSymbol(name: "checkmark.seal"),
-      description: "Reviews code changes for correctness and style."
+      description: "Reviews code changes for correctness and style"
     ),
     AgentPersona(
       identifier: "architect",
       name: "Architect",
       symbol: .sfSymbol(name: "building.columns"),
-      description: "Focuses on system design and architecture decisions."
+      description: "Focuses on system design and architecture decisions"
     ),
   ]
 
@@ -47,7 +47,7 @@ extension PreviewHarnessClient {
       modelCatalog: codexRuntimeModelCatalog(),
       installHint: [
         "Codex ACP ships with Harness. Install or update Harness to restore the bundled adapter, ",
-        "then authenticate Codex.",
+        "then authenticate Codex",
       ].joined(),
       doctorProbe: AcpDoctorProbe(command: "harness-codex-acp", args: ["--probe"]),
       bundledWithHarness: true
@@ -60,7 +60,7 @@ extension PreviewHarnessClient {
       launchArgs: ["--acp", "--stdio"],
       envPassthrough: ["COPILOT_GITHUB_TOKEN", "GH_TOKEN", "GITHUB_TOKEN"],
       modelCatalog: copilotRuntimeModelCatalog(),
-      installHint: "Install GitHub Copilot CLI and sign in.",
+      installHint: "Install GitHub Copilot CLI and sign in",
       doctorProbe: AcpDoctorProbe(command: "copilot", args: ["--version"])
     ),
     AcpAgentDescriptor(
@@ -105,7 +105,7 @@ extension PreviewHarnessClient {
       ],
       modelCatalog: claudeRuntimeModelCatalog(),
       installHint:
-        "Install the official Claude ACP wrapper and authenticate Claude before using ACP.",
+        "Install the official Claude ACP wrapper and authenticate Claude before using ACP",
       doctorProbe: AcpDoctorProbe(
         command: "claude-agent-acp",
         args: ["--cli", "auth", "status"]
@@ -140,7 +140,7 @@ extension PreviewHarnessClient {
         "GEMINI_CLI_TRUST_WORKSPACE",
       ],
       modelCatalog: geminiRuntimeModelCatalog(),
-      installHint: "Install an ACP-capable Gemini CLI and authenticate.",
+      installHint: "Install an ACP-capable Gemini CLI and authenticate",
       doctorProbe: AcpDoctorProbe(command: "gemini", args: ["--version"])
     ),
   ]

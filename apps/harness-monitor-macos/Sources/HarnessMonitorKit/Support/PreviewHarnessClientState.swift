@@ -183,7 +183,7 @@ actor PreviewHarnessClientState {
 
   func archiveSession(sessionID: String) throws -> SessionArchiveResponse {
     guard sessionSummaries.contains(where: { $0.sessionId == sessionID }) else {
-      throw HarnessMonitorAPIError.server(code: 404, message: "No preview session available.")
+      throw HarnessMonitorAPIError.server(code: 404, message: "No preview session available")
     }
 
     sessionSummaries.removeAll { $0.sessionId == sessionID }
@@ -292,12 +292,12 @@ actor PreviewHarnessClientState {
     guard let detail = detail(for: sessionID, scope: nil) else {
       throw HarnessMonitorAPIError.server(
         code: 404,
-        message: "No preview session detail available."
+        message: "No preview session detail available"
       )
     }
 
     guard let taskIndex = detail.tasks.firstIndex(where: { $0.taskId == taskID }) else {
-      throw HarnessMonitorAPIError.server(code: 404, message: "No preview task available.")
+      throw HarnessMonitorAPIError.server(code: 404, message: "No preview task available")
     }
 
     let targetAgentID: String
@@ -307,12 +307,12 @@ actor PreviewHarnessClientState {
     }
 
     guard let agentIndex = detail.agents.firstIndex(where: { $0.agentId == targetAgentID }) else {
-      throw HarnessMonitorAPIError.server(code: 404, message: "No preview agent available.")
+      throw HarnessMonitorAPIError.server(code: 404, message: "No preview agent available")
     }
 
     let agent = detail.agents[agentIndex]
     guard agent.role == .worker, agent.status == .active else {
-      throw HarnessMonitorAPIError.server(code: 409, message: "Preview agent cannot take tasks.")
+      throw HarnessMonitorAPIError.server(code: 409, message: "Preview agent cannot take tasks")
     }
 
     var tasks = detail.tasks
@@ -352,17 +352,17 @@ actor PreviewHarnessClientState {
     guard let detail = detail(for: sessionID, scope: nil) else {
       throw HarnessMonitorAPIError.server(
         code: 404,
-        message: "No preview session detail available."
+        message: "No preview session detail available"
       )
     }
 
     guard let agentIndex = detail.agents.firstIndex(where: { $0.agentId == agentID }) else {
-      throw HarnessMonitorAPIError.server(code: 404, message: "No preview agent available.")
+      throw HarnessMonitorAPIError.server(code: 404, message: "No preview agent available")
     }
 
     let removedAgent = detail.agents[agentIndex]
     guard removedAgent.role != .leader else {
-      throw HarnessMonitorAPIError.server(code: 409, message: "Preview leader cannot be removed.")
+      throw HarnessMonitorAPIError.server(code: 409, message: "Preview leader cannot be removed")
     }
 
     var agents = detail.agents

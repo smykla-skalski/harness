@@ -6,7 +6,7 @@ public enum HarnessMonitorPushEventError: Error, LocalizedError, Equatable {
   public var errorDescription: String? {
     switch self {
     case .missingSessionID(let event):
-      "Missing session ID for daemon push event '\(event)'."
+      "Missing session ID for daemon push event '\(event)'"
     }
   }
 }

@@ -5,7 +5,7 @@ extension PreviewFixtures {
     public static let awaitingReviewTask = WorkItem(
       taskId: "task-review-queue",
       title: "Auth middleware review",
-      context: "Queued after worker finished patch.",
+      context: "Queued after worker finished patch",
       severity: .high,
       status: .awaitingReview,
       assignedTo: "worker-codex",
@@ -23,7 +23,7 @@ extension PreviewFixtures {
       awaitingReview: AwaitingReview(
         queuedAt: "2026-04-24T10:00:00Z",
         submitterAgentId: "worker-codex",
-        summary: "Patch ready; requires security review.",
+        summary: "Patch ready; requires security review",
         requiredConsensus: 2
       ),
       suggestedPersona: "reviewer-security"
@@ -49,7 +49,7 @@ extension PreviewFixtures {
       awaitingReview: AwaitingReview(
         queuedAt: "2026-04-24T10:05:00Z",
         submitterAgentId: "worker-codex",
-        summary: "Partial claim: one reviewer online.",
+        summary: "Partial claim: one reviewer online",
         requiredConsensus: 2
       ),
       reviewClaim: ReviewClaim(reviewers: [
@@ -81,7 +81,7 @@ extension PreviewFixtures {
       checkpointSummary: nil,
       consensus: ReviewConsensus(
         verdict: .approve,
-        summary: "Two reviewers approved after round 1.",
+        summary: "Two reviewers approved after round 1",
         closedAt: "2026-04-24T09:00:00Z",
         reviewerAgentIds: ["reviewer-claude", "reviewer-codex"]
       ),
@@ -127,7 +127,7 @@ extension PreviewFixtures {
       arbitration: ArbitrationOutcome(
         arbiterAgentId: "leader-claude",
         verdict: .approve,
-        summary: "Leader approved after two inconclusive rounds.",
+        summary: "Leader approved after two inconclusive rounds",
         recordedAt: "2026-04-24T10:45:00Z"
       )
     )

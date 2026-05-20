@@ -146,7 +146,7 @@ public final class PreviewHarnessClient: HarnessMonitorClientProtocol, Sendable 
     guard let detail = await state.detail(for: id, scope: scope) else {
       throw HarnessMonitorAPIError.server(
         code: 404,
-        message: "No preview session detail available."
+        message: "No preview session detail available"
       )
     }
     return detail
@@ -156,7 +156,7 @@ public final class PreviewHarnessClient: HarnessMonitorClientProtocol, Sendable 
     guard await state.containsSession(sessionID) else {
       throw HarnessMonitorAPIError.server(
         code: 404,
-        message: "No preview timeline available."
+        message: "No preview timeline available"
       )
     }
     return await state.timeline(for: sessionID)
@@ -199,7 +199,7 @@ public final class PreviewHarnessClient: HarnessMonitorClientProtocol, Sendable 
     try await performActionDelay()
     switch codexStartBehavior {
     case .unsupported:
-      throw HarnessMonitorAPIError.server(code: 501, message: "Codex controller unavailable.")
+      throw HarnessMonitorAPIError.server(code: 501, message: "Codex controller unavailable")
     case .success:
       return await state.startCodexRun(sessionID: sessionID, request: request)
     case .unavailableRunningBridge:
@@ -227,7 +227,7 @@ public final class PreviewHarnessClient: HarnessMonitorClientProtocol, Sendable 
       decision: decision
     )
     guard let snapshot else {
-      throw HarnessMonitorAPIError.server(code: 404, message: "ACP permission unavailable.")
+      throw HarnessMonitorAPIError.server(code: 404, message: "ACP permission unavailable")
     }
     return .acp(snapshot)
   }
@@ -240,7 +240,7 @@ public final class PreviewHarnessClient: HarnessMonitorClientProtocol, Sendable 
     guard await state.containsSession(sessionID) else {
       throw HarnessMonitorAPIError.server(
         code: 404,
-        message: "ACP transcript unavailable."
+        message: "ACP transcript unavailable"
       )
     }
     return await state.acpTranscript(sessionID: sessionID)
@@ -254,7 +254,7 @@ public final class PreviewHarnessClient: HarnessMonitorClientProtocol, Sendable 
     guard await state.containsSession(sessionID) else {
       throw HarnessMonitorAPIError.server(
         code: 404,
-        message: "Codex transcript unavailable."
+        message: "Codex transcript unavailable"
       )
     }
     return await state.codexTranscript(sessionID: sessionID)

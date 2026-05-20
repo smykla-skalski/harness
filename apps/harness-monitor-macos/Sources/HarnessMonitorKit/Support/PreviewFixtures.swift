@@ -97,7 +97,7 @@ public enum PreviewFixtures {
     WorkItem(
       taskId: "task-ui",
       title: "Finish the session cockpit timeline",
-      context: "Need a merged timeline with tasks, agents, and signal acknowledgements.",
+      context: "Need a merged timeline with tasks, agents, and signal acknowledgements",
       severity: .high,
       status: .inProgress,
       assignedTo: "worker-codex",
@@ -108,11 +108,11 @@ public enum PreviewFixtures {
         TaskNote(
           timestamp: "2026-03-28T14:16:00Z",
           agentId: "worker-codex",
-          text: "Merged daemon timeline entries with session checkpoints."
+          text: "Merged daemon timeline entries with session checkpoints"
         )
       ],
       suggestedFix:
-        "Use daemon timeline summaries directly instead of reconstructing them in SwiftUI.",
+        "Use daemon timeline summaries directly instead of reconstructing them in SwiftUI",
       source: .observe,
       blockedReason: nil,
       completedAt: nil,
@@ -120,14 +120,14 @@ public enum PreviewFixtures {
         checkpointId: "task-ui-cp-1",
         recordedAt: "2026-03-28T14:17:30Z",
         actorId: "worker-codex",
-        summary: "Cockpit timeline rows and metric cards are now live-backed.",
+        summary: "Cockpit timeline rows and metric cards are now live-backed",
         progress: 70
       )
     ),
     WorkItem(
       taskId: "task-routing",
       title: "Validate daemon bootstrap path resolution",
-      context: "The app needs the exact XDG/App Support root used by harness on macOS.",
+      context: "The app needs the exact XDG/App Support root used by harness on macOS",
       severity: .medium,
       status: .blocked,
       assignedTo: "leader-claude",
@@ -135,9 +135,9 @@ public enum PreviewFixtures {
       updatedAt: "2026-03-28T14:14:00Z",
       createdBy: "leader-claude",
       notes: [],
-      suggestedFix: "Mirror the Rust user_dirs behavior exactly.",
+      suggestedFix: "Mirror the Rust user_dirs behavior exactly",
       source: .manual,
-      blockedReason: "Waiting on local validation against the crate implementation.",
+      blockedReason: "Waiting on local validation against the crate implementation",
       completedAt: nil,
       checkpointSummary: nil
     ),
@@ -146,7 +146,7 @@ public enum PreviewFixtures {
   public static let taskDropTask = WorkItem(
     taskId: "task-drop-queue",
     title: "Queue the drag-and-drop smoke task",
-    context: "Drag this open task onto the busy worker card.",
+    context: "Drag this open task onto the busy worker card",
     severity: .medium,
     status: .open,
     assignedTo: nil,
@@ -154,7 +154,7 @@ public enum PreviewFixtures {
     updatedAt: "2026-03-28T14:10:00Z",
     createdBy: "leader-claude",
     notes: [],
-    suggestedFix: "Drop it onto worker-codex and verify it becomes queued.",
+    suggestedFix: "Drop it onto worker-codex and verify it becomes queued",
     source: .manual,
     blockedReason: nil,
     completedAt: nil,
@@ -221,7 +221,7 @@ public enum PreviewFixtures {
             harness run apply --manifest groups/g12
             ```
             """,
-          actionHint: "Open the selected session timeline and refresh.",
+          actionHint: "Open the selected session timeline and refresh",
           relatedFiles: ["src/daemon/protocol.rs"],
           metadata: .object(["source": .string("preview")])
         ),
@@ -233,7 +233,7 @@ public enum PreviewFixtures {
         result: .accepted,
         agent: "worker-codex",
         sessionId: summary.sessionId,
-        details: "Loaded and applied."
+        details: "Loaded and applied"
       )
     )
   ]
@@ -251,7 +251,7 @@ public enum PreviewFixtures {
     originPath: "/Users/example/Projects/harness",
     branchRef: "harness/sess5678",
     title: "Signal retention verification",
-    context: "Switch between sessions and make sure existing signal history survives each reload.",
+    context: "Switch between sessions and make sure existing signal history survives each reload",
     status: .active,
     createdAt: "2026-03-28T14:09:00Z",
     updatedAt: "2026-03-28T14:19:00Z",
