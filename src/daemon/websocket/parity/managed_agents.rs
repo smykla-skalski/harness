@@ -13,6 +13,10 @@ use super::{
     extract_managed_agent_id, extract_session_id, extract_string_param,
 };
 
+mod response;
+
+use response::dispatch_managed_agent_response;
+
 pub(crate) async fn dispatch_managed_agent_start_terminal(
     request: &WsRequest,
     state: &DaemonHttpState,
@@ -513,42 +517,4 @@ fn codex_session_id(state: &DaemonHttpState, agent_id: &str) -> Result<String, C
 fn acp_session_id(state: &DaemonHttpState, agent_id: &str) -> Result<String, CliError> {
     ensure_acp_agent(state, agent_id)?;
     state.acp_agent_manager.get(agent_id).map(|s| s.session_id)
-}
-
-#[expect(
-    clippy::cognitive_complexity,
-    reason = "tracing macro expansion inflates the score; tokio-rs/tracing#553"
-)]
-pub(super) async fn dispatch_managed_agent_response(
-    request: &WsRequest,
-    state: &DaemonHttpState,
-    result: Result<ManagedAgentSnapshot, CliError>,
-) -> WsResponse {
-    match result {
-        Ok(snapshot) => {
-            tracing::info!(
-                method = %request.method,
-                request_id = %request.id,
-                kind = %managed_agent_snapshot_kind(&snapshot),
-                runtime_id = %snapshot.agent_id(),
-                session_id = %snapshot.session_id(),
-                "managed agent dispatch returning snapshot"
-            );
-            if let Err(error) =
-                super::broadcast_session_snapshot(state, snapshot.session_id()).await
-            {
-                return super::cli_error_response(&request.id, &error);
-            }
-            super::dispatch_query_result(&request.id, Ok::<_, CliError>(snapshot))
-        }
-        Err(error) => super::cli_error_response(&request.id, &error),
-    }
-}
-
-const fn managed_agent_snapshot_kind(snapshot: &ManagedAgentSnapshot) -> &'static str {
-    match snapshot {
-        ManagedAgentSnapshot::Terminal(_) => "terminal",
-        ManagedAgentSnapshot::Codex(_) => "codex",
-        ManagedAgentSnapshot::Acp(_) => "acp",
-    }
 }
