@@ -29,7 +29,6 @@ use super::mutations::{cli_error_response, dispatch_query_result};
 use super::params::{extract_managed_agent_id, extract_session_id, extract_string_param};
 
 mod managed_agents;
-mod openrouter;
 #[cfg(test)]
 mod tests;
 mod voice;
@@ -41,11 +40,6 @@ pub(crate) use self::managed_agents::{
     dispatch_managed_agent_start_acp, dispatch_managed_agent_start_codex,
     dispatch_managed_agent_start_terminal, dispatch_managed_agent_steer_codex,
     dispatch_managed_agent_stop, dispatch_managed_agent_stop_acp,
-};
-pub(crate) use self::openrouter::{
-    dispatch_managed_agent_cancel_openrouter, dispatch_managed_agent_detail_openrouter,
-    dispatch_managed_agent_openrouter_list, dispatch_managed_agent_openrouter_models,
-    dispatch_managed_agent_prompt_openrouter, dispatch_managed_agent_start_openrouter,
 };
 pub(crate) use self::voice::{
     dispatch_voice_append_audio, dispatch_voice_append_transcript, dispatch_voice_finish_session,

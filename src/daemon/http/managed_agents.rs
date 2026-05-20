@@ -17,7 +17,6 @@ mod codex_inspect;
 mod codex_transcript;
 mod lookup;
 mod mutations;
-mod openrouter;
 pub(crate) mod reads;
 mod snapshots;
 
@@ -43,26 +42,6 @@ pub(super) fn managed_agent_routes() -> Router<DaemonHttpState> {
         .route(
             http_paths::SESSION_MANAGED_AGENTS_ACP,
             post(acp_start::post_acp_agent_start),
-        )
-        .route(
-            http_paths::SESSION_MANAGED_AGENTS_OPENROUTER,
-            post(openrouter::post_openrouter_start).get(openrouter::get_openrouter_runs),
-        )
-        .route(
-            http_paths::MANAGED_AGENT_OPENROUTER,
-            get(openrouter::get_openrouter_run),
-        )
-        .route(
-            http_paths::MANAGED_AGENT_OPENROUTER_PROMPT,
-            post(openrouter::post_openrouter_prompt),
-        )
-        .route(
-            http_paths::MANAGED_AGENT_OPENROUTER_CANCEL,
-            post(openrouter::post_openrouter_cancel),
-        )
-        .route(
-            http_paths::MANAGED_AGENTS_OPENROUTER_MODELS,
-            get(openrouter::get_openrouter_models),
         )
         .route(
             http_paths::MANAGED_AGENT_DETAIL,
@@ -186,8 +165,6 @@ mod tests {
             codex_controller: CodexControllerHandle::new(sender.clone(), db_slot.clone(), false),
             acp_agent_manager: AcpAgentManagerHandle::new(sender.clone(), db_slot.clone()),
             agent_tui_manager: AgentTuiManagerHandle::new(sender.clone(), db_slot, false),
-            openrouter_agent_manager:
-                crate::daemon::openrouter_agent::OpenRouterAgentManagerHandle::new(sender),
             managed_agent_mutation_locks: crate::daemon::http::ManagedAgentMutationLocks::default(),
         }
     }
@@ -448,66 +425,4 @@ mod tests {
         .await;
     }
 
-    #[tokio::test]
-    async fn unified_list_includes_openrouter_session() {
-        let tmp = tempdir().expect("tempdir");
-        let project_dir = tmp.path().to_string_lossy().into_owned();
-        temp_env::async_with_vars([("OPENROUTER_API_KEY", Some("sk-test"))], async move {
-            let state = minimal_state();
-            let session_id = "11111111-1111-4111-8111-111111111111";
-            let snapshot = state
-                .openrouter_agent_manager
-                .start(
-                    session_id,
-                    crate::daemon::openrouter_agent::OpenRouterStartRequest {
-                        project_dir: Some(project_dir.clone()),
-                        ..Default::default()
-                    },
-                )
-                .expect("start openrouter session");
-            let response = super::super::managed_agent_list_response(&state, session_id)
-                .expect("list response");
-            let openrouter = response
-                .agents
-                .iter()
-                .find_map(|agent| match agent {
-                    crate::daemon::protocol::ManagedAgentSnapshot::OpenRouter(snap) => Some(snap),
-                    _ => None,
-                })
-                .expect("openrouter snapshot present");
-            assert_eq!(openrouter.run_id, snapshot.run_id);
-            assert_eq!(openrouter.session_id, session_id);
-        })
-        .await;
-    }
-
-    #[tokio::test]
-    async fn unified_snapshot_lookup_finds_openrouter_run() {
-        let tmp = tempdir().expect("tempdir");
-        let project_dir = tmp.path().to_string_lossy().into_owned();
-        temp_env::async_with_vars([("OPENROUTER_API_KEY", Some("sk-test"))], async move {
-            let state = minimal_state();
-            let session_id = "22222222-2222-4222-8222-222222222222";
-            let snapshot = state
-                .openrouter_agent_manager
-                .start(
-                    session_id,
-                    crate::daemon::openrouter_agent::OpenRouterStartRequest {
-                        project_dir: Some(project_dir.clone()),
-                        ..Default::default()
-                    },
-                )
-                .expect("start openrouter session");
-            let lookup =
-                super::super::managed_agent_snapshot(&state, &snapshot.run_id).expect("lookup");
-            match lookup {
-                crate::daemon::protocol::ManagedAgentSnapshot::OpenRouter(snap) => {
-                    assert_eq!(snap.run_id, snapshot.run_id);
-                    assert_eq!(snap.session_id, session_id);
-                }
-                other => panic!("expected OpenRouter snapshot, got {other:?}"),
-            }
-        })
-        .await;
-    }
 }
