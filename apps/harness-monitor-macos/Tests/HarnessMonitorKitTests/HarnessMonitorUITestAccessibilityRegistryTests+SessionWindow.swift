@@ -83,6 +83,9 @@ extension HarnessMonitorUITestAccessibilityRegistryTests {
   func dashboardAndSessionWindowAccessibilityIdentifiersAreAttachedByProductionViews() throws {
     let dashboardRoot = try sourceFile(named: "DashboardWindowView.swift")
     let dashboardView = try sourceFile(named: "DashboardWindowSupport.swift")
+    let dashboardSidebarSessionsView = try sourceFile(
+      named: "DashboardSidebarRecentSessionsSection.swift"
+    )
     let notificationsView = try sourceFile(named: "DashboardNotificationsRouteView.swift")
     let dashboardToolbar = try sourceFile(named: "DashboardWindowToolbar.swift")
     let rootView = try sourceFile(named: "SessionWindowRootView.swift")
@@ -104,11 +107,22 @@ extension HarnessMonitorUITestAccessibilityRegistryTests {
     #expect(
       dashboardView.contains("HarnessMonitorAccessibility.dashboardWindowRoute(route.rawValue)"))
     #expect(
+      dashboardSidebarSessionsView.contains(
+        "HarnessMonitorAccessibility.sessionRow(session.sessionId)"
+      )
+    )
+    #expect(
       notificationsView.contains("HarnessMonitorAccessibility.dashboardNotificationsRoot")
     )
     #expect(dashboardView.contains("HarnessMonitorSidebar("))
     #expect(dashboardView.contains("List(selection: dashboardSelectionBinding)"))
     #expect(dashboardView.contains("SessionSidebarRow("))
+    #expect(dashboardView.contains("Section(\"Routes\")"))
+    #expect(dashboardView.contains("DashboardSidebarRecentSessionsSection("))
+    #expect(dashboardSidebarSessionsView.contains("Section(\"Sessions\")"))
+    #expect(dashboardSidebarSessionsView.contains("SessionSidebarRow("))
+    #expect(dashboardSidebarSessionsView.contains("subtitle: subtitle"))
+    #expect(dashboardSidebarSessionsView.contains("projectAndWorktreeDisplayLabel(separator: \"·\")"))
     #expect(dashboardView.contains(".harnessMonitorSidebarListChrome("))
     #expect(dashboardView.contains("HarnessMonitorAccessibility.dashboardScrollView"))
     #expect(

@@ -29,14 +29,6 @@ extension HarnessMonitorAccessibility {
     "\(sessionRow(sessionID)).last-activity.frame"
   }
 
-  public static func dashboardSessionCard(_ sessionID: String) -> String {
-    "harness.board.session.\(slug(sessionID))"
-  }
-
-  public static func dashboardSessionCardFrame(_ sessionID: String) -> String {
-    "\(dashboardSessionCard(sessionID)).frame"
-  }
-
   public static func dashboardWindowRoute(_ route: String) -> String {
     "harness.dashboard.route.\(slug(route))"
   }

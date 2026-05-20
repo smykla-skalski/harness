@@ -143,20 +143,54 @@ enum DashboardWindowRoute: String, CaseIterable, Identifiable {
   }
 }
 
+enum DashboardSidebarSelection: Hashable {
+  case route(DashboardWindowRoute)
+  case session(String)
+}
+
 struct DashboardSidebar: View {
+  let store: HarnessMonitorStore
   @Binding var selectedRoute: DashboardWindowRoute
+  let recentSessions: [SessionSummary]
   let statusModel: SessionStatusSummaryModel
+  @State private var dashboardSelection: DashboardSidebarSelection?
+  @State private var pendingSessionOpenID: String?
+  @Environment(\.openWindow)
+  private var openWindow
   @Environment(\.harnessTextSizeIndex)
   private var textSizeIndex
 
-  private var dashboardSelectionBinding: Binding<DashboardWindowRoute?> {
+  private var dashboardSelectionBinding: Binding<DashboardSidebarSelection?> {
     Binding(
-      get: { selectedRoute },
+      get: { dashboardSelection ?? .route(selectedRoute) },
       set: { newValue in
         guard let newValue else { return }
-        selectedRoute = newValue
+        dashboardSelection = newValue
+        switch newValue {
+        case .route(let route):
+          selectedRoute = route
+        case .session(let sessionID):
+          guard shouldOpenSessionWindow(for: NSApp.currentEvent) else {
+            return
+          }
+          pendingSessionOpenID = sessionID
+        }
       }
     )
+  }
+
+  private func shouldOpenSessionWindow(for event: NSEvent?) -> Bool {
+    guard let event else {
+      return true
+    }
+    switch event.type {
+    case .rightMouseDown, .rightMouseUp, .otherMouseDown, .otherMouseUp:
+      return false
+    case .leftMouseDown, .leftMouseUp:
+      return !event.modifierFlags.contains(.control)
+    default:
+      return true
+    }
   }
 
   var body: some View {
@@ -173,22 +207,39 @@ struct DashboardSidebar: View {
         statusModel: statusModel
       ) {
         List(selection: dashboardSelectionBinding) {
-          ForEach(DashboardWindowRoute.allCases, id: \.id) { route in
-            let isSelected = selectedRoute == route
-            SessionSidebarRow(
-              title: route.title,
-              systemImage: route.systemImage
-            )
-            .tag(route)
-            .accessibilityIdentifier(
-              HarnessMonitorAccessibility.dashboardWindowRoute(route.rawValue)
-            )
-            .accessibilityValue(isSelected ? "selected" : "not selected")
+          Section("Routes") {
+            ForEach(DashboardWindowRoute.allCases, id: \.id) { route in
+              let isSelected = selectedRoute == route
+              SessionSidebarRow(
+                title: route.title,
+                systemImage: route.systemImage
+              )
+              .tag(DashboardSidebarSelection.route(route))
+              .accessibilityIdentifier(
+                HarnessMonitorAccessibility.dashboardWindowRoute(route.rawValue)
+              )
+              .accessibilityValue(isSelected ? "selected" : "not selected")
+            }
           }
+          DashboardSidebarRecentSessionsSection(store: store, sessions: recentSessions)
         }
         .harnessMonitorSidebarListChrome(
           rowSize: harnessSidebarRowSize(for: textSizeIndex)
         )
+        .onAppear {
+          dashboardSelection = .route(selectedRoute)
+        }
+        .onChange(of: selectedRoute) { _, route in
+          dashboardSelection = .route(route)
+        }
+        .onChange(of: pendingSessionOpenID) { _, sessionID in
+          guard let sessionID else {
+            return
+          }
+          openWindow.openHarnessSessionWindow(sessionID: sessionID)
+          pendingSessionOpenID = nil
+          dashboardSelection = .route(selectedRoute)
+        }
       }
     }
   }
@@ -254,7 +305,6 @@ struct DashboardTaskBoardRouteView: View {
   )
   @State private var perfScrollPosition = ScrollPosition()
   private let perfScrollHookEnabled = HarnessMonitorPerfDashboardScrollBus.isActive()
-  private let detailRowHorizontalPadding: CGFloat = 24
 
   private var visibleTaskBoardSessions: [SessionSummary] {
     let visible = store.visibleSessions
@@ -287,8 +337,6 @@ struct DashboardTaskBoardRouteView: View {
           evaluationSummary: dashboardUI.taskBoardEvaluationSummary,
           isActionInFlight: dashboardUI.isBusy
         )
-        SessionsBoardRecentSessionsSection(store: store, sessions: sessionCatalog.recentSessions)
-          .padding(.horizontal, detailRowHorizontalPadding)
       }
       .frame(maxWidth: .infinity, alignment: .leading)
     }

@@ -110,15 +110,17 @@ public struct DashboardWindowView: View {
         columnVisibility: resolvedColumnVisibility
       )
     ) {
-      HarnessMonitorSidebarDetailLayout(
-        columnVisibility: columnVisibilityBinding,
-        sidebarWidth: sidebarWidth
-      ) {
-        DashboardSidebar(
-          selectedRoute: selectedRouteBinding,
-          statusModel: dashboardStatusSummaryModel(route: route)
-        )
-      } detail: {
+        HarnessMonitorSidebarDetailLayout(
+          columnVisibility: columnVisibilityBinding,
+          sidebarWidth: sidebarWidth
+        ) {
+          DashboardSidebar(
+            store: store,
+            selectedRoute: selectedRouteBinding,
+            recentSessions: sessionCatalog.recentSessions,
+            statusModel: dashboardStatusSummaryModel(route: route)
+          )
+        } detail: {
         DashboardBannerStack(store: store) {
           DashboardRouteContent(
             route: route,

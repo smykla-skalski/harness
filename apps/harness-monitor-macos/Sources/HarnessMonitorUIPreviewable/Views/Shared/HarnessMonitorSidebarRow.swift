@@ -3,6 +3,7 @@ import SwiftUI
 
 struct HarnessMonitorSidebarRow: View {
   let title: String
+  var subtitle: String? = nil
   let systemImage: String
   var severityShape: HarnessMonitorSidebarSeverityShape = .none
   var severityTint: Color = .gray
@@ -29,16 +30,31 @@ struct HarnessMonitorSidebarRow: View {
             .offset(x: metrics.severityIndicatorOffset, y: -metrics.severityIndicatorOffset)
         }
 
-      Text(title)
-        .scaledFont(.body)
-        .lineLimit(1)
+      VStack(alignment: .leading, spacing: subtitle == nil ? 0 : 1) {
+        Text(title)
+          .scaledFont(.body)
+          .lineLimit(1)
+        if let subtitle, subtitle.isEmpty == false {
+          Text(subtitle)
+            .scaledFont(.caption)
+            .foregroundStyle(.secondary)
+            .lineLimit(1)
+        }
+      }
       Spacer(minLength: 0)
     }
     .padding(.vertical, metrics.verticalPadding)
     .frame(maxWidth: .infinity, minHeight: metrics.minHeight, alignment: .leading)
     .contentShape(Rectangle())
     .accessibilityElement(children: .combine)
-    .accessibilityLabel(title)
+    .accessibilityLabel(accessibilityLabel)
+  }
+
+  private var accessibilityLabel: String {
+    if let subtitle, subtitle.isEmpty == false {
+      return "\(title), \(subtitle)"
+    }
+    return title
   }
 
   @ViewBuilder private var severityIndicator: some View {

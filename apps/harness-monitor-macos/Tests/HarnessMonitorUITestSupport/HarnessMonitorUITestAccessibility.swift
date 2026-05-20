@@ -157,8 +157,6 @@ enum HarnessMonitorUITestAccessibility {
   static let dashboardOpenFolderButton = "harness.dashboard.open-folder"
   static let sessionsBoardRoot = dashboardWindowRoot
   static let sessionsBoardScrollView = dashboardScrollView
-  static let recentSessionsCard = "harness.board.recent-sessions-card"
-  static let recentSessionsCardFrame = "harness.board.recent-sessions-card.frame"
   static let contentRoot = "harness.content.root"
   static let contentRootFrame = "harness.content.root.frame"
   static let contentAcpBridgeBanner = "harness.content.acp-bridge.banner"
@@ -292,14 +290,6 @@ enum HarnessMonitorUITestAccessibility {
 
   static func sessionRow(_ sessionID: String) -> String {
     "harness.sidebar.session.\(slug(sessionID))"
-  }
-
-  static func dashboardSessionCard(_ sessionID: String) -> String {
-    "harness.board.session.\(slug(sessionID))"
-  }
-
-  static func dashboardSessionCardFrame(_ sessionID: String) -> String {
-    "\(dashboardSessionCard(sessionID)).frame"
   }
 
   static func dashboardWindowRoute(_ route: String) -> String {
