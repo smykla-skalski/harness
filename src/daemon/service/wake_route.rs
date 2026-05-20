@@ -211,11 +211,7 @@ pub(crate) fn wake_route_for_registration<'a>(
             kind: ManagedAgentKind::Codex,
             id: run_id,
         }) => codex_route(run_id, dispatch.codex),
-        Some(ManagedAgentRef {
-            kind: ManagedAgentKind::OpenRouter,
-            ..
-        })
-        | None => WakeRoute::None {
+        None => WakeRoute::None {
             reason: NoneReason::Unmanaged,
         },
     }

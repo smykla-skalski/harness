@@ -483,6 +483,5 @@ const fn managed_agent_snapshot_kind(snapshot: &ManagedAgentSnapshot) -> &'stati
         ManagedAgentSnapshot::Terminal(_) => "terminal",
         ManagedAgentSnapshot::Codex(_) => "codex",
         ManagedAgentSnapshot::Acp(_) => "acp",
-        ManagedAgentSnapshot::OpenRouter(_) => "openrouter",
     }
 }

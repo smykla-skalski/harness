@@ -98,13 +98,11 @@ pub(in crate::daemon::http) fn test_http_state_with_db() -> DaemonHttpState {
             async_db.clone(),
         ),
         agent_tui_manager: AgentTuiManagerHandle::new_with_async_db(
-            sender.clone(),
+            sender,
             db_slot,
             async_db,
             false,
         ),
-        openrouter_agent_manager:
-            crate::daemon::openrouter_agent::OpenRouterAgentManagerHandle::new(sender),
         managed_agent_mutation_locks: super::super::ManagedAgentMutationLocks::default(),
     }
 }
@@ -141,9 +139,7 @@ pub(in crate::daemon::http) fn test_http_state_with_sync_db_only(
         db_path: Some(db_path.to_path_buf()),
         codex_controller: CodexControllerHandle::new(sender.clone(), db_slot.clone(), false),
         acp_agent_manager: AcpAgentManagerHandle::new(sender.clone(), db_slot.clone()),
-        agent_tui_manager: AgentTuiManagerHandle::new(sender.clone(), db_slot, false),
-        openrouter_agent_manager:
-            crate::daemon::openrouter_agent::OpenRouterAgentManagerHandle::new(sender),
+        agent_tui_manager: AgentTuiManagerHandle::new(sender, db_slot, false),
         managed_agent_mutation_locks: super::super::ManagedAgentMutationLocks::default(),
     }
 }
