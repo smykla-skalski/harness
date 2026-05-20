@@ -4,21 +4,16 @@ private typealias Accessibility = HarnessMonitorUITestAccessibility
 
 @MainActor
 final class HarnessMonitorLayoutUITests: HarnessMonitorUITestCase {
-  func testPreviewRecentSessionsCardFillsColumn() throws {
+  func testPreviewRecentSessionsMoveIntoDashboardSidebar() throws {
     let app = launch(mode: "preview")
-    let boardRoot = element(in: app, identifier: Accessibility.sessionsBoardRoot)
-    let recentSessionsCard = frameElement(
-      in: app, identifier: Accessibility.recentSessionsCardFrame)
-
-    XCTAssertTrue(boardRoot.waitForExistence(timeout: Self.actionTimeout))
-    XCTAssertTrue(recentSessionsCard.waitForExistence(timeout: Self.actionTimeout))
-
-    assertFillsColumn(
-      child: recentSessionsCard,
-      in: boardRoot,
-      expectedHorizontalInset: 24,
-      tolerance: 8
+    let dashboardSidebar = element(in: app, identifier: Accessibility.dashboardSidebar)
+    let previewSessionRow = sessionTrigger(
+      in: app,
+      identifier: Accessibility.sessionRow(Accessibility.previewSessionID)
     )
+
+    XCTAssertTrue(dashboardSidebar.waitForExistence(timeout: Self.actionTimeout))
+    XCTAssertTrue(previewSessionRow.waitForExistence(timeout: Self.actionTimeout))
   }
 
   func testDashboardRemovesSummaryMetricCards() throws {
@@ -37,19 +32,15 @@ final class HarnessMonitorLayoutUITests: HarnessMonitorUITestCase {
     )
   }
 
-  func testRemovingDashboardSessionCardHidesItImmediately() throws {
+  func testRemovingDashboardSessionRowHidesItImmediately() throws {
     let app = launch(
       mode: "preview",
       additionalEnvironment: ["HARNESS_MONITOR_PREVIEW_SCENARIO": "dashboard-landing"]
     )
     let boardRoot = element(in: app, identifier: Accessibility.sessionsBoardRoot)
-    let sessionCard = sessionTrigger(
+    let sessionRow = sessionTrigger(
       in: app,
-      identifier: Accessibility.dashboardSessionCard(Accessibility.previewSessionID)
-    )
-    let sessionCardFrame = frameElement(
-      in: app,
-      identifier: Accessibility.dashboardSessionCardFrame(Accessibility.previewSessionID)
+      identifier: Accessibility.sessionRow(Accessibility.previewSessionID)
     )
     let cockpitScrollView = frameElement(
       in: app,
@@ -64,31 +55,29 @@ final class HarnessMonitorLayoutUITests: HarnessMonitorUITestCase {
       """
     )
     XCTAssertTrue(
-      sessionCardFrame.waitForExistence(timeout: Self.actionTimeout),
-      "Dashboard session card frame should be visible before opening its context menu"
+      sessionRow.waitForExistence(timeout: Self.actionTimeout),
+      "Dashboard sidebar session row should be visible before opening its context menu"
     )
 
-    let contextMenuTarget = sessionCard.exists ? sessionCard : sessionCardFrame
-    if rightClickElementReliably(in: app, element: contextMenuTarget) == false {
-      recordDiagnosticsSnapshot(in: app, named: "dashboard-card-context-menu-target-missing")
-      XCTFail("Dashboard session cards should expose the native remove-session context menu")
+    if rightClickElementReliably(in: app, element: sessionRow) == false {
+      recordDiagnosticsSnapshot(in: app, named: "dashboard-row-context-menu-target-missing")
+      XCTFail("Dashboard sidebar session rows should expose the native remove-session context menu")
     }
 
     let removeSessionItem = app.menuItems["Remove Session..."].firstMatch
     if removeSessionItem.waitForExistence(timeout: Self.fastActionTimeout) == false {
-      recordDiagnosticsSnapshot(in: app, named: "dashboard-card-context-menu-missing-remove")
+      recordDiagnosticsSnapshot(in: app, named: "dashboard-row-context-menu-missing-remove")
       XCTFail(
         """
-        Dashboard session card context menu should expose Remove Session...
-        buttonExists=\(sessionCard.exists)
-        frameExists=\(sessionCardFrame.exists)
+        Dashboard sidebar session row context menu should expose Remove Session...
+        rowExists=\(sessionRow.exists)
         """
       )
     }
 
     XCTAssertTrue(
       removeSessionItem.exists,
-      "Dashboard session cards should expose Remove Session... in the native context menu"
+      "Dashboard sidebar session rows should expose Remove Session... in the native context menu"
     )
     removeSessionItem.tap()
 
@@ -107,28 +96,28 @@ final class HarnessMonitorLayoutUITests: HarnessMonitorUITestCase {
 
     XCTAssertTrue(waitForElement(boardRoot, timeout: Self.fastActionTimeout))
     XCTAssertTrue(
-      waitUntil(timeout: Self.fastActionTimeout) { !sessionCardFrame.exists },
-      "Removed sessions should disappear from the dashboard card list immediately"
+      waitUntil(timeout: Self.fastActionTimeout) { !sessionRow.exists },
+      "Removed sessions should disappear from the dashboard sidebar immediately"
     )
   }
 
-  func testDashboardSessionCardDoesNotExposeRawSessionID() throws {
+  func testDashboardSessionRowDoesNotExposeRawSessionID() throws {
     let app = launch(
       mode: "preview",
       additionalEnvironment: ["HARNESS_MONITOR_PREVIEW_SCENARIO": "dashboard-landing"]
     )
-    let sessionCard = sessionTrigger(
+    let sessionRow = sessionTrigger(
       in: app,
-      identifier: Accessibility.dashboardSessionCard(Accessibility.previewSessionID)
+      identifier: Accessibility.sessionRow(Accessibility.previewSessionID)
     )
 
-    XCTAssertTrue(sessionCard.waitForExistence(timeout: Self.actionTimeout))
+    XCTAssertTrue(sessionRow.waitForExistence(timeout: Self.actionTimeout))
     XCTAssertEqual(
-      sessionCard.descendants(matching: .any).matching(
+      sessionRow.descendants(matching: .any).matching(
         NSPredicate(format: "label CONTAINS %@", Accessibility.previewSessionID)
       ).count,
       0,
-      "Dashboard session cards should not surface raw session IDs below the session title"
+      "Dashboard session rows should not surface raw session IDs in the sidebar"
     )
   }
 

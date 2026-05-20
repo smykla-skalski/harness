@@ -111,14 +111,26 @@ struct HarnessMonitorUITestAccessibilityRegistryMoreTests {
   @Test("Dashboard route sidebar stays accessibility-addressable")
   func dashboardRouteSidebarStaysAccessibilityAddressable() throws {
     let dashboardView = try sourceFile(named: "DashboardWindowSupport.swift")
+    let dashboardSidebarSessionsView = try sourceFile(
+      named: "DashboardSidebarRecentSessionsSection.swift"
+    )
     let sharedSidebarView = try sourceFile(named: "HarnessMonitorSidebar.swift")
 
     #expect(dashboardView.contains("HarnessMonitorAccessibility.dashboardSidebar"))
     #expect(
       dashboardView.contains("HarnessMonitorAccessibility.dashboardWindowRoute(route.rawValue)"))
+    #expect(
+      dashboardSidebarSessionsView.contains(
+        "HarnessMonitorAccessibility.sessionRow(session.sessionId)"
+      )
+    )
     #expect(dashboardView.contains("HarnessMonitorSidebar("))
     #expect(dashboardView.contains("List(selection: dashboardSelectionBinding)"))
     #expect(dashboardView.contains("SessionSidebarRow("))
+    #expect(dashboardView.contains("Section(\"Routes\")"))
+    #expect(dashboardView.contains("DashboardSidebarRecentSessionsSection("))
+    #expect(dashboardSidebarSessionsView.contains("Section(\"Sessions\")"))
+    #expect(dashboardSidebarSessionsView.contains("subtitle: subtitle"))
     #expect(dashboardView.contains(".harnessMonitorSidebarListChrome("))
     #expect(
       dashboardView.contains(".accessibilityValue(isSelected ? \"selected\" : \"not selected\")"))

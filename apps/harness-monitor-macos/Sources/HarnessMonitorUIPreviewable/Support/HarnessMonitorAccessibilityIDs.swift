@@ -93,7 +93,6 @@ public enum HarnessMonitorAccessibility {
   public static let dashboardOpenFolderButton = "harness.dashboard.open-folder"
   public static let sessionsBoardRoot = "harness.board.root"
   public static let sessionsBoardScrollView = "harness.board.scroll"
-  public static let recentSessionsCard = "harness.board.recent-sessions-card"
   public static let openRecentRoot = "harness.open.recent"
   public static let openRecentProjectList = "harness.open.recent.projects"
   public static let openRecentOpenFolderButton = "harness.open.recent.open-folder"

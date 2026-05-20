@@ -11,9 +11,9 @@ final class HarnessMonitorPerfTests: HarnessMonitorUITestCase {
     let launched = launchForPerf(app: app, scenario: "open-recent-window")
     let dashboardRoot = element(in: launched, identifier: Accessibility.dashboardWindowRoot)
     let dashboardScrollView = element(in: launched, identifier: Accessibility.dashboardScrollView)
-    let sessionCard = element(
+    let sessionRow = element(
       in: launched,
-      identifier: Accessibility.dashboardSessionCard(Self.previewSessionID)
+      identifier: Accessibility.sessionRow(Self.previewSessionID)
     )
     let sessionWindow = element(in: launched, identifier: Accessibility.sessionWindowShell)
 
@@ -21,7 +21,7 @@ final class HarnessMonitorPerfTests: HarnessMonitorUITestCase {
 
     XCTAssertTrue(dashboardRoot.waitForExistence(timeout: Self.uiTimeout))
     XCTAssertTrue(dashboardScrollView.waitForExistence(timeout: Self.uiTimeout))
-    XCTAssertTrue(sessionCard.waitForExistence(timeout: Self.uiTimeout))
+    XCTAssertTrue(sessionRow.waitForExistence(timeout: Self.uiTimeout))
     XCTAssertFalse(sessionWindow.exists)
 
     launched.terminate()
