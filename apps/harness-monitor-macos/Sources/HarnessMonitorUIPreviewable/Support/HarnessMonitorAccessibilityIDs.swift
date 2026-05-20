@@ -228,6 +228,15 @@ public enum HarnessMonitorAccessibility {
   public static let agentTuiNavigateForwardButton = "harness.sheet.agent-tui.navigate-forward"
   public static let newSessionSheet = "harness.new-session.sheet"
   public static let newCodexAgentSheet = "harness.new-codex-agent.sheet"
+  public static let newOpenRouterAgentSheet = "harness.new-openrouter-agent.sheet"
+  public static let sessionOpenRouterRunRow = "harness.session.openrouter-run-row"
+  public static let sessionOpenRouterRunDetail = "harness.session.openrouter-run-detail"
+  public static let sessionOpenRouterRunPromptField =
+    "harness.session.openrouter-run.prompt-field"
+  public static let sessionOpenRouterRunSendButton =
+    "harness.session.openrouter-run.send-button"
+  public static let sessionOpenRouterRunCancelButton =
+    "harness.session.openrouter-run.cancel-button"
   public static let newSessionTitle = "harness.new-session.title"
   public static let newSessionContext = "harness.new-session.context"
   public static let newSessionBaseRef = "harness.new-session.base-ref"

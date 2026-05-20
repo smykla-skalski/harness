@@ -103,6 +103,42 @@ struct OpenRouterManagedAgentTests {
     #expect(empty.isEmpty)
   }
 
+  @Test("AcpPermissionBatch decoder accepts the open_router family for OpenRouter sessions")
+  func acpPermissionBatchAcceptsOpenRouterFamily() throws {
+    let payload = """
+      {
+        "batch_id": "batch-or-1",
+        "managed_agent_id": "openrouter-1",
+        "managed_agent_family": "open_router",
+        "session_id": "11111111-1111-4111-8111-111111111111",
+        "requests": [],
+        "created_at": "2026-05-20T00:00:00Z",
+        "expires_at": "2026-05-20T00:05:00Z"
+      }
+      """.data(using: .utf8)!
+    let decoder = JSONDecoder()
+    let batch = try decoder.decode(AcpPermissionBatch.self, from: payload)
+    #expect(batch.acpId == "openrouter-1")
+  }
+
+  @Test("OpenRouterModelEntry decodes context_length and supported_parameters")
+  func openRouterModelEntryDecodes() throws {
+    let payload = """
+      {
+        "id": "anthropic/claude-3.7-sonnet",
+        "name": "Claude 3.7 Sonnet",
+        "context_length": 200000,
+        "supported_parameters": ["temperature", "max_tokens"]
+      }
+      """.data(using: .utf8)!
+    let decoder = JSONDecoder()
+    decoder.keyDecodingStrategy = .convertFromSnakeCase
+    let entry = try decoder.decode(OpenRouterModelEntry.self, from: payload)
+    #expect(entry.id == "anthropic/claude-3.7-sonnet")
+    #expect(entry.contextLength == 200000)
+    #expect(entry.supportedParameters == ["temperature", "max_tokens"])
+  }
+
   @Test("HTTP and WebSocket OpenRouter start paths return the same managed-agent envelope")
   func startManagedOpenRouterAgentEnvelope() async throws {
     let fixture = OpenRouterRunSnapshot(

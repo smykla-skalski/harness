@@ -14,6 +14,8 @@ private struct HarnessMonitorSheetMetrics {
       Self(minWidth: 480, idealWidth: 560, minHeight: 360)
     case .newCodexAgent:
       Self(minWidth: 500, idealWidth: 620, minHeight: 420)
+    case .newOpenRouterAgent:
+      Self(minWidth: 500, idealWidth: 620, minHeight: 420)
     case .attachExternal:
       Self(minWidth: 480, idealWidth: 560, minHeight: 360)
     case .signalDetail:
@@ -65,6 +67,8 @@ struct HarnessMonitorSheetRouter: View {
       }
     case .newCodexAgent(let sessionID):
       NewCodexAgentSheet(store: store, sessionID: sessionID)
+    case .newOpenRouterAgent(let sessionID):
+      NewOpenRouterAgentSheet(store: store, sessionID: sessionID)
     case .attachExternal(let bookmarkID, let preview):
       AttachSessionSheetView(store: store, bookmarkID: bookmarkID, preview: preview)
     case .signalDetail(let signalID):

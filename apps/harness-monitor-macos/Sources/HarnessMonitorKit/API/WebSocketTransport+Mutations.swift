@@ -299,6 +299,11 @@ extension WebSocketTransport {
     return try decode(value)
   }
 
+  public func listOpenRouterModels() async throws -> OpenRouterModelListResponse {
+    let value = try await rpc(method: .managedAgentOpenRouterModels, params: .object([:]))
+    return try decode(value)
+  }
+
   public func sendManagedAgentInput(
     agentID: String,
     request: AgentTuiInputRequest

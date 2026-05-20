@@ -34,6 +34,7 @@ public enum ManagedAgentKind: String, Codable, Sendable {
   case tui
   case acp
   case codex
+  case openRouter = "open_router"
 }
 
 public struct ManagedAgentRef: Codable, Equatable, Sendable {
