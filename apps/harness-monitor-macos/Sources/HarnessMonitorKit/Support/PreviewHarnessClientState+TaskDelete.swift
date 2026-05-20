@@ -5,12 +5,12 @@ extension PreviewHarnessClientState {
     guard let detail = detail(for: sessionID, scope: nil) else {
       throw HarnessMonitorAPIError.server(
         code: 404,
-        message: "No preview session detail available."
+        message: "No preview session detail available"
       )
     }
 
     guard detail.tasks.contains(where: { $0.taskId == taskID }) else {
-      throw HarnessMonitorAPIError.server(code: 404, message: "No preview task available.")
+      throw HarnessMonitorAPIError.server(code: 404, message: "No preview task available")
     }
 
     let tasks = detail.tasks.filter { $0.taskId != taskID }

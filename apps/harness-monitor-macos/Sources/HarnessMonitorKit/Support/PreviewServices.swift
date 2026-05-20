@@ -33,7 +33,7 @@ actor PreviewHostBridgeState {
     case .unsupported:
       throw HarnessMonitorAPIError.server(code: 501, message: "Host bridge unavailable")
     case .missingRoute:
-      throw HarnessMonitorAPIError.server(code: 404, message: "Route not found.")
+      throw HarnessMonitorAPIError.server(code: 404, message: "Route not found")
     case .bridgeStopped:
       throw HarnessMonitorAPIError.server(code: 400, message: "bridge is not running")
     case .apply:

@@ -346,7 +346,7 @@ extension PreviewHarnessClientState {
   }
 
   private func taskBoardItemUnavailable() -> HarnessMonitorAPIError {
-    HarnessMonitorAPIError.server(code: 404, message: "Task board item unavailable.")
+    HarnessMonitorAPIError.server(code: 404, message: "Task board item unavailable")
   }
 
   private func statusCounts(for items: [TaskBoardItem]) -> [TaskBoardStatusCount] {

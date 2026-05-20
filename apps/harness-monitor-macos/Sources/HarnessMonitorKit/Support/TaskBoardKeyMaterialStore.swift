@@ -9,9 +9,9 @@ public enum TaskBoardKeyMaterialStoreError: LocalizedError, Equatable {
   public var errorDescription: String? {
     switch self {
     case .unexpectedStatus(let status):
-      "Key-material store failed with Keychain status \(status)."
+      "Key-material store failed with Keychain status \(status)"
     case .invalidPayload:
-      "Stored key material is unreadable."
+      "Stored key material is unreadable"
     }
   }
 }
@@ -99,7 +99,7 @@ public struct TaskBoardKeyMaterialStore: TaskBoardKeyMaterialPersisting, Sendabl
       case .global:
         "global"
       case .repository(let slug):
-        "repo." + Self.hashRepository(slug)
+        "repo" + Self.hashRepository(slug)
       }
     }
 

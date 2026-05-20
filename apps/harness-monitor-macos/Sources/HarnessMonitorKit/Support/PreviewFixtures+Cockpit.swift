@@ -20,7 +20,7 @@ extension PreviewFixtures {
         lastSeenLine: 48,
         occurrenceCount: 2,
         fixSafety: "triage_required",
-        evidenceExcerpt: "No progress checkpoint after 12 minutes."
+        evidenceExcerpt: "No progress checkpoint after 12 minutes"
       ),
       ObserverIssueSummary(
         issueId: "issue-2",
@@ -33,7 +33,7 @@ extension PreviewFixtures {
         lastSeenLine: 76,
         occurrenceCount: 1,
         fixSafety: "safe",
-        evidenceExcerpt: "Prefer the Harness daemon API for session detail."
+        evidenceExcerpt: "Prefer the Harness daemon API for session detail"
       ),
       ObserverIssueSummary(
         issueId: "issue-3",
@@ -46,7 +46,7 @@ extension PreviewFixtures {
         lastSeenLine: 94,
         occurrenceCount: 3,
         fixSafety: "safe",
-        evidenceExcerpt: "Retry pattern needs a softer heuristic."
+        evidenceExcerpt: "Retry pattern needs a softer heuristic"
       ),
     ],
     mutedCodes: ["agent_repeated_error"],
@@ -138,7 +138,7 @@ extension PreviewFixtures {
     branchRef: "harness/sessempty",
     title: "Harness Monitor Empty Cockpit",
     context:
-      "Preview the compact cockpit placeholders without tasks, agents, signals, or timeline activity.",
+      "Preview the compact cockpit placeholders without tasks, agents, signals, or timeline activity",
     status: .awaitingLeader,
     createdAt: "2026-03-28T14:05:00Z",
     updatedAt: "2026-03-28T14:20:00Z",
@@ -189,7 +189,7 @@ extension PreviewFixtures {
       sessionId: summary.sessionId,
       agentId: "worker-codex",
       taskId: "task-ui",
-      summary: "Checkpoint 70%: Cockpit timeline rows and metric cards are now live-backed.",
+      summary: "Checkpoint 70%: Cockpit timeline rows and metric cards are now live-backed",
       payload: .object(["progress": .number(70)])
     ),
     TimelineEntry(
@@ -268,8 +268,8 @@ extension PreviewFixtures {
       let kind = index.isMultiple(of: 4) ? "task_checkpoint" : "tool_result"
       let entrySummary =
         index.isMultiple(of: 4)
-        ? "Checkpoint \(min(99, 72 + batch + index % 6))%: timeline diff batch \(batch) committed."
-        : "worker-codex processed preview burst event \(index + 1) in batch \(batch)."
+        ? "Checkpoint \(min(99, 72 + batch + index % 6))%: timeline diff batch \(batch) committed"
+        : "worker-codex processed preview burst event \(index + 1) in batch \(batch)"
 
       return TimelineEntry(
         entryId: "perf-timeline-\(batch)-\(index)",

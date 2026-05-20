@@ -10,7 +10,7 @@ extension PreviewFixtures {
           kind: "approval_required",
           agentID: "worker-codex",
           taskID: "task-ui",
-          summary: "Worker requested approval for the focused preview render.",
+          summary: "Worker requested approval for the focused preview render",
           payload: .object(["decisionID": .string("decision-preview-approval")])
         )),
       sessionTimelineEntry(
@@ -20,7 +20,7 @@ extension PreviewFixtures {
           kind: "tool_failed",
           agentID: "worker-codex",
           taskID: "task-ui",
-          summary: "Preview render failed once while the host was still reconnecting.",
+          summary: "Preview render failed once while the host was still reconnecting",
           payload: .object(["tool": .string("preview-renderer"), "status": .string("failed")])
         )),
       sessionTimelineEntry(
@@ -30,7 +30,7 @@ extension PreviewFixtures {
           kind: "retry_warning",
           agentID: "leader-claude",
           taskID: "task-ui",
-          summary: "Leader queued a bounded retry after the first render timeout.",
+          summary: "Leader queued a bounded retry after the first render timeout",
           payload: .object(["attempt": .number(2)])
         )),
       sessionTimelineEntry(
@@ -40,7 +40,7 @@ extension PreviewFixtures {
           kind: "scroll_checkpoint",
           agentID: "worker-codex",
           taskID: "task-ui",
-          summary: "Fast-fling scroll audit reached the older-window prefetch band.",
+          summary: "Fast-fling scroll audit reached the older-window prefetch band",
           payload: .object(["visibleRows": .number(6), "loadedEvents": .number(24)])
         )),
       sessionTimelineEntry(
@@ -50,7 +50,7 @@ extension PreviewFixtures {
           kind: "task_completed",
           agentID: "worker-codex",
           taskID: "task-ui",
-          summary: "Timeline visibility stats stabilized after variable row heights.",
+          summary: "Timeline visibility stats stabilized after variable row heights",
           payload: .object(["result": .string("success")])
         )),
       sessionTimelineEntry(
@@ -60,7 +60,7 @@ extension PreviewFixtures {
           kind: "signal_sent",
           agentID: "leader-claude",
           taskID: nil,
-          summary: "Leader sent validation context to the monitor worker.",
+          summary: "Leader sent validation context to the monitor worker",
           payload: .object(["command": .string("validate_scroll_window")])
         )),
     ] + Array(pagedTimeline.prefix(12))
@@ -244,7 +244,7 @@ extension PreviewFixtures {
           ruleID: "idle-session",
           agentID: "gemini-20260504124513402981000",
           taskID: nil,
-          summary: "Session nod8ccog has had no activity for over 600s.",
+          summary: "Session nod8ccog has had no activity for over 600s",
           createdAt: previewDate("2026-05-04T13:17:42Z"),
           actionsJSON: idleSessionActionsJSON
         ))
@@ -260,7 +260,7 @@ extension PreviewFixtures {
           ruleID: "codex.approval",
           agentID: "worker-codex",
           taskID: "task-ui",
-          summary: "Approve retrying the preview render after host reconnect.",
+          summary: "Approve retrying the preview render after host reconnect",
           createdAt: Date(timeIntervalSince1970: 1_774_700_655),
           actionsJSON: approvalActionsJSON
         )),
@@ -271,7 +271,7 @@ extension PreviewFixtures {
           ruleID: "timeline.fast_fling_gap",
           agentID: "worker-codex",
           taskID: "task-ui",
-          summary: "Fast fling found a missing loaded-window buffer.",
+          summary: "Fast fling found a missing loaded-window buffer",
           createdAt: Date(timeIntervalSince1970: 1_774_700_610),
           actionsJSON: repairActionsJSON
         )),
@@ -282,7 +282,7 @@ extension PreviewFixtures {
           ruleID: "timeline.preview_richness",
           agentID: "leader-claude",
           taskID: "task-ui",
-          summary: "Preview should show warning, success, info, and action states.",
+          summary: "Preview should show warning, success, info, and action states",
           createdAt: Date(timeIntervalSince1970: 1_774_700_555),
           actionsJSON: previewActionsJSON
         )),

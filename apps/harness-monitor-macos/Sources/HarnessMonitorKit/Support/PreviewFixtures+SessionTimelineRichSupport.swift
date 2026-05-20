@@ -109,7 +109,7 @@ extension PreviewFixtures {
 
   private static let idleSessionNudgePayloadJSON = encodedPayloadJSON(
     agentID: "gemini-20260504124513402981000",
-    input: "Quick check-in from Harness Monitor supervisor for idle session nod8ccog."
+    input: "Quick check-in from Harness Monitor supervisor for idle session nod8ccog"
   )
 
   private static func actionsJSON(_ actions: [PreviewDecisionActionSpec]) -> String {
