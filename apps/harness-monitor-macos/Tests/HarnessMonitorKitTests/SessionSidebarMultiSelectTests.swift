@@ -97,6 +97,7 @@ struct SessionSidebarMultiSelectTests {
       store: store,
       snapshot: nil,
       sessionCodexRuns: [],
+      sessionOpenRouterRuns: [],
       decisions: [],
       decisionIDs: [],
       statusModel: SessionStatusSummaryModel(
