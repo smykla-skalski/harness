@@ -102,6 +102,9 @@ struct SettingsScrollRestorationModifier: ViewModifier {
             for: SettingsScrollState.self,
             of: Self.scrollState
           ) { _, newState in
+            if pendingRestore?.section == section, scrollPosition.isPositionedByUser {
+              cancelRestore(for: section, observedOffset: newState.offsetY)
+            }
             guard !waitForPendingRestore(newState, for: section) else {
               return
             }
@@ -116,7 +119,7 @@ struct SettingsScrollRestorationModifier: ViewModifier {
           }
           .onChange(of: isRestorationSuspended, initial: true) { _, isSuspended in
             guard isSuspended else { return }
-            cancelRestore(for: section)
+            cancelRestore(for: section, observedOffset: nil)
           }
           .onDisappear {
             guard pendingRestore?.section != section else {
@@ -140,7 +143,7 @@ struct SettingsScrollRestorationModifier: ViewModifier {
 
   private func restoreScrollPosition(for section: SettingsSection) {
     guard !isRestorationSuspended else {
-      cancelRestore(for: section)
+      cancelRestore(for: section, observedOffset: nil)
       return
     }
 
@@ -166,10 +169,16 @@ struct SettingsScrollRestorationModifier: ViewModifier {
     }
   }
 
-  private func cancelRestore(for section: SettingsSection) {
+  private func cancelRestore(
+    for section: SettingsSection,
+    observedOffset: CGFloat?
+  ) {
     restoreGeneration &+= 1
     pendingRestore = nil
     restoredSection = section
+    if let observedOffset {
+      lastObservedOffset = observedOffset
+    }
     lastPersistedOffset = SettingsRestorationDefaults.scrollOffset(for: section)
   }
 
