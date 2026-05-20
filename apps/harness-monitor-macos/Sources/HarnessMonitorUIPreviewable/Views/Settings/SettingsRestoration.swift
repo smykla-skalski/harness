@@ -91,6 +91,7 @@ struct SettingsScrollRestorationModifier: ViewModifier {
   @State private var pendingRestore: PendingRestore?
   @State private var restoreGeneration: UInt64 = 0
   @State private var restoredSection: SettingsSection?
+  @State private var scrollPhase: ScrollPhase = .idle
   @State private var scrollPosition = ScrollPosition()
 
   func body(content: Content) -> some View {
@@ -102,7 +103,9 @@ struct SettingsScrollRestorationModifier: ViewModifier {
             for: SettingsScrollState.self,
             of: Self.scrollState
           ) { _, newState in
-            if pendingRestore?.section == section, scrollPosition.isPositionedByUser {
+            if pendingRestore?.section == section,
+              SettingsScrollRestorationPhasePolicy.cancelsPendingRestore(scrollPhase)
+            {
               cancelRestore(for: section, observedOffset: newState.offsetY)
             }
             guard !waitForPendingRestore(newState, for: section) else {
@@ -116,6 +119,18 @@ struct SettingsScrollRestorationModifier: ViewModifier {
           }
           .onChange(of: section, initial: true) { _, newSection in
             restoreScrollPosition(for: newSection)
+          }
+          .onScrollPhaseChange { _, newPhase, context in
+            scrollPhase = newPhase
+            guard pendingRestore?.section == section,
+              SettingsScrollRestorationPhasePolicy.cancelsPendingRestore(newPhase)
+            else {
+              return
+            }
+            cancelRestore(
+              for: section,
+              observedOffset: Self.scrollState(context.geometry).offsetY
+            )
           }
           .onChange(of: isRestorationSuspended, initial: true) { _, isSuspended in
             guard isSuspended else { return }
@@ -150,6 +165,7 @@ struct SettingsScrollRestorationModifier: ViewModifier {
     restoreGeneration &+= 1
     let generation = restoreGeneration
     let offset = SettingsRestorationDefaults.scrollOffset(for: section)
+    scrollPhase = .idle
     lastObservedOffset = offset
     lastPersistedOffset = offset
     if offset > 0 {
@@ -246,5 +262,16 @@ struct SettingsScrollRestorationModifier: ViewModifier {
   private struct SettingsScrollState: Equatable {
     var offsetY: CGFloat
     var maxOffsetY: CGFloat
+  }
+}
+
+enum SettingsScrollRestorationPhasePolicy {
+  static func cancelsPendingRestore(_ phase: ScrollPhase) -> Bool {
+    switch phase {
+    case .tracking, .interacting, .decelerating:
+      true
+    case .idle, .animating:
+      false
+    }
   }
 }
