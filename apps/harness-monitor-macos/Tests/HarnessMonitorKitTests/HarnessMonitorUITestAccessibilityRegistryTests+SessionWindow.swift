@@ -117,7 +117,7 @@ extension HarnessMonitorUITestAccessibilityRegistryTests {
     #expect(dashboardView.contains("HarnessMonitorSidebar("))
     #expect(dashboardView.contains("List(selection: dashboardSelectionBinding)"))
     #expect(dashboardView.contains("SessionSidebarRow("))
-    #expect(dashboardView.contains("Section(\"Routes\")"))
+    #expect(!dashboardView.contains("Section(\"Routes\")"))
     #expect(dashboardView.contains("DashboardSidebarRecentSessionsSection("))
     #expect(dashboardSidebarSessionsView.contains("Section(\"Sessions\")"))
     #expect(dashboardSidebarSessionsView.contains("SessionSidebarRow("))

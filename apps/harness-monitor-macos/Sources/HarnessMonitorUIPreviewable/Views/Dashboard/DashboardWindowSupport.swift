@@ -207,7 +207,7 @@ struct DashboardSidebar: View {
         statusModel: statusModel
       ) {
         List(selection: dashboardSelectionBinding) {
-          Section("Routes") {
+          Section {
             ForEach(DashboardWindowRoute.allCases, id: \.id) { route in
               let isSelected = selectedRoute == route
               SessionSidebarRow(
