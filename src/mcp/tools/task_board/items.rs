@@ -4,7 +4,8 @@ use serde_json::{Value, json};
 use crate::daemon::protocol::{
     TaskBoardCreateItemRequest, TaskBoardDeleteItemRequest, TaskBoardGetItemRequest,
     TaskBoardListItemsRequest, TaskBoardPlanApproveRequest, TaskBoardPlanBeginRequest,
-    TaskBoardPlanSubmitRequest, TaskBoardUpdateItemRequest, ws_methods,
+    TaskBoardPlanRevokeRequest, TaskBoardPlanSubmitRequest, TaskBoardUpdateItemRequest,
+    ws_methods,
 };
 use crate::mcp::tool::ToolRegistry;
 
@@ -73,8 +74,26 @@ pub(super) fn register(registry: &mut ToolRegistry) {
                 input_schema: plan_approve_schema,
                 normalize: validate_params::<TaskBoardPlanApproveRequest>,
             },
+            TaskBoardToolDescriptor {
+                name: ws_methods::TASK_BOARD_PLAN_REVOKE,
+                description: "Revoke an approved task-board plan and return it to draft.",
+                input_schema: plan_revoke_schema,
+                normalize: validate_params::<TaskBoardPlanRevokeRequest>,
+            },
         ],
     );
+}
+
+fn plan_revoke_schema() -> Value {
+    json!({
+        "type": "object",
+        "properties": {
+            "id": { "type": "string" },
+            "actor": { "type": "string" }
+        },
+        "required": ["id"],
+        "additionalProperties": false
+    })
 }
 
 fn create_schema() -> Value {
