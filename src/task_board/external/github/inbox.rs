@@ -1,7 +1,6 @@
 use std::fmt;
 
 use async_trait::async_trait;
-use serde::{Deserialize, Serialize};
 
 use crate::errors::{CliError, CliErrorKind};
 use crate::task_board::external::{
@@ -12,12 +11,9 @@ use crate::task_board::types::{TaskBoardItem, TaskBoardStatus};
 
 use super::{
     GitHubRepository, assigned_issue_query, ensure_rustls_provider, github_client_error,
-    github_external_id, github_inbox_issue_status, github_sync_error_with_context,
-    parse_github_repository, review_request_query, search_label_matches_filter,
-    warn_github_message,
+    github_external_id, github_inbox_issue_status, graphql, parse_github_repository,
+    review_request_query, search_label_matches_filter, warn_github_message,
 };
-
-const GITHUB_SEARCH_PAGE_CAP: u32 = 10;
 
 #[derive(Clone)]
 pub struct GitHubInboxSyncClient {
@@ -78,14 +74,7 @@ impl GitHubInboxSyncClient {
     }
 
     async fn current_user_login(&self) -> Result<String, CliError> {
-        let user: GitHubCurrentUser =
-            self.client
-                .get("/user", None::<&()>)
-                .await
-                .map_err(|error| {
-                    github_sync_error_with_context("loading authenticated GitHub user", error)
-                })?;
-        Ok(user.login)
+        graphql::current_user_login(&self.client).await
     }
 
     async fn search(
@@ -93,50 +82,10 @@ impl GitHubInboxSyncClient {
         repository: &GitHubRepository,
         kind: GitHubInboxSearchKind,
         login: &str,
-    ) -> Result<Vec<GitHubSearchIssuePullRequestItem>, CliError> {
+    ) -> Result<Vec<graphql::GitHubSearchIssuePullRequestItem>, CliError> {
         let query = kind.query(repository, login);
-        let mut page = 1_u32;
-        let mut items = Vec::new();
-        loop {
-            let response: GitHubSearchIssuePullRequestResponse = self
-                .client
-                .get(
-                    "/search/issues",
-                    Some(&GitHubSearchIssuePullRequestQuery {
-                        q: query.clone(),
-                        per_page: 100,
-                        page,
-                    }),
-                )
-                .await
-                .map_err(|error| github_sync_error_with_context(kind.context(repository), error))?;
-            let count = response.items.len();
-            items.extend(response.items);
-            match next_search_page(count, page) {
-                Some(next_page) => page = next_page,
-                None => break,
-            }
-        }
-        Ok(items)
+        graphql::search_issue_pull_requests(&self.client, &query, &kind.context(repository)).await
     }
-}
-
-fn next_search_page(count: usize, page: u32) -> Option<u32> {
-    if count < 100 {
-        return None;
-    }
-    if page >= GITHUB_SEARCH_PAGE_CAP {
-        warn_search_results_truncated();
-        return None;
-    }
-    Some(page + 1)
-}
-
-fn warn_search_results_truncated() {
-    warn_github_message(&format!(
-        "github search results truncated at {} hits",
-        GITHUB_SEARCH_PAGE_CAP * 100
-    ));
 }
 
 impl fmt::Debug for GitHubInboxSyncClient {
@@ -221,7 +170,7 @@ impl GitHubInboxSyncClient {
             .into_iter()
             .filter(|item| search_label_matches_filter(&item.label_names(), &self.import_labels))
             .map(|item| ExternalTask {
-                reference: github_task_ref(repository, item.number, item.html_url),
+                reference: github_task_ref(repository, item.number, item.url),
                 title: item.title,
                 body: item.body.unwrap_or_default(),
                 status: github_inbox_issue_status(item.state.as_str()),
@@ -244,7 +193,7 @@ impl GitHubInboxSyncClient {
             .into_iter()
             .filter(|item| search_label_matches_filter(&item.label_names(), &self.import_labels))
             .map(|item| ExternalTask {
-                reference: github_task_ref(repository, item.number, item.html_url),
+                reference: github_task_ref(repository, item.number, item.url),
                 title: item.title,
                 body: item.body.unwrap_or_default(),
                 status: TaskBoardStatus::NeedsYou,
@@ -312,47 +261,6 @@ impl GitHubInboxSearchKind {
             Self::ReviewRequests => format!("searching review requests in {}", repository.slug()),
         }
     }
-}
-
-#[derive(Debug, Clone, Deserialize)]
-struct GitHubCurrentUser {
-    login: String,
-}
-
-#[derive(Debug, Clone, Deserialize)]
-struct GitHubSearchIssuePullRequestResponse {
-    items: Vec<GitHubSearchIssuePullRequestItem>,
-}
-
-#[derive(Debug, Clone, Deserialize)]
-struct GitHubSearchIssuePullRequestItem {
-    number: u64,
-    title: String,
-    #[serde(default)]
-    body: Option<String>,
-    html_url: String,
-    state: String,
-    updated_at: String,
-    #[serde(default)]
-    labels: Vec<GitHubSearchLabel>,
-}
-
-impl GitHubSearchIssuePullRequestItem {
-    fn label_names(&self) -> Vec<String> {
-        self.labels.iter().map(|label| label.name.clone()).collect()
-    }
-}
-
-#[derive(Debug, Clone, Deserialize)]
-struct GitHubSearchLabel {
-    name: String,
-}
-
-#[derive(Debug, Clone, Serialize)]
-struct GitHubSearchIssuePullRequestQuery {
-    q: String,
-    per_page: u8,
-    page: u32,
 }
 
 #[cfg(test)]

@@ -22,45 +22,6 @@ fn github_inbox_search_queries_scope_assigned_issues_and_review_requests() {
 }
 
 #[test]
-fn github_inbox_search_payload_serializes_query_page_and_page_size() {
-    let payload = GitHubSearchIssuePullRequestQuery {
-        q: "repo:owner/repo is:pr review-requested:octo-user state:open".into(),
-        per_page: 100,
-        page: 2,
-    };
-
-    assert_eq!(
-        serde_json::to_value(payload).expect("serialize payload"),
-        json!({
-            "q": "repo:owner/repo is:pr review-requested:octo-user state:open",
-            "per_page": 100,
-            "page": 2
-        })
-    );
-}
-
-#[test]
-fn github_inbox_search_item_deserializes_label_names() {
-    let payload = json!({
-        "number": 42,
-        "title": "Fix bug",
-        "body": null,
-        "html_url": "https://example.com/i/42",
-        "state": "open",
-        "updated_at": "2026-05-15T00:00:00Z",
-        "labels": [{ "name": "needs-fix" }, { "name": "automation" }]
-    });
-
-    let item: GitHubSearchIssuePullRequestItem =
-        serde_json::from_value(payload).expect("deserialize search item");
-
-    assert_eq!(
-        item.label_names(),
-        vec!["needs-fix".to_string(), "automation".to_string()]
-    );
-}
-
-#[test]
 fn search_label_filter_admits_only_matching_labels() {
     assert!(search_label_matches_filter(
         &["bug".into(), "automation".into()],
@@ -77,15 +38,10 @@ fn search_label_filter_admits_only_matching_labels() {
     assert!(search_label_matches_filter(&["bug".into()], &[]));
 }
 
-#[test]
-fn github_search_page_cap_keeps_total_hits_under_one_thousand() {
-    assert_eq!(GITHUB_SEARCH_PAGE_CAP, 10);
-}
-
 #[tokio::test]
 async fn github_inbox_pull_skips_failed_repository_and_keeps_pullable_tasks() {
     let (endpoint, requests, handle) = spawn_sequence_mock(vec![
-        MockResponse::json(200, json!({ "login": "octo-user" })),
+        MockResponse::json(200, viewer_response("octo-user")),
         MockResponse::json(
             422,
             json!({
@@ -104,7 +60,7 @@ async fn github_inbox_pull_skips_failed_repository_and_keeps_pullable_tasks() {
             200,
             search_response_with_issue("https://example.test/good/7"),
         ),
-        MockResponse::json(200, json!({ "items": [] })),
+        MockResponse::json(200, empty_search_response()),
     ]);
     let client = inbox_client_with_base_uri(endpoint, &["bad/repo", "good/repo"]);
 
@@ -113,8 +69,8 @@ async fn github_inbox_pull_skips_failed_repository_and_keeps_pullable_tasks() {
     handle.join().expect("mock server");
     let requests = requests.lock().expect("requests");
     assert_eq!(requests.len(), 4);
-    assert!(requests[1].contains("repo%3Abad%2Frepo"));
-    assert!(requests[2].contains("repo%3Agood%2Frepo"));
+    assert!(requests[1].contains("repo:bad/repo"));
+    assert!(requests[2].contains("repo:good/repo"));
     assert_eq!(tasks.len(), 1);
     assert_eq!(tasks[0].reference.external_id, "good/repo#7");
 }
@@ -122,7 +78,7 @@ async fn github_inbox_pull_skips_failed_repository_and_keeps_pullable_tasks() {
 #[tokio::test]
 async fn github_inbox_pull_fails_when_no_repository_can_be_pulled() {
     let (endpoint, _requests, handle) = spawn_sequence_mock(vec![
-        MockResponse::json(200, json!({ "login": "octo-user" })),
+        MockResponse::json(200, viewer_response("octo-user")),
         MockResponse::json(
             422,
             json!({
@@ -181,15 +137,47 @@ fn inbox_client_with_base_uri(base_uri: String, repositories: &[&str]) -> GitHub
 
 fn search_response_with_issue(url: &str) -> serde_json::Value {
     json!({
-        "items": [{
-            "number": 7,
-            "title": "Keep pullable repo",
-            "body": null,
-            "html_url": url,
-            "state": "open",
-            "updated_at": "2026-05-19T00:00:00Z",
-            "labels": []
-        }]
+        "data": {
+            "search": {
+                "pageInfo": {
+                    "hasNextPage": false,
+                    "endCursor": null
+                },
+                "nodes": [{
+                    "number": 7,
+                    "title": "Keep pullable repo",
+                    "body": null,
+                    "url": url,
+                    "state": "OPEN",
+                    "updatedAt": "2026-05-19T00:00:00Z",
+                    "labels": { "nodes": [] }
+                }]
+            }
+        }
+    })
+}
+
+fn empty_search_response() -> serde_json::Value {
+    json!({
+        "data": {
+            "search": {
+                "pageInfo": {
+                    "hasNextPage": false,
+                    "endCursor": null
+                },
+                "nodes": []
+            }
+        }
+    })
+}
+
+fn viewer_response(login: &str) -> serde_json::Value {
+    json!({
+        "data": {
+            "viewer": {
+                "login": login
+            }
+        }
     })
 }
 
@@ -215,10 +203,7 @@ fn spawn_sequence_mock(
         for response in responses {
             let (mut stream, _) = listener.accept().expect("accept");
             let request = read_http_request(&mut stream);
-            captured
-                .lock()
-                .expect("captured requests")
-                .push(request_target(&request));
+            captured.lock().expect("captured requests").push(request);
             write_http_response(&mut stream, response);
         }
     });
@@ -234,20 +219,29 @@ fn read_http_request(stream: &mut TcpStream) -> String {
             break;
         }
         request.extend_from_slice(&buffer[..count]);
-        if request.windows(4).any(|window| window == b"\r\n\r\n") {
+        if headers_and_body_complete(&request) {
             break;
         }
     }
     String::from_utf8(request).expect("utf8 request")
 }
 
-fn request_target(request: &str) -> String {
-    request
+fn headers_and_body_complete(request: &[u8]) -> bool {
+    let request = String::from_utf8_lossy(request);
+    let Some((headers, body)) = request.split_once("\r\n\r\n") else {
+        return false;
+    };
+    let content_length = headers
         .lines()
-        .next()
-        .and_then(|line| line.split_whitespace().nth(1))
-        .expect("request target")
-        .to_string()
+        .find_map(|line| {
+            line.split_once(':').and_then(|(name, value)| {
+                name.eq_ignore_ascii_case("content-length")
+                    .then(|| value.trim().parse::<usize>().ok())
+                    .flatten()
+            })
+        })
+        .unwrap_or(0);
+    body.len() >= content_length
 }
 
 fn write_http_response(stream: &mut TcpStream, response: MockResponse) {

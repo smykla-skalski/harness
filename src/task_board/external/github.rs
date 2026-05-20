@@ -1,9 +1,9 @@
+use std::collections::BTreeMap;
 use std::fmt;
 use std::sync::OnceLock;
 
 use async_trait::async_trait;
 use octocrab::models::IssueState;
-use octocrab::params::State;
 use rustls::crypto::ring::default_provider;
 
 use crate::errors::{CliError, CliErrorKind};
@@ -18,6 +18,7 @@ use super::{
 static RUSTLS_PROVIDER: OnceLock<()> = OnceLock::new();
 
 mod errors;
+mod graphql;
 mod inbox;
 
 use errors::{github_client_error, github_sync_error_with_context, warn_github_message};
@@ -152,41 +153,39 @@ impl ExternalSyncClient for GitHubSyncClient {
         }
         let repository = self.repository_for(None)?;
         let project_id = repository.slug();
-        let issues_api = self
-            .octocrab()
-            .issues(repository.owner.as_str(), repository.repo.as_str());
-        let mut request = issues_api.list().state(State::All).per_page(100_u8);
-        if !self.import_labels.is_empty() {
-            request = request.labels(&self.import_labels);
+        let login = graphql::current_user_login(self.octocrab()).await?;
+        let mut tasks = BTreeMap::new();
+        for query in graphql::personal_issue_queries(&repository, login.as_str()) {
+            let context = format!("searching task-board issues in {}", repository.slug());
+            let issues =
+                graphql::search_issue_pull_requests(self.octocrab(), &query, &context).await?;
+            tasks.extend(
+                issues
+                    .into_iter()
+                    .filter(|issue| {
+                        search_label_matches_filter(&issue.label_names(), &self.import_labels)
+                    })
+                    .map(|issue| {
+                        let number = issue.number;
+                        (
+                            number,
+                            ExternalTask {
+                                reference: ExternalTaskRef::new(
+                                    ExternalProvider::GitHub,
+                                    github_external_id(&repository, number),
+                                )
+                                .with_url(issue.url),
+                                title: issue.title,
+                                body: issue.body.unwrap_or_default(),
+                                status: github_issue_search_status(issue.state.as_str()),
+                                project_id: Some(project_id.clone()),
+                                updated_at: Some(issue.updated_at),
+                            },
+                        )
+                    }),
+            );
         }
-        let page = request.send().await.map_err(|error| {
-            github_sync_error_with_context(
-                format!("listing issues in {}", repository.slug()),
-                error,
-            )
-        })?;
-        let issues = self.octocrab().all_pages(page).await.map_err(|error| {
-            github_sync_error_with_context(
-                format!("loading issue pages from {}", repository.slug()),
-                error,
-            )
-        })?;
-        Ok(issues
-            .into_iter()
-            .filter(|issue| issue.pull_request.is_none())
-            .map(|issue| ExternalTask {
-                reference: ExternalTaskRef::new(
-                    ExternalProvider::GitHub,
-                    github_external_id(&repository, issue.number),
-                )
-                .with_url(issue.html_url.to_string()),
-                title: issue.title,
-                body: issue.body.unwrap_or_default(),
-                status: github_issue_status(&issue.state),
-                project_id: Some(project_id.clone()),
-                updated_at: Some(issue.updated_at.to_rfc3339()),
-            })
-            .collect())
+        Ok(tasks.into_values().collect())
     }
 
     async fn push_task(&self, item: &TaskBoardItem) -> Result<ExternalTaskRef, CliError> {
@@ -342,10 +341,11 @@ fn parse_issue_number(value: &str) -> Result<u64, CliError> {
         })
 }
 
-fn github_issue_status(state: &IssueState) -> TaskBoardStatus {
-    match state {
-        IssueState::Closed => TaskBoardStatus::Done,
-        _ => TaskBoardStatus::Todo,
+fn github_issue_search_status(state: &str) -> TaskBoardStatus {
+    if state.eq_ignore_ascii_case("closed") {
+        TaskBoardStatus::Done
+    } else {
+        TaskBoardStatus::Todo
     }
 }
 
@@ -371,6 +371,13 @@ fn github_external_id(repository: &GitHubRepository, issue_number: u64) -> Strin
 fn assigned_issue_query(repository: &GitHubRepository, login: &str) -> String {
     format!(
         "repo:{} is:issue assignee:{login} state:all",
+        repository.slug()
+    )
+}
+
+fn author_issue_query(repository: &GitHubRepository, login: &str) -> String {
+    format!(
+        "repo:{} is:issue author:{login} state:all",
         repository.slug()
     )
 }

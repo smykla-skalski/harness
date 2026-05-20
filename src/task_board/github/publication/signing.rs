@@ -1,7 +1,6 @@
 use std::fs;
 use std::io::Cursor;
 
-use chrono::{FixedOffset, TimeZone};
 use gix::actor::SignatureRef;
 use pgp::composed::{ArmorOptions, Deserializable, DetachedSignature, SignedSecretKey};
 use pgp::crypto::hash::HashAlgorithm;
@@ -14,8 +13,8 @@ use crate::task_board::{TaskBoardGitRuntimeProfile, TaskBoardGitSigningMode};
 
 use super::snapshot_error;
 use super::types::{
-    GitHubCommitAuthorRequest, LocalBranchSnapshot, LocalCommitAuthor, LocalCommitSignature,
-    NativeGitTransportReason, RestCommitSignatureBoundary,
+    LocalBranchSnapshot, LocalCommitAuthor, LocalCommitSignature, NativeGitTransportReason,
+    RestCommitSignatureBoundary,
 };
 
 pub(super) fn commit_author(
@@ -27,22 +26,6 @@ pub(super) fn commit_author(
     let time = signature
         .time()
         .map_err(|error| snapshot_error("parse commit author time", error))?;
-    let offset = FixedOffset::east_opt(time.offset).ok_or_else(|| {
-        CliError::from(CliErrorKind::workflow_io(format!(
-            "task-board github commit author timezone offset '{}' is outside supported range",
-            time.offset
-        )))
-    })?;
-    let date = offset
-        .timestamp_opt(time.seconds, 0)
-        .single()
-        .ok_or_else(|| {
-            CliError::from(CliErrorKind::workflow_io(format!(
-                "task-board github commit author timestamp '{}' is outside supported range",
-                time.seconds
-            )))
-        })?
-        .to_rfc3339();
     let name = override_name.map_or_else(
         || String::from_utf8_lossy(signature.name.as_ref()).into_owned(),
         ToOwned::to_owned,
@@ -63,14 +46,7 @@ pub(super) fn commit_author(
         time.seconds,
         git_timezone_offset(time.offset)
     );
-    Ok(LocalCommitAuthor {
-        request: GitHubCommitAuthorRequest {
-            name,
-            email: Some(email),
-            date: Some(date),
-        },
-        git_actor,
-    })
+    Ok(LocalCommitAuthor { git_actor })
 }
 
 pub(super) fn unsigned_commit_payload(
@@ -215,25 +191,13 @@ pub(super) fn rest_commit_signature_boundary(
     }
 }
 
-pub(super) fn validate_rest_publication_signature_support(
-    profile: &TaskBoardGitRuntimeProfile,
-    signature: Option<&LocalCommitSignature>,
-) -> Result<(), CliError> {
-    match rest_commit_signature_boundary(profile, signature)? {
-        RestCommitSignatureBoundary::RestSupported => Ok(()),
-        RestCommitSignatureBoundary::NativeGitTransportRequired(reason) => {
-            Err(native_git_transport_required_error(reason))
-        }
-    }
-}
-
 pub(super) fn native_git_transport_required_error(reason: NativeGitTransportReason) -> CliError {
     let reason = match reason {
         NativeGitTransportReason::ConfiguredSshSigning => "configured SSH commit signing",
         NativeGitTransportReason::ExistingSshSignature => "an existing SSH commit signature",
     };
     CliError::from(CliErrorKind::workflow_io(format!(
-        "task-board github REST commit creation accepts only PGP signatures; {reason} requires native Git object creation plus smart HTTP send-pack transport, which this publisher does not implement"
+        "task-board github {reason} requires native Git commit-object publication"
     )))
 }
 
