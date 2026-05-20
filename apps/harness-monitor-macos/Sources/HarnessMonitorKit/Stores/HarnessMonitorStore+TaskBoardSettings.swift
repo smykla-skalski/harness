@@ -310,34 +310,42 @@ extension HarnessMonitorStore {
         )
       }
 
-      let verifyOutcome = await verifyTaskBoardSigning(client: client, repository: nil)
-      switch verifyOutcome {
-      case .skipped:
-        break
-      case .signed:
-        break
-      case .failed(let message):
-        presentFailureFeedback(
-          "Saved task board settings, but signing dry-run failed: \(message)"
-        )
-      }
-
       recordRequestSuccess()
-      guard
-        await syncAndRefreshTaskBoardDashboard(
-          using: client,
-          request: TaskBoardSyncRequest(direction: .pull, dryRun: false),
-          failureMessagePrefix: "Saved task board settings, but task board sync failed"
-        )
-      else {
-        return false
-      }
       presentSuccessFeedback("Saved task board settings")
+      scheduleTaskBoardSettingsPostSaveRefresh(client: client)
       return true
     } catch {
       presentFailureFeedback(error.localizedDescription)
       return false
     }
+  }
+
+  private func scheduleTaskBoardSettingsPostSaveRefresh(
+    client: any HarnessMonitorClientProtocol
+  ) {
+    Task { [weak self] in
+      guard let self else { return }
+      await runTaskBoardSettingsPostSaveRefresh(client: client)
+    }
+  }
+
+  private func runTaskBoardSettingsPostSaveRefresh(
+    client: any HarnessMonitorClientProtocol
+  ) async {
+    async let verifyOutcome = verifyTaskBoardSigning(client: client, repository: nil)
+    async let refresh: Void = refreshTaskBoardDashboardSnapshot(using: client)
+
+    switch await verifyOutcome {
+    case .skipped:
+      break
+    case .signed:
+      break
+    case .failed(let message):
+      presentFailureFeedback(
+        "Saved task board settings, but signing dry-run failed: \(message)"
+      )
+    }
+    await refresh
   }
 
   private func verifyTaskBoardSigning(
@@ -358,15 +366,16 @@ extension HarnessMonitorStore {
     snapshot: TaskBoardGitSettingsSnapshot
   ) async -> Bool {
     do {
-      _ = try await client.syncTaskBoardGitHubTokens(
+      async let githubTokens = client.syncTaskBoardGitHubTokens(
         request: snapshot.githubCredentials.syncRequest
       )
-      _ = try await client.syncTaskBoardTodoistToken(
+      async let todoistToken = client.syncTaskBoardTodoistToken(
         request: snapshot.todoistCredentials.syncRequest
       )
-      _ = try await client.syncTaskBoardOpenRouterToken(
+      async let openRouterToken = client.syncTaskBoardOpenRouterToken(
         request: snapshot.openRouterCredentials.syncRequest
       )
+      _ = try await (githubTokens, todoistToken, openRouterToken)
       return true
     } catch {
       presentFailureFeedback(

@@ -60,13 +60,16 @@ extension RecordingHarnessClient {
   func syncTaskBoardGitHubTokens(
     request: TaskBoardGitHubTokensSyncRequest
   ) async throws -> TaskBoardGitHubTokensSyncResponse {
-    calls.append(
-      .syncTaskBoardGitHubTokens(
-        globalTokenConfigured: request.globalToken != nil,
-        repositoryTokenCount: request.repositoryTokens.count
+    let error = lock.withLock {
+      callsStorage.append(
+        .syncTaskBoardGitHubTokens(
+          globalTokenConfigured: request.globalToken != nil,
+          repositoryTokenCount: request.repositoryTokens.count
+        )
       )
-    )
-    if let error = lock.withLock({ taskBoardGitHubTokensSyncError }) {
+      return taskBoardGitHubTokensSyncError
+    }
+    if let error {
       throw error
     }
     return TaskBoardGitHubTokensSyncResponse(
@@ -78,11 +81,23 @@ extension RecordingHarnessClient {
   func syncTaskBoardTodoistToken(
     request: TaskBoardTodoistTokenSyncRequest
   ) async throws -> TaskBoardTodoistTokenSyncResponse {
-    calls.append(.syncTaskBoardTodoistToken(tokenConfigured: request.token != nil))
-    if let error = lock.withLock({ taskBoardTodoistTokenSyncError }) {
+    let error = lock.withLock {
+      callsStorage.append(.syncTaskBoardTodoistToken(tokenConfigured: request.token != nil))
+      return taskBoardTodoistTokenSyncError
+    }
+    if let error {
       throw error
     }
     return TaskBoardTodoistTokenSyncResponse(tokenConfigured: request.token != nil)
+  }
+
+  func syncTaskBoardOpenRouterToken(
+    request: TaskBoardOpenRouterTokenSyncRequest
+  ) async throws -> TaskBoardOpenRouterTokenSyncResponse {
+    lock.withLock {
+      callsStorage.append(.syncTaskBoardOpenRouterToken(tokenConfigured: request.token != nil))
+    }
+    return TaskBoardOpenRouterTokenSyncResponse(tokenConfigured: request.token != nil)
   }
 
   func taskBoardGitIdentityDefaults() async throws -> TaskBoardGitIdentityDefaults {

@@ -25,6 +25,8 @@ final class ContinuationResumeGate: @unchecked Sendable {
 }
 
 extension WebSocketTransport {
+  static let pingTimeout: Duration = .seconds(5)
+
   func sendPing() async throws {
     guard let webSocketTask else {
       throw WebSocketTransportError.connectionClosed
@@ -32,6 +34,11 @@ extension WebSocketTransport {
     let task = webSocketTask
     try await withCheckedThrowingContinuation { (continuation: VoidPingContinuation) in
       let gate = ContinuationResumeGate()
+      let timeoutTask = Task {
+        try? await Task.sleep(for: Self.pingTimeout)
+        guard gate.tryBeginResume() else { return }
+        continuation.resume(throwing: URLError(.timedOut))
+      }
       task.sendPing { error in
         guard gate.tryBeginResume() else {
           HarnessMonitorLogger.websocket.warning(
@@ -39,6 +46,7 @@ extension WebSocketTransport {
           )
           return
         }
+        timeoutTask.cancel()
         if let error {
           continuation.resume(throwing: error)
         } else {
@@ -56,6 +64,11 @@ extension WebSocketTransport {
     let startedAt = ContinuousClock.now
     return try await withCheckedThrowingContinuation { (continuation: IntPingContinuation) in
       let gate = ContinuationResumeGate()
+      let timeoutTask = Task {
+        try? await Task.sleep(for: Self.pingTimeout)
+        guard gate.tryBeginResume() else { return }
+        continuation.resume(throwing: URLError(.timedOut))
+      }
       task.sendPing { error in
         guard gate.tryBeginResume() else {
           HarnessMonitorLogger.websocket.warning(
@@ -63,6 +76,7 @@ extension WebSocketTransport {
           )
           return
         }
+        timeoutTask.cancel()
         let duration = startedAt.duration(to: ContinuousClock.now)
         let ms =
           max(0, Int(duration.components.seconds * 1_000))
