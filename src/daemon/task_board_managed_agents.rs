@@ -313,8 +313,6 @@ mod tests {
                 async_db,
                 false,
             ),
-            openrouter_agent_manager:
-                crate::daemon::openrouter_agent::OpenRouterAgentManagerHandle::new(sender),
             managed_agent_mutation_locks: ManagedAgentMutationLocks::default(),
         }
     }
