@@ -1,6 +1,18 @@
 import Foundation
 
+/// OpenRouter session orchestration on top of the generic ACP managed-agent
+/// surface.
+///
+/// The daemon dispatches OpenRouter through the catalog descriptor
+/// `"openrouter"`. The store projects each returned `AcpAgentSnapshot` into an
+/// `OpenRouterRunSnapshot` for the existing OpenRouter UI surfaces.
 extension HarnessMonitorStore {
+  /// Catalog descriptor id the daemon uses to dispatch OpenRouter sessions.
+  public static let openRouterDescriptorID = "openrouter"
+
+  /// Default model picked when a caller does not supply one.
+  public static let defaultOpenRouterModel = "anthropic/claude-3.7-sonnet"
+
   public func openRouterRuns(forSessionID sessionID: String) -> [OpenRouterRunSnapshot] {
     openRouterRunsBySessionID[sessionID] ?? []
   }
@@ -11,82 +23,70 @@ extension HarnessMonitorStore {
     model: String?,
     displayName: String? = nil,
     sessionAgentID: String? = nil,
-    temperature: Float? = nil,
-    maxTokens: UInt32? = nil,
-    reasoningEffort: String? = nil,
     projectDir: String? = nil,
     sessionID: String? = nil
   ) async -> OpenRouterRunSnapshot? {
+    let resolvedModel = (model?.trimmingCharacters(in: .whitespacesAndNewlines)).flatMap {
+      $0.isEmpty ? nil : $0
+    } ?? Self.defaultOpenRouterModel
+    let resolvedName =
+      displayName?.trimmingCharacters(in: .whitespacesAndNewlines).nonEmpty
+      ?? "OpenRouter"
+
     guard
-      let action = prepareSessionAction(
-        named: "Start OpenRouter session",
-        sessionID: sessionID ?? selectedSessionID
+      let acp = await startAcpAgent(
+        descriptorID: AcpDescriptorID(rawValue: Self.openRouterDescriptorID),
+        capabilities: [],
+        name: resolvedName,
+        prompt: prompt,
+        projectDir: projectDir,
+        model: resolvedModel,
+        allowCustomModel: true,
+        sessionID: sessionID
       )
     else {
       return nil
     }
-    let trimmedPrompt = prompt.trimmingCharacters(in: .whitespacesAndNewlines)
-    let request = OpenRouterStartRequest(
-      model: model,
-      prompt: trimmedPrompt.isEmpty ? nil : trimmedPrompt,
-      sessionAgentId: sessionAgentID,
-      displayName: displayName,
-      temperature: temperature,
-      maxTokens: maxTokens,
-      reasoningEffort: reasoningEffort,
-      projectDir: projectDir
+
+    registerOpenRouterRunMetadata(
+      runID: acp.acpId,
+      model: resolvedModel,
+      displayName: resolvedName
     )
-    do {
-      let snapshot = try await action.client.startManagedOpenRouterAgent(
-        sessionID: action.sessionID,
-        request: request
-      )
-      if let run = snapshot.openRouter {
-        applyOpenRouterRun(run)
-        return run
-      }
-      return nil
-    } catch {
-      presentFailureFeedback(
-        "Failed to start OpenRouter session: \(error.localizedDescription)"
-      )
-      return nil
-    }
+    let run = OpenRouterRunSnapshot(
+      acp: acp,
+      model: resolvedModel,
+      displayName: resolvedName
+    )
+    applyOpenRouterRun(run)
+    return run
   }
 
   @discardableResult
   public func promptOpenRouterRun(
-    runID: String,
-    prompt: String
+    runID _: String,
+    prompt _: String
   ) async -> OpenRouterRunSnapshot? {
-    guard let client else { return nil }
-    let trimmedPrompt = prompt.trimmingCharacters(in: .whitespacesAndNewlines)
-    guard !trimmedPrompt.isEmpty else {
-      presentFailureFeedback("OpenRouter prompt cannot be empty.")
-      return nil
-    }
-    do {
-      let run = try await client.promptManagedOpenRouterAgent(
-        managedAgentID: runID,
-        prompt: trimmedPrompt
-      )
-      applyOpenRouterRun(run)
-      return run
-    } catch {
-      presentFailureFeedback(
-        "Failed to send prompt to OpenRouter session: \(error.localizedDescription)"
-      )
-      return nil
-    }
+    presentFailureFeedback(
+      "Follow-up prompts for OpenRouter sessions require a future daemon update."
+    )
+    return nil
   }
 
   @discardableResult
   public func cancelOpenRouterRun(runID: String) async -> OpenRouterRunSnapshot? {
     guard let client else { return nil }
     do {
-      let run = try await client.cancelManagedOpenRouterAgent(managedAgentID: runID)
-      applyOpenRouterRun(run)
-      return run
+      let snapshot = try await client.stopManagedAcpAgent(agentID: runID)
+      guard case .acp(let acp) = snapshot else { return nil }
+      let metadata = openRouterRunMetadata[runID]
+      let projected = OpenRouterRunSnapshot(
+        acp: acp,
+        model: metadata?.model ?? "",
+        displayName: metadata?.displayName
+      )
+      applyOpenRouterRun(projected)
+      return projected
     } catch {
       presentFailureFeedback(
         "Failed to cancel OpenRouter session: \(error.localizedDescription)"
@@ -95,12 +95,26 @@ extension HarnessMonitorStore {
     }
   }
 
+  /// The OpenRouter sheet's model picker.
+  ///
+  /// The daemon's openrouter descriptor carries an authored model catalog via
+  /// the standard ACP descriptors endpoint; surface that catalog here so the
+  /// sheet keeps its existing picker without a dedicated transport call.
   public func fetchOpenRouterModels() async -> [OpenRouterModelEntry] {
-    guard let client else { return [] }
-    do {
-      return try await client.listOpenRouterModels().data
-    } catch {
+    let descriptors = await fetchAcpAgentDescriptors()
+    guard
+      let descriptor = descriptors.first(where: { $0.id == Self.openRouterDescriptorID }),
+      let catalog = descriptor.modelCatalog
+    else {
       return []
+    }
+    return catalog.models.map { model in
+      OpenRouterModelEntry(
+        id: model.id,
+        name: model.displayName,
+        contextLength: nil,
+        supportedParameters: []
+      )
     }
   }
 
@@ -117,8 +131,14 @@ extension HarnessMonitorStore {
         batchID: batchID,
         decision: decision
       )
-      if let run = snapshot.openRouter {
-        applyOpenRouterRun(run)
+      if case .acp(let acp) = snapshot {
+        let metadata = openRouterRunMetadata[runID]
+        let projected = OpenRouterRunSnapshot(
+          acp: acp,
+          model: metadata?.model ?? "",
+          displayName: metadata?.displayName
+        )
+        applyOpenRouterRun(projected)
       }
       return snapshot
     } catch {
@@ -140,15 +160,42 @@ extension HarnessMonitorStore {
   }
 
   func refreshOpenRouterRuns(
-    using client: any HarnessMonitorClientProtocol,
-    sessionID: String
+    using _: any HarnessMonitorClientProtocol,
+    sessionID _: String
   ) async {
-    do {
-      let response = try await client.listManagedOpenRouterAgents(sessionID: sessionID)
-      openRouterRunsBySessionID[sessionID] = response.runs
-    } catch {
-      // Best effort. Leave existing cache untouched so transient errors do
-      // not blank the sidebar.
-    }
+    // OpenRouter runs are projected from ACP snapshots emitted on the daemon
+    // push event stream. The store mirrors snapshots into
+    // `openRouterRunsBySessionID` when start completes and when a permission
+    // batch resolves; no separate transport refresh is required.
+  }
+
+  func registerOpenRouterRunMetadata(
+    runID: String,
+    model: String,
+    displayName: String?
+  ) {
+    openRouterRunMetadata[runID] = OpenRouterRunMetadata(
+      model: model,
+      displayName: displayName
+    )
+  }
+}
+
+/// Per-run metadata that the daemon's ACP snapshot does not surface
+/// (model id, friendly display name). Populated at session start and reused
+/// across subsequent snapshot projections.
+public struct OpenRouterRunMetadata: Sendable, Equatable {
+  public let model: String
+  public let displayName: String?
+
+  public init(model: String, displayName: String?) {
+    self.model = model
+    self.displayName = displayName
+  }
+}
+
+extension String {
+  fileprivate var nonEmpty: String? {
+    isEmpty ? nil : self
   }
 }
