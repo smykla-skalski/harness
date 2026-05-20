@@ -33,9 +33,8 @@ extension HarnessMonitorStore {
     projectDir: String? = nil,
     sessionID: String? = nil
   ) async -> OpenRouterRunSnapshot? {
-    let resolvedModel = (model?.trimmingCharacters(in: .whitespacesAndNewlines)).flatMap {
-      $0.isEmpty ? nil : $0
-    } ?? Self.defaultOpenRouterModel
+    let trimmedModel = model?.trimmingCharacters(in: .whitespacesAndNewlines)
+    let resolvedModel = trimmedModel?.nonEmpty ?? Self.defaultOpenRouterModel
     let resolvedName =
       displayName?.trimmingCharacters(in: .whitespacesAndNewlines).nonEmpty
       ?? "OpenRouter"
