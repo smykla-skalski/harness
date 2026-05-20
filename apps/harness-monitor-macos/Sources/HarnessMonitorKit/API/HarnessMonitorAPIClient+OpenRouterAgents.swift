@@ -42,6 +42,10 @@ extension HarnessMonitorAPIClient {
       body: EmptyRequest()
     )
   }
+
+  public func listOpenRouterModels() async throws -> OpenRouterModelListResponse {
+    try await get("/v1/managed-agents/openrouter/models")
+  }
 }
 
 private struct EmptyRequest: Codable {}
