@@ -5,7 +5,8 @@ use tokio::sync::broadcast;
 use crate::agents::acp::probe::probe_acp_agents_cached;
 use crate::daemon::http::{
     AsyncDaemonDbSlot, DaemonHttpState, acp_inspect_response, acp_transcript_response,
-    ensure_acp_enabled, managed_agent_list_response, managed_agent_snapshot, require_async_db,
+    ensure_acp_enabled, managed_agent_list_response_async, managed_agent_snapshot_async,
+    require_async_db,
 };
 use crate::daemon::protocol::{
     StreamEvent, TimelineWindowRequest, WsRequest, WsResponse, ws_methods,
@@ -78,10 +79,10 @@ async fn dispatch_session_read_query(
         ws_methods::SESSION_DETAIL => Some(dispatch_session_detail_query(request, state).await),
         ws_methods::SESSION_TIMELINE => Some(dispatch_session_timeline_query(request, state).await),
         ws_methods::SESSION_MANAGED_AGENTS => {
-            Some(dispatch_session_managed_agents_query(request, state))
+            Some(dispatch_session_managed_agents_query(request, state).await)
         }
         ws_methods::MANAGED_AGENT_DETAIL => {
-            Some(dispatch_managed_agent_detail_query(request, state))
+            Some(dispatch_managed_agent_detail_query(request, state).await)
         }
         ws_methods::MANAGED_AGENTS_CODEX_INSPECT => {
             Some(dispatch_codex_inspect_query(request, state))
@@ -93,7 +94,9 @@ async fn dispatch_session_read_query(
         ws_methods::MANAGED_AGENTS_ACP_TRANSCRIPT => {
             Some(dispatch_acp_transcript_query(request, state).await)
         }
-        ws_methods::OPENROUTER_LIST_MODELS => Some(dispatch_openrouter_list_models_query(request).await),
+        ws_methods::OPENROUTER_LIST_MODELS => {
+            Some(dispatch_openrouter_list_models_query(request).await)
+        }
         _ => None,
     }
 }
@@ -215,7 +218,7 @@ fn timeline_window_request_from_ws(request: &WsRequest) -> TimelineWindowRequest
     }
 }
 
-fn dispatch_session_managed_agents_query(
+async fn dispatch_session_managed_agents_query(
     request: &WsRequest,
     state: &DaemonHttpState,
 ) -> WsResponse {
@@ -223,15 +226,24 @@ fn dispatch_session_managed_agents_query(
         return error_response(&request.id, "MISSING_PARAM", "missing session_id");
     };
 
-    dispatch_query_result(&request.id, managed_agent_list_response(state, &session_id))
+    dispatch_query_result(
+        &request.id,
+        managed_agent_list_response_async(state, &session_id).await,
+    )
 }
 
-fn dispatch_managed_agent_detail_query(request: &WsRequest, state: &DaemonHttpState) -> WsResponse {
+async fn dispatch_managed_agent_detail_query(
+    request: &WsRequest,
+    state: &DaemonHttpState,
+) -> WsResponse {
     let Some(agent_id) = extract_managed_agent_id(&request.params) else {
         return error_response(&request.id, "MISSING_PARAM", "missing managed_agent_id");
     };
 
-    dispatch_query_result(&request.id, managed_agent_snapshot(state, &agent_id))
+    dispatch_query_result(
+        &request.id,
+        managed_agent_snapshot_async(state, &agent_id).await,
+    )
 }
 
 fn dispatch_acp_inspect_query(request: &WsRequest, state: &DaemonHttpState) -> WsResponse {

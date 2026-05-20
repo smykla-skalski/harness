@@ -16,7 +16,10 @@ use crate::errors::CliError;
 use super::super::DaemonHttpState;
 use super::super::auth::{authorize_control_request, require_auth};
 use super::super::response::{extract_request_id, timed_json};
-use super::{ensure_acp_agent, ensure_acp_enabled, ensure_codex_agent, ensure_terminal_agent};
+use super::{
+    ensure_acp_agent, ensure_acp_enabled, ensure_codex_agent, ensure_terminal_agent_async,
+    run_terminal_agent_blocking,
+};
 
 pub(super) async fn post_terminal_agent_start(
     Path(session_id): Path<String>,
@@ -29,10 +32,11 @@ pub(super) async fn post_terminal_agent_start(
     if let Err(response) = require_auth(&headers, &state) {
         return *response;
     }
-    let result = state
-        .agent_tui_manager
-        .start(&session_id, &request)
-        .map(ManagedAgentSnapshot::Terminal);
+    let result = run_terminal_agent_blocking(&state, "start", move |manager| {
+        manager.start(&session_id, &request)
+    })
+    .await
+    .map(ManagedAgentSnapshot::Terminal);
     timed_json(
         "POST",
         http_paths::SESSION_MANAGED_AGENTS_TERMINAL,
@@ -80,9 +84,17 @@ pub(super) async fn post_terminal_agent_input(
     if let Err(response) = require_auth(&headers, &state) {
         return *response;
     }
-    let result = ensure_terminal_agent(&state, &managed_agent_id)
-        .and_then(|()| state.agent_tui_manager.input(&managed_agent_id, &request))
-        .map(ManagedAgentSnapshot::Terminal);
+    let result = match ensure_terminal_agent_async(&state, &managed_agent_id).await {
+        Ok(()) => {
+            let agent_id = managed_agent_id.clone();
+            run_terminal_agent_blocking(&state, "input", move |manager| {
+                manager.input(&agent_id, &request)
+            })
+            .await
+            .map(ManagedAgentSnapshot::Terminal)
+        }
+        Err(error) => Err(error),
+    };
     timed_json(
         "POST",
         http_paths::MANAGED_AGENT_INPUT,
@@ -103,9 +115,17 @@ pub(super) async fn post_terminal_agent_resize(
     if let Err(response) = require_auth(&headers, &state) {
         return *response;
     }
-    let result = ensure_terminal_agent(&state, &managed_agent_id)
-        .and_then(|()| state.agent_tui_manager.resize(&managed_agent_id, &request))
-        .map(ManagedAgentSnapshot::Terminal);
+    let result = match ensure_terminal_agent_async(&state, &managed_agent_id).await {
+        Ok(()) => {
+            let agent_id = managed_agent_id.clone();
+            run_terminal_agent_blocking(&state, "resize", move |manager| {
+                manager.resize(&agent_id, &request)
+            })
+            .await
+            .map(ManagedAgentSnapshot::Terminal)
+        }
+        Err(error) => Err(error),
+    };
     timed_json(
         "POST",
         http_paths::MANAGED_AGENT_RESIZE,
@@ -142,9 +162,17 @@ pub(super) async fn post_terminal_agent_stop(
                     .stop(&managed_agent_id)
                     .map(ManagedAgentSnapshot::Acp)
             } else {
-                ensure_terminal_agent(&state, &managed_agent_id)
-                    .and_then(|()| state.agent_tui_manager.stop(&managed_agent_id))
-                    .map(ManagedAgentSnapshot::Terminal)
+                match ensure_terminal_agent_async(&state, &managed_agent_id).await {
+                    Ok(()) => {
+                        let agent_id = managed_agent_id.clone();
+                        run_terminal_agent_blocking(&state, "stop", move |manager| {
+                            manager.stop(&agent_id)
+                        })
+                        .await
+                        .map(ManagedAgentSnapshot::Terminal)
+                    }
+                    Err(error) => Err(error),
+                }
             }
         }
         Err(error) => Err(error),
@@ -168,9 +196,17 @@ pub(super) async fn post_terminal_agent_ready(
     if let Err(response) = require_auth(&headers, &state) {
         return *response;
     }
-    let result = ensure_terminal_agent(&state, &managed_agent_id)
-        .and_then(|()| state.agent_tui_manager.signal_ready(&managed_agent_id))
-        .map(ManagedAgentSnapshot::Terminal);
+    let result = match ensure_terminal_agent_async(&state, &managed_agent_id).await {
+        Ok(()) => {
+            let agent_id = managed_agent_id.clone();
+            run_terminal_agent_blocking(&state, "ready", move |manager| {
+                manager.signal_ready(&agent_id)
+            })
+            .await
+            .map(ManagedAgentSnapshot::Terminal)
+        }
+        Err(error) => Err(error),
+    };
     timed_json(
         "POST",
         http_paths::MANAGED_AGENT_READY,
@@ -311,7 +347,11 @@ pub(super) async fn post_acp_agent_prompt(
     }
     let result = ensure_acp_enabled().and_then(|()| {
         ensure_acp_agent(&state, &agent_id)
-            .and_then(|()| state.acp_agent_manager.send_prompt(&agent_id, &request.prompt))
+            .and_then(|()| {
+                state
+                    .acp_agent_manager
+                    .send_prompt(&agent_id, &request.prompt)
+            })
             .map(ManagedAgentSnapshot::Acp)
     });
     timed_json(

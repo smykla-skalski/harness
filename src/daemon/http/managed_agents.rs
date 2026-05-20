@@ -1,6 +1,8 @@
 use axum::Router;
 use axum::routing::{delete, get, post};
+use tokio::task::spawn_blocking;
 
+use crate::daemon::agent_tui::AgentTuiManagerHandle;
 use crate::daemon::protocol::{AcpTranscriptResponse, http_paths};
 use crate::daemon::service::session_acp_transcript_async;
 use crate::errors::{CliError, CliErrorKind};
@@ -20,9 +22,9 @@ mod mutations;
 pub(crate) mod reads;
 mod snapshots;
 
-pub(crate) use lookup::{ensure_acp_agent, ensure_codex_agent, ensure_terminal_agent};
+pub(crate) use lookup::{ensure_acp_agent, ensure_codex_agent, ensure_terminal_agent_async};
 pub(crate) use snapshots::{
-    acp_inspect_response, managed_agent_list_response, managed_agent_snapshot,
+    acp_inspect_response, managed_agent_list_response_async, managed_agent_snapshot_async,
 };
 
 pub(super) fn managed_agent_routes() -> Router<DaemonHttpState> {
@@ -125,6 +127,26 @@ pub(crate) async fn acp_transcript_response(
 ) -> Result<AcpTranscriptResponse, CliError> {
     let async_db = require_async_db(state, "ACP transcript")?;
     session_acp_transcript_async(session_id, Some(async_db)).await
+}
+
+pub(crate) async fn run_terminal_agent_blocking<T, F>(
+    state: &DaemonHttpState,
+    operation: &'static str,
+    work: F,
+) -> Result<T, CliError>
+where
+    T: Send + 'static,
+    F: FnOnce(AgentTuiManagerHandle) -> Result<T, CliError> + Send + 'static,
+{
+    let manager = state.agent_tui_manager.clone();
+    spawn_blocking(move || work(manager))
+        .await
+        .unwrap_or_else(|error| {
+            Err(CliErrorKind::workflow_io(format!(
+                "managed terminal agent {operation} worker failed: {error}"
+            ))
+            .into())
+        })
 }
 
 #[cfg(test)]
@@ -428,5 +450,4 @@ mod tests {
         })
         .await;
     }
-
 }
