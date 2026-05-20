@@ -292,7 +292,11 @@ fn prune_search_cache(cache: &mut BTreeMap<(GitHubGraphqlCacheKey, String), Cach
 
 fn trim_viewer_cache(cache: &mut BTreeMap<GitHubGraphqlCacheKey, CachedViewerLogin>) {
     while cache.len() > GITHUB_GRAPHQL_CACHE_ENTRY_CAP {
-        let Some(key) = cache.keys().next().copied() else {
+        let Some(key) = cache
+            .iter()
+            .min_by_key(|(_, cached)| cached.stored_at)
+            .map(|(key, _)| *key)
+        else {
             break;
         };
         cache.remove(&key);
@@ -301,7 +305,11 @@ fn trim_viewer_cache(cache: &mut BTreeMap<GitHubGraphqlCacheKey, CachedViewerLog
 
 fn trim_search_cache(cache: &mut BTreeMap<(GitHubGraphqlCacheKey, String), CachedSearchResults>) {
     while cache.len() > GITHUB_GRAPHQL_CACHE_ENTRY_CAP {
-        let Some(key) = cache.keys().next().cloned() else {
+        let Some(key) = cache
+            .iter()
+            .min_by_key(|(_, cached)| cached.stored_at)
+            .map(|(key, _)| key.clone())
+        else {
             break;
         };
         cache.remove(&key);
