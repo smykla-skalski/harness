@@ -105,6 +105,8 @@ async fn start_test_daemon(db: Option<DaemonDb>) -> TestDaemon {
         codex_controller,
         acp_agent_manager: AcpAgentManagerHandle::new(sender.clone(), db_slot.clone()),
         agent_tui_manager,
+        openrouter_agent_manager:
+            harness::daemon::openrouter_agent::OpenRouterAgentManagerHandle::new(sender.clone()),
         managed_agent_mutation_locks: harness::daemon::http::ManagedAgentMutationLocks::default(),
     };
 

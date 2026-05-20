@@ -17,6 +17,7 @@ mod codex_inspect;
 mod codex_transcript;
 mod lookup;
 mod mutations;
+mod openrouter;
 pub(crate) mod reads;
 mod snapshots;
 
@@ -42,6 +43,22 @@ pub(super) fn managed_agent_routes() -> Router<DaemonHttpState> {
         .route(
             http_paths::SESSION_MANAGED_AGENTS_ACP,
             post(acp_start::post_acp_agent_start),
+        )
+        .route(
+            http_paths::SESSION_MANAGED_AGENTS_OPENROUTER,
+            post(openrouter::post_openrouter_start).get(openrouter::get_openrouter_runs),
+        )
+        .route(
+            http_paths::MANAGED_AGENT_OPENROUTER,
+            get(openrouter::get_openrouter_run),
+        )
+        .route(
+            http_paths::MANAGED_AGENT_OPENROUTER_PROMPT,
+            post(openrouter::post_openrouter_prompt),
+        )
+        .route(
+            http_paths::MANAGED_AGENT_OPENROUTER_CANCEL,
+            post(openrouter::post_openrouter_cancel),
         )
         .route(
             http_paths::MANAGED_AGENT_DETAIL,
@@ -164,7 +181,9 @@ mod tests {
             db_path: None,
             codex_controller: CodexControllerHandle::new(sender.clone(), db_slot.clone(), false),
             acp_agent_manager: AcpAgentManagerHandle::new(sender.clone(), db_slot.clone()),
-            agent_tui_manager: AgentTuiManagerHandle::new(sender, db_slot, false),
+            agent_tui_manager: AgentTuiManagerHandle::new(sender.clone(), db_slot, false),
+            openrouter_agent_manager:
+                crate::daemon::openrouter_agent::OpenRouterAgentManagerHandle::new(sender),
             managed_agent_mutation_locks: crate::daemon::http::ManagedAgentMutationLocks::default(),
         }
     }

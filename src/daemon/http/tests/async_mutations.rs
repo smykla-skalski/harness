@@ -72,11 +72,13 @@ pub(super) async fn test_http_state_with_empty_async_db(
             async_db_slot.clone(),
         ),
         agent_tui_manager: AgentTuiManagerHandle::new_with_async_db(
-            sender,
+            sender.clone(),
             db_slot,
             async_db_slot,
             false,
         ),
+        openrouter_agent_manager:
+            crate::daemon::openrouter_agent::OpenRouterAgentManagerHandle::new(sender),
         managed_agent_mutation_locks: super::super::ManagedAgentMutationLocks::default(),
     }
 }

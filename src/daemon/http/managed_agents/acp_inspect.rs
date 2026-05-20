@@ -81,7 +81,9 @@ mod tests {
             db_path: None,
             codex_controller: CodexControllerHandle::new(sender.clone(), db_slot.clone(), false),
             acp_agent_manager: AcpAgentManagerHandle::new(sender.clone(), db_slot.clone()),
-            agent_tui_manager: AgentTuiManagerHandle::new(sender, db_slot, false),
+            agent_tui_manager: AgentTuiManagerHandle::new(sender.clone(), db_slot, false),
+            openrouter_agent_manager:
+                crate::daemon::openrouter_agent::OpenRouterAgentManagerHandle::new(sender),
             managed_agent_mutation_locks: crate::daemon::http::ManagedAgentMutationLocks::default(),
         }
     }

@@ -31,6 +31,7 @@ pub mod discovery;
 pub mod http;
 pub mod index;
 pub mod launchd;
+pub mod openrouter_agent;
 pub mod ordering;
 pub mod protocol;
 pub mod service;

@@ -308,8 +308,13 @@ mod tests {
                 async_db.clone(),
             ),
             agent_tui_manager: AgentTuiManagerHandle::new_with_async_db(
-                sender, db_slot, async_db, false,
+                sender.clone(),
+                db_slot,
+                async_db,
+                false,
             ),
+            openrouter_agent_manager:
+                crate::daemon::openrouter_agent::OpenRouterAgentManagerHandle::new(sender),
             managed_agent_mutation_locks: ManagedAgentMutationLocks::default(),
         }
     }
