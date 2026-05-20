@@ -180,11 +180,11 @@ struct SessionWindowCreateForm: View {
     .task(id: selectedAcpDescriptorID) {
       await loadOpenRouterModelsIfNeeded()
     }
-    .sheet(isPresented: openRouterBrowserPresentation) {
+    .sheet(isPresented: $stateStorage.isPresentingOpenRouterBrowser) {
       OpenRouterModelBrowserSheet(
         models: openRouterModels,
         usage: store.openRouterModelUsage,
-        usageSnapshot: openRouterUsageSnapshotBinding,
+        usageSnapshot: $stateStorage.openRouterUsageSnapshot,
         onSelect: { modelID in
           if let runtimeKey = selectedModelCatalogRuntimeKey {
             updateRuntimeModelPickerSelection(modelID, for: runtimeKey)
@@ -192,20 +192,6 @@ struct SessionWindowCreateForm: View {
         }
       )
     }
-  }
-
-  private var openRouterBrowserPresentation: Binding<Bool> {
-    Binding(
-      get: { isPresentingOpenRouterBrowser },
-      set: { isPresentingOpenRouterBrowser = $0 }
-    )
-  }
-
-  private var openRouterUsageSnapshotBinding: Binding<OpenRouterModelUsageSnapshot> {
-    Binding(
-      get: { openRouterUsageSnapshot },
-      set: { openRouterUsageSnapshot = $0 }
-    )
   }
 
   private func loadOpenRouterModelsIfNeeded() async {
