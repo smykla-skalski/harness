@@ -7,14 +7,11 @@ use super::super::connection::ConnectionState;
 use super::super::frames::ok_response;
 use super::super::mutations::{dispatch_session_start, dispatch_set_log_level};
 use super::super::parity::{
-    dispatch_bridge_reconfigure, dispatch_managed_agent_cancel_openrouter,
-    dispatch_managed_agent_detail_openrouter, dispatch_managed_agent_input,
-    dispatch_managed_agent_interrupt_codex, dispatch_managed_agent_openrouter_list,
-    dispatch_managed_agent_openrouter_models, dispatch_managed_agent_prompt_openrouter,
-    dispatch_managed_agent_ready, dispatch_managed_agent_resize,
-    dispatch_managed_agent_resolve_acp_permission, dispatch_managed_agent_resolve_codex_approval,
-    dispatch_managed_agent_start_acp, dispatch_managed_agent_start_codex,
-    dispatch_managed_agent_start_openrouter, dispatch_managed_agent_start_terminal,
+    dispatch_bridge_reconfigure, dispatch_managed_agent_input,
+    dispatch_managed_agent_interrupt_codex, dispatch_managed_agent_ready,
+    dispatch_managed_agent_resize, dispatch_managed_agent_resolve_acp_permission,
+    dispatch_managed_agent_resolve_codex_approval, dispatch_managed_agent_start_acp,
+    dispatch_managed_agent_start_codex, dispatch_managed_agent_start_terminal,
     dispatch_managed_agent_steer_codex, dispatch_managed_agent_stop,
     dispatch_managed_agent_stop_acp, dispatch_session_adopt, dispatch_session_archive,
     dispatch_session_delete, dispatch_session_join, dispatch_session_leave,
@@ -316,9 +313,6 @@ async fn dispatch_managed_agent_mutation(
     if let Some(response) = dispatch_codex_managed_agent_mutation(request, state).await {
         return Some(response);
     }
-    if let Some(response) = dispatch_openrouter_managed_agent_mutation(request, state).await {
-        return Some(response);
-    }
     dispatch_acp_managed_agent_mutation(request, state).await
 }
 
@@ -374,52 +368,6 @@ async fn dispatch_acp_managed_agent_mutation(
         }
         ws_methods::MANAGED_AGENT_RESOLVE_ACP_PERMISSION => {
             Some(dispatch_managed_agent_resolve_acp_permission(request, state).await)
-        }
-        _ => None,
-    }
-}
-
-async fn dispatch_openrouter_managed_agent_mutation(
-    request: &WsRequest,
-    state: &DaemonHttpState,
-) -> Option<WsResponse> {
-    if let Some(response) = dispatch_openrouter_lifecycle_mutation(request, state).await {
-        return Some(response);
-    }
-    dispatch_openrouter_read(request, state).await
-}
-
-async fn dispatch_openrouter_lifecycle_mutation(
-    request: &WsRequest,
-    state: &DaemonHttpState,
-) -> Option<WsResponse> {
-    match request.method.as_str() {
-        ws_methods::MANAGED_AGENT_START_OPENROUTER => {
-            Some(dispatch_managed_agent_start_openrouter(request, state).await)
-        }
-        ws_methods::MANAGED_AGENT_PROMPT_OPENROUTER => {
-            Some(dispatch_managed_agent_prompt_openrouter(request, state).await)
-        }
-        ws_methods::MANAGED_AGENT_CANCEL_OPENROUTER => {
-            Some(dispatch_managed_agent_cancel_openrouter(request, state).await)
-        }
-        _ => None,
-    }
-}
-
-async fn dispatch_openrouter_read(
-    request: &WsRequest,
-    state: &DaemonHttpState,
-) -> Option<WsResponse> {
-    match request.method.as_str() {
-        ws_methods::MANAGED_AGENT_DETAIL_OPENROUTER => {
-            Some(dispatch_managed_agent_detail_openrouter(request, state).await)
-        }
-        ws_methods::MANAGED_AGENTS_OPENROUTER_LIST => {
-            Some(dispatch_managed_agent_openrouter_list(request, state).await)
-        }
-        ws_methods::MANAGED_AGENTS_OPENROUTER_MODELS => {
-            Some(dispatch_managed_agent_openrouter_models(request, state).await)
         }
         _ => None,
     }

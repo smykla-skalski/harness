@@ -332,27 +332,20 @@ pub(crate) async fn dispatch_managed_agent_resolve_acp_permission(
             );
         }
     };
-    let result = if state.openrouter_agent_manager.has_session(&agent_id) {
-        state
-            .openrouter_agent_manager
-            .resolve_permission_batch(&agent_id, &batch_id, &decision)
-            .map(ManagedAgentSnapshot::OpenRouter)
-    } else {
-        if let Err(error) = ensure_acp_enabled() {
-            return error_response(&request.id, error.code(), &error.message());
+    if let Err(error) = ensure_acp_enabled() {
+        return error_response(&request.id, error.code(), &error.message());
+    }
+    let result = match acp_session_id(state, &agent_id) {
+        Ok(session_id) => {
+            with_managed_agent_lock(state, &session_id, &agent_id, || {
+                state
+                    .acp_agent_manager
+                    .resolve_permission_batch(&agent_id, &batch_id, &decision)
+                    .map(ManagedAgentSnapshot::Acp)
+            })
+            .await
         }
-        match acp_session_id(state, &agent_id) {
-            Ok(session_id) => {
-                with_managed_agent_lock(state, &session_id, &agent_id, || {
-                    state
-                        .acp_agent_manager
-                        .resolve_permission_batch(&agent_id, &batch_id, &decision)
-                        .map(ManagedAgentSnapshot::Acp)
-                })
-                .await
-            }
-            Err(error) => Err(error),
-        }
+        Err(error) => Err(error),
     };
     dispatch_managed_agent_response(request, state, result).await
 }
@@ -394,29 +387,8 @@ async fn stop_non_codex_managed_agent(
     {
         return stop_acp_managed_agent(state, &session_id, agent_id).await;
     }
-    if let Ok(session_id) = state
-        .openrouter_agent_manager
-        .get(agent_id)
-        .map(|snapshot| snapshot.session_id)
-    {
-        return stop_openrouter_managed_agent(state, &session_id, agent_id).await;
-    }
     let session_id = terminal_session_id(state, agent_id)?;
     stop_terminal_managed_agent(state, &session_id, agent_id).await
-}
-
-async fn stop_openrouter_managed_agent(
-    state: &DaemonHttpState,
-    session_id: &str,
-    agent_id: &str,
-) -> Result<ManagedAgentSnapshot, CliError> {
-    with_managed_agent_lock(state, session_id, agent_id, || {
-        state
-            .openrouter_agent_manager
-            .cancel(agent_id)
-            .map(ManagedAgentSnapshot::OpenRouter)
-    })
-    .await
 }
 
 async fn stop_codex_managed_agent(
