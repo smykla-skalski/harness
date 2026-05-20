@@ -2,7 +2,6 @@ use serde::{Deserialize, Serialize};
 
 use crate::daemon::agent_acp::AcpAgentSnapshot;
 use crate::daemon::agent_tui::AgentTuiSnapshot;
-use crate::daemon::openrouter_agent::OpenRouterRunSnapshot;
 use crate::session::types::{HarnessSessionId, ManagedAgentId, SessionAgentId};
 
 use super::CodexRunSnapshot;
@@ -13,23 +12,21 @@ pub enum ManagedAgentSnapshot {
     Terminal(AgentTuiSnapshot),
     Codex(CodexRunSnapshot),
     Acp(AcpAgentSnapshot),
-    OpenRouter(OpenRouterRunSnapshot),
 }
 
 impl ManagedAgentSnapshot {
     /// Legacy transport identifier used by existing managed-agent routes.
     ///
-    /// For terminal agents this is `tui_id`, for codex it is `run_id`, for
-    /// ACP it is `acp_id`, and for `OpenRouter` it is `run_id`. Prefer
-    /// [`Self::managed_agent_id`] or [`Self::session_agent_id`] in new code
-    /// when the identity class matters.
+    /// For terminal agents this is `tui_id`, for codex it is `run_id`, and
+    /// for ACP it is `acp_id`. Prefer [`Self::managed_agent_id`] or
+    /// [`Self::session_agent_id`] in new code when the identity class
+    /// matters.
     #[must_use]
     pub fn agent_id(&self) -> &str {
         match self {
             Self::Terminal(snapshot) => &snapshot.tui_id,
             Self::Codex(snapshot) => &snapshot.run_id,
             Self::Acp(snapshot) => &snapshot.acp_id,
-            Self::OpenRouter(snapshot) => &snapshot.run_id,
         }
     }
 
@@ -47,10 +44,6 @@ impl ManagedAgentSnapshot {
                 .as_deref()
                 .map(SessionAgentId::from),
             Self::Acp(snapshot) => Some(SessionAgentId::from(snapshot.agent_id.as_str())),
-            Self::OpenRouter(snapshot) => snapshot
-                .session_agent_id
-                .as_deref()
-                .map(SessionAgentId::from),
         }
     }
 
@@ -65,7 +58,6 @@ impl ManagedAgentSnapshot {
             Self::Terminal(snapshot) => &snapshot.session_id,
             Self::Codex(snapshot) => &snapshot.session_id,
             Self::Acp(snapshot) => &snapshot.session_id,
-            Self::OpenRouter(snapshot) => &snapshot.session_id,
         }
     }
 
@@ -75,7 +67,6 @@ impl ManagedAgentSnapshot {
             Self::Terminal(snapshot) => &snapshot.updated_at,
             Self::Codex(snapshot) => &snapshot.updated_at,
             Self::Acp(snapshot) => &snapshot.updated_at,
-            Self::OpenRouter(snapshot) => &snapshot.updated_at,
         }
     }
 }
@@ -91,7 +82,6 @@ mod tests {
     use crate::daemon::agent_tui::{
         AgentTuiSize, AgentTuiSnapshot, AgentTuiStatus, TerminalScreenSnapshot,
     };
-    use crate::daemon::openrouter_agent::{OpenRouterRunSnapshot, OpenRouterRunStatus};
     use crate::daemon::protocol::{CodexRunMode, CodexRunSnapshot, CodexRunStatus};
     use crate::session::types::{AgentStatus, HarnessSessionId, ManagedAgentId, SessionAgentId};
 
@@ -192,59 +182,5 @@ mod tests {
             acp.harness_session_id(),
             HarnessSessionId::from("eadbcb3e-6ef7-53d2-ad56-0347cb7189fc")
         );
-
-        let openrouter = ManagedAgentSnapshot::OpenRouter(OpenRouterRunSnapshot {
-            run_id: "openrouter-1".into(),
-            session_id: "eadbcb3e-6ef7-53d2-ad56-0347cb7189fc".into(),
-            session_agent_id: Some("worker-or".into()),
-            display_name: "OpenRouter".into(),
-            model: "anthropic/claude-3.7-sonnet".into(),
-            status: OpenRouterRunStatus::Idle,
-            latest_message: None,
-            latest_reasoning: None,
-            final_message: None,
-            error: None,
-            turn_count: 0,
-            pending_permission_batches: Vec::new(),
-            created_at: "2026-05-20T00:00:00Z".into(),
-            updated_at: "2026-05-20T00:00:00Z".into(),
-        });
-        assert_eq!(
-            openrouter.managed_agent_id(),
-            ManagedAgentId::from("openrouter-1")
-        );
-        assert_eq!(
-            openrouter.session_agent_id(),
-            Some(SessionAgentId::from("worker-or"))
-        );
-        assert_eq!(
-            openrouter.harness_session_id(),
-            HarnessSessionId::from("eadbcb3e-6ef7-53d2-ad56-0347cb7189fc")
-        );
-        assert_eq!(openrouter.session_id(), "eadbcb3e-6ef7-53d2-ad56-0347cb7189fc");
-        assert_eq!(openrouter.updated_at(), "2026-05-20T00:00:00Z");
-    }
-
-    #[test]
-    fn openrouter_variant_serializes_with_open_router_kind_tag() {
-        let snapshot = ManagedAgentSnapshot::OpenRouter(OpenRouterRunSnapshot {
-            run_id: "openrouter-1".into(),
-            session_id: "eadbcb3e-6ef7-53d2-ad56-0347cb7189fc".into(),
-            session_agent_id: None,
-            display_name: "OpenRouter".into(),
-            model: "anthropic/claude-3.7-sonnet".into(),
-            status: OpenRouterRunStatus::Pending,
-            latest_message: None,
-            latest_reasoning: None,
-            final_message: None,
-            error: None,
-            turn_count: 0,
-            pending_permission_batches: Vec::new(),
-            created_at: "2026-05-20T00:00:00Z".into(),
-            updated_at: "2026-05-20T00:00:00Z".into(),
-        });
-        let value = serde_json::to_value(&snapshot).expect("serialize");
-        assert_eq!(value["kind"], "open_router");
-        assert_eq!(value["snapshot"]["run_id"], "openrouter-1");
     }
 }

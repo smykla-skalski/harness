@@ -40,14 +40,6 @@ pub(crate) fn managed_agent_list_response(
                 .into_iter()
                 .map(ManagedAgentSnapshot::Acp),
         )
-        .chain(
-            state
-                .openrouter_agent_manager
-                .list_for_session(session_id)
-                .runs
-                .into_iter()
-                .map(ManagedAgentSnapshot::OpenRouter),
-        )
         .collect();
     agents.sort_by_key(|agent| {
         (
@@ -68,9 +60,6 @@ pub(crate) fn managed_agent_snapshot(
     }
     if let Ok(snapshot) = state.codex_controller.run(agent_id) {
         return Ok(ManagedAgentSnapshot::Codex(snapshot));
-    }
-    if let Ok(snapshot) = state.openrouter_agent_manager.get(agent_id) {
-        return Ok(ManagedAgentSnapshot::OpenRouter(snapshot));
     }
     state
         .acp_agent_manager

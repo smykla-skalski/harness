@@ -141,15 +141,6 @@ pub(super) async fn post_terminal_agent_stop(
                     .acp_agent_manager
                     .stop(&managed_agent_id)
                     .map(ManagedAgentSnapshot::Acp)
-            } else if state
-                .openrouter_agent_manager
-                .get(&managed_agent_id)
-                .is_ok()
-            {
-                state
-                    .openrouter_agent_manager
-                    .cancel(&managed_agent_id)
-                    .map(ManagedAgentSnapshot::OpenRouter)
             } else {
                 ensure_terminal_agent(&state, &managed_agent_id)
                     .and_then(|()| state.agent_tui_manager.stop(&managed_agent_id))
@@ -313,22 +304,15 @@ pub(super) async fn post_acp_permission(
     if let Err(response) = require_auth(&headers, &state) {
         return *response;
     }
-    let result = if state.openrouter_agent_manager.has_session(&agent_id) {
-        state
-            .openrouter_agent_manager
-            .resolve_permission_batch(&agent_id, &batch_id, &request)
-            .map(ManagedAgentSnapshot::OpenRouter)
-    } else {
-        ensure_acp_enabled().and_then(|()| {
-            ensure_acp_agent(&state, &agent_id)
-                .and_then(|()| {
-                    state
-                        .acp_agent_manager
-                        .resolve_permission_batch(&agent_id, &batch_id, &request)
-                })
-                .map(ManagedAgentSnapshot::Acp)
-        })
-    };
+    let result = ensure_acp_enabled().and_then(|()| {
+        ensure_acp_agent(&state, &agent_id)
+            .and_then(|()| {
+                state
+                    .acp_agent_manager
+                    .resolve_permission_batch(&agent_id, &batch_id, &request)
+            })
+            .map(ManagedAgentSnapshot::Acp)
+    });
     timed_json(
         "POST",
         http_paths::MANAGED_AGENT_ACP_PERMISSION,
