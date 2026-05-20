@@ -79,68 +79,61 @@ extension EnvironmentValues {
 }
 
 struct SettingsScrollRestorationModifier: ViewModifier {
-  private static let persistenceStep: CGFloat = 24
   private static let restoreTolerance: CGFloat = 1
 
   @Environment(\.settingsScrollRestorationSection)
   private var section
   @Environment(\.settingsScrollRestorationSuspended)
   private var isRestorationSuspended
-  @State private var lastObservedOffset: CGFloat = 0
+  @State private var activeUserScroll = false
+  @State private var lastObservedState = SettingsScrollState()
   @State private var lastPersistedOffset: CGFloat?
   @State private var pendingRestore: PendingRestore?
   @State private var restoreGeneration: UInt64 = 0
   @State private var restoredSection: SettingsSection?
-  @State private var scrollPhase: ScrollPhase = .idle
+  @State private var restoreApplicatorRequest: SettingsScrollRestoreRequest?
+  @State private var restoreApplicatorRequestID: UInt64 = 0
   @State private var scrollPosition = ScrollPosition()
+  @State private var userScrollObserved = false
 
   func body(content: Content) -> some View {
     Group {
       if let section {
         content
           .scrollPosition($scrollPosition)
+          .background(
+            SettingsScrollRestoreApplicator(request: restoreApplicatorRequest)
+          )
           .onScrollGeometryChange(
             for: SettingsScrollState.self,
             of: Self.scrollState
-          ) { _, newState in
-            if pendingRestore?.section == section,
-              SettingsScrollRestorationPhasePolicy.cancelsPendingRestore(scrollPhase)
-            {
-              cancelRestore(for: section, observedOffset: newState.offsetY)
-            }
+          ) { oldState, newState in
+            lastObservedState = newState
             guard !waitForPendingRestore(newState, for: section) else {
               return
             }
-            lastObservedOffset = newState.offsetY
             guard restoredSection == section else {
               return
             }
-            persistObservedOffset(newState.offsetY, for: section, force: false)
+            persistGeometryOffset(
+              newState.offsetY,
+              oldOffset: oldState.offsetY,
+              for: section
+            )
+          }
+          .onScrollPhaseChange { _, newPhase, context in
+            handleScrollPhaseChange(
+              newPhase,
+              state: Self.scrollState(context.geometry),
+              for: section
+            )
           }
           .onChange(of: section, initial: true) { _, newSection in
             restoreScrollPosition(for: newSection)
           }
-          .onScrollPhaseChange { _, newPhase, context in
-            scrollPhase = newPhase
-            guard pendingRestore?.section == section,
-              SettingsScrollRestorationPhasePolicy.cancelsPendingRestore(newPhase)
-            else {
-              return
-            }
-            cancelRestore(
-              for: section,
-              observedOffset: Self.scrollState(context.geometry).offsetY
-            )
-          }
           .onChange(of: isRestorationSuspended, initial: true) { _, isSuspended in
             guard isSuspended else { return }
             cancelRestore(for: section, observedOffset: nil)
-          }
-          .onDisappear {
-            guard pendingRestore?.section != section else {
-              return
-            }
-            persistObservedOffset(lastObservedOffset, for: section, force: true)
           }
       } else {
         content
@@ -165,23 +158,63 @@ struct SettingsScrollRestorationModifier: ViewModifier {
     restoreGeneration &+= 1
     let generation = restoreGeneration
     let offset = SettingsRestorationDefaults.scrollOffset(for: section)
-    scrollPhase = .idle
-    lastObservedOffset = offset
+    activeUserScroll = false
+    userScrollObserved = false
+    lastObservedState = SettingsScrollState(offsetY: offset, maxOffsetY: 0)
     lastPersistedOffset = offset
     if offset > 0 {
       pendingRestore = PendingRestore(section: section, offset: offset, generation: generation)
+      restoredSection = nil
     } else {
       pendingRestore = nil
+      restoredSection = section
     }
-    restoredSection = offset > 0 ? nil : section
-    scrollPosition = ScrollPosition(point: CGPoint(x: 0, y: offset))
+    requestScroll(to: offset)
 
     Task { @MainActor in
       await Task.yield()
       guard restoreGeneration == generation else {
         return
       }
-      scrollPosition = ScrollPosition(point: CGPoint(x: 0, y: offset))
+      requestScroll(to: offset)
+    }
+  }
+
+  private func requestScroll(to offset: CGFloat) {
+    restoreApplicatorRequestID &+= 1
+    restoreApplicatorRequest = SettingsScrollRestoreRequest(
+      id: restoreApplicatorRequestID,
+      offset: offset
+    )
+    scrollPosition.scrollTo(
+      point: CGPoint(
+        x: 0,
+        y: SettingsRestorationDefaults.normalizedScrollOffset(offset)
+      )
+    )
+  }
+
+  private func handleScrollPhaseChange(
+    _ phase: ScrollPhase,
+    state: SettingsScrollState,
+    for section: SettingsSection
+  ) {
+    lastObservedState = state
+
+    if SettingsScrollRestorationPhasePolicy.isUserScroll(phase) {
+      activeUserScroll = true
+      userScrollObserved = true
+      if pendingRestore?.section == section {
+        cancelRestore(for: section, observedOffset: state.offsetY)
+      }
+      persistObservedOffset(state.offsetY, for: section, force: false, allowsZero: true)
+      return
+    }
+
+    if phase == .idle, userScrollObserved {
+      persistObservedOffset(state.offsetY, for: section, force: true, allowsZero: true)
+      activeUserScroll = false
+      userScrollObserved = false
     }
   }
 
@@ -193,7 +226,7 @@ struct SettingsScrollRestorationModifier: ViewModifier {
     pendingRestore = nil
     restoredSection = section
     if let observedOffset {
-      lastObservedOffset = observedOffset
+      lastObservedState = SettingsScrollState(offsetY: observedOffset, maxOffsetY: 0)
     }
     lastPersistedOffset = SettingsRestorationDefaults.scrollOffset(for: section)
   }
@@ -211,21 +244,24 @@ struct SettingsScrollRestorationModifier: ViewModifier {
     }
 
     let targetOffset = pendingRestore.offset
-    guard targetOffset > 0 else {
+    let visibleTargetOffset = SettingsScrollPersistencePolicy.restorationTargetOffset(
+      storedOffset: targetOffset,
+      maxOffset: state.maxOffsetY
+    )
+    guard visibleTargetOffset > 0 else {
       finishRestore(for: section, observedOffset: state.offsetY)
       return false
     }
-    guard state.maxOffsetY + Self.restoreTolerance >= targetOffset else {
-      scrollPosition = ScrollPosition(point: CGPoint(x: 0, y: targetOffset))
-      return true
-    }
-    guard abs(state.offsetY - targetOffset) <= Self.restoreTolerance else {
-      scrollPosition = ScrollPosition(point: CGPoint(x: 0, y: targetOffset))
+    guard state.maxOffsetY > 0 else {
+      requestScroll(to: targetOffset)
       return true
     }
 
+    if abs(state.offsetY - visibleTargetOffset) > Self.restoreTolerance {
+      requestScroll(to: targetOffset)
+    }
     finishRestore(for: section, observedOffset: state.offsetY)
-    return false
+    return true
   }
 
   private func finishRestore(
@@ -234,21 +270,52 @@ struct SettingsScrollRestorationModifier: ViewModifier {
   ) {
     pendingRestore = nil
     restoredSection = section
-    lastObservedOffset = observedOffset
+    lastObservedState = SettingsScrollState(offsetY: observedOffset, maxOffsetY: 0)
+  }
+
+  private func persistGeometryOffset(
+    _ offset: CGFloat,
+    oldOffset: CGFloat,
+    for section: SettingsSection
+  ) {
+    let isConfirmedUserScroll = activeUserScroll || userScrollObserved
+    guard isConfirmedUserScroll || offset > 0 else {
+      return
+    }
+    let hasMeaningfulMovement =
+      isConfirmedUserScroll
+      || SettingsScrollPersistencePolicy.hasMeaningfulMovement(
+        from: oldOffset,
+        to: offset
+      )
+    guard hasMeaningfulMovement else {
+      return
+    }
+    persistObservedOffset(
+      offset,
+      for: section,
+      force: false,
+      allowsZero: isConfirmedUserScroll
+    )
   }
 
   private func persistObservedOffset(
     _ offset: CGFloat,
     for section: SettingsSection,
-    force: Bool
+    force: Bool,
+    allowsZero: Bool
   ) {
-    let normalizedOffset = SettingsRestorationDefaults.normalizedScrollOffset(offset)
-    let shouldPersist =
-      force
-      || lastPersistedOffset.map { abs($0 - normalizedOffset) >= Self.persistenceStep } ?? true
-    guard shouldPersist else {
+    guard
+      SettingsScrollPersistencePolicy.shouldPersist(
+        offset,
+        previousOffset: lastPersistedOffset,
+        force: force,
+        allowsZero: allowsZero
+      )
+    else {
       return
     }
+    let normalizedOffset = SettingsRestorationDefaults.normalizedScrollOffset(offset)
     SettingsRestorationDefaults.storeScrollOffset(normalizedOffset, for: section)
     lastPersistedOffset = normalizedOffset
   }
@@ -260,13 +327,47 @@ struct SettingsScrollRestorationModifier: ViewModifier {
   }
 
   private struct SettingsScrollState: Equatable {
-    var offsetY: CGFloat
-    var maxOffsetY: CGFloat
+    var offsetY: CGFloat = 0
+    var maxOffsetY: CGFloat = 0
+  }
+}
+
+enum SettingsScrollPersistencePolicy {
+  private static let persistenceStep: CGFloat = 24
+
+  static func restorationTargetOffset(storedOffset: CGFloat, maxOffset: CGFloat) -> CGFloat {
+    min(
+      SettingsRestorationDefaults.normalizedScrollOffset(storedOffset),
+      SettingsRestorationDefaults.normalizedScrollOffset(maxOffset)
+    )
+  }
+
+  static func hasMeaningfulMovement(from oldOffset: CGFloat, to newOffset: CGFloat) -> Bool {
+    abs(
+      SettingsRestorationDefaults.normalizedScrollOffset(newOffset)
+        - SettingsRestorationDefaults.normalizedScrollOffset(oldOffset)
+    ) >= persistenceStep
+  }
+
+  static func shouldPersist(
+    _ offset: CGFloat,
+    previousOffset: CGFloat?,
+    force: Bool,
+    allowsZero: Bool
+  ) -> Bool {
+    let normalizedOffset = SettingsRestorationDefaults.normalizedScrollOffset(offset)
+    guard allowsZero || normalizedOffset > 0 else {
+      return false
+    }
+    return force
+      || previousOffset.map {
+        abs($0 - normalizedOffset) >= persistenceStep
+      } ?? true
   }
 }
 
 enum SettingsScrollRestorationPhasePolicy {
-  static func cancelsPendingRestore(_ phase: ScrollPhase) -> Bool {
+  static func isUserScroll(_ phase: ScrollPhase) -> Bool {
     switch phase {
     case .tracking, .interacting, .decelerating:
       true
@@ -274,4 +375,9 @@ enum SettingsScrollRestorationPhasePolicy {
       false
     }
   }
+}
+
+struct SettingsScrollRestoreRequest: Equatable {
+  var id: UInt64
+  var offset: CGFloat
 }
