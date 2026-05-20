@@ -1,4 +1,4 @@
-//! In-daemon OpenRouter agent session manager (turn loop in `turn_runner`).
+//! In-daemon `OpenRouter` agent session manager (turn loop in `turn_runner`).
 //!
 //! Slated for removal once `crates/harness-openrouter-agent` covers the same
 //! surface via the ACP catalog.
@@ -33,7 +33,7 @@ use crate::workspace::utc_now;
 
 use super::snapshot::{OpenRouterRunSnapshot, OpenRouterRunStatus};
 
-const PERMISSION_BRIDGE_DEADLINE: Duration = Duration::from_secs(300);
+const PERMISSION_BRIDGE_DEADLINE: Duration = Duration::from_mins(5);
 
 mod turn_runner;
 
@@ -124,14 +124,14 @@ impl OpenRouterAgentManagerHandle {
         harness_session: &str,
         request: OpenRouterStartRequest,
     ) -> Result<OpenRouterRunSnapshot, CliError> {
-        let config = OpenRouterAgentConfig::from_env_with_override(
-            state::task_board_openrouter_token(),
-        )
-        .map_err(|error| {
-            CliError::from(CliErrorKind::workflow_parse(format!(
-                "OpenRouter configuration error: {error}"
-            )))
-        })?;
+        let token = state::task_board_openrouter_token();
+        let config = OpenRouterAgentConfig::from_env_with_override(token.as_deref()).map_err(
+            |error| {
+                CliError::from(CliErrorKind::workflow_parse(format!(
+                    "OpenRouter configuration error: {error}"
+                )))
+            },
+        )?;
         let model = request
             .model
             .clone()
@@ -328,14 +328,14 @@ impl OpenRouterAgentManagerHandle {
     /// Returns an error if the API key is missing, transport fails, or the
     /// response cannot be parsed.
     pub async fn list_models(&self) -> Result<ModelListResponse, CliError> {
-        let config = OpenRouterAgentConfig::from_env_with_override(
-            state::task_board_openrouter_token(),
-        )
-        .map_err(|error| {
-            CliError::from(CliErrorKind::workflow_parse(format!(
-                "OpenRouter configuration error: {error}"
-            )))
-        })?;
+        let token = state::task_board_openrouter_token();
+        let config = OpenRouterAgentConfig::from_env_with_override(token.as_deref()).map_err(
+            |error| {
+                CliError::from(CliErrorKind::workflow_parse(format!(
+                    "OpenRouter configuration error: {error}"
+                )))
+            },
+        )?;
         let client = OpenRouterClient::new(
             config.base_url,
             config.api_key,

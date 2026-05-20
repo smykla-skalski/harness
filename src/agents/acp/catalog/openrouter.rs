@@ -1,9 +1,9 @@
-//! Built-in descriptor for the harness-managed OpenRouter ACP shim.
+//! Built-in descriptor for the `harness`-managed `OpenRouter` ACP shim.
 //!
 //! Harness ships and owns the `harness-openrouter-agent` binary; the catalog
 //! treats it identically to other ACP agents. The shim speaks ACP over stdio
-//! and translates `session/prompt` calls into OpenRouter Chat Completions plus
-//! the standard ACP tool surface (file IO, terminal lifecycle, permission
+//! and translates `session/prompt` calls into `OpenRouter` Chat Completions
+//! plus the standard ACP tool surface (file IO, terminal lifecycle, permission
 //! requests).
 
 use super::{
