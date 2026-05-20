@@ -71,6 +71,16 @@ struct PolicyCanvasInteractiveEdge: View {
   private var canvasReducedMotion
   @Environment(\.accessibilityReduceMotion)
   private var systemReduceMotion
+  /// Pauses the dash-march `TimelineView(.animation)` when the host window
+  /// drops to `.inactive` (occluded or background). With the animation
+  /// running across every animated edge SwiftUI bumps an internal
+  /// `External: UInt32` seed every animation tick that fans out through
+  /// MergedEnvironment + ForEach evictor cascades app-wide — the trace
+  /// showed 45k port-marker evictor edges in 30s while the Settings window
+  /// was active and the canvas was offscreen. Inactive windows skip the
+  /// TimelineView entirely; static stroke draws once and stops.
+  @Environment(\.controlActiveState)
+  private var controlActiveState
 
   init(
     route: PolicyCanvasEdgeRoute,
@@ -181,7 +191,7 @@ struct PolicyCanvasInteractiveEdge: View {
 
   @ViewBuilder
   private func strokeLayer(route: PolicyCanvasEdgeRoute) -> some View {
-    if isAnimated, !reducedMotion {
+    if isAnimated, !reducedMotion, controlActiveState != .inactive {
       TimelineView(.animation) { context in
         let phase = PolicyCanvasEdgeAnimation.dashPhase(
           at: context.date,
@@ -199,6 +209,21 @@ struct PolicyCanvasInteractiveEdge: View {
             )
           )
       }
+    } else if isAnimated, !reducedMotion {
+      // Window inactive: keep the animated dash pattern but freeze the
+      // march at phase 0. The edge still reads as "active" visually, just
+      // not marching, and the TimelineView animation tick is gone.
+      PolicyCanvasEdgeShape(route: route, gapFrames: labelGapFrames)
+        .stroke(
+          color,
+          style: StrokeStyle(
+            lineWidth: effectiveStrokeWidth,
+            lineCap: .round,
+            lineJoin: .round,
+            dash: PolicyCanvasEdgeAnimation.dashPattern,
+            dashPhase: 0
+          )
+        )
     } else {
       PolicyCanvasEdgeShape(route: route, gapFrames: labelGapFrames)
         .stroke(
