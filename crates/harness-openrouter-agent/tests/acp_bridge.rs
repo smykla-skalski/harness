@@ -48,13 +48,21 @@ impl ChunkLog {
     }
 }
 
-fn build_agent(server_url: &str) -> AcpAgent {
-    let stdio = McpServerStdio::new("openrouter-shim", PathBuf::from(BIN_PATH)).env(vec![
-        EnvVariable::new("OPENROUTER_API_KEY", "sk-test"),
-        EnvVariable::new("OPENROUTER_API_URL", server_url.to_owned()),
-        EnvVariable::new("HARNESS_OPENROUTER_LOG", "off"),
-    ]);
-    AcpAgent::new(McpServer::Stdio(stdio))
+fn build_agent(server_url: &str) -> (AcpAgent, tempfile::TempDir) {
+    let key_dir = tempfile::tempdir().expect("api-key-file tempdir");
+    let key_path = key_dir.path().join("openrouter-key");
+    std::fs::write(&key_path, "sk-test").expect("write api-key-file");
+    let stdio = McpServerStdio::new("openrouter-shim", PathBuf::from(BIN_PATH))
+        .args(vec![
+            "--stdio".to_string(),
+            "--api-key-file".to_string(),
+            key_path.display().to_string(),
+        ])
+        .env(vec![
+            EnvVariable::new("OPENROUTER_API_URL", server_url.to_owned()),
+            EnvVariable::new("HARNESS_OPENROUTER_LOG", "off"),
+        ]);
+    (AcpAgent::new(McpServer::Stdio(stdio)), key_dir)
 }
 
 fn sse(body: &[&str]) -> String {
@@ -162,10 +170,9 @@ fn client_builder_with_chunks(
 async fn probe_flag_exits_success_without_api_key() {
     // The catalog descriptor's doctor_probe runs the shim with --probe to
     // detect installation. It must exit 0 without spinning up the runtime
-    // and without requiring OPENROUTER_API_KEY.
+    // and without needing the --api-key-file credential.
     let status = Command::new(BIN_PATH)
         .arg("--probe")
-        .env_remove("OPENROUTER_API_KEY")
         .status()
         .await
         .expect("spawn shim");
@@ -176,7 +183,7 @@ async fn probe_flag_exits_success_without_api_key() {
 async fn initialize_round_trips() {
     let server = MockServer::start().await;
     mount_models(&server).await;
-    let agent = build_agent(&server.uri());
+    let (agent, _key_tmp) = build_agent(&server.uri());
 
     let log = ChunkLog::default();
     client_builder_with_chunks(log)
@@ -197,7 +204,7 @@ async fn initialize_round_trips() {
 async fn session_new_returns_session_id_and_models() {
     let server = MockServer::start().await;
     mount_models(&server).await;
-    let agent = build_agent(&server.uri());
+    let (agent, _key_tmp) = build_agent(&server.uri());
     let log = ChunkLog::default();
 
     client_builder_with_chunks(log)
@@ -241,7 +248,7 @@ async fn prompt_streams_text_and_returns_end_turn() {
         )
         .mount(&server)
         .await;
-    let agent = build_agent(&server.uri());
+    let (agent, _key_tmp) = build_agent(&server.uri());
     let log = ChunkLog::default();
     let log_for_assert = log.clone();
 
@@ -332,7 +339,7 @@ async fn prompt_round_trips_a_tool_call() {
         .mount(&server)
         .await;
 
-    let agent = build_agent(&server.uri());
+    let (agent, _key_tmp) = build_agent(&server.uri());
     let log = ChunkLog::default();
     let log_for_assert = log.clone();
 
@@ -402,7 +409,7 @@ async fn parallel_tool_calls_in_one_chunk_dispatch_in_index_order() {
         .mount(&server)
         .await;
 
-    let agent = build_agent(&server.uri());
+    let (agent, _key_tmp) = build_agent(&server.uri());
     let log = ChunkLog::default();
     let log_for_assert = log.clone();
     client_builder_with_chunks(log)
@@ -451,7 +458,7 @@ async fn tool_iteration_cap_returns_max_turn_requests() {
         .mount(&server)
         .await;
 
-    let agent = build_agent(&server.uri());
+    let (agent, _key_tmp) = build_agent(&server.uri());
     client_builder_with_chunks(ChunkLog::default())
         .connect_with(agent, |cx: ConnectionTo<Agent>| async move {
             cx.send_request(InitializeRequest::new(ProtocolVersion::LATEST))
@@ -489,7 +496,7 @@ async fn http_error_surfaces_as_end_turn_with_diagnostic_chunk() {
         .mount(&server)
         .await;
 
-    let agent = build_agent(&server.uri());
+    let (agent, _key_tmp) = build_agent(&server.uri());
     let log = ChunkLog::default();
     let log_for_assert = log.clone();
     client_builder_with_chunks(log)
@@ -534,7 +541,7 @@ async fn moderation_status_surfaces_as_refusal() {
         .mount(&server)
         .await;
 
-    let agent = build_agent(&server.uri());
+    let (agent, _key_tmp) = build_agent(&server.uri());
     client_builder_with_chunks(ChunkLog::default())
         .connect_with(agent, |cx: ConnectionTo<Agent>| async move {
             cx.send_request(InitializeRequest::new(ProtocolVersion::LATEST))
@@ -586,7 +593,7 @@ async fn cancel_mid_stream_returns_cancelled_stop_reason() {
         .mount(&server)
         .await;
 
-    let agent = build_agent(&server.uri());
+    let (agent, _key_tmp) = build_agent(&server.uri());
     let log = ChunkLog::default();
     let log_for_assert = log.clone();
     client_builder_with_chunks(log)
@@ -665,7 +672,7 @@ async fn multiple_sessions_keep_isolated_histories() {
         .mount(&server)
         .await;
 
-    let agent = build_agent(&server.uri());
+    let (agent, _key_tmp) = build_agent(&server.uri());
     let log = ChunkLog::default();
     let log_for_assert = log.clone();
     client_builder_with_chunks(log)

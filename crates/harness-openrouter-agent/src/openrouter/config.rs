@@ -1,10 +1,19 @@
-//! Environment-derived configuration for the `OpenRouter` agent backend.
+//! Configuration for the OpenRouter ACP shim.
 //!
-//! Reads `OPENROUTER_*` variables at the time the daemon spins up an
-//! `OpenRouter` session. Values are immutable for the session's lifetime; a
-//! new session re-reads the environment.
+//! The API key reaches the shim through a one-shot credential file whose path
+//! the daemon supplies via `--api-key-file PATH`. The daemon creates the file
+//! with mode 0600 in a per-spawn random directory, writes the key from its
+//! Monitor-synced in-memory token cache, and the shim reads then immediately
+//! unlinks the file. Environment variables are deliberately NOT a delivery
+//! channel — they leak to grand-children and show up in `/proc/<pid>/environ`,
+//! which is the wrong threat model for an API credential.
+//!
+//! Non-secret tuning (base URL, referer, title) is still read from environment
+//! variables — those values aren't secrets and routinely need to be overridden
+//! for local proxying or branding.
 
 use std::env;
+use std::path::{Path, PathBuf};
 
 use thiserror::Error;
 
@@ -22,61 +31,97 @@ pub struct AgentConfig {
 
 #[derive(Debug, Error)]
 pub enum ConfigError {
-    #[error("OPENROUTER_API_KEY environment variable is empty or unset")]
-    MissingApiKey,
+    #[error(
+        "OpenRouter API key file was not supplied. The daemon must launch the shim with `--api-key-file PATH`. If you are running the shim manually, write the key to a mode-0600 file and pass its path."
+    )]
+    MissingApiKeyFile,
+    #[error("OpenRouter API key file `{path}` is empty after trimming")]
+    EmptyApiKeyFile { path: String },
+    #[error("failed to read api-key-file `{path}`: {source}")]
+    ApiKeyFile {
+        path: String,
+        #[source]
+        source: std::io::Error,
+    },
 }
 
 impl AgentConfig {
-    /// Build the agent config from `OPENROUTER_*` environment variables.
+    /// Read the API key from `path` (the file the daemon prepared) and layer
+    /// non-secret tuning from the process environment.
     ///
     /// # Errors
-    /// Returns [`ConfigError::MissingApiKey`] when the API key is empty or
-    /// absent.
-    pub fn from_env() -> Result<Self, ConfigError> {
-        Self::from_env_with_override(None)
-    }
-
-    /// Build the agent config from `OPENROUTER_*` environment variables, but
-    /// prefer `override_api_key` when present. The daemon uses this to honor
-    /// the Keychain-backed key persisted via `task_board.orchestrator_openrouter_token_sync`
-    /// before falling back to the env var.
-    ///
-    /// # Errors
-    /// Returns [`ConfigError::MissingApiKey`] when neither the override nor
-    /// the env var supplies a key.
-    pub fn from_env_with_override(override_api_key: Option<String>) -> Result<Self, ConfigError> {
-        Self::from_source(|name| match (name, override_api_key.as_deref()) {
-            ("OPENROUTER_API_KEY", Some(value)) if !value.is_empty() => Some(value.to_owned()),
-            _ => env::var(name).ok(),
+    /// Returns [`ConfigError::ApiKeyFile`] when the file can't be opened,
+    /// or [`ConfigError::EmptyApiKeyFile`] when the trimmed contents are
+    /// empty.
+    pub fn from_api_key_file(path: &Path) -> Result<Self, ConfigError> {
+        let raw = std::fs::read_to_string(path).map_err(|source| ConfigError::ApiKeyFile {
+            path: path.display().to_string(),
+            source,
+        })?;
+        let api_key = raw.trim().to_owned();
+        if api_key.is_empty() {
+            return Err(ConfigError::EmptyApiKeyFile {
+                path: path.display().to_string(),
+            });
+        }
+        Ok(Self {
+            api_key,
+            base_url: env_string("OPENROUTER_API_URL")
+                .unwrap_or_else(|| DEFAULT_BASE_URL.to_owned()),
+            http_referer: env_string("OPENROUTER_HTTP_REFERER")
+                .unwrap_or_else(|| DEFAULT_HTTP_REFERER.to_owned()),
+            x_title: env_string("OPENROUTER_X_TITLE").unwrap_or_else(|| DEFAULT_X_TITLE.to_owned()),
         })
     }
 
-    /// Build the agent config from an arbitrary source. Exposed for tests so
-    /// the unit suite doesn't have to mutate process-wide env state.
+    /// Build the agent config from an arbitrary source. Exposed so the unit
+    /// suite doesn't have to touch the filesystem.
     ///
     /// # Errors
-    /// Returns [`ConfigError::MissingApiKey`] when the API key is empty or
-    /// absent.
+    /// Returns [`ConfigError::MissingApiKeyFile`] when the API key is empty
+    /// or absent.
     pub fn from_source<F: Fn(&str) -> Option<String>>(read: F) -> Result<Self, ConfigError> {
         let api_key = read("OPENROUTER_API_KEY")
             .filter(|value| !value.is_empty())
-            .ok_or(ConfigError::MissingApiKey)?;
-        let base_url = read("OPENROUTER_API_URL")
-            .filter(|value| !value.is_empty())
-            .unwrap_or_else(|| DEFAULT_BASE_URL.to_owned());
-        let http_referer = read("OPENROUTER_HTTP_REFERER")
-            .filter(|value| !value.is_empty())
-            .unwrap_or_else(|| DEFAULT_HTTP_REFERER.to_owned());
-        let x_title = read("OPENROUTER_X_TITLE")
-            .filter(|value| !value.is_empty())
-            .unwrap_or_else(|| DEFAULT_X_TITLE.to_owned());
+            .ok_or(ConfigError::MissingApiKeyFile)?;
         Ok(Self {
             api_key,
-            base_url,
-            http_referer,
-            x_title,
+            base_url: read("OPENROUTER_API_URL")
+                .filter(|value| !value.is_empty())
+                .unwrap_or_else(|| DEFAULT_BASE_URL.to_owned()),
+            http_referer: read("OPENROUTER_HTTP_REFERER")
+                .filter(|value| !value.is_empty())
+                .unwrap_or_else(|| DEFAULT_HTTP_REFERER.to_owned()),
+            x_title: read("OPENROUTER_X_TITLE")
+                .filter(|value| !value.is_empty())
+                .unwrap_or_else(|| DEFAULT_X_TITLE.to_owned()),
         })
     }
+}
+
+/// Unlink the credential file. Called by the shim after [`AgentConfig::from_api_key_file`]
+/// so the key never lingers on disk longer than one stat() interval.
+///
+/// Errors are logged at warn level and not propagated — losing the unlink is
+/// not worth aborting the session for, and the daemon already created the
+/// file in a per-spawn tempdir that gets reaped on supervisor shutdown.
+pub fn discard_api_key_file(path: &Path) {
+    if let Err(err) = std::fs::remove_file(path) {
+        tracing::warn!(
+            path = %path.display(),
+            error = %err,
+            "failed to unlink api-key-file after read"
+        );
+    }
+}
+
+/// Convenience that calls [`discard_api_key_file`] on an owned `PathBuf`.
+pub fn discard_api_key_pathbuf(path: PathBuf) {
+    discard_api_key_file(&path);
+}
+
+fn env_string(name: &str) -> Option<String> {
+    env::var(name).ok().filter(|value| !value.is_empty())
 }
 
 #[cfg(test)]
@@ -99,7 +144,7 @@ mod tests {
     #[test]
     fn missing_api_key_is_an_error() {
         let err = AgentConfig::from_source(|_| None).expect_err("missing key should error");
-        assert!(matches!(err, ConfigError::MissingApiKey));
+        assert!(matches!(err, ConfigError::MissingApiKeyFile));
     }
 
     #[test]
@@ -112,7 +157,7 @@ mod tests {
             }
         })
         .expect_err("empty key should error");
-        assert!(matches!(err, ConfigError::MissingApiKey));
+        assert!(matches!(err, ConfigError::MissingApiKeyFile));
     }
 
     #[test]
@@ -124,5 +169,41 @@ mod tests {
         })
         .expect("config from source");
         assert_eq!(config.base_url, "https://example.test/v1");
+    }
+
+    #[test]
+    fn from_api_key_file_loads_trimmed_key() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let path = dir.path().join("openrouter-key");
+        std::fs::write(&path, "  sk-test-file\n").expect("write key file");
+        let config = AgentConfig::from_api_key_file(&path).expect("from file");
+        assert_eq!(config.api_key, "sk-test-file");
+    }
+
+    #[test]
+    fn empty_api_key_file_is_missing() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let path = dir.path().join("openrouter-key");
+        std::fs::write(&path, " \n  \n").expect("write key file");
+        let err = AgentConfig::from_api_key_file(&path).expect_err("empty file should error");
+        assert!(matches!(err, ConfigError::EmptyApiKeyFile { .. }));
+    }
+
+    #[test]
+    fn missing_api_key_file_surfaces_io_error() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let path = dir.path().join("does-not-exist");
+        let err = AgentConfig::from_api_key_file(&path).expect_err("missing file should error");
+        assert!(matches!(err, ConfigError::ApiKeyFile { .. }));
+    }
+
+    #[test]
+    fn discard_api_key_file_unlinks() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let path = dir.path().join("ephemeral-key");
+        std::fs::write(&path, "sk-ephemeral").expect("write");
+        assert!(path.exists());
+        discard_api_key_file(&path);
+        assert!(!path.exists());
     }
 }

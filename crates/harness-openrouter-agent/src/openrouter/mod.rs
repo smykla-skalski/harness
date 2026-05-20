@@ -9,7 +9,7 @@ pub mod errors;
 pub mod types;
 
 pub use client::OpenRouterClient;
-pub use config::{AgentConfig, ConfigError};
+pub use config::{AgentConfig, ConfigError, discard_api_key_file};
 pub use errors::{OpenRouterError, classify_status, parse_retry_after};
 pub use types::{
     AssistantToolCall, AssistantToolCallFunction, AssistantToolCallKind, ChatChoiceDelta,

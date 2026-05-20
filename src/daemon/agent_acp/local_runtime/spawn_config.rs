@@ -1,10 +1,12 @@
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use crate::agents::acp::catalog::{AcpAgentDescriptor, AcpSpawnConfiguration};
 use crate::agents::acp::connection::SpawnConfig;
 use crate::agents::runtime::{AgentRuntime, runtime_for_name};
 use crate::daemon::agent_acp::protocol::AcpSessionRequestConfig;
 use crate::errors::{CliError, CliErrorKind};
+
+const OPENROUTER_DESCRIPTOR_ID: &str = "openrouter";
 
 pub(super) fn build_spawn_config(
     descriptor: &AcpAgentDescriptor,
@@ -36,6 +38,7 @@ pub(super) fn build_spawn_config(
     if !session_config.effort_via_session() {
         push_effort_args(&mut args, runtime, effort);
     }
+    args.extend(descriptor_credential_args(descriptor)?);
     let env_overrides = effort_env_overrides(session_config, runtime, effort);
 
     Ok(SpawnConfig {
@@ -45,6 +48,66 @@ pub(super) fn build_spawn_config(
         env_overrides,
         working_dir: project_dir.to_path_buf(),
     })
+}
+
+/// Append per-descriptor secret arguments. Today only the OpenRouter shim
+/// needs one (`--api-key-file PATH`); other catalog entries expect zero extra
+/// args. The shim reads the file immediately and unlinks it, so the credential
+/// never lives on disk longer than one stat() interval.
+fn descriptor_credential_args(descriptor: &AcpAgentDescriptor) -> Result<Vec<String>, CliError> {
+    if descriptor.id.as_str() != OPENROUTER_DESCRIPTOR_ID {
+        return Ok(Vec::new());
+    }
+    let token = crate::daemon::state::task_board_openrouter_token().ok_or_else(|| {
+        CliErrorKind::workflow_io(
+            "OpenRouter API key is not configured. Set it via Harness Monitor → Settings → OpenRouter or run `harness setup secrets set --kind openrouter`.",
+        )
+    })?;
+    let path = write_openrouter_api_key_file(&token)?;
+    Ok(vec![
+        "--api-key-file".to_string(),
+        path.display().to_string(),
+    ])
+}
+
+/// Write the OpenRouter API key into a mode-0600 file inside a freshly-created
+/// per-spawn random tempdir. The shim unlinks the file at startup. The
+/// surrounding directory lingers until the OS or daemon shutdown sweeps it,
+/// which is acceptable because the secret itself is gone after the unlink.
+fn write_openrouter_api_key_file(token: &str) -> Result<PathBuf, CliError> {
+    let dir = tempfile::Builder::new()
+        .prefix("harness-openrouter-")
+        .tempdir()
+        .map_err(|err| {
+            CliErrorKind::workflow_io(format!("create openrouter credential tempdir: {err}"))
+        })?;
+    let dir_path = dir.keep();
+    let file_path = dir_path.join("api-key");
+    write_credential_bytes(&file_path, token).map_err(|err| {
+        CliErrorKind::workflow_io(format!(
+            "write openrouter credential file `{}`: {err}",
+            file_path.display()
+        ))
+    })?;
+    Ok(file_path)
+}
+
+#[cfg(unix)]
+fn write_credential_bytes(path: &Path, token: &str) -> std::io::Result<()> {
+    use std::io::Write;
+    use std::os::unix::fs::OpenOptionsExt;
+    let mut file = std::fs::OpenOptions::new()
+        .create_new(true)
+        .write(true)
+        .mode(0o600)
+        .open(path)?;
+    file.write_all(token.as_bytes())?;
+    file.sync_all()
+}
+
+#[cfg(not(unix))]
+fn write_credential_bytes(path: &Path, token: &str) -> std::io::Result<()> {
+    std::fs::write(path, token)
 }
 
 fn push_model_args(
@@ -227,5 +290,18 @@ mod tests {
             .expect_err("missing model delivery path should fail");
 
         assert!(format!("{error}").contains("model delivery path"));
+    }
+
+    #[test]
+    fn descriptor_credential_args_empty_for_non_openrouter_descriptors() {
+        for id in ["claude", "codex", "copilot", "gemini"] {
+            let descriptor = descriptor(id);
+            let args = descriptor_credential_args(&descriptor)
+                .expect("non-openrouter descriptors never need credentials");
+            assert!(
+                args.is_empty(),
+                "descriptor `{id}` unexpectedly produced credential args: {args:?}"
+            );
+        }
     }
 }

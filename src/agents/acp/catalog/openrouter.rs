@@ -29,7 +29,6 @@ pub fn descriptor() -> AcpAgentDescriptor {
         launch_command: "harness-openrouter-agent".to_owned(),
         launch_args: Vec::new(),
         env_passthrough: vec![
-            "OPENROUTER_API_KEY".to_owned(),
             "OPENROUTER_API_URL".to_owned(),
             "OPENROUTER_HTTP_REFERER".to_owned(),
             "OPENROUTER_X_TITLE".to_owned(),
@@ -37,7 +36,7 @@ pub fn descriptor() -> AcpAgentDescriptor {
         spawn_configuration: AcpSpawnConfiguration::None,
         model_catalog: models::catalog_for(OPENROUTER_ID).cloned(),
         install_hint: Some(
-            "OpenRouter ACP ships with Harness. Install or update Harness to restore the bundled `harness-openrouter-agent` adapter, then set OPENROUTER_API_KEY (env var or Settings → Credentials → OpenRouter)."
+            "OpenRouter ACP ships with Harness. Configure the API key via Harness Monitor → Settings → OpenRouter or `harness setup secrets set --kind openrouter`. The daemon delivers the key to the shim via a per-spawn mode-0600 file, never via environment variables."
                 .to_owned(),
         ),
         session_configuration: AcpSessionConfiguration::default(),
@@ -79,10 +78,9 @@ mod tests {
     }
 
     #[test]
-    fn env_passthrough_covers_openrouter_configuration() {
+    fn env_passthrough_covers_non_secret_openrouter_configuration() {
         let descriptor = descriptor();
         for name in [
-            "OPENROUTER_API_KEY",
             "OPENROUTER_API_URL",
             "OPENROUTER_HTTP_REFERER",
             "OPENROUTER_X_TITLE",
@@ -92,6 +90,18 @@ mod tests {
                 "env passthrough missing {name}"
             );
         }
+    }
+
+    #[test]
+    fn env_passthrough_excludes_api_key_to_avoid_env_leakage() {
+        let descriptor = descriptor();
+        assert!(
+            !descriptor
+                .env_passthrough
+                .iter()
+                .any(|entry| entry == "OPENROUTER_API_KEY"),
+            "OPENROUTER_API_KEY must not be in env_passthrough — the shim reads its key from --api-key-file written by the daemon, never from the env."
+        );
     }
 
     #[test]
