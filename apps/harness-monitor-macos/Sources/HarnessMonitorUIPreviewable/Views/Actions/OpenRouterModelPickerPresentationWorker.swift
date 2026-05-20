@@ -6,6 +6,20 @@ struct OpenRouterModelPickerPresentationInput: Equatable, Sendable {
   let usageSnapshot: OpenRouterModelUsageSnapshot
 }
 
+struct OpenRouterModelPickerInputFingerprint: Equatable, Sendable {
+  let modelCount: Int
+  let firstModelID: String?
+  let lastModelID: String?
+  let usageSnapshot: OpenRouterModelUsageSnapshot
+
+  init(input: OpenRouterModelPickerPresentationInput) {
+    modelCount = input.availableModels.count
+    firstModelID = input.availableModels.first?.id
+    lastModelID = input.availableModels.last?.id
+    usageSnapshot = input.usageSnapshot
+  }
+}
+
 struct OpenRouterModelPickerPresentation: Equatable, Sendable {
   static let empty = Self(sections: [], displayNamesByID: [:])
 
@@ -27,20 +41,22 @@ struct OpenRouterModelPickerMenuEntry: Equatable, Sendable {
   let displayName: String
 }
 
-actor OpenRouterModelPickerPresentationWorker {
+@MainActor
+final class OpenRouterModelPickerPresentationWorker {
   private static let signposter = OSSignposter(
     subsystem: "io.harnessmonitor",
     category: "perf"
   )
   private static let sectionCap = 5
 
-  private var cachedInput: OpenRouterModelPickerPresentationInput?
+  private var cachedFingerprint: OpenRouterModelPickerInputFingerprint?
   private var cachedOutput = OpenRouterModelPickerPresentation.empty
 
   func compute(
     input: OpenRouterModelPickerPresentationInput
   ) -> OpenRouterModelPickerPresentation {
-    guard input != cachedInput else {
+    let fingerprint = OpenRouterModelPickerInputFingerprint(input: input)
+    if fingerprint == cachedFingerprint {
       return cachedOutput
     }
 
@@ -50,34 +66,42 @@ actor OpenRouterModelPickerPresentationWorker {
       id: signpostID,
       "models=\(input.availableModels.count, privacy: .public)"
     )
-    defer {
-      Self.signposter.endInterval(
-        "openrouter_model_picker.presentation.compute",
-        interval,
-        "sections=\(self.cachedOutput.sections.count, privacy: .public)"
-      )
-    }
+    let output = Self.presentation(from: input)
+    Self.signposter.endInterval(
+      "openrouter_model_picker.presentation.compute",
+      interval,
+      "sections=\(output.sections.count, privacy: .public)"
+    )
 
-    cachedInput = input
-    cachedOutput = Self.presentation(from: input)
-    return cachedOutput
+    cachedFingerprint = fingerprint
+    cachedOutput = output
+    return output
   }
-
-  func waitForIdle() async {}
 
   private static func presentation(
     from input: OpenRouterModelPickerPresentationInput
   ) -> OpenRouterModelPickerPresentation {
-    let modelLookup = Dictionary(uniqueKeysWithValues: input.availableModels.map { ($0.id, $0) })
+    let availableModels = input.availableModels
+    var modelLookup: [String: OpenRouterModelEntry] = [:]
+    modelLookup.reserveCapacity(availableModels.count)
+    var displayNames: [String: String] = [:]
+    displayNames.reserveCapacity(availableModels.count)
+    for model in availableModels {
+      modelLookup[model.id] = model
+      displayNames[model.id] = model.name ?? model.id
+    }
+
     var sectionList: [OpenRouterModelPickerMenuSection] = []
+    sectionList.reserveCapacity(4)
     let usage = UsageBuckets(snapshot: input.usageSnapshot)
+    let allowsFallback = availableModels.isEmpty
 
     if let pinned = makeSection(
       title: "Pinned",
       ids: usage.pinned,
       cap: nil,
       lookup: modelLookup,
-      allowsFallbackEntries: input.availableModels.isEmpty
+      allowsFallbackEntries: allowsFallback
     ) {
       sectionList.append(pinned)
     }
@@ -86,7 +110,7 @@ actor OpenRouterModelPickerPresentationWorker {
       ids: usage.recents,
       cap: Self.sectionCap,
       lookup: modelLookup,
-      allowsFallbackEntries: input.availableModels.isEmpty
+      allowsFallbackEntries: allowsFallback
     ) {
       sectionList.append(recent)
     }
@@ -95,7 +119,7 @@ actor OpenRouterModelPickerPresentationWorker {
       ids: usage.frequent,
       cap: Self.sectionCap,
       lookup: modelLookup,
-      allowsFallbackEntries: input.availableModels.isEmpty
+      allowsFallbackEntries: allowsFallback
     ) {
       sectionList.append(frequent)
     }
@@ -105,7 +129,7 @@ actor OpenRouterModelPickerPresentationWorker {
         ids: OpenRouterPopularModels.modelIDs,
         cap: 10,
         lookup: modelLookup,
-        allowsFallbackEntries: input.availableModels.isEmpty
+        allowsFallbackEntries: allowsFallback
       )
     {
       sectionList.append(popular)
@@ -113,9 +137,7 @@ actor OpenRouterModelPickerPresentationWorker {
 
     return OpenRouterModelPickerPresentation(
       sections: sectionList,
-      displayNamesByID: Dictionary(
-        uniqueKeysWithValues: input.availableModels.map { ($0.id, $0.name ?? $0.id) }
-      )
+      displayNamesByID: displayNames
     )
   }
 
@@ -126,29 +148,22 @@ actor OpenRouterModelPickerPresentationWorker {
     lookup: [String: OpenRouterModelEntry],
     allowsFallbackEntries: Bool
   ) -> OpenRouterModelPickerMenuSection? {
-    let resolved =
-      ids
-      .compactMap { id -> OpenRouterModelPickerMenuEntry? in
-        if let model = lookup[id] {
-          return OpenRouterModelPickerMenuEntry(
-            id: model.id,
-            displayName: model.name ?? model.id
-          )
-        }
-        if allowsFallbackEntries {
-          return OpenRouterModelPickerMenuEntry(id: id, displayName: id)
-        }
-        return nil
+    var resolved: [OpenRouterModelPickerMenuEntry] = []
+    resolved.reserveCapacity(min(ids.count, cap ?? ids.count))
+    let limit = cap ?? Int.max
+    for id in ids {
+      if resolved.count >= limit { break }
+      if let model = lookup[id] {
+        resolved.append(
+          OpenRouterModelPickerMenuEntry(id: model.id, displayName: model.name ?? model.id)
+        )
+      } else if allowsFallbackEntries {
+        resolved.append(OpenRouterModelPickerMenuEntry(id: id, displayName: id))
       }
-    let trimmed: [OpenRouterModelPickerMenuEntry]
-    if let cap, cap > 0 {
-      trimmed = Array(resolved.prefix(cap))
-    } else {
-      trimmed = resolved
     }
-    return trimmed.isEmpty
+    return resolved.isEmpty
       ? nil
-      : OpenRouterModelPickerMenuSection(title: title, entries: trimmed)
+      : OpenRouterModelPickerMenuSection(title: title, entries: resolved)
   }
 
   private struct UsageBuckets {
@@ -158,11 +173,8 @@ actor OpenRouterModelPickerPresentationWorker {
 
     init(snapshot: OpenRouterModelUsageSnapshot) {
       pinned = snapshot.pinned
-      let pinnedSet = Set(pinned)
-      recents = snapshot.recentModels().filter { !pinnedSet.contains($0) }
-      let recentSet = Set(recents)
-      frequent = snapshot.frequentModels()
-        .filter { !pinnedSet.contains($0) && !recentSet.contains($0) }
+      recents = snapshot.cachedRecentsExcludingPinned
+      frequent = snapshot.cachedFrequentExcludingPinnedAndRecents
     }
   }
 }

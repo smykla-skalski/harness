@@ -15,20 +15,56 @@ struct OpenRouterModelBrowserPresentation: Equatable, Sendable {
   let filteredModels: [OpenRouterModelEntry]
 }
 
-actor OpenRouterModelBrowserPresentationWorker {
+@MainActor
+final class OpenRouterModelBrowserPresentationWorker {
   private static let signposter = OSSignposter(
     subsystem: "io.harnessmonitor",
     category: "perf"
   )
 
-  private var cachedInput: OpenRouterModelBrowserPresentationInput?
-  private var cachedOutput = OpenRouterModelBrowserPresentation.empty
+  private struct ModelsFingerprint: Equatable {
+    let modelCount: Int
+    let firstModelID: String?
+    let lastModelID: String?
+  }
+
+  private struct FilterFingerprint: Equatable {
+    let models: ModelsFingerprint
+    let searchText: String
+    let selectedProvider: String?
+  }
+
+  private var cachedModelsFingerprint: ModelsFingerprint?
+  private var cachedProviders: [String] = []
+  private var cachedSearchableEntries: [SearchableEntry] = []
+
+  private var cachedFilterFingerprint: FilterFingerprint?
+  private var cachedFilteredModels: [OpenRouterModelEntry] = []
 
   func compute(
     input: OpenRouterModelBrowserPresentationInput
   ) -> OpenRouterModelBrowserPresentation {
-    guard input != cachedInput else {
-      return cachedOutput
+    let modelsFingerprint = ModelsFingerprint(
+      modelCount: input.models.count,
+      firstModelID: input.models.first?.id,
+      lastModelID: input.models.last?.id
+    )
+    if modelsFingerprint != cachedModelsFingerprint {
+      cachedModelsFingerprint = modelsFingerprint
+      cachedProviders = Self.providers(from: input.models)
+      cachedSearchableEntries = input.models.map(SearchableEntry.init(model:))
+    }
+
+    let filterFingerprint = FilterFingerprint(
+      models: modelsFingerprint,
+      searchText: input.searchText,
+      selectedProvider: input.selectedProvider
+    )
+    if filterFingerprint == cachedFilterFingerprint {
+      return OpenRouterModelBrowserPresentation(
+        providers: cachedProviders,
+        filteredModels: cachedFilteredModels
+      )
     }
 
     let signpostID = Self.signposter.makeSignpostID()
@@ -37,47 +73,42 @@ actor OpenRouterModelBrowserPresentationWorker {
       id: signpostID,
       "models=\(input.models.count, privacy: .public)"
     )
-    defer {
-      Self.signposter.endInterval(
-        "openrouter_model_browser.presentation.compute",
-        interval,
-        "filtered=\(self.cachedOutput.filteredModels.count, privacy: .public)"
-      )
+
+    let needle = input.searchText.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+    let provider = input.selectedProvider
+    var filtered: [OpenRouterModelEntry] = []
+    filtered.reserveCapacity(cachedSearchableEntries.count)
+    for entry in cachedSearchableEntries {
+      if let provider, entry.provider != provider { continue }
+      if !needle.isEmpty {
+        if !entry.lowercasedID.contains(needle),
+          entry.lowercasedName?.contains(needle) != true
+        {
+          continue
+        }
+      }
+      filtered.append(entry.model)
     }
+    cachedFilterFingerprint = filterFingerprint
+    cachedFilteredModels = filtered
 
-    cachedInput = input
-    cachedOutput = Self.presentation(from: input)
-    return cachedOutput
-  }
+    Self.signposter.endInterval(
+      "openrouter_model_browser.presentation.compute",
+      interval,
+      "filtered=\(filtered.count, privacy: .public)"
+    )
 
-  func waitForIdle() async {}
-
-  private static func presentation(
-    from input: OpenRouterModelBrowserPresentationInput
-  ) -> OpenRouterModelBrowserPresentation {
-    let providers = providers(from: input.models)
-    let needle = input.searchText.trimmingCharacters(in: .whitespacesAndNewlines)
-    let filteredModels = input.models.filter { model in
-      if let provider = input.selectedProvider, model.provider != provider {
-        return false
-      }
-      if needle.isEmpty {
-        return true
-      }
-      if model.id.localizedCaseInsensitiveContains(needle) {
-        return true
-      }
-      return model.name?.localizedCaseInsensitiveContains(needle) == true
-    }
     return OpenRouterModelBrowserPresentation(
-      providers: providers,
-      filteredModels: filteredModels
+      providers: cachedProviders,
+      filteredModels: filtered
     )
   }
 
   private static func providers(from models: [OpenRouterModelEntry]) -> [String] {
     var seen: Set<String> = []
+    seen.reserveCapacity(models.count)
     var ordered: [String] = []
+    ordered.reserveCapacity(models.count)
     for model in models {
       let provider = model.provider
       if seen.insert(provider).inserted {
@@ -85,6 +116,20 @@ actor OpenRouterModelBrowserPresentationWorker {
       }
     }
     return ordered.sorted()
+  }
+
+  private struct SearchableEntry {
+    let model: OpenRouterModelEntry
+    let provider: String
+    let lowercasedID: String
+    let lowercasedName: String?
+
+    init(model: OpenRouterModelEntry) {
+      self.model = model
+      provider = model.provider
+      lowercasedID = model.id.lowercased()
+      lowercasedName = model.name?.lowercased()
+    }
   }
 }
 

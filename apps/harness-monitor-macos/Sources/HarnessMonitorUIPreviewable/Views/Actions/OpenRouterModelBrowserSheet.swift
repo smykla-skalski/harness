@@ -14,7 +14,6 @@ public struct OpenRouterModelBrowserSheet: View {
   @State private var selectedProvider: String?
   @State private var presentationWorker = OpenRouterModelBrowserPresentationWorker()
   @State private var cachedPresentation = OpenRouterModelBrowserPresentation.empty
-  @State private var presentationGeneration: UInt64 = 0
 
   public init(
     models: [OpenRouterModelEntry],
@@ -37,17 +36,21 @@ public struct OpenRouterModelBrowserSheet: View {
   }
 
   public var body: some View {
-    VStack(spacing: 0) {
-      header
-      Divider()
-      providerChips
-      Divider()
-      listContent
+    NavigationStack {
+      VStack(spacing: 0) {
+        header
+        Divider()
+        providerChips
+        Divider()
+        listContent
+      }
+      .navigationBarBackButtonHidden(true)
+      .searchable(text: $searchText, placement: .toolbar, prompt: "Search models")
     }
     .frame(minWidth: 520, minHeight: 480)
     .accessibilityIdentifier(HarnessMonitorAccessibility.openRouterModelBrowserSheet)
-    .task(id: presentationInput) {
-      await rebuildPresentation(input: presentationInput)
+    .onChange(of: presentationInput, initial: true) { _, newInput in
+      cachedPresentation = presentationWorker.compute(input: newInput)
     }
   }
 
@@ -70,11 +73,17 @@ public struct OpenRouterModelBrowserSheet: View {
   private var providerChips: some View {
     ScrollView(.horizontal, showsIndicators: false) {
       HStack(spacing: HarnessMonitorTheme.spacingSM) {
-        chip(label: "All", isSelected: selectedProvider == nil) {
+        OpenRouterBrowserProviderChip(
+          label: "All",
+          isSelected: selectedProvider == nil
+        ) {
           selectedProvider = nil
         }
         ForEach(cachedPresentation.providers, id: \.self) { provider in
-          chip(label: provider, isSelected: selectedProvider == provider) {
+          OpenRouterBrowserProviderChip(
+            label: provider,
+            isSelected: selectedProvider == provider
+          ) {
             selectedProvider = (selectedProvider == provider) ? nil : provider
           }
         }
@@ -82,28 +91,6 @@ public struct OpenRouterModelBrowserSheet: View {
       .padding(.horizontal, HarnessMonitorTheme.spacingLG)
       .padding(.vertical, HarnessMonitorTheme.spacingSM)
     }
-  }
-
-  private func chip(label: String, isSelected: Bool, action: @escaping () -> Void) -> some View {
-    Button(action: action) {
-      Text(label)
-        .scaledFont(.caption)
-        .padding(.horizontal, HarnessMonitorTheme.spacingSM)
-        .padding(.vertical, 4)
-        .background(
-          RoundedRectangle(cornerRadius: 6)
-            .fill(isSelected ? HarnessMonitorTheme.accent.opacity(0.18) : Color.clear)
-        )
-        .overlay(
-          RoundedRectangle(cornerRadius: 6)
-            .stroke(
-              isSelected
-                ? HarnessMonitorTheme.accent : HarnessMonitorTheme.secondaryInk.opacity(0.3),
-              lineWidth: 0.5
-            )
-        )
-    }
-    .harnessPlainButtonStyle()
   }
 
   private var listContent: some View {
@@ -122,66 +109,27 @@ public struct OpenRouterModelBrowserSheet: View {
       } else {
         List {
           ForEach(filteredModels, id: \.id) { model in
-            modelRow(model)
+            OpenRouterModelBrowserRow(
+              model: model,
+              isPinned: usageSnapshot.isPinned(model.id),
+              onTogglePin: { togglePin(model.id) },
+              onSelect: { selectModel(model.id) }
+            )
           }
         }
         .listStyle(.inset)
         .accessibilityIdentifier(HarnessMonitorAccessibility.openRouterModelBrowserList)
       }
     }
-    .searchable(text: $searchText, placement: .toolbar, prompt: "Search models")
   }
 
-  private func modelRow(_ model: OpenRouterModelEntry) -> some View {
-    HStack(spacing: HarnessMonitorTheme.spacingMD) {
-      VStack(alignment: .leading, spacing: 2) {
-        Text(model.name ?? model.id)
-          .scaledFont(.body.weight(.semibold))
-        Text(model.id)
-          .scaledFont(.caption)
-          .foregroundStyle(HarnessMonitorTheme.secondaryInk)
-        if let context = model.contextLength {
-          Text("Context: \(context.formatted()) tokens")
-            .scaledFont(.caption)
-            .foregroundStyle(HarnessMonitorTheme.secondaryInk)
-        }
-      }
-      Spacer()
-      pinButton(for: model.id)
-      Button("Select") {
-        onSelect(model.id)
-        dismiss()
-      }
-      .controlSize(.small)
-    }
-    .padding(.vertical, 4)
-    .contentShape(Rectangle())
+  private func togglePin(_ modelID: String) {
+    usage.togglePin(modelID)
+    usageSnapshot = usage.snapshot()
   }
 
-  private func pinButton(for modelID: String) -> some View {
-    let isPinned = usageSnapshot.isPinned(modelID)
-    return Button {
-      usage.togglePin(modelID)
-      usageSnapshot = usage.snapshot()
-    } label: {
-      Image(systemName: isPinned ? "pin.fill" : "pin")
-        .foregroundStyle(isPinned ? HarnessMonitorTheme.accent : HarnessMonitorTheme.secondaryInk)
-    }
-    .harnessPlainButtonStyle()
-    .help(isPinned ? "Unpin model" : "Pin model")
-    .accessibilityLabel(isPinned ? "Unpin \(modelID)" : "Pin \(modelID)")
-  }
-
-  @MainActor
-  private func rebuildPresentation(input: OpenRouterModelBrowserPresentationInput) async {
-    presentationGeneration &+= 1
-    let generation = presentationGeneration
-    let presentation = await presentationWorker.compute(input: input)
-    guard !Task.isCancelled, presentationGeneration == generation else {
-      return
-    }
-    if cachedPresentation != presentation {
-      cachedPresentation = presentation
-    }
+  private func selectModel(_ modelID: String) {
+    onSelect(modelID)
+    dismiss()
   }
 }
