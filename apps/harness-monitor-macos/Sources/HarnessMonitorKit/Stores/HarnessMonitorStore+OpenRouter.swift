@@ -19,16 +19,16 @@ public enum OpenRouterAcpDispatch {
 /// stale; the dynamic catalog overrides this as soon as it loads.
 public enum OpenRouterPopularModels {
   public static let modelIDs: [String] = [
-    "anthropic/claude-opus-4",
-    "anthropic/claude-sonnet-4",
-    "openai/gpt-5",
-    "openai/gpt-4o",
-    "google/gemini-2.5-pro",
-    "google/gemini-2.5-flash",
-    "xai/grok-4",
-    "deepseek/deepseek-r1",
-    "meta-llama/llama-4-maverick",
-    "qwen/qwen3-coder",
+    "anthropic/claude-opus-4.7",
+    "anthropic/claude-opus-4.7-fast",
+    "openai/gpt-5.5-pro",
+    "openai/gpt-5.5",
+    "google/gemini-3.5-flash",
+    "x-ai/grok-4.3",
+    "x-ai/grok-4.20",
+    "deepseek/deepseek-v4-pro",
+    "moonshotai/kimi-k2.6",
+    "qwen/qwen3.6-max-preview",
   ]
 }
 
