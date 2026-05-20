@@ -348,6 +348,53 @@ async fn prompt_round_trips_a_tool_call() {
 }
 
 #[tokio::test]
+async fn tool_iteration_cap_returns_max_turn_requests() {
+    let server = MockServer::start().await;
+    mount_models(&server).await;
+    // Every chat completion returns a tool_call, so the shim loops until it
+    // hits MAX_TOOL_ITERATIONS=10 and bails with MaxTurnRequests.
+    let tool_call = sse(&[
+        r#"{"id":"loop","choices":[{"index":0,"delta":{"role":"assistant","tool_calls":[{"index":0,"id":"call_loop","type":"function","function":{"name":"read_text_file","arguments":"{\"path\":\"x.txt\"}"}}]},"finish_reason":"tool_calls"}]}"#,
+    ]);
+    Mock::given(method("POST"))
+        .and(path("/chat/completions"))
+        .respond_with(
+            ResponseTemplate::new(200)
+                .insert_header("content-type", "text/event-stream")
+                .set_body_string(tool_call),
+        )
+        .mount(&server)
+        .await;
+
+    let agent = build_agent(&server.uri());
+    client_builder_with_chunks(ChunkLog::default())
+        .connect_with(agent, |cx: ConnectionTo<Agent>| async move {
+            cx.send_request(InitializeRequest::new(ProtocolVersion::LATEST))
+                .block_task()
+                .await?;
+            let session = cx
+                .send_request(NewSessionRequest::new(std::env::temp_dir()))
+                .block_task()
+                .await?;
+            let response = cx
+                .send_request(PromptRequest::new(
+                    session.session_id,
+                    vec![ContentBlock::Text(TextContent::new("Loop"))],
+                ))
+                .block_task()
+                .await?;
+            assert!(
+                matches!(response.stop_reason, StopReason::MaxTurnRequests),
+                "expected MaxTurnRequests after the iteration cap, got {:?}",
+                response.stop_reason,
+            );
+            Ok(())
+        })
+        .await
+        .expect("connection drives to completion");
+}
+
+#[tokio::test]
 async fn http_error_surfaces_as_end_turn_with_diagnostic_chunk() {
     let server = MockServer::start().await;
     mount_models(&server).await;
