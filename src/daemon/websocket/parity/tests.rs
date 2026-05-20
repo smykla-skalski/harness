@@ -241,7 +241,7 @@ async fn dispatch_managed_agent_resolve_acp_permission_returns_acp_disabled_when
             id: "req-resolve-acp-disabled".into(),
             method: "managed_agent.resolve_acp_permission".into(),
             params: json!({
-                "agent_id": "acp-worker",
+                "managed_agent_id": "acp-worker",
                 "batch_id": "batch-1",
                 "decision": "approve_all",
             }),
