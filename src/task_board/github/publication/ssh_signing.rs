@@ -170,7 +170,7 @@ fn actor_signature(actor: &str, label: &str) -> Result<Signature, CliError> {
 
 #[cfg(test)]
 mod tests {
-    use super::super::types::{GitHubCommitAuthorRequest, LocalCommitAuthor, LocalTreeSnapshot};
+    use super::super::types::LocalCommitAuthor;
     use super::*;
     use crate::task_board::{
         TaskBoardGitRuntimeProfile, TaskBoardGitSigningConfig, TaskBoardGitSigningMode,
@@ -287,19 +287,11 @@ ZfG1KaT0PtFDJ/XFSqtiAAAAEHVzZXJAZXhhbXBsZS5jb20BAgMEBQ==
             committer: commit_author(),
             profile,
             existing_signature: None,
-            root_tree: LocalTreeSnapshot {
-                entries: Vec::new(),
-            },
         }
     }
 
     fn commit_author() -> LocalCommitAuthor {
         LocalCommitAuthor {
-            request: GitHubCommitAuthorRequest {
-                name: "Harness Bot".into(),
-                email: Some("bot@example.com".into()),
-                date: Some("2024-03-25T18:20:00Z".into()),
-            },
             git_actor: "Harness Bot <bot@example.com> 1711390800 +0000".into(),
         }
     }

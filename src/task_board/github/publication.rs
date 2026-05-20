@@ -2,10 +2,6 @@ use std::fmt::Display;
 use std::path::Path;
 
 use axum::http::StatusCode;
-use base64::Engine;
-use base64::engine::general_purpose::STANDARD as Base64Standard;
-use futures_util::future::BoxFuture;
-use gix::{Tree, object::tree::EntryKind};
 use octocrab::models;
 use octocrab::params::repos::Reference;
 use octocrab::{Error as OctocrabError, Octocrab};
@@ -15,21 +11,11 @@ use crate::daemon::service::git_runtime_profile_for_repository;
 use crate::errors::{CliError, CliErrorKind};
 use crate::git::GitRepository;
 use crate::sandbox;
-use crate::task_board::TaskBoardGitSigningMode;
 
 use super::GitHubProjectConfig;
 pub(crate) use signing::{SigningVerifyOutcome, verify_signing_for_profile};
-use signing::{
-    commit_author, local_commit_signature, native_git_transport_required_error,
-    publication_signature, rest_commit_signature_boundary, unsigned_commit_payload,
-    validate_rest_publication_signature_support,
-};
-use types::{
-    BranchPublicationMode, GitHubCreateBlobRequest, GitHubCreateCommitRequest,
-    GitHubCreateTreeRequest, GitHubObjectShaResponse, GitHubTreeEntryRequest,
-    GitHubUpdateRefRequest, LocalBranchSnapshot, LocalTreeEntry, LocalTreeSnapshot,
-    NativeGitTransportReason, RestCommitSignatureBoundary,
-};
+use signing::{commit_author, local_commit_signature};
+use types::{BranchPublicationMode, LocalBranchSnapshot};
 
 mod git_ssh_publish;
 mod signing;
@@ -95,60 +81,8 @@ pub(crate) async fn publish_branch_from_worktree_async(
     let Some(mode) = publication_mode(client, config, branch, &snapshot).await? else {
         return Ok(());
     };
-    if should_publish_configured_ssh_with_git(&snapshot)? {
-        return git_ssh_publish::publish_configured_ssh_branch(
-            config,
-            worktree,
-            branch,
-            github_token,
-            &snapshot,
-            &mode,
-        )
-        .await;
-    }
-    ensure_rest_publication_supported_or_prepare_native_boundary(&snapshot, &mode)?;
-    let root_tree_sha = upload_tree(client, config, &snapshot.root_tree).await?;
-    let commit_sha =
-        create_commit(client, config, &snapshot, &root_tree_sha, mode.parent_sha()).await?;
-    update_branch_ref(client, config, branch, commit_sha.as_str(), &mode).await
-}
-
-fn should_publish_configured_ssh_with_git(
-    snapshot: &LocalBranchSnapshot,
-) -> Result<bool, CliError> {
-    match rest_commit_signature_boundary(&snapshot.profile, snapshot.existing_signature.as_ref())? {
-        RestCommitSignatureBoundary::NativeGitTransportRequired(
-            NativeGitTransportReason::ConfiguredSshSigning,
-        ) => Ok(true),
-        _ => Ok(false),
-    }
-}
-
-fn ensure_rest_publication_supported_or_prepare_native_boundary(
-    snapshot: &LocalBranchSnapshot,
-    mode: &BranchPublicationMode,
-) -> Result<(), CliError> {
-    match rest_commit_signature_boundary(&snapshot.profile, snapshot.existing_signature.as_ref())? {
-        RestCommitSignatureBoundary::RestSupported => validate_rest_publication_signature_support(
-            &snapshot.profile,
-            snapshot.existing_signature.as_ref(),
-        ),
-        RestCommitSignatureBoundary::NativeGitTransportRequired(
-            NativeGitTransportReason::ConfiguredSshSigning,
-        ) => {
-            let _native_commit = ssh_signing::native_ssh_commit_object(
-                snapshot,
-                snapshot.head_tree_sha.as_str(),
-                mode.parent_sha(),
-            )?;
-            Err(native_git_transport_required_error(
-                NativeGitTransportReason::ConfiguredSshSigning,
-            ))
-        }
-        RestCommitSignatureBoundary::NativeGitTransportRequired(reason) => {
-            Err(native_git_transport_required_error(reason))
-        }
-    }
+    git_ssh_publish::publish_native_branch(config, worktree, branch, github_token, &snapshot, &mode)
+        .await
 }
 
 async fn load_local_branch_snapshot(
@@ -179,9 +113,6 @@ fn local_branch_snapshot(
     let head = repo
         .head_commit()
         .map_err(|error| snapshot_error("read HEAD commit", error))?;
-    let root_tree = head
-        .tree()
-        .map_err(|error| snapshot_error("read HEAD tree", error))?;
     let profile = git_runtime_profile_for_repository(Some(repository_slug))?;
     let commit_signature = local_commit_signature(&head)?;
     Ok(LocalBranchSnapshot {
@@ -211,161 +142,7 @@ fn local_branch_snapshot(
         )?,
         profile,
         existing_signature: commit_signature,
-        root_tree: collect_tree(&root_tree)?,
     })
-}
-
-fn collect_tree(tree: &Tree<'_>) -> Result<LocalTreeSnapshot, CliError> {
-    let mut entries = Vec::new();
-    for entry in tree.iter() {
-        let entry = entry.map_err(|error| snapshot_error("decode tree entry", error))?;
-        let path = String::from_utf8_lossy(entry.filename().as_ref()).into_owned();
-        let mode = format!("{:06o}", entry.mode());
-        match entry.kind() {
-            EntryKind::Tree => {
-                let subtree = entry
-                    .object()
-                    .map_err(|error| snapshot_error("load subtree", error))?
-                    .into_tree();
-                entries.push(LocalTreeEntry::Tree {
-                    path,
-                    mode,
-                    tree: collect_tree(&subtree)?,
-                });
-            }
-            EntryKind::Commit => {
-                entries.push(LocalTreeEntry::Commit {
-                    path,
-                    mode,
-                    sha: entry.id().detach().to_hex().to_string(),
-                });
-            }
-            _ => {
-                let blob = entry
-                    .object()
-                    .map_err(|error| snapshot_error("load blob", error))?
-                    .into_blob();
-                entries.push(LocalTreeEntry::Blob {
-                    path,
-                    mode,
-                    content: blob.data.clone(),
-                });
-            }
-        }
-    }
-    Ok(LocalTreeSnapshot { entries })
-}
-
-fn upload_tree<'a>(
-    client: &'a Octocrab,
-    config: &'a GitHubProjectConfig,
-    tree: &'a LocalTreeSnapshot,
-) -> BoxFuture<'a, Result<String, CliError>> {
-    Box::pin(async move {
-        let mut entries = Vec::with_capacity(tree.entries.len());
-        for entry in &tree.entries {
-            entries.push(match entry {
-                LocalTreeEntry::Blob {
-                    path,
-                    mode,
-                    content,
-                } => GitHubTreeEntryRequest {
-                    path: path.clone(),
-                    mode: mode.clone(),
-                    kind: "blob".to_string(),
-                    sha: Some(upload_blob(client, config, content).await?),
-                },
-                LocalTreeEntry::Tree { path, mode, tree } => GitHubTreeEntryRequest {
-                    path: path.clone(),
-                    mode: mode.clone(),
-                    kind: "tree".to_string(),
-                    sha: Some(upload_tree(client, config, tree).await?),
-                },
-                LocalTreeEntry::Commit { path, mode, sha } => GitHubTreeEntryRequest {
-                    path: path.clone(),
-                    mode: mode.clone(),
-                    kind: "commit".to_string(),
-                    sha: Some(sha.clone()),
-                },
-            });
-        }
-        let route = format!(
-            "/repos/{owner}/{repo}/git/trees",
-            owner = config.owner,
-            repo = config.repo,
-        );
-        let response: GitHubObjectShaResponse = client
-            .post(route, Some(&GitHubCreateTreeRequest { tree: entries }))
-            .await
-            .map_err(operation_error)?;
-        Ok(response.sha)
-    })
-}
-
-async fn upload_blob(
-    client: &Octocrab,
-    config: &GitHubProjectConfig,
-    content: &[u8],
-) -> Result<String, CliError> {
-    let route = format!(
-        "/repos/{owner}/{repo}/git/blobs",
-        owner = config.owner,
-        repo = config.repo,
-    );
-    let response: GitHubObjectShaResponse = client
-        .post(
-            route,
-            Some(&GitHubCreateBlobRequest {
-                content: Base64Standard.encode(content),
-                encoding: "base64",
-            }),
-        )
-        .await
-        .map_err(operation_error)?;
-    Ok(response.sha)
-}
-
-async fn create_commit(
-    client: &Octocrab,
-    config: &GitHubProjectConfig,
-    snapshot: &LocalBranchSnapshot,
-    tree_sha: &str,
-    parent_sha: &str,
-) -> Result<String, CliError> {
-    let route = format!(
-        "/repos/{owner}/{repo}/git/commits",
-        owner = config.owner,
-        repo = config.repo,
-    );
-    let payload = unsigned_commit_payload(snapshot, tree_sha, parent_sha);
-    let signature = publication_signature(
-        &snapshot.profile,
-        snapshot.existing_signature.as_ref(),
-        payload.as_bytes(),
-    )?;
-    let commit: models::commits::GitCommitObject = client
-        .post(
-            route,
-            Some(&GitHubCreateCommitRequest {
-                message: snapshot.commit_message.clone(),
-                tree: tree_sha.to_string(),
-                parents: vec![parent_sha.to_string()],
-                author: Some(snapshot.author.request.clone()),
-                committer: Some(snapshot.committer.request.clone()),
-                signature,
-            }),
-        )
-        .await
-        .map_err(operation_error)?;
-    if matches!(snapshot.profile.signing.mode, TaskBoardGitSigningMode::Gpg)
-        && !commit.verification.verified
-    {
-        return Err(CliError::from(CliErrorKind::workflow_io(format!(
-            "task-board github created commit signature was not verified: {}",
-            commit.verification.reason
-        ))));
-    }
-    Ok(commit.sha)
 }
 
 fn github_not_found(error: &OctocrabError) -> bool {
@@ -418,42 +195,4 @@ async fn publication_mode(
     Ok(Some(BranchPublicationMode::Create {
         parent_sha: default_state.commit_sha,
     }))
-}
-
-async fn update_branch_ref(
-    client: &Octocrab,
-    config: &GitHubProjectConfig,
-    branch: &str,
-    commit_sha: &str,
-    mode: &BranchPublicationMode,
-) -> Result<(), CliError> {
-    let reference = Reference::Branch(branch.to_string());
-    match mode {
-        BranchPublicationMode::Update { .. } => {
-            let route = format!(
-                "/repos/{owner}/{repo}/git/refs/{reference}",
-                owner = config.owner,
-                repo = config.repo,
-                reference = reference.ref_url(),
-            );
-            let _: models::repos::Ref = client
-                .patch(
-                    route,
-                    Some(&GitHubUpdateRefRequest {
-                        sha: commit_sha,
-                        force: false,
-                    }),
-                )
-                .await
-                .map_err(operation_error)?;
-        }
-        BranchPublicationMode::Create { .. } => {
-            client
-                .repos(config.owner.as_str(), config.repo.as_str())
-                .create_ref(&reference, commit_sha.to_string())
-                .await
-                .map_err(operation_error)?;
-        }
-    }
-    Ok(())
 }

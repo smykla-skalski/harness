@@ -90,7 +90,7 @@ fn publication_uses_configured_gpg_key_material_before_path() {
 }
 
 #[test]
-fn publication_rejects_configured_ssh_mode_before_rest_publication() {
+fn publication_marks_configured_ssh_mode_for_native_publication() {
     let profile = TaskBoardGitRuntimeProfile {
         signing: crate::task_board::TaskBoardGitSigningConfig {
             mode: TaskBoardGitSigningMode::Ssh,
@@ -107,20 +107,6 @@ fn publication_rejects_configured_ssh_mode_before_rest_publication() {
             NativeGitTransportReason::ConfiguredSshSigning
         )
     );
-
-    let error =
-        validate_rest_publication_signature_support(&profile, None).expect_err("ssh mode error");
-
-    assert!(
-        error
-            .to_string()
-            .contains("REST commit creation accepts only PGP signatures")
-    );
-    assert!(
-        error
-            .to_string()
-            .contains("requires native Git object creation plus smart HTTP send-pack transport")
-    );
 }
 
 #[test]
@@ -132,17 +118,13 @@ fn publication_rejects_ssh_signature_on_rest_path() {
     assert!(
         error
             .to_string()
-            .contains("REST commit creation accepts only PGP signatures")
+            .contains("requires native Git commit-object publication")
     );
 }
 
 #[test]
-fn publication_rejects_existing_ssh_signature_before_rest_publication() {
+fn publication_rejects_existing_ssh_signature_without_configured_key() {
     let profile = TaskBoardGitRuntimeProfile::default();
-
-    let error =
-        validate_rest_publication_signature_support(&profile, Some(&LocalCommitSignature::Ssh))
-            .expect_err("ssh signature error");
 
     assert_eq!(
         rest_commit_signature_boundary(&profile, Some(&LocalCommitSignature::Ssh))
@@ -152,10 +134,11 @@ fn publication_rejects_existing_ssh_signature_before_rest_publication() {
         )
     );
 
+    let error = native_git_transport_required_error(NativeGitTransportReason::ExistingSshSignature);
     assert!(
         error
             .to_string()
-            .contains("REST commit creation accepts only PGP signatures")
+            .contains("requires native Git commit-object publication")
     );
 }
 

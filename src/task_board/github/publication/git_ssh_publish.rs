@@ -2,16 +2,27 @@ use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output, Stdio};
 
+use gix::actor::{Signature, SignatureRef};
+use gix::bstr::ByteSlice;
+use gix::objs::WriteTo;
+use gix::{ObjectId, objs};
 use tokio::task::spawn_blocking;
 
 use crate::errors::{CliError, CliErrorKind};
 use crate::sandbox;
 use crate::task_board::github::GitHubProjectConfig;
 
+use super::signing::{
+    native_git_transport_required_error, publication_signature, rest_commit_signature_boundary,
+    unsigned_commit_payload,
+};
 use super::ssh_signing;
-use super::types::{BranchPublicationMode, LocalBranchSnapshot};
+use super::types::{
+    BranchPublicationMode, LocalBranchSnapshot, NativeGitTransportReason,
+    RestCommitSignatureBoundary,
+};
 
-pub(super) async fn publish_configured_ssh_branch(
+pub(super) async fn publish_native_branch(
     config: &GitHubProjectConfig,
     worktree: &Path,
     branch: &str,
@@ -19,7 +30,7 @@ pub(super) async fn publish_configured_ssh_branch(
     snapshot: &LocalBranchSnapshot,
     mode: &BranchPublicationMode,
 ) -> Result<(), CliError> {
-    let plan = GitSshPublishPlan::new(config, worktree, branch, github_token, snapshot, mode)?;
+    let plan = GitPublishPlan::new(config, worktree, branch, github_token, snapshot, mode)?;
     spawn_blocking(move || plan.publish())
         .await
         .unwrap_or_else(|error| {
@@ -30,7 +41,7 @@ pub(super) async fn publish_configured_ssh_branch(
         })
 }
 
-struct GitSshPublishPlan {
+struct GitPublishPlan {
     worktree: PathBuf,
     remote_url: String,
     auth_header: String,
@@ -39,7 +50,7 @@ struct GitSshPublishPlan {
     commit_payload: Vec<u8>,
 }
 
-impl GitSshPublishPlan {
+impl GitPublishPlan {
     fn new(
         config: &GitHubProjectConfig,
         worktree: &Path,
@@ -56,18 +67,13 @@ impl GitSshPublishPlan {
             BranchPublicationMode::Update { .. } => branch,
         };
         validate_branch_name(parent_branch)?;
-        let native_commit = ssh_signing::native_ssh_commit_object(
-            snapshot,
-            snapshot.head_tree_sha.as_str(),
-            mode.parent_sha(),
-        )?;
         Ok(Self {
             worktree: worktree_scope.path().to_path_buf(),
             remote_url,
             auth_header: github_auth_header(github_token)?,
             fetch_ref: branch_head_ref(parent_branch),
             push_refspec_prefix: branch_push_refspec_prefix(branch),
-            commit_payload: native_commit.commit_payload,
+            commit_payload: native_commit_payload(snapshot, mode.parent_sha())?,
         })
     }
 
@@ -156,6 +162,81 @@ impl GitSshPublishPlan {
     }
 }
 
+fn native_commit_payload(
+    snapshot: &LocalBranchSnapshot,
+    parent_sha: &str,
+) -> Result<Vec<u8>, CliError> {
+    match rest_commit_signature_boundary(&snapshot.profile, snapshot.existing_signature.as_ref())? {
+        RestCommitSignatureBoundary::RestSupported => {
+            rest_supported_native_commit_payload(snapshot, parent_sha)
+        }
+        RestCommitSignatureBoundary::NativeGitTransportRequired(
+            NativeGitTransportReason::ConfiguredSshSigning,
+        ) => Ok(ssh_signing::native_ssh_commit_object(
+            snapshot,
+            snapshot.head_tree_sha.as_str(),
+            parent_sha,
+        )?
+        .commit_payload),
+        RestCommitSignatureBoundary::NativeGitTransportRequired(reason) => {
+            Err(native_git_transport_required_error(reason))
+        }
+    }
+}
+
+fn rest_supported_native_commit_payload(
+    snapshot: &LocalBranchSnapshot,
+    parent_sha: &str,
+) -> Result<Vec<u8>, CliError> {
+    let unsigned_payload = unsigned_commit_payload(snapshot, &snapshot.head_tree_sha, parent_sha);
+    let signature = publication_signature(
+        &snapshot.profile,
+        snapshot.existing_signature.as_ref(),
+        unsigned_payload.as_bytes(),
+    )?;
+    let extra_headers = signature.map_or_else(Vec::new, |signature| {
+        vec![("gpgsig".into(), signature.as_bytes().as_bstr().into())]
+    });
+    let commit = objs::Commit {
+        tree: object_id_from_hex(snapshot.head_tree_sha.as_str(), "tree")?,
+        parents: [object_id_from_hex(parent_sha, "parent")?]
+            .into_iter()
+            .collect(),
+        author: actor_signature(snapshot.author.git_actor.as_str(), "author")?,
+        committer: actor_signature(snapshot.committer.git_actor.as_str(), "committer")?,
+        encoding: None,
+        message: snapshot.commit_message.as_str().into(),
+        extra_headers,
+    };
+    let mut commit_payload = Vec::new();
+    commit.write_to(&mut commit_payload).map_err(|error| {
+        CliErrorKind::workflow_io(format!(
+            "task-board github serialize commit object: {error}"
+        ))
+    })?;
+    Ok(commit_payload)
+}
+
+fn object_id_from_hex(hex: &str, label: &str) -> Result<ObjectId, CliError> {
+    ObjectId::from_hex(hex.as_bytes()).map_err(|error| {
+        CliErrorKind::workflow_io(format!(
+            "task-board github parse native commit {label} sha '{hex}': {error}"
+        ))
+        .into()
+    })
+}
+
+fn actor_signature(actor: &str, label: &str) -> Result<Signature, CliError> {
+    SignatureRef::from_bytes(actor.as_bytes())
+        .map(Into::into)
+        .map_err(|error| {
+            CliErrorKind::workflow_io(format!(
+                "task-board github parse native commit {label}: {error}"
+            ))
+            .into()
+        })
+}
+
 fn github_https_url(config: &GitHubProjectConfig) -> Result<String, CliError> {
     validate_repository_part("owner", config.owner.as_str())?;
     validate_repository_part("repo", config.repo.as_str())?;
@@ -226,7 +307,7 @@ fn stderr_tail(stderr: &[u8]) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::super::types::{GitHubCommitAuthorRequest, LocalCommitAuthor, LocalTreeSnapshot};
+    use super::super::types::LocalCommitAuthor;
     use super::*;
     use crate::task_board::{
         TaskBoardGitRuntimeProfile, TaskBoardGitSigningConfig, TaskBoardGitSigningMode,
@@ -296,7 +377,7 @@ ZfG1KaT0PtFDJ/XFSqtiAAAAEHVzZXJAZXhhbXBsZS5jb20BAgMEBQ==
             parent_sha.as_str(),
         )
         .expect("ssh commit");
-        let plan = GitSshPublishPlan {
+        let plan = GitPublishPlan {
             worktree: fs::canonicalize(&worktree).expect("canonical worktree"),
             remote_url: remote.display().to_string(),
             auth_header: github_auth_header("local-token").expect("auth header"),
@@ -347,19 +428,11 @@ ZfG1KaT0PtFDJ/XFSqtiAAAAEHVzZXJAZXhhbXBsZS5jb20BAgMEBQ==
                 ..Default::default()
             },
             existing_signature: None,
-            root_tree: LocalTreeSnapshot {
-                entries: Vec::new(),
-            },
         }
     }
 
     fn commit_author() -> LocalCommitAuthor {
         LocalCommitAuthor {
-            request: GitHubCommitAuthorRequest {
-                name: "Harness Bot".into(),
-                email: Some("bot@example.com".into()),
-                date: Some("2024-03-25T18:20:00Z".into()),
-            },
             git_actor: "Harness Bot <bot@example.com> 1711390800 +0000".into(),
         }
     }
