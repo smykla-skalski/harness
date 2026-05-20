@@ -42,7 +42,13 @@ public struct HarnessMonitorEnvironment: Equatable, Sendable {
   }
 
   private static func currentProcessValues() -> [String: String] {
-    var values = ProcessInfo.processInfo.environment
+    // `ProcessInfo.processInfo.environment` copies the full env dictionary
+    // out of CFCopyEnvironment on every access. Cache the baseline once at
+    // first read; the only keys that the app needs to re-read at runtime are
+    // in `liveEnvironmentOverrideKeys` and we still pull those via `getenv`
+    // below. Without this cache every `HarnessMonitorPaths.*` default-arg
+    // invocation pays a full env-dict copy.
+    var values = baseProcessEnvironment
     for key in liveEnvironmentOverrideKeys {
       if let value = currentCEnvironmentValue(for: key) {
         values[key] = value
@@ -52,6 +58,14 @@ public struct HarnessMonitorEnvironment: Equatable, Sendable {
     }
     return values
   }
+
+  private static let baseProcessEnvironment: [String: String] = {
+    var values = ProcessInfo.processInfo.environment
+    for key in liveEnvironmentOverrideKeys {
+      values.removeValue(forKey: key)
+    }
+    return values
+  }()
 
   private static func currentCEnvironmentValue(for key: String) -> String? {
     key.withCString { namePointer in
