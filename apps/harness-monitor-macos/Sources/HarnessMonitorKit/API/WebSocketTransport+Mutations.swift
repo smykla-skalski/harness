@@ -281,6 +281,16 @@ extension WebSocketTransport {
     return try decode(value)
   }
 
+  public func promptManagedAcpAgent(
+    agentID: String,
+    prompt: String
+  ) async throws -> ManagedAgentSnapshot {
+    var params = managedAgentParams(agentID: agentID)
+    params["prompt"] = .string(prompt)
+    let value = try await rpc(method: .managedAgentPromptAcp, params: .object(params))
+    return try decode(value)
+  }
+
   public func steerManagedCodexAgent(
     agentID: String,
     request: CodexSteerRequest

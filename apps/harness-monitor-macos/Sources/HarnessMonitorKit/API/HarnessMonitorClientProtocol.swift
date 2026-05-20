@@ -154,6 +154,7 @@ public protocol HarnessMonitorClientProtocol: HarnessMonitorTaskBoardClientProto
   ) async throws -> ManagedAgentSnapshot
   func stopManagedAgent(agentID: String) async throws -> ManagedAgentSnapshot
   func stopManagedAcpAgent(agentID: String) async throws -> ManagedAgentSnapshot
+  func promptManagedAcpAgent(agentID: String, prompt: String) async throws -> ManagedAgentSnapshot
   func steerManagedCodexAgent(
     agentID: String,
     request: CodexSteerRequest

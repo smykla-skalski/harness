@@ -22,4 +22,15 @@ extension HarnessMonitorAPIClient {
   public func stopManagedAcpAgent(agentID: String) async throws -> ManagedAgentSnapshot {
     try await delete("/v1/managed-agents/\(agentID)")
   }
+
+  public func promptManagedAcpAgent(
+    agentID: String,
+    prompt: String
+  ) async throws -> ManagedAgentSnapshot {
+    struct Body: Encodable { let prompt: String }
+    return try await post(
+      "/v1/managed-agents/\(agentID)/prompt",
+      body: Body(prompt: prompt)
+    )
+  }
 }
