@@ -57,6 +57,8 @@ public enum ProviderBrandSymbol: String, CaseIterable, Identifiable {
   case copilot = "Copilot"
   case openRouter = "OpenRouter"
   case neuralwatt = "Neuralwatt"
+  case kuma = "Kuma"
+  case kong = "Kong"
   case mistral = "Mistral"
 
   public var id: String { rawValue }
@@ -75,6 +77,10 @@ public enum ProviderBrandSymbol: String, CaseIterable, Identifiable {
       self = .openRouter
     case "neuralwatt", "neuralwatt cloud":
       self = .neuralwatt
+    case "kuma":
+      self = .kuma
+    case "kong":
+      self = .kong
     case "mistral", "vibe":
       self = .mistral
     default:
@@ -98,6 +104,10 @@ public enum ProviderBrandSymbol: String, CaseIterable, Identifiable {
       "ProviderSymbol-openrouter"
     case .neuralwatt:
       "ProviderSymbol-neuralwatt"
+    case .kuma:
+      "ProviderSymbol-kuma"
+    case .kong:
+      "ProviderSymbol-kong"
     case .mistral:
       "ProviderSymbol-mistral"
     }
