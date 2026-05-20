@@ -223,7 +223,10 @@ async fn run_protocol(args: RunProtocolArgs) {
         )
         .on_receive_request(
             async move |request: ReadTextFileRequest, responder, _connection| {
-                respond_client_result(responder, read_context.read_text_file(&request))
+                respond_client_result(
+                    responder,
+                    read_context.clone().read_text_file(request).await,
+                )
             },
             agent_client_protocol::on_receive_request!(),
         )
@@ -258,7 +261,10 @@ async fn run_protocol(args: RunProtocolArgs) {
             async move |request: ReleaseTerminalRequest, responder, _connection| {
                 respond_client_result(
                     responder,
-                    release_terminal_context.release_terminal(&request),
+                    release_terminal_context
+                        .clone()
+                        .release_terminal(request)
+                        .await,
                 )
             },
             agent_client_protocol::on_receive_request!(),
@@ -267,14 +273,20 @@ async fn run_protocol(args: RunProtocolArgs) {
             async move |request: WaitForTerminalExitRequest, responder, _connection| {
                 respond_client_result(
                     responder,
-                    wait_terminal_context.wait_for_terminal_exit(&request),
+                    wait_terminal_context
+                        .clone()
+                        .wait_for_terminal_exit(request)
+                        .await,
                 )
             },
             agent_client_protocol::on_receive_request!(),
         )
         .on_receive_request(
             async move |request: KillTerminalRequest, responder, _connection| {
-                respond_client_result(responder, kill_terminal_context.kill_terminal(&request))
+                respond_client_result(
+                    responder,
+                    kill_terminal_context.clone().kill_terminal(request).await,
+                )
             },
             agent_client_protocol::on_receive_request!(),
         )

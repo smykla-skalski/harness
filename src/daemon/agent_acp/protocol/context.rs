@@ -33,15 +33,20 @@ impl ProtocolContext {
         }
     }
 
-    pub(super) fn read_text_file(
-        &self,
-        request: &ReadTextFileRequest,
+    pub(super) async fn read_text_file(
+        self,
+        request: ReadTextFileRequest,
     ) -> ClientResult<<ReadTextFileRequest as agent_client_protocol::JsonRpcRequest>::Response>
     {
         let _target = self.session_guard.ensure_known(&request.session_id)?;
-        with_client_call(&self.supervisor, "client/read_text_file", || {
-            self.client.handle_read_text_file(request)
-        })
+        spawn_blocking_client_call(
+            self.supervisor,
+            self.client,
+            "join read_text_file",
+            "client/read_text_file",
+            move |client| client.handle_read_text_file(&request),
+        )
+        .await
     }
 
     pub(super) async fn write_text_file(
@@ -87,37 +92,52 @@ impl ProtocolContext {
         })
     }
 
-    pub(super) fn release_terminal(
-        &self,
-        request: &ReleaseTerminalRequest,
+    pub(super) async fn release_terminal(
+        self,
+        request: ReleaseTerminalRequest,
     ) -> ClientResult<<ReleaseTerminalRequest as agent_client_protocol::JsonRpcRequest>::Response>
     {
         let _target = self.session_guard.ensure_known(&request.session_id)?;
-        with_client_call(&self.supervisor, "client/release_terminal", || {
-            self.client.handle_release_terminal(request)
-        })
+        spawn_blocking_client_call(
+            self.supervisor,
+            self.client,
+            "join release_terminal",
+            "client/release_terminal",
+            move |client| client.handle_release_terminal(&request),
+        )
+        .await
     }
 
-    pub(super) fn wait_for_terminal_exit(
-        &self,
-        request: &WaitForTerminalExitRequest,
+    pub(super) async fn wait_for_terminal_exit(
+        self,
+        request: WaitForTerminalExitRequest,
     ) -> ClientResult<<WaitForTerminalExitRequest as agent_client_protocol::JsonRpcRequest>::Response>
     {
         let _target = self.session_guard.ensure_known(&request.session_id)?;
-        with_client_call(&self.supervisor, "client/wait_for_terminal_exit", || {
-            self.client.handle_wait_for_terminal_exit(request)
-        })
+        spawn_blocking_client_call(
+            self.supervisor,
+            self.client,
+            "join wait_for_terminal_exit",
+            "client/wait_for_terminal_exit",
+            move |client| client.handle_wait_for_terminal_exit(&request),
+        )
+        .await
     }
 
-    pub(super) fn kill_terminal(
-        &self,
-        request: &KillTerminalRequest,
+    pub(super) async fn kill_terminal(
+        self,
+        request: KillTerminalRequest,
     ) -> ClientResult<<KillTerminalRequest as agent_client_protocol::JsonRpcRequest>::Response>
     {
         let _target = self.session_guard.ensure_known(&request.session_id)?;
-        with_client_call(&self.supervisor, "client/kill_terminal", || {
-            self.client.handle_kill_terminal(request)
-        })
+        spawn_blocking_client_call(
+            self.supervisor,
+            self.client,
+            "join kill_terminal",
+            "client/kill_terminal",
+            move |client| client.handle_kill_terminal(&request),
+        )
+        .await
     }
 
     pub(super) async fn request_permission(
