@@ -47,6 +47,7 @@ struct SessionCreateBridgeBanner: View {
     .padding(.vertical, HarnessMonitorTheme.spacingSM)
     .frame(maxWidth: .infinity, alignment: .leading)
     .modifier(ChromeBannerSurfaceModifier(tint: HarnessMonitorTheme.caution))
+    .clipShape(.rect(cornerRadius: HarnessMonitorTheme.cornerRadiusLG))
     .accessibilityElement(children: .contain)
   }
 }

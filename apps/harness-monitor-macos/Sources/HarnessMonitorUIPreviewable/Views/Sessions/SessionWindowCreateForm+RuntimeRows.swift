@@ -26,6 +26,8 @@ struct SessionWindowCreateTransportChoicesGroup: View, Equatable {
           choice: transportChoice,
           isSelected: selectedSelection == transportChoice.id,
           isEnabled: option.isEnabled(transportChoice),
+          showsUnavailableReasonText: SessionWindowCreateFormCatalogs
+            .shouldSurfaceInlineUnavailableReason(for: option),
           unavailableReason: SessionWindowCreateFormCatalogs.unavailableReason(
             for: option,
             choice: transportChoice

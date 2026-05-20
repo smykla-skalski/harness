@@ -77,7 +77,7 @@ struct SessionWindowCreateForm: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
       }
-      if draft.kind == .agent {
+      if draft.kind == .agent, embedsRuntimeConfiguration {
         SessionWindowCreateBridgeBannerSection(
           store: store,
           selection: normalizedLaunchSelection
