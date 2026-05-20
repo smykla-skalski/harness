@@ -6,7 +6,7 @@ use crate::daemon::index::ResolvedSession;
 use crate::daemon::protocol::{
     SessionDetail, TaskBoardEvaluateRequest, TaskBoardEvaluationResponse,
 };
-use crate::errors::CliError;
+use crate::errors::{CliError, CliErrorKind};
 use crate::session::service as session_service;
 use crate::session::storage as session_storage;
 use crate::session::types::{SessionSignalRecord, TaskStatus, WorkItem};
@@ -18,6 +18,7 @@ use crate::task_board::{
     record_from_decision, skipped_unlinked_record,
 };
 use crate::workspace::utc_now;
+use tokio::task::spawn_blocking;
 
 use super::{build_log_entry, effective_project_dir, index, session_not_found};
 
@@ -82,7 +83,7 @@ pub(crate) async fn evaluate_task_board_async(
     async_db: &AsyncDaemonDb,
 ) -> Result<TaskBoardEvaluationResponse, CliError> {
     let board = store();
-    let items = selected_items(&board, request)?;
+    let items = selected_items_async(&board, request).await?;
     let mut summary = TaskBoardEvaluationSummary::default();
     for item in &items {
         let Some((session_id, work_item_id)) = linked_task(item) else {
@@ -92,29 +93,31 @@ pub(crate) async fn evaluate_task_board_async(
         let task = match super::session_detail_async(session_id, Some(async_db)).await {
             Ok(detail) => task_from_detail(detail, work_item_id),
             Err(error) => {
-                let record = failure_record(
+                let record = failure_record_async(
                     &board,
                     item,
                     missing_session_record(item, error.to_string()),
                     "missing_session",
                     request.dry_run,
-                )?;
+                )
+                .await?;
                 summary.push(record);
                 continue;
             }
         };
         let Some(task) = task else {
-            let record = failure_record(
+            let record = failure_record_async(
                 &board,
                 item,
                 missing_task_record(item, format!("session task '{work_item_id}' was not found")),
                 "missing_task",
                 request.dry_run,
-            )?;
+            )
+            .await?;
             summary.push(record);
             continue;
         };
-        let record = evaluate_linked_item(&board, item, &task, request.dry_run)?;
+        let record = evaluate_linked_item_async(&board, item, &task, request.dry_run).await?;
         // Record the decision before attempting reviewer materialization so a
         // downstream signal failure cannot drop the evaluation outcome.
         let signal_outcome = materialize_reviewer_signal_async(item, &task, &record, async_db)
@@ -136,6 +139,17 @@ fn selected_items(
         || board.list(request.status),
         |item_id| board.get(item_id).map(|item| vec![item]),
     )
+}
+
+async fn selected_items_async(
+    board: &TaskBoardStore,
+    request: &TaskBoardEvaluateRequest,
+) -> Result<Vec<TaskBoardItem>, CliError> {
+    let request = request.clone();
+    run_board_blocking(board, "select items", move |board| {
+        selected_items(&board, &request)
+    })
+    .await
 }
 
 fn evaluate_items_with_loader<F>(
@@ -229,6 +243,20 @@ fn evaluate_linked_item(
         true,
         Some(updated_item),
     ))
+}
+
+async fn evaluate_linked_item_async(
+    board: &TaskBoardStore,
+    item: &TaskBoardItem,
+    task: &WorkItem,
+    dry_run: bool,
+) -> Result<TaskBoardEvaluationRecord, CliError> {
+    let item = item.clone();
+    let task = task.clone();
+    run_board_blocking(board, "evaluate linked item", move |board| {
+        evaluate_linked_item(&board, &item, &task, dry_run)
+    })
+    .await
 }
 
 fn materialize_reviewer_signal(
@@ -331,7 +359,15 @@ async fn write_reviewer_signal_async(
     };
     let project_dir = effective_project_dir(resolved).to_path_buf();
     let target_session_id = signal_target_session_id(resolved, &record);
-    runtime.write_signal(&project_dir, &target_session_id, &record.signal)?;
+    let signal = record.signal.clone();
+    spawn_blocking(move || runtime.write_signal(&project_dir, &target_session_id, &signal))
+        .await
+        .unwrap_or_else(|error| {
+            Err(CliErrorKind::workflow_io(format!(
+                "task-board evaluation reviewer signal worker failed: {error}"
+            ))
+            .into())
+        })?;
     async_db
         .append_log_entry(&build_log_entry(
             &resolved.state.session_id,
@@ -384,8 +420,42 @@ fn failure_record(
     Ok(record)
 }
 
+async fn failure_record_async(
+    board: &TaskBoardStore,
+    item: &TaskBoardItem,
+    record: TaskBoardEvaluationRecord,
+    step: &'static str,
+    dry_run: bool,
+) -> Result<TaskBoardEvaluationRecord, CliError> {
+    let item = item.clone();
+    run_board_blocking(board, "record failure", move |board| {
+        failure_record(&board, &item, record, step, dry_run)
+    })
+    .await
+}
+
 fn store() -> TaskBoardStore {
     TaskBoardStore::new(default_board_root())
+}
+
+async fn run_board_blocking<T, F>(
+    board: &TaskBoardStore,
+    operation: &'static str,
+    work: F,
+) -> Result<T, CliError>
+where
+    T: Send + 'static,
+    F: FnOnce(TaskBoardStore) -> Result<T, CliError> + Send + 'static,
+{
+    let board = board.clone();
+    spawn_blocking(move || work(board))
+        .await
+        .unwrap_or_else(|error| {
+            Err(CliErrorKind::workflow_io(format!(
+                "task-board evaluation {operation} worker failed: {error}"
+            ))
+            .into())
+        })
 }
 
 #[cfg(test)]

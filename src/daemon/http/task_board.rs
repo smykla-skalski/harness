@@ -175,7 +175,7 @@ async fn get_task_board_orchestrator_status(
         http_paths::TASK_BOARD_ORCHESTRATOR_STATUS,
         &request_id,
         start,
-        task_board_route_executor::orchestrator_status(),
+        task_board_route_executor::orchestrator_status().await,
     )
 }
 
@@ -192,7 +192,7 @@ async fn post_task_board_orchestrator_start(
         http_paths::TASK_BOARD_ORCHESTRATOR_START,
         &request_id,
         start,
-        task_board_route_executor::start_orchestrator(),
+        task_board_route_executor::start_orchestrator().await,
     )
 }
 
@@ -209,7 +209,7 @@ async fn post_task_board_orchestrator_stop(
         http_paths::TASK_BOARD_ORCHESTRATOR_STOP,
         &request_id,
         start,
-        task_board_route_executor::stop_orchestrator(),
+        task_board_route_executor::stop_orchestrator().await,
     )
 }
 
@@ -218,7 +218,8 @@ async fn post_task_board_orchestrator_run_once(
     State(state): State<DaemonHttpState>,
     Json(mut request): Json<TaskBoardOrchestratorRunOnceRequest>,
 ) -> Response {
-    let (start, request_id) = match authorized_control_request_parts(&headers, &state, &mut request) {
+    let (start, request_id) = match authorized_control_request_parts(&headers, &state, &mut request)
+    {
         Ok(parts) => parts,
         Err(response) => return *response,
     };
@@ -245,7 +246,7 @@ async fn get_task_board_orchestrator_settings(
         http_paths::TASK_BOARD_ORCHESTRATOR_SETTINGS,
         &request_id,
         start,
-        task_board_route_executor::orchestrator_settings(),
+        task_board_route_executor::orchestrator_settings().await,
     )
 }
 
@@ -263,7 +264,7 @@ async fn put_task_board_orchestrator_settings(
         http_paths::TASK_BOARD_ORCHESTRATOR_SETTINGS,
         &request_id,
         start,
-        task_board_route_executor::update_orchestrator_settings(&request),
+        task_board_route_executor::update_orchestrator_settings(&request).await,
     )
 }
 
@@ -280,7 +281,7 @@ async fn get_task_board_orchestrator_runtime_config(
         http_paths::TASK_BOARD_ORCHESTRATOR_RUNTIME_CONFIG,
         &request_id,
         start,
-        task_board_route_executor::runtime_config(),
+        task_board_route_executor::runtime_config().await,
     )
 }
 
@@ -298,7 +299,7 @@ async fn put_task_board_orchestrator_runtime_config(
         http_paths::TASK_BOARD_ORCHESTRATOR_RUNTIME_CONFIG,
         &request_id,
         start,
-        task_board_route_executor::update_runtime_config(&request),
+        task_board_route_executor::update_runtime_config(&request).await,
     )
 }
 
@@ -316,7 +317,7 @@ async fn put_task_board_orchestrator_github_tokens(
         http_paths::TASK_BOARD_ORCHESTRATOR_GITHUB_TOKENS,
         &request_id,
         start,
-        task_board_route_executor::sync_github_tokens(&request),
+        task_board_route_executor::sync_github_tokens(&request).await,
     )
 }
 
@@ -334,7 +335,7 @@ async fn put_task_board_orchestrator_todoist_token(
         http_paths::TASK_BOARD_ORCHESTRATOR_TODOIST_TOKEN,
         &request_id,
         start,
-        task_board_route_executor::sync_todoist_token(&request),
+        task_board_route_executor::sync_todoist_token(&request).await,
     )
 }
 
@@ -352,7 +353,7 @@ async fn put_task_board_orchestrator_openrouter_token(
         http_paths::TASK_BOARD_ORCHESTRATOR_OPENROUTER_TOKEN,
         &request_id,
         start,
-        task_board_route_executor::sync_openrouter_token(&request),
+        task_board_route_executor::sync_openrouter_token(&request).await,
     )
 }
 
@@ -369,7 +370,7 @@ async fn get_task_board_git_identity_defaults(
         http_paths::TASK_BOARD_GIT_IDENTITY_DEFAULTS,
         &request_id,
         start,
-        task_board_route_executor::git_identity_defaults(),
+        task_board_route_executor::git_identity_defaults().await,
     )
 }
 
@@ -387,7 +388,7 @@ async fn post_task_board_git_signing_verify(
         http_paths::TASK_BOARD_GIT_SIGNING_VERIFY,
         &request_id,
         start,
-        task_board_route_executor::verify_git_signing(&request),
+        task_board_route_executor::verify_git_signing(&request).await,
     )
 }
 
@@ -404,7 +405,7 @@ async fn post_task_board_git_runtime_drain_secrets(
         http_paths::TASK_BOARD_GIT_RUNTIME_DRAIN_SECRETS,
         &request_id,
         start,
-        task_board_route_executor::drain_git_runtime_secrets(),
+        task_board_route_executor::drain_git_runtime_secrets().await,
     )
 }
 
@@ -421,7 +422,7 @@ async fn get_task_board_policy_pipeline(
         http_paths::TASK_BOARD_POLICY_PIPELINE,
         &request_id,
         start,
-        task_board_route_executor::policy_pipeline(),
+        task_board_route_executor::policy_pipeline().await,
     )
 }
 
@@ -439,7 +440,7 @@ async fn put_task_board_policy_pipeline_draft(
         http_paths::TASK_BOARD_POLICY_PIPELINE,
         &request_id,
         start,
-        task_board_route_executor::save_policy_pipeline_draft(&request),
+        task_board_route_executor::save_policy_pipeline_draft(&request).await,
     )
 }
 
@@ -457,7 +458,7 @@ async fn post_task_board_policy_simulate(
         http_paths::TASK_BOARD_POLICY_SIMULATE,
         &request_id,
         start,
-        task_board_route_executor::simulate_policy_pipeline(&request),
+        task_board_route_executor::simulate_policy_pipeline(&request).await,
     )
 }
 
@@ -475,7 +476,7 @@ async fn post_task_board_policy_promote(
         http_paths::TASK_BOARD_POLICY_PROMOTE,
         &request_id,
         start,
-        task_board_route_executor::promote_policy_pipeline(&request),
+        task_board_route_executor::promote_policy_pipeline(&request).await,
     )
 }
 
@@ -492,6 +493,6 @@ async fn get_task_board_policy_audit(
         http_paths::TASK_BOARD_POLICY_AUDIT,
         &request_id,
         start,
-        task_board_route_executor::audit_policy_pipeline(),
+        task_board_route_executor::audit_policy_pipeline().await,
     )
 }

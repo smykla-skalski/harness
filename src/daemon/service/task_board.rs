@@ -26,6 +26,7 @@ use crate::task_board::{
     PlanningTransition, approve_plan, begin_planning, revoke_plan, submit_plan,
 };
 use crate::workspace::utc_now;
+use tokio::task::spawn_blocking;
 
 use self::sync::{
     build_sync_response, ensure_sync_request_can_run, log_sync_completion, log_sync_request,
@@ -185,7 +186,8 @@ pub fn sync_task_board(request: &TaskBoardSyncRequest) -> Result<TaskBoardSyncRe
 pub async fn sync_task_board_async(
     request: &TaskBoardSyncRequest,
 ) -> Result<TaskBoardSyncResponse, CliError> {
-    sync_task_board_async_with_config(request, active_external_sync_config()).await
+    let config = active_external_sync_config_async().await?;
+    sync_task_board_async_with_config(request, config).await
 }
 
 pub(crate) async fn sync_task_board_async_with_config(
@@ -197,7 +199,7 @@ pub(crate) async fn sync_task_board_async_with_config(
     log_sync_request(request, &config, clients.len());
     ensure_sync_request_can_run(request, &config, &clients)?;
     let operations = sync_external_tasks(&board, sync_options(request), &clients).await?;
-    let summary = build_sync_response(&board, request, &config, operations)?;
+    let summary = build_sync_response_async(&board, request, config.clone(), operations).await?;
     log_sync_completion(&summary);
     Ok(summary)
 }
@@ -414,6 +416,27 @@ fn active_external_sync_config() -> ExternalSyncConfig {
         .with_todoist_import_project_ids_override(&todoist_projects)
 }
 
+async fn active_external_sync_config_async() -> Result<ExternalSyncConfig, CliError> {
+    run_task_board_service_blocking("load external sync config", || {
+        Ok(active_external_sync_config())
+    })
+    .await
+}
+
+async fn build_sync_response_async(
+    board: &TaskBoardStore,
+    request: &TaskBoardSyncRequest,
+    config: ExternalSyncConfig,
+    operations: Vec<crate::task_board::ExternalSyncOperation>,
+) -> Result<TaskBoardSyncResponse, CliError> {
+    let board = board.clone();
+    let request = request.clone();
+    run_task_board_service_blocking("build sync response", move || {
+        build_sync_response(&board, &request, &config, operations)
+    })
+    .await
+}
+
 pub(crate) fn run_task_board_sync_blocking_with_config(
     request: &TaskBoardSyncRequest,
     config: ExternalSyncConfig,
@@ -425,6 +448,22 @@ pub(crate) fn run_task_board_sync_blocking_with_config(
             CliErrorKind::workflow_io(format!("create task-board sync runtime: {error}"))
         })?
         .block_on(sync_task_board_async_with_config(request, config))
+}
+
+async fn run_task_board_service_blocking<T, F>(
+    operation: &'static str,
+    work: F,
+) -> Result<T, CliError>
+where
+    T: Send + 'static,
+    F: FnOnce() -> Result<T, CliError> + Send + 'static,
+{
+    spawn_blocking(work).await.unwrap_or_else(|error| {
+        Err(CliErrorKind::workflow_io(format!(
+            "task-board service {operation} worker failed: {error}"
+        ))
+        .into())
+    })
 }
 
 fn new_task_id() -> String {
