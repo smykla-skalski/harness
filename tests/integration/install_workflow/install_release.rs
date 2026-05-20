@@ -4,7 +4,10 @@ use std::process::Command;
 
 use tempfile::tempdir;
 
-use super::support::{run_harness_version, write_fake_harness_binary, write_fake_shell_tool};
+use super::support::{
+    run_harness_version, write_fake_harness_binary, write_fake_managed_adapters,
+    write_fake_shell_tool,
+};
 
 #[test]
 fn install_script_reconciles_shadowed_harness_binary_for_stale_shell_paths() {
@@ -19,6 +22,7 @@ fn install_script_reconciles_shadowed_harness_binary_for_stale_shell_paths() {
     let version = env!("CARGO_PKG_VERSION");
     std::fs::create_dir_all(&install_dir).expect("create install dir");
     write_fake_harness_binary(&build_binary, version);
+    write_fake_managed_adapters(&target_dir);
     let shadow_binary = shadow_dir.join("harness");
     write_fake_harness_binary(&shadow_binary, "18.2.3");
 
@@ -71,12 +75,17 @@ fn install_script_installs_managed_codex_adapter_binary() {
     let target_dir = tmp.path().join("cargo-target");
     let build_binary = target_dir.join("release/harness");
     let build_codex_adapter = target_dir.join("release/harness-codex-acp");
+    let build_openrouter_adapter = target_dir.join("release/harness-openrouter-agent");
     let version = env!("CARGO_PKG_VERSION");
 
     std::fs::create_dir_all(&install_dir).expect("create install dir");
     write_fake_harness_binary(&build_binary, version);
     write_fake_shell_tool(
         &build_codex_adapter,
+        "#!/bin/sh\nif [ \"$1\" = \"--probe\" ]; then\n  exit 0\nfi\nexit 1\n",
+    );
+    write_fake_shell_tool(
+        &build_openrouter_adapter,
         "#!/bin/sh\nif [ \"$1\" = \"--probe\" ]; then\n  exit 0\nfi\nexit 1\n",
     );
 
@@ -111,6 +120,21 @@ fn install_script_installs_managed_codex_adapter_binary() {
         String::from_utf8_lossy(&probe.stdout),
         String::from_utf8_lossy(&probe.stderr)
     );
+    let installed_openrouter = install_dir.join("harness-openrouter-agent");
+    assert!(
+        installed_openrouter.exists(),
+        "expected managed OpenRouter adapter to be installed"
+    );
+    let probe = Command::new(&installed_openrouter)
+        .arg("--probe")
+        .output()
+        .expect("run installed openrouter adapter probe");
+    assert!(
+        probe.status.success(),
+        "expected installed openrouter adapter probe to succeed: stdout={} stderr={}",
+        String::from_utf8_lossy(&probe.stdout),
+        String::from_utf8_lossy(&probe.stderr)
+    );
 }
 
 #[test]
@@ -127,6 +151,7 @@ fn install_script_reconciles_shadowed_cargo_harness_binary_in_place() {
     let version = env!("CARGO_PKG_VERSION");
 
     write_fake_harness_binary(&build_binary, version);
+    write_fake_managed_adapters(&target_dir);
     write_fake_harness_binary(&cargo_binary, "18.2.3");
 
     let output = Command::new("/bin/bash")
@@ -187,6 +212,7 @@ fn install_script_fails_when_shadowed_harness_binary_cannot_be_reconciled() {
 
     std::fs::create_dir_all(&install_dir).expect("create install dir");
     write_fake_harness_binary(&build_binary, version);
+    write_fake_managed_adapters(&target_dir);
     write_fake_harness_binary(&shadow_binary, "18.2.3");
     std::fs::set_permissions(&shadow_dir, std::fs::Permissions::from_mode(0o555))
         .expect("lock shadow dir");

@@ -7,11 +7,12 @@ use axum::response::Response;
 use serde::Deserialize;
 
 use crate::daemon::protocol::{
-    TaskBoardAuditRequest, TaskBoardCatalogRequest, TaskBoardCreateItemRequest,
-    TaskBoardDeleteItemRequest, TaskBoardDispatchRequest, TaskBoardEvaluateRequest,
-    TaskBoardGetItemRequest, TaskBoardHostSetProjectTypesRequest, TaskBoardListItemsRequest,
-    TaskBoardPlanApproveRequest, TaskBoardPlanBeginRequest, TaskBoardPlanRevokeRequest,
-    TaskBoardPlanSubmitRequest, TaskBoardSyncRequest, TaskBoardUpdateItemRequest, http_paths,
+    ControlPlaneActorRequest, TaskBoardAuditRequest, TaskBoardCatalogRequest,
+    TaskBoardCreateItemRequest, TaskBoardDeleteItemRequest, TaskBoardDispatchRequest,
+    TaskBoardEvaluateRequest, TaskBoardGetItemRequest, TaskBoardHostSetProjectTypesRequest,
+    TaskBoardListItemsRequest, TaskBoardPlanApproveRequest, TaskBoardPlanBeginRequest,
+    TaskBoardPlanRevokeRequest, TaskBoardPlanSubmitRequest, TaskBoardSyncRequest,
+    TaskBoardUpdateItemRequest, http_paths,
 };
 use crate::task_board::TaskBoardStatus;
 
@@ -42,32 +43,16 @@ pub(super) struct TaskBoardPlanRevokeBody {
     pub actor: Option<String>,
 }
 
-macro_rules! authenticated_parts {
-    ($headers:expr, $state:expr) => {{
-        match authenticated_request(&$headers, &$state) {
-            Ok(parts) => parts,
-            Err(response) => return *response,
-        }
-    }};
-}
-
-macro_rules! authorized_control_parts {
-    ($headers:expr, $state:expr, $request:expr) => {{
-        let start = Instant::now();
-        let request_id = extract_request_id(&$headers);
-        if let Err(response) = authorize_control_request(&$headers, &$state, &mut $request) {
-            return *response;
-        }
-        (start, request_id)
-    }};
-}
 
 pub(super) async fn post_task_board_item(
     headers: HeaderMap,
     State(state): State<DaemonHttpState>,
     Json(request): Json<TaskBoardCreateItemRequest>,
 ) -> Response {
-    let (start, request_id) = authenticated_parts!(headers, state);
+    let (start, request_id) = match authenticated_request(&headers, &state) {
+        Ok(parts) => parts,
+        Err(response) => return *response,
+    };
     timed_json(
         "POST",
         http_paths::TASK_BOARD_ITEMS,
@@ -82,7 +67,10 @@ pub(super) async fn get_task_board_items(
     headers: HeaderMap,
     State(state): State<DaemonHttpState>,
 ) -> Response {
-    let (start, request_id) = authenticated_parts!(headers, state);
+    let (start, request_id) = match authenticated_request(&headers, &state) {
+        Ok(parts) => parts,
+        Err(response) => return *response,
+    };
     let request = TaskBoardListItemsRequest {
         status: query.status,
     };
@@ -100,7 +88,10 @@ pub(super) async fn get_task_board_item(
     headers: HeaderMap,
     State(state): State<DaemonHttpState>,
 ) -> Response {
-    let (start, request_id) = authenticated_parts!(headers, state);
+    let (start, request_id) = match authenticated_request(&headers, &state) {
+        Ok(parts) => parts,
+        Err(response) => return *response,
+    };
     timed_json(
         "GET",
         http_paths::TASK_BOARD_ITEM,
@@ -116,7 +107,10 @@ pub(super) async fn put_task_board_item(
     State(state): State<DaemonHttpState>,
     Json(request): Json<TaskBoardUpdateItemRequest>,
 ) -> Response {
-    let (start, request_id) = authenticated_parts!(headers, state);
+    let (start, request_id) = match authenticated_request(&headers, &state) {
+        Ok(parts) => parts,
+        Err(response) => return *response,
+    };
     timed_json(
         "PUT",
         http_paths::TASK_BOARD_ITEM,
@@ -131,7 +125,10 @@ pub(super) async fn delete_task_board_item(
     headers: HeaderMap,
     State(state): State<DaemonHttpState>,
 ) -> Response {
-    let (start, request_id) = authenticated_parts!(headers, state);
+    let (start, request_id) = match authenticated_request(&headers, &state) {
+        Ok(parts) => parts,
+        Err(response) => return *response,
+    };
     let request = TaskBoardDeleteItemRequest { id: item_id };
     timed_json(
         "DELETE",
@@ -147,7 +144,10 @@ pub(super) async fn post_task_board_plan_begin(
     headers: HeaderMap,
     State(state): State<DaemonHttpState>,
 ) -> Response {
-    let (start, request_id) = authenticated_parts!(headers, state);
+    let (start, request_id) = match authenticated_request(&headers, &state) {
+        Ok(parts) => parts,
+        Err(response) => return *response,
+    };
     let request = TaskBoardPlanBeginRequest { id: item_id };
     timed_json(
         "POST",
@@ -164,7 +164,10 @@ pub(super) async fn post_task_board_plan_submit(
     State(state): State<DaemonHttpState>,
     Json(body): Json<TaskBoardPlanSubmitBody>,
 ) -> Response {
-    let (start, request_id) = authenticated_parts!(headers, state);
+    let (start, request_id) = match authenticated_request(&headers, &state) {
+        Ok(parts) => parts,
+        Err(response) => return *response,
+    };
     let request = TaskBoardPlanSubmitRequest {
         id: item_id,
         summary: body.summary,
@@ -189,7 +192,10 @@ pub(super) async fn post_task_board_plan_approve(
         approved_by: body.approved_by,
         approved_at: body.approved_at,
     };
-    let (start, request_id) = authorized_control_parts!(headers, state, request);
+    let (start, request_id) = match authorized_control_request_parts(&headers, &state, &mut request) {
+        Ok(parts) => parts,
+        Err(response) => return *response,
+    };
     timed_json(
         "POST",
         http_paths::TASK_BOARD_PLAN_APPROVE,
@@ -209,7 +215,10 @@ pub(super) async fn post_task_board_plan_revoke(
         id: item_id,
         actor: body.and_then(|Json(body)| body.actor),
     };
-    let (start, request_id) = authorized_control_parts!(headers, state, request);
+    let (start, request_id) = match authorized_control_request_parts(&headers, &state, &mut request) {
+        Ok(parts) => parts,
+        Err(response) => return *response,
+    };
     timed_json(
         "POST",
         http_paths::TASK_BOARD_PLAN_REVOKE,
@@ -224,7 +233,10 @@ pub(super) async fn post_task_board_sync(
     State(state): State<DaemonHttpState>,
     Json(request): Json<TaskBoardSyncRequest>,
 ) -> Response {
-    let (start, request_id) = authenticated_parts!(headers, state);
+    let (start, request_id) = match authenticated_request(&headers, &state) {
+        Ok(parts) => parts,
+        Err(response) => return *response,
+    };
     timed_json(
         "POST",
         http_paths::TASK_BOARD_SYNC,
@@ -239,7 +251,10 @@ pub(super) async fn post_task_board_dispatch(
     State(state): State<DaemonHttpState>,
     Json(mut request): Json<TaskBoardDispatchRequest>,
 ) -> Response {
-    let (start, request_id) = authorized_control_parts!(headers, state, request);
+    let (start, request_id) = match authorized_control_request_parts(&headers, &state, &mut request) {
+        Ok(parts) => parts,
+        Err(response) => return *response,
+    };
     let result = task_board_route_executor::dispatch(&state, request).await;
     timed_json(
         "POST",
@@ -255,7 +270,10 @@ pub(super) async fn post_task_board_evaluate(
     State(state): State<DaemonHttpState>,
     Json(mut request): Json<TaskBoardEvaluateRequest>,
 ) -> Response {
-    let (start, request_id) = authorized_control_parts!(headers, state, request);
+    let (start, request_id) = match authorized_control_request_parts(&headers, &state, &mut request) {
+        Ok(parts) => parts,
+        Err(response) => return *response,
+    };
     let result = task_board_route_executor::evaluate(&state, request).await;
     timed_json(
         "POST",
@@ -271,7 +289,10 @@ pub(super) async fn get_task_board_audit(
     headers: HeaderMap,
     State(state): State<DaemonHttpState>,
 ) -> Response {
-    let (start, request_id) = authenticated_parts!(headers, state);
+    let (start, request_id) = match authenticated_request(&headers, &state) {
+        Ok(parts) => parts,
+        Err(response) => return *response,
+    };
     let request = TaskBoardAuditRequest {
         status: query.status,
     };
@@ -289,7 +310,10 @@ pub(super) async fn get_task_board_projects(
     headers: HeaderMap,
     State(state): State<DaemonHttpState>,
 ) -> Response {
-    let (start, request_id) = authenticated_parts!(headers, state);
+    let (start, request_id) = match authenticated_request(&headers, &state) {
+        Ok(parts) => parts,
+        Err(response) => return *response,
+    };
     let request = TaskBoardCatalogRequest {
         status: query.status,
     };
@@ -307,7 +331,10 @@ pub(super) async fn get_task_board_machines(
     headers: HeaderMap,
     State(state): State<DaemonHttpState>,
 ) -> Response {
-    let (start, request_id) = authenticated_parts!(headers, state);
+    let (start, request_id) = match authenticated_request(&headers, &state) {
+        Ok(parts) => parts,
+        Err(response) => return *response,
+    };
     let request = TaskBoardCatalogRequest {
         status: query.status,
     };
@@ -324,7 +351,10 @@ pub(super) async fn get_task_board_host_local(
     headers: HeaderMap,
     State(state): State<DaemonHttpState>,
 ) -> Response {
-    let (start, request_id) = authenticated_parts!(headers, state);
+    let (start, request_id) = match authenticated_request(&headers, &state) {
+        Ok(parts) => parts,
+        Err(response) => return *response,
+    };
     timed_json(
         "GET",
         http_paths::TASK_BOARD_HOST_LOCAL,
@@ -338,7 +368,10 @@ pub(super) async fn get_task_board_host_list(
     headers: HeaderMap,
     State(state): State<DaemonHttpState>,
 ) -> Response {
-    let (start, request_id) = authenticated_parts!(headers, state);
+    let (start, request_id) = match authenticated_request(&headers, &state) {
+        Ok(parts) => parts,
+        Err(response) => return *response,
+    };
     timed_json(
         "GET",
         http_paths::TASK_BOARD_HOST_LIST,
@@ -353,7 +386,10 @@ pub(super) async fn put_task_board_host_set_project_types(
     State(state): State<DaemonHttpState>,
     Json(request): Json<TaskBoardHostSetProjectTypesRequest>,
 ) -> Response {
-    let (start, request_id) = authenticated_parts!(headers, state);
+    let (start, request_id) = match authenticated_request(&headers, &state) {
+        Ok(parts) => parts,
+        Err(response) => return *response,
+    };
     timed_json(
         "PUT",
         http_paths::TASK_BOARD_HOST_SET_PROJECT_TYPES,
@@ -363,12 +399,23 @@ pub(super) async fn put_task_board_host_set_project_types(
     )
 }
 
-fn authenticated_request(
+pub(super) fn authenticated_request(
     headers: &HeaderMap,
     state: &DaemonHttpState,
 ) -> Result<(Instant, String), Box<Response>> {
     let start = Instant::now();
     let request_id = extract_request_id(headers);
     require_auth(headers, state)?;
+    Ok((start, request_id))
+}
+
+pub(super) fn authorized_control_request_parts<T: ControlPlaneActorRequest>(
+    headers: &HeaderMap,
+    state: &DaemonHttpState,
+    request: &mut T,
+) -> Result<(Instant, String), Box<Response>> {
+    let start = Instant::now();
+    let request_id = extract_request_id(headers);
+    authorize_control_request(headers, state, request)?;
     Ok((start, request_id))
 }

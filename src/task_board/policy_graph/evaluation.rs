@@ -261,7 +261,10 @@ fn edge_condition_matches(
     }
 }
 
-#[allow(clippy::cognitive_complexity)]
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "tracing::warn! macro expands into a chain clippy reads as branchy"
+)]
 fn warn_cycle(visited: &[String], node_id: &str) {
     warn!(
         target: "harness::policy_graph",
@@ -271,7 +274,10 @@ fn warn_cycle(visited: &[String], node_id: &str) {
     );
 }
 
-#[allow(clippy::cognitive_complexity)]
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "tracing::warn! macro expands into a chain clippy reads as branchy"
+)]
 fn warn_safety_cap(visited: &[String], safety_cap: usize) {
     warn!(
         target: "harness::policy_graph",

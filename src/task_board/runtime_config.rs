@@ -286,7 +286,10 @@ impl TaskBoardGitSigningConfig {
     }
 }
 
-#[allow(clippy::trivially_copy_pass_by_ref)]
+#[expect(
+    clippy::trivially_copy_pass_by_ref,
+    reason = "serde skip_serializing_if requires a function taking `&T`"
+)]
 fn is_false_ref(value: &bool) -> bool {
     !*value
 }
