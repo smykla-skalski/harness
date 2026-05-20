@@ -1,3 +1,4 @@
+use std::future::Future;
 use std::time::Instant;
 
 use axum::Json;
@@ -18,7 +19,7 @@ use super::super::auth::{authorize_control_request, require_auth};
 use super::super::response::{extract_request_id, timed_json};
 use super::{
     ensure_acp_agent, ensure_acp_enabled, ensure_codex_agent, ensure_terminal_agent_async,
-    run_terminal_agent_blocking,
+    run_acp_agent_blocking, run_codex_agent_blocking, run_terminal_agent_blocking,
 };
 
 pub(super) async fn post_terminal_agent_start(
@@ -57,11 +58,13 @@ pub(super) async fn post_codex_agent_start(
     if let Err(response) = authorize_control_request(&headers, &state, &mut request) {
         return *response;
     }
+    let run_session_id = session_id.clone();
     let result = with_managed_agent_lock(&state, &session_id, "codex:start", || {
-        state
-            .codex_controller
-            .start_run(&session_id, &request)
-            .map(ManagedAgentSnapshot::Codex)
+        run_codex_agent_blocking(&state, "start", move |controller| {
+            controller
+                .start_run(&run_session_id, &request)
+                .map(ManagedAgentSnapshot::Codex)
+        })
     })
     .await;
     timed_json(
@@ -147,20 +150,24 @@ pub(super) async fn post_terminal_agent_stop(
     }
     let result = match state.codex_controller.session_id_for_run(&managed_agent_id) {
         Ok(session_id) => {
+            let agent_id = managed_agent_id.clone();
             with_managed_agent_lock(&state, &session_id, &managed_agent_id, || {
-                state
-                    .codex_controller
-                    .stop(&managed_agent_id)
-                    .map(ManagedAgentSnapshot::Codex)
+                run_codex_agent_blocking(&state, "stop", move |controller| {
+                    controller.stop(&agent_id).map(ManagedAgentSnapshot::Codex)
+                })
             })
             .await
         }
         Err(error) if error.code() == "KSRCLI090" => {
-            if state.acp_agent_manager.get(&managed_agent_id).is_ok() {
-                state
-                    .acp_agent_manager
-                    .stop(&managed_agent_id)
-                    .map(ManagedAgentSnapshot::Acp)
+            if let Ok(snapshot) = state.acp_agent_manager.get(&managed_agent_id) {
+                let session_id = snapshot.session_id;
+                let agent_id = managed_agent_id.clone();
+                with_managed_agent_lock(&state, &session_id, &managed_agent_id, || {
+                    run_acp_agent_blocking(&state, "stop", move |manager| {
+                        manager.stop(&agent_id).map(ManagedAgentSnapshot::Acp)
+                    })
+                })
+                .await
             } else {
                 match ensure_terminal_agent_async(&state, &managed_agent_id).await {
                     Ok(()) => {
@@ -229,11 +236,13 @@ pub(super) async fn post_codex_agent_steer(
     }
     let result = match codex_session_id(&state, &managed_agent_id) {
         Ok(session_id) => {
+            let agent_id = managed_agent_id.clone();
             with_managed_agent_lock(&state, &session_id, &managed_agent_id, || {
-                state
-                    .codex_controller
-                    .steer(&managed_agent_id, &request)
-                    .map(ManagedAgentSnapshot::Codex)
+                run_codex_agent_blocking(&state, "steer", move |controller| {
+                    controller
+                        .steer(&agent_id, &request)
+                        .map(ManagedAgentSnapshot::Codex)
+                })
             })
             .await
         }
@@ -260,11 +269,13 @@ pub(super) async fn post_codex_agent_interrupt(
     }
     let result = match codex_session_id(&state, &agent_id) {
         Ok(session_id) => {
+            let run_id = agent_id.clone();
             with_managed_agent_lock(&state, &session_id, &agent_id, || {
-                state
-                    .codex_controller
-                    .interrupt(&agent_id)
-                    .map(ManagedAgentSnapshot::Codex)
+                run_codex_agent_blocking(&state, "interrupt", move |controller| {
+                    controller
+                        .interrupt(&run_id)
+                        .map(ManagedAgentSnapshot::Codex)
+                })
             })
             .await
         }
@@ -292,11 +303,14 @@ pub(super) async fn post_codex_agent_approval(
     }
     let result = match codex_session_id(&state, &agent_id) {
         Ok(session_id) => {
+            let run_id = agent_id.clone();
+            let approval_id = approval_id.clone();
             with_managed_agent_lock(&state, &session_id, &agent_id, || {
-                state
-                    .codex_controller
-                    .resolve_approval(&agent_id, &approval_id, &request)
-                    .map(ManagedAgentSnapshot::Codex)
+                run_codex_agent_blocking(&state, "approval", move |controller| {
+                    controller
+                        .resolve_approval(&run_id, &approval_id, &request)
+                        .map(ManagedAgentSnapshot::Codex)
+                })
             })
             .await
         }
@@ -311,22 +325,31 @@ pub(super) async fn post_codex_agent_approval(
     )
 }
 
-async fn with_managed_agent_lock<T>(
+async fn with_managed_agent_lock<T, Fut>(
     state: &DaemonHttpState,
     session_id: &str,
     agent_id: &str,
-    action: impl FnOnce() -> Result<T, CliError>,
-) -> Result<T, CliError> {
+    action: impl FnOnce() -> Fut,
+) -> Result<T, CliError>
+where
+    Fut: Future<Output = Result<T, CliError>>,
+{
     let _guard = state
         .managed_agent_mutation_locks
         .lock(session_id, agent_id)
         .await;
-    action()
+    action().await
 }
 
 fn codex_session_id(state: &DaemonHttpState, agent_id: &str) -> Result<String, CliError> {
     ensure_codex_agent(state, agent_id)?;
     Ok(state.codex_controller.run(agent_id)?.session_id)
+}
+
+fn acp_session_id(state: &DaemonHttpState, agent_id: &str) -> Result<String, CliError> {
+    ensure_acp_enabled()?;
+    ensure_acp_agent(state, agent_id)?;
+    state.acp_agent_manager.get(agent_id).map(|s| s.session_id)
 }
 
 #[derive(serde::Deserialize)]
@@ -345,15 +368,21 @@ pub(super) async fn post_acp_agent_prompt(
     if let Err(response) = require_auth(&headers, &state) {
         return *response;
     }
-    let result = ensure_acp_enabled().and_then(|()| {
-        ensure_acp_agent(&state, &agent_id)
-            .and_then(|()| {
-                state
-                    .acp_agent_manager
-                    .send_prompt(&agent_id, &request.prompt)
+    let result = match acp_session_id(&state, &agent_id) {
+        Ok(session_id) => {
+            let prompt = request.prompt;
+            let prompt_agent_id = agent_id.clone();
+            with_managed_agent_lock(&state, &session_id, &agent_id, || {
+                run_acp_agent_blocking(&state, "prompt", move |manager| {
+                    manager
+                        .send_prompt(&prompt_agent_id, &prompt)
+                        .map(ManagedAgentSnapshot::Acp)
+                })
             })
-            .map(ManagedAgentSnapshot::Acp)
-    });
+            .await
+        }
+        Err(error) => Err(error),
+    };
     timed_json(
         "POST",
         http_paths::MANAGED_AGENT_ACP_PROMPT,
@@ -374,15 +403,21 @@ pub(super) async fn post_acp_permission(
     if let Err(response) = require_auth(&headers, &state) {
         return *response;
     }
-    let result = ensure_acp_enabled().and_then(|()| {
-        ensure_acp_agent(&state, &agent_id)
-            .and_then(|()| {
-                state
-                    .acp_agent_manager
-                    .resolve_permission_batch(&agent_id, &batch_id, &request)
+    let result = match acp_session_id(&state, &agent_id) {
+        Ok(session_id) => {
+            let decision_agent_id = agent_id.clone();
+            let decision_batch_id = batch_id.clone();
+            with_managed_agent_lock(&state, &session_id, &agent_id, || {
+                run_acp_agent_blocking(&state, "permission", move |manager| {
+                    manager
+                        .resolve_permission_batch(&decision_agent_id, &decision_batch_id, &request)
+                        .map(ManagedAgentSnapshot::Acp)
+                })
             })
-            .map(ManagedAgentSnapshot::Acp)
-    });
+            .await
+        }
+        Err(error) => Err(error),
+    };
     timed_json(
         "POST",
         http_paths::MANAGED_AGENT_ACP_PERMISSION,

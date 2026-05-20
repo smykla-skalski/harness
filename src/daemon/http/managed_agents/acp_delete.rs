@@ -11,7 +11,7 @@ use crate::errors::{CliError, CliErrorKind};
 use super::super::DaemonHttpState;
 use super::super::auth::require_auth;
 use super::super::response::{extract_request_id, timed_json};
-use super::{ensure_acp_agent, ensure_acp_enabled};
+use super::{ensure_acp_agent, ensure_acp_enabled, run_acp_agent_blocking};
 
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -30,11 +30,11 @@ pub(super) async fn delete_acp_agent(
     if let Err(response) = require_auth(&headers, &state) {
         return *response;
     }
-    let result = (|| -> Result<ManagedAgentSnapshot, CliError> {
+    let result = match (|| -> Result<String, CliError> {
         ensure_acp_enabled()?;
         ensure_acp_agent(&state, &agent_id)?;
+        let snapshot = state.acp_agent_manager.get(&agent_id)?;
         if let Some(required) = &query.session_id {
-            let snapshot = state.acp_agent_manager.get(&agent_id)?;
             if &snapshot.session_id != required {
                 return Err(CliErrorKind::session_scope_denied(format!(
                     "agent '{agent_id}' belongs to a different session"
@@ -42,11 +42,21 @@ pub(super) async fn delete_acp_agent(
                 .into());
             }
         }
-        state
-            .acp_agent_manager
-            .stop(&agent_id)
-            .map(ManagedAgentSnapshot::Acp)
-    })();
+        Ok(snapshot.session_id)
+    })() {
+        Ok(session_id) => {
+            let stop_agent_id = agent_id.clone();
+            let _guard = state
+                .managed_agent_mutation_locks
+                .lock(&session_id, &agent_id)
+                .await;
+            run_acp_agent_blocking(&state, "delete", move |manager| {
+                manager.stop(&stop_agent_id).map(ManagedAgentSnapshot::Acp)
+            })
+            .await
+        }
+        Err(error) => Err(error),
+    };
     timed_json(
         "DELETE",
         http_paths::MANAGED_AGENT_DELETE,
