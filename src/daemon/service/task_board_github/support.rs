@@ -242,7 +242,10 @@ pub(super) fn action_policy(
 /// `event = "harness_audit_policy_load_failure"`. The daemon falls open to the
 /// built-in policy gate, but this log line lets operators alert on persistent
 /// load failures.
-#[allow(clippy::cognitive_complexity)]
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "tracing::error! macro expands into a chain clippy reads as branchy"
+)]
 pub(super) fn record_policy_load_failure(error: &CliError) {
     let error = error.to_string();
     tracing::error!(

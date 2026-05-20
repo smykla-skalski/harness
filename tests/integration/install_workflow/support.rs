@@ -23,6 +23,16 @@ pub(super) fn write_fake_shell_tool(path: &Path, body: &str) {
         .expect("chmod fake shell tool");
 }
 
+/// Write both managed adapter binaries (`harness-codex-acp` +
+/// `harness-openrouter-agent`) into the target `release/` dir so the install
+/// script's adapter-presence checks pass. Both stubs exit 0 on `--probe` so
+/// the install script's probe assertion succeeds too.
+pub(super) fn write_fake_managed_adapters(target_dir: &Path) {
+    let stub = "#!/bin/sh\nif [ \"$1\" = \"--probe\" ]; then\n  exit 0\nfi\nexit 1\n";
+    write_fake_shell_tool(&target_dir.join("release/harness-codex-acp"), stub);
+    write_fake_shell_tool(&target_dir.join("release/harness-openrouter-agent"), stub);
+}
+
 pub(super) fn run_harness_version(path: &Path) -> String {
     let output = Command::new(path)
         .arg("--version")

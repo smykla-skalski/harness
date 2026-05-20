@@ -1,4 +1,7 @@
-#![allow(clippy::module_name_repetitions)]
+#![expect(
+    clippy::module_name_repetitions,
+    reason = "PolicyGraph* names mirror the protocol contract surfaced to clients"
+)]
 
 use serde::{Deserialize, Serialize};
 

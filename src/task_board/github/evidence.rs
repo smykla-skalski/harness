@@ -217,7 +217,10 @@ impl GitHubReviewEvidence {
     }
 }
 
-#[allow(clippy::trivially_copy_pass_by_ref)]
+#[expect(
+    clippy::trivially_copy_pass_by_ref,
+    reason = "serde skip_serializing_if requires a function taking `&T`"
+)]
 fn is_zero(value: &u32) -> bool {
     *value == 0
 }
