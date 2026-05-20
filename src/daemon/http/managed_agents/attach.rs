@@ -1,22 +1,25 @@
+use std::sync::Arc;
+use std::time::Instant;
+
 use axum::extract::{
     Path, State,
     ws::{Message, WebSocket, WebSocketUpgrade},
 };
 use axum::http::HeaderMap;
 use axum::response::Response;
-use std::time::Instant;
 use tokio::io::{AsyncReadExt as _, AsyncWriteExt as _};
 use tokio::net::UnixStream;
 use tokio::sync::broadcast::error::RecvError;
-use tokio::task::block_in_place;
+use tokio::task::spawn_blocking;
 
+use crate::daemon::agent_tui::AgentTuiProcess;
 use crate::daemon::bridge::{BridgeCapability, BridgeClient};
 use crate::daemon::http::DaemonHttpState;
 use crate::errors::{CliError, CliErrorKind};
 
 use super::super::auth::require_auth;
 use super::super::response::{extract_request_id, timed_json};
-use super::ensure_terminal_agent;
+use super::{ensure_terminal_agent_async, run_terminal_agent_blocking};
 
 #[expect(clippy::too_many_lines, reason = "tokio select proxying loop")]
 pub(super) async fn get_terminal_agent_attach(
@@ -30,7 +33,7 @@ pub(super) async fn get_terminal_agent_attach(
     if let Err(response) = require_auth(&headers, &state) {
         return *response;
     }
-    if let Err(error) = ensure_terminal_agent(&state, &agent_id) {
+    if let Err(error) = ensure_terminal_agent_async(&state, &agent_id).await {
         return timed_json(
             "GET",
             "/v1/managed-agents/{id}/attach",
@@ -41,9 +44,17 @@ pub(super) async fn get_terminal_agent_attach(
     }
 
     if state.agent_tui_manager.state.sandboxed {
-        let stream_result = block_in_place(|| {
+        let agent_id_for_bridge = agent_id.clone();
+        let stream_result = spawn_blocking(move || {
             BridgeClient::for_capability(BridgeCapability::AgentTui)
-                .and_then(|client| client.agent_tui_attach(&agent_id))
+                .and_then(|client| client.agent_tui_attach(&agent_id_for_bridge))
+        })
+        .await
+        .unwrap_or_else(|error| {
+            Err(CliErrorKind::workflow_io(format!(
+                "managed terminal agent attach bridge worker failed: {error}"
+            ))
+            .into())
         });
 
         let stream = match stream_result {
@@ -114,7 +125,12 @@ pub(super) async fn get_terminal_agent_attach(
         });
     }
 
-    let process = match state.agent_tui_manager.active_process(&agent_id) {
+    let agent_id_for_process = agent_id.clone();
+    let process = match run_terminal_agent_blocking(&state, "load active process", move |manager| {
+        manager.active_process(&agent_id_for_process)
+    })
+    .await
+    {
         Ok(process) => process,
         Err(error) => {
             return timed_json(
@@ -156,11 +172,11 @@ pub(super) async fn get_terminal_agent_attach(
             tokio::select! {
                 msg = socket.recv() => {
                     if let Some(Ok(Message::Binary(bytes))) = msg {
-                        if process.write_bytes(&bytes).is_err() {
+                        if write_process_bytes(Arc::clone(&process), bytes.to_vec()).await.is_err() {
                             break;
                         }
                     } else if let Some(Ok(Message::Text(text))) = msg {
-                        if process.write_bytes(text.as_bytes()).is_err() {
+                        if write_process_bytes(Arc::clone(&process), text.as_bytes().to_vec()).await.is_err() {
                             break;
                         }
                     } else {
@@ -182,4 +198,18 @@ pub(super) async fn get_terminal_agent_attach(
             }
         }
     })
+}
+
+async fn write_process_bytes(
+    process: Arc<AgentTuiProcess>,
+    bytes: Vec<u8>,
+) -> Result<(), CliError> {
+    spawn_blocking(move || process.write_bytes(&bytes))
+        .await
+        .unwrap_or_else(|error| {
+            Err(CliErrorKind::workflow_io(format!(
+                "managed terminal agent attach write worker failed: {error}"
+            ))
+            .into())
+        })
 }

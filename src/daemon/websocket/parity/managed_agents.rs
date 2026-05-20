@@ -1,11 +1,13 @@
-use crate::daemon::http::ensure_acp_enabled;
+use crate::daemon::http::{
+    ensure_acp_enabled, ensure_terminal_agent_async, run_terminal_agent_blocking,
+};
 use crate::errors::CliError;
 
 use super::{
     AcpAgentStartRequest, AcpPermissionDecision, CodexApprovalDecisionRequest, CodexRunRequest,
     CodexSteerRequest, DaemonHttpState, ManagedAgentSnapshot, WsRequest, WsResponse,
-    bind_control_plane_actor_value, ensure_acp_agent, ensure_codex_agent, ensure_terminal_agent,
-    error_response, extract_managed_agent_id, extract_session_id, extract_string_param,
+    bind_control_plane_actor_value, ensure_acp_agent, ensure_codex_agent, error_response,
+    extract_managed_agent_id, extract_session_id, extract_string_param,
 };
 
 pub(crate) async fn dispatch_managed_agent_start_terminal(
@@ -25,10 +27,11 @@ pub(crate) async fn dispatch_managed_agent_start_terminal(
             );
         }
     };
-    let result = state
-        .agent_tui_manager
-        .start(&session_id, &body)
-        .map(ManagedAgentSnapshot::Terminal);
+    let result = run_terminal_agent_blocking(state, "ws start", move |manager| {
+        manager.start(&session_id, &body)
+    })
+    .await
+    .map(ManagedAgentSnapshot::Terminal);
     dispatch_managed_agent_response(request, state, result).await
 }
 
@@ -118,15 +121,17 @@ pub(crate) async fn dispatch_managed_agent_input(
             );
         }
     };
-    let result = match terminal_session_id(state, &agent_id) {
+    let result = match terminal_session_id(state, &agent_id).await {
         Ok(session_id) => {
-            with_managed_agent_lock(state, &session_id, &agent_id, || {
-                state
-                    .agent_tui_manager
-                    .input(&agent_id, &body)
-                    .map(ManagedAgentSnapshot::Terminal)
+            let _guard = state
+                .managed_agent_mutation_locks
+                .lock(&session_id, &agent_id)
+                .await;
+            run_terminal_agent_blocking(state, "ws input", move |manager| {
+                manager.input(&agent_id, &body)
             })
             .await
+            .map(ManagedAgentSnapshot::Terminal)
         }
         Err(error) => Err(error),
     };
@@ -150,15 +155,17 @@ pub(crate) async fn dispatch_managed_agent_resize(
             );
         }
     };
-    let result = match terminal_session_id(state, &agent_id) {
+    let result = match terminal_session_id(state, &agent_id).await {
         Ok(session_id) => {
-            with_managed_agent_lock(state, &session_id, &agent_id, || {
-                state
-                    .agent_tui_manager
-                    .resize(&agent_id, &body)
-                    .map(ManagedAgentSnapshot::Terminal)
+            let _guard = state
+                .managed_agent_mutation_locks
+                .lock(&session_id, &agent_id)
+                .await;
+            run_terminal_agent_blocking(state, "ws resize", move |manager| {
+                manager.resize(&agent_id, &body)
             })
             .await
+            .map(ManagedAgentSnapshot::Terminal)
         }
         Err(error) => Err(error),
     };
@@ -183,15 +190,17 @@ pub(crate) async fn dispatch_managed_agent_ready(
     let Some(agent_id) = extract_managed_agent_id(&request.params) else {
         return error_response(&request.id, "MISSING_PARAM", "missing managed_agent_id");
     };
-    let result = match terminal_session_id(state, &agent_id) {
+    let result = match terminal_session_id(state, &agent_id).await {
         Ok(session_id) => {
-            with_managed_agent_lock(state, &session_id, &agent_id, || {
-                state
-                    .agent_tui_manager
-                    .signal_ready(&agent_id)
-                    .map(ManagedAgentSnapshot::Terminal)
+            let _guard = state
+                .managed_agent_mutation_locks
+                .lock(&session_id, &agent_id)
+                .await;
+            run_terminal_agent_blocking(state, "ws ready", move |manager| {
+                manager.signal_ready(&agent_id)
             })
             .await
+            .map(ManagedAgentSnapshot::Terminal)
         }
         Err(error) => Err(error),
     };
@@ -415,7 +424,7 @@ async fn stop_non_codex_managed_agent(
     {
         return stop_acp_managed_agent(state, &session_id, agent_id).await;
     }
-    let session_id = terminal_session_id(state, agent_id)?;
+    let session_id = terminal_session_id(state, agent_id).await?;
     stop_terminal_managed_agent(state, &session_id, agent_id).await
 }
 
@@ -452,18 +461,23 @@ async fn stop_terminal_managed_agent(
     session_id: &str,
     agent_id: &str,
 ) -> Result<ManagedAgentSnapshot, CliError> {
-    with_managed_agent_lock(state, session_id, agent_id, || {
-        state
-            .agent_tui_manager
-            .stop(agent_id)
-            .map(ManagedAgentSnapshot::Terminal)
-    })
-    .await
+    let _guard = state
+        .managed_agent_mutation_locks
+        .lock(session_id, agent_id)
+        .await;
+    let agent_id = agent_id.to_string();
+    run_terminal_agent_blocking(state, "ws stop", move |manager| manager.stop(&agent_id))
+        .await
+        .map(ManagedAgentSnapshot::Terminal)
 }
 
-fn terminal_session_id(state: &DaemonHttpState, agent_id: &str) -> Result<String, CliError> {
-    ensure_terminal_agent(state, agent_id)?;
-    state.agent_tui_manager.get(agent_id).map(|s| s.session_id)
+async fn terminal_session_id(state: &DaemonHttpState, agent_id: &str) -> Result<String, CliError> {
+    ensure_terminal_agent_async(state, agent_id).await?;
+    let agent_id = agent_id.to_string();
+    run_terminal_agent_blocking(state, "ws terminal session lookup", move |manager| {
+        manager.get(&agent_id).map(|snapshot| snapshot.session_id)
+    })
+    .await
 }
 
 fn codex_session_id(state: &DaemonHttpState, agent_id: &str) -> Result<String, CliError> {

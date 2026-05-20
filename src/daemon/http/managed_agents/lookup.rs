@@ -1,12 +1,19 @@
 use crate::errors::{CliError, CliErrorKind};
 
 use super::super::DaemonHttpState;
+use super::run_terminal_agent_blocking;
 
-pub(crate) fn ensure_terminal_agent(
+pub(crate) async fn ensure_terminal_agent_async(
     state: &DaemonHttpState,
     agent_id: &str,
 ) -> Result<(), CliError> {
-    if state.agent_tui_manager.get(agent_id).is_ok() {
+    let agent_id_owned = agent_id.to_string();
+    if run_terminal_agent_blocking(state, "lookup terminal agent", move |manager| {
+        manager.get(&agent_id_owned)
+    })
+    .await
+    .is_ok()
+    {
         return Ok(());
     }
     if state.codex_controller.run(agent_id).is_ok() {
