@@ -146,12 +146,17 @@ extension HarnessMonitorPaths {
   }
 
   static func derivedCodexBridgePort(for lane: String) -> Int {
+    if let cached = DerivedCodexBridgePortCache.lookup(lane) {
+      return cached
+    }
     let digest = SHA256.hash(data: Data(lane.utf8))
     let prefix = digest.prefix(4).reduce(0) { partial, byte in
       (partial << 8) | Int(byte)
     }
-    return HarnessMonitorRuntimeLane.codexWSPortBase
+    let port = HarnessMonitorRuntimeLane.codexWSPortBase
       + (prefix % HarnessMonitorRuntimeLane.codexWSPortSpan)
+    DerivedCodexBridgePortCache.store(lane, port: port)
+    return port
   }
 
   static func inferRuntimeLane(fromPath rawPath: String?) -> String? {
@@ -211,5 +216,22 @@ extension HarnessMonitorPaths {
 
   static func shellEscape(_ rawValue: String) -> String {
     "'\(rawValue.replacingOccurrences(of: "'", with: "'\\''"))'"
+  }
+}
+
+private enum DerivedCodexBridgePortCache {
+  private static let lock = NSLock()
+  nonisolated(unsafe) private static var entries: [String: Int] = [:]
+
+  static func lookup(_ lane: String) -> Int? {
+    lock.lock()
+    defer { lock.unlock() }
+    return entries[lane]
+  }
+
+  static func store(_ lane: String, port: Int) {
+    lock.lock()
+    defer { lock.unlock() }
+    entries[lane] = port
   }
 }
