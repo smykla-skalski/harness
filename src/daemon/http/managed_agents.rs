@@ -2,7 +2,9 @@ use axum::Router;
 use axum::routing::{delete, get, post};
 use tokio::task::spawn_blocking;
 
+use crate::daemon::agent_acp::AcpAgentManagerHandle;
 use crate::daemon::agent_tui::AgentTuiManagerHandle;
+use crate::daemon::codex_controller::CodexControllerHandle;
 use crate::daemon::protocol::{AcpTranscriptResponse, http_paths};
 use crate::daemon::service::session_acp_transcript_async;
 use crate::errors::{CliError, CliErrorKind};
@@ -144,6 +146,46 @@ where
         .unwrap_or_else(|error| {
             Err(CliErrorKind::workflow_io(format!(
                 "managed terminal agent {operation} worker failed: {error}"
+            ))
+            .into())
+        })
+}
+
+pub(crate) async fn run_codex_agent_blocking<T, F>(
+    state: &DaemonHttpState,
+    operation: &'static str,
+    work: F,
+) -> Result<T, CliError>
+where
+    T: Send + 'static,
+    F: FnOnce(CodexControllerHandle) -> Result<T, CliError> + Send + 'static,
+{
+    let controller = state.codex_controller.clone();
+    spawn_blocking(move || work(controller))
+        .await
+        .unwrap_or_else(|error| {
+            Err(CliErrorKind::workflow_io(format!(
+                "managed Codex agent {operation} worker failed: {error}"
+            ))
+            .into())
+        })
+}
+
+pub(crate) async fn run_acp_agent_blocking<T, F>(
+    state: &DaemonHttpState,
+    operation: &'static str,
+    work: F,
+) -> Result<T, CliError>
+where
+    T: Send + 'static,
+    F: FnOnce(AcpAgentManagerHandle) -> Result<T, CliError> + Send + 'static,
+{
+    let manager = state.acp_agent_manager.clone();
+    spawn_blocking(move || work(manager))
+        .await
+        .unwrap_or_else(|error| {
+            Err(CliErrorKind::workflow_io(format!(
+                "managed ACP agent {operation} worker failed: {error}"
             ))
             .into())
         })

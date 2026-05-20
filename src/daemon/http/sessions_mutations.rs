@@ -15,9 +15,9 @@ use crate::daemon::service;
 use crate::errors::CliError;
 use crate::session::types::SessionState;
 
-use super::DaemonHttpState;
 use super::auth::{authorize_control_request, require_auth};
 use super::response::{extract_request_id, timed_json};
+use super::{DaemonHttpState, run_acp_agent_blocking};
 
 pub(super) async fn post_end_session(
     Path(session_id): Path<String>,
@@ -50,7 +50,7 @@ pub(super) async fn post_session_archive(
     }
     let result = archive_session_response(&state, &session_id, &request).await;
     if result.is_ok() {
-        stop_archived_session_acp_agents(&state, &session_id);
+        stop_archived_session_acp_agents(&state, &session_id).await;
         broadcast_sessions_list_changed(&state).await;
     }
     timed_json(
@@ -62,8 +62,12 @@ pub(super) async fn post_session_archive(
     )
 }
 
-fn stop_archived_session_acp_agents(state: &DaemonHttpState, session_id: &str) {
-    let result = state.acp_agent_manager.stop_session_acp_agents(session_id);
+async fn stop_archived_session_acp_agents(state: &DaemonHttpState, session_id: &str) {
+    let stop_session_id = session_id.to_string();
+    let result = run_acp_agent_blocking(state, "archive stop", move |manager| {
+        manager.stop_session_acp_agents(&stop_session_id)
+    })
+    .await;
     if let Err(error) = result {
         log_archive_acp_stop_failure(&error, session_id);
     }

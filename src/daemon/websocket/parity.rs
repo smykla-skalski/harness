@@ -7,7 +7,7 @@ use crate::daemon::bridge::reconfigure_bridge_async;
 use crate::daemon::db::{DaemonDb, ensure_shared_db};
 use crate::daemon::http::{
     DaemonHttpState, adopt_session, adoption_error_status_and_body, ensure_acp_agent,
-    ensure_codex_agent, record_adopt_in_db,
+    ensure_codex_agent, record_adopt_in_db, run_acp_agent_blocking,
 };
 use crate::daemon::protocol::{
     AdoptSessionRequest, AgentRuntimeSessionRegistrationRequest,
@@ -225,7 +225,7 @@ pub(crate) async fn dispatch_session_archive(
         })
     };
     if result.is_ok() {
-        stop_archived_session_acp_agents(state, &session_id);
+        stop_archived_session_acp_agents(state, &session_id).await;
         if let Some(async_db) = state.async_db.get() {
             service::broadcast_sessions_updated_async(&state.sender, Some(async_db.as_ref())).await;
         } else if let Err(error) = broadcast_sessions_updated_sync(state) {
@@ -235,8 +235,12 @@ pub(crate) async fn dispatch_session_archive(
     dispatch_query_result(&request.id, result)
 }
 
-fn stop_archived_session_acp_agents(state: &DaemonHttpState, session_id: &str) {
-    let result = state.acp_agent_manager.stop_session_acp_agents(session_id);
+async fn stop_archived_session_acp_agents(state: &DaemonHttpState, session_id: &str) {
+    let stop_session_id = session_id.to_string();
+    let result = run_acp_agent_blocking(state, "ws archive stop", move |manager| {
+        manager.stop_session_acp_agents(&stop_session_id)
+    })
+    .await;
     if let Err(error) = result {
         log_archive_acp_stop_failure(&error, session_id);
     }

@@ -1,5 +1,8 @@
+use std::future::Future;
+
 use crate::daemon::http::{
-    ensure_acp_enabled, ensure_terminal_agent_async, run_terminal_agent_blocking,
+    ensure_acp_enabled, ensure_terminal_agent_async, run_acp_agent_blocking,
+    run_codex_agent_blocking, run_terminal_agent_blocking,
 };
 use crate::errors::CliError;
 
@@ -54,11 +57,13 @@ pub(crate) async fn dispatch_managed_agent_start_codex(
             );
         }
     };
+    let run_session_id = session_id.clone();
     let result = with_managed_agent_lock(state, &session_id, "codex:start", || {
-        state
-            .codex_controller
-            .start_run(&session_id, &body)
-            .map(ManagedAgentSnapshot::Codex)
+        run_codex_agent_blocking(state, "ws start", move |controller| {
+            controller
+                .start_run(&run_session_id, &body)
+                .map(ManagedAgentSnapshot::Codex)
+        })
     })
     .await;
     dispatch_managed_agent_response(request, state, result).await
@@ -94,11 +99,14 @@ pub(crate) async fn dispatch_managed_agent_start_acp(
     {
         return error_response(&request.id, error.code(), &error.message());
     }
-    let result = with_managed_agent_lock(state, &session_id, &body.agent, || {
-        state
-            .acp_agent_manager
-            .start(&session_id, &body)
-            .map(ManagedAgentSnapshot::Acp)
+    let start_session_id = session_id.clone();
+    let lock_agent_id = body.agent.clone();
+    let result = with_managed_agent_lock(state, &session_id, &lock_agent_id, || {
+        run_acp_agent_blocking(state, "ws start", move |manager| {
+            manager
+                .start(&start_session_id, &body)
+                .map(ManagedAgentSnapshot::Acp)
+        })
     })
     .await;
     dispatch_managed_agent_response(request, state, result).await
@@ -226,11 +234,13 @@ pub(crate) async fn dispatch_managed_agent_steer_codex(
     };
     let result = match codex_session_id(state, &agent_id) {
         Ok(session_id) => {
+            let run_id = agent_id.clone();
             with_managed_agent_lock(state, &session_id, &agent_id, || {
-                state
-                    .codex_controller
-                    .steer(&agent_id, &body)
-                    .map(ManagedAgentSnapshot::Codex)
+                run_codex_agent_blocking(state, "ws steer", move |controller| {
+                    controller
+                        .steer(&run_id, &body)
+                        .map(ManagedAgentSnapshot::Codex)
+                })
             })
             .await
         }
@@ -248,11 +258,13 @@ pub(crate) async fn dispatch_managed_agent_interrupt_codex(
     };
     let result = match codex_session_id(state, &agent_id) {
         Ok(session_id) => {
+            let run_id = agent_id.clone();
             with_managed_agent_lock(state, &session_id, &agent_id, || {
-                state
-                    .codex_controller
-                    .interrupt(&agent_id)
-                    .map(ManagedAgentSnapshot::Codex)
+                run_codex_agent_blocking(state, "ws interrupt", move |controller| {
+                    controller
+                        .interrupt(&run_id)
+                        .map(ManagedAgentSnapshot::Codex)
+                })
             })
             .await
         }
@@ -283,11 +295,14 @@ pub(crate) async fn dispatch_managed_agent_resolve_codex_approval(
     };
     let result = match codex_session_id(state, &agent_id) {
         Ok(session_id) => {
+            let run_id = agent_id.clone();
+            let approval_id = approval_id.clone();
             with_managed_agent_lock(state, &session_id, &agent_id, || {
-                state
-                    .codex_controller
-                    .resolve_approval(&agent_id, &approval_id, &body)
-                    .map(ManagedAgentSnapshot::Codex)
+                run_codex_agent_blocking(state, "ws approval", move |controller| {
+                    controller
+                        .resolve_approval(&run_id, &approval_id, &body)
+                        .map(ManagedAgentSnapshot::Codex)
+                })
             })
             .await
         }
@@ -308,11 +323,11 @@ pub(crate) async fn dispatch_managed_agent_stop_acp(
     };
     let result = match acp_session_id(state, &agent_id) {
         Ok(session_id) => {
+            let stop_agent_id = agent_id.clone();
             with_managed_agent_lock(state, &session_id, &agent_id, || {
-                state
-                    .acp_agent_manager
-                    .stop(&agent_id)
-                    .map(ManagedAgentSnapshot::Acp)
+                run_acp_agent_blocking(state, "ws stop", move |manager| {
+                    manager.stop(&stop_agent_id).map(ManagedAgentSnapshot::Acp)
+                })
             })
             .await
         }
@@ -336,11 +351,13 @@ pub(crate) async fn dispatch_managed_agent_prompt_acp(
     };
     let result = match acp_session_id(state, &agent_id) {
         Ok(session_id) => {
+            let prompt_agent_id = agent_id.clone();
             with_managed_agent_lock(state, &session_id, &agent_id, || {
-                state
-                    .acp_agent_manager
-                    .send_prompt(&agent_id, &prompt)
-                    .map(ManagedAgentSnapshot::Acp)
+                run_acp_agent_blocking(state, "ws prompt", move |manager| {
+                    manager
+                        .send_prompt(&prompt_agent_id, &prompt)
+                        .map(ManagedAgentSnapshot::Acp)
+                })
             })
             .await
         }
@@ -374,11 +391,14 @@ pub(crate) async fn dispatch_managed_agent_resolve_acp_permission(
     }
     let result = match acp_session_id(state, &agent_id) {
         Ok(session_id) => {
+            let decision_agent_id = agent_id.clone();
+            let decision_batch_id = batch_id.clone();
             with_managed_agent_lock(state, &session_id, &agent_id, || {
-                state
-                    .acp_agent_manager
-                    .resolve_permission_batch(&agent_id, &batch_id, &decision)
-                    .map(ManagedAgentSnapshot::Acp)
+                run_acp_agent_blocking(state, "ws permission", move |manager| {
+                    manager
+                        .resolve_permission_batch(&decision_agent_id, &decision_batch_id, &decision)
+                        .map(ManagedAgentSnapshot::Acp)
+                })
             })
             .await
         }
@@ -387,17 +407,20 @@ pub(crate) async fn dispatch_managed_agent_resolve_acp_permission(
     dispatch_managed_agent_response(request, state, result).await
 }
 
-async fn with_managed_agent_lock<T>(
+async fn with_managed_agent_lock<T, Fut>(
     state: &DaemonHttpState,
     session_id: &str,
     agent_id: &str,
-    action: impl FnOnce() -> Result<T, CliError>,
-) -> Result<T, CliError> {
+    action: impl FnOnce() -> Fut,
+) -> Result<T, CliError>
+where
+    Fut: Future<Output = Result<T, CliError>>,
+{
     let _guard = state
         .managed_agent_mutation_locks
         .lock(session_id, agent_id)
         .await;
-    action()
+    action().await
 }
 
 async fn stop_any_managed_agent(
@@ -433,11 +456,13 @@ async fn stop_codex_managed_agent(
     session_id: &str,
     agent_id: &str,
 ) -> Result<ManagedAgentSnapshot, CliError> {
+    let stop_agent_id = agent_id.to_string();
     with_managed_agent_lock(state, session_id, agent_id, || {
-        state
-            .codex_controller
-            .stop(agent_id)
-            .map(ManagedAgentSnapshot::Codex)
+        run_codex_agent_blocking(state, "ws stop", move |controller| {
+            controller
+                .stop(&stop_agent_id)
+                .map(ManagedAgentSnapshot::Codex)
+        })
     })
     .await
 }
@@ -447,11 +472,11 @@ async fn stop_acp_managed_agent(
     session_id: &str,
     agent_id: &str,
 ) -> Result<ManagedAgentSnapshot, CliError> {
+    let stop_agent_id = agent_id.to_string();
     with_managed_agent_lock(state, session_id, agent_id, || {
-        state
-            .acp_agent_manager
-            .stop(agent_id)
-            .map(ManagedAgentSnapshot::Acp)
+        run_acp_agent_blocking(state, "ws stop", move |manager| {
+            manager.stop(&stop_agent_id).map(ManagedAgentSnapshot::Acp)
+        })
     })
     .await
 }
