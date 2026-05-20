@@ -6,7 +6,7 @@ use std::time::{Duration, Instant};
 use notify::{RecommendedWatcher, RecursiveMode, Watcher};
 use tokio::spawn;
 use tokio::sync::{broadcast, mpsc};
-use tokio::task::JoinHandle;
+use tokio::task::{JoinHandle, spawn_blocking};
 use tokio::time::{Instant as TokioInstant, interval as tokio_interval, sleep_until};
 
 use super::paths::{
@@ -86,7 +86,7 @@ fn spawn_db_watch_loop(
             }
 
             if let Some(paths) = pending_paths.take_ready_paths(Instant::now()) {
-                reindex_sessions_from_paths(&db, &paths, &mut resolve_cache);
+                reindex_sessions_from_paths_async(Arc::clone(&db), paths, &mut resolve_cache).await;
             }
 
             reconcile_session_liveness_for_watch(async_db.get(), &db).await;
@@ -280,7 +280,26 @@ fn reindex_sessions_from_paths(
 ) {
     resolve_cache.invalidate_paths(paths);
     let work = extract_reindex_work(paths, resolve_cache);
-    if work.full_session_ids.is_empty() && work.transcript_targets.is_empty() {
+    reindex_extracted_work(db, work);
+}
+
+async fn reindex_sessions_from_paths_async(
+    db: Arc<Mutex<DaemonDb>>,
+    paths: Vec<PathBuf>,
+    resolve_cache: &mut RuntimeSessionResolveCache,
+) {
+    resolve_cache.invalidate_paths(&paths);
+    let work = extract_reindex_work(&paths, resolve_cache);
+    if work.is_empty() {
+        return;
+    }
+    if let Err(error) = spawn_blocking(move || reindex_extracted_work(&db, work)).await {
+        tracing::warn!(%error, "session reindex worker failed");
+    }
+}
+
+fn reindex_extracted_work(db: &Arc<Mutex<DaemonDb>>, work: ReindexWork) {
+    if work.is_empty() {
         return;
     }
     tracing::debug!(
@@ -369,6 +388,12 @@ struct TranscriptRefreshTarget {
 struct ReindexWork {
     full_session_ids: BTreeSet<String>,
     transcript_targets: BTreeSet<TranscriptRefreshTarget>,
+}
+
+impl ReindexWork {
+    fn is_empty(&self) -> bool {
+        self.full_session_ids.is_empty() && self.transcript_targets.is_empty()
+    }
 }
 
 fn extract_reindex_work(
