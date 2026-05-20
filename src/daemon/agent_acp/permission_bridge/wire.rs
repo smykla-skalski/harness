@@ -35,7 +35,7 @@ impl Serialize for AcpPermissionBatch {
         AcpPermissionBatchEncode {
             batch_id: &self.batch_id,
             managed_agent_id: &self.acp_id,
-            managed_agent_family: ManagedAgentKind::Acp,
+            managed_agent_family: self.family,
             session_id: &self.session_id,
             requests: &self.requests,
             created_at: &self.created_at,
@@ -51,11 +51,12 @@ impl<'de> Deserialize<'de> for AcpPermissionBatch {
         D: Deserializer<'de>,
     {
         let decoded = AcpPermissionBatchDecode::deserialize(deserializer)?;
-        validate_acp_family::<D::Error>(decoded.managed_agent_family)?;
+        validate_permission_family::<D::Error>(decoded.managed_agent_family)?;
         Ok(Self {
             batch_id: decoded.batch_id,
             acp_id: decoded.managed_agent_id,
             session_id: decoded.session_id,
+            family: decoded.managed_agent_family,
             requests: decoded.requests,
             created_at: decoded.created_at,
             expires_at: decoded.expires_at,
@@ -63,14 +64,14 @@ impl<'de> Deserialize<'de> for AcpPermissionBatch {
     }
 }
 
-fn validate_acp_family<E>(managed_agent_family: ManagedAgentKind) -> Result<(), E>
+fn validate_permission_family<E>(managed_agent_family: ManagedAgentKind) -> Result<(), E>
 where
     E: DeError,
 {
     match managed_agent_family {
-        ManagedAgentKind::Acp => Ok(()),
+        ManagedAgentKind::Acp | ManagedAgentKind::OpenRouter => Ok(()),
         other => Err(E::custom(format!(
-            "managed_agent_family must be 'acp', got '{other:?}'"
+            "managed_agent_family must be 'acp' or 'open_router', got '{other:?}'"
         ))),
     }
 }
@@ -101,6 +102,7 @@ mod tests {
             batch_id: "batch-1".into(),
             acp_id: "acp-1".into(),
             session_id: "eadbcb3e-6ef7-53d2-ad56-0347cb7189fc".into(),
+            family: crate::session::types::ManagedAgentKind::Acp,
             requests: Vec::new(),
             created_at: "2026-05-06T00:00:00Z".into(),
             expires_at: "2026-05-06T00:05:00Z".into(),
@@ -110,6 +112,23 @@ mod tests {
         assert_eq!(value["managed_agent_id"], "acp-1");
         assert_eq!(value["managed_agent_family"], "acp");
         assert!(value.get("acp_id").is_none());
+    }
+
+    #[test]
+    fn openrouter_permission_batch_serializes_with_open_router_family() {
+        let batch = AcpPermissionBatch {
+            batch_id: "batch-or".into(),
+            acp_id: "openrouter-1".into(),
+            session_id: "eadbcb3e-6ef7-53d2-ad56-0347cb7189fc".into(),
+            family: crate::session::types::ManagedAgentKind::OpenRouter,
+            requests: Vec::new(),
+            created_at: "2026-05-20T00:00:00Z".into(),
+            expires_at: "2026-05-20T00:05:00Z".into(),
+        };
+        let value = serde_json::to_value(&batch).expect("serialize");
+        assert_eq!(value["managed_agent_family"], "open_router");
+        let roundtrip: AcpPermissionBatch = serde_json::from_value(value).expect("roundtrip");
+        assert_eq!(roundtrip.family, crate::session::types::ManagedAgentKind::OpenRouter);
     }
 
     #[test]

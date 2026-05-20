@@ -316,9 +316,6 @@ pub(crate) async fn dispatch_managed_agent_resolve_acp_permission(
     request: &WsRequest,
     state: &DaemonHttpState,
 ) -> WsResponse {
-    if let Err(error) = ensure_acp_enabled() {
-        return error_response(&request.id, error.code(), &error.message());
-    }
     let Some(agent_id) = extract_managed_agent_id(&request.params) else {
         return error_response(&request.id, "MISSING_PARAM", "missing managed_agent_id");
     };
@@ -335,17 +332,27 @@ pub(crate) async fn dispatch_managed_agent_resolve_acp_permission(
             );
         }
     };
-    let result = match acp_session_id(state, &agent_id) {
-        Ok(session_id) => {
-            with_managed_agent_lock(state, &session_id, &agent_id, || {
-                state
-                    .acp_agent_manager
-                    .resolve_permission_batch(&agent_id, &batch_id, &decision)
-                    .map(ManagedAgentSnapshot::Acp)
-            })
-            .await
+    let result = if state.openrouter_agent_manager.has_session(&agent_id) {
+        state
+            .openrouter_agent_manager
+            .resolve_permission_batch(&agent_id, &batch_id, &decision)
+            .map(ManagedAgentSnapshot::OpenRouter)
+    } else {
+        if let Err(error) = ensure_acp_enabled() {
+            return error_response(&request.id, error.code(), &error.message());
         }
-        Err(error) => Err(error),
+        match acp_session_id(state, &agent_id) {
+            Ok(session_id) => {
+                with_managed_agent_lock(state, &session_id, &agent_id, || {
+                    state
+                        .acp_agent_manager
+                        .resolve_permission_batch(&agent_id, &batch_id, &decision)
+                        .map(ManagedAgentSnapshot::Acp)
+                })
+                .await
+            }
+            Err(error) => Err(error),
+        }
     };
     dispatch_managed_agent_response(request, state, result).await
 }

@@ -405,6 +405,7 @@ fn replace_agents(
                 ManagedAgentKind::Tui => "tui",
                 ManagedAgentKind::Acp => "acp",
                 ManagedAgentKind::Codex => "codex",
+                ManagedAgentKind::OpenRouter => "openrouter",
             });
         let managed_agent_id = agent
             .managed_agent

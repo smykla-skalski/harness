@@ -22,18 +22,26 @@ use tokio::task::JoinHandle;
 use tracing::error;
 use uuid::Uuid;
 
+use std::time::Duration;
+
 use crate::agents::acp::client::HarnessAcpClient;
-use crate::agents::acp::permission::{PermissionMode, recording_log_path_for_session};
 use crate::agents::openrouter::{
-    AgentConfig as OpenRouterAgentConfig, ChatMessage, ChatRole, OpenRouterClient, OpenRouterError,
+    AgentConfig as OpenRouterAgentConfig, ChatMessage, ChatRole, ModelListResponse,
+    OpenRouterClient, OpenRouterError,
+};
+use crate::daemon::agent_acp::permission_bridge::{
+    AcpPermissionDecision, PermissionBridgeHandle,
 };
 use crate::daemon::protocol::StreamEvent;
 use crate::daemon::state;
 use crate::errors::{CliError, CliErrorKind};
 use crate::hooks::runner_policy::managed_cluster_binaries;
+use crate::session::types::ManagedAgentKind;
 use crate::workspace::utc_now;
 
 use super::snapshot::{OpenRouterRunSnapshot, OpenRouterRunStatus};
+
+const PERMISSION_BRIDGE_DEADLINE: Duration = Duration::from_secs(300);
 
 mod turn_runner;
 
@@ -88,6 +96,7 @@ pub(super) struct SessionEntry {
     pub(super) reasoning_effort: Option<String>,
     pub(super) project_dir: PathBuf,
     pub(super) tool_client: Arc<HarnessAcpClient>,
+    pub(super) permissions: PermissionBridgeHandle,
 }
 
 pub(super) struct TurnParams {
@@ -136,8 +145,14 @@ impl OpenRouterAgentManagerHandle {
             .clone()
             .unwrap_or_else(|| DEFAULT_OPENROUTER_MODEL.to_owned());
         let project_dir = resolve_project_dir(request.project_dir.as_deref());
-        let tool_client = Arc::new(build_tool_client(harness_session, &project_dir));
         let run_id = format!("openrouter-{}", Uuid::new_v4());
+        let permissions = PermissionBridgeHandle::spawn_with_kind(
+            run_id.clone(),
+            harness_session.to_owned(),
+            ManagedAgentKind::OpenRouter,
+            self.inner.sender.clone(),
+        );
+        let tool_client = Arc::new(build_tool_client(&project_dir, &permissions));
         let now = utc_now();
         let snapshot = OpenRouterRunSnapshot {
             run_id: run_id.clone(),
@@ -154,6 +169,7 @@ impl OpenRouterAgentManagerHandle {
             final_message: None,
             error: None,
             turn_count: 0,
+            pending_permission_batches: Vec::new(),
             created_at: now.clone(),
             updated_at: now,
         };
@@ -172,6 +188,7 @@ impl OpenRouterAgentManagerHandle {
                     reasoning_effort: request.reasoning_effort,
                     project_dir,
                     tool_client,
+                    permissions,
                 },
             );
         }
@@ -260,15 +277,88 @@ impl OpenRouterAgentManagerHandle {
         Ok(snapshot)
     }
 
-    /// Fetch the current snapshot for a session.
+    /// Fetch the current snapshot for a session, with live pending permission
+    /// batches mixed in.
     ///
     /// # Errors
     /// Returns an error if `run_id` does not exist.
     pub fn get(&self, run_id: &str) -> Result<OpenRouterRunSnapshot, CliError> {
-        lock_sessions(&self.inner)
-            .get(run_id)
-            .map(|entry| entry.snapshot.clone())
-            .ok_or_else(|| not_found(run_id))
+        let sessions = lock_sessions(&self.inner);
+        let entry = sessions.get(run_id).ok_or_else(|| not_found(run_id))?;
+        Ok(snapshot_with_pending(entry))
+    }
+
+    /// Resolve a pending permission batch produced by this session's tool
+    /// dispatcher.
+    ///
+    /// # Errors
+    /// Returns an error if `run_id` does not exist or the batch is stale.
+    pub fn resolve_permission_batch(
+        &self,
+        run_id: &str,
+        batch_id: &str,
+        decision: &AcpPermissionDecision,
+    ) -> Result<OpenRouterRunSnapshot, CliError> {
+        let snapshot = {
+            let sessions = lock_sessions(&self.inner);
+            let entry = sessions.get(run_id).ok_or_else(|| not_found(run_id))?;
+            if entry
+                .permissions
+                .resolve_batch(batch_id, decision)
+                .is_none()
+            {
+                return Err(CliError::from(CliErrorKind::session_not_active(format!(
+                    "permission_batch_stale: OpenRouter permission batch '{batch_id}' is not pending for session '{run_id}'"
+                ))));
+            }
+            snapshot_with_pending(entry)
+        };
+        self.emit(
+            &snapshot.session_id,
+            "openrouter_permission_batch_resolved",
+            json!({"run_id": snapshot.run_id, "batch_id": batch_id}),
+        );
+        Ok(snapshot)
+    }
+
+    /// Return whether the manager owns a session for the given run id. Used by
+    /// the shared permission resolve route to decide which manager handles a
+    /// batch.
+    #[must_use]
+    pub fn has_session(&self, run_id: &str) -> bool {
+        lock_sessions(&self.inner).contains_key(run_id)
+    }
+
+    /// Fetch the live per-key model catalog from `OpenRouter`'s `/models/user`
+    /// endpoint. Uses the daemon-state token first, falling back to env.
+    ///
+    /// # Errors
+    /// Returns an error if the API key is missing, transport fails, or the
+    /// response cannot be parsed.
+    pub async fn list_models(&self) -> Result<ModelListResponse, CliError> {
+        let config = OpenRouterAgentConfig::from_env_with_override(
+            state::task_board_openrouter_token(),
+        )
+        .map_err(|error| {
+            CliError::from(CliErrorKind::workflow_parse(format!(
+                "OpenRouter configuration error: {error}"
+            )))
+        })?;
+        let client = OpenRouterClient::new(
+            config.base_url,
+            config.api_key,
+            config.http_referer,
+            config.x_title,
+        )
+        .map_err(|error| {
+            CliError::from(CliErrorKind::workflow_parse(format!(
+                "OpenRouter client init failed: {error}"
+            )))
+        })?;
+        client
+            .list_models()
+            .await
+            .map_err(|error| CliError::from(CliErrorKind::workflow_parse(classify(error))))
     }
 
     /// List every `OpenRouter` session belonging to the given harness session.
@@ -278,7 +368,7 @@ impl OpenRouterAgentManagerHandle {
         let runs = sessions
             .values()
             .filter(|entry| entry.snapshot.session_id == harness_session)
-            .map(|entry| entry.snapshot.clone())
+            .map(snapshot_with_pending)
             .collect();
         OpenRouterRunListResponse { runs }
     }
@@ -419,11 +509,15 @@ fn resolve_project_dir(requested: Option<&str>) -> PathBuf {
     env::current_dir().unwrap_or_else(|_| PathBuf::from("."))
 }
 
-fn build_tool_client(harness_session: &str, project_dir: &Path) -> HarnessAcpClient {
+pub(super) fn snapshot_with_pending(entry: &SessionEntry) -> OpenRouterRunSnapshot {
+    let mut snapshot = entry.snapshot.clone();
+    snapshot.pending_permission_batches = entry.permissions.pending_batches();
+    snapshot
+}
+
+fn build_tool_client(project_dir: &Path, bridge: &PermissionBridgeHandle) -> HarnessAcpClient {
     let denied: BTreeSet<String> = managed_cluster_binaries();
-    let permission_mode = PermissionMode::Recording {
-        log_path: recording_log_path_for_session(harness_session),
-    };
+    let permission_mode = bridge.mode(PERMISSION_BRIDGE_DEADLINE);
     HarnessAcpClient::new(
         project_dir.to_path_buf(),
         project_dir.to_path_buf(),

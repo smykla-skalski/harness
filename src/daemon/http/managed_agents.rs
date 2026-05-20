@@ -61,6 +61,10 @@ pub(super) fn managed_agent_routes() -> Router<DaemonHttpState> {
             post(openrouter::post_openrouter_cancel),
         )
         .route(
+            http_paths::MANAGED_AGENTS_OPENROUTER_MODELS,
+            get(openrouter::get_openrouter_models),
+        )
+        .route(
             http_paths::MANAGED_AGENT_DETAIL,
             get(reads::get_managed_agent),
         )

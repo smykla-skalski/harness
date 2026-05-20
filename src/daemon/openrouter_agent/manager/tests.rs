@@ -8,7 +8,9 @@ use tokio::sync::broadcast;
 use crate::agents::acp::client::HarnessAcpClient;
 use crate::agents::acp::permission::PermissionMode;
 use crate::agents::openrouter::AgentConfig as OpenRouterAgentConfig;
+use crate::daemon::agent_acp::permission_bridge::PermissionBridgeHandle;
 use crate::daemon::protocol::StreamEvent;
+use crate::session::types::ManagedAgentKind;
 use crate::workspace::utc_now;
 
 use super::{
@@ -71,6 +73,13 @@ fn seed_entry(run_id: &str, harness_session: &str) -> SessionEntry {
             log_path: project_dir.join("permission-log.ndjson"),
         },
     ));
+    let (bridge_sender, _bridge_rx) = broadcast::channel::<StreamEvent>(4);
+    let permissions = PermissionBridgeHandle::spawn_with_kind(
+        run_id.to_owned(),
+        harness_session.to_owned(),
+        ManagedAgentKind::OpenRouter,
+        bridge_sender,
+    );
     // The TempDir guard would clean up the project directory as soon as this
     // helper returns. The integration tests below only inspect snapshot
     // state, so we intentionally leak the guard to keep paths valid for the
@@ -89,6 +98,7 @@ fn seed_entry(run_id: &str, harness_session: &str) -> SessionEntry {
             final_message: None,
             error: None,
             turn_count: 0,
+            pending_permission_batches: Vec::new(),
             created_at: now.clone(),
             updated_at: now,
         },
@@ -105,5 +115,6 @@ fn seed_entry(run_id: &str, harness_session: &str) -> SessionEntry {
         reasoning_effort: None,
         project_dir,
         tool_client,
+        permissions,
     }
 }
