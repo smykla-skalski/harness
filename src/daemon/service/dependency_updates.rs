@@ -9,6 +9,7 @@ use crate::dependency_updates::{
     DependencyUpdatesAutoRequest, DependencyUpdatesCacheClearResponse,
     DependencyUpdatesGitHubClient, DependencyUpdatesLabelRequest,
     DependencyUpdatesMergeRequest, DependencyUpdatesQueryRequest, DependencyUpdatesQueryResponse,
+    DependencyUpdatesRepositoryCatalogRequest, DependencyUpdatesRepositoryCatalogResponse,
     DependencyUpdatesRerunChecksRequest,
 };
 use crate::errors::{CliError, CliErrorKind};
@@ -69,6 +70,22 @@ pub async fn query_dependency_updates(
     let response = DependencyUpdatesQueryResponse::new(items, utc_now());
     store_cached_query_response(cache_key, &response);
     Ok(response)
+}
+
+pub async fn catalog_dependency_update_repositories(
+    request: &DependencyUpdatesRepositoryCatalogRequest,
+) -> Result<DependencyUpdatesRepositoryCatalogResponse, CliError> {
+    request.validate()?;
+    let organization = request.normalized_organization();
+    let token = github_token(None).ok_or_else(|| missing_token_error(None))?;
+    let client = DependencyUpdatesGitHubClient::new(&token)?;
+    let repositories = client
+        .catalog_organization_repositories(&organization)
+        .await?;
+    Ok(DependencyUpdatesRepositoryCatalogResponse {
+        organization,
+        repositories,
+    })
 }
 
 pub async fn approve_dependency_updates(

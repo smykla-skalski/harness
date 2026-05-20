@@ -9,6 +9,7 @@ public enum SettingsSection: String, CaseIterable, Identifiable, Hashable, Senda
   case voice
   case connection
   case taskBoard
+  case repositories
   case dependencies
   case secrets
   case policies
@@ -31,6 +32,7 @@ public enum SettingsSection: String, CaseIterable, Identifiable, Hashable, Senda
     case .voice: "Voice"
     case .connection: "Connection"
     case .taskBoard: "Task Board"
+    case .repositories: "Repositories"
     case .dependencies: "Dependencies"
     case .secrets: "Secrets"
     case .policies: "Policies"
@@ -60,6 +62,7 @@ public enum SettingsSection: String, CaseIterable, Identifiable, Hashable, Senda
     case .voice: "mic"
     case .connection: "bolt.horizontal.circle"
     case .taskBoard: "list.bullet.rectangle"
+    case .repositories: "shippingbox.circle"
     case .dependencies: "shippingbox"
     case .secrets: "key"
     case .policies: "point.3.connected.trianglepath.dotted"

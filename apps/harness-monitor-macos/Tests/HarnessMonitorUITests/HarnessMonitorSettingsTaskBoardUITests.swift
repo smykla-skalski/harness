@@ -13,6 +13,10 @@ final class HarnessMonitorSettingsTaskBoardUITests: HarnessMonitorUITestCase {
     let saveButton = element(in: app, identifier: Accessibility.settingsTaskBoardSaveButton)
     let reloadButton = element(in: app, identifier: Accessibility.settingsTaskBoardReloadButton)
     let ownerField = element(in: app, identifier: Accessibility.settingsTaskBoardOwnerField)
+    let repositoriesButton = element(
+      in: app,
+      identifier: Accessibility.settingsTaskBoardRepositoriesButton
+    )
     let todoistTokenField = element(
       in: app,
       identifier: Accessibility.settingsTaskBoardTodoistTokenField
@@ -29,15 +33,38 @@ final class HarnessMonitorSettingsTaskBoardUITests: HarnessMonitorUITestCase {
       ownerField.waitForExistence(timeout: Self.actionTimeout),
       "Task Board settings should load editable fields"
     )
+    XCTAssertTrue(
+      repositoriesButton.exists,
+      "Task Board settings should link monitored repositories to the shared Repositories section"
+    )
     XCTAssertFalse(
       todoistTokenField.exists,
       "Task Board settings should keep shared secrets in the dedicated Secrets section"
+    )
+    XCTAssertFalse(
+      element(in: app, identifier: Accessibility.settingsTaskBoardInboxRepositoriesField).exists,
+      "Task Board settings should not edit inbox repositories inline anymore"
     )
     XCTAssertFalse(
       todoistProjectField.exists,
       "Task Board settings should hide Todoist inbox controls while the integration is disabled"
     )
     XCTAssertFalse(status.exists, "Task Board preview should not settle on a status error")
+  }
+
+  func testRepositoriesSectionAppearsInSettings() throws {
+    let app = launch(mode: "preview")
+
+    openSettings(in: app)
+    selectRepositoriesSection(in: app)
+
+    let saveButton = element(in: app, identifier: Accessibility.settingsRepositoriesSaveButton)
+    let reloadButton = element(in: app, identifier: Accessibility.settingsRepositoriesReloadButton)
+    let root = element(in: app, identifier: Accessibility.settingsRepositoriesRoot)
+
+    XCTAssertTrue(saveButton.waitForExistence(timeout: Self.actionTimeout))
+    XCTAssertTrue(reloadButton.exists)
+    XCTAssertTrue(root.exists)
   }
 }
 
@@ -52,6 +79,10 @@ final class HarnessMonitorSettingsDependenciesAndSecretsUITests: HarnessMonitorU
     let saveButton = element(in: app, identifier: Accessibility.settingsDependenciesSaveButton)
     let reloadButton = element(in: app, identifier: Accessibility.settingsDependenciesReloadButton)
     let authorsField = element(in: app, identifier: Accessibility.settingsDependenciesAuthorsField)
+    let repositoriesButton = element(
+      in: app,
+      identifier: Accessibility.settingsDependenciesRepositoriesButton
+    )
     let mergeMethodField = element(
       in: app,
       identifier: Accessibility.settingsDependenciesMergeMethodField
@@ -60,7 +91,12 @@ final class HarnessMonitorSettingsDependenciesAndSecretsUITests: HarnessMonitorU
     XCTAssertTrue(saveButton.waitForExistence(timeout: Self.actionTimeout))
     XCTAssertTrue(reloadButton.waitForExistence(timeout: Self.actionTimeout))
     XCTAssertTrue(authorsField.waitForExistence(timeout: Self.actionTimeout))
+    XCTAssertTrue(repositoriesButton.exists)
     XCTAssertTrue(mergeMethodField.exists)
+    XCTAssertFalse(
+      element(in: app, identifier: Accessibility.settingsDependenciesRepositoriesField).exists,
+      "Dependencies settings should not edit repository scope inline anymore"
+    )
   }
 
   func testSecretsSectionAppearsInSettings() throws {

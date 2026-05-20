@@ -2,12 +2,15 @@ import HarnessMonitorKit
 import SwiftUI
 
 struct SettingsDependenciesSection: View {
+  @Binding var navigationRequest: SettingsNavigationRequest?
   @AppStorage(DashboardDependenciesPreferences.storageKey)
   private var storedPreferences = ""
   @State private var draft = DashboardDependenciesPreferences()
   @State private var hasLoadedDraft = false
 
-  init() {}
+  init(navigationRequest: Binding<SettingsNavigationRequest?> = .constant(nil)) {
+    _navigationRequest = navigationRequest
+  }
 
   var body: some View {
     Form {
@@ -27,14 +30,9 @@ struct SettingsDependenciesSection: View {
 
   private var sourceScopeSection: some View {
     Section {
+      monitoredRepositoriesSummary
       TextField("Authors", text: $draft.authorsText)
         .accessibilityIdentifier(HarnessMonitorAccessibility.settingsDependenciesAuthorsField)
-      TextField("Organizations", text: $draft.organizationsText)
-        .accessibilityIdentifier(
-          HarnessMonitorAccessibility.settingsDependenciesOrganizationsField
-        )
-      TextField("Repositories", text: $draft.repositoriesText)
-        .accessibilityIdentifier(HarnessMonitorAccessibility.settingsDependenciesRepositoriesField)
       TextField("Excluded Repositories", text: $draft.excludeRepositoriesText)
         .accessibilityIdentifier(
           HarnessMonitorAccessibility.settingsDependenciesExcludedRepositoriesField
@@ -43,8 +41,45 @@ struct SettingsDependenciesSection: View {
       Text("Sources")
         .harnessNativeFormSectionHeader()
     } footer: {
-      Text("Separate multiple authors, organizations, or repositories with commas or new lines")
+      Text(
+        """
+        Configure shared monitored repositories in Settings > Repositories. Authors and \
+        excluded repositories remain Dependencies-specific.
+        """
+      )
     }
+  }
+
+  private var monitoredRepositoriesSummary: some View {
+    let repositories = draft.normalizedRepositories
+    let legacyOrganizations = draft.normalizedOrganizations
+    let repositoriesLabel = repositories.isEmpty
+      ? "No repositories enabled"
+      : "\(repositories.count) repositories enabled"
+    let organizationsLabel = legacyOrganizations.isEmpty
+      ? nil
+      : "\(legacyOrganizations.count) legacy organization sources still active"
+
+    return VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
+      Text("Monitored Repositories")
+        .font(.caption.weight(.semibold))
+        .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+      Text(repositoriesLabel)
+        .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+      if let organizationsLabel {
+        Text(organizationsLabel)
+          .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+      }
+      Button("Open Repositories") {
+        navigationRequest = SettingsNavigationRequest(target: .section(.repositories))
+      }
+      .harnessActionButtonStyle(variant: .bordered, tint: .secondary)
+      .fixedSize(horizontal: true, vertical: true)
+      .accessibilityIdentifier(
+        HarnessMonitorAccessibility.settingsDependenciesRepositoriesButton
+      )
+    }
+    .accessibilityIdentifier(HarnessMonitorAccessibility.settingsDependenciesRepositoriesSummary)
   }
 
   private var behaviorSection: some View {

@@ -1,6 +1,9 @@
 import Foundation
 
 public protocol HarnessMonitorDependenciesClientProtocol: Sendable {
+  func catalogDependencyUpdateRepositories(
+    request: DependencyUpdatesRepositoryCatalogRequest
+  ) async throws -> DependencyUpdatesRepositoryCatalogResponse
   func queryDependencyUpdates(
     request: DependencyUpdatesQueryRequest
   ) async throws -> DependencyUpdatesQueryResponse
@@ -23,6 +26,12 @@ public protocol HarnessMonitorDependenciesClientProtocol: Sendable {
 }
 
 extension HarnessMonitorDependenciesClientProtocol {
+  public func catalogDependencyUpdateRepositories(
+    request _: DependencyUpdatesRepositoryCatalogRequest
+  ) async throws -> DependencyUpdatesRepositoryCatalogResponse {
+    throw HarnessMonitorAPIError.server(code: 501, message: "Dependencies unavailable")
+  }
+
   public func queryDependencyUpdates(
     request _: DependencyUpdatesQueryRequest
   ) async throws -> DependencyUpdatesQueryResponse {

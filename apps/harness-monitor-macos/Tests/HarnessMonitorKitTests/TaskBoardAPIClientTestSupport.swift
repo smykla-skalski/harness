@@ -81,6 +81,8 @@ private let taskBoardRPCResponses: [WebSocketRPCMethod: JSONValue] = [
   .taskBoardPolicyPipelineSimulate: .object(samplePolicySimulationJSON),
   .taskBoardPolicyPipelinePromote: .object(samplePolicyPromotionJSON),
   .taskBoardPolicyPipelineAudit: .object(samplePolicyAuditJSON),
+  .dependencyUpdatesRepositoryCatalog:
+    fixtureJSONValue(sampleDependencyUpdatesRepositoryCatalogResponseText),
   .dependencyUpdatesQuery: fixtureJSONValue(sampleDependencyUpdatesQueryResponseText),
   .dependencyUpdatesApprove: fixtureJSONValue(sampleDependencyUpdatesApproveResponseText),
   .dependencyUpdatesMerge: fixtureJSONValue(sampleDependencyUpdatesMergeResponseText),
@@ -135,6 +137,7 @@ final class TaskBoardURLProtocol: URLProtocol, @unchecked Sendable {
     Route("/v1/task-board/policy/simulate"): samplePolicySimulationText,
     Route("/v1/task-board/policy/promote"): samplePolicyPromotionText,
     Route("/v1/task-board/policy/audit"): samplePolicyAuditText,
+    Route("/v1/dependency-updates/repositories"): sampleDependencyUpdatesRepositoryCatalogResponseText,
     Route("/v1/dependency-updates/query"): sampleDependencyUpdatesQueryResponseText,
     Route("/v1/dependency-updates/approve"): sampleDependencyUpdatesApproveResponseText,
     Route("/v1/dependency-updates/merge"): sampleDependencyUpdatesMergeResponseText,

@@ -43,6 +43,7 @@ extension HarnessMonitorAccessibility {
   public static let settingsVoiceSection = "harness.settings.section.voice"
   public static let settingsConnectionSection = "harness.settings.section.connection"
   public static let settingsTaskBoardSection = "harness.settings.section.taskboard"
+  public static let settingsRepositoriesSection = "harness.settings.section.repositories"
   public static let settingsDependenciesSection = "harness.settings.section.dependencies"
   public static let settingsSecretsSection = "harness.settings.section.secrets"
   public static let settingsDatabaseSection = "harness.settings.section.database"
@@ -121,10 +122,34 @@ extension HarnessMonitorAccessibility {
   public static let settingsTaskBoardStatus = "harness.settings.task-board.status"
   public static let settingsTaskBoardReloadButton = "harness.settings.task-board.reload"
   public static let settingsTaskBoardSaveButton = "harness.settings.task-board.save"
+  public static let settingsRepositoriesRoot = "harness.settings.repositories"
+  public static let settingsRepositoriesStatus = "harness.settings.repositories.status"
+  public static let settingsRepositoriesReloadButton = "harness.settings.repositories.reload"
+  public static let settingsRepositoriesSaveButton = "harness.settings.repositories.save"
+  public static let settingsRepositoriesOwnerField = "harness.settings.repositories.owner"
+  public static let settingsRepositoriesNameField = "harness.settings.repositories.name"
+  public static let settingsRepositoriesAddButton = "harness.settings.repositories.add"
+  public static let settingsRepositoriesOrganizationField =
+    "harness.settings.repositories.organization"
+  public static let settingsRepositoriesOrganizationLoadButton =
+    "harness.settings.repositories.organization.load"
+  public static let settingsRepositoriesCatalogStatus =
+    "harness.settings.repositories.catalog.status"
+  public static let settingsRepositoriesCatalogSearchField =
+    "harness.settings.repositories.catalog.search"
+  public static let settingsRepositoriesCatalogList = "harness.settings.repositories.catalog.list"
+  public static let settingsRepositoriesCatalogAddSelectedButton =
+    "harness.settings.repositories.catalog.add-selected"
+  public static let settingsRepositoriesCatalogAddAllButton =
+    "harness.settings.repositories.catalog.add-all"
   public static let settingsDependenciesRoot = "harness.settings.dependencies"
   public static let settingsDependenciesReloadButton = "harness.settings.dependencies.reload"
   public static let settingsDependenciesSaveButton = "harness.settings.dependencies.save"
   public static let settingsDependenciesAuthorsField = "harness.settings.dependencies.authors"
+  public static let settingsDependenciesRepositoriesSummary =
+    "harness.settings.dependencies.repositories.summary"
+  public static let settingsDependenciesRepositoriesButton =
+    "harness.settings.dependencies.repositories.open"
   public static let settingsDependenciesOrganizationsField =
     "harness.settings.dependencies.organizations"
   public static let settingsDependenciesRepositoriesField =
@@ -144,6 +169,10 @@ extension HarnessMonitorAccessibility {
   public static let settingsTaskBoardProjectDirField = "harness.settings.task-board.project-dir"
   public static let settingsTaskBoardOwnerField = "harness.settings.task-board.owner"
   public static let settingsTaskBoardRepoField = "harness.settings.task-board.repo"
+  public static let settingsTaskBoardRepositoriesSummary =
+    "harness.settings.task-board.repositories.summary"
+  public static let settingsTaskBoardRepositoriesButton =
+    "harness.settings.task-board.repositories.open"
   public static let settingsTaskBoardInboxRepositoriesField =
     "harness.settings.task-board.github-inbox.repositories"
   public static let settingsTaskBoardInboxLabelFilterField =
@@ -229,6 +258,30 @@ extension HarnessMonitorAccessibility {
 
   public static func settingsTBInboxRepoRow(_ index: Int) -> String {
     "harness.settings.task-board.github-inbox.repositories.\(index).row"
+  }
+
+  public static func settingsRepositoriesRow(_ index: Int) -> String {
+    "harness.settings.repositories.\(index).row"
+  }
+
+  public static func settingsRepositoriesDependenciesToggle(_ index: Int) -> String {
+    "harness.settings.repositories.\(index).dependencies"
+  }
+
+  public static func settingsRepositoriesTaskBoardToggle(_ index: Int) -> String {
+    "harness.settings.repositories.\(index).task-board"
+  }
+
+  public static func settingsRepositoriesRemoveButton(_ index: Int) -> String {
+    "harness.settings.repositories.\(index).remove"
+  }
+
+  public static func settingsRepositoriesLegacyImportButton(_ index: Int) -> String {
+    "harness.settings.repositories.legacy.\(index).import"
+  }
+
+  public static func settingsRepositoriesLegacyRemoveButton(_ index: Int) -> String {
+    "harness.settings.repositories.legacy.\(index).remove"
   }
 
   public static func settingsTBInboxRepoRemoveButton(_ index: Int) -> String {

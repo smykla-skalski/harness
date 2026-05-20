@@ -1,6 +1,13 @@
 import Foundation
 
 extension PreviewHarnessClient {
+  public func catalogDependencyUpdateRepositories(
+    request: DependencyUpdatesRepositoryCatalogRequest
+  ) async throws -> DependencyUpdatesRepositoryCatalogResponse {
+    try await performActionDelay()
+    return await state.catalogDependencyUpdateRepositories(request: request)
+  }
+
   public func queryDependencyUpdates(
     request: DependencyUpdatesQueryRequest
   ) async throws -> DependencyUpdatesQueryResponse {

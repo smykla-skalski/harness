@@ -116,6 +116,7 @@ enum WebSocketRPCMethod: String, CaseIterable, Equatable, Sendable {
   case taskBoardPolicyPipelineSimulate = "task_board.policy_pipeline_simulate"
   case taskBoardPolicyPipelinePromote = "task_board.policy_pipeline_promote"
   case taskBoardPolicyPipelineAudit = "task_board.policy_pipeline_audit"
+  case dependencyUpdatesRepositoryCatalog = "dependency_updates.repository_catalog"
   case dependencyUpdatesQuery = "dependency_updates.query"
   case dependencyUpdatesApprove = "dependency_updates.approve"
   case dependencyUpdatesMerge = "dependency_updates.merge"

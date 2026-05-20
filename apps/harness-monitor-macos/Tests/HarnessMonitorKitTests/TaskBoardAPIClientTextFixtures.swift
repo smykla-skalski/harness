@@ -342,6 +342,17 @@ let sampleDependencyUpdatesQueryResponseText =
   }
   """
 
+let sampleDependencyUpdatesRepositoryCatalogResponseText =
+  """
+  {
+    "organization": "example",
+    "repositories": [
+      "example/aff",
+      "example/harness"
+    ]
+  }
+  """
+
 let sampleDependencyUpdatesApproveResponseText =
   """
   {

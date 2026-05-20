@@ -340,6 +340,12 @@ fn dependency_update_routes_have_complete_ws_parity() {
         vec![
             (
                 HttpRouteMethod::Post,
+                http_paths::DEPENDENCY_UPDATES_REPOSITORIES,
+                ws_methods::DEPENDENCY_UPDATES_REPOSITORY_CATALOG,
+                true,
+            ),
+            (
+                HttpRouteMethod::Post,
                 http_paths::DEPENDENCY_UPDATES_QUERY,
                 ws_methods::DEPENDENCY_UPDATES_QUERY,
                 true,

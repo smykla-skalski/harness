@@ -40,6 +40,7 @@ extension HarnessMonitorUITestAccessibility {
   static let settingsVoiceSection = "harness.settings.section.voice"
   static let settingsConnectionSection = "harness.settings.section.connection"
   static let settingsTaskBoardSection = "harness.settings.section.taskboard"
+  static let settingsRepositoriesSection = "harness.settings.section.repositories"
   static let settingsDependenciesSection = "harness.settings.section.dependencies"
   static let settingsSecretsSection = "harness.settings.section.secrets"
   static let settingsDatabaseSection = "harness.settings.section.database"
@@ -48,6 +49,10 @@ extension HarnessMonitorUITestAccessibility {
   static let settingsDependenciesReloadButton = "harness.settings.dependencies.reload"
   static let settingsDependenciesSaveButton = "harness.settings.dependencies.save"
   static let settingsDependenciesAuthorsField = "harness.settings.dependencies.authors"
+  static let settingsDependenciesRepositoriesSummary =
+    "harness.settings.dependencies.repositories.summary"
+  static let settingsDependenciesRepositoriesButton =
+    "harness.settings.dependencies.repositories.open"
   static let settingsDependenciesOrganizationsField = "harness.settings.dependencies.organizations"
   static let settingsDependenciesRepositoriesField = "harness.settings.dependencies.repositories"
   static let settingsDependenciesExcludedRepositoriesField =
@@ -64,8 +69,15 @@ extension HarnessMonitorUITestAccessibility {
   static let settingsTaskBoardStatus = "harness.settings.task-board.status"
   static let settingsTaskBoardReloadButton = "harness.settings.task-board.reload"
   static let settingsTaskBoardSaveButton = "harness.settings.task-board.save"
+  static let settingsRepositoriesRoot = "harness.settings.repositories"
+  static let settingsRepositoriesReloadButton = "harness.settings.repositories.reload"
+  static let settingsRepositoriesSaveButton = "harness.settings.repositories.save"
   static let settingsTaskBoardOwnerField = "harness.settings.task-board.owner"
   static let settingsTaskBoardRepoField = "harness.settings.task-board.repo"
+  static let settingsTaskBoardRepositoriesSummary =
+    "harness.settings.task-board.repositories.summary"
+  static let settingsTaskBoardRepositoriesButton =
+    "harness.settings.task-board.repositories.open"
   static let settingsTaskBoardInboxRepositoriesField =
     "harness.settings.task-board.github-inbox.repositories"
   static let settingsTaskBoardInboxLabelFilterField =

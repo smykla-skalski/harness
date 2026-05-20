@@ -1,6 +1,27 @@
 import Foundation
 
 extension PreviewHarnessClientState {
+  func catalogDependencyUpdateRepositories(
+    request: DependencyUpdatesRepositoryCatalogRequest
+  ) -> DependencyUpdatesRepositoryCatalogResponse {
+    let organization = request.organization.trimmingCharacters(in: .whitespacesAndNewlines)
+      .lowercased()
+    let knownRepositories =
+      dependencyUpdateItems.map(\.repository)
+      + taskBoardOrchestratorSettings.githubInbox.repositories
+    let repositories = Array(
+      Set(
+        knownRepositories.filter { repository in
+          repository.split(separator: "/", maxSplits: 1).first?.lowercased() == organization
+        }
+      )
+    ).sorted { $0.localizedStandardCompare($1) == .orderedAscending }
+    return DependencyUpdatesRepositoryCatalogResponse(
+      organization: organization,
+      repositories: repositories
+    )
+  }
+
   func currentDependencyUpdates(
     request: DependencyUpdatesQueryRequest
   ) -> DependencyUpdatesQueryResponse {

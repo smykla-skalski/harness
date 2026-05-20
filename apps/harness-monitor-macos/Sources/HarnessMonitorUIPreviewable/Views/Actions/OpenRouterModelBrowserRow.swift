@@ -7,7 +7,7 @@ struct OpenRouterModelBrowserRow: View, Equatable {
   let onTogglePin: () -> Void
   let onSelect: () -> Void
 
-  static func == (lhs: Self, rhs: Self) -> Bool {
+  nonisolated static func == (lhs: Self, rhs: Self) -> Bool {
     lhs.isPinned == rhs.isPinned
       && lhs.model.id == rhs.model.id
       && lhs.model.name == rhs.model.name
@@ -53,7 +53,7 @@ struct OpenRouterBrowserProviderChip: View, Equatable {
   let isSelected: Bool
   let action: () -> Void
 
-  static func == (lhs: Self, rhs: Self) -> Bool {
+  nonisolated static func == (lhs: Self, rhs: Self) -> Bool {
     lhs.isSelected == rhs.isSelected && lhs.label == rhs.label
   }
 

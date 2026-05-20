@@ -70,8 +70,14 @@ public struct SettingsView: View {
             navigationRequest: $navigationRequest
           )
           .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        case .repositories:
+          SettingsRepositoriesSection(
+            store: store,
+            formState: $taskBoardFormState
+          )
+          .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         case .dependencies:
-          SettingsDependenciesSection()
+          SettingsDependenciesSection(navigationRequest: $navigationRequest)
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         case .secrets:
           SettingsSecretsSection(

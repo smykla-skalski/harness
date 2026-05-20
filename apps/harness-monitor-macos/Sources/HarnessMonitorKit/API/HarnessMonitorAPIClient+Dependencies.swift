@@ -1,6 +1,12 @@
 import Foundation
 
 extension HarnessMonitorAPIClient {
+  public func catalogDependencyUpdateRepositories(
+    request: DependencyUpdatesRepositoryCatalogRequest
+  ) async throws -> DependencyUpdatesRepositoryCatalogResponse {
+    try await post("/v1/dependency-updates/repositories", body: request)
+  }
+
   public func queryDependencyUpdates(
     request: DependencyUpdatesQueryRequest
   ) async throws -> DependencyUpdatesQueryResponse {

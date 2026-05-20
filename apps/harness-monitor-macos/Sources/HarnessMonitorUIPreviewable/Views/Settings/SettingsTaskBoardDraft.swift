@@ -339,49 +339,22 @@ struct TaskBoardGitSettingsDraft: Equatable {
   }
 
   private var normalizedGitHubInboxRepositoryInput: String? {
-    normalizedRepository(
+    SettingsGitHubRepositoryNormalization.repository(
       owner: githubInboxRepositoryOwnerInput,
       repo: githubInboxRepositoryNameInput
     )
   }
 
   private func normalizedRepositories(from value: String) -> [String] {
-    var repositories: [String] = []
-    var seen: Set<String> = []
-    for entry in value.split(whereSeparator: \.isNewline) {
-      guard let repository = normalizedRepositoryEntry(String(entry)) else {
-        continue
-      }
-      let key = repository.lowercased()
-      if seen.insert(key).inserted {
-        repositories.append(repository)
-      }
-    }
-    return repositories
+    SettingsGitHubRepositoryNormalization.repositories(from: value)
   }
 
   private func normalizedRepositoryEntry(_ value: String) -> String? {
-    let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
-    guard !trimmed.isEmpty else {
-      return nil
-    }
-    let parts = trimmed.split(separator: "/", maxSplits: 2, omittingEmptySubsequences: false)
-    guard parts.count == 2 else {
-      return trimmed
-    }
-    let owner = parts[0].trimmingCharacters(in: .whitespacesAndNewlines)
-    let repo = parts[1].trimmingCharacters(in: .whitespacesAndNewlines)
-    guard let repository = normalizedRepository(owner: owner, repo: repo) else {
-      return trimmed
-    }
-    return repository
+    SettingsGitHubRepositoryNormalization.repositoryEntry(value)
   }
 
   private func normalizedRepository(owner: String, repo: String) -> String? {
-    guard let owner = normalized(owner), let repo = normalized(repo), !repo.contains("/") else {
-      return nil
-    }
-    return "\(owner.lowercased())/\(repo.lowercased())"
+    SettingsGitHubRepositoryNormalization.repository(owner: owner, repo: repo)
   }
 
   private func appendingUnique(

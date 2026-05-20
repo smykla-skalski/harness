@@ -74,6 +74,7 @@ pub const TASK_BOARD_POLICY_PIPELINE: &str = "/v1/task-board/policy/pipeline";
 pub const TASK_BOARD_POLICY_SIMULATE: &str = "/v1/task-board/policy/simulate";
 pub const TASK_BOARD_POLICY_PROMOTE: &str = "/v1/task-board/policy/promote";
 pub const TASK_BOARD_POLICY_AUDIT: &str = "/v1/task-board/policy/audit";
+pub const DEPENDENCY_UPDATES_REPOSITORIES: &str = "/v1/dependency-updates/repositories";
 pub const DEPENDENCY_UPDATES_QUERY: &str = "/v1/dependency-updates/query";
 pub const DEPENDENCY_UPDATES_APPROVE: &str = "/v1/dependency-updates/approve";
 pub const DEPENDENCY_UPDATES_MERGE: &str = "/v1/dependency-updates/merge";

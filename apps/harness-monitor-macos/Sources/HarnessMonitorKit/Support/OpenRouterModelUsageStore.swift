@@ -7,8 +7,8 @@ public struct OpenRouterModelUsageSnapshot: Equatable, Sendable {
   public let recents: [String]
   public let frequencies: [String: Int]
   private let pinnedLookup: Set<String>
-  let cachedRecentsExcludingPinned: [String]
-  let cachedFrequentExcludingPinnedAndRecents: [String]
+  public let cachedRecentsExcludingPinned: [String]
+  public let cachedFrequentExcludingPinnedAndRecents: [String]
 
   public init(
     pinned: [String] = [],
@@ -169,7 +169,7 @@ public final class OpenRouterModelUsageStore: @unchecked Sendable {
     lock.lock()
     cachedPayload = Payload()
     lock.unlock()
-    Self.persistQueue.async { [defaults, key] in
+    Self.persistQueue.async { [self] in
       defaults.removeObject(forKey: key)
     }
   }
@@ -208,7 +208,7 @@ public final class OpenRouterModelUsageStore: @unchecked Sendable {
     cachedPayload = payload
     let payloadCopy = payload
     lock.unlock()
-    Self.persistQueue.async { [defaults, key] in
+    Self.persistQueue.async { [self] in
       if let encoded = try? Self.encoder.encode(payloadCopy) {
         defaults.set(encoded, forKey: key)
       }

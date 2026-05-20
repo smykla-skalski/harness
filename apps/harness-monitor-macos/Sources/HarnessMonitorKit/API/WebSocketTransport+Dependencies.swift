@@ -1,6 +1,14 @@
 import Foundation
 
 extension WebSocketTransport {
+  public func catalogDependencyUpdateRepositories(
+    request: DependencyUpdatesRepositoryCatalogRequest
+  ) async throws -> DependencyUpdatesRepositoryCatalogResponse {
+    let params = try encodeParams(request, extra: [:])
+    let value = try await rpc(method: .dependencyUpdatesRepositoryCatalog, params: params)
+    return try decode(value)
+  }
+
   public func queryDependencyUpdates(
     request: DependencyUpdatesQueryRequest
   ) async throws -> DependencyUpdatesQueryResponse {
