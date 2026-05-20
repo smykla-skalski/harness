@@ -7,9 +7,9 @@ use super::super::{
     DaemonRuntimeConfig, config_path, drain_task_board_git_runtime_secrets,
     load_persisted_log_level, load_runtime_config, load_task_board_git_runtime_config,
     persist_log_level, persist_task_board_git_runtime_config, read_recent_events,
-    replace_task_board_github_tokens, replace_task_board_openrouter_token,
-    replace_task_board_todoist_token, task_board_github_token, task_board_openrouter_token,
-    task_board_todoist_token,
+    replace_task_board_git_runtime_secrets, replace_task_board_github_tokens,
+    replace_task_board_openrouter_token, replace_task_board_todoist_token,
+    task_board_github_token, task_board_openrouter_token, task_board_todoist_token,
 };
 use crate::task_board::{
     TaskBoardGitHubRepositoryToken, TaskBoardGitHubTokensSyncRequest, TaskBoardGitRuntimeConfig,
@@ -110,7 +110,11 @@ fn persist_log_level_replaces_malformed_runtime_config() {
 fn runtime_config_round_trips_task_board_git_runtime_config() {
     let tmp = tempdir().expect("tempdir");
     with_isolated_harness_env(tmp.path(), || {
-        persist_task_board_git_runtime_config(&TaskBoardGitRuntimeConfig {
+        // Mirror the production flow: persist the non-secret view to disk and
+        // keep the secret material process-local. The `*_configured` flags on
+        // the load path are derived from the in-memory secret state, never
+        // from disk, so the test seeds both sides.
+        let runtime = TaskBoardGitRuntimeConfig {
             global: TaskBoardGitRuntimeProfile {
                 author_name: Some("Harness Bot".into()),
                 author_email: Some("bot@example.com".into()),
@@ -131,8 +135,10 @@ fn runtime_config_round_trips_task_board_git_runtime_config() {
                 ..Default::default()
             },
             repository_overrides: vec![],
-        })
-        .expect("persist task-board runtime config");
+        };
+
+        persist_task_board_git_runtime_config(&runtime).expect("persist task-board runtime config");
+        replace_task_board_git_runtime_secrets(&runtime);
 
         assert_eq!(
             load_task_board_git_runtime_config().expect("load task-board runtime config"),
@@ -163,6 +169,19 @@ fn runtime_config_round_trips_task_board_git_runtime_config() {
                 repository_overrides: vec![],
             }
         );
+
+        // The on-disk view must contain neither secret material nor the
+        // wire-only `*_configured` indicators. The privacy contract is that
+        // both never reach disk.
+        let raw = fs::read_to_string(config_path()).expect("read raw config");
+        assert!(!raw.contains("ssh-secret"));
+        assert!(!raw.contains("ssh-passphrase"));
+        assert!(!raw.contains("signing-ssh-secret"));
+        assert!(!raw.contains("signing-ssh-passphrase"));
+        assert!(!raw.contains("gpg-secret"));
+        assert!(!raw.contains("\"ssh_private_key\""));
+        assert!(!raw.contains("\"gpg_private_key\""));
+        assert!(!raw.contains("_configured"));
     });
 }
 

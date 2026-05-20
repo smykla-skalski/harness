@@ -41,6 +41,24 @@ impl TaskBoardGitRuntimeConfig {
                 .collect(),
         }
     }
+
+    /// Strip both secret values and the wire-only `*_configured` indicators.
+    ///
+    /// Use this for disk persistence: the configured booleans are derived from
+    /// the in-memory secret state at response time, so persisting them would
+    /// leak metadata about secret presence onto disk and risk reporting stale
+    /// "configured" state after a secret has been removed from RAM.
+    #[must_use]
+    pub fn without_secret_metadata(&self) -> Self {
+        Self {
+            global: self.global.without_secret_metadata(),
+            repository_overrides: self
+                .repository_overrides
+                .iter()
+                .map(TaskBoardGitRepositoryOverride::without_secret_metadata)
+                .collect(),
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
@@ -133,6 +151,22 @@ impl TaskBoardGitRuntimeProfile {
             ssh_private_key_passphrase_configured: self.ssh_private_key_passphrase.is_some()
                 || self.ssh_private_key_passphrase_configured,
             signing: self.signing.without_secrets(),
+        }
+    }
+
+    /// Strip both secret values and the wire-only `*_configured` indicators.
+    /// See [`TaskBoardGitRuntimeConfig::without_secret_metadata`] for rationale.
+    #[must_use]
+    pub fn without_secret_metadata(&self) -> Self {
+        Self {
+            author_name: self.author_name.clone(),
+            author_email: self.author_email.clone(),
+            ssh_key_path: self.ssh_key_path.clone(),
+            ssh_private_key: None,
+            ssh_private_key_passphrase: None,
+            ssh_private_key_configured: false,
+            ssh_private_key_passphrase_configured: false,
+            signing: self.signing.without_secret_metadata(),
         }
     }
 }
@@ -230,6 +264,26 @@ impl TaskBoardGitSigningConfig {
                 || self.gpg_private_key_passphrase_configured,
         }
     }
+
+    /// Strip both secret values and the wire-only `*_configured` indicators.
+    /// See [`TaskBoardGitRuntimeConfig::without_secret_metadata`] for rationale.
+    #[must_use]
+    pub fn without_secret_metadata(&self) -> Self {
+        Self {
+            mode: self.mode,
+            ssh_key_path: self.ssh_key_path.clone(),
+            ssh_private_key: None,
+            ssh_private_key_passphrase: None,
+            gpg_key_id: self.gpg_key_id.clone(),
+            gpg_private_key_path: self.gpg_private_key_path.clone(),
+            gpg_private_key: None,
+            gpg_private_key_passphrase: None,
+            ssh_private_key_configured: false,
+            ssh_private_key_passphrase_configured: false,
+            gpg_private_key_configured: false,
+            gpg_private_key_passphrase_configured: false,
+        }
+    }
 }
 
 #[allow(clippy::trivially_copy_pass_by_ref)]
@@ -268,6 +322,16 @@ impl TaskBoardGitRepositoryOverride {
         Self {
             repository: self.repository.clone(),
             profile: self.profile.without_secrets(),
+        }
+    }
+
+    /// Strip both secret values and the wire-only `*_configured` indicators.
+    /// See [`TaskBoardGitRuntimeConfig::without_secret_metadata`] for rationale.
+    #[must_use]
+    pub fn without_secret_metadata(&self) -> Self {
+        Self {
+            repository: self.repository.clone(),
+            profile: self.profile.without_secret_metadata(),
         }
     }
 }
