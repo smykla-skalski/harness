@@ -400,16 +400,25 @@ struct SessionWindowRouteContentMetricsTests {
       domain: "Dashboard",
       named: "DashboardWindowSupport.swift"
     )
+    let overviewHostSource = try taskBoardSourceFile(named: "TaskBoardOverviewHost.swift")
     let overviewSource = try taskBoardSourceFile(named: "TaskBoardOverviewView.swift")
     let overviewSupportSource = try taskBoardSourceFile(named: "TaskBoardOverviewSupport.swift")
     let laneSupportSource = try taskBoardSourceFile(named: "TaskBoardLaneSupport.swift")
 
-    #expect(!dashboardSource.contains("ViewThatFits(in: .vertical)"))
     #expect(dashboardSource.contains("dashboardExpandedContent"))
-    #expect(dashboardSource.contains("dashboardScrollingContent("))
-    #expect(overviewSource.contains(".frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)"))
-    #expect(overviewSource.contains(".layoutPriority(1)"))
-    #expect(overviewSupportSource.contains("let height = max(measuredHeight, proposal.height ?? 0)"))
+    #expect(dashboardSource.contains("GeometryReader { proxy in"))
+    #expect(dashboardSource.contains("ScrollView(.vertical)"))
+    #expect(dashboardSource.contains("TaskBoardDashboardViewportLayout"))
+    #expect(dashboardSource.contains(".scrollBounceBehavior(.basedOnSize)"))
+    #expect(overviewHostSource.contains("fillsAvailableHeight: scope.fillsAvailableHeight"))
+    #expect(overviewSource.contains("fillsAvailableHeight ? .infinity : nil"))
+    #expect(overviewSupportSource.contains("struct TaskBoardDashboardViewportLayout: Layout"))
+    #expect(overviewSupportSource.contains("max(intrinsic.height, max(viewportHeight, 0))"))
+    #expect(!overviewSupportSource.contains("TaskBoardFillLastLayout"))
+    #expect(!overviewSupportSource.contains("usesProposedHeightForMeasurement"))
+    let stripHeightExpression = "let height = max(measuredHeight, proposal.height ?? 0)"
+    #expect(overviewSupportSource.contains(stripHeightExpression))
+    #expect(laneSupportSource.contains("idealHeight: metrics.laneFixedHeight"))
     #expect(laneSupportSource.contains("minHeight: metrics.laneFixedHeight"))
     #expect(laneSupportSource.contains("maxHeight: .infinity"))
   }

@@ -369,12 +369,19 @@ struct DashboardTaskBoardRouteView: View {
   }
 
   private var dashboardExpandedContent: some View {
-    taskBoardOverviewContent
-      .padding(.vertical, 24)
-      .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+    GeometryReader { proxy in
+      ScrollView(.vertical) {
+        TaskBoardDashboardViewportLayout(viewportHeight: proxy.size.height) {
+          taskBoardOverviewContent
+            .padding(.vertical, 24)
+        }
+        .frame(maxWidth: .infinity, alignment: .topLeading)
+      }
+      .scrollBounceBehavior(.basedOnSize)
       .accessibilityElement(children: .contain)
       .accessibilityIdentifier(HarnessMonitorAccessibility.dashboardScrollView)
       .accessibilityLabel("Dashboard")
+    }
   }
 
   private func dashboardScrollingContent(

@@ -409,6 +409,7 @@ private struct TaskBoardLaneColumnChrome: ViewModifier {
         minWidth: metrics.laneWidth,
         maxWidth: .infinity,
         minHeight: metrics.laneFixedHeight,
+        idealHeight: metrics.laneFixedHeight,
         maxHeight: .infinity,
         alignment: .topLeading
       )

@@ -45,6 +45,7 @@ struct TaskBoardOverviewHost: View {
       evaluationSummary: evaluationSummary,
       taskBoardSessionID: scope.sessionID,
       contentHorizontalPadding: scope.taskBoardContentHorizontalPadding,
+      fillsAvailableHeight: scope.fillsAvailableHeight,
       decisions: decisions,
       isActionInFlight: isActionInFlight,
       onOpenItem: openInboxItem,
@@ -248,6 +249,15 @@ extension TaskBoardOverviewHost.Scope {
       24
     case .session:
       0
+    }
+  }
+
+  fileprivate var fillsAvailableHeight: Bool {
+    switch self {
+    case .dashboard:
+      true
+    case .session:
+      false
     }
   }
 }

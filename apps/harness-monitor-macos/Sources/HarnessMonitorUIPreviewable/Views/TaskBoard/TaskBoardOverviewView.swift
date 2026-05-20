@@ -9,6 +9,7 @@ public struct TaskBoardOverviewView: View {
   let evaluationSummary: TaskBoardEvaluationSummary?
   let taskBoardSessionID: String?
   let contentHorizontalPadding: CGFloat
+  let fillsAvailableHeight: Bool
   let decisions: [Decision]
   private let decisionsByID: [String: Decision]
   private let decisionItems: [DecisionPresentationItem]
@@ -88,6 +89,7 @@ public struct TaskBoardOverviewView: View {
     evaluationSummary: TaskBoardEvaluationSummary? = nil,
     taskBoardSessionID: String? = nil,
     contentHorizontalPadding: CGFloat = 24,
+    fillsAvailableHeight: Bool = false,
     decisions: [Decision] = [],
     isActionInFlight: Bool = false,
     onOpenItem: @escaping (TaskBoardInboxItem) -> Void = { _ in },
@@ -117,6 +119,7 @@ public struct TaskBoardOverviewView: View {
     self.evaluationSummary = evaluationSummary
     self.taskBoardSessionID = taskBoardSessionID
     self.contentHorizontalPadding = contentHorizontalPadding
+    self.fillsAvailableHeight = fillsAvailableHeight
     self.decisions = decisions
     self.decisionsByID =
       decisionsByID ?? Dictionary(uniqueKeysWithValues: decisions.map { ($0.id, $0) })
@@ -145,9 +148,13 @@ public struct TaskBoardOverviewView: View {
     VStack(alignment: .leading, spacing: HarnessMonitorTheme.sectionSpacing) {
       boardChrome
       taskBoardDetailRow { boardSection }
-        .layoutPriority(1)
+        .frame(maxHeight: fillsAvailableHeight ? .infinity : nil)
     }
-    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+    .frame(
+      maxWidth: .infinity,
+      maxHeight: fillsAvailableHeight ? .infinity : nil,
+      alignment: fillsAvailableHeight ? .topLeading : .leading
+    )
     .accessibilityElement(children: .contain)
     .accessibilityIdentifier("harness.task-board.overview")
     .sheet(item: taskBoardManagementSheet) { taskBoardManagementSheet in
@@ -314,8 +321,9 @@ extension TaskBoardOverviewView {
         boardAccessoryRow
       }
       boardContent
+        .frame(maxHeight: fillsAvailableHeight ? .infinity : nil)
     }
-    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+    .frame(maxHeight: fillsAvailableHeight ? .infinity : nil)
   }
 
   @ViewBuilder private var boardContent: some View {
@@ -331,20 +339,16 @@ extension TaskBoardOverviewView {
       TaskBoardLaneStripLayout(sizing: laneStripSizing) {
         taskBoardLaneColumns
       }
-      .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
       .padding(.vertical, metrics.boardVerticalPadding)
 
       ScrollView(.horizontal, showsIndicators: true) {
         TaskBoardLaneStripLayout(sizing: laneStripSizing) {
           taskBoardLaneColumns
         }
-        .frame(maxHeight: .infinity, alignment: .topLeading)
         .padding(.vertical, metrics.boardVerticalPadding)
       }
-      .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
       .scrollClipDisabled()
     }
-    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
   }
 
   @ViewBuilder private var taskBoardLaneColumns: some View {
