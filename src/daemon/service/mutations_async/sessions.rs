@@ -1,11 +1,12 @@
 use super::super::{
-    CliError, LeaderTransferRequest, SessionDetail, SessionEndRequest,
+    CliError, CliErrorKind, LeaderTransferRequest, SessionDetail, SessionEndRequest,
     append_transfer_logs_to_async_db, db::AsyncDaemonDb, effective_project_dir,
     session_detail_from_async_daemon_db, session_service, sync_file_state_from_async_db, utc_now,
 };
 use super::{bump_session, persist_leave_signal_mutation, resolved_session_for_mutation};
 use crate::daemon::protocol::{SessionArchiveRequest, SessionArchiveResponse};
 use crate::session::storage as session_storage;
+use tokio::task::spawn_blocking;
 
 /// Transfer session leadership through the canonical async daemon DB.
 ///
@@ -56,7 +57,8 @@ pub(crate) async fn end_session_async(
         })
         .await?;
     sync_file_state_from_async_db(async_db, session_id).await?;
-    session_service::write_prepared_leave_signals(&project_dir, &leave_signals, "end session")?;
+    write_prepared_leave_signals_async(project_dir.clone(), leave_signals.clone(), "end session")
+        .await?;
     let resolved = resolved_session_for_mutation(async_db, session_id).await?;
     persist_leave_signal_mutation(
         async_db,
@@ -89,8 +91,7 @@ pub(crate) async fn archive_session_async(
             Ok((archived_at, state.clone()))
         })
         .await?;
-    let layout = session_storage::layout_from_project_dir(&project_dir, session_id)?;
-    session_storage::save_state(&layout, &state)?;
+    save_archived_file_state_async(project_dir, session_id.to_string(), state).await?;
     super::append_log(
         async_db,
         session_id,
@@ -102,5 +103,40 @@ pub(crate) async fn archive_session_async(
     Ok(SessionArchiveResponse {
         session_id: session_id.to_string(),
         archived_at,
+    })
+}
+
+async fn write_prepared_leave_signals_async(
+    project_dir: std::path::PathBuf,
+    leave_signals: Vec<session_service::LeaveSignalRecord>,
+    operation: &'static str,
+) -> Result<(), CliError> {
+    spawn_blocking(move || {
+        session_service::write_prepared_leave_signals(&project_dir, &leave_signals, operation)
+    })
+    .await
+    .unwrap_or_else(|error| {
+        Err(
+            CliErrorKind::workflow_io(format!("{operation} leave-signal worker failed: {error}"))
+                .into(),
+        )
+    })
+}
+
+async fn save_archived_file_state_async(
+    project_dir: std::path::PathBuf,
+    session_id: String,
+    state: crate::session::types::SessionState,
+) -> Result<(), CliError> {
+    spawn_blocking(move || {
+        let layout = session_storage::layout_from_project_dir(&project_dir, &session_id)?;
+        session_storage::save_state(&layout, &state)
+    })
+    .await
+    .unwrap_or_else(|error| {
+        Err(CliErrorKind::workflow_io(format!(
+            "archive session file mirror worker failed: {error}"
+        ))
+        .into())
     })
 }

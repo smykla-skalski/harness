@@ -1,17 +1,19 @@
 use crate::agents::runtime::signal::SignalAck;
 use crate::agents::runtime::{AgentRuntime, runtime_for_name};
 use crate::daemon::index::ResolvedSession;
+use tokio::task::spawn_blocking;
 use tokio::time::{Instant as TokioInstant, sleep};
 
 use super::signals::{
     build_active_signal_prompt, handled_active_signal_ack_wait_result,
     handled_active_signal_wake_result, wake_tui_for_signal, warn_active_signal_ack_record_failure,
 };
+use super::sync_support::{read_runtime_acknowledgments_async, sync_file_state_for_resolved_async};
 use super::wake_route::{WakeDispatch, WakeRoute, log_wake_attempt, wake_route_for_registration};
 use super::{
-    ACTIVE_SIGNAL_ACK_POLL_INTERVAL, ACTIVE_SIGNAL_ACK_TIMEOUT, CliError, ManagedTuiWake, Path,
-    SessionTransition, SignalAckRequest, SignalCoords, build_log_entry, effective_project_dir,
-    session_not_found, session_service, snapshot, sync_file_state_for_resolved,
+    ACTIVE_SIGNAL_ACK_POLL_INTERVAL, ACTIVE_SIGNAL_ACK_TIMEOUT, CliError, CliErrorKind,
+    ManagedTuiWake, Path, PathBuf, SessionTransition, SignalAckRequest, SignalCoords,
+    build_log_entry, effective_project_dir, session_not_found, session_service, snapshot,
     task_drop_effect_signal_records, write_task_start_signals,
 };
 use crate::daemon::agent_acp::AcpWakePrompt;
@@ -50,7 +52,16 @@ async fn refresh_signal_index_for_resolved(
     async_db: &super::db::AsyncDaemonDb,
     resolved: &ResolvedSession,
 ) -> Result<(), CliError> {
-    let signals = snapshot::load_signals_for(&resolved.project, &resolved.state)?;
+    let project = resolved.project.clone();
+    let state = resolved.state.clone();
+    let signals = spawn_blocking(move || snapshot::load_signals_for(&project, &state))
+        .await
+        .unwrap_or_else(|error| {
+            Err(
+                CliErrorKind::workflow_io(format!("signal index refresh worker failed: {error}"))
+                    .into(),
+            )
+        })?;
     async_db
         .sync_signal_index(&resolved.state.session_id, &signals)
         .await
@@ -112,17 +123,22 @@ async fn append_leave_signal_logs_async(
 }
 
 async fn wait_for_task_start_ack_async(
-    runtime: &dyn AgentRuntime,
+    runtime: &'static dyn AgentRuntime,
     project_dir: &Path,
     signal_session_id: &str,
     signal_id: &str,
 ) -> Result<Option<SignalAck>, CliError> {
     let deadline = TokioInstant::now() + ACTIVE_SIGNAL_ACK_TIMEOUT;
     loop {
-        if let Some(ack) = runtime
-            .read_acknowledgments(project_dir, signal_session_id)?
-            .into_iter()
-            .find(|ack| ack.signal_id == signal_id)
+        if let Some(ack) = read_runtime_acknowledgments_async(
+            runtime,
+            project_dir.to_path_buf(),
+            signal_session_id.to_string(),
+            "task start",
+        )
+        .await?
+        .into_iter()
+        .find(|ack| ack.signal_id == signal_id)
         {
             return Ok(Some(ack));
         }
@@ -199,7 +215,7 @@ async fn try_wake_started_workers_async(
 }
 
 async fn wake_tui_async(
-    runtime: &dyn AgentRuntime,
+    runtime: &'static dyn AgentRuntime,
     record: &session_service::TaskStartSignalRecord,
     session_id: &str,
     project_dir: &Path,
@@ -256,8 +272,8 @@ async fn persist_task_signal_effects(
     dispatch: WakeDispatch<'_>,
 ) -> Result<(), CliError> {
     let project_dir = effective_project_dir(resolved).to_path_buf();
-    sync_file_state_for_resolved(resolved)?;
-    write_task_start_signals(&project_dir, effects)?;
+    sync_file_state_for_resolved_async(resolved).await?;
+    write_task_start_signals_async(project_dir.clone(), effects.to_vec()).await?;
     if let Some(transition) = extra_transition {
         append_log(async_db, session_id, transition, actor_id).await?;
     }
@@ -288,9 +304,23 @@ async fn persist_leave_signal_mutation(
     leave_signals: &[session_service::LeaveSignalRecord],
     transition: SessionTransition,
 ) -> Result<(), CliError> {
-    sync_file_state_for_resolved(resolved)?;
+    sync_file_state_for_resolved_async(resolved).await?;
     append_leave_signal_logs_async(async_db, session_id, actor_id, leave_signals).await?;
     append_log(async_db, session_id, transition, actor_id).await?;
     refresh_signal_index_for_resolved(async_db, resolved).await?;
     bump_session(async_db, session_id).await
+}
+
+async fn write_task_start_signals_async(
+    project_dir: PathBuf,
+    effects: Vec<session_service::TaskDropEffect>,
+) -> Result<(), CliError> {
+    spawn_blocking(move || write_task_start_signals(&project_dir, &effects))
+        .await
+        .unwrap_or_else(|error| {
+            Err(CliErrorKind::workflow_io(format!(
+                "task-start signal write worker failed: {error}"
+            ))
+            .into())
+        })
 }
