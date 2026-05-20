@@ -130,8 +130,9 @@ struct SessionWindowCreateForm: View {
     .scrollContentBackground(.hidden)
     .dynamicTypeSize(.xSmall ... .accessibility5)
     .task {
+      await SessionGeometryWritebackDeferral.nextMainActorTurn()
       prefillAgentNameIfEligible()
-      if draft.kind == .agent {
+      if draft.kind == .agent, embedsRuntimeConfiguration {
         await SessionWindowCreateFormCatalogs.loadAgentCatalogStateIfNeeded(
           store: store,
           state: state,
