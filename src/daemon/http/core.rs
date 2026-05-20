@@ -9,7 +9,7 @@ use axum::{Json, Router};
 use axum::extract::Query;
 
 use crate::agents::acp::probe::probe_acp_agents_cached;
-use crate::daemon::bridge::reconfigure_bridge;
+use crate::daemon::bridge::reconfigure_bridge_async;
 use crate::daemon::protocol::{
     DaemonTelemetryRequest, HostBridgeReconfigureRequest, ReadinessResponse,
     RuntimeSessionResolutionResponse, SetLogLevelRequest, http_paths,
@@ -227,7 +227,7 @@ async fn post_bridge_reconfigure(
         http_paths::BRIDGE_RECONFIGURE,
         &request_id,
         start,
-        reconfigure_bridge(&request.enable, &request.disable, request.force),
+        reconfigure_bridge_async(&request.enable, &request.disable, request.force).await,
     )
 }
 

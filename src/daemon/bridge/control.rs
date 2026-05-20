@@ -3,11 +3,11 @@ use std::time::Duration;
 
 use notify::{RecommendedWatcher, RecursiveMode, Watcher};
 use tokio::sync::mpsc;
-use tokio::task::JoinHandle;
+use tokio::task::{JoinHandle, spawn_blocking};
 use tokio::time::{Interval, interval, sleep};
 
 use crate::daemon::state;
-use crate::errors::CliError;
+use crate::errors::{CliError, CliErrorKind};
 
 use super::bridge_state::{
     LivenessMode, ResolvedRunningBridge, clear_bridge_state, host_bridge_manifest_with_discovery,
@@ -102,6 +102,28 @@ pub fn reconfigure_bridge(
     BridgeClient::from_state_file()?.reconfigure(&request)
 }
 
+/// Apply a capability reconfiguration without blocking the async runtime.
+///
+/// # Errors
+/// Returns [`CliError`] when the blocking worker cannot be joined or when the
+/// underlying bridge reconfiguration fails.
+pub async fn reconfigure_bridge_async(
+    enable: &[String],
+    disable: &[String],
+    force: bool,
+) -> Result<BridgeStatusReport, CliError> {
+    let enable = enable.to_vec();
+    let disable = disable.to_vec();
+    spawn_blocking(move || reconfigure_bridge(&enable, &disable, force))
+        .await
+        .unwrap_or_else(|error| {
+            Err(
+                CliErrorKind::workflow_io(format!("join bridge reconfigure worker: {error}"))
+                    .into(),
+            )
+        })
+}
+
 /// Spawn the daemon manifest watcher that republishes bridge state changes.
 #[must_use]
 pub fn spawn_manifest_watcher() -> JoinHandle<()> {
@@ -123,7 +145,7 @@ async fn run_manifest_watcher() {
     let Some((_daemon_root, _watcher, mut event_rx)) = manifest_watcher_parts() else {
         return;
     };
-    apply_bridge_state_to_manifest();
+    apply_bridge_state_to_manifest_async().await;
     let mut tick = interval(MANIFEST_REFRESH_TICK);
     tick.tick().await;
     drive_manifest_watcher(&mut event_rx, &mut tick).await;
@@ -142,7 +164,7 @@ async fn drive_manifest_watcher(
                 handle_watcher_event(event_rx).await;
             }
             _ = tick.tick() => {
-                apply_bridge_state_to_manifest();
+                apply_bridge_state_to_manifest_async().await;
             }
         }
     }
@@ -151,7 +173,7 @@ async fn drive_manifest_watcher(
 async fn handle_watcher_event(event_rx: &mut mpsc::Receiver<notify::Result<notify::Event>>) {
     sleep(WATCH_DEBOUNCE).await;
     while event_rx.try_recv().is_ok() {}
-    apply_bridge_state_to_manifest();
+    apply_bridge_state_to_manifest_async().await;
 }
 
 enum ManifestWatcherSetupError {
@@ -235,6 +257,12 @@ fn apply_bridge_state_to_manifest() {
         return;
     };
     publish_bridge_manifest_update(&next);
+}
+
+async fn apply_bridge_state_to_manifest_async() {
+    if let Err(error) = spawn_blocking(apply_bridge_state_to_manifest).await {
+        tracing::warn!(%error, "bridge watcher: failed to join manifest update worker");
+    }
 }
 
 fn write_bridge_manifest_update(manifest: &state::DaemonManifest) -> Result<(), CliError> {
