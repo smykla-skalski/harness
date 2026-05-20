@@ -13,6 +13,7 @@ pub mod claude;
 pub mod codex;
 pub mod copilot;
 pub mod gemini;
+pub mod openrouter;
 pub mod tags;
 
 use std::sync::LazyLock;
@@ -201,6 +202,7 @@ static BUILTIN_DESCRIPTORS: LazyLock<Vec<AcpAgentDescriptor>> = LazyLock::new(||
         gemini::descriptor(),
         claude::descriptor(),
         codex::descriptor(),
+        openrouter::descriptor(),
     ]
 });
 
@@ -271,6 +273,19 @@ mod tests {
         assert_eq!(codex.display_name, "Codex");
         assert_eq!(codex.launch_command, "harness-codex-acp");
         assert!(codex.launch_args.is_empty());
+    }
+
+    #[test]
+    fn catalog_contains_openrouter() {
+        let agents = acp_agents();
+        let openrouter = agents
+            .iter()
+            .find(|d| d.id == "openrouter")
+            .expect("openrouter descriptor in catalog");
+        assert_eq!(openrouter.display_name, "OpenRouter");
+        assert_eq!(openrouter.launch_command, "harness-openrouter-agent");
+        assert!(openrouter.launch_args.is_empty());
+        assert!(openrouter.bundled_with_harness);
     }
 
     #[test]
