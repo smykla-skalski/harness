@@ -99,6 +99,17 @@ extension SessionWindowCreateForm {
     selectedRuntimeCatalog?.runtime
   }
 
+  var selectedAcpDescriptorID: String? {
+    if case .acp(let descriptorID) = normalizedLaunchSelection {
+      return descriptorID
+    }
+    return nil
+  }
+
+  var isOpenRouterAcpSelected: Bool {
+    selectedAcpDescriptorID == HarnessMonitorStore.openRouterDescriptorID
+  }
+
   var codexCatalog: RuntimeModelCatalog? {
     SessionWindowCreateFormCatalogs.codexModelCatalog(catalogState: catalogState)
   }
