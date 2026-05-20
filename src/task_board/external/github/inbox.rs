@@ -18,6 +18,7 @@ use super::{
 #[derive(Clone)]
 pub struct GitHubInboxSyncClient {
     client: octocrab::Octocrab,
+    graphql_cache_key: graphql::GitHubGraphqlCacheKey,
     repositories: Vec<GitHubRepository>,
     import_labels: Vec<String>,
 }
@@ -44,6 +45,7 @@ impl GitHubInboxSyncClient {
         import_labels: &[String],
     ) -> Result<Self, CliError> {
         let token = normalize_token(ExternalProvider::GitHub, token)?;
+        let graphql_cache_key = graphql::token_cache_key(token.as_str());
         ensure_rustls_provider();
         let client = octocrab::Octocrab::builder()
             .personal_token(token)
@@ -56,6 +58,7 @@ impl GitHubInboxSyncClient {
             .collect::<Result<Vec<_>, _>>()?;
         Ok(Self {
             client,
+            graphql_cache_key,
             repositories,
             import_labels: import_labels.to_vec(),
         })
@@ -74,7 +77,7 @@ impl GitHubInboxSyncClient {
     }
 
     async fn current_user_login(&self) -> Result<String, CliError> {
-        graphql::current_user_login(&self.client).await
+        graphql::current_user_login(&self.client, self.graphql_cache_key).await
     }
 
     async fn search(
@@ -84,7 +87,13 @@ impl GitHubInboxSyncClient {
         login: &str,
     ) -> Result<Vec<graphql::GitHubSearchIssuePullRequestItem>, CliError> {
         let query = kind.query(repository, login);
-        graphql::search_issue_pull_requests(&self.client, &query, &kind.context(repository)).await
+        graphql::search_issue_pull_requests(
+            &self.client,
+            self.graphql_cache_key,
+            &query,
+            &kind.context(repository),
+        )
+        .await
     }
 }
 

@@ -3,6 +3,7 @@ use serde::Deserialize;
 use serde_json::json;
 
 use crate::errors::{CliError, CliErrorKind};
+use crate::github_api_errors;
 
 use super::client::{GitHubCreatePullRequest, GitHubPullRequestHandle};
 use super::config::GitHubProjectConfig;
@@ -181,10 +182,7 @@ fn page_limit(page: &str, loaded_pages: u32) -> Result<(), CliError> {
 }
 
 fn operation_error(error: octocrab::Error) -> CliError {
-    CliError::new(CliErrorKind::workflow_io(format!(
-        "task-board github automation failed: {error}"
-    )))
-    .with_source(error)
+    github_api_errors::operation_error("task-board github automation failed", error)
 }
 
 fn pull_request_not_found(config: &GitHubProjectConfig, pull_request_number: u64) -> CliError {

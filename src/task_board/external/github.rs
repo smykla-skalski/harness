@@ -27,6 +27,7 @@ pub use inbox::GitHubInboxSyncClient;
 #[derive(Clone)]
 pub struct GitHubSyncClient {
     client: octocrab::Octocrab,
+    graphql_cache_key: graphql::GitHubGraphqlCacheKey,
     repository: Option<GitHubRepository>,
     pull_enabled: bool,
     import_labels: Vec<String>,
@@ -62,6 +63,7 @@ impl GitHubSyncClient {
         pull_enabled: bool,
     ) -> Result<Self, CliError> {
         let token = normalize_token(ExternalProvider::GitHub, token)?;
+        let graphql_cache_key = graphql::token_cache_key(token.as_str());
         let repository = repository.map(parse_github_repository).transpose()?;
         ensure_rustls_provider();
         let client = octocrab::Octocrab::builder()
@@ -70,6 +72,7 @@ impl GitHubSyncClient {
             .map_err(github_client_error)?;
         Ok(Self {
             client,
+            graphql_cache_key,
             repository,
             pull_enabled,
             import_labels: Vec::new(),
@@ -153,12 +156,17 @@ impl ExternalSyncClient for GitHubSyncClient {
         }
         let repository = self.repository_for(None)?;
         let project_id = repository.slug();
-        let login = graphql::current_user_login(self.octocrab()).await?;
+        let login = graphql::current_user_login(self.octocrab(), self.graphql_cache_key).await?;
         let mut tasks = BTreeMap::new();
         for query in graphql::personal_issue_queries(&repository, login.as_str()) {
             let context = format!("searching task-board issues in {}", repository.slug());
-            let issues =
-                graphql::search_issue_pull_requests(self.octocrab(), &query, &context).await?;
+            let issues = graphql::search_issue_pull_requests(
+                self.octocrab(),
+                self.graphql_cache_key,
+                &query,
+                &context,
+            )
+            .await?;
             tasks.extend(
                 issues
                     .into_iter()

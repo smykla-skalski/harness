@@ -1,3 +1,9 @@
+use std::collections::BTreeMap;
+use std::collections::hash_map::DefaultHasher;
+use std::hash::{Hash, Hasher};
+use std::sync::{Mutex, OnceLock};
+use std::time::{Duration, Instant};
+
 use octocrab::Octocrab;
 use serde::Deserialize;
 use serde_json::json;
@@ -13,6 +19,16 @@ pub(super) const GITHUB_SEARCH_PAGE_CAP: u32 = 10;
 
 const GITHUB_SEARCH_PAGE_SIZE: usize = 100;
 const AUTOMATION_ISSUE_AUTHORS: &[&str] = &["renovate[bot]"];
+const GITHUB_GRAPHQL_CACHE_TTL: Duration = Duration::from_secs(60);
+const GITHUB_GRAPHQL_CACHE_ENTRY_CAP: usize = 128;
+
+pub(super) type GitHubGraphqlCacheKey = u64;
+
+static VIEWER_CACHE: OnceLock<Mutex<BTreeMap<GitHubGraphqlCacheKey, CachedViewerLogin>>> =
+    OnceLock::new();
+static SEARCH_CACHE: OnceLock<
+    Mutex<BTreeMap<(GitHubGraphqlCacheKey, String), CachedSearchResults>>,
+> = OnceLock::new();
 
 const VIEWER_QUERY: &str = r"
 query TaskBoardViewer {
@@ -71,7 +87,19 @@ query TaskBoardIssueUpdatedAt($owner: String!, $repo: String!, $number: Int!) {
 }
 ";
 
-pub(super) async fn current_user_login(client: &Octocrab) -> Result<String, CliError> {
+pub(super) fn token_cache_key(token: &str) -> GitHubGraphqlCacheKey {
+    let mut hasher = DefaultHasher::new();
+    token.hash(&mut hasher);
+    hasher.finish()
+}
+
+pub(super) async fn current_user_login(
+    client: &Octocrab,
+    cache_key: GitHubGraphqlCacheKey,
+) -> Result<String, CliError> {
+    if let Some(login) = cached_viewer_login(cache_key) {
+        return Ok(login);
+    }
     let response: GitHubViewerResponse = client
         .graphql(&json!({ "query": VIEWER_QUERY }))
         .await
@@ -85,6 +113,7 @@ pub(super) async fn current_user_login(client: &Octocrab) -> Result<String, CliE
         )
         .into());
     }
+    store_viewer_login(cache_key, login);
     Ok(login.to_string())
 }
 
@@ -139,9 +168,13 @@ pub(super) fn personal_issue_queries(repository: &GitHubRepository, login: &str)
 
 pub(super) async fn search_issue_pull_requests(
     client: &Octocrab,
+    cache_key: GitHubGraphqlCacheKey,
     query: &str,
     context: &str,
 ) -> Result<Vec<GitHubSearchIssuePullRequestItem>, CliError> {
+    if let Some(items) = cached_search_results(cache_key, query) {
+        return Ok(items);
+    }
     let mut cursor = None;
     let mut page = 1_u32;
     let mut items = Vec::new();
@@ -156,18 +189,123 @@ pub(super) async fn search_issue_pull_requests(
             }))
             .await
             .map_err(|error| github_sync_error_with_context(context, error))?;
+        let page_info = response.search.page_info;
         items.extend(response.search.nodes.into_iter().flatten());
-        if !response.search.page_info.has_next_page {
+        let Some(next_cursor) = next_search_cursor(page, context, page_info)? else {
             break;
-        }
-        if page >= GITHUB_SEARCH_PAGE_CAP {
-            warn_search_results_truncated(context);
-            break;
-        }
+        };
         page += 1;
-        cursor = response.search.page_info.end_cursor;
+        cursor = Some(next_cursor);
     }
+    store_search_results(cache_key, query, &items);
     Ok(items)
+}
+
+fn next_search_cursor(
+    page: u32,
+    context: &str,
+    page_info: GitHubSearchPageInfo,
+) -> Result<Option<String>, CliError> {
+    if !page_info.has_next_page {
+        return Ok(None);
+    }
+    if page >= GITHUB_SEARCH_PAGE_CAP {
+        warn_search_results_truncated(context);
+        return Ok(None);
+    }
+    page_info.end_cursor.map(Some).ok_or_else(|| {
+        CliErrorKind::workflow_io(format!(
+            "github search pagination returned a next page without a cursor while {context}"
+        ))
+        .into()
+    })
+}
+
+fn cached_viewer_login(cache_key: GitHubGraphqlCacheKey) -> Option<String> {
+    let mut cache = VIEWER_CACHE
+        .get_or_init(|| Mutex::new(BTreeMap::new()))
+        .lock()
+        .ok()?;
+    prune_viewer_cache(&mut cache);
+    cache.get(&cache_key).map(|cached| cached.login.clone())
+}
+
+fn store_viewer_login(cache_key: GitHubGraphqlCacheKey, login: &str) {
+    if let Ok(mut cache) = VIEWER_CACHE
+        .get_or_init(|| Mutex::new(BTreeMap::new()))
+        .lock()
+    {
+        prune_viewer_cache(&mut cache);
+        cache.insert(
+            cache_key,
+            CachedViewerLogin {
+                login: login.to_owned(),
+                stored_at: Instant::now(),
+            },
+        );
+        trim_viewer_cache(&mut cache);
+    }
+}
+
+fn cached_search_results(
+    cache_key: GitHubGraphqlCacheKey,
+    query: &str,
+) -> Option<Vec<GitHubSearchIssuePullRequestItem>> {
+    let mut cache = SEARCH_CACHE
+        .get_or_init(|| Mutex::new(BTreeMap::new()))
+        .lock()
+        .ok()?;
+    prune_search_cache(&mut cache);
+    cache
+        .get(&(cache_key, query.to_owned()))
+        .map(|cached| cached.items.clone())
+}
+
+fn store_search_results(
+    cache_key: GitHubGraphqlCacheKey,
+    query: &str,
+    items: &[GitHubSearchIssuePullRequestItem],
+) {
+    if let Ok(mut cache) = SEARCH_CACHE
+        .get_or_init(|| Mutex::new(BTreeMap::new()))
+        .lock()
+    {
+        prune_search_cache(&mut cache);
+        cache.insert(
+            (cache_key, query.to_owned()),
+            CachedSearchResults {
+                items: items.to_vec(),
+                stored_at: Instant::now(),
+            },
+        );
+        trim_search_cache(&mut cache);
+    }
+}
+
+fn prune_viewer_cache(cache: &mut BTreeMap<GitHubGraphqlCacheKey, CachedViewerLogin>) {
+    cache.retain(|_, cached| cached.is_fresh());
+}
+
+fn prune_search_cache(cache: &mut BTreeMap<(GitHubGraphqlCacheKey, String), CachedSearchResults>) {
+    cache.retain(|_, cached| cached.is_fresh());
+}
+
+fn trim_viewer_cache(cache: &mut BTreeMap<GitHubGraphqlCacheKey, CachedViewerLogin>) {
+    while cache.len() > GITHUB_GRAPHQL_CACHE_ENTRY_CAP {
+        let Some(key) = cache.keys().next().copied() else {
+            break;
+        };
+        cache.remove(&key);
+    }
+}
+
+fn trim_search_cache(cache: &mut BTreeMap<(GitHubGraphqlCacheKey, String), CachedSearchResults>) {
+    while cache.len() > GITHUB_GRAPHQL_CACHE_ENTRY_CAP {
+        let Some(key) = cache.keys().next().cloned() else {
+            break;
+        };
+        cache.remove(&key);
+    }
 }
 
 fn warn_search_results_truncated(context: &str) {
@@ -175,6 +313,30 @@ fn warn_search_results_truncated(context: &str) {
         "github search results truncated at {} hits while {context}",
         GITHUB_SEARCH_PAGE_CAP * GITHUB_SEARCH_PAGE_SIZE as u32
     ));
+}
+
+#[derive(Debug, Clone)]
+struct CachedViewerLogin {
+    login: String,
+    stored_at: Instant,
+}
+
+impl CachedViewerLogin {
+    fn is_fresh(&self) -> bool {
+        self.stored_at.elapsed() <= GITHUB_GRAPHQL_CACHE_TTL
+    }
+}
+
+#[derive(Debug, Clone)]
+struct CachedSearchResults {
+    items: Vec<GitHubSearchIssuePullRequestItem>,
+    stored_at: Instant,
+}
+
+impl CachedSearchResults {
+    fn is_fresh(&self) -> bool {
+        self.stored_at.elapsed() <= GITHUB_GRAPHQL_CACHE_TTL
+    }
 }
 
 #[derive(Debug, Deserialize)]
@@ -326,5 +488,28 @@ mod tests {
     #[test]
     fn github_search_page_cap_keeps_total_hits_under_one_thousand() {
         assert_eq!(GITHUB_SEARCH_PAGE_CAP, 10);
+    }
+
+    #[test]
+    fn next_search_cursor_requires_cursor_when_more_pages_exist() {
+        let error = next_search_cursor(
+            1,
+            "testing pagination",
+            GitHubSearchPageInfo {
+                has_next_page: true,
+                end_cursor: None,
+            },
+        )
+        .expect_err("missing cursor should fail");
+
+        assert!(error.message().contains("next page without a cursor"));
+    }
+
+    #[test]
+    fn graphql_cache_keys_do_not_expose_token_text() {
+        let key = token_cache_key("ghp_secret");
+
+        assert_ne!(key, 0);
+        assert_eq!(token_cache_key("ghp_secret"), key);
     }
 }
