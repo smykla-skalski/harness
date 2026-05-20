@@ -13,8 +13,9 @@ use super::super::parity::{
     dispatch_managed_agent_resize, dispatch_managed_agent_resolve_acp_permission,
     dispatch_managed_agent_resolve_codex_approval, dispatch_managed_agent_start_acp,
     dispatch_managed_agent_start_codex, dispatch_managed_agent_start_terminal,
-    dispatch_managed_agent_steer_codex, dispatch_managed_agent_stop,
-    dispatch_managed_agent_stop_acp, dispatch_session_adopt, dispatch_session_archive,
+    dispatch_managed_agent_prompt_acp, dispatch_managed_agent_steer_codex,
+    dispatch_managed_agent_stop, dispatch_managed_agent_stop_acp, dispatch_session_adopt,
+    dispatch_session_archive,
     dispatch_session_delete, dispatch_session_join, dispatch_session_leave,
     dispatch_session_runtime_session, dispatch_session_title, dispatch_signal_ack,
     dispatch_voice_append_audio, dispatch_voice_append_transcript, dispatch_voice_finish_session,
@@ -369,6 +370,9 @@ async fn dispatch_acp_managed_agent_mutation(
         }
         ws_methods::MANAGED_AGENT_STOP_ACP => {
             Some(dispatch_managed_agent_stop_acp(request, state).await)
+        }
+        ws_methods::MANAGED_AGENT_PROMPT_ACP => {
+            Some(dispatch_managed_agent_prompt_acp(request, state).await)
         }
         ws_methods::MANAGED_AGENT_RESOLVE_ACP_PERMISSION => {
             Some(dispatch_managed_agent_resolve_acp_permission(request, state).await)

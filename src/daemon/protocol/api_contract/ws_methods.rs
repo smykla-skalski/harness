@@ -105,6 +105,7 @@ pub const MANAGED_AGENT_INTERRUPT_CODEX: &str = "managed_agent.interrupt_codex";
 pub const MANAGED_AGENT_RESOLVE_CODEX_APPROVAL: &str = "managed_agent.resolve_codex_approval";
 pub const MANAGED_AGENT_RESOLVE_ACP_PERMISSION: &str = "managed_agent.resolve_acp_permission";
 pub const MANAGED_AGENT_STOP_ACP: &str = "managed_agent.stop_acp";
+pub const MANAGED_AGENT_PROMPT_ACP: &str = "managed_agent.prompt_acp";
 pub const MANAGED_AGENTS_CODEX_INSPECT: &str = "managed_agent.codex_inspect";
 pub const MANAGED_AGENTS_CODEX_TRANSCRIPT: &str = "managed_agent.codex_transcript";
 pub const MANAGED_AGENTS_ACP_INSPECT: &str = "managed_agent.acp_inspect";

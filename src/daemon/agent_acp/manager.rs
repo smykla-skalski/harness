@@ -44,6 +44,7 @@ mod process_fault;
 mod process_pool;
 mod reconcile;
 mod request_wire;
+mod send_prompt;
 mod session_access;
 #[cfg(test)]
 mod shutdown_tests;
