@@ -201,7 +201,8 @@ struct TaskBoardItemRow: View {
       .taskBoardCardBackgroundGlyph(
         systemImage: cardGlyph.systemImage,
         tint: cardGlyph.tint,
-        cornerRadius: metrics.cardCornerRadius
+        cornerRadius: metrics.cardCornerRadius,
+        providerSymbol: item.taskBoardBackgroundProviderSymbol
       )
     }
     .taskBoardCardChrome()

@@ -321,6 +321,51 @@ struct TaskBoardOverviewBehaviorTests {
     #expect(TaskBoardInboxLane.needsYou.taskBoardDropStatus(for: manualItem) == .planReview)
   }
 
+  @Test("Task board item resolves Kuma background symbol from the project owner")
+  func taskBoardItemResolvesKumaBackgroundSymbolFromProjectOwner() {
+    let item = taskBoardItem(
+      id: "kuma-item",
+      status: .todo,
+      projectId: "kumahq/kuma"
+    )
+
+    #expect(item.taskBoardBackgroundProviderSymbol == .kuma)
+  }
+
+  @Test("Task board item resolves Kong background symbol from GitHub owner case-insensitively")
+  func taskBoardItemResolvesKongBackgroundSymbolFromGitHubOwnerCaseInsensitively() {
+    let item = taskBoardItem(
+      id: "kong-item",
+      status: .todo,
+      externalRefs: [
+        TaskBoardExternalRef(
+          provider: .gitHub,
+          externalId: "Kong/gateway-operator#123",
+          url: "https://github.com/Kong/gateway-operator/issues/123"
+        )
+      ]
+    )
+
+    #expect(item.taskBoardBackgroundProviderSymbol == .kong)
+  }
+
+  @Test("Task board item falls back to no background symbol for other owners")
+  func taskBoardItemFallsBackToNoBackgroundSymbolForOtherOwners() {
+    let item = taskBoardItem(
+      id: "other-item",
+      status: .todo,
+      externalRefs: [
+        TaskBoardExternalRef(
+          provider: .gitHub,
+          externalId: "example/repo#42",
+          url: "https://github.com/example/repo/issues/42"
+        )
+      ]
+    )
+
+    #expect(item.taskBoardBackgroundProviderSymbol == nil)
+  }
+
   @Test("Drop deduper suppresses duplicate successful drops until reset")
   func dropDeduperSuppressesDuplicateSuccessfulDropsUntilReset() {
     var deduper = TaskBoardDropDeduper<String>()
@@ -429,6 +474,7 @@ struct TaskBoardOverviewBehaviorTests {
     status: TaskBoardStatus,
     priority: TaskBoardPriority = .medium,
     targetProjectTypes: [String] = [],
+    projectId: String? = "project-1",
     externalRefs: [TaskBoardExternalRef] = [],
     planning: TaskBoardPlanningState = TaskBoardPlanningState(),
     sessionId: String? = nil,
@@ -443,7 +489,7 @@ struct TaskBoardOverviewBehaviorTests {
       status: status,
       priority: priority,
       tags: [],
-      projectId: "project-1",
+      projectId: projectId,
       targetProjectTypes: targetProjectTypes,
       agentMode: .interactive,
       externalRefs: externalRefs,
