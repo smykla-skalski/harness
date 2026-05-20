@@ -7,6 +7,8 @@ public struct OpenRouterModelUsageSnapshot: Equatable, Sendable {
   public let recents: [String]
   public let frequencies: [String: Int]
   private let pinnedLookup: Set<String>
+  let cachedRecentsExcludingPinned: [String]
+  let cachedFrequentExcludingPinnedAndRecents: [String]
 
   public init(
     pinned: [String] = [],
@@ -16,7 +18,31 @@ public struct OpenRouterModelUsageSnapshot: Equatable, Sendable {
     self.pinned = pinned
     self.recents = recents
     self.frequencies = frequencies
-    pinnedLookup = Set(pinned)
+    let pinnedSet = Set(pinned)
+    pinnedLookup = pinnedSet
+    let limit = OpenRouterModelUsageStore.recentLimit
+
+    var recentsOut: [String] = []
+    recentsOut.reserveCapacity(min(recents.count, limit))
+    for id in recents {
+      if recentsOut.count >= limit { break }
+      if !pinnedSet.contains(id) { recentsOut.append(id) }
+    }
+    cachedRecentsExcludingPinned = recentsOut
+
+    let recentSet = Set(recentsOut)
+    let sorted = frequencies.sorted { lhs, rhs in
+      if lhs.value != rhs.value { return lhs.value > rhs.value }
+      return lhs.key < rhs.key
+    }
+    var frequentOut: [String] = []
+    frequentOut.reserveCapacity(min(sorted.count, limit))
+    for (id, _) in sorted {
+      if frequentOut.count >= limit { break }
+      if pinnedSet.contains(id) || recentSet.contains(id) { continue }
+      frequentOut.append(id)
+    }
+    cachedFrequentExcludingPinnedAndRecents = frequentOut
   }
 
   public func recentModels(limit: Int = OpenRouterModelUsageStore.recentLimit) -> [String] {
@@ -24,7 +50,10 @@ public struct OpenRouterModelUsageSnapshot: Equatable, Sendable {
   }
 
   public func frequentModels(limit: Int = OpenRouterModelUsageStore.recentLimit) -> [String] {
-    frequencies
+    if limit == OpenRouterModelUsageStore.recentLimit {
+      return cachedFrequentExcludingPinnedAndRecents
+    }
+    return frequencies
       .sorted { lhs, rhs in
         if lhs.value != rhs.value { return lhs.value > rhs.value }
         return lhs.key < rhs.key
@@ -35,6 +64,12 @@ public struct OpenRouterModelUsageSnapshot: Equatable, Sendable {
 
   public func isPinned(_ modelID: String) -> Bool {
     pinnedLookup.contains(modelID)
+  }
+
+  public static func == (lhs: Self, rhs: Self) -> Bool {
+    lhs.pinned == rhs.pinned
+      && lhs.recents == rhs.recents
+      && lhs.frequencies == rhs.frequencies
   }
 }
 
@@ -69,6 +104,10 @@ public final class OpenRouterModelUsageStore: @unchecked Sendable {
 
   private static let decoder = JSONDecoder()
   private static let encoder = JSONEncoder()
+  private static let persistQueue = DispatchQueue(
+    label: "io.harnessmonitor.openrouter-model-usage.persist",
+    qos: .utility
+  )
 
   private let defaults: UserDefaults
   private let key: String
@@ -91,14 +130,7 @@ public final class OpenRouterModelUsageStore: @unchecked Sendable {
   }
 
   public func frequentModels(limit: Int = OpenRouterModelUsageStore.recentLimit) -> [String] {
-    let payload = load()
-    return payload.frequencies
-      .sorted { lhs, rhs in
-        if lhs.value != rhs.value { return lhs.value > rhs.value }
-        return lhs.key < rhs.key
-      }
-      .prefix(max(0, limit))
-      .map(\.key)
+    load().snapshot.frequentModels(limit: limit)
   }
 
   public func isPinned(_ modelID: String) -> Bool {
@@ -119,7 +151,7 @@ public final class OpenRouterModelUsageStore: @unchecked Sendable {
     }
   }
 
-  public func recordUsage(of modelID: String, now: Date = Date()) {
+  public func recordUsage(of modelID: String) {
     let trimmed = modelID.trimmingCharacters(in: .whitespacesAndNewlines)
     guard !trimmed.isEmpty else { return }
     update { payload in
@@ -130,15 +162,16 @@ public final class OpenRouterModelUsageStore: @unchecked Sendable {
         payload.recents = Array(payload.recents.prefix(capacity))
       }
       payload.frequencies[trimmed, default: 0] += 1
-      _ = now
     }
   }
 
   public func reset() {
     lock.lock()
-    defer { lock.unlock() }
-    defaults.removeObject(forKey: key)
     cachedPayload = Payload()
+    lock.unlock()
+    Self.persistQueue.async { [defaults, key] in
+      defaults.removeObject(forKey: key)
+    }
   }
 
   private func load() -> Payload {
@@ -161,7 +194,6 @@ public final class OpenRouterModelUsageStore: @unchecked Sendable {
 
   private func update(_ mutate: (inout Payload) -> Void) {
     lock.lock()
-    defer { lock.unlock() }
     var payload =
       cachedPayload
       ?? {
@@ -174,8 +206,12 @@ public final class OpenRouterModelUsageStore: @unchecked Sendable {
       }()
     mutate(&payload)
     cachedPayload = payload
-    if let encoded = try? Self.encoder.encode(payload) {
-      defaults.set(encoded, forKey: key)
+    let payloadCopy = payload
+    lock.unlock()
+    Self.persistQueue.async { [defaults, key] in
+      if let encoded = try? Self.encoder.encode(payloadCopy) {
+        defaults.set(encoded, forKey: key)
+      }
     }
   }
 }
