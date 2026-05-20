@@ -383,6 +383,16 @@ async fn dispatch_openrouter_managed_agent_mutation(
     request: &WsRequest,
     state: &DaemonHttpState,
 ) -> Option<WsResponse> {
+    if let Some(response) = dispatch_openrouter_lifecycle_mutation(request, state).await {
+        return Some(response);
+    }
+    dispatch_openrouter_read(request, state).await
+}
+
+async fn dispatch_openrouter_lifecycle_mutation(
+    request: &WsRequest,
+    state: &DaemonHttpState,
+) -> Option<WsResponse> {
     match request.method.as_str() {
         ws_methods::MANAGED_AGENT_START_OPENROUTER => {
             Some(dispatch_managed_agent_start_openrouter(request, state).await)
@@ -393,6 +403,15 @@ async fn dispatch_openrouter_managed_agent_mutation(
         ws_methods::MANAGED_AGENT_CANCEL_OPENROUTER => {
             Some(dispatch_managed_agent_cancel_openrouter(request, state).await)
         }
+        _ => None,
+    }
+}
+
+async fn dispatch_openrouter_read(
+    request: &WsRequest,
+    state: &DaemonHttpState,
+) -> Option<WsResponse> {
+    match request.method.as_str() {
         ws_methods::MANAGED_AGENT_DETAIL_OPENROUTER => {
             Some(dispatch_managed_agent_detail_openrouter(request, state).await)
         }
