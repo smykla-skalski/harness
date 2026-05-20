@@ -23,6 +23,7 @@ use crate::openrouter::{AgentConfig, ConfigError, OpenRouterClient};
 
 use super::model_catalog::{DEFAULT_MODEL_ID, build_session_models};
 use super::session::{SessionState, SessionStore};
+use super::turn::drive_turn;
 
 /// Run the ACP agent server on stdio until the client disconnects.
 ///
@@ -39,6 +40,7 @@ pub async fn run_stdio() -> Result<(), agent_client_protocol::Error> {
     let store_new = store.clone();
     let config_new = config.clone();
     let store_prompt = store.clone();
+    let config_prompt = config.clone();
     let store_cancel = store.clone();
 
     Agent
@@ -61,9 +63,17 @@ pub async fn run_stdio() -> Result<(), agent_client_protocol::Error> {
             agent_client_protocol::on_receive_request!(),
         )
         .on_receive_request(
-            async move |request: PromptRequest, responder, _connection| {
-                let _ = (&store_prompt, request);
-                responder.respond(PromptResponse::new(StopReason::Refusal))
+            async move |request: PromptRequest, responder, connection| {
+                let store = store_prompt.clone();
+                let config = config_prompt.clone();
+                connection.spawn({
+                    let connection = connection.clone();
+                    async move {
+                        let stop_reason = run_prompt(&connection, &store, &config, request).await;
+                        responder.respond(PromptResponse::new(stop_reason))
+                    }
+                })?;
+                Ok(())
             },
             agent_client_protocol::on_receive_request!(),
         )
@@ -101,6 +111,27 @@ fn initialize_response(request: InitializeRequest) -> InitializeResponse {
             "harness-openrouter-agent",
             env!("CARGO_PKG_VERSION"),
         )))
+}
+
+async fn run_prompt(
+    connection: &ConnectionTo<agent_client_protocol::Client>,
+    store: &SessionStore,
+    config: &AgentConfig,
+    request: PromptRequest,
+) -> StopReason {
+    let client = match OpenRouterClient::new(
+        config.base_url.clone(),
+        config.api_key.clone(),
+        config.http_referer.clone(),
+        config.x_title.clone(),
+    ) {
+        Ok(client) => client,
+        Err(error) => {
+            tracing::warn!(%error, "failed to build OpenRouter client for prompt");
+            return StopReason::EndTurn;
+        }
+    };
+    drive_turn(connection, &client, store, &request.session_id, request.prompt).await
 }
 
 async fn handle_new_session(
