@@ -1,31 +1,40 @@
 //! `OpenRouter` agent session manager.
 //!
 //! Holds in-memory session state keyed by `run_id`. Each session owns a
-//! conversation history and (optionally) an in-flight turn task. Streaming
-//! deltas fan out through the daemon's shared `broadcast::Sender<StreamEvent>`
-//! so SSE consumers see chunks in real time.
+//! conversation history, a fixed in-process tool-dispatch [`HarnessAcpClient`]
+//! that enforces the daemon's write surface and denied-binary policy, and
+//! (optionally) an in-flight turn task. Streaming deltas and tool-call events
+//! fan out through the daemon's shared `broadcast::Sender<StreamEvent>` so
+//! SSE/WebSocket consumers see real-time updates.
+//!
+//! The actual streaming + tool-loop logic lives in
+//! [`crate::daemon::openrouter_agent::manager::turn_runner`].
 
-use std::collections::BTreeMap;
-use std::pin::Pin;
+use std::collections::{BTreeMap, BTreeSet};
+use std::env;
+use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex, MutexGuard, PoisonError};
 
-use futures_util::StreamExt;
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use tokio::sync::broadcast;
 use tokio::task::JoinHandle;
-use tracing::{error, warn};
+use tracing::error;
 use uuid::Uuid;
 
+use crate::agents::acp::client::HarnessAcpClient;
+use crate::agents::acp::permission::{PermissionMode, recording_log_path_for_session};
 use crate::agents::openrouter::{
-    AgentConfig as OpenRouterAgentConfig, ChatChoiceDelta, ChatMessage, ChatRequest, ChatRole,
-    OpenRouterClient, OpenRouterError, ReasoningRequest, StreamChunk,
+    AgentConfig as OpenRouterAgentConfig, ChatMessage, ChatRole, OpenRouterClient, OpenRouterError,
 };
 use crate::daemon::protocol::StreamEvent;
 use crate::errors::{CliError, CliErrorKind};
+use crate::hooks::runner_policy::managed_cluster_binaries;
 use crate::workspace::utc_now;
 
 use super::snapshot::{OpenRouterRunSnapshot, OpenRouterRunStatus};
+
+mod turn_runner;
 
 /// Default model when the start request leaves it unset.
 pub const DEFAULT_OPENROUTER_MODEL: &str = "anthropic/claude-3.7-sonnet";
@@ -47,6 +56,10 @@ pub struct OpenRouterStartRequest {
     /// `low` / `medium` / `high`; ignored on models without reasoning support.
     #[serde(default)]
     pub reasoning_effort: Option<String>,
+    /// Project directory the tool dispatcher uses as both `working_dir` and
+    /// `run_dir`. Defaults to the daemon's current working directory.
+    #[serde(default)]
+    pub project_dir: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -56,22 +69,35 @@ pub struct OpenRouterRunListResponse {
 
 #[derive(Clone)]
 pub struct OpenRouterAgentManagerHandle {
-    inner: Arc<Inner>,
+    pub(super) inner: Arc<Inner>,
 }
 
-struct Inner {
-    sender: broadcast::Sender<StreamEvent>,
-    sessions: Mutex<BTreeMap<String, SessionEntry>>,
+pub(super) struct Inner {
+    pub(super) sender: broadcast::Sender<StreamEvent>,
+    pub(super) sessions: Mutex<BTreeMap<String, SessionEntry>>,
 }
 
-struct SessionEntry {
-    snapshot: OpenRouterRunSnapshot,
-    history: Vec<ChatMessage>,
-    config: OpenRouterAgentConfig,
-    active_turn: Option<JoinHandle<()>>,
-    temperature: Option<f32>,
-    max_tokens: Option<u32>,
-    reasoning_effort: Option<String>,
+pub(super) struct SessionEntry {
+    pub(super) snapshot: OpenRouterRunSnapshot,
+    pub(super) history: Vec<ChatMessage>,
+    pub(super) config: OpenRouterAgentConfig,
+    pub(super) active_turn: Option<JoinHandle<()>>,
+    pub(super) temperature: Option<f32>,
+    pub(super) max_tokens: Option<u32>,
+    pub(super) reasoning_effort: Option<String>,
+    pub(super) project_dir: PathBuf,
+    pub(super) tool_client: Arc<HarnessAcpClient>,
+}
+
+pub(super) struct TurnParams {
+    pub snapshot: OpenRouterRunSnapshot,
+    pub history: Vec<ChatMessage>,
+    pub config: OpenRouterAgentConfig,
+    pub temperature: Option<f32>,
+    pub max_tokens: Option<u32>,
+    pub reasoning_effort: Option<String>,
+    pub project_dir: PathBuf,
+    pub tool_client: Arc<HarnessAcpClient>,
 }
 
 impl OpenRouterAgentManagerHandle {
@@ -105,6 +131,8 @@ impl OpenRouterAgentManagerHandle {
             .model
             .clone()
             .unwrap_or_else(|| DEFAULT_OPENROUTER_MODEL.to_owned());
+        let project_dir = resolve_project_dir(request.project_dir.as_deref());
+        let tool_client = Arc::new(build_tool_client(harness_session, &project_dir));
         let run_id = format!("openrouter-{}", Uuid::new_v4());
         let now = utc_now();
         let snapshot = OpenRouterRunSnapshot {
@@ -138,6 +166,8 @@ impl OpenRouterAgentManagerHandle {
                     temperature: request.temperature,
                     max_tokens: request.max_tokens,
                     reasoning_effort: request.reasoning_effort,
+                    project_dir,
+                    tool_client,
                 },
             );
         }
@@ -188,6 +218,8 @@ impl OpenRouterAgentManagerHandle {
                 temperature: entry.temperature,
                 max_tokens: entry.max_tokens,
                 reasoning_effort: entry.reasoning_effort.clone(),
+                project_dir: entry.project_dir.clone(),
+                tool_client: Arc::clone(&entry.tool_client),
             }
         };
         let snapshot = turn_params.snapshot.clone();
@@ -247,96 +279,18 @@ impl OpenRouterAgentManagerHandle {
         OpenRouterRunListResponse { runs }
     }
 
-    async fn run_turn(self, run_id: String, params: TurnParams) {
-        let client = match build_client(&params) {
-            Ok(client) => client,
-            Err(message) => {
-                self.finish_with_error(&run_id, &message);
-                return;
-            }
-        };
-        let request = build_request(&params);
-        let stream = match client.stream_chat(request).await {
-            Ok(stream) => stream,
-            Err(error) => {
-                self.finish_with_error(&run_id, &classify(error));
-                return;
-            }
-        };
-        match self.drain_stream(&run_id, stream).await {
-            Ok(final_text) => self.finish_with_assistant_message(&run_id, final_text),
-            Err(message) => self.finish_with_error(&run_id, &message),
-        }
-    }
-
-    async fn drain_stream(
+    pub(super) fn update_snapshot<F: FnOnce(&mut OpenRouterRunSnapshot)>(
         &self,
         run_id: &str,
-        mut stream: Pin<
-            Box<dyn futures_util::Stream<Item = Result<StreamChunk, OpenRouterError>> + Send>,
-        >,
-    ) -> Result<String, String> {
-        let mut text = String::new();
-        let mut reasoning = String::new();
-        while let Some(chunk_result) = stream.next().await {
-            let chunk = chunk_result.map_err(classify)?;
-            for choice in chunk.choices {
-                self.absorb_choice_delta(run_id, choice.delta, &mut text, &mut reasoning);
-            }
-        }
-        Ok(text)
-    }
-
-    #[expect(
-        clippy::cognitive_complexity,
-        reason = "tracing macros inflate cognitive complexity; three if-let branches are clearer than further decomposition"
-    )]
-    fn absorb_choice_delta(
-        &self,
-        run_id: &str,
-        delta: ChatChoiceDelta,
-        text: &mut String,
-        reasoning: &mut String,
+        mutate: F,
     ) {
-        if let Some(content) = delta.content {
-            self.absorb_message_delta(run_id, &content, text);
-        }
-        if let Some(thought) = delta.reasoning {
-            self.absorb_thought_delta(run_id, &thought, reasoning);
-        }
-        if !delta.tool_calls.is_empty() {
-            warn!(run_id = %run_id, "OpenRouter tool calls received but not yet supported");
-        }
-    }
-
-    fn absorb_message_delta(&self, run_id: &str, content: &str, text: &mut String) {
-        text.push_str(content);
-        self.observe_chunk(run_id, "openrouter_message_chunk", content);
-        let snapshot_text = text.clone();
-        self.update_snapshot(run_id, |snap| {
-            snap.latest_message = Some(snapshot_text);
-            snap.updated_at = utc_now();
-        });
-    }
-
-    fn absorb_thought_delta(&self, run_id: &str, thought: &str, reasoning: &mut String) {
-        reasoning.push_str(thought);
-        self.observe_chunk(run_id, "openrouter_thought_chunk", thought);
-        let snapshot_reasoning = reasoning.clone();
-        self.update_snapshot(run_id, |snap| {
-            snap.latest_reasoning = Some(snapshot_reasoning);
-            snap.updated_at = utc_now();
-        });
-    }
-
-    fn update_snapshot<F: FnOnce(&mut OpenRouterRunSnapshot)>(&self, run_id: &str, mutate: F) {
         let mut sessions = lock_sessions(&self.inner);
         if let Some(entry) = sessions.get_mut(run_id) {
             mutate(&mut entry.snapshot);
         }
     }
 
-    fn finish_with_assistant_message(&self, run_id: &str, message: String) {
+    pub(super) fn finish_with_assistant_message(&self, run_id: &str, message: String) {
         let snapshot = {
             let mut sessions = lock_sessions(&self.inner);
             let Some(entry) = sessions.get_mut(run_id) else {
@@ -369,7 +323,7 @@ impl OpenRouterAgentManagerHandle {
         );
     }
 
-    fn finish_with_error(&self, run_id: &str, message: &str) {
+    pub(super) fn finish_with_error(&self, run_id: &str, message: &str) {
         if let Some(snapshot) = self.mark_failed(run_id, message) {
             self.emit_failure(&snapshot, message);
         }
@@ -398,19 +352,7 @@ impl OpenRouterAgentManagerHandle {
         Some(entry.snapshot.clone())
     }
 
-    fn observe_chunk(&self, run_id: &str, event: &str, text: &str) {
-        let session_id = lock_sessions(&self.inner)
-            .get(run_id)
-            .map(|entry| entry.snapshot.session_id.clone())
-            .unwrap_or_default();
-        self.emit(
-            &session_id,
-            event,
-            json!({"run_id": run_id, "delta": text}),
-        );
-    }
-
-    fn emit(&self, session_id: &str, event: &str, payload: Value) {
+    pub(super) fn emit(&self, session_id: &str, event: &str, payload: Value) {
         let event = StreamEvent {
             event: event.to_owned(),
             recorded_at: utc_now(),
@@ -421,20 +363,11 @@ impl OpenRouterAgentManagerHandle {
     }
 }
 
-struct TurnParams {
-    snapshot: OpenRouterRunSnapshot,
-    history: Vec<ChatMessage>,
-    config: OpenRouterAgentConfig,
-    temperature: Option<f32>,
-    max_tokens: Option<u32>,
-    reasoning_effort: Option<String>,
-}
-
-fn lock_sessions(inner: &Inner) -> MutexGuard<'_, BTreeMap<String, SessionEntry>> {
+pub(super) fn lock_sessions(inner: &Inner) -> MutexGuard<'_, BTreeMap<String, SessionEntry>> {
     inner.sessions.lock().unwrap_or_else(PoisonError::into_inner)
 }
 
-fn build_client(params: &TurnParams) -> Result<OpenRouterClient, String> {
+pub(super) fn build_client(params: &TurnParams) -> Result<OpenRouterClient, String> {
     OpenRouterClient::new(
         params.config.base_url.clone(),
         params.config.api_key.clone(),
@@ -444,33 +377,13 @@ fn build_client(params: &TurnParams) -> Result<OpenRouterClient, String> {
     .map_err(|error| format!("client init failed: {error}"))
 }
 
-fn build_request(params: &TurnParams) -> ChatRequest {
-    ChatRequest {
-        model: params.snapshot.model.clone(),
-        messages: params.history.clone(),
-        stream: true,
-        tools: Vec::new(),
-        tool_choice: None,
-        parallel_tool_calls: None,
-        reasoning: params
-            .reasoning_effort
-            .clone()
-            .map(|effort| ReasoningRequest {
-                effort: Some(effort),
-                exclude: None,
-            }),
-        temperature: params.temperature,
-        max_tokens: params.max_tokens,
-    }
-}
-
 fn not_found(run_id: &str) -> CliError {
     CliError::from(CliErrorKind::session_not_active(format!(
         "openrouter run '{run_id}' not found"
     )))
 }
 
-fn classify(error: OpenRouterError) -> String {
+pub(super) fn classify(error: OpenRouterError) -> String {
     match error {
         OpenRouterError::RateLimited { retry_after } => match retry_after {
             Some(duration) => format!(
@@ -493,6 +406,27 @@ fn classify(error: OpenRouterError) -> String {
         }
         other => other.to_string(),
     }
+}
+
+fn resolve_project_dir(requested: Option<&str>) -> PathBuf {
+    if let Some(path) = requested {
+        return PathBuf::from(path);
+    }
+    env::current_dir().unwrap_or_else(|_| PathBuf::from("."))
+}
+
+fn build_tool_client(harness_session: &str, project_dir: &Path) -> HarnessAcpClient {
+    let denied: BTreeSet<String> = managed_cluster_binaries();
+    let permission_mode = PermissionMode::Recording {
+        log_path: recording_log_path_for_session(harness_session),
+    };
+    HarnessAcpClient::new(
+        project_dir.to_path_buf(),
+        project_dir.to_path_buf(),
+        None,
+        denied,
+        permission_mode,
+    )
 }
 
 #[cfg(test)]
