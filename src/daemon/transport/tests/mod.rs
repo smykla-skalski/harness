@@ -119,6 +119,7 @@ fn daemon_transport_round_trip_smoke_covers_public_surface() {
                     .join("com.example.group")
                     .join("harness")
                     .join("daemon")
+                    .join("external")
             );
             assert_eq!(
                 plan.log_effective_app_group.as_deref(),

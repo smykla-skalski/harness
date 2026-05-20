@@ -115,7 +115,8 @@ fn try_build_client_discovers_running_app_group_daemon_when_default_root_is_empt
         .join("Group Containers")
         .join(HARNESS_MONITOR_APP_GROUP_ID)
         .join("harness")
-        .join("daemon");
+        .join("daemon")
+        .join(state::DaemonOwnership::Managed.as_str());
     std::fs::create_dir_all(&app_group_root).expect("create app group daemon root");
 
     let lock_path = app_group_root.join(state::DAEMON_LOCK_FILE);
@@ -197,7 +198,9 @@ fn try_build_client_discovers_running_app_group_daemon_when_default_root_is_empt
             assert_eq!(client.token, "test-token");
             assert_eq!(
                 state::daemon_root(),
-                xdg.join("harness").join("daemon"),
+                xdg.join("harness")
+                    .join("daemon")
+                    .join(state::DaemonOwnership::Managed.as_str()),
                 "daemon client discovery must not mutate the process root"
             );
         },
