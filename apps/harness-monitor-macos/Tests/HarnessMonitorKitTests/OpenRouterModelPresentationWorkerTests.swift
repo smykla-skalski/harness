@@ -6,7 +6,8 @@ import Testing
 @Suite("OpenRouter model presentation workers")
 struct OpenRouterModelPresentationWorkerTests {
   @Test("picker worker builds usage sections from one snapshot")
-  func pickerWorkerBuildsUsageSections() async {
+  @MainActor
+  func pickerWorkerBuildsUsageSections() {
     let models = [
       OpenRouterModelEntry(id: "openai/gpt-4.1", name: "GPT 4.1"),
       OpenRouterModelEntry(id: "anthropic/claude-sonnet-4", name: "Claude Sonnet 4"),
@@ -22,7 +23,7 @@ struct OpenRouterModelPresentationWorkerTests {
       ]
     )
 
-    let output = await OpenRouterModelPickerPresentationWorker().compute(
+    let output = OpenRouterModelPickerPresentationWorker().compute(
       input: OpenRouterModelPickerPresentationInput(
         availableModels: models,
         usageSnapshot: snapshot
@@ -37,14 +38,15 @@ struct OpenRouterModelPresentationWorkerTests {
   }
 
   @Test("browser worker precomputes providers and filtered model rows")
-  func browserWorkerPrecomputesProvidersAndFilters() async {
+  @MainActor
+  func browserWorkerPrecomputesProvidersAndFilters() {
     let models = [
       OpenRouterModelEntry(id: "openai/gpt-4.1", name: "GPT 4.1"),
       OpenRouterModelEntry(id: "anthropic/claude-sonnet-4", name: "Claude Sonnet 4"),
       OpenRouterModelEntry(id: "openai/o3", name: "o3"),
     ]
 
-    let output = await OpenRouterModelBrowserPresentationWorker().compute(
+    let output = OpenRouterModelBrowserPresentationWorker().compute(
       input: OpenRouterModelBrowserPresentationInput(
         models: models,
         searchText: "o3",
@@ -54,5 +56,34 @@ struct OpenRouterModelPresentationWorkerTests {
 
     #expect(output.providers == ["anthropic", "openai"])
     #expect(output.filteredModels.map(\.id) == ["openai/o3"])
+  }
+
+  @Test("browser worker reuses providers cache when only search changes")
+  @MainActor
+  func browserWorkerReusesProvidersCache() {
+    let models = [
+      OpenRouterModelEntry(id: "openai/gpt-4.1", name: "GPT 4.1"),
+      OpenRouterModelEntry(id: "anthropic/claude-sonnet-4", name: "Claude Sonnet 4"),
+      OpenRouterModelEntry(id: "openai/o3", name: "o3"),
+    ]
+    let worker = OpenRouterModelBrowserPresentationWorker()
+
+    let first = worker.compute(
+      input: OpenRouterModelBrowserPresentationInput(
+        models: models,
+        searchText: "",
+        selectedProvider: nil
+      )
+    )
+    let second = worker.compute(
+      input: OpenRouterModelBrowserPresentationInput(
+        models: models,
+        searchText: "claude",
+        selectedProvider: nil
+      )
+    )
+
+    #expect(first.providers == second.providers)
+    #expect(second.filteredModels.map(\.id) == ["anthropic/claude-sonnet-4"])
   }
 }

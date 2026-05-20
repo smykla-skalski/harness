@@ -11,7 +11,10 @@ struct OpenRouterModelPicker: View {
 
   @State private var presentationWorker = OpenRouterModelPickerPresentationWorker()
   @State private var cachedPresentation = OpenRouterModelPickerPresentation.empty
-  @State private var presentationGeneration: UInt64 = 0
+
+  private var presentationFingerprint: OpenRouterModelPickerInputFingerprint {
+    OpenRouterModelPickerInputFingerprint(input: presentationInput)
+  }
 
   private var presentationInput: OpenRouterModelPickerPresentationInput {
     OpenRouterModelPickerPresentationInput(
@@ -25,8 +28,8 @@ struct OpenRouterModelPicker: View {
       pickerRow
       browseLink
     }
-    .task(id: presentationInput) {
-      await rebuildPresentation(input: presentationInput)
+    .onChange(of: presentationFingerprint, initial: true) { _, _ in
+      cachedPresentation = presentationWorker.compute(input: presentationInput)
     }
   }
 
@@ -103,18 +106,5 @@ struct OpenRouterModelPicker: View {
       return displayName
     }
     return selectedModelID
-  }
-
-  @MainActor
-  private func rebuildPresentation(input: OpenRouterModelPickerPresentationInput) async {
-    presentationGeneration &+= 1
-    let generation = presentationGeneration
-    let presentation = await presentationWorker.compute(input: input)
-    guard !Task.isCancelled, presentationGeneration == generation else {
-      return
-    }
-    if cachedPresentation != presentation {
-      cachedPresentation = presentation
-    }
   }
 }
