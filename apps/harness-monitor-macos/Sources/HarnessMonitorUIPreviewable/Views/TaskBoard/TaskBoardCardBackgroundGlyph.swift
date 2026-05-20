@@ -40,7 +40,7 @@ private struct TaskBoardCardBackgroundGlyphModifier: ViewModifier {
   private var glyphOffset: CGSize {
     switch providerSymbol {
     case .kuma:
-      CGSize(width: 6, height: 12)
+      CGSize(width: 52, height: 62)
     default:
       CGSize(width: 20, height: 24)
     }
