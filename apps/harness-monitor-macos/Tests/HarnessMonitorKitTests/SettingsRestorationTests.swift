@@ -5,41 +5,56 @@ import Testing
 
 @Suite("Settings scroll restoration")
 struct SettingsRestorationTests {
-  @Test("Idle and programmatic animation phases keep a pending restore alive")
-  func reopenPhasesDoNotCancelPendingRestore() {
-    #expect(!SettingsScrollRestorationPhasePolicy.cancelsPendingRestore(.idle))
-    #expect(!SettingsScrollRestorationPhasePolicy.cancelsPendingRestore(.animating))
+  @Test("Idle and programmatic animation phases are not user scroll")
+  func nonUserPhasesDoNotPersistByThemselves() {
+    #expect(!SettingsScrollRestorationPhasePolicy.isUserScroll(.idle))
+    #expect(!SettingsScrollRestorationPhasePolicy.isUserScroll(.animating))
   }
 
-  @Test("Direct user scroll phases cancel a pending restore")
-  func userScrollPhasesCancelPendingRestore() {
-    #expect(SettingsScrollRestorationPhasePolicy.cancelsPendingRestore(.tracking))
-    #expect(SettingsScrollRestorationPhasePolicy.cancelsPendingRestore(.interacting))
-    #expect(SettingsScrollRestorationPhasePolicy.cancelsPendingRestore(.decelerating))
+  @Test("Direct user scroll phases are user scroll")
+  func userScrollPhasesPersist() {
+    #expect(SettingsScrollRestorationPhasePolicy.isUserScroll(.tracking))
+    #expect(SettingsScrollRestorationPhasePolicy.isUserScroll(.interacting))
+    #expect(SettingsScrollRestorationPhasePolicy.isUserScroll(.decelerating))
   }
 
-  @Test("Settings restoration is not gated by sticky ScrollPosition user ownership")
-  func restorationDoesNotUseStickyUserOwnership() throws {
-    let source = try settingsRestorationSource()
-    #expect(!source.contains("isPositionedByUser"))
-    #expect(source.contains(".onScrollPhaseChange"))
-    #expect(source.contains("scrollPhase = .idle"))
-  }
-
-  private func settingsRestorationSource() throws -> String {
-    let testsDirectory = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
-    let repoRoot =
-      testsDirectory
-      .deletingLastPathComponent()
-      .deletingLastPathComponent()
-      .deletingLastPathComponent()
-      .deletingLastPathComponent()
-    let fileURL =
-      repoRoot
-      .appendingPathComponent(
-        "apps/harness-monitor-macos/Sources/HarnessMonitorUIPreviewable/Views/Settings"
+  @Test("Idle zero geometry does not overwrite a stored scroll offset")
+  func idleZeroGeometryDoesNotOverwriteStoredOffset() {
+    #expect(
+      !SettingsScrollPersistencePolicy.shouldPersist(
+        0,
+        previousOffset: 96,
+        force: false,
+        allowsZero: false
       )
-      .appendingPathComponent("SettingsRestoration.swift")
-    return try String(contentsOf: fileURL, encoding: .utf8)
+    )
+  }
+
+  @Test("Confirmed user scroll can persist top")
+  func confirmedUserScrollCanPersistTop() {
+    #expect(
+      SettingsScrollPersistencePolicy.shouldPersist(
+        0,
+        previousOffset: 96,
+        force: true,
+        allowsZero: true
+      )
+    )
+  }
+
+  @Test("Nonzero movement uses a coarse persistence threshold")
+  func nonzeroMovementUsesPersistenceThreshold() {
+    #expect(!SettingsScrollPersistencePolicy.hasMeaningfulMovement(from: 96, to: 116))
+    #expect(SettingsScrollPersistencePolicy.hasMeaningfulMovement(from: 96, to: 140))
+  }
+
+  @Test("Restore target clamps to available content")
+  func restoreTargetClampsToAvailableContent() {
+    #expect(
+      SettingsScrollPersistencePolicy.restorationTargetOffset(
+        storedOffset: 384,
+        maxOffset: 120
+      ) == 120
+    )
   }
 }
