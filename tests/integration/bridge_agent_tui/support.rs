@@ -5,12 +5,17 @@ use std::thread;
 use std::time::Instant;
 
 use harness::daemon::bridge::BridgeState;
+use harness::daemon::state::DaemonOwnership;
 
 use super::super::helpers::ManagedChild;
 use super::{BRIDGE_POLL_INTERVAL, BRIDGE_WAIT_TIMEOUT};
 
 pub(super) fn wait_for_bridge_state(data_home: &Path) -> BridgeState {
-    let state_path = data_home.join("harness/daemon/bridge.json");
+    let state_path = data_home
+        .join("harness")
+        .join("daemon")
+        .join(DaemonOwnership::Managed.as_str())
+        .join("bridge.json");
     let deadline = Instant::now() + BRIDGE_WAIT_TIMEOUT;
     loop {
         if let Ok(data) = std::fs::read_to_string(&state_path)

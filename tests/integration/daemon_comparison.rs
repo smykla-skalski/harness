@@ -116,7 +116,7 @@ fn file_and_db_reads_produce_identical_output() {
         seed_workspace(tmp.path());
     });
 
-    let db_path = tmp.path().join("harness/daemon/harness.db");
+    let db_path = tmp.path().join("harness/daemon/managed/harness.db");
     let db = DaemonDb::open(&db_path).expect("open db");
     with_isolated_harness_env(tmp.path(), || db.import_from_files()).expect("import");
 

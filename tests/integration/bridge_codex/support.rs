@@ -84,7 +84,11 @@ PY
 }
 
 pub(super) fn wait_for_bridge_state(data_home: &Path) -> BridgeState {
-    let state_path = data_home.join("harness/daemon/bridge.json");
+    let state_path = data_home
+        .join("harness")
+        .join("daemon")
+        .join(DaemonOwnership::Managed.as_str())
+        .join("bridge.json");
     let deadline = Instant::now() + BRIDGE_WAIT_TIMEOUT;
     loop {
         if let Ok(data) = std::fs::read_to_string(&state_path)
@@ -102,7 +106,14 @@ pub(super) fn wait_for_bridge_state(data_home: &Path) -> BridgeState {
 }
 
 pub(super) fn read_daemon_events(data_home: &Path) -> String {
-    std::fs::read_to_string(data_home.join("harness/daemon/events.jsonl")).unwrap_or_default()
+    std::fs::read_to_string(
+        data_home
+            .join("harness")
+            .join("daemon")
+            .join(DaemonOwnership::Managed.as_str())
+            .join("events.jsonl"),
+    )
+    .unwrap_or_default()
 }
 
 pub(super) fn wait_for_bridge_state_with_capabilities(

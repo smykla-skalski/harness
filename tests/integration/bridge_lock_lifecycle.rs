@@ -244,7 +244,7 @@ fn bridge_start_holds_exclusive_bridge_lock_while_serving() {
     )
     .expect("spawn first bridge");
 
-    let daemon_root = tmp.path().join("harness").join("daemon");
+    let daemon_root = tmp.path().join("harness").join("daemon").join("managed");
     let lock_path = daemon_root.join("bridge.lock");
     let state_path = daemon_root.join("bridge.json");
 
@@ -319,7 +319,7 @@ fn bridge_json_survives_synthetic_watcher_trigger() {
     let host_home = host_home.to_str().expect("utf8 host home").to_string();
 
     // Set up daemon root and write a synthetic bridge.json.
-    let daemon_root = tmp.path().join("harness").join("daemon");
+    let daemon_root = tmp.path().join("harness").join("daemon").join("managed");
     std::fs::create_dir_all(&daemon_root).expect("create daemon root");
 
     let bridge_json = daemon_root.join("bridge.json");
@@ -404,7 +404,7 @@ fn sandboxed_host_bridge_manifest_uses_legacy_bridge_rpc_without_lock() {
 
     let tmp = tempdir().expect("tempdir");
     let daemon_data_home = tmp.path().to_str().expect("utf8").to_string();
-    let daemon_root = tmp.path().join("harness").join("daemon");
+    let daemon_root = tmp.path().join("harness").join("daemon").join("managed");
     let _server = LegacyBridgeServer::start(
         &daemon_root,
         legacy_codex_capabilities(),
@@ -437,7 +437,7 @@ fn sandboxed_stop_bridge_waits_for_legacy_rpc_shutdown_before_clearing_state() {
 
     let tmp = tempdir().expect("tempdir");
     let daemon_data_home = tmp.path().to_str().expect("utf8").to_string();
-    let daemon_root = tmp.path().join("harness").join("daemon");
+    let daemon_root = tmp.path().join("harness").join("daemon").join("managed");
     let _server = LegacyBridgeServer::start(
         &daemon_root,
         legacy_codex_capabilities(),

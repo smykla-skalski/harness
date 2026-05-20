@@ -35,7 +35,7 @@ fn bridge_start_waits_for_codex_readiness_before_publishing_state() {
     .expect("spawn bridge");
 
     thread::sleep(Duration::from_millis(250));
-    let state_path = tmp.path().join("harness/daemon/bridge.json");
+    let state_path = tmp.path().join("harness/daemon/managed/bridge.json");
     assert!(
         !state_path.exists(),
         "bridge state should not publish before codex readiness"
@@ -100,7 +100,7 @@ fn bridge_start_records_error_when_codex_exits_before_readiness() {
 
     assert!(!output.status.success(), "bridge unexpectedly succeeded");
     assert!(
-        !tmp.path().join("harness/daemon/bridge.json").exists(),
+        !tmp.path().join("harness/daemon/managed/bridge.json").exists(),
         "bridge state should not persist failed codex readiness"
     );
 
@@ -157,7 +157,7 @@ fn bridge_start_fails_when_codex_port_is_already_bound() {
         output_text(&output)
     );
     assert!(
-        !tmp.path().join("harness/daemon/bridge.json").exists(),
+        !tmp.path().join("harness/daemon/managed/bridge.json").exists(),
         "bridge state should not persist when the codex port is already bound"
     );
 
@@ -201,7 +201,7 @@ fn bridge_start_records_error_when_codex_readiness_times_out() {
 
     assert!(!output.status.success(), "bridge unexpectedly succeeded");
     assert!(
-        !tmp.path().join("harness/daemon/bridge.json").exists(),
+        !tmp.path().join("harness/daemon/managed/bridge.json").exists(),
         "bridge state should not persist timed out codex readiness"
     );
 
