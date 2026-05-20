@@ -7,7 +7,7 @@ use crate::daemon::bridge::reconfigure_bridge;
 use crate::daemon::db::{DaemonDb, ensure_shared_db};
 use crate::daemon::http::{
     DaemonHttpState, adopt_session, adoption_error_status_and_body, ensure_acp_agent,
-    ensure_codex_agent, ensure_terminal_agent, record_adopt_in_db,
+    ensure_codex_agent, record_adopt_in_db,
 };
 use crate::daemon::protocol::{
     AdoptSessionRequest, AgentRuntimeSessionRegistrationRequest,

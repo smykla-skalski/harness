@@ -8,13 +8,13 @@ use super::signals::{
     build_active_signal_prompt, handled_active_signal_ack_wait_result,
     handled_active_signal_wake_result, wake_tui_for_signal, warn_active_signal_ack_record_failure,
 };
-use super::sync_support::{read_runtime_acknowledgments_async, sync_file_state_for_resolved_async};
+use super::sync_support::read_runtime_acknowledgments_async;
 use super::wake_route::{WakeDispatch, WakeRoute, log_wake_attempt, wake_route_for_registration};
 use super::{
     ACTIVE_SIGNAL_ACK_POLL_INTERVAL, ACTIVE_SIGNAL_ACK_TIMEOUT, CliError, CliErrorKind,
     ManagedTuiWake, Path, PathBuf, SessionTransition, SignalAckRequest, SignalCoords,
     build_log_entry, effective_project_dir, session_not_found, session_service, snapshot,
-    task_drop_effect_signal_records, write_task_start_signals,
+    sync_file_state_for_resolved, task_drop_effect_signal_records, write_task_start_signals,
 };
 use crate::daemon::agent_acp::AcpWakePrompt;
 use crate::daemon::protocol::CodexSteerRequest;
@@ -272,7 +272,7 @@ async fn persist_task_signal_effects(
     dispatch: WakeDispatch<'_>,
 ) -> Result<(), CliError> {
     let project_dir = effective_project_dir(resolved).to_path_buf();
-    sync_file_state_for_resolved_async(resolved).await?;
+    sync_file_state_for_resolved_off_main(resolved).await?;
     write_task_start_signals_async(project_dir.clone(), effects.to_vec()).await?;
     if let Some(transition) = extra_transition {
         append_log(async_db, session_id, transition, actor_id).await?;
@@ -304,7 +304,7 @@ async fn persist_leave_signal_mutation(
     leave_signals: &[session_service::LeaveSignalRecord],
     transition: SessionTransition,
 ) -> Result<(), CliError> {
-    sync_file_state_for_resolved_async(resolved).await?;
+    sync_file_state_for_resolved_off_main(resolved).await?;
     append_leave_signal_logs_async(async_db, session_id, actor_id, leave_signals).await?;
     append_log(async_db, session_id, transition, actor_id).await?;
     refresh_signal_index_for_resolved(async_db, resolved).await?;
@@ -322,5 +322,17 @@ async fn write_task_start_signals_async(
                 "task-start signal write worker failed: {error}"
             ))
             .into())
+        })
+}
+
+async fn sync_file_state_for_resolved_off_main(resolved: &ResolvedSession) -> Result<(), CliError> {
+    let resolved = resolved.clone();
+    spawn_blocking(move || sync_file_state_for_resolved(&resolved))
+        .await
+        .unwrap_or_else(|error| {
+            Err(
+                CliErrorKind::workflow_io(format!("session file mirror worker failed: {error}"))
+                    .into(),
+            )
         })
 }
