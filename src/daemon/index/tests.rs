@@ -6,9 +6,11 @@ use tempfile::tempdir;
 
 use super::contexts::{infer_checkout_identity, infer_ledger_cwd, repair_context_root};
 use super::*;
+use crate::infra::io::write_json_pretty;
 use crate::session::service as session_service;
 use crate::session::types::SessionRole;
-use crate::workspace::{canonical_checkout_root, project_context_dir};
+use crate::workspace::layout::sessions_root as workspace_sessions_root;
+use crate::workspace::{canonical_checkout_root, harness_data_root, project_context_dir, utc_now};
 
 mod adopted_external;
 mod ledger_fallback;
@@ -285,6 +287,47 @@ fn infer_checkout_identity_uses_recorded_origin_when_checkout_root_is_missing() 
     assert_eq!(identity.repository_root, project_dir);
     assert_eq!(identity.checkout_root, project_dir);
     assert!(!identity.is_worktree);
+}
+
+#[test]
+fn infer_checkout_identity_recovers_from_new_layout_state_without_project_origin() {
+    let tmp = tempdir().expect("tempdir");
+    with_isolated_harness_env(tmp.path(), || {
+        let project_dir = tmp.path().join("workspace").join("harness");
+        init_git_repo(&project_dir);
+        let context_root = project_context_dir(&project_dir);
+        fs::create_dir_all(&context_root).expect("create context root");
+
+        let session_id = "00000000-0000-4001-8000-0000000000aa";
+        let mut state = session_service::build_new_session_with_policy(
+            "ctx",
+            "bart",
+            session_id,
+            "leaderless",
+            None,
+            &utc_now(),
+            None,
+        );
+        state.project_name = "harness".into();
+        state.origin_path = project_dir.clone();
+        let state_path = workspace_sessions_root(&harness_data_root())
+            .join("harness")
+            .join(session_id)
+            .join("state.json");
+        write_json_pretty(&state_path, &state).expect("write state");
+
+        let identity = infer_checkout_identity(&context_root).expect("identity");
+
+        assert_eq!(
+            identity.checkout_root,
+            canonical_checkout_root(&project_dir)
+        );
+        assert_eq!(
+            identity.repository_root,
+            canonical_checkout_root(&project_dir)
+        );
+        assert!(!context_root.join("project-origin.json").exists());
+    });
 }
 
 #[test]
