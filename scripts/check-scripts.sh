@@ -136,6 +136,7 @@ if (( ${#monitor_python_tests[@]} > 0 )); then
 fi
 
 run_quiet_step "run-step shell tests" "$ROOT/scripts/tests/test-run-step.sh"
+run_quiet_step "clean-build-caches shell tests" "$ROOT/scripts/tests/test-clean-build-caches.sh"
 run_quiet_step "mcp shell tests" "$ROOT/scripts/tests/test-mcp-scripts.sh"
 if [[ "${HARNESS_CHECK_SCRIPTS_FULL:-0}" == "1" ]]; then
   HARNESS_CHECK_SCRIPTS_STEP_TIMEOUT_SECONDS=180 \

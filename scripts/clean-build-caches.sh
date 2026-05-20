@@ -2,8 +2,11 @@
 # Reclaim disk space from build artifacts and tool caches.
 #
 # Default scope (safe, no source loss, no live-app disruption):
-#   - Repo Rust artifacts:   target/, mcp-servers/*/target, apps/*/target
-#   - Repo Xcode artifacts:  xcode-derived/, xcode-derived-lanes/, tmp/
+#   - Repo Rust artifacts:   target/, crates/*/target, mcp-servers/*/target,
+#                            apps/*/target, .cache/harness-monitor-xcode-daemon
+#   - Repo Xcode artifacts:  xcode-derived*, xcode-derived-e2e/,
+#                            xcode-derived-instruments/, tmp/
+#   - Repo SwiftPM artifacts: apps/**/.build, mcp-servers/**/.build
 #   - Global build caches:   ~/Library/Caches/go-build, Mozilla.sccache, Yarn,
 #                            ~/.cache/tuist
 #   - Tool caches:           JetBrains, Homebrew prune, swiftpm
@@ -108,19 +111,23 @@ printf '\nbefore: %s\n' "$(disk_free_g)"
 
 section 'Rust artifacts'
 remove_path 'repo target/'                          "$ROOT/target"
+remove_path 'daemon cargo target'                   "$ROOT/.cache/harness-monitor-xcode-daemon"
 while IFS= read -r -d '' tdir; do
   rel=${tdir#"$ROOT/"}
   remove_path "$rel"                                "$tdir"
-done < <(find "$ROOT/apps" "$ROOT/mcp-servers" -mindepth 2 -maxdepth 4 -type d -name target -print0 2>/dev/null)
+done < <(find "$ROOT/apps" "$ROOT/crates" "$ROOT/mcp-servers" -mindepth 2 -type d -name target -prune -print0 2>/dev/null)
 
 section 'Xcode artifacts (project-local)'
 remove_path 'xcode-derived/'                        "$ROOT/xcode-derived"
+remove_path 'xcode-derived-e2e/'                    "$ROOT/xcode-derived-e2e"
 remove_path 'xcode-derived-lanes/'                  "$ROOT/xcode-derived-lanes"
-remove_path 'apps/harness-monitor-macos/.build'     "$ROOT/apps/harness-monitor-macos/.build"
+remove_path 'xcode-derived-instruments/'            "$ROOT/xcode-derived-instruments"
+
+section 'SwiftPM artifacts (project-local)'
 while IFS= read -r -d '' tdir; do
   rel=${tdir#"$ROOT/"}
   remove_path "$rel"                                "$tdir"
-done < <(find "$ROOT/apps/harness-monitor-macos/Tools" -mindepth 2 -maxdepth 3 -type d -name '.build' -print0 2>/dev/null)
+done < <(find "$ROOT/apps" "$ROOT/mcp-servers" -mindepth 2 -type d -name '.build' -prune -print0 2>/dev/null)
 
 section 'Repo tmp + scratch'
 remove_path 'tmp/'                                  "$ROOT/tmp"
