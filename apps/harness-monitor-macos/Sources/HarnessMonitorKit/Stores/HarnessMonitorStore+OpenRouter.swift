@@ -6,12 +6,19 @@ import Foundation
 /// The daemon dispatches OpenRouter through the catalog descriptor
 /// `"openrouter"`. The store projects each returned `AcpAgentSnapshot` into an
 /// `OpenRouterRunSnapshot` for the existing OpenRouter UI surfaces.
+
+/// Catalog descriptor id the daemon uses to dispatch OpenRouter sessions.
+public enum OpenRouterAcpDispatch {
+  public static let descriptorID = "openrouter"
+  public static let defaultModel = "anthropic/claude-3.7-sonnet"
+}
+
 extension HarnessMonitorStore {
   /// Catalog descriptor id the daemon uses to dispatch OpenRouter sessions.
-  public static let openRouterDescriptorID = "openrouter"
+  public static var openRouterDescriptorID: String { OpenRouterAcpDispatch.descriptorID }
 
   /// Default model picked when a caller does not supply one.
-  public static let defaultOpenRouterModel = "anthropic/claude-3.7-sonnet"
+  public static var defaultOpenRouterModel: String { OpenRouterAcpDispatch.defaultModel }
 
   public func openRouterRuns(forSessionID sessionID: String) -> [OpenRouterRunSnapshot] {
     openRouterRunsBySessionID[sessionID] ?? []
