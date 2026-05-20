@@ -11,15 +11,8 @@ extension SettingsTaskBoardEditingSurface {
         accessibilityIdentifier: HarnessMonitorAccessibility.settingsTaskBoardGlobalTokenField
       )
       SettingsSecretField(
-        title: "Todoist Token",
-        placeholder: "Optional Todoist API token",
-        field: draftBinding.todoistToken,
-        accessibilityIdentifier: HarnessMonitorAccessibility.settingsTaskBoardGlobalTokenField
-          + ".todoist"
-      )
-      SettingsSecretField(
         title: "OpenRouter API Key",
-        placeholder: "sk-or-...",
+        placeholder: "OpenRouter API key",
         field: draftBinding.openRouterToken,
         accessibilityIdentifier: HarnessMonitorAccessibility.settingsTaskBoardGlobalTokenField
           + ".openrouter"
