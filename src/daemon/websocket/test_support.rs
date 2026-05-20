@@ -130,7 +130,14 @@ pub(super) async fn test_http_state_with_async_db_timeline() -> DaemonHttpState 
             db.clone(),
             async_db.clone(),
         ),
-        agent_tui_manager: AgentTuiManagerHandle::new_with_async_db(sender, db, async_db, false),
+        agent_tui_manager: AgentTuiManagerHandle::new_with_async_db(
+            sender.clone(),
+            db,
+            async_db,
+            false,
+        ),
+        openrouter_agent_manager:
+            crate::daemon::openrouter_agent::OpenRouterAgentManagerHandle::new(sender),
         managed_agent_mutation_locks: crate::daemon::http::ManagedAgentMutationLocks::default(),
     }
 }
@@ -178,6 +185,8 @@ fn build_test_http_state(version: &str, started_at: &str, install_db: bool) -> D
         AcpAgentManagerHandle::new(sender.clone(), db.clone())
     };
 
+    let openrouter_agent_manager =
+        crate::daemon::openrouter_agent::OpenRouterAgentManagerHandle::new(sender.clone());
     DaemonHttpState {
         token: "token".into(),
         sender,
@@ -190,6 +199,7 @@ fn build_test_http_state(version: &str, started_at: &str, install_db: bool) -> D
         codex_controller,
         acp_agent_manager,
         agent_tui_manager,
+        openrouter_agent_manager,
         managed_agent_mutation_locks: crate::daemon::http::ManagedAgentMutationLocks::default(),
     }
 }

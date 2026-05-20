@@ -80,6 +80,8 @@ pub const SESSION_MANAGED_AGENTS_TERMINAL: &str =
     "/v1/sessions/{session_id}/managed-agents/terminal";
 pub const SESSION_MANAGED_AGENTS_CODEX: &str = "/v1/sessions/{session_id}/managed-agents/codex";
 pub const SESSION_MANAGED_AGENTS_ACP: &str = "/v1/sessions/{session_id}/managed-agents/acp";
+pub const SESSION_MANAGED_AGENTS_OPENROUTER: &str =
+    "/v1/sessions/{session_id}/managed-agents/openrouter";
 pub const MANAGED_AGENT_DETAIL: &str = "/v1/managed-agents/{managed_agent_id}";
 pub const MANAGED_AGENT_INPUT: &str = "/v1/managed-agents/{managed_agent_id}/input";
 pub const MANAGED_AGENT_RESIZE: &str = "/v1/managed-agents/{managed_agent_id}/resize";
@@ -97,6 +99,11 @@ pub const MANAGED_AGENTS_CODEX_INSPECT: &str = "/v1/managed-agents/codex/inspect
 pub const MANAGED_AGENTS_CODEX_TRANSCRIPT: &str = "/v1/managed-agents/codex/transcript";
 pub const MANAGED_AGENTS_ACP_INSPECT: &str = "/v1/managed-agents/acp/inspect";
 pub const MANAGED_AGENTS_ACP_TRANSCRIPT: &str = "/v1/managed-agents/acp/transcript";
+pub const MANAGED_AGENT_OPENROUTER: &str = "/v1/managed-agents/{managed_agent_id}/openrouter";
+pub const MANAGED_AGENT_OPENROUTER_PROMPT: &str =
+    "/v1/managed-agents/{managed_agent_id}/openrouter/prompt";
+pub const MANAGED_AGENT_OPENROUTER_CANCEL: &str =
+    "/v1/managed-agents/{managed_agent_id}/openrouter/cancel";
 pub const SESSION_SIGNAL_SEND: &str = "/v1/sessions/{session_id}/signal";
 pub const SESSION_SIGNAL_CANCEL: &str = "/v1/sessions/{session_id}/signal-cancel";
 pub const SESSION_SIGNAL_ACK: &str = "/v1/sessions/{session_id}/signal-ack";

@@ -21,6 +21,7 @@ use tracing::field::{Empty, display};
 use crate::daemon::agent_acp::AcpAgentManagerHandle;
 use crate::daemon::agent_tui::AgentTuiManagerHandle;
 use crate::daemon::codex_controller::CodexControllerHandle;
+use crate::daemon::openrouter_agent::OpenRouterAgentManagerHandle;
 use crate::daemon::db::{AsyncDaemonDb, DaemonDb, canonical_db_unavailable};
 use crate::daemon::protocol::StreamEvent;
 use crate::daemon::service::WakeDispatch;
@@ -161,6 +162,7 @@ pub struct DaemonHttpState {
     pub codex_controller: CodexControllerHandle,
     pub agent_tui_manager: AgentTuiManagerHandle,
     pub acp_agent_manager: AcpAgentManagerHandle,
+    pub openrouter_agent_manager: OpenRouterAgentManagerHandle,
     pub managed_agent_mutation_locks: ManagedAgentMutationLocks,
 }
 

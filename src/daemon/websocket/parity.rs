@@ -29,6 +29,7 @@ use super::mutations::{cli_error_response, dispatch_query_result};
 use super::params::{extract_managed_agent_id, extract_session_id, extract_string_param};
 
 mod managed_agents;
+mod openrouter;
 #[cfg(test)]
 mod tests;
 mod voice;
@@ -40,6 +41,11 @@ pub(crate) use self::managed_agents::{
     dispatch_managed_agent_start_acp, dispatch_managed_agent_start_codex,
     dispatch_managed_agent_start_terminal, dispatch_managed_agent_steer_codex,
     dispatch_managed_agent_stop, dispatch_managed_agent_stop_acp,
+};
+pub(crate) use self::openrouter::{
+    dispatch_managed_agent_cancel_openrouter, dispatch_managed_agent_detail_openrouter,
+    dispatch_managed_agent_openrouter_list, dispatch_managed_agent_prompt_openrouter,
+    dispatch_managed_agent_start_openrouter,
 };
 pub(crate) use self::voice::{
     dispatch_voice_append_audio, dispatch_voice_append_transcript, dispatch_voice_finish_session,
@@ -436,42 +442,6 @@ pub(crate) async fn dispatch_signal_ack(
             dispatch_query_result(&request.id, Ok::<_, CliError>(json!({ "ok": true })))
         }
         Err(error) => cli_error_response(&request.id, &error),
-    }
-}
-
-#[expect(
-    clippy::cognitive_complexity,
-    reason = "tracing macro expansion inflates the score; tokio-rs/tracing#553"
-)]
-async fn dispatch_managed_agent_response(
-    request: &WsRequest,
-    state: &DaemonHttpState,
-    result: Result<ManagedAgentSnapshot, CliError>,
-) -> WsResponse {
-    match result {
-        Ok(snapshot) => {
-            tracing::info!(
-                method = %request.method,
-                request_id = %request.id,
-                kind = %managed_agent_snapshot_kind(&snapshot),
-                runtime_id = %snapshot.agent_id(),
-                session_id = %snapshot.session_id(),
-                "managed agent dispatch returning snapshot"
-            );
-            if let Err(error) = broadcast_session_snapshot(state, snapshot.session_id()).await {
-                return cli_error_response(&request.id, &error);
-            }
-            dispatch_query_result(&request.id, Ok::<_, CliError>(snapshot))
-        }
-        Err(error) => cli_error_response(&request.id, &error),
-    }
-}
-
-const fn managed_agent_snapshot_kind(snapshot: &ManagedAgentSnapshot) -> &'static str {
-    match snapshot {
-        ManagedAgentSnapshot::Terminal(_) => "terminal",
-        ManagedAgentSnapshot::Codex(_) => "codex",
-        ManagedAgentSnapshot::Acp(_) => "acp",
     }
 }
 
