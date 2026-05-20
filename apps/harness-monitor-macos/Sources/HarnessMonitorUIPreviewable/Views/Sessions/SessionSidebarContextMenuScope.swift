@@ -88,7 +88,7 @@ struct SessionSidebarContextMenuScope: Equatable {
     case .agent: .agent
     case .task: .task
     case .decision: .decision
-    case .route, .codexRun, .create: nil
+    case .route, .codexRun, .openRouterRun, .create: nil
     }
   }
 }

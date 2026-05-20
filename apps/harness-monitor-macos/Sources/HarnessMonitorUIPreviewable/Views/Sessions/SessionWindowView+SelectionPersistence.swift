@@ -36,6 +36,9 @@ extension SessionWindowView {
     case .codexRun:
       targetRoute = .agents
       targetDecisionID = ""
+    case .openRouterRun:
+      targetRoute = .agents
+      targetDecisionID = ""
     case .decision(_, let decisionID):
       targetRoute = .decisions
       targetDecisionID = decisionID

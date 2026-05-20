@@ -7,6 +7,7 @@ public final class SessionWindowSectionState {
   public var routeSelection: SessionWindowRoute = .overview
   public var agentID: String?
   public var codexRunID: String?
+  public var openRouterRunID: String?
   public var decisionID: String?
   public var taskID: String?
   public var createDrafts: [SessionCreateKind: SessionCreateDraft] = [:]
@@ -21,6 +22,8 @@ public final class SessionWindowSectionState {
       assign(\.agentID, agentID)
     case .codexRun(_, let runID):
       assign(\.codexRunID, runID)
+    case .openRouterRun(_, let runID):
+      assign(\.openRouterRunID, runID)
     case .decision(_, let decisionID):
       assign(\.decisionID, decisionID)
     case .task(_, let taskID):

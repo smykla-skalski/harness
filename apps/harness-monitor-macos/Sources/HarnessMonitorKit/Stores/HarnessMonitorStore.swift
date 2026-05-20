@@ -359,6 +359,7 @@ public final class HarnessMonitorStore {
   @ObservationIgnored var acpRuntimeClockTask: Task<Void, Never>?
   var selectionTask: Task<Void, Never>?
   var codexRunsBySessionID: [String: [CodexRunSnapshot]] = [:]
+  var openRouterRunsBySessionID: [String: [OpenRouterRunSnapshot]] = [:]
   @ObservationIgnored var locallyRemovedSessionIDs: Set<String> = []
   @ObservationIgnored var pendingListSelectionTask: Task<Void, Never>?
   @ObservationIgnored var pendingListSelectionTaskToken: UInt64 = 0

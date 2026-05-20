@@ -5,6 +5,7 @@ struct SessionSidebar: View {
   let store: HarnessMonitorStore
   let snapshot: HarnessMonitorSessionWindowSnapshot?
   let sessionCodexRuns: [CodexRunSnapshot]
+  let sessionOpenRouterRuns: [OpenRouterRunSnapshot]
   let decisions: [Decision]
   let decisionIDs: [String]
   let statusModel: SessionStatusSummaryModel
@@ -27,6 +28,7 @@ struct SessionSidebar: View {
     store: HarnessMonitorStore,
     snapshot: HarnessMonitorSessionWindowSnapshot?,
     sessionCodexRuns: [CodexRunSnapshot],
+    sessionOpenRouterRuns: [OpenRouterRunSnapshot],
     decisions: [Decision],
     decisionIDs: [String],
     statusModel: SessionStatusSummaryModel,
@@ -36,6 +38,7 @@ struct SessionSidebar: View {
     self.store = store
     self.snapshot = snapshot
     self.sessionCodexRuns = sessionCodexRuns
+    self.sessionOpenRouterRuns = sessionOpenRouterRuns
     self.decisions = decisions
     self.decisionIDs = decisionIDs
     self.statusModel = statusModel

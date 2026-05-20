@@ -164,7 +164,30 @@ extension SessionSidebar {
           }
         }
       }
-      if orderedAgents.isEmpty && sessionCodexRuns.isEmpty {
+      ForEach(sessionOpenRouterRuns) { run in
+        let selection = SessionSelection.openRouterRun(
+          sessionID: state.sessionID,
+          runID: run.runId
+        )
+        SessionSidebarRow(
+          title: run.displayName,
+          systemImage: "network",
+          severityShape: SessionOpenRouterRunRowFormatter.severityShape(for: run.status),
+          severityTint: SessionOpenRouterRunRowFormatter.severityTint(for: run.status)
+        )
+        .tag(selection)
+        .contextMenu {
+          if displayedSelectionSet.count > 1, displayedSelectionSet.contains(selection) {
+            Button(SessionSidebarContextMenuScope.mixedSelectionUnavailableLabel) {}
+              .disabled(true)
+          } else {
+            Button("Copy Run ID") {
+              HarnessMonitorClipboard.copy(run.runId)
+            }
+          }
+        }
+      }
+      if orderedAgents.isEmpty && sessionCodexRuns.isEmpty && sessionOpenRouterRuns.isEmpty {
         Text("No agents")
           .foregroundStyle(.secondary)
       }

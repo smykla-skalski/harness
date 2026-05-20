@@ -134,6 +134,7 @@
       selectedCodexRuns = []
       selectedCodexRun = nil
       codexRunsBySessionID = [:]
+      openRouterRunsBySessionID = [:]
       connectionState = .online
       activeTransport = .webSocket
       await cacheSessionDetail(detail, timeline: [], markViewed: false)

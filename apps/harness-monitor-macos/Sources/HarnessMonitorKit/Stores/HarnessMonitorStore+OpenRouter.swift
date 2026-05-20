@@ -1,6 +1,10 @@
 import Foundation
 
 extension HarnessMonitorStore {
+  public func openRouterRuns(forSessionID sessionID: String) -> [OpenRouterRunSnapshot] {
+    openRouterRunsBySessionID[sessionID] ?? []
+  }
+
   @discardableResult
   public func startOpenRouterRun(
     prompt: String,
@@ -37,7 +41,11 @@ extension HarnessMonitorStore {
         sessionID: action.sessionID,
         request: request
       )
-      return snapshot.openRouter
+      if let run = snapshot.openRouter {
+        applyOpenRouterRun(run)
+        return run
+      }
+      return nil
     } catch {
       presentFailureFeedback(
         "Failed to start OpenRouter session: \(error.localizedDescription)"
@@ -58,10 +66,12 @@ extension HarnessMonitorStore {
       return nil
     }
     do {
-      return try await client.promptManagedOpenRouterAgent(
+      let run = try await client.promptManagedOpenRouterAgent(
         managedAgentID: runID,
         prompt: trimmedPrompt
       )
+      applyOpenRouterRun(run)
+      return run
     } catch {
       presentFailureFeedback(
         "Failed to send prompt to OpenRouter session: \(error.localizedDescription)"
@@ -74,7 +84,9 @@ extension HarnessMonitorStore {
   public func cancelOpenRouterRun(runID: String) async -> OpenRouterRunSnapshot? {
     guard let client else { return nil }
     do {
-      return try await client.cancelManagedOpenRouterAgent(managedAgentID: runID)
+      let run = try await client.cancelManagedOpenRouterAgent(managedAgentID: runID)
+      applyOpenRouterRun(run)
+      return run
     } catch {
       presentFailureFeedback(
         "Failed to cancel OpenRouter session: \(error.localizedDescription)"
@@ -100,16 +112,43 @@ extension HarnessMonitorStore {
   ) async -> ManagedAgentSnapshot? {
     guard let client else { return nil }
     do {
-      return try await client.resolveManagedAcpPermission(
+      let snapshot = try await client.resolveManagedAcpPermission(
         agentID: runID,
         batchID: batchID,
         decision: decision
       )
+      if let run = snapshot.openRouter {
+        applyOpenRouterRun(run)
+      }
+      return snapshot
     } catch {
       presentFailureFeedback(
         "Failed to resolve permission batch: \(error.localizedDescription)"
       )
       return nil
+    }
+  }
+
+  func applyOpenRouterRun(_ run: OpenRouterRunSnapshot) {
+    var runs = openRouterRunsBySessionID[run.sessionId] ?? []
+    if let index = runs.firstIndex(where: { $0.runId == run.runId }) {
+      runs[index] = run
+    } else {
+      runs.append(run)
+    }
+    openRouterRunsBySessionID[run.sessionId] = runs
+  }
+
+  func refreshOpenRouterRuns(
+    using client: any HarnessMonitorClientProtocol,
+    sessionID: String
+  ) async {
+    do {
+      let response = try await client.listManagedOpenRouterAgents(sessionID: sessionID)
+      openRouterRunsBySessionID[sessionID] = response.runs
+    } catch {
+      // Best effort. Leave existing cache untouched so transient errors do
+      // not blank the sidebar.
     }
   }
 }

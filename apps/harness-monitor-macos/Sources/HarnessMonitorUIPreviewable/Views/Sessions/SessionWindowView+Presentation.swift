@@ -86,6 +86,7 @@ extension SessionWindowView {
     case .route(let route): route
     case .agent: .agents
     case .codexRun: .agents
+    case .openRouterRun: .agents
     case .decision: .decisions
     case .task: .tasks
     case .create: .agents
