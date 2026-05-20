@@ -27,6 +27,7 @@ use agent_client_protocol::schema::{
     WaitForTerminalExitResponse, WriteTextFileRequest, WriteTextFileResponse,
 };
 use agent_client_protocol::{AcpAgent, Agent, Client, ConnectionTo};
+use tokio::process::Command;
 use wiremock::matchers::{method, path};
 use wiremock::{Mock, MockServer, Request, ResponseTemplate};
 
@@ -155,6 +156,20 @@ fn client_builder_with_chunks(
             },
             agent_client_protocol::on_receive_request!(),
         )
+}
+
+#[tokio::test]
+async fn probe_flag_exits_success_without_api_key() {
+    // The catalog descriptor's doctor_probe runs the shim with --probe to
+    // detect installation. It must exit 0 without spinning up the runtime
+    // and without requiring OPENROUTER_API_KEY.
+    let status = Command::new(BIN_PATH)
+        .arg("--probe")
+        .env_remove("OPENROUTER_API_KEY")
+        .status()
+        .await
+        .expect("spawn shim");
+    assert!(status.success(), "probe exited with {status}");
 }
 
 #[tokio::test]
@@ -345,6 +360,76 @@ async fn prompt_round_trips_a_tool_call() {
 
     let concatenated = log_for_assert.snapshot().join("");
     assert_eq!(concatenated, "file says: hi");
+}
+
+#[tokio::test]
+async fn parallel_tool_calls_in_one_chunk_dispatch_in_index_order() {
+    let server = MockServer::start().await;
+    mount_models(&server).await;
+    // Two tool_calls keyed by index 0 and 1 in a single SSE delta.
+    let parallel = sse(&[
+        r#"{"id":"par","choices":[{"index":0,"delta":{"role":"assistant","tool_calls":[{"index":0,"id":"c0","type":"function","function":{"name":"read_text_file","arguments":"{\"path\":\"a\"}"}},{"index":1,"id":"c1","type":"function","function":{"name":"read_text_file","arguments":"{\"path\":\"b\"}"}}]},"finish_reason":"tool_calls"}]}"#,
+    ]);
+    let final_text = sse(&[
+        r#"{"id":"fin","choices":[{"index":0,"delta":{"content":"done"},"finish_reason":"stop"}]}"#,
+    ]);
+    Mock::given(method("POST"))
+        .and(path("/chat/completions"))
+        .and(|req: &Request| -> bool {
+            let body: serde_json::Value = match serde_json::from_slice(&req.body) {
+                Ok(value) => value,
+                Err(_) => return false,
+            };
+            body["messages"]
+                .as_array()
+                .map(|msgs| msgs.iter().any(|m| m["role"] == "tool"))
+                .unwrap_or(false)
+        })
+        .respond_with(
+            ResponseTemplate::new(200)
+                .insert_header("content-type", "text/event-stream")
+                .set_body_string(final_text),
+        )
+        .mount(&server)
+        .await;
+    Mock::given(method("POST"))
+        .and(path("/chat/completions"))
+        .respond_with(
+            ResponseTemplate::new(200)
+                .insert_header("content-type", "text/event-stream")
+                .set_body_string(parallel),
+        )
+        .mount(&server)
+        .await;
+
+    let agent = build_agent(&server.uri());
+    let log = ChunkLog::default();
+    let log_for_assert = log.clone();
+    client_builder_with_chunks(log)
+        .connect_with(agent, |cx: ConnectionTo<Agent>| async move {
+            cx.send_request(InitializeRequest::new(ProtocolVersion::LATEST))
+                .block_task()
+                .await?;
+            let session = cx
+                .send_request(NewSessionRequest::new(std::env::temp_dir()))
+                .block_task()
+                .await?;
+            let response = cx
+                .send_request(PromptRequest::new(
+                    session.session_id,
+                    vec![ContentBlock::Text(TextContent::new("Parallel"))],
+                ))
+                .block_task()
+                .await?;
+            assert!(matches!(response.stop_reason, StopReason::EndTurn));
+            Ok(())
+        })
+        .await
+        .expect("connection drives to completion");
+    assert!(
+        log_for_assert.snapshot().iter().any(|s| s == "done"),
+        "expected final text after both tool calls resolved",
+    );
 }
 
 #[tokio::test]
