@@ -18,10 +18,14 @@ struct SettingsRepositoriesSection: View {
   @State private var catalogSelection: Set<String> = []
   @State private var catalogSearchText = ""
   @State private var isCatalogLoading = false
-  @State private var catalogError: String?
+  @State private var catalogError: SettingsRepositoriesCatalogErrorPresentation?
 
   @Environment(\.fontScale)
   private var fontScale
+  @Environment(\.openSettingsSection)
+  private var openSettingsSection
+  @Environment(\.openURL)
+  private var openURL
 
   init(
     store: HarnessMonitorStore,
@@ -48,6 +52,11 @@ struct SettingsRepositoriesSection: View {
     return catalogRepositories.filter { $0.localizedCaseInsensitiveContains(needle) }
   }
 
+  private var catalogListHeight: CGFloat {
+    let visibleRows = min(max(filteredCatalogRepositories.count, 4), 8)
+    return CGFloat(visibleRows) * 36
+  }
+
   var body: some View {
     Form {
       if let loadError {
@@ -68,6 +77,10 @@ struct SettingsRepositoriesSection: View {
     .settingsDetailFormStyle()
     .accessibilityIdentifier(HarnessMonitorAccessibility.settingsRepositoriesRoot)
     .task { await loadDraftIfNeeded() }
+    .onChange(of: catalogError) { _, newValue in
+      guard let newValue else { return }
+      AccessibilityNotification.Announcement("\(newValue.title). \(newValue.message)").post()
+    }
     .safeAreaInset(edge: .bottom, spacing: 0) {
       actionsBar
     }
@@ -269,9 +282,7 @@ struct SettingsRepositoriesSection: View {
       }
 
       if let catalogError {
-        Text(catalogError)
-          .foregroundStyle(.red)
-          .accessibilityIdentifier(HarnessMonitorAccessibility.settingsRepositoriesCatalogStatus)
+        catalogErrorView(catalogError)
       }
 
       if !loadedCatalogOrganization.isEmpty {
@@ -283,13 +294,12 @@ struct SettingsRepositoriesSection: View {
           Label("No repositories available for import", systemImage: "shippingbox")
             .foregroundStyle(HarnessMonitorTheme.tertiaryInk)
             .accessibilityIdentifier(HarnessMonitorAccessibility.settingsRepositoriesCatalogList)
+        } else if filteredCatalogRepositories.isEmpty {
+          Label("No repositories match the current search", systemImage: "magnifyingglass")
+            .foregroundStyle(HarnessMonitorTheme.tertiaryInk)
+            .accessibilityIdentifier(HarnessMonitorAccessibility.settingsRepositoriesCatalogList)
         } else {
-          List(filteredCatalogRepositories, id: \.self, selection: $catalogSelection) { repository in
-            Text(repository)
-              .textSelection(.enabled)
-          }
-          .frame(minHeight: 180, maxHeight: 280)
-          .accessibilityIdentifier(HarnessMonitorAccessibility.settingsRepositoriesCatalogList)
+          catalogRepositoryList
 
           HStack(spacing: HarnessMonitorTheme.spacingSM) {
             Button("Select Visible") {
@@ -335,6 +345,83 @@ struct SettingsRepositoriesSection: View {
         """
       )
     }
+  }
+
+  private func catalogErrorView(_ error: SettingsRepositoriesCatalogErrorPresentation) -> some View {
+    VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
+      Label(error.title, systemImage: "exclamationmark.triangle.fill")
+        .font(captionSemibold)
+        .foregroundStyle(.orange)
+        .accessibilityAddTraits(.isHeader)
+
+      Text(error.message)
+        .font(bodyFont)
+        .foregroundStyle(.primary)
+        .fixedSize(horizontal: false, vertical: true)
+
+      if let action = error.action {
+        Button(action.title) {
+          performCatalogErrorAction(action)
+        }
+        .harnessActionButtonStyle(variant: .bordered, tint: .secondary)
+        .fixedSize(horizontal: true, vertical: true)
+        .accessibilityHint(error.actionHint)
+      }
+    }
+    .frame(maxWidth: .infinity, alignment: .leading)
+    .padding(HarnessMonitorTheme.spacingMD)
+    .background(Color(nsColor: .controlBackgroundColor).opacity(0.42))
+    .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+    .overlay {
+      RoundedRectangle(cornerRadius: 10, style: .continuous)
+        .stroke(.orange.opacity(0.45), lineWidth: 1)
+    }
+    .accessibilityIdentifier(HarnessMonitorAccessibility.settingsRepositoriesCatalogStatus)
+  }
+
+  private var catalogRepositoryList: some View {
+    ScrollView {
+      LazyVStack(spacing: 0) {
+        ForEach(Array(filteredCatalogRepositories.enumerated()), id: \.offset) { index, repository in
+          if index > 0 {
+            Divider()
+          }
+          catalogRepositoryRow(repository)
+        }
+      }
+    }
+    .frame(height: catalogListHeight)
+    .background(tableBackground)
+    .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+    .overlay {
+      RoundedRectangle(cornerRadius: 8, style: .continuous)
+        .stroke(Color(nsColor: .separatorColor).opacity(0.55), lineWidth: 1)
+    }
+    .accessibilityIdentifier(HarnessMonitorAccessibility.settingsRepositoriesCatalogList)
+  }
+
+  private func catalogRepositoryRow(_ repository: String) -> some View {
+    Toggle(
+      isOn: Binding(
+        get: { catalogSelection.contains(repository) },
+        set: { isSelected in
+          if isSelected {
+            catalogSelection.insert(repository)
+          } else {
+            catalogSelection.remove(repository)
+          }
+        }
+      )
+    ) {
+      Text(repository)
+        .font(bodyFont)
+        .lineLimit(1)
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+    .toggleStyle(.checkbox)
+    .padding(.horizontal, HarnessMonitorTheme.spacingMD)
+    .padding(.vertical, HarnessMonitorTheme.spacingSM)
+    .frame(maxWidth: .infinity, alignment: .leading)
   }
 
   private var catalogSummary: some View {
@@ -523,7 +610,10 @@ struct SettingsRepositoriesSection: View {
       catalogSearchText = ""
       catalogSelection = preselectVisible ? Set(repositories) : []
     } catch {
-      catalogError = error.localizedDescription
+      catalogError = SettingsRepositoriesCatalogErrorPresentation(
+        error: error,
+        organization: organization
+      )
       loadedCatalogOrganization = ""
       catalogRepositories = []
       catalogSelection = []
@@ -598,6 +688,151 @@ struct SettingsRepositoriesSection: View {
     catalogSearchText = ""
     catalogError = nil
     isCatalogLoading = false
+  }
+
+  private func performCatalogErrorAction(
+    _ action: SettingsRepositoriesCatalogErrorPresentation.RecoveryAction
+  ) {
+    switch action {
+    case .openSecrets:
+      openSettingsSection(.secrets)
+    case .openURL(let url):
+      openURL(url)
+    }
+  }
+}
+
+struct SettingsRepositoriesCatalogErrorPresentation: Equatable {
+  enum RecoveryAction: Equatable {
+    case openSecrets
+    case openURL(URL)
+
+    var title: String {
+      switch self {
+      case .openSecrets:
+        "Open Secrets"
+      case .openURL:
+        "Open Token Settings"
+      }
+    }
+  }
+
+  let title: String
+  let message: String
+  let action: RecoveryAction?
+
+  init(title: String, message: String, action: RecoveryAction?) {
+    self.title = title
+    self.message = message
+    self.action = action
+  }
+
+  init(error: any Error, organization: String) {
+    self = Self.presentation(for: error, organization: organization)
+  }
+
+  var actionHint: String {
+    switch action {
+    case .openSecrets:
+      "Open the Secrets settings section."
+    case .openURL:
+      "Open GitHub token settings in your browser."
+    case nil:
+      ""
+    }
+  }
+
+  private static func presentation(
+    for error: any Error,
+    organization: String
+  ) -> SettingsRepositoriesCatalogErrorPresentation {
+    let rawMessage = sourceMessage(from: error)
+    let normalized = rawMessage.lowercased()
+    let organizationReference = organization.isEmpty ? "this organization" : organization
+
+    if normalized.contains("requires a github token") {
+      return Self(
+        title: "GitHub token required",
+        message: "Add a GitHub token in Settings > Secrets, then load repositories again.",
+        action: .openSecrets
+      )
+    }
+
+    if normalized.contains("forbids access via a fine-grained personal access") {
+      let action = tokenSettingsAction(in: rawMessage)
+      if normalized.contains("token's lifetime is greater than 366 days") {
+        return Self(
+          title: "GitHub token needs attention",
+          message:
+            "GitHub blocked access to \(organizationReference) because the current fine-grained token exceeds the organization's lifetime policy. Update the token, then load repositories again.",
+          action: action
+        )
+      }
+
+      return Self(
+        title: "GitHub access is blocked",
+        message:
+          "GitHub blocked access to \(organizationReference) for the current fine-grained token. Update the token's organization access, then load repositories again.",
+        action: action
+      )
+    }
+
+    if normalized.contains("was not found or is not accessible")
+      || normalized.contains("could not resolve to an organization")
+    {
+      return Self(
+        title: "Organization unavailable",
+        message:
+          "GitHub couldn't load repositories for \(organizationReference). Check the organization name and confirm the current token can access it, then try again.",
+        action: nil
+      )
+    }
+
+    if normalized.contains("rate limit") {
+      return Self(
+        title: "GitHub is rate limiting requests",
+        message: "Wait a moment, then load repositories again.",
+        action: nil
+      )
+    }
+
+    if normalized.contains("bad credentials") || normalized.contains("unauthorized") {
+      return Self(
+        title: "GitHub token was rejected",
+        message: "Update the GitHub token in Settings > Secrets, then load repositories again.",
+        action: .openSecrets
+      )
+    }
+
+    return Self(
+      title: "Couldn't load repositories",
+      message:
+        "GitHub couldn't load repositories for \(organizationReference). Check the organization name and your GitHub access, then try again.",
+      action: nil
+    )
+  }
+
+  private static func sourceMessage(from error: any Error) -> String {
+    if let apiError = error as? HarnessMonitorAPIError {
+      return apiError.serverMessage ?? apiError.errorDescription ?? error.localizedDescription
+    }
+    return error.localizedDescription
+  }
+
+  private static func tokenSettingsAction(in message: String) -> RecoveryAction? {
+    guard
+      let range = message.range(
+        of: #"https://github\.com/settings/personal-access-tokens/[^\s)]+"#,
+        options: .regularExpression
+      )
+    else {
+      return nil
+    }
+    let urlString = String(message[range]).trimmingCharacters(in: CharacterSet(charactersIn: ".)"))
+    guard let url = URL(string: urlString) else {
+      return nil
+    }
+    return .openURL(url)
   }
 }
 
