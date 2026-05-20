@@ -23,8 +23,8 @@ fn manager_with_no_subscribers() -> OpenRouterAgentManagerHandle {
     OpenRouterAgentManagerHandle::new(sender)
 }
 
-#[test]
-fn list_for_session_filters_by_harness_session() {
+#[tokio::test(flavor = "current_thread")]
+async fn list_for_session_filters_by_harness_session() {
     let manager = manager_with_no_subscribers();
     {
         let mut sessions = lock_sessions(&manager.inner);
@@ -49,8 +49,8 @@ fn get_returns_not_found_for_unknown_run() {
     assert!(err.to_string().to_lowercase().contains("not found"));
 }
 
-#[test]
-fn cancel_marks_status_cancelled() {
+#[tokio::test(flavor = "current_thread")]
+async fn cancel_marks_status_cancelled() {
     let manager = manager_with_no_subscribers();
     {
         let mut sessions = lock_sessions(&manager.inner);
