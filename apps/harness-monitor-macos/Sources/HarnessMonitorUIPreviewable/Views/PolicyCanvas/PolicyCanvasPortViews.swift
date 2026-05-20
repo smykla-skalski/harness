@@ -17,27 +17,25 @@ struct PolicyCanvasPortColumn: View {
   var isAuxiliary = false
 
   var body: some View {
-    // Ports are fixed per node-kind (node ports are created once in
-    // `PolicyCanvasNode.init` and never mutated at runtime, only cloned).
-    // Iterating `ports.indices` keeps the offset math inline so we avoid
-    // allocating a fresh `[PolicyCanvasPort.ID: CGSize]` dictionary on
-    // every body call - that allocation was the hot lever feeding the
-    // `External: UInt32 -> PolicyCanvasPort.Evictor` cascade observed in
-    // r23 (14k edges).
-    let count = ports.count
+    // One ForEach over a flat `[PortMarkerPlacement]` instead of nested
+    // `ForEach(ports.indices) { ForEach(markers(for:)) }`. The previous nesting
+    // doubled the per-transaction `External: UInt32 -> ForEach<…>.Evictor`
+    // edge count (45k edges/30s in the settings-open trace) because every
+    // SwiftUI frame stamps each ForEach state independently. Flattening drops
+    // half of those edges and also hoists the per-port marker computation out
+    // of the inner ForEach data argument so the array identity is stable
+    // across consecutive ticks with the same inputs.
     ZStack(alignment: stackAlignment) {
-      ForEach(ports.indices, id: \.self) { index in
-        ForEach(markers(for: ports[index]), id: \.id) { marker in
-          PolicyCanvasPortView(
-            node: node,
-            port: ports[index],
-            side: portSide,
-            viewModel: viewModel,
-            isAuxiliary: isAuxiliary || !marker.allowsInteraction,
-            allowsInteraction: marker.allowsInteraction
-          )
-          .offset(offset(index: index, count: count, marker: marker))
-        }
+      ForEach(placements) { placement in
+        PolicyCanvasPortView(
+          node: node,
+          port: placement.port,
+          side: portSide,
+          viewModel: viewModel,
+          isAuxiliary: isAuxiliary || !placement.marker.allowsInteraction,
+          allowsInteraction: placement.marker.allowsInteraction
+        )
+        .offset(placement.offset)
       }
     }
     .frame(
@@ -50,6 +48,38 @@ struct PolicyCanvasPortColumn: View {
       y: frameOffset.height
     )
     .accessibilityHidden(isAuxiliary)
+  }
+
+  private var placements: [PolicyCanvasPortPlacement] {
+    let count = ports.count
+    let side = portSide
+    var result: [PolicyCanvasPortPlacement] = []
+    result.reserveCapacity(ports.count)
+    for index in ports.indices {
+      let port = ports[index]
+      let endpoint = PolicyCanvasPortEndpoint(
+        nodeID: node.id,
+        portID: port.id,
+        kind: port.kind
+      )
+      let isVisible = policyCanvasVisiblePortSides(
+        for: endpoint,
+        visibility: visibleSides
+      )
+      .contains(side)
+      let markers = markerLayout.markers(for: endpoint, side: side, isVisible: isVisible)
+      for marker in markers {
+        result.append(
+          PolicyCanvasPortPlacement(
+            id: "\(port.id)#\(marker.id)",
+            port: port,
+            marker: marker,
+            offset: offset(index: index, count: count, marker: marker)
+          )
+        )
+      }
+    }
+    return result
   }
 
   private var stackAlignment: Alignment {
@@ -76,20 +106,6 @@ struct PolicyCanvasPortColumn: View {
     case .bottom:
       .bottom
     }
-  }
-
-  private func markers(for port: PolicyCanvasPort) -> [PolicyCanvasPortMarker] {
-    let endpoint = PolicyCanvasPortEndpoint(
-      nodeID: node.id,
-      portID: port.id,
-      kind: port.kind
-    )
-    let isVisible = policyCanvasVisiblePortSides(
-      for: endpoint,
-      visibility: visibleSides
-    )
-    .contains(portSide)
-    return markerLayout.markers(for: endpoint, side: portSide, isVisible: isVisible)
   }
 
   private var frameOffset: CGSize {
@@ -127,6 +143,13 @@ struct PolicyCanvasPortColumn: View {
       )
     }
   }
+}
+
+private struct PolicyCanvasPortPlacement: Identifiable, Equatable {
+  let id: String
+  let port: PolicyCanvasPort
+  let marker: PolicyCanvasPortMarker
+  let offset: CGSize
 }
 
 private struct PolicyCanvasPortView: View {
