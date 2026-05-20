@@ -222,13 +222,9 @@ impl ExternalSyncClient for GitHubSyncClient {
             .octocrab()
             .issues(repository.owner.as_str(), repository.repo.as_str());
         if let Some(precondition) = update.precondition_updated_at.as_deref() {
-            let current = issues.get(issue_number).await.map_err(|error| {
-                github_sync_error_with_context(
-                    format!("loading issue {issue_number} in {}", repository.slug()),
-                    error,
-                )
-            })?;
-            if current.updated_at.to_rfc3339() != precondition {
+            let current_updated_at =
+                graphql::issue_updated_at(self.octocrab(), &repository, issue_number).await?;
+            if current_updated_at != precondition {
                 return Ok(ExternalUpdateOutcome::PreconditionFailed);
             }
         }

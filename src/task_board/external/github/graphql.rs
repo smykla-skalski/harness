@@ -61,6 +61,16 @@ query TaskBoardGitHubSearch($query: String!, $after: String) {
 }
 ";
 
+const ISSUE_UPDATED_AT_QUERY: &str = r"
+query TaskBoardIssueUpdatedAt($owner: String!, $repo: String!, $number: Int!) {
+  repository(owner: $owner, name: $repo) {
+    issue(number: $number) {
+      updatedAt
+    }
+  }
+}
+";
+
 pub(super) async fn current_user_login(client: &Octocrab) -> Result<String, CliError> {
     let response: GitHubViewerResponse = client
         .graphql(&json!({ "query": VIEWER_QUERY }))
@@ -76,6 +86,40 @@ pub(super) async fn current_user_login(client: &Octocrab) -> Result<String, CliE
         .into());
     }
     Ok(login.to_string())
+}
+
+pub(super) async fn issue_updated_at(
+    client: &Octocrab,
+    repository: &GitHubRepository,
+    issue_number: u64,
+) -> Result<String, CliError> {
+    let response: GitHubIssueUpdatedAtResponse = client
+        .graphql(&json!({
+            "query": ISSUE_UPDATED_AT_QUERY,
+            "variables": {
+                "owner": repository.owner.as_str(),
+                "repo": repository.repo.as_str(),
+                "number": issue_number,
+            },
+        }))
+        .await
+        .map_err(|error| {
+            github_sync_error_with_context(
+                format!("loading issue {issue_number} in {}", repository.slug()),
+                error,
+            )
+        })?;
+    response
+        .repository
+        .and_then(|repository| repository.issue)
+        .map(|issue| issue.updated_at)
+        .ok_or_else(|| {
+            CliErrorKind::workflow_io(format!(
+                "loading issue {issue_number} in {} returned no issue",
+                repository.slug()
+            ))
+            .into()
+        })
 }
 
 pub(super) fn personal_issue_queries(repository: &GitHubRepository, login: &str) -> Vec<String> {
@@ -141,6 +185,22 @@ struct GitHubViewerResponse {
 #[derive(Debug, Deserialize)]
 struct GitHubViewer {
     login: String,
+}
+
+#[derive(Debug, Deserialize)]
+struct GitHubIssueUpdatedAtResponse {
+    repository: Option<GitHubIssueUpdatedAtRepository>,
+}
+
+#[derive(Debug, Deserialize)]
+struct GitHubIssueUpdatedAtRepository {
+    issue: Option<GitHubIssueUpdatedAtNode>,
+}
+
+#[derive(Debug, Deserialize)]
+struct GitHubIssueUpdatedAtNode {
+    #[serde(rename = "updatedAt")]
+    updated_at: String,
 }
 
 #[derive(Debug, Deserialize)]
@@ -239,6 +299,27 @@ mod tests {
         assert_eq!(
             item.label_names(),
             vec!["needs-fix".to_string(), "automation".to_string()]
+        );
+    }
+
+    #[test]
+    fn issue_updated_at_response_deserializes_minimal_payload() {
+        let payload = json!({
+            "repository": {
+                "issue": {
+                    "updatedAt": "2026-05-20T12:00:00Z"
+                }
+            }
+        });
+        let response: GitHubIssueUpdatedAtResponse =
+            serde_json::from_value(payload).expect("deserialize issue timestamp");
+
+        assert_eq!(
+            response
+                .repository
+                .and_then(|repository| repository.issue)
+                .map(|issue| issue.updated_at),
+            Some("2026-05-20T12:00:00Z".to_string())
         );
     }
 
