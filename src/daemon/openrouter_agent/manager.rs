@@ -1,19 +1,13 @@
-//! `OpenRouter` agent session manager.
+//! In-daemon OpenRouter agent session manager (turn loop in `turn_runner`).
 //!
-//! Holds in-memory session state keyed by `run_id`. Each session owns a
-//! conversation history, a fixed in-process tool-dispatch [`HarnessAcpClient`]
-//! that enforces the daemon's write surface and denied-binary policy, and
-//! (optionally) an in-flight turn task. Streaming deltas and tool-call events
-//! fan out through the daemon's shared `broadcast::Sender<StreamEvent>` so
-//! SSE/WebSocket consumers see real-time updates.
-//!
-//! The actual streaming + tool-loop logic lives in
-//! [`crate::daemon::openrouter_agent::manager::turn_runner`].
+//! Slated for removal once `crates/harness-openrouter-agent` covers the same
+//! surface via the ACP catalog.
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::env;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex, MutexGuard, PoisonError};
+use std::time::Duration;
 
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
@@ -21,8 +15,6 @@ use tokio::sync::broadcast;
 use tokio::task::JoinHandle;
 use tracing::error;
 use uuid::Uuid;
-
-use std::time::Duration;
 
 use crate::agents::acp::client::HarnessAcpClient;
 use crate::agents::openrouter::{
@@ -479,25 +471,18 @@ fn not_found(run_id: &str) -> CliError {
 
 pub(super) fn classify(error: OpenRouterError) -> String {
     match error {
-        OpenRouterError::RateLimited { retry_after } => match retry_after {
-            Some(duration) => format!(
-                "OpenRouter rate limit exceeded (retry after {}s)",
-                duration.as_secs()
-            ),
-            None => "OpenRouter rate limit exceeded".to_owned(),
-        },
+        OpenRouterError::RateLimited { retry_after } => retry_after.map_or_else(
+            || "OpenRouter rate limit exceeded".to_owned(),
+            |d| format!("OpenRouter rate limit exceeded (retry after {}s)", d.as_secs()),
+        ),
         OpenRouterError::AuthenticationFailed { body } => {
             format!("OpenRouter authentication failed: {body}")
         }
-        OpenRouterError::Moderation { body } => {
-            format!("OpenRouter moderation block: {body}")
-        }
+        OpenRouterError::Moderation { body } => format!("OpenRouter moderation block: {body}"),
         OpenRouterError::Overloaded { status } => {
             format!("OpenRouter upstream overloaded (HTTP {status})")
         }
-        OpenRouterError::ApiError { status, body } => {
-            format!("OpenRouter HTTP {status}: {body}")
-        }
+        OpenRouterError::ApiError { status, body } => format!("OpenRouter HTTP {status}: {body}"),
         other => other.to_string(),
     }
 }

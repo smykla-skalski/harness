@@ -463,26 +463,17 @@ async fn stop_terminal_managed_agent(
 
 fn terminal_session_id(state: &DaemonHttpState, agent_id: &str) -> Result<String, CliError> {
     ensure_terminal_agent(state, agent_id)?;
-    state
-        .agent_tui_manager
-        .get(agent_id)
-        .map(|snapshot| snapshot.session_id)
+    state.agent_tui_manager.get(agent_id).map(|s| s.session_id)
 }
 
 fn codex_session_id(state: &DaemonHttpState, agent_id: &str) -> Result<String, CliError> {
     ensure_codex_agent(state, agent_id)?;
-    state
-        .codex_controller
-        .run(agent_id)
-        .map(|snapshot| snapshot.session_id)
+    state.codex_controller.run(agent_id).map(|s| s.session_id)
 }
 
 fn acp_session_id(state: &DaemonHttpState, agent_id: &str) -> Result<String, CliError> {
     ensure_acp_agent(state, agent_id)?;
-    state
-        .acp_agent_manager
-        .get(agent_id)
-        .map(|snapshot| snapshot.session_id)
+    state.acp_agent_manager.get(agent_id).map(|s| s.session_id)
 }
 
 #[expect(
