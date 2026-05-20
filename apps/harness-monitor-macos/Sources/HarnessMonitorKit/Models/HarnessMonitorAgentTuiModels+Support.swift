@@ -65,6 +65,7 @@ public enum ManagedAgentFamily: String, Codable, Sendable {
   case terminal
   case codex
   case acp
+  case openRouter = "open_router"
 }
 
 extension AgentTuiSnapshot {

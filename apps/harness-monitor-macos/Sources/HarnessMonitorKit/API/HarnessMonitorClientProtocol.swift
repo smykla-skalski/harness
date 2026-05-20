@@ -142,6 +142,23 @@ public protocol HarnessMonitorClientProtocol: HarnessMonitorTaskBoardClientProto
     sessionID: String,
     request: AcpAgentStartRequest
   ) async throws -> ManagedAgentSnapshot
+  func startManagedOpenRouterAgent(
+    sessionID: String,
+    request: OpenRouterStartRequest
+  ) async throws -> ManagedAgentSnapshot
+  func listManagedOpenRouterAgents(
+    sessionID: String
+  ) async throws -> OpenRouterRunListResponse
+  func getManagedOpenRouterAgent(
+    managedAgentID: String
+  ) async throws -> OpenRouterRunSnapshot
+  func promptManagedOpenRouterAgent(
+    managedAgentID: String,
+    prompt: String
+  ) async throws -> OpenRouterRunSnapshot
+  func cancelManagedOpenRouterAgent(
+    managedAgentID: String
+  ) async throws -> OpenRouterRunSnapshot
   func sendManagedAgentInput(
     agentID: String,
     request: AgentTuiInputRequest

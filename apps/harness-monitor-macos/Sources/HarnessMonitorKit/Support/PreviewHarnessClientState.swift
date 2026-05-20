@@ -18,6 +18,7 @@ actor PreviewHarnessClientState {
   var taskBoardGitRuntimeConfig: TaskBoardGitRuntimeConfig
   var taskBoardGitHubTokens: TaskBoardGitHubTokensSyncRequest
   var taskBoardTodoistToken: TaskBoardTodoistTokenSyncRequest
+  var taskBoardOpenRouterToken: TaskBoardOpenRouterTokenSyncRequest
   var taskBoardGitIdentityDefaults: TaskBoardGitIdentityDefaults
   var taskBoardItems: [TaskBoardItem]
   var taskBoardHostRegistry: [TaskBoardHostMachine]
@@ -58,6 +59,7 @@ actor PreviewHarnessClientState {
       repositoryTokens: []
     )
     self.taskBoardTodoistToken = TaskBoardTodoistTokenSyncRequest(token: nil)
+    self.taskBoardOpenRouterToken = TaskBoardOpenRouterTokenSyncRequest(token: nil)
     self.taskBoardGitIdentityDefaults = fixtures.taskBoardGitIdentityDefaults
     self.taskBoardItems = fixtures.taskBoardItems
     self.taskBoardHostRegistry = [

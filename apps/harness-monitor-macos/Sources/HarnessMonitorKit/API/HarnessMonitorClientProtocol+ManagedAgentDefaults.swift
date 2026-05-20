@@ -4,10 +4,13 @@ extension HarnessMonitorClientProtocol {
   public func managedAgents(sessionID: String) async throws -> ManagedAgentListResponse {
     let terminals = try await agentTuis(sessionID: sessionID)
     let codexRuns = try await codexRuns(sessionID: sessionID)
+    let openRouterRuns =
+      (try? await listManagedOpenRouterAgents(sessionID: sessionID))?.runs ?? []
     return ManagedAgentListResponse(
       agents:
         terminals.tuis.map(ManagedAgentSnapshot.terminal)
         + codexRuns.runs.map(ManagedAgentSnapshot.codex)
+        + openRouterRuns.map(ManagedAgentSnapshot.openRouter)
     )
   }
 
@@ -15,7 +18,42 @@ extension HarnessMonitorClientProtocol {
     if let terminal = try? await agentTui(tuiID: agentID) {
       return .terminal(terminal)
     }
+    if let openRouter = try? await getManagedOpenRouterAgent(managedAgentID: agentID) {
+      return .openRouter(openRouter)
+    }
     return .codex(try await codexRun(runID: agentID))
+  }
+
+  public func startManagedOpenRouterAgent(
+    sessionID _: String,
+    request _: OpenRouterStartRequest
+  ) async throws -> ManagedAgentSnapshot {
+    throw HarnessMonitorAPIError.server(code: 501, message: "OpenRouter agent unavailable.")
+  }
+
+  public func listManagedOpenRouterAgents(
+    sessionID _: String
+  ) async throws -> OpenRouterRunListResponse {
+    OpenRouterRunListResponse(runs: [])
+  }
+
+  public func getManagedOpenRouterAgent(
+    managedAgentID _: String
+  ) async throws -> OpenRouterRunSnapshot {
+    throw HarnessMonitorAPIError.server(code: 501, message: "OpenRouter agent unavailable.")
+  }
+
+  public func promptManagedOpenRouterAgent(
+    managedAgentID _: String,
+    prompt _: String
+  ) async throws -> OpenRouterRunSnapshot {
+    throw HarnessMonitorAPIError.server(code: 501, message: "OpenRouter agent unavailable.")
+  }
+
+  public func cancelManagedOpenRouterAgent(
+    managedAgentID _: String
+  ) async throws -> OpenRouterRunSnapshot {
+    throw HarnessMonitorAPIError.server(code: 501, message: "OpenRouter agent unavailable.")
   }
 
   public func startManagedTerminalAgent(

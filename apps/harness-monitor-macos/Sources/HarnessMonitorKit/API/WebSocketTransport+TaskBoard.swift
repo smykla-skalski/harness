@@ -201,6 +201,14 @@ extension WebSocketTransport {
     return try decode(value)
   }
 
+  public func syncTaskBoardOpenRouterToken(
+    request: TaskBoardOpenRouterTokenSyncRequest
+  ) async throws -> TaskBoardOpenRouterTokenSyncResponse {
+    let params = try encodeParams(request, extra: [:])
+    let value = try await rpc(method: .taskBoardOrchestratorOpenRouterTokenSync, params: params)
+    return try decode(value)
+  }
+
   public func syncTaskBoardTodoistToken(
     request: TaskBoardTodoistTokenSyncRequest
   ) async throws -> TaskBoardTodoistTokenSyncResponse {

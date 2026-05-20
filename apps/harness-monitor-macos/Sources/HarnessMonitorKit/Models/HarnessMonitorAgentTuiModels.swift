@@ -162,6 +162,7 @@ public enum ManagedAgentSnapshot: Equatable, Identifiable, Sendable {
   case terminal(AgentTuiSnapshot)
   case codex(CodexRunSnapshot)
   case acp(AcpAgentSnapshot)
+  case openRouter(OpenRouterRunSnapshot)
 
   public var id: String { agentId }
   public var family: ManagedAgentFamily {
@@ -172,6 +173,8 @@ public enum ManagedAgentSnapshot: Equatable, Identifiable, Sendable {
       .codex
     case .acp:
       .acp
+    case .openRouter:
+      .openRouter
     }
   }
   public var managedAgentID: String { agentId }
@@ -184,6 +187,8 @@ public enum ManagedAgentSnapshot: Equatable, Identifiable, Sendable {
       snapshot.runId
     case .acp(let snapshot):
       snapshot.acpId
+    case .openRouter(let snapshot):
+      snapshot.runId
     }
   }
 
@@ -194,6 +199,8 @@ public enum ManagedAgentSnapshot: Equatable, Identifiable, Sendable {
     case .codex(let snapshot):
       snapshot.sessionAgentID
     case .acp(let snapshot):
+      snapshot.sessionAgentID
+    case .openRouter(let snapshot):
       snapshot.sessionAgentID
     }
   }
@@ -206,6 +213,8 @@ public enum ManagedAgentSnapshot: Equatable, Identifiable, Sendable {
       snapshot.sessionId
     case .acp(let snapshot):
       snapshot.sessionId
+    case .openRouter(let snapshot):
+      snapshot.sessionId
     }
   }
 
@@ -216,6 +225,8 @@ public enum ManagedAgentSnapshot: Equatable, Identifiable, Sendable {
     case .codex(let snapshot):
       snapshot.updatedAt
     case .acp(let snapshot):
+      snapshot.updatedAt
+    case .openRouter(let snapshot):
       snapshot.updatedAt
     }
   }
@@ -234,6 +245,11 @@ public enum ManagedAgentSnapshot: Equatable, Identifiable, Sendable {
     guard case .acp(let snapshot) = self else { return nil }
     return snapshot
   }
+
+  public var openRouter: OpenRouterRunSnapshot? {
+    guard case .openRouter(let snapshot) = self else { return nil }
+    return snapshot
+  }
 }
 
 extension ManagedAgentSnapshot: Codable {
@@ -246,6 +262,7 @@ extension ManagedAgentSnapshot: Codable {
     case terminal
     case codex
     case acp
+    case openRouter = "open_router"
   }
 
   public init(from decoder: any Decoder) throws {
@@ -257,6 +274,8 @@ extension ManagedAgentSnapshot: Codable {
       self = .codex(try container.decode(CodexRunSnapshot.self, forKey: .snapshot))
     case .acp:
       self = .acp(try container.decode(AcpAgentSnapshot.self, forKey: .snapshot))
+    case .openRouter:
+      self = .openRouter(try container.decode(OpenRouterRunSnapshot.self, forKey: .snapshot))
     }
   }
 
@@ -271,6 +290,9 @@ extension ManagedAgentSnapshot: Codable {
       try container.encode(snapshot, forKey: .snapshot)
     case .acp(let snapshot):
       try container.encode(Kind.acp, forKey: .kind)
+      try container.encode(snapshot, forKey: .snapshot)
+    case .openRouter(let snapshot):
+      try container.encode(Kind.openRouter, forKey: .kind)
       try container.encode(snapshot, forKey: .snapshot)
     }
   }

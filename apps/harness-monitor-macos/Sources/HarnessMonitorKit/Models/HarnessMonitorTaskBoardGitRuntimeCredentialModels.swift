@@ -65,6 +65,38 @@ public struct TaskBoardTodoistCredentialSnapshot: Codable, Equatable, Sendable {
   }
 }
 
+public struct TaskBoardOpenRouterTokenSyncRequest: Codable, Equatable, Sendable {
+  public let token: String?
+
+  public init(token: String? = nil) {
+    self.token = token
+  }
+}
+
+public struct TaskBoardOpenRouterTokenSyncResponse: Codable, Equatable, Sendable {
+  public let tokenConfigured: Bool
+
+  public init(tokenConfigured: Bool) {
+    self.tokenConfigured = tokenConfigured
+  }
+}
+
+public struct TaskBoardOpenRouterCredentialSnapshot: Codable, Equatable, Sendable {
+  public let token: String?
+
+  public init(token: String? = nil) {
+    self.token = token
+  }
+
+  public var syncRequest: TaskBoardOpenRouterTokenSyncRequest {
+    TaskBoardOpenRouterTokenSyncRequest(token: token)
+  }
+
+  public var isEmpty: Bool {
+    token == nil
+  }
+}
+
 public struct TaskBoardGitHubCredentialSnapshot: Codable, Equatable, Sendable {
   public let globalToken: String?
   public let repositoryTokens: [TaskBoardGitHubRepositoryToken]
@@ -94,6 +126,7 @@ public struct TaskBoardGitSettingsSnapshot: Equatable, Sendable {
   public let runtimeConfig: TaskBoardGitRuntimeConfig
   public let githubCredentials: TaskBoardGitHubCredentialSnapshot
   public let todoistCredentials: TaskBoardTodoistCredentialSnapshot
+  public let openRouterCredentials: TaskBoardOpenRouterCredentialSnapshot
   public let identityDefaults: TaskBoardGitIdentityDefaults
 
   public init(
@@ -101,12 +134,15 @@ public struct TaskBoardGitSettingsSnapshot: Equatable, Sendable {
     runtimeConfig: TaskBoardGitRuntimeConfig,
     githubCredentials: TaskBoardGitHubCredentialSnapshot,
     todoistCredentials: TaskBoardTodoistCredentialSnapshot = TaskBoardTodoistCredentialSnapshot(),
+    openRouterCredentials: TaskBoardOpenRouterCredentialSnapshot =
+      TaskBoardOpenRouterCredentialSnapshot(),
     identityDefaults: TaskBoardGitIdentityDefaults = TaskBoardGitIdentityDefaults()
   ) {
     self.orchestratorSettings = orchestratorSettings
     self.runtimeConfig = runtimeConfig
     self.githubCredentials = githubCredentials
     self.todoistCredentials = todoistCredentials
+    self.openRouterCredentials = openRouterCredentials
     self.identityDefaults = identityDefaults
   }
 }

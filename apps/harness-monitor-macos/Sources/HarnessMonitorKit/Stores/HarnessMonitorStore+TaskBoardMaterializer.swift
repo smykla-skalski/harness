@@ -10,7 +10,8 @@ extension HarnessMonitorStore {
       ),
       runtimeConfig: try await materializeTaskBoardGitRuntimeConfig(snapshot.runtimeConfig),
       githubCredentials: snapshot.githubCredentials,
-      todoistCredentials: snapshot.todoistCredentials
+      todoistCredentials: snapshot.todoistCredentials,
+      openRouterCredentials: snapshot.openRouterCredentials
     )
   }
 

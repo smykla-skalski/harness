@@ -39,6 +39,13 @@ extension PreviewHarnessClient {
     return await state.syncTaskBoardTodoistToken(request)
   }
 
+  public func syncTaskBoardOpenRouterToken(
+    request: TaskBoardOpenRouterTokenSyncRequest
+  ) async throws -> TaskBoardOpenRouterTokenSyncResponse {
+    try await performActionDelay()
+    return await state.syncTaskBoardOpenRouterToken(request)
+  }
+
   public func taskBoardGitIdentityDefaults() async throws -> TaskBoardGitIdentityDefaults {
     try await performActionDelay()
     return await state.currentTaskBoardGitIdentityDefaults()

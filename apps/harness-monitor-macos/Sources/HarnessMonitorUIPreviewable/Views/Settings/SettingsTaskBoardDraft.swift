@@ -41,6 +41,7 @@ struct TaskBoardGitSettingsDraft: Equatable {
   var gpgPrivateKeyPassphrase: TaskBoardSecretField = .notConfigured
   var globalToken: TaskBoardSecretField = .notConfigured
   var todoistToken: TaskBoardSecretField = .notConfigured
+  var openRouterToken: TaskBoardSecretField = .notConfigured
   var repositoryOverrides: [TaskBoardRepositoryOverrideDraft] = []
   var policyVersion = ""
   var identityDefaults = TaskBoardGitIdentityDefaults()
@@ -94,6 +95,7 @@ struct TaskBoardGitSettingsDraft: Equatable {
     gpgPrivateKeyPassphrase = .secretFromLoaded(runtime.global.signing.gpgPrivateKeyPassphrase)
     globalToken = .secretFromLoaded(snapshot.githubCredentials.globalToken)
     todoistToken = .secretFromLoaded(snapshot.todoistCredentials.token)
+    openRouterToken = .secretFromLoaded(snapshot.openRouterCredentials.token)
     policyVersion = orchestrator.policyVersion
     identityDefaults = snapshot.identityDefaults
     loadedSecrets = TaskBoardLoadedSecrets(snapshot: snapshot)
@@ -227,6 +229,9 @@ struct TaskBoardGitSettingsDraft: Equatable {
       ),
       todoistCredentials: TaskBoardTodoistCredentialSnapshot(
         token: todoistToken.materialized(loaded: loadedSecrets.todoistToken)
+      ),
+      openRouterCredentials: TaskBoardOpenRouterCredentialSnapshot(
+        token: openRouterToken.materialized(loaded: loadedSecrets.openRouterToken)
       )
     )
   }
