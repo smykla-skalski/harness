@@ -244,6 +244,12 @@ fn task_board_routes_have_complete_ws_parity() {
                 true,
             ),
             (
+                HttpRouteMethod::Put,
+                http_paths::TASK_BOARD_ORCHESTRATOR_OPENROUTER_TOKEN,
+                ws_methods::TASK_BOARD_ORCHESTRATOR_OPENROUTER_TOKEN_SYNC,
+                true,
+            ),
+            (
                 HttpRouteMethod::Get,
                 http_paths::TASK_BOARD_GIT_IDENTITY_DEFAULTS,
                 ws_methods::TASK_BOARD_GIT_IDENTITY_DEFAULTS,
@@ -308,5 +314,72 @@ fn mapped_ws_methods_are_unique() {
         methods.len(),
         unique.len(),
         "duplicate websocket method mapping"
+    );
+}
+
+#[test]
+fn dependency_update_routes_have_complete_ws_parity() {
+    let dependency_update_routes = super::routes_dependency_updates::ROUTES;
+    let actual: Vec<_> = dependency_update_routes
+        .iter()
+        .map(|route| {
+            let ws_method = route
+                .parity
+                .ws_method()
+                .expect("dependency-updates route should map to websocket");
+            (
+                route.method,
+                route.path,
+                ws_method,
+                route.swift_client_exposed,
+            )
+        })
+        .collect();
+    assert_eq!(
+        actual,
+        vec![
+            (
+                HttpRouteMethod::Post,
+                http_paths::DEPENDENCY_UPDATES_QUERY,
+                ws_methods::DEPENDENCY_UPDATES_QUERY,
+                true,
+            ),
+            (
+                HttpRouteMethod::Post,
+                http_paths::DEPENDENCY_UPDATES_APPROVE,
+                ws_methods::DEPENDENCY_UPDATES_APPROVE,
+                true,
+            ),
+            (
+                HttpRouteMethod::Post,
+                http_paths::DEPENDENCY_UPDATES_MERGE,
+                ws_methods::DEPENDENCY_UPDATES_MERGE,
+                true,
+            ),
+            (
+                HttpRouteMethod::Post,
+                http_paths::DEPENDENCY_UPDATES_RERUN_CHECKS,
+                ws_methods::DEPENDENCY_UPDATES_RERUN_CHECKS,
+                true,
+            ),
+            (
+                HttpRouteMethod::Post,
+                http_paths::DEPENDENCY_UPDATES_LABELS,
+                ws_methods::DEPENDENCY_UPDATES_ADD_LABEL,
+                true,
+            ),
+            (
+                HttpRouteMethod::Post,
+                http_paths::DEPENDENCY_UPDATES_AUTO,
+                ws_methods::DEPENDENCY_UPDATES_AUTO,
+                true,
+            ),
+            (
+                HttpRouteMethod::Delete,
+                http_paths::DEPENDENCY_UPDATES_CACHE,
+                ws_methods::DEPENDENCY_UPDATES_CLEAR_CACHE,
+                true,
+            ),
+        ]
     );
 }

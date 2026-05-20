@@ -12,6 +12,17 @@ struct TaskBoardHTTPRouteCatalogParityTests {
   }
 }
 
+@Suite("Dependencies HTTP route catalog parity")
+struct DependencyUpdatesHTTPRouteCatalogParityTests {
+  @Test("Swift dependency-updates HTTP paths match daemon catalog")
+  func swiftDependencyUpdatesHTTPPathsMatchDaemonCatalog() throws {
+    let daemonRoutes = try daemonDependencyUpdatesHTTPRoutes()
+    let swiftRoutes = try swiftDependencyUpdatesHTTPRoutes()
+
+    #expect(swiftRoutes == daemonRoutes)
+  }
+}
+
 private struct TaskBoardHTTPRoute: Comparable, CustomStringConvertible, Hashable {
   let method: String
   let path: String
@@ -38,7 +49,7 @@ private enum TaskBoardHTTPRouteCatalogError: Error, CustomStringConvertible {
     case .missingPathConstant(let constant):
       return "Missing HTTP path constant \(constant)"
     case .noRoutes(let relativePath):
-      return "No task-board HTTP routes found in \(relativePath)"
+      return "No HTTP routes found in \(relativePath)"
     }
   }
 }
@@ -85,6 +96,50 @@ private func swiftTaskBoardHTTPRoutes() throws -> [TaskBoardHTTPRoute] {
   let routes = matches.compactMap { capture -> TaskBoardHTTPRoute? in
     let path = normalizedSwiftHTTPPath(capture[1])
     guard path.hasPrefix("/v1/task-board/") else {
+      return nil
+    }
+    return TaskBoardHTTPRoute(method: capture[0].uppercased(), path: path)
+  }
+
+  guard routes.isEmpty == false else {
+    throw TaskBoardHTTPRouteCatalogError.noRoutes(relativePath: relativePath)
+  }
+  return routes.sorted()
+}
+
+private func daemonDependencyUpdatesHTTPRoutes() throws -> [TaskBoardHTTPRoute] {
+  let relativePath = "src/daemon/protocol/api_contract/routes_dependency_updates.rs"
+  let source = try repoFileContents(relativePath: relativePath)
+  let pathConstants = try daemonHTTPPathConstants()
+  let blocks = source.components(separatedBy: "HttpApiRouteContract {").dropFirst()
+  var routes: [TaskBoardHTTPRoute] = []
+
+  for block in blocks where block.contains("swift_client_exposed: true") {
+    let method = try firstCapture(in: block, pattern: "method:\\s*HttpRouteMethod::([A-Za-z]+)")
+    let pathConstant = try firstCapture(in: block, pattern: "path:\\s*http_paths::([A-Z0-9_]+)")
+    guard let path = pathConstants[pathConstant] else {
+      throw TaskBoardHTTPRouteCatalogError.missingPathConstant(pathConstant)
+    }
+    routes.append(TaskBoardHTTPRoute(method: method.uppercased(), path: path))
+  }
+
+  guard routes.isEmpty == false else {
+    throw TaskBoardHTTPRouteCatalogError.noRoutes(relativePath: relativePath)
+  }
+  return routes.sorted()
+}
+
+private func swiftDependencyUpdatesHTTPRoutes() throws -> [TaskBoardHTTPRoute] {
+  let relativePath =
+    "apps/harness-monitor-macos/Sources/HarnessMonitorKit/API/HarnessMonitorAPIClient+Dependencies.swift"
+  let source = try repoFileContents(relativePath: relativePath)
+  let matches = try captures(
+    in: source,
+    pattern: "\\b(get|post|put|delete)\\s*\\(\\s*\"([^\"]+)\""
+  )
+  let routes = matches.compactMap { capture -> TaskBoardHTTPRoute? in
+    let path = normalizedSwiftHTTPPath(capture[1])
+    guard path.hasPrefix("/v1/dependency-updates/") else {
       return nil
     }
     return TaskBoardHTTPRoute(method: capture[0].uppercased(), path: path)

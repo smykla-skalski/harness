@@ -1,6 +1,7 @@
 mod api_contract;
 mod binding;
 mod codex;
+mod dependency_updates;
 mod managed_agents;
 mod session_requests;
 mod summaries;
@@ -13,6 +14,7 @@ mod websocket;
 pub use api_contract::*;
 pub use binding::{ControlPlaneActorRequest, bind_control_plane_actor_value};
 pub use codex::*;
+pub use dependency_updates::*;
 pub use managed_agents::*;
 pub use session_requests::*;
 pub use summaries::*;

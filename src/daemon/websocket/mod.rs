@@ -1,5 +1,6 @@
 mod config;
 mod connection;
+mod dependency_updates;
 mod dispatch;
 mod frames;
 mod mutations;

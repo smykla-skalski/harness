@@ -124,6 +124,7 @@ public struct DashboardWindowView: View {
         DashboardBannerStack(store: store) {
           DashboardRouteContent(
             route: route,
+            selectedRoute: selectedRouteBinding,
             store: store,
             dashboardUI: dashboardUI,
             sessionCatalog: sessionCatalog
