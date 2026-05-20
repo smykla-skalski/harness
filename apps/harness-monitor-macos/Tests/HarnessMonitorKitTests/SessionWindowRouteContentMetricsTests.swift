@@ -394,6 +394,26 @@ struct SessionWindowRouteContentMetricsTests {
     #expect(!overviewSource.contains("Open work pulled from active sessions."))
   }
 
+  @Test("Task board lanes expand beyond the fixed baseline when the dashboard is taller")
+  func taskBoardLanesExpandBeyondFixedBaselineWhenDashboardIsTaller() throws {
+    let dashboardSource = try previewableSourceFile(
+      domain: "Dashboard",
+      named: "DashboardWindowSupport.swift"
+    )
+    let overviewSource = try taskBoardSourceFile(named: "TaskBoardOverviewView.swift")
+    let overviewSupportSource = try taskBoardSourceFile(named: "TaskBoardOverviewSupport.swift")
+    let laneSupportSource = try taskBoardSourceFile(named: "TaskBoardLaneSupport.swift")
+
+    #expect(!dashboardSource.contains("ViewThatFits(in: .vertical)"))
+    #expect(dashboardSource.contains("dashboardExpandedContent"))
+    #expect(dashboardSource.contains("dashboardScrollingContent("))
+    #expect(overviewSource.contains(".frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)"))
+    #expect(overviewSource.contains(".layoutPriority(1)"))
+    #expect(overviewSupportSource.contains("let height = max(measuredHeight, proposal.height ?? 0)"))
+    #expect(laneSupportSource.contains("minHeight: metrics.laneFixedHeight"))
+    #expect(laneSupportSource.contains("maxHeight: .infinity"))
+  }
+
   @Test("Task board lanes render every card instead of hiding overflow")
   func taskBoardLanesRenderEveryCardInsteadOfHidingOverflow() throws {
     let unifiedSource = try taskBoardSourceFile(named: "TaskBoardLaneUnifiedColumn.swift")

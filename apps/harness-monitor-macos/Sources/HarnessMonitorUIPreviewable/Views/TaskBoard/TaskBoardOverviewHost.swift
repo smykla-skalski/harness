@@ -16,6 +16,26 @@ struct TaskBoardOverviewHost: View {
   let evaluationSummary: TaskBoardEvaluationSummary?
   let isActionInFlight: Bool
 
+  init(
+    scope: Scope,
+    store: HarnessMonitorStore,
+    snapshot: TaskBoardInboxSnapshot,
+    taskBoardItems: [TaskBoardItem],
+    decisions: [Decision],
+    orchestratorStatus: TaskBoardOrchestratorStatus?,
+    evaluationSummary: TaskBoardEvaluationSummary?,
+    isActionInFlight: Bool
+  ) {
+    self.scope = scope
+    self.store = store
+    self.snapshot = snapshot
+    self.taskBoardItems = taskBoardItems
+    self.decisions = decisions
+    self.orchestratorStatus = orchestratorStatus
+    self.evaluationSummary = evaluationSummary
+    self.isActionInFlight = isActionInFlight
+  }
+
   var body: some View {
     TaskBoardOverviewView(
       snapshot: snapshot,

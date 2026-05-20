@@ -143,31 +143,11 @@ public struct TaskBoardOverviewView: View {
 
   public var body: some View {
     VStack(alignment: .leading, spacing: HarnessMonitorTheme.sectionSpacing) {
-      if hasRouteContent || store != nil {
-        if let orchestratorStatus {
-          taskBoardDetailRow {
-            TaskBoardOrchestratorSummaryView(
-              status: orchestratorStatus,
-              latestEvaluation: evaluationSummary,
-              isActionInFlight: isActionInFlight,
-              onStart: onStartTaskBoardOrchestrator,
-              onStop: onStopTaskBoardOrchestrator,
-              onRunOnce: runOrchestratorOnce
-            )
-          }
-        } else if let evaluationSummary {
-          taskBoardDetailRow { evaluationSummaryRow(evaluationSummary) }
-        }
-      }
-      taskBoardDetailRow { headerTitle }
-      if let store {
-        taskBoardDetailRow {
-          TaskBoardOperationsPanel(store: store, taskBoardItems: cachedPresentation.taskBoardItems)
-        }
-      }
+      boardChrome
       taskBoardDetailRow { boardSection }
+        .layoutPriority(1)
     }
-    .frame(maxWidth: .infinity, alignment: .leading)
+    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     .accessibilityElement(children: .contain)
     .accessibilityIdentifier("harness.task-board.overview")
     .sheet(item: taskBoardManagementSheet) { taskBoardManagementSheet in
@@ -190,6 +170,31 @@ public struct TaskBoardOverviewView: View {
 }
 
 extension TaskBoardOverviewView {
+  @ViewBuilder private var boardChrome: some View {
+    if hasRouteContent || store != nil {
+      if let orchestratorStatus {
+        taskBoardDetailRow {
+          TaskBoardOrchestratorSummaryView(
+            status: orchestratorStatus,
+            latestEvaluation: evaluationSummary,
+            isActionInFlight: isActionInFlight,
+            onStart: onStartTaskBoardOrchestrator,
+            onStop: onStopTaskBoardOrchestrator,
+            onRunOnce: runOrchestratorOnce
+          )
+        }
+      } else if let evaluationSummary {
+        taskBoardDetailRow { evaluationSummaryRow(evaluationSummary) }
+      }
+    }
+    taskBoardDetailRow { headerTitle }
+    if let store {
+      taskBoardDetailRow {
+        TaskBoardOperationsPanel(store: store, taskBoardItems: cachedPresentation.taskBoardItems)
+      }
+    }
+  }
+
   private var headerTitle: some View {
     Label("Board", systemImage: "rectangle.3.group")
       .font(titleHeaderFont)
@@ -310,6 +315,7 @@ extension TaskBoardOverviewView {
       }
       boardContent
     }
+    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
   }
 
   @ViewBuilder private var boardContent: some View {
@@ -325,16 +331,20 @@ extension TaskBoardOverviewView {
       TaskBoardLaneStripLayout(sizing: laneStripSizing) {
         taskBoardLaneColumns
       }
+      .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
       .padding(.vertical, metrics.boardVerticalPadding)
 
       ScrollView(.horizontal, showsIndicators: true) {
         TaskBoardLaneStripLayout(sizing: laneStripSizing) {
           taskBoardLaneColumns
         }
+        .frame(maxHeight: .infinity, alignment: .topLeading)
         .padding(.vertical, metrics.boardVerticalPadding)
       }
+      .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
       .scrollClipDisabled()
     }
+    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
   }
 
   @ViewBuilder private var taskBoardLaneColumns: some View {

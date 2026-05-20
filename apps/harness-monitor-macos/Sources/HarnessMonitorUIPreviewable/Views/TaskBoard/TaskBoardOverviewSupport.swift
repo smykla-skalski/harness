@@ -76,10 +76,11 @@ struct TaskBoardLaneStripLayout: Layout {
     guard columnCount > 0 else { return .zero }
 
     let columnWidth = sizing.columnWidth(for: proposal.width, columnCount: columnCount)
-    let height =
+    let measuredHeight =
       subviews.map { subview in
         subview.sizeThatFits(ProposedViewSize(width: columnWidth, height: nil)).height
       }.max() ?? 0
+    let height = max(measuredHeight, proposal.height ?? 0)
 
     return CGSize(
       width: sizing.resolvedWidth(for: proposal.width, columnCount: columnCount),
