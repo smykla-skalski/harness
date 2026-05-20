@@ -170,10 +170,19 @@ extension SessionWindowCreateForm {
     for runtimeKey: String,
     catalog: RuntimeModelCatalog
   ) -> String {
-    if let stored = draft.modelByRuntime[runtimeKey], !stored.isEmpty {
-      return stored
-    }
-    return catalog.default
+    SessionWindowCreateFormCatalogs.normalizedRuntimeModelPickerValue(
+      storedValue: draft.modelByRuntime[runtimeKey],
+      catalog: catalog
+    )
+  }
+
+  func currentOpenRouterModelPickerValue(
+    for runtimeKey: String
+  ) -> String {
+    SessionWindowCreateFormCatalogs.normalizedOpenRouterModelPickerValue(
+      storedValue: draft.modelByRuntime[runtimeKey],
+      availableModels: openRouterModels
+    )
   }
 
   func updateRuntimeModelPickerSelection(

@@ -381,6 +381,61 @@ enum SessionWindowCreateFormCatalogs {
     return values[values.count / 2]
   }
 
+  static func normalizedRuntimeModelPickerValue(
+    storedValue: String?,
+    catalog: RuntimeModelCatalog
+  ) -> String {
+    normalizedModelPickerValue(
+      storedValue: storedValue,
+      validModelIDs: catalog.models.map(\.id),
+      preferredDefault: catalog.default
+    )
+  }
+
+  static func normalizedOpenRouterModelPickerValue(
+    storedValue: String?,
+    availableModels: [OpenRouterModelEntry],
+    preferredDefault: String = OpenRouterAcpDispatch.defaultModel
+  ) -> String {
+    normalizedModelPickerValue(
+      storedValue: storedValue,
+      validModelIDs: availableModels.map(\.id),
+      preferredDefault: preferredDefault
+    )
+  }
+
+  private static func normalizedModelPickerValue(
+    storedValue: String?,
+    validModelIDs: [String],
+    preferredDefault: String
+  ) -> String {
+    let trimmedStored =
+      storedValue?.trimmingCharacters(in: .whitespacesAndNewlines)
+    if trimmedStored == RuntimeCustomModel.tag {
+      return RuntimeCustomModel.tag
+    }
+
+    let trimmedIDs =
+      validModelIDs
+      .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+      .filter { !$0.isEmpty }
+    let validIDs = Set(trimmedIDs)
+    if let trimmedStored, !trimmedStored.isEmpty, validIDs.contains(trimmedStored) {
+      return trimmedStored
+    }
+
+    let trimmedDefault = preferredDefault.trimmingCharacters(in: .whitespacesAndNewlines)
+    if !trimmedDefault.isEmpty, validIDs.contains(trimmedDefault) {
+      return trimmedDefault
+    }
+
+    if let firstValid = trimmedIDs.first {
+      return firstValid
+    }
+
+    return RuntimeCustomModel.tag
+  }
+
   static func effectiveModelSelection(
     pickerValue: String,
     customValue: String,

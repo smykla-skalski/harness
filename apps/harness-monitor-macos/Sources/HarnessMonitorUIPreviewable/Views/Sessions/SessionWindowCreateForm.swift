@@ -389,16 +389,23 @@ extension SessionWindowCreateForm {
       if let catalog = selectedRuntimeCatalog,
         let runtimeKey = selectedModelCatalogRuntimeKey
       {
-        let modelPickerValue = currentRuntimeModelPickerValue(
-          for: runtimeKey,
-          catalog: catalog
-        )
-        let effortValues = runtimeEffortValues(
-          for: runtimeKey,
-          catalog: catalog
-        )
+        let modelPickerValue =
+          if isOpenRouterAcpSelected {
+            currentOpenRouterModelPickerValue(for: runtimeKey)
+          } else {
+            currentRuntimeModelPickerValue(for: runtimeKey, catalog: catalog)
+          }
+        let effortValues =
+          if isOpenRouterAcpSelected {
+            SessionWindowCreateFormCatalogs.effortValues(
+              catalog: catalog,
+              selectedModelID: modelPickerValue
+            )
+          } else {
+            runtimeEffortValues(for: runtimeKey, catalog: catalog)
+          }
         if isOpenRouterAcpSelected {
-          openRouterPickerView(runtimeKey: runtimeKey, modelPickerValue: modelPickerValue)
+          openRouterPickerView(runtimeKey: runtimeKey)
         } else {
           SessionWindowCreateRuntimeModelPickerRow(
             catalog: catalog,
@@ -455,16 +462,16 @@ extension SessionWindowCreateForm {
 
   @ViewBuilder
   private func openRouterPickerView(
-    runtimeKey: String,
-    modelPickerValue: String
+    runtimeKey: String
   ) -> some View {
     let selectionBinding = Binding<String>(
-      get: { modelPickerValue },
+      get: { currentOpenRouterModelPickerValue(for: runtimeKey) },
       set: { updateRuntimeModelPickerSelection($0, for: runtimeKey) }
     )
     let useCustomBinding = Binding<Bool>(
       get: {
-        modelPickerValue == SessionWindowCreateFormCatalogs.RuntimeCustomModel.tag
+        currentOpenRouterModelPickerValue(for: runtimeKey)
+          == SessionWindowCreateFormCatalogs.RuntimeCustomModel.tag
       },
       set: { newValue in
         if newValue {

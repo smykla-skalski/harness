@@ -292,6 +292,65 @@ struct SessionWindowCreateFormCatalogsSelectionTests {
     #expect(!SessionWindowCreateFormCatalogs.shouldShowTransportDiagnosticsDisclosure(for: option))
   }
 
+  @Test("Catalog helpers clamp stale picker selections to rendered tags")
+  func catalogHelpersClampStalePickerSelectionsToRenderedTags() {
+    let catalog = RuntimeModelCatalog(
+      runtime: "codex",
+      models: [
+        RuntimeModel(
+          id: "gpt-5-mini",
+          displayName: "GPT-5 mini",
+          tier: .fast
+        ),
+        RuntimeModel(
+          id: "gpt-5",
+          displayName: "GPT-5",
+          tier: .balanced
+        ),
+      ],
+      default: "gpt-5",
+      cheapestFastest: "gpt-5-mini"
+    )
+
+    #expect(
+      SessionWindowCreateFormCatalogs.normalizedRuntimeModelPickerValue(
+        storedValue: "gpt-4-stale",
+        catalog: catalog
+      ) == "gpt-5"
+    )
+    #expect(
+      SessionWindowCreateFormCatalogs.normalizedRuntimeModelPickerValue(
+        storedValue: SessionWindowCreateFormCatalogs.RuntimeCustomModel.tag,
+        catalog: catalog
+      ) == SessionWindowCreateFormCatalogs.RuntimeCustomModel.tag
+    )
+  }
+
+  @Test("OpenRouter picker helper clamps stale selections to live model tags")
+  func openRouterPickerHelperClampsStaleSelectionsToLiveModelTags() {
+    let defaultModel = OpenRouterModelEntry(
+      id: HarnessMonitorStore.defaultOpenRouterModel,
+      name: "Claude 3.7 Sonnet"
+    )
+    let fallbackModel = OpenRouterModelEntry(
+      id: "openai/gpt-5.5",
+      name: "GPT-5.5"
+    )
+
+    #expect(
+      SessionWindowCreateFormCatalogs.normalizedOpenRouterModelPickerValue(
+        storedValue: "anthropic/claude-sonnet-4-6",
+        availableModels: [defaultModel, fallbackModel]
+      ) == HarnessMonitorStore.defaultOpenRouterModel
+    )
+    #expect(
+      SessionWindowCreateFormCatalogs.normalizedOpenRouterModelPickerValue(
+        storedValue: "anthropic/claude-sonnet-4-6",
+        availableModels: [fallbackModel]
+      ) == fallbackModel.id
+    )
+  }
+
   private func descriptor(id: String, displayName: String) -> AcpAgentDescriptor {
     AcpAgentDescriptor(
       id: id,
