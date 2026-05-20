@@ -4,17 +4,29 @@ import SwiftUI
 @MainActor
 struct OpenRouterModelPicker: View {
   let availableModels: [OpenRouterModelEntry]
-  let usage: OpenRouterModelUsageStore
+  let usageSnapshot: OpenRouterModelUsageSnapshot
   @Binding var selectedModelID: String
   @Binding var useCustomModel: Bool
   let onBrowseAll: () -> Void
 
-  private static let sectionCap = 5
+  @State private var presentationWorker = OpenRouterModelPickerPresentationWorker()
+  @State private var cachedPresentation = OpenRouterModelPickerPresentation.empty
+  @State private var presentationGeneration: UInt64 = 0
+
+  private var presentationInput: OpenRouterModelPickerPresentationInput {
+    OpenRouterModelPickerPresentationInput(
+      availableModels: availableModels,
+      usageSnapshot: usageSnapshot
+    )
+  }
 
   var body: some View {
     VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
       pickerRow
       browseLink
+    }
+    .task(id: presentationInput) {
+      await rebuildPresentation(input: presentationInput)
     }
   }
 
@@ -36,9 +48,8 @@ struct OpenRouterModelPicker: View {
     }
   }
 
-  @ViewBuilder
-  private var pickerContent: some View {
-    ForEach(sections, id: \.title) { section in
+  @ViewBuilder private var pickerContent: some View {
+    ForEach(cachedPresentation.sections, id: \.title) { section in
       Section(section.title) {
         ForEach(section.entries, id: \.id) { entry in
           Text(entry.displayName).tag(entry.id)
@@ -59,7 +70,7 @@ struct OpenRouterModelPicker: View {
       Image(systemName: "rectangle.grid.2x2")
         .scaledFont(.body)
     }
-    .buttonStyle(.bordered)
+    .harnessActionButtonStyle(variant: .bordered)
     .controlSize(.regular)
     .disabled(availableModels.isEmpty)
     .help(browseLabel)
@@ -88,99 +99,22 @@ struct OpenRouterModelPicker: View {
 
   private var menuTitle: String {
     if useCustomModel { return "Custom model" }
-    if let entry = availableModels.first(where: { $0.id == selectedModelID }) {
-      return entry.name ?? entry.id
+    if let displayName = cachedPresentation.displayName(for: selectedModelID) {
+      return displayName
     }
     return selectedModelID
   }
 
-  private var sections: [MenuSection] {
-    let usageSnapshot = UsageSnapshot(usage: usage)
-    let modelLookup = Dictionary(uniqueKeysWithValues: availableModels.map { ($0.id, $0) })
-    var sectionList: [MenuSection] = []
-    if let pinned = makeSection(
-      title: "Pinned",
-      ids: usageSnapshot.pinned,
-      cap: nil,
-      lookup: modelLookup
-    ) {
-      sectionList.append(pinned)
+  @MainActor
+  private func rebuildPresentation(input: OpenRouterModelPickerPresentationInput) async {
+    presentationGeneration &+= 1
+    let generation = presentationGeneration
+    let presentation = await presentationWorker.compute(input: input)
+    guard !Task.isCancelled, presentationGeneration == generation else {
+      return
     }
-    if let recent = makeSection(
-      title: "Recently Used",
-      ids: usageSnapshot.recents,
-      cap: Self.sectionCap,
-      lookup: modelLookup
-    ) {
-      sectionList.append(recent)
-    }
-    if let frequent = makeSection(
-      title: "Frequently Used",
-      ids: usageSnapshot.frequent,
-      cap: Self.sectionCap,
-      lookup: modelLookup
-    ) {
-      sectionList.append(frequent)
-    }
-    if sectionList.isEmpty {
-      if let popular = makeSection(
-        title: "Popular",
-        ids: OpenRouterPopularModels.modelIDs,
-        cap: 10,
-        lookup: modelLookup
-      ) {
-        sectionList.append(popular)
-      }
-    }
-    return sectionList
-  }
-
-  private func makeSection(
-    title: String,
-    ids: [String],
-    cap: Int?,
-    lookup: [String: OpenRouterModelEntry]
-  ) -> MenuSection? {
-    let resolved = ids
-      .compactMap { id -> Entry? in
-        if let model = lookup[id] {
-          return Entry(id: model.id, displayName: model.name ?? model.id)
-        }
-        if availableModels.isEmpty {
-          return Entry(id: id, displayName: id)
-        }
-        return nil
-      }
-    let trimmed: [Entry]
-    if let cap, cap > 0 {
-      trimmed = Array(resolved.prefix(cap))
-    } else {
-      trimmed = resolved
-    }
-    return trimmed.isEmpty ? nil : MenuSection(title: title, entries: trimmed)
-  }
-
-  private struct MenuSection {
-    let title: String
-    let entries: [Entry]
-  }
-
-  private struct Entry {
-    let id: String
-    let displayName: String
-  }
-
-  private struct UsageSnapshot {
-    let pinned: [String]
-    let recents: [String]
-    let frequent: [String]
-
-    init(usage: OpenRouterModelUsageStore) {
-      pinned = usage.pinnedModels()
-      let pinnedSet = Set(pinned)
-      recents = usage.recentModels().filter { !pinnedSet.contains($0) }
-      let recentSet = Set(recents)
-      frequent = usage.frequentModels().filter { !pinnedSet.contains($0) && !recentSet.contains($0) }
+    if cachedPresentation != presentation {
+      cachedPresentation = presentation
     }
   }
 }

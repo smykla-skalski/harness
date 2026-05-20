@@ -1,5 +1,43 @@
 import Foundation
 
+public struct OpenRouterModelUsageSnapshot: Equatable, Sendable {
+  public static let empty = Self()
+
+  public let pinned: [String]
+  public let recents: [String]
+  public let frequencies: [String: Int]
+  private let pinnedLookup: Set<String>
+
+  public init(
+    pinned: [String] = [],
+    recents: [String] = [],
+    frequencies: [String: Int] = [:]
+  ) {
+    self.pinned = pinned
+    self.recents = recents
+    self.frequencies = frequencies
+    pinnedLookup = Set(pinned)
+  }
+
+  public func recentModels(limit: Int = OpenRouterModelUsageStore.recentLimit) -> [String] {
+    Array(recents.prefix(max(0, limit)))
+  }
+
+  public func frequentModels(limit: Int = OpenRouterModelUsageStore.recentLimit) -> [String] {
+    frequencies
+      .sorted { lhs, rhs in
+        if lhs.value != rhs.value { return lhs.value > rhs.value }
+        return lhs.key < rhs.key
+      }
+      .prefix(max(0, limit))
+      .map(\.key)
+  }
+
+  public func isPinned(_ modelID: String) -> Bool {
+    pinnedLookup.contains(modelID)
+  }
+}
+
 /// Per-user persistence for OpenRouter model selection state shown in the new
 /// agent picker. Tracks three independent dimensions:
 ///
@@ -19,6 +57,14 @@ public final class OpenRouterModelUsageStore: @unchecked Sendable {
     var pinned: [String] = []
     var recents: [String] = []
     var frequencies: [String: Int] = [:]
+
+    var snapshot: OpenRouterModelUsageSnapshot {
+      OpenRouterModelUsageSnapshot(
+        pinned: pinned,
+        recents: recents,
+        frequencies: frequencies
+      )
+    }
   }
 
   private static let decoder = JSONDecoder()
@@ -29,7 +75,9 @@ public final class OpenRouterModelUsageStore: @unchecked Sendable {
   private let lock = NSLock()
   private var cachedPayload: Payload?
 
-  public init(defaults: UserDefaults = .standard, key: String = OpenRouterModelUsageStore.defaultsKey) {
+  public init(
+    defaults: UserDefaults = .standard, key: String = OpenRouterModelUsageStore.defaultsKey
+  ) {
     self.defaults = defaults
     self.key = key
   }
@@ -57,6 +105,10 @@ public final class OpenRouterModelUsageStore: @unchecked Sendable {
     load().pinned.contains(modelID)
   }
 
+  public func snapshot() -> OpenRouterModelUsageSnapshot {
+    load().snapshot
+  }
+
   public func togglePin(_ modelID: String) {
     update { payload in
       if let index = payload.pinned.firstIndex(of: modelID) {
@@ -73,7 +125,7 @@ public final class OpenRouterModelUsageStore: @unchecked Sendable {
     update { payload in
       payload.recents.removeAll { $0 == trimmed }
       payload.recents.insert(trimmed, at: 0)
-      let capacity = OpenRouterModelUsageStore.recentLimit
+      let capacity = Self.recentLimit
       if payload.recents.count > capacity {
         payload.recents = Array(payload.recents.prefix(capacity))
       }
@@ -96,8 +148,7 @@ public final class OpenRouterModelUsageStore: @unchecked Sendable {
       return cached
     }
     let payload: Payload
-    if
-      let data = defaults.data(forKey: key),
+    if let data = defaults.data(forKey: key),
       let decoded = try? Self.decoder.decode(Payload.self, from: data)
     {
       payload = decoded
@@ -111,15 +162,16 @@ public final class OpenRouterModelUsageStore: @unchecked Sendable {
   private func update(_ mutate: (inout Payload) -> Void) {
     lock.lock()
     defer { lock.unlock() }
-    var payload = cachedPayload ?? {
-      if
-        let data = defaults.data(forKey: key),
-        let decoded = try? Self.decoder.decode(Payload.self, from: data)
-      {
-        return decoded
-      }
-      return Payload()
-    }()
+    var payload =
+      cachedPayload
+      ?? {
+        if let data = defaults.data(forKey: key),
+          let decoded = try? Self.decoder.decode(Payload.self, from: data)
+        {
+          return decoded
+        }
+        return Payload()
+      }()
     mutate(&payload)
     cachedPayload = payload
     if let encoded = try? Self.encoder.encode(payload) {

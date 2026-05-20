@@ -59,6 +59,9 @@ struct DashboardDependenciesRouteView: View {
   @State private var labelDraft = ""
   @State private var labelTargetItems = [DependencyUpdateItem]()
   @State private var inFlightActionTitle: String?
+  @State private var presentationWorker = DashboardDependenciesPresentationWorker()
+  @State private var cachedPresentation = DashboardDependenciesPresentation.empty
+  @State private var presentationGeneration: UInt64 = 0
 
   private var preferences: DashboardDependenciesPreferences {
     get { DashboardDependenciesPreferences.decode(from: storedPreferences) }
@@ -74,59 +77,38 @@ struct DashboardDependenciesRouteView: View {
     nonmutating set { collapsedRepositoriesStorage = newValue.encodedString }
   }
 
-  private var filterMode: DashboardDependenciesFilterMode {
-    DashboardDependenciesFilterMode(rawValue: filterModeRaw) ?? .all
-  }
-
-  private var sortMode: DashboardDependenciesSortMode {
-    DashboardDependenciesSortMode(rawValue: sortModeRaw) ?? .status
-  }
-
   private var groupMode: DashboardDependenciesGroupMode {
     DashboardDependenciesGroupMode(rawValue: groupModeRaw) ?? .repository
   }
 
-  private var filteredItems: [DependencyUpdateItem] {
-    response.items
-      .filter { filterMode.matches($0) }
-      .filter { item in
-        let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !query.isEmpty else { return true }
-        let haystacks = [
-          item.repository,
-          item.title,
-          item.authorLogin,
-          item.labels.joined(separator: " "),
-        ]
-        return haystacks.joined(separator: " ").localizedCaseInsensitiveContains(query)
-      }
-      .sorted(by: sortMode.comparator)
+  private var presentationInput: DashboardDependenciesPresentationInput {
+    let preferences = normalizedPreferences
+    return DashboardDependenciesPresentationInput(
+      items: response.items,
+      filterModeRaw: filterModeRaw,
+      sortModeRaw: sortModeRaw,
+      searchText: searchText,
+      configuredRepositories: preferences.normalizedRepositories,
+      configuredOrganizations: preferences.normalizedOrganizations,
+      selectedIDs: selectedIDs,
+      persistedPrimarySelectionID: persistedPrimarySelectionID
+    )
   }
 
-  private var groupedItems: [(repository: String, items: [DependencyUpdateItem])] {
-    let grouped = Dictionary(grouping: filteredItems, by: \.repository)
-    let ordering = DashboardDependenciesRepositoryOrdering(
-      configuredRepositories: normalizedPreferences.normalizedRepositories,
-      configuredOrganizations: normalizedPreferences.normalizedOrganizations
-    )
-    return grouped
-      .map { ($0.key, $0.value.sorted(by: sortMode.comparator)) }
-      .sorted { ordering.compare($0.repository, $1.repository) }
+  private var filteredItems: [DependencyUpdateItem] {
+    cachedPresentation.filteredItems
+  }
+
+  private var groupedItems: [DashboardDependenciesRepositoryGroup] {
+    cachedPresentation.groupedItems
   }
 
   private var selectedItems: [DependencyUpdateItem] {
-    let selected = response.items.filter { selectedIDs.contains($0.pullRequestID) }
-    return selected.sorted(by: sortMode.comparator)
+    cachedPresentation.selectedItems
   }
 
   private var primaryDetailItem: DependencyUpdateItem? {
-    if selectedItems.count == 1 {
-      return selectedItems.first
-    }
-    if selectedItems.isEmpty, let persisted = persistedPrimarySelectionID.nonEmpty {
-      return filteredItems.first { $0.pullRequestID == persisted }
-    }
-    return selectedItems.isEmpty ? filteredItems.first : nil
+    cachedPresentation.primaryDetailItem
   }
 
   private var summarySubtitle: String {
@@ -158,6 +140,9 @@ struct DashboardDependenciesRouteView: View {
     }
     .task(id: storedPreferences) {
       await runAutoRefreshLoop()
+    }
+    .task(id: presentationInput) {
+      await rebuildPresentation(input: presentationInput)
     }
     .sheet(isPresented: $isLabelSheetPresented) {
       labelSheet
@@ -283,7 +268,7 @@ struct DashboardDependenciesRouteView: View {
     .accessibilityIdentifier(HarnessMonitorAccessibility.dashboardDependenciesRefreshButton)
 
     actionButton("Configure Sources", systemImage: "line.3.horizontal.decrease.circle") {
-      openSettingsSection(.dependencies)
+      openSettingsSection(.repositories)
     }
     .accessibilityIdentifier(HarnessMonitorAccessibility.dashboardDependenciesConfigureButton)
 
@@ -681,7 +666,7 @@ struct DashboardDependenciesRouteView: View {
         openSettingsSection(.secrets)
       }
       Button("Open Sources Settings") {
-        openSettingsSection(.dependencies)
+        openSettingsSection(.repositories)
       }
     }
     .frame(maxWidth: .infinity, minHeight: 320)
@@ -937,6 +922,19 @@ struct DashboardDependenciesRouteView: View {
   private func parsedDate(_ value: String) -> Date? {
     dependenciesISO8601Formatter.date(from: value)
   }
+
+  @MainActor
+  private func rebuildPresentation(input: DashboardDependenciesPresentationInput) async {
+    presentationGeneration &+= 1
+    let generation = presentationGeneration
+    let presentation = await presentationWorker.compute(input: input)
+    guard !Task.isCancelled, presentationGeneration == generation else {
+      return
+    }
+    if cachedPresentation != presentation {
+      cachedPresentation = presentation
+    }
+  }
 }
 
 private struct DashboardDependenciesNotice {
@@ -1172,7 +1170,7 @@ private struct DashboardDependenciesRepositorySortKey: Comparable {
   }
 }
 
-private enum DashboardDependenciesFilterMode: String, CaseIterable, Identifiable {
+enum DashboardDependenciesFilterMode: String, CaseIterable, Identifiable {
   case all
   case ready
   case review
@@ -1204,7 +1202,7 @@ private enum DashboardDependenciesFilterMode: String, CaseIterable, Identifiable
   }
 }
 
-private enum DashboardDependenciesSortMode: String, CaseIterable, Identifiable {
+enum DashboardDependenciesSortMode: String, CaseIterable, Identifiable {
   case status
   case age
   case repository
