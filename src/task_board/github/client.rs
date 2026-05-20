@@ -8,6 +8,7 @@ use rustls::crypto::ring::default_provider;
 use serde::{Deserialize, Serialize};
 
 use crate::errors::{CliError, CliErrorKind};
+use crate::github_api_errors;
 
 use super::GitHubAutomationClient;
 use super::config::{GitHubMergeMethod, GitHubProjectConfig};
@@ -307,17 +308,11 @@ fn build_pull_request_handle(
 }
 
 fn client_error(error: octocrab::Error) -> CliError {
-    CliError::new(CliErrorKind::workflow_io(format!(
-        "create task-board github automation client: {error}"
-    )))
-    .with_source(error)
+    github_api_errors::client_error("create task-board github automation client", error)
 }
 
 fn operation_error(error: octocrab::Error) -> CliError {
-    CliError::new(CliErrorKind::workflow_io(format!(
-        "task-board github automation failed: {error}"
-    )))
-    .with_source(error)
+    github_api_errors::operation_error("task-board github automation failed", error)
 }
 
 fn pull_request_not_found(config: &GitHubProjectConfig, pull_request_number: u64) -> CliError {

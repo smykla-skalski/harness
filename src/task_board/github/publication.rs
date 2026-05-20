@@ -9,6 +9,7 @@ use tokio::task::spawn_blocking;
 use crate::daemon::service::git_runtime_profile_for_repository;
 use crate::errors::{CliError, CliErrorKind};
 use crate::git::GitRepository;
+use crate::github_api_errors;
 use crate::sandbox;
 
 use super::GitHubProjectConfig;
@@ -129,10 +130,7 @@ fn snapshot_error(context: &str, error: impl Display) -> CliError {
 }
 
 fn operation_error(error: octocrab::Error) -> CliError {
-    CliError::new(CliErrorKind::workflow_io(format!(
-        "task-board github automation failed: {error}"
-    )))
-    .with_source(error)
+    github_api_errors::operation_error("task-board github automation failed", error)
 }
 
 async fn publication_mode(

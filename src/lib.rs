@@ -11,11 +11,12 @@ pub mod app;
 #[cfg(test)]
 mod codec;
 pub mod create;
-pub mod dependency_updates;
 pub mod daemon;
+pub mod dependency_updates;
 pub mod errors;
 pub mod feature_flags;
 pub(crate) mod git;
+pub(crate) mod github_api_errors;
 pub mod hooks;
 pub mod infra;
 pub mod kernel;

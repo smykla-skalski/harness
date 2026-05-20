@@ -9,6 +9,7 @@ use serde::Deserialize;
 use serde_json::json;
 
 use crate::errors::{CliError, CliErrorKind};
+use crate::github_api_errors;
 use crate::task_board::github::{
     GitHubApiAutomationClient, GitHubAutomationClient, GitHubProjectConfig,
 };
@@ -696,17 +697,11 @@ fn ensure_rustls_provider() {
 }
 
 fn client_error(error: octocrab::Error) -> CliError {
-    CliError::new(CliErrorKind::workflow_io(format!(
-        "create dependency-updates github client: {error}"
-    )))
-    .with_source(error)
+    github_api_errors::client_error("create dependency-updates github client", error)
 }
 
 fn operation_error(error: octocrab::Error) -> CliError {
-    CliError::new(CliErrorKind::workflow_io(format!(
-        "dependency-updates github request failed: {error}"
-    )))
-    .with_source(error)
+    github_api_errors::operation_error("dependency-updates github request failed", error)
 }
 
 fn next_cursor_or_scope_limit(

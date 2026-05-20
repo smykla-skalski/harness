@@ -4,6 +4,7 @@ use octocrab::{Error as OctocrabError, Octocrab};
 use serde_json::json;
 
 use crate::errors::{CliError, CliErrorKind};
+use crate::github_api_errors;
 
 use super::config::GitHubProjectConfig;
 use super::evidence::{
@@ -387,10 +388,7 @@ fn missing_pull_request_error(config: &GitHubProjectConfig, pull_request_number:
 }
 
 fn operation_error(error: OctocrabError) -> CliError {
-    CliError::new(CliErrorKind::workflow_io(format!(
-        "task-board github automation failed: {error}"
-    )))
-    .with_source(error)
+    github_api_errors::operation_error("task-board github automation failed", error)
 }
 
 #[cfg(test)]
