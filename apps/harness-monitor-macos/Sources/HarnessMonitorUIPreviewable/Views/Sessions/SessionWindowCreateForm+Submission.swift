@@ -150,29 +150,25 @@ extension SessionWindowCreateForm {
     selection: AgentLaunchSelection,
     context: AgentCreationContext
   ) async {
+    let catalog = SessionWindowCreateFormCatalogs.selectedModelCatalog(
+      selection: .tui(runtime),
+      catalogState: state.agentCreateCatalog
+    )
     let pickerValue =
-      draft.modelByRuntime[runtime.rawValue]
-      ?? SessionWindowCreateFormCatalogs.selectedModelCatalog(
-        selection: .tui(runtime),
-        catalogState: state.agentCreateCatalog
-      )?.default
+      catalog.map {
+        currentRuntimeModelPickerValue(for: runtime.rawValue, catalog: $0)
+      }
+      ?? draft.modelByRuntime[runtime.rawValue]
       ?? ""
     let customValue = draft.customModelByRuntime[runtime.rawValue] ?? ""
-    let catalogDefault =
-      SessionWindowCreateFormCatalogs.selectedModelCatalog(
-        selection: .tui(runtime),
-        catalogState: state.agentCreateCatalog
-      )?.default ?? ""
+    let catalogDefault = catalog?.default ?? ""
     let modelSelection = SessionWindowCreateFormCatalogs.effectiveModelSelection(
       pickerValue: pickerValue,
       customValue: customValue,
       catalogDefault: catalogDefault
     )
     let effortValues =
-      SessionWindowCreateFormCatalogs.selectedModelCatalog(
-        selection: .tui(runtime),
-        catalogState: state.agentCreateCatalog
-      ).map {
+      catalog.map {
         SessionWindowCreateFormCatalogs.effortValues(
           catalog: $0,
           selectedModelID: pickerValue
@@ -229,7 +225,14 @@ extension SessionWindowCreateForm {
       catalogState: state.agentCreateCatalog
     )
     let runtimeKey = catalog?.runtime ?? descriptorID
-    let pickerValue = draft.modelByRuntime[runtimeKey] ?? catalog?.default ?? ""
+    let pickerValue =
+      if descriptorID == HarnessMonitorStore.openRouterDescriptorID {
+        currentOpenRouterModelPickerValue(for: runtimeKey)
+      } else if let catalog {
+        currentRuntimeModelPickerValue(for: runtimeKey, catalog: catalog)
+      } else {
+        draft.modelByRuntime[runtimeKey] ?? ""
+      }
     let customValue = draft.customModelByRuntime[runtimeKey] ?? ""
     let catalogDefault = catalog?.default ?? ""
     let modelSelection = SessionWindowCreateFormCatalogs.effectiveModelSelection(
