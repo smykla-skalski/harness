@@ -156,6 +156,8 @@ enum HarnessMonitorUITestAccessibility {
   static let dashboardDependenciesRoot = "harness.dashboard.dependencies"
   static let dashboardDependenciesList = "harness.dashboard.dependencies.list"
   static let dashboardDependenciesDetail = "harness.dashboard.dependencies.detail"
+  static let dashboardDependenciesContentDetailDivider =
+    "harness.dashboard.dependencies.content-detail-divider"
   static let dashboardDependenciesRefreshButton = "harness.dashboard.dependencies.refresh"
   static let dashboardDependenciesConfigureButton = "harness.dashboard.dependencies.configure"
   static let dashboardDependenciesFixCIButton = "harness.dashboard.dependencies.fix-ci"

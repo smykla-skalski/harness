@@ -144,7 +144,7 @@ extension HarnessMonitorStore {
         message.localizedCaseInsensitiveContains("bridge is not running")
       {
         applyStoppedHostBridgeState()
-        let friendlyMessage = "The shared host bridge is not running. Start it and try again."
+        let friendlyMessage = "The shared host bridge is not running. Start it and try again"
         appendConnectionEvent(kind: .error, detail: friendlyMessage)
         presentFailureFeedback(friendlyMessage)
         return .failed
@@ -214,7 +214,7 @@ extension HarnessMonitorStore {
       let daemonCommand = HarnessMonitorPaths.shellCommand("harness daemon dev")
       let message =
         "Connected daemon does not support live host bridge reconfiguration yet. "
-        + "Restart `\(daemonCommand)` and try again."
+        + "Restart `\(daemonCommand)` and try again"
       appendConnectionEvent(kind: .error, detail: message)
       presentFailureFeedback(message)
       return .failed
@@ -262,10 +262,10 @@ extension HarnessMonitorStore {
       break
     case .requiresApproval:
       throw DaemonControlError.commandFailed(
-        "Launch agent needs approval in System Settings > General > Login Items."
+        "Launch agent needs approval in System Settings > General > Login Items"
       )
     case .notRegistered, .notFound:
-      throw DaemonControlError.commandFailed("Launch agent registration did not complete.")
+      throw DaemonControlError.commandFailed("Launch agent registration did not complete")
     }
 
     let refreshedClient = try await daemonController.awaitManifestWarmUp(
@@ -274,7 +274,7 @@ extension HarnessMonitorStore {
     await connect(using: refreshedClient)
     guard connectionState == .online else {
       throw DaemonControlError.commandFailed(
-        "The harness daemon did not become healthy before the timeout."
+        "The harness daemon did not become healthy before the timeout"
       )
     }
     return refreshedClient

@@ -29,17 +29,17 @@ public enum HarnessMonitorAPIError: Error, LocalizedError, Equatable {
     case .invalidEndpoint(let value):
       "Invalid daemon endpoint: \(value)"
     case .invalidResponse:
-      "The daemon returned an invalid response."
+      "The daemon returned an invalid response"
     case .server(let code, let message):
       Self.userFacingServerErrorDescription(code: code, message: message)
     case .adoptAlreadyAttached(let sessionId):
-      "Session \(sessionId) is already attached."
+      "Session \(sessionId) is already attached"
     case .adoptLayoutViolation(let reason):
       "Not a harness session: \(reason)"
     case .adoptOriginMismatch(let expected, let found):
       "Origin mismatch: expected \(expected), found \(found)"
     case .adoptUnsupportedSchemaVersion(let found, let supported):
-      "Unsupported schema version \(found); this version supports \(supported)."
+      "Unsupported schema version \(found); this version supports \(supported)"
     }
   }
 
@@ -91,18 +91,18 @@ public enum HarnessMonitorAPIError: Error, LocalizedError, Equatable {
       Start the host bridge and try again.
       """
     case "codex.host-bridge":
-      "Codex can't start because the shared host bridge isn't running. Start the host bridge and try again."
+      "Codex can't start because the shared host bridge isn't running. Start the host bridge and try again"
     default:
-      "This action isn't available because the required bridge isn't running. Start the bridge and try again."
+      "This action isn't available because the required bridge isn't running. Start the bridge and try again"
     }
   }
 
   private static func localizedDescription(for acpServiceError: AcpServiceError) -> String {
     switch acpServiceError {
     case .disabled:
-      "ACP isn't available in this daemon session. Enable ACP and try again."
+      "ACP isn't available in this daemon session. Enable ACP and try again"
     case .sessionScopeDenied:
-      "ACP access is limited to the active session. Switch to the matching session and try again."
+      "ACP access is limited to the active session. Switch to the matching session and try again"
     }
   }
 
@@ -115,7 +115,7 @@ public enum HarnessMonitorAPIError: Error, LocalizedError, Equatable {
     guard !normalized.isEmpty else {
       return message
     }
-    return normalized
+    return normalized.harnessMonitorTrimmedTrailingPeriod
   }
 
   private static func parsedServerEnvelope(from message: String) -> ParsedServerEnvelope? {

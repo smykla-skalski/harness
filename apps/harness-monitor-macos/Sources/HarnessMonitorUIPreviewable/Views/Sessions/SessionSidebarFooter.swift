@@ -33,7 +33,7 @@ struct SessionStatusSummaryModel: Equatable {
   }
 
   var helpText: String {
-    let base = "Current connection, source, session, and service status."
+    let base = "Current connection, source, session, and service status"
     guard !statusStripState.helpText.isEmpty else {
       return base
     }

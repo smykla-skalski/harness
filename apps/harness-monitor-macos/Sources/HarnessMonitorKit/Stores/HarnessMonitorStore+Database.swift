@@ -149,7 +149,7 @@ extension HarnessMonitorStore {
     guard let cacheService, persistenceError == nil else {
       presentFailureFeedback(
         persistenceFailureMessage(
-          action: "Session cache could not be cleared.",
+          action: "Session cache could not be cleared",
           underlyingError: nil
         )
       )
@@ -162,7 +162,7 @@ extension HarnessMonitorStore {
       lastPersistedSnapshotAt = nil
       presentSuccessFeedback("Session cache cleared")
     } else {
-      presentFailureFeedback("Failed to clear session cache.")
+      presentFailureFeedback("Failed to clear session cache")
     }
     return success
   }
@@ -171,7 +171,7 @@ extension HarnessMonitorStore {
   public func clearAllUserData() async -> Bool {
     guard
       let userDataService = unavailablePersistenceService(
-        for: "User data could not be cleared."
+        for: "User data could not be cleared"
       )
     else {
       return false
@@ -188,7 +188,7 @@ extension HarnessMonitorStore {
       return true
     } catch {
       recordPersistenceFailure(
-        action: "User data could not be cleared.",
+        action: "User data could not be cleared",
         underlyingError: error
       )
       return false
@@ -219,7 +219,7 @@ extension HarnessMonitorStore {
   @discardableResult
   public func openDaemonLog() -> Bool {
     guard let url = daemonLogURL() else {
-      presentFailureFeedback("Daemon log is unavailable.")
+      presentFailureFeedback("Daemon log is unavailable")
       return false
     }
     fileViewer.open(itemAt: url)
@@ -232,7 +232,7 @@ extension HarnessMonitorStore {
     rawPath: String?
   ) -> RevealAcpPermissionLogResult {
     guard let url = acpPermissionLogURL(rawPath: rawPath) else {
-      presentFailureFeedback("ACP permission log for \(runID) is unavailable.")
+      presentFailureFeedback("ACP permission log for \(runID) is unavailable")
       return .unavailable
     }
     fileViewer.reveal(itemsAt: [url])

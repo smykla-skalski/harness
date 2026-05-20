@@ -6,7 +6,7 @@ enum HarnessMonitorMCPWindowCommandDescriptors {
     HarnessMonitorMCPWindowCommandDescriptor(
       identifier: HarnessMonitorAccessibility.windowMenuMainItem,
       label: WindowMenuCommands.mainTitle,
-      hint: "Open the dashboard window.",
+      hint: "Open the dashboard window",
       windowID: HarnessMonitorWindowID.dashboard
     )
   ]

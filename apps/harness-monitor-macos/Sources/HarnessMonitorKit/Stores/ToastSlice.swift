@@ -390,14 +390,14 @@ public final class ToastSlice {
   private func announce(_ feedback: ActionFeedback) {
     let prefix: String
     switch feedback.severity {
-    case .success: prefix = "Success."
-    case .warning: prefix = "Warning."
-    case .failure: prefix = "Action failed."
-    case .undoable: prefix = "Started."
+    case .success: prefix = "Success"
+    case .warning: prefix = "Warning"
+    case .failure: prefix = "Action failed"
+    case .undoable: prefix = "Started"
     }
     let repetitionNotice =
       if feedback.repeatCount > 1 {
-        " Repeated \(feedback.repeatCount) times."
+        " Repeated \(feedback.repeatCount) times"
       } else {
         ""
       }

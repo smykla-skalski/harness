@@ -66,7 +66,7 @@ public enum HarnessMonitorLaunchBehavior: String, CaseIterable, Codable, Hashabl
   public static let defaultValue: Self = .restoreSessionWindows
   public static let closingBehaviorDescription =
     "Command-W or the red close button removes a session window from relaunch. "
-    + "Windows left open at quit restore open; minimized session windows restore visible."
+    + "Windows left open at quit restore open; minimized session windows restore visible"
 
   public var id: String { rawValue }
 
@@ -80,9 +80,9 @@ public enum HarnessMonitorLaunchBehavior: String, CaseIterable, Codable, Hashabl
   public var description: String {
     switch self {
     case .restoreSessionWindows:
-      "Reopen session windows from system restoration when available."
+      "Reopen session windows from system restoration when available"
     case .alwaysOpenRecent:
-      "Open the recents window on launch even when session windows restore."
+      "Open the recents window on launch even when session windows restore"
     }
   }
 
@@ -166,11 +166,11 @@ public enum SessionWindowTabbingPreference: String, CaseIterable, Codable, Hasha
   public var description: String {
     switch self {
     case .system:
-      "Follow the macOS setting for opening windows as tabs."
+      "Follow the macOS setting for opening windows as tabs"
     case .always:
-      "Prefer native tabs for session windows."
+      "Prefer native tabs for session windows"
     case .never:
-      "Open session windows as separate windows."
+      "Open session windows as separate windows"
     }
   }
 

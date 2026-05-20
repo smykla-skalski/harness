@@ -249,7 +249,7 @@ struct SessionSidebar: View {
         VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingXS) {
           Text("Loading session items")
             .scaledFont(.body.weight(.medium))
-          Text("Agents, decisions, and tasks will appear shortly.")
+          Text("Agents, decisions, and tasks will appear shortly")
             .scaledFont(.footnote)
             .foregroundStyle(.secondary)
         }

@@ -151,12 +151,12 @@ extension HarnessMonitorStore {
     switch registrationState {
     case .notRegistered, .notFound:
       await applyLaunchAgentOfflineState(
-        reason: "Launch agent not installed. Install to start the daemon."
+        reason: "Launch agent not installed. Install to start the daemon"
       )
       return
     case .requiresApproval:
       await applyLaunchAgentOfflineState(
-        reason: "Launch agent needs approval in System Settings > General > Login Items."
+        reason: "Launch agent needs approval in System Settings > General > Login Items"
       )
       return
     case .enabled:
@@ -186,7 +186,7 @@ extension HarnessMonitorStore {
         kind: .error,
         detail: "SMAppService launch agent is still registered. Remove it in "
           + "System Settings > General > Login Items to avoid conflicts with "
-          + "`\(daemonCommand)`."
+          + "`\(daemonCommand)`"
       )
     }
     do {

@@ -28,23 +28,23 @@ extension HarnessMonitorStore {
       return AcpRuntimeInspectStatus(
         phase: .ready,
         shortLabel: "Ready",
-        detail: "ACP runtime telemetry available.",
+        detail: "ACP runtime telemetry available",
         accessibilityValue: "Runtime telemetry available"
       )
     case .waiting:
       return AcpRuntimeInspectStatus(
         phase: .waiting,
         shortLabel: "Waiting",
-        detail: "Waiting for the first ACP runtime inspect snapshot.",
+        detail: "Waiting for the first ACP runtime inspect snapshot",
         accessibilityValue: "Waiting for first runtime telemetry"
       )
     case .retrying:
       let attemptCount = entry?.retryCount ?? 0
       let detail =
         if attemptCount > 1 {
-          "ACP runtime telemetry is still missing. Retrying inspect (attempt \(attemptCount))."
+          "ACP runtime telemetry is still missing. Retrying inspect (attempt \(attemptCount))"
         } else {
-          "ACP runtime telemetry is still missing. Retrying inspect now."
+          "ACP runtime telemetry is still missing. Retrying inspect now"
         }
       return AcpRuntimeInspectStatus(
         phase: .retrying,
@@ -56,7 +56,7 @@ extension HarnessMonitorStore {
       return AcpRuntimeInspectStatus(
         phase: .stalled,
         shortLabel: "Stalled",
-        detail: "ACP runtime telemetry has not arrived yet. Use Refresh if this persists.",
+        detail: "ACP runtime telemetry has not arrived yet. Use Refresh if this persists",
         accessibilityValue: "Runtime telemetry stalled"
       )
     case .unavailable:
@@ -97,23 +97,23 @@ extension HarnessMonitorStore {
       return AcpRuntimeInspectStatus(
         phase: .ready,
         shortLabel: "Ready",
-        detail: "ACP runtime telemetry available.",
+        detail: "ACP runtime telemetry available",
         accessibilityValue: "Runtime telemetry available"
       )
     case .waiting:
       return AcpRuntimeInspectStatus(
         phase: .waiting,
         shortLabel: "Waiting",
-        detail: "Waiting for the first ACP runtime inspect snapshot.",
+        detail: "Waiting for the first ACP runtime inspect snapshot",
         accessibilityValue: "Waiting for first runtime telemetry"
       )
     case .retrying:
       let attemptCount = entry?.retryCount ?? 0
       let detail =
         if attemptCount > 1 {
-          "ACP runtime telemetry is still missing. Retrying inspect (attempt \(attemptCount))."
+          "ACP runtime telemetry is still missing. Retrying inspect (attempt \(attemptCount))"
         } else {
-          "ACP runtime telemetry is still missing. Retrying inspect now."
+          "ACP runtime telemetry is still missing. Retrying inspect now"
         }
       return AcpRuntimeInspectStatus(
         phase: .retrying,
@@ -125,7 +125,7 @@ extension HarnessMonitorStore {
       return AcpRuntimeInspectStatus(
         phase: .stalled,
         shortLabel: "Stalled",
-        detail: "ACP runtime telemetry has not arrived yet. Use Refresh if this persists.",
+        detail: "ACP runtime telemetry has not arrived yet. Use Refresh if this persists",
         accessibilityValue: "Runtime telemetry stalled"
       )
     case .unavailable:
@@ -161,7 +161,7 @@ extension HarnessMonitorStore {
       return AcpRuntimeInspectStatus(
         phase: .ready,
         shortLabel: "Ready",
-        detail: "ACP runtime telemetry available.",
+        detail: "ACP runtime telemetry available",
         accessibilityValue: "Runtime telemetry available"
       )
     }
@@ -169,7 +169,7 @@ extension HarnessMonitorStore {
     return AcpRuntimeInspectStatus(
       phase: .waiting,
       shortLabel: "Waiting",
-      detail: "Waiting for the first ACP runtime inspect snapshot.",
+      detail: "Waiting for the first ACP runtime inspect snapshot",
       accessibilityValue: "Waiting for first runtime telemetry"
     )
   }
@@ -406,7 +406,7 @@ extension HarnessMonitorStore {
       return acpHostBridgeFailureMessage()
     case .ready:
       return entry?.message
-        ?? "ACP runtime inspect is unavailable. Retry or restart the shared host bridge."
+        ?? "ACP runtime inspect is unavailable. Retry or restart the shared host bridge"
     }
   }
 }

@@ -72,7 +72,7 @@ final class DecisionActionHandlerSupervisorCustomTests: XCTestCase {
     XCTAssertEqual(warmUpCallCount, 1)
     XCTAssertEqual(
       store.connectionState,
-      .offline("Background helper is not running. Start it to load live sessions.")
+      .offline("Background helper is not running. Start it to load live sessions")
     )
     let feedback = try XCTUnwrap(store.toast.activeFeedback.first)
     XCTAssertEqual(feedback.title, "Start background helper")

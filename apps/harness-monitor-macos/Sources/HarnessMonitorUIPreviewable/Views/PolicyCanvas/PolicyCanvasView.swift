@@ -334,7 +334,7 @@ public struct PolicyCanvasView: View {
       }
       Button("Cancel", role: .cancel) {}
     } message: {
-      Text("The saved revision will become the enforced automation policy.")
+      Text("The saved revision will become the enforced automation policy")
     }
     .confirmationDialog(
       pendingDeletionRequest?.title ?? "Delete policy component?",

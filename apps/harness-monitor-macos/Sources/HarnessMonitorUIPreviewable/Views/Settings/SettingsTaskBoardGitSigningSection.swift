@@ -61,7 +61,7 @@ extension SettingsTaskBoardEditingSurface {
         .harnessNativeFormSectionHeader()
     } footer: {
       Text(
-        "Choose how the daemon signs commits and tags it creates on your behalf."
+        "Choose how the daemon signs commits and tags it creates on your behalf"
       )
     }
   }

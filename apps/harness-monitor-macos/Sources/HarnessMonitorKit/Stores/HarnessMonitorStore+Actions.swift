@@ -314,7 +314,7 @@ extension HarnessMonitorStore {
         let remaining = agentIDs.count - index - 1
         presentFailureFeedback(
           "Removed \(succeeded) of \(agentIDs.count) agents. "
-            + "Stopped after a failure with \(remaining) not attempted."
+            + "Stopped after a failure with \(remaining) not attempted"
         )
         return false
       }

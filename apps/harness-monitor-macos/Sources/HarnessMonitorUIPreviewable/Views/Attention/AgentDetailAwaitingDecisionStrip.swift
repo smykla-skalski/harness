@@ -40,7 +40,7 @@ struct AgentDetailAwaitingDecisionStrip: View {
       return "Submitting decision..."
     }
     if payload != nil && payload?.isRenderable != true {
-      return "Request details unavailable here — review in Decisions to inspect and act."
+      return "Request details unavailable here — review in Decisions to inspect and act"
     }
     if count > 1 {
       if topRequestTitle != nil {

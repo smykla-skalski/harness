@@ -29,7 +29,7 @@ public struct ArbitrationBannerView: View {
     if let outcome = task.arbitration {
       return outcome.summary
     }
-    return "Reviewers exhausted the consensus rounds. Leader must arbitrate \(task.title)."
+    return "Reviewers exhausted the consensus rounds. Leader must arbitrate \(task.title)"
   }
 
   public var body: some View {

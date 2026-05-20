@@ -48,7 +48,7 @@ struct HarnessMonitorPersistenceSetup {
     if environment.values["HARNESS_MONITOR_FORCE_PERSISTENCE_FAILURE"] == "1" {
       return Self(
         container: nil,
-        error: persistenceUnavailableMessage(details: "Forced failure for testing.")
+        error: persistenceUnavailableMessage(details: "Forced failure for testing")
       )
     }
 

@@ -45,7 +45,7 @@ struct HarnessMonitorJSONCodeBlockTests {
     let rawJSON = #"{"id":"broken","payload":{"agentID":"agent-7"}"#
     let presentation = HarnessMonitorJSONPresentation.formatted(rawJSON: rawJSON)
 
-    #expect(presentation.errorMessage == "Could not format JSON. Showing raw payload.")
+    #expect(presentation.errorMessage == "Could not format JSON. Showing raw payload")
     #expect(presentation.displayText == rawJSON)
     #expect(presentation.tokens == [.init(text: rawJSON, kind: .plain)])
   }

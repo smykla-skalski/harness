@@ -35,7 +35,7 @@ struct SessionFilteredDecisionNotice: View {
       VStack(alignment: .leading, spacing: metrics.textSpacing) {
         Text("Decision hidden by current filters")
           .scaledFont(.headline)
-        Text("Clear the decision filters to show this selection in the sidebar again.")
+        Text("Clear the decision filters to show this selection in the sidebar again")
           .scaledFont(.subheadline)
           .foregroundStyle(.secondary)
       }

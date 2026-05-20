@@ -28,7 +28,7 @@ struct PolicyCanvasEmptyStatePlaceholder: View {
             .lineLimit(2)
             .fixedSize(horizontal: false, vertical: true)
 
-          Text("Compose a policy graph by adding nodes from the palette.")
+          Text("Compose a policy graph by adding nodes from the palette")
             .scaledFont(.callout)
             // .white.opacity(0.78) hits WCAG AA on the canvas's dark background
             // (~9.4:1); .opacity(0.48) used elsewhere fails the bar (~3.0:1)
@@ -39,7 +39,7 @@ struct PolicyCanvasEmptyStatePlaceholder: View {
             .fixedSize(horizontal: false, vertical: true)
         }
 
-        Text("Tip: drag a tool from the left rail onto the canvas to start.")
+        Text("Tip: drag a tool from the left rail onto the canvas to start")
           .scaledFont(.caption.weight(.medium))
           .foregroundStyle(.white.opacity(0.78))
           .multilineTextAlignment(.center)

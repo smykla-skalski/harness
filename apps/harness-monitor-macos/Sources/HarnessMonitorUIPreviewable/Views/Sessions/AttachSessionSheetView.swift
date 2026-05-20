@@ -38,7 +38,7 @@ struct AttachSessionSheetView: View {
     VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingXS) {
       Text("Attach External Session")
         .scaledFont(.system(.title3, design: .rounded, weight: .bold))
-      Text("Inspect and confirm before attaching to the daemon.")
+      Text("Inspect and confirm before attaching to the daemon")
         .scaledFont(.subheadline)
         .foregroundStyle(HarnessMonitorTheme.secondaryInk)
     }
@@ -72,7 +72,7 @@ struct AttachSessionSheetView: View {
       row(label: "Memory", value: preview.sessionRoot.appendingPathComponent("memory").path)
       if !preview.originReachable {
         Label(
-          "Origin is not reachable. Attach succeeds but will be read-only until re-authorized.",
+          "Origin is not reachable. Attach succeeds but will be read-only until re-authorized",
           systemImage: "exclamationmark.triangle.fill"
         )
         .foregroundStyle(.yellow)
@@ -134,11 +134,11 @@ struct AttachSessionSheetView: View {
     switch failure {
     case .notAHarnessSession(let reason): reason
     case .unsupportedSchemaVersion(let found, let supported):
-      "Schema version \(found) is not supported. This Monitor expects v\(supported)."
+      "Schema version \(found) is not supported. This Monitor expects v\(supported)"
     case .belongsToAnotherProject(let expected, let found):
-      "Expected origin \(expected), found \(found)."
+      "Expected origin \(expected), found \(found)"
     case .alreadyAttached(let sid):
-      "Session \(sid) is already attached."
+      "Session \(sid) is already attached"
     }
   }
 }

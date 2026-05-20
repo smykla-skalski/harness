@@ -279,7 +279,7 @@ public struct DaemonController: DaemonControlling {
     if ownership == .external {
       throw DaemonControlError.commandFailed(
         "Install Launch Agent is disabled in external daemon mode. "
-          + "Stop the dev daemon or unset HARNESS_MONITOR_EXTERNAL_DAEMON to install."
+          + "Stop the dev daemon or unset HARNESS_MONITOR_EXTERNAL_DAEMON to install"
       )
     }
     switch launchAgentManager.registrationState() {
@@ -287,7 +287,7 @@ public struct DaemonController: DaemonControlling {
       return "launch agent already installed"
     case .requiresApproval:
       throw DaemonControlError.commandFailed(
-        "Enable Harness Monitor daemon in System Settings > General > Login Items."
+        "Enable Harness Monitor daemon in System Settings > General > Login Items"
       )
     case .notRegistered, .notFound:
       switch try await registerLaunchAgent() {
@@ -304,7 +304,7 @@ public struct DaemonController: DaemonControlling {
   public func removeLaunchAgent() async throws -> String {
     if ownership == .external {
       throw DaemonControlError.commandFailed(
-        "Remove Launch Agent is disabled in external daemon mode."
+        "Remove Launch Agent is disabled in external daemon mode"
       )
     }
     switch launchAgentManager.registrationState() {

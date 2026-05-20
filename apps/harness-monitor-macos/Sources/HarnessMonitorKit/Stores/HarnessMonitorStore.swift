@@ -362,6 +362,7 @@ public final class HarnessMonitorStore {
   var codexRunsBySessionID: [String: [CodexRunSnapshot]] = [:]
   var openRouterRunsBySessionID: [String: [OpenRouterRunSnapshot]] = [:]
   @ObservationIgnored var openRouterRunMetadata: [String: OpenRouterRunMetadata] = [:]
+  @ObservationIgnored public let openRouterModelUsage = OpenRouterModelUsageStore()
   @ObservationIgnored var locallyRemovedSessionIDs: Set<String> = []
   @ObservationIgnored var pendingListSelectionTask: Task<Void, Never>?
   @ObservationIgnored var pendingListSelectionTaskToken: UInt64 = 0

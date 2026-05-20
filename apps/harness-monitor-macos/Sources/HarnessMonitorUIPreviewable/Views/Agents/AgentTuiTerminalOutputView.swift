@@ -19,7 +19,7 @@ struct AgentTuiTerminalOutputView: View {
 
   var body: some View {
     if visibleRows.isEmpty {
-      Text("No terminal output yet.")
+      Text("No terminal output yet")
         .foregroundStyle(HarnessMonitorTheme.secondaryInk)
         .frame(
           maxWidth: wrapLines ? .infinity : nil,

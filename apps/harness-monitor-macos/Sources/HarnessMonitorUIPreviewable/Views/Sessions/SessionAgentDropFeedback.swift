@@ -69,7 +69,7 @@ struct AgentTaskDropFeedback {
   static func deliveringStart() -> Self {
     Self(
       title: "Delivering task",
-      detail: "Sending the live handoff now.",
+      detail: "Sending the live handoff now",
       systemImage: "paperplane.fill",
       tint: HarnessMonitorTheme.accent,
       isActionable: true
@@ -79,7 +79,7 @@ struct AgentTaskDropFeedback {
   static func deliveringQueue() -> Self {
     Self(
       title: "Queueing task",
-      detail: "Saving it behind the current work.",
+      detail: "Saving it behind the current work",
       systemImage: "text.line.last.and.arrowtriangle.forward",
       tint: HarnessMonitorTheme.caution,
       isActionable: true
@@ -94,7 +94,7 @@ struct AgentTaskDropFeedback {
     if isSessionReadOnly {
       self.init(
         title: "Read-only session",
-        detail: "Task drops are disabled.",
+        detail: "Task drops are disabled",
         systemImage: "lock",
         tint: HarnessMonitorTheme.danger,
         isActionable: false
@@ -105,7 +105,7 @@ struct AgentTaskDropFeedback {
     guard agent.role == .worker else {
       self.init(
         title: "\(agent.role.title) cannot take tasks",
-        detail: "Only active workers accept tasks.",
+        detail: "Only active workers accept tasks",
         systemImage: "nosign",
         tint: HarnessMonitorTheme.danger,
         isActionable: false
@@ -116,7 +116,7 @@ struct AgentTaskDropFeedback {
     guard agent.status == .active else {
       self.init(
         title: "\(agent.status.title) agent",
-        detail: "Only active workers accept tasks.",
+        detail: "Only active workers accept tasks",
         systemImage: "pause.circle",
         tint: HarnessMonitorTheme.danger,
         isActionable: false
@@ -127,7 +127,7 @@ struct AgentTaskDropFeedback {
     guard agent.currentTaskId != nil else {
       self.init(
         title: "Start on this worker",
-        detail: "Drop to run it now.",
+        detail: "Drop to run it now",
         systemImage: "play.fill",
         tint: HarnessMonitorTheme.success,
         isActionable: true
@@ -137,10 +137,10 @@ struct AgentTaskDropFeedback {
 
     let detail: String
     if queuedTaskCount == 0 {
-      detail = "Drop behind the current task."
+      detail = "Drop behind the current task"
     } else {
       let taskWord = queuedTaskCount == 1 ? "task" : "tasks"
-      detail = "\(queuedTaskCount) \(taskWord) queued."
+      detail = "\(queuedTaskCount) \(taskWord) queued"
     }
     self.init(
       title: "Queue for this worker",

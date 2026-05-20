@@ -176,7 +176,7 @@ struct PolicyCanvasSearchPalette: View {
   }
 
   private var emptyRecentState: some View {
-    Text("Start typing to find nodes, edges, or groups.")
+    Text("Start typing to find nodes, edges, or groups")
       .scaledFont(.caption)
       .foregroundStyle(.white.opacity(0.62))
       .padding(.horizontal, 12)

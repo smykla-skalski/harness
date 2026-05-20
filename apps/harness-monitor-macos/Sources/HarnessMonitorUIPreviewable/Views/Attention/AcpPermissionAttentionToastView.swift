@@ -16,9 +16,9 @@ public struct AcpPermissionAttentionToastView: View {
 
   private var requestSummary: String {
     if attention.requestCount == 1 {
-      return "1 permission request is waiting."
+      return "1 permission request is waiting"
     }
-    return "\(attention.requestCount) permission requests are waiting."
+    return "\(attention.requestCount) permission requests are waiting"
   }
 
   private var announcementMessage: String {

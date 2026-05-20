@@ -43,7 +43,7 @@ struct SettingsDependenciesSection: View {
       Text("Sources")
         .harnessNativeFormSectionHeader()
     } footer: {
-      Text("Separate multiple authors, organizations, or repositories with commas or new lines.")
+      Text("Separate multiple authors, organizations, or repositories with commas or new lines")
     }
   }
 
@@ -60,7 +60,7 @@ struct SettingsDependenciesSection: View {
       Text("Actions")
         .harnessNativeFormSectionHeader()
     } footer: {
-      Text("This merge method is used for Merge and Auto actions in the Dependencies dashboard.")
+      Text("This merge method is used for Merge and Auto actions in the Dependencies dashboard")
     }
   }
 
@@ -84,7 +84,7 @@ struct SettingsDependenciesSection: View {
       Text("Refresh & Cache")
         .harnessNativeFormSectionHeader()
     } footer: {
-      Text("The route background refresh loop and cache TTL both use these values.")
+      Text("The route background refresh loop and cache TTL both use these values")
     }
   }
 

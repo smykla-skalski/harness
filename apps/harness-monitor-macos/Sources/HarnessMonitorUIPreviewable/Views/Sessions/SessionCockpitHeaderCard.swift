@@ -249,7 +249,7 @@ struct SessionCockpitHeaderCard: View {
       let requested = pendingTransfer.requestedBy
       let newLeader = pendingTransfer.newLeaderId
       let current = pendingTransfer.currentLeaderId
-      Text(verbatim: "\(requested) requested \(newLeader) to replace \(current).")
+      Text(verbatim: "\(requested) requested \(newLeader) to replace \(current)")
         .scaledFont(.system(.body, design: .rounded, weight: .medium))
         .foregroundStyle(HarnessMonitorTheme.secondaryInk)
       if let reason = pendingTransfer.reason, !reason.isEmpty {

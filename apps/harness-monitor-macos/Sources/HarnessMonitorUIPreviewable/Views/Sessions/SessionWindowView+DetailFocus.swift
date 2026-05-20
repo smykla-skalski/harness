@@ -27,8 +27,8 @@ extension SessionWindowView {
               systemImage: SessionWindowRoute.agents.systemImage,
               description: Text(
                 hasQuery
-                  ? "No agents match the current search."
-                  : "This session does not have any agents."
+                  ? "No agents match the current search"
+                  : "This session does not have any agents"
               )
             )
           }
@@ -83,8 +83,8 @@ extension SessionWindowView {
               systemImage: SessionWindowRoute.tasks.systemImage,
               description: Text(
                 hasQuery
-                  ? "No tasks match the current search."
-                  : "This session does not have any tasks."
+                  ? "No tasks match the current search"
+                  : "This session does not have any tasks"
               )
             )
           }
@@ -93,7 +93,7 @@ extension SessionWindowView {
         unavailableDetailSurface(
           "Select an Item",
           systemImage: "sidebar.right",
-          description: Text("Pick an agent, decision, or task in the sidebar.")
+          description: Text("Pick an agent, decision, or task in the sidebar")
         )
       }
     }
@@ -198,7 +198,7 @@ extension SessionWindowView {
         ContentUnavailableView(
           "Agent \(agentID)",
           systemImage: "person.crop.circle",
-          description: Text("Agent detail is not available.")
+          description: Text("Agent detail is not available")
         )
       }
     }

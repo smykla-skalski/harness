@@ -53,7 +53,7 @@ struct SessionTimelineActionButtons: View {
         }
         Button("Keep", role: .cancel) {}
       } message: { _ in
-        Text("The signal will not be delivered.")
+        Text("The signal will not be delivered")
       }
     }
   }

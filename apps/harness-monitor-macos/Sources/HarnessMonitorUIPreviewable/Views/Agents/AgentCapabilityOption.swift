@@ -217,7 +217,7 @@ struct AgentCapabilityOption: Identifiable, Equatable {
       "ACP is still being checked"
     case .setupRequired:
       if bundledWithHarness {
-        "This ACP adapter ships with Harness. Install or update Harness to enable it here."
+        "This ACP adapter ships with Harness. Install or update Harness to enable it here"
       } else {
         "Install the \(title) CLI to add ACP here"
       }

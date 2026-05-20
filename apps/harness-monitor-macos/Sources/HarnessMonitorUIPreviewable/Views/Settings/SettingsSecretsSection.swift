@@ -86,7 +86,7 @@ struct SettingsSecretsSection: View, SettingsTaskBoardEditingSurface {
       Text("Git Keys")
         .harnessNativeFormSectionHeader()
     } footer: {
-      Text("These values affect daemon-managed git authentication only.")
+      Text("These values affect daemon-managed git authentication only")
     }
   }
 }

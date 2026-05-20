@@ -54,7 +54,7 @@ struct DashboardNotificationsRouteView: View {
     ContentUnavailableView {
       Label("No notifications yet", systemImage: "bell.slash")
     } description: {
-      Text("In-app toasts and Notification Center deliveries will appear here.")
+      Text("In-app toasts and Notification Center deliveries will appear here")
     }
     .frame(maxWidth: .infinity, minHeight: 320)
     .accessibilityIdentifier(HarnessMonitorAccessibility.dashboardNotificationsEmptyState)
@@ -83,12 +83,12 @@ private struct DashboardNotificationSummary: Equatable {
 
   var subtitle: String {
     guard totalCount > 0 else {
-      return "In-app toasts and Notification Center deliveries are collected here."
+      return "In-app toasts and Notification Center deliveries are collected here"
     }
     if activeCount > 0 {
-      return "\(totalCount) entries captured so far, \(activeCount) still active."
+      return "\(totalCount) entries captured so far, \(activeCount) still active"
     }
-    return "\(totalCount) entries captured so far. No active notifications right now."
+    return "\(totalCount) entries captured so far. No active notifications right now"
   }
 }
 
@@ -516,7 +516,7 @@ private enum DashboardNotificationsRoutePreview {
       status: .dismissed,
       statusText: "Dismissed automatically",
       title: "Draft saved",
-      message: "Saved supervisor draft to shared preview fixtures.",
+      message: "Saved supervisor draft to shared preview fixtures",
       actions: [
         NotificationHistoryAction(
           id: "copy",
@@ -537,7 +537,7 @@ private enum DashboardNotificationsRoutePreview {
       statusText: "Opened in Notification Center",
       title: "Harness Monitor",
       subtitle: "Supervisor attention required",
-      message: "A decision needs review before the next automation tick.",
+      message: "A decision needs review before the next automation tick",
       actions: [
         NotificationHistoryAction(
           id: "open",
@@ -564,9 +564,9 @@ private enum DashboardNotificationsRoutePreview {
       status: .undone,
       statusText: "Undo completed",
       title: "Task removed",
-      message: "The task was restored from Notifications.",
+      message: "The task was restored from Notifications",
       details: NotificationHistoryDetails(
-        summary: "Undo restored the task assignment and notes.",
+        summary: "Undo restored the task assignment and notes",
         rows: [
           NotificationHistoryDetailRow(label: "Task", value: "task-42"),
           NotificationHistoryDetailRow(label: "Session", value: "sess-alpha"),

@@ -82,7 +82,7 @@ public struct HarnessMonitorMCPStatusSnapshot: Equatable, Sendable {
   public var detail: String {
     switch runtimeState {
     case .disabled:
-      return "The in-app MCP accessibility registry host is disabled."
+      return "The in-app MCP accessibility registry host is disabled"
     case .starting(let socketPath):
       if let socketPath {
         return
@@ -116,14 +116,14 @@ public struct HarnessMonitorMCPStatusSnapshot: Equatable, Sendable {
       return
         "Recovery continues in the background. Retry \(nextAttempt) of "
         + "\(recoveryStatus.maximumRetryCount) is scheduled"
-        + " \(formattedDelay(nextRetryDelay))."
+        + " \(formattedDelay(nextRetryDelay))"
     }
     guard recoveryStatus.completedRetryCount > 0 else {
       return nil
     }
     return
       "Automatic recovery paused after \(recoveryStatus.completedRetryCount) "
-      + "attempts."
+      + "attempts"
   }
 
   public var shouldShowChromeBanner: Bool {
@@ -160,9 +160,9 @@ public struct HarnessMonitorMCPStatusSnapshot: Equatable, Sendable {
 
   private var recoveryGuidance: String {
     if isRecovering {
-      return "You can keep working while the registry retries in the background."
+      return "You can keep working while the registry retries in the background"
     }
-    return "Correct the problem, then open Settings > MCP to re-enable the registry host."
+    return "Correct the problem, then open Settings > MCP to re-enable the registry host"
   }
 
   private var hostScopeClarification: String {

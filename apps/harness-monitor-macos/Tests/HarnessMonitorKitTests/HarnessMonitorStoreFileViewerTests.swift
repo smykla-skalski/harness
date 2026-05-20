@@ -49,7 +49,7 @@ struct HarnessMonitorStoreFileViewerTests {
     #expect(opened == false)
     #expect(fileViewer.openedItems.isEmpty)
     #expect(fileViewer.revealedBatches.isEmpty)
-    #expect(store.currentFailureFeedbackMessage == "Daemon log is unavailable.")
+    #expect(store.currentFailureFeedbackMessage == "Daemon log is unavailable")
   }
 
   @Test("Reveal ACP permission log opens the file in Finder")

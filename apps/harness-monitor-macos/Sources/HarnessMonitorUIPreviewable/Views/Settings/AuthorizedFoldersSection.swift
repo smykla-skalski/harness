@@ -45,7 +45,7 @@ public struct AuthorizedFoldersSection: View {
         "Bookmark store unavailable",
         systemImage: "exclamationmark.triangle",
         description: Text(
-          "The app group container is not available; authorized folders cannot be managed."
+          "The app group container is not available; authorized folders cannot be managed"
         )
       )
       .accessibilityIdentifier(
@@ -55,7 +55,7 @@ public struct AuthorizedFoldersSection: View {
       ContentUnavailableView(
         "No authorized folders",
         systemImage: "folder.badge.questionmark",
-        description: Text("Use File > Open Folder… to authorize a project directory.")
+        description: Text("Use File > Open Folder… to authorize a project directory")
       )
       .accessibilityIdentifier(
         HarnessMonitorAccessibility.settingsAuthorizedFoldersEmpty

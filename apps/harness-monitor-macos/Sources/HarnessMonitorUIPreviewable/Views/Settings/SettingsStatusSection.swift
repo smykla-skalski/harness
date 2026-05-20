@@ -13,7 +13,7 @@ struct SettingsStatusSection: View {
           value: formatTimestamp(startedAt, configuration: dateTimeConfiguration)
         )
       } else {
-        Text("Daemon not started.")
+        Text("Daemon not started")
           .foregroundStyle(.secondary)
       }
     } header: {

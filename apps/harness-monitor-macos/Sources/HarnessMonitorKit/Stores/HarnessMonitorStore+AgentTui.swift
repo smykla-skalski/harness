@@ -91,7 +91,7 @@ extension HarnessMonitorStore {
       return nil
     }
     guard rows > 0, cols > 0 else {
-      presentFailureFeedback("Terminal size must be greater than zero.")
+      presentFailureFeedback("Terminal size must be greater than zero")
       return nil
     }
 
@@ -189,7 +189,7 @@ extension HarnessMonitorStore {
     }
     guard let client else { return false }
     guard rows > 0, cols > 0 else {
-      presentFailureFeedback("Terminal size must be greater than zero.")
+      presentFailureFeedback("Terminal size must be greater than zero")
       return false
     }
 

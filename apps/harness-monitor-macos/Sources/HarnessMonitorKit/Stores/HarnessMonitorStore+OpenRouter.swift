@@ -13,6 +13,25 @@ public enum OpenRouterAcpDispatch {
   public static let defaultModel = "anthropic/claude-3.7-sonnet"
 }
 
+/// Curated fallback list shown in the picker when the user has no pinned,
+/// recent, or frequent models yet and the daemon could not return a dynamic
+/// catalog. Kept narrow and current-generation so the empty state is never
+/// stale; the dynamic catalog overrides this as soon as it loads.
+public enum OpenRouterPopularModels {
+  public static let modelIDs: [String] = [
+    "anthropic/claude-opus-4",
+    "anthropic/claude-sonnet-4",
+    "openai/gpt-5",
+    "openai/gpt-4o",
+    "google/gemini-2.5-pro",
+    "google/gemini-2.5-flash",
+    "xai/grok-4",
+    "deepseek/deepseek-r1",
+    "meta-llama/llama-4-maverick",
+    "qwen/qwen3-coder",
+  ]
+}
+
 extension HarnessMonitorStore {
   /// Catalog descriptor id the daemon uses to dispatch OpenRouter sessions.
   public static var openRouterDescriptorID: String { OpenRouterAcpDispatch.descriptorID }
@@ -59,6 +78,7 @@ extension HarnessMonitorStore {
       model: resolvedModel,
       displayName: resolvedName
     )
+    openRouterModelUsage.recordUsage(of: resolvedModel)
     let run = OpenRouterRunSnapshot(
       acp: acp,
       model: resolvedModel,
@@ -76,13 +96,16 @@ extension HarnessMonitorStore {
     guard let client else { return nil }
     let trimmed = prompt.trimmingCharacters(in: .whitespacesAndNewlines)
     guard !trimmed.isEmpty else {
-      presentFailureFeedback("OpenRouter prompt cannot be empty.")
+      presentFailureFeedback("OpenRouter prompt cannot be empty")
       return nil
     }
     do {
       let snapshot = try await client.promptManagedAcpAgent(agentID: runID, prompt: trimmed)
       guard case .acp(let acp) = snapshot else { return nil }
       let metadata = openRouterRunMetadata[runID]
+      if let model = metadata?.model, !model.isEmpty {
+        openRouterModelUsage.recordUsage(of: model)
+      }
       let projected = OpenRouterRunSnapshot(
         acp: acp,
         model: metadata?.model ?? "",

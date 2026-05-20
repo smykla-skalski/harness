@@ -107,9 +107,9 @@ struct AgentCapabilityRow: View {
     switch option.availabilityState {
     case .projectAccessAvailable:
       if !currentChoice.id.isAcp {
-        return "ACP is also available."
+        return "ACP is also available"
       }
-      return "Starts via ACP."
+      return "Starts via ACP"
     case .checkingAccess, .setupRequired, .bridgeAccessRequired:
       if !currentChoice.id.isAcp {
         return option.projectAccessGuidanceText

@@ -24,6 +24,15 @@ func taskBoardRPCResponse(for method: WebSocketRPCMethod) throws -> JSONValue {
   return response
 }
 
+private func fixtureJSONValue(_ text: String) -> JSONValue {
+  let data = Data(text.utf8)
+  do {
+    return try JSONDecoder().decode(JSONValue.self, from: data)
+  } catch {
+    fatalError("Unable to decode JSONValue fixture: \(error)")
+  }
+}
+
 private let taskBoardRPCResponses: [WebSocketRPCMethod: JSONValue] = [
   .taskBoardList: .object(["items": .array([.object(sampleTaskBoardItemJSON)])]),
   .taskBoardCreate: .object(sampleTaskBoardItemJSON),
@@ -72,6 +81,13 @@ private let taskBoardRPCResponses: [WebSocketRPCMethod: JSONValue] = [
   .taskBoardPolicyPipelineSimulate: .object(samplePolicySimulationJSON),
   .taskBoardPolicyPipelinePromote: .object(samplePolicyPromotionJSON),
   .taskBoardPolicyPipelineAudit: .object(samplePolicyAuditJSON),
+  .dependencyUpdatesQuery: fixtureJSONValue(sampleDependencyUpdatesQueryResponseText),
+  .dependencyUpdatesApprove: fixtureJSONValue(sampleDependencyUpdatesApproveResponseText),
+  .dependencyUpdatesMerge: fixtureJSONValue(sampleDependencyUpdatesMergeResponseText),
+  .dependencyUpdatesRerunChecks: fixtureJSONValue(sampleDependencyUpdatesRerunResponseText),
+  .dependencyUpdatesAddLabel: fixtureJSONValue(sampleDependencyUpdatesLabelResponseText),
+  .dependencyUpdatesAuto: fixtureJSONValue(sampleDependencyUpdatesAutoResponseText),
+  .dependencyUpdatesClearCache: fixtureJSONValue(sampleDependencyUpdatesCacheClearResponseText),
 ]
 
 final class TaskBoardURLProtocol: URLProtocol, @unchecked Sendable {

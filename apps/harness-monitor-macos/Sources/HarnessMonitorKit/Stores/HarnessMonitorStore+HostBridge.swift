@@ -197,13 +197,13 @@ extension HarnessMonitorStore {
         Retry or restart the shared host bridge.
         """
     case .excluded:
-      return "ACP project access is excluded from the shared host bridge. Enable ACP and try again."
+      return "ACP project access is excluded from the shared host bridge. Enable ACP and try again"
     case .unavailable:
       if hostBridge.running {
         return
-          "ACP project access is unavailable on the shared host bridge. Re-enable ACP and try again."
+          "ACP project access is unavailable on the shared host bridge. Re-enable ACP and try again"
       }
-      return "ACP project access requires the shared host bridge. Start it and try again."
+      return "ACP project access requires the shared host bridge. Start it and try again"
     }
   }
 

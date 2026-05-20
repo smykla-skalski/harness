@@ -226,7 +226,7 @@ private struct SessionLoadingBanner: View {
         .scaledFont(.caption)
         .controlSize(.small)
         .accessibilityHidden(true)
-      Text("Loading session detail from daemon.")
+      Text("Loading session detail from daemon")
         .scaledFont(.caption.weight(.medium))
       Spacer(minLength: 0)
     }
@@ -252,9 +252,9 @@ private struct SessionDecisionAttentionBanner: View {
 
   private var message: String {
     if count == 1 {
-      return "1 pending decision needs attention."
+      return "1 pending decision needs attention"
     }
-    return "\(count) pending decisions need attention."
+    return "\(count) pending decisions need attention"
   }
 
   private var bannerVerticalPadding: CGFloat {

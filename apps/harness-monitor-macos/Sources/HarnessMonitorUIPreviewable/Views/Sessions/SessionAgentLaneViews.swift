@@ -254,7 +254,7 @@ struct SessionAgentListSection: View {
       if agents.isEmpty {
         if sessionStatus == .awaitingLeader {
           HStack(spacing: 0) {
-            Text("No agents yet. Join a leader to activate this session.")
+            Text("No agents yet. Join a leader to activate this session")
               .scaledFont(SessionCockpitEmptyStateRow.baseFont)
               .foregroundStyle(.secondary)
             Spacer(minLength: 0)

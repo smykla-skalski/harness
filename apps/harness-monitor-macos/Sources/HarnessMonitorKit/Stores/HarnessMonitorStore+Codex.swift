@@ -11,7 +11,7 @@ extension HarnessMonitorStore {
     force: Bool = false
   ) async -> HostBridgeCapabilityMutationResult {
     guard let client else {
-      presentFailureFeedback("Daemon unavailable.")
+      presentFailureFeedback("Daemon unavailable")
       return .failed
     }
 
@@ -100,7 +100,7 @@ extension HarnessMonitorStore {
 
     let trimmedPrompt = prompt.trimmingCharacters(in: .whitespacesAndNewlines)
     guard !trimmedPrompt.isEmpty else {
-      presentFailureFeedback("Codex prompt cannot be empty.")
+      presentFailureFeedback("Codex prompt cannot be empty")
       return nil
     }
 
@@ -168,7 +168,7 @@ extension HarnessMonitorStore {
 
     let trimmedPrompt = prompt.trimmingCharacters(in: .whitespacesAndNewlines)
     guard !trimmedPrompt.isEmpty else {
-      presentFailureFeedback("Codex context cannot be empty.")
+      presentFailureFeedback("Codex context cannot be empty")
       return false
     }
 

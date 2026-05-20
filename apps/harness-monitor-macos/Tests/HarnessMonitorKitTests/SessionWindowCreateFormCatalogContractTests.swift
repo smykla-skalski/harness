@@ -122,7 +122,7 @@ extension SessionWindowCreateFormMetricsTests {
       SessionWindowCreateFormCatalogs.selectedPersonaStateText(
         personaID: "",
         personas: personas
-      ) == "No persona selected."
+      ) == "No persona selected"
     )
   }
 

@@ -30,7 +30,7 @@ public struct DecisionsSidebarPresentation: Equatable, Sendable {
     resultSummary: "Decisions and related activity",
     scopeDescription: "All open decisions",
     emptyStateTitle: "No active decisions",
-    emptyStateDescription: "This area fills in when the workspace needs attention."
+    emptyStateDescription: "This area fills in when the workspace needs attention"
   )
 
   public let groups: [DecisionsSidebarPresentationGroup]
@@ -293,12 +293,12 @@ actor DecisionsSidebarPresentationWorker {
     hasActiveFilters: Bool
   ) -> String {
     if totalCount == 0 {
-      return "This area fills in when the workspace needs attention."
+      return "This area fills in when the workspace needs attention"
     }
     if hasActiveFilters {
-      return "Clear filters or broaden the search scope to bring decisions back into view."
+      return "Clear filters or broaden the search scope to bring decisions back into view"
     }
-    return "Broaden the search scope to bring decisions back into view."
+    return "Broaden the search scope to bring decisions back into view"
   }
 }
 

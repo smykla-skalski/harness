@@ -6,7 +6,7 @@ extension NewSessionSheetView {
     VStack(alignment: .leading, spacing: HarnessMonitorTheme.sectionSpacing) {
       fieldBlock(
         "Launch with",
-        help: "Choose the provider that starts first when the session begins."
+        help: "Choose the provider that starts first when the session begins"
       ) {
         NewSessionPreferredLeaderPicker(
           options: agentCapabilityOptions,
@@ -73,21 +73,21 @@ private struct NewSessionProviderDetailsDisclosure: View {
 
     switch (installCount, checkingCount, bridgeAccessCount, otherCount, options.count) {
     case (0, 0, 0, 0, 1):
-      return "1 provider needs attention."
+      return "1 provider needs attention"
     case (0, 0, 0, 0, let total):
-      return "\(total) providers need attention."
+      return "\(total) providers need attention"
     case (0, let checking, 0, 0, _):
       return
         checking == 1
-        ? "1 provider is still checking access."
-        : "\(checking) providers are still checking access."
+        ? "1 provider is still checking access"
+        : "\(checking) providers are still checking access"
     case (let install, 0, 0, 0, _):
-      return install == 1 ? "1 provider needs setup." : "\(install) providers need setup."
+      return install == 1 ? "1 provider needs setup" : "\(install) providers need setup"
     case (0, 0, let bridgeAccess, 0, _):
       return
         bridgeAccess == 1
-        ? "1 provider needs bridge access."
-        : "\(bridgeAccess) providers need bridge access."
+        ? "1 provider needs bridge access"
+        : "\(bridgeAccess) providers need bridge access"
     default:
       var parts: [String] = []
       if installCount > 0 {
@@ -266,29 +266,29 @@ extension AgentCapabilityOption {
 
     let launchText =
       startsWithCodex
-      ? "Starts via Codex app server."
-      : (startsWithAcp ? "Starts via ACP." : "Opens in Terminal.")
+      ? "Starts via Codex app server"
+      : (startsWithAcp ? "Starts via ACP" : "Opens in Terminal")
 
     let detail: String =
       switch availabilityState {
       case .projectAccessAvailable:
-        startsWithAcp || startsWithCodex ? launchText : "\(launchText) ACP is also available."
+        startsWithAcp || startsWithCodex ? launchText : "\(launchText) ACP is also available"
       case .checkingAccess:
         startsWithAcp
-          ? "ACP is still being checked."
-          : "\(launchText) ACP is still being checked."
+          ? "ACP is still being checked"
+          : "\(launchText) ACP is still being checked"
       case .setupRequired:
         startsWithAcp
-          ? "Set up ACP to launch this provider via ACP."
-          : "\(launchText) Set up ACP when you're ready."
+          ? "Set up ACP to launch this provider via ACP"
+          : "\(launchText) Set up ACP when you're ready"
       case .bridgeAccessRequired:
         requiresCodexBridgeAccess
-          ? "Turn on bridge access to use Codex while the daemon runs sandboxed."
-          : "Turn on bridge access to use ACP while the daemon runs sandboxed."
+          ? "Turn on bridge access to use Codex while the daemon runs sandboxed"
+          : "Turn on bridge access to use ACP while the daemon runs sandboxed"
       case .terminalOnly:
-        "Opens in Terminal only."
+        "Opens in Terminal only"
       case .unavailable:
-        projectAccessGuidanceText ?? "This provider isn't available in New Session yet."
+        projectAccessGuidanceText ?? "This provider isn't available in New Session yet"
       }
 
     return NewSessionCapabilityPresentation(

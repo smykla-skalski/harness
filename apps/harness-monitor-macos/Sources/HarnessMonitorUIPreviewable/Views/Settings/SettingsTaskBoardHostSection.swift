@@ -94,7 +94,7 @@ public struct SettingsTaskBoardHostSection: View {
   private func registeredSection(_ registered: [TaskBoardHostMachine]) -> some View {
     Section {
       if registered.isEmpty {
-        Text("No hosts registered yet.")
+        Text("No hosts registered yet")
       } else {
         ForEach(registered) { machine in
           VStack(alignment: .leading, spacing: 2) {

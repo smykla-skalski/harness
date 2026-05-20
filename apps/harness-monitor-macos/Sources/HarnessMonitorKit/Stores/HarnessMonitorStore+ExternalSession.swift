@@ -57,10 +57,10 @@ private func failureSummary(_ failure: SessionDiscoveryProbe.Failure) -> String 
   case .notAHarnessSession(let reason):
     "Not a harness session: \(reason)"
   case .unsupportedSchemaVersion(let found, let supported):
-    "Unsupported schema version \(found); expected \(supported)."
+    "Unsupported schema version \(found); expected \(supported)"
   case .belongsToAnotherProject(let expected, let found):
-    "Origin mismatch: expected \(expected), found \(found)."
+    "Origin mismatch: expected \(expected), found \(found)"
   case .alreadyAttached(let sid):
-    "Session \(sid) is already attached."
+    "Session \(sid) is already attached"
   }
 }

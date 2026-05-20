@@ -18,7 +18,7 @@ enum SessionWindowCreateFormValidation {
   ) -> SessionWindowCreateFormValidationResult? {
     let title = draft.title.trimmingCharacters(in: .whitespacesAndNewlines)
     guard !title.isEmpty else {
-      return .init(message: "\(draft.kind.title) name is required.", field: .name)
+      return .init(message: "\(draft.kind.title) name is required", field: .name)
     }
     if draft.kind == .agent,
       let message = capabilityMessage(for: draft, options: capabilityOptions)
@@ -46,11 +46,11 @@ enum SessionWindowCreateFormValidation {
         option.transportChoices.contains { $0.id == selection }
       })
     else {
-      return "Selected agent capability is unavailable."
+      return "Selected agent capability is unavailable"
     }
     let choice = option.transportChoice(for: selection)
     guard option.isEnabled(choice) else {
-      return option.projectAccessGuidanceText ?? "Selected agent capability is unavailable."
+      return option.projectAccessGuidanceText ?? "Selected agent capability is unavailable"
     }
     return nil
   }

@@ -11,7 +11,7 @@ public struct SettingsPoliciesSection: View {
       Section {
         Toggle("Show edge legend", isOn: $edgeLegendVisible)
           .accessibilityHint(
-            "Shows or hides the edge legend card in Policy Canvas windows."
+            "Shows or hides the edge legend card in Policy Canvas windows"
           )
           .accessibilityIdentifier(
             HarnessMonitorAccessibility.settingsPoliciesEdgeLegendToggle

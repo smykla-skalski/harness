@@ -199,13 +199,13 @@ private struct SettingsVoiceRemoteProcessorSection: View {
 
       switch remoteProcessorStatus {
       case .disabled:
-        Text("The saved endpoint is ignored until the Remote processor sink is enabled.")
+        Text("The saved endpoint is ignored until the Remote processor sink is enabled")
           .foregroundStyle(HarnessMonitorTheme.secondaryInk)
       case .invalid:
-        Text("Enter a full HTTPS endpoint before recording to a remote processor.")
+        Text("Enter a full HTTPS endpoint before recording to a remote processor")
           .foregroundStyle(HarnessMonitorTheme.danger)
       case .valid(let url):
-        Text("Audio and transcript events will be routed to \(url.absoluteString).")
+        Text("Audio and transcript events will be routed to \(url.absoluteString)")
           .foregroundStyle(HarnessMonitorTheme.secondaryInk)
       }
     } header: {
@@ -305,7 +305,7 @@ private struct SettingsVoiceStatusSection: View {
     } footer: {
       Text(
         "Microphone permission is still enforced when recording starts. If speech assets are missing, "
-          + "Harness Monitor surfaces the same System Settings recovery path from the voice popover."
+          + "Harness Monitor surfaces the same System Settings recovery path from the voice popover"
       )
     }
     .accessibilityElement(children: .contain)
@@ -315,7 +315,7 @@ private struct SettingsVoiceStatusSection: View {
   private var localeStatusSummary: String {
     switch localeAvailabilityState {
     case .checking:
-      "Checking speech availability for \(settings.effectiveLocaleIdentifier)."
+      "Checking speech availability for \(settings.effectiveLocaleIdentifier)"
     case .resolved(let availability):
       availability.statusSummary
     }
@@ -324,7 +324,7 @@ private struct SettingsVoiceStatusSection: View {
   private var localeRecoverySummary: String {
     switch localeAvailabilityState {
     case .checking:
-      "Loading the current speech and dictation readiness."
+      "Loading the current speech and dictation readiness"
     case .resolved(let availability):
       availability.recoverySummary
     }
@@ -358,11 +358,7 @@ private struct SettingsVoiceStatusValue: View {
   let text: String
 
   init(_ text: String) {
-    var trimmed = text
-    while trimmed.hasSuffix(".") {
-      trimmed.removeLast()
-    }
-    self.text = trimmed
+    self.text = text.harnessMonitorTrimmedTrailingPeriod
   }
 
   var body: some View {

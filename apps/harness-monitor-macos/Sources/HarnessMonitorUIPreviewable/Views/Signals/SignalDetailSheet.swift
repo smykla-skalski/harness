@@ -57,7 +57,7 @@ struct SignalDetailSheet: View {
       Image(systemName: "questionmark.circle")
         .font(.system(size: 36))
         .foregroundStyle(.secondary)
-      Text("Signal unavailable.")
+      Text("Signal unavailable")
         .scaledFont(.headline)
       Button("Dismiss") {
         dismiss()

@@ -19,7 +19,7 @@ extension HarnessMonitorStore {
   public func toggleBookmark(sessionId: String, projectId: String) async -> Bool {
     guard
       let userDataService = unavailablePersistenceService(
-        for: "Bookmark changes could not be saved."
+        for: "Bookmark changes could not be saved"
       )
     else {
       return false
@@ -34,7 +34,7 @@ extension HarnessMonitorStore {
       return true
     } catch {
       recordPersistenceFailure(
-        action: "Bookmark changes could not be saved.",
+        action: "Bookmark changes could not be saved",
         underlyingError: error
       )
       return false
@@ -56,7 +56,7 @@ extension HarnessMonitorStore {
     } catch {
       bookmarkedSessionIds = []
       recordPersistenceFailure(
-        action: "Bookmarks could not be loaded.",
+        action: "Bookmarks could not be loaded",
         underlyingError: error
       )
     }
@@ -81,7 +81,7 @@ extension HarnessMonitorStore {
   ) async -> Bool {
     guard
       let userDataService = unavailablePersistenceService(
-        for: "Note changes could not be saved."
+        for: "Note changes could not be saved"
       )
     else {
       return false
@@ -97,7 +97,7 @@ extension HarnessMonitorStore {
       return true
     } catch {
       recordPersistenceFailure(
-        action: "Note changes could not be saved.",
+        action: "Note changes could not be saved",
         underlyingError: error
       )
       return false
@@ -108,7 +108,7 @@ extension HarnessMonitorStore {
   public func deleteNote(_ note: UserNote) async -> Bool {
     guard
       let userDataService = unavailablePersistenceService(
-        for: "Note changes could not be saved."
+        for: "Note changes could not be saved"
       )
     else {
       return false
@@ -118,7 +118,7 @@ extension HarnessMonitorStore {
       return try await userDataService.deleteNote(.init(note))
     } catch {
       recordPersistenceFailure(
-        action: "Note changes could not be saved.",
+        action: "Note changes could not be saved",
         underlyingError: error
       )
       return false
@@ -133,7 +133,7 @@ extension HarnessMonitorStore {
     guard !trimmed.isEmpty else { return false }
     guard
       let userDataService = unavailablePersistenceService(
-        for: "Search history could not be updated."
+        for: "Search history could not be updated"
       )
     else {
       return false
@@ -143,7 +143,7 @@ extension HarnessMonitorStore {
       return try await userDataService.recordSearch(trimmed)
     } catch {
       recordPersistenceFailure(
-        action: "Search history could not be updated.",
+        action: "Search history could not be updated",
         underlyingError: error
       )
       return false
@@ -154,7 +154,7 @@ extension HarnessMonitorStore {
   public func clearSearchHistory() async -> Bool {
     guard
       let userDataService = unavailablePersistenceService(
-        for: "Search history could not be cleared."
+        for: "Search history could not be cleared"
       )
     else {
       return false
@@ -165,7 +165,7 @@ extension HarnessMonitorStore {
       return true
     } catch {
       recordPersistenceFailure(
-        action: "Search history could not be cleared.",
+        action: "Search history could not be cleared",
         underlyingError: error
       )
       return false
@@ -185,7 +185,7 @@ extension HarnessMonitorStore {
       )
     } catch {
       recordPersistenceFailure(
-        action: "Filter settings could not be saved.",
+        action: "Filter settings could not be saved",
         underlyingError: error
       )
     }
@@ -208,7 +208,7 @@ extension HarnessMonitorStore {
       }
     } catch {
       recordPersistenceFailure(
-        action: "Filter settings could not be loaded.",
+        action: "Filter settings could not be loaded",
         underlyingError: error
       )
     }

@@ -36,7 +36,7 @@ extension HarnessMonitorClientProtocol {
     sessionID _: String,
     request _: AcpAgentStartRequest
   ) async throws -> ManagedAgentSnapshot {
-    throw HarnessMonitorAPIError.server(code: 501, message: "Managed agent unavailable.")
+    throw HarnessMonitorAPIError.server(code: 501, message: "Managed agent unavailable")
   }
 
   public func sendManagedAgentInput(
@@ -58,18 +58,18 @@ extension HarnessMonitorClientProtocol {
   }
 
   public func stopManagedAcpAgent(agentID _: String) async throws -> ManagedAgentSnapshot {
-    throw HarnessMonitorAPIError.server(code: 501, message: "Managed agent unavailable.")
+    throw HarnessMonitorAPIError.server(code: 501, message: "Managed agent unavailable")
   }
 
   public func promptManagedAcpAgent(
     agentID _: String,
     prompt _: String
   ) async throws -> ManagedAgentSnapshot {
-    throw HarnessMonitorAPIError.server(code: 501, message: "Managed agent unavailable.")
+    throw HarnessMonitorAPIError.server(code: 501, message: "Managed agent unavailable")
   }
 
   public func openRouterModelCatalog() async throws -> OpenRouterModelCatalog {
-    throw HarnessMonitorAPIError.server(code: 501, message: "OpenRouter catalog unavailable.")
+    throw HarnessMonitorAPIError.server(code: 501, message: "OpenRouter catalog unavailable")
   }
 
   public func steerManagedCodexAgent(
@@ -102,7 +102,7 @@ extension HarnessMonitorClientProtocol {
     batchID _: String,
     decision _: AcpPermissionDecision
   ) async throws -> ManagedAgentSnapshot {
-    throw HarnessMonitorAPIError.server(code: 501, message: "Managed agent unavailable.")
+    throw HarnessMonitorAPIError.server(code: 501, message: "Managed agent unavailable")
   }
 
   public func codexRuns(sessionID: String) async throws -> CodexRunListResponse {
@@ -115,7 +115,7 @@ extension HarnessMonitorClientProtocol {
   public func codexRun(runID: String) async throws -> CodexRunSnapshot {
     let snapshot = try await managedAgent(agentID: runID)
     guard let codex = snapshot.codex else {
-      throw HarnessMonitorAPIError.server(code: 404, message: "Codex run unavailable.")
+      throw HarnessMonitorAPIError.server(code: 404, message: "Codex run unavailable")
     }
     return codex
   }
@@ -128,7 +128,7 @@ extension HarnessMonitorClientProtocol {
     guard let codex = snapshot.codex else {
       throw HarnessMonitorAPIError.server(
         code: 500,
-        message: "Managed Codex agent did not return a Codex snapshot."
+        message: "Managed Codex agent did not return a Codex snapshot"
       )
     }
     return codex
@@ -140,7 +140,7 @@ extension HarnessMonitorClientProtocol {
   ) async throws -> CodexRunSnapshot {
     let snapshot = try await steerManagedCodexAgent(agentID: runID, request: request)
     guard let codex = snapshot.codex else {
-      throw HarnessMonitorAPIError.server(code: 404, message: "Codex run unavailable.")
+      throw HarnessMonitorAPIError.server(code: 404, message: "Codex run unavailable")
     }
     return codex
   }
@@ -148,7 +148,7 @@ extension HarnessMonitorClientProtocol {
   public func interruptCodexRun(runID: String) async throws -> CodexRunSnapshot {
     let snapshot = try await interruptManagedCodexAgent(agentID: runID)
     guard let codex = snapshot.codex else {
-      throw HarnessMonitorAPIError.server(code: 404, message: "Codex run unavailable.")
+      throw HarnessMonitorAPIError.server(code: 404, message: "Codex run unavailable")
     }
     return codex
   }
@@ -164,7 +164,7 @@ extension HarnessMonitorClientProtocol {
       request: request
     )
     guard let codex = snapshot.codex else {
-      throw HarnessMonitorAPIError.server(code: 404, message: "Codex run unavailable.")
+      throw HarnessMonitorAPIError.server(code: 404, message: "Codex run unavailable")
     }
     return codex
   }
@@ -177,7 +177,7 @@ extension HarnessMonitorClientProtocol {
   public func agentTui(tuiID: String) async throws -> AgentTuiSnapshot {
     let snapshot = try await managedAgent(agentID: tuiID)
     guard let tui = snapshot.terminal else {
-      throw HarnessMonitorAPIError.server(code: 404, message: "Agents unavailable.")
+      throw HarnessMonitorAPIError.server(code: 404, message: "Agents unavailable")
     }
     return tui
   }
@@ -190,7 +190,7 @@ extension HarnessMonitorClientProtocol {
     guard let tui = snapshot.terminal else {
       throw HarnessMonitorAPIError.server(
         code: 500,
-        message: "Managed agent start did not return a terminal snapshot."
+        message: "Managed agent start did not return a terminal snapshot"
       )
     }
     return tui
@@ -202,7 +202,7 @@ extension HarnessMonitorClientProtocol {
   ) async throws -> AgentTuiSnapshot {
     let snapshot = try await sendManagedAgentInput(agentID: tuiID, request: request)
     guard let tui = snapshot.terminal else {
-      throw HarnessMonitorAPIError.server(code: 404, message: "Agents unavailable.")
+      throw HarnessMonitorAPIError.server(code: 404, message: "Agents unavailable")
     }
     return tui
   }
@@ -213,7 +213,7 @@ extension HarnessMonitorClientProtocol {
   ) async throws -> AgentTuiSnapshot {
     let snapshot = try await resizeManagedAgent(agentID: tuiID, request: request)
     guard let tui = snapshot.terminal else {
-      throw HarnessMonitorAPIError.server(code: 404, message: "Agents unavailable.")
+      throw HarnessMonitorAPIError.server(code: 404, message: "Agents unavailable")
     }
     return tui
   }
@@ -221,7 +221,7 @@ extension HarnessMonitorClientProtocol {
   public func stopAgentTui(tuiID: String) async throws -> AgentTuiSnapshot {
     let snapshot = try await stopManagedAgent(agentID: tuiID)
     guard let tui = snapshot.terminal else {
-      throw HarnessMonitorAPIError.server(code: 404, message: "Agents unavailable.")
+      throw HarnessMonitorAPIError.server(code: 404, message: "Agents unavailable")
     }
     return tui
   }
@@ -230,27 +230,27 @@ extension HarnessMonitorClientProtocol {
     sessionID _: String,
     request _: VoiceSessionStartRequest
   ) async throws -> VoiceSessionStartResponse {
-    throw HarnessMonitorAPIError.server(code: 501, message: "Voice capture unavailable.")
+    throw HarnessMonitorAPIError.server(code: 501, message: "Voice capture unavailable")
   }
 
   public func appendVoiceAudioChunk(
     voiceSessionID _: String,
     request _: VoiceAudioChunkRequest
   ) async throws -> VoiceSessionMutationResponse {
-    throw HarnessMonitorAPIError.server(code: 501, message: "Voice capture unavailable.")
+    throw HarnessMonitorAPIError.server(code: 501, message: "Voice capture unavailable")
   }
 
   public func appendVoiceTranscript(
     voiceSessionID _: String,
     request _: VoiceTranscriptUpdateRequest
   ) async throws -> VoiceSessionMutationResponse {
-    throw HarnessMonitorAPIError.server(code: 501, message: "Voice capture unavailable.")
+    throw HarnessMonitorAPIError.server(code: 501, message: "Voice capture unavailable")
   }
 
   public func finishVoiceSession(
     voiceSessionID _: String,
     request _: VoiceSessionFinishRequest
   ) async throws -> VoiceSessionMutationResponse {
-    throw HarnessMonitorAPIError.server(code: 501, message: "Voice capture unavailable.")
+    throw HarnessMonitorAPIError.server(code: 501, message: "Voice capture unavailable")
   }
 }

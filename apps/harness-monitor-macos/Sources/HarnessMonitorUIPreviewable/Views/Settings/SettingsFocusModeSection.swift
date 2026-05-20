@@ -20,7 +20,7 @@ public struct SettingsFocusModeSection: View {
         .accessibilityLabel("Show pending decision banners in Focus mode")
         .accessibilityHint(
           "When disabled, Focus mode hides the pending decision banner even while "
-            + "banners stay enabled elsewhere."
+            + "banners stay enabled elsewhere"
         )
       } header: {
         Text("Pending Decisions")
@@ -28,7 +28,7 @@ public struct SettingsFocusModeSection: View {
         Text(
           "Controls whether Focus mode keeps the pending decision banner visible. "
             + "This setting takes effect when the Banners page keeps pending "
-            + "decision banners enabled."
+            + "decision banners enabled"
         )
       }
     }

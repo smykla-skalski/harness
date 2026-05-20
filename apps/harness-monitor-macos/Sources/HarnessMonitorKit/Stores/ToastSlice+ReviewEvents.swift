@@ -14,7 +14,7 @@ extension ToastSlice {
     agentID: String,
     taskID: String
   ) -> UUID {
-    let message = "Agent \(agentID) is awaiting review. Task \(taskID) stays queued."
+    let message = "Agent \(agentID) is awaiting review. Task \(taskID) stays queued"
     return present(
       message: message,
       severity: .failure,
@@ -31,7 +31,7 @@ extension ToastSlice {
     actorID: String
   ) -> UUID {
     let message =
-      "Signal \(signalID) collided with a concurrent claim by \(actorID). Retry once the other actor settles."
+      "Signal \(signalID) collided with a concurrent claim by \(actorID). Retry once the other actor settles"
     return present(
       message: message,
       severity: .failure,

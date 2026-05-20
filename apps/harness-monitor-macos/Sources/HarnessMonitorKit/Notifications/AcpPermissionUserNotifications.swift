@@ -27,11 +27,11 @@ public struct AcpPermissionAttentionEvent: Equatable, Sendable, Identifiable {
   public var id: String { batchID }
 
   public var toastMessage: String {
-    "Permission requested by \(agentName). Workspace."
+    "Permission requested by \(agentName). Workspace"
   }
 
   public var notificationBody: String {
-    "Permission requested by \(agentName). Open the workspace."
+    "Permission requested by \(agentName). Open the workspace"
   }
 
   public var notificationSubtitle: String {
@@ -77,15 +77,15 @@ public enum AcpPermissionNotificationAuthorizationStatus: String, Equatable, Sen
   public var detailText: String {
     switch self {
     case .unknown:
-      "Harness Monitor has not refreshed Notification Center status yet."
+      "Harness Monitor has not refreshed Notification Center status yet"
     case .notDetermined:
-      "Notification Center delivery is available once system permission is granted."
+      "Notification Center delivery is available once system permission is granted"
     case .denied:
-      "Notification Center delivery is disabled. Dock, badge, and Decisions routes stay available."
+      "Notification Center delivery is disabled. Dock, badge, and Decisions routes stay available"
     case .provisional:
-      "Notification Center delivery is available quietly until full alerts are granted."
+      "Notification Center delivery is available quietly until full alerts are granted"
     case .authorized:
-      "Notification Center delivery is enabled for background ACP attention."
+      "Notification Center delivery is enabled for background ACP attention"
     }
   }
 }

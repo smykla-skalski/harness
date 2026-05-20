@@ -180,36 +180,36 @@ struct SessionWindowCreateProviderListRow: View {
   private static func codexProviderSubtitle(for option: AgentCapabilityOption) -> String {
     switch option.availabilityState {
     case .projectAccessAvailable:
-      return "Codex app server is available."
+      return "Codex app server is available"
     case .bridgeAccessRequired:
-      return "Codex needs bridge access."
+      return "Codex needs bridge access"
     case .terminalOnly:
-      return "Codex opens in Terminal only."
+      return "Codex opens in Terminal only"
     default:
-      return option.projectAccessGuidanceText ?? "Codex is not available here yet."
+      return option.projectAccessGuidanceText ?? "Codex is not available here yet"
     }
   }
 
   private static func standardProviderSubtitle(for option: AgentCapabilityOption) -> String {
     switch option.availabilityState {
     case .projectAccessAvailable:
-      return "Terminal and ACP are available."
+      return "Terminal and ACP are available"
     case .checkingAccess:
-      return "ACP is still being checked."
+      return "ACP is still being checked"
     case .setupRequired:
       if option.bundledWithHarness {
-        return "ACP ships with Harness."
+        return "ACP ships with Harness"
       }
-      return "ACP needs CLI setup."
+      return "ACP needs CLI setup"
     case .bridgeAccessRequired:
-      return "ACP needs bridge access."
+      return "ACP needs bridge access"
     case .terminalOnly:
       if option.acpChoice != nil {
-        return "ACP is not available here yet."
+        return "ACP is not available here yet"
       }
-      return "This provider opens in Terminal only."
+      return "This provider opens in Terminal only"
     case .unavailable:
-      return option.projectAccessGuidanceText ?? "This provider is not available here yet."
+      return option.projectAccessGuidanceText ?? "This provider is not available here yet"
     }
   }
 

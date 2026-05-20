@@ -375,7 +375,7 @@ public struct DecisionDeskPreviewView: View {
 
   private var dismissConfirmationMessage: String {
     guard let snapshot = pendingDismissBatch else {
-      return "No visible decisions to dismiss."
+      return "No visible decisions to dismiss"
     }
     let capturedAt = snapshot.capturedAt.formatted(
       date: .abbreviated,
@@ -389,12 +389,12 @@ public struct DecisionDeskPreviewView: View {
       return
     }
     guard dismissAllVisibleDraft == "\(snapshot.count)" else {
-      store?.presentFailureFeedback("Typed count did not match.")
+      store?.presentFailureFeedback("Typed count did not match")
       return
     }
     let currentIDs = visibleOpenDecisionIDs
     guard currentIDs == snapshot.ids, visibleSnapshot.signature == snapshot.filterSignature else {
-      store?.presentFailureFeedback("Visible decisions changed. Bulk dismiss aborted.")
+      store?.presentFailureFeedback("Visible decisions changed. Bulk dismiss aborted")
       return
     }
     let handler = actionHandler
@@ -411,12 +411,12 @@ public struct DecisionDeskPreviewView: View {
 
   private func reopenDismissedBatch(_ batch: DecisionReopenBatchState) async {
     guard Date() <= batch.expiresAt else {
-      store?.presentFailureFeedback("Recovery window expired.")
+      store?.presentFailureFeedback("Recovery window expired")
       reopenBatch = nil
       return
     }
     guard let decisionStore = store?.supervisorDecisionStore else {
-      store?.presentFailureFeedback("Cannot reopen dismissed batch: decision store unavailable.")
+      store?.presentFailureFeedback("Cannot reopen dismissed batch: decision store unavailable")
       return
     }
     for id in batch.ids {
@@ -425,9 +425,9 @@ public struct DecisionDeskPreviewView: View {
         case .reopened:
           break
         case .missing:
-          store?.presentFailureFeedback("Cannot reopen \(id): decision missing.")
+          store?.presentFailureFeedback("Cannot reopen \(id): decision missing")
         case .notDismissed:
-          store?.presentFailureFeedback("Cannot reopen \(id): decision state changed.")
+          store?.presentFailureFeedback("Cannot reopen \(id): decision state changed")
         }
       } catch {
         store?.presentFailureFeedback(

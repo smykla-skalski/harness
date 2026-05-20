@@ -6,17 +6,17 @@ public enum SettingsPreviewSupport {
     DaemonAuditEvent(
       recordedAt: "2026-03-31T12:08:43Z",
       level: "info",
-      message: "Connected to daemon via server-sent events."
+      message: "Connected to daemon via server-sent events"
     ),
     DaemonAuditEvent(
       recordedAt: "2026-03-31T12:07:10Z",
       level: "warn",
-      message: "Heartbeat jitter exceeded threshold; connection probe rescheduled."
+      message: "Heartbeat jitter exceeded threshold; connection probe rescheduled"
     ),
     DaemonAuditEvent(
       recordedAt: "2026-03-31T12:05:28Z",
       level: "error",
-      message: "WebSocket upgrade failed once; recovered on HTTP fallback."
+      message: "WebSocket upgrade failed once; recovered on HTTP fallback"
     ),
   ]
 

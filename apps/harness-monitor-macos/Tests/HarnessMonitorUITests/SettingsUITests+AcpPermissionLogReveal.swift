@@ -77,7 +77,7 @@ final class SettingsUITestsAcpPermissionLogReveal:
 
     switch expectation {
     case .opensLog:
-      let statusMessage = "Reveal requested in Finder."
+      let statusMessage = "Reveal requested in Finder"
       let statusID = Accessibility.settingsAcpPermissionLogRevealStatus(
         previewPermissionLogEntryID
       )
@@ -100,7 +100,7 @@ final class SettingsUITestsAcpPermissionLogReveal:
       )
       assertPermissionLogUnavailableErrorIsAbsent(in: app, file: file, line: line)
     case .reportsUnavailable:
-      let errorMessage = "ACP permission log for this run is unavailable."
+      let errorMessage = "ACP permission log for this run is unavailable"
       let inlineError = element(in: app, identifier: inlineErrorID)
       let inlineErrorProbe = element(in: app, identifier: "\(inlineErrorID).probe")
       XCTAssertTrue(
@@ -145,7 +145,7 @@ final class SettingsUITestsAcpPermissionLogReveal:
     file: StaticString,
     line: UInt
   ) {
-    let inlineError = app.staticTexts["ACP permission log for this run is unavailable."]
+    let inlineError = app.staticTexts["ACP permission log for this run is unavailable"]
     XCTAssertFalse(
       waitForElement(inlineError, timeout: Self.fastPollInterval),
       "Reveal action should stay on the successful path for seeded ACP preview logs",

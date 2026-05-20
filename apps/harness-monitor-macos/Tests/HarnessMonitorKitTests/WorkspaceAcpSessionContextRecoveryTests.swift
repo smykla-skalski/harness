@@ -127,7 +127,7 @@ struct WorkspaceAcpSessionContextRecoveryTests {
     #expect(store.hostBridgeCapabilityIssues["acp"] == nil)
     #expect(
       store.currentFailureFeedbackMessage
-        == "ACP isn't available in this daemon session. Enable ACP and try again."
+        == "ACP isn't available in this daemon session. Enable ACP and try again"
     )
   }
 
@@ -170,7 +170,7 @@ struct WorkspaceAcpSessionContextRecoveryTests {
     #expect(store.hostBridgeCapabilityIssues["acp"] == nil)
     #expect(
       store.currentFailureFeedbackMessage
-        == "ACP access is limited to the active session. Switch to the matching session and try again."
+        == "ACP access is limited to the active session. Switch to the matching session and try again"
     )
   }
 

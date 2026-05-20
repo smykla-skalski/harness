@@ -283,7 +283,7 @@ public final class HarnessMonitorAPIClient: HarnessMonitorClientProtocol {
   public func codexRun(runID: String) async throws -> CodexRunSnapshot {
     let snapshot = try await managedAgent(agentID: runID)
     guard let codex = snapshot.codex else {
-      throw HarnessMonitorAPIError.server(code: 404, message: "Codex run unavailable.")
+      throw HarnessMonitorAPIError.server(code: 404, message: "Codex run unavailable")
     }
     return codex
   }
@@ -296,7 +296,7 @@ public final class HarnessMonitorAPIClient: HarnessMonitorClientProtocol {
     guard let codex = snapshot.codex else {
       throw HarnessMonitorAPIError.server(
         code: 500,
-        message: "Managed Codex agent did not return a Codex snapshot."
+        message: "Managed Codex agent did not return a Codex snapshot"
       )
     }
     return codex
@@ -308,7 +308,7 @@ public final class HarnessMonitorAPIClient: HarnessMonitorClientProtocol {
   ) async throws -> CodexRunSnapshot {
     let snapshot = try await steerManagedCodexAgent(agentID: runID, request: request)
     guard let codex = snapshot.codex else {
-      throw HarnessMonitorAPIError.server(code: 404, message: "Codex run unavailable.")
+      throw HarnessMonitorAPIError.server(code: 404, message: "Codex run unavailable")
     }
     return codex
   }
@@ -316,7 +316,7 @@ public final class HarnessMonitorAPIClient: HarnessMonitorClientProtocol {
   public func interruptCodexRun(runID: String) async throws -> CodexRunSnapshot {
     let snapshot = try await interruptManagedCodexAgent(agentID: runID)
     guard let codex = snapshot.codex else {
-      throw HarnessMonitorAPIError.server(code: 404, message: "Codex run unavailable.")
+      throw HarnessMonitorAPIError.server(code: 404, message: "Codex run unavailable")
     }
     return codex
   }
@@ -332,7 +332,7 @@ public final class HarnessMonitorAPIClient: HarnessMonitorClientProtocol {
       request: request
     )
     guard let codex = snapshot.codex else {
-      throw HarnessMonitorAPIError.server(code: 404, message: "Codex run unavailable.")
+      throw HarnessMonitorAPIError.server(code: 404, message: "Codex run unavailable")
     }
     return codex
   }
@@ -345,7 +345,7 @@ public final class HarnessMonitorAPIClient: HarnessMonitorClientProtocol {
   public func agentTui(tuiID: String) async throws -> AgentTuiSnapshot {
     let snapshot = try await managedAgent(agentID: tuiID)
     guard let tui = snapshot.terminal else {
-      throw HarnessMonitorAPIError.server(code: 404, message: "Agents unavailable.")
+      throw HarnessMonitorAPIError.server(code: 404, message: "Agents unavailable")
     }
     return tui
   }
@@ -358,7 +358,7 @@ public final class HarnessMonitorAPIClient: HarnessMonitorClientProtocol {
     guard let tui = snapshot.terminal else {
       throw HarnessMonitorAPIError.server(
         code: 500,
-        message: "Managed agent start did not return a terminal snapshot."
+        message: "Managed agent start did not return a terminal snapshot"
       )
     }
     return tui
@@ -370,7 +370,7 @@ public final class HarnessMonitorAPIClient: HarnessMonitorClientProtocol {
   ) async throws -> AgentTuiSnapshot {
     let snapshot = try await sendManagedAgentInput(agentID: tuiID, request: request)
     guard let tui = snapshot.terminal else {
-      throw HarnessMonitorAPIError.server(code: 404, message: "Agents unavailable.")
+      throw HarnessMonitorAPIError.server(code: 404, message: "Agents unavailable")
     }
     return tui
   }
@@ -381,7 +381,7 @@ public final class HarnessMonitorAPIClient: HarnessMonitorClientProtocol {
   ) async throws -> AgentTuiSnapshot {
     let snapshot = try await resizeManagedAgent(agentID: tuiID, request: request)
     guard let tui = snapshot.terminal else {
-      throw HarnessMonitorAPIError.server(code: 404, message: "Agents unavailable.")
+      throw HarnessMonitorAPIError.server(code: 404, message: "Agents unavailable")
     }
     return tui
   }
@@ -389,7 +389,7 @@ public final class HarnessMonitorAPIClient: HarnessMonitorClientProtocol {
   public func stopAgentTui(tuiID: String) async throws -> AgentTuiSnapshot {
     let snapshot = try await stopManagedAgent(agentID: tuiID)
     guard let tui = snapshot.terminal else {
-      throw HarnessMonitorAPIError.server(code: 404, message: "Agents unavailable.")
+      throw HarnessMonitorAPIError.server(code: 404, message: "Agents unavailable")
     }
     return tui
   }

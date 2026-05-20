@@ -60,7 +60,7 @@ struct NewSessionSheetView: View {
   private var header: some View {
     HarnessMonitorActionHeader(
       title: "New Session",
-      subtitle: "Start a harness session in a project folder."
+      subtitle: "Start a harness session in a project folder"
     )
     .padding(HarnessMonitorTheme.spacingLG)
     .frame(maxWidth: .infinity, alignment: .leading)
@@ -134,7 +134,7 @@ struct NewSessionSheetView: View {
         .accessibilityElement(children: .combine)
         .accessibilityLabel(Text("Path: \(selectedBookmark.lastResolvedPath)"))
       } else {
-        fieldHelp("Choose a Git project folder to start a session.")
+        fieldHelp("Choose a Git project folder to start a session")
       }
     }
   }
@@ -143,7 +143,7 @@ struct NewSessionSheetView: View {
     VStack(alignment: .leading, spacing: HarnessMonitorTheme.sectionSpacing) {
       fieldBlock(
         "Session title",
-        help: "Required. Keep it short so it stays readable in the sidebar and session history."
+        help: "Required. Keep it short so it stays readable in the sidebar and session history"
       ) {
         TextField("Short summary", text: $viewModel.title)
           .harnessNativeFormControl()
@@ -155,7 +155,7 @@ struct NewSessionSheetView: View {
 
       fieldBlock(
         "Context",
-        help: "Optional goals, links, or handoff notes. Multiline input stays enabled."
+        help: "Optional goals, links, or handoff notes. Multiline input stays enabled"
       ) {
         HarnessMonitorMultilineTextField(
           placeholder: "Optional goals, links, or handoff notes",
@@ -165,7 +165,7 @@ struct NewSessionSheetView: View {
           equals: .context,
           accessibilityLabel: "Context",
           accessibilityHint:
-            "Optional goals, links, or handoff notes. Multiline input stays enabled."
+            "Optional goals, links, or handoff notes. Multiline input stays enabled"
         )
         .accessibilityIdentifier(HarnessMonitorAccessibility.newSessionContext)
       }
@@ -175,7 +175,7 @@ struct NewSessionSheetView: View {
   private var advancedSection: some View {
     fieldBlock(
       "Base ref",
-      help: "Optional. Leave blank to use the repository default branch."
+      help: "Optional. Leave blank to use the repository default branch"
     ) {
       TextField("main", text: $viewModel.baseRef)
         .harnessNativeFormControl()
@@ -256,15 +256,15 @@ struct NewSessionSheetView: View {
   private func errorMessage(for error: NewSessionViewModel.SubmitError) -> String {
     switch error {
     case .validation(.titleRequired):
-      return "A session title is required."
+      return "A session title is required"
     case .validation(.projectRequired):
-      return "Select a project folder to continue."
+      return "Select a project folder to continue"
     case .bookmarkRevoked(let id):
       return "Access to folder \"\(id)\" was revoked. Re-add it via Add Folder\u{2026}"
     case .bookmarkStale(let id):
-      return "Bookmark for \"\(id)\" is stale. Re-add the folder and try again."
+      return "Bookmark for \"\(id)\" is stale. Re-add the folder and try again"
     case .daemonUnreachable:
-      return "The harness daemon is not reachable. Start it and try again."
+      return "The harness daemon is not reachable. Start it and try again"
     case .invalidProject:
       return """
         The selected folder is not a Git checkout with a valid HEAD.
@@ -273,7 +273,7 @@ struct NewSessionSheetView: View {
     case .worktreeCreateFailed(let reason):
       return "Could not create the session worktree: \(reason)"
     case .invalidBaseRef(let ref, _):
-      return "The base ref \"\(ref)\" could not be resolved."
+      return "The base ref \"\(ref)\" could not be resolved"
     case .unexpected(let message):
       return "Unexpected error: \(message)"
     }
@@ -315,11 +315,11 @@ struct NewSessionSheetView: View {
     }
 
     if viewModel.selectedBookmarkId == nil {
-      return "Select a project folder to enable Create."
+      return "Select a project folder to enable Create"
     }
 
     if viewModel.title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-      return "Session title is required."
+      return "Session title is required"
     }
 
     return nil

@@ -165,7 +165,7 @@ struct AgentCapabilityPickerTests {
     #expect(option.installAccessibilityHint == "Copies Harness install instructions for Codex")
     #expect(
       option.projectAccessGuidanceText
-        == "This ACP adapter ships with Harness. Install or update Harness to enable it here.")
+        == "This ACP adapter ships with Harness. Install or update Harness to enable it here")
   }
 
   @Test("sandboxed monitor disables ACP transport even when binary exists")

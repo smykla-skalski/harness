@@ -144,7 +144,7 @@ public struct DecisionInspector: View {
       Text("No decision selected")
         .scaledFont(.callout)
         .foregroundStyle(HarnessMonitorTheme.secondaryInk)
-      Text("Select a decision from the list to inspect its details.")
+      Text("Select a decision from the list to inspect its details")
         .scaledFont(.caption)
         .foregroundStyle(HarnessMonitorTheme.secondaryInk)
     }

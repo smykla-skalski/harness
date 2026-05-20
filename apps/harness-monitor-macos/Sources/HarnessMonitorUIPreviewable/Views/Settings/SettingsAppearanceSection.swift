@@ -77,7 +77,7 @@ public struct SettingsAppearanceSection: View {
 
         Toggle("Session shortcut overlays", isOn: $sessionShortcutOverlaysEnabled)
           .accessibilityHint(
-            "Shows or hides the floating keyboard shortcut hints in session windows."
+            "Shows or hides the floating keyboard shortcut hints in session windows"
           )
           .accessibilityIdentifier(
             HarnessMonitorAccessibility.settingsSessionShortcutOverlaysToggle
@@ -85,7 +85,7 @@ public struct SettingsAppearanceSection: View {
 
         Toggle("Session title blur", isOn: $sessionTitleBlurEnabled)
           .accessibilityHint(
-            "Shows or hides the softened session status glow behind session window titles."
+            "Shows or hides the softened session status glow behind session window titles"
           )
           .accessibilityIdentifier(
             HarnessMonitorAccessibility.settingsSessionTitleBlurToggle
@@ -124,11 +124,11 @@ public struct SettingsAppearanceSection: View {
 
   private var appearanceFooterText: String {
     let parts = [
-      "Theme mode, text size, and sidebar session rows apply to every Harness Monitor window.",
-      "Session shortcut overlays and title blur control optional session-window chrome.",
-      "Backdrop controls where the softened background image renders.",
-      "The menu bar icon can follow app state colors or stay neutral.",
-      "Choosing an image turns on the window backdrop if it is currently off.",
+      "Theme mode, text size, and sidebar session rows apply to every Harness Monitor window",
+      "Session shortcut overlays and title blur control optional session-window chrome",
+      "Backdrop controls where the softened background image renders",
+      "The menu bar icon can follow app state colors or stay neutral",
+      "Choosing an image turns on the window backdrop if it is currently off",
     ]
     return parts.joined(separator: " ")
   }

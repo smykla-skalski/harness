@@ -115,10 +115,10 @@ public struct SettingsGeneralSection: View {
     }
     .harnessNativeFormControl()
     .accessibilityHint(
-      "Choose which daemon ownership mode Harness Monitor should use the next time it launches."
+      "Choose which daemon ownership mode Harness Monitor should use the next time it launches"
     )
     if preferredDaemonMode != store.daemonOwnership {
-      Text("Relaunch Harness Monitor to switch to \(preferredDaemonMode.settingsLabel).")
+      Text("Relaunch Harness Monitor to switch to \(preferredDaemonMode.settingsLabel)")
         .scaledFont(.caption)
         .foregroundStyle(.secondary)
     }
@@ -226,7 +226,7 @@ public struct SettingsGeneralSection: View {
       } footer: {
         Text(
           "Controls whether Session cockpit timeline filters reset each time, "
-            + "restore per window and session, or reopen app-wide."
+            + "restore per window and session, or reopen app-wide"
         )
       }
 
@@ -331,7 +331,7 @@ public struct SettingsGeneralSection: View {
       }
       Button("Cancel", role: .cancel) {}
     } message: {
-      Text("This disables launchd residency for the harness daemon on this Mac.")
+      Text("This disables launchd residency for the harness daemon on this Mac")
     }
   }
 }

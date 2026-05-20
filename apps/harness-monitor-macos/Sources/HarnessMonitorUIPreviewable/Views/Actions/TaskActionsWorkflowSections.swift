@@ -50,7 +50,7 @@ struct TaskActionsReviewWorkflowSection: View {
         tint: nil,
         isExternallyDisabled: !areSessionActionsAvailable || actorID == nil,
         accessibilityIdentifier: HarnessMonitorAccessibility.submitTaskForReviewButton,
-        help: actorID == nil ? "Only the assigned worker can submit this task for review." : "",
+        help: actorID == nil ? "Only the assigned worker can submit this task for review" : "",
         action: submitForReview
       )
     }
@@ -67,7 +67,7 @@ struct TaskActionsReviewWorkflowSection: View {
         }
         .harnessNativeFormControl()
       } else {
-        Text("No eligible reviewer is available for this task.")
+        Text("No eligible reviewer is available for this task")
           .scaledFont(.caption)
           .foregroundStyle(HarnessMonitorTheme.secondaryInk)
       }
@@ -79,7 +79,7 @@ struct TaskActionsReviewWorkflowSection: View {
         tint: .secondary,
         isExternallyDisabled: !areSessionActionsAvailable || candidates.isEmpty,
         accessibilityIdentifier: HarnessMonitorAccessibility.claimTaskReviewButton,
-        help: candidates.isEmpty ? "No eligible reviewer is available for this task." : "",
+        help: candidates.isEmpty ? "No eligible reviewer is available for this task" : "",
         action: claimReview
       )
     }
@@ -101,7 +101,7 @@ struct TaskActionsReviewWorkflowSection: View {
           .lineLimit(2, reservesSpace: true)
           .submitLabel(.done)
       } else {
-        Text("A claimed reviewer is required before submitting review.")
+        Text("A claimed reviewer is required before submitting review")
           .scaledFont(.caption)
           .foregroundStyle(HarnessMonitorTheme.secondaryInk)
       }
@@ -127,7 +127,7 @@ struct TaskActionsReviewWorkflowSection: View {
     let actorID = TaskActionsSheet.respondReviewActorID(for: task, agents: agents)
     if TaskActionsSheet.shouldShowReviewResponse(for: task) {
       if points.isEmpty {
-        Text("Consensus has no review points to dispute.")
+        Text("Consensus has no review points to dispute")
           .scaledFont(.caption)
           .foregroundStyle(HarnessMonitorTheme.secondaryInk)
       } else {
@@ -153,7 +153,7 @@ struct TaskActionsReviewWorkflowSection: View {
         tint: .secondary,
         isExternallyDisabled: !areSessionActionsAvailable || actorID == nil,
         accessibilityIdentifier: HarnessMonitorAccessibility.respondTaskReviewButton,
-        help: actorID == nil ? "Only the original worker can respond to consensus." : "",
+        help: actorID == nil ? "Only the original worker can respond to consensus" : "",
         action: respondReview
       )
     }
@@ -241,20 +241,20 @@ struct TaskActionsReviewWorkflowSection: View {
     summary: String
   ) -> String {
     if candidates.isEmpty {
-      return "A reviewer must claim this task before submitting review."
+      return "A reviewer must claim this task before submitting review"
     }
     if summary.isEmpty {
-      return "Review summary is required."
+      return "Review summary is required"
     }
     return ""
   }
 
   private func arbitrationUnavailableMessage(actorID: String?) -> String {
     if actorID == nil {
-      return "Only the current leader can arbitrate this task."
+      return "Only the current leader can arbitrate this task"
     }
     if arbitrationSummary.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-      return "Arbitration summary is required."
+      return "Arbitration summary is required"
     }
     return ""
   }
@@ -274,7 +274,7 @@ struct TaskActionsCheckpointSection: View {
     let checkpointSummaryValue = checkpointSummary.trimmingCharacters(in: .whitespacesAndNewlines)
     let checkpointUnavailableMessage =
       taskMutationUnavailableMessage
-      ?? (checkpointSummaryValue.isEmpty ? "Checkpoint summary is required." : nil)
+      ?? (checkpointSummaryValue.isEmpty ? "Checkpoint summary is required" : nil)
     Text("Checkpoint")
       .scaledFont(.headline)
     TextField("Summary", text: $checkpointSummary, axis: .vertical)

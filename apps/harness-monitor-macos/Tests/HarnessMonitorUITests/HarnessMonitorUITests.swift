@@ -83,7 +83,7 @@ final class HarnessMonitorUITests: HarnessMonitorUITestCase {
     XCTAssertTrue(timelineEmpty.waitForExistence(timeout: Self.actionTimeout))
 
     XCTAssertEqual(tasksEmpty.label, "No tasks right now")
-    XCTAssertEqual(agentsEmpty.label, "No agents yet. Join a leader to activate this session.")
+    XCTAssertEqual(agentsEmpty.label, "No agents yet. Join a leader to activate this session")
     XCTAssertEqual(timelineEmpty.label, "No activity right now")
     XCTAssertFalse(element(in: app, identifier: Accessibility.sessionTimelinePagination).exists)
   }

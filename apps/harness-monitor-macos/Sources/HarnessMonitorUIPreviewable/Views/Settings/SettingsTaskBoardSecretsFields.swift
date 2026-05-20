@@ -30,7 +30,7 @@ extension SettingsTaskBoardEditingSurface {
     } footer: {
       Text(
         "Tokens are stored in your macOS Keychain. "
-          + "Click the trash icon to clear a stored value."
+          + "Click the trash icon to clear a stored value"
       )
     }
   }
@@ -49,7 +49,7 @@ extension SettingsTaskBoardEditingSurface {
       Text("Repository Overrides")
         .harnessNativeFormSectionHeader()
     } footer: {
-      Text("Use overrides for repo-specific identity, keys, or GitHub token values.")
+      Text("Use overrides for repo-specific identity, keys, or GitHub token values")
     }
   }
 

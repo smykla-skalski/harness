@@ -107,7 +107,7 @@ extension HarnessMonitorStore {
           decisionStore: activeDecisionStore
         )
       else {
-        presentFailureFeedback("ACP permission decision is no longer available.")
+        presentFailureFeedback("ACP permission decision is no longer available")
         return false
       }
       payload = resolvedPayload

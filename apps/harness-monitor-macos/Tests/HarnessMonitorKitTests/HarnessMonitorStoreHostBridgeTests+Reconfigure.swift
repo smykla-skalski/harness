@@ -269,7 +269,7 @@ extension HarnessMonitorStoreHostBridgeTests {
     #expect(result == .failed)
     #expect(
       store.currentFailureFeedbackMessage
-        == "The shared host bridge is not running. Start it and try again.")
+        == "The shared host bridge is not running. Start it and try again")
     #expect(store.hostBridgeCapabilityState(for: "agent-tui") == .unavailable)
     #expect(
       store.hostBridgeStartCommand(

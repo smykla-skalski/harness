@@ -22,7 +22,7 @@ extension RecordingHarnessClient {
     if let acp = lock.withLock({ resolvedAcpSnapshotsByAgentID[agentID] }) {
       return .acp(acp)
     }
-    throw HarnessMonitorAPIError.server(code: 404, message: "Managed agent unavailable.")
+    throw HarnessMonitorAPIError.server(code: 404, message: "Managed agent unavailable")
   }
 
   func acpInspect(sessionID: String?) async throws -> AcpAgentInspectResponse {

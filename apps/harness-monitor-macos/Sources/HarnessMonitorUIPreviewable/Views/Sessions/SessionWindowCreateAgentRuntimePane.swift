@@ -146,7 +146,7 @@ struct SessionWindowCreateAgentRuntimeContent: View {
   }
 
   private var compactDescription: String {
-    "Choose a provider below. ACP is preferred when available; finish configuration in the form."
+    "Choose a provider below. ACP is preferred when available; finish configuration in the form"
   }
 
   @ViewBuilder private var availabilityNote: some View {

@@ -112,7 +112,7 @@ extension SessionWindowCreateForm {
       Text("Codex")
         .harnessNativeFormSectionHeader()
     } footer: {
-      Text("Choose the run mode, model, and effort for this draft.")
+      Text("Choose the run mode, model, and effort for this draft")
         .harnessNativeFormSectionFooter()
     }
   }
