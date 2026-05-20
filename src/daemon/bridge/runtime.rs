@@ -3,7 +3,7 @@ use std::fs::Permissions;
 use std::io::{BufRead, BufReader, ErrorKind, Write as _};
 use std::net::{SocketAddr, TcpStream, ToSocketAddrs};
 use std::os::unix::fs::PermissionsExt;
-use std::os::unix::net::UnixListener;
+use std::os::unix::net::{UnixListener, UnixStream};
 use std::os::unix::process::CommandExt as _;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
@@ -33,6 +33,8 @@ use super::types::{
     CODEX_READY_POLL_INTERVAL, CODEX_READY_PROBE_TIMEOUT, CODEX_READY_TIMEOUT,
     CODEX_READY_WARN_AFTER,
 };
+
+const BRIDGE_ACCEPT_POLL_INTERVAL: Duration = Duration::from_millis(50);
 
 pub(super) fn matches_running_config(config: &ResolvedBridgeConfig) -> Result<bool, CliError> {
     let Some(running) = resolve_running_bridge(LivenessMode::HostAuthoritative)? else {
@@ -101,6 +103,12 @@ pub(super) fn run_bridge_server(config: &ResolvedBridgeConfig) -> Result<i32, Cl
             config.socket_path.display()
         ))
     })?;
+    listener.set_nonblocking(true).map_err(|error| {
+        CliErrorKind::workflow_io(format!(
+            "configure bridge socket nonblocking {}: {error}",
+            config.socket_path.display()
+        ))
+    })?;
 
     let token = state::ensure_auth_token()?;
     let capabilities = initial_capabilities(config);
@@ -117,9 +125,12 @@ pub(super) fn run_bridge_server(config: &ResolvedBridgeConfig) -> Result<i32, Cl
     }
     server.persist_state()?;
 
-    for stream in listener.incoming() {
-        match stream {
-            Ok(stream) => handle_stream(&server, &stream)?,
+    while !server.shutdown_requested() {
+        match listener.accept() {
+            Ok((stream, _addr)) => spawn_bridge_connection_handler(&server, stream)?,
+            Err(error) if error.kind() == ErrorKind::WouldBlock => {
+                thread::sleep(BRIDGE_ACCEPT_POLL_INTERVAL);
+            }
             Err(error) => {
                 return Err(CliErrorKind::workflow_io(format!(
                     "accept bridge connection: {error}"
@@ -127,15 +138,30 @@ pub(super) fn run_bridge_server(config: &ResolvedBridgeConfig) -> Result<i32, Cl
                 .into());
             }
         }
-        if server.shutdown_requested() {
-            break;
-        }
     }
     server.cleanup();
     clear_bridge_state()?;
     socket_guard.disarm();
     state_guard.disarm();
     Ok(0)
+}
+
+fn spawn_bridge_connection_handler(
+    server: &Arc<BridgeServer>,
+    stream: UnixStream,
+) -> Result<(), CliError> {
+    let server = Arc::clone(server);
+    thread::Builder::new()
+        .name("harness-bridge-rpc".to_string())
+        .spawn(move || {
+            if let Err(error) = handle_stream(&server, &stream) {
+                tracing::warn!(%error, "bridge RPC handler failed");
+            }
+        })
+        .map(|_| ())
+        .map_err(|error| {
+            CliErrorKind::workflow_io(format!("spawn bridge RPC handler: {error}")).into()
+        })
 }
 
 /// RAII guard that unlinks the bridge unix socket file on drop, unless
