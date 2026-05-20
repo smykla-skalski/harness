@@ -101,13 +101,13 @@ public enum ProviderBrandSymbol: String, CaseIterable, Identifiable {
     case .copilot:
       "ProviderSymbol-copilot"
     case .openRouter:
-      "ProviderSymbol-openrouter"
+      "BrandSymbol-openrouter"
     case .neuralwatt:
-      "ProviderSymbol-neuralwatt"
+      "BrandSymbol-neuralwatt"
     case .kuma:
-      "ProviderSymbol-kuma"
+      "BrandSymbol-kuma"
     case .kong:
-      "ProviderSymbol-kong"
+      "BrandSymbol-kong"
     case .mistral:
       "ProviderSymbol-mistral"
     }
