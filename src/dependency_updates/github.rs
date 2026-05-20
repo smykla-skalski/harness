@@ -119,6 +119,11 @@ mutation RerequestDependencyUpdateCheckSuite($checkSuiteId: ID!, $repositoryId: 
 }
 "#;
 
+const GRAPHQL_PAGE_SIZE: u32 = 100;
+const SEARCH_PAGE_CAP: u32 = 10;
+const REPOSITORY_CATALOG_PAGE_CAP: u32 = 5;
+const SCOPE_QUERY_CAP: usize = 50;
+
 static RUSTLS_PROVIDER: OnceLock<()> = OnceLock::new();
 
 pub(crate) struct DependencyUpdatesGitHubClient {
@@ -148,8 +153,9 @@ impl DependencyUpdatesGitHubClient {
         request: &DependencyUpdatesQueryRequest,
     ) -> Result<Vec<DependencyUpdateItem>, CliError> {
         let mut deduped = BTreeMap::new();
-        for scope in scopes(request) {
+        for scope in scopes(request)? {
             let mut cursor = None;
+            let mut page = 1_u32;
             loop {
                 let response: SearchResponse = self
                     .client
@@ -175,7 +181,13 @@ impl DependencyUpdatesGitHubClient {
                 if !response.search.page_info.has_next_page {
                     break;
                 }
-                cursor = response.search.page_info.end_cursor;
+                cursor = next_cursor_or_scope_limit(
+                    &response.search.page_info,
+                    page,
+                    SEARCH_PAGE_CAP,
+                    &format!("dependency-updates query '{}'", scope.query),
+                )?;
+                page += 1;
             }
         }
         Ok(deduped.into_values().collect())
@@ -187,6 +199,7 @@ impl DependencyUpdatesGitHubClient {
     ) -> Result<Vec<String>, CliError> {
         let mut repositories = Vec::new();
         let mut cursor = None;
+        let mut page = 1_u32;
         loop {
             let response: OrganizationRepositoriesResponse = self
                 .client
@@ -199,7 +212,9 @@ impl DependencyUpdatesGitHubClient {
                 }))
                 .await
                 .map_err(operation_error)?;
-            let Some(connection) = response.organization.map(|organization| organization.repositories)
+            let Some(connection) = response
+                .organization
+                .map(|organization| organization.repositories)
             else {
                 return Err(CliErrorKind::workflow_parse(format!(
                     "dependency-updates organization '{organization}' was not found or is not accessible"
@@ -215,7 +230,13 @@ impl DependencyUpdatesGitHubClient {
             if !connection.page_info.has_next_page {
                 break;
             }
-            cursor = connection.page_info.end_cursor;
+            cursor = next_cursor_or_scope_limit(
+                &connection.page_info,
+                page,
+                REPOSITORY_CATALOG_PAGE_CAP,
+                &format!("dependency-updates repository catalog for '{organization}'"),
+            )?;
+            page += 1;
         }
         repositories.sort();
         repositories.dedup();
@@ -351,7 +372,11 @@ impl DependencyUpdatesGitHubClient {
         request: &DependencyUpdatesAutoRequest,
     ) -> Result<Vec<DependencyUpdateActionResult>, CliError> {
         let mut results = Vec::new();
-        for target in request.targets.iter().filter(|target| target.is_auto_approvable()) {
+        for target in request
+            .targets
+            .iter()
+            .filter(|target| target.is_auto_approvable())
+        {
             let result = self
                 .client
                 .graphql::<serde_json::Value>(&json!({
@@ -369,9 +394,11 @@ impl DependencyUpdatesGitHubClient {
                 result,
             ));
         }
-        for target in request.targets.iter().filter(|target| {
-            target.is_auto_mergeable() || target.is_auto_approvable()
-        }) {
+        for target in request
+            .targets
+            .iter()
+            .filter(|target| target.is_auto_mergeable() || target.is_auto_approvable())
+        {
             let result = if let Some(config) = github_project_config(&target.repository) {
                 self.automation
                     .merge_pull_request(
@@ -398,10 +425,19 @@ impl DependencyUpdatesGitHubClient {
     }
 }
 
-fn scopes(request: &DependencyUpdatesQueryRequest) -> Vec<ScopeQuery> {
+fn scopes(request: &DependencyUpdatesQueryRequest) -> Result<Vec<ScopeQuery>, CliError> {
     let authors = request.normalized_authors();
     let organizations = request.normalized_organizations();
     let repositories = request.normalized_repositories();
+    let scope_count = authors
+        .len()
+        .saturating_mul(organizations.len().saturating_add(repositories.len()));
+    if scope_count > SCOPE_QUERY_CAP {
+        return Err(CliErrorKind::workflow_parse(format!(
+            "dependency-updates query resolves to {scope_count} GitHub searches; narrow authors, organizations, or repositories to at most {SCOPE_QUERY_CAP} searches"
+        ))
+        .into());
+    }
     let mut scopes = Vec::new();
     for author in &authors {
         for organization in &organizations {
@@ -415,7 +451,7 @@ fn scopes(request: &DependencyUpdatesQueryRequest) -> Vec<ScopeQuery> {
             });
         }
     }
-    scopes
+    Ok(scopes)
 }
 
 fn convert_node(node: SearchNode) -> Result<DependencyUpdateItem, CliError> {
@@ -505,7 +541,10 @@ fn convert_node(node: SearchNode) -> Result<DependencyUpdateItem, CliError> {
         number: node.number,
         title: node.title,
         url: node.url,
-        author_login: node.author.and_then(|author| author.login).unwrap_or_default(),
+        author_login: node
+            .author
+            .and_then(|author| author.login)
+            .unwrap_or_default(),
         state: map_pull_request_state(node.state.as_deref()),
         mergeable: map_mergeable_state(node.mergeable.as_deref()),
         review_status: map_review_status(node.review_decision.as_deref()),
@@ -513,14 +552,22 @@ fn convert_node(node: SearchNode) -> Result<DependencyUpdateItem, CliError> {
         policy_blocked,
         is_draft: node.is_draft,
         head_sha: node.head_ref_oid.unwrap_or_default(),
-        labels: node.labels.nodes.into_iter().map(|label| label.name).collect(),
+        labels: node
+            .labels
+            .nodes
+            .into_iter()
+            .map(|label| label.name)
+            .collect(),
         checks,
         reviews: node
             .reviews
             .nodes
             .into_iter()
             .map(|review| DependencyUpdateReview {
-                author: review.author.and_then(|author| author.login).unwrap_or_default(),
+                author: review
+                    .author
+                    .and_then(|author| author.login)
+                    .unwrap_or_default(),
                 state: map_review_event_state(review.state.as_deref()),
             })
             .collect(),
@@ -533,11 +580,7 @@ fn convert_node(node: SearchNode) -> Result<DependencyUpdateItem, CliError> {
 
 fn github_project_config(repository: &str) -> Option<GitHubProjectConfig> {
     let (owner, repo) = repository.split_once('/')?;
-    Some(GitHubProjectConfig::new(
-        owner,
-        repo,
-        PathBuf::new(),
-    ))
+    Some(GitHubProjectConfig::new(owner, repo, PathBuf::new()))
 }
 
 fn action_result(
@@ -664,6 +707,24 @@ fn operation_error(error: octocrab::Error) -> CliError {
         "dependency-updates github request failed: {error}"
     )))
     .with_source(error)
+}
+
+fn next_cursor_or_scope_limit(
+    page_info: &PageInfo,
+    page: u32,
+    page_cap: u32,
+    context: &str,
+) -> Result<Option<String>, CliError> {
+    if page >= page_cap {
+        return Err(CliErrorKind::workflow_io(format!(
+            "{context} exceeded {} GitHub GraphQL results; narrow the request before retrying",
+            page_cap * GRAPHQL_PAGE_SIZE
+        ))
+        .into());
+    }
+    page_info.end_cursor.clone().map(Some).ok_or_else(|| {
+        CliErrorKind::workflow_io(format!("{context} returned a next page without a cursor")).into()
+    })
 }
 
 #[derive(Debug)]
@@ -820,3 +881,6 @@ struct LabelConnection {
 struct LabelNode {
     name: String,
 }
+
+#[cfg(test)]
+mod tests;
