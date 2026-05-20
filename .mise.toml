@@ -20,7 +20,7 @@ description = "Quit Harness Monitor and stop live daemon work while resetting st
 run = "HARNESS_STALE_CLEANUP_ALLOW_LIVE_RESET=1 ./scripts/clean-stale-state.sh"
 
 [tasks."clean:caches"]
-description = "Reclaim disk by removing repo Rust + Xcode build artifacts and global build caches (pass --dry-run or --aggressive after --)"
+description = "Reclaim disk by removing repo Rust targets, daemon Cargo target, Xcode derived roots, SwiftPM .build dirs, repo tmp, and global build caches (pass --dry-run or --aggressive after --)"
 run = "./scripts/clean-build-caches.sh"
 
 [tasks."clean:caches:dry-run"]
@@ -28,7 +28,7 @@ description = "Preview clean:caches: print every target and its size; delete not
 run = "./scripts/clean-build-caches.sh --dry-run"
 
 [tasks."clean:caches:aggressive"]
-description = "clean:caches plus Xcode UI HarnessMonitor-* DerivedData slots (loses SourcePackages cache; full regen)"
+description = "clean:caches plus Xcode UI HarnessMonitor-* DerivedData slots and Xcode module/compilation caches (loses SourcePackages cache; full regen)"
 run = "./scripts/clean-build-caches.sh --aggressive"
 
 [tasks."clean:system"]
@@ -38,6 +38,20 @@ run = "./scripts/clean-system-state.sh"
 [tasks."clean:system:dry-run"]
 description = "Preview clean:system: list every Simulator runtime, Daemon Container, and Xcode cache that would be removed; delete nothing"
 run = "./scripts/clean-system-state.sh --dry-run"
+
+[tasks."clean:disk"]
+description = "Run the normal disk cleanup sweep: clean:caches followed by clean:system"
+run = [
+  "./scripts/clean-build-caches.sh",
+  "./scripts/clean-system-state.sh",
+]
+
+[tasks."clean:disk:dry-run"]
+description = "Preview the normal disk cleanup sweep: clean:caches:dry-run followed by clean:system:dry-run"
+run = [
+  "./scripts/clean-build-caches.sh --dry-run",
+  "./scripts/clean-system-state.sh --dry-run",
+]
 
 [tasks."clean:repos:cold"]
 description = "Audit and delete cold non-harness repos (kong, bartsmykla, klab, kubernetes-manifests, JetBrains) - skips any root with dirty trees, unpushed commits, or untracked branches (pass --dry-run or --root PATH after --)"
