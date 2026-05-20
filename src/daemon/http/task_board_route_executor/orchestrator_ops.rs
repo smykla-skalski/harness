@@ -3,6 +3,7 @@ use crate::daemon::protocol::{
     TaskBoardGitIdentityDefaultsResponse, TaskBoardGitRuntimeConfig,
     TaskBoardGitRuntimeConfigResponse, TaskBoardGitRuntimeDrainSecretsResponse,
     TaskBoardGitSigningVerifyRequest, TaskBoardGitSigningVerifyResponse,
+    TaskBoardOpenRouterTokenSyncRequest, TaskBoardOpenRouterTokenSyncResponse,
     TaskBoardOrchestratorSettingsResponse, TaskBoardOrchestratorSettingsUpdateRequest,
     TaskBoardOrchestratorStatusResponse, TaskBoardTodoistTokenSyncRequest,
     TaskBoardTodoistTokenSyncResponse,
@@ -52,6 +53,12 @@ pub(crate) fn sync_todoist_token(
     request: &TaskBoardTodoistTokenSyncRequest,
 ) -> Result<TaskBoardTodoistTokenSyncResponse, CliError> {
     service::sync_task_board_todoist_token(request)
+}
+
+pub(crate) fn sync_openrouter_token(
+    request: &TaskBoardOpenRouterTokenSyncRequest,
+) -> Result<TaskBoardOpenRouterTokenSyncResponse, CliError> {
+    service::sync_task_board_openrouter_token(request)
 }
 
 pub(crate) fn git_identity_defaults() -> Result<TaskBoardGitIdentityDefaultsResponse, CliError> {

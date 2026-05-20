@@ -11,7 +11,8 @@ use crate::task_board::{
     ExternalProvider, ExternalSyncConfig, TaskBoardGitHubRepositoryToken,
     TaskBoardGitHubTokensSyncRequest, TaskBoardGitHubTokensSyncResponse,
     TaskBoardGitIdentityDefaults, TaskBoardGitRepositoryOverride, TaskBoardGitRuntimeConfig,
-    TaskBoardGitRuntimeProfile, TaskBoardTodoistTokenSyncRequest,
+    TaskBoardGitRuntimeProfile, TaskBoardOpenRouterTokenSyncRequest,
+    TaskBoardOpenRouterTokenSyncResponse, TaskBoardTodoistTokenSyncRequest,
     TaskBoardTodoistTokenSyncResponse, discover_git_identity_defaults, normalize_repository_slug,
 };
 
@@ -126,6 +127,18 @@ pub fn sync_task_board_todoist_token(
     request: &TaskBoardTodoistTokenSyncRequest,
 ) -> Result<TaskBoardTodoistTokenSyncResponse, CliError> {
     Ok(state::replace_task_board_todoist_token(request))
+}
+
+/// Replace the in-memory `OpenRouter` API key snapshot used by the daemon's
+/// `OpenRouter` managed-agent backend.
+///
+/// # Errors
+/// This function is currently infallible but returns a `Result` to keep the
+/// daemon route signatures aligned with the other token-sync surfaces.
+pub fn sync_task_board_openrouter_token(
+    request: &TaskBoardOpenRouterTokenSyncRequest,
+) -> Result<TaskBoardOpenRouterTokenSyncResponse, CliError> {
+    Ok(state::replace_task_board_openrouter_token(request))
 }
 
 pub(crate) fn external_sync_config_for_repository(

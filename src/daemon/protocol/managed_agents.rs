@@ -223,4 +223,26 @@ mod tests {
         assert_eq!(openrouter.session_id(), "eadbcb3e-6ef7-53d2-ad56-0347cb7189fc");
         assert_eq!(openrouter.updated_at(), "2026-05-20T00:00:00Z");
     }
+
+    #[test]
+    fn openrouter_variant_serializes_with_open_router_kind_tag() {
+        let snapshot = ManagedAgentSnapshot::OpenRouter(OpenRouterRunSnapshot {
+            run_id: "openrouter-1".into(),
+            session_id: "eadbcb3e-6ef7-53d2-ad56-0347cb7189fc".into(),
+            session_agent_id: None,
+            display_name: "OpenRouter".into(),
+            model: "anthropic/claude-3.7-sonnet".into(),
+            status: OpenRouterRunStatus::Pending,
+            latest_message: None,
+            latest_reasoning: None,
+            final_message: None,
+            error: None,
+            turn_count: 0,
+            created_at: "2026-05-20T00:00:00Z".into(),
+            updated_at: "2026-05-20T00:00:00Z".into(),
+        });
+        let value = serde_json::to_value(&snapshot).expect("serialize");
+        assert_eq!(value["kind"], "open_router");
+        assert_eq!(value["snapshot"]["run_id"], "openrouter-1");
+    }
 }

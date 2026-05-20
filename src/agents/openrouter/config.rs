@@ -33,7 +33,22 @@ impl AgentConfig {
     /// Returns [`ConfigError::MissingApiKey`] when the API key is empty or
     /// absent.
     pub fn from_env() -> Result<Self, ConfigError> {
-        Self::from_source(|name| env::var(name).ok())
+        Self::from_env_with_override(None)
+    }
+
+    /// Build the agent config from `OPENROUTER_*` environment variables, but
+    /// prefer `override_api_key` when present. The daemon uses this to honor
+    /// the Keychain-backed key persisted via `task_board.orchestrator_openrouter_token_sync`
+    /// before falling back to the env var.
+    ///
+    /// # Errors
+    /// Returns [`ConfigError::MissingApiKey`] when neither the override nor
+    /// the env var supplies a key.
+    pub fn from_env_with_override(override_api_key: Option<String>) -> Result<Self, ConfigError> {
+        Self::from_source(|name| match (name, override_api_key.as_deref()) {
+            ("OPENROUTER_API_KEY", Some(value)) if !value.is_empty() => Some(value.to_owned()),
+            _ => env::var(name).ok(),
+        })
     }
 
     /// Build the agent config from an arbitrary source. Exposed for tests so

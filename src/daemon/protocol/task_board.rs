@@ -15,7 +15,9 @@ use crate::task_board::{
 pub use crate::task_board::{
     TaskBoardGitHubTokensSyncRequest,
     TaskBoardGitHubTokensSyncResponse as TaskBoardGitHubTokensSyncOutcome,
-    TaskBoardGitRuntimeConfig, TaskBoardOrchestratorRunOnceRequest, TaskBoardOrchestratorSettings,
+    TaskBoardGitRuntimeConfig, TaskBoardOpenRouterTokenSyncRequest,
+    TaskBoardOpenRouterTokenSyncResponse as TaskBoardOpenRouterTokenSyncOutcome,
+    TaskBoardOrchestratorRunOnceRequest, TaskBoardOrchestratorSettings,
     TaskBoardOrchestratorSettingsUpdateRequest, TaskBoardOrchestratorStatus,
     TaskBoardTodoistTokenSyncRequest,
     TaskBoardTodoistTokenSyncResponse as TaskBoardTodoistTokenSyncOutcome,
@@ -292,6 +294,7 @@ pub struct TaskBoardGitRuntimeDrainSecretsResponse {
 
 pub type TaskBoardGitHubTokensSyncResponse = TaskBoardGitHubTokensSyncOutcome;
 pub type TaskBoardTodoistTokenSyncResponse = TaskBoardTodoistTokenSyncOutcome;
+pub type TaskBoardOpenRouterTokenSyncResponse = TaskBoardOpenRouterTokenSyncOutcome;
 pub type TaskBoardPolicyPipelineResponse = PolicyPipelineDocument;
 pub type TaskBoardPolicyPipelineSaveDraftResponse = PolicyPipelineSaveResponse;
 pub type TaskBoardPolicyPipelineSimulationResponse = PolicyPipelineSimulationResult;
