@@ -19,7 +19,6 @@ use crate::agents::acp::permission::{
     PermissionBridgeError, PermissionBridgeRequest, PermissionBridgeResult, PermissionMode,
 };
 use crate::daemon::protocol::StreamEvent;
-use crate::session::types::ManagedAgentKind;
 use crate::workspace::utc_now;
 
 const COALESCE_WINDOW: Duration = Duration::from_millis(5);
@@ -43,7 +42,6 @@ pub struct AcpPermissionBatch {
     pub batch_id: String,
     pub acp_id: String,
     pub session_id: String,
-    pub family: ManagedAgentKind,
     pub requests: Vec<AcpPermissionItem>,
     pub created_at: String,
     pub expires_at: String,
@@ -67,7 +65,6 @@ pub struct PermissionBridgeHandle {
 struct PermissionBridgeState {
     acp_id: String,
     session_id: String,
-    family: ManagedAgentKind,
     sender: BroadcastSender<StreamEvent>,
     pending: Mutex<BTreeMap<String, PendingBatch>>,
     next_batch: AtomicU64,
@@ -91,21 +88,10 @@ struct PendingResponder {
 impl PermissionBridgeHandle {
     #[must_use]
     pub fn spawn(acp_id: String, session_id: String, sender: BroadcastSender<StreamEvent>) -> Self {
-        Self::spawn_with_kind(acp_id, session_id, ManagedAgentKind::Acp, sender)
-    }
-
-    #[must_use]
-    pub fn spawn_with_kind(
-        acp_id: String,
-        session_id: String,
-        family: ManagedAgentKind,
-        sender: BroadcastSender<StreamEvent>,
-    ) -> Self {
         let (tx, rx) = mpsc::channel(BRIDGE_CHANNEL_BUFFER);
         let state = Arc::new(PermissionBridgeState {
             acp_id,
             session_id,
-            family,
             sender,
             pending: Mutex::new(BTreeMap::new()),
             next_batch: AtomicU64::new(1),
@@ -402,7 +388,6 @@ fn enqueue_batch_locked(
         batch_id: batch_id.clone(),
         acp_id: state.acp_id.clone(),
         session_id: state.session_id.clone(),
-        family: state.family,
         requests: items,
         created_at: created_at.format("%Y-%m-%dT%H:%M:%SZ").to_string(),
         expires_at,
