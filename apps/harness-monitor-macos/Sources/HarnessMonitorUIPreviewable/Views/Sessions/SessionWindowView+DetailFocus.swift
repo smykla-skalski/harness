@@ -49,6 +49,8 @@ extension SessionWindowView {
         taskDetailContent(for: taskID)
       case .codexRun(_, let runID):
         codexRunDetailContent(for: runID)
+      case .openRouterRun(_, let runID):
+        openRouterRunDetailContent(for: runID)
       case .create(let draft):
         SessionWindowCreateForm(
           store: store,
@@ -121,6 +123,19 @@ extension SessionWindowView {
       unavailableDetailSurface(
         "Codex Run Not Available",
         systemImage: "wand.and.stars",
+        description: Text(runID)
+      )
+    }
+  }
+
+  @ViewBuilder
+  private func openRouterRunDetailContent(for runID: String) -> some View {
+    if let run = sessionOpenRouterRuns.first(where: { $0.runId == runID }) {
+      SessionOpenRouterRunDetailSection(store: store, run: run)
+    } else {
+      unavailableDetailSurface(
+        "OpenRouter Run Not Available",
+        systemImage: "network",
         description: Text(runID)
       )
     }

@@ -40,6 +40,8 @@ struct SessionPerfStaticDetailSurface: View {
       "task.\(taskID)"
     case .codexRun(_, let runID):
       "codex.\(runID)"
+    case .openRouterRun(_, let runID):
+      "openrouter.\(runID)"
     case .create(let draft):
       "create.\(draft.kind.rawValue)"
     }

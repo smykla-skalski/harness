@@ -186,6 +186,12 @@ extension HarnessMonitorStore {
           guard let self, !Task.isCancelled else {
             return
           }
+          await self.refreshOpenRouterRuns(using: client, sessionID: sessionID)
+        }
+        group.addTask { [weak self] in
+          guard let self, !Task.isCancelled else {
+            return
+          }
           _ = await self.refreshAgentTuis(using: client, sessionID: sessionID)
         }
         group.addTask { [weak self] in

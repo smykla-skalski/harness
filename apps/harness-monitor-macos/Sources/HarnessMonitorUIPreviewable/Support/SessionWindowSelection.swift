@@ -149,6 +149,7 @@ public enum SessionSelection: Hashable, Sendable {
   case route(SessionWindowRoute)
   case agent(sessionID: String, agentID: String)
   case codexRun(sessionID: String, runID: String)
+  case openRouterRun(sessionID: String, runID: String)
   case decision(sessionID: String, decisionID: String)
   case task(sessionID: String, taskID: String)
   case create(SessionCreateDraft)
@@ -165,6 +166,11 @@ public enum SessionSelection: Hashable, Sendable {
 
   public var codexRunID: String? {
     guard case .codexRun(_, let runID) = self else { return nil }
+    return runID
+  }
+
+  public var openRouterRunID: String? {
+    guard case .openRouterRun(_, let runID) = self else { return nil }
     return runID
   }
 
@@ -185,21 +191,21 @@ public enum SessionSelection: Hashable, Sendable {
 
   /// The cross-domain search domain implied by this selection, when one
   /// exists. Drilled-in selections (`.agent`, `.decision`, `.task`) imply
-  /// their parent route's domain. `.codexRun` and `.create` and routes
-  /// without a search domain (`.overview`) return `nil`.
+  /// their parent route's domain. `.codexRun`, `.openRouterRun`, `.create`
+  /// and routes without a search domain (`.overview`) return `nil`.
   public var routeDomain: AppSearchDomain? {
     switch self {
     case .agent: .agents
     case .decision: .decisions
     case .task: .tasks
-    case .codexRun, .create: nil
+    case .codexRun, .openRouterRun, .create: nil
     case .route(let route): route.appSearchDomain
     }
   }
 
   public var primaryCreateKind: SessionCreateKind {
     switch self {
-    case .agent, .codexRun:
+    case .agent, .codexRun, .openRouterRun:
       .agent
     case .task:
       .task

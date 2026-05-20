@@ -184,6 +184,7 @@ extension SessionWindowView {
         store: store,
         snapshot: snapshot,
         sessionCodexRuns: sessionCodexRuns,
+        sessionOpenRouterRuns: sessionOpenRouterRuns,
         decisions: allSessionDecisions,
         decisionIDs: allSessionDecisionIDsInOrderCache,
         statusModel: sessionStatusSummaryModel,
@@ -405,5 +406,9 @@ extension SessionWindowView {
 
   var sessionCodexRuns: [CodexRunSnapshot] {
     store.codexRuns(forSessionID: token.sessionID)
+  }
+
+  var sessionOpenRouterRuns: [OpenRouterRunSnapshot] {
+    store.openRouterRuns(forSessionID: token.sessionID)
   }
 }

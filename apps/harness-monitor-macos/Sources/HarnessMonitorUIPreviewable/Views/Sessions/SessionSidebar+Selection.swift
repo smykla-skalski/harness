@@ -179,7 +179,7 @@ extension SessionSidebar {
     case .agent: .agent
     case .task: .task
     case .decision: .decision
-    case .route, .codexRun, .create: nil
+    case .route, .codexRun, .openRouterRun, .create: nil
     }
   }
 
@@ -188,7 +188,7 @@ extension SessionSidebar {
     case .agent(_, let id): id
     case .task(_, let id): id
     case .decision(_, let id): id
-    case .route, .codexRun, .create: nil
+    case .route, .codexRun, .openRouterRun, .create: nil
     }
   }
 }
