@@ -241,7 +241,6 @@ public enum HarnessMonitorAccessibility {
   public static let agentTuiNavigateForwardButton = "harness.sheet.agent-tui.navigate-forward"
   public static let newSessionSheet = "harness.new-session.sheet"
   public static let newCodexAgentSheet = "harness.new-codex-agent.sheet"
-  public static let newOpenRouterAgentSheet = "harness.new-openrouter-agent.sheet"
   public static let openRouterModelBrowserSheet = "harness.openrouter-model-browser.sheet"
   public static let openRouterModelBrowserSearch = "harness.openrouter-model-browser.search"
   public static let openRouterModelBrowserList = "harness.openrouter-model-browser.list"

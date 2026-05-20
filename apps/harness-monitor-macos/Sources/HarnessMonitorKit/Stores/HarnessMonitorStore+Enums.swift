@@ -105,7 +105,6 @@ extension HarnessMonitorStore {
     case sendSignal(agentID: String)
     case newSession
     case newCodexAgent(sessionID: String)
-    case newOpenRouterAgent(sessionID: String)
     case attachExternal(bookmarkId: String, preview: SessionDiscoveryProbe.Preview?)
     case signalDetail(signalID: String)
     case createTask(sessionID: String)
@@ -117,7 +116,6 @@ extension HarnessMonitorStore {
       case .sendSignal(let agentID): "sendSignal:\(agentID)"
       case .newSession: "newSession"
       case .newCodexAgent(let sessionID): "newCodexAgent:\(sessionID)"
-      case .newOpenRouterAgent(let sessionID): "newOpenRouterAgent:\(sessionID)"
       case .attachExternal(let bookmarkId, _): "attachExternal:\(bookmarkId)"
       case .signalDetail(let signalID): "signalDetail:\(signalID)"
       case .createTask(let sessionID): "createTask:\(sessionID)"

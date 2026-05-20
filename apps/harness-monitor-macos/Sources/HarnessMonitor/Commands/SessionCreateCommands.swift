@@ -9,7 +9,6 @@ struct SessionCreateCommands: Commands {
   var body: some Commands {
     let createAgent = createAction(for: .agent)
     let createCodexAgent = createCodexAction
-    let createOpenRouterAgent = createOpenRouterAction
     let createTask = createAction(for: .task)
     let createDecision = createAction(for: .decision)
     CommandGroup(after: .newItem) {
@@ -21,8 +20,6 @@ struct SessionCreateCommands: Commands {
         .disabled(createAgent == nil)
       Button("New Codex Agent") { createCodexAgent?() }
         .disabled(createCodexAgent == nil)
-      Button("New OpenRouter Session") { createOpenRouterAgent?() }
-        .disabled(createOpenRouterAgent == nil)
       Button("New Task") { createTask?() }
         .keyboardShortcut(
           SessionCreateKind.task.createShortcut.keyEquivalent,
@@ -50,13 +47,6 @@ struct SessionCreateCommands: Commands {
       return nil
     }
     return { store.presentedSheet = .newCodexAgent(sessionID: sessionID) }
-  }
-
-  private var createOpenRouterAction: (() -> Void)? {
-    guard let sessionID = activeSessionID else {
-      return nil
-    }
-    return { store.presentedSheet = .newOpenRouterAgent(sessionID: sessionID) }
   }
 
   private func createAction(for kind: SessionCreateKind) -> (() -> Void)? {
