@@ -263,6 +263,7 @@ fn handle_from_pull_request(pull_request: &models::pulls::PullRequest) -> GitHub
     )
 }
 
+#[cfg(test)]
 fn handle_from_simple_pull_request(
     pull_request: &models::pulls::SimplePullRequest,
 ) -> GitHubPullRequestHandle {

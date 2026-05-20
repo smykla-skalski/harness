@@ -269,20 +269,6 @@ pub(super) async fn poll_change_tracking_async(
     changes
 }
 
-#[expect(
-    clippy::cognitive_complexity,
-    reason = "tracing macro expansion; tokio-rs/tracing#553"
-)]
-fn reindex_sessions_from_paths(
-    db: &Arc<Mutex<DaemonDb>>,
-    paths: &[PathBuf],
-    resolve_cache: &mut RuntimeSessionResolveCache,
-) {
-    resolve_cache.invalidate_paths(paths);
-    let work = extract_reindex_work(paths, resolve_cache);
-    reindex_extracted_work(db, work);
-}
-
 async fn reindex_sessions_from_paths_async(
     db: Arc<Mutex<DaemonDb>>,
     paths: Vec<PathBuf>,
