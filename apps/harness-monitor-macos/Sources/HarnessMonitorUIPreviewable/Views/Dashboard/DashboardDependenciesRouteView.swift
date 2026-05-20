@@ -16,6 +16,31 @@ import SwiftUI
 
 @MainActor private let dependenciesISO8601Formatter = ISO8601DateFormatter()
 
+struct DashboardDependenciesReloadTaskKey: Equatable {
+  let storedPreferences: String
+  let refreshToken: Int
+  let connectionState: HarnessMonitorStore.ConnectionState
+}
+
+enum DashboardDependenciesMissingClientState: Equatable {
+  case ignore
+  case loading
+  case error(String)
+}
+
+func dashboardDependenciesMissingClientState(
+  backgroundRefresh: Bool,
+  connectionState: HarnessMonitorStore.ConnectionState
+) -> DashboardDependenciesMissingClientState {
+  guard !backgroundRefresh else {
+    return .ignore
+  }
+  if connectionState == .connecting {
+    return .loading
+  }
+  return .error("The dependencies route needs a daemon client")
+}
+
 @MainActor
 struct DashboardDependenciesRouteView: View {
   let store: HarnessMonitorStore
@@ -66,6 +91,14 @@ struct DashboardDependenciesRouteView: View {
   private var preferences: DashboardDependenciesPreferences {
     get { DashboardDependenciesPreferences.decode(from: storedPreferences) }
     nonmutating set { storedPreferences = newValue.encodedString }
+  }
+
+  private var reloadTaskKey: DashboardDependenciesReloadTaskKey {
+    DashboardDependenciesReloadTaskKey(
+      storedPreferences: storedPreferences,
+      refreshToken: refreshToken,
+      connectionState: store.connectionState
+    )
   }
 
   private var normalizedPreferences: DashboardDependenciesPreferences {
@@ -135,7 +168,7 @@ struct DashboardDependenciesRouteView: View {
     }
     .frame(maxWidth: .infinity, maxHeight: .infinity)
     .accessibilityIdentifier(HarnessMonitorAccessibility.dashboardDependenciesRoot)
-    .task(id: "\(storedPreferences)-\(refreshToken)") {
+    .task(id: reloadTaskKey) {
       await reload(forceRefresh: false)
     }
     .task(id: storedPreferences) {
@@ -704,10 +737,21 @@ struct DashboardDependenciesRouteView: View {
 
   private func reload(forceRefresh: Bool, backgroundRefresh: Bool = false) async {
     guard let client = store.apiClient else {
-      if !backgroundRefresh || response.items.isEmpty {
-        errorMessage = "The dependencies route needs a daemon client"
+      switch dashboardDependenciesMissingClientState(
+        backgroundRefresh: backgroundRefresh,
+        connectionState: store.connectionState
+      ) {
+      case .ignore:
+        return
+      case .loading:
+        isLoading = true
+        errorMessage = nil
+        return
+      case .error(let message):
+        isLoading = false
+        errorMessage = message
+        return
       }
-      return
     }
     if backgroundRefresh {
       isBackgroundRefreshing = true
