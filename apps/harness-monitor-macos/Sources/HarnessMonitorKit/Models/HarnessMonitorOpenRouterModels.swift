@@ -188,3 +188,25 @@ public struct OpenRouterModelEntry: Codable, Equatable, Identifiable, Sendable {
     case supportedParameters
   }
 }
+
+public enum OpenRouterModelCatalogSource: String, Codable, Sendable {
+  case live
+  case cache
+  case fallback
+}
+
+public struct OpenRouterModelCatalog: Codable, Equatable, Sendable {
+  public let models: [OpenRouterModelEntry]
+  public let fetchedAt: String
+  public let source: OpenRouterModelCatalogSource
+
+  public init(
+    models: [OpenRouterModelEntry],
+    fetchedAt: String,
+    source: OpenRouterModelCatalogSource
+  ) {
+    self.models = models
+    self.fetchedAt = fetchedAt
+    self.source = source
+  }
+}
