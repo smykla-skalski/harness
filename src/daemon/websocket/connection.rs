@@ -8,7 +8,7 @@ use axum::http::HeaderMap;
 use axum::response::Response;
 use futures_util::{SinkExt, StreamExt};
 use tokio::sync::mpsc;
-use tokio::task::JoinHandle;
+use tokio::task::{JoinHandle, JoinSet};
 use tokio::time::{Instant, interval as tokio_interval};
 use tracing::Instrument as _;
 use tracing::field::{Empty, display};
@@ -120,6 +120,7 @@ async fn handle_connection(socket: WebSocket, state: DaemonHttpState) {
     let priority_tx_dispatch = priority_tx.clone();
     let connection_dispatch = Arc::clone(&connection);
     let inbound_task = tokio::spawn(async move {
+        let mut dispatch_tasks = JoinSet::new();
         let mut last_client_message = Instant::now();
         let mut idle_check = tokio_interval(Duration::from_secs(15));
 
@@ -131,13 +132,14 @@ async fn handle_connection(socket: WebSocket, state: DaemonHttpState) {
                             if incoming_message_counts_as_activity(&message) {
                                 last_client_message = Instant::now();
                             }
-                            match Box::pin(handle_incoming_message(
+                            match handle_incoming_message(
                                 message,
-                                &state,
-                                &connection_dispatch,
-                            ))
-                            .await
-                            {
+                                state.clone(),
+                                Arc::clone(&connection_dispatch),
+                                priority_tx_dispatch.clone(),
+                                &mut dispatch_tasks,
+                            )
+                            .await {
                                 IncomingMessageAction::ContinueLoop => {}
                                 IncomingMessageAction::CloseConnection => break,
                                 IncomingMessageAction::RespondBatch(frames) => {
@@ -156,6 +158,7 @@ async fn handle_connection(socket: WebSocket, state: DaemonHttpState) {
                         }
                     }
                 }
+                Some(_) = dispatch_tasks.join_next(), if !dispatch_tasks.is_empty() => {}
                 _ = idle_check.tick() => {
                     if last_client_message.elapsed() > Duration::from_secs(45) {
                         info!("websocket idle timeout, closing connection");
@@ -164,6 +167,8 @@ async fn handle_connection(socket: WebSocket, state: DaemonHttpState) {
                 }
             }
         }
+        dispatch_tasks.abort_all();
+        while dispatch_tasks.join_next().await.is_some() {}
     });
 
     let writer_task = tokio::spawn(async move {
@@ -269,17 +274,42 @@ pub(crate) fn incoming_message_counts_as_activity(message: &Message) -> bool {
 
 pub(crate) async fn handle_incoming_message(
     message: Message,
-    state: &DaemonHttpState,
-    connection: &Arc<Mutex<ConnectionState>>,
+    state: DaemonHttpState,
+    connection: Arc<Mutex<ConnectionState>>,
+    priority_tx: mpsc::Sender<Message>,
+    dispatch_tasks: &mut JoinSet<()>,
 ) -> IncomingMessageAction {
     match message {
-        Message::Text(text) => IncomingMessageAction::RespondBatch(
-            Box::pin(handle_message(&text, state, connection)).await,
-        ),
+        Message::Text(text) => {
+            spawn_text_dispatch(
+                text.to_string(),
+                state,
+                connection,
+                priority_tx,
+                dispatch_tasks,
+            );
+            IncomingMessageAction::ContinueLoop
+        }
         Message::Ping(payload) => IncomingMessageAction::RespondBatch(vec![Message::Pong(payload)]),
         Message::Close(_) => IncomingMessageAction::CloseConnection,
         Message::Binary(_) | Message::Pong(_) => IncomingMessageAction::ContinueLoop,
     }
+}
+
+fn spawn_text_dispatch(
+    text: String,
+    state: DaemonHttpState,
+    connection: Arc<Mutex<ConnectionState>>,
+    priority_tx: mpsc::Sender<Message>,
+    dispatch_tasks: &mut JoinSet<()>,
+) {
+    dispatch_tasks.spawn(async move {
+        for frame in Box::pin(handle_message(&text, &state, &connection)).await {
+            if priority_tx.send(frame).await.is_err() {
+                break;
+            }
+        }
+    });
 }
 
 #[cfg(test)]
@@ -454,8 +484,16 @@ mod tests {
         let state = test_http_state();
         let connection = Arc::new(Mutex::new(ConnectionState::new()));
 
-        let action =
-            handle_incoming_message(Message::Ping(vec![4, 5, 6].into()), &state, &connection).await;
+        let (priority_tx, _) = mpsc::channel::<Message>(1);
+        let mut dispatch_tasks = JoinSet::new();
+        let action = handle_incoming_message(
+            Message::Ping(vec![4, 5, 6].into()),
+            state,
+            connection,
+            priority_tx,
+            &mut dispatch_tasks,
+        )
+        .await;
 
         match action {
             IncomingMessageAction::RespondBatch(frames) => {

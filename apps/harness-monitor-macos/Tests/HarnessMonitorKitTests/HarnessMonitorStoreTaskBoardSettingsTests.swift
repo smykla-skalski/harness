@@ -120,6 +120,26 @@ struct HarnessMonitorStoreTaskBoardSettingsTests {
     #expect(failureMessage.contains("keychain left unchanged"))
   }
 
+  @Test("Successful save does not run external sync on the foreground path")
+  func successfulSaveDoesNotRunExternalSyncOnForegroundPath() async {
+    let client = RecordingHarnessClient()
+    let store = await makeBootstrappedStore(client: client)
+    let baselineCallCount = client.recordedCalls().count
+    let snapshot = makeSettingsSnapshot()
+
+    let success = await store.updateTaskBoardGitSettings(snapshot: snapshot)
+
+    #expect(success)
+    let newCalls = Array(client.recordedCalls().dropFirst(baselineCallCount))
+    #expect(
+      newCalls.contains { call in
+        if case .syncTaskBoard = call { return true }
+        return false
+      } == false
+    )
+    #expect(store.currentSuccessFeedbackMessage == "Saved task board settings")
+  }
+
   private func makeSettingsSnapshot() -> TaskBoardGitSettingsSnapshot {
     TaskBoardGitSettingsSnapshot(
       orchestratorSettings: TaskBoardOrchestratorSettings(

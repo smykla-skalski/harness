@@ -192,6 +192,7 @@ final class RecordingHarnessClient: HarnessMonitorClientProtocol, @unchecked Sen
       repositoryTokenCount: Int
     )
     case syncTaskBoardTodoistToken(tokenConfigured: Bool)
+    case syncTaskBoardOpenRouterToken(tokenConfigured: Bool)
     case taskBoardGitIdentityDefaults
     case verifyTaskBoardGitSigning(repository: String?)
     case drainTaskBoardGitRuntimeSecrets
