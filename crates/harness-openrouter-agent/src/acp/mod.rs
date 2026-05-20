@@ -14,6 +14,8 @@
 //! traffic. The rest lands in the next chunk.
 
 pub mod bridge;
+pub mod model_catalog;
+pub mod session;
 pub mod tool_translator;
 
 pub use bridge::run_stdio;
