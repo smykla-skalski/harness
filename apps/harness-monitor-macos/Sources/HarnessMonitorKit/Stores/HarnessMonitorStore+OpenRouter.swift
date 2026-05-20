@@ -70,13 +70,32 @@ extension HarnessMonitorStore {
 
   @discardableResult
   public func promptOpenRouterRun(
-    runID _: String,
-    prompt _: String
+    runID: String,
+    prompt: String
   ) async -> OpenRouterRunSnapshot? {
-    presentFailureFeedback(
-      "Follow-up prompts for OpenRouter sessions require a future daemon update."
-    )
-    return nil
+    guard let client else { return nil }
+    let trimmed = prompt.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard !trimmed.isEmpty else {
+      presentFailureFeedback("OpenRouter prompt cannot be empty.")
+      return nil
+    }
+    do {
+      let snapshot = try await client.promptManagedAcpAgent(agentID: runID, prompt: trimmed)
+      guard case .acp(let acp) = snapshot else { return nil }
+      let metadata = openRouterRunMetadata[runID]
+      let projected = OpenRouterRunSnapshot(
+        acp: acp,
+        model: metadata?.model ?? "",
+        displayName: metadata?.displayName
+      )
+      applyOpenRouterRun(projected)
+      return projected
+    } catch {
+      presentFailureFeedback(
+        "Failed to send OpenRouter follow-up: \(error.localizedDescription)"
+      )
+      return nil
+    }
   }
 
   @discardableResult
