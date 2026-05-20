@@ -5,8 +5,10 @@ unalias -a 2>/dev/null || true
 binary_dir="${HARNESS_INSTALL_BINARY_DIR:-${HOME}/.local/bin}"
 binary_path="${binary_dir}/harness"
 codex_adapter_path="${binary_dir}/harness-codex-acp"
+openrouter_adapter_path="${binary_dir}/harness-openrouter-agent"
 tmp_path="${binary_path}.new"
 codex_adapter_tmp_path="${codex_adapter_path}.new"
+openrouter_adapter_tmp_path="${openrouter_adapter_path}.new"
 signing_identity="${HARNESS_INSTALL_SIGNING_IDENTITY:-Developer ID Application: Bartlomiej Smykla (Q498EB36N4)}"
 skip_codesign="${HARNESS_INSTALL_SKIP_CODESIGN:-0}"
 ROOT="$(CDPATH='' cd -- "$(dirname -- "$0")/.." && pwd)"
@@ -34,6 +36,7 @@ resolve_target_dir() {
 target_dir="$(resolve_target_dir)"
 build_binary="${target_dir}/release/harness"
 build_codex_adapter_binary="${target_dir}/release/harness-codex-acp"
+build_openrouter_adapter_binary="${target_dir}/release/harness-openrouter-agent"
 
 if [[ "${1:-}" == "--print-build-binary" ]]; then
   printf '%s\n' "${build_binary}"
@@ -45,7 +48,12 @@ if [[ "${1:-}" == "--print-build-codex-acp-binary" ]]; then
   exit 0
 fi
 
-trap 'command rm -f "${tmp_path}" "${codex_adapter_tmp_path}"' EXIT
+if [[ "${1:-}" == "--print-build-openrouter-binary" ]]; then
+  printf '%s\n' "${build_openrouter_adapter_binary}"
+  exit 0
+fi
+
+trap 'command rm -f "${tmp_path}" "${codex_adapter_tmp_path}" "${openrouter_adapter_tmp_path}"' EXIT
 
 run_for_cli_daemon_root() {
   command env -u HARNESS_APP_GROUP_ID -u HARNESS_DAEMON_DATA_HOME -u HARNESS_SANDBOXED "$@"
@@ -70,6 +78,11 @@ candidate_version() {
 }
 
 codex_adapter_probe_ok() {
+  local candidate="$1"
+  "${candidate}" --probe >/dev/null 2>&1
+}
+
+openrouter_adapter_probe_ok() {
   local candidate="$1"
   "${candidate}" --probe >/dev/null 2>&1
 }
@@ -220,20 +233,30 @@ if [[ ! -x "${build_codex_adapter_binary}" ]]; then
   printf 'expected managed Codex ACP release binary missing at %s\n' "${build_codex_adapter_binary}" >&2
   exit 1
 fi
+if [[ ! -x "${build_openrouter_adapter_binary}" ]]; then
+  printf 'expected managed OpenRouter ACP release binary missing at %s\n' "${build_openrouter_adapter_binary}" >&2
+  exit 1
+fi
 command rm -f "${tmp_path}"
 command rm -f "${codex_adapter_tmp_path}"
+command rm -f "${openrouter_adapter_tmp_path}"
 command cp "${build_binary}" "${tmp_path}"
 command cp "${build_codex_adapter_binary}" "${codex_adapter_tmp_path}"
+command cp "${build_openrouter_adapter_binary}" "${openrouter_adapter_tmp_path}"
 command chmod 755 "${tmp_path}"
 command chmod 755 "${codex_adapter_tmp_path}"
+command chmod 755 "${openrouter_adapter_tmp_path}"
 if [[ "${skip_codesign}" != "1" ]]; then
   command codesign --force --options=runtime -s "${signing_identity}" "${tmp_path}"
   command codesign --force --options=runtime -s "${signing_identity}" "${codex_adapter_tmp_path}"
+  command codesign --force --options=runtime -s "${signing_identity}" "${openrouter_adapter_tmp_path}"
 fi
 command chmod 555 "${tmp_path}"
 command chmod 555 "${codex_adapter_tmp_path}"
+command chmod 555 "${openrouter_adapter_tmp_path}"
 command mv -f "${tmp_path}" "${binary_path}"
 command mv -f "${codex_adapter_tmp_path}" "${codex_adapter_path}"
+command mv -f "${openrouter_adapter_tmp_path}" "${openrouter_adapter_path}"
 
 cleanup_cli_launch_agent
 
@@ -247,15 +270,20 @@ if ! codex_adapter_probe_ok "${codex_adapter_path}"; then
   printf 'installed harness-codex-acp failed its --probe check at %s\n' "${codex_adapter_path}" >&2
   exit 1
 fi
+if ! openrouter_adapter_probe_ok "${openrouter_adapter_path}"; then
+  printf 'installed harness-openrouter-agent failed its --probe check at %s\n' "${openrouter_adapter_path}" >&2
+  exit 1
+fi
 
 reconcile_shadowed_harness_binaries
 
 if [[ "${skip_codesign}" != "1" ]]; then
   command codesign --verify --strict --verbose=2 "${binary_path}" >/dev/null
   command codesign --verify --strict --verbose=2 "${codex_adapter_path}" >/dev/null
+  command codesign --verify --strict --verbose=2 "${openrouter_adapter_path}" >/dev/null
 fi
 
 warn_shadowed_harness_binaries
 
-printf 'installed harness %s at %s (with harness-codex-acp at %s)\n' \
-  "${installed_version}" "${binary_path}" "${codex_adapter_path}"
+printf 'installed harness %s at %s (with harness-codex-acp at %s and harness-openrouter-agent at %s)\n' \
+  "${installed_version}" "${binary_path}" "${codex_adapter_path}" "${openrouter_adapter_path}"
