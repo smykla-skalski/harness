@@ -34,9 +34,9 @@ struct AgentDetailRoleActionsSection: View {
 
   private var disabledReason: String {
     if isLeader {
-      "Transfer leadership before changing the leader's role or removing this agent."
+      "Transfer leadership before changing the leader's role or removing this agent"
     } else if !roleActionsAvailable {
-      "Role actions are unavailable for this session."
+      "Role actions are unavailable for this session"
     } else {
       ""
     }
@@ -48,15 +48,15 @@ struct AgentDetailRoleActionsSection: View {
         title: "Role actions unavailable",
         systemImage: "lock.slash",
         description: disabledReason,
-        nextStep: "Switch to a session that supports leadership changes.",
+        nextStep: "Switch to a session that supports leadership changes",
         tint: HarnessMonitorTheme.caution
       )
     } else if isLeader {
       AgentDetailEmptyState(
         title: "Leader role is fixed",
         systemImage: "crown",
-        description: "The leader role cannot be changed while this agent leads the session.",
-        nextStep: "Transfer leadership to another agent before removing this one.",
+        description: "The leader role cannot be changed while this agent leads the session",
+        nextStep: "Transfer leadership to another agent before removing this one",
         tint: HarnessMonitorTheme.warmAccent
       )
     } else {

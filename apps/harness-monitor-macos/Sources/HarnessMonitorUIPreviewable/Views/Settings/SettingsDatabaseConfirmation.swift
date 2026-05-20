@@ -31,12 +31,12 @@ enum DatabaseConfirmation: Equatable {
   var message: String {
     switch self {
     case .clearSessionCache:
-      "This removes all cached session and project data. Bookmarks, notes, and search history are preserved."
+      "This removes all cached session and project data. Bookmarks, notes, and search history are preserved"
     case .clearUserData:
       "This removes all bookmarks, notes, search history, and filter settings. "
-        + "Cached session data is preserved."
+        + "Cached session data is preserved"
     case .clearAllData:
-      "This removes all cached data and user data. This cannot be undone."
+      "This removes all cached data and user data. This cannot be undone"
     }
   }
 }

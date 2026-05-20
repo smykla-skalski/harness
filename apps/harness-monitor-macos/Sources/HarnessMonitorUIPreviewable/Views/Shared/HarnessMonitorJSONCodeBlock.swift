@@ -184,7 +184,7 @@ struct HarnessMonitorJSONPresentation: Equatable, Sendable {
       return Self(
         displayText: rawJSON,
         tokens: [.init(text: rawJSON, kind: .plain)],
-        errorMessage: "Could not format JSON. Showing raw payload."
+        errorMessage: "Could not format JSON. Showing raw payload"
       )
     }
 

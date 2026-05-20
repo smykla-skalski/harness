@@ -32,7 +32,7 @@ struct VoicePopoverConfigurationSummary: View {
         )
       }
 
-      Text("Change defaults in Settings > Voice.")
+      Text("Change defaults in Settings > Voice")
         .scaledFont(.caption)
         .foregroundStyle(HarnessMonitorTheme.secondaryInk)
     }
@@ -81,7 +81,7 @@ struct VoiceCaptureFailurePresentation: Equatable {
       title: "Voice Capture Failed",
       message: message,
       recoverySuggestion:
-        "Check microphone access and installed dictation languages in System Settings, then try again."
+        "Check microphone access and installed dictation languages in System Settings, then try again"
     )
   }
 
@@ -93,7 +93,7 @@ struct VoiceCaptureFailurePresentation: Equatable {
         message: message,
         recoverySuggestion:
           "Open System Settings > Privacy & Security > Microphone, allow Harness Monitor, "
-          + "then try recording again."
+          + "then try recording again"
       )
     case .speechAssetsUnavailable(let locale):
       self.init(
@@ -102,7 +102,7 @@ struct VoiceCaptureFailurePresentation: Equatable {
         recoverySuggestion:
           "Open Settings > Voice to confirm the selected locale, then open System Settings > "
           + "Keyboard > Dictation and download that language or switch to a supported English locale "
-          + "such as English (US). macOS does not have an on-device speech asset ready for \(locale)."
+          + "such as English (US). macOS does not have an on-device speech asset ready for \(locale)"
       )
     case .unsupportedLocale(let locale):
       self.init(
@@ -110,7 +110,7 @@ struct VoiceCaptureFailurePresentation: Equatable {
         message: message,
         recoverySuggestion:
           "Open Settings > Voice and choose a Speech-supported locale such as English (US), "
-          + "then try recording again. Harness Monitor asked for \(locale)."
+          + "then try recording again. Harness Monitor asked for \(locale)"
       )
     case .speechUnavailable:
       self.init(
@@ -118,14 +118,14 @@ struct VoiceCaptureFailurePresentation: Equatable {
         message: message,
         recoverySuggestion:
           "Make sure speech recognition and dictation are available on this Mac, install the "
-          + "required language assets in System Settings, then try recording again."
+          + "required language assets in System Settings, then try recording again"
       )
     case .noInputFormat, .couldNotCopyAudioBuffer, .couldNotConvertAudioBuffer:
       self.init(
         title: "Microphone Audio Unavailable",
         message: message,
         recoverySuggestion:
-          "Check the selected microphone in System Settings > Sound > Input, then try recording again."
+          "Check the selected microphone in System Settings > Sound > Input, then try recording again"
       )
     }
   }

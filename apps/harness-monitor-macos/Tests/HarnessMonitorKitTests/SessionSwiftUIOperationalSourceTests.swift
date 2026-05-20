@@ -57,7 +57,7 @@ struct SessionSwiftUIOperationalSourceTests {
     #expect(sidebarSource.contains("ProgressView()"))
     #expect(sidebarSource.contains("\"Loading session items\""))
     #expect(sidebarSource.contains("sessionWindowSidebarDeferredLoader"))
-    #expect(sidebarSource.contains("Agents, decisions, and tasks will appear shortly."))
+    #expect(sidebarSource.contains("Agents, decisions, and tasks will appear shortly"))
     #expect(!sidebarSource.contains("private var pendingSidebarList: some View"))
   }
 

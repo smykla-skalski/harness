@@ -244,7 +244,7 @@ struct TaskBoardDecisionRow: View {
         \(TaskBoardInlineCodeFormatter.displayText(for: primaryAction.title)).
         """
     }
-    return "Activate to review."
+    return "Activate to review"
   }
 }
 

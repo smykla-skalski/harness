@@ -50,7 +50,7 @@ struct AgentTranscriptRows: View {
       AgentDetailEmptyState(
         title: "No transcript yet",
         systemImage: "text.line.first.and.arrowtriangle.forward",
-        description: "Send an update below to start the conversation.",
+        description: "Send an update below to start the conversation",
         tint: HarnessMonitorTheme.secondaryInk
       )
     } else {

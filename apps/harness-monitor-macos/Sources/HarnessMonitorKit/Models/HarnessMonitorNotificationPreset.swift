@@ -25,7 +25,7 @@ public enum HarnessMonitorNotificationPreset: String, CaseIterable, Identifiable
       HarnessMonitorNotificationDraft(
         title: "Harness session finished",
         subtitle: "worker-codex",
-        body: "The selected session completed with a clean verdict.",
+        body: "The selected session completed with a clean verdict",
         threadIdentifier: "session-finished",
         targetContentIdentifier: "session-summary",
         filterCriteria: "session",
@@ -41,7 +41,7 @@ public enum HarnessMonitorNotificationPreset: String, CaseIterable, Identifiable
       HarnessMonitorNotificationDraft(
         title: "Review needed",
         subtitle: "leader-claude",
-        body: "Approve the next run step or reply with updated context.",
+        body: "Approve the next run step or reply with updated context",
         threadIdentifier: "manual-actions",
         targetContentIdentifier: "agent-action",
         filterCriteria: "action-required",
@@ -57,7 +57,7 @@ public enum HarnessMonitorNotificationPreset: String, CaseIterable, Identifiable
       HarnessMonitorNotificationDraft(
         title: "Timeline snapshot ready",
         subtitle: "Rich notification",
-        body: "A generated image attachment is included for visual testing.",
+        body: "A generated image attachment is included for visual testing",
         threadIdentifier: "timeline-snapshots",
         targetContentIdentifier: "timeline",
         filterCriteria: "image",

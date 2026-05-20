@@ -303,8 +303,8 @@ struct AgentDetailAssignmentSection: View {
       AgentDetailEmptyState(
         title: "No assignment yet",
         systemImage: "person.2.slash",
-        description: "This agent does not currently carry a persona or a task assignment.",
-        nextStep: "Send an update below or assign a task from the workspace board.",
+        description: "This agent does not currently carry a persona or a task assignment",
+        nextStep: "Send an update below or assign a task from the workspace board",
         tint: HarnessMonitorTheme.secondaryInk
       )
       .accessibilityIdentifier(HarnessMonitorAccessibility.agentDetailPersona)

@@ -141,7 +141,7 @@ enum HarnessMonitorNotificationRequestFactory {
     let content = UNMutableNotificationContent()
     content.title = "Harness Monitor"
     content.subtitle = "Agent permission required"
-    content.body = "Permission requested by \(agentName). Open the workspace."
+    content.body = "Permission requested by \(agentName). Open the workspace"
     content.threadIdentifier = HarnessMonitorAcpPermissionNotificationID.threadIdentifier
     content.categoryIdentifier = HarnessMonitorAcpPermissionNotificationID.categoryIdentifier
     content.interruptionLevel = .timeSensitive

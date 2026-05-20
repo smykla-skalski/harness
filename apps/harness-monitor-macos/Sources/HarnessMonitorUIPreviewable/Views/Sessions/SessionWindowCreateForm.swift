@@ -201,11 +201,11 @@ extension SessionWindowCreateForm {
   private var embeddedProviderDescription: String {
     if let option = selectedCapabilityOption, let choice = selectedTransportChoice {
       let summary = SessionWindowCreateFormCatalogs.transportSummary(option: option, choice: choice)
-      return "\(summary) Finish the remaining setup in the sections below."
+      return "\(summary) Finish the remaining setup in the sections below"
     }
     return
       "Choose how this agent starts. ACP is preferred when available; the remaining "
-      + "form sections hold the configuration details."
+      + "form sections hold the configuration details"
   }
 
   @ViewBuilder private var terminalConfigurationSections: some View {
@@ -213,7 +213,7 @@ extension SessionWindowCreateForm {
       terminalTransportChoicesSection(option: option)
     } else if !embedsRuntimeConfiguration, selectedCapabilityOption == nil {
       Section {
-        Text("Choose a provider in the middle pane to configure this agent.")
+        Text("Choose a provider in the middle pane to configure this agent")
           .scaledFont(.caption)
           .foregroundStyle(HarnessMonitorTheme.secondaryInk)
           .fixedSize(horizontal: false, vertical: true)
@@ -298,7 +298,7 @@ extension SessionWindowCreateForm {
   }
 
   private var advancedOverridesDescription: String {
-    "Use one argument per line for a command override; the first line is the executable."
+    "Use one argument per line for a command override; the first line is the executable"
   }
 
   @ViewBuilder
@@ -320,7 +320,7 @@ extension SessionWindowCreateForm {
         Text("Start with")
           .harnessNativeFormSectionHeader()
       } footer: {
-        Text("Choose whether this provider opens in Terminal or joins via ACP.")
+        Text("Choose whether this provider opens in Terminal or joins via ACP")
           .harnessNativeFormSectionFooter()
       }
     }
@@ -369,12 +369,12 @@ extension SessionWindowCreateForm {
           .equatable()
         }
       } else if normalizedLaunchSelection.isAcp {
-        Text("ACP uses the provider's configured defaults.")
+        Text("ACP uses the provider's configured defaults")
           .scaledFont(.caption)
           .foregroundStyle(HarnessMonitorTheme.secondaryInk)
           .fixedSize(horizontal: false, vertical: true)
       } else {
-        Text("This runtime does not publish additional model controls here.")
+        Text("This runtime does not publish additional model controls here")
           .scaledFont(.caption)
           .foregroundStyle(HarnessMonitorTheme.secondaryInk)
           .fixedSize(horizontal: false, vertical: true)

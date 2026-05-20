@@ -28,8 +28,8 @@ struct SleepPreventionToolbarPresentation: Equatable {
 
   var accessibilityHint: String {
     isEnabled
-      ? "Allows the system to sleep again."
-      : "Keeps the system awake while sessions are active."
+      ? "Allows the system to sleep again"
+      : "Keeps the system awake while sessions are active"
   }
 }
 

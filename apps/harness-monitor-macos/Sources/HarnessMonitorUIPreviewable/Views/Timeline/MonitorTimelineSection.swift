@@ -255,7 +255,7 @@ struct SessionTimelineView: View {
         ContentUnavailableView(
           "No Timeline Events",
           systemImage: "clock.arrow.circlepath",
-          description: Text("This session has not recorded timeline activity yet.")
+          description: Text("This session has not recorded timeline activity yet")
         )
         .padding(.horizontal, routeMetrics.contentPadding)
         .frame(maxWidth: .infinity, maxHeight: .infinity)

@@ -199,7 +199,7 @@ extension WebSocketTransport {
   public func agentTui(tuiID: String) async throws -> AgentTuiSnapshot {
     let snapshot = try await managedAgent(agentID: tuiID)
     guard let tui = snapshot.terminal else {
-      throw HarnessMonitorAPIError.server(code: 404, message: "Agents unavailable.")
+      throw HarnessMonitorAPIError.server(code: 404, message: "Agents unavailable")
     }
     return tui
   }
@@ -346,7 +346,7 @@ extension WebSocketTransport {
     guard let tui = snapshot.terminal else {
       throw HarnessMonitorAPIError.server(
         code: 500,
-        message: "Managed agent start did not return a terminal snapshot."
+        message: "Managed agent start did not return a terminal snapshot"
       )
     }
     return tui
@@ -358,7 +358,7 @@ extension WebSocketTransport {
   ) async throws -> AgentTuiSnapshot {
     let snapshot = try await sendManagedAgentInput(agentID: tuiID, request: request)
     guard let tui = snapshot.terminal else {
-      throw HarnessMonitorAPIError.server(code: 404, message: "Agents unavailable.")
+      throw HarnessMonitorAPIError.server(code: 404, message: "Agents unavailable")
     }
     return tui
   }
@@ -369,7 +369,7 @@ extension WebSocketTransport {
   ) async throws -> AgentTuiSnapshot {
     let snapshot = try await resizeManagedAgent(agentID: tuiID, request: request)
     guard let tui = snapshot.terminal else {
-      throw HarnessMonitorAPIError.server(code: 404, message: "Agents unavailable.")
+      throw HarnessMonitorAPIError.server(code: 404, message: "Agents unavailable")
     }
     return tui
   }
@@ -377,7 +377,7 @@ extension WebSocketTransport {
   public func stopAgentTui(tuiID: String) async throws -> AgentTuiSnapshot {
     let snapshot = try await stopManagedAgent(agentID: tuiID)
     guard let tui = snapshot.terminal else {
-      throw HarnessMonitorAPIError.server(code: 404, message: "Agents unavailable.")
+      throw HarnessMonitorAPIError.server(code: 404, message: "Agents unavailable")
     }
     return tui
   }

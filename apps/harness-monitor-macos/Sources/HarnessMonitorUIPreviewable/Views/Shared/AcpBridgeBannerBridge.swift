@@ -89,7 +89,7 @@ struct AcpBridgeBannerAnnouncement: Equatable {
       return nil
     }
     incidentID = state.firstDetectedAt
-    message = "ACP bridge outage. \(state.factText). \(AcpBridgeBannerState.blastRadiusText)."
+    message = "ACP bridge outage. \(state.factText). \(AcpBridgeBannerState.blastRadiusText)"
   }
 
   static func shouldAnnounce(

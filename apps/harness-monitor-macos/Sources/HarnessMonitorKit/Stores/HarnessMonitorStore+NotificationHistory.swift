@@ -49,7 +49,7 @@ extension HarnessMonitorStore {
       notificationHistoryRuntimeActions.removeAll()
       notificationHistoryEntries = []
       recordPersistenceFailure(
-        action: "Notification history could not be loaded.",
+        action: "Notification history could not be loaded",
         underlyingError: error
       )
     }
@@ -102,7 +102,7 @@ extension HarnessMonitorStore {
         supervisorBindings.notificationController?.openDecisionRequest(decisionID: decisionID)
           == true
       else {
-        presentFailureFeedback("Notification actions are unavailable.")
+        presentFailureFeedback("Notification actions are unavailable")
         return false
       }
       await mutateNotificationHistory(id: entryID) { entry in
@@ -116,7 +116,7 @@ extension HarnessMonitorStore {
         supervisorBindings.notificationController?.acknowledgeDecision(decisionID: decisionID)
           == true
       else {
-        presentFailureFeedback("Notification actions are unavailable.")
+        presentFailureFeedback("Notification actions are unavailable")
         return false
       }
       await mutateNotificationHistory(id: entryID) { entry in
@@ -129,7 +129,7 @@ extension HarnessMonitorStore {
       return true
     case .runtimeUndo(let token):
       guard let action = notificationHistoryRuntimeActions[token] else {
-        presentFailureFeedback("That undo action is no longer available.")
+        presentFailureFeedback("That undo action is no longer available")
         return false
       }
       await action()
@@ -248,7 +248,7 @@ extension HarnessMonitorStore {
       applyNotificationHistoryEntry(entry)
     } catch {
       recordPersistenceFailure(
-        action: "Notification history could not be saved.",
+        action: "Notification history could not be saved",
         underlyingError: error
       )
     }

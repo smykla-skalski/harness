@@ -48,7 +48,7 @@ public struct SettingsNotificationsSection: View {
       Text("System Status")
         .harnessNativeFormSectionHeader()
     } footer: {
-      Text("These values come from the system notification center for this app.")
+      Text("These values come from the system notification center for this app")
         .harnessNativeFormSectionFooter()
     }
     .accessibilityElement(children: .contain)
@@ -248,7 +248,7 @@ public struct SettingsNotificationsSection: View {
       Text("Native Options")
         .harnessNativeFormSectionHeader()
     } footer: {
-      Text("Time-sensitive delivery remains available when the system allows it.")
+      Text("Time-sensitive delivery remains available when the system allows it")
         .harnessNativeFormSectionFooter()
     }
   }

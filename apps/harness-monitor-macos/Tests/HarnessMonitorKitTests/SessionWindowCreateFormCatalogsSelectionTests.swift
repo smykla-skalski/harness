@@ -31,7 +31,7 @@ struct SessionWindowCreateFormCatalogsSelectionTests {
     )
     #expect(
       SessionWindowCreateProviderListRow.providerSubtitle(for: claude)
-        == "This provider opens in Terminal only."
+        == "This provider opens in Terminal only"
     )
   }
 

@@ -122,7 +122,7 @@ extension RecordingHarnessClient {
       return configuredDetail
     }
     guard detail.session.sessionId == id else {
-      throw HarnessMonitorAPIError.server(code: 404, message: "Session unavailable.")
+      throw HarnessMonitorAPIError.server(code: 404, message: "Session unavailable")
     }
     return detail
   }

@@ -26,12 +26,12 @@ actor PreviewHostBridgeState {
 
   func reconfigure(request: HostBridgeReconfigureRequest) throws -> BridgeStatusReport {
     guard var bridgeStatus else {
-      throw HarnessMonitorAPIError.server(code: 501, message: "Host bridge unavailable.")
+      throw HarnessMonitorAPIError.server(code: 501, message: "Host bridge unavailable")
     }
 
     switch reconfigureBehavior {
     case .unsupported:
-      throw HarnessMonitorAPIError.server(code: 501, message: "Host bridge unavailable.")
+      throw HarnessMonitorAPIError.server(code: 501, message: "Host bridge unavailable")
     case .missingRoute:
       throw HarnessMonitorAPIError.server(code: 404, message: "Route not found.")
     case .bridgeStopped:

@@ -79,17 +79,17 @@ struct PolicyCanvasInspectorEdgePinToggle: View {
   private var helpText: String {
     if isLockedByKind {
       return
-        "Error edges are always pinned. Change the edge kind to flow or control to unlock this control."
+        "Error edges are always pinned. Change the edge kind to flow or control to unlock this control"
     }
-    return "On keeps the current port side. Off lets the router pick the lowest-bend side."
+    return "On keeps the current port side. Off lets the router pick the lowest-bend side"
   }
 
   private var accessibilityHintText: String {
     if isLockedByKind {
       // VoiceOver already announces the disabled trait via `.disabled()`;
-      // the hint adds the *reason*, not the state. Leading with "Disabled."
+      // the hint adds the *reason*, not the state. Leading with "Disabled"
       // would double-announce.
-      return "Error edges are always pinned to prevent the router from relocating them."
+      return "Error edges are always pinned to prevent the router from relocating them"
     }
     return "Off lets the router pick the lowest-bend port side"
   }

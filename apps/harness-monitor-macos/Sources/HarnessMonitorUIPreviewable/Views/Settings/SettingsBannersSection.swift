@@ -13,14 +13,14 @@ public struct SettingsBannersSection: View {
           .accessibilityIdentifier(HarnessMonitorAccessibility.settingsPendingDecisionBannersToggle)
           .accessibilityLabel("Show pending decision banners")
           .accessibilityHint(
-            "When disabled, session windows hide the banner that highlights pending decisions."
+            "When disabled, session windows hide the banner that highlights pending decisions"
           )
       } header: {
         Text("Pending Decisions")
       } footer: {
         Text(
           "Controls the pending decision banner across session windows. "
-            + "Focus Mode has its own override when banners stay enabled here."
+            + "Focus Mode has its own override when banners stay enabled here"
         )
       }
     }

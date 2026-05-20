@@ -26,40 +26,40 @@ extension HarnessMonitorDependenciesClientProtocol {
   public func queryDependencyUpdates(
     request _: DependencyUpdatesQueryRequest
   ) async throws -> DependencyUpdatesQueryResponse {
-    throw HarnessMonitorAPIError.server(code: 501, message: "Dependencies unavailable.")
+    throw HarnessMonitorAPIError.server(code: 501, message: "Dependencies unavailable")
   }
 
   public func approveDependencyUpdates(
     request _: DependencyUpdatesApproveRequest
   ) async throws -> DependencyUpdatesActionResponse {
-    throw HarnessMonitorAPIError.server(code: 501, message: "Dependencies unavailable.")
+    throw HarnessMonitorAPIError.server(code: 501, message: "Dependencies unavailable")
   }
 
   public func mergeDependencyUpdates(
     request _: DependencyUpdatesMergeRequest
   ) async throws -> DependencyUpdatesActionResponse {
-    throw HarnessMonitorAPIError.server(code: 501, message: "Dependencies unavailable.")
+    throw HarnessMonitorAPIError.server(code: 501, message: "Dependencies unavailable")
   }
 
   public func rerunDependencyUpdateChecks(
     request _: DependencyUpdatesRerunChecksRequest
   ) async throws -> DependencyUpdatesActionResponse {
-    throw HarnessMonitorAPIError.server(code: 501, message: "Dependencies unavailable.")
+    throw HarnessMonitorAPIError.server(code: 501, message: "Dependencies unavailable")
   }
 
   public func addDependencyUpdateLabel(
     request _: DependencyUpdatesLabelRequest
   ) async throws -> DependencyUpdatesActionResponse {
-    throw HarnessMonitorAPIError.server(code: 501, message: "Dependencies unavailable.")
+    throw HarnessMonitorAPIError.server(code: 501, message: "Dependencies unavailable")
   }
 
   public func autoDependencyUpdates(
     request _: DependencyUpdatesAutoRequest
   ) async throws -> DependencyUpdatesActionResponse {
-    throw HarnessMonitorAPIError.server(code: 501, message: "Dependencies unavailable.")
+    throw HarnessMonitorAPIError.server(code: 501, message: "Dependencies unavailable")
   }
 
   public func clearDependencyUpdatesCache() async throws -> DependencyUpdatesCacheClearResponse {
-    throw HarnessMonitorAPIError.server(code: 501, message: "Dependencies unavailable.")
+    throw HarnessMonitorAPIError.server(code: 501, message: "Dependencies unavailable")
   }
 }

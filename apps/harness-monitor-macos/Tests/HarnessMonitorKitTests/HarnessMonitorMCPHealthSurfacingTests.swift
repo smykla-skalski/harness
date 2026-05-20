@@ -33,7 +33,7 @@ struct HarnessMonitorMCPHealthSurfacingTests {
     )
     #expect(
       status.failureFeedbackMessage?
-        .contains("You can keep working while the registry retries in the background.") == true
+        .contains("You can keep working while the registry retries in the background") == true
     )
   }
 
@@ -75,7 +75,7 @@ struct HarnessMonitorMCPHealthSurfacingTests {
     #expect(store.contentUI.chrome.mcpStatus == healthy)
     #expect(
       store.toast.activeFeedback.first?.message
-        == "MCP registry host recovered and is ready."
+        == "MCP registry host recovered and is ready"
     )
   }
 

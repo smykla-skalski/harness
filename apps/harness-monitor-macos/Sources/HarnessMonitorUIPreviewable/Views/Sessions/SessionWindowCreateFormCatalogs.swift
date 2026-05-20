@@ -175,26 +175,26 @@ enum SessionWindowCreateFormCatalogs {
     choice: AgentCapabilityTransportChoice
   ) -> String {
     if choice.id.isCodexNative {
-      return "Starts via Codex app server."
+      return "Starts via Codex app server"
     }
 
     if choice.id.isAcp {
-      return "Starts via ACP."
+      return "Starts via ACP"
     }
 
     switch option.availabilityState {
     case .projectAccessAvailable:
-      return "Opens in Terminal. ACP is also available."
+      return "Opens in Terminal. ACP is also available"
     case .checkingAccess:
-      return "Opens in Terminal while ACP is checked."
+      return "Opens in Terminal while ACP is checked"
     case .setupRequired:
-      return "Opens in Terminal. Set up ACP when you're ready."
+      return "Opens in Terminal. Set up ACP when you're ready"
     case .bridgeAccessRequired:
-      return "Opens in Terminal. Turn on bridge access to use ACP."
+      return "Opens in Terminal. Turn on bridge access to use ACP"
     case .terminalOnly:
-      return "Opens in Terminal."
+      return "Opens in Terminal"
     case .unavailable:
-      return option.projectAccessGuidanceText ?? "This provider isn't available yet."
+      return option.projectAccessGuidanceText ?? "This provider isn't available yet"
     }
   }
 
@@ -211,7 +211,7 @@ enum SessionWindowCreateFormCatalogs {
   ) -> String? {
     if choice.id.isCodexNative {
       return option.requiresCodexBridgeAccess
-        ? "Codex requires bridge setup. Open setup details below."
+        ? "Codex requires bridge setup. Open setup details below"
         : nil
     }
 
@@ -223,20 +223,20 @@ enum SessionWindowCreateFormCatalogs {
     case .projectAccessAvailable:
       return nil
     case .checkingAccess:
-      return "ACP is still being checked."
+      return "ACP is still being checked"
     case .setupRequired:
       if option.bundledWithHarness {
-        return "ACP ships with Harness. Install or update Harness to enable it here."
+        return "ACP ships with Harness. Install or update Harness to enable it here"
       }
-      return "ACP requires CLI setup. Copy install instructions below."
+      return "ACP requires CLI setup. Copy install instructions below"
     case .bridgeAccessRequired:
-      return "ACP requires bridge setup. Open setup details below."
+      return "ACP requires bridge setup. Open setup details below"
     case .terminalOnly:
-      return "ACP isn't available for this provider yet."
+      return "ACP isn't available for this provider yet"
     case .unavailable:
       return
         option.projectAccessGuidanceText
-        ?? "ACP isn't available for this provider yet."
+        ?? "ACP isn't available for this provider yet"
     }
   }
 
@@ -263,10 +263,10 @@ enum SessionWindowCreateFormCatalogs {
     personas: [AgentPersona]
   ) -> String {
     guard let persona = selectedPersona(personaID: personaID, personas: personas) else {
-      return "No persona selected."
+      return "No persona selected"
     }
 
-    return "Using \(persona.name)."
+    return "Using \(persona.name)"
   }
 
   @MainActor

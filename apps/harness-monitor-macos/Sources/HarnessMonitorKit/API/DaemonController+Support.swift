@@ -128,24 +128,24 @@ public enum DaemonControlError: Error, LocalizedError, Equatable {
   public var errorDescription: String? {
     switch self {
     case .harnessBinaryNotFound:
-      return "Unable to locate the bundled harness daemon helper."
+      return "Unable to locate the bundled harness daemon helper"
     case .manifestMissing:
-      return "The harness daemon manifest is missing."
+      return "The harness daemon manifest is missing"
     case .manifestUnreadable:
-      return "The harness daemon manifest could not be read."
+      return "The harness daemon manifest could not be read"
     case .invalidManifest(let message):
       return "The harness daemon manifest failed trust validation: \(message)"
     case .managedDaemonVersionMismatch(let expected, let actual):
       return
-        "The managed daemon is running version \(actual), but this app bundle expects \(expected)."
+        "The managed daemon is running version \(actual), but this app bundle expects \(expected)"
     case .daemonOffline:
-      return "The harness daemon is offline. Start the daemon to load live sessions."
+      return "The harness daemon is offline. Start the daemon to load live sessions"
     case .daemonDidNotStart:
-      return "The harness daemon did not become healthy before the timeout."
+      return "The harness daemon did not become healthy before the timeout"
     case .externalDaemonOffline:
-      return "Background helper is not running. Start it to load live sessions."
+      return "Background helper is not running. Start it to load live sessions"
     case .externalDaemonManifestStale:
-      return "Background helper stopped unexpectedly. Restart it to reconnect."
+      return "Background helper stopped unexpectedly. Restart it to reconnect"
     case .commandFailed(let message):
       return message
     }

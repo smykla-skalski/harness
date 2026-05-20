@@ -70,7 +70,7 @@ public struct SettingsHostBridgeSection: View {
       } footer: {
         Text(
           "Sandboxed monitor features use the shared host bridge. Start it once to enable every "
-            + "compiled capability, or narrow it with repeated --capability flags."
+            + "compiled capability, or narrow it with repeated --capability flags"
         )
         .harnessNativeFormSectionFooter()
       }
@@ -129,7 +129,7 @@ public struct SettingsHostBridgeSection: View {
             .textSelection(.enabled)
         }
       } else {
-        Text("Available to enable through the shared host bridge.")
+        Text("Available to enable through the shared host bridge")
           .scaledFont(.subheadline)
           .foregroundStyle(HarnessMonitorTheme.secondaryInk)
       }

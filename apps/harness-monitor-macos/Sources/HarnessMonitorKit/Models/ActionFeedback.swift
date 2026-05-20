@@ -36,7 +36,7 @@ public struct ActionFeedbackDetails: Equatable, Hashable, Sendable {
     command: String? = nil
   ) {
     self.disclosureLabel = disclosureLabel
-    self.summary = summary
+    self.summary = summary?.harnessMonitorTrimmedTrailingPeriod
     self.rows = rows
     self.command = command
   }
@@ -85,7 +85,7 @@ public struct ActionFeedback: Identifiable, Equatable, Hashable, Sendable {
   ) {
     self.id = id
     self.title = title
-    self.message = message
+    self.message = message.harnessMonitorTrimmedTrailingPeriod
     self.severity = severity
     self.details = details
     self.primaryAction = primaryAction

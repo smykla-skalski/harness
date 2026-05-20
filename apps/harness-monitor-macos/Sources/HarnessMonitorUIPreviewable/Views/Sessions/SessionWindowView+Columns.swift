@@ -140,9 +140,9 @@ extension SessionWindowView {
     let prefix: String
     switch reason {
     case .openedRoute:
-      prefix = "Showing first \(severity)."
+      prefix = "Showing first \(severity)"
     case .advancedToVisible:
-      prefix = "Previous decision closed. Showing next \(severity)."
+      prefix = "Previous decision closed. Showing next \(severity)"
     }
     AccessibilityNotification.Announcement("\(prefix) \(decision.summary)").post()
   }

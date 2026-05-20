@@ -96,19 +96,19 @@ struct LeaderTransferSheet: View {
   @ViewBuilder
   private func form(for detail: SessionDetail) -> some View {
     VStack(alignment: .leading, spacing: HarnessMonitorTheme.sectionSpacing) {
-      Text("Promote a live agent to leader when the current leader needs to step away.")
+      Text("Promote a live agent to leader when the current leader needs to step away")
         .scaledFont(.system(.footnote, design: .rounded, weight: .medium))
         .foregroundStyle(HarnessMonitorTheme.secondaryInk)
       if let pendingTransfer = detail.session.pendingLeaderTransfer {
         let timestamp = formatTimestamp(pendingTransfer.requestedAt)
         Text(
-          "\(pendingTransfer.requestedBy) requested \(pendingTransfer.newLeaderId) at \(timestamp)."
+          "\(pendingTransfer.requestedBy) requested \(pendingTransfer.newLeaderId) at \(timestamp)"
         )
         .scaledFont(.caption)
         .foregroundStyle(HarnessMonitorTheme.secondaryInk)
       }
       if detail.agents.isEmpty {
-        Text("Agent availability is still loading for this session.")
+        Text("Agent availability is still loading for this session")
           .scaledFont(.caption)
           .foregroundStyle(HarnessMonitorTheme.secondaryInk)
       } else {
@@ -161,7 +161,7 @@ struct LeaderTransferSheet: View {
       Image(systemName: "questionmark.circle")
         .font(.system(size: 36))
         .foregroundStyle(.secondary)
-      Text("Session unavailable.")
+      Text("Session unavailable")
         .scaledFont(.headline)
       Button("Dismiss") { dismiss() }
         .keyboardShortcut(.cancelAction)

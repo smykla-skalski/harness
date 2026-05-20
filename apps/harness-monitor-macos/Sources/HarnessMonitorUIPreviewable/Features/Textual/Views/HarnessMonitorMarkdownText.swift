@@ -177,7 +177,7 @@ private struct HarnessMonitorMarkdownUnorderedListMarker: StructuredText.Unorder
 
 private struct HarnessMonitorMarkdownOrderedListMarker: StructuredText.OrderedListMarker {
   func makeBody(configuration: Configuration) -> some View {
-    Text("\(configuration.ordinal).")
+    Text("\(configuration.ordinal)")
       .monospacedDigit()
       .foregroundStyle(HarnessMonitorTheme.accent)
       .fontWeight(.semibold)

@@ -28,7 +28,7 @@ public struct SettingsSupervisorRulesPane: View {
           ContentUnavailableView(
             "Rules unavailable",
             systemImage: "externaldrive.badge.exclamationmark",
-            description: Text("Rule overrides require a writable Monitor data store.")
+            description: Text("Rule overrides require a writable Monitor data store")
           )
         }
       } else {

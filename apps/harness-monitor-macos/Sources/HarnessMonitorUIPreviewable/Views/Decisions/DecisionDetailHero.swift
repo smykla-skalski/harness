@@ -80,7 +80,7 @@ struct DecisionDetailHero: View {
     let age = viewModel.formattedAge(reference: .now)
     let source = humanizedWorkspaceLabel(viewModel.decision.ruleID)
     let summary = viewModel.decision.summary
-    return "\(severity) decision. \(summary). Source \(source). \(age)."
+    return "\(severity) decision. \(summary). Source \(source). \(age)"
   }
 
   private func scopeItemTitle(_ deeplink: DecisionDetailViewModel.Deeplink) -> String {

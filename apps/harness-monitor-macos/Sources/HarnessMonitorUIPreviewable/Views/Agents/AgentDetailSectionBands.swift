@@ -138,8 +138,8 @@ struct AgentDetailActivityBand: View {
       if isSparseState {
         AgentDetailOperationalSummary(
           title: "Waiting for work",
-          summary: "No transcript or assignment is attached to this agent yet.",
-          nextStep: "Send an update below to give the agent a concrete next step."
+          summary: "No transcript or assignment is attached to this agent yet",
+          nextStep: "Send an update below to give the agent a concrete next step"
         )
       } else {
         AgentDetailAssignmentSection(

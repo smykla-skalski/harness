@@ -40,7 +40,7 @@ struct HarnessMonitorStoreExternalDaemonTests {
       Issue.record("Expected offline connection state, got \(store.connectionState)")
       return
     }
-    #expect(message == "Background helper is not running. Start it to load live sessions.")
+    #expect(message == "Background helper is not running. Start it to load live sessions")
   }
 
   @Test("Managed bootstrap still gates on launch agent registration state")
@@ -128,7 +128,7 @@ struct HarnessMonitorStoreExternalDaemonTests {
   func externalDaemonOfflineErrorMessageUsesShortCopy() {
     let error = DaemonControlError.externalDaemonOffline(manifestPath: "/tmp/x")
     let description = error.errorDescription ?? ""
-    #expect(description == "Background helper is not running. Start it to load live sessions.")
+    #expect(description == "Background helper is not running. Start it to load live sessions")
     #expect(!description.contains("/tmp/x"))
   }
 
@@ -138,7 +138,7 @@ struct HarnessMonitorStoreExternalDaemonTests {
       manifestPath: "/tmp/y/manifest.json"
     )
     let description = error.errorDescription ?? ""
-    #expect(description == "Background helper stopped unexpectedly. Restart it to reconnect.")
+    #expect(description == "Background helper stopped unexpectedly. Restart it to reconnect")
     #expect(!description.contains("/tmp/y/manifest.json"))
   }
 
@@ -160,7 +160,7 @@ struct HarnessMonitorStoreExternalDaemonTests {
       Issue.record("Expected offline connection state, got \(store.connectionState)")
       return
     }
-    #expect(message == "Background helper stopped. Restart it to reconnect.")
+    #expect(message == "Background helper stopped. Restart it to reconnect")
   }
 
   @Test("External bootstrap warns when SMAppService launch agent is still registered")

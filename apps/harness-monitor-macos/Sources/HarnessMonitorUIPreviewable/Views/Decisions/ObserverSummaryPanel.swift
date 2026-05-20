@@ -39,7 +39,7 @@ public struct ObserverSummaryPanel: View {
         .accessibilityAddTraits(.isHeader)
       Text(
         scope?.resultSummary
-          ?? "Stay on top of the decisions that need attention and the signals shaping them."
+          ?? "Stay on top of the decisions that need attention and the signals shaping them"
       )
       .scaledFont(.callout)
       .foregroundStyle(HarnessMonitorTheme.secondaryInk)
@@ -111,7 +111,7 @@ public struct ObserverSummaryEmptyState: View {
       Text("Signals will appear here")
         .scaledFont(.system(.headline, design: .rounded, weight: .semibold))
       Text(
-        "Open alerts, muted rules, and active work appear here once the session starts reporting them."
+        "Open alerts, muted rules, and active work appear here once the session starts reporting them"
       )
       .scaledFont(.callout)
       .foregroundStyle(HarnessMonitorTheme.secondaryInk)
@@ -228,7 +228,7 @@ private struct ObserverPanelDecisionQueueSection: View {
           ObserverPanelDecisionQueueRow(decision: decision)
         }
         if scope.visibleCount > 4 {
-          Text("\(scope.visibleCount - 4) more stay in the list.")
+          Text("\(scope.visibleCount - 4) more stay in the list")
             .scaledFont(.caption)
             .foregroundStyle(HarnessMonitorTheme.secondaryInk)
             .padding(.horizontal, HarnessMonitorTheme.spacingXS)

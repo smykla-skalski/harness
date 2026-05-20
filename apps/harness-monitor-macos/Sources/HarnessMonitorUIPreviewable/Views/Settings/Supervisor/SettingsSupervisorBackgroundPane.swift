@@ -33,7 +33,7 @@ public struct SettingsSupervisorBackgroundPane: View {
           )
         )
         Text(
-          "Keeps the background activity scheduler armed when all Harness Monitor windows are closed."
+          "Keeps the background activity scheduler armed when all Harness Monitor windows are closed"
         )
         .scaledFont(.caption)
         .foregroundStyle(.secondary)
@@ -71,8 +71,8 @@ public struct SettingsSupervisorBackgroundPane: View {
 
           Text(
             viewModel.isQuietHoursActive
-              ? "Quiet hours are active for the current local time."
-              : "Quiet hours are configured but not active right now."
+              ? "Quiet hours are active for the current local time"
+              : "Quiet hours are configured but not active right now"
           )
           .scaledFont(.caption)
           .foregroundStyle(.secondary)
@@ -81,7 +81,7 @@ public struct SettingsSupervisorBackgroundPane: View {
         Text("Quiet Hours")
           .harnessNativeFormSectionHeader()
       } footer: {
-        Text("Quiet hours use the current local clock and support overnight ranges.")
+        Text("Quiet hours use the current local clock and support overnight ranges")
           .harnessNativeFormSectionFooter()
       }
     }

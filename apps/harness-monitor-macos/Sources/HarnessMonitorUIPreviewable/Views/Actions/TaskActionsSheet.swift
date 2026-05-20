@@ -213,20 +213,20 @@ struct TaskActionsSheet: View {
       return reviewMessage
     }
     guard task.status == .open else {
-      return "Only open tasks can be assigned."
+      return "Only open tasks can be assigned"
     }
     guard !effectiveAssigneeID.isEmpty else {
-      return "No free worker is available."
+      return "No free worker is available"
     }
     return nil
   }
 
   private func genericTaskMutationUnavailableMessage(for task: WorkItem) -> String? {
     if task.status.isReviewManagedStatus {
-      return "Use the review controls for this task."
+      return "Use the review controls for this task"
     }
     if Self.isArbitrationBlocked(task) {
-      return "This task is waiting for leader arbitration."
+      return "This task is waiting for leader arbitration"
     }
     return nil
   }

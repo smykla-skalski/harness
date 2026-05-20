@@ -134,7 +134,7 @@ struct SessionAgentTuiPendingPromptBanner: View {
         ForEach(Array(prompt.questions.enumerated()), id: \.offset) { _, question in
           questionBlock(question)
         }
-        Text("Reply with the composer below to unblock the agent.")
+        Text("Reply with the composer below to unblock the agent")
           .scaledFont(.footnote)
           .foregroundStyle(.secondary)
           .padding(.top, 2)
@@ -191,7 +191,7 @@ struct SessionAgentTuiPendingPromptBanner: View {
         return question.question
       }
       let options = question.options.map(\.label).joined(separator: ", ")
-      return "\(question.question) Options: \(options)."
+      return "\(question.question) Options: \(options)"
     }
     return (["User input required"] + questions).joined(separator: " ")
   }

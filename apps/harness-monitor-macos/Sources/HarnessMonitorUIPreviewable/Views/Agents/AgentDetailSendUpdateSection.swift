@@ -207,7 +207,7 @@ struct AgentDetailSendUpdateSection: View {
         }
         AgentDetailFieldBlock(
           title: "Optional context",
-          help: "Add extra framing only if it helps the agent act on the update."
+          help: "Add extra framing only if it helps the agent act on the update"
         ) {
           TextField(
             "Constraints, acceptance criteria, or related context",

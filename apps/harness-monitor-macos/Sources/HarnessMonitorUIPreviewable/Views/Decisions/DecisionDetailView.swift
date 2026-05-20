@@ -211,7 +211,7 @@ public struct DecisionDetailView: View {
             viewModel.cancelSnooze()
           }
         } message: {
-          Text("Pause this decision for a fixed interval.")
+          Text("Pause this decision for a fixed interval")
         }
     } else {
       emptyState
@@ -287,7 +287,7 @@ public struct DecisionDetailView: View {
           .foregroundStyle(.secondary)
         Text("Select a decision")
           .font(.title3)
-        Text("Decisions and related activity appear here.")
+        Text("Decisions and related activity appear here")
           .font(.callout)
           .foregroundStyle(.secondary)
           .multilineTextAlignment(.center)

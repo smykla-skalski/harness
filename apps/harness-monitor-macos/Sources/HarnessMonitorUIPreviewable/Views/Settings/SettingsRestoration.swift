@@ -3,7 +3,7 @@ import SwiftUI
 
 public enum SettingsRestorationDefaults {
   public static let selectedSectionKey = "harness.settings.selectedSection"
-  private static let scrollOffsetKeyPrefix = "harness.settings.scrollOffset."
+  private static let scrollOffsetKeyPrefix = "harness.settings.scrollOffset"
 
   public static func initialSelectedSection(
     fallback: SettingsSection,

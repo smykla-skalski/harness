@@ -53,9 +53,9 @@ struct ExternalDaemonRecoveryFeedback {
     Self(
       title: "Restart background helper",
       message: "Monitor will reconnect to \(profileLabel) after you restart the helper in Terminal",
-      offlineMessage: "Background helper stopped. Restart it to reconnect.",
+      offlineMessage: "Background helper stopped. Restart it to reconnect",
       details: details(
-        summary: "Restarting replaces the stale daemon state; it does not delete lane data.",
+        summary: "Restarting replaces the stale daemon state; it does not delete lane data",
         manifestPath: manifestPath,
         daemonCommand: daemonCommand
       ),
@@ -70,10 +70,10 @@ struct ExternalDaemonRecoveryFeedback {
   ) -> Self {
     Self(
       title: "Start background helper",
-      message: "Start the helper in Terminal to load live sessions for \(profileLabel).",
-      offlineMessage: "Background helper is not running. Start it to load live sessions.",
+      message: "Start the helper in Terminal to load live sessions for \(profileLabel)",
+      offlineMessage: "Background helper is not running. Start it to load live sessions",
       details: details(
-        summary: "Use this command in Terminal when you want Monitor to reconnect.",
+        summary: "Use this command in Terminal when you want Monitor to reconnect",
         manifestPath: manifestPath,
         daemonCommand: daemonCommand
       ),
@@ -84,10 +84,10 @@ struct ExternalDaemonRecoveryFeedback {
   static func generic(daemonCommand: String, message: String? = nil) -> Self {
     Self(
       title: "Start background helper",
-      message: message ?? "Start the helper in Terminal to load live sessions.",
-      offlineMessage: message ?? "Background helper unavailable. Start it to load live sessions.",
+      message: message ?? "Start the helper in Terminal to load live sessions",
+      offlineMessage: message ?? "Background helper unavailable. Start it to load live sessions",
       details: details(
-        summary: "Use this command in Terminal when you want Monitor to reconnect.",
+        summary: "Use this command in Terminal when you want Monitor to reconnect",
         manifestPath: nil,
         daemonCommand: daemonCommand
       ),

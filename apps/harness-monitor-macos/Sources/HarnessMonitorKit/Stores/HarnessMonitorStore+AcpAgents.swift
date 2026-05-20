@@ -103,7 +103,7 @@ extension HarnessMonitorStore {
         request: request
       )
       guard let snapshot = acpAgentSnapshot(from: measuredSnapshot.value) else {
-        presentFailureFeedback("Agent controller returned an unexpected response.")
+        presentFailureFeedback("Agent controller returned an unexpected response")
         return nil
       }
       applyAcpAgentStartSuccess(snapshot, actionName: actionName)
@@ -198,7 +198,7 @@ extension HarnessMonitorStore {
   }
 
   static func acpAgentStartedInOtherSessionMessage(actionName: String) -> String {
-    "\(actionName) in another session. Reselect that session to view it."
+    "\(actionName) in another session. Reselect that session to view it"
   }
 
   private func measureAcpAgentStart(
@@ -324,7 +324,7 @@ extension HarnessMonitorStore {
         request: request
       )
       guard let snapshot = acpAgentSnapshot(from: measuredSnapshot.value) else {
-        presentFailureFeedback("Agent controller returned an unexpected response.")
+        presentFailureFeedback("Agent controller returned an unexpected response")
         return .failed
       }
       return .succeeded(snapshot)

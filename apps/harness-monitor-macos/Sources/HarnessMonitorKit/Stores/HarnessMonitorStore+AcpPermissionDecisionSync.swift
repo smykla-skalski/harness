@@ -53,7 +53,7 @@ extension HarnessMonitorStore {
       )
       if !didPresentFailure {
         self.presentFailureFeedback(
-          "ACP decisions fell out of sync with the Decisions queue. Refresh the session and try again."
+          "ACP decisions fell out of sync with the Decisions queue. Refresh the session and try again"
         )
         didPresentFailure = true
       }

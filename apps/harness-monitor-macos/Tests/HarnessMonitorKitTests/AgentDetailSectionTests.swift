@@ -151,7 +151,7 @@ struct AgentDetailSectionTests {
         actionUnavailableMessage: nil,
         trimmedCommand: SendUpdateAction.injectContext.rawCommand,
         trimmedMessage: "Follow up"
-      ) == "Read-only session — open a writable session to send updates."
+      ) == "Read-only session — open a writable session to send updates"
     )
     #expect(
       AgentDetailSendUpdateSection.statusMessage(
@@ -167,7 +167,7 @@ struct AgentDetailSectionTests {
         actionUnavailableMessage: nil,
         trimmedCommand: SendUpdateAction.injectContext.rawCommand,
         trimmedMessage: ""
-      ) == "Type a message to send."
+      ) == "Type a message to send"
     )
     #expect(
       AgentDetailSendUpdateSection.statusMessage(

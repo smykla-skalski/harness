@@ -37,7 +37,7 @@ struct SessionStatusStripState: Equatable {
         label: "BRIDGE",
         tone: bridgeRunning ? .success : .muted,
         accessibilityValue: bridgeRunning ? "Host bridge running" : "Host bridge stopped",
-        help: bridgeRunning ? "Built-in host bridge running." : "Built-in host bridge not running."
+        help: bridgeRunning ? "Built-in host bridge running" : "Built-in host bridge not running"
       )
     } else {
       bridge = nil

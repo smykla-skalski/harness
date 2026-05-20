@@ -336,7 +336,7 @@ struct SessionWindowAgentsList: View {
           ContentUnavailableView(
             "No Matching Agents",
             systemImage: SessionWindowRoute.agents.systemImage,
-            description: Text("No agents match the current search.")
+            description: Text("No agents match the current search")
           )
         } else {
           ContentUnavailableView("No Agents", systemImage: SessionWindowRoute.agents.systemImage)

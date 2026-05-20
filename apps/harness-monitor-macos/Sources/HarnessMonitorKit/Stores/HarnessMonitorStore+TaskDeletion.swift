@@ -100,7 +100,7 @@ extension HarnessMonitorStore {
         let remaining = taskIDs.count - index - 1
         presentFailureFeedback(
           "Deleted \(succeeded) of \(taskIDs.count) tasks. "
-            + "Stopped after a failure with \(remaining) not attempted."
+            + "Stopped after a failure with \(remaining) not attempted"
         )
         return false
       }
@@ -154,7 +154,7 @@ extension HarnessMonitorStore {
     if !didDeleteNotes, expectedNoteCount > 0 {
       let noteNoun = expectedNoteCount == 1 ? "note" : "notes"
       presentFailureFeedback(
-        "Task deleted, but \(expectedNoteCount) local workspace \(noteNoun) could not be removed."
+        "Task deleted, but \(expectedNoteCount) local workspace \(noteNoun) could not be removed"
       )
     }
     return true
@@ -178,7 +178,7 @@ extension HarnessMonitorStore {
       return try await userDataService.taskUserNoteCount(taskID: taskID, sessionID: sessionID)
     } catch {
       recordPersistenceFailure(
-        action: "Task note count could not be loaded.",
+        action: "Task note count could not be loaded",
         underlyingError: error
       )
       return 0
@@ -198,7 +198,7 @@ extension HarnessMonitorStore {
       return true
     } catch {
       recordPersistenceFailure(
-        action: "Task note changes could not be saved.",
+        action: "Task note changes could not be saved",
         underlyingError: error
       )
       return false

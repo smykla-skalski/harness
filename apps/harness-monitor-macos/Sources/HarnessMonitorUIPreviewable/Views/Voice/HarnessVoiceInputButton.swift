@@ -117,7 +117,7 @@ struct HarnessVoiceInputButton: View {
       }
       .frame(height: 22)
 
-      Text(completeTranscript.isEmpty ? "No transcript yet." : completeTranscript)
+      Text(completeTranscript.isEmpty ? "No transcript yet" : completeTranscript)
         .scaledFont(.body)
         .textSelection(.enabled)
         .frame(height: 96, alignment: .topLeading)

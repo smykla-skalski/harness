@@ -95,9 +95,9 @@ private struct NewSessionOfflinePlaceholder: View {
       Image(systemName: "exclamationmark.triangle")
         .font(.system(size: 36))
         .foregroundStyle(.secondary)
-      Text("New Session unavailable.")
+      Text("New Session unavailable")
         .font(.headline)
-      Text("Harness Monitor could not load project bookmark access for this sheet.")
+      Text("Harness Monitor could not load project bookmark access for this sheet")
         .foregroundStyle(.secondary)
       Button("Dismiss") {
         store.dismissSheet()

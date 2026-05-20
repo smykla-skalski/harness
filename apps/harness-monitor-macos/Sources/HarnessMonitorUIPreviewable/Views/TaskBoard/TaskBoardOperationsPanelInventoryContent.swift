@@ -128,7 +128,7 @@ struct TaskBoardOperationsPanelInventoryCard: View {
       if let audit = dashboard.taskBoardItemAuditSummary {
         auditPillsAndStatuses(audit)
       } else {
-        placeholder("Load a task-board audit to inspect readiness and status totals.")
+        placeholder("Load a task-board audit to inspect readiness and status totals")
       }
     }
   }
@@ -167,7 +167,7 @@ struct TaskBoardOperationsPanelInventoryCard: View {
     block(title: "Projects", systemImage: "folder") {
       if let projects = dashboard.taskBoardProjects {
         if projects.isEmpty {
-          placeholder("No matching projects.")
+          placeholder("No matching projects")
         } else {
           ForEach(projects.prefix(5)) { project in
             row(
@@ -177,7 +177,7 @@ struct TaskBoardOperationsPanelInventoryCard: View {
           }
         }
       } else {
-        placeholder("Load project summaries for the current board filter.")
+        placeholder("Load project summaries for the current board filter")
       }
     }
   }
@@ -186,7 +186,7 @@ struct TaskBoardOperationsPanelInventoryCard: View {
     block(title: "Machines", systemImage: "desktopcomputer") {
       if let machines = dashboard.taskBoardMachines {
         if machines.isEmpty {
-          placeholder("No matching machine modes.")
+          placeholder("No matching machine modes")
         } else {
           ForEach(machines.prefix(5)) { machine in
             row(
@@ -196,7 +196,7 @@ struct TaskBoardOperationsPanelInventoryCard: View {
           }
         }
       } else {
-        placeholder("Load machine summaries for the current board filter.")
+        placeholder("Load machine summaries for the current board filter")
       }
     }
   }

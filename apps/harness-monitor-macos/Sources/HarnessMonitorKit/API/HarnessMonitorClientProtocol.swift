@@ -241,14 +241,14 @@ extension HarnessMonitorClientProtocol {
   public func reconfigureHostBridge(
     request _: HostBridgeReconfigureRequest
   ) async throws -> BridgeStatusReport {
-    throw HarnessMonitorAPIError.server(code: 501, message: "Host bridge unavailable.")
+    throw HarnessMonitorAPIError.server(code: 501, message: "Host bridge unavailable")
   }
 
   public func adoptSession(
     bookmarkID _: String?,
     sessionRoot _: URL
   ) async throws -> SessionSummary {
-    throw HarnessMonitorAPIError.server(code: 501, message: "Session adoption unavailable.")
+    throw HarnessMonitorAPIError.server(code: 501, message: "Session adoption unavailable")
   }
 
   public func submitTaskForReview(
@@ -256,7 +256,7 @@ extension HarnessMonitorClientProtocol {
     taskID _: String,
     request _: TaskSubmitForReviewRequest
   ) async throws -> SessionDetail {
-    throw HarnessMonitorAPIError.server(code: 501, message: "Submit for review unavailable.")
+    throw HarnessMonitorAPIError.server(code: 501, message: "Submit for review unavailable")
   }
 
   public func claimTaskReview(
@@ -264,7 +264,7 @@ extension HarnessMonitorClientProtocol {
     taskID _: String,
     request _: TaskClaimReviewRequest
   ) async throws -> SessionDetail {
-    throw HarnessMonitorAPIError.server(code: 501, message: "Claim review unavailable.")
+    throw HarnessMonitorAPIError.server(code: 501, message: "Claim review unavailable")
   }
 
   public func submitTaskReview(
@@ -272,7 +272,7 @@ extension HarnessMonitorClientProtocol {
     taskID _: String,
     request _: TaskSubmitReviewRequest
   ) async throws -> SessionDetail {
-    throw HarnessMonitorAPIError.server(code: 501, message: "Submit review unavailable.")
+    throw HarnessMonitorAPIError.server(code: 501, message: "Submit review unavailable")
   }
 
   public func respondTaskReview(
@@ -280,7 +280,7 @@ extension HarnessMonitorClientProtocol {
     taskID _: String,
     request _: TaskRespondReviewRequest
   ) async throws -> SessionDetail {
-    throw HarnessMonitorAPIError.server(code: 501, message: "Respond review unavailable.")
+    throw HarnessMonitorAPIError.server(code: 501, message: "Respond review unavailable")
   }
 
   public func arbitrateTask(
@@ -288,14 +288,14 @@ extension HarnessMonitorClientProtocol {
     taskID _: String,
     request _: TaskArbitrateRequest
   ) async throws -> SessionDetail {
-    throw HarnessMonitorAPIError.server(code: 501, message: "Arbitration unavailable.")
+    throw HarnessMonitorAPIError.server(code: 501, message: "Arbitration unavailable")
   }
 
   public func applyImproverPatch(
     sessionID _: String,
     request _: ImproverApplyRequest
   ) async throws -> SessionDetail {
-    throw HarnessMonitorAPIError.server(code: 501, message: "Improver apply unavailable.")
+    throw HarnessMonitorAPIError.server(code: 501, message: "Improver apply unavailable")
   }
 
   public func sessionDetail(id: String) async throws -> SessionDetail {

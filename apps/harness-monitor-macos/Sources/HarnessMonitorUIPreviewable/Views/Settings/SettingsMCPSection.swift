@@ -32,7 +32,7 @@ public struct SettingsMCPSection: View {
             Text(
               forceEnabled
                 ? forceEnabledMessage
-                : "Turns the MCP accessibility registry host on or off."
+                : "Turns the MCP accessibility registry host on or off"
             )
           )
           .disabled(forceEnabled)
@@ -66,7 +66,7 @@ public struct SettingsMCPSection: View {
   private var forceEnabledMessage: String {
     let envVar = HarnessMonitorMCPSettingsDefaults.forceEnableEnvVar
     return "\(envVar) is set in this DEBUG build; the host is forced on "
-      + "regardless of the toggle."
+      + "regardless of the toggle"
   }
 
   private var footerAttributed: AttributedString {
@@ -85,7 +85,7 @@ public struct SettingsMCPSection: View {
           + "controls. MCP clients still resolve some live accessibility "
           + "queries and input actions through the bundled helper, and the "
           + "client process still needs Accessibility permission in System "
-          + "Settings."
+          + "Settings"
       )
     )
     return string

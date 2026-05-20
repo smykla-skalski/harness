@@ -6,12 +6,12 @@ extension HarnessVoiceInputButton {
     guard !model.isRecording else { return }
     model.failurePresentation = nil
     if remoteProcessorSinkEnabled, voiceSettings.remoteProcessorURL == nil {
-      model.statusText = "Remote processor endpoint must be HTTPS."
+      model.statusText = "Remote processor endpoint must be HTTPS"
       model.failurePresentation = VoiceCaptureFailurePresentation(
         title: "Remote Processor Unavailable",
-        message: "Remote processor endpoint must be a full HTTPS URL.",
+        message: "Remote processor endpoint must be a full HTTPS URL",
         recoverySuggestion:
-          "Open Settings > Voice, turn off Remote processor or save a full HTTPS endpoint, then try again."
+          "Open Settings > Voice, turn off Remote processor or save a full HTTPS endpoint, then try again"
       )
       return
     }

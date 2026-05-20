@@ -81,7 +81,7 @@ public struct NewOpenRouterAgentSheet: View {
     VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingXL) {
       fieldBlock(
         "Prompt",
-        help: "Required. This starts an OpenRouter session in the selected harness session."
+        help: "Required. This starts an OpenRouter session in the selected harness session"
       ) {
         HarnessMonitorMultilineTextField(
           placeholder: "Ask the model...",
@@ -199,13 +199,13 @@ public struct NewOpenRouterAgentSheet: View {
   private func submit() async {
     let trimmedPrompt = prompt.trimmingCharacters(in: .whitespacesAndNewlines)
     guard !trimmedPrompt.isEmpty else {
-      validationMessage = "Prompt is required."
+      validationMessage = "Prompt is required"
       focusedField = .prompt
       return
     }
     let modelID = effectiveModelID
     guard !modelID.isEmpty else {
-      validationMessage = "Pick a model or enter a custom id."
+      validationMessage = "Pick a model or enter a custom id"
       focusedField = .customModel
       return
     }

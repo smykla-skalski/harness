@@ -93,7 +93,7 @@ struct ToolCallTimelineView: View {
         )
       }
       if cachedPresentation.rows.isEmpty {
-        Text("No activity yet.")
+        Text("No activity yet")
           .scaledFont(.caption)
           .foregroundStyle(HarnessMonitorTheme.secondaryInk)
       } else {
@@ -318,7 +318,7 @@ struct ToolCallTimelineView: View {
     guard !capabilityTags.isEmpty else {
       return title
     }
-    return "\(title). Capabilities: \(capabilityTags.joined(separator: ", "))."
+    return "\(title). Capabilities: \(capabilityTags.joined(separator: ", "))"
   }
 
   static var accessibilityStateMarkerText: String {

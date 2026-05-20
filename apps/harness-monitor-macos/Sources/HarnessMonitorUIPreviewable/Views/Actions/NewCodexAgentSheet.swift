@@ -103,7 +103,7 @@ struct NewCodexAgentSheet: View {
     VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingXL) {
       fieldBlock(
         "Prompt",
-        help: "Required. This starts a Codex run in the current session."
+        help: "Required. This starts a Codex run in the current session"
       ) {
         HarnessMonitorMultilineTextField(
           placeholder: "Prompt",
@@ -242,7 +242,7 @@ struct NewCodexAgentSheet: View {
   private func submit() async {
     let trimmedPrompt = prompt.trimmingCharacters(in: .whitespacesAndNewlines)
     guard !trimmedPrompt.isEmpty else {
-      validationMessage = "Codex prompt is required."
+      validationMessage = "Codex prompt is required"
       focusedField = .prompt
       return
     }

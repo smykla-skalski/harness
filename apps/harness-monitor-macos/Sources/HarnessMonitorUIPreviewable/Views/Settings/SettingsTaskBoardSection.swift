@@ -140,7 +140,7 @@ struct SettingsTaskBoardSection: View, SettingsTaskBoardEditingSurface {
       Text("GitHub Project")
         .harnessNativeFormSectionHeader()
     } footer: {
-      Text("These settings control the automation repository that the orchestrator targets.")
+      Text("These settings control the automation repository that the orchestrator targets")
     }
   }
 
@@ -191,8 +191,8 @@ struct SettingsTaskBoardSection: View, SettingsTaskBoardEditingSurface {
         .harnessNativeFormSectionHeader()
     } footer: {
       VStack(alignment: .leading, spacing: 4) {
-        Text("These values affect daemon-managed author identity only.")
-        Text("Empty = use your git config defaults.")
+        Text("These values affect daemon-managed author identity only")
+        Text("Empty = use your git config defaults")
       }
     }
   }

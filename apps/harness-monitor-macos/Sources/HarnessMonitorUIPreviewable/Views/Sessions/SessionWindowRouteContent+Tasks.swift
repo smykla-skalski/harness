@@ -94,7 +94,7 @@ struct SessionWindowTasksList: View {
           ContentUnavailableView(
             "No Matching Tasks",
             systemImage: "checklist",
-            description: Text("No tasks match the current search.")
+            description: Text("No tasks match the current search")
           )
         } else {
           ContentUnavailableView("No Tasks", systemImage: "checklist")

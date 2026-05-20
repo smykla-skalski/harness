@@ -33,6 +33,15 @@ extension TaskBoardAPIClientTests {
     assertWebSocketResults(result)
   }
 
+  @Test("WebSocket transport uses dependency-updates RPC contract")
+  func webSocketTransportUsesDependencyUpdatesRPCContract() async throws {
+    let result = try await performDependencyUpdatesWebSocketContractCalls()
+
+    assertDependencyUpdatesWebSocketRPCContract(result.calls)
+    assertDependencyUpdatesWebSocketPayloadContract(result.calls)
+    assertDependencyUpdatesWebSocketResults(result)
+  }
+
   @Test("Recording client implements task-board orchestrator contract")
   func recordingClientImplementsTaskBoardOrchestratorContract() async throws {
     let client = RecordingHarnessClient()

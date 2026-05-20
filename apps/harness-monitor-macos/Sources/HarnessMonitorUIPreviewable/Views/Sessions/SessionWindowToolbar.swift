@@ -116,7 +116,7 @@ struct SessionWindowToolbar: ToolbarContent {
           HarnessMonitorAccessibility.sessionWindowFocusModeButton,
           label: "Focus mode",
           value: focusMode ? "On" : "Off",
-          hint: "Shows or hides secondary session columns.",
+          hint: "Shows or hides secondary session columns",
           pressAction: { toggleFocusMode() }
         )
       }

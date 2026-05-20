@@ -49,7 +49,7 @@ struct TaskActionsPickerSection: View {
         Text(task.status.title)
           .foregroundStyle(HarnessMonitorTheme.secondaryInk)
       }
-      Text("Review status changes are managed by the review flow.")
+      Text("Review status changes are managed by the review flow")
         .scaledFont(.caption)
         .foregroundStyle(HarnessMonitorTheme.secondaryInk)
     } else {
@@ -114,7 +114,7 @@ struct TaskActionsStatusRow: View {
 
   var body: some View {
     if let message = taskMutationUnavailableMessage {
-      Text("Status updates are unavailable while the task is in the review flow.")
+      Text("Status updates are unavailable while the task is in the review flow")
         .scaledFont(.footnote)
         .foregroundStyle(HarnessMonitorTheme.secondaryInk)
       Text(message)
@@ -149,7 +149,7 @@ struct TaskActionsUnavailableState: View {
       Image(systemName: "questionmark.circle")
         .font(.system(size: 36))
         .foregroundStyle(.secondary)
-      Text("Task unavailable.")
+      Text("Task unavailable")
         .scaledFont(.headline)
       Button("Dismiss") { dismiss() }
         .keyboardShortcut(.cancelAction)

@@ -52,7 +52,7 @@ public struct DecisionAuditTrailTab: View {
       VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingXS) {
         Text("No audit events yet")
           .scaledFont(.callout.weight(.semibold))
-        Text("Changes to this decision appear here as the workspace responds.")
+        Text("Changes to this decision appear here as the workspace responds")
           .scaledFont(.footnote)
           .foregroundStyle(HarnessMonitorTheme.secondaryInk)
           .fixedSize(horizontal: false, vertical: true)

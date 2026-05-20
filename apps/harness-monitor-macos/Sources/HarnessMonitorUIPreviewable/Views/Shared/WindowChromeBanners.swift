@@ -120,9 +120,9 @@ struct SessionDataAvailabilityBanner: View {
     case .unavailable(let reason):
       switch reason {
       case .daemonOffline:
-        return "Daemon is off. No persisted session snapshot is available yet."
+        return "Daemon is off. No persisted session snapshot is available yet"
       case .liveDataUnavailable:
-        return "Live session detail is unavailable and no persisted session snapshot is available."
+        return "Live session detail is unavailable and no persisted session snapshot is available"
       }
     }
   }
@@ -132,9 +132,9 @@ struct SessionDataAvailabilityBanner: View {
   ) -> String {
     switch reason {
     case .daemonOffline:
-      return "Daemon is off. Visible sessions are persisted snapshots and may be stale."
+      return "Daemon is off. Visible sessions are persisted snapshots and may be stale"
     case .liveDataUnavailable:
-      return "Showing persisted session data because live session detail is unavailable."
+      return "Showing persisted session data because live session detail is unavailable"
     }
   }
 
@@ -142,7 +142,7 @@ struct SessionDataAvailabilityBanner: View {
     guard let lastSnapshotAt else {
       return ""
     }
-    return " Last saved \(lastSnapshotAt.formatted(date: .abbreviated, time: .shortened))."
+    return " Last saved \(lastSnapshotAt.formatted(date: .abbreviated, time: .shortened))"
   }
 }
 
@@ -171,7 +171,7 @@ struct DaemonWireVersionSkewBanner: View {
 
   private var message: String {
     "Connected daemon speaks wire version \(observed); this build expects \(expected). "
-      + "Some features will be unavailable until the daemon is upgraded."
+      + "Some features will be unavailable until the daemon is upgraded"
   }
 }
 

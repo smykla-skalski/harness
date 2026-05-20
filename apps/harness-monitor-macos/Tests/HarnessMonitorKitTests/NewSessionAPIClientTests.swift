@@ -115,7 +115,7 @@ struct NewSessionAPIClientTests {
         return
       }
       #expect(code == 500)
-      #expect(message == "Managed Codex agent did not return a Codex snapshot.")
+      #expect(message == "Managed Codex agent did not return a Codex snapshot")
     }
   }
 

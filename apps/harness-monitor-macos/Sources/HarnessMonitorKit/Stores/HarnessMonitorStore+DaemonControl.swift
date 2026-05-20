@@ -114,10 +114,10 @@ extension HarnessMonitorStore {
           break
         case .requiresApproval:
           throw DaemonControlError.commandFailed(
-            "Launch agent needs approval in System Settings > General > Login Items."
+            "Launch agent needs approval in System Settings > General > Login Items"
           )
         case .notRegistered, .notFound:
-          throw DaemonControlError.commandFailed("Launch agent registration did not complete.")
+          throw DaemonControlError.commandFailed("Launch agent registration did not complete")
         }
         return try await daemonController.awaitManifestWarmUp(
           timeout: bootstrapWarmUpTimeout
@@ -206,12 +206,12 @@ extension HarnessMonitorStore {
     switch registrationState {
     case .requiresApproval:
       await applyLaunchAgentOfflineState(
-        reason: "Launch agent needs approval in System Settings > General > Login Items."
+        reason: "Launch agent needs approval in System Settings > General > Login Items"
       )
       return
     case .notRegistered, .notFound:
       await applyLaunchAgentOfflineState(
-        reason: "Launch agent registration did not complete."
+        reason: "Launch agent registration did not complete"
       )
       return
     case .enabled:

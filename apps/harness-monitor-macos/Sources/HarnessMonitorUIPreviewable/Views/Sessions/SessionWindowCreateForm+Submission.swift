@@ -366,7 +366,7 @@ extension SessionWindowCreateForm {
   @MainActor
   func createDecision(summary: String) async {
     guard let decisionStore = store.supervisorDecisionStore else {
-      validationResult = .init(message: "Decision store is unavailable.", field: .form)
+      validationResult = .init(message: "Decision store is unavailable", field: .form)
       return
     }
     let id = "manual-\(UUID().uuidString)"

@@ -9,15 +9,15 @@ extension HarnessMonitorStore {
   }
 
   private var actionChannelUnavailableMessage: String {
-    "The daemon action channel is unavailable. Refresh the session and try again."
+    "The daemon action channel is unavailable. Refresh the session and try again"
   }
 
   private var noSelectedSessionActionMessage: String {
-    "No session is selected. Choose a session and try again."
+    "No session is selected. Choose a session and try again"
   }
 
   var noResolvedActionActorMessage: String {
-    "No session actor is available yet. Wait for a leader or active agent to join, then try again."
+    "No session actor is available yet. Wait for a leader or active agent to join, then try again"
   }
 
   private var noSelectedLeaderMessage: String {

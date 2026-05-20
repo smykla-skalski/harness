@@ -41,6 +41,10 @@ extension HarnessMonitorUITestAccessibilityRegistryTests {
         == "harness.dashboard.dependencies.detail"
     )
     #expect(
+      HarnessMonitorAccessibility.dashboardDependenciesContentDetailDivider
+        == "harness.dashboard.dependencies.content-detail-divider"
+    )
+    #expect(
       HarnessMonitorAccessibility.dashboardDependenciesRefreshButton
         == "harness.dashboard.dependencies.refresh"
     )
@@ -170,6 +174,11 @@ extension HarnessMonitorUITestAccessibilityRegistryTests {
       dependenciesView.contains("HarnessMonitorAccessibility.dashboardDependenciesDetail")
     )
     #expect(
+      dependenciesView.contains(
+        "HarnessMonitorAccessibility.dashboardDependenciesContentDetailDivider"
+      )
+    )
+    #expect(
       dependenciesView.contains("HarnessMonitorAccessibility.dashboardDependenciesRefreshButton")
     )
     #expect(
@@ -189,6 +198,7 @@ extension HarnessMonitorUITestAccessibilityRegistryTests {
     #expect(
       dashboardView.contains("DashboardDependenciesRouteView(")
     )
+    #expect(dependenciesView.contains("SessionContentDetailSplitView("))
     #expect(dashboardToolbar.contains("SleepPreventionToolbarButton("))
     #expect(windowView.contains("HarnessMonitorAccessibility.sessionWindowShell"))
     #expect(

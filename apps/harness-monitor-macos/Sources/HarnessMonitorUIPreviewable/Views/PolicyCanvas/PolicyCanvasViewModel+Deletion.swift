@@ -94,7 +94,7 @@ extension PolicyCanvasViewModel {
       return PolicyCanvasDeletionRequest(
         selection: selection,
         title: "Delete group?",
-        message: "Delete \(group.title)? \(memberCount) node(s) will stay on the canvas.",
+        message: "Delete \(group.title)? \(memberCount) node(s) will stay on the canvas",
         confirmationTitle: "Delete Group"
       )
     }

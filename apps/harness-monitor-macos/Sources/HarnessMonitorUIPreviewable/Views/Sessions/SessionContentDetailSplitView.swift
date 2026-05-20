@@ -51,6 +51,7 @@ struct SessionContentDetailSplitView<Content: View, Detail: View>: View {
   @State private var liveContentWidth = SessionContentDetailSplitLayout.defaultContentWidth
   @State private var isDragging = false
   private let commitContentWidth: (Double) -> Void
+  private let dividerAccessibilityIdentifier: String
   private let content: Content
   private let detail: Detail
 
@@ -58,6 +59,7 @@ struct SessionContentDetailSplitView<Content: View, Detail: View>: View {
     contentWidth: Binding<Double>,
     perfOverrideContentWidth: Binding<Double?> = .constant(nil),
     commitContentWidth: @escaping (Double) -> Void,
+    dividerAccessibilityIdentifier: String = HarnessMonitorAccessibility.sessionWindowContentDetailDivider,
     @ViewBuilder content: () -> Content,
     @ViewBuilder detail: () -> Detail
   ) {
@@ -65,6 +67,7 @@ struct SessionContentDetailSplitView<Content: View, Detail: View>: View {
     _perfOverrideContentWidth = perfOverrideContentWidth
     _liveContentWidth = State(wrappedValue: contentWidth.wrappedValue)
     self.commitContentWidth = commitContentWidth
+    self.dividerAccessibilityIdentifier = dividerAccessibilityIdentifier
     self.content = content()
     self.detail = detail()
   }
@@ -88,7 +91,8 @@ struct SessionContentDetailSplitView<Content: View, Detail: View>: View {
           contentWidth: $liveContentWidth,
           isDragging: $isDragging,
           commitContentWidth: commitContentWidth,
-          widthRange: contentRange
+          widthRange: contentRange,
+          accessibilityIdentifier: dividerAccessibilityIdentifier
         )
 
         detail
@@ -149,6 +153,7 @@ private struct SessionContentDetailDivider: View {
   @Binding var isDragging: Bool
   let commitContentWidth: (Double) -> Void
   let widthRange: ClosedRange<Double>
+  let accessibilityIdentifier: String
   @FocusState private var isKeyboardFocused: Bool
   @ScaledMetric(relativeTo: .body)
   private var interactiveWidth = 24.0
@@ -233,7 +238,7 @@ private struct SessionContentDetailDivider: View {
     .contentShape(Rectangle())
     .focusable(interactions: .activate)
     .focused($isKeyboardFocused)
-    .help("Drag or use the arrow keys to resize the content and detail panes.")
+    .help("Drag or use the arrow keys to resize the content and detail panes")
     .gesture(dragGesture)
     .onHover { isHovering in
       isHovered = isHovering
@@ -254,9 +259,9 @@ private struct SessionContentDetailDivider: View {
         break
       }
     }
-    .accessibilityIdentifier(HarnessMonitorAccessibility.sessionWindowContentDetailDivider)
+    .accessibilityIdentifier(accessibilityIdentifier)
     .accessibilityFrameMarker(
-      "\(HarnessMonitorAccessibility.sessionWindowContentDetailDivider).frame"
+      "\(accessibilityIdentifier).frame"
     )
   }
 

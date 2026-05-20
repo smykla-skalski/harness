@@ -107,7 +107,7 @@ struct TaskBoardOperationsDispatchCard: View, TaskBoardOperationsHost {
       if cachedPresentation.didFilterOut {
         Text(
           "No items match this host's project types (\(formattedLocalHostProjectTypes)). "
-            + "Set host project types in Settings or clear an item's Routes To list."
+            + "Set host project types in Settings or clear an item's Routes To list"
         )
         .font(captionFont)
         .foregroundStyle(HarnessMonitorTheme.caution)
@@ -132,7 +132,7 @@ struct TaskBoardOperationsDispatchCard: View, TaskBoardOperationsHost {
       }
 
       if !dryRun {
-        Text("Live dispatch creates session work and requires confirmation.")
+        Text("Live dispatch creates session work and requires confirmation")
           .font(captionFont)
           .foregroundStyle(HarnessMonitorTheme.caution)
           .padding(.top, HarnessMonitorTheme.spacingSM)

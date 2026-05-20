@@ -185,12 +185,12 @@ public struct DecisionWorkspaceScope: Equatable {
       return presentation.emptyStateDescription
     }
     if totalCount == 0 {
-      return "This area fills in when the workspace needs attention."
+      return "This area fills in when the workspace needs attention"
     }
     if hasActiveFilters {
-      return "Clear filters or broaden the search scope to bring decisions back into view."
+      return "Clear filters or broaden the search scope to bring decisions back into view"
     }
-    return "Broaden the search scope to bring decisions back into view."
+    return "Broaden the search scope to bring decisions back into view"
   }
 
   private var trimmedQuery: String {

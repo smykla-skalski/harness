@@ -65,7 +65,7 @@ extension SessionAgentDetailSection {
   }
 
   nonisolated static let noAvailableActionActorMessage =
-    "No session actor is available yet. Wait for a leader or active agent to join, then try again."
+    "No session actor is available yet. Wait for a leader or active agent to join, then try again"
 
   nonisolated static func draftCommandKey(sessionID: String, agentID: String) -> String {
     "harness.session.agentDraft.\(sessionID).\(agentID).command"

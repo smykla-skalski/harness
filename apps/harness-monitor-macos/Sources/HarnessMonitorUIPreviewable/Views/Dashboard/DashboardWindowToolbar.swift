@@ -44,7 +44,7 @@ extension DashboardWindowToolbar {
     .harnessMCPButton(
       HarnessMonitorAccessibility.dashboardNewSessionButton,
       label: "New Session",
-      hint: "Create a new session.",
+      hint: "Create a new session",
       pressAction: { store.presentedSheet = .newSession }
     )
   }
@@ -65,7 +65,7 @@ extension DashboardWindowToolbar {
     .harnessMCPButton(
       HarnessMonitorAccessibility.dashboardOpenFolderButton,
       label: "Open Folder",
-      hint: "Open a project folder.",
+      hint: "Open a project folder",
       pressAction: { store.requestOpenFolder() }
     )
   }

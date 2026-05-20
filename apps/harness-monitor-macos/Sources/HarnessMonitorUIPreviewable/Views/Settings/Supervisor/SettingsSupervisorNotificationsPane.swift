@@ -90,14 +90,14 @@ public struct SettingsSupervisorNotificationsPane: View {
       LabeledContent("Notification permission", value: acpAuthorizationStatus.displayTitle)
         .accessibilityIdentifier(HarnessMonitorAccessibility.settingsAcpCatalogPermission)
       if viewModel.acpCatalogForcedByEnvironment {
-        Text("Managed by HARNESS_FEATURE_ACP environment value.")
+        Text("Managed by HARNESS_FEATURE_ACP environment value")
           .scaledFont(.caption)
           .foregroundStyle(HarnessMonitorTheme.secondaryInk)
       }
     } header: {
       Text("ACP Catalog")
     } footer: {
-      Text("When enabled, ACP catalog surfaces can request Notification Center permission.")
+      Text("When enabled, ACP catalog surfaces can request Notification Center permission")
     }
   }
 

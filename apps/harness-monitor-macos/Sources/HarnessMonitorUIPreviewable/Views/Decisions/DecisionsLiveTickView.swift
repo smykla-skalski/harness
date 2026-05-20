@@ -27,7 +27,7 @@ public struct DecisionsLiveTickView: View {
         }
       }
       if snapshot.quarantinedRuleIDs.isEmpty {
-        Text("No paused checks.")
+        Text("No paused checks")
           .scaledFont(.callout)
           .foregroundStyle(HarnessMonitorTheme.secondaryInk)
       } else {

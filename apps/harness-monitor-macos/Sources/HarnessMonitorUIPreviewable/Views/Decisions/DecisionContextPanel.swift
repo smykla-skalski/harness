@@ -36,7 +36,7 @@ public struct DecisionContextPanel: View {
           .scaledFont(.callout.weight(.semibold))
         Text(
           "This decision does not include additional notes yet. "
-            + "Check the history or related workspace activity instead."
+            + "Check the history or related workspace activity instead"
         )
         .scaledFont(.footnote)
         .foregroundStyle(HarnessMonitorTheme.secondaryInk)

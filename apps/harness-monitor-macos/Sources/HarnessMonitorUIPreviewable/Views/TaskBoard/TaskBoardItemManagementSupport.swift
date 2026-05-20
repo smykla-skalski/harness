@@ -252,7 +252,7 @@ private struct TaskBoardTextualDescriptionContent: View {
               rendering: mode.rendering
             )
           } else {
-            Text("Add a description to preview it here.")
+            Text("Add a description to preview it here")
               .scaledFont(.caption)
               .foregroundStyle(HarnessMonitorTheme.secondaryInk)
               .frame(maxWidth: .infinity, alignment: .leading)

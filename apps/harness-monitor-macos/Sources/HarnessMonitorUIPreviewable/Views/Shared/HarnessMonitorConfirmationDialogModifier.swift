@@ -157,7 +157,7 @@ public struct HarnessMonitorConfirmationDialogModifier: ViewModifier {
       attached to these tasks will be deleted with them.
       """
     case .interruptCodexRun(_, _, let runTitle):
-      "This interrupts the active Codex run for \"\(runTitle)\". The current turn stops immediately."
+      "This interrupts the active Codex run for \"\(runTitle)\". The current turn stops immediately"
     case nil:
       ""
     }

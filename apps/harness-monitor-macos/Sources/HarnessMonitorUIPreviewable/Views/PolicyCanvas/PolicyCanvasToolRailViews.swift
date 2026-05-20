@@ -116,7 +116,7 @@ private struct PolicyCanvasPaletteButton: View {
         NSCursor.pop()
       }
     }
-    .help("Drag onto the canvas, or click to drop near the center.")
+    .help("Drag onto the canvas, or click to drop near the center")
     .accessibilityIdentifier(HarnessMonitorAccessibility.policyCanvasPaletteItem(kind.rawValue))
   }
 }

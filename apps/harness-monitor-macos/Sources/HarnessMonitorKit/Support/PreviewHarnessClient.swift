@@ -176,7 +176,7 @@ public final class PreviewHarnessClient: HarnessMonitorClientProtocol, Sendable 
 
   public func codexRun(runID: String) async throws -> CodexRunSnapshot {
     guard let run = await state.codexRun(runID: runID) else {
-      throw HarnessMonitorAPIError.server(code: 404, message: "Codex run unavailable.")
+      throw HarnessMonitorAPIError.server(code: 404, message: "Codex run unavailable")
     }
     return run
   }
@@ -187,7 +187,7 @@ public final class PreviewHarnessClient: HarnessMonitorClientProtocol, Sendable 
 
   public func managedAgent(agentID: String) async throws -> ManagedAgentSnapshot {
     guard let snapshot = await state.managedAgent(agentID: agentID) else {
-      throw HarnessMonitorAPIError.server(code: 404, message: "Managed agent unavailable.")
+      throw HarnessMonitorAPIError.server(code: 404, message: "Managed agent unavailable")
     }
     return snapshot
   }
@@ -273,7 +273,7 @@ public final class PreviewHarnessClient: HarnessMonitorClientProtocol, Sendable 
         decision: request.decision
       )
     else {
-      throw HarnessMonitorAPIError.server(code: 404, message: "Codex run unavailable.")
+      throw HarnessMonitorAPIError.server(code: 404, message: "Codex run unavailable")
     }
     return run
   }

@@ -75,7 +75,7 @@ struct PolicyCanvasTopBar: View {
         }
         .harnessActionButtonStyle(variant: .bordered, tint: .orange)
         .controlSize(.small)
-        .help("Apply the latest pipeline from the dashboard and discard local edits.")
+        .help("Apply the latest pipeline from the dashboard and discard local edits")
         .accessibilityIdentifier(HarnessMonitorAccessibility.policyCanvasReloadButton)
       }
 

@@ -74,7 +74,7 @@ struct TaskBoardItemRoutesToEditor: View {
       }
       Text(
         "Items with no entries route to every host. Add a project type to limit dispatch to "
-          + "hosts that declare it."
+          + "hosts that declare it"
       )
       .font(caption2Font)
       .foregroundStyle(HarnessMonitorTheme.secondaryInk)

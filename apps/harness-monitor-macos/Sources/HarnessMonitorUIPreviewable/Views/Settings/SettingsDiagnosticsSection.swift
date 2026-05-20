@@ -248,12 +248,12 @@ private struct SettingsAcpPermissionLogSection: View {
                 clearError(run.id)
                 onRevealed(
                   run.id,
-                  "Reveal requested in Finder."
+                  "Reveal requested in Finder"
                 )
               } else {
                 onError(
                   run.id,
-                  "ACP permission log for this run is unavailable."
+                  "ACP permission log for this run is unavailable"
                 )
               }
             }

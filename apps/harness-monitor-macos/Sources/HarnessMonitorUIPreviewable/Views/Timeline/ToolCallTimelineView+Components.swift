@@ -230,7 +230,7 @@ struct ToolCallTimelineRow: Identifiable, Equatable, Sendable {
 
   var announcementText: String {
     let actor = agentDisplayName ?? "Agent"
-    let suffix = formattedStopReason.map { ". \($0)." } ?? ""
+    let suffix = formattedStopReason.map { ". \($0)" } ?? ""
     switch status {
     case .started: return "\(actor) started \(title)\(suffix)"
     case .completed: return "\(actor) completed \(title)\(suffix)"

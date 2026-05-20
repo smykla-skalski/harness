@@ -80,7 +80,7 @@ extension HarnessMonitorMCPAccessibilityService {
       bundleIdentifier: localPingInfo.bundleIdentifier,
       message:
         "A newer Harness Monitor MCP registry host is taking ownership of this socket. "
-        + "Stop listening and reregister your windows and elements against the replacement host."
+        + "Stop listening and reregister your windows and elements against the replacement host"
     )
 
     do {

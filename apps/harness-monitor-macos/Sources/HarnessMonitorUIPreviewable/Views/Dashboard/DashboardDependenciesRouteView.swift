@@ -40,6 +40,8 @@ struct DashboardDependenciesRouteView: View {
   private var persistedPrimarySelectionID = ""
   @SceneStorage("dashboard.dependencies.collapsed-repositories")
   private var collapsedRepositoriesStorage = ""
+  @SceneStorage("dashboard.dependencies.content-detail-width")
+  private var contentDetailWidth = SessionContentDetailSplitLayout.defaultContentWidth
 
   @State private var response = DependencyUpdatesQueryResponse(
     fetchedAt: "",
@@ -129,34 +131,25 @@ struct DashboardDependenciesRouteView: View {
 
   private var summarySubtitle: String {
     guard let fetchedAt = parsedDate(response.fetchedAt) else {
-      return response.fromCache ? "Showing cached results." : "Dependencies from configured sources."
+      return response.fromCache ? "Showing cached results" : "Dependencies from configured sources"
     }
     let timestamp = dependenciesTimestampFormatter.string(from: fetchedAt)
     let relative = dependenciesRelativeFormatter.localizedString(for: fetchedAt, relativeTo: .now)
     return response.fromCache
-      ? "Cached at \(timestamp) (\(relative))."
-      : "Last refreshed \(timestamp) (\(relative))."
+      ? "Cached at \(timestamp) (\(relative))"
+      : "Last refreshed \(timestamp) (\(relative))"
   }
 
   var body: some View {
-    HSplitView {
-      VStack(alignment: .leading, spacing: 16) {
-        summaryCard
-        filterBar
-        if let notice {
-          noticeBanner(notice)
-        }
-        if let errorMessage, !isLoading {
-          errorState(message: errorMessage)
-        } else {
-          dependenciesList
-        }
-      }
-      .frame(minWidth: 340, idealWidth: 420, maxWidth: 520)
-      .padding(24)
-
+    SessionContentDetailSplitView(
+      contentWidth: $contentDetailWidth,
+      commitContentWidth: { contentDetailWidth = $0 },
+      dividerAccessibilityIdentifier:
+        HarnessMonitorAccessibility.dashboardDependenciesContentDetailDivider
+    ) {
+      contentPane
+    } detail: {
       detailPane
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
     .frame(maxWidth: .infinity, maxHeight: .infinity)
     .accessibilityIdentifier(HarnessMonitorAccessibility.dashboardDependenciesRoot)
@@ -171,6 +164,28 @@ struct DashboardDependenciesRouteView: View {
     }
     .onChange(of: selectedIDs) { _, newValue in
       persistedPrimarySelectionID = newValue.sorted().first ?? persistedPrimarySelectionID
+    }
+  }
+
+  private var contentPane: some View {
+    VStack(alignment: .leading, spacing: 16) {
+      summaryCard
+      filterBar
+      if let notice {
+        noticeBanner(notice)
+      }
+      contentListPane
+    }
+    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+    .padding(24)
+  }
+
+  @ViewBuilder private var contentListPane: some View {
+    if let errorMessage, !isLoading {
+      errorState(message: errorMessage)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+    } else {
+      dependenciesList
     }
   }
 
@@ -241,57 +256,11 @@ struct DashboardDependenciesRouteView: View {
   }
 
   private var filterControls: some View {
-    ViewThatFits(in: .horizontal) {
-      HStack(alignment: .center, spacing: HarnessMonitorTheme.spacingSM) {
-        filterPicker
-        sortAndGroupControls
-      }
-      VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
-        filterPicker
-        sortAndGroupControls
-      }
-    }
-  }
-
-  private var filterPicker: some View {
-    Picker("Filter", selection: $filterModeRaw) {
-      ForEach(DashboardDependenciesFilterMode.allCases) { mode in
-        Text(mode.title).tag(mode.rawValue)
-      }
-    }
-    .pickerStyle(.segmented)
-    .accessibilityIdentifier(HarnessMonitorAccessibility.dashboardDependenciesSelectionStatus)
-  }
-
-  private var sortAndGroupControls: some View {
-    ViewThatFits(in: .horizontal) {
-      HStack(alignment: .center, spacing: HarnessMonitorTheme.spacingSM) {
-        sortPicker
-        groupPicker
-      }
-      VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
-        sortPicker
-        groupPicker
-      }
-    }
-  }
-
-  private var sortPicker: some View {
-    Picker("Sort", selection: $sortModeRaw) {
-      ForEach(DashboardDependenciesSortMode.allCases) { mode in
-        Text(mode.title).tag(mode.rawValue)
-      }
-    }
-    .pickerStyle(.menu)
-  }
-
-  private var groupPicker: some View {
-    Picker("Group", selection: $groupModeRaw) {
-      ForEach(DashboardDependenciesGroupMode.allCases) { mode in
-        Text(mode.title).tag(mode.rawValue)
-      }
-    }
-    .pickerStyle(.menu)
+    DashboardDependenciesControlStrip(
+      filterModeRaw: $filterModeRaw,
+      sortModeRaw: $sortModeRaw,
+      groupModeRaw: $groupModeRaw
+    )
   }
 
   private var routeActions: some View {
@@ -333,7 +302,7 @@ struct DashboardDependenciesRouteView: View {
         ContentUnavailableView {
           Label("No dependency updates", systemImage: "shippingbox")
         } description: {
-          Text("Adjust your filters or configure a broader source scope.")
+          Text("Adjust your filters or configure a broader source scope")
         }
         .frame(maxWidth: .infinity, minHeight: 280)
       } else if groupMode == .repository {
@@ -356,6 +325,7 @@ struct DashboardDependenciesRouteView: View {
     }
     .listStyle(.sidebar)
     .accessibilityIdentifier(HarnessMonitorAccessibility.dashboardDependenciesList)
+    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     .overlay {
       if isLoading {
         ProgressView("Loading dependencies…")
@@ -378,11 +348,12 @@ struct DashboardDependenciesRouteView: View {
         ContentUnavailableView {
           Label("Select a dependency update", systemImage: "sidebar.right")
         } description: {
-          Text("Review checks, approvals, labels, and native actions without leaving the dashboard.")
+          Text("Review checks, approvals, labels, and native actions without leaving the dashboard")
         }
       }
     }
     .accessibilityIdentifier(HarnessMonitorAccessibility.dashboardDependenciesDetail)
+    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
   }
 
   private var batchDetail: some View {
@@ -396,7 +367,7 @@ struct DashboardDependenciesRouteView: View {
       scrollSurfaceLabel: "Dependencies detail"
     ) {
       VStack(alignment: .leading, spacing: 24) {
-        detailCard(title: "\(selectedItems.count) selected", subtitle: "Run batch dependency actions across the current selection.") {
+        detailCard(title: "\(selectedItems.count) selected", subtitle: "Run batch dependency actions across the current selection") {
           dependencyActionBar(items: selectedItems)
         }
       }
@@ -421,7 +392,7 @@ struct DashboardDependenciesRouteView: View {
         detailMetrics(for: item)
         detailSection("Checks") {
           if item.checks.isEmpty {
-            Text("No checks reported.")
+            Text("No checks reported")
               .foregroundStyle(HarnessMonitorTheme.secondaryInk)
           } else {
             ForEach(item.checks) { check in
@@ -437,7 +408,7 @@ struct DashboardDependenciesRouteView: View {
         }
         detailSection("Reviews") {
           if item.reviews.isEmpty {
-            Text("No reviews yet.")
+            Text("No reviews yet")
               .foregroundStyle(HarnessMonitorTheme.secondaryInk)
           } else {
             ForEach(item.reviews) { review in
@@ -453,7 +424,7 @@ struct DashboardDependenciesRouteView: View {
         }
         detailSection("Labels") {
           if item.labels.isEmpty {
-            Text("No labels applied.")
+            Text("No labels applied")
               .foregroundStyle(HarnessMonitorTheme.secondaryInk)
           } else {
             HarnessMonitorWrapLayout(
@@ -749,7 +720,7 @@ struct DashboardDependenciesRouteView: View {
   private func reload(forceRefresh: Bool, backgroundRefresh: Bool = false) async {
     guard let client = store.apiClient else {
       if !backgroundRefresh || response.items.isEmpty {
-        errorMessage = "The dependencies route needs a daemon client."
+        errorMessage = "The dependencies route needs a daemon client"
       }
       return
     }
@@ -793,7 +764,7 @@ struct DashboardDependenciesRouteView: View {
     do {
       let cleared = try await client.clearDependencyUpdatesCache()
       notice = DashboardDependenciesNotice(
-        title: "Cleared \(cleared.clearedEntries) cached dependency query bucket(s).",
+        title: "Cleared \(cleared.clearedEntries) cached dependency query bucket(s)",
         tint: HarnessMonitorTheme.secondaryInk,
         systemImage: "trash"
       )
@@ -878,7 +849,7 @@ struct DashboardDependenciesRouteView: View {
             )
           ],
           planning: TaskBoardPlanningState(
-            summary: "Repair dependency-update CI failures and restore mergeability."
+            summary: "Repair dependency-update CI failures and restore mergeability"
           )
         )
       )
@@ -935,7 +906,7 @@ struct DashboardDependenciesRouteView: View {
       .map(\.url)
     guard !links.isEmpty else {
       notice = DashboardDependenciesNotice(
-        title: "No approval links are needed for the current scope.",
+        title: "No approval links are needed for the current scope",
         tint: HarnessMonitorTheme.secondaryInk,
         systemImage: "doc.on.doc"
       )
@@ -943,7 +914,7 @@ struct DashboardDependenciesRouteView: View {
     }
     HarnessMonitorClipboard.copy(links.joined(separator: "\n"))
     notice = DashboardDependenciesNotice(
-      title: "Copied \(links.count) approval link(s).",
+      title: "Copied \(links.count) approval link(s)",
       tint: HarnessMonitorTheme.accent,
       systemImage: "doc.on.doc"
     )
@@ -972,6 +943,52 @@ private struct DashboardDependenciesNotice {
   let title: String
   let tint: Color
   let systemImage: String
+}
+
+private struct DashboardDependenciesControlStrip: View {
+  @Binding var filterModeRaw: String
+  @Binding var sortModeRaw: String
+  @Binding var groupModeRaw: String
+
+  var body: some View {
+    HarnessMonitorWrapLayout(
+      spacing: HarnessMonitorTheme.spacingSM,
+      lineSpacing: HarnessMonitorTheme.spacingSM
+    ) {
+      filterPicker
+      sortPicker
+      groupPicker
+    }
+    .frame(maxWidth: .infinity, alignment: .leading)
+  }
+
+  private var filterPicker: some View {
+    Picker("Filter", selection: $filterModeRaw) {
+      ForEach(DashboardDependenciesFilterMode.pickerCases) { mode in
+        Text(mode.title).tag(mode.rawValue)
+      }
+    }
+    .pickerStyle(.segmented)
+    .accessibilityIdentifier(HarnessMonitorAccessibility.dashboardDependenciesSelectionStatus)
+  }
+
+  private var sortPicker: some View {
+    Picker("Sort", selection: $sortModeRaw) {
+      ForEach(DashboardDependenciesSortMode.pickerCases) { mode in
+        Text(mode.title).tag(mode.rawValue)
+      }
+    }
+    .pickerStyle(.menu)
+  }
+
+  private var groupPicker: some View {
+    Picker("Group", selection: $groupModeRaw) {
+      ForEach(DashboardDependenciesGroupMode.pickerCases) { mode in
+        Text(mode.title).tag(mode.rawValue)
+      }
+    }
+    .pickerStyle(.menu)
+  }
 }
 
 struct DashboardDependenciesPreferences: Codable, Equatable {
@@ -1162,6 +1179,8 @@ private enum DashboardDependenciesFilterMode: String, CaseIterable, Identifiable
   case waiting
   case blocked
 
+  static let pickerCases: [Self] = [.all, .ready, .review, .waiting, .blocked]
+
   var id: String { rawValue }
 
   var title: String {
@@ -1189,6 +1208,8 @@ private enum DashboardDependenciesSortMode: String, CaseIterable, Identifiable {
   case status
   case age
   case repository
+
+  static let pickerCases: [Self] = [.status, .age, .repository]
 
   var id: String { rawValue }
 
@@ -1220,6 +1241,8 @@ private enum DashboardDependenciesSortMode: String, CaseIterable, Identifiable {
 private enum DashboardDependenciesGroupMode: String, CaseIterable, Identifiable {
   case repository
   case flat
+
+  static let pickerCases: [Self] = [.repository, .flat]
 
   var id: String { rawValue }
 

@@ -13,7 +13,7 @@ extension DecisionDetailView {
         .scaledFont(.caption.bold())
         .foregroundStyle(HarnessMonitorTheme.secondaryInk)
       if effectiveActions.isEmpty {
-        Text("No actions are available for this decision yet.")
+        Text("No actions are available for this decision yet")
           .scaledFont(.callout)
           .foregroundStyle(HarnessMonitorTheme.secondaryInk)
       } else {
