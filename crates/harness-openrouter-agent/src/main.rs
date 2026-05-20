@@ -8,13 +8,22 @@
 //!
 //! `--probe` returns immediately so `harness doctor` can detect the binary
 //! without bringing up the full async runtime.
+//!
+//! The OpenRouter API key arrives via `--api-key-file PATH`: the daemon
+//! creates a mode-0600 file in a per-spawn random tempdir, writes the key
+//! from its Monitor-synced in-memory cache, and the bridge reads + immediately
+//! unlinks it inside `run_stdio`. Environment variables are deliberately NOT
+//! a delivery channel — they leak to grand-children and show up in
+//! `/proc/<pid>/environ`.
 
+use std::path::PathBuf;
 use std::process::ExitCode;
 
 use clap::Parser;
 
 /// Entry-point CLI surface. The harness daemon launches the binary with
-/// `--stdio`; the catalog descriptor's doctor probe uses `--probe`.
+/// `--stdio --api-key-file PATH`; the catalog descriptor's doctor probe uses
+/// `--probe`.
 #[derive(Debug, Parser)]
 #[command(name = "harness-openrouter-agent", version)]
 struct Cli {
@@ -25,6 +34,12 @@ struct Cli {
     /// Print success and exit. Used by `harness doctor` to detect installation.
     #[arg(long, conflicts_with = "stdio")]
     probe: bool,
+
+    /// Path to a mode-0600 file containing the OpenRouter API key. The shim
+    /// reads the file then immediately unlinks it. The daemon prepares this
+    /// file from its in-memory token cache before each spawn.
+    #[arg(long, conflicts_with = "probe")]
+    api_key_file: Option<PathBuf>,
 }
 
 fn main() -> ExitCode {
@@ -46,7 +61,7 @@ fn main() -> ExitCode {
             return ExitCode::from(2);
         }
     };
-    match runtime.block_on(harness_openrouter_agent::acp::run_stdio()) {
+    match runtime.block_on(harness_openrouter_agent::acp::run_stdio(cli.api_key_file)) {
         Ok(()) => ExitCode::SUCCESS,
         Err(error) => {
             tracing::error!(%error, "openrouter ACP bridge exited with error");
@@ -57,9 +72,8 @@ fn main() -> ExitCode {
 
 fn init_tracing() -> Result<(), String> {
     use tracing_subscriber::EnvFilter;
-    let filter = EnvFilter::try_from_env("HARNESS_OPENROUTER_LOG").unwrap_or_else(|_| {
-        EnvFilter::new("harness_openrouter_agent=info,warn")
-    });
+    let filter = EnvFilter::try_from_env("HARNESS_OPENROUTER_LOG")
+        .unwrap_or_else(|_| EnvFilter::new("harness_openrouter_agent=info,warn"));
     tracing_subscriber::fmt()
         .with_writer(std::io::stderr)
         .with_env_filter(filter)

@@ -9,6 +9,7 @@
 //! ACP event loop keeps servicing other messages — most importantly the
 //! `session/cancel` notification — while a turn is in flight.
 
+use std::path::PathBuf;
 use std::sync::Arc;
 use uuid::Uuid;
 
@@ -19,23 +20,35 @@ use agent_client_protocol::schema::{
 use agent_client_protocol::util::internal_error;
 use agent_client_protocol::{Agent, ConnectionTo, Dispatch, Stdio};
 
-use crate::openrouter::{AgentConfig, ConfigError, OpenRouterClient};
+use crate::openrouter::{AgentConfig, ConfigError, OpenRouterClient, discard_api_key_file};
 
 use super::model_catalog::{DEFAULT_MODEL_ID, build_session_models};
 use super::session::{SessionState, SessionStore};
 use super::turn::drive_turn;
 
-/// Run the ACP agent server on stdio until the client disconnects.
+/// Run the ACP agent server on stdio until the client disconnects. The
+/// daemon-supplied `api_key_file` carries the OpenRouter API key (Monitor →
+/// keychain → daemon in-memory → daemon-written tempfile). The file is
+/// unlinked immediately after the key is read, so it never lingers past
+/// startup. A `None` value is rejected — the shim refuses to run without a
+/// credential.
 ///
 /// # Errors
 /// Returns an error if the underlying ACP connection terminates abnormally
-/// or the `OPENROUTER_API_KEY` environment variable is missing at startup.
-pub async fn run_stdio() -> Result<(), agent_client_protocol::Error> {
+/// or the `api_key_file` is missing, unreadable, or empty.
+pub async fn run_stdio(
+    api_key_file: Option<PathBuf>,
+) -> Result<(), agent_client_protocol::Error> {
     let store = SessionStore::new();
-    let config = match AgentConfig::from_env() {
+    let path = api_key_file.ok_or_else(|| config_error(ConfigError::MissingApiKeyFile))?;
+    let config = match AgentConfig::from_api_key_file(&path) {
         Ok(config) => Arc::new(config),
-        Err(error) => return Err(config_error(error)),
+        Err(error) => {
+            discard_api_key_file(&path);
+            return Err(config_error(error));
+        }
     };
+    discard_api_key_file(&path);
 
     let store_new = store.clone();
     let config_new = config.clone();
