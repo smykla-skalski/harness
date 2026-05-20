@@ -10,7 +10,9 @@ use crate::daemon::protocol::{
     VoiceAudioChunkRequest, VoiceSessionFinishRequest, VoiceSessionStartRequest,
     VoiceTranscriptUpdateRequest, http_paths,
 };
-use crate::daemon::voice::{append_audio_chunk, append_transcript, finish_session, start_session};
+use crate::daemon::voice::{
+    append_audio_chunk, append_transcript_async, finish_session_async, start_session_async,
+};
 
 use super::DaemonHttpState;
 use super::auth::authorize_control_request;
@@ -43,7 +45,7 @@ async fn post_voice_session(
         http_paths::SESSION_VOICE_START,
         &request_id,
         start,
-        start_session(&session_id, &request),
+        start_session_async(&session_id, &request).await,
     )
 }
 
@@ -83,7 +85,7 @@ async fn post_voice_transcript(
         http_paths::VOICE_TRANSCRIPT_APPEND,
         &request_id,
         start,
-        append_transcript(&voice_session_id, &request),
+        append_transcript_async(&voice_session_id, &request).await,
     )
 }
 
@@ -103,6 +105,6 @@ async fn post_voice_finish(
         http_paths::VOICE_FINISH,
         &request_id,
         start,
-        finish_session(&voice_session_id, &request),
+        finish_session_async(&voice_session_id, &request).await,
     )
 }

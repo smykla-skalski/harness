@@ -6,6 +6,7 @@ use base64::engine::general_purpose::STANDARD;
 use chrono::{DateTime, Duration as ChronoDuration, Utc};
 use fs_err as fs;
 use serde::{Deserialize, Serialize};
+use tokio::task::spawn_blocking;
 use uuid::Uuid;
 
 use crate::errors::{CliError, CliErrorKind};
@@ -91,6 +92,22 @@ pub fn start_session(
     })
 }
 
+/// Start a session-scoped voice-processing record on a blocking worker.
+///
+/// # Errors
+/// Returns `CliError` when the sink request is invalid or the metadata cannot be persisted.
+pub async fn start_session_async(
+    harness_session_id: &str,
+    request: &VoiceSessionStartRequest,
+) -> Result<VoiceSessionStartResponse, CliError> {
+    let harness_session_id = harness_session_id.to_string();
+    let request = request.clone();
+    run_voice_blocking("start voice session", move || {
+        start_session(&harness_session_id, &request)
+    })
+    .await
+}
+
 /// Persist and optionally forward a live audio chunk.
 ///
 /// # Errors
@@ -99,16 +116,48 @@ pub async fn append_audio_chunk(
     voice_session_id: &str,
     request: &VoiceAudioChunkRequest,
 ) -> Result<VoiceSessionMutationResponse, CliError> {
-    cleanup_session_after_error(
+    cleanup_session_after_error_async(
         voice_session_id,
         append_audio_chunk_inner(voice_session_id, request).await,
     )
+    .await
 }
 
 async fn append_audio_chunk_inner(
     voice_session_id: &str,
     request: &VoiceAudioChunkRequest,
 ) -> Result<VoiceSessionMutationResponse, CliError> {
+    let record = persist_audio_chunk_async(voice_session_id, request).await?;
+
+    if record
+        .accepted_sinks
+        .contains(&VoiceProcessingSink::RemoteProcessor)
+    {
+        forward_chunk_to_remote(&record, request).await?;
+    }
+
+    Ok(VoiceSessionMutationResponse {
+        voice_session_id: voice_session_id.to_string(),
+        status: "recording".into(),
+    })
+}
+
+async fn persist_audio_chunk_async(
+    voice_session_id: &str,
+    request: &VoiceAudioChunkRequest,
+) -> Result<VoiceSessionRecord, CliError> {
+    let voice_session_id = voice_session_id.to_string();
+    let request = request.clone();
+    run_voice_blocking("append voice audio chunk", move || {
+        persist_audio_chunk(&voice_session_id, &request)
+    })
+    .await
+}
+
+fn persist_audio_chunk(
+    voice_session_id: &str,
+    request: &VoiceAudioChunkRequest,
+) -> Result<VoiceSessionRecord, CliError> {
     let mut record = read_record(voice_session_id)?;
     if request.sequence != record.last_sequence + 1 {
         return Err(CliErrorKind::workflow_parse(format!(
@@ -147,18 +196,7 @@ async fn append_audio_chunk_inner(
     record.last_sequence = request.sequence;
     record.updated_at = Some(utc_now());
     write_record(&record)?;
-
-    if record
-        .accepted_sinks
-        .contains(&VoiceProcessingSink::RemoteProcessor)
-    {
-        forward_chunk_to_remote(&record, request).await?;
-    }
-
-    Ok(VoiceSessionMutationResponse {
-        voice_session_id: voice_session_id.to_string(),
-        status: "recording".into(),
-    })
+    Ok(record)
 }
 
 /// Persist a live transcript update for the voice session.
@@ -189,6 +227,22 @@ fn append_transcript_inner(
     })
 }
 
+/// Persist a live transcript update for the voice session on a blocking worker.
+///
+/// # Errors
+/// Returns `CliError` when the transcript file cannot be updated.
+pub async fn append_transcript_async(
+    voice_session_id: &str,
+    request: &VoiceTranscriptUpdateRequest,
+) -> Result<VoiceSessionMutationResponse, CliError> {
+    let voice_session_id = voice_session_id.to_string();
+    let request = request.clone();
+    run_voice_blocking("append voice transcript", move || {
+        append_transcript(&voice_session_id, &request)
+    })
+    .await
+}
+
 /// Finish or cancel a voice session and clean up transient audio data.
 ///
 /// # Errors
@@ -207,6 +261,22 @@ pub fn finish_session(
         voice_session_id: voice_session_id.to_string(),
         status: status.into(),
     })
+}
+
+/// Finish or cancel a voice session and clean up transient audio data on a blocking worker.
+///
+/// # Errors
+/// Returns `CliError` when cleanup fails.
+pub async fn finish_session_async(
+    voice_session_id: &str,
+    request: &VoiceSessionFinishRequest,
+) -> Result<VoiceSessionMutationResponse, CliError> {
+    let voice_session_id = voice_session_id.to_string();
+    let request = request.clone();
+    run_voice_blocking("finish voice session", move || {
+        finish_session(&voice_session_id, &request)
+    })
+    .await
 }
 
 /// Remove abandoned voice-session artifacts from prior crashed or disconnected flows.
@@ -379,6 +449,30 @@ fn cleanup_session_after_error<T>(
         let _ = remove_session_dir(&session_dir(voice_session_id));
     }
     result
+}
+
+async fn cleanup_session_after_error_async<T: Send>(
+    voice_session_id: &str,
+    result: Result<T, CliError>,
+) -> Result<T, CliError> {
+    if result.is_err() {
+        let dir = session_dir(voice_session_id);
+        let _ = run_voice_blocking("clean up failed voice session", move || {
+            remove_session_dir(&dir)
+        })
+        .await;
+    }
+    result
+}
+
+async fn run_voice_blocking<T, F>(operation: &'static str, work: F) -> Result<T, CliError>
+where
+    T: Send + 'static,
+    F: FnOnce() -> Result<T, CliError> + Send + 'static,
+{
+    spawn_blocking(work).await.unwrap_or_else(|error| {
+        Err(CliErrorKind::workflow_io(format!("{operation} worker failed: {error}")).into())
+    })
 }
 
 fn cleanup_abandoned_sessions_at(now: &DateTime<Utc>) -> Result<(), CliError> {

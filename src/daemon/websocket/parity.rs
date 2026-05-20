@@ -19,7 +19,9 @@ use crate::daemon::protocol::{
     bind_control_plane_actor_value,
 };
 use crate::daemon::service;
-use crate::daemon::voice::{append_audio_chunk, append_transcript, finish_session, start_session};
+use crate::daemon::voice::{
+    append_audio_chunk, append_transcript_async, finish_session_async, start_session_async,
+};
 use crate::errors::{CliError, CliErrorKind};
 use crate::sandbox;
 use crate::workspace::adopter::AdoptionOutcome;

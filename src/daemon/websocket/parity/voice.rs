@@ -1,8 +1,8 @@
 use super::{
     DaemonHttpState, VoiceAudioChunkRequest, VoiceSessionFinishRequest, VoiceSessionStartRequest,
-    VoiceTranscriptUpdateRequest, WsRequest, WsResponse, append_audio_chunk, append_transcript,
-    bind_control_plane_actor_value, dispatch_query_result, error_response, extract_session_id,
-    extract_string_param, finish_session, start_session,
+    VoiceTranscriptUpdateRequest, WsRequest, WsResponse, append_audio_chunk,
+    append_transcript_async, bind_control_plane_actor_value, dispatch_query_result, error_response,
+    extract_session_id, extract_string_param, finish_session_async, start_session_async,
 };
 
 pub(crate) async fn dispatch_voice_start_session(
@@ -24,7 +24,7 @@ pub(crate) async fn dispatch_voice_start_session(
             );
         }
     };
-    dispatch_query_result(&request.id, start_session(&session_id, &body))
+    dispatch_query_result(&request.id, start_session_async(&session_id, &body).await)
 }
 
 pub(crate) async fn dispatch_voice_append_audio(
@@ -71,7 +71,10 @@ pub(crate) async fn dispatch_voice_append_transcript(
             );
         }
     };
-    dispatch_query_result(&request.id, append_transcript(&voice_session_id, &body))
+    dispatch_query_result(
+        &request.id,
+        append_transcript_async(&voice_session_id, &body).await,
+    )
 }
 
 pub(crate) async fn dispatch_voice_finish_session(
@@ -93,5 +96,8 @@ pub(crate) async fn dispatch_voice_finish_session(
             );
         }
     };
-    dispatch_query_result(&request.id, finish_session(&voice_session_id, &body))
+    dispatch_query_result(
+        &request.id,
+        finish_session_async(&voice_session_id, &body).await,
+    )
 }
