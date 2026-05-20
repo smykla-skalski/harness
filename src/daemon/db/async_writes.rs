@@ -384,6 +384,7 @@ async fn replace_agents(
                         ManagedAgentKind::Tui => "tui",
                         ManagedAgentKind::Acp => "acp",
                         ManagedAgentKind::Codex => "codex",
+                        ManagedAgentKind::OpenRouter => "openrouter",
                     }),
             )
             .bind(

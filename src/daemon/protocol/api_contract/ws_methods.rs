@@ -103,6 +103,7 @@ pub const MANAGED_AGENT_PROMPT_OPENROUTER: &str = "managed_agent.prompt_openrout
 pub const MANAGED_AGENT_CANCEL_OPENROUTER: &str = "managed_agent.cancel_openrouter";
 pub const MANAGED_AGENT_DETAIL_OPENROUTER: &str = "managed_agent.detail_openrouter";
 pub const MANAGED_AGENTS_OPENROUTER_LIST: &str = "managed_agent.openrouter_list";
+pub const MANAGED_AGENTS_OPENROUTER_MODELS: &str = "managed_agent.openrouter_models";
 pub const MANAGED_AGENTS_CODEX_INSPECT: &str = "managed_agent.codex_inspect";
 pub const MANAGED_AGENTS_CODEX_TRANSCRIPT: &str = "managed_agent.codex_transcript";
 pub const MANAGED_AGENTS_ACP_INSPECT: &str = "managed_agent.acp_inspect";

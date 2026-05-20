@@ -97,3 +97,11 @@ pub(crate) async fn dispatch_managed_agent_cancel_openrouter(
     let result = state.openrouter_agent_manager.cancel(&agent_id);
     dispatch_query_result(&request.id, result)
 }
+
+pub(crate) async fn dispatch_managed_agent_openrouter_models(
+    request: &WsRequest,
+    state: &DaemonHttpState,
+) -> WsResponse {
+    let result = state.openrouter_agent_manager.list_models().await;
+    dispatch_query_result(&request.id, result)
+}

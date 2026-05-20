@@ -44,8 +44,8 @@ pub(crate) use self::managed_agents::{
 };
 pub(crate) use self::openrouter::{
     dispatch_managed_agent_cancel_openrouter, dispatch_managed_agent_detail_openrouter,
-    dispatch_managed_agent_openrouter_list, dispatch_managed_agent_prompt_openrouter,
-    dispatch_managed_agent_start_openrouter,
+    dispatch_managed_agent_openrouter_list, dispatch_managed_agent_openrouter_models,
+    dispatch_managed_agent_prompt_openrouter, dispatch_managed_agent_start_openrouter,
 };
 pub(crate) use self::voice::{
     dispatch_voice_append_audio, dispatch_voice_append_transcript, dispatch_voice_finish_session,

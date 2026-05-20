@@ -70,6 +70,7 @@ pub enum ManagedAgentKind {
     Tui,
     Acp,
     Codex,
+    OpenRouter,
 }
 
 /// An agent registered in a multi-agent session.

@@ -204,19 +204,19 @@ pub struct Usage {
     pub total_tokens: u32,
 }
 
-#[derive(Debug, Clone, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct ModelListResponse {
     pub data: Vec<ModelEntry>,
 }
 
-#[derive(Debug, Clone, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct ModelEntry {
     pub id: String,
     #[serde(default)]
     pub name: Option<String>,
     #[serde(default)]
     pub context_length: Option<u64>,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub supported_parameters: Vec<String>,
 }
 

@@ -136,3 +136,22 @@ pub(super) async fn post_openrouter_cancel(
         result,
     )
 }
+
+pub(super) async fn get_openrouter_models(
+    headers: HeaderMap,
+    State(state): State<DaemonHttpState>,
+) -> Response {
+    let start = Instant::now();
+    let request_id = extract_request_id(&headers);
+    if let Err(response) = require_auth(&headers, &state) {
+        return *response;
+    }
+    let result = state.openrouter_agent_manager.list_models().await;
+    timed_json(
+        "GET",
+        http_paths::MANAGED_AGENTS_OPENROUTER_MODELS,
+        &request_id,
+        start,
+        result,
+    )
+}

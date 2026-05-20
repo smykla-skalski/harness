@@ -106,6 +106,7 @@ pub const MANAGED_AGENT_OPENROUTER_PROMPT: &str =
     "/v1/managed-agents/{managed_agent_id}/openrouter/prompt";
 pub const MANAGED_AGENT_OPENROUTER_CANCEL: &str =
     "/v1/managed-agents/{managed_agent_id}/openrouter/cancel";
+pub const MANAGED_AGENTS_OPENROUTER_MODELS: &str = "/v1/managed-agents/openrouter/models";
 pub const SESSION_SIGNAL_SEND: &str = "/v1/sessions/{session_id}/signal";
 pub const SESSION_SIGNAL_CANCEL: &str = "/v1/sessions/{session_id}/signal-cancel";
 pub const SESSION_SIGNAL_ACK: &str = "/v1/sessions/{session_id}/signal-ack";
