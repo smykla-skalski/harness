@@ -5,8 +5,10 @@ use super::{
 };
 use crate::agents::acp::probe::probe_acp_agents_cached;
 use crate::daemon::db::DaemonDb;
+use crate::daemon::launchd::LaunchAgentStatus;
 use crate::daemon::protocol::{DaemonTelemetryRequest, DaemonTelemetryResponse};
 use crate::run::audit::scrub;
+use tokio::task::{JoinError, spawn_blocking};
 
 /// Build a point-in-time daemon status report.
 ///
@@ -102,6 +104,12 @@ fn diagnostics_manifest() -> Result<Option<DaemonManifest>, CliError> {
     }
 }
 
+async fn diagnostics_manifest_async() -> Result<Option<DaemonManifest>, CliError> {
+    spawn_blocking(diagnostics_manifest)
+        .await
+        .unwrap_or_else(|error| Err(blocking_join_error("daemon diagnostics manifest", error)))
+}
+
 fn enrich_diagnostics_manifest(mut manifest: DaemonManifest) -> DaemonManifest {
     if let Ok(live_bridge) = bridge::host_bridge_manifest_with_discovery() {
         manifest.host_bridge = live_bridge;
@@ -170,7 +178,7 @@ pub(crate) async fn diagnostics_report_async(
             "async daemon database pool is required for async diagnostics reads",
         ))
     })?;
-    let manifest = diagnostics_manifest()?;
+    let manifest = diagnostics_manifest_async().await?;
     let health = if let Some(manifest) = manifest.as_ref() {
         Some(health_response_async(manifest, Some(async_db)).await?)
     } else {
@@ -209,13 +217,13 @@ async fn diagnostics_from_async_db(
     manifest: Option<DaemonManifest>,
     health: Option<HealthResponse>,
 ) -> Result<DaemonDiagnosticsReport, CliError> {
-    let launch_agent = async_db
-        .load_cached_launch_agent_status()
-        .await?
-        .unwrap_or_else(launchd::launch_agent_status);
+    let launch_agent = match async_db.load_cached_launch_agent_status().await? {
+        Some(cached) => cached,
+        None => launch_agent_status_async().await?,
+    };
     let workspace = match async_db.load_cached_workspace_diagnostics().await? {
         Some(cached) => cached,
-        None => state::diagnostics()?,
+        None => workspace_diagnostics_async().await?,
     };
     let recent_events = async_db.load_recent_daemon_events(16).await?;
 
@@ -227,6 +235,22 @@ async fn diagnostics_from_async_db(
         workspace,
         recent_events,
     })
+}
+
+async fn launch_agent_status_async() -> Result<LaunchAgentStatus, CliError> {
+    spawn_blocking(launchd::launch_agent_status)
+        .await
+        .map_err(|error| blocking_join_error("daemon launch agent status", error))
+}
+
+async fn workspace_diagnostics_async() -> Result<state::DaemonDiagnostics, CliError> {
+    spawn_blocking(state::diagnostics)
+        .await
+        .unwrap_or_else(|error| Err(blocking_join_error("daemon workspace diagnostics", error)))
+}
+
+fn blocking_join_error(operation: &str, error: JoinError) -> CliError {
+    CliErrorKind::workflow_io(format!("join {operation} worker: {error}")).into()
 }
 
 /// Request graceful daemon shutdown.

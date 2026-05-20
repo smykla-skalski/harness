@@ -3,7 +3,7 @@ use std::sync::{Arc, Mutex, MutexGuard};
 use serde_json::json;
 
 use crate::daemon::agent_acp::{AcpAgentStartRequest, AcpPermissionDecision};
-use crate::daemon::bridge::reconfigure_bridge;
+use crate::daemon::bridge::reconfigure_bridge_async;
 use crate::daemon::db::{DaemonDb, ensure_shared_db};
 use crate::daemon::http::{
     DaemonHttpState, adopt_session, adoption_error_status_and_body, ensure_acp_agent,
@@ -65,7 +65,7 @@ pub(crate) async fn dispatch_bridge_reconfigure(
 
     dispatch_query_result(
         &request.id,
-        reconfigure_bridge(&body.enable, &body.disable, body.force),
+        reconfigure_bridge_async(&body.enable, &body.disable, body.force).await,
     )
 }
 

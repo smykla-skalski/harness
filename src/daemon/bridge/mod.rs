@@ -27,7 +27,9 @@ pub use bridge_state::{
 };
 pub use client::BridgeClient;
 pub use commands::BridgeCommand;
-pub use control::{reconfigure_bridge, spawn_manifest_watcher, stop_bridge};
+pub use control::{
+    reconfigure_bridge, reconfigure_bridge_async, spawn_manifest_watcher, stop_bridge,
+};
 pub(crate) use runtime::probe_codex_readiness;
 pub use types::{
     AgentTuiStartSpec, BRIDGE_CAPABILITY_ACP, BRIDGE_CAPABILITY_AGENT_TUI, BRIDGE_CAPABILITY_CODEX,
