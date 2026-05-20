@@ -35,6 +35,7 @@ mod core;
 mod dependency_updates;
 mod improver;
 mod managed_agents;
+mod openrouter_models;
 mod response;
 mod runtime_session;
 mod sessions;
@@ -282,6 +283,7 @@ fn daemon_http_router() -> Router<DaemonHttpState> {
         .merge(improver::improver_routes())
         .merge(agents::agent_routes())
         .merge(managed_agents::managed_agent_routes())
+        .merge(openrouter_models::openrouter_model_routes())
         .merge(signals::signal_routes())
         .merge(voice::voice_routes())
         .layer(middleware::from_fn(trace_http_request))

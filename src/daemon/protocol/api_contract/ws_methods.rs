@@ -110,6 +110,7 @@ pub const MANAGED_AGENTS_CODEX_INSPECT: &str = "managed_agent.codex_inspect";
 pub const MANAGED_AGENTS_CODEX_TRANSCRIPT: &str = "managed_agent.codex_transcript";
 pub const MANAGED_AGENTS_ACP_INSPECT: &str = "managed_agent.acp_inspect";
 pub const MANAGED_AGENTS_ACP_TRANSCRIPT: &str = "managed_agent.acp_transcript";
+pub const OPENROUTER_LIST_MODELS: &str = "openrouter.list_models";
 pub const SIGNAL_SEND: &str = "signal.send";
 pub const SIGNAL_CANCEL: &str = "signal.cancel";
 pub const SIGNAL_ACK: &str = "signal.ack";

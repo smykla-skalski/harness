@@ -93,8 +93,13 @@ async fn dispatch_session_read_query(
         ws_methods::MANAGED_AGENTS_ACP_TRANSCRIPT => {
             Some(dispatch_acp_transcript_query(request, state).await)
         }
+        ws_methods::OPENROUTER_LIST_MODELS => Some(dispatch_openrouter_list_models_query(request).await),
         _ => None,
     }
+}
+
+async fn dispatch_openrouter_list_models_query(request: &WsRequest) -> WsResponse {
+    dispatch_query_result(&request.id, service::list_openrouter_models().await)
 }
 
 fn dispatch_runtimes_probe_query(request_id: &str) -> WsResponse {
