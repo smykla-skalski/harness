@@ -89,6 +89,28 @@ struct HarnessMonitorUITestAccessibilityRegistryMoreTests {
     )
   }
 
+  @Test("Settings dependencies and secrets identifiers match UI-test mirror")
+  func settingsDependenciesAndSecretsIdentifiersMirror() {
+    #expect(
+      HarnessMonitorAccessibility.settingsDependenciesSection
+        == "harness.settings.section.dependencies"
+    )
+    #expect(
+      HarnessMonitorAccessibility.settingsSecretsSection
+        == "harness.settings.section.secrets"
+    )
+    #expect(HarnessMonitorAccessibility.settingsDependenciesRoot == "harness.settings.dependencies")
+    #expect(HarnessMonitorAccessibility.settingsSecretsRoot == "harness.settings.secrets")
+    #expect(
+      HarnessMonitorAccessibility.settingsDependenciesSaveButton
+        == "harness.settings.dependencies.save"
+    )
+    #expect(
+      HarnessMonitorAccessibility.settingsSecretsSaveButton
+        == "harness.settings.secrets.save"
+    )
+  }
+
   @Test("New session capability identifiers match UI-test mirror")
   func newSessionCapabilityIdentifiersMirror() {
     #expect(

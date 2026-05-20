@@ -56,6 +56,22 @@ extension HarnessMonitorUITestCase {
     )
   }
 
+  func selectDependenciesSection(in app: XCUIApplication) {
+    selectSettingsSection(
+      in: app,
+      identifier: HarnessMonitorUITestAccessibility.settingsDependenciesSection,
+      expectedTitle: "Dependencies"
+    )
+  }
+
+  func selectSecretsSection(in app: XCUIApplication) {
+    selectSettingsSection(
+      in: app,
+      identifier: HarnessMonitorUITestAccessibility.settingsSecretsSection,
+      expectedTitle: "Secrets"
+    )
+  }
+
   func selectSupervisorSection(in app: XCUIApplication) {
     selectSettingsSection(
       in: app,

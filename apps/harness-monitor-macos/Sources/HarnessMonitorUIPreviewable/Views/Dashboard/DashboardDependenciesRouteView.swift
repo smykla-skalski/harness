@@ -21,12 +21,12 @@ struct DashboardDependenciesRouteView: View {
   let store: HarnessMonitorStore
   @Binding var selectedRoute: DashboardWindowRoute
 
-  @Environment(\.openTaskBoardSettings)
-  private var openTaskBoardSettings
+  @Environment(\.openSettingsSection)
+  private var openSettingsSection
   @Environment(\.openURL)
   private var openURL
 
-  @AppStorage("dashboard.dependencies.preferences")
+  @AppStorage(DashboardDependenciesPreferences.storageKey)
   private var storedPreferences = ""
   @SceneStorage("dashboard.dependencies.filter")
   private var filterModeRaw = DashboardDependenciesFilterMode.all.rawValue
@@ -53,8 +53,6 @@ struct DashboardDependenciesRouteView: View {
   @State private var notice: DashboardDependenciesNotice?
   @State private var selectedIDs = Set<String>()
   @State private var refreshToken = 0
-  @State private var isSettingsPresented = false
-  @State private var settingsDraft = DashboardDependenciesPreferences()
   @State private var isLabelSheetPresented = false
   @State private var labelDraft = ""
   @State private var labelTargetItems = [DependencyUpdateItem]()
@@ -168,9 +166,6 @@ struct DashboardDependenciesRouteView: View {
     .task(id: storedPreferences) {
       await runAutoRefreshLoop()
     }
-    .sheet(isPresented: $isSettingsPresented) {
-      settingsSheet
-    }
     .sheet(isPresented: $isLabelSheetPresented) {
       labelSheet
     }
@@ -240,51 +235,95 @@ struct DashboardDependenciesRouteView: View {
       TextField("Search repos, titles, authors, or labels", text: $searchText)
         .textFieldStyle(.roundedBorder)
 
-      HStack(spacing: HarnessMonitorTheme.spacingSM) {
-        Picker("Filter", selection: $filterModeRaw) {
-          ForEach(DashboardDependenciesFilterMode.allCases) { mode in
-            Text(mode.title).tag(mode.rawValue)
-          }
-        }
-        .pickerStyle(.segmented)
-        .accessibilityIdentifier(HarnessMonitorAccessibility.dashboardDependenciesSelectionStatus)
+      filterControls
+      routeActions
+    }
+  }
 
-        Picker("Sort", selection: $sortModeRaw) {
-          ForEach(DashboardDependenciesSortMode.allCases) { mode in
-            Text(mode.title).tag(mode.rawValue)
-          }
-        }
-        .frame(width: 160)
-
-        Picker("Group", selection: $groupModeRaw) {
-          ForEach(DashboardDependenciesGroupMode.allCases) { mode in
-            Text(mode.title).tag(mode.rawValue)
-          }
-        }
-        .frame(width: 140)
+  private var filterControls: some View {
+    ViewThatFits(in: .horizontal) {
+      HStack(alignment: .center, spacing: HarnessMonitorTheme.spacingSM) {
+        filterPicker
+        sortAndGroupControls
       }
-
-      HStack(spacing: HarnessMonitorTheme.spacingSM) {
-        actionButton("Refresh", systemImage: "arrow.clockwise") {
-          refreshToken += 1
-          Task { await reload(forceRefresh: true) }
-        }
-        .accessibilityIdentifier(HarnessMonitorAccessibility.dashboardDependenciesRefreshButton)
-
-        actionButton("Configure Sources", systemImage: "line.3.horizontal.decrease.circle") {
-          settingsDraft = normalizedPreferences
-          isSettingsPresented = true
-        }
-        .accessibilityIdentifier(HarnessMonitorAccessibility.dashboardDependenciesConfigureButton)
-
-        actionButton("Credentials", systemImage: "key") {
-          openTaskBoardSettings(.credentials)
-        }
-
-        actionButton("Clear Cache", systemImage: "trash") {
-          Task { await clearCacheAndReload() }
-        }
+      VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
+        filterPicker
+        sortAndGroupControls
       }
+    }
+  }
+
+  private var filterPicker: some View {
+    Picker("Filter", selection: $filterModeRaw) {
+      ForEach(DashboardDependenciesFilterMode.allCases) { mode in
+        Text(mode.title).tag(mode.rawValue)
+      }
+    }
+    .pickerStyle(.segmented)
+    .accessibilityIdentifier(HarnessMonitorAccessibility.dashboardDependenciesSelectionStatus)
+  }
+
+  private var sortAndGroupControls: some View {
+    ViewThatFits(in: .horizontal) {
+      HStack(alignment: .center, spacing: HarnessMonitorTheme.spacingSM) {
+        sortPicker
+        groupPicker
+      }
+      VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
+        sortPicker
+        groupPicker
+      }
+    }
+  }
+
+  private var sortPicker: some View {
+    Picker("Sort", selection: $sortModeRaw) {
+      ForEach(DashboardDependenciesSortMode.allCases) { mode in
+        Text(mode.title).tag(mode.rawValue)
+      }
+    }
+    .pickerStyle(.menu)
+  }
+
+  private var groupPicker: some View {
+    Picker("Group", selection: $groupModeRaw) {
+      ForEach(DashboardDependenciesGroupMode.allCases) { mode in
+        Text(mode.title).tag(mode.rawValue)
+      }
+    }
+    .pickerStyle(.menu)
+  }
+
+  private var routeActions: some View {
+    HarnessMonitorGlassControlGroup(spacing: HarnessMonitorTheme.itemSpacing) {
+      HarnessMonitorWrapLayout(
+        spacing: HarnessMonitorTheme.itemSpacing,
+        lineSpacing: HarnessMonitorTheme.itemSpacing
+      ) {
+        routeActionButtons
+      }
+    }
+    .frame(maxWidth: .infinity, alignment: .leading)
+  }
+
+  @ViewBuilder private var routeActionButtons: some View {
+    actionButton("Refresh", systemImage: "arrow.clockwise") {
+      refreshToken += 1
+      Task { await reload(forceRefresh: true) }
+    }
+    .accessibilityIdentifier(HarnessMonitorAccessibility.dashboardDependenciesRefreshButton)
+
+    actionButton("Configure Sources", systemImage: "line.3.horizontal.decrease.circle") {
+      openSettingsSection(.dependencies)
+    }
+    .accessibilityIdentifier(HarnessMonitorAccessibility.dashboardDependenciesConfigureButton)
+
+    actionButton("Secrets", systemImage: "key") {
+      openSettingsSection(.secrets)
+    }
+
+    actionButton("Clear Cache", systemImage: "trash") {
+      Task { await clearCacheAndReload() }
     }
   }
 
@@ -327,7 +366,9 @@ struct DashboardDependenciesRouteView: View {
 
   private var detailPane: some View {
     Group {
-      if selectedItems.count > 1 {
+      if let errorMessage, !isLoading {
+        errorState(message: errorMessage)
+      } else if selectedItems.count > 1 {
         batchDetail
       } else if let item = primaryDetailItem {
         dependencyDetail(item)
@@ -504,7 +545,7 @@ struct DashboardDependenciesRouteView: View {
       }
       .contentShape(.rect)
     }
-    .buttonStyle(.plain)
+    .buttonStyle(.borderless)
   }
 
   private func detailMetrics(for item: DependencyUpdateItem) -> some View {
@@ -524,97 +565,64 @@ struct DashboardDependenciesRouteView: View {
   }
 
   private func dependencyActionBar(items: [DependencyUpdateItem]) -> some View {
-    HStack(spacing: HarnessMonitorTheme.spacingSM) {
-      actionButton("Approve", systemImage: "checkmark.seal") {
-        Task { await approve(items: items) }
-      }
-      .disabled(!items.contains { $0.canAttemptManualApproval })
-
-      actionButton("Merge", systemImage: "arrow.triangle.merge") {
-        Task { await merge(items: items) }
-      }
-      .disabled(!items.contains { $0.canAttemptManualMerge })
-
-      actionButton("Rerun Checks", systemImage: "arrow.clockwise.circle") {
-        Task { await rerunChecks(items: items) }
-      }
-      .disabled(!items.contains { $0.hasRerunnableChecks })
-
-      actionButton("Add Label", systemImage: "tag") {
-        labelTargetItems = items
-        labelDraft = ""
-        isLabelSheetPresented = true
-      }
-      .disabled(items.isEmpty)
-
-      actionButton("Copy Approval Links", systemImage: "doc.on.doc") {
-        copyApprovalLinks(for: items)
-      }
-
-      if items.count == 1, let item = items.first {
-        actionButton("Auto", systemImage: "bolt") {
-          Task { await auto(items: [item]) }
-        }
-        .disabled(!item.canRunAutoMode)
-        actionButton("Open Pull Request", systemImage: "safari") {
-          openItem(item)
-        }
-        if item.canStartFixCI {
-          actionButton("Fix CI", systemImage: "wrench.and.screwdriver") {
-            Task { await fixCI(item: item) }
-          }
-          .accessibilityIdentifier(HarnessMonitorAccessibility.dashboardDependenciesFixCIButton)
-        }
-      } else {
-        actionButton("Auto", systemImage: "bolt") {
-          Task { await auto(items: items) }
-        }
-        .disabled(!items.contains { $0.canRunAutoMode })
+    HarnessMonitorGlassControlGroup(spacing: HarnessMonitorTheme.itemSpacing) {
+      HarnessMonitorWrapLayout(
+        spacing: HarnessMonitorTheme.itemSpacing,
+        lineSpacing: HarnessMonitorTheme.itemSpacing
+      ) {
+        dependencyActionButtons(items: items)
       }
     }
+    .frame(maxWidth: .infinity, alignment: .leading)
   }
 
-  private var settingsSheet: some View {
-    NavigationStack {
-      Form {
-        TextField("Authors", text: $settingsDraft.authorsText)
-        TextField("Organizations", text: $settingsDraft.organizationsText)
-        TextField("Repositories", text: $settingsDraft.repositoriesText)
-        TextField("Excluded Repositories", text: $settingsDraft.excludeRepositoriesText)
-        Picker("Merge Method", selection: $settingsDraft.mergeMethodRaw) {
-          ForEach(TaskBoardGitHubMergeMethod.allCases) { method in
-            Text(method.rawValue.capitalized).tag(method.rawValue)
-          }
-        }
-        TextField(
-          "Refresh Interval (seconds)",
-          value: $settingsDraft.refreshIntervalSeconds,
-          format: .number
-        )
-        TextField(
-          "Cache Max Age (seconds)",
-          value: $settingsDraft.cacheMaxAgeSeconds,
-          format: .number
-        )
-      }
-      .formStyle(.grouped)
-      .navigationTitle("Dependencies Sources")
-      .toolbar {
-        ToolbarItem(placement: .cancellationAction) {
-          Button("Cancel") {
-            isSettingsPresented = false
-          }
-        }
-        ToolbarItem(placement: .confirmationAction) {
-          Button("Save") {
-            preferences = settingsDraft.normalized()
-            isSettingsPresented = false
-            refreshToken += 1
-          }
-        }
-      }
+  @ViewBuilder private func dependencyActionButtons(items: [DependencyUpdateItem]) -> some View {
+    actionButton("Approve", systemImage: "checkmark.seal") {
+      Task { await approve(items: items) }
     }
-    .frame(minWidth: 520, minHeight: 320)
+    .disabled(!items.contains { $0.canAttemptManualApproval })
+
+    actionButton("Merge", systemImage: "arrow.triangle.merge") {
+      Task { await merge(items: items) }
+    }
+    .disabled(!items.contains { $0.canAttemptManualMerge })
+
+    actionButton("Rerun Checks", systemImage: "arrow.clockwise.circle") {
+      Task { await rerunChecks(items: items) }
+    }
+    .disabled(!items.contains { $0.hasRerunnableChecks })
+
+    actionButton("Add Label", systemImage: "tag") {
+      labelTargetItems = items
+      labelDraft = ""
+      isLabelSheetPresented = true
+    }
+    .disabled(items.isEmpty)
+
+    actionButton("Copy Approval Links", systemImage: "doc.on.doc") {
+      copyApprovalLinks(for: items)
+    }
+
+    if items.count == 1, let item = items.first {
+      actionButton("Auto", systemImage: "bolt") {
+        Task { await auto(items: [item]) }
+      }
+      .disabled(!item.canRunAutoMode)
+      actionButton("Open Pull Request", systemImage: "safari") {
+        openItem(item)
+      }
+      if item.canStartFixCI {
+        actionButton("Fix CI", systemImage: "wrench.and.screwdriver") {
+          Task { await fixCI(item: item) }
+        }
+        .accessibilityIdentifier(HarnessMonitorAccessibility.dashboardDependenciesFixCIButton)
+      }
+    } else {
+      actionButton("Auto", systemImage: "bolt") {
+        Task { await auto(items: items) }
+      }
+      .disabled(!items.contains { $0.canRunAutoMode })
+    }
   }
 
   private var labelSheet: some View {
@@ -686,8 +694,10 @@ struct DashboardDependenciesRouteView: View {
   {
     Button(action: action) {
       Label(title, systemImage: systemImage)
+        .lineLimit(1)
     }
-    .buttonStyle(.glass)
+    .harnessActionButtonStyle(variant: .bordered, tint: .secondary)
+    .fixedSize(horizontal: true, vertical: true)
   }
 
   private func errorState(message: String) -> some View {
@@ -696,12 +706,11 @@ struct DashboardDependenciesRouteView: View {
     } description: {
       Text(message)
     } actions: {
-      Button("Open Credentials") {
-        openTaskBoardSettings(.credentials)
+      Button("Open Secrets") {
+        openSettingsSection(.secrets)
       }
-      Button("Configure Sources") {
-        settingsDraft = normalizedPreferences
-        isSettingsPresented = true
+      Button("Open Sources Settings") {
+        openSettingsSection(.dependencies)
       }
     }
     .frame(maxWidth: .infinity, minHeight: 320)
@@ -966,6 +975,7 @@ private struct DashboardDependenciesNotice {
 }
 
 struct DashboardDependenciesPreferences: Codable, Equatable {
+  static let storageKey = "dashboard.dependencies.preferences"
   var authorsText = "renovate[bot]"
   var organizationsText = ""
   var repositoriesText = ""

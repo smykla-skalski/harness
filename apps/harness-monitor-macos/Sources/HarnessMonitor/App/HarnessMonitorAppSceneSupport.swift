@@ -123,6 +123,14 @@ struct DashboardWindowRootView: View {
         openWindow(id: HarnessMonitorWindowID.settings)
       }
     )
+    .environment(
+      \.openSettingsSection,
+      OpenSettingsSectionAction { section in
+        settingsSelectedSection = section
+        settingsNavigationRequest = SettingsNavigationRequest(target: .section(section))
+        openWindow(id: HarnessMonitorWindowID.settings)
+      }
+    )
     .modifier(
       HarnessMonitorPerfScenarioModifier(
         delegate: delegate,

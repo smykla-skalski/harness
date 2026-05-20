@@ -52,8 +52,27 @@ public struct OpenTaskBoardSettingsAction: Sendable {
   }
 }
 
+public struct OpenSettingsSectionAction: Sendable {
+  private let action: @MainActor @Sendable (SettingsSection) -> Void
+
+  public init(
+    _ action: @escaping @MainActor @Sendable (SettingsSection) -> Void = { _ in }
+  ) {
+    self.action = action
+  }
+
+  @MainActor
+  public func callAsFunction(_ section: SettingsSection) {
+    action(section)
+  }
+}
+
 private struct OpenTaskBoardSettingsActionKey: EnvironmentKey {
   static let defaultValue = OpenTaskBoardSettingsAction()
+}
+
+private struct OpenSettingsSectionActionKey: EnvironmentKey {
+  static let defaultValue = OpenSettingsSectionAction()
 }
 
 private struct WindowSurfaceContextKey: EnvironmentKey {
@@ -64,6 +83,11 @@ extension EnvironmentValues {
   public var openTaskBoardSettings: OpenTaskBoardSettingsAction {
     get { self[OpenTaskBoardSettingsActionKey.self] }
     set { self[OpenTaskBoardSettingsActionKey.self] = newValue }
+  }
+
+  public var openSettingsSection: OpenSettingsSectionAction {
+    get { self[OpenSettingsSectionActionKey.self] }
+    set { self[OpenSettingsSectionActionKey.self] = newValue }
   }
 
   public var windowSurfaceContext: WindowSurfaceContext {

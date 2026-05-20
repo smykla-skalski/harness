@@ -1,7 +1,7 @@
 import HarnessMonitorKit
 import SwiftUI
 
-extension SettingsTaskBoardSection {
+extension SettingsTaskBoardEditingSurface {
   var gitSigningSection: some View {
     Section {
       Picker("Signing Mode", selection: draftBinding.signingMode) {

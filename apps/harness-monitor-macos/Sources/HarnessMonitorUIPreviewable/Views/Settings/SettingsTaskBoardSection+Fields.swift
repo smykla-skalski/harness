@@ -1,7 +1,7 @@
 import HarnessMonitorKit
 import SwiftUI
 
-extension SettingsTaskBoardSection {
+extension SettingsTaskBoardEditingSurface {
   @ViewBuilder
   func repositoryIdentityFields(
     index: Int,

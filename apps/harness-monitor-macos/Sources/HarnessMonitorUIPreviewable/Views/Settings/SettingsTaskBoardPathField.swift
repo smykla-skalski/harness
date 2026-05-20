@@ -36,7 +36,7 @@ struct TaskBoardSettingsPathFieldConfig {
   }
 }
 
-extension SettingsTaskBoardSection {
+extension SettingsTaskBoardEditingSurface {
   @ViewBuilder
   func pathField(
     _ config: TaskBoardSettingsPathFieldConfig,
