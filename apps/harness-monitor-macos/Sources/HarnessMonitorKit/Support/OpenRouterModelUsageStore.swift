@@ -21,9 +21,13 @@ public final class OpenRouterModelUsageStore: @unchecked Sendable {
     var frequencies: [String: Int] = [:]
   }
 
+  private static let decoder = JSONDecoder()
+  private static let encoder = JSONEncoder()
+
   private let defaults: UserDefaults
   private let key: String
   private let lock = NSLock()
+  private var cachedPayload: Payload?
 
   public init(defaults: UserDefaults = .standard, key: String = OpenRouterModelUsageStore.defaultsKey) {
     self.defaults = defaults
@@ -82,34 +86,43 @@ public final class OpenRouterModelUsageStore: @unchecked Sendable {
     lock.lock()
     defer { lock.unlock() }
     defaults.removeObject(forKey: key)
+    cachedPayload = Payload()
   }
 
   private func load() -> Payload {
     lock.lock()
     defer { lock.unlock() }
-    guard
-      let data = defaults.data(forKey: key),
-      let payload = try? JSONDecoder().decode(Payload.self, from: data)
-    else {
-      return Payload()
+    if let cached = cachedPayload {
+      return cached
     }
+    let payload: Payload
+    if
+      let data = defaults.data(forKey: key),
+      let decoded = try? Self.decoder.decode(Payload.self, from: data)
+    {
+      payload = decoded
+    } else {
+      payload = Payload()
+    }
+    cachedPayload = payload
     return payload
   }
 
   private func update(_ mutate: (inout Payload) -> Void) {
     lock.lock()
     defer { lock.unlock() }
-    var payload: Payload
-    if
-      let data = defaults.data(forKey: key),
-      let decoded = try? JSONDecoder().decode(Payload.self, from: data)
-    {
-      payload = decoded
-    } else {
-      payload = Payload()
-    }
+    var payload = cachedPayload ?? {
+      if
+        let data = defaults.data(forKey: key),
+        let decoded = try? Self.decoder.decode(Payload.self, from: data)
+      {
+        return decoded
+      }
+      return Payload()
+    }()
     mutate(&payload)
-    if let encoded = try? JSONEncoder().encode(payload) {
+    cachedPayload = payload
+    if let encoded = try? Self.encoder.encode(payload) {
       defaults.set(encoded, forKey: key)
     }
   }
