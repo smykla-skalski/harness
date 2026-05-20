@@ -52,6 +52,15 @@ extension PreviewHarnessClientState {
     return TaskBoardTodoistTokenSyncResponse(tokenConfigured: request.token?.isEmpty == false)
   }
 
+  func syncTaskBoardOpenRouterToken(
+    _ request: TaskBoardOpenRouterTokenSyncRequest
+  ) -> TaskBoardOpenRouterTokenSyncResponse {
+    taskBoardOpenRouterToken = request
+    return TaskBoardOpenRouterTokenSyncResponse(
+      tokenConfigured: request.token?.isEmpty == false
+    )
+  }
+
   func currentTaskBoardGitIdentityDefaults() -> TaskBoardGitIdentityDefaults {
     taskBoardGitIdentityDefaults
   }

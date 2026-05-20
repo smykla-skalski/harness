@@ -14,6 +14,7 @@ struct TaskBoardLoadedSecrets: Equatable {
   var globalGPGPrivateKeyPassphrase: String?
   var globalGitHubToken: String?
   var todoistToken: String?
+  var openRouterToken: String?
   var repositoryRuntime: [String: TaskBoardLoadedRepositorySecrets] = [:]
   var repositoryTokens: [String: String] = [:]
 
@@ -29,6 +30,7 @@ struct TaskBoardLoadedSecrets: Equatable {
     globalGPGPrivateKeyPassphrase = snapshot.runtimeConfig.global.signing.gpgPrivateKeyPassphrase
     globalGitHubToken = snapshot.githubCredentials.globalToken
     todoistToken = snapshot.todoistCredentials.token
+    openRouterToken = snapshot.openRouterCredentials.token
 
     repositoryRuntime = Dictionary(
       uniqueKeysWithValues: snapshot.runtimeConfig.repositoryOverrides.map { override in

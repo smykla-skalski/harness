@@ -312,6 +312,13 @@ public struct SettingsTaskBoardSection: View {
         accessibilityIdentifier: HarnessMonitorAccessibility.settingsTaskBoardGlobalTokenField
           + ".todoist"
       )
+      SettingsSecretField(
+        title: "OpenRouter API Key",
+        placeholder: "sk-or-...",
+        field: $draft.openRouterToken,
+        accessibilityIdentifier: HarnessMonitorAccessibility.settingsTaskBoardGlobalTokenField
+          + ".openrouter"
+      )
     } header: {
       Text("Credentials")
         .harnessNativeFormSectionHeader()

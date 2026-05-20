@@ -4,16 +4,19 @@ import Foundation
 struct TaskBoardStoredCredentialSnapshot: Sendable {
   let githubCredentials: TaskBoardGitHubCredentialSnapshot
   let todoistCredentials: TaskBoardTodoistCredentialSnapshot
+  let openRouterCredentials: TaskBoardOpenRouterCredentialSnapshot
 }
 
 actor TaskBoardSettingsWorker {
   private let githubCredentialStore = TaskBoardGitHubCredentialStore()
   private let todoistCredentialStore = TaskBoardTodoistCredentialStore()
+  private let openRouterCredentialStore = TaskBoardOpenRouterCredentialStore()
 
   func loadStoredCredentials() throws -> TaskBoardStoredCredentialSnapshot {
     try TaskBoardStoredCredentialSnapshot(
       githubCredentials: githubCredentialStore.load(),
-      todoistCredentials: todoistCredentialStore.load()
+      todoistCredentials: todoistCredentialStore.load(),
+      openRouterCredentials: openRouterCredentialStore.load()
     )
   }
 
@@ -27,6 +30,7 @@ actor TaskBoardSettingsWorker {
   func persistLocalSecrets(snapshot: TaskBoardGitSettingsSnapshot) throws {
     try githubCredentialStore.save(snapshot.githubCredentials)
     try todoistCredentialStore.save(snapshot.todoistCredentials)
+    try openRouterCredentialStore.save(snapshot.openRouterCredentials)
     try HarnessMonitorStore.persistKeyMaterial(runtime: snapshot.runtimeConfig)
   }
 
@@ -84,6 +88,7 @@ extension HarnessMonitorStore {
       runtimeConfig: hydratedRuntime,
       githubCredentials: credentials.githubCredentials,
       todoistCredentials: credentials.todoistCredentials,
+      openRouterCredentials: credentials.openRouterCredentials,
       identityDefaults: identityDefaults
     )
   }
@@ -359,6 +364,9 @@ extension HarnessMonitorStore {
       _ = try await client.syncTaskBoardTodoistToken(
         request: snapshot.todoistCredentials.syncRequest
       )
+      _ = try await client.syncTaskBoardOpenRouterToken(
+        request: snapshot.openRouterCredentials.syncRequest
+      )
       return true
     } catch {
       presentFailureFeedback(
@@ -393,6 +401,9 @@ extension HarnessMonitorStore {
       )
       _ = try await client.syncTaskBoardTodoistToken(
         request: credentials.todoistCredentials.syncRequest
+      )
+      _ = try await client.syncTaskBoardOpenRouterToken(
+        request: credentials.openRouterCredentials.syncRequest
       )
     } catch {
       let description = RefreshSnapshotErrorFormatting.describeUnderlying(error)
