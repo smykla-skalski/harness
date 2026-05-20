@@ -11,11 +11,8 @@ use crate::errors::{CliError, CliErrorKind};
 
 use super::GitHubAutomationClient;
 use super::config::{GitHubMergeMethod, GitHubProjectConfig};
-use super::evidence::{GitHubMergeEvidence, GitHubPullRequestEvidence};
-use super::evidence_api::{
-    branch_protection_evidence, check_runs_for_ref, combined_status_for_sha, merge_checks,
-    merge_reviews, review_thread_summary,
-};
+use super::evidence::GitHubMergeEvidence;
+use super::evidence_api::pull_request_merge_evidence;
 use super::publication::{
     GitHubBranchState, branch_state_async, publish_branch_from_worktree_async,
 };
@@ -96,61 +93,7 @@ impl GitHubAutomationClient for GitHubApiAutomationClient {
         config: &GitHubProjectConfig,
         pull_request_number: u64,
     ) -> Result<GitHubMergeEvidence, CliError> {
-        let pulls = self
-            .client
-            .pulls(config.owner.as_str(), config.repo.as_str());
-        let pull_request = pulls
-            .get(pull_request_number)
-            .await
-            .map_err(operation_error)?;
-        let files = self
-            .client
-            .all_pages(
-                pulls
-                    .list_files(pull_request_number)
-                    .await
-                    .map_err(operation_error)?,
-            )
-            .await
-            .map_err(operation_error)?;
-        let reviews = self
-            .client
-            .all_pages(
-                pulls
-                    .list_reviews(pull_request_number)
-                    .per_page(100_u8)
-                    .send()
-                    .await
-                    .map_err(operation_error)?,
-            )
-            .await
-            .map_err(operation_error)?;
-        let head_sha = pull_request.head.sha.clone();
-        let combined_status = combined_status_for_sha(&self.client, config, &head_sha)
-            .await
-            .map_err(operation_error)?;
-        let check_runs = check_runs_for_ref(&self.client, config, &head_sha)
-            .await
-            .map_err(operation_error)?;
-        let branch_protection = branch_protection_evidence(&self.client, config, &pull_request)
-            .await
-            .map_err(operation_error)?;
-        let review_threads = review_thread_summary(&self.client, config, &pull_request)
-            .await
-            .map_err(operation_error)?;
-        Ok(GitHubMergeEvidence {
-            pull_request: GitHubPullRequestEvidence {
-                number: pull_request.number,
-                html_url: Some(pull_request.html_url.to_string()),
-                base_branch: pull_request.base.ref_field.clone(),
-                head_branch: pull_request.head.ref_field.clone(),
-                draft: pull_request.draft.unwrap_or(false),
-                changed_paths: files.into_iter().map(|entry| entry.filename).collect(),
-            },
-            checks: merge_checks(combined_status.statuses, check_runs),
-            reviews: merge_reviews(reviews, &review_threads),
-            branch_protection,
-        })
+        pull_request_merge_evidence(&self.client, config, pull_request_number).await
     }
 
     async fn get_pull_request(
@@ -158,12 +101,9 @@ impl GitHubAutomationClient for GitHubApiAutomationClient {
         config: &GitHubProjectConfig,
         pull_request_number: u64,
     ) -> Result<GitHubPullRequestHandle, CliError> {
-        self.client
-            .pulls(config.owner.as_str(), config.repo.as_str())
-            .get(pull_request_number)
-            .await
-            .map(|pull_request| handle_from_pull_request(&pull_request))
-            .map_err(operation_error)
+        super::client_graphql::pull_request_handle(&self.client, config, pull_request_number)
+            .await?
+            .ok_or_else(|| pull_request_not_found(config, pull_request_number))
     }
 
     async fn ensure_pull_request(
@@ -174,22 +114,11 @@ impl GitHubAutomationClient for GitHubApiAutomationClient {
         let pulls = self
             .client
             .pulls(config.owner.as_str(), config.repo.as_str());
-        let existing = self
-            .client
-            .all_pages(
-                pulls
-                    .list()
-                    .state(params::State::Open)
-                    .head(format!("{}:{}", config.owner, request.head_branch))
-                    .per_page(100_u8)
-                    .send()
-                    .await
-                    .map_err(operation_error)?,
-            )
-            .await
-            .map_err(operation_error)?;
-        if let Some(existing) = existing.into_iter().next() {
-            return Ok(handle_from_simple_pull_request(&existing));
+        if let Some(existing) =
+            super::client_graphql::open_pull_request_for_branch(&self.client, config, request)
+                .await?
+        {
+            return Ok(existing);
         }
         let mut builder = pulls
             .create(
@@ -255,25 +184,15 @@ impl GitHubAutomationClient for GitHubApiAutomationClient {
         let issues = self
             .client
             .issues(config.owner.as_str(), config.repo.as_str());
-        let current_labels = self
-            .client
-            .all_pages(
-                issues
-                    .list_labels_for_issue(pull_request_number)
-                    .per_page(100_u8)
-                    .send()
-                    .await
-                    .map_err(operation_error)?,
-            )
-            .await
-            .map_err(operation_error)?;
+        let current_labels =
+            super::client_graphql::pull_request_labels(&self.client, config, pull_request_number)
+                .await?;
         let managed = managed_labels
             .iter()
             .map(String::as_str)
             .collect::<Vec<_>>();
         let mut labels = current_labels
             .into_iter()
-            .map(|label| label.name)
             .filter(|label| !managed.contains(&label.as_str()))
             .collect::<Vec<_>>();
         labels.extend(desired_labels.iter().cloned());
@@ -398,6 +317,14 @@ fn operation_error(error: octocrab::Error) -> CliError {
         "task-board github automation failed: {error}"
     )))
     .with_source(error)
+}
+
+fn pull_request_not_found(config: &GitHubProjectConfig, pull_request_number: u64) -> CliError {
+    CliErrorKind::workflow_io(format!(
+        "task-board github pull request not found: {}/{}#{}",
+        config.owner, config.repo, pull_request_number
+    ))
+    .into()
 }
 
 #[cfg(test)]

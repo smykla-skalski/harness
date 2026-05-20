@@ -6,6 +6,7 @@ use crate::errors::{CliError, CliErrorKind};
 use crate::task_board::policy::PolicyInput;
 
 mod client;
+mod client_graphql;
 mod config;
 mod evidence;
 mod evidence_api;

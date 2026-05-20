@@ -1,10 +1,9 @@
 use std::fmt::Display;
 use std::path::Path;
 
-use axum::http::StatusCode;
-use octocrab::models;
-use octocrab::params::repos::Reference;
-use octocrab::{Error as OctocrabError, Octocrab};
+use octocrab::Octocrab;
+use serde::Deserialize;
+use serde_json::json;
 use tokio::task::spawn_blocking;
 
 use crate::daemon::service::git_runtime_profile_for_repository;
@@ -33,41 +32,21 @@ pub(crate) async fn branch_state_async(
     config: &GitHubProjectConfig,
     branch: &str,
 ) -> Result<Option<GitHubBranchState>, CliError> {
-    let reference = Reference::Branch(branch.to_string());
-    let git_ref = match client
-        .repos(config.owner.as_str(), config.repo.as_str())
-        .get_ref(&reference)
-        .await
-    {
-        Ok(git_ref) => git_ref,
-        Err(error) if github_not_found(&error) => return Ok(None),
-        Err(error) => return Err(operation_error(error)),
-    };
-    let (models::repos::Object::Commit {
-        sha: commit_sha, ..
-    }
-    | models::repos::Object::Tag {
-        sha: commit_sha, ..
-    }) = git_ref.object
-    else {
-        return Err(CliErrorKind::workflow_io(format!(
-            "task-board github branch '{branch}' does not point to a commit or tag"
-        ))
-        .into());
-    };
-    let route = format!(
-        "/repos/{owner}/{repo}/git/commits/{commit_sha}",
-        owner = config.owner,
-        repo = config.repo,
-    );
-    let commit: models::commits::GitCommitObject = client
-        .get(route, None::<&()>)
+    let response: BranchStateResponse = client
+        .graphql(&json!({
+            "query": BRANCH_STATE_QUERY,
+            "variables": {
+                "owner": config.owner.as_str(),
+                "repo": config.repo.as_str(),
+                "qualifiedName": branch,
+            },
+        }))
         .await
         .map_err(operation_error)?;
-    Ok(Some(GitHubBranchState {
-        commit_sha,
-        tree_sha: commit.tree.sha,
-    }))
+    let Some(reference) = response.repository.and_then(|repo| repo.ref_field) else {
+        return Ok(None);
+    };
+    reference.target.into_branch_state(branch).map(Some)
 }
 
 pub(crate) async fn publish_branch_from_worktree_async(
@@ -145,18 +124,11 @@ fn local_branch_snapshot(
     })
 }
 
-fn github_not_found(error: &OctocrabError) -> bool {
-    matches!(
-        error,
-        OctocrabError::GitHub { source, .. } if source.status_code == StatusCode::NOT_FOUND
-    )
-}
-
 fn snapshot_error(context: &str, error: impl Display) -> CliError {
     CliErrorKind::workflow_io(format!("task-board github {context}: {error}")).into()
 }
 
-fn operation_error(error: OctocrabError) -> CliError {
+fn operation_error(error: octocrab::Error) -> CliError {
     CliError::new(CliErrorKind::workflow_io(format!(
         "task-board github automation failed: {error}"
     )))
@@ -195,4 +167,80 @@ async fn publication_mode(
     Ok(Some(BranchPublicationMode::Create {
         parent_sha: default_state.commit_sha,
     }))
+}
+
+const BRANCH_STATE_QUERY: &str = r"
+query($owner: String!, $repo: String!, $qualifiedName: String!) {
+  repository(owner: $owner, name: $repo) {
+    ref(qualifiedName: $qualifiedName) {
+      target {
+        __typename
+        ... on Commit {
+          oid
+          tree { oid }
+        }
+        ... on Tag {
+          target {
+            __typename
+            ... on Commit {
+              oid
+              tree { oid }
+            }
+          }
+        }
+      }
+    }
+  }
+}
+";
+
+#[derive(Debug, Deserialize)]
+struct BranchStateResponse {
+    repository: Option<BranchStateRepository>,
+}
+
+#[derive(Debug, Deserialize)]
+struct BranchStateRepository {
+    #[serde(rename = "ref")]
+    ref_field: Option<BranchStateReference>,
+}
+
+#[derive(Debug, Deserialize)]
+struct BranchStateReference {
+    target: BranchStateTarget,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(tag = "__typename")]
+enum BranchStateTarget {
+    Commit {
+        oid: String,
+        tree: BranchStateTree,
+    },
+    Tag {
+        target: Box<BranchStateTarget>,
+    },
+    #[serde(other)]
+    Unknown,
+}
+
+impl BranchStateTarget {
+    fn into_branch_state(self, branch: &str) -> Result<GitHubBranchState, CliError> {
+        match self {
+            Self::Commit { oid, tree } => Ok(GitHubBranchState {
+                commit_sha: oid,
+                tree_sha: tree.oid,
+            }),
+            Self::Tag { target } => target.into_branch_state(branch),
+            Self::Unknown => Err(CliErrorKind::workflow_io(format!(
+                "task-board github branch '{branch}' does not point to a commit or tag"
+            ))
+            .into()),
+        }
+    }
+}
+
+#[derive(Debug, Deserialize)]
+struct BranchStateTree {
+    oid: String,
 }
