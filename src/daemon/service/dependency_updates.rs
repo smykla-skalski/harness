@@ -246,11 +246,11 @@ fn github_token(repository: Option<&str>) -> Option<String> {
 fn missing_token_error(repository: Option<&str>) -> CliError {
     match repository {
         Some(repository) => CliErrorKind::workflow_io(format!(
-            "dependency-updates requires a GitHub token for '{repository}'. Configure one in Settings > Task Board > Credentials."
+            "dependency-updates requires a GitHub token for '{repository}'. Configure one in Settings > Secrets."
         ))
         .into(),
         None => CliErrorKind::workflow_io(
-            "dependency-updates requires a GitHub token. Configure one in Settings > Task Board > Credentials.",
+            "dependency-updates requires a GitHub token. Configure one in Settings > Secrets.",
         )
         .into(),
     }
