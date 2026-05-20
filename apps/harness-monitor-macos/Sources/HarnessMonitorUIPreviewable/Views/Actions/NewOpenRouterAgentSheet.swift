@@ -14,12 +14,13 @@ public struct NewOpenRouterAgentSheet: View {
   private var dismiss
   @State private var prompt = ""
   @State private var availableModels: [OpenRouterModelEntry] = []
-  @State private var selectedModelID = "anthropic/claude-3.7-sonnet"
+  @State private var selectedModelID = HarnessMonitorStore.defaultOpenRouterModel
   @State private var customModelID = ""
   @State private var useCustomModel = false
   @State private var validationMessage: String?
   @State private var isLoadingModels = false
   @State private var isSubmitting = false
+  @State private var isPresentingBrowser = false
   @FocusState private var focusedField: Field?
 
   public init(store: HarnessMonitorStore, sessionID: String) {
@@ -63,6 +64,16 @@ public struct NewOpenRouterAgentSheet: View {
       focusedField = .prompt
       await loadModels()
     }
+    .sheet(isPresented: $isPresentingBrowser) {
+      OpenRouterModelBrowserSheet(
+        models: availableModels,
+        usage: store.openRouterModelUsage,
+        onSelect: { id in
+          selectedModelID = id
+          useCustomModel = false
+        }
+      )
+    }
   }
 
   private var header: some View {
@@ -98,26 +109,18 @@ public struct NewOpenRouterAgentSheet: View {
         if isLoadingModels {
           HStack {
             ProgressView().controlSize(.small)
-            Text("Loading model catalog from OpenRouter...")
+            Text("Loading model catalog from OpenRouter…")
               .scaledFont(.caption)
               .foregroundStyle(HarnessMonitorTheme.secondaryInk)
           }
-        } else if availableModels.isEmpty {
-          TextField("Model ID", text: $selectedModelID)
-            .harnessNativeTextField()
-            .focused($focusedField, equals: .customModel)
         } else {
-          Picker(modelMenuTitle, selection: $selectedModelID) {
-            ForEach(availableModels) { model in
-              Text(model.name ?? model.id).tag(model.id)
-            }
-            Text("Custom...").tag("__custom__")
-          }
-          .pickerStyle(.menu)
-          .harnessNativeFormControl()
-          .onChange(of: selectedModelID) { _, newValue in
-            useCustomModel = newValue == "__custom__"
-          }
+          OpenRouterModelPicker(
+            availableModels: availableModels,
+            usage: store.openRouterModelUsage,
+            selectedModelID: $selectedModelID,
+            useCustomModel: $useCustomModel,
+            onBrowseAll: { isPresentingBrowser = true }
+          )
           if useCustomModel {
             TextField("Provider-specific model id", text: $customModelID)
               .harnessNativeTextField()
@@ -126,14 +129,6 @@ public struct NewOpenRouterAgentSheet: View {
         }
       }
     }
-  }
-
-  private var modelMenuTitle: String {
-    if useCustomModel {
-      let trimmed = customModelID.trimmingCharacters(in: .whitespacesAndNewlines)
-      return trimmed.isEmpty ? "Custom model" : trimmed
-    }
-    return availableModels.first { $0.id == selectedModelID }?.name ?? selectedModelID
   }
 
   private var footer: some View {

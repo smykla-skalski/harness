@@ -242,6 +242,9 @@ public enum HarnessMonitorAccessibility {
   public static let newSessionSheet = "harness.new-session.sheet"
   public static let newCodexAgentSheet = "harness.new-codex-agent.sheet"
   public static let newOpenRouterAgentSheet = "harness.new-openrouter-agent.sheet"
+  public static let openRouterModelBrowserSheet = "harness.openrouter-model-browser.sheet"
+  public static let openRouterModelBrowserSearch = "harness.openrouter-model-browser.search"
+  public static let openRouterModelBrowserList = "harness.openrouter-model-browser.list"
   public static let sessionOpenRouterRunRow = "harness.session.openrouter-run-row"
   public static let sessionOpenRouterRunDetail = "harness.session.openrouter-run-detail"
   public static let sessionOpenRouterRunPromptField =
