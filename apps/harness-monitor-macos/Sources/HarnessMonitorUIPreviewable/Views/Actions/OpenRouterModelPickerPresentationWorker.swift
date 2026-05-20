@@ -12,14 +12,6 @@ struct OpenRouterModelPickerPresentation: Equatable, Sendable {
   let sections: [OpenRouterModelPickerMenuSection]
   fileprivate let displayNamesByID: [String: String]
 
-  fileprivate init(
-    sections: [OpenRouterModelPickerMenuSection],
-    displayNamesByID: [String: String]
-  ) {
-    self.sections = sections
-    self.displayNamesByID = displayNamesByID
-  }
-
   func displayName(for modelID: String) -> String? {
     displayNamesByID[modelID]
   }

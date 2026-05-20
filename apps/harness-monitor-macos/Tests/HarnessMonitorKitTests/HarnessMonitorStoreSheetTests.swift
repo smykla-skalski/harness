@@ -180,7 +180,6 @@ struct HarnessMonitorStoreSheetTests {
     case .taskActions: break
     case .leaderTransfer: break
     case .newCodexAgent: break
-    case .newOpenRouterAgent: break
     }
   }
 
