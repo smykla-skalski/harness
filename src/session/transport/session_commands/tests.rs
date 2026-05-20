@@ -55,7 +55,9 @@ fn session_title_execute_updates_active_session_via_daemon_client() {
                     continue;
                 }
                 assert!(
-                    request.starts_with("POST /v1/sessions/sess-title-daemon/title "),
+                    request.starts_with(
+                        "POST /v1/sessions/00000000-0000-4000-8000-00000000b001/title "
+                    ),
                     "expected session title POST, got: {request}"
                 );
                 requests_for_server
@@ -67,7 +69,7 @@ fn session_title_execute_updates_active_session_via_daemon_client() {
                         state: build_new_session_with_policy(
                             "daemon title context",
                             "renamed title",
-                            "sess-title-daemon",
+                            "00000000-0000-4000-8000-00000000b001",
                             "leaderless",
                             None,
                             &utc_now(),
@@ -83,7 +85,7 @@ fn session_title_execute_updates_active_session_via_daemon_client() {
         init_git_repo_with_seed(&project);
 
         let exit = SessionTitleArgs {
-            session_id: "sess-title-daemon".into(),
+            session_id: "00000000-0000-4000-8000-00000000b001".into(),
             title: "renamed title".into(),
             project_dir: Some(project.to_string_lossy().into_owned()),
         }
