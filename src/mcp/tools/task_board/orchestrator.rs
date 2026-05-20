@@ -2,6 +2,7 @@ use serde_json::{Value, json};
 
 use crate::daemon::protocol::{
     TaskBoardGitHubTokensSyncRequest, TaskBoardGitRuntimeConfig,
+    TaskBoardGitRuntimeDrainSecretsRequest, TaskBoardGitSigningVerifyRequest,
     TaskBoardOrchestratorRunOnceRequest, TaskBoardOrchestratorSettingsUpdateRequest,
     TaskBoardTodoistTokenSyncRequest, ws_methods,
 };
@@ -81,8 +82,30 @@ pub(super) fn register(registry: &mut ToolRegistry) {
                 input_schema: empty_schema,
                 normalize: validate_empty_object,
             },
+            TaskBoardToolDescriptor {
+                name: ws_methods::TASK_BOARD_GIT_SIGNING_VERIFY,
+                description: "Verify the active git signing profile by producing a probe signature.",
+                input_schema: signing_verify_schema,
+                normalize: validate_params::<TaskBoardGitSigningVerifyRequest>,
+            },
+            TaskBoardToolDescriptor {
+                name: ws_methods::TASK_BOARD_GIT_RUNTIME_DRAIN_SECRETS,
+                description: "One-shot migration that returns on-disk task-board git secrets so the caller can persist them in a secure store.",
+                input_schema: empty_schema,
+                normalize: validate_params::<TaskBoardGitRuntimeDrainSecretsRequest>,
+            },
         ],
     );
+}
+
+fn signing_verify_schema() -> Value {
+    json!({
+        "type": "object",
+        "properties": {
+            "repository": { "type": "string" }
+        },
+        "additionalProperties": false
+    })
 }
 
 fn empty_schema() -> Value {
