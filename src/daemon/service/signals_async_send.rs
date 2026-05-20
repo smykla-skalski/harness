@@ -13,6 +13,7 @@ use super::signals_async::{
     bump_session, record_signal_ack_direct_async, resolved_session_for_signal_mutation,
     runtime_for_agent,
 };
+use super::sync_support::{read_runtime_acknowledgments_async, write_runtime_signal_async};
 use super::{
     ACTIVE_SIGNAL_ACK_POLL_INTERVAL, ACTIVE_SIGNAL_ACK_TIMEOUT, AgentTuiManagerHandle, CliError,
     ManagedTuiWake, SessionDetail, SessionLogEntry, SignalAckRequest, SignalCoords,
@@ -108,17 +109,22 @@ fn sent_signal_log_entry(
 }
 
 async fn wait_for_signal_ack_async(
-    runtime: &dyn AgentRuntime,
+    runtime: &'static dyn AgentRuntime,
     project_dir: &Path,
     signal_session_id: &str,
     signal_id: &str,
 ) -> Result<Option<SignalAck>, CliError> {
     let deadline = TokioInstant::now() + ACTIVE_SIGNAL_ACK_TIMEOUT;
     loop {
-        if let Some(ack) = runtime
-            .read_acknowledgments(project_dir, signal_session_id)?
-            .into_iter()
-            .find(|ack| ack.signal_id == signal_id)
+        if let Some(ack) = read_runtime_acknowledgments_async(
+            runtime,
+            project_dir.to_path_buf(),
+            signal_session_id.to_string(),
+            "send signal",
+        )
+        .await?
+        .into_iter()
+        .find(|ack| ack.signal_id == signal_id)
         {
             return Ok(Some(ack));
         }
@@ -143,7 +149,14 @@ async fn prepare_signal_send(
     let runtime = runtime_for_agent(&runtime_name)?;
     let signal = build_runtime_signal(request, session_id, &request.agent_id, &now);
     let signal_session_id = target_agent_session_id.unwrap_or_else(|| session_id.to_string());
-    runtime.write_signal(&project_dir, &signal_session_id, &signal)?;
+    write_runtime_signal_async(
+        runtime,
+        project_dir.clone(),
+        signal_session_id.clone(),
+        signal.clone(),
+        "send signal",
+    )
+    .await?;
     async_db
         .append_log_entry(&sent_signal_log_entry(
             session_id,

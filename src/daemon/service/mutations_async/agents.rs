@@ -1,11 +1,12 @@
-use std::path::Path;
+use std::path::PathBuf;
 
 use super::super::{
-    AgentRemoveRequest, CliError, RoleChangeRequest, SessionDetail, build_log_entry,
+    AgentRemoveRequest, CliError, CliErrorKind, RoleChangeRequest, SessionDetail, build_log_entry,
     db::AsyncDaemonDb, effective_project_dir, session_detail_from_async_daemon_db, session_service,
-    slice, sync_file_state_from_async_db, utc_now,
+    sync_file_state_from_async_db, utc_now,
 };
 use super::{bump_session, persist_leave_signal_mutation, resolved_session_for_mutation};
+use tokio::task::spawn_blocking;
 
 /// Change an agent role through the canonical async daemon DB.
 ///
@@ -63,7 +64,7 @@ pub(crate) async fn remove_agent_async(
         })
         .await?;
     sync_file_state_from_async_db(async_db, session_id).await?;
-    let leave_signals = write_and_collect_leave_signal(leave_signal, &project_dir)?;
+    let leave_signals = write_and_collect_leave_signal_async(leave_signal, project_dir).await?;
     let resolved = resolved_session_for_mutation(async_db, session_id).await?;
     persist_leave_signal_mutation(
         async_db,
@@ -77,17 +78,28 @@ pub(crate) async fn remove_agent_async(
     session_detail_from_async_daemon_db(session_id, async_db).await
 }
 
-fn write_and_collect_leave_signal(
+async fn write_and_collect_leave_signal_async(
     signal: Option<session_service::LeaveSignalRecord>,
-    project_dir: &Path,
+    project_dir: PathBuf,
 ) -> Result<Vec<session_service::LeaveSignalRecord>, CliError> {
     let Some(signal) = signal else {
         return Ok(vec![]);
     };
-    session_service::write_prepared_leave_signals(
-        project_dir,
-        slice::from_ref(&signal),
-        "remove agent",
-    )?;
-    Ok(vec![signal])
+    let leave_signals = vec![signal];
+    let signals_for_write = leave_signals.clone();
+    spawn_blocking(move || {
+        session_service::write_prepared_leave_signals(
+            &project_dir,
+            &signals_for_write,
+            "remove agent",
+        )
+    })
+    .await
+    .unwrap_or_else(|error| {
+        Err(
+            CliErrorKind::workflow_io(format!("remove agent leave-signal worker failed: {error}"))
+                .into(),
+        )
+    })?;
+    Ok(leave_signals)
 }
