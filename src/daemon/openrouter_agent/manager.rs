@@ -28,6 +28,7 @@ use crate::agents::openrouter::{
     AgentConfig as OpenRouterAgentConfig, ChatMessage, ChatRole, OpenRouterClient, OpenRouterError,
 };
 use crate::daemon::protocol::StreamEvent;
+use crate::daemon::state;
 use crate::errors::{CliError, CliErrorKind};
 use crate::hooks::runner_policy::managed_cluster_binaries;
 use crate::workspace::utc_now;
@@ -122,7 +123,10 @@ impl OpenRouterAgentManagerHandle {
         harness_session: &str,
         request: OpenRouterStartRequest,
     ) -> Result<OpenRouterRunSnapshot, CliError> {
-        let config = OpenRouterAgentConfig::from_env().map_err(|error| {
+        let config = OpenRouterAgentConfig::from_env_with_override(
+            state::task_board_openrouter_token(),
+        )
+        .map_err(|error| {
             CliError::from(CliErrorKind::workflow_parse(format!(
                 "OpenRouter configuration error: {error}"
             )))

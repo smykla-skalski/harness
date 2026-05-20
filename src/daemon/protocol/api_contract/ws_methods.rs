@@ -71,6 +71,8 @@ pub const TASK_BOARD_ORCHESTRATOR_GITHUB_TOKENS_SYNC: &str =
     "task_board.orchestrator_github_tokens_sync";
 pub const TASK_BOARD_ORCHESTRATOR_TODOIST_TOKEN_SYNC: &str =
     "task_board.orchestrator_todoist_token_sync";
+pub const TASK_BOARD_ORCHESTRATOR_OPENROUTER_TOKEN_SYNC: &str =
+    "task_board.orchestrator_openrouter_token_sync";
 pub const TASK_BOARD_GIT_IDENTITY_DEFAULTS: &str = "task_board.git_identity_defaults";
 pub const TASK_BOARD_GIT_SIGNING_VERIFY: &str = "task_board.git_signing_verify";
 pub const TASK_BOARD_GIT_RUNTIME_DRAIN_SECRETS: &str = "task_board.git_runtime_drain_secrets";

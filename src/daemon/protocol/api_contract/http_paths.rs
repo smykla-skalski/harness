@@ -65,6 +65,8 @@ pub const TASK_BOARD_ORCHESTRATOR_RUNTIME_CONFIG: &str =
     "/v1/task-board/orchestrator/runtime-config";
 pub const TASK_BOARD_ORCHESTRATOR_GITHUB_TOKENS: &str = "/v1/task-board/orchestrator/github-tokens";
 pub const TASK_BOARD_ORCHESTRATOR_TODOIST_TOKEN: &str = "/v1/task-board/orchestrator/todoist-token";
+pub const TASK_BOARD_ORCHESTRATOR_OPENROUTER_TOKEN: &str =
+    "/v1/task-board/orchestrator/openrouter-token";
 pub const TASK_BOARD_GIT_IDENTITY_DEFAULTS: &str = "/v1/task-board/git/identity-defaults";
 pub const TASK_BOARD_GIT_SIGNING_VERIFY: &str = "/v1/task-board/git/signing/verify";
 pub const TASK_BOARD_GIT_RUNTIME_DRAIN_SECRETS: &str = "/v1/task-board/git/runtime/drain-secrets";

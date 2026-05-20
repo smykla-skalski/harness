@@ -9,6 +9,7 @@ use crate::infra::io::{read_json_typed, write_json_pretty};
 use crate::task_board::{
     TaskBoardGitHubRepositoryToken, TaskBoardGitHubTokensSyncRequest,
     TaskBoardGitHubTokensSyncResponse, TaskBoardGitRuntimeConfig, TaskBoardGitRuntimeProfile,
+    TaskBoardOpenRouterTokenSyncRequest, TaskBoardOpenRouterTokenSyncResponse,
     TaskBoardTodoistTokenSyncRequest, TaskBoardTodoistTokenSyncResponse, normalize_repository_slug,
 };
 
@@ -19,6 +20,8 @@ pub const VALID_LOG_LEVELS: &[&str] = &["trace", "debug", "info", "warn", "error
 static TASK_BOARD_GITHUB_TOKENS: LazyLock<RwLock<BTreeMap<PathBuf, TaskBoardGitHubTokenState>>> =
     LazyLock::new(|| RwLock::new(BTreeMap::new()));
 static TASK_BOARD_TODOIST_TOKENS: LazyLock<RwLock<BTreeMap<PathBuf, String>>> =
+    LazyLock::new(|| RwLock::new(BTreeMap::new()));
+static TASK_BOARD_OPENROUTER_TOKENS: LazyLock<RwLock<BTreeMap<PathBuf, String>>> =
     LazyLock::new(|| RwLock::new(BTreeMap::new()));
 static TASK_BOARD_GIT_RUNTIME_SECRETS: LazyLock<
     RwLock<BTreeMap<PathBuf, TaskBoardGitRuntimeConfig>>,
@@ -278,6 +281,38 @@ pub fn task_board_todoist_token() -> Option<String> {
     TASK_BOARD_TODOIST_TOKENS
         .read()
         .expect("task-board todoist token state lock poisoned")
+        .get(&task_board_memory_key())
+        .cloned()
+}
+
+/// Replace the daemon's in-memory `OpenRouter` token snapshot.
+///
+/// # Panics
+/// Panics when the in-memory token state lock is poisoned.
+#[must_use]
+pub fn replace_task_board_openrouter_token(
+    request: &TaskBoardOpenRouterTokenSyncRequest,
+) -> TaskBoardOpenRouterTokenSyncResponse {
+    let mut states = TASK_BOARD_OPENROUTER_TOKENS
+        .write()
+        .expect("task-board openrouter token state lock poisoned");
+    let token = normalize_optional_value(request.token.as_deref());
+    let token_configured = token.is_some();
+    if let Some(token) = token {
+        states.insert(task_board_memory_key(), token);
+    } else {
+        states.remove(&task_board_memory_key());
+    }
+    TaskBoardOpenRouterTokenSyncResponse { token_configured }
+}
+
+/// # Panics
+/// Panics when the in-memory token state lock is poisoned.
+#[must_use]
+pub fn task_board_openrouter_token() -> Option<String> {
+    TASK_BOARD_OPENROUTER_TOKENS
+        .read()
+        .expect("task-board openrouter token state lock poisoned")
         .get(&task_board_memory_key())
         .cloned()
 }

@@ -8,9 +8,10 @@ use axum::{Json, Router};
 
 use crate::daemon::protocol::{
     TaskBoardGitHubTokensSyncRequest, TaskBoardGitRuntimeConfig, TaskBoardGitSigningVerifyRequest,
-    TaskBoardOrchestratorRunOnceRequest, TaskBoardOrchestratorSettingsUpdateRequest,
-    TaskBoardPolicyPipelinePromoteRequest, TaskBoardPolicyPipelineSaveDraftRequest,
-    TaskBoardPolicyPipelineSimulateRequest, TaskBoardTodoistTokenSyncRequest, http_paths,
+    TaskBoardOpenRouterTokenSyncRequest, TaskBoardOrchestratorRunOnceRequest,
+    TaskBoardOrchestratorSettingsUpdateRequest, TaskBoardPolicyPipelinePromoteRequest,
+    TaskBoardPolicyPipelineSaveDraftRequest, TaskBoardPolicyPipelineSimulateRequest,
+    TaskBoardTodoistTokenSyncRequest, http_paths,
 };
 
 use super::DaemonHttpState;
@@ -150,6 +151,10 @@ pub(super) fn task_board_routes() -> Router<DaemonHttpState> {
         .route(
             http_paths::TASK_BOARD_ORCHESTRATOR_TODOIST_TOKEN,
             put(put_task_board_orchestrator_todoist_token),
+        )
+        .route(
+            http_paths::TASK_BOARD_ORCHESTRATOR_OPENROUTER_TOKEN,
+            put(put_task_board_orchestrator_openrouter_token),
         )
         .route(
             http_paths::TASK_BOARD_GIT_IDENTITY_DEFAULTS,
@@ -324,6 +329,21 @@ async fn put_task_board_orchestrator_todoist_token(
         &request_id,
         start,
         task_board_route_executor::sync_todoist_token(&request),
+    )
+}
+
+async fn put_task_board_orchestrator_openrouter_token(
+    headers: HeaderMap,
+    State(state): State<DaemonHttpState>,
+    Json(request): Json<TaskBoardOpenRouterTokenSyncRequest>,
+) -> Response {
+    let (start, request_id) = authenticated_request!(headers, state);
+    timed_json(
+        "PUT",
+        http_paths::TASK_BOARD_ORCHESTRATOR_OPENROUTER_TOKEN,
+        &request_id,
+        start,
+        task_board_route_executor::sync_openrouter_token(&request),
     )
 }
 

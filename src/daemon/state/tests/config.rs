@@ -7,13 +7,14 @@ use super::super::{
     DaemonRuntimeConfig, config_path, drain_task_board_git_runtime_secrets,
     load_persisted_log_level, load_runtime_config, load_task_board_git_runtime_config,
     persist_log_level, persist_task_board_git_runtime_config, read_recent_events,
-    replace_task_board_github_tokens, replace_task_board_todoist_token, task_board_github_token,
+    replace_task_board_github_tokens, replace_task_board_openrouter_token,
+    replace_task_board_todoist_token, task_board_github_token, task_board_openrouter_token,
     task_board_todoist_token,
 };
 use crate::task_board::{
     TaskBoardGitHubRepositoryToken, TaskBoardGitHubTokensSyncRequest, TaskBoardGitRuntimeConfig,
     TaskBoardGitRuntimeProfile, TaskBoardGitSigningConfig, TaskBoardGitSigningMode,
-    TaskBoardTodoistTokenSyncRequest,
+    TaskBoardOpenRouterTokenSyncRequest, TaskBoardTodoistTokenSyncRequest,
 };
 
 #[test]
@@ -303,11 +304,15 @@ fn task_board_credential_snapshots_are_scoped_by_daemon_root() {
         let _ = replace_task_board_todoist_token(&TaskBoardTodoistTokenSyncRequest {
             token: Some("first-todoist".into()),
         });
+        let _ = replace_task_board_openrouter_token(&TaskBoardOpenRouterTokenSyncRequest {
+            token: Some("first-or".into()),
+        });
     });
 
     with_isolated_harness_env(second.path(), || {
         assert!(task_board_github_token(None).is_none());
         assert!(task_board_todoist_token().is_none());
+        assert!(task_board_openrouter_token().is_none());
 
         let _ = replace_task_board_github_tokens(&TaskBoardGitHubTokensSyncRequest {
             global_token: Some("second-gh".into()),
@@ -316,16 +321,21 @@ fn task_board_credential_snapshots_are_scoped_by_daemon_root() {
         let _ = replace_task_board_todoist_token(&TaskBoardTodoistTokenSyncRequest {
             token: Some("second-todoist".into()),
         });
+        let _ = replace_task_board_openrouter_token(&TaskBoardOpenRouterTokenSyncRequest {
+            token: Some("second-or".into()),
+        });
 
         assert_eq!(task_board_github_token(None).as_deref(), Some("second-gh"));
         assert_eq!(
             task_board_todoist_token().as_deref(),
             Some("second-todoist")
         );
+        assert_eq!(task_board_openrouter_token().as_deref(), Some("second-or"));
     });
 
     with_isolated_harness_env(first.path(), || {
         assert_eq!(task_board_github_token(None).as_deref(), Some("first-gh"));
         assert_eq!(task_board_todoist_token().as_deref(), Some("first-todoist"));
+        assert_eq!(task_board_openrouter_token().as_deref(), Some("first-or"));
     });
 }

@@ -9,8 +9,8 @@ use crate::daemon::protocol::{
     TaskBoardPlanApproveRequest, TaskBoardPlanBeginRequest, TaskBoardPlanRevokeRequest,
     TaskBoardPlanSubmitRequest, TaskBoardPolicyPipelinePromoteRequest,
     TaskBoardPolicyPipelineSaveDraftRequest, TaskBoardPolicyPipelineSimulateRequest,
-    TaskBoardSyncRequest, TaskBoardTodoistTokenSyncRequest, TaskBoardUpdateItemRequest, WsRequest,
-    WsResponse, ws_methods,
+    TaskBoardOpenRouterTokenSyncRequest, TaskBoardSyncRequest, TaskBoardTodoistTokenSyncRequest,
+    TaskBoardUpdateItemRequest, WsRequest, WsResponse, ws_methods,
 };
 use serde::de::DeserializeOwned;
 
@@ -72,6 +72,9 @@ pub(crate) async fn dispatch_task_board_method(
         ws_methods::TASK_BOARD_ORCHESTRATOR_TODOIST_TOKEN_SYNC => {
             Some(dispatch_task_board_orchestrator_todoist_token_sync(request))
         }
+        ws_methods::TASK_BOARD_ORCHESTRATOR_OPENROUTER_TOKEN_SYNC => Some(
+            dispatch_task_board_orchestrator_openrouter_token_sync(request),
+        ),
         ws_methods::TASK_BOARD_GIT_IDENTITY_DEFAULTS => {
             Some(dispatch_task_board_git_identity_defaults(request))
         }
@@ -309,6 +312,16 @@ fn dispatch_task_board_orchestrator_todoist_token_sync(request: &WsRequest) -> W
     dispatch_query_result(
         &request.id,
         task_board_route_executor::sync_todoist_token(&body),
+    )
+}
+
+fn dispatch_task_board_orchestrator_openrouter_token_sync(request: &WsRequest) -> WsResponse {
+    let Ok(body) = parse_params::<TaskBoardOpenRouterTokenSyncRequest>(request) else {
+        return invalid_params(request);
+    };
+    dispatch_query_result(
+        &request.id,
+        task_board_route_executor::sync_openrouter_token(&body),
     )
 }
 
