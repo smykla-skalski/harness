@@ -5,11 +5,11 @@ func requireAcpManagedAgentFamily<Key: CodingKey>(
   forKey key: Key
 ) throws {
   let family = try container.decode(ManagedAgentKind.self, forKey: key)
-  guard family == .acp || family == .openRouter else {
+  guard family == .acp else {
     throw DecodingError.dataCorruptedError(
       forKey: key,
       in: container,
-      debugDescription: "managed_agent_family must be 'acp' or 'open_router'"
+      debugDescription: "managed_agent_family must be 'acp'"
     )
   }
 }

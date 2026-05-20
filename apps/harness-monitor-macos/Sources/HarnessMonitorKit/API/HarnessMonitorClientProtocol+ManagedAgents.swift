@@ -30,41 +30,6 @@ extension HarnessMonitorClientProtocol {
     try await startManagedAcpAgent(sessionID: sessionID.rawValue, request: request)
   }
 
-  public func startManagedOpenRouterAgent(
-    sessionID: HarnessSessionID,
-    request: OpenRouterStartRequest
-  ) async throws -> ManagedAgentSnapshot {
-    try await startManagedOpenRouterAgent(sessionID: sessionID.rawValue, request: request)
-  }
-
-  public func listManagedOpenRouterAgents(
-    sessionID: HarnessSessionID
-  ) async throws -> OpenRouterRunListResponse {
-    try await listManagedOpenRouterAgents(sessionID: sessionID.rawValue)
-  }
-
-  public func getManagedOpenRouterAgent(
-    managedAgentID: ManagedAgentID
-  ) async throws -> OpenRouterRunSnapshot {
-    try await getManagedOpenRouterAgent(managedAgentID: managedAgentID.rawValue)
-  }
-
-  public func promptManagedOpenRouterAgent(
-    managedAgentID: ManagedAgentID,
-    prompt: String
-  ) async throws -> OpenRouterRunSnapshot {
-    try await promptManagedOpenRouterAgent(
-      managedAgentID: managedAgentID.rawValue,
-      prompt: prompt
-    )
-  }
-
-  public func cancelManagedOpenRouterAgent(
-    managedAgentID: ManagedAgentID
-  ) async throws -> OpenRouterRunSnapshot {
-    try await cancelManagedOpenRouterAgent(managedAgentID: managedAgentID.rawValue)
-  }
-
   public func sendManagedAgentInput(
     agentID: ManagedAgentID,
     request: AgentTuiInputRequest

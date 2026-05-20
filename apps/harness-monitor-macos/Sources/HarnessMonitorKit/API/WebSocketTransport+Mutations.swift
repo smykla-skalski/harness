@@ -247,63 +247,6 @@ extension WebSocketTransport {
     return try decode(value)
   }
 
-  public func startManagedOpenRouterAgent(
-    sessionID: String,
-    request: OpenRouterStartRequest
-  ) async throws -> ManagedAgentSnapshot {
-    let params = try encodeParams(request, extra: sessionScopeParams(sessionID: sessionID))
-    let value = try await rpc(method: .managedAgentStartOpenRouter, params: params)
-    let snapshot: OpenRouterRunSnapshot = try decode(value)
-    return .openRouter(snapshot)
-  }
-
-  public func listManagedOpenRouterAgents(
-    sessionID: String
-  ) async throws -> OpenRouterRunListResponse {
-    let value = try await rpc(
-      method: .managedAgentOpenRouterList,
-      params: .object(sessionScopeParams(sessionID: sessionID))
-    )
-    return try decode(value)
-  }
-
-  public func getManagedOpenRouterAgent(
-    managedAgentID: String
-  ) async throws -> OpenRouterRunSnapshot {
-    let value = try await rpc(
-      method: .managedAgentDetailOpenRouter,
-      params: .object(managedAgentParams(agentID: managedAgentID))
-    )
-    return try decode(value)
-  }
-
-  public func promptManagedOpenRouterAgent(
-    managedAgentID: String,
-    prompt: String
-  ) async throws -> OpenRouterRunSnapshot {
-    let params = try encodeParams(
-      OpenRouterPromptRequest(prompt: prompt),
-      extra: managedAgentParams(agentID: managedAgentID)
-    )
-    let value = try await rpc(method: .managedAgentPromptOpenRouter, params: params)
-    return try decode(value)
-  }
-
-  public func cancelManagedOpenRouterAgent(
-    managedAgentID: String
-  ) async throws -> OpenRouterRunSnapshot {
-    let value = try await rpc(
-      method: .managedAgentCancelOpenRouter,
-      params: .object(managedAgentParams(agentID: managedAgentID))
-    )
-    return try decode(value)
-  }
-
-  public func listOpenRouterModels() async throws -> OpenRouterModelListResponse {
-    let value = try await rpc(method: .managedAgentOpenRouterModels, params: .object([:]))
-    return try decode(value)
-  }
-
   public func sendManagedAgentInput(
     agentID: String,
     request: AgentTuiInputRequest

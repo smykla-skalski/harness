@@ -1,5 +1,14 @@
 import Foundation
 
+/// UI-side projection types for OpenRouter sessions.
+///
+/// OpenRouter no longer ships a daemon-side managed-agent family. The daemon
+/// dispatches OpenRouter through the generic ACP managed-agent surface using
+/// the catalog descriptor `"openrouter"`. The Swift `OpenRouterRunSnapshot` is
+/// therefore a Monitor-only projection layered on top of `AcpAgentSnapshot`,
+/// enriched with model/transcript fields the store accumulates from the daemon
+/// push event stream.
+
 public enum OpenRouterRunStatus: String, Codable, Sendable {
   case pending
   case streaming
@@ -30,9 +39,35 @@ public enum OpenRouterRunStatus: String, Codable, Sendable {
       false
     }
   }
+
+  /// Derive an OpenRouter UI status from an ACP agent's lifecycle state.
+  public init(acp status: AgentStatus, disconnect: AgentDisconnectReason?) {
+    switch status {
+    case .active, .awaitingReview:
+      self = .streaming
+    case .idle:
+      self = .idle
+    case .disconnected:
+      switch disconnect?.kind {
+      case "user_cancelled":
+        self = .cancelled
+      case "daemon_shutdown", "unknown", .none:
+        self = .cancelled
+      default:
+        self = .failed
+      }
+    case .removed:
+      self = .cancelled
+    }
+  }
 }
 
-public struct OpenRouterRunSnapshot: Codable, Equatable, Identifiable, Sendable {
+/// View model for a single OpenRouter session.
+///
+/// `runId` carries the same value as the underlying `AcpAgentSnapshot.acpId`,
+/// so transport calls on this projection map directly to ACP managed-agent
+/// routes (e.g. `stopManagedAcpAgent`, `resolveManagedAcpPermission`).
+public struct OpenRouterRunSnapshot: Equatable, Identifiable, Sendable {
   public let runId: String
   public let sessionId: String
   public let sessionAgentId: String?
@@ -80,94 +115,42 @@ public struct OpenRouterRunSnapshot: Codable, Equatable, Identifiable, Sendable 
     self.updatedAt = updatedAt
   }
 
-  public init(from decoder: any Decoder) throws {
-    let container = try decoder.container(keyedBy: CodingKeys.self)
-    runId = try container.decode(String.self, forKey: .runId)
-    sessionId = try container.decode(String.self, forKey: .sessionId)
-    sessionAgentId = try container.decodeIfPresent(String.self, forKey: .sessionAgentId)
-    displayName = try container.decode(String.self, forKey: .displayName)
-    model = try container.decode(String.self, forKey: .model)
-    status = try container.decode(OpenRouterRunStatus.self, forKey: .status)
-    latestMessage = try container.decodeIfPresent(String.self, forKey: .latestMessage)
-    latestReasoning = try container.decodeIfPresent(String.self, forKey: .latestReasoning)
-    finalMessage = try container.decodeIfPresent(String.self, forKey: .finalMessage)
-    error = try container.decodeIfPresent(String.self, forKey: .error)
-    turnCount = try container.decode(UInt32.self, forKey: .turnCount)
-    pendingPermissionBatches =
-      try container.decodeIfPresent(
-        [AcpPermissionBatch].self,
-        forKey: .pendingPermissionBatches
-      ) ?? []
-    createdAt = try container.decode(String.self, forKey: .createdAt)
-    updatedAt = try container.decode(String.self, forKey: .updatedAt)
-  }
-
-  private enum CodingKeys: String, CodingKey {
-    case runId
-    case sessionId
-    case sessionAgentId
-    case displayName
-    case model
-    case status
-    case latestMessage
-    case latestReasoning
-    case finalMessage
-    case error
-    case turnCount
-    case pendingPermissionBatches
-    case createdAt
-    case updatedAt
-  }
-
   public var id: String { runId }
   public var managedAgentID: String { runId }
   public var sessionAgentID: String? { sessionAgentId }
 }
 
-public struct OpenRouterStartRequest: Codable, Equatable, Sendable {
-  public let model: String?
-  public let prompt: String?
-  public let sessionAgentId: String?
-  public let displayName: String?
-  public let temperature: Float?
-  public let maxTokens: UInt32?
-  public let reasoningEffort: String?
-  public let projectDir: String?
-
+extension OpenRouterRunSnapshot {
+  /// Project an `AcpAgentSnapshot` into an OpenRouter run snapshot.
+  ///
+  /// `model` and `displayName` are not carried by the daemon's ACP snapshot,
+  /// so the store tracks them per run id from the original start request.
   public init(
-    model: String? = nil,
-    prompt: String? = nil,
-    sessionAgentId: String? = nil,
+    acp: AcpAgentSnapshot,
+    model: String,
     displayName: String? = nil,
-    temperature: Float? = nil,
-    maxTokens: UInt32? = nil,
-    reasoningEffort: String? = nil,
-    projectDir: String? = nil
+    latestMessage: String? = nil,
+    latestReasoning: String? = nil,
+    finalMessage: String? = nil,
+    error: String? = nil,
+    turnCount: UInt32 = 0
   ) {
-    self.model = model
-    self.prompt = prompt
-    self.sessionAgentId = sessionAgentId
-    self.displayName = displayName
-    self.temperature = temperature
-    self.maxTokens = maxTokens
-    self.reasoningEffort = reasoningEffort
-    self.projectDir = projectDir
-  }
-}
-
-public struct OpenRouterPromptRequest: Codable, Equatable, Sendable {
-  public let prompt: String
-
-  public init(prompt: String) {
-    self.prompt = prompt
-  }
-}
-
-public struct OpenRouterRunListResponse: Codable, Equatable, Sendable {
-  public let runs: [OpenRouterRunSnapshot]
-
-  public init(runs: [OpenRouterRunSnapshot]) {
-    self.runs = runs
+    self.init(
+      runId: acp.acpId,
+      sessionId: acp.sessionId,
+      sessionAgentId: acp.sessionAgentID,
+      displayName: displayName ?? acp.displayName,
+      model: model,
+      status: OpenRouterRunStatus(acp: acp.status, disconnect: acp.disconnectReason),
+      latestMessage: latestMessage,
+      latestReasoning: latestReasoning,
+      finalMessage: finalMessage,
+      error: error ?? acp.stderrTail,
+      turnCount: turnCount,
+      pendingPermissionBatches: acp.pendingPermissionBatches,
+      createdAt: acp.createdAt,
+      updatedAt: acp.updatedAt
+    )
   }
 }
 
@@ -203,13 +186,5 @@ public struct OpenRouterModelEntry: Codable, Equatable, Identifiable, Sendable {
     case name
     case contextLength
     case supportedParameters
-  }
-}
-
-public struct OpenRouterModelListResponse: Codable, Equatable, Sendable {
-  public let data: [OpenRouterModelEntry]
-
-  public init(data: [OpenRouterModelEntry]) {
-    self.data = data
   }
 }
