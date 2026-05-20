@@ -64,6 +64,49 @@ struct TaskBoardLaneStripSizing: Equatable {
   }
 }
 
+/// Wraps a single subview so the dashboard task-board content reports
+/// `max(intrinsic, viewportHeight)` to its parent `ScrollView`.
+///
+/// The lane chrome uses `idealHeight: laneFixedHeight`, so the subview's
+/// intrinsic height in an unbounded context is `chrome + laneFixedHeight + ...`.
+/// When the viewport exceeds that intrinsic, this layout proposes the larger
+/// viewport-sized bounds back to the subview, which lets the `.frame(maxHeight:
+/// .infinity)` chain inside `TaskBoardOverviewView` expand lanes into the
+/// leftover space. When the viewport is smaller, the layout reports the
+/// intrinsic and the parent `ScrollView` activates so chrome + lane minimum
+/// stays reachable.
+struct TaskBoardDashboardViewportLayout: Layout {
+  let viewportHeight: CGFloat
+
+  func sizeThatFits(
+    proposal: ProposedViewSize,
+    subviews: Subviews,
+    cache _: inout ()
+  ) -> CGSize {
+    guard let subview = subviews.first else { return .zero }
+    let intrinsic = subview.sizeThatFits(
+      ProposedViewSize(width: proposal.width, height: nil)
+    )
+    let width = proposal.width ?? intrinsic.width
+    let height = max(intrinsic.height, max(viewportHeight, 0))
+    return CGSize(width: width, height: height)
+  }
+
+  func placeSubviews(
+    in bounds: CGRect,
+    proposal _: ProposedViewSize,
+    subviews: Subviews,
+    cache _: inout ()
+  ) {
+    guard let subview = subviews.first else { return }
+    subview.place(
+      at: CGPoint(x: bounds.minX, y: bounds.minY),
+      anchor: .topLeading,
+      proposal: ProposedViewSize(width: bounds.width, height: bounds.height)
+    )
+  }
+}
+
 struct TaskBoardLaneStripLayout: Layout {
   let sizing: TaskBoardLaneStripSizing
 
