@@ -206,9 +206,9 @@ where
 fn submit_for_review_args_routes_through_daemon_client() {
     // Silence unused import when a subset of tests is selected.
     let _ = (TaskSeverity::Medium, TaskSource::Manual);
-    let captured = run_against_fake_daemon("sess-route-sfr", || {
+    let captured = run_against_fake_daemon("00000000-0000-4000-8000-00000000a001", || {
         let args = TaskSubmitForReviewArgs {
-            session_id: "sess-route-sfr".into(),
+            session_id: "00000000-0000-4000-8000-00000000a001".into(),
             task_id: "task-1".into(),
             actor: "worker-1".into(),
             summary: Some("done".into()),
@@ -220,7 +220,7 @@ fn submit_for_review_args_routes_through_daemon_client() {
     });
     assert_eq!(
         captured.path,
-        "/v1/sessions/sess-route-sfr/tasks/task-1/submit-for-review"
+        "/v1/sessions/00000000-0000-4000-8000-00000000a001/tasks/task-1/submit-for-review"
     );
     assert!(
         captured.body.contains("\"actor\":\"worker-1\""),
@@ -238,9 +238,9 @@ fn submit_for_review_args_routes_through_daemon_client() {
 
 #[test]
 fn claim_review_args_routes_through_daemon_client() {
-    let captured = run_against_fake_daemon("sess-route-claim", || {
+    let captured = run_against_fake_daemon("00000000-0000-4000-8000-00000000a002", || {
         let args = TaskClaimReviewArgs {
-            session_id: "sess-route-claim".into(),
+            session_id: "00000000-0000-4000-8000-00000000a002".into(),
             task_id: "task-1".into(),
             actor: "rev-1".into(),
             project_dir: None,
@@ -250,16 +250,16 @@ fn claim_review_args_routes_through_daemon_client() {
     });
     assert_eq!(
         captured.path,
-        "/v1/sessions/sess-route-claim/tasks/task-1/claim-review"
+        "/v1/sessions/00000000-0000-4000-8000-00000000a002/tasks/task-1/claim-review"
     );
     assert!(captured.body.contains("\"actor\":\"rev-1\""));
 }
 
 #[test]
 fn submit_review_args_routes_through_daemon_client() {
-    let captured = run_against_fake_daemon("sess-route-sr", || {
+    let captured = run_against_fake_daemon("00000000-0000-4000-8000-00000000a003", || {
         let args = TaskSubmitReviewArgs {
-            session_id: "sess-route-sr".into(),
+            session_id: "00000000-0000-4000-8000-00000000a003".into(),
             task_id: "task-1".into(),
             actor: "rev-1".into(),
             verdict: ReviewVerdict::RequestChanges,
@@ -272,7 +272,7 @@ fn submit_review_args_routes_through_daemon_client() {
     });
     assert_eq!(
         captured.path,
-        "/v1/sessions/sess-route-sr/tasks/task-1/submit-review"
+        "/v1/sessions/00000000-0000-4000-8000-00000000a003/tasks/task-1/submit-review"
     );
     assert!(
         captured.body.contains("\"verdict\":\"request_changes\""),
@@ -288,9 +288,9 @@ fn submit_review_args_routes_through_daemon_client() {
 
 #[test]
 fn respond_review_args_routes_through_daemon_client() {
-    let captured = run_against_fake_daemon("sess-route-respond", || {
+    let captured = run_against_fake_daemon("00000000-0000-4000-8000-00000000a004", || {
         let args = TaskRespondReviewArgs {
-            session_id: "sess-route-respond".into(),
+            session_id: "00000000-0000-4000-8000-00000000a004".into(),
             task_id: "task-1".into(),
             actor: "worker-1".into(),
             agreed: vec!["p1".into()],
@@ -303,7 +303,7 @@ fn respond_review_args_routes_through_daemon_client() {
     });
     assert_eq!(
         captured.path,
-        "/v1/sessions/sess-route-respond/tasks/task-1/respond-review"
+        "/v1/sessions/00000000-0000-4000-8000-00000000a004/tasks/task-1/respond-review"
     );
     assert!(captured.body.contains("\"agreed\":[\"p1\"]"));
     assert!(captured.body.contains("\"disputed\":[\"p2\",\"p3\"]"));
@@ -311,9 +311,9 @@ fn respond_review_args_routes_through_daemon_client() {
 
 #[test]
 fn arbitrate_args_routes_through_daemon_client() {
-    let captured = run_against_fake_daemon("sess-route-arb", || {
+    let captured = run_against_fake_daemon("00000000-0000-4000-8000-00000000a005", || {
         let args = TaskArbitrateArgs {
-            session_id: "sess-route-arb".into(),
+            session_id: "00000000-0000-4000-8000-00000000a005".into(),
             task_id: "task-1".into(),
             actor: "leader".into(),
             verdict: ReviewVerdict::Approve,
@@ -325,7 +325,7 @@ fn arbitrate_args_routes_through_daemon_client() {
     });
     assert_eq!(
         captured.path,
-        "/v1/sessions/sess-route-arb/tasks/task-1/arbitrate"
+        "/v1/sessions/00000000-0000-4000-8000-00000000a005/tasks/task-1/arbitrate"
     );
     assert!(captured.body.contains("\"verdict\":\"approve\""));
     assert!(captured.body.contains("\"summary\":\"shipping\""));
@@ -339,7 +339,7 @@ fn improver_apply_args_routes_through_daemon_client() {
 
     let captured = run_improver_against_fake_daemon(|| {
         let args = SessionImproverApplyArgs {
-            session_id: "sess-route-imp".into(),
+            session_id: "00000000-0000-4000-8000-00000000a006".into(),
             actor: "improver-1".into(),
             issue_id: "issue/abc".into(),
             target: crate::session::service::ImproverTarget::Skill,
@@ -351,7 +351,10 @@ fn improver_apply_args_routes_through_daemon_client() {
         let exit = args.execute(&AppContext).expect("execute");
         assert_eq!(exit, 0);
     });
-    assert_eq!(captured.path, "/v1/sessions/sess-route-imp/improver/apply");
+    assert_eq!(
+        captured.path,
+        "/v1/sessions/00000000-0000-4000-8000-00000000a006/improver/apply"
+    );
     assert!(captured.body.contains("\"actor\":\"improver-1\""));
     assert!(captured.body.contains("\"issue_id\":\"issue/abc\""));
     assert!(captured.body.contains("\"target\":\"skill\""));
