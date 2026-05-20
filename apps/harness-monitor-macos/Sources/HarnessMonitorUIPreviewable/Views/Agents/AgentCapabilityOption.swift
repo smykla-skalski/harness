@@ -264,4 +264,23 @@ struct AgentCapabilityOption: Identifiable, Equatable {
       return probe?.binaryPresent == true
     }
   }
+
+  func refreshingAvailability(
+    sandboxed: Bool,
+    acpHostBridgeReady: Bool,
+    codexHostBridgeReady: Bool
+  ) -> Self {
+    AgentCapabilityOption(
+      id: id,
+      title: title,
+      transportChoices: transportChoices,
+      doctorProbe: doctorProbe,
+      probe: probe,
+      installHint: installHint,
+      bundledWithHarness: bundledWithHarness,
+      sandboxed: sandboxed,
+      acpHostBridgeReady: acpHostBridgeReady,
+      codexHostBridgeReady: codexHostBridgeReady
+    )
+  }
 }

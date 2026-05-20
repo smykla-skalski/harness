@@ -126,9 +126,48 @@ enum SessionWindowCreateFormCatalogs {
     catalogState: SessionWindowAgentCreateCatalogState,
     store: HarnessMonitorStore
   ) -> [AgentCapabilityOption] {
-    catalogState.capabilityOptions.isEmpty
+    let options =
+      catalogState.capabilityOptions.isEmpty
       ? fallbackAgentOptions(store: store)
       : catalogState.capabilityOptions
+    return refreshedCapabilityOptions(
+      options,
+      sandboxed: store.daemonStatus?.manifest?.sandboxed == true,
+      acpHostBridgeReady: store.hostBridgeCapabilityState(for: "acp") == .ready,
+      codexHostBridgeReady: store.hostBridgeCapabilityState(for: "codex") == .ready
+    )
+  }
+
+  static func refreshedCapabilityOptions(
+    _ options: [AgentCapabilityOption],
+    sandboxed: Bool,
+    acpHostBridgeReady: Bool,
+    codexHostBridgeReady: Bool
+  ) -> [AgentCapabilityOption] {
+    options.map {
+      $0.refreshingAvailability(
+        sandboxed: sandboxed,
+        acpHostBridgeReady: acpHostBridgeReady,
+        codexHostBridgeReady: codexHostBridgeReady
+      )
+    }
+  }
+
+  static func shouldSurfaceInlineUnavailableReason(
+    for option: AgentCapabilityOption
+  ) -> Bool {
+    option.availabilityState != .bridgeAccessRequired
+  }
+
+  static func shouldShowTransportDiagnosticsDisclosure(
+    for option: AgentCapabilityOption
+  ) -> Bool {
+    switch option.availabilityState {
+    case .checkingAccess, .setupRequired, .unavailable:
+      return true
+    case .projectAccessAvailable, .bridgeAccessRequired, .terminalOnly:
+      return false
+    }
   }
 
   static func transportSummary(

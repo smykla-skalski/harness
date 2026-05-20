@@ -318,6 +318,7 @@ struct SessionWindowCreateTransportChoiceButton: View {
   let choice: AgentCapabilityTransportChoice
   let isSelected: Bool
   let isEnabled: Bool
+  let showsUnavailableReasonText: Bool
   let unavailableReason: String?
   let onSelect: () -> Void
 
@@ -350,7 +351,7 @@ struct SessionWindowCreateTransportChoiceButton: View {
         isEnabled ? "" : (unavailableReason ?? "Unavailable")
       )
 
-      if !isEnabled, let unavailableReason {
+      if showsUnavailableReasonText, !isEnabled, let unavailableReason {
         Text(unavailableReason)
           .scaledFont(.caption2)
           .foregroundStyle(HarnessMonitorTheme.caution)

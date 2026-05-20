@@ -199,6 +199,99 @@ struct SessionWindowCreateFormCatalogsSelectionTests {
     )
   }
 
+  @Test("Cached capability options refresh live bridge availability")
+  func cachedCapabilityOptionsRefreshLiveBridgeAvailability() throws {
+    let cachedOption = AgentCapabilityOption(
+      id: "codex",
+      title: "Codex",
+      transportChoices: [
+        AgentCapabilityTransportChoice(
+          id: .codex,
+          title: "Codex",
+          capabilities: ["streaming", "multi-turn", "approvals", "app-server"]
+        ),
+        AgentCapabilityTransportChoice(
+          id: .acp("codex"),
+          title: "ACP",
+          capabilities: ["fs.read", "fs.write", "terminal.spawn"]
+        ),
+        AgentCapabilityTransportChoice(
+          id: .tui(.codex),
+          title: "Terminal screen",
+          capabilities: ["streaming", "multi-turn"]
+        ),
+      ],
+      doctorProbe: AcpDoctorProbe(command: "harness-codex-acp", args: ["--probe"]),
+      probe: AcpRuntimeProbe(
+        agentId: "codex",
+        displayName: "Codex",
+        binaryPresent: true,
+        authState: .ready
+      ),
+      installHint: nil,
+      bundledWithHarness: true,
+      sandboxed: true,
+      acpHostBridgeReady: false,
+      codexHostBridgeReady: false
+    )
+
+    let refreshed = try #require(
+      SessionWindowCreateFormCatalogs.refreshedCapabilityOptions(
+        [cachedOption],
+        sandboxed: true,
+        acpHostBridgeReady: true,
+        codexHostBridgeReady: true
+      ).first
+    )
+
+    let codexChoice = try #require(refreshed.codexChoice)
+    let acpChoice = try #require(refreshed.acpChoice)
+    #expect(refreshed.isEnabled(codexChoice))
+    #expect(refreshed.isEnabled(acpChoice))
+    #expect(refreshed.availabilityState == .projectAccessAvailable)
+  }
+
+  @Test("Bridge access relies on the top banner instead of inline transport warnings")
+  func bridgeAccessUsesTopBannerInsteadOfInlineTransportWarnings() {
+    let option = AgentCapabilityOption(
+      id: "codex",
+      title: "Codex",
+      transportChoices: [
+        AgentCapabilityTransportChoice(
+          id: .codex,
+          title: "Codex",
+          capabilities: ["streaming", "multi-turn", "approvals", "app-server"]
+        ),
+        AgentCapabilityTransportChoice(
+          id: .acp("codex"),
+          title: "ACP",
+          capabilities: ["fs.read", "fs.write", "terminal.spawn"]
+        ),
+        AgentCapabilityTransportChoice(
+          id: .tui(.codex),
+          title: "Terminal screen",
+          capabilities: ["streaming", "multi-turn"]
+        ),
+      ],
+      doctorProbe: AcpDoctorProbe(command: "harness-codex-acp", args: ["--probe"]),
+      probe: AcpRuntimeProbe(
+        agentId: "codex",
+        displayName: "Codex",
+        binaryPresent: true,
+        authState: .ready
+      ),
+      installHint: nil,
+      bundledWithHarness: true,
+      sandboxed: true,
+      acpHostBridgeReady: false,
+      codexHostBridgeReady: false
+    )
+
+    #expect(option.availabilityState == .bridgeAccessRequired)
+    #expect(!SessionWindowCreateFormCatalogs.shouldSurfaceInlineUnavailableReason(for: option))
+    #expect(!SessionWindowCreateFormCatalogs.shouldShowTransportDiagnosticsDisclosure(for: option))
+  }
+
   private func descriptor(id: String, displayName: String) -> AcpAgentDescriptor {
     AcpAgentDescriptor(
       id: id,

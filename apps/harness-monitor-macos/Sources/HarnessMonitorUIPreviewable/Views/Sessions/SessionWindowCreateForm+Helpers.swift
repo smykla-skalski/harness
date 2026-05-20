@@ -11,10 +11,11 @@ extension SessionWindowCreateForm {
     option: AgentCapabilityOption,
     choice: AgentCapabilityTransportChoice
   ) -> some View {
-    if let unavailableReason = SessionWindowCreateFormCatalogs.unavailableReason(
-      for: option,
-      choice: choice
-    ),
+    if SessionWindowCreateFormCatalogs.shouldSurfaceInlineUnavailableReason(for: option),
+      let unavailableReason = SessionWindowCreateFormCatalogs.unavailableReason(
+        for: option,
+        choice: choice
+      ),
       !option.isEnabled(choice)
     {
       Label {
@@ -43,11 +44,7 @@ extension SessionWindowCreateForm {
       .accessibilityHint(option.installAccessibilityHint ?? "")
     }
 
-    if option.availabilityState == .checkingAccess
-      || option.availabilityState == .setupRequired
-      || option.availabilityState == .bridgeAccessRequired
-      || option.availabilityState == .unavailable
-    {
+    if SessionWindowCreateFormCatalogs.shouldShowTransportDiagnosticsDisclosure(for: option) {
       SessionWindowCreateDiagnosticsDisclosure(option: option)
     }
   }
