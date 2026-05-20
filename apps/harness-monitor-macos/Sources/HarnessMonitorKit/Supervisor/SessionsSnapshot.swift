@@ -152,16 +152,20 @@ public struct SessionsSnapshot: Sendable, Hashable {
       sessions: sessions.map(SessionCanonicalPayload.init(session:)),
       connection: connection
     )
-    let encoder = JSONEncoder()
-    encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
-    encoder.dateEncodingStrategy = .iso8601
-    guard let data = try? encoder.encode(payload) else {
+    guard let data = try? canonicalHashEncoder.encode(payload) else {
       return ""
     }
     let digest = SHA256.hash(data: data)
     return digest.map { String(format: "%02x", $0) }.joined()
   }
 }
+
+private let canonicalHashEncoder: JSONEncoder = {
+  let encoder = JSONEncoder()
+  encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
+  encoder.dateEncodingStrategy = .iso8601
+  return encoder
+}()
 
 public struct SessionSnapshot: Sendable, Hashable, Codable {
   public let id: String
