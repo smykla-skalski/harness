@@ -1,3 +1,4 @@
+import Foundation
 import Testing
 
 @testable import HarnessMonitorKit
@@ -193,5 +194,51 @@ struct SettingsTaskBoardDraftTests {
     let projects = draft.snapshot.orchestratorSettings.todoistInbox.projectFilter
 
     #expect(projects == ["1234567890", "9876543210"])
+  }
+}
+
+@Suite("Settings repositories catalog error presentation")
+struct SettingsRepositoriesCatalogErrorPresentationTests {
+  @Test("Missing GitHub token points users to Secrets")
+  func missingGitHubTokenPointsUsersToSecrets() {
+    let presentation = SettingsRepositoriesCatalogErrorPresentation(
+      error: HarnessMonitorAPIError.server(
+        code: 400,
+        message: "dependency-updates requires a GitHub token. Configure one in Settings > Secrets."
+      ),
+      organization: "smykla-skalski"
+    )
+
+    #expect(presentation.title == "GitHub token required")
+    #expect(
+      presentation.message
+        == "Add a GitHub token in Settings > Secrets, then load repositories again."
+    )
+    #expect(presentation.action == .openSecrets)
+  }
+
+  @Test("Fine-grained token lifetime errors surface friendly recovery copy")
+  func fineGrainedTokenLifetimeErrorsSurfaceFriendlyRecoveryCopy() throws {
+    let message =
+      "dependency-updates github request failed: GraphQL Error: The 'smykla-skalski' organization "
+      + "forbids access via a fine-grained personal access tokens if the token's lifetime is "
+      + "greater than 366 days. Please adjust your token's lifetime at the following URL: "
+      + "https://github.com/settings/personal-access-tokens/14799622 (path: [Path(\"organization\")])"
+    let presentation = SettingsRepositoriesCatalogErrorPresentation(
+      error: HarnessMonitorAPIError.server(code: 400, message: message),
+      organization: "smykla-skalski"
+    )
+
+    #expect(presentation.title == "GitHub token needs attention")
+    #expect(
+      presentation.message
+        == "GitHub blocked access to smykla-skalski because the current fine-grained token exceeds the organization's lifetime policy. Update the token, then load repositories again."
+    )
+
+    guard case let .openURL(url)? = presentation.action else {
+      Issue.record("expected token settings recovery action")
+      return
+    }
+    #expect(url == URL(string: "https://github.com/settings/personal-access-tokens/14799622"))
   }
 }
