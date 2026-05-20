@@ -19,7 +19,6 @@ use super::{
 use crate::agents::acp::probe::schedule_probe_cache_refresh;
 use crate::daemon::agent_acp::AcpAgentManagerHandle;
 use crate::daemon::http::AsyncDaemonDbSlot;
-use crate::daemon::openrouter_agent::OpenRouterAgentManagerHandle;
 use crate::telemetry::current_trace_id;
 use crate::workspace::orphan_cleanup::run_startup_sweep;
 use background_tasks::spawn_background_tasks;
@@ -113,7 +112,6 @@ pub async fn serve(config: DaemonServeConfig) -> Result<(), CliError> {
     let _bridge_watcher = bridge::spawn_manifest_watcher();
     let app_state = DaemonHttpState {
         token,
-        openrouter_agent_manager: OpenRouterAgentManagerHandle::new(sender.clone()),
         sender,
         manifest,
         daemon_epoch,
