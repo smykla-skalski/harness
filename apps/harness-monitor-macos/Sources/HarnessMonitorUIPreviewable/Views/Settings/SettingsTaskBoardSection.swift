@@ -1,45 +1,31 @@
 import HarnessMonitorKit
 import SwiftUI
 
-public struct SettingsTaskBoardSection: View {
-  public let store: HarnessMonitorStore
+struct SettingsTaskBoardSection: View, SettingsTaskBoardEditingSurface {
+  let store: HarnessMonitorStore
+  @Binding private var taskBoardFormState: TaskBoardSettingsFormState
   @Binding var navigationRequest: SettingsNavigationRequest?
-
-  @State private var draft = TaskBoardGitSettingsDraft()
-  @State private var isLoading = false
-  @State private var isSaving = false
-  @State private var loadError: String?
-  @State private var hasLoadedSettings = false
   @State private var pendingNavigationRequestID: UUID?
 
-  public init(
+  var formState: Binding<TaskBoardSettingsFormState> { $taskBoardFormState }
+
+  init(
     store: HarnessMonitorStore,
+    formState: Binding<TaskBoardSettingsFormState>,
     navigationRequest: Binding<SettingsNavigationRequest?> = .constant(nil)
   ) {
     self.store = store
+    _taskBoardFormState = formState
     _navigationRequest = navigationRequest
   }
 
-  public var body: some View {
+  var body: some View {
     ScrollViewReader { proxy in
       Form {
         if let loadError {
-          Section {
-            Text(loadError)
-              .foregroundStyle(.red)
-              .accessibilityIdentifier(HarnessMonitorAccessibility.settingsTaskBoardStatus)
-          } header: {
-            Text("Status")
-              .harnessNativeFormSectionHeader()
-          }
+          statusSection(message: loadError)
         } else if isLoading {
-          Section {
-            ProgressView("Loading Task Board settings...")
-              .accessibilityIdentifier(HarnessMonitorAccessibility.settingsTaskBoardStatus)
-          } header: {
-            Text("Status")
-              .harnessNativeFormSectionHeader()
-          }
+          loadingSection
         } else {
           workflowSection
           projectSection
@@ -48,17 +34,12 @@ public struct SettingsTaskBoardSection: View {
             .id(SettingsTaskBoardAnchor.githubInbox)
           SettingsTaskBoardHostSection(store: store)
           automationSection
-          gitIdentitySection
-          gitSigningSection
-          credentialsSection
-            .id(SettingsTaskBoardAnchor.credentials)
-          repositoryOverridesHeader
-          repositoryOverrideSections
+          authorIdentitySection
         }
       }
       .settingsDetailFormStyle()
       .accessibilityIdentifier(HarnessMonitorAccessibility.settingsTaskBoardRoot)
-      .task { await loadSettings() }
+      .task { await loadSettingsIfNeeded() }
       .onChange(of: navigationRequest, initial: true) { _, request in
         scrollToNavigationRequest(request, proxy: proxy)
       }
@@ -68,43 +49,32 @@ public struct SettingsTaskBoardSection: View {
       }
     }
     .safeAreaInset(edge: .bottom, spacing: 0) {
-      actionsComposer
+      settingsPersistenceActionBar(
+        reloadAccessibilityIdentifier: HarnessMonitorAccessibility.settingsTaskBoardReloadButton,
+        saveAccessibilityIdentifier: HarnessMonitorAccessibility.settingsTaskBoardSaveButton
+      )
     }
   }
 
-  private var actionsComposer: some View {
-    VStack(spacing: 0) {
-      Divider()
-      HStack {
-        Spacer(minLength: 0)
-        HarnessMonitorGlassControlGroup(spacing: HarnessMonitorTheme.itemSpacing) {
-          HStack(spacing: HarnessMonitorTheme.itemSpacing) {
-            HarnessMonitorAsyncActionButton(
-              title: "Reload",
-              tint: .secondary,
-              variant: .bordered,
-              isLoading: isLoading,
-              accessibilityIdentifier: HarnessMonitorAccessibility.settingsTaskBoardReloadButton,
-              action: loadSettings
-            )
-            HarnessMonitorAsyncActionButton(
-              title: "Save",
-              tint: nil,
-              variant: .prominent,
-              isLoading: isSaving,
-              accessibilityIdentifier: HarnessMonitorAccessibility.settingsTaskBoardSaveButton,
-              action: saveSettings
-            )
-            .disabled(isLoading || loadError != nil)
-          }
-        }
-      }
-      .padding(.horizontal, HarnessMonitorTheme.spacingXL)
-      .padding(.vertical, HarnessMonitorTheme.spacingSM)
-      .frame(maxWidth: .infinity, alignment: .trailing)
+  private func statusSection(message: String) -> some View {
+    Section {
+      Text(message)
+        .foregroundStyle(.red)
+        .accessibilityIdentifier(HarnessMonitorAccessibility.settingsTaskBoardStatus)
+    } header: {
+      Text("Status")
+        .harnessNativeFormSectionHeader()
     }
-    .frame(maxWidth: .infinity, alignment: .trailing)
-    .background(.background)
+  }
+
+  private var loadingSection: some View {
+    Section {
+      ProgressView("Loading Task Board settings...")
+        .accessibilityIdentifier(HarnessMonitorAccessibility.settingsTaskBoardStatus)
+    } header: {
+      Text("Status")
+        .harnessNativeFormSectionHeader()
+    }
   }
 
   private var workflowSection: some View {
@@ -112,8 +82,8 @@ public struct SettingsTaskBoardSection: View {
       ForEach(TaskBoardOrchestratorWorkflow.allCases, id: \.self) { workflow in
         Toggle(workflow.title, isOn: workflowBinding(workflow))
       }
-      Toggle("Dry Run by Default", isOn: $draft.dryRunDefault)
-      Picker("Dispatch Status Filter", selection: $draft.dispatchStatusFilter) {
+      Toggle("Dry Run by Default", isOn: draftBinding.dryRunDefault)
+      Picker("Dispatch Status Filter", selection: draftBinding.dispatchStatusFilter) {
         ForEach(DispatchStatusFilterChoice.allCases, id: \.self) { choice in
           Text(choice.title).tag(choice)
         }
@@ -132,22 +102,22 @@ public struct SettingsTaskBoardSection: View {
           title: "Project Directory",
           accessibilityIdentifier: HarnessMonitorAccessibility.settingsTaskBoardProjectDirField
         ),
-        text: $draft.projectDir
+        text: draftBinding.projectDir
       )
-      TextField("Owner", text: $draft.owner)
+      TextField("Owner", text: draftBinding.owner)
         .accessibilityIdentifier(HarnessMonitorAccessibility.settingsTaskBoardOwnerField)
-      TextField("Repository", text: $draft.repo)
+      TextField("Repository", text: draftBinding.repo)
         .accessibilityIdentifier(HarnessMonitorAccessibility.settingsTaskBoardRepoField)
       pathField(
         .directory(
           title: "Checkout Path",
           accessibilityIdentifier: HarnessMonitorAccessibility.settingsTaskBoardCheckoutPathField
         ),
-        text: $draft.checkoutPath
+        text: draftBinding.checkoutPath
       )
-      TextField("Default Branch", text: $draft.defaultBranch)
-      TextField("Branch Prefix", text: $draft.branchPrefix)
-      Picker("Merge Method", selection: $draft.mergeMethod) {
+      TextField("Default Branch", text: draftBinding.defaultBranch)
+      TextField("Branch Prefix", text: draftBinding.branchPrefix)
+      Picker("Merge Method", selection: draftBinding.mergeMethod) {
         ForEach(TaskBoardGitHubMergeMethod.allCases, id: \.self) { method in
           Text(method.title).tag(method)
         }
@@ -156,14 +126,14 @@ public struct SettingsTaskBoardSection: View {
       multilineField(
         title: "Requested Reviewers",
         placeholder: "usernames, one per line",
-        text: $draft.requestedReviewersText,
+        text: draftBinding.requestedReviewersText,
         accessibilityIdentifier: HarnessMonitorAccessibility
           .settingsTaskBoardRequestedReviewersField
       )
       multilineField(
         title: "Requested Team Reviewers",
         placeholder: "team slugs, one per line",
-        text: $draft.requestedTeamReviewersText,
+        text: draftBinding.requestedTeamReviewersText,
         accessibilityIdentifier: HarnessMonitorAccessibility.settingsTaskBoardTeamReviewersField
       )
     } header: {
@@ -175,18 +145,18 @@ public struct SettingsTaskBoardSection: View {
   }
 
   private var githubInboxSection: some View {
-    SettingsTaskBoardInboxSection(draft: $draft)
+    SettingsTaskBoardInboxSection(draft: draftBinding)
   }
 
   private var automationSection: some View {
     Section {
-      TextField("Managed Label", text: $draft.managedLabel)
-      TextField("Auto Merge Label", text: $draft.autoMergeLabel)
-      TextField("Needs Human Label", text: $draft.needsHumanLabel)
-      TextField("Protected Path Label", text: $draft.protectedPathLabel)
+      TextField("Managed Label", text: draftBinding.managedLabel)
+      TextField("Auto Merge Label", text: draftBinding.autoMergeLabel)
+      TextField("Needs Human Label", text: draftBinding.needsHumanLabel)
+      TextField("Protected Path Label", text: draftBinding.protectedPathLabel)
       HarnessMonitorMultilineTextField<Never>(
         placeholder: "Protected paths, one per line",
-        text: $draft.protectedPathsText,
+        text: draftBinding.protectedPathsText,
         minHeight: 88,
         accessibilityLabel: "Protected paths"
       )
@@ -200,47 +170,28 @@ public struct SettingsTaskBoardSection: View {
     }
   }
 
-  private var gitIdentitySection: some View {
+  private var authorIdentitySection: some View {
     Section {
       TextField(
         "Author Name",
-        text: $draft.authorName,
+        text: draftBinding.authorName,
         prompt: identityPrompt(draft.identityDefaults.gitConfig.userName)
       )
       TextField(
         "Author Email",
-        text: $draft.authorEmail,
+        text: draftBinding.authorEmail,
         prompt: identityPrompt(draft.identityDefaults.gitConfig.userEmail)
       )
       if shouldOfferAdoptDefaults {
         Button("Use my git config defaults", action: adoptGitConfigDefaults)
           .buttonStyle(.borderless)
       }
-      pathField(
-        .keyFile(
-          title: "SSH Key Path",
-          accessibilityIdentifier: HarnessMonitorAccessibility.settingsTaskBoardSSHKeyPathField
-        ),
-        text: $draft.sshKeyPath
-      )
-      SettingsSecretField(
-        title: "SSH Private Key",
-        placeholder: "Paste SSH private key material",
-        field: $draft.sshPrivateKey,
-        accessibilityIdentifier: HarnessMonitorAccessibility.settingsTaskBoardSSHPrivateKeyField
-      )
-      SettingsSecretField(
-        title: "SSH Key Passphrase",
-        placeholder: "Optional passphrase",
-        field: $draft.sshPrivateKeyPassphrase,
-        accessibilityIdentifier: HarnessMonitorAccessibility.settingsTBSSHKeyPassphraseField
-      )
     } header: {
-      Text("Git Identity")
+      Text("Git Author Identity")
         .harnessNativeFormSectionHeader()
     } footer: {
       VStack(alignment: .leading, spacing: 4) {
-        Text("These values affect daemon-managed git operations only.")
+        Text("These values affect daemon-managed author identity only.")
         Text("Empty = use your git config defaults.")
       }
     }
@@ -249,26 +200,6 @@ public struct SettingsTaskBoardSection: View {
   private func identityPrompt(_ detected: String?) -> Text? {
     guard let detected, !detected.isEmpty else { return nil }
     return Text(detected)
-  }
-
-  var draftBinding: Binding<TaskBoardGitSettingsDraft> {
-    $draft
-  }
-
-  var isLoadingBinding: Binding<Bool> {
-    $isLoading
-  }
-
-  var isSavingBinding: Binding<Bool> {
-    $isSaving
-  }
-
-  var loadErrorBinding: Binding<String?> {
-    $loadError
-  }
-
-  var hasLoadedSettingsBinding: Binding<Bool> {
-    $hasLoadedSettings
   }
 
   var navigationRequestBinding: Binding<SettingsNavigationRequest?> {
@@ -289,96 +220,13 @@ public struct SettingsTaskBoardSection: View {
 
   private func adoptGitConfigDefaults() {
     let gitConfig = draft.identityDefaults.gitConfig
-    if draft.authorName.isEmpty, let name = gitConfig.userName {
-      draft.authorName = name
+    var updatedDraft = draft
+    if updatedDraft.authorName.isEmpty, let name = gitConfig.userName {
+      updatedDraft.authorName = name
     }
-    if draft.authorEmail.isEmpty, let email = gitConfig.userEmail {
-      draft.authorEmail = email
+    if updatedDraft.authorEmail.isEmpty, let email = gitConfig.userEmail {
+      updatedDraft.authorEmail = email
     }
-  }
-
-  private var credentialsSection: some View {
-    Section {
-      SettingsSecretField(
-        title: "GitHub Token",
-        placeholder: "Personal access token",
-        field: $draft.globalToken,
-        accessibilityIdentifier: HarnessMonitorAccessibility.settingsTaskBoardGlobalTokenField
-      )
-      SettingsSecretField(
-        title: "Todoist Token",
-        placeholder: "Optional Todoist API token",
-        field: $draft.todoistToken,
-        accessibilityIdentifier: HarnessMonitorAccessibility.settingsTaskBoardGlobalTokenField
-          + ".todoist"
-      )
-      SettingsSecretField(
-        title: "OpenRouter API Key",
-        placeholder: "sk-or-...",
-        field: $draft.openRouterToken,
-        accessibilityIdentifier: HarnessMonitorAccessibility.settingsTaskBoardGlobalTokenField
-          + ".openrouter"
-      )
-    } header: {
-      Text("Credentials")
-        .harnessNativeFormSectionHeader()
-    } footer: {
-      Text(
-        "Tokens are stored in your macOS Keychain. "
-          + "Click the trash icon to clear a stored value."
-      )
-    }
-  }
-
-  private var repositoryOverridesHeader: some View {
-    Section {
-      Button {
-        draft.repositoryOverrides.append(TaskBoardRepositoryOverrideDraft())
-      } label: {
-        Label("Add Repository Override", systemImage: "plus")
-      }
-      .accessibilityIdentifier(HarnessMonitorAccessibility.settingsTaskBoardAddOverrideButton)
-    } header: {
-      Text("Repository Overrides")
-        .harnessNativeFormSectionHeader()
-    } footer: {
-      Text("Use overrides for repo-specific identity or GitHub token values.")
-    }
-  }
-
-  @ViewBuilder private var repositoryOverrideSections: some View {
-    ForEach(Array(draft.repositoryOverrides.enumerated()), id: \.element.id) { index, _ in
-      Section {
-        DisclosureGroup(repositoryOverrideTitle(index: index)) {
-          TextField("owner/repo", text: $draft.repositoryOverrides[index].repository)
-            .accessibilityIdentifier(
-              HarnessMonitorAccessibility.settingsTaskBoardRepositoryOverrideField(index)
-            )
-          repositoryIdentityFields(index: index, override: $draft.repositoryOverrides[index])
-          repositorySigningFields(index: index, override: $draft.repositoryOverrides[index])
-          SettingsSecretField(
-            title: "GitHub Token",
-            placeholder: "Repository-specific token",
-            field: $draft.repositoryOverrides[index].token,
-            accessibilityIdentifier:
-              HarnessMonitorAccessibility.settingsTaskBoardRepositoryOverrideTokenField(index)
-          )
-          Button(role: .destructive) {
-            draft.repositoryOverrides.remove(at: index)
-          } label: {
-            Label("Remove Override", systemImage: "trash")
-          }
-        }
-      }
-    }
-  }
-
-  private func repositoryOverrideTitle(index: Int) -> String {
-    let slug = draft.repositoryOverrides[index].repository
-      .trimmingCharacters(in: .whitespacesAndNewlines)
-    if slug.isEmpty {
-      return "Repository Override \(index + 1)"
-    }
-    return slug
+    draftBinding.wrappedValue = updatedDraft
   }
 }

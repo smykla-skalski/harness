@@ -43,6 +43,8 @@ extension HarnessMonitorAccessibility {
   public static let settingsVoiceSection = "harness.settings.section.voice"
   public static let settingsConnectionSection = "harness.settings.section.connection"
   public static let settingsTaskBoardSection = "harness.settings.section.taskboard"
+  public static let settingsDependenciesSection = "harness.settings.section.dependencies"
+  public static let settingsSecretsSection = "harness.settings.section.secrets"
   public static let settingsDatabaseSection = "harness.settings.section.database"
   public static let settingsDiagnosticsSection = "harness.settings.section.diagnostics"
   public static let settingsMCPSection = "harness.settings.mcp"
@@ -119,6 +121,26 @@ extension HarnessMonitorAccessibility {
   public static let settingsTaskBoardStatus = "harness.settings.task-board.status"
   public static let settingsTaskBoardReloadButton = "harness.settings.task-board.reload"
   public static let settingsTaskBoardSaveButton = "harness.settings.task-board.save"
+  public static let settingsDependenciesRoot = "harness.settings.dependencies"
+  public static let settingsDependenciesReloadButton = "harness.settings.dependencies.reload"
+  public static let settingsDependenciesSaveButton = "harness.settings.dependencies.save"
+  public static let settingsDependenciesAuthorsField = "harness.settings.dependencies.authors"
+  public static let settingsDependenciesOrganizationsField =
+    "harness.settings.dependencies.organizations"
+  public static let settingsDependenciesRepositoriesField =
+    "harness.settings.dependencies.repositories"
+  public static let settingsDependenciesExcludedRepositoriesField =
+    "harness.settings.dependencies.exclude-repositories"
+  public static let settingsDependenciesMergeMethodField =
+    "harness.settings.dependencies.merge-method"
+  public static let settingsDependenciesRefreshIntervalField =
+    "harness.settings.dependencies.refresh-interval"
+  public static let settingsDependenciesCacheMaxAgeField =
+    "harness.settings.dependencies.cache-max-age"
+  public static let settingsSecretsRoot = "harness.settings.secrets"
+  public static let settingsSecretsStatus = "harness.settings.secrets.status"
+  public static let settingsSecretsReloadButton = "harness.settings.secrets.reload"
+  public static let settingsSecretsSaveButton = "harness.settings.secrets.save"
   public static let settingsTaskBoardProjectDirField = "harness.settings.task-board.project-dir"
   public static let settingsTaskBoardOwnerField = "harness.settings.task-board.owner"
   public static let settingsTaskBoardRepoField = "harness.settings.task-board.repo"

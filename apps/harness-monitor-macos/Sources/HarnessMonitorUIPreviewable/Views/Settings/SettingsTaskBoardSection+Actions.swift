@@ -33,37 +33,6 @@ extension SettingsTaskBoardSection {
   }
 
   @MainActor
-  func loadSettings() async {
-    isLoadingBinding.wrappedValue = true
-    hasLoadedSettingsBinding.wrappedValue = false
-    defer { isLoadingBinding.wrappedValue = false }
-
-    do {
-      let snapshot = try await store.taskBoardGitSettingsSnapshot()
-      draftBinding.wrappedValue = TaskBoardGitSettingsDraft(snapshot: snapshot)
-      loadErrorBinding.wrappedValue = nil
-      hasLoadedSettingsBinding.wrappedValue = true
-    } catch {
-      loadErrorBinding.wrappedValue = error.localizedDescription
-      hasLoadedSettingsBinding.wrappedValue = false
-    }
-  }
-
-  @MainActor
-  func saveSettings() async {
-    isSavingBinding.wrappedValue = true
-    defer { isSavingBinding.wrappedValue = false }
-
-    let succeeded = await store.updateTaskBoardGitSettings(
-      snapshot: draftBinding.wrappedValue.snapshot
-    )
-    if succeeded {
-      loadErrorBinding.wrappedValue = nil
-      await loadSettings()
-    }
-  }
-
-  @MainActor
   func scrollToNavigationRequest(
     _ request: SettingsNavigationRequest?,
     proxy: ScrollViewProxy

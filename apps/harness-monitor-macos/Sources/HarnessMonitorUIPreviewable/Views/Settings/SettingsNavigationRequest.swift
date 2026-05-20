@@ -11,10 +11,13 @@ public struct SettingsNavigationRequest: Equatable, Sendable {
 }
 
 public enum SettingsNavigationTarget: Equatable, Hashable, Sendable {
+  case section(SettingsSection)
   case taskBoard(SettingsTaskBoardAnchor)
 
   public var section: SettingsSection {
     switch self {
+    case .section(let section):
+      return section
     case .taskBoard:
       return .taskBoard
     }
@@ -24,12 +27,13 @@ public enum SettingsNavigationTarget: Equatable, Hashable, Sendable {
 public enum SettingsTaskBoardAnchor: String, Equatable, Hashable, Sendable {
   case githubProject
   case githubInbox
-  case credentials
 }
 
 extension SettingsNavigationRequest {
   var taskBoardAnchor: SettingsTaskBoardAnchor? {
     switch target {
+    case .section:
+      return nil
     case .taskBoard(let anchor):
       return anchor
     }

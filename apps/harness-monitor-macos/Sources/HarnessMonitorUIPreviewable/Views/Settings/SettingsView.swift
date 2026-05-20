@@ -12,6 +12,7 @@ public struct SettingsView: View {
   @State private var selectedSupervisorPane: SupervisorPaneKey = .rules
   @State private var preparedDiagnosticsInput: SettingsDiagnosticsSnapshotInput?
   @State private var preparedDiagnosticsSnapshot: SettingsDiagnosticsSnapshot?
+  @State private var taskBoardFormState = TaskBoardSettingsFormState()
 
   public init(
     store: HarnessMonitorStore,
@@ -65,7 +66,17 @@ public struct SettingsView: View {
         case .taskBoard:
           SettingsTaskBoardSection(
             store: store,
+            formState: $taskBoardFormState,
             navigationRequest: $navigationRequest
+          )
+          .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        case .dependencies:
+          SettingsDependenciesSection()
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        case .secrets:
+          SettingsSecretsSection(
+            store: store,
+            formState: $taskBoardFormState
           )
           .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         case .policies:
@@ -132,6 +143,9 @@ public struct SettingsView: View {
     .onChange(of: navigationRequest, initial: true) { _, request in
       guard let request else { return }
       selectedSection = request.target.section
+      if case .section = request.target {
+        navigationRequest = nil
+      }
     }
     .overlay {
       SettingsOverlayMarkers(
