@@ -75,7 +75,11 @@ fn bridge_start_adopts_group_container_when_xdg_is_empty() {
     .expect("spawn bridge");
 
     let adopted_state_path = group_daemon_root.join("bridge.json");
-    let xdg_state_path = xdg.join("harness").join("daemon").join("bridge.json");
+    let xdg_state_path = xdg
+        .join("harness")
+        .join("daemon")
+        .join("managed")
+        .join("bridge.json");
 
     let bridge_result = wait_for_state_at(&adopted_state_path);
     let adopted_state = std::fs::read_to_string(&adopted_state_path)
@@ -157,6 +161,7 @@ fn bridge_start_personal_profile_adopts_group_container_when_profile_root_is_emp
     let profile_state_path = profile_data_home
         .join("harness")
         .join("daemon")
+        .join("managed")
         .join("bridge.json");
 
     wait_for_state_at(&adopted_state_path)
@@ -221,6 +226,7 @@ fn bridge_start_personal_profile_keeps_profile_root_when_no_running_daemon_exist
     let profile_state_path = profile_data_home
         .join("harness")
         .join("daemon")
+        .join("managed")
         .join("bridge.json");
     let group_state_path = group_daemon_root(home).join("bridge.json");
 
@@ -287,6 +293,7 @@ fn bridge_start_agent_profile_keeps_profile_root_when_group_daemon_is_running() 
     let profile_state_path = profile_data_home
         .join("harness")
         .join("daemon")
+        .join("managed")
         .join("bridge.json");
     let group_state_path = group_daemon_root.join("bridge.json");
 
@@ -315,6 +322,7 @@ fn group_daemon_root(home: &Path) -> PathBuf {
         .join(HARNESS_MONITOR_APP_GROUP_ID)
         .join("harness")
         .join("daemon")
+        .join("managed")
 }
 
 fn profile_data_home(home: &Path, profile: &str) -> PathBuf {

@@ -47,6 +47,12 @@ fn parse_terminal_agent_output(bytes: &[u8]) -> AgentTuiSnapshot {
         ManagedAgentSnapshot::Acp(snapshot) => {
             panic!("expected terminal snapshot, got acp {}", snapshot.acp_id)
         }
+        ManagedAgentSnapshot::OpenRouter(snapshot) => {
+            panic!(
+                "expected terminal snapshot, got openrouter {}",
+                snapshot.run_id
+            )
+        }
     }
 }
 
@@ -60,6 +66,12 @@ fn parse_terminal_agent_value(value: Value) -> AgentTuiSnapshot {
         ManagedAgentSnapshot::Acp(snapshot) => {
             panic!("expected terminal snapshot, got acp {}", snapshot.acp_id)
         }
+        ManagedAgentSnapshot::OpenRouter(snapshot) => {
+            panic!(
+                "expected terminal snapshot, got openrouter {}",
+                snapshot.run_id
+            )
+        }
     }
 }
 
@@ -72,6 +84,12 @@ fn parse_codex_agent_value(value: Value) -> CodexRunSnapshot {
         }
         ManagedAgentSnapshot::Acp(snapshot) => {
             panic!("expected codex snapshot, got acp {}", snapshot.acp_id)
+        }
+        ManagedAgentSnapshot::OpenRouter(snapshot) => {
+            panic!(
+                "expected codex snapshot, got openrouter {}",
+                snapshot.run_id
+            )
         }
     }
 }

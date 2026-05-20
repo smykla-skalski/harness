@@ -210,7 +210,7 @@ async fn daemon_http_endpoint_performance_budgets() {
         seed_workspace(tmp.path());
     });
 
-    let db_path = tmp.path().join("harness/daemon/harness.db");
+    let db_path = tmp.path().join("harness/daemon/managed/harness.db");
     let db = DaemonDb::open(&db_path).expect("open db");
     with_isolated_harness_env(tmp.path(), || db.import_from_files()).expect("import");
 
@@ -281,7 +281,7 @@ fn daemon_status_report_within_budget() {
     });
 
     // Import into DB so status_report uses SQLite path.
-    let db_path = tmp.path().join("harness/daemon/harness.db");
+    let db_path = tmp.path().join("harness/daemon/managed/harness.db");
     let db = DaemonDb::open(&db_path).expect("open db");
     with_isolated_harness_env(tmp.path(), || db.import_from_files()).expect("import");
     drop(db);

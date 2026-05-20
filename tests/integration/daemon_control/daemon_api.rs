@@ -225,6 +225,7 @@ fn app_group_daemon_root(home: &Path) -> PathBuf {
         .join(HARNESS_MONITOR_APP_GROUP_ID)
         .join("harness")
         .join("daemon")
+        .join("managed")
 }
 
 fn read_daemon_token(token_path: &str) -> String {
