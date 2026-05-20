@@ -316,29 +316,12 @@ struct DashboardTaskBoardRouteView: View {
   }
 
   var body: some View {
-    HarnessMonitorColumnScrollView(
-      horizontalPadding: 0,
-      verticalPadding: 24,
-      constrainContentWidth: true,
-      readableWidth: false,
-      topScrollEdgeEffect: .soft,
-      scrollSurfaceIdentifier: HarnessMonitorAccessibility.dashboardScrollView,
-      scrollSurfaceLabel: "Dashboard",
-      scrollPosition: perfScrollHookEnabled ? $perfScrollPosition : nil
-    ) {
-      VStack(alignment: .leading, spacing: 24) {
-        TaskBoardOverviewHost(
-          scope: .dashboard,
-          store: store,
-          snapshot: taskBoardInboxSnapshot,
-          taskBoardItems: dashboardUI.taskBoardItems,
-          decisions: store.supervisorOpenDecisions,
-          orchestratorStatus: dashboardUI.taskBoardOrchestratorStatus,
-          evaluationSummary: dashboardUI.taskBoardEvaluationSummary,
-          isActionInFlight: dashboardUI.isBusy
-        )
+    Group {
+      if perfScrollHookEnabled {
+        dashboardScrollingContent(scrollPosition: $perfScrollPosition)
+      } else {
+        dashboardExpandedContent
       }
-      .frame(maxWidth: .infinity, alignment: .leading)
     }
     .frame(maxWidth: .infinity, maxHeight: .infinity)
     .onAppear {
@@ -369,6 +352,48 @@ struct DashboardTaskBoardRouteView: View {
       withAnimation(.easeOut(duration: 0.6)) {
         perfScrollPosition = ScrollPosition(edge: .top)
       }
+    }
+  }
+
+  private var taskBoardOverviewContent: some View {
+    TaskBoardOverviewHost(
+      scope: .dashboard,
+      store: store,
+      snapshot: taskBoardInboxSnapshot,
+      taskBoardItems: dashboardUI.taskBoardItems,
+      decisions: store.supervisorOpenDecisions,
+      orchestratorStatus: dashboardUI.taskBoardOrchestratorStatus,
+      evaluationSummary: dashboardUI.taskBoardEvaluationSummary,
+      isActionInFlight: dashboardUI.isBusy
+    )
+  }
+
+  private var dashboardExpandedContent: some View {
+    taskBoardOverviewContent
+      .padding(.vertical, 24)
+      .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+      .accessibilityElement(children: .contain)
+      .accessibilityIdentifier(HarnessMonitorAccessibility.dashboardScrollView)
+      .accessibilityLabel("Dashboard")
+  }
+
+  private func dashboardScrollingContent(
+    scrollPosition: Binding<ScrollPosition>? = nil
+  ) -> some View {
+    HarnessMonitorColumnScrollView(
+      horizontalPadding: 0,
+      verticalPadding: 24,
+      constrainContentWidth: true,
+      readableWidth: false,
+      topScrollEdgeEffect: .soft,
+      scrollSurfaceIdentifier: HarnessMonitorAccessibility.dashboardScrollView,
+      scrollSurfaceLabel: "Dashboard",
+      scrollPosition: scrollPosition
+    ) {
+      VStack(alignment: .leading, spacing: 24) {
+        taskBoardOverviewContent
+      }
+      .frame(maxWidth: .infinity, alignment: .leading)
     }
   }
 
