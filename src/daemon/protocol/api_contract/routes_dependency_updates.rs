@@ -3,6 +3,14 @@ use super::{HttpApiRouteContract, HttpRouteMethod, HttpRouteParity, http_paths, 
 pub(crate) const ROUTES: &[HttpApiRouteContract] = &[
     HttpApiRouteContract {
         method: HttpRouteMethod::Post,
+        path: http_paths::DEPENDENCY_UPDATES_REPOSITORIES,
+        parity: HttpRouteParity::Rpc {
+            ws_method: ws_methods::DEPENDENCY_UPDATES_REPOSITORY_CATALOG,
+        },
+        swift_client_exposed: true,
+    },
+    HttpApiRouteContract {
+        method: HttpRouteMethod::Post,
         path: http_paths::DEPENDENCY_UPDATES_QUERY,
         parity: HttpRouteParity::Rpc {
             ws_method: ws_methods::DEPENDENCY_UPDATES_QUERY,

@@ -1,0 +1,735 @@
+import HarnessMonitorKit
+import SwiftUI
+
+struct SettingsRepositoriesSection: View {
+  let store: HarnessMonitorStore
+  @Binding private var taskBoardFormState: TaskBoardSettingsFormState
+  @AppStorage(DashboardDependenciesPreferences.storageKey)
+  private var storedDependenciesPreferences = ""
+  @State private var draft = SettingsSharedRepositoriesDraft()
+  @State private var isLoading = false
+  @State private var isSaving = false
+  @State private var loadError: String?
+  @State private var saveWarning: String?
+  @State private var hasLoadedDraft = false
+  @State private var catalogOrganization = ""
+  @State private var loadedCatalogOrganization = ""
+  @State private var catalogRepositories: [String] = []
+  @State private var catalogSelection: Set<String> = []
+  @State private var catalogSearchText = ""
+  @State private var isCatalogLoading = false
+  @State private var catalogError: String?
+
+  @Environment(\.fontScale)
+  private var fontScale
+
+  init(
+    store: HarnessMonitorStore,
+    formState: Binding<TaskBoardSettingsFormState>
+  ) {
+    self.store = store
+    _taskBoardFormState = formState
+  }
+
+  private var bodyFont: Font {
+    HarnessMonitorTextSize.scaledFont(.body, by: fontScale)
+  }
+
+  private var captionSemibold: Font {
+    HarnessMonitorTextSize.scaledFont(.caption.weight(.semibold), by: fontScale)
+  }
+
+  private var filteredCatalogRepositories: [String] {
+    let needle = catalogSearchText.trimmingCharacters(in: .whitespacesAndNewlines)
+      .lowercased()
+    guard !needle.isEmpty else {
+      return catalogRepositories
+    }
+    return catalogRepositories.filter { $0.localizedCaseInsensitiveContains(needle) }
+  }
+
+  var body: some View {
+    Form {
+      if let loadError {
+        statusSection(message: loadError)
+      } else if isLoading {
+        loadingSection
+      } else {
+        if let saveWarning {
+          statusSection(message: saveWarning, color: .orange)
+        }
+        monitoredRepositoriesSection
+        organizationImportSection
+        if !draft.legacyOrganizations.isEmpty {
+          legacyOrganizationsSection
+        }
+      }
+    }
+    .settingsDetailFormStyle()
+    .accessibilityIdentifier(HarnessMonitorAccessibility.settingsRepositoriesRoot)
+    .task { await loadDraftIfNeeded() }
+    .safeAreaInset(edge: .bottom, spacing: 0) {
+      actionsBar
+    }
+  }
+
+  private func statusSection(message: String, color: Color = .red) -> some View {
+    Section {
+      Text(message)
+        .foregroundStyle(color)
+        .accessibilityIdentifier(HarnessMonitorAccessibility.settingsRepositoriesStatus)
+    } header: {
+      Text("Status")
+        .harnessNativeFormSectionHeader()
+    }
+  }
+
+  private var loadingSection: some View {
+    Section {
+      ProgressView("Loading monitored repositories...")
+        .accessibilityIdentifier(HarnessMonitorAccessibility.settingsRepositoriesStatus)
+    } header: {
+      Text("Status")
+        .harnessNativeFormSectionHeader()
+    }
+  }
+
+  private var monitoredRepositoriesSection: some View {
+    Section {
+      repositoriesTable
+      manualAddRow
+    } header: {
+      Text("Monitored Repositories")
+        .harnessNativeFormSectionHeader()
+    } footer: {
+      Text(
+        """
+        Manage the shared repository scope for Dependencies and Task Board here. Turning both \
+        feature toggles off removes the row.
+        """
+      )
+    }
+  }
+
+  private var repositoriesTable: some View {
+    VStack(spacing: 0) {
+      repositoriesTableHeader
+      Divider()
+
+      if draft.rows.isEmpty {
+        repositoriesEmptyRow
+      } else {
+        ForEach(Array(draft.rows.enumerated()), id: \.element.id) { index, row in
+          if index > 0 {
+            Divider()
+          }
+          repositoryRow(row, index: index)
+        }
+      }
+    }
+    .background(tableBackground)
+    .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+    .overlay {
+      RoundedRectangle(cornerRadius: 8, style: .continuous)
+        .stroke(Color(nsColor: .separatorColor).opacity(0.55), lineWidth: 1)
+    }
+  }
+
+  private var repositoriesTableHeader: some View {
+    HStack(spacing: HarnessMonitorTheme.spacingMD) {
+      Text("Owner")
+        .frame(maxWidth: .infinity, alignment: .leading)
+      Text("Repository")
+        .frame(maxWidth: .infinity, alignment: .leading)
+      Text("Dependencies")
+        .frame(width: 116, alignment: .center)
+      Text("Task Board")
+        .frame(width: 110, alignment: .center)
+      Text("Action")
+        .frame(width: 72, alignment: .trailing)
+    }
+    .font(captionSemibold)
+    .foregroundStyle(HarnessMonitorTheme.tertiaryInk)
+    .padding(.horizontal, HarnessMonitorTheme.spacingMD)
+    .padding(.vertical, HarnessMonitorTheme.spacingSM)
+  }
+
+  private var repositoriesEmptyRow: some View {
+    Label("No monitored repositories configured", systemImage: "shippingbox")
+      .font(bodyFont)
+      .foregroundStyle(HarnessMonitorTheme.tertiaryInk)
+      .frame(maxWidth: .infinity, alignment: .leading)
+      .padding(.horizontal, HarnessMonitorTheme.spacingMD)
+      .padding(.vertical, HarnessMonitorTheme.spacingSM)
+      .accessibilityIdentifier(HarnessMonitorAccessibility.settingsRepositoriesRow(0))
+  }
+
+  private func repositoryRow(_ row: SettingsSharedRepositoryRow, index: Int) -> some View {
+    HStack(spacing: HarnessMonitorTheme.spacingMD) {
+      Text(row.owner)
+        .font(bodyFont)
+        .textSelection(.enabled)
+        .frame(maxWidth: .infinity, alignment: .leading)
+      Text(row.repository)
+        .font(bodyFont)
+        .textSelection(.enabled)
+        .frame(maxWidth: .infinity, alignment: .leading)
+      Toggle(
+        "Dependencies",
+        isOn: Binding(
+          get: { row.dependenciesEnabled },
+          set: { draft.setDependenciesEnabled($0, for: row.id) }
+        )
+      )
+      .labelsHidden()
+      .toggleStyle(.switch)
+      .frame(width: 116, alignment: .center)
+      .accessibilityIdentifier(
+        HarnessMonitorAccessibility.settingsRepositoriesDependenciesToggle(index)
+      )
+      Toggle(
+        "Task Board",
+        isOn: Binding(
+          get: { row.taskBoardEnabled },
+          set: { draft.setTaskBoardEnabled($0, for: row.id) }
+        )
+      )
+      .labelsHidden()
+      .toggleStyle(.switch)
+      .frame(width: 110, alignment: .center)
+      .accessibilityIdentifier(
+        HarnessMonitorAccessibility.settingsRepositoriesTaskBoardToggle(index)
+      )
+      Button(role: .destructive) {
+        draft.remove(rowID: row.id)
+      } label: {
+        Image(systemName: "trash")
+          .frame(width: 18, height: 18)
+      }
+      .buttonStyle(.borderless)
+      .foregroundStyle(HarnessMonitorTheme.danger)
+      .help("Remove \(row.repositoryPath)")
+      .accessibilityLabel("Remove \(row.repositoryPath)")
+      .accessibilityIdentifier(HarnessMonitorAccessibility.settingsRepositoriesRemoveButton(index))
+      .frame(width: 72, alignment: .trailing)
+    }
+    .padding(.horizontal, HarnessMonitorTheme.spacingMD)
+    .padding(.vertical, HarnessMonitorTheme.spacingSM)
+    .accessibilityIdentifier(HarnessMonitorAccessibility.settingsRepositoriesRow(index))
+  }
+
+  private var manualAddRow: some View {
+    HStack(alignment: .center, spacing: HarnessMonitorTheme.spacingSM) {
+      SettingsTaskBoardInboxTextField(
+        placeholder: "owner",
+        text: $draft.ownerInput,
+        accessibilityIdentifier: HarnessMonitorAccessibility.settingsRepositoriesOwnerField,
+        onSubmit: addManualRepository
+      )
+
+      SettingsTaskBoardInboxTextField(
+        placeholder: "repository",
+        text: $draft.repositoryInput,
+        accessibilityIdentifier: HarnessMonitorAccessibility.settingsRepositoriesNameField,
+        onSubmit: addManualRepository
+      )
+
+      Button(action: addManualRepository) {
+        Label("Add Repository", systemImage: "plus")
+          .labelStyle(.titleAndIcon)
+          .lineLimit(1)
+      }
+      .harnessActionButtonStyle(variant: .bordered, tint: .secondary)
+      .harnessNativeFormControl()
+      .fixedSize(horizontal: true, vertical: true)
+      .disabled(!draft.canAddManualRepository)
+      .accessibilityIdentifier(HarnessMonitorAccessibility.settingsRepositoriesAddButton)
+    }
+  }
+
+  private var organizationImportSection: some View {
+    Section {
+      HStack(alignment: .center, spacing: HarnessMonitorTheme.spacingSM) {
+        TextField("GitHub Organization", text: $catalogOrganization)
+          .accessibilityIdentifier(HarnessMonitorAccessibility.settingsRepositoriesOrganizationField)
+          .onSubmit {
+            Task { await loadCatalogForCurrentOrganization() }
+          }
+
+        HarnessMonitorAsyncActionButton(
+          title: "Load Repositories",
+          tint: .secondary,
+          variant: .bordered,
+          isLoading: isCatalogLoading,
+          accessibilityIdentifier: HarnessMonitorAccessibility
+            .settingsRepositoriesOrganizationLoadButton,
+          action: { await loadCatalogForCurrentOrganization() }
+        )
+        .disabled(normalizedCatalogOrganization == nil)
+      }
+
+      if let catalogError {
+        Text(catalogError)
+          .foregroundStyle(.red)
+          .accessibilityIdentifier(HarnessMonitorAccessibility.settingsRepositoriesCatalogStatus)
+      }
+
+      if !loadedCatalogOrganization.isEmpty {
+        catalogSummary
+        TextField("Search repositories", text: $catalogSearchText)
+          .accessibilityIdentifier(HarnessMonitorAccessibility.settingsRepositoriesCatalogSearchField)
+
+        if catalogRepositories.isEmpty {
+          Label("No repositories available for import", systemImage: "shippingbox")
+            .foregroundStyle(HarnessMonitorTheme.tertiaryInk)
+            .accessibilityIdentifier(HarnessMonitorAccessibility.settingsRepositoriesCatalogList)
+        } else {
+          List(filteredCatalogRepositories, id: \.self, selection: $catalogSelection) { repository in
+            Text(repository)
+              .textSelection(.enabled)
+          }
+          .frame(minHeight: 180, maxHeight: 280)
+          .accessibilityIdentifier(HarnessMonitorAccessibility.settingsRepositoriesCatalogList)
+
+          HStack(spacing: HarnessMonitorTheme.spacingSM) {
+            Button("Select Visible") {
+              catalogSelection = Set(filteredCatalogRepositories)
+            }
+            .buttonStyle(.borderless)
+
+            Button("Clear Selection") {
+              catalogSelection = []
+            }
+            .buttonStyle(.borderless)
+
+            Spacer()
+
+            Button("Add Selected") {
+              addCatalogRepositories(Array(catalogSelection))
+            }
+            .harnessActionButtonStyle(variant: .bordered, tint: .secondary)
+            .disabled(catalogSelection.isEmpty)
+            .accessibilityIdentifier(
+              HarnessMonitorAccessibility.settingsRepositoriesCatalogAddSelectedButton
+            )
+
+            Button("Add All") {
+              addCatalogRepositories(catalogRepositories)
+            }
+            .harnessActionButtonStyle(variant: .bordered, tint: .secondary)
+            .disabled(catalogRepositories.isEmpty)
+            .accessibilityIdentifier(
+              HarnessMonitorAccessibility.settingsRepositoriesCatalogAddAllButton
+            )
+          }
+        }
+      }
+    } header: {
+      Text("Organization Import")
+        .harnessNativeFormSectionHeader()
+    } footer: {
+      Text(
+        """
+        Search and import repositories from a GitHub organization, then tune each row's \
+        Dependencies and Task Board toggles in the shared table above.
+        """
+      )
+    }
+  }
+
+  private var catalogSummary: some View {
+    HStack {
+      VStack(alignment: .leading, spacing: 4) {
+        Text(loadedCatalogOrganization)
+          .font(captionSemibold)
+          .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+        Text(
+          "\(catalogRepositories.count) repositories loaded · "
+            + "\(filteredCatalogRepositories.count) visible"
+        )
+        .font(bodyFont)
+        .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+      }
+      Spacer()
+      if !catalogSelection.isEmpty {
+        Text("\(catalogSelection.count) selected")
+          .font(bodyFont)
+          .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+      }
+    }
+  }
+
+  private var legacyOrganizationsSection: some View {
+    Section {
+      ForEach(Array(draft.legacyOrganizations.enumerated()), id: \.element) { index, organization in
+        if index > 0 {
+          Divider()
+        }
+        HStack(spacing: HarnessMonitorTheme.spacingMD) {
+          VStack(alignment: .leading, spacing: 4) {
+            Text(organization)
+              .font(bodyFont.weight(.semibold))
+            Text("Dependencies still queries this legacy organization until you import or remove it.")
+              .font(HarnessMonitorTextSize.scaledFont(.caption, by: fontScale))
+              .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+          }
+          Spacer()
+          Button("Review Repositories") {
+            Task { await loadCatalog(for: organization, preselectVisible: true) }
+          }
+          .harnessActionButtonStyle(variant: .bordered, tint: .secondary)
+          .fixedSize(horizontal: true, vertical: true)
+          .accessibilityIdentifier(
+            HarnessMonitorAccessibility.settingsRepositoriesLegacyImportButton(index)
+          )
+          Button("Remove") {
+            draft.removeLegacyOrganization(organization)
+          }
+          .harnessActionButtonStyle(variant: .bordered, tint: .red)
+          .fixedSize(horizontal: true, vertical: true)
+          .accessibilityIdentifier(
+            HarnessMonitorAccessibility.settingsRepositoriesLegacyRemoveButton(index)
+          )
+        }
+        .padding(.vertical, HarnessMonitorTheme.spacingXS)
+      }
+    } header: {
+      Text("Legacy Organization Sources")
+        .harnessNativeFormSectionHeader()
+    } footer: {
+      Text(
+        """
+        Older Dependencies settings may still monitor whole organizations. Import them into \
+        concrete repository rows when you're ready, or remove them to stop querying that \
+        organization.
+        """
+      )
+    }
+  }
+
+  private var actionsBar: some View {
+    VStack(spacing: 0) {
+      Divider()
+      HStack {
+        Spacer(minLength: 0)
+        HarnessMonitorGlassControlGroup(spacing: HarnessMonitorTheme.itemSpacing) {
+          HarnessMonitorWrapLayout(
+            spacing: HarnessMonitorTheme.itemSpacing,
+            lineSpacing: HarnessMonitorTheme.itemSpacing,
+            rowAlignment: .trailing
+          ) {
+            HarnessMonitorAsyncActionButton(
+              title: "Reload",
+              tint: .secondary,
+              variant: .bordered,
+              isLoading: isLoading,
+              accessibilityIdentifier: HarnessMonitorAccessibility.settingsRepositoriesReloadButton,
+              action: { await reloadDraft(forceTaskBoardReload: true) }
+            )
+            HarnessMonitorAsyncActionButton(
+              title: "Save",
+              tint: nil,
+              variant: .prominent,
+              isLoading: isSaving,
+              accessibilityIdentifier: HarnessMonitorAccessibility.settingsRepositoriesSaveButton,
+              action: { await saveDraft() }
+            )
+            .disabled(isLoading || loadError != nil)
+          }
+        }
+      }
+      .padding(.horizontal, HarnessMonitorTheme.spacingXL)
+      .padding(.vertical, HarnessMonitorTheme.spacingSM)
+      .frame(maxWidth: .infinity, alignment: .trailing)
+    }
+    .frame(maxWidth: .infinity, alignment: .trailing)
+    .background(.background)
+  }
+
+  private var tableBackground: some ShapeStyle {
+    Color(nsColor: .controlBackgroundColor).opacity(0.42)
+  }
+
+  private var normalizedCatalogOrganization: String? {
+    SettingsGitHubRepositoryNormalization.normalized(catalogOrganization)?.lowercased()
+  }
+
+  @MainActor
+  private func loadDraftIfNeeded() async {
+    guard !isLoading, !hasLoadedDraft else { return }
+    await reloadDraft(forceTaskBoardReload: false)
+  }
+
+  @MainActor
+  private func reloadDraft(forceTaskBoardReload: Bool) async {
+    isLoading = true
+    loadError = nil
+    saveWarning = nil
+    defer { isLoading = false }
+
+    do {
+      try await ensureTaskBoardSettingsLoaded(forceReload: forceTaskBoardReload)
+      let dependenciesPreferences = DashboardDependenciesPreferences.decode(
+        from: storedDependenciesPreferences
+      ).normalized()
+      draft = SettingsSharedRepositoriesDraft(
+        dependenciesPreferences: dependenciesPreferences,
+        taskBoardDraft: taskBoardFormState.draft
+      )
+      hasLoadedDraft = true
+      resetCatalogState()
+    } catch {
+      loadError = error.localizedDescription
+      hasLoadedDraft = false
+    }
+  }
+
+  @MainActor
+  private func ensureTaskBoardSettingsLoaded(forceReload: Bool) async throws {
+    guard forceReload || !taskBoardFormState.hasLoadedSettings else { return }
+    taskBoardFormState.isLoading = true
+    defer { taskBoardFormState.isLoading = false }
+    let snapshot = try await store.taskBoardGitSettingsSnapshot()
+    taskBoardFormState.draft = TaskBoardGitSettingsDraft(snapshot: snapshot)
+    taskBoardFormState.loadError = nil
+    taskBoardFormState.hasLoadedSettings = true
+  }
+
+  @MainActor
+  private func loadCatalogForCurrentOrganization() async {
+    guard let organization = normalizedCatalogOrganization else { return }
+    await loadCatalog(for: organization, preselectVisible: false)
+  }
+
+  @MainActor
+  private func loadCatalog(for organization: String, preselectVisible: Bool) async {
+    isCatalogLoading = true
+    catalogError = nil
+    defer { isCatalogLoading = false }
+
+    do {
+      guard let client = store.apiClient else {
+        throw HarnessMonitorAPIError.server(code: 501, message: "Repositories unavailable")
+      }
+      let response = try await client.catalogDependencyUpdateRepositories(
+        request: DependencyUpdatesRepositoryCatalogRequest(organization: organization)
+      )
+      let repositories = response.repositories.sorted {
+        $0.localizedStandardCompare($1) == .orderedAscending
+      }
+      loadedCatalogOrganization = response.organization
+      catalogOrganization = response.organization
+      catalogRepositories = repositories
+      catalogSearchText = ""
+      catalogSelection = preselectVisible ? Set(repositories) : []
+    } catch {
+      catalogError = error.localizedDescription
+      loadedCatalogOrganization = ""
+      catalogRepositories = []
+      catalogSelection = []
+      catalogSearchText = ""
+    }
+  }
+
+  @MainActor
+  private func saveDraft() async {
+    guard loadError == nil else { return }
+    isSaving = true
+    saveWarning = nil
+    defer { isSaving = false }
+
+    var taskBoardDraft = taskBoardFormState.draft
+    taskBoardDraft.githubInboxRepositoriesText = draft.taskBoardRepositories.joined(separator: "\n")
+
+    let dependenciesRepositories = draft.dependenciesRepositories
+    let legacyOrganizations = draft.legacyOrganizations
+
+    let succeeded = await store.updateTaskBoardGitSettings(snapshot: taskBoardDraft.snapshot)
+    guard succeeded else { return }
+
+    var dependenciesPreferences = DashboardDependenciesPreferences.decode(
+      from: storedDependenciesPreferences
+    ).normalized()
+    dependenciesPreferences.repositoriesText = dependenciesRepositories.joined(separator: ", ")
+    dependenciesPreferences.organizationsText = legacyOrganizations.joined(separator: ", ")
+    let normalizedPreferences = dependenciesPreferences.normalized()
+    storedDependenciesPreferences = normalizedPreferences.encodedString
+
+    do {
+      let snapshot = try await store.taskBoardGitSettingsSnapshot()
+      taskBoardFormState.draft = TaskBoardGitSettingsDraft(snapshot: snapshot)
+      taskBoardFormState.loadError = nil
+      taskBoardFormState.hasLoadedSettings = true
+      draft = SettingsSharedRepositoriesDraft(
+        dependenciesPreferences: normalizedPreferences,
+        taskBoardDraft: taskBoardFormState.draft
+      )
+      hasLoadedDraft = true
+      loadError = nil
+    } catch {
+      taskBoardFormState.draft = taskBoardDraft
+      taskBoardFormState.loadError = nil
+      taskBoardFormState.hasLoadedSettings = true
+      draft = SettingsSharedRepositoriesDraft(
+        dependenciesPreferences: normalizedPreferences,
+        taskBoardDraft: taskBoardDraft
+      )
+      hasLoadedDraft = true
+      loadError = nil
+      saveWarning =
+        "Saved changes, but reloading the latest settings failed: \(error.localizedDescription)"
+    }
+  }
+
+  private func addManualRepository() {
+    draft.addManualRepository()
+  }
+
+  private func addCatalogRepositories(_ repositories: [String]) {
+    draft.addImportedRepositories(repositories)
+    catalogSelection.subtract(repositories)
+  }
+
+  private func resetCatalogState() {
+    catalogOrganization = ""
+    loadedCatalogOrganization = ""
+    catalogRepositories = []
+    catalogSelection = []
+    catalogSearchText = ""
+    catalogError = nil
+    isCatalogLoading = false
+  }
+}
+
+private struct SettingsSharedRepositoryRow: Identifiable, Equatable {
+  let owner: String
+  let repository: String
+  var dependenciesEnabled: Bool
+  var taskBoardEnabled: Bool
+
+  var repositoryPath: String { "\(owner)/\(repository)" }
+  var id: String { repositoryPath.lowercased() }
+}
+
+private struct SettingsSharedRepositoriesDraft: Equatable {
+  var rows: [SettingsSharedRepositoryRow] = []
+  var legacyOrganizations: [String] = []
+  var ownerInput = ""
+  var repositoryInput = ""
+
+  init() {}
+
+  init(
+    dependenciesPreferences: DashboardDependenciesPreferences,
+    taskBoardDraft: TaskBoardGitSettingsDraft
+  ) {
+    for repository in dependenciesPreferences.normalizedRepositories {
+      insert(repository: repository, dependenciesEnabled: true, taskBoardEnabled: false)
+    }
+    for repository in taskBoardDraft.githubInboxRepositoryEntries {
+      insert(repository: repository, dependenciesEnabled: false, taskBoardEnabled: true)
+    }
+    legacyOrganizations = Self.normalizedOrganizations(dependenciesPreferences.normalizedOrganizations)
+  }
+
+  var canAddManualRepository: Bool {
+    SettingsGitHubRepositoryNormalization.repository(
+      owner: ownerInput,
+      repo: repositoryInput
+    ) != nil
+  }
+
+  var dependenciesRepositories: [String] {
+    rows.filter(\.dependenciesEnabled).map(\.repositoryPath)
+  }
+
+  var taskBoardRepositories: [String] {
+    rows.filter(\.taskBoardEnabled).map(\.repositoryPath)
+  }
+
+  mutating func addManualRepository() {
+    guard
+      let repository = SettingsGitHubRepositoryNormalization.repository(
+        owner: ownerInput,
+        repo: repositoryInput
+      )
+    else {
+      return
+    }
+    insert(repository: repository, dependenciesEnabled: true, taskBoardEnabled: true)
+    ownerInput = ""
+    repositoryInput = ""
+  }
+
+  mutating func addImportedRepositories(_ repositories: [String]) {
+    for repository in repositories {
+      insert(repository: repository, dependenciesEnabled: true, taskBoardEnabled: true)
+    }
+  }
+
+  mutating func setDependenciesEnabled(_ isEnabled: Bool, for rowID: String) {
+    guard let index = rows.firstIndex(where: { $0.id == rowID }) else { return }
+    rows[index].dependenciesEnabled = isEnabled
+    removeIfDisabled(index: index)
+  }
+
+  mutating func setTaskBoardEnabled(_ isEnabled: Bool, for rowID: String) {
+    guard let index = rows.firstIndex(where: { $0.id == rowID }) else { return }
+    rows[index].taskBoardEnabled = isEnabled
+    removeIfDisabled(index: index)
+  }
+
+  mutating func remove(rowID: String) {
+    rows.removeAll { $0.id == rowID }
+  }
+
+  mutating func removeLegacyOrganization(_ organization: String) {
+    let normalized = organization.lowercased()
+    legacyOrganizations.removeAll { $0.lowercased() == normalized }
+  }
+
+  private mutating func insert(
+    repository: String,
+    dependenciesEnabled: Bool,
+    taskBoardEnabled: Bool
+  ) {
+    guard let normalized = SettingsGitHubRepositoryNormalization.repositoryEntry(repository) else {
+      return
+    }
+    let parts = normalized.split(separator: "/", maxSplits: 1).map(String.init)
+    guard parts.count == 2 else { return }
+    let candidate = SettingsSharedRepositoryRow(
+      owner: parts[0],
+      repository: parts[1],
+      dependenciesEnabled: dependenciesEnabled,
+      taskBoardEnabled: taskBoardEnabled
+    )
+    if let index = rows.firstIndex(where: { $0.id == candidate.id }) {
+      rows[index].dependenciesEnabled = rows[index].dependenciesEnabled || dependenciesEnabled
+      rows[index].taskBoardEnabled = rows[index].taskBoardEnabled || taskBoardEnabled
+      return
+    }
+    rows.append(candidate)
+  }
+
+  private mutating func removeIfDisabled(index: Int) {
+    guard rows.indices.contains(index) else { return }
+    guard !rows[index].dependenciesEnabled, !rows[index].taskBoardEnabled else { return }
+    rows.remove(at: index)
+  }
+
+  private static func normalizedOrganizations(_ organizations: [String]) -> [String] {
+    var normalized: [String] = []
+    var seen: Set<String> = []
+    for organization in organizations {
+      guard let value = SettingsGitHubRepositoryNormalization.normalized(organization)?.lowercased()
+      else {
+        continue
+      }
+      if seen.insert(value).inserted {
+        normalized.append(value)
+      }
+    }
+    return normalized
+  }
+}

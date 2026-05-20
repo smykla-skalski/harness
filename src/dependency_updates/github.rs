@@ -87,6 +87,22 @@ query SearchDependencyUpdates($query: String!, $after: String) {
 }
 "#;
 
+const ORGANIZATION_REPOSITORIES_QUERY: &str = r#"
+query OrganizationRepositories($organization: String!, $after: String) {
+  organization(login: $organization) {
+    repositories(first: 100, after: $after, orderBy: { field: NAME, direction: ASC }) {
+      pageInfo {
+        hasNextPage
+        endCursor
+      }
+      nodes {
+        nameWithOwner
+      }
+    }
+  }
+}
+"#;
+
 const APPROVE_MUTATION: &str = r#"
 mutation ApproveDependencyUpdate($id: ID!) {
   addPullRequestReview(input: { pullRequestId: $id, event: APPROVE }) {
@@ -163,6 +179,47 @@ impl DependencyUpdatesGitHubClient {
             }
         }
         Ok(deduped.into_values().collect())
+    }
+
+    pub(crate) async fn catalog_organization_repositories(
+        &self,
+        organization: &str,
+    ) -> Result<Vec<String>, CliError> {
+        let mut repositories = Vec::new();
+        let mut cursor = None;
+        loop {
+            let response: OrganizationRepositoriesResponse = self
+                .client
+                .graphql(&json!({
+                    "query": ORGANIZATION_REPOSITORIES_QUERY,
+                    "variables": {
+                        "organization": organization,
+                        "after": cursor.as_deref(),
+                    },
+                }))
+                .await
+                .map_err(operation_error)?;
+            let Some(connection) = response.organization.map(|organization| organization.repositories)
+            else {
+                return Err(CliErrorKind::workflow_parse(format!(
+                    "dependency-updates organization '{organization}' was not found or is not accessible"
+                ))
+                .into());
+            };
+            repositories.extend(
+                connection
+                    .nodes
+                    .into_iter()
+                    .map(|repository| repository.name_with_owner.to_lowercase()),
+            );
+            if !connection.page_info.has_next_page {
+                break;
+            }
+            cursor = connection.page_info.end_cursor;
+        }
+        repositories.sort();
+        repositories.dedup();
+        Ok(repositories)
     }
 
     pub(crate) async fn approve(
@@ -624,6 +681,29 @@ struct SearchConnection {
     #[serde(rename = "pageInfo")]
     page_info: PageInfo,
     nodes: Vec<SearchNode>,
+}
+
+#[derive(Debug, Deserialize)]
+struct OrganizationRepositoriesResponse {
+    organization: Option<OrganizationRepositoriesNode>,
+}
+
+#[derive(Debug, Deserialize)]
+struct OrganizationRepositoriesNode {
+    repositories: OrganizationRepositoriesConnection,
+}
+
+#[derive(Debug, Deserialize)]
+struct OrganizationRepositoriesConnection {
+    #[serde(rename = "pageInfo")]
+    page_info: PageInfo,
+    nodes: Vec<OrganizationRepositoryNode>,
+}
+
+#[derive(Debug, Deserialize)]
+struct OrganizationRepositoryNode {
+    #[serde(rename = "nameWithOwner")]
+    name_with_owner: String,
 }
 
 #[derive(Debug, Deserialize)]

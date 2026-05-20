@@ -7,5 +7,6 @@ pub use crate::dependency_updates::{
     DependencyUpdatesApproveRequest, DependencyUpdatesAutoRequest,
     DependencyUpdatesCacheClearResponse, DependencyUpdatesLabelRequest,
     DependencyUpdatesMergeRequest, DependencyUpdatesQueryRequest, DependencyUpdatesQueryResponse,
+    DependencyUpdatesRepositoryCatalogRequest, DependencyUpdatesRepositoryCatalogResponse,
     DependencyUpdatesRerunChecksRequest, DependencyUpdatesSummary,
 };

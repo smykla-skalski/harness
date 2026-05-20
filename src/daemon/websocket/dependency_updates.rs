@@ -2,7 +2,8 @@ use crate::daemon::http::DaemonHttpState;
 use crate::daemon::protocol::{
     DependencyUpdatesApproveRequest, DependencyUpdatesAutoRequest, DependencyUpdatesLabelRequest,
     DependencyUpdatesMergeRequest, DependencyUpdatesQueryRequest,
-    DependencyUpdatesRerunChecksRequest, WsRequest, WsResponse, ws_methods,
+    DependencyUpdatesRepositoryCatalogRequest, DependencyUpdatesRerunChecksRequest, WsRequest,
+    WsResponse, ws_methods,
 };
 use crate::daemon::service;
 use serde::de::DeserializeOwned;
@@ -15,6 +16,9 @@ pub(crate) async fn dispatch_dependency_updates_method(
     _state: &DaemonHttpState,
 ) -> Option<WsResponse> {
     match request.method.as_str() {
+        ws_methods::DEPENDENCY_UPDATES_REPOSITORY_CATALOG => {
+            Some(dispatch_dependency_updates_repository_catalog(request).await)
+        }
         ws_methods::DEPENDENCY_UPDATES_QUERY => Some(dispatch_dependency_updates_query(request).await),
         ws_methods::DEPENDENCY_UPDATES_APPROVE => {
             Some(dispatch_dependency_updates_approve(request).await)
@@ -32,6 +36,16 @@ pub(crate) async fn dispatch_dependency_updates_method(
         }
         _ => None,
     }
+}
+
+async fn dispatch_dependency_updates_repository_catalog(request: &WsRequest) -> WsResponse {
+    let Ok(body) = parse_params::<DependencyUpdatesRepositoryCatalogRequest>(request) else {
+        return invalid_params(request);
+    };
+    dispatch_query_result(
+        &request.id,
+        service::catalog_dependency_update_repositories(&body).await,
+    )
 }
 
 async fn dispatch_dependency_updates_query(request: &WsRequest) -> WsResponse {

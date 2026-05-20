@@ -257,8 +257,8 @@ pub use direct::{
 };
 pub use dependency_updates::{
     add_label_to_dependency_updates, approve_dependency_updates, auto_dependency_updates,
-    clear_dependency_updates_cache, merge_dependency_updates, query_dependency_updates,
-    rerun_dependency_updates_checks,
+    catalog_dependency_update_repositories, clear_dependency_updates_cache,
+    merge_dependency_updates, query_dependency_updates, rerun_dependency_updates_checks,
 };
 pub(crate) use direct::{
     delete_session_direct_async, disconnect_agent_direct_async, join_session_direct_async,

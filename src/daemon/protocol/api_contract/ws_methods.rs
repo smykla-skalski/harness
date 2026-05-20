@@ -81,6 +81,7 @@ pub const TASK_BOARD_POLICY_PIPELINE_SAVE_DRAFT: &str = "task_board.policy_pipel
 pub const TASK_BOARD_POLICY_PIPELINE_SIMULATE: &str = "task_board.policy_pipeline_simulate";
 pub const TASK_BOARD_POLICY_PIPELINE_PROMOTE: &str = "task_board.policy_pipeline_promote";
 pub const TASK_BOARD_POLICY_PIPELINE_AUDIT: &str = "task_board.policy_pipeline_audit";
+pub const DEPENDENCY_UPDATES_REPOSITORY_CATALOG: &str = "dependency_updates.repository_catalog";
 pub const DEPENDENCY_UPDATES_QUERY: &str = "dependency_updates.query";
 pub const DEPENDENCY_UPDATES_APPROVE: &str = "dependency_updates.approve";
 pub const DEPENDENCY_UPDATES_MERGE: &str = "dependency_updates.merge";

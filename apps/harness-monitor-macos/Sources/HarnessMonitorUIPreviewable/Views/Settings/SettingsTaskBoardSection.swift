@@ -30,8 +30,9 @@ struct SettingsTaskBoardSection: View, SettingsTaskBoardEditingSurface {
           workflowSection
           projectSection
             .id(SettingsTaskBoardAnchor.githubProject)
-          githubInboxSection
+          monitoredRepositoriesSection
             .id(SettingsTaskBoardAnchor.githubInbox)
+          githubInboxSection
           SettingsTaskBoardHostSection(store: store)
           automationSection
           authorIdentitySection
@@ -146,6 +147,34 @@ struct SettingsTaskBoardSection: View, SettingsTaskBoardEditingSurface {
 
   private var githubInboxSection: some View {
     SettingsTaskBoardInboxSection(draft: draftBinding)
+  }
+
+  private var monitoredRepositoriesSection: some View {
+    Section {
+      VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
+        Text("Monitored Repositories")
+          .font(.caption.weight(.semibold))
+          .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+        Text(
+          draft.githubInboxRepositoryEntries.isEmpty
+            ? "No repositories enabled for Task Board inbox monitoring"
+            : "\(draft.githubInboxRepositoryEntries.count) repositories enabled for Task Board"
+        )
+        .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+        Button("Open Repositories") {
+          navigationRequest = SettingsNavigationRequest(target: .section(.repositories))
+        }
+        .harnessActionButtonStyle(variant: .bordered, tint: .secondary)
+        .fixedSize(horizontal: true, vertical: true)
+        .accessibilityIdentifier(HarnessMonitorAccessibility.settingsTaskBoardRepositoriesButton)
+      }
+      .accessibilityIdentifier(HarnessMonitorAccessibility.settingsTaskBoardRepositoriesSummary)
+    } header: {
+      Text("Monitored Repositories")
+        .harnessNativeFormSectionHeader()
+    } footer: {
+      Text("Dependencies and Task Board share repository scope in Settings > Repositories.")
+    }
   }
 
   private var automationSection: some View {

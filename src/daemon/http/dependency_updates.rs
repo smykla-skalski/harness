@@ -9,7 +9,7 @@ use axum::{Json, Router};
 use crate::daemon::protocol::{
     DependencyUpdatesApproveRequest, DependencyUpdatesAutoRequest, DependencyUpdatesLabelRequest,
     DependencyUpdatesMergeRequest, DependencyUpdatesQueryRequest,
-    DependencyUpdatesRerunChecksRequest, http_paths,
+    DependencyUpdatesRepositoryCatalogRequest, DependencyUpdatesRerunChecksRequest, http_paths,
 };
 use crate::daemon::service;
 
@@ -30,6 +30,10 @@ macro_rules! authenticated_request {
 
 pub(super) fn dependency_updates_routes() -> Router<DaemonHttpState> {
     Router::new()
+        .route(
+            http_paths::DEPENDENCY_UPDATES_REPOSITORIES,
+            post(post_dependency_update_repositories),
+        )
         .route(http_paths::DEPENDENCY_UPDATES_QUERY, post(post_query_dependency_updates))
         .route(
             http_paths::DEPENDENCY_UPDATES_APPROVE,
@@ -52,6 +56,22 @@ pub(super) fn dependency_updates_routes() -> Router<DaemonHttpState> {
             http_paths::DEPENDENCY_UPDATES_CACHE,
             delete(delete_dependency_updates_cache),
         )
+}
+
+async fn post_dependency_update_repositories(
+    headers: HeaderMap,
+    State(state): State<DaemonHttpState>,
+    Json(request): Json<DependencyUpdatesRepositoryCatalogRequest>,
+) -> Response {
+    let (start, request_id) = authenticated_request!(headers, state);
+    let result = service::catalog_dependency_update_repositories(&request).await;
+    timed_json(
+        "POST",
+        http_paths::DEPENDENCY_UPDATES_REPOSITORIES,
+        &request_id,
+        start,
+        result,
+    )
 }
 
 async fn post_query_dependency_updates(

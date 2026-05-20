@@ -25,6 +25,24 @@ public struct DependencyUpdatesQueryRequest: Codable, Equatable, Sendable {
   }
 }
 
+public struct DependencyUpdatesRepositoryCatalogRequest: Codable, Equatable, Sendable {
+  public let organization: String
+
+  public init(organization: String) {
+    self.organization = organization
+  }
+}
+
+public struct DependencyUpdatesRepositoryCatalogResponse: Codable, Equatable, Sendable {
+  public let organization: String
+  public let repositories: [String]
+
+  public init(organization: String, repositories: [String]) {
+    self.organization = organization
+    self.repositories = repositories
+  }
+}
+
 public struct DependencyUpdatesApproveRequest: Codable, Equatable, Sendable {
   public let targets: [DependencyUpdateTarget]
 

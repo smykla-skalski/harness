@@ -56,6 +56,14 @@ extension HarnessMonitorUITestCase {
     )
   }
 
+  func selectRepositoriesSection(in app: XCUIApplication) {
+    selectSettingsSection(
+      in: app,
+      identifier: HarnessMonitorUITestAccessibility.settingsRepositoriesSection,
+      expectedTitle: "Repositories"
+    )
+  }
+
   func selectDependenciesSection(in app: XCUIApplication) {
     selectSettingsSection(
       in: app,

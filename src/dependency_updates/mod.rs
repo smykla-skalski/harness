@@ -25,6 +25,18 @@ pub struct DependencyUpdatesQueryRequest {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct DependencyUpdatesRepositoryCatalogRequest {
+    pub organization: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct DependencyUpdatesRepositoryCatalogResponse {
+    pub organization: String,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub repositories: Vec<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct DependencyUpdatesQueryResponse {
     pub fetched_at: String,
     pub from_cache: bool,
@@ -326,6 +338,24 @@ impl DependencyUpdatesQueryRequest {
     }
 }
 
+impl DependencyUpdatesRepositoryCatalogRequest {
+    pub fn validate(&self) -> Result<(), CliError> {
+        let organization = self.organization.trim();
+        if organization.is_empty() || organization.contains('/') {
+            return Err(CliErrorKind::workflow_parse(
+                "dependency-updates repository catalog requires a valid organization login",
+            )
+            .into());
+        }
+        Ok(())
+    }
+
+    #[must_use]
+    pub fn normalized_organization(&self) -> String {
+        self.organization.trim().to_lowercase()
+    }
+}
+
 impl DependencyUpdatesQueryResponse {
     #[must_use]
     pub fn new(items: Vec<DependencyUpdateItem>, fetched_at: String) -> Self {
@@ -531,6 +561,29 @@ mod tests {
             request.cache_key(),
             "authors=renovate[bot]|orgs=acme|repos=acme/api|exclude=acme/old"
         );
+    }
+
+    #[test]
+    fn repository_catalog_request_rejects_empty_and_slashed_organizations() {
+        assert!(DependencyUpdatesRepositoryCatalogRequest {
+            organization: String::new(),
+        }
+        .validate()
+        .is_err());
+        assert!(DependencyUpdatesRepositoryCatalogRequest {
+            organization: "acme/api".into(),
+        }
+        .validate()
+        .is_err());
+    }
+
+    #[test]
+    fn repository_catalog_request_normalizes_organization() {
+        let request = DependencyUpdatesRepositoryCatalogRequest {
+            organization: " Acme ".into(),
+        };
+
+        assert_eq!(request.normalized_organization(), "acme");
     }
 
     #[test]
