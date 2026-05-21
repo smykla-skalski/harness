@@ -762,38 +762,13 @@ struct DashboardDependenciesRouteView: View {
   }
 
   private func repositorySectionHeader(_ repository: String, itemCount: Int) -> some View {
-    let isCollapsed = collapsedRepositories.contains(repository)
-    let isSyncing = refreshingRepositories.contains(repository)
-    let lastSyncedAt = scheduler.states[repository]?.lastSyncedAt
-    return Button {
-      toggleRepositoryCollapse(repository)
-    } label: {
-      HStack(spacing: HarnessMonitorTheme.spacingSM) {
-        Image(systemName: isCollapsed ? "chevron.right" : "chevron.down")
-          .font(.caption.weight(.semibold))
-          .foregroundStyle(HarnessMonitorTheme.secondaryInk)
-          .frame(width: 12, alignment: .center)
-        Text(repository)
-        Spacer(minLength: HarnessMonitorTheme.spacingSM)
-        if isSyncing {
-          ProgressView()
-            .controlSize(.small)
-            .accessibilityLabel("Syncing \(repository)")
-        } else if let lastSyncedAt {
-          let relative = dependenciesRelativeFormatter.localizedString(
-            for: lastSyncedAt, relativeTo: .now)
-          Text("synced \(relative)")
-            .scaledFont(.caption)
-            .foregroundStyle(HarnessMonitorTheme.secondaryInk)
-            .accessibilityLabel("Last synced \(relative)")
-        }
-        Text(verbatim: String(itemCount))
-          .foregroundStyle(HarnessMonitorTheme.secondaryInk)
-      }
-      .contentShape(.rect)
-    }
-    .buttonStyle(.borderless)
-    .listRowInsets(EdgeInsets(top: 6, leading: 12, bottom: 6, trailing: 12))
+    DashboardDependenciesRepositorySectionHeader(
+      repository: repository,
+      itemCount: itemCount,
+      isCollapsed: collapsedRepositories.contains(repository),
+      scheduler: scheduler,
+      onToggleCollapse: { toggleRepositoryCollapse(repository) }
+    )
   }
 
   private func detailMetrics(for item: DependencyUpdateItem) -> some View {
@@ -1195,6 +1170,47 @@ struct DashboardDependenciesRouteView: View {
 struct DashboardDependenciesRepoLabelMenuData: Equatable, Sendable {
   let sortedLabels: [DependencyUpdateRepositoryLabel]
   let frequentNames: [String]
+}
+
+@MainActor
+private struct DashboardDependenciesRepositorySectionHeader: View {
+  let repository: String
+  let itemCount: Int
+  let isCollapsed: Bool
+  let scheduler: DashboardDependenciesScheduler
+  let onToggleCollapse: () -> Void
+
+  var body: some View {
+    let isSyncing = scheduler.repositoriesInFlight.contains(repository)
+    let lastSyncedAt = scheduler.states[repository]?.lastSyncedAt
+    Button(action: onToggleCollapse) {
+      HStack(spacing: HarnessMonitorTheme.spacingSM) {
+        Image(systemName: isCollapsed ? "chevron.right" : "chevron.down")
+          .font(.caption.weight(.semibold))
+          .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+          .frame(width: 12, alignment: .center)
+        Text(repository)
+        Spacer(minLength: HarnessMonitorTheme.spacingSM)
+        if isSyncing {
+          ProgressView()
+            .controlSize(.small)
+            .accessibilityLabel("Syncing \(repository)")
+        } else if let lastSyncedAt {
+          let relative = dependenciesRelativeFormatter.localizedString(
+            for: lastSyncedAt, relativeTo: .now)
+          Text("synced \(relative)")
+            .scaledFont(.caption)
+            .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+            .accessibilityLabel("Last synced \(relative)")
+        }
+        Text(verbatim: String(itemCount))
+          .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+      }
+      .contentShape(.rect)
+    }
+    .buttonStyle(.borderless)
+    .listRowInsets(EdgeInsets(top: 6, leading: 12, bottom: 6, trailing: 12))
+  }
 }
 
 @MainActor
