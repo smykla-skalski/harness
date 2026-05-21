@@ -18,17 +18,17 @@ struct SessionAgentDetailSection: View {
   var voiceOverEnabled
   @Environment(\.fontScale)
   var fontScale
-  @State var message = ""
-  @State var composerBackdropHeight: CGFloat = 0
-  @State var outputAnnouncementGate = SessionAgentOutputAnnouncementGate()
-  @State var latestOutput = "No output"
-  @State var selectedSendAction: SendUpdateAction = .injectContext
-  @State var signalCommand = "inject_context"
-  @State var signalMessage = ""
-  @State var signalActionHint = ""
-  @State var selectedRole: SessionRole = .worker
-  @State var transcriptAnnouncer = MonitorTimelineLiveRegionThrottle()
-  @State var lastAnnouncedTimelineEntryId: String?
+  @State private var message = ""
+  @State private var composerBackdropHeight: CGFloat = 0
+  @State private var outputAnnouncementGate = SessionAgentOutputAnnouncementGate()
+  @State private var latestOutput = "No output"
+  @State private var selectedSendAction: SendUpdateAction = .injectContext
+  @State private var signalCommand = "inject_context"
+  @State private var signalMessage = ""
+  @State private var signalActionHint = ""
+  @State private var selectedRole: SessionRole = .worker
+  @State private var transcriptAnnouncer = MonitorTimelineLiveRegionThrottle()
+  @State private var lastAnnouncedTimelineEntryId: String?
   @FocusState var focusedField: SessionAgentComposerField?
 
   var canSendInput: Bool {

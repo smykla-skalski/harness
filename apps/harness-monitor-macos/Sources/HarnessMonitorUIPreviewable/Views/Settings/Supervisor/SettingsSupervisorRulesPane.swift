@@ -7,11 +7,11 @@ public struct SettingsSupervisorRulesPane: View {
   static let persistDebounceDuration: Duration = .milliseconds(500)
   static let statusDisplayDuration: Duration = .seconds(2)
 
-  @State var viewModel = SettingsSupervisorRulesViewModel()
-  @State var persistedRowsByRuleID: [String: PolicyConfigRowSnapshot] = [:]
-  @State var statusMessages: [String: String] = [:]
-  @State var errorMessages: [String: String] = [:]
-  @State var pendingPersistTasks: [String: Task<Void, Never>] = [:]
+  @State private var viewModel = SettingsSupervisorRulesViewModel()
+  @State private var persistedRowsByRuleID: [String: PolicyConfigRowSnapshot] = [:]
+  @State private var statusMessages: [String: String] = [:]
+  @State private var errorMessages: [String: String] = [:]
+  @State private var pendingPersistTasks: [String: Task<Void, Never>] = [:]
 
   public init(store: HarnessMonitorStore) {
     self.store = store

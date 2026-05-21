@@ -33,12 +33,12 @@ public struct TaskBoardOverviewView: View {
   let onRunTaskBoardOrchestratorOnce: ((TaskBoardOrchestratorRunOnceRequest) -> Void)?
   @Environment(\.fontScale)
   var fontScale
-  @State var selectedTaskBoardItemID: String?
-  @State var isCreatingTaskBoardItem = false
-  @State var evaluationSummaryFitsHorizontally = true
-  @State var presentationWorker = TaskBoardOverviewPresentationWorker()
-  @State var cachedPresentation = TaskBoardOverviewPresentation.empty
-  @State var presentationGeneration: UInt64 = 0
+  @State private var selectedTaskBoardItemID: String?
+  @State private var isCreatingTaskBoardItem = false
+  @State private var evaluationSummaryFitsHorizontally = true
+  @State private var presentationWorker = TaskBoardOverviewPresentationWorker()
+  @State private var cachedPresentation = TaskBoardOverviewPresentation.empty
+  @State private var presentationGeneration: UInt64 = 0
 
   var captionSemibold: Font {
     HarnessMonitorTextSize.scaledFont(.caption.weight(.semibold), by: fontScale)

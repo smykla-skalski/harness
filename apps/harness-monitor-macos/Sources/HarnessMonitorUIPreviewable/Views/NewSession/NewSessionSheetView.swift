@@ -16,13 +16,13 @@ struct NewSessionSheetView: View {
   var dismiss
   @Environment(\.openWindow)
   var openWindow
-  @State var bookmarks: [BookmarkStore.Record] = []
-  @State var availableAcpAgents: [AcpAgentDescriptor] = []
-  @State var runtimeProbeResults: AcpRuntimeProbeResponse?
-  @State var selectedLaunchSelection =
+  @State private var bookmarks: [BookmarkStore.Record] = []
+  @State private var availableAcpAgents: [AcpAgentDescriptor] = []
+  @State private var runtimeProbeResults: AcpRuntimeProbeResponse?
+  @State private var selectedLaunchSelection =
     HarnessMonitorAgentLaunchDefaults.preferredSelection()
-  @State var didPickLaunchSelectionManually = false
-  @State var showImporter = false
+  @State private var didPickLaunchSelectionManually = false
+  @State private var showImporter = false
   @FocusState var focusedField: Field?
 
   var body: some View {

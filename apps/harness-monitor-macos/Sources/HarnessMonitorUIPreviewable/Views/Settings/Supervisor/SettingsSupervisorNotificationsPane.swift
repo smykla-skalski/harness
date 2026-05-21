@@ -3,7 +3,7 @@ import SwiftUI
 
 public struct SettingsSupervisorNotificationsPane: View {
   let notifications: HarnessMonitorUserNotificationController
-  @State var viewModel: SettingsSupervisorNotificationsViewModel
+  @State private var viewModel: SettingsSupervisorNotificationsViewModel
   @Environment(\.openURL)
   var openURL
 

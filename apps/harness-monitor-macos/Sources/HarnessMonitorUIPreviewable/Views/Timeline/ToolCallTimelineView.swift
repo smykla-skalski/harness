@@ -9,14 +9,14 @@ struct ToolCallTimelineView: View {
   let entries: [TimelineEntry]
   let liveAnnouncementRowIDs: Set<String>
   let overflowNotice: HarnessMonitorStore.ToolCallTimelineOverflowNotice?
-  @State var cachedPresentation = ToolCallTimelinePresentation.empty
-  @State var cachedVirtualizedLayout = ToolCallTimelineVirtualizedLayout.empty
-  @State var cachedAnnouncementSnapshot = ToolCallTimelineAnnouncementSnapshot.empty
-  @State var cachedScrollMetrics = ToolCallTimelineScrollMetrics.zero
-  @State var cachedOverflowAnnouncement: ToolCallTimelineOverflowAnnouncement?
-  @State var cachedRowFrames: [String: CGRect] = [:]
-  @State var presentationGeneration: UInt64 = 0
-  @State var scrollMetricsDeferrer = ToolCallTimelineScrollMetricsDeferrer()
+  @State private var cachedPresentation = ToolCallTimelinePresentation.empty
+  @State private var cachedVirtualizedLayout = ToolCallTimelineVirtualizedLayout.empty
+  @State private var cachedAnnouncementSnapshot = ToolCallTimelineAnnouncementSnapshot.empty
+  @State private var cachedScrollMetrics = ToolCallTimelineScrollMetrics.zero
+  @State private var cachedOverflowAnnouncement: ToolCallTimelineOverflowAnnouncement?
+  @State private var cachedRowFrames: [String: CGRect] = [:]
+  @State private var presentationGeneration: UInt64 = 0
+  @State private var scrollMetricsDeferrer = ToolCallTimelineScrollMetricsDeferrer()
 
   @AppStorage(
     HarnessMonitorToolCallAnnouncementSettings.verboseAnnouncementsKey

@@ -50,15 +50,15 @@ struct SessionTimelineView: View {
   @SceneStorage(SessionTimelineFilterDefaults.sceneRegistryKey)
   var sceneStoredFilterRegistryRawValue = ""
 
-  @State var filters = SessionTimelineFilterState()
-  @State var presentationWorker = SessionTimelinePresentationWorker()
-  @State var cachedPresentation = SessionTimelineSectionPresentation.empty
-  @State var presentationGeneration: UInt64 = 0
-  @State var loadOlderInFlight = false
-  @State var loadOlderPending = false
-  @State var signalDeadlineGeneration: UInt64 = 0
-  @State var didInitialFreshFetch = false
-  @State var measuredContainerHeight: CGFloat = 0
+  @State private var filters = SessionTimelineFilterState()
+  @State private var presentationWorker = SessionTimelinePresentationWorker()
+  @State private var cachedPresentation = SessionTimelineSectionPresentation.empty
+  @State private var presentationGeneration: UInt64 = 0
+  @State private var loadOlderInFlight = false
+  @State private var loadOlderPending = false
+  @State private var signalDeadlineGeneration: UInt64 = 0
+  @State private var didInitialFreshFetch = false
+  @State private var measuredContainerHeight: CGFloat = 0
 
   static let fallbackPageSize = 10
   static let estimatedRowHeight: CGFloat = 56
@@ -350,8 +350,7 @@ struct SessionTimelineView: View {
     )
   }
 
-  func normalizedFilters(_ state: SessionTimelineFilterState) -> SessionTimelineFilterState
-  {
+  func normalizedFilters(_ state: SessionTimelineFilterState) -> SessionTimelineFilterState {
     var copy = state
     copy.searchScope = .all
     return copy

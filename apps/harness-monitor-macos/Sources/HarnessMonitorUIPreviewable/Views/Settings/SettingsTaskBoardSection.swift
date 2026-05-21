@@ -5,8 +5,8 @@ struct SettingsTaskBoardSection: View, SettingsTaskBoardEditingSurface {
   let store: HarnessMonitorStore
   @Binding var taskBoardFormState: TaskBoardSettingsFormState
   @Binding var navigationRequest: SettingsNavigationRequest?
-  @State var pendingNavigationRequestID: UUID?
-  @State var isFullyExpanded = false
+  @State private var pendingNavigationRequestID: UUID?
+  @State private var isFullyExpanded = false
 
   var formState: Binding<TaskBoardSettingsFormState> { $taskBoardFormState }
 
