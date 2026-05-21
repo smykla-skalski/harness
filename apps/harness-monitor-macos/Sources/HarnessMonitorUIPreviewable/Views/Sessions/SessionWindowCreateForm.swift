@@ -8,8 +8,8 @@ struct SessionWindowCreateForm: View {
   let embedsRuntimeConfiguration: Bool
   @Environment(\.fontScale)
   var fontScale
-  @State private var stateStorage = SessionWindowCreateFormStateStorage()
-  @FocusState private var focusedFieldStorage: SessionWindowCreateFormField?
+  @State var stateStorage = SessionWindowCreateFormStateStorage()
+  @FocusState var focusedFieldStorage: SessionWindowCreateFormField?
 
   var validationResult: SessionWindowCreateFormValidationResult? {
     get { stateStorage.validationResult }
@@ -194,7 +194,7 @@ struct SessionWindowCreateForm: View {
     }
   }
 
-  private func loadOpenRouterModelsIfNeeded() async {
+  func loadOpenRouterModelsIfNeeded() async {
     guard isOpenRouterAcpSelected else { return }
     if openRouterModelsLoadedFor == HarnessMonitorStore.openRouterDescriptorID,
       !openRouterModels.isEmpty

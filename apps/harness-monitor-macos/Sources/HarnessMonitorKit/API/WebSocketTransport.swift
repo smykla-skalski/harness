@@ -271,7 +271,7 @@ extension WebSocketTransport {
     )
   }
 
-  private func timelineWindowParams(
+  func timelineWindowParams(
     sessionID: String,
     request: TimelineWindowRequest
   ) -> JSONValue {
@@ -328,7 +328,7 @@ extension WebSocketTransport {
     return stream
   }
 
-  private func cleanupGlobalSubscription() {
+  func cleanupGlobalSubscription() {
     globalStreamContinuation = nil
     globalSubscriptionActive = false
     Task {
@@ -363,7 +363,7 @@ extension WebSocketTransport {
     return stream
   }
 
-  private func cleanupSessionSubscription(sessionID: String) {
+  func cleanupSessionSubscription(sessionID: String) {
     sessionStreamContinuations[sessionID] = nil
     activeSubscriptions.remove(sessionID)
     Task {

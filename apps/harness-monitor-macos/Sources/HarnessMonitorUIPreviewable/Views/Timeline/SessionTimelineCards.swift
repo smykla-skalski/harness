@@ -6,7 +6,7 @@ struct SessionTimelineCards: View {
   let actionHandler: any DecisionActionHandler
   let onSignalTap: ((String) -> Void)?
   @Environment(\.fontScale)
-  private var fontScale
+  var fontScale
 
   var body: some View {
     LazyVStack(alignment: .leading, spacing: HarnessMonitorTheme.itemSpacing) {
@@ -66,17 +66,17 @@ extension SessionTimelineNodeCluster: @MainActor Equatable {
   }
 }
 
-private struct SessionTimelineNodeRow: View {
+struct SessionTimelineNodeRow: View {
   let row: SessionTimelineRow
   let actionHandler: any DecisionActionHandler
   let onSignalTap: ((String) -> Void)?
-  private let statusBadges: [SessionTimelineStatusBadge]
-  private let fontScale: CGFloat
-  private let timestampFont: Font
-  private let titleFont: Font
-  private let sourceFont: Font
-  private let detailFont: Font
-  private let compactSourceFont: Font
+  let statusBadges: [SessionTimelineStatusBadge]
+  let fontScale: CGFloat
+  let timestampFont: Font
+  let titleFont: Font
+  let sourceFont: Font
+  let detailFont: Font
+  let compactSourceFont: Font
 
   init(
     row: SessionTimelineRow,
@@ -108,11 +108,11 @@ private struct SessionTimelineNodeRow: View {
     )
   }
 
-  private var node: SessionTimelineNode {
+  var node: SessionTimelineNode {
     row.node
   }
 
-  private var usesSimpleWideLayout: Bool {
+  var usesSimpleWideLayout: Bool {
     SessionTimelineCardLayout.usesSimpleWideLayout(for: row)
   }
 
@@ -180,7 +180,7 @@ private struct SessionTimelineNodeRow: View {
     }
   }
 
-  private var cardContent: some View {
+  var cardContent: some View {
     Group {
       if SessionTimelineCardLayout.prefersCompactLayout(for: row) {
         compactContent
@@ -200,7 +200,7 @@ private struct SessionTimelineNodeRow: View {
   // `prefersCompactLayout(for:)` already encodes the size decision; a
   // deterministic branch is enough.
 
-  private var wideContent: some View {
+  var wideContent: some View {
     HStack(
       alignment: usesSimpleWideLayout ? .center : .top,
       spacing: HarnessMonitorTheme.spacingMD
@@ -235,7 +235,7 @@ private struct SessionTimelineNodeRow: View {
     }
   }
 
-  private var compactContent: some View {
+  var compactContent: some View {
     VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
       HStack(alignment: .top, spacing: HarnessMonitorTheme.spacingSM) {
         if node.kind != .event {
@@ -267,16 +267,16 @@ private struct SessionTimelineNodeRow: View {
     }
   }
 
-  private var kindBadge: some View {
+  var kindBadge: some View {
     SessionTimelineBadge(label: node.kind.label, tint: typeTint, style: .quiet)
       .equatable()
   }
 
-  private var rightBadges: some View {
+  var rightBadges: some View {
     SessionTimelineBadgeStrip(badges: statusBadges)
   }
 
-  private var typeTint: Color {
+  var typeTint: Color {
     switch node.kind {
     case .event:
       cardTint
@@ -287,14 +287,14 @@ private struct SessionTimelineNodeRow: View {
     }
   }
 
-  private var cardTint: Color {
+  var cardTint: Color {
     if let eventTone = node.eventTone {
       return eventTone.color
     }
     return node.decision?.severity.color ?? HarnessMonitorTheme.secondaryInk
   }
 
-  private static func makeStatusBadges(
+  static func makeStatusBadges(
     for node: SessionTimelineNode
   ) -> [SessionTimelineStatusBadge] {
     var badges: [SessionTimelineStatusBadge] = []
@@ -316,7 +316,7 @@ private struct SessionTimelineNodeRow: View {
   }
 }
 
-private struct SessionTimelineBadgeStrip: View {
+struct SessionTimelineBadgeStrip: View {
   let badges: [SessionTimelineStatusBadge]
 
   var body: some View {
@@ -332,7 +332,7 @@ private struct SessionTimelineBadgeStrip: View {
     .fixedSize(horizontal: true, vertical: false)
   }
 
-  private func badgeView(_ badge: SessionTimelineStatusBadge) -> some View {
+  func badgeView(_ badge: SessionTimelineStatusBadge) -> some View {
     SessionTimelineBadge(label: badge.label, tint: badge.tint, style: .prominent)
       .equatable()
   }

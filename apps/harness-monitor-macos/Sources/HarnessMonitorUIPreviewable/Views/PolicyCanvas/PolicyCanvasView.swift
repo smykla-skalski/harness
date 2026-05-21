@@ -21,11 +21,11 @@ public struct PolicyCanvasView: View {
   static let labRemoteActionDisabledReason = "Disabled in Policy Canvas Lab"
   static let missingStoreRemoteActionDisabledReason =
     "Unavailable without a live policy store"
-  @State private var viewModelState: PolicyCanvasViewModel
-  @State private var isShowingPromoteConfirmationState = false
-  @State private var pendingDeletionRequestState: PolicyCanvasDeletionRequest?
-  @State private var statusLineState: String = "No pending changes"
-  @State private var searchPaletteVisibleState: Bool = false
+  @State var viewModelState: PolicyCanvasViewModel
+  @State var isShowingPromoteConfirmationState = false
+  @State var pendingDeletionRequestState: PolicyCanvasDeletionRequest?
+  @State var statusLineState: String = "No pending changes"
+  @State var searchPaletteVisibleState: Bool = false
   /// User-facing override for the simulation overlay. Defaults to nil
   /// (auto-show whenever a simulation exists and the user is on the
   /// simulation tab); the chrome toggle in the top bar flips this to
@@ -37,8 +37,8 @@ public struct PolicyCanvasView: View {
   /// model) keeps document state separate from per-window viewport
   /// preferences, matching how the rest of the canvas treats zoom and
   /// inspector visibility.
-  @State private var simulationOverlayOverrideState: Bool?
-  @FocusState private var focusedFieldState: PolicyCanvasFocusedField?
+  @State var simulationOverlayOverrideState: Bool?
+  @FocusState var focusedFieldState: PolicyCanvasFocusedField?
   /// VoiceOver focus anchor for the canvas surface. The search palette writes
   /// the just-selected component into this binding after dismiss so VO lands
   /// on the destination node/edge/group instead of the empty space where the
@@ -46,15 +46,15 @@ public struct PolicyCanvasView: View {
   /// `.accessibilityFocused($focusedComponent, equals: ...)` to receive the
   /// shift; 3G's broader a11y focus plumbing will subsume this anchor at
   /// integration time.
-  @AccessibilityFocusState private var focusedComponentState: PolicyCanvasSelection?
+  @AccessibilityFocusState var focusedComponentState: PolicyCanvasSelection?
   @Environment(\.scenePhase)
-  private var scenePhase
+  var scenePhase
   @Environment(\.undoManager)
-  private var undoManager
+  var undoManager
   /// P19 root-side system reduce-motion read; rebound onto
   /// `\.policyCanvasReducedMotion` for nested layers (Wave 4K).
   @Environment(\.accessibilityReduceMotion)
-  private var systemReduceMotion
+  var systemReduceMotion
 
   /// Scene-scoped storage for viewport state (zoom, selection, scroll
   /// position) keyed by pipeline identity. Before this commit each viewport
@@ -72,7 +72,7 @@ public struct PolicyCanvasView: View {
   /// its extension; the host view struct is only constructable from the same
   /// module so this is not API surface.
   @SceneStorage("policyCanvas.byPipeline")
-  private var storedPipelineStateRawState: String = ""
+  var storedPipelineStateRawState: String = ""
   let store: HarnessMonitorStore?
   let dashboardUI: HarnessMonitorStore.ContentDashboardSlice?
   let suppressesAutosave: Bool
@@ -357,7 +357,7 @@ public struct PolicyCanvasView: View {
   // in `PolicyCanvasView+Shortcuts.swift` to keep this file under the
   // 420-line cap.
 
-  private var deletionConfirmationPresented: Binding<Bool> {
+  var deletionConfirmationPresented: Binding<Bool> {
     Binding(
       get: { pendingDeletionRequest != nil },
       set: { isPresented in
@@ -368,7 +368,7 @@ public struct PolicyCanvasView: View {
     )
   }
 
-  private func loadPolicyPipeline() async {
+  func loadPolicyPipeline() async {
     guard let store else {
       return
     }

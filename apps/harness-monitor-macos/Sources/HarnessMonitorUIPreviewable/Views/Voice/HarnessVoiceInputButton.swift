@@ -28,9 +28,9 @@ struct HarnessVoiceInputButton: View {
   @AppStorage(HarnessMonitorVoiceSettingsDefaults.pendingTranscriptSegmentLimitKey)
   var pendingTranscriptSegmentLimit =
     HarnessMonitorVoiceSettings.defaultPendingTranscriptSegmentLimit
-  @State private var _model = ViewModel()
+  @State var _model = ViewModel()
   @ScaledMetric(relativeTo: .headline)
-  private var progressSize: CGFloat = 16
+  var progressSize: CGFloat = 16
 
   var model: ViewModel { _model }
 
@@ -79,7 +79,7 @@ struct HarnessVoiceInputButton: View {
     }
   }
 
-  private var popoverContent: some View {
+  var popoverContent: some View {
     ZStack {
       popoverControls
         .blur(radius: model.failurePresentation == nil ? 0 : 2)
@@ -103,7 +103,7 @@ struct HarnessVoiceInputButton: View {
     .accessibilityIdentifier(HarnessMonitorAccessibility.voiceInputPopover)
   }
 
-  private var popoverControls: some View {
+  var popoverControls: some View {
     VStack(alignment: .leading, spacing: HarnessMonitorTheme.itemSpacing) {
       HStack(spacing: HarnessMonitorTheme.itemSpacing) {
         Label(model.statusText, systemImage: model.isRecording ? "waveform" : "mic")
@@ -136,7 +136,7 @@ struct HarnessVoiceInputButton: View {
     .padding(HarnessMonitorTheme.spacingLG)
   }
 
-  @ViewBuilder private var captureControl: some View {
+  @ViewBuilder var captureControl: some View {
     if model.isRecording {
       captureButton
         .harnessActionButtonStyle(variant: .bordered)
@@ -147,7 +147,7 @@ struct HarnessVoiceInputButton: View {
     }
   }
 
-  private var captureButton: some View {
+  var captureButton: some View {
     Button {
       if model.isRecording {
         stopCaptureOnly()
@@ -164,7 +164,7 @@ struct HarnessVoiceInputButton: View {
     .accessibilityIdentifier(HarnessMonitorAccessibility.voiceInputStopButton)
   }
 
-  private var insertTranscriptControl: some View {
+  var insertTranscriptControl: some View {
     Button("Insert Transcript") {
       insertTranscript()
     }
@@ -175,15 +175,15 @@ struct HarnessVoiceInputButton: View {
     .accessibilityIdentifier(HarnessMonitorAccessibility.voiceInputInsertButton)
   }
 
-  private var captureButtonTitle: String {
+  var captureButtonTitle: String {
     model.isRecording ? "Stop" : "Record"
   }
 
-  private var captureButtonSystemImage: String {
+  var captureButtonSystemImage: String {
     model.isRecording ? "stop.fill" : "record.circle"
   }
 
-  private var configurationSummary: some View {
+  var configurationSummary: some View {
     VoicePopoverConfigurationSummary(settings: voiceSettings)
   }
 }

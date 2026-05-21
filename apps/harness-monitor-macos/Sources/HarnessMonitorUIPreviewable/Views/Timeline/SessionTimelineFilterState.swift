@@ -303,7 +303,7 @@ struct SessionTimelineFilterState: Equatable, Sendable {
   static let encoder = StableFilterStateEncoder()
   static let decoder = JSONDecoder()
 
-  private static func toggleMembership<Value: Hashable>(
+  static func toggleMembership<Value: Hashable>(
     of value: Value,
     in set: inout Set<Value>
   ) {
@@ -314,7 +314,7 @@ struct SessionTimelineFilterState: Equatable, Sendable {
     }
   }
 
-  private static func signatureValue<S: Sequence>(_ values: S) -> String where S.Element == String {
+  static func signatureValue<S: Sequence>(_ values: S) -> String where S.Element == String {
     values.sorted().joined(separator: ",")
   }
 }

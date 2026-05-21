@@ -7,38 +7,38 @@ struct TaskActionsSheet: View {
   let sessionID: String
   let taskID: String
   @Environment(\.dismiss)
-  private var dismiss
+  var dismiss
 
-  @State private var localTaskID = ""
-  @State private var assigneeID = ""
-  @State private var taskStatus: TaskStatus = .inProgress
-  @State private var queuePolicy: TaskQueuePolicy = .locked
-  @State private var statusNote = ""
-  @State private var checkpointSummary = ""
-  @State private var checkpointProgress: Double = 50
-  @State private var submitForReviewSummary = ""
-  @State private var reviewActorID = ""
-  @State private var reviewVerdict: ReviewVerdict = .approve
-  @State private var reviewSummary = ""
-  @State private var reviewPointText = ""
-  @State private var reviewResponseNote = ""
-  @State private var disputedReviewPointIDs: Set<String> = []
-  @State private var arbitrationVerdict: ReviewVerdict = .approve
-  @State private var arbitrationSummary = ""
+  @State var localTaskID = ""
+  @State var assigneeID = ""
+  @State var taskStatus: TaskStatus = .inProgress
+  @State var queuePolicy: TaskQueuePolicy = .locked
+  @State var statusNote = ""
+  @State var checkpointSummary = ""
+  @State var checkpointProgress: Double = 50
+  @State var submitForReviewSummary = ""
+  @State var reviewActorID = ""
+  @State var reviewVerdict: ReviewVerdict = .approve
+  @State var reviewSummary = ""
+  @State var reviewPointText = ""
+  @State var reviewResponseNote = ""
+  @State var disputedReviewPointIDs: Set<String> = []
+  @State var arbitrationVerdict: ReviewVerdict = .approve
+  @State var arbitrationSummary = ""
 
-  private var detail: SessionDetail? {
+  var detail: SessionDetail? {
     store.contentUI.sessionDetail.presentedSessionDetail
   }
 
-  private var task: WorkItem? { detail?.tasks.first { $0.taskId == taskID } }
+  var task: WorkItem? { detail?.tasks.first { $0.taskId == taskID } }
 
-  private var tasks: [WorkItem] { detail?.tasks ?? [] }
-  private var agents: [AgentRegistration] { detail?.agents ?? [] }
-  private var assignmentAgents: [AgentRegistration] { Self.eligibleAssignmentAgents(agents) }
+  var tasks: [WorkItem] { detail?.tasks ?? [] }
+  var agents: [AgentRegistration] { detail?.agents ?? [] }
+  var assignmentAgents: [AgentRegistration] { Self.eligibleAssignmentAgents(agents) }
 
-  private var areSessionActionsAvailable: Bool { store.areSelectedSessionActionsAvailable }
+  var areSessionActionsAvailable: Bool { store.areSelectedSessionActionsAvailable }
 
-  private var effectiveTaskID: String {
+  var effectiveTaskID: String {
     Self.normalizedTaskID(
       draftID: localTaskID,
       currentTaskID: task?.taskId,
@@ -46,7 +46,7 @@ struct TaskActionsSheet: View {
     )
   }
 
-  private var effectiveAssigneeID: String {
+  var effectiveAssigneeID: String {
     Self.normalizedAssigneeID(
       draftID: assigneeID,
       assignedAgentID: task?.assignedTo,
@@ -54,14 +54,14 @@ struct TaskActionsSheet: View {
     )
   }
 
-  private var taskSelection: Binding<String> {
+  var taskSelection: Binding<String> {
     Binding(
       get: { effectiveTaskID },
       set: { localTaskID = $0 }
     )
   }
 
-  private var assigneeSelection: Binding<String> {
+  var assigneeSelection: Binding<String> {
     Binding(
       get: { effectiveAssigneeID },
       set: { assigneeID = $0 }
@@ -94,7 +94,7 @@ struct TaskActionsSheet: View {
     }
   }
 
-  private func header(for task: WorkItem) -> some View {
+  func header(for task: WorkItem) -> some View {
     HStack(alignment: .firstTextBaseline) {
       VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingXS) {
         Text("Task Actions")
@@ -113,7 +113,7 @@ struct TaskActionsSheet: View {
   }
 
   @ViewBuilder
-  private func form(for task: WorkItem) -> some View {
+  func form(for task: WorkItem) -> some View {
     VStack(alignment: .leading, spacing: HarnessMonitorTheme.sectionSpacing) {
       if let banner = store.selectedSessionActionUnavailableMessage {
         Text(banner)
@@ -131,7 +131,7 @@ struct TaskActionsSheet: View {
     }
   }
 
-  private func pickers(for task: WorkItem) -> some View {
+  func pickers(for task: WorkItem) -> some View {
     TaskActionsPickerSection(
       task: task,
       tasks: tasks,
@@ -143,7 +143,7 @@ struct TaskActionsSheet: View {
     )
   }
 
-  private func assignAndQueueRow(for task: WorkItem) -> some View {
+  func assignAndQueueRow(for task: WorkItem) -> some View {
     TaskActionsAssignmentRows(
       task: task,
       sessionID: sessionID,
@@ -156,7 +156,7 @@ struct TaskActionsSheet: View {
     )
   }
 
-  private func statusRow(for task: WorkItem) -> some View {
+  func statusRow(for task: WorkItem) -> some View {
     TaskActionsStatusRow(
       task: task,
       sessionID: sessionID,
@@ -168,7 +168,7 @@ struct TaskActionsSheet: View {
     )
   }
 
-  private func reviewWorkflowSection(for task: WorkItem) -> some View {
+  func reviewWorkflowSection(for task: WorkItem) -> some View {
     TaskActionsReviewWorkflowSection(
       task: task,
       agents: agents,
@@ -193,7 +193,7 @@ struct TaskActionsSheet: View {
     )
   }
 
-  private func checkpointSection(for task: WorkItem) -> some View {
+  func checkpointSection(for task: WorkItem) -> some View {
     TaskActionsCheckpointSection(
       task: task,
       sessionID: sessionID,
@@ -206,9 +206,9 @@ struct TaskActionsSheet: View {
     )
   }
 
-  private var unavailableState: some View { TaskActionsUnavailableState(dismiss: { dismiss() }) }
+  var unavailableState: some View { TaskActionsUnavailableState(dismiss: { dismiss() }) }
 
-  private func assignmentUnavailableMessage(for task: WorkItem) -> String? {
+  func assignmentUnavailableMessage(for task: WorkItem) -> String? {
     if let reviewMessage = genericTaskMutationUnavailableMessage(for: task) {
       return reviewMessage
     }
@@ -221,7 +221,7 @@ struct TaskActionsSheet: View {
     return nil
   }
 
-  private func genericTaskMutationUnavailableMessage(for task: WorkItem) -> String? {
+  func genericTaskMutationUnavailableMessage(for task: WorkItem) -> String? {
     if task.status.isReviewManagedStatus {
       return "Use the review controls for this task"
     }
@@ -231,7 +231,7 @@ struct TaskActionsSheet: View {
     return nil
   }
 
-  private func syncDefaults() {
+  func syncDefaults() {
     guard let task else { return }
     localTaskID = task.taskId
     taskStatus = task.status
@@ -251,25 +251,25 @@ struct TaskActionsSheet: View {
     disputedReviewPointIDs.formIntersection(Set(task.consensus?.points.map(\.pointId) ?? []))
   }
 
-  private func submitAssign() { Task { await assign() } }
+  func submitAssign() { Task { await assign() } }
 
-  private func submitUpdateStatus() { Task { await updateStatus() } }
+  func submitUpdateStatus() { Task { await updateStatus() } }
 
-  private func submitUpdateQueuePolicy() { Task { await updateQueuePolicy() } }
+  func submitUpdateQueuePolicy() { Task { await updateQueuePolicy() } }
 
-  private func submitCheckpoint() { Task { await checkpoint() } }
+  func submitCheckpoint() { Task { await checkpoint() } }
 
-  private func submitSubmitForReview() { Task { await submitForReview() } }
+  func submitSubmitForReview() { Task { await submitForReview() } }
 
-  private func submitClaimReview() { Task { await claimReview() } }
+  func submitClaimReview() { Task { await claimReview() } }
 
-  private func submitSubmitReview() { Task { await submitReview() } }
+  func submitSubmitReview() { Task { await submitReview() } }
 
-  private func submitRespondReview() { Task { await respondReview() } }
+  func submitRespondReview() { Task { await respondReview() } }
 
-  private func submitArbitrate() { Task { await arbitrate() } }
+  func submitArbitrate() { Task { await arbitrate() } }
 
-  private func assign() async {
+  func assign() async {
     guard !effectiveTaskID.isEmpty, !effectiveAssigneeID.isEmpty else { return }
     await TaskActionsSheetRequests.assign(
       store: store,
@@ -279,7 +279,7 @@ struct TaskActionsSheet: View {
     syncDefaults()
   }
 
-  private func updateStatus() async {
+  func updateStatus() async {
     guard !effectiveTaskID.isEmpty else { return }
     let success = await TaskActionsSheetRequests.updateStatus(
       store: store,
@@ -291,7 +291,7 @@ struct TaskActionsSheet: View {
     syncDefaults()
   }
 
-  private func updateQueuePolicy() async {
+  func updateQueuePolicy() async {
     guard !effectiveTaskID.isEmpty else { return }
     await TaskActionsSheetRequests.updateQueuePolicy(
       store: store,
@@ -301,7 +301,7 @@ struct TaskActionsSheet: View {
     syncDefaults()
   }
 
-  private func checkpoint() async {
+  func checkpoint() async {
     let summary = checkpointSummary.trimmingCharacters(in: .whitespacesAndNewlines)
     guard !effectiveTaskID.isEmpty, !summary.isEmpty else { return }
     let success = await TaskActionsSheetRequests.checkpoint(
@@ -314,7 +314,7 @@ struct TaskActionsSheet: View {
     syncDefaults()
   }
 
-  private func submitForReview() async {
+  func submitForReview() async {
     guard let task,
       let actorID = Self.submitForReviewActorID(for: task, agents: agents)
     else { return }
@@ -328,7 +328,7 @@ struct TaskActionsSheet: View {
     syncDefaults()
   }
 
-  private func claimReview() async {
+  func claimReview() async {
     guard let task else { return }
     let candidates = Self.eligibleReviewClaimAgents(task: task, agents: agents)
     let actorID = Self.normalizedAgentID(
@@ -345,7 +345,7 @@ struct TaskActionsSheet: View {
     syncDefaults()
   }
 
-  private func submitReview() async {
+  func submitReview() async {
     guard let task else { return }
     let candidates = Self.eligibleReviewSubmitAgents(task: task, agents: agents)
     let actorID = Self.normalizedAgentID(
@@ -372,7 +372,7 @@ struct TaskActionsSheet: View {
     syncDefaults()
   }
 
-  private func respondReview() async {
+  func respondReview() async {
     guard let task,
       let actorID = Self.respondReviewActorID(for: task, agents: agents),
       let consensus = task.consensus
@@ -397,7 +397,7 @@ struct TaskActionsSheet: View {
     syncDefaults()
   }
 
-  private func arbitrate() async {
+  func arbitrate() async {
     guard let task,
       let actorID = Self.arbitrationActorID(
         for: task,

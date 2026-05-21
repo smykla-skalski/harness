@@ -4,20 +4,20 @@ import SwiftUI
 public struct SettingsSupervisorRulesPane: View {
   let store: HarnessMonitorStore
 
-  private static let persistDebounceDuration: Duration = .milliseconds(500)
-  private static let statusDisplayDuration: Duration = .seconds(2)
+  static let persistDebounceDuration: Duration = .milliseconds(500)
+  static let statusDisplayDuration: Duration = .seconds(2)
 
-  @State private var viewModel = SettingsSupervisorRulesViewModel()
-  @State private var persistedRowsByRuleID: [String: PolicyConfigRowSnapshot] = [:]
-  @State private var statusMessages: [String: String] = [:]
-  @State private var errorMessages: [String: String] = [:]
-  @State private var pendingPersistTasks: [String: Task<Void, Never>] = [:]
+  @State var viewModel = SettingsSupervisorRulesViewModel()
+  @State var persistedRowsByRuleID: [String: PolicyConfigRowSnapshot] = [:]
+  @State var statusMessages: [String: String] = [:]
+  @State var errorMessages: [String: String] = [:]
+  @State var pendingPersistTasks: [String: Task<Void, Never>] = [:]
 
   public init(store: HarnessMonitorStore) {
     self.store = store
   }
 
-  private var repository: SupervisorPolicyConfigRepository? {
+  var repository: SupervisorPolicyConfigRepository? {
     store.supervisorPolicyConfigRepository
   }
 
@@ -51,7 +51,7 @@ public struct SettingsSupervisorRulesPane: View {
   }
 
   @MainActor
-  private func reloadRows() async {
+  func reloadRows() async {
     guard let repository else {
       persistedRowsByRuleID = [:]
       await viewModel.applyRowSnapshotsAsync([])
@@ -72,7 +72,7 @@ public struct SettingsSupervisorRulesPane: View {
   }
 
   @MainActor
-  private func persistRule(_ rule: SettingsSupervisorRuleDescriptor) async {
+  func persistRule(_ rule: SettingsSupervisorRuleDescriptor) async {
     guard let repository else { return }
     cancelPendingPersist(for: rule.id)
     do {
@@ -88,7 +88,7 @@ public struct SettingsSupervisorRulesPane: View {
     }
   }
 
-  private func schedulePersist(for rule: SettingsSupervisorRuleDescriptor) {
+  func schedulePersist(for rule: SettingsSupervisorRuleDescriptor) {
     cancelPendingPersist(for: rule.id)
     pendingPersistTasks[rule.id] = Task {
       try? await Task.sleep(for: Self.persistDebounceDuration)
@@ -97,18 +97,18 @@ public struct SettingsSupervisorRulesPane: View {
     }
   }
 
-  private func cancelPendingPersist(for ruleID: String) {
+  func cancelPendingPersist(for ruleID: String) {
     pendingPersistTasks.removeValue(forKey: ruleID)?.cancel()
   }
 
-  private func cancelPendingPersists() {
+  func cancelPendingPersists() {
     for ruleID in pendingPersistTasks.keys {
       cancelPendingPersist(for: ruleID)
     }
   }
 
   @MainActor
-  private func resetRule(_ rule: SettingsSupervisorRuleDescriptor) async {
+  func resetRule(_ rule: SettingsSupervisorRuleDescriptor) async {
     guard let repository else { return }
     cancelPendingPersist(for: rule.id)
     if persistedRowsByRuleID[rule.id] != nil {
@@ -127,7 +127,7 @@ public struct SettingsSupervisorRulesPane: View {
     Task { await store.refreshSupervisorPolicyOverrides() }
   }
 
-  private func showTransientStatus(_ message: String, for ruleID: String) {
+  func showTransientStatus(_ message: String, for ruleID: String) {
     withAnimation(.easeOut(duration: 0.15)) {
       statusMessages[ruleID] = message
     }

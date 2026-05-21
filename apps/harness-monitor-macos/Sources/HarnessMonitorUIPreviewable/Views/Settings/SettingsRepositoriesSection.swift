@@ -90,13 +90,13 @@ struct SettingsRepositoriesSection: View {
     }
   }
 
-  private func expandAfterFirstFrame() async {
+  func expandAfterFirstFrame() async {
     guard !isFullyExpanded else { return }
     try? await Task.sleep(for: .milliseconds(40))
     isFullyExpanded = true
   }
 
-  private func statusSection(message: String, color: Color = .red) -> some View {
+  func statusSection(message: String, color: Color = .red) -> some View {
     Section {
       Text(message)
         .foregroundStyle(color)
@@ -107,7 +107,7 @@ struct SettingsRepositoriesSection: View {
     }
   }
 
-  private var loadingSection: some View {
+  var loadingSection: some View {
     Section {
       ProgressView("Loading monitored repositories...")
         .accessibilityIdentifier(HarnessMonitorAccessibility.settingsRepositoriesStatus)
@@ -117,7 +117,7 @@ struct SettingsRepositoriesSection: View {
     }
   }
 
-  private var actionsBar: some View {
+  var actionsBar: some View {
     VStack(spacing: 0) {
       Divider()
       HStack {

@@ -3,25 +3,25 @@ import HarnessMonitorKit
 import OSLog
 import SwiftUI
 
-private let toolCallTimelinePresentationWorker = ToolCallTimelinePresentationWorker()
+let toolCallTimelinePresentationWorker = ToolCallTimelinePresentationWorker()
 
 struct ToolCallTimelineView: View {
   let entries: [TimelineEntry]
   let liveAnnouncementRowIDs: Set<String>
   let overflowNotice: HarnessMonitorStore.ToolCallTimelineOverflowNotice?
-  @State private var cachedPresentation = ToolCallTimelinePresentation.empty
-  @State private var cachedVirtualizedLayout = ToolCallTimelineVirtualizedLayout.empty
-  @State private var cachedAnnouncementSnapshot = ToolCallTimelineAnnouncementSnapshot.empty
-  @State private var cachedScrollMetrics = ToolCallTimelineScrollMetrics.zero
-  @State private var cachedOverflowAnnouncement: ToolCallTimelineOverflowAnnouncement?
-  @State private var cachedRowFrames: [String: CGRect] = [:]
-  @State private var presentationGeneration: UInt64 = 0
-  @State private var scrollMetricsDeferrer = ToolCallTimelineScrollMetricsDeferrer()
+  @State var cachedPresentation = ToolCallTimelinePresentation.empty
+  @State var cachedVirtualizedLayout = ToolCallTimelineVirtualizedLayout.empty
+  @State var cachedAnnouncementSnapshot = ToolCallTimelineAnnouncementSnapshot.empty
+  @State var cachedScrollMetrics = ToolCallTimelineScrollMetrics.zero
+  @State var cachedOverflowAnnouncement: ToolCallTimelineOverflowAnnouncement?
+  @State var cachedRowFrames: [String: CGRect] = [:]
+  @State var presentationGeneration: UInt64 = 0
+  @State var scrollMetricsDeferrer = ToolCallTimelineScrollMetricsDeferrer()
 
   @AppStorage(
     HarnessMonitorToolCallAnnouncementSettings.verboseAnnouncementsKey
   )
-  private var verboseToolCallAnnouncements =
+  var verboseToolCallAnnouncements =
     HarnessMonitorToolCallAnnouncementSettings.verboseAnnouncementsDefault
 
   init(
@@ -50,7 +50,7 @@ struct ToolCallTimelineView: View {
     }
   }
 
-  private var presentationInput: ToolCallTimelinePresentationInput {
+  var presentationInput: ToolCallTimelinePresentationInput {
     ToolCallTimelinePresentationInput(
       entries: entries,
       liveAnnouncementRowIDs: liveAnnouncementRowIDs,
@@ -59,7 +59,7 @@ struct ToolCallTimelineView: View {
     )
   }
 
-  private var presentationTaskKey: ToolCallTimelinePresentationTaskKey {
+  var presentationTaskKey: ToolCallTimelinePresentationTaskKey {
     ToolCallTimelinePresentationTaskKey(
       entries: entries,
       liveAnnouncementRowIDs: liveAnnouncementRowIDs,
@@ -68,11 +68,11 @@ struct ToolCallTimelineView: View {
     )
   }
 
-  private var overflowToolCallCount: Int {
+  var overflowToolCallCount: Int {
     overflowNotice?.displayedEventCount ?? visibleOverflowToolCallCount
   }
 
-  private var visibleOverflowToolCallCount: Int {
+  var visibleOverflowToolCallCount: Int {
     let viewportVisibleRowIDs = Self.viewportVisibleRowIDs(
       renderedRowIDs: cachedVirtualizedLayout.renderedRowIDs,
       rowFrames: cachedRowFrames,
@@ -182,7 +182,7 @@ struct ToolCallTimelineView: View {
   }
 
   @MainActor
-  private func rebuildCachedPresentation() async {
+  func rebuildCachedPresentation() async {
     presentationGeneration &+= 1
     let generation = presentationGeneration
     let input = presentationInput
@@ -204,7 +204,7 @@ struct ToolCallTimelineView: View {
     }
   }
 
-  private func scheduleScrollMetricsUpdate(_ scrollMetrics: ToolCallTimelineScrollMetrics) {
+  func scheduleScrollMetricsUpdate(_ scrollMetrics: ToolCallTimelineScrollMetrics) {
     scrollMetricsDeferrer.schedule(scrollMetrics) { latestMetrics in
       guard cachedScrollMetrics != latestMetrics else {
         return
@@ -341,7 +341,7 @@ struct ToolCallTimelineView: View {
     "live-region=polite"
   }
 
-  private func announceToolCallStateChanges(
+  func announceToolCallStateChanges(
     from oldValue: ToolCallTimelineAnnouncementSnapshot,
     to newValue: ToolCallTimelineAnnouncementSnapshot
   ) {

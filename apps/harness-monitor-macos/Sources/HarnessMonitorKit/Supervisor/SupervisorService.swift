@@ -6,32 +6,32 @@ import SwiftData
 #endif
 
 public actor SupervisorService {
-  private static let quarantineErrorThreshold = 5
-  private static let quarantineWindowTicks = 10
+  static let quarantineErrorThreshold = 5
+  static let quarantineWindowTicks = 10
   static let recentActionWindow: TimeInterval = 60
   weak var store: HarnessMonitorStore?
   let registry: PolicyRegistry
-  private let executor: PolicyExecutor
+  let executor: PolicyExecutor
   let clock: any SupervisorClock
   let interval: TimeInterval
-  private let ruleEvaluationTimeout: Duration
+  let ruleEvaluationTimeout: Duration
 
   var tickTask: Task<Void, Never>?
   var running = false, tickInProgress = false
-  private var tickWaiters: [CheckedContinuation<Void, Never>] = []
+  var tickWaiters: [CheckedContinuation<Void, Never>] = []
   var autoActionSuppressionDepth = 0
   var quietHoursWindow: SupervisorQuietHoursWindow?
 
-  private var ruleFailureWindow: [[String: Bool]] = []
-  private var quarantined: Set<String> = []
-  private var injectedFailures: Set<String> = []
-  private var dispatchedQuarantineDecisions: Set<String> = []
+  var ruleFailureWindow: [[String: Bool]] = []
+  var quarantined: Set<String> = []
+  var injectedFailures: Set<String> = []
+  var dispatchedQuarantineDecisions: Set<String> = []
   var ruleLastFiredAt: [String: Date] = [:]
   var ruleRecentActionKeys: [String: [String: Date]] = [:]
   var ruleRecentSuppressedActionKeys: [String: [String: Date]] = [:]
   var tickLatencySamplesMs: [Double] = []
-  private var lastSnapshotID: String?
-  private var lastObserverCount = 0
+  var lastSnapshotID: String?
+  var lastObserverCount = 0
   var fallbackDisconnectedSince: Date?
   var fallbackLastMessageAt: Date?
 
@@ -99,7 +99,7 @@ public actor SupervisorService {
     resumeTickWaiters()
   }
 
-  private func resumeTickWaiters() {
+  func resumeTickWaiters() {
     let waiters = tickWaiters
     tickWaiters.removeAll()
     for waiter in waiters {
@@ -107,7 +107,7 @@ public actor SupervisorService {
     }
   }
 
-  private func tickBody() async {
+  func tickBody() async {
     let tickStartedAt = clock.now()
     #if HARNESS_FEATURE_OTEL
       let tracer = SupervisorTelemetry.tracer()
@@ -157,12 +157,12 @@ public actor SupervisorService {
     }
   }
 
-  private struct TickResults {
+  struct TickResults {
     var actionsByRule: [(rule: any PolicyRule, actions: [PolicyAction])] = []
     var failedRuleIDs: Set<String> = []
   }
 
-  private func evaluateRules(
+  func evaluateRules(
     _ rules: [any PolicyRule],
     snapshot: SessionsSnapshot,
     now: Date,
@@ -220,7 +220,7 @@ public actor SupervisorService {
     }
   }
 
-  private static func runRule(
+  static func runRule(
     _ rule: any PolicyRule,
     snapshot: SessionsSnapshot,
     context: PolicyContext,
@@ -259,7 +259,7 @@ public actor SupervisorService {
     return evaluation
   }
 
-  private func advanceFailureWindow(with failedRuleIDs: Set<String>) {
+  func advanceFailureWindow(with failedRuleIDs: Set<String>) {
     var entry: [String: Bool] = [:]
     for ruleID in failedRuleIDs { entry[ruleID] = true }
     ruleFailureWindow.append(entry)
@@ -268,7 +268,7 @@ public actor SupervisorService {
     }
   }
 
-  private func applyNewQuarantines(for failedRuleIDs: Set<String>) {
+  func applyNewQuarantines(for failedRuleIDs: Set<String>) {
     for ruleID in failedRuleIDs {
       if quarantined.contains(ruleID) { continue }
       let count = ruleFailureWindow.reduce(0) { partial, entry in
@@ -283,7 +283,7 @@ public actor SupervisorService {
     }
   }
 
-  private func dispatchActions(
+  func dispatchActions(
     _ actionsByRule: [(rule: any PolicyRule, actions: [PolicyAction])],
     tickID: String,
     firedAt: Date,
@@ -321,7 +321,7 @@ public actor SupervisorService {
     }
   }
 
-  private func dispatchObserverSuggestions(
+  func dispatchObserverSuggestions(
     from observers: [any PolicyObserver],
     history: PolicyHistoryWindow,
     tickID: String
@@ -334,11 +334,11 @@ public actor SupervisorService {
     }
   }
 
-  private func wasQuarantinedThisTick(_ ruleID: String) -> Bool {
+  func wasQuarantinedThisTick(_ ruleID: String) -> Bool {
     quarantined.contains(ruleID) && !dispatchedQuarantineDecisions.contains(ruleID)
   }
 
-  private func dispatch(
+  func dispatch(
     _ action: PolicyAction,
     tickID: String,
     observers: [any PolicyObserver]

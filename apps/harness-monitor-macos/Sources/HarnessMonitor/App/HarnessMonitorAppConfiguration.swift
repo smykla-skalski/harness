@@ -4,12 +4,12 @@ import HarnessMonitorUIPreviewable
 import SwiftData
 
 struct HarnessMonitorAppConfiguration {
-  private static let uiTestingBundleIdentifier = "io.harnessmonitor.app.ui-testing"
-  private static let uiTestsEnvironmentKey = "HARNESS_MONITOR_UI_TESTS"
-  private static let uiTestDefaultDataRootName = "HarnessMonitorUITestHost"
+  static let uiTestingBundleIdentifier = "io.harnessmonitor.app.ui-testing"
+  static let uiTestsEnvironmentKey = "HARNESS_MONITOR_UI_TESTS"
+  static let uiTestDefaultDataRootName = "HarnessMonitorUITestHost"
   static let policyCanvasLabEnvironmentKey = "HARNESS_MONITOR_POLICY_CANVAS_LAB"
-  private static let resetBackgroundRecentsOverrideKey = "HARNESS_MONITOR_RESET_BACKGROUND_RECENTS"
-  private static let openRecentCloseAfterPickOverrideKey =
+  static let resetBackgroundRecentsOverrideKey = "HARNESS_MONITOR_RESET_BACKGROUND_RECENTS"
+  static let openRecentCloseAfterPickOverrideKey =
     "HARNESS_MONITOR_OPEN_RECENT_CLOSE_AFTER_PICK_OVERRIDE"
   static let sessionShortcutOverlaysOverrideKey =
     "HARNESS_MONITOR_SESSION_SHORTCUT_OVERLAYS_OVERRIDE"
@@ -17,8 +17,8 @@ struct HarnessMonitorAppConfiguration {
     "HARNESS_MONITOR_SESSION_TITLE_BLUR_OVERRIDE"
   static let menuBarStateColorsOverrideKey =
     "HARNESS_MONITOR_MENU_BAR_STATE_COLORS_OVERRIDE"
-  private static let toastDismissOverrideKey = "HARNESS_MONITOR_TEST_TOAST_DISMISS_MS"
-  private static let toastSeedKey = "HARNESS_MONITOR_TEST_SEED_TOASTS"
+  static let toastDismissOverrideKey = "HARNESS_MONITOR_TEST_TOAST_DISMISS_MS"
+  static let toastSeedKey = "HARNESS_MONITOR_TEST_SEED_TOASTS"
 
   let container: ModelContainer?
   let store: HarnessMonitorStore
@@ -99,7 +99,7 @@ struct HarnessMonitorAppConfiguration {
     )
   }
 
-  private static func resolveUITestOverrides(
+  static func resolveUITestOverrides(
     isUITesting: Bool,
     environment: HarnessMonitorEnvironment
   ) -> UITestOverrides {
@@ -161,7 +161,7 @@ struct HarnessMonitorAppConfiguration {
       && bundleIdentifier == uiTestingBundleIdentifier
   }
 
-  private struct UITestOverrides {
+  struct UITestOverrides {
     let themeMode: HarnessMonitorThemeMode
     let textSizeIndex: Int
     let sidebarSessionRowDisplayMode: HarnessMonitorSidebarSessionRowDisplayMode
@@ -174,7 +174,7 @@ struct HarnessMonitorAppConfiguration {
     let menuBarStateColors: Bool
   }
 
-  private static func uiTestSafeEnvironment(
+  static func uiTestSafeEnvironment(
     base: HarnessMonitorEnvironment = .current
   ) -> HarnessMonitorEnvironment {
     let environment = base
@@ -206,7 +206,7 @@ struct HarnessMonitorAppConfiguration {
     )
   }
 
-  private static func daemonOwnershipPreferenceEnvironment(
+  static func daemonOwnershipPreferenceEnvironment(
     base: HarnessMonitorEnvironment = .current,
     defaults: UserDefaults = .standard
   ) -> HarnessMonitorEnvironment {
@@ -225,7 +225,7 @@ struct HarnessMonitorAppConfiguration {
     )
   }
 
-  private static func defaultUITestDataHomePath(bundleIdentifier: String?) -> String {
+  static func defaultUITestDataHomePath(bundleIdentifier: String?) -> String {
     let bundleComponent = storagePathComponent(bundleIdentifier ?? uiTestingBundleIdentifier)
     return FileManager.default.temporaryDirectory
       .appendingPathComponent(uiTestDefaultDataRootName, isDirectory: true)
@@ -236,7 +236,7 @@ struct HarnessMonitorAppConfiguration {
       .path
   }
 
-  private static func storagePathComponent(_ value: String) -> String {
+  static func storagePathComponent(_ value: String) -> String {
     let allowedScalars = CharacterSet.alphanumerics.union(CharacterSet(charactersIn: "._-"))
     let component = value.unicodeScalars
       .map { allowedScalars.contains($0) ? String($0) : "-" }
@@ -245,11 +245,11 @@ struct HarnessMonitorAppConfiguration {
     return component.isEmpty ? "ui-test-host" : component
   }
 
-  private static func isBlank(_ rawValue: String?) -> Bool {
+  static func isBlank(_ rawValue: String?) -> Bool {
     rawValue?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ?? true
   }
 
-  private static func normalizeUITestDaemonOwnership(_ values: inout [String: String]) {
+  static func normalizeUITestDaemonOwnership(_ values: inout [String: String]) {
     guard uiTestsMayUseExternalDaemon(values) else {
       // Normal UI tests must stay preview-safe even if the developer shell
       // happens to export an external-daemon override.
@@ -260,7 +260,7 @@ struct HarnessMonitorAppConfiguration {
     values[DaemonOwnership.environmentKey] = "1"
   }
 
-  private static func uiTestsMayUseExternalDaemon(_ values: [String: String]) -> Bool {
+  static func uiTestsMayUseExternalDaemon(_ values: [String: String]) -> Bool {
     guard HarnessMonitorLaunchMode(environment: values) == .live else {
       return false
     }
@@ -268,7 +268,7 @@ struct HarnessMonitorAppConfiguration {
   }
 
   @MainActor
-  private static func applyUITestDefaults(
+  static func applyUITestDefaults(
     environment: HarnessMonitorEnvironment,
     overrides: UITestOverrides
   ) {
@@ -332,7 +332,7 @@ struct HarnessMonitorAppConfiguration {
     applyVoiceUITestDefaults(environment: environment)
   }
 
-  private static func resolvedToastDismissDelay(
+  static func resolvedToastDismissDelay(
     environment: HarnessMonitorEnvironment
   ) -> Duration {
     guard
@@ -348,7 +348,7 @@ struct HarnessMonitorAppConfiguration {
   }
 
   @MainActor
-  private static func seedTestToasts(
+  static func seedTestToasts(
     environment: HarnessMonitorEnvironment,
     store: HarnessMonitorStore
   ) {

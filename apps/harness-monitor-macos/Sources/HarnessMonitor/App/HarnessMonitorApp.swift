@@ -21,25 +21,25 @@ struct HarnessMonitorApp: App {
   let notificationController: HarnessMonitorUserNotificationController
   let keyWindowObserver: KeyWindowObserver
   let acpAttentionState: AcpPermissionAttentionState
-  private let pendingDecisionsDockBadgeController: PendingDecisionsDockBadgeController
+  let pendingDecisionsDockBadgeController: PendingDecisionsDockBadgeController
   let perfScenario: HarnessMonitorPerfScenario?
   let initialSessionWindowRoute: SessionWindowRoute?
   let showsPolicyCanvasLab: Bool
-  @State private var store: HarnessMonitorStore
-  @State private var menuBarStatusController: HarnessMonitorMenuBarStatusController
-  @State private var sessionWindowPresenceTracker: SessionWindowPresenceTracker
-  @State private var windowCommandRouting: WindowCommandRoutingState
-  @State private var windowNavigationHistory: GlobalWindowNavigationHistory
-  @State private var mcpWindowCommandRegistrar: HarnessMonitorMCPWindowCommandRegistrar
-  @State private var settingsSelectedSection: SettingsSection
-  @State private var settingsNavigationRequest: SettingsNavigationRequest?
-  @State private var hasInstalledMainWindowLauncher = false
-  @State private var hasScheduledInitialWindowRouting = false
-  @State private var hasRunPerfScenario = false
-  @State private var perfScenarioStatus: HarnessMonitorPerfScenarioStatus = .idle
-  @State private var perfScenarioFailureReason: String?
+  @State var store: HarnessMonitorStore
+  @State var menuBarStatusController: HarnessMonitorMenuBarStatusController
+  @State var sessionWindowPresenceTracker: SessionWindowPresenceTracker
+  @State var windowCommandRouting: WindowCommandRoutingState
+  @State var windowNavigationHistory: GlobalWindowNavigationHistory
+  @State var mcpWindowCommandRegistrar: HarnessMonitorMCPWindowCommandRegistrar
+  @State var settingsSelectedSection: SettingsSection
+  @State var settingsNavigationRequest: SettingsNavigationRequest?
+  @State var hasInstalledMainWindowLauncher = false
+  @State var hasScheduledInitialWindowRouting = false
+  @State var hasRunPerfScenario = false
+  @State var perfScenarioStatus: HarnessMonitorPerfScenarioStatus = .idle
+  @State var perfScenarioFailureReason: String?
   @AppStorage(HarnessMonitorThemeDefaults.modeKey)
-  private var themeMode: HarnessMonitorThemeMode = .auto
+  var themeMode: HarnessMonitorThemeMode = .auto
   @AppStorage(HarnessMonitorTextSize.storageKey)
   var textSizeIndex = HarnessMonitorTextSize.defaultIndex
   @AppStorage(HarnessMonitorMenuBarDefaults.stateColorVariantsEnabledKey)
@@ -141,7 +141,7 @@ struct HarnessMonitorApp: App {
     delegate.bind(store: store)
   }
 
-  private static func scheduleLaunchFilesystemMaintenance(
+  static func scheduleLaunchFilesystemMaintenance(
     environment: HarnessMonitorEnvironment
   ) {
     Task.detached(priority: .utility) {

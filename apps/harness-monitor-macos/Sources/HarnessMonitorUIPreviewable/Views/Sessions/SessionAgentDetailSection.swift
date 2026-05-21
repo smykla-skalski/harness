@@ -3,7 +3,7 @@ import SwiftUI
 
 struct SessionAgentDetailSection: View {
   @Environment(\.openWindow)
-  private var openWindow
+  var openWindow
   let store: HarnessMonitorStore
   let sessionID: String
   let detail: SessionDetail
@@ -15,35 +15,35 @@ struct SessionAgentDetailSection: View {
   let pendingPrompt: AgentPendingUserPrompt?
   let composerFocusRequestID: Int
   @Environment(\.accessibilityVoiceOverEnabled)
-  private var voiceOverEnabled
+  var voiceOverEnabled
   @Environment(\.fontScale)
-  private var fontScale
-  @State private var message = ""
-  @State private var composerBackdropHeight: CGFloat = 0
-  @State private var outputAnnouncementGate = SessionAgentOutputAnnouncementGate()
-  @State private var latestOutput = "No output"
-  @State private var selectedSendAction: SendUpdateAction = .injectContext
-  @State private var signalCommand = "inject_context"
-  @State private var signalMessage = ""
-  @State private var signalActionHint = ""
-  @State private var selectedRole: SessionRole = .worker
-  @State private var transcriptAnnouncer = MonitorTimelineLiveRegionThrottle()
-  @State private var lastAnnouncedTimelineEntryId: String?
-  @FocusState private var focusedField: SessionAgentComposerField?
+  var fontScale
+  @State var message = ""
+  @State var composerBackdropHeight: CGFloat = 0
+  @State var outputAnnouncementGate = SessionAgentOutputAnnouncementGate()
+  @State var latestOutput = "No output"
+  @State var selectedSendAction: SendUpdateAction = .injectContext
+  @State var signalCommand = "inject_context"
+  @State var signalMessage = ""
+  @State var signalActionHint = ""
+  @State var selectedRole: SessionRole = .worker
+  @State var transcriptAnnouncer = MonitorTimelineLiveRegionThrottle()
+  @State var lastAnnouncedTimelineEntryId: String?
+  @FocusState var focusedField: SessionAgentComposerField?
 
-  private var canSendInput: Bool {
+  var canSendInput: Bool {
     isTuiActive && !message.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
   }
 
-  private var isTuiActive: Bool {
+  var isTuiActive: Bool {
     tui?.status.isActive == true
   }
 
-  private var metrics: SessionAgentDetailSectionMetrics {
+  var metrics: SessionAgentDetailSectionMetrics {
     SessionAgentDetailSectionMetrics(fontScale: fontScale)
   }
 
-  private var rolePickerSelection: Binding<SessionRole> {
+  var rolePickerSelection: Binding<SessionRole> {
     Binding(
       get: {
         AgentDetailSection.normalizedRoleSelection(
@@ -135,7 +135,7 @@ struct SessionAgentDetailSection: View {
     }
   }
 
-  @ViewBuilder private var awaitingDecisionStripView: some View {
+  @ViewBuilder var awaitingDecisionStripView: some View {
     if let pendingDecisionAttention {
       AgentDetailAwaitingDecisionRegion(
         agentID: agent.agentId,
@@ -168,7 +168,7 @@ struct SessionAgentDetailSection: View {
     }
   }
 
-  private var summaryBandView: some View {
+  var summaryBandView: some View {
     AgentDetailSummaryBand(
       store: store,
       title: agent.name,
@@ -184,7 +184,7 @@ struct SessionAgentDetailSection: View {
     )
   }
 
-  private var activityBandView: some View {
+  var activityBandView: some View {
     AgentDetailActivityBand(
       store: store,
       agentID: agent.agentId,
@@ -201,7 +201,7 @@ struct SessionAgentDetailSection: View {
     )
   }
 
-  private var actionBandView: some View {
+  var actionBandView: some View {
     AgentDetailActionBand(
       store: store,
       sessionID: sessionID,
@@ -222,7 +222,7 @@ struct SessionAgentDetailSection: View {
     )
   }
 
-  private var terminalBandView: some View {
+  var terminalBandView: some View {
     AgentDetailPanel(title: "Terminal") {
       VStack(alignment: .leading, spacing: metrics.sectionSpacing) {
         if let error = tui?.error, !error.isEmpty {
@@ -257,7 +257,7 @@ struct SessionAgentDetailSection: View {
   }
 
   @MainActor
-  private func sendMessage() async {
+  func sendMessage() async {
     guard let tui, canSendInput else { return }
     let text = message.trimmingCharacters(in: .whitespacesAndNewlines)
     message = ""
@@ -270,7 +270,7 @@ struct SessionAgentDetailSection: View {
   }
 
   @MainActor
-  private func sendKey(_ key: AgentTuiKey) async {
+  func sendKey(_ key: AgentTuiKey) async {
     guard let tui else { return }
     _ = await store.sendAgentTuiInput(
       tuiID: tui.tuiId,
@@ -279,12 +279,12 @@ struct SessionAgentDetailSection: View {
     )
   }
 
-  private func announceOutputIfAllowed(_ output: String) {
+  func announceOutputIfAllowed(_ output: String) {
     guard outputAnnouncementGate.shouldAnnounce(output: output) else { return }
     AccessibilityNotification.Announcement(output).post()
   }
 
-  private func announceLatestTimelineEntryIfNeeded() {
+  func announceLatestTimelineEntryIfNeeded() {
     guard let entry = agentTimelineEntries.last else { return }
     guard entry.entryId != lastAnnouncedTimelineEntryId else { return }
     lastAnnouncedTimelineEntryId = entry.entryId
@@ -295,7 +295,7 @@ struct SessionAgentDetailSection: View {
     transcriptAnnouncer.announceIfAllowed(entry.summary, priority: priority)
   }
 
-  private func hydrateDraft() {
+  func hydrateDraft() {
     let defaults = UserDefaults.standard
     let savedCommand =
       defaults.string(
@@ -322,7 +322,7 @@ struct SessionAgentDetailSection: View {
     signalActionHint = savedActionHint
   }
 
-  private func dispatchPendingDecision(
+  func dispatchPendingDecision(
     attention: AcpDecisionAttention,
     actionID: String
   ) {
@@ -335,7 +335,7 @@ struct SessionAgentDetailSection: View {
     }
   }
 
-  private func openPendingDecisions() {
+  func openPendingDecisions() {
     let oldestOpenDecisionID =
       (store.supervisorPresentationItemsBySession[sessionID] ?? [])
       .filter { $0.agentID == agent.agentId }
@@ -359,7 +359,7 @@ struct SessionAgentDetailSection: View {
     }
   }
 
-  private func promoteComposerFocusIfRequested() {
+  func promoteComposerFocusIfRequested() {
     guard
       SessionAgentComposerFocusPolicy.shouldPromoteComposerFocus(
         requestID: composerFocusRequestID,

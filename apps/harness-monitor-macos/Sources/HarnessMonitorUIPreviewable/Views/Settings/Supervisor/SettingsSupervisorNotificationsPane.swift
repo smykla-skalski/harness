@@ -3,9 +3,9 @@ import SwiftUI
 
 public struct SettingsSupervisorNotificationsPane: View {
   let notifications: HarnessMonitorUserNotificationController
-  @State private var viewModel: SettingsSupervisorNotificationsViewModel
+  @State var viewModel: SettingsSupervisorNotificationsViewModel
   @Environment(\.openURL)
-  private var openURL
+  var openURL
 
   public init(
     notifications: HarnessMonitorUserNotificationController,
@@ -56,13 +56,13 @@ public struct SettingsSupervisorNotificationsPane: View {
     }
   }
 
-  private var acpAuthorizationStatus: AcpPermissionNotificationAuthorizationStatus {
+  var acpAuthorizationStatus: AcpPermissionNotificationAuthorizationStatus {
     AcpPermissionUserNotifications.authorizationStatus(
       from: notifications.settingsSnapshot
     )
   }
 
-  @ViewBuilder private var acpCatalogSection: some View {
+  @ViewBuilder var acpCatalogSection: some View {
     Section {
       Toggle(
         "Enable ACP catalog",
@@ -101,7 +101,7 @@ public struct SettingsSupervisorNotificationsPane: View {
     }
   }
 
-  @ViewBuilder private var acpStatusSection: some View {
+  @ViewBuilder var acpStatusSection: some View {
     let verboseAnnouncementHelp = """
       When off, VoiceOver announces only completed or failed tool calls. \
       Turn this on to announce every tool-call state change.

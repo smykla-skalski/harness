@@ -26,7 +26,7 @@ public final class SettingsSupervisorRulesViewModel {
 
   public let rules: [SettingsSupervisorRuleDescriptor]
 
-  @ObservationIgnored private let worker = SettingsSupervisorRulesWorker()
+  @ObservationIgnored let worker = SettingsSupervisorRulesWorker()
   @ObservationIgnored var overridesByRuleID: [String: RuleOverrideState] = [:]
   @ObservationIgnored var parameterValuesByKey: [String: String] = [:]
   var editorStates: [String: RuleEditorState] = [:]

@@ -124,7 +124,7 @@ public final class DecisionDetailViewModel {
   public private(set) var deeplinks: [Deeplink]
   public var snoozeRequest: SnoozeRequest?
 
-  @ObservationIgnored private let handler: any DecisionActionHandler
+  @ObservationIgnored let handler: any DecisionActionHandler
 
   public convenience init(decision: Decision, handler: any DecisionActionHandler) {
     self.init(

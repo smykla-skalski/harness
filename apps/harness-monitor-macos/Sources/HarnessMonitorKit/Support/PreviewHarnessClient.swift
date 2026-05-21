@@ -5,12 +5,12 @@ public final class PreviewHarnessClient: HarnessMonitorClientProtocol, Sendable 
     static let agentTuisDelay = "HARNESS_MONITOR_PREVIEW_AGENT_TUIS_DELAY_MS"
   }
 
-  private let fixtures: Fixtures
+  let fixtures: Fixtures
   let state: PreviewHarnessClientState
-  private let isLaunchAgentInstalled: Bool
-  private let hostBridgeState: PreviewHostBridgeState
-  private let actionDelay: Duration?
-  private let codexStartBehavior: PreviewCodexStartBehavior
+  let isLaunchAgentInstalled: Bool
+  let hostBridgeState: PreviewHostBridgeState
+  let actionDelay: Duration?
+  let codexStartBehavior: PreviewCodexStartBehavior
 
   var readySessionID: String? {
     fixtures.readySessionID

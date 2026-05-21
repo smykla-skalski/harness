@@ -62,7 +62,7 @@ public struct AcpPermissionDecisionPayload: Codable, Equatable, Sendable {
     case acpPermission = "acp_permission"
   }
 
-  private enum CodingKeys: String, CodingKey {
+  enum CodingKeys: String, CodingKey {
     case decisionKind
     case decisionID
     case summary
@@ -127,7 +127,7 @@ public struct AcpPermissionDecisionPayload: Codable, Equatable, Sendable {
     return encoder
   }()
 
-  private static let decoder = JSONDecoder()
+  static let decoder = JSONDecoder()
 
   public init(
     decisionKind: Kind = Self.decisionKind,

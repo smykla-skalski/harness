@@ -13,24 +13,24 @@ struct TaskBoardOperationsPanel: View {
   let taskBoardItems: [TaskBoardItem]
 
   @Environment(\.fontScale)
-  private var fontScale
+  var fontScale
 
-  @State private var inventoryStatusChoice = TaskBoardStatusFilterChoice.all
-  @State private var localHostProjectTypes: [String] = []
+  @State var inventoryStatusChoice = TaskBoardStatusFilterChoice.all
+  @State var localHostProjectTypes: [String] = []
 
-  private var metrics: TaskBoardOverviewMetrics {
+  var metrics: TaskBoardOverviewMetrics {
     TaskBoardOverviewMetrics(fontScale: fontScale)
   }
 
-  private var rowLabelFont: Font {
+  var rowLabelFont: Font {
     HarnessMonitorTextSize.scaledFont(.body, by: fontScale)
   }
 
-  private var rowLabelWidth: CGFloat {
+  var rowLabelWidth: CGFloat {
     112 * min(fontScale, 1.3)
   }
 
-  private var dashboard: HarnessMonitorStore.ContentDashboardSlice {
+  var dashboard: HarnessMonitorStore.ContentDashboardSlice {
     store.contentUI.dashboard
   }
 
@@ -67,7 +67,7 @@ struct TaskBoardOperationsPanel: View {
   }
 
   @MainActor
-  private func loadLocalHostProjectTypes() async {
+  func loadLocalHostProjectTypes() async {
     do {
       let snapshot = try await store.taskBoardHostSnapshot()
       localHostProjectTypes = snapshot.local.projectTypes

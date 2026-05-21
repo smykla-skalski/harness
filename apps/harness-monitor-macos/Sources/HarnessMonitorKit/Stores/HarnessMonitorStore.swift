@@ -316,7 +316,7 @@ public final class HarnessMonitorStore {
   var isReconnecting = false
   var isAppLifecycleSuspended = false
   var reconnectRequestedDuringReconnect = false
-  private let sleepAssertion = SleepAssertion()
+  let sleepAssertion = SleepAssertion()
   @ObservationIgnored var pendingUISyncAreas: Set<UISyncArea> = []
   @ObservationIgnored var isApplyingUISyncBatch = false
   @ObservationIgnored var debugUISyncCounts: [UISyncArea: Int] = [:]

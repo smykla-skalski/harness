@@ -3,10 +3,10 @@ import SwiftUI
 
 struct SettingsTaskBoardSection: View, SettingsTaskBoardEditingSurface {
   let store: HarnessMonitorStore
-  @Binding private var taskBoardFormState: TaskBoardSettingsFormState
+  @Binding var taskBoardFormState: TaskBoardSettingsFormState
   @Binding var navigationRequest: SettingsNavigationRequest?
-  @State private var pendingNavigationRequestID: UUID?
-  @State private var isFullyExpanded = false
+  @State var pendingNavigationRequestID: UUID?
+  @State var isFullyExpanded = false
 
   var formState: Binding<TaskBoardSettingsFormState> { $taskBoardFormState }
 
@@ -65,13 +65,13 @@ struct SettingsTaskBoardSection: View, SettingsTaskBoardEditingSurface {
     }
   }
 
-  private func expandAfterFirstFrame() async {
+  func expandAfterFirstFrame() async {
     guard !isFullyExpanded else { return }
     try? await Task.sleep(for: .milliseconds(40))
     isFullyExpanded = true
   }
 
-  private func statusSection(message: String) -> some View {
+  func statusSection(message: String) -> some View {
     Section {
       Text(message)
         .foregroundStyle(.red)
@@ -82,7 +82,7 @@ struct SettingsTaskBoardSection: View, SettingsTaskBoardEditingSurface {
     }
   }
 
-  private var loadingSection: some View {
+  var loadingSection: some View {
     Section {
       ProgressView("Loading Task Board settings...")
         .accessibilityIdentifier(HarnessMonitorAccessibility.settingsTaskBoardStatus)
@@ -92,11 +92,11 @@ struct SettingsTaskBoardSection: View, SettingsTaskBoardEditingSurface {
     }
   }
 
-  private var githubInboxSection: some View {
+  var githubInboxSection: some View {
     SettingsTaskBoardInboxSection(draft: draftBinding)
   }
 
-  private var automationSection: some View {
+  var automationSection: some View {
     Section {
       TextField("Managed Label", text: draftBinding.managedLabel)
       TextField("Auto Merge Label", text: draftBinding.autoMergeLabel)
@@ -118,7 +118,7 @@ struct SettingsTaskBoardSection: View, SettingsTaskBoardEditingSurface {
     }
   }
 
-  private var authorIdentitySection: some View {
+  var authorIdentitySection: some View {
     Section {
       TextField(
         "Author Name",
@@ -145,7 +145,7 @@ struct SettingsTaskBoardSection: View, SettingsTaskBoardEditingSurface {
     }
   }
 
-  private func identityPrompt(_ detected: String?) -> Text? {
+  func identityPrompt(_ detected: String?) -> Text? {
     guard let detected, !detected.isEmpty else { return nil }
     return Text(detected)
   }
@@ -158,7 +158,7 @@ struct SettingsTaskBoardSection: View, SettingsTaskBoardEditingSurface {
     $pendingNavigationRequestID
   }
 
-  private var shouldOfferAdoptDefaults: Bool {
+  var shouldOfferAdoptDefaults: Bool {
     let gitConfig = draft.identityDefaults.gitConfig
     let hasDetectedName = gitConfig.userName?.isEmpty == false
     let hasDetectedEmail = gitConfig.userEmail?.isEmpty == false
@@ -166,7 +166,7 @@ struct SettingsTaskBoardSection: View, SettingsTaskBoardEditingSurface {
     return draft.authorName.isEmpty || draft.authorEmail.isEmpty
   }
 
-  private func adoptGitConfigDefaults() {
+  func adoptGitConfigDefaults() {
     let gitConfig = draft.identityDefaults.gitConfig
     var updatedDraft = draft
     if updatedDraft.authorName.isEmpty, let name = gitConfig.userName {
@@ -179,7 +179,7 @@ struct SettingsTaskBoardSection: View, SettingsTaskBoardEditingSurface {
   }
 }
 
-private struct TaskBoardWorkflowSection: View, SettingsTaskBoardEditingSurface {
+struct TaskBoardWorkflowSection: View, SettingsTaskBoardEditingSurface {
   let store: HarnessMonitorStore
   @Binding var taskBoardFormState: TaskBoardSettingsFormState
   var formState: Binding<TaskBoardSettingsFormState> { $taskBoardFormState }
@@ -203,7 +203,7 @@ private struct TaskBoardWorkflowSection: View, SettingsTaskBoardEditingSurface {
   }
 }
 
-private struct TaskBoardProjectSection: View, SettingsTaskBoardEditingSurface {
+struct TaskBoardProjectSection: View, SettingsTaskBoardEditingSurface {
   let store: HarnessMonitorStore
   @Binding var taskBoardFormState: TaskBoardSettingsFormState
   var formState: Binding<TaskBoardSettingsFormState> { $taskBoardFormState }
@@ -258,7 +258,7 @@ private struct TaskBoardProjectSection: View, SettingsTaskBoardEditingSurface {
   }
 }
 
-private struct TaskBoardMonitoredReposSection: View, SettingsTaskBoardEditingSurface {
+struct TaskBoardMonitoredReposSection: View, SettingsTaskBoardEditingSurface {
   let store: HarnessMonitorStore
   @Binding var taskBoardFormState: TaskBoardSettingsFormState
   @Binding var navigationRequest: SettingsNavigationRequest?

@@ -4,26 +4,26 @@ import SwiftUI
 public struct OpenRecentView: View {
   public let store: HarnessMonitorStore
   @Environment(\.openWindow)
-  private var openWindow
+  var openWindow
   @Environment(\.dismiss)
-  private var dismiss
+  var dismiss
   @Environment(\.harnessDateTimeConfiguration)
-  private var dateTimeConfiguration
+  var dateTimeConfiguration
   @Environment(\.fontScale)
-  private var fontScale
+  var fontScale
   @Environment(\.accessibilityReduceMotion)
-  private var reduceMotion
+  var reduceMotion
   @AppStorage(OpenRecentCloseAfterPickDefaults.storageKey)
-  private var closeAfterPick = OpenRecentCloseAfterPickDefaults.defaultValue
-  @State private var openFolderActivationCount = 0
-  @State private var newSessionActivationCount = 0
-  @State private var showsStartPanel = true
+  var closeAfterPick = OpenRecentCloseAfterPickDefaults.defaultValue
+  @State var openFolderActivationCount = 0
+  @State var newSessionActivationCount = 0
+  @State var showsStartPanel = true
 
   public init(store: HarnessMonitorStore) {
     self.store = store
   }
 
-  private var recentSessions: [OpenRecentSessionItem] {
+  var recentSessions: [OpenRecentSessionItem] {
     let bookmarkedSessionIDs = store.sidebarUI.bookmarkedSessionIds
     return store.sessionIndex.catalog.recentSessions.prefix(8).map {
       OpenRecentSessionItem(
@@ -62,23 +62,23 @@ public struct OpenRecentView: View {
     .accessibilityIdentifier(HarnessMonitorAccessibility.openRecentRoot)
   }
 
-  private var layoutScale: CGFloat {
+  var layoutScale: CGFloat {
     min(max(fontScale, 0.88), 1.18)
   }
 
-  private func openFolderAction() {
+  func openFolderAction() {
     openFolderActivationCount += 1
     HarnessMonitorLogger.swiftui.info("Open Recent open folder action activated")
     store.requestOpenFolder()
   }
 
-  private func newSessionAction() {
+  func newSessionAction() {
     newSessionActivationCount += 1
     HarnessMonitorLogger.swiftui.info("Open Recent new session action activated")
     store.presentedSheet = .newSession
   }
 
-  private func openSession(_ sessionID: String) {
+  func openSession(_ sessionID: String) {
     let shouldCloseAfterPick = closeAfterPick
     openWindow.openHarnessSessionWindow(sessionID: sessionID)
     guard shouldCloseAfterPick else {
@@ -93,7 +93,7 @@ public struct OpenRecentView: View {
   }
 
   @MainActor
-  private func dismissCurrentWindow() async {
+  func dismissCurrentWindow() async {
     let animation = OpenRecentCloseAfterPickMotionPolicy.animation(reduceMotion: reduceMotion)
     if let animation {
       withAnimation(animation) {
@@ -109,7 +109,7 @@ public struct OpenRecentView: View {
     dismiss()
   }
 
-  @ViewBuilder private var actionStateMarker: some View {
+  @ViewBuilder var actionStateMarker: some View {
     if HarnessMonitorUITestEnvironment.accessibilityMarkersEnabled {
       AccessibilityTextMarker(
         identifier: HarnessMonitorAccessibility.openRecentActionState,
@@ -119,14 +119,14 @@ public struct OpenRecentView: View {
   }
 }
 
-private struct OpenRecentStartPanel: View {
+struct OpenRecentStartPanel: View {
   let recentSessions: [OpenRecentSessionItem]
   let dateTimeConfiguration: HarnessMonitorDateTimeConfiguration
   let openFolder: () -> Void
   let newSession: () -> Void
   let openSession: (String) -> Void
   @Environment(\.fontScale)
-  private var fontScale
+  var fontScale
 
   var body: some View {
     OpenRecentStartPanelLayout(
@@ -141,7 +141,7 @@ private struct OpenRecentStartPanel: View {
     .frame(maxHeight: .infinity, alignment: .top)
   }
 
-  private var header: some View {
+  var header: some View {
     HStack(spacing: 14 * layoutScale) {
       Image(systemName: "rectangle.stack.badge.play")
         .scaledFont(.system(size: 34, weight: .regular))
@@ -158,7 +158,7 @@ private struct OpenRecentStartPanel: View {
     .frame(maxWidth: .infinity, alignment: .center)
   }
 
-  private var content: some View {
+  var content: some View {
     VStack(alignment: .leading, spacing: sectionSpacing) {
       section(title: "Get Started") {
         actionButton(
@@ -199,7 +199,7 @@ private struct OpenRecentStartPanel: View {
     .frame(maxWidth: .infinity, alignment: .leading)
   }
 
-  private func section<Content: View>(
+  func section<Content: View>(
     title: String,
     accessibilityMarkerID: String? = nil,
     @ViewBuilder content: () -> Content
@@ -223,7 +223,7 @@ private struct OpenRecentStartPanel: View {
     }
   }
 
-  private func actionButton(
+  func actionButton(
     _ title: String,
     systemImage: String,
     shortcut: KeyboardShortcutDescriptor,
@@ -256,7 +256,7 @@ private struct OpenRecentStartPanel: View {
     .accessibilityIdentifier(accessibilityID)
   }
 
-  private func keyEquivalent(for title: String) -> KeyEquivalent {
+  func keyEquivalent(for title: String) -> KeyEquivalent {
     switch title {
     case "Open Folder": "o"
     case "New Session": "n"
@@ -264,25 +264,25 @@ private struct OpenRecentStartPanel: View {
     }
   }
 
-  private var layoutScale: CGFloat {
+  var layoutScale: CGFloat {
     min(max(fontScale, 0.88), 1.18)
   }
 
-  private var panelWidth: CGFloat {
+  var panelWidth: CGFloat {
     500 * layoutScale
   }
 
-  private var sectionSpacing: CGFloat {
+  var sectionSpacing: CGFloat {
     22 * layoutScale
   }
 }
 
-private struct OpenRecentSessionRow: View {
+struct OpenRecentSessionRow: View {
   let item: OpenRecentSessionItem
   let dateTimeConfiguration: HarnessMonitorDateTimeConfiguration
   let openSession: (String) -> Void
   @Environment(\.fontScale)
-  private var fontScale
+  var fontScale
 
   var body: some View {
     Button {
@@ -332,7 +332,7 @@ private struct OpenRecentSessionRow: View {
     )
   }
 
-  private var metadata: String {
+  var metadata: String {
     let timestamp = formatTimestamp(
       item.session.lastActivityAt,
       configuration: dateTimeConfiguration
@@ -340,15 +340,15 @@ private struct OpenRecentSessionRow: View {
     return "\(item.session.worktreeDisplayName) - \(timestamp)"
   }
 
-  private var layoutScale: CGFloat {
+  var layoutScale: CGFloat {
     min(max(fontScale, 0.88), 1.18)
   }
 }
 
-private struct OpenRecentSessionStatusDot: View {
+struct OpenRecentSessionStatusDot: View {
   let status: SessionStatus
   @Environment(\.fontScale)
-  private var fontScale
+  var fontScale
 
   var body: some View {
     Circle()
@@ -357,7 +357,7 @@ private struct OpenRecentSessionStatusDot: View {
       .accessibilityHidden(true)
   }
 
-  private var dotSize: CGFloat {
+  var dotSize: CGFloat {
     8 * min(max(fontScale, 0.88), 1.18)
   }
 }

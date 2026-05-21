@@ -6,10 +6,10 @@ actor PreviewHarnessClientState {
     "HARNESS_MONITOR_PREVIEW_AGENT_TUI_REFRESH_STATUS"
 
   let environment: HarnessMonitorEnvironment
-  private var sessionSummaries: [SessionSummary]
-  private var detailsBySessionID: [String: SessionDetail]
-  private var coreDetailsBySessionID: [String: SessionDetail]
-  private var timelinesBySessionID: [String: [TimelineEntry]]
+  var sessionSummaries: [SessionSummary]
+  var detailsBySessionID: [String: SessionDetail]
+  var coreDetailsBySessionID: [String: SessionDetail]
+  var timelinesBySessionID: [String: [TimelineEntry]]
   var agentTuisBySessionID: [String: [AgentTuiSnapshot]]
   var acpAgentsBySessionID: [String: [AcpAgentSnapshot]]
   var codexRunsBySessionID: [String: [CodexRunSnapshot]]
@@ -26,9 +26,9 @@ actor PreviewHarnessClientState {
   var nextAgentTuiSequence: Int
   var nextCodexRunSequence: Int
   var nextAcpAgentSequence: Int
-  private var nextMutationSecond: Int
+  var nextMutationSecond: Int
   let fallbackDetail: SessionDetail?
-  private let fallbackTimeline: [TimelineEntry]
+  let fallbackTimeline: [TimelineEntry]
 
   init(
     fixtures: PreviewHarnessClient.Fixtures,
@@ -241,12 +241,12 @@ actor PreviewHarnessClientState {
     return updatedSummary
   }
 
-  private func nextSyntheticMutationTimestamp() -> String {
+  func nextSyntheticMutationTimestamp() -> String {
     nextMutationSecond = (nextMutationSecond + 1) % 60
     return String(format: "2026-03-28T14:20:%02dZ", nextMutationSecond)
   }
 
-  private func summaryByUpdatingActivity(
+  func summaryByUpdatingActivity(
     _ summary: SessionSummary,
     updatedAt: String
   ) -> SessionSummary {

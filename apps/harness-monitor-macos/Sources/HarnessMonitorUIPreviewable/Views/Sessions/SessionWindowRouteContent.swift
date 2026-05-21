@@ -7,13 +7,13 @@ struct SessionWindowOverview: View {
   let decisions: [Decision]
   let tuiStatusByAgent: [String: AgentTuiStatus]
   @Environment(\.fontScale)
-  private var fontScale
+  var fontScale
 
-  private var metrics: SessionWindowRouteContentMetrics {
+  var metrics: SessionWindowRouteContentMetrics {
     SessionWindowRouteContentMetrics(fontScale: fontScale)
   }
 
-  private var runtimePresentation: HarnessMonitorStore.AgentRuntimePresentationContext? {
+  var runtimePresentation: HarnessMonitorStore.AgentRuntimePresentationContext? {
     switch snapshot.source {
     case .live:
       return HarnessMonitorStore.AgentRuntimePresentationContext(
@@ -55,7 +55,7 @@ struct SessionWindowOverview: View {
     }
   }
 
-  private var overviewFacts: [SessionOverviewFact] {
+  var overviewFacts: [SessionOverviewFact] {
     [
       SessionOverviewFact(title: "Status", value: snapshot.summary.status.title),
       SessionOverviewFact(title: "Project", value: snapshot.summary.projectName),
@@ -74,11 +74,11 @@ struct SessionWindowOverview: View {
     ]
   }
 
-  private var agentCount: Int {
+  var agentCount: Int {
     snapshot.detail?.agents.count ?? snapshot.summary.metrics.agentCount
   }
 
-  private var agentCountText: String {
+  var agentCountText: String {
     guard
       runtimePresentation?.availability == .live,
       let detail = snapshot.detail
@@ -103,7 +103,7 @@ struct SessionWindowOverview: View {
 
 }
 
-private struct SessionOverviewFact: Identifiable {
+struct SessionOverviewFact: Identifiable {
   let title: String
   let value: String
   let usesMonospacedDigits: Bool
@@ -120,7 +120,7 @@ private struct SessionOverviewFact: Identifiable {
   }
 }
 
-private struct SessionOverviewInfoStrip: View {
+struct SessionOverviewInfoStrip: View {
   let facts: [SessionOverviewFact]
   let metrics: SessionWindowRouteContentMetrics
 
@@ -136,7 +136,7 @@ private struct SessionOverviewInfoStrip: View {
     .frame(maxWidth: .infinity, alignment: .leading)
   }
 
-  private func cardsRow(expandsToFill: Bool) -> some View {
+  func cardsRow(expandsToFill: Bool) -> some View {
     HStack(alignment: .top, spacing: metrics.gridVerticalSpacing) {
       ForEach(facts) { fact in
         SessionOverviewFactCard(fact: fact, metrics: metrics)
@@ -151,17 +151,17 @@ private struct SessionOverviewInfoStrip: View {
   }
 }
 
-private struct SessionOverviewFactCard: View {
+struct SessionOverviewFactCard: View {
   let fact: SessionOverviewFact
   let metrics: SessionWindowRouteContentMetrics
   @Environment(\.fontScale)
-  private var fontScale
+  var fontScale
 
-  private var titleFont: Font {
+  var titleFont: Font {
     HarnessMonitorTextSize.scaledFont(.caption.weight(.bold), by: fontScale)
   }
 
-  private var valueFont: Font {
+  var valueFont: Font {
     HarnessMonitorTextSize.scaledFont(
       .system(.title3, design: .rounded, weight: .semibold),
       by: fontScale
@@ -201,7 +201,7 @@ private struct SessionOverviewFactCard: View {
     .accessibilityValue(fact.value)
   }
 
-  @ViewBuilder private var valueView: some View {
+  @ViewBuilder var valueView: some View {
     if fact.usesMonospacedDigits {
       Text(verbatim: fact.value)
         .monospacedDigit()

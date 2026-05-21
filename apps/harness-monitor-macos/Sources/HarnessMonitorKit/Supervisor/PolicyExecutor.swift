@@ -57,15 +57,15 @@ public protocol SupervisorAuditWriter: Sendable {
 /// audit-before-action ordering for side-effecting actions, store-backed suppression of unchanged
 /// decision replays, and sliding-window deduplication keyed by `actionKey`.
 public actor PolicyExecutor {
-  private let api: any SupervisorAPIClient
-  private let decisions: DecisionStore
-  private let audit: any SupervisorAuditWriter
-  private let clock: any SupervisorClock
-  private let cooldown: TimeInterval
+  let api: any SupervisorAPIClient
+  let decisions: DecisionStore
+  let audit: any SupervisorAuditWriter
+  let clock: any SupervisorClock
+  let cooldown: TimeInterval
 
   /// Keys of actions dispatched within the current cooldown window, mapped to the timestamp.
-  private var recentKeys: [String: Date] = [:]
-  private var pendingDecisionNotifications: Set<String> = []
+  var recentKeys: [String: Date] = [:]
+  var pendingDecisionNotifications: Set<String> = []
 
   public init(
     api: any SupervisorAPIClient,
@@ -177,12 +177,12 @@ public actor PolicyExecutor {
 
   // MARK: - Private helpers
 
-  private func pruneExpiredKeys(at now: Date) {
+  func pruneExpiredKeys(at now: Date) {
     let cutoff = now.addingTimeInterval(-cooldown)
     recentKeys = recentKeys.filter { $0.value > cutoff }
   }
 
-  private func appendPostActionAudit(
+  func appendPostActionAudit(
     _ record: SupervisorAuditRecord,
     actionKey: String
   ) async {
@@ -196,7 +196,7 @@ public actor PolicyExecutor {
     }
   }
 
-  private func auditRecord(
+  func auditRecord(
     id: String,
     kind: String,
     action: PolicyAction,
@@ -214,7 +214,7 @@ public actor PolicyExecutor {
     )
   }
 
-  private func shouldSkipBeforeAudit(_ action: PolicyAction) async throws -> Bool {
+  func shouldSkipBeforeAudit(_ action: PolicyAction) async throws -> Bool {
     switch action {
     case .queueDecision(let payload):
       guard !pendingDecisionNotifications.contains(payload.id) else {
@@ -227,7 +227,7 @@ public actor PolicyExecutor {
     }
   }
 
-  private func dispatch(_ action: PolicyAction) async throws {
+  func dispatch(_ action: PolicyAction) async throws {
     switch action {
     case .nudgeAgent(let payload):
       try await api.nudgeAgent(agentID: payload.agentID, input: payload.prompt)
@@ -306,7 +306,7 @@ public actor PolicyExecutor {
     }
   }
 
-  private func ruleID(for action: PolicyAction) -> String? {
+  func ruleID(for action: PolicyAction) -> String? {
     switch action {
     case .nudgeAgent(let payload): payload.ruleID
     case .assignTask(let payload): payload.ruleID
@@ -318,7 +318,7 @@ public actor PolicyExecutor {
     }
   }
 
-  private func severity(for action: PolicyAction) -> DecisionSeverity? {
+  func severity(for action: PolicyAction) -> DecisionSeverity? {
     switch action {
     case .queueDecision(let payload): payload.severity
     case .notifyOnly(let payload): payload.severity
@@ -326,7 +326,7 @@ public actor PolicyExecutor {
     }
   }
 
-  private func decisionDraft(
+  func decisionDraft(
     from payload: PolicyAction.DecisionPayload
   ) -> DecisionDraft {
     DecisionDraft(
@@ -342,7 +342,7 @@ public actor PolicyExecutor {
     )
   }
 
-  private func actionPayloadJSON(_ action: PolicyAction) -> String {
+  func actionPayloadJSON(_ action: PolicyAction) -> String {
     guard
       let data = try? JSONEncoder().encode(action),
       let text = String(data: data, encoding: .utf8)

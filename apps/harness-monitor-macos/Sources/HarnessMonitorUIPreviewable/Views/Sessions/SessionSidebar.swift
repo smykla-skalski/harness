@@ -12,17 +12,17 @@ struct SessionSidebar: View {
   let currentModifiers: EventModifiers
   @Bindable var state: SessionWindowStateCache
   @Environment(\.harnessTextSizeIndex)
-  private var textSizeIndex
-  @State private var selectionDispatcher = SessionSidebarSelectionDispatcher()
-  @State private var listSelection: Set<SessionSelection> = []
-  @State private var listSelectionSyncGeneration: UInt64 = 0
-  @State private var showsDeferredSidebarSections = false
-  @State private var usesNativeListSelection = false
-  @State private var presentationWorker = SessionRouteListPresentationWorker()
-  @State private var cachedAgentPresentation = SessionAgentListPresentation.empty
-  @State private var cachedTaskPresentation = SessionTaskListPresentation.empty
-  @State private var agentPresentationGeneration: UInt64 = 0
-  @State private var taskPresentationGeneration: UInt64 = 0
+  var textSizeIndex
+  @State var selectionDispatcher = SessionSidebarSelectionDispatcher()
+  @State var listSelection: Set<SessionSelection> = []
+  @State var listSelectionSyncGeneration: UInt64 = 0
+  @State var showsDeferredSidebarSections = false
+  @State var usesNativeListSelection = false
+  @State var presentationWorker = SessionRouteListPresentationWorker()
+  @State var cachedAgentPresentation = SessionAgentListPresentation.empty
+  @State var cachedTaskPresentation = SessionTaskListPresentation.empty
+  @State var agentPresentationGeneration: UInt64 = 0
+  @State var taskPresentationGeneration: UInt64 = 0
 
   init(
     store: HarnessMonitorStore,
@@ -50,7 +50,7 @@ struct SessionSidebar: View {
     sidebarList
   }
 
-  private var shouldShowShortcutOverlays: Bool {
+  var shouldShowShortcutOverlays: Bool {
     !HarnessMonitorUITestEnvironment.disablesVisualOptions
       && SessionWindowKeyboardShortcutOverlaySettings.read()
   }
@@ -103,7 +103,7 @@ struct SessionSidebar: View {
     generation == listSelectionSyncGeneration
   }
 
-  private var sidebarList: some View {
+  var sidebarList: some View {
     HarnessMonitorSidebar(
       accessibilityIdentifier: HarnessMonitorAccessibility.sessionWindowSidebar,
       accessibilityValue: decisionSelectionAccessibilityValue,
@@ -135,7 +135,7 @@ struct SessionSidebar: View {
     }
   }
 
-  private var agentPresentationInput: SessionAgentListPresentationInput {
+  var agentPresentationInput: SessionAgentListPresentationInput {
     SessionAgentListPresentationInput(
       agents: snapshot?.detail?.agents ?? [],
       query: "",
@@ -143,14 +143,14 @@ struct SessionSidebar: View {
     )
   }
 
-  private var taskPresentationInput: SessionTaskListPresentationInput {
+  var taskPresentationInput: SessionTaskListPresentationInput {
     SessionTaskListPresentationInput(
       tasks: snapshot?.detail?.tasks ?? [],
       query: ""
     )
   }
 
-  private var nativeSidebarList: some View {
+  var nativeSidebarList: some View {
     List(selection: nativeSelectionBinding) {
       sidebarRouteSection
       if showsDeferredSidebarSections {
@@ -205,7 +205,7 @@ struct SessionSidebar: View {
     }
   }
 
-  @ViewBuilder private var sidebarRouteSection: some View {
+  @ViewBuilder var sidebarRouteSection: some View {
     if nativeListSelectionEnabled {
       routeSection
     } else {
@@ -213,7 +213,7 @@ struct SessionSidebar: View {
     }
   }
 
-  private var pendingRouteSection: some View {
+  var pendingRouteSection: some View {
     ForEach(sidebarRoutes) { route in
       let selection = SessionSelection.route(route)
       let isSelected = displayedSelectionSet.contains(selection)
@@ -240,7 +240,7 @@ struct SessionSidebar: View {
     }
   }
 
-  private var pendingSidebarLoadingSection: some View {
+  var pendingSidebarLoadingSection: some View {
     Section {
       HStack(alignment: .center, spacing: HarnessMonitorTheme.spacingSM) {
         ProgressView()
@@ -261,12 +261,12 @@ struct SessionSidebar: View {
     }
   }
 
-  private var sidebarRowSize: SidebarRowSize {
+  var sidebarRowSize: SidebarRowSize {
     harnessSidebarRowSize(for: textSizeIndex)
   }
 
   @MainActor
-  private func rebuildAgentPresentation(input: SessionAgentListPresentationInput) async {
+  func rebuildAgentPresentation(input: SessionAgentListPresentationInput) async {
     agentPresentationGeneration &+= 1
     let generation = agentPresentationGeneration
     let presentation = await presentationWorker.computeAgents(input: input)
@@ -279,7 +279,7 @@ struct SessionSidebar: View {
   }
 
   @MainActor
-  private func rebuildTaskPresentation(input: SessionTaskListPresentationInput) async {
+  func rebuildTaskPresentation(input: SessionTaskListPresentationInput) async {
     taskPresentationGeneration &+= 1
     let generation = taskPresentationGeneration
     let presentation = await presentationWorker.computeTasks(input: input)

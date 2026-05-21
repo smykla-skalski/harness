@@ -103,7 +103,7 @@ struct PolicyCanvasVisibilityRouter: PolicyCanvasEdgeRouter {
   /// that case is the hand-coded fallback. Flex-anchor selection only
   /// considers candidates with non-nil cost; fallback candidates are skipped
   /// in ranking so an A*-solved combo always wins over a fallback combo.
-  private func routeAndCost(
+  func routeAndCost(
     source: CGPoint,
     target: CGPoint,
     context: PolicyCanvasRouteContext
@@ -169,7 +169,7 @@ struct PolicyCanvasVisibilityRouter: PolicyCanvasEdgeRouter {
     return (polyline, aStarResult.cost)
   }
 
-  private func preparedObstacles(
+  func preparedObstacles(
     source: CGPoint,
     target: CGPoint,
     sourceActual: CGPoint?,
@@ -187,7 +187,7 @@ struct PolicyCanvasVisibilityRouter: PolicyCanvasEdgeRouter {
     }
   }
 
-  private func visibilityGridAxes(
+  func visibilityGridAxes(
     source: CGPoint,
     target: CGPoint,
     context: PolicyCanvasRouteContext,
@@ -242,15 +242,15 @@ struct PolicyCanvasVisibilityRouter: PolicyCanvasEdgeRouter {
     return values.sorted()
   }
 
-  private func laneOffsetX(lane: Int, spacing: CGFloat) -> CGFloat {
+  func laneOffsetX(lane: Int, spacing: CGFloat) -> CGFloat {
     CGFloat(((lane % 12) - 6)) * spacing
   }
 
-  private func laneOffsetY(lane: Int, spacing: CGFloat) -> CGFloat {
+  func laneOffsetY(lane: Int, spacing: CGFloat) -> CGFloat {
     CGFloat(((lane / 12) - 6)) * spacing
   }
 
-  private func fallback(
+  func fallback(
     source: CGPoint,
     target: CGPoint,
     context: PolicyCanvasRouteContext

@@ -5,7 +5,7 @@ import OpenTelemetryProtocolExporterHttp
 import OpenTelemetrySdk
 
 typealias OpenTelemetry = OpenTelemetryApi.OpenTelemetry
-private typealias ConcurrencyOpenTelemetry = OpenTelemetryConcurrency.OpenTelemetry
+typealias ConcurrencyOpenTelemetry = OpenTelemetryConcurrency.OpenTelemetry
 
 public final class HarnessMonitorTelemetry: @unchecked Sendable {
   public static let shared = HarnessMonitorTelemetry()
