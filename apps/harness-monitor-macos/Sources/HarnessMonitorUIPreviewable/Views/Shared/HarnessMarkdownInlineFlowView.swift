@@ -14,7 +14,7 @@ struct HarnessMarkdownInlineFlowView: View {
 
   var body: some View {
     if inlines.containsMarkdownImage {
-      HStack(alignment: .firstTextBaseline, spacing: 4) {
+      HStack(alignment: inlineAlignment, spacing: 4) {
         ForEach(Array(inlines.enumerated()), id: \.offset) { _, inline in
           HarnessMarkdownInlineFragmentView(
             inline: inline,
@@ -26,10 +26,19 @@ struct HarnessMarkdownInlineFlowView: View {
         }
       }
       .fixedSize(horizontal: false, vertical: true)
+      .alignmentGuide(.firstTextBaseline) { dimensions in
+        inlines.isStandaloneMarkdownImage
+          ? dimensions[VerticalAlignment.center]
+          : dimensions[VerticalAlignment.firstTextBaseline]
+      }
     } else {
       Text(HarnessMarkdownInlineRenderer.attributedString(from: inlines, style: style))
         .fixedSize(horizontal: false, vertical: true)
     }
+  }
+
+  private var inlineAlignment: VerticalAlignment {
+    inlines.isStandaloneMarkdownImage ? .center : .firstTextBaseline
   }
 }
 
@@ -108,13 +117,7 @@ private struct HarnessMarkdownRemoteImageView: View {
   var body: some View {
     Group {
       if let loadedImage {
-        Image(nsImage: loadedImage)
-          .resizable()
-          .interpolation(.high)
-          .scaledToFit()
-          .frame(maxHeight: imageHeight)
-          .clipShape(
-            RoundedRectangle(cornerRadius: settings.cornerRadius, style: .continuous))
+        loadedImageView(loadedImage)
       } else if failed {
         fallbackLabel
       } else {
@@ -127,10 +130,33 @@ private struct HarnessMarkdownRemoteImageView: View {
       await loadImage()
     }
     .help(image.title ?? image.alt)
+    .alignmentGuide(.firstTextBaseline) { dimensions in
+      dimensions[VerticalAlignment.center]
+    }
   }
 
   private var imageHeight: CGFloat {
     usesBlockSizing ? settings.maxBlockHeight : settings.maxInlineHeight
+  }
+
+  @ViewBuilder
+  private func loadedImageView(_ loadedImage: NSImage) -> some View {
+    let image = Image(nsImage: loadedImage)
+      .resizable()
+      .interpolation(.high)
+      .scaledToFit()
+
+    if usesBlockSizing {
+      image
+        .frame(maxHeight: imageHeight)
+        .clipShape(
+          RoundedRectangle(cornerRadius: settings.cornerRadius, style: .continuous))
+    } else {
+      image
+        .frame(height: imageHeight, alignment: .center)
+        .clipShape(
+          RoundedRectangle(cornerRadius: settings.cornerRadius, style: .continuous))
+    }
   }
 
   private var fallbackLabel: some View {
