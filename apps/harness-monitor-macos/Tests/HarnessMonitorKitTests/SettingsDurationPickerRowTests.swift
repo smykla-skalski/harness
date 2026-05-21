@@ -3,6 +3,7 @@ import XCTest
 
 @testable import HarnessMonitorUIPreviewable
 
+@MainActor
 final class SettingsDurationPickerRowTests: XCTestCase {
   func testCurrentSelectionUsesCustomTagForNonPresetInitialValue() {
     var seconds: UInt64 = 3_000
