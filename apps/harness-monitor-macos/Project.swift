@@ -27,6 +27,7 @@ private let kitDependencies: [TargetDependency] = {
         .sdk(name: "ApplicationServices", type: .framework),
         .sdk(name: "AVFAudio", type: .framework),
         .sdk(name: "CoreMedia", type: .framework),
+        .external(name: "Fuse"),
         .sdk(name: "SwiftData", type: .framework),
         .sdk(name: "Speech", type: .framework),
         .sdk(name: "IOKit", type: .framework),

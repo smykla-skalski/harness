@@ -41,6 +41,7 @@ let packageSettings = PackageSettings(
 let package = Package(
     name: "HarnessMonitorDeps",
     dependencies: [
+        .package(url: "https://github.com/krisk/fuse-swift.git", exact: "2.0.0-rc.1"),
         .package(url: "https://github.com/open-telemetry/opentelemetry-swift", exact: "2.3.0"),
         .package(url: "https://github.com/open-telemetry/opentelemetry-swift-core", exact: "2.4.1"),
         .package(url: "https://github.com/grpc/grpc-swift", exact: "1.27.0"),

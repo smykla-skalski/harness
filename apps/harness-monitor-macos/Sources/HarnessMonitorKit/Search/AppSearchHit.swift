@@ -16,6 +16,7 @@ public struct AppSearchHit: Identifiable, Hashable, Sendable {
   /// leave it nil.
   public let trailing: String?
   public let systemImage: String
+  public let highlights: SearchHighlights
   /// Lower is better. Used only for stable ordering inside a section; the
   /// UI never reads it directly.
   public let score: Int
@@ -27,6 +28,7 @@ public struct AppSearchHit: Identifiable, Hashable, Sendable {
     subtitle: String?,
     trailing: String? = nil,
     systemImage: String,
+    highlights: SearchHighlights = .empty,
     score: Int
   ) {
     self.domain = domain
@@ -35,6 +37,7 @@ public struct AppSearchHit: Identifiable, Hashable, Sendable {
     self.subtitle = subtitle
     self.trailing = trailing
     self.systemImage = systemImage
+    self.highlights = highlights
     self.score = score
   }
 }

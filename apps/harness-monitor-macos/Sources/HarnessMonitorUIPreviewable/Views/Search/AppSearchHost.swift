@@ -312,8 +312,42 @@ private struct AppSearchFieldSurface: View, Equatable {
       )
       .searchSuggestions {
         ForEach(suggestionRows) { row in
-          Text(verbatim: row.displayTitle)
-            .searchCompletion(row.displayTitle)
+          VStack(alignment: .leading, spacing: 2) {
+            HStack(alignment: .firstTextBaseline, spacing: 6) {
+              SearchHighlightedText(
+                text: row.hit.title,
+                highlights: row.hit.highlights.title
+              )
+              .lineLimit(1)
+              Text("(\(row.domainLabel))")
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+            }
+
+            if row.hit.subtitle != nil || row.hit.trailing != nil {
+              HStack(alignment: .firstTextBaseline, spacing: 6) {
+                if let subtitle = row.hit.subtitle {
+                  SearchHighlightedText(
+                    text: subtitle,
+                    highlights: row.hit.highlights.subtitle
+                  )
+                }
+                if let trailing = row.hit.trailing {
+                  if row.hit.subtitle != nil {
+                    Text("·")
+                  }
+                  SearchHighlightedText(
+                    text: trailing,
+                    highlights: row.hit.highlights.trailing
+                  )
+                }
+              }
+              .font(.caption)
+              .foregroundStyle(.secondary)
+              .lineLimit(1)
+            }
+          }
+          .searchCompletion(row.displayTitle)
         }
         .searchSuggestions(.hidden, for: .content)
       }
