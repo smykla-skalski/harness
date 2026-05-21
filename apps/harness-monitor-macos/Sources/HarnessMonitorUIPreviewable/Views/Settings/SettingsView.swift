@@ -84,12 +84,25 @@ public struct SettingsView: View {
 }
 
 /// Holds per-section editable state (task-board form, diagnostics snapshot
-/// cache) outside of `SettingsView`. Per-keystroke writes in the task-board,
-/// repositories, and secrets sections previously invalidated the entire
-/// `SettingsView` body - including the toolbar, navigation chrome, and
-/// titlebar separator overrides. Moving the storage one level down means
-/// only this switch's body re-evaluates on each keystroke; the outer
-/// `NavigationSplitView` modifier chain stays stable.
+/// cache) outside of `SettingsView`, and lazy-mounts each section into a ZStack
+/// so subsequent visits don't pay SwiftUI's view-tree rebuild cost.
+///
+/// Trace baseline (post-P1+P2+P3#7) showed 5 microhangs of 264-371ms per
+/// section switch, almost all SwiftUI runtime: ~9.5% swift_conforms,
+/// ~3.8% find1<A>, ~4.9% AG operations. None of that is our code - it's the
+/// inherent cost of building a new generic `some View` tree on each switch.
+///
+/// Retention semantics:
+/// - First visit to a section: full build cost (one-shot ~300ms).
+/// - Any subsequent visit: instant. The view tree stays mounted, hidden via
+///   opacity/allowsHitTesting/accessibilityHidden. ScrollView state preserved.
+/// - Each retained section gets its own `\.settingsScrollRestorationSection`
+///   env override so SettingsScrollRestorationModifier targets the right
+///   per-section persisted offset.
+///
+/// Trade-off accepted: sections with `.task { await refresh() }` only refresh
+/// on first visit instead of on every visit. Notifications/AuthorizedFolders/
+/// Database show stale data on revisit until the user clicks Refresh.
 private struct SettingsDetailSwitch: View {
   let store: HarnessMonitorStore
   let notifications: HarnessMonitorUserNotificationController
@@ -100,79 +113,96 @@ private struct SettingsDetailSwitch: View {
   @State private var taskBoardFormState = TaskBoardSettingsFormState()
   @State private var preparedDiagnosticsInput: SettingsDiagnosticsSnapshotInput?
   @State private var preparedDiagnosticsSnapshot: SettingsDiagnosticsSnapshot?
+  @State private var visitedSections: Set<SettingsSection> = []
 
   var body: some View {
-    Group {
-      switch selectedSection {
-      case .general:
-        SettingsGeneralSectionRoot(store: store)
-      case .focusMode:
-        SettingsFocusModeSection()
-      case .banners:
-        SettingsBannersSection()
-      case .appearance:
-        SettingsAppearanceSection(themeMode: $themeMode)
-      case .markdown:
-        SettingsMarkdownSection()
-      case .notifications:
-        SettingsNotificationsSection(notifications: notifications)
-      case .voice:
-        SettingsVoiceSection()
-      case .connection:
-        SettingsConnectionSectionRoot(store: store)
-      case .taskBoard:
-        SettingsTaskBoardSection(
-          store: store,
-          formState: $taskBoardFormState,
-          navigationRequest: $navigationRequest
-        )
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-      case .repositories:
-        SettingsRepositoriesSection(
-          store: store,
-          formState: $taskBoardFormState
-        )
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-      case .dependencies:
-        SettingsDependenciesSection(navigationRequest: $navigationRequest)
-          .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-      case .secrets:
-        SettingsSecretsSection(
-          store: store,
-          formState: $taskBoardFormState
-        )
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-      case .policies:
-        SettingsPoliciesSection()
-      case .codex:
-        SettingsHostBridgeSection(store: store)
-      case .mcp:
-        SettingsMCPSection(store: store)
-      case .authorizedFolders:
-        AuthorizedFoldersSection(store: store)
-      case .supervisor:
-        SettingsSupervisorSection(
-          store: store,
-          notifications: notifications,
-          selectedPane: $selectedSupervisorPane
-        )
-      case .database:
-        SettingsDatabaseSection(store: store)
-      case .diagnostics:
-        SettingsDiagnosticsSectionRoot(
-          store: store,
-          preparedInput: $preparedDiagnosticsInput,
-          preparedSnapshot: $preparedDiagnosticsSnapshot
-        )
+    ZStack {
+      ForEach(SettingsSection.allCases, id: \.self) { section in
+        if visitedSections.contains(section) {
+          sectionContent(section)
+            .environment(\.settingsScrollRestorationSection, section)
+            .environment(
+              \.settingsScrollRestorationSuspended,
+              section == selectedSection
+                && navigationRequest?.target.section == section
+            )
+            .opacity(section == selectedSection ? 1 : 0)
+            .allowsHitTesting(section == selectedSection)
+            .accessibilityHidden(section != selectedSection)
+        }
       }
     }
     .harnessGlassContainerScope()
-    .environment(\.settingsScrollRestorationSection, selectedSection)
-    .environment(
-      \.settingsScrollRestorationSuspended,
-      navigationRequest?.target.section == selectedSection
-    )
     .harnessMonitorBackgroundExtensionEffect()
+    .onChange(of: selectedSection, initial: true) { _, newValue in
+      visitedSections.insert(newValue)
+    }
+  }
+
+  @ViewBuilder
+  private func sectionContent(_ section: SettingsSection) -> some View {
+    switch section {
+    case .general:
+      SettingsGeneralSectionRoot(store: store)
+    case .focusMode:
+      SettingsFocusModeSection()
+    case .banners:
+      SettingsBannersSection()
+    case .appearance:
+      SettingsAppearanceSection(themeMode: $themeMode)
+    case .markdown:
+      SettingsMarkdownSection()
+    case .notifications:
+      SettingsNotificationsSection(notifications: notifications)
+    case .voice:
+      SettingsVoiceSection()
+    case .connection:
+      SettingsConnectionSectionRoot(store: store)
+    case .taskBoard:
+      SettingsTaskBoardSection(
+        store: store,
+        formState: $taskBoardFormState,
+        navigationRequest: $navigationRequest
+      )
+      .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+    case .repositories:
+      SettingsRepositoriesSection(
+        store: store,
+        formState: $taskBoardFormState
+      )
+      .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+    case .dependencies:
+      SettingsDependenciesSection(navigationRequest: $navigationRequest)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+    case .secrets:
+      SettingsSecretsSection(
+        store: store,
+        formState: $taskBoardFormState
+      )
+      .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+    case .policies:
+      SettingsPoliciesSection()
+    case .codex:
+      SettingsHostBridgeSection(store: store)
+    case .mcp:
+      SettingsMCPSection(store: store)
+    case .authorizedFolders:
+      AuthorizedFoldersSection(store: store)
+    case .supervisor:
+      SettingsSupervisorSection(
+        store: store,
+        notifications: notifications,
+        selectedPane: $selectedSupervisorPane
+      )
+    case .database:
+      SettingsDatabaseSection(store: store)
+    case .diagnostics:
+      SettingsDiagnosticsSectionRoot(
+        store: store,
+        preparedInput: $preparedDiagnosticsInput,
+        preparedSnapshot: $preparedDiagnosticsSnapshot
+      )
+    }
   }
 }
 
