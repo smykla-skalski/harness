@@ -126,6 +126,8 @@ enum HarnessMonitorPerfDriver {
       .timelineFilterFormVisualOptionsDisabled,
       .permissionModal,
       .taskBoardSettings,
+      .repositoriesSettings,
+      .dependenciesSettings,
       .settingsBackdropCycle,
       .settingsBackgroundCycle,
       .timelineBurst,
@@ -170,6 +172,8 @@ enum HarnessMonitorPerfDriver {
       .settingsBackdropCycle,
       .settingsBackgroundCycle,
       .taskBoardSettings,
+      .repositoriesSettings,
+      .dependenciesSettings,
       .timelineBurst,
       .toastOverlayChurn,
       .offlineCachedOpen,
@@ -184,7 +188,9 @@ enum HarnessMonitorPerfDriver {
     openWindow: OpenWindowAction
   ) async -> ScenarioResult? {
     switch scenario {
-    case .taskBoardSettings:
+    case .taskBoardSettings,
+      .repositoriesSettings,
+      .dependenciesSettings:
       return await runTaskBoardSettingsScenario(openWindow: openWindow)
     case .settingsBackdropCycle:
       return await runSettingsBackdropCycleScenario(openWindow: openWindow)
@@ -244,6 +250,8 @@ enum HarnessMonitorPerfDriver {
       .timelineFilterFormVisualOptionsDisabled,
       .permissionModal,
       .taskBoardSettings,
+      .repositoriesSettings,
+      .dependenciesSettings,
       .settingsBackdropCycle,
       .settingsBackgroundCycle,
       .offlineCachedOpen,

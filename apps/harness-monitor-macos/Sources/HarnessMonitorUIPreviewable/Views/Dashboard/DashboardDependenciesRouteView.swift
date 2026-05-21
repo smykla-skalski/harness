@@ -210,9 +210,6 @@ struct DashboardDependenciesRouteView: View {
     .task(id: reloadTaskKey) {
       await reload(forceRefresh: false)
     }
-    .task(id: storedPreferences) {
-      await runAutoRefreshLoop()
-    }
     .task(id: presentationInput) {
       await rebuildPresentation(input: presentationInput)
     }
@@ -824,10 +821,6 @@ struct DashboardDependenciesRouteView: View {
     .frame(maxWidth: .infinity, minHeight: 320)
   }
 
-  private func runAutoRefreshLoop() async {
-    await startScheduler()
-  }
-
   func reload(forceRefresh: Bool, backgroundRefresh: Bool = false) async {
     hydrateDependenciesFromCacheIfNeeded()
     guard store.apiClient != nil else {
@@ -860,10 +853,7 @@ struct DashboardDependenciesRouteView: View {
         isLoading = false
       }
     }
-    if forceRefresh {
-      scheduler.forceRefreshAll()
-    }
-    await startScheduler()
+    await startScheduler(forceRefreshAll: forceRefresh)
   }
 
   private func clearCacheAndReload() async {
