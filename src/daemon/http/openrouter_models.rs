@@ -14,10 +14,7 @@ use super::auth::require_auth;
 use super::response::{extract_request_id, timed_json};
 
 pub(super) fn openrouter_model_routes() -> Router<DaemonHttpState> {
-    Router::new().route(
-        http_paths::OPENROUTER_MODELS,
-        get(get_openrouter_models),
-    )
+    Router::new().route(http_paths::OPENROUTER_MODELS, get(get_openrouter_models))
 }
 
 async fn get_openrouter_models(

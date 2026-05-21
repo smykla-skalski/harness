@@ -310,7 +310,6 @@ impl GraphqlStatusContext {
             conclusion: Some(match self.state.as_str() {
                 "SUCCESS" => GitHubCheckConclusion::Success,
                 "ERROR" | "FAILURE" => GitHubCheckConclusion::Failure,
-                "PENDING" | "EXPECTED" => GitHubCheckConclusion::ActionRequired,
                 _ => GitHubCheckConclusion::ActionRequired,
             }),
         }

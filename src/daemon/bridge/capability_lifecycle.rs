@@ -247,7 +247,7 @@ impl BridgeServer {
 
     fn cleanup_active_tuis(&self) {
         if let Ok(mut active) = self.active_tuis.lock() {
-            for (_, entry) in active.iter() {
+            for entry in active.values() {
                 let _ = entry.process.kill();
             }
             active.clear();

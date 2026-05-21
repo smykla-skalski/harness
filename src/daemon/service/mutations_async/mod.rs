@@ -262,6 +262,10 @@ async fn wake_tui_async(
     }
 }
 
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "task-drop persistence keeps ordered side effects explicit"
+)]
 async fn persist_task_signal_effects(
     async_db: &super::db::AsyncDaemonDb,
     resolved: &ResolvedSession,

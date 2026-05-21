@@ -138,6 +138,10 @@ pub(super) async fn post_terminal_agent_resize(
     )
 }
 
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "managed-agent stop probes codex, ACP, then terminal managers explicitly"
+)]
 pub(super) async fn post_terminal_agent_stop(
     Path(managed_agent_id): Path<String>,
     headers: HeaderMap,

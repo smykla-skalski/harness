@@ -5,7 +5,7 @@ use chrono::{DateTime, Utc};
 use crate::errors::{CliError, CliErrorKind};
 use crate::task_board::github::GitHubProjectConfig;
 
-use super::types::*;
+use super::types::{CommitConnection, PageInfo, SearchNode, StatusContextNode};
 use super::{
     DependencyUpdateActionKind, DependencyUpdateActionOutcome, DependencyUpdateActionResult,
     DependencyUpdateCheck, DependencyUpdateCheckConclusion, DependencyUpdateCheckRunStatus,
@@ -47,82 +47,7 @@ pub(super) fn scopes(request: &DependencyUpdatesQueryRequest) -> Result<Vec<Scop
 pub(super) fn convert_node(node: SearchNode) -> Result<DependencyUpdateItem, CliError> {
     let created_at = parse_timestamp(node.created_at.as_str())?;
     let updated_at = parse_timestamp(node.updated_at.as_str())?;
-    let mut checks = Vec::new();
-    let mut pending = 0;
-    let mut failed = 0;
-    let mut total = 0;
-    let mut policy_blocked = false;
-
-    if let Some(commit) = node
-        .commits
-        .nodes
-        .into_iter()
-        .last()
-        .and_then(|node| node.commit)
-        && let Some(rollup) = commit.status_check_rollup
-    {
-        for context in rollup.contexts.nodes {
-            match context {
-                StatusContextNode::CheckRun {
-                    name,
-                    status,
-                    conclusion,
-                    check_suite,
-                } => {
-                    total += 1;
-                    let status = map_check_run_status(status.as_deref());
-                    let conclusion = map_check_conclusion(conclusion.as_deref());
-                    if status != DependencyUpdateCheckRunStatus::Completed {
-                        pending += 1;
-                    } else if matches!(
-                        conclusion,
-                        DependencyUpdateCheckConclusion::Failure
-                            | DependencyUpdateCheckConclusion::Cancelled
-                            | DependencyUpdateCheckConclusion::TimedOut
-                            | DependencyUpdateCheckConclusion::ActionRequired
-                            | DependencyUpdateCheckConclusion::StartupFailure
-                    ) {
-                        failed += 1;
-                    }
-                    checks.push(DependencyUpdateCheck {
-                        name,
-                        status,
-                        conclusion,
-                        check_suite_id: check_suite.and_then(|suite| suite.id),
-                    });
-                }
-                StatusContextNode::StatusContext { context, state } => {
-                    if context == "renovate/stability-days"
-                        && !matches!(state.as_deref(), Some("SUCCESS"))
-                    {
-                        policy_blocked = true;
-                        continue;
-                    }
-                    total += 1;
-                    let conclusion = map_status_context_conclusion(state.as_deref());
-                    if matches!(conclusion, DependencyUpdateCheckConclusion::Failure) {
-                        failed += 1;
-                    }
-                    checks.push(DependencyUpdateCheck {
-                        name: context,
-                        status: DependencyUpdateCheckRunStatus::Completed,
-                        conclusion,
-                        check_suite_id: None,
-                    });
-                }
-            }
-        }
-    }
-
-    let check_status = if total == 0 {
-        DependencyUpdateCheckStatus::None
-    } else if failed > 0 {
-        DependencyUpdateCheckStatus::Failure
-    } else if pending > 0 {
-        DependencyUpdateCheckStatus::Pending
-    } else {
-        DependencyUpdateCheckStatus::Success
-    };
+    let check_summary = CheckSummary::from_commits(node.commits);
 
     Ok(DependencyUpdateItem {
         pull_request_id: node.id,
@@ -138,8 +63,8 @@ pub(super) fn convert_node(node: SearchNode) -> Result<DependencyUpdateItem, Cli
         state: map_pull_request_state(node.state.as_deref()),
         mergeable: map_mergeable_state(node.mergeable.as_deref()),
         review_status: map_review_status(node.review_decision.as_deref()),
-        check_status,
-        policy_blocked,
+        check_status: check_summary.status(),
+        policy_blocked: check_summary.policy_blocked,
         is_draft: node.is_draft,
         head_sha: node.head_ref_oid.unwrap_or_default(),
         labels: node
@@ -148,7 +73,7 @@ pub(super) fn convert_node(node: SearchNode) -> Result<DependencyUpdateItem, Cli
             .into_iter()
             .map(|label| label.name)
             .collect(),
-        checks,
+        checks: check_summary.checks,
         reviews: node
             .reviews
             .nodes
@@ -161,11 +86,122 @@ pub(super) fn convert_node(node: SearchNode) -> Result<DependencyUpdateItem, Cli
                 state: map_review_event_state(review.state.as_deref()),
             })
             .collect(),
-        additions: node.additions.max(0) as u64,
-        deletions: node.deletions.max(0) as u64,
+        additions: node.additions.max(0).cast_unsigned(),
+        deletions: node.deletions.max(0).cast_unsigned(),
         created_at,
         updated_at,
     })
+}
+
+#[derive(Default)]
+struct CheckSummary {
+    checks: Vec<DependencyUpdateCheck>,
+    pending: u64,
+    failed: u64,
+    total: u64,
+    policy_blocked: bool,
+}
+
+impl CheckSummary {
+    fn from_commits(commits: CommitConnection) -> Self {
+        let mut summary = Self::default();
+        let Some(rollup) = commits
+            .nodes
+            .into_iter()
+            .last()
+            .and_then(|node| node.commit)
+            .and_then(|commit| commit.status_check_rollup)
+        else {
+            return summary;
+        };
+        for context in rollup.contexts.nodes {
+            summary.push_context(context);
+        }
+        summary
+    }
+
+    fn push_context(&mut self, context: StatusContextNode) {
+        match context {
+            StatusContextNode::CheckRun {
+                name,
+                status,
+                conclusion,
+                check_suite,
+            } => self.push_check_run(
+                name,
+                status.as_deref(),
+                conclusion.as_deref(),
+                check_suite.and_then(|suite| suite.id),
+            ),
+            StatusContextNode::StatusContext { context, state } => {
+                self.push_status_context(context, state.as_deref());
+            }
+        }
+    }
+
+    fn push_check_run(
+        &mut self,
+        name: String,
+        status: Option<&str>,
+        conclusion: Option<&str>,
+        check_suite_id: Option<String>,
+    ) {
+        self.total += 1;
+        let status = map_check_run_status(status);
+        let conclusion = map_check_conclusion(conclusion);
+        if status != DependencyUpdateCheckRunStatus::Completed {
+            self.pending += 1;
+        } else if is_failed_check_conclusion(conclusion) {
+            self.failed += 1;
+        }
+        self.checks.push(DependencyUpdateCheck {
+            name,
+            status,
+            conclusion,
+            check_suite_id,
+        });
+    }
+
+    fn push_status_context(&mut self, context: String, state: Option<&str>) {
+        if context == "renovate/stability-days" && !matches!(state, Some("SUCCESS")) {
+            self.policy_blocked = true;
+            return;
+        }
+        self.total += 1;
+        let conclusion = map_status_context_conclusion(state);
+        if matches!(conclusion, DependencyUpdateCheckConclusion::Failure) {
+            self.failed += 1;
+        }
+        self.checks.push(DependencyUpdateCheck {
+            name: context,
+            status: DependencyUpdateCheckRunStatus::Completed,
+            conclusion,
+            check_suite_id: None,
+        });
+    }
+
+    fn status(&self) -> DependencyUpdateCheckStatus {
+        if self.total == 0 {
+            DependencyUpdateCheckStatus::None
+        } else if self.failed > 0 {
+            DependencyUpdateCheckStatus::Failure
+        } else if self.pending > 0 {
+            DependencyUpdateCheckStatus::Pending
+        } else {
+            DependencyUpdateCheckStatus::Success
+        }
+    }
+}
+
+fn is_failed_check_conclusion(conclusion: DependencyUpdateCheckConclusion) -> bool {
+    matches!(
+        conclusion,
+        DependencyUpdateCheckConclusion::Failure
+            | DependencyUpdateCheckConclusion::Cancelled
+            | DependencyUpdateCheckConclusion::TimedOut
+            | DependencyUpdateCheckConclusion::ActionRequired
+            | DependencyUpdateCheckConclusion::StartupFailure
+    )
 }
 
 pub(super) fn github_project_config(repository: &str) -> Option<GitHubProjectConfig> {
@@ -265,7 +301,6 @@ pub(super) fn map_status_context_conclusion(
     match value {
         Some("SUCCESS") => DependencyUpdateCheckConclusion::Success,
         Some("FAILURE" | "ERROR") => DependencyUpdateCheckConclusion::Failure,
-        Some("PENDING" | "EXPECTED") => DependencyUpdateCheckConclusion::None,
         _ => DependencyUpdateCheckConclusion::None,
     }
 }

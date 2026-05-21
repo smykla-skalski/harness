@@ -1,6 +1,8 @@
 use std::path::PathBuf;
+use std::sync::Arc;
 use std::thread;
 
+use super::super::active::ActiveAcpSession;
 use super::{AcpAgentManagerHandle, AcpAgentSnapshot};
 use crate::daemon::service;
 use crate::errors::{CliError, CliErrorKind};
@@ -16,11 +18,7 @@ impl AcpAgentManagerHandle {
     /// # Errors
     /// Returns [`CliError`] when the ACP session is unknown, already
     /// disconnected, or the prompt thread cannot be spawned.
-    pub fn send_prompt(
-        &self,
-        acp_id: &str,
-        prompt: &str,
-    ) -> Result<AcpAgentSnapshot, CliError> {
+    pub fn send_prompt(&self, acp_id: &str, prompt: &str) -> Result<AcpAgentSnapshot, CliError> {
         let trimmed = prompt.trim();
         if trimmed.is_empty() {
             return Err(CliErrorKind::session_not_active(format!(
@@ -51,21 +49,13 @@ impl AcpAgentManagerHandle {
         thread::Builder::new()
             .name(thread_name)
             .spawn(move || {
-                let result = session.prompt_protocol_session(
+                prompt_protocol_session_thread(
+                    &session,
                     &acp_id_owned,
                     &session_id_owned,
                     project_dir,
                     prompt_owned,
                 );
-                if let Err(error) = result {
-                    tracing::warn!(
-                        target: "harness::acp_manager",
-                        managed_agent_id = %acp_id_owned,
-                        runtime_session_id = %session_id_owned,
-                        %error,
-                        "user-initiated ACP follow-up prompt failed"
-                    );
-                }
             })
             .map_err(|error| {
                 CliErrorKind::workflow_io(format!(
@@ -74,5 +64,28 @@ impl AcpAgentManagerHandle {
             })?;
         self.broadcast("acp_agent_prompted", &snapshot);
         Ok(snapshot)
+    }
+}
+
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "tracing macro expansion inflates the score; tokio-rs/tracing#553"
+)]
+fn prompt_protocol_session_thread(
+    session: &Arc<ActiveAcpSession>,
+    acp_id: &str,
+    session_id: &str,
+    project_dir: PathBuf,
+    prompt: String,
+) {
+    let result = session.prompt_protocol_session(acp_id, session_id, project_dir, prompt);
+    if let Err(error) = result {
+        tracing::warn!(
+            target: "harness::acp_manager",
+            managed_agent_id = %acp_id,
+            runtime_session_id = %session_id,
+            %error,
+            "user-initiated ACP follow-up prompt failed"
+        );
     }
 }

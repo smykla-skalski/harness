@@ -196,6 +196,10 @@ fn direction_allows_push(direction: ExternalSyncDirection) -> bool {
     )
 }
 
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "pull reconciliation keeps existing, dry-run, and create branches explicit"
+)]
 async fn pull_provider_tasks(
     board: &TaskBoardStore,
     options: ExternalSyncOptions,

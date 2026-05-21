@@ -78,6 +78,10 @@ fn log_signal_failure(failure: &EvaluationSignalFailure) {
 /// # Errors
 /// Returns `CliError` when board items cannot be loaded, session state cannot be
 /// read, or updated board items cannot be persisted.
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "evaluation loop keeps per-item failure branches explicit"
+)]
 pub(crate) async fn evaluate_task_board_async(
     request: &TaskBoardEvaluateRequest,
     async_db: &AsyncDaemonDb,

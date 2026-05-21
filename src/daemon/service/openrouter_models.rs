@@ -1,3 +1,4 @@
+use std::env;
 use std::sync::{LazyLock, Mutex};
 use std::time::{Duration, Instant};
 
@@ -11,7 +12,7 @@ use crate::errors::{CliError, CliErrorKind};
 use crate::workspace::utc_now;
 
 const DEFAULT_OPENROUTER_BASE_URL: &str = "https://openrouter.ai/api/v1";
-const CACHE_TTL: Duration = Duration::from_secs(30 * 60);
+const CACHE_TTL: Duration = Duration::from_mins(30);
 const REQUEST_TIMEOUT: Duration = Duration::from_secs(15);
 const HARNESS_REFERER: &str = "https://harness.dev";
 const HARNESS_TITLE: &str = "Harness";
@@ -40,7 +41,7 @@ struct UpstreamModelEntry {
     supported_parameters: Vec<String>,
 }
 
-/// Return the OpenRouter model catalog, serving the in-memory cache when it is
+/// Return the `OpenRouter` model catalog, serving the in-memory cache when it is
 /// still fresh and the API key fingerprint matches. On cache miss or expiry the
 /// daemon issues one upstream request against `/api/v1/models`. Callers receive
 /// the same payload via the cache or live source; the response declares which.
@@ -113,8 +114,8 @@ fn fingerprint_token(token: &str) -> String {
 }
 
 async fn fetch_upstream(token: &str) -> Result<Vec<OpenRouterModelEntry>, CliError> {
-    let base_url = std::env::var("OPENROUTER_API_URL")
-        .unwrap_or_else(|_| DEFAULT_OPENROUTER_BASE_URL.to_string());
+    let base_url =
+        env::var("OPENROUTER_API_URL").unwrap_or_else(|_| DEFAULT_OPENROUTER_BASE_URL.to_string());
     let url = format!("{}/models", base_url.trim_end_matches('/'));
     let response = reqwest::Client::new()
         .get(&url)
@@ -125,9 +126,7 @@ async fn fetch_upstream(token: &str) -> Result<Vec<OpenRouterModelEntry>, CliErr
         .send()
         .await
         .map_err(|error| {
-            CliErrorKind::workflow_io(format!(
-                "openrouter_models_unreachable: {url}: {error}"
-            ))
+            CliErrorKind::workflow_io(format!("openrouter_models_unreachable: {url}: {error}"))
         })?;
     let status = response.status();
     if !status.is_success() {
@@ -143,9 +142,7 @@ async fn fetch_upstream(token: &str) -> Result<Vec<OpenRouterModelEntry>, CliErr
         .into());
     }
     let parsed: UpstreamModelListResponse = response.json().await.map_err(|error| {
-        CliErrorKind::workflow_parse(format!(
-            "openrouter_models_decode_failed: {url}: {error}"
-        ))
+        CliErrorKind::workflow_parse(format!("openrouter_models_decode_failed: {url}: {error}"))
     })?;
     Ok(parsed
         .data

@@ -4,8 +4,7 @@ use serde_json::{Value, json};
 use crate::daemon::protocol::{
     TaskBoardCreateItemRequest, TaskBoardDeleteItemRequest, TaskBoardGetItemRequest,
     TaskBoardListItemsRequest, TaskBoardPlanApproveRequest, TaskBoardPlanBeginRequest,
-    TaskBoardPlanRevokeRequest, TaskBoardPlanSubmitRequest, TaskBoardUpdateItemRequest,
-    ws_methods,
+    TaskBoardPlanRevokeRequest, TaskBoardPlanSubmitRequest, TaskBoardUpdateItemRequest, ws_methods,
 };
 use crate::mcp::tool::ToolRegistry;
 

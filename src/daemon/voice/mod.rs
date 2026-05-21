@@ -3,7 +3,7 @@ use std::path::{Path, PathBuf};
 
 use base64::Engine as _;
 use base64::engine::general_purpose::STANDARD;
-use chrono::{DateTime, Utc};
+use chrono::Utc;
 use fs_err as fs;
 use serde::{Deserialize, Serialize};
 use tokio::task::spawn_blocking;

@@ -22,6 +22,10 @@ use super::super::response::{extract_request_id, timed_json};
 use super::{ensure_terminal_agent_async, run_terminal_agent_blocking};
 
 #[expect(clippy::too_many_lines, reason = "tokio select proxying loop")]
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "websocket attach proxy keeps sandbox and local transport branches explicit"
+)]
 pub(super) async fn get_terminal_agent_attach(
     Path(agent_id): Path<String>,
     headers: HeaderMap,

@@ -17,6 +17,10 @@ use serde::de::DeserializeOwned;
 use super::frames::error_response;
 use super::mutations::dispatch_query_result;
 
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "task-board websocket method dispatch is clearer as an explicit match"
+)]
 pub(crate) async fn dispatch_task_board_method(
     request: &WsRequest,
     state: &DaemonHttpState,

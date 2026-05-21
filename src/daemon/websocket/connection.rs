@@ -138,8 +138,7 @@ async fn handle_connection(socket: WebSocket, state: DaemonHttpState) {
                                 Arc::clone(&connection_dispatch),
                                 priority_tx_dispatch.clone(),
                                 &mut dispatch_tasks,
-                            )
-                            .await {
+                            ) {
                                 IncomingMessageAction::ContinueLoop => {}
                                 IncomingMessageAction::CloseConnection => break,
                                 IncomingMessageAction::RespondBatch(frames) => {
@@ -272,7 +271,7 @@ pub(crate) fn incoming_message_counts_as_activity(message: &Message) -> bool {
     )
 }
 
-pub(crate) async fn handle_incoming_message(
+pub(crate) fn handle_incoming_message(
     message: Message,
     state: DaemonHttpState,
     connection: Arc<Mutex<ConnectionState>>,
@@ -492,8 +491,7 @@ mod tests {
             connection,
             priority_tx,
             &mut dispatch_tasks,
-        )
-        .await;
+        );
 
         match action {
             IncomingMessageAction::RespondBatch(frames) => {

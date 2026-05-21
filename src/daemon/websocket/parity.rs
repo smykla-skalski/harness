@@ -197,6 +197,10 @@ pub(crate) async fn dispatch_session_delete(
     )
 }
 
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "archive dispatch keeps async and sync storage paths explicit"
+)]
 pub(crate) async fn dispatch_session_archive(
     request: &WsRequest,
     state: &DaemonHttpState,

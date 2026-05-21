@@ -1,3 +1,5 @@
+use std::path::PathBuf;
+
 use super::super::{
     CliError, CliErrorKind, LeaderTransferRequest, SessionDetail, SessionEndRequest,
     append_transfer_logs_to_async_db, db::AsyncDaemonDb, effective_project_dir,
@@ -6,6 +8,7 @@ use super::super::{
 use super::{bump_session, persist_leave_signal_mutation, resolved_session_for_mutation};
 use crate::daemon::protocol::{SessionArchiveRequest, SessionArchiveResponse};
 use crate::session::storage as session_storage;
+use crate::session::types::SessionState;
 use tokio::task::spawn_blocking;
 
 /// Transfer session leadership through the canonical async daemon DB.
@@ -39,6 +42,10 @@ pub(crate) async fn transfer_leader_async(
 ///
 /// # Errors
 /// Returns `CliError` when the session cannot be resolved or ending fails.
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "session ending keeps state mutation and leave-signal persistence ordered"
+)]
 pub(crate) async fn end_session_async(
     session_id: &str,
     request: &SessionEndRequest,
@@ -107,7 +114,7 @@ pub(crate) async fn archive_session_async(
 }
 
 async fn write_prepared_leave_signals_async(
-    project_dir: std::path::PathBuf,
+    project_dir: PathBuf,
     leave_signals: Vec<session_service::LeaveSignalRecord>,
     operation: &'static str,
 ) -> Result<(), CliError> {
@@ -124,9 +131,9 @@ async fn write_prepared_leave_signals_async(
 }
 
 async fn save_archived_file_state_async(
-    project_dir: std::path::PathBuf,
+    project_dir: PathBuf,
     session_id: String,
-    state: crate::session::types::SessionState,
+    state: SessionState,
 ) -> Result<(), CliError> {
     spawn_blocking(move || {
         let layout = session_storage::layout_from_project_dir(&project_dir, &session_id)?;

@@ -18,9 +18,9 @@ use crate::daemon::protocol::{
 use crate::errors::{CliError, CliErrorKind};
 use crate::task_board::store::{OptionalFieldPatch, TaskBoardItemPatch};
 use crate::task_board::{
-    ExternalSyncConfig, PolicyPipelineStore, TaskBoardItem, TaskBoardOrchestrator, TaskBoardStore,
-    build_audit_summary, build_machine_summaries, build_project_summaries, configured_sync_clients,
-    default_board_root, sync_external_tasks,
+    ExternalSyncConfig, ExternalSyncOperation, PolicyPipelineStore, TaskBoardItem,
+    TaskBoardOrchestrator, TaskBoardStore, build_audit_summary, build_machine_summaries,
+    build_project_summaries, configured_sync_clients, default_board_root, sync_external_tasks,
 };
 use crate::task_board::{
     PlanningTransition, approve_plan, begin_planning, revoke_plan, submit_plan,
@@ -427,7 +427,7 @@ async fn build_sync_response_async(
     board: &TaskBoardStore,
     request: &TaskBoardSyncRequest,
     config: ExternalSyncConfig,
-    operations: Vec<crate::task_board::ExternalSyncOperation>,
+    operations: Vec<ExternalSyncOperation>,
 ) -> Result<TaskBoardSyncResponse, CliError> {
     let board = board.clone();
     let request = request.clone();

@@ -14,7 +14,13 @@ use super::evidence::{
 
 mod types;
 
-use types::*;
+use types::{
+    CHECKS_PAGE_QUERY, FILES_PAGE_QUERY, GitHubGraphqlPageInfo, GitHubReviewRollup,
+    GitHubReviewThreadSummary, GraphqlBranchProtectionRule, GraphqlPullRequest,
+    GraphqlPullRequestPage, GraphqlPullRequestReview, GraphqlRef, GraphqlStatusCheckContext,
+    GraphqlStatusContext, PULL_REQUEST_MERGE_EVIDENCE_QUERY, PullRequestMergeEvidenceResponse,
+    PullRequestPageResponse, REVIEWS_PAGE_QUERY, THREADS_PAGE_QUERY,
+};
 
 const GRAPHQL_PAGE_LIMIT: u32 = 20;
 

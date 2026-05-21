@@ -151,6 +151,10 @@ async fn run_manifest_watcher() {
     drive_manifest_watcher(&mut event_rx, &mut tick).await;
 }
 
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "tokio::select! watcher loop is clearer as two explicit branches"
+)]
 async fn drive_manifest_watcher(
     event_rx: &mut mpsc::Receiver<notify::Result<notify::Event>>,
     tick: &mut Interval,
@@ -259,6 +263,10 @@ fn apply_bridge_state_to_manifest() {
     publish_bridge_manifest_update(&next);
 }
 
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "tracing macro expansion inflates the score; tokio-rs/tracing#553"
+)]
 async fn apply_bridge_state_to_manifest_async() {
     if let Err(error) = spawn_blocking(apply_bridge_state_to_manifest).await {
         tracing::warn!(%error, "bridge watcher: failed to join manifest update worker");

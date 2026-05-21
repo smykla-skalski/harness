@@ -17,9 +17,9 @@ use super::{
 
 pub(super) const GITHUB_SEARCH_PAGE_CAP: u32 = 10;
 
-const GITHUB_SEARCH_PAGE_SIZE: usize = 100;
+const GITHUB_SEARCH_PAGE_SIZE: u32 = 100;
 const AUTOMATION_ISSUE_AUTHORS: &[&str] = &["renovate[bot]"];
-const GITHUB_GRAPHQL_CACHE_TTL: Duration = Duration::from_secs(60);
+const GITHUB_GRAPHQL_CACHE_TTL: Duration = Duration::from_mins(1);
 const GITHUB_GRAPHQL_CACHE_ENTRY_CAP: usize = 128;
 
 pub(super) type GitHubGraphqlCacheKey = u64;
@@ -319,7 +319,7 @@ fn trim_search_cache(cache: &mut BTreeMap<(GitHubGraphqlCacheKey, String), Cache
 fn warn_search_results_truncated(context: &str) {
     warn_github_message(&format!(
         "github search results truncated at {} hits while {context}",
-        GITHUB_SEARCH_PAGE_CAP * GITHUB_SEARCH_PAGE_SIZE as u32
+        GITHUB_SEARCH_PAGE_CAP * GITHUB_SEARCH_PAGE_SIZE
     ));
 }
 

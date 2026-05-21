@@ -1,9 +1,11 @@
+use std::io;
 use std::path::{Path, PathBuf};
 
 use crate::agents::acp::catalog::{AcpAgentDescriptor, AcpSpawnConfiguration};
 use crate::agents::acp::connection::SpawnConfig;
 use crate::agents::runtime::{AgentRuntime, runtime_for_name};
 use crate::daemon::agent_acp::protocol::AcpSessionRequestConfig;
+use crate::daemon::state::task_board_openrouter_token;
 use crate::errors::{CliError, CliErrorKind};
 
 const OPENROUTER_DESCRIPTOR_ID: &str = "openrouter";
@@ -50,15 +52,15 @@ pub(super) fn build_spawn_config(
     })
 }
 
-/// Append per-descriptor secret arguments. Today only the OpenRouter shim
+/// Append per-descriptor secret arguments. Today only the `OpenRouter` shim
 /// needs one (`--api-key-file PATH`); other catalog entries expect zero extra
 /// args. The shim reads the file immediately and unlinks it, so the credential
-/// never lives on disk longer than one stat() interval.
+/// never lives on disk longer than one `stat()` interval.
 fn descriptor_credential_args(descriptor: &AcpAgentDescriptor) -> Result<Vec<String>, CliError> {
     if descriptor.id.as_str() != OPENROUTER_DESCRIPTOR_ID {
         return Ok(Vec::new());
     }
-    let token = crate::daemon::state::task_board_openrouter_token().ok_or_else(|| {
+    let token = task_board_openrouter_token().ok_or_else(|| {
         CliErrorKind::workflow_io(
             "OpenRouter API key is not configured. Set it via Harness Monitor → Settings → OpenRouter or run `harness setup secrets set --kind openrouter`.",
         )
@@ -70,7 +72,7 @@ fn descriptor_credential_args(descriptor: &AcpAgentDescriptor) -> Result<Vec<Str
     ])
 }
 
-/// Write the OpenRouter API key into a mode-0600 file inside a freshly-created
+/// Write the `OpenRouter` API key into a mode-0600 file inside a freshly-created
 /// per-spawn random tempdir. The shim unlinks the file at startup. The
 /// surrounding directory lingers until the OS or daemon shutdown sweeps it,
 /// which is acceptable because the secret itself is gone after the unlink.
@@ -93,10 +95,11 @@ fn write_openrouter_api_key_file(token: &str) -> Result<PathBuf, CliError> {
 }
 
 #[cfg(unix)]
-fn write_credential_bytes(path: &Path, token: &str) -> std::io::Result<()> {
+fn write_credential_bytes(path: &Path, token: &str) -> io::Result<()> {
+    use std::fs::OpenOptions;
     use std::io::Write;
     use std::os::unix::fs::OpenOptionsExt;
-    let mut file = std::fs::OpenOptions::new()
+    let mut file = OpenOptions::new()
         .create_new(true)
         .write(true)
         .mode(0o600)
@@ -106,8 +109,9 @@ fn write_credential_bytes(path: &Path, token: &str) -> std::io::Result<()> {
 }
 
 #[cfg(not(unix))]
-fn write_credential_bytes(path: &Path, token: &str) -> std::io::Result<()> {
-    std::fs::write(path, token)
+fn write_credential_bytes(path: &Path, token: &str) -> io::Result<()> {
+    use std::fs;
+    fs::write(path, token)
 }
 
 fn push_model_args(

@@ -34,7 +34,10 @@ pub(super) fn dependency_updates_routes() -> Router<DaemonHttpState> {
             http_paths::DEPENDENCY_UPDATES_REPOSITORIES,
             post(post_dependency_update_repositories),
         )
-        .route(http_paths::DEPENDENCY_UPDATES_QUERY, post(post_query_dependency_updates))
+        .route(
+            http_paths::DEPENDENCY_UPDATES_QUERY,
+            post(post_query_dependency_updates),
+        )
         .route(
             http_paths::DEPENDENCY_UPDATES_APPROVE,
             post(post_approve_dependency_updates),
@@ -51,7 +54,10 @@ pub(super) fn dependency_updates_routes() -> Router<DaemonHttpState> {
             http_paths::DEPENDENCY_UPDATES_LABELS,
             post(post_label_dependency_updates),
         )
-        .route(http_paths::DEPENDENCY_UPDATES_AUTO, post(post_auto_dependency_updates))
+        .route(
+            http_paths::DEPENDENCY_UPDATES_AUTO,
+            post(post_auto_dependency_updates),
+        )
         .route(
             http_paths::DEPENDENCY_UPDATES_CACHE,
             delete(delete_dependency_updates_cache),
