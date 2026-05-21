@@ -276,7 +276,7 @@ struct DashboardDependenciesRouteView: View {
       items: response.items,
       filterModeRaw: filterModeRaw,
       sortModeRaw: sortModeRaw,
-      searchText: searchText,
+      searchText: "",
       configuredRepositories: preferences.repositories,
       configuredOrganizations: preferences.organizations,
       selectedIDs: selectedIDs,
@@ -349,6 +349,12 @@ struct DashboardDependenciesRouteView: View {
     }
     .onChange(of: normalizedPreferences.frequentLabelsCount) { _, _ in
       refreshLabelMenuData()
+    }
+    .dashboardDependenciesToolbarSearch(
+      query: $searchText,
+      items: response.items
+    ) { pullRequestID in
+      selectedIDs = [pullRequestID]
     }
   }
 
@@ -452,10 +458,6 @@ struct DashboardDependenciesRouteView: View {
 
   private var filterBar: some View {
     VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
-      TextField("Search repos, titles, authors, or labels", text: $searchText)
-        .textFieldStyle(.roundedBorder)
-        .scaledFont(.callout)
-
       filterControls
       routeActions
     }
