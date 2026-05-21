@@ -41,8 +41,7 @@ public struct SettingsView: View {
       Group {
         switch selectedSection {
         case .general:
-          let overview = SettingsGeneralOverviewState(store: store)
-          SettingsGeneralSection(store: store, overview: overview)
+          SettingsGeneralSectionRoot(store: store)
         case .focusMode:
           SettingsFocusModeSection()
         case .banners:
@@ -54,15 +53,7 @@ public struct SettingsView: View {
         case .voice:
           SettingsVoiceSection()
         case .connection:
-          let snapshot = SettingsConnectionSnapshot(store: store)
-          SettingsConnectionSection(
-            connectionState: snapshot.connectionState,
-            isDiagnosticsRefreshInFlight: snapshot.isDiagnosticsRefreshInFlight,
-            metrics: snapshot.metrics,
-            events: snapshot.events,
-            reconnect: { await store.reconnect() },
-            refreshDiagnostics: { await store.refreshDiagnostics() }
-          )
+          SettingsConnectionSectionRoot(store: store)
         case .taskBoard:
           SettingsTaskBoardSection(
             store: store,
@@ -102,28 +93,11 @@ public struct SettingsView: View {
         case .database:
           SettingsDatabaseSection(store: store)
         case .diagnostics:
-          let input = SettingsDiagnosticsSnapshotInput(store: store)
-          Group {
-            if preparedDiagnosticsInput == input, let snapshot = preparedDiagnosticsSnapshot {
-              SettingsDiagnosticsSection(
-                snapshot: snapshot,
-                revealPermissionLog: { runID, path in
-                  guard let path, !path.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-                  else {
-                    return .unavailable
-                  }
-                  return store.revealAcpPermissionLogInFinder(runID: runID, rawPath: path)
-                },
-                repairLaunchAgent: { await store.repairLaunchAgent() }
-              )
-            } else {
-              ProgressView("Loading diagnostics...")
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-            }
-          }
-          .task(id: input) {
-            await syncDiagnosticsSnapshot(input: input)
-          }
+          SettingsDiagnosticsSectionRoot(
+            store: store,
+            preparedInput: $preparedDiagnosticsInput,
+            preparedSnapshot: $preparedDiagnosticsSnapshot
+          )
         }
       }
       .environment(\.settingsScrollRestorationSection, selectedSection)
@@ -162,15 +136,6 @@ public struct SettingsView: View {
     .accessibilityFrameMarker(HarnessMonitorAccessibility.settingsPanel)
   }
 
-  @MainActor
-  private func syncDiagnosticsSnapshot(input: SettingsDiagnosticsSnapshotInput) async {
-    guard preparedDiagnosticsInput != input else { return }
-    let snapshot = await settingsDiagnosticsSnapshotWorker.prepare(input: input)
-    guard !Task.isCancelled else { return }
-    preparedDiagnosticsInput = input
-    preparedDiagnosticsSnapshot = snapshot
-  }
-
   @ToolbarContentBuilder private var settingsToolbarItems: some ToolbarContent {
     if selectedSection == .supervisor {
       ToolbarItem(placement: .primaryAction) {
@@ -193,5 +158,74 @@ private struct SettingsConnectionSnapshot {
     isDiagnosticsRefreshInFlight = store.isDiagnosticsRefreshInFlight
     metrics = store.connectionMetrics
     events = store.connectionEvents
+  }
+}
+
+/// Thin wrapper that confines `SettingsGeneralOverviewState`'s store reads to
+/// its own body, so unrelated store updates do not invalidate `SettingsView`.
+private struct SettingsGeneralSectionRoot: View {
+  let store: HarnessMonitorStore
+
+  var body: some View {
+    let overview = SettingsGeneralOverviewState(store: store)
+    SettingsGeneralSection(store: store, overview: overview)
+  }
+}
+
+/// Thin wrapper that confines connection-snapshot store reads (including the
+/// `connectionEvents` array copy) to its own body, so connection telemetry
+/// updates only invalidate the connection section, not the whole `SettingsView`.
+private struct SettingsConnectionSectionRoot: View {
+  let store: HarnessMonitorStore
+
+  var body: some View {
+    let snapshot = SettingsConnectionSnapshot(store: store)
+    SettingsConnectionSection(
+      connectionState: snapshot.connectionState,
+      isDiagnosticsRefreshInFlight: snapshot.isDiagnosticsRefreshInFlight,
+      metrics: snapshot.metrics,
+      events: snapshot.events,
+      reconnect: { await store.reconnect() },
+      refreshDiagnostics: { await store.refreshDiagnostics() }
+    )
+  }
+}
+
+/// Thin wrapper that confines `SettingsDiagnosticsSnapshotInput`'s store reads
+/// (including four array copies) to its own body. The `@State` for the cached
+/// snapshot stays on `SettingsView` via `@Binding`, so revisiting the diagnostics
+/// section after switching does not flash the loading state.
+private struct SettingsDiagnosticsSectionRoot: View {
+  let store: HarnessMonitorStore
+  @Binding var preparedInput: SettingsDiagnosticsSnapshotInput?
+  @Binding var preparedSnapshot: SettingsDiagnosticsSnapshot?
+
+  var body: some View {
+    let input = SettingsDiagnosticsSnapshotInput(store: store)
+    Group {
+      if preparedInput == input, let snapshot = preparedSnapshot {
+        SettingsDiagnosticsSection(
+          snapshot: snapshot,
+          revealPermissionLog: { runID, path in
+            guard let path, !path.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            else {
+              return .unavailable
+            }
+            return store.revealAcpPermissionLogInFinder(runID: runID, rawPath: path)
+          },
+          repairLaunchAgent: { await store.repairLaunchAgent() }
+        )
+      } else {
+        ProgressView("Loading diagnostics...")
+          .frame(maxWidth: .infinity, maxHeight: .infinity)
+      }
+    }
+    .task(id: input) {
+      guard preparedInput != input else { return }
+      let snapshot = await settingsDiagnosticsSnapshotWorker.prepare(input: input)
+      guard !Task.isCancelled else { return }
+      preparedInput = input
+      preparedSnapshot = snapshot
+    }
   }
 }
