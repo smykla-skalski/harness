@@ -60,7 +60,6 @@ struct HarnessMarkdownDetailsView: View {
         height: metrics.firstLineHeight,
         alignment: .center
       )
-      .offset(y: metrics.firstLineMarkerYOffset)
   }
 
   private func summaryText(metrics: HarnessMarkdownMarkerMetrics) -> some View {
@@ -74,7 +73,7 @@ struct HarnessMarkdownDetailsView: View {
       images: style.images,
       imageLayout: .inline
     )
-    .offset(y: metrics.firstLineTextYOffset)
+    .frame(minHeight: metrics.firstLineHeight, alignment: .center)
   }
 
   private var summaryBackground: some View {
