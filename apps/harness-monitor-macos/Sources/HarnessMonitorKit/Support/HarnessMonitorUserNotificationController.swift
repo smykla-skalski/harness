@@ -136,11 +136,13 @@ public final class HarnessMonitorUserNotificationController: NSObject,
     decisionID: String
   ) async -> Bool {
     await deliverSupervisorNotification(
-      source: .supervisorDecision,
-      severity: severity,
-      successMessage: "Scheduled supervisor decision \(decisionID)",
-      failureMessage: "Scheduling supervisor decision failed",
-      actions: decisionActions(decisionID: decisionID)
+      descriptor: SupervisorNotificationDescriptor(
+        source: .supervisorDecision,
+        severity: severity,
+        successMessage: "Scheduled supervisor decision \(decisionID)",
+        failureMessage: "Scheduling supervisor decision failed",
+        actions: decisionActions(decisionID: decisionID)
+      )
     ) {
       try await HarnessMonitorNotificationRequestFactory.makeSupervisorRequest(
         severity: severity,
@@ -156,11 +158,13 @@ public final class HarnessMonitorUserNotificationController: NSObject,
     ruleID: String
   ) async -> Bool {
     await deliverSupervisorNotification(
-      source: .supervisorNotice,
-      severity: severity,
-      successMessage: "Scheduled supervisor notice for \(ruleID)",
-      failureMessage: "Scheduling supervisor notice failed",
-      actions: []
+      descriptor: SupervisorNotificationDescriptor(
+        source: .supervisorNotice,
+        severity: severity,
+        successMessage: "Scheduled supervisor notice for \(ruleID)",
+        failureMessage: "Scheduling supervisor notice failed",
+        actions: []
+      )
     ) {
       try await HarnessMonitorNotificationRequestFactory.makeSupervisorNoticeRequest(
         severity: severity,
@@ -170,15 +174,11 @@ public final class HarnessMonitorUserNotificationController: NSObject,
     }
   }
 
-  // swiftlint:disable:next function_parameter_count
   private func deliverSupervisorNotification(
-    source: NotificationHistoryEntry.Source,
-    severity: DecisionSeverity,
-    successMessage: String,
-    failureMessage: String,
-    actions: [NotificationHistoryAction],
+    descriptor: SupervisorNotificationDescriptor,
     makeRequest: () async throws -> UNNotificationRequest
   ) async -> Bool {
+    let severity = descriptor.severity
     await performNotificationOperation {
       let settings = SupervisorNotificationSettings.load()
       guard settings.allowsAnyDelivery(for: severity) else {
@@ -192,15 +192,15 @@ public final class HarnessMonitorUserNotificationController: NSObject,
         historyEventSink?(
           .scheduled(
             request: NotificationHistoryRequestSnapshot(request: request),
-            source: source,
+            source: descriptor.source,
             severity: .init(severity),
-            actions: actions
+            actions: descriptor.actions
           ))
-        lastResult = successMessage
+        lastResult = descriptor.successMessage
         await refreshStatus()
         return true
       } catch {
-        lastResult = "\(failureMessage): \(error.localizedDescription)"
+        lastResult = "\(descriptor.failureMessage): \(error.localizedDescription)"
         return false
       }
     } ?? false
@@ -488,5 +488,12 @@ public final class HarnessMonitorUserNotificationController: NSObject,
     defer { isWorking = false }
     return await operation()
   }
+}
 
+private struct SupervisorNotificationDescriptor {
+  let source: NotificationHistoryEntry.Source
+  let severity: DecisionSeverity
+  let successMessage: String
+  let failureMessage: String
+  let actions: [NotificationHistoryAction]
 }
