@@ -200,7 +200,21 @@ final class TrackAccessibilityNSView: NSView {
   private nonisolated(unsafe) var windowObservers: [NSObjectProtocol] = []
   private var lastPublishedElement: RegistryElement?
   private var lastDidUpdateRefreshAt: ContinuousClock.Instant?
+  private var lastConfiguredSignature: ConfigurationSignature?
   var accessibilityFrameProviderOverride: ((TrackAccessibilityNSView) -> NSRect)?
+
+  private struct ConfigurationSignature: Equatable {
+    let elementID: String
+    let kind: RegistryElementKind
+    let label: String?
+    let value: String?
+    let hint: String?
+    let windowID: Int?
+    let enabled: Bool
+    let supportedActions: [RegistrySemanticAction]
+    let registryID: ObjectIdentifier
+    let sinkID: ObjectIdentifier?
+  }
 
   override init(frame frameRect: NSRect) {
     super.init(frame: frameRect)
@@ -254,6 +268,27 @@ final class TrackAccessibilityNSView: NSView {
         )
       }
       lastPublishedElement = nil
+      lastConfiguredSignature = nil
+    }
+    let signature = ConfigurationSignature(
+      elementID: elementID,
+      kind: kind,
+      label: label,
+      value: value,
+      hint: hint,
+      windowID: windowID,
+      enabled: enabled,
+      supportedActions: semanticActions.supportedActions,
+      registryID: ObjectIdentifier(registry),
+      sinkID: semanticActionSink.map(ObjectIdentifier.init)
+    )
+    // Keep the freshly-captured semanticActions closure in sync regardless of
+    // early-out, so the next layout-driven publish re-registers with the
+    // current press handler if the frame changes.
+    self.semanticActions = semanticActions
+    self.semanticActionSink = semanticActionSink
+    if lastConfiguredSignature == signature, claimTask != nil, self.registry === registry {
+      return
     }
     trackedElementID = elementID
     self.kind = kind
@@ -262,9 +297,8 @@ final class TrackAccessibilityNSView: NSView {
     self.hint = hint
     explicitWindowID = windowID
     self.enabled = enabled
-    self.semanticActions = semanticActions
-    self.semanticActionSink = semanticActionSink
     self.registry = registry
+    lastConfiguredSignature = signature
     claimTrackedElement()
     beginObserving(window: window)
     schedulePublishCurrentElement()
@@ -277,6 +311,7 @@ final class TrackAccessibilityNSView: NSView {
     publishTask = nil
     let claimTask = self.claimTask
     self.claimTask = nil
+    lastConfiguredSignature = nil
     guard let registry, !trackedElementID.isEmpty else {
       return
     }

@@ -91,6 +91,56 @@ struct TrackAccessibilityModifierTests {
     #expect(element?.frame == expectedFrame)
   }
 
+  @Test("identical configure calls skip republish so dense panes do not churn")
+  @MainActor
+  func identicalConfigureCallsSkipRepublish() async {
+    let registry = AccessibilityRegistry()
+    let view = TrackAccessibilityNSView()
+    let publishedFrame = NSRect(x: 12, y: 24, width: 120, height: 36)
+    var frameQueryCount = 0
+    view.accessibilityFrameProviderOverride = { _ in
+      frameQueryCount += 1
+      return publishedFrame
+    }
+
+    view.configure(
+      elementID: "workspace.refresh",
+      kind: .button,
+      label: "Refresh workspace",
+      value: nil,
+      hint: nil,
+      windowID: 41,
+      enabled: true,
+      semanticActions: .none,
+      semanticActionSink: nil,
+      registry: registry
+    )
+
+    _ = await waitForElement(identifier: "workspace.refresh", registry: registry)
+    let baselineQueries = frameQueryCount
+
+    for _ in 0..<3 {
+      view.configure(
+        elementID: "workspace.refresh",
+        kind: .button,
+        label: "Refresh workspace",
+        value: nil,
+        hint: nil,
+        windowID: 41,
+        enabled: true,
+        semanticActions: .none,
+        semanticActionSink: nil,
+        registry: registry
+      )
+    }
+
+    for _ in 0..<6 {
+      await Task.yield()
+    }
+
+    #expect(frameQueryCount == baselineQueries)
+  }
+
   @Test("didUpdate clears tracked elements once scrolling clips them fully off-screen")
   @MainActor
   func didUpdateClearsTrackedElementsWhenScrollingClipsThemOffScreen() async {
