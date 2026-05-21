@@ -108,6 +108,7 @@ extension DashboardDependenciesRouteView {
     {
       mergedLabels[repository] = updatedLabels
     }
+    let needsCacheBackfill = mergedLabels[repository, default: []].isEmpty
     routeResponse = DependencyUpdatesQueryResponse(
       fetchedAt: perResponse.fetchedAt,
       fromCache: false,
@@ -115,6 +116,9 @@ extension DashboardDependenciesRouteView {
       items: nextItems,
       repositoryLabels: mergedLabels
     )
+    if needsCacheBackfill {
+      hydrateRepositoryLabelsFromCache()
+    }
     routeErrorMessage = nil
     reconcileSelection()
     persistDependenciesPerRepoResponse(
