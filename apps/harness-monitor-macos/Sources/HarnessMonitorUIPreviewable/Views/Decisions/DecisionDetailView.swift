@@ -11,9 +11,9 @@ public struct DecisionDetailView: View {
   @Binding var selectedTab: DecisionDetailTab
   @AccessibilityFocusState var focusedPrimaryActionDecisionID: String?
   @FocusState var keyboardFocusedPrimaryActionDecisionID: String?
-  @State var handledPrimaryActionFocusTick = 0
-  @State var scopedAuditEvents: [SupervisorEventSnapshot] = []
-  @State var scopedAuditInput: DecisionDetailViewModel.AuditScopeInput?
+  @State private var handledPrimaryActionFocusTick = 0
+  @State private var scopedAuditEvents: [SupervisorEventSnapshot] = []
+  @State private var scopedAuditInput: DecisionDetailViewModel.AuditScopeInput?
 
   let viewModel: DecisionDetailViewModel?
   let store: HarnessMonitorStore?

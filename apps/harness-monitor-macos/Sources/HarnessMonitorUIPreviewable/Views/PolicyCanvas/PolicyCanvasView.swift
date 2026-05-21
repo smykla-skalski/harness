@@ -21,11 +21,11 @@ public struct PolicyCanvasView: View {
   static let labRemoteActionDisabledReason = "Disabled in Policy Canvas Lab"
   static let missingStoreRemoteActionDisabledReason =
     "Unavailable without a live policy store"
-  @State var viewModelState: PolicyCanvasViewModel
-  @State var isShowingPromoteConfirmationState = false
-  @State var pendingDeletionRequestState: PolicyCanvasDeletionRequest?
-  @State var statusLineState: String = "No pending changes"
-  @State var searchPaletteVisibleState: Bool = false
+  @State private var viewModelState: PolicyCanvasViewModel
+  @State private var isShowingPromoteConfirmationState = false
+  @State private var pendingDeletionRequestState: PolicyCanvasDeletionRequest?
+  @State private var statusLineState: String = "No pending changes"
+  @State private var searchPaletteVisibleState: Bool = false
   /// User-facing override for the simulation overlay. Defaults to nil
   /// (auto-show whenever a simulation exists and the user is on the
   /// simulation tab); the chrome toggle in the top bar flips this to
@@ -37,7 +37,7 @@ public struct PolicyCanvasView: View {
   /// model) keeps document state separate from per-window viewport
   /// preferences, matching how the rest of the canvas treats zoom and
   /// inspector visibility.
-  @State var simulationOverlayOverrideState: Bool?
+  @State private var simulationOverlayOverrideState: Bool?
   @FocusState var focusedFieldState: PolicyCanvasFocusedField?
   /// VoiceOver focus anchor for the canvas surface. The search palette writes
   /// the just-selected component into this binding after dismiss so VO lands

@@ -6,25 +6,25 @@ let decisionDeskDetailPreparationWorker = DecisionDetailPreparationWorker()
 public struct DecisionDeskPreviewView: View {
   let store: HarnessMonitorStore?
 
-  @State var selection: String?
-  @State var detailTab: DecisionDetailTab = .context
-  @State var runtime = DecisionRuntime()
-  @State var presentationWorker = DecisionsSidebarPresentationWorker()
-  @State var cachedPresentation = DecisionsSidebarPresentation.empty
-  @State var presentationGeneration: UInt64 = 0
-  @State var sidebarFilters = DecisionsSidebarViewModel.FilterState(
+  @State private var selection: String?
+  @State private var detailTab: DecisionDetailTab = .context
+  @State private var runtime = DecisionRuntime()
+  @State private var presentationWorker = DecisionsSidebarPresentationWorker()
+  @State private var cachedPresentation = DecisionsSidebarPresentation.empty
+  @State private var presentationGeneration: UInt64 = 0
+  @State private var sidebarFilters = DecisionsSidebarViewModel.FilterState(
     query: "",
     severities: [],
     scope: .summary
   )
-  @State var dismissAllVisibleDraft = ""
-  @State var pendingDismissBatch: DecisionDismissBatchSnapshot?
-  @State var showDismissAllVisibleConfirmation = false
-  @State var reopenBatch: DecisionReopenBatchState?
-  @State var cachedDetailViewModel: DecisionDetailViewModel?
-  @State var cachedDetailViewModelInput: DecisionDetailViewModel.PreparationInput?
+  @State private var dismissAllVisibleDraft = ""
+  @State private var pendingDismissBatch: DecisionDismissBatchSnapshot?
+  @State private var showDismissAllVisibleConfirmation = false
+  @State private var reopenBatch: DecisionReopenBatchState?
+  @State private var cachedDetailViewModel: DecisionDetailViewModel?
+  @State private var cachedDetailViewModelInput: DecisionDetailViewModel.PreparationInput?
 
-  @State var inspectorVisible = false
+  @State private var inspectorVisible = false
 
   public init(store: HarnessMonitorStore? = nil) {
     self.store = store

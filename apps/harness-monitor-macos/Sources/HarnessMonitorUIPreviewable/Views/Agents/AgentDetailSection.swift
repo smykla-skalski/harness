@@ -18,13 +18,13 @@ struct AgentDetailSection: View {
   let agent: AgentRegistration
   let activity: AgentToolActivitySummary?
   let runtimePresentation: AcpRuntimePresentation
-  @State var selectedSendAction: SendUpdateAction = .injectContext
-  @State var signalCommand = "inject_context"
-  @State var signalMessage = ""
-  @State var signalActionHint = ""
-  @State var selectedRole: SessionRole = .worker
-  @State var transcriptAnnouncer = MonitorTimelineLiveRegionThrottle()
-  @State var lastAnnouncedTimelineEntryId: String?
+  @State private var selectedSendAction: SendUpdateAction = .injectContext
+  @State private var signalCommand = "inject_context"
+  @State private var signalMessage = ""
+  @State private var signalActionHint = ""
+  @State private var selectedRole: SessionRole = .worker
+  @State private var transcriptAnnouncer = MonitorTimelineLiveRegionThrottle()
+  @State private var lastAnnouncedTimelineEntryId: String?
 
   init(
     store: HarnessMonitorStore,

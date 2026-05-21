@@ -6,20 +6,20 @@ struct SettingsRepositoriesSection: View {
   @Binding var taskBoardFormState: TaskBoardSettingsFormState
   @AppStorage(DashboardDependenciesPreferences.storageKey)
   var storedDependenciesPreferences = ""
-  @State var draft = SettingsSharedRepositoriesDraft()
-  @State var isLoading = false
-  @State var isSaving = false
-  @State var loadError: String?
-  @State var saveWarning: String?
-  @State var hasLoadedDraft = false
-  @State var catalogOrganization = ""
-  @State var loadedCatalogOrganization = ""
-  @State var catalogRepositories: [String] = []
-  @State var catalogSelection: Set<String> = []
-  @State var catalogSearchText = ""
-  @State var isCatalogLoading = false
-  @State var catalogError: SettingsRepositoriesCatalogErrorPresentation?
-  @State var isFullyExpanded = false
+  @State private var draft = SettingsSharedRepositoriesDraft()
+  @State private var isLoading = false
+  @State private var isSaving = false
+  @State private var loadError: String?
+  @State private var saveWarning: String?
+  @State private var hasLoadedDraft = false
+  @State private var catalogOrganization = ""
+  @State private var loadedCatalogOrganization = ""
+  @State private var catalogRepositories: [String] = []
+  @State private var catalogSelection: Set<String> = []
+  @State private var catalogSearchText = ""
+  @State private var isCatalogLoading = false
+  @State private var catalogError: SettingsRepositoriesCatalogErrorPresentation?
+  @State private var isFullyExpanded = false
 
   @Environment(\.fontScale)
   var fontScale

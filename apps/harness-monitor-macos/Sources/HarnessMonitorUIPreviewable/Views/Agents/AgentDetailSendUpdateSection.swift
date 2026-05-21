@@ -19,12 +19,12 @@ struct AgentDetailSendUpdateSection: View {
   @Binding var signalMessage: String
   @Binding var signalActionHint: String
   @FocusState var focusedField: AgentDetailSendUpdateFocusField?
-  @State var deadlineClock = AgentDetailDeadlineClockState()
-  @State var isMoreOptionsExpanded = false
+  @State private var deadlineClock = AgentDetailDeadlineClockState()
+  @State private var isMoreOptionsExpanded = false
   // Measured container width drives the deterministic horizontal/vertical pick
   // below. ViewThatFits would build both candidate trees on every body
   // invocation; here we measure once and only re-pick on threshold crossings.
-  @State var composerFitsHorizontally = true
+  @State private var composerFitsHorizontally = true
 
   static let composerHorizontalMinWidth: CGFloat = 480
 

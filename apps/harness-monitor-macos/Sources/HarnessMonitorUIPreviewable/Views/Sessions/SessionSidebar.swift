@@ -13,16 +13,16 @@ struct SessionSidebar: View {
   @Bindable var state: SessionWindowStateCache
   @Environment(\.harnessTextSizeIndex)
   var textSizeIndex
-  @State var selectionDispatcher = SessionSidebarSelectionDispatcher()
-  @State var listSelection: Set<SessionSelection> = []
-  @State var listSelectionSyncGeneration: UInt64 = 0
-  @State var showsDeferredSidebarSections = false
-  @State var usesNativeListSelection = false
-  @State var presentationWorker = SessionRouteListPresentationWorker()
-  @State var cachedAgentPresentation = SessionAgentListPresentation.empty
-  @State var cachedTaskPresentation = SessionTaskListPresentation.empty
-  @State var agentPresentationGeneration: UInt64 = 0
-  @State var taskPresentationGeneration: UInt64 = 0
+  @State private var selectionDispatcher = SessionSidebarSelectionDispatcher()
+  @State private var listSelection: Set<SessionSelection> = []
+  @State private var listSelectionSyncGeneration: UInt64 = 0
+  @State private var showsDeferredSidebarSections = false
+  @State private var usesNativeListSelection = false
+  @State private var presentationWorker = SessionRouteListPresentationWorker()
+  @State private var cachedAgentPresentation = SessionAgentListPresentation.empty
+  @State private var cachedTaskPresentation = SessionTaskListPresentation.empty
+  @State private var agentPresentationGeneration: UInt64 = 0
+  @State private var taskPresentationGeneration: UInt64 = 0
 
   init(
     store: HarnessMonitorStore,

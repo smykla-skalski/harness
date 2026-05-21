@@ -15,11 +15,11 @@ public struct DecisionsSidebar: View {
   let presentationOverride: DecisionsSidebarPresentation?
   let store: HarnessMonitorStore?
 
-  @State var query: String = ""
-  @State var presentationWorker = DecisionsSidebarPresentationWorker()
-  @State var cachedPresentation = DecisionsSidebarPresentation.empty
-  @State var cachedDecisionsByID: [String: Decision] = [:]
-  @State var presentationGeneration: UInt64 = 0
+  @State private var query: String = ""
+  @State private var presentationWorker = DecisionsSidebarPresentationWorker()
+  @State private var cachedPresentation = DecisionsSidebarPresentation.empty
+  @State private var cachedDecisionsByID: [String: Decision] = [:]
+  @State private var presentationGeneration: UInt64 = 0
 
   @AppStorage("harness.decisions.sidebar.filterExpanded")
   var filterExpanded: Bool = true

@@ -5,7 +5,7 @@ public struct SessionWindowView: View {
   public let store: HarnessMonitorStore
   public let token: SessionWindowToken
   public let history: GlobalWindowNavigationHistory
-  @State var stateCacheStorage: SessionWindowStateCache
+  @State private var stateCacheStorage: SessionWindowStateCache
   @Environment(\.dismiss)
   var dismiss
   @Environment(\.openWindow)
@@ -36,19 +36,19 @@ public struct SessionWindowView: View {
   @AppStorage(HarnessMonitorMCPSettingsDefaults.registryHostEnabledKey)
   var mcpRegistryHostEnabled = HarnessMonitorMCPSettingsDefaults
     .registryHostEnabledDefault
-  @State var snapshotStorage: HarnessMonitorSessionWindowSnapshot?
-  @State var isLoadingStorage = false
-  @State var didLoadSnapshotStorage = false
-  @State var detailColumnWidthStorage: CGFloat = 0
-  @State var liveInspectorWidthStorage: Double?
-  @State var liveContentColumnWidthStorage: Double?
-  @State var perfContentDividerWidthStorage: Double?
-  @State var decisionCacheStorage = SessionWindowDecisionCacheStorage()
-  @State var currentModifiers: EventModifiers = []
-  @State var policyCanvasViewModelStorage: PolicyCanvasViewModel
-  @State var startupSearchParticipationEnabledStorage =
+  @State private var snapshotStorage: HarnessMonitorSessionWindowSnapshot?
+  @State private var isLoadingStorage = false
+  @State private var didLoadSnapshotStorage = false
+  @State private var detailColumnWidthStorage: CGFloat = 0
+  @State private var liveInspectorWidthStorage: Double?
+  @State private var liveContentColumnWidthStorage: Double?
+  @State private var perfContentDividerWidthStorage: Double?
+  @State private var decisionCacheStorage = SessionWindowDecisionCacheStorage()
+  @State private var currentModifiers: EventModifiers = []
+  @State private var policyCanvasViewModelStorage: PolicyCanvasViewModel
+  @State private var startupSearchParticipationEnabledStorage =
     HarnessMonitorUITestEnvironment.isEnabled
-  @State var handledHistoryRestoreRequestID = 0
+  @State private var handledHistoryRestoreRequestID = 0
 
   @MainActor
   public init(

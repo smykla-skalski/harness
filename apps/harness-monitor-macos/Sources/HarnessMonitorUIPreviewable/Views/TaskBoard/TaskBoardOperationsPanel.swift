@@ -15,8 +15,8 @@ struct TaskBoardOperationsPanel: View {
   @Environment(\.fontScale)
   var fontScale
 
-  @State var inventoryStatusChoice = TaskBoardStatusFilterChoice.all
-  @State var localHostProjectTypes: [String] = []
+  @State private var inventoryStatusChoice = TaskBoardStatusFilterChoice.all
+  @State private var localHostProjectTypes: [String] = []
 
   var metrics: TaskBoardOverviewMetrics {
     TaskBoardOverviewMetrics(fontScale: fontScale)

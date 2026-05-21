@@ -18,8 +18,8 @@ struct TaskBoardItemManagementPanel: View {
   let onRefresh: (() -> Void)?
   let onClose: () -> Void
 
-  @State var draft: TaskBoardItemEditorDraft
-  @State var projectTypeSuggestions: [String] = []
+  @State private var draft: TaskBoardItemEditorDraft
+  @State private var projectTypeSuggestions: [String] = []
   @Environment(\.fontScale)
   var fontScale
 

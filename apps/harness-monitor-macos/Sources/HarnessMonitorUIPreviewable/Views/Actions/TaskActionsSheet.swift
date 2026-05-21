@@ -9,22 +9,22 @@ struct TaskActionsSheet: View {
   @Environment(\.dismiss)
   var dismiss
 
-  @State var localTaskID = ""
-  @State var assigneeID = ""
-  @State var taskStatus: TaskStatus = .inProgress
-  @State var queuePolicy: TaskQueuePolicy = .locked
-  @State var statusNote = ""
-  @State var checkpointSummary = ""
-  @State var checkpointProgress: Double = 50
-  @State var submitForReviewSummary = ""
-  @State var reviewActorID = ""
-  @State var reviewVerdict: ReviewVerdict = .approve
-  @State var reviewSummary = ""
-  @State var reviewPointText = ""
-  @State var reviewResponseNote = ""
-  @State var disputedReviewPointIDs: Set<String> = []
-  @State var arbitrationVerdict: ReviewVerdict = .approve
-  @State var arbitrationSummary = ""
+  @State private var localTaskID = ""
+  @State private var assigneeID = ""
+  @State private var taskStatus: TaskStatus = .inProgress
+  @State private var queuePolicy: TaskQueuePolicy = .locked
+  @State private var statusNote = ""
+  @State private var checkpointSummary = ""
+  @State private var checkpointProgress: Double = 50
+  @State private var submitForReviewSummary = ""
+  @State private var reviewActorID = ""
+  @State private var reviewVerdict: ReviewVerdict = .approve
+  @State private var reviewSummary = ""
+  @State private var reviewPointText = ""
+  @State private var reviewResponseNote = ""
+  @State private var disputedReviewPointIDs: Set<String> = []
+  @State private var arbitrationVerdict: ReviewVerdict = .approve
+  @State private var arbitrationSummary = ""
 
   var detail: SessionDetail? {
     store.contentUI.sessionDetail.presentedSessionDetail
