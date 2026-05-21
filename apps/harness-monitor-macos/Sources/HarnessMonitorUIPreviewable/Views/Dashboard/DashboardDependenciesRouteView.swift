@@ -466,7 +466,9 @@ struct DashboardDependenciesRouteView: View {
       } else if selectedItems.count > 1 {
         batchDetail
       } else if let item = primaryDetailItem {
-        dependencyDetail(item)
+        DashboardDependencyDetailView(item: item, store: store) {
+          dependencyActionBar(items: [item])
+        }
       } else if isLoading {
         ProgressView("Loading dependencies…")
           .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -494,7 +496,7 @@ struct DashboardDependenciesRouteView: View {
       scrollSurfaceLabel: "Dependencies detail"
     ) {
       VStack(alignment: .leading, spacing: 24) {
-        detailCard(
+        DashboardDependencyDetailCard(
           title: "\(selectedItems.count) selected",
           subtitle: "Run batch dependency actions across the current selection"
         ) {
@@ -504,57 +506,6 @@ struct DashboardDependenciesRouteView: View {
       .frame(maxWidth: dependenciesDetailMaxWidth, alignment: .leading)
       .frame(maxWidth: .infinity, alignment: .center)
     }
-  }
-
-  private func dependencyDetail(_ item: DependencyUpdateItem) -> some View {
-    HarnessMonitorColumnScrollView(
-      horizontalPadding: 24,
-      verticalPadding: 24,
-      constrainContentWidth: true,
-      readableWidth: false,
-      topScrollEdgeEffect: .soft,
-      scrollSurfaceIdentifier: HarnessMonitorAccessibility.dashboardDependenciesDetail,
-      scrollSurfaceLabel: "Dependencies detail"
-    ) {
-      VStack(alignment: .leading, spacing: 18) {
-        detailCard(
-          title: item.title, subtitle: "\(item.repository)#\(item.number) · @\(item.authorLogin)"
-        ) {
-          VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingMD) {
-            dependencyActionBar(items: [item])
-            DashboardDependencyStatusStrip(item: item)
-          }
-        }
-        detailSection(nil) {
-          descriptionView(for: item)
-        }
-        .accessibilityIdentifier(HarnessMonitorAccessibility.dashboardDependenciesDescription)
-        detailSection("Checks") {
-          DashboardDependencyCheckList(checks: item.checks)
-        }
-        detailSection("Reviews") {
-          DashboardDependencyReviewList(reviews: item.reviews)
-        }
-        detailSection("Labels") {
-          DashboardDependencyLabelStrip(labels: item.labels)
-        }
-      }
-      .frame(maxWidth: dependenciesDetailMaxWidth, alignment: .leading)
-      .frame(maxWidth: .infinity, alignment: .center)
-      .task(
-        id: DependencyUpdateBodyTaskKey(
-          item: item, isDaemonOnline: store.connectionState == .online)
-      ) {
-        await store.prepareDependencyUpdateBody(for: item)
-      }
-    }
-  }
-
-  private func descriptionView(for item: DependencyUpdateItem) -> some View {
-    DashboardDependenciesDescriptionView(
-      store: store,
-      pullRequestID: item.pullRequestID
-    )
   }
 
   private func dependencyRow(
