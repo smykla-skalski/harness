@@ -32,7 +32,7 @@ struct HarnessMarkdownRenderingBehaviorTests {
     #expect(textSource.contains("width: metrics.listSymbolColumnWidth"))
     #expect(textSource.contains("alignment: .leading"))
     #expect(textSource.contains("height: metrics.firstLineHeight"))
-    #expect(textSource.contains(".offset(y: metrics.markerVisualYOffset)"))
+    #expect(!textSource.contains("markerVisualYOffset"))
     #expect(!textSource.contains("firstLineCenterBaselineOffset"))
   }
 
@@ -84,7 +84,7 @@ struct HarnessMarkdownRenderingBehaviorTests {
   func taskCheckboxesUseNativeCheckboxControls() throws {
     let source = try readRepositoryFile(
       "apps/harness-monitor-macos/Sources/HarnessMonitorUIPreviewable"
-        + "/Views/Shared/HarnessMarkdownDetailsView.swift"
+        + "/Views/Shared/HarnessMonitorMarkdownText.swift"
     )
 
     #expect(source.contains("Toggle(isOn: .constant(checkbox))"))
@@ -97,7 +97,7 @@ struct HarnessMarkdownRenderingBehaviorTests {
   func markdownDetailsSummaryRowTogglesDisclosure() throws {
     let source = try readRepositoryFile(
       "apps/harness-monitor-macos/Sources/HarnessMonitorUIPreviewable"
-        + "/Views/Shared/HarnessMonitorMarkdownText.swift"
+        + "/Views/Shared/HarnessMarkdownDetailsView.swift"
     )
 
     #expect(source.contains("Button {"))
@@ -105,7 +105,7 @@ struct HarnessMarkdownRenderingBehaviorTests {
     #expect(source.contains(".contentShape(Rectangle())"))
     #expect(source.contains("HarnessMarkdownPointerHoverModifier"))
     #expect(source.contains("metrics.chevronSize"))
-    #expect(source.contains(".offset(y: metrics.chevronVisualYOffset)"))
+    #expect(!source.contains("chevronVisualYOffset"))
     #expect(source.contains("HStack(alignment: .top, spacing: metrics.gap)"))
     #expect(!source.contains("DisclosureGroup(isExpanded: $isExpanded)"))
   }

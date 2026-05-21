@@ -1,3 +1,4 @@
+import Foundation
 import Testing
 
 @testable import HarnessMonitorUIPreviewable
@@ -155,5 +156,21 @@ struct HarnessMarkdownRenderSettingsTests {
     #expect(sectionSource.contains("Markdown Colors"))
     #expect(sectionSource.contains("Code Token Colors"))
     #expect(rendererSource.contains("HarnessMarkdownStoredRenderSettings"))
+  }
+
+  private func readRepositoryFile(_ relativePath: String) throws -> String {
+    try String(contentsOfFile: repositoryPath(relativePath), encoding: .utf8)
+  }
+
+  private func repositoryPath(_ relativePath: String) -> String {
+    let testsDirectory = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
+    return
+      testsDirectory
+      .deletingLastPathComponent()
+      .deletingLastPathComponent()
+      .deletingLastPathComponent()
+      .deletingLastPathComponent()
+      .appendingPathComponent(relativePath)
+      .path
   }
 }

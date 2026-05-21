@@ -181,7 +181,7 @@ struct SettingsMarkdownSection: View {
     step: Double = 1
   ) -> some View {
     let value = numberBinding(keyPath, in: range)
-    LabeledContent(title) {
+    return LabeledContent(title) {
       HStack(spacing: 4) {
         TextField("", value: value, format: .number.precision(.fractionLength(0...2)))
           .textFieldStyle(.roundedBorder)
