@@ -7,7 +7,7 @@ struct DashboardRouteContent: View {
   let store: HarnessMonitorStore
   let dashboardUI: HarnessMonitorStore.ContentDashboardSlice
   let sessionCatalog: HarnessMonitorStore.SessionCatalogSlice
-  @State private var dependenciesSearchAutomationState = AppSearchAutomationState()
+  @State private var dependenciesSearchAutomationCommand = AppSearchAutomationCommand.idle
   @State private var notificationsHasBeenMounted = false
   @State private var policyCanvasHasBeenMounted = false
   @State private var dependenciesHasBeenMounted = false
@@ -16,9 +16,9 @@ struct DashboardRouteContent: View {
   private var isNotificationsVisible: Bool { route == .notifications }
   private var isPolicyCanvasVisible: Bool { route == .policyCanvas }
   private var isDependenciesVisible: Bool { route == .dependencies }
-  private var dependenciesSearchAutomation: AppSearchAutomationState? {
+  private var dependenciesSearchAutomation: AppSearchAutomationCommand? {
     HarnessMonitorUITestEnvironment.isPerfScenarioActive
-      ? dependenciesSearchAutomationState
+      ? dependenciesSearchAutomationCommand
       : nil
   }
 
@@ -61,7 +61,7 @@ struct DashboardRouteContent: View {
         DashboardDependenciesRouteView(
           store: store,
           selectedRoute: $selectedRoute,
-          searchAutomation: dependenciesSearchAutomation
+          searchAutomationCommand: dependenciesSearchAutomation
         )
         .opacity(isDependenciesVisible ? 1 : 0)
         .allowsHitTesting(isDependenciesVisible)
@@ -74,7 +74,7 @@ struct DashboardRouteContent: View {
     .modifier(
       DashboardWindowPerfScenarioScript(
         selectedRoute: $selectedRoute,
-        searchAutomation: dependenciesSearchAutomationState
+        searchAutomationCommand: $dependenciesSearchAutomationCommand
       )
     )
   }

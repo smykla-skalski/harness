@@ -109,14 +109,14 @@ extension View {
   func dashboardDependenciesToolbarSearch(
     query: Binding<String>,
     items: [DependencyUpdateItem],
-    automation: AppSearchAutomationState? = nil,
+    automationCommand: AppSearchAutomationCommand? = nil,
     onSelect: @escaping (String) -> Void
   ) -> some View {
     modifier(
       DashboardDependenciesToolbarSearchModifier(
         query: query,
         items: items,
-        automation: automation,
+        automationCommand: automationCommand,
         onSelect: onSelect
       )
     )
@@ -126,7 +126,7 @@ extension View {
 private struct DashboardDependenciesToolbarSearchModifier: ViewModifier {
   @Binding var query: String
   let items: [DependencyUpdateItem]
-  let automation: AppSearchAutomationState?
+  let automationCommand: AppSearchAutomationCommand?
   let onSelect: (String) -> Void
 
   @FocusState private var isSearchFocused: Bool
@@ -209,15 +209,9 @@ private struct DashboardDependenciesToolbarSearchModifier: ViewModifier {
           focusSearchField()
         }
       }
-      .task {
-        automation?.handler = { command in
-          Task { @MainActor in
-            await applyAutomationCommand(command)
-          }
-        }
-      }
-      .onDisappear {
-        automation?.handler = nil
+      .task(id: automationCommand?.generation ?? 0) {
+        guard let automationCommand else { return }
+        await applyAutomationCommand(automationCommand)
       }
   }
 

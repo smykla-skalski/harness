@@ -7,7 +7,7 @@ private struct DashboardWindowPerfScenarioTrigger: Equatable {
 
 struct DashboardWindowPerfScenarioScript: ViewModifier {
   @Binding var selectedRoute: DashboardWindowRoute
-  let searchAutomation: AppSearchAutomationState
+  @Binding var searchAutomationCommand: AppSearchAutomationCommand
 
   @State private var appliedScenarioRawValue: String?
 
@@ -58,20 +58,20 @@ struct DashboardWindowPerfScenarioScript: ViewModifier {
       try? await Task.sleep(for: .milliseconds(180))
     }
     await runMeasuredStep("search.present") {
-      searchAutomation.present(query: "")
+      updateSearchAutomation(query: "", isPresented: true)
       await Task.yield()
       try? await Task.sleep(for: .milliseconds(240))
     }
 
     for query in searchQueries {
       await runMeasuredStep("query.\(query)") {
-        searchAutomation.present(query: query)
+        updateSearchAutomation(query: query, isPresented: true)
         try? await Task.sleep(for: .milliseconds(260))
       }
     }
 
     await runMeasuredStep("search.dismiss") {
-      searchAutomation.dismiss()
+      updateSearchAutomation(query: "", isPresented: false)
     }
   }
 
@@ -92,5 +92,13 @@ struct DashboardWindowPerfScenarioScript: ViewModifier {
     let interval = HarnessMonitorPerfTrace.beginStep(step, details: details)
     await operation()
     HarnessMonitorPerfTrace.endStep(interval, details: details)
+  }
+
+  private func updateSearchAutomation(query: String, isPresented: Bool) {
+    searchAutomationCommand = AppSearchAutomationCommand(
+      generation: searchAutomationCommand.generation &+ 1,
+      query: query,
+      isPresented: isPresented
+    )
   }
 }
