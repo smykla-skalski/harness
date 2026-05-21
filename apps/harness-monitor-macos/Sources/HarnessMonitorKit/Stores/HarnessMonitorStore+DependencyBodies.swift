@@ -9,6 +9,22 @@ public enum DependencyUpdateBodyState: Equatable, Sendable {
   case failed(String)
 }
 
+/// Identity used by SwiftUI `.task(id:)` to drive the description fetch.
+/// Re-fires when the visible PR changes or when the daemon comes back online,
+/// so a `.failed("Daemon unavailable")` state recovers automatically without
+/// the user having to navigate away and back.
+public struct DependencyUpdateBodyTaskKey: Hashable, Sendable {
+  public let pullRequestID: String
+  public let prUpdatedAt: String
+  public let isDaemonOnline: Bool
+
+  public init(item: DependencyUpdateItem, isDaemonOnline: Bool) {
+    self.pullRequestID = item.pullRequestID
+    self.prUpdatedAt = item.updatedAt
+    self.isDaemonOnline = isDaemonOnline
+  }
+}
+
 extension HarnessMonitorStore {
   /// Ensure the description body for `item` is loaded into
   /// `dependencyUpdateBodyState`. Returns immediately when a fresh entry is
