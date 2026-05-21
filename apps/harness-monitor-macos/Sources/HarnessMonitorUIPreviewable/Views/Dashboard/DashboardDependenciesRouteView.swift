@@ -1050,7 +1050,7 @@ private struct DashboardDependenciesRepositorySectionHeader: View {
     let isSyncing = scheduler.repositoriesInFlight.contains(repository)
     let lastSyncedAt = scheduler.states[repository]?.lastSyncedAt
     Button(action: onToggleCollapse) {
-      HStack(spacing: HarnessMonitorTheme.spacingSM) {
+      HStack(alignment: .center, spacing: HarnessMonitorTheme.spacingSM) {
         Image(systemName: isCollapsed ? "chevron.right" : "chevron.down")
           .font(.caption.weight(.semibold))
           .foregroundStyle(HarnessMonitorTheme.secondaryInk)
@@ -1064,18 +1064,61 @@ private struct DashboardDependenciesRepositorySectionHeader: View {
         } else if let lastSyncedAt {
           let relative = dependenciesRelativeFormatter.localizedString(
             for: lastSyncedAt, relativeTo: .now)
-          Text("synced \(relative)")
-            .scaledFont(.caption)
-            .foregroundStyle(HarnessMonitorTheme.secondaryInk)
-            .accessibilityLabel("Last synced \(relative)")
+          DashboardDependenciesRepositoryHeaderPill(
+            title: relative,
+            systemImage: "arrow.triangle.2.circlepath",
+            accessibilityLabel: "Last synced \(relative)"
+          )
         }
-        Text(verbatim: String(itemCount))
-          .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+        DashboardDependenciesRepositoryHeaderPill(
+          title: String(itemCount),
+          accessibilityLabel: itemCountAccessibilityLabel
+        )
       }
       .contentShape(.rect)
     }
     .buttonStyle(.borderless)
     .listRowInsets(EdgeInsets(top: 6, leading: 12, bottom: 6, trailing: 12))
+  }
+
+  private var itemCountAccessibilityLabel: String {
+    itemCount == 1 ? "1 dependency update" : "\(itemCount) dependency updates"
+  }
+}
+
+@MainActor
+private struct DashboardDependenciesRepositoryHeaderPill: View {
+  let title: String
+  let systemImage: String?
+  let accessibilityLabel: String
+
+  @ScaledMetric(relativeTo: .caption)
+  private var height = 22.0
+  @ScaledMetric(relativeTo: .caption)
+  private var horizontalPadding = 8.0
+
+  init(title: String, systemImage: String? = nil, accessibilityLabel: String) {
+    self.title = title
+    self.systemImage = systemImage
+    self.accessibilityLabel = accessibilityLabel
+  }
+
+  var body: some View {
+    HStack(alignment: .center, spacing: HarnessMonitorTheme.spacingXS) {
+      if let systemImage {
+        Image(systemName: systemImage)
+          .imageScale(.small)
+      }
+      Text(verbatim: title)
+        .monospacedDigit()
+    }
+    .scaledFont(.caption.weight(.semibold))
+    .lineLimit(1)
+    .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+    .padding(.horizontal, horizontalPadding)
+    .frame(height: height, alignment: .center)
+    .harnessControlPillGlass(tint: HarnessMonitorTheme.controlBorder)
+    .accessibilityLabel(accessibilityLabel)
   }
 }
 
