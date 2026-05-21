@@ -258,4 +258,49 @@ final class HarnessMonitorPerfTests: HarnessMonitorUITestCase {
     launched.terminate()
   }
 
+  func testRepositoriesSettingsScenarioState() {
+    let app = XCUIApplication(bundleIdentifier: Self.uiTestHostBundleIdentifier)
+    let launched = launchForPerf(app: app, scenario: "repositories-settings")
+    let settingsRoot = element(in: launched, identifier: Accessibility.settingsRoot)
+    let repositoriesRoot = element(in: launched, identifier: Accessibility.settingsRepositoriesRoot)
+    let saveButton = element(in: launched, identifier: Accessibility.settingsRepositoriesSaveButton)
+    let ownerField = element(in: launched, identifier: Accessibility.settingsRepositoriesOwnerField)
+
+    waitForScenarioCompletion(app: launched, scenario: "repositories-settings")
+
+    XCTAssertTrue(waitForElement(settingsRoot, timeout: Self.uiTimeout))
+    XCTAssertTrue(
+      waitForElement(repositoriesRoot, timeout: Self.actionTimeout),
+      "Repositories settings perf scenario should render the repositories pane"
+    )
+    XCTAssertTrue(waitForElement(saveButton, timeout: Self.actionTimeout))
+    XCTAssertTrue(waitForElement(ownerField, timeout: Self.actionTimeout))
+
+    launched.terminate()
+  }
+
+  func testDependenciesSettingsScenarioState() {
+    let app = XCUIApplication(bundleIdentifier: Self.uiTestHostBundleIdentifier)
+    let launched = launchForPerf(app: app, scenario: "dependencies-settings")
+    let settingsRoot = element(in: launched, identifier: Accessibility.settingsRoot)
+    let dependenciesRoot = element(in: launched, identifier: Accessibility.settingsDependenciesRoot)
+    let saveButton = element(in: launched, identifier: Accessibility.settingsDependenciesSaveButton)
+    let authorsField = element(
+      in: launched,
+      identifier: Accessibility.settingsDependenciesAuthorsField
+    )
+
+    waitForScenarioCompletion(app: launched, scenario: "dependencies-settings")
+
+    XCTAssertTrue(waitForElement(settingsRoot, timeout: Self.uiTimeout))
+    XCTAssertTrue(
+      waitForElement(dependenciesRoot, timeout: Self.actionTimeout),
+      "Dependencies settings perf scenario should render the Dependencies pane"
+    )
+    XCTAssertTrue(waitForElement(saveButton, timeout: Self.actionTimeout))
+    XCTAssertTrue(waitForElement(authorsField, timeout: Self.actionTimeout))
+
+    launched.terminate()
+  }
+
 }

@@ -135,6 +135,20 @@ struct SettingsTaskBoardDraftTests {
     #expect(repositories == ["example/harness", "example/aff"])
   }
 
+  @Test("GitHub inbox repositories reject malformed repository paths")
+  func githubInboxRepositoriesRejectMalformedRepositoryPaths() {
+    var draft = TaskBoardGitSettingsDraft()
+    draft.githubInboxRepositoriesText = """
+       EXAMPLE/HARNESS/EXTRA
+       example/valid
+       example/
+       /harness
+      """
+
+    #expect(draft.githubInboxRepositoryEntries == ["example/valid"])
+    #expect(draft.snapshot.orchestratorSettings.githubInbox.repositories == ["example/valid"])
+  }
+
   @Test("GitHub inbox repository editor adds, dedupes, and removes entries")
   func githubInboxRepositoryEditorMutations() {
     var draft = TaskBoardGitSettingsDraft()
@@ -254,10 +268,15 @@ struct SettingsRepositoriesPerformanceSourceTests {
     #expect(source.contains("SettingsRepositoriesCatalogLoader.load("))
     #expect(source.contains("Task.detached(priority: .userInitiated)"))
     #expect(source.contains("LazyVStack(spacing: 0)"))
-    #expect(source.contains("ForEach(Array(repositories.enumerated()), id: \\.element)"))
+    #expect(source.contains("ForEach(draft.rows) { row in"))
+    #expect(source.contains("ForEach(repositories, id: \\.self) { repository in"))
     #expect(!source.contains("if index > 0"))
-    #expect(source.contains("rowIndexesByID()"))
-    #expect(source.contains("rowIndexes: &rowIndexes"))
+    #expect(!source.contains("Array(draft.rows.enumerated())"))
+    #expect(!source.contains("Array(repositories.enumerated())"))
+    #expect(!source.contains("rows.firstIndex(where:"))
+    #expect(!source.contains("rowIndexesByID()"))
+    #expect(source.contains("private var rowIndexes: [String: Int] = [:]"))
+    #expect(source.contains("func index(for rowID: String) -> Int?"))
   }
 
   private func settingsRepositoriesSource() throws -> String {

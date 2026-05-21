@@ -18,16 +18,13 @@ enum SettingsGitHubRepositoryNormalization {
     guard !trimmed.isEmpty else {
       return nil
     }
-    let parts = trimmed.split(separator: "/", maxSplits: 2, omittingEmptySubsequences: false)
+    let parts = trimmed.split(separator: "/", maxSplits: 1, omittingEmptySubsequences: false)
     guard parts.count == 2 else {
-      return trimmed.lowercased()
+      return nil
     }
     let owner = parts[0].trimmingCharacters(in: .whitespacesAndNewlines)
     let repo = parts[1].trimmingCharacters(in: .whitespacesAndNewlines)
-    guard let repository = repository(owner: owner, repo: repo) else {
-      return trimmed.lowercased()
-    }
-    return repository
+    return repository(owner: owner, repo: repo)
   }
 
   static func repositories(from value: String) -> [String] {

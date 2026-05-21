@@ -166,7 +166,8 @@ struct SettingsRepositoriesSection: View {
       } else {
         ScrollView {
           LazyVStack(spacing: 0) {
-            ForEach(Array(draft.rows.enumerated()), id: \.element.id) { index, row in
+            ForEach(draft.rows) { row in
+              let index = draft.index(for: row.id) ?? 0
               repositoryTableRow(row, index: index)
             }
           }
@@ -429,10 +430,9 @@ struct SettingsRepositoriesSection: View {
   private func catalogRepositoryList(_ repositories: [String]) -> some View {
     ScrollView {
       LazyVStack(spacing: 0) {
-        ForEach(Array(repositories.enumerated()), id: \.element) { row in
-          let index = row.offset
-          let repository = row.element
-          catalogRepositoryListRow(repository, index: index)
+        let firstRepository = repositories.first
+        ForEach(repositories, id: \.self) { repository in
+          catalogRepositoryListRow(repository, isFirst: repository == firstRepository)
         }
       }
     }
@@ -446,11 +446,11 @@ struct SettingsRepositoriesSection: View {
     .accessibilityIdentifier(HarnessMonitorAccessibility.settingsRepositoriesCatalogList)
   }
 
-  private func catalogRepositoryListRow(_ repository: String, index: Int) -> some View {
+  private func catalogRepositoryListRow(_ repository: String, isFirst: Bool) -> some View {
     catalogRepositoryRow(repository)
       .overlay(alignment: .top) {
         Divider()
-          .opacity(index == 0 ? 0 : 1)
+          .opacity(isFirst ? 0 : 1)
       }
   }
 
@@ -916,6 +916,7 @@ private struct SettingsSharedRepositoriesDraft: Equatable {
   var legacyOrganizations: [String] = []
   var ownerInput = ""
   var repositoryInput = ""
+  private var rowIndexes: [String: Int] = [:]
 
   init() {}
 
@@ -923,18 +924,15 @@ private struct SettingsSharedRepositoriesDraft: Equatable {
     dependenciesPreferences: DashboardDependenciesPreferences,
     taskBoardDraft: TaskBoardGitSettingsDraft
   ) {
-    var rowIndexes = [String: Int]()
     insert(
       repositories: dependenciesPreferences.normalizedRepositories,
       dependenciesEnabled: true,
-      taskBoardEnabled: false,
-      rowIndexes: &rowIndexes
+      taskBoardEnabled: false
     )
     insert(
       repositories: taskBoardDraft.githubInboxRepositoryEntries,
       dependenciesEnabled: false,
-      taskBoardEnabled: true,
-      rowIndexes: &rowIndexes
+      taskBoardEnabled: true
     )
     legacyOrganizations = Self.normalizedOrganizations(
       dependenciesPreferences.normalizedOrganizations)
@@ -955,6 +953,10 @@ private struct SettingsSharedRepositoriesDraft: Equatable {
     rows.filter(\.taskBoardEnabled).map(\.repositoryPath)
   }
 
+  func index(for rowID: String) -> Int? {
+    rowIndexes[rowID]
+  }
+
   mutating func addManualRepository() {
     guard
       let repository = SettingsGitHubRepositoryNormalization.repository(
@@ -964,41 +966,39 @@ private struct SettingsSharedRepositoriesDraft: Equatable {
     else {
       return
     }
-    var rowIndexes = rowIndexesByID()
     insert(
       repository: repository,
       dependenciesEnabled: true,
-      taskBoardEnabled: true,
-      rowIndexes: &rowIndexes
+      taskBoardEnabled: true
     )
     ownerInput = ""
     repositoryInput = ""
   }
 
   mutating func addImportedRepositories(_ repositories: [String]) {
-    var rowIndexes = rowIndexesByID()
     insert(
       repositories: repositories,
       dependenciesEnabled: true,
-      taskBoardEnabled: true,
-      rowIndexes: &rowIndexes
+      taskBoardEnabled: true
     )
   }
 
   mutating func setDependenciesEnabled(_ isEnabled: Bool, for rowID: String) {
-    guard let index = rows.firstIndex(where: { $0.id == rowID }) else { return }
+    guard let index = rowIndexes[rowID] else { return }
     rows[index].dependenciesEnabled = isEnabled
     removeIfDisabled(index: index)
   }
 
   mutating func setTaskBoardEnabled(_ isEnabled: Bool, for rowID: String) {
-    guard let index = rows.firstIndex(where: { $0.id == rowID }) else { return }
+    guard let index = rowIndexes[rowID] else { return }
     rows[index].taskBoardEnabled = isEnabled
     removeIfDisabled(index: index)
   }
 
   mutating func remove(rowID: String) {
-    rows.removeAll { $0.id == rowID }
+    guard let index = rowIndexes[rowID] else { return }
+    rows.remove(at: index)
+    rebuildRowIndexes()
   }
 
   mutating func removeLegacyOrganization(_ organization: String) {
@@ -1009,15 +1009,13 @@ private struct SettingsSharedRepositoriesDraft: Equatable {
   private mutating func insert(
     repositories: [String],
     dependenciesEnabled: Bool,
-    taskBoardEnabled: Bool,
-    rowIndexes: inout [String: Int]
+    taskBoardEnabled: Bool
   ) {
     for repository in repositories {
       insert(
         repository: repository,
         dependenciesEnabled: dependenciesEnabled,
-        taskBoardEnabled: taskBoardEnabled,
-        rowIndexes: &rowIndexes
+        taskBoardEnabled: taskBoardEnabled
       )
     }
   }
@@ -1025,8 +1023,7 @@ private struct SettingsSharedRepositoriesDraft: Equatable {
   private mutating func insert(
     repository: String,
     dependenciesEnabled: Bool,
-    taskBoardEnabled: Bool,
-    rowIndexes: inout [String: Int]
+    taskBoardEnabled: Bool
   ) {
     guard let normalized = SettingsGitHubRepositoryNormalization.repositoryEntry(repository) else {
       return
@@ -1048,14 +1045,15 @@ private struct SettingsSharedRepositoriesDraft: Equatable {
     rows.append(candidate)
   }
 
-  private func rowIndexesByID() -> [String: Int] {
-    Dictionary(uniqueKeysWithValues: rows.enumerated().map { ($1.id, $0) })
-  }
-
   private mutating func removeIfDisabled(index: Int) {
     guard rows.indices.contains(index) else { return }
     guard !rows[index].dependenciesEnabled, !rows[index].taskBoardEnabled else { return }
     rows.remove(at: index)
+    rebuildRowIndexes()
+  }
+
+  private mutating func rebuildRowIndexes() {
+    rowIndexes = Dictionary(uniqueKeysWithValues: rows.enumerated().map { ($1.id, $0) })
   }
 
   private static func normalizedOrganizations(_ organizations: [String]) -> [String] {
