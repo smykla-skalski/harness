@@ -5,9 +5,6 @@ import PackageDescription
 import ProjectDescription
 
 let packageSettings = PackageSettings(
-    productTypes: [
-        "Textual": .framework
-    ],
     baseSettings: .settings(
         base: [
             "ALWAYS_SEARCH_USER_PATHS": "NO",
@@ -47,7 +44,6 @@ let package = Package(
         .package(url: "https://github.com/open-telemetry/opentelemetry-swift", exact: "2.3.0"),
         .package(url: "https://github.com/open-telemetry/opentelemetry-swift-core", exact: "2.4.1"),
         .package(url: "https://github.com/grpc/grpc-swift", exact: "1.27.0"),
-        .package(url: "https://github.com/gonzalezreal/textual", exact: "0.3.1"),
         .package(path: "../../../mcp-servers/harness-monitor-registry")
     ]
 )
