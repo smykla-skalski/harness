@@ -23,8 +23,8 @@ struct DashboardWindowRootView: View {
   let defersInitialContentUntilBootstrap: Bool
   @Environment(\.openWindow)
   var openWindow
-  @State var completedInitialBootstrap = false
-  @State var handledSettingsOpenRequestID = 0
+  @State private var completedInitialBootstrap = false
+  @State private var handledSettingsOpenRequestID = 0
 
   var shouldShowBootstrapPlaceholder: Bool {
     defersInitialContentUntilBootstrap

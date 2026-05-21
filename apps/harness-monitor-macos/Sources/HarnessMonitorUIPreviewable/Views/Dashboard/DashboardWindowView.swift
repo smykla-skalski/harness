@@ -16,7 +16,7 @@ public struct DashboardWindowView: View {
   var persistedSidebarWidth = 220.0
   @Environment(\.openWindow)
   var openWindow
-  @State var handledHistoryRestoreRequestID = 0
+  @State private var handledHistoryRestoreRequestID = 0
 
   public init(
     store: HarnessMonitorStore,

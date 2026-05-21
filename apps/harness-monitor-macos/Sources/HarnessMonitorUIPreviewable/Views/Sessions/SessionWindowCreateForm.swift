@@ -8,7 +8,7 @@ struct SessionWindowCreateForm: View {
   let embedsRuntimeConfiguration: Bool
   @Environment(\.fontScale)
   var fontScale
-  @State var stateStorage = SessionWindowCreateFormStateStorage()
+  @State private var stateStorage = SessionWindowCreateFormStateStorage()
   @FocusState var focusedFieldStorage: SessionWindowCreateFormField?
 
   var validationResult: SessionWindowCreateFormValidationResult? {

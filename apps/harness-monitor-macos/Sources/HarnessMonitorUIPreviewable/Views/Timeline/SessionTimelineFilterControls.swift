@@ -167,7 +167,7 @@ struct SessionTimelineFilterActionButtons: View {
   @Binding var filters: SessionTimelineFilterState
   let inventory: SessionTimelineFilterInventory
   let showsClearButton: Bool
-  @State var showsAdvancedFilters = false
+  @State private var showsAdvancedFilters = false
 
   init(
     filters: Binding<SessionTimelineFilterState>,
