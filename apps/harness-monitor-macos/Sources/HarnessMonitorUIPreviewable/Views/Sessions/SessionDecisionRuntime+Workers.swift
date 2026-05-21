@@ -114,7 +114,7 @@ actor SessionDecisionAuditWorker {
   func waitForIdle() async {}
 }
 
-private struct SessionDecisionAuditInput: Equatable, Sendable {
+struct SessionDecisionAuditInput: Equatable, Sendable {
   let sessionID: String
   let decisionIDs: Set<String>
   let agentIDs: Set<String>
@@ -136,7 +136,7 @@ private struct SessionDecisionAuditInput: Equatable, Sendable {
   }
 }
 
-private struct SessionDecisionAuditOutput: Equatable, Sendable {
+struct SessionDecisionAuditOutput: Equatable, Sendable {
   static let empty = Self(events: [], payloadPresentations: [:])
 
   let events: [SupervisorEventSnapshot]
