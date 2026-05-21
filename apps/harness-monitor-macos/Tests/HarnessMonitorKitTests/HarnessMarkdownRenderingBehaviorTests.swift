@@ -110,16 +110,33 @@ struct HarnessMarkdownRenderingBehaviorTests {
     #expect(source.contains(".frame(minHeight: metrics.firstLineHeight"))
     #expect(source.contains("ScrollView(.vertical)"))
     #expect(source.contains("HarnessMarkdownLazyBlockStackView"))
-    #expect(source.contains(".scrollIndicators(.visible)"))
+    #expect(source.contains(".scrollIndicators(.automatic)"))
+    #expect(source.contains(".scrollBounceBehavior(.basedOnSize, axes: .vertical)"))
+    #expect(source.contains("HarnessMarkdownDetailsScrollTuner"))
     #expect(source.contains(".frame(maxHeight: style.spacing.detailsMaxHeight)"))
     #expect(source.contains("VStack(alignment: .leading, spacing: 0)"))
     #expect(source.contains(".background(cardBackground)"))
     #expect(source.contains(".overlay(cardBorder)"))
+    #expect(source.contains("detailsSeparator"))
+    #expect(source.contains(".padding(cardPadding)"))
     #expect(!source.contains("firstLineMarkerYOffset"))
     #expect(!source.contains("firstLineTextYOffset"))
     #expect(!source.contains("chevronVisualYOffset"))
     #expect(source.contains("HStack(alignment: .top, spacing: metrics.gap)"))
     #expect(!source.contains("DisclosureGroup(isExpanded: $isExpanded)"))
+  }
+
+  @Test("Markdown details tune the nested macOS scroll view")
+  func markdownDetailsTuneNestedMacOSScrollView() throws {
+    let source = try readRepositoryFile(
+      "apps/harness-monitor-macos/Sources/HarnessMonitorUIPreviewable"
+        + "/Views/Shared/HarnessMarkdownDetailsView.swift"
+    )
+
+    #expect(source.contains("scrollView.verticalScrollElasticity = .none"))
+    #expect(source.contains("scrollView.horizontalScrollElasticity = .none"))
+    #expect(source.contains("scrollView.usesPredominantAxisScrolling = true"))
+    #expect(source.contains("scrollView.automaticallyAdjustsContentInsets = false"))
   }
 
   @Test("Markdown quotes keep marker bars at content height")
@@ -134,6 +151,16 @@ struct HarnessMarkdownRenderingBehaviorTests {
     #expect(source.contains(".overlay(alignment: .leading)"))
     #expect(source.contains(".fixedSize(horizontal: false, vertical: true)"))
     #expect(!source.contains("HStack(alignment: .top, spacing: style.spacing.quoteContentGap)"))
+  }
+
+  @Test("Markdown block stacks skip invisible trailing blocks")
+  func markdownBlockStacksSkipInvisibleTrailingBlocks() throws {
+    let source = try readRepositoryFile(
+      "apps/harness-monitor-macos/Sources/HarnessMonitorUIPreviewable"
+        + "/Views/Shared/HarnessMonitorMarkdownText.swift"
+    )
+
+    #expect(source.contains("guard block.rendersVisibleMarkdownContent else { return nil }"))
   }
 
   @Test("Markdown renderer suppresses thematic breaks before headings")

@@ -140,6 +140,7 @@ struct HarnessMarkdownBlockStackView: View {
 
   private var visibleBlocks: [(offset: Int, block: HarnessMarkdownBlock)] {
     blocks.enumerated().compactMap { offset, block in
+      guard block.rendersVisibleMarkdownContent else { return nil }
       guard !isSuppressedThematicBreak(at: offset) else { return nil }
       return (offset: offset, block: block)
     }
@@ -175,6 +176,7 @@ struct HarnessMarkdownLazyBlockStackView: View {
 
   private var visibleBlocks: [(offset: Int, block: HarnessMarkdownBlock)] {
     blocks.enumerated().compactMap { offset, block in
+      guard block.rendersVisibleMarkdownContent else { return nil }
       guard !isSuppressedThematicBreak(at: offset) else { return nil }
       return (offset: offset, block: block)
     }
