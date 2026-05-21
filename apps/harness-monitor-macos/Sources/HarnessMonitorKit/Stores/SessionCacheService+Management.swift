@@ -84,6 +84,16 @@ extension SessionCacheService {
       for project in projects {
         context.delete(project)
       }
+      let repositoryLabels = try context.fetch(
+        FetchDescriptor<CachedDependencyRepositoryLabels>()
+      )
+      for row in repositoryLabels {
+        context.delete(row)
+      }
+      let labelUsage = try context.fetch(FetchDescriptor<CachedDependencyLabelUsage>())
+      for row in labelUsage {
+        context.delete(row)
+      }
       try context.save()
       return true
     }
