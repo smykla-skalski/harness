@@ -4,6 +4,7 @@ use serde_json::json;
 
 use crate::task_board::github::{GitHubCheckConclusion, GitHubCheckStatus};
 
+use super::types::*;
 use super::*;
 
 #[test]
