@@ -9,18 +9,16 @@ import Testing
 struct PolicyCanvasRoutingTerminalTests {
   @Test("same endpoint routes use separate terminal anchors")
   func sameEndpointRoutesUseSeparateTerminalAnchors() {
-    let (_, edges, routes) = defaultDisplayedRoutes()
+    let scenario = defaultDisplayedRoutes()
 
     assertSeparateTerminalAnchors(
-      edges: edges,
-      routes: routes,
+      scenario: scenario,
       endpoint: \.source,
       routePoint: { $0.points.first },
       label: "source"
     )
     assertSeparateTerminalAnchors(
-      edges: edges,
-      routes: routes,
+      scenario: scenario,
       endpoint: \.target,
       routePoint: { $0.points.last },
       label: "target"
@@ -29,65 +27,71 @@ struct PolicyCanvasRoutingTerminalTests {
 
   @Test("same endpoint route anchors keep port spacing")
   func sameEndpointRouteAnchorsKeepPortSpacing() {
-    let (viewModel, edges, routes) = defaultDisplayedRoutes()
+    let scenario = defaultDisplayedRoutes()
 
     assertTerminalAnchorSpacing(
-      viewModel: viewModel,
-      edges: edges,
-      routes: routes,
-      endpoint: \.source,
-      routePoint: { $0.points.first },
-      routeSide: policyCanvasRouteSourceSide,
-      label: "source"
+      scenario: scenario,
+      assertion: PolicyCanvasTerminalAssertion(
+        endpoint: \.source,
+        routePoint: { $0.points.first },
+        routeSide: policyCanvasRouteSourceSide,
+        label: "source"
+      )
     )
     assertTerminalAnchorSpacing(
-      viewModel: viewModel,
-      edges: edges,
-      routes: routes,
-      endpoint: \.target,
-      routePoint: { $0.points.last },
-      routeSide: policyCanvasRouteTargetSide,
-      label: "target"
+      scenario: scenario,
+      assertion: PolicyCanvasTerminalAssertion(
+        endpoint: \.target,
+        routePoint: { $0.points.last },
+        routeSide: policyCanvasRouteTargetSide,
+        label: "target"
+      )
     )
   }
 
   @Test("port marker layout matches route terminal offsets")
   func portMarkerLayoutMatchesRouteTerminalOffsets() {
-    let (viewModel, edges, routes) = defaultDisplayedRoutes()
+    let scenario = defaultDisplayedRoutes()
     let input = PolicyCanvasRouteWorkerInput(
-      nodes: viewModel.nodes,
-      groups: viewModel.groups,
-      edges: edges,
+      nodes: scenario.viewModel.nodes,
+      groups: scenario.viewModel.groups,
+      edges: scenario.edges,
       fontScale: 1
     )
     let prepared = PolicyCanvasPreparedRouteInput(input: input)
-    let markerLayout = prepared.portMarkerLayout(routes: routes, nodeIndex: prepared.nodeIndex)
+    let markerLayout = prepared.portMarkerLayout(
+      routes: scenario.routes,
+      nodeIndex: prepared.nodeIndex
+    )
 
     assertMarkerOffsets(
-      viewModel: viewModel,
-      edges: edges,
-      routes: routes,
+      scenario: scenario,
       markerLayout: markerLayout,
-      endpoint: \.source,
-      routePoint: { $0.points.first },
-      routeSide: policyCanvasRouteSourceSide,
-      label: "source"
+      assertion: PolicyCanvasTerminalAssertion(
+        endpoint: \.source,
+        routePoint: { $0.points.first },
+        routeSide: policyCanvasRouteSourceSide,
+        label: "source"
+      )
     )
     assertMarkerOffsets(
-      viewModel: viewModel,
-      edges: edges,
-      routes: routes,
+      scenario: scenario,
       markerLayout: markerLayout,
-      endpoint: \.target,
-      routePoint: { $0.points.last },
-      routeSide: policyCanvasRouteTargetSide,
-      label: "target"
+      assertion: PolicyCanvasTerminalAssertion(
+        endpoint: \.target,
+        routePoint: { $0.points.last },
+        routeSide: policyCanvasRouteTargetSide,
+        label: "target"
+      )
     )
   }
 
   @Test("default graph displayed routes keep port spacing between route edges")
   func defaultGraphDisplayedRoutesKeepPortSpacingBetweenRouteEdges() {
-    let (viewModel, edges, routes) = defaultDisplayedRoutes()
+    let scenario = defaultDisplayedRoutes()
+    let viewModel = scenario.viewModel
+    let edges = scenario.edges
+    let routes = scenario.routes
 
     for leftIndex in edges.indices {
       for rightIndex in edges.index(after: leftIndex)..<edges.endIndex {
@@ -122,7 +126,9 @@ struct PolicyCanvasRoutingTerminalTests {
 
   @Test("default graph displayed routes do not share rendered collinear segments")
   func defaultGraphDisplayedRoutesDoNotShareRenderedCollinearSegments() {
-    let (_, edges, routes) = defaultDisplayedRoutes()
+    let scenario = defaultDisplayedRoutes()
+    let edges = scenario.edges
+    let routes = scenario.routes
 
     for leftIndex in edges.indices {
       for rightIndex in edges.index(after: leftIndex)..<edges.endIndex {
@@ -138,17 +144,12 @@ struct PolicyCanvasRoutingTerminalTests {
     }
   }
 
-  // swiftlint:disable:next large_tuple
-  private func defaultDisplayedRoutes() -> (
-    viewModel: PolicyCanvasViewModel,
-    edges: [PolicyCanvasEdge],
-    routes: [String: PolicyCanvasEdgeRoute]
-  ) {
+  private func defaultDisplayedRoutes() -> PolicyCanvasTerminalScenario {
     let document = PreviewFixtures.policyCanvasPipelineDocument()
     let viewModel = PolicyCanvasViewModel.sample()
     viewModel.load(document: document, simulation: nil, audit: nil)
     let edges = viewModel.edges
-    return (
+    return PolicyCanvasTerminalScenario(
       viewModel: viewModel,
       edges: edges,
       routes: policyCanvasDisplayedRoutes(
@@ -160,63 +161,65 @@ struct PolicyCanvasRoutingTerminalTests {
     )
   }
 
-  // swiftlint:disable:next function_parameter_count
   private func assertTerminalAnchorSpacing(
-    viewModel: PolicyCanvasViewModel,
-    edges: [PolicyCanvasEdge],
-    routes: [String: PolicyCanvasEdgeRoute],
-    endpoint: KeyPath<PolicyCanvasEdge, PolicyCanvasPortEndpoint>,
-    routePoint: (PolicyCanvasEdgeRoute) -> CGPoint?,
-    routeSide: (PolicyCanvasEdgeRoute) -> PolicyCanvasPortSide?,
-    label: String
+    scenario: PolicyCanvasTerminalScenario,
+    assertion: PolicyCanvasTerminalAssertion
   ) {
-    let groups = Dictionary(grouping: edges) { edge in
-      PolicyCanvasRouteEndpointTestKey(edge[keyPath: endpoint])
+    let groups = Dictionary(grouping: scenario.edges) { edge in
+      PolicyCanvasRouteEndpointTestKey(edge[keyPath: assertion.endpoint])
     }
     for groupEdges in groups.values where groupEdges.count > 1 {
-      let entries = groupEdges.compactMap {
-        // swiftlint:disable:next closure_parameter_position large_tuple
-        edge -> (String, CGPoint, CGFloat, PolicyCanvasPortSide?)? in
-        guard let route = routes[edge.id], let point = routePoint(route) else {
-          return nil
-        }
-        let side = routeSide(route)
-        let spacing = viewModel.portSpacing(
-          for: edge[keyPath: endpoint],
-          side: side
-        )
-        return (edge.id, point, spacing, side)
+      let entries = groupEdges.compactMap { edge in
+        terminalEntry(edge: edge, scenario: scenario, assertion: assertion)
       }
       for leftIndex in entries.indices {
         for rightIndex in entries.index(after: leftIndex)..<entries.endIndex {
           let left = entries[leftIndex]
           let right = entries[rightIndex]
-          guard left.3 == right.3 else {
+          guard left.side == right.side else {
             continue
           }
-          let distance = hypot(left.1.x - right.1.x, left.1.y - right.1.y)
+          let distance = hypot(left.point.x - right.point.x, left.point.y - right.point.y)
           #expect(
-            distance >= min(left.2, right.2) - 0.5,
-            "\(label) anchors \(left.0) and \(right.0) are closer than port spacing"
+            distance >= min(left.spacing, right.spacing) - 0.5,
+            "\(assertion.label) anchors \(left.id) and \(right.id) are closer than port spacing"
           )
         }
       }
     }
   }
 
+  private func terminalEntry(
+    edge: PolicyCanvasEdge,
+    scenario: PolicyCanvasTerminalScenario,
+    assertion: PolicyCanvasTerminalAssertion
+  ) -> PolicyCanvasTerminalEntry? {
+    guard
+      let route = scenario.routes[edge.id],
+      let point = assertion.routePoint(route)
+    else {
+      return nil
+    }
+    let side = assertion.routeSide(route)
+    let spacing = scenario.viewModel.portSpacing(
+      for: edge[keyPath: assertion.endpoint],
+      side: side
+    )
+    return PolicyCanvasTerminalEntry(id: edge.id, point: point, spacing: spacing, side: side)
+  }
+
   private func assertSeparateTerminalAnchors(
-    edges: [PolicyCanvasEdge],
-    routes: [String: PolicyCanvasEdgeRoute],
+    scenario: PolicyCanvasTerminalScenario,
     endpoint: KeyPath<PolicyCanvasEdge, PolicyCanvasPortEndpoint>,
     routePoint: (PolicyCanvasEdgeRoute) -> CGPoint?,
     label: String
   ) {
-    let groups = Dictionary(grouping: edges) { edge in
+    let groups = Dictionary(grouping: scenario.edges) { edge in
       PolicyCanvasRouteEndpointTestKey(edge[keyPath: endpoint])
     }
     for groupEdges in groups.values where groupEdges.count > 1 {
       let points = groupEdges.compactMap { edge -> PolicyCanvasPointKey? in
-        guard let route = routes[edge.id], let point = routePoint(route) else {
+        guard let route = scenario.routes[edge.id], let point = routePoint(route) else {
           return nil
         }
         return PolicyCanvasPointKey(point)
@@ -228,36 +231,30 @@ struct PolicyCanvasRoutingTerminalTests {
     }
   }
 
-  // swiftlint:disable:next function_parameter_count
   private func assertMarkerOffsets(
-    viewModel: PolicyCanvasViewModel,
-    edges: [PolicyCanvasEdge],
-    routes: [String: PolicyCanvasEdgeRoute],
+    scenario: PolicyCanvasTerminalScenario,
     markerLayout: PolicyCanvasPortMarkerLayout,
-    endpoint: KeyPath<PolicyCanvasEdge, PolicyCanvasPortEndpoint>,
-    routePoint: (PolicyCanvasEdgeRoute) -> CGPoint?,
-    routeSide: (PolicyCanvasEdgeRoute) -> PolicyCanvasPortSide?,
-    label: String
+    assertion: PolicyCanvasTerminalAssertion
   ) {
-    for edge in edges {
+    for edge in scenario.edges {
       guard
-        let route = routes[edge.id],
-        let point = routePoint(route),
-        let side = routeSide(route),
-        let base = viewModel.portAnchorCandidates(for: edge[keyPath: endpoint])
+        let route = scenario.routes[edge.id],
+        let point = assertion.routePoint(route),
+        let side = assertion.routeSide(route),
+        let base = scenario.viewModel.portAnchorCandidates(for: edge[keyPath: assertion.endpoint])
           .first(where: { $0.side == side })?.point
       else {
         continue
       }
       let offset = axisOffset(from: base, to: point, side: side)
       let markers = markerLayout.markers(
-        for: edge[keyPath: endpoint],
+        for: edge[keyPath: assertion.endpoint],
         side: side,
         isVisible: true
       )
       #expect(
         markers.contains { abs($0.axisOffset - offset) < 0.5 },
-        "\(label) marker missing \(edge.id) terminal offset \(offset)"
+        "\(assertion.label) marker missing \(edge.id) terminal offset \(offset)"
       )
     }
   }
@@ -294,6 +291,26 @@ struct PolicyCanvasRoutingTerminalTests {
       return PolicyCanvasTerminalTestSegment(start: start, end: end)
     }
   }
+}
+
+private struct PolicyCanvasTerminalScenario {
+  let viewModel: PolicyCanvasViewModel
+  let edges: [PolicyCanvasEdge]
+  let routes: [String: PolicyCanvasEdgeRoute]
+}
+
+private struct PolicyCanvasTerminalAssertion {
+  let endpoint: KeyPath<PolicyCanvasEdge, PolicyCanvasPortEndpoint>
+  let routePoint: (PolicyCanvasEdgeRoute) -> CGPoint?
+  let routeSide: (PolicyCanvasEdgeRoute) -> PolicyCanvasPortSide?
+  let label: String
+}
+
+private struct PolicyCanvasTerminalEntry {
+  let id: String
+  let point: CGPoint
+  let spacing: CGFloat
+  let side: PolicyCanvasPortSide?
 }
 
 private struct PolicyCanvasRouteEndpointTestKey: Hashable {
