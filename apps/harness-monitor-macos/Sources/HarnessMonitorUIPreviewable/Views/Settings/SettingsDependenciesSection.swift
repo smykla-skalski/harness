@@ -93,11 +93,20 @@ struct SettingsDependenciesSection: View {
       }
       .pickerStyle(.menu)
       .accessibilityIdentifier(HarnessMonitorAccessibility.settingsDependenciesMergeMethodField)
+      Toggle("Show label descriptions in pickers", isOn: $draft.showLabelDescriptions)
+        .accessibilityIdentifier(
+          HarnessMonitorAccessibility.settingsDependenciesShowLabelDescriptionsToggle
+        )
     } header: {
       Text("Actions")
         .harnessNativeFormSectionHeader()
     } footer: {
-      Text("This merge method is used for Merge and Auto actions in the Dependencies dashboard")
+      Text(
+        """
+        Merge method drives Merge and Auto actions. Toggle label descriptions to append the \
+        repository-defined description next to each label name in the Add Label menus.
+        """
+      )
     }
   }
 

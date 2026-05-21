@@ -40,6 +40,7 @@ func dashboardDependenciesAvailableLabels(
 struct DashboardDependenciesLabelPickerMenu: View {
   let title: String
   let labels: [DependencyUpdateRepositoryLabel]
+  let showsDescriptions: Bool
   let onSelect: (String) -> Void
   let onCustom: () -> Void
 
@@ -59,7 +60,10 @@ struct DashboardDependenciesLabelPickerMenu: View {
         Button {
           onSelect(label.name)
         } label: {
-          DashboardDependenciesLabelMenuRow(label: label)
+          DashboardDependenciesLabelMenuRow(
+            label: label,
+            showsDescription: showsDescriptions
+          )
         }
       }
     }
@@ -73,6 +77,7 @@ struct DashboardDependenciesLabelPickerMenu: View {
 @MainActor
 struct DashboardDependenciesLabelPickerActionMenu: View {
   let labels: [DependencyUpdateRepositoryLabel]
+  let showsDescriptions: Bool
   let onSelect: (String) -> Void
   let onCustom: () -> Void
 
@@ -86,7 +91,10 @@ struct DashboardDependenciesLabelPickerActionMenu: View {
           Button {
             onSelect(label.name)
           } label: {
-            DashboardDependenciesLabelMenuRow(label: label)
+            DashboardDependenciesLabelMenuRow(
+              label: label,
+              showsDescription: showsDescriptions
+            )
           }
         }
       }
@@ -107,9 +115,10 @@ struct DashboardDependenciesLabelPickerActionMenu: View {
 @MainActor
 private struct DashboardDependenciesLabelMenuRow: View {
   let label: DependencyUpdateRepositoryLabel
+  let showsDescription: Bool
 
   var body: some View {
-    if let description = label.description, !description.isEmpty {
+    if showsDescription, let description = label.description, !description.isEmpty {
       Text("\(label.name) — \(description)")
     } else {
       Text(label.name)
