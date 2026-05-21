@@ -136,8 +136,12 @@ private struct HarnessMarkdownTableLayout: Layout {
     let proposedWidth = proposal.width ?? intrinsicContentWidth
     let targetWidth = max(intrinsicContentWidth, proposedWidth)
     let spareWidth = max(0, targetWidth - intrinsicContentWidth)
-    let extraColumnWidth = spareWidth / CGFloat(columnCount)
-    let columnWidths = intrinsicWidths.map { $0 + extraColumnWidth }
+    let expandableColumnCount = max(0, columnCount - 1)
+    let extraColumnWidth =
+      expandableColumnCount > 0 ? spareWidth / CGFloat(expandableColumnCount) : 0
+    let columnWidths = intrinsicWidths.enumerated().map { column, width in
+      column == columnCount - 1 ? width : width + extraColumnWidth
+    }
     let rowHeights = measuredRowHeights(
       subviews: subviews,
       rowCount: rowCount,

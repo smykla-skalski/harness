@@ -68,7 +68,8 @@ struct HarnessMarkdownRenderingBehaviorTests {
 
     #expect(source.contains("ViewThatFits(in: .horizontal)"))
     #expect(source.contains("HarnessMarkdownTableLayout"))
-    #expect(source.contains("spareWidth / CGFloat(columnCount)"))
+    #expect(source.contains("spareWidth / CGFloat(expandableColumnCount)"))
+    #expect(source.contains("column == columnCount - 1 ? width : width + extraColumnWidth"))
     #expect(source.contains("measurement.rowHeights[row] - size.height"))
     #expect(source.contains("tableHorizontalPadding = HarnessMonitorTheme.spacingMD"))
     #expect(source.contains("tableCellVerticalPadding = HarnessMonitorTheme.spacingSM"))
