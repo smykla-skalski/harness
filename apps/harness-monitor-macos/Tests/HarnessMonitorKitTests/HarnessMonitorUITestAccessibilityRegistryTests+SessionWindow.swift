@@ -3,6 +3,7 @@ import Testing
 @testable import HarnessMonitorUIPreviewable
 
 extension HarnessMonitorUITestAccessibilityRegistryTests {
+  // swiftlint:disable function_body_length
   @Test("Dashboard and session window identifiers match UI-test mirror")
   func dashboardAndSessionWindowIdentifiersMirror() {
     #expect(HarnessMonitorAccessibility.dashboardWindowRoot == "harness.dashboard.window")
@@ -249,4 +250,5 @@ extension HarnessMonitorUITestAccessibilityRegistryTests {
       )
     )
   }
+  // swiftlint:enable function_body_length
 }

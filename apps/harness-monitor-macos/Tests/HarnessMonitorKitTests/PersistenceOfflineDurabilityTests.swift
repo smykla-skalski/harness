@@ -6,6 +6,7 @@ import XCTest
 @testable import HarnessMonitorKit
 
 // swiftlint:disable file_length
+// swiftlint:disable type_body_length
 @MainActor
 @Suite("Persistence offline durability")
 struct PersistenceOfflineDurabilityTests {
@@ -710,6 +711,8 @@ struct PersistenceOfflineDurabilityTests {
   }
 
 }
+
+// swiftlint:enable type_body_length
 
 extension PersistenceOfflineDurabilityTests {
   @Test("Live SwiftData store rebuilds incompatible cache stores with unknown model versions")

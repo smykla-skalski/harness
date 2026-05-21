@@ -65,8 +65,7 @@ public struct SessionOpenRouterRunDetailSection: View {
     }
   }
 
-  @ViewBuilder
-  private var transcriptCard: some View {
+  @ViewBuilder private var transcriptCard: some View {
     if let text = run.latestMessage ?? run.finalMessage, !text.isEmpty {
       cardSection(title: "Latest message") {
         Text(text)
@@ -85,8 +84,7 @@ public struct SessionOpenRouterRunDetailSection: View {
     }
   }
 
-  @ViewBuilder
-  private var reasoningCard: some View {
+  @ViewBuilder private var reasoningCard: some View {
     if let reasoning = run.latestReasoning, !reasoning.isEmpty {
       cardSection(title: "Reasoning") {
         Text(reasoning)
@@ -98,8 +96,7 @@ public struct SessionOpenRouterRunDetailSection: View {
     }
   }
 
-  @ViewBuilder
-  private var pendingPermissionsCard: some View {
+  @ViewBuilder private var pendingPermissionsCard: some View {
     if !run.pendingPermissionBatches.isEmpty {
       cardSection(title: "Pending tool permissions") {
         VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
