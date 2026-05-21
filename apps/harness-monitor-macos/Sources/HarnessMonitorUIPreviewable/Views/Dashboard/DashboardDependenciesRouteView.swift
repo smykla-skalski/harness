@@ -18,6 +18,8 @@ import SwiftUI
 
 @MainActor private let dependenciesISO8601Formatter = ISO8601DateFormatter()
 
+private let dependenciesDetailMaxWidth: CGFloat = 940
+
 enum DashboardDependenciesRemoteLoader {
   static func query(
     client: any HarnessMonitorDependenciesClientProtocol,
@@ -485,15 +487,6 @@ struct DashboardDependenciesRouteView: View {
     }
     .accessibilityIdentifier(HarnessMonitorAccessibility.dashboardDependenciesRefreshButton)
 
-    actionButton("Configure Sources", systemImage: "line.3.horizontal.decrease.circle") {
-      openSettingsSection(.repositories)
-    }
-    .accessibilityIdentifier(HarnessMonitorAccessibility.dashboardDependenciesConfigureButton)
-
-    actionButton("Secrets", systemImage: "key") {
-      openSettingsSection(.secrets)
-    }
-
     actionButton("Clear Cache", systemImage: "trash") {
       Task { await clearCacheAndReload() }
     }
@@ -559,7 +552,7 @@ struct DashboardDependenciesRouteView: View {
       }
     }
     .accessibilityIdentifier(HarnessMonitorAccessibility.dashboardDependenciesDetail)
-    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
   }
 
   private var batchDetail: some View {
@@ -580,7 +573,8 @@ struct DashboardDependenciesRouteView: View {
           dependencyActionBar(items: selectedItems)
         }
       }
-      .frame(maxWidth: .infinity, alignment: .leading)
+      .frame(maxWidth: dependenciesDetailMaxWidth, alignment: .leading)
+      .frame(maxWidth: .infinity, alignment: .center)
     }
   }
 
@@ -617,7 +611,8 @@ struct DashboardDependenciesRouteView: View {
           DashboardDependencyLabelStrip(labels: item.labels)
         }
       }
-      .frame(maxWidth: 940, alignment: .leading)
+      .frame(maxWidth: dependenciesDetailMaxWidth, alignment: .leading)
+      .frame(maxWidth: .infinity, alignment: .center)
       .task(
         id: DependencyUpdateBodyTaskKey(
           item: item, isDaemonOnline: store.connectionState == .online)
@@ -641,14 +636,12 @@ struct DashboardDependenciesRouteView: View {
     DashboardDependencyListRow(
       item: item,
       showsRepository: showsRepository,
-      isSelected: selectedIDs.contains(item.pullRequestID),
       isRefreshing: refreshingPullRequestIDs.contains(item.pullRequestID),
       updatedLabel: relativeUpdatedLabel(for: item)
     )
     .tag(item.pullRequestID)
-    .listRowInsets(EdgeInsets(top: 5, leading: 8, bottom: 5, trailing: 8))
-    .listRowSeparator(.hidden)
-    .listRowBackground(Color.clear)
+    .listRowInsets(EdgeInsets(top: 4, leading: 10, bottom: 4, trailing: 10))
+    .listRowSeparator(.visible)
     .contextMenu {
       Button("Open Pull Request") {
         openItem(item)
@@ -811,7 +804,7 @@ struct DashboardDependenciesRouteView: View {
         .foregroundStyle(HarnessMonitorTheme.secondaryInk)
       content()
     }
-    .frame(maxWidth: 940, alignment: .leading)
+    .frame(maxWidth: dependenciesDetailMaxWidth, alignment: .leading)
     .padding(.bottom, HarnessMonitorTheme.spacingLG)
     .overlay(alignment: .bottom) {
       Divider().opacity(0.42)
@@ -829,7 +822,7 @@ struct DashboardDependenciesRouteView: View {
       }
       content()
     }
-    .frame(maxWidth: 940, alignment: .leading)
+    .frame(maxWidth: dependenciesDetailMaxWidth, alignment: .leading)
     .padding(.vertical, HarnessMonitorTheme.spacingLG)
     .overlay(alignment: .top) {
       Divider().opacity(0.34)
@@ -1472,6 +1465,16 @@ extension DependencyUpdateItem {
     case checkStatus == .pending: HarnessMonitorTheme.caution
     case requiresAttention: HarnessMonitorTheme.danger
     default: HarnessMonitorTheme.secondaryInk
+    }
+  }
+
+  var statusSystemImage: String {
+    switch true {
+    case isAutoMergeable: "checkmark.circle.fill"
+    case isAutoApprovable: "checkmark.seal.fill"
+    case checkStatus == .pending: "clock.arrow.circlepath"
+    case requiresAttention: "exclamationmark.triangle.fill"
+    default: "circle"
     }
   }
 

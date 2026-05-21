@@ -189,9 +189,9 @@ private struct SessionContentDetailDivider: View {
       return focusTint.opacity(0.92)
     }
     if isHovered || isDragging {
-      return Color(nsColor: .separatorColor).opacity(0.9)
+      return Color(nsColor: .separatorColor).opacity(0.78)
     }
-    return Color(nsColor: .separatorColor).opacity(0.68)
+    return Color(nsColor: .separatorColor).opacity(0.38)
   }
 
   private var separatorLineWidth: CGFloat {
