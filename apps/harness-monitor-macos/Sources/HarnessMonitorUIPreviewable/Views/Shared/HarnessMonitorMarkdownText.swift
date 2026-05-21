@@ -383,7 +383,11 @@ private struct HarnessMarkdownListView: View {
       Text("•")
         .font(style.typography.listMarker.font)
         .foregroundStyle(style.colors.secondaryText)
-        .frame(width: metrics.columnWidth, height: metrics.firstLineHeight, alignment: .center)
+        .frame(
+          width: metrics.listSymbolColumnWidth,
+          height: metrics.firstLineHeight,
+          alignment: .leading
+        )
         .offset(y: metrics.markerVisualYOffset)
     }
   }
