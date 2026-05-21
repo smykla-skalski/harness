@@ -241,11 +241,11 @@ private struct MarkdownBlockSpacingSection: View {
   }
 }
 
-fileprivate func decodedMarkdown(_ storage: String) -> HarnessMarkdownUserSettings {
+@MainActor fileprivate func decodedMarkdown(_ storage: String) -> HarnessMarkdownUserSettings {
   HarnessMarkdownUserSettings.decode(storage)
 }
 
-fileprivate func markdownBinding<Value>(
+@MainActor fileprivate func markdownBinding<Value>(
   storage: Binding<String>,
   keyPath: WritableKeyPath<HarnessMarkdownUserSettings, Value>
 ) -> Binding<Value> {
@@ -258,7 +258,7 @@ fileprivate func markdownBinding<Value>(
   }
 }
 
-fileprivate func markdownNumberBinding(
+@MainActor fileprivate func markdownNumberBinding(
   storage: Binding<String>,
   keyPath: WritableKeyPath<HarnessMarkdownUserSettings, Double>,
   in range: ClosedRange<Double>
@@ -272,7 +272,7 @@ fileprivate func markdownNumberBinding(
   }
 }
 
-@ViewBuilder
+@MainActor @ViewBuilder
 fileprivate func markdownNumberRow(
   _ title: String,
   _ keyPath: WritableKeyPath<HarnessMarkdownUserSettings, Double>,
@@ -295,7 +295,7 @@ fileprivate func markdownNumberRow(
   }
 }
 
-@ViewBuilder
+@MainActor @ViewBuilder
 fileprivate func markdownColorRow(
   _ title: String,
   _ keyPath: WritableKeyPath<HarnessMarkdownUserSettings, HarnessMarkdownColorChoice>,
