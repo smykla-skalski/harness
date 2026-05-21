@@ -210,9 +210,54 @@ struct HarnessMonitorStoreSelectedTranscriptCacheTests {
     #expect(cached.transcriptSource == .derived)
   }
 
-  // swiftlint:disable function_body_length
   @Test("Switching sessions before the transcript debounce flush keeps each cache row coherent")
   func switchingSessionsBeforeTranscriptFlushKeepsCacheRowsCoherent() async throws {
+    let fixtures = makeSwitchingSessionsFixtures()
+    let client = configuredClient(for: fixtures)
+    let container = try HarnessMonitorModelContainer.preview()
+    let store = HarnessMonitorStore(
+      daemonController: RecordingDaemonController(client: client),
+      modelContainer: container
+    )
+    await store.bootstrap()
+
+    await store.selectSession(fixtures.summaryA.sessionId)
+    for _ in 0..<20
+    where store.acpTranscript(
+      forAgent: "worker-selected-transcript-a",
+      sessionID: fixtures.summaryA.sessionId
+    ).isEmpty {
+      try await Task.sleep(for: .milliseconds(20))
+    }
+    await store.selectSession(fixtures.summaryB.sessionId)
+    try await Task.sleep(for: .milliseconds(500))
+    await store.flushPendingCacheWrite()
+
+    let cachedA = try #require(
+      await store.loadCachedSessionDetail(sessionID: fixtures.summaryA.sessionId)
+    )
+    let cachedB = try #require(
+      await store.loadCachedSessionDetail(sessionID: fixtures.summaryB.sessionId)
+    )
+
+    #expect(cachedA.timeline.map(\.summary) == ["Timeline A"])
+    #expect(cachedA.transcript?.map(\.summary) == ["Transcript A"])
+    #expect(cachedB.timeline.map(\.summary) == ["Timeline B"])
+    #expect(cachedB.transcript?.map(\.summary) == ["Transcript B"])
+  }
+
+  private struct SwitchingSessionsFixtures {
+    let summaryA: SessionSummary
+    let summaryB: SessionSummary
+    let detailA: SessionDetail
+    let detailB: SessionDetail
+    let timelineA: [TimelineEntry]
+    let timelineB: [TimelineEntry]
+    let transcriptA: TimelineEntry
+    let transcriptB: TimelineEntry
+  }
+
+  private func makeSwitchingSessionsFixtures() -> SwitchingSessionsFixtures {
     let summaryA = makeSession(
       .init(
         sessionId: "sess-selected-transcript-a",
@@ -237,93 +282,76 @@ struct HarnessMonitorStoreSelectedTranscriptCacheTests {
         activeAgentCount: 2
       )
     )
-    let detailA = makeSessionDetail(
-      summary: summaryA,
-      workerID: "worker-selected-transcript-a",
-      workerName: "Worker Selected Transcript A"
+    return SwitchingSessionsFixtures(
+      summaryA: summaryA,
+      summaryB: summaryB,
+      detailA: makeSessionDetail(
+        summary: summaryA,
+        workerID: "worker-selected-transcript-a",
+        workerName: "Worker Selected Transcript A"
+      ),
+      detailB: makeSessionDetail(
+        summary: summaryB,
+        workerID: "worker-selected-transcript-b",
+        workerName: "Worker Selected Transcript B"
+      ),
+      timelineA: makeTimelineEntries(
+        sessionID: summaryA.sessionId,
+        agentID: "worker-selected-transcript-a",
+        summary: "Timeline A"
+      ),
+      timelineB: makeTimelineEntries(
+        sessionID: summaryB.sessionId,
+        agentID: "worker-selected-transcript-b",
+        summary: "Timeline B"
+      ),
+      transcriptA: TimelineEntry(
+        entryId: "acp-selected-transcript-a",
+        recordedAt: "2026-04-28T00:00:20Z",
+        kind: "assistant_message",
+        sessionId: summaryA.sessionId,
+        agentId: "worker-selected-transcript-a",
+        taskId: nil,
+        summary: "Transcript A",
+        payload: .object(["runtime": .string("acp")])
+      ),
+      transcriptB: TimelineEntry(
+        entryId: "acp-selected-transcript-b",
+        recordedAt: "2026-04-28T00:00:20Z",
+        kind: "assistant_message",
+        sessionId: summaryB.sessionId,
+        agentId: "worker-selected-transcript-b",
+        taskId: nil,
+        summary: "Transcript B",
+        payload: .object(["runtime": .string("acp")])
+      )
     )
-    let detailB = makeSessionDetail(
-      summary: summaryB,
-      workerID: "worker-selected-transcript-b",
-      workerName: "Worker Selected Transcript B"
-    )
-    let timelineA = makeTimelineEntries(
-      sessionID: summaryA.sessionId,
-      agentID: "worker-selected-transcript-a",
-      summary: "Timeline A"
-    )
-    let timelineB = makeTimelineEntries(
-      sessionID: summaryB.sessionId,
-      agentID: "worker-selected-transcript-b",
-      summary: "Timeline B"
-    )
-    let transcriptA = TimelineEntry(
-      entryId: "acp-selected-transcript-a",
-      recordedAt: "2026-04-28T00:00:20Z",
-      kind: "assistant_message",
-      sessionId: summaryA.sessionId,
-      agentId: "worker-selected-transcript-a",
-      taskId: nil,
-      summary: "Transcript A",
-      payload: .object(["runtime": .string("acp")])
-    )
-    let transcriptB = TimelineEntry(
-      entryId: "acp-selected-transcript-b",
-      recordedAt: "2026-04-28T00:00:20Z",
-      kind: "assistant_message",
-      sessionId: summaryB.sessionId,
-      agentId: "worker-selected-transcript-b",
-      taskId: nil,
-      summary: "Transcript B",
-      payload: .object(["runtime": .string("acp")])
-    )
+  }
+
+  private func configuredClient(
+    for fixtures: SwitchingSessionsFixtures
+  ) -> RecordingHarnessClient {
     let client = HarnessMonitorStoreSelectionTestSupport.configuredClient(
-      summaries: [summaryA, summaryB],
+      summaries: [fixtures.summaryA, fixtures.summaryB],
       detailsByID: [
-        summaryA.sessionId: detailA,
-        summaryB.sessionId: detailB,
+        fixtures.summaryA.sessionId: fixtures.detailA,
+        fixtures.summaryB.sessionId: fixtures.detailB,
       ],
       timelinesBySessionID: [
-        summaryA.sessionId: timelineA,
-        summaryB.sessionId: timelineB,
+        fixtures.summaryA.sessionId: fixtures.timelineA,
+        fixtures.summaryB.sessionId: fixtures.timelineB,
       ],
-      detail: detailA
+      detail: fixtures.detailA
     )
     client.configureAcpTranscriptResponse(
-      AcpTranscriptResponse(entries: [transcriptA]),
-      for: summaryA.sessionId
+      AcpTranscriptResponse(entries: [fixtures.transcriptA]),
+      for: fixtures.summaryA.sessionId
     )
     client.configureAcpTranscriptResponse(
-      AcpTranscriptResponse(entries: [transcriptB]),
-      for: summaryB.sessionId
+      AcpTranscriptResponse(entries: [fixtures.transcriptB]),
+      for: fixtures.summaryB.sessionId
     )
-    client.configureAcpTranscriptDelay(.milliseconds(25), for: summaryA.sessionId)
-    let container = try HarnessMonitorModelContainer.preview()
-    let store = HarnessMonitorStore(
-      daemonController: RecordingDaemonController(client: client),
-      modelContainer: container
-    )
-    await store.bootstrap()
-
-    await store.selectSession(summaryA.sessionId)
-    for _ in 0..<20
-    where store.acpTranscript(
-      forAgent: "worker-selected-transcript-a",
-      sessionID: summaryA.sessionId
-    ).isEmpty {
-      try await Task.sleep(for: .milliseconds(20))
-    }
-    await store.selectSession(summaryB.sessionId)
-    try await Task.sleep(for: .milliseconds(500))
-    await store.flushPendingCacheWrite()
-
-    let cachedA = try #require(await store.loadCachedSessionDetail(sessionID: summaryA.sessionId))
-    let cachedB = try #require(await store.loadCachedSessionDetail(sessionID: summaryB.sessionId))
-
-    #expect(cachedA.timeline.map(\.summary) == ["Timeline A"])
-    #expect(cachedA.transcript?.map(\.summary) == ["Transcript A"])
-    #expect(cachedB.timeline.map(\.summary) == ["Timeline B"])
-    #expect(cachedB.transcript?.map(\.summary) == ["Transcript B"])
+    client.configureAcpTranscriptDelay(.milliseconds(25), for: fixtures.summaryA.sessionId)
+    return client
   }
-  // swiftlint:enable function_body_length
 }
