@@ -290,19 +290,19 @@ private struct HarnessMarkdownAlertView: View {
   let settings: HarnessMarkdownRenderSettings
   let style: HarnessMarkdownResolvedRenderSettings
 
-  private let accentRuleWidth: CGFloat = 4
-  private let cornerRadius = HarnessMonitorTheme.cornerRadiusSM
+  private let accentRuleWidth: CGFloat = 5
+  private let cornerRadius = HarnessMonitorTheme.cornerRadiusMD
 
   var body: some View {
     let metrics = HarnessMarkdownMarkerMetrics(style: style)
     let accent = style.colors.alertAccent(for: alert.kind)
-    HStack(alignment: .top, spacing: cardPadding) {
-      RoundedRectangle(cornerRadius: accentRuleWidth / 2, style: .continuous)
-        .fill(accent)
-        .frame(width: accentRuleWidth)
+    HStack(alignment: .top, spacing: cardContentSpacing) {
+      accentRail(accent: accent)
       VStack(
         alignment: .leading,
-        spacing: visibleBodyBlocks.isEmpty ? 0 : style.spacing.nestedBlock
+        spacing: visibleBodyBlocks.isEmpty
+          ? 0
+          : max(style.spacing.nestedBlock, HarnessMonitorTheme.spacingSM)
       ) {
         header(metrics: metrics, accent: accent)
         if !visibleBodyBlocks.isEmpty {
@@ -315,12 +315,17 @@ private struct HarnessMarkdownAlertView: View {
           .padding(.leading, iconColumnWidth(metrics: metrics) + metrics.gap)
         }
       }
+      .frame(maxWidth: .infinity, alignment: .leading)
     }
     .padding(cardPadding)
     .frame(maxWidth: .infinity, alignment: .leading)
+    .background(alignment: .bottomTrailing) {
+      backgroundGlyph(accent: accent)
+    }
     .background(cardBackground(accent: accent))
     .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
     .overlay(cardBorder(accent: accent))
+    .padding(.vertical, HarnessMonitorTheme.spacingXS)
     .accessibilityElement(children: .contain)
     .fixedSize(horizontal: false, vertical: true)
   }
@@ -328,7 +333,7 @@ private struct HarnessMarkdownAlertView: View {
   private func header(metrics: HarnessMarkdownMarkerMetrics, accent: Color) -> some View {
     HStack(alignment: .top, spacing: metrics.gap) {
       Image(systemName: alert.kind.symbolName)
-        .font(.system(size: max(metrics.chevronSize + 6, 13), weight: .semibold))
+        .font(.system(size: max(metrics.firstLineHeight * 0.62, 14), weight: .semibold))
         .foregroundStyle(accent)
         .frame(
           width: iconColumnWidth(metrics: metrics),
@@ -337,8 +342,8 @@ private struct HarnessMarkdownAlertView: View {
         )
         .accessibilityHidden(true)
       Text(alert.kind.title)
-        .font(style.typography.heading3.font)
-        .foregroundStyle(accent)
+        .font(style.typography.body.font.weight(.semibold))
+        .foregroundStyle(style.colors.text)
         .frame(minHeight: metrics.firstLineHeight, alignment: .center)
     }
     .accessibilityElement(children: .combine)
@@ -349,13 +354,44 @@ private struct HarnessMarkdownAlertView: View {
     max(metrics.columnWidth, 20)
   }
 
-  private func cardBackground(accent: Color) -> some ShapeStyle {
-    accent.opacity(0.10)
+  private func backgroundGlyph(accent: Color) -> some View {
+    Image(systemName: alert.kind.symbolName)
+      .font(.system(size: backgroundGlyphSize, weight: .black, design: .rounded))
+      .symbolRenderingMode(.hierarchical)
+      .foregroundStyle(accent.opacity(0.30))
+      .rotationEffect(.degrees(-8))
+      .offset(x: 30, y: 30)
+      .accessibilityHidden(true)
+      .allowsHitTesting(false)
+  }
+
+  private func cardBackground(accent: Color) -> some View {
+    RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+      .fill(HarnessMonitorTheme.ink.opacity(0.05))
+      .overlay {
+        RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+          .fill(accent.opacity(0.10))
+      }
   }
 
   private func cardBorder(accent: Color) -> some View {
     RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-      .strokeBorder(accent.opacity(0.28), lineWidth: 1)
+      .strokeBorder(HarnessMonitorTheme.controlBorder.opacity(0.55), lineWidth: 1)
+      .overlay {
+        RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+          .strokeBorder(accent.opacity(0.22), lineWidth: 1)
+      }
+  }
+
+  private func accentRail(accent: Color) -> some View {
+    RoundedRectangle(cornerRadius: accentRuleWidth / 2, style: .continuous)
+      .fill(accent)
+      .frame(width: accentRuleWidth)
+      .accessibilityHidden(true)
+  }
+
+  private var backgroundGlyphSize: CGFloat {
+    visibleBodyBlocks.isEmpty ? 94 : 124
   }
 
   private var cardPadding: CGFloat {
@@ -363,6 +399,10 @@ private struct HarnessMarkdownAlertView: View {
       HarnessMonitorTheme.cardPadding,
       style.spacing.quoteContentGap + HarnessMonitorTheme.spacingXS
     )
+  }
+
+  private var cardContentSpacing: CGFloat {
+    max(HarnessMonitorTheme.spacingSM, style.spacing.quoteContentGap)
   }
 
   private var visibleBodyBlocks: [HarnessMarkdownBlock] {

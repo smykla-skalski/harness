@@ -56,6 +56,10 @@ struct HarnessMarkdownRenderingBehaviorTests {
     #expect(source.contains("case .alert(let alert):"))
     #expect(source.contains("style.colors.alertAccent(for: alert.kind)"))
     #expect(source.contains("Image(systemName: alert.kind.symbolName)"))
+    #expect(source.contains("HStack(alignment: .top, spacing: cardContentSpacing)"))
+    #expect(source.contains("backgroundGlyph(accent: accent)"))
+    #expect(source.contains(".background(alignment: .bottomTrailing)"))
+    #expect(source.contains(".rotationEffect(.degrees(-8))"))
     #expect(source.contains(".background(cardBackground(accent: accent))"))
   }
 
