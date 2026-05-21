@@ -95,21 +95,125 @@ struct HarnessMarkdownParserTests {
     #expect(inlines.contains(.strong([.text("bold "), .emphasis([.text("nested")])])))
     #expect(inlines.contains(.strikethrough([.text("gone")])))
     #expect(inlines.contains(.code("code")))
-    #expect(inlines.contains(.link(label: [.text("site")], destination: "https://example.com")))
+    #expect(
+      inlines.contains(
+        .link(label: [.text("site")], destination: "https://example.com", title: nil)))
     #expect(inlines.contains(.autolink("a@b.test")))
     #expect(inlines.contains(.autolink("https://harness.local")))
   }
 
+  @Test("Inline parser distinguishes references and soft breaks")
+  func inlineParserHandlesReferencesAndBreaks() {
+    let references = [
+      "h": HarnessMarkdownReference(destination: "https://example.com", title: "Docs"),
+      "collapsed": HarnessMarkdownReference(destination: "https://collapsed.example", title: nil),
+    ]
+    let inlines = HarnessMarkdownInlineParser.parse(
+      "See [Harness][h] and [collapsed][]\nsoft  \nslash\\\nnext.",
+      references: references
+    )
+
+    #expect(
+      inlines.contains(
+        .link(label: [.text("Harness")], destination: "https://example.com", title: "Docs")))
+    #expect(
+      inlines.contains(
+        .link(label: [.text("collapsed")], destination: "https://collapsed.example", title: nil)))
+    #expect(inlines.contains(.softBreak))
+    #expect(inlines.filter { $0 == .lineBreak }.count == 2)
+  }
+
+  @Test("Block parser handles setext headings and table alignment")
+  func blockParserHandlesSetextHeadingsAndTableAlignment() {
+    let document = HarnessMarkdownParser.parse(
+      """
+      Title
+      =====
+
+      | Left | Center | Right |
+      | :--- | :----: | ----: |
+      | l | c | r |
+      """
+    )
+
+    guard case .heading(1, let heading)? = document.blocks.first else {
+      Issue.record("Expected setext heading")
+      return
+    }
+    #expect(heading == [.text("Title")])
+
+    guard case .table(let table)? = document.blocks.dropFirst().first else {
+      Issue.record("Expected aligned table")
+      return
+    }
+    #expect(table.alignments == [.leading, .center, .trailing])
+    #expect(table.rows.count == 1)
+  }
+
+  @Test("Block parser handles long fence closers and ordered parentheses")
+  func blockParserHandlesFenceAndOrderedParity() {
+    let document = HarnessMarkdownParser.parse(
+      """
+      ```swift
+      let value = true
+      ````
+
+      7) parenthesized item
+      """
+    )
+
+    guard case .codeBlock(let language, let source, _)? = document.blocks.first else {
+      Issue.record("Expected code block")
+      return
+    }
+    #expect(language == .swift)
+    #expect(source == "let value = true")
+
+    guard case .orderedList(let start, let items)? = document.blocks.dropFirst().first else {
+      Issue.record("Expected ordered list")
+      return
+    }
+    #expect(start == 7)
+    #expect(items.count == 1)
+  }
+
+  @Test("Parser exits early when detached work is cancelled")
+  func parserHonorsCancellation() {
+    let document = HarnessMarkdownParser.parse(
+      "# Title\n\nBody",
+      shouldCancel: { true }
+    )
+
+    #expect(document == .empty)
+  }
+
   @Test("Code highlighter covers curated languages")
   func codeHighlighterCoversCuratedLanguages() {
-    #expect(HarnessCodeHighlighter.highlight("let value = true", language: .swift).contains(.init(text: "let", kind: .keyword)))
-    #expect(HarnessCodeHighlighter.highlight("fn main() {}", language: .rust).contains(.init(text: "fn", kind: .keyword)))
-    #expect(HarnessCodeHighlighter.highlight("if test; then echo ok; fi", language: .shell).contains(.init(text: "then", kind: .keyword)))
-    #expect(HarnessCodeHighlighter.highlight(#"{"ok":true}"#, language: .json).contains(.init(text: #""ok""#, kind: .property)))
-    #expect(HarnessCodeHighlighter.highlight("ok: true", language: .yaml).contains(.init(text: "ok", kind: .property)))
-    #expect(HarnessCodeHighlighter.highlight("# Heading", language: .markdown).contains(.init(text: "# Heading", kind: .heading)))
-    #expect(HarnessCodeHighlighter.highlight("+added", language: .diff).contains(.init(text: "+added", kind: .inserted)))
-    #expect(HarnessCodeHighlighter.highlight("plain", language: .generic) == [.init(text: "plain", kind: .plain)])
+    #expect(
+      HarnessCodeHighlighter.highlight("let value = true", language: .swift).contains(
+        .init(text: "let", kind: .keyword)))
+    #expect(
+      HarnessCodeHighlighter.highlight("fn main() {}", language: .rust).contains(
+        .init(text: "fn", kind: .keyword)))
+    #expect(
+      HarnessCodeHighlighter.highlight("if test; then echo ok; fi", language: .shell).contains(
+        .init(text: "then", kind: .keyword)))
+    #expect(
+      HarnessCodeHighlighter.highlight(#"{"ok":true}"#, language: .json).contains(
+        .init(text: #""ok""#, kind: .property)))
+    #expect(
+      HarnessCodeHighlighter.highlight("ok: true", language: .yaml).contains(
+        .init(text: "ok", kind: .property)))
+    #expect(
+      HarnessCodeHighlighter.highlight("# Heading", language: .markdown).contains(
+        .init(text: "# Heading", kind: .heading)))
+    #expect(
+      HarnessCodeHighlighter.highlight("+added", language: .diff).contains(
+        .init(text: "+added", kind: .inserted)))
+    #expect(
+      HarnessCodeHighlighter.highlight("plain", language: .generic) == [
+        .init(text: "plain", kind: .plain)
+      ])
   }
 }
 
@@ -131,7 +235,9 @@ struct HarnessMarkdownSourceContractTests {
         #expect(!source.contains(token), "\(file) still contains \(token)")
       }
     }
-    #expect(!FileManager.default.fileExists(atPath: repositoryPath("apps/harness-monitor-macos/features/" + "text" + "ual.yml")))
+    #expect(
+      !FileManager.default.fileExists(
+        atPath: repositoryPath("apps/harness-monitor-macos/features/" + "text" + "ual.yml")))
   }
 
   @Test("Markdown parser support stays scanner-based")
@@ -151,13 +257,28 @@ struct HarnessMarkdownSourceContractTests {
     }
   }
 
+  @Test("Markdown render pipeline explicitly cancels detached work")
+  func markdownRenderPipelineCancelsDetachedWork() throws {
+    let renderer = try readRepositoryFile(
+      "apps/harness-monitor-macos/Sources/HarnessMonitorUIPreviewable/Views/Shared/HarnessMonitorMarkdownText.swift"
+    )
+    let parser = try readRepositoryFile(
+      "apps/harness-monitor-macos/Sources/HarnessMonitorUIPreviewable/Support/Markdown/HarnessMarkdownParser.swift"
+    )
+
+    #expect(renderer.contains("withTaskCancellationHandler"))
+    #expect(renderer.contains("worker.cancel()"))
+    #expect(parser.contains("shouldCancel"))
+  }
+
   private func readRepositoryFile(_ relativePath: String) throws -> String {
     try String(contentsOfFile: repositoryPath(relativePath), encoding: .utf8)
   }
 
   private func repositoryPath(_ relativePath: String) -> String {
     let testsDirectory = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
-    return testsDirectory
+    return
+      testsDirectory
       .deletingLastPathComponent()
       .deletingLastPathComponent()
       .deletingLastPathComponent()

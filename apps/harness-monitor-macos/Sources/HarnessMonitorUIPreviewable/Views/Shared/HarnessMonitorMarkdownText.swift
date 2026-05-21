@@ -53,9 +53,14 @@ struct HarnessMonitorMarkdownText: View {
       return
     }
     let source = markdown
-    let parsed = await Task.detached(priority: .userInitiated) {
-      HarnessMarkdownParser.parse(source)
-    }.value
+    let worker = Task.detached(priority: .userInitiated) {
+      HarnessMarkdownParser.parse(source, shouldCancel: { Task.isCancelled })
+    }
+    let parsed = await withTaskCancellationHandler {
+      await worker.value
+    } onCancel: {
+      worker.cancel()
+    }
     guard !Task.isCancelled else { return }
     await HarnessMarkdownRenderCache.shared.store(parsed, for: key)
     document = parsed
@@ -86,7 +91,8 @@ private struct HarnessMarkdownBlockView: View {
       HarnessMarkdownQuoteView(blocks: blocks, font: font)
     case .codeBlock(let language, let source, let tokens):
       HarnessMonitorCodeBlock(
-        presentation: HarnessCodeBlockPresentation(source: source, language: language, tokens: tokens)
+        presentation: HarnessCodeBlockPresentation(
+          source: source, language: language, tokens: tokens)
       )
     case .heading(let level, let inlines):
       Text(HarnessMarkdownInlineRenderer.attributedString(from: inlines, font: headingFont(level)))
@@ -164,14 +170,21 @@ private struct HarnessMarkdownListView: View {
     }
   }
 
-  private func marker(for item: HarnessMarkdownListItem, index: Int) -> Text {
+  @ViewBuilder
+  private func marker(for item: HarnessMarkdownListItem, index: Int) -> some View {
     if let checkbox = item.checkbox {
-      return Text(checkbox ? "[x]" : "[ ]")
+      Image(systemName: checkbox ? "checkmark.square.fill" : "square")
+        .foregroundStyle(checkbox ? HarnessMonitorTheme.accent : HarnessMonitorTheme.secondaryInk)
+        .imageScale(.small)
+    } else if ordered {
+      Text("\(start + index).")
+        .scaledFont(font)
+        .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+    } else {
+      Text("•")
+        .scaledFont(font)
+        .foregroundStyle(HarnessMonitorTheme.secondaryInk)
     }
-    if ordered {
-      return Text("\(start + index).")
-    }
-    return Text("•")
   }
 }
 
@@ -208,8 +221,21 @@ private struct HarnessMarkdownTableView: View {
             font: isHeader ? font.weight(.semibold) : font
           )
         )
+        .frame(maxWidth: .infinity, alignment: swiftAlignment(for: index))
         .fixedSize(horizontal: false, vertical: true)
       }
+    }
+  }
+
+  private func swiftAlignment(for index: Int) -> SwiftUI.Alignment {
+    guard index < table.alignments.count else { return .leading }
+    switch table.alignments[index] {
+    case .leading:
+      return .leading
+    case .center:
+      return .center
+    case .trailing:
+      return .trailing
     }
   }
 }

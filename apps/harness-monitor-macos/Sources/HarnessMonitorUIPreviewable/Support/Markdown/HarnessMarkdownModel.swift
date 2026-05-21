@@ -24,7 +24,14 @@ struct HarnessMarkdownListItem: Equatable, Sendable {
 }
 
 struct HarnessMarkdownTable: Equatable, Sendable {
+  enum Alignment: Equatable, Sendable {
+    case leading
+    case center
+    case trailing
+  }
+
   let headers: [[HarnessMarkdownInline]]
+  let alignments: [Alignment]
   let rows: [[[HarnessMarkdownInline]]]
 }
 
@@ -33,10 +40,16 @@ indirect enum HarnessMarkdownInline: Equatable, Sendable {
   case code(String)
   case emphasis([HarnessMarkdownInline])
   case lineBreak
-  case link(label: [HarnessMarkdownInline], destination: String)
+  case link(label: [HarnessMarkdownInline], destination: String, title: String?)
+  case softBreak
   case strikethrough([HarnessMarkdownInline])
   case strong([HarnessMarkdownInline])
   case text(String)
+}
+
+struct HarnessMarkdownReference: Equatable, Sendable {
+  let destination: String
+  let title: String?
 }
 
 enum HarnessMarkdownTextSelection: Sendable {
@@ -62,7 +75,8 @@ enum HarnessCodeLanguage: String, Equatable, Sendable {
   case yaml
 
   init(infoString: String?) {
-    let tag = infoString?
+    let tag =
+      infoString?
       .split(whereSeparator: \.isWhitespace)
       .first?
       .lowercased() ?? ""
