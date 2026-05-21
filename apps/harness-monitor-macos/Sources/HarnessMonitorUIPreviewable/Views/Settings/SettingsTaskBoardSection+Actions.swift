@@ -1,7 +1,7 @@
 import HarnessMonitorKit
 import SwiftUI
 
-extension SettingsTaskBoardSection {
+extension SettingsTaskBoardEditingSurface {
   func workflowBinding(_ workflow: TaskBoardOrchestratorWorkflow) -> Binding<Bool> {
     Binding(
       get: { draftBinding.wrappedValue.enabledWorkflows.contains(workflow) },
@@ -31,7 +31,9 @@ extension SettingsTaskBoardSection {
       }
     )
   }
+}
 
+extension SettingsTaskBoardSection {
   @MainActor
   func scrollToNavigationRequest(
     _ request: SettingsNavigationRequest?,
