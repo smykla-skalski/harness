@@ -1,28 +1,28 @@
 import HarnessMonitorKit
 import SwiftUI
 
-private let decisionAuditScopeWorker = DecisionAuditScopeWorker()
+let decisionAuditScopeWorker = DecisionAuditScopeWorker()
 
 /// Decisions detail column with header, suggested actions, context, audit trail, and live tick.
 public struct DecisionDetailView: View {
   @Environment(\.harnessDateTimeConfiguration)
-  private var dateTimeConfiguration
+  var dateTimeConfiguration
 
-  @Binding private var selectedTab: DecisionDetailTab
-  @AccessibilityFocusState private var focusedPrimaryActionDecisionID: String?
-  @FocusState private var keyboardFocusedPrimaryActionDecisionID: String?
-  @State private var handledPrimaryActionFocusTick = 0
-  @State private var scopedAuditEvents: [SupervisorEventSnapshot] = []
-  @State private var scopedAuditInput: DecisionDetailViewModel.AuditScopeInput?
+  @Binding var selectedTab: DecisionDetailTab
+  @AccessibilityFocusState var focusedPrimaryActionDecisionID: String?
+  @FocusState var keyboardFocusedPrimaryActionDecisionID: String?
+  @State var handledPrimaryActionFocusTick = 0
+  @State var scopedAuditEvents: [SupervisorEventSnapshot] = []
+  @State var scopedAuditInput: DecisionDetailViewModel.AuditScopeInput?
 
-  private let viewModel: DecisionDetailViewModel?
-  private let store: HarnessMonitorStore?
-  private let auditEvents: [SupervisorEventSnapshot]
-  private let auditEventPayloadPresentations: [String: DecisionAuditTrailPayloadPresentation]
-  private let observer: ObserverSummary?
-  private let decisionScope: DecisionWorkspaceScope?
-  private let primaryActionFocusDecisionID: String?
-  private let primaryActionFocusRequestTick: Int
+  let viewModel: DecisionDetailViewModel?
+  let store: HarnessMonitorStore?
+  let auditEvents: [SupervisorEventSnapshot]
+  let auditEventPayloadPresentations: [String: DecisionAuditTrailPayloadPresentation]
+  let observer: ObserverSummary?
+  let decisionScope: DecisionWorkspaceScope?
+  let primaryActionFocusDecisionID: String?
+  let primaryActionFocusRequestTick: Int
 
   public init(
     selectedTab: Binding<DecisionDetailTab> = .constant(.context),
@@ -181,7 +181,7 @@ public struct DecisionDetailView: View {
       }
   }
 
-  private var auditScopeInput: DecisionDetailViewModel.AuditScopeInput? {
+  var auditScopeInput: DecisionDetailViewModel.AuditScopeInput? {
     guard let viewModel else { return nil }
     return DecisionDetailViewModel.AuditScopeInput(
       decision: viewModel.decision,
@@ -189,7 +189,7 @@ public struct DecisionDetailView: View {
     )
   }
 
-  @ViewBuilder private var detailBody: some View {
+  @ViewBuilder var detailBody: some View {
     if let viewModel {
       populatedBody(viewModel)
         .confirmationDialog(
@@ -215,7 +215,7 @@ public struct DecisionDetailView: View {
     }
   }
 
-  private var detailTabPicker: some View {
+  var detailTabPicker: some View {
     HarnessMonitorSegmentedPicker(
       title: "Decision detail section",
       selection: $selectedTab,
@@ -236,7 +236,7 @@ public struct DecisionDetailView: View {
     .fixedSize()
   }
 
-  private func populatedBody(_ viewModel: DecisionDetailViewModel) -> some View {
+  func populatedBody(_ viewModel: DecisionDetailViewModel) -> some View {
     let contextAdapter = DecisionKindContextAdapter(
       decision: viewModel.decision,
       store: store
@@ -266,7 +266,7 @@ public struct DecisionDetailView: View {
     )
   }
 
-  @ViewBuilder private var emptyState: some View {
+  @ViewBuilder var emptyState: some View {
     if decisionScope != nil || observer != nil {
       ScrollView {
         ObserverSummaryPanel(scope: decisionScope, observer: observer)

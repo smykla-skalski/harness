@@ -1,40 +1,40 @@
 import HarnessMonitorKit
 import SwiftUI
 
-private let decisionDeskDetailPreparationWorker = DecisionDetailPreparationWorker()
+let decisionDeskDetailPreparationWorker = DecisionDetailPreparationWorker()
 
 public struct DecisionDeskPreviewView: View {
-  private let store: HarnessMonitorStore?
+  let store: HarnessMonitorStore?
 
-  @State private var selection: String?
-  @State private var detailTab: DecisionDetailTab = .context
-  @State private var runtime = DecisionRuntime()
-  @State private var presentationWorker = DecisionsSidebarPresentationWorker()
-  @State private var cachedPresentation = DecisionsSidebarPresentation.empty
-  @State private var presentationGeneration: UInt64 = 0
-  @State private var sidebarFilters = DecisionsSidebarViewModel.FilterState(
+  @State var selection: String?
+  @State var detailTab: DecisionDetailTab = .context
+  @State var runtime = DecisionRuntime()
+  @State var presentationWorker = DecisionsSidebarPresentationWorker()
+  @State var cachedPresentation = DecisionsSidebarPresentation.empty
+  @State var presentationGeneration: UInt64 = 0
+  @State var sidebarFilters = DecisionsSidebarViewModel.FilterState(
     query: "",
     severities: [],
     scope: .summary
   )
-  @State private var dismissAllVisibleDraft = ""
-  @State private var pendingDismissBatch: DecisionDismissBatchSnapshot?
-  @State private var showDismissAllVisibleConfirmation = false
-  @State private var reopenBatch: DecisionReopenBatchState?
-  @State private var cachedDetailViewModel: DecisionDetailViewModel?
-  @State private var cachedDetailViewModelInput: DecisionDetailViewModel.PreparationInput?
+  @State var dismissAllVisibleDraft = ""
+  @State var pendingDismissBatch: DecisionDismissBatchSnapshot?
+  @State var showDismissAllVisibleConfirmation = false
+  @State var reopenBatch: DecisionReopenBatchState?
+  @State var cachedDetailViewModel: DecisionDetailViewModel?
+  @State var cachedDetailViewModelInput: DecisionDetailViewModel.PreparationInput?
 
-  @State private var inspectorVisible = false
+  @State var inspectorVisible = false
 
   public init(store: HarnessMonitorStore? = nil) {
     self.store = store
   }
 
-  private var actionHandler: any DecisionActionHandler {
+  var actionHandler: any DecisionActionHandler {
     store?.supervisorDecisionActionHandler() ?? NullDecisionActionHandler()
   }
 
-  private var decisionWorkspaceScope: DecisionWorkspaceScope {
+  var decisionWorkspaceScope: DecisionWorkspaceScope {
     DecisionWorkspaceScope(
       decisions: runtime.decisions,
       decisionsByID: runtime.decisionsByID,
@@ -44,7 +44,7 @@ public struct DecisionDeskPreviewView: View {
     )
   }
 
-  private var presentationTaskKey: DecisionsSidebarPresentationTaskKey {
+  var presentationTaskKey: DecisionsSidebarPresentationTaskKey {
     DecisionsSidebarPresentationTaskKey(
       decisionsRevision: runtime.decisionsRevision,
       decisions: runtime.decisions,
@@ -52,36 +52,36 @@ public struct DecisionDeskPreviewView: View {
     )
   }
 
-  private var selectedDecision: Decision? {
+  var selectedDecision: Decision? {
     decisionWorkspaceScope.selectedDecision
   }
 
-  private var selectedDecisionPreparationInput: DecisionDetailViewModel.PreparationInput? {
+  var selectedDecisionPreparationInput: DecisionDetailViewModel.PreparationInput? {
     selectedDecision.map(DecisionDetailViewModel.PreparationInput.init(decision:))
   }
 
-  private var currentDetailViewModel: DecisionDetailViewModel? {
+  var currentDetailViewModel: DecisionDetailViewModel? {
     guard cachedDetailViewModelInput == selectedDecisionPreparationInput else {
       return nil
     }
     return cachedDetailViewModel
   }
 
-  private var openDecisionCount: Int { decisionWorkspaceScope.totalCount }
+  var openDecisionCount: Int { decisionWorkspaceScope.totalCount }
 
-  private var criticalDecisionCount: Int {
+  var criticalDecisionCount: Int {
     decisionWorkspaceScope.criticalCount
   }
 
-  private var infoDecisionIDs: [String] {
+  var infoDecisionIDs: [String] {
     decisionWorkspaceScope.visibleInfoDecisionIDs
   }
 
-  private var criticalDecisionIDs: [String] {
+  var criticalDecisionIDs: [String] {
     decisionWorkspaceScope.visibleCriticalDecisionIDs
   }
 
-  private var navigationSubtitle: String {
+  var navigationSubtitle: String {
     let openLabel = "\(openDecisionCount) open"
     guard criticalDecisionCount > 0 else {
       return openLabel
@@ -89,23 +89,23 @@ public struct DecisionDeskPreviewView: View {
     return "\(openLabel) · \(criticalDecisionCount) critical"
   }
 
-  private var inspectorToggleLabel: String {
+  var inspectorToggleLabel: String {
     inspectorVisible ? "Hide Inspector" : "Show Inspector"
   }
 
-  private var sessionObserver: ObserverSummary? {
+  var sessionObserver: ObserverSummary? {
     store?.selectedSession?.observer
   }
 
-  private var visibleSnapshot: DecisionsSidebarViewModel.VisibleSnapshot {
+  var visibleSnapshot: DecisionsSidebarViewModel.VisibleSnapshot {
     decisionWorkspaceScope.visibleSnapshot
   }
 
-  private var visibleOpenDecisionIDs: [String] {
+  var visibleOpenDecisionIDs: [String] {
     decisionWorkspaceScope.visibleDecisionIDs
   }
 
-  @ViewBuilder private var detailColumn: some View {
+  @ViewBuilder var detailColumn: some View {
     if selectedDecision != nil {
       DecisionDetailView(
         viewModel: currentDetailViewModel,
@@ -224,7 +224,7 @@ public struct DecisionDeskPreviewView: View {
     }
   }
 
-  @ToolbarContentBuilder private var windowToolbar: some ToolbarContent {
+  @ToolbarContentBuilder var windowToolbar: some ToolbarContent {
     ToolbarItem(placement: .primaryAction) {
       bulkActionsMenu
     }
@@ -236,7 +236,7 @@ public struct DecisionDeskPreviewView: View {
     }
   }
 
-  private var bulkActionsMenu: some View {
+  var bulkActionsMenu: some View {
     Menu {
       Button("Dismiss selected") {
         Task { await dismissSelected() }
@@ -310,7 +310,7 @@ public struct DecisionDeskPreviewView: View {
     )
   }
 
-  private var inspectorToggleButton: some View {
+  var inspectorToggleButton: some View {
     Button {
       inspectorVisible.toggle()
     } label: {
