@@ -1,5 +1,5 @@
 use crate::daemon::agent_tui::AgentTuiStartRequest;
-use crate::daemon::http::DaemonHttpState;
+use crate::daemon::http::{DaemonHttpState, run_codex_agent_blocking, run_terminal_agent_blocking};
 use crate::daemon::protocol::{
     CodexRunMode, CodexRunRequest, ManagedAgentSnapshot, TaskBoardOrchestratorRunOnceResponse,
 };
@@ -52,28 +52,35 @@ async fn start_codex_worker(
     applied: &DispatchAppliedTask,
 ) -> Result<ManagedAgentSnapshot, CliError> {
     let request = codex_worker_request(applied);
+    let session_id = applied.session_id.clone();
     let _guard = state
         .managed_agent_mutation_locks
-        .lock(&applied.session_id, "task-board:codex-worker")
+        .lock(&session_id, "task-board:codex-worker")
         .await;
-    state
-        .codex_controller
-        .start_run(&applied.session_id, &request)
-        .map(ManagedAgentSnapshot::Codex)
+    run_codex_agent_blocking(state, "task-board worker start", move |controller| {
+        controller
+            .start_run(&session_id, &request)
+            .map(ManagedAgentSnapshot::Codex)
+    })
+    .await
 }
 
 async fn start_interactive_worker(
     state: &DaemonHttpState,
     applied: &DispatchAppliedTask,
 ) -> Result<ManagedAgentSnapshot, CliError> {
+    let session_id = applied.session_id.clone();
+    let request = terminal_worker_request(applied);
     let _guard = state
         .managed_agent_mutation_locks
-        .lock(&applied.session_id, "task-board:terminal-worker")
+        .lock(&session_id, "task-board:terminal-worker")
         .await;
-    state
-        .agent_tui_manager
-        .start(&applied.session_id, &terminal_worker_request(applied))
-        .map(ManagedAgentSnapshot::Terminal)
+    run_terminal_agent_blocking(state, "task-board worker start", move |manager| {
+        manager
+            .start(&session_id, &request)
+            .map(ManagedAgentSnapshot::Terminal)
+    })
+    .await
 }
 
 fn codex_worker_request(applied: &DispatchAppliedTask) -> CodexRunRequest {
