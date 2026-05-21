@@ -5,24 +5,35 @@ import XCTest
 
 @MainActor
 final class SessionWindowToolbarNavigationTests: XCTestCase {
-  func testSessionToolbarModelUsesWindowLocalNavigationHistory() {
+  func testSessionToolbarModelUsesGlobalWindowNavigationHistory() {
     let store = HarnessMonitorStore(daemonController: RecordingDaemonController())
+    let history = GlobalWindowNavigationHistory(store: store)
+    let sessionWindow = NSObject()
     let view = SessionWindowView(
       store: store,
-      token: SessionWindowToken(sessionID: "sess-alpha")
+      token: SessionWindowToken(sessionID: "sess-alpha"),
+      history: history
+    )
+    store.registerOpenSessionWindow(
+      windowID: ObjectIdentifier(sessionWindow),
+      sessionID: "sess-alpha"
     )
 
     XCTAssertFalse(view.sessionToolbarModel.canNavigateBack)
     XCTAssertFalse(view.sessionToolbarModel.canNavigateForward)
 
-    view.stateCache.selectRoute(.timeline)
+    history.installDashboardStateIfNeeded(route: .taskBoard)
+    history.recordSessionSelection(
+      sessionID: "sess-alpha",
+      selection: .route(.timeline)
+    )
 
-    XCTAssertTrue(view.stateCache.navigationHistory.canGoBack)
+    XCTAssertFalse(view.stateCache.navigationHistory.canGoBack)
     XCTAssertFalse(store.contentUI.toolbar.canNavigateBack)
     XCTAssertTrue(view.sessionToolbarModel.canNavigateBack)
     XCTAssertFalse(view.sessionToolbarModel.canNavigateForward)
 
-    view.stateCache.navigateBack()
+    history.navigateBack()
 
     XCTAssertFalse(view.sessionToolbarModel.canNavigateBack)
     XCTAssertTrue(view.sessionToolbarModel.canNavigateForward)

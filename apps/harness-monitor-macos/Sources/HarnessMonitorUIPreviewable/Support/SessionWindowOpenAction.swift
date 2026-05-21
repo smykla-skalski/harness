@@ -9,7 +9,11 @@ extension OpenWindowAction {
       openHarnessDashboardWindow()
       return
     }
-    openHarnessSessionWindow(sessionID: sessionID, mergeIfNeeded: true)
+    openHarnessSessionWindow(
+      sessionID: sessionID,
+      mergeIfNeeded: true,
+      recordHistory: true
+    )
   }
 
   @MainActor
@@ -17,6 +21,22 @@ extension OpenWindowAction {
     sessionID: String,
     mergeIfNeeded: Bool
   ) {
+    openHarnessSessionWindow(
+      sessionID: sessionID,
+      mergeIfNeeded: mergeIfNeeded,
+      recordHistory: true
+    )
+  }
+
+  @MainActor
+  public func openHarnessSessionWindow(
+    sessionID: String,
+    mergeIfNeeded: Bool,
+    recordHistory: Bool
+  ) {
+    if recordHistory {
+      GlobalWindowNavigationHistoryRegistry.current?.recordSessionOpen(sessionID: sessionID)
+    }
     let tabbingPreference = SessionWindowTabbingPreference.resolved(
       rawValue: UserDefaults.standard.string(forKey: SessionWindowTabbingPreference.storageKey)
     )
@@ -43,11 +63,25 @@ extension OpenWindowAction {
 
   @MainActor
   public func openHarnessDashboardWindow() {
-    openHarnessDashboardWindow(mergeIfNeeded: true)
+    openHarnessDashboardWindow(mergeIfNeeded: true, recordHistory: true)
   }
 
   @MainActor
   public func openHarnessDashboardWindow(mergeIfNeeded: Bool) {
+    openHarnessDashboardWindow(
+      mergeIfNeeded: mergeIfNeeded,
+      recordHistory: true
+    )
+  }
+
+  @MainActor
+  public func openHarnessDashboardWindow(
+    mergeIfNeeded: Bool,
+    recordHistory: Bool
+  ) {
+    if recordHistory {
+      GlobalWindowNavigationHistoryRegistry.current?.recordDashboardOpen()
+    }
     let tabbingPreference = SessionWindowTabbingPreference.resolved(
       rawValue: UserDefaults.standard.string(forKey: SessionWindowTabbingPreference.storageKey)
     )

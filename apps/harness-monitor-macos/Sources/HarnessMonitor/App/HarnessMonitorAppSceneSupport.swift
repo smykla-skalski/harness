@@ -11,6 +11,7 @@ struct DashboardWindowRootView: View {
   let keyWindowObserver: KeyWindowObserver
   let acpAttentionState: AcpPermissionAttentionState
   let windowCommandRouting: WindowCommandRoutingState
+  let windowNavigationHistory: GlobalWindowNavigationHistory
   let mcpWindowCommandRegistrar: HarnessMonitorMCPWindowCommandRegistrar
   @Binding var themeMode: HarnessMonitorThemeMode
   @Binding var settingsSelectedSection: SettingsSection
@@ -113,7 +114,8 @@ struct DashboardWindowRootView: View {
     DashboardWindowView(
       store: store,
       dashboardUI: store.contentUI.dashboard,
-      sessionCatalog: store.sessionIndex.catalog
+      sessionCatalog: store.sessionIndex.catalog,
+      history: windowNavigationHistory
     )
     .environment(
       \.openTaskBoardSettings,

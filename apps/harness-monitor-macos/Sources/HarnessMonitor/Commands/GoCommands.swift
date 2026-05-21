@@ -5,24 +5,24 @@ import SwiftUI
 struct GoCommands: Commands {
   let store: HarnessMonitorStore
   let displayState: CommandsDisplayState
-  @FocusedValue(\.sessionNavigation)
-  private var sessionNavigation
+  @FocusedValue(\.windowNavigation)
+  private var windowNavigation
 
-  private var usesSessionHistory: Bool {
-    sessionNavigation != nil
+  private var usesWindowHistory: Bool {
+    windowNavigation != nil
   }
 
   private var canNavigateBack: Bool {
-    if usesSessionHistory {
-      sessionNavigation?.canGoBack ?? false
+    if usesWindowHistory {
+      windowNavigation?.canGoBack ?? false
     } else {
       displayState.canNavigateBack
     }
   }
 
   private var canNavigateForward: Bool {
-    if usesSessionHistory {
-      sessionNavigation?.canGoForward ?? false
+    if usesWindowHistory {
+      windowNavigation?.canGoForward ?? false
     } else {
       displayState.canNavigateForward
     }
@@ -40,17 +40,19 @@ struct GoCommands: Commands {
     }
   }
 
+  @MainActor
   private func navigateBack() {
-    if usesSessionHistory {
-      sessionNavigation?.goBack()
+    if usesWindowHistory {
+      windowNavigation?.navigateBack()
     } else {
       Task { await store.navigateBack() }
     }
   }
 
+  @MainActor
   private func navigateForward() {
-    if usesSessionHistory {
-      sessionNavigation?.goForward()
+    if usesWindowHistory {
+      windowNavigation?.navigateForward()
     } else {
       Task { await store.navigateForward() }
     }

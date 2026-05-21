@@ -7,84 +7,110 @@ class HarnessMonitorNavigationUITests: HarnessMonitorUITestCase {
   override nonisolated class var reuseLaunchedApp: Bool { true }
 
   /// Reproduces the reported issue: after selecting a session from the
-  /// dashboard, the toolbar back button remains disabled (greyed out)
-  /// when it should become enabled so the user can navigate back.
+  /// dashboard, the newly focused session window must inherit the shared
+  /// history stack so its toolbar back button becomes enabled.
   func testBackButtonEnablesAfterSelectingSession() throws {
     let app = launch(mode: "preview")
 
-    let backButton = toolbarButton(in: app, identifier: Accessibility.navigateBackButton)
+    let dashboardBackButton = toolbarButton(in: app, identifier: Accessibility.navigateBackButton)
     XCTAssertTrue(
-      backButton.waitForExistence(timeout: Self.actionTimeout),
-      "Back button should exist in toolbar")
+      dashboardBackButton.waitForExistence(timeout: Self.actionTimeout),
+      "Back button should exist in dashboard toolbar")
 
     // Before selecting a session the back button must be disabled.
     XCTAssertFalse(
-      backButton.isEnabled, "Back button should be disabled with no navigation history")
+      dashboardBackButton.isEnabled,
+      "Dashboard back button should be disabled with no navigation history"
+    )
 
     // Select the preview session from the sidebar.
     tapPreviewSession(in: app)
 
-    // Wait for the cockpit to load (proves selection completed).
-    let observeButton = app.buttons
-      .matching(identifier: Accessibility.observeSummaryButton)
-      .firstMatch
+    let sessionWindow = element(in: app, identifier: Accessibility.sessionWindowShell)
     XCTAssertTrue(
-      observeButton.waitForExistence(timeout: Self.actionTimeout),
-      "Session cockpit should load after selecting preview session"
+      sessionWindow.waitForExistence(timeout: Self.actionTimeout),
+      "Session window should appear after selecting a session from the dashboard"
+    )
+    let sessionBackButton = toolbarButton(
+      in: app,
+      identifier: Accessibility.sessionNavigateBackButton
+    )
+    XCTAssertTrue(
+      sessionBackButton.waitForExistence(timeout: Self.actionTimeout),
+      "Session history button should appear in the session toolbar"
     )
 
-    // The back button must now be enabled - the dashboard is in the back stack.
+    // The session back button must now be enabled - the dashboard is in the
+    // shared cross-window back stack.
     let enabled = waitUntil(timeout: Self.actionTimeout) {
-      backButton.isEnabled
+      sessionBackButton.isEnabled
     }
 
     attachWindowScreenshot(in: app, named: "back-button-after-selection")
 
     XCTAssertTrue(
       enabled,
-      "Back button should be enabled after navigating from dashboard to a session"
+      "Session back button should be enabled after navigating from dashboard to a session"
     )
   }
 
-  /// Verifies that tapping back actually navigates to the previous view
-  /// and that forward then becomes enabled.
+  /// Verifies that global history can move focus back to the dashboard window
+  /// and that the dashboard forward button then reopens the session entry.
   func testBackNavigatesToDashboardAndEnablesForward() throws {
     let app = launch(mode: "preview")
 
-    let backButton = toolbarButton(in: app, identifier: Accessibility.navigateBackButton)
-    let forwardButton = toolbarButton(in: app, identifier: Accessibility.navigateForwardButton)
-    XCTAssertTrue(backButton.waitForExistence(timeout: Self.actionTimeout))
-    XCTAssertTrue(forwardButton.waitForExistence(timeout: Self.actionTimeout))
+    let dashboardBackButton = toolbarButton(in: app, identifier: Accessibility.navigateBackButton)
+    let dashboardForwardButton = toolbarButton(in: app, identifier: Accessibility.navigateForwardButton)
+    XCTAssertTrue(dashboardBackButton.waitForExistence(timeout: Self.actionTimeout))
+    XCTAssertTrue(dashboardForwardButton.waitForExistence(timeout: Self.actionTimeout))
 
     // Select the preview session.
     tapPreviewSession(in: app)
-    let observeButton = app.buttons
-      .matching(identifier: Accessibility.observeSummaryButton)
-      .firstMatch
-    XCTAssertTrue(observeButton.waitForExistence(timeout: Self.actionTimeout))
+    let sessionWindow = element(in: app, identifier: Accessibility.sessionWindowShell)
+    XCTAssertTrue(sessionWindow.waitForExistence(timeout: Self.actionTimeout))
+    let sessionBackButton = toolbarButton(
+      in: app,
+      identifier: Accessibility.sessionNavigateBackButton
+    )
+    let sessionForwardButton = toolbarButton(
+      in: app,
+      identifier: Accessibility.sessionNavigateForwardButton
+    )
+    XCTAssertTrue(sessionBackButton.waitForExistence(timeout: Self.actionTimeout))
+    XCTAssertTrue(sessionForwardButton.waitForExistence(timeout: Self.actionTimeout))
 
-    // Wait for back to become enabled.
+    // Wait for the session-window back button to become enabled.
     XCTAssertTrue(
-      waitUntil(timeout: Self.actionTimeout) { backButton.isEnabled },
-      "Back button should be enabled after session selection"
+      waitUntil(timeout: Self.actionTimeout) { sessionBackButton.isEnabled },
+      "Session back button should be enabled after session selection"
     )
 
-    // Tap back.
-    backButton.tap()
+    // Tap back on the session window; global history should return focus to the
+    // dashboard window and enable forward there.
+    XCTAssertTrue(
+      tapElementReliably(in: app, element: sessionBackButton),
+      "Session back button should be tappable"
+    )
 
-    // The dashboard should reappear (no session selected -> board shows).
+    let dashboardWindow = element(in: app, identifier: Accessibility.dashboardWindowRoot)
     let boardRoot = element(in: app, identifier: Accessibility.sessionsBoardRoot)
     XCTAssertTrue(
-      boardRoot.waitForExistence(timeout: Self.actionTimeout),
-      "Dashboard should appear after navigating back"
+      waitUntil(timeout: Self.actionTimeout) {
+        dashboardWindow.exists && boardRoot.exists
+      },
+      "Dashboard should appear after navigating back across windows"
     )
 
-    // Forward should now be enabled, back should be disabled.
+    // Forward should now be enabled on the dashboard, while the dashboard back
+    // button stays disabled at the start of the stack.
     XCTAssertTrue(
-      waitUntil(timeout: Self.actionTimeout) { forwardButton.isEnabled },
-      "Forward button should be enabled after going back"
+      waitUntil(timeout: Self.actionTimeout) { dashboardForwardButton.isEnabled },
+      "Dashboard forward button should be enabled after going back"
     )
-    XCTAssertFalse(backButton.isEnabled, "Back button should be disabled at start of history")
+    XCTAssertFalse(
+      dashboardBackButton.isEnabled,
+      "Dashboard back button should be disabled at the start of history"
+    )
   }
 
 }

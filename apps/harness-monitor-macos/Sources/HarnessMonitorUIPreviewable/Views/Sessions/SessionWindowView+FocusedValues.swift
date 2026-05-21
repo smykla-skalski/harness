@@ -16,6 +16,7 @@ extension SessionWindowView {
     return
       content
       .harnessFocusedSceneValue(\.sessionNavigation, navigation)
+      .harnessFocusedSceneValue(\.windowNavigation, windowNavigationState)
       .harnessFocusedSceneValue(\.sessionAttention, attention)
       .harnessFocusedSceneValue(\.sessionInspector, inspector)
   }

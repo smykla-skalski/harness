@@ -6,6 +6,7 @@ import SwiftUI
 public struct SessionWindowView: View {
   public let store: HarnessMonitorStore
   public let token: SessionWindowToken
+  public let history: GlobalWindowNavigationHistory
   @State private var stateCacheStorage: SessionWindowStateCache
   @Environment(\.dismiss)
   var dismiss
@@ -49,15 +50,18 @@ public struct SessionWindowView: View {
   @State private var policyCanvasViewModelStorage: PolicyCanvasViewModel
   @State private var startupSearchParticipationEnabledStorage =
     HarnessMonitorUITestEnvironment.isEnabled
+  @State private var handledHistoryRestoreRequestID = 0
 
   @MainActor
   public init(
     store: HarnessMonitorStore,
     token: SessionWindowToken,
-    initialRoute: SessionWindowRoute? = nil
+    initialRoute: SessionWindowRoute? = nil,
+    history: GlobalWindowNavigationHistory? = nil
   ) {
     self.store = store
     self.token = token
+    self.history = history ?? GlobalWindowNavigationHistory(store: store)
     _stateCacheStorage = State(
       wrappedValue: SessionWindowStateCache(
         sessionID: token.sessionID,
@@ -257,6 +261,18 @@ public struct SessionWindowView: View {
     route(for: stateCache.selection)
   }
 
+  var windowNavigationState: WindowNavigationState {
+    let navigationState = WindowNavigationState(
+      canGoBack: history.canGoBack,
+      canGoForward: history.canGoForward
+    )
+    navigationState.setHandlers(
+      back: { history.navigateBack() },
+      forward: { history.navigateForward() }
+    )
+    return navigationState
+  }
+
   var renderedRoute: SessionWindowRoute {
     contentRenderedRoute ?? route
   }
@@ -282,6 +298,16 @@ public struct SessionWindowView: View {
         )
       )
     )
+    .task(id: history.pendingSessionRestoreRequest) {
+      await applyPendingHistoryRestoreIfNeeded()
+    }
+    .task {
+      history.installNavigator(openWindow: openWindow)
+      history.installSessionStateIfNeeded(
+        sessionID: token.sessionID,
+        selection: stateCache.selection
+      )
+    }
     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     .accessibilityElement(children: .contain)
     .accessibilityFocused($primaryContentAccessibilityFocused)
@@ -301,6 +327,10 @@ public struct SessionWindowView: View {
   ) -> some View {
     content
       .onChange(of: stateCache.selection) { _, newSelection in
+        history.recordSessionSelection(
+          sessionID: token.sessionID,
+          selection: newSelection
+        )
         syncPersistedStorage(from: newSelection)
         reconcileInspectorVisibility(
           visibleBinding: inspectorVisibleBinding,
@@ -333,6 +363,28 @@ public struct SessionWindowView: View {
           preferredBinding: inspectorPreferredBinding
         )
       }
+  }
+
+  @MainActor
+  private func applyPendingHistoryRestoreIfNeeded() async {
+    guard let request = history.pendingSessionRestoreRequest else {
+      return
+    }
+    guard request.sessionID == token.sessionID else {
+      return
+    }
+    guard request.requestID != handledHistoryRestoreRequestID else {
+      return
+    }
+    handledHistoryRestoreRequestID = request.requestID
+    if stateCache.selection != request.selection {
+      stateCache.restoreNavigationSelection(request.selection)
+    }
+    await Task.yield()
+    history.finishSessionRestoreRequest(
+      request.requestID,
+      sessionID: token.sessionID
+    )
   }
 
   private func sessionWindowDecisionFilterPersistence<Content: View>(

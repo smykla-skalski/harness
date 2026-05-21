@@ -29,6 +29,7 @@ struct HarnessMonitorApp: App {
   @State private var menuBarStatusController: HarnessMonitorMenuBarStatusController
   @State private var sessionWindowPresenceTracker: SessionWindowPresenceTracker
   @State private var windowCommandRouting: WindowCommandRoutingState
+  @State private var windowNavigationHistory: GlobalWindowNavigationHistory
   @State private var mcpWindowCommandRegistrar: HarnessMonitorMCPWindowCommandRegistrar
   @State private var settingsSelectedSection: SettingsSection
   @State private var settingsNavigationRequest: SettingsNavigationRequest?
@@ -111,6 +112,7 @@ struct HarnessMonitorApp: App {
     )
     showsPolicyCanvasLab = configuration.showsPolicyCanvasLab
     let store = configuration.store
+    let windowNavigationHistory = GlobalWindowNavigationHistory(store: store)
     Self.bindSupervisorSurfaces(
       to: store,
       notificationController: notificationController,
@@ -123,6 +125,8 @@ struct HarnessMonitorApp: App {
       initialValue: SessionWindowPresenceTracker()
     )
     _windowCommandRouting = State(initialValue: WindowCommandRoutingState())
+    GlobalWindowNavigationHistoryRegistry.current = windowNavigationHistory
+    _windowNavigationHistory = State(initialValue: windowNavigationHistory)
     _mcpWindowCommandRegistrar = State(
       initialValue: HarnessMonitorMCPWindowCommandRegistrar(
         descriptors: HarnessMonitorMCPWindowCommandDescriptors.all
@@ -188,6 +192,10 @@ struct HarnessMonitorApp: App {
 
   var appMCPWindowCommandRegistrar: HarnessMonitorMCPWindowCommandRegistrar {
     mcpWindowCommandRegistrar
+  }
+
+  var appWindowNavigationHistory: GlobalWindowNavigationHistory {
+    windowNavigationHistory
   }
 
   var themeModeBinding: Binding<HarnessMonitorThemeMode> {

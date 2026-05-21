@@ -3,10 +3,18 @@ import SwiftUI
 
 struct DashboardWindowToolbar: ToolbarContent {
   let store: HarnessMonitorStore
+  let navigation: WindowNavigationState
   let showsQuickActions: Bool
   let sleepPreventionPresentation: SleepPreventionToolbarPresentation
 
   @ToolbarContentBuilder var body: some ToolbarContent {
+    WindowHistoryToolbarItems(
+      navigation: navigation,
+      backAccessibilityIdentifier: HarnessMonitorAccessibility.navigateBackButton,
+      forwardAccessibilityIdentifier: HarnessMonitorAccessibility.navigateForwardButton,
+      shortcutOverlay: nil
+    )
+
     if showsQuickActions {
       ToolbarItem(placement: .primaryAction) {
         newSessionButton

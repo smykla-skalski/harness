@@ -11,6 +11,7 @@ struct SessionWindowRootView: View {
   let acpAttentionState: AcpPermissionAttentionState
   let keyWindowObserver: KeyWindowObserver
   let windowCommandRouting: WindowCommandRoutingState
+  let windowNavigationHistory: GlobalWindowNavigationHistory
   let mcpWindowCommandRegistrar: HarnessMonitorMCPWindowCommandRegistrar
   let sessionWindowPresenceTracker: SessionWindowPresenceTracker
   let initialRoute: SessionWindowRoute?
@@ -77,7 +78,12 @@ struct SessionWindowRootView: View {
       windowToolbarBackgroundVisibility: .automatic,
       toast: store.toast
     ) {
-      SessionWindowView(store: store, token: token, initialRoute: initialRoute)
+      SessionWindowView(
+        store: store,
+        token: token,
+        initialRoute: initialRoute,
+        history: windowNavigationHistory
+      )
     }
     .suppressToolbarBaselineSeparator(
       markedAs: HarnessMonitorAccessibility.sessionWindowToolbarSeparatorSuppressed

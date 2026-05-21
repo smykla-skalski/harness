@@ -208,7 +208,10 @@ final class SessionWindowVoiceOverTests: HarnessMonitorUITestCase {
     let forwardButton = button(in: app, identifier: Accessibility.sessionNavigateForwardButton)
     XCTAssertTrue(waitForElement(backButton, timeout: Self.actionTimeout))
     XCTAssertTrue(waitForElement(forwardButton, timeout: Self.actionTimeout))
-    XCTAssertFalse(backButton.isEnabled)
+    XCTAssertTrue(
+      waitUntil(timeout: Self.actionTimeout) { backButton.isEnabled },
+      "Opening the session from the dashboard should seed cross-window back history."
+    )
     XCTAssertFalse(forwardButton.isEnabled)
 
     let timelineRoute = element(
@@ -235,10 +238,10 @@ final class SessionWindowVoiceOverTests: HarnessMonitorUITestCase {
     let openTasksMetric = staticText(in: app, containing: "Open tasks")
     XCTAssertTrue(
       waitUntil(timeout: Self.actionTimeout) {
-        openTasksMetric.exists && !timelineNavigation.exists && !backButton.isEnabled
+        openTasksMetric.exists && !timelineNavigation.exists && backButton.isEnabled
           && forwardButton.isEnabled
       },
-      "Back should restore the overview route and enable forward navigation."
+      "Back should restore the overview route, keep dashboard history behind it, and enable forward."
     )
 
     forwardButton.tap()
