@@ -32,6 +32,7 @@ struct HarnessMarkdownRenderingBehaviorTests {
     #expect(textSource.contains("width: metrics.listSymbolColumnWidth"))
     #expect(textSource.contains("alignment: .leading"))
     #expect(textSource.contains("height: metrics.firstLineHeight"))
+    #expect(textSource.contains(".offset(y: metrics.listSymbolYOffset)"))
     #expect(!textSource.contains("firstLineMarkerYOffset"))
     #expect(!textSource.contains("markerVisualYOffset"))
     #expect(!textSource.contains("firstLineCenterBaselineOffset"))
