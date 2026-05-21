@@ -204,6 +204,42 @@ public enum HarnessMonitorSchemaV18: VersionedSchema {
   }
 }
 
+/// V19 is purely additive: one new entity (CachedDependencyLabelUsage) keyed
+/// by `(repository, label)` so the label picker can surface a per-repo
+/// "Frequently Used" section. Lightweight migration adds the empty table; the
+/// dashboard upserts rows after a successful addLabel mutation.
+public enum HarnessMonitorSchemaV19: VersionedSchema {
+  public static var versionIdentifier: Schema.Version { Schema.Version(19, 0, 0) }
+
+  public static var models: [any PersistentModel.Type] {
+    [
+      HarnessMonitorSchemaV14.CachedProject.self,
+      HarnessMonitorSchemaV14.CachedSession.self,
+      HarnessMonitorSchemaV14.CachedAgent.self,
+      HarnessMonitorSchemaV14.CachedWorkItem.self,
+      HarnessMonitorSchemaV14.CachedSignalRecord.self,
+      HarnessMonitorSchemaV14.CachedTimelineEntry.self,
+      HarnessMonitorSchemaV14.CachedObserver.self,
+      HarnessMonitorSchemaV14.CachedAgentActivity.self,
+      SessionBookmark.self,
+      UserNote.self,
+      RecentSearch.self,
+      ProjectFilterPreference.self,
+      NotificationHistoryRecord.self,
+      CachedTaskBoardSnapshot.self,
+      CachedDependencyUpdatesSnapshot.self,
+      CachedDependencyRepositoryLabels.self,
+      CachedDependencyLabelUsage.self,
+      Decision.self,
+      SupervisorEvent.self,
+      PolicyConfigRow.self,
+      HarnessMonitorSchemaV8.CachedTaskReviewMetadata.self,
+      HarnessMonitorSchemaV10.CachedSessionWindowState.self,
+      HarnessMonitorSchemaV12.CachedSessionTranscriptEntry.self,
+    ]
+  }
+}
+
 public enum HarnessMonitorMigrationPlan: SchemaMigrationPlan {
   public static var schemas: [any VersionedSchema.Type] {
     [
@@ -225,6 +261,7 @@ public enum HarnessMonitorMigrationPlan: SchemaMigrationPlan {
       HarnessMonitorSchemaV16.self,
       HarnessMonitorSchemaV17.self,
       HarnessMonitorSchemaV18.self,
+      HarnessMonitorSchemaV19.self,
     ]
   }
 
@@ -247,6 +284,7 @@ public enum HarnessMonitorMigrationPlan: SchemaMigrationPlan {
       migrateV15toV16,
       migrateV16toV17,
       migrateV17toV18,
+      migrateV18toV19,
     ]
   }
 
@@ -382,6 +420,15 @@ public enum HarnessMonitorMigrationPlan: SchemaMigrationPlan {
     fromVersion: HarnessMonitorSchemaV17.self,
     toVersion: HarnessMonitorSchemaV18.self
   )
+
+  // V19 is purely additive: one new entity (CachedDependencyLabelUsage) keyed
+  // by `(repository, label)` so the dependency label picker can surface a
+  // per-repo "Frequently Used" section. Lightweight migration adds the empty
+  // table; the dashboard upserts rows after a successful addLabel mutation.
+  static let migrateV18toV19 = MigrationStage.lightweight(
+    fromVersion: HarnessMonitorSchemaV18.self,
+    toVersion: HarnessMonitorSchemaV19.self
+  )
 }
 
-public typealias HarnessMonitorCurrentSchema = HarnessMonitorSchemaV18
+public typealias HarnessMonitorCurrentSchema = HarnessMonitorSchemaV19
