@@ -179,7 +179,7 @@ public final class HarnessMonitorUserNotificationController: NSObject,
     makeRequest: () async throws -> UNNotificationRequest
   ) async -> Bool {
     let severity = descriptor.severity
-    await performNotificationOperation {
+    return await performNotificationOperation {
       let settings = SupervisorNotificationSettings.load()
       guard settings.allowsAnyDelivery(for: severity) else {
         lastResult = "Supervisor notification suppressed by settings"
