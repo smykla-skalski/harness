@@ -182,6 +182,26 @@ struct AcpEventPresentationOutput: Sendable {
   let overflowNotice: HarnessMonitorStore.ToolCallTimelineOverflowNotice?
 }
 
+struct AcpEventPresentationInput: Sendable {
+  let payload: AcpEventBatchPayload
+  let recordedAt: String
+  let selectedSessionID: String?
+  let descriptorsByID: [String: AcpAgentDescriptor]
+  let sessionRegistrations: [AgentRegistration]
+  let snapshots: [AcpAgentSnapshot]
+  let inspectSample: AcpInspectSample?
+}
+
+struct AcpPermissionDecisionStalenessInput: Sendable {
+  let openDecisionIDs: Set<String>
+  let activeDecisionIDs: Set<String>
+  let staleDecisionIDs: Set<String>
+  let protectedDecisionIDs: Set<String>
+  let pendingTimeoutDecisionIDs: Set<String>
+  let pendingShutdownDecisionIDs: Set<String>
+  let terminalDecisionIDs: Set<String>
+}
+
 struct AcpInspectReplacementOutput: Sendable {
   let sample: AcpInspectSample
   let syncEntries: [AcpRuntimeIdentity: AcpInspectSyncEntry]
@@ -354,22 +374,15 @@ actor AcpRuntimeWorker {
     )
   }
 
-  // swiftlint:disable:next function_parameter_count
-  func eventPresentation(
-    payload: AcpEventBatchPayload,
-    recordedAt: String,
-    selectedSessionID: String?,
-    descriptorsByID: [String: AcpAgentDescriptor],
-    sessionRegistrations: [AgentRegistration],
-    snapshots: [AcpAgentSnapshot],
-    inspectSample: AcpInspectSample?
-  ) -> AcpEventPresentationOutput {
+  func eventPresentation(input: AcpEventPresentationInput) -> AcpEventPresentationOutput {
+    let payload = input.payload
+    let recordedAt = input.recordedAt
     let crosswalk = AcpAgentIdentityCrosswalk(
-      selectedSessionIdentity: selectedSessionID.map(HarnessSessionID.init(rawValue:)),
-      descriptorsByID: descriptorsByID,
-      sessionRegistrations: sessionRegistrations,
-      snapshots: snapshots,
-      inspectSample: inspectSample
+      selectedSessionIdentity: input.selectedSessionID.map(HarnessSessionID.init(rawValue:)),
+      descriptorsByID: input.descriptorsByID,
+      sessionRegistrations: input.sessionRegistrations,
+      snapshots: input.snapshots,
+      inspectSample: input.inspectSample
     )
     let metadata = Self.toolCallTimelineMetadata(for: payload, crosswalk: crosswalk)
     let entries = payload.timelineEntries(
@@ -449,23 +462,14 @@ actor AcpRuntimeWorker {
     permissionDecisionSyncPayloadState(payloads).sortedPayloads
   }
 
-  // swiftlint:disable:next function_parameter_count
-  func stalePermissionDecisionIDs(
-    openDecisionIDs: Set<String>,
-    activeDecisionIDs: Set<String>,
-    staleDecisionIDs: Set<String>,
-    protectedDecisionIDs: Set<String>,
-    pendingTimeoutDecisionIDs: Set<String>,
-    pendingShutdownDecisionIDs: Set<String>,
-    terminalDecisionIDs: Set<String>
-  ) -> [String] {
-    openDecisionIDs
-      .subtracting(activeDecisionIDs)
-      .union(staleDecisionIDs)
-      .subtracting(protectedDecisionIDs)
-      .subtracting(pendingTimeoutDecisionIDs)
-      .subtracting(pendingShutdownDecisionIDs)
-      .subtracting(terminalDecisionIDs)
+  func stalePermissionDecisionIDs(input: AcpPermissionDecisionStalenessInput) -> [String] {
+    input.openDecisionIDs
+      .subtracting(input.activeDecisionIDs)
+      .union(input.staleDecisionIDs)
+      .subtracting(input.protectedDecisionIDs)
+      .subtracting(input.pendingTimeoutDecisionIDs)
+      .subtracting(input.pendingShutdownDecisionIDs)
+      .subtracting(input.terminalDecisionIDs)
       .sorted()
   }
 

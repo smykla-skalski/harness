@@ -131,13 +131,15 @@ extension HarnessMonitorStore {
       ruleID: AcpPermissionDecisionPayload.ruleID
     )
     return await acpRuntimeWorker.stalePermissionDecisionIDs(
-      openDecisionIDs: openACPDecisionIDs,
-      activeDecisionIDs: activeDecisionIDs,
-      staleDecisionIDs: staleDecisionIDs,
-      protectedDecisionIDs: protectedDecisionIDs,
-      pendingTimeoutDecisionIDs: acpPermissionPendingTimeoutDecisionIDs,
-      pendingShutdownDecisionIDs: acpPermissionPendingShutdownDecisionIDs,
-      terminalDecisionIDs: Set(acpPermissionTerminalOutcomesByID.keys)
+      input: AcpPermissionDecisionStalenessInput(
+        openDecisionIDs: openACPDecisionIDs,
+        activeDecisionIDs: activeDecisionIDs,
+        staleDecisionIDs: staleDecisionIDs,
+        protectedDecisionIDs: protectedDecisionIDs,
+        pendingTimeoutDecisionIDs: acpPermissionPendingTimeoutDecisionIDs,
+        pendingShutdownDecisionIDs: acpPermissionPendingShutdownDecisionIDs,
+        terminalDecisionIDs: Set(acpPermissionTerminalOutcomesByID.keys)
+      )
     )
   }
 
