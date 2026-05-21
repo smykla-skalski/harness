@@ -653,32 +653,24 @@ struct DashboardDependenciesRouteView: View {
   }
 
   private var labelSheet: some View {
-    NavigationStack {
-      Form {
-        TextField("Label", text: $labelDraft)
+    DashboardDependenciesCustomLabelSheet(
+      items: labelTargetItems,
+      suggestions: dashboardDependenciesAvailableLabels(
+        repositoryLabels: response.repositoryLabels,
+        items: labelTargetItems
+      ),
+      draft: $labelDraft,
+      onApply: { label in
+        isLabelSheetPresented = false
+        let items = labelTargetItems
+        labelTargetItems = []
+        Task { await addLabel(label, to: items) }
+      },
+      onCancel: {
+        labelTargetItems = []
+        isLabelSheetPresented = false
       }
-      .navigationTitle("Add Label")
-      .toolbar {
-        ToolbarItem(placement: .cancellationAction) {
-          Button("Cancel") {
-            labelTargetItems = []
-            isLabelSheetPresented = false
-          }
-        }
-        ToolbarItem(placement: .confirmationAction) {
-          Button("Apply") {
-            let label = labelDraft.trimmingCharacters(in: .whitespacesAndNewlines)
-            guard !label.isEmpty else { return }
-            isLabelSheetPresented = false
-            let items = labelTargetItems
-            labelTargetItems = []
-            Task { await addLabel(label, to: items) }
-          }
-          .disabled(labelDraft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-        }
-      }
-    }
-    .frame(minWidth: 360, minHeight: 160)
+    )
   }
 
   private func detailCard<Content: View>(
