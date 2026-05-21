@@ -109,10 +109,14 @@ public struct DependencyUpdatesQueryResponse: Codable, Equatable, Sendable {
     items: [DependencyUpdateItem],
     repositoryLabels: [String: [DependencyUpdateRepositoryLabel]] = [:]
   ) {
+    let normalizedItems = normalizedDependencyUpdateItems(items)
     self.fetchedAt = fetchedAt
     self.fromCache = fromCache
-    self.summary = summary
-    self.items = items
+    self.summary =
+      normalizedItems.count == items.count
+      ? summary
+      : DependencyUpdatesSummary(items: normalizedItems)
+    self.items = normalizedItems
     self.repositoryLabels = repositoryLabels
   }
 
@@ -126,10 +130,16 @@ public struct DependencyUpdatesQueryResponse: Codable, Equatable, Sendable {
 
   public init(from decoder: Decoder) throws {
     let container = try decoder.container(keyedBy: CodingKeys.self)
+    let decodedSummary = try container.decode(DependencyUpdatesSummary.self, forKey: .summary)
+    let decodedItems = try container.decode([DependencyUpdateItem].self, forKey: .items)
+    let normalizedItems = normalizedDependencyUpdateItems(decodedItems)
     fetchedAt = try container.decode(String.self, forKey: .fetchedAt)
     fromCache = try container.decode(Bool.self, forKey: .fromCache)
-    summary = try container.decode(DependencyUpdatesSummary.self, forKey: .summary)
-    items = try container.decode([DependencyUpdateItem].self, forKey: .items)
+    summary =
+      normalizedItems.count == decodedItems.count
+      ? decodedSummary
+      : DependencyUpdatesSummary(items: normalizedItems)
+    items = normalizedItems
     repositoryLabels =
       try container.decodeIfPresent(
         [String: [DependencyUpdateRepositoryLabel]].self,
@@ -323,6 +333,51 @@ public struct DependencyUpdateItem: Codable, Equatable, Identifiable, Sendable {
   }
 }
 
+func normalizedDependencyUpdateItems(
+  _ items: [DependencyUpdateItem]
+) -> [DependencyUpdateItem] {
+  guard items.count > 1 else { return items }
+  let formatter = ISO8601DateFormatter()
+  var uniqueItems: [DependencyUpdateItem] = []
+  uniqueItems.reserveCapacity(items.count)
+  var indexByPullRequestID: [String: Int] = [:]
+
+  for item in items {
+    if let existingIndex = indexByPullRequestID[item.pullRequestID] {
+      let existingItem = uniqueItems[existingIndex]
+      if dependencyUpdateItem(item, shouldReplace: existingItem, using: formatter) {
+        uniqueItems[existingIndex] = item
+      }
+      continue
+    }
+
+    indexByPullRequestID[item.pullRequestID] = uniqueItems.count
+    uniqueItems.append(item)
+  }
+
+  return uniqueItems
+}
+
+private func dependencyUpdateItem(
+  _ candidate: DependencyUpdateItem,
+  shouldReplace existing: DependencyUpdateItem,
+  using formatter: ISO8601DateFormatter
+) -> Bool {
+  let candidateDate = formatter.date(from: candidate.updatedAt)
+  let existingDate = formatter.date(from: existing.updatedAt)
+
+  switch (candidateDate, existingDate) {
+  case let (candidateDate?, existingDate?) where candidateDate != existingDate:
+    return candidateDate > existingDate
+  case (_?, nil):
+    return true
+  case (nil, _?):
+    return false
+  default:
+    return candidate.updatedAt >= existing.updatedAt
+  }
+}
+
 public struct DependencyUpdateCheck: Codable, Equatable, Identifiable, Sendable {
   public let name: String
   public let status: DependencyUpdateCheckRunStatus
@@ -476,7 +531,7 @@ public struct DependencyUpdatesRefreshResponse: Codable, Equatable, Sendable {
     missingPullRequestIDs: [String] = []
   ) {
     self.fetchedAt = fetchedAt
-    self.items = items
+    self.items = normalizedDependencyUpdateItems(items)
     self.missingPullRequestIDs = missingPullRequestIDs
   }
 
@@ -484,6 +539,16 @@ public struct DependencyUpdatesRefreshResponse: Codable, Equatable, Sendable {
     case fetchedAt
     case items
     case missingPullRequestIDs = "missingPullRequestIds"
+  }
+
+  public init(from decoder: Decoder) throws {
+    let container = try decoder.container(keyedBy: CodingKeys.self)
+    fetchedAt = try container.decode(String.self, forKey: .fetchedAt)
+    items = normalizedDependencyUpdateItems(
+      try container.decode([DependencyUpdateItem].self, forKey: .items)
+    )
+    missingPullRequestIDs =
+      try container.decodeIfPresent([String].self, forKey: .missingPullRequestIDs) ?? []
   }
 }
 

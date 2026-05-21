@@ -11,16 +11,18 @@ public func applyDependencyRefresh(
   to items: [DependencyUpdateItem],
   refresh: DependencyUpdatesRefreshResponse
 ) -> [DependencyUpdateItem] {
+  let currentItems = normalizedDependencyUpdateItems(items)
+  let refreshedItems = normalizedDependencyUpdateItems(refresh.items)
   let droppedIDs = Set(refresh.missingPullRequestIDs)
   let openItemsByID: [String: DependencyUpdateItem] = Dictionary(
-    uniqueKeysWithValues: refresh.items
+    uniqueKeysWithValues: refreshedItems
       .filter { $0.state == .open }
       .map { ($0.pullRequestID, $0) }
   )
   let closedIDs = Set(
-    refresh.items.filter { $0.state != .open }.map(\.pullRequestID)
+    refreshedItems.filter { $0.state != .open }.map(\.pullRequestID)
   )
-  return items.compactMap { item -> DependencyUpdateItem? in
+  return currentItems.compactMap { item -> DependencyUpdateItem? in
     if droppedIDs.contains(item.pullRequestID) || closedIDs.contains(item.pullRequestID) {
       return nil
     }
