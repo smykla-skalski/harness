@@ -9,8 +9,9 @@ struct HarnessMarkdownDocument: Equatable, Sendable {
 indirect enum HarnessMarkdownBlock: Equatable, Sendable {
   case blockQuote([HarnessMarkdownBlock])
   case codeBlock(language: HarnessCodeLanguage, source: String, tokens: [HarnessCodeToken])
+  case details(HarnessMarkdownDetails)
   case heading(level: Int, inlines: [HarnessMarkdownInline])
-  case html(String)
+  case html([HarnessMarkdownInline])
   case orderedList(start: Int, items: [HarnessMarkdownListItem])
   case paragraph([HarnessMarkdownInline])
   case table(HarnessMarkdownTable)
@@ -21,6 +22,12 @@ indirect enum HarnessMarkdownBlock: Equatable, Sendable {
 struct HarnessMarkdownListItem: Equatable, Sendable {
   let checkbox: Bool?
   let blocks: [HarnessMarkdownBlock]
+}
+
+struct HarnessMarkdownDetails: Equatable, Sendable {
+  let summary: [HarnessMarkdownInline]
+  let blocks: [HarnessMarkdownBlock]
+  let isOpen: Bool
 }
 
 struct HarnessMarkdownTable: Equatable, Sendable {

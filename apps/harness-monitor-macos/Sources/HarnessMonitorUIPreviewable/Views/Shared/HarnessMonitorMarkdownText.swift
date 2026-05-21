@@ -94,13 +94,13 @@ private struct HarnessMarkdownBlockView: View {
         presentation: HarnessCodeBlockPresentation(
           source: source, language: language, tokens: tokens)
       )
+    case .details(let details):
+      HarnessMarkdownDetailsView(details: details, font: font)
     case .heading(let level, let inlines):
       Text(HarnessMarkdownInlineRenderer.attributedString(from: inlines, font: headingFont(level)))
         .fixedSize(horizontal: false, vertical: true)
-    case .html(let html):
-      Text(verbatim: html)
-        .scaledFont(font.monospaced())
-        .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+    case .html(let inlines):
+      Text(HarnessMarkdownInlineRenderer.attributedString(from: inlines, font: font))
         .fixedSize(horizontal: false, vertical: true)
     case .orderedList(let start, let items):
       HarnessMarkdownListView(start: start, ordered: true, items: items, font: font)
@@ -126,6 +126,33 @@ private struct HarnessMarkdownBlockView: View {
       .headline
     default:
       .subheadline.weight(.semibold)
+    }
+  }
+}
+
+private struct HarnessMarkdownDetailsView: View {
+  let details: HarnessMarkdownDetails
+  let font: Font
+
+  @State private var isExpanded: Bool
+
+  init(details: HarnessMarkdownDetails, font: Font) {
+    self.details = details
+    self.font = font
+    _isExpanded = State(initialValue: details.isOpen)
+  }
+
+  var body: some View {
+    DisclosureGroup(isExpanded: $isExpanded) {
+      VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingXS) {
+        ForEach(Array(details.blocks.enumerated()), id: \.offset) { _, block in
+          HarnessMarkdownBlockView(block: block, font: font)
+        }
+      }
+      .padding(.leading, HarnessMonitorTheme.spacingSM)
+    } label: {
+      Text(HarnessMarkdownInlineRenderer.attributedString(from: details.summary, font: font))
+        .fixedSize(horizontal: false, vertical: true)
     }
   }
 }

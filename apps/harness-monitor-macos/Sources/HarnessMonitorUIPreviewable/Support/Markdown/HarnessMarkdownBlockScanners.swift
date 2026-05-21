@@ -1,0 +1,117 @@
+import Foundation
+
+struct FenceStart {
+  let marker: Character
+  let count: Int
+  let info: String
+}
+
+func fenceStart(_ line: String) -> FenceStart? {
+  let trimmed = line.trimmingLeadingSpaces()
+  guard let marker = trimmed.first, marker == "`" || marker == "~" else { return nil }
+  let count = trimmed.prefix { $0 == marker }.count
+  guard count >= 3 else { return nil }
+  let info = String(trimmed.dropFirst(count)).trimmingCharacters(in: .whitespaces)
+  return FenceStart(marker: marker, count: count, info: info)
+}
+
+func fenceClose(_ line: String, fence: FenceStart) -> Bool {
+  let trimmed = line.trimmingLeadingSpaces()
+  let run = trimmed.prefix { $0 == fence.marker }.count
+  guard run >= fence.count else { return false }
+  return trimmed.dropFirst(run).allSatisfy { $0.isWhitespace }
+}
+
+func heading(
+  _ line: String,
+  references: [String: HarnessMarkdownReference] = [:]
+) -> HarnessMarkdownBlock? {
+  let trimmed = line.trimmingLeadingSpaces()
+  let level = trimmed.prefix { $0 == "#" }.count
+  guard (1...6).contains(level), trimmed.dropFirst(level).first?.isWhitespace == true else {
+    return nil
+  }
+  let text = String(trimmed.dropFirst(level)).trimmingCharacters(in: .whitespaces)
+  return .heading(
+    level: level, inlines: HarnessMarkdownInlineParser.parse(text, references: references))
+}
+
+func isThematicBreak(_ line: String) -> Bool {
+  let compact = line.filter { !$0.isWhitespace }
+  guard compact.count >= 3, let first = compact.first, ["-", "*", "_"].contains(first) else {
+    return false
+  }
+  return compact.allSatisfy { $0 == first }
+}
+
+func unorderedMarker(_ line: String) -> (content: String, checkbox: Bool?)? {
+  let trimmed = line.trimmingLeadingSpaces()
+  guard let marker = trimmed.first, trimmed.count >= 2, ["-", "*", "+"].contains(marker),
+    trimmed.dropFirst().first?.isWhitespace == true
+  else {
+    return nil
+  }
+  return checkboxContent(String(trimmed.dropFirst(2)))
+}
+
+func orderedMarker(_ line: String) -> (number: Int, content: String)? {
+  let trimmed = line.trimmingLeadingSpaces()
+  var digits = ""
+  var cursor = trimmed.startIndex
+  while cursor < trimmed.endIndex, trimmed[cursor].isNumber {
+    digits.append(trimmed[cursor])
+    cursor = trimmed.index(after: cursor)
+  }
+  guard !digits.isEmpty, cursor < trimmed.endIndex, trimmed[cursor] == "." || trimmed[cursor] == ")"
+  else {
+    return nil
+  }
+  let afterMarker = trimmed.index(after: cursor)
+  guard afterMarker < trimmed.endIndex, trimmed[afterMarker].isWhitespace else { return nil }
+  return (Int(digits) ?? 1, String(trimmed[trimmed.index(after: afterMarker)...]))
+}
+
+func checkboxContent(_ raw: String) -> (content: String, checkbox: Bool?) {
+  guard raw.count >= 4, raw.first == "[" else { return (raw, nil) }
+  let marker = raw.dropFirst().first
+  let close = raw.dropFirst(2).first
+  guard close == "]", raw.dropFirst(3).first?.isWhitespace == true else { return (raw, nil) }
+  let checked = marker == "x" || marker == "X"
+  return (String(raw.dropFirst(4)), marker == " " || checked ? checked : nil)
+}
+
+func isTableSeparator(_ line: String) -> Bool {
+  let cells = splitTableRow(line)
+  guard !cells.isEmpty else { return false }
+  return cells.allSatisfy { cell in
+    let compact = cell.trimmingCharacters(in: .whitespaces)
+    let core = compact.trimmingCharacters(in: CharacterSet(charactersIn: ":"))
+    return core.count >= 3 && core.allSatisfy { $0 == "-" }
+  }
+}
+
+func tableAlignments(_ line: String) -> [HarnessMarkdownTable.Alignment] {
+  splitTableRow(line).map { cell in
+    let trimmed = cell.trimmingCharacters(in: .whitespaces)
+    if trimmed.hasPrefix(":"), trimmed.hasSuffix(":") { return .center }
+    if trimmed.hasSuffix(":") { return .trailing }
+    return .leading
+  }
+}
+
+func splitTableRow(_ line: String) -> [String] {
+  var trimmed = line.trimmingCharacters(in: .whitespaces)
+  if trimmed.first == "|" { trimmed.removeFirst() }
+  if trimmed.last == "|" { trimmed.removeLast() }
+  return trimmed.split(separator: "|", omittingEmptySubsequences: false)
+    .map { String($0).trimmingCharacters(in: .whitespaces) }
+}
+
+func isHTML(_ line: String) -> Bool {
+  let trimmed = line.trimmingLeadingSpaces()
+  return trimmed.hasPrefix("<") && trimmed.hasSuffix(">") && trimmed.count > 2
+}
+
+func isSingleLineHTML(_ line: String) -> Bool {
+  line.contains("</") || line.hasPrefix("<!--") && line.contains("-->")
+}
