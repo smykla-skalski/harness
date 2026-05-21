@@ -99,9 +99,20 @@ private struct DashboardDependenciesToolbarSearchModifier: ViewModifier {
   let items: [DependencyUpdateItem]
   let onSelect: (String) -> Void
 
+  @FocusState private var isSearchFocused: Bool
+  @State private var searchFocusDispatcher = HarnessSidebarSearchFocusDispatcher()
+
   private var suggestions: [DashboardDependenciesSearchSuggestion] {
     guard !HarnessMonitorPerfIsolation.disablesSearchSuggestions else { return [] }
     return dashboardDependenciesSearchSuggestions(query: query, items: items)
+  }
+
+  private var searchFocusAction: HarnessSidebarSearchFocus {
+    HarnessSidebarSearchFocus(
+      isAvailable: true,
+      menuLabel: .findGeneric,
+      dispatcher: searchFocusDispatcher
+    )
   }
 
   func body(content: Content) -> some View {
@@ -124,12 +135,24 @@ private struct DashboardDependenciesToolbarSearchModifier: ViewModifier {
           .searchCompletion(suggestion.completionKey)
         }
       }
+      .searchFocused($isSearchFocused)
       .onChange(of: query) { oldValue, newValue in
         routeIfCompletionPicked(from: oldValue, to: newValue)
       }
       .onSubmit(of: .search) {
         submit()
       }
+      .harnessFocusedSceneValue(\.harnessSidebarSearchFocusAction, searchFocusAction)
+      .task {
+        searchFocusDispatcher.handler = {
+          focusSearchField()
+        }
+      }
+  }
+
+  private func focusSearchField() {
+    guard !isSearchFocused else { return }
+    isSearchFocused = true
   }
 
   private func routeIfCompletionPicked(from oldValue: String, to newValue: String) {
