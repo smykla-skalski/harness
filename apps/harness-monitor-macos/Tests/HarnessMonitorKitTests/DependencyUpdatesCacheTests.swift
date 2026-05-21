@@ -196,7 +196,7 @@ final class DependencyUpdatesCacheTests: XCTestCase {
       makeItem(pullRequestID: "pr_a1", repository: "acme/api", reviewStatus: .approved)
     ])
 
-    let result = DependencyUpdatesCache.applyPerRepoResponse(
+    let result = DependencyUpdatesCache.applyPerRepoResponseToItems(
       cached,
       repository: "acme/api",
       response: response
@@ -217,7 +217,7 @@ final class DependencyUpdatesCacheTests: XCTestCase {
       makeItem(pullRequestID: "pr_a2", repository: "acme/api", reviewStatus: .reviewRequired),
     ])
 
-    let result = DependencyUpdatesCache.applyPerRepoResponse(
+    let result = DependencyUpdatesCache.applyPerRepoResponseToItems(
       cached,
       repository: "acme/api",
       response: response
@@ -238,7 +238,7 @@ final class DependencyUpdatesCacheTests: XCTestCase {
       makeItem(pullRequestID: "pr_a1", repository: "acme/api")
     ])
 
-    let result = DependencyUpdatesCache.applyPerRepoResponse(
+    let result = DependencyUpdatesCache.applyPerRepoResponseToItems(
       cached,
       repository: "acme/api",
       response: response
@@ -257,7 +257,7 @@ final class DependencyUpdatesCacheTests: XCTestCase {
       makeItem(pullRequestID: "pr_a_new", repository: "acme/api"),
     ])
 
-    let result = DependencyUpdatesCache.applyPerRepoResponse(
+    let result = DependencyUpdatesCache.applyPerRepoResponseToItems(
       cached,
       repository: "acme/api",
       response: response
@@ -274,7 +274,7 @@ final class DependencyUpdatesCacheTests: XCTestCase {
     ]
     let response = makeResponse(items: [])
 
-    let result = DependencyUpdatesCache.applyPerRepoResponse(
+    let result = DependencyUpdatesCache.applyPerRepoResponseToItems(
       cached,
       repository: "acme/api",
       response: response

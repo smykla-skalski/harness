@@ -12,7 +12,7 @@ extension DashboardDependenciesRouteView {
       !response.items.isEmpty
       && Set(targetIDs) == Set(response.items.map(\.pullRequestID))
     if coversFullCatalog {
-      Task { await reload(forceRefresh: true, backgroundRefresh: true) }
+      schedulerForceRefreshAll()
       return
     }
     let targets = items.map(\.target)

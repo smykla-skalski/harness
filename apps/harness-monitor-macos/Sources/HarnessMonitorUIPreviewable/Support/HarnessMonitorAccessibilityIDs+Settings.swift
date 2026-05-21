@@ -164,6 +164,14 @@ extension HarnessMonitorAccessibility {
     "harness.settings.dependencies.frequent-labels-count"
   public static let settingsDependenciesRefreshIntervalField =
     "harness.settings.dependencies.refresh-interval"
+  public static let settingsDependenciesPerRepoIntervalField =
+    "harness.settings.dependencies.per-repo-interval"
+  public static let settingsDependenciesMaxConcurrentField =
+    "harness.settings.dependencies.max-concurrent"
+  public static let settingsDependenciesExpandOrganizationsToggle =
+    "harness.settings.dependencies.expand-organizations"
+  public static let dashboardDependenciesSchedulerBadge =
+    "harness.dashboard.dependencies.scheduler-badge"
   public static let settingsDependenciesCacheMaxAgeField =
     "harness.settings.dependencies.cache-max-age"
   public static let settingsSecretsRoot = "harness.settings.secrets"

@@ -242,7 +242,7 @@ struct PolicyCanvasViewModelTests {
       label: "policy"
     )
 
-    #expect(policyCanvasEdge(edge).label.isEmpty)
+    #expect(policyCanvasEdge(edge)?.label.isEmpty == true)
   }
 
   @Test("tool rail spacing scales with font scale")

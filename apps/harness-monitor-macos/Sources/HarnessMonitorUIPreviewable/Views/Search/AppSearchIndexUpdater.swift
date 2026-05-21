@@ -10,6 +10,7 @@ import SwiftUI
 private struct AppSearchDomainSignature: Hashable {
   let count: Int
   let lastID: String?
+  let contentFingerprint: Int
 }
 
 /// Drives ``AppSearchIndex`` re-indexing from a zero-size anchor rather
@@ -63,21 +64,83 @@ struct AppSearchIndexUpdater: View {
   }
 
   private var agentSignature: AppSearchDomainSignature {
-    AppSearchDomainSignature(count: agents.count, lastID: agents.last?.agentId)
+    AppSearchDomainSignature(
+      count: agents.count,
+      lastID: agents.last?.agentId,
+      contentFingerprint: Self.fingerprint(
+        agents.flatMap { agent in
+          [
+            agent.agentId,
+            agent.name,
+            agent.persona?.name ?? "",
+            agent.persona?.description ?? "",
+            agent.role.rawValue,
+            agent.runtime,
+          ]
+        }
+      )
+    )
   }
 
   private var decisionSignature: AppSearchDomainSignature {
     AppSearchDomainSignature(
       count: decisionProjections.count,
-      lastID: decisionProjections.last?.id
+      lastID: decisionProjections.last?.id,
+      contentFingerprint: Self.fingerprint(
+        decisionProjections.flatMap { decision in
+          [
+            decision.id,
+            decision.summary,
+            decision.ruleID,
+            decision.agentID ?? "",
+            decision.taskID ?? "",
+          ]
+        }
+      )
     )
   }
 
   private var taskSignature: AppSearchDomainSignature {
-    AppSearchDomainSignature(count: tasks.count, lastID: tasks.last?.taskId)
+    AppSearchDomainSignature(
+      count: tasks.count,
+      lastID: tasks.last?.taskId,
+      contentFingerprint: Self.fingerprint(
+        tasks.flatMap { task in
+          [
+            task.taskId,
+            task.title,
+            task.context ?? "",
+            task.suggestedFix ?? "",
+            task.blockedReason ?? "",
+          ]
+        }
+      )
+    )
   }
 
   private var eventSignature: AppSearchDomainSignature {
-    AppSearchDomainSignature(count: events.count, lastID: events.last?.entryId)
+    AppSearchDomainSignature(
+      count: events.count,
+      lastID: events.last?.entryId,
+      contentFingerprint: Self.fingerprint(
+        events.flatMap { event in
+          [
+            event.entryId,
+            event.summary,
+            event.kind,
+            event.agentId ?? "",
+            event.taskId ?? "",
+          ]
+        }
+      )
+    )
+  }
+
+  private static func fingerprint(_ values: [String]) -> Int {
+    var hasher = Hasher()
+    for value in values {
+      hasher.combine(value)
+    }
+    return hasher.finalize()
   }
 }

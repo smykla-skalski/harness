@@ -2,7 +2,6 @@ import CryptoKit
 import Foundation
 import SwiftData
 
-@MainActor
 public struct DependencyUpdatesCache {
   private let context: ModelContext
 
@@ -102,7 +101,7 @@ public struct DependencyUpdatesCache {
     else {
       return nil
     }
-    let nextItems = Self.applyPerRepoResponse(
+    let nextItems = Self.applyPerRepoResponseToItems(
       cached.items,
       repository: repository,
       response: response
@@ -181,7 +180,7 @@ public struct DependencyUpdatesCache {
   /// - PRs present in `response.items` that were not yet known are appended.
   ///
   /// Pure function so tests can exercise it without a `ModelContext`.
-  static func applyPerRepoResponse(
+  public static func applyPerRepoResponseToItems(
     _ items: [DependencyUpdateItem],
     repository: String,
     response: DependencyUpdatesQueryResponse
@@ -228,6 +227,59 @@ extension DependencyUpdatesCache {
     let data = (try? encoder.encode(normalized)) ?? Data()
     let digest = SHA256.hash(data: data)
     return digest.map { String(format: "%02x", $0) }.joined()
+  }
+}
+
+public actor DependencyUpdatesCachePersistenceWriter {
+  private let modelContainer: ModelContainer
+
+  public init(modelContainer: ModelContainer) {
+    self.modelContainer = modelContainer
+  }
+
+  public func saveResponse(
+    preferencesHash: String,
+    response: DependencyUpdatesQueryResponse
+  ) {
+    let context = ModelContext(modelContainer)
+    context.autosaveEnabled = false
+    DependencyUpdatesCache(context: context).save(
+      preferencesHash: preferencesHash,
+      response: response
+    )
+    RepositoryLabelsCache(context: context).upsert(response.repositoryLabels)
+  }
+
+  public func applyRefresh(
+    preferencesHash: String,
+    refresh: DependencyUpdatesRefreshResponse
+  ) {
+    let context = ModelContext(modelContainer)
+    context.autosaveEnabled = false
+    _ = DependencyUpdatesCache(context: context).applyRefresh(
+      preferencesHash: preferencesHash,
+      refresh: refresh
+    )
+  }
+
+  public func applyPerRepoResponse(
+    preferencesHash: String,
+    repository: String,
+    response: DependencyUpdatesQueryResponse,
+    fallbackResponse: DependencyUpdatesQueryResponse
+  ) {
+    let context = ModelContext(modelContainer)
+    context.autosaveEnabled = false
+    let cache = DependencyUpdatesCache(context: context)
+    let merged = cache.applyPerRepoResponse(
+      preferencesHash: preferencesHash,
+      repository: repository,
+      response: response
+    )
+    if merged == nil {
+      cache.save(preferencesHash: preferencesHash, response: fallbackResponse)
+    }
+    RepositoryLabelsCache(context: context).upsert(response.repositoryLabels)
   }
 }
 

@@ -55,6 +55,8 @@ struct SessionTimelineView: View {
   @State private var cachedPresentation = SessionTimelineSectionPresentation.empty
   @State private var presentationGeneration: UInt64 = 0
   @State private var loadOlderInFlight = false
+  @State private var loadOlderPending = false
+  @State private var signalDeadlineGeneration: UInt64 = 0
   @State private var didInitialFreshFetch = false
   @State private var measuredContainerHeight: CGFloat = 0
 
@@ -95,10 +97,15 @@ struct SessionTimelineView: View {
       decisionsRevision: store.supervisorDecisionRefreshTick,
       decisionsCount: decisionSnapshots?.count ?? decisions.count,
       signalsRevision: store.selectedSessionSignalsRevision,
+      signalDeadlineGeneration: signalDeadlineGeneration,
       filters: normalizedFilters(filters),
       isTimelineLoading: isTimelineLoading,
       dateTimeConfiguration: dateTimeConfiguration
     )
+  }
+
+  private var signalDeadlineClockKey: SessionTimelineSignalDeadlineClockKey {
+    SessionTimelineSignalDeadlineClockKey(signals: store.selectedSessionSignals)
   }
 
   var filterPersistenceMode: SessionTimelineFilterPersistenceMode {
@@ -143,6 +150,9 @@ struct SessionTimelineView: View {
     .task(id: taskKey) {
       await rebuildPresentation()
     }
+    .task(id: signalDeadlineClockKey) {
+      await runSignalDeadlineClock(for: signalDeadlineClockKey)
+    }
     .task(id: HarnessMonitorUITestEnvironment.perfScenarioRawValue ?? "") {
       applyPerfScenarioFiltersIfNeeded()
     }
@@ -178,6 +188,19 @@ struct SessionTimelineView: View {
       cachedPresentation = presentation
     }
     requestLatestWindowIfNeeded(presentation)
+  }
+
+  @MainActor
+  private func runSignalDeadlineClock(for key: SessionTimelineSignalDeadlineClockKey) async {
+    guard let nextExpiration = key.nextExpiration else { return }
+    let delay = max(0, nextExpiration.timeIntervalSinceNow)
+    do {
+      try await Task.sleep(for: .seconds(delay))
+    } catch {
+      return
+    }
+    guard !Task.isCancelled else { return }
+    signalDeadlineGeneration &+= 1
   }
 
   @ViewBuilder
@@ -339,7 +362,10 @@ struct SessionTimelineView: View {
   }
 
   func requestLoadOlderTimelineChunk() {
+    guard !loadOlderInFlight, !loadOlderPending else { return }
+    loadOlderPending = true
     Task { @MainActor in
+      defer { loadOlderPending = false }
       // Escape the scroll-geometry callback before mutating SwiftUI state.
       await Task.yield()
 
