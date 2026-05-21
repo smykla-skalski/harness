@@ -160,6 +160,7 @@ public struct SettingsDiagnosticsSection: View {
   public let repairLaunchAgent: (() async -> Void)?
   @State private var permissionLogErrorsByEntryID: [String: String] = [:]
   @State private var permissionLogRevealStatusesByEntryID: [String: String] = [:]
+  @State private var isFullyExpanded = false
 
   public init(
     snapshot: SettingsDiagnosticsSnapshot,
@@ -188,26 +189,29 @@ public struct SettingsDiagnosticsSection: View {
         lastEvent: snapshot.lastEvent,
         repairLaunchAgent: repairLaunchAgent
       )
-      SettingsAcpPermissionLogSection(
-        runs: snapshot.acpPermissionLogRuns,
-        errorsByEntryID: permissionLogErrorsByEntryID,
-        revealStatusesByEntryID: permissionLogRevealStatusesByEntryID,
-        reveal: revealPermissionLog,
-        onRevealed: { entryID, message in
-          permissionLogRevealStatusesByEntryID[entryID] = message
-        },
-        onError: { entryID, message in
-          permissionLogRevealStatusesByEntryID.removeValue(forKey: entryID)
-          permissionLogErrorsByEntryID[entryID] = message
-        },
-        clearError: { entryID in
-          permissionLogErrorsByEntryID.removeValue(forKey: entryID)
-        }
-      )
-      SettingsPathsSection(paths: snapshot.paths)
-      SettingsRecentEventsSection(events: snapshot.recentEvents)
+      if isFullyExpanded {
+        SettingsAcpPermissionLogSection(
+          runs: snapshot.acpPermissionLogRuns,
+          errorsByEntryID: permissionLogErrorsByEntryID,
+          revealStatusesByEntryID: permissionLogRevealStatusesByEntryID,
+          reveal: revealPermissionLog,
+          onRevealed: { entryID, message in
+            permissionLogRevealStatusesByEntryID[entryID] = message
+          },
+          onError: { entryID, message in
+            permissionLogRevealStatusesByEntryID.removeValue(forKey: entryID)
+            permissionLogErrorsByEntryID[entryID] = message
+          },
+          clearError: { entryID in
+            permissionLogErrorsByEntryID.removeValue(forKey: entryID)
+          }
+        )
+        SettingsPathsSection(paths: snapshot.paths)
+        SettingsRecentEventsSection(events: snapshot.recentEvents)
+      }
     }
     .settingsDetailFormStyle()
+    .task { await expandAfterFirstFrame() }
     .onChange(of: snapshot.acpPermissionLogRuns.map(\.id)) { _, entryIDs in
       let activeIDs = Set(entryIDs)
       permissionLogErrorsByEntryID = permissionLogErrorsByEntryID.filter { entry in
@@ -217,6 +221,12 @@ public struct SettingsDiagnosticsSection: View {
         activeIDs.contains(entry.key)
       }
     }
+  }
+
+  private func expandAfterFirstFrame() async {
+    guard !isFullyExpanded else { return }
+    try? await Task.sleep(for: .milliseconds(40))
+    isFullyExpanded = true
   }
 }
 
