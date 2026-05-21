@@ -103,7 +103,9 @@ extension DashboardDependenciesRouteView {
       response: perResponse
     )
     var mergedLabels = routeResponse.repositoryLabels
-    if let updatedLabels = perResponse.repositoryLabels[repository] {
+    if let updatedLabels = perResponse.repositoryLabels[repository],
+      !updatedLabels.isEmpty
+    {
       mergedLabels[repository] = updatedLabels
     }
     routeResponse = DependencyUpdatesQueryResponse(
