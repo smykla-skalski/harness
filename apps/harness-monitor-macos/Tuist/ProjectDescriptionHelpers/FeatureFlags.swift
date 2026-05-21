@@ -3,13 +3,10 @@ import ProjectDescription
 
 public enum FeatureFlag: String, CaseIterable, Sendable {
     case otel = "HARNESS_FEATURE_OTEL"
-    case textual = "HARNESS_FEATURE_TEXTUAL"
 
     private var enabledByDefault: Bool {
         switch self {
         case .otel:
-            false
-        case .textual:
             false
         }
     }
@@ -45,8 +42,6 @@ public enum FeatureFlags {
             switch flag {
             case .otel:
                 return []
-            case .textual:
-                return [.glob("Sources/HarnessMonitorUIPreviewable/Features/Textual/**/*.swift")]
             }
         }
     }
@@ -54,8 +49,6 @@ public enum FeatureFlags {
     public static func kitAdditionalSourceGlobs() -> [SourceFileGlob] {
         enabled.flatMap { flag -> [SourceFileGlob] in
             switch flag {
-            case .textual:
-                return []
             case .otel:
                 return [.glob("Sources/HarnessMonitorKit/Features/Otel/**/*.swift")]
             }
@@ -65,8 +58,6 @@ public enum FeatureFlags {
     public static func kitTestsAdditionalSourceGlobs() -> [SourceFileGlob] {
         enabled.flatMap { flag -> [SourceFileGlob] in
             switch flag {
-            case .textual:
-                return []
             case .otel:
                 return [.glob("Tests/HarnessMonitorKitTests/Features/Otel/**/*.swift")]
             }
@@ -82,8 +73,6 @@ public enum FeatureFlags {
             switch flag {
             case .otel:
                 return []
-            case .textual:
-                return [.external(name: "Textual")]
             }
         }
     }
@@ -91,8 +80,6 @@ public enum FeatureFlags {
     public static func kitAdditionalDependencies() -> [TargetDependency] {
         enabled.flatMap { flag -> [TargetDependency] in
             switch flag {
-            case .textual:
-                return []
             case .otel:
                 return [
                     .external(name: "OpenTelemetryApi"),

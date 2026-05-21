@@ -33,11 +33,11 @@ struct HarnessMonitorJSONCodeBlockTests {
       rawJSON: #"{"name":"alpha","count":2,"enabled":false,"missing":null}"#
     )
 
-    #expect(presentation.tokens.contains(.init(text: #""name""#, kind: .key)))
-    #expect(presentation.tokens.contains(.init(text: #""alpha""#, kind: .stringValue)))
+    #expect(presentation.tokens.contains(.init(text: #""name""#, kind: .property)))
+    #expect(presentation.tokens.contains(.init(text: #""alpha""#, kind: .string)))
     #expect(presentation.tokens.contains(.init(text: "2", kind: .number)))
-    #expect(presentation.tokens.contains(.init(text: "false", kind: .boolean)))
-    #expect(presentation.tokens.contains(.init(text: "null", kind: .null)))
+    #expect(presentation.tokens.contains(.init(text: "false", kind: .literal)))
+    #expect(presentation.tokens.contains(.init(text: "null", kind: .literal)))
   }
 
   @Test("Invalid JSON shows an error and preserves the raw payload")
