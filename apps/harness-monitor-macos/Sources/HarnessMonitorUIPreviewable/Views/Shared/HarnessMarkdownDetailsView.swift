@@ -20,12 +20,15 @@ struct HarnessMarkdownDetailsView: View {
 
   var body: some View {
     let metrics = HarnessMarkdownMarkerMetrics(style: style)
-    VStack(alignment: .leading, spacing: style.spacing.nestedBlock) {
+    VStack(alignment: .leading, spacing: 0) {
       summaryButton(metrics: metrics)
       if isExpanded {
         detailsContent
       }
     }
+    .background(cardBackground)
+    .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+    .overlay(cardBorder)
   }
 
   private func summaryButton(metrics: HarnessMarkdownMarkerMetrics) -> some View {
@@ -41,8 +44,6 @@ struct HarnessMarkdownDetailsView: View {
       .frame(maxWidth: .infinity, alignment: .leading)
       .padding(.horizontal, HarnessMonitorTheme.spacingSM)
       .padding(.vertical, 6)
-      .background(summaryBackground)
-      .overlay(summaryBorder)
     }
     .buttonStyle(.borderless)
     .frame(maxWidth: .infinity, alignment: .leading)
@@ -76,12 +77,12 @@ struct HarnessMarkdownDetailsView: View {
     .frame(minHeight: metrics.firstLineHeight, alignment: .center)
   }
 
-  private var summaryBackground: some View {
+  private var cardBackground: some View {
     RoundedRectangle(cornerRadius: 8, style: .continuous)
       .fill(style.colors.link.opacity(isExpanded ? 0.12 : 0.08))
   }
 
-  private var summaryBorder: some View {
+  private var cardBorder: some View {
     RoundedRectangle(cornerRadius: 8, style: .continuous)
       .strokeBorder(style.colors.link.opacity(isExpanded ? 0.42 : 0.28), lineWidth: 1)
   }
@@ -99,5 +100,8 @@ struct HarnessMarkdownDetailsView: View {
     .scrollIndicators(.visible)
     .frame(maxHeight: style.spacing.detailsMaxHeight)
     .padding(.leading, style.spacing.detailsContentIndent)
+    .padding(.trailing, HarnessMonitorTheme.spacingSM)
+    .padding(.bottom, HarnessMonitorTheme.spacingSM)
+    .padding(.top, style.spacing.nestedBlock)
   }
 }

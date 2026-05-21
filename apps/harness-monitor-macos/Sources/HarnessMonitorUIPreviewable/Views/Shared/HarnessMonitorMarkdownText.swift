@@ -286,18 +286,22 @@ private struct HarnessMarkdownQuoteView: View {
   let settings: HarnessMarkdownRenderSettings
   let style: HarnessMarkdownResolvedRenderSettings
 
+  private let quoteBarWidth: CGFloat = 3
+
   var body: some View {
-    HStack(alignment: .top, spacing: style.spacing.quoteContentGap) {
+    HarnessMarkdownBlockStackView(
+      blocks: blocks,
+      settings: settings,
+      style: style,
+      spacing: style.spacing.nestedBlock
+    )
+    .padding(.leading, quoteBarWidth + style.spacing.quoteContentGap)
+    .overlay(alignment: .leading) {
       Rectangle()
         .fill(style.colors.quoteBar)
-        .frame(width: 3)
-      HarnessMarkdownBlockStackView(
-        blocks: blocks,
-        settings: settings,
-        style: style,
-        spacing: style.spacing.nestedBlock
-      )
+        .frame(width: quoteBarWidth)
     }
+    .fixedSize(horizontal: false, vertical: true)
   }
 }
 
