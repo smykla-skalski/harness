@@ -48,6 +48,8 @@ public struct SettingsView: View {
           SettingsBannersSection()
         case .appearance:
           SettingsAppearanceSection(themeMode: $themeMode)
+        case .markdown:
+          SettingsMarkdownSection()
         case .notifications:
           SettingsNotificationsSection(notifications: notifications)
         case .voice:

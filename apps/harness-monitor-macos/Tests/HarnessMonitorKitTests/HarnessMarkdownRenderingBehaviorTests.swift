@@ -84,7 +84,7 @@ struct HarnessMarkdownRenderingBehaviorTests {
   func taskCheckboxesUseNativeCheckboxControls() throws {
     let source = try readRepositoryFile(
       "apps/harness-monitor-macos/Sources/HarnessMonitorUIPreviewable"
-        + "/Views/Shared/HarnessMonitorMarkdownText.swift"
+        + "/Views/Shared/HarnessMarkdownDetailsView.swift"
     )
 
     #expect(source.contains("Toggle(isOn: .constant(checkbox))"))

@@ -38,6 +38,7 @@ extension HarnessMonitorAccessibility {
   public static let settingsFocusModeSection = "harness.settings.section.focusmode"
   public static let settingsBannersSection = "harness.settings.section.banners"
   public static let settingsAppearanceSection = "harness.settings.section.appearance"
+  public static let settingsMarkdownSection = "harness.settings.section.markdown"
   public static let settingsNotificationsSection = "harness.settings.section.notifications"
   public static let settingsSupervisorSection = "harness.settings.section.supervisor"
   public static let settingsVoiceSection = "harness.settings.section.voice"
