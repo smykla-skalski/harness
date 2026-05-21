@@ -85,6 +85,43 @@ public struct DependencyUpdatesCache {
     return nextResponse
   }
 
+  /// Apply a per-repository query response to the cached snapshot for
+  /// `preferencesHash`. Items belonging to other repositories pass through
+  /// untouched; the targeted repository's items are wholesale replaced by
+  /// `response.items`. Repository labels for the targeted repo are refreshed,
+  /// other repos' labels remain. Returns the reconciled response, or `nil` if
+  /// no cached row exists for `preferencesHash`.
+  @discardableResult
+  public func applyPerRepoResponse(
+    preferencesHash: String,
+    repository: String,
+    response: DependencyUpdatesQueryResponse
+  ) -> DependencyUpdatesQueryResponse? {
+    guard let row = fetchRow(preferencesHash: preferencesHash),
+      let cached = try? row.decodedResponse()
+    else {
+      return nil
+    }
+    let nextItems = Self.applyPerRepoResponse(
+      cached.items,
+      repository: repository,
+      response: response
+    )
+    var nextLabels = cached.repositoryLabels
+    if let updatedLabels = response.repositoryLabels[repository] {
+      nextLabels[repository] = updatedLabels
+    }
+    let nextResponse = DependencyUpdatesQueryResponse(
+      fetchedAt: response.fetchedAt,
+      fromCache: cached.fromCache,
+      summary: DependencyUpdatesSummary(items: nextItems),
+      items: nextItems,
+      repositoryLabels: nextLabels
+    )
+    save(preferencesHash: preferencesHash, response: nextResponse)
+    return nextResponse
+  }
+
   public func deleteAll() {
     do {
       let descriptor = FetchDescriptor<CachedDependencyUpdatesSnapshot>()
@@ -131,6 +168,44 @@ public struct DependencyUpdatesCache {
       }
       return openItemsByID[item.pullRequestID] ?? item
     }
+  }
+
+  /// Merge a per-repository response into a flat items list.
+  ///
+  /// - Items for repositories other than `repository` pass through in their
+  ///   original order, untouched.
+  /// - Items for `repository` whose `pullRequestID` appears in
+  ///   `response.items` get replaced in place with the response variant.
+  /// - Items for `repository` absent from `response.items` are dropped
+  ///   (closed, merged, or no longer matching the query).
+  /// - PRs present in `response.items` that were not yet known are appended.
+  ///
+  /// Pure function so tests can exercise it without a `ModelContext`.
+  static func applyPerRepoResponse(
+    _ items: [DependencyUpdateItem],
+    repository: String,
+    response: DependencyUpdatesQueryResponse
+  ) -> [DependencyUpdateItem] {
+    let responseByID: [String: DependencyUpdateItem] = Dictionary(
+      uniqueKeysWithValues: response.items.map { ($0.pullRequestID, $0) }
+    )
+    var seenIDs = Set<String>()
+    var result: [DependencyUpdateItem] = []
+    result.reserveCapacity(items.count + response.items.count)
+    for item in items {
+      if item.repository != repository {
+        result.append(item)
+        continue
+      }
+      if let updated = responseByID[item.pullRequestID] {
+        result.append(updated)
+        seenIDs.insert(updated.pullRequestID)
+      }
+    }
+    for newItem in response.items where !seenIDs.contains(newItem.pullRequestID) {
+      result.append(newItem)
+    }
+    return result
   }
 }
 
