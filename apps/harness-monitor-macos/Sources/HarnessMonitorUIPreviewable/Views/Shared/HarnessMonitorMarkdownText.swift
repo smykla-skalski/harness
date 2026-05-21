@@ -230,17 +230,22 @@ private struct HarnessMarkdownDetailsView: View {
   }
 
   var body: some View {
+    let metrics = HarnessMarkdownMarkerMetrics(style: style)
     VStack(alignment: .leading, spacing: style.spacing.nestedBlock) {
       Button {
         isExpanded.toggle()
       } label: {
-        HStack(alignment: .firstTextBaseline, spacing: style.spacing.listMarkerGap) {
+        HStack(alignment: .firstTextBaseline, spacing: metrics.gap) {
           Image(systemName: isExpanded ? "chevron.down" : "chevron.right")
-            .font(style.typography.listMarker.font.weight(.semibold))
+            .font(.system(size: metrics.chevronSize, weight: .semibold))
             .foregroundStyle(style.colors.secondaryText)
-            .frame(width: style.spacing.listMarkerWidth, alignment: .trailing)
+            .frame(
+              width: metrics.chevronColumnWidth,
+              height: metrics.firstLineHeight,
+              alignment: .center
+            )
             .alignmentGuide(.firstTextBaseline) { dimensions in
-              dimensions[VerticalAlignment.center]
+              dimensions[VerticalAlignment.center] + metrics.firstLineCenterBaselineOffset
             }
           HarnessMarkdownInlineFlowView(
             inlines: details.summary,
@@ -258,6 +263,8 @@ private struct HarnessMarkdownDetailsView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
       }
       .harnessPlainButtonStyle()
+      .frame(maxWidth: .infinity, alignment: .leading)
+      .modifier(HarnessMarkdownPointerHoverModifier(color: style.colors.link))
       .accessibilityLabel(Text(HarnessMarkdownInlinePlainText.string(from: details.summary)))
       .accessibilityValue(isExpanded ? "Expanded" : "Collapsed")
 
@@ -329,11 +336,11 @@ private struct HarnessMarkdownListView: View {
   let style: HarnessMarkdownResolvedRenderSettings
 
   var body: some View {
+    let metrics = HarnessMarkdownMarkerMetrics(style: style)
     VStack(alignment: .leading, spacing: style.spacing.listItem) {
       ForEach(visibleItems, id: \.offset) { index, item in
-        HStack(alignment: .firstTextBaseline, spacing: style.spacing.listMarkerGap) {
-          marker(for: item, index: index)
-            .frame(width: style.spacing.listMarkerWidth, alignment: .trailing)
+        HStack(alignment: .firstTextBaseline, spacing: metrics.gap) {
+          marker(for: item, index: index, metrics: metrics)
           HarnessMarkdownBlockStackView(
             blocks: item.blocks,
             settings: settings,
@@ -353,7 +360,11 @@ private struct HarnessMarkdownListView: View {
   }
 
   @ViewBuilder
-  private func marker(for item: HarnessMarkdownListItem, index: Int) -> some View {
+  private func marker(
+    for item: HarnessMarkdownListItem,
+    index: Int,
+    metrics: HarnessMarkdownMarkerMetrics
+  ) -> some View {
     if let checkbox = item.checkbox {
       Toggle(isOn: .constant(checkbox)) {
         EmptyView()
@@ -362,17 +373,26 @@ private struct HarnessMarkdownListView: View {
       .labelsHidden()
       .controlSize(.small)
       .allowsHitTesting(false)
+      .frame(width: metrics.columnWidth, height: metrics.firstLineHeight, alignment: .center)
       .alignmentGuide(.firstTextBaseline) { dimensions in
-        dimensions[VerticalAlignment.center]
+        dimensions[VerticalAlignment.center] + metrics.firstLineCenterBaselineOffset
       }
     } else if ordered {
       Text("\(start + index).")
         .font(style.typography.listMarker.font)
         .foregroundStyle(style.colors.secondaryText)
+        .frame(width: metrics.columnWidth, height: metrics.firstLineHeight, alignment: .trailing)
+        .alignmentGuide(.firstTextBaseline) { dimensions in
+          dimensions[VerticalAlignment.center] + metrics.firstLineCenterBaselineOffset
+        }
     } else {
       Text("•")
         .font(style.typography.listMarker.font)
         .foregroundStyle(style.colors.secondaryText)
+        .frame(width: metrics.columnWidth, height: metrics.firstLineHeight, alignment: .center)
+        .alignmentGuide(.firstTextBaseline) { dimensions in
+          dimensions[VerticalAlignment.center] + metrics.firstLineCenterBaselineOffset
+        }
     }
   }
 }

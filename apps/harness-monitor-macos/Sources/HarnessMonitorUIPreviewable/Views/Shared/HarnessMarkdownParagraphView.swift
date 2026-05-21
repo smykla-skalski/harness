@@ -6,23 +6,16 @@ struct HarnessMarkdownParagraphView: View {
 
   var body: some View {
     if let leadingEmoji = HarnessMarkdownLeadingEmoji(inlines: inlines) {
-      HStack(alignment: .firstTextBaseline, spacing: emojiGap) {
+      let metrics = HarnessMarkdownMarkerMetrics(style: style)
+      HStack(alignment: .firstTextBaseline, spacing: metrics.gap) {
         Text(verbatim: leadingEmoji.emoji)
           .font(style.typography.body.font)
-          .frame(width: emojiColumnWidth, alignment: .center)
+          .frame(width: metrics.columnWidth, alignment: .center)
         inlineFlow(leadingEmoji.remaining)
       }
     } else {
       inlineFlow(inlines)
     }
-  }
-
-  private var emojiColumnWidth: CGFloat {
-    max(24, (style.typography.body.pointSize ?? 13) * 1.75)
-  }
-
-  private var emojiGap: CGFloat {
-    max(4, style.spacing.listMarkerGap * 0.5)
   }
 
   private func inlineFlow(_ inlines: [HarnessMarkdownInline]) -> some View {

@@ -15,6 +15,23 @@ struct HarnessMarkdownRenderingBehaviorTests {
     #expect(split?.remaining == [.strong([.text("Automerge")]), .text(": Disabled")])
   }
 
+  @Test("Markdown markers share one compact marker lane")
+  func markdownMarkersShareOneCompactMarkerLane() throws {
+    let paragraphSource = try readRepositoryFile(
+      "apps/harness-monitor-macos/Sources/HarnessMonitorUIPreviewable"
+        + "/Views/Shared/HarnessMarkdownParagraphView.swift"
+    )
+    let textSource = try readRepositoryFile(
+      "apps/harness-monitor-macos/Sources/HarnessMonitorUIPreviewable"
+        + "/Views/Shared/HarnessMonitorMarkdownText.swift"
+    )
+
+    #expect(paragraphSource.contains("HarnessMarkdownMarkerMetrics(style: style)"))
+    #expect(paragraphSource.contains(".frame(width: metrics.columnWidth, alignment: .center)"))
+    #expect(textSource.contains(".frame(width: metrics.columnWidth"))
+    #expect(textSource.contains("metrics.firstLineCenterBaselineOffset"))
+  }
+
   @Test("Markdown table renderer keeps content-width columns")
   func markdownTableRendererKeepsContentWidthColumns() throws {
     let source = try readRepositoryFile(
@@ -68,7 +85,8 @@ struct HarnessMarkdownRenderingBehaviorTests {
 
     #expect(source.contains("Toggle(isOn: .constant(checkbox))"))
     #expect(source.contains(".toggleStyle(.checkbox)"))
-    #expect(source.contains("dimensions[VerticalAlignment.center]"))
+    #expect(source.contains(".frame(width: metrics.columnWidth, height: metrics.firstLineHeight"))
+    #expect(source.contains("metrics.firstLineCenterBaselineOffset"))
   }
 
   @Test("Markdown details summary row toggles disclosure")
@@ -81,6 +99,8 @@ struct HarnessMarkdownRenderingBehaviorTests {
     #expect(source.contains("Button {"))
     #expect(source.contains("isExpanded.toggle()"))
     #expect(source.contains(".contentShape(Rectangle())"))
+    #expect(source.contains("HarnessMarkdownPointerHoverModifier"))
+    #expect(source.contains("metrics.chevronSize"))
     #expect(!source.contains("DisclosureGroup(isExpanded: $isExpanded)"))
   }
 
