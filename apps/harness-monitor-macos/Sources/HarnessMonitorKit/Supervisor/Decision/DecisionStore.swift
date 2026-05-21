@@ -84,7 +84,7 @@ public actor DecisionStore {
   let eventsContinuation: AsyncStream<DecisionEvent>.Continuation
 
   let container: ModelContainer
-  nonisolated private let now: @Sendable () -> Date
+  nonisolated let now: @Sendable () -> Date
   nonisolated let readQueue: DispatchQueue
 
   public init(container: ModelContainer, now: @escaping @Sendable () -> Date = { Date() }) {
