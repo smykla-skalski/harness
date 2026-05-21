@@ -197,13 +197,23 @@ func policyCanvasRouteFrames(
     })
 }
 
+private struct PolicyCanvasRouteSortKey {
+  let span: CGFloat
+  let source: CGPoint
+  let target: CGPoint
+}
+
 private func policyCanvasRouteBuildSortValues(
   edge: PolicyCanvasEdge,
   portAnchors: [PolicyCanvasPortEndpoint: CGPoint]
-) -> (span: CGFloat, source: CGPoint, target: CGPoint) {  // swiftlint:disable:this large_tuple
+) -> PolicyCanvasRouteSortKey {
   let source = portAnchors[edge.source] ?? .zero
   let target = portAnchors[edge.target] ?? .zero
-  return (abs(target.x - source.x) + abs(target.y - source.y), source, target)
+  return PolicyCanvasRouteSortKey(
+    span: abs(target.x - source.x) + abs(target.y - source.y),
+    source: source,
+    target: target
+  )
 }
 
 private func policyCanvasInteriorRouteSegments(
