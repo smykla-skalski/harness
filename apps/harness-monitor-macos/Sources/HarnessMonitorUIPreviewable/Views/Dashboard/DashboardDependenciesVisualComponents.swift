@@ -150,8 +150,8 @@ struct DashboardDependencyStatusPill: View {
 }
 
 private struct DashboardDependencyChangePill: View {
-  let additions: Int
-  let deletions: Int
+  let additions: UInt64
+  let deletions: UInt64
 
   var body: some View {
     HStack(spacing: HarnessMonitorTheme.spacingSM) {
