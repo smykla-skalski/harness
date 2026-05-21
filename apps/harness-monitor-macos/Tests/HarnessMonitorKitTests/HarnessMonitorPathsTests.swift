@@ -1,4 +1,3 @@
-// swiftlint:disable file_length
 import Foundation
 import Testing
 
@@ -375,53 +374,4 @@ struct HarnessMonitorPathsTests {
         == "Q498EB36N4.io.harnessmonitor.daemon"
     )
   }
-}
-
-private func expectedDefaultAppGroupRoot(homeDirectory: URL) -> URL {
-  expectedAppGroupRoot(
-    identifier: HarnessMonitorAppGroup.identifier,
-    homeDirectory: homeDirectory
-  )
-}
-
-private func expectedAppGroupRoot(identifier: String, homeDirectory: URL) -> URL {
-  homeDirectory
-    .appendingPathComponent("Library", isDirectory: true)
-    .appendingPathComponent("Group Containers", isDirectory: true)
-    .appendingPathComponent(identifier, isDirectory: true)
-}
-
-private func expectedRuntimeLaneRoot(homeDirectory: URL, lane: String) -> URL {
-  expectedDefaultAppGroupRoot(homeDirectory: homeDirectory)
-    .appendingPathComponent("runtime-lanes", isDirectory: true)
-    .appendingPathComponent(lane, isDirectory: true)
-}
-
-private func expectedHarnessRoot(in dataHomeRoot: URL) -> URL {
-  dataHomeRoot.appendingPathComponent("harness", isDirectory: true)
-}
-
-private func expectedDaemonRoot(
-  in dataHomeRoot: URL,
-  ownership: DaemonOwnership = .managed
-) -> URL {
-  expectedHarnessRoot(in: dataHomeRoot)
-    .appendingPathComponent("daemon", isDirectory: true)
-    .appendingPathComponent(ownership.rawValue, isDirectory: true)
-}
-
-private func expectedManifestURL(
-  in dataHomeRoot: URL,
-  ownership: DaemonOwnership = .managed
-) -> URL {
-  expectedDaemonRoot(in: dataHomeRoot, ownership: ownership)
-    .appendingPathComponent("manifest.json")
-}
-
-private func expectedAuthTokenURL(
-  in dataHomeRoot: URL,
-  ownership: DaemonOwnership = .managed
-) -> URL {
-  expectedDaemonRoot(in: dataHomeRoot, ownership: ownership)
-    .appendingPathComponent("auth-token")
 }
