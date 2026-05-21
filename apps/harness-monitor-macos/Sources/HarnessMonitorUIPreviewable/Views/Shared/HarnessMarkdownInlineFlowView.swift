@@ -13,8 +13,8 @@ struct HarnessMarkdownInlineFlowView: View {
   var imageLayout: ImageLayout = .body
 
   var body: some View {
-    if inlines.containsMarkdownImage {
-      HStack(alignment: inlineAlignment, spacing: 4) {
+    if usesFragmentLayout {
+      HarnessMarkdownInlineWrapLayout(horizontalSpacing: 4, verticalSpacing: 2) {
         ForEach(Array(inlines.enumerated()), id: \.offset) { _, inline in
           HarnessMarkdownInlineFragmentView(
             inline: inline,
@@ -37,9 +37,10 @@ struct HarnessMarkdownInlineFlowView: View {
     }
   }
 
-  private var inlineAlignment: VerticalAlignment {
-    inlines.isStandaloneMarkdownImage ? .center : .firstTextBaseline
+  private var usesFragmentLayout: Bool {
+    inlines.containsMarkdownImage || inlines.containsMarkdownLink
   }
+
 }
 
 private struct HarnessMarkdownInlineFragmentView: View {
@@ -79,7 +80,9 @@ private struct HarnessMarkdownInlineFragmentView: View {
         images: images,
         imageLayout: .inline
       )
-    case .autolink, .code, .lineBreak, .softBreak, .text:
+    case .autolink(let destination):
+      link(label: [.text(destination)], destination: destination)
+    case .code, .lineBreak, .softBreak, .text:
       Text(HarnessMarkdownInlineRenderer.attributedString(from: [inline], style: style))
     }
   }
@@ -95,13 +98,132 @@ private struct HarnessMarkdownInlineFragmentView: View {
           imageLayout: preferBlockImage ? imageLayout : .inline
         )
       }
-      .buttonStyle(.plain)
+      .modifier(HarnessMarkdownLinkHoverModifier(color: style.colors.link))
+    } else if let url = URL(string: destination) {
+      Link(destination: url) {
+        HarnessMarkdownInlineFlowView(
+          inlines: label,
+          style: style.withMarkdownTextColor(style.colors.link),
+          images: images,
+          imageLayout: .inline
+        )
+      }
+      .underline()
+      .modifier(HarnessMarkdownLinkHoverModifier(color: style.colors.link))
     } else {
       Text(
         HarnessMarkdownInlineRenderer.attributedString(
           from: [.link(label: label, destination: destination, title: nil)], style: style)
       )
     }
+  }
+}
+
+private struct HarnessMarkdownInlineWrapLayout: Layout {
+  let horizontalSpacing: CGFloat
+  let verticalSpacing: CGFloat
+
+  func sizeThatFits(
+    proposal: ProposedViewSize,
+    subviews: Subviews,
+    cache: inout ()
+  ) -> CGSize {
+    measuredRows(in: proposal.width, subviews: subviews).size
+  }
+
+  func placeSubviews(
+    in bounds: CGRect,
+    proposal: ProposedViewSize,
+    subviews: Subviews,
+    cache: inout ()
+  ) {
+    for row in measuredRows(in: bounds.width, subviews: subviews).rows {
+      for item in row.items {
+        subviews[item.index].place(
+          at: CGPoint(x: bounds.minX + item.x, y: bounds.minY + row.y),
+          proposal: ProposedViewSize(item.size)
+        )
+      }
+    }
+  }
+
+  private func measuredRows(in width: CGFloat?, subviews: Subviews) -> (
+    rows: [HarnessMarkdownInlineLayoutRow], size: CGSize
+  ) {
+    let maxWidth = width ?? .greatestFiniteMagnitude
+    var rows: [HarnessMarkdownInlineLayoutRow] = []
+    var items: [HarnessMarkdownInlineLayoutItem] = []
+    var rowWidth: CGFloat = 0
+    var rowHeight: CGFloat = 0
+    var totalWidth: CGFloat = 0
+    var y: CGFloat = 0
+
+    func finishRow() {
+      guard !items.isEmpty else { return }
+      rows.append(HarnessMarkdownInlineLayoutRow(items: items, y: y, height: rowHeight))
+      totalWidth = max(totalWidth, rowWidth)
+      y += rowHeight + verticalSpacing
+      items.removeAll(keepingCapacity: true)
+      rowWidth = 0
+      rowHeight = 0
+    }
+
+    for index in subviews.indices {
+      let size = subviews[index].sizeThatFits(
+        ProposedViewSize(width: maxWidth.isFinite ? maxWidth : nil, height: nil)
+      )
+      let spacing = items.isEmpty ? 0 : horizontalSpacing
+      if !items.isEmpty, rowWidth + spacing + size.width > maxWidth {
+        finishRow()
+      }
+      let x = items.isEmpty ? 0 : rowWidth + horizontalSpacing
+      items.append(HarnessMarkdownInlineLayoutItem(index: index, x: x, size: size))
+      rowWidth = x + size.width
+      rowHeight = max(rowHeight, size.height)
+    }
+    finishRow()
+    return (rows, CGSize(width: totalWidth, height: max(0, y - verticalSpacing)))
+  }
+}
+
+private struct HarnessMarkdownInlineLayoutRow {
+  let items: [HarnessMarkdownInlineLayoutItem]
+  let y: CGFloat
+  let height: CGFloat
+}
+
+private struct HarnessMarkdownInlineLayoutItem {
+  let index: Int
+  let x: CGFloat
+  let size: CGSize
+}
+
+private struct HarnessMarkdownLinkHoverModifier: ViewModifier {
+  let color: Color
+  @State private var isHovering = false
+
+  func body(content: Content) -> some View {
+    content
+      .padding(.horizontal, 1)
+      .background {
+        RoundedRectangle(cornerRadius: 3, style: .continuous)
+          .fill(color.opacity(isHovering ? 0.14 : 0))
+      }
+      .onHover { hovering in
+        guard isHovering != hovering else { return }
+        isHovering = hovering
+        if hovering {
+          NSCursor.pointingHand.push()
+        } else {
+          NSCursor.pop()
+        }
+      }
+      .onDisappear {
+        if isHovering {
+          NSCursor.pop()
+          isHovering = false
+        }
+      }
   }
 }
 
@@ -204,5 +326,32 @@ private actor HarnessMarkdownImageDataCache {
       values.removeValue(forKey: removed)
     }
     return data
+  }
+}
+
+extension HarnessMarkdownInline {
+  fileprivate var containsMarkdownLink: Bool {
+    switch self {
+    case .autolink, .link:
+      true
+    case .emphasis(let children), .strikethrough(let children), .strong(let children):
+      children.containsMarkdownLink
+    case .code, .image, .lineBreak, .softBreak, .text:
+      false
+    }
+  }
+}
+
+extension [HarnessMarkdownInline] {
+  fileprivate var containsMarkdownLink: Bool {
+    contains { $0.containsMarkdownLink }
+  }
+}
+
+extension HarnessMarkdownInlineRenderStyle {
+  fileprivate func withMarkdownTextColor(_ color: Color) -> HarnessMarkdownInlineRenderStyle {
+    var updatedColors = colors
+    updatedColors.text = color
+    return HarnessMarkdownInlineRenderStyle(font: font, codeFont: codeFont, colors: updatedColors)
   }
 }

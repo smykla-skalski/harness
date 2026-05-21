@@ -149,19 +149,17 @@ private struct HarnessMarkdownBlockView: View {
         images: style.images
       )
     case .html(let inlines):
-      HarnessMarkdownInlineFlowView(
+      HarnessMarkdownParagraphView(
         inlines: inlines,
-        style: inlineStyle(font: style.typography.body.font),
-        images: style.images
+        style: style
       )
     case .orderedList(let start, let items):
       HarnessMarkdownListView(
         start: start, ordered: true, items: items, settings: settings, style: style)
     case .paragraph(let inlines):
-      HarnessMarkdownInlineFlowView(
+      HarnessMarkdownParagraphView(
         inlines: inlines,
-        style: inlineStyle(font: style.typography.body.font),
-        images: style.images
+        style: style
       )
     case .table(let table):
       HarnessMarkdownTableView(table: table, settings: settings, style: style)
@@ -313,18 +311,23 @@ private struct HarnessMarkdownTableView: View {
   let style: HarnessMarkdownResolvedRenderSettings
 
   var body: some View {
-    Grid(
-      alignment: .leadingFirstTextBaseline,
-      horizontalSpacing: style.spacing.tableColumn,
-      verticalSpacing: style.spacing.tableRow
-    ) {
-      row(cells: table.headers, isHeader: true)
-      Divider()
-      ForEach(table.rows.indices, id: \.self) { index in
-        row(cells: table.rows[index], isHeader: false)
+    ScrollView(.horizontal) {
+      Grid(
+        alignment: .leading,
+        horizontalSpacing: style.spacing.tableColumn,
+        verticalSpacing: style.spacing.tableRow
+      ) {
+        row(cells: table.headers, isHeader: true)
+        Divider()
+        ForEach(table.rows.indices, id: \.self) { index in
+          row(cells: table.rows[index], isHeader: false)
+        }
       }
+      .fixedSize(horizontal: true, vertical: false)
+      .padding(HarnessMonitorTheme.spacingSM)
     }
-    .padding(HarnessMonitorTheme.spacingSM)
+    .scrollIndicators(.hidden)
+    .frame(maxWidth: .infinity, alignment: .leading)
     .background {
       RoundedRectangle(cornerRadius: HarnessMonitorTheme.cornerRadiusSM, style: .continuous)
         .fill(style.colors.tableBackground)
@@ -337,7 +340,7 @@ private struct HarnessMarkdownTableView: View {
 
   @ViewBuilder
   private func row(cells: [[HarnessMarkdownInline]], isHeader: Bool) -> some View {
-    GridRow {
+    GridRow(alignment: .center) {
       ForEach(cells.indices, id: \.self) { index in
         HarnessMarkdownInlineFlowView(
           inlines: cells[index],
@@ -349,12 +352,25 @@ private struct HarnessMarkdownTableView: View {
           images: style.images,
           imageLayout: .inline
         )
-        .frame(maxWidth: .infinity, alignment: swiftAlignment(for: index))
+        .gridColumnAlignment(horizontalAlignment(for: index))
+        .multilineTextAlignment(textAlignment(for: index))
       }
     }
   }
 
-  private func swiftAlignment(for index: Int) -> SwiftUI.Alignment {
+  private func horizontalAlignment(for index: Int) -> HorizontalAlignment {
+    guard index < table.alignments.count else { return .leading }
+    switch table.alignments[index] {
+    case .leading:
+      return .leading
+    case .center:
+      return .center
+    case .trailing:
+      return .trailing
+    }
+  }
+
+  private func textAlignment(for index: Int) -> TextAlignment {
     guard index < table.alignments.count else { return .leading }
     switch table.alignments[index] {
     case .leading:
