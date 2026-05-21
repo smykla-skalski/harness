@@ -60,6 +60,9 @@ struct DashboardDependenciesRouteViewTests {
     #expect(source.contains("private var reloadTaskKey: DashboardDependenciesReloadTaskKey"))
     #expect(source.contains("connectionState: store.connectionState"))
     #expect(source.contains(".task(id: reloadTaskKey)"))
+    #expect(!source.contains(".task(id: storedPreferences)"))
+    #expect(!source.contains("runAutoRefreshLoop"))
+    #expect(source.contains("await startScheduler(forceRefreshAll: forceRefresh)"))
     #expect(!source.contains("refreshToken +="))
     #expect(!source.contains("let refreshToken"))
   }

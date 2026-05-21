@@ -72,14 +72,14 @@ actor DashboardDependenciesPresentationWorker {
     category: "perf"
   )
 
-  private var cachedListInput: DashboardDependenciesListPresentationInput?
-  private var cachedListPresentation = DashboardDependenciesListPresentation.empty
   private let isoFormatter = ISO8601DateFormatter()
   private let relativeFormatter: RelativeDateTimeFormatter = {
     let formatter = RelativeDateTimeFormatter()
     formatter.unitsStyle = .short
     return formatter
   }()
+  private var cachedListInput: DashboardDependenciesListPresentationInput?
+  private var cachedListPresentation = DashboardDependenciesListPresentation.empty
 
   func compute(
     input: DashboardDependenciesPresentationInput
@@ -169,7 +169,7 @@ actor DashboardDependenciesPresentationWorker {
     for items: [DependencyUpdateItem],
     relativeTo now: Date = .now
   ) -> [String: String] {
-    Dictionary(
+    return Dictionary(
       items.map { item -> (String, String) in
         guard let date = isoFormatter.date(from: item.updatedAt) else {
           return (item.pullRequestID, item.updatedAt)

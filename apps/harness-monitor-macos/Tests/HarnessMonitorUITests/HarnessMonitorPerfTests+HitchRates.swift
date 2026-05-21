@@ -74,6 +74,14 @@ extension HarnessMonitorPerfTests {
     measureScenario("task-board-settings")
   }
 
+  func testRepositoriesSettingsHitchRate() {
+    measureScenario("repositories-settings")
+  }
+
+  func testDependenciesSettingsHitchRate() {
+    measureScenario("dependencies-settings")
+  }
+
   func testSettingsBackdropCycleHitchRate() {
     measureScenario("settings-backdrop-cycle", includeMemoryMetric: true)
   }

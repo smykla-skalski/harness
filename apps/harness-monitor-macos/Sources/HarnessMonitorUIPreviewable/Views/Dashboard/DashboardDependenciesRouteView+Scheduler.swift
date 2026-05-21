@@ -6,7 +6,7 @@ extension DashboardDependenciesRouteView {
   /// per-repository scheduler. Idempotent and safe to call on every
   /// preferences-change tick; the scheduler internally cancels its prior
   /// tick task and any in-flight fetches before resuming.
-  func startScheduler() async {
+  func startScheduler(forceRefreshAll: Bool = false) async {
     guard let client = store.apiClient else {
       scheduler.stop()
       return
@@ -29,6 +29,7 @@ extension DashboardDependenciesRouteView {
         preferences: preferences,
         client: client,
         initialLastSyncedAt: hydrated,
+        forceRefreshAll: forceRefreshAll,
         onMerge: { [self] repository, response in
           self.applyPerRepoResponse(repository: repository, response: response)
         }

@@ -54,6 +54,8 @@ final class ScenarioCatalogTests: XCTestCase {
         )
         XCTAssertEqual(ScenarioCatalog.durationSeconds(for: "permission-modal"), 8)
         XCTAssertEqual(ScenarioCatalog.durationSeconds(for: "task-board-settings"), 8)
+        XCTAssertEqual(ScenarioCatalog.durationSeconds(for: "repositories-settings"), 8)
+        XCTAssertEqual(ScenarioCatalog.durationSeconds(for: "dependencies-settings"), 8)
         XCTAssertEqual(ScenarioCatalog.durationSeconds(for: "unknown-scenario"), 8)
     }
 
@@ -83,6 +85,8 @@ final class ScenarioCatalogTests: XCTestCase {
         XCTAssertEqual(ScenarioCatalog.previewScenario(for: "timeline-filter-form-visual-options-disabled"), "dashboard-landing")
         XCTAssertEqual(ScenarioCatalog.previewScenario(for: "permission-modal"), "cockpit")
         XCTAssertEqual(ScenarioCatalog.previewScenario(for: "task-board-settings"), "dashboard")
+        XCTAssertEqual(ScenarioCatalog.previewScenario(for: "repositories-settings"), "dashboard")
+        XCTAssertEqual(ScenarioCatalog.previewScenario(for: "dependencies-settings"), "dashboard")
         XCTAssertEqual(ScenarioCatalog.previewScenario(for: "offline-cached-open"), "offline-cached")
         XCTAssertEqual(ScenarioCatalog.previewScenario(for: "anything-else"), "dashboard")
     }
@@ -107,6 +111,8 @@ final class ScenarioCatalogTests: XCTestCase {
         XCTAssertTrue(ScenarioCatalog.swiftUI.contains("timeline-filter-form-visual-options-disabled"))
         XCTAssertTrue(ScenarioCatalog.swiftUI.contains("toast-overlay-churn"))
         XCTAssertTrue(ScenarioCatalog.swiftUI.contains("task-board-settings"))
+        XCTAssertTrue(ScenarioCatalog.swiftUI.contains("repositories-settings"))
+        XCTAssertTrue(ScenarioCatalog.swiftUI.contains("dependencies-settings"))
         XCTAssertFalse(ScenarioCatalog.swiftUI.contains("settings-backdrop-cycle"))
         XCTAssertTrue(ScenarioCatalog.allocations.contains("settings-background-cycle"))
         XCTAssertTrue(ScenarioCatalog.allocations.contains("offline-cached-open"))

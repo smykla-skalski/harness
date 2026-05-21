@@ -146,6 +146,46 @@ struct DashboardDependenciesSchedulerTests {
     scheduler.stop()
   }
 
+  @Test("forced restart refreshes newly hydrated repositories")
+  func forcedRestartRefreshesNewlyHydratedRepositories() async throws {
+    let stub = SchedulerStub()
+    stub.responses = [
+      "acme/api": stubResponse(),
+      "acme/web": stubResponse(),
+    ]
+    let scheduler = DashboardDependenciesScheduler()
+
+    var prefs = DashboardDependenciesPreferences()
+    prefs.perRepositoryIntervalSeconds = 3_600
+    prefs.maxConcurrentRepositoryFetches = 2
+    let fresh = Date()
+
+    scheduler.start(
+      repositories: ["acme/api"],
+      preferences: prefs,
+      client: stub,
+      initialLastSyncedAt: ["acme/api": fresh],
+      onMerge: { _, _ in }
+    )
+    try await Task.sleep(for: .milliseconds(100))
+    #expect(stub.totalCalls() == 0)
+
+    scheduler.start(
+      repositories: ["acme/api", "acme/web"],
+      preferences: prefs,
+      client: stub,
+      initialLastSyncedAt: ["acme/api": fresh, "acme/web": fresh],
+      forceRefreshAll: true,
+      onMerge: { _, _ in }
+    )
+
+    try await waitUntilFetchCount(stub: stub, repo: "acme/api", target: 1)
+    try await waitUntilFetchCount(stub: stub, repo: "acme/web", target: 1)
+    #expect(stub.callCount(for: "acme/api") == 1)
+    #expect(stub.callCount(for: "acme/web") == 1)
+    scheduler.stop()
+  }
+
   // MARK: - Helpers
 
   private func stubResponse() -> DependencyUpdatesQueryResponse {

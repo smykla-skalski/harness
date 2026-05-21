@@ -375,6 +375,46 @@
       }
     },
     {
+      "id": "repositories-settings",
+      "signpostName": "repositories-settings",
+      "defaultPreviewScenario": "dashboard",
+      "initialSettingsSection": "repositories",
+      "disablesVisualOptions": false,
+      "needsPreviewAcpPermissionBatch": false,
+      "includesBootstrapInMeasurement": false,
+      "durationSeconds": 8,
+      "templates": ["swiftui"],
+      "swiftUIBudget": {
+        "totalUpdates": 35000,
+        "bodyUpdates": 3500,
+        "maxUpdateGroupMilliseconds": 50,
+        "hitches": 0,
+        "potentialHangs": 0,
+        "p95UpdateMilliseconds": 8,
+        "updateGroupP95Milliseconds": 30
+      }
+    },
+    {
+      "id": "dependencies-settings",
+      "signpostName": "dependencies-settings",
+      "defaultPreviewScenario": "dashboard",
+      "initialSettingsSection": "dependencies",
+      "disablesVisualOptions": false,
+      "needsPreviewAcpPermissionBatch": false,
+      "includesBootstrapInMeasurement": false,
+      "durationSeconds": 8,
+      "templates": ["swiftui"],
+      "swiftUIBudget": {
+        "totalUpdates": 35000,
+        "bodyUpdates": 3500,
+        "maxUpdateGroupMilliseconds": 50,
+        "hitches": 0,
+        "potentialHangs": 0,
+        "p95UpdateMilliseconds": 8,
+        "updateGroupP95Milliseconds": 30
+      }
+    },
+    {
       "id": "settings-backdrop-cycle",
       "signpostName": "settings-backdrop-cycle",
       "defaultPreviewScenario": "dashboard",

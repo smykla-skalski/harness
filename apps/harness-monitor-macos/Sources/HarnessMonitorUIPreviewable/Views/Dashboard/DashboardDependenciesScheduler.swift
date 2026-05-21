@@ -48,6 +48,7 @@ final class DashboardDependenciesScheduler {
     preferences: DashboardDependenciesPreferences,
     client: any HarnessMonitorDependenciesClientProtocol,
     initialLastSyncedAt: [String: Date] = [:],
+    forceRefreshAll: Bool = false,
     onMerge: @escaping @MainActor (String, DependencyUpdatesQueryResponse) -> Void
   ) {
     stop()
@@ -68,6 +69,9 @@ final class DashboardDependenciesScheduler {
         let hydrated = initialLastSyncedAt[repository]
       {
         states[repository]?.lastSyncedAt = hydrated
+      }
+      if forceRefreshAll {
+        states[repository]?.forceRefreshRequested = true
       }
     }
     for key in Array(states.keys) where !repositories.contains(key) {
