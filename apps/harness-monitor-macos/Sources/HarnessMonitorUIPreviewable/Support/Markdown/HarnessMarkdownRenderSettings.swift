@@ -341,6 +341,7 @@ struct HarnessMarkdownSpacingSettings: Equatable {
   var listSymbolWidth: CGFloat
   var listMarkerWidth: CGFloat
   var quoteContentGap: CGFloat
+  var alertBottomMargin: CGFloat
   var tableColumn: CGFloat
   var tableRow: CGFloat
 
@@ -363,6 +364,7 @@ struct HarnessMarkdownSpacingSettings: Equatable {
     listSymbolWidth: 6,
     listMarkerWidth: 20,
     quoteContentGap: HarnessMonitorTheme.spacingSM,
+    alertBottomMargin: HarnessMonitorTheme.spacingSM,
     tableColumn: HarnessMonitorTheme.spacingMD,
     tableRow: HarnessMonitorTheme.spacingXS
   )
@@ -387,6 +389,7 @@ struct HarnessMarkdownSpacingSettings: Equatable {
       listSymbolWidth: scaled(listSymbolWidth, by: scale),
       listMarkerWidth: scaled(listMarkerWidth, by: scale),
       quoteContentGap: scaled(quoteContentGap, by: scale),
+      alertBottomMargin: scaled(alertBottomMargin, by: scale),
       tableColumn: scaled(tableColumn, by: scale),
       tableRow: scaled(tableRow, by: scale)
     )

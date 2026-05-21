@@ -101,6 +101,7 @@ struct SettingsMarkdownSection: View {
       numberRow("Bullet symbol width", \.spacing.listSymbolWidth, in: 0...32)
       numberRow("Ordered and checkbox width", \.spacing.listMarkerWidth, in: 0...48)
       numberRow("Quote content gap", \.spacing.quoteContentGap, in: 0...32)
+      numberRow("Alert bottom margin", \.spacing.alertBottomMargin, in: 0...48)
       numberRow("Table column gap", \.spacing.tableColumn, in: 0...64)
       numberRow("Table row gap", \.spacing.tableRow, in: 0...32)
     }
