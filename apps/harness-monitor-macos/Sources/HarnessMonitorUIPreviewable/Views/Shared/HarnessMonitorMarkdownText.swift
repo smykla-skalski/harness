@@ -2,11 +2,13 @@ import SwiftUI
 
 struct HarnessMonitorMarkdownText: View {
   private let markdown: String
-  private let font: Font
+  private let settings: HarnessMarkdownRenderSettings
   private let textSelection: HarnessMonitorMarkdownTextSelection
   private let rendering: HarnessMonitorMarkdownTextRendering
   private let lineLimit: Int?
 
+  @Environment(\.fontScale)
+  private var environmentFontScale
   @State private var document = HarnessMarkdownDocument.empty
 
   init(
@@ -17,7 +19,21 @@ struct HarnessMonitorMarkdownText: View {
     lineLimit: Int? = nil
   ) {
     self.markdown = markdown
-    self.font = font
+    settings = HarnessMarkdownRenderSettings.default.withBodyFont(font)
+    self.textSelection = textSelection
+    self.rendering = rendering
+    self.lineLimit = lineLimit
+  }
+
+  init(
+    _ markdown: String,
+    settings: HarnessMarkdownRenderSettings,
+    textSelection: HarnessMonitorMarkdownTextSelection = .disabled,
+    rendering: HarnessMonitorMarkdownTextRendering = .rich,
+    lineLimit: Int? = nil
+  ) {
+    self.markdown = markdown
+    self.settings = settings
     self.textSelection = textSelection
     self.rendering = rendering
     self.lineLimit = lineLimit
@@ -28,9 +44,14 @@ struct HarnessMonitorMarkdownText: View {
       switch rendering {
       case .plainPreview:
         Text(verbatim: markdown)
-          .scaledFont(font)
+          .font(resolvedSettings.typography.body.font)
+          .foregroundStyle(resolvedSettings.colors.text)
       case .rich:
-        HarnessMarkdownDocumentView(document: document, font: font)
+        HarnessMarkdownDocumentView(
+          document: document,
+          settings: settings,
+          style: resolvedSettings
+        )
       }
     }
     .lineLimit(lineLimit)
@@ -42,6 +63,10 @@ struct HarnessMonitorMarkdownText: View {
 
   private var renderKey: HarnessMarkdownRenderKey {
     HarnessMarkdownRenderKey(markdown: markdown, rendering: rendering, lineLimit: lineLimit)
+  }
+
+  private var resolvedSettings: HarnessMarkdownResolvedRenderSettings {
+    settings.resolved(environmentFontScale: environmentFontScale)
   }
 
   @MainActor
@@ -69,12 +94,13 @@ struct HarnessMonitorMarkdownText: View {
 
 private struct HarnessMarkdownDocumentView: View {
   let document: HarnessMarkdownDocument
-  let font: Font
+  let settings: HarnessMarkdownRenderSettings
+  let style: HarnessMarkdownResolvedRenderSettings
 
   var body: some View {
     VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
       ForEach(Array(document.blocks.enumerated()), id: \.offset) { _, block in
-        HarnessMarkdownBlockView(block: block, font: font)
+        HarnessMarkdownBlockView(block: block, settings: settings, style: style)
       }
     }
     .frame(maxWidth: .infinity, alignment: .leading)
@@ -83,62 +109,86 @@ private struct HarnessMarkdownDocumentView: View {
 
 private struct HarnessMarkdownBlockView: View {
   let block: HarnessMarkdownBlock
-  let font: Font
+  let settings: HarnessMarkdownRenderSettings
+  let style: HarnessMarkdownResolvedRenderSettings
 
   var body: some View {
     switch block {
     case .blockQuote(let blocks):
-      HarnessMarkdownQuoteView(blocks: blocks, font: font)
+      HarnessMarkdownQuoteView(blocks: blocks, settings: settings, style: style)
     case .codeBlock(let language, let source, let tokens):
       HarnessMonitorCodeBlock(
         presentation: HarnessCodeBlockPresentation(
-          source: source, language: language, tokens: tokens)
+          source: source, language: language, tokens: tokens),
+        settings: settings.codeBlock
       )
     case .details(let details):
-      HarnessMarkdownDetailsView(details: details, font: font)
+      HarnessMarkdownDetailsView(details: details, settings: settings, style: style)
     case .heading(let level, let inlines):
-      Text(HarnessMarkdownInlineRenderer.attributedString(from: inlines, font: headingFont(level)))
+      Text(attributedString(from: inlines, font: headingFont(level).font))
         .fixedSize(horizontal: false, vertical: true)
     case .html(let inlines):
-      Text(HarnessMarkdownInlineRenderer.attributedString(from: inlines, font: font))
+      Text(attributedString(from: inlines, font: style.typography.body.font))
         .fixedSize(horizontal: false, vertical: true)
     case .orderedList(let start, let items):
-      HarnessMarkdownListView(start: start, ordered: true, items: items, font: font)
+      HarnessMarkdownListView(
+        start: start, ordered: true, items: items, settings: settings, style: style)
     case .paragraph(let inlines):
-      Text(HarnessMarkdownInlineRenderer.attributedString(from: inlines, font: font))
+      Text(attributedString(from: inlines, font: style.typography.body.font))
         .fixedSize(horizontal: false, vertical: true)
     case .table(let table):
-      HarnessMarkdownTableView(table: table, font: font)
+      HarnessMarkdownTableView(table: table, settings: settings, style: style)
     case .thematicBreak:
       Divider()
+        .overlay(style.colors.thematicBreak)
     case .unorderedList(let items):
-      HarnessMarkdownListView(start: 1, ordered: false, items: items, font: font)
+      HarnessMarkdownListView(
+        start: 1, ordered: false, items: items, settings: settings, style: style)
     }
   }
 
-  private func headingFont(_ level: Int) -> Font {
+  private func attributedString(from inlines: [HarnessMarkdownInline], font: Font)
+    -> AttributedString
+  {
+    HarnessMarkdownInlineRenderer.attributedString(
+      from: inlines,
+      style: HarnessMarkdownInlineRenderStyle(
+        font: font,
+        codeFont: style.typography.inlineCode.font,
+        colors: style.colors
+      )
+    )
+  }
+
+  private func headingFont(_ level: Int) -> HarnessMarkdownResolvedFontStyle {
     switch level {
     case 1:
-      .title2.weight(.semibold)
+      style.typography.heading1
     case 2:
-      .title3.weight(.semibold)
+      style.typography.heading2
     case 3:
-      .headline
+      style.typography.heading3
     default:
-      .subheadline.weight(.semibold)
+      style.typography.headingDefault
     }
   }
 }
 
 private struct HarnessMarkdownDetailsView: View {
   let details: HarnessMarkdownDetails
-  let font: Font
+  let settings: HarnessMarkdownRenderSettings
+  let style: HarnessMarkdownResolvedRenderSettings
 
   @State private var isExpanded: Bool
 
-  init(details: HarnessMarkdownDetails, font: Font) {
+  init(
+    details: HarnessMarkdownDetails,
+    settings: HarnessMarkdownRenderSettings,
+    style: HarnessMarkdownResolvedRenderSettings
+  ) {
     self.details = details
-    self.font = font
+    self.settings = settings
+    self.style = style
     _isExpanded = State(initialValue: details.isOpen)
   }
 
@@ -146,29 +196,39 @@ private struct HarnessMarkdownDetailsView: View {
     DisclosureGroup(isExpanded: $isExpanded) {
       VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingXS) {
         ForEach(Array(details.blocks.enumerated()), id: \.offset) { _, block in
-          HarnessMarkdownBlockView(block: block, font: font)
+          HarnessMarkdownBlockView(block: block, settings: settings, style: style)
         }
       }
       .padding(.leading, HarnessMonitorTheme.spacingSM)
     } label: {
-      Text(HarnessMarkdownInlineRenderer.attributedString(from: details.summary, font: font))
-        .fixedSize(horizontal: false, vertical: true)
+      Text(
+        HarnessMarkdownInlineRenderer.attributedString(
+          from: details.summary,
+          style: HarnessMarkdownInlineRenderStyle(
+            font: style.typography.body.font,
+            codeFont: style.typography.inlineCode.font,
+            colors: style.colors
+          )
+        )
+      )
+      .fixedSize(horizontal: false, vertical: true)
     }
   }
 }
 
 private struct HarnessMarkdownQuoteView: View {
   let blocks: [HarnessMarkdownBlock]
-  let font: Font
+  let settings: HarnessMarkdownRenderSettings
+  let style: HarnessMarkdownResolvedRenderSettings
 
   var body: some View {
     HStack(alignment: .top, spacing: HarnessMonitorTheme.spacingSM) {
       Rectangle()
-        .fill(HarnessMonitorTheme.controlBorder)
+        .fill(style.colors.quoteBar)
         .frame(width: 3)
       VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingXS) {
         ForEach(Array(blocks.enumerated()), id: \.offset) { _, block in
-          HarnessMarkdownBlockView(block: block, font: font)
+          HarnessMarkdownBlockView(block: block, settings: settings, style: style)
         }
       }
     }
@@ -179,7 +239,8 @@ private struct HarnessMarkdownListView: View {
   let start: Int
   let ordered: Bool
   let items: [HarnessMarkdownListItem]
-  let font: Font
+  let settings: HarnessMarkdownRenderSettings
+  let style: HarnessMarkdownResolvedRenderSettings
 
   var body: some View {
     VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingXS) {
@@ -189,7 +250,7 @@ private struct HarnessMarkdownListView: View {
             .frame(width: 28, alignment: .trailing)
           VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingXS) {
             ForEach(Array(items[index].blocks.enumerated()), id: \.offset) { _, block in
-              HarnessMarkdownBlockView(block: block, font: font)
+              HarnessMarkdownBlockView(block: block, settings: settings, style: style)
             }
           }
         }
@@ -201,23 +262,24 @@ private struct HarnessMarkdownListView: View {
   private func marker(for item: HarnessMarkdownListItem, index: Int) -> some View {
     if let checkbox = item.checkbox {
       Image(systemName: checkbox ? "checkmark.square.fill" : "square")
-        .foregroundStyle(checkbox ? HarnessMonitorTheme.accent : HarnessMonitorTheme.secondaryInk)
+        .foregroundStyle(checkbox ? style.colors.taskChecked : style.colors.taskUnchecked)
         .imageScale(.small)
     } else if ordered {
       Text("\(start + index).")
-        .scaledFont(font)
-        .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+        .font(style.typography.listMarker.font)
+        .foregroundStyle(style.colors.secondaryText)
     } else {
       Text("•")
-        .scaledFont(font)
-        .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+        .font(style.typography.listMarker.font)
+        .foregroundStyle(style.colors.secondaryText)
     }
   }
 }
 
 private struct HarnessMarkdownTableView: View {
   let table: HarnessMarkdownTable
-  let font: Font
+  let settings: HarnessMarkdownRenderSettings
+  let style: HarnessMarkdownResolvedRenderSettings
 
   var body: some View {
     Grid(alignment: .leadingFirstTextBaseline, horizontalSpacing: HarnessMonitorTheme.spacingMD) {
@@ -230,11 +292,11 @@ private struct HarnessMarkdownTableView: View {
     .padding(HarnessMonitorTheme.spacingSM)
     .background {
       RoundedRectangle(cornerRadius: HarnessMonitorTheme.cornerRadiusSM, style: .continuous)
-        .fill(HarnessMonitorTheme.ink.opacity(0.04))
+        .fill(style.colors.tableBackground)
     }
     .overlay {
       RoundedRectangle(cornerRadius: HarnessMonitorTheme.cornerRadiusSM, style: .continuous)
-        .stroke(HarnessMonitorTheme.controlBorder.opacity(0.5), lineWidth: 1)
+        .stroke(style.colors.tableBorder, lineWidth: 1)
     }
   }
 
@@ -245,7 +307,11 @@ private struct HarnessMarkdownTableView: View {
         Text(
           HarnessMarkdownInlineRenderer.attributedString(
             from: cells[index],
-            font: isHeader ? font.weight(.semibold) : font
+            style: HarnessMarkdownInlineRenderStyle(
+              font: isHeader ? style.typography.tableHeader.font : style.typography.body.font,
+              codeFont: style.typography.inlineCode.font,
+              colors: style.colors
+            )
           )
         )
         .frame(maxWidth: .infinity, alignment: swiftAlignment(for: index))

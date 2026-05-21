@@ -22,34 +22,41 @@ struct HarnessMonitorJSONCodeBlock: View {
 
   private let chrome: Chrome
   private let presentation: HarnessMonitorJSONPresentation
+  private let settings: HarnessCodeBlockRenderSettings
   private let wrapLongLines: Bool
 
   init(
     presentation: HarnessMonitorJSONPresentation,
+    settings: HarnessCodeBlockRenderSettings = .default,
     chrome: Chrome = .card,
     wrapLongLines: Bool = false
   ) {
     self.chrome = chrome
     self.presentation = presentation
+    self.settings = settings
     self.wrapLongLines = wrapLongLines
   }
 
   init(
     rawJSON: String,
+    settings: HarnessCodeBlockRenderSettings = .default,
     chrome: Chrome = .card,
     wrapLongLines: Bool = false
   ) {
     self.chrome = chrome
+    self.settings = settings
     self.wrapLongLines = wrapLongLines
     presentation = .formatted(rawJSON: rawJSON)
   }
 
   init(
     jsonValue: JSONValue,
+    settings: HarnessCodeBlockRenderSettings = .default,
     chrome: Chrome = .card,
     wrapLongLines: Bool = false
   ) {
     self.chrome = chrome
+    self.settings = settings
     self.wrapLongLines = wrapLongLines
     presentation = .formatted(jsonValue: jsonValue)
   }
@@ -57,6 +64,7 @@ struct HarnessMonitorJSONCodeBlock: View {
   var body: some View {
     HarnessMonitorCodeBlock(
       presentation: presentation.codeBlockPresentation,
+      settings: settings,
       chrome: chrome.codeBlockChrome,
       wrapLongLines: wrapLongLines
     )

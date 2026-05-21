@@ -41,10 +41,13 @@ enum HarnessCodeHighlighter {
     }
   }
 
-  static func makeAttributedString(from tokens: [HarnessCodeToken]) -> AttributedString {
+  static func makeAttributedString(
+    from tokens: [HarnessCodeToken],
+    colors: HarnessCodeTokenColors = .default
+  ) -> AttributedString {
     tokens.reduce(into: AttributedString()) { result, token in
       var fragment = AttributedString(token.text)
-      fragment.foregroundColor = token.kind.color
+      fragment.foregroundColor = colors.color(for: token.kind)
       result += fragment
     }
   }
@@ -66,7 +69,8 @@ enum HarnessCodeHighlighter {
       } else if characters[index] == "\"" {
         appendQuoted(in: characters, from: &index, to: &tokens)
       } else if characters[index].isWhitespace {
-        appendRun(in: characters, from: &index, while: \.isWhitespace, kind: .whitespace, to: &tokens)
+        appendRun(
+          in: characters, from: &index, while: \.isWhitespace, kind: .whitespace, to: &tokens)
       } else if punctuation.contains(characters[index]) {
         tokens.append(.init(text: String(characters[index]), kind: .punctuation))
         index += 1
@@ -74,7 +78,9 @@ enum HarnessCodeHighlighter {
         tokens.append(.init(text: String(characters[index]), kind: .operatorSymbol))
         index += 1
       } else if characters[index].isNumber {
-        appendRun(in: characters, from: &index, while: { $0.isNumber || $0 == "." }, kind: .number, to: &tokens)
+        appendRun(
+          in: characters, from: &index, while: { $0.isNumber || $0 == "." }, kind: .number,
+          to: &tokens)
       } else if isIdentifierStart(characters[index]) {
         appendIdentifier(in: characters, from: &index, keywords: keywords, to: &tokens)
       } else {
@@ -95,13 +101,17 @@ enum HarnessCodeHighlighter {
       } else if characters[index] == "\"" || characters[index] == "'" {
         appendQuoted(in: characters, from: &index, to: &tokens)
       } else if characters[index] == "$" {
-        appendRun(in: characters, from: &index, while: { isIdentifierPart($0) || $0 == "$" }, kind: .literal, to: &tokens)
+        appendRun(
+          in: characters, from: &index, while: { isIdentifierPart($0) || $0 == "$" },
+          kind: .literal, to: &tokens)
       } else if characters[index].isWhitespace {
-        appendRun(in: characters, from: &index, while: \.isWhitespace, kind: .whitespace, to: &tokens)
+        appendRun(
+          in: characters, from: &index, while: \.isWhitespace, kind: .whitespace, to: &tokens)
       } else if isIdentifierStart(characters[index]) {
         appendIdentifier(in: characters, from: &index, keywords: shellKeywords, to: &tokens)
       } else {
-        let kind: HarnessCodeToken.Kind = operators.contains(characters[index]) ? .operatorSymbol : .plain
+        let kind: HarnessCodeToken.Kind =
+          operators.contains(characters[index]) ? .operatorSymbol : .plain
         tokens.append(.init(text: String(characters[index]), kind: kind))
         index += 1
       }
@@ -116,13 +126,15 @@ enum HarnessCodeHighlighter {
     while index < characters.count {
       let character = characters[index]
       if character.isWhitespace {
-        appendRun(in: characters, from: &index, while: \.isWhitespace, kind: .whitespace, to: &tokens)
+        appendRun(
+          in: characters, from: &index, while: \.isWhitespace, kind: .whitespace, to: &tokens)
       } else if ["{", "}", "[", "]", ":", ","].contains(character) {
         tokens.append(.init(text: String(character), kind: .punctuation))
         index += 1
       } else if character == "\"" {
         let end = quotedEnd(in: characters, start: index)
-        let kind: HarnessCodeToken.Kind = nextNonWhitespace(in: characters, after: end) == ":" ? .property : .string
+        let kind: HarnessCodeToken.Kind =
+          nextNonWhitespace(in: characters, after: end) == ":" ? .property : .string
         tokens.append(.init(text: String(characters[index...end]), kind: kind))
         index = end + 1
       } else {
@@ -133,7 +145,8 @@ enum HarnessCodeHighlighter {
   }
 
   private static func highlightYAML(_ source: String) -> [HarnessCodeToken] {
-    source.split(separator: "\n", omittingEmptySubsequences: false).enumerated().flatMap { offset, line in
+    source.split(separator: "\n", omittingEmptySubsequences: false).enumerated().flatMap {
+      offset, line in
       var tokens: [HarnessCodeToken] = offset == 0 ? [] : [.init(text: "\n", kind: .whitespace)]
       tokens.append(contentsOf: highlightYAMLLine(String(line)))
       return tokens
@@ -153,26 +166,28 @@ enum HarnessCodeHighlighter {
     ]
     if colon + 1 < chars.count {
       let value = String(chars[(colon + 1)...])
-      let kind: HarnessCodeToken.Kind = literals.contains(value.trimmingCharacters(in: .whitespaces)) ? .literal : .plain
+      let kind: HarnessCodeToken.Kind =
+        literals.contains(value.trimmingCharacters(in: .whitespaces)) ? .literal : .plain
       tokens.append(.init(text: value, kind: kind))
     }
     return tokens
   }
 
   private static func highlightDiff(_ source: String) -> [HarnessCodeToken] {
-    source.split(separator: "\n", omittingEmptySubsequences: false).enumerated().map { offset, line in
+    source.split(separator: "\n", omittingEmptySubsequences: false).enumerated().map {
+      offset, line in
       let prefix = offset == 0 ? "" : "\n"
       let text = String(line)
       let kind: HarnessCodeToken.Kind =
-        text.hasPrefix("@@") ? .heading :
-        text.hasPrefix("+") ? .inserted :
-        text.hasPrefix("-") ? .deleted : .plain
+        text.hasPrefix("@@")
+        ? .heading : text.hasPrefix("+") ? .inserted : text.hasPrefix("-") ? .deleted : .plain
       return .init(text: prefix + text, kind: kind)
     }
   }
 
   private static func highlightMarkdown(_ source: String) -> [HarnessCodeToken] {
-    source.split(separator: "\n", omittingEmptySubsequences: false).enumerated().flatMap { offset, line in
+    source.split(separator: "\n", omittingEmptySubsequences: false).enumerated().flatMap {
+      offset, line in
       var tokens: [HarnessCodeToken] = offset == 0 ? [] : [.init(text: "\n", kind: .whitespace)]
       let text = String(line)
       let trimmed = text.trimmingCharacters(in: .whitespaces)
@@ -217,7 +232,9 @@ enum HarnessCodeHighlighter {
     tokens.append(.init(text: String(chars[start..<index]), kind: .comment))
   }
 
-  private static func appendQuoted(in chars: [Character], from index: inout Int, to tokens: inout [HarnessCodeToken]) {
+  private static func appendQuoted(
+    in chars: [Character], from index: inout Int, to tokens: inout [HarnessCodeToken]
+  ) {
     let end = quotedEnd(in: chars, start: index)
     tokens.append(.init(text: String(chars[index...end]), kind: .string))
     index = end + 1
@@ -234,15 +251,19 @@ enum HarnessCodeHighlighter {
     while index < chars.count, isIdentifierPart(chars[index]) { index += 1 }
     let text = String(chars[start..<index])
     let kind: HarnessCodeToken.Kind =
-      keywords.contains(text) ? .keyword :
-      literals.contains(text) ? .literal :
-      text.first?.isUppercase == true ? .type : .plain
+      keywords.contains(text)
+      ? .keyword
+      : literals.contains(text) ? .literal : text.first?.isUppercase == true ? .type : .plain
     tokens.append(.init(text: text, kind: kind))
   }
 
-  private static func appendLiteral(in chars: [Character], from index: inout Int, to tokens: inout [HarnessCodeToken]) {
+  private static func appendLiteral(
+    in chars: [Character], from index: inout Int, to tokens: inout [HarnessCodeToken]
+  ) {
     let start = index
-    while index < chars.count, !chars[index].isWhitespace, !["{", "}", "[", "]", ":", ","].contains(chars[index]) {
+    while index < chars.count, !chars[index].isWhitespace,
+      !["{", "}", "[", "]", ":", ","].contains(chars[index])
+    {
       index += 1
     }
     let text = String(chars[start..<index])
@@ -296,32 +317,5 @@ enum HarnessCodeHighlighter {
 
   private static func isIdentifierPart(_ character: Character) -> Bool {
     character.isLetter || character.isNumber || character == "_"
-  }
-}
-
-extension HarnessCodeToken.Kind {
-  fileprivate var color: Color {
-    switch self {
-    case .comment:
-      HarnessMonitorTheme.secondaryInk
-    case .deleted:
-      HarnessMonitorTheme.danger
-    case .heading, .keyword, .property:
-      HarnessMonitorTheme.accent
-    case .inserted:
-      HarnessMonitorTheme.success
-    case .literal:
-      HarnessMonitorTheme.caution
-    case .number:
-      HarnessMonitorTheme.warmAccent
-    case .operatorSymbol, .punctuation, .whitespace:
-      HarnessMonitorTheme.tertiaryInk
-    case .plain:
-      HarnessMonitorTheme.ink
-    case .string:
-      HarnessMonitorTheme.success
-    case .type:
-      HarnessMonitorTheme.warmAccent
-    }
   }
 }
