@@ -70,6 +70,18 @@ struct AppSearchIndexTests {
     #expect(results.sections.isEmpty)
   }
 
+  @Test("Single-edit typo still matches title and carries highlight ranges")
+  func typoMatchCarriesHighlightRanges() async {
+    let index = AppSearchIndex()
+    await index.reindex(agents: [makeAgent(id: "a1", name: "Codex Worker")])
+
+    let results = await index.search(query: "codx", primary: .agents)
+
+    let hit = results.sections.first?.hits.first
+    #expect(hit?.id == "a1")
+    #expect(hit?.highlights.title.isEmpty == false)
+  }
+
   // MARK: Section ordering
 
   @Test("Primary domain section appears first")

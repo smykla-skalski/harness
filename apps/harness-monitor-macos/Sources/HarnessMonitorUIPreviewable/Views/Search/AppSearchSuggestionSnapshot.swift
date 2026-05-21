@@ -46,13 +46,15 @@ public struct AppSearchSuggestionSnapshot: Equatable, Sendable {
 
 public struct AppSearchSuggestionRow: Identifiable, Equatable, Sendable {
   public let id: String
+  public let domainLabel: String
   public let displayTitle: String
   public let completion: String
   public let hit: AppSearchHit
 
   public init(sectionDomain: AppSearchDomain, hit: AppSearchHit) {
     id = "\(sectionDomain.rawValue):\(hit.id)"
-    displayTitle = "\(hit.title) (\(sectionDomain.label))"
+    domainLabel = sectionDomain.label
+    displayTitle = "\(hit.title) (\(domainLabel))"
     completion = hit.title
     self.hit = hit
   }

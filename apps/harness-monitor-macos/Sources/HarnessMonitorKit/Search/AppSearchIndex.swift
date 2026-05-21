@@ -43,8 +43,7 @@ public struct DecisionSearchProjection: Hashable, Sendable {
 /// The index is an `actor` because re-tokenising tens of thousands of
 /// records on every keystroke would saturate the `@MainActor`. Re-index
 /// happens incrementally on a `(count, lastID)` signature change at the
-/// view layer; `search(...)` is a pure read against precomputed
-/// lowercased corpora so it never allocates for each keystroke.
+/// view layer; `search(...)` is a pure read against precomputed searchers.
 public actor AppSearchIndex {
   /// Cap on hits returned for the active route's primary domain.
   /// Keep the toolbar search popover compact; large suggestion lists rebuild
@@ -56,104 +55,106 @@ public actor AppSearchIndex {
   /// without scrolling.
   public static let defaultFallbackK = 1
 
-  /// Backing store for one indexed record. Lowercased corpora are
-  /// precomputed so search avoids per-keystroke allocation.
   private struct Record: Sendable {
     let id: String
     let title: String
     let subtitle: String?
     let trailing: String?
-    let lowercasedTitle: String
-    let lowercasedCorpus: String
+    let searchBody: String
   }
 
-  private struct ScoredRecord {
-    let score: Int
-    let record: Record
+  private static let fields: [FuzzySearchField<Record>] = [
+    .single("title", weight: 0.75, highlightField: .title, prefixRank: 0) { $0.title },
+    .single("subtitle", weight: 0.45, highlightField: .subtitle, prefixRank: 1) {
+      $0.subtitle
+    },
+    .single("trailing", weight: 0.2, highlightField: .trailing, prefixRank: 2) {
+      $0.trailing
+    },
+    .single("searchBody", weight: 0.3) {
+      $0.searchBody.isEmpty ? nil : $0.searchBody
+    },
+  ]
+
+  private var agentIndex: FuzzySearchIndex<Record>
+  private var decisionIndex: FuzzySearchIndex<Record>
+  private var taskIndex: FuzzySearchIndex<Record>
+  private var eventIndex: FuzzySearchIndex<Record>
+
+  public init() {
+    agentIndex = Self.makeIndex(records: [])
+    decisionIndex = Self.makeIndex(records: [])
+    taskIndex = Self.makeIndex(records: [])
+    eventIndex = Self.makeIndex(records: [])
   }
-
-  private var agents: [Record] = []
-  private var decisions: [Record] = []
-  private var tasks: [Record] = []
-  private var events: [Record] = []
-
-  public init() {}
 
   // MARK: Reindex
 
   public func reindex(agents snapshot: [AgentRegistration]) {
-    agents = snapshot.map { agent in
-      let parts = [
-        agent.name,
-        agent.persona?.name,
-        agent.persona?.description,
-        agent.agentId,
-        agent.role.rawValue,
-        agent.runtime,
-      ].compactMap { $0 }
-      return makeRecord(
+    let records = snapshot.map { agent in
+      makeRecord(
         id: agent.agentId,
         title: agent.name,
         subtitle: agent.persona?.name,
         trailing: agent.runtime,
-        corpusParts: parts
+        searchBodyParts: [
+          agent.persona?.description,
+          agent.agentId,
+          agent.role.rawValue,
+        ]
       )
     }
+    agentIndex = Self.makeIndex(records: records)
   }
 
   public func reindex(decisions snapshot: [DecisionSearchProjection]) {
-    decisions = snapshot.map { decision in
-      let parts = [
-        decision.summary,
-        decision.ruleID,
-        decision.agentID ?? "",
-        decision.taskID ?? "",
-      ]
-      return makeRecord(
+    let records = snapshot.map { decision in
+      makeRecord(
         id: decision.id,
         title: decision.summary,
         subtitle: decision.ruleID.isEmpty ? nil : decision.ruleID,
         trailing: nil,
-        corpusParts: parts
+        searchBodyParts: [
+          decision.agentID,
+          decision.taskID,
+        ]
       )
     }
+    decisionIndex = Self.makeIndex(records: records)
   }
 
   public func reindex(tasks snapshot: [WorkItem]) {
-    tasks = snapshot.map { task in
-      let parts = [
-        task.title,
-        task.context ?? "",
-        task.suggestedFix ?? "",
-        task.blockedReason ?? "",
-        task.taskId,
-      ]
-      return makeRecord(
+    let records = snapshot.map { task in
+      makeRecord(
         id: task.taskId,
         title: task.title,
         subtitle: task.assignedTo,
         trailing: nil,
-        corpusParts: parts
+        searchBodyParts: [
+          task.context,
+          task.suggestedFix,
+          task.blockedReason,
+          task.taskId,
+        ]
       )
     }
+    taskIndex = Self.makeIndex(records: records)
   }
 
   public func reindex(events snapshot: [TimelineEntry]) {
-    events = snapshot.map { entry in
-      let parts = [
-        entry.summary,
-        entry.kind,
-        entry.agentId ?? "",
-        entry.taskId ?? "",
-      ]
-      return makeRecord(
+    let records = snapshot.map { entry in
+      makeRecord(
         id: entry.entryId,
         title: entry.summary.isEmpty ? entry.kind : entry.summary,
         subtitle: entry.kind,
         trailing: nil,
-        corpusParts: parts
+        searchBodyParts: [
+          entry.agentId,
+          entry.taskId,
+        ]
       )
     }
+    eventIndex = Self.makeIndex(records: records)
   }
 
   // MARK: Search
@@ -168,13 +169,12 @@ public actor AppSearchIndex {
     guard !trimmed.isEmpty else {
       return AppSearchResults(query: trimmed, primaryDomain: primary, sections: [])
     }
-    let needle = trimmed.lowercased()
     let domainOrder = orderedDomains(primary: primary)
     var sections: [AppSearchSection] = []
     sections.reserveCapacity(domainOrder.count)
     for domain in domainOrder {
       let perDomainK = (domain == primary) ? primaryK : fallbackK
-      let section = searchDomain(domain, needle: needle, perDomainK: perDomainK)
+      let section = searchDomain(domain, needle: trimmed, perDomainK: perDomainK)
       guard !section.hits.isEmpty else {
         continue
       }
@@ -194,18 +194,33 @@ public actor AppSearchIndex {
     title: String,
     subtitle: String?,
     trailing: String?,
-    corpusParts: [String]
+    searchBodyParts: [String?]
   ) -> Record {
-    let nonEmptyParts = corpusParts.filter { !$0.isEmpty }
-    let corpus = nonEmptyParts.joined(separator: " ").lowercased()
-    return Record(
+    Record(
       id: id,
       title: title,
       subtitle: subtitle,
       trailing: trailing,
-      lowercasedTitle: title.lowercased(),
-      lowercasedCorpus: corpus
+      searchBody: searchBodyParts
+        .compactMap { value in
+          guard let value else { return nil }
+          return value.isEmpty ? nil : value
+        }
+        .joined(separator: " ")
     )
+  }
+
+  private static func makeIndex(
+    records: [Record]
+  ) -> FuzzySearchIndex<Record> {
+    do {
+      return try FuzzySearchIndex(
+        items: records,
+        fields: fields
+      )
+    } catch {
+      preconditionFailure("Failed to build AppSearchIndex: \(error)")
+    }
   }
 
   /// Ranked fallback order for non-primary domains.
@@ -228,16 +243,16 @@ public actor AppSearchIndex {
     return [primary] + Self.fallbackDomainOrder.filter { $0 != primary }
   }
 
-  private func corpus(for domain: AppSearchDomain) -> [Record] {
+  private func index(for domain: AppSearchDomain) -> FuzzySearchIndex<Record> {
     switch domain {
     case .agents:
-      agents
+      agentIndex
     case .decisions:
-      decisions
+      decisionIndex
     case .tasks:
-      tasks
+      taskIndex
     case .timeline:
-      events
+      eventIndex
     }
   }
 
@@ -246,81 +261,35 @@ public actor AppSearchIndex {
     needle: String,
     perDomainK: Int
   ) -> AppSearchSection {
-    let records = corpus(for: domain)
     let limit = max(0, perDomainK)
-    var scored: [ScoredRecord] = []
-    scored.reserveCapacity(min(limit, records.count))
-    var matchCount = 0
-    for record in records {
-      guard let score = score(record: record, needle: needle) else {
-        continue
-      }
-      matchCount += 1
-      appendTopMatch(
-        ScoredRecord(score: score, record: record),
-        to: &scored,
-        limit: limit
-      )
+    guard limit > 0 else {
+      return AppSearchSection(domain: domain, hits: [], truncated: false)
     }
-    scored.sort(by: sortsBefore)
-    let truncated = matchCount > limit
-    let hits = scored.map { entry in
+
+    let matches = index(for: domain).search(needle).sorted(by: sortsBefore)
+    let truncated = matches.count > limit
+    let hits = matches.prefix(limit).map { entry in
       AppSearchHit(
         domain: domain,
-        id: entry.record.id,
-        title: entry.record.title,
-        subtitle: entry.record.subtitle,
-        trailing: entry.record.trailing,
+        id: entry.item.id,
+        title: entry.item.title,
+        subtitle: entry.item.subtitle,
+        trailing: entry.item.trailing,
         systemImage: domain.systemImage,
+        highlights: entry.highlights,
         score: entry.score
       )
     }
-    return AppSearchSection(domain: domain, hits: hits, truncated: truncated)
+    return AppSearchSection(domain: domain, hits: Array(hits), truncated: truncated)
   }
 
-  private func appendTopMatch(
-    _ candidate: ScoredRecord,
-    to scored: inout [ScoredRecord],
-    limit: Int
-  ) {
-    guard limit > 0 else { return }
-    guard scored.count >= limit else {
-      scored.append(candidate)
-      return
-    }
-    guard let worstIndex = scored.indices.max(by: { sortsBefore(scored[$0], scored[$1]) }) else {
-      return
-    }
-    if sortsBefore(candidate, scored[worstIndex]) {
-      scored[worstIndex] = candidate
-    }
-  }
-
-  private func sortsBefore(_ lhs: ScoredRecord, _ rhs: ScoredRecord) -> Bool {
+  private func sortsBefore(
+    _ lhs: FuzzySearchResult<Record>,
+    _ rhs: FuzzySearchResult<Record>
+  ) -> Bool {
     if lhs.score != rhs.score {
       return lhs.score < rhs.score
     }
-    return lhs.record.title.localizedCompare(rhs.record.title) == .orderedAscending
-  }
-
-  /// Score: lower is better. Title matches outrank corpus matches; within a
-  /// match class, earlier substring positions outrank later ones. Returns
-  /// `nil` when neither title nor corpus contains the needle.
-  private func score(record: Record, needle: String) -> Int? {
-    if let titleRange = record.lowercasedTitle.range(of: needle) {
-      let position = record.lowercasedTitle.distance(
-        from: record.lowercasedTitle.startIndex,
-        to: titleRange.lowerBound
-      )
-      return -1_000 + position
-    }
-    if let corpusRange = record.lowercasedCorpus.range(of: needle) {
-      let position = record.lowercasedCorpus.distance(
-        from: record.lowercasedCorpus.startIndex,
-        to: corpusRange.lowerBound
-      )
-      return position
-    }
-    return nil
+    return lhs.item.title.localizedCompare(rhs.item.title) == .orderedAscending
   }
 }

@@ -51,7 +51,8 @@ extension SessionWindowFlowTests {
     #expect(!source.contains("AppSearchSuggestionsView"))
     #expect(!source.contains("AppSearchFieldRebinder"))
     #expect(!source.contains("NSSearchField"))
-    #expect(source.contains("Text(verbatim: row.displayTitle)"))
+    #expect(source.contains("SearchHighlightedText("))
+    #expect(source.contains("Text(\"(\\(row.domainLabel))\")"))
     #expect(!source.contains("Section {"))
     #expect(!source.contains("@Bindable var model = model"))
   }
