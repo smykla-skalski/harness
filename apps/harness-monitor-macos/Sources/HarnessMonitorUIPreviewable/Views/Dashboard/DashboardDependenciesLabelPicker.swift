@@ -20,10 +20,15 @@ func dashboardDependenciesLabelSwatchColor(_ hex: String?) -> Color? {
 /// which silently converts SF Symbols to monochrome templates and discards
 /// `.foregroundStyle()`. Baking the color into an NSImage with
 /// `isTemplate = false` is the only path that keeps the per-label color.
+///
+/// The canvas matches the standard NSMenuItem icon box (14×14) so the
+/// disc lands on the text's optical centre instead of riding above the
+/// cap height.
 @MainActor
 func dashboardDependenciesLabelSwatchImage(
   hex: String?,
-  diameter: CGFloat = 10
+  diameter: CGFloat = 10,
+  canvas: CGFloat = 14
 ) -> Image {
   let nsColor: NSColor
   if let color = dashboardDependenciesLabelSwatchColor(hex) {
@@ -31,10 +36,12 @@ func dashboardDependenciesLabelSwatchImage(
   } else {
     nsColor = NSColor(HarnessMonitorTheme.secondaryInk.opacity(0.5))
   }
-  let size = NSSize(width: diameter, height: diameter)
+  let size = NSSize(width: canvas, height: canvas)
+  let inset = (canvas - diameter) / 2
   let image = NSImage(size: size, flipped: false) { rect in
+    let discRect = rect.insetBy(dx: inset, dy: inset)
     nsColor.setFill()
-    NSBezierPath(ovalIn: rect.insetBy(dx: 0.5, dy: 0.5)).fill()
+    NSBezierPath(ovalIn: discRect).fill()
     return true
   }
   image.isTemplate = false
