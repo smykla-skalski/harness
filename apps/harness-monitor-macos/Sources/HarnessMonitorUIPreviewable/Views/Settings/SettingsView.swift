@@ -87,22 +87,16 @@ public struct SettingsView: View {
 /// cache) outside of `SettingsView`, and lazy-mounts each section into a ZStack
 /// so subsequent visits don't pay SwiftUI's view-tree rebuild cost.
 ///
-/// Trace baseline (post-P1+P2+P3#7) showed 5 microhangs of 264-371ms per
-/// section switch, almost all SwiftUI runtime: ~9.5% swift_conforms,
-/// ~3.8% find1<A>, ~4.9% AG operations. None of that is our code - it's the
-/// inherent cost of building a new generic `some View` tree on each switch.
-///
 /// Retention semantics:
-/// - First visit to a section: full build cost (one-shot ~300ms).
+/// - First visit to a section: full build cost.
 /// - Any subsequent visit: instant. The view tree stays mounted, hidden via
 ///   opacity/allowsHitTesting/accessibilityHidden. ScrollView state preserved.
 /// - Each retained section gets its own `\.settingsScrollRestorationSection`
 ///   env override so SettingsScrollRestorationModifier targets the right
 ///   per-section persisted offset.
 ///
-/// Trade-off accepted: sections with `.task { await refresh() }` only refresh
-/// on first visit instead of on every visit. Notifications/AuthorizedFolders/
-/// Database show stale data on revisit until the user clicks Refresh.
+/// Trade-off: sections with `.task { await refresh() }` only refresh on first
+/// visit per Settings session.
 private struct SettingsDetailSwitch: View {
   let store: HarnessMonitorStore
   let notifications: HarnessMonitorUserNotificationController
@@ -142,6 +136,21 @@ private struct SettingsDetailSwitch: View {
   @ViewBuilder
   private func sectionContent(_ section: SettingsSection) -> some View {
     switch section {
+    case .general, .focusMode, .banners, .appearance, .markdown, .notifications, .voice,
+      .connection:
+      primarySectionContent(section)
+    case .taskBoard, .repositories, .dependencies, .secrets:
+      taskBoardSectionContent(section)
+    case .policies, .codex, .mcp, .authorizedFolders:
+      integrationSectionContent(section)
+    case .supervisor, .database, .diagnostics:
+      operationsSectionContent(section)
+    }
+  }
+
+  @ViewBuilder
+  private func primarySectionContent(_ section: SettingsSection) -> some View {
+    switch section {
     case .general:
       SettingsGeneralSectionRoot(store: store)
     case .focusMode:
@@ -158,6 +167,14 @@ private struct SettingsDetailSwitch: View {
       SettingsVoiceSection()
     case .connection:
       SettingsConnectionSectionRoot(store: store)
+    default:
+      EmptyView()
+    }
+  }
+
+  @ViewBuilder
+  private func taskBoardSectionContent(_ section: SettingsSection) -> some View {
+    switch section {
     case .taskBoard:
       SettingsTaskBoardSection(
         store: store,
@@ -180,6 +197,14 @@ private struct SettingsDetailSwitch: View {
         formState: $taskBoardFormState
       )
       .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+    default:
+      EmptyView()
+    }
+  }
+
+  @ViewBuilder
+  private func integrationSectionContent(_ section: SettingsSection) -> some View {
+    switch section {
     case .policies:
       SettingsPoliciesSection()
     case .codex:
@@ -188,6 +213,14 @@ private struct SettingsDetailSwitch: View {
       SettingsMCPSection(store: store)
     case .authorizedFolders:
       AuthorizedFoldersSection(store: store)
+    default:
+      EmptyView()
+    }
+  }
+
+  @ViewBuilder
+  private func operationsSectionContent(_ section: SettingsSection) -> some View {
+    switch section {
     case .supervisor:
       SettingsSupervisorSection(
         store: store,
@@ -202,6 +235,8 @@ private struct SettingsDetailSwitch: View {
         preparedInput: $preparedDiagnosticsInput,
         preparedSnapshot: $preparedDiagnosticsSnapshot
       )
+    default:
+      EmptyView()
     }
   }
 }

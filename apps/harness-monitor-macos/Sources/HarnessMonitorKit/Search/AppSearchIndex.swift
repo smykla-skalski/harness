@@ -201,7 +201,8 @@ public actor AppSearchIndex {
       title: title,
       subtitle: subtitle,
       trailing: trailing,
-      searchBody: searchBodyParts
+      searchBody:
+        searchBodyParts
         .compactMap { value in
           guard let value else { return nil }
           return value.isEmpty ? nil : value

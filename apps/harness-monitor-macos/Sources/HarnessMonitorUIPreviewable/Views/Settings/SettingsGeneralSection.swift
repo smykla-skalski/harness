@@ -171,48 +171,48 @@ public struct SettingsGeneralSection: View {
 
         Section {
           LabeledContent("Endpoint", value: overview.endpoint)
-          .textSelection(.enabled)
-          .accessibilityIdentifier(HarnessMonitorAccessibility.settingsMetricCard("Endpoint"))
-        LabeledContent("Version", value: overview.version)
-          .textSelection(.enabled)
-          .accessibilityIdentifier(HarnessMonitorAccessibility.settingsMetricCard("Version"))
-        daemonModeRow
-        if overview.showsLaunchAgent {
-          LabeledContent("Launchd") {
-            VStack(alignment: .trailing, spacing: 2) {
-              Text(overview.launchAgentState)
-              Text(overview.launchAgentCaption)
+            .textSelection(.enabled)
+            .accessibilityIdentifier(HarnessMonitorAccessibility.settingsMetricCard("Endpoint"))
+          LabeledContent("Version", value: overview.version)
+            .textSelection(.enabled)
+            .accessibilityIdentifier(HarnessMonitorAccessibility.settingsMetricCard("Version"))
+          daemonModeRow
+          if overview.showsLaunchAgent {
+            LabeledContent("Launchd") {
+              VStack(alignment: .trailing, spacing: 2) {
+                Text(overview.launchAgentState)
+                Text(overview.launchAgentCaption)
+                  .scaledFont(.caption)
+                  .foregroundStyle(.secondary)
+              }
+            }
+            .accessibilityIdentifier(HarnessMonitorAccessibility.settingsMetricCard("Launchd"))
+          }
+          LabeledContent("Sandbox") {
+            if overview.sandboxState == .enabled {
+              Text("Enabled")
                 .scaledFont(.caption)
+                .padding(.horizontal, 8)
+                .padding(.vertical, 3)
+                .background(HarnessMonitorTheme.accent.opacity(0.18), in: Capsule())
+                .foregroundStyle(HarnessMonitorTheme.accent)
+            } else {
+              Text(overview.sandboxState == .unknown ? "Unknown" : "Off")
                 .foregroundStyle(.secondary)
             }
           }
-          .accessibilityIdentifier(HarnessMonitorAccessibility.settingsMetricCard("Launchd"))
-        }
-        LabeledContent("Sandbox") {
-          if overview.sandboxState == .enabled {
-            Text("Enabled")
-              .scaledFont(.caption)
-              .padding(.horizontal, 8)
-              .padding(.vertical, 3)
-              .background(HarnessMonitorTheme.accent.opacity(0.18), in: Capsule())
-              .foregroundStyle(HarnessMonitorTheme.accent)
-          } else {
-            Text(overview.sandboxState == .unknown ? "Unknown" : "Off")
-              .foregroundStyle(.secondary)
+          .accessibilityIdentifier(HarnessMonitorAccessibility.settingsMetricCard("Sandbox"))
+          LabeledContent("Database Size") {
+            Text(overview.databaseSize)
           }
+          .accessibilityIdentifier(HarnessMonitorAccessibility.settingsMetricCard("Database Size"))
+          LabeledContent("Live Sessions") {
+            Text("\(overview.sessionCount)")
+          }
+          .accessibilityIdentifier(HarnessMonitorAccessibility.settingsMetricCard("Live Sessions"))
+        } header: {
+          Text("Overview")
         }
-        .accessibilityIdentifier(HarnessMonitorAccessibility.settingsMetricCard("Sandbox"))
-        LabeledContent("Database Size") {
-          Text(overview.databaseSize)
-        }
-        .accessibilityIdentifier(HarnessMonitorAccessibility.settingsMetricCard("Database Size"))
-        LabeledContent("Live Sessions") {
-          Text("\(overview.sessionCount)")
-        }
-        .accessibilityIdentifier(HarnessMonitorAccessibility.settingsMetricCard("Live Sessions"))
-      } header: {
-        Text("Overview")
-      }
 
         SettingsStatusSection(startedAt: overview.startedAt)
       }

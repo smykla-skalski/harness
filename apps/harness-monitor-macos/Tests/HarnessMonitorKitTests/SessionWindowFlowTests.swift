@@ -235,6 +235,4 @@ struct SessionWindowFlowTests {
       )
     )
   }
-
-  @MainActor
 }

@@ -6,23 +6,23 @@ let decisionDeskDetailPreparationWorker = DecisionDetailPreparationWorker()
 public struct DecisionDeskPreviewView: View {
   let store: HarnessMonitorStore?
 
-  @State private var selection: String?
-  @State private var detailTab: DecisionDetailTab = .context
-  @State private var runtime = DecisionRuntime()
-  @State private var presentationWorker = DecisionsSidebarPresentationWorker()
-  @State private var cachedPresentation = DecisionsSidebarPresentation.empty
-  @State private var presentationGeneration: UInt64 = 0
-  @State private var sidebarFilters = DecisionsSidebarViewModel.FilterState(
+  @State private var selectionStorage: String?
+  @State private var detailTabStorage: DecisionDetailTab = .context
+  @State private var runtimeStorage = DecisionRuntime()
+  @State private var presentationWorkerStorage = DecisionsSidebarPresentationWorker()
+  @State private var cachedPresentationStorage = DecisionsSidebarPresentation.empty
+  @State private var presentationGenerationStorage: UInt64 = 0
+  @State private var sidebarFiltersStorage = DecisionsSidebarViewModel.FilterState(
     query: "",
     severities: [],
     scope: .summary
   )
-  @State private var dismissAllVisibleDraft = ""
-  @State private var pendingDismissBatch: DecisionDismissBatchSnapshot?
-  @State private var showDismissAllVisibleConfirmation = false
-  @State private var reopenBatch: DecisionReopenBatchState?
-  @State private var cachedDetailViewModel: DecisionDetailViewModel?
-  @State private var cachedDetailViewModelInput: DecisionDetailViewModel.PreparationInput?
+  @State private var dismissAllVisibleDraftStorage = ""
+  @State private var pendingDismissBatchStorage: DecisionDismissBatchSnapshot?
+  @State private var showDismissAllVisibleConfirmationStorage = false
+  @State private var reopenBatchStorage: DecisionReopenBatchState?
+  @State private var cachedDetailViewModelStorage: DecisionDetailViewModel?
+  @State private var cachedDetailViewModelInputStorage: DecisionDetailViewModel.PreparationInput?
 
   @State private var inspectorVisible = false
 
@@ -32,6 +32,89 @@ public struct DecisionDeskPreviewView: View {
 
   var actionHandler: any DecisionActionHandler {
     store?.supervisorDecisionActionHandler() ?? NullDecisionActionHandler()
+  }
+
+  var selection: String? {
+    get { selectionStorage }
+    nonmutating set { selectionStorage = newValue }
+  }
+
+  private var selectionBinding: Binding<String?> {
+    $selectionStorage
+  }
+
+  var detailTab: DecisionDetailTab {
+    get { detailTabStorage }
+    nonmutating set { detailTabStorage = newValue }
+  }
+
+  private var detailTabBinding: Binding<DecisionDetailTab> {
+    $detailTabStorage
+  }
+
+  var runtime: DecisionRuntime {
+    runtimeStorage
+  }
+
+  var presentationWorker: DecisionsSidebarPresentationWorker {
+    presentationWorkerStorage
+  }
+
+  var cachedPresentation: DecisionsSidebarPresentation {
+    get { cachedPresentationStorage }
+    nonmutating set { cachedPresentationStorage = newValue }
+  }
+
+  var presentationGeneration: UInt64 {
+    get { presentationGenerationStorage }
+    nonmutating set { presentationGenerationStorage = newValue }
+  }
+
+  var sidebarFilters: DecisionsSidebarViewModel.FilterState {
+    get { sidebarFiltersStorage }
+    nonmutating set { sidebarFiltersStorage = newValue }
+  }
+
+  private var sidebarFiltersBinding: Binding<DecisionsSidebarViewModel.FilterState> {
+    $sidebarFiltersStorage
+  }
+
+  var dismissAllVisibleDraft: String {
+    get { dismissAllVisibleDraftStorage }
+    nonmutating set { dismissAllVisibleDraftStorage = newValue }
+  }
+
+  private var dismissAllVisibleDraftBinding: Binding<String> {
+    $dismissAllVisibleDraftStorage
+  }
+
+  var pendingDismissBatch: DecisionDismissBatchSnapshot? {
+    get { pendingDismissBatchStorage }
+    nonmutating set { pendingDismissBatchStorage = newValue }
+  }
+
+  var showDismissAllVisibleConfirmation: Bool {
+    get { showDismissAllVisibleConfirmationStorage }
+    nonmutating set { showDismissAllVisibleConfirmationStorage = newValue }
+  }
+
+  private var showDismissAllVisibleConfirmationBinding: Binding<Bool> {
+    $showDismissAllVisibleConfirmationStorage
+  }
+
+  var reopenBatch: DecisionReopenBatchState? {
+    get { reopenBatchStorage }
+    nonmutating set { reopenBatchStorage = newValue }
+  }
+
+  var cachedDetailViewModel: DecisionDetailViewModel? {
+    get { cachedDetailViewModelStorage }
+    nonmutating set { cachedDetailViewModelStorage = newValue }
+  }
+
+  var cachedDetailViewModelInput: DecisionDetailViewModel.PreparationInput? {
+    get { cachedDetailViewModelInputStorage }
+    nonmutating set { cachedDetailViewModelInputStorage = newValue }
   }
 
   var decisionWorkspaceScope: DecisionWorkspaceScope {
@@ -112,7 +195,7 @@ public struct DecisionDeskPreviewView: View {
         store: store,
         auditEvents: runtime.auditEvents,
         auditEventPayloadPresentations: runtime.auditEventPayloadPresentations,
-        selectedTab: $detailTab,
+        selectedTab: detailTabBinding,
         observer: sessionObserver,
         decisionScope: decisionWorkspaceScope,
         primaryActionFocusDecisionID: store?.supervisorPrimaryActionFocusDecisionID,
@@ -120,7 +203,7 @@ public struct DecisionDeskPreviewView: View {
       )
     } else {
       DecisionDetailView(
-        selectedTab: $detailTab,
+        selectedTab: detailTabBinding,
         observer: sessionObserver,
         decisionScope: decisionWorkspaceScope
       )
@@ -135,8 +218,8 @@ public struct DecisionDeskPreviewView: View {
         decisionItems: runtime.decisionItems,
         decisionsRevision: runtime.decisionsRevision,
         presentation: cachedPresentation,
-        selection: $selection,
-        filters: $sidebarFilters,
+        selection: selectionBinding,
+        filters: sidebarFiltersBinding,
         store: store
       )
       .navigationSplitViewColumnWidth(min: 280, ideal: 320, max: 380)
@@ -193,12 +276,12 @@ public struct DecisionDeskPreviewView: View {
     }
     .confirmationDialog(
       "Dismiss all visible decisions",
-      isPresented: $showDismissAllVisibleConfirmation,
+      isPresented: showDismissAllVisibleConfirmationBinding,
       titleVisibility: .visible
     ) {
       TextField(
         "Type \(pendingDismissBatch?.count ?? 0) to confirm",
-        text: $dismissAllVisibleDraft
+        text: dismissAllVisibleDraftBinding
       )
       .harnessMCPTextField(
         HarnessMonitorAccessibility.decisionBulkDismissVisibleInput,

@@ -174,11 +174,14 @@ struct RepositoriesMonitoredSection: View {
         onSubmit: { draft.addManualRepository() }
       )
 
-      Button(action: { draft.addManualRepository() }) {
-        Label("Add Repository", systemImage: "plus")
-          .labelStyle(.titleAndIcon)
-          .lineLimit(1)
-      }
+      Button(
+        action: { draft.addManualRepository() },
+        label: {
+          Label("Add Repository", systemImage: "plus")
+            .labelStyle(.titleAndIcon)
+            .lineLimit(1)
+        }
+      )
       .harnessActionButtonStyle(variant: .bordered, tint: .secondary)
       .harnessNativeFormControl()
       .fixedSize(horizontal: true, vertical: true)

@@ -202,17 +202,18 @@ extension HarnessMonitorStore {
     preservesTimeline: Bool = false
   ) {
     guard cacheService != nil, persistenceError == nil else { return }
-    cacheWriteSync.pendingSessionDetailCacheWrites[detail.session.sessionId] = PendingSessionDetailCacheWrite(
-      snapshot: SessionCacheService.CachedSessionSnapshot(
-        detail: detail,
-        timeline: timeline,
-        timelineWindow: timelineWindow,
-        transcript: transcript,
-        transcriptSource: transcriptSource
-      ),
-      markViewed: markViewed,
-      preservesTimeline: preservesTimeline
-    )
+    cacheWriteSync.pendingSessionDetailCacheWrites[detail.session.sessionId] =
+      PendingSessionDetailCacheWrite(
+        snapshot: SessionCacheService.CachedSessionSnapshot(
+          detail: detail,
+          timeline: timeline,
+          timelineWindow: timelineWindow,
+          transcript: transcript,
+          transcriptSource: transcriptSource
+        ),
+        markViewed: markViewed,
+        preservesTimeline: preservesTimeline
+      )
     cancelPendingSessionDetailCacheWriteTask()
     cacheWriteSync.pendingSessionDetailCacheWriteTaskToken &+= 1
     let taskToken = cacheWriteSync.pendingSessionDetailCacheWriteTaskToken

@@ -11,9 +11,9 @@ public struct DecisionDetailView: View {
   @Binding var selectedTab: DecisionDetailTab
   @AccessibilityFocusState var focusedPrimaryActionDecisionID: String?
   @FocusState var keyboardFocusedPrimaryActionDecisionID: String?
-  @State private var handledPrimaryActionFocusTick = 0
-  @State private var scopedAuditEvents: [SupervisorEventSnapshot] = []
-  @State private var scopedAuditInput: DecisionDetailViewModel.AuditScopeInput?
+  @State private var handledPrimaryActionFocusTickStorage = 0
+  @State private var scopedAuditEventsStorage: [SupervisorEventSnapshot] = []
+  @State private var scopedAuditInputStorage: DecisionDetailViewModel.AuditScopeInput?
 
   let viewModel: DecisionDetailViewModel?
   let store: HarnessMonitorStore?
@@ -23,6 +23,21 @@ public struct DecisionDetailView: View {
   let decisionScope: DecisionWorkspaceScope?
   let primaryActionFocusDecisionID: String?
   let primaryActionFocusRequestTick: Int
+
+  var handledPrimaryActionFocusTick: Int {
+    get { handledPrimaryActionFocusTickStorage }
+    nonmutating set { handledPrimaryActionFocusTickStorage = newValue }
+  }
+
+  var scopedAuditEvents: [SupervisorEventSnapshot] {
+    get { scopedAuditEventsStorage }
+    nonmutating set { scopedAuditEventsStorage = newValue }
+  }
+
+  var scopedAuditInput: DecisionDetailViewModel.AuditScopeInput? {
+    get { scopedAuditInputStorage }
+    nonmutating set { scopedAuditInputStorage = newValue }
+  }
 
   public init(
     selectedTab: Binding<DecisionDetailTab> = .constant(.context),

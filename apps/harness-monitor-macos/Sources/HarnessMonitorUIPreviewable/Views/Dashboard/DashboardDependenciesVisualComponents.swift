@@ -21,11 +21,11 @@ private enum DashboardDependencyCheckTextCenterAlignment: AlignmentID {
   }
 }
 
-private extension VerticalAlignment {
-  static let dashboardDependencyTitleLineCenter = VerticalAlignment(
+extension VerticalAlignment {
+  fileprivate static let dashboardDependencyTitleLineCenter = VerticalAlignment(
     DashboardDependencyTitleLineCenterAlignment.self
   )
-  static let dashboardDependencyCheckTextCenter = VerticalAlignment(
+  fileprivate static let dashboardDependencyCheckTextCenter = VerticalAlignment(
     DashboardDependencyCheckTextCenterAlignment.self
   )
 }

@@ -198,7 +198,6 @@ extension HarnessMonitorStoreLifecycleCoreTests {
     )
   }
 }
-}
 
 private struct SnapshotCodingKey: CodingKey, Sendable {
   let stringValue: String
