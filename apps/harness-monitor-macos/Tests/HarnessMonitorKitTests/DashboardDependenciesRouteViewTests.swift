@@ -75,7 +75,9 @@ struct DashboardDependenciesRouteViewTests {
     let schedulerSource = try routeSource(named: "DashboardDependenciesRouteView+Scheduler.swift")
 
     #expect(source.contains("struct DashboardDependenciesResolvedPreferences"))
-    #expect(source.contains("@State var resolvedPreferences"))
+    #expect(source.contains("@State private var resolvedPreferences"))
+    #expect(
+      source.contains("var routeResolvedPreferences: DashboardDependenciesResolvedPreferences"))
     #expect(source.contains(".onChange(of: storedPreferences, initial: true)"))
     #expect(source.contains("syncPreferencesFromStorage(newValue)"))
     #expect(
@@ -85,7 +87,7 @@ struct DashboardDependenciesRouteViewTests {
         "var normalizedPreferences: DashboardDependenciesPreferences {\n    preferences.normalized()"
       )
     )
-    #expect(cacheSource.contains("resolvedPreferences.cacheHash"))
+    #expect(cacheSource.contains("routeResolvedPreferences.cacheHash"))
     #expect(schedulerSource.contains("explicitRepositories: preferences.repositories"))
     #expect(schedulerSource.contains("preferences: preferences"))
   }
