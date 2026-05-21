@@ -10,9 +10,6 @@ public struct SettingsView: View {
   @Binding var selectedSection: SettingsSection
   @Binding var navigationRequest: SettingsNavigationRequest?
   @State private var selectedSupervisorPane: SupervisorPaneKey = .rules
-  @State private var preparedDiagnosticsInput: SettingsDiagnosticsSnapshotInput?
-  @State private var preparedDiagnosticsSnapshot: SettingsDiagnosticsSnapshot?
-  @State private var taskBoardFormState = TaskBoardSettingsFormState()
 
   public init(
     store: HarnessMonitorStore,
@@ -38,76 +35,14 @@ public struct SettingsView: View {
         )
         .toolbarBaselineFrame(.sidebar)
     } detail: {
-      Group {
-        switch selectedSection {
-        case .general:
-          SettingsGeneralSectionRoot(store: store)
-        case .focusMode:
-          SettingsFocusModeSection()
-        case .banners:
-          SettingsBannersSection()
-        case .appearance:
-          SettingsAppearanceSection(themeMode: $themeMode)
-        case .markdown:
-          SettingsMarkdownSection()
-        case .notifications:
-          SettingsNotificationsSection(notifications: notifications)
-        case .voice:
-          SettingsVoiceSection()
-        case .connection:
-          SettingsConnectionSectionRoot(store: store)
-        case .taskBoard:
-          SettingsTaskBoardSection(
-            store: store,
-            formState: $taskBoardFormState,
-            navigationRequest: $navigationRequest
-          )
-          .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        case .repositories:
-          SettingsRepositoriesSection(
-            store: store,
-            formState: $taskBoardFormState
-          )
-          .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        case .dependencies:
-          SettingsDependenciesSection(navigationRequest: $navigationRequest)
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        case .secrets:
-          SettingsSecretsSection(
-            store: store,
-            formState: $taskBoardFormState
-          )
-          .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        case .policies:
-          SettingsPoliciesSection()
-        case .codex:
-          SettingsHostBridgeSection(store: store)
-        case .mcp:
-          SettingsMCPSection(store: store)
-        case .authorizedFolders:
-          AuthorizedFoldersSection(store: store)
-        case .supervisor:
-          SettingsSupervisorSection(
-            store: store,
-            notifications: notifications,
-            selectedPane: $selectedSupervisorPane
-          )
-        case .database:
-          SettingsDatabaseSection(store: store)
-        case .diagnostics:
-          SettingsDiagnosticsSectionRoot(
-            store: store,
-            preparedInput: $preparedDiagnosticsInput,
-            preparedSnapshot: $preparedDiagnosticsSnapshot
-          )
-        }
-      }
-      .environment(\.settingsScrollRestorationSection, selectedSection)
-      .environment(
-        \.settingsScrollRestorationSuspended,
-        navigationRequest?.target.section == selectedSection
+      SettingsDetailSwitch(
+        store: store,
+        notifications: notifications,
+        themeMode: $themeMode,
+        selectedSection: selectedSection,
+        navigationRequest: $navigationRequest,
+        selectedSupervisorPane: $selectedSupervisorPane
       )
-      .harnessMonitorBackgroundExtensionEffect()
     }
     .navigationSplitViewStyle(.balanced)
     .toolbarBaselineOverlay()
@@ -145,6 +80,98 @@ public struct SettingsView: View {
       }
       .sharedBackgroundVisibility(.hidden)
     }
+  }
+}
+
+/// Holds per-section editable state (task-board form, diagnostics snapshot
+/// cache) outside of `SettingsView`. Per-keystroke writes in the task-board,
+/// repositories, and secrets sections previously invalidated the entire
+/// `SettingsView` body - including the toolbar, navigation chrome, and
+/// titlebar separator overrides. Moving the storage one level down means
+/// only this switch's body re-evaluates on each keystroke; the outer
+/// `NavigationSplitView` modifier chain stays stable.
+private struct SettingsDetailSwitch: View {
+  let store: HarnessMonitorStore
+  let notifications: HarnessMonitorUserNotificationController
+  @Binding var themeMode: HarnessMonitorThemeMode
+  let selectedSection: SettingsSection
+  @Binding var navigationRequest: SettingsNavigationRequest?
+  @Binding var selectedSupervisorPane: SupervisorPaneKey
+  @State private var taskBoardFormState = TaskBoardSettingsFormState()
+  @State private var preparedDiagnosticsInput: SettingsDiagnosticsSnapshotInput?
+  @State private var preparedDiagnosticsSnapshot: SettingsDiagnosticsSnapshot?
+
+  var body: some View {
+    Group {
+      switch selectedSection {
+      case .general:
+        SettingsGeneralSectionRoot(store: store)
+      case .focusMode:
+        SettingsFocusModeSection()
+      case .banners:
+        SettingsBannersSection()
+      case .appearance:
+        SettingsAppearanceSection(themeMode: $themeMode)
+      case .markdown:
+        SettingsMarkdownSection()
+      case .notifications:
+        SettingsNotificationsSection(notifications: notifications)
+      case .voice:
+        SettingsVoiceSection()
+      case .connection:
+        SettingsConnectionSectionRoot(store: store)
+      case .taskBoard:
+        SettingsTaskBoardSection(
+          store: store,
+          formState: $taskBoardFormState,
+          navigationRequest: $navigationRequest
+        )
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+      case .repositories:
+        SettingsRepositoriesSection(
+          store: store,
+          formState: $taskBoardFormState
+        )
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+      case .dependencies:
+        SettingsDependenciesSection(navigationRequest: $navigationRequest)
+          .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+      case .secrets:
+        SettingsSecretsSection(
+          store: store,
+          formState: $taskBoardFormState
+        )
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+      case .policies:
+        SettingsPoliciesSection()
+      case .codex:
+        SettingsHostBridgeSection(store: store)
+      case .mcp:
+        SettingsMCPSection(store: store)
+      case .authorizedFolders:
+        AuthorizedFoldersSection(store: store)
+      case .supervisor:
+        SettingsSupervisorSection(
+          store: store,
+          notifications: notifications,
+          selectedPane: $selectedSupervisorPane
+        )
+      case .database:
+        SettingsDatabaseSection(store: store)
+      case .diagnostics:
+        SettingsDiagnosticsSectionRoot(
+          store: store,
+          preparedInput: $preparedDiagnosticsInput,
+          preparedSnapshot: $preparedDiagnosticsSnapshot
+        )
+      }
+    }
+    .environment(\.settingsScrollRestorationSection, selectedSection)
+    .environment(
+      \.settingsScrollRestorationSuspended,
+      navigationRequest?.target.section == selectedSection
+    )
+    .harnessMonitorBackgroundExtensionEffect()
   }
 }
 
