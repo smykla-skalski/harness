@@ -144,9 +144,9 @@ extension HarnessMonitorStore {
     supervisorOpenDecisionsByID = snapshot.decisionsByID
     supervisorOpenDecisionsBySession = snapshot.decisionsBySession
     supervisorOpenDecisionPresentationItems = snapshot.presentationItems
-    supervisorOpenDecisionPresentationItemsBySession = snapshot.presentationItemsBySession
+    supervisorPresentationItemsBySession = snapshot.presentationItemsBySession
     supervisorOpenDecisionSearchProjections = snapshot.searchProjections
-    supervisorOpenDecisionSearchProjectionsBySession = snapshot.searchProjectionsBySession
+    supervisorSearchProjectionsBySession = snapshot.searchProjectionsBySession
     supervisorOpenDecisionIDsBySession = snapshot.decisionIDsBySession
     supervisorToolbarSlice.refresh(counts: snapshot.countsBySeverity)
     supervisorBindings.pendingDecisionsBadgeSync?(snapshot.decisions.count)

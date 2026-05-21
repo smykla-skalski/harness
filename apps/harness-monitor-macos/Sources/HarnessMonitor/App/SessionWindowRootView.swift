@@ -34,7 +34,7 @@ struct SessionWindowRootView: View {
 
   private var pendingDecisionSeverity: DecisionSeverity? {
     var seen: Set<DecisionSeverity> = []
-    for decision in store.supervisorOpenDecisionPresentationItemsBySession[token.sessionID] ?? [] {
+    for decision in store.supervisorPresentationItemsBySession[token.sessionID] ?? [] {
       if let severity = DecisionSeverity(rawValue: decision.severityRaw) {
         seen.insert(severity)
       }

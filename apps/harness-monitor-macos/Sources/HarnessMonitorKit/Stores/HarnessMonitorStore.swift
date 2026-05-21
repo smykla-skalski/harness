@@ -67,13 +67,9 @@ public final class HarnessMonitorStore {
   public var supervisorOpenDecisionsByID: [String: Decision] = [:]
   public var supervisorOpenDecisionsBySession: [String: [Decision]] = [:]
   public var supervisorOpenDecisionPresentationItems: [DecisionPresentationSnapshot] = []
-  // swiftlint:disable:next identifier_name
-  public var supervisorOpenDecisionPresentationItemsBySession:
-    [String: [DecisionPresentationSnapshot]] = [:]
+  public var supervisorPresentationItemsBySession: [String: [DecisionPresentationSnapshot]] = [:]
   public var supervisorOpenDecisionSearchProjections: [DecisionSearchProjection] = []
-  // swiftlint:disable:next identifier_name
-  public var supervisorOpenDecisionSearchProjectionsBySession:
-    [String: [DecisionSearchProjection]] = [:]
+  public var supervisorSearchProjectionsBySession: [String: [DecisionSearchProjection]] = [:]
   public var supervisorOpenDecisionIDsBySession: [String: [String]] = [:]
   public var supervisorDecisionRefreshTick: Int = 0
   public internal(set) var supervisorLiveTickRefreshTick: Int = 0
