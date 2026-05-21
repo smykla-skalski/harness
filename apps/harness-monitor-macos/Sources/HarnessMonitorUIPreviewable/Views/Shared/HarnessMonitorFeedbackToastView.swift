@@ -11,14 +11,16 @@ public struct HarnessMonitorFeedbackToastView: View {
   }
 
   public var body: some View {
-    VStack(alignment: .trailing, spacing: HarnessMonitorTheme.spacingXS) {
-      ForEach(toast.activeFeedback) { feedback in
-        HarnessMonitorFeedbackToastRow(
-          feedback: feedback,
-          toast: toast,
-          canUndo: toast.hasUndoAction(id: feedback.id),
-          detailsInitiallyExpanded: detailsInitiallyExpanded
-        )
+    HarnessMonitorGlassControlGroup(spacing: HarnessMonitorTheme.spacingXS) {
+      VStack(alignment: .trailing, spacing: HarnessMonitorTheme.spacingXS) {
+        ForEach(toast.activeFeedback) { feedback in
+          HarnessMonitorFeedbackToastRow(
+            feedback: feedback,
+            toast: toast,
+            canUndo: toast.hasUndoAction(id: feedback.id),
+            detailsInitiallyExpanded: detailsInitiallyExpanded
+          )
+        }
       }
     }
     .frame(maxWidth: 540, alignment: .trailing)
