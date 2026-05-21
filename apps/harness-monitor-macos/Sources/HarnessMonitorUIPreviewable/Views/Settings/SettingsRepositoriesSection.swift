@@ -19,6 +19,7 @@ struct SettingsRepositoriesSection: View {
   @State var catalogSearchText = ""
   @State var isCatalogLoading = false
   @State var catalogError: SettingsRepositoriesCatalogErrorPresentation?
+  @State var isFullyExpanded = false
 
   @Environment(\.fontScale)
   var fontScale
@@ -73,15 +74,18 @@ struct SettingsRepositoriesSection: View {
           statusSection(message: saveWarning, color: .orange)
         }
         monitoredRepositoriesSection
-        organizationImportSection
-        if !draft.legacyOrganizations.isEmpty {
-          legacyOrganizationsSection
+        if isFullyExpanded {
+          organizationImportSection
+          if !draft.legacyOrganizations.isEmpty {
+            legacyOrganizationsSection
+          }
         }
       }
     }
     .settingsDetailFormStyle()
     .accessibilityIdentifier(HarnessMonitorAccessibility.settingsRepositoriesRoot)
     .task { await loadDraftIfNeeded() }
+    .task { await expandAfterFirstFrame() }
     .onChange(of: catalogError) { _, newValue in
       guard let newValue else { return }
       AccessibilityNotification.Announcement("\(newValue.title). \(newValue.message)").post()
@@ -89,6 +93,12 @@ struct SettingsRepositoriesSection: View {
     .safeAreaInset(edge: .bottom, spacing: 0) {
       actionsBar
     }
+  }
+
+  private func expandAfterFirstFrame() async {
+    guard !isFullyExpanded else { return }
+    try? await Task.sleep(for: .milliseconds(40))
+    isFullyExpanded = true
   }
 
   private func statusSection(message: String, color: Color = .red) -> some View {
