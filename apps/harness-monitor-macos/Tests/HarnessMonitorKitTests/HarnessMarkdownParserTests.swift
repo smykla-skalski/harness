@@ -322,6 +322,17 @@ struct HarnessMarkdownSourceContractTests {
     #expect(parser.contains("shouldCancel"))
   }
 
+  @Test("Markdown image flow participates in baseline alignment")
+  func markdownImageFlowParticipatesInBaselineAlignment() throws {
+    let source = try readRepositoryFile(
+      "apps/harness-monitor-macos/Sources/HarnessMonitorUIPreviewable"
+        + "/Views/Shared/HarnessMarkdownInlineFlowView.swift"
+    )
+
+    #expect(source.contains(".alignmentGuide(.firstTextBaseline)"))
+    #expect(source.contains("dimensions[VerticalAlignment.center]"))
+  }
+
   private func readRepositoryFile(_ relativePath: String) throws -> String {
     try String(contentsOfFile: repositoryPath(relativePath), encoding: .utf8)
   }

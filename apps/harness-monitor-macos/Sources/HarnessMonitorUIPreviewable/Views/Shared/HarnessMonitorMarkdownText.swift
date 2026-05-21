@@ -284,7 +284,7 @@ private struct HarnessMarkdownListView: View {
 
   private var visibleItems: [(offset: Int, item: HarnessMarkdownListItem)] {
     items.enumerated().compactMap { offset, item in
-      guard item.checkbox == nil || item.rendersVisibleContent else { return nil }
+      guard item.rendersListRow else { return nil }
       return (offset: offset, item: item)
     }
   }

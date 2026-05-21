@@ -4,6 +4,10 @@ extension HarnessMarkdownListItem {
   var rendersVisibleContent: Bool {
     blocks.contains { $0.rendersVisibleMarkdownContent }
   }
+
+  var rendersListRow: Bool {
+    checkbox != nil || rendersVisibleContent
+  }
 }
 
 extension HarnessMarkdownBlock {

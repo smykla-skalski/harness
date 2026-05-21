@@ -68,8 +68,8 @@ struct HarnessMarkdownImageRenderingTests {
       ])
   }
 
-  @Test("Comment-only task checkboxes are hidden by render visibility")
-  func commentOnlyTaskCheckboxesAreHiddenByRenderVisibility() {
+  @Test("Comment-only task checkboxes still render a list row")
+  func commentOnlyTaskCheckboxesStillRenderAListRow() {
     let document = HarnessMarkdownParser.parse(
       """
       - [ ] <!-- rebase-check -->
@@ -84,6 +84,8 @@ struct HarnessMarkdownImageRenderingTests {
     #expect(items.count == 2)
     #expect(items[0].checkbox == false)
     #expect(!items[0].rendersVisibleContent)
+    #expect(items[0].rendersListRow)
     #expect(items[1].rendersVisibleContent)
+    #expect(items[1].rendersListRow)
   }
 }
