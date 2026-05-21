@@ -88,13 +88,13 @@ extension HarnessMonitorStore {
   public func waitForAcpTimelineIdle() async {
     while true {
       let pendingTasks = [
-        acpTimelineMergeTask,
-        acpTranscriptMergeTask,
-        acpTranscriptLiveMergeTask,
-        acpTranscriptHistoryTask,
-        acpTimelineReattributeTask,
-        acpTranscriptReattributeTask,
-        acpTranscriptPartitionTask,
+        acpTimelineSync.mergeTask,
+        acpTimelineSync.transcriptMergeTask,
+        acpTimelineSync.transcriptLiveMergeTask,
+        acpTimelineSync.transcriptHistoryTask,
+        acpTimelineSync.reattributeTask,
+        acpTimelineSync.transcriptReattributeTask,
+        acpTimelineSync.transcriptPartitionTask,
       ].compactMap(\.self)
 
       guard !pendingTasks.isEmpty else {
