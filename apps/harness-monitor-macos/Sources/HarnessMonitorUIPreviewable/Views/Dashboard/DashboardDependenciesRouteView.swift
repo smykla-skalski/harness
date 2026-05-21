@@ -625,74 +625,42 @@ struct DashboardDependenciesRouteView: View {
   }
 
   private func dependencyActionBar(items: [DependencyUpdateItem]) -> some View {
-    HarnessMonitorGlassControlGroup(spacing: HarnessMonitorTheme.itemSpacing) {
-      HarnessMonitorWrapLayout(
-        spacing: HarnessMonitorTheme.itemSpacing,
-        lineSpacing: HarnessMonitorTheme.itemSpacing
-      ) {
-        dependencyActionButtons(items: items)
-      }
-    }
-    .frame(maxWidth: .infinity, alignment: .leading)
-  }
-
-  @ViewBuilder
-  private func dependencyActionButtons(items: [DependencyUpdateItem]) -> some View {
-    actionButton("Approve", systemImage: "checkmark.seal", prominence: .primary) {
-      Task { await approve(items: items) }
-    }
-    .disabled(!items.contains { $0.canAttemptManualApproval })
-
-    actionButton("Merge", systemImage: "arrow.triangle.merge", prominence: .success) {
-      Task { await merge(items: items) }
-    }
-    .disabled(!items.contains { $0.canAttemptManualMerge })
-
-    actionButton("Rerun Checks", systemImage: "arrow.clockwise.circle", prominence: .secondary) {
-      Task { await rerunChecks(items: items) }
-    }
-    .disabled(!items.contains { $0.hasRerunnableChecks })
-
-    DashboardDependenciesLabelPickerActionMenu(
-      labels: dashboardDependenciesAvailableLabels(
+    DashboardDependencyActionBar(
+      items: items,
+      availableLabels: dashboardDependenciesAvailableLabels(
         repositoryLabels: response.repositoryLabels,
         items: items
       ),
       frequentNames: frequentLabelNames(for: items),
       showsDescriptions: normalizedPreferences.showLabelDescriptions,
-      onSelect: { name in Task { await addLabel(name, to: items) } },
-      onCustom: {
+      onApprove: { Task { await approve(items: items) } },
+      onMerge: { Task { await merge(items: items) } },
+      onRerunChecks: { Task { await rerunChecks(items: items) } },
+      onSelectLabel: { name in Task { await addLabel(name, to: items) } },
+      onCustomLabel: {
         labelTargetItems = items
         labelDraft = ""
         isLabelSheetPresented = true
-      }
-    )
-    .disabled(items.isEmpty)
-
-    actionButton("Copy Approval Links", systemImage: "doc.on.doc", prominence: .secondary) {
-      copyApprovalLinks(for: items)
-    }
-
-    if items.count == 1, let item = items.first {
-      actionButton("Auto", systemImage: "bolt", prominence: .utility) {
-        Task { await auto(items: [item]) }
-      }
-      .disabled(!item.canRunAutoMode)
-      actionButton("Open Pull Request", systemImage: "safari", prominence: .utility) {
-        openItem(item)
-      }
-      if item.canStartFixCI {
-        actionButton("Fix CI", systemImage: "wrench.and.screwdriver", prominence: .secondary) {
+      },
+      onCopyApprovalLinks: { copyApprovalLinks(for: items) },
+      onAuto: {
+        if items.count == 1, let item = items.first {
+          Task { await auto(items: [item]) }
+        } else {
+          Task { await auto(items: items) }
+        }
+      },
+      onOpenItem: {
+        if let item = items.first {
+          openItem(item)
+        }
+      },
+      onFixCI: {
+        if let item = items.first {
           Task { await fixCI(item: item) }
         }
-        .accessibilityIdentifier(HarnessMonitorAccessibility.dashboardDependenciesFixCIButton)
       }
-    } else {
-      actionButton("Auto", systemImage: "bolt", prominence: .utility) {
-        Task { await auto(items: items) }
-      }
-      .disabled(!items.contains { $0.canRunAutoMode })
-    }
+    )
   }
 
   private var labelSheet: some View {
