@@ -3,22 +3,32 @@ import SwiftUI
 struct SettingsMarkdownSection: View {
   @AppStorage(HarnessMarkdownUserSettings.storageKey)
   private var storage = HarnessMarkdownUserSettings.defaultStorageValue
+  @State private var isFullyExpanded = false
 
   var body: some View {
     Form {
       scaleSection
       typographySection
       blockSpacingSection
-      layoutSpacingSection
-      imageSection
-      markdownColorsSection
-      codeBlockColorsSection
-      codeTokenColorsSection
-      previewSection
-      resetSection
+      if isFullyExpanded {
+        layoutSpacingSection
+        imageSection
+        markdownColorsSection
+        codeBlockColorsSection
+        codeTokenColorsSection
+        previewSection
+        resetSection
+      }
     }
     .settingsDetailFormStyle()
     .accessibilityIdentifier(HarnessMonitorAccessibility.settingsMarkdownSection)
+    .task { await expandAfterFirstFrame() }
+  }
+
+  private func expandAfterFirstFrame() async {
+    guard !isFullyExpanded else { return }
+    try? await Task.sleep(for: .milliseconds(40))
+    isFullyExpanded = true
   }
 
   private var currentSettings: HarnessMarkdownUserSettings {
