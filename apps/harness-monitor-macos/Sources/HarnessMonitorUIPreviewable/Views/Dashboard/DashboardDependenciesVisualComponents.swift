@@ -3,7 +3,8 @@ import SwiftUI
 
 private enum DashboardDependenciesVisualMetrics {
   static let pillCornerRadius: CGFloat = 7
-  static let dependencyRowPadding: CGFloat = 10
+  static let dependencyRowHorizontalPadding: CGFloat = 4
+  static let dependencyRowVerticalPadding: CGFloat = 10
   static let sectionMaxWidth: CGFloat = 940
   static let checksMaxWidth: CGFloat = 680
 }
@@ -186,7 +187,8 @@ struct DashboardDependencyListRow: View {
           .accessibilityLabel("Refreshing pull request")
       }
     }
-    .padding(DashboardDependenciesVisualMetrics.dependencyRowPadding)
+    .padding(.horizontal, DashboardDependenciesVisualMetrics.dependencyRowHorizontalPadding)
+    .padding(.vertical, DashboardDependenciesVisualMetrics.dependencyRowVerticalPadding)
     .frame(maxWidth: .infinity, alignment: .leading)
     .overlay(alignment: .bottom) {
       Divider()
