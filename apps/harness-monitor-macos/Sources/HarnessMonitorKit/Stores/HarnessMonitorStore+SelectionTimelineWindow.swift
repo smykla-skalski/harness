@@ -12,16 +12,16 @@ extension HarnessMonitorStore {
     }
 
     let loadKey = SelectedTimelineWindowLoadKey(sessionID: sessionID, request: request)
-    if let selectedTimelineWindowLoadTask, selectedTimelineWindowLoadKey == loadKey {
-      await selectedTimelineWindowLoadTask.value
+    if let selectedTimelineLoad.windowLoadTask, selectedTimelineLoad.windowLoadKey == loadKey {
+      await selectedTimelineLoad.windowLoadTask.value
       return
     }
 
     cancelSelectedTimelinePageLoad()
     cancelSelectedTimelineWindowLoad()
-    selectedTimelineWindowLoadSequence &+= 1
-    let token = selectedTimelineWindowLoadSequence
-    selectedTimelineWindowLoadKey = loadKey
+    selectedTimelineLoad.windowLoadSequence &+= 1
+    let token = selectedTimelineLoad.windowLoadSequence
+    selectedTimelineLoad.windowLoadKey = loadKey
 
     withUISyncBatch {
       isTimelineLoading = true
@@ -66,15 +66,15 @@ extension HarnessMonitorStore {
         )
       }
     }
-    selectedTimelineWindowLoadTask = task
+    selectedTimelineLoad.windowLoadTask = task
     await task.value
   }
 
   func cancelSelectedTimelineWindowLoad() {
-    selectedTimelineWindowLoadTask?.cancel()
-    selectedTimelineWindowLoadTask = nil
-    selectedTimelineWindowLoadKey = nil
-    selectedTimelineWindowLoadSequence &+= 1
+    selectedTimelineLoad.windowLoadTask?.cancel()
+    selectedTimelineLoad.windowLoadTask = nil
+    selectedTimelineLoad.windowLoadKey = nil
+    selectedTimelineLoad.windowLoadSequence &+= 1
   }
 
   func applySelectedTimelineWindowResponse(
@@ -112,17 +112,17 @@ extension HarnessMonitorStore {
     _ token: UInt64,
     key: SelectedTimelineWindowLoadKey
   ) -> Bool {
-    selectedTimelineWindowLoadSequence == token
-      && selectedTimelineWindowLoadKey == key
+    selectedTimelineLoad.windowLoadSequence == token
+      && selectedTimelineLoad.windowLoadKey == key
       && selectedSessionID == key.sessionID
   }
 
   func finishSelectedTimelineWindowLoadIfCurrent(_ token: UInt64, sessionID: String) {
-    guard selectedTimelineWindowLoadSequence == token else {
+    guard selectedTimelineLoad.windowLoadSequence == token else {
       return
     }
-    selectedTimelineWindowLoadTask = nil
-    selectedTimelineWindowLoadKey = nil
+    selectedTimelineLoad.windowLoadTask = nil
+    selectedTimelineLoad.windowLoadKey = nil
     if selectedSessionID == sessionID {
       isTimelineLoading = false
     }

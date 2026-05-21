@@ -9,15 +9,15 @@ extension HarnessMonitorStore {
     loadedTimeline: [TimelineEntry],
     timelineWindow: TimelineWindowResponse?
   ) -> Int {
-    max(1, selectedTimelinePreferredWindowLimit ?? Self.initialSelectedTimelineWindowLimit)
+    max(1, selectedTimelineLoad.preferredWindowLimit ?? Self.initialSelectedTimelineWindowLimit)
   }
 
   public func updateSelectedTimelinePreferredWindowLimit(_ limit: Int?) {
     let normalizedLimit = limit.map { max(1, $0) }
-    guard selectedTimelinePreferredWindowLimit != normalizedLimit else {
+    guard selectedTimelineLoad.preferredWindowLimit != normalizedLimit else {
       return
     }
-    selectedTimelinePreferredWindowLimit = normalizedLimit
+    selectedTimelineLoad.preferredWindowLimit = normalizedLimit
   }
 
   /// Resolve the timeline window after a streaming push delivers a new timeline

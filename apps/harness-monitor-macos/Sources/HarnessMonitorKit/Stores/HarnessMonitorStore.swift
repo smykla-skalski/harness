@@ -287,13 +287,7 @@ public final class HarnessMonitorStore {
   @ObservationIgnored var locallyRemovedSessionIDs: Set<String> = []
   @ObservationIgnored var pendingListSelectionTask: Task<Void, Never>?
   @ObservationIgnored var pendingListSelectionTaskToken: UInt64 = 0
-  @ObservationIgnored var selectedTimelinePageLoadTask: Task<Void, Never>?
-  @ObservationIgnored var selectedTimelinePageLoadKey: SelectedTimelinePageLoadKey?
-  @ObservationIgnored var selectedTimelinePageLoadSequence: UInt64 = 0
-  @ObservationIgnored var selectedTimelinePreferredWindowLimit: Int?
-  @ObservationIgnored var selectedTimelineWindowLoadTask: Task<Void, Never>?
-  @ObservationIgnored var selectedTimelineWindowLoadKey: SelectedTimelineWindowLoadKey?
-  @ObservationIgnored var selectedTimelineWindowLoadSequence: UInt64 = 0
+  @ObservationIgnored var selectedTimelineLoad = SelectedTimelineLoadState()
   var pendingCacheWriteTask: Task<Void, Never>?
   @ObservationIgnored var pendingCacheWriteTaskToken: UInt64 = 0
   @ObservationIgnored var pendingTaskBoardSnapshotCacheWriteTask: Task<Void, Never>?
@@ -423,6 +417,16 @@ public final class HarnessMonitorStore {
     scheduleBookmarkedSessionRefresh()
     scheduleNotificationHistoryRefresh()
   }
+}
+
+struct SelectedTimelineLoadState {
+  var pageLoadTask: Task<Void, Never>?
+  var pageLoadKey: SelectedTimelinePageLoadKey?
+  var pageLoadSequence: UInt64 = 0
+  var preferredWindowLimit: Int?
+  var windowLoadTask: Task<Void, Never>?
+  var windowLoadKey: SelectedTimelineWindowLoadKey?
+  var windowLoadSequence: UInt64 = 0
 }
 
 struct AcpPermissionSyncState {

@@ -295,10 +295,10 @@ extension HarnessMonitorStore {
   }
 
   func cancelSelectedTimelinePageLoad() {
-    selectedTimelinePageLoadTask?.cancel()
-    selectedTimelinePageLoadTask = nil
-    selectedTimelinePageLoadKey = nil
-    selectedTimelinePageLoadSequence &+= 1
+    selectedTimelineLoad.pageLoadTask?.cancel()
+    selectedTimelineLoad.pageLoadTask = nil
+    selectedTimelineLoad.pageLoadKey = nil
+    selectedTimelineLoad.pageLoadSequence &+= 1
     cancelSelectedTimelineWindowLoad()
   }
 
