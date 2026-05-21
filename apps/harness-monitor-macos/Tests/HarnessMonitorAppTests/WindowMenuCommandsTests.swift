@@ -48,7 +48,9 @@ final class WindowMenuCommandsTests: XCTestCase {
 
     XCTAssertTrue(
       commandSetSource.contains(
-        "NewSessionCommand(\n      store: store,\n      keyWindowObserver: keyWindowObserver,\n      windowCommandRouting: windowCommandRouting"
+        "NewSessionCommand(\n      store: store,"
+          + "\n      keyWindowObserver: keyWindowObserver,"
+          + "\n      windowCommandRouting: windowCommandRouting"
       )
     )
     XCTAssertTrue(source.contains("Button(\"New Session\")"))
@@ -98,7 +100,11 @@ final class WindowMenuCommandsTests: XCTestCase {
     XCTAssertTrue(sheetRouterSource.contains("NewCodexAgentSheet(store: store, sessionID: sessionID)"))
     XCTAssertTrue(storeEnumsSource.contains("case newCodexAgent(sessionID: String)"))
     XCTAssertTrue(routingStateSource.contains("public private(set) var activeSessionID: String?"))
-    XCTAssertTrue(routingStateSource.contains("public func register(sessionID: String?, windowID: ObjectIdentifier)"))
+    XCTAssertTrue(
+      routingStateSource.contains(
+        "public func register(sessionID: String?, windowID: ObjectIdentifier)"
+      )
+    )
     XCTAssertTrue(shellSource.contains("let sessionID: String?"))
     XCTAssertTrue(shellSource.contains("sessionID: sessionID"))
     XCTAssertTrue(routeModelSource.contains("case task"))
@@ -124,7 +130,11 @@ final class WindowMenuCommandsTests: XCTestCase {
     )
     XCTAssertTrue(shortcutSource.contains("case .control: \"⌃\""))
     XCTAssertTrue(shortcutSource.contains("case .shift: \"⇧\""))
-    XCTAssertTrue(shortcutSource.contains("public func isRevealed(by activeModifiers: EventModifiers) -> Bool"))
+    XCTAssertTrue(
+      shortcutSource.contains(
+        "public func isRevealed(by activeModifiers: EventModifiers) -> Bool"
+      )
+    )
     XCTAssertTrue(selectionSource.contains("public var primaryCreateKind: SessionCreateKind"))
     XCTAssertTrue(
       commandsSource.contains(
@@ -254,14 +264,22 @@ final class WindowMenuCommandsTests: XCTestCase {
       source.contains("Button(\"Decrease Text Size\", action: decreaseTextSize)\n          .disabled(true)")
     )
     XCTAssertTrue(
-      source.contains("Button(\"Decrease Text Size\", action: decreaseTextSize)\n          .keyboardShortcut(\"-\", modifiers: .command)")
+      source.contains(
+        "Button(\"Decrease Text Size\", action: decreaseTextSize)"
+          + "\n          .keyboardShortcut(\"-\", modifiers: .command)"
+      )
     )
     XCTAssertTrue(source.contains("if let zoomFocus = policyCanvasZoomFocus {"))
     XCTAssertTrue(
       source.contains("zoomFocus.dispatcher.performZoomOut()")
     )
     XCTAssertTrue(
-      source.contains("Button(\"Reset Zoom\") {\n          zoomFocus.dispatcher.performResetZoom()\n        }\n        .keyboardShortcut(\"0\", modifiers: .command)")
+      source.contains(
+        "Button(\"Reset Zoom\") {"
+          + "\n          zoomFocus.dispatcher.performResetZoom()"
+          + "\n        }"
+          + "\n        .keyboardShortcut(\"0\", modifiers: .command)"
+      )
     )
     XCTAssertFalse(source.contains(".disabled(!canDecreaseTextSize || policyCanvasZoomFocus != nil)"))
     XCTAssertFalse(source.contains(".disabled(policyCanvasZoomFocus == nil)"))

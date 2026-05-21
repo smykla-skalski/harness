@@ -4,7 +4,7 @@ import Observation
 import SwiftUI
 
 @MainActor
-enum GlobalWindowNavigationEntry: Hashable, Sendable {
+enum GlobalWindowNavigationEntry: Hashable {
   case dashboard(route: DashboardWindowRoute)
   case session(sessionID: String, selection: SessionSelection)
 }
@@ -12,30 +12,12 @@ enum GlobalWindowNavigationEntry: Hashable, Sendable {
 struct DashboardWindowNavigationRestoreRequest: Equatable, Sendable {
   let requestID: Int
   let route: DashboardWindowRoute
-
-  init(
-    requestID: Int,
-    route: DashboardWindowRoute
-  ) {
-    self.requestID = requestID
-    self.route = route
-  }
 }
 
 struct SessionWindowNavigationRestoreRequest: Equatable, Sendable {
   let requestID: Int
   let sessionID: String
   let selection: SessionSelection
-
-  init(
-    requestID: Int,
-    sessionID: String,
-    selection: SessionSelection
-  ) {
-    self.requestID = requestID
-    self.sessionID = sessionID
-    self.selection = selection
-  }
 }
 
 @MainActor
@@ -224,12 +206,13 @@ public final class GlobalWindowNavigationHistory {
   private func activateExistingWindowIfPossible(
     for entry: GlobalWindowNavigationEntry
   ) -> Bool {
-    let expectedIdentifier = switch entry {
-    case .dashboard:
-      HarnessMonitorWindowID.dashboard
-    case .session(let sessionID, _):
-      HarnessMonitorWindowID.sessionWindow(sessionID)
-    }
+    let expectedIdentifier =
+      switch entry {
+      case .dashboard:
+        HarnessMonitorWindowID.dashboard
+      case .session(let sessionID, _):
+        HarnessMonitorWindowID.sessionWindow(sessionID)
+      }
 
     guard
       let window = NSApplication.shared.windows.first(where: {
