@@ -115,7 +115,7 @@ struct DashboardDependenciesResolvedPreferences: Equatable {
     )
   }
 
-  private static func queryRequest(_ parts: DashboardDependenciesQueryRequestParts)
+  static func queryRequest(_ parts: DashboardDependenciesQueryRequestParts)
     -> DependencyUpdatesQueryRequest
   {
     DependencyUpdatesQueryRequest(
@@ -160,26 +160,26 @@ struct DashboardDependenciesRouteView: View {
   @Environment(\.openSettingsSection)
   var openSettingsSection
   @Environment(\.openURL)
-  private var openURL
+  var openURL
 
   @AppStorage(DashboardDependenciesPreferences.storageKey)
-  private var storedPreferences = ""
+  var storedPreferences = ""
   @SceneStorage("dashboard.dependencies.filter")
-  private var filterModeRaw = DashboardDependenciesFilterMode.all.rawValue
+  var filterModeRaw = DashboardDependenciesFilterMode.all.rawValue
   @SceneStorage("dashboard.dependencies.sort")
-  private var sortModeRaw = DashboardDependenciesSortMode.status.rawValue
+  var sortModeRaw = DashboardDependenciesSortMode.status.rawValue
   @SceneStorage("dashboard.dependencies.group")
-  private var groupModeRaw = DashboardDependenciesGroupMode.repository.rawValue
+  var groupModeRaw = DashboardDependenciesGroupMode.repository.rawValue
   @SceneStorage("dashboard.dependencies.search")
-  private var searchText = ""
+  var searchText = ""
   @SceneStorage("dashboard.dependencies.primary-selection")
-  private var persistedPrimarySelectionID = ""
+  var persistedPrimarySelectionID = ""
   @SceneStorage("dashboard.dependencies.collapsed-repositories")
-  private var collapsedRepositoriesStorage = ""
+  var collapsedRepositoriesStorage = ""
   @SceneStorage("dashboard.dependencies.content-detail-width")
-  private var contentDetailWidth = SessionContentDetailSplitLayout.defaultContentWidth
+  var contentDetailWidth = SessionContentDetailSplitLayout.defaultContentWidth
 
-  @State private var response = DependencyUpdatesQueryResponse(
+  @State var response = DependencyUpdatesQueryResponse(
     fetchedAt: "",
     fromCache: false,
     summary: DependencyUpdatesSummary(
@@ -192,22 +192,22 @@ struct DashboardDependenciesRouteView: View {
     ),
     items: []
   )
-  @State private var isLoading = false
-  @State private var isBackgroundRefreshing = false
-  @State private var errorMessage: String?
-  @State private var selectedIDs = Set<String>()
-  @State private var isLabelSheetPresented = false
-  @State private var labelDraft = ""
-  @State private var labelTargetItems = [DependencyUpdateItem]()
-  @State private var inFlightActionTitle: String?
-  @State private var resolvedPreferences: DashboardDependenciesResolvedPreferences
-  @State private var presentationWorker = DashboardDependenciesPresentationWorker()
-  @State private var cachedPresentation = DashboardDependenciesPresentation.empty
-  @State private var presentationGeneration: UInt64 = 0
-  @State private var refreshingPullRequestIDs = Set<String>()
-  @State private var scheduler = DashboardDependenciesScheduler()
-  @State private var collapsedRepositories = DashboardDependenciesCollapsedRepositories()
-  @State private var labelMenuDataByRepository: [String: DashboardDependenciesRepoLabelMenuData] =
+  @State var isLoading = false
+  @State var isBackgroundRefreshing = false
+  @State var errorMessage: String?
+  @State var selectedIDs = Set<String>()
+  @State var isLabelSheetPresented = false
+  @State var labelDraft = ""
+  @State var labelTargetItems = [DependencyUpdateItem]()
+  @State var inFlightActionTitle: String?
+  @State var resolvedPreferences: DashboardDependenciesResolvedPreferences
+  @State var presentationWorker = DashboardDependenciesPresentationWorker()
+  @State var cachedPresentation = DashboardDependenciesPresentation.empty
+  @State var presentationGeneration: UInt64 = 0
+  @State var refreshingPullRequestIDs = Set<String>()
+  @State var scheduler = DashboardDependenciesScheduler()
+  @State var collapsedRepositories = DashboardDependenciesCollapsedRepositories()
+  @State var labelMenuDataByRepository: [String: DashboardDependenciesRepoLabelMenuData] =
     [:]
 
   init(
@@ -250,7 +250,7 @@ struct DashboardDependenciesRouteView: View {
     scheduler
   }
 
-  private var reloadTaskKey: DashboardDependenciesReloadTaskKey {
+  var reloadTaskKey: DashboardDependenciesReloadTaskKey {
     DashboardDependenciesReloadTaskKey(
       preferencesSignature: resolvedPreferences.cacheHash,
       connectionState: store.connectionState
@@ -261,11 +261,11 @@ struct DashboardDependenciesRouteView: View {
     resolvedPreferences.preferences
   }
 
-  private var groupMode: DashboardDependenciesGroupMode {
+  var groupMode: DashboardDependenciesGroupMode {
     DashboardDependenciesGroupMode(rawValue: groupModeRaw) ?? .repository
   }
 
-  private var presentationInput: DashboardDependenciesPresentationInput {
+  var presentationInput: DashboardDependenciesPresentationInput {
     let preferences = resolvedPreferences
     return DashboardDependenciesPresentationInput(
       items: response.items,
@@ -279,23 +279,23 @@ struct DashboardDependenciesRouteView: View {
     )
   }
 
-  private var filteredItems: [DependencyUpdateItem] {
+  var filteredItems: [DependencyUpdateItem] {
     cachedPresentation.filteredItems
   }
 
-  private var groupedItems: [DashboardDependenciesRepositoryGroup] {
+  var groupedItems: [DashboardDependenciesRepositoryGroup] {
     cachedPresentation.groupedItems
   }
 
-  private var selectedItems: [DependencyUpdateItem] {
+  var selectedItems: [DependencyUpdateItem] {
     cachedPresentation.selectedItems
   }
 
-  private var primaryDetailItem: DependencyUpdateItem? {
+  var primaryDetailItem: DependencyUpdateItem? {
     cachedPresentation.primaryDetailItem
   }
 
-  private var relativeUpdatedLabels: [String: String] {
+  var relativeUpdatedLabels: [String: String] {
     cachedPresentation.relativeUpdatedLabels
   }
 
@@ -372,19 +372,19 @@ struct DashboardDependenciesRouteView: View {
     labelMenuDataByRepository[item.repository]?.frequentNames ?? []
   }
 
-  private func syncCollapsedRepositoriesFromStorage(_ storedValue: String) {
+  func syncCollapsedRepositoriesFromStorage(_ storedValue: String) {
     let next = DashboardDependenciesCollapsedRepositories.decode(from: storedValue)
     guard next != collapsedRepositories else { return }
     collapsedRepositories = next
   }
 
-  private func syncPreferencesFromStorage(_ storedValue: String) {
+  func syncPreferencesFromStorage(_ storedValue: String) {
     let nextPreferences = DashboardDependenciesResolvedPreferences(storedValue: storedValue)
     guard nextPreferences != resolvedPreferences else { return }
     resolvedPreferences = nextPreferences
   }
 
-  private var contentPane: some View {
+  var contentPane: some View {
     VStack(alignment: .leading, spacing: 14) {
       filterBar
       contentListPane
@@ -393,7 +393,7 @@ struct DashboardDependenciesRouteView: View {
     .padding(20)
   }
 
-  @ViewBuilder private var contentListPane: some View {
+  @ViewBuilder var contentListPane: some View {
     if let errorMessage, !isLoading {
       errorState(message: errorMessage)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
@@ -402,11 +402,11 @@ struct DashboardDependenciesRouteView: View {
     }
   }
 
-  private var filterBar: some View {
+  var filterBar: some View {
     filterControls
   }
 
-  private var filterControls: some View {
+  var filterControls: some View {
     DashboardDependenciesControlStrip(
       filterModeRaw: $filterModeRaw,
       sortModeRaw: $sortModeRaw,
@@ -420,7 +420,7 @@ struct DashboardDependenciesRouteView: View {
     )
   }
 
-  private var dependenciesList: some View {
+  var dependenciesList: some View {
     List(selection: $selectedIDs) {
       if filteredItems.isEmpty, !isLoading {
         ContentUnavailableView {
@@ -459,7 +459,7 @@ struct DashboardDependenciesRouteView: View {
     }
   }
 
-  private var detailPane: some View {
+  var detailPane: some View {
     Group {
       if let errorMessage, !isLoading {
         errorState(message: errorMessage)
@@ -485,7 +485,7 @@ struct DashboardDependenciesRouteView: View {
     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
   }
 
-  private var batchDetail: some View {
+  var batchDetail: some View {
     HarnessMonitorColumnScrollView(
       horizontalPadding: 24,
       verticalPadding: 24,
@@ -508,7 +508,7 @@ struct DashboardDependenciesRouteView: View {
     }
   }
 
-  private func dependencyRow(
+  func dependencyRow(
     _ item: DependencyUpdateItem,
     showsRepository: Bool
   ) -> some View {
@@ -536,7 +536,7 @@ struct DashboardDependenciesRouteView: View {
     )
   }
 
-  private func repositorySectionHeader(_ repository: String, itemCount: Int) -> some View {
+  func repositorySectionHeader(_ repository: String, itemCount: Int) -> some View {
     DashboardDependenciesRepositorySectionHeader(
       repository: repository,
       itemCount: itemCount,
@@ -546,7 +546,7 @@ struct DashboardDependenciesRouteView: View {
     )
   }
 
-  private func dependencyActionBar(items: [DependencyUpdateItem]) -> some View {
+  func dependencyActionBar(items: [DependencyUpdateItem]) -> some View {
     DashboardDependencyActionBar(
       items: items,
       availableLabels: dashboardDependenciesAvailableLabels(
@@ -585,7 +585,7 @@ struct DashboardDependenciesRouteView: View {
     )
   }
 
-  private var labelSheet: some View {
+  var labelSheet: some View {
     DashboardDependenciesCustomLabelSheet(
       items: labelTargetItems,
       suggestions: dashboardDependenciesAvailableLabels(
@@ -641,7 +641,7 @@ struct DashboardDependenciesRouteView: View {
     await startScheduler(forceRefreshAll: forceRefresh)
   }
 
-  private func clearCacheAndReload() async {
+  func clearCacheAndReload() async {
     guard let client = store.apiClient else { return }
     do {
       let cleared = try await client.clearDependencyUpdatesCache()
@@ -654,7 +654,7 @@ struct DashboardDependenciesRouteView: View {
     }
   }
 
-  private func approve(items: [DependencyUpdateItem]) async {
+  func approve(items: [DependencyUpdateItem]) async {
     await performMutation("Approving", items: items) { client in
       try await client.approveDependencyUpdates(
         request: DependencyUpdatesApproveRequest(targets: items.map(\.target))
@@ -662,7 +662,7 @@ struct DashboardDependenciesRouteView: View {
     }
   }
 
-  private func merge(items: [DependencyUpdateItem]) async {
+  func merge(items: [DependencyUpdateItem]) async {
     let nextID = nextSelectionID(after: items)
     await performMutation(
       "Merging",
@@ -683,7 +683,7 @@ struct DashboardDependenciesRouteView: View {
     )
   }
 
-  private func nextSelectionID(after items: [DependencyUpdateItem]) -> String? {
+  func nextSelectionID(after items: [DependencyUpdateItem]) -> String? {
     let mergedIDs = Set(items.map(\.pullRequestID))
     let list = filteredItems
     guard
@@ -696,7 +696,7 @@ struct DashboardDependenciesRouteView: View {
       .pullRequestID
   }
 
-  private func rerunChecks(items: [DependencyUpdateItem]) async {
+  func rerunChecks(items: [DependencyUpdateItem]) async {
     await performMutation("Rerunning", items: items) { client in
       try await client.rerunDependencyUpdateChecks(
         request: DependencyUpdatesRerunChecksRequest(targets: items.map(\.rerunTarget))
@@ -704,7 +704,7 @@ struct DashboardDependenciesRouteView: View {
     }
   }
 
-  private func addLabel(_ label: String, to items: [DependencyUpdateItem]) async {
+  func addLabel(_ label: String, to items: [DependencyUpdateItem]) async {
     await performMutation(
       "Labeling",
       items: items,
@@ -717,7 +717,7 @@ struct DashboardDependenciesRouteView: View {
     )
   }
 
-  private func auto(items: [DependencyUpdateItem]) async {
+  func auto(items: [DependencyUpdateItem]) async {
     await performMutation("Running auto mode", items: items) { client in
       try await client.autoDependencyUpdates(
         request: DependencyUpdatesAutoRequest(
@@ -728,7 +728,7 @@ struct DashboardDependenciesRouteView: View {
     }
   }
 
-  private func fixCI(item: DependencyUpdateItem) async {
+  func fixCI(item: DependencyUpdateItem) async {
     guard let client = store.apiClient else { return }
     inFlightActionTitle = "Creating Fix CI work…"
     do {
@@ -764,7 +764,7 @@ struct DashboardDependenciesRouteView: View {
     inFlightActionTitle = nil
   }
 
-  private func performMutation(
+  func performMutation(
     _ title: String,
     items: [DependencyUpdateItem],
     onSuccess: @MainActor () -> Void = {},
@@ -785,12 +785,12 @@ struct DashboardDependenciesRouteView: View {
     }
   }
 
-  private func openItem(_ item: DependencyUpdateItem) {
+  func openItem(_ item: DependencyUpdateItem) {
     guard let url = URL(string: item.url) else { return }
     openURL(url)
   }
 
-  private func copyApprovalLinks(for items: [DependencyUpdateItem]) {
+  func copyApprovalLinks(for items: [DependencyUpdateItem]) {
     let scopedItems: [DependencyUpdateItem]
     if selectedItems.isEmpty, items.count == 1, let repository = items.first?.repository,
       groupMode == .repository
@@ -811,11 +811,11 @@ struct DashboardDependenciesRouteView: View {
     store.presentSuccessFeedback("Copied \(links.count) approval link(s)")
   }
 
-  private func relativeUpdatedLabel(for item: DependencyUpdateItem) -> String {
+  func relativeUpdatedLabel(for item: DependencyUpdateItem) -> String {
     relativeUpdatedLabels[item.pullRequestID] ?? item.updatedAt
   }
 
-  private func toggleRepositoryCollapse(_ repository: String) {
+  func toggleRepositoryCollapse(_ repository: String) {
     var collapsed = collapsedRepositories
     collapsed.toggle(repository)
     collapsedRepositories = collapsed
@@ -833,7 +833,7 @@ struct DashboardDependenciesRouteView: View {
   }
 
   @MainActor
-  private func rebuildPresentation(input: DashboardDependenciesPresentationInput) async {
+  func rebuildPresentation(input: DashboardDependenciesPresentationInput) async {
     presentationGeneration &+= 1
     let generation = presentationGeneration
     let presentation = await presentationWorker.compute(input: input)
