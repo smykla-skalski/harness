@@ -298,6 +298,9 @@ final class RecordingHarnessClient: HarnessMonitorClientProtocol, @unchecked Sen
   var timelineBatchDelaysBySessionID: [String: Duration] = [:]
   var timelineErrorsBySessionID: [String: any Error] = [:]
   var timelineWindowErrorsBySessionID: [String: any Error] = [:]
+  var dependencyBodyResponses: [String: DependencyUpdatesBodyResponse] = [:]
+  var dependencyBodyFetchedIDs: [String] = []
+  var dependencyBodyFetchHook: (@Sendable (String) async -> Void)?
   var codexRunsBySessionID: [String: [CodexRunSnapshot]] = [:]
   var codexRunsDelaysBySessionID: [String: Duration] = [:]
   var resolvedAcpSnapshotsByAgentID: [String: AcpAgentSnapshot] = [:]
