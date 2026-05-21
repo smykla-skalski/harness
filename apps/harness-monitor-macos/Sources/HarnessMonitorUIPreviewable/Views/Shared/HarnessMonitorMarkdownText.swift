@@ -266,7 +266,7 @@ private struct HarnessMarkdownListView: View {
   var body: some View {
     VStack(alignment: .leading, spacing: style.spacing.listItem) {
       ForEach(visibleItems, id: \.offset) { index, item in
-        HStack(alignment: .top, spacing: style.spacing.listMarkerGap) {
+        HStack(alignment: .firstTextBaseline, spacing: style.spacing.listMarkerGap) {
           marker(for: item, index: index)
             .frame(width: 28, alignment: .trailing)
           HarnessMarkdownBlockStackView(
@@ -290,9 +290,16 @@ private struct HarnessMarkdownListView: View {
   @ViewBuilder
   private func marker(for item: HarnessMarkdownListItem, index: Int) -> some View {
     if let checkbox = item.checkbox {
-      Image(systemName: checkbox ? "checkmark.square.fill" : "square")
-        .foregroundStyle(checkbox ? style.colors.taskChecked : style.colors.taskUnchecked)
-        .imageScale(.small)
+      Toggle(isOn: .constant(checkbox)) {
+        EmptyView()
+      }
+      .toggleStyle(.checkbox)
+      .labelsHidden()
+      .controlSize(.small)
+      .allowsHitTesting(false)
+      .alignmentGuide(.firstTextBaseline) { dimensions in
+        dimensions[VerticalAlignment.center]
+      }
     } else if ordered {
       Text("\(start + index).")
         .font(style.typography.listMarker.font)
@@ -301,84 +308,6 @@ private struct HarnessMarkdownListView: View {
       Text("•")
         .font(style.typography.listMarker.font)
         .foregroundStyle(style.colors.secondaryText)
-    }
-  }
-}
-
-private struct HarnessMarkdownTableView: View {
-  let table: HarnessMarkdownTable
-  let settings: HarnessMarkdownRenderSettings
-  let style: HarnessMarkdownResolvedRenderSettings
-
-  var body: some View {
-    ScrollView(.horizontal) {
-      Grid(
-        alignment: .leading,
-        horizontalSpacing: style.spacing.tableColumn,
-        verticalSpacing: style.spacing.tableRow
-      ) {
-        row(cells: table.headers, isHeader: true)
-        Divider()
-        ForEach(table.rows.indices, id: \.self) { index in
-          row(cells: table.rows[index], isHeader: false)
-        }
-      }
-      .fixedSize(horizontal: true, vertical: false)
-      .padding(HarnessMonitorTheme.spacingSM)
-    }
-    .scrollIndicators(.hidden)
-    .frame(maxWidth: .infinity, alignment: .leading)
-    .background {
-      RoundedRectangle(cornerRadius: HarnessMonitorTheme.cornerRadiusSM, style: .continuous)
-        .fill(style.colors.tableBackground)
-    }
-    .overlay {
-      RoundedRectangle(cornerRadius: HarnessMonitorTheme.cornerRadiusSM, style: .continuous)
-        .stroke(style.colors.tableBorder, lineWidth: 1)
-    }
-  }
-
-  @ViewBuilder
-  private func row(cells: [[HarnessMarkdownInline]], isHeader: Bool) -> some View {
-    GridRow(alignment: .center) {
-      ForEach(cells.indices, id: \.self) { index in
-        HarnessMarkdownInlineFlowView(
-          inlines: cells[index],
-          style: HarnessMarkdownInlineRenderStyle(
-            font: isHeader ? style.typography.tableHeader.font : style.typography.body.font,
-            codeFont: style.typography.inlineCode.font,
-            colors: style.colors
-          ),
-          images: style.images,
-          imageLayout: .inline
-        )
-        .gridColumnAlignment(horizontalAlignment(for: index))
-        .multilineTextAlignment(textAlignment(for: index))
-      }
-    }
-  }
-
-  private func horizontalAlignment(for index: Int) -> HorizontalAlignment {
-    guard index < table.alignments.count else { return .leading }
-    switch table.alignments[index] {
-    case .leading:
-      return .leading
-    case .center:
-      return .center
-    case .trailing:
-      return .trailing
-    }
-  }
-
-  private func textAlignment(for index: Int) -> TextAlignment {
-    guard index < table.alignments.count else { return .leading }
-    switch table.alignments[index] {
-    case .leading:
-      return .leading
-    case .center:
-      return .center
-    case .trailing:
-      return .trailing
     }
   }
 }

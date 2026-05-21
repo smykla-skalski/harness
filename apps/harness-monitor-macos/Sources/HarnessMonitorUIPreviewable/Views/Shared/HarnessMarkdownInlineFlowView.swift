@@ -14,7 +14,7 @@ struct HarnessMarkdownInlineFlowView: View {
 
   var body: some View {
     if usesFragmentLayout {
-      HarnessMarkdownInlineWrapLayout(horizontalSpacing: 4, verticalSpacing: 2) {
+      HarnessMarkdownInlineWrapLayout(horizontalSpacing: 0, verticalSpacing: 2) {
         ForEach(Array(inlines.enumerated()), id: \.offset) { _, inline in
           HarnessMarkdownInlineFragmentView(
             inline: inline,
@@ -40,7 +40,6 @@ struct HarnessMarkdownInlineFlowView: View {
   private var usesFragmentLayout: Bool {
     inlines.containsMarkdownImage || inlines.containsMarkdownLink
   }
-
 }
 
 private struct HarnessMarkdownInlineFragmentView: View {
@@ -89,7 +88,7 @@ private struct HarnessMarkdownInlineFragmentView: View {
 
   @ViewBuilder
   private func link(label: [HarnessMarkdownInline], destination: String) -> some View {
-    if label.containsMarkdownImage, let url = URL(string: destination) {
+    if label.containsMarkdownImage, let url = URL(string: decodeEntities(destination)) {
       Link(destination: url) {
         HarnessMarkdownInlineFlowView(
           inlines: label,
@@ -99,7 +98,7 @@ private struct HarnessMarkdownInlineFragmentView: View {
         )
       }
       .modifier(HarnessMarkdownLinkHoverModifier(color: style.colors.link))
-    } else if let url = URL(string: destination) {
+    } else if let url = URL(string: decodeEntities(destination)) {
       Link(destination: url) {
         HarnessMarkdownInlineFlowView(
           inlines: label,
@@ -204,7 +203,7 @@ private struct HarnessMarkdownLinkHoverModifier: ViewModifier {
 
   func body(content: Content) -> some View {
     content
-      .padding(.horizontal, 1)
+      .contentShape(Rectangle())
       .background {
         RoundedRectangle(cornerRadius: 3, style: .continuous)
           .fill(color.opacity(isHovering ? 0.14 : 0))

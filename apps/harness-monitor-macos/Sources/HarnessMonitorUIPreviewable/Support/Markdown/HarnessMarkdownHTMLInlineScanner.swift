@@ -101,7 +101,7 @@ enum HarnessMarkdownHTMLInlineScanner {
 
   private static func flush(_ buffer: inout String, into parts: inout [HarnessMarkdownInline]) {
     guard !buffer.isEmpty else { return }
-    parts.append(.text(buffer))
+    parts.append(.text(decodeEntities(buffer)))
     buffer.removeAll(keepingCapacity: true)
   }
 
