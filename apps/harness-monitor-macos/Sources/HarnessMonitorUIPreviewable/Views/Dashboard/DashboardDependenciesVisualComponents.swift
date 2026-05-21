@@ -14,9 +14,18 @@ private enum DashboardDependencyTitleLineCenterAlignment: AlignmentID {
   }
 }
 
+private enum DashboardDependencyCheckTextCenterAlignment: AlignmentID {
+  static func defaultValue(in context: ViewDimensions) -> CGFloat {
+    context[VerticalAlignment.center]
+  }
+}
+
 private extension VerticalAlignment {
   static let dashboardDependencyTitleLineCenter = VerticalAlignment(
     DashboardDependencyTitleLineCenterAlignment.self
+  )
+  static let dashboardDependencyCheckTextCenter = VerticalAlignment(
+    DashboardDependencyCheckTextCenterAlignment.self
   )
 }
 
@@ -319,7 +328,7 @@ private struct DashboardDependencyCheckRow: View {
   let suppressPassingStatus: Bool
 
   var body: some View {
-    HStack(alignment: .firstTextBaseline, spacing: HarnessMonitorTheme.spacingSM) {
+    HStack(alignment: .dashboardDependencyCheckTextCenter, spacing: HarnessMonitorTheme.spacingSM) {
       Image(systemName: check.systemImage)
         .foregroundStyle(check.tint)
         .frame(width: 16, alignment: .center)
@@ -327,6 +336,9 @@ private struct DashboardDependencyCheckRow: View {
         .scaledFont(.callout)
         .foregroundStyle(HarnessMonitorTheme.ink)
         .lineLimit(2)
+        .alignmentGuide(.dashboardDependencyCheckTextCenter) { dimensions in
+          dimensions[VerticalAlignment.center]
+        }
         .layoutPriority(1)
       if !suppressPassingStatus {
         DashboardDependencyStatusPill(
