@@ -10,7 +10,7 @@ struct AcpToolCallPhaseKey: Hashable {
   }
 }
 
-private enum AcpToolCallPhaseLocation {
+enum AcpToolCallPhaseLocation {
   case current(String)
   case incoming(Int)
 }
