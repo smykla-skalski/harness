@@ -678,30 +678,11 @@ struct DashboardDependenciesRouteView: View {
     }
   }
 
-  @ViewBuilder
   private func descriptionView(for item: DependencyUpdateItem) -> some View {
-    switch store.dependencyUpdateBodyState[item.pullRequestID] {
-    case .loaded(let body):
-      if body.isEmpty {
-        Text("No description")
-          .foregroundStyle(HarnessMonitorTheme.secondaryInk)
-          .scaledFont(.callout)
-      } else {
-        HarnessMonitorMarkdownText(body, textSelection: .enabled)
-      }
-    case .failed(let message):
-      Text(message)
-        .foregroundStyle(HarnessMonitorTheme.secondaryInk)
-        .scaledFont(.callout)
-    case .loading, nil:
-      HStack(spacing: HarnessMonitorTheme.spacingSM) {
-        ProgressView()
-          .controlSize(.small)
-        Text("Loading description…")
-          .foregroundStyle(HarnessMonitorTheme.secondaryInk)
-          .scaledFont(.callout)
-      }
-    }
+    DashboardDependenciesDescriptionView(
+      store: store,
+      pullRequestID: item.pullRequestID
+    )
   }
 
   private func dependencyRow(
@@ -1214,6 +1195,37 @@ struct DashboardDependenciesRouteView: View {
 struct DashboardDependenciesRepoLabelMenuData: Equatable, Sendable {
   let sortedLabels: [DependencyUpdateRepositoryLabel]
   let frequentNames: [String]
+}
+
+@MainActor
+private struct DashboardDependenciesDescriptionView: View {
+  let store: HarnessMonitorStore
+  let pullRequestID: String
+
+  var body: some View {
+    switch store.dependencyUpdateBodyState[pullRequestID] {
+    case .loaded(let body):
+      if body.isEmpty {
+        Text("No description")
+          .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+          .scaledFont(.callout)
+      } else {
+        HarnessMonitorMarkdownText(body, textSelection: .enabled)
+      }
+    case .failed(let message):
+      Text(message)
+        .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+        .scaledFont(.callout)
+    case .loading, nil:
+      HStack(spacing: HarnessMonitorTheme.spacingSM) {
+        ProgressView()
+          .controlSize(.small)
+        Text("Loading description…")
+          .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+          .scaledFont(.callout)
+      }
+    }
+  }
 }
 
 private struct DashboardDependenciesControlStrip: View {
