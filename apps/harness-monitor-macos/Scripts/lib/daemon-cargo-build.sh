@@ -13,11 +13,14 @@ find_cargo() {
     return
   fi
 
-  if command -v cargo >/dev/null 2>&1; then
-    command -v cargo
-    return
-  fi
-
+  # Prefer the rustup proxy at ~/.cargo/bin/cargo before falling through to
+  # `command -v cargo`. The proxy honors rust-toolchain.toml, so the rustc
+  # version is identical whether the build runs from Xcode's UI (no mise
+  # activation, minimal PATH) or from a terminal `mise run monitor:build`.
+  # `command -v cargo` resolves against the caller's PATH and can pick a
+  # standalone Homebrew cargo that pins its own rustc and ignores the
+  # toolchain file - each switch flips cargo's `rustc` fingerprint and forces
+  # a full rebuild of every dependency.
   for candidate in \
     "$HOME/.cargo/bin/cargo" \
     /opt/homebrew/bin/cargo \
@@ -27,6 +30,11 @@ find_cargo() {
       return
     fi
   done
+
+  if command -v cargo >/dev/null 2>&1; then
+    command -v cargo
+    return
+  fi
 
   printf 'cargo is required to build the Harness daemon helper. Set CARGO_BIN or HARNESS_MONITOR_DAEMON_BINARY.\n' >&2
   exit 1
