@@ -37,15 +37,15 @@ struct DashboardDependenciesRouteViewTests {
   @Test("reload task key changes when connection state changes")
   func reloadTaskKeyChangesWhenConnectionStateChanges() {
     let idle = DashboardDependenciesReloadTaskKey(
-      storedPreferences: "",
+      preferencesSignature: "",
       connectionState: .idle
     )
     let connecting = DashboardDependenciesReloadTaskKey(
-      storedPreferences: "",
+      preferencesSignature: "",
       connectionState: .connecting
     )
     let online = DashboardDependenciesReloadTaskKey(
-      storedPreferences: "",
+      preferencesSignature: "",
       connectionState: .online
     )
 
@@ -59,12 +59,34 @@ struct DashboardDependenciesRouteViewTests {
 
     #expect(source.contains("private var reloadTaskKey: DashboardDependenciesReloadTaskKey"))
     #expect(source.contains("connectionState: store.connectionState"))
+    #expect(source.contains("preferencesSignature: resolvedPreferences.cacheHash"))
     #expect(source.contains(".task(id: reloadTaskKey)"))
     #expect(!source.contains(".task(id: storedPreferences)"))
     #expect(!source.contains("runAutoRefreshLoop"))
     #expect(source.contains("await startScheduler(forceRefreshAll: forceRefresh)"))
     #expect(!source.contains("refreshToken +="))
     #expect(!source.contains("let refreshToken"))
+  }
+
+  @Test("route source caches decoded preferences off the SwiftUI body path")
+  func routeSourceCachesDecodedPreferencesOffTheSwiftUIBodyPath() throws {
+    let source = try routeSource()
+    let cacheSource = try routeSource(named: "DashboardDependenciesRouteView+Cache.swift")
+    let schedulerSource = try routeSource(named: "DashboardDependenciesRouteView+Scheduler.swift")
+
+    #expect(source.contains("struct DashboardDependenciesResolvedPreferences"))
+    #expect(source.contains("@State var resolvedPreferences"))
+    #expect(source.contains(".onChange(of: storedPreferences, initial: true)"))
+    #expect(source.contains("syncPreferencesFromStorage(newValue)"))
+    #expect(!source.contains("get { DashboardDependenciesPreferences.decode(from: storedPreferences) }"))
+    #expect(
+      !source.contains(
+        "var normalizedPreferences: DashboardDependenciesPreferences {\n    preferences.normalized()"
+      )
+    )
+    #expect(cacheSource.contains("resolvedPreferences.cacheHash"))
+    #expect(schedulerSource.contains("explicitRepositories: preferences.repositories"))
+    #expect(schedulerSource.contains("preferences: preferences"))
   }
 
   @Test("route source keeps dependency network decode off the view actor")

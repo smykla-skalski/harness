@@ -32,7 +32,9 @@ final class DashboardDependenciesScheduler {
   @ObservationIgnored private var maxConcurrent: Int = 2
   @ObservationIgnored private var repositories: [String] = []
   @ObservationIgnored private var client: (any HarnessMonitorDependenciesClientProtocol)?
-  @ObservationIgnored private var preferences: DashboardDependenciesPreferences = .init()
+  @ObservationIgnored private var preferences = DashboardDependenciesResolvedPreferences(
+    preferences: .init()
+  )
   @ObservationIgnored private var onMerge:
     (@MainActor (String, DependencyUpdatesQueryResponse) -> Void)?
 
@@ -51,11 +53,29 @@ final class DashboardDependenciesScheduler {
     forceRefreshAll: Bool = false,
     onMerge: @escaping @MainActor (String, DependencyUpdatesQueryResponse) -> Void
   ) {
+    start(
+      repositories: repositories,
+      preferences: DashboardDependenciesResolvedPreferences(preferences: preferences),
+      client: client,
+      initialLastSyncedAt: initialLastSyncedAt,
+      forceRefreshAll: forceRefreshAll,
+      onMerge: onMerge
+    )
+  }
+
+  func start(
+    repositories: [String],
+    preferences: DashboardDependenciesResolvedPreferences,
+    client: any HarnessMonitorDependenciesClientProtocol,
+    initialLastSyncedAt: [String: Date] = [:],
+    forceRefreshAll: Bool = false,
+    onMerge: @escaping @MainActor (String, DependencyUpdatesQueryResponse) -> Void
+  ) {
     stop()
     self.repositories = repositories
     self.preferences = preferences
-    self.perRepoInterval = max(TimeInterval(preferences.perRepositoryIntervalSeconds), 1)
-    self.maxConcurrent = max(preferences.maxConcurrentRepositoryFetches, 1)
+    self.perRepoInterval = max(TimeInterval(preferences.preferences.perRepositoryIntervalSeconds), 1)
+    self.maxConcurrent = max(preferences.preferences.maxConcurrentRepositoryFetches, 1)
     self.client = client
     self.onMerge = onMerge
 

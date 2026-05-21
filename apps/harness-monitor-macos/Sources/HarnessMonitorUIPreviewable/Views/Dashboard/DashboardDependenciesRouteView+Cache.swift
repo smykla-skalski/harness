@@ -30,7 +30,7 @@ extension DashboardDependenciesRouteView {
   func frequentLabelNames(for items: [DependencyUpdateItem]) -> [String] {
     guard let cache = repositoryLabelUsageCache, !items.isEmpty else { return [] }
     let repositories = Array(Set(items.map(\.repository)))
-    let limit = normalizedPreferences.frequentLabelsCount
+    let limit = resolvedPreferences.preferences.frequentLabelsCount
     return cache.topUsed(repositories: repositories, limit: limit)
   }
 
@@ -42,9 +42,7 @@ extension DashboardDependenciesRouteView {
   }
 
   var dependenciesCachePreferencesHash: String {
-    DependencyUpdatesCache.preferencesHash(
-      for: normalizedPreferences.queryRequest(forceRefresh: false)
-    )
+    resolvedPreferences.cacheHash
   }
 
   /// Restore the last persisted response into `response` when the in-memory

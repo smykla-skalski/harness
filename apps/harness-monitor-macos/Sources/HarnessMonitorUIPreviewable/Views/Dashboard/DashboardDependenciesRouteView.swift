@@ -49,8 +49,86 @@ enum DashboardDependenciesRemoteLoader {
 }
 
 struct DashboardDependenciesReloadTaskKey: Equatable {
-  let storedPreferences: String
+  let preferencesSignature: String
   let connectionState: HarnessMonitorStore.ConnectionState
+}
+
+struct DashboardDependenciesResolvedPreferences: Equatable {
+  let preferences: DashboardDependenciesPreferences
+  let authors: [String]
+  let organizations: [String]
+  let repositories: [String]
+  let excludeRepositories: [String]
+  let cacheHash: String
+
+  init(storedValue: String) {
+    self.init(preferences: DashboardDependenciesPreferences.decode(from: storedValue))
+  }
+
+  init(preferences: DashboardDependenciesPreferences) {
+    let normalized = preferences.normalized()
+    self.preferences = normalized
+    authors = normalized.normalizedAuthors
+    organizations = normalized.normalizedOrganizations
+    repositories = normalized.normalizedRepositories
+    excludeRepositories = normalized.normalizedExcludeRepositories
+    cacheHash = DependencyUpdatesCache.preferencesHash(
+      for: Self.queryRequest(
+        authors: authors,
+        organizations: organizations,
+        repositories: repositories,
+        excludeRepositories: excludeRepositories,
+        cacheMaxAgeSeconds: normalized.cacheMaxAgeSeconds,
+        forceRefresh: false
+      )
+    )
+  }
+
+  func queryRequest(forceRefresh: Bool) -> DependencyUpdatesQueryRequest {
+    Self.queryRequest(
+      authors: authors,
+      organizations: organizations,
+      repositories: repositories,
+      excludeRepositories: excludeRepositories,
+      cacheMaxAgeSeconds: preferences.cacheMaxAgeSeconds,
+      forceRefresh: forceRefresh
+    )
+  }
+
+  func perRepositoryQueryRequest(
+    for repository: String,
+    forceRefresh: Bool
+  ) -> DependencyUpdatesQueryRequest {
+    Self.queryRequest(
+      authors: authors,
+      organizations: [],
+      repositories: [repository],
+      excludeRepositories: excludeRepositories,
+      cacheMaxAgeSeconds: preferences.cacheMaxAgeSeconds,
+      forceRefresh: forceRefresh
+    )
+  }
+
+  private static func queryRequest(
+    authors: [String],
+    organizations: [String],
+    repositories: [String],
+    excludeRepositories: [String],
+    cacheMaxAgeSeconds: UInt64,
+    forceRefresh: Bool
+  ) -> DependencyUpdatesQueryRequest {
+    DependencyUpdatesQueryRequest(
+      authors: authors,
+      organizations: organizations,
+      repositories: repositories,
+      excludeRepositories: excludeRepositories,
+      forceRefresh: forceRefresh,
+      cacheMaxAgeSeconds: max(
+        cacheMaxAgeSeconds,
+        DashboardDependenciesPreferences.minimumPerRepositoryIntervalSeconds
+      )
+    )
+  }
 }
 
 enum DashboardDependenciesMissingClientState: Equatable {
@@ -120,26 +198,34 @@ struct DashboardDependenciesRouteView: View {
   @State private var labelDraft = ""
   @State private var labelTargetItems = [DependencyUpdateItem]()
   @State private var inFlightActionTitle: String?
+  @State var resolvedPreferences: DashboardDependenciesResolvedPreferences
   @State private var presentationWorker = DashboardDependenciesPresentationWorker()
   @State private var cachedPresentation = DashboardDependenciesPresentation.empty
   @State private var presentationGeneration: UInt64 = 0
   @State var refreshingPullRequestIDs = Set<String>()
   @State var scheduler = DashboardDependenciesScheduler()
 
-  private var preferences: DashboardDependenciesPreferences {
-    get { DashboardDependenciesPreferences.decode(from: storedPreferences) }
-    nonmutating set { storedPreferences = newValue.encodedString }
+  init(store: HarnessMonitorStore, selectedRoute: Binding<DashboardWindowRoute>) {
+    self.store = store
+    _selectedRoute = selectedRoute
+    _resolvedPreferences = State(
+      initialValue: DashboardDependenciesResolvedPreferences(
+        storedValue: UserDefaults.standard.string(
+          forKey: DashboardDependenciesPreferences.storageKey
+        ) ?? ""
+      )
+    )
   }
 
   private var reloadTaskKey: DashboardDependenciesReloadTaskKey {
     DashboardDependenciesReloadTaskKey(
-      storedPreferences: storedPreferences,
+      preferencesSignature: resolvedPreferences.cacheHash,
       connectionState: store.connectionState
     )
   }
 
   var normalizedPreferences: DashboardDependenciesPreferences {
-    preferences.normalized()
+    resolvedPreferences.preferences
   }
 
   private var collapsedRepositories: DashboardDependenciesCollapsedRepositories {
@@ -152,14 +238,14 @@ struct DashboardDependenciesRouteView: View {
   }
 
   private var presentationInput: DashboardDependenciesPresentationInput {
-    let preferences = normalizedPreferences
+    let preferences = resolvedPreferences
     return DashboardDependenciesPresentationInput(
       items: response.items,
       filterModeRaw: filterModeRaw,
       sortModeRaw: sortModeRaw,
       searchText: searchText,
-      configuredRepositories: preferences.normalizedRepositories,
-      configuredOrganizations: preferences.normalizedOrganizations,
+      configuredRepositories: preferences.repositories,
+      configuredOrganizations: preferences.organizations,
       selectedIDs: selectedIDs,
       persistedPrimarySelectionID: persistedPrimarySelectionID
     )
@@ -219,6 +305,15 @@ struct DashboardDependenciesRouteView: View {
     .onChange(of: selectedIDs) { _, newValue in
       persistedPrimarySelectionID = newValue.min() ?? persistedPrimarySelectionID
     }
+    .onChange(of: storedPreferences, initial: true) { _, newValue in
+      syncPreferencesFromStorage(newValue)
+    }
+  }
+
+  private func syncPreferencesFromStorage(_ storedValue: String) {
+    let nextPreferences = DashboardDependenciesResolvedPreferences(storedValue: storedValue)
+    guard nextPreferences != resolvedPreferences else { return }
+    resolvedPreferences = nextPreferences
   }
 
   private var contentPane: some View {
