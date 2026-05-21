@@ -69,7 +69,7 @@ public final class GlobalWindowNavigationHistory {
   func installNavigator(openWindow: OpenWindowAction) {
     GlobalWindowNavigationHistoryRegistry.current = self
     navigator = { entry in
-      if activateExistingWindowIfPossible(for: entry) {
+      if self.activateExistingWindowIfPossible(for: entry) {
         return
       }
       switch entry {
