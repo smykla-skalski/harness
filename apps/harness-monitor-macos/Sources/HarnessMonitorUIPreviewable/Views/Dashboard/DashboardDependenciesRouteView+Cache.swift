@@ -39,6 +39,7 @@ extension DashboardDependenciesRouteView {
     for repository in Set(items.map(\.repository)) {
       cache.recordUse(repository: repository, label: label)
     }
+    refreshLabelMenuData()
   }
 
   var dependenciesCachePreferencesHash: String {
