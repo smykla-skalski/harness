@@ -3,20 +3,11 @@
 import HarnessMonitorKit
 import SwiftUI
 
-@MainActor private let dependenciesTimestampFormatter: DateFormatter = {
-  let formatter = DateFormatter()
-  formatter.dateStyle = .medium
-  formatter.timeStyle = .short
-  return formatter
-}()
-
 @MainActor private let dependenciesRelativeFormatter: RelativeDateTimeFormatter = {
   let formatter = RelativeDateTimeFormatter()
   formatter.unitsStyle = .short
   return formatter
 }()
-
-@MainActor private let dependenciesISO8601Formatter = ISO8601DateFormatter()
 
 private let dependenciesDetailMaxWidth: CGFloat = 940
 
@@ -310,17 +301,6 @@ struct DashboardDependenciesRouteView: View {
     cachedPresentation.relativeUpdatedLabels
   }
 
-  private var summarySubtitle: String {
-    guard let fetchedAt = parsedDate(response.fetchedAt) else {
-      return response.fromCache ? "Showing cached results" : "Dependencies from configured sources"
-    }
-    let timestamp = dependenciesTimestampFormatter.string(from: fetchedAt)
-    let relative = dependenciesRelativeFormatter.localizedString(for: fetchedAt, relativeTo: .now)
-    return response.fromCache
-      ? "Cached at \(timestamp) (\(relative))"
-      : "Last refreshed \(timestamp) (\(relative))"
-  }
-
   var body: some View {
     SessionContentDetailSplitView(
       contentWidth: $contentDetailWidth,
@@ -407,7 +387,6 @@ struct DashboardDependenciesRouteView: View {
 
   private var contentPane: some View {
     VStack(alignment: .leading, spacing: 14) {
-      summaryCard
       filterBar
       contentListPane
     }
@@ -421,44 +400,6 @@ struct DashboardDependenciesRouteView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     } else {
       dependenciesList
-    }
-  }
-
-  private var summaryCard: some View {
-    VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingLG) {
-      HStack(alignment: .top, spacing: HarnessMonitorTheme.spacingMD) {
-        Image(systemName: DashboardWindowRoute.dependencies.systemImage)
-          .font(.system(size: 25, weight: .semibold))
-          .foregroundStyle(HarnessMonitorTheme.accent)
-          .frame(width: 34, height: 34)
-
-        VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingXS) {
-          Text("Dependencies")
-            .scaledFont(.system(.title3, design: .rounded, weight: .semibold))
-            .foregroundStyle(HarnessMonitorTheme.ink)
-          Text(summarySubtitle)
-            .scaledFont(.callout)
-            .foregroundStyle(HarnessMonitorTheme.secondaryInk)
-            .fixedSize(horizontal: false, vertical: true)
-        }
-        Spacer(minLength: HarnessMonitorTheme.spacingMD)
-        DashboardDependenciesSummaryProgressBadge(
-          scheduler: scheduler,
-          inFlightActionTitle: inFlightActionTitle,
-          isBackgroundRefreshing: isBackgroundRefreshing
-        )
-      }
-
-      DashboardDependenciesSummaryStatStrip(
-        summary: response.summary,
-        showsCachedResults: response.fromCache,
-        refreshDescription: normalizedPreferences.refreshIntervalDescription
-      )
-    }
-    .frame(maxWidth: .infinity, alignment: .leading)
-    .padding(.bottom, HarnessMonitorTheme.spacingLG)
-    .overlay(alignment: .bottom) {
-      Divider().opacity(0.45)
     }
   }
 
@@ -1095,10 +1036,6 @@ struct DashboardDependenciesRouteView: View {
     }
   }
 
-  private func parsedDate(_ value: String) -> Date? {
-    dependenciesISO8601Formatter.date(from: value)
-  }
-
   @MainActor
   private func rebuildPresentation(input: DashboardDependenciesPresentationInput) async {
     presentationGeneration &+= 1
@@ -1118,36 +1055,6 @@ struct DashboardDependenciesRouteView: View {
 struct DashboardDependenciesRepoLabelMenuData: Equatable, Sendable {
   let sortedLabels: [DependencyUpdateRepositoryLabel]
   let frequentNames: [String]
-}
-
-@MainActor
-private struct DashboardDependenciesSummaryProgressBadge: View {
-  let scheduler: DashboardDependenciesScheduler
-  let inFlightActionTitle: String?
-  let isBackgroundRefreshing: Bool
-
-  var body: some View {
-    if let inFlightActionTitle {
-      ProgressView(inFlightActionTitle)
-        .controlSize(.small)
-    } else if !scheduler.repositoriesInFlight.isEmpty {
-      let total = max(scheduler.states.count, 1)
-      let inFlight = scheduler.repositoriesInFlight.count
-      HStack(spacing: HarnessMonitorTheme.spacingXS) {
-        ProgressView()
-          .controlSize(.small)
-        Text("Syncing \(inFlight) of \(total)")
-          .scaledFont(.callout)
-          .foregroundStyle(HarnessMonitorTheme.secondaryInk)
-      }
-      .accessibilityIdentifier(HarnessMonitorAccessibility.dashboardDependenciesSchedulerBadge)
-      .accessibilityElement(children: .combine)
-      .accessibilityLabel("Syncing \(inFlight) of \(total) repositories")
-    } else if isBackgroundRefreshing {
-      ProgressView("Refreshing…")
-        .controlSize(.small)
-    }
-  }
 }
 
 @MainActor
