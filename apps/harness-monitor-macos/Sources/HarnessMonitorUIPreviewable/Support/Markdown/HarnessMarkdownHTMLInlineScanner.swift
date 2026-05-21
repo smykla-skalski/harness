@@ -27,7 +27,17 @@ enum HarnessMarkdownHTMLInlineScanner {
     }
     if tag.name == "img" {
       flush(&buffer, into: &parts)
-      appendText(tag.attributes["alt"] ?? "", into: &parts)
+      if let source = tag.attributes["src"], !source.isEmpty {
+        parts.append(
+          .image(
+            HarnessMarkdownImage(
+              source: source,
+              alt: tag.attributes["alt"] ?? "",
+              title: tag.attributes["title"]
+            )))
+      } else {
+        appendText(tag.attributes["alt"] ?? "", into: &parts)
+      }
       index = tag.end + 1
       return true
     }

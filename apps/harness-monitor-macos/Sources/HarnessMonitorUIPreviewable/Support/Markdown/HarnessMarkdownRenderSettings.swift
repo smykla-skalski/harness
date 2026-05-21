@@ -23,16 +23,19 @@ struct HarnessMarkdownRenderSettings {
   var typography: HarnessMarkdownTypography
   var colors: HarnessMarkdownColorSettings
   var codeBlock: HarnessCodeBlockRenderSettings
+  var images: HarnessMarkdownImageSettings
   var fontScaleMode: HarnessMarkdownFontScaleMode
 
   init(
     typography: HarnessMarkdownTypography = .default,
     colors: HarnessMarkdownColorSettings = .default,
     codeBlock: HarnessCodeBlockRenderSettings = .default,
+    images: HarnessMarkdownImageSettings = .default,
     fontScaleMode: HarnessMarkdownFontScaleMode = .environment
   ) {
     self.typography = typography
     self.colors = colors
+    self.images = images
     self.fontScaleMode = fontScaleMode
     self.codeBlock = codeBlock.withFontScaleMode(fontScaleMode)
   }
@@ -48,7 +51,8 @@ struct HarnessMarkdownRenderSettings {
     headingDefault: CGFloat = 13,
     fontScaleMode: HarnessMarkdownFontScaleMode = .environment,
     colors: HarnessMarkdownColorSettings = .default,
-    codeBlock: HarnessCodeBlockRenderSettings = .default
+    codeBlock: HarnessCodeBlockRenderSettings = .default,
+    images: HarnessMarkdownImageSettings = .default
   ) -> HarnessMarkdownRenderSettings {
     HarnessMarkdownRenderSettings(
       typography: HarnessMarkdownTypography(
@@ -63,6 +67,7 @@ struct HarnessMarkdownRenderSettings {
       ),
       colors: colors,
       codeBlock: codeBlock,
+      images: images,
       fontScaleMode: fontScaleMode
     )
   }
@@ -81,7 +86,8 @@ struct HarnessMarkdownRenderSettings {
     return HarnessMarkdownResolvedRenderSettings(
       typography: typography.resolved(scale: scale),
       colors: colors,
-      codeBlock: codeBlock
+      codeBlock: codeBlock,
+      images: images.scaled(by: scale)
     )
   }
 }
@@ -125,6 +131,7 @@ struct HarnessMarkdownResolvedRenderSettings {
   let typography: HarnessMarkdownResolvedTypography
   let colors: HarnessMarkdownColorSettings
   let codeBlock: HarnessCodeBlockRenderSettings
+  let images: HarnessMarkdownImageSettings
 }
 
 struct HarnessMarkdownResolvedTypography {
@@ -250,6 +257,26 @@ struct HarnessMarkdownColorSettings {
     taskUnchecked: HarnessMonitorTheme.secondaryInk,
     thematicBreak: HarnessMonitorTheme.controlBorder
   )
+}
+
+struct HarnessMarkdownImageSettings {
+  var maxInlineHeight: CGFloat
+  var maxBlockHeight: CGFloat
+  var cornerRadius: CGFloat
+
+  static let `default` = HarnessMarkdownImageSettings(
+    maxInlineHeight: 22,
+    maxBlockHeight: 220,
+    cornerRadius: 3
+  )
+
+  func scaled(by scale: CGFloat) -> HarnessMarkdownImageSettings {
+    HarnessMarkdownImageSettings(
+      maxInlineHeight: max(1, maxInlineHeight * scale),
+      maxBlockHeight: max(1, maxBlockHeight * scale),
+      cornerRadius: cornerRadius
+    )
+  }
 }
 
 struct HarnessMarkdownInlineRenderStyle {

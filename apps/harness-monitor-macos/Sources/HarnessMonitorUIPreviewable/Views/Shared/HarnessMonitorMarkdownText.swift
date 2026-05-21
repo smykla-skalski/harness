@@ -125,17 +125,26 @@ private struct HarnessMarkdownBlockView: View {
     case .details(let details):
       HarnessMarkdownDetailsView(details: details, settings: settings, style: style)
     case .heading(let level, let inlines):
-      Text(attributedString(from: inlines, font: headingFont(level).font))
-        .fixedSize(horizontal: false, vertical: true)
+      HarnessMarkdownInlineFlowView(
+        inlines: inlines,
+        style: inlineStyle(font: headingFont(level).font),
+        images: style.images
+      )
     case .html(let inlines):
-      Text(attributedString(from: inlines, font: style.typography.body.font))
-        .fixedSize(horizontal: false, vertical: true)
+      HarnessMarkdownInlineFlowView(
+        inlines: inlines,
+        style: inlineStyle(font: style.typography.body.font),
+        images: style.images
+      )
     case .orderedList(let start, let items):
       HarnessMarkdownListView(
         start: start, ordered: true, items: items, settings: settings, style: style)
     case .paragraph(let inlines):
-      Text(attributedString(from: inlines, font: style.typography.body.font))
-        .fixedSize(horizontal: false, vertical: true)
+      HarnessMarkdownInlineFlowView(
+        inlines: inlines,
+        style: inlineStyle(font: style.typography.body.font),
+        images: style.images
+      )
     case .table(let table):
       HarnessMarkdownTableView(table: table, settings: settings, style: style)
     case .thematicBreak:
@@ -147,16 +156,11 @@ private struct HarnessMarkdownBlockView: View {
     }
   }
 
-  private func attributedString(from inlines: [HarnessMarkdownInline], font: Font)
-    -> AttributedString
-  {
-    HarnessMarkdownInlineRenderer.attributedString(
-      from: inlines,
-      style: HarnessMarkdownInlineRenderStyle(
-        font: font,
-        codeFont: style.typography.inlineCode.font,
-        colors: style.colors
-      )
+  private func inlineStyle(font: Font) -> HarnessMarkdownInlineRenderStyle {
+    HarnessMarkdownInlineRenderStyle(
+      font: font,
+      codeFont: style.typography.inlineCode.font,
+      colors: style.colors
     )
   }
 
@@ -201,17 +205,16 @@ private struct HarnessMarkdownDetailsView: View {
       }
       .padding(.leading, HarnessMonitorTheme.spacingSM)
     } label: {
-      Text(
-        HarnessMarkdownInlineRenderer.attributedString(
-          from: details.summary,
-          style: HarnessMarkdownInlineRenderStyle(
-            font: style.typography.body.font,
-            codeFont: style.typography.inlineCode.font,
-            colors: style.colors
-          )
-        )
+      HarnessMarkdownInlineFlowView(
+        inlines: details.summary,
+        style: HarnessMarkdownInlineRenderStyle(
+          font: style.typography.body.font,
+          codeFont: style.typography.inlineCode.font,
+          colors: style.colors
+        ),
+        images: style.images,
+        imageLayout: .inline
       )
-      .fixedSize(horizontal: false, vertical: true)
     }
   }
 }
@@ -244,17 +247,24 @@ private struct HarnessMarkdownListView: View {
 
   var body: some View {
     VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingXS) {
-      ForEach(items.indices, id: \.self) { index in
+      ForEach(visibleItems, id: \.offset) { index, item in
         HStack(alignment: .top, spacing: HarnessMonitorTheme.spacingSM) {
-          marker(for: items[index], index: index)
+          marker(for: item, index: index)
             .frame(width: 28, alignment: .trailing)
           VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingXS) {
-            ForEach(Array(items[index].blocks.enumerated()), id: \.offset) { _, block in
+            ForEach(Array(item.blocks.enumerated()), id: \.offset) { _, block in
               HarnessMarkdownBlockView(block: block, settings: settings, style: style)
             }
           }
         }
       }
+    }
+  }
+
+  private var visibleItems: [(offset: Int, item: HarnessMarkdownListItem)] {
+    items.enumerated().compactMap { offset, item in
+      guard item.checkbox == nil || item.rendersVisibleContent else { return nil }
+      return (offset: offset, item: item)
     }
   }
 
@@ -304,18 +314,17 @@ private struct HarnessMarkdownTableView: View {
   private func row(cells: [[HarnessMarkdownInline]], isHeader: Bool) -> some View {
     GridRow {
       ForEach(cells.indices, id: \.self) { index in
-        Text(
-          HarnessMarkdownInlineRenderer.attributedString(
-            from: cells[index],
-            style: HarnessMarkdownInlineRenderStyle(
-              font: isHeader ? style.typography.tableHeader.font : style.typography.body.font,
-              codeFont: style.typography.inlineCode.font,
-              colors: style.colors
-            )
-          )
+        HarnessMarkdownInlineFlowView(
+          inlines: cells[index],
+          style: HarnessMarkdownInlineRenderStyle(
+            font: isHeader ? style.typography.tableHeader.font : style.typography.body.font,
+            codeFont: style.typography.inlineCode.font,
+            colors: style.colors
+          ),
+          images: style.images,
+          imageLayout: .inline
         )
         .frame(maxWidth: .infinity, alignment: swiftAlignment(for: index))
-        .fixedSize(horizontal: false, vertical: true)
       }
     }
   }
