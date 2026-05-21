@@ -140,6 +140,19 @@ extension PreviewHarnessClientState {
     DependencyUpdatesCacheClearResponse(clearedEntries: 1)
   }
 
+  func refreshDependencyUpdates(
+    request: DependencyUpdatesRefreshRequest
+  ) -> DependencyUpdatesRefreshResponse {
+    let requestedIDs = Set(request.targets.map(\.pullRequestID))
+    let refreshed = dependencyUpdateItems.filter { requestedIDs.contains($0.pullRequestID) }
+    let missing = requestedIDs.subtracting(refreshed.map(\.pullRequestID))
+    return DependencyUpdatesRefreshResponse(
+      fetchedAt: Self.mutationTimestamp,
+      items: refreshed,
+      missingPullRequestIDs: missing.sorted()
+    )
+  }
+
   private func previewActionResponse(
     summary: String,
     action: DependencyUpdateActionKind,

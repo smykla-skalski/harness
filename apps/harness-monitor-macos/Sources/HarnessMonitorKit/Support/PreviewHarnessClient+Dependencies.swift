@@ -54,4 +54,11 @@ extension PreviewHarnessClient {
     try await performActionDelay()
     return await state.clearDependencyUpdatesCache()
   }
+
+  public func refreshDependencyUpdates(
+    request: DependencyUpdatesRefreshRequest
+  ) async throws -> DependencyUpdatesRefreshResponse {
+    try await performActionDelay()
+    return await state.refreshDependencyUpdates(request: request)
+  }
 }
