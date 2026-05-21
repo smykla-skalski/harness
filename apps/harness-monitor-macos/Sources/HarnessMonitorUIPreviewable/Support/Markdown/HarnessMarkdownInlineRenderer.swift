@@ -32,7 +32,7 @@ enum HarnessMarkdownInlineRenderer {
       return fragment
     case .lineBreak:
       return AttributedString("\n")
-    case .link(let label, let destination):
+    case .link(let label, let destination, _):
       var fragment = attributedString(from: label, font: font, codeFont: codeFont)
       if let url = URL(string: destination) {
         fragment.link = url
@@ -40,6 +40,8 @@ enum HarnessMarkdownInlineRenderer {
       fragment.foregroundColor = HarnessMonitorTheme.accent
       fragment.underlineStyle = .single
       return fragment
+    case .softBreak:
+      return AttributedString(" ")
     case .strikethrough(let children):
       var fragment = attributedString(from: children, font: font, codeFont: codeFont)
       fragment.strikethroughStyle = .single
