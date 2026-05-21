@@ -32,7 +32,7 @@ public struct SessionWindowView: View {
   private var sidebarWidthStorage = 200.0
   @SceneStorage("session.content-detail.width")
   private var contentColumnWidthStorage = SessionContentDetailSplitLayout.defaultContentWidth
-  @AccessibilityFocusState private var primaryContentAccessibilityFocused: Bool
+  @AccessibilityFocusState var primaryContentAccessibilityFocused: Bool
   @AppStorage(HarnessMonitorMCPSettingsDefaults.registryHostEnabledKey)
   var mcpRegistryHostEnabled = HarnessMonitorMCPSettingsDefaults
     .registryHostEnabledDefault
@@ -48,7 +48,7 @@ public struct SessionWindowView: View {
   @State private var policyCanvasViewModelStorage: PolicyCanvasViewModel
   @State private var startupSearchParticipationEnabledStorage =
     HarnessMonitorUITestEnvironment.isEnabled
-  @State private var handledHistoryRestoreRequestID = 0
+  @State var handledHistoryRestoreRequestID = 0
 
   @MainActor
   public init(
