@@ -90,7 +90,6 @@ struct DashboardDependenciesSchedulerTests {
       "acme/api": stubResponse(),
       "acme/web": stubResponse(),
     ]
-    stub.delaySeconds = 0.05
     let scheduler = DashboardDependenciesScheduler()
 
     var prefs = DashboardDependenciesPreferences()
@@ -99,18 +98,19 @@ struct DashboardDependenciesSchedulerTests {
 
     let older = Date(timeIntervalSinceNow: -7_200)
     let newer = Date(timeIntervalSinceNow: -300)
-    var merges: [String] = []
 
     scheduler.start(
       repositories: ["acme/api", "acme/web"],
       preferences: prefs,
       client: stub,
       initialLastSyncedAt: ["acme/api": newer, "acme/web": older],
-      onMerge: { repo, _ in merges.append(repo) }
+      onMerge: { _, _ in }
     )
-    try await waitUntilMergeCount(merges: { merges.count }, target: 1)
+    try await waitUntilFetchCount(stub: stub, repo: "acme/web", target: 1)
+    try await Task.sleep(for: .milliseconds(100))
 
-    #expect(merges.first == "acme/web")
+    #expect(stub.callCount(for: "acme/web") == 1)
+    #expect(stub.callCount(for: "acme/api") == 0)
     #expect(scheduler.states["acme/api"]?.lastSyncedAt == newer)
     scheduler.stop()
   }
@@ -175,15 +175,6 @@ struct DashboardDependenciesSchedulerTests {
     target: Int
   ) async throws {
     for _ in 0..<60 where stub.callCount(for: repo) < target {
-      try await Task.sleep(for: .milliseconds(50))
-    }
-  }
-
-  private func waitUntilMergeCount(
-    merges: () -> Int,
-    target: Int
-  ) async throws {
-    for _ in 0..<60 where merges() < target {
       try await Task.sleep(for: .milliseconds(50))
     }
   }
