@@ -86,7 +86,6 @@ struct SettingsScrollRestorationModifier: ViewModifier {
   @Environment(\.settingsScrollRestorationSuspended)
   private var isRestorationSuspended
   @State private var activeUserScroll = false
-  @State private var lastObservedState = SettingsScrollState()
   @State private var lastPersistedOffset: CGFloat?
   @State private var pendingRestore: PendingRestore?
   @State private var restoreGeneration: UInt64 = 0
@@ -108,7 +107,6 @@ struct SettingsScrollRestorationModifier: ViewModifier {
             for: SettingsScrollState.self,
             of: Self.scrollState
           ) { oldState, newState in
-            lastObservedState = newState
             guard !waitForPendingRestore(newState, for: section) else {
               return
             }
@@ -160,7 +158,6 @@ struct SettingsScrollRestorationModifier: ViewModifier {
     let offset = SettingsRestorationDefaults.scrollOffset(for: section)
     activeUserScroll = false
     userScrollObserved = false
-    lastObservedState = SettingsScrollState(offsetY: offset, maxOffsetY: 0)
     lastPersistedOffset = offset
     if offset > 0 {
       pendingRestore = PendingRestore(section: section, offset: offset, generation: generation)
@@ -199,8 +196,6 @@ struct SettingsScrollRestorationModifier: ViewModifier {
     state: SettingsScrollState,
     for section: SettingsSection
   ) {
-    lastObservedState = state
-
     if SettingsScrollRestorationPhasePolicy.isUserScroll(phase) {
       activeUserScroll = true
       userScrollObserved = true
@@ -225,9 +220,6 @@ struct SettingsScrollRestorationModifier: ViewModifier {
     restoreGeneration &+= 1
     pendingRestore = nil
     restoredSection = section
-    if let observedOffset {
-      lastObservedState = SettingsScrollState(offsetY: observedOffset, maxOffsetY: 0)
-    }
     lastPersistedOffset = SettingsRestorationDefaults.scrollOffset(for: section)
   }
 
@@ -266,11 +258,10 @@ struct SettingsScrollRestorationModifier: ViewModifier {
 
   private func finishRestore(
     for section: SettingsSection,
-    observedOffset: CGFloat
+    observedOffset _: CGFloat
   ) {
     pendingRestore = nil
     restoredSection = section
-    lastObservedState = SettingsScrollState(offsetY: observedOffset, maxOffsetY: 0)
   }
 
   private func persistGeometryOffset(
