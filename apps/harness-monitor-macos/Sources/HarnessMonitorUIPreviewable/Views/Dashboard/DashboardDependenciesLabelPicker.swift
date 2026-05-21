@@ -1,6 +1,19 @@
 import HarnessMonitorKit
 import SwiftUI
 
+/// Parse a GitHub label hex string (`"rrggbb"`, with or without leading `#`)
+/// into a SwiftUI `Color`. Returns `nil` for unparseable input so callers can
+/// fall back to a neutral swatch.
+func dashboardDependenciesLabelSwatchColor(_ hex: String?) -> Color? {
+  guard let hex else { return nil }
+  let trimmed = hex.hasPrefix("#") ? String(hex.dropFirst()) : hex
+  guard trimmed.count == 6, let value = UInt32(trimmed, radix: 16) else { return nil }
+  let red = Double((value >> 16) & 0xFF) / 255.0
+  let green = Double((value >> 8) & 0xFF) / 255.0
+  let blue = Double(value & 0xFF) / 255.0
+  return Color(.sRGB, red: red, green: green, blue: blue, opacity: 1)
+}
+
 @MainActor
 func dashboardDependenciesAvailableLabels(
   repositoryLabels: [String: [DependencyUpdateRepositoryLabel]],
@@ -165,10 +178,20 @@ private struct DashboardDependenciesLabelMenuRow: View {
   let showsDescription: Bool
 
   var body: some View {
-    if showsDescription, let description = label.description, !description.isEmpty {
-      Text("\(label.name) — \(description)")
-    } else {
-      Text(label.name)
+    Label {
+      if showsDescription, let description = label.description, !description.isEmpty {
+        Text("\(label.name) — \(description)")
+      } else {
+        Text(label.name)
+      }
+    } icon: {
+      Image(systemName: "circle.fill")
+        .foregroundStyle(swatch)
     }
+  }
+
+  private var swatch: Color {
+    dashboardDependenciesLabelSwatchColor(label.color)
+      ?? HarnessMonitorTheme.secondaryInk.opacity(0.5)
   }
 }

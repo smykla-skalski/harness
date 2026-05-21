@@ -123,7 +123,10 @@ struct DashboardDependenciesCustomLabelSheet: View {
   private func suggestionChip(_ label: DependencyUpdateRepositoryLabel) -> some View {
     HStack(spacing: HarnessMonitorTheme.spacingXS) {
       Circle()
-        .fill(color(forHex: label.color) ?? HarnessMonitorTheme.secondaryInk.opacity(0.5))
+        .fill(
+          dashboardDependenciesLabelSwatchColor(label.color)
+            ?? HarnessMonitorTheme.secondaryInk.opacity(0.5)
+        )
         .frame(width: 8, height: 8)
       Text(label.name)
         .scaledFont(.caption.weight(.medium))
@@ -170,13 +173,5 @@ struct DashboardDependenciesCustomLabelSheet: View {
   private func applyIfPossible() {
     guard canApply else { return }
     onApply(trimmedDraft)
-  }
-
-  private func color(forHex hex: String?) -> Color? {
-    guard let hex, hex.count == 6, let value = UInt32(hex, radix: 16) else { return nil }
-    let r = Double((value >> 16) & 0xFF) / 255.0
-    let g = Double((value >> 8) & 0xFF) / 255.0
-    let b = Double(value & 0xFF) / 255.0
-    return Color(.sRGB, red: r, green: g, blue: b, opacity: 1)
   }
 }
