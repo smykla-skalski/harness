@@ -86,7 +86,6 @@ struct DashboardDependenciesRouteView: View {
   @State private var isLoading = false
   @State private var isBackgroundRefreshing = false
   @State private var errorMessage: String?
-  @State private var notice: DashboardDependenciesNotice?
   @State private var selectedIDs = Set<String>()
   @State private var refreshToken = 0
   @State private var isLabelSheetPresented = false
@@ -196,9 +195,6 @@ struct DashboardDependenciesRouteView: View {
     VStack(alignment: .leading, spacing: 16) {
       summaryCard
       filterBar
-      if let notice {
-        noticeBanner(notice)
-      }
       contentListPane
     }
     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
@@ -348,7 +344,7 @@ struct DashboardDependenciesRouteView: View {
         }
       }
     }
-    .listStyle(.sidebar)
+    .listStyle(.plain)
     .accessibilityIdentifier(HarnessMonitorAccessibility.dashboardDependenciesList)
     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     .overlay {
@@ -719,20 +715,6 @@ struct DashboardDependenciesRouteView: View {
     .frame(maxWidth: .infinity, minHeight: 320)
   }
 
-  private func noticeBanner(_ notice: DashboardDependenciesNotice) -> some View {
-    HStack {
-      Label(notice.title, systemImage: notice.systemImage)
-      Spacer()
-      Button("Dismiss") {
-        self.notice = nil
-      }
-    }
-    .padding(12)
-    .background(notice.tint.opacity(0.12))
-    .foregroundStyle(notice.tint)
-    .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-  }
-
   private func runAutoRefreshLoop() async {
     let refreshIntervalSeconds = normalizedPreferences.refreshIntervalSeconds
     guard refreshIntervalSeconds > 0 else {
@@ -795,11 +777,7 @@ struct DashboardDependenciesRouteView: View {
       )
       let displayMessage = dashboardDependenciesErrorMessage(for: error)
       if backgroundRefresh, !response.items.isEmpty {
-        notice = DashboardDependenciesNotice(
-          title: displayMessage,
-          tint: HarnessMonitorTheme.danger,
-          systemImage: "exclamationmark.triangle"
-        )
+        store.presentFailureFeedback(displayMessage)
       } else {
         errorMessage = displayMessage
       }
@@ -810,18 +788,12 @@ struct DashboardDependenciesRouteView: View {
     guard let client = store.apiClient else { return }
     do {
       let cleared = try await client.clearDependencyUpdatesCache()
-      notice = DashboardDependenciesNotice(
-        title: "Cleared \(cleared.clearedEntries) cached dependency query bucket(s)",
-        tint: HarnessMonitorTheme.secondaryInk,
-        systemImage: "trash"
+      store.presentSuccessFeedback(
+        "Cleared \(cleared.clearedEntries) cached dependency query bucket(s)"
       )
       await reload(forceRefresh: true)
     } catch {
-      notice = DashboardDependenciesNotice(
-        title: error.localizedDescription,
-        tint: HarnessMonitorTheme.danger,
-        systemImage: "exclamationmark.triangle"
-      )
+      store.presentFailureFeedback(error.localizedDescription)
     }
   }
 
@@ -902,11 +874,7 @@ struct DashboardDependenciesRouteView: View {
       )
       selectedRoute = .taskBoard
     } catch {
-      notice = DashboardDependenciesNotice(
-        title: error.localizedDescription,
-        tint: HarnessMonitorTheme.danger,
-        systemImage: "exclamationmark.triangle"
-      )
+      store.presentFailureFeedback(error.localizedDescription)
     }
     inFlightActionTitle = nil
   }
@@ -921,18 +889,10 @@ struct DashboardDependenciesRouteView: View {
     inFlightActionTitle = title
     do {
       let response = try await operation(client)
-      notice = DashboardDependenciesNotice(
-        title: response.summary,
-        tint: HarnessMonitorTheme.success,
-        systemImage: "checkmark.circle"
-      )
+      store.presentSuccessFeedback(response.summary)
       await reload(forceRefresh: true)
     } catch {
-      notice = DashboardDependenciesNotice(
-        title: error.localizedDescription,
-        tint: HarnessMonitorTheme.danger,
-        systemImage: "exclamationmark.triangle"
-      )
+      store.presentFailureFeedback(error.localizedDescription)
     }
     inFlightActionTitle = nil
   }
@@ -956,19 +916,11 @@ struct DashboardDependenciesRouteView: View {
       .filter { $0.reviewStatus == .reviewRequired }
       .map(\.url)
     guard !links.isEmpty else {
-      notice = DashboardDependenciesNotice(
-        title: "No approval links are needed for the current scope",
-        tint: HarnessMonitorTheme.secondaryInk,
-        systemImage: "doc.on.doc"
-      )
+      store.toast.presentWarning("No approval links are needed for the current scope")
       return
     }
     HarnessMonitorClipboard.copy(links.joined(separator: "\n"))
-    notice = DashboardDependenciesNotice(
-      title: "Copied \(links.count) approval link(s)",
-      tint: HarnessMonitorTheme.accent,
-      systemImage: "doc.on.doc"
-    )
+    store.presentSuccessFeedback("Copied \(links.count) approval link(s)")
   }
 
   private func toggleRepositoryCollapse(_ repository: String) {
@@ -1006,12 +958,6 @@ struct DashboardDependenciesRouteView: View {
 }
 
 // swiftlint:enable type_body_length
-
-private struct DashboardDependenciesNotice {
-  let title: String
-  let tint: Color
-  let systemImage: String
-}
 
 private struct DashboardDependenciesControlStrip: View {
   @Binding var filterModeRaw: String
