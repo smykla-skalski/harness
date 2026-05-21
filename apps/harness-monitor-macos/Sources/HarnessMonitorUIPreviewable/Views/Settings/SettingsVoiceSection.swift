@@ -23,6 +23,7 @@ public struct SettingsVoiceSection: View {
   private var pendingTranscriptSegmentLimit =
     HarnessMonitorVoiceSettings.defaultPendingTranscriptSegmentLimit
   @State private var localeAvailabilityState: VoiceLocaleAvailabilityState = .checking
+  @State private var isFullyExpanded = false
 
   public init() {}
 
@@ -74,33 +75,36 @@ public struct SettingsVoiceSection: View {
           for: settings.effectiveLocaleIdentifier
         )
       )
-      SettingsVoiceProcessingSection(
-        localDaemonSinkEnabled: $localDaemonSinkEnabled,
-        agentBridgeSinkEnabled: $agentBridgeSinkEnabled,
-        remoteProcessorSinkEnabled: $remoteProcessorSinkEnabled,
-        requestedSinksSummary: settings.requestedSinksSummary
-      )
-      SettingsVoiceRemoteProcessorSection(
-        remoteProcessorSinkEnabled: remoteProcessorSinkEnabled,
-        remoteProcessorURLText: $remoteProcessorURLText,
-        remoteProcessorStatus: settings.remoteProcessorStatus
-      )
-      SettingsVoiceTranscriptHandlingSection(
-        transcriptInsertionModeRawValue: $transcriptInsertionModeRawValue
-      )
-      SettingsVoiceAdvancedSection(
-        deliversAudioChunks: $deliversAudioChunks,
-        pendingAudioChunkLimit: pendingAudioChunkLimitBinding,
-        pendingTranscriptSegmentLimit: pendingTranscriptSegmentLimitBinding
-      )
-      SettingsVoiceStatusSection(
-        settings: settings,
-        localeAvailabilityState: localeAvailabilityState
-      )
+      if isFullyExpanded {
+        SettingsVoiceProcessingSection(
+          localDaemonSinkEnabled: $localDaemonSinkEnabled,
+          agentBridgeSinkEnabled: $agentBridgeSinkEnabled,
+          remoteProcessorSinkEnabled: $remoteProcessorSinkEnabled,
+          requestedSinksSummary: settings.requestedSinksSummary
+        )
+        SettingsVoiceRemoteProcessorSection(
+          remoteProcessorSinkEnabled: remoteProcessorSinkEnabled,
+          remoteProcessorURLText: $remoteProcessorURLText,
+          remoteProcessorStatus: settings.remoteProcessorStatus
+        )
+        SettingsVoiceTranscriptHandlingSection(
+          transcriptInsertionModeRawValue: $transcriptInsertionModeRawValue
+        )
+        SettingsVoiceAdvancedSection(
+          deliversAudioChunks: $deliversAudioChunks,
+          pendingAudioChunkLimit: pendingAudioChunkLimitBinding,
+          pendingTranscriptSegmentLimit: pendingTranscriptSegmentLimitBinding
+        )
+        SettingsVoiceStatusSection(
+          settings: settings,
+          localeAvailabilityState: localeAvailabilityState
+        )
+      }
     }
     .settingsDetailFormStyle()
     .accessibilityElement(children: .contain)
     .accessibilityIdentifier(HarnessMonitorAccessibility.settingsVoiceSection)
+    .task { await expandAfterFirstFrame() }
     .task(id: settings.effectiveLocaleIdentifier) {
       localeAvailabilityState = .checking
       localeAvailabilityState = .resolved(
@@ -109,6 +113,12 @@ public struct SettingsVoiceSection: View {
         )
       )
     }
+  }
+
+  private func expandAfterFirstFrame() async {
+    guard !isFullyExpanded else { return }
+    try? await Task.sleep(for: .milliseconds(40))
+    isFullyExpanded = true
   }
 }
 
