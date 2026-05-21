@@ -70,6 +70,7 @@ struct HarnessMarkdownRenderSettingsTests {
       listItem: 8,
       listItemContent: 9,
       listMarkerGap: 10,
+      listMarkerWidth: 14,
       quoteContentGap: 11,
       tableColumn: 12,
       tableRow: 13
@@ -84,7 +85,20 @@ struct HarnessMarkdownRenderSettingsTests {
     #expect(resolved.spacing.detailsContentIndent == 15)
     #expect(resolved.spacing.listItem == 16)
     #expect(resolved.spacing.listMarkerGap == 20)
+    #expect(resolved.spacing.listMarkerWidth == 28)
     #expect(resolved.spacing.tableColumn == 24)
     #expect(resolved.spacing.tableRow == 26)
+  }
+
+  @Test("Default markdown spacing follows PR body typography conventions")
+  func defaultMarkdownSpacingFollowsPRBodyTypographyConventions() {
+    let spacing = HarnessMarkdownSpacingSettings.default
+
+    #expect(spacing.documentBlock == 8)
+    #expect(spacing.heading == HarnessMarkdownBlockSpacing(before: 16, after: 8))
+    #expect(spacing.documentBlock + spacing.heading.before == 24)
+    #expect(spacing.documentBlock + spacing.heading.after == 16)
+    #expect(spacing.listMarkerWidth + spacing.listMarkerGap == 26)
+    #expect(spacing.listItem == 4)
   }
 }

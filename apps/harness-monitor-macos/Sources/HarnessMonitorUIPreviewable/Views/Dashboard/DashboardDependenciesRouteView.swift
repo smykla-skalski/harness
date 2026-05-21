@@ -449,7 +449,7 @@ struct DashboardDependenciesRouteView: View {
           dependencyActionBar(items: [item])
         }
         detailMetrics(for: item)
-        detailSection("Description") {
+        detailSection(nil) {
           descriptionView(for: item)
         }
         .accessibilityIdentifier(HarnessMonitorAccessibility.dashboardDependenciesDescription)
@@ -778,12 +778,14 @@ struct DashboardDependenciesRouteView: View {
     .background(SessionTimelineCardBackground(tint: HarnessMonitorTheme.accent))
   }
 
-  private func detailSection<Content: View>(_ title: String, @ViewBuilder content: () -> Content)
+  private func detailSection<Content: View>(_ title: String?, @ViewBuilder content: () -> Content)
     -> some View
   {
     VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
-      Text(title)
-        .scaledFont(.headline)
+      if let title {
+        Text(title)
+          .scaledFont(.headline)
+      }
       content()
     }
     .frame(maxWidth: .infinity, alignment: .leading)

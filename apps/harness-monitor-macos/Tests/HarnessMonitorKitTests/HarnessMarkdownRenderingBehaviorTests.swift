@@ -71,6 +71,42 @@ struct HarnessMarkdownRenderingBehaviorTests {
     #expect(source.contains("dimensions[VerticalAlignment.center]"))
   }
 
+  @Test("Markdown details summary row toggles disclosure")
+  func markdownDetailsSummaryRowTogglesDisclosure() throws {
+    let source = try readRepositoryFile(
+      "apps/harness-monitor-macos/Sources/HarnessMonitorUIPreviewable"
+        + "/Views/Shared/HarnessMonitorMarkdownText.swift"
+    )
+
+    #expect(source.contains("Button {"))
+    #expect(source.contains("isExpanded.toggle()"))
+    #expect(source.contains(".contentShape(Rectangle())"))
+    #expect(!source.contains("DisclosureGroup(isExpanded: $isExpanded)"))
+  }
+
+  @Test("Markdown renderer suppresses thematic breaks before headings")
+  func markdownRendererSuppressesThematicBreaksBeforeHeadings() throws {
+    let source = try readRepositoryFile(
+      "apps/harness-monitor-macos/Sources/HarnessMonitorUIPreviewable"
+        + "/Views/Shared/HarnessMonitorMarkdownText.swift"
+    )
+
+    #expect(source.contains("isSuppressedThematicBreak"))
+    #expect(source.contains("case .thematicBreak = blocks[index]"))
+    #expect(source.contains("case .heading = blocks[index + 1]"))
+  }
+
+  @Test("Dependency description card omits duplicate title")
+  func dependencyDescriptionCardOmitsDuplicateTitle() throws {
+    let source = try readRepositoryFile(
+      "apps/harness-monitor-macos/Sources/HarnessMonitorUIPreviewable"
+        + "/Views/Dashboard/DashboardDependenciesRouteView.swift"
+    )
+
+    #expect(source.contains("detailSection(nil)"))
+    #expect(!source.contains("detailSection(\"Description\")"))
+  }
+
   private func readRepositoryFile(_ relativePath: String) throws -> String {
     try String(contentsOfFile: repositoryPath(relativePath), encoding: .utf8)
   }
