@@ -27,9 +27,10 @@ struct HarnessMarkdownRenderingBehaviorTests {
     )
 
     #expect(paragraphSource.contains("HarnessMarkdownMarkerMetrics(style: style)"))
-    #expect(paragraphSource.contains(".frame(width: metrics.columnWidth, alignment: .center)"))
+    #expect(paragraphSource.contains("HStack(alignment: .top, spacing: metrics.gap)"))
     #expect(textSource.contains(".frame(width: metrics.columnWidth"))
-    #expect(textSource.contains("metrics.firstLineCenterBaselineOffset"))
+    #expect(textSource.contains("height: metrics.firstLineHeight"))
+    #expect(!textSource.contains("firstLineCenterBaselineOffset"))
   }
 
   @Test("Markdown table renderer keeps content-width columns")
@@ -86,7 +87,7 @@ struct HarnessMarkdownRenderingBehaviorTests {
     #expect(source.contains("Toggle(isOn: .constant(checkbox))"))
     #expect(source.contains(".toggleStyle(.checkbox)"))
     #expect(source.contains(".frame(width: metrics.columnWidth, height: metrics.firstLineHeight"))
-    #expect(source.contains("metrics.firstLineCenterBaselineOffset"))
+    #expect(!source.contains(".alignmentGuide(.firstTextBaseline)"))
   }
 
   @Test("Markdown details summary row toggles disclosure")
@@ -101,6 +102,7 @@ struct HarnessMarkdownRenderingBehaviorTests {
     #expect(source.contains(".contentShape(Rectangle())"))
     #expect(source.contains("HarnessMarkdownPointerHoverModifier"))
     #expect(source.contains("metrics.chevronSize"))
+    #expect(source.contains("HStack(alignment: .top, spacing: metrics.gap)"))
     #expect(!source.contains("DisclosureGroup(isExpanded: $isExpanded)"))
   }
 
