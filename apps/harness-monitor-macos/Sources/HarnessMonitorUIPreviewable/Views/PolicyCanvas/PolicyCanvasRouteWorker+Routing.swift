@@ -32,18 +32,22 @@ extension PolicyCanvasPreparedRouteInput {
       }
       let edgeTerminalSlots = terminalSlots[edge.id]
       let request = resolvedDisplayedRouteRequest(
-        edge: edge,
-        source: source,
-        target: target,
-        routeLane: edgeLanes[edge.id, default: 0],
-        sourceFanoutLane: sourceFanoutLanes[edge.id, default: 0],
-        targetFanoutLane: targetFanoutLanes[edge.id, default: 0],
-        sourceTerminalSlot: edgeTerminalSlots?.source ?? .single,
-        targetTerminalSlot: edgeTerminalSlots?.target ?? .single,
-        portMarkerLayout: portMarkerLayout,
-        nodeIndex: nodeIndex,
-        obstacles: obstacles,
-        router: router
+        edge: PolicyCanvasDisplayedRouteEdgeContext(
+          edge: edge,
+          source: source,
+          target: target,
+          routeLane: edgeLanes[edge.id, default: 0],
+          sourceFanoutLane: sourceFanoutLanes[edge.id, default: 0],
+          targetFanoutLane: targetFanoutLanes[edge.id, default: 0],
+          sourceTerminalSlot: edgeTerminalSlots?.source ?? .single,
+          targetTerminalSlot: edgeTerminalSlots?.target ?? .single
+        ),
+        shared: PolicyCanvasDisplayedRouteSharedContext(
+          portMarkerLayout: portMarkerLayout,
+          nodeIndex: nodeIndex,
+          obstacles: obstacles,
+          router: router
+        )
       )
       let route = policyCanvasCollisionAwareDisplayedRoute(
         request,
@@ -69,47 +73,38 @@ extension PolicyCanvasPreparedRouteInput {
     }
   }
 
-  // swiftlint:disable:next function_parameter_count
   private func resolvedDisplayedRouteRequest(
-    edge: PolicyCanvasEdge,
-    source: CGPoint,
-    target: CGPoint,
-    routeLane: Int,
-    sourceFanoutLane: Int,
-    targetFanoutLane: Int,
-    sourceTerminalSlot: PolicyCanvasRouteEndpointSlot,
-    targetTerminalSlot: PolicyCanvasRouteEndpointSlot,
-    portMarkerLayout: PolicyCanvasPortMarkerLayout?,
-    nodeIndex: [String: PolicyCanvasRouteNode],
-    obstacles: [CGRect],
-    router: any PolicyCanvasEdgeRouter
+    edge edgeContext: PolicyCanvasDisplayedRouteEdgeContext,
+    shared: PolicyCanvasDisplayedRouteSharedContext
   ) -> PolicyCanvasResolvedDisplayedRouteRequest {
-    let sourceTerminal = portMarkerLayout?.terminal(edgeID: edge.id, role: .source)
-    let targetTerminal = portMarkerLayout?.terminal(edgeID: edge.id, role: .target)
+    let edge = edgeContext.edge
+    let nodeIndex = shared.nodeIndex
+    let sourceTerminal = shared.portMarkerLayout?.terminal(edgeID: edge.id, role: .source)
+    let targetTerminal = shared.portMarkerLayout?.terminal(edgeID: edge.id, role: .target)
     let sourceCandidates = routeAnchorCandidates(
       for: edge.source,
       nodeIndex: nodeIndex,
-      terminalSlot: sourceTerminalSlot,
+      terminalSlot: edgeContext.sourceTerminalSlot,
       terminal: sourceTerminal
     )
     let targetCandidates = routeAnchorCandidates(
       for: edge.target,
       nodeIndex: nodeIndex,
-      terminalSlot: targetTerminalSlot,
+      terminalSlot: edgeContext.targetTerminalSlot,
       terminal: targetTerminal
     )
     let sourceSide = sourceTerminal?.side ?? policyCanvasResolvedPortSide(for: edge.source)
     let targetSide = targetTerminal?.side ?? policyCanvasResolvedPortSide(for: edge.target)
     return PolicyCanvasResolvedDisplayedRouteRequest(
-      router: router,
+      router: shared.router,
       edge: edge,
-      source: source,
-      target: target,
-      routeLane: routeLane,
-      sourceFanoutLane: sourceFanoutLane,
-      targetFanoutLane: targetFanoutLane,
+      source: edgeContext.source,
+      target: edgeContext.target,
+      routeLane: edgeContext.routeLane,
+      sourceFanoutLane: edgeContext.sourceFanoutLane,
+      targetFanoutLane: edgeContext.targetFanoutLane,
       lineSpacing: edgeLineSpacing(for: edge, nodeIndex: nodeIndex),
-      obstacles: obstacles,
+      obstacles: shared.obstacles,
       groups: groups,
       sourceGroupID: nodeIndex[edge.source.nodeID]?.groupID,
       targetGroupID: nodeIndex[edge.target.nodeID]?.groupID,
@@ -117,16 +112,16 @@ extension PolicyCanvasPreparedRouteInput {
         for: edge.source,
         side: sourceSide,
         nodeIndex: nodeIndex,
-        terminalSlot: sourceTerminalSlot,
+        terminalSlot: edgeContext.sourceTerminalSlot,
         terminal: sourceTerminal
-      ) ?? (point: source, side: sourceSide),
+      ) ?? (point: edgeContext.source, side: sourceSide),
       targetAnchor: routeAnchorCandidate(
         for: edge.target,
         side: targetSide,
         nodeIndex: nodeIndex,
-        terminalSlot: targetTerminalSlot,
+        terminalSlot: edgeContext.targetTerminalSlot,
         terminal: targetTerminal
-      ) ?? (point: target, side: targetSide),
+      ) ?? (point: edgeContext.target, side: targetSide),
       sourceCandidates: sourceCandidates,
       targetCandidates: targetCandidates,
       sourceSpacingBySide: portSpacingBySide(for: edge.source, nodeIndex: nodeIndex),
