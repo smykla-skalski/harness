@@ -1,7 +1,7 @@
 import Foundation
 
 extension HarnessMonitorStore {
-  private struct TimelineEntrySortKey {
+  struct TimelineEntrySortKey {
     let entry: TimelineEntry
     let toolCallSequence: UInt64?
   }
