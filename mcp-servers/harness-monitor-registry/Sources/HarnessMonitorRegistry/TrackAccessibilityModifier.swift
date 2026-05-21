@@ -173,6 +173,7 @@ private struct TrackAccessibilityProbe: NSViewRepresentable {
 
 final class TrackAccessibilityNSView: NSView {
   private static let didUpdateRefreshInterval: Duration = .milliseconds(250)
+  private static let layoutRefreshInterval: Duration = .milliseconds(120)
 
   private let registrationOwnerID = UUID()
   private let clock = ContinuousClock()
@@ -200,6 +201,7 @@ final class TrackAccessibilityNSView: NSView {
   private nonisolated(unsafe) var windowObservers: [NSObjectProtocol] = []
   private var lastPublishedElement: RegistryElement?
   private var lastDidUpdateRefreshAt: ContinuousClock.Instant?
+  private var lastLayoutRefreshAt: ContinuousClock.Instant?
   private var lastConfiguredSignature: ConfigurationSignature?
   var accessibilityFrameProviderOverride: ((TrackAccessibilityNSView) -> NSRect)?
 
@@ -352,7 +354,7 @@ final class TrackAccessibilityNSView: NSView {
 
   override func layout() {
     super.layout()
-    schedulePublishCurrentElement()
+    schedulePublishCurrentElement(triggeredByLayout: true)
   }
 
   private func beginObserving(window: NSWindow?) {
@@ -439,8 +441,14 @@ final class TrackAccessibilityNSView: NSView {
     }
   }
 
-  private func schedulePublishCurrentElement(triggeredByDidUpdate: Bool = false) {
+  private func schedulePublishCurrentElement(
+    triggeredByDidUpdate: Bool = false,
+    triggeredByLayout: Bool = false
+  ) {
     if triggeredByDidUpdate, shouldRefreshOnDidUpdate() == false {
+      return
+    }
+    if triggeredByLayout, shouldRefreshOnLayout() == false {
       return
     }
     deferredPublishTask?.cancel()
@@ -449,6 +457,9 @@ final class TrackAccessibilityNSView: NSView {
     }
     if triggeredByDidUpdate {
       lastDidUpdateRefreshAt = clock.now
+    }
+    if triggeredByLayout {
+      lastLayoutRefreshAt = clock.now
     }
     // Keep frame publication deferred so representable-backed views finish the
     // current update/layout pass before the registry snapshots screen geometry.
@@ -467,6 +478,14 @@ final class TrackAccessibilityNSView: NSView {
     }
     let now = clock.now
     return lastDidUpdateRefreshAt + Self.didUpdateRefreshInterval <= now
+  }
+
+  private func shouldRefreshOnLayout() -> Bool {
+    guard let lastLayoutRefreshAt else {
+      return true
+    }
+    let now = clock.now
+    return lastLayoutRefreshAt + Self.layoutRefreshInterval <= now
   }
 
   private func currentAccessibilityFrame() -> NSRect {
