@@ -5,12 +5,14 @@ use std::time::Instant;
 use crate::daemon::service::task_board_runtime::external_sync_config_for_repository;
 use crate::dependency_updates::{
     DependencyUpdateActionOutcome, DependencyUpdateActionResult, DependencyUpdateItem,
-    DependencyUpdateTarget, DependencyUpdatesActionResponse, DependencyUpdatesApproveRequest,
-    DependencyUpdatesAutoRequest, DependencyUpdatesCacheClearResponse,
-    DependencyUpdatesGitHubClient, DependencyUpdatesLabelRequest, DependencyUpdatesMergeRequest,
-    DependencyUpdatesQueryRequest, DependencyUpdatesQueryResponse,
-    DependencyUpdatesRepositoryCatalogRequest, DependencyUpdatesRepositoryCatalogResponse,
-    DependencyUpdatesRerunChecksRequest,
+    DependencyUpdatePullRequestState, DependencyUpdateTarget, DependencyUpdatesActionResponse,
+    DependencyUpdatesApproveRequest, DependencyUpdatesAutoRequest,
+    DependencyUpdatesCacheClearResponse, DependencyUpdatesGitHubClient,
+    DependencyUpdatesLabelRequest, DependencyUpdatesMergeRequest, DependencyUpdatesQueryRequest,
+    DependencyUpdatesQueryResponse, DependencyUpdatesRefreshRequest,
+    DependencyUpdatesRefreshResponse, DependencyUpdatesRepositoryCatalogRequest,
+    DependencyUpdatesRepositoryCatalogResponse, DependencyUpdatesRerunChecksRequest,
+    DependencyUpdatesSummary,
 };
 use crate::errors::{CliError, CliErrorKind};
 use crate::task_board::ExternalProvider;
@@ -231,6 +233,37 @@ pub async fn auto_dependency_updates(
     Ok(action_response("Auto mode finished", results))
 }
 
+/// Re-fetch a focused list of dependency update pull requests by GraphQL ID,
+/// patching matching cache entries in place and returning the refreshed items.
+///
+/// # Errors
+/// Returns `CliError` when the request is invalid, a required token is missing,
+/// or GitHub cannot return the requested pull requests.
+pub async fn refresh_dependency_updates(
+    request: &DependencyUpdatesRefreshRequest,
+) -> Result<DependencyUpdatesRefreshResponse, CliError> {
+    request.validate()?;
+    let mut items = Vec::new();
+    let mut missing = Vec::new();
+    for segment in token_bound_targets(&request.targets)? {
+        let ids: Vec<String> = segment
+            .targets
+            .iter()
+            .map(|target| target.pull_request_id.clone())
+            .collect();
+        let client = DependencyUpdatesGitHubClient::new(&segment.token)?;
+        let (fetched, segment_missing) = client.fetch_by_ids(&ids).await?;
+        items.extend(fetched);
+        missing.extend(segment_missing);
+    }
+    patch_cached_items(&items, &missing);
+    Ok(DependencyUpdatesRefreshResponse {
+        fetched_at: utc_now(),
+        items,
+        missing_pull_request_ids: missing,
+    })
+}
+
 /// Clear the in-memory dependency updates query cache.
 ///
 /// # Errors
@@ -337,6 +370,42 @@ fn cached_query_response(
     let mut response = entry.response.clone();
     response.from_cache = true;
     Some(response)
+}
+
+fn patch_cached_items(refreshed: &[DependencyUpdateItem], missing: &[String]) {
+    if refreshed.is_empty() && missing.is_empty() {
+        return;
+    }
+    let mut cache = cache().lock().expect("dependency-updates cache lock");
+    for entry in cache.values_mut() {
+        let mut changed = false;
+        for refreshed_item in refreshed {
+            if let Some(slot) = entry
+                .response
+                .items
+                .iter_mut()
+                .find(|item| item.pull_request_id == refreshed_item.pull_request_id)
+            {
+                *slot = refreshed_item.clone();
+                changed = true;
+            }
+        }
+        let pre_drop_len = entry.response.items.len();
+        entry.response.items.retain(|item| {
+            let dropped_by_missing = missing.contains(&item.pull_request_id);
+            let dropped_by_state = refreshed
+                .iter()
+                .any(|refreshed_item| refreshed_item.pull_request_id == item.pull_request_id)
+                && item.state != DependencyUpdatePullRequestState::Open;
+            !(dropped_by_missing || dropped_by_state)
+        });
+        if entry.response.items.len() != pre_drop_len {
+            changed = true;
+        }
+        if changed {
+            entry.response.summary = DependencyUpdatesSummary::from_items(&entry.response.items);
+        }
+    }
 }
 
 fn store_cached_query_response(cache_key: String, response: &DependencyUpdatesQueryResponse) {

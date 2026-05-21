@@ -386,6 +386,12 @@ fn dependency_update_routes_have_complete_ws_parity() {
                 ws_methods::DEPENDENCY_UPDATES_CLEAR_CACHE,
                 true,
             ),
+            (
+                HttpRouteMethod::Post,
+                http_paths::DEPENDENCY_UPDATES_REFRESH,
+                ws_methods::DEPENDENCY_UPDATES_REFRESH,
+                true,
+            ),
         ]
     );
 }

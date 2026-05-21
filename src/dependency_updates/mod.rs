@@ -139,6 +139,21 @@ pub struct DependencyUpdatesCacheClearResponse {
     pub cleared_entries: usize,
 }
 
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct DependencyUpdatesRefreshRequest {
+    #[serde(default)]
+    pub targets: Vec<DependencyUpdateTarget>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct DependencyUpdatesRefreshResponse {
+    pub fetched_at: String,
+    #[serde(default)]
+    pub items: Vec<DependencyUpdateItem>,
+    #[serde(default)]
+    pub missing_pull_request_ids: Vec<String>,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct DependencyUpdateTarget {
     pub pull_request_id: String,

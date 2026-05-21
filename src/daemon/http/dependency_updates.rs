@@ -9,7 +9,8 @@ use axum::{Json, Router};
 use crate::daemon::protocol::{
     DependencyUpdatesApproveRequest, DependencyUpdatesAutoRequest, DependencyUpdatesLabelRequest,
     DependencyUpdatesMergeRequest, DependencyUpdatesQueryRequest,
-    DependencyUpdatesRepositoryCatalogRequest, DependencyUpdatesRerunChecksRequest, http_paths,
+    DependencyUpdatesRefreshRequest, DependencyUpdatesRepositoryCatalogRequest,
+    DependencyUpdatesRerunChecksRequest, http_paths,
 };
 use crate::daemon::service;
 
@@ -61,6 +62,10 @@ pub(super) fn dependency_updates_routes() -> Router<DaemonHttpState> {
         .route(
             http_paths::DEPENDENCY_UPDATES_CACHE,
             delete(delete_dependency_updates_cache),
+        )
+        .route(
+            http_paths::DEPENDENCY_UPDATES_REFRESH,
+            post(post_refresh_dependency_updates),
         )
 }
 
@@ -187,5 +192,21 @@ async fn delete_dependency_updates_cache(
         &request_id,
         start,
         service::clear_dependency_updates_cache(),
+    )
+}
+
+async fn post_refresh_dependency_updates(
+    headers: HeaderMap,
+    State(state): State<DaemonHttpState>,
+    Json(request): Json<DependencyUpdatesRefreshRequest>,
+) -> Response {
+    let (start, request_id) = authenticated_request!(headers, state);
+    let result = service::refresh_dependency_updates(&request).await;
+    timed_json(
+        "POST",
+        http_paths::DEPENDENCY_UPDATES_REFRESH,
+        &request_id,
+        start,
+        result,
     )
 }
