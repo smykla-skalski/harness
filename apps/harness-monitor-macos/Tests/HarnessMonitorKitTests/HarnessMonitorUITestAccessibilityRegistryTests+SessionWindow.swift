@@ -50,10 +50,6 @@ extension HarnessMonitorUITestAccessibilityRegistryTests {
         == "harness.dashboard.dependencies.refresh"
     )
     #expect(
-      HarnessMonitorAccessibility.dashboardDependenciesConfigureButton
-        == "harness.dashboard.dependencies.configure"
-    )
-    #expect(
       HarnessMonitorAccessibility.dashboardDependenciesFixCIButton
         == "harness.dashboard.dependencies.fix-ci"
     )
@@ -120,6 +116,7 @@ extension HarnessMonitorUITestAccessibilityRegistryTests {
   func dashboardAndSessionWindowAccessibilityIdentifiersAreAttachedByProductionViews() throws {
     let dashboardRoot = try sourceFile(named: "DashboardWindowView.swift")
     let dashboardView = try sourceFile(named: "DashboardWindowSupport.swift")
+    let dashboardRouteContent = try sourceFile(named: "DashboardRouteContent.swift")
     let dashboardSidebarSessionsView = try sourceFile(
       named: "DashboardSidebarRecentSessionsSection.swift"
     )
@@ -163,7 +160,7 @@ extension HarnessMonitorUITestAccessibilityRegistryTests {
     #expect(
       dashboardSidebarSessionsView.contains("projectAndWorktreeDisplayLabel(separator: \"·\")"))
     #expect(dashboardView.contains(".harnessMonitorSidebarListChrome("))
-    #expect(dashboardView.contains("HarnessMonitorAccessibility.dashboardScrollView"))
+    #expect(dashboardRouteContent.contains("HarnessMonitorAccessibility.dashboardScrollView"))
     #expect(
       notificationsView.contains("HarnessMonitorAccessibility.dashboardNotificationsScrollView"))
     #expect(
@@ -184,9 +181,6 @@ extension HarnessMonitorUITestAccessibilityRegistryTests {
       dependenciesView.contains("HarnessMonitorAccessibility.dashboardDependenciesRefreshButton")
     )
     #expect(
-      dependenciesView.contains("HarnessMonitorAccessibility.dashboardDependenciesConfigureButton")
-    )
-    #expect(
       dependenciesView.contains("HarnessMonitorAccessibility.dashboardDependenciesFixCIButton")
     )
     #expect(
@@ -195,10 +189,10 @@ extension HarnessMonitorUITestAccessibilityRegistryTests {
     #expect(dashboardToolbar.contains("HarnessMonitorAccessibility.dashboardNewSessionButton"))
     #expect(dashboardToolbar.contains("HarnessMonitorAccessibility.dashboardOpenFolderButton"))
     #expect(
-      dashboardView.contains("DashboardNotificationsRouteView(")
+      dashboardRouteContent.contains("DashboardNotificationsRouteView(")
     )
     #expect(
-      dashboardView.contains("DashboardDependenciesRouteView(")
+      dashboardRouteContent.contains("DashboardDependenciesRouteView(")
     )
     #expect(dependenciesView.contains("SessionContentDetailSplitView("))
     #expect(dashboardToolbar.contains("SleepPreventionToolbarButton("))
