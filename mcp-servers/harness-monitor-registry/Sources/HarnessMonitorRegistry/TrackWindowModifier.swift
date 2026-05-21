@@ -11,17 +11,21 @@ public extension View {
   ///
   /// Tracks frame, key/main state, and title automatically; re-registers on
   /// window and content updates.
-  func trackWindow(registry: AccessibilityRegistry) -> some View {
-    modifier(TrackWindowModifier(registry: registry))
+  func trackWindow(
+    registry: AccessibilityRegistry,
+    tracksElements: Bool = true
+  ) -> some View {
+    modifier(TrackWindowModifier(registry: registry, tracksElements: tracksElements))
   }
 }
 
 private struct TrackWindowModifier: ViewModifier {
   let registry: AccessibilityRegistry
+  let tracksElements: Bool
 
   func body(content: Content) -> some View {
     content.background(
-      WindowTrackingRepresentable(registry: registry)
+      WindowTrackingRepresentable(registry: registry, tracksElements: tracksElements)
         .frame(width: 0, height: 0)
     )
   }
@@ -29,9 +33,10 @@ private struct TrackWindowModifier: ViewModifier {
 
 private struct WindowTrackingRepresentable: NSViewRepresentable {
   let registry: AccessibilityRegistry
+  let tracksElements: Bool
 
   func makeNSView(context: Context) -> WindowTrackingNSView {
-    WindowTrackingNSView(registry: registry)
+    WindowTrackingNSView(registry: registry, tracksElements: tracksElements)
   }
 
   func updateNSView(_ nsView: WindowTrackingNSView, context: Context) {}
@@ -51,6 +56,7 @@ private struct WindowTrackingRepresentable: NSViewRepresentable {
 final class WindowTrackingNSView: NSView {
   private let syncController: WindowRegistrySyncController
   private let elementSyncController: WindowElementRegistrySyncController
+  private let tracksElements: Bool
   private let elementSyncDelay: Duration
   private let didUpdateElementSyncDelay: Duration
   // nonisolated(unsafe) so the nonisolated deinit can read the array and
@@ -73,11 +79,13 @@ final class WindowTrackingNSView: NSView {
 
   init(
     registry: AccessibilityRegistry,
+    tracksElements: Bool = true,
     elementSyncDelay: Duration = .milliseconds(250),
     didUpdateElementSyncDelay: Duration = .milliseconds(1500)
   ) {
     syncController = WindowRegistrySyncController(registry: registry)
     elementSyncController = WindowElementRegistrySyncController(registry: registry)
+    self.tracksElements = tracksElements
     self.elementSyncDelay = elementSyncDelay
     self.didUpdateElementSyncDelay = didUpdateElementSyncDelay
     super.init(frame: .zero)
@@ -95,12 +103,13 @@ final class WindowTrackingNSView: NSView {
 
   private func startTracking(_ window: NSWindow) {
     let windowGeneration = syncController.beginTracking(windowID: window.windowNumber)
-    let elementGeneration = elementSyncController.beginTracking(windowID: window.windowNumber)
+    let elementGeneration =
+      tracksElements ? elementSyncController.beginTracking(windowID: window.windowNumber) : 0
     sync(
       window,
       windowGeneration: windowGeneration,
       elementGeneration: elementGeneration,
-      includeElements: true
+      includeElements: tracksElements
     )
     let names: [NSNotification.Name] = [
       NSWindow.didMoveNotification,
@@ -133,6 +142,9 @@ final class WindowTrackingNSView: NSView {
               elementGeneration: elementGeneration,
               includeElements: false
             )
+            guard self.tracksElements else {
+              return
+            }
             self.scheduleDidUpdateElementSync(
               window: window,
               windowGeneration: windowGeneration,
@@ -147,6 +159,9 @@ final class WindowTrackingNSView: NSView {
             elementGeneration: elementGeneration,
             includeElements: false
           )
+          guard self.tracksElements else {
+            return
+          }
           self.scheduleElementSync(
             window: window,
             windowGeneration: windowGeneration,
@@ -164,7 +179,9 @@ final class WindowTrackingNSView: NSView {
     observations.forEach { NotificationCenter.default.removeObserver($0) }
     observations.removeAll()
     syncController.stopTracking()
-    elementSyncController.stopTracking()
+    if tracksElements {
+      elementSyncController.stopTracking()
+    }
   }
 
   private func scheduleDidUpdateElementSync(
@@ -241,7 +258,7 @@ final class WindowTrackingNSView: NSView {
       isMain: window.isMainWindow
     )
     syncController.sync(entry, generation: windowGeneration)
-    guard includeElements else {
+    guard tracksElements, includeElements else {
       return
     }
     elementSyncController.sync(

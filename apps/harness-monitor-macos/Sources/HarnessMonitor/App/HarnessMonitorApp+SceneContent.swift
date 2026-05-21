@@ -72,7 +72,7 @@ extension HarnessMonitorApp {
         selectedSection: settingsSelectedSectionBinding,
         navigationRequest: settingsNavigationRequestBinding
       )
-      .harnessTrackMCPWindow()
+      .harnessTrackMCPWindow(tracksElements: false)
     } else {
       Color.clear.accessibilityHidden(true)
     }
