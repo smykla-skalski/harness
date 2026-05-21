@@ -136,4 +136,3 @@ extension HarnessMonitorUserNotificationController {
     return await operation()
   }
 }
-}
