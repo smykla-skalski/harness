@@ -11,15 +11,25 @@ public struct SettingsDatabaseSection: View {
   @State private var isLoadingStats = false
   @State private var pendingConfirmation: DatabaseConfirmation?
   @State private var selectedStatisticsTab: StatisticsTab = .cache
+  @State private var isFullyExpanded = false
 
   public var body: some View {
     Form {
       statisticsSection
-      operationsSection
-      healthSection
+      if isFullyExpanded {
+        operationsSection
+        healthSection
+      }
     }
     .settingsDetailFormStyle()
     .task { await refreshStatistics() }
+    .task { await expandAfterFirstFrame() }
+  }
+
+  private func expandAfterFirstFrame() async {
+    guard !isFullyExpanded else { return }
+    try? await Task.sleep(for: .milliseconds(40))
+    isFullyExpanded = true
   }
 
   // MARK: - Statistics
