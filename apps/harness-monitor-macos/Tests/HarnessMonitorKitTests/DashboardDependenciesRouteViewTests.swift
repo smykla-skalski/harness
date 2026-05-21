@@ -65,6 +65,58 @@ struct DashboardDependenciesRouteViewTests {
     #expect(source.contains(".task(id: reloadTaskKey)"))
   }
 
+  @Test("error helper rewrites GitHub 401 messages into actionable copy")
+  func errorHelperRewritesGitHubUnauthorizedIntoActionableCopy() {
+    let envelope =
+      #"{"error":{"code":"WORKFLOW_IO","message":"dependency-updates github "#
+      + #"request failed: GitHub API returned 401 Unauthorized: Bad credentials. "#
+      + #"Check that the GitHub token is valid"}}"#
+    let apiError = HarnessMonitorAPIError.server(code: 400, message: envelope)
+
+    #expect(
+      dashboardDependenciesErrorMessage(for: apiError)
+        == dashboardDependenciesGitHubAuthFailureMessage
+    )
+  }
+
+  @Test("error helper detects GitHub 401 messages in non-API errors")
+  func errorHelperDetectsGitHubUnauthorizedInTransportLikeErrors() {
+    struct LegacyTransportError: LocalizedError {
+      var errorDescription: String? {
+        "dependency-updates github request failed: GitHub API returned 401 Unauthorized"
+      }
+    }
+
+    #expect(
+      dashboardDependenciesErrorMessage(for: LegacyTransportError())
+        == dashboardDependenciesGitHubAuthFailureMessage
+    )
+  }
+
+  @Test("error helper rewrites DecodingError into version-mismatch copy")
+  func errorHelperRewritesDecodingErrorIntoVersionMismatchCopy() {
+    let decodingError = DecodingError.valueNotFound(
+      String.self,
+      DecodingError.Context(codingPath: [], debugDescription: "missing payload")
+    )
+
+    #expect(
+      dashboardDependenciesErrorMessage(for: decodingError)
+        == dashboardDependenciesDecodingFailureMessage
+    )
+  }
+
+  @Test("error helper passes through unknown localized errors")
+  func errorHelperPassesThroughUnknownLocalizedErrors() {
+    struct UnknownError: LocalizedError {
+      var errorDescription: String? { "everything is on fire" }
+    }
+
+    #expect(
+      dashboardDependenciesErrorMessage(for: UnknownError()) == "everything is on fire"
+    )
+  }
+
   private func routeSource() throws -> String {
     let testsDirectory = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
     let repoRoot =
