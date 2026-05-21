@@ -366,7 +366,7 @@ extension TaskBoardAPIClientTests {
     #expect(approveTarget?["check_suite_ids"] as? [String] == ["suite-1"])
 
     #expect(records[3].body?["method"] as? String == "rebase")
-    #expect(records[4].body?["targets"] as? [[String: Any]] != nil)
+    #expect(records[4].body?["targets"] is [[String: Any]])
     #expect(records[5].body?["label"] as? String == "dependencies:ready")
     #expect(records[6].body?["method"] as? String == "squash")
     #expect(records[7].body == nil)

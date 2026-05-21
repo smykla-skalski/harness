@@ -5,7 +5,7 @@ public typealias SessionSidebarSeverityShape = HarnessMonitorSidebarSeverityShap
 
 struct SessionSidebarRow: View {
   let title: String
-  var subtitle: String? = nil
+  var subtitle: String?
   let systemImage: String
   var severityShape: SessionSidebarSeverityShape = .none
   var severityTint: Color = .gray

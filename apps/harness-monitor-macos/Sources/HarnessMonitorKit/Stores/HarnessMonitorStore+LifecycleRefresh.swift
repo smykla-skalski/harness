@@ -383,7 +383,7 @@ extension HarnessMonitorStore {
 
       while !Task.isCancelled {
         do {
-          try await Task.sleep(for: self.initialTaskBoardConfirmationRetryInterval)
+          try await Task.sleep(for: self.taskBoardConfirmationRetryInterval)
         } catch {
           return
         }

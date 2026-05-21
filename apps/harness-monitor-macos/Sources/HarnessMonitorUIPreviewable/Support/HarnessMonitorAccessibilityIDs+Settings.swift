@@ -131,14 +131,14 @@ extension HarnessMonitorAccessibility {
   public static let settingsRepositoriesAddButton = "harness.settings.repositories.add"
   public static let settingsRepositoriesOrganizationField =
     "harness.settings.repositories.organization"
-  public static let settingsRepositoriesOrganizationLoadButton =
+  public static let settingsRepositoriesOrgLoadButton =
     "harness.settings.repositories.organization.load"
   public static let settingsRepositoriesCatalogStatus =
     "harness.settings.repositories.catalog.status"
   public static let settingsRepositoriesCatalogSearchField =
     "harness.settings.repositories.catalog.search"
   public static let settingsRepositoriesCatalogList = "harness.settings.repositories.catalog.list"
-  public static let settingsRepositoriesCatalogAddSelectedButton =
+  public static let settingsRepositoriesCatalogAddButton =
     "harness.settings.repositories.catalog.add-selected"
   public static let settingsRepositoriesCatalogAddAllButton =
     "harness.settings.repositories.catalog.add-all"
@@ -154,7 +154,7 @@ extension HarnessMonitorAccessibility {
     "harness.settings.dependencies.organizations"
   public static let settingsDependenciesRepositoriesField =
     "harness.settings.dependencies.repositories"
-  public static let settingsDependenciesExcludedRepositoriesField =
+  public static let settingsDependenciesExcludedReposField =
     "harness.settings.dependencies.exclude-repositories"
   public static let settingsDependenciesMergeMethodField =
     "harness.settings.dependencies.merge-method"

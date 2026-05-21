@@ -41,7 +41,7 @@ extension HarnessMonitorUITestAccessibilityRegistryTests {
         == "harness.dashboard.dependencies.detail"
     )
     #expect(
-      HarnessMonitorAccessibility.dashboardDependenciesContentDetailDivider
+      HarnessMonitorAccessibility.dashboardDependenciesDetailDivider
         == "harness.dashboard.dependencies.content-detail-divider"
     )
     #expect(
@@ -176,7 +176,7 @@ extension HarnessMonitorUITestAccessibilityRegistryTests {
     )
     #expect(
       dependenciesView.contains(
-        "HarnessMonitorAccessibility.dashboardDependenciesContentDetailDivider"
+        "HarnessMonitorAccessibility.dashboardDependenciesDetailDivider"
       )
     )
     #expect(

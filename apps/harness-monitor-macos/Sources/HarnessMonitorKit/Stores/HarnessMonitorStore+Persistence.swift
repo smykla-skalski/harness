@@ -95,19 +95,19 @@ extension HarnessMonitorStore {
   ) {
     guard let cacheService, persistenceError == nil else { return }
     cancelPendingTaskBoardSnapshotCacheWriteTask()
-    pendingTaskBoardSnapshotCacheWriteTaskToken &+= 1
-    let taskToken = pendingTaskBoardSnapshotCacheWriteTaskToken
+    taskBoardSnapshotCacheWriteToken &+= 1
+    let taskToken = taskBoardSnapshotCacheWriteToken
     pendingTaskBoardSnapshotCacheWriteTask = Task { @MainActor [weak self] in
       guard let self else { return }
       defer {
-        if self.pendingTaskBoardSnapshotCacheWriteTaskToken == taskToken {
+        if self.taskBoardSnapshotCacheWriteToken == taskToken {
           self.pendingTaskBoardSnapshotCacheWriteTask = nil
         }
       }
       try? await Task.sleep(for: .milliseconds(250))
       guard
         !Task.isCancelled,
-        self.pendingTaskBoardSnapshotCacheWriteTaskToken == taskToken
+        self.taskBoardSnapshotCacheWriteToken == taskToken
       else {
         return
       }
@@ -323,7 +323,7 @@ extension HarnessMonitorStore {
   private func cancelPendingTaskBoardSnapshotCacheWriteTask() {
     pendingTaskBoardSnapshotCacheWriteTask?.cancel()
     pendingTaskBoardSnapshotCacheWriteTask = nil
-    pendingTaskBoardSnapshotCacheWriteTaskToken &+= 1
+    taskBoardSnapshotCacheWriteToken &+= 1
   }
 
   private func cancelPendingSessionDetailCacheWriteTask() {

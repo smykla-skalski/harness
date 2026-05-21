@@ -55,7 +55,7 @@ extension HarnessMonitorUITestAccessibility {
     "harness.settings.dependencies.repositories.open"
   static let settingsDependenciesOrganizationsField = "harness.settings.dependencies.organizations"
   static let settingsDependenciesRepositoriesField = "harness.settings.dependencies.repositories"
-  static let settingsDependenciesExcludedRepositoriesField =
+  static let settingsDependenciesExcludedReposField =
     "harness.settings.dependencies.exclude-repositories"
   static let settingsDependenciesMergeMethodField = "harness.settings.dependencies.merge-method"
   static let settingsDependenciesRefreshIntervalField =

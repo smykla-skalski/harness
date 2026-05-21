@@ -386,7 +386,7 @@ extension HarnessMonitorStoreLifecycleCoreTests {
       modelContainer: container
     )
     store.initialTaskBoardConfirmationGracePeriod = .seconds(1)
-    store.initialTaskBoardConfirmationRetryInterval = .seconds(1)
+    store.taskBoardConfirmationRetryInterval = .seconds(1)
 
     await store.bootstrap()
 
@@ -420,7 +420,7 @@ extension HarnessMonitorStoreLifecycleCoreTests {
       modelContainer: container
     )
     store.initialTaskBoardConfirmationGracePeriod = .milliseconds(200)
-    store.initialTaskBoardConfirmationRetryInterval = .milliseconds(50)
+    store.taskBoardConfirmationRetryInterval = .milliseconds(50)
 
     await store.bootstrap()
 
@@ -489,7 +489,7 @@ extension HarnessMonitorStoreLifecycleCoreTests {
       modelContainer: container
     )
     store.initialTaskBoardConfirmationGracePeriod = .milliseconds(200)
-    store.initialTaskBoardConfirmationRetryInterval = .milliseconds(50)
+    store.taskBoardConfirmationRetryInterval = .milliseconds(50)
 
     await store.bootstrap()
 
@@ -539,7 +539,7 @@ extension HarnessMonitorStoreLifecycleCoreTests {
       modelContainer: container
     )
     store.initialTaskBoardConfirmationGracePeriod = .milliseconds(40)
-    store.initialTaskBoardConfirmationRetryInterval = .milliseconds(10)
+    store.taskBoardConfirmationRetryInterval = .milliseconds(10)
 
     await store.bootstrap()
 
