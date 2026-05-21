@@ -80,7 +80,8 @@ build_daemon_binary() {
     cd "$repo_root" || exit 1
     CARGO_TARGET_DIR="$target_dir" run_with_sanitized_xcode_only_swift_environment \
       "$cargo_bin" "${cargo_args[@]}" -- \
-      -C "link-arg=-Wl,-sectcreate,__TEXT,__info_plist,$daemon_info_link_plist"
+      -C "link-arg=-Wl,-sectcreate,__TEXT,__info_plist,$daemon_info_link_plist" \
+      -C "link-arg=-Wl,-no_compact_unwind"
   )
 
   printf '%s\n' "$(daemon_binary_output_path)"
