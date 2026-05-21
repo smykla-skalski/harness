@@ -65,8 +65,8 @@ extension HarnessMonitorStore {
       revision: currentRevision
     )
 
-    if let selectedTimelineLoad.pageLoadTask, selectedTimelineLoad.pageLoadKey == loadKey {
-      await selectedTimelineLoad.pageLoadTask.value
+    if let task = selectedTimelineLoad.pageLoadTask, selectedTimelineLoad.pageLoadKey == loadKey {
+      await task.value
       return
     }
 
