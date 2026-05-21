@@ -1,6 +1,6 @@
 import Foundation
 
-private struct AcpToolCallPhaseKey: Hashable {
+struct AcpToolCallPhaseKey: Hashable {
   let rowID: String
   let status: String
 
