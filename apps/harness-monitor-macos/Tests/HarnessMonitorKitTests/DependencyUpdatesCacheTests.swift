@@ -184,6 +184,156 @@ final class DependencyUpdatesCacheTests: XCTestCase {
     XCTAssertNil(cache.applyRefresh(preferencesHash: "missing", refresh: refresh))
   }
 
+  // MARK: - applyPerRepoResponse
+
+  func testApplyPerRepoResponseLeavesOtherReposUntouched() {
+    let cached = [
+      makeItem(pullRequestID: "pr_a1", repository: "acme/api"),
+      makeItem(pullRequestID: "pr_w1", repository: "acme/web"),
+      makeItem(pullRequestID: "pr_a2", repository: "acme/api"),
+    ]
+    let response = makeResponse(items: [
+      makeItem(pullRequestID: "pr_a1", repository: "acme/api", reviewStatus: .approved)
+    ])
+
+    let result = DependencyUpdatesCache.applyPerRepoResponse(
+      cached,
+      repository: "acme/api",
+      response: response
+    )
+
+    let webItems = result.filter { $0.repository == "acme/web" }
+    XCTAssertEqual(webItems.map(\.pullRequestID), ["pr_w1"])
+    XCTAssertEqual(webItems.first?.reviewStatus, .reviewRequired)
+  }
+
+  func testApplyPerRepoResponseReplacesOpenItemsForTargetedRepo() {
+    let cached = [
+      makeItem(pullRequestID: "pr_a1", repository: "acme/api", reviewStatus: .reviewRequired),
+      makeItem(pullRequestID: "pr_a2", repository: "acme/api", reviewStatus: .reviewRequired),
+    ]
+    let response = makeResponse(items: [
+      makeItem(pullRequestID: "pr_a1", repository: "acme/api", reviewStatus: .approved),
+      makeItem(pullRequestID: "pr_a2", repository: "acme/api", reviewStatus: .reviewRequired),
+    ])
+
+    let result = DependencyUpdatesCache.applyPerRepoResponse(
+      cached,
+      repository: "acme/api",
+      response: response
+    )
+
+    XCTAssertEqual(result.map(\.pullRequestID), ["pr_a1", "pr_a2"])
+    XCTAssertEqual(result[0].reviewStatus, .approved)
+    XCTAssertEqual(result[1].reviewStatus, .reviewRequired)
+  }
+
+  func testApplyPerRepoResponseDropsMissingItemsForTargetedRepo() {
+    let cached = [
+      makeItem(pullRequestID: "pr_a1", repository: "acme/api"),
+      makeItem(pullRequestID: "pr_a2", repository: "acme/api"),
+      makeItem(pullRequestID: "pr_w1", repository: "acme/web"),
+    ]
+    let response = makeResponse(items: [
+      makeItem(pullRequestID: "pr_a1", repository: "acme/api")
+    ])
+
+    let result = DependencyUpdatesCache.applyPerRepoResponse(
+      cached,
+      repository: "acme/api",
+      response: response
+    )
+
+    XCTAssertEqual(result.map(\.pullRequestID), ["pr_a1", "pr_w1"])
+  }
+
+  func testApplyPerRepoResponseAppendsNewlyDiscoveredPRs() {
+    let cached = [
+      makeItem(pullRequestID: "pr_a1", repository: "acme/api"),
+      makeItem(pullRequestID: "pr_w1", repository: "acme/web"),
+    ]
+    let response = makeResponse(items: [
+      makeItem(pullRequestID: "pr_a1", repository: "acme/api"),
+      makeItem(pullRequestID: "pr_a_new", repository: "acme/api"),
+    ])
+
+    let result = DependencyUpdatesCache.applyPerRepoResponse(
+      cached,
+      repository: "acme/api",
+      response: response
+    )
+
+    XCTAssertEqual(result.map(\.pullRequestID), ["pr_a1", "pr_w1", "pr_a_new"])
+  }
+
+  func testApplyPerRepoResponseEmptyResponseDropsAllRepoItems() {
+    let cached = [
+      makeItem(pullRequestID: "pr_a1", repository: "acme/api"),
+      makeItem(pullRequestID: "pr_w1", repository: "acme/web"),
+      makeItem(pullRequestID: "pr_a2", repository: "acme/api"),
+    ]
+    let response = makeResponse(items: [])
+
+    let result = DependencyUpdatesCache.applyPerRepoResponse(
+      cached,
+      repository: "acme/api",
+      response: response
+    )
+
+    XCTAssertEqual(result.map(\.pullRequestID), ["pr_w1"])
+  }
+
+  func testApplyPerRepoResponsePersistsAndReturnsReconciledSnapshot() throws {
+    let context = try makeContext()
+    let cache = DependencyUpdatesCache(context: context)
+    cache.save(
+      preferencesHash: "alpha",
+      response: makeResponse(items: [
+        makeItem(pullRequestID: "pr_a1", repository: "acme/api"),
+        makeItem(pullRequestID: "pr_w1", repository: "acme/web"),
+      ])
+    )
+
+    let response = DependencyUpdatesQueryResponse(
+      fetchedAt: "2026-05-21T12:00:00Z",
+      fromCache: false,
+      summary: DependencyUpdatesSummary(items: []),
+      items: [makeItem(pullRequestID: "pr_a_new", repository: "acme/api")]
+    )
+    let reconciled = try XCTUnwrap(
+      cache.applyPerRepoResponse(
+        preferencesHash: "alpha",
+        repository: "acme/api",
+        response: response
+      )
+    )
+
+    XCTAssertEqual(
+      reconciled.items.map(\.pullRequestID).sorted(),
+      ["pr_a_new", "pr_w1"]
+    )
+    XCTAssertEqual(reconciled.fetchedAt, "2026-05-21T12:00:00Z")
+    XCTAssertEqual(reconciled.summary.total, 2)
+
+    let loaded = try XCTUnwrap(cache.load(preferencesHash: "alpha"))
+    XCTAssertEqual(loaded.items.map(\.pullRequestID).sorted(), ["pr_a_new", "pr_w1"])
+  }
+
+  func testApplyPerRepoResponseReturnsNilWhenNoSnapshotExists() throws {
+    let context = try makeContext()
+    let cache = DependencyUpdatesCache(context: context)
+    let response = makeResponse(items: [
+      makeItem(pullRequestID: "pr_a1", repository: "acme/api")
+    ])
+    XCTAssertNil(
+      cache.applyPerRepoResponse(
+        preferencesHash: "missing",
+        repository: "acme/api",
+        response: response
+      )
+    )
+  }
+
   // MARK: - Helpers
 
   private func makeContext() throws -> ModelContext {
@@ -206,13 +356,14 @@ final class DependencyUpdatesCacheTests: XCTestCase {
 
   private func makeItem(
     pullRequestID: String,
+    repository: String = "acme/api",
     state: DependencyUpdatePullRequestState = .open,
     reviewStatus: DependencyUpdateReviewStatus = .reviewRequired
   ) -> DependencyUpdateItem {
     DependencyUpdateItem(
       pullRequestID: pullRequestID,
-      repositoryID: "repo_1",
-      repository: "acme/api",
+      repositoryID: "\(repository)#node",
+      repository: repository,
       number: 1,
       title: "chore(deps): bump",
       url: "https://example.com",
