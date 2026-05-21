@@ -16,7 +16,7 @@ extension HarnessMonitorStore {
     guard limit > 0 else {
       return
     }
-    guard selectedTimelineWindowLoadTask == nil else {
+    guard selectedTimelineLoad.windowLoadTask == nil else {
       return
     }
     guard timelineWindow?.hasOlder == true else {
@@ -65,15 +65,15 @@ extension HarnessMonitorStore {
       revision: currentRevision
     )
 
-    if let selectedTimelinePageLoadTask, selectedTimelinePageLoadKey == loadKey {
-      await selectedTimelinePageLoadTask.value
+    if let selectedTimelineLoad.pageLoadTask, selectedTimelineLoad.pageLoadKey == loadKey {
+      await selectedTimelineLoad.pageLoadTask.value
       return
     }
 
     cancelSelectedTimelinePageLoad()
-    selectedTimelinePageLoadSequence &+= 1
-    let token = selectedTimelinePageLoadSequence
-    selectedTimelinePageLoadKey = loadKey
+    selectedTimelineLoad.pageLoadSequence &+= 1
+    let token = selectedTimelineLoad.pageLoadSequence
+    selectedTimelineLoad.pageLoadKey = loadKey
 
     withUISyncBatch {
       isTimelineLoading = true
@@ -91,7 +91,7 @@ extension HarnessMonitorStore {
         loadKey: loadKey
       )
     )
-    selectedTimelinePageLoadTask = task
+    selectedTimelineLoad.pageLoadTask = task
     await task.value
   }
 
