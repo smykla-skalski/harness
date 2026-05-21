@@ -93,12 +93,12 @@ custom_rules:
   no_direct_glass_effect:
     name: "No Direct glassEffect Usage"
     regex: '\.glassEffect\('
-    message: "Use Harness glass primitives instead of .glassEffect(). All glass goes through HarnessGlass.swift."
+    message: "Use Harness glass primitives instead of .glassEffect(). All glass goes through HarnessMonitorGlass*.swift."
     severity: error
     included:
       - "Sources/HarnessMonitor"
     excluded:
-      - "HarnessMonitorGlass\\.swift"
+      - "HarnessMonitor.*Glass.*\\.swift"
   no_direct_glass_button_style:
     name: "No Direct Glass Button Style"
     regex: '\.buttonStyle\(\.glass'
@@ -120,12 +120,12 @@ custom_rules:
   no_direct_glass_container:
     name: "No Direct GlassEffectContainer"
     regex: 'GlassEffectContainer'
-    message: "Use HarnessGlassContainer instead. All glass grouping goes through HarnessGlass.swift."
+    message: "Use HarnessGlassContainer instead. All glass grouping goes through HarnessMonitorGlass*.swift."
     severity: error
     included:
       - "Sources/HarnessMonitor"
     excluded:
-      - "HarnessMonitorGlass\\.swift"
+      - "HarnessMonitor.*Glass.*\\.swift"
   forbid_raw_security_scoped_resource:
     name: "Raw security-scoped resource access"
     regex: '\.startAccessingSecurityScopedResource\b'
