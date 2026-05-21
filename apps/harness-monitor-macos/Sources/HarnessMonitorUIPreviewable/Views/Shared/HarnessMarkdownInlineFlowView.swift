@@ -139,7 +139,10 @@ private struct HarnessMarkdownInlineWrapLayout: Layout {
     for row in measuredRows(in: bounds.width, subviews: subviews).rows {
       for item in row.items {
         subviews[item.index].place(
-          at: CGPoint(x: bounds.minX + item.x, y: bounds.minY + row.y),
+          at: CGPoint(
+            x: bounds.minX + item.x,
+            y: bounds.minY + row.y + max(0, (row.height - item.size.height) / 2)
+          ),
           proposal: ProposedViewSize(item.size)
         )
       }
