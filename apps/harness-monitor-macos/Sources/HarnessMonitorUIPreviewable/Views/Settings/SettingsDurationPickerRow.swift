@@ -80,6 +80,29 @@ struct SettingsDurationPickerRow: View {
   @State private var customAmount: UInt64 = 1
   @State private var customUnit: SettingsDurationUnit = .minutes
 
+  init(
+    title: String,
+    presets: [UInt64],
+    minSeconds: UInt64,
+    seconds: Binding<UInt64>,
+    pickerAccessibilityIdentifier: String
+  ) {
+    self.title = title
+    self.presets = presets
+    self.minSeconds = minSeconds
+    _seconds = seconds
+    self.pickerAccessibilityIdentifier = pickerAccessibilityIdentifier
+
+    let decomposition = SettingsDurationDecomposition(seconds: seconds.wrappedValue)
+    let startsCustom = Self.requiresCustomSelection(
+      for: seconds.wrappedValue,
+      presets: presets
+    )
+    _isCustom = State(initialValue: startsCustom)
+    _customAmount = State(initialValue: max(decomposition.amount, 1))
+    _customUnit = State(initialValue: decomposition.unit)
+  }
+
   var body: some View {
     Picker(title, selection: selectionBinding) {
       ForEach(presets, id: \.self) { value in
@@ -91,7 +114,7 @@ struct SettingsDurationPickerRow: View {
     }
     .pickerStyle(.menu)
     .accessibilityIdentifier(pickerAccessibilityIdentifier)
-    .onChange(of: seconds, initial: true) { _, newValue in
+    .onChange(of: seconds) { _, newValue in
       syncFromExternalSeconds(newValue)
     }
 
@@ -100,9 +123,17 @@ struct SettingsDurationPickerRow: View {
     }
   }
 
+  var currentSelection: SettingsDurationSelection {
+    if isCustom || Self.requiresCustomSelection(for: seconds, presets: presets) {
+      .custom
+    } else {
+      .preset(seconds)
+    }
+  }
+
   private var selectionBinding: Binding<SettingsDurationSelection> {
     Binding(
-      get: { isCustom ? .custom : .preset(seconds) },
+      get: { currentSelection },
       set: { newValue in
         switch newValue {
         case .preset(let value):
@@ -189,7 +220,7 @@ struct SettingsDurationPickerRow: View {
       let derived = max(customAmount * customUnit.secondsPerUnit, minSeconds)
       if derived == value { return }
     }
-    if presets.contains(value) {
+    if !Self.requiresCustomSelection(for: value, presets: presets) {
       isCustom = false
       return
     }
@@ -197,5 +228,9 @@ struct SettingsDurationPickerRow: View {
     customAmount = max(decomposition.amount, 1)
     customUnit = decomposition.unit
     isCustom = true
+  }
+
+  private static func requiresCustomSelection(for seconds: UInt64, presets: [UInt64]) -> Bool {
+    !presets.contains(seconds)
   }
 }

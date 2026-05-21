@@ -1,8 +1,35 @@
+import SwiftUI
 import XCTest
 
 @testable import HarnessMonitorUIPreviewable
 
 final class SettingsDurationPickerRowTests: XCTestCase {
+  func testCurrentSelectionUsesCustomTagForNonPresetInitialValue() {
+    var seconds: UInt64 = 3_000
+    let row = SettingsDurationPickerRow(
+      title: "Refresh",
+      presets: [30, 60, 120, 300, 600, 900, 1_800, 3_600],
+      minSeconds: 30,
+      seconds: Binding(get: { seconds }, set: { seconds = $0 }),
+      pickerAccessibilityIdentifier: "picker"
+    )
+
+    XCTAssertEqual(row.currentSelection, .custom)
+  }
+
+  func testCurrentSelectionKeepsPresetTagForPresetInitialValue() {
+    var seconds: UInt64 = 300
+    let row = SettingsDurationPickerRow(
+      title: "Refresh",
+      presets: [30, 60, 120, 300, 600, 900, 1_800, 3_600],
+      minSeconds: 30,
+      seconds: Binding(get: { seconds }, set: { seconds = $0 }),
+      pickerAccessibilityIdentifier: "picker"
+    )
+
+    XCTAssertEqual(row.currentSelection, .preset(300))
+  }
+
   func testDecompositionPicksHoursForWholeHour() {
     let decomposition = SettingsDurationDecomposition(seconds: 7_200)
     XCTAssertEqual(decomposition.unit, .hours)
