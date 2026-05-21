@@ -2,7 +2,7 @@ import Foundation
 
 public enum PreviewFixtures {
   public static let previewSessionID = "9f62b1d4-0c8a-4c2f-9f4f-4d6cf6a13e9b"
-  private static let previewSessionRoot =
+  static let previewSessionRoot =
     "/Users/example/Library/Application Support/harness/sessions/harness/\(previewSessionID)"
 
   public static let summary = SessionSummary(

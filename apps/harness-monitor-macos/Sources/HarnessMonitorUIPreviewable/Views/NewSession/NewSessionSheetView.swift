@@ -4,7 +4,7 @@ import UniformTypeIdentifiers
 
 @MainActor
 struct NewSessionSheetView: View {
-  private enum Field: Hashable {
+  enum Field: Hashable {
     case title
     case context
     case baseRef
@@ -13,17 +13,17 @@ struct NewSessionSheetView: View {
   let store: HarnessMonitorStore
   @Bindable var viewModel: NewSessionViewModel
   @Environment(\.dismiss)
-  private var dismiss
+  var dismiss
   @Environment(\.openWindow)
-  private var openWindow
-  @State private var bookmarks: [BookmarkStore.Record] = []
-  @State private var availableAcpAgents: [AcpAgentDescriptor] = []
-  @State private var runtimeProbeResults: AcpRuntimeProbeResponse?
-  @State private var selectedLaunchSelection =
+  var openWindow
+  @State var bookmarks: [BookmarkStore.Record] = []
+  @State var availableAcpAgents: [AcpAgentDescriptor] = []
+  @State var runtimeProbeResults: AcpRuntimeProbeResponse?
+  @State var selectedLaunchSelection =
     HarnessMonitorAgentLaunchDefaults.preferredSelection()
-  @State private var didPickLaunchSelectionManually = false
-  @State private var showImporter = false
-  @FocusState private var focusedField: Field?
+  @State var didPickLaunchSelectionManually = false
+  @State var showImporter = false
+  @FocusState var focusedField: Field?
 
   var body: some View {
     VStack(alignment: .leading, spacing: 0) {
@@ -57,7 +57,7 @@ struct NewSessionSheetView: View {
 
   // MARK: - Header
 
-  private var header: some View {
+  var header: some View {
     HarnessMonitorActionHeader(
       title: "New Session",
       subtitle: "Start a harness session in a project folder"
@@ -68,7 +68,7 @@ struct NewSessionSheetView: View {
 
   // MARK: - Form
 
-  private var formContent: some View {
+  var formContent: some View {
     ScrollView {
       VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingXL) {
         createSessionContent
@@ -83,7 +83,7 @@ struct NewSessionSheetView: View {
     }
   }
 
-  private var createSessionContent: some View {
+  var createSessionContent: some View {
     VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingXL) {
       projectSection
       detailsSection
@@ -93,7 +93,7 @@ struct NewSessionSheetView: View {
     .accessibilityIdentifier(HarnessMonitorAccessibility.newSessionCreatePanel)
   }
 
-  private var projectSection: some View {
+  var projectSection: some View {
     VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
       fieldLabel("Project folder")
 
@@ -139,7 +139,7 @@ struct NewSessionSheetView: View {
     }
   }
 
-  private var detailsSection: some View {
+  var detailsSection: some View {
     VStack(alignment: .leading, spacing: HarnessMonitorTheme.sectionSpacing) {
       fieldBlock(
         "Session title",
@@ -172,7 +172,7 @@ struct NewSessionSheetView: View {
     }
   }
 
-  private var advancedSection: some View {
+  var advancedSection: some View {
     fieldBlock(
       "Base ref",
       help: "Optional. Leave blank to use the repository default branch"
@@ -225,20 +225,20 @@ struct NewSessionSheetView: View {
     .frame(maxWidth: .infinity, alignment: .leading)
   }
 
-  private func fieldLabel(_ title: String) -> some View {
+  func fieldLabel(_ title: String) -> some View {
     Text(title)
       .scaledFont(.caption.bold())
       .foregroundStyle(HarnessMonitorTheme.secondaryInk)
   }
 
-  private func fieldHelp(_ text: String) -> some View {
+  func fieldHelp(_ text: String) -> some View {
     Text(text)
       .scaledFont(.caption)
       .foregroundStyle(HarnessMonitorTheme.secondaryInk)
       .fixedSize(horizontal: false, vertical: true)
   }
 
-  private func errorBanner(for error: NewSessionViewModel.SubmitError) -> some View {
+  func errorBanner(for error: NewSessionViewModel.SubmitError) -> some View {
     HStack(spacing: HarnessMonitorTheme.spacingSM) {
       Image(systemName: "exclamationmark.circle")
         .foregroundStyle(HarnessMonitorTheme.danger)
@@ -253,7 +253,7 @@ struct NewSessionSheetView: View {
     .accessibilityIdentifier(HarnessMonitorAccessibility.newSessionErrorBanner)
   }
 
-  private func errorMessage(for error: NewSessionViewModel.SubmitError) -> String {
+  func errorMessage(for error: NewSessionViewModel.SubmitError) -> String {
     switch error {
     case .validation(.titleRequired):
       return "A session title is required"
@@ -281,7 +281,7 @@ struct NewSessionSheetView: View {
 
   // MARK: - Footer
 
-  private var footer: some View {
+  var footer: some View {
     HStack {
       Button("Cancel") {
         dismiss()
@@ -303,13 +303,13 @@ struct NewSessionSheetView: View {
     .padding(HarnessMonitorTheme.spacingLG)
   }
 
-  private var canCreate: Bool {
+  var canCreate: Bool {
     !viewModel.title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
       && viewModel.selectedBookmarkId != nil
       && !viewModel.isSubmitting
   }
 
-  private var createDisabledReason: String? {
+  var createDisabledReason: String? {
     if viewModel.isSubmitting {
       return "Creating session…"
     }
@@ -325,12 +325,12 @@ struct NewSessionSheetView: View {
     return nil
   }
 
-  private var selectedBookmark: BookmarkStore.Record? {
+  var selectedBookmark: BookmarkStore.Record? {
     bookmarks.first { $0.id == viewModel.selectedBookmarkId }
   }
 
   @MainActor
-  private func submitAndDismiss() async {
+  func submitAndDismiss() async {
     let result = await viewModel.submit(
       preferredLaunchSelectionStorageKey: selectedLaunchSelection.storageKey
     )
@@ -345,7 +345,7 @@ struct NewSessionSheetView: View {
     openWindow.openHarnessSessionWindow(sessionID: startedSession.sessionId)
   }
 
-  private func refreshBookmarks() async {
+  func refreshBookmarks() async {
     let availableBookmarks = await viewModel.availableBookmarks()
     bookmarks = availableBookmarks
 
@@ -360,14 +360,14 @@ struct NewSessionSheetView: View {
     }
   }
 
-  private func loadAgentPickerCatalogs() async {
+  func loadAgentPickerCatalogs() async {
     async let descriptors = store.fetchAcpAgentDescriptors()
     async let probes = store.fetchRuntimeProbeResults()
     availableAcpAgents = await descriptors
     runtimeProbeResults = await probes
   }
 
-  private func normalizePreferredSelection() {
+  func normalizePreferredSelection() {
     let options = agentCapabilityOptions
     if didPickLaunchSelectionManually {
       selectedLaunchSelection = AgentCapabilityCatalog.normalizedLaunchSelection(

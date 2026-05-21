@@ -3,9 +3,9 @@ import Foundation
 import ServiceManagement
 
 public struct DaemonController: DaemonControlling {
-  private static let managedStaleManifestDefaultGracePeriod: Duration = .seconds(5)
+  static let managedStaleManifestDefaultGracePeriod: Duration = .seconds(5)
 
-  private enum AutoTransportBootstrapOutcome: Sendable {
+  enum AutoTransportBootstrapOutcome: Sendable {
     case upgraded(any HarnessMonitorClientProtocol)
     case unavailable
     case timedOut
@@ -191,7 +191,7 @@ public struct DaemonController: DaemonControlling {
     throw DaemonControlError.commandFailed("WebSocket connection failed")
   }
 
-  private func bootstrapAutoTransport(
+  func bootstrapAutoTransport(
     connection: HarnessMonitorConnection
   ) async -> AutoTransportBootstrapOutcome {
     await withTaskGroup(

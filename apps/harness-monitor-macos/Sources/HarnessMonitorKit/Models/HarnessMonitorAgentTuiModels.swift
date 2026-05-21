@@ -237,12 +237,12 @@ public enum ManagedAgentSnapshot: Equatable, Identifiable, Sendable {
 }
 
 extension ManagedAgentSnapshot: Codable {
-  private enum CodingKeys: String, CodingKey {
+  enum CodingKeys: String, CodingKey {
     case kind
     case snapshot
   }
 
-  private enum Kind: String, Codable {
+  enum Kind: String, Codable {
     case terminal
     case codex
     case acp
@@ -352,7 +352,7 @@ public struct AgentTuiStartRequest: Codable, Equatable, Sendable {
     self.cols = cols
   }
 
-  private enum CodingKeys: String, CodingKey {
+  enum CodingKeys: String, CodingKey {
     case runtime
     case role
     case capabilities

@@ -112,7 +112,7 @@ struct SessionTimelineFilterSummary: Equatable, Sendable {
     )
   }
 
-  private static func countLabel(
+  static func countLabel(
     _ count: Int,
     singular: String,
     plural: String
@@ -120,7 +120,7 @@ struct SessionTimelineFilterSummary: Equatable, Sendable {
     count == 1 ? "1 \(singular)" : "\(count) \(plural)"
   }
 
-  private static func accessibilityStateDescription(
+  static func accessibilityStateDescription(
     filters: SessionTimelineFilterState,
     matchCount: Int
   ) -> String {
@@ -139,7 +139,7 @@ struct SessionTimelineFilterSummary: Equatable, Sendable {
     .joined(separator: ";")
   }
 
-  private static func stateValue<S: Sequence>(_ values: S) -> String where S.Element == String {
+  static func stateValue<S: Sequence>(_ values: S) -> String where S.Element == String {
     let sorted = values.sorted()
     return sorted.isEmpty ? "all" : sorted.joined(separator: ",")
   }
@@ -209,7 +209,7 @@ struct SessionTimelineFilterSnapshot: Equatable, Sendable {
 
 struct SessionTimelineFilterMatcher {
   let filters: SessionTimelineFilterState
-  private let trimmedQuery: String
+  let trimmedQuery: String
 
   init(filters: SessionTimelineFilterState) {
     self.filters = filters
@@ -297,43 +297,43 @@ struct SessionTimelineFilterMatcher {
       && matchesQuery(node)
   }
 
-  private func matchesTone(_ node: SessionTimelineNode) -> Bool {
+  func matchesTone(_ node: SessionTimelineNode) -> Bool {
     matches(filters.tones, value: node.eventTone)
   }
 
-  private func matchesEventType(_ node: SessionTimelineNode) -> Bool {
+  func matchesEventType(_ node: SessionTimelineNode) -> Bool {
     matches(filters.eventTypes, value: node.entryKind)
   }
 
-  private func matchesAgent(_ node: SessionTimelineNode) -> Bool {
+  func matchesAgent(_ node: SessionTimelineNode) -> Bool {
     matches(filters.agents, value: node.agentID)
   }
 
-  private func matchesTask(_ node: SessionTimelineNode) -> Bool {
+  func matchesTask(_ node: SessionTimelineNode) -> Bool {
     matches(filters.tasks, value: node.taskID)
   }
 
-  private func matchesDecisionSeverity(_ node: SessionTimelineNode) -> Bool {
+  func matchesDecisionSeverity(_ node: SessionTimelineNode) -> Bool {
     matches(filters.decisionSeverities, value: node.decision?.severity.rawValue)
   }
 
-  private func matchesSemanticProperties(_ node: SessionTimelineNode) -> Bool {
+  func matchesSemanticProperties(_ node: SessionTimelineNode) -> Bool {
     matchesAny(filters.semanticProperties, values: node.semanticProperties)
   }
 
-  private func matchesRawPayloadKeys(_ node: SessionTimelineNode) -> Bool {
+  func matchesRawPayloadKeys(_ node: SessionTimelineNode) -> Bool {
     matchesAny(filters.rawPayloadKeys, values: node.rawPayloadKeys)
   }
 
-  private func matchesQuery(_ node: SessionTimelineNode) -> Bool {
+  func matchesQuery(_ node: SessionTimelineNode) -> Bool {
     trimmedQuery.isEmpty || node.matches(query: trimmedQuery, scope: filters.searchScope)
   }
 
-  private func matches<T: Hashable>(_ selected: Set<T>, value: T?) -> Bool {
+  func matches<T: Hashable>(_ selected: Set<T>, value: T?) -> Bool {
     selected.isEmpty || value.map(selected.contains) == true
   }
 
-  private func matchesAny<T: Hashable>(_ selected: Set<T>, values: Set<T>) -> Bool {
+  func matchesAny<T: Hashable>(_ selected: Set<T>, values: Set<T>) -> Bool {
     selected.isEmpty || !values.isDisjoint(with: selected)
   }
 }

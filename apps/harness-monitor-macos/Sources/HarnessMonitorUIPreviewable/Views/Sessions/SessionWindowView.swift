@@ -5,7 +5,7 @@ public struct SessionWindowView: View {
   public let store: HarnessMonitorStore
   public let token: SessionWindowToken
   public let history: GlobalWindowNavigationHistory
-  @State private var stateCacheStorage: SessionWindowStateCache
+  @State var stateCacheStorage: SessionWindowStateCache
   @Environment(\.dismiss)
   var dismiss
   @Environment(\.openWindow)
@@ -19,34 +19,34 @@ public struct SessionWindowView: View {
   @SceneStorage("session.decisionFilters.query")
   var persistedDecisionQuery = ""
   @SceneStorage("session.decision.detail-tab")
-  private var persistedDecisionDetailTabRawStorage = DecisionDetailTab.context.rawValue
+  var persistedDecisionDetailTabRawStorage = DecisionDetailTab.context.rawValue
   @SceneStorage("session.focusMode")
-  private var focusModeStorage = false
+  var focusModeStorage = false
   @SceneStorage("session.inspector.visible")
-  private var inspectorVisibleStorage = false
+  var inspectorVisibleStorage = false
   @SceneStorage("session.inspector.preferred")
-  private var inspectorPreferredStorage = false
+  var inspectorPreferredStorage = false
   @SceneStorage("session.inspector.width")
-  private var inspectorWidthStorage = 280.0
+  var inspectorWidthStorage = 280.0
   @SceneStorage("session.sidebarWidth")
-  private var sidebarWidthStorage = 200.0
+  var sidebarWidthStorage = 200.0
   @SceneStorage("session.content-detail.width")
-  private var contentColumnWidthStorage = SessionContentDetailSplitLayout.defaultContentWidth
+  var contentColumnWidthStorage = SessionContentDetailSplitLayout.defaultContentWidth
   @AccessibilityFocusState var primaryContentAccessibilityFocused: Bool
   @AppStorage(HarnessMonitorMCPSettingsDefaults.registryHostEnabledKey)
   var mcpRegistryHostEnabled = HarnessMonitorMCPSettingsDefaults
     .registryHostEnabledDefault
-  @State private var snapshotStorage: HarnessMonitorSessionWindowSnapshot?
-  @State private var isLoadingStorage = false
-  @State private var didLoadSnapshotStorage = false
-  @State private var detailColumnWidthStorage: CGFloat = 0
-  @State private var liveInspectorWidthStorage: Double?
-  @State private var liveContentColumnWidthStorage: Double?
-  @State private var perfContentDividerWidthStorage: Double?
-  @State private var decisionCacheStorage = SessionWindowDecisionCacheStorage()
-  @State private var currentModifiers: EventModifiers = []
-  @State private var policyCanvasViewModelStorage: PolicyCanvasViewModel
-  @State private var startupSearchParticipationEnabledStorage =
+  @State var snapshotStorage: HarnessMonitorSessionWindowSnapshot?
+  @State var isLoadingStorage = false
+  @State var didLoadSnapshotStorage = false
+  @State var detailColumnWidthStorage: CGFloat = 0
+  @State var liveInspectorWidthStorage: Double?
+  @State var liveContentColumnWidthStorage: Double?
+  @State var perfContentDividerWidthStorage: Double?
+  @State var decisionCacheStorage = SessionWindowDecisionCacheStorage()
+  @State var currentModifiers: EventModifiers = []
+  @State var policyCanvasViewModelStorage: PolicyCanvasViewModel
+  @State var startupSearchParticipationEnabledStorage =
     HarnessMonitorUITestEnvironment.isEnabled
   @State var handledHistoryRestoreRequestID = 0
 
@@ -288,7 +288,7 @@ public struct SessionWindowView: View {
     }
   }
 
-  private var bodyContent: some View {
+  var bodyContent: some View {
     sessionWindowFocusedValues(
       sessionWindowDecisionFilterPersistence(
         sessionWindowSelectionObservers(
@@ -312,7 +312,7 @@ public struct SessionWindowView: View {
     .accessibilityIdentifier(HarnessMonitorAccessibility.sessionWindowShell)
   }
 
-  @ViewBuilder private var sessionWindowSurface: some View {
+  @ViewBuilder var sessionWindowSurface: some View {
     if isUnknownSession {
       unknownSessionContent
     } else {

@@ -25,7 +25,7 @@ struct PolicyCanvasInspector: View {
     .accessibilityIdentifier(HarnessMonitorAccessibility.policyCanvasInspector)
   }
 
-  private var header: some View {
+  var header: some View {
     VStack(alignment: .leading, spacing: 5) {
       Text("Inspector")
         .scaledFont(.headline.weight(.semibold))
@@ -43,7 +43,7 @@ struct PolicyCanvasInspector: View {
     }
   }
 
-  @ViewBuilder private var selectionDetails: some View {
+  @ViewBuilder var selectionDetails: some View {
     if !viewModel.secondarySelections.isEmpty {
       // Multi-selection: surface the count explicitly so the inspector
       // does not pretend it is editing a single primary while the user
@@ -70,7 +70,7 @@ struct PolicyCanvasInspector: View {
   /// "N items selected" string would lose the breakdown VO users need to
   /// reason about a multi-delete. The section is intentionally inert —
   /// inspector-side property edits make no sense on a mixed selection.
-  private var multiSelectionSection: some View {
+  var multiSelectionSection: some View {
     let nodeCount = viewModel.selectedNodeIDs.count
     let edgeCount = viewModel.selectedEdgeIDs.count
     let groupCount = viewModel.selectedGroupIDs.count
@@ -91,7 +91,7 @@ struct PolicyCanvasInspector: View {
     }
   }
 
-  private func nodeSection(_ node: PolicyCanvasNode) -> some View {
+  func nodeSection(_ node: PolicyCanvasNode) -> some View {
     PolicyCanvasInspectorSection(title: "Node") {
       nodeTitleField(node)
       nodeSubtitleField(node)
@@ -110,7 +110,7 @@ struct PolicyCanvasInspector: View {
   /// text-field's local @State; the funnel only sees the resulting string on
   /// Enter or focus-loss so the undo stack carries one entry per committed
   /// subtitle edit.
-  private func nodeSubtitleField(_ node: PolicyCanvasNode) -> some View {
+  func nodeSubtitleField(_ node: PolicyCanvasNode) -> some View {
     PolicyCanvasInspectorField(label: "Subtitle") {
       PolicyCanvasInspectorCommitTextField(
         label: "Subtitle",
@@ -129,7 +129,7 @@ struct PolicyCanvasInspector: View {
   /// understands as a discrete picker — the user can swap a node between
   /// `action_gate`, `evidence_check`, `risk_classifier`, the gate variants
   /// and `supervisor_rule` without re-typing the surrounding fields.
-  private func nodePolicyKindField(_ node: PolicyCanvasNode) -> some View {
+  func nodePolicyKindField(_ node: PolicyCanvasNode) -> some View {
     PolicyCanvasInspectorField(label: "Binding") {
       Picker("Policy binding", selection: selectedNodePolicyKindStringBinding(node)) {
         ForEach(Self.policyKindOptions, id: \.self) { kindString in
@@ -148,7 +148,7 @@ struct PolicyCanvasInspector: View {
   /// PolicyCanvasInspectorCommitTextField wrapper so per-keystroke writes
   /// stay in the wrapper's local @State and only the resulting string lands
   /// through `mutate(_:)`.
-  private func nodeTitleField(_ node: PolicyCanvasNode) -> some View {
+  func nodeTitleField(_ node: PolicyCanvasNode) -> some View {
     PolicyCanvasInspectorField(label: "Name") {
       PolicyCanvasInspectorCommitTextField(
         label: "Name",
@@ -166,7 +166,7 @@ struct PolicyCanvasInspector: View {
   /// Wave 4K kind picker. Routes through `commitSelectedNodeKind` so the
   /// undo funnel captures the prior kind plus every edge the kind switch
   /// prunes — Cmd-Z restores both in one step.
-  private func nodeKindField(_ node: PolicyCanvasNode) -> some View {
+  func nodeKindField(_ node: PolicyCanvasNode) -> some View {
     PolicyCanvasInspectorField(label: "Kind") {
       Picker("Node kind", selection: selectedNodeKindBinding(node)) {
         ForEach(PolicyCanvasNodeKind.allCases) { kind in
@@ -181,7 +181,7 @@ struct PolicyCanvasInspector: View {
     }
   }
 
-  private func nodeGroupField(_ node: PolicyCanvasNode) -> some View {
+  func nodeGroupField(_ node: PolicyCanvasNode) -> some View {
     PolicyCanvasInspectorField(label: "Group") {
       Picker("Node group", selection: selectedNodeGroupBinding(node)) {
         Text("None").tag(Self.noneGroupTag)
@@ -197,7 +197,7 @@ struct PolicyCanvasInspector: View {
     }
   }
 
-  private func groupSection(_ group: PolicyCanvasGroup) -> some View {
+  func groupSection(_ group: PolicyCanvasGroup) -> some View {
     PolicyCanvasInspectorSection(title: "Group") {
       PolicyCanvasInspectorField(label: "Name") {
         PolicyCanvasInspectorCommitTextField(
@@ -222,7 +222,7 @@ struct PolicyCanvasInspector: View {
 
   /// Wave 4K P08 group-tone picker. Swaps the group's `tone` (intake /
   /// evaluation / release), routes through the commit funnel for undo.
-  private func groupToneField(_ group: PolicyCanvasGroup) -> some View {
+  func groupToneField(_ group: PolicyCanvasGroup) -> some View {
     PolicyCanvasInspectorField(label: "Tone") {
       Picker("Group tone", selection: selectedGroupToneBinding(group)) {
         ForEach(PolicyCanvasGroupTone.allCases, id: \.self) { tone in
@@ -237,7 +237,7 @@ struct PolicyCanvasInspector: View {
     }
   }
 
-  private func edgeSection(_ edge: PolicyCanvasEdge) -> some View {
+  func edgeSection(_ edge: PolicyCanvasEdge) -> some View {
     PolicyCanvasInspectorSection(title: "Edge") {
       PolicyCanvasInspectorField(label: "Label") {
         PolicyCanvasInspectorCommitTextField(
@@ -281,7 +281,7 @@ struct PolicyCanvasInspector: View {
     }
   }
 
-  private var canvasSection: some View {
+  var canvasSection: some View {
     PolicyCanvasInspectorSection(title: "Canvas") {
       // Mode is intentionally absent here. The Draft/Simulation/Promote
       // segmented control above the canvas owns the mode display; an
@@ -297,7 +297,7 @@ struct PolicyCanvasInspector: View {
   /// Zoom percentage rendered without trailing decimals. Matches the
   /// canvas chrome's HUD format so the two surfaces don't show
   /// different precisions for the same value.
-  private var zoomDisplayValue: String {
+  var zoomDisplayValue: String {
     let percent = Int((viewModel.zoom * 100).rounded())
     return "\(percent)%"
   }
@@ -389,7 +389,7 @@ struct PolicyCanvasInspector: View {
     }
   }
 
-  private func selectedNodePolicyKindStringBinding(
+  func selectedNodePolicyKindStringBinding(
     _ node: PolicyCanvasNode
   ) -> Binding<String> {
     Binding(
@@ -406,7 +406,7 @@ struct PolicyCanvasInspector: View {
     )
   }
 
-  private func selectedGroupToneBinding(
+  func selectedGroupToneBinding(
     _ group: PolicyCanvasGroup
   ) -> Binding<PolicyCanvasGroupTone> {
     Binding(

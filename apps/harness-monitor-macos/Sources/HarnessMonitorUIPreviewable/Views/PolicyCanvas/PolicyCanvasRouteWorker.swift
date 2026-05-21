@@ -2,14 +2,14 @@ import OSLog
 import SwiftUI
 
 actor PolicyCanvasRouteWorker {
-  private static let signposter = OSSignposter(
+  static let signposter = OSSignposter(
     subsystem: "io.harnessmonitor",
     category: "policy-canvas.perf"
   )
 
-  private let router: any PolicyCanvasEdgeRouter
-  private var cachedInput: PolicyCanvasRouteWorkerInput?
-  private var cachedOutput: PolicyCanvasRouteWorkerOutput = .empty
+  let router: any PolicyCanvasEdgeRouter
+  var cachedInput: PolicyCanvasRouteWorkerInput?
+  var cachedOutput: PolicyCanvasRouteWorkerOutput = .empty
 
   init(
     router: any PolicyCanvasEdgeRouter = PolicyCanvasMemoizedRouter(
@@ -72,7 +72,7 @@ actor PolicyCanvasRouteWorker {
 
   func waitForIdle() async {}
 
-  private static func edgeLabelsByID(
+  static func edgeLabelsByID(
     _ entries: [PolicyCanvasAccessibilityEdgeEntry]
   ) -> [String: String] {
     Dictionary(uniqueKeysWithValues: entries.map { ($0.id, $0.label) })

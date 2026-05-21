@@ -3,7 +3,7 @@ import HarnessMonitorKit
 import ImageIO
 import os
 
-private let log = Logger(subsystem: "io.harnessmonitor", category: "thumbnail")
+let log = Logger(subsystem: "io.harnessmonitor", category: "thumbnail")
 
 public actor BackgroundThumbnailCache {
   public static let shared = BackgroundThumbnailCache()
@@ -19,11 +19,11 @@ public actor BackgroundThumbnailCache {
   var fullImageMemoryCache: [String: CGImage] = [:]
   var thumbnailMemoryCacheByteCost = 0
   var fullImageMemoryCacheByteCost = 0
-  private var thumbnailAccessOrder: [String] = []
-  private var fullImageAccessOrder: [String] = []
-  private var thumbnailTasks: [String: Task<CGImage?, Never>] = [:]
-  private var fullImageTasks: [String: Task<CGImage?, Never>] = [:]
-  private var thumbnailGenerationTail: Task<Void, Never>?
+  var thumbnailAccessOrder: [String] = []
+  var fullImageAccessOrder: [String] = []
+  var thumbnailTasks: [String: Task<CGImage?, Never>] = [:]
+  var fullImageTasks: [String: Task<CGImage?, Never>] = [:]
+  var thumbnailGenerationTail: Task<Void, Never>?
 
   static let allowedPathPrefixes = ["/System/Library/", "/Library/"]
   static let allowedExtensions: Set<String> = ["heic", "jpg", "jpeg", "png", "tiff"]
@@ -115,7 +115,7 @@ public actor BackgroundThumbnailCache {
 
   // MARK: - Off-actor generation
 
-  nonisolated private func generateThumbnail(
+  nonisolated func generateThumbnail(
     key: String,
     selection: HarnessMonitorBackgroundSelection
   ) -> CGImage? {
@@ -127,7 +127,7 @@ public actor BackgroundThumbnailCache {
     }
   }
 
-  nonisolated private func generateFullImage(
+  nonisolated func generateFullImage(
     selection: HarnessMonitorBackgroundSelection
   ) -> CGImage? {
     switch selection.source {
@@ -138,7 +138,7 @@ public actor BackgroundThumbnailCache {
     }
   }
 
-  nonisolated private func generateBundledThumbnail(
+  nonisolated func generateBundledThumbnail(
     key: String,
     image: HarnessMonitorBackgroundImage
   ) -> CGImage? {
@@ -165,7 +165,7 @@ public actor BackgroundThumbnailCache {
     return thumbnail
   }
 
-  nonisolated private func generateBundledFullImage(
+  nonisolated func generateBundledFullImage(
     image: HarnessMonitorBackgroundImage
   ) -> CGImage? {
     guard let nsImage = HarnessMonitorUIAssets.bundle.image(forResource: image.assetName) else {
@@ -177,7 +177,7 @@ public actor BackgroundThumbnailCache {
     return opaqueRGBImage(from: cgImage, maxPixelSize: maxFullImagePixelSize)
   }
 
-  nonisolated private func generateSystemThumbnail(
+  nonisolated func generateSystemThumbnail(
     key: String,
     wallpaper: HarnessMonitorSystemWallpaper
   ) -> CGImage? {
@@ -201,7 +201,7 @@ public actor BackgroundThumbnailCache {
     return thumbnail
   }
 
-  nonisolated private func generateSystemFullImage(
+  nonisolated func generateSystemFullImage(
     wallpaper: HarnessMonitorSystemWallpaper
   ) -> CGImage? {
     guard validateSourcePath(wallpaper.imagePath) else {
@@ -213,7 +213,7 @@ public actor BackgroundThumbnailCache {
 
   // MARK: - Security validation
 
-  nonisolated private func validateSourcePath(_ path: String) -> Bool {
+  nonisolated func validateSourcePath(_ path: String) -> Bool {
     let resolvedPath = URL(fileURLWithPath: path).standardized.path
 
     let hasAllowedPrefix = Self.allowedPathPrefixes.contains { resolvedPath.hasPrefix($0) }
@@ -249,7 +249,7 @@ public actor BackgroundThumbnailCache {
 
   // MARK: - Thumbnail generation
 
-  nonisolated private func downsampleFile(at path: String, maximumPixelSize: Int) -> CGImage? {
+  nonisolated func downsampleFile(at path: String, maximumPixelSize: Int) -> CGImage? {
     let url = URL(fileURLWithPath: path)
     let sourceOptions: [CFString: Any] = [kCGImageSourceShouldCache: false]
 
@@ -292,7 +292,7 @@ public actor BackgroundThumbnailCache {
     return opaqueRGBImage(from: thumbnail, maxPixelSize: nil)
   }
 
-  nonisolated private func downsample(cgImage: CGImage) -> CGImage? {
+  nonisolated func downsample(cgImage: CGImage) -> CGImage? {
     opaqueRGBImage(from: cgImage, maxPixelSize: maxPixelSize)
   }
 
@@ -359,11 +359,11 @@ public actor BackgroundThumbnailCache {
     evictMemoryCacheIfNeeded(kind: kind, countLimit: countLimit, byteLimit: byteLimit)
   }
 
-  private func memoryCost(of image: CGImage) -> Int {
+  func memoryCost(of image: CGImage) -> Int {
     image.bytesPerRow * image.height
   }
 
-  private func removeMemoryImage(for key: String, kind: MemoryCacheKind) {
+  func removeMemoryImage(for key: String, kind: MemoryCacheKind) {
     switch kind {
     case .thumbnail:
       if let removed = thumbnailMemoryCache.removeValue(forKey: key) {
@@ -378,7 +378,7 @@ public actor BackgroundThumbnailCache {
     }
   }
 
-  private func recordMemoryAccess(for key: String, kind: MemoryCacheKind) {
+  func recordMemoryAccess(for key: String, kind: MemoryCacheKind) {
     switch kind {
     case .thumbnail:
       thumbnailAccessOrder.removeAll { $0 == key }
@@ -389,7 +389,7 @@ public actor BackgroundThumbnailCache {
     }
   }
 
-  private func evictMemoryCacheIfNeeded(
+  func evictMemoryCacheIfNeeded(
     kind: MemoryCacheKind,
     countLimit: Int,
     byteLimit: Int

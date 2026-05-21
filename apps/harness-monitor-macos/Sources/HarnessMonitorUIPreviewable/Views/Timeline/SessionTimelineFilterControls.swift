@@ -7,10 +7,10 @@ struct SessionTimelineFilterControls: View {
     case chipsOnly
   }
 
-  @Binding private var filters: SessionTimelineFilterState
-  private let inventory: SessionTimelineFilterInventory
-  private let summary: SessionTimelineFilterSummary
-  private let layout: Layout
+  @Binding var filters: SessionTimelineFilterState
+  let inventory: SessionTimelineFilterInventory
+  let summary: SessionTimelineFilterSummary
+  let layout: Layout
 
   init(
     filters: Binding<SessionTimelineFilterState>,
@@ -24,7 +24,7 @@ struct SessionTimelineFilterControls: View {
     self.layout = layout
   }
 
-  private var activeFacetChips: [SessionTimelineActiveFilterChip] {
+  var activeFacetChips: [SessionTimelineActiveFilterChip] {
     var chips: [SessionTimelineActiveFilterChip] = []
     for option in inventory.eventTypes where filters.eventTypes.contains(option.id) {
       chips.append(.eventType(option))
@@ -53,15 +53,15 @@ struct SessionTimelineFilterControls: View {
     return chips
   }
 
-  private var showsSignalPreset: Bool {
+  var showsSignalPreset: Bool {
     inventory.signalCount > 0 || filters.signalPresetActive
   }
 
-  private var showsActionRow: Bool {
+  var showsActionRow: Bool {
     layout == .stacked
   }
 
-  private var showsSupportingSections: Bool {
+  var showsSupportingSections: Bool {
     showsSignalPreset || !activeFacetChips.isEmpty
   }
 
@@ -91,12 +91,12 @@ struct SessionTimelineFilterControls: View {
     }
   }
 
-  private var filterActionRow: some View {
+  var filterActionRow: some View {
     SessionTimelineFilterActionButtons(filters: $filters, inventory: inventory)
       .frame(maxWidth: .infinity, alignment: .leading)
   }
 
-  private var signalPresetSection: some View {
+  var signalPresetSection: some View {
     HarnessMonitorWrapLayout(
       spacing: HarnessMonitorTheme.spacingXS,
       lineSpacing: HarnessMonitorTheme.spacingXS
@@ -121,7 +121,7 @@ struct SessionTimelineFilterControls: View {
     }
   }
 
-  private var activeFiltersSection: some View {
+  var activeFiltersSection: some View {
     VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingXS) {
       sectionLabel("Active filters")
       HarnessMonitorWrapLayout(
@@ -149,13 +149,13 @@ struct SessionTimelineFilterControls: View {
     }
   }
 
-  private func sectionLabel(_ title: String) -> some View {
+  func sectionLabel(_ title: String) -> some View {
     Text(title)
       .scaledFont(.caption.weight(.semibold))
       .foregroundStyle(HarnessMonitorTheme.secondaryInk)
   }
 
-  private func containsSemanticProperty(optionID: String) -> Bool {
+  func containsSemanticProperty(optionID: String) -> Bool {
     guard let property = SessionTimelineSemanticProperty(rawValue: optionID) else {
       return false
     }
@@ -164,10 +164,10 @@ struct SessionTimelineFilterControls: View {
 }
 
 struct SessionTimelineFilterActionButtons: View {
-  @Binding private var filters: SessionTimelineFilterState
-  private let inventory: SessionTimelineFilterInventory
-  private let showsClearButton: Bool
-  @State private var showsAdvancedFilters = false
+  @Binding var filters: SessionTimelineFilterState
+  let inventory: SessionTimelineFilterInventory
+  let showsClearButton: Bool
+  @State var showsAdvancedFilters = false
 
   init(
     filters: Binding<SessionTimelineFilterState>,
@@ -179,7 +179,7 @@ struct SessionTimelineFilterActionButtons: View {
     self.showsClearButton = showsClearButton
   }
 
-  private var moreFiltersSystemImage: String {
+  var moreFiltersSystemImage: String {
     filters.activeAdvancedFilterCount > 0
       ? "line.3.horizontal.decrease.circle.fill"
       : "line.3.horizontal.decrease.circle"
@@ -194,7 +194,7 @@ struct SessionTimelineFilterActionButtons: View {
     }
   }
 
-  private var moreFiltersButton: some View {
+  var moreFiltersButton: some View {
     Button("Filters", systemImage: moreFiltersSystemImage) {
       showsAdvancedFilters = true
     }
@@ -209,7 +209,7 @@ struct SessionTimelineFilterActionButtons: View {
     }
   }
 
-  private var clearFiltersButton: some View {
+  var clearFiltersButton: some View {
     Button("Clear") {
       filters.clear()
     }

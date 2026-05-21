@@ -18,21 +18,21 @@ struct TaskBoardItemManagementPanel: View {
   let onRefresh: (() -> Void)?
   let onClose: () -> Void
 
-  @State private var draft: TaskBoardItemEditorDraft
-  @State private var projectTypeSuggestions: [String] = []
+  @State var draft: TaskBoardItemEditorDraft
+  @State var projectTypeSuggestions: [String] = []
   @Environment(\.fontScale)
-  private var fontScale
+  var fontScale
 
-  private var headerTitleFont: Font {
+  var headerTitleFont: Font {
     HarnessMonitorTextSize.scaledFont(.title2.weight(.semibold), by: fontScale)
   }
-  private var headerSymbolFont: Font {
+  var headerSymbolFont: Font {
     HarnessMonitorTextSize.scaledFont(.title3.weight(.semibold), by: fontScale)
   }
-  private var captionFont: Font {
+  var captionFont: Font {
     HarnessMonitorTextSize.scaledFont(.caption, by: fontScale)
   }
-  private var captionSemibold: Font {
+  var captionSemibold: Font {
     HarnessMonitorTextSize.scaledFont(.caption.weight(.semibold), by: fontScale)
   }
 
@@ -96,7 +96,7 @@ struct TaskBoardItemManagementPanel: View {
   }
 
   @MainActor
-  private func loadProjectTypeSuggestions() async {
+  func loadProjectTypeSuggestions() async {
     projectTypeSuggestions = await TaskBoardHostProjectTypeSuggestions.load(from: store)
   }
 
@@ -137,7 +137,7 @@ struct TaskBoardItemManagementPanel: View {
     return $draft.externalRefs[index]
   }
 
-  private var header: some View {
+  var header: some View {
     HStack(alignment: .center, spacing: HarnessMonitorTheme.spacingSM) {
       HStack(alignment: .firstTextBaseline, spacing: HarnessMonitorTheme.spacingSM) {
         Image(systemName: "slider.horizontal.3")
@@ -169,7 +169,7 @@ struct TaskBoardItemManagementPanel: View {
     }
   }
 
-  private var statusPills: some View {
+  var statusPills: some View {
     HStack(spacing: HarnessMonitorTheme.spacingXS) {
       TaskBoardManagementPill(
         label: draft.status.title,
@@ -189,7 +189,7 @@ struct TaskBoardItemManagementPanel: View {
     }
   }
 
-  private var editorFields: some View {
+  var editorFields: some View {
     VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
       TaskBoardManagementNativeField(label: "Title", text: $draft.title)
       TaskBoardDescriptionSection(
@@ -232,7 +232,7 @@ struct TaskBoardItemManagementPanel: View {
     }
   }
 
-  private var approvalReadout: some View {
+  var approvalReadout: some View {
     VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingXS) {
       Text("Approval")
         .font(captionSemibold)
@@ -244,14 +244,14 @@ struct TaskBoardItemManagementPanel: View {
     }
   }
 
-  private var actionButtons: some View {
+  var actionButtons: some View {
     HStack(spacing: HarnessMonitorTheme.spacingSM) {
       actionButtonContent
     }
     .fixedSize(horizontal: true, vertical: false)
   }
 
-  @ViewBuilder private var actionButtonContent: some View {
+  @ViewBuilder var actionButtonContent: some View {
     Button {
       submitDraft()
     } label: {
@@ -326,23 +326,23 @@ struct TaskBoardItemManagementPanel: View {
     .accessibilityIdentifier("harness.task-board.manage-item.refresh")
   }
 
-  private var isCreating: Bool {
+  var isCreating: Bool {
     item == nil
   }
 
-  private var canSubmit: Bool {
+  var canSubmit: Bool {
     isCreating ? onCreate != nil : onUpdate != nil
   }
 
-  private var linkLabel: String {
+  var linkLabel: String {
     draft.sessionId.isEmpty || draft.workItemId.isEmpty ? "Board Only" : "Session Task"
   }
 
-  private var linkTint: Color {
+  var linkTint: Color {
     linkLabel == "Session Task" ? HarnessMonitorTheme.accent : HarnessMonitorTheme.caution
   }
 
-  private var approvalSummary: String {
+  var approvalSummary: String {
     if !draft.approvedBy.isEmpty && !draft.approvedAt.isEmpty {
       return "Approved by \(draft.approvedBy) at \(draft.approvedAt)"
     }
@@ -352,7 +352,7 @@ struct TaskBoardItemManagementPanel: View {
     return "Not approved"
   }
 
-  private var managementFacts: [TaskBoardManagementFact] {
+  var managementFacts: [TaskBoardManagementFact] {
     guard let item else {
       return [TaskBoardManagementFact("Mode", value: draft.agentMode.title)]
     }
@@ -372,7 +372,7 @@ struct TaskBoardItemManagementPanel: View {
     return facts
   }
 
-  private func submitDraft() {
+  func submitDraft() {
     if let item {
       onUpdate?(item.id, draft.updateRequest)
     } else {

@@ -389,7 +389,7 @@ extension HarnessMonitorClientProtocol {
     MonitorConfiguration(personas: [], runtimeModels: [])
   }
 
-  private func timelineWindowResponse(
+  func timelineWindowResponse(
     from entries: [TimelineEntry],
     request: TimelineWindowRequest
   ) -> TimelineWindowResponse {

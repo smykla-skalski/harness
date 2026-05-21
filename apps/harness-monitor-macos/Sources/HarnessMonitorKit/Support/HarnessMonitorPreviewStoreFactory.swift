@@ -142,7 +142,7 @@ public enum HarnessMonitorPreviewStoreFactory {
     return store
   }
 
-  private static func seedSelectedSessionState(
+  static func seedSelectedSessionState(
     store: HarnessMonitorStore,
     configuration: PreviewStoreConfiguration,
     environment: HarnessMonitorEnvironment = .current
@@ -168,7 +168,7 @@ public enum HarnessMonitorPreviewStoreFactory {
     )
   }
 
-  private static func seedPendingAcpIfNeeded(
+  static func seedPendingAcpIfNeeded(
     store: HarnessMonitorStore,
     sessionID: String,
     environment: HarnessMonitorEnvironment
@@ -203,14 +203,14 @@ public enum HarnessMonitorPreviewStoreFactory {
     store.reconcileAcpPermissionDecisions()
   }
 
-  private static func seedPolicyCanvasState(store: HarnessMonitorStore) {
+  static func seedPolicyCanvasState(store: HarnessMonitorStore) {
     let document = PreviewFixtures.policyCanvasPipelineDocument()
     store.globalTaskBoardPolicyPipeline = document
     store.globalTaskBoardPolicyAudit = PreviewFixtures.policyCanvasAudit(for: document)
     store.globalTaskBoardPolicySimulation = nil
   }
 
-  private static func seedAcpBridgeOutageIfNeeded(
+  static func seedAcpBridgeOutageIfNeeded(
     store: HarnessMonitorStore,
     environment: HarnessMonitorEnvironment,
     hostBridgeOverride: PreviewHostBridgeOverride?
@@ -224,7 +224,7 @@ public enum HarnessMonitorPreviewStoreFactory {
     store.markHostBridgeIssue(for: "acp", statusCode: 503)
   }
 
-  private static func seedForcedHostBridgeIssues(
+  static func seedForcedHostBridgeIssues(
     store: HarnessMonitorStore,
     environment: HarnessMonitorEnvironment
   ) {
@@ -236,7 +236,7 @@ public enum HarnessMonitorPreviewStoreFactory {
     store.forcedHostBridgeCapabilities.formUnion(forcedIssues.keys)
   }
 
-  private static func previewStatusReport(
+  static func previewStatusReport(
     _ statusReport: DaemonStatusReport,
     hostBridgeOverride: PreviewHostBridgeOverride?
   ) -> DaemonStatusReport {
@@ -265,7 +265,7 @@ public enum HarnessMonitorPreviewStoreFactory {
     )
   }
 
-  private static func previewAcpAgentSnapshot(
+  static func previewAcpAgentSnapshot(
     sessionID: String,
     pendingBatch: AcpPermissionBatch
   ) -> AcpAgentSnapshot {
@@ -290,11 +290,11 @@ public enum HarnessMonitorPreviewStoreFactory {
     )
   }
 
-  private static func previewAcpInspectSampledAt() -> Date {
+  static func previewAcpInspectSampledAt() -> Date {
     ISO8601DateFormatter().date(from: PreviewHarnessClientState.mutationTimestamp) ?? Date()
   }
 
-  private static func previewAcpPermissionBatch(sessionID: String) -> AcpPermissionBatch {
+  static func previewAcpPermissionBatch(sessionID: String) -> AcpPermissionBatch {
     AcpPermissionBatch(
       batchId: "preview-acp-permission-1",
       acpId: "preview-managed-agent-1",

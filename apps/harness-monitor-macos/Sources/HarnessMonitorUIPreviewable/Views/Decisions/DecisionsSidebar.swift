@@ -6,32 +6,32 @@ import SwiftUI
 /// chip next to each row. Selection writes back through a `Binding<String?>` so the detail
 /// column can render the chosen decision by id.
 public struct DecisionsSidebar: View {
-  @Binding private var selectedDecisionID: String?
-  @Binding private var filters: DecisionsSidebarViewModel.FilterState
-  private let decisions: [Decision]
-  private let decisionsByIDOverride: [String: Decision]?
-  private let decisionItemsOverride: [DecisionPresentationSnapshot]?
-  private let decisionsRevision: UInt64
-  private let presentationOverride: DecisionsSidebarPresentation?
-  private let store: HarnessMonitorStore?
+  @Binding var selectedDecisionID: String?
+  @Binding var filters: DecisionsSidebarViewModel.FilterState
+  let decisions: [Decision]
+  let decisionsByIDOverride: [String: Decision]?
+  let decisionItemsOverride: [DecisionPresentationSnapshot]?
+  let decisionsRevision: UInt64
+  let presentationOverride: DecisionsSidebarPresentation?
+  let store: HarnessMonitorStore?
 
-  @State private var query: String = ""
-  @State private var presentationWorker = DecisionsSidebarPresentationWorker()
-  @State private var cachedPresentation = DecisionsSidebarPresentation.empty
-  @State private var cachedDecisionsByID: [String: Decision] = [:]
-  @State private var presentationGeneration: UInt64 = 0
+  @State var query: String = ""
+  @State var presentationWorker = DecisionsSidebarPresentationWorker()
+  @State var cachedPresentation = DecisionsSidebarPresentation.empty
+  @State var cachedDecisionsByID: [String: Decision] = [:]
+  @State var presentationGeneration: UInt64 = 0
 
   @AppStorage("harness.decisions.sidebar.filterExpanded")
-  private var filterExpanded: Bool = true
+  var filterExpanded: Bool = true
 
   @AppStorage("harness.decisions.sidebar.severitiesCSV")
-  private var severitiesCSV: String = ""
+  var severitiesCSV: String = ""
 
   @AppStorage("harness.decisions.sidebar.searchScope")
-  private var searchScopeRaw: String = DecisionsSidebarSearchScope.summary.rawValue
+  var searchScopeRaw: String = DecisionsSidebarSearchScope.summary.rawValue
 
   @Environment(\.fontScale)
-  private var fontScale
+  var fontScale
 
   public init(
     decisions: [Decision] = [],
@@ -55,7 +55,7 @@ public struct DecisionsSidebar: View {
     _filters = filters
   }
 
-  private var selectedSeverities: Set<DecisionSeverity> {
+  var selectedSeverities: Set<DecisionSeverity> {
     Set(
       severitiesCSV
         .split(separator: ",")
@@ -63,15 +63,15 @@ public struct DecisionsSidebar: View {
     )
   }
 
-  private var searchScope: DecisionsSidebarSearchScope {
+  var searchScope: DecisionsSidebarSearchScope {
     DecisionsSidebarSearchScope(rawValue: searchScopeRaw) ?? .summary
   }
 
-  private func setSelectedSeverities(_ newValue: Set<DecisionSeverity>) {
+  func setSelectedSeverities(_ newValue: Set<DecisionSeverity>) {
     severitiesCSV = newValue.map(\.rawValue).sorted().joined(separator: ",")
   }
 
-  private var presentationTaskKey: DecisionsSidebarPresentationTaskKey {
+  var presentationTaskKey: DecisionsSidebarPresentationTaskKey {
     DecisionsSidebarPresentationTaskKey(
       decisionsRevision: decisionsRevision,
       decisions: decisions,
@@ -79,7 +79,7 @@ public struct DecisionsSidebar: View {
     )
   }
 
-  private var currentFilters: DecisionsSidebarViewModel.FilterState {
+  var currentFilters: DecisionsSidebarViewModel.FilterState {
     .init(
       query: query,
       severities: selectedSeverities,
@@ -87,21 +87,21 @@ public struct DecisionsSidebar: View {
     )
   }
 
-  private var activePresentation: DecisionsSidebarPresentation {
+  var activePresentation: DecisionsSidebarPresentation {
     presentationOverride ?? cachedPresentation
   }
 
-  private var activeDecisionsByID: [String: Decision] {
+  var activeDecisionsByID: [String: Decision] {
     decisionsByIDOverride ?? cachedDecisionsByID
   }
 
-  private func lastAcpMessageAt(
+  func lastAcpMessageAt(
     for decision: Decision
   ) -> Date? {
     store?.acpPermissionLastSignalAt(sessionID: decision.sessionID)
   }
 
-  private func acpPayload(
+  func acpPayload(
     for decision: Decision
   ) -> AcpPermissionDecisionPayload? {
     guard decision.ruleID == AcpPermissionDecisionPayload.ruleID else {
@@ -141,7 +141,7 @@ public struct DecisionsSidebar: View {
   }
 
   @MainActor
-  private func rebuildPresentationIfNeeded() async {
+  func rebuildPresentationIfNeeded() async {
     guard presentationOverride == nil else {
       return
     }
@@ -163,7 +163,7 @@ public struct DecisionsSidebar: View {
     }
   }
 
-  private var header: some View {
+  var header: some View {
     VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
       searchRow
       if filterExpanded {
@@ -175,7 +175,7 @@ public struct DecisionsSidebar: View {
     .animation(.snappy(duration: 0.18), value: filterExpanded)
   }
 
-  private var searchRow: some View {
+  var searchRow: some View {
     HStack(spacing: HarnessMonitorTheme.spacingXS) {
       TextField(searchScope.label, text: $query)
         .textFieldStyle(.roundedBorder)
@@ -185,7 +185,7 @@ public struct DecisionsSidebar: View {
     }
   }
 
-  private var filterToggleButton: some View {
+  var filterToggleButton: some View {
     let systemName: String
     if filterExpanded {
       systemName = "line.3.horizontal.decrease.circle.fill"
@@ -206,7 +206,7 @@ public struct DecisionsSidebar: View {
     .accessibilityIdentifier(HarnessMonitorAccessibility.decisionsSidebarFilterToggle)
   }
 
-  private var scopeMenu: some View {
+  var scopeMenu: some View {
     Menu {
       Picker("Search scope", selection: $searchScopeRaw) {
         ForEach(DecisionsSidebarSearchScope.allCases) { scope in
@@ -226,7 +226,7 @@ public struct DecisionsSidebar: View {
     .accessibilityIdentifier(HarnessMonitorAccessibility.decisionsSidebarSearchScopeMenu)
   }
 
-  private func publishFilters() {
+  func publishFilters() {
     filters = DecisionsSidebarViewModel.FilterState(
       query: query,
       severities: selectedSeverities,
@@ -234,7 +234,7 @@ public struct DecisionsSidebar: View {
     )
   }
 
-  private func applyExternalFilters(_ incoming: DecisionsSidebarViewModel.FilterState? = nil) {
+  func applyExternalFilters(_ incoming: DecisionsSidebarViewModel.FilterState? = nil) {
     let source = incoming ?? filters
     if query != source.query {
       query = source.query
@@ -247,7 +247,7 @@ public struct DecisionsSidebar: View {
     }
   }
 
-  private var severityChipRow: some View {
+  var severityChipRow: some View {
     ScrollView(.horizontal, showsIndicators: false) {
       HStack(spacing: HarnessMonitorTheme.spacingXS) {
         allChip
@@ -264,7 +264,7 @@ public struct DecisionsSidebar: View {
     .scrollClipDisabled()
   }
 
-  private var allChip: some View {
+  var allChip: some View {
     let isActive = selectedSeverities.isEmpty
     return Button {
       setSelectedSeverities([])
@@ -277,7 +277,7 @@ public struct DecisionsSidebar: View {
     .accessibilityValue(isActive ? "selected" : "not selected")
   }
 
-  private func severityChip(_ severity: DecisionSeverity) -> some View {
+  func severityChip(_ severity: DecisionSeverity) -> some View {
     let isActive = selectedSeverities.contains(severity)
     return Button {
       var next = selectedSeverities
@@ -300,7 +300,7 @@ public struct DecisionsSidebar: View {
     .accessibilityValue(isActive ? "selected" : "not selected")
   }
 
-  @ViewBuilder private var content: some View {
+  @ViewBuilder var content: some View {
     let visibleGroups = activePresentation.groups
     if visibleGroups.isEmpty {
       emptyState
@@ -320,7 +320,7 @@ public struct DecisionsSidebar: View {
     }
   }
 
-  private var emptyState: some View {
+  var emptyState: some View {
     VStack(spacing: HarnessMonitorTheme.spacingSM) {
       Image(systemName: "bell.slash")
         .font(.title2)
@@ -333,7 +333,7 @@ public struct DecisionsSidebar: View {
     .padding()
   }
 
-  private func sessionSection(
+  func sessionSection(
     _ group: DecisionsSidebarPresentationGroup
   ) -> some View {
     Section {
@@ -355,7 +355,7 @@ public struct DecisionsSidebar: View {
     }
   }
 
-  private func sessionHeader(
+  func sessionHeader(
     _ group: DecisionsSidebarPresentationGroup
   ) -> some View {
     HStack {

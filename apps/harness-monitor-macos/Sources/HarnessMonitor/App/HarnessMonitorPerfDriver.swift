@@ -11,12 +11,12 @@ enum HarnessMonitorPerfDriver {
   }
 
   #if HARNESS_FEATURE_OTEL
-    private static let signpostBridge = HarnessMonitorSignpostBridge(
+    static let signpostBridge = HarnessMonitorSignpostBridge(
       subsystem: "io.harnessmonitor",
       category: "perf"
     )
   #else
-    private static let signposter = OSSignposter(
+    static let signposter = OSSignposter(
       subsystem: "io.harnessmonitor",
       category: "perf"
     )
@@ -33,7 +33,7 @@ enum HarnessMonitorPerfDriver {
   static let routeTimeout = Duration.seconds(2)
   static let sessionWindowTimeout = Duration.seconds(3)
 
-  private static func envMilliseconds(_ key: String, fallback: Int) -> Duration {
+  static func envMilliseconds(_ key: String, fallback: Int) -> Duration {
     guard let raw = ProcessInfo.processInfo.environment[key],
       let value = Int(raw), value > 0
     else {
@@ -63,7 +63,7 @@ enum HarnessMonitorPerfDriver {
     return result
   }
 
-  private static func runScenario(
+  static func runScenario(
     _ scenario: HarnessMonitorPerfScenario,
     store: HarnessMonitorStore,
     openWindow: OpenWindowAction
@@ -80,7 +80,7 @@ enum HarnessMonitorPerfDriver {
     return await runActivityScenario(scenario, store: store, openWindow: openWindow)
   }
 
-  private static func runWindowScenario(
+  static func runWindowScenario(
     _ scenario: HarnessMonitorPerfScenario,
     store: HarnessMonitorStore,
     openWindow: OpenWindowAction
@@ -138,7 +138,7 @@ enum HarnessMonitorPerfDriver {
     }
   }
 
-  private static func runDetailScenario(
+  static func runDetailScenario(
     _ scenario: HarnessMonitorPerfScenario,
     store: HarnessMonitorStore,
     openWindow: OpenWindowAction
@@ -186,7 +186,7 @@ enum HarnessMonitorPerfDriver {
     }
   }
 
-  private static func runSettingsScenario(
+  static func runSettingsScenario(
     _ scenario: HarnessMonitorPerfScenario,
     openWindow: OpenWindowAction
   ) async -> ScenarioResult? {
@@ -226,7 +226,7 @@ enum HarnessMonitorPerfDriver {
     }
   }
 
-  private static func runActivityScenario(
+  static func runActivityScenario(
     _ scenario: HarnessMonitorPerfScenario,
     store: HarnessMonitorStore,
     openWindow: OpenWindowAction

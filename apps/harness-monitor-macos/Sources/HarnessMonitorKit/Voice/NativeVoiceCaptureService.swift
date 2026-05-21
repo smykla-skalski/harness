@@ -34,7 +34,7 @@ public enum NativeVoiceCaptureError: Error, LocalizedError, Equatable, Sendable 
 
 @available(macOS 26.0, *)
 public actor NativeVoiceCaptureService: VoiceCaptureProviding {
-  private struct ActiveCapture {
+  struct ActiveCapture {
     let engine: AVAudioEngine
     let analyzer: SpeechAnalyzer
     let inputContinuation: AsyncStream<AnalyzerInput>.Continuation
@@ -44,13 +44,13 @@ public actor NativeVoiceCaptureService: VoiceCaptureProviding {
     let reservedLocale: Locale
   }
 
-  private struct TranscriptionModules {
+  struct TranscriptionModules {
     let locale: Locale
     let transcriber: SpeechTranscriber
     let modules: [any SpeechModule]
   }
 
-  private var activeCapture: ActiveCapture?
+  var activeCapture: ActiveCapture?
 
   public init() {}
 
@@ -84,7 +84,7 @@ public actor NativeVoiceCaptureService: VoiceCaptureProviding {
     activeCapture.outputContinuation.finish()
   }
 
-  private func startCapture(
+  func startCapture(
     configuration: VoiceCaptureConfiguration,
     continuation: VoiceCaptureEventStream.Continuation
   ) async {
@@ -96,7 +96,7 @@ public actor NativeVoiceCaptureService: VoiceCaptureProviding {
     }
   }
 
-  private func configureCapture(
+  func configureCapture(
     configuration: VoiceCaptureConfiguration,
     continuation: VoiceCaptureEventStream.Continuation
   ) async throws {
@@ -196,7 +196,7 @@ public actor NativeVoiceCaptureService: VoiceCaptureProviding {
     continuation.yield(.state(.recording))
   }
 
-  private func makeTranscriptionModules(
+  func makeTranscriptionModules(
     configuration: VoiceCaptureConfiguration
   ) async throws -> TranscriptionModules {
     var foundSupportedLocale = false
@@ -228,7 +228,7 @@ public actor NativeVoiceCaptureService: VoiceCaptureProviding {
     throw NativeVoiceCaptureError.unsupportedLocale(configuration.localeIdentifier)
   }
 
-  private func prepareAssets(for modules: [any SpeechModule], locale: Locale) async throws {
+  func prepareAssets(for modules: [any SpeechModule], locale: Locale) async throws {
     switch await AssetInventory.status(forModules: modules) {
     case .installed:
       break
@@ -250,7 +250,7 @@ public actor NativeVoiceCaptureService: VoiceCaptureProviding {
     }
   }
 
-  nonisolated private func streamResults(
+  nonisolated func streamResults(
     from transcriber: SpeechTranscriber,
     to continuation: VoiceCaptureEventStream.Continuation
   ) async {

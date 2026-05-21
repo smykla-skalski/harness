@@ -31,18 +31,18 @@ struct SessionWindowCreateAgentRuntimeContent: View {
   let draft: SessionCreateDraft
   let embeddedInForm: Bool
 
-  private var catalogState: SessionWindowAgentCreateCatalogState {
+  var catalogState: SessionWindowAgentCreateCatalogState {
     state.agentCreateCatalog
   }
 
-  private var activeAgentOptions: [AgentCapabilityOption] {
+  var activeAgentOptions: [AgentCapabilityOption] {
     SessionWindowCreateFormCatalogs.activeAgentOptions(
       catalogState: catalogState,
       store: store
     )
   }
 
-  private var normalizedLaunchSelection: AgentLaunchSelection {
+  var normalizedLaunchSelection: AgentLaunchSelection {
     SessionWindowCreateFormCatalogs.normalizedLaunchSelection(
       draft: draft,
       options: activeAgentOptions,
@@ -52,14 +52,14 @@ struct SessionWindowCreateAgentRuntimeContent: View {
     )
   }
 
-  private var selectedCapabilityOption: AgentCapabilityOption? {
+  var selectedCapabilityOption: AgentCapabilityOption? {
     SessionWindowCreateFormCatalogs.selectedCapabilityOption(
       selection: normalizedLaunchSelection,
       options: activeAgentOptions
     )
   }
 
-  private var bridgeBannerKind: SessionCreateBridgeBannerKind? {
+  var bridgeBannerKind: SessionCreateBridgeBannerKind? {
     guard draft.kind == .agent else { return nil }
     if normalizedLaunchSelection.isCodexNative {
       return store.codexUnavailable ? .codex : nil
@@ -70,14 +70,14 @@ struct SessionWindowCreateAgentRuntimeContent: View {
     return store.agentTuiUnavailable ? .agentTui : nil
   }
 
-  private var launchSelection: Binding<AgentLaunchSelection> {
+  var launchSelection: Binding<AgentLaunchSelection> {
     Binding(
       get: { normalizedLaunchSelection },
       set: { state.persistCreateLaunchSelection($0, for: draft) }
     )
   }
 
-  private var selectedProviderID: String? {
+  var selectedProviderID: String? {
     selectedCapabilityOption?.id
   }
 
@@ -110,7 +110,7 @@ struct SessionWindowCreateAgentRuntimeContent: View {
     }
   }
 
-  @ViewBuilder private var header: some View {
+  @ViewBuilder var header: some View {
     if embeddedInForm {
       compactHeader
     } else {
@@ -118,7 +118,7 @@ struct SessionWindowCreateAgentRuntimeContent: View {
     }
   }
 
-  private var paneHeader: some View {
+  var paneHeader: some View {
     VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
       Text(paneTitle)
         .scaledFont(.title2.weight(.semibold))
@@ -128,7 +128,7 @@ struct SessionWindowCreateAgentRuntimeContent: View {
     }
   }
 
-  private var compactHeader: some View {
+  var compactHeader: some View {
     VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
       Text(paneTitle)
         .scaledFont(.headline.weight(.semibold))
@@ -141,15 +141,15 @@ struct SessionWindowCreateAgentRuntimeContent: View {
     }
   }
 
-  private var paneTitle: String {
+  var paneTitle: String {
     "New agent"
   }
 
-  private var compactDescription: String {
+  var compactDescription: String {
     "Choose a provider below. ACP is preferred when available; finish configuration in the form"
   }
 
-  @ViewBuilder private var availabilityNote: some View {
+  @ViewBuilder var availabilityNote: some View {
     if catalogState.isLoading && !catalogState.hasLoaded {
       Label("Checking available runtimes", systemImage: "clock")
         .scaledFont(.caption)
@@ -157,14 +157,14 @@ struct SessionWindowCreateAgentRuntimeContent: View {
     }
   }
 
-  @ViewBuilder private var providerSection: some View {
+  @ViewBuilder var providerSection: some View {
     VStack(alignment: .leading, spacing: HarnessMonitorTheme.sectionSpacing) {
       SessionWindowCreateSidebarSectionHeader(title: "Provider")
       providerRows
     }
   }
 
-  private var providerRows: some View {
+  var providerRows: some View {
     SessionWindowCreateProviderButtonList(
       options: activeAgentOptions,
       selectedProviderID: selectedProviderID,
@@ -173,12 +173,12 @@ struct SessionWindowCreateAgentRuntimeContent: View {
     .padding(.horizontal, -HarnessMonitorTheme.spacingSM)
   }
 
-  private func selectProvider(_ option: AgentCapabilityOption) {
+  func selectProvider(_ option: AgentCapabilityOption) {
     launchSelection.wrappedValue = option.normalizedSelection(for: launchSelection.wrappedValue)
   }
 }
 
-private struct SessionWindowCreateSidebarSectionHeader: View {
+struct SessionWindowCreateSidebarSectionHeader: View {
   let title: String
 
   var body: some View {

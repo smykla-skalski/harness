@@ -7,17 +7,16 @@ public struct DashboardWindowView: View {
   public let sessionCatalog: HarnessMonitorStore.SessionCatalogSlice
   public let history: GlobalWindowNavigationHistory
   @AppStorage(HarnessMonitorMCPSettingsDefaults.registryHostEnabledKey)
-  private var mcpRegistryHostEnabled = HarnessMonitorMCPSettingsDefaults.registryHostEnabledDefault
+  var mcpRegistryHostEnabled = HarnessMonitorMCPSettingsDefaults.registryHostEnabledDefault
   @SceneStorage("dashboard.route")
-  private var persistedRouteRaw = DashboardWindowRoute.taskBoard.rawValue
+  var persistedRouteRaw = DashboardWindowRoute.taskBoard.rawValue
   @SceneStorage("dashboard.columnVisibility")
-  private var persistedColumnVisibilityRaw = SessionColumnVisibilityCodec.encode(.doubleColumn)
+  var persistedColumnVisibilityRaw = SessionColumnVisibilityCodec.encode(.doubleColumn)
   @SceneStorage("dashboard.sidebarWidth")
-  private var persistedSidebarWidth = 220.0
+  var persistedSidebarWidth = 220.0
   @Environment(\.openWindow)
-  private var openWindow
-  @State private var dependenciesSearchAutomationState = AppSearchAutomationState()
-  @State private var handledHistoryRestoreRequestID = 0
+  var openWindow
+  @State var handledHistoryRestoreRequestID = 0
 
   public init(
     store: HarnessMonitorStore,
@@ -31,24 +30,24 @@ public struct DashboardWindowView: View {
     self.history = history ?? GlobalWindowNavigationHistory(store: store)
   }
 
-  private var selectedRoute: DashboardWindowRoute {
+  var selectedRoute: DashboardWindowRoute {
     get { DashboardWindowRoute(rawValue: persistedRouteRaw) ?? .taskBoard }
     nonmutating set { persistedRouteRaw = newValue.rawValue }
   }
 
-  private var selectedRouteBinding: Binding<DashboardWindowRoute> {
+  var selectedRouteBinding: Binding<DashboardWindowRoute> {
     Binding(
       get: { selectedRoute },
       set: { selectedRoute = $0 }
     )
   }
 
-  private var columnVisibility: NavigationSplitViewVisibility {
+  var columnVisibility: NavigationSplitViewVisibility {
     let decodedVisibility = SessionColumnVisibilityCodec.decode(columnVisibilityRaw)
     return decodedVisibility == .all ? .doubleColumn : decodedVisibility
   }
 
-  private func makeProfilingAttributes(
+  func makeProfilingAttributes(
     route: DashboardWindowRoute,
     columnVisibility: NavigationSplitViewVisibility
   ) -> [String: String] {
@@ -59,7 +58,7 @@ public struct DashboardWindowView: View {
     ]
   }
 
-  private func dashboardStatusSummaryModel(
+  func dashboardStatusSummaryModel(
     route: DashboardWindowRoute
   ) -> SessionStatusSummaryModel {
     let metrics = store.connectionMetrics
@@ -77,17 +76,17 @@ public struct DashboardWindowView: View {
     )
   }
 
-  private var sidebarWidth: Double {
+  var sidebarWidth: Double {
     get { persistedSidebarWidth }
     nonmutating set { persistedSidebarWidth = newValue }
   }
 
-  private var columnVisibilityRaw: String {
+  var columnVisibilityRaw: String {
     get { persistedColumnVisibilityRaw }
     nonmutating set { persistedColumnVisibilityRaw = newValue }
   }
 
-  private var columnVisibilityBinding: Binding<NavigationSplitViewVisibility> {
+  var columnVisibilityBinding: Binding<NavigationSplitViewVisibility> {
     Binding(
       get: { columnVisibility },
       set: { newValue in
@@ -102,7 +101,7 @@ public struct DashboardWindowView: View {
     )
   }
 
-  private var windowNavigationState: WindowNavigationState {
+  var windowNavigationState: WindowNavigationState {
     let navigationState = WindowNavigationState(
       canGoBack: history.canGoBack,
       canGoForward: history.canGoForward
@@ -112,12 +111,6 @@ public struct DashboardWindowView: View {
       forward: { history.navigateForward() }
     )
     return navigationState
-  }
-
-  private var dependenciesSearchAutomation: AppSearchAutomationState? {
-    HarnessMonitorUITestEnvironment.isPerfScenarioActive
-      ? dependenciesSearchAutomationState
-      : nil
   }
 
   public var body: some View {
@@ -152,8 +145,7 @@ public struct DashboardWindowView: View {
             selectedRoute: selectedRouteBinding,
             store: store,
             dashboardUI: dashboardUI,
-            sessionCatalog: sessionCatalog,
-            dependenciesSearchAutomation: dependenciesSearchAutomation
+            sessionCatalog: sessionCatalog
           )
         }
         .navigationTitle("Dashboard")
@@ -191,17 +183,11 @@ public struct DashboardWindowView: View {
         )
       }
       .modifier(DashboardPerfRouteHook(selectedRouteBinding: selectedRouteBinding))
-      .modifier(
-        DashboardWindowPerfScenarioScript(
-          selectedRoute: selectedRouteBinding,
-          searchAutomation: dependenciesSearchAutomationState
-        )
-      )
     }
   }
 
   @MainActor
-  private func applyPendingHistoryRestoreIfNeeded() async {
+  func applyPendingHistoryRestoreIfNeeded() async {
     guard let request = history.pendingDashboardRestoreRequest else {
       return
     }

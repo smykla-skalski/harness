@@ -172,7 +172,7 @@ public final class HarnessMonitorUserNotificationController: NSObject,
     }
   }
 
-  private func deliverSupervisorNotification(
+  func deliverSupervisorNotification(
     descriptor: SupervisorNotificationDescriptor,
     makeRequest: () async throws -> UNNotificationRequest
   ) async -> Bool {
@@ -204,7 +204,7 @@ public final class HarnessMonitorUserNotificationController: NSObject,
     } ?? false
   }
 
-  private func decisionActions(decisionID: String) -> [NotificationHistoryAction] {
+  func decisionActions(decisionID: String) -> [NotificationHistoryAction] {
     [
       NotificationHistoryAction(
         id: "open",
@@ -355,7 +355,7 @@ public final class HarnessMonitorUserNotificationController: NSObject,
 
 }
 
-private struct SupervisorNotificationDescriptor {
+struct SupervisorNotificationDescriptor {
   let source: NotificationHistoryEntry.Source
   let severity: DecisionSeverity
   let successMessage: String

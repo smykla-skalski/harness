@@ -5,12 +5,12 @@ import Foundation
 #endif
 // MARK: - Internal transport mechanics
 
-private typealias VoidPingContinuation = CheckedContinuation<Void, Error>
-private typealias IntPingContinuation = CheckedContinuation<Int, Error>
+typealias VoidPingContinuation = CheckedContinuation<Void, Error>
+typealias IntPingContinuation = CheckedContinuation<Int, Error>
 
 final class ContinuationResumeGate: @unchecked Sendable {
-  private let lock = NSLock()
-  private var didResume = false
+  let lock = NSLock()
+  var didResume = false
 
   func tryBeginResume() -> Bool {
     lock.lock()

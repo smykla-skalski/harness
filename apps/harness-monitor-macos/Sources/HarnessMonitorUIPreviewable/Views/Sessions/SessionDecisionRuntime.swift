@@ -144,22 +144,22 @@ public final class SessionDecisionRuntime {
   public private(set) var isFilteringDecisions = false
   private(set) var preparedInspectorRows = SessionDecisionInspectorRows.empty
 
-  @ObservationIgnored private var inspectorRowCache:
+  @ObservationIgnored var inspectorRowCache:
     [SessionDecisionInspectorRowKey: SessionDecisionInspectorRows] = [:]
-  @ObservationIgnored private var inspectorRowKeyOrder: [SessionDecisionInspectorRowKey] = []
-  @ObservationIgnored nonisolated(unsafe) private var filterTask: Task<Void, Never>?
-  @ObservationIgnored nonisolated(unsafe) private var inspectorRowTask: Task<Void, Never>?
-  @ObservationIgnored private var latestFilterInput: SessionDecisionFilterInput?
-  @ObservationIgnored private var latestInspectorRowKey: SessionDecisionInspectorRowKey?
-  @ObservationIgnored private var inspectorRowGeneration: UInt64 = 0
-  @ObservationIgnored private var auditReloadGeneration: UInt64 = 0
+  @ObservationIgnored var inspectorRowKeyOrder: [SessionDecisionInspectorRowKey] = []
+  @ObservationIgnored nonisolated(unsafe) var filterTask: Task<Void, Never>?
+  @ObservationIgnored nonisolated(unsafe) var inspectorRowTask: Task<Void, Never>?
+  @ObservationIgnored var latestFilterInput: SessionDecisionFilterInput?
+  @ObservationIgnored var latestInspectorRowKey: SessionDecisionInspectorRowKey?
+  @ObservationIgnored var inspectorRowGeneration: UInt64 = 0
+  @ObservationIgnored var auditReloadGeneration: UInt64 = 0
 
-  private static let cacheLimit = 32
-  private static let filterSignposter = OSSignposter(
+  static let cacheLimit = 32
+  static let filterSignposter = OSSignposter(
     subsystem: "io.harnessmonitor",
     category: "perf/session-decision-filter"
   )
-  private static let inspectorSignposter = OSSignposter(
+  static let inspectorSignposter = OSSignposter(
     subsystem: "io.harnessmonitor",
     category: "perf/session-decision-inspector"
   )
@@ -328,7 +328,7 @@ public final class SessionDecisionRuntime {
     )
   }
 
-  private func applyAuditReloadOutput(
+  func applyAuditReloadOutput(
     _ output: SessionDecisionAuditOutput,
     generation: UInt64
   ) {
@@ -364,7 +364,7 @@ public final class SessionDecisionRuntime {
     SessionInspectorVisibilityPolicy.allowsInspector(width: width)
   }
 
-  private func storeInspectorRows(
+  func storeInspectorRows(
     _ rows: SessionDecisionInspectorRows,
     forKey key: SessionDecisionInspectorRowKey
   ) {

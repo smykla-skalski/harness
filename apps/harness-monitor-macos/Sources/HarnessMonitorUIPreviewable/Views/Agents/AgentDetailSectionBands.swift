@@ -40,7 +40,7 @@ struct AgentDetailSummaryBand: View {
     }
   }
 
-  private var lastActivityFactValue: String {
+  var lastActivityFactValue: String {
     overviewFacts.first(where: { $0.title == "Last Activity" })?.value ?? "unknown"
   }
 }
@@ -60,9 +60,9 @@ struct AgentDetailActivityBand: View {
   let isSparseState: Bool
   // Replaces ViewThatFits: a single deterministic if/else gated on a measured
   // container width avoids the double-tree-build cost on every body update.
-  @State private var fitsHorizontally = true
+  @State var fitsHorizontally = true
 
-  private var horizontalMinWidth: CGFloat {
+  var horizontalMinWidth: CGFloat {
     isSparseState ? 544 : 528
   }
 
@@ -109,7 +109,7 @@ struct AgentDetailActivityBand: View {
     }
   }
 
-  private var runtimeLanePane: some View {
+  var runtimeLanePane: some View {
     VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingMD) {
       AgentDetailFactInlineRow(
         title: "Runtime lane",
@@ -133,7 +133,7 @@ struct AgentDetailActivityBand: View {
     .frame(maxWidth: .infinity, alignment: .leading)
   }
 
-  private var assignmentPane: some View {
+  var assignmentPane: some View {
     AgentDetailInsetGroup(title: isSparseState ? "Current state" : "Assignment") {
       if isSparseState {
         AgentDetailOperationalSummary(
@@ -171,7 +171,7 @@ struct AgentDetailActionBand: View {
   @Binding var signalActionHint: String
   let prefersWideLayout: Bool
   // Replaces ViewThatFits: deterministic if/else gated on measured width.
-  @State private var fitsHorizontally = true
+  @State var fitsHorizontally = true
 
   init(
     store: HarnessMonitorStore,
@@ -209,7 +209,7 @@ struct AgentDetailActionBand: View {
     self.prefersWideLayout = prefersWideLayout
   }
 
-  private var horizontalMinWidth: CGFloat {
+  var horizontalMinWidth: CGFloat {
     roleActionsColumnWidth + HarnessMonitorTheme.spacingMD + 300
   }
 
@@ -241,7 +241,7 @@ struct AgentDetailActionBand: View {
     }
   }
 
-  private var roleActionsPane: some View {
+  var roleActionsPane: some View {
     AgentDetailInsetGroup(title: "Role actions") {
       AgentDetailRoleActionsSection(
         store: store,
@@ -256,11 +256,11 @@ struct AgentDetailActionBand: View {
     }
   }
 
-  private var roleActionsColumnWidth: CGFloat {
+  var roleActionsColumnWidth: CGFloat {
     roleActionsAvailable && !isLeader ? 216 : 204
   }
 
-  private var sendUpdatePane: some View {
+  var sendUpdatePane: some View {
     AgentDetailInsetGroup(title: "Send update") {
       AgentDetailSendUpdateSection(
         store: store,

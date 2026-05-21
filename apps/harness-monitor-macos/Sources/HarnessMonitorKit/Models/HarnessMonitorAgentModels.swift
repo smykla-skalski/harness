@@ -110,7 +110,7 @@ public enum AgentStatus: String, Codable, CaseIterable, Sendable {
     try container.encode(rawValue)
   }
 
-  private enum TaggedCodingKeys: String, CodingKey {
+  enum TaggedCodingKeys: String, CodingKey {
     case state
   }
 
@@ -268,7 +268,7 @@ public struct AgentRegistration: Codable, Equatable, Identifiable, Sendable {
     case persona
   }
 
-  private struct TaggedRuntime: Codable, Equatable, Sendable {
+  struct TaggedRuntime: Codable, Equatable, Sendable {
     let kind: String
     let id: String
   }

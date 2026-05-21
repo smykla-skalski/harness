@@ -26,12 +26,12 @@ public final class ToastSlice {
   public var undoableDismissDelay: Duration = .seconds(8)
   public var dedupeWindow: Duration = .seconds(2)
 
-  @ObservationIgnored private var dismissTasks: [UUID: Task<Void, Never>] = [:]
-  @ObservationIgnored private var targetInstants: [UUID: ContinuousClock.Instant] = [:]
-  @ObservationIgnored private var pendingUndoActions: [UUID: @MainActor () async -> Void] = [:]
+  @ObservationIgnored var dismissTasks: [UUID: Task<Void, Never>] = [:]
+  @ObservationIgnored var targetInstants: [UUID: ContinuousClock.Instant] = [:]
+  @ObservationIgnored var pendingUndoActions: [UUID: @MainActor () async -> Void] = [:]
   @ObservationIgnored var pauseObservationTask: Task<Void, Never>?
   @ObservationIgnored var resumeObservationTask: Task<Void, Never>?
-  @ObservationIgnored private let clock: any ContinuousClockSource
+  @ObservationIgnored let clock: any ContinuousClockSource
   @ObservationIgnored public var onChanged: (() -> Void)?
   @ObservationIgnored public var onHistoryEvent: ((ToastHistoryEvent) -> Void)?
 
@@ -249,7 +249,7 @@ public final class ToastSlice {
     }
   }
 
-  private func dismiss(id: UUID, reason: ToastHistoryEvent.DismissReason) {
+  func dismiss(id: UUID, reason: ToastHistoryEvent.DismissReason) {
     let dismissedFeedback = activeFeedback.first { $0.id == id }
     dismissTasks[id]?.cancel()
     dismissTasks.removeValue(forKey: id)
@@ -322,14 +322,14 @@ public final class ToastSlice {
 
   // MARK: - Private helpers
 
-  private func enforceMaxVisible() {
+  func enforceMaxVisible() {
     while activeFeedback.count > maxVisible {
       guard let oldest = activeFeedback.last else { break }
       dismiss(id: oldest.id, reason: .evicted)
     }
   }
 
-  private func rearmDismiss(
+  func rearmDismiss(
     for id: UUID,
     severity: ActionFeedback.Severity,
     from now: ContinuousClock.Instant
@@ -339,7 +339,7 @@ public final class ToastSlice {
     scheduleDismiss(for: id, after: delay)
   }
 
-  private func scheduleDismiss(for id: UUID, after delay: Duration) {
+  func scheduleDismiss(for id: UUID, after delay: Duration) {
     dismissTasks[id]?.cancel()
     dismissTasks[id] = Task { @MainActor [weak self] in
       try? await Task.sleep(for: delay)
@@ -348,7 +348,7 @@ public final class ToastSlice {
     }
   }
 
-  private func dismissDelay(for severity: ActionFeedback.Severity) -> Duration {
+  func dismissDelay(for severity: ActionFeedback.Severity) -> Duration {
     switch severity {
     case .success: successDismissDelay
     case .warning: warningDismissDelay
@@ -357,7 +357,7 @@ public final class ToastSlice {
     }
   }
 
-  private func announce(_ feedback: ActionFeedback) {
+  func announce(_ feedback: ActionFeedback) {
     let prefix: String
     switch feedback.severity {
     case .success: prefix = "Success"
@@ -375,7 +375,7 @@ public final class ToastSlice {
     AccessibilityNotification.Announcement(payload).post()
   }
 
-  private func emitHistoryEvent(
+  func emitHistoryEvent(
     feedback: ActionFeedback,
     kind: ToastHistoryEvent.Kind,
     recordedAt: Date,

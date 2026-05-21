@@ -35,7 +35,7 @@ public final class NullDecisionActionHandler: DecisionActionHandler {
 @MainActor
 public final class StoreDecisionActionHandler: DecisionActionHandler {
   let store: HarnessMonitorStore
-  private let decisions: DecisionStore
+  let decisions: DecisionStore
 
   public init(store: HarnessMonitorStore, decisions: DecisionStore) {
     self.store = store
@@ -102,7 +102,7 @@ public final class StoreDecisionActionHandler: DecisionActionHandler {
     }
   }
 
-  private static func handleNotificationAcknowledgement(
+  static func handleNotificationAcknowledgement(
     for decision: DecisionActionSnapshot,
     decisions: DecisionStore
   ) async throws {
@@ -113,7 +113,7 @@ public final class StoreDecisionActionHandler: DecisionActionHandler {
     try await decisions.dismiss(id: decision.id)
   }
 
-  private static func suggestedAction(
+  static func suggestedAction(
     in suggestedActionsJSON: String,
     matching actionID: String?
   ) -> SuggestedAction? {

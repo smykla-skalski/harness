@@ -203,7 +203,7 @@ public struct AcpEventBatchPayload: Codable, Equatable, Sendable {
     self.events = events
   }
 
-  private enum CodingKeys: String, CodingKey {
+  enum CodingKeys: String, CodingKey {
     case managedAgentId
     case managedAgentFamily
     case sessionId
@@ -257,7 +257,7 @@ public struct StreamEvent: Codable, Equatable, Identifiable, Sendable {
   public let recordedAt: String
   public let sessionId: String?
   public let payload: JSONValue
-  private let stableID = UUID()
+  let stableID = UUID()
 
   public var id: UUID { stableID }
   enum CodingKeys: String, CodingKey { case event, recordedAt, sessionId, payload }

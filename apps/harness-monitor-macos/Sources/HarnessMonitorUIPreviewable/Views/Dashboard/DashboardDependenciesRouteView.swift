@@ -1,5 +1,3 @@
-// swiftlint:disable file_length
-// swiftlint:disable type_body_length
 import HarnessMonitorKit
 import SwiftUI
 
@@ -448,6 +446,9 @@ struct DashboardDependenciesRouteView: View {
       }
     }
     .accessibilityIdentifier(HarnessMonitorAccessibility.dashboardDependenciesList)
+    .contextMenu(forSelectionType: String.self) { selection in
+      dependencySelectionContextMenu(for: selection)
+    }
     .listStyle(.plain)
     .scrollContentBackground(.hidden)
     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
@@ -512,54 +513,88 @@ struct DashboardDependenciesRouteView: View {
     _ item: DependencyUpdateItem,
     showsRepository: Bool
   ) -> some View {
-    let contextItems = contextMenuItems(for: item)
-    let isBatchContext =
-      contextItems.count > 1 || contextItems.first?.pullRequestID != item.pullRequestID
-    let availableLabels =
-      isBatchContext
-      ? dashboardDependenciesAvailableLabels(
-        repositoryLabels: response.repositoryLabels,
-        items: contextItems
-      )
-      : rowAvailableLabels(for: item)
-    let frequentNames =
-      isBatchContext
-      ? frequentLabelNames(for: contextItems)
-      : rowFrequentLabelNames(for: item)
-    return DashboardDependencyRow(
+    DashboardDependencyRow(
       item: item,
       showsRepository: showsRepository,
       isRefreshing: refreshingPullRequestIDs.contains(item.pullRequestID),
-      updatedLabel: relativeUpdatedLabel(for: item),
-      availableLabels: availableLabels,
-      frequentNames: frequentNames,
-      showsDescriptions: normalizedPreferences.showLabelDescriptions,
-      canApprove: contextItems.contains { $0.canAttemptManualApproval },
-      canMerge: contextItems.contains { $0.canAttemptManualMerge },
-      hasRerunnableChecks: contextItems.contains { $0.hasRerunnableChecks },
-      canRunAutoMode: contextItems.contains { $0.canRunAutoMode },
-      onOpen: { openItem(item) },
-      onCopyLink: { HarnessMonitorClipboard.copy(item.url) },
-      onApprove: { Task { await approve(items: contextItems) } },
-      onMerge: { Task { await merge(items: contextItems) } },
-      onRerunChecks: { Task { await rerunChecks(items: contextItems) } },
-      onSelectLabel: { name in Task { await addLabel(name, to: contextItems) } },
-      onCustomLabel: {
-        labelTargetItems = contextItems
-        labelDraft = ""
-        isLabelSheetPresented = true
-      },
-      onAuto: { Task { await auto(items: contextItems) } },
-      onFixCI: { Task { await fixCI(item: item) } }
+      updatedLabel: relativeUpdatedLabel(for: item)
     )
   }
 
-  func contextMenuItems(for item: DependencyUpdateItem) -> [DependencyUpdateItem] {
-    guard selectedIDs.contains(item.pullRequestID) else {
-      return [item]
+  @ViewBuilder
+  func dependencySelectionContextMenu(for selection: Set<String>) -> some View {
+    let items = contextMenuItems(forSelection: selection)
+    if let primaryItem = items.first {
+      let isSingleItem = items.count == 1
+      let availableLabels = contextMenuAvailableLabels(for: items)
+      let frequentNames = contextMenuFrequentNames(for: items)
+      if isSingleItem {
+        Button("Open Pull Request") {
+          openItem(primaryItem)
+        }
+        Button("Copy Link") {
+          HarnessMonitorClipboard.copy(primaryItem.url)
+        }
+        Divider()
+      }
+      Button("Approve") {
+        Task { await approve(items: items) }
+      }
+      .disabled(!items.contains { $0.canAttemptManualApproval })
+      Button("Merge") {
+        Task { await merge(items: items) }
+      }
+      .disabled(!items.contains { $0.canAttemptManualMerge })
+      Button("Rerun Checks") {
+        Task { await rerunChecks(items: items) }
+      }
+      .disabled(!items.contains { $0.hasRerunnableChecks })
+      DashboardDependenciesLabelPickerMenu(
+        title: "Add Label",
+        labels: availableLabels,
+        frequentNames: frequentNames,
+        showsDescriptions: normalizedPreferences.showLabelDescriptions,
+        onSelect: { name in Task { await addLabel(name, to: items) } },
+        onCustom: {
+          labelTargetItems = items
+          labelDraft = ""
+          isLabelSheetPresented = true
+        }
+      )
+      Button("Auto") {
+        Task { await auto(items: items) }
+      }
+      .disabled(!items.contains { $0.canRunAutoMode })
+      if isSingleItem, primaryItem.canStartFixCI {
+        Button("Fix CI") {
+          Task { await fixCI(item: primaryItem) }
+        }
+      }
     }
-    let scopedItems = filteredItems.filter { selectedIDs.contains($0.pullRequestID) }
-    return scopedItems.isEmpty ? [item] : scopedItems
+  }
+
+  func contextMenuItems(forSelection selection: Set<String>) -> [DependencyUpdateItem] {
+    guard !selection.isEmpty else { return [] }
+    return filteredItems.filter { selection.contains($0.pullRequestID) }
+  }
+
+  func contextMenuAvailableLabels(
+    for items: [DependencyUpdateItem]
+  ) -> [DependencyUpdateRepositoryLabel] {
+    if items.count == 1, let item = items.first {
+      return rowAvailableLabels(for: item)
+    }
+    return dashboardDependenciesAvailableLabels(
+      repositoryLabels: response.repositoryLabels,
+      items: items
+    )
+  }
+
+  func contextMenuFrequentNames(for items: [DependencyUpdateItem]) -> [String] {
+    if items.count == 1, let item = items.first {
+      return rowFrequentLabelNames(for: item)
+    }
+    return frequentLabelNames(for: items)
   }
 
   func repositorySectionHeader(_ repository: String, itemCount: Int) -> some View {

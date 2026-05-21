@@ -46,7 +46,7 @@ public enum HarnessMonitorPaths {
   ///    when `preferExternalDaemon` is true.
   ///
   /// Returns `nil` when none of the above resolves — callers decide how to handle that.
-  private static func resolveBaseRoot(
+  static func resolveBaseRoot(
     using environment: HarnessMonitorEnvironment,
     preferExternalDaemon: Bool,
     discoverLiveDaemon: Bool = true
@@ -96,7 +96,7 @@ public enum HarnessMonitorPaths {
     return nil
   }
 
-  private static func sharedObservabilityRoot(
+  static func sharedObservabilityRoot(
     using environment: HarnessMonitorEnvironment
   ) -> URL {
     if let configuredRoot = configuredDataHomeRoot(using: environment) {
@@ -207,7 +207,7 @@ public enum HarnessMonitorPaths {
     harnessRoot(using: environment, discoverLiveDaemon: false)
   }
 
-  private static func harnessRoot(
+  static func harnessRoot(
     using environment: HarnessMonitorEnvironment,
     discoverLiveDaemon: Bool
   ) -> URL {
@@ -373,7 +373,7 @@ public enum HarnessMonitorPaths {
     }
   }
 
-  private static func legacyGeneratedCacheDirectories(
+  static func legacyGeneratedCacheDirectories(
     using environment: HarnessMonitorEnvironment
   ) -> [URL] {
     let legacyCacheRoot = Self.harnessRoot(using: environment)

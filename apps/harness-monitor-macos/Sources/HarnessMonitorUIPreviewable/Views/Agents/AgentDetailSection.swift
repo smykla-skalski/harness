@@ -18,13 +18,13 @@ struct AgentDetailSection: View {
   let agent: AgentRegistration
   let activity: AgentToolActivitySummary?
   let runtimePresentation: AcpRuntimePresentation
-  @State private var selectedSendAction: SendUpdateAction = .injectContext
-  @State private var signalCommand = "inject_context"
-  @State private var signalMessage = ""
-  @State private var signalActionHint = ""
-  @State private var selectedRole: SessionRole = .worker
-  @State private var transcriptAnnouncer = MonitorTimelineLiveRegionThrottle()
-  @State private var lastAnnouncedTimelineEntryId: String?
+  @State var selectedSendAction: SendUpdateAction = .injectContext
+  @State var signalCommand = "inject_context"
+  @State var signalMessage = ""
+  @State var signalActionHint = ""
+  @State var selectedRole: SessionRole = .worker
+  @State var transcriptAnnouncer = MonitorTimelineLiveRegionThrottle()
+  @State var lastAnnouncedTimelineEntryId: String?
 
   init(
     store: HarnessMonitorStore,
@@ -38,14 +38,14 @@ struct AgentDetailSection: View {
     self.runtimePresentation = runtimePresentation
   }
 
-  private var sessionID: String { store.selectedSessionID ?? "" }
-  private var leaderID: String? { store.selectedSession?.session.leaderId }
-  private var isLeader: Bool { agent.agentId == leaderID }
-  private var roleActionsAvailable: Bool { store.areSelectedLeaderActionsAvailable }
-  private var roleStateKey: String {
+  var sessionID: String { store.selectedSessionID ?? "" }
+  var leaderID: String? { store.selectedSession?.session.leaderId }
+  var isLeader: Bool { agent.agentId == leaderID }
+  var roleActionsAvailable: Bool { store.areSelectedLeaderActionsAvailable }
+  var roleStateKey: String {
     "\(agent.agentId)|\(agent.role.rawValue)|\(leaderID ?? "-")"
   }
-  private var rolePickerSelection: Binding<SessionRole> {
+  var rolePickerSelection: Binding<SessionRole> {
     Binding(
       get: {
         Self.normalizedRoleSelection(
@@ -56,11 +56,11 @@ struct AgentDetailSection: View {
       set: { selectedRole = $0 }
     )
   }
-  private var rolePickerValues: [SessionRole] {
+  var rolePickerValues: [SessionRole] {
     Self.rolePickerOptions(for: agent.role)
   }
 
-  private var overviewFacts: [AgentDetailFact] {
+  var overviewFacts: [AgentDetailFact] {
     [
       .init(title: "Last Activity", value: formatTimestamp(agent.lastActivityAt)),
       .init(
@@ -70,7 +70,7 @@ struct AgentDetailSection: View {
     ]
   }
 
-  private var runtimeLaneFacts: [AgentDetailFact] {
+  var runtimeLaneFacts: [AgentDetailFact] {
     [
       .init(
         title: "Transcript",
@@ -88,15 +88,15 @@ struct AgentDetailSection: View {
     ]
   }
 
-  private var capabilityValues: [String] {
+  var capabilityValues: [String] {
     agent.capabilities.isEmpty ? ["No declared capabilities"] : agent.capabilities
   }
 
-  private var hookPoints: [HookIntegrationDescriptor] {
+  var hookPoints: [HookIntegrationDescriptor] {
     agent.runtimeCapabilities.hookPoints
   }
 
-  private var activityFacts: [AgentDetailFact] {
+  var activityFacts: [AgentDetailFact] {
     guard let activity else {
       return []
     }
@@ -123,11 +123,11 @@ struct AgentDetailSection: View {
     ]
   }
 
-  private var assignedTasks: [WorkItem] {
+  var assignedTasks: [WorkItem] {
     (store.selectedSession?.tasks ?? []).filter { $0.assignedTo == agent.agentId }
   }
 
-  private var currentTaskTitle: String {
+  var currentTaskTitle: String {
     guard
       let currentTaskID = agent.currentTaskId,
       let task = store.selectedSession?.tasks.first(where: { $0.taskId == currentTaskID })
@@ -137,27 +137,27 @@ struct AgentDetailSection: View {
     return task.title
   }
 
-  private var isSparseState: Bool {
+  var isSparseState: Bool {
     agentTimelineEntries.isEmpty && agent.persona == nil && assignedTasks.isEmpty
   }
 
-  private var agentTimelineEntries: [TimelineEntry] {
+  var agentTimelineEntries: [TimelineEntry] {
     Self.transcriptEntries(store: store, agent: agent)
   }
 
-  private var pendingDecisionAttention: AcpDecisionAttention? {
+  var pendingDecisionAttention: AcpDecisionAttention? {
     store.acpDecisionAttention(for: agent.agentId)
   }
 
-  private var acpRuntimeState: AcpAgentRuntimeState? {
+  var acpRuntimeState: AcpAgentRuntimeState? {
     store.acpRuntimeState(for: agent.agentId)
   }
 
-  private var acpRuntimeInspectStatus: AcpRuntimeInspectStatus? {
+  var acpRuntimeInspectStatus: AcpRuntimeInspectStatus? {
     store.acpRuntimeInspectStatus(for: agent.agentId)
   }
 
-  private var lifecyclePresentation: (label: String, visualStatus: AgentStatus) {
+  var lifecyclePresentation: (label: String, visualStatus: AgentStatus) {
     let lifecycle = store.agentLifecyclePresentation(
       for: agent,
       sessionID: sessionID,
@@ -219,7 +219,7 @@ struct AgentDetailSection: View {
     }
   }
 
-  @ViewBuilder private var fullPaneBody: some View {
+  @ViewBuilder var fullPaneBody: some View {
     HarnessMonitorColumnScrollView(
       horizontalPadding: HarnessMonitorTheme.spacingLG,
       verticalPadding: HarnessMonitorTheme.spacingLG,
@@ -239,13 +239,13 @@ struct AgentDetailSection: View {
     )
   }
 
-  @ViewBuilder private var compactBody: some View {
+  @ViewBuilder var compactBody: some View {
     contentColumn(pinsComposer: false)
       .agentDetailCardProbe(name: agent.name, agentID: agent.agentId)
   }
 
   @ViewBuilder
-  private func contentColumn(pinsComposer: Bool) -> some View {
+  func contentColumn(pinsComposer: Bool) -> some View {
     VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingLG) {
       awaitingDecisionStripView
       summaryBandView
@@ -258,7 +258,7 @@ struct AgentDetailSection: View {
     }
   }
 
-  @ViewBuilder private var awaitingDecisionStripView: some View {
+  @ViewBuilder var awaitingDecisionStripView: some View {
     if let pendingDecisionAttention {
       AgentDetailAwaitingDecisionRegion(
         agentID: agent.agentId,
@@ -291,7 +291,7 @@ struct AgentDetailSection: View {
     }
   }
 
-  private var summaryBandView: some View {
+  var summaryBandView: some View {
     AgentDetailSummaryBand(
       store: store,
       title: agent.name,
@@ -307,7 +307,7 @@ struct AgentDetailSection: View {
     )
   }
 
-  private var activityBandView: some View {
+  var activityBandView: some View {
     AgentDetailActivityBand(
       store: store,
       agentID: agent.agentId,
@@ -324,7 +324,7 @@ struct AgentDetailSection: View {
     )
   }
 
-  private var actionBandView: some View {
+  var actionBandView: some View {
     AgentDetailActionBand(
       store: store,
       sessionID: store.selectedSessionID ?? "",
@@ -341,7 +341,7 @@ struct AgentDetailSection: View {
     )
   }
 
-  private var roleActionsOnlyBandView: some View {
+  var roleActionsOnlyBandView: some View {
     AgentDetailRoleActionsRegion(
       store: store,
       sessionID: store.selectedSessionID ?? "",
@@ -353,7 +353,7 @@ struct AgentDetailSection: View {
     )
   }
 
-  private var composerInset: some View {
+  var composerInset: some View {
     AgentDetailComposerRegion(
       store: store,
       sessionID: store.selectedSessionID ?? "",
@@ -365,7 +365,7 @@ struct AgentDetailSection: View {
     )
   }
 
-  private func announceLatestTimelineEntryIfNeeded() {
+  func announceLatestTimelineEntryIfNeeded() {
     guard let entry = agentTimelineEntries.last else { return }
     guard entry.entryId != lastAnnouncedTimelineEntryId else { return }
     lastAnnouncedTimelineEntryId = entry.entryId
@@ -376,7 +376,7 @@ struct AgentDetailSection: View {
     transcriptAnnouncer.announceIfAllowed(entry.summary, priority: priority)
   }
 
-  private func hydrateDraft() {
+  func hydrateDraft() {
     let defaults = UserDefaults.standard
     let savedCommand = defaults.string(forKey: Self.draftCommandKey(agentID: agent.agentId)) ?? ""
     let savedMessage = defaults.string(forKey: Self.draftMessageKey(agentID: agent.agentId)) ?? ""
@@ -396,7 +396,7 @@ struct AgentDetailSection: View {
   }
 
   @ViewBuilder
-  private func runtimeView(
+  func runtimeView(
     runtimeState: AcpAgentRuntimeState,
     inspectStatus: AcpRuntimeInspectStatus
   ) -> some View {

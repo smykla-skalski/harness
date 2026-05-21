@@ -11,8 +11,8 @@ public struct TaskBoardOverviewView: View {
   let contentHorizontalPadding: CGFloat
   let fillsAvailableHeight: Bool
   let decisions: [Decision]
-  private let decisionsByID: [String: Decision]
-  private let decisionItems: [DecisionPresentationItem]
+  let decisionsByID: [String: Decision]
+  let decisionItems: [DecisionPresentationItem]
   let isActionInFlight: Bool
   let onOpenItem: (TaskBoardInboxItem) -> Void
   let onOpenTaskBoardItem: (TaskBoardItem) -> Void
@@ -32,21 +32,21 @@ public struct TaskBoardOverviewView: View {
   let onStopTaskBoardOrchestrator: (() -> Void)?
   let onRunTaskBoardOrchestratorOnce: ((TaskBoardOrchestratorRunOnceRequest) -> Void)?
   @Environment(\.fontScale)
-  private var fontScale
-  @State private var selectedTaskBoardItemID: String?
-  @State private var isCreatingTaskBoardItem = false
-  @State private var evaluationSummaryFitsHorizontally = true
-  @State private var presentationWorker = TaskBoardOverviewPresentationWorker()
-  @State private var cachedPresentation = TaskBoardOverviewPresentation.empty
-  @State private var presentationGeneration: UInt64 = 0
+  var fontScale
+  @State var selectedTaskBoardItemID: String?
+  @State var isCreatingTaskBoardItem = false
+  @State var evaluationSummaryFitsHorizontally = true
+  @State var presentationWorker = TaskBoardOverviewPresentationWorker()
+  @State var cachedPresentation = TaskBoardOverviewPresentation.empty
+  @State var presentationGeneration: UInt64 = 0
 
-  private var captionSemibold: Font {
+  var captionSemibold: Font {
     HarnessMonitorTextSize.scaledFont(.caption.weight(.semibold), by: fontScale)
   }
-  private var bodyFont: Font {
+  var bodyFont: Font {
     HarnessMonitorTextSize.scaledFont(.body, by: fontScale)
   }
-  private var titleHeaderFont: Font {
+  var titleHeaderFont: Font {
     HarnessMonitorTextSize.scaledFont(
       .system(.title3, design: .rounded, weight: .semibold),
       by: fontScale
@@ -57,18 +57,18 @@ public struct TaskBoardOverviewView: View {
     TaskBoardOverviewMetrics(fontScale: fontScale)
   }
 
-  private var laneMetrics: TaskBoardLaneMetrics {
+  var laneMetrics: TaskBoardLaneMetrics {
     TaskBoardLaneMetrics(fontScale: fontScale)
   }
 
-  private var laneStripSizing: TaskBoardLaneStripSizing {
+  var laneStripSizing: TaskBoardLaneStripSizing {
     TaskBoardLaneStripSizing(
       minColumnWidth: laneMetrics.laneWidth,
       spacing: metrics.columnSpacing
     )
   }
 
-  private var presentationInput: TaskBoardOverviewPresentationInput {
+  var presentationInput: TaskBoardOverviewPresentationInput {
     TaskBoardOverviewPresentationInput(
       snapshot: snapshot,
       taskBoardItems: taskBoardItems,
@@ -177,7 +177,7 @@ public struct TaskBoardOverviewView: View {
 }
 
 extension TaskBoardOverviewView {
-  @ViewBuilder private var boardChrome: some View {
+  @ViewBuilder var boardChrome: some View {
     if hasRouteContent || store != nil {
       if let orchestratorStatus {
         taskBoardDetailRow {
@@ -202,20 +202,20 @@ extension TaskBoardOverviewView {
     }
   }
 
-  private var headerTitle: some View {
+  var headerTitle: some View {
     Label("Board", systemImage: "rectangle.3.group")
       .font(titleHeaderFont)
       .accessibilityAddTraits(.isHeader)
   }
 
-  private var headerActions: some View {
+  var headerActions: some View {
     HStack(spacing: HarnessMonitorTheme.spacingSM) {
       headerActionButtons
     }
     .fixedSize(horizontal: true, vertical: false)
   }
 
-  private var boardAccessoryRow: some View {
+  var boardAccessoryRow: some View {
     HStack(alignment: .center, spacing: HarnessMonitorTheme.spacingMD) {
       if hasAggregateSummary {
         aggregateSummaryRow
@@ -229,11 +229,11 @@ extension TaskBoardOverviewView {
     }
   }
 
-  private var hasHeaderActions: Bool {
+  var hasHeaderActions: Bool {
     onCreateTaskBoardItem != nil || onEvaluateTaskBoard != nil || onRefreshTaskBoard != nil
   }
 
-  @ViewBuilder private var headerActionButtons: some View {
+  @ViewBuilder var headerActionButtons: some View {
     if onCreateTaskBoardItem != nil {
       Button {
         startTaskBoardItemCreation()
@@ -280,14 +280,14 @@ extension TaskBoardOverviewView {
     }
   }
 
-  private var aggregateSummaryRow: some View {
+  var aggregateSummaryRow: some View {
     HStack(spacing: HarnessMonitorTheme.spacingSM) {
       aggregateSummaryContent
     }
     .fixedSize(horizontal: true, vertical: false)
   }
 
-  private func evaluationSummaryRow(_ summary: TaskBoardEvaluationSummary) -> some View {
+  func evaluationSummaryRow(_ summary: TaskBoardEvaluationSummary) -> some View {
     Group {
       if evaluationSummaryFitsHorizontally {
         HStack(spacing: HarnessMonitorTheme.spacingSM) {
@@ -311,11 +311,11 @@ extension TaskBoardOverviewView {
     .accessibilityIdentifier("harness.task-board.evaluation-summary")
   }
 
-  private var hasBoardContent: Bool {
+  var hasBoardContent: Bool {
     cachedPresentation.hasBoardContent
   }
 
-  private var boardSection: some View {
+  var boardSection: some View {
     VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
       if hasAggregateSummary || hasHeaderActions {
         boardAccessoryRow
@@ -326,7 +326,7 @@ extension TaskBoardOverviewView {
     .frame(maxHeight: fillsAvailableHeight ? .infinity : nil)
   }
 
-  @ViewBuilder private var boardContent: some View {
+  @ViewBuilder var boardContent: some View {
     if hasBoardContent {
       taskBoardColumns
     } else {
@@ -334,7 +334,7 @@ extension TaskBoardOverviewView {
     }
   }
 
-  private var taskBoardColumns: some View {
+  var taskBoardColumns: some View {
     ViewThatFits(in: .horizontal) {
       TaskBoardLaneStripLayout(sizing: laneStripSizing) {
         taskBoardLaneColumns
@@ -351,7 +351,7 @@ extension TaskBoardOverviewView {
     }
   }
 
-  @ViewBuilder private var taskBoardLaneColumns: some View {
+  @ViewBuilder var taskBoardLaneColumns: some View {
     ForEach(TaskBoardInboxLane.allCases) { lane in
       TaskBoardLaneUnifiedColumn(
         lane: lane,
@@ -367,7 +367,7 @@ extension TaskBoardOverviewView {
     }
   }
 
-  private var emptyState: some View {
+  var emptyState: some View {
     ContentUnavailableView("No Open Tasks", systemImage: "tray")
       .font(bodyFont)
       .frame(maxWidth: .infinity, minHeight: 180)
@@ -375,12 +375,12 @@ extension TaskBoardOverviewView {
         .background.opacity(0.45), in: .rect(cornerRadius: HarnessMonitorTheme.cornerRadiusSM))
   }
 
-  private func decisions(in lane: TaskBoardInboxLane) -> [Decision] {
+  func decisions(in lane: TaskBoardInboxLane) -> [Decision] {
     cachedPresentation.decisionIDs(in: lane).compactMap { decisionsByID[$0] }
   }
 
   @MainActor
-  private func rebuildPresentation(input: TaskBoardOverviewPresentationInput) async {
+  func rebuildPresentation(input: TaskBoardOverviewPresentationInput) async {
     presentationGeneration &+= 1
     let generation = presentationGeneration
     let presentation = await presentationWorker.compute(input: input)

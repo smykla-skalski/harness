@@ -1,7 +1,7 @@
 import HarnessMonitorKit
 import SwiftUI
 
-private enum AgentDetailSendUpdateFocusField: Hashable {
+enum AgentDetailSendUpdateFocusField: Hashable {
   case customCommand
 }
 
@@ -18,15 +18,15 @@ struct AgentDetailSendUpdateSection: View {
   @Binding var signalCommand: String
   @Binding var signalMessage: String
   @Binding var signalActionHint: String
-  @FocusState private var focusedField: AgentDetailSendUpdateFocusField?
-  @State private var deadlineClock = AgentDetailDeadlineClockState()
-  @State private var isMoreOptionsExpanded = false
+  @FocusState var focusedField: AgentDetailSendUpdateFocusField?
+  @State var deadlineClock = AgentDetailDeadlineClockState()
+  @State var isMoreOptionsExpanded = false
   // Measured container width drives the deterministic horizontal/vertical pick
   // below. ViewThatFits would build both candidate trees on every body
   // invocation; here we measure once and only re-pick on threshold crossings.
-  @State private var composerFitsHorizontally = true
+  @State var composerFitsHorizontally = true
 
-  private static let composerHorizontalMinWidth: CGFloat = 480
+  static let composerHorizontalMinWidth: CGFloat = 480
 
   init(
     store: HarnessMonitorStore,
@@ -54,11 +54,11 @@ struct AgentDetailSendUpdateSection: View {
     _signalActionHint = signalActionHint
   }
 
-  private var trimmedCommand: String {
+  var trimmedCommand: String {
     signalCommand.trimmingCharacters(in: .whitespacesAndNewlines)
   }
 
-  private var trimmedMessage: String {
+  var trimmedMessage: String {
     signalMessage.trimmingCharacters(in: .whitespacesAndNewlines)
   }
 
@@ -71,7 +71,7 @@ struct AgentDetailSendUpdateSection: View {
     )
   }
 
-  private var trimmedActionHint: String? {
+  var trimmedActionHint: String? {
     let trimmed = signalActionHint.trimmingCharacters(in: .whitespacesAndNewlines)
     return trimmed.isEmpty ? nil : trimmed
   }
@@ -87,7 +87,7 @@ struct AgentDetailSendUpdateSection: View {
     return observedAt.addingTimeInterval(TimeInterval(remaining) / 1000)
   }
 
-  private var moreOptionsSummary: String? {
+  var moreOptionsSummary: String? {
     switch (selectedSendAction == .custom, trimmedActionHint != nil) {
     case (true, true):
       "Custom type · Context added"
@@ -139,7 +139,7 @@ struct AgentDetailSendUpdateSection: View {
     }
   }
 
-  @ViewBuilder private var compactComposer: some View {
+  @ViewBuilder var compactComposer: some View {
     Group {
       if composerFitsHorizontally {
         HStack(alignment: .top, spacing: HarnessMonitorTheme.spacingSM) {
@@ -169,7 +169,7 @@ struct AgentDetailSendUpdateSection: View {
     }
   }
 
-  private var updateTypePicker: some View {
+  var updateTypePicker: some View {
     Picker("Update type", selection: $selectedSendAction) {
       ForEach(SendUpdateAction.allLabeledCases, id: \.self) { action in
         Text(action.humanLabel).tag(action)
@@ -182,7 +182,7 @@ struct AgentDetailSendUpdateSection: View {
     .disabled(isSessionReadOnly)
   }
 
-  private var messageField: some View {
+  var messageField: some View {
     TextField("Tell this agent what to do next", text: $signalMessage, axis: .vertical)
       .harnessNativeFormControl()
       .lineLimit(1...3)
@@ -192,7 +192,7 @@ struct AgentDetailSendUpdateSection: View {
       .disabled(isSessionReadOnly)
   }
 
-  private var advancedOptionsDisclosure: some View {
+  var advancedOptionsDisclosure: some View {
     DisclosureGroup(isExpanded: $isMoreOptionsExpanded) {
       VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
         if selectedSendAction == .custom {
@@ -243,7 +243,7 @@ struct AgentDetailSendUpdateSection: View {
     .accessibilityIdentifier(HarnessMonitorAccessibility.agentDetailSignalDisclosure)
   }
 
-  private var sendButton: some View {
+  var sendButton: some View {
     AgentDetailDeadlineSendButton(
       store: store,
       sessionID: sessionID,
@@ -255,7 +255,7 @@ struct AgentDetailSendUpdateSection: View {
     )
   }
 
-  private var composerStatusRow: some View {
+  var composerStatusRow: some View {
     AgentDetailComposerStatusRow(
       store: store,
       statusMessage: statusMessage,
@@ -266,7 +266,7 @@ struct AgentDetailSendUpdateSection: View {
     )
   }
 
-  private func dispatchSendUpdate() {
+  func dispatchSendUpdate() {
     guard statusMessage == nil else { return }
     let dispatchedCommand = trimmedCommand
     let dispatchedMessage = trimmedMessage

@@ -309,7 +309,7 @@ public actor DecisionStore {
 
   // MARK: - Private
 
-  nonisolated private func apply(
+  nonisolated func apply(
     _ draft: DecisionDraft,
     to decision: Decision,
     reopen: Bool
@@ -350,7 +350,7 @@ public actor DecisionStore {
     return result
   }
 
-  nonisolated private func upsertResult(
+  nonisolated func upsertResult(
     _ draft: DecisionDraft,
     for decision: Decision,
     reopen: Bool

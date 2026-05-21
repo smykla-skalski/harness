@@ -8,7 +8,7 @@ enum SessionWindowCreateFormCatalogs {
 
   static let allEffortLevels: [String] = ["off", "low", "medium", "high", "xhigh"]
   // Keep Claude ACP out of the New Agent form until the bundled Harness adapter lands.
-  private static let deferredAcpDescriptorIDsForNewAgentForm: Set<String> = ["claude"]
+  static let deferredAcpDescriptorIDsForNewAgentForm: Set<String> = ["claude"]
 
   static func capabilityOptions(
     acpAgents: [AcpAgentDescriptor],
