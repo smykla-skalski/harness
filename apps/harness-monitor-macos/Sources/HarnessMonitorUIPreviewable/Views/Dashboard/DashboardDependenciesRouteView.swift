@@ -179,7 +179,7 @@ struct DashboardDependenciesRouteView: View {
   @SceneStorage("dashboard.dependencies.content-detail-width")
   var contentDetailWidth = SessionContentDetailSplitLayout.defaultContentWidth
 
-  @State var response = DependencyUpdatesQueryResponse(
+  @State private var response = DependencyUpdatesQueryResponse(
     fetchedAt: "",
     fromCache: false,
     summary: DependencyUpdatesSummary(
@@ -192,22 +192,22 @@ struct DashboardDependenciesRouteView: View {
     ),
     items: []
   )
-  @State var isLoading = false
-  @State var isBackgroundRefreshing = false
-  @State var errorMessage: String?
-  @State var selectedIDs = Set<String>()
-  @State var isLabelSheetPresented = false
-  @State var labelDraft = ""
-  @State var labelTargetItems = [DependencyUpdateItem]()
-  @State var inFlightActionTitle: String?
-  @State var resolvedPreferences: DashboardDependenciesResolvedPreferences
-  @State var presentationWorker = DashboardDependenciesPresentationWorker()
-  @State var cachedPresentation = DashboardDependenciesPresentation.empty
-  @State var presentationGeneration: UInt64 = 0
-  @State var refreshingPullRequestIDs = Set<String>()
-  @State var scheduler = DashboardDependenciesScheduler()
-  @State var collapsedRepositories = DashboardDependenciesCollapsedRepositories()
-  @State var labelMenuDataByRepository: [String: DashboardDependenciesRepoLabelMenuData] =
+  @State private var isLoading = false
+  @State private var isBackgroundRefreshing = false
+  @State private var errorMessage: String?
+  @State private var selectedIDs = Set<String>()
+  @State private var isLabelSheetPresented = false
+  @State private var labelDraft = ""
+  @State private var labelTargetItems = [DependencyUpdateItem]()
+  @State private var inFlightActionTitle: String?
+  @State private var resolvedPreferences: DashboardDependenciesResolvedPreferences
+  @State private var presentationWorker = DashboardDependenciesPresentationWorker()
+  @State private var cachedPresentation = DashboardDependenciesPresentation.empty
+  @State private var presentationGeneration: UInt64 = 0
+  @State private var refreshingPullRequestIDs = Set<String>()
+  @State private var scheduler = DashboardDependenciesScheduler()
+  @State private var collapsedRepositories = DashboardDependenciesCollapsedRepositories()
+  @State private var labelMenuDataByRepository: [String: DashboardDependenciesRepoLabelMenuData] =
     [:]
 
   init(
@@ -512,28 +512,54 @@ struct DashboardDependenciesRouteView: View {
     _ item: DependencyUpdateItem,
     showsRepository: Bool
   ) -> some View {
-    DashboardDependencyRow(
+    let contextItems = contextMenuItems(for: item)
+    let isBatchContext =
+      contextItems.count > 1 || contextItems.first?.pullRequestID != item.pullRequestID
+    let availableLabels =
+      isBatchContext
+      ? dashboardDependenciesAvailableLabels(
+        repositoryLabels: response.repositoryLabels,
+        items: contextItems
+      )
+      : rowAvailableLabels(for: item)
+    let frequentNames =
+      isBatchContext
+      ? frequentLabelNames(for: contextItems)
+      : rowFrequentLabelNames(for: item)
+    return DashboardDependencyRow(
       item: item,
       showsRepository: showsRepository,
       isRefreshing: refreshingPullRequestIDs.contains(item.pullRequestID),
       updatedLabel: relativeUpdatedLabel(for: item),
-      availableLabels: rowAvailableLabels(for: item),
-      frequentNames: rowFrequentLabelNames(for: item),
+      availableLabels: availableLabels,
+      frequentNames: frequentNames,
       showsDescriptions: normalizedPreferences.showLabelDescriptions,
+      canApprove: contextItems.contains { $0.canAttemptManualApproval },
+      canMerge: contextItems.contains { $0.canAttemptManualMerge },
+      hasRerunnableChecks: contextItems.contains { $0.hasRerunnableChecks },
+      canRunAutoMode: contextItems.contains { $0.canRunAutoMode },
       onOpen: { openItem(item) },
       onCopyLink: { HarnessMonitorClipboard.copy(item.url) },
-      onApprove: { Task { await approve(items: [item]) } },
-      onMerge: { Task { await merge(items: [item]) } },
-      onRerunChecks: { Task { await rerunChecks(items: [item]) } },
-      onSelectLabel: { name in Task { await addLabel(name, to: [item]) } },
+      onApprove: { Task { await approve(items: contextItems) } },
+      onMerge: { Task { await merge(items: contextItems) } },
+      onRerunChecks: { Task { await rerunChecks(items: contextItems) } },
+      onSelectLabel: { name in Task { await addLabel(name, to: contextItems) } },
       onCustomLabel: {
-        labelTargetItems = [item]
+        labelTargetItems = contextItems
         labelDraft = ""
         isLabelSheetPresented = true
       },
-      onAuto: { Task { await auto(items: [item]) } },
+      onAuto: { Task { await auto(items: contextItems) } },
       onFixCI: { Task { await fixCI(item: item) } }
     )
+  }
+
+  func contextMenuItems(for item: DependencyUpdateItem) -> [DependencyUpdateItem] {
+    guard selectedIDs.contains(item.pullRequestID) else {
+      return [item]
+    }
+    let scopedItems = filteredItems.filter { selectedIDs.contains($0.pullRequestID) }
+    return scopedItems.isEmpty ? [item] : scopedItems
   }
 
   func repositorySectionHeader(_ repository: String, itemCount: Int) -> some View {
