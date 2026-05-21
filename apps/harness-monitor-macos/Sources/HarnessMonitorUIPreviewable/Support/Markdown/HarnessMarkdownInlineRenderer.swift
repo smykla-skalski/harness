@@ -29,8 +29,18 @@ enum HarnessMarkdownInlineRenderer {
     style: HarnessMarkdownInlineRenderStyle
   ) -> AttributedString {
     switch inline {
-    case .autolink(let value):
-      return linked(value, label: value, style: style)
+    case .autolink, .image, .link:
+      return linkFragment(for: inline, style: style)
+    case .code, .emphasis, .lineBreak, .softBreak, .strikethrough, .strong, .text:
+      return styledFragment(for: inline, style: style)
+    }
+  }
+
+  private static func styledFragment(
+    for inline: HarnessMarkdownInline,
+    style: HarnessMarkdownInlineRenderStyle
+  ) -> AttributedString {
+    switch inline {
     case .code(let value):
       var fragment = AttributedString(value)
       fragment.font = style.codeFont
@@ -41,19 +51,8 @@ enum HarnessMarkdownInlineRenderer {
       var fragment = attributedString(from: children, style: style.withFont(style.font.italic()))
       fragment.font = style.font.italic()
       return fragment
-    case .image(let image):
-      let label = image.alt.isEmpty ? image.source : image.alt
-      return linked(image.source, label: label, style: style)
     case .lineBreak:
       return AttributedString("\n")
-    case .link(let label, let destination, _):
-      var fragment = attributedString(from: label, style: style)
-      if let url = URL(string: destination) {
-        fragment.link = url
-      }
-      fragment.foregroundColor = style.colors.link
-      fragment.underlineStyle = .single
-      return fragment
     case .softBreak:
       return AttributedString(" ")
     case .strikethrough(let children):
@@ -65,10 +64,35 @@ enum HarnessMarkdownInlineRenderer {
       fragment.font = style.font.bold()
       return fragment
     case .text(let value):
-      var fragment = AttributedString(value)
+      var fragment = AttributedString(decodeEntities(value))
       fragment.font = style.font
       fragment.foregroundColor = style.colors.text
       return fragment
+    case .autolink, .image, .link:
+      return linkFragment(for: inline, style: style)
+    }
+  }
+
+  private static func linkFragment(
+    for inline: HarnessMarkdownInline,
+    style: HarnessMarkdownInlineRenderStyle
+  ) -> AttributedString {
+    switch inline {
+    case .autolink(let value):
+      return linked(value, label: value, style: style)
+    case .image(let image):
+      let label = image.alt.isEmpty ? image.source : image.alt
+      return linked(image.source, label: label, style: style)
+    case .link(let label, let destination, _):
+      var fragment = attributedString(from: label, style: style)
+      if let url = URL(string: decodeEntities(destination)) {
+        fragment.link = url
+      }
+      fragment.foregroundColor = style.colors.link
+      fragment.underlineStyle = .single
+      return fragment
+    case .code, .emphasis, .lineBreak, .softBreak, .strikethrough, .strong, .text:
+      return styledFragment(for: inline, style: style)
     }
   }
 
@@ -77,10 +101,10 @@ enum HarnessMarkdownInlineRenderer {
     label: String,
     style: HarnessMarkdownInlineRenderStyle
   ) -> AttributedString {
-    var fragment = AttributedString(label)
+    var fragment = AttributedString(decodeEntities(label))
     fragment.font = style.font
     fragment.foregroundColor = style.colors.link
-    if let url = URL(string: destination) {
+    if let url = URL(string: decodeEntities(destination)) {
       fragment.link = url
     }
     fragment.underlineStyle = .single
