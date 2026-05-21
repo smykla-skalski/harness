@@ -232,7 +232,9 @@ struct SettingsRepositoriesCatalogErrorPresentationTests {
     #expect(presentation.title == "GitHub token needs attention")
     #expect(
       presentation.message
-        == "GitHub blocked access to smykla-skalski because the current fine-grained token exceeds the organization's lifetime policy. Update the token, then load repositories again."
+        == "GitHub blocked access to smykla-skalski because the current fine-grained token "
+        + "exceeds the organization's lifetime policy. Update the token, then load "
+        + "repositories again."
     )
 
     guard case .openURL(let url)? = presentation.action else {

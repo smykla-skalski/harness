@@ -1,3 +1,4 @@
+// swiftlint:disable file_length
 import Foundation
 
 extension HarnessMonitorStore {
@@ -179,6 +180,7 @@ extension HarnessMonitorStore {
     )
   }
 
+  // swiftlint:disable:next function_parameter_count
   private func applyRefreshSnapshot(
     _ refreshSnapshot: RefreshSnapshot,
     using client: any HarnessMonitorClientProtocol,
@@ -364,6 +366,7 @@ extension HarnessMonitorStore {
     initialTaskBoardConfirmationTask = nil
   }
 
+  // swiftlint:disable:next cyclomatic_complexity
   func scheduleInitialTaskBoardConfirmationRefresh(
     using client: any HarnessMonitorClientProtocol,
     preservedItemIDs: Set<String>,

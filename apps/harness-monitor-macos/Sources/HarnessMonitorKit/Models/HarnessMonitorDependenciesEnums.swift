@@ -184,6 +184,7 @@ public enum DependencyUpdateCheckConclusion: TaskBoardOpenEnum, CaseIterable, Id
     }
   }
 
+  // swiftlint:disable:next cyclomatic_complexity
   public init(rawValue: String) {
     switch rawValue {
     case "none": self = .none

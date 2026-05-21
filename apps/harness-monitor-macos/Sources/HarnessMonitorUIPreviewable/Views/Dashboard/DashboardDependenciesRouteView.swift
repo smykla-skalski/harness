@@ -1,3 +1,5 @@
+// swiftlint:disable file_length
+// swiftlint:disable type_body_length
 import HarnessMonitorKit
 import SwiftUI
 
@@ -72,8 +74,13 @@ struct DashboardDependenciesRouteView: View {
     fetchedAt: "",
     fromCache: false,
     summary: DependencyUpdatesSummary(
-      total: 0, reviewRequired: 0, readyToMerge: 0, autoApprovable: 0, waitingOnChecks: 0,
-      blocked: 0),
+      total: 0,
+      reviewRequired: 0,
+      readyToMerge: 0,
+      autoApprovable: 0,
+      waitingOnChecks: 0,
+      blocked: 0
+    ),
     items: []
   )
   @State private var isLoading = false
@@ -162,12 +169,10 @@ struct DashboardDependenciesRouteView: View {
       contentWidth: $contentDetailWidth,
       commitContentWidth: { contentDetailWidth = $0 },
       dividerAccessibilityIdentifier:
-        HarnessMonitorAccessibility.dashboardDependenciesDetailDivider
-    ) {
-      contentPane
-    } detail: {
-      detailPane
-    }
+        HarnessMonitorAccessibility.dashboardDependenciesDetailDivider,
+      content: { contentPane },
+      detail: { detailPane }
+    )
     .frame(maxWidth: .infinity, maxHeight: .infinity)
     .accessibilityIdentifier(HarnessMonitorAccessibility.dashboardDependenciesRoot)
     .task(id: reloadTaskKey) {
@@ -183,7 +188,7 @@ struct DashboardDependenciesRouteView: View {
       labelSheet
     }
     .onChange(of: selectedIDs) { _, newValue in
-      persistedPrimarySelectionID = newValue.sorted().first ?? persistedPrimarySelectionID
+      persistedPrimarySelectionID = newValue.min() ?? persistedPrimarySelectionID
     }
   }
 
@@ -573,7 +578,8 @@ struct DashboardDependenciesRouteView: View {
     .frame(maxWidth: .infinity, alignment: .leading)
   }
 
-  @ViewBuilder private func dependencyActionButtons(items: [DependencyUpdateItem]) -> some View {
+  @ViewBuilder
+  private func dependencyActionButtons(items: [DependencyUpdateItem]) -> some View {
     actionButton("Approve", systemImage: "checkmark.seal") {
       Task { await approve(items: items) }
     }
@@ -999,6 +1005,8 @@ struct DashboardDependenciesRouteView: View {
   }
 }
 
+// swiftlint:enable type_body_length
+
 private struct DashboardDependenciesNotice {
   let title: String
   let tint: Color
@@ -1354,8 +1362,7 @@ extension DependencyUpdateItem {
     }
   }
 
-  @MainActor
-  fileprivate var relativeUpdatedLabel: String {
+  @MainActor fileprivate var relativeUpdatedLabel: String {
     guard
       let date = dependenciesISO8601Formatter.date(from: updatedAt)
     else {
@@ -1371,7 +1378,7 @@ extension DependencyUpdateReviewStatus {
     case .approved: "Approved"
     case .reviewRequired: "Review required"
     case .changesRequested: "Changes requested"
-    case .none, .unknown(_): "No review"
+    case .none, .unknown: "No review"
     }
   }
 
@@ -1380,7 +1387,7 @@ extension DependencyUpdateReviewStatus {
     case .approved: HarnessMonitorTheme.success
     case .reviewRequired: HarnessMonitorTheme.accent
     case .changesRequested: HarnessMonitorTheme.danger
-    case .none, .unknown(_): HarnessMonitorTheme.secondaryInk
+    case .none, .unknown: HarnessMonitorTheme.secondaryInk
     }
   }
 }
@@ -1405,7 +1412,7 @@ extension DependencyUpdateCheck {
     case .queued: "Queued"
     case .requested: "Requested"
     case .waiting: "Waiting"
-    case .unknown(_): status.rawValue
+    case .unknown: status.rawValue
     }
   }
 
@@ -1414,7 +1421,7 @@ extension DependencyUpdateCheck {
     case .success: HarnessMonitorTheme.success
     case .failure, .cancelled, .timedOut, .actionRequired, .startupFailure:
       HarnessMonitorTheme.danger
-    case .none, .neutral, .skipped, .stale, .unknown(_):
+    case .none, .neutral, .skipped, .stale, .unknown:
       HarnessMonitorTheme.secondaryInk
     }
   }
@@ -1432,7 +1439,7 @@ extension DependencyUpdateCheckConclusion {
     case .skipped: "Skipped"
     case .stale: "Stale"
     case .startupFailure: "Startup failure"
-    case .none, .unknown(_): "Unknown"
+    case .none, .unknown: "Unknown"
     }
   }
 }
@@ -1445,7 +1452,7 @@ extension DependencyUpdateReviewEventState {
     case .commented: "Commented"
     case .dismissed: "Dismissed"
     case .pending: "Pending"
-    case .unknown(_): "Unknown"
+    case .unknown: "Unknown"
     }
   }
 
@@ -1453,7 +1460,7 @@ extension DependencyUpdateReviewEventState {
     switch self {
     case .approved: HarnessMonitorTheme.success
     case .changesRequested: HarnessMonitorTheme.danger
-    case .commented, .dismissed, .pending, .unknown(_): HarnessMonitorTheme.secondaryInk
+    case .commented, .dismissed, .pending, .unknown: HarnessMonitorTheme.secondaryInk
     }
   }
 }

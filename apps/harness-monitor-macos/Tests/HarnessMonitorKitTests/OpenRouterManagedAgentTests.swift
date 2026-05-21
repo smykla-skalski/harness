@@ -123,14 +123,16 @@ struct OpenRouterManagedAgentTests {
 
   @Test("OpenRouterModelEntry decodes context_length and supported_parameters")
   func openRouterModelEntryDecodes() throws {
-    let payload = """
+    let payload = Data(
+      """
       {
         "id": "anthropic/claude-3.7-sonnet",
         "name": "Claude 3.7 Sonnet",
         "context_length": 200000,
         "supported_parameters": ["temperature", "max_tokens"]
       }
-      """.data(using: .utf8)!
+      """.utf8
+    )
     let decoder = JSONDecoder()
     decoder.keyDecodingStrategy = .convertFromSnakeCase
     let entry = try decoder.decode(OpenRouterModelEntry.self, from: payload)
@@ -152,7 +154,8 @@ struct OpenRouterManagedAgentTests {
 
   @Test("AcpPermissionBatch decoder rejects non-acp managed_agent_family values")
   func acpPermissionBatchRejectsOpenRouterFamily() throws {
-    let payload = """
+    let payload = Data(
+      """
       {
         "batch_id": "batch-or-1",
         "managed_agent_id": "openrouter-1",
@@ -162,7 +165,8 @@ struct OpenRouterManagedAgentTests {
         "created_at": "2026-05-20T00:00:00Z",
         "expires_at": "2026-05-20T00:05:00Z"
       }
-      """.data(using: .utf8)!
+      """.utf8
+    )
     let decoder = JSONDecoder()
     #expect(throws: DecodingError.self) {
       _ = try decoder.decode(AcpPermissionBatch.self, from: payload)

@@ -1,6 +1,8 @@
+// swiftlint:disable file_length
 import HarnessMonitorKit
 import SwiftUI
 
+// swiftlint:disable:next type_body_length
 struct SettingsRepositoriesSection: View {
   let store: HarnessMonitorStore
   @Binding private var taskBoardFormState: TaskBoardSettingsFormState
@@ -386,8 +388,9 @@ struct SettingsRepositoriesSection: View {
   private var catalogRepositoryList: some View {
     ScrollView {
       LazyVStack(spacing: 0) {
-        ForEach(Array(filteredCatalogRepositories.enumerated()), id: \.offset) {
-          index, repository in
+        ForEach(Array(filteredCatalogRepositories.enumerated()), id: \.offset) { row in
+          let index = row.offset
+          let repository = row.element
           if index > 0 {
             Divider()
           }
@@ -752,7 +755,7 @@ struct SettingsRepositoriesCatalogErrorPresentation: Equatable {
   private static func presentation(
     for error: any Error,
     organization: String
-  ) -> SettingsRepositoriesCatalogErrorPresentation {
+  ) -> Self {
     let rawMessage = sourceMessage(from: error)
     let normalized = rawMessage.lowercased()
     let organizationReference = organization.isEmpty ? "this organization" : organization
@@ -771,7 +774,9 @@ struct SettingsRepositoriesCatalogErrorPresentation: Equatable {
         return Self(
           title: "GitHub token needs attention",
           message:
-            "GitHub blocked access to \(organizationReference) because the current fine-grained token exceeds the organization's lifetime policy. Update the token, then load repositories again.",
+            "GitHub blocked access to \(organizationReference) because the current "
+            + "fine-grained token exceeds the organization's lifetime policy. "
+            + "Update the token, then load repositories again.",
           action: action
         )
       }
@@ -779,7 +784,8 @@ struct SettingsRepositoriesCatalogErrorPresentation: Equatable {
       return Self(
         title: "GitHub access is blocked",
         message:
-          "GitHub blocked access to \(organizationReference) for the current fine-grained token. Update the token's organization access, then load repositories again.",
+          "GitHub blocked access to \(organizationReference) for the current fine-grained "
+          + "token. Update the token's organization access, then load repositories again.",
         action: action
       )
     }
@@ -790,7 +796,8 @@ struct SettingsRepositoriesCatalogErrorPresentation: Equatable {
       return Self(
         title: "Organization unavailable",
         message:
-          "GitHub couldn't load repositories for \(organizationReference). Check the organization name and confirm the current token can access it, then try again.",
+          "GitHub couldn't load repositories for \(organizationReference). Check the "
+          + "organization name and confirm the current token can access it, then try again.",
         action: nil
       )
     }
@@ -814,7 +821,8 @@ struct SettingsRepositoriesCatalogErrorPresentation: Equatable {
     return Self(
       title: "Couldn't load repositories",
       message:
-        "GitHub couldn't load repositories for \(organizationReference). Check the organization name and your GitHub access, then try again.",
+        "GitHub couldn't load repositories for \(organizationReference). Check the "
+        + "organization name and your GitHub access, then try again.",
       action: nil
     )
   }

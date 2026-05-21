@@ -69,7 +69,7 @@ final class HarnessMonitorSettingsTaskBoardUITests: HarnessMonitorUITestCase {
 }
 
 @MainActor
-final class HarnessMonitorSettingsDependenciesAndSecretsUITests: HarnessMonitorUITestCase {
+final class HarnessMonitorSettingsDepsUITests: HarnessMonitorUITestCase {
   func testDependenciesSectionAppearsInSettings() throws {
     let app = launch(mode: "preview")
 

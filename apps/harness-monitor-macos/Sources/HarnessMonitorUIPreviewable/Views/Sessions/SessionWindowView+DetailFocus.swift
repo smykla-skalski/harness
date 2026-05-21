@@ -6,6 +6,7 @@ extension SessionWindowView {
     detailFocusContent(for: detailRenderedSelection ?? stateCache.selection)
   }
 
+  // swiftlint:disable cyclomatic_complexity
   @ViewBuilder
   private func detailFocusContent(for selection: SessionSelection) -> some View {
     if HarnessMonitorPerfIsolation.usesStaticDetail {
@@ -98,6 +99,7 @@ extension SessionWindowView {
       }
     }
   }
+  // swiftlint:enable cyclomatic_complexity
 
   @ViewBuilder
   private func taskDetailContent(for taskID: String) -> some View {
