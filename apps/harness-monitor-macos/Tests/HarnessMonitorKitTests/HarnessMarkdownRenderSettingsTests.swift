@@ -52,4 +52,39 @@ struct HarnessMarkdownRenderSettingsTests {
     #expect(resolvedCode.typography.label.pointSize == 15)
     #expect(resolvedCode.typography.error.pointSize == 16.5)
   }
+
+  @Test("Markdown spacing settings expose block gaps and scale with font mode")
+  func spacingSettingsResolveBlockGaps() {
+    let spacing = HarnessMarkdownSpacingSettings(
+      documentBlock: 6,
+      paragraph: HarnessMarkdownBlockSpacing(before: 1, after: 2),
+      heading: HarnessMarkdownBlockSpacing(before: 3, after: 4),
+      blockQuote: .none,
+      codeBlock: .none,
+      details: .none,
+      list: HarnessMarkdownBlockSpacing(before: 5, after: 6),
+      table: .none,
+      thematicBreak: .none,
+      nestedBlock: 7,
+      detailsContentIndent: 7.5,
+      listItem: 8,
+      listItemContent: 9,
+      listMarkerGap: 10,
+      quoteContentGap: 11,
+      tableColumn: 12,
+      tableRow: 13
+    )
+    let settings = HarnessMarkdownRenderSettings(spacing: spacing, fontScaleMode: .explicit(2))
+    let resolved = settings.resolved(environmentFontScale: 1)
+
+    #expect(resolved.spacing.documentBlock == 12)
+    #expect(resolved.spacing.blockSpacing(for: .paragraph([])).after == 4)
+    #expect(resolved.spacing.blockSpacing(for: .heading(level: 1, inlines: [])).before == 6)
+    #expect(resolved.spacing.blockSpacing(for: .unorderedList([])).after == 12)
+    #expect(resolved.spacing.detailsContentIndent == 15)
+    #expect(resolved.spacing.listItem == 16)
+    #expect(resolved.spacing.listMarkerGap == 20)
+    #expect(resolved.spacing.tableColumn == 24)
+    #expect(resolved.spacing.tableRow == 26)
+  }
 }

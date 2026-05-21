@@ -24,6 +24,7 @@ struct HarnessMarkdownRenderSettings {
   var colors: HarnessMarkdownColorSettings
   var codeBlock: HarnessCodeBlockRenderSettings
   var images: HarnessMarkdownImageSettings
+  var spacing: HarnessMarkdownSpacingSettings
   var fontScaleMode: HarnessMarkdownFontScaleMode
 
   init(
@@ -31,11 +32,13 @@ struct HarnessMarkdownRenderSettings {
     colors: HarnessMarkdownColorSettings = .default,
     codeBlock: HarnessCodeBlockRenderSettings = .default,
     images: HarnessMarkdownImageSettings = .default,
+    spacing: HarnessMarkdownSpacingSettings = .default,
     fontScaleMode: HarnessMarkdownFontScaleMode = .environment
   ) {
     self.typography = typography
     self.colors = colors
     self.images = images
+    self.spacing = spacing
     self.fontScaleMode = fontScaleMode
     self.codeBlock = codeBlock.withFontScaleMode(fontScaleMode)
   }
@@ -52,7 +55,8 @@ struct HarnessMarkdownRenderSettings {
     fontScaleMode: HarnessMarkdownFontScaleMode = .environment,
     colors: HarnessMarkdownColorSettings = .default,
     codeBlock: HarnessCodeBlockRenderSettings = .default,
-    images: HarnessMarkdownImageSettings = .default
+    images: HarnessMarkdownImageSettings = .default,
+    spacing: HarnessMarkdownSpacingSettings = .default
   ) -> HarnessMarkdownRenderSettings {
     HarnessMarkdownRenderSettings(
       typography: HarnessMarkdownTypography(
@@ -68,6 +72,7 @@ struct HarnessMarkdownRenderSettings {
       colors: colors,
       codeBlock: codeBlock,
       images: images,
+      spacing: spacing,
       fontScaleMode: fontScaleMode
     )
   }
@@ -87,7 +92,8 @@ struct HarnessMarkdownRenderSettings {
       typography: typography.resolved(scale: scale),
       colors: colors,
       codeBlock: codeBlock,
-      images: images.scaled(by: scale)
+      images: images.scaled(by: scale),
+      spacing: spacing.scaled(by: scale)
     )
   }
 }
@@ -132,6 +138,7 @@ struct HarnessMarkdownResolvedRenderSettings {
   let colors: HarnessMarkdownColorSettings
   let codeBlock: HarnessCodeBlockRenderSettings
   let images: HarnessMarkdownImageSettings
+  let spacing: HarnessMarkdownSpacingSettings
 }
 
 struct HarnessMarkdownResolvedTypography {
@@ -276,6 +283,104 @@ struct HarnessMarkdownImageSettings {
       maxBlockHeight: max(1, maxBlockHeight * scale),
       cornerRadius: cornerRadius
     )
+  }
+}
+
+struct HarnessMarkdownBlockSpacing: Equatable {
+  var before: CGFloat
+  var after: CGFloat
+
+  static let none = HarnessMarkdownBlockSpacing(before: 0, after: 0)
+
+  func scaled(by scale: CGFloat) -> HarnessMarkdownBlockSpacing {
+    HarnessMarkdownBlockSpacing(before: max(0, before * scale), after: max(0, after * scale))
+  }
+}
+
+struct HarnessMarkdownSpacingSettings: Equatable {
+  var documentBlock: CGFloat
+  var paragraph: HarnessMarkdownBlockSpacing
+  var heading: HarnessMarkdownBlockSpacing
+  var blockQuote: HarnessMarkdownBlockSpacing
+  var codeBlock: HarnessMarkdownBlockSpacing
+  var details: HarnessMarkdownBlockSpacing
+  var list: HarnessMarkdownBlockSpacing
+  var table: HarnessMarkdownBlockSpacing
+  var thematicBreak: HarnessMarkdownBlockSpacing
+  var nestedBlock: CGFloat
+  var detailsContentIndent: CGFloat
+  var listItem: CGFloat
+  var listItemContent: CGFloat
+  var listMarkerGap: CGFloat
+  var quoteContentGap: CGFloat
+  var tableColumn: CGFloat
+  var tableRow: CGFloat
+
+  static let `default` = HarnessMarkdownSpacingSettings(
+    documentBlock: HarnessMonitorTheme.spacingSM,
+    paragraph: .none,
+    heading: .none,
+    blockQuote: .none,
+    codeBlock: .none,
+    details: .none,
+    list: .none,
+    table: .none,
+    thematicBreak: .none,
+    nestedBlock: HarnessMonitorTheme.spacingXS,
+    detailsContentIndent: HarnessMonitorTheme.spacingSM,
+    listItem: HarnessMonitorTheme.spacingXS,
+    listItemContent: HarnessMonitorTheme.spacingXS,
+    listMarkerGap: HarnessMonitorTheme.spacingSM,
+    quoteContentGap: HarnessMonitorTheme.spacingSM,
+    tableColumn: HarnessMonitorTheme.spacingMD,
+    tableRow: HarnessMonitorTheme.spacingXS
+  )
+
+  func scaled(by scale: CGFloat) -> HarnessMarkdownSpacingSettings {
+    HarnessMarkdownSpacingSettings(
+      documentBlock: scaled(documentBlock, by: scale),
+      paragraph: paragraph.scaled(by: scale),
+      heading: heading.scaled(by: scale),
+      blockQuote: blockQuote.scaled(by: scale),
+      codeBlock: codeBlock.scaled(by: scale),
+      details: details.scaled(by: scale),
+      list: list.scaled(by: scale),
+      table: table.scaled(by: scale),
+      thematicBreak: thematicBreak.scaled(by: scale),
+      nestedBlock: scaled(nestedBlock, by: scale),
+      detailsContentIndent: scaled(detailsContentIndent, by: scale),
+      listItem: scaled(listItem, by: scale),
+      listItemContent: scaled(listItemContent, by: scale),
+      listMarkerGap: scaled(listMarkerGap, by: scale),
+      quoteContentGap: scaled(quoteContentGap, by: scale),
+      tableColumn: scaled(tableColumn, by: scale),
+      tableRow: scaled(tableRow, by: scale)
+    )
+  }
+
+  func blockSpacing(for block: HarnessMarkdownBlock) -> HarnessMarkdownBlockSpacing {
+    switch block {
+    case .blockQuote:
+      blockQuote
+    case .codeBlock:
+      codeBlock
+    case .details:
+      details
+    case .heading:
+      heading
+    case .html, .paragraph:
+      paragraph
+    case .orderedList, .unorderedList:
+      list
+    case .table:
+      table
+    case .thematicBreak:
+      thematicBreak
+    }
+  }
+
+  private func scaled(_ value: CGFloat, by scale: CGFloat) -> CGFloat {
+    max(0, value * scale)
   }
 }
 
