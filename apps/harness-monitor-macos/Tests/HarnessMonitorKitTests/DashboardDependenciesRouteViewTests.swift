@@ -75,7 +75,7 @@ struct DashboardDependenciesRouteViewTests {
 
     #expect(
       dashboardDependenciesErrorMessage(for: apiError)
-        == depsGitHubAuthFailureMessage
+        == dashboardDependenciesGitHubAuthFailureMessage
     )
   }
 
@@ -89,7 +89,7 @@ struct DashboardDependenciesRouteViewTests {
 
     #expect(
       dashboardDependenciesErrorMessage(for: LegacyTransportError())
-        == depsGitHubAuthFailureMessage
+        == dashboardDependenciesGitHubAuthFailureMessage
     )
   }
 
