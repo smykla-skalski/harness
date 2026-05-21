@@ -784,14 +784,18 @@ struct DashboardDependenciesRouteView: View {
       reconcileSelection()
     } catch {
       guard !Task.isCancelled else { return }
+      HarnessMonitorLogger.api.warning(
+        "Dependency update reload failed: \(String(reflecting: error), privacy: .public)"
+      )
+      let displayMessage = dashboardDependenciesErrorMessage(for: error)
       if backgroundRefresh, !response.items.isEmpty {
         notice = DashboardDependenciesNotice(
-          title: error.localizedDescription,
+          title: displayMessage,
           tint: HarnessMonitorTheme.danger,
           systemImage: "exclamationmark.triangle"
         )
       } else {
-        errorMessage = error.localizedDescription
+        errorMessage = displayMessage
       }
     }
   }
