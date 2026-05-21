@@ -33,21 +33,7 @@ extension DashboardDependenciesRouteView {
   }
 
   func applyRefreshedItems(_ refresh: DependencyUpdatesRefreshResponse) {
-    let droppedIDs = Set(refresh.missingPullRequestIDs)
-    let openItemsByID: [String: DependencyUpdateItem] = Dictionary(
-      uniqueKeysWithValues: refresh.items
-        .filter { $0.state == .open }
-        .map { ($0.pullRequestID, $0) }
-    )
-    let closedIDs = Set(
-      refresh.items.filter { $0.state != .open }.map(\.pullRequestID)
-    )
-    let nextItems = response.items.compactMap { item -> DependencyUpdateItem? in
-      if droppedIDs.contains(item.pullRequestID) || closedIDs.contains(item.pullRequestID) {
-        return nil
-      }
-      return openItemsByID[item.pullRequestID] ?? item
-    }
+    let nextItems = applyDependencyRefresh(to: response.items, refresh: refresh)
     response = DependencyUpdatesQueryResponse(
       fetchedAt: refresh.fetchedAt,
       fromCache: response.fromCache,
