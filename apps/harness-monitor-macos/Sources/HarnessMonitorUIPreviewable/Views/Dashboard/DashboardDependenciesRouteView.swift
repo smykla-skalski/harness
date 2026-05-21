@@ -642,8 +642,8 @@ struct DashboardDependenciesRouteView: View {
       updatedLabel: relativeUpdatedLabel(for: item)
     )
     .tag(item.pullRequestID)
-    .listRowInsets(EdgeInsets(top: 4, leading: 10, bottom: 4, trailing: 10))
-    .listRowSeparator(.visible)
+    .listRowInsets(EdgeInsets(top: 0, leading: 0, bottom: 0, trailing: 0))
+    .listRowSeparator(.hidden)
     .contextMenu {
       Button("Open Pull Request") {
         openItem(item)
