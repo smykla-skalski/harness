@@ -18,18 +18,36 @@ import SwiftUI
 // that deliberately use a transparent titlebar.
 private final class _TitlebarSeparatorSuppressorView: NSView {
   var titlebarAppearsTransparent = false
+  private weak var lastAppliedWindow: NSWindow?
+  private var lastAppliedTransparent: Bool?
 
   override func viewDidMoveToWindow() {
     super.viewDidMoveToWindow()
+    // Force re-apply when the window changes — the new window starts with
+    // its own default chrome state.
+    lastAppliedWindow = nil
+    lastAppliedTransparent = nil
     applyWindowOverrides()
   }
 
   func applyWindowOverrides() {
-    window?.titlebarSeparatorStyle = .none
-    window?.titlebarAppearsTransparent = titlebarAppearsTransparent
-    if titlebarAppearsTransparent {
-      window?.styleMask.insert(.fullSizeContentView)
+    guard let window else { return }
+    // SwiftUI calls updateNSView on every parent body re-evaluation. The
+    // window's titlebarSeparatorStyle / titlebarAppearsTransparent / styleMask
+    // are idempotent semantically, but AppKit still does validation and
+    // potential re-layout per assignment. Cache the last applied state so
+    // repeated updateNSView calls collapse to zero AppKit work once the
+    // window chrome is in the desired shape.
+    if lastAppliedWindow === window, lastAppliedTransparent == titlebarAppearsTransparent {
+      return
     }
+    window.titlebarSeparatorStyle = .none
+    window.titlebarAppearsTransparent = titlebarAppearsTransparent
+    if titlebarAppearsTransparent {
+      window.styleMask.insert(.fullSizeContentView)
+    }
+    lastAppliedWindow = window
+    lastAppliedTransparent = titlebarAppearsTransparent
   }
 }
 
