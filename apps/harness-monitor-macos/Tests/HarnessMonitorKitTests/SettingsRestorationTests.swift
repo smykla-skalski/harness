@@ -1,3 +1,4 @@
+import Foundation
 import SwiftUI
 import Testing
 
@@ -56,5 +57,43 @@ struct SettingsRestorationTests {
         maxOffset: 120
       ) == 120
     )
+  }
+
+  @Test("Pending restore avoids direct geometry callback scroll writes")
+  func pendingRestoreAvoidsDirectGeometryCallbackScrollWrites() throws {
+    let source = try sourceFile(named: "Views/Settings/SettingsRestoration.swift")
+    let waitRange = try #require(source.range(of: "private func waitForPendingRestore("))
+    let persistRange = try #require(source.range(of: "private func persistGeometryOffset("))
+    let waitBody = String(source[waitRange.lowerBound..<persistRange.lowerBound])
+
+    #expect(!waitBody.contains("requestScroll("))
+    #expect(waitBody.contains("scheduleRestoreRetry("))
+  }
+
+  @Test("Geometry persistence only tracks confirmed user scroll")
+  func geometryPersistenceOnlyTracksConfirmedUserScroll() throws {
+    let source = try sourceFile(named: "Views/Settings/SettingsRestoration.swift")
+    let persistRange = try #require(source.range(of: "private func persistGeometryOffset("))
+    let observedRange = try #require(source.range(of: "private func persistObservedOffset("))
+    let persistBody = String(source[persistRange.lowerBound..<observedRange.lowerBound])
+
+    #expect(persistBody.contains("guard isConfirmedUserScroll else {"))
+    #expect(!persistBody.contains("|| offset > 0"))
+  }
+
+  private func sourceFile(named relativePath: String) throws -> String {
+    let testsDirectory = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
+    let repoRoot =
+      testsDirectory
+      .deletingLastPathComponent()
+      .deletingLastPathComponent()
+      .deletingLastPathComponent()
+      .deletingLastPathComponent()
+    let fileURL =
+      repoRoot
+      .appendingPathComponent("apps/harness-monitor-macos")
+      .appendingPathComponent("Sources/HarnessMonitorUIPreviewable")
+      .appendingPathComponent(relativePath)
+    return try String(contentsOf: fileURL, encoding: .utf8)
   }
 }
