@@ -153,7 +153,8 @@ extension HarnessMonitorPaths {
     let prefix = digest.prefix(4).reduce(0) { partial, byte in
       (partial << 8) | Int(byte)
     }
-    let port = HarnessMonitorRuntimeLane.codexWSPortBase
+    let port =
+      HarnessMonitorRuntimeLane.codexWSPortBase
       + (prefix % HarnessMonitorRuntimeLane.codexWSPortSpan)
     DerivedCodexBridgePortCache.store(lane, port: port)
     return port

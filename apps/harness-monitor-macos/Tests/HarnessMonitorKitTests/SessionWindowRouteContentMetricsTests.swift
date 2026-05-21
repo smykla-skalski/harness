@@ -320,7 +320,9 @@ struct SessionWindowRouteContentMetricsTests {
     #expect(managementPanelSource.contains(".harnessDismissButtonStyle()"))
     #expect(managementPanelSource.contains("xmark.circle.fill"))
     #expect(!managementPanelSource.contains(".harnessAccessoryButtonStyle(tint: .secondary)"))
-    #expect(managementPanelSource.contains("HarnessMonitorTextSize.scaledFont(.title2.weight(.semibold), by: fontScale)"))
+    #expect(
+      managementPanelSource.contains(
+        "HarnessMonitorTextSize.scaledFont(.title2.weight(.semibold), by: fontScale)"))
     #expect(managementComponentsSource.contains("HarnessMonitorInlineTextField("))
     #expect(managementComponentsSource.contains("showsClearButton: false"))
     #expect(managementComponentsSource.contains("hasVisibleLabel: true"))

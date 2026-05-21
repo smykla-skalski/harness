@@ -159,7 +159,8 @@ extension HarnessMonitorUITestAccessibilityRegistryTests {
     #expect(dashboardSidebarSessionsView.contains("Section(\"Sessions\")"))
     #expect(dashboardSidebarSessionsView.contains("SessionSidebarRow("))
     #expect(dashboardSidebarSessionsView.contains("subtitle: subtitle"))
-    #expect(dashboardSidebarSessionsView.contains("projectAndWorktreeDisplayLabel(separator: \"·\")"))
+    #expect(
+      dashboardSidebarSessionsView.contains("projectAndWorktreeDisplayLabel(separator: \"·\")"))
     #expect(dashboardView.contains(".harnessMonitorSidebarListChrome("))
     #expect(dashboardView.contains("HarnessMonitorAccessibility.dashboardScrollView"))
     #expect(

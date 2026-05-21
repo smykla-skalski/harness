@@ -27,9 +27,11 @@ extension PreviewHarnessClientState {
   ) -> DependencyUpdatesQueryResponse {
     let items = dependencyUpdateItems.filter { item in
       let owner = item.repository.split(separator: "/").first.map(String.init)
-      let matchesOrganizations = request.organizations.isEmpty
+      let matchesOrganizations =
+        request.organizations.isEmpty
         || owner.map { request.organizations.contains($0) } == true
-      let matchesRepositories = request.repositories.isEmpty
+      let matchesRepositories =
+        request.repositories.isEmpty
         || request.repositories.contains(item.repository)
       let matchesExclusions = !request.excludeRepositories.contains(item.repository)
       let matchesAuthors = request.authors.isEmpty || request.authors.contains(item.authorLogin)

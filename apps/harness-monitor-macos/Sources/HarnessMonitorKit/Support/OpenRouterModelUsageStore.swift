@@ -53,7 +53,8 @@ public struct OpenRouterModelUsageSnapshot: Equatable, Sendable {
     if limit == OpenRouterModelUsageStore.recentLimit {
       return cachedFrequentExcludingPinnedAndRecents
     }
-    return frequencies
+    return
+      frequencies
       .sorted { lhs, rhs in
         if lhs.value != rhs.value { return lhs.value > rhs.value }
         return lhs.key < rhs.key

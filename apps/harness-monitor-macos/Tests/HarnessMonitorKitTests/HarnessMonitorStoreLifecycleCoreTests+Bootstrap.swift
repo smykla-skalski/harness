@@ -361,7 +361,9 @@ extension HarnessMonitorStoreLifecycleCoreTests {
     #expect(await daemon.recordedWarmUpCallCount() == 2)
   }
 
-  @Test("Bootstrap keeps cached task-board items when the first live task-board snapshot is unavailable")
+  @Test(
+    "Bootstrap keeps cached task-board items when the first live task-board snapshot is unavailable"
+  )
   func bootstrapKeepsCachedTaskBoardItemsWhenInitialTaskBoardSnapshotIsUnavailable() async throws {
     let cachedItem = makeBootstrapTaskBoardItem(
       id: "board-cached-unavailable",
@@ -425,7 +427,8 @@ extension HarnessMonitorStoreLifecycleCoreTests {
     #expect(store.connectionState == .online)
     #expect(store.globalTaskBoardItems.map(\.id) == ["board-cached-confirmation"])
 
-    for _ in 0..<40 where store.globalTaskBoardItems.first?.externalRefs.first?.provider != .todoist {
+    for _ in 0..<40 where store.globalTaskBoardItems.first?.externalRefs.first?.provider != .todoist
+    {
       try await Task.sleep(for: .milliseconds(10))
     }
 
@@ -433,8 +436,12 @@ extension HarnessMonitorStoreLifecycleCoreTests {
     #expect(store.globalTaskBoardItems.first?.externalRefs.first?.provider == .todoist)
   }
 
-  @Test("Bootstrap merges cached external task-board items when the first live board snapshot is partial")
-  func bootstrapMergesCachedExternalTaskBoardItemsWhenInitialLiveBoardSnapshotIsPartial() async throws {
+  @Test(
+    "Bootstrap merges cached external task-board items when the first live board snapshot is partial"
+  )
+  func bootstrapMergesCachedExternalTaskBoardItemsWhenInitialLiveBoardSnapshotIsPartial()
+    async throws
+  {
     let cachedExternalItem = makeBootstrapTaskBoardItem(
       id: "board-cached-external",
       provider: .gitHub,
@@ -475,7 +482,7 @@ extension HarnessMonitorStoreLifecycleCoreTests {
     let client = RecordingHarnessClient()
     client.configureTaskBoardItemSnapshots([
       [localLiveItem],
-      [localLiveItem, liveExternalItem]
+      [localLiveItem, liveExternalItem],
     ])
     let store = HarnessMonitorStore(
       daemonController: RecordingDaemonController(client: client),
@@ -487,11 +494,15 @@ extension HarnessMonitorStoreLifecycleCoreTests {
     await store.bootstrap()
 
     #expect(store.connectionState == .online)
-    #expect(Set(store.globalTaskBoardItems.map(\.id)) == Set(["board-live-local", "board-cached-external"]))
+    #expect(
+      Set(store.globalTaskBoardItems.map(\.id))
+        == Set(["board-live-local", "board-cached-external"]))
 
     for _ in 0..<40 {
       let liveIDs = store.globalTaskBoardItems.map(\.id)
-      if liveIDs.count == 2, liveIDs.contains("board-live-local"), liveIDs.contains("board-cached-external") {
+      if liveIDs.count == 2, liveIDs.contains("board-live-local"),
+        liveIDs.contains("board-cached-external")
+      {
         let externalProviders = store.globalTaskBoardItems
           .first(where: { $0.id == "board-cached-external" })?
           .externalRefs.map(\.provider)
@@ -502,7 +513,9 @@ extension HarnessMonitorStoreLifecycleCoreTests {
       try await Task.sleep(for: .milliseconds(10))
     }
 
-    #expect(Set(store.globalTaskBoardItems.map(\.id)) == Set(["board-live-local", "board-cached-external"]))
+    #expect(
+      Set(store.globalTaskBoardItems.map(\.id))
+        == Set(["board-live-local", "board-cached-external"]))
   }
 
   @Test("Bootstrap eventually clears cached task-board items when the live board stays empty")

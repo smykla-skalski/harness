@@ -34,7 +34,7 @@ private struct TaskBoardManagementFieldChrome: ViewModifier {
         RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
           .stroke(strokeColor, lineWidth: lineWidth)
       }
-    }
+  }
 }
 
 extension View {

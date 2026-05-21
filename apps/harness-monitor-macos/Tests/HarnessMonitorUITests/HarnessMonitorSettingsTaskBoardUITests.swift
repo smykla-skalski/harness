@@ -107,12 +107,14 @@ final class HarnessMonitorSettingsDependenciesAndSecretsUITests: HarnessMonitorU
 
     let saveButton = element(in: app, identifier: Accessibility.settingsSecretsSaveButton)
     let reloadButton = element(in: app, identifier: Accessibility.settingsSecretsReloadButton)
-    let githubTokenField = element(in: app, identifier: Accessibility.settingsTaskBoardGlobalTokenField)
+    let githubTokenField = element(
+      in: app, identifier: Accessibility.settingsTaskBoardGlobalTokenField)
     let todoistTokenField = element(
       in: app,
       identifier: "\(Accessibility.settingsTaskBoardGlobalTokenField).todoist"
     )
-    let sshKeyPathField = element(in: app, identifier: Accessibility.settingsTaskBoardSSHKeyPathField)
+    let sshKeyPathField = element(
+      in: app, identifier: Accessibility.settingsTaskBoardSSHKeyPathField)
     let status = element(in: app, identifier: Accessibility.settingsSecretsStatus)
 
     XCTAssertTrue(saveButton.waitForExistence(timeout: Self.actionTimeout))

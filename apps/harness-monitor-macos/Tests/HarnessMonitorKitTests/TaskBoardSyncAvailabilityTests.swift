@@ -1,5 +1,6 @@
 import HarnessMonitorKit
 import XCTest
+
 @testable import HarnessMonitorUIPreviewable
 
 final class TaskBoardSyncAvailabilityTests: XCTestCase {

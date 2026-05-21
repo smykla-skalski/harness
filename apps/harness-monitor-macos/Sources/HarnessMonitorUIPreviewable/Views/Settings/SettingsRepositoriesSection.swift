@@ -264,7 +264,9 @@ struct SettingsRepositoriesSection: View {
     Section {
       HStack(alignment: .center, spacing: HarnessMonitorTheme.spacingSM) {
         TextField("GitHub Organization", text: $catalogOrganization)
-          .accessibilityIdentifier(HarnessMonitorAccessibility.settingsRepositoriesOrganizationField)
+          .accessibilityIdentifier(
+            HarnessMonitorAccessibility.settingsRepositoriesOrganizationField
+          )
           .onSubmit {
             Task { await loadCatalogForCurrentOrganization() }
           }
@@ -288,7 +290,8 @@ struct SettingsRepositoriesSection: View {
       if !loadedCatalogOrganization.isEmpty {
         catalogSummary
         TextField("Search repositories", text: $catalogSearchText)
-          .accessibilityIdentifier(HarnessMonitorAccessibility.settingsRepositoriesCatalogSearchField)
+          .accessibilityIdentifier(
+            HarnessMonitorAccessibility.settingsRepositoriesCatalogSearchField)
 
         if catalogRepositories.isEmpty {
           Label("No repositories available for import", systemImage: "shippingbox")
@@ -347,7 +350,8 @@ struct SettingsRepositoriesSection: View {
     }
   }
 
-  private func catalogErrorView(_ error: SettingsRepositoriesCatalogErrorPresentation) -> some View {
+  private func catalogErrorView(_ error: SettingsRepositoriesCatalogErrorPresentation) -> some View
+  {
     VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
       Label(error.title, systemImage: "exclamationmark.triangle.fill")
         .font(captionSemibold)
@@ -382,7 +386,8 @@ struct SettingsRepositoriesSection: View {
   private var catalogRepositoryList: some View {
     ScrollView {
       LazyVStack(spacing: 0) {
-        ForEach(Array(filteredCatalogRepositories.enumerated()), id: \.offset) { index, repository in
+        ForEach(Array(filteredCatalogRepositories.enumerated()), id: \.offset) {
+          index, repository in
           if index > 0 {
             Divider()
           }
@@ -456,9 +461,11 @@ struct SettingsRepositoriesSection: View {
           VStack(alignment: .leading, spacing: 4) {
             Text(organization)
               .font(bodyFont.weight(.semibold))
-            Text("Dependencies still queries this legacy organization until you import or remove it.")
-              .font(HarnessMonitorTextSize.scaledFont(.caption, by: fontScale))
-              .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+            Text(
+              "Dependencies still queries this legacy organization until you import or remove it."
+            )
+            .font(HarnessMonitorTextSize.scaledFont(.caption, by: fontScale))
+            .foregroundStyle(HarnessMonitorTheme.secondaryInk)
           }
           Spacer()
           Button("Review Repositories") {
@@ -864,7 +871,8 @@ private struct SettingsSharedRepositoriesDraft: Equatable {
     for repository in taskBoardDraft.githubInboxRepositoryEntries {
       insert(repository: repository, dependenciesEnabled: false, taskBoardEnabled: true)
     }
-    legacyOrganizations = Self.normalizedOrganizations(dependenciesPreferences.normalizedOrganizations)
+    legacyOrganizations = Self.normalizedOrganizations(
+      dependenciesPreferences.normalizedOrganizations)
   }
 
   var canAddManualRepository: Bool {

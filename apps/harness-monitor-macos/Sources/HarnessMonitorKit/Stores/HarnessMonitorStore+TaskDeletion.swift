@@ -1,4 +1,5 @@
 import Foundation
+
 extension HarnessMonitorStore {
   public func requestDeleteTaskConfirmation(
     sessionID: String,

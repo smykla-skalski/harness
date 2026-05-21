@@ -1,5 +1,5 @@
-public extension String {
-  var harnessMonitorTrimmedTrailingPeriod: String {
+extension String {
+  public var harnessMonitorTrimmedTrailingPeriod: String {
     guard self != ".", self.hasSuffix("."), !self.hasSuffix("...") else {
       return self
     }

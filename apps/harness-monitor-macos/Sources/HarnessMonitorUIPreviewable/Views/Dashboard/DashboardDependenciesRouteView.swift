@@ -71,7 +71,9 @@ struct DashboardDependenciesRouteView: View {
   @State private var response = DependencyUpdatesQueryResponse(
     fetchedAt: "",
     fromCache: false,
-    summary: DependencyUpdatesSummary(total: 0, reviewRequired: 0, readyToMerge: 0, autoApprovable: 0, waitingOnChecks: 0, blocked: 0),
+    summary: DependencyUpdatesSummary(
+      total: 0, reviewRequired: 0, readyToMerge: 0, autoApprovable: 0, waitingOnChecks: 0,
+      blocked: 0),
     items: []
   )
   @State private var isLoading = false
@@ -385,7 +387,10 @@ struct DashboardDependenciesRouteView: View {
       scrollSurfaceLabel: "Dependencies detail"
     ) {
       VStack(alignment: .leading, spacing: 24) {
-        detailCard(title: "\(selectedItems.count) selected", subtitle: "Run batch dependency actions across the current selection") {
+        detailCard(
+          title: "\(selectedItems.count) selected",
+          subtitle: "Run batch dependency actions across the current selection"
+        ) {
           dependencyActionBar(items: selectedItems)
         }
       }
@@ -404,7 +409,9 @@ struct DashboardDependenciesRouteView: View {
       scrollSurfaceLabel: "Dependencies detail"
     ) {
       VStack(alignment: .leading, spacing: 24) {
-        detailCard(title: item.title, subtitle: "\(item.repository)#\(item.number) · @\(item.authorLogin)") {
+        detailCard(
+          title: item.title, subtitle: "\(item.repository)#\(item.number) · @\(item.authorLogin)"
+        ) {
           dependencyActionBar(items: [item])
         }
         detailMetrics(for: item)
@@ -545,7 +552,8 @@ struct DashboardDependenciesRouteView: View {
       ) {
         summaryBadge(item.statusLabel, tint: item.statusTint)
         summaryBadge(item.reviewStatus.label, tint: item.reviewStatus.tint)
-        summaryBadge("\(item.additions)+ / \(item.deletions)-", tint: HarnessMonitorTheme.secondaryInk)
+        summaryBadge(
+          "\(item.additions)+ / \(item.deletions)-", tint: HarnessMonitorTheme.secondaryInk)
         if item.policyBlocked {
           summaryBadge("policy wait", tint: HarnessMonitorTheme.caution)
         }
@@ -861,12 +869,12 @@ struct DashboardDependenciesRouteView: View {
         request: TaskBoardCreateItemRequest(
           title: "Fix CI · \(item.repository)#\(item.number)",
           body: """
-          Investigate and restore mergeability for \(item.repository)#\(item.number).
+            Investigate and restore mergeability for \(item.repository)#\(item.number).
 
-          Pull request: \(item.url)
-          Review status: \(item.reviewStatus.label)
-          Check status: \(item.checkStatus.label)
-          """,
+            Pull request: \(item.url)
+            Review status: \(item.reviewStatus.label)
+            Check status: \(item.checkStatus.label)
+            """,
           priority: item.requiresAttention ? .high : .medium,
           agentMode: .headless,
           tags: ["dependencies", "fix-ci"],
@@ -895,7 +903,8 @@ struct DashboardDependenciesRouteView: View {
 
   private func performMutation(
     _ title: String,
-    operation: @escaping (any HarnessMonitorClientProtocol) async throws
+    operation:
+      @escaping (any HarnessMonitorClientProtocol) async throws
       -> DependencyUpdatesActionResponse
   ) async {
     guard let client = store.apiClient else { return }
@@ -925,12 +934,15 @@ struct DashboardDependenciesRouteView: View {
 
   private func copyApprovalLinks(for items: [DependencyUpdateItem]) {
     let scopedItems: [DependencyUpdateItem]
-    if selectedItems.isEmpty, items.count == 1, let repository = items.first?.repository, groupMode == .repository {
+    if selectedItems.isEmpty, items.count == 1, let repository = items.first?.repository,
+      groupMode == .repository
+    {
       scopedItems = filteredItems.filter { $0.repository == repository }
     } else {
       scopedItems = items
     }
-    let links = scopedItems
+    let links =
+      scopedItems
       .filter { $0.reviewStatus == .reviewRequired }
       .map(\.url)
     guard !links.isEmpty else {
@@ -958,7 +970,9 @@ struct DashboardDependenciesRouteView: View {
   private func reconcileSelection() {
     let liveIDs = Set(response.items.map(\.pullRequestID))
     selectedIDs = selectedIDs.intersection(liveIDs)
-    if selectedIDs.isEmpty, let persisted = persistedPrimarySelectionID.nonEmpty, liveIDs.contains(persisted) {
+    if selectedIDs.isEmpty, let persisted = persistedPrimarySelectionID.nonEmpty,
+      liveIDs.contains(persisted)
+    {
       selectedIDs = [persisted]
     }
   }
@@ -1065,7 +1079,8 @@ struct DashboardDependenciesPreferences: Codable, Equatable {
 
   var encodedString: String {
     let encoder = JSONEncoder()
-    guard let data = try? encoder.encode(self), let string = String(data: data, encoding: .utf8) else {
+    guard let data = try? encoder.encode(self), let string = String(data: data, encoding: .utf8)
+    else {
       return ""
     }
     return string
@@ -1164,7 +1179,8 @@ struct DashboardDependenciesCollapsedRepositories: Codable, Equatable {
 
   var encodedString: String {
     let encoder = JSONEncoder()
-    guard let data = try? encoder.encode(self), let string = String(data: data, encoding: .utf8) else {
+    guard let data = try? encoder.encode(self), let string = String(data: data, encoding: .utf8)
+    else {
       return ""
     }
     return string
@@ -1296,8 +1312,8 @@ private enum DashboardDependenciesGroupMode: String, CaseIterable, Identifiable 
   }
 }
 
-private extension DependencyUpdateItem {
-  var statusWeight: Int {
+extension DependencyUpdateItem {
+  fileprivate var statusWeight: Int {
     switch true {
     case reviewStatus == .approved && checkStatus == .success:
       0
@@ -1314,7 +1330,7 @@ private extension DependencyUpdateItem {
     }
   }
 
-  var statusLabel: String {
+  fileprivate var statusLabel: String {
     switch true {
     case isAutoMergeable: "Ready to merge"
     case isAutoApprovable: "Ready for approval"
@@ -1324,7 +1340,7 @@ private extension DependencyUpdateItem {
     }
   }
 
-  var statusTint: Color {
+  fileprivate var statusTint: Color {
     switch true {
     case isAutoMergeable: HarnessMonitorTheme.success
     case isAutoApprovable: HarnessMonitorTheme.accent
@@ -1335,7 +1351,7 @@ private extension DependencyUpdateItem {
   }
 
   @MainActor
-  var relativeUpdatedLabel: String {
+  fileprivate var relativeUpdatedLabel: String {
     guard
       let date = dependenciesISO8601Formatter.date(from: updatedAt)
     else {
@@ -1345,8 +1361,8 @@ private extension DependencyUpdateItem {
   }
 }
 
-private extension DependencyUpdateReviewStatus {
-  var label: String {
+extension DependencyUpdateReviewStatus {
+  fileprivate var label: String {
     switch self {
     case .approved: "Approved"
     case .reviewRequired: "Review required"
@@ -1355,7 +1371,7 @@ private extension DependencyUpdateReviewStatus {
     }
   }
 
-  var tint: Color {
+  fileprivate var tint: Color {
     switch self {
     case .approved: HarnessMonitorTheme.success
     case .reviewRequired: HarnessMonitorTheme.accent
@@ -1365,8 +1381,8 @@ private extension DependencyUpdateReviewStatus {
   }
 }
 
-private extension DependencyUpdateCheckStatus {
-  var label: String {
+extension DependencyUpdateCheckStatus {
+  fileprivate var label: String {
     switch self {
     case .none: "No checks"
     case .success: "Checks passing"
@@ -1377,8 +1393,8 @@ private extension DependencyUpdateCheckStatus {
   }
 }
 
-private extension DependencyUpdateCheck {
-  var statusLabel: String {
+extension DependencyUpdateCheck {
+  fileprivate var statusLabel: String {
     switch status {
     case .completed: conclusion.label
     case .inProgress: "In progress"
@@ -1389,7 +1405,7 @@ private extension DependencyUpdateCheck {
     }
   }
 
-  var tint: Color {
+  fileprivate var tint: Color {
     switch conclusion {
     case .success: HarnessMonitorTheme.success
     case .failure, .cancelled, .timedOut, .actionRequired, .startupFailure:
@@ -1400,8 +1416,8 @@ private extension DependencyUpdateCheck {
   }
 }
 
-private extension DependencyUpdateCheckConclusion {
-  var label: String {
+extension DependencyUpdateCheckConclusion {
+  fileprivate var label: String {
     switch self {
     case .success: "Success"
     case .failure: "Failure"
@@ -1417,8 +1433,8 @@ private extension DependencyUpdateCheckConclusion {
   }
 }
 
-private extension DependencyUpdateReviewEventState {
-  var label: String {
+extension DependencyUpdateReviewEventState {
+  fileprivate var label: String {
     switch self {
     case .approved: "Approved"
     case .changesRequested: "Changes requested"
@@ -1429,7 +1445,7 @@ private extension DependencyUpdateReviewEventState {
     }
   }
 
-  var tint: Color {
+  fileprivate var tint: Color {
     switch self {
     case .approved: HarnessMonitorTheme.success
     case .changesRequested: HarnessMonitorTheme.danger
@@ -1438,14 +1454,14 @@ private extension DependencyUpdateReviewEventState {
   }
 }
 
-private extension String {
-  var nonEmpty: String? {
+extension String {
+  fileprivate var nonEmpty: String? {
     isEmpty ? nil : self
   }
 }
 
-private extension Array where Element == String {
-  func removingDuplicates() -> [String] {
+extension Array where Element == String {
+  fileprivate func removingDuplicates() -> [String] {
     var seen = Set<String>()
     return filter { seen.insert($0).inserted }
   }

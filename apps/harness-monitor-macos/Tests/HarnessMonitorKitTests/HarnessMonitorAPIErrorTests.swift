@@ -97,9 +97,9 @@ struct HarnessMonitorAPIErrorTests {
     #expect(
       error.errorDescription
         == """
-          GitHub rejected the configured token (HTTP 401 Bad credentials). The token \
-          may have expired or been revoked. Update it in Settings > Secrets and try again
-          """
+        GitHub rejected the configured token (HTTP 401 Bad credentials). The token \
+        may have expired or been revoked. Update it in Settings > Secrets and try again
+        """
     )
   }
 

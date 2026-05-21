@@ -106,7 +106,7 @@ struct TaskBoardItemRoutesToEditor: View {
         textAlignment: .leading,
         showsClearButton: false
       )
-        .onSubmit { commitDraftEntry() }
+      .onSubmit { commitDraftEntry() }
       Button {
         commitDraftEntry()
       } label: {

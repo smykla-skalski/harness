@@ -235,7 +235,7 @@ struct SettingsRepositoriesCatalogErrorPresentationTests {
         == "GitHub blocked access to smykla-skalski because the current fine-grained token exceeds the organization's lifetime policy. Update the token, then load repositories again."
     )
 
-    guard case let .openURL(url)? = presentation.action else {
+    guard case .openURL(let url)? = presentation.action else {
       Issue.record("expected token settings recovery action")
       return
     }
