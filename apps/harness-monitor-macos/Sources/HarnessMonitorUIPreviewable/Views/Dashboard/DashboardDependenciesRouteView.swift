@@ -416,6 +416,9 @@ struct DashboardDependenciesRouteView: View {
           dependencyActionBar(items: [item])
         }
         detailMetrics(for: item)
+        detailSection("Description") {
+          descriptionView(for: item)
+        }
         detailSection("Checks") {
           if item.checks.isEmpty {
             Text("No checks reported")
@@ -465,6 +468,35 @@ struct DashboardDependenciesRouteView: View {
         }
       }
       .frame(maxWidth: .infinity, alignment: .leading)
+      .task(id: item.pullRequestID) {
+        await store.prepareDependencyUpdateBody(for: item)
+      }
+    }
+  }
+
+  @ViewBuilder
+  private func descriptionView(for item: DependencyUpdateItem) -> some View {
+    switch store.dependencyUpdateBodyState[item.pullRequestID] {
+    case .loaded(let body):
+      if body.isEmpty {
+        Text("No description")
+          .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+          .scaledFont(.callout)
+      } else {
+        HarnessMonitorMarkdownText(body, textSelection: .enabled)
+      }
+    case .failed(let message):
+      Text(message)
+        .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+        .scaledFont(.callout)
+    case .loading, nil:
+      HStack(spacing: HarnessMonitorTheme.spacingSM) {
+        ProgressView()
+          .controlSize(.small)
+        Text("Loading description…")
+          .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+          .scaledFont(.callout)
+      }
     }
   }
 
