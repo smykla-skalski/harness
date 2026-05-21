@@ -71,20 +71,6 @@ public struct SettingsGeneralOverviewState {
 public struct SettingsGeneralSection: View {
   public let store: HarnessMonitorStore
   public let overview: SettingsGeneralOverviewState
-  @AppStorage(HarnessMonitorDateTimeConfiguration.timeZoneModeKey)
-  private var timeZoneModeRawValue = HarnessMonitorDateTimeConfiguration.defaultTimeZoneModeRawValue
-  @AppStorage(HarnessMonitorDateTimeConfiguration.customTimeZoneIdentifierKey)
-  private var customTimeZoneIdentifier = HarnessMonitorDateTimeConfiguration
-    .defaultCustomTimeZoneIdentifier
-  @AppStorage(SessionTimelineFilterDefaults.persistenceModeKey)
-  private var timelineFilterPersistenceModeRawValue =
-    SessionTimelineFilterDefaults.defaultPersistenceMode.rawValue
-  @AppStorage(HarnessMonitorLaunchBehavior.storageKey)
-  private var launchBehaviorRawValue = HarnessMonitorLaunchBehavior.defaultValue.rawValue
-  @AppStorage(OpenRecentCloseAfterPickDefaults.storageKey)
-  private var closeOpenRecentAfterPick = OpenRecentCloseAfterPickDefaults.defaultValue
-  @AppStorage(SessionWindowTabbingPreference.storageKey)
-  private var sessionWindowTabbingRawValue = SessionWindowTabbingPreference.defaultValue.rawValue
   @AppStorage(DaemonOwnership.preferenceKey)
   private var preferredDaemonModeRawValue = DaemonOwnership.managed.rawValue
   @State private var isRemoveLaunchAgentConfirmationPresented = false
@@ -154,21 +140,6 @@ public struct SettingsGeneralSection: View {
       || store.connectionState == .connecting
   }
 
-  private var dateTimeConfiguration: HarnessMonitorDateTimeConfiguration {
-    HarnessMonitorDateTimeConfiguration(
-      timeZoneModeRawValue: timeZoneModeRawValue,
-      customTimeZoneIdentifier: customTimeZoneIdentifier
-    )
-  }
-
-  private var launchBehavior: HarnessMonitorLaunchBehavior {
-    HarnessMonitorLaunchBehavior.resolved(rawValue: launchBehaviorRawValue)
-  }
-
-  private var sessionWindowTabbingPreference: SessionWindowTabbingPreference {
-    SessionWindowTabbingPreference.resolved(rawValue: sessionWindowTabbingRawValue)
-  }
-
   private var preferredDaemonMode: DaemonOwnership {
     DaemonOwnership(rawValue: preferredDaemonModeRawValue) ?? .managed
   }
@@ -181,92 +152,9 @@ public struct SettingsGeneralSection: View {
 
   public var body: some View {
     Form {
-      Section {
-        Picker("Time zone", selection: $timeZoneModeRawValue) {
-          ForEach(HarnessMonitorDateTimeZoneMode.allCases) { mode in
-            Text(mode.label).tag(mode.rawValue)
-          }
-        }
-        .harnessNativeFormControl()
-        .accessibilityIdentifier(HarnessMonitorAccessibility.settingsTimeZoneModePicker)
-
-        if dateTimeConfiguration.showsCustomTimeZoneField {
-          Picker("Custom zone", selection: $customTimeZoneIdentifier) {
-            ForEach(
-              HarnessMonitorDateTimeConfiguration.knownTimeZoneIdentifiers,
-              id: \.self
-            ) { identifier in
-              Text(identifier).tag(identifier)
-            }
-          }
-          .harnessNativeFormControl()
-          .accessibilityIdentifier(HarnessMonitorAccessibility.settingsCustomTimeZonePicker)
-        }
-
-        LabeledContent("Resolved Zone", value: dateTimeConfiguration.effectiveTimeZoneDisplayName)
-        LabeledContent(
-          "Preview",
-          value: formatTimestamp(
-            HarnessMonitorDateTimeConfiguration.previewTimestampValue,
-            configuration: dateTimeConfiguration
-          )
-        )
-      } header: {
-        Text("Date & Time")
-      } footer: {
-        Text("Every timestamp in Harness Monitor uses this timezone-aware display format")
-          .accessibilityIdentifier("harness.settings.footer.datetime")
-      }
-
-      Section {
-        Picker("Filter persistence", selection: $timelineFilterPersistenceModeRawValue) {
-          ForEach(SessionTimelineFilterPersistenceMode.allCases) { mode in
-            Text(mode.label).tag(mode.rawValue)
-          }
-        }
-        .harnessNativeFormControl()
-        .accessibilityIdentifier(
-          HarnessMonitorAccessibility.settingsTimelinePersistencePicker
-        )
-      } header: {
-        Text("Timeline")
-      } footer: {
-        Text(
-          "Controls whether Session cockpit timeline filters reset each time, "
-            + "restore per window and session, or reopen app-wide"
-        )
-      }
-
-      Section {
-        Picker("Launch behavior", selection: $launchBehaviorRawValue) {
-          ForEach(HarnessMonitorLaunchBehavior.allCases) { behavior in
-            Text(behavior.label).tag(behavior.rawValue)
-          }
-        }
-        .harnessNativeFormControl()
-        .accessibilityIdentifier(HarnessMonitorAccessibility.settingsLaunchBehaviorPicker)
-
-        Toggle("Close Open Recent after picking a session", isOn: $closeOpenRecentAfterPick)
-          .accessibilityLabel("Close Open Recent after picking a session")
-          .accessibilityHint("When enabled, choosing a recent session closes the welcome window.")
-
-        Picker("Session window tabs", selection: $sessionWindowTabbingRawValue) {
-          ForEach(SessionWindowTabbingPreference.allCases) { preference in
-            Text(preference.label).tag(preference.rawValue)
-          }
-        }
-        .harnessNativeFormControl()
-        .accessibilityLabel("Session window tabs")
-        .accessibilityHint("Controls whether session windows prefer native macOS tabs.")
-      } header: {
-        Text("Windows")
-      } footer: {
-        Text(
-          "\(launchBehavior.description) "
-            + "\(HarnessMonitorLaunchBehavior.closingBehaviorDescription) "
-            + "\(sessionWindowTabbingPreference.description)"
-        )
-      }
+      GeneralDateTimeSection()
+      GeneralTimelineSection()
+      GeneralWindowsSection()
 
       if isFullyExpanded {
         SettingsLoggingSection(store: store)
@@ -342,6 +230,137 @@ public struct SettingsGeneralSection: View {
       Button("Cancel", role: .cancel) {}
     } message: {
       Text("This disables launchd residency for the harness daemon on this Mac")
+    }
+  }
+}
+
+private struct GeneralDateTimeSection: View {
+  @AppStorage(HarnessMonitorDateTimeConfiguration.timeZoneModeKey)
+  private var timeZoneModeRawValue = HarnessMonitorDateTimeConfiguration.defaultTimeZoneModeRawValue
+  @AppStorage(HarnessMonitorDateTimeConfiguration.customTimeZoneIdentifierKey)
+  private var customTimeZoneIdentifier = HarnessMonitorDateTimeConfiguration
+    .defaultCustomTimeZoneIdentifier
+
+  private var dateTimeConfiguration: HarnessMonitorDateTimeConfiguration {
+    HarnessMonitorDateTimeConfiguration(
+      timeZoneModeRawValue: timeZoneModeRawValue,
+      customTimeZoneIdentifier: customTimeZoneIdentifier
+    )
+  }
+
+  var body: some View {
+    Section {
+      Picker("Time zone", selection: $timeZoneModeRawValue) {
+        ForEach(HarnessMonitorDateTimeZoneMode.allCases) { mode in
+          Text(mode.label).tag(mode.rawValue)
+        }
+      }
+      .harnessNativeFormControl()
+      .accessibilityIdentifier(HarnessMonitorAccessibility.settingsTimeZoneModePicker)
+
+      if dateTimeConfiguration.showsCustomTimeZoneField {
+        Picker("Custom zone", selection: $customTimeZoneIdentifier) {
+          ForEach(
+            HarnessMonitorDateTimeConfiguration.knownTimeZoneIdentifiers,
+            id: \.self
+          ) { identifier in
+            Text(identifier).tag(identifier)
+          }
+        }
+        .harnessNativeFormControl()
+        .accessibilityIdentifier(HarnessMonitorAccessibility.settingsCustomTimeZonePicker)
+      }
+
+      LabeledContent("Resolved Zone", value: dateTimeConfiguration.effectiveTimeZoneDisplayName)
+      LabeledContent(
+        "Preview",
+        value: formatTimestamp(
+          HarnessMonitorDateTimeConfiguration.previewTimestampValue,
+          configuration: dateTimeConfiguration
+        )
+      )
+    } header: {
+      Text("Date & Time")
+    } footer: {
+      Text("Every timestamp in Harness Monitor uses this timezone-aware display format")
+        .accessibilityIdentifier("harness.settings.footer.datetime")
+    }
+  }
+}
+
+private struct GeneralTimelineSection: View {
+  @AppStorage(SessionTimelineFilterDefaults.persistenceModeKey)
+  private var timelineFilterPersistenceModeRawValue =
+    SessionTimelineFilterDefaults.defaultPersistenceMode.rawValue
+
+  var body: some View {
+    Section {
+      Picker("Filter persistence", selection: $timelineFilterPersistenceModeRawValue) {
+        ForEach(SessionTimelineFilterPersistenceMode.allCases) { mode in
+          Text(mode.label).tag(mode.rawValue)
+        }
+      }
+      .harnessNativeFormControl()
+      .accessibilityIdentifier(
+        HarnessMonitorAccessibility.settingsTimelinePersistencePicker
+      )
+    } header: {
+      Text("Timeline")
+    } footer: {
+      Text(
+        "Controls whether Session cockpit timeline filters reset each time, "
+          + "restore per window and session, or reopen app-wide"
+      )
+    }
+  }
+}
+
+private struct GeneralWindowsSection: View {
+  @AppStorage(HarnessMonitorLaunchBehavior.storageKey)
+  private var launchBehaviorRawValue = HarnessMonitorLaunchBehavior.defaultValue.rawValue
+  @AppStorage(OpenRecentCloseAfterPickDefaults.storageKey)
+  private var closeOpenRecentAfterPick = OpenRecentCloseAfterPickDefaults.defaultValue
+  @AppStorage(SessionWindowTabbingPreference.storageKey)
+  private var sessionWindowTabbingRawValue = SessionWindowTabbingPreference.defaultValue.rawValue
+
+  private var launchBehavior: HarnessMonitorLaunchBehavior {
+    HarnessMonitorLaunchBehavior.resolved(rawValue: launchBehaviorRawValue)
+  }
+
+  private var sessionWindowTabbingPreference: SessionWindowTabbingPreference {
+    SessionWindowTabbingPreference.resolved(rawValue: sessionWindowTabbingRawValue)
+  }
+
+  var body: some View {
+    Section {
+      Picker("Launch behavior", selection: $launchBehaviorRawValue) {
+        ForEach(HarnessMonitorLaunchBehavior.allCases) { behavior in
+          Text(behavior.label).tag(behavior.rawValue)
+        }
+      }
+      .harnessNativeFormControl()
+      .accessibilityIdentifier(HarnessMonitorAccessibility.settingsLaunchBehaviorPicker)
+
+      Toggle("Close Open Recent after picking a session", isOn: $closeOpenRecentAfterPick)
+        .accessibilityLabel("Close Open Recent after picking a session")
+        .accessibilityHint("When enabled, choosing a recent session closes the welcome window.")
+
+      Picker("Session window tabs", selection: $sessionWindowTabbingRawValue) {
+        ForEach(SessionWindowTabbingPreference.allCases) { preference in
+          Text(preference.label).tag(preference.rawValue)
+        }
+      }
+      .harnessNativeFormControl()
+      .accessibilityLabel("Session window tabs")
+      .accessibilityHint("Controls whether session windows prefer native macOS tabs.")
+    } header: {
+      Text("Windows")
+    } footer: {
+      Text(
+        "\(launchBehavior.description) "
+          + "\(HarnessMonitorLaunchBehavior.closingBehaviorDescription) "
+          + "\(sessionWindowTabbingPreference.description)"
+      )
     }
   }
 }
