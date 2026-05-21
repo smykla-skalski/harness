@@ -644,7 +644,10 @@ struct SettingsRepositoriesSection: View {
     let dependenciesRepositories = draft.dependenciesRepositories
     let legacyOrganizations = draft.legacyOrganizations
 
-    let succeeded = await store.updateTaskBoardGitSettings(snapshot: taskBoardDraft.snapshot)
+    let succeeded = await store.updateTaskBoardGitSettings(
+      snapshot: taskBoardDraft.snapshot,
+      origin: .settingsRepositoriesSaveButton
+    )
     guard succeeded else { return }
 
     var dependenciesPreferences = DashboardDependenciesPreferences.decode(
