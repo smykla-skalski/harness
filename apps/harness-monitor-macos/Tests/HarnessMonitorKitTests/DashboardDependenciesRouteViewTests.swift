@@ -105,6 +105,14 @@ struct DashboardDependenciesRouteViewTests {
     #expect(refreshSource.contains("DashboardDependenciesRemoteLoader.refresh("))
   }
 
+  @Test("dashboard preview exercises dependency alert rendering")
+  func dashboardPreviewExercisesDependencyAlertRendering() throws {
+    let source = try previewSource(named: "PreviewDashboardDependenciesRouteView.swift")
+
+    #expect(source.contains("> ℹ️ **Note**"))
+    #expect(source.contains("This PR body was truncated due to platform limits."))
+  }
+
   @Test("error helper rewrites GitHub 401 messages into actionable copy")
   func errorHelperRewritesGitHubUnauthorizedIntoActionableCopy() {
     let envelope =
@@ -173,6 +181,23 @@ struct DashboardDependenciesRouteViewTests {
       repoRoot
       .appendingPathComponent(
         "apps/harness-monitor-macos/Sources/HarnessMonitorUIPreviewable/Views/Dashboard"
+      )
+      .appendingPathComponent(fileName)
+    return try String(contentsOf: sourceURL, encoding: .utf8)
+  }
+
+  private func previewSource(named fileName: String) throws -> String {
+    let testsDirectory = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
+    let repoRoot =
+      testsDirectory
+      .deletingLastPathComponent()
+      .deletingLastPathComponent()
+      .deletingLastPathComponent()
+      .deletingLastPathComponent()
+    let sourceURL =
+      repoRoot
+      .appendingPathComponent(
+        "apps/harness-monitor-macos/Sources/HarnessMonitorUIPreviewable/Views/Dashboard/Previews"
       )
       .appendingPathComponent(fileName)
     return try String(contentsOf: sourceURL, encoding: .utf8)

@@ -163,6 +163,27 @@ struct HarnessMarkdownParserTests {
     #expect(body == [.text("Check configuration before continuing.")])
   }
 
+  @Test("Parser recognizes legacy GitHub note quotes with emoji headers")
+  func parserRecognizesLegacyGitHubNoteQuotes() {
+    let document = HarnessMarkdownParser.parse(
+      """
+      > ℹ️ **Note**
+      > This PR body was truncated due to platform limits.
+      """
+    )
+
+    guard case .alert(let alert)? = document.blocks.first else {
+      Issue.record("Expected legacy note quote to parse as alert")
+      return
+    }
+    #expect(alert.kind == .note)
+    guard case .paragraph(let body)? = alert.blocks.first else {
+      Issue.record("Expected legacy note body paragraph")
+      return
+    }
+    #expect(body == [.text("This PR body was truncated due to platform limits.")])
+  }
+
   @Test("Unknown GitHub alert markers fall back to plain block quotes")
   func unknownGitHubAlertMarkersFallbackToBlockQuotes() {
     let document = HarnessMarkdownParser.parse(

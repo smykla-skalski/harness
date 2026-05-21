@@ -19,6 +19,10 @@ import SwiftUI
 
 private enum DashboardDependenciesPreviewBody {
   static let octocrab = """
+    > ℹ️ **Note**
+    > This PR body was truncated due to platform limits.
+    > Open GitHub to inspect the full release notes and generated update context.
+
     Bumps `octocrab` from **0.45.0** to **0.46.0**.
 
     ## Highlights

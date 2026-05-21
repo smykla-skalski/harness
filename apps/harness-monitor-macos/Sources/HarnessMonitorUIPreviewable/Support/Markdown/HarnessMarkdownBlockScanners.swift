@@ -121,6 +121,52 @@ func githubAlertKind(_ line: String) -> HarnessMarkdownAlert.Kind? {
   return HarnessMarkdownAlert.Kind(marker: marker)
 }
 
+func legacyGitHubAlert(_ line: String) -> (kind: HarnessMarkdownAlert.Kind, remainder: String)? {
+  let trimmed = line.trimmingCharacters(in: .whitespaces)
+  let withoutEmoji = droppingLeadingMarkdownAlertEmoji(from: trimmed)
+  for kind in HarnessMarkdownAlert.Kind.allCases {
+    for pattern in legacyGitHubAlertLabelPatterns(for: kind.title) {
+      guard withoutEmoji.lowercased().hasPrefix(pattern.lowercased()) else { continue }
+      let remainder = String(withoutEmoji.dropFirst(pattern.count))
+      return (kind, trimLegacyGitHubAlertRemainder(remainder))
+    }
+  }
+  return nil
+}
+
+private func legacyGitHubAlertLabelPatterns(for title: String) -> [String] {
+  [
+    "**\(title)**",
+    "**\(title)**:",
+    "**\(title):**",
+    title,
+    "\(title):",
+  ]
+}
+
+private func droppingLeadingMarkdownAlertEmoji(from line: String) -> String {
+  let characters = Array(line)
+  guard let first = characters.first, isMarkdownAlertEmoji(first) else { return line }
+  let restStart = characters.index(after: characters.startIndex)
+  guard restStart < characters.endIndex, characters[restStart].isWhitespace else { return line }
+  return String(characters[restStart...]).trimmingCharacters(in: .whitespaces)
+}
+
+private func trimLegacyGitHubAlertRemainder(_ raw: String) -> String {
+  var trimmed = raw.trimmingCharacters(in: .whitespaces)
+  while let first = trimmed.first, [":", "-", "—", "–"].contains(first) {
+    trimmed.removeFirst()
+    trimmed = trimmed.trimmingCharacters(in: .whitespaces)
+  }
+  return trimmed
+}
+
+private func isMarkdownAlertEmoji(_ character: Character) -> Bool {
+  character.unicodeScalars.contains { scalar in
+    scalar.properties.isEmojiPresentation || scalar.properties.isEmoji
+  }
+}
+
 func isSingleLineHTML(_ line: String) -> Bool {
   line.contains("</") || line.hasPrefix("<!--") && line.contains("-->")
 }
