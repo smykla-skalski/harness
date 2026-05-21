@@ -62,10 +62,61 @@ struct HarnessMarkdownParserTests {
     #expect(tokens.contains(.init(text: "let", kind: .keyword)))
 
     guard case .html(let html) = document.blocks[7] else {
-      Issue.record("Expected raw HTML text")
+      Issue.record("Expected HTML text")
       return
     }
-    #expect(html == "<div>safe text</div>")
+    #expect(html == [.text("safe text")])
+  }
+
+  @Test("Parser renders supported markdown HTML and drops comments")
+  func parserRendersSupportedMarkdownHTML() {
+    let document = HarnessMarkdownParser.parse(
+      """
+      <p>Hello <strong>bold</strong> <em>em</em> <code>x</code><br><a href="https://example.com" title="Docs">link</a></p>
+      <!-- hidden comment -->
+      <script>hidden()</script>
+      """
+    )
+
+    guard case .html(let inlines)? = document.blocks.first else {
+      Issue.record("Expected rendered HTML inline block")
+      return
+    }
+    #expect(inlines.contains(.strong([.text("bold")])))
+    #expect(inlines.contains(.emphasis([.text("em")])))
+    #expect(inlines.contains(.code("x")))
+    #expect(inlines.contains(.lineBreak))
+    #expect(
+      inlines.contains(
+        .link(label: [.text("link")], destination: "https://example.com", title: "Docs")))
+    #expect(!inlines.contains(.text("hidden comment")))
+  }
+
+  @Test("Parser renders HTML details as disclosure content")
+  func parserRendersHTMLDetails() {
+    let document = HarnessMarkdownParser.parse(
+      """
+      <details open>
+      <summary><strong>More</strong> info</summary>
+
+      Body with <em>inline</em> HTML.
+      <!-- hidden -->
+      </details>
+      """
+    )
+
+    guard case .details(let details)? = document.blocks.first else {
+      Issue.record("Expected details block")
+      return
+    }
+    #expect(details.isOpen)
+    #expect(details.summary == [.strong([.text("More")]), .text(" info")])
+    guard case .paragraph(let body)? = details.blocks.first else {
+      Issue.record("Expected details body paragraph")
+      return
+    }
+    #expect(body.contains(.emphasis([.text("inline")])))
+    #expect(!body.contains(.text("hidden")))
   }
 
   @Test("Malformed fences parse as code through end of source")

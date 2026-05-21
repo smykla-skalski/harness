@@ -37,7 +37,11 @@ enum HarnessMarkdownInlineParser {
         appendLink(
           in: characters, from: &index, buffer: &buffer, into: &parts, references: references)
       } else if characters[index] == "<" {
-        appendAngleAutolink(in: characters, from: &index, buffer: &buffer, into: &parts)
+        if !HarnessMarkdownHTMLInlineScanner.appendIfHTML(
+          in: characters, from: &index, buffer: &buffer, into: &parts, references: references)
+        {
+          appendAngleAutolink(in: characters, from: &index, buffer: &buffer, into: &parts)
+        }
       } else if startsURL(in: characters, at: index) {
         appendBareAutolink(in: characters, from: &index, buffer: &buffer, into: &parts)
       } else {

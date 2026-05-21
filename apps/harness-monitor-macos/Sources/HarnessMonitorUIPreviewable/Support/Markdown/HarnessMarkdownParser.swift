@@ -39,10 +39,14 @@ private struct HarnessMarkdownBlockParser {
       let line = lines[index]
       if line.isBlank {
         index += 1
+      } else if HarnessMarkdownHTMLBlocks.isCommentStart(line) {
+        skipHTMLComment()
       } else if HarnessMarkdownReferenceDefinitions.definition(line) != nil {
         index += 1
       } else if let fence = fenceStart(line) {
         blocks.append(parseFencedCode(fence))
+      } else if HarnessMarkdownHTMLBlocks.detailsStart(line) != nil {
+        blocks.append(parseDetails())
       } else if line.leadingSpaceCount >= 4 {
         blocks.append(parseIndentedCode())
       } else if let heading = heading(line, references: references) {
@@ -60,7 +64,9 @@ private struct HarnessMarkdownBlockParser {
       } else if isTableStart(at: index) {
         blocks.append(parseTable())
       } else if isHTML(line) {
-        blocks.append(parseHTMLBlock())
+        if let block = parseHTMLBlock() {
+          blocks.append(block)
+        }
       } else if let setext = setextHeading(at: index) {
         blocks.append(setext)
         index += 2
@@ -178,7 +184,7 @@ private struct HarnessMarkdownBlockParser {
     return .table(HarnessMarkdownTable(headers: headers, alignments: alignments, rows: rows))
   }
 
-  private mutating func parseHTMLBlock() -> HarnessMarkdownBlock {
+  private mutating func parseHTMLBlock() -> HarnessMarkdownBlock? {
     var body: [String] = []
     while index < lines.count, !lines[index].isBlank {
       guard !shouldCancel() else { break }
@@ -186,7 +192,42 @@ private struct HarnessMarkdownBlockParser {
       index += 1
       if body.count == 1, isSingleLineHTML(body[0]) { break }
     }
-    return .html(body.joined(separator: "\n"))
+    let html = HarnessMarkdownHTMLBlocks.removingComments(from: body.joined(separator: "\n"))
+    let inlines = HarnessMarkdownInlineParser.parse(html, references: references)
+    return inlines.isEmpty ? nil : .html(inlines)
+  }
+
+  private mutating func parseDetails() -> HarnessMarkdownBlock {
+    var body: [String] = []
+    var depth = 0
+    while index < lines.count {
+      guard !shouldCancel() else { break }
+      let line = lines[index]
+      if HarnessMarkdownHTMLBlocks.detailsStart(line) != nil { depth += 1 }
+      body.append(line)
+      index += 1
+      if HarnessMarkdownHTMLBlocks.containsDetailsClose(line) {
+        depth -= 1
+        if depth <= 0 { break }
+      }
+    }
+    let details = HarnessMarkdownHTMLBlocks.details(from: body.joined(separator: "\n"))
+    var parser = childParser(
+      lines: details.body.split(separator: "\n", omittingEmptySubsequences: false).map(String.init)
+    )
+    return .details(
+      HarnessMarkdownDetails(
+        summary: HarnessMarkdownInlineParser.parse(details.summary, references: references),
+        blocks: parser.parseBlocks(),
+        isOpen: details.isOpen
+      ))
+  }
+
+  private mutating func skipHTMLComment() {
+    while index < lines.count {
+      defer { index += 1 }
+      if lines[index].contains("-->") { break }
+    }
   }
 
   private mutating func parseParagraph() -> HarnessMarkdownBlock {
@@ -204,6 +245,8 @@ private struct HarnessMarkdownBlockParser {
     fenceStart(line) != nil
       || line.leadingSpaceCount >= 4
       || heading(line, references: references) != nil
+      || HarnessMarkdownHTMLBlocks.isCommentStart(line)
+      || HarnessMarkdownHTMLBlocks.detailsStart(line) != nil
       || isThematicBreak(line)
       || line.trimmingLeadingSpaces().hasPrefix(">")
       || unorderedMarker(line) != nil
@@ -237,136 +280,20 @@ private struct HarnessMarkdownBlockParser {
   }
 }
 
-private struct FenceStart {
-  let marker: Character
-  let count: Int
-  let info: String
-}
-
-private func fenceStart(_ line: String) -> FenceStart? {
-  let trimmed = line.trimmingLeadingSpaces()
-  guard let marker = trimmed.first, marker == "`" || marker == "~" else { return nil }
-  let count = trimmed.prefix { $0 == marker }.count
-  guard count >= 3 else { return nil }
-  let info = String(trimmed.dropFirst(count)).trimmingCharacters(in: .whitespaces)
-  return FenceStart(marker: marker, count: count, info: info)
-}
-
-private func fenceClose(_ line: String, fence: FenceStart) -> Bool {
-  let trimmed = line.trimmingLeadingSpaces()
-  let run = trimmed.prefix { $0 == fence.marker }.count
-  guard run >= fence.count else { return false }
-  return trimmed.dropFirst(run).allSatisfy(\.isWhitespace)
-}
-
-private func heading(
-  _ line: String,
-  references: [String: HarnessMarkdownReference] = [:]
-) -> HarnessMarkdownBlock? {
-  let trimmed = line.trimmingLeadingSpaces()
-  let level = trimmed.prefix { $0 == "#" }.count
-  guard (1...6).contains(level), trimmed.dropFirst(level).first?.isWhitespace == true else {
-    return nil
-  }
-  let text = String(trimmed.dropFirst(level)).trimmingCharacters(in: .whitespaces)
-  return .heading(
-    level: level, inlines: HarnessMarkdownInlineParser.parse(text, references: references))
-}
-
-private func isThematicBreak(_ line: String) -> Bool {
-  let compact = line.filter { !$0.isWhitespace }
-  guard compact.count >= 3, let first = compact.first, ["-", "*", "_"].contains(first) else {
-    return false
-  }
-  return compact.allSatisfy { $0 == first }
-}
-
-private func unorderedMarker(_ line: String) -> (content: String, checkbox: Bool?)? {
-  let trimmed = line.trimmingLeadingSpaces()
-  guard let marker = trimmed.first, trimmed.count >= 2, ["-", "*", "+"].contains(marker),
-    trimmed.dropFirst().first?.isWhitespace == true
-  else {
-    return nil
-  }
-  return checkboxContent(String(trimmed.dropFirst(2)))
-}
-
-private func orderedMarker(_ line: String) -> (number: Int, content: String)? {
-  let trimmed = line.trimmingLeadingSpaces()
-  var digits = ""
-  var cursor = trimmed.startIndex
-  while cursor < trimmed.endIndex, trimmed[cursor].isNumber {
-    digits.append(trimmed[cursor])
-    cursor = trimmed.index(after: cursor)
-  }
-  guard !digits.isEmpty, cursor < trimmed.endIndex, trimmed[cursor] == "." || trimmed[cursor] == ")"
-  else {
-    return nil
-  }
-  let afterMarker = trimmed.index(after: cursor)
-  guard afterMarker < trimmed.endIndex, trimmed[afterMarker].isWhitespace else { return nil }
-  return (Int(digits) ?? 1, String(trimmed[trimmed.index(after: afterMarker)...]))
-}
-
-private func checkboxContent(_ raw: String) -> (content: String, checkbox: Bool?) {
-  guard raw.count >= 4, raw.first == "[" else { return (raw, nil) }
-  let marker = raw.dropFirst().first
-  let close = raw.dropFirst(2).first
-  guard close == "]", raw.dropFirst(3).first?.isWhitespace == true else { return (raw, nil) }
-  let checked = marker == "x" || marker == "X"
-  return (String(raw.dropFirst(4)), marker == " " || checked ? checked : nil)
-}
-
-private func isTableSeparator(_ line: String) -> Bool {
-  let cells = splitTableRow(line)
-  guard !cells.isEmpty else { return false }
-  return cells.allSatisfy { cell in
-    let compact = cell.trimmingCharacters(in: .whitespaces)
-    let core = compact.trimmingCharacters(in: CharacterSet(charactersIn: ":"))
-    return core.count >= 3 && core.allSatisfy { $0 == "-" }
-  }
-}
-
-private func tableAlignments(_ line: String) -> [HarnessMarkdownTable.Alignment] {
-  splitTableRow(line).map { cell in
-    let trimmed = cell.trimmingCharacters(in: .whitespaces)
-    if trimmed.hasPrefix(":"), trimmed.hasSuffix(":") { return .center }
-    if trimmed.hasSuffix(":") { return .trailing }
-    return .leading
-  }
-}
-
-private func splitTableRow(_ line: String) -> [String] {
-  var trimmed = line.trimmingCharacters(in: .whitespaces)
-  if trimmed.first == "|" { trimmed.removeFirst() }
-  if trimmed.last == "|" { trimmed.removeLast() }
-  return trimmed.split(separator: "|", omittingEmptySubsequences: false)
-    .map { String($0).trimmingCharacters(in: .whitespaces) }
-}
-
-private func isHTML(_ line: String) -> Bool {
-  let trimmed = line.trimmingLeadingSpaces()
-  return trimmed.hasPrefix("<") && trimmed.hasSuffix(">") && trimmed.count > 2
-}
-
-private func isSingleLineHTML(_ line: String) -> Bool {
-  line.contains("</") || line.hasPrefix("<!--") && line.contains("-->")
-}
-
 extension String {
-  fileprivate var isBlank: Bool {
+  var isBlank: Bool {
     allSatisfy(\.isWhitespace)
   }
 
-  fileprivate var leadingSpaceCount: Int {
+  var leadingSpaceCount: Int {
     prefix { $0 == " " }.count
   }
 
-  fileprivate func trimmingLeadingSpaces() -> String {
+  func trimmingLeadingSpaces() -> String {
     String(drop { $0 == " " || $0 == "\t" })
   }
 
-  fileprivate func droppingLeadingSpaces(_ count: Int) -> String {
+  func droppingLeadingSpaces(_ count: Int) -> String {
     var dropped = 0
     var cursor = startIndex
     while cursor < endIndex, dropped < count, self[cursor] == " " {
