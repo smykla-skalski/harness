@@ -14,11 +14,10 @@ struct ToolCallTimelineView: View {
   @State private var cachedVirtualizedLayout = ToolCallTimelineVirtualizedLayout.empty
   @State private var cachedAnnouncementSnapshot = ToolCallTimelineAnnouncementSnapshot.empty
   @State private var cachedScrollMetrics = ToolCallTimelineScrollMetrics.zero
-  @State private var cachedVisibleOverflowToolCallCount = 0
   @State private var cachedOverflowAnnouncement: ToolCallTimelineOverflowAnnouncement?
   @State private var cachedRowFrames: [String: CGRect] = [:]
-  @State private var cachedRowFramesRevision: UInt64 = 0
   @State private var presentationGeneration: UInt64 = 0
+  @State private var scrollMetricsDeferrer = ToolCallTimelineScrollMetricsDeferrer()
 
   @AppStorage(
     HarnessMonitorToolCallAnnouncementSettings.verboseAnnouncementsKey
@@ -37,7 +36,6 @@ struct ToolCallTimelineView: View {
     _cachedPresentation = State(initialValue: .empty)
     _cachedVirtualizedLayout = State(initialValue: .empty)
     _cachedAnnouncementSnapshot = State(initialValue: .empty)
-    _cachedVisibleOverflowToolCallCount = State(initialValue: 0)
     if let overflowNotice {
       _cachedOverflowAnnouncement = State(
         initialValue: ToolCallTimelineOverflowAnnouncement(
@@ -58,8 +56,7 @@ struct ToolCallTimelineView: View {
       entries: entries,
       liveAnnouncementRowIDs: liveAnnouncementRowIDs,
       overflowNotice: overflowNotice,
-      scrollMetrics: cachedScrollMetrics,
-      rowFrames: cachedRowFrames
+      scrollMetrics: cachedScrollMetrics
     )
   }
 
@@ -68,13 +65,25 @@ struct ToolCallTimelineView: View {
       entries: entries,
       liveAnnouncementRowIDs: liveAnnouncementRowIDs,
       overflowNotice: overflowNotice,
-      scrollMetrics: cachedScrollMetrics,
-      rowFramesRevision: cachedRowFramesRevision
+      scrollMetrics: cachedScrollMetrics
     )
   }
 
   private var overflowToolCallCount: Int {
-    overflowNotice?.displayedEventCount ?? cachedVisibleOverflowToolCallCount
+    overflowNotice?.displayedEventCount ?? visibleOverflowToolCallCount
+  }
+
+  private var visibleOverflowToolCallCount: Int {
+    let viewportVisibleRowIDs = Self.viewportVisibleRowIDs(
+      renderedRowIDs: cachedVirtualizedLayout.renderedRowIDs,
+      rowFrames: cachedRowFrames,
+      visibleRect: cachedScrollMetrics.visibleRect
+    )
+    return viewportVisibleRowIDs.reduce(into: 0) { count, rowID in
+      if liveAnnouncementRowIDs.contains(rowID) {
+        count += 1
+      }
+    }
   }
 
   var body: some View {
@@ -89,7 +98,7 @@ struct ToolCallTimelineView: View {
         ToolCallTimelineOverflowNoticeView(
           rawUpdateCount: overflowNotice.rawUpdateCount,
           displayedToolCallCount: overflowToolCallCount,
-          visibleToolCallCount: cachedVisibleOverflowToolCallCount
+          visibleToolCallCount: visibleOverflowToolCallCount
         )
       }
       if cachedPresentation.rows.isEmpty {
@@ -122,16 +131,26 @@ struct ToolCallTimelineView: View {
         .onScrollGeometryChange(
           for: ToolCallTimelineScrollMetrics.self,
           of: ToolCallTimelineScrollMetrics.init(geometry:)
-        ) { _, newValue in
-          guard cachedScrollMetrics != newValue else {
+        ) { oldValue, newValue in
+          let oldBucket = ToolCallTimelineVirtualizedLayout.scrollBucket(for: oldValue)
+          let newBucket = ToolCallTimelineVirtualizedLayout.scrollBucket(for: newValue)
+          let needsInitialMetrics = cachedScrollMetrics.viewportHeight == 0
+          let viewportHeightChanged =
+            abs(cachedScrollMetrics.viewportHeight - newValue.viewportHeight) > 0.5
+          guard needsInitialMetrics || viewportHeightChanged || oldBucket != newBucket else {
             return
           }
-          cachedScrollMetrics = newValue
+          scheduleScrollMetricsUpdate(newValue)
+        }
+        .onScrollPhaseChange { _, newPhase, context in
+          guard newPhase == .idle else {
+            return
+          }
+          scheduleScrollMetricsUpdate(ToolCallTimelineScrollMetrics(geometry: context.geometry))
         }
         .onPreferenceChange(ToolCallTimelineRowFramePreferenceKey.self) { newFrames in
           if cachedRowFrames != newFrames {
             cachedRowFrames = newFrames
-            cachedRowFramesRevision &+= 1
           }
         }
       }
@@ -178,9 +197,6 @@ struct ToolCallTimelineView: View {
     if cachedVirtualizedLayout != output.layout {
       cachedVirtualizedLayout = output.layout
     }
-    if cachedVisibleOverflowToolCallCount != output.visibleOverflowToolCallCount {
-      cachedVisibleOverflowToolCallCount = output.visibleOverflowToolCallCount
-    }
     if cachedAnnouncementSnapshot != output.announcementSnapshot {
       cachedAnnouncementSnapshot = output.announcementSnapshot
     }
@@ -189,12 +205,13 @@ struct ToolCallTimelineView: View {
     }
   }
 
-  private func visibleViewportRowIDs(in layout: ToolCallTimelineVirtualizedLayout) -> Set<String> {
-    Self.viewportVisibleRowIDs(
-      renderedRowIDs: layout.renderedRowIDs,
-      rowFrames: cachedRowFrames,
-      visibleRect: cachedScrollMetrics.visibleRect
-    )
+  private func scheduleScrollMetricsUpdate(_ scrollMetrics: ToolCallTimelineScrollMetrics) {
+    scrollMetricsDeferrer.schedule(scrollMetrics) { latestMetrics in
+      guard cachedScrollMetrics != latestMetrics else {
+        return
+      }
+      cachedScrollMetrics = latestMetrics
+    }
   }
 
   nonisolated static func viewportVisibleRowIDs(
@@ -388,28 +405,24 @@ private struct ToolCallTimelinePresentationInput: Equatable, Sendable {
   let liveAnnouncementRowIDs: Set<String>
   let overflowNotice: HarnessMonitorStore.ToolCallTimelineOverflowNotice?
   let scrollMetrics: ToolCallTimelineScrollMetrics
-  let rowFrames: [String: CGRect]
 }
 
 private struct ToolCallTimelinePresentationTaskKey: Equatable {
   let entriesSignature: ToolCallTimelineEntriesBoundarySignature
   let liveAnnouncementRowIDsCount: Int
   let overflowNotice: HarnessMonitorStore.ToolCallTimelineOverflowNotice?
-  let scrollMetrics: ToolCallTimelineScrollMetrics
-  let rowFramesRevision: UInt64
+  let scrollBucket: ToolCallTimelineVirtualizedScrollBucket
 
   init(
     entries: [TimelineEntry],
     liveAnnouncementRowIDs: Set<String>,
     overflowNotice: HarnessMonitorStore.ToolCallTimelineOverflowNotice?,
-    scrollMetrics: ToolCallTimelineScrollMetrics,
-    rowFramesRevision: UInt64
+    scrollMetrics: ToolCallTimelineScrollMetrics
   ) {
     entriesSignature = ToolCallTimelineEntriesBoundarySignature(entries)
     liveAnnouncementRowIDsCount = liveAnnouncementRowIDs.count
     self.overflowNotice = overflowNotice
-    self.scrollMetrics = scrollMetrics
-    self.rowFramesRevision = rowFramesRevision
+    scrollBucket = ToolCallTimelineVirtualizedLayout.scrollBucket(for: scrollMetrics)
   }
 }
 
@@ -432,9 +445,28 @@ private struct ToolCallTimelineEntriesBoundarySignature: Equatable {
 private struct ToolCallTimelinePresentationOutput: Equatable, Sendable {
   let presentation: ToolCallTimelinePresentation
   let layout: ToolCallTimelineVirtualizedLayout
-  let visibleOverflowToolCallCount: Int
   let announcementSnapshot: ToolCallTimelineAnnouncementSnapshot
   let overflowAnnouncement: ToolCallTimelineOverflowAnnouncement?
+}
+
+@MainActor
+private final class ToolCallTimelineScrollMetricsDeferrer {
+  private var generation: UInt64 = 0
+
+  func schedule(
+    _ scrollMetrics: ToolCallTimelineScrollMetrics,
+    apply: @escaping @MainActor (ToolCallTimelineScrollMetrics) -> Void
+  ) {
+    generation &+= 1
+    let scheduledGeneration = generation
+    Task { @MainActor in
+      await Task.yield()
+      guard self.generation == scheduledGeneration else {
+        return
+      }
+      apply(scrollMetrics)
+    }
+  }
 }
 
 private actor ToolCallTimelinePresentationWorker {
@@ -446,7 +478,6 @@ private actor ToolCallTimelinePresentationWorker {
   private var cachedOutput = ToolCallTimelinePresentationOutput(
     presentation: .empty,
     layout: .empty,
-    visibleOverflowToolCallCount: 0,
     announcementSnapshot: .empty,
     overflowAnnouncement: nil
   )
@@ -473,16 +504,6 @@ private actor ToolCallTimelinePresentationWorker {
       presentation: presentation,
       scrollMetrics: input.scrollMetrics
     )
-    let viewportVisibleRowIDs = ToolCallTimelineView.viewportVisibleRowIDs(
-      renderedRowIDs: layout.renderedRowIDs,
-      rowFrames: input.rowFrames,
-      visibleRect: input.scrollMetrics.visibleRect
-    )
-    let visibleOverflowToolCallCount = viewportVisibleRowIDs.reduce(into: 0) { count, rowID in
-      if input.liveAnnouncementRowIDs.contains(rowID) {
-        count += 1
-      }
-    }
     let announcementSnapshot = ToolCallTimelineAnnouncementSnapshot(
       rows: presentation.rows,
       liveRowIDs: input.liveAnnouncementRowIDs
@@ -503,7 +524,6 @@ private actor ToolCallTimelinePresentationWorker {
     cachedOutput = ToolCallTimelinePresentationOutput(
       presentation: presentation,
       layout: layout,
-      visibleOverflowToolCallCount: visibleOverflowToolCallCount,
       announcementSnapshot: announcementSnapshot,
       overflowAnnouncement: overflowAnnouncement
     )
