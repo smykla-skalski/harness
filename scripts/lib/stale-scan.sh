@@ -122,6 +122,39 @@ stale_scan_monitor_wrapper_derived_data_path() {
   ' <<<"$command_line"
 }
 
+stale_scan_pid_has_live_xcodebuild_descendant() {
+  local root_pid="$1"
+  [[ -n "$root_pid" ]] || return 1
+  stale_scan_ensure_ps
+  awk -v root_pid="$root_pid" '
+    {
+      pid = $1
+      ppid = $2
+      $1 = ""; $2 = ""; $3 = ""
+      sub(/^ +/, "", $0)
+      children[ppid] = children[ppid] " " pid
+      cmd[pid] = $0
+    }
+    function walk(parent, list, count, idx, child) {
+      count = split(children[parent], list, " ")
+      for (idx = 1; idx <= count; idx += 1) {
+        child = list[idx]
+        if (child == "") continue
+        if (cmd[child] ~ /(^|\/)xcodebuild( |$)/) {
+          found = 1
+          return
+        }
+        walk(child)
+        if (found) return
+      }
+    }
+    END {
+      walk(root_pid)
+      exit(found ? 0 : 1)
+    }
+  ' <<<"$_stale_scan_ps_snapshot"
+}
+
 stale_scan_orphan_monitor_wrapper_pids() {
   stale_scan_ensure_ps
   local line pid ppid command_line derived_data_path
@@ -133,6 +166,13 @@ stale_scan_orphan_monitor_wrapper_pids() {
 
     [[ "$ppid" == "1" ]] || continue
     [[ "$command_line" == *"monitor-xcodebuild.sh"* ]] || continue
+
+    # A wrapper with a live xcodebuild descendant is never an orphan, even if
+    # the lock owner.env is missing or the -derivedDataPath arg can't be
+    # parsed. Killing it mid-build is the cancel-cascade we want to avoid.
+    if stale_scan_pid_has_live_xcodebuild_descendant "$pid"; then
+      continue
+    fi
 
     derived_data_path="$(stale_scan_monitor_wrapper_derived_data_path "$command_line")"
     if [[ -z "$derived_data_path" ]]; then

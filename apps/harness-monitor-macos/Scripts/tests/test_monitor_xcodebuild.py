@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 import os
+import signal
 import stat
 import subprocess
 import tempfile
+import time
 import unittest
 from pathlib import Path
 
@@ -188,6 +190,113 @@ shift
         self.assertEqual(log, "")
         self.assertIn("Harness Monitor xcodebuild lane is busy", completed.stderr)
         self.assertIn(f"pid={sleeper.pid}", completed.stderr)
+
+    def _spawn_long_running_wrapper(
+        self,
+        temp_root: Path,
+        marker_path: Path,
+        protect: str,
+    ) -> tuple[subprocess.Popen[str], Path]:
+        fake_bin = temp_root / "bin"
+        fake_bin.mkdir()
+        derived_data_path = temp_root / "derived"
+        derived_data_path.mkdir(parents=True)
+        write_executable(
+            fake_bin / "xcodebuild",
+            f"""#!/bin/bash
+printf 'started\\n' > "{marker_path}"
+sleep 30
+""",
+        )
+        write_executable(
+            fake_bin / "tuist",
+            f"""#!/bin/bash
+shift
+exec "{fake_bin / "xcodebuild"}" "$@"
+""",
+        )
+        env = os.environ.copy()
+        for key in (
+            "HARNESS_MONITOR_RUNTIME_PROFILE",
+            "HARNESS_MONITOR_BUILD_LANE",
+            "XCODEBUILD_DERIVED_DATA_PATH",
+        ):
+            env.pop(key, None)
+        env.update(
+            {
+                "PATH": f"{fake_bin}:/usr/bin:/bin",
+                "BASH_ENV": "/dev/null",
+                "HARNESS_SKIP_STALE_CHECK": "1",
+                "XCODEBUILD_BIN": str(fake_bin / "xcodebuild"),
+                "TMPDIR": str(temp_root),
+                "HARNESS_MONITOR_BUILD_PROTECT_INFLIGHT": protect,
+            }
+        )
+        proc = subprocess.Popen(
+            [
+                "bash",
+                str(SCRIPT_PATH),
+                "-derivedDataPath",
+                str(derived_data_path),
+                "-scheme",
+                "HarnessMonitor",
+                "build",
+            ],
+            env=env,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            start_new_session=True,
+        )
+        deadline = time.monotonic() + 5
+        while time.monotonic() < deadline:
+            if marker_path.exists():
+                return proc, derived_data_path
+            if proc.poll() is not None:
+                self.fail(
+                    f"wrapper exited before marker appeared, rc={proc.returncode}"
+                )
+            time.sleep(0.05)
+        proc.kill()
+        proc.wait(timeout=5)
+        self.fail("fake xcodebuild never wrote start marker")
+
+    def test_protect_inflight_ignores_sigterm_by_default(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            temp_root = Path(tmp_dir)
+            marker = temp_root / "started"
+            proc, _ = self._spawn_long_running_wrapper(temp_root, marker, "1")
+            try:
+                proc.send_signal(signal.SIGTERM)
+                proc.send_signal(signal.SIGHUP)
+                time.sleep(0.5)
+                self.assertIsNone(
+                    proc.poll(),
+                    "wrapper must survive SIGTERM and SIGHUP when protection is on",
+                )
+            finally:
+                proc.kill()
+                proc.wait(timeout=5)
+
+    def test_protect_inflight_off_honors_sigterm(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            temp_root = Path(tmp_dir)
+            marker = temp_root / "started"
+            proc, _ = self._spawn_long_running_wrapper(temp_root, marker, "0")
+            try:
+                proc.send_signal(signal.SIGTERM)
+                try:
+                    proc.wait(timeout=5)
+                except subprocess.TimeoutExpired:
+                    proc.kill()
+                    proc.wait(timeout=5)
+                    self.fail(
+                        "wrapper should exit on SIGTERM when protection is disabled"
+                    )
+                self.assertEqual(proc.returncode, 143)
+            finally:
+                if proc.poll() is None:
+                    proc.kill()
+                    proc.wait(timeout=5)
 
     def test_failure_persists_report(self) -> None:
         with tempfile.TemporaryDirectory() as report_dir:
