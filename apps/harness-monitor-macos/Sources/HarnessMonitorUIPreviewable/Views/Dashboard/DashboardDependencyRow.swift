@@ -9,6 +9,10 @@ struct DashboardDependencyRow: View {
   let availableLabels: [DependencyUpdateRepositoryLabel]
   let frequentNames: [String]
   let showsDescriptions: Bool
+  let canApprove: Bool
+  let canMerge: Bool
+  let hasRerunnableChecks: Bool
+  let canRunAutoMode: Bool
   let onOpen: () -> Void
   let onCopyLink: () -> Void
   let onApprove: () -> Void
@@ -34,11 +38,11 @@ struct DashboardDependencyRow: View {
       Button("Copy Link", action: onCopyLink)
       Divider()
       Button("Approve", action: onApprove)
-        .disabled(!item.canAttemptManualApproval)
+        .disabled(!canApprove)
       Button("Merge", action: onMerge)
-        .disabled(!item.canAttemptManualMerge)
+        .disabled(!canMerge)
       Button("Rerun Checks", action: onRerunChecks)
-        .disabled(!item.hasRerunnableChecks)
+        .disabled(!hasRerunnableChecks)
       DashboardDependenciesLabelPickerMenu(
         title: "Add Label",
         labels: availableLabels,
@@ -48,7 +52,7 @@ struct DashboardDependencyRow: View {
         onCustom: onCustomLabel
       )
       Button("Auto", action: onAuto)
-        .disabled(!item.canRunAutoMode)
+        .disabled(!canRunAutoMode)
       if item.canStartFixCI {
         Button("Fix CI", action: onFixCI)
       }
