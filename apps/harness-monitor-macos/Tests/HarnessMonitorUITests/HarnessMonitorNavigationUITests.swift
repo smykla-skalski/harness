@@ -60,7 +60,8 @@ class HarnessMonitorNavigationUITests: HarnessMonitorUITestCase {
     let app = launch(mode: "preview")
 
     let dashboardBackButton = toolbarButton(in: app, identifier: Accessibility.navigateBackButton)
-    let dashboardForwardButton = toolbarButton(in: app, identifier: Accessibility.navigateForwardButton)
+    let dashboardForwardButton = toolbarButton(
+      in: app, identifier: Accessibility.navigateForwardButton)
     XCTAssertTrue(dashboardBackButton.waitForExistence(timeout: Self.actionTimeout))
     XCTAssertTrue(dashboardForwardButton.waitForExistence(timeout: Self.actionTimeout))
 

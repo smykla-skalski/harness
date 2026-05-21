@@ -6,20 +6,20 @@ struct SettingsRepositoriesSection: View {
   @Binding var taskBoardFormState: TaskBoardSettingsFormState
   @AppStorage(DashboardDependenciesPreferences.storageKey)
   var storedDependenciesPreferences = ""
-  @State private var draft = SettingsSharedRepositoriesDraft()
-  @State private var isLoading = false
-  @State private var isSaving = false
-  @State private var loadError: String?
-  @State private var saveWarning: String?
-  @State private var hasLoadedDraft = false
-  @State private var catalogOrganization = ""
-  @State private var loadedCatalogOrganization = ""
-  @State private var catalogRepositories: [String] = []
-  @State private var catalogSelection: Set<String> = []
-  @State private var catalogSearchText = ""
-  @State private var isCatalogLoading = false
-  @State private var catalogError: SettingsRepositoriesCatalogErrorPresentation?
-  @State private var isFullyExpanded = false
+  @State private var draftStorage = SettingsSharedRepositoriesDraft()
+  @State private var isLoadingStorage = false
+  @State private var isSavingStorage = false
+  @State private var loadErrorStorage: String?
+  @State private var saveWarningStorage: String?
+  @State private var hasLoadedDraftStorage = false
+  @State private var catalogOrganizationStorage = ""
+  @State private var loadedCatalogOrganizationStorage = ""
+  @State private var catalogRepositoriesStorage: [String] = []
+  @State private var catalogSelectionStorage: Set<String> = []
+  @State private var catalogSearchTextStorage = ""
+  @State private var isCatalogLoadingStorage = false
+  @State private var catalogErrorStorage: SettingsRepositoriesCatalogErrorPresentation?
+  @State private var isFullyExpandedStorage = false
 
   @Environment(\.fontScale)
   var fontScale
@@ -34,6 +34,88 @@ struct SettingsRepositoriesSection: View {
   ) {
     self.store = store
     _taskBoardFormState = formState
+  }
+
+  var draft: SettingsSharedRepositoriesDraft {
+    get { draftStorage }
+    nonmutating set { draftStorage = newValue }
+  }
+
+  var draftBinding: Binding<SettingsSharedRepositoriesDraft> {
+    $draftStorage
+  }
+
+  var isLoading: Bool {
+    get { isLoadingStorage }
+    nonmutating set { isLoadingStorage = newValue }
+  }
+
+  var isSaving: Bool {
+    get { isSavingStorage }
+    nonmutating set { isSavingStorage = newValue }
+  }
+
+  var loadError: String? {
+    get { loadErrorStorage }
+    nonmutating set { loadErrorStorage = newValue }
+  }
+
+  var saveWarning: String? {
+    get { saveWarningStorage }
+    nonmutating set { saveWarningStorage = newValue }
+  }
+
+  var hasLoadedDraft: Bool {
+    get { hasLoadedDraftStorage }
+    nonmutating set { hasLoadedDraftStorage = newValue }
+  }
+
+  var catalogOrganization: String {
+    get { catalogOrganizationStorage }
+    nonmutating set { catalogOrganizationStorage = newValue }
+  }
+
+  var catalogOrganizationBinding: Binding<String> {
+    $catalogOrganizationStorage
+  }
+
+  var loadedCatalogOrganization: String {
+    get { loadedCatalogOrganizationStorage }
+    nonmutating set { loadedCatalogOrganizationStorage = newValue }
+  }
+
+  var catalogRepositories: [String] {
+    get { catalogRepositoriesStorage }
+    nonmutating set { catalogRepositoriesStorage = newValue }
+  }
+
+  var catalogSelection: Set<String> {
+    get { catalogSelectionStorage }
+    nonmutating set { catalogSelectionStorage = newValue }
+  }
+
+  var catalogSearchText: String {
+    get { catalogSearchTextStorage }
+    nonmutating set { catalogSearchTextStorage = newValue }
+  }
+
+  var catalogSearchTextBinding: Binding<String> {
+    $catalogSearchTextStorage
+  }
+
+  var isCatalogLoading: Bool {
+    get { isCatalogLoadingStorage }
+    nonmutating set { isCatalogLoadingStorage = newValue }
+  }
+
+  var catalogError: SettingsRepositoriesCatalogErrorPresentation? {
+    get { catalogErrorStorage }
+    nonmutating set { catalogErrorStorage = newValue }
+  }
+
+  var isFullyExpanded: Bool {
+    get { isFullyExpandedStorage }
+    nonmutating set { isFullyExpandedStorage = newValue }
   }
 
   var bodyFont: Font {
@@ -68,7 +150,7 @@ struct SettingsRepositoriesSection: View {
         if let saveWarning {
           statusSection(message: saveWarning, color: .orange)
         }
-        RepositoriesMonitoredSection(draft: $draft)
+        RepositoriesMonitoredSection(draft: draftBinding)
         if isFullyExpanded {
           organizationImportSection
           if !draft.legacyOrganizations.isEmpty {

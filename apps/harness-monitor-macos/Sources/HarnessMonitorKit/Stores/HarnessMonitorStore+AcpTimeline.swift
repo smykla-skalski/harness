@@ -149,7 +149,8 @@ extension HarnessMonitorStore {
     acpTimelineSync.transcriptPartitionTask = Task { @MainActor [weak self] in
       guard let self else { return }
       let partition = await self.acpTimelineWorker.partitionByAgentID(entries)
-      guard !Task.isCancelled, self.acpTimelineSync.transcriptPartitionGeneration == generation else {
+      guard !Task.isCancelled, self.acpTimelineSync.transcriptPartitionGeneration == generation
+      else {
         return
       }
       self.acpTranscriptByAgentID = partition
@@ -239,7 +240,8 @@ extension HarnessMonitorStore {
         incoming: entries,
         using: snapshots
       )
-      guard !Task.isCancelled, self.acpTimelineSync.transcriptLiveMergeGeneration == generation else {
+      guard !Task.isCancelled, self.acpTimelineSync.transcriptLiveMergeGeneration == generation
+      else {
         return
       }
       if output.changed {
@@ -333,7 +335,8 @@ extension HarnessMonitorStore {
         using: snapshots
       )
       let (updatedHistory, updatedLive) = await (reattributedHistory, reattributedLive)
-      guard !Task.isCancelled, self.acpTimelineSync.transcriptReattributeGeneration == generation else {
+      guard !Task.isCancelled, self.acpTimelineSync.transcriptReattributeGeneration == generation
+      else {
         return
       }
       if updatedHistory.changed {

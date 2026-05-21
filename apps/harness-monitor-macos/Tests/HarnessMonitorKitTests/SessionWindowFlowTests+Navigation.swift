@@ -262,4 +262,3 @@ struct SessionWindowNativeTabbingTests {
     #expect(targetWindow.tabGroup?.windows.count == 3)
   }
 }
-}

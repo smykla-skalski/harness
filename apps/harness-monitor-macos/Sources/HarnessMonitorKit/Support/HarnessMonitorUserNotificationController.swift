@@ -33,12 +33,10 @@ public final class HarnessMonitorUserNotificationController: NSObject,
 
   @ObservationIgnored let centerBox: HarnessMonitorUserNotificationCenterBox
   @ObservationIgnored let assetWriter: HarnessMonitorNotificationAssetWriting
-  @ObservationIgnored let previewSettingsSnapshot:
-    HarnessMonitorNotificationSettingsSnapshot?
+  @ObservationIgnored let previewSettingsSnapshot: HarnessMonitorNotificationSettingsSnapshot?
   @ObservationIgnored var isActivated = false
   @ObservationIgnored var resolveHandler: DecisionResolveHandler?
-  @ObservationIgnored var historyEventSink:
-    (@MainActor (NotificationHistorySystemEvent) -> Void)?
+  @ObservationIgnored var historyEventSink: (@MainActor (NotificationHistorySystemEvent) -> Void)?
 
   public init(
     center: any HarnessMonitorUserNotificationCenter = UNUserNotificationCenter.current(),

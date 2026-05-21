@@ -31,7 +31,7 @@ extension SettingsRepositoriesSection {
     let visibleCatalogRepositories = filteredCatalogRepositories
     return Section {
       HStack(alignment: .center, spacing: HarnessMonitorTheme.spacingSM) {
-        TextField("GitHub Organization", text: $catalogOrganization)
+        TextField("GitHub Organization", text: catalogOrganizationBinding)
           .accessibilityIdentifier(
             HarnessMonitorAccessibility.settingsRepositoriesOrganizationField
           )
@@ -57,7 +57,7 @@ extension SettingsRepositoriesSection {
 
       if !loadedCatalogOrganization.isEmpty {
         catalogSummary(visibleCount: visibleCatalogRepositories.count)
-        TextField("Search repositories", text: $catalogSearchText)
+        TextField("Search repositories", text: catalogSearchTextBinding)
           .accessibilityIdentifier(
             HarnessMonitorAccessibility.settingsRepositoriesCatalogSearchField)
 

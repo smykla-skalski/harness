@@ -204,6 +204,4 @@ extension SessionWindowFlowTests {
     #expect(state.selectionSource == .sidebar)
     #expect(state.agentComposerFocusRequestID == 0)
   }
-
-  @MainActor
 }

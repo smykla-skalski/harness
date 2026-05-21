@@ -63,7 +63,9 @@ public final class HarnessMonitorStore {
     didSet { if oldValue != globalTaskBoardItems { scheduleUISync([.contentDashboard]) } }
   }
   public var globalTaskBoardOrchestratorStatus: TaskBoardOrchestratorStatus? {
-    didSet { if oldValue != globalTaskBoardOrchestratorStatus { scheduleUISync([.contentDashboard]) } }
+    didSet {
+      if oldValue != globalTaskBoardOrchestratorStatus { scheduleUISync([.contentDashboard]) }
+    }
   }
   public var globalTaskBoardSyncSummary: TaskBoardSyncSummary? {
     didSet { if oldValue != globalTaskBoardSyncSummary { scheduleUISync([.contentDashboard]) } }
@@ -72,10 +74,14 @@ public final class HarnessMonitorStore {
     didSet { if oldValue != globalTaskBoardDispatchSummary { scheduleUISync([.contentDashboard]) } }
   }
   public var globalTaskBoardEvaluationSummary: TaskBoardEvaluationSummary? {
-    didSet { if oldValue != globalTaskBoardEvaluationSummary { scheduleUISync([.contentDashboard]) } }
+    didSet {
+      if oldValue != globalTaskBoardEvaluationSummary { scheduleUISync([.contentDashboard]) }
+    }
   }
   public var globalTaskBoardItemAuditSummary: TaskBoardAuditSummary? {
-    didSet { if oldValue != globalTaskBoardItemAuditSummary { scheduleUISync([.contentDashboard]) } }
+    didSet {
+      if oldValue != globalTaskBoardItemAuditSummary { scheduleUISync([.contentDashboard]) }
+    }
   }
   public var globalTaskBoardProjects: [TaskBoardProjectSummary]? {
     didSet { if oldValue != globalTaskBoardProjects { scheduleUISync([.contentDashboard]) } }
@@ -87,7 +93,9 @@ public final class HarnessMonitorStore {
     didSet { if oldValue != globalTaskBoardPolicyPipeline { scheduleUISync([.contentDashboard]) } }
   }
   public var globalTaskBoardPolicySimulation: TaskBoardPolicyPipelineSimulationResult? {
-    didSet { if oldValue != globalTaskBoardPolicySimulation { scheduleUISync([.contentDashboard]) } }
+    didSet {
+      if oldValue != globalTaskBoardPolicySimulation { scheduleUISync([.contentDashboard]) }
+    }
   }
   public var globalTaskBoardPolicyAudit: TaskBoardPolicyPipelineAuditSummary? {
     didSet { if oldValue != globalTaskBoardPolicyAudit { scheduleUISync([.contentDashboard]) } }
@@ -202,7 +210,8 @@ public final class HarnessMonitorStore {
   public var presentingAcpPermissionBatch: AcpPermissionBatch?
   public var resolvingAcpPermissionBatchID: String?
   public var acpPermissionResolutionStateByDecisionID: [String: BatchResolutionState] = [:]
-  @ObservationIgnored var acpPermissionPayloadsByDecisionID: [String: AcpPermissionDecisionPayload] = [:]
+  @ObservationIgnored var acpPermissionPayloadsByDecisionID:
+    [String: AcpPermissionDecisionPayload] = [:]
   var acpPermissionLastSignalAtBySessionID: [String: Date] = [:]
   @ObservationIgnored var acpPermissionPendingTimeoutDecisionIDs: Set<String> = []
   @ObservationIgnored var acpPermissionPendingShutdownDecisionIDs: Set<String> = []
@@ -323,27 +332,6 @@ public final class HarnessMonitorStore {
   @ObservationIgnored var notificationHistoryRuntimeActions: [String: @MainActor () async -> Void] =
     [:]
 
-  public convenience init(
-    daemonController: any DaemonControlling,
-    fileViewer: any FileViewerActivating = WorkspaceFileViewer(),
-    voiceCapture: any VoiceCaptureProviding,
-    daemonOwnership: DaemonOwnership = .managed,
-    modelContainer: ModelContainer? = nil,
-    persistenceError: String? = nil,
-    cacheService: SessionCacheService? = nil
-  ) {
-    self.init(
-      daemonController: daemonController,
-      fileViewer: fileViewer,
-      voiceCapture: voiceCapture,
-      daemonOwnership: daemonOwnership,
-      modelContainer: modelContainer,
-      persistenceError: persistenceError,
-      cacheService: cacheService,
-      taskBoardSettingsWorker: TaskBoardSettingsWorker()
-    )
-  }
-
   init(
     daemonController: any DaemonControlling,
     fileViewer: any FileViewerActivating = WorkspaceFileViewer(),
@@ -405,5 +393,28 @@ public final class HarnessMonitorStore {
     syncAllUI()
     scheduleBookmarkedSessionRefresh()
     scheduleNotificationHistoryRefresh()
+  }
+}
+
+extension HarnessMonitorStore {
+  public convenience init(
+    daemonController: any DaemonControlling,
+    fileViewer: any FileViewerActivating = WorkspaceFileViewer(),
+    voiceCapture: any VoiceCaptureProviding,
+    daemonOwnership: DaemonOwnership = .managed,
+    modelContainer: ModelContainer? = nil,
+    persistenceError: String? = nil,
+    cacheService: SessionCacheService? = nil
+  ) {
+    self.init(
+      daemonController: daemonController,
+      fileViewer: fileViewer,
+      voiceCapture: voiceCapture,
+      daemonOwnership: daemonOwnership,
+      modelContainer: modelContainer,
+      persistenceError: persistenceError,
+      cacheService: cacheService,
+      taskBoardSettingsWorker: TaskBoardSettingsWorker()
+    )
   }
 }

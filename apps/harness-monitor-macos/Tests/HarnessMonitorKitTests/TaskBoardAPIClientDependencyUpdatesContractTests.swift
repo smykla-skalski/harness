@@ -121,7 +121,6 @@ extension TaskBoardAPIClientTests {
     )
   }
 }
-}
 
 struct DependencyUpdatesHTTPContractResult {
   let repositoryCatalog: DependencyUpdatesRepositoryCatalogResponse

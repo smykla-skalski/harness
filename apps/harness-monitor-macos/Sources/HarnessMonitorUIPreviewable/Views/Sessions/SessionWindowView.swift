@@ -48,7 +48,7 @@ public struct SessionWindowView: View {
   @State private var policyCanvasViewModelStorage: PolicyCanvasViewModel
   @State private var startupSearchParticipationEnabledStorage =
     HarnessMonitorUITestEnvironment.isEnabled
-  @State private var handledHistoryRestoreRequestID = 0
+  @State private var handledHistoryRestoreRequestIDStorage = 0
 
   @MainActor
   public init(
@@ -77,6 +77,12 @@ public struct SessionWindowView: View {
   var stateCache: SessionWindowStateCache {
     stateCacheStorage
   }
+
+  var handledHistoryRestoreRequestID: Int {
+    get { handledHistoryRestoreRequestIDStorage }
+    nonmutating set { handledHistoryRestoreRequestIDStorage = newValue }
+  }
+
   var snapshot: HarnessMonitorSessionWindowSnapshot? {
     get { snapshotStorage }
     nonmutating set { snapshotStorage = newValue }
