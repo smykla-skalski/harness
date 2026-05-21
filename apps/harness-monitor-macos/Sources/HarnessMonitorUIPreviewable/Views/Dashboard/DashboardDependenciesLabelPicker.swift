@@ -30,40 +30,114 @@ func dashboardDependenciesAvailableLabels(
     appliedEverywhere = firstApplied ? applied : appliedEverywhere.intersection(applied)
     firstApplied = false
   }
-  return candidateNames
+
+  return
+    candidateNames
     .subtracting(appliedEverywhere)
     .compactMap { labelByName[$0] }
     .sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
+}
+
+/// Split `available` into a (frequent, rest) pair given `frequentNames` order.
+/// Frequent labels keep `frequentNames` ordering; the rest stays in `available`
+/// ordering (already alphabetical from `dashboardDependenciesAvailableLabels`).
+@MainActor
+func dashboardDependenciesPartitionFrequent(
+  available: [DependencyUpdateRepositoryLabel],
+  frequentNames: [String]
+) -> (frequent: [DependencyUpdateRepositoryLabel], rest: [DependencyUpdateRepositoryLabel]) {
+  guard !frequentNames.isEmpty else { return ([], available) }
+  let labelByName = Dictionary(uniqueKeysWithValues: available.map { ($0.name, $0) })
+  var frequent: [DependencyUpdateRepositoryLabel] = []
+  var seen: Set<String> = []
+  for name in frequentNames {
+    guard let label = labelByName[name], seen.insert(name).inserted else { continue }
+    frequent.append(label)
+  }
+  let rest = available.filter { !seen.contains($0.name) }
+  return (frequent, rest)
 }
 
 @MainActor
 struct DashboardDependenciesLabelPickerMenu: View {
   let title: String
   let labels: [DependencyUpdateRepositoryLabel]
+  let frequentNames: [String]
   let showsDescriptions: Bool
   let onSelect: (String) -> Void
   let onCustom: () -> Void
 
   var body: some View {
     Menu(title) {
-      menuContent
+      DashboardDependenciesLabelMenuContent(
+        labels: labels,
+        frequentNames: frequentNames,
+        showsDescriptions: showsDescriptions,
+        onSelect: onSelect,
+        onCustom: onCustom
+      )
     }
   }
+}
 
-  @ViewBuilder
-  private var menuContent: some View {
+@MainActor
+struct DashboardDependenciesLabelPickerActionMenu: View {
+  let labels: [DependencyUpdateRepositoryLabel]
+  let frequentNames: [String]
+  let showsDescriptions: Bool
+  let onSelect: (String) -> Void
+  let onCustom: () -> Void
+
+  var body: some View {
+    Menu {
+      DashboardDependenciesLabelMenuContent(
+        labels: labels,
+        frequentNames: frequentNames,
+        showsDescriptions: showsDescriptions,
+        onSelect: onSelect,
+        onCustom: onCustom
+      )
+    } label: {
+      Label("Add Label", systemImage: "tag")
+        .lineLimit(1)
+    }
+    .menuStyle(.button)
+    .harnessActionButtonStyle(variant: .bordered, tint: .secondary)
+    .fixedSize(horizontal: true, vertical: true)
+  }
+}
+
+@MainActor
+private struct DashboardDependenciesLabelMenuContent: View {
+  let labels: [DependencyUpdateRepositoryLabel]
+  let frequentNames: [String]
+  let showsDescriptions: Bool
+  let onSelect: (String) -> Void
+  let onCustom: () -> Void
+
+  var body: some View {
     if labels.isEmpty {
       Button("No labels available") {}
         .disabled(true)
     } else {
-      ForEach(labels) { label in
-        Button {
-          onSelect(label.name)
-        } label: {
-          DashboardDependenciesLabelMenuRow(
-            label: label,
-            showsDescription: showsDescriptions
-          )
+      let split = dashboardDependenciesPartitionFrequent(
+        available: labels,
+        frequentNames: frequentNames
+      )
+      if !split.frequent.isEmpty {
+        Section("Frequently Used") {
+          ForEach(split.frequent) { label in
+            labelButton(for: label)
+          }
+        }
+        Section("All Labels") {
+          ForEach(split.rest) { label in
+            labelButton(for: label)
+          }
+        }
+      } else {
+        ForEach(split.rest) { label in
+          labelButton(for: label)
         }
       }
     }
@@ -72,43 +146,16 @@ struct DashboardDependenciesLabelPickerMenu: View {
       onCustom()
     }
   }
-}
 
-@MainActor
-struct DashboardDependenciesLabelPickerActionMenu: View {
-  let labels: [DependencyUpdateRepositoryLabel]
-  let showsDescriptions: Bool
-  let onSelect: (String) -> Void
-  let onCustom: () -> Void
-
-  var body: some View {
-    Menu {
-      if labels.isEmpty {
-        Button("No labels available") {}
-          .disabled(true)
-      } else {
-        ForEach(labels) { label in
-          Button {
-            onSelect(label.name)
-          } label: {
-            DashboardDependenciesLabelMenuRow(
-              label: label,
-              showsDescription: showsDescriptions
-            )
-          }
-        }
-      }
-      Divider()
-      Button("Custom Label…") {
-        onCustom()
-      }
+  private func labelButton(for label: DependencyUpdateRepositoryLabel) -> some View {
+    Button {
+      onSelect(label.name)
     } label: {
-      Label("Add Label", systemImage: "tag")
-        .lineLimit(1)
+      DashboardDependenciesLabelMenuRow(
+        label: label,
+        showsDescription: showsDescriptions
+      )
     }
-    .menuStyle(.borderlessButton)
-    .harnessActionButtonStyle(variant: .bordered, tint: .secondary)
-    .fixedSize(horizontal: true, vertical: true)
   }
 }
 

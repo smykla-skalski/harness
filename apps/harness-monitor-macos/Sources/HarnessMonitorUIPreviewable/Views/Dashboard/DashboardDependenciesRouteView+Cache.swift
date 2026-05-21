@@ -12,6 +12,25 @@ extension DashboardDependenciesRouteView {
     return RepositoryLabelsCache(context: context)
   }
 
+  var repositoryLabelUsageCache: RepositoryLabelUsageCache? {
+    guard let context = store.modelContext else { return nil }
+    return RepositoryLabelUsageCache(context: context)
+  }
+
+  func frequentLabelNames(for items: [DependencyUpdateItem]) -> [String] {
+    guard let cache = repositoryLabelUsageCache, !items.isEmpty else { return [] }
+    let repositories = Array(Set(items.map(\.repository)))
+    let limit = normalizedPreferences.frequentLabelsCount
+    return cache.topUsed(repositories: repositories, limit: limit)
+  }
+
+  func recordLabelUsage(_ label: String, items: [DependencyUpdateItem]) {
+    guard let cache = repositoryLabelUsageCache else { return }
+    for repository in Set(items.map(\.repository)) {
+      cache.recordUse(repository: repository, label: label)
+    }
+  }
+
   var dependenciesCachePreferencesHash: String {
     DependencyUpdatesCache.preferencesHash(
       for: normalizedPreferences.queryRequest(forceRefresh: false)

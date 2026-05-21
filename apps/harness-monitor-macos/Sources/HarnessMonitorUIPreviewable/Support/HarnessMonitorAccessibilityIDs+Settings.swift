@@ -160,6 +160,8 @@ extension HarnessMonitorAccessibility {
     "harness.settings.dependencies.merge-method"
   public static let settingsDependenciesShowLabelDescriptionsToggle =
     "harness.settings.dependencies.show-label-descriptions"
+  public static let settingsDependenciesFrequentLabelsCountField =
+    "harness.settings.dependencies.frequent-labels-count"
   public static let settingsDependenciesRefreshIntervalField =
     "harness.settings.dependencies.refresh-interval"
   public static let settingsDependenciesCacheMaxAgeField =

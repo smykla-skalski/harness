@@ -559,6 +559,7 @@ struct DashboardDependenciesRouteView: View {
           repositoryLabels: response.repositoryLabels,
           items: [item]
         ),
+        frequentNames: frequentLabelNames(for: [item]),
         showsDescriptions: normalizedPreferences.showLabelDescriptions,
         onSelect: { name in Task { await addLabel(name, to: [item]) } },
         onCustom: {
@@ -651,6 +652,7 @@ struct DashboardDependenciesRouteView: View {
         repositoryLabels: response.repositoryLabels,
         items: items
       ),
+      frequentNames: frequentLabelNames(for: items),
       showsDescriptions: normalizedPreferences.showLabelDescriptions,
       onSelect: { name in Task { await addLabel(name, to: items) } },
       onCustom: {
@@ -882,11 +884,16 @@ struct DashboardDependenciesRouteView: View {
   }
 
   private func addLabel(_ label: String, to items: [DependencyUpdateItem]) async {
-    await performMutation("Labeling", items: items) { client in
-      try await client.addDependencyUpdateLabel(
-        request: DependencyUpdatesLabelRequest(targets: items.map(\.target), label: label)
-      )
-    }
+    await performMutation(
+      "Labeling",
+      items: items,
+      onSuccess: { recordLabelUsage(label, items: items) },
+      operation: { client in
+        try await client.addDependencyUpdateLabel(
+          request: DependencyUpdatesLabelRequest(targets: items.map(\.target), label: label)
+        )
+      }
+    )
   }
 
   private func auto(items: [DependencyUpdateItem]) async {
@@ -939,6 +946,7 @@ struct DashboardDependenciesRouteView: View {
   private func performMutation(
     _ title: String,
     items: [DependencyUpdateItem],
+    onSuccess: @MainActor () -> Void = {},
     operation:
       @escaping (any HarnessMonitorClientProtocol) async throws
       -> DependencyUpdatesActionResponse
@@ -949,6 +957,7 @@ struct DashboardDependenciesRouteView: View {
     do {
       let response = try await operation(client)
       store.presentSuccessFeedback(response.summary)
+      onSuccess()
       scheduleAffectedRefresh(for: items, using: client)
     } catch {
       store.presentFailureFeedback(error.localizedDescription)
@@ -1060,132 +1069,6 @@ private struct DashboardDependenciesControlStrip: View {
       }
     }
     .pickerStyle(.menu)
-  }
-}
-
-struct DashboardDependenciesPreferences: Codable, Equatable {
-  static let storageKey = "dashboard.dependencies.preferences"
-  var authorsText = "renovate[bot]"
-  var organizationsText = ""
-  var repositoriesText = ""
-  var excludeRepositoriesText = ""
-  var mergeMethodRaw = TaskBoardGitHubMergeMethod.squash.rawValue
-  var refreshIntervalSeconds: UInt64 = 300
-  var cacheMaxAgeSeconds: UInt64 = 600
-  var showLabelDescriptions = false
-
-  enum CodingKeys: String, CodingKey {
-    case authorsText
-    case organizationsText
-    case repositoriesText
-    case excludeRepositoriesText
-    case mergeMethodRaw
-    case refreshIntervalSeconds
-    case cacheMaxAgeSeconds
-    case showLabelDescriptions
-  }
-
-  init() {}
-
-  init(from decoder: Decoder) throws {
-    let container = try decoder.container(keyedBy: CodingKeys.self)
-    let defaults = Self()
-    authorsText =
-      try container.decodeIfPresent(String.self, forKey: .authorsText) ?? defaults.authorsText
-    organizationsText =
-      try container.decodeIfPresent(String.self, forKey: .organizationsText)
-      ?? defaults.organizationsText
-    repositoriesText =
-      try container.decodeIfPresent(String.self, forKey: .repositoriesText)
-      ?? defaults.repositoriesText
-    excludeRepositoriesText =
-      try container.decodeIfPresent(String.self, forKey: .excludeRepositoriesText)
-      ?? defaults.excludeRepositoriesText
-    mergeMethodRaw =
-      try container.decodeIfPresent(String.self, forKey: .mergeMethodRaw)
-      ?? defaults.mergeMethodRaw
-    refreshIntervalSeconds =
-      try container.decodeIfPresent(UInt64.self, forKey: .refreshIntervalSeconds)
-      ?? defaults.refreshIntervalSeconds
-    cacheMaxAgeSeconds =
-      try container.decodeIfPresent(UInt64.self, forKey: .cacheMaxAgeSeconds)
-      ?? defaults.cacheMaxAgeSeconds
-    showLabelDescriptions =
-      try container.decodeIfPresent(Bool.self, forKey: .showLabelDescriptions)
-      ?? defaults.showLabelDescriptions
-  }
-
-  var mergeMethod: TaskBoardGitHubMergeMethod {
-    TaskBoardGitHubMergeMethod(rawValue: mergeMethodRaw)
-  }
-
-  var normalizedOrganizations: [String] {
-    Self.normalizedEntries(organizationsText)
-  }
-
-  var normalizedRepositories: [String] {
-    Self.normalizedEntries(repositoriesText)
-  }
-
-  var refreshIntervalDescription: String {
-    if refreshIntervalSeconds.isMultiple(of: 60) {
-      let minutes = refreshIntervalSeconds / 60
-      return minutes == 1 ? "1 min" : "\(minutes) min"
-    }
-    return "\(refreshIntervalSeconds)s"
-  }
-
-  var encodedString: String {
-    let encoder = JSONEncoder()
-    guard let data = try? encoder.encode(self), let string = String(data: data, encoding: .utf8)
-    else {
-      return ""
-    }
-    return string
-  }
-
-  func normalized() -> Self {
-    var copy = self
-    copy.authorsText = Self.normalizedText(authorsText)
-    copy.organizationsText = Self.normalizedText(organizationsText)
-    copy.repositoriesText = Self.normalizedText(repositoriesText)
-    copy.excludeRepositoriesText = Self.normalizedText(excludeRepositoriesText)
-    copy.refreshIntervalSeconds = max(refreshIntervalSeconds, 30)
-    copy.cacheMaxAgeSeconds = max(cacheMaxAgeSeconds, 30)
-    return copy
-  }
-
-  static func decode(from string: String) -> Self {
-    guard
-      let data = string.data(using: .utf8),
-      let decoded = try? JSONDecoder().decode(Self.self, from: data)
-    else {
-      return Self()
-    }
-    return decoded
-  }
-
-  func queryRequest(forceRefresh: Bool) -> DependencyUpdatesQueryRequest {
-    DependencyUpdatesQueryRequest(
-      authors: Self.normalizedEntries(authorsText),
-      organizations: Self.normalizedEntries(organizationsText),
-      repositories: Self.normalizedEntries(repositoriesText),
-      excludeRepositories: Self.normalizedEntries(excludeRepositoriesText),
-      forceRefresh: forceRefresh,
-      cacheMaxAgeSeconds: max(cacheMaxAgeSeconds, 30)
-    )
-  }
-
-  private static func normalizedText(_ text: String) -> String {
-    normalizedEntries(text).joined(separator: ", ")
-  }
-
-  private static func normalizedEntries(_ text: String) -> [String] {
-    text
-      .split(whereSeparator: { $0 == "," || $0.isNewline })
-      .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
-      .filter { !$0.isEmpty }
-      .removingDuplicates()
   }
 }
 
@@ -1518,7 +1401,7 @@ extension String {
 }
 
 extension Array where Element == String {
-  fileprivate func removingDuplicates() -> [String] {
+  func removingDuplicates() -> [String] {
     var seen = Set<String>()
     return filter { seen.insert($0).inserted }
   }
