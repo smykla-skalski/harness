@@ -47,12 +47,14 @@ func policyCanvasDisplayedRoutes(
   let orderedEdges = policyCanvasRouteBuildOrder(edges: edges, portAnchors: portAnchors)
   let terminalSlots = policyCanvasRouteEndpointSlots(edges: orderedEdges)
   let initialRoutes = policyCanvasDisplayedRoutes(
-    viewModel: viewModel,
-    orderedEdges: orderedEdges,
-    portAnchors: portAnchors,
-    terminalSlots: terminalSlots,
-    portMarkerLayout: nil,
-    router: router
+    context: PolicyCanvasDisplayedRoutesContext(
+      viewModel: viewModel,
+      orderedEdges: orderedEdges,
+      portAnchors: portAnchors,
+      terminalSlots: terminalSlots,
+      portMarkerLayout: nil,
+      router: router
+    )
   )
   let markerInput = PolicyCanvasRouteWorkerInput(
     nodes: viewModel.nodes,
@@ -66,38 +68,47 @@ func policyCanvasDisplayedRoutes(
     nodeIndex: preparedMarkerInput.nodeIndex
   )
   return policyCanvasDisplayedRoutes(
-    viewModel: viewModel,
-    orderedEdges: orderedEdges,
-    portAnchors: portAnchors,
-    terminalSlots: terminalSlots,
-    portMarkerLayout: portMarkerLayout,
-    router: router
+    context: PolicyCanvasDisplayedRoutesContext(
+      viewModel: viewModel,
+      orderedEdges: orderedEdges,
+      portAnchors: portAnchors,
+      terminalSlots: terminalSlots,
+      portMarkerLayout: portMarkerLayout,
+      router: router
+    )
   )
 }
 
+private struct PolicyCanvasDisplayedRoutesContext {
+  let viewModel: PolicyCanvasViewModel
+  let orderedEdges: [PolicyCanvasEdge]
+  let portAnchors: [PolicyCanvasPortEndpoint: CGPoint]
+  let terminalSlots: [String: PolicyCanvasRouteEndpointSlots]
+  let portMarkerLayout: PolicyCanvasPortMarkerLayout?
+  let router: any PolicyCanvasEdgeRouter
+}
+
 @MainActor
-// swiftlint:disable:next function_parameter_count attributes
 private func policyCanvasDisplayedRoutes(
-  viewModel: PolicyCanvasViewModel,
-  orderedEdges: [PolicyCanvasEdge],
-  portAnchors: [PolicyCanvasPortEndpoint: CGPoint],
-  terminalSlots: [String: PolicyCanvasRouteEndpointSlots],
-  portMarkerLayout: PolicyCanvasPortMarkerLayout?,
-  router: any PolicyCanvasEdgeRouter
+  context: PolicyCanvasDisplayedRoutesContext
 ) -> [String: PolicyCanvasEdgeRoute] {
+  let viewModel = context.viewModel
   let edgeLanes = viewModel.edgeRouteLanes
   let sourceFanoutLanes = viewModel.edgeSourceFanoutLanes
   let targetFanoutLanes = viewModel.edgeTargetFanoutLanes
   var routes: [String: PolicyCanvasEdgeRoute] = [:]
   var previousRoutes: [PolicyCanvasDisplayedRouteClearance] = []
-  for edge in orderedEdges {
-    guard let source = portAnchors[edge.source], let target = portAnchors[edge.target] else {
+  for edge in context.orderedEdges {
+    guard
+      let source = context.portAnchors[edge.source],
+      let target = context.portAnchors[edge.target]
+    else {
       continue
     }
-    let edgeTerminalSlots = terminalSlots[edge.id]
+    let edgeTerminalSlots = context.terminalSlots[edge.id]
     let request = policyCanvasResolvedDisplayedRouteRequest(
       PolicyCanvasDisplayedEdgeRouteRequest(
-        router: router,
+        router: context.router,
         viewModel: viewModel,
         edge: edge,
         source: source,
@@ -107,7 +118,7 @@ private func policyCanvasDisplayedRoutes(
         targetFanoutLane: targetFanoutLanes[edge.id, default: 0],
         sourceTerminalSlot: edgeTerminalSlots?.source ?? .single,
         targetTerminalSlot: edgeTerminalSlots?.target ?? .single,
-        portMarkerLayout: portMarkerLayout,
+        portMarkerLayout: context.portMarkerLayout,
         lineSpacing: viewModel.edgeLineSpacing(for: edge),
         obstacles: viewModel.routingObstacles(source: source, target: target)
       )
