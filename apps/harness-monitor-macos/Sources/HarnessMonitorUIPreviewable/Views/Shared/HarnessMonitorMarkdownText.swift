@@ -114,14 +114,31 @@ private struct HarnessMarkdownBlockStackView: View {
   let spacing: CGFloat
 
   var body: some View {
+    let renderableBlocks = visibleBlocks
     VStack(alignment: .leading, spacing: spacing) {
-      ForEach(Array(blocks.enumerated()), id: \.offset) { _, block in
-        HarnessMarkdownBlockView(block: block, settings: settings, style: style)
-          .padding(.top, style.spacing.blockSpacing(for: block).before)
-          .padding(.bottom, style.spacing.blockSpacing(for: block).after)
+      ForEach(Array(renderableBlocks.enumerated()), id: \.element.offset) { visibleIndex, entry in
+        let blockSpacing = style.spacing.blockSpacing(for: entry.block)
+        HarnessMarkdownBlockView(block: entry.block, settings: settings, style: style)
+          .padding(.top, visibleIndex == 0 ? 0 : blockSpacing.before)
+          .padding(.bottom, visibleIndex == renderableBlocks.count - 1 ? 0 : blockSpacing.after)
       }
     }
     .frame(maxWidth: .infinity, alignment: .leading)
+  }
+
+  private var visibleBlocks: [(offset: Int, block: HarnessMarkdownBlock)] {
+    blocks.enumerated().compactMap { offset, block in
+      guard !isSuppressedThematicBreak(at: offset) else { return nil }
+      return (offset: offset, block: block)
+    }
+  }
+
+  private func isSuppressedThematicBreak(at index: Int) -> Bool {
+    guard case .thematicBreak = blocks[index], index + 1 < blocks.count else { return false }
+    if case .heading = blocks[index + 1] {
+      return true
+    }
+    return false
   }
 }
 
@@ -213,25 +230,73 @@ private struct HarnessMarkdownDetailsView: View {
   }
 
   var body: some View {
-    DisclosureGroup(isExpanded: $isExpanded) {
-      HarnessMarkdownBlockStackView(
-        blocks: details.blocks,
-        settings: settings,
-        style: style,
-        spacing: style.spacing.nestedBlock
-      )
-      .padding(.leading, style.spacing.detailsContentIndent)
-    } label: {
-      HarnessMarkdownInlineFlowView(
-        inlines: details.summary,
-        style: HarnessMarkdownInlineRenderStyle(
-          font: style.typography.body.font,
-          codeFont: style.typography.inlineCode.font,
-          colors: style.colors
-        ),
-        images: style.images,
-        imageLayout: .inline
-      )
+    VStack(alignment: .leading, spacing: style.spacing.nestedBlock) {
+      Button {
+        isExpanded.toggle()
+      } label: {
+        HStack(alignment: .firstTextBaseline, spacing: style.spacing.listMarkerGap) {
+          Image(systemName: isExpanded ? "chevron.down" : "chevron.right")
+            .font(style.typography.listMarker.font.weight(.semibold))
+            .foregroundStyle(style.colors.secondaryText)
+            .frame(width: style.spacing.listMarkerWidth, alignment: .trailing)
+            .alignmentGuide(.firstTextBaseline) { dimensions in
+              dimensions[VerticalAlignment.center]
+            }
+          HarnessMarkdownInlineFlowView(
+            inlines: details.summary,
+            style: HarnessMarkdownInlineRenderStyle(
+              font: style.typography.body.font,
+              codeFont: style.typography.inlineCode.font,
+              colors: style.colors
+            ),
+            images: style.images,
+            imageLayout: .inline
+          )
+          Spacer(minLength: 0)
+        }
+        .contentShape(Rectangle())
+        .frame(maxWidth: .infinity, alignment: .leading)
+      }
+      .harnessPlainButtonStyle()
+      .accessibilityLabel(Text(HarnessMarkdownInlinePlainText.string(from: details.summary)))
+      .accessibilityValue(isExpanded ? "Expanded" : "Collapsed")
+
+      if isExpanded {
+        detailsContent
+      }
+    }
+  }
+
+  private var detailsContent: some View {
+    HarnessMarkdownBlockStackView(
+      blocks: details.blocks,
+      settings: settings,
+      style: style,
+      spacing: style.spacing.nestedBlock
+    )
+    .padding(.leading, style.spacing.detailsContentIndent)
+  }
+}
+
+private enum HarnessMarkdownInlinePlainText {
+  static func string(from inlines: [HarnessMarkdownInline]) -> String {
+    inlines.map { text(for: $0) }.joined()
+  }
+
+  private static func text(for inline: HarnessMarkdownInline) -> String {
+    switch inline {
+    case .autolink(let destination):
+      decodeEntities(destination)
+    case .code(let value), .text(let value):
+      decodeEntities(value)
+    case .emphasis(let children), .strikethrough(let children), .strong(let children):
+      string(from: children)
+    case .image(let image):
+      image.alt.isEmpty ? image.source : image.alt
+    case .lineBreak, .softBreak:
+      " "
+    case .link(let label, _, _):
+      string(from: label)
     }
   }
 }
@@ -268,7 +333,7 @@ private struct HarnessMarkdownListView: View {
       ForEach(visibleItems, id: \.offset) { index, item in
         HStack(alignment: .firstTextBaseline, spacing: style.spacing.listMarkerGap) {
           marker(for: item, index: index)
-            .frame(width: 28, alignment: .trailing)
+            .frame(width: style.spacing.listMarkerWidth, alignment: .trailing)
           HarnessMarkdownBlockStackView(
             blocks: item.blocks,
             settings: settings,

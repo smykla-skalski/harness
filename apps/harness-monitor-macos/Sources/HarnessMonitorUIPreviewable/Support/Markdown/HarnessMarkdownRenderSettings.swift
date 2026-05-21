@@ -43,7 +43,7 @@ struct HarnessMarkdownRenderSettings {
     self.codeBlock = codeBlock.withFontScaleMode(fontScaleMode)
   }
 
-  static let `default` = HarnessMarkdownRenderSettings()
+  static let `default` = Self()
 
   static func sized(
     body: CGFloat = 13,
@@ -57,8 +57,8 @@ struct HarnessMarkdownRenderSettings {
     codeBlock: HarnessCodeBlockRenderSettings = .default,
     images: HarnessMarkdownImageSettings = .default,
     spacing: HarnessMarkdownSpacingSettings = .default
-  ) -> HarnessMarkdownRenderSettings {
-    HarnessMarkdownRenderSettings(
+  ) -> Self {
+    Self(
       typography: HarnessMarkdownTypography(
         body: .system(size: body),
         inlineCode: .system(size: inlineCode, design: .monospaced),
@@ -77,7 +77,7 @@ struct HarnessMarkdownRenderSettings {
     )
   }
 
-  func withBodyFont(_ font: Font) -> HarnessMarkdownRenderSettings {
+  func withBodyFont(_ font: Font) -> Self {
     var copy = self
     copy.typography.body = .font(font)
     copy.typography.inlineCode = .font(font.monospaced())
@@ -108,7 +108,7 @@ struct HarnessMarkdownTypography {
   var listMarker: HarnessMarkdownFontStyle
   var tableHeader: HarnessMarkdownFontStyle
 
-  static let `default` = HarnessMarkdownTypography(
+  static let `default` = Self(
     body: .system(size: 13),
     inlineCode: .system(size: 12, design: .monospaced),
     heading1: .system(size: 20, weight: .semibold),
@@ -168,8 +168,8 @@ struct HarnessMarkdownFontStyle {
     size: CGFloat,
     weight: Font.Weight? = nil,
     design: Font.Design = .default
-  ) -> HarnessMarkdownFontStyle {
-    HarnessMarkdownFontStyle(
+  ) -> Self {
+    Self(
       baseFont: nil,
       pointSize: size,
       weight: weight,
@@ -178,8 +178,8 @@ struct HarnessMarkdownFontStyle {
     )
   }
 
-  static func font(_ font: Font) -> HarnessMarkdownFontStyle {
-    HarnessMarkdownFontStyle(
+  static func font(_ font: Font) -> Self {
+    Self(
       baseFont: font,
       pointSize: 0,
       weight: nil,
@@ -207,15 +207,15 @@ struct HarnessMarkdownFontStyle {
     baseFont == nil ? max(1, pointSize * scale) : nil
   }
 
-  func bold() -> HarnessMarkdownFontStyle {
+  func bold() -> Self {
     weighted(.bold)
   }
 
-  func italic() -> HarnessMarkdownFontStyle {
+  func italic() -> Self {
     if let baseFont {
       return .font(baseFont.italic())
     }
-    return HarnessMarkdownFontStyle(
+    return Self(
       baseFont: nil,
       pointSize: pointSize,
       weight: weight,
@@ -224,11 +224,11 @@ struct HarnessMarkdownFontStyle {
     )
   }
 
-  private func weighted(_ weight: Font.Weight) -> HarnessMarkdownFontStyle {
+  private func weighted(_ weight: Font.Weight) -> Self {
     if let baseFont {
       return .font(baseFont.weight(weight))
     }
-    return HarnessMarkdownFontStyle(
+    return Self(
       baseFont: nil,
       pointSize: pointSize,
       weight: weight,
@@ -251,7 +251,7 @@ struct HarnessMarkdownColorSettings {
   var taskUnchecked: Color
   var thematicBreak: Color
 
-  static let `default` = HarnessMarkdownColorSettings(
+  static let `default` = Self(
     text: HarnessMonitorTheme.ink,
     secondaryText: HarnessMonitorTheme.secondaryInk,
     link: HarnessMonitorTheme.accent,
@@ -271,14 +271,14 @@ struct HarnessMarkdownImageSettings {
   var maxBlockHeight: CGFloat
   var cornerRadius: CGFloat
 
-  static let `default` = HarnessMarkdownImageSettings(
+  static let `default` = Self(
     maxInlineHeight: 22,
     maxBlockHeight: 220,
     cornerRadius: 3
   )
 
-  func scaled(by scale: CGFloat) -> HarnessMarkdownImageSettings {
-    HarnessMarkdownImageSettings(
+  func scaled(by scale: CGFloat) -> Self {
+    Self(
       maxInlineHeight: max(1, maxInlineHeight * scale),
       maxBlockHeight: max(1, maxBlockHeight * scale),
       cornerRadius: cornerRadius
@@ -290,10 +290,10 @@ struct HarnessMarkdownBlockSpacing: Equatable {
   var before: CGFloat
   var after: CGFloat
 
-  static let none = HarnessMarkdownBlockSpacing(before: 0, after: 0)
+  static let none = Self(before: 0, after: 0)
 
-  func scaled(by scale: CGFloat) -> HarnessMarkdownBlockSpacing {
-    HarnessMarkdownBlockSpacing(before: max(0, before * scale), after: max(0, after * scale))
+  func scaled(by scale: CGFloat) -> Self {
+    Self(before: max(0, before * scale), after: max(0, after * scale))
   }
 }
 
@@ -312,14 +312,15 @@ struct HarnessMarkdownSpacingSettings: Equatable {
   var listItem: CGFloat
   var listItemContent: CGFloat
   var listMarkerGap: CGFloat
+  var listMarkerWidth: CGFloat
   var quoteContentGap: CGFloat
   var tableColumn: CGFloat
   var tableRow: CGFloat
 
-  static let `default` = HarnessMarkdownSpacingSettings(
+  static let `default` = Self(
     documentBlock: HarnessMonitorTheme.spacingSM,
     paragraph: .none,
-    heading: .none,
+    heading: HarnessMarkdownBlockSpacing(before: 16, after: 8),
     blockQuote: .none,
     codeBlock: .none,
     details: .none,
@@ -330,14 +331,15 @@ struct HarnessMarkdownSpacingSettings: Equatable {
     detailsContentIndent: HarnessMonitorTheme.spacingSM,
     listItem: HarnessMonitorTheme.spacingXS,
     listItemContent: HarnessMonitorTheme.spacingXS,
-    listMarkerGap: HarnessMonitorTheme.spacingSM,
+    listMarkerGap: 6,
+    listMarkerWidth: 20,
     quoteContentGap: HarnessMonitorTheme.spacingSM,
     tableColumn: HarnessMonitorTheme.spacingMD,
     tableRow: HarnessMonitorTheme.spacingXS
   )
 
-  func scaled(by scale: CGFloat) -> HarnessMarkdownSpacingSettings {
-    HarnessMarkdownSpacingSettings(
+  func scaled(by scale: CGFloat) -> Self {
+    Self(
       documentBlock: scaled(documentBlock, by: scale),
       paragraph: paragraph.scaled(by: scale),
       heading: heading.scaled(by: scale),
@@ -352,6 +354,7 @@ struct HarnessMarkdownSpacingSettings: Equatable {
       listItem: scaled(listItem, by: scale),
       listItemContent: scaled(listItemContent, by: scale),
       listMarkerGap: scaled(listMarkerGap, by: scale),
+      listMarkerWidth: scaled(listMarkerWidth, by: scale),
       quoteContentGap: scaled(quoteContentGap, by: scale),
       tableColumn: scaled(tableColumn, by: scale),
       tableRow: scaled(tableRow, by: scale)
@@ -389,7 +392,7 @@ struct HarnessMarkdownInlineRenderStyle {
   let codeFont: Font
   let colors: HarnessMarkdownColorSettings
 
-  func withFont(_ font: Font) -> HarnessMarkdownInlineRenderStyle {
-    HarnessMarkdownInlineRenderStyle(font: font, codeFont: codeFont, colors: colors)
+  func withFont(_ font: Font) -> Self {
+    Self(font: font, codeFont: codeFont, colors: colors)
   }
 }
