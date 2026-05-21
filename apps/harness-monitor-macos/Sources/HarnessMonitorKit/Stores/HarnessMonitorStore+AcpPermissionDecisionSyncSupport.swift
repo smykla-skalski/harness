@@ -60,8 +60,8 @@ extension HarnessMonitorStore {
   ) {
     startAcpPermissionResolutionTask(
       decisionID: decisionID,
-      taskKeyPath: \.acpPermissionDeadlineResolutionTasks,
-      tokenKeyPath: \.acpDeadlineResolutionTokens,
+      taskKeyPath: \.acpPermissionSync.deadlineResolutionTasks,
+      tokenKeyPath: \.acpPermissionSync.deadlineResolutionTokens,
       operation: operation
     )
   }
@@ -72,8 +72,8 @@ extension HarnessMonitorStore {
   ) {
     startAcpPermissionResolutionTask(
       decisionID: decisionID,
-      taskKeyPath: \.acpPermissionShutdownResolutionTasks,
-      tokenKeyPath: \.acpShutdownResolutionTokens,
+      taskKeyPath: \.acpPermissionSync.shutdownResolutionTasks,
+      tokenKeyPath: \.acpPermissionSync.shutdownResolutionTokens,
       operation: operation
     )
   }
@@ -81,16 +81,16 @@ extension HarnessMonitorStore {
   func cancelAcpPermissionDeadlineResolutionTask(for decisionID: String) {
     cancelAcpPermissionResolutionTask(
       decisionID: decisionID,
-      taskKeyPath: \.acpPermissionDeadlineResolutionTasks,
-      tokenKeyPath: \.acpDeadlineResolutionTokens
+      taskKeyPath: \.acpPermissionSync.deadlineResolutionTasks,
+      tokenKeyPath: \.acpPermissionSync.deadlineResolutionTokens
     )
   }
 
   func cancelAcpPermissionShutdownResolutionTask(for decisionID: String) {
     cancelAcpPermissionResolutionTask(
       decisionID: decisionID,
-      taskKeyPath: \.acpPermissionShutdownResolutionTasks,
-      tokenKeyPath: \.acpShutdownResolutionTokens
+      taskKeyPath: \.acpPermissionSync.shutdownResolutionTasks,
+      tokenKeyPath: \.acpPermissionSync.shutdownResolutionTokens
     )
   }
 
@@ -101,12 +101,12 @@ extension HarnessMonitorStore {
 
   func cancelAllAcpPermissionResolutionTasks() {
     cancelAcpPermissionResolutionTasks(
-      taskKeyPath: \.acpPermissionDeadlineResolutionTasks,
-      tokenKeyPath: \.acpDeadlineResolutionTokens
+      taskKeyPath: \.acpPermissionSync.deadlineResolutionTasks,
+      tokenKeyPath: \.acpPermissionSync.deadlineResolutionTokens
     )
     cancelAcpPermissionResolutionTasks(
-      taskKeyPath: \.acpPermissionShutdownResolutionTasks,
-      tokenKeyPath: \.acpShutdownResolutionTokens
+      taskKeyPath: \.acpPermissionSync.shutdownResolutionTasks,
+      tokenKeyPath: \.acpPermissionSync.shutdownResolutionTokens
     )
   }
 

@@ -62,76 +62,40 @@ public final class HarnessMonitorStore {
   public internal(set) var supervisorLiveTickRefreshTick: Int = 0
   public internal(set) var supervisorRuntimeState: SupervisorRuntimeState = .stopped
   public var globalTaskBoardItems: [TaskBoardItem] = [] {
-    didSet {
-      guard oldValue != globalTaskBoardItems else { return }
-      scheduleUISync([.contentDashboard])
-    }
+    didSet { if oldValue != globalTaskBoardItems { scheduleUISync([.contentDashboard]) } }
   }
   public var globalTaskBoardOrchestratorStatus: TaskBoardOrchestratorStatus? {
-    didSet {
-      guard oldValue != globalTaskBoardOrchestratorStatus else { return }
-      scheduleUISync([.contentDashboard])
-    }
+    didSet { if oldValue != globalTaskBoardOrchestratorStatus { scheduleUISync([.contentDashboard]) } }
   }
   public var globalTaskBoardSyncSummary: TaskBoardSyncSummary? {
-    didSet {
-      guard oldValue != globalTaskBoardSyncSummary else { return }
-      scheduleUISync([.contentDashboard])
-    }
+    didSet { if oldValue != globalTaskBoardSyncSummary { scheduleUISync([.contentDashboard]) } }
   }
   public var globalTaskBoardDispatchSummary: TaskBoardDispatchSummary? {
-    didSet {
-      guard oldValue != globalTaskBoardDispatchSummary else { return }
-      scheduleUISync([.contentDashboard])
-    }
+    didSet { if oldValue != globalTaskBoardDispatchSummary { scheduleUISync([.contentDashboard]) } }
   }
   public var globalTaskBoardEvaluationSummary: TaskBoardEvaluationSummary? {
-    didSet {
-      guard oldValue != globalTaskBoardEvaluationSummary else { return }
-      scheduleUISync([.contentDashboard])
-    }
+    didSet { if oldValue != globalTaskBoardEvaluationSummary { scheduleUISync([.contentDashboard]) } }
   }
   public var globalTaskBoardItemAuditSummary: TaskBoardAuditSummary? {
-    didSet {
-      guard oldValue != globalTaskBoardItemAuditSummary else { return }
-      scheduleUISync([.contentDashboard])
-    }
+    didSet { if oldValue != globalTaskBoardItemAuditSummary { scheduleUISync([.contentDashboard]) } }
   }
   public var globalTaskBoardProjects: [TaskBoardProjectSummary]? {
-    didSet {
-      guard oldValue != globalTaskBoardProjects else { return }
-      scheduleUISync([.contentDashboard])
-    }
+    didSet { if oldValue != globalTaskBoardProjects { scheduleUISync([.contentDashboard]) } }
   }
   public var globalTaskBoardMachines: [TaskBoardMachineSummary]? {
-    didSet {
-      guard oldValue != globalTaskBoardMachines else { return }
-      scheduleUISync([.contentDashboard])
-    }
+    didSet { if oldValue != globalTaskBoardMachines { scheduleUISync([.contentDashboard]) } }
   }
   public var globalTaskBoardPolicyPipeline: TaskBoardPolicyPipelineDocument? {
-    didSet {
-      guard oldValue != globalTaskBoardPolicyPipeline else { return }
-      scheduleUISync([.contentDashboard])
-    }
+    didSet { if oldValue != globalTaskBoardPolicyPipeline { scheduleUISync([.contentDashboard]) } }
   }
   public var globalTaskBoardPolicySimulation: TaskBoardPolicyPipelineSimulationResult? {
-    didSet {
-      guard oldValue != globalTaskBoardPolicySimulation else { return }
-      scheduleUISync([.contentDashboard])
-    }
+    didSet { if oldValue != globalTaskBoardPolicySimulation { scheduleUISync([.contentDashboard]) } }
   }
   public var globalTaskBoardPolicyAudit: TaskBoardPolicyPipelineAuditSummary? {
-    didSet {
-      guard oldValue != globalTaskBoardPolicyAudit else { return }
-      scheduleUISync([.contentDashboard])
-    }
+    didSet { if oldValue != globalTaskBoardPolicyAudit { scheduleUISync([.contentDashboard]) } }
   }
   public var notificationHistoryEntries: [NotificationHistoryEntry] = [] {
-    didSet {
-      guard oldValue != notificationHistoryEntries else { return }
-      scheduleUISync([.contentDashboard])
-    }
+    didSet { if oldValue != notificationHistoryEntries { scheduleUISync([.contentDashboard]) } }
   }
   public var supervisorObserverFocusTick: Int = 0
   public var supervisorPrimaryActionFocusDecisionID: String?
@@ -139,22 +103,13 @@ public final class HarnessMonitorStore {
   var supervisorLiveTick: DecisionLiveTickSnapshot = .placeholder
 
   public var persistenceError: String? {
-    didSet {
-      guard oldValue != persistenceError else { return }
-      scheduleUISync([.contentChrome])
-    }
+    didSet { if oldValue != persistenceError { scheduleUISync([.contentChrome]) } }
   }
   public var presentedSheet: PresentedSheet? {
-    didSet {
-      guard oldValue != presentedSheet else { return }
-      scheduleUISync([.contentShell])
-    }
+    didSet { if oldValue != presentedSheet { scheduleUISync([.contentShell]) } }
   }
   public var pendingConfirmation: PendingConfirmation? {
-    didSet {
-      guard oldValue != pendingConfirmation else { return }
-      scheduleUISync([.contentShell])
-    }
+    didSet { if oldValue != pendingConfirmation { scheduleUISync([.contentShell]) } }
   }
   public var pendingSessionRoute: SessionRouteSelection?
   public internal(set) var pendingSessionRouteRequestID = 0
@@ -163,19 +118,13 @@ public final class HarnessMonitorStore {
   var pendingSessionRouteCreateSessionID: String?
   public var hostBridgeCapabilityIssues: [String: HostBridgeCapabilityIssue] = [:]
   public var acpBridgeHTTPIncident: AcpBridgeHTTPIncident? {
-    didSet {
-      guard oldValue != acpBridgeHTTPIncident else { return }
-      scheduleUISync([.contentChrome])
-    }
+    didSet { if oldValue != acpBridgeHTTPIncident { scheduleUISync([.contentChrome]) } }
   }
   public var mcpStatus = HarnessMonitorMCPStatusSnapshot(
     runtimeState: .disabled,
     recoveryStatus: nil
   ) {
-    didSet {
-      guard oldValue != mcpStatus else { return }
-      scheduleUISync([.contentChrome])
-    }
+    didSet { if oldValue != mcpStatus { scheduleUISync([.contentChrome]) } }
   }
   @ObservationIgnored var mcpFeedbackState = MCPStatusFeedbackState()
   @ObservationIgnored var forcedHostBridgeCapabilities: Set<String> = []
@@ -264,12 +213,7 @@ public final class HarnessMonitorStore {
   @ObservationIgnored var acpPermissionTerminalOutcomesByID: [String: DecisionOutcome] = [:]
   @ObservationIgnored var acpPermissionAuditEncoder = JSONEncoder()
   @ObservationIgnored var acpPermissionOutcomeDecoder = JSONDecoder()
-  @ObservationIgnored var acpPermissionDecisionSyncTask: Task<Void, Never>?
-  @ObservationIgnored var acpPermissionDecisionSyncGeneration: UInt64 = 0
-  @ObservationIgnored var acpPermissionDeadlineResolutionTasks: [String: Task<Void, Never>] = [:]
-  @ObservationIgnored var acpDeadlineResolutionTokens: [String: UInt64] = [:]
-  @ObservationIgnored var acpPermissionShutdownResolutionTasks: [String: Task<Void, Never>] = [:]
-  @ObservationIgnored var acpShutdownResolutionTokens: [String: UInt64] = [:]
+  @ObservationIgnored var acpPermissionSync = AcpPermissionSyncState()
   public var sleepPreventionEnabled = false {
     didSet {
       guard oldValue != sleepPreventionEnabled else { return }
@@ -278,22 +222,13 @@ public final class HarnessMonitorStore {
     }
   }
   var manualRefreshSuccessToken = 0 {
-    didSet {
-      guard oldValue != manualRefreshSuccessToken else { return }
-      scheduleUISync([.contentToolbar])
-    }
+    didSet { if oldValue != manualRefreshSuccessToken { scheduleUISync([.contentToolbar]) } }
   }
   public var navigationBackStack: [String?] = [] {
-    didSet {
-      guard oldValue != navigationBackStack else { return }
-      scheduleUISync([.contentToolbar])
-    }
+    didSet { if oldValue != navigationBackStack { scheduleUISync([.contentToolbar]) } }
   }
   public var navigationForwardStack: [String?] = [] {
-    didSet {
-      guard oldValue != navigationForwardStack else { return }
-      scheduleUISync([.contentToolbar])
-    }
+    didSet { if oldValue != navigationForwardStack { scheduleUISync([.contentToolbar]) } }
   }
   var connectionProbeInterval: Duration = .seconds(10)
   var bootstrapWarmUpTimeout: Duration = .seconds(15)
@@ -488,6 +423,15 @@ public final class HarnessMonitorStore {
     scheduleBookmarkedSessionRefresh()
     scheduleNotificationHistoryRefresh()
   }
+}
+
+struct AcpPermissionSyncState {
+  var decisionSyncTask: Task<Void, Never>?
+  var decisionSyncGeneration: UInt64 = 0
+  var deadlineResolutionTasks: [String: Task<Void, Never>] = [:]
+  var deadlineResolutionTokens: [String: UInt64] = [:]
+  var shutdownResolutionTasks: [String: Task<Void, Never>] = [:]
+  var shutdownResolutionTokens: [String: UInt64] = [:]
 }
 
 struct AcpTimelineSyncState {
