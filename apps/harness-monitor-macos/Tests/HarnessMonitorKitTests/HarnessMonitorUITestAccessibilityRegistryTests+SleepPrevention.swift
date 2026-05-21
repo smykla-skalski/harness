@@ -21,6 +21,8 @@ extension HarnessMonitorUITestAccessibilityRegistryTests {
     #expect(!sleepToolbarButton.contains(".animation(.default"))
     #expect(sleepToolbarButton.contains(".harnessMCPButton("))
     #expect(sleepToolbarButton.contains("SleepPreventionToolbarSymbolLayout.size"))
+    #expect(sleepToolbarButton.contains("SleepPreventionToolbarSymbolLayout.opticalOffset"))
+    #expect(sleepToolbarButton.contains(".offset("))
     #expect(sessionToolbar.contains("SleepPreventionToolbarButton("))
   }
 }
