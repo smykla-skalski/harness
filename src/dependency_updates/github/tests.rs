@@ -1,4 +1,5 @@
 use super::*;
+use super::types::PageInfo;
 
 #[test]
 fn scope_query_cap_rejects_broad_cartesian_requests() {
