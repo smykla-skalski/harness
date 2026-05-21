@@ -20,7 +20,7 @@ import SwiftUI
 
 enum DashboardDependenciesRemoteLoader {
   static func query(
-    client: any HarnessMonitorClientProtocol,
+    client: any HarnessMonitorDependenciesClientProtocol,
     request: DependencyUpdatesQueryRequest
   ) async throws -> DependencyUpdatesQueryResponse {
     let task = Task.detached(priority: .userInitiated) {
@@ -34,7 +34,7 @@ enum DashboardDependenciesRemoteLoader {
   }
 
   static func refresh(
-    client: any HarnessMonitorClientProtocol,
+    client: any HarnessMonitorDependenciesClientProtocol,
     request: DependencyUpdatesRefreshRequest
   ) async throws -> DependencyUpdatesRefreshResponse {
     let task = Task.detached(priority: .userInitiated) {

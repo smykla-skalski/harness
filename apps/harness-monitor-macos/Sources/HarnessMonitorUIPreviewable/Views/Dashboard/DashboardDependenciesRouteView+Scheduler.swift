@@ -21,10 +21,14 @@ extension DashboardDependenciesRouteView {
         expandOrganizations: preferences.expandOrganizations
       )
       guard !Task.isCancelled else { return }
+      let hydrated =
+        repoSyncStateCache?
+        .loadStates(preferencesHash: dependenciesCachePreferencesHash) ?? [:]
       scheduler.start(
         repositories: repositories,
         preferences: preferences,
         client: client,
+        initialLastSyncedAt: hydrated,
         onMerge: { [self] repository, response in
           self.applyPerRepoResponse(repository: repository, response: response)
         }

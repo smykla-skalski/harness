@@ -186,22 +186,26 @@ public struct DependencyUpdatesCache {
     response: DependencyUpdatesQueryResponse
   ) -> [DependencyUpdateItem] {
     let responseByID: [String: DependencyUpdateItem] = Dictionary(
-      uniqueKeysWithValues: response.items.map { ($0.pullRequestID, $0) }
+      response.items.map { ($0.pullRequestID, $0) },
+      uniquingKeysWith: { _, last in last }
     )
     var seenIDs = Set<String>()
     var result: [DependencyUpdateItem] = []
     result.reserveCapacity(items.count + response.items.count)
     for item in items {
       if item.repository != repository {
-        result.append(item)
+        if seenIDs.insert(item.pullRequestID).inserted {
+          result.append(item)
+        }
         continue
       }
       if let updated = responseByID[item.pullRequestID] {
-        result.append(updated)
-        seenIDs.insert(updated.pullRequestID)
+        if seenIDs.insert(updated.pullRequestID).inserted {
+          result.append(updated)
+        }
       }
     }
-    for newItem in response.items where !seenIDs.contains(newItem.pullRequestID) {
+    for newItem in response.items where seenIDs.insert(newItem.pullRequestID).inserted {
       result.append(newItem)
     }
     return result
@@ -280,6 +284,20 @@ public actor DependencyUpdatesCachePersistenceWriter {
       cache.save(preferencesHash: preferencesHash, response: fallbackResponse)
     }
     RepositoryLabelsCache(context: context).upsert(response.repositoryLabels)
+  }
+
+  public func recordRepoSyncedAt(
+    preferencesHash: String,
+    repository: String,
+    syncedAt: Date = .now
+  ) {
+    let context = ModelContext(modelContainer)
+    context.autosaveEnabled = false
+    DependencyUpdatesRepoSyncStateCache(context: context).recordSyncedAt(
+      preferencesHash: preferencesHash,
+      repository: repository,
+      syncedAt: syncedAt
+    )
   }
 }
 

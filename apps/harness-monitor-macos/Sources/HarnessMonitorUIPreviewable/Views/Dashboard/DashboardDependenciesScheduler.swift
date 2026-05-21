@@ -40,12 +40,14 @@ final class DashboardDependenciesScheduler {
   ///
   /// Cancels any in-flight fetches and resets the tick loop. Repositories
   /// missing from `repositories` are dropped from `states`; new ones are
-  /// added with `lastSyncedAt = nil` so the cold-start dispatcher treats
-  /// them as fully stale.
+  /// seeded with `lastSyncedAt` from `initialLastSyncedAt` (or `nil` when
+  /// absent) so a relaunch resumes oldest-first instead of treating every
+  /// repository as cold.
   func start(
     repositories: [String],
     preferences: DashboardDependenciesPreferences,
     client: any HarnessMonitorDependenciesClientProtocol,
+    initialLastSyncedAt: [String: Date] = [:],
     onMerge: @escaping @MainActor (String, DependencyUpdatesQueryResponse) -> Void
   ) {
     stop()
@@ -57,7 +59,16 @@ final class DashboardDependenciesScheduler {
     self.onMerge = onMerge
 
     for repository in repositories where states[repository] == nil {
-      states[repository] = RepoSyncState()
+      var state = RepoSyncState()
+      state.lastSyncedAt = initialLastSyncedAt[repository]
+      states[repository] = state
+    }
+    for repository in repositories {
+      if states[repository]?.lastSyncedAt == nil,
+        let hydrated = initialLastSyncedAt[repository]
+      {
+        states[repository]?.lastSyncedAt = hydrated
+      }
     }
     for key in Array(states.keys) where !repositories.contains(key) {
       states.removeValue(forKey: key)

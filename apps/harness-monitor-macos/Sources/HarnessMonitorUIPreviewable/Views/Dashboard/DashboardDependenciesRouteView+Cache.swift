@@ -17,6 +17,11 @@ extension DashboardDependenciesRouteView {
     return RepositoryLabelUsageCache(context: context)
   }
 
+  var repoSyncStateCache: DependencyUpdatesRepoSyncStateCache? {
+    guard let context = store.modelContext else { return nil }
+    return DependencyUpdatesRepoSyncStateCache(context: context)
+  }
+
   var dependencyCachePersistenceWriter: DependencyUpdatesCachePersistenceWriter? {
     guard let modelContainer = store.modelContext?.container else { return nil }
     return DependencyUpdatesCachePersistenceWriter(modelContainer: modelContainer)
@@ -117,6 +122,10 @@ extension DashboardDependenciesRouteView {
         repository: repository,
         response: response,
         fallbackResponse: fallbackResponse
+      )
+      await writer.recordRepoSyncedAt(
+        preferencesHash: preferencesHash,
+        repository: repository
       )
     }
   }

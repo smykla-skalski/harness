@@ -94,6 +94,12 @@ extension SessionCacheService {
       for row in labelUsage {
         context.delete(row)
       }
+      let repoSyncStates = try context.fetch(
+        FetchDescriptor<CachedDependencyUpdatesRepoSyncState>()
+      )
+      for row in repoSyncStates {
+        context.delete(row)
+      }
       try context.save()
       return true
     }
