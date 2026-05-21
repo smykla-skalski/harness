@@ -28,7 +28,7 @@ struct HarnessVoiceInputButton: View {
   @AppStorage(HarnessMonitorVoiceSettingsDefaults.pendingTranscriptSegmentLimitKey)
   var pendingTranscriptSegmentLimit =
     HarnessMonitorVoiceSettings.defaultPendingTranscriptSegmentLimit
-  @State var _model = ViewModel()
+  @State private var _model = ViewModel()
   @ScaledMetric(relativeTo: .headline)
   var progressSize: CGFloat = 16
 

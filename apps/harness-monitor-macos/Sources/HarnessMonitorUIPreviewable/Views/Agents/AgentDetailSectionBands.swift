@@ -60,7 +60,7 @@ struct AgentDetailActivityBand: View {
   let isSparseState: Bool
   // Replaces ViewThatFits: a single deterministic if/else gated on a measured
   // container width avoids the double-tree-build cost on every body update.
-  @State var fitsHorizontally = true
+  @State private var fitsHorizontally = true
 
   var horizontalMinWidth: CGFloat {
     isSparseState ? 544 : 528
@@ -171,7 +171,7 @@ struct AgentDetailActionBand: View {
   @Binding var signalActionHint: String
   let prefersWideLayout: Bool
   // Replaces ViewThatFits: deterministic if/else gated on measured width.
-  @State var fitsHorizontally = true
+  @State private var fitsHorizontally = true
 
   init(
     store: HarnessMonitorStore,

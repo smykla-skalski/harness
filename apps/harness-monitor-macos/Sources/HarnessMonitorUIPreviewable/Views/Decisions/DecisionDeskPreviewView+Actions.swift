@@ -54,8 +54,8 @@ extension DecisionDeskPreviewView {
       return "No visible decisions to dismiss"
     }
     let capturedAt = snapshot.capturedAt.formatted(
-      date: .abbreviated,
-      time: .standard
+      date: Date.FormatStyle.DateStyle.abbreviated,
+      time: Date.FormatStyle.TimeStyle.standard
     )
     return "Scope: \(snapshot.scopeDescription)\nCaptured: \(capturedAt)"
   }

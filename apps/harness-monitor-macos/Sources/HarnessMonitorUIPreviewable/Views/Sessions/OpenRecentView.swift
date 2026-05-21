@@ -15,9 +15,9 @@ public struct OpenRecentView: View {
   var reduceMotion
   @AppStorage(OpenRecentCloseAfterPickDefaults.storageKey)
   var closeAfterPick = OpenRecentCloseAfterPickDefaults.defaultValue
-  @State var openFolderActivationCount = 0
-  @State var newSessionActivationCount = 0
-  @State var showsStartPanel = true
+  @State private var openFolderActivationCount = 0
+  @State private var newSessionActivationCount = 0
+  @State private var showsStartPanel = true
 
   public init(store: HarnessMonitorStore) {
     self.store = store
