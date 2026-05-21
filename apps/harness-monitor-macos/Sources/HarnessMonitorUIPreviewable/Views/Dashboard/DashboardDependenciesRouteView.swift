@@ -428,15 +428,11 @@ struct DashboardDependenciesRouteView: View {
             .fixedSize(horizontal: false, vertical: true)
         }
         Spacer(minLength: HarnessMonitorTheme.spacingMD)
-        if let inFlightActionTitle {
-          ProgressView(inFlightActionTitle)
-            .controlSize(.small)
-        } else if isAnyRepositorySyncing {
-          schedulerProgressBadge
-        } else if isBackgroundRefreshing {
-          ProgressView("Refreshing…")
-            .controlSize(.small)
-        }
+        DashboardDependenciesSummaryProgressBadge(
+          scheduler: scheduler,
+          inFlightActionTitle: inFlightActionTitle,
+          isBackgroundRefreshing: isBackgroundRefreshing
+        )
       }
 
       HarnessMonitorWrapLayout(
@@ -1170,6 +1166,36 @@ struct DashboardDependenciesRouteView: View {
 struct DashboardDependenciesRepoLabelMenuData: Equatable, Sendable {
   let sortedLabels: [DependencyUpdateRepositoryLabel]
   let frequentNames: [String]
+}
+
+@MainActor
+private struct DashboardDependenciesSummaryProgressBadge: View {
+  let scheduler: DashboardDependenciesScheduler
+  let inFlightActionTitle: String?
+  let isBackgroundRefreshing: Bool
+
+  var body: some View {
+    if let inFlightActionTitle {
+      ProgressView(inFlightActionTitle)
+        .controlSize(.small)
+    } else if !scheduler.repositoriesInFlight.isEmpty {
+      let total = max(scheduler.states.count, 1)
+      let inFlight = scheduler.repositoriesInFlight.count
+      HStack(spacing: HarnessMonitorTheme.spacingXS) {
+        ProgressView()
+          .controlSize(.small)
+        Text("Syncing \(inFlight) of \(total)")
+          .scaledFont(.callout)
+          .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+      }
+      .accessibilityIdentifier(HarnessMonitorAccessibility.dashboardDependenciesSchedulerBadge)
+      .accessibilityElement(children: .combine)
+      .accessibilityLabel("Syncing \(inFlight) of \(total) repositories")
+    } else if isBackgroundRefreshing {
+      ProgressView("Refreshing…")
+        .controlSize(.small)
+    }
+  }
 }
 
 @MainActor
