@@ -1,3 +1,5 @@
+use std::collections::BTreeMap;
+
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
@@ -42,6 +44,17 @@ pub struct DependencyUpdatesQueryResponse {
     pub from_cache: bool,
     pub summary: DependencyUpdatesSummary,
     pub items: Vec<DependencyUpdateItem>,
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub repository_labels: BTreeMap<String, Vec<DependencyUpdateRepositoryLabel>>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct DependencyUpdateRepositoryLabel {
+    pub name: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub color: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -352,7 +365,15 @@ impl DependencyUpdatesQueryResponse {
             from_cache: false,
             summary: DependencyUpdatesSummary::from_items(&items),
             items,
+            repository_labels: BTreeMap::new(),
         }
+    }
+
+    pub fn set_repository_labels(
+        &mut self,
+        repository_labels: BTreeMap<String, Vec<DependencyUpdateRepositoryLabel>>,
+    ) {
+        self.repository_labels = repository_labels;
     }
 }
 

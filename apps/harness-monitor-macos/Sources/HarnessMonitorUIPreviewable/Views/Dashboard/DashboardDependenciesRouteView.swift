@@ -345,7 +345,6 @@ struct DashboardDependenciesRouteView: View {
         }
       }
     }
-    .listStyle(.plain)
     .accessibilityIdentifier(HarnessMonitorAccessibility.dashboardDependenciesList)
     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     .overlay {
@@ -521,11 +520,19 @@ struct DashboardDependenciesRouteView: View {
         Task { await rerunChecks(items: [item]) }
       }
       .disabled(!item.hasRerunnableChecks)
-      Button("Add Label") {
-        labelTargetItems = [item]
-        labelDraft = ""
-        isLabelSheetPresented = true
-      }
+      DashboardDependenciesLabelPickerMenu(
+        title: "Add Label",
+        labels: dashboardDependenciesAvailableLabels(
+          repositoryLabels: response.repositoryLabels,
+          items: [item]
+        ),
+        onSelect: { name in Task { await addLabel(name, to: [item]) } },
+        onCustom: {
+          labelTargetItems = [item]
+          labelDraft = ""
+          isLabelSheetPresented = true
+        }
+      )
       Button("Auto") {
         Task { await auto(items: [item]) }
       }
@@ -605,11 +612,18 @@ struct DashboardDependenciesRouteView: View {
     }
     .disabled(!items.contains { $0.hasRerunnableChecks })
 
-    actionButton("Add Label", systemImage: "tag") {
-      labelTargetItems = items
-      labelDraft = ""
-      isLabelSheetPresented = true
-    }
+    DashboardDependenciesLabelPickerActionMenu(
+      labels: dashboardDependenciesAvailableLabels(
+        repositoryLabels: response.repositoryLabels,
+        items: items
+      ),
+      onSelect: { name in Task { await addLabel(name, to: items) } },
+      onCustom: {
+        labelTargetItems = items
+        labelDraft = ""
+        isLabelSheetPresented = true
+      }
+    )
     .disabled(items.isEmpty)
 
     actionButton("Copy Approval Links", systemImage: "doc.on.doc") {

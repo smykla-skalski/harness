@@ -100,17 +100,69 @@ public struct DependencyUpdatesQueryResponse: Codable, Equatable, Sendable {
   public let fromCache: Bool
   public let summary: DependencyUpdatesSummary
   public let items: [DependencyUpdateItem]
+  public let repositoryLabels: [String: [DependencyUpdateRepositoryLabel]]
 
   public init(
     fetchedAt: String,
     fromCache: Bool,
     summary: DependencyUpdatesSummary,
-    items: [DependencyUpdateItem]
+    items: [DependencyUpdateItem],
+    repositoryLabels: [String: [DependencyUpdateRepositoryLabel]] = [:]
   ) {
     self.fetchedAt = fetchedAt
     self.fromCache = fromCache
     self.summary = summary
     self.items = items
+    self.repositoryLabels = repositoryLabels
+  }
+
+  enum CodingKeys: String, CodingKey {
+    case fetchedAt
+    case fromCache
+    case summary
+    case items
+    case repositoryLabels
+  }
+
+  public init(from decoder: Decoder) throws {
+    let container = try decoder.container(keyedBy: CodingKeys.self)
+    fetchedAt = try container.decode(String.self, forKey: .fetchedAt)
+    fromCache = try container.decode(Bool.self, forKey: .fromCache)
+    summary = try container.decode(DependencyUpdatesSummary.self, forKey: .summary)
+    items = try container.decode([DependencyUpdateItem].self, forKey: .items)
+    repositoryLabels =
+      try container.decodeIfPresent(
+        [String: [DependencyUpdateRepositoryLabel]].self,
+        forKey: .repositoryLabels
+      ) ?? [:]
+  }
+}
+
+public struct DependencyUpdateRepositoryLabel: Codable, Equatable, Identifiable, Sendable, Hashable
+{
+  public let name: String
+  public let color: String?
+  public let description: String?
+
+  public var id: String { name }
+
+  public init(name: String, color: String? = nil, description: String? = nil) {
+    self.name = name
+    self.color = color
+    self.description = description
+  }
+
+  enum CodingKeys: String, CodingKey {
+    case name
+    case color
+    case description
+  }
+
+  public init(from decoder: Decoder) throws {
+    let container = try decoder.container(keyedBy: CodingKeys.self)
+    name = try container.decode(String.self, forKey: .name)
+    color = try container.decodeIfPresent(String.self, forKey: .color)
+    description = try container.decodeIfPresent(String.self, forKey: .description)
   }
 }
 

@@ -40,7 +40,7 @@ pub(super) struct OrganizationRepositoryNode {
     pub(super) name_with_owner: String,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone)]
 pub(super) struct PageInfo {
     #[serde(rename = "hasNextPage")]
     pub(super) has_next_page: bool,
@@ -85,6 +85,24 @@ pub(super) struct RepositoryNode {
     pub(super) id: String,
     #[serde(rename = "nameWithOwner")]
     pub(super) name_with_owner: String,
+    #[serde(default)]
+    pub(super) labels: Option<RepositoryLabelConnection>,
+}
+
+#[derive(Debug, Deserialize)]
+pub(super) struct RepositoryLabelConnection {
+    #[serde(rename = "pageInfo")]
+    pub(super) page_info: PageInfo,
+    pub(super) nodes: Vec<RepositoryLabelNode>,
+}
+
+#[derive(Debug, Deserialize)]
+pub(super) struct RepositoryLabelNode {
+    pub(super) name: String,
+    #[serde(default)]
+    pub(super) color: Option<String>,
+    #[serde(default)]
+    pub(super) description: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -110,6 +128,8 @@ pub(super) struct StatusCheckRollup {
 
 #[derive(Debug, Deserialize)]
 pub(super) struct StatusCheckContexts {
+    #[serde(rename = "pageInfo")]
+    pub(super) page_info: PageInfo,
     pub(super) nodes: Vec<StatusContextNode>,
 }
 
@@ -136,6 +156,8 @@ pub(super) struct CheckSuiteNode {
 
 #[derive(Debug, Deserialize)]
 pub(super) struct ReviewConnection {
+    #[serde(rename = "pageInfo")]
+    pub(super) page_info: PageInfo,
     pub(super) nodes: Vec<ReviewNode>,
 }
 
@@ -147,10 +169,54 @@ pub(super) struct ReviewNode {
 
 #[derive(Debug, Deserialize)]
 pub(super) struct LabelConnection {
+    #[serde(rename = "pageInfo")]
+    pub(super) page_info: PageInfo,
     pub(super) nodes: Vec<LabelNode>,
 }
 
 #[derive(Debug, Deserialize)]
 pub(super) struct LabelNode {
     pub(super) name: String,
+}
+
+#[derive(Debug, Deserialize)]
+pub(super) struct PullRequestLabelsPageResponse {
+    pub(super) node: Option<PullRequestLabelsPageNode>,
+}
+
+#[derive(Debug, Deserialize)]
+pub(super) struct PullRequestLabelsPageNode {
+    pub(super) labels: LabelConnection,
+}
+
+#[derive(Debug, Deserialize)]
+pub(super) struct PullRequestReviewsPageResponse {
+    pub(super) node: Option<PullRequestReviewsPageNode>,
+}
+
+#[derive(Debug, Deserialize)]
+pub(super) struct PullRequestReviewsPageNode {
+    pub(super) reviews: ReviewConnection,
+}
+
+#[derive(Debug, Deserialize)]
+pub(super) struct PullRequestChecksPageResponse {
+    pub(super) node: Option<PullRequestChecksPageNode>,
+}
+
+#[derive(Debug, Deserialize)]
+pub(super) struct PullRequestChecksPageNode {
+    pub(super) commits: CommitConnection,
+}
+
+#[derive(Debug, Deserialize)]
+pub(super) struct RepositoryLabelsPageResponse {
+    pub(super) node: Option<RepositoryLabelsPageNode>,
+}
+
+#[derive(Debug, Deserialize)]
+pub(super) struct RepositoryLabelsPageNode {
+    #[serde(rename = "nameWithOwner")]
+    pub(super) name_with_owner: String,
+    pub(super) labels: RepositoryLabelConnection,
 }
