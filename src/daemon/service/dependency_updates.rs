@@ -5,8 +5,8 @@ use std::time::Instant;
 use crate::daemon::service::task_board_runtime::external_sync_config_for_repository;
 use crate::dependency_updates::{
     DependencyUpdateActionOutcome, DependencyUpdateActionResult, DependencyUpdateItem,
-    DependencyUpdatePullRequestState, DependencyUpdateTarget, DependencyUpdatesActionResponse,
-    DependencyUpdatesApproveRequest, DependencyUpdatesAutoRequest,
+    DependencyUpdatePullRequestState, DependencyUpdateRepositoryLabel, DependencyUpdateTarget,
+    DependencyUpdatesActionResponse, DependencyUpdatesApproveRequest, DependencyUpdatesAutoRequest,
     DependencyUpdatesCacheClearResponse, DependencyUpdatesGitHubClient,
     DependencyUpdatesLabelRequest, DependencyUpdatesMergeRequest, DependencyUpdatesQueryRequest,
     DependencyUpdatesQueryResponse, DependencyUpdatesRefreshRequest,
@@ -57,12 +57,21 @@ pub async fn query_dependency_updates(
 
     let segments = token_bound_requests(request)?;
     let mut items_by_key = BTreeMap::new();
+    let mut repository_labels: BTreeMap<String, Vec<DependencyUpdateRepositoryLabel>> =
+        BTreeMap::new();
     for segment in segments {
         let client = DependencyUpdatesGitHubClient::new(&segment.token)?;
-        for item in client.fetch_updates(&segment.request).await? {
+        let fetch = client.fetch_updates(&segment.request).await?;
+        for item in fetch.items {
             items_by_key
                 .entry(format!("{}#{}", item.repository, item.number))
                 .or_insert(item);
+        }
+        for (repository, labels) in fetch.repository_labels {
+            let entry = repository_labels.entry(repository).or_default();
+            if entry.is_empty() && !labels.is_empty() {
+                *entry = labels;
+            }
         }
     }
 
@@ -76,7 +85,8 @@ pub async fn query_dependency_updates(
             .then_with(|| left.repository.cmp(&right.repository))
             .then_with(|| left.number.cmp(&right.number))
     });
-    let response = DependencyUpdatesQueryResponse::new(items, utc_now());
+    let mut response = DependencyUpdatesQueryResponse::new(items, utc_now());
+    response.set_repository_labels(repository_labels);
     store_cached_query_response(cache_key, &response);
     Ok(response)
 }
@@ -252,9 +262,12 @@ pub async fn refresh_dependency_updates(
             .map(|target| target.pull_request_id.clone())
             .collect();
         let client = DependencyUpdatesGitHubClient::new(&segment.token)?;
-        let (fetched, segment_missing) = client.fetch_by_ids(&ids).await?;
-        items.extend(fetched);
-        missing.extend(segment_missing);
+        let fetch = client.fetch_by_ids(&ids).await?;
+        items.extend(fetch.items);
+        missing.extend(fetch.missing);
+        if !fetch.repository_labels.is_empty() {
+            patch_cached_repository_labels(&fetch.repository_labels);
+        }
     }
     patch_cached_items(&items, &missing);
     Ok(DependencyUpdatesRefreshResponse {
@@ -378,32 +391,62 @@ fn patch_cached_items(refreshed: &[DependencyUpdateItem], missing: &[String]) {
     }
     let mut cache = cache().lock().expect("dependency-updates cache lock");
     for entry in cache.values_mut() {
-        let mut changed = false;
-        for refreshed_item in refreshed {
-            if let Some(slot) = entry
-                .response
-                .items
-                .iter_mut()
-                .find(|item| item.pull_request_id == refreshed_item.pull_request_id)
-            {
-                *slot = refreshed_item.clone();
-                changed = true;
-            }
+        if let Some(updated) = apply_refresh_to_items(&entry.response.items, refreshed, missing) {
+            entry.response.summary = DependencyUpdatesSummary::from_items(&updated);
+            entry.response.items = updated;
         }
-        let pre_drop_len = entry.response.items.len();
-        entry.response.items.retain(|item| {
-            let dropped_by_missing = missing.contains(&item.pull_request_id);
-            let dropped_by_state = refreshed
-                .iter()
-                .any(|refreshed_item| refreshed_item.pull_request_id == item.pull_request_id)
-                && item.state != DependencyUpdatePullRequestState::Open;
-            !(dropped_by_missing || dropped_by_state)
-        });
-        if entry.response.items.len() != pre_drop_len {
+    }
+}
+
+/// Apply a targeted refresh result to a cached item list.
+///
+/// Returns `Some(new_items)` when the list changed (item replaced, missing
+/// dropped, or no-longer-open item dropped) and `None` when the refresh did
+/// not affect this list.
+pub(crate) fn apply_refresh_to_items(
+    items: &[DependencyUpdateItem],
+    refreshed: &[DependencyUpdateItem],
+    missing: &[String],
+) -> Option<Vec<DependencyUpdateItem>> {
+    let mut next = items.to_vec();
+    let mut changed = false;
+    for refreshed_item in refreshed {
+        if let Some(slot) = next
+            .iter_mut()
+            .find(|item| item.pull_request_id == refreshed_item.pull_request_id)
+        {
+            *slot = refreshed_item.clone();
             changed = true;
         }
-        if changed {
-            entry.response.summary = DependencyUpdatesSummary::from_items(&entry.response.items);
+    }
+    let pre_drop_len = next.len();
+    next.retain(|item| {
+        let dropped_by_missing = missing.contains(&item.pull_request_id);
+        let dropped_by_state = refreshed
+            .iter()
+            .any(|refreshed_item| refreshed_item.pull_request_id == item.pull_request_id)
+            && item.state != DependencyUpdatePullRequestState::Open;
+        !(dropped_by_missing || dropped_by_state)
+    });
+    if next.len() != pre_drop_len {
+        changed = true;
+    }
+    if changed { Some(next) } else { None }
+}
+
+fn patch_cached_repository_labels(
+    refreshed: &BTreeMap<String, Vec<DependencyUpdateRepositoryLabel>>,
+) {
+    let mut cache = cache().lock().expect("dependency-updates cache lock");
+    for entry in cache.values_mut() {
+        for (repository, labels) in refreshed {
+            if labels.is_empty() {
+                continue;
+            }
+            entry
+                .response
+                .repository_labels
+                .insert(repository.clone(), labels.clone());
         }
     }
 }
@@ -440,3 +483,7 @@ fn action_response(
         results,
     }
 }
+
+#[cfg(test)]
+#[path = "dependency_updates_tests.rs"]
+mod tests;
