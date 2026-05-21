@@ -486,3 +486,55 @@ public struct DependencyUpdatesRefreshResponse: Codable, Equatable, Sendable {
     case missingPullRequestIDs = "missingPullRequestIds"
   }
 }
+
+public struct DependencyUpdatesBodyRequest: Codable, Equatable, Sendable {
+  public let pullRequestID: String
+  public let forceRefresh: Bool
+  public let cacheMaxAgeSeconds: UInt64
+
+  public init(
+    pullRequestID: String,
+    forceRefresh: Bool = false,
+    cacheMaxAgeSeconds: UInt64 = 600
+  ) {
+    self.pullRequestID = pullRequestID
+    self.forceRefresh = forceRefresh
+    self.cacheMaxAgeSeconds = cacheMaxAgeSeconds
+  }
+
+  enum CodingKeys: String, CodingKey {
+    case pullRequestID = "pullRequestId"
+    case forceRefresh
+    case cacheMaxAgeSeconds
+  }
+}
+
+public struct DependencyUpdatesBodyResponse: Codable, Equatable, Sendable {
+  public let pullRequestID: String
+  public let body: String
+  public let prUpdatedAt: String
+  public let fetchedAt: String
+  public let fromCache: Bool
+
+  public init(
+    pullRequestID: String,
+    body: String,
+    prUpdatedAt: String,
+    fetchedAt: String,
+    fromCache: Bool
+  ) {
+    self.pullRequestID = pullRequestID
+    self.body = body
+    self.prUpdatedAt = prUpdatedAt
+    self.fetchedAt = fetchedAt
+    self.fromCache = fromCache
+  }
+
+  enum CodingKeys: String, CodingKey {
+    case pullRequestID = "pullRequestId"
+    case body
+    case prUpdatedAt
+    case fetchedAt
+    case fromCache
+  }
+}

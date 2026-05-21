@@ -153,6 +153,30 @@ extension PreviewHarnessClientState {
     )
   }
 
+  func fetchDependencyUpdateBody(
+    request: DependencyUpdatesBodyRequest
+  ) -> DependencyUpdatesBodyResponse {
+    let item = dependencyUpdateItems.first { $0.pullRequestID == request.pullRequestID }
+    let body =
+      item.map {
+        """
+        Bumps `\($0.repository.split(separator: "/").last ?? "package")` from an older release.
+
+        - Release notes: link
+        - Changelog: link
+
+        Closes a tracking issue and keeps dependencies current.
+        """
+      } ?? ""
+    return DependencyUpdatesBodyResponse(
+      pullRequestID: request.pullRequestID,
+      body: body,
+      prUpdatedAt: item?.updatedAt ?? "2026-05-21T00:00:00Z",
+      fetchedAt: "2026-05-21T00:00:00Z",
+      fromCache: false
+    )
+  }
+
   private func previewActionResponse(
     summary: String,
     action: DependencyUpdateActionKind,
