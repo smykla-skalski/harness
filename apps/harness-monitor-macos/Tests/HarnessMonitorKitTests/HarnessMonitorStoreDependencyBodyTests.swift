@@ -148,6 +148,38 @@ final class HarnessMonitorStoreDependencyBodyTests: XCTestCase {
       "concurrent prepare calls must collapse to one client fetch"
     )
   }
+
+  func testTaskKeyChangesWhenDaemonComesOnline() {
+    let item = makeItem(pullRequestID: "PR_1", updatedAt: "2026-05-21T00:00:00Z")
+    let offline = DependencyUpdateBodyTaskKey(item: item, isDaemonOnline: false)
+    let online = DependencyUpdateBodyTaskKey(item: item, isDaemonOnline: true)
+    XCTAssertNotEqual(
+      offline,
+      online,
+      "task key must flip identity when daemon comes back online so SwiftUI .task(id:) re-fires"
+    )
+  }
+
+  func testTaskKeyChangesWhenPRUpdatedAtAdvances() {
+    let original = makeItem(pullRequestID: "PR_1", updatedAt: "2026-05-21T00:00:00Z")
+    let edited = makeItem(pullRequestID: "PR_1", updatedAt: "2026-05-21T01:00:00Z")
+    XCTAssertNotEqual(
+      DependencyUpdateBodyTaskKey(item: original, isDaemonOnline: true),
+      DependencyUpdateBodyTaskKey(item: edited, isDaemonOnline: true),
+      "task key must flip when item.updatedAt advances so the body refetches against the new revision"
+    )
+  }
+
+  func testTaskKeyStableForSameItemAndConnection() {
+    let item = makeItem(pullRequestID: "PR_1", updatedAt: "2026-05-21T00:00:00Z")
+    let first = DependencyUpdateBodyTaskKey(item: item, isDaemonOnline: true)
+    let second = DependencyUpdateBodyTaskKey(item: item, isDaemonOnline: true)
+    XCTAssertEqual(
+      first,
+      second,
+      "task key must stay stable across renders when item and connection are unchanged"
+    )
+  }
 }
 
 /// Minimal async semaphore (single-permit) used to suspend a fetch so a

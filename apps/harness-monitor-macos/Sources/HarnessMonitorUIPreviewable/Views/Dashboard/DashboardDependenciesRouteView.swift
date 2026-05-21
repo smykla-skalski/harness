@@ -469,7 +469,7 @@ struct DashboardDependenciesRouteView: View {
         }
       }
       .frame(maxWidth: .infinity, alignment: .leading)
-      .task(id: item.pullRequestID) {
+      .task(id: DependencyUpdateBodyTaskKey(item: item, isDaemonOnline: store.connectionState == .online)) {
         await store.prepareDependencyUpdateBody(for: item)
       }
     }
