@@ -244,3 +244,35 @@ struct SettingsRepositoriesCatalogErrorPresentationTests {
     #expect(url == URL(string: "https://github.com/settings/personal-access-tokens/14799622"))
   }
 }
+
+@Suite("Settings repositories performance source contracts")
+struct SettingsRepositoriesPerformanceSourceTests {
+  @Test("Repositories settings keeps large lists lazy and indexed")
+  func repositoriesSettingsKeepsLargeListsLazyAndIndexed() throws {
+    let source = try settingsRepositoriesSource()
+
+    #expect(source.contains("SettingsRepositoriesCatalogLoader.load("))
+    #expect(source.contains("Task.detached(priority: .userInitiated)"))
+    #expect(source.contains("LazyVStack(spacing: 0)"))
+    #expect(source.contains("ForEach(Array(repositories.enumerated()), id: \\.element)"))
+    #expect(source.contains("rowIndexesByID()"))
+    #expect(source.contains("rowIndexes: &rowIndexes"))
+  }
+
+  private func settingsRepositoriesSource() throws -> String {
+    let testsDirectory = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
+    let repoRoot =
+      testsDirectory
+      .deletingLastPathComponent()
+      .deletingLastPathComponent()
+      .deletingLastPathComponent()
+      .deletingLastPathComponent()
+    let sourceURL =
+      repoRoot
+      .appendingPathComponent(
+        "apps/harness-monitor-macos/Sources/HarnessMonitorUIPreviewable/Views/Settings"
+      )
+      .appendingPathComponent("SettingsRepositoriesSection.swift")
+    return try String(contentsOf: sourceURL, encoding: .utf8)
+  }
+}

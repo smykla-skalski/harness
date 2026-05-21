@@ -20,7 +20,8 @@ extension DashboardDependenciesRouteView {
     Task {
       defer { refreshingPullRequestIDs.subtract(targetIDs) }
       do {
-        let refreshed = try await client.refreshDependencyUpdates(
+        let refreshed = try await DashboardDependenciesRemoteLoader.refresh(
+          client: client,
           request: DependencyUpdatesRefreshRequest(targets: targets)
         )
         applyRefreshedItems(refreshed)

@@ -2,6 +2,31 @@
 import HarnessMonitorKit
 import SwiftUI
 
+private enum SettingsRepositoriesCatalogLoader {
+  static func load(
+    client: any HarnessMonitorClientProtocol,
+    organization: String
+  ) async throws -> DependencyUpdatesRepositoryCatalogResponse {
+    let task = Task.detached(priority: .userInitiated) {
+      let response = try await client.catalogDependencyUpdateRepositories(
+        request: DependencyUpdatesRepositoryCatalogRequest(organization: organization)
+      )
+      let repositories = response.repositories.sorted {
+        $0.localizedStandardCompare($1) == .orderedAscending
+      }
+      return DependencyUpdatesRepositoryCatalogResponse(
+        organization: response.organization,
+        repositories: repositories
+      )
+    }
+    return try await withTaskCancellationHandler {
+      try await task.value
+    } onCancel: {
+      task.cancel()
+    }
+  }
+}
+
 // swiftlint:disable:next type_body_length
 struct SettingsRepositoriesSection: View {
   let store: HarnessMonitorStore
@@ -54,8 +79,13 @@ struct SettingsRepositoriesSection: View {
     return catalogRepositories.filter { $0.localizedCaseInsensitiveContains(needle) }
   }
 
-  private var catalogListHeight: CGFloat {
-    let visibleRows = min(max(filteredCatalogRepositories.count, 4), 8)
+  private var repositoriesTableRowsHeight: CGFloat {
+    let visibleRows = min(draft.rows.count, 12)
+    return CGFloat(visibleRows) * 44
+  }
+
+  private func catalogListHeight(visibleCount: Int) -> CGFloat {
+    let visibleRows = min(max(visibleCount, 4), 8)
     return CGFloat(visibleRows) * 36
   }
 
@@ -134,12 +164,17 @@ struct SettingsRepositoriesSection: View {
       if draft.rows.isEmpty {
         repositoriesEmptyRow
       } else {
-        ForEach(Array(draft.rows.enumerated()), id: \.element.id) { index, row in
-          if index > 0 {
-            Divider()
+        ScrollView {
+          LazyVStack(spacing: 0) {
+            ForEach(Array(draft.rows.enumerated()), id: \.element.id) { index, row in
+              if index > 0 {
+                Divider()
+              }
+              repositoryRow(row, index: index)
+            }
           }
-          repositoryRow(row, index: index)
         }
+        .frame(height: repositoriesTableRowsHeight)
       }
     }
     .background(tableBackground)
@@ -263,7 +298,8 @@ struct SettingsRepositoriesSection: View {
   }
 
   private var organizationImportSection: some View {
-    Section {
+    let visibleCatalogRepositories = filteredCatalogRepositories
+    return Section {
       HStack(alignment: .center, spacing: HarnessMonitorTheme.spacingSM) {
         TextField("GitHub Organization", text: $catalogOrganization)
           .accessibilityIdentifier(
@@ -290,7 +326,7 @@ struct SettingsRepositoriesSection: View {
       }
 
       if !loadedCatalogOrganization.isEmpty {
-        catalogSummary
+        catalogSummary(visibleCount: visibleCatalogRepositories.count)
         TextField("Search repositories", text: $catalogSearchText)
           .accessibilityIdentifier(
             HarnessMonitorAccessibility.settingsRepositoriesCatalogSearchField)
@@ -299,16 +335,16 @@ struct SettingsRepositoriesSection: View {
           Label("No repositories available for import", systemImage: "shippingbox")
             .foregroundStyle(HarnessMonitorTheme.tertiaryInk)
             .accessibilityIdentifier(HarnessMonitorAccessibility.settingsRepositoriesCatalogList)
-        } else if filteredCatalogRepositories.isEmpty {
+        } else if visibleCatalogRepositories.isEmpty {
           Label("No repositories match the current search", systemImage: "magnifyingglass")
             .foregroundStyle(HarnessMonitorTheme.tertiaryInk)
             .accessibilityIdentifier(HarnessMonitorAccessibility.settingsRepositoriesCatalogList)
         } else {
-          catalogRepositoryList
+          catalogRepositoryList(visibleCatalogRepositories)
 
           HStack(spacing: HarnessMonitorTheme.spacingSM) {
             Button("Select Visible") {
-              catalogSelection = Set(filteredCatalogRepositories)
+              catalogSelection = Set(visibleCatalogRepositories)
             }
             .buttonStyle(.borderless)
 
@@ -385,10 +421,10 @@ struct SettingsRepositoriesSection: View {
     .accessibilityIdentifier(HarnessMonitorAccessibility.settingsRepositoriesCatalogStatus)
   }
 
-  private var catalogRepositoryList: some View {
+  private func catalogRepositoryList(_ repositories: [String]) -> some View {
     ScrollView {
       LazyVStack(spacing: 0) {
-        ForEach(Array(filteredCatalogRepositories.enumerated()), id: \.offset) { row in
+        ForEach(Array(repositories.enumerated()), id: \.element) { row in
           let index = row.offset
           let repository = row.element
           if index > 0 {
@@ -398,7 +434,7 @@ struct SettingsRepositoriesSection: View {
         }
       }
     }
-    .frame(height: catalogListHeight)
+    .frame(height: catalogListHeight(visibleCount: repositories.count))
     .background(tableBackground)
     .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
     .overlay {
@@ -432,7 +468,7 @@ struct SettingsRepositoriesSection: View {
     .frame(maxWidth: .infinity, alignment: .leading)
   }
 
-  private var catalogSummary: some View {
+  private func catalogSummary(visibleCount: Int) -> some View {
     HStack {
       VStack(alignment: .leading, spacing: 4) {
         Text(loadedCatalogOrganization)
@@ -440,7 +476,7 @@ struct SettingsRepositoriesSection: View {
           .foregroundStyle(HarnessMonitorTheme.secondaryInk)
         Text(
           "\(catalogRepositories.count) repositories loaded · "
-            + "\(filteredCatalogRepositories.count) visible"
+            + "\(visibleCount) visible"
         )
         .font(bodyFont)
         .foregroundStyle(HarnessMonitorTheme.secondaryInk)
@@ -608,17 +644,15 @@ struct SettingsRepositoriesSection: View {
       guard let client = store.apiClient else {
         throw HarnessMonitorAPIError.server(code: 501, message: "Repositories unavailable")
       }
-      let response = try await client.catalogDependencyUpdateRepositories(
-        request: DependencyUpdatesRepositoryCatalogRequest(organization: organization)
+      let response = try await SettingsRepositoriesCatalogLoader.load(
+        client: client,
+        organization: organization
       )
-      let repositories = response.repositories.sorted {
-        $0.localizedStandardCompare($1) == .orderedAscending
-      }
       loadedCatalogOrganization = response.organization
       catalogOrganization = response.organization
-      catalogRepositories = repositories
+      catalogRepositories = response.repositories
       catalogSearchText = ""
-      catalogSelection = preselectVisible ? Set(repositories) : []
+      catalogSelection = preselectVisible ? Set(response.repositories) : []
     } catch {
       catalogError = SettingsRepositoriesCatalogErrorPresentation(
         error: error,
@@ -876,12 +910,19 @@ private struct SettingsSharedRepositoriesDraft: Equatable {
     dependenciesPreferences: DashboardDependenciesPreferences,
     taskBoardDraft: TaskBoardGitSettingsDraft
   ) {
-    for repository in dependenciesPreferences.normalizedRepositories {
-      insert(repository: repository, dependenciesEnabled: true, taskBoardEnabled: false)
-    }
-    for repository in taskBoardDraft.githubInboxRepositoryEntries {
-      insert(repository: repository, dependenciesEnabled: false, taskBoardEnabled: true)
-    }
+    var rowIndexes = [String: Int]()
+    insert(
+      repositories: dependenciesPreferences.normalizedRepositories,
+      dependenciesEnabled: true,
+      taskBoardEnabled: false,
+      rowIndexes: &rowIndexes
+    )
+    insert(
+      repositories: taskBoardDraft.githubInboxRepositoryEntries,
+      dependenciesEnabled: false,
+      taskBoardEnabled: true,
+      rowIndexes: &rowIndexes
+    )
     legacyOrganizations = Self.normalizedOrganizations(
       dependenciesPreferences.normalizedOrganizations)
   }
@@ -910,15 +951,25 @@ private struct SettingsSharedRepositoriesDraft: Equatable {
     else {
       return
     }
-    insert(repository: repository, dependenciesEnabled: true, taskBoardEnabled: true)
+    var rowIndexes = rowIndexesByID()
+    insert(
+      repository: repository,
+      dependenciesEnabled: true,
+      taskBoardEnabled: true,
+      rowIndexes: &rowIndexes
+    )
     ownerInput = ""
     repositoryInput = ""
   }
 
   mutating func addImportedRepositories(_ repositories: [String]) {
-    for repository in repositories {
-      insert(repository: repository, dependenciesEnabled: true, taskBoardEnabled: true)
-    }
+    var rowIndexes = rowIndexesByID()
+    insert(
+      repositories: repositories,
+      dependenciesEnabled: true,
+      taskBoardEnabled: true,
+      rowIndexes: &rowIndexes
+    )
   }
 
   mutating func setDependenciesEnabled(_ isEnabled: Bool, for rowID: String) {
@@ -943,9 +994,26 @@ private struct SettingsSharedRepositoriesDraft: Equatable {
   }
 
   private mutating func insert(
+    repositories: [String],
+    dependenciesEnabled: Bool,
+    taskBoardEnabled: Bool,
+    rowIndexes: inout [String: Int]
+  ) {
+    for repository in repositories {
+      insert(
+        repository: repository,
+        dependenciesEnabled: dependenciesEnabled,
+        taskBoardEnabled: taskBoardEnabled,
+        rowIndexes: &rowIndexes
+      )
+    }
+  }
+
+  private mutating func insert(
     repository: String,
     dependenciesEnabled: Bool,
-    taskBoardEnabled: Bool
+    taskBoardEnabled: Bool,
+    rowIndexes: inout [String: Int]
   ) {
     guard let normalized = SettingsGitHubRepositoryNormalization.repositoryEntry(repository) else {
       return
@@ -958,12 +1026,17 @@ private struct SettingsSharedRepositoriesDraft: Equatable {
       dependenciesEnabled: dependenciesEnabled,
       taskBoardEnabled: taskBoardEnabled
     )
-    if let index = rows.firstIndex(where: { $0.id == candidate.id }) {
+    if let index = rowIndexes[candidate.id] {
       rows[index].dependenciesEnabled = rows[index].dependenciesEnabled || dependenciesEnabled
       rows[index].taskBoardEnabled = rows[index].taskBoardEnabled || taskBoardEnabled
       return
     }
+    rowIndexes[candidate.id] = rows.count
     rows.append(candidate)
+  }
+
+  private func rowIndexesByID() -> [String: Int] {
+    Dictionary(uniqueKeysWithValues: rows.enumerated().map { ($1.id, $0) })
   }
 
   private mutating func removeIfDisabled(index: Int) {

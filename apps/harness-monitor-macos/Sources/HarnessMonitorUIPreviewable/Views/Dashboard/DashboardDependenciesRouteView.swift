@@ -18,6 +18,36 @@ import SwiftUI
 
 @MainActor private let dependenciesISO8601Formatter = ISO8601DateFormatter()
 
+enum DashboardDependenciesRemoteLoader {
+  static func query(
+    client: any HarnessMonitorClientProtocol,
+    request: DependencyUpdatesQueryRequest
+  ) async throws -> DependencyUpdatesQueryResponse {
+    let task = Task.detached(priority: .userInitiated) {
+      try await client.queryDependencyUpdates(request: request)
+    }
+    return try await withTaskCancellationHandler {
+      try await task.value
+    } onCancel: {
+      task.cancel()
+    }
+  }
+
+  static func refresh(
+    client: any HarnessMonitorClientProtocol,
+    request: DependencyUpdatesRefreshRequest
+  ) async throws -> DependencyUpdatesRefreshResponse {
+    let task = Task.detached(priority: .userInitiated) {
+      try await client.refreshDependencyUpdates(request: request)
+    }
+    return try await withTaskCancellationHandler {
+      try await task.value
+    } onCancel: {
+      task.cancel()
+    }
+  }
+}
+
 struct DashboardDependenciesReloadTaskKey: Equatable {
   let storedPreferences: String
   let connectionState: HarnessMonitorStore.ConnectionState
@@ -585,6 +615,7 @@ struct DashboardDependenciesRouteView: View {
   private func repositorySectionHeader(_ repository: String, itemCount: Int) -> some View {
     let isCollapsed = collapsedRepositories.contains(repository)
     let isSyncing = refreshingRepositories.contains(repository)
+    let lastSyncedAt = scheduler.states[repository]?.lastSyncedAt
     return Button {
       toggleRepositoryCollapse(repository)
     } label: {
@@ -599,6 +630,13 @@ struct DashboardDependenciesRouteView: View {
           ProgressView()
             .controlSize(.small)
             .accessibilityLabel("Syncing \(repository)")
+        } else if let lastSyncedAt {
+          let relative = dependenciesRelativeFormatter.localizedString(
+            for: lastSyncedAt, relativeTo: .now)
+          Text("synced \(relative)")
+            .scaledFont(.caption)
+            .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+            .accessibilityLabel("Last synced \(relative)")
         }
         Text(verbatim: String(itemCount))
           .foregroundStyle(HarnessMonitorTheme.secondaryInk)
