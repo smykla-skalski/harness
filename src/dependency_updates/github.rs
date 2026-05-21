@@ -16,16 +16,21 @@ mod pagination;
 mod queries;
 mod types;
 
+use chrono::{DateTime, Utc};
+
 use ingest::{ingest_nodes_chunk, ingest_search_node};
 use mapping::{
-    action_result, github_project_config, next_cursor_or_scope_limit, scopes, NodeContinuation,
+    action_result, github_project_config, next_cursor_or_scope_limit, parse_timestamp, scopes,
+    NodeContinuation,
 };
 use pagination::resolve_continuation;
 use queries::{
     APPROVE_MUTATION, NODES_BY_IDS_QUERY, ORGANIZATION_REPOSITORIES_QUERY,
-    REREQUEST_CHECK_SUITE_MUTATION, SEARCH_QUERY,
+    PULL_REQUEST_BODY_QUERY, REREQUEST_CHECK_SUITE_MUTATION, SEARCH_QUERY,
 };
-use types::{NodesResponse, OrganizationRepositoriesResponse, SearchResponse};
+use types::{
+    NodesResponse, OrganizationRepositoriesResponse, PullRequestBodyResponse, SearchResponse,
+};
 
 use super::{
     DependencyUpdateActionKind, DependencyUpdateActionOutcome, DependencyUpdateActionResult,
@@ -257,6 +262,27 @@ impl DependencyUpdatesGitHubClient {
         repositories.sort();
         repositories.dedup();
         Ok(repositories)
+    }
+
+    pub(crate) async fn fetch_pull_request_body(
+        &self,
+        pull_request_id: &str,
+    ) -> Result<(String, DateTime<Utc>), CliError> {
+        let response: PullRequestBodyResponse = self
+            .client
+            .graphql(&json!({
+                "query": PULL_REQUEST_BODY_QUERY,
+                "variables": { "id": pull_request_id },
+            }))
+            .await
+            .map_err(operation_error)?;
+        let node = response.node.ok_or_else(|| {
+            CliErrorKind::workflow_parse(format!(
+                "dependency-updates pull request '{pull_request_id}' was not found or is not accessible"
+            ))
+        })?;
+        let updated_at = parse_timestamp(node.updated_at.as_str())?;
+        Ok((node.body.unwrap_or_default(), updated_at))
     }
 
     pub(crate) async fn approve(
