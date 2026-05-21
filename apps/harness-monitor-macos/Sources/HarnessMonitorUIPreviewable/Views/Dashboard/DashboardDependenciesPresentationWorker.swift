@@ -167,7 +167,7 @@ actor DashboardDependenciesPresentationWorker {
     let relativeFormatter = RelativeDateTimeFormatter()
     relativeFormatter.unitsStyle = .short
     return Dictionary(
-      uniqueKeysWithValues: items.map { item in
+      items.map { item -> (String, String) in
         guard let date = formatter.date(from: item.updatedAt) else {
           return (item.pullRequestID, item.updatedAt)
         }
@@ -175,7 +175,8 @@ actor DashboardDependenciesPresentationWorker {
           item.pullRequestID,
           relativeFormatter.localizedString(for: date, relativeTo: now)
         )
-      }
+      },
+      uniquingKeysWith: { _, last in last }
     )
   }
 
