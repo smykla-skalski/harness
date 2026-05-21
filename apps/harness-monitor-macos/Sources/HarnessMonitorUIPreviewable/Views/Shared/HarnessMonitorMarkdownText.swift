@@ -2,24 +2,27 @@ import SwiftUI
 
 struct HarnessMonitorMarkdownText: View {
   private let markdown: String
-  private let settings: HarnessMarkdownRenderSettings
+  private let explicitSettings: HarnessMarkdownRenderSettings?
+  private let bodyFontOverride: Font?
   private let textSelection: HarnessMonitorMarkdownTextSelection
   private let rendering: HarnessMonitorMarkdownTextRendering
   private let lineLimit: Int?
 
   @Environment(\.fontScale)
   private var environmentFontScale
+  private var storedSettings = HarnessMarkdownStoredRenderSettings()
   @State private var document = HarnessMarkdownDocument.empty
 
   init(
     _ markdown: String,
-    font: Font = .body,
+    font: Font? = nil,
     textSelection: HarnessMonitorMarkdownTextSelection = .disabled,
     rendering: HarnessMonitorMarkdownTextRendering = .rich,
     lineLimit: Int? = nil
   ) {
     self.markdown = markdown
-    settings = HarnessMarkdownRenderSettings.default.withBodyFont(font)
+    explicitSettings = nil
+    bodyFontOverride = font
     self.textSelection = textSelection
     self.rendering = rendering
     self.lineLimit = lineLimit
@@ -33,7 +36,8 @@ struct HarnessMonitorMarkdownText: View {
     lineLimit: Int? = nil
   ) {
     self.markdown = markdown
-    self.settings = settings
+    explicitSettings = settings
+    bodyFontOverride = nil
     self.textSelection = textSelection
     self.rendering = rendering
     self.lineLimit = lineLimit
@@ -49,7 +53,7 @@ struct HarnessMonitorMarkdownText: View {
       case .rich:
         HarnessMarkdownDocumentView(
           document: document,
-          settings: settings,
+          settings: effectiveSettings,
           style: resolvedSettings
         )
       }
@@ -66,7 +70,15 @@ struct HarnessMonitorMarkdownText: View {
   }
 
   private var resolvedSettings: HarnessMarkdownResolvedRenderSettings {
-    settings.resolved(environmentFontScale: environmentFontScale)
+    effectiveSettings.resolved(environmentFontScale: environmentFontScale)
+  }
+
+  private var effectiveSettings: HarnessMarkdownRenderSettings {
+    var settings = explicitSettings ?? storedSettings.settings
+    if let bodyFontOverride {
+      settings = settings.withBodyFont(bodyFontOverride)
+    }
+    return settings
   }
 
   @MainActor
@@ -107,7 +119,7 @@ private struct HarnessMarkdownDocumentView: View {
   }
 }
 
-private struct HarnessMarkdownBlockStackView: View {
+struct HarnessMarkdownBlockStackView: View {
   let blocks: [HarnessMarkdownBlock]
   let settings: HarnessMarkdownRenderSettings
   let style: HarnessMarkdownResolvedRenderSettings
@@ -211,79 +223,7 @@ private struct HarnessMarkdownBlockView: View {
   }
 }
 
-private struct HarnessMarkdownDetailsView: View {
-  let details: HarnessMarkdownDetails
-  let settings: HarnessMarkdownRenderSettings
-  let style: HarnessMarkdownResolvedRenderSettings
-
-  @State private var isExpanded: Bool
-
-  init(
-    details: HarnessMarkdownDetails,
-    settings: HarnessMarkdownRenderSettings,
-    style: HarnessMarkdownResolvedRenderSettings
-  ) {
-    self.details = details
-    self.settings = settings
-    self.style = style
-    _isExpanded = State(initialValue: details.isOpen)
-  }
-
-  var body: some View {
-    let metrics = HarnessMarkdownMarkerMetrics(style: style)
-    VStack(alignment: .leading, spacing: style.spacing.nestedBlock) {
-      Button {
-        isExpanded.toggle()
-      } label: {
-        HStack(alignment: .top, spacing: metrics.gap) {
-          Image(systemName: isExpanded ? "chevron.down" : "chevron.right")
-            .font(.system(size: metrics.chevronSize, weight: .semibold))
-            .foregroundStyle(style.colors.secondaryText)
-            .frame(
-              width: metrics.chevronColumnWidth,
-              height: metrics.firstLineHeight,
-              alignment: .center
-            )
-            .offset(y: metrics.chevronVisualYOffset)
-          HarnessMarkdownInlineFlowView(
-            inlines: details.summary,
-            style: HarnessMarkdownInlineRenderStyle(
-              font: style.typography.body.font,
-              codeFont: style.typography.inlineCode.font,
-              colors: style.colors
-            ),
-            images: style.images,
-            imageLayout: .inline
-          )
-          Spacer(minLength: 0)
-        }
-        .contentShape(Rectangle())
-        .frame(maxWidth: .infinity, alignment: .leading)
-      }
-      .buttonStyle(.borderless)
-      .frame(maxWidth: .infinity, alignment: .leading)
-      .modifier(HarnessMarkdownPointerHoverModifier(color: style.colors.link))
-      .accessibilityLabel(Text(HarnessMarkdownInlinePlainText.string(from: details.summary)))
-      .accessibilityValue(isExpanded ? "Expanded" : "Collapsed")
-
-      if isExpanded {
-        detailsContent
-      }
-    }
-  }
-
-  private var detailsContent: some View {
-    HarnessMarkdownBlockStackView(
-      blocks: details.blocks,
-      settings: settings,
-      style: style,
-      spacing: style.spacing.nestedBlock
-    )
-    .padding(.leading, style.spacing.detailsContentIndent)
-  }
-}
-
-private enum HarnessMarkdownInlinePlainText {
+enum HarnessMarkdownInlinePlainText {
   static func string(from inlines: [HarnessMarkdownInline]) -> String {
     inlines.map { text(for: $0) }.joined()
   }

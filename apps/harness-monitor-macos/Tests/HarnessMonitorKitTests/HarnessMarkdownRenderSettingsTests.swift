@@ -53,6 +53,30 @@ struct HarnessMarkdownRenderSettingsTests {
     #expect(resolvedCode.typography.error.pointSize == 16.5)
   }
 
+  @Test("Persisted markdown settings round trip into render settings")
+  func persistedMarkdownSettingsRoundTripIntoRenderSettings() {
+    var userSettings = HarnessMarkdownUserSettings.default
+    userSettings.scale.mode = .custom
+    userSettings.scale.customScale = 1.5
+    userSettings.typography.bodySize = 14
+    userSettings.typography.codeSize = 10
+    userSettings.spacing.headingBefore = 12
+    userSettings.spacing.listMarkerGap = 3
+    userSettings.images.maxInlineHeight = 18
+
+    let decoded = HarnessMarkdownUserSettings.decode(userSettings.storageValue)
+    let renderSettings = decoded.renderSettings
+    let resolved = renderSettings.resolved(environmentFontScale: 1)
+    let resolvedCode = renderSettings.codeBlock.resolved(environmentFontScale: 1)
+
+    #expect(decoded == userSettings)
+    #expect(resolved.typography.body.pointSize == 21)
+    #expect(resolved.spacing.heading.before == 18)
+    #expect(resolved.spacing.listMarkerGap == 4.5)
+    #expect(resolved.images.maxInlineHeight == 27)
+    #expect(resolvedCode.typography.code.pointSize == 15)
+  }
+
   @Test("Markdown spacing settings expose block gaps and scale with font mode")
   func spacingSettingsResolveBlockGaps() {
     let spacing = HarnessMarkdownSpacingSettings(
@@ -103,5 +127,33 @@ struct HarnessMarkdownRenderSettingsTests {
     #expect(spacing.listSymbolWidth + spacing.listMarkerGap == 12)
     #expect(spacing.listMarkerWidth + spacing.listMarkerGap == 26)
     #expect(spacing.listItem == 4)
+  }
+
+  @Test("Settings window exposes markdown renderer controls")
+  func settingsWindowExposesMarkdownRendererControls() throws {
+    let sidebarSource = try readRepositoryFile(
+      "apps/harness-monitor-macos/Sources/HarnessMonitorUIPreviewable"
+        + "/Views/Settings/SettingsSidebar.swift"
+    )
+    let settingsSource = try readRepositoryFile(
+      "apps/harness-monitor-macos/Sources/HarnessMonitorUIPreviewable"
+        + "/Views/Settings/SettingsView.swift"
+    )
+    let sectionSource = try readRepositoryFile(
+      "apps/harness-monitor-macos/Sources/HarnessMonitorUIPreviewable"
+        + "/Views/Settings/SettingsMarkdownSection.swift"
+    )
+    let rendererSource = try readRepositoryFile(
+      "apps/harness-monitor-macos/Sources/HarnessMonitorUIPreviewable"
+        + "/Views/Shared/HarnessMonitorMarkdownText.swift"
+    )
+
+    #expect(sidebarSource.contains("case markdown"))
+    #expect(settingsSource.contains("SettingsMarkdownSection()"))
+    #expect(sectionSource.contains("Block Gaps"))
+    #expect(sectionSource.contains("Layout Spacing"))
+    #expect(sectionSource.contains("Markdown Colors"))
+    #expect(sectionSource.contains("Code Token Colors"))
+    #expect(rendererSource.contains("HarnessMarkdownStoredRenderSettings"))
   }
 }

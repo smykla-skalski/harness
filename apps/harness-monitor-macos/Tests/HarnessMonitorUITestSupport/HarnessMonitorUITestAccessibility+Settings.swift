@@ -35,6 +35,7 @@ extension HarnessMonitorUITestAccessibility {
   static let settingsFocusModeSection = "harness.settings.section.focusmode"
   static let settingsBannersSection = "harness.settings.section.banners"
   static let settingsAppearanceSection = "harness.settings.section.appearance"
+  static let settingsMarkdownSection = "harness.settings.section.markdown"
   static let settingsNotificationsSection = "harness.settings.section.notifications"
   static let settingsSupervisorSection = "harness.settings.section.supervisor"
   static let settingsVoiceSection = "harness.settings.section.voice"

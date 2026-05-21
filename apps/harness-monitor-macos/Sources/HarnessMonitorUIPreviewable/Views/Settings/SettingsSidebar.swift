@@ -5,6 +5,7 @@ public enum SettingsSection: String, CaseIterable, Identifiable, Hashable, Senda
   case focusMode
   case banners
   case appearance
+  case markdown
   case notifications
   case voice
   case connection
@@ -28,6 +29,7 @@ public enum SettingsSection: String, CaseIterable, Identifiable, Hashable, Senda
     case .focusMode: "Focus Mode"
     case .banners: "Banners"
     case .appearance: "Appearance"
+    case .markdown: "Markdown"
     case .notifications: "Notifications"
     case .voice: "Voice"
     case .connection: "Connection"
@@ -58,6 +60,7 @@ public enum SettingsSection: String, CaseIterable, Identifiable, Hashable, Senda
     case .focusMode: "moon"
     case .banners: "megaphone"
     case .appearance: "paintbrush"
+    case .markdown: "text.alignleft"
     case .notifications: "bell.badge"
     case .voice: "mic"
     case .connection: "bolt.horizontal.circle"
