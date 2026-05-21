@@ -24,7 +24,15 @@ struct ToolCallTimelineScrollMetrics: Equatable, Sendable {
   }
 }
 
+struct ToolCallTimelineVirtualizedScrollBucket: Equatable, Sendable {
+  let startIndex: Int
+  let endIndex: Int
+}
+
 struct ToolCallTimelineVirtualizedLayout: Equatable, Sendable {
+  static let estimatedRowHeight: CGFloat = 54
+  static let fallbackViewportHeight: CGFloat = 260
+
   let sections: [ToolCallTimelineSection]
   let topSpacerHeight: CGFloat
   let bottomSpacerHeight: CGFloat
@@ -60,16 +68,11 @@ struct ToolCallTimelineVirtualizedLayout: Equatable, Sendable {
       return
     }
 
-    let estimatedRowHeight: CGFloat = 54
-    let fallbackViewportHeight: CGFloat = 260
-    let viewportHeight = max(scrollMetrics.viewportHeight, fallbackViewportHeight)
-    let overscanHeight = viewportHeight
-    let lowerBound = max(0, scrollMetrics.contentOffsetY - overscanHeight)
-    let upperBound = scrollMetrics.contentOffsetY + viewportHeight + overscanHeight
-    let startIndex = max(0, Int((lowerBound / estimatedRowHeight).rounded(.down)))
+    let scrollBucket = Self.scrollBucket(for: scrollMetrics)
+    let startIndex = min(rows.count - 1, max(0, scrollBucket.startIndex))
     let endIndex = min(
       rows.count,
-      max(startIndex + 1, Int((upperBound / estimatedRowHeight).rounded(.up)))
+      max(startIndex + 1, scrollBucket.endIndex)
     )
     let renderedRows = Array(rows[startIndex..<endIndex])
     let renderedSections = ToolCallTimelinePresentation.sections(for: renderedRows)
@@ -77,9 +80,27 @@ struct ToolCallTimelineVirtualizedLayout: Equatable, Sendable {
 
     self.init(
       sections: renderedSections,
-      topSpacerHeight: CGFloat(startIndex) * estimatedRowHeight,
-      bottomSpacerHeight: CGFloat(rows.count - endIndex) * estimatedRowHeight,
+      topSpacerHeight: CGFloat(startIndex) * Self.estimatedRowHeight,
+      bottomSpacerHeight: CGFloat(rows.count - endIndex) * Self.estimatedRowHeight,
       renderedRowIDs: renderedRowIDs
+    )
+  }
+
+  static func scrollBucket(
+    for scrollMetrics: ToolCallTimelineScrollMetrics
+  ) -> ToolCallTimelineVirtualizedScrollBucket {
+    let viewportHeight = max(scrollMetrics.viewportHeight, Self.fallbackViewportHeight)
+    let overscanHeight = viewportHeight
+    let lowerBound = max(0, scrollMetrics.contentOffsetY - overscanHeight)
+    let upperBound = scrollMetrics.contentOffsetY + viewportHeight + overscanHeight
+    let startIndex = max(0, Int((lowerBound / Self.estimatedRowHeight).rounded(.down)))
+    let endIndex = max(
+      startIndex + 1,
+      Int((upperBound / Self.estimatedRowHeight).rounded(.up))
+    )
+    return ToolCallTimelineVirtualizedScrollBucket(
+      startIndex: startIndex,
+      endIndex: endIndex
     )
   }
 }
