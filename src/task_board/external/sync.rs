@@ -1,11 +1,9 @@
-use std::collections::HashMap;
-
 use clap::ValueEnum;
 use serde::{Deserialize, Serialize};
 
 use crate::errors::{CliError, CliErrorKind};
 use crate::task_board::store::{TaskBoardItemPatch, TaskBoardStore};
-use crate::task_board::types::{ExternalRefProvider, TaskBoardItem, TaskBoardStatus};
+use crate::task_board::types::{TaskBoardItem, TaskBoardStatus};
 use crate::workspace::utc_now;
 use tokio::task::spawn_blocking;
 
@@ -17,12 +15,17 @@ use super::{
 
 mod delete;
 mod import;
+mod lookup;
 mod merge;
 mod reconcile;
 mod stale_reviews;
 
 use delete::delete_remote_tombstones;
 use import::{external_item_id, imported_external_planning};
+use lookup::{
+    OperationDraft, build_external_ref_index, item_for_ref, operation, provider_is_allowed,
+    provider_ref,
+};
 use merge::{
     has_reported_conflict, local_update_fields, matching_ref, pull_create_fields,
     push_create_fields, replace_synced_ref, split_supported_fields, sync_state_from_task,
@@ -449,80 +452,4 @@ fn create_item_from_external(task: &ExternalTask) -> TaskBoardItem {
         item.planning = planning;
     }
     item
-}
-
-fn item_for_ref<'a>(
-    board_items: &'a [TaskBoardItem],
-    item_index: &HashMap<(ExternalRefProvider, String), usize>,
-    reference: &ExternalTaskRef,
-    project_id: Option<&str>,
-) -> Option<&'a TaskBoardItem> {
-    let key = (reference.provider.into(), reference.external_id.clone());
-    if let Some(index) = item_index.get(&key)
-        && let Some(item) = board_items.get(*index)
-        && matching_ref(item, reference, project_id).is_some()
-    {
-        return Some(item);
-    }
-    board_items
-        .iter()
-        .find(|item| matching_ref(item, reference, project_id).is_some())
-}
-
-fn build_external_ref_index(
-    items: &[TaskBoardItem],
-) -> HashMap<(ExternalRefProvider, String), usize> {
-    let mut index = HashMap::with_capacity(items.len() * 2);
-    for (offset, item) in items.iter().enumerate() {
-        for reference in &item.external_refs {
-            let key = (reference.provider, reference.external_id.clone());
-            index.entry(key).or_insert(offset);
-        }
-    }
-    index
-}
-
-pub(super) fn provider_ref(
-    item: &TaskBoardItem,
-    provider: ExternalProvider,
-) -> Option<ExternalTaskRef> {
-    let core_provider = provider.into();
-    item.external_refs
-        .iter()
-        .filter(|candidate| candidate.provider == core_provider)
-        .find_map(|candidate| {
-            let probe = ExternalTaskRef::new(provider, candidate.external_id.clone());
-            matching_ref(item, &probe, item.project_id.as_deref())
-                .map(|matched| ExternalTaskRef::from(matched.clone()))
-        })
-}
-
-pub(super) struct OperationDraft {
-    pub(super) provider: ExternalProvider,
-    pub(super) action: ExternalSyncAction,
-    pub(super) board_item_id: Option<String>,
-    pub(super) reference: ExternalTaskRef,
-    pub(super) dry_run: bool,
-    pub(super) applied: bool,
-    pub(super) changed_fields: Vec<ExternalSyncField>,
-    pub(super) unsupported_fields: Vec<ExternalSyncField>,
-}
-
-pub(super) fn operation(draft: OperationDraft) -> ExternalSyncOperation {
-    ExternalSyncOperation {
-        provider: draft.provider,
-        action: draft.action,
-        board_item_id: draft.board_item_id,
-        external_id: (!draft.reference.external_id.is_empty())
-            .then_some(draft.reference.external_id),
-        url: draft.reference.url,
-        dry_run: draft.dry_run,
-        applied: draft.applied,
-        changed_fields: draft.changed_fields,
-        unsupported_fields: draft.unsupported_fields,
-    }
-}
-
-fn provider_is_allowed(provider: ExternalProvider, filter: Option<ExternalProvider>) -> bool {
-    filter.is_none_or(|target| target == provider)
 }
