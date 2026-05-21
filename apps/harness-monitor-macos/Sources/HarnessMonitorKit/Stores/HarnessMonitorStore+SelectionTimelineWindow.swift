@@ -12,8 +12,8 @@ extension HarnessMonitorStore {
     }
 
     let loadKey = SelectedTimelineWindowLoadKey(sessionID: sessionID, request: request)
-    if let selectedTimelineLoad.windowLoadTask, selectedTimelineLoad.windowLoadKey == loadKey {
-      await selectedTimelineLoad.windowLoadTask.value
+    if let task = selectedTimelineLoad.windowLoadTask, selectedTimelineLoad.windowLoadKey == loadKey {
+      await task.value
       return
     }
 
