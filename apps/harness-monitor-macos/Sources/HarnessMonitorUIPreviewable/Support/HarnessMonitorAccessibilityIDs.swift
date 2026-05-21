@@ -102,6 +102,14 @@ public enum HarnessMonitorAccessibility {
   public static let dashboardDependenciesConfigureButton =
     "harness.dashboard.dependencies.configure"
   public static let dashboardDependenciesFixCIButton = "harness.dashboard.dependencies.fix-ci"
+  public static let dashboardDependenciesCustomLabelSheet =
+    "harness.dashboard.dependencies.custom-label.sheet"
+  public static let dashboardDependenciesCustomLabelField =
+    "harness.dashboard.dependencies.custom-label.field"
+  public static let dashboardDependenciesCustomLabelCancel =
+    "harness.dashboard.dependencies.custom-label.cancel"
+  public static let dashboardDependenciesCustomLabelApply =
+    "harness.dashboard.dependencies.custom-label.apply"
   public static let dashboardDependenciesSelectionStatus =
     "harness.dashboard.dependencies.selection"
   public static let dashboardNewSessionButton = "harness.dashboard.new-session"
