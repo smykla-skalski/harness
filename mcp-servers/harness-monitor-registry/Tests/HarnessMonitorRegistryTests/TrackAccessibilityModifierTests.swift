@@ -141,6 +141,60 @@ struct TrackAccessibilityModifierTests {
     #expect(frameQueryCount == baselineQueries)
   }
 
+  @Test("rapid layout passes are throttled so dense panes do not republish per frame")
+  @MainActor
+  func rapidLayoutPassesAreThrottled() async {
+    let registry = AccessibilityRegistry()
+    let host = NSView(frame: NSRect(x: 0, y: 0, width: 320, height: 160))
+    let view = TrackAccessibilityNSView(frame: NSRect(x: 40, y: 24, width: 120, height: 36))
+    let window = NSWindow(
+      contentRect: NSRect(x: 0, y: 0, width: 320, height: 160),
+      styleMask: [.titled, .closable],
+      backing: .buffered,
+      defer: false
+    )
+    defer {
+      window.orderOut(nil)
+      window.contentView = nil
+    }
+    host.addSubview(view)
+    window.contentView = host
+    window.layoutIfNeeded()
+    host.layoutSubtreeIfNeeded()
+
+    var frameQueryCount = 0
+    view.accessibilityFrameProviderOverride = { trackedView in
+      frameQueryCount += 1
+      return window.convertToScreen(trackedView.convert(trackedView.bounds, to: nil))
+    }
+
+    view.configure(
+      elementID: "workspace.layout-throttle",
+      kind: .button,
+      label: "Layout Throttled",
+      value: nil,
+      hint: nil,
+      windowID: nil,
+      enabled: true,
+      semanticActions: .none,
+      semanticActionSink: nil,
+      registry: registry
+    )
+    _ = await waitForElement(identifier: "workspace.layout-throttle", registry: registry)
+    let baselineQueries = frameQueryCount
+
+    // Simulate a burst of layout passes (e.g. 60Hz scroll). Each call must NOT
+    // spawn a publish Task while inside the 120ms throttle window.
+    for _ in 0..<10 {
+      view.layout()
+    }
+    for _ in 0..<6 {
+      await Task.yield()
+    }
+
+    #expect(frameQueryCount - baselineQueries <= 1)
+  }
+
   @Test("didUpdate clears tracked elements once scrolling clips them fully off-screen")
   @MainActor
   func didUpdateClearsTrackedElementsWhenScrollingClipsThemOffScreen() async {
