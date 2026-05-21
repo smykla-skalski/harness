@@ -33,6 +33,14 @@ enum HarnessMarkdownInlineParser {
         appendDelimited(
           String(characters[index]), .emphasis, in: characters, from: &index, buffer: &buffer,
           into: &parts, references: references)
+      } else if index + 1 < characters.count, characters[index] == "!", characters[index + 1] == "["
+      {
+        if !HarnessMarkdownInlineImageScanner.appendImage(
+          in: characters, from: &index, buffer: &buffer, into: &parts, references: references)
+        {
+          buffer.append(characters[index])
+          index += 1
+        }
       } else if characters[index] == "[" {
         appendLink(
           in: characters, from: &index, buffer: &buffer, into: &parts, references: references)

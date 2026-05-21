@@ -41,6 +41,9 @@ enum HarnessMarkdownInlineRenderer {
       var fragment = attributedString(from: children, style: style.withFont(style.font.italic()))
       fragment.font = style.font.italic()
       return fragment
+    case .image(let image):
+      let label = image.alt.isEmpty ? image.source : image.alt
+      return linked(image.source, label: label, style: style)
     case .lineBreak:
       return AttributedString("\n")
     case .link(let label, let destination, _):
