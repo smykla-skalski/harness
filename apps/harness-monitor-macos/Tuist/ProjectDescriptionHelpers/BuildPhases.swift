@@ -69,7 +69,12 @@ public enum BuildPhases {
                 "$(TARGET_BUILD_DIR)/$(CONTENTS_FOLDER_PATH)/Library/LaunchAgents/io.harnessmonitor.daemon.managed.plist",
                 "$(TARGET_BUILD_DIR)/$(CONTENTS_FOLDER_PATH)/Library/LaunchAgents/io.harnessmonitor.daemon.plist"
             ],
-            basedOnDependencyAnalysis: true
+            // The bundle phase's inputPaths can't enumerate every Rust source file,
+            // so dependency analysis was skipping the phase whenever scripts and
+            // plists were untouched even after cargo produced a fresh helper. Run
+            // unconditionally - bundle-daemon-agent.sh delegates freshness to
+            // cargo, which no-ops when the binary is already up to date.
+            basedOnDependencyAnalysis: false
         )
     }
 
