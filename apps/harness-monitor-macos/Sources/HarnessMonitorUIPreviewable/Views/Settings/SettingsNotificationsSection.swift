@@ -13,7 +13,7 @@ public struct SettingsNotificationsSection: View {
 
   public var body: some View {
     Form {
-      statusSection
+      NotificationsStatusSection(notifications: notifications)
       authorizationSection
       presetSection
       if isFullyExpanded {
@@ -33,36 +33,6 @@ public struct SettingsNotificationsSection: View {
     guard !isFullyExpanded else { return }
     try? await Task.sleep(for: .milliseconds(40))
     isFullyExpanded = true
-  }
-
-  private var statusSection: some View {
-    Section {
-      LabeledContent("Authorization", value: notifications.settingsSnapshot.authorizationStatus)
-      LabeledContent("Alerts", value: notifications.settingsSnapshot.alertSetting)
-      LabeledContent("Sound", value: notifications.settingsSnapshot.soundSetting)
-      LabeledContent("Badges", value: notifications.settingsSnapshot.badgeSetting)
-      LabeledContent(
-        "Notification Center",
-        value: notifications.settingsSnapshot.notificationCenterSetting
-      )
-      LabeledContent("Lock Screen", value: notifications.settingsSnapshot.lockScreenSetting)
-      LabeledContent("Alert Style", value: notifications.settingsSnapshot.alertStyle)
-      LabeledContent("Previews", value: notifications.settingsSnapshot.showPreviews)
-      LabeledContent("Time Sensitive", value: notifications.settingsSnapshot.timeSensitiveSetting)
-      LabeledContent("Categories", value: "\(notifications.registeredCategoryCount)")
-      LabeledContent("Pending", value: "\(notifications.pendingRequestCount)")
-      LabeledContent("Delivered", value: "\(notifications.deliveredNotificationCount)")
-      LabeledContent("Last Result", value: notifications.lastResult)
-        .textSelection(.enabled)
-    } header: {
-      Text("System Status")
-        .harnessNativeFormSectionHeader()
-    } footer: {
-      Text("These values come from the system notification center for this app")
-        .harnessNativeFormSectionFooter()
-    }
-    .accessibilityElement(children: .contain)
-    .accessibilityIdentifier(HarnessMonitorAccessibility.settingsNotificationsStatus)
   }
 
   private var authorizationSection: some View {
@@ -391,5 +361,39 @@ public struct SettingsNotificationsSection: View {
           .harnessNativeFormSectionHeader()
       }
     }
+  }
+}
+
+private struct NotificationsStatusSection: View {
+  let notifications: HarnessMonitorUserNotificationController
+
+  var body: some View {
+    Section {
+      LabeledContent("Authorization", value: notifications.settingsSnapshot.authorizationStatus)
+      LabeledContent("Alerts", value: notifications.settingsSnapshot.alertSetting)
+      LabeledContent("Sound", value: notifications.settingsSnapshot.soundSetting)
+      LabeledContent("Badges", value: notifications.settingsSnapshot.badgeSetting)
+      LabeledContent(
+        "Notification Center",
+        value: notifications.settingsSnapshot.notificationCenterSetting
+      )
+      LabeledContent("Lock Screen", value: notifications.settingsSnapshot.lockScreenSetting)
+      LabeledContent("Alert Style", value: notifications.settingsSnapshot.alertStyle)
+      LabeledContent("Previews", value: notifications.settingsSnapshot.showPreviews)
+      LabeledContent("Time Sensitive", value: notifications.settingsSnapshot.timeSensitiveSetting)
+      LabeledContent("Categories", value: "\(notifications.registeredCategoryCount)")
+      LabeledContent("Pending", value: "\(notifications.pendingRequestCount)")
+      LabeledContent("Delivered", value: "\(notifications.deliveredNotificationCount)")
+      LabeledContent("Last Result", value: notifications.lastResult)
+        .textSelection(.enabled)
+    } header: {
+      Text("System Status")
+        .harnessNativeFormSectionHeader()
+    } footer: {
+      Text("These values come from the system notification center for this app")
+        .harnessNativeFormSectionFooter()
+    }
+    .accessibilityElement(children: .contain)
+    .accessibilityIdentifier(HarnessMonitorAccessibility.settingsNotificationsStatus)
   }
 }
