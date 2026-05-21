@@ -3,7 +3,7 @@
 import HarnessMonitorKit
 import SwiftUI
 
-@MainActor private let dependenciesRelativeFormatter: RelativeDateTimeFormatter = {
+@MainActor let dependenciesRelativeFormatter: RelativeDateTimeFormatter = {
   let formatter = RelativeDateTimeFormatter()
   formatter.unitsStyle = .short
   return formatter
@@ -158,7 +158,7 @@ struct DashboardDependenciesRouteView: View {
   let searchAutomationCommand: AppSearchAutomationCommand?
 
   @Environment(\.openSettingsSection)
-  private var openSettingsSection
+  var openSettingsSection
   @Environment(\.openURL)
   private var openURL
 

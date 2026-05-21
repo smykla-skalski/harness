@@ -145,7 +145,7 @@ extension DependencyUpdateReviewEventState {
 }
 
 extension String {
-  fileprivate var nonEmpty: String? {
+  var nonEmpty: String? {
     isEmpty ? nil : self
   }
 }

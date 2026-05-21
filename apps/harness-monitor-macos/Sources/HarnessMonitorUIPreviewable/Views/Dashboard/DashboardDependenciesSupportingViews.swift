@@ -7,7 +7,7 @@ struct DashboardDependenciesRepoLabelMenuData: Equatable, Sendable {
 }
 
 @MainActor
-private struct DashboardDependenciesRepositorySectionHeader: View {
+struct DashboardDependenciesRepositorySectionHeader: View {
   let repository: String
   let itemCount: Int
   let isCollapsed: Bool
@@ -91,7 +91,7 @@ private struct DashboardDependenciesRepositoryHeaderPill: View {
 }
 
 @MainActor
-private struct DashboardDependenciesDescriptionView: View {
+struct DashboardDependenciesDescriptionView: View {
   let store: HarnessMonitorStore
   let pullRequestID: String
 
@@ -121,7 +121,7 @@ private struct DashboardDependenciesDescriptionView: View {
   }
 }
 
-private struct DashboardDependenciesControlStrip: View {
+struct DashboardDependenciesControlStrip: View {
   @Binding var filterModeRaw: String
   @Binding var sortModeRaw: String
   @Binding var groupModeRaw: String
@@ -354,7 +354,7 @@ enum DashboardDependenciesSortMode: String, CaseIterable, Identifiable {
   }
 }
 
-private enum DashboardDependenciesGroupMode: String, CaseIterable, Identifiable {
+enum DashboardDependenciesGroupMode: String, CaseIterable, Identifiable {
   case repository
   case flat
 
