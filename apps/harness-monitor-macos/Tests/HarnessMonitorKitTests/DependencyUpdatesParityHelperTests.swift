@@ -95,6 +95,41 @@ struct DependencyUpdatesParityHelperTests {
     )
   }
 
+  @Test("Item decoder defaults labels, checks, and reviews when keys are missing")
+  func itemDecoderDefaultsArrayFieldsWhenKeysAreMissing() throws {
+    let payload = """
+      {
+        "pullRequestId": "pr-1",
+        "repositoryId": "repo-1",
+        "repository": "org-a/example",
+        "number": 42,
+        "title": "Bump dependency",
+        "url": "https://github.com/org-a/example/pull/42",
+        "authorLogin": "renovate[bot]",
+        "state": "open",
+        "mergeable": "mergeable",
+        "reviewStatus": "review_required",
+        "checkStatus": "success",
+        "policyBlocked": false,
+        "isDraft": false,
+        "headSha": "abc123",
+        "additions": 10,
+        "deletions": 4,
+        "createdAt": "2026-05-20T10:00:00Z",
+        "updatedAt": "2026-05-20T11:00:00Z"
+      }
+      """
+
+    let decoder = JSONDecoder()
+    decoder.keyDecodingStrategy = .convertFromSnakeCase
+    let item = try decoder.decode(DependencyUpdateItem.self, from: Data(payload.utf8))
+
+    #expect(item.labels == [])
+    #expect(item.checks == [])
+    #expect(item.reviews == [])
+    #expect(item.pullRequestID == "pr-1")
+  }
+
   private func makeItem(
     state: DependencyUpdatePullRequestState = .open,
     mergeable: DependencyUpdateMergeableState = .mergeable,

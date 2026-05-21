@@ -242,6 +242,33 @@ public struct DependencyUpdateItem: Codable, Equatable, Identifiable, Sendable {
     case createdAt
     case updatedAt
   }
+
+  public init(from decoder: Decoder) throws {
+    let container = try decoder.container(keyedBy: CodingKeys.self)
+    pullRequestID = try container.decode(String.self, forKey: .pullRequestID)
+    repositoryID = try container.decode(String.self, forKey: .repositoryID)
+    repository = try container.decode(String.self, forKey: .repository)
+    number = try container.decode(UInt64.self, forKey: .number)
+    title = try container.decode(String.self, forKey: .title)
+    url = try container.decode(String.self, forKey: .url)
+    authorLogin = try container.decode(String.self, forKey: .authorLogin)
+    state = try container.decode(DependencyUpdatePullRequestState.self, forKey: .state)
+    mergeable = try container.decode(DependencyUpdateMergeableState.self, forKey: .mergeable)
+    reviewStatus = try container.decode(DependencyUpdateReviewStatus.self, forKey: .reviewStatus)
+    checkStatus = try container.decode(DependencyUpdateCheckStatus.self, forKey: .checkStatus)
+    policyBlocked = try container.decode(Bool.self, forKey: .policyBlocked)
+    isDraft = try container.decode(Bool.self, forKey: .isDraft)
+    headSha = try container.decode(String.self, forKey: .headSha)
+    labels = try container.decodeIfPresent([String].self, forKey: .labels) ?? []
+    checks =
+      try container.decodeIfPresent([DependencyUpdateCheck].self, forKey: .checks) ?? []
+    reviews =
+      try container.decodeIfPresent([DependencyUpdateReview].self, forKey: .reviews) ?? []
+    additions = try container.decode(UInt64.self, forKey: .additions)
+    deletions = try container.decode(UInt64.self, forKey: .deletions)
+    createdAt = try container.decode(String.self, forKey: .createdAt)
+    updatedAt = try container.decode(String.self, forKey: .updatedAt)
+  }
 }
 
 public struct DependencyUpdateCheck: Codable, Equatable, Identifiable, Sendable {
