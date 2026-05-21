@@ -262,7 +262,7 @@ private struct HarnessMarkdownDetailsView: View {
         .contentShape(Rectangle())
         .frame(maxWidth: .infinity, alignment: .leading)
       }
-      .harnessPlainButtonStyle()
+      .buttonStyle(.borderless)
       .frame(maxWidth: .infinity, alignment: .leading)
       .modifier(HarnessMarkdownPointerHoverModifier(color: style.colors.link))
       .accessibilityLabel(Text(HarnessMarkdownInlinePlainText.string(from: details.summary)))

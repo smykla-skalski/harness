@@ -437,7 +437,7 @@ private struct DashboardNotificationDetailsView: View {
           .foregroundStyle(HarnessMonitorTheme.secondaryInk)
           .fixedSize(horizontal: false, vertical: true)
       }
-      ForEach(details.rows, id: \.self) { row in
+      ForEach(Array(details.rows.enumerated()), id: \.offset) { _, row in
         HStack(alignment: .firstTextBaseline, spacing: HarnessMonitorTheme.spacingSM) {
           Text(row.label)
             .scaledFont(.caption.monospaced().weight(.medium))

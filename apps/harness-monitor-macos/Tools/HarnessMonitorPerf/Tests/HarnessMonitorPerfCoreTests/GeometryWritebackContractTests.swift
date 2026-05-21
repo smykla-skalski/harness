@@ -89,30 +89,21 @@ final class GeometryWritebackContractTests: XCTestCase {
             expectedCount: 1,
             rationale: "rounded-height threshold drives dynamic timeline page size"
         ),
-        // Task board overview uses four width thresholds to choose compact vs
-        // horizontal header/accessory/summary layouts. Each handler writes a
-        // view-local boolean only when the threshold result changes.
+        // Task board overview uses one width threshold to choose compact vs
+        // horizontal layout. The handler writes a view-local boolean only when
+        // the threshold result changes.
         .init(
             relativePath: "Sources/HarnessMonitorUIPreviewable/Views/TaskBoard/TaskBoardOverviewView.swift",
-            expectedCount: 4,
-            rationale: "four threshold-gated view-local width flags for task-board overview"
+            expectedCount: 1,
+            rationale: "threshold-gated view-local width flag for task-board overview"
         ),
-        // Orchestrator summary replaced ViewThatFits branch construction with
-        // two explicit width gates. Both writes are view-local booleans guarded
-        // by `!= next`.
+        // Orchestrator summary uses one explicit width gate. The write is a
+        // view-local boolean guarded by `!= next`.
         .init(
             relativePath:
                 "Sources/HarnessMonitorUIPreviewable/Views/TaskBoard/TaskBoardOrchestratorSummaryView.swift",
-            expectedCount: 2,
-            rationale: "two threshold-gated view-local width flags for orchestrator summary"
-        ),
-        // Operations panel switches between horizontal and stacked layout at a
-        // single width threshold, writing only a view-local boolean.
-        .init(
-            relativePath:
-                "Sources/HarnessMonitorUIPreviewable/Views/TaskBoard/TaskBoardOperationsPanelLayout.swift",
             expectedCount: 1,
-            rationale: "single threshold-gated view-local width flag for operations panel"
+            rationale: "threshold-gated view-local width flag for orchestrator summary"
         ),
     ]
 

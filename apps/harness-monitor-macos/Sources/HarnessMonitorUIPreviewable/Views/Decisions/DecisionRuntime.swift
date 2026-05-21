@@ -68,10 +68,11 @@ final class DecisionRuntime {
 private let decisionAuditPayloadWorker = DecisionAuditPayloadWorker()
 
 private actor DecisionAuditPayloadWorker {
+  private let decoder = JSONDecoder()
+
   func presentations(
     for events: [SupervisorEventSnapshot]
   ) -> [String: DecisionAuditTrailPayloadPresentation] {
-    let decoder = JSONDecoder()
     return Dictionary(
       uniqueKeysWithValues: events.map {
         (

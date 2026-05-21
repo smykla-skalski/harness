@@ -114,7 +114,7 @@ struct DashboardDependenciesCustomLabelSheet: View {
           } label: {
             suggestionChip(label)
           }
-          .buttonStyle(.plain)
+          .buttonStyle(.borderless)
         }
       }
     }

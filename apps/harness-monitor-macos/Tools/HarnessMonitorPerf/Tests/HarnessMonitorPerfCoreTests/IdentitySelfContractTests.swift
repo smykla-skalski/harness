@@ -53,6 +53,21 @@ final class IdentitySelfContractTests: XCTestCase {
         // Policy canvas port indices are stable because ports are fixed for a
         // node kind and only cloned as a complete ordered list.
         "ports.indices",
+        // OpenRouter provider chips are built by `providers(from:)`, which
+        // inserts through a Set before sorting the display list.
+        "cachedPresentation.providers",
+        // Decision sidebar groups store decision IDs, which are unique within
+        // each grouped section by construction.
+        "group.decisionIDs",
+        // Dependencies settings picker ranges are fixed integer domains.
+        "Self.frequentLabelsCountRange",
+        "Self.maxConcurrentRange",
+        // Duration picker presets are curated fixed arrays of unique seconds.
+        "presets",
+        // Markdown table row and column loops use structural indices over an
+        // immutable parsed table for the render pass.
+        "table.rows.indices",
+        "0..<columnCount",
     ]
 
     func testEveryIdSelfSiteUsesAnAllowlistedCollection() throws {

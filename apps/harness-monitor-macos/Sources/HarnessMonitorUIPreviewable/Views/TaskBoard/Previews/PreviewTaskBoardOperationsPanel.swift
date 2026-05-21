@@ -123,9 +123,11 @@ private enum TaskBoardOperationsPreviewFixtures {
       """
   )
 
+  private static let decoder = JSONDecoder()
+
   private static func decode<T: Decodable>(_ type: T.Type, json: String) -> T {
     do {
-      return try JSONDecoder().decode(type, from: Data(json.utf8))
+      return try decoder.decode(type, from: Data(json.utf8))
     } catch {
       fatalError("Failed to decode task-board operations preview fixture: \(error)")
     }
