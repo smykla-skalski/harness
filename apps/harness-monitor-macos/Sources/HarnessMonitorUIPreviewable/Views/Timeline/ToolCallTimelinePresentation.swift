@@ -96,7 +96,7 @@ struct ToolCallTimelinePresentationOutput: Equatable, Sendable {
 }
 
 @MainActor
-private final class ToolCallTimelineScrollMetricsDeferrer {
+final class ToolCallTimelineScrollMetricsDeferrer {
   private var generation: UInt64 = 0
 
   func schedule(
@@ -115,7 +115,7 @@ private final class ToolCallTimelineScrollMetricsDeferrer {
   }
 }
 
-private actor ToolCallTimelinePresentationWorker {
+actor ToolCallTimelinePresentationWorker {
   private static let signposter = OSSignposter(
     subsystem: "io.harnessmonitor",
     category: "perf"
@@ -158,3 +158,23 @@ private actor ToolCallTimelinePresentationWorker {
       if let overflowNotice = input.overflowNotice {
         ToolCallTimelineOverflowAnnouncement(
           id: overflowNotice.recordedAt,
+          text: ToolCallTimelineView.overflowNoticeText(
+            rawUpdateCount: overflowNotice.rawUpdateCount,
+            visibleToolCallCount: overflowNotice.displayedEventCount
+          )
+        )
+      } else {
+        nil
+      }
+    cachedInput = input
+    cachedOutput = ToolCallTimelinePresentationOutput(
+      presentation: presentation,
+      layout: layout,
+      announcementSnapshot: announcementSnapshot,
+      overflowAnnouncement: overflowAnnouncement
+    )
+    return cachedOutput
+  }
+
+  func waitForIdle() async {}
+}
