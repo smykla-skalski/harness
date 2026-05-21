@@ -1,3 +1,4 @@
+import AppKit
 import HarnessMonitorKit
 import SwiftUI
 
@@ -12,6 +13,32 @@ func dashboardDependenciesLabelSwatchColor(_ hex: String?) -> Color? {
   let green = Double((value >> 8) & 0xFF) / 255.0
   let blue = Double(value & 0xFF) / 255.0
   return Color(.sRGB, red: red, green: green, blue: blue, opacity: 1)
+}
+
+/// Build a non-template `NSImage` disc swatch that survives NSMenu's
+/// template-image treatment. SwiftUI `Menu` content is hosted by NSMenuItem,
+/// which silently converts SF Symbols to monochrome templates and discards
+/// `.foregroundStyle()`. Baking the color into an NSImage with
+/// `isTemplate = false` is the only path that keeps the per-label color.
+@MainActor
+func dashboardDependenciesLabelSwatchImage(
+  hex: String?,
+  diameter: CGFloat = 10
+) -> Image {
+  let nsColor: NSColor
+  if let color = dashboardDependenciesLabelSwatchColor(hex) {
+    nsColor = NSColor(color)
+  } else {
+    nsColor = NSColor(HarnessMonitorTheme.secondaryInk.opacity(0.5))
+  }
+  let size = NSSize(width: diameter, height: diameter)
+  let image = NSImage(size: size, flipped: false) { rect in
+    nsColor.setFill()
+    NSBezierPath(ovalIn: rect.insetBy(dx: 0.5, dy: 0.5)).fill()
+    return true
+  }
+  image.isTemplate = false
+  return Image(nsImage: image)
 }
 
 @MainActor
@@ -185,13 +212,7 @@ private struct DashboardDependenciesLabelMenuRow: View {
         Text(label.name)
       }
     } icon: {
-      Image(systemName: "circle.fill")
-        .foregroundStyle(swatch)
+      dashboardDependenciesLabelSwatchImage(hex: label.color)
     }
-  }
-
-  private var swatch: Color {
-    dashboardDependenciesLabelSwatchColor(label.color)
-      ?? HarnessMonitorTheme.secondaryInk.opacity(0.5)
   }
 }
