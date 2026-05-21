@@ -405,41 +405,21 @@ struct DashboardDependenciesRouteView: View {
   }
 
   private var filterBar: some View {
-    VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
-      filterControls
-      routeActions
-    }
+    filterControls
   }
 
   private var filterControls: some View {
     DashboardDependenciesControlStrip(
       filterModeRaw: $filterModeRaw,
       sortModeRaw: $sortModeRaw,
-      groupModeRaw: $groupModeRaw
-    )
-  }
-
-  private var routeActions: some View {
-    HarnessMonitorGlassControlGroup(spacing: HarnessMonitorTheme.itemSpacing) {
-      HarnessMonitorWrapLayout(
-        spacing: HarnessMonitorTheme.itemSpacing,
-        lineSpacing: HarnessMonitorTheme.itemSpacing
-      ) {
-        routeActionButtons
+      groupModeRaw: $groupModeRaw,
+      onRefresh: {
+        Task { await reload(forceRefresh: true) }
+      },
+      onClearCache: {
+        Task { await clearCacheAndReload() }
       }
-    }
-    .frame(maxWidth: .infinity, alignment: .leading)
-  }
-
-  @ViewBuilder private var routeActionButtons: some View {
-    actionButton("Refresh", systemImage: "arrow.clockwise") {
-      Task { await reload(forceRefresh: true) }
-    }
-    .accessibilityIdentifier(HarnessMonitorAccessibility.dashboardDependenciesRefreshButton)
-
-    actionButton("Clear Cache", systemImage: "trash") {
-      Task { await clearCacheAndReload() }
-    }
+    )
   }
 
   private var dependenciesList: some View {
@@ -1134,15 +1114,25 @@ private struct DashboardDependenciesControlStrip: View {
   @Binding var filterModeRaw: String
   @Binding var sortModeRaw: String
   @Binding var groupModeRaw: String
+  let onRefresh: () -> Void
+  let onClearCache: () -> Void
 
   var body: some View {
-    HarnessMonitorWrapLayout(
-      spacing: HarnessMonitorTheme.spacingSM,
-      lineSpacing: HarnessMonitorTheme.spacingSM
-    ) {
-      filterPicker
-      sortPicker
-      groupPicker
+    HarnessMonitorGlassControlGroup(spacing: HarnessMonitorTheme.spacingSM) {
+      HStack(alignment: .top, spacing: HarnessMonitorTheme.spacingSM) {
+        HarnessMonitorWrapLayout(
+          spacing: HarnessMonitorTheme.spacingSM,
+          lineSpacing: HarnessMonitorTheme.spacingSM
+        ) {
+          filterPicker
+          sortPicker
+          groupPicker
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+
+        actionsMenu
+          .fixedSize(horizontal: true, vertical: true)
+      }
     }
     .frame(maxWidth: .infinity, alignment: .leading)
   }
@@ -1173,6 +1163,29 @@ private struct DashboardDependenciesControlStrip: View {
       }
     }
     .pickerStyle(.menu)
+  }
+
+  private var actionsMenu: some View {
+    Menu {
+      Button(action: onRefresh) {
+        Label("Refresh", systemImage: "arrow.clockwise")
+      }
+      .accessibilityIdentifier(HarnessMonitorAccessibility.dashboardDependenciesRefreshButton)
+
+      Divider()
+
+      Button(action: onClearCache) {
+        Label("Clear Cache", systemImage: "trash")
+      }
+    } label: {
+      Image(systemName: "ellipsis.circle")
+        .imageScale(.medium)
+        .frame(width: 18, height: 18)
+        .accessibilityLabel("More dependency actions")
+    }
+    .menuStyle(.button)
+    .harnessActionButtonStyle(variant: .bordered, tint: .secondary)
+    .accessibilityLabel("More dependency actions")
   }
 }
 
