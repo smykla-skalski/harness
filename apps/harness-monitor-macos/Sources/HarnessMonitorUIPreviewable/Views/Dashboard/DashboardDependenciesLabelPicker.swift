@@ -105,6 +105,41 @@ func dashboardDependenciesPartitionFrequent(
   return (frequent, rest)
 }
 
+/// Bucket `labels` into groups by the prefix before the first `/`. Labels
+/// with no slash form the leading group; the remaining buckets follow in
+/// alphabetical prefix order. Order inside each bucket is preserved from
+/// `labels`, so callers should sort the input ahead of grouping.
+@MainActor
+func dashboardDependenciesGroupByPrefix(
+  _ labels: [DependencyUpdateRepositoryLabel]
+) -> [[DependencyUpdateRepositoryLabel]] {
+  var unprefixed: [DependencyUpdateRepositoryLabel] = []
+  var byPrefix: [String: [DependencyUpdateRepositoryLabel]] = [:]
+  for label in labels {
+    if let slash = label.name.firstIndex(of: "/"),
+      slash != label.name.startIndex
+    {
+      let prefix = String(label.name[..<slash])
+      byPrefix[prefix, default: []].append(label)
+    } else {
+      unprefixed.append(label)
+    }
+  }
+  var groups: [[DependencyUpdateRepositoryLabel]] = []
+  if !unprefixed.isEmpty {
+    groups.append(unprefixed)
+  }
+  let sortedPrefixes = byPrefix.keys.sorted {
+    $0.localizedCaseInsensitiveCompare($1) == .orderedAscending
+  }
+  for prefix in sortedPrefixes {
+    if let group = byPrefix[prefix], !group.isEmpty {
+      groups.append(group)
+    }
+  }
+  return groups
+}
+
 @MainActor
 struct DashboardDependenciesLabelPickerMenu: View {
   let title: String
@@ -177,13 +212,13 @@ private struct DashboardDependenciesLabelMenuContent: View {
             labelButton(for: label)
           }
         }
-        Section("All Labels") {
-          ForEach(split.rest) { label in
-            labelButton(for: label)
-          }
+      }
+      let groups = dashboardDependenciesGroupByPrefix(split.rest)
+      ForEach(Array(groups.enumerated()), id: \.offset) { index, group in
+        if index > 0 || !split.frequent.isEmpty {
+          Divider()
         }
-      } else {
-        ForEach(split.rest) { label in
+        ForEach(group) { label in
           labelButton(for: label)
         }
       }
