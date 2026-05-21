@@ -97,7 +97,7 @@ extension HarnessMonitorStore {
     )
   }
 
-  private struct ResolvedTaskBoardRefreshSnapshot {
+  struct ResolvedTaskBoardRefreshSnapshot {
     let items: [TaskBoardItem]
     let orchestratorStatus: TaskBoardOrchestratorStatus?
     let preservedItemIDs: Set<String>
