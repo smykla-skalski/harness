@@ -260,11 +260,12 @@ public final class SessionDecisionRuntime {
         "decision=\(input.decisionID, privacy: .public)"
       )
       let rows = await sessionDecisionInspectorRowWorker.compute(input: input)
+      let contextCount = rows.contextRows.count
+      let historyCount = rows.historyRows.count
       Self.inspectorSignposter.endInterval(
         "session_decision_inspector.compute",
         computeInterval,
-        // swiftlint:disable:next line_length
-        "contextRows=\(rows.contextRows.count, privacy: .public) historyRows=\(rows.historyRows.count, privacy: .public)"
+        "contextRows=\(contextCount, privacy: .public) historyRows=\(historyCount, privacy: .public)"
       )
       guard !Task.isCancelled else { return }
       guard let self, inspectorRowGeneration == generation, latestInspectorRowKey == input.key
