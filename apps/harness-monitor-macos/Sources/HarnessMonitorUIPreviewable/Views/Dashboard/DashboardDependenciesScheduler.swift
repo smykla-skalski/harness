@@ -148,7 +148,10 @@ final class DashboardDependenciesScheduler {
     )
     let task = Task { @MainActor [weak self] in
       do {
-        let response = try await client.queryDependencyUpdates(request: request)
+        let response = try await DashboardDependenciesRemoteLoader.query(
+          client: client,
+          request: request
+        )
         guard let self, !Task.isCancelled else { return }
         self.states[repository]?.lastSyncedAt = Date()
         self.states[repository]?.lastErrorMessage = nil

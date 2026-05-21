@@ -60,6 +60,21 @@ struct DashboardDependenciesRouteViewTests {
     #expect(source.contains("private var reloadTaskKey: DashboardDependenciesReloadTaskKey"))
     #expect(source.contains("connectionState: store.connectionState"))
     #expect(source.contains(".task(id: reloadTaskKey)"))
+    #expect(!source.contains("refreshToken +="))
+    #expect(!source.contains("let refreshToken"))
+  }
+
+  @Test("route source keeps dependency network decode off the view actor")
+  func routeSourceKeepsDependencyNetworkDecodeOffTheViewActor() throws {
+    let source = try routeSource()
+    let refreshSource = try routeSource(named: "DashboardDependenciesRouteView+Refresh.swift")
+    let schedulerSource = try routeSource(named: "DashboardDependenciesScheduler.swift")
+
+    #expect(source.contains("enum DashboardDependenciesRemoteLoader"))
+    #expect(source.contains("Task.detached(priority: .userInitiated)"))
+    #expect(schedulerSource.contains("DashboardDependenciesRemoteLoader.query("))
+    #expect(!schedulerSource.contains("client.queryDependencyUpdates(request: request)"))
+    #expect(refreshSource.contains("DashboardDependenciesRemoteLoader.refresh("))
   }
 
   @Test("error helper rewrites GitHub 401 messages into actionable copy")
@@ -115,6 +130,10 @@ struct DashboardDependenciesRouteViewTests {
   }
 
   private func routeSource() throws -> String {
+    try routeSource(named: "DashboardDependenciesRouteView.swift")
+  }
+
+  private func routeSource(named fileName: String) throws -> String {
     let testsDirectory = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
     let repoRoot =
       testsDirectory
@@ -127,7 +146,7 @@ struct DashboardDependenciesRouteViewTests {
       .appendingPathComponent(
         "apps/harness-monitor-macos/Sources/HarnessMonitorUIPreviewable/Views/Dashboard"
       )
-      .appendingPathComponent("DashboardDependenciesRouteView.swift")
+      .appendingPathComponent(fileName)
     return try String(contentsOf: sourceURL, encoding: .utf8)
   }
 }
