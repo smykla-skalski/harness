@@ -6,6 +6,7 @@ public struct SettingsHostBridgeSection: View {
   @State private var pendingForcedDisableCapability: String?
   @State private var pendingForcedDisableMessage = ""
   @State private var capabilityNames: [String] = []
+  @State private var isFullyExpanded = false
   @ScaledMetric(relativeTo: .caption)
   private var statusCircleSize: CGFloat = 8
 
@@ -26,6 +27,12 @@ public struct SettingsHostBridgeSection: View {
     let next = Array(Set(builtIns).union(hostBridge.capabilities.keys)).sorted()
     guard next != capabilityNames else { return }
     capabilityNames = next
+  }
+
+  private func expandAfterFirstFrame() async {
+    guard !isFullyExpanded else { return }
+    try? await Task.sleep(for: .milliseconds(40))
+    isFullyExpanded = true
   }
 
   public var body: some View {
@@ -56,29 +63,32 @@ public struct SettingsHostBridgeSection: View {
           .harnessNativeFormSectionHeader()
       }
 
-      Section {
-        ForEach(Array(capabilityNames.enumerated()), id: \.offset) { _, name in
-          capabilityRow(name: name)
+      if isFullyExpanded {
+        Section {
+          ForEach(Array(capabilityNames.enumerated()), id: \.offset) { _, name in
+            capabilityRow(name: name)
+          }
+        } header: {
+          Text("Capabilities")
+            .harnessNativeFormSectionHeader()
         }
-      } header: {
-        Text("Capabilities")
-          .harnessNativeFormSectionHeader()
-      }
 
-      Section {
-        HostBridgeCommandsView()
-      } header: {
-        Text("Setup")
-          .harnessNativeFormSectionHeader()
-      } footer: {
-        Text(
-          "Sandboxed monitor features use the shared host bridge. Start it once to enable every "
-            + "compiled capability, or narrow it with repeated --capability flags"
-        )
-        .harnessNativeFormSectionFooter()
+        Section {
+          HostBridgeCommandsView()
+        } header: {
+          Text("Setup")
+            .harnessNativeFormSectionHeader()
+        } footer: {
+          Text(
+            "Sandboxed monitor features use the shared host bridge. Start it once to enable every "
+              + "compiled capability, or narrow it with repeated --capability flags"
+          )
+          .harnessNativeFormSectionFooter()
+        }
       }
     }
     .settingsDetailFormStyle()
+    .task { await expandAfterFirstFrame() }
     .onChange(of: hostBridge.capabilities, initial: true) { _, _ in
       syncCapabilityNames()
     }
