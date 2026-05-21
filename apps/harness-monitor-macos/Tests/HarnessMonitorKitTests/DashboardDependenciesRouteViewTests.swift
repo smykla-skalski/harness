@@ -38,17 +38,14 @@ struct DashboardDependenciesRouteViewTests {
   func reloadTaskKeyChangesWhenConnectionStateChanges() {
     let idle = DashboardDependenciesReloadTaskKey(
       storedPreferences: "",
-      refreshToken: 0,
       connectionState: .idle
     )
     let connecting = DashboardDependenciesReloadTaskKey(
       storedPreferences: "",
-      refreshToken: 0,
       connectionState: .connecting
     )
     let online = DashboardDependenciesReloadTaskKey(
       storedPreferences: "",
-      refreshToken: 0,
       connectionState: .online
     )
 

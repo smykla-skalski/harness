@@ -62,7 +62,10 @@ func policyCanvasCleanInitialLayout(
 func policyCanvasEdge(
   _ edge: TaskBoardPolicyPipelineEdge,
   nodes: [PolicyCanvasNode] = []
-) -> PolicyCanvasEdge {
+) -> PolicyCanvasEdge? {
+  guard policyCanvasEdgeEndpointsExist(edge, nodes: nodes) else {
+    return nil
+  }
   var source = PolicyCanvasPortEndpoint(
     nodeID: edge.fromNodeId,
     portID: edge.fromPort,
@@ -84,6 +87,20 @@ func policyCanvasEdge(
     pinnedPortSide: source.side != nil || target.side != nil,
     kind: kind
   )
+}
+
+func policyCanvasEdgeEndpointsExist(
+  _ edge: TaskBoardPolicyPipelineEdge,
+  nodes: [PolicyCanvasNode]
+) -> Bool {
+  guard !nodes.isEmpty else { return true }
+  guard let sourceNode = nodes.first(where: { $0.id == edge.fromNodeId }),
+    let targetNode = nodes.first(where: { $0.id == edge.toNodeId })
+  else {
+    return false
+  }
+  return sourceNode.outputPorts.contains { $0.id == edge.fromPort }
+    && targetNode.inputPorts.contains { $0.id == edge.toPort }
 }
 
 func taskBoardPolicyNode(

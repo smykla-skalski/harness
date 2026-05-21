@@ -18,9 +18,11 @@ private struct TimelineIdentity: Equatable {
     let entryID: String
     let recordedAt: String
     let kind: String
+    let sessionID: String
     let agentID: String?
     let taskID: String?
     let summary: String
+    let payload: JSONValue
   }
 
   let entries: [Entry]
@@ -31,9 +33,11 @@ private struct TimelineIdentity: Equatable {
         entryID: $0.entryId,
         recordedAt: $0.recordedAt,
         kind: $0.kind,
+        sessionID: $0.sessionId,
         agentID: $0.agentId,
         taskID: $0.taskId,
-        summary: $0.summary
+        summary: $0.summary,
+        payload: $0.payload
       )
     }
   }

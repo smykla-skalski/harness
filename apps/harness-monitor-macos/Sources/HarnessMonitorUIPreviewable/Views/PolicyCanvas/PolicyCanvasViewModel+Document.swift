@@ -101,7 +101,7 @@ extension PolicyCanvasViewModel {
     let cleanLayout = policyCanvasCleanInitialLayout(nodes: loadedNodes, groups: loadedGroups)
     nodes = cleanLayout.nodes
     groups = cleanLayout.groups
-    edges = document.edges.map { edge in
+    edges = document.edges.compactMap { edge in
       policyCanvasEdge(edge, nodes: cleanLayout.nodes)
     }
     zoom = Self.sanitizedZoom(CGFloat(document.layout.zoom), fallback: 1)
@@ -219,6 +219,7 @@ extension PolicyCanvasViewModel {
       backingDocument.map { document in
         Dictionary(uniqueKeysWithValues: document.edges.map { ($0.id, $0.condition) })
       } ?? [:]
+    let liveNodeIDs = Set(nodes.map(\.id))
     return TaskBoardPolicyPipelineDocument(
       schemaVersion: backingDocument?.schemaVersion ?? 2,
       revision: backingDocument?.revision ?? 1,
@@ -226,8 +227,11 @@ extension PolicyCanvasViewModel {
       nodes: nodes.map { node in
         taskBoardPolicyNode(node, originalKind: originalNodeKinds[node.id])
       },
-      edges: edges.map { edge in
-        taskBoardPolicyEdge(edge, originalCondition: originalEdgeConditions[edge.id])
+      edges: edges.compactMap { edge in
+        guard liveNodeIDs.contains(edge.source.nodeID),
+          liveNodeIDs.contains(edge.target.nodeID)
+        else { return nil }
+        return taskBoardPolicyEdge(edge, originalCondition: originalEdgeConditions[edge.id])
       },
       groups: groups.map { group in
         taskBoardPolicyGroup(group, nodes: nodes)

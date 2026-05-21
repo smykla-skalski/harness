@@ -20,6 +20,31 @@ struct DashboardDependenciesPresentationInput: Equatable, Sendable {
   let persistedPrimarySelectionID: String
 }
 
+private struct DashboardDependenciesListPresentationInput: Equatable, Sendable {
+  let items: [DependencyUpdateItem]
+  let filterModeRaw: String
+  let sortModeRaw: String
+  let searchText: String
+  let configuredRepositories: [String]
+  let configuredOrganizations: [String]
+
+  init(_ input: DashboardDependenciesPresentationInput) {
+    items = input.items
+    filterModeRaw = input.filterModeRaw
+    sortModeRaw = input.sortModeRaw
+    searchText = input.searchText
+    configuredRepositories = input.configuredRepositories
+    configuredOrganizations = input.configuredOrganizations
+  }
+}
+
+private struct DashboardDependenciesListPresentation: Equatable, Sendable {
+  static let empty = Self(filteredItems: [], groupedItems: [])
+
+  let filteredItems: [DependencyUpdateItem]
+  let groupedItems: [DashboardDependenciesRepositoryGroup]
+}
+
 struct DashboardDependenciesPresentation: Equatable, Sendable {
   static let empty = Self(
     filteredItems: [],
@@ -40,16 +65,39 @@ actor DashboardDependenciesPresentationWorker {
     category: "perf"
   )
 
-  private var cachedInput: DashboardDependenciesPresentationInput?
-  private var cachedOutput = DashboardDependenciesPresentation.empty
+  private var cachedListInput: DashboardDependenciesListPresentationInput?
+  private var cachedListPresentation = DashboardDependenciesListPresentation.empty
 
   func compute(
     input: DashboardDependenciesPresentationInput
   ) -> DashboardDependenciesPresentation {
-    guard input != cachedInput else {
-      return cachedOutput
-    }
+    let listInput = DashboardDependenciesListPresentationInput(input)
+    let listPresentation = computeListPresentation(input: listInput)
+    let sortMode = DashboardDependenciesSortMode(rawValue: input.sortModeRaw) ?? .status
+    let comparator = sortMode.comparator
+    let selectedItems = input.items
+      .filter { input.selectedIDs.contains($0.pullRequestID) }
+      .sorted(by: comparator)
+    return DashboardDependenciesPresentation(
+      filteredItems: listPresentation.filteredItems,
+      groupedItems: listPresentation.groupedItems,
+      selectedItems: selectedItems,
+      primaryDetailItem: Self.primaryDetailItem(
+        selectedItems: selectedItems,
+        filteredItems: listPresentation.filteredItems,
+        persistedPrimarySelectionID: input.persistedPrimarySelectionID
+      )
+    )
+  }
 
+  func waitForIdle() async {}
+
+  private func computeListPresentation(
+    input: DashboardDependenciesListPresentationInput
+  ) -> DashboardDependenciesListPresentation {
+    guard input != cachedListInput else {
+      return cachedListPresentation
+    }
     let signpostID = Self.signposter.makeSignpostID()
     let interval = Self.signposter.beginInterval(
       "dashboard_dependencies.presentation.compute",
@@ -60,20 +108,17 @@ actor DashboardDependenciesPresentationWorker {
       Self.signposter.endInterval(
         "dashboard_dependencies.presentation.compute",
         interval,
-        "visible=\(self.cachedOutput.filteredItems.count, privacy: .public)"
+        "visible=\(self.cachedListPresentation.filteredItems.count, privacy: .public)"
       )
     }
-
-    cachedInput = input
-    cachedOutput = Self.presentation(from: input)
-    return cachedOutput
+    cachedListInput = input
+    cachedListPresentation = Self.listPresentation(from: input)
+    return cachedListPresentation
   }
 
-  func waitForIdle() async {}
-
-  private static func presentation(
-    from input: DashboardDependenciesPresentationInput
-  ) -> DashboardDependenciesPresentation {
+  private static func listPresentation(
+    from input: DashboardDependenciesListPresentationInput
+  ) -> DashboardDependenciesListPresentation {
     let filterMode = DashboardDependenciesFilterMode(rawValue: input.filterModeRaw) ?? .all
     let sortMode = DashboardDependenciesSortMode(rawValue: input.sortModeRaw) ?? .status
     let comparator = sortMode.comparator
@@ -99,19 +144,9 @@ actor DashboardDependenciesPresentationWorker {
       configuredRepositories: input.configuredRepositories,
       configuredOrganizations: input.configuredOrganizations
     )
-    let selectedItems = input.items
-      .filter { input.selectedIDs.contains($0.pullRequestID) }
-      .sorted(by: comparator)
-
-    return DashboardDependenciesPresentation(
+    return DashboardDependenciesListPresentation(
       filteredItems: filteredItems,
-      groupedItems: groupedItems,
-      selectedItems: selectedItems,
-      primaryDetailItem: primaryDetailItem(
-        selectedItems: selectedItems,
-        filteredItems: filteredItems,
-        persistedPrimarySelectionID: input.persistedPrimarySelectionID
-      )
+      groupedItems: groupedItems
     )
   }
 

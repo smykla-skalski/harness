@@ -74,30 +74,22 @@ struct PolicyCanvasDocumentRoundTripOrphansTests {
     #expect(secondGroup?.nodeIds.contains("node-missing") == false)
   }
 
-  @Test("orphan edge endpoint is preserved verbatim across two round-trips")
-  func orphanEdgeStableAcrossRoundTrips() {
-    // BUG: PolicyCanvasViewModel.load / applyDocument do not validate that an
-    // edge's fromNodeId/toNodeId resolve to a node in the document. The edge
-    // slips through with a dead endpoint and exportDocument writes it back
-    // out verbatim. Round-trip stability is locked here so a future fix that
-    // either drops or repairs orphan edges is a deliberate, observable
-    // change. See PolicyCanvasOrphanTests::orphanEdgeSurvivesRoundTrip for
-    // the single-pass version of the same finding.
+  @Test("orphan edge endpoint is dropped across two round-trips")
+  func orphanEdgeDroppedAcrossRoundTrips() {
     let viewModel = PolicyCanvasViewModel.sample()
     let document = makeOrphanEdgeDocument(revision: 11)
 
     viewModel.load(document: document, simulation: nil, audit: nil)
     let firstExport = viewModel.exportDocument()
     let firstEdge = firstExport.edges.first { $0.id == "edge-dead-target" }
-    #expect(firstEdge?.toNodeId == "node-missing")
+    #expect(firstEdge == nil)
 
     let secondVM = PolicyCanvasViewModel.sample()
     secondVM.applyDocument(document: firstExport, simulation: nil, audit: nil)
     let secondExport = secondVM.exportDocument()
     let secondEdge = secondExport.edges.first { $0.id == "edge-dead-target" }
 
-    #expect(secondEdge?.toNodeId == "node-missing")
-    #expect(secondEdge?.fromNodeId == "node-real")
+    #expect(secondEdge == nil)
   }
 
   @Test("a node in nodes but not in any group's nodeIds round-trips as ungrouped")

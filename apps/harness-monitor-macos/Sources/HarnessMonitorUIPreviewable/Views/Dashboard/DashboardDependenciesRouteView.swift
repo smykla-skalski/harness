@@ -20,7 +20,6 @@ import SwiftUI
 
 struct DashboardDependenciesReloadTaskKey: Equatable {
   let storedPreferences: String
-  let refreshToken: Int
   let connectionState: HarnessMonitorStore.ConnectionState
 }
 
@@ -85,9 +84,8 @@ struct DashboardDependenciesRouteView: View {
   )
   @State private var isLoading = false
   @State private var isBackgroundRefreshing = false
-  @State private var errorMessage: String?
+  @State var errorMessage: String?
   @State private var selectedIDs = Set<String>()
-  @State private var refreshToken = 0
   @State private var isLabelSheetPresented = false
   @State private var labelDraft = ""
   @State private var labelTargetItems = [DependencyUpdateItem]()
@@ -96,6 +94,7 @@ struct DashboardDependenciesRouteView: View {
   @State private var cachedPresentation = DashboardDependenciesPresentation.empty
   @State private var presentationGeneration: UInt64 = 0
   @State var refreshingPullRequestIDs = Set<String>()
+  @State var scheduler = DashboardDependenciesScheduler()
 
   private var preferences: DashboardDependenciesPreferences {
     get { DashboardDependenciesPreferences.decode(from: storedPreferences) }
@@ -105,7 +104,6 @@ struct DashboardDependenciesRouteView: View {
   private var reloadTaskKey: DashboardDependenciesReloadTaskKey {
     DashboardDependenciesReloadTaskKey(
       storedPreferences: storedPreferences,
-      refreshToken: refreshToken,
       connectionState: store.connectionState
     )
   }
@@ -232,6 +230,8 @@ struct DashboardDependenciesRouteView: View {
         if let inFlightActionTitle {
           ProgressView(inFlightActionTitle)
             .controlSize(.small)
+        } else if isAnyRepositorySyncing {
+          schedulerProgressBadge
         } else if isBackgroundRefreshing {
           ProgressView("Refreshing…")
             .controlSize(.small)
@@ -299,7 +299,6 @@ struct DashboardDependenciesRouteView: View {
 
   @ViewBuilder private var routeActionButtons: some View {
     actionButton("Refresh", systemImage: "arrow.clockwise") {
-      refreshToken += 1
       Task { await reload(forceRefresh: true) }
     }
     .accessibilityIdentifier(HarnessMonitorAccessibility.dashboardDependenciesRefreshButton)
@@ -469,7 +468,10 @@ struct DashboardDependenciesRouteView: View {
         }
       }
       .frame(maxWidth: .infinity, alignment: .leading)
-      .task(id: DependencyUpdateBodyTaskKey(item: item, isDaemonOnline: store.connectionState == .online)) {
+      .task(
+        id: DependencyUpdateBodyTaskKey(
+          item: item, isDaemonOnline: store.connectionState == .online)
+      ) {
         await store.prepareDependencyUpdateBody(for: item)
       }
     }
@@ -582,6 +584,7 @@ struct DashboardDependenciesRouteView: View {
 
   private func repositorySectionHeader(_ repository: String, itemCount: Int) -> some View {
     let isCollapsed = collapsedRepositories.contains(repository)
+    let isSyncing = refreshingRepositories.contains(repository)
     return Button {
       toggleRepositoryCollapse(repository)
     } label: {
@@ -592,6 +595,11 @@ struct DashboardDependenciesRouteView: View {
           .frame(width: 12, alignment: .center)
         Text(repository)
         Spacer(minLength: HarnessMonitorTheme.spacingSM)
+        if isSyncing {
+          ProgressView()
+            .controlSize(.small)
+            .accessibilityLabel("Syncing \(repository)")
+        }
         Text(verbatim: String(itemCount))
           .foregroundStyle(HarnessMonitorTheme.secondaryInk)
       }
@@ -773,24 +781,12 @@ struct DashboardDependenciesRouteView: View {
   }
 
   private func runAutoRefreshLoop() async {
-    let refreshIntervalSeconds = normalizedPreferences.refreshIntervalSeconds
-    guard refreshIntervalSeconds > 0 else {
-      return
-    }
-    while !Task.isCancelled {
-      do {
-        try await Task.sleep(for: .seconds(refreshIntervalSeconds))
-      } catch {
-        return
-      }
-      guard !Task.isCancelled else { return }
-      await reload(forceRefresh: true, backgroundRefresh: true)
-    }
+    await startScheduler()
   }
 
   func reload(forceRefresh: Bool, backgroundRefresh: Bool = false) async {
     hydrateDependenciesFromCacheIfNeeded()
-    guard let client = store.apiClient else {
+    guard store.apiClient != nil else {
       switch dashboardDependenciesMissingClientState(
         backgroundRefresh: backgroundRefresh,
         connectionState: store.connectionState
@@ -820,27 +816,10 @@ struct DashboardDependenciesRouteView: View {
         isLoading = false
       }
     }
-    do {
-      let loaded = try await client.queryDependencyUpdates(
-        request: normalizedPreferences.queryRequest(forceRefresh: forceRefresh)
-      )
-      guard !Task.isCancelled else { return }
-      response = loaded
-      errorMessage = nil
-      reconcileSelection()
-      persistDependenciesResponse(loaded)
-    } catch {
-      guard !Task.isCancelled else { return }
-      HarnessMonitorLogger.api.warning(
-        "Dependency update reload failed: \(String(reflecting: error), privacy: .public)"
-      )
-      let displayMessage = dashboardDependenciesErrorMessage(for: error)
-      if !response.items.isEmpty {
-        store.presentFailureFeedback(displayMessage)
-      } else {
-        errorMessage = displayMessage
-      }
+    if forceRefresh {
+      scheduler.forceRefreshAll()
     }
+    await startScheduler()
   }
 
   private func clearCacheAndReload() async {

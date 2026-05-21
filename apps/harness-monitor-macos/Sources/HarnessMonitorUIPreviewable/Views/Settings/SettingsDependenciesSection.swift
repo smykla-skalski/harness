@@ -37,6 +37,10 @@ struct SettingsDependenciesSection: View {
         .accessibilityIdentifier(
           HarnessMonitorAccessibility.settingsDependenciesExcludedReposField
         )
+      Toggle("Expand organizations to repositories", isOn: $draft.expandOrganizations)
+        .accessibilityIdentifier(
+          HarnessMonitorAccessibility.settingsDependenciesExpandOrganizationsToggle
+        )
     } header: {
       Text("Sources")
         .harnessNativeFormSectionHeader()
@@ -44,7 +48,9 @@ struct SettingsDependenciesSection: View {
       Text(
         """
         Configure shared monitored repositories in Settings > Repositories. Authors and \
-        excluded repositories remain Dependencies-specific.
+        excluded repositories remain Dependencies-specific. When organization expansion is \
+        on, each org resolves to its repositories so per-repo syncs can stagger across the \
+        schedule.
         """
       )
     }
@@ -123,12 +129,21 @@ struct SettingsDependenciesSection: View {
   private var refreshSection: some View {
     Section {
       SettingsDurationPickerRow(
-        title: "Refresh Interval",
+        title: "Refresh Each Repository Every",
         presets: Self.refreshPresetsSeconds,
         minSeconds: Self.minimumDurationSeconds,
-        seconds: $draft.refreshIntervalSeconds,
+        seconds: $draft.perRepositoryIntervalSeconds,
         pickerAccessibilityIdentifier:
-          HarnessMonitorAccessibility.settingsDependenciesRefreshIntervalField
+          HarnessMonitorAccessibility.settingsDependenciesPerRepoIntervalField
+      )
+      Picker("Max Concurrent Fetches", selection: $draft.maxConcurrentRepositoryFetches) {
+        ForEach(Self.maxConcurrentRange, id: \.self) { count in
+          Text(verbatim: "\(count)").tag(count)
+        }
+      }
+      .pickerStyle(.menu)
+      .accessibilityIdentifier(
+        HarnessMonitorAccessibility.settingsDependenciesMaxConcurrentField
       )
       SettingsDurationPickerRow(
         title: "Cache Max Age",
@@ -139,16 +154,27 @@ struct SettingsDependenciesSection: View {
           HarnessMonitorAccessibility.settingsDependenciesCacheMaxAgeField
       )
     } header: {
-      Text("Refresh & Cache")
+      Text("Sync Schedule")
         .harnessNativeFormSectionHeader()
     } footer: {
-      Text("The route background refresh loop and cache TTL both use these values")
+      Text(
+        """
+        Each repository is fetched on its own timer. With 12 repositories and a 5-minute \
+        interval, expect a sync roughly every 25 seconds.
+        """
+      )
     }
   }
 
   static let minimumDurationSeconds: UInt64 = 30
   static let refreshPresetsSeconds: [UInt64] = [30, 60, 120, 300, 600, 900, 1_800, 3_600]
   static let cachePresetsSeconds: [UInt64] = [60, 300, 600, 900, 1_800, 3_600, 7_200, 21_600]
+  static let maxConcurrentRange = ClosedRange(
+    uncheckedBounds: (
+      lower: DashboardDependenciesPreferences.minimumConcurrentRepositoryFetches,
+      upper: DashboardDependenciesPreferences.maximumConcurrentRepositoryFetches
+    )
+  )
   static let frequentLabelsCountRange = ClosedRange(
     uncheckedBounds: (
       lower: DashboardDependenciesPreferences.minimumFrequentLabelsCount,

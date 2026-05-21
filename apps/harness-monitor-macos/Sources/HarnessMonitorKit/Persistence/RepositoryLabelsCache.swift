@@ -1,7 +1,6 @@
 import Foundation
 import SwiftData
 
-@MainActor
 public struct RepositoryLabelsCache {
   private let context: ModelContext
 

@@ -44,28 +44,20 @@ struct PolicyCanvasOrphanTests {
     #expect(exportedGroup?.nodeIds.contains("node-missing") == false)
   }
 
-  @Test("orphan edge endpoints survive load+export round-trip today")
-  func orphanEdgeSurvivesRoundTrip() {
-    // POTENTIAL BUG: load() and exportDocument() do not validate that an
-    // edge's fromNodeId/toNodeId resolve to a node in the document. The
-    // edge slips through with a dead endpoint, and exportDocument writes
-    // it back out verbatim. Lock this behavior in so a future fix is a
-    // deliberate, observable change.
+  @Test("orphan edge endpoints are dropped on load and export")
+  func orphanEdgeIsDroppedOnRoundTrip() {
     let viewModel = PolicyCanvasViewModel.sample()
     let document = makeOrphanEdgeDocument()
 
     viewModel.load(document: document, simulation: nil, audit: nil)
 
     let canvasEdge = viewModel.edges.first { $0.id == "edge-dead-target" }
-    #expect(canvasEdge != nil)
-    #expect(canvasEdge?.target.nodeID == "node-missing")
+    #expect(canvasEdge == nil)
     #expect(viewModel.node("node-missing") == nil)
 
     let exported = viewModel.exportDocument()
     let exportedEdge = exported.edges.first { $0.id == "edge-dead-target" }
-    #expect(exportedEdge != nil)
-    #expect(exportedEdge?.toNodeId == "node-missing")
-    #expect(exportedEdge?.fromNodeId == "node-real")
+    #expect(exportedEdge == nil)
   }
 
   // MARK: - Helpers

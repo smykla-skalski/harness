@@ -172,9 +172,31 @@ struct SessionTimelinePresentationTaskKey: Equatable {
   let decisionsRevision: Int
   let decisionsCount: Int
   let signalsRevision: UInt64
+  let signalDeadlineGeneration: UInt64
   let filters: SessionTimelineFilterState
   let isTimelineLoading: Bool
   let dateTimeConfiguration: HarnessMonitorDateTimeConfiguration
+}
+
+struct SessionTimelineSignalDeadlineClockKey: Equatable {
+  let pendingExpirations: [Date]
+
+  init(signals: [SessionSignalRecord], now: Date = .now) {
+    pendingExpirations =
+      signals
+      .compactMap { record -> Date? in
+        guard record.status == .pending,
+          let expires = record.expiresAtDate,
+          expires > now
+        else { return nil }
+        return expires
+      }
+      .sorted()
+  }
+
+  var nextExpiration: Date? {
+    pendingExpirations.first
+  }
 }
 
 struct SessionTimelineEntriesBoundarySignature: Equatable {

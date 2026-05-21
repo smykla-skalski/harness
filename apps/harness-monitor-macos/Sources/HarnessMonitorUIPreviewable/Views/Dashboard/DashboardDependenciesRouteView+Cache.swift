@@ -17,6 +17,11 @@ extension DashboardDependenciesRouteView {
     return RepositoryLabelUsageCache(context: context)
   }
 
+  var dependencyCachePersistenceWriter: DependencyUpdatesCachePersistenceWriter? {
+    guard let modelContainer = store.modelContext?.container else { return nil }
+    return DependencyUpdatesCachePersistenceWriter(modelContainer: modelContainer)
+  }
+
   func frequentLabelNames(for items: [DependencyUpdateItem]) -> [String] {
     guard let cache = repositoryLabelUsageCache, !items.isEmpty else { return [] }
     let repositories = Array(Set(items.map(\.repository)))
@@ -78,17 +83,41 @@ extension DashboardDependenciesRouteView {
   }
 
   func persistDependenciesResponse(_ response: DependencyUpdatesQueryResponse) {
-    dependenciesCache?.save(
-      preferencesHash: dependenciesCachePreferencesHash,
-      response: response
-    )
-    repositoryLabelsCache?.upsert(response.repositoryLabels)
+    guard let writer = dependencyCachePersistenceWriter else { return }
+    let preferencesHash = dependenciesCachePreferencesHash
+    Task {
+      await writer.saveResponse(
+        preferencesHash: preferencesHash,
+        response: response
+      )
+    }
   }
 
   func persistDependenciesRefresh(_ refresh: DependencyUpdatesRefreshResponse) {
-    dependenciesCache?.applyRefresh(
-      preferencesHash: dependenciesCachePreferencesHash,
-      refresh: refresh
-    )
+    guard let writer = dependencyCachePersistenceWriter else { return }
+    let preferencesHash = dependenciesCachePreferencesHash
+    Task {
+      await writer.applyRefresh(
+        preferencesHash: preferencesHash,
+        refresh: refresh
+      )
+    }
+  }
+
+  func persistDependenciesPerRepoResponse(
+    repository: String,
+    response: DependencyUpdatesQueryResponse,
+    fallbackResponse: DependencyUpdatesQueryResponse
+  ) {
+    guard let writer = dependencyCachePersistenceWriter else { return }
+    let preferencesHash = dependenciesCachePreferencesHash
+    Task {
+      await writer.applyPerRepoResponse(
+        preferencesHash: preferencesHash,
+        repository: repository,
+        response: response,
+        fallbackResponse: fallbackResponse
+      )
+    }
   }
 }
