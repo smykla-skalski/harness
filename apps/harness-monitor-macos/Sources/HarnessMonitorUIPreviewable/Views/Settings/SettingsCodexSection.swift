@@ -37,31 +37,11 @@ public struct SettingsHostBridgeSection: View {
 
   public var body: some View {
     Form {
-      Section {
-        LabeledContent("Status") {
-          HStack(spacing: HarnessMonitorTheme.spacingXS) {
-            Circle()
-              .fill(hostBridge.running ? .green : .secondary)
-              .frame(width: statusCircleSize, height: statusCircleSize)
-            Text(hostBridge.running ? "Running" : "Not running")
-              .scaledFont(.body)
-          }
-        }
-        LabeledContent("Socket") {
-          Text(hostBridge.socketPath ?? "none")
-            .scaledFont(.body.monospaced())
-        }
-        if manifest?.sandboxed == true {
-          LabeledContent("Sandbox") {
-            Text("Active")
-              .scaledFont(.body)
-              .foregroundStyle(.orange)
-          }
-        }
-      } header: {
-        Text("Host Bridge")
-          .harnessNativeFormSectionHeader()
-      }
+      HostBridgeStatusSection(
+        running: hostBridge.running,
+        socketPath: hostBridge.socketPath,
+        isSandboxActive: manifest?.sandboxed == true
+      )
 
       if isFullyExpanded {
         Section {
@@ -288,6 +268,42 @@ private struct HostBridgeCommandsView: View {
         .harnessActionButtonStyle(variant: .bordered, tint: .secondary)
         .accessibilityIdentifier(accessibilityID)
       }
+    }
+  }
+}
+
+private struct HostBridgeStatusSection: View {
+  let running: Bool
+  let socketPath: String?
+  let isSandboxActive: Bool
+  @ScaledMetric(relativeTo: .caption)
+  private var statusCircleSize: CGFloat = 8
+
+  var body: some View {
+    Section {
+      LabeledContent("Status") {
+        HStack(spacing: HarnessMonitorTheme.spacingXS) {
+          Circle()
+            .fill(running ? .green : .secondary)
+            .frame(width: statusCircleSize, height: statusCircleSize)
+          Text(running ? "Running" : "Not running")
+            .scaledFont(.body)
+        }
+      }
+      LabeledContent("Socket") {
+        Text(socketPath ?? "none")
+          .scaledFont(.body.monospaced())
+      }
+      if isSandboxActive {
+        LabeledContent("Sandbox") {
+          Text("Active")
+            .scaledFont(.body)
+            .foregroundStyle(.orange)
+        }
+      }
+    } header: {
+      Text("Host Bridge")
+        .harnessNativeFormSectionHeader()
     }
   }
 }
