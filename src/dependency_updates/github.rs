@@ -18,9 +18,10 @@ use mapping::{
     action_result, convert_node, github_project_config, next_cursor_or_scope_limit, scopes,
 };
 use queries::{
-    APPROVE_MUTATION, ORGANIZATION_REPOSITORIES_QUERY, REREQUEST_CHECK_SUITE_MUTATION, SEARCH_QUERY,
+    APPROVE_MUTATION, NODES_BY_IDS_QUERY, ORGANIZATION_REPOSITORIES_QUERY,
+    REREQUEST_CHECK_SUITE_MUTATION, SEARCH_QUERY,
 };
-use types::{OrganizationRepositoriesResponse, SearchResponse};
+use types::{NodesResponse, OrganizationRepositoriesResponse, SearchResponse};
 
 use super::{
     DependencyUpdateActionKind, DependencyUpdateActionOutcome, DependencyUpdateActionResult,
@@ -36,6 +37,7 @@ const GRAPHQL_PAGE_SIZE: u32 = 100;
 const SEARCH_PAGE_CAP: u32 = 10;
 const REPOSITORY_CATALOG_PAGE_CAP: u32 = 5;
 const SCOPE_QUERY_CAP: usize = 50;
+const NODES_BATCH_SIZE: usize = 50;
 
 static RUSTLS_PROVIDER: OnceLock<()> = OnceLock::new();
 
@@ -104,6 +106,38 @@ impl DependencyUpdatesGitHubClient {
             }
         }
         Ok(deduped.into_values().collect())
+    }
+
+    pub(crate) async fn fetch_by_ids(
+        &self,
+        ids: &[String],
+    ) -> Result<(Vec<DependencyUpdateItem>, Vec<String>), CliError> {
+        if ids.is_empty() {
+            return Ok((Vec::new(), Vec::new()));
+        }
+        let mut items = Vec::with_capacity(ids.len());
+        let mut missing = Vec::new();
+        for chunk in ids.chunks(NODES_BATCH_SIZE) {
+            let response: NodesResponse = self
+                .client
+                .graphql(&json!({
+                    "query": NODES_BY_IDS_QUERY,
+                    "variables": { "ids": chunk },
+                }))
+                .await
+                .map_err(operation_error)?;
+            for (offset, node) in response.nodes.into_iter().enumerate() {
+                match node {
+                    Some(node) => items.push(convert_node(node)?),
+                    None => {
+                        if let Some(id) = chunk.get(offset) {
+                            missing.push(id.clone());
+                        }
+                    }
+                }
+            }
+        }
+        Ok((items, missing))
     }
 
     pub(crate) async fn catalog_organization_repositories(

@@ -3,7 +3,8 @@ use crate::errors::{CliError, CliErrorKind};
 use super::{
     DependencyUpdateTarget, DependencyUpdatesApproveRequest, DependencyUpdatesAutoRequest,
     DependencyUpdatesLabelRequest, DependencyUpdatesMergeRequest, DependencyUpdatesQueryRequest,
-    DependencyUpdatesRepositoryCatalogRequest, DependencyUpdatesRerunChecksRequest,
+    DependencyUpdatesRefreshRequest, DependencyUpdatesRepositoryCatalogRequest,
+    DependencyUpdatesRerunChecksRequest,
 };
 
 impl DependencyUpdatesQueryRequest {
@@ -101,6 +102,16 @@ impl DependencyUpdatesAutoRequest {
     /// Returns `CliError` when no dependency update targets are provided.
     pub fn validate(&self) -> Result<(), CliError> {
         ensure_targets(&self.targets, "auto mode")
+    }
+}
+
+impl DependencyUpdatesRefreshRequest {
+    /// Validate the refresh request.
+    ///
+    /// # Errors
+    /// Returns `CliError` when no dependency update targets are provided.
+    pub fn validate(&self) -> Result<(), CliError> {
+        ensure_targets(&self.targets, "refresh")
     }
 }
 

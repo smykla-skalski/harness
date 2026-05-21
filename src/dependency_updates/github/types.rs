@@ -13,6 +13,11 @@ pub(super) struct SearchConnection {
 }
 
 #[derive(Debug, Deserialize)]
+pub(super) struct NodesResponse {
+    pub(super) nodes: Vec<Option<SearchNode>>,
+}
+
+#[derive(Debug, Deserialize)]
 pub(super) struct OrganizationRepositoriesResponse {
     pub(super) organization: Option<OrganizationRepositoriesNode>,
 }

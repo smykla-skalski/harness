@@ -82,6 +82,7 @@ pub const DEPENDENCY_UPDATES_RERUN_CHECKS: &str = "/v1/dependency-updates/rerun-
 pub const DEPENDENCY_UPDATES_LABELS: &str = "/v1/dependency-updates/labels";
 pub const DEPENDENCY_UPDATES_AUTO: &str = "/v1/dependency-updates/auto";
 pub const DEPENDENCY_UPDATES_CACHE: &str = "/v1/dependency-updates/cache";
+pub const DEPENDENCY_UPDATES_REFRESH: &str = "/v1/dependency-updates/refresh";
 pub const SESSION_AGENT_ROLE: &str = "/v1/sessions/{session_id}/agents/{session_agent_id}/role";
 pub const SESSION_AGENT_REMOVE: &str = "/v1/sessions/{session_id}/agents/{session_agent_id}/remove";
 pub const SESSION_LEADER_TRANSFER: &str = "/v1/sessions/{session_id}/leader";
