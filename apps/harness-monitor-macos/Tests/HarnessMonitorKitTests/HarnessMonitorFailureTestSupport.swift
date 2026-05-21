@@ -255,10 +255,22 @@ final class FailingHarnessClient: HarnessMonitorClientProtocol, @unchecked Senda
 
 @MainActor
 func makeBootstrappedStore(
-  client: any HarnessMonitorClientProtocol = RecordingHarnessClient()
+  client: any HarnessMonitorClientProtocol = RecordingHarnessClient(),
+  credentialPersistence: InMemoryTaskBoardCredentialBundle? = nil,
+  keychainBundle: InMemoryTaskBoardKeychainBundle? = nil
 ) async -> HarnessMonitorStore {
   let daemon = RecordingDaemonController(client: client)
-  let store = HarnessMonitorStore(daemonController: daemon)
+  let credentialPersistence = credentialPersistence ?? InMemoryTaskBoardCredentialBundle()
+  let keychainBundle = keychainBundle ?? InMemoryTaskBoardKeychainBundle()
+  let taskBoardSettingsWorker = TaskBoardSettingsWorker(
+    credentialPersistence: credentialPersistence.persistence,
+    keyMaterialPersistence: keychainBundle.persistence
+  )
+  let store = HarnessMonitorStore(
+    daemonController: daemon,
+    voiceCapture: NativeVoiceCaptureService(),
+    taskBoardSettingsWorker: taskBoardSettingsWorker
+  )
   await store.bootstrap()
   clearRecordedCallsIfNeeded(for: client)
   return store
@@ -267,6 +279,113 @@ func makeBootstrappedStore(
 @MainActor
 func clearRecordedCallsIfNeeded(for client: any HarnessMonitorClientProtocol) {
   (client as? RecordingHarnessClient)?.calls = []
+}
+
+@MainActor
+final class InMemoryTaskBoardCredentialBundle {
+  let github = InMemoryTaskBoardGitHubCredentialStore()
+  let todoist = InMemoryTaskBoardTodoistCredentialStore()
+  let openRouter = InMemoryTaskBoardOpenRouterCredentialStore()
+
+  var persistence: TaskBoardCredentialPersistence {
+    TaskBoardCredentialPersistence(
+      github: github,
+      todoist: todoist,
+      openRouter: openRouter
+    )
+  }
+}
+
+final class InMemoryTaskBoardGitHubCredentialStore:
+  TaskBoardGitHubCredentialPersisting, @unchecked Sendable
+{
+  var snapshot = TaskBoardGitHubCredentialSnapshot()
+  var savedSnapshots: [TaskBoardGitHubCredentialSnapshot] = []
+
+  func load() throws -> TaskBoardGitHubCredentialSnapshot {
+    snapshot
+  }
+
+  func save(_ snapshot: TaskBoardGitHubCredentialSnapshot) throws {
+    self.snapshot = snapshot
+    savedSnapshots.append(snapshot)
+  }
+
+  func delete() throws {
+    snapshot = TaskBoardGitHubCredentialSnapshot()
+  }
+}
+
+final class InMemoryTaskBoardTodoistCredentialStore:
+  TaskBoardTodoistCredentialPersisting, @unchecked Sendable
+{
+  var snapshot = TaskBoardTodoistCredentialSnapshot()
+
+  func load() throws -> TaskBoardTodoistCredentialSnapshot {
+    snapshot
+  }
+
+  func save(_ snapshot: TaskBoardTodoistCredentialSnapshot) throws {
+    self.snapshot = snapshot
+  }
+
+  func delete() throws {
+    snapshot = TaskBoardTodoistCredentialSnapshot()
+  }
+}
+
+final class InMemoryTaskBoardOpenRouterCredentialStore:
+  TaskBoardOpenRouterCredentialPersisting, @unchecked Sendable
+{
+  var snapshot = TaskBoardOpenRouterCredentialSnapshot()
+
+  func load() throws -> TaskBoardOpenRouterCredentialSnapshot {
+    snapshot
+  }
+
+  func save(_ snapshot: TaskBoardOpenRouterCredentialSnapshot) throws {
+    self.snapshot = snapshot
+  }
+
+  func delete() throws {
+    snapshot = TaskBoardOpenRouterCredentialSnapshot()
+  }
+}
+
+@MainActor
+final class InMemoryTaskBoardKeychainBundle {
+  let ssh = InMemoryTaskBoardKeyMaterialStore()
+  let signingSsh = InMemoryTaskBoardKeyMaterialStore()
+  let gpg = InMemoryTaskBoardKeyMaterialStore()
+
+  var persistence: TaskBoardKeyMaterialPersistence {
+    TaskBoardKeyMaterialPersistence(
+      ssh: ssh,
+      signingSsh: signingSsh,
+      gpg: gpg
+    )
+  }
+}
+
+final class InMemoryTaskBoardKeyMaterialStore: TaskBoardKeyMaterialPersisting, @unchecked Sendable {
+  var snapshots: [TaskBoardKeyMaterialStore.Scope: TaskBoardKeyMaterialSnapshot] = [:]
+  var recorded: [(TaskBoardKeyMaterialStore.Scope, TaskBoardKeyMaterialSnapshot)] = []
+
+  func load(scope: TaskBoardKeyMaterialStore.Scope) throws -> TaskBoardKeyMaterialSnapshot {
+    snapshots[scope] ?? TaskBoardKeyMaterialSnapshot()
+  }
+
+  func save(_ snapshot: TaskBoardKeyMaterialSnapshot, scope: TaskBoardKeyMaterialStore.Scope) throws
+  {
+    snapshots[scope] = snapshot
+    if !snapshot.isEmpty {
+      recorded.append((scope, snapshot))
+    }
+  }
+
+  func delete(scope: TaskBoardKeyMaterialStore.Scope) throws {
+    snapshots.removeValue(forKey: scope)
+  }
 }
 
 @MainActor

@@ -15,7 +15,10 @@ struct HarnessMonitorStoreTaskBoardSettingsTests {
     let baselineCallCount = client.recordedCalls().count
     let snapshot = makeSettingsSnapshot()
 
-    let success = await store.updateTaskBoardGitSettings(snapshot: snapshot)
+    let success = await store.updateTaskBoardGitSettings(
+      snapshot: snapshot,
+      origin: .settingsSecretsSaveButton
+    )
 
     #expect(success == false)
     let newCalls = Array(client.recordedCalls().dropFirst(baselineCallCount))
@@ -58,7 +61,10 @@ struct HarnessMonitorStoreTaskBoardSettingsTests {
     let baselineCallCount = client.recordedCalls().count
     let snapshot = makeSettingsSnapshot()
 
-    let success = await store.updateTaskBoardGitSettings(snapshot: snapshot)
+    let success = await store.updateTaskBoardGitSettings(
+      snapshot: snapshot,
+      origin: .settingsSecretsSaveButton
+    )
 
     #expect(success == false)
     let newCalls = Array(client.recordedCalls().dropFirst(baselineCallCount))
@@ -92,7 +98,10 @@ struct HarnessMonitorStoreTaskBoardSettingsTests {
     let baselineCallCount = client.recordedCalls().count
     let snapshot = makeSettingsSnapshot()
 
-    let success = await store.updateTaskBoardGitSettings(snapshot: snapshot)
+    let success = await store.updateTaskBoardGitSettings(
+      snapshot: snapshot,
+      origin: .settingsSecretsSaveButton
+    )
 
     #expect(success == false)
     let newCalls = Array(client.recordedCalls().dropFirst(baselineCallCount))
@@ -123,11 +132,20 @@ struct HarnessMonitorStoreTaskBoardSettingsTests {
   @Test("Successful save does not run external sync on the foreground path")
   func successfulSaveDoesNotRunExternalSyncOnForegroundPath() async {
     let client = RecordingHarnessClient()
-    let store = await makeBootstrappedStore(client: client)
+    let credentialPersistence = InMemoryTaskBoardCredentialBundle()
+    let keychainBundle = InMemoryTaskBoardKeychainBundle()
+    let store = await makeBootstrappedStore(
+      client: client,
+      credentialPersistence: credentialPersistence,
+      keychainBundle: keychainBundle
+    )
     let baselineCallCount = client.recordedCalls().count
     let snapshot = makeSettingsSnapshot()
 
-    let success = await store.updateTaskBoardGitSettings(snapshot: snapshot)
+    let success = await store.updateTaskBoardGitSettings(
+      snapshot: snapshot,
+      origin: .settingsSecretsSaveButton
+    )
 
     #expect(success)
     let newCalls = Array(client.recordedCalls().dropFirst(baselineCallCount))
@@ -138,6 +156,8 @@ struct HarnessMonitorStoreTaskBoardSettingsTests {
       } == false
     )
     #expect(store.currentSuccessFeedbackMessage == "Saved task board settings")
+    #expect(credentialPersistence.github.savedSnapshots == [snapshot.githubCredentials])
+    #expect(keychainBundle.ssh.recorded.isEmpty)
   }
 
   private func makeSettingsSnapshot() -> TaskBoardGitSettingsSnapshot {

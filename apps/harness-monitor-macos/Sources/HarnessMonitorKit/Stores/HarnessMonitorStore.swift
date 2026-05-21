@@ -34,7 +34,7 @@ public final class HarnessMonitorStore {
   @ObservationIgnored let sessionCacheWriteWorker = SessionCacheWriteWorker()
   @ObservationIgnored let timelineWindowWorker = TimelineWindowWorker()
   @ObservationIgnored let sessionWindowPresentationWorker = SessionWindowPresentationWorker()
-  @ObservationIgnored let taskBoardSettingsWorker = TaskBoardSettingsWorker()
+  @ObservationIgnored let taskBoardSettingsWorker: TaskBoardSettingsWorker
   @ObservationIgnored var sessionIndexSnapshotApplyTask: Task<Void, Never>?
   @ObservationIgnored var sessionIndexSnapshotApplyGeneration: UInt64 = 0
   @ObservationIgnored var acpTimelineMergeTask: Task<Void, Never>?
@@ -422,7 +422,7 @@ public final class HarnessMonitorStore {
   @ObservationIgnored var notificationHistoryRuntimeActions: [String: @MainActor () async -> Void] =
     [:]
 
-  public init(
+  public convenience init(
     daemonController: any DaemonControlling,
     fileViewer: any FileViewerActivating = WorkspaceFileViewer(),
     voiceCapture: any VoiceCaptureProviding,
@@ -430,6 +430,28 @@ public final class HarnessMonitorStore {
     modelContainer: ModelContainer? = nil,
     persistenceError: String? = nil,
     cacheService: SessionCacheService? = nil
+  ) {
+    self.init(
+      daemonController: daemonController,
+      fileViewer: fileViewer,
+      voiceCapture: voiceCapture,
+      daemonOwnership: daemonOwnership,
+      modelContainer: modelContainer,
+      persistenceError: persistenceError,
+      cacheService: cacheService,
+      taskBoardSettingsWorker: TaskBoardSettingsWorker()
+    )
+  }
+
+  init(
+    daemonController: any DaemonControlling,
+    fileViewer: any FileViewerActivating = WorkspaceFileViewer(),
+    voiceCapture: any VoiceCaptureProviding,
+    daemonOwnership: DaemonOwnership = .managed,
+    modelContainer: ModelContainer? = nil,
+    persistenceError: String? = nil,
+    cacheService: SessionCacheService? = nil,
+    taskBoardSettingsWorker: TaskBoardSettingsWorker
   ) {
     self.connection = ConnectionSlice()
     self.sessionIndex = SessionIndexSlice()
@@ -444,6 +466,7 @@ public final class HarnessMonitorStore {
     self.daemonOwnership = daemonOwnership
     self.fileViewer = fileViewer
     self.voiceCapture = voiceCapture
+    self.taskBoardSettingsWorker = taskBoardSettingsWorker
     self.modelContext = modelContainer?.mainContext
     self.userDataService = modelContainer.map {
       UserDataPersistenceService(

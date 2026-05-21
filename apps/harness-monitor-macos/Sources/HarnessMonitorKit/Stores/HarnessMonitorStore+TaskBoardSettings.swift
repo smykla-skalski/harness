@@ -7,38 +7,86 @@ struct TaskBoardStoredCredentialSnapshot: Sendable {
   let openRouterCredentials: TaskBoardOpenRouterCredentialSnapshot
 }
 
+public enum TaskBoardSettingsSaveOrigin: String, Sendable {
+  case settingsSecretsSaveButton
+  case settingsRepositoriesSaveButton
+}
+
+protocol TaskBoardGitHubCredentialPersisting: Sendable {
+  func load() throws -> TaskBoardGitHubCredentialSnapshot
+  func save(_ snapshot: TaskBoardGitHubCredentialSnapshot) throws
+  func delete() throws
+}
+
+protocol TaskBoardTodoistCredentialPersisting: Sendable {
+  func load() throws -> TaskBoardTodoistCredentialSnapshot
+  func save(_ snapshot: TaskBoardTodoistCredentialSnapshot) throws
+  func delete() throws
+}
+
+protocol TaskBoardOpenRouterCredentialPersisting: Sendable {
+  func load() throws -> TaskBoardOpenRouterCredentialSnapshot
+  func save(_ snapshot: TaskBoardOpenRouterCredentialSnapshot) throws
+  func delete() throws
+}
+
+struct TaskBoardCredentialPersistence: Sendable {
+  let github: any TaskBoardGitHubCredentialPersisting
+  let todoist: any TaskBoardTodoistCredentialPersisting
+  let openRouter: any TaskBoardOpenRouterCredentialPersisting
+
+  static var defaultKeychain: Self {
+    Self(
+      github: TaskBoardGitHubCredentialStore(),
+      todoist: TaskBoardTodoistCredentialStore(),
+      openRouter: TaskBoardOpenRouterCredentialStore()
+    )
+  }
+}
+
 actor TaskBoardSettingsWorker {
-  private let githubCredentialStore = TaskBoardGitHubCredentialStore()
-  private let todoistCredentialStore = TaskBoardTodoistCredentialStore()
-  private let openRouterCredentialStore = TaskBoardOpenRouterCredentialStore()
+  private let credentialPersistence: TaskBoardCredentialPersistence
+  private let keyMaterialPersistence: TaskBoardKeyMaterialPersistence
+
+  init(
+    credentialPersistence: TaskBoardCredentialPersistence = .defaultKeychain,
+    keyMaterialPersistence: TaskBoardKeyMaterialPersistence = .defaultKeychain
+  ) {
+    self.credentialPersistence = credentialPersistence
+    self.keyMaterialPersistence = keyMaterialPersistence
+  }
 
   func loadStoredCredentials() throws -> TaskBoardStoredCredentialSnapshot {
     try TaskBoardStoredCredentialSnapshot(
-      githubCredentials: githubCredentialStore.load(),
-      todoistCredentials: todoistCredentialStore.load(),
-      openRouterCredentials: openRouterCredentialStore.load()
+      githubCredentials: credentialPersistence.github.load(),
+      todoistCredentials: credentialPersistence.todoist.load(),
+      openRouterCredentials: credentialPersistence.openRouter.load()
     )
   }
 
-  func hydrateKeyMaterial(
-    into runtime: TaskBoardGitRuntimeConfig,
-    keychain: TaskBoardKeyMaterialPersistence = .defaultKeychain
-  ) -> TaskBoardGitRuntimeConfig {
-    HarnessMonitorStore.hydrateKeyMaterial(into: runtime, keychain: keychain)
+  func hydrateKeyMaterial(into runtime: TaskBoardGitRuntimeConfig) -> TaskBoardGitRuntimeConfig {
+    HarnessMonitorStore.hydrateKeyMaterial(into: runtime, keychain: keyMaterialPersistence)
   }
 
-  func persistLocalSecrets(snapshot: TaskBoardGitSettingsSnapshot) throws {
-    try githubCredentialStore.save(snapshot.githubCredentials)
-    try todoistCredentialStore.save(snapshot.todoistCredentials)
-    try openRouterCredentialStore.save(snapshot.openRouterCredentials)
-    try HarnessMonitorStore.persistKeyMaterial(runtime: snapshot.runtimeConfig)
-  }
-
-  func persistKeyMaterial(
-    runtime: TaskBoardGitRuntimeConfig,
-    keychain: TaskBoardKeyMaterialPersistence = .defaultKeychain
+  fileprivate func persistLocalSecrets(
+    snapshot: TaskBoardGitSettingsSnapshot,
+    origin: TaskBoardSettingsSaveOrigin
   ) throws {
-    try HarnessMonitorStore.persistKeyMaterial(runtime: runtime, keychain: keychain)
+    switch origin {
+    case .settingsSecretsSaveButton, .settingsRepositoriesSaveButton:
+      break
+    }
+    try credentialPersistence.github.save(snapshot.githubCredentials)
+    try credentialPersistence.todoist.save(snapshot.todoistCredentials)
+    try credentialPersistence.openRouter.save(snapshot.openRouterCredentials)
+    try HarnessMonitorStore.persistKeyMaterial(
+      runtime: snapshot.runtimeConfig,
+      keychain: keyMaterialPersistence
+    )
+  }
+
+  private func persistKeyMaterial(runtime: TaskBoardGitRuntimeConfig) throws {
+    try HarnessMonitorStore.persistKeyMaterial(runtime: runtime, keychain: keyMaterialPersistence)
   }
 
   func drainRuntimeSecretsIfNeeded(
@@ -250,7 +298,10 @@ extension HarnessMonitorStore {
   }
 
   @discardableResult
-  public func updateTaskBoardGitSettings(snapshot: TaskBoardGitSettingsSnapshot) async -> Bool {
+  public func updateTaskBoardGitSettings(
+    snapshot: TaskBoardGitSettingsSnapshot,
+    origin: TaskBoardSettingsSaveOrigin
+  ) async -> Bool {
     isDaemonActionInFlight = true
     defer { isDaemonActionInFlight = false }
 
@@ -288,7 +339,10 @@ extension HarnessMonitorStore {
       }
 
       do {
-        try await taskBoardSettingsWorker.persistLocalSecrets(snapshot: materializedSnapshot)
+        try await taskBoardSettingsWorker.persistLocalSecrets(
+          snapshot: materializedSnapshot,
+          origin: origin
+        )
       } catch {
         presentFailureFeedback(
           """

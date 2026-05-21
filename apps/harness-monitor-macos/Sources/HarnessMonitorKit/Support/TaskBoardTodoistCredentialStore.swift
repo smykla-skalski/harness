@@ -15,7 +15,7 @@ public enum TaskBoardTodoistCredentialStoreError: LocalizedError, Equatable {
   }
 }
 
-public struct TaskBoardTodoistCredentialStore: Sendable {
+public struct TaskBoardTodoistCredentialStore: TaskBoardTodoistCredentialPersisting, Sendable {
   private let service = "io.harnessmonitor.task-board.todoist-credentials"
   private let account = "default"
 

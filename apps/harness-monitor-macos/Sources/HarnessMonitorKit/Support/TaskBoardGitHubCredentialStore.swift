@@ -15,7 +15,7 @@ public enum TaskBoardGitHubCredentialStoreError: LocalizedError, Equatable {
   }
 }
 
-public struct TaskBoardGitHubCredentialStore: Sendable {
+public struct TaskBoardGitHubCredentialStore: TaskBoardGitHubCredentialPersisting, Sendable {
   private let service = "io.harnessmonitor.task-board.github-credentials"
   private let account = "default"
 

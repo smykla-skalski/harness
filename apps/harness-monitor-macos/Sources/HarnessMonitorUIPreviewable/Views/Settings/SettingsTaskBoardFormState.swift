@@ -99,7 +99,8 @@ extension SettingsTaskBoardEditingSurface {
     defer { isSavingBinding.wrappedValue = false }
 
     let succeeded = await store.updateTaskBoardGitSettings(
-      snapshot: draftBinding.wrappedValue.snapshot
+      snapshot: draftBinding.wrappedValue.snapshot,
+      origin: .settingsSecretsSaveButton
     )
     if succeeded {
       loadErrorBinding.wrappedValue = nil
