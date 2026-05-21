@@ -5,6 +5,7 @@ pub use crate::dependency_updates::{
     DependencyUpdatePullRequestState, DependencyUpdateReview, DependencyUpdateReviewEventState,
     DependencyUpdateReviewStatus, DependencyUpdateTarget, DependencyUpdatesActionResponse,
     DependencyUpdatesApproveRequest, DependencyUpdatesAutoRequest,
+    DependencyUpdatesBodyRequest, DependencyUpdatesBodyResponse,
     DependencyUpdatesCacheClearResponse, DependencyUpdatesLabelRequest,
     DependencyUpdatesMergeRequest, DependencyUpdatesQueryRequest, DependencyUpdatesQueryResponse,
     DependencyUpdatesRefreshRequest, DependencyUpdatesRefreshResponse,
