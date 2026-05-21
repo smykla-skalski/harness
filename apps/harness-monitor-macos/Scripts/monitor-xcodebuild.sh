@@ -331,8 +331,16 @@ ensure_non_indexable_directory "$derive_data_path"
 run_stale_preflight
 trap 'cleanup_descendants_and_lock $?' EXIT
 trap 'cleanup_descendants_and_lock 130' INT
-trap 'cleanup_descendants_and_lock 143' TERM
-trap 'cleanup_descendants_and_lock 129' HUP
+if [[ "${HARNESS_MONITOR_BUILD_PROTECT_INFLIGHT:-1}" == "1" ]]; then
+  # POSIX preserves the ignore disposition across exec(), so xcodebuild (and
+  # tuist/xcbeautify in the formatter pipeline) inherit the ignore from us.
+  # Only SIGINT (user Ctrl-C) and SIGKILL can cancel a running build.
+  # Set HARNESS_MONITOR_BUILD_PROTECT_INFLIGHT=0 to opt out.
+  trap '' TERM HUP
+else
+  trap 'cleanup_descendants_and_lock 143' TERM
+  trap 'cleanup_descendants_and_lock 129' HUP
+fi
 
 acquire_xcodebuild_lock
 run_xcodebuild
