@@ -173,22 +173,24 @@ extension HarnessMonitorStore {
     await applyRefreshSnapshot(
       refreshSnapshot,
       using: client,
-      preserveSelection: preserveSelection,
-      allowPreviewReadySelection: allowPreviewReadySelection,
-      recordConnectionTelemetry: recordConnectionTelemetry,
-      isInitialConnect: isInitialConnect
+      options: RefreshApplyOptions(
+        preserveSelection: preserveSelection,
+        allowPreviewReadySelection: allowPreviewReadySelection,
+        recordConnectionTelemetry: recordConnectionTelemetry,
+        isInitialConnect: isInitialConnect
+      )
     )
   }
 
-  // swiftlint:disable:next function_parameter_count
   private func applyRefreshSnapshot(
     _ refreshSnapshot: RefreshSnapshot,
     using client: any HarnessMonitorClientProtocol,
-    preserveSelection: Bool,
-    allowPreviewReadySelection: Bool,
-    recordConnectionTelemetry: Bool,
-    isInitialConnect: Bool
+    options: RefreshApplyOptions
   ) async {
+    let preserveSelection = options.preserveSelection
+    let allowPreviewReadySelection = options.allowPreviewReadySelection
+    let recordConnectionTelemetry = options.recordConnectionTelemetry
+    let isInitialConnect = options.isInitialConnect
     cancelInitialTaskBoardConfirmationRefresh()
     let measuredDiagnostics = refreshSnapshot.diagnostics
     let measuredProjects = refreshSnapshot.projects
@@ -366,7 +368,6 @@ extension HarnessMonitorStore {
     initialTaskBoardConfirmationTask = nil
   }
 
-  // swiftlint:disable:next cyclomatic_complexity
   func scheduleInitialTaskBoardConfirmationRefresh(
     using client: any HarnessMonitorClientProtocol,
     preservedItemIDs: Set<String>,
@@ -390,70 +391,112 @@ extension HarnessMonitorStore {
         } catch {
           return
         }
-
-        guard
-          self.connectionState == .online || self.connectionState == .connecting
-        else {
+        guard self.connectionState == .online || self.connectionState == .connecting else {
           return
         }
-
         let snapshot = await Self.loadTaskBoardRefreshSnapshot(using: client)
         let reachedDeadline = ContinuousClock.now >= deadline
-
-        var resolvedItems = self.globalTaskBoardItems
-        var resolvedStatus = self.globalTaskBoardOrchestratorStatus
-        var shouldApply = false
-        var shouldKeepWaiting = false
-
-        if !preservedItemIDs.isEmpty {
-          if let measuredItems = snapshot.items.measured {
-            let liveIDs = Set(measuredItems.value.map(\.id))
-            if preservedItemIDs.isSubset(of: liveIDs) || reachedDeadline {
-              resolvedItems = measuredItems.value
-              shouldApply = true
-            } else {
-              shouldKeepWaiting = true
-            }
-          } else if !reachedDeadline {
-            shouldKeepWaiting = true
-          }
-        }
-
-        if preservedStatus {
-          if let measuredStatus = snapshot.orchestratorStatus.measured {
-            if measuredStatus.value != nil || reachedDeadline {
-              resolvedStatus = measuredStatus.value
-              shouldApply = true
-            } else {
-              shouldKeepWaiting = true
-            }
-          } else if !reachedDeadline {
-            shouldKeepWaiting = true
-          }
-        }
-
-        if shouldKeepWaiting && !reachedDeadline {
+        let tick = self.evaluateTaskBoardConfirmationTick(
+          snapshot: snapshot,
+          preservedItemIDs: preservedItemIDs,
+          preservedStatus: preservedStatus,
+          reachedDeadline: reachedDeadline
+        )
+        if tick.shouldKeepWaiting && !reachedDeadline {
           continue
         }
-        guard shouldApply else {
+        guard tick.shouldApply else {
           return
         }
-        let didChangeTaskBoardSnapshot =
-          self.globalTaskBoardItems != resolvedItems
-          || self.globalTaskBoardOrchestratorStatus != resolvedStatus
-
-        withUISyncBatch {
-          self.globalTaskBoardItems = resolvedItems
-          self.globalTaskBoardOrchestratorStatus = resolvedStatus
-        }
-        if didChangeTaskBoardSnapshot {
-          self.scheduleTaskBoardSnapshotCacheWrite(
-            items: resolvedItems,
-            orchestratorStatus: resolvedStatus
-          )
-        }
+        self.commitTaskBoardConfirmationTick(tick)
         return
       }
+    }
+  }
+
+  private func evaluateTaskBoardConfirmationTick(
+    snapshot: TaskBoardRefreshSnapshot,
+    preservedItemIDs: Set<String>,
+    preservedStatus: Bool,
+    reachedDeadline: Bool
+  ) -> TaskBoardConfirmationTick {
+    var tick = TaskBoardConfirmationTick(
+      resolvedItems: globalTaskBoardItems,
+      resolvedStatus: globalTaskBoardOrchestratorStatus,
+      shouldApply: false,
+      shouldKeepWaiting: false
+    )
+    if !preservedItemIDs.isEmpty {
+      resolveTaskBoardItems(
+        snapshot: snapshot,
+        preservedItemIDs: preservedItemIDs,
+        reachedDeadline: reachedDeadline,
+        tick: &tick
+      )
+    }
+    if preservedStatus {
+      resolveTaskBoardStatus(
+        snapshot: snapshot,
+        reachedDeadline: reachedDeadline,
+        tick: &tick
+      )
+    }
+    return tick
+  }
+
+  private func resolveTaskBoardItems(
+    snapshot: TaskBoardRefreshSnapshot,
+    preservedItemIDs: Set<String>,
+    reachedDeadline: Bool,
+    tick: inout TaskBoardConfirmationTick
+  ) {
+    guard let measuredItems = snapshot.items.measured else {
+      if !reachedDeadline {
+        tick.shouldKeepWaiting = true
+      }
+      return
+    }
+    let liveIDs = Set(measuredItems.value.map(\.id))
+    if preservedItemIDs.isSubset(of: liveIDs) || reachedDeadline {
+      tick.resolvedItems = measuredItems.value
+      tick.shouldApply = true
+    } else {
+      tick.shouldKeepWaiting = true
+    }
+  }
+
+  private func resolveTaskBoardStatus(
+    snapshot: TaskBoardRefreshSnapshot,
+    reachedDeadline: Bool,
+    tick: inout TaskBoardConfirmationTick
+  ) {
+    guard let measuredStatus = snapshot.orchestratorStatus.measured else {
+      if !reachedDeadline {
+        tick.shouldKeepWaiting = true
+      }
+      return
+    }
+    if measuredStatus.value != nil || reachedDeadline {
+      tick.resolvedStatus = measuredStatus.value
+      tick.shouldApply = true
+    } else {
+      tick.shouldKeepWaiting = true
+    }
+  }
+
+  private func commitTaskBoardConfirmationTick(_ tick: TaskBoardConfirmationTick) {
+    let didChangeTaskBoardSnapshot =
+      globalTaskBoardItems != tick.resolvedItems
+      || globalTaskBoardOrchestratorStatus != tick.resolvedStatus
+    withUISyncBatch {
+      self.globalTaskBoardItems = tick.resolvedItems
+      self.globalTaskBoardOrchestratorStatus = tick.resolvedStatus
+    }
+    if didChangeTaskBoardSnapshot {
+      scheduleTaskBoardSnapshotCacheWrite(
+        items: tick.resolvedItems,
+        orchestratorStatus: tick.resolvedStatus
+      )
     }
   }
 
@@ -465,10 +508,12 @@ extension HarnessMonitorStore {
     await applyRefreshSnapshot(
       refreshSnapshot,
       using: client,
-      preserveSelection: preserveSelection,
-      allowPreviewReadySelection: true,
-      recordConnectionTelemetry: false,
-      isInitialConnect: false
+      options: RefreshApplyOptions(
+        preserveSelection: preserveSelection,
+        allowPreviewReadySelection: true,
+        recordConnectionTelemetry: false,
+        isInitialConnect: false
+      )
     )
   }
 
@@ -584,5 +629,18 @@ extension HarnessMonitorStore {
     }
     return RefreshSnapshotErrorFormatting.describeUnderlying(error)
   }
+}
 
+struct RefreshApplyOptions {
+  let preserveSelection: Bool
+  let allowPreviewReadySelection: Bool
+  let recordConnectionTelemetry: Bool
+  let isInitialConnect: Bool
+}
+
+struct TaskBoardConfirmationTick {
+  var resolvedItems: [TaskBoardItem]
+  var resolvedStatus: TaskBoardOrchestratorStatus?
+  var shouldApply: Bool
+  var shouldKeepWaiting: Bool
 }
