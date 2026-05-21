@@ -70,7 +70,7 @@ extension DecisionDetailViewModel {
     return links
   }
 
-  nonisolated private static func isProminentActionCandidate(_ action: SuggestedAction) -> Bool {
+  nonisolated static func isProminentActionCandidate(_ action: SuggestedAction) -> Bool {
     switch action.kind {
     case .dismiss, .snooze:
       false
@@ -103,7 +103,7 @@ extension DecisionDetailViewModel {
     return payloadScope.matches(decision: scope)
   }
 
-  @MainActor private static let ageFormatter: RelativeDateTimeFormatter = {
+  @MainActor static let ageFormatter: RelativeDateTimeFormatter = {
     let formatter = RelativeDateTimeFormatter()
     formatter.unitsStyle = .abbreviated
     return formatter
@@ -162,7 +162,7 @@ public actor DecisionAuditScopeWorker {
   public func waitForIdle() async {}
 }
 
-private struct AuditPayloadScope {
+struct AuditPayloadScope {
   let sessionID: String?
   let agentID: String?
   let taskID: String?
