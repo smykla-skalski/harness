@@ -70,7 +70,7 @@ struct DashboardDependenciesRouteView: View {
   @SceneStorage("dashboard.dependencies.content-detail-width")
   private var contentDetailWidth = SessionContentDetailSplitLayout.defaultContentWidth
 
-  @State private var response = DependencyUpdatesQueryResponse(
+  @State var response = DependencyUpdatesQueryResponse(
     fetchedAt: "",
     fromCache: false,
     summary: DependencyUpdatesSummary(
@@ -95,6 +95,7 @@ struct DashboardDependenciesRouteView: View {
   @State private var presentationWorker = DashboardDependenciesPresentationWorker()
   @State private var cachedPresentation = DashboardDependenciesPresentation.empty
   @State private var presentationGeneration: UInt64 = 0
+  @State var refreshingPullRequestIDs = Set<String>()
 
   private var preferences: DashboardDependenciesPreferences {
     get { DashboardDependenciesPreferences.decode(from: storedPreferences) }
@@ -331,7 +332,7 @@ struct DashboardDependenciesRouteView: View {
           Section {
             if !collapsedRepositories.contains(group.repository) {
               ForEach(group.items) { item in
-                dependencyRow(item)
+                dependencyRow(item, showsRepository: false)
               }
             }
           } header: {
@@ -340,7 +341,7 @@ struct DashboardDependenciesRouteView: View {
         }
       } else {
         ForEach(filteredItems) { item in
-          dependencyRow(item)
+          dependencyRow(item, showsRepository: true)
         }
       }
     }
@@ -468,27 +469,38 @@ struct DashboardDependenciesRouteView: View {
     }
   }
 
-  private func dependencyRow(_ item: DependencyUpdateItem) -> some View {
+  private func dependencyRow(
+    _ item: DependencyUpdateItem,
+    showsRepository: Bool
+  ) -> some View {
     VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingXS) {
       HStack(alignment: .firstTextBaseline, spacing: HarnessMonitorTheme.spacingSM) {
         Text(item.title)
           .fontWeight(.semibold)
           .lineLimit(2)
         Spacer(minLength: HarnessMonitorTheme.spacingSM)
-        Text("#\(item.number)")
+        Text(verbatim: "#\(item.number)")
           .foregroundStyle(HarnessMonitorTheme.secondaryInk)
       }
       HStack(spacing: HarnessMonitorTheme.spacingSM) {
-        Text(item.repository)
-        Text("·")
+        if showsRepository {
+          Text(item.repository)
+          Text("·")
+        }
         Text(item.statusLabel)
-        Text("·")
+        if refreshingPullRequestIDs.contains(item.pullRequestID) {
+          ProgressView()
+            .controlSize(.mini)
+            .accessibilityLabel("Refreshing pull request")
+        }
+        Spacer(minLength: HarnessMonitorTheme.spacingSM)
         Text(item.relativeUpdatedLabel)
       }
       .scaledFont(.caption)
       .foregroundStyle(HarnessMonitorTheme.secondaryInk)
     }
     .tag(item.pullRequestID)
+    .listRowInsets(EdgeInsets(top: 6, leading: 12, bottom: 6, trailing: 12))
     .contextMenu {
       Button("Open Pull Request") {
         openItem(item)
@@ -535,14 +547,16 @@ struct DashboardDependenciesRouteView: View {
         Image(systemName: isCollapsed ? "chevron.right" : "chevron.down")
           .font(.caption.weight(.semibold))
           .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+          .frame(width: 12, alignment: .center)
         Text(repository)
         Spacer(minLength: HarnessMonitorTheme.spacingSM)
-        Text("\(itemCount)")
+        Text(verbatim: String(itemCount))
           .foregroundStyle(HarnessMonitorTheme.secondaryInk)
       }
       .contentShape(.rect)
     }
     .buttonStyle(.borderless)
+    .listRowInsets(EdgeInsets(top: 6, leading: 12, bottom: 6, trailing: 12))
   }
 
   private func detailMetrics(for item: DependencyUpdateItem) -> some View {
@@ -731,7 +745,7 @@ struct DashboardDependenciesRouteView: View {
     }
   }
 
-  private func reload(forceRefresh: Bool, backgroundRefresh: Bool = false) async {
+  func reload(forceRefresh: Bool, backgroundRefresh: Bool = false) async {
     guard let client = store.apiClient else {
       switch dashboardDependenciesMissingClientState(
         backgroundRefresh: backgroundRefresh,
@@ -798,7 +812,7 @@ struct DashboardDependenciesRouteView: View {
   }
 
   private func approve(items: [DependencyUpdateItem]) async {
-    await performMutation("Approving") { client in
+    await performMutation("Approving", items: items) { client in
       try await client.approveDependencyUpdates(
         request: DependencyUpdatesApproveRequest(targets: items.map(\.target))
       )
@@ -806,7 +820,7 @@ struct DashboardDependenciesRouteView: View {
   }
 
   private func merge(items: [DependencyUpdateItem]) async {
-    await performMutation("Merging") { client in
+    await performMutation("Merging", items: items) { client in
       try await client.mergeDependencyUpdates(
         request: DependencyUpdatesMergeRequest(
           targets: items.map(\.target),
@@ -817,7 +831,7 @@ struct DashboardDependenciesRouteView: View {
   }
 
   private func rerunChecks(items: [DependencyUpdateItem]) async {
-    await performMutation("Rerunning") { client in
+    await performMutation("Rerunning", items: items) { client in
       try await client.rerunDependencyUpdateChecks(
         request: DependencyUpdatesRerunChecksRequest(targets: items.map(\.rerunTarget))
       )
@@ -825,7 +839,7 @@ struct DashboardDependenciesRouteView: View {
   }
 
   private func addLabel(_ label: String, to items: [DependencyUpdateItem]) async {
-    await performMutation("Labeling") { client in
+    await performMutation("Labeling", items: items) { client in
       try await client.addDependencyUpdateLabel(
         request: DependencyUpdatesLabelRequest(targets: items.map(\.target), label: label)
       )
@@ -833,7 +847,7 @@ struct DashboardDependenciesRouteView: View {
   }
 
   private func auto(items: [DependencyUpdateItem]) async {
-    await performMutation("Running auto mode") { client in
+    await performMutation("Running auto mode", items: items) { client in
       try await client.autoDependencyUpdates(
         request: DependencyUpdatesAutoRequest(
           targets: items.map(\.target),
@@ -881,21 +895,23 @@ struct DashboardDependenciesRouteView: View {
 
   private func performMutation(
     _ title: String,
+    items: [DependencyUpdateItem],
     operation:
       @escaping (any HarnessMonitorClientProtocol) async throws
       -> DependencyUpdatesActionResponse
   ) async {
     guard let client = store.apiClient else { return }
     inFlightActionTitle = title
+    defer { inFlightActionTitle = nil }
     do {
       let response = try await operation(client)
       store.presentSuccessFeedback(response.summary)
-      await reload(forceRefresh: true)
+      scheduleAffectedRefresh(for: items, using: client)
     } catch {
       store.presentFailureFeedback(error.localizedDescription)
     }
-    inFlightActionTitle = nil
   }
+
 
   private func openItem(_ item: DependencyUpdateItem) {
     guard let url = URL(string: item.url) else { return }
