@@ -107,7 +107,9 @@ public struct DependencyUpdatesCache {
       response: response
     )
     var nextLabels = cached.repositoryLabels
-    if let updatedLabels = response.repositoryLabels[repository] {
+    if let updatedLabels = response.repositoryLabels[repository],
+      !updatedLabels.isEmpty
+    {
       nextLabels[repository] = updatedLabels
     }
     let nextResponse = DependencyUpdatesQueryResponse(

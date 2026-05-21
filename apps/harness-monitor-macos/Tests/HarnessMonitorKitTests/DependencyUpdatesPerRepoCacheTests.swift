@@ -189,6 +189,48 @@ final class DependencyUpdatesPerRepoCacheTests: XCTestCase {
     )
   }
 
+  func testApplyPerRepoResponsePreservesLabelsWhenResponseLabelsEmpty() throws {
+    let context = try makeContext()
+    let cache = DependencyUpdatesCache(context: context)
+    let seededLabels = [
+      DependencyUpdateRepositoryLabel(name: "bug", color: "d73a4a", description: nil),
+      DependencyUpdateRepositoryLabel(name: "release", color: "0e8a16", description: nil),
+    ]
+    cache.save(
+      preferencesHash: "alpha",
+      response: DependencyUpdatesQueryResponse(
+        fetchedAt: "2026-05-21T10:00:00Z",
+        fromCache: false,
+        summary: DependencyUpdatesSummary(
+          items: [makeItem(pullRequestID: "pr_a1", repository: "acme/api")]
+        ),
+        items: [makeItem(pullRequestID: "pr_a1", repository: "acme/api")],
+        repositoryLabels: ["acme/api": seededLabels]
+      )
+    )
+
+    let response = DependencyUpdatesQueryResponse(
+      fetchedAt: "2026-05-21T12:00:00Z",
+      fromCache: false,
+      summary: DependencyUpdatesSummary(
+        items: [makeItem(pullRequestID: "pr_a1", repository: "acme/api")]
+      ),
+      items: [makeItem(pullRequestID: "pr_a1", repository: "acme/api")],
+      repositoryLabels: ["acme/api": []]
+    )
+    let reconciled = try XCTUnwrap(
+      cache.applyPerRepoResponse(
+        preferencesHash: "alpha",
+        repository: "acme/api",
+        response: response
+      )
+    )
+
+    XCTAssertEqual(reconciled.repositoryLabels["acme/api"], seededLabels)
+    let loaded = try XCTUnwrap(cache.load(preferencesHash: "alpha"))
+    XCTAssertEqual(loaded.repositoryLabels["acme/api"], seededLabels)
+  }
+
   // MARK: - Helpers
 
   private func makeContext() throws -> ModelContext {
