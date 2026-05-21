@@ -215,8 +215,8 @@ struct DashboardDependenciesRouteView: View {
   @State private var refreshingPullRequestIDs = Set<String>()
   @State private var scheduler = DashboardDependenciesScheduler()
   @State private var collapsedRepositories = DashboardDependenciesCollapsedRepositories()
-  @State private var labelMenuDataByRepository:
-    [String: DashboardDependenciesRepoLabelMenuData] = [:]
+  @State private var labelMenuDataByRepository: [String: DashboardDependenciesRepoLabelMenuData] =
+    [:]
 
   init(store: HarnessMonitorStore, selectedRoute: Binding<DashboardWindowRoute>) {
     self.store = store
@@ -1210,6 +1210,11 @@ struct DashboardDependenciesRouteView: View {
 }
 
 // swiftlint:enable type_body_length
+
+struct DashboardDependenciesRepoLabelMenuData: Equatable, Sendable {
+  let sortedLabels: [DependencyUpdateRepositoryLabel]
+  let frequentNames: [String]
+}
 
 private struct DashboardDependenciesControlStrip: View {
   @Binding var filterModeRaw: String
