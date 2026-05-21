@@ -88,6 +88,7 @@ public struct SettingsGeneralSection: View {
   @AppStorage(DaemonOwnership.preferenceKey)
   private var preferredDaemonModeRawValue = DaemonOwnership.managed.rawValue
   @State private var isRemoveLaunchAgentConfirmationPresented = false
+  @State private var isFullyExpanded = false
 
   public init(store: HarnessMonitorStore, overview: SettingsGeneralOverviewState) {
     self.store = store
@@ -170,6 +171,12 @@ public struct SettingsGeneralSection: View {
 
   private var preferredDaemonMode: DaemonOwnership {
     DaemonOwnership(rawValue: preferredDaemonModeRawValue) ?? .managed
+  }
+
+  private func expandAfterFirstFrame() async {
+    guard !isFullyExpanded else { return }
+    try? await Task.sleep(for: .milliseconds(40))
+    isFullyExpanded = true
   }
 
   public var body: some View {
@@ -261,20 +268,21 @@ public struct SettingsGeneralSection: View {
         )
       }
 
-      SettingsLoggingSection(store: store)
+      if isFullyExpanded {
+        SettingsLoggingSection(store: store)
 
-      Section {
-        SettingsActionButtons(
-          store: store,
-          isLoading: isLoading,
-          isRemoveLaunchAgentConfirmationPresented: $isRemoveLaunchAgentConfirmationPresented
-        )
-      } header: {
-        Text("Actions")
-      }
+        Section {
+          SettingsActionButtons(
+            store: store,
+            isLoading: isLoading,
+            isRemoveLaunchAgentConfirmationPresented: $isRemoveLaunchAgentConfirmationPresented
+          )
+        } header: {
+          Text("Actions")
+        }
 
-      Section {
-        LabeledContent("Endpoint", value: overview.endpoint)
+        Section {
+          LabeledContent("Endpoint", value: overview.endpoint)
           .textSelection(.enabled)
           .accessibilityIdentifier(HarnessMonitorAccessibility.settingsMetricCard("Endpoint"))
         LabeledContent("Version", value: overview.version)
@@ -318,9 +326,11 @@ public struct SettingsGeneralSection: View {
         Text("Overview")
       }
 
-      SettingsStatusSection(startedAt: overview.startedAt)
+        SettingsStatusSection(startedAt: overview.startedAt)
+      }
     }
     .settingsDetailFormStyle()
+    .task { await expandAfterFirstFrame() }
     .confirmationDialog(
       "Remove Launch Agent?",
       isPresented: $isRemoveLaunchAgentConfirmationPresented,
