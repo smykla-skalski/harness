@@ -75,7 +75,22 @@ public enum HarnessMonitorAPIError: Error, LocalizedError, Equatable {
       return sandboxDisabledDescription(feature: flatEnvelope.feature)
     }
 
-    return "Daemon error \(code): \(Self.normalizedServerMessage(from: message))"
+    let normalized = Self.normalizedServerMessage(from: message)
+    if let githubAuth = githubAuthFailureDescription(from: normalized) {
+      return githubAuth
+    }
+
+    return "Daemon error \(code): \(normalized)"
+  }
+
+  private static func githubAuthFailureDescription(from message: String) -> String? {
+    guard message.contains("GitHub API returned 401") else {
+      return nil
+    }
+    return """
+      GitHub rejected the configured token (HTTP 401 Bad credentials). The token \
+      may have expired or been revoked. Update it in Settings > Secrets and try again
+      """
   }
 
   private static func sandboxDisabledDescription(feature: String?) -> String {
