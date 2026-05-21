@@ -74,8 +74,13 @@ public struct TaskBoardKeyMaterialPersistence: Sendable {
     self.gpg = gpg
   }
 
+  /// Real Keychain in normal runs; in-memory stand-ins under xctest so test
+  /// processes never trigger the macOS Keychain access prompt.
   public static var defaultKeychain: Self {
-    Self(
+    if HarnessMonitorEnvironment.current.isXCTestProcess {
+      return .inMemory
+    }
+    return Self(
       ssh: TaskBoardKeyMaterialStore(kind: .ssh),
       signingSsh: TaskBoardKeyMaterialStore(kind: .signingSsh),
       gpg: TaskBoardKeyMaterialStore(kind: .gpg)

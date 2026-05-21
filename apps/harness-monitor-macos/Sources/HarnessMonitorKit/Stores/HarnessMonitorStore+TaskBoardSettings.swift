@@ -35,8 +35,13 @@ struct TaskBoardCredentialPersistence: Sendable {
   let todoist: any TaskBoardTodoistCredentialPersisting
   let openRouter: any TaskBoardOpenRouterCredentialPersisting
 
+  /// Real Keychain in normal runs; in-memory stand-ins under xctest so test
+  /// processes never trigger the macOS Keychain access prompt.
   static var defaultKeychain: Self {
-    Self(
+    if HarnessMonitorEnvironment.current.isXCTestProcess {
+      return .inMemory
+    }
+    return Self(
       github: TaskBoardGitHubCredentialStore(),
       todoist: TaskBoardTodoistCredentialStore(),
       openRouter: TaskBoardOpenRouterCredentialStore()
