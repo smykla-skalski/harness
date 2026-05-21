@@ -32,7 +32,7 @@ pub struct DependencyUpdatesRepositoryCatalogRequest {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct DependencyUpdatesRepositoryCatalogResponse {
     pub organization: String,
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    #[serde(default)]
     pub repositories: Vec<String>,
 }
 
@@ -70,11 +70,11 @@ pub struct DependencyUpdateItem {
     pub policy_blocked: bool,
     pub is_draft: bool,
     pub head_sha: String,
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    #[serde(default)]
     pub labels: Vec<String>,
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    #[serde(default)]
     pub checks: Vec<DependencyUpdateCheck>,
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    #[serde(default)]
     pub reviews: Vec<DependencyUpdateReview>,
     pub additions: u64,
     pub deletions: u64,
@@ -130,7 +130,7 @@ pub struct DependencyUpdatesAutoRequest {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct DependencyUpdatesActionResponse {
     pub summary: String,
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    #[serde(default)]
     pub results: Vec<DependencyUpdateActionResult>,
 }
 
@@ -151,7 +151,7 @@ pub struct DependencyUpdateTarget {
     pub review_status: DependencyUpdateReviewStatus,
     pub check_status: DependencyUpdateCheckStatus,
     pub policy_blocked: bool,
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    #[serde(default)]
     pub check_suite_ids: Vec<String>,
 }
 
@@ -378,12 +378,18 @@ impl DependencyUpdatesSummary {
                 .filter(|item| item.review_status == DependencyUpdateReviewStatus::ReviewRequired)
                 .count(),
             ready_to_merge: items.iter().filter(|item| item.is_ready_to_merge()).count(),
-            auto_approvable: items.iter().filter(|item| item.is_auto_approvable()).count(),
+            auto_approvable: items
+                .iter()
+                .filter(|item| item.is_auto_approvable())
+                .count(),
             waiting_on_checks: items
                 .iter()
                 .filter(|item| item.check_status == DependencyUpdateCheckStatus::Pending)
                 .count(),
-            blocked: items.iter().filter(|item| item.requires_attention()).count(),
+            blocked: items
+                .iter()
+                .filter(|item| item.requires_attention())
+                .count(),
         }
     }
 }
@@ -506,110 +512,4 @@ fn normalized_entries(entries: &[String]) -> Vec<String> {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    fn sample_item(
-        review_status: DependencyUpdateReviewStatus,
-        check_status: DependencyUpdateCheckStatus,
-        mergeable: DependencyUpdateMergeableState,
-        policy_blocked: bool,
-    ) -> DependencyUpdateItem {
-        DependencyUpdateItem {
-            pull_request_id: "pr_1".into(),
-            repository_id: "repo_1".into(),
-            repository: "acme/api".into(),
-            number: 42,
-            title: "chore(deps): bump".into(),
-            url: "https://example.com".into(),
-            author_login: "renovate[bot]".into(),
-            state: DependencyUpdatePullRequestState::Open,
-            mergeable,
-            review_status,
-            check_status,
-            policy_blocked,
-            is_draft: false,
-            head_sha: "abc123".into(),
-            labels: Vec::new(),
-            checks: Vec::new(),
-            reviews: Vec::new(),
-            additions: 1,
-            deletions: 1,
-            created_at: DateTime::parse_from_rfc3339("2026-05-20T12:00:00Z")
-                .expect("date")
-                .with_timezone(&Utc),
-            updated_at: DateTime::parse_from_rfc3339("2026-05-20T12:00:00Z")
-                .expect("date")
-                .with_timezone(&Utc),
-        }
-    }
-
-    #[test]
-    fn query_request_normalizes_cache_key_inputs() {
-        let request = DependencyUpdatesQueryRequest {
-            authors: vec![" renovate[bot] ".into(), "renovate[bot]".into()],
-            organizations: vec![" acme ".into()],
-            repositories: vec!["acme/api".into(), "acme/api".into()],
-            exclude_repositories: vec![" acme/old ".into()],
-            force_refresh: false,
-            cache_max_age_seconds: 0,
-        };
-
-        assert_eq!(request.normalized_authors(), vec!["renovate[bot]"]);
-        assert_eq!(request.cache_max_age_seconds(), 1);
-        assert_eq!(
-            request.cache_key(),
-            "authors=renovate[bot]|orgs=acme|repos=acme/api|exclude=acme/old"
-        );
-    }
-
-    #[test]
-    fn repository_catalog_request_rejects_empty_and_slashed_organizations() {
-        assert!(DependencyUpdatesRepositoryCatalogRequest {
-            organization: String::new(),
-        }
-        .validate()
-        .is_err());
-        assert!(DependencyUpdatesRepositoryCatalogRequest {
-            organization: "acme/api".into(),
-        }
-        .validate()
-        .is_err());
-    }
-
-    #[test]
-    fn repository_catalog_request_normalizes_organization() {
-        let request = DependencyUpdatesRepositoryCatalogRequest {
-            organization: " Acme ".into(),
-        };
-
-        assert_eq!(request.normalized_organization(), "acme");
-    }
-
-    #[test]
-    fn auto_mode_rules_match_helper_contract() {
-        let review_required = sample_item(
-            DependencyUpdateReviewStatus::ReviewRequired,
-            DependencyUpdateCheckStatus::Success,
-            DependencyUpdateMergeableState::Mergeable,
-            false,
-        );
-        let approved = sample_item(
-            DependencyUpdateReviewStatus::Approved,
-            DependencyUpdateCheckStatus::Success,
-            DependencyUpdateMergeableState::Mergeable,
-            false,
-        );
-        let blocked = sample_item(
-            DependencyUpdateReviewStatus::Approved,
-            DependencyUpdateCheckStatus::Success,
-            DependencyUpdateMergeableState::Mergeable,
-            true,
-        );
-
-        assert!(review_required.is_auto_approvable());
-        assert!(!review_required.is_ready_to_merge());
-        assert!(approved.is_ready_to_merge());
-        assert!(!blocked.is_ready_to_merge());
-    }
-}
+mod tests;
