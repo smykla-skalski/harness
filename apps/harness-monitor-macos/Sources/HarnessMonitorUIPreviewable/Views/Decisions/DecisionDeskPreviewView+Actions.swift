@@ -49,7 +49,7 @@ extension DecisionDeskPreviewView {
     showDismissAllVisibleConfirmation = true
   }
 
-  private var dismissConfirmationMessage: String {
+  var dismissConfirmationMessage: String {
     guard let snapshot = pendingDismissBatch else {
       return "No visible decisions to dismiss"
     }
