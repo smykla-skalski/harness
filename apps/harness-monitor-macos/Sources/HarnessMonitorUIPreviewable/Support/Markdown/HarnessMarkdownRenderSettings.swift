@@ -309,6 +309,7 @@ struct HarnessMarkdownSpacingSettings: Equatable {
   var thematicBreak: HarnessMarkdownBlockSpacing
   var nestedBlock: CGFloat
   var detailsContentIndent: CGFloat
+  var detailsMaxHeight: CGFloat
   var listItem: CGFloat
   var listItemContent: CGFloat
   var listMarkerGap: CGFloat
@@ -330,6 +331,7 @@ struct HarnessMarkdownSpacingSettings: Equatable {
     thematicBreak: .none,
     nestedBlock: HarnessMonitorTheme.spacingXS,
     detailsContentIndent: HarnessMonitorTheme.spacingSM,
+    detailsMaxHeight: 420,
     listItem: HarnessMonitorTheme.spacingXS,
     listItemContent: HarnessMonitorTheme.spacingXS,
     listMarkerGap: 6,
@@ -353,6 +355,7 @@ struct HarnessMarkdownSpacingSettings: Equatable {
       thematicBreak: thematicBreak.scaled(by: scale),
       nestedBlock: scaled(nestedBlock, by: scale),
       detailsContentIndent: scaled(detailsContentIndent, by: scale),
+      detailsMaxHeight: max(120, scaled(detailsMaxHeight, by: scale)),
       listItem: scaled(listItem, by: scale),
       listItemContent: scaled(listItemContent, by: scale),
       listMarkerGap: scaled(listMarkerGap, by: scale),

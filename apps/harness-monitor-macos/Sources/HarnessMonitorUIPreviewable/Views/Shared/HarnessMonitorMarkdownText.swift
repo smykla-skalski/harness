@@ -154,6 +154,41 @@ struct HarnessMarkdownBlockStackView: View {
   }
 }
 
+struct HarnessMarkdownLazyBlockStackView: View {
+  let blocks: [HarnessMarkdownBlock]
+  let settings: HarnessMarkdownRenderSettings
+  let style: HarnessMarkdownResolvedRenderSettings
+  let spacing: CGFloat
+
+  var body: some View {
+    let renderableBlocks = visibleBlocks
+    LazyVStack(alignment: .leading, spacing: spacing) {
+      ForEach(Array(renderableBlocks.enumerated()), id: \.element.offset) { visibleIndex, entry in
+        let blockSpacing = style.spacing.blockSpacing(for: entry.block)
+        HarnessMarkdownBlockView(block: entry.block, settings: settings, style: style)
+          .padding(.top, visibleIndex == 0 ? 0 : blockSpacing.before)
+          .padding(.bottom, visibleIndex == renderableBlocks.count - 1 ? 0 : blockSpacing.after)
+      }
+    }
+    .frame(maxWidth: .infinity, alignment: .leading)
+  }
+
+  private var visibleBlocks: [(offset: Int, block: HarnessMarkdownBlock)] {
+    blocks.enumerated().compactMap { offset, block in
+      guard !isSuppressedThematicBreak(at: offset) else { return nil }
+      return (offset: offset, block: block)
+    }
+  }
+
+  private func isSuppressedThematicBreak(at index: Int) -> Bool {
+    guard case .thematicBreak = blocks[index], index + 1 < blocks.count else { return false }
+    if case .heading = blocks[index + 1] {
+      return true
+    }
+    return false
+  }
+}
+
 private struct HarnessMarkdownBlockView: View {
   let block: HarnessMarkdownBlock
   let settings: HarnessMarkdownRenderSettings

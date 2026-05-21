@@ -84,6 +84,7 @@ struct SettingsMarkdownSection: View {
     Section("Layout Spacing") {
       numberRow("Nested block gap", \.spacing.nestedBlock, in: 0...32)
       numberRow("Details content indent", \.spacing.detailsContentIndent, in: 0...48)
+      numberRow("Details max height", \.spacing.detailsMaxHeight, in: 120...1200)
       numberRow("List item gap", \.spacing.listItem, in: 0...32)
       numberRow("List content gap", \.spacing.listItemContent, in: 0...32)
       numberRow("Marker gap", \.spacing.listMarkerGap, in: 0...32)

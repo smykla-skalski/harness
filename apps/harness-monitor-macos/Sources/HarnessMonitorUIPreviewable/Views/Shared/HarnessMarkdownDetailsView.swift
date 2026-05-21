@@ -87,12 +87,17 @@ struct HarnessMarkdownDetailsView: View {
   }
 
   private var detailsContent: some View {
-    HarnessMarkdownBlockStackView(
-      blocks: details.blocks,
-      settings: settings,
-      style: style,
-      spacing: style.spacing.nestedBlock
-    )
+    ScrollView(.vertical) {
+      HarnessMarkdownLazyBlockStackView(
+        blocks: details.blocks,
+        settings: settings,
+        style: style,
+        spacing: style.spacing.nestedBlock
+      )
+      .padding(.trailing, HarnessMonitorTheme.spacingXS)
+    }
+    .scrollIndicators(.visible)
+    .frame(maxHeight: style.spacing.detailsMaxHeight)
     .padding(.leading, style.spacing.detailsContentIndent)
   }
 }
