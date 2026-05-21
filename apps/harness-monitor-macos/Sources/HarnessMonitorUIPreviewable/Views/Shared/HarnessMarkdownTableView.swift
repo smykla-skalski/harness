@@ -5,7 +5,7 @@ struct HarnessMarkdownTableView: View {
   let settings: HarnessMarkdownRenderSettings
   let style: HarnessMarkdownResolvedRenderSettings
 
-  private let tableHorizontalPadding = HarnessMonitorTheme.spacingSM
+  private let tableHorizontalPadding = HarnessMonitorTheme.spacingMD
   private let tableCellVerticalPadding = HarnessMonitorTheme.spacingSM
 
   var body: some View {

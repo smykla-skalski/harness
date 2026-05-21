@@ -49,6 +49,8 @@ struct HarnessMarkdownRenderingBehaviorTests {
     #expect(source.contains("HarnessMarkdownTableLayout"))
     #expect(source.contains("spareWidth / CGFloat(columnCount)"))
     #expect(source.contains("measurement.rowHeights[row] - size.height"))
+    #expect(source.contains("tableHorizontalPadding = HarnessMonitorTheme.spacingMD"))
+    #expect(source.contains("tableCellVerticalPadding = HarnessMonitorTheme.spacingSM"))
     #expect(!source.contains("GridRow"))
   }
 
@@ -62,6 +64,7 @@ struct HarnessMarkdownRenderingBehaviorTests {
     #expect(source.contains("HarnessMarkdownLinkHoverModifier"))
     #expect(source.contains("NSCursor.pointingHand.push()"))
     #expect(source.contains("HarnessMarkdownInlineWrapLayout(horizontalSpacing: 0"))
+    #expect(source.contains("row.height - item.size.height"))
     #expect(!source.contains(".padding(.horizontal"))
   }
 
