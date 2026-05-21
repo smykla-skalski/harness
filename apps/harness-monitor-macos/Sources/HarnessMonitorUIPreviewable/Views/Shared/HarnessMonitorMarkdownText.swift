@@ -326,6 +326,7 @@ private struct HarnessMarkdownListView: View {
           height: metrics.firstLineHeight,
           alignment: .leading
         )
+        .offset(y: metrics.listSymbolYOffset)
     }
   }
 }
