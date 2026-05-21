@@ -27,6 +27,12 @@ enum HarnessMarkdownHTMLBlocks {
     line.trimmingLeadingSpacesForHTML().hasPrefix("<!--")
   }
 
+  static func isStandaloneCommentStart(_ line: String) -> Bool {
+    let trimmed = line.trimmingLeadingSpacesForHTML()
+    guard trimmed.hasPrefix("<!--") else { return false }
+    return removingComments(from: trimmed).trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+  }
+
   static func details(from raw: String) -> (summary: String, body: String, isOpen: Bool) {
     let source = removingComments(from: raw)
     let characters = Array(source)

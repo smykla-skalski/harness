@@ -88,4 +88,25 @@ struct HarnessMarkdownImageRenderingTests {
     #expect(items[1].rendersVisibleContent)
     #expect(items[1].rendersListRow)
   }
+
+  @Test("Task checkboxes keep visible text after marker comments")
+  func taskCheckboxesKeepVisibleTextAfterMarkerComments() {
+    let document = HarnessMarkdownParser.parse(
+      """
+      - [ ] <!-- rebase-check -->If you want to rebase/retry this PR, check this box
+      """
+    )
+
+    guard case .unorderedList(let items)? = document.blocks.first else {
+      Issue.record("Expected task list")
+      return
+    }
+    #expect(items.count == 1)
+    #expect(items[0].checkbox == false)
+    guard case .paragraph(let inlines)? = items[0].blocks.first else {
+      Issue.record("Expected visible task text")
+      return
+    }
+    #expect(inlines == [.text("If you want to rebase/retry this PR, check this box")])
+  }
 }

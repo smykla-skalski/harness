@@ -39,7 +39,7 @@ private struct HarnessMarkdownBlockParser {
       let line = lines[index]
       if line.isBlank {
         index += 1
-      } else if HarnessMarkdownHTMLBlocks.isCommentStart(line) {
+      } else if HarnessMarkdownHTMLBlocks.isStandaloneCommentStart(line) {
         skipHTMLComment()
       } else if HarnessMarkdownReferenceDefinitions.definition(line) != nil {
         index += 1
@@ -245,7 +245,7 @@ private struct HarnessMarkdownBlockParser {
     fenceStart(line) != nil
       || line.leadingSpaceCount >= 4
       || heading(line, references: references) != nil
-      || HarnessMarkdownHTMLBlocks.isCommentStart(line)
+      || HarnessMarkdownHTMLBlocks.isStandaloneCommentStart(line)
       || HarnessMarkdownHTMLBlocks.detailsStart(line) != nil
       || isThematicBreak(line)
       || line.trimmingLeadingSpaces().hasPrefix(">")
