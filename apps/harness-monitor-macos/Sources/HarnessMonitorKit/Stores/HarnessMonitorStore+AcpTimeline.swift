@@ -142,37 +142,37 @@ extension HarnessMonitorStore {
   }
 
   func rebuildAcpTranscriptPartition() {
-    acpTranscriptPartitionTask?.cancel()
-    acpTranscriptPartitionGeneration &+= 1
-    let generation = acpTranscriptPartitionGeneration
+    acpTimelineSync.transcriptPartitionTask?.cancel()
+    acpTimelineSync.transcriptPartitionGeneration &+= 1
+    let generation = acpTimelineSync.transcriptPartitionGeneration
     let entries = selectedAcpTranscriptEntries
-    acpTranscriptPartitionTask = Task { @MainActor [weak self] in
+    acpTimelineSync.transcriptPartitionTask = Task { @MainActor [weak self] in
       guard let self else { return }
       let partition = await self.acpTimelineWorker.partitionByAgentID(entries)
-      guard !Task.isCancelled, self.acpTranscriptPartitionGeneration == generation else {
+      guard !Task.isCancelled, self.acpTimelineSync.transcriptPartitionGeneration == generation else {
         return
       }
       self.acpTranscriptByAgentID = partition
-      self.acpTranscriptPartitionTask = nil
+      self.acpTimelineSync.transcriptPartitionTask = nil
     }
   }
 
   func rebuildSelectedAcpTranscriptEntries() {
-    acpTranscriptMergeTask?.cancel()
-    acpTranscriptMergeGeneration &+= 1
-    let generation = acpTranscriptMergeGeneration
+    acpTimelineSync.transcriptMergeTask?.cancel()
+    acpTimelineSync.transcriptMergeGeneration &+= 1
+    let generation = acpTimelineSync.transcriptMergeGeneration
     let currentEntries = selectedAcpTranscriptEntries
     let historyEntries = selectedAcpTranscriptHistoryEntries
     let liveEntries = selectedAcpTranscriptLiveEntries
     let transcriptSource = selectedAcpTranscriptSource
-    acpTranscriptMergeTask = Task { @MainActor [weak self] in
+    acpTimelineSync.transcriptMergeTask = Task { @MainActor [weak self] in
       guard let self else { return }
       let output = await self.acpTimelineWorker.mergeTranscript(
         currentEntries: currentEntries,
         historyEntries: historyEntries,
         incoming: liveEntries
       )
-      guard !Task.isCancelled, self.acpTranscriptMergeGeneration == generation else {
+      guard !Task.isCancelled, self.acpTimelineSync.transcriptMergeGeneration == generation else {
         return
       }
       if output.changed {
@@ -180,7 +180,7 @@ extension HarnessMonitorStore {
       } else if self.selectedAcpTranscriptSource != transcriptSource {
         self.replaceSelectedAcpTranscript(currentEntries, transcriptSource: transcriptSource)
       }
-      self.acpTranscriptMergeTask = nil
+      self.acpTimelineSync.transcriptMergeTask = nil
     }
   }
 
@@ -202,23 +202,23 @@ extension HarnessMonitorStore {
     guard !entries.isEmpty else {
       return
     }
-    acpTimelineMergeTask?.cancel()
-    acpTimelineMergeGeneration &+= 1
-    let generation = acpTimelineMergeGeneration
+    acpTimelineSync.mergeTask?.cancel()
+    acpTimelineSync.mergeGeneration &+= 1
+    let generation = acpTimelineSync.mergeGeneration
     let currentTimeline = timeline
-    acpTimelineMergeTask = Task { @MainActor [weak self] in
+    acpTimelineSync.mergeTask = Task { @MainActor [weak self] in
       guard let self else { return }
       let output = await self.acpTimelineWorker.merge(
         current: currentTimeline,
         incoming: entries
       )
-      guard !Task.isCancelled, self.acpTimelineMergeGeneration == generation else {
+      guard !Task.isCancelled, self.acpTimelineSync.mergeGeneration == generation else {
         return
       }
       if output.changed {
         self.replaceSelectedTimeline(output.entries)
       }
-      self.acpTimelineMergeTask = nil
+      self.acpTimelineSync.mergeTask = nil
     }
   }
 
@@ -227,25 +227,25 @@ extension HarnessMonitorStore {
       return
     }
     selectedAcpTranscriptSource = .direct
-    acpTranscriptLiveMergeTask?.cancel()
-    acpTranscriptLiveMergeGeneration &+= 1
-    let generation = acpTranscriptLiveMergeGeneration
+    acpTimelineSync.transcriptLiveMergeTask?.cancel()
+    acpTimelineSync.transcriptLiveMergeGeneration &+= 1
+    let generation = acpTimelineSync.transcriptLiveMergeGeneration
     let currentLiveEntries = selectedAcpTranscriptLiveEntries
     let snapshots = selectedAcpAgents
-    acpTranscriptLiveMergeTask = Task { @MainActor [weak self] in
+    acpTimelineSync.transcriptLiveMergeTask = Task { @MainActor [weak self] in
       guard let self else { return }
       let output = await self.acpTimelineWorker.mergeAndReattribute(
         current: currentLiveEntries,
         incoming: entries,
         using: snapshots
       )
-      guard !Task.isCancelled, self.acpTranscriptLiveMergeGeneration == generation else {
+      guard !Task.isCancelled, self.acpTimelineSync.transcriptLiveMergeGeneration == generation else {
         return
       }
       if output.changed {
         self.selectedAcpTranscriptLiveEntries = output.entries
       }
-      self.acpTranscriptLiveMergeTask = nil
+      self.acpTimelineSync.transcriptLiveMergeTask = nil
     }
   }
 
@@ -257,14 +257,14 @@ extension HarnessMonitorStore {
       return
     }
     selectedAcpTranscriptSource = .direct
-    acpTranscriptHistoryTask?.cancel()
-    acpTranscriptHistoryGeneration &+= 1
-    let generation = acpTranscriptHistoryGeneration
+    acpTimelineSync.transcriptHistoryTask?.cancel()
+    acpTimelineSync.transcriptHistoryGeneration &+= 1
+    let generation = acpTimelineSync.transcriptHistoryGeneration
     let currentHistoryEntries = selectedAcpTranscriptHistoryEntries
     let responseEntries = response.entries
     let liveEntries = selectedAcpTranscriptLiveEntries
     let snapshots = selectedAcpAgents
-    acpTranscriptHistoryTask = Task { @MainActor [weak self] in
+    acpTimelineSync.transcriptHistoryTask = Task { @MainActor [weak self] in
       guard let self else { return }
       let output = await self.acpTimelineWorker.prepareTranscriptHistory(
         currentHistoryEntries: currentHistoryEntries,
@@ -272,7 +272,7 @@ extension HarnessMonitorStore {
         liveEntries: liveEntries,
         using: snapshots
       )
-      guard !Task.isCancelled, self.acpTranscriptHistoryGeneration == generation else {
+      guard !Task.isCancelled, self.acpTimelineSync.transcriptHistoryGeneration == generation else {
         return
       }
       if output.historyChanged {
@@ -281,7 +281,7 @@ extension HarnessMonitorStore {
       if output.liveChanged {
         self.selectedAcpTranscriptLiveEntries = output.liveEntries
       }
-      self.acpTranscriptHistoryTask = nil
+      self.acpTimelineSync.transcriptHistoryTask = nil
     }
   }
 
@@ -289,23 +289,23 @@ extension HarnessMonitorStore {
     guard !timeline.isEmpty, !snapshots.isEmpty else {
       return
     }
-    acpTimelineReattributeTask?.cancel()
-    acpTimelineReattributeGeneration &+= 1
-    let generation = acpTimelineReattributeGeneration
+    acpTimelineSync.reattributeTask?.cancel()
+    acpTimelineSync.reattributeGeneration &+= 1
+    let generation = acpTimelineSync.reattributeGeneration
     let currentTimeline = timeline
-    acpTimelineReattributeTask = Task { @MainActor [weak self] in
+    acpTimelineSync.reattributeTask = Task { @MainActor [weak self] in
       guard let self else { return }
       let output = await self.acpTimelineWorker.reattribute(
         currentTimeline,
         using: snapshots
       )
-      guard !Task.isCancelled, self.acpTimelineReattributeGeneration == generation else {
+      guard !Task.isCancelled, self.acpTimelineSync.reattributeGeneration == generation else {
         return
       }
       if output.changed {
         self.replaceSelectedTimeline(output.entries)
       }
-      self.acpTimelineReattributeTask = nil
+      self.acpTimelineSync.reattributeTask = nil
     }
   }
 
@@ -317,12 +317,12 @@ extension HarnessMonitorStore {
     else {
       return
     }
-    acpTranscriptReattributeTask?.cancel()
-    acpTranscriptReattributeGeneration &+= 1
-    let generation = acpTranscriptReattributeGeneration
+    acpTimelineSync.transcriptReattributeTask?.cancel()
+    acpTimelineSync.transcriptReattributeGeneration &+= 1
+    let generation = acpTimelineSync.transcriptReattributeGeneration
     let historyEntries = selectedAcpTranscriptHistoryEntries
     let liveEntries = selectedAcpTranscriptLiveEntries
-    acpTranscriptReattributeTask = Task { @MainActor [weak self] in
+    acpTimelineSync.transcriptReattributeTask = Task { @MainActor [weak self] in
       guard let self else { return }
       async let reattributedHistory = self.acpTimelineWorker.reattribute(
         historyEntries,
@@ -333,7 +333,7 @@ extension HarnessMonitorStore {
         using: snapshots
       )
       let (updatedHistory, updatedLive) = await (reattributedHistory, reattributedLive)
-      guard !Task.isCancelled, self.acpTranscriptReattributeGeneration == generation else {
+      guard !Task.isCancelled, self.acpTimelineSync.transcriptReattributeGeneration == generation else {
         return
       }
       if updatedHistory.changed {
@@ -342,7 +342,7 @@ extension HarnessMonitorStore {
       if updatedLive.changed {
         self.selectedAcpTranscriptLiveEntries = updatedLive.entries
       }
-      self.acpTranscriptReattributeTask = nil
+      self.acpTimelineSync.transcriptReattributeTask = nil
     }
   }
 

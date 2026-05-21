@@ -37,20 +37,7 @@ public final class HarnessMonitorStore {
   @ObservationIgnored let taskBoardSettingsWorker: TaskBoardSettingsWorker
   @ObservationIgnored var sessionIndexSnapshotApplyTask: Task<Void, Never>?
   @ObservationIgnored var sessionIndexSnapshotApplyGeneration: UInt64 = 0
-  @ObservationIgnored var acpTimelineMergeTask: Task<Void, Never>?
-  @ObservationIgnored var acpTranscriptMergeTask: Task<Void, Never>?
-  @ObservationIgnored var acpTranscriptLiveMergeTask: Task<Void, Never>?
-  @ObservationIgnored var acpTranscriptHistoryTask: Task<Void, Never>?
-  @ObservationIgnored var acpTimelineReattributeTask: Task<Void, Never>?
-  @ObservationIgnored var acpTranscriptReattributeTask: Task<Void, Never>?
-  @ObservationIgnored var acpTranscriptPartitionTask: Task<Void, Never>?
-  @ObservationIgnored var acpTimelineMergeGeneration: UInt64 = 0
-  @ObservationIgnored var acpTranscriptMergeGeneration: UInt64 = 0
-  @ObservationIgnored var acpTranscriptLiveMergeGeneration: UInt64 = 0
-  @ObservationIgnored var acpTranscriptHistoryGeneration: UInt64 = 0
-  @ObservationIgnored var acpTimelineReattributeGeneration: UInt64 = 0
-  @ObservationIgnored var acpTranscriptReattributeGeneration: UInt64 = 0
-  @ObservationIgnored var acpTranscriptPartitionGeneration: UInt64 = 0
+  @ObservationIgnored var acpTimelineSync = AcpTimelineSyncState()
   @ObservationIgnored var acpRuntimeStateGeneration: UInt64 = 0
   @ObservationIgnored var cachedNullActionHandler: NullDecisionActionHandler?
   @ObservationIgnored var openSessionWindowsByID: [ObjectIdentifier: String] = [:]
@@ -501,5 +488,21 @@ public final class HarnessMonitorStore {
     scheduleBookmarkedSessionRefresh()
     scheduleNotificationHistoryRefresh()
   }
+}
 
+struct AcpTimelineSyncState {
+  var mergeTask: Task<Void, Never>?
+  var mergeGeneration: UInt64 = 0
+  var transcriptMergeTask: Task<Void, Never>?
+  var transcriptMergeGeneration: UInt64 = 0
+  var transcriptLiveMergeTask: Task<Void, Never>?
+  var transcriptLiveMergeGeneration: UInt64 = 0
+  var transcriptHistoryTask: Task<Void, Never>?
+  var transcriptHistoryGeneration: UInt64 = 0
+  var reattributeTask: Task<Void, Never>?
+  var reattributeGeneration: UInt64 = 0
+  var transcriptReattributeTask: Task<Void, Never>?
+  var transcriptReattributeGeneration: UInt64 = 0
+  var transcriptPartitionTask: Task<Void, Never>?
+  var transcriptPartitionGeneration: UInt64 = 0
 }
