@@ -86,6 +86,23 @@ struct HarnessMonitorAPIErrorTests {
     )
   }
 
+  @Test("GitHub 401 server errors surface as an actionable secrets message")
+  func githubUnauthorizedSurfacesAsActionableSecretsMessage() {
+    let envelope =
+      #"{"error":{"code":"WORKFLOW_IO","message":"dependency-updates github "#
+      + #"request failed: GitHub API returned 401 Unauthorized: Bad credentials. "#
+      + #"Check that the GitHub token is valid"}}"#
+    let error = HarnessMonitorAPIError.server(code: 400, message: envelope)
+
+    #expect(
+      error.errorDescription
+        == """
+          GitHub rejected the configured token (HTTP 401 Bad credentials). The token \
+          may have expired or been revoked. Update it in Settings > Secrets and try again
+          """
+    )
+  }
+
   @Test("HTTP decode failures post daemon telemetry")
   func httpDecodeFailuresPostDaemonTelemetry() async throws {
     APIErrorTelemetryURLProtocol.reset()
