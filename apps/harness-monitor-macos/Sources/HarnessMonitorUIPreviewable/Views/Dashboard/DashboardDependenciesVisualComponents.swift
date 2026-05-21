@@ -149,6 +149,44 @@ struct DashboardDependencyStatusPill: View {
   }
 }
 
+private struct DashboardDependencyChangePill: View {
+  let additions: Int
+  let deletions: Int
+
+  var body: some View {
+    HStack(spacing: HarnessMonitorTheme.spacingSM) {
+      Text(verbatim: "+\(additions)")
+        .foregroundStyle(HarnessMonitorTheme.success)
+      Text(verbatim: "-\(deletions)")
+        .foregroundStyle(HarnessMonitorTheme.danger)
+    }
+    .scaledFont(.caption.weight(.semibold).monospacedDigit())
+    .lineLimit(1)
+    .padding(.horizontal, 7)
+    .padding(.vertical, 3)
+    .background {
+      RoundedRectangle(
+        cornerRadius: DashboardDependenciesVisualMetrics.pillCornerRadius,
+        style: .continuous
+      )
+      .fill(HarnessMonitorTheme.secondaryInk.opacity(0.10))
+    }
+    .overlay {
+      RoundedRectangle(
+        cornerRadius: DashboardDependenciesVisualMetrics.pillCornerRadius,
+        style: .continuous
+      )
+      .strokeBorder(HarnessMonitorTheme.secondaryInk.opacity(0.22), lineWidth: 1)
+    }
+    .accessibilityLabel(accessibilityLabel)
+  }
+
+  private var accessibilityLabel: String {
+    "\(additions) \(additions == 1 ? "addition" : "additions"), \(deletions) "
+      + (deletions == 1 ? "deletion" : "deletions")
+  }
+}
+
 struct DashboardDependencyListRow: View {
   let item: DependencyUpdateItem
   let showsRepository: Bool
@@ -270,12 +308,7 @@ struct DashboardDependencyStatusStrip: View {
         tint: item.reviewStatus.tint,
         isQuiet: true
       )
-      DashboardDependencyStatusPill(
-        label: "\(item.additions)+ / \(item.deletions)-",
-        tint: HarnessMonitorTheme.secondaryInk,
-        systemImage: "plus.forwardslash.minus",
-        isQuiet: true
-      )
+      DashboardDependencyChangePill(additions: item.additions, deletions: item.deletions)
       if item.policyBlocked {
         DashboardDependencyStatusPill(
           label: "Policy wait",
