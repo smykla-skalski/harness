@@ -58,6 +58,10 @@ extension HarnessMonitorPerfTests {
     }
   }
 
+  func testDashboardSearchSuggestionsHitchRate() {
+    measureScenario("dashboard-search-suggestions")
+  }
+
   func testSidebarToggleRichDetailHitchRate() {
     measureScenario("sidebar-toggle-rich-detail")
   }

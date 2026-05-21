@@ -31,6 +31,7 @@ enum HarnessMonitorPerfScenario: String, CaseIterable, Sendable {
   case timelineBurst = "timeline-burst"
   case toastOverlayChurn = "toast-overlay-churn"
   case offlineCachedOpen = "offline-cached-open"
+  case dashboardSearchSuggestions = "dashboard-search-suggestions"
   case dashboardLiveScroll = "dashboard-live-scroll"
   case dashboardLiveInteract = "dashboard-live-interact"
 
@@ -144,6 +145,7 @@ extension HarnessMonitorPerfScenario {
     case .timelineBurst: "timeline-burst"
     case .toastOverlayChurn: "toast-overlay-churn"
     case .offlineCachedOpen: "offline-cached-open"
+    case .dashboardSearchSuggestions: "dashboard-search-suggestions"
     case .dashboardLiveScroll: "dashboard-live-scroll"
     case .dashboardLiveInteract: "dashboard-live-interact"
     }

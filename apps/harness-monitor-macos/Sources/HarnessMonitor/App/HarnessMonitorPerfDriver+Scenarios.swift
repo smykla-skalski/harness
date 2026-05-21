@@ -130,6 +130,14 @@ extension HarnessMonitorPerfDriver {
     return .completed
   }
 
+  static func runDashboardSearchSuggestionsScenario(
+    store: HarnessMonitorStore
+  ) async -> ScenarioResult {
+    await store.bootstrapIfNeeded()
+    await settle(.milliseconds(1_000))
+    return .completed
+  }
+
   static func runTimelineFilterFormScenario(
     store: HarnessMonitorStore,
     openWindow: OpenWindowAction

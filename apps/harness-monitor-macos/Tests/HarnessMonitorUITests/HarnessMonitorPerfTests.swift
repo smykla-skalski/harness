@@ -172,6 +172,25 @@ final class HarnessMonitorPerfTests: HarnessMonitorUITestCase {
     launched.terminate()
   }
 
+  func testDashboardSearchSuggestionsScenarioState() {
+    let app = XCUIApplication(bundleIdentifier: Self.uiTestHostBundleIdentifier)
+    let launched = launchForPerf(app: app, scenario: "dashboard-search-suggestions")
+    let dashboardRoot = element(in: launched, identifier: Accessibility.dashboardWindowRoot)
+    let dependenciesRoot = element(
+      in: launched,
+      identifier: Accessibility.dashboardDependenciesRoot
+    )
+    let searchField = mainWindow(in: launched).searchFields.firstMatch
+
+    waitForScenarioCompletion(app: launched, scenario: "dashboard-search-suggestions")
+
+    XCTAssertTrue(dashboardRoot.waitForExistence(timeout: Self.uiTimeout))
+    XCTAssertTrue(waitForElement(dependenciesRoot, timeout: Self.uiTimeout))
+    XCTAssertTrue(waitForElement(searchField, timeout: Self.uiTimeout))
+
+    launched.terminate()
+  }
+
   func testSidebarToggleRichDetailScenarioState() {
     let app = XCUIApplication(bundleIdentifier: Self.uiTestHostBundleIdentifier)
     let launched = launchForPerf(app: app, scenario: "sidebar-toggle-rich-detail")
