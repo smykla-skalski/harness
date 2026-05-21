@@ -392,13 +392,13 @@ struct DashboardDependenciesRouteView: View {
   }
 
   private var contentPane: some View {
-    VStack(alignment: .leading, spacing: 16) {
+    VStack(alignment: .leading, spacing: 14) {
       summaryCard
       filterBar
       contentListPane
     }
     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-    .padding(24)
+    .padding(20)
   }
 
   @ViewBuilder private var contentListPane: some View {
@@ -411,12 +411,12 @@ struct DashboardDependenciesRouteView: View {
   }
 
   private var summaryCard: some View {
-    VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingMD) {
+    VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingLG) {
       HStack(alignment: .top, spacing: HarnessMonitorTheme.spacingMD) {
         Image(systemName: DashboardWindowRoute.dependencies.systemImage)
-          .font(.system(size: 28, weight: .semibold))
+          .font(.system(size: 25, weight: .semibold))
           .foregroundStyle(HarnessMonitorTheme.accent)
-          .frame(width: 40, height: 40)
+          .frame(width: 34, height: 34)
 
         VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingXS) {
           Text("Dependencies")
@@ -435,39 +435,24 @@ struct DashboardDependenciesRouteView: View {
         )
       }
 
-      HarnessMonitorWrapLayout(
-        spacing: HarnessMonitorTheme.spacingSM,
-        lineSpacing: HarnessMonitorTheme.spacingSM
-      ) {
-        summaryBadge("\(response.summary.total) total", tint: HarnessMonitorTheme.accent)
-        summaryBadge("\(response.summary.readyToMerge) ready", tint: HarnessMonitorTheme.success)
-        summaryBadge(
-          "\(response.summary.reviewRequired) review",
-          tint: HarnessMonitorTheme.secondaryInk
-        )
-        summaryBadge(
-          "\(response.summary.waitingOnChecks) waiting",
-          tint: HarnessMonitorTheme.caution
-        )
-        summaryBadge("\(response.summary.blocked) blocked", tint: HarnessMonitorTheme.danger)
-        if response.fromCache {
-          summaryBadge("cached", tint: HarnessMonitorTheme.secondaryInk)
-        }
-        summaryBadge(
-          "refresh \(normalizedPreferences.refreshIntervalDescription)",
-          tint: HarnessMonitorTheme.secondaryInk
-        )
-      }
+      DashboardDependenciesSummaryStatStrip(
+        summary: response.summary,
+        showsCachedResults: response.fromCache,
+        refreshDescription: normalizedPreferences.refreshIntervalDescription
+      )
     }
     .frame(maxWidth: .infinity, alignment: .leading)
-    .padding(24)
-    .background(SessionTimelineCardBackground(tint: HarnessMonitorTheme.accent))
+    .padding(.bottom, HarnessMonitorTheme.spacingLG)
+    .overlay(alignment: .bottom) {
+      Divider().opacity(0.45)
+    }
   }
 
   private var filterBar: some View {
     VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
       TextField("Search repos, titles, authors, or labels", text: $searchText)
         .textFieldStyle(.roundedBorder)
+        .scaledFont(.callout)
 
       filterControls
       routeActions
@@ -542,6 +527,8 @@ struct DashboardDependenciesRouteView: View {
       }
     }
     .accessibilityIdentifier(HarnessMonitorAccessibility.dashboardDependenciesList)
+    .listStyle(.plain)
+    .scrollContentBackground(.hidden)
     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     .overlay {
       if isLoading {
@@ -561,12 +548,14 @@ struct DashboardDependenciesRouteView: View {
         dependencyDetail(item)
       } else if isLoading {
         ProgressView("Loading dependencies…")
+          .frame(maxWidth: .infinity, maxHeight: .infinity)
       } else {
         ContentUnavailableView {
           Label("Select a dependency update", systemImage: "sidebar.right")
         } description: {
           Text("Review checks, approvals, labels, and native actions without leaving the dashboard")
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
       }
     }
     .accessibilityIdentifier(HarnessMonitorAccessibility.dashboardDependenciesDetail)
@@ -605,66 +594,30 @@ struct DashboardDependenciesRouteView: View {
       scrollSurfaceIdentifier: HarnessMonitorAccessibility.dashboardDependenciesDetail,
       scrollSurfaceLabel: "Dependencies detail"
     ) {
-      VStack(alignment: .leading, spacing: 24) {
+      VStack(alignment: .leading, spacing: 18) {
         detailCard(
           title: item.title, subtitle: "\(item.repository)#\(item.number) · @\(item.authorLogin)"
         ) {
-          dependencyActionBar(items: [item])
+          VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingMD) {
+            dependencyActionBar(items: [item])
+            DashboardDependencyStatusStrip(item: item)
+          }
         }
-        detailMetrics(for: item)
         detailSection(nil) {
           descriptionView(for: item)
         }
         .accessibilityIdentifier(HarnessMonitorAccessibility.dashboardDependenciesDescription)
         detailSection("Checks") {
-          if item.checks.isEmpty {
-            Text("No checks reported")
-              .foregroundStyle(HarnessMonitorTheme.secondaryInk)
-          } else {
-            ForEach(item.checks) { check in
-              HStack(alignment: .firstTextBaseline) {
-                Text(check.name)
-                Spacer()
-                Text(check.statusLabel)
-                  .foregroundStyle(check.tint)
-              }
-              .scaledFont(.callout)
-            }
-          }
+          DashboardDependencyCheckList(checks: item.checks)
         }
         detailSection("Reviews") {
-          if item.reviews.isEmpty {
-            Text("No reviews yet")
-              .foregroundStyle(HarnessMonitorTheme.secondaryInk)
-          } else {
-            ForEach(item.reviews) { review in
-              HStack(alignment: .firstTextBaseline) {
-                Text(review.author)
-                Spacer()
-                Text(review.state.label)
-                  .foregroundStyle(review.state.tint)
-              }
-              .scaledFont(.callout)
-            }
-          }
+          DashboardDependencyReviewList(reviews: item.reviews)
         }
         detailSection("Labels") {
-          if item.labels.isEmpty {
-            Text("No labels applied")
-              .foregroundStyle(HarnessMonitorTheme.secondaryInk)
-          } else {
-            HarnessMonitorWrapLayout(
-              spacing: HarnessMonitorTheme.spacingSM,
-              lineSpacing: HarnessMonitorTheme.spacingSM
-            ) {
-              ForEach(Array(item.labels.enumerated()), id: \.offset) { _, label in
-                summaryBadge(label, tint: HarnessMonitorTheme.secondaryInk)
-              }
-            }
-          }
+          DashboardDependencyLabelStrip(labels: item.labels)
         }
       }
-      .frame(maxWidth: .infinity, alignment: .leading)
+      .frame(maxWidth: 940, alignment: .leading)
       .task(
         id: DependencyUpdateBodyTaskKey(
           item: item, isDaemonOnline: store.connectionState == .online)
@@ -685,34 +638,17 @@ struct DashboardDependenciesRouteView: View {
     _ item: DependencyUpdateItem,
     showsRepository: Bool
   ) -> some View {
-    VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingXS) {
-      HStack(alignment: .firstTextBaseline, spacing: HarnessMonitorTheme.spacingSM) {
-        Text(item.title)
-          .fontWeight(.semibold)
-          .lineLimit(2)
-        Spacer(minLength: HarnessMonitorTheme.spacingSM)
-        Text(verbatim: "#\(item.number)")
-          .foregroundStyle(HarnessMonitorTheme.secondaryInk)
-      }
-      HStack(spacing: HarnessMonitorTheme.spacingSM) {
-        if showsRepository {
-          Text(item.repository)
-          Text("·")
-        }
-        Text(item.statusLabel)
-        if refreshingPullRequestIDs.contains(item.pullRequestID) {
-          ProgressView()
-            .controlSize(.mini)
-            .accessibilityLabel("Refreshing pull request")
-        }
-        Spacer(minLength: HarnessMonitorTheme.spacingSM)
-        Text(relativeUpdatedLabel(for: item))
-      }
-      .scaledFont(.caption)
-      .foregroundStyle(HarnessMonitorTheme.secondaryInk)
-    }
+    DashboardDependencyListRow(
+      item: item,
+      showsRepository: showsRepository,
+      isSelected: selectedIDs.contains(item.pullRequestID),
+      isRefreshing: refreshingPullRequestIDs.contains(item.pullRequestID),
+      updatedLabel: relativeUpdatedLabel(for: item)
+    )
     .tag(item.pullRequestID)
-    .listRowInsets(EdgeInsets(top: 6, leading: 12, bottom: 6, trailing: 12))
+    .listRowInsets(EdgeInsets(top: 5, leading: 8, bottom: 5, trailing: 8))
+    .listRowSeparator(.hidden)
+    .listRowBackground(Color.clear)
     .contextMenu {
       Button("Open Pull Request") {
         openItem(item)
@@ -767,23 +703,6 @@ struct DashboardDependenciesRouteView: View {
     )
   }
 
-  private func detailMetrics(for item: DependencyUpdateItem) -> some View {
-    detailSection("Status") {
-      HarnessMonitorWrapLayout(
-        spacing: HarnessMonitorTheme.spacingSM,
-        lineSpacing: HarnessMonitorTheme.spacingSM
-      ) {
-        summaryBadge(item.statusLabel, tint: item.statusTint)
-        summaryBadge(item.reviewStatus.label, tint: item.reviewStatus.tint)
-        summaryBadge(
-          "\(item.additions)+ / \(item.deletions)-", tint: HarnessMonitorTheme.secondaryInk)
-        if item.policyBlocked {
-          summaryBadge("policy wait", tint: HarnessMonitorTheme.caution)
-        }
-      }
-    }
-  }
-
   private func dependencyActionBar(items: [DependencyUpdateItem]) -> some View {
     HarnessMonitorGlassControlGroup(spacing: HarnessMonitorTheme.itemSpacing) {
       HarnessMonitorWrapLayout(
@@ -798,17 +717,17 @@ struct DashboardDependenciesRouteView: View {
 
   @ViewBuilder
   private func dependencyActionButtons(items: [DependencyUpdateItem]) -> some View {
-    actionButton("Approve", systemImage: "checkmark.seal") {
+    actionButton("Approve", systemImage: "checkmark.seal", prominence: .primary) {
       Task { await approve(items: items) }
     }
     .disabled(!items.contains { $0.canAttemptManualApproval })
 
-    actionButton("Merge", systemImage: "arrow.triangle.merge") {
+    actionButton("Merge", systemImage: "arrow.triangle.merge", prominence: .success) {
       Task { await merge(items: items) }
     }
     .disabled(!items.contains { $0.canAttemptManualMerge })
 
-    actionButton("Rerun Checks", systemImage: "arrow.clockwise.circle") {
+    actionButton("Rerun Checks", systemImage: "arrow.clockwise.circle", prominence: .secondary) {
       Task { await rerunChecks(items: items) }
     }
     .disabled(!items.contains { $0.hasRerunnableChecks })
@@ -829,26 +748,26 @@ struct DashboardDependenciesRouteView: View {
     )
     .disabled(items.isEmpty)
 
-    actionButton("Copy Approval Links", systemImage: "doc.on.doc") {
+    actionButton("Copy Approval Links", systemImage: "doc.on.doc", prominence: .secondary) {
       copyApprovalLinks(for: items)
     }
 
     if items.count == 1, let item = items.first {
-      actionButton("Auto", systemImage: "bolt") {
+      actionButton("Auto", systemImage: "bolt", prominence: .utility) {
         Task { await auto(items: [item]) }
       }
       .disabled(!item.canRunAutoMode)
-      actionButton("Open Pull Request", systemImage: "safari") {
+      actionButton("Open Pull Request", systemImage: "safari", prominence: .utility) {
         openItem(item)
       }
       if item.canStartFixCI {
-        actionButton("Fix CI", systemImage: "wrench.and.screwdriver") {
+        actionButton("Fix CI", systemImage: "wrench.and.screwdriver", prominence: .secondary) {
           Task { await fixCI(item: item) }
         }
         .accessibilityIdentifier(HarnessMonitorAccessibility.dashboardDependenciesFixCIButton)
       }
     } else {
-      actionButton("Auto", systemImage: "bolt") {
+      actionButton("Auto", systemImage: "bolt", prominence: .utility) {
         Task { await auto(items: items) }
       }
       .disabled(!items.contains { $0.canRunAutoMode })
@@ -883,15 +802,20 @@ struct DashboardDependenciesRouteView: View {
   ) -> some View {
     VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingMD) {
       Text(title)
-        .scaledFont(.system(.title3, design: .rounded, weight: .semibold))
+        .scaledFont(.system(.title2, design: .rounded, weight: .semibold))
+        .foregroundStyle(HarnessMonitorTheme.ink)
+        .lineLimit(3)
+        .fixedSize(horizontal: false, vertical: true)
       Text(subtitle)
-        .scaledFont(.callout)
+        .scaledFont(.callout.weight(.semibold))
         .foregroundStyle(HarnessMonitorTheme.secondaryInk)
       content()
     }
-    .frame(maxWidth: .infinity, alignment: .leading)
-    .padding(24)
-    .background(SessionTimelineCardBackground(tint: HarnessMonitorTheme.accent))
+    .frame(maxWidth: 940, alignment: .leading)
+    .padding(.bottom, HarnessMonitorTheme.spacingLG)
+    .overlay(alignment: .bottom) {
+      Divider().opacity(0.42)
+    }
   }
 
   private func detailSection<Content: View>(_ title: String?, @ViewBuilder content: () -> Content)
@@ -900,28 +824,32 @@ struct DashboardDependenciesRouteView: View {
     VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
       if let title {
         Text(title)
-          .scaledFont(.headline)
+          .scaledFont(.headline.weight(.semibold))
+          .foregroundStyle(HarnessMonitorTheme.ink)
       }
       content()
     }
-    .frame(maxWidth: .infinity, alignment: .leading)
-    .padding(24)
-    .background(SessionTimelineCardBackground(tint: HarnessMonitorTheme.secondaryInk))
+    .frame(maxWidth: 940, alignment: .leading)
+    .padding(.vertical, HarnessMonitorTheme.spacingLG)
+    .overlay(alignment: .top) {
+      Divider().opacity(0.34)
+    }
   }
 
-  private func summaryBadge(_ label: String, tint: Color) -> some View {
-    SessionTimelineBadge(label: label, tint: tint, style: .quiet)
-  }
-
-  private func actionButton(_ title: String, systemImage: String, action: @escaping () -> Void)
+  private func actionButton(
+    _ title: String,
+    systemImage: String,
+    prominence: DashboardDependencyActionProminence = .utility,
+    action: @escaping () -> Void
+  )
     -> some View
   {
-    Button(action: action) {
-      Label(title, systemImage: systemImage)
-        .lineLimit(1)
-    }
-    .harnessActionButtonStyle(variant: .bordered, tint: .secondary)
-    .fixedSize(horizontal: true, vertical: true)
+    DashboardDependencyActionButton(
+      title: title,
+      systemImage: systemImage,
+      prominence: prominence,
+      action: action
+    )
   }
 
   private func errorState(message: String) -> some View {
@@ -937,7 +865,7 @@ struct DashboardDependenciesRouteView: View {
         openSettingsSection(.repositories)
       }
     }
-    .frame(maxWidth: .infinity, minHeight: 320)
+    .frame(maxWidth: .infinity, maxHeight: .infinity)
   }
 
   func reload(forceRefresh: Bool, backgroundRefresh: Bool = false) async {
@@ -997,14 +925,37 @@ struct DashboardDependenciesRouteView: View {
   }
 
   private func merge(items: [DependencyUpdateItem]) async {
-    await performMutation("Merging", items: items) { client in
-      try await client.mergeDependencyUpdates(
-        request: DependencyUpdatesMergeRequest(
-          targets: items.map(\.target),
-          method: normalizedPreferences.mergeMethod
+    let nextID = nextSelectionID(after: items)
+    await performMutation(
+      "Merging",
+      items: items,
+      onSuccess: {
+        if let nextID {
+          selectedIDs = [nextID]
+        }
+      },
+      operation: { client in
+        try await client.mergeDependencyUpdates(
+          request: DependencyUpdatesMergeRequest(
+            targets: items.map(\.target),
+            method: normalizedPreferences.mergeMethod
+          )
         )
-      )
+      }
+    )
+  }
+
+  private func nextSelectionID(after items: [DependencyUpdateItem]) -> String? {
+    let mergedIDs = Set(items.map(\.pullRequestID))
+    let list = filteredItems
+    guard
+      let lastMergedIndex = list.lastIndex(where: { mergedIDs.contains($0.pullRequestID) })
+    else {
+      return nil
     }
+    return list[(lastMergedIndex + 1)...]
+      .first(where: { !mergedIDs.contains($0.pullRequestID) })?
+      .pullRequestID
   }
 
   private func rerunChecks(items: [DependencyUpdateItem]) async {
@@ -1487,7 +1438,7 @@ private enum DashboardDependenciesGroupMode: String, CaseIterable, Identifiable 
 }
 
 extension DependencyUpdateItem {
-  fileprivate var statusWeight: Int {
+  var statusWeight: Int {
     switch true {
     case reviewStatus == .approved && checkStatus == .success:
       0
@@ -1504,7 +1455,7 @@ extension DependencyUpdateItem {
     }
   }
 
-  fileprivate var statusLabel: String {
+  var statusLabel: String {
     switch true {
     case isAutoMergeable: "Ready to merge"
     case isAutoApprovable: "Ready for approval"
@@ -1514,7 +1465,7 @@ extension DependencyUpdateItem {
     }
   }
 
-  fileprivate var statusTint: Color {
+  var statusTint: Color {
     switch true {
     case isAutoMergeable: HarnessMonitorTheme.success
     case isAutoApprovable: HarnessMonitorTheme.accent
@@ -1527,7 +1478,7 @@ extension DependencyUpdateItem {
 }
 
 extension DependencyUpdateReviewStatus {
-  fileprivate var label: String {
+  var label: String {
     switch self {
     case .approved: "Approved"
     case .reviewRequired: "Review required"
@@ -1536,7 +1487,7 @@ extension DependencyUpdateReviewStatus {
     }
   }
 
-  fileprivate var tint: Color {
+  var tint: Color {
     switch self {
     case .approved: HarnessMonitorTheme.success
     case .reviewRequired: HarnessMonitorTheme.accent
@@ -1547,7 +1498,7 @@ extension DependencyUpdateReviewStatus {
 }
 
 extension DependencyUpdateCheckStatus {
-  fileprivate var label: String {
+  var label: String {
     switch self {
     case .none: "No checks"
     case .success: "Checks passing"
@@ -1559,7 +1510,7 @@ extension DependencyUpdateCheckStatus {
 }
 
 extension DependencyUpdateCheck {
-  fileprivate var statusLabel: String {
+  var statusLabel: String {
     switch status {
     case .completed: conclusion.label
     case .inProgress: "In progress"
@@ -1570,7 +1521,7 @@ extension DependencyUpdateCheck {
     }
   }
 
-  fileprivate var tint: Color {
+  var tint: Color {
     switch conclusion {
     case .success: HarnessMonitorTheme.success
     case .failure, .cancelled, .timedOut, .actionRequired, .startupFailure:
@@ -1582,7 +1533,7 @@ extension DependencyUpdateCheck {
 }
 
 extension DependencyUpdateCheckConclusion {
-  fileprivate var label: String {
+  var label: String {
     switch self {
     case .success: "Success"
     case .failure: "Failure"
@@ -1599,7 +1550,7 @@ extension DependencyUpdateCheckConclusion {
 }
 
 extension DependencyUpdateReviewEventState {
-  fileprivate var label: String {
+  var label: String {
     switch self {
     case .approved: "Approved"
     case .changesRequested: "Changes requested"
@@ -1610,7 +1561,7 @@ extension DependencyUpdateReviewEventState {
     }
   }
 
-  fileprivate var tint: Color {
+  var tint: Color {
     switch self {
     case .approved: HarnessMonitorTheme.success
     case .changesRequested: HarnessMonitorTheme.danger
