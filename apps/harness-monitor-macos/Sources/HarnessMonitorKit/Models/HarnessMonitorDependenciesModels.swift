@@ -404,3 +404,33 @@ public struct DependencyUpdatesCacheClearResponse: Codable, Equatable, Sendable 
     self.clearedEntries = clearedEntries
   }
 }
+
+public struct DependencyUpdatesRefreshRequest: Codable, Equatable, Sendable {
+  public let targets: [DependencyUpdateTarget]
+
+  public init(targets: [DependencyUpdateTarget]) {
+    self.targets = targets
+  }
+}
+
+public struct DependencyUpdatesRefreshResponse: Codable, Equatable, Sendable {
+  public let fetchedAt: String
+  public let items: [DependencyUpdateItem]
+  public let missingPullRequestIDs: [String]
+
+  public init(
+    fetchedAt: String,
+    items: [DependencyUpdateItem] = [],
+    missingPullRequestIDs: [String] = []
+  ) {
+    self.fetchedAt = fetchedAt
+    self.items = items
+    self.missingPullRequestIDs = missingPullRequestIDs
+  }
+
+  enum CodingKeys: String, CodingKey {
+    case fetchedAt
+    case items
+    case missingPullRequestIDs = "missingPullRequestIds"
+  }
+}

@@ -46,4 +46,10 @@ extension HarnessMonitorAPIClient {
   public func clearDependencyUpdatesCache() async throws -> DependencyUpdatesCacheClearResponse {
     try await delete("/v1/dependency-updates/cache")
   }
+
+  public func refreshDependencyUpdates(
+    request: DependencyUpdatesRefreshRequest
+  ) async throws -> DependencyUpdatesRefreshResponse {
+    try await post("/v1/dependency-updates/refresh", body: request)
+  }
 }

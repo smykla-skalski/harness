@@ -153,3 +153,12 @@ let sampleDepsCacheClearResponseText =
     "cleared_entries": 2
   }
   """
+
+let sampleDependencyUpdatesRefreshResponseText =
+  """
+  {
+    "fetched_at": "2026-05-21T12:00:00Z",
+    "items": [],
+    "missing_pull_request_ids": ["pr-42"]
+  }
+  """

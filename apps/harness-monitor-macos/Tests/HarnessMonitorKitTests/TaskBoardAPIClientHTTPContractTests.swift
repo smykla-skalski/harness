@@ -192,6 +192,9 @@ extension TaskBoardAPIClientTests {
       request: DependencyUpdatesAutoRequest(targets: [target], method: .squash)
     )
     let cacheClear = try await client.clearDependencyUpdatesCache()
+    let refresh = try await client.refreshDependencyUpdates(
+      request: DependencyUpdatesRefreshRequest(targets: [target])
+    )
 
     return DependencyUpdatesHTTPContractResult(
       repositoryCatalog: repositoryCatalog,
@@ -201,7 +204,8 @@ extension TaskBoardAPIClientTests {
       rerun: rerun,
       label: label,
       auto: auto,
-      cacheClear: cacheClear
+      cacheClear: cacheClear,
+      refresh: refresh
     )
   }
 
@@ -335,7 +339,7 @@ extension TaskBoardAPIClientTests {
   func assertDependencyUpdatesHTTPRouteContract(_ records: [TaskBoardURLProtocol.RecordedRequest]) {
     #expect(
       records.map(\.method)
-        == ["POST", "POST", "POST", "POST", "POST", "POST", "POST", "DELETE"]
+        == ["POST", "POST", "POST", "POST", "POST", "POST", "POST", "DELETE", "POST"]
     )
     #expect(
       records.map(\.path)
@@ -348,6 +352,7 @@ extension TaskBoardAPIClientTests {
           "/v1/dependency-updates/labels",
           "/v1/dependency-updates/auto",
           "/v1/dependency-updates/cache",
+          "/v1/dependency-updates/refresh",
         ]
     )
   }
@@ -416,6 +421,7 @@ extension TaskBoardAPIClientTests {
     #expect(result.label.results.first?.action == .addLabel)
     #expect(result.auto.results.first?.action == .autoMerge)
     #expect(result.cacheClear.clearedEntries == 2)
+    #expect(result.refresh.missingPullRequestIDs == ["pr-42"])
   }
 
   private func makeClient() throws -> HarnessMonitorAPIClient {
@@ -471,6 +477,7 @@ struct DependencyUpdatesHTTPContractResult {
   let label: DependencyUpdatesActionResponse
   let auto: DependencyUpdatesActionResponse
   let cacheClear: DependencyUpdatesCacheClearResponse
+  let refresh: DependencyUpdatesRefreshResponse
 }
 
 private struct TaskBoardHTTPWorkflowResult {
