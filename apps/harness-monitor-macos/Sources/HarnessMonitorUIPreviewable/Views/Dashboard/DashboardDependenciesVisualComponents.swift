@@ -7,6 +7,18 @@ private enum DashboardDependenciesVisualMetrics {
   static let checksMaxWidth: CGFloat = 680
 }
 
+private enum DashboardDependencyTitleLineCenterAlignment: AlignmentID {
+  static func defaultValue(in context: ViewDimensions) -> CGFloat {
+    context[VerticalAlignment.center]
+  }
+}
+
+private extension VerticalAlignment {
+  static let dashboardDependencyTitleLineCenter = VerticalAlignment(
+    DashboardDependencyTitleLineCenterAlignment.self
+  )
+}
+
 struct DashboardDependenciesSummaryStatStrip: View {
   let summary: DependencyUpdatesSummary
   let showsCachedResults: Bool
@@ -133,7 +145,7 @@ struct DashboardDependencyListRow: View {
   let updatedLabel: String
 
   var body: some View {
-    HStack(alignment: .center, spacing: HarnessMonitorTheme.spacingSM) {
+    HStack(alignment: .dashboardDependencyTitleLineCenter, spacing: HarnessMonitorTheme.spacingSM) {
       Image(systemName: item.statusSystemImage)
         .font(.system(size: 14, weight: .semibold))
         .foregroundStyle(item.statusTint)
@@ -146,6 +158,9 @@ struct DashboardDependencyListRow: View {
           .foregroundStyle(HarnessMonitorTheme.ink)
           .lineLimit(1)
           .truncationMode(.tail)
+          .alignmentGuide(.dashboardDependencyTitleLineCenter) { dimensions in
+            dimensions[VerticalAlignment.center]
+          }
 
         Text(secondaryText)
           .scaledFont(.caption)
