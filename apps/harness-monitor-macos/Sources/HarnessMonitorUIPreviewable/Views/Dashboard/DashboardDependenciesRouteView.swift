@@ -181,6 +181,10 @@ struct DashboardDependenciesRouteView: View {
     cachedPresentation.primaryDetailItem
   }
 
+  private var relativeUpdatedLabels: [String: String] {
+    cachedPresentation.relativeUpdatedLabels
+  }
+
   private var summarySubtitle: String {
     guard let fetchedAt = parsedDate(response.fetchedAt) else {
       return response.fromCache ? "Showing cached results" : "Dependencies from configured sources"
@@ -558,7 +562,7 @@ struct DashboardDependenciesRouteView: View {
             .accessibilityLabel("Refreshing pull request")
         }
         Spacer(minLength: HarnessMonitorTheme.spacingSM)
-        Text(item.relativeUpdatedLabel)
+        Text(relativeUpdatedLabel(for: item))
       }
       .scaledFont(.caption)
       .foregroundStyle(HarnessMonitorTheme.secondaryInk)
@@ -1007,6 +1011,10 @@ struct DashboardDependenciesRouteView: View {
     store.presentSuccessFeedback("Copied \(links.count) approval link(s)")
   }
 
+  private func relativeUpdatedLabel(for item: DependencyUpdateItem) -> String {
+    relativeUpdatedLabels[item.pullRequestID] ?? item.updatedAt
+  }
+
   private func toggleRepositoryCollapse(_ repository: String) {
     var collapsed = collapsedRepositories
     collapsed.toggle(repository)
@@ -1308,14 +1316,6 @@ extension DependencyUpdateItem {
     }
   }
 
-  @MainActor fileprivate var relativeUpdatedLabel: String {
-    guard
-      let date = dependenciesISO8601Formatter.date(from: updatedAt)
-    else {
-      return updatedAt
-    }
-    return dependenciesRelativeFormatter.localizedString(for: date, relativeTo: .now)
-  }
 }
 
 extension DependencyUpdateReviewStatus {

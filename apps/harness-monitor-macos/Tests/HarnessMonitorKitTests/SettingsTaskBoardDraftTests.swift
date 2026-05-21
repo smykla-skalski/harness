@@ -255,6 +255,7 @@ struct SettingsRepositoriesPerformanceSourceTests {
     #expect(source.contains("Task.detached(priority: .userInitiated)"))
     #expect(source.contains("LazyVStack(spacing: 0)"))
     #expect(source.contains("ForEach(Array(repositories.enumerated()), id: \\.element)"))
+    #expect(!source.contains("if index > 0"))
     #expect(source.contains("rowIndexesByID()"))
     #expect(source.contains("rowIndexes: &rowIndexes"))
   }

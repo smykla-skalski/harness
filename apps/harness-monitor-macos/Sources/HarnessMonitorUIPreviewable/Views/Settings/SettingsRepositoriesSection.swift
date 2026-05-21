@@ -167,10 +167,7 @@ struct SettingsRepositoriesSection: View {
         ScrollView {
           LazyVStack(spacing: 0) {
             ForEach(Array(draft.rows.enumerated()), id: \.element.id) { index, row in
-              if index > 0 {
-                Divider()
-              }
-              repositoryRow(row, index: index)
+              repositoryTableRow(row, index: index)
             }
           }
         }
@@ -183,6 +180,14 @@ struct SettingsRepositoriesSection: View {
       RoundedRectangle(cornerRadius: 8, style: .continuous)
         .stroke(Color(nsColor: .separatorColor).opacity(0.55), lineWidth: 1)
     }
+  }
+
+  private func repositoryTableRow(_ row: SettingsSharedRepositoryRow, index: Int) -> some View {
+    repositoryRow(row, index: index)
+      .overlay(alignment: .top) {
+        Divider()
+          .opacity(index == 0 ? 0 : 1)
+      }
   }
 
   private var repositoriesTableHeader: some View {
@@ -427,10 +432,7 @@ struct SettingsRepositoriesSection: View {
         ForEach(Array(repositories.enumerated()), id: \.element) { row in
           let index = row.offset
           let repository = row.element
-          if index > 0 {
-            Divider()
-          }
-          catalogRepositoryRow(repository)
+          catalogRepositoryListRow(repository, index: index)
         }
       }
     }
@@ -442,6 +444,14 @@ struct SettingsRepositoriesSection: View {
         .stroke(Color(nsColor: .separatorColor).opacity(0.55), lineWidth: 1)
     }
     .accessibilityIdentifier(HarnessMonitorAccessibility.settingsRepositoriesCatalogList)
+  }
+
+  private func catalogRepositoryListRow(_ repository: String, index: Int) -> some View {
+    catalogRepositoryRow(repository)
+      .overlay(alignment: .top) {
+        Divider()
+          .opacity(index == 0 ? 0 : 1)
+      }
   }
 
   private func catalogRepositoryRow(_ repository: String) -> some View {
@@ -493,38 +503,7 @@ struct SettingsRepositoriesSection: View {
   private var legacyOrganizationsSection: some View {
     Section {
       ForEach(Array(draft.legacyOrganizations.enumerated()), id: \.element) { index, organization in
-        if index > 0 {
-          Divider()
-        }
-        HStack(spacing: HarnessMonitorTheme.spacingMD) {
-          VStack(alignment: .leading, spacing: 4) {
-            Text(organization)
-              .font(bodyFont.weight(.semibold))
-            Text(
-              "Dependencies still queries this legacy organization until you import or remove it."
-            )
-            .font(HarnessMonitorTextSize.scaledFont(.caption, by: fontScale))
-            .foregroundStyle(HarnessMonitorTheme.secondaryInk)
-          }
-          Spacer()
-          Button("Review Repositories") {
-            Task { await loadCatalog(for: organization, preselectVisible: true) }
-          }
-          .harnessActionButtonStyle(variant: .bordered, tint: .secondary)
-          .fixedSize(horizontal: true, vertical: true)
-          .accessibilityIdentifier(
-            HarnessMonitorAccessibility.settingsRepositoriesLegacyImportButton(index)
-          )
-          Button("Remove") {
-            draft.removeLegacyOrganization(organization)
-          }
-          .harnessActionButtonStyle(variant: .bordered, tint: .red)
-          .fixedSize(horizontal: true, vertical: true)
-          .accessibilityIdentifier(
-            HarnessMonitorAccessibility.settingsRepositoriesLegacyRemoveButton(index)
-          )
-        }
-        .padding(.vertical, HarnessMonitorTheme.spacingXS)
+        legacyOrganizationRow(organization, index: index)
       }
     } header: {
       Text("Legacy Organization Sources")
@@ -537,6 +516,40 @@ struct SettingsRepositoriesSection: View {
         organization.
         """
       )
+    }
+  }
+
+  private func legacyOrganizationRow(_ organization: String, index: Int) -> some View {
+    HStack(spacing: HarnessMonitorTheme.spacingMD) {
+      VStack(alignment: .leading, spacing: 4) {
+        Text(organization)
+          .font(bodyFont.weight(.semibold))
+        Text("Dependencies still queries this legacy organization until you import or remove it.")
+          .font(HarnessMonitorTextSize.scaledFont(.caption, by: fontScale))
+          .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+      }
+      Spacer()
+      Button("Review Repositories") {
+        Task { await loadCatalog(for: organization, preselectVisible: true) }
+      }
+      .harnessActionButtonStyle(variant: .bordered, tint: .secondary)
+      .fixedSize(horizontal: true, vertical: true)
+      .accessibilityIdentifier(
+        HarnessMonitorAccessibility.settingsRepositoriesLegacyImportButton(index)
+      )
+      Button("Remove") {
+        draft.removeLegacyOrganization(organization)
+      }
+      .harnessActionButtonStyle(variant: .bordered, tint: .red)
+      .fixedSize(horizontal: true, vertical: true)
+      .accessibilityIdentifier(
+        HarnessMonitorAccessibility.settingsRepositoriesLegacyRemoveButton(index)
+      )
+    }
+    .padding(.vertical, HarnessMonitorTheme.spacingXS)
+    .overlay(alignment: .top) {
+      Divider()
+        .opacity(index == 0 ? 0 : 1)
     }
   }
 
