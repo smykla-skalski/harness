@@ -89,6 +89,7 @@ struct SettingsScrollRestorationModifier: ViewModifier {
   @State private var lastPersistedOffset: CGFloat?
   @State private var pendingRestore: PendingRestore?
   @State private var restoreGeneration: UInt64 = 0
+  @State private var restoreRetryDeferrer = SettingsScrollRestoreRetryDeferrer()
   @State private var restoredSection: SettingsSection?
   @State private var restoreApplicatorRequest: SettingsScrollRestoreRequest?
   @State private var restoreApplicatorRequestID: UInt64 = 0
@@ -245,15 +246,27 @@ struct SettingsScrollRestorationModifier: ViewModifier {
       return false
     }
     guard state.maxOffsetY > 0 else {
-      requestScroll(to: targetOffset)
+      scheduleRestoreRetry(to: targetOffset, generation: pendingRestore.generation)
       return true
     }
 
     if abs(state.offsetY - visibleTargetOffset) > Self.restoreTolerance {
-      requestScroll(to: targetOffset)
+      scheduleRestoreRetry(to: targetOffset, generation: pendingRestore.generation)
+      return true
     }
     finishRestore(for: section, observedOffset: state.offsetY)
     return true
+  }
+
+  private func scheduleRestoreRetry(to offset: CGFloat, generation: UInt64) {
+    // Defer geometry-driven restore retries so the callback never mutates scroll
+    // position during the same frame that produced the measurement.
+    restoreRetryDeferrer.schedule(offset) { latestOffset in
+      guard restoreGeneration == generation else {
+        return
+      }
+      requestScroll(to: latestOffset)
+    }
   }
 
   private func finishRestore(
@@ -270,12 +283,11 @@ struct SettingsScrollRestorationModifier: ViewModifier {
     for section: SettingsSection
   ) {
     let isConfirmedUserScroll = activeUserScroll || userScrollObserved
-    guard isConfirmedUserScroll || offset > 0 else {
+    guard isConfirmedUserScroll else {
       return
     }
     let hasMeaningfulMovement =
-      isConfirmedUserScroll
-      || SettingsScrollPersistencePolicy.hasMeaningfulMovement(
+      SettingsScrollPersistencePolicy.hasMeaningfulMovement(
         from: oldOffset,
         to: offset
       )
@@ -286,7 +298,7 @@ struct SettingsScrollRestorationModifier: ViewModifier {
       offset,
       for: section,
       force: false,
-      allowsZero: isConfirmedUserScroll
+      allowsZero: true
     )
   }
 
@@ -371,4 +383,24 @@ enum SettingsScrollRestorationPhasePolicy {
 struct SettingsScrollRestoreRequest: Equatable {
   var id: UInt64
   var offset: CGFloat
+}
+
+@MainActor
+final class SettingsScrollRestoreRetryDeferrer {
+  private var generation: UInt64 = 0
+
+  func schedule(
+    _ offset: CGFloat,
+    apply: @escaping @MainActor (CGFloat) -> Void
+  ) {
+    generation &+= 1
+    let scheduledGeneration = generation
+    Task { @MainActor in
+      await Task.yield()
+      guard self.generation == scheduledGeneration else {
+        return
+      }
+      apply(offset)
+    }
+  }
 }
