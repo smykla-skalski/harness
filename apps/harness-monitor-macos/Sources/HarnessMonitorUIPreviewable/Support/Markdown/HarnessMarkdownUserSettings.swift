@@ -316,12 +316,86 @@ extension HarnessMarkdownUserSettings {
     var link = HarnessMarkdownColorChoice.accent
     var inlineCodeText = HarnessMarkdownColorChoice.primary
     var inlineCodeBackground = HarnessMarkdownColorChoice.accentFill
+    var alertNote = HarnessMarkdownColorChoice.accent
+    var alertTip = HarnessMarkdownColorChoice.success
+    var alertImportant = HarnessMarkdownColorChoice.warmAccent
+    var alertWarning = HarnessMarkdownColorChoice.caution
+    var alertCaution = HarnessMarkdownColorChoice.danger
     var quoteBar = HarnessMarkdownColorChoice.border
     var tableBackground = HarnessMarkdownColorChoice.subtleFill
     var tableBorder = HarnessMarkdownColorChoice.border
     var taskChecked = HarnessMarkdownColorChoice.accent
     var taskUnchecked = HarnessMarkdownColorChoice.secondary
     var thematicBreak = HarnessMarkdownColorChoice.border
+
+    enum CodingKeys: String, CodingKey {
+      case text
+      case secondaryText
+      case link
+      case inlineCodeText
+      case inlineCodeBackground
+      case alertNote
+      case alertTip
+      case alertImportant
+      case alertWarning
+      case alertCaution
+      case quoteBar
+      case tableBackground
+      case tableBorder
+      case taskChecked
+      case taskUnchecked
+      case thematicBreak
+    }
+
+    init() {}
+
+    init(from decoder: Decoder) throws {
+      self.init()
+      let values = try decoder.container(keyedBy: CodingKeys.self)
+      text = try values.decodeIfPresent(HarnessMarkdownColorChoice.self, forKey: .text) ?? text
+      secondaryText =
+        try values.decodeIfPresent(HarnessMarkdownColorChoice.self, forKey: .secondaryText)
+        ?? secondaryText
+      link = try values.decodeIfPresent(HarnessMarkdownColorChoice.self, forKey: .link) ?? link
+      inlineCodeText =
+        try values.decodeIfPresent(HarnessMarkdownColorChoice.self, forKey: .inlineCodeText)
+        ?? inlineCodeText
+      inlineCodeBackground =
+        try values.decodeIfPresent(HarnessMarkdownColorChoice.self, forKey: .inlineCodeBackground)
+        ?? inlineCodeBackground
+      alertNote =
+        try values.decodeIfPresent(HarnessMarkdownColorChoice.self, forKey: .alertNote)
+        ?? alertNote
+      alertTip =
+        try values.decodeIfPresent(HarnessMarkdownColorChoice.self, forKey: .alertTip)
+        ?? alertTip
+      alertImportant =
+        try values.decodeIfPresent(HarnessMarkdownColorChoice.self, forKey: .alertImportant)
+        ?? alertImportant
+      alertWarning =
+        try values.decodeIfPresent(HarnessMarkdownColorChoice.self, forKey: .alertWarning)
+        ?? alertWarning
+      alertCaution =
+        try values.decodeIfPresent(HarnessMarkdownColorChoice.self, forKey: .alertCaution)
+        ?? alertCaution
+      quoteBar =
+        try values.decodeIfPresent(HarnessMarkdownColorChoice.self, forKey: .quoteBar) ?? quoteBar
+      tableBackground =
+        try values.decodeIfPresent(HarnessMarkdownColorChoice.self, forKey: .tableBackground)
+        ?? tableBackground
+      tableBorder =
+        try values.decodeIfPresent(HarnessMarkdownColorChoice.self, forKey: .tableBorder)
+        ?? tableBorder
+      taskChecked =
+        try values.decodeIfPresent(HarnessMarkdownColorChoice.self, forKey: .taskChecked)
+        ?? taskChecked
+      taskUnchecked =
+        try values.decodeIfPresent(HarnessMarkdownColorChoice.self, forKey: .taskUnchecked)
+        ?? taskUnchecked
+      thematicBreak =
+        try values.decodeIfPresent(HarnessMarkdownColorChoice.self, forKey: .thematicBreak)
+        ?? thematicBreak
+    }
 
     var markdownColors: HarnessMarkdownColorSettings {
       HarnessMarkdownColorSettings(
@@ -330,6 +404,11 @@ extension HarnessMarkdownUserSettings {
         link: link.color,
         inlineCodeText: inlineCodeText.color,
         inlineCodeBackground: inlineCodeBackground.color,
+        alertNote: alertNote.color,
+        alertTip: alertTip.color,
+        alertImportant: alertImportant.color,
+        alertWarning: alertWarning.color,
+        alertCaution: alertCaution.color,
         quoteBar: quoteBar.color,
         tableBackground: tableBackground.color,
         tableBorder: tableBorder.color,

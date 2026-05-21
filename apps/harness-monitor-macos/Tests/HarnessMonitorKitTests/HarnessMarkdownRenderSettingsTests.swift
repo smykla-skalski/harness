@@ -93,6 +93,23 @@ struct HarnessMarkdownRenderSettingsTests {
     #expect(decoded.detailsMaxHeight == 420)
   }
 
+  @Test("Persisted markdown colors keep defaults for newly added settings")
+  func persistedMarkdownColorsKeepDefaultsForNewSettings() throws {
+    let storage = #"{"text":"secondary","link":"success"}"#
+    let decoded = try JSONDecoder().decode(
+      HarnessMarkdownUserSettings.Colors.self,
+      from: Data(storage.utf8)
+    )
+
+    #expect(decoded.text == .secondary)
+    #expect(decoded.link == .success)
+    #expect(decoded.alertNote == .accent)
+    #expect(decoded.alertTip == .success)
+    #expect(decoded.alertImportant == .warmAccent)
+    #expect(decoded.alertWarning == .caution)
+    #expect(decoded.alertCaution == .danger)
+  }
+
   @Test("Markdown spacing settings expose block gaps and scale with font mode")
   func spacingSettingsResolveBlockGaps() {
     let spacing = HarnessMarkdownSpacingSettings(
@@ -124,6 +141,9 @@ struct HarnessMarkdownRenderSettingsTests {
     #expect(resolved.spacing.blockSpacing(for: .paragraph([])).after == 4)
     #expect(resolved.spacing.blockSpacing(for: .heading(level: 1, inlines: [])).before == 6)
     #expect(resolved.spacing.blockSpacing(for: .unorderedList([])).after == 12)
+    #expect(
+      resolved.spacing.blockSpacing(
+        for: .alert(HarnessMarkdownAlert(kind: .note, blocks: []))) == .none)
     #expect(resolved.spacing.detailsContentIndent == 15)
     #expect(resolved.spacing.detailsMaxHeight == 600)
     #expect(resolved.spacing.listItem == 16)
@@ -173,6 +193,8 @@ struct HarnessMarkdownRenderSettingsTests {
     #expect(sectionSource.contains("Layout Spacing"))
     #expect(sectionSource.contains("Details max height"))
     #expect(sectionSource.contains("Markdown Colors"))
+    #expect(sectionSource.contains("Alert note"))
+    #expect(sectionSource.contains("Alert caution"))
     #expect(sectionSource.contains("Code Token Colors"))
     #expect(rendererSource.contains("HarnessMarkdownStoredRenderSettings"))
   }

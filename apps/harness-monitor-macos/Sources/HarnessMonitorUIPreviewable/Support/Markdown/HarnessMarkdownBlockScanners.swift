@@ -112,6 +112,15 @@ func isHTML(_ line: String) -> Bool {
   return trimmed.hasPrefix("<") && trimmed.hasSuffix(">") && trimmed.count > 2
 }
 
+func githubAlertKind(_ line: String) -> HarnessMarkdownAlert.Kind? {
+  let trimmed = line.trimmingCharacters(in: .whitespaces)
+  guard trimmed.hasPrefix("[!"), trimmed.last == "]", trimmed.count > 3 else {
+    return nil
+  }
+  let marker = String(trimmed.dropFirst(2).dropLast())
+  return HarnessMarkdownAlert.Kind(marker: marker)
+}
+
 func isSingleLineHTML(_ line: String) -> Bool {
   line.contains("</") || line.hasPrefix("<!--") && line.contains("-->")
 }
