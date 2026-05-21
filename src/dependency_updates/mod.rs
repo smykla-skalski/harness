@@ -168,6 +168,24 @@ pub struct DependencyUpdatesRefreshResponse {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct DependencyUpdatesBodyRequest {
+    pub pull_request_id: String,
+    #[serde(default)]
+    pub force_refresh: bool,
+    #[serde(default = "default_cache_max_age_seconds")]
+    pub cache_max_age_seconds: u64,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct DependencyUpdatesBodyResponse {
+    pub pull_request_id: String,
+    pub body: String,
+    pub pr_updated_at: DateTime<Utc>,
+    pub fetched_at: String,
+    pub from_cache: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct DependencyUpdateTarget {
     pub pull_request_id: String,
     pub repository_id: String,
@@ -354,6 +372,18 @@ impl DependencyUpdatesRepositoryCatalogRequest {
     #[must_use]
     pub fn normalized_organization(&self) -> String {
         self.organization.trim().to_lowercase()
+    }
+}
+
+impl DependencyUpdatesBodyRequest {
+    #[must_use]
+    pub fn normalized_pull_request_id(&self) -> String {
+        self.pull_request_id.trim().to_string()
+    }
+
+    #[must_use]
+    pub fn cache_max_age_seconds(&self) -> u64 {
+        self.cache_max_age_seconds.max(1)
     }
 }
 

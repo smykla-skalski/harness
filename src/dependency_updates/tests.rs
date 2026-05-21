@@ -176,6 +176,28 @@ fn serialized_catalog_response_always_emits_repositories_array() {
 }
 
 #[test]
+fn body_request_rejects_empty_pull_request_id() {
+    let request = DependencyUpdatesBodyRequest {
+        pull_request_id: "   ".into(),
+        force_refresh: false,
+        cache_max_age_seconds: 0,
+    };
+    assert!(request.validate().is_err());
+}
+
+#[test]
+fn body_request_normalizes_pull_request_id_and_cache_age() {
+    let request = DependencyUpdatesBodyRequest {
+        pull_request_id: " pr_node ".into(),
+        force_refresh: false,
+        cache_max_age_seconds: 0,
+    };
+    assert_eq!(request.normalized_pull_request_id(), "pr_node");
+    assert_eq!(request.cache_max_age_seconds(), 1);
+    assert!(request.validate().is_ok());
+}
+
+#[test]
 fn serialized_target_always_emits_check_suite_ids_array() {
     let target = DependencyUpdateTarget {
         pull_request_id: "pr_1".into(),

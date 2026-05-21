@@ -2,9 +2,9 @@ use crate::errors::{CliError, CliErrorKind};
 
 use super::{
     DependencyUpdateTarget, DependencyUpdatesApproveRequest, DependencyUpdatesAutoRequest,
-    DependencyUpdatesLabelRequest, DependencyUpdatesMergeRequest, DependencyUpdatesQueryRequest,
-    DependencyUpdatesRefreshRequest, DependencyUpdatesRepositoryCatalogRequest,
-    DependencyUpdatesRerunChecksRequest,
+    DependencyUpdatesBodyRequest, DependencyUpdatesLabelRequest, DependencyUpdatesMergeRequest,
+    DependencyUpdatesQueryRequest, DependencyUpdatesRefreshRequest,
+    DependencyUpdatesRepositoryCatalogRequest, DependencyUpdatesRerunChecksRequest,
 };
 
 impl DependencyUpdatesQueryRequest {
@@ -88,6 +88,22 @@ impl DependencyUpdatesLabelRequest {
         if self.label.trim().is_empty() {
             return Err(CliErrorKind::workflow_parse(
                 "dependency-updates label request requires a non-empty label",
+            )
+            .into());
+        }
+        Ok(())
+    }
+}
+
+impl DependencyUpdatesBodyRequest {
+    /// Validate the pull request body fetch request.
+    ///
+    /// # Errors
+    /// Returns `CliError` when the pull request id is empty.
+    pub fn validate(&self) -> Result<(), CliError> {
+        if self.normalized_pull_request_id().is_empty() {
+            return Err(CliErrorKind::workflow_parse(
+                "dependency-updates body request requires a pull request id",
             )
             .into());
         }
