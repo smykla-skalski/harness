@@ -7,10 +7,10 @@ struct HarnessMarkdownParagraphView: View {
   var body: some View {
     if let leadingEmoji = HarnessMarkdownLeadingEmoji(inlines: inlines) {
       let metrics = HarnessMarkdownMarkerMetrics(style: style)
-      HStack(alignment: .firstTextBaseline, spacing: metrics.gap) {
+      HStack(alignment: .top, spacing: metrics.gap) {
         Text(verbatim: leadingEmoji.emoji)
           .font(style.typography.body.font)
-          .frame(width: metrics.columnWidth, alignment: .center)
+          .frame(width: metrics.columnWidth, height: metrics.firstLineHeight, alignment: .center)
         inlineFlow(leadingEmoji.remaining)
       }
     } else {

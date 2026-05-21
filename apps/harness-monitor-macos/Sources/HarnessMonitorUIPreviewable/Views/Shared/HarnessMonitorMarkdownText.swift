@@ -235,7 +235,7 @@ private struct HarnessMarkdownDetailsView: View {
       Button {
         isExpanded.toggle()
       } label: {
-        HStack(alignment: .firstTextBaseline, spacing: metrics.gap) {
+        HStack(alignment: .top, spacing: metrics.gap) {
           Image(systemName: isExpanded ? "chevron.down" : "chevron.right")
             .font(.system(size: metrics.chevronSize, weight: .semibold))
             .foregroundStyle(style.colors.secondaryText)
@@ -244,9 +244,6 @@ private struct HarnessMarkdownDetailsView: View {
               height: metrics.firstLineHeight,
               alignment: .center
             )
-            .alignmentGuide(.firstTextBaseline) { dimensions in
-              dimensions[VerticalAlignment.center] + metrics.firstLineCenterBaselineOffset
-            }
           HarnessMarkdownInlineFlowView(
             inlines: details.summary,
             style: HarnessMarkdownInlineRenderStyle(
@@ -339,7 +336,7 @@ private struct HarnessMarkdownListView: View {
     let metrics = HarnessMarkdownMarkerMetrics(style: style)
     VStack(alignment: .leading, spacing: style.spacing.listItem) {
       ForEach(visibleItems, id: \.offset) { index, item in
-        HStack(alignment: .firstTextBaseline, spacing: metrics.gap) {
+        HStack(alignment: .top, spacing: metrics.gap) {
           marker(for: item, index: index, metrics: metrics)
           HarnessMarkdownBlockStackView(
             blocks: item.blocks,
@@ -374,25 +371,16 @@ private struct HarnessMarkdownListView: View {
       .controlSize(.small)
       .allowsHitTesting(false)
       .frame(width: metrics.columnWidth, height: metrics.firstLineHeight, alignment: .center)
-      .alignmentGuide(.firstTextBaseline) { dimensions in
-        dimensions[VerticalAlignment.center] + metrics.firstLineCenterBaselineOffset
-      }
     } else if ordered {
       Text("\(start + index).")
         .font(style.typography.listMarker.font)
         .foregroundStyle(style.colors.secondaryText)
         .frame(width: metrics.columnWidth, height: metrics.firstLineHeight, alignment: .trailing)
-        .alignmentGuide(.firstTextBaseline) { dimensions in
-          dimensions[VerticalAlignment.center] + metrics.firstLineCenterBaselineOffset
-        }
     } else {
       Text("•")
         .font(style.typography.listMarker.font)
         .foregroundStyle(style.colors.secondaryText)
         .frame(width: metrics.columnWidth, height: metrics.firstLineHeight, alignment: .center)
-        .alignmentGuide(.firstTextBaseline) { dimensions in
-          dimensions[VerticalAlignment.center] + metrics.firstLineCenterBaselineOffset
-        }
     }
   }
 }
