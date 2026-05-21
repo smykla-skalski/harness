@@ -134,6 +134,40 @@ public enum HarnessMonitorSchemaV16: VersionedSchema {
   }
 }
 
+/// V17 is purely additive: dependency-update query responses persist as one
+/// row per normalized-preferences hash so cold starts can hydrate the dashboard
+/// route before the daemon round-trip completes. Existing rows are untouched,
+/// so lightweight migration is correct.
+public enum HarnessMonitorSchemaV17: VersionedSchema {
+  public static var versionIdentifier: Schema.Version { Schema.Version(17, 0, 0) }
+
+  public static var models: [any PersistentModel.Type] {
+    [
+      HarnessMonitorSchemaV14.CachedProject.self,
+      HarnessMonitorSchemaV14.CachedSession.self,
+      HarnessMonitorSchemaV14.CachedAgent.self,
+      HarnessMonitorSchemaV14.CachedWorkItem.self,
+      HarnessMonitorSchemaV14.CachedSignalRecord.self,
+      HarnessMonitorSchemaV14.CachedTimelineEntry.self,
+      HarnessMonitorSchemaV14.CachedObserver.self,
+      HarnessMonitorSchemaV14.CachedAgentActivity.self,
+      SessionBookmark.self,
+      UserNote.self,
+      RecentSearch.self,
+      ProjectFilterPreference.self,
+      NotificationHistoryRecord.self,
+      CachedTaskBoardSnapshot.self,
+      CachedDependencyUpdatesSnapshot.self,
+      Decision.self,
+      SupervisorEvent.self,
+      PolicyConfigRow.self,
+      HarnessMonitorSchemaV8.CachedTaskReviewMetadata.self,
+      HarnessMonitorSchemaV10.CachedSessionWindowState.self,
+      HarnessMonitorSchemaV12.CachedSessionTranscriptEntry.self,
+    ]
+  }
+}
+
 public enum HarnessMonitorMigrationPlan: SchemaMigrationPlan {
   public static var schemas: [any VersionedSchema.Type] {
     [
@@ -153,6 +187,7 @@ public enum HarnessMonitorMigrationPlan: SchemaMigrationPlan {
       HarnessMonitorSchemaV14.self,
       HarnessMonitorSchemaV15.self,
       HarnessMonitorSchemaV16.self,
+      HarnessMonitorSchemaV17.self,
     ]
   }
 
@@ -173,6 +208,7 @@ public enum HarnessMonitorMigrationPlan: SchemaMigrationPlan {
       migrateV13toV14,
       migrateV14toV15,
       migrateV15toV16,
+      migrateV16toV17,
     ]
   }
 
@@ -289,6 +325,15 @@ public enum HarnessMonitorMigrationPlan: SchemaMigrationPlan {
     fromVersion: HarnessMonitorSchemaV15.self,
     toVersion: HarnessMonitorSchemaV16.self
   )
+
+  // V17 is purely additive: one new entity (CachedDependencyUpdatesSnapshot)
+  // keyed by `preferencesHash` with no relationship into the V14 cached session
+  // graph. Lightweight migration adds the empty table; the dashboard cache
+  // writer populates rows on the next dependency-updates query.
+  static let migrateV16toV17 = MigrationStage.lightweight(
+    fromVersion: HarnessMonitorSchemaV16.self,
+    toVersion: HarnessMonitorSchemaV17.self
+  )
 }
 
-public typealias HarnessMonitorCurrentSchema = HarnessMonitorSchemaV16
+public typealias HarnessMonitorCurrentSchema = HarnessMonitorSchemaV17

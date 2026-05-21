@@ -110,7 +110,7 @@ struct DashboardDependenciesRouteView: View {
     )
   }
 
-  private var normalizedPreferences: DashboardDependenciesPreferences {
+  var normalizedPreferences: DashboardDependenciesPreferences {
     preferences.normalized()
   }
 
@@ -746,6 +746,7 @@ struct DashboardDependenciesRouteView: View {
   }
 
   func reload(forceRefresh: Bool, backgroundRefresh: Bool = false) async {
+    hydrateDependenciesFromCacheIfNeeded()
     guard let client = store.apiClient else {
       switch dashboardDependenciesMissingClientState(
         backgroundRefresh: backgroundRefresh,
@@ -784,13 +785,14 @@ struct DashboardDependenciesRouteView: View {
       response = loaded
       errorMessage = nil
       reconcileSelection()
+      persistDependenciesResponse(loaded)
     } catch {
       guard !Task.isCancelled else { return }
       HarnessMonitorLogger.api.warning(
         "Dependency update reload failed: \(String(reflecting: error), privacy: .public)"
       )
       let displayMessage = dashboardDependenciesErrorMessage(for: error)
-      if backgroundRefresh, !response.items.isEmpty {
+      if !response.items.isEmpty {
         store.presentFailureFeedback(displayMessage)
       } else {
         errorMessage = displayMessage
@@ -912,7 +914,6 @@ struct DashboardDependenciesRouteView: View {
     }
   }
 
-
   private func openItem(_ item: DependencyUpdateItem) {
     guard let url = URL(string: item.url) else { return }
     openURL(url)
@@ -945,7 +946,7 @@ struct DashboardDependenciesRouteView: View {
     collapsedRepositories = collapsed
   }
 
-  private func reconcileSelection() {
+  func reconcileSelection() {
     let liveIDs = Set(response.items.map(\.pullRequestID))
     selectedIDs = selectedIDs.intersection(liveIDs)
     if selectedIDs.isEmpty, let persisted = persistedPrimarySelectionID.nonEmpty,
