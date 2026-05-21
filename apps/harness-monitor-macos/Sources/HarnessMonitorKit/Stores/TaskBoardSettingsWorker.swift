@@ -72,7 +72,7 @@ actor TaskBoardSettingsWorker {
     HarnessMonitorStore.hydrateKeyMaterial(into: runtime, keychain: keyMaterialPersistence)
   }
 
-  fileprivate func persistLocalSecrets(
+  func persistLocalSecrets(
     snapshot: TaskBoardGitSettingsSnapshot,
     origin: TaskBoardSettingsSaveOrigin
   ) throws {
