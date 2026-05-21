@@ -90,6 +90,8 @@ struct SettingsBackgroundGallery: View {
   @State private var systemBackgroundOptions: [HarnessMonitorBackgroundSelection] =
     HarnessMonitorBackgroundSelection.systemLibrary
   @State private var recentItems: [HarnessMonitorBackgroundSelection] = []
+  @State private var galleryPrefetchSelections: [HarnessMonitorBackgroundSelection] = []
+  @State private var galleryPrefetchSignature = ""
 
   private static let maxRecents = 8
   private static let recentTileWidth: CGFloat = 140
@@ -126,17 +128,17 @@ struct SettingsBackgroundGallery: View {
     GridItem(.adaptive(minimum: 180, maximum: 220), spacing: HarnessMonitorTheme.spacingMD)
   ]
 
-  private var galleryPrefetchSelections: [HarnessMonitorBackgroundSelection] {
-    SettingsBackgroundGalleryPrefetchPlan.selections(
+  private func syncGalleryPrefetch() {
+    let next = SettingsBackgroundGalleryPrefetchPlan.selections(
       options: options,
       recentItems: recentItems,
       selectedBackground: selectedBackground,
       visibleIDs: []
     )
-  }
-
-  private var galleryPrefetchSignature: String {
-    galleryPrefetchSelections.map(\.storageValue).joined(separator: "|")
+    let nextSignature = next.map(\.storageValue).joined(separator: "|")
+    guard nextSignature != galleryPrefetchSignature else { return }
+    galleryPrefetchSelections = next
+    galleryPrefetchSignature = nextSignature
   }
 
   var body: some View {
@@ -210,6 +212,18 @@ struct SettingsBackgroundGallery: View {
     }
     .onChange(of: recentStorageValues, initial: true) { _, _ in
       syncRecentItems()
+    }
+    .onChange(of: selectedBackground, initial: true) { _, _ in
+      syncGalleryPrefetch()
+    }
+    .onChange(of: collection) { _, _ in
+      syncGalleryPrefetch()
+    }
+    .onChange(of: systemBackgroundOptions) { _, _ in
+      syncGalleryPrefetch()
+    }
+    .onChange(of: recentItems) { _, _ in
+      syncGalleryPrefetch()
     }
   }
 
