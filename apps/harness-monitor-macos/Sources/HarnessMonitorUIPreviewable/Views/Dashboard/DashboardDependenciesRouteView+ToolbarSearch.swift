@@ -193,7 +193,7 @@ private struct DashboardDependenciesToolbarSearchModifier: ViewModifier {
             .frame(maxWidth: .infinity, alignment: .leading)
             .contentShape(Rectangle())
           }
-          .buttonStyle(.plain)
+          .harnessPlainButtonStyle()
         }
       }
       .searchFocused($isSearchFocused)
