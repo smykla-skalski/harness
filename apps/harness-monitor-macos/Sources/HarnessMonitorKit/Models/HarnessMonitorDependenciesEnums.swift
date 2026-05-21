@@ -184,21 +184,21 @@ public enum DependencyUpdateCheckConclusion: TaskBoardOpenEnum, CaseIterable, Id
     }
   }
 
-  // swiftlint:disable:next cyclomatic_complexity
+  private static let knownCases: [String: Self] = [
+    "none": .none,
+    "success": .success,
+    "failure": .failure,
+    "neutral": .neutral,
+    "cancelled": .cancelled,
+    "timed_out": .timedOut,
+    "action_required": .actionRequired,
+    "skipped": .skipped,
+    "stale": .stale,
+    "startup_failure": .startupFailure,
+  ]
+
   public init(rawValue: String) {
-    switch rawValue {
-    case "none": self = .none
-    case "success": self = .success
-    case "failure": self = .failure
-    case "neutral": self = .neutral
-    case "cancelled": self = .cancelled
-    case "timed_out": self = .timedOut
-    case "action_required": self = .actionRequired
-    case "skipped": self = .skipped
-    case "stale": self = .stale
-    case "startup_failure": self = .startupFailure
-    default: self = .unknown(rawValue)
-    }
+    self = Self.knownCases[rawValue] ?? .unknown(rawValue)
   }
 }
 
