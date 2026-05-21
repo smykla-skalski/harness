@@ -63,6 +63,7 @@ struct HarnessMarkdownRenderSettingsTests {
     userSettings.typography.codeSize = 10
     userSettings.spacing.headingBefore = 12
     userSettings.spacing.listMarkerGap = 3
+    userSettings.spacing.detailsMaxHeight = 360
     userSettings.images.maxInlineHeight = 18
 
     let decoded = HarnessMarkdownUserSettings.decode(userSettings.storageValue)
@@ -74,8 +75,22 @@ struct HarnessMarkdownRenderSettingsTests {
     #expect(resolved.typography.body.pointSize == 21)
     #expect(resolved.spacing.heading.before == 18)
     #expect(resolved.spacing.listMarkerGap == 4.5)
+    #expect(resolved.spacing.detailsMaxHeight == 540)
     #expect(resolved.images.maxInlineHeight == 27)
     #expect(resolvedCode.typography.code.pointSize == 15)
+  }
+
+  @Test("Persisted markdown spacing keeps defaults for newly added settings")
+  func persistedMarkdownSpacingKeepsDefaultsForNewSettings() throws {
+    let storage = #"{"documentBlock":12,"listMarkerGap":2}"#
+    let decoded = try JSONDecoder().decode(
+      HarnessMarkdownUserSettings.Spacing.self,
+      from: Data(storage.utf8)
+    )
+
+    #expect(decoded.documentBlock == 12)
+    #expect(decoded.listMarkerGap == 2)
+    #expect(decoded.detailsMaxHeight == 420)
   }
 
   @Test("Markdown spacing settings expose block gaps and scale with font mode")
@@ -92,6 +107,7 @@ struct HarnessMarkdownRenderSettingsTests {
       thematicBreak: .none,
       nestedBlock: 7,
       detailsContentIndent: 7.5,
+      detailsMaxHeight: 300,
       listItem: 8,
       listItemContent: 9,
       listMarkerGap: 10,
@@ -109,6 +125,7 @@ struct HarnessMarkdownRenderSettingsTests {
     #expect(resolved.spacing.blockSpacing(for: .heading(level: 1, inlines: [])).before == 6)
     #expect(resolved.spacing.blockSpacing(for: .unorderedList([])).after == 12)
     #expect(resolved.spacing.detailsContentIndent == 15)
+    #expect(resolved.spacing.detailsMaxHeight == 600)
     #expect(resolved.spacing.listItem == 16)
     #expect(resolved.spacing.listMarkerGap == 20)
     #expect(resolved.spacing.listSymbolWidth == 22)
@@ -125,6 +142,7 @@ struct HarnessMarkdownRenderSettingsTests {
     #expect(spacing.heading == HarnessMarkdownBlockSpacing(before: 16, after: 8))
     #expect(spacing.documentBlock + spacing.heading.before == 24)
     #expect(spacing.documentBlock + spacing.heading.after == 16)
+    #expect(spacing.detailsMaxHeight == 420)
     #expect(spacing.listSymbolWidth + spacing.listMarkerGap == 12)
     #expect(spacing.listMarkerWidth + spacing.listMarkerGap == 26)
     #expect(spacing.listItem == 4)
@@ -153,6 +171,7 @@ struct HarnessMarkdownRenderSettingsTests {
     #expect(settingsSource.contains("SettingsMarkdownSection()"))
     #expect(sectionSource.contains("Block Gaps"))
     #expect(sectionSource.contains("Layout Spacing"))
+    #expect(sectionSource.contains("Details max height"))
     #expect(sectionSource.contains("Markdown Colors"))
     #expect(sectionSource.contains("Code Token Colors"))
     #expect(rendererSource.contains("HarnessMarkdownStoredRenderSettings"))
