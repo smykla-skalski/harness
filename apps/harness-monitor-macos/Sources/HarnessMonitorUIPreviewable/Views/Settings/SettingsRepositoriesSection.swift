@@ -53,11 +53,6 @@ struct SettingsRepositoriesSection: View {
     return catalogRepositories.filter { $0.localizedCaseInsensitiveContains(needle) }
   }
 
-  var repositoriesTableRowsHeight: CGFloat {
-    let visibleRows = min(draft.rows.count, 12)
-    return CGFloat(visibleRows) * 44
-  }
-
   func catalogListHeight(visibleCount: Int) -> CGFloat {
     let visibleRows = min(max(visibleCount, 4), 8)
     return CGFloat(visibleRows) * 36
@@ -73,7 +68,7 @@ struct SettingsRepositoriesSection: View {
         if let saveWarning {
           statusSection(message: saveWarning, color: .orange)
         }
-        monitoredRepositoriesSection
+        RepositoriesMonitoredSection(draft: $draft)
         if isFullyExpanded {
           organizationImportSection
           if !draft.legacyOrganizations.isEmpty {
