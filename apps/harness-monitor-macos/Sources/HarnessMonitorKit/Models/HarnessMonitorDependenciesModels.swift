@@ -540,7 +540,10 @@ public enum DependencyUpdateCheckConclusion: TaskBoardOpenEnum, CaseIterable, Id
   case startupFailure
   case unknown(String)
 
-  public static let allCases: [Self] = [.none, .success, .failure, .neutral, .cancelled, .timedOut, .actionRequired, .skipped, .stale, .startupFailure]
+  public static let allCases: [Self] = [
+    .none, .success, .failure, .neutral, .cancelled, .timedOut, .actionRequired, .skipped, .stale,
+    .startupFailure,
+  ]
   public var id: String { rawValue }
 
   public var rawValue: String {
@@ -584,7 +587,9 @@ public enum DependencyUpdateReviewEventState: TaskBoardOpenEnum, CaseIterable, I
   case pending
   case unknown(String)
 
-  public static let allCases: [Self] = [.approved, .changesRequested, .commented, .dismissed, .pending]
+  public static let allCases: [Self] = [
+    .approved, .changesRequested, .commented, .dismissed, .pending,
+  ]
   public var id: String { rawValue }
 
   public var rawValue: String {
@@ -619,7 +624,9 @@ public enum DependencyUpdateActionKind: TaskBoardOpenEnum, CaseIterable, Identif
   case autoMerge
   case unknown(String)
 
-  public static let allCases: [Self] = [.approve, .merge, .rerunChecks, .addLabel, .autoApprove, .autoMerge]
+  public static let allCases: [Self] = [
+    .approve, .merge, .rerunChecks, .addLabel, .autoApprove, .autoMerge,
+  ]
   public var id: String { rawValue }
 
   public var rawValue: String {

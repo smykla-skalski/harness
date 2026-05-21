@@ -59,7 +59,8 @@ struct SessionContentDetailSplitView<Content: View, Detail: View>: View {
     contentWidth: Binding<Double>,
     perfOverrideContentWidth: Binding<Double?> = .constant(nil),
     commitContentWidth: @escaping (Double) -> Void,
-    dividerAccessibilityIdentifier: String = HarnessMonitorAccessibility.sessionWindowContentDetailDivider,
+    dividerAccessibilityIdentifier: String = HarnessMonitorAccessibility
+      .sessionWindowContentDetailDivider,
     @ViewBuilder content: () -> Content,
     @ViewBuilder detail: () -> Detail
   ) {

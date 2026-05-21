@@ -372,7 +372,9 @@ struct PersistenceOfflineDurabilityTests {
     await bootstrapTask.value
   }
 
-  @Test("Connecting restore keeps cached task-board items when connection state flips idle mid-hydration")
+  @Test(
+    "Connecting restore keeps cached task-board items when connection state flips idle mid-hydration"
+  )
   func connectingRestoreKeepsCachedTaskBoardItemsWhenConnectionTurnsIdle() async throws {
     let githubItem = makeTaskBoardItem(
       id: "board-connecting-github",

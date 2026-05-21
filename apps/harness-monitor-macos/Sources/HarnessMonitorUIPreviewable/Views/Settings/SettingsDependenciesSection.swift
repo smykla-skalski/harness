@@ -53,10 +53,12 @@ struct SettingsDependenciesSection: View {
   private var monitoredRepositoriesSummary: some View {
     let repositories = draft.normalizedRepositories
     let legacyOrganizations = draft.normalizedOrganizations
-    let repositoriesLabel = repositories.isEmpty
+    let repositoriesLabel =
+      repositories.isEmpty
       ? "No repositories enabled"
       : "\(repositories.count) repositories enabled"
-    let organizationsLabel = legacyOrganizations.isEmpty
+    let organizationsLabel =
+      legacyOrganizations.isEmpty
       ? nil
       : "\(legacyOrganizations.count) legacy organization sources still active"
 

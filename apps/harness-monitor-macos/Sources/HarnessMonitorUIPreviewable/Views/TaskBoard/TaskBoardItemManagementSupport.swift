@@ -174,100 +174,102 @@ private struct TaskBoardDescriptionEditor: View {
 }
 
 #if HARNESS_FEATURE_TEXTUAL
-private enum TaskBoardDescriptionPreviewMode: String, CaseIterable, Identifiable {
-  case markdown
-  case rendered
+  private enum TaskBoardDescriptionPreviewMode: String, CaseIterable, Identifiable {
+    case markdown
+    case rendered
 
-  var id: Self { self }
+    var id: Self { self }
 
-  var title: String {
-    switch self {
-    case .markdown:
-      "Markdown"
-    case .rendered:
-      "Rendered"
-    }
-  }
-
-  var accessibilityID: String {
-    "harness.task-board.manage-item.body.mode.\(rawValue)"
-  }
-
-  var rendering: HarnessMonitorMarkdownTextRendering {
-    switch self {
-    case .markdown:
-      .plainPreview
-    case .rendered:
-      .rich
-    }
-  }
-}
-
-private struct TaskBoardTextualDescriptionContent: View {
-  @Binding var text: String
-  let minHeight: CGFloat
-
-  @State private var mode: TaskBoardDescriptionPreviewMode = .markdown
-
-  private var hasText: Bool {
-    !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-  }
-
-  var body: some View {
-    VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingXS) {
-      header
-      content
-    }
-  }
-
-  private var header: some View {
-    HStack(alignment: .center, spacing: HarnessMonitorTheme.spacingMD) {
-      Spacer(minLength: HarnessMonitorTheme.spacingSM)
-      HarnessMonitorSegmentedPicker(
-        title: "Description mode",
-        selection: $mode,
-        accessibilityIdentifier: "harness.task-board.manage-item.body.mode"
-      ) {
-        ForEach(TaskBoardDescriptionPreviewMode.allCases) { mode in
-          Text(mode.title)
-            .tag(mode)
-            .accessibilityIdentifier(mode.accessibilityID)
-        }
+    var title: String {
+      switch self {
+      case .markdown:
+        "Markdown"
+      case .rendered:
+        "Rendered"
       }
-      .fixedSize()
+    }
+
+    var accessibilityID: String {
+      "harness.task-board.manage-item.body.mode.\(rawValue)"
+    }
+
+    var rendering: HarnessMonitorMarkdownTextRendering {
+      switch self {
+      case .markdown:
+        .plainPreview
+      case .rendered:
+        .rich
+      }
     }
   }
 
-  @ViewBuilder private var content: some View {
-    switch mode {
-    case .markdown:
-      TaskBoardDescriptionEditor(text: $text, minHeight: minHeight)
-    case .rendered:
-      ScrollView {
-        Group {
-          if hasText {
-            HarnessMonitorMarkdownText(
-              text,
-              textSelection: .enabled,
-              rendering: mode.rendering
-            )
-          } else {
-            Text("Add a description to preview it here")
-              .scaledFont(.caption)
-              .foregroundStyle(HarnessMonitorTheme.secondaryInk)
-              .frame(maxWidth: .infinity, alignment: .leading)
+  private struct TaskBoardTextualDescriptionContent: View {
+    @Binding var text: String
+    let minHeight: CGFloat
+
+    @State private var mode: TaskBoardDescriptionPreviewMode = .markdown
+
+    private var hasText: Bool {
+      !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
+    var body: some View {
+      VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingXS) {
+        header
+        content
+      }
+    }
+
+    private var header: some View {
+      HStack(alignment: .center, spacing: HarnessMonitorTheme.spacingMD) {
+        Spacer(minLength: HarnessMonitorTheme.spacingSM)
+        HarnessMonitorSegmentedPicker(
+          title: "Description mode",
+          selection: $mode,
+          accessibilityIdentifier: "harness.task-board.manage-item.body.mode"
+        ) {
+          ForEach(TaskBoardDescriptionPreviewMode.allCases) { mode in
+            Text(mode.title)
+              .tag(mode)
+              .accessibilityIdentifier(mode.accessibilityID)
           }
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(HarnessMonitorTheme.spacingSM)
+        .fixedSize()
       }
-      .frame(maxWidth: .infinity, minHeight: minHeight, maxHeight: minHeight, alignment: .topLeading)
-      .taskBoardManagementFieldChrome()
-      .accessibilityElement(children: .contain)
-      .accessibilityIdentifier("harness.task-board.manage-item.body-preview")
+    }
+
+    @ViewBuilder private var content: some View {
+      switch mode {
+      case .markdown:
+        TaskBoardDescriptionEditor(text: $text, minHeight: minHeight)
+      case .rendered:
+        ScrollView {
+          Group {
+            if hasText {
+              HarnessMonitorMarkdownText(
+                text,
+                textSelection: .enabled,
+                rendering: mode.rendering
+              )
+            } else {
+              Text("Add a description to preview it here")
+                .scaledFont(.caption)
+                .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+          }
+          .frame(maxWidth: .infinity, alignment: .leading)
+          .padding(HarnessMonitorTheme.spacingSM)
+        }
+        .frame(
+          maxWidth: .infinity, minHeight: minHeight, maxHeight: minHeight, alignment: .topLeading
+        )
+        .taskBoardManagementFieldChrome()
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("harness.task-board.manage-item.body-preview")
+      }
     }
   }
-}
 #endif
 
 struct TaskBoardPlanLifecycleActionButtons: View {

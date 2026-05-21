@@ -88,7 +88,8 @@ extension TaskBoardAPIClientTests {
     #expect(objectValue(calls[0].params, key: "organization") == .string("example"))
     #expect(objectValue(calls[1].params, key: "authors") == .array([.string("renovate[bot]")]))
     #expect(objectValue(calls[1].params, key: "organizations") == .array([.string("example")]))
-    #expect(objectValue(calls[1].params, key: "repositories") == .array([.string("example/harness")]))
+    #expect(
+      objectValue(calls[1].params, key: "repositories") == .array([.string("example/harness")]))
     #expect(
       objectValue(calls[1].params, key: "exclude_repositories")
         == .array([.string("example/archive")])
