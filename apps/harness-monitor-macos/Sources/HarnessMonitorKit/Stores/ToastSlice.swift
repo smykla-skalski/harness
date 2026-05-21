@@ -1,4 +1,3 @@
-// swiftlint:disable file_length
 import AppKit
 import Foundation
 import Observation
@@ -30,8 +29,8 @@ public final class ToastSlice {
   @ObservationIgnored private var dismissTasks: [UUID: Task<Void, Never>] = [:]
   @ObservationIgnored private var targetInstants: [UUID: ContinuousClock.Instant] = [:]
   @ObservationIgnored private var pendingUndoActions: [UUID: @MainActor () async -> Void] = [:]
-  @ObservationIgnored private var pauseObservationTask: Task<Void, Never>?
-  @ObservationIgnored private var resumeObservationTask: Task<Void, Never>?
+  @ObservationIgnored var pauseObservationTask: Task<Void, Never>?
+  @ObservationIgnored var resumeObservationTask: Task<Void, Never>?
   @ObservationIgnored private let clock: any ContinuousClockSource
   @ObservationIgnored public var onChanged: (() -> Void)?
   @ObservationIgnored public var onHistoryEvent: ((ToastHistoryEvent) -> Void)?
@@ -302,35 +301,6 @@ public final class ToastSlice {
       targetInstants[feedback.id] = target
       scheduleDismiss(for: feedback.id, after: remaining)
     }
-  }
-
-  public func startObservingAppActivation() {
-    guard pauseObservationTask == nil, resumeObservationTask == nil else { return }
-    pauseObservationTask = Task { @MainActor [weak self] in
-      let stream = NotificationCenter.default.notifications(
-        named: NSApplication.didResignActiveNotification
-      )
-      for await _ in stream {
-        guard let self else { return }
-        self.pauseTimers()
-      }
-    }
-    resumeObservationTask = Task { @MainActor [weak self] in
-      let stream = NotificationCenter.default.notifications(
-        named: NSApplication.didBecomeActiveNotification
-      )
-      for await _ in stream {
-        guard let self else { return }
-        self.resumeTimers()
-      }
-    }
-  }
-
-  public func stopObservingAppActivation() {
-    pauseObservationTask?.cancel()
-    resumeObservationTask?.cancel()
-    pauseObservationTask = nil
-    resumeObservationTask = nil
   }
 
   /// Test helper: dismiss every toast whose virtual target instant has elapsed
