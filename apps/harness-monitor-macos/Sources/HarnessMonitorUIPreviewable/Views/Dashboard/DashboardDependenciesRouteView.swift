@@ -561,57 +561,28 @@ struct DashboardDependenciesRouteView: View {
     _ item: DependencyUpdateItem,
     showsRepository: Bool
   ) -> some View {
-    DashboardDependencyListRow(
+    DashboardDependencyRow(
       item: item,
       showsRepository: showsRepository,
       isRefreshing: refreshingPullRequestIDs.contains(item.pullRequestID),
-      updatedLabel: relativeUpdatedLabel(for: item)
+      updatedLabel: relativeUpdatedLabel(for: item),
+      availableLabels: rowAvailableLabels(for: item),
+      frequentNames: rowFrequentLabelNames(for: item),
+      showsDescriptions: normalizedPreferences.showLabelDescriptions,
+      onOpen: { openItem(item) },
+      onCopyLink: { HarnessMonitorClipboard.copy(item.url) },
+      onApprove: { Task { await approve(items: [item]) } },
+      onMerge: { Task { await merge(items: [item]) } },
+      onRerunChecks: { Task { await rerunChecks(items: [item]) } },
+      onSelectLabel: { name in Task { await addLabel(name, to: [item]) } },
+      onCustomLabel: {
+        labelTargetItems = [item]
+        labelDraft = ""
+        isLabelSheetPresented = true
+      },
+      onAuto: { Task { await auto(items: [item]) } },
+      onFixCI: { Task { await fixCI(item: item) } }
     )
-    .tag(item.pullRequestID)
-    .listRowInsets(EdgeInsets(top: 0, leading: 0, bottom: 0, trailing: 0))
-    .listRowSeparator(.hidden)
-    .contextMenu {
-      Button("Open Pull Request") {
-        openItem(item)
-      }
-      Button("Copy Link") {
-        HarnessMonitorClipboard.copy(item.url)
-      }
-      Divider()
-      Button("Approve") {
-        Task { await approve(items: [item]) }
-      }
-      .disabled(!item.canAttemptManualApproval)
-      Button("Merge") {
-        Task { await merge(items: [item]) }
-      }
-      .disabled(!item.canAttemptManualMerge)
-      Button("Rerun Checks") {
-        Task { await rerunChecks(items: [item]) }
-      }
-      .disabled(!item.hasRerunnableChecks)
-      DashboardDependenciesLabelPickerMenu(
-        title: "Add Label",
-        labels: rowAvailableLabels(for: item),
-        frequentNames: rowFrequentLabelNames(for: item),
-        showsDescriptions: normalizedPreferences.showLabelDescriptions,
-        onSelect: { name in Task { await addLabel(name, to: [item]) } },
-        onCustom: {
-          labelTargetItems = [item]
-          labelDraft = ""
-          isLabelSheetPresented = true
-        }
-      )
-      Button("Auto") {
-        Task { await auto(items: [item]) }
-      }
-      .disabled(!item.canRunAutoMode)
-      if item.canStartFixCI {
-        Button("Fix CI") {
-          Task { await fixCI(item: item) }
-        }
-      }
-    }
   }
 
   private func repositorySectionHeader(_ repository: String, itemCount: Int) -> some View {
