@@ -36,8 +36,8 @@ extension DashboardDependenciesRouteView {
 
   func recordLabelUsage(_ label: String, items: [DependencyUpdateItem]) {
     guard let cache = repositoryLabelUsageCache else { return }
-    for repository in Set(items.map(\.repository)) {
-      cache.recordUse(repository: repository, label: label)
+    for item in items {
+      cache.recordUse(repository: item.repository, label: label)
     }
     refreshLabelMenuData()
   }
