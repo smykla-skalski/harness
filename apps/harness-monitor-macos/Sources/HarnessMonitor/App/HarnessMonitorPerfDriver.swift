@@ -109,6 +109,8 @@ enum HarnessMonitorPerfDriver {
       }
       await settle(.milliseconds(2_800))
       return .completed
+    case .dashboardSearchSuggestions:
+      return await runDashboardSearchSuggestionsScenario(store: store)
     case .dashboardLiveScroll:
       return await runDashboardLiveScrollScenario(store: store)
     case .dashboardLiveInteract:
@@ -177,6 +179,7 @@ enum HarnessMonitorPerfDriver {
       .timelineBurst,
       .toastOverlayChurn,
       .offlineCachedOpen,
+      .dashboardSearchSuggestions,
       .dashboardLiveScroll,
       .dashboardLiveInteract:
       return nil
@@ -216,6 +219,7 @@ enum HarnessMonitorPerfDriver {
       .timelineBurst,
       .toastOverlayChurn,
       .offlineCachedOpen,
+      .dashboardSearchSuggestions,
       .dashboardLiveScroll,
       .dashboardLiveInteract:
       return nil
@@ -255,6 +259,7 @@ enum HarnessMonitorPerfDriver {
       .settingsBackdropCycle,
       .settingsBackgroundCycle,
       .offlineCachedOpen,
+      .dashboardSearchSuggestions,
       .dashboardLiveScroll,
       .dashboardLiveInteract:
       return .failed("unsupported-scenario")

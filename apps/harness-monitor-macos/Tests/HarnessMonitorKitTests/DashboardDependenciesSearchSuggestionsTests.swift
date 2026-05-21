@@ -73,11 +73,11 @@ struct DashboardDependenciesSearchSuggestionsTests {
     #expect(suggestions.count == 5)
   }
 
-  @Test("completion key matches subtitle for routing detection")
-  func completionKeyShape() {
+  @Test("suggestion subtitle has the routing-friendly shape")
+  func subtitleShape() {
     let entry = item(id: "pr-x", repository: "kong/a", number: 7, title: "Bump foo")
     let suggestions = dashboardDependenciesSearchSuggestions(query: "bump", items: [entry])
-    #expect(suggestions.first?.completionKey == "kong/a#7 · @renovate[bot]")
+    #expect(suggestions.first?.subtitle == "kong/a#7 · @renovate[bot]")
   }
 
   private func item(

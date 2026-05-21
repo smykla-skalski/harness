@@ -507,6 +507,27 @@
       }
     },
     {
+      "id": "dashboard-search-suggestions",
+      "signpostName": "dashboard-search-suggestions",
+      "defaultPreviewScenario": "dashboard",
+      "initialSettingsSection": "general",
+      "disablesVisualOptions": false,
+      "needsPreviewAcpPermissionBatch": false,
+      "includesBootstrapInMeasurement": false,
+      "durationSeconds": 8,
+      "launchBudgetMilliseconds": 700,
+      "templates": ["swiftui"],
+      "swiftUIBudget": {
+        "totalUpdates": 40000,
+        "bodyUpdates": 4000,
+        "maxUpdateGroupMilliseconds": 50,
+        "hitches": 0,
+        "potentialHangs": 0,
+        "p95UpdateMilliseconds": 10,
+        "updateGroupP95Milliseconds": 35
+      }
+    },
+    {
       "id": "dashboard-live-scroll",
       "signpostName": "dashboard-live-scroll",
       "defaultPreviewScenario": "dashboard",

@@ -166,6 +166,7 @@ func dashboardDependenciesMissingClientState(
 struct DashboardDependenciesRouteView: View {
   let store: HarnessMonitorStore
   @Binding var selectedRoute: DashboardWindowRoute
+  let searchAutomation: AppSearchAutomationState?
 
   @Environment(\.openSettingsSection)
   private var openSettingsSection
@@ -220,9 +221,14 @@ struct DashboardDependenciesRouteView: View {
   @State private var labelMenuDataByRepository: [String: DashboardDependenciesRepoLabelMenuData] =
     [:]
 
-  init(store: HarnessMonitorStore, selectedRoute: Binding<DashboardWindowRoute>) {
+  init(
+    store: HarnessMonitorStore,
+    selectedRoute: Binding<DashboardWindowRoute>,
+    searchAutomation: AppSearchAutomationState? = nil
+  ) {
     self.store = store
     _selectedRoute = selectedRoute
+    self.searchAutomation = searchAutomation
     _resolvedPreferences = State(
       initialValue: DashboardDependenciesResolvedPreferences(
         storedValue: UserDefaults.standard.string(
