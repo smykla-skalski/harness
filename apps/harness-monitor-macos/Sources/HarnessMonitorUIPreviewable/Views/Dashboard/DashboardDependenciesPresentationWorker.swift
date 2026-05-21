@@ -74,6 +74,12 @@ actor DashboardDependenciesPresentationWorker {
 
   private var cachedListInput: DashboardDependenciesListPresentationInput?
   private var cachedListPresentation = DashboardDependenciesListPresentation.empty
+  private let isoFormatter = ISO8601DateFormatter()
+  private let relativeFormatter: RelativeDateTimeFormatter = {
+    let formatter = RelativeDateTimeFormatter()
+    formatter.unitsStyle = .short
+    return formatter
+  }()
 
   func compute(
     input: DashboardDependenciesPresentationInput
@@ -120,11 +126,11 @@ actor DashboardDependenciesPresentationWorker {
       )
     }
     cachedListInput = input
-    cachedListPresentation = Self.listPresentation(from: input)
+    cachedListPresentation = listPresentation(from: input)
     return cachedListPresentation
   }
 
-  private static func listPresentation(
+  private func listPresentation(
     from input: DashboardDependenciesListPresentationInput
   ) -> DashboardDependenciesListPresentation {
     let filterMode = DashboardDependenciesFilterMode(rawValue: input.filterModeRaw) ?? .all
@@ -159,16 +165,13 @@ actor DashboardDependenciesPresentationWorker {
     )
   }
 
-  private static func relativeUpdatedLabels(
+  private func relativeUpdatedLabels(
     for items: [DependencyUpdateItem],
     relativeTo now: Date = .now
   ) -> [String: String] {
-    let formatter = ISO8601DateFormatter()
-    let relativeFormatter = RelativeDateTimeFormatter()
-    relativeFormatter.unitsStyle = .short
-    return Dictionary(
+    Dictionary(
       items.map { item -> (String, String) in
-        guard let date = formatter.date(from: item.updatedAt) else {
+        guard let date = isoFormatter.date(from: item.updatedAt) else {
           return (item.pullRequestID, item.updatedAt)
         }
         return (
