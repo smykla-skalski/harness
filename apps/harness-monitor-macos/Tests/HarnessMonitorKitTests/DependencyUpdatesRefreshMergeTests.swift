@@ -76,6 +76,37 @@ struct DependencyUpdatesRefreshMergeTests {
     #expect(next[0].reviewStatus == .reviewRequired)
   }
 
+  @Test("collapses duplicate cached ids before applying refreshed replacements")
+  func collapsesDuplicateCachedIDsBeforeReplacing() {
+    let older = item(
+      id: "pr-1",
+      reviewStatus: .reviewRequired,
+      updatedAt: "2026-05-20T12:00:00Z"
+    )
+    let duplicate = item(
+      id: "pr-1",
+      reviewStatus: .reviewRequired,
+      updatedAt: "2026-05-20T12:30:00Z"
+    )
+    let other = item(id: "pr-2", reviewStatus: .reviewRequired)
+    let refreshed = item(
+      id: "pr-1",
+      reviewStatus: .approved,
+      updatedAt: "2026-05-21T12:00:00Z"
+    )
+
+    let next = applyDependencyRefresh(
+      to: [older, duplicate, other],
+      refresh: DependencyUpdatesRefreshResponse(
+        fetchedAt: "2026-05-21T12:00:00Z",
+        items: [refreshed]
+      )
+    )
+
+    #expect(next.map(\.pullRequestID) == ["pr-1", "pr-2"])
+    #expect(next[0].reviewStatus == .approved)
+  }
+
   @Test("returns empty result when the refresh wipes the entire list")
   func clearsListWhenAllDropped() {
     let one = item(id: "pr-1", state: .open)
@@ -96,7 +127,8 @@ struct DependencyUpdatesRefreshMergeTests {
   private func item(
     id: String,
     state: DependencyUpdatePullRequestState = .open,
-    reviewStatus: DependencyUpdateReviewStatus = .reviewRequired
+    reviewStatus: DependencyUpdateReviewStatus = .reviewRequired,
+    updatedAt: String = "2026-05-20T12:00:00Z"
   ) -> DependencyUpdateItem {
     DependencyUpdateItem(
       pullRequestID: id,
@@ -117,7 +149,7 @@ struct DependencyUpdatesRefreshMergeTests {
       additions: 1,
       deletions: 1,
       createdAt: "2026-05-20T12:00:00Z",
-      updatedAt: "2026-05-20T12:00:00Z"
+      updatedAt: updatedAt
     )
   }
 }

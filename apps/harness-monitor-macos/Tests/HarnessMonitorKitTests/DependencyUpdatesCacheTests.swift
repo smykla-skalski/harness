@@ -52,6 +52,72 @@ final class DependencyUpdatesCacheTests: XCTestCase {
     XCTAssertEqual(loaded.summary.total, 2)
   }
 
+  func testSaveAndLoadCollapseDuplicatePullRequestIDs() throws {
+    let context = try makeContext()
+    let cache = DependencyUpdatesCache(context: context)
+    let response = makeResponse(items: [
+      makeItem(
+        pullRequestID: "pr_1",
+        reviewStatus: .reviewRequired,
+        updatedAt: "2026-05-20T12:00:00Z"
+      ),
+      makeItem(
+        pullRequestID: "pr_1",
+        reviewStatus: .approved,
+        updatedAt: "2026-05-21T12:00:00Z"
+      ),
+    ])
+
+    cache.save(preferencesHash: "alpha", response: response)
+    let loaded = try XCTUnwrap(cache.load(preferencesHash: "alpha"))
+
+    XCTAssertEqual(loaded.items.map(\.pullRequestID), ["pr_1"])
+    XCTAssertEqual(loaded.items[0].reviewStatus, .approved)
+    XCTAssertEqual(loaded.summary.total, 1)
+  }
+
+  func testDecodingResponseCollapsesDuplicatePullRequestIDs() throws {
+    let encoder = JSONEncoder()
+    let first = makeItem(
+      pullRequestID: "pr_1",
+      reviewStatus: .reviewRequired,
+      updatedAt: "2026-05-20T12:00:00Z"
+    )
+    let second = makeItem(
+      pullRequestID: "pr_1",
+      reviewStatus: .approved,
+      updatedAt: "2026-05-21T12:00:00Z"
+    )
+
+    let firstObject = try XCTUnwrap(
+      JSONSerialization.jsonObject(with: try encoder.encode(first)) as? [String: Any]
+    )
+    let secondObject = try XCTUnwrap(
+      JSONSerialization.jsonObject(with: try encoder.encode(second)) as? [String: Any]
+    )
+    let payload: [String: Any] = [
+      "fetchedAt": "2026-05-21T12:00:00Z",
+      "fromCache": true,
+      "summary": [
+        "total": 2,
+        "reviewRequired": 2,
+        "readyToMerge": 0,
+        "autoApprovable": 0,
+        "waitingOnChecks": 0,
+        "blocked": 2,
+      ],
+      "items": [firstObject, secondObject],
+      "repositoryLabels": [:],
+    ]
+
+    let data = try JSONSerialization.data(withJSONObject: payload)
+    let decoded = try JSONDecoder().decode(DependencyUpdatesQueryResponse.self, from: data)
+
+    XCTAssertEqual(decoded.items.map(\.pullRequestID), ["pr_1"])
+    XCTAssertEqual(decoded.items[0].reviewStatus, .approved)
+    XCTAssertEqual(decoded.summary.total, 1)
+  }
+
   func testSaveReplacesPriorSnapshotAndDropsAbsentItems() throws {
     let context = try makeContext()
     let cache = DependencyUpdatesCache(context: context)
@@ -228,6 +294,41 @@ final class DependencyUpdatesCacheTests: XCTestCase {
     XCTAssertEqual(result[1].reviewStatus, .reviewRequired)
   }
 
+  func testApplyPerRepoResponseCollapsesDuplicateCachedIDs() {
+    let cached = [
+      makeItem(
+        pullRequestID: "pr_a1",
+        repository: "acme/api",
+        reviewStatus: .reviewRequired,
+        updatedAt: "2026-05-20T12:00:00Z"
+      ),
+      makeItem(
+        pullRequestID: "pr_a1",
+        repository: "acme/api",
+        reviewStatus: .reviewRequired,
+        updatedAt: "2026-05-20T12:30:00Z"
+      ),
+      makeItem(pullRequestID: "pr_w1", repository: "acme/web"),
+    ]
+    let response = makeResponse(items: [
+      makeItem(
+        pullRequestID: "pr_a1",
+        repository: "acme/api",
+        reviewStatus: .approved,
+        updatedAt: "2026-05-21T12:00:00Z"
+      ),
+    ])
+
+    let result = DependencyUpdatesCache.applyPerRepoResponseToItems(
+      cached,
+      repository: "acme/api",
+      response: response
+    )
+
+    XCTAssertEqual(result.map(\.pullRequestID), ["pr_a1", "pr_w1"])
+    XCTAssertEqual(result[0].reviewStatus, .approved)
+  }
+
   func testApplyPerRepoResponseDropsMissingItemsForTargetedRepo() {
     let cached = [
       makeItem(pullRequestID: "pr_a1", repository: "acme/api"),
@@ -358,7 +459,8 @@ final class DependencyUpdatesCacheTests: XCTestCase {
     pullRequestID: String,
     repository: String = "acme/api",
     state: DependencyUpdatePullRequestState = .open,
-    reviewStatus: DependencyUpdateReviewStatus = .reviewRequired
+    reviewStatus: DependencyUpdateReviewStatus = .reviewRequired,
+    updatedAt: String = "2026-05-20T12:00:00Z"
   ) -> DependencyUpdateItem {
     DependencyUpdateItem(
       pullRequestID: pullRequestID,
@@ -378,7 +480,7 @@ final class DependencyUpdatesCacheTests: XCTestCase {
       additions: 1,
       deletions: 1,
       createdAt: "2026-05-20T12:00:00Z",
-      updatedAt: "2026-05-20T12:00:00Z"
+      updatedAt: updatedAt
     )
   }
 }

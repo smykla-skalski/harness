@@ -152,21 +152,7 @@ public struct DependencyUpdatesCache {
     _ items: [DependencyUpdateItem],
     refresh: DependencyUpdatesRefreshResponse
   ) -> [DependencyUpdateItem] {
-    let droppedIDs = Set(refresh.missingPullRequestIDs)
-    let openItemsByID: [String: DependencyUpdateItem] = Dictionary(
-      uniqueKeysWithValues: refresh.items
-        .filter { $0.state == .open }
-        .map { ($0.pullRequestID, $0) }
-    )
-    let closedIDs = Set(
-      refresh.items.filter { $0.state != .open }.map(\.pullRequestID)
-    )
-    return items.compactMap { item -> DependencyUpdateItem? in
-      if droppedIDs.contains(item.pullRequestID) || closedIDs.contains(item.pullRequestID) {
-        return nil
-      }
-      return openItemsByID[item.pullRequestID] ?? item
-    }
+    applyDependencyRefresh(to: items, refresh: refresh)
   }
 
   /// Merge a per-repository response into a flat items list.
@@ -185,30 +171,28 @@ public struct DependencyUpdatesCache {
     repository: String,
     response: DependencyUpdatesQueryResponse
   ) -> [DependencyUpdateItem] {
+    let currentItems = normalizedDependencyUpdateItems(items)
+    let refreshedItems = normalizedDependencyUpdateItems(response.items)
     let responseByID: [String: DependencyUpdateItem] = Dictionary(
-      response.items.map { ($0.pullRequestID, $0) },
-      uniquingKeysWith: { _, last in last }
+      uniqueKeysWithValues: refreshedItems.map { ($0.pullRequestID, $0) }
     )
     var seenIDs = Set<String>()
     var result: [DependencyUpdateItem] = []
-    result.reserveCapacity(items.count + response.items.count)
-    for item in items {
+    result.reserveCapacity(currentItems.count + refreshedItems.count)
+    for item in currentItems {
       if item.repository != repository {
-        if seenIDs.insert(item.pullRequestID).inserted {
-          result.append(item)
-        }
+        result.append(item)
         continue
       }
       if let updated = responseByID[item.pullRequestID] {
-        if seenIDs.insert(updated.pullRequestID).inserted {
-          result.append(updated)
-        }
+        result.append(updated)
+        seenIDs.insert(updated.pullRequestID)
       }
     }
-    for newItem in response.items where seenIDs.insert(newItem.pullRequestID).inserted {
+    for newItem in refreshedItems where !seenIDs.contains(newItem.pullRequestID) {
       result.append(newItem)
     }
-    return result
+    return normalizedDependencyUpdateItems(result)
   }
 }
 
