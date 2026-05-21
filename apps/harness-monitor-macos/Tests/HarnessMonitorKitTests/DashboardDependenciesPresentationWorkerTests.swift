@@ -105,6 +105,37 @@ struct DashboardDependenciesPresentationWorkerTests {
     #expect(output.relativeUpdatedLabels["pr-invalid"] == "not-a-date")
   }
 
+  @Test("precomputing row labels tolerates duplicate pull request ids")
+  func precomputingRowLabelsToleratesDuplicatePullRequestIDs() async {
+    let first = dependencyItem(
+      id: "pr-duplicate",
+      repository: "kong/a",
+      number: 1,
+      updatedAt: "not-a-date"
+    )
+    let second = dependencyItem(
+      id: "pr-duplicate",
+      repository: "kong/a",
+      number: 2,
+      updatedAt: "2026-05-01T10:00:00Z"
+    )
+
+    let output = await DashboardDependenciesPresentationWorker().compute(
+      input: DashboardDependenciesPresentationInput(
+        items: [first, second],
+        filterModeRaw: DashboardDependenciesFilterMode.all.rawValue,
+        sortModeRaw: DashboardDependenciesSortMode.repository.rawValue,
+        searchText: "",
+        configuredRepositories: [],
+        configuredOrganizations: [],
+        selectedIDs: [],
+        persistedPrimarySelectionID: ""
+      )
+    )
+
+    #expect(output.relativeUpdatedLabels["pr-duplicate"] != nil)
+  }
+
   private func dependencyItem(
     id: String,
     repository: String,
