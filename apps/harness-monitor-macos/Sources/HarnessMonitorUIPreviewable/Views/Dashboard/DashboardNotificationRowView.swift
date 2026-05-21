@@ -225,7 +225,7 @@ struct DashboardNotificationDetailsView: View {
 }
 
 extension NotificationHistoryEntry.Severity {
-  fileprivate var label: String {
+  var label: String {
     switch self {
     case .info:
       return "Info"

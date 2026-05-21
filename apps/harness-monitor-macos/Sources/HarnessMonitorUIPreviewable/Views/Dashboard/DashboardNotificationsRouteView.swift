@@ -165,7 +165,7 @@ private struct DashboardNotificationsTimeline: View {
   }
 }
 
-private struct DashboardNotificationTimelineRow: Identifiable, Equatable {
+struct DashboardNotificationTimelineRow: Identifiable, Equatable {
   let entry: NotificationHistoryEntry
   let dayDividerLabel: String?
   let timeLabel: String
