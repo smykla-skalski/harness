@@ -11,14 +11,14 @@ extension DashboardDependenciesRouteView {
       scheduler.stop()
       return
     }
-    let preferences = normalizedPreferences
+    let preferences = resolvedPreferences
     let resolver = ensureRepoResolver(client: client)
     do {
       let repositories = try await resolver.resolveRepositories(
-        explicitRepositories: preferences.normalizedRepositories,
-        organizations: preferences.normalizedOrganizations,
-        excludeRepositories: preferences.normalizedExcludeRepositories,
-        expandOrganizations: preferences.expandOrganizations
+        explicitRepositories: preferences.repositories,
+        organizations: preferences.organizations,
+        excludeRepositories: preferences.excludeRepositories,
+        expandOrganizations: preferences.preferences.expandOrganizations
       )
       guard !Task.isCancelled else { return }
       let hydrated =
