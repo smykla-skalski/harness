@@ -1,8 +1,29 @@
 import HarnessMonitorKit
 import SwiftUI
 
-extension SettingsRepositoriesSection {
-  var monitoredRepositoriesSection: some View {
+struct RepositoriesMonitoredSection: View {
+  @Binding var draft: SettingsSharedRepositoriesDraft
+  @Environment(\.fontScale)
+  private var fontScale
+
+  private var bodyFont: Font {
+    HarnessMonitorTextSize.scaledFont(.body, by: fontScale)
+  }
+
+  private var captionSemibold: Font {
+    HarnessMonitorTextSize.scaledFont(.caption.weight(.semibold), by: fontScale)
+  }
+
+  private var repositoriesTableRowsHeight: CGFloat {
+    let visibleRows = min(draft.rows.count, 12)
+    return CGFloat(visibleRows) * 44
+  }
+
+  private var tableBackground: some ShapeStyle {
+    Color(nsColor: .controlBackgroundColor).opacity(0.42)
+  }
+
+  var body: some View {
     Section {
       repositoriesTable
       manualAddRow
@@ -143,17 +164,17 @@ extension SettingsRepositoriesSection {
         placeholder: "owner",
         text: $draft.ownerInput,
         accessibilityIdentifier: HarnessMonitorAccessibility.settingsRepositoriesOwnerField,
-        onSubmit: addManualRepository
+        onSubmit: { draft.addManualRepository() }
       )
 
       SettingsTaskBoardInboxTextField(
         placeholder: "repository",
         text: $draft.repositoryInput,
         accessibilityIdentifier: HarnessMonitorAccessibility.settingsRepositoriesNameField,
-        onSubmit: addManualRepository
+        onSubmit: { draft.addManualRepository() }
       )
 
-      Button(action: addManualRepository) {
+      Button(action: { draft.addManualRepository() }) {
         Label("Add Repository", systemImage: "plus")
           .labelStyle(.titleAndIcon)
           .lineLimit(1)
