@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 
 struct HarnessMarkdownDetailsView: View {
@@ -23,6 +24,7 @@ struct HarnessMarkdownDetailsView: View {
     VStack(alignment: .leading, spacing: 0) {
       summaryButton(metrics: metrics)
       if isExpanded {
+        detailsSeparator
         detailsContent
       }
     }
@@ -42,8 +44,7 @@ struct HarnessMarkdownDetailsView: View {
       }
       .contentShape(Rectangle())
       .frame(maxWidth: .infinity, alignment: .leading)
-      .padding(.horizontal, HarnessMonitorTheme.spacingSM)
-      .padding(.vertical, 6)
+      .padding(cardPadding)
     }
     .buttonStyle(.borderless)
     .frame(maxWidth: .infinity, alignment: .leading)
@@ -87,6 +88,13 @@ struct HarnessMarkdownDetailsView: View {
       .strokeBorder(style.colors.link.opacity(isExpanded ? 0.42 : 0.28), lineWidth: 1)
   }
 
+  private var detailsSeparator: some View {
+    Rectangle()
+      .fill(style.colors.link.opacity(0.22))
+      .frame(height: 1)
+      .padding(.horizontal, cardPadding)
+  }
+
   private var detailsContent: some View {
     ScrollView(.vertical) {
       HarnessMarkdownLazyBlockStackView(
@@ -95,13 +103,58 @@ struct HarnessMarkdownDetailsView: View {
         style: style,
         spacing: style.spacing.nestedBlock
       )
-      .padding(.trailing, HarnessMonitorTheme.spacingXS)
+      .background(HarnessMarkdownDetailsScrollTuner())
     }
-    .scrollIndicators(.visible)
+    .scrollIndicators(.automatic)
+    .scrollBounceBehavior(.basedOnSize, axes: .vertical)
     .frame(maxHeight: style.spacing.detailsMaxHeight)
-    .padding(.leading, style.spacing.detailsContentIndent)
-    .padding(.trailing, HarnessMonitorTheme.spacingSM)
-    .padding(.bottom, HarnessMonitorTheme.spacingSM)
-    .padding(.top, style.spacing.nestedBlock)
+    .padding(cardPadding)
+  }
+
+  private var cardPadding: CGFloat {
+    max(HarnessMonitorTheme.cardPadding, style.spacing.detailsContentIndent)
+  }
+}
+
+private struct HarnessMarkdownDetailsScrollTuner: NSViewRepresentable {
+  func makeNSView(context: Context) -> HarnessMarkdownDetailsScrollTuningView {
+    HarnessMarkdownDetailsScrollTuningView()
+  }
+
+  func updateNSView(_ view: HarnessMarkdownDetailsScrollTuningView, context: Context) {
+    view.tuneWhenReady()
+  }
+}
+
+private final class HarnessMarkdownDetailsScrollTuningView: NSView {
+  override func viewDidMoveToWindow() {
+    super.viewDidMoveToWindow()
+    tuneWhenReady()
+  }
+
+  override func viewDidMoveToSuperview() {
+    super.viewDidMoveToSuperview()
+    tuneWhenReady()
+  }
+
+  func tuneWhenReady() {
+    DispatchQueue.main.async { [weak self] in
+      self?.tuneScrollView()
+    }
+  }
+
+  private func tuneScrollView() {
+    guard let scrollView = enclosingScrollView else { return }
+    scrollView.drawsBackground = false
+    scrollView.hasHorizontalScroller = false
+    scrollView.hasVerticalScroller = true
+    scrollView.autohidesScrollers = true
+    scrollView.automaticallyAdjustsContentInsets = false
+    let zeroInsets = NSEdgeInsets(top: 0, left: 0, bottom: 0, right: 0)
+    scrollView.contentInsets = zeroInsets
+    scrollView.scrollerInsets = zeroInsets
+    scrollView.usesPredominantAxisScrolling = true
+    scrollView.horizontalScrollElasticity = .none
+    scrollView.verticalScrollElasticity = .none
   }
 }
