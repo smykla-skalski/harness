@@ -21,6 +21,7 @@ public struct SettingsAppearanceSection: View {
   private var sidebarSessionRowDisplayModeRawValue =
     HarnessMonitorSidebarSessionRowDisplayMode.defaultMode.rawValue
   @State private var selectedBackgroundTab: BackgroundCollectionTab = .featured
+  @State private var isFullyExpanded = false
 
   public init(themeMode: Binding<HarnessMonitorThemeMode>) {
     _themeMode = themeMode
@@ -113,13 +114,22 @@ public struct SettingsAppearanceSection: View {
         Text(appearanceFooterText)
       }
 
-      backgroundImageSection
+      if isFullyExpanded {
+        backgroundImageSection
+      }
     }
     .settingsDetailFormStyle()
     .onAppear(perform: selectTabForCurrentBackground)
     .onChange(of: selectedBackground.storageValue) { _, _ in
       selectTabForCurrentBackground()
     }
+    .task { await expandAfterFirstFrame() }
+  }
+
+  private func expandAfterFirstFrame() async {
+    guard !isFullyExpanded else { return }
+    try? await Task.sleep(for: .milliseconds(40))
+    isFullyExpanded = true
   }
 
   private var appearanceFooterText: String {
