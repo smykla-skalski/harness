@@ -130,7 +130,8 @@ struct TaskBoardRouteContentSourceTests {
     #expect(overviewSupportSource.contains("max(intrinsic.height, max(viewportHeight, 0))"))
     #expect(!overviewSupportSource.contains("TaskBoardFillLastLayout"))
     #expect(!overviewSupportSource.contains("usesProposedHeightForMeasurement"))
-    #expect(overviewSupportSource.contains("let height = max(measuredHeight, proposal.height ?? 0)"))
+    #expect(
+      overviewSupportSource.contains("let height = max(measuredHeight, proposal.height ?? 0)"))
     #expect(laneChromeSource.contains("idealHeight: metrics.laneFixedHeight"))
     #expect(laneChromeSource.contains("minHeight: metrics.laneFixedHeight"))
     #expect(laneChromeSource.contains("maxHeight: .infinity"))

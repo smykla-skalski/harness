@@ -90,7 +90,7 @@ private let taskBoardRPCResponses: [WebSocketRPCMethod: JSONValue] = [
   .dependencyUpdatesAddLabel: fixtureJSONValue(sampleDependencyUpdatesLabelResponseText),
   .dependencyUpdatesAuto: fixtureJSONValue(sampleDependencyUpdatesAutoResponseText),
   .dependencyUpdatesClearCache: fixtureJSONValue(sampleDepsCacheClearResponseText),
-  .dependencyUpdatesRefresh: fixtureJSONValue(sampleDependencyUpdatesRefreshResponseText),
+  .dependencyUpdatesRefresh: fixtureJSONValue(sampleDependencyRefreshResponseText),
 ]
 
 final class TaskBoardURLProtocol: URLProtocol, @unchecked Sendable {
@@ -148,7 +148,7 @@ final class TaskBoardURLProtocol: URLProtocol, @unchecked Sendable {
     Route("/v1/dependency-updates/auto"): sampleDependencyUpdatesAutoResponseText,
     Route("/v1/dependency-updates/cache", method: "DELETE"):
       sampleDepsCacheClearResponseText,
-    Route("/v1/dependency-updates/refresh"): sampleDependencyUpdatesRefreshResponseText,
+    Route("/v1/dependency-updates/refresh"): sampleDependencyRefreshResponseText,
   ]
 
   static var records: [RecordedRequest] {

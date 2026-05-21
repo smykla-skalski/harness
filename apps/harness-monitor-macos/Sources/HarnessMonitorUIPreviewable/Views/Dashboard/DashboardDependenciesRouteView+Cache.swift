@@ -30,7 +30,7 @@ extension DashboardDependenciesRouteView {
   func frequentLabelNames(for items: [DependencyUpdateItem]) -> [String] {
     guard let cache = repositoryLabelUsageCache, !items.isEmpty else { return [] }
     let repositories = Array(Set(items.map(\.repository)))
-    let limit = resolvedPreferences.preferences.frequentLabelsCount
+    let limit = routeResolvedPreferences.preferences.frequentLabelsCount
     return cache.topUsed(repositories: repositories, limit: limit)
   }
 
@@ -42,7 +42,7 @@ extension DashboardDependenciesRouteView {
   }
 
   var dependenciesCachePreferencesHash: String {
-    resolvedPreferences.cacheHash
+    routeResolvedPreferences.cacheHash
   }
 
   /// Restore the last persisted response into `response` when the in-memory
@@ -50,11 +50,11 @@ extension DashboardDependenciesRouteView {
   @discardableResult
   func hydrateDependenciesFromCacheIfNeeded() -> Bool {
     var didApply = false
-    if response.items.isEmpty,
+    if routeResponse.items.isEmpty,
       let cache = dependenciesCache,
       let cached = cache.load(preferencesHash: dependenciesCachePreferencesHash)
     {
-      response = cached
+      routeResponse = cached
       reconcileSelection()
       didApply = true
     }
@@ -70,16 +70,16 @@ extension DashboardDependenciesRouteView {
     guard let cache = repositoryLabelsCache else { return }
     let cached = cache.loadAll()
     guard !cached.isEmpty else { return }
-    var merged = response.repositoryLabels
+    var merged = routeResponse.repositoryLabels
     for (repository, labels) in cached where merged[repository, default: []].isEmpty {
       merged[repository] = labels
     }
-    if merged != response.repositoryLabels {
-      response = DependencyUpdatesQueryResponse(
-        fetchedAt: response.fetchedAt,
-        fromCache: response.fromCache,
-        summary: response.summary,
-        items: response.items,
+    if merged != routeResponse.repositoryLabels {
+      routeResponse = DependencyUpdatesQueryResponse(
+        fetchedAt: routeResponse.fetchedAt,
+        fromCache: routeResponse.fromCache,
+        summary: routeResponse.summary,
+        items: routeResponse.items,
         repositoryLabels: merged
       )
     }

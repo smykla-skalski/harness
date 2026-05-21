@@ -74,7 +74,8 @@ final class DashboardDependenciesScheduler {
     stop()
     self.repositories = repositories
     self.preferences = preferences
-    self.perRepoInterval = max(TimeInterval(preferences.preferences.perRepositoryIntervalSeconds), 1)
+    self.perRepoInterval = max(
+      TimeInterval(preferences.preferences.perRepositoryIntervalSeconds), 1)
     self.maxConcurrent = max(preferences.preferences.maxConcurrentRepositoryFetches, 1)
     self.client = client
     self.onMerge = onMerge

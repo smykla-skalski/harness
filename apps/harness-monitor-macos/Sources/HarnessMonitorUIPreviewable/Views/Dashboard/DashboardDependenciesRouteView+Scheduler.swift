@@ -8,10 +8,10 @@ extension DashboardDependenciesRouteView {
   /// tick task and any in-flight fetches before resuming.
   func startScheduler(forceRefreshAll: Bool = false) async {
     guard let client = store.apiClient else {
-      scheduler.stop()
+      routeScheduler.stop()
       return
     }
-    let preferences = resolvedPreferences
+    let preferences = routeResolvedPreferences
     let resolver = ensureRepoResolver(client: client)
     do {
       let repositories = try await resolver.resolveRepositories(
@@ -24,7 +24,7 @@ extension DashboardDependenciesRouteView {
       let hydrated =
         repoSyncStateCache?
         .loadStates(preferencesHash: dependenciesCachePreferencesHash) ?? [:]
-      scheduler.start(
+      routeScheduler.start(
         repositories: repositories,
         preferences: preferences,
         client: client,
@@ -42,8 +42,8 @@ extension DashboardDependenciesRouteView {
         """
       )
       let displayMessage = dashboardDependenciesErrorMessage(for: error)
-      if response.items.isEmpty {
-        errorMessage = displayMessage
+      if routeResponse.items.isEmpty {
+        routeErrorMessage = displayMessage
       } else {
         store.presentFailureFeedback(displayMessage)
       }
@@ -53,32 +53,32 @@ extension DashboardDependenciesRouteView {
   /// Mark every tracked repository for refresh on the next tick. Called from
   /// the manual force-refresh button and after a daemon cache clear.
   func schedulerForceRefreshAll() {
-    scheduler.forceRefreshAll()
+    routeScheduler.forceRefreshAll()
   }
 
   /// Mark a single repository for refresh on the next tick. Called from
   /// `scheduleAffectedRefresh` after a per-PR mutation when the targeted
   /// refresh path is not granular enough.
   func schedulerForceRefresh(repository: String) {
-    scheduler.forceRefresh(repository: repository)
+    routeScheduler.forceRefresh(repository: repository)
   }
 
   /// True while any tracked repository is currently being fetched.
   var isAnyRepositorySyncing: Bool {
-    !scheduler.repositoriesInFlight.isEmpty
+    !routeScheduler.repositoriesInFlight.isEmpty
   }
 
   /// Snapshot of currently in-flight repositories for per-section progress
   /// indicators.
   var refreshingRepositories: Set<String> {
-    scheduler.repositoriesInFlight
+    routeScheduler.repositoriesInFlight
   }
 
   /// Compact "Syncing N of M" indicator shown in the summary card while the
   /// scheduler has any repository in flight.
   @ViewBuilder var schedulerProgressBadge: some View {
-    let total = max(scheduler.states.count, 1)
-    let inFlight = scheduler.repositoriesInFlight.count
+    let total = max(routeScheduler.states.count, 1)
+    let inFlight = routeScheduler.repositoriesInFlight.count
     HStack(spacing: HarnessMonitorTheme.spacingXS) {
       ProgressView()
         .controlSize(.small)
@@ -98,27 +98,27 @@ extension DashboardDependenciesRouteView {
     response perResponse: DependencyUpdatesQueryResponse
   ) {
     let nextItems = DependencyUpdatesCache.applyPerRepoResponseToItems(
-      response.items,
+      routeResponse.items,
       repository: repository,
       response: perResponse
     )
-    var mergedLabels = response.repositoryLabels
+    var mergedLabels = routeResponse.repositoryLabels
     if let updatedLabels = perResponse.repositoryLabels[repository] {
       mergedLabels[repository] = updatedLabels
     }
-    response = DependencyUpdatesQueryResponse(
+    routeResponse = DependencyUpdatesQueryResponse(
       fetchedAt: perResponse.fetchedAt,
       fromCache: false,
       summary: DependencyUpdatesSummary(items: nextItems),
       items: nextItems,
       repositoryLabels: mergedLabels
     )
-    errorMessage = nil
+    routeErrorMessage = nil
     reconcileSelection()
     persistDependenciesPerRepoResponse(
       repository: repository,
       response: perResponse,
-      fallbackResponse: response
+      fallbackResponse: routeResponse
     )
   }
 

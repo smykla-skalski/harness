@@ -8,52 +8,65 @@ struct HTMLInlineTag: Equatable {
   let end: Int
 
   init?(characters: [Character], start: Int) {
-    guard start < characters.count, characters[start] == "<" else { return nil }
-    var index = start + 1
-    var closing = false
-    if index < characters.count, characters[index] == "/" {
-      closing = true
-      index += 1
-    }
-    while index < characters.count, characters[index].isWhitespace {
-      index += 1
-    }
-    let nameStart = index
-    while index < characters.count, isNameCharacter(characters[index]) {
-      index += 1
-    }
-    guard index > nameStart else { return nil }
-    guard index == characters.count || isTagNameTerminator(characters[index]) else { return nil }
-    let parsedName = String(characters[nameStart..<index]).lowercased()
-    var attributes: [String: String] = [:]
-    var quote: Character?
-    var tagEnd: Int?
-    while index < characters.count {
-      let character = characters[index]
-      if let activeQuote = quote {
-        if character == activeQuote { quote = nil }
-        index += 1
-      } else if character == "\"" || character == "'" {
-        quote = character
-        index += 1
-      } else if character == ">" {
-        tagEnd = index
-        break
-      } else {
-        index += 1
-      }
-    }
-    guard let end = tagEnd else { return nil }
-    if !closing {
-      attributes = parseAttributes(
-        characters: characters, start: nameStart + parsedName.count, end: end)
-    }
-    self.name = parsedName
-    self.attributes = attributes
-    self.isClosing = closing
-    self.isSelfClosing = !closing && end > start && characters[end - 1] == "/"
+    guard let header = parseHTMLInlineTagHeader(characters: characters, start: start),
+      let end = firstTagEnd(in: characters, from: header.attributesStart)
+    else { return nil }
+    self.name = header.name
+    self.attributes =
+      header.isClosing
+      ? [:]
+      : parseAttributes(characters: characters, start: header.attributesStart, end: end)
+    self.isClosing = header.isClosing
+    self.isSelfClosing = !header.isClosing && end > start && characters[end - 1] == "/"
     self.end = end
   }
+}
+
+private struct HTMLInlineTagHeader {
+  let name: String
+  let isClosing: Bool
+  let attributesStart: Int
+}
+
+private func parseHTMLInlineTagHeader(
+  characters: [Character],
+  start: Int
+) -> HTMLInlineTagHeader? {
+  guard start < characters.count, characters[start] == "<" else { return nil }
+  var index = start + 1
+  let isClosing = index < characters.count && characters[index] == "/"
+  if isClosing { index += 1 }
+  while index < characters.count, characters[index].isWhitespace {
+    index += 1
+  }
+  let nameStart = index
+  while index < characters.count, isNameCharacter(characters[index]) {
+    index += 1
+  }
+  guard index > nameStart else { return nil }
+  guard index == characters.count || isTagNameTerminator(characters[index]) else { return nil }
+  return HTMLInlineTagHeader(
+    name: String(characters[nameStart..<index]).lowercased(),
+    isClosing: isClosing,
+    attributesStart: index
+  )
+}
+
+private func firstTagEnd(in characters: [Character], from start: Int) -> Int? {
+  var index = start
+  var quote: Character?
+  while index < characters.count {
+    let character = characters[index]
+    if let activeQuote = quote {
+      if character == activeQuote { quote = nil }
+    } else if character == "\"" || character == "'" {
+      quote = character
+    } else if character == ">" {
+      return index
+    }
+    index += 1
+  }
+  return nil
 }
 
 func decodeEntities(_ source: String) -> String {

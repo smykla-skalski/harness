@@ -53,6 +53,15 @@ struct DashboardDependenciesReloadTaskKey: Equatable {
   let connectionState: HarnessMonitorStore.ConnectionState
 }
 
+private struct DashboardDependenciesQueryRequestParts {
+  let authors: [String]
+  let organizations: [String]
+  let repositories: [String]
+  let excludeRepositories: [String]
+  let cacheMaxAgeSeconds: UInt64
+  let forceRefresh: Bool
+}
+
 struct DashboardDependenciesResolvedPreferences: Equatable {
   let preferences: DashboardDependenciesPreferences
   let authors: [String]
@@ -74,24 +83,28 @@ struct DashboardDependenciesResolvedPreferences: Equatable {
     excludeRepositories = normalized.normalizedExcludeRepositories
     cacheHash = DependencyUpdatesCache.preferencesHash(
       for: Self.queryRequest(
-        authors: authors,
-        organizations: organizations,
-        repositories: repositories,
-        excludeRepositories: excludeRepositories,
-        cacheMaxAgeSeconds: normalized.cacheMaxAgeSeconds,
-        forceRefresh: false
+        DashboardDependenciesQueryRequestParts(
+          authors: authors,
+          organizations: organizations,
+          repositories: repositories,
+          excludeRepositories: excludeRepositories,
+          cacheMaxAgeSeconds: normalized.cacheMaxAgeSeconds,
+          forceRefresh: false
+        )
       )
     )
   }
 
   func queryRequest(forceRefresh: Bool) -> DependencyUpdatesQueryRequest {
     Self.queryRequest(
-      authors: authors,
-      organizations: organizations,
-      repositories: repositories,
-      excludeRepositories: excludeRepositories,
-      cacheMaxAgeSeconds: preferences.cacheMaxAgeSeconds,
-      forceRefresh: forceRefresh
+      DashboardDependenciesQueryRequestParts(
+        authors: authors,
+        organizations: organizations,
+        repositories: repositories,
+        excludeRepositories: excludeRepositories,
+        cacheMaxAgeSeconds: preferences.cacheMaxAgeSeconds,
+        forceRefresh: forceRefresh
+      )
     )
   }
 
@@ -100,31 +113,28 @@ struct DashboardDependenciesResolvedPreferences: Equatable {
     forceRefresh: Bool
   ) -> DependencyUpdatesQueryRequest {
     Self.queryRequest(
-      authors: authors,
-      organizations: [],
-      repositories: [repository],
-      excludeRepositories: excludeRepositories,
-      cacheMaxAgeSeconds: preferences.cacheMaxAgeSeconds,
-      forceRefresh: forceRefresh
+      DashboardDependenciesQueryRequestParts(
+        authors: authors,
+        organizations: [],
+        repositories: [repository],
+        excludeRepositories: excludeRepositories,
+        cacheMaxAgeSeconds: preferences.cacheMaxAgeSeconds,
+        forceRefresh: forceRefresh
+      )
     )
   }
 
-  private static func queryRequest(
-    authors: [String],
-    organizations: [String],
-    repositories: [String],
-    excludeRepositories: [String],
-    cacheMaxAgeSeconds: UInt64,
-    forceRefresh: Bool
-  ) -> DependencyUpdatesQueryRequest {
+  private static func queryRequest(_ parts: DashboardDependenciesQueryRequestParts)
+    -> DependencyUpdatesQueryRequest
+  {
     DependencyUpdatesQueryRequest(
-      authors: authors,
-      organizations: organizations,
-      repositories: repositories,
-      excludeRepositories: excludeRepositories,
-      forceRefresh: forceRefresh,
+      authors: parts.authors,
+      organizations: parts.organizations,
+      repositories: parts.repositories,
+      excludeRepositories: parts.excludeRepositories,
+      forceRefresh: parts.forceRefresh,
       cacheMaxAgeSeconds: max(
-        cacheMaxAgeSeconds,
+        parts.cacheMaxAgeSeconds,
         DashboardDependenciesPreferences.minimumPerRepositoryIntervalSeconds
       )
     )
@@ -177,7 +187,7 @@ struct DashboardDependenciesRouteView: View {
   @SceneStorage("dashboard.dependencies.content-detail-width")
   private var contentDetailWidth = SessionContentDetailSplitLayout.defaultContentWidth
 
-  @State var response = DependencyUpdatesQueryResponse(
+  @State private var response = DependencyUpdatesQueryResponse(
     fetchedAt: "",
     fromCache: false,
     summary: DependencyUpdatesSummary(
@@ -192,18 +202,21 @@ struct DashboardDependenciesRouteView: View {
   )
   @State private var isLoading = false
   @State private var isBackgroundRefreshing = false
-  @State var errorMessage: String?
+  @State private var errorMessage: String?
   @State private var selectedIDs = Set<String>()
   @State private var isLabelSheetPresented = false
   @State private var labelDraft = ""
   @State private var labelTargetItems = [DependencyUpdateItem]()
   @State private var inFlightActionTitle: String?
-  @State var resolvedPreferences: DashboardDependenciesResolvedPreferences
+  @State private var resolvedPreferences: DashboardDependenciesResolvedPreferences
   @State private var presentationWorker = DashboardDependenciesPresentationWorker()
   @State private var cachedPresentation = DashboardDependenciesPresentation.empty
   @State private var presentationGeneration: UInt64 = 0
-  @State var refreshingPullRequestIDs = Set<String>()
-  @State var scheduler = DashboardDependenciesScheduler()
+  @State private var refreshingPullRequestIDs = Set<String>()
+  @State private var scheduler = DashboardDependenciesScheduler()
+  @State private var collapsedRepositories = DashboardDependenciesCollapsedRepositories()
+  @State private var labelMenuDataByRepository:
+    [String: DashboardDependenciesRepoLabelMenuData] = [:]
 
   init(store: HarnessMonitorStore, selectedRoute: Binding<DashboardWindowRoute>) {
     self.store = store
@@ -217,6 +230,29 @@ struct DashboardDependenciesRouteView: View {
     )
   }
 
+  var routeResponse: DependencyUpdatesQueryResponse {
+    get { response }
+    nonmutating set { response = newValue }
+  }
+
+  var routeErrorMessage: String? {
+    get { errorMessage }
+    nonmutating set { errorMessage = newValue }
+  }
+
+  var routeResolvedPreferences: DashboardDependenciesResolvedPreferences {
+    resolvedPreferences
+  }
+
+  var routeRefreshingPullRequestIDs: Set<String> {
+    get { refreshingPullRequestIDs }
+    nonmutating set { refreshingPullRequestIDs = newValue }
+  }
+
+  var routeScheduler: DashboardDependenciesScheduler {
+    scheduler
+  }
+
   private var reloadTaskKey: DashboardDependenciesReloadTaskKey {
     DashboardDependenciesReloadTaskKey(
       preferencesSignature: resolvedPreferences.cacheHash,
@@ -226,11 +262,6 @@ struct DashboardDependenciesRouteView: View {
 
   var normalizedPreferences: DashboardDependenciesPreferences {
     resolvedPreferences.preferences
-  }
-
-  private var collapsedRepositories: DashboardDependenciesCollapsedRepositories {
-    get { DashboardDependenciesCollapsedRepositories.decode(from: collapsedRepositoriesStorage) }
-    nonmutating set { collapsedRepositoriesStorage = newValue.encodedString }
   }
 
   private var groupMode: DashboardDependenciesGroupMode {
@@ -308,6 +339,50 @@ struct DashboardDependenciesRouteView: View {
     .onChange(of: storedPreferences, initial: true) { _, newValue in
       syncPreferencesFromStorage(newValue)
     }
+    .onChange(of: collapsedRepositoriesStorage, initial: true) { _, newValue in
+      syncCollapsedRepositoriesFromStorage(newValue)
+    }
+    .onChange(of: response.repositoryLabels, initial: true) { _, _ in
+      refreshLabelMenuData()
+    }
+    .onChange(of: normalizedPreferences.frequentLabelsCount) { _, _ in
+      refreshLabelMenuData()
+    }
+  }
+
+  func refreshLabelMenuData() {
+    let limit = normalizedPreferences.frequentLabelsCount
+    let usageCache = repositoryLabelUsageCache
+    var result: [String: DashboardDependenciesRepoLabelMenuData] = [:]
+    result.reserveCapacity(response.repositoryLabels.count)
+    for (repository, labels) in response.repositoryLabels {
+      let sorted = labels.sorted {
+        $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending
+      }
+      let frequent = usageCache?.topUsed(repositories: [repository], limit: limit) ?? []
+      result[repository] = DashboardDependenciesRepoLabelMenuData(
+        sortedLabels: sorted,
+        frequentNames: frequent
+      )
+    }
+    guard result != labelMenuDataByRepository else { return }
+    labelMenuDataByRepository = result
+  }
+
+  func rowAvailableLabels(for item: DependencyUpdateItem) -> [DependencyUpdateRepositoryLabel] {
+    guard let data = labelMenuDataByRepository[item.repository] else { return [] }
+    let applied = Set(item.labels)
+    return data.sortedLabels.filter { !applied.contains($0.name) }
+  }
+
+  func rowFrequentLabelNames(for item: DependencyUpdateItem) -> [String] {
+    labelMenuDataByRepository[item.repository]?.frequentNames ?? []
+  }
+
+  private func syncCollapsedRepositoriesFromStorage(_ storedValue: String) {
+    let next = DashboardDependenciesCollapsedRepositories.decode(from: storedValue)
+    guard next != collapsedRepositories else { return }
+    collapsedRepositories = next
   }
 
   private func syncPreferencesFromStorage(_ storedValue: String) {
@@ -683,11 +758,8 @@ struct DashboardDependenciesRouteView: View {
       .disabled(!item.hasRerunnableChecks)
       DashboardDependenciesLabelPickerMenu(
         title: "Add Label",
-        labels: dashboardDependenciesAvailableLabels(
-          repositoryLabels: response.repositoryLabels,
-          items: [item]
-        ),
-        frequentNames: frequentLabelNames(for: [item]),
+        labels: rowAvailableLabels(for: item),
+        frequentNames: rowFrequentLabelNames(for: item),
         showsDescriptions: normalizedPreferences.showLabelDescriptions,
         onSelect: { name in Task { await addLabel(name, to: [item]) } },
         onCustom: {
@@ -1106,6 +1178,7 @@ struct DashboardDependenciesRouteView: View {
     var collapsed = collapsedRepositories
     collapsed.toggle(repository)
     collapsedRepositories = collapsed
+    collapsedRepositoriesStorage = collapsed.encodedString
   }
 
   func reconcileSelection() {

@@ -62,7 +62,8 @@ final class SettingsDurationPickerRowTests: XCTestCase {
     for seconds in [30, 60, 120, 300, 600, 900, 1_800, 3_600, 7_200, 21_600] {
       let decomposition = SettingsDurationDecomposition(seconds: UInt64(seconds))
       XCTAssertEqual(
-        decomposition.seconds, UInt64(seconds),
+        decomposition.seconds,
+        UInt64(seconds),
         "decomposition should roundtrip \(seconds)s"
       )
     }

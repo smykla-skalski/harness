@@ -4,33 +4,37 @@ import XCTest
 @testable import HarnessMonitorKit
 
 final class DependencyUpdateBodyStoreTests: XCTestCase {
-  private func makeStore() -> (DependencyUpdateBodyStore, UserDefaults, String) {
+  private struct BodyStoreFixture {
+    let store: DependencyUpdateBodyStore
+    let suite: String
+  }
+
+  private func makeStore() -> BodyStoreFixture {
     let suite = "DependencyUpdateBodyStoreTests.\(UUID().uuidString)"
     let defaults = UserDefaults(suiteName: suite)!
     let key = "test-bodies"
-    return (DependencyUpdateBodyStore(defaults: defaults, key: key), defaults, suite)
-  }
-
-  override func tearDown() {
-    super.tearDown()
+    return BodyStoreFixture(
+      store: DependencyUpdateBodyStore(defaults: defaults, key: key),
+      suite: suite
+    )
   }
 
   func testMissingEntryReturnsNil() {
-    let (store, _, suite) = makeStore()
-    defer { UserDefaults().removePersistentDomain(forName: suite) }
-    XCTAssertNil(store.cached(forPullRequestID: "PR_1", since: "2026-05-21T00:00:00Z"))
+    let fixture = makeStore()
+    defer { UserDefaults().removePersistentDomain(forName: fixture.suite) }
+    XCTAssertNil(fixture.store.cached(forPullRequestID: "PR_1", since: "2026-05-21T00:00:00Z"))
   }
 
   func testFreshEntryRoundTrips() {
-    let (store, _, suite) = makeStore()
-    defer { UserDefaults().removePersistentDomain(forName: suite) }
-    store.store(
+    let fixture = makeStore()
+    defer { UserDefaults().removePersistentDomain(forName: fixture.suite) }
+    fixture.store.store(
       pullRequestID: "PR_1",
       body: "Hello",
       prUpdatedAt: "2026-05-21T00:00:00Z",
       fetchedAt: "2026-05-21T00:00:10Z"
     )
-    let entry = store.cached(
+    let entry = fixture.store.cached(
       forPullRequestID: "PR_1",
       since: "2026-05-21T00:00:00Z"
     )
@@ -39,16 +43,16 @@ final class DependencyUpdateBodyStoreTests: XCTestCase {
   }
 
   func testStaleEntryReturnsNilWhenPRWasUpdated() {
-    let (store, _, suite) = makeStore()
-    defer { UserDefaults().removePersistentDomain(forName: suite) }
-    store.store(
+    let fixture = makeStore()
+    defer { UserDefaults().removePersistentDomain(forName: fixture.suite) }
+    fixture.store.store(
       pullRequestID: "PR_1",
       body: "Old body",
       prUpdatedAt: "2026-05-21T00:00:00Z",
       fetchedAt: "2026-05-21T00:00:10Z"
     )
     XCTAssertNil(
-      store.cached(
+      fixture.store.cached(
         forPullRequestID: "PR_1",
         since: "2026-05-21T00:05:00Z"
       ),
@@ -57,16 +61,16 @@ final class DependencyUpdateBodyStoreTests: XCTestCase {
   }
 
   func testEqualTimestampStaysFresh() {
-    let (store, _, suite) = makeStore()
-    defer { UserDefaults().removePersistentDomain(forName: suite) }
-    store.store(
+    let fixture = makeStore()
+    defer { UserDefaults().removePersistentDomain(forName: fixture.suite) }
+    fixture.store.store(
       pullRequestID: "PR_1",
       body: "Hello",
       prUpdatedAt: "2026-05-21T00:00:00Z",
       fetchedAt: "2026-05-21T00:00:10Z"
     )
     XCTAssertNotNil(
-      store.cached(
+      fixture.store.cached(
         forPullRequestID: "PR_1",
         since: "2026-05-21T00:00:00Z"
       )
@@ -93,15 +97,15 @@ final class DependencyUpdateBodyStoreTests: XCTestCase {
   }
 
   func testClearWipesAllEntries() {
-    let (store, _, suite) = makeStore()
-    defer { UserDefaults().removePersistentDomain(forName: suite) }
-    store.store(
+    let fixture = makeStore()
+    defer { UserDefaults().removePersistentDomain(forName: fixture.suite) }
+    fixture.store.store(
       pullRequestID: "PR_1",
       body: "Hello",
       prUpdatedAt: "2026-05-21T00:00:00Z",
       fetchedAt: "2026-05-21T00:00:10Z"
     )
-    store.clear()
-    XCTAssertNil(store.cached(forPullRequestID: "PR_1"))
+    fixture.store.clear()
+    XCTAssertNil(fixture.store.cached(forPullRequestID: "PR_1"))
   }
 }

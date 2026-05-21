@@ -78,7 +78,8 @@ struct DashboardDependenciesRouteViewTests {
     #expect(source.contains("@State var resolvedPreferences"))
     #expect(source.contains(".onChange(of: storedPreferences, initial: true)"))
     #expect(source.contains("syncPreferencesFromStorage(newValue)"))
-    #expect(!source.contains("get { DashboardDependenciesPreferences.decode(from: storedPreferences) }"))
+    #expect(
+      !source.contains("get { DashboardDependenciesPreferences.decode(from: storedPreferences) }"))
     #expect(
       !source.contains(
         "var normalizedPreferences: DashboardDependenciesPreferences {\n    preferences.normalized()"
@@ -112,7 +113,7 @@ struct DashboardDependenciesRouteViewTests {
 
     #expect(
       dashboardDependenciesErrorMessage(for: apiError)
-        == dashboardDependenciesGitHubAuthFailureMessage
+        == dashboardDepsGitHubAuthFailureMessage
     )
   }
 
@@ -126,7 +127,7 @@ struct DashboardDependenciesRouteViewTests {
 
     #expect(
       dashboardDependenciesErrorMessage(for: LegacyTransportError())
-        == dashboardDependenciesGitHubAuthFailureMessage
+        == dashboardDepsGitHubAuthFailureMessage
     )
   }
 
@@ -139,7 +140,7 @@ struct DashboardDependenciesRouteViewTests {
 
     #expect(
       dashboardDependenciesErrorMessage(for: decodingError)
-        == dashboardDependenciesDecodingFailureMessage
+        == dashboardDepsDecodingFailureMessage
     )
   }
 

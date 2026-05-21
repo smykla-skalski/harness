@@ -154,7 +154,7 @@ let sampleDepsCacheClearResponseText =
   }
   """
 
-let sampleDependencyUpdatesRefreshResponseText =
+let sampleDependencyRefreshResponseText =
   """
   {
     "fetched_at": "2026-05-21T12:00:00Z",

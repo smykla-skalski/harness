@@ -15,7 +15,7 @@ struct HarnessCodeBlockRenderSettings {
     self.fontScaleMode = fontScaleMode
   }
 
-  static let `default` = HarnessCodeBlockRenderSettings()
+  static let `default` = Self()
 
   func resolved(environmentFontScale: CGFloat) -> HarnessCodeBlockResolvedSettings {
     let scale = fontScaleMode.resolvedScale(environmentFontScale: environmentFontScale)
@@ -25,7 +25,7 @@ struct HarnessCodeBlockRenderSettings {
     )
   }
 
-  func withFontScaleMode(_ mode: HarnessMarkdownFontScaleMode) -> HarnessCodeBlockRenderSettings {
+  func withFontScaleMode(_ mode: HarnessMarkdownFontScaleMode) -> Self {
     var copy = self
     copy.fontScaleMode = mode
     return copy
@@ -37,7 +37,7 @@ struct HarnessCodeBlockTypography {
   var label: HarnessMarkdownFontStyle
   var error: HarnessMarkdownFontStyle
 
-  static let `default` = HarnessCodeBlockTypography(
+  static let `default` = Self(
     code: .system(size: 12, design: .monospaced),
     label: .system(size: 11, weight: .semibold),
     error: .system(size: 12, weight: .semibold)
@@ -70,7 +70,7 @@ struct HarnessCodeBlockColorSettings {
   var border: Color
   var tokens: HarnessCodeTokenColors
 
-  static let `default` = HarnessCodeBlockColorSettings(
+  static let `default` = Self(
     label: HarnessMonitorTheme.secondaryInk,
     error: HarnessMonitorTheme.danger,
     background: HarnessMonitorTheme.ink,
@@ -95,7 +95,7 @@ struct HarnessCodeTokenColors {
   var type: Color
   var whitespace: Color
 
-  static let `default` = HarnessCodeTokenColors(
+  static let `default` = Self(
     comment: HarnessMonitorTheme.secondaryInk,
     deleted: HarnessMonitorTheme.danger,
     heading: HarnessMonitorTheme.accent,
@@ -113,25 +113,36 @@ struct HarnessCodeTokenColors {
   )
 
   func color(for kind: HarnessCodeToken.Kind) -> Color {
+    primaryColor(for: kind) ?? secondaryColor(for: kind) ?? plain
+  }
+
+  private func primaryColor(for kind: HarnessCodeToken.Kind) -> Color? {
     switch kind {
     case .comment:
       comment
-    case .deleted:
-      deleted
     case .heading:
       heading
-    case .inserted:
-      inserted
     case .keyword:
       keyword
     case .literal:
       literal
+    case .plain:
+      plain
+    default:
+      nil
+    }
+  }
+
+  private func secondaryColor(for kind: HarnessCodeToken.Kind) -> Color? {
+    switch kind {
+    case .deleted:
+      deleted
+    case .inserted:
+      inserted
     case .number:
       number
     case .operatorSymbol:
       operatorSymbol
-    case .plain:
-      plain
     case .property:
       property
     case .punctuation:
@@ -142,6 +153,8 @@ struct HarnessCodeTokenColors {
       type
     case .whitespace:
       whitespace
+    default:
+      nil
     }
   }
 }

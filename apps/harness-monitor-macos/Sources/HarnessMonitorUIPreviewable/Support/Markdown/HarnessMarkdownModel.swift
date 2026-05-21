@@ -1,13 +1,13 @@
 import Foundation
 
 struct HarnessMarkdownDocument: Equatable, Sendable {
-  static let empty = HarnessMarkdownDocument(blocks: [])
+  static let empty = Self(blocks: [])
 
   let blocks: [HarnessMarkdownBlock]
 }
 
 indirect enum HarnessMarkdownBlock: Equatable, Sendable {
-  case blockQuote([HarnessMarkdownBlock])
+  case blockQuote([Self])
   case codeBlock(language: HarnessCodeLanguage, source: String, tokens: [HarnessCodeToken])
   case details(HarnessMarkdownDetails)
   case heading(level: Int, inlines: [HarnessMarkdownInline])
@@ -45,13 +45,13 @@ struct HarnessMarkdownTable: Equatable, Sendable {
 indirect enum HarnessMarkdownInline: Equatable, Sendable {
   case autolink(String)
   case code(String)
-  case emphasis([HarnessMarkdownInline])
+  case emphasis([Self])
   case image(HarnessMarkdownImage)
   case lineBreak
-  case link(label: [HarnessMarkdownInline], destination: String, title: String?)
+  case link(label: [Self], destination: String, title: String?)
   case softBreak
-  case strikethrough([HarnessMarkdownInline])
-  case strong([HarnessMarkdownInline])
+  case strikethrough([Self])
+  case strong([Self])
   case text(String)
 }
 

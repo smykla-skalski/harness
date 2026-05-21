@@ -15,7 +15,8 @@ public func applyDependencyRefresh(
   let refreshedItems = normalizedDependencyUpdateItems(refresh.items)
   let droppedIDs = Set(refresh.missingPullRequestIDs)
   let openItemsByID: [String: DependencyUpdateItem] = Dictionary(
-    uniqueKeysWithValues: refreshedItems
+    uniqueKeysWithValues:
+      refreshedItems
       .filter { $0.state == .open }
       .map { ($0.pullRequestID, $0) }
   )

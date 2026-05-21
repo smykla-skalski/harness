@@ -1,5 +1,11 @@
 import Foundation
 
+struct HarnessMarkdownDetailsBlock {
+  let summary: String
+  let body: String
+  let isOpen: Bool
+}
+
 enum HarnessMarkdownHTMLBlocks {
   static func detailsStart(_ line: String) -> Bool? {
     let characters = Array(line.trimmingLeadingSpacesForHTML())
@@ -33,11 +39,11 @@ enum HarnessMarkdownHTMLBlocks {
     return removingComments(from: trimmed).trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
   }
 
-  static func details(from raw: String) -> (summary: String, body: String, isOpen: Bool) {
+  static func details(from raw: String) -> HarnessMarkdownDetailsBlock {
     let source = removingComments(from: raw)
     let characters = Array(source)
     guard let open = firstTag(named: "details", in: characters, closing: false, from: 0) else {
-      return ("Details", source, false)
+      return HarnessMarkdownDetailsBlock(summary: "Details", body: source, isOpen: false)
     }
     let isOpen = open.tag.attributes.keys.contains("open")
     let close = lastClosingTag(named: "details", in: characters) ?? characters.count
@@ -45,13 +51,17 @@ enum HarnessMarkdownHTMLBlocks {
     let innerEnd = max(innerStart, close)
     let inner = String(characters[innerStart..<innerEnd])
     guard let summary = summaryRange(in: Array(inner)) else {
-      return ("Details", inner, isOpen)
+      return HarnessMarkdownDetailsBlock(summary: "Details", body: inner, isOpen: isOpen)
     }
     let innerCharacters = Array(inner)
     let summaryText = String(innerCharacters[(summary.open.end + 1)..<summary.closeStart])
     let before = String(innerCharacters[..<summary.openStart])
     let after = String(innerCharacters[summary.closeEnd...])
-    return (summaryText, [before, after].joined(separator: "\n"), isOpen)
+    return HarnessMarkdownDetailsBlock(
+      summary: summaryText,
+      body: [before, after].joined(separator: "\n"),
+      isOpen: isOpen
+    )
   }
 
   static func removingComments(from source: String) -> String {
@@ -69,13 +79,16 @@ enum HarnessMarkdownHTMLBlocks {
     return result
   }
 
-  private static func summaryRange(in characters: [Character]) -> (
-    openStart: Int, open: HTMLInlineTag, closeStart: Int, closeEnd: Int
-  )? {
+  private static func summaryRange(in characters: [Character]) -> HarnessMarkdownSummaryRange? {
     guard let open = firstTag(named: "summary", in: characters, closing: false, from: 0),
       let close = firstTag(named: "summary", in: characters, closing: true, from: open.tag.end + 1)
     else { return nil }
-    return (open.start, open.tag, close.start, close.tag.end + 1)
+    return HarnessMarkdownSummaryRange(
+      openStart: open.start,
+      open: open.tag,
+      closeStart: close.start,
+      closeEnd: close.tag.end + 1
+    )
   }
 
   private static func firstTag(
@@ -126,6 +139,13 @@ enum HarnessMarkdownHTMLBlocks {
     guard index + needleCharacters.count <= characters.count else { return false }
     return Array(characters[index..<(index + needleCharacters.count)]) == needleCharacters
   }
+}
+
+private struct HarnessMarkdownSummaryRange {
+  let openStart: Int
+  let open: HTMLInlineTag
+  let closeStart: Int
+  let closeEnd: Int
 }
 
 extension String {

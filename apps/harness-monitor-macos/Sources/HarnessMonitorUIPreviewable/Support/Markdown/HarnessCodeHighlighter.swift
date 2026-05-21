@@ -70,7 +70,12 @@ enum HarnessCodeHighlighter {
         appendQuoted(in: characters, from: &index, to: &tokens)
       } else if characters[index].isWhitespace {
         appendRun(
-          in: characters, from: &index, while: \.isWhitespace, kind: .whitespace, to: &tokens)
+          in: characters,
+          from: &index,
+          while: \.isWhitespace,
+          kind: .whitespace,
+          to: &tokens
+        )
       } else if punctuation.contains(characters[index]) {
         tokens.append(.init(text: String(characters[index]), kind: .punctuation))
         index += 1
@@ -79,8 +84,12 @@ enum HarnessCodeHighlighter {
         index += 1
       } else if characters[index].isNumber {
         appendRun(
-          in: characters, from: &index, while: { $0.isNumber || $0 == "." }, kind: .number,
-          to: &tokens)
+          in: characters,
+          from: &index,
+          while: { $0.isNumber || $0 == "." },
+          kind: .number,
+          to: &tokens
+        )
       } else if isIdentifierStart(characters[index]) {
         appendIdentifier(in: characters, from: &index, keywords: keywords, to: &tokens)
       } else {
@@ -102,11 +111,20 @@ enum HarnessCodeHighlighter {
         appendQuoted(in: characters, from: &index, to: &tokens)
       } else if characters[index] == "$" {
         appendRun(
-          in: characters, from: &index, while: { isIdentifierPart($0) || $0 == "$" },
-          kind: .literal, to: &tokens)
+          in: characters,
+          from: &index,
+          while: { isIdentifierPart($0) || $0 == "$" },
+          kind: .literal,
+          to: &tokens
+        )
       } else if characters[index].isWhitespace {
         appendRun(
-          in: characters, from: &index, while: \.isWhitespace, kind: .whitespace, to: &tokens)
+          in: characters,
+          from: &index,
+          while: \.isWhitespace,
+          kind: .whitespace,
+          to: &tokens
+        )
       } else if isIdentifierStart(characters[index]) {
         appendIdentifier(in: characters, from: &index, keywords: shellKeywords, to: &tokens)
       } else {
@@ -127,7 +145,12 @@ enum HarnessCodeHighlighter {
       let character = characters[index]
       if character.isWhitespace {
         appendRun(
-          in: characters, from: &index, while: \.isWhitespace, kind: .whitespace, to: &tokens)
+          in: characters,
+          from: &index,
+          while: \.isWhitespace,
+          kind: .whitespace,
+          to: &tokens
+        )
       } else if ["{", "}", "[", "]", ":", ","].contains(character) {
         tokens.append(.init(text: String(character), kind: .punctuation))
         index += 1
@@ -145,8 +168,8 @@ enum HarnessCodeHighlighter {
   }
 
   private static func highlightYAML(_ source: String) -> [HarnessCodeToken] {
-    source.split(separator: "\n", omittingEmptySubsequences: false).enumerated().flatMap {
-      offset, line in
+    let sourceLines = source.split(separator: "\n", omittingEmptySubsequences: false)
+    return sourceLines.enumerated().flatMap { offset, line in
       var tokens: [HarnessCodeToken] = offset == 0 ? [] : [.init(text: "\n", kind: .whitespace)]
       tokens.append(contentsOf: highlightYAMLLine(String(line)))
       return tokens
@@ -174,8 +197,8 @@ enum HarnessCodeHighlighter {
   }
 
   private static func highlightDiff(_ source: String) -> [HarnessCodeToken] {
-    source.split(separator: "\n", omittingEmptySubsequences: false).enumerated().map {
-      offset, line in
+    let sourceLines = source.split(separator: "\n", omittingEmptySubsequences: false)
+    return sourceLines.enumerated().map { offset, line in
       let prefix = offset == 0 ? "" : "\n"
       let text = String(line)
       let kind: HarnessCodeToken.Kind =
@@ -186,8 +209,8 @@ enum HarnessCodeHighlighter {
   }
 
   private static func highlightMarkdown(_ source: String) -> [HarnessCodeToken] {
-    source.split(separator: "\n", omittingEmptySubsequences: false).enumerated().flatMap {
-      offset, line in
+    let sourceLines = source.split(separator: "\n", omittingEmptySubsequences: false)
+    return sourceLines.enumerated().flatMap { offset, line in
       var tokens: [HarnessCodeToken] = offset == 0 ? [] : [.init(text: "\n", kind: .whitespace)]
       let text = String(line)
       let trimmed = text.trimmingCharacters(in: .whitespaces)

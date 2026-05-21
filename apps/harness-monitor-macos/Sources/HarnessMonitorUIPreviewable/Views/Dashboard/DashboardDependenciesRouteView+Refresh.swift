@@ -9,16 +9,16 @@ extension DashboardDependenciesRouteView {
     guard !items.isEmpty else { return }
     let targetIDs = items.map(\.pullRequestID)
     let coversFullCatalog =
-      !response.items.isEmpty
-      && Set(targetIDs) == Set(response.items.map(\.pullRequestID))
+      !routeResponse.items.isEmpty
+      && Set(targetIDs) == Set(routeResponse.items.map(\.pullRequestID))
     if coversFullCatalog {
       schedulerForceRefreshAll()
       return
     }
     let targets = items.map(\.target)
-    refreshingPullRequestIDs.formUnion(targetIDs)
+    routeRefreshingPullRequestIDs.formUnion(targetIDs)
     Task {
-      defer { refreshingPullRequestIDs.subtract(targetIDs) }
+      defer { routeRefreshingPullRequestIDs.subtract(targetIDs) }
       do {
         let refreshed = try await DashboardDependenciesRemoteLoader.refresh(
           client: client,
@@ -34,10 +34,10 @@ extension DashboardDependenciesRouteView {
   }
 
   func applyRefreshedItems(_ refresh: DependencyUpdatesRefreshResponse) {
-    let nextItems = applyDependencyRefresh(to: response.items, refresh: refresh)
-    response = DependencyUpdatesQueryResponse(
+    let nextItems = applyDependencyRefresh(to: routeResponse.items, refresh: refresh)
+    routeResponse = DependencyUpdatesQueryResponse(
       fetchedAt: refresh.fetchedAt,
-      fromCache: response.fromCache,
+      fromCache: routeResponse.fromCache,
       summary: DependencyUpdatesSummary(items: nextItems),
       items: nextItems
     )
