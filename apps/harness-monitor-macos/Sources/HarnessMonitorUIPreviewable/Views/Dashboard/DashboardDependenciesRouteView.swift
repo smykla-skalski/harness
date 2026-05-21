@@ -44,7 +44,7 @@ struct DashboardDependenciesReloadTaskKey: Equatable {
   let connectionState: HarnessMonitorStore.ConnectionState
 }
 
-private struct DashboardDependenciesQueryRequestParts {
+struct DashboardDependenciesQueryRequestParts {
   let authors: [String]
   let organizations: [String]
   let repositories: [String]
@@ -115,7 +115,7 @@ struct DashboardDependenciesResolvedPreferences: Equatable {
     )
   }
 
-  static func queryRequest(_ parts: DashboardDependenciesQueryRequestParts)
+  fileprivate static func queryRequest(_ parts: DashboardDependenciesQueryRequestParts)
     -> DependencyUpdatesQueryRequest
   {
     DependencyUpdatesQueryRequest(
@@ -179,7 +179,7 @@ struct DashboardDependenciesRouteView: View {
   @SceneStorage("dashboard.dependencies.content-detail-width")
   var contentDetailWidth = SessionContentDetailSplitLayout.defaultContentWidth
 
-  @State private var response = DependencyUpdatesQueryResponse(
+  @State var response = DependencyUpdatesQueryResponse(
     fetchedAt: "",
     fromCache: false,
     summary: DependencyUpdatesSummary(
@@ -192,22 +192,22 @@ struct DashboardDependenciesRouteView: View {
     ),
     items: []
   )
-  @State private var isLoading = false
-  @State private var isBackgroundRefreshing = false
-  @State private var errorMessage: String?
-  @State private var selectedIDs = Set<String>()
-  @State private var isLabelSheetPresented = false
-  @State private var labelDraft = ""
-  @State private var labelTargetItems = [DependencyUpdateItem]()
-  @State private var inFlightActionTitle: String?
-  @State private var resolvedPreferences: DashboardDependenciesResolvedPreferences
-  @State private var presentationWorker = DashboardDependenciesPresentationWorker()
-  @State private var cachedPresentation = DashboardDependenciesPresentation.empty
-  @State private var presentationGeneration: UInt64 = 0
-  @State private var refreshingPullRequestIDs = Set<String>()
-  @State private var scheduler = DashboardDependenciesScheduler()
-  @State private var collapsedRepositories = DashboardDependenciesCollapsedRepositories()
-  @State private var labelMenuDataByRepository: [String: DashboardDependenciesRepoLabelMenuData] =
+  @State var isLoading = false
+  @State var isBackgroundRefreshing = false
+  @State var errorMessage: String?
+  @State var selectedIDs = Set<String>()
+  @State var isLabelSheetPresented = false
+  @State var labelDraft = ""
+  @State var labelTargetItems = [DependencyUpdateItem]()
+  @State var inFlightActionTitle: String?
+  @State var resolvedPreferences: DashboardDependenciesResolvedPreferences
+  @State var presentationWorker = DashboardDependenciesPresentationWorker()
+  @State var cachedPresentation = DashboardDependenciesPresentation.empty
+  @State var presentationGeneration: UInt64 = 0
+  @State var refreshingPullRequestIDs = Set<String>()
+  @State var scheduler = DashboardDependenciesScheduler()
+  @State var collapsedRepositories = DashboardDependenciesCollapsedRepositories()
+  @State var labelMenuDataByRepository: [String: DashboardDependenciesRepoLabelMenuData] =
     [:]
 
   init(
@@ -631,7 +631,9 @@ struct DashboardDependenciesRouteView: View {
       }
     )
   }
+}
 
+extension DashboardDependenciesRouteView {
   func reload(forceRefresh: Bool, backgroundRefresh: Bool = false) async {
     hydrateDependenciesFromCacheIfNeeded()
     guard store.apiClient != nil else {
@@ -871,5 +873,3 @@ struct DashboardDependenciesRouteView: View {
     }
   }
 }
-
-// swiftlint:enable type_body_length
