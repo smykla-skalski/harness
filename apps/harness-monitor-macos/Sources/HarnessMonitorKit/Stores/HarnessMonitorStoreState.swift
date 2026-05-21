@@ -1,5 +1,15 @@
 import Foundation
 
+struct CacheWriteSyncState {
+  var pendingCacheWriteTask: Task<Void, Never>?
+  var pendingCacheWriteTaskToken: UInt64 = 0
+  var pendingTaskBoardSnapshotCacheWriteTask: Task<Void, Never>?
+  var taskBoardSnapshotCacheWriteToken: UInt64 = 0
+  var pendingSessionDetailCacheWriteTask: Task<Void, Never>?
+  var pendingSessionDetailCacheWriteTaskToken: UInt64 = 0
+  var pendingSessionDetailCacheWrites: [String: PendingSessionDetailCacheWrite] = [:]
+}
+
 struct SelectedTimelineLoadState {
   var pageLoadTask: Task<Void, Never>?
   var pageLoadKey: SelectedTimelinePageLoadKey?

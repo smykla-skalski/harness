@@ -1,4 +1,3 @@
-// swiftlint:disable file_length
 import Foundation
 import Observation
 import SwiftData
@@ -11,7 +10,6 @@ struct PendingSessionDetailCacheWrite: Sendable {
 
 @MainActor
 @Observable
-// swiftlint:disable:next type_body_length attributes
 public final class HarnessMonitorStore {
   public let connection: ConnectionSlice
   public let sessionIndex: SessionIndexSlice
@@ -204,9 +202,7 @@ public final class HarnessMonitorStore {
   public var presentingAcpPermissionBatch: AcpPermissionBatch?
   public var resolvingAcpPermissionBatchID: String?
   public var acpPermissionResolutionStateByDecisionID: [String: BatchResolutionState] = [:]
-  @ObservationIgnored var acpPermissionPayloadsByDecisionID:
-    [String: AcpPermissionDecisionPayload] =
-      [:]
+  @ObservationIgnored var acpPermissionPayloadsByDecisionID: [String: AcpPermissionDecisionPayload] = [:]
   var acpPermissionLastSignalAtBySessionID: [String: Date] = [:]
   @ObservationIgnored var acpPermissionPendingTimeoutDecisionIDs: Set<String> = []
   @ObservationIgnored var acpPermissionPendingShutdownDecisionIDs: Set<String> = []
@@ -288,14 +284,7 @@ public final class HarnessMonitorStore {
   @ObservationIgnored var pendingListSelectionTask: Task<Void, Never>?
   @ObservationIgnored var pendingListSelectionTaskToken: UInt64 = 0
   @ObservationIgnored var selectedTimelineLoad = SelectedTimelineLoadState()
-  var pendingCacheWriteTask: Task<Void, Never>?
-  @ObservationIgnored var pendingCacheWriteTaskToken: UInt64 = 0
-  @ObservationIgnored var pendingTaskBoardSnapshotCacheWriteTask: Task<Void, Never>?
-  @ObservationIgnored var taskBoardSnapshotCacheWriteToken: UInt64 = 0
-  @ObservationIgnored var pendingSessionDetailCacheWriteTask: Task<Void, Never>?
-  @ObservationIgnored var pendingSessionDetailCacheWriteTaskToken: UInt64 = 0
-  @ObservationIgnored var pendingSessionDetailCacheWrites:
-    [String: PendingSessionDetailCacheWrite] = [:]
+  @ObservationIgnored var cacheWriteSync = CacheWriteSyncState()
   @ObservationIgnored var suppressSelectedAcpTranscriptCacheWrite = false
   @ObservationIgnored var agentTuiActionRefreshTask: Task<Void, Never>?
   var manifestWatcher: ManifestWatcher?
