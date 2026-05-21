@@ -66,6 +66,21 @@ final class HarnessMonitorWindowShellTests: XCTestCase {
     XCTAssertTrue(source.contains("NSUserInterfaceItemIdentifier(logicalWindowID)"))
   }
 
+  func testSettingsWindowUsesLightweightMCPTracking() throws {
+    let source = try appSourceFile(named: "HarnessMonitorApp+SceneContent.swift")
+    let settingsScene = try source.slice(
+      from: "@ViewBuilder var settingsSceneContent",
+      to: "@ViewBuilder var policyCanvasLabWindowSceneContent"
+    )
+    let dashboardScene = try source.slice(
+      from: "@ViewBuilder var dashboardWindowSceneContent",
+      to: "@ViewBuilder var settingsSceneContent"
+    )
+
+    XCTAssertTrue(settingsScene.contains(".harnessTrackMCPWindow(tracksElements: false)"))
+    XCTAssertTrue(dashboardScene.contains(".harnessTrackMCPWindow()"))
+  }
+
   func testPerfScenarioStateMarkerIsNotInstalledWhenDisabled() throws {
     let source = try appSourceFile(named: "HarnessMonitorAppSceneSupport.swift")
     let sessionRoot = try appSourceFile(named: "SessionWindowRootView.swift")

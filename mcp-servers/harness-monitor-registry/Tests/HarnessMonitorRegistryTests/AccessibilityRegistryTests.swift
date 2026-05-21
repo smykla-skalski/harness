@@ -621,6 +621,51 @@ struct AccessibilityRegistryTests {
   }
 
   @MainActor
+  @Test("window tracking can skip accessibility element harvesting")
+  func windowTrackingCanSkipAccessibilityElementHarvesting() async {
+    let registry = AccessibilityRegistry()
+    let trackingView = WindowTrackingNSView(
+      registry: registry,
+      tracksElements: false,
+      didUpdateElementSyncDelay: .milliseconds(25)
+    )
+    let window = NSWindow(
+      contentRect: NSRect(x: 120, y: 180, width: 420, height: 320),
+      styleMask: [.titled, .closable],
+      backing: .buffered,
+      defer: false
+    )
+    let root = NSView(frame: NSRect(x: 0, y: 0, width: 420, height: 320))
+    let button = NSButton(title: "Start", target: nil, action: nil)
+    button.frame = NSRect(x: 40, y: 40, width: 120, height: 32)
+    button.setAccessibilityIdentifier("settings.controls.start")
+    trackingView.frame = .zero
+    root.addSubview(button)
+    root.addSubview(trackingView)
+    window.contentView = root
+    window.layoutIfNeeded()
+    root.layoutSubtreeIfNeeded()
+
+    defer {
+      window.orderOut(nil)
+      window.contentView = nil
+    }
+
+    #expect(
+      await waitUntil {
+        await registry.allWindows().map(\.id).contains(window.windowNumber)
+      }
+    )
+    #expect(await registry.allElements(windowID: window.windowNumber).isEmpty)
+
+    button.setAccessibilityIdentifier("settings.controls.updated")
+    NotificationCenter.default.post(name: NSWindow.didUpdateNotification, object: window)
+    try? await Task.sleep(for: .milliseconds(50))
+
+    #expect(await registry.allElements(windowID: window.windowNumber).isEmpty)
+  }
+
+  @MainActor
   @Test("routine didUpdate skips full harvest when explicit tracked elements exist")
   func routineDidUpdateSkipsFullHarvestWhenExplicitTrackedElementsExist() async {
     let registry = AccessibilityRegistry()

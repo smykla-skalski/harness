@@ -126,8 +126,9 @@ extension View {
   }
 
   public func harnessTrackMCPWindow(
-    service: HarnessMonitorMCPAccessibilityService = .shared
+    service: HarnessMonitorMCPAccessibilityService = .shared,
+    tracksElements: Bool = true
   ) -> some View {
-    trackWindow(registry: service.registry)
+    trackWindow(registry: service.registry, tracksElements: tracksElements)
   }
 }
