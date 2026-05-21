@@ -89,6 +89,7 @@ struct SettingsBackgroundGallery: View {
   private var recentStorageValues = ""
   @State private var systemBackgroundOptions: [HarnessMonitorBackgroundSelection] =
     HarnessMonitorBackgroundSelection.systemLibrary
+  @State private var recentItems: [HarnessMonitorBackgroundSelection] = []
 
   private static let maxRecents = 8
   private static let recentTileWidth: CGFloat = 140
@@ -108,11 +109,13 @@ struct SettingsBackgroundGallery: View {
     }
   }
 
-  private var recentItems: [HarnessMonitorBackgroundSelection] {
-    SettingsBackgroundGalleryRecents.items(
+  private func syncRecentItems() {
+    let parsed = SettingsBackgroundGalleryRecents.items(
       from: recentStorageValues,
       maxItems: Self.maxRecents
     )
+    guard parsed != recentItems else { return }
+    recentItems = parsed
   }
 
   private var recentStateLabel: String {
@@ -204,6 +207,9 @@ struct SettingsBackgroundGallery: View {
     }
     .task(id: collection) {
       await refreshSystemBackgroundOptionsIfNeeded()
+    }
+    .onChange(of: recentStorageValues, initial: true) { _, _ in
+      syncRecentItems()
     }
   }
 
