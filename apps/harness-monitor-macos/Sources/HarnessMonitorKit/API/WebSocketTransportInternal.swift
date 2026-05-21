@@ -195,7 +195,7 @@ extension WebSocketTransport {
   /// Maximum internal WS reconnection attempts before giving up and
   /// letting the store-level retry escalate to a full re-bootstrap
   /// (which re-reads the daemon manifest and discovers the new port).
-  private static let maxReconnectAttempts = reconnectDelays.count
+  static let maxReconnectAttempts = reconnectDelays.count
 
   /// True when the error means the remote port is gone (daemon process
   /// died or was killed). Retrying the same endpoint will never succeed —
