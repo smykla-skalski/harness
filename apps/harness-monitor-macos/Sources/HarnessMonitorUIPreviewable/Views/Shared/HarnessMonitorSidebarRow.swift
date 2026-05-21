@@ -3,7 +3,7 @@ import SwiftUI
 
 struct HarnessMonitorSidebarRow: View {
   let title: String
-  var subtitle: String? = nil
+  var subtitle: String?
   let systemImage: String
   var severityShape: HarnessMonitorSidebarSeverityShape = .none
   var severityTint: Color = .gray

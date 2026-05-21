@@ -317,7 +317,7 @@ public final class HarnessMonitorStore {
   var initialConnectRefreshRetryGracePeriod: Duration = .seconds(2)
   var initialConnectRefreshRetryInterval: Duration = .milliseconds(200)
   var initialTaskBoardConfirmationGracePeriod: Duration = .seconds(5)
-  var initialTaskBoardConfirmationRetryInterval: Duration = .milliseconds(250)
+  var taskBoardConfirmationRetryInterval: Duration = .milliseconds(250)
   var acpInspectGracePeriod: Duration = .seconds(2)
   var acpInspectRecoveryDelays: [Duration] = [.seconds(1), .seconds(2), .seconds(4)]
   var managedLaunchAgentRefreshMinimumInterval: Duration = .seconds(10)
@@ -376,7 +376,7 @@ public final class HarnessMonitorStore {
   var pendingCacheWriteTask: Task<Void, Never>?
   @ObservationIgnored var pendingCacheWriteTaskToken: UInt64 = 0
   @ObservationIgnored var pendingTaskBoardSnapshotCacheWriteTask: Task<Void, Never>?
-  @ObservationIgnored var pendingTaskBoardSnapshotCacheWriteTaskToken: UInt64 = 0
+  @ObservationIgnored var taskBoardSnapshotCacheWriteToken: UInt64 = 0
   @ObservationIgnored var pendingSessionDetailCacheWriteTask: Task<Void, Never>?
   @ObservationIgnored var pendingSessionDetailCacheWriteTaskToken: UInt64 = 0
   @ObservationIgnored var pendingSessionDetailCacheWrites:

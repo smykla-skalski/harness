@@ -35,7 +35,7 @@ struct SettingsDependenciesSection: View {
         .accessibilityIdentifier(HarnessMonitorAccessibility.settingsDependenciesAuthorsField)
       TextField("Excluded Repositories", text: $draft.excludeRepositoriesText)
         .accessibilityIdentifier(
-          HarnessMonitorAccessibility.settingsDependenciesExcludedRepositoriesField
+          HarnessMonitorAccessibility.settingsDependenciesExcludedReposField
         )
     } header: {
       Text("Sources")

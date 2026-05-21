@@ -277,7 +277,7 @@ struct SettingsRepositoriesSection: View {
           variant: .bordered,
           isLoading: isCatalogLoading,
           accessibilityIdentifier: HarnessMonitorAccessibility
-            .settingsRepositoriesOrganizationLoadButton,
+            .settingsRepositoriesOrgLoadButton,
           action: { await loadCatalogForCurrentOrganization() }
         )
         .disabled(normalizedCatalogOrganization == nil)
@@ -323,7 +323,7 @@ struct SettingsRepositoriesSection: View {
             .harnessActionButtonStyle(variant: .bordered, tint: .secondary)
             .disabled(catalogSelection.isEmpty)
             .accessibilityIdentifier(
-              HarnessMonitorAccessibility.settingsRepositoriesCatalogAddSelectedButton
+              HarnessMonitorAccessibility.settingsRepositoriesCatalogAddButton
             )
 
             Button("Add All") {

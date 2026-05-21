@@ -204,7 +204,7 @@ struct TaskBoardInlineCodeText: View {
   var foregroundStyle: Color = .primary
   var codeForeground: Color = HarnessMonitorTheme.ink
   var codeBackground: Color = HarnessMonitorTheme.accent.opacity(0.10)
-  var lineLimit: Int? = nil
+  var lineLimit: Int?
   var truncationMode: Text.TruncationMode = .tail
   var multilineTextAlignment: TextAlignment = .leading
 

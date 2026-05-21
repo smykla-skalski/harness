@@ -162,7 +162,7 @@ struct DashboardDependenciesRouteView: View {
       contentWidth: $contentDetailWidth,
       commitContentWidth: { contentDetailWidth = $0 },
       dividerAccessibilityIdentifier:
-        HarnessMonitorAccessibility.dashboardDependenciesContentDetailDivider
+        HarnessMonitorAccessibility.dashboardDependenciesDetailDivider
     ) {
       contentPane
     } detail: {

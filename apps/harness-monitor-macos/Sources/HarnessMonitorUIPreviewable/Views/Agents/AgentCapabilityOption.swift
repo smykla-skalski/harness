@@ -270,7 +270,7 @@ struct AgentCapabilityOption: Identifiable, Equatable {
     acpHostBridgeReady: Bool,
     codexHostBridgeReady: Bool
   ) -> Self {
-    AgentCapabilityOption(
+    Self(
       id: id,
       title: title,
       transportChoices: transportChoices,
