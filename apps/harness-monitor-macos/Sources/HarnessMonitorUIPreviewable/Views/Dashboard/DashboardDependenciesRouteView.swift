@@ -1153,7 +1153,7 @@ private struct DashboardDependenciesControlStrip: View {
         Text(mode.title).tag(mode.rawValue)
       }
     }
-    .pickerStyle(.segmented)
+    .pickerStyle(.menu)
     .accessibilityIdentifier(HarnessMonitorAccessibility.dashboardDependenciesSelectionStatus)
   }
 
