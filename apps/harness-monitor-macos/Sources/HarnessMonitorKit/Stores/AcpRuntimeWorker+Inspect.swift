@@ -100,7 +100,7 @@ extension AcpRuntimeWorker {
 
   func waitForIdle() async {}
 
-  private static func toolCallTimelineMetadata(
+  static func toolCallTimelineMetadata(
     for payload: AcpEventBatchPayload,
     crosswalk: AcpAgentIdentityCrosswalk
   ) -> AcpToolCallTimelineMetadata {
@@ -125,7 +125,7 @@ extension AcpRuntimeWorker {
     )
   }
 
-  private static func sortedInspectSnapshots(
+  static func sortedInspectSnapshots(
     _ snapshots: [AcpAgentInspectSnapshot]
   ) -> [AcpAgentInspectSnapshot] {
     snapshots.sorted {
@@ -136,11 +136,11 @@ extension AcpRuntimeWorker {
     }
   }
 
-  private static func sortedAgents(_ snapshots: [AcpAgentSnapshot]) -> [AcpAgentSnapshot] {
+  static func sortedAgents(_ snapshots: [AcpAgentSnapshot]) -> [AcpAgentSnapshot] {
     snapshots.sorted(by: agentPrecedes)
   }
 
-  private static func upsertingAgent(
+  static func upsertingAgent(
     _ snapshot: AcpAgentSnapshot,
     into snapshots: [AcpAgentSnapshot]
   ) -> [AcpAgentSnapshot] {
@@ -152,7 +152,7 @@ extension AcpRuntimeWorker {
     return result
   }
 
-  private static func agentPrecedes(
+  static func agentPrecedes(
     _ lhs: AcpAgentSnapshot,
     _ rhs: AcpAgentSnapshot
   ) -> Bool {
@@ -162,7 +162,7 @@ extension AcpRuntimeWorker {
     return lhs.sessionAgentID < rhs.sessionAgentID
   }
 
-  private static func mergedPermissionBatches(
+  static func mergedPermissionBatches(
     primary: [AcpPermissionBatch],
     secondary: [AcpPermissionBatch],
     preferSecondary: Bool
@@ -182,7 +182,7 @@ extension AcpRuntimeWorker {
     return Array(byBatchID.values)
   }
 
-  private static func shouldReplacePermissionBatch(
+  static func shouldReplacePermissionBatch(
     existing: AcpPermissionBatch?,
     incoming: AcpPermissionBatch,
     preferSecondary: Bool
@@ -196,7 +196,7 @@ extension AcpRuntimeWorker {
     return incoming.createdAt >= existing.createdAt
   }
 
-  private static func upsertingPermissionBatch(
+  static func upsertingPermissionBatch(
     _ batch: AcpPermissionBatch,
     into batches: [AcpPermissionBatch]
   ) -> [AcpPermissionBatch] {
@@ -208,7 +208,7 @@ extension AcpRuntimeWorker {
     return result
   }
 
-  private static func permissionBatchPrecedes(
+  static func permissionBatchPrecedes(
     _ lhs: AcpPermissionBatch,
     _ rhs: AcpPermissionBatch
   ) -> Bool {
@@ -218,7 +218,7 @@ extension AcpRuntimeWorker {
     return lhs.batchId < rhs.batchId
   }
 
-  private static func staleDecisionIDsForRestartedRuntime(
+  static func staleDecisionIDsForRestartedRuntime(
     replacedBy snapshot: AcpAgentSnapshot,
     currentAgents: [AcpAgentSnapshot],
     standalonePermissionBatches: inout [AcpPermissionBatch]
@@ -245,7 +245,7 @@ extension AcpRuntimeWorker {
     return Set(staleBatches.map { AcpPermissionDecisionPayload.decisionID(for: $0.batchId) })
   }
 
-  private static func reconciledInspectSample(
+  static func reconciledInspectSample(
     _ sample: AcpInspectSample?,
     with snapshot: AcpAgentSnapshot
   ) -> AcpInspectSample? {
@@ -263,13 +263,13 @@ extension AcpRuntimeWorker {
     })
   }
 
-  private static func hasRecoverableMissingInspectEntries(
+  static func hasRecoverableMissingInspectEntries(
     _ entries: [AcpRuntimeIdentity: AcpInspectSyncEntry]
   ) -> Bool {
     entries.values.contains { $0.phase != .unavailable }
   }
 
-  private static func reconciledInspectSyncEntries(
+  static func reconciledInspectSyncEntries(
     activeAgents: [AcpAgentSnapshot],
     inspectedAgents: [AcpAgentInspectSnapshot],
     currentEntries: [AcpRuntimeIdentity: AcpInspectSyncEntry],
