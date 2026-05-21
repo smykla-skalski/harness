@@ -212,27 +212,6 @@ struct RenderedTopCause<'a> {
     summary: &'a str,
 }
 
-#[derive(Serialize, tabled::Tabled)]
-pub(super) struct RenderedMarkdownRow<'a> {
-    line: usize,
-    severity: IssueSeverity,
-    category: IssueCategory,
-    code: IssueCode,
-    summary: &'a str,
-}
-
-impl<'a> From<&'a Issue> for RenderedMarkdownRow<'a> {
-    fn from(issue: &'a Issue) -> Self {
-        Self {
-            line: issue.line,
-            severity: issue.severity,
-            category: issue.category,
-            code: issue.code,
-            summary: &issue.summary,
-        }
-    }
-}
-
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 pub(super) struct SarifProperties<'a> {

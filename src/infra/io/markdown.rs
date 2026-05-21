@@ -1,12 +1,22 @@
 use std::path::Path;
 
 use serde_json::Value;
-use tabled::builder::Builder;
-use tabled::settings::Style;
 
 use crate::errors::{CliError, CliErrorKind};
 
 use super::{read_text, write_text};
+
+/// Format a GitHub-flavored markdown table from headers and rows. No trailing newline.
+#[must_use]
+pub fn format_markdown_table(headers: &[&str], rows: &[Vec<String>]) -> String {
+    let mut lines: Vec<String> = Vec::with_capacity(2 + rows.len());
+    lines.push(format!("| {} |", headers.join(" | ")));
+    lines.push(format!("|{}", " --- |".repeat(headers.len())));
+    for row in rows {
+        lines.push(format!("| {} |", row.join(" | ")));
+    }
+    lines.join("\n")
+}
 
 /// Append a row to a markdown table file, creating the file with headers if needed.
 ///
@@ -49,10 +59,7 @@ pub fn append_markdown_row(path: &Path, headers: &[&str], values: &[&str]) -> Re
             })
             .collect::<Vec<_>>()
             .join(" ");
-        let mut builder = Builder::default();
-        builder.push_record(headers.iter().copied());
-        let mut table = builder.build();
-        table.with(Style::markdown());
+        let table = format_markdown_table(headers, &[]);
         format!("# {title}\n\n{table}\n")
     };
     let escaped: Vec<String> = values
