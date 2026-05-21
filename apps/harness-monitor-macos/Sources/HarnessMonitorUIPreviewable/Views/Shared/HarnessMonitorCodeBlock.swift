@@ -36,17 +36,22 @@ struct HarnessMonitorCodeBlock: View {
 
   @Environment(\.colorSchemeContrast)
   private var colorSchemeContrast
+  @Environment(\.fontScale)
+  private var environmentFontScale
 
   let presentation: HarnessCodeBlockPresentation
+  let settings: HarnessCodeBlockRenderSettings
   let chrome: Chrome
   let wrapLongLines: Bool
 
   init(
     presentation: HarnessCodeBlockPresentation,
+    settings: HarnessCodeBlockRenderSettings = .default,
     chrome: Chrome = .card,
     wrapLongLines: Bool = false
   ) {
     self.presentation = presentation
+    self.settings = settings
     self.chrome = chrome
     self.wrapLongLines = wrapLongLines
   }
@@ -59,10 +64,10 @@ struct HarnessMonitorCodeBlock: View {
     }
     .padding(contentPadding)
     .frame(maxWidth: .infinity, alignment: .leading)
-    .background { backgroundShape.fill(HarnessMonitorTheme.ink.opacity(backgroundOpacity)) }
+    .background { backgroundShape.fill(style.colors.background.opacity(backgroundOpacity)) }
     .overlay {
       backgroundShape.stroke(
-        HarnessMonitorTheme.controlBorder.opacity(borderOpacity),
+        style.colors.border.opacity(borderOpacity),
         lineWidth: borderLineWidth
       )
     }
@@ -72,8 +77,8 @@ struct HarnessMonitorCodeBlock: View {
   private var header: some View {
     HStack(spacing: HarnessMonitorTheme.spacingSM) {
       Text(presentation.language.displayName ?? "Code")
-        .scaledFont(.caption2.weight(.semibold))
-        .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+        .font(style.typography.label.font)
+        .foregroundStyle(style.colors.label)
       Spacer(minLength: HarnessMonitorTheme.spacingSM)
       Button {
         HarnessMonitorClipboard.copy(presentation.source)
@@ -90,8 +95,8 @@ struct HarnessMonitorCodeBlock: View {
   @ViewBuilder private var errorMessage: some View {
     if let errorMessage = presentation.errorMessage {
       Label(errorMessage, systemImage: "exclamationmark.triangle.fill")
-        .scaledFont(.caption.weight(.semibold))
-        .foregroundStyle(HarnessMonitorTheme.danger)
+        .font(style.typography.error.font)
+        .foregroundStyle(style.colors.error)
         .fixedSize(horizontal: false, vertical: true)
     }
   }
@@ -112,9 +117,18 @@ struct HarnessMonitorCodeBlock: View {
   }
 
   private var codeText: some View {
-    Text(presentation.attributedText)
-      .scaledFont(.caption.monospaced())
-      .textSelection(.enabled)
+    Text(
+      HarnessCodeHighlighter.makeAttributedString(
+        from: presentation.tokens,
+        colors: style.colors.tokens
+      )
+    )
+    .font(style.typography.code.font)
+    .textSelection(.enabled)
+  }
+
+  private var style: HarnessCodeBlockResolvedSettings {
+    settings.resolved(environmentFontScale: environmentFontScale)
   }
 
   private var contentPadding: CGFloat {
