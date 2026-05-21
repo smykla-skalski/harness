@@ -13,7 +13,10 @@ final class PolicyCanvasLabWindowViewTests: XCTestCase {
     )
 
     XCTAssertFalse(seed.allowsEmptyLiveSnapshot)
-    XCTAssertEqual(seed.document.nodes.map(\.id), PreviewFixtures.policyCanvasPipelineDocument().nodes.map(\.id))
+    XCTAssertEqual(
+      seed.document.nodes.map(\.id),
+      PreviewFixtures.policyCanvasPipelineDocument().nodes.map(\.id)
+    )
     XCTAssertEqual(seed.audit?.activeRevision, seed.document.revision)
   }
 

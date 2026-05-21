@@ -30,11 +30,17 @@ struct DashboardDependenciesSearchSuggestionsTests {
     let items = [
       item(id: "pr-repo", repository: "kong/kuma", number: 10, title: "Unrelated"),
       item(
-        id: "pr-author", repository: "kong/a", number: 11, title: "Unrelated",
+        id: "pr-author",
+        repository: "kong/a",
+        number: 11,
+        title: "Unrelated",
         authorLogin: "smykla"
       ),
       item(
-        id: "pr-label", repository: "kong/b", number: 12, title: "Unrelated",
+        id: "pr-label",
+        repository: "kong/b",
+        number: 12,
+        title: "Unrelated",
         labels: ["security"]
       ),
       item(id: "pr-number", repository: "kong/c", number: 4242, title: "Unrelated"),

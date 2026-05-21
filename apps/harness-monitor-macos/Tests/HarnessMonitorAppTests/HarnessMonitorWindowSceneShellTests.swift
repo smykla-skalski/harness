@@ -86,7 +86,11 @@ final class HarnessMonitorWindowShellTests: XCTestCase {
     let sessionRoot = try appSourceFile(named: "SessionWindowRootView.swift")
 
     XCTAssertTrue(source.contains(".modifier(PerfScenarioStateMarker(text: perfScenarioStateText))"))
-    XCTAssertTrue(sessionRoot.contains(".modifier(PerfScenarioStateMarker(text: sessionPerfScenarioStateText))"))
+    XCTAssertTrue(
+      sessionRoot.contains(
+        ".modifier(PerfScenarioStateMarker(text: sessionPerfScenarioStateText))"
+      )
+    )
     XCTAssertTrue(source.contains("struct PerfScenarioStateMarker: ViewModifier"))
     XCTAssertFalse(source.contains(".overlay {\n        if let perfScenarioStateText"))
   }
