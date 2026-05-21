@@ -312,13 +312,13 @@ private struct HarnessMarkdownListView: View {
       .controlSize(.small)
       .allowsHitTesting(false)
       .frame(width: metrics.columnWidth, height: metrics.firstLineHeight, alignment: .center)
-      .offset(y: metrics.markerVisualYOffset)
+      .offset(y: metrics.firstLineMarkerYOffset)
     } else if ordered {
       Text("\(start + index).")
         .font(style.typography.listMarker.font)
         .foregroundStyle(style.colors.secondaryText)
         .frame(width: metrics.columnWidth, height: metrics.firstLineHeight, alignment: .trailing)
-        .offset(y: metrics.markerVisualYOffset)
+        .offset(y: metrics.firstLineMarkerYOffset)
     } else {
       Text("•")
         .font(style.typography.listMarker.font)
@@ -328,7 +328,7 @@ private struct HarnessMarkdownListView: View {
           height: metrics.firstLineHeight,
           alignment: .leading
         )
-        .offset(y: metrics.markerVisualYOffset)
+        .offset(y: metrics.firstLineMarkerYOffset)
     }
   }
 }
