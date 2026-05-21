@@ -320,7 +320,7 @@ extension HarnessMonitorStoreSelectionFlowTests {
     }
 
     #expect(
-      store.pendingCacheWriteTask != nil || true,
+      store.cacheWriteSync.pendingCacheWriteTask != nil || true,
       "At most one cache write task should exist at any time"
     )
   }

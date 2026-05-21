@@ -74,12 +74,12 @@ extension HarnessMonitorStoreDatabaseTests {
       ))
 
     store.applySessionSummaryUpdate(summary)
-    #expect(store.pendingCacheWriteTask != nil)
+    #expect(store.cacheWriteSync.pendingCacheWriteTask != nil)
 
     store.stopAllStreams()
     try? await Task.sleep(for: .milliseconds(50))
 
-    #expect(store.pendingCacheWriteTask == nil)
+    #expect(store.cacheWriteSync.pendingCacheWriteTask == nil)
     #expect(store.persistedSessionCount == 0)
     if case .some = await store.loadCachedSessionList() {
       Issue.record("Expected cancelled cache write task to leave the cache unchanged")
