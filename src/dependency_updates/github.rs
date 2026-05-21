@@ -1,4 +1,4 @@
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::slice;
 use std::sync::OnceLock;
 
@@ -10,13 +10,17 @@ use crate::errors::{CliError, CliErrorKind};
 use crate::github_api_errors;
 use crate::task_board::github::{GitHubApiAutomationClient, GitHubAutomationClient};
 
+mod ingest;
 mod mapping;
+mod pagination;
 mod queries;
 mod types;
 
+use ingest::{ingest_nodes_chunk, ingest_search_node};
 use mapping::{
-    action_result, convert_node, github_project_config, next_cursor_or_scope_limit, scopes,
+    action_result, github_project_config, next_cursor_or_scope_limit, scopes, NodeContinuation,
 };
+use pagination::resolve_continuation;
 use queries::{
     APPROVE_MUTATION, NODES_BY_IDS_QUERY, ORGANIZATION_REPOSITORIES_QUERY,
     REREQUEST_CHECK_SUITE_MUTATION, SEARCH_QUERY,
@@ -27,11 +31,23 @@ use super::{
     DependencyUpdateActionKind, DependencyUpdateActionOutcome, DependencyUpdateActionResult,
     DependencyUpdateCheck, DependencyUpdateCheckConclusion, DependencyUpdateCheckRunStatus,
     DependencyUpdateCheckStatus, DependencyUpdateItem, DependencyUpdateMergeableState,
-    DependencyUpdatePullRequestState, DependencyUpdateReview, DependencyUpdateReviewEventState,
-    DependencyUpdateReviewStatus, DependencyUpdateTarget, DependencyUpdatesApproveRequest,
-    DependencyUpdatesAutoRequest, DependencyUpdatesLabelRequest, DependencyUpdatesMergeRequest,
-    DependencyUpdatesQueryRequest, DependencyUpdatesRerunChecksRequest,
+    DependencyUpdatePullRequestState, DependencyUpdateRepositoryLabel, DependencyUpdateReview,
+    DependencyUpdateReviewEventState, DependencyUpdateReviewStatus, DependencyUpdateTarget,
+    DependencyUpdatesApproveRequest, DependencyUpdatesAutoRequest, DependencyUpdatesLabelRequest,
+    DependencyUpdatesMergeRequest, DependencyUpdatesQueryRequest,
+    DependencyUpdatesRerunChecksRequest,
 };
+
+pub(crate) struct DependencyUpdatesFetch {
+    pub items: Vec<DependencyUpdateItem>,
+    pub repository_labels: BTreeMap<String, Vec<DependencyUpdateRepositoryLabel>>,
+}
+
+pub(crate) struct DependencyUpdatesFetchByIds {
+    pub items: Vec<DependencyUpdateItem>,
+    pub missing: Vec<String>,
+    pub repository_labels: BTreeMap<String, Vec<DependencyUpdateRepositoryLabel>>,
+}
 
 const GRAPHQL_PAGE_SIZE: u32 = 100;
 const SEARCH_PAGE_CAP: u32 = 10;
@@ -66,57 +82,98 @@ impl DependencyUpdatesGitHubClient {
     pub(crate) async fn fetch_updates(
         &self,
         request: &DependencyUpdatesQueryRequest,
-    ) -> Result<Vec<DependencyUpdateItem>, CliError> {
-        let mut deduped = BTreeMap::new();
+    ) -> Result<DependencyUpdatesFetch, CliError> {
+        let mut deduped: BTreeMap<String, DependencyUpdateItem> = BTreeMap::new();
+        let mut continuations: BTreeMap<String, NodeContinuation> = BTreeMap::new();
+        let mut repository_labels: BTreeMap<String, Vec<DependencyUpdateRepositoryLabel>> =
+            BTreeMap::new();
+        let mut repository_label_continuation_seen: BTreeSet<String> = BTreeSet::new();
         for scope in scopes(request)? {
-            let mut cursor = None;
-            let mut page = 1_u32;
-            loop {
-                let response: SearchResponse = self
-                    .client
-                    .graphql(&json!({
-                        "query": SEARCH_QUERY,
-                        "variables": {
-                            "query": scope.query,
-                            "after": cursor.as_deref(),
-                        },
-                    }))
-                    .await
-                    .map_err(operation_error)?;
-                for node in response.search.nodes {
-                    let item = convert_node(node)?;
-                    if request
-                        .normalized_exclude_repositories()
-                        .contains(&item.repository)
-                    {
-                        continue;
-                    }
-                    deduped.insert(format!("{}#{}", item.repository, item.number), item);
-                }
-                if !response.search.page_info.has_next_page {
-                    break;
-                }
-                cursor = next_cursor_or_scope_limit(
-                    &response.search.page_info,
-                    page,
-                    SEARCH_PAGE_CAP,
-                    &format!("dependency-updates query '{}'", scope.query),
-                )?;
-                page += 1;
+            self.fetch_updates_scope(
+                request,
+                &scope,
+                &mut deduped,
+                &mut continuations,
+                &mut repository_labels,
+                &mut repository_label_continuation_seen,
+            )
+            .await?;
+        }
+        for (key, continuation) in continuations {
+            if let Some(item) = deduped.get_mut(&key) {
+                resolve_continuation(&self.client, item, &mut repository_labels, continuation)
+                    .await?;
             }
         }
-        Ok(deduped.into_values().collect())
+        Ok(DependencyUpdatesFetch {
+            items: deduped.into_values().collect(),
+            repository_labels,
+        })
+    }
+
+    async fn fetch_updates_scope(
+        &self,
+        request: &DependencyUpdatesQueryRequest,
+        scope: &mapping::ScopeQuery,
+        deduped: &mut BTreeMap<String, DependencyUpdateItem>,
+        continuations: &mut BTreeMap<String, NodeContinuation>,
+        repository_labels: &mut BTreeMap<String, Vec<DependencyUpdateRepositoryLabel>>,
+        repository_label_continuation_seen: &mut BTreeSet<String>,
+    ) -> Result<(), CliError> {
+        let mut cursor = None;
+        let mut page = 1_u32;
+        loop {
+            let response: SearchResponse = self
+                .client
+                .graphql(&json!({
+                    "query": SEARCH_QUERY,
+                    "variables": {
+                        "query": scope.query,
+                        "after": cursor.as_deref(),
+                    },
+                }))
+                .await
+                .map_err(operation_error)?;
+            for node in response.search.nodes {
+                ingest_search_node(
+                    node,
+                    request,
+                    deduped,
+                    continuations,
+                    repository_labels,
+                    repository_label_continuation_seen,
+                )?;
+            }
+            if !response.search.page_info.has_next_page {
+                return Ok(());
+            }
+            cursor = next_cursor_or_scope_limit(
+                &response.search.page_info,
+                page,
+                SEARCH_PAGE_CAP,
+                &format!("dependency-updates query '{}'", scope.query),
+            )?;
+            page += 1;
+        }
     }
 
     pub(crate) async fn fetch_by_ids(
         &self,
         ids: &[String],
-    ) -> Result<(Vec<DependencyUpdateItem>, Vec<String>), CliError> {
+    ) -> Result<DependencyUpdatesFetchByIds, CliError> {
         if ids.is_empty() {
-            return Ok((Vec::new(), Vec::new()));
+            return Ok(DependencyUpdatesFetchByIds {
+                items: Vec::new(),
+                missing: Vec::new(),
+                repository_labels: BTreeMap::new(),
+            });
         }
-        let mut items = Vec::with_capacity(ids.len());
+        let mut items: Vec<DependencyUpdateItem> = Vec::with_capacity(ids.len());
+        let mut continuations: Vec<NodeContinuation> = Vec::new();
         let mut missing = Vec::new();
+        let mut repository_labels: BTreeMap<String, Vec<DependencyUpdateRepositoryLabel>> =
+            BTreeMap::new();
+        let mut repository_label_continuation_seen: BTreeSet<String> = BTreeSet::new();
         for chunk in ids.chunks(NODES_BATCH_SIZE) {
             let response: NodesResponse = self
                 .client
@@ -126,18 +183,30 @@ impl DependencyUpdatesGitHubClient {
                 }))
                 .await
                 .map_err(operation_error)?;
-            for (offset, node) in response.nodes.into_iter().enumerate() {
-                match node {
-                    Some(node) => items.push(convert_node(node)?),
-                    None => {
-                        if let Some(id) = chunk.get(offset) {
-                            missing.push(id.clone());
-                        }
-                    }
-                }
+            ingest_nodes_chunk(
+                response.nodes,
+                chunk,
+                &mut items,
+                &mut continuations,
+                &mut missing,
+                &mut repository_labels,
+                &mut repository_label_continuation_seen,
+            )?;
+        }
+        for continuation in continuations {
+            if let Some(item) = items
+                .iter_mut()
+                .find(|item| item.pull_request_id == continuation.pull_request_id)
+            {
+                resolve_continuation(&self.client, item, &mut repository_labels, continuation)
+                    .await?;
             }
         }
-        Ok((items, missing))
+        Ok(DependencyUpdatesFetchByIds {
+            items,
+            missing,
+            repository_labels,
+        })
     }
 
     pub(crate) async fn catalog_organization_repositories(

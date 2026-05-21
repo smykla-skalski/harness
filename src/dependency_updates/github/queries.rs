@@ -20,12 +20,21 @@ query SearchDependencyUpdates($query: String!, $after: String) {
         repository {
           id
           nameWithOwner
+          labels(first: 100) {
+            pageInfo { hasNextPage endCursor }
+            nodes {
+              name
+              color
+              description
+            }
+          }
         }
         commits(last: 1) {
           nodes {
             commit {
               statusCheckRollup {
-                contexts(first: 50) {
+                contexts(first: 100) {
+                  pageInfo { hasNextPage endCursor }
                   nodes {
                     ... on CheckRun {
                       name
@@ -43,13 +52,15 @@ query SearchDependencyUpdates($query: String!, $after: String) {
             }
           }
         }
-        reviews(last: 10) {
+        reviews(first: 100) {
+          pageInfo { hasNextPage endCursor }
           nodes {
             author { login }
             state
           }
         }
-        labels(first: 20) {
+        labels(first: 100) {
+          pageInfo { hasNextPage endCursor }
           nodes { name }
         }
         additions
@@ -95,12 +106,21 @@ query DependencyUpdateNodes($ids: [ID!]!) {
       repository {
         id
         nameWithOwner
+        labels(first: 100) {
+          pageInfo { hasNextPage endCursor }
+          nodes {
+            name
+            color
+            description
+          }
+        }
       }
       commits(last: 1) {
         nodes {
           commit {
             statusCheckRollup {
-              contexts(first: 50) {
+              contexts(first: 100) {
+                pageInfo { hasNextPage endCursor }
                 nodes {
                   ... on CheckRun {
                     name
@@ -118,19 +138,100 @@ query DependencyUpdateNodes($ids: [ID!]!) {
           }
         }
       }
-      reviews(last: 10) {
+      reviews(first: 100) {
+        pageInfo { hasNextPage endCursor }
         nodes {
           author { login }
           state
         }
       }
-      labels(first: 20) {
+      labels(first: 100) {
+        pageInfo { hasNextPage endCursor }
         nodes { name }
       }
       additions
       deletions
       createdAt
       updatedAt
+    }
+  }
+}
+";
+
+pub(super) const PR_LABELS_PAGE_QUERY: &str = r"
+query DependencyUpdatePullRequestLabelsPage($id: ID!, $after: String) {
+  node(id: $id) {
+    ... on PullRequest {
+      labels(first: 100, after: $after) {
+        pageInfo { hasNextPage endCursor }
+        nodes { name }
+      }
+    }
+  }
+}
+";
+
+pub(super) const PR_REVIEWS_PAGE_QUERY: &str = r"
+query DependencyUpdatePullRequestReviewsPage($id: ID!, $after: String) {
+  node(id: $id) {
+    ... on PullRequest {
+      reviews(first: 100, after: $after) {
+        pageInfo { hasNextPage endCursor }
+        nodes {
+          author { login }
+          state
+        }
+      }
+    }
+  }
+}
+";
+
+pub(super) const PR_CHECKS_PAGE_QUERY: &str = r"
+query DependencyUpdatePullRequestChecksPage($id: ID!, $after: String) {
+  node(id: $id) {
+    ... on PullRequest {
+      commits(last: 1) {
+        nodes {
+          commit {
+            statusCheckRollup {
+              contexts(first: 100, after: $after) {
+                pageInfo { hasNextPage endCursor }
+                nodes {
+                  ... on CheckRun {
+                    name
+                    status
+                    conclusion
+                    checkSuite { id }
+                  }
+                  ... on StatusContext {
+                    context
+                    state
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
+";
+
+pub(super) const REPO_LABELS_PAGE_QUERY: &str = r"
+query DependencyUpdateRepositoryLabelsPage($id: ID!, $after: String) {
+  node(id: $id) {
+    ... on Repository {
+      nameWithOwner
+      labels(first: 100, after: $after) {
+        pageInfo { hasNextPage endCursor }
+        nodes {
+          name
+          color
+          description
+        }
+      }
     }
   }
 }

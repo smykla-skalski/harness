@@ -5,15 +5,44 @@ use chrono::{DateTime, Utc};
 use crate::errors::{CliError, CliErrorKind};
 use crate::task_board::github::GitHubProjectConfig;
 
-use super::types::{CommitConnection, PageInfo, SearchNode, StatusContextNode};
+use super::types::{
+    CommitConnection, LabelNode, PageInfo, RepositoryLabelNode, ReviewNode, SearchNode,
+    StatusContextNode,
+};
 use super::{
     DependencyUpdateActionKind, DependencyUpdateActionOutcome, DependencyUpdateActionResult,
     DependencyUpdateCheck, DependencyUpdateCheckConclusion, DependencyUpdateCheckRunStatus,
     DependencyUpdateCheckStatus, DependencyUpdateItem, DependencyUpdateMergeableState,
-    DependencyUpdatePullRequestState, DependencyUpdateReview, DependencyUpdateReviewEventState,
-    DependencyUpdateReviewStatus, DependencyUpdateTarget, DependencyUpdatesQueryRequest,
-    GRAPHQL_PAGE_SIZE, SCOPE_QUERY_CAP,
+    DependencyUpdatePullRequestState, DependencyUpdateRepositoryLabel, DependencyUpdateReview,
+    DependencyUpdateReviewEventState, DependencyUpdateReviewStatus, DependencyUpdateTarget,
+    DependencyUpdatesQueryRequest, GRAPHQL_PAGE_SIZE, SCOPE_QUERY_CAP,
 };
+
+pub(super) type RepositoryLabelBundle = (String, Vec<DependencyUpdateRepositoryLabel>);
+
+#[derive(Debug, Clone)]
+pub(super) struct InnerCursor {
+    pub(super) after: Option<String>,
+}
+
+#[derive(Debug)]
+pub(super) struct NodeContinuation {
+    pub(super) pull_request_id: String,
+    pub(super) repository_id: String,
+    pub(super) pr_labels: Option<InnerCursor>,
+    pub(super) reviews: Option<InnerCursor>,
+    pub(super) checks: Option<InnerCursor>,
+    pub(super) repository_labels: Option<InnerCursor>,
+}
+
+impl NodeContinuation {
+    pub(super) fn has_work(&self) -> bool {
+        self.pr_labels.is_some()
+            || self.reviews.is_some()
+            || self.checks.is_some()
+            || self.repository_labels.is_some()
+    }
+}
 
 pub(super) fn scopes(request: &DependencyUpdatesQueryRequest) -> Result<Vec<ScopeQuery>, CliError> {
     let authors = request.normalized_authors();
@@ -44,15 +73,71 @@ pub(super) fn scopes(request: &DependencyUpdatesQueryRequest) -> Result<Vec<Scop
     Ok(scopes)
 }
 
-pub(super) fn convert_node(node: SearchNode) -> Result<DependencyUpdateItem, CliError> {
+pub(super) fn convert_node(
+    node: SearchNode,
+) -> Result<
+    (
+        DependencyUpdateItem,
+        Option<RepositoryLabelBundle>,
+        NodeContinuation,
+    ),
+    CliError,
+> {
     let created_at = parse_timestamp(node.created_at.as_str())?;
     let updated_at = parse_timestamp(node.updated_at.as_str())?;
+    let pull_request_id = node.id.clone();
+    let repository_id = node.repository.id.clone();
     let check_summary = CheckSummary::from_commits(node.commits);
+    let checks_continuation = check_summary
+        .next_page_cursor
+        .clone()
+        .map(|cursor| InnerCursor {
+            after: Some(cursor),
+        });
 
-    Ok(DependencyUpdateItem {
-        pull_request_id: node.id,
-        repository_id: node.repository.id,
-        repository: node.repository.name_with_owner,
+    let repository_name = node.repository.name_with_owner;
+    let (repository_label_bundle, repository_labels_continuation) = match node.repository.labels {
+        Some(connection) => {
+            let labels = connection
+                .nodes
+                .into_iter()
+                .map(|label| DependencyUpdateRepositoryLabel {
+                    name: label.name,
+                    color: label.color.filter(|value| !value.is_empty()),
+                    description: label.description.filter(|value| !value.is_empty()),
+                })
+                .collect::<Vec<_>>();
+            let continuation = if connection.page_info.has_next_page {
+                Some(InnerCursor {
+                    after: connection.page_info.end_cursor,
+                })
+            } else {
+                None
+            };
+            (Some((repository_name.clone(), labels)), continuation)
+        }
+        None => (None, None),
+    };
+
+    let pr_labels_continuation = if node.labels.page_info.has_next_page {
+        Some(InnerCursor {
+            after: node.labels.page_info.end_cursor.clone(),
+        })
+    } else {
+        None
+    };
+    let reviews_continuation = if node.reviews.page_info.has_next_page {
+        Some(InnerCursor {
+            after: node.reviews.page_info.end_cursor.clone(),
+        })
+    } else {
+        None
+    };
+
+    let item = DependencyUpdateItem {
+        pull_request_id: pull_request_id.clone(),
+        repository_id: repository_id.clone(),
+        repository: repository_name,
         number: node.number,
         title: node.title,
         url: node.url,
@@ -90,16 +175,26 @@ pub(super) fn convert_node(node: SearchNode) -> Result<DependencyUpdateItem, Cli
         deletions: node.deletions.max(0).cast_unsigned(),
         created_at,
         updated_at,
-    })
+    };
+    let continuation = NodeContinuation {
+        pull_request_id,
+        repository_id,
+        pr_labels: pr_labels_continuation,
+        reviews: reviews_continuation,
+        checks: checks_continuation,
+        repository_labels: repository_labels_continuation,
+    };
+    Ok((item, repository_label_bundle, continuation))
 }
 
 #[derive(Default)]
-struct CheckSummary {
-    checks: Vec<DependencyUpdateCheck>,
+pub(super) struct CheckSummary {
+    pub(super) checks: Vec<DependencyUpdateCheck>,
     pending: u64,
     failed: u64,
     total: u64,
-    policy_blocked: bool,
+    pub(super) policy_blocked: bool,
+    pub(super) next_page_cursor: Option<String>,
 }
 
 impl CheckSummary {
@@ -114,6 +209,11 @@ impl CheckSummary {
         else {
             return summary;
         };
+        if rollup.contexts.page_info.has_next_page {
+            summary
+                .next_page_cursor
+                .clone_from(&rollup.contexts.page_info.end_cursor);
+        }
         for context in rollup.contexts.nodes {
             summary.push_context(context);
         }
@@ -202,6 +302,71 @@ fn is_failed_check_conclusion(conclusion: DependencyUpdateCheckConclusion) -> bo
             | DependencyUpdateCheckConclusion::ActionRequired
             | DependencyUpdateCheckConclusion::StartupFailure
     )
+}
+
+pub(super) fn append_pull_request_labels(item: &mut DependencyUpdateItem, labels: Vec<LabelNode>) {
+    item.labels.extend(labels.into_iter().map(|label| label.name));
+}
+
+pub(super) fn append_pull_request_reviews(item: &mut DependencyUpdateItem, reviews: Vec<ReviewNode>) {
+    item.reviews
+        .extend(reviews.into_iter().map(|review| DependencyUpdateReview {
+            author: review
+                .author
+                .and_then(|author| author.login)
+                .unwrap_or_default(),
+            state: map_review_event_state(review.state.as_deref()),
+        }));
+}
+
+pub(super) fn append_check_contexts(
+    item: &mut DependencyUpdateItem,
+    contexts: Vec<StatusContextNode>,
+) {
+    let mut summary = CheckSummary::default();
+    for context in contexts {
+        summary.push_context(context);
+    }
+    item.policy_blocked = item.policy_blocked || summary.policy_blocked;
+    item.checks.extend(summary.checks);
+    item.check_status = recompute_check_status(&item.checks);
+}
+
+pub(super) fn append_repository_labels(
+    bundle: &mut Vec<DependencyUpdateRepositoryLabel>,
+    labels: Vec<RepositoryLabelNode>,
+) {
+    bundle.extend(
+        labels
+            .into_iter()
+            .map(|label| DependencyUpdateRepositoryLabel {
+                name: label.name,
+                color: label.color.filter(|value| !value.is_empty()),
+                description: label.description.filter(|value| !value.is_empty()),
+            }),
+    );
+}
+
+fn recompute_check_status(checks: &[DependencyUpdateCheck]) -> DependencyUpdateCheckStatus {
+    if checks.is_empty() {
+        return DependencyUpdateCheckStatus::None;
+    }
+    let mut pending = 0_u64;
+    let mut failed = 0_u64;
+    for check in checks {
+        if check.status != DependencyUpdateCheckRunStatus::Completed {
+            pending += 1;
+        } else if is_failed_check_conclusion(check.conclusion) {
+            failed += 1;
+        }
+    }
+    if failed > 0 {
+        DependencyUpdateCheckStatus::Failure
+    } else if pending > 0 {
+        DependencyUpdateCheckStatus::Pending
+    } else {
+        DependencyUpdateCheckStatus::Success
+    }
 }
 
 pub(super) fn github_project_config(repository: &str) -> Option<GitHubProjectConfig> {
