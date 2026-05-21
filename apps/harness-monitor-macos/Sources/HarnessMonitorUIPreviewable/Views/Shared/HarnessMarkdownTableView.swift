@@ -5,6 +5,9 @@ struct HarnessMarkdownTableView: View {
   let settings: HarnessMarkdownRenderSettings
   let style: HarnessMarkdownResolvedRenderSettings
 
+  private let tableHorizontalPadding = HarnessMonitorTheme.spacingSM
+  private let tableCellVerticalPadding = HarnessMonitorTheme.spacingSM
+
   var body: some View {
     if columnCount > 0 {
       ViewThatFits(in: .horizontal) {
@@ -15,7 +18,7 @@ struct HarnessMarkdownTableView: View {
         }
         .scrollIndicators(.hidden)
       }
-      .padding(HarnessMonitorTheme.spacingSM)
+      .padding(.horizontal, tableHorizontalPadding)
       .frame(maxWidth: .infinity, alignment: .leading)
       .background {
         RoundedRectangle(cornerRadius: HarnessMonitorTheme.cornerRadiusSM, style: .continuous)
@@ -34,7 +37,7 @@ struct HarnessMarkdownTableView: View {
       rowCount: table.rows.count + 1,
       alignments: table.alignments,
       horizontalSpacing: style.spacing.tableColumn,
-      verticalSpacing: style.spacing.tableRow
+      verticalSpacing: 0
     ) {
       rowCells(table.headers, isHeader: true)
       if !table.rows.isEmpty {
@@ -63,7 +66,7 @@ struct HarnessMarkdownTableView: View {
         imageLayout: .inline
       )
       .multilineTextAlignment(textAlignment(for: column))
-      .padding(.vertical, isHeader ? 1 : 3)
+      .padding(.vertical, tableCellVerticalPadding)
     }
   }
 
