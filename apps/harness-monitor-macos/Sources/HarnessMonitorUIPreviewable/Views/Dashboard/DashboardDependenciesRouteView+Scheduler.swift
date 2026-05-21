@@ -93,7 +93,7 @@ extension DashboardDependenciesRouteView {
 
   // MARK: - Internal helpers
 
-  private func applyPerRepoResponse(
+  func applyPerRepoResponse(
     repository: String,
     response perResponse: DependencyUpdatesQueryResponse
   ) {
@@ -124,7 +124,7 @@ extension DashboardDependenciesRouteView {
     )
   }
 
-  private func ensureRepoResolver(
+  func ensureRepoResolver(
     client: any HarnessMonitorClientProtocol
   ) -> DashboardDependenciesRepoResolver {
     DashboardDependenciesRepoResolver(client: client)
