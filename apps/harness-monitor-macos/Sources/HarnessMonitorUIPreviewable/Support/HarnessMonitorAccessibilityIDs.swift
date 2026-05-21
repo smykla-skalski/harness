@@ -112,6 +112,8 @@ public enum HarnessMonitorAccessibility {
     "harness.dashboard.dependencies.custom-label.apply"
   public static let dashboardDependenciesSelectionStatus =
     "harness.dashboard.dependencies.selection"
+  public static let dashboardDependenciesDescription =
+    "harness.dashboard.dependencies.description"
   public static let dashboardNewSessionButton = "harness.dashboard.new-session"
   public static let dashboardOpenFolderButton = "harness.dashboard.open-folder"
   public static let sessionsBoardRoot = "harness.board.root"

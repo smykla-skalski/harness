@@ -419,6 +419,7 @@ struct DashboardDependenciesRouteView: View {
         detailSection("Description") {
           descriptionView(for: item)
         }
+        .accessibilityIdentifier(HarnessMonitorAccessibility.dashboardDependenciesDescription)
         detailSection("Checks") {
           if item.checks.isEmpty {
             Text("No checks reported")
