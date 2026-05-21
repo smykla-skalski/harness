@@ -62,10 +62,10 @@ struct DependencyUpdatesRepoSyncStateCacheTests {
     cache.recordSyncedAt(preferencesHash: "hash-a", repository: "acme/web")
     cache.recordSyncedAt(preferencesHash: "hash-b", repository: "acme/api")
 
-    let a = cache.loadStates(preferencesHash: "hash-a")
-    let b = cache.loadStates(preferencesHash: "hash-b")
-    #expect(Set(a.keys) == Set(["acme/api", "acme/web"]))
-    #expect(Set(b.keys) == Set(["acme/api"]))
+    let hashAStates = cache.loadStates(preferencesHash: "hash-a")
+    let hashBStates = cache.loadStates(preferencesHash: "hash-b")
+    #expect(Set(hashAStates.keys) == Set(["acme/api", "acme/web"]))
+    #expect(Set(hashBStates.keys) == Set(["acme/api"]))
   }
 
   @Test("recordSyncedAt ignores empty hash or repository")

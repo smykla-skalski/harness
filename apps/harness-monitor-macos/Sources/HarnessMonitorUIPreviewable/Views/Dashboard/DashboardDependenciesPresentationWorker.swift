@@ -169,7 +169,7 @@ actor DashboardDependenciesPresentationWorker {
     for items: [DependencyUpdateItem],
     relativeTo now: Date = .now
   ) -> [String: String] {
-    return Dictionary(
+    Dictionary(
       items.map { item -> (String, String) in
         guard let date = isoFormatter.date(from: item.updatedAt) else {
           return (item.pullRequestID, item.updatedAt)

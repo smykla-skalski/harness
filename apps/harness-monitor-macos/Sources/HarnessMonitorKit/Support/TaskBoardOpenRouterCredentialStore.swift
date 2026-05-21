@@ -15,7 +15,8 @@ public enum TaskBoardOpenRouterCredentialStoreError: LocalizedError, Equatable {
   }
 }
 
-public struct TaskBoardOpenRouterCredentialStore: TaskBoardOpenRouterCredentialPersisting, Sendable {
+public struct TaskBoardOpenRouterCredentialStore: TaskBoardOpenRouterCredentialPersisting, Sendable
+{
   private let service = "io.harnessmonitor.task-board.openrouter-credentials"
   private let account = "default"
 

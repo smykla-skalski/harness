@@ -73,7 +73,7 @@ private actor DecisionAuditPayloadWorker {
   func presentations(
     for events: [SupervisorEventSnapshot]
   ) -> [String: DecisionAuditTrailPayloadPresentation] {
-    return Dictionary(
+    Dictionary(
       uniqueKeysWithValues: events.map {
         (
           $0.id,

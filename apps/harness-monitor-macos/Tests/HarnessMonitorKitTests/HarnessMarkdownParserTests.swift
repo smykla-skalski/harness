@@ -72,7 +72,8 @@ struct HarnessMarkdownParserTests {
   func parserRendersSupportedMarkdownHTML() {
     let document = HarnessMarkdownParser.parse(
       """
-      <p>Hello <strong>bold</strong> <em>em</em> <code>x</code><br><a href="https://example.com" title="Docs">link</a></p>
+      <p>Hello <strong>bold</strong> <em>em</em> <code>x</code><br>\
+      <a href="https://example.com" title="Docs">link</a></p>
       <!-- hidden comment -->
       <script>hidden()</script>
       """
@@ -276,8 +277,14 @@ struct HarnessMarkdownSourceContractTests {
     let files = [
       "apps/harness-monitor-macos/Tuist/Package.swift",
       "apps/harness-monitor-macos/Tuist/ProjectDescriptionHelpers/FeatureFlags.swift",
-      "apps/harness-monitor-macos/Sources/HarnessMonitorUIPreviewable/Views/Shared/HarnessMonitorMarkdownText.swift",
-      "apps/harness-monitor-macos/Sources/HarnessMonitorUIPreviewable/Views/TaskBoard/TaskBoardItemManagementSupport.swift",
+      """
+      apps/harness-monitor-macos/Sources/HarnessMonitorUIPreviewable/Views/Shared/\
+      HarnessMonitorMarkdownText.swift
+      """,
+      """
+      apps/harness-monitor-macos/Sources/HarnessMonitorUIPreviewable/Views/TaskBoard/\
+      TaskBoardItemManagementSupport.swift
+      """,
     ]
 
     for file in files {
@@ -311,10 +318,16 @@ struct HarnessMarkdownSourceContractTests {
   @Test("Markdown render pipeline explicitly cancels detached work")
   func markdownRenderPipelineCancelsDetachedWork() throws {
     let renderer = try readRepositoryFile(
-      "apps/harness-monitor-macos/Sources/HarnessMonitorUIPreviewable/Views/Shared/HarnessMonitorMarkdownText.swift"
+      """
+      apps/harness-monitor-macos/Sources/HarnessMonitorUIPreviewable/Views/Shared/\
+      HarnessMonitorMarkdownText.swift
+      """
     )
     let parser = try readRepositoryFile(
-      "apps/harness-monitor-macos/Sources/HarnessMonitorUIPreviewable/Support/Markdown/HarnessMarkdownParser.swift"
+      """
+      apps/harness-monitor-macos/Sources/HarnessMonitorUIPreviewable/Support/Markdown/\
+      HarnessMarkdownParser.swift
+      """
     )
 
     #expect(renderer.contains("withTaskCancellationHandler"))

@@ -1,5 +1,24 @@
 import Foundation
 
+struct HarnessMarkdownInlineParseState {
+  let characters: [Character]
+  let references: [String: HarnessMarkdownReference]
+  var index = 0
+  var buffer = ""
+  var parts: [HarnessMarkdownInline] = []
+
+  init(source: String, references: [String: HarnessMarkdownReference]) {
+    self.characters = Array(source)
+    self.references = references
+  }
+
+  mutating func flushBuffer() {
+    guard !buffer.isEmpty else { return }
+    parts.append(.text(buffer))
+    buffer.removeAll(keepingCapacity: true)
+  }
+}
+
 enum HarnessMarkdownInlineParser {
   private static let escapable = Set("\\`*_{}[]()#+-.!|~<>")
 
@@ -7,249 +26,242 @@ enum HarnessMarkdownInlineParser {
     _ source: String,
     references: [String: HarnessMarkdownReference] = [:]
   ) -> [HarnessMarkdownInline] {
-    var parts: [HarnessMarkdownInline] = []
-    var buffer = ""
-    let characters = Array(source)
-    var index = 0
+    var state = HarnessMarkdownInlineParseState(source: source, references: references)
 
-    while index < characters.count {
-      if characters[index] == "\\" {
-        appendEscaped(in: characters, from: &index, buffer: &buffer, into: &parts)
-      } else if characters[index] == "\n" {
-        appendBreak(from: &buffer, into: &parts)
-        index += 1
-      } else if characters[index] == "`" {
-        appendCode(in: characters, from: &index, buffer: &buffer, into: &parts)
-      } else if starts("~~", in: characters, at: index) {
-        appendDelimited(
-          "~~", .strikethrough, in: characters, from: &index, buffer: &buffer, into: &parts,
-          references: references)
-      } else if starts("**", in: characters, at: index) || starts("__", in: characters, at: index) {
-        let delimiter = String(characters[index...(index + 1)])
-        appendDelimited(
-          delimiter, .strong, in: characters, from: &index, buffer: &buffer, into: &parts,
-          references: references)
-      } else if characters[index] == "*" || characters[index] == "_" {
-        appendDelimited(
-          String(characters[index]), .emphasis, in: characters, from: &index, buffer: &buffer,
-          into: &parts, references: references)
-      } else if index + 1 < characters.count, characters[index] == "!", characters[index + 1] == "["
-      {
-        if !HarnessMarkdownInlineImageScanner.appendImage(
-          in: characters, from: &index, buffer: &buffer, into: &parts, references: references)
-        {
-          buffer.append(characters[index])
-          index += 1
-        }
-      } else if characters[index] == "[" {
-        appendLink(
-          in: characters, from: &index, buffer: &buffer, into: &parts, references: references)
-      } else if characters[index] == "<" {
-        if !HarnessMarkdownHTMLInlineScanner.appendIfHTML(
-          in: characters, from: &index, buffer: &buffer, into: &parts, references: references)
-        {
-          appendAngleAutolink(in: characters, from: &index, buffer: &buffer, into: &parts)
-        }
-      } else if startsURL(in: characters, at: index) {
-        appendBareAutolink(in: characters, from: &index, buffer: &buffer, into: &parts)
-      } else {
-        buffer.append(characters[index])
-        index += 1
+    while state.index < state.characters.count {
+      consumeNext(from: &state)
+    }
+
+    state.flushBuffer()
+    return state.parts
+  }
+
+  private static func consumeNext(from state: inout HarnessMarkdownInlineParseState) {
+    if appendEscapeBreakOrCode(from: &state) { return }
+    if appendDelimitedMarkup(from: &state) { return }
+    if appendImageLinkOrHTML(from: &state) { return }
+    if startsURL(in: state.characters, at: state.index) {
+      appendBareAutolink(from: &state)
+      return
+    }
+    state.buffer.append(state.characters[state.index])
+    state.index += 1
+  }
+
+  private static func appendEscapeBreakOrCode(
+    from state: inout HarnessMarkdownInlineParseState
+  ) -> Bool {
+    switch state.characters[state.index] {
+    case "\\":
+      appendEscaped(from: &state)
+    case "\n":
+      appendBreak(from: &state)
+      state.index += 1
+    case "`":
+      appendCode(from: &state)
+    default:
+      return false
+    }
+    return true
+  }
+
+  private static func appendDelimitedMarkup(
+    from state: inout HarnessMarkdownInlineParseState
+  ) -> Bool {
+    if starts("~~", in: state.characters, at: state.index) {
+      appendDelimited("~~", .strikethrough, from: &state)
+      return true
+    }
+    if starts("**", in: state.characters, at: state.index)
+      || starts("__", in: state.characters, at: state.index)
+    {
+      let delimiter = String(state.characters[state.index...(state.index + 1)])
+      appendDelimited(delimiter, .strong, from: &state)
+      return true
+    }
+    if state.characters[state.index] == "*" || state.characters[state.index] == "_" {
+      appendDelimited(String(state.characters[state.index]), .emphasis, from: &state)
+      return true
+    }
+    return false
+  }
+
+  private static func appendImageLinkOrHTML(
+    from state: inout HarnessMarkdownInlineParseState
+  ) -> Bool {
+    if isImageStart(in: state.characters, at: state.index) {
+      if !HarnessMarkdownInlineImageScanner.appendImage(in: &state) {
+        state.buffer.append(state.characters[state.index])
+        state.index += 1
       }
+      return true
     }
-
-    flush(&buffer, into: &parts)
-    return parts
+    if state.characters[state.index] == "[" {
+      appendLink(from: &state)
+      return true
+    }
+    if state.characters[state.index] == "<" {
+      if !HarnessMarkdownHTMLInlineScanner.appendIfHTML(
+        in: state.characters,
+        from: &state.index,
+        buffer: &state.buffer,
+        into: &state.parts,
+        references: state.references
+      ) {
+        appendAngleAutolink(from: &state)
+      }
+      return true
+    }
+    return false
   }
 
-  private static func appendEscaped(
-    in characters: [Character],
-    from index: inout Int,
-    buffer: inout String,
-    into parts: inout [HarnessMarkdownInline]
-  ) {
-    guard index + 1 < characters.count else {
-      buffer.append("\\")
-      index += 1
+  private static func appendEscaped(from state: inout HarnessMarkdownInlineParseState) {
+    guard state.index + 1 < state.characters.count else {
+      state.buffer.append("\\")
+      state.index += 1
       return
     }
-    if characters[index + 1] == "\n" {
-      flush(&buffer, into: &parts)
-      parts.append(.lineBreak)
-      index += 2
-    } else if escapable.contains(characters[index + 1]) {
-      buffer.append(characters[index + 1])
-      index += 2
+    if state.characters[state.index + 1] == "\n" {
+      state.flushBuffer()
+      state.parts.append(.lineBreak)
+      state.index += 2
+    } else if escapable.contains(state.characters[state.index + 1]) {
+      state.buffer.append(state.characters[state.index + 1])
+      state.index += 2
     } else {
-      buffer.append("\\")
-      index += 1
+      state.buffer.append("\\")
+      state.index += 1
     }
   }
 
-  private static func appendBreak(
-    from buffer: inout String,
-    into parts: inout [HarnessMarkdownInline]
-  ) {
-    if buffer.hasSuffix("  ") {
-      buffer.removeLast(2)
-      flush(&buffer, into: &parts)
-      parts.append(.lineBreak)
+  private static func appendBreak(from state: inout HarnessMarkdownInlineParseState) {
+    if state.buffer.hasSuffix("  ") {
+      state.buffer.removeLast(2)
+      state.flushBuffer()
+      state.parts.append(.lineBreak)
     } else {
-      flush(&buffer, into: &parts)
-      parts.append(.softBreak)
+      state.flushBuffer()
+      state.parts.append(.softBreak)
     }
   }
 
-  private static func appendCode(
-    in characters: [Character],
-    from index: inout Int,
-    buffer: inout String,
-    into parts: inout [HarnessMarkdownInline]
-  ) {
-    let run = delimiterRunLength("`", in: characters, at: index)
+  private static func appendCode(from state: inout HarnessMarkdownInlineParseState) {
+    let run = delimiterRunLength("`", in: state.characters, at: state.index)
     let delimiter = String(repeating: "`", count: run)
-    guard let end = findDelimiter(delimiter, in: characters, after: index + run) else {
-      buffer.append(characters[index])
-      index += 1
+    guard let end = findDelimiter(delimiter, in: state.characters, after: state.index + run) else {
+      state.buffer.append(state.characters[state.index])
+      state.index += 1
       return
     }
-    flush(&buffer, into: &parts)
-    let raw = String(characters[(index + run)..<end]).replacingOccurrences(of: "\n", with: " ")
-    parts.append(.code(raw))
-    index = end + run
+    state.flushBuffer()
+    let raw = String(state.characters[(state.index + run)..<end])
+      .replacingOccurrences(of: "\n", with: " ")
+    state.parts.append(.code(raw))
+    state.index = end + run
   }
 
   private static func appendDelimited(
     _ delimiter: String,
     _ kind: InlineDelimiterKind,
-    in characters: [Character],
-    from index: inout Int,
-    buffer: inout String,
-    into parts: inout [HarnessMarkdownInline],
-    references: [String: HarnessMarkdownReference]
+    from state: inout HarnessMarkdownInlineParseState
   ) {
-    let start = index + delimiter.count
-    guard let end = findDelimiter(delimiter, in: characters, after: start), end > start else {
-      buffer.append(characters[index])
-      index += 1
+    let start = state.index + delimiter.count
+    guard let end = findDelimiter(delimiter, in: state.characters, after: start), end > start else {
+      state.buffer.append(state.characters[state.index])
+      state.index += 1
       return
     }
-    flush(&buffer, into: &parts)
-    let nested = parse(String(characters[start..<end]), references: references)
+    state.flushBuffer()
+    let nested = parse(String(state.characters[start..<end]), references: state.references)
     switch kind {
     case .emphasis:
-      parts.append(.emphasis(nested))
+      state.parts.append(.emphasis(nested))
     case .strong:
-      parts.append(.strong(nested))
+      state.parts.append(.strong(nested))
     case .strikethrough:
-      parts.append(.strikethrough(nested))
+      state.parts.append(.strikethrough(nested))
     }
-    index = end + delimiter.count
+    state.index = end + delimiter.count
   }
 
-  private static func appendLink(
-    in characters: [Character],
-    from index: inout Int,
-    buffer: inout String,
-    into parts: inout [HarnessMarkdownInline],
-    references: [String: HarnessMarkdownReference]
-  ) {
-    guard let labelEnd = matchingBracket(in: characters, at: index) else {
-      buffer.append("[")
-      index += 1
+  private static func appendLink(from state: inout HarnessMarkdownInlineParseState) {
+    guard let labelEnd = matchingBracket(in: state.characters, at: state.index) else {
+      state.buffer.append("[")
+      state.index += 1
       return
     }
-    let label = String(characters[(index + 1)..<labelEnd])
-    if appendInlineLink(
-      label: label, labelEnd: labelEnd, in: characters, from: &index, buffer: &buffer, into: &parts,
-      references: references)
-    {
-      return
-    }
-    buffer.append("[")
-    index += 1
+    let label = String(state.characters[(state.index + 1)..<labelEnd])
+    if appendInlineLink(label: label, labelEnd: labelEnd, from: &state) { return }
+    state.buffer.append("[")
+    state.index += 1
   }
 
   private static func appendInlineLink(
     label: String,
     labelEnd: Int,
-    in characters: [Character],
-    from index: inout Int,
-    buffer: inout String,
-    into parts: inout [HarnessMarkdownInline],
-    references: [String: HarnessMarkdownReference]
+    from state: inout HarnessMarkdownInlineParseState
   ) -> Bool {
-    if labelEnd + 1 < characters.count, characters[labelEnd + 1] == "(",
-      let destination = linkDestination(in: characters, afterOpeningParen: labelEnd + 1)
+    if labelEnd + 1 < state.characters.count, state.characters[labelEnd + 1] == "(",
+      let destination = linkDestination(in: state.characters, afterOpeningParen: labelEnd + 1)
     {
-      flush(&buffer, into: &parts)
+      state.flushBuffer()
       let parsed = destinationAndTitle(destination.raw)
-      parts.append(
+      state.parts.append(
         .link(
-          label: parse(label, references: references), destination: parsed.destination,
-          title: parsed.title))
-      index = destination.end + 1
+          label: parse(label, references: state.references),
+          destination: parsed.destination,
+          title: parsed.title
+        )
+      )
+      state.index = destination.end + 1
       return true
     }
-    let reference = referenceLabel(after: labelEnd, label: label, in: characters)
-    guard let target = references[normalizedReference(reference.label)] else { return false }
-    flush(&buffer, into: &parts)
-    parts.append(
+    let reference = referenceLabel(after: labelEnd, label: label, in: state.characters)
+    guard let target = state.references[normalizedReference(reference.label)] else { return false }
+    state.flushBuffer()
+    state.parts.append(
       .link(
-        label: parse(label, references: references), destination: target.destination,
-        title: target.title))
-    index = reference.end
+        label: parse(label, references: state.references),
+        destination: target.destination,
+        title: target.title
+      )
+    )
+    state.index = reference.end
     return true
   }
 
-  private static func appendAngleAutolink(
-    in characters: [Character],
-    from index: inout Int,
-    buffer: inout String,
-    into parts: inout [HarnessMarkdownInline]
-  ) {
-    guard let end = first(">", in: characters, after: index + 1) else {
-      buffer.append("<")
-      index += 1
+  private static func appendAngleAutolink(from state: inout HarnessMarkdownInlineParseState) {
+    guard let end = first(">", in: state.characters, after: state.index + 1) else {
+      state.buffer.append("<")
+      state.index += 1
       return
     }
-    let value = String(characters[(index + 1)..<end])
+    let value = String(state.characters[(state.index + 1)..<end])
     guard value.hasPrefix("http://") || value.hasPrefix("https://") || value.contains("@") else {
-      buffer.append("<")
-      index += 1
+      state.buffer.append("<")
+      state.index += 1
       return
     }
-    flush(&buffer, into: &parts)
-    parts.append(.autolink(value))
-    index = end + 1
+    state.flushBuffer()
+    state.parts.append(.autolink(value))
+    state.index = end + 1
   }
 
-  private static func appendBareAutolink(
-    in characters: [Character],
-    from index: inout Int,
-    buffer: inout String,
-    into parts: inout [HarnessMarkdownInline]
-  ) {
-    let start = index
-    while index < characters.count, !characters[index].isWhitespace,
-      !["<", ">", ")"].contains(characters[index])
+  private static func appendBareAutolink(from state: inout HarnessMarkdownInlineParseState) {
+    let start = state.index
+    while state.index < state.characters.count, !state.characters[state.index].isWhitespace,
+      !["<", ">", ")"].contains(state.characters[state.index])
     {
-      index += 1
+      state.index += 1
     }
-    flush(&buffer, into: &parts)
-    var value = String(characters[start..<index])
+    state.flushBuffer()
+    var value = String(state.characters[start..<state.index])
     var trailing = ""
     while let last = value.last, ".,;:!?".contains(last) {
       trailing.insert(value.removeLast(), at: trailing.startIndex)
     }
-    parts.append(.autolink(value))
-    buffer.append(trailing)
-  }
-
-  private static func flush(_ buffer: inout String, into parts: inout [HarnessMarkdownInline]) {
-    guard !buffer.isEmpty else { return }
-    parts.append(.text(buffer))
-    buffer.removeAll(keepingCapacity: true)
+    state.parts.append(.autolink(value))
+    state.buffer.append(trailing)
   }
 
   private static func matchingBracket(in characters: [Character], at start: Int) -> Int? {
@@ -365,6 +377,10 @@ enum HarnessMarkdownInlineParser {
 
   private static func startsURL(in characters: [Character], at index: Int) -> Bool {
     starts("http://", in: characters, at: index) || starts("https://", in: characters, at: index)
+  }
+
+  private static func isImageStart(in characters: [Character], at index: Int) -> Bool {
+    index + 1 < characters.count && characters[index] == "!" && characters[index + 1] == "["
   }
 
   private static func starts(_ needle: String, in characters: [Character], at index: Int) -> Bool {

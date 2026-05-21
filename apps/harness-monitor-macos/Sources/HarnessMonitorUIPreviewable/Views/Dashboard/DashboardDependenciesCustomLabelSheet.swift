@@ -34,10 +34,11 @@ struct DashboardDependenciesCustomLabelSheet: View {
   private var unusedSuggestions: [DependencyUpdateRepositoryLabel] {
     let trimmedLower = trimmedDraft.lowercased()
     guard !trimmedLower.isEmpty else { return Array(suggestions.prefix(6)) }
-    return suggestions
-      .filter { $0.name.lowercased().contains(trimmedLower) }
-      .prefix(6)
-      .map { $0 }
+    return Array(
+      suggestions
+        .filter { $0.name.lowercased().contains(trimmedLower) }
+        .prefix(6)
+    )
   }
 
   var body: some View {

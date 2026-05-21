@@ -1,5 +1,3 @@
-// swiftlint:disable file_length
-// swiftlint:disable type_body_length
 import Foundation
 import Testing
 
@@ -322,4 +320,3 @@ struct SessionWindowRouteContentMetricsTests {
     return try String(contentsOf: fileURL, encoding: .utf8)
   }
 }
-// swiftlint:enable type_body_length

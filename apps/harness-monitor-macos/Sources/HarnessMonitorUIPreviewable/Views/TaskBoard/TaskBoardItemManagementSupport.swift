@@ -243,7 +243,9 @@ private struct TaskBoardMarkdownDescriptionContent: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(HarnessMonitorTheme.spacingSM)
       }
-      .frame(maxWidth: .infinity, minHeight: minHeight, maxHeight: minHeight, alignment: .topLeading)
+      .frame(
+        maxWidth: .infinity, minHeight: minHeight, maxHeight: minHeight, alignment: .topLeading
+      )
       .taskBoardManagementFieldChrome()
       .accessibilityElement(children: .contain)
       .accessibilityIdentifier("harness.task-board.manage-item.body-preview")

@@ -36,12 +36,13 @@ extension RecordingHarnessClient {
   func fetchDependencyUpdateBody(
     request: DependencyUpdatesBodyRequest
   ) async throws -> DependencyUpdatesBodyResponse {
-    let (hook, response): (
-      (@Sendable (String) async -> Void)?, DependencyUpdatesBodyResponse?
-    ) = lock.withLock {
-      dependencyBodyFetchedIDs.append(request.pullRequestID)
-      return (dependencyBodyFetchHook, dependencyBodyResponses[request.pullRequestID])
-    }
+    let (hook, response):
+      (
+        (@Sendable (String) async -> Void)?, DependencyUpdatesBodyResponse?
+      ) = lock.withLock {
+        dependencyBodyFetchedIDs.append(request.pullRequestID)
+        return (dependencyBodyFetchHook, dependencyBodyResponses[request.pullRequestID])
+      }
     if let hook {
       await hook(request.pullRequestID)
     }

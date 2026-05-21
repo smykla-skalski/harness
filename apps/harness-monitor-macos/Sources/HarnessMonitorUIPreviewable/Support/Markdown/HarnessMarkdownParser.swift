@@ -37,44 +37,65 @@ private struct HarnessMarkdownBlockParser {
     while index < lines.count {
       guard !shouldCancel() else { return blocks }
       let line = lines[index]
-      if line.isBlank {
-        index += 1
-      } else if HarnessMarkdownHTMLBlocks.isStandaloneCommentStart(line) {
-        skipHTMLComment()
-      } else if HarnessMarkdownReferenceDefinitions.definition(line) != nil {
-        index += 1
-      } else if let fence = fenceStart(line) {
-        blocks.append(parseFencedCode(fence))
-      } else if HarnessMarkdownHTMLBlocks.detailsStart(line) != nil {
-        blocks.append(parseDetails())
-      } else if line.leadingSpaceCount >= 4 {
-        blocks.append(parseIndentedCode())
-      } else if let heading = heading(line, references: references) {
-        blocks.append(heading)
-        index += 1
-      } else if isThematicBreak(line) {
-        blocks.append(.thematicBreak)
-        index += 1
-      } else if line.trimmingLeadingSpaces().hasPrefix(">") {
-        blocks.append(parseBlockQuote())
-      } else if unorderedMarker(line) != nil {
-        blocks.append(parseUnorderedList())
-      } else if orderedMarker(line) != nil {
-        blocks.append(parseOrderedList())
-      } else if isTableStart(at: index) {
-        blocks.append(parseTable())
-      } else if isHTML(line) {
-        if let block = parseHTMLBlock() {
-          blocks.append(block)
-        }
-      } else if let setext = setextHeading(at: index) {
-        blocks.append(setext)
-        index += 2
-      } else {
-        blocks.append(parseParagraph())
-      }
+      if let block = parseNextBlock(line) { blocks.append(block) }
     }
     return blocks
+  }
+
+  private mutating func parseNextBlock(_ line: String) -> HarnessMarkdownBlock? {
+    if skipIgnorableLine(line) { return nil }
+    if let block = parseCodeOrDetailsBlock(line) { return block }
+    if let block = parseInlineStructuredBlock(line) { return block }
+    if let block = parseContainerBlock(line) { return block }
+    if isHTML(line) { return parseHTMLBlock() }
+    if let setext = setextHeading(at: index) {
+      index += 2
+      return setext
+    }
+    return parseParagraph()
+  }
+
+  private mutating func skipIgnorableLine(_ line: String) -> Bool {
+    if line.isBlank {
+      index += 1
+      return true
+    }
+    if HarnessMarkdownHTMLBlocks.isStandaloneCommentStart(line) {
+      skipHTMLComment()
+      return true
+    }
+    if HarnessMarkdownReferenceDefinitions.definition(line) != nil {
+      index += 1
+      return true
+    }
+    return false
+  }
+
+  private mutating func parseCodeOrDetailsBlock(_ line: String) -> HarnessMarkdownBlock? {
+    if let fence = fenceStart(line) { return parseFencedCode(fence) }
+    if HarnessMarkdownHTMLBlocks.detailsStart(line) != nil { return parseDetails() }
+    if line.leadingSpaceCount >= 4 { return parseIndentedCode() }
+    return nil
+  }
+
+  private mutating func parseInlineStructuredBlock(_ line: String) -> HarnessMarkdownBlock? {
+    if let heading = heading(line, references: references) {
+      index += 1
+      return heading
+    }
+    if isThematicBreak(line) {
+      index += 1
+      return .thematicBreak
+    }
+    return nil
+  }
+
+  private mutating func parseContainerBlock(_ line: String) -> HarnessMarkdownBlock? {
+    if line.trimmingLeadingSpaces().hasPrefix(">") { return parseBlockQuote() }
+    if unorderedMarker(line) != nil { return parseUnorderedList() }
+    if orderedMarker(line) != nil { return parseOrderedList() }
+    if isTableStart(at: index) { return parseTable() }
+    return nil
   }
 
   private mutating func parseFencedCode(_ fence: FenceStart) -> HarnessMarkdownBlock {
@@ -107,8 +128,10 @@ private struct HarnessMarkdownBlockParser {
     }
     let source = body.joined(separator: "\n")
     return .codeBlock(
-      language: .generic, source: source,
-      tokens: HarnessCodeHighlighter.highlight(source, language: .generic))
+      language: .generic,
+      source: source,
+      tokens: HarnessCodeHighlighter.highlight(source, language: .generic)
+    )
   }
 
   private mutating func parseBlockQuote() -> HarnessMarkdownBlock {
@@ -275,8 +298,8 @@ private struct HarnessMarkdownBlockParser {
     )
   }
 
-  private func childParser(lines: [String]) -> HarnessMarkdownBlockParser {
-    HarnessMarkdownBlockParser(lines: lines, references: references, shouldCancel: shouldCancel)
+  private func childParser(lines: [String]) -> Self {
+    Self(lines: lines, references: references, shouldCancel: shouldCancel)
   }
 }
 

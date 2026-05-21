@@ -1,60 +1,43 @@
 import Foundation
 
 enum HarnessMarkdownInlineImageScanner {
-  static func appendImage(
-    in characters: [Character],
-    from index: inout Int,
-    buffer: inout String,
-    into parts: inout [HarnessMarkdownInline],
-    references: [String: HarnessMarkdownReference]
-  ) -> Bool {
-    guard startsImage(in: characters, at: index),
-      let labelEnd = matchingBracket(in: characters, at: index + 1)
+  static func appendImage(in state: inout HarnessMarkdownInlineParseState) -> Bool {
+    guard startsImage(in: state.characters, at: state.index),
+      let labelEnd = matchingBracket(in: state.characters, at: state.index + 1)
     else { return false }
 
-    let alt = String(characters[(index + 2)..<labelEnd])
-    if appendInlineImage(
-      alt: alt, labelEnd: labelEnd, in: characters, from: &index, buffer: &buffer, into: &parts)
-    {
+    let alt = String(state.characters[(state.index + 2)..<labelEnd])
+    if appendInlineImage(alt: alt, labelEnd: labelEnd, in: &state) {
       return true
     }
-    let reference = referenceLabel(after: labelEnd, label: alt, in: characters)
-    guard let target = references[normalizedReference(reference.label)] else { return false }
-    flush(&buffer, into: &parts)
-    parts.append(
+    let reference = referenceLabel(after: labelEnd, label: alt, in: state.characters)
+    guard let target = state.references[normalizedReference(reference.label)] else { return false }
+    state.flushBuffer()
+    state.parts.append(
       .image(HarnessMarkdownImage(source: target.destination, alt: alt, title: target.title)))
-    index = reference.end
+    state.index = reference.end
     return true
   }
 
   private static func appendInlineImage(
     alt: String,
     labelEnd: Int,
-    in characters: [Character],
-    from index: inout Int,
-    buffer: inout String,
-    into parts: inout [HarnessMarkdownInline]
+    in state: inout HarnessMarkdownInlineParseState
   ) -> Bool {
-    guard labelEnd + 1 < characters.count, characters[labelEnd + 1] == "(",
-      let destination = linkDestination(in: characters, afterOpeningParen: labelEnd + 1)
+    guard labelEnd + 1 < state.characters.count, state.characters[labelEnd + 1] == "(",
+      let destination = linkDestination(in: state.characters, afterOpeningParen: labelEnd + 1)
     else { return false }
     let parsed = destinationAndTitle(destination.raw)
     guard !parsed.destination.isEmpty else { return false }
-    flush(&buffer, into: &parts)
-    parts.append(
+    state.flushBuffer()
+    state.parts.append(
       .image(HarnessMarkdownImage(source: parsed.destination, alt: alt, title: parsed.title)))
-    index = destination.end + 1
+    state.index = destination.end + 1
     return true
   }
 
   private static func startsImage(in characters: [Character], at index: Int) -> Bool {
     index + 1 < characters.count && characters[index] == "!" && characters[index + 1] == "["
-  }
-
-  private static func flush(_ buffer: inout String, into parts: inout [HarnessMarkdownInline]) {
-    guard !buffer.isEmpty else { return }
-    parts.append(.text(buffer))
-    buffer.removeAll(keepingCapacity: true)
   }
 
   private static func matchingBracket(in characters: [Character], at start: Int) -> Int? {

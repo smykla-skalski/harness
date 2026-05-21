@@ -39,7 +39,7 @@ struct SettingsDependenciesSection: View {
         )
       Toggle("Expand organizations to repositories", isOn: $draft.expandOrganizations)
         .accessibilityIdentifier(
-          HarnessMonitorAccessibility.settingsDependenciesExpandOrganizationsToggle
+          HarnessMonitorAccessibility.settingsDepsExpandOrganizationsToggle
         )
     } header: {
       Text("Sources")
@@ -101,7 +101,7 @@ struct SettingsDependenciesSection: View {
       .accessibilityIdentifier(HarnessMonitorAccessibility.settingsDependenciesMergeMethodField)
       Toggle("Show label descriptions in pickers", isOn: $draft.showLabelDescriptions)
         .accessibilityIdentifier(
-          HarnessMonitorAccessibility.settingsDependenciesShowLabelDescriptionsToggle
+          HarnessMonitorAccessibility.settingsDepsShowLabelDescriptionsToggle
         )
       Picker("Frequently used labels", selection: $draft.frequentLabelsCount) {
         ForEach(Self.frequentLabelsCountRange, id: \.self) { count in
@@ -110,7 +110,7 @@ struct SettingsDependenciesSection: View {
       }
       .pickerStyle(.menu)
       .accessibilityIdentifier(
-        HarnessMonitorAccessibility.settingsDependenciesFrequentLabelsCountField
+        HarnessMonitorAccessibility.settingsDepsFrequentLabelsCountField
       )
     } header: {
       Text("Actions")
