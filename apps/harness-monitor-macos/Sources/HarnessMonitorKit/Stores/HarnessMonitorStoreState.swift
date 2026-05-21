@@ -12,11 +12,11 @@ struct CacheWriteSyncState {
 
 struct SelectedTimelineLoadState {
   var pageLoadTask: Task<Void, Never>?
-  var pageLoadKey: SelectedTimelinePageLoadKey?
+  var pageLoadKey: HarnessMonitorStore.SelectedTimelinePageLoadKey?
   var pageLoadSequence: UInt64 = 0
   var preferredWindowLimit: Int?
   var windowLoadTask: Task<Void, Never>?
-  var windowLoadKey: SelectedTimelineWindowLoadKey?
+  var windowLoadKey: HarnessMonitorStore.SelectedTimelineWindowLoadKey?
   var windowLoadSequence: UInt64 = 0
 }
 
