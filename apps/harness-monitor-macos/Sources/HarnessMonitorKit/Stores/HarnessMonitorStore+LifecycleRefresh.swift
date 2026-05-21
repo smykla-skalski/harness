@@ -16,7 +16,7 @@ extension HarnessMonitorStore {
     }
   }
 
-  private struct RefreshSnapshot: Sendable {
+  struct RefreshSnapshot: Sendable {
     let diagnostics: MeasuredOperation<DaemonDiagnosticsReport>
     let projects: MeasuredOperation<[ProjectSummary]>
     let sessions: MeasuredOperation<[SessionSummary]>
