@@ -5,6 +5,7 @@ public struct SettingsNotificationsSection: View {
   @Bindable public var notifications: HarnessMonitorUserNotificationController
   @State private var selectedPreset: HarnessMonitorNotificationPreset = .basic
   @State private var contentFieldWidth: CGFloat = 0
+  @State private var isFullyExpanded = false
 
   public init(notifications: HarnessMonitorUserNotificationController) {
     self.notifications = notifications
@@ -15,14 +16,23 @@ public struct SettingsNotificationsSection: View {
       statusSection
       authorizationSection
       presetSection
-      contentSection
-      nativeOptionsSection
-      attachmentSection
-      deliverySection
-      responseSection
+      if isFullyExpanded {
+        contentSection
+        nativeOptionsSection
+        attachmentSection
+        deliverySection
+        responseSection
+      }
     }
     .settingsDetailFormStyle()
     .task { await notifications.refreshStatus() }
+    .task { await expandAfterFirstFrame() }
+  }
+
+  private func expandAfterFirstFrame() async {
+    guard !isFullyExpanded else { return }
+    try? await Task.sleep(for: .milliseconds(40))
+    isFullyExpanded = true
   }
 
   private var statusSection: some View {
