@@ -166,6 +166,7 @@ private struct SettingsDetailSwitch: View {
         )
       }
     }
+    .harnessGlassContainerScope()
     .environment(\.settingsScrollRestorationSection, selectedSection)
     .environment(
       \.settingsScrollRestorationSuspended,
