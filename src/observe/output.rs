@@ -6,9 +6,10 @@ use super::types::{Issue, IssueSeverity};
 mod rendering;
 
 use self::rendering::{
-    RenderedIssue, RenderedMarkdownRow, RenderedSummary, RenderedTopCauses, SarifProperties,
-    render_json_pretty_string, render_json_string, render_property_bag,
+    RenderedIssue, RenderedSummary, RenderedTopCauses, SarifProperties, render_json_pretty_string,
+    render_json_string, render_property_bag,
 };
+use crate::infra::io::format_markdown_table;
 
 /// Render an issue as a human-readable line.
 #[must_use]
@@ -40,18 +41,27 @@ pub fn render_summary(issues: &[Issue], last_line: usize) -> String {
     render_json_string(&RenderedSummary::new(issues, last_line))
 }
 
-/// Render issues as a markdown report using `tabled` for table formatting.
+/// Render issues as a GitHub-flavored markdown report.
 #[must_use]
 pub fn render_markdown(issues: &[Issue]) -> String {
-    use tabled::Table;
-    use tabled::settings::Style;
-
     if issues.is_empty() {
         return "# Observe report\n\nNo issues found.\n".to_string();
     }
 
-    let rows: Vec<_> = issues.iter().map(RenderedMarkdownRow::from).collect();
-    let table = Table::new(&rows).with(Style::markdown()).to_string();
+    let headers: &[&str] = &["line", "severity", "category", "code", "summary"];
+    let rows: Vec<Vec<String>> = issues
+        .iter()
+        .map(|issue| {
+            vec![
+                issue.line.to_string(),
+                issue.severity.to_string(),
+                issue.category.to_string(),
+                issue.code.to_string(),
+                issue.summary.clone(),
+            ]
+        })
+        .collect();
+    let table = format_markdown_table(headers, &rows);
     let mut output = String::from("# Observe report\n\n");
     output.push_str(&table);
     let _ = write!(output, "\n\n**Total: {} issues**\n", issues.len());

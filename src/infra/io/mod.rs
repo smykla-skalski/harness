@@ -12,7 +12,7 @@ use serde_json::Value;
 
 use crate::errors::{CliError, CliErrorKind, io_for};
 
-pub use self::markdown::{append_markdown_row, as_list, as_mapping, drill};
+pub use self::markdown::{append_markdown_row, as_list, as_mapping, drill, format_markdown_table};
 pub use self::yaml::{FrontmatterDocument, parse_frontmatter};
 
 /// Check whether a name is safe to use as a path component.
