@@ -5,6 +5,7 @@ public struct SettingsHostBridgeSection: View {
   public let store: HarnessMonitorStore
   @State private var pendingForcedDisableCapability: String?
   @State private var pendingForcedDisableMessage = ""
+  @State private var capabilityNames: [String] = []
   @ScaledMetric(relativeTo: .caption)
   private var statusCircleSize: CGFloat = 8
 
@@ -20,9 +21,11 @@ public struct SettingsHostBridgeSection: View {
     manifest?.hostBridge ?? HostBridgeManifest()
   }
 
-  private var capabilityNames: [String] {
+  private func syncCapabilityNames() {
     let builtIns = ["codex", "agent-tui"]
-    return Array(Set(builtIns).union(hostBridge.capabilities.keys)).sorted()
+    let next = Array(Set(builtIns).union(hostBridge.capabilities.keys)).sorted()
+    guard next != capabilityNames else { return }
+    capabilityNames = next
   }
 
   public var body: some View {
@@ -76,6 +79,9 @@ public struct SettingsHostBridgeSection: View {
       }
     }
     .settingsDetailFormStyle()
+    .onChange(of: hostBridge.capabilities, initial: true) { _, _ in
+      syncCapabilityNames()
+    }
     .confirmationDialog(
       "Disable Agents capability?",
       isPresented: forceDisableConfirmationPresented,
