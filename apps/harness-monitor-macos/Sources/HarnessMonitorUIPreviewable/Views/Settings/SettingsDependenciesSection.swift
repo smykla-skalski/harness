@@ -103,20 +103,22 @@ struct SettingsDependenciesSection: View {
 
   private var refreshSection: some View {
     Section {
-      TextField(
-        "Refresh Interval (seconds)",
-        value: $draft.refreshIntervalSeconds,
-        format: .number
+      SettingsDurationPickerRow(
+        title: "Refresh Interval",
+        presets: Self.refreshPresetsSeconds,
+        minSeconds: Self.minimumDurationSeconds,
+        seconds: $draft.refreshIntervalSeconds,
+        pickerAccessibilityIdentifier:
+          HarnessMonitorAccessibility.settingsDependenciesRefreshIntervalField
       )
-      .accessibilityIdentifier(
-        HarnessMonitorAccessibility.settingsDependenciesRefreshIntervalField
+      SettingsDurationPickerRow(
+        title: "Cache Max Age",
+        presets: Self.cachePresetsSeconds,
+        minSeconds: Self.minimumDurationSeconds,
+        seconds: $draft.cacheMaxAgeSeconds,
+        pickerAccessibilityIdentifier:
+          HarnessMonitorAccessibility.settingsDependenciesCacheMaxAgeField
       )
-      TextField(
-        "Cache Max Age (seconds)",
-        value: $draft.cacheMaxAgeSeconds,
-        format: .number
-      )
-      .accessibilityIdentifier(HarnessMonitorAccessibility.settingsDependenciesCacheMaxAgeField)
     } header: {
       Text("Refresh & Cache")
         .harnessNativeFormSectionHeader()
@@ -124,6 +126,10 @@ struct SettingsDependenciesSection: View {
       Text("The route background refresh loop and cache TTL both use these values")
     }
   }
+
+  static let minimumDurationSeconds: UInt64 = 30
+  static let refreshPresetsSeconds: [UInt64] = [30, 60, 120, 300, 600, 900, 1_800, 3_600]
+  static let cachePresetsSeconds: [UInt64] = [60, 300, 600, 900, 1_800, 3_600, 7_200, 21_600]
 
   private var actionsComposer: some View {
     VStack(spacing: 0) {
