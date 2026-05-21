@@ -3,9 +3,10 @@ use chrono::{DateTime, Utc};
 use crate::dependency_updates::{
     DependencyUpdateCheckStatus, DependencyUpdateItem, DependencyUpdateMergeableState,
     DependencyUpdatePullRequestState, DependencyUpdateReviewStatus,
+    DependencyUpdatesBodyResponse,
 };
 
-use super::apply_refresh_to_items;
+use super::{apply_refresh_to_items, cached_body_response, store_cached_body_response};
 
 fn item(
     pr_id: &str,
@@ -155,4 +156,56 @@ fn apply_refresh_keeps_closed_item_when_refresh_still_reports_open() {
         updated[0].review_status,
         DependencyUpdateReviewStatus::Approved
     );
+}
+
+fn body_response(pull_request_id: &str, body: &str) -> DependencyUpdatesBodyResponse {
+    DependencyUpdatesBodyResponse {
+        pull_request_id: pull_request_id.into(),
+        body: body.into(),
+        pr_updated_at: parsed("2026-05-20T12:00:00Z"),
+        fetched_at: "2026-05-21T00:00:00Z".into(),
+        from_cache: false,
+    }
+}
+
+#[test]
+fn cached_body_response_returns_none_for_missing_key() {
+    assert!(cached_body_response("body-cache-miss-test-pr", 600).is_none());
+}
+
+#[test]
+fn cached_body_response_flips_from_cache_on_hit() {
+    let key = "body-cache-hit-test-pr".to_string();
+    let stored = body_response("pr_body_hit", "Some markdown body.");
+    store_cached_body_response(key.clone(), &stored);
+
+    let hit = cached_body_response(&key, 600).expect("cache hit within TTL");
+    assert!(hit.from_cache, "second read should mark response from_cache");
+    assert_eq!(hit.pull_request_id, stored.pull_request_id);
+    assert_eq!(hit.body, stored.body);
+    assert_eq!(hit.pr_updated_at, stored.pr_updated_at);
+    assert_eq!(hit.fetched_at, stored.fetched_at);
+}
+
+#[test]
+fn cached_body_response_distinguishes_cache_keys() {
+    let key_a = "body-cache-key-a-pr".to_string();
+    let key_b = "body-cache-key-b-pr";
+    let stored = body_response("pr_body_a", "Body A");
+    store_cached_body_response(key_a.clone(), &stored);
+
+    assert!(cached_body_response(key_b, 600).is_none());
+    let hit = cached_body_response(&key_a, 600).expect("hit for stored key");
+    assert_eq!(hit.body, "Body A");
+}
+
+#[test]
+fn store_cached_body_response_overwrites_existing_entry() {
+    let key = "body-cache-overwrite-test-pr".to_string();
+    store_cached_body_response(key.clone(), &body_response("pr_body_v1", "first"));
+    store_cached_body_response(key.clone(), &body_response("pr_body_v2", "second"));
+
+    let hit = cached_body_response(&key, 600).expect("cache hit");
+    assert_eq!(hit.pull_request_id, "pr_body_v2");
+    assert_eq!(hit.body, "second");
 }
