@@ -8,13 +8,18 @@ enum HarnessMonitorFloatingGlassProminence {
 struct HarnessMonitorGlassControlGroup<Content: View>: View {
   let spacing: CGFloat?
   private let content: Content
+  @Environment(\.accessibilityReduceTransparency)
+  private var reduceTransparency
+
   init(spacing: CGFloat? = nil, @ViewBuilder content: () -> Content) {
     self.spacing = spacing
     self.content = content()
   }
 
   var body: some View {
-    if let spacing {
+    if reduceTransparency {
+      content
+    } else if let spacing {
       GlassEffectContainer(spacing: spacing) {
         content
       }
