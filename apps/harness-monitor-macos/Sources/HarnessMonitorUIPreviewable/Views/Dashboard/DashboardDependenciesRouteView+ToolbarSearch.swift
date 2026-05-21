@@ -142,8 +142,8 @@ private struct DashboardDependenciesToolbarSearchModifier: ViewModifier {
       .onSubmit(of: .search) {
         submit()
       }
-      .harnessFocusedSceneValue(\.harnessSidebarSearchFocusAction, searchFocusAction)
-      .task {
+      .focusedSceneValue(\.harnessSidebarSearchFocusAction, searchFocusAction)
+      .onAppear {
         searchFocusDispatcher.handler = {
           focusSearchField()
         }
