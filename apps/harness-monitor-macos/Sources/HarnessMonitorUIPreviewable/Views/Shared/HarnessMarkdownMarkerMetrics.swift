@@ -4,16 +4,20 @@ struct HarnessMarkdownMarkerMetrics {
   let columnWidth: CGFloat
   let gap: CGFloat
   let firstLineHeight: CGFloat
+  let markerVisualYOffset: CGFloat
   let chevronColumnWidth: CGFloat
   let chevronSize: CGFloat
+  let chevronVisualYOffset: CGFloat
 
   init(style: HarnessMarkdownResolvedRenderSettings) {
     let pointSize = style.typography.body.pointSize ?? 13
     columnWidth = max(style.spacing.listMarkerWidth, pointSize * 1.5)
     gap = style.spacing.listMarkerGap
     firstLineHeight = max(18, pointSize * 1.35)
+    markerVisualYOffset = max(1, pointSize * 0.08)
     chevronColumnWidth = max(12, pointSize * 0.75)
     chevronSize = max(7, pointSize * 0.48)
+    chevronVisualYOffset = max(2, pointSize * 0.14)
   }
 }
 

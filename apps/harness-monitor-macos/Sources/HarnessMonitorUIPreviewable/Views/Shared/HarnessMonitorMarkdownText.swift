@@ -244,6 +244,7 @@ private struct HarnessMarkdownDetailsView: View {
               height: metrics.firstLineHeight,
               alignment: .center
             )
+            .offset(y: metrics.chevronVisualYOffset)
           HarnessMarkdownInlineFlowView(
             inlines: details.summary,
             style: HarnessMarkdownInlineRenderStyle(
@@ -371,16 +372,19 @@ private struct HarnessMarkdownListView: View {
       .controlSize(.small)
       .allowsHitTesting(false)
       .frame(width: metrics.columnWidth, height: metrics.firstLineHeight, alignment: .center)
+      .offset(y: metrics.markerVisualYOffset)
     } else if ordered {
       Text("\(start + index).")
         .font(style.typography.listMarker.font)
         .foregroundStyle(style.colors.secondaryText)
         .frame(width: metrics.columnWidth, height: metrics.firstLineHeight, alignment: .trailing)
+        .offset(y: metrics.markerVisualYOffset)
     } else {
       Text("•")
         .font(style.typography.listMarker.font)
         .foregroundStyle(style.colors.secondaryText)
         .frame(width: metrics.columnWidth, height: metrics.firstLineHeight, alignment: .center)
+        .offset(y: metrics.markerVisualYOffset)
     }
   }
 }

@@ -30,6 +30,7 @@ struct HarnessMarkdownRenderingBehaviorTests {
     #expect(paragraphSource.contains("HStack(alignment: .top, spacing: metrics.gap)"))
     #expect(textSource.contains(".frame(width: metrics.columnWidth"))
     #expect(textSource.contains("height: metrics.firstLineHeight"))
+    #expect(textSource.contains(".offset(y: metrics.markerVisualYOffset)"))
     #expect(!textSource.contains("firstLineCenterBaselineOffset"))
   }
 
@@ -102,6 +103,7 @@ struct HarnessMarkdownRenderingBehaviorTests {
     #expect(source.contains(".contentShape(Rectangle())"))
     #expect(source.contains("HarnessMarkdownPointerHoverModifier"))
     #expect(source.contains("metrics.chevronSize"))
+    #expect(source.contains(".offset(y: metrics.chevronVisualYOffset)"))
     #expect(source.contains("HStack(alignment: .top, spacing: metrics.gap)"))
     #expect(!source.contains("DisclosureGroup(isExpanded: $isExpanded)"))
   }
