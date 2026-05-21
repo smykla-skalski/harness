@@ -41,6 +41,10 @@ pub(crate) async fn change_role_async(
 ///
 /// # Errors
 /// Returns `CliError` when the session cannot be resolved or the removal fails.
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "agent removal keeps state mutation and leave-signal persistence ordered"
+)]
 pub(crate) async fn remove_agent_async(
     session_id: &str,
     agent_id: &str,

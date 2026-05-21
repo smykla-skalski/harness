@@ -71,6 +71,10 @@ fn dispatch_daemon_stop_query(request_id: &str, state: &DaemonHttpState) -> WsRe
     )
 }
 
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "session read websocket method dispatch is clearer as an explicit match"
+)]
 async fn dispatch_session_read_query(
     request: &WsRequest,
     state: &DaemonHttpState,

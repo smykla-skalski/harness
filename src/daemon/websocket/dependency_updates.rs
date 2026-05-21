@@ -11,6 +11,10 @@ use serde::de::DeserializeOwned;
 use super::frames::error_response;
 use super::mutations::dispatch_query_result;
 
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "dependency-update websocket method dispatch is clearer as an explicit match"
+)]
 pub(crate) async fn dispatch_dependency_updates_method(
     request: &WsRequest,
     _state: &DaemonHttpState,
@@ -19,21 +23,28 @@ pub(crate) async fn dispatch_dependency_updates_method(
         ws_methods::DEPENDENCY_UPDATES_REPOSITORY_CATALOG => {
             Some(dispatch_dependency_updates_repository_catalog(request).await)
         }
-        ws_methods::DEPENDENCY_UPDATES_QUERY => Some(dispatch_dependency_updates_query(request).await),
+        ws_methods::DEPENDENCY_UPDATES_QUERY => {
+            Some(dispatch_dependency_updates_query(request).await)
+        }
         ws_methods::DEPENDENCY_UPDATES_APPROVE => {
             Some(dispatch_dependency_updates_approve(request).await)
         }
-        ws_methods::DEPENDENCY_UPDATES_MERGE => Some(dispatch_dependency_updates_merge(request).await),
+        ws_methods::DEPENDENCY_UPDATES_MERGE => {
+            Some(dispatch_dependency_updates_merge(request).await)
+        }
         ws_methods::DEPENDENCY_UPDATES_RERUN_CHECKS => {
             Some(dispatch_dependency_updates_rerun_checks(request).await)
         }
         ws_methods::DEPENDENCY_UPDATES_ADD_LABEL => {
             Some(dispatch_dependency_updates_add_label(request).await)
         }
-        ws_methods::DEPENDENCY_UPDATES_AUTO => Some(dispatch_dependency_updates_auto(request).await),
-        ws_methods::DEPENDENCY_UPDATES_CLEAR_CACHE => {
-            Some(dispatch_query_result(&request.id, service::clear_dependency_updates_cache()))
+        ws_methods::DEPENDENCY_UPDATES_AUTO => {
+            Some(dispatch_dependency_updates_auto(request).await)
         }
+        ws_methods::DEPENDENCY_UPDATES_CLEAR_CACHE => Some(dispatch_query_result(
+            &request.id,
+            service::clear_dependency_updates_cache(),
+        )),
         _ => None,
     }
 }
@@ -59,7 +70,10 @@ async fn dispatch_dependency_updates_approve(request: &WsRequest) -> WsResponse 
     let Ok(body) = parse_params::<DependencyUpdatesApproveRequest>(request) else {
         return invalid_params(request);
     };
-    dispatch_query_result(&request.id, service::approve_dependency_updates(&body).await)
+    dispatch_query_result(
+        &request.id,
+        service::approve_dependency_updates(&body).await,
+    )
 }
 
 async fn dispatch_dependency_updates_merge(request: &WsRequest) -> WsResponse {

@@ -34,13 +34,13 @@ pub(super) async fn delete_acp_agent(
         ensure_acp_enabled()?;
         ensure_acp_agent(&state, &agent_id)?;
         let snapshot = state.acp_agent_manager.get(&agent_id)?;
-        if let Some(required) = &query.session_id {
-            if &snapshot.session_id != required {
-                return Err(CliErrorKind::session_scope_denied(format!(
-                    "agent '{agent_id}' belongs to a different session"
-                ))
-                .into());
-            }
+        if let Some(required) = &query.session_id
+            && &snapshot.session_id != required
+        {
+            return Err(CliErrorKind::session_scope_denied(format!(
+                "agent '{agent_id}' belongs to a different session"
+            ))
+            .into());
         }
         Ok(snapshot.session_id)
     })() {

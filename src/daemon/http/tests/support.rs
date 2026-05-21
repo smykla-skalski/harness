@@ -98,10 +98,7 @@ pub(in crate::daemon::http) fn test_http_state_with_db() -> DaemonHttpState {
             async_db.clone(),
         ),
         agent_tui_manager: AgentTuiManagerHandle::new_with_async_db(
-            sender,
-            db_slot,
-            async_db,
-            false,
+            sender, db_slot, async_db, false,
         ),
         managed_agent_mutation_locks: super::super::ManagedAgentMutationLocks::default(),
     }

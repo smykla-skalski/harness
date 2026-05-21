@@ -1,10 +1,10 @@
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
-use crate::errors::{CliError, CliErrorKind};
 use crate::task_board::github::GitHubMergeMethod;
 
 mod github;
+mod validation;
 
 pub(crate) use github::DependencyUpdatesGitHubClient;
 
@@ -261,22 +261,6 @@ fn default_cache_max_age_seconds() -> u64 {
 }
 
 impl DependencyUpdatesQueryRequest {
-    pub fn validate(&self) -> Result<(), CliError> {
-        if self.normalized_authors().is_empty() {
-            return Err(CliErrorKind::workflow_parse(
-                "dependency-updates query requires at least one author",
-            )
-            .into());
-        }
-        if self.normalized_organizations().is_empty() && self.normalized_repositories().is_empty() {
-            return Err(CliErrorKind::workflow_parse(
-                "dependency-updates query requires at least one organization or repository",
-            )
-            .into());
-        }
-        Ok(())
-    }
-
     #[must_use]
     pub fn normalized_authors(&self) -> Vec<String> {
         normalized_entries(&self.authors)
@@ -339,17 +323,6 @@ impl DependencyUpdatesQueryRequest {
 }
 
 impl DependencyUpdatesRepositoryCatalogRequest {
-    pub fn validate(&self) -> Result<(), CliError> {
-        let organization = self.organization.trim();
-        if organization.is_empty() || organization.contains('/') {
-            return Err(CliErrorKind::workflow_parse(
-                "dependency-updates repository catalog requires a valid organization login",
-            )
-            .into());
-        }
-        Ok(())
-    }
-
     #[must_use]
     pub fn normalized_organization(&self) -> String {
         self.organization.trim().to_lowercase()
@@ -450,53 +423,6 @@ impl DependencyUpdateTarget {
             && self.mergeable != DependencyUpdateMergeableState::Conflicting
             && !self.policy_blocked
     }
-}
-
-impl DependencyUpdatesApproveRequest {
-    pub fn validate(&self) -> Result<(), CliError> {
-        ensure_targets(&self.targets, "approve")
-    }
-}
-
-impl DependencyUpdatesMergeRequest {
-    pub fn validate(&self) -> Result<(), CliError> {
-        ensure_targets(&self.targets, "merge")
-    }
-}
-
-impl DependencyUpdatesRerunChecksRequest {
-    pub fn validate(&self) -> Result<(), CliError> {
-        ensure_targets(&self.targets, "rerun checks")
-    }
-}
-
-impl DependencyUpdatesLabelRequest {
-    pub fn validate(&self) -> Result<(), CliError> {
-        ensure_targets(&self.targets, "label")?;
-        if self.label.trim().is_empty() {
-            return Err(CliErrorKind::workflow_parse(
-                "dependency-updates label request requires a non-empty label",
-            )
-            .into());
-        }
-        Ok(())
-    }
-}
-
-impl DependencyUpdatesAutoRequest {
-    pub fn validate(&self) -> Result<(), CliError> {
-        ensure_targets(&self.targets, "auto mode")
-    }
-}
-
-fn ensure_targets(targets: &[DependencyUpdateTarget], action: &str) -> Result<(), CliError> {
-    if targets.is_empty() {
-        return Err(CliErrorKind::workflow_parse(format!(
-            "dependency-updates {action} request requires at least one target"
-        ))
-        .into());
-    }
-    Ok(())
 }
 
 fn normalized_entries(entries: &[String]) -> Vec<String> {

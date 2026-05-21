@@ -107,7 +107,7 @@ fn diagnostics_manifest() -> Result<Option<DaemonManifest>, CliError> {
 async fn diagnostics_manifest_async() -> Result<Option<DaemonManifest>, CliError> {
     spawn_blocking(diagnostics_manifest)
         .await
-        .unwrap_or_else(|error| Err(blocking_join_error("daemon diagnostics manifest", error)))
+        .unwrap_or_else(|error| Err(blocking_join_error("daemon diagnostics manifest", &error)))
 }
 
 fn enrich_diagnostics_manifest(mut manifest: DaemonManifest) -> DaemonManifest {
@@ -212,6 +212,10 @@ pub(crate) fn diagnostics_from_db(
     })
 }
 
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "cached diagnostics keep explicit fallback branches per source"
+)]
 async fn diagnostics_from_async_db(
     async_db: &super::db::AsyncDaemonDb,
     manifest: Option<DaemonManifest>,
@@ -240,16 +244,16 @@ async fn diagnostics_from_async_db(
 async fn launch_agent_status_async() -> Result<LaunchAgentStatus, CliError> {
     spawn_blocking(launchd::launch_agent_status)
         .await
-        .map_err(|error| blocking_join_error("daemon launch agent status", error))
+        .map_err(|error| blocking_join_error("daemon launch agent status", &error))
 }
 
 async fn workspace_diagnostics_async() -> Result<state::DaemonDiagnostics, CliError> {
     spawn_blocking(state::diagnostics)
         .await
-        .unwrap_or_else(|error| Err(blocking_join_error("daemon workspace diagnostics", error)))
+        .unwrap_or_else(|error| Err(blocking_join_error("daemon workspace diagnostics", &error)))
 }
 
-fn blocking_join_error(operation: &str, error: JoinError) -> CliError {
+fn blocking_join_error(operation: &str, error: &JoinError) -> CliError {
     CliErrorKind::workflow_io(format!("join {operation} worker: {error}")).into()
 }
 

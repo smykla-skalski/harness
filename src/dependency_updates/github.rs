@@ -1,4 +1,5 @@
 use std::collections::BTreeMap;
+use std::slice;
 use std::sync::OnceLock;
 
 use octocrab::Octocrab;
@@ -261,7 +262,12 @@ impl DependencyUpdatesGitHubClient {
         for target in &request.targets {
             let result = if let Some(config) = github_project_config(&target.repository) {
                 self.automation
-                    .sync_pull_request_labels(&config, target.number, &[], &[request.label.clone()])
+                    .sync_pull_request_labels(
+                        &config,
+                        target.number,
+                        &[],
+                        slice::from_ref(&request.label),
+                    )
                     .await
             } else {
                 Err(CliErrorKind::workflow_parse(format!(

@@ -130,9 +130,7 @@ fn bridge_start_with_mock_codex_publishes_codex_capability() {
         output_text(&stop_output)
     );
 
-    let state_path = tmp
-        .path()
-        .join("harness/daemon/managed/bridge.json");
+    let state_path = tmp.path().join("harness/daemon/managed/bridge.json");
     assert!(!state_path.exists(), "state file should be cleaned up");
 
     let deadline = Instant::now() + BRIDGE_WAIT_TIMEOUT;

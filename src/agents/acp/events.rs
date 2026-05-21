@@ -115,13 +115,10 @@ pub fn materialise_one(
         },
 
         SessionUpdate::SessionInfoUpdate(info) => {
-            if let Some(title) = info.title.value() {
-                ConversationEventKind::StateChange {
-                    from: String::new(),
-                    to: format!("title:{title}"),
-                }
-            } else {
-                return None;
+            let title = info.title.value()?;
+            ConversationEventKind::StateChange {
+                from: String::new(),
+                to: format!("title:{title}"),
             }
         }
 

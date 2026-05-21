@@ -131,10 +131,9 @@ pub(crate) fn parse_common_jsonl(raw_line: &str, agent: &str) -> Option<Conversa
                 content: text.to_string(),
             },
         }
-    } else if let Some(blocks) = content.as_array() {
-        parse_first_block(blocks, role)?
     } else {
-        return None;
+        let blocks = content.as_array()?;
+        parse_first_block(blocks, role)?
     };
 
     Some(ConversationEvent {

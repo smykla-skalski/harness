@@ -7,8 +7,8 @@ use crate::dependency_updates::{
     DependencyUpdateActionOutcome, DependencyUpdateActionResult, DependencyUpdateItem,
     DependencyUpdateTarget, DependencyUpdatesActionResponse, DependencyUpdatesApproveRequest,
     DependencyUpdatesAutoRequest, DependencyUpdatesCacheClearResponse,
-    DependencyUpdatesGitHubClient, DependencyUpdatesLabelRequest,
-    DependencyUpdatesMergeRequest, DependencyUpdatesQueryRequest, DependencyUpdatesQueryResponse,
+    DependencyUpdatesGitHubClient, DependencyUpdatesLabelRequest, DependencyUpdatesMergeRequest,
+    DependencyUpdatesQueryRequest, DependencyUpdatesQueryResponse,
     DependencyUpdatesRepositoryCatalogRequest, DependencyUpdatesRepositoryCatalogResponse,
     DependencyUpdatesRerunChecksRequest,
 };
@@ -37,6 +37,11 @@ struct TokenBoundTargets {
     targets: Vec<DependencyUpdateTarget>,
 }
 
+/// Query dependency update pull requests through configured GitHub tokens.
+///
+/// # Errors
+/// Returns `CliError` when the request is invalid, a required token is missing,
+/// or GitHub cannot return the requested update data.
 pub async fn query_dependency_updates(
     request: &DependencyUpdatesQueryRequest,
 ) -> Result<DependencyUpdatesQueryResponse, CliError> {
@@ -59,7 +64,9 @@ pub async fn query_dependency_updates(
         }
     }
 
-    let mut items = items_by_key.into_values().collect::<Vec<DependencyUpdateItem>>();
+    let mut items = items_by_key
+        .into_values()
+        .collect::<Vec<DependencyUpdateItem>>();
     items.sort_by(|left, right| {
         right
             .updated_at
@@ -72,6 +79,11 @@ pub async fn query_dependency_updates(
     Ok(response)
 }
 
+/// List repositories in an organization that can be used for dependency updates.
+///
+/// # Errors
+/// Returns `CliError` when the request is invalid, the GitHub token is missing,
+/// or GitHub cannot return the repository catalog.
 pub async fn catalog_dependency_update_repositories(
     request: &DependencyUpdatesRepositoryCatalogRequest,
 ) -> Result<DependencyUpdatesRepositoryCatalogResponse, CliError> {
@@ -88,6 +100,11 @@ pub async fn catalog_dependency_update_repositories(
     })
 }
 
+/// Approve selected dependency update pull requests.
+///
+/// # Errors
+/// Returns `CliError` when the request is invalid, a required token is missing,
+/// or GitHub rejects an approval.
 pub async fn approve_dependency_updates(
     request: &DependencyUpdatesApproveRequest,
 ) -> Result<DependencyUpdatesActionResponse, CliError> {
@@ -106,6 +123,11 @@ pub async fn approve_dependency_updates(
     Ok(action_response("Approved dependency updates", results))
 }
 
+/// Merge selected dependency update pull requests.
+///
+/// # Errors
+/// Returns `CliError` when the request is invalid, a required token is missing,
+/// or GitHub rejects a merge.
 pub async fn merge_dependency_updates(
     request: &DependencyUpdatesMergeRequest,
 ) -> Result<DependencyUpdatesActionResponse, CliError> {
@@ -125,6 +147,11 @@ pub async fn merge_dependency_updates(
     Ok(action_response("Merged dependency updates", results))
 }
 
+/// Rerun checks for selected dependency update pull requests.
+///
+/// # Errors
+/// Returns `CliError` when the request is invalid, a required token is missing,
+/// or GitHub rejects the check rerun.
 pub async fn rerun_dependency_updates_checks(
     request: &DependencyUpdatesRerunChecksRequest,
 ) -> Result<DependencyUpdatesActionResponse, CliError> {
@@ -143,6 +170,11 @@ pub async fn rerun_dependency_updates_checks(
     Ok(action_response("Reran dependency update checks", results))
 }
 
+/// Add a label to selected dependency update pull requests.
+///
+/// # Errors
+/// Returns `CliError` when the request is invalid, a required token is missing,
+/// or GitHub rejects the label update.
 pub async fn add_label_to_dependency_updates(
     request: &DependencyUpdatesLabelRequest,
 ) -> Result<DependencyUpdatesActionResponse, CliError> {
@@ -162,6 +194,11 @@ pub async fn add_label_to_dependency_updates(
     Ok(action_response("Labeled dependency updates", results))
 }
 
+/// Apply automatic approve or merge actions to eligible dependency updates.
+///
+/// # Errors
+/// Returns `CliError` when the request is invalid, a required token is missing,
+/// or GitHub rejects an automatic action.
 pub async fn auto_dependency_updates(
     request: &DependencyUpdatesAutoRequest,
 ) -> Result<DependencyUpdatesActionResponse, CliError> {
@@ -194,6 +231,13 @@ pub async fn auto_dependency_updates(
     Ok(action_response("Auto mode finished", results))
 }
 
+/// Clear the in-memory dependency updates query cache.
+///
+/// # Errors
+/// This function currently does not return operational errors.
+///
+/// # Panics
+/// Panics if the dependency updates cache mutex is poisoned.
 pub fn clear_dependency_updates_cache() -> Result<DependencyUpdatesCacheClearResponse, CliError> {
     let mut cache = cache().lock().expect("dependency-updates cache lock");
     let cleared_entries = cache.len();
@@ -209,7 +253,9 @@ fn token_bound_requests(
 
     let org_request = request.organization_only_request();
     if !org_request.normalized_organizations().is_empty() {
-        let token = global_token.clone().ok_or_else(|| missing_token_error(None))?;
+        let token = global_token
+            .clone()
+            .ok_or_else(|| missing_token_error(None))?;
         segments.push(TokenBoundRequest {
             token,
             request: org_request,
@@ -239,7 +285,9 @@ fn token_bound_requests(
     Ok(segments)
 }
 
-fn token_bound_targets(targets: &[DependencyUpdateTarget]) -> Result<Vec<TokenBoundTargets>, CliError> {
+fn token_bound_targets(
+    targets: &[DependencyUpdateTarget],
+) -> Result<Vec<TokenBoundTargets>, CliError> {
     let global_token = github_token(None);
     let mut grouped = BTreeMap::<String, Vec<DependencyUpdateTarget>>::new();
     for target in targets {

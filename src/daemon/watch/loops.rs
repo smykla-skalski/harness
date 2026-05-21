@@ -269,6 +269,10 @@ pub(super) async fn poll_change_tracking_async(
     changes
 }
 
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "tracing macro expansion inflates the score; tokio-rs/tracing#553"
+)]
 async fn reindex_sessions_from_paths_async(
     db: Arc<Mutex<DaemonDb>>,
     paths: Vec<PathBuf>,
@@ -284,6 +288,10 @@ async fn reindex_sessions_from_paths_async(
     }
 }
 
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "tracing macro expansion inflates the score; tokio-rs/tracing#553"
+)]
 fn reindex_extracted_work(db: &Arc<Mutex<DaemonDb>>, work: ReindexWork) {
     if work.is_empty() {
         return;

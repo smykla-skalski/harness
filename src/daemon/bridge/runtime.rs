@@ -153,15 +153,21 @@ fn spawn_bridge_connection_handler(
     let server = Arc::clone(server);
     thread::Builder::new()
         .name("harness-bridge-rpc".to_string())
-        .spawn(move || {
-            if let Err(error) = handle_stream(&server, &stream) {
-                tracing::warn!(%error, "bridge RPC handler failed");
-            }
-        })
+        .spawn(move || handle_bridge_connection_thread(&server, &stream))
         .map(|_| ())
         .map_err(|error| {
             CliErrorKind::workflow_io(format!("spawn bridge RPC handler: {error}")).into()
         })
+}
+
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "tracing macro expansion inflates the score; tokio-rs/tracing#553"
+)]
+fn handle_bridge_connection_thread(server: &Arc<BridgeServer>, stream: &UnixStream) {
+    if let Err(error) = handle_stream(server, stream) {
+        tracing::warn!(%error, "bridge RPC handler failed");
+    }
 }
 
 /// RAII guard that unlinks the bridge unix socket file on drop, unless

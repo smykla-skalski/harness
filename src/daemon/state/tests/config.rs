@@ -8,8 +8,8 @@ use super::super::{
     load_persisted_log_level, load_runtime_config, load_task_board_git_runtime_config,
     persist_log_level, persist_task_board_git_runtime_config, read_recent_events,
     replace_task_board_git_runtime_secrets, replace_task_board_github_tokens,
-    replace_task_board_openrouter_token, replace_task_board_todoist_token,
-    task_board_github_token, task_board_openrouter_token, task_board_todoist_token,
+    replace_task_board_openrouter_token, replace_task_board_todoist_token, task_board_github_token,
+    task_board_openrouter_token, task_board_todoist_token,
 };
 use crate::task_board::{
     TaskBoardGitHubRepositoryToken, TaskBoardGitHubTokensSyncRequest, TaskBoardGitRuntimeConfig,
