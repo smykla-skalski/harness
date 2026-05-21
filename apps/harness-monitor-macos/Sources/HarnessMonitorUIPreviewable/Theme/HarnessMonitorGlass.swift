@@ -286,26 +286,30 @@ private struct HarnessMonitorToastDismissGlassModifier: ViewModifier {
     colorSchemeContrast == .increased ? 0.28 : 0.18
   }
 
+  private var glassTintOpacity: Double {
+    colorSchemeContrast == .increased ? 0.24 : 0.16
+  }
+
   func body(content: Content) -> some View {
-    let fillOpacity =
-      reduceTransparency
-      ? fallbackFillOpacity
-      : (colorSchemeContrast == .increased ? 0.16 : 0.12)
-    let strokeOpacity =
-      reduceTransparency
-      ? fallbackStrokeOpacity
-      : (colorSchemeContrast == .increased ? 0.24 : 0.18)
-    content
-      .background {
-        Circle().fill(HarnessMonitorTheme.ink.opacity(fillOpacity))
-      }
-      .overlay {
-        Circle()
-          .strokeBorder(
-            HarnessMonitorTheme.ink.opacity(strokeOpacity),
-            lineWidth: colorSchemeContrast == .increased ? 1.5 : 1
-          )
-      }
+    if reduceTransparency {
+      content
+        .background {
+          Circle().fill(HarnessMonitorTheme.ink.opacity(fallbackFillOpacity))
+        }
+        .overlay {
+          Circle()
+            .strokeBorder(
+              HarnessMonitorTheme.ink.opacity(fallbackStrokeOpacity),
+              lineWidth: colorSchemeContrast == .increased ? 1.5 : 1
+            )
+        }
+    } else {
+      content
+        .glassEffect(
+          .regular.tint(HarnessMonitorTheme.ink.opacity(glassTintOpacity)),
+          in: .circle
+        )
+    }
   }
 }
 
@@ -340,23 +344,27 @@ private struct HarnessMonitorFeedbackToastGlassModifier: ViewModifier {
     colorSchemeContrast == .increased ? 1.5 : 1
   }
 
+  private var glassTintOpacity: Double {
+    colorSchemeContrast == .increased ? 0.28 : 0.2
+  }
+
   func body(content: Content) -> some View {
     let shape = RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-    let fillOpacity =
-      reduceTransparency
-      ? fallbackFillOpacity
-      : (colorSchemeContrast == .increased ? 0.28 : 0.2)
-    let strokeOpacity =
-      reduceTransparency
-      ? fallbackStrokeOpacity
-      : (colorSchemeContrast == .increased ? 0.42 : 0.28)
-    content
-      .background {
-        shape.fill(tint.opacity(fillOpacity))
-      }
-      .overlay {
-        shape.strokeBorder(tint.opacity(strokeOpacity), lineWidth: fallbackStrokeWidth)
-      }
+    if reduceTransparency {
+      content
+        .background {
+          shape.fill(tint.opacity(fallbackFillOpacity))
+        }
+        .overlay {
+          shape.strokeBorder(tint.opacity(fallbackStrokeOpacity), lineWidth: fallbackStrokeWidth)
+        }
+    } else {
+      content
+        .glassEffect(
+          .regular.tint(tint.opacity(glassTintOpacity)),
+          in: .rect(cornerRadius: cornerRadius, style: .continuous)
+        )
+    }
   }
 }
 
