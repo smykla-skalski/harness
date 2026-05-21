@@ -3,6 +3,9 @@ import SwiftUI
 
 private enum SleepPreventionToolbarSymbolLayout {
   static let size: CGFloat = 14
+  // `cup.and.heat.waves` reads slightly low-left when AppKit centers its square
+  // bounds inside the circular toolbar capsule, so nudge it to its optical center.
+  static let opticalOffset = CGSize(width: 0.5, height: -0.5)
 }
 
 struct SleepPreventionToolbarPresentation: Equatable {
@@ -48,6 +51,10 @@ struct SleepPreventionToolbarButton: View {
           .frame(
             width: SleepPreventionToolbarSymbolLayout.size,
             height: SleepPreventionToolbarSymbolLayout.size
+          )
+          .offset(
+            x: SleepPreventionToolbarSymbolLayout.opticalOffset.width,
+            y: SleepPreventionToolbarSymbolLayout.opticalOffset.height
           )
       }
     }
