@@ -6,6 +6,7 @@ struct SettingsTaskBoardSection: View, SettingsTaskBoardEditingSurface {
   @Binding private var taskBoardFormState: TaskBoardSettingsFormState
   @Binding var navigationRequest: SettingsNavigationRequest?
   @State private var pendingNavigationRequestID: UUID?
+  @State private var isFullyExpanded = false
 
   var formState: Binding<TaskBoardSettingsFormState> { $taskBoardFormState }
 
@@ -32,15 +33,18 @@ struct SettingsTaskBoardSection: View, SettingsTaskBoardEditingSurface {
             .id(SettingsTaskBoardAnchor.githubProject)
           monitoredRepositoriesSection
             .id(SettingsTaskBoardAnchor.githubInbox)
-          githubInboxSection
-          SettingsTaskBoardHostSection(store: store)
-          automationSection
-          authorIdentitySection
+          if isFullyExpanded {
+            githubInboxSection
+            SettingsTaskBoardHostSection(store: store)
+            automationSection
+            authorIdentitySection
+          }
         }
       }
       .settingsDetailFormStyle()
       .accessibilityIdentifier(HarnessMonitorAccessibility.settingsTaskBoardRoot)
       .task { await loadSettingsIfNeeded() }
+      .task { await expandAfterFirstFrame() }
       .onChange(of: navigationRequest, initial: true) { _, request in
         scrollToNavigationRequest(request, proxy: proxy)
       }
@@ -55,6 +59,12 @@ struct SettingsTaskBoardSection: View, SettingsTaskBoardEditingSurface {
         saveAccessibilityIdentifier: HarnessMonitorAccessibility.settingsTaskBoardSaveButton
       )
     }
+  }
+
+  private func expandAfterFirstFrame() async {
+    guard !isFullyExpanded else { return }
+    try? await Task.sleep(for: .milliseconds(40))
+    isFullyExpanded = true
   }
 
   private func statusSection(message: String) -> some View {
