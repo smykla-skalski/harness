@@ -7,6 +7,7 @@ use crate::dependency_updates::{
     DependencyUpdateActionOutcome, DependencyUpdateActionResult, DependencyUpdateItem,
     DependencyUpdatePullRequestState, DependencyUpdateRepositoryLabel, DependencyUpdateTarget,
     DependencyUpdatesActionResponse, DependencyUpdatesApproveRequest, DependencyUpdatesAutoRequest,
+    DependencyUpdatesBodyRequest, DependencyUpdatesBodyResponse,
     DependencyUpdatesCacheClearResponse, DependencyUpdatesGitHubClient,
     DependencyUpdatesLabelRequest, DependencyUpdatesMergeRequest, DependencyUpdatesQueryRequest,
     DependencyUpdatesQueryResponse, DependencyUpdatesRefreshRequest,
@@ -20,11 +21,19 @@ use crate::workspace::utc_now;
 
 static DEPENDENCY_UPDATES_CACHE: OnceLock<Mutex<BTreeMap<String, CachedDependencyUpdates>>> =
     OnceLock::new();
+static DEPENDENCY_UPDATES_BODY_CACHE: OnceLock<Mutex<BTreeMap<String, CachedDependencyUpdateBody>>> =
+    OnceLock::new();
 
 #[derive(Clone)]
 struct CachedDependencyUpdates {
     stored_at: Instant,
     response: DependencyUpdatesQueryResponse,
+}
+
+#[derive(Clone)]
+struct CachedDependencyUpdateBody {
+    stored_at: Instant,
+    response: DependencyUpdatesBodyResponse,
 }
 
 #[derive(Clone)]
@@ -277,17 +286,57 @@ pub async fn refresh_dependency_updates(
     })
 }
 
-/// Clear the in-memory dependency updates query cache.
+/// Fetch the description body for a single dependency update pull request.
+///
+/// Caches per `pull_request_id` for `cache_max_age_seconds` to keep repeated
+/// detail-pane opens cheap. The bulk list query intentionally omits `body`.
+///
+/// # Errors
+/// Returns `CliError` when the request is invalid, the GitHub token is
+/// missing, or GitHub cannot return the pull request.
+pub async fn fetch_dependency_update_body(
+    request: &DependencyUpdatesBodyRequest,
+) -> Result<DependencyUpdatesBodyResponse, CliError> {
+    request.validate()?;
+    let cache_key = request.normalized_pull_request_id();
+    if !request.force_refresh
+        && let Some(response) =
+            cached_body_response(&cache_key, request.cache_max_age_seconds())
+    {
+        return Ok(response);
+    }
+
+    let token = github_token(None).ok_or_else(|| missing_token_error(None))?;
+    let client = DependencyUpdatesGitHubClient::new(&token)?;
+    let (body, pr_updated_at) = client.fetch_pull_request_body(&cache_key).await?;
+    let response = DependencyUpdatesBodyResponse {
+        pull_request_id: cache_key.clone(),
+        body,
+        pr_updated_at,
+        fetched_at: utc_now(),
+        from_cache: false,
+    };
+    store_cached_body_response(cache_key, &response);
+    Ok(response)
+}
+
+/// Clear the in-memory dependency updates query cache (list + body).
 ///
 /// # Errors
 /// This function currently does not return operational errors.
 ///
 /// # Panics
-/// Panics if the dependency updates cache mutex is poisoned.
+/// Panics if either dependency updates cache mutex is poisoned.
 pub fn clear_dependency_updates_cache() -> Result<DependencyUpdatesCacheClearResponse, CliError> {
     let mut cache = cache().lock().expect("dependency-updates cache lock");
-    let cleared_entries = cache.len();
+    let mut cleared_entries = cache.len();
     cache.clear();
+    drop(cache);
+    let mut body_cache = body_cache()
+        .lock()
+        .expect("dependency-updates body cache lock");
+    cleared_entries += body_cache.len();
+    body_cache.clear();
     Ok(DependencyUpdatesCacheClearResponse { cleared_entries })
 }
 
@@ -456,6 +505,39 @@ fn store_cached_query_response(cache_key: String, response: &DependencyUpdatesQu
     cache.insert(
         cache_key,
         CachedDependencyUpdates {
+            stored_at: Instant::now(),
+            response: response.clone(),
+        },
+    );
+}
+
+fn body_cache() -> &'static Mutex<BTreeMap<String, CachedDependencyUpdateBody>> {
+    DEPENDENCY_UPDATES_BODY_CACHE.get_or_init(|| Mutex::new(BTreeMap::new()))
+}
+
+fn cached_body_response(
+    cache_key: &str,
+    max_age_seconds: u64,
+) -> Option<DependencyUpdatesBodyResponse> {
+    let cache = body_cache()
+        .lock()
+        .expect("dependency-updates body cache lock");
+    let entry = cache.get(cache_key)?;
+    if entry.stored_at.elapsed().as_secs() > max_age_seconds {
+        return None;
+    }
+    let mut response = entry.response.clone();
+    response.from_cache = true;
+    Some(response)
+}
+
+fn store_cached_body_response(cache_key: String, response: &DependencyUpdatesBodyResponse) {
+    let mut cache = body_cache()
+        .lock()
+        .expect("dependency-updates body cache lock");
+    cache.insert(
+        cache_key,
+        CachedDependencyUpdateBody {
             stored_at: Instant::now(),
             response: response.clone(),
         },

@@ -237,6 +237,17 @@ query DependencyUpdateRepositoryLabelsPage($id: ID!, $after: String) {
 }
 ";
 
+pub(super) const PULL_REQUEST_BODY_QUERY: &str = r"
+query PullRequestBody($id: ID!) {
+  node(id: $id) {
+    ... on PullRequest {
+      body
+      updatedAt
+    }
+  }
+}
+";
+
 pub(super) const APPROVE_MUTATION: &str = r"
 mutation ApproveDependencyUpdate($id: ID!) {
   addPullRequestReview(input: { pullRequestId: $id, event: APPROVE }) {

@@ -220,3 +220,16 @@ pub(super) struct RepositoryLabelsPageNode {
     pub(super) name_with_owner: String,
     pub(super) labels: RepositoryLabelConnection,
 }
+
+#[derive(Debug, Deserialize)]
+pub(super) struct PullRequestBodyResponse {
+    pub(super) node: Option<PullRequestBodyNode>,
+}
+
+#[derive(Debug, Deserialize)]
+pub(super) struct PullRequestBodyNode {
+    #[serde(default)]
+    pub(super) body: Option<String>,
+    #[serde(rename = "updatedAt")]
+    pub(super) updated_at: String,
+}
