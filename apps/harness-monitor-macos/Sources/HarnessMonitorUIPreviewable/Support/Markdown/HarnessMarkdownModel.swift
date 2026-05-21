@@ -7,7 +7,7 @@ struct HarnessMarkdownDocument: Equatable, Sendable {
 }
 
 struct HarnessMarkdownAlert: Equatable, Sendable {
-  enum Kind: String, Equatable, Sendable {
+  enum Kind: String, CaseIterable, Equatable, Sendable {
     case note
     case tip
     case important
