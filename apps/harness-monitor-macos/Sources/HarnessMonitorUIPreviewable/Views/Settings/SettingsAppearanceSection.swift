@@ -7,19 +7,6 @@ public struct SettingsAppearanceSection: View {
   @AppStorage(HarnessMonitorBackgroundDefaults.imageKey)
   private var backgroundImageRawValue = HarnessMonitorBackgroundSelection.defaultSelection
     .storageValue
-  @AppStorage(HarnessMonitorTextSize.storageKey)
-  private var textSizeIndex = HarnessMonitorTextSize.defaultIndex
-  @AppStorage(HarnessMonitorMenuBarDefaults.stateColorVariantsEnabledKey)
-  private var menuBarStateColorVariantsEnabled =
-    HarnessMonitorMenuBarDefaults.stateColorVariantsEnabledDefault
-  @AppStorage(SessionWindowKeyboardShortcutOverlaySettings.storageKey)
-  private var sessionShortcutOverlaysEnabled =
-    SessionWindowKeyboardShortcutOverlaySettings.defaultValue
-  @AppStorage(HarnessMonitorSessionTitleBlurDefaults.enabledKey)
-  private var sessionTitleBlurEnabled = HarnessMonitorSessionTitleBlurDefaults.enabledDefault
-  @AppStorage(HarnessMonitorSidebarSessionRowDisplayMode.storageKey)
-  private var sidebarSessionRowDisplayModeRawValue =
-    HarnessMonitorSidebarSessionRowDisplayMode.defaultMode.rawValue
   @State private var selectedBackgroundTab: BackgroundCollectionTab = .featured
   @State private var isFullyExpanded = false
 
@@ -31,88 +18,9 @@ public struct SettingsAppearanceSection: View {
     HarnessMonitorBackgroundSelection.decode(backgroundImageRawValue)
   }
 
-  private var sidebarSessionRowDisplayMode: Binding<HarnessMonitorSidebarSessionRowDisplayMode> {
-    Binding(
-      get: {
-        HarnessMonitorSidebarSessionRowDisplayMode.resolved(
-          rawValue: sidebarSessionRowDisplayModeRawValue
-        )
-      },
-      set: { sidebarSessionRowDisplayModeRawValue = $0.rawValue }
-    )
-  }
-
   public var body: some View {
     Form {
-      Section {
-        Picker("Theme mode", selection: $themeMode) {
-          ForEach(HarnessMonitorThemeMode.allCases) {
-            Text($0.label).tag($0)
-          }
-        }
-        .harnessNativeFormControl()
-        .accessibilityHint("Changes the color scheme for all windows")
-        .accessibilityIdentifier(HarnessMonitorAccessibility.settingsThemeModePicker)
-
-        Picker("Text size", selection: $textSizeIndex) {
-          ForEach(Array(HarnessMonitorTextSize.scales.enumerated()), id: \.offset) { index, level in
-            Text(level.label).tag(index)
-          }
-        }
-        .harnessNativeFormControl()
-        .accessibilityHint("Scales text throughout the application")
-        .accessibilityIdentifier(HarnessMonitorAccessibility.settingsTextSizePicker)
-
-        Picker("Sidebar session rows", selection: sidebarSessionRowDisplayMode) {
-          ForEach(HarnessMonitorSidebarSessionRowDisplayMode.allCases) { mode in
-            Text(mode.label).tag(mode)
-          }
-        }
-        .harnessNativeFormControl()
-        .accessibilityHint(
-          "Switches the session sidebar between strict rows and a native-compatible dense mode"
-        )
-        .accessibilityIdentifier(
-          HarnessMonitorAccessibility.settingsSessionRowModePicker
-        )
-
-        Toggle("Session shortcut overlays", isOn: $sessionShortcutOverlaysEnabled)
-          .accessibilityHint(
-            "Shows or hides the floating keyboard shortcut hints in session windows"
-          )
-          .accessibilityIdentifier(
-            HarnessMonitorAccessibility.settingsSessionShortcutOverlaysToggle
-          )
-
-        Toggle("Session title blur", isOn: $sessionTitleBlurEnabled)
-          .accessibilityHint(
-            "Shows or hides the softened session status glow behind session window titles"
-          )
-          .accessibilityIdentifier(
-            HarnessMonitorAccessibility.settingsSessionTitleBlurToggle
-          )
-
-        Picker("Backdrop", selection: $backdropModeRawValue) {
-          ForEach(HarnessMonitorBackdropMode.allCases) { mode in
-            Text(mode.label).tag(mode.rawValue)
-          }
-        }
-        .harnessNativeFormControl()
-        .accessibilityHint("Controls where the background image renders")
-        .accessibilityIdentifier(HarnessMonitorAccessibility.settingsBackdropModePicker)
-
-        Toggle("Color menu bar icon by state", isOn: $menuBarStateColorVariantsEnabled)
-          .accessibilityHint(
-            "Uses colored warning and critical variants for the menu bar icon when attention changes"
-          )
-          .accessibilityIdentifier(
-            HarnessMonitorAccessibility.settingsMenuBarStateColorsToggle
-          )
-      } header: {
-        Text("Appearance")
-      } footer: {
-        Text(appearanceFooterText)
-      }
+      AppearanceMainSection(themeMode: $themeMode)
 
       if isFullyExpanded {
         backgroundImageSection
@@ -130,17 +38,6 @@ public struct SettingsAppearanceSection: View {
     guard !isFullyExpanded else { return }
     try? await Task.sleep(for: .milliseconds(40))
     isFullyExpanded = true
-  }
-
-  private var appearanceFooterText: String {
-    let parts = [
-      "Theme mode, text size, and sidebar session rows apply to every Harness Monitor window",
-      "Session shortcut overlays and title blur control optional session-window chrome",
-      "Backdrop controls where the softened background image renders",
-      "The menu bar icon can follow app state colors or stay neutral",
-      "Choosing an image turns on the window backdrop if it is currently off",
-    ]
-    return parts.joined(separator: " ")
   }
 
   private var isBackdropDisabled: Bool {
@@ -169,6 +66,119 @@ public struct SettingsAppearanceSection: View {
   private func selectTabForCurrentBackground() {
     if case .system = selectedBackground.source {
       selectedBackgroundTab = .native
+    }
+  }
+}
+
+private struct AppearanceMainSection: View {
+  @Binding var themeMode: HarnessMonitorThemeMode
+  @AppStorage(HarnessMonitorBackdropDefaults.modeKey)
+  private var backdropModeRawValue = HarnessMonitorBackdropMode.none.rawValue
+  @AppStorage(HarnessMonitorTextSize.storageKey)
+  private var textSizeIndex = HarnessMonitorTextSize.defaultIndex
+  @AppStorage(HarnessMonitorMenuBarDefaults.stateColorVariantsEnabledKey)
+  private var menuBarStateColorVariantsEnabled =
+    HarnessMonitorMenuBarDefaults.stateColorVariantsEnabledDefault
+  @AppStorage(SessionWindowKeyboardShortcutOverlaySettings.storageKey)
+  private var sessionShortcutOverlaysEnabled =
+    SessionWindowKeyboardShortcutOverlaySettings.defaultValue
+  @AppStorage(HarnessMonitorSessionTitleBlurDefaults.enabledKey)
+  private var sessionTitleBlurEnabled = HarnessMonitorSessionTitleBlurDefaults.enabledDefault
+  @AppStorage(HarnessMonitorSidebarSessionRowDisplayMode.storageKey)
+  private var sidebarSessionRowDisplayModeRawValue =
+    HarnessMonitorSidebarSessionRowDisplayMode.defaultMode.rawValue
+
+  private var sidebarSessionRowDisplayMode: Binding<HarnessMonitorSidebarSessionRowDisplayMode> {
+    Binding(
+      get: {
+        HarnessMonitorSidebarSessionRowDisplayMode.resolved(
+          rawValue: sidebarSessionRowDisplayModeRawValue
+        )
+      },
+      set: { sidebarSessionRowDisplayModeRawValue = $0.rawValue }
+    )
+  }
+
+  private var appearanceFooterText: String {
+    let parts = [
+      "Theme mode, text size, and sidebar session rows apply to every Harness Monitor window",
+      "Session shortcut overlays and title blur control optional session-window chrome",
+      "Backdrop controls where the softened background image renders",
+      "The menu bar icon can follow app state colors or stay neutral",
+      "Choosing an image turns on the window backdrop if it is currently off",
+    ]
+    return parts.joined(separator: " ")
+  }
+
+  var body: some View {
+    Section {
+      Picker("Theme mode", selection: $themeMode) {
+        ForEach(HarnessMonitorThemeMode.allCases) {
+          Text($0.label).tag($0)
+        }
+      }
+      .harnessNativeFormControl()
+      .accessibilityHint("Changes the color scheme for all windows")
+      .accessibilityIdentifier(HarnessMonitorAccessibility.settingsThemeModePicker)
+
+      Picker("Text size", selection: $textSizeIndex) {
+        ForEach(Array(HarnessMonitorTextSize.scales.enumerated()), id: \.offset) { index, level in
+          Text(level.label).tag(index)
+        }
+      }
+      .harnessNativeFormControl()
+      .accessibilityHint("Scales text throughout the application")
+      .accessibilityIdentifier(HarnessMonitorAccessibility.settingsTextSizePicker)
+
+      Picker("Sidebar session rows", selection: sidebarSessionRowDisplayMode) {
+        ForEach(HarnessMonitorSidebarSessionRowDisplayMode.allCases) { mode in
+          Text(mode.label).tag(mode)
+        }
+      }
+      .harnessNativeFormControl()
+      .accessibilityHint(
+        "Switches the session sidebar between strict rows and a native-compatible dense mode"
+      )
+      .accessibilityIdentifier(
+        HarnessMonitorAccessibility.settingsSessionRowModePicker
+      )
+
+      Toggle("Session shortcut overlays", isOn: $sessionShortcutOverlaysEnabled)
+        .accessibilityHint(
+          "Shows or hides the floating keyboard shortcut hints in session windows"
+        )
+        .accessibilityIdentifier(
+          HarnessMonitorAccessibility.settingsSessionShortcutOverlaysToggle
+        )
+
+      Toggle("Session title blur", isOn: $sessionTitleBlurEnabled)
+        .accessibilityHint(
+          "Shows or hides the softened session status glow behind session window titles"
+        )
+        .accessibilityIdentifier(
+          HarnessMonitorAccessibility.settingsSessionTitleBlurToggle
+        )
+
+      Picker("Backdrop", selection: $backdropModeRawValue) {
+        ForEach(HarnessMonitorBackdropMode.allCases) { mode in
+          Text(mode.label).tag(mode.rawValue)
+        }
+      }
+      .harnessNativeFormControl()
+      .accessibilityHint("Controls where the background image renders")
+      .accessibilityIdentifier(HarnessMonitorAccessibility.settingsBackdropModePicker)
+
+      Toggle("Color menu bar icon by state", isOn: $menuBarStateColorVariantsEnabled)
+        .accessibilityHint(
+          "Uses colored warning and critical variants for the menu bar icon when attention changes"
+        )
+        .accessibilityIdentifier(
+          HarnessMonitorAccessibility.settingsMenuBarStateColorsToggle
+        )
+    } header: {
+      Text("Appearance")
+    } footer: {
+      Text(appearanceFooterText)
     }
   }
 }
