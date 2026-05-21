@@ -6,7 +6,7 @@ extension SessionWindowView {
   func refreshDecisionsCache() async {
     let sessionDecisionIDs = store.supervisorOpenDecisionIDsBySession[token.sessionID] ?? []
     let sessionDecisionItems =
-      store.supervisorOpenDecisionPresentationItemsBySession[token.sessionID] ?? []
+      store.supervisorPresentationItemsBySession[token.sessionID] ?? []
     let all = store.supervisorOpenDecisionsBySession[token.sessionID] ?? []
     let allIDs = Set(sessionDecisionIDs)
     if sessionDecisionIDs != allSessionDecisionIDsInOrderCache {
@@ -16,7 +16,7 @@ extension SessionWindowView {
       allSessionDecisionPresentationItemsCache = sessionDecisionItems
     }
     let searchProjections =
-      store.supervisorOpenDecisionSearchProjectionsBySession[token.sessionID] ?? []
+      store.supervisorSearchProjectionsBySession[token.sessionID] ?? []
     if searchProjections != allSessionDecisionSearchProjectionsCache {
       allSessionDecisionSearchProjectionsCache = searchProjections
     }
@@ -41,7 +41,7 @@ extension SessionWindowView {
   @MainActor
   func refilterDecisionsCache() async {
     let cachedItems =
-      store.supervisorOpenDecisionPresentationItemsBySession[token.sessionID]
+      store.supervisorPresentationItemsBySession[token.sessionID]
       ?? allSessionDecisionPresentationItemsCache
     await refilterDecisionsCache(
       decisions: allSessionDecisionsCache,

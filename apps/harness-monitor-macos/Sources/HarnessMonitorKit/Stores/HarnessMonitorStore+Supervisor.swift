@@ -215,9 +215,9 @@ extension HarnessMonitorStore {
     supervisorOpenDecisionsByID = [:]
     supervisorOpenDecisionsBySession = [:]
     supervisorOpenDecisionPresentationItems = []
-    supervisorOpenDecisionPresentationItemsBySession = [:]
+    supervisorPresentationItemsBySession = [:]
     supervisorOpenDecisionSearchProjections = []
-    supervisorOpenDecisionSearchProjectionsBySession = [:]
+    supervisorSearchProjectionsBySession = [:]
     supervisorOpenDecisionIDsBySession = [:]
     supervisorSelectedDecisionID = nil
     supervisorPrimaryActionFocusDecisionID = nil
