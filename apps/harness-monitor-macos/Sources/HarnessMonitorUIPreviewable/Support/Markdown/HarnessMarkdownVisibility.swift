@@ -13,6 +13,8 @@ extension HarnessMarkdownListItem {
 extension HarnessMarkdownBlock {
   var rendersVisibleMarkdownContent: Bool {
     switch self {
+    case .alert:
+      true
     case .blockQuote(let blocks):
       blocks.contains { $0.rendersVisibleMarkdownContent }
     case .codeBlock(_, let source, _):

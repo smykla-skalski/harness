@@ -120,6 +120,69 @@ struct HarnessMarkdownParserTests {
     #expect(!body.contains(.text("hidden")))
   }
 
+  @Test("Parser recognizes GitHub alerts with trailing marker whitespace")
+  func parserRecognizesGitHubAlerts() {
+    let document = HarnessMarkdownParser.parse(
+      """
+      > [!NOTE]   
+      > Useful information that users should know.
+      """
+    )
+
+    guard case .alert(let alert)? = document.blocks.first else {
+      Issue.record("Expected alert block")
+      return
+    }
+    #expect(alert.kind == .note)
+    guard case .paragraph(let body)? = alert.blocks.first else {
+      Issue.record("Expected alert paragraph body")
+      return
+    }
+    #expect(body == [.text("Useful information that users should know.")])
+  }
+
+  @Test("Parser recognizes GitHub alerts after a leading blank quote line")
+  func parserRecognizesGitHubAlertsAfterLeadingBlankQuoteLine() {
+    let document = HarnessMarkdownParser.parse(
+      """
+      >
+      > [!WARNING]
+      > Check configuration before continuing.
+      """
+    )
+
+    guard case .alert(let alert)? = document.blocks.first else {
+      Issue.record("Expected alert block after blank quote line")
+      return
+    }
+    #expect(alert.kind == .warning)
+    guard case .paragraph(let body)? = alert.blocks.first else {
+      Issue.record("Expected alert paragraph body")
+      return
+    }
+    #expect(body == [.text("Check configuration before continuing.")])
+  }
+
+  @Test("Unknown GitHub alert markers fall back to plain block quotes")
+  func unknownGitHubAlertMarkersFallbackToBlockQuotes() {
+    let document = HarnessMarkdownParser.parse(
+      """
+      > [!UNKNOWN]
+      > This stays a quote.
+      """
+    )
+
+    guard case .blockQuote(let blocks)? = document.blocks.first else {
+      Issue.record("Expected plain block quote")
+      return
+    }
+    guard case .paragraph(let body)? = blocks.first else {
+      Issue.record("Expected quote paragraph body")
+      return
+    }
+    #expect(body == [.text("[!UNKNOWN]"), .softBreak, .text("This stays a quote.")])
+  }
+
   @Test("Malformed fences parse as code through end of source")
   func preservesMalformedFencesAsCodeUntilEnd() {
     let document = HarnessMarkdownParser.parse(

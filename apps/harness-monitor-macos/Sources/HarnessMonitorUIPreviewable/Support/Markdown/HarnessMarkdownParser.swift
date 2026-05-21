@@ -145,8 +145,21 @@ private struct HarnessMarkdownBlockParser {
       quoteLines.append(content)
       index += 1
     }
+    if let alert = parseGitHubAlert(from: quoteLines) {
+      return alert
+    }
     var parser = childParser(lines: quoteLines)
     return .blockQuote(parser.parseBlocks())
+  }
+
+  private func parseGitHubAlert(from quoteLines: [String]) -> HarnessMarkdownBlock? {
+    guard let markerIndex = quoteLines.firstIndex(where: { !$0.isBlank }),
+      let kind = githubAlertKind(quoteLines[markerIndex])
+    else {
+      return nil
+    }
+    var parser = childParser(lines: Array(quoteLines.dropFirst(markerIndex + 1)))
+    return .alert(HarnessMarkdownAlert(kind: kind, blocks: parser.parseBlocks()))
   }
 
   private mutating func parseUnorderedList() -> HarnessMarkdownBlock {

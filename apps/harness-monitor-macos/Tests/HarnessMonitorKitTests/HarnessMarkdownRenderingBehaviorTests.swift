@@ -38,6 +38,27 @@ struct HarnessMarkdownRenderingBehaviorTests {
     #expect(!textSource.contains("firstLineCenterBaselineOffset"))
   }
 
+  @Test("Markdown alerts remain visible even without body content")
+  func markdownAlertsRemainVisibleWithoutBodyContent() {
+    let alert = HarnessMarkdownBlock.alert(HarnessMarkdownAlert(kind: .note, blocks: []))
+
+    #expect(alert.rendersVisibleMarkdownContent)
+  }
+
+  @Test("Markdown alerts render through a dedicated card view")
+  func markdownAlertsRenderThroughDedicatedCardView() throws {
+    let source = try readRepositoryFile(
+      "apps/harness-monitor-macos/Sources/HarnessMonitorUIPreviewable"
+        + "/Views/Shared/HarnessMonitorMarkdownText.swift"
+    )
+
+    #expect(source.contains("HarnessMarkdownAlertView"))
+    #expect(source.contains("case .alert(let alert):"))
+    #expect(source.contains("style.colors.alertAccent(for: alert.kind)"))
+    #expect(source.contains("Image(systemName: alert.kind.symbolName)"))
+    #expect(source.contains(".background(cardBackground(accent: accent))"))
+  }
+
   @Test("Markdown table renderer keeps content-width columns")
   func markdownTableRendererKeepsContentWidthColumns() throws {
     let source = try readRepositoryFile(

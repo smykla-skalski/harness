@@ -6,7 +6,68 @@ struct HarnessMarkdownDocument: Equatable, Sendable {
   let blocks: [HarnessMarkdownBlock]
 }
 
+struct HarnessMarkdownAlert: Equatable, Sendable {
+  enum Kind: String, Equatable, Sendable {
+    case note
+    case tip
+    case important
+    case warning
+    case caution
+
+    init?(marker: String) {
+      switch marker.lowercased() {
+      case "note":
+        self = .note
+      case "tip":
+        self = .tip
+      case "important":
+        self = .important
+      case "warning":
+        self = .warning
+      case "caution":
+        self = .caution
+      default:
+        return nil
+      }
+    }
+
+    var title: String {
+      switch self {
+      case .note:
+        "Note"
+      case .tip:
+        "Tip"
+      case .important:
+        "Important"
+      case .warning:
+        "Warning"
+      case .caution:
+        "Caution"
+      }
+    }
+
+    var symbolName: String {
+      switch self {
+      case .note:
+        "info.circle.fill"
+      case .tip:
+        "lightbulb.fill"
+      case .important:
+        "exclamationmark.circle.fill"
+      case .warning:
+        "exclamationmark.triangle.fill"
+      case .caution:
+        "exclamationmark.octagon.fill"
+      }
+    }
+  }
+
+  let kind: Kind
+  let blocks: [HarnessMarkdownBlock]
+}
+
 indirect enum HarnessMarkdownBlock: Equatable, Sendable {
+  case alert(HarnessMarkdownAlert)
   case blockQuote([Self])
   case codeBlock(language: HarnessCodeLanguage, source: String, tokens: [HarnessCodeToken])
   case details(HarnessMarkdownDetails)

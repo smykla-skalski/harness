@@ -111,6 +111,11 @@ struct SettingsMarkdownSection: View {
       colorRow("Links", \.colors.link)
       colorRow("Inline code text", \.colors.inlineCodeText)
       colorRow("Inline code background", \.colors.inlineCodeBackground)
+      colorRow("Alert note", \.colors.alertNote)
+      colorRow("Alert tip", \.colors.alertTip)
+      colorRow("Alert important", \.colors.alertImportant)
+      colorRow("Alert warning", \.colors.alertWarning)
+      colorRow("Alert caution", \.colors.alertCaution)
       colorRow("Quote bar", \.colors.quoteBar)
       colorRow("Table background", \.colors.tableBackground)
       colorRow("Table border", \.colors.tableBorder)
@@ -233,6 +238,21 @@ struct SettingsMarkdownSection: View {
     - Parent item
       - Nested item
     - [ ] Task item
+
+    > [!NOTE]
+    > Note alert
+
+    > [!TIP]
+    > Tip alert
+
+    > [!IMPORTANT]
+    > Important alert
+
+    > [!WARNING]
+    > Warning alert
+
+    > [!CAUTION]
+    > Caution alert
 
     `inline code` and [link](https://example.com)
 

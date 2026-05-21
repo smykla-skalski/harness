@@ -198,6 +198,8 @@ private struct HarnessMarkdownBlockView: View {
 
   var body: some View {
     switch block {
+    case .alert(let alert):
+      HarnessMarkdownAlertView(alert: alert, settings: settings, style: style)
     case .blockQuote(let blocks):
       HarnessMarkdownQuoteView(blocks: blocks, settings: settings, style: style)
     case .codeBlock(let language, let source, let tokens):
@@ -280,6 +282,91 @@ enum HarnessMarkdownInlinePlainText {
     case .link(let label, _, _):
       string(from: label)
     }
+  }
+}
+
+private struct HarnessMarkdownAlertView: View {
+  let alert: HarnessMarkdownAlert
+  let settings: HarnessMarkdownRenderSettings
+  let style: HarnessMarkdownResolvedRenderSettings
+
+  private let accentRuleWidth: CGFloat = 4
+  private let cornerRadius = HarnessMonitorTheme.cornerRadiusSM
+
+  var body: some View {
+    let metrics = HarnessMarkdownMarkerMetrics(style: style)
+    let accent = style.colors.alertAccent(for: alert.kind)
+    HStack(alignment: .top, spacing: cardPadding) {
+      RoundedRectangle(cornerRadius: accentRuleWidth / 2, style: .continuous)
+        .fill(accent)
+        .frame(width: accentRuleWidth)
+      VStack(
+        alignment: .leading,
+        spacing: visibleBodyBlocks.isEmpty ? 0 : style.spacing.nestedBlock
+      ) {
+        header(metrics: metrics, accent: accent)
+        if !visibleBodyBlocks.isEmpty {
+          HarnessMarkdownBlockStackView(
+            blocks: visibleBodyBlocks,
+            settings: settings,
+            style: style,
+            spacing: style.spacing.nestedBlock
+          )
+          .padding(.leading, iconColumnWidth(metrics: metrics) + metrics.gap)
+        }
+      }
+    }
+    .padding(cardPadding)
+    .frame(maxWidth: .infinity, alignment: .leading)
+    .background(cardBackground(accent: accent))
+    .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
+    .overlay(cardBorder(accent: accent))
+    .accessibilityElement(children: .contain)
+    .fixedSize(horizontal: false, vertical: true)
+  }
+
+  private func header(metrics: HarnessMarkdownMarkerMetrics, accent: Color) -> some View {
+    HStack(alignment: .top, spacing: metrics.gap) {
+      Image(systemName: alert.kind.symbolName)
+        .font(.system(size: max(metrics.chevronSize + 6, 13), weight: .semibold))
+        .foregroundStyle(accent)
+        .frame(
+          width: iconColumnWidth(metrics: metrics),
+          height: metrics.firstLineHeight,
+          alignment: .center
+        )
+        .accessibilityHidden(true)
+      Text(alert.kind.title)
+        .font(style.typography.heading3.font)
+        .foregroundStyle(accent)
+        .frame(minHeight: metrics.firstLineHeight, alignment: .center)
+    }
+    .accessibilityElement(children: .combine)
+    .accessibilityLabel(Text(alert.kind.title))
+  }
+
+  private func iconColumnWidth(metrics: HarnessMarkdownMarkerMetrics) -> CGFloat {
+    max(metrics.columnWidth, 20)
+  }
+
+  private func cardBackground(accent: Color) -> some ShapeStyle {
+    accent.opacity(0.10)
+  }
+
+  private func cardBorder(accent: Color) -> some View {
+    RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+      .strokeBorder(accent.opacity(0.28), lineWidth: 1)
+  }
+
+  private var cardPadding: CGFloat {
+    max(
+      HarnessMonitorTheme.cardPadding,
+      style.spacing.quoteContentGap + HarnessMonitorTheme.spacingXS
+    )
+  }
+
+  private var visibleBodyBlocks: [HarnessMarkdownBlock] {
+    alert.blocks.filter(\.rendersVisibleMarkdownContent)
   }
 }
 
