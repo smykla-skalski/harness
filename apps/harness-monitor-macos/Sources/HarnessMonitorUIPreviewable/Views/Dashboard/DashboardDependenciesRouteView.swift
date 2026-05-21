@@ -559,6 +559,7 @@ struct DashboardDependenciesRouteView: View {
           repositoryLabels: response.repositoryLabels,
           items: [item]
         ),
+        showsDescriptions: normalizedPreferences.showLabelDescriptions,
         onSelect: { name in Task { await addLabel(name, to: [item]) } },
         onCustom: {
           labelTargetItems = [item]
@@ -650,6 +651,7 @@ struct DashboardDependenciesRouteView: View {
         repositoryLabels: response.repositoryLabels,
         items: items
       ),
+      showsDescriptions: normalizedPreferences.showLabelDescriptions,
       onSelect: { name in Task { await addLabel(name, to: items) } },
       onCustom: {
         labelTargetItems = items
@@ -1070,6 +1072,48 @@ struct DashboardDependenciesPreferences: Codable, Equatable {
   var mergeMethodRaw = TaskBoardGitHubMergeMethod.squash.rawValue
   var refreshIntervalSeconds: UInt64 = 300
   var cacheMaxAgeSeconds: UInt64 = 600
+  var showLabelDescriptions = false
+
+  enum CodingKeys: String, CodingKey {
+    case authorsText
+    case organizationsText
+    case repositoriesText
+    case excludeRepositoriesText
+    case mergeMethodRaw
+    case refreshIntervalSeconds
+    case cacheMaxAgeSeconds
+    case showLabelDescriptions
+  }
+
+  init() {}
+
+  init(from decoder: Decoder) throws {
+    let container = try decoder.container(keyedBy: CodingKeys.self)
+    let defaults = Self()
+    authorsText =
+      try container.decodeIfPresent(String.self, forKey: .authorsText) ?? defaults.authorsText
+    organizationsText =
+      try container.decodeIfPresent(String.self, forKey: .organizationsText)
+      ?? defaults.organizationsText
+    repositoriesText =
+      try container.decodeIfPresent(String.self, forKey: .repositoriesText)
+      ?? defaults.repositoriesText
+    excludeRepositoriesText =
+      try container.decodeIfPresent(String.self, forKey: .excludeRepositoriesText)
+      ?? defaults.excludeRepositoriesText
+    mergeMethodRaw =
+      try container.decodeIfPresent(String.self, forKey: .mergeMethodRaw)
+      ?? defaults.mergeMethodRaw
+    refreshIntervalSeconds =
+      try container.decodeIfPresent(UInt64.self, forKey: .refreshIntervalSeconds)
+      ?? defaults.refreshIntervalSeconds
+    cacheMaxAgeSeconds =
+      try container.decodeIfPresent(UInt64.self, forKey: .cacheMaxAgeSeconds)
+      ?? defaults.cacheMaxAgeSeconds
+    showLabelDescriptions =
+      try container.decodeIfPresent(Bool.self, forKey: .showLabelDescriptions)
+      ?? defaults.showLabelDescriptions
+  }
 
   var mergeMethod: TaskBoardGitHubMergeMethod {
     TaskBoardGitHubMergeMethod(rawValue: mergeMethodRaw)
