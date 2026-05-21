@@ -39,10 +39,15 @@ private struct DashboardDependenciesListPresentationInput: Equatable, Sendable {
 }
 
 private struct DashboardDependenciesListPresentation: Equatable, Sendable {
-  static let empty = Self(filteredItems: [], groupedItems: [])
+  static let empty = Self(
+    filteredItems: [],
+    groupedItems: [],
+    relativeUpdatedLabels: [:]
+  )
 
   let filteredItems: [DependencyUpdateItem]
   let groupedItems: [DashboardDependenciesRepositoryGroup]
+  let relativeUpdatedLabels: [String: String]
 }
 
 struct DashboardDependenciesPresentation: Equatable, Sendable {
@@ -50,13 +55,15 @@ struct DashboardDependenciesPresentation: Equatable, Sendable {
     filteredItems: [],
     groupedItems: [],
     selectedItems: [],
-    primaryDetailItem: nil
+    primaryDetailItem: nil,
+    relativeUpdatedLabels: [:]
   )
 
   let filteredItems: [DependencyUpdateItem]
   let groupedItems: [DashboardDependenciesRepositoryGroup]
   let selectedItems: [DependencyUpdateItem]
   let primaryDetailItem: DependencyUpdateItem?
+  let relativeUpdatedLabels: [String: String]
 }
 
 actor DashboardDependenciesPresentationWorker {
@@ -86,7 +93,8 @@ actor DashboardDependenciesPresentationWorker {
         selectedItems: selectedItems,
         filteredItems: listPresentation.filteredItems,
         persistedPrimarySelectionID: input.persistedPrimarySelectionID
-      )
+      ),
+      relativeUpdatedLabels: listPresentation.relativeUpdatedLabels
     )
   }
 
@@ -146,7 +154,28 @@ actor DashboardDependenciesPresentationWorker {
     )
     return DashboardDependenciesListPresentation(
       filteredItems: filteredItems,
-      groupedItems: groupedItems
+      groupedItems: groupedItems,
+      relativeUpdatedLabels: relativeUpdatedLabels(for: filteredItems)
+    )
+  }
+
+  private static func relativeUpdatedLabels(
+    for items: [DependencyUpdateItem],
+    relativeTo now: Date = .now
+  ) -> [String: String] {
+    let formatter = ISO8601DateFormatter()
+    let relativeFormatter = RelativeDateTimeFormatter()
+    relativeFormatter.unitsStyle = .short
+    return Dictionary(
+      uniqueKeysWithValues: items.map { item in
+        guard let date = formatter.date(from: item.updatedAt) else {
+          return (item.pullRequestID, item.updatedAt)
+        }
+        return (
+          item.pullRequestID,
+          relativeFormatter.localizedString(for: date, relativeTo: now)
+        )
+      }
     )
   }
 

@@ -54,6 +54,7 @@ struct DashboardDependenciesPresentationWorkerTests {
     #expect(output.groupedItems.map(\.repository) == ["kong/b"])
     #expect(output.selectedItems.map(\.pullRequestID) == ["pr-2"])
     #expect(output.primaryDetailItem?.pullRequestID == "pr-2")
+    #expect(output.relativeUpdatedLabels["pr-2"] != nil)
   }
 
   @Test("uses configured repository order and persisted primary selection")
@@ -79,6 +80,31 @@ struct DashboardDependenciesPresentationWorkerTests {
     #expect(output.primaryDetailItem?.pullRequestID == "pr-3")
   }
 
+  @Test("precomputes row relative date labels with fallback for bad timestamps")
+  func precomputesRowRelativeDateLabelsWithFallback() async {
+    let item = dependencyItem(
+      id: "pr-invalid",
+      repository: "kong/a",
+      number: 1,
+      updatedAt: "not-a-date"
+    )
+
+    let output = await DashboardDependenciesPresentationWorker().compute(
+      input: DashboardDependenciesPresentationInput(
+        items: [item],
+        filterModeRaw: DashboardDependenciesFilterMode.all.rawValue,
+        sortModeRaw: DashboardDependenciesSortMode.repository.rawValue,
+        searchText: "",
+        configuredRepositories: [],
+        configuredOrganizations: [],
+        selectedIDs: [],
+        persistedPrimarySelectionID: ""
+      )
+    )
+
+    #expect(output.relativeUpdatedLabels["pr-invalid"] == "not-a-date")
+  }
+
   private func dependencyItem(
     id: String,
     repository: String,
@@ -87,7 +113,8 @@ struct DashboardDependenciesPresentationWorkerTests {
     authorLogin: String = "renovate[bot]",
     reviewStatus: DependencyUpdateReviewStatus = .none,
     checkStatus: DependencyUpdateCheckStatus = .success,
-    createdAt: String = "2026-05-01T10:00:00Z"
+    createdAt: String = "2026-05-01T10:00:00Z",
+    updatedAt: String? = nil
   ) -> DependencyUpdateItem {
     DependencyUpdateItem(
       pullRequestID: id,
@@ -108,7 +135,7 @@ struct DashboardDependenciesPresentationWorkerTests {
       additions: 1,
       deletions: 1,
       createdAt: createdAt,
-      updatedAt: createdAt
+      updatedAt: updatedAt ?? createdAt
     )
   }
 }
