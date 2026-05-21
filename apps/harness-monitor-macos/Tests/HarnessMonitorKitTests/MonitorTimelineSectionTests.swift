@@ -107,7 +107,7 @@ struct MonitorTimelineSectionTests {
     )
     #expect(
       snapshotSource.contains(
-        "init(decision: Decision, actionsDecoder: JSONDecoder = JSONDecoder())"
+        "actionsDecoder: JSONDecoder = sessionTimelineDecisionSnapshotActionsDecoder"
       )
     )
     #expect(

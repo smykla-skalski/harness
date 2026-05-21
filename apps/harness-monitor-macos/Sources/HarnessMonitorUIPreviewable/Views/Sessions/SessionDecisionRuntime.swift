@@ -458,6 +458,8 @@ actor SessionDecisionInspectorRowWorker {
 }
 
 private actor SessionDecisionAuditWorker {
+  private let decoder = JSONDecoder()
+
   func scopedOutput(
     events: [SupervisorEventSnapshot],
     input: SessionDecisionAuditInput
@@ -471,7 +473,6 @@ private actor SessionDecisionAuditWorker {
           taskIDs: input.taskIDs
         )
     }
-    let decoder = JSONDecoder()
     return SessionDecisionAuditOutput(
       events: scopedEvents,
       payloadPresentations: Dictionary(

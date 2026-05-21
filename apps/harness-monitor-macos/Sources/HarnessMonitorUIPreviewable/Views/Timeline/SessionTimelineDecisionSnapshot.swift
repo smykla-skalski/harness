@@ -124,6 +124,8 @@ struct SessionTimelineAction: Identifiable, Equatable, Sendable {
 
 typealias SessionTimelineDecisionInput = DecisionPresentationSnapshot
 
+private let sessionTimelineDecisionSnapshotActionsDecoder = JSONDecoder()
+
 struct SessionTimelineDecisionSnapshot: Identifiable, Equatable, Sendable {
   let id: String
   let severity: DecisionSeverity
@@ -135,12 +137,18 @@ struct SessionTimelineDecisionSnapshot: Identifiable, Equatable, Sendable {
   let createdAt: Date
   let actions: [SessionTimelineAction]
 
-  init(decision: Decision, actionsDecoder: JSONDecoder = JSONDecoder()) {
+  init(
+    decision: Decision,
+    actionsDecoder: JSONDecoder = sessionTimelineDecisionSnapshotActionsDecoder
+  ) {
     self.init(
       input: SessionTimelineDecisionInput(decision: decision), actionsDecoder: actionsDecoder)
   }
 
-  init(input: SessionTimelineDecisionInput, actionsDecoder: JSONDecoder = JSONDecoder()) {
+  init(
+    input: SessionTimelineDecisionInput,
+    actionsDecoder: JSONDecoder = sessionTimelineDecisionSnapshotActionsDecoder
+  ) {
     id = input.id
     severity = DecisionSeverity(rawValue: input.severityRaw) ?? .info
     ruleID = input.ruleID

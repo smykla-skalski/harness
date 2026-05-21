@@ -491,7 +491,7 @@ struct DashboardDependenciesRouteView: View {
               spacing: HarnessMonitorTheme.spacingSM,
               lineSpacing: HarnessMonitorTheme.spacingSM
             ) {
-              ForEach(item.labels, id: \.self) { label in
+              ForEach(Array(item.labels.enumerated()), id: \.offset) { _, label in
                 summaryBadge(label, tint: HarnessMonitorTheme.secondaryInk)
               }
             }
@@ -1136,12 +1136,7 @@ struct DashboardDependenciesCollapsedRepositories: Codable, Equatable {
   var repositories: [String] = []
 
   var encodedString: String {
-    let encoder = JSONEncoder()
-    guard let data = try? encoder.encode(self), let string = String(data: data, encoding: .utf8)
-    else {
-      return ""
-    }
-    return string
+    DashboardDependenciesStorageCodec.encodeToString(self)
   }
 
   func contains(_ repository: String) -> Bool {
@@ -1158,13 +1153,7 @@ struct DashboardDependenciesCollapsedRepositories: Codable, Equatable {
   }
 
   static func decode(from string: String) -> Self {
-    guard
-      let data = string.data(using: .utf8),
-      let decoded = try? JSONDecoder().decode(Self.self, from: data)
-    else {
-      return Self()
-    }
-    return decoded
+    DashboardDependenciesStorageCodec.decode(Self.self, from: string) ?? Self()
   }
 }
 

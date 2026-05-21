@@ -118,12 +118,7 @@ struct DashboardDependenciesPreferences: Codable, Equatable {
   }
 
   var encodedString: String {
-    let encoder = JSONEncoder()
-    guard let data = try? encoder.encode(self), let string = String(data: data, encoding: .utf8)
-    else {
-      return ""
-    }
-    return string
+    DashboardDependenciesStorageCodec.encodeToString(self)
   }
 
   func normalized() -> Self {
@@ -151,13 +146,7 @@ struct DashboardDependenciesPreferences: Codable, Equatable {
   }
 
   static func decode(from string: String) -> Self {
-    guard
-      let data = string.data(using: .utf8),
-      let decoded = try? JSONDecoder().decode(Self.self, from: data)
-    else {
-      return Self()
-    }
-    return decoded
+    DashboardDependenciesStorageCodec.decode(Self.self, from: string) ?? Self()
   }
 
   func queryRequest(forceRefresh: Bool) -> DependencyUpdatesQueryRequest {

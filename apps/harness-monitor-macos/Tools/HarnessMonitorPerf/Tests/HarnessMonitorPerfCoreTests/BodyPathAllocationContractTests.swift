@@ -113,34 +113,6 @@ final class BodyPathAllocationContractTests: XCTestCase {
             line: 179,
             constructor: "JSONDecoder"
         ),
-        // Same shape for `SessionTimelineDecisionSnapshot.init`. The timeline
-        // index in `SessionTimelineNodeBuilder` injects a shared decoder for
-        // the per-row construction path.
-        KnownSite(
-            relativePath:
-                "Sources/HarnessMonitorUIPreviewable/Views/Timeline/SessionTimelineDecisionSnapshot.swift",
-            line: 160,
-            constructor: "JSONDecoder"
-        ),
-        // Same default-parameter sentinel on the plain-input initializer.
-        // Production timeline presentation uses `SessionTimelineNodeBuilder`,
-        // which injects one decoder per worker compute; this default is for
-        // direct tests and non-hot helper construction.
-        KnownSite(
-            relativePath:
-                "Sources/HarnessMonitorUIPreviewable/Views/Timeline/SessionTimelineDecisionSnapshot.swift",
-            line: 164,
-            constructor: "JSONDecoder"
-        ),
-        // Local decoder threaded into N snapshot inits during a one-shot data
-        // refresh (`auditEvents(forSessionID:decisions:)`). Allocated once
-        // per refresh, not per render.
-        KnownSite(
-            relativePath:
-                "Sources/HarnessMonitorUIPreviewable/Views/Sessions/SessionDecisionRuntime.swift",
-            line: 149,
-            constructor: "JSONDecoder"
-        ),
         // SceneStorage codec helper. `decodePipelineStateMap` runs when the
         // scene state restores, not on view body re-evaluation.
         KnownSite(

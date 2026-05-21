@@ -42,7 +42,7 @@ struct OpenRouterModelBrowserRow: View, Equatable {
       Image(systemName: isPinned ? "pin.fill" : "pin")
         .foregroundStyle(isPinned ? HarnessMonitorTheme.accent : HarnessMonitorTheme.secondaryInk)
     }
-    .harnessPlainButtonStyle()
+    .buttonStyle(.borderless)
     .help(isPinned ? "Unpin model" : "Pin model")
     .accessibilityLabel(isPinned ? "Unpin \(model.id)" : "Pin \(model.id)")
   }
@@ -76,6 +76,6 @@ struct OpenRouterBrowserProviderChip: View, Equatable {
             )
         )
     }
-    .harnessPlainButtonStyle()
+    .buttonStyle(.borderless)
   }
 }
