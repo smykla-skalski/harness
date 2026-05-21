@@ -112,11 +112,28 @@ struct HarnessMarkdownRenderingBehaviorTests {
     #expect(source.contains("HarnessMarkdownLazyBlockStackView"))
     #expect(source.contains(".scrollIndicators(.visible)"))
     #expect(source.contains(".frame(maxHeight: style.spacing.detailsMaxHeight)"))
+    #expect(source.contains("VStack(alignment: .leading, spacing: 0)"))
+    #expect(source.contains(".background(cardBackground)"))
+    #expect(source.contains(".overlay(cardBorder)"))
     #expect(!source.contains("firstLineMarkerYOffset"))
     #expect(!source.contains("firstLineTextYOffset"))
     #expect(!source.contains("chevronVisualYOffset"))
     #expect(source.contains("HStack(alignment: .top, spacing: metrics.gap)"))
     #expect(!source.contains("DisclosureGroup(isExpanded: $isExpanded)"))
+  }
+
+  @Test("Markdown quotes keep marker bars at content height")
+  func markdownQuotesKeepMarkerBarsAtContentHeight() throws {
+    let source = try readRepositoryFile(
+      "apps/harness-monitor-macos/Sources/HarnessMonitorUIPreviewable"
+        + "/Views/Shared/HarnessMonitorMarkdownText.swift"
+    )
+
+    #expect(source.contains("private let quoteBarWidth: CGFloat = 3"))
+    #expect(source.contains(".padding(.leading, quoteBarWidth + style.spacing.quoteContentGap)"))
+    #expect(source.contains(".overlay(alignment: .leading)"))
+    #expect(source.contains(".fixedSize(horizontal: false, vertical: true)"))
+    #expect(!source.contains("HStack(alignment: .top, spacing: style.spacing.quoteContentGap)"))
   }
 
   @Test("Markdown renderer suppresses thematic breaks before headings")
