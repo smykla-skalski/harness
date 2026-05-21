@@ -98,9 +98,27 @@ private struct HarnessMarkdownDocumentView: View {
   let style: HarnessMarkdownResolvedRenderSettings
 
   var body: some View {
-    VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
-      ForEach(Array(document.blocks.enumerated()), id: \.offset) { _, block in
+    HarnessMarkdownBlockStackView(
+      blocks: document.blocks,
+      settings: settings,
+      style: style,
+      spacing: style.spacing.documentBlock
+    )
+  }
+}
+
+private struct HarnessMarkdownBlockStackView: View {
+  let blocks: [HarnessMarkdownBlock]
+  let settings: HarnessMarkdownRenderSettings
+  let style: HarnessMarkdownResolvedRenderSettings
+  let spacing: CGFloat
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: spacing) {
+      ForEach(Array(blocks.enumerated()), id: \.offset) { _, block in
         HarnessMarkdownBlockView(block: block, settings: settings, style: style)
+          .padding(.top, style.spacing.blockSpacing(for: block).before)
+          .padding(.bottom, style.spacing.blockSpacing(for: block).after)
       }
     }
     .frame(maxWidth: .infinity, alignment: .leading)
@@ -198,12 +216,13 @@ private struct HarnessMarkdownDetailsView: View {
 
   var body: some View {
     DisclosureGroup(isExpanded: $isExpanded) {
-      VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingXS) {
-        ForEach(Array(details.blocks.enumerated()), id: \.offset) { _, block in
-          HarnessMarkdownBlockView(block: block, settings: settings, style: style)
-        }
-      }
-      .padding(.leading, HarnessMonitorTheme.spacingSM)
+      HarnessMarkdownBlockStackView(
+        blocks: details.blocks,
+        settings: settings,
+        style: style,
+        spacing: style.spacing.nestedBlock
+      )
+      .padding(.leading, style.spacing.detailsContentIndent)
     } label: {
       HarnessMarkdownInlineFlowView(
         inlines: details.summary,
@@ -225,15 +244,16 @@ private struct HarnessMarkdownQuoteView: View {
   let style: HarnessMarkdownResolvedRenderSettings
 
   var body: some View {
-    HStack(alignment: .top, spacing: HarnessMonitorTheme.spacingSM) {
+    HStack(alignment: .top, spacing: style.spacing.quoteContentGap) {
       Rectangle()
         .fill(style.colors.quoteBar)
         .frame(width: 3)
-      VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingXS) {
-        ForEach(Array(blocks.enumerated()), id: \.offset) { _, block in
-          HarnessMarkdownBlockView(block: block, settings: settings, style: style)
-        }
-      }
+      HarnessMarkdownBlockStackView(
+        blocks: blocks,
+        settings: settings,
+        style: style,
+        spacing: style.spacing.nestedBlock
+      )
     }
   }
 }
@@ -246,16 +266,17 @@ private struct HarnessMarkdownListView: View {
   let style: HarnessMarkdownResolvedRenderSettings
 
   var body: some View {
-    VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingXS) {
+    VStack(alignment: .leading, spacing: style.spacing.listItem) {
       ForEach(visibleItems, id: \.offset) { index, item in
-        HStack(alignment: .top, spacing: HarnessMonitorTheme.spacingSM) {
+        HStack(alignment: .top, spacing: style.spacing.listMarkerGap) {
           marker(for: item, index: index)
             .frame(width: 28, alignment: .trailing)
-          VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingXS) {
-            ForEach(Array(item.blocks.enumerated()), id: \.offset) { _, block in
-              HarnessMarkdownBlockView(block: block, settings: settings, style: style)
-            }
-          }
+          HarnessMarkdownBlockStackView(
+            blocks: item.blocks,
+            settings: settings,
+            style: style,
+            spacing: style.spacing.listItemContent
+          )
         }
       }
     }
@@ -292,7 +313,11 @@ private struct HarnessMarkdownTableView: View {
   let style: HarnessMarkdownResolvedRenderSettings
 
   var body: some View {
-    Grid(alignment: .leadingFirstTextBaseline, horizontalSpacing: HarnessMonitorTheme.spacingMD) {
+    Grid(
+      alignment: .leadingFirstTextBaseline,
+      horizontalSpacing: style.spacing.tableColumn,
+      verticalSpacing: style.spacing.tableRow
+    ) {
       row(cells: table.headers, isHeader: true)
       Divider()
       ForEach(table.rows.indices, id: \.self) { index in
