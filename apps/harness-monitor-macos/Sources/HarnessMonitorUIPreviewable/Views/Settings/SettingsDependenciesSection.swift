@@ -97,6 +97,15 @@ struct SettingsDependenciesSection: View {
         .accessibilityIdentifier(
           HarnessMonitorAccessibility.settingsDependenciesShowLabelDescriptionsToggle
         )
+      Picker("Frequently used labels", selection: $draft.frequentLabelsCount) {
+        ForEach(Self.frequentLabelsCountRange, id: \.self) { count in
+          Text(verbatim: "\(count)").tag(count)
+        }
+      }
+      .pickerStyle(.menu)
+      .accessibilityIdentifier(
+        HarnessMonitorAccessibility.settingsDependenciesFrequentLabelsCountField
+      )
     } header: {
       Text("Actions")
         .harnessNativeFormSectionHeader()
@@ -104,7 +113,8 @@ struct SettingsDependenciesSection: View {
       Text(
         """
         Merge method drives Merge and Auto actions. Toggle label descriptions to append the \
-        repository-defined description next to each label name in the Add Label menus.
+        repository-defined description next to each label name in the Add Label menus. The \
+        Add Label dropdown surfaces the top N most-used labels per repository at the top.
         """
       )
     }
@@ -139,6 +149,12 @@ struct SettingsDependenciesSection: View {
   static let minimumDurationSeconds: UInt64 = 30
   static let refreshPresetsSeconds: [UInt64] = [30, 60, 120, 300, 600, 900, 1_800, 3_600]
   static let cachePresetsSeconds: [UInt64] = [60, 300, 600, 900, 1_800, 3_600, 7_200, 21_600]
+  static let frequentLabelsCountRange = ClosedRange(
+    uncheckedBounds: (
+      lower: DashboardDependenciesPreferences.minimumFrequentLabelsCount,
+      upper: DashboardDependenciesPreferences.maximumFrequentLabelsCount
+    )
+  )
 
   private var actionsComposer: some View {
     VStack(spacing: 0) {
