@@ -7,12 +7,16 @@ struct SessionWindowToolbarModel: Equatable {
   let sleepPreventionPresentation: SleepPreventionToolbarPresentation
 }
 
-struct SessionWindowToolbar: ToolbarContent {
-  let store: HarnessMonitorStore
-  let model: SessionWindowToolbarModel
-  let state: SessionWindowStateCache
-  @Binding var focusMode: Bool
+struct WindowHistoryToolbarShortcutOverlay {
+  let shortcut: KeyboardShortcutDescriptor
   let currentModifiers: EventModifiers
+}
+
+struct WindowHistoryToolbarItems: ToolbarContent {
+  let navigation: WindowNavigationState
+  let backAccessibilityIdentifier: String
+  let forwardAccessibilityIdentifier: String
+  let shortcutOverlay: WindowHistoryToolbarShortcutOverlay?
   @ScaledMetric(relativeTo: .caption)
   private var sidebarShortcutKeySpacing =
     HarnessMonitorTheme.spacingXS - 1
@@ -20,113 +24,149 @@ struct SessionWindowToolbar: ToolbarContent {
   private var sidebarShortcutHorizontalOffset = 56
   @ScaledMetric(relativeTo: .caption)
   private var sidebarShortcutVerticalOffset = 12
-  @Environment(\.accessibilityReduceMotion)
-  private var reduceMotion
+
+  private var shouldRenderShortcutOverlay: Bool {
+    guard let shortcutOverlay else {
+      return false
+    }
+    return shortcutOverlay.shortcut.isRevealed(by: shortcutOverlay.currentModifiers)
+  }
+
+  @ToolbarContentBuilder var body: some ToolbarContent {
+    ToolbarItemGroup(placement: .navigation) {
+      Button {
+        navigation.navigateBack()
+      } label: {
+        Label {
+          Text("Go back")
+        } icon: {
+          Image(systemName: "chevron.backward")
+            .frame(width: 14, height: 14)
+        }
+      }
+      .disabled(!navigation.canGoBack)
+      .help("Go back")
+      .accessibilityIdentifier(backAccessibilityIdentifier)
+      .accessibilityLabel("Back")
+      .harnessMCPButton(
+        backAccessibilityIdentifier,
+        label: "Back",
+        hint: "Go back",
+        enabled: navigation.canGoBack,
+        pressAction: {
+          Task { @MainActor in
+            navigation.navigateBack()
+          }
+        }
+      )
+      .overlay(alignment: .bottom) {
+        if let shortcutOverlay, shouldRenderShortcutOverlay {
+          KeyboardShortcutLabel(
+            shortcut: shortcutOverlay.shortcut,
+            activeModifiers: shortcutOverlay.currentModifiers,
+            revealPolicy: .revealOnRelevantModifierHold,
+            keySpacing: sidebarShortcutKeySpacing
+          )
+          .fixedSize(horizontal: true, vertical: true)
+          .offset(x: -sidebarShortcutHorizontalOffset, y: sidebarShortcutVerticalOffset)
+          .allowsHitTesting(false)
+          .accessibilityHidden(true)
+        }
+      }
+      .zIndex(
+        shouldRenderShortcutOverlay ? 1 : 0
+      )
+
+      Button {
+        navigation.navigateForward()
+      } label: {
+        Label {
+          Text("Go forward")
+        } icon: {
+          Image(systemName: "chevron.forward")
+            .frame(width: 14, height: 14)
+        }
+      }
+      .disabled(!navigation.canGoForward)
+      .help("Go forward")
+      .accessibilityIdentifier(forwardAccessibilityIdentifier)
+      .accessibilityLabel("Forward")
+      .harnessMCPButton(
+        forwardAccessibilityIdentifier,
+        label: "Forward",
+        hint: "Go forward",
+        enabled: navigation.canGoForward,
+        pressAction: {
+          Task { @MainActor in
+            navigation.navigateForward()
+          }
+        }
+      )
+    }
+  }
+}
+
+struct SessionWindowToolbar: ToolbarContent {
+  let store: HarnessMonitorStore
+  let model: SessionWindowToolbarModel
+  let navigation: WindowNavigationState
+  @Binding var focusMode: Bool
+  let currentModifiers: EventModifiers
 
   private let sidebarShortcut = KeyboardShortcutDescriptor.toggleSidebar
 
-  private var shouldShowShortcutOverlays: Bool {
-    !HarnessMonitorUITestEnvironment.disablesVisualOptions
-      && SessionWindowKeyboardShortcutOverlaySettings.read()
-  }
-
-  private var shouldRenderShortcutOverlay: Bool {
-    shouldShowShortcutOverlays && sidebarShortcut.isRevealed(by: currentModifiers)
+  private var historyShortcutOverlay: WindowHistoryToolbarShortcutOverlay? {
+    guard
+      !HarnessMonitorUITestEnvironment.disablesVisualOptions
+        && SessionWindowKeyboardShortcutOverlaySettings.read()
+    else {
+      return nil
+    }
+    return WindowHistoryToolbarShortcutOverlay(
+      shortcut: sidebarShortcut,
+      currentModifiers: currentModifiers
+    )
   }
 
   var body: some ToolbarContent {
-    HarnessMonitorWindowToolbar {
-      ToolbarItemGroup(placement: .navigation) {
-        Button {
-          state.navigateBack()
-        } label: {
-          Label {
-            Text("Go back")
-          } icon: {
-            Image(systemName: "chevron.backward")
-              .frame(width: 14, height: 14)
-          }
-        }
-        .disabled(!model.canNavigateBack)
-        .help("Go back")
-        .accessibilityLabel("Back")
-        .harnessMCPButton(
-          HarnessMonitorAccessibility.sessionNavigateBackButton,
-          label: "Back",
-          hint: "Go back",
-          enabled: model.canNavigateBack,
-          pressAction: { state.navigateBack() }
-        )
-        .overlay(alignment: .bottom) {
-          if shouldRenderShortcutOverlay {
-            KeyboardShortcutLabel(
-              shortcut: sidebarShortcut,
-              activeModifiers: currentModifiers,
-              revealPolicy: .revealOnRelevantModifierHold,
-              keySpacing: sidebarShortcutKeySpacing
-            )
-            .fixedSize(horizontal: true, vertical: true)
-            .offset(x: -sidebarShortcutHorizontalOffset, y: sidebarShortcutVerticalOffset)
-            .allowsHitTesting(false)
-            .accessibilityHidden(true)
-          }
-        }
-        .zIndex(
-          shouldRenderShortcutOverlay ? 1 : 0
-        )
+    WindowHistoryToolbarItems(
+      navigation: navigation,
+      backAccessibilityIdentifier:
+        HarnessMonitorAccessibility.sessionNavigateBackButton,
+      forwardAccessibilityIdentifier:
+        HarnessMonitorAccessibility.sessionNavigateForwardButton,
+      shortcutOverlay: historyShortcutOverlay
+    )
 
-        Button {
-          state.navigateForward()
-        } label: {
-          Label {
-            Text("Go forward")
-          } icon: {
-            Image(systemName: "chevron.forward")
-              .frame(width: 14, height: 14)
-          }
+    ToolbarItem(placement: .automatic) {
+      Button {
+        toggleFocusMode()
+      } label: {
+        Label {
+          Text(focusMode ? "Exit focus mode" : "Enter focus mode")
+        } icon: {
+          Image(systemName: focusMode ? "moon.fill" : "moon")
+            .frame(width: 14, height: 14)
         }
-        .disabled(!model.canNavigateForward)
-        .help("Go forward")
-        .accessibilityLabel("Forward")
-        .harnessMCPButton(
-          HarnessMonitorAccessibility.sessionNavigateForwardButton,
-          label: "Forward",
-          hint: "Go forward",
-          enabled: model.canNavigateForward,
-          pressAction: { state.navigateForward() }
-        )
       }
-    } automatic: {
-      ToolbarItem(placement: .automatic) {
-        Button {
-          toggleFocusMode()
-        } label: {
-          Label {
-            Text(focusMode ? "Exit focus mode" : "Enter focus mode")
-          } icon: {
-            Image(systemName: focusMode ? "moon.fill" : "moon")
-              .frame(width: 14, height: 14)
-          }
-        }
-        .help(focusMode ? "Exit focus mode" : "Enter focus mode")
-        .accessibilityLabel("Focus mode")
-        .accessibilityValue(focusMode ? "On" : "Off")
-        .accessibilityHint("Shows or hides secondary session columns.")
-        .harnessMCPButton(
-          HarnessMonitorAccessibility.sessionWindowFocusModeButton,
-          label: "Focus mode",
-          value: focusMode ? "On" : "Off",
-          hint: "Shows or hides secondary session columns",
-          pressAction: { toggleFocusMode() }
-        )
-      }
-    } primaryAction: {
-      ToolbarItem(placement: .primaryAction) {
-        SleepPreventionToolbarButton(
-          store: store,
-          presentation: model.sleepPreventionPresentation
-        )
-      }
+      .help(focusMode ? "Exit focus mode" : "Enter focus mode")
+      .accessibilityLabel("Focus mode")
+      .accessibilityValue(focusMode ? "On" : "Off")
+      .accessibilityHint("Shows or hides secondary session columns.")
+      .harnessMCPButton(
+        HarnessMonitorAccessibility.sessionWindowFocusModeButton,
+        label: "Focus mode",
+        value: focusMode ? "On" : "Off",
+        hint: "Shows or hides secondary session columns",
+        pressAction: { toggleFocusMode() }
+      )
+    }
+
+    ToolbarItem(placement: .primaryAction) {
+      SleepPreventionToolbarButton(
+        store: store,
+        presentation: model.sleepPreventionPresentation
+      )
     }
   }
 

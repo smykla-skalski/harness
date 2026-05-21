@@ -179,13 +179,19 @@ final class WindowMenuCommandsTests: XCTestCase {
     XCTAssertFalse(source.contains("let primaryKind = sessionCreate?.primaryKind"))
   }
 
-  func testGoCommandsUseSessionFocusedNavigationOnly() throws {
+  func testGoCommandsPreferSharedWindowNavigation() throws {
     let source = try harnessSourceFile(named: "Commands/GoCommands.swift")
 
-    XCTAssertTrue(source.contains("@FocusedValue(\\.sessionNavigation)"))
-    XCTAssertFalse(source.contains("@FocusedValue(\\.windowNavigation)"))
-    XCTAssertFalse(source.contains("workspaceNavigation"))
-    XCTAssertFalse(source.contains("WindowNavigationScope"))
+    XCTAssertTrue(source.contains("@FocusedValue(\\.windowNavigation)"))
+    XCTAssertFalse(source.contains("@FocusedValue(\\.sessionNavigation)"))
+    XCTAssertTrue(source.contains("windowNavigation?.canGoBack ?? false"))
+    XCTAssertTrue(source.contains("windowNavigation?.canGoForward ?? false"))
+    XCTAssertTrue(source.contains("windowNavigation?.navigateBack()"))
+    XCTAssertTrue(source.contains("windowNavigation?.navigateForward()"))
+    XCTAssertFalse(source.contains("await windowNavigation?.navigateBack()"))
+    XCTAssertFalse(source.contains("await windowNavigation?.navigateForward()"))
+    XCTAssertTrue(source.contains("displayState.canNavigateBack"))
+    XCTAssertTrue(source.contains("displayState.canNavigateForward"))
   }
 
   func testTaskLaneHelpDoesNotAdvertiseCommandT() throws {

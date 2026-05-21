@@ -217,6 +217,21 @@ public final class SessionWindowStateCache {
     )
   }
 
+  public func restoreNavigationSelection(_ selection: SessionSelection) {
+    if case .create(let draft) = selection,
+      sectionState.createDrafts[draft.kind] != draft
+    {
+      sectionState.createDrafts[draft.kind] = draft
+    }
+
+    updateSelection(
+      selection,
+      source: .programmatic,
+      rememberCurrentSelection: false,
+      recordHistory: false
+    )
+  }
+
   public func selectedDecision(in decisions: [Decision]) -> Decision? {
     guard let decisionID = selection.decisionID else {
       return nil

@@ -124,8 +124,8 @@ struct HarnessMonitorStoreNavigationTests {
     let forwardRecorder = ConfirmationRecorder()
     let state = WindowNavigationState()
     state.setHandlers(
-      back: { await backRecorder.record() },
-      forward: { await forwardRecorder.record() }
+      back: { Task { await backRecorder.record() } },
+      forward: { Task { await forwardRecorder.record() } }
     )
 
     let updated = state.updating(canGoBack: true, canGoForward: true)
@@ -133,8 +133,9 @@ struct HarnessMonitorStoreNavigationTests {
     #expect(updated.canGoBack)
     #expect(updated.canGoForward)
 
-    await updated.navigateBack()
-    await updated.navigateForward()
+    updated.navigateBack()
+    updated.navigateForward()
+    await Task.yield()
 
     #expect(await backRecorder.count == 1)
     #expect(await forwardRecorder.count == 1)
@@ -146,6 +147,52 @@ struct HarnessMonitorStoreNavigationTests {
     let updated = state.updating(canGoBack: false, canGoForward: false)
     #expect(updated.canGoBack == state.canGoBack)
     #expect(updated.canGoForward == state.canGoForward)
+  }
+
+  @Test("Global window history navigates between dashboard and session selections")
+  func globalWindowHistoryNavigatesAcrossWindows() async throws {
+    let store = try await makeNavigationStore()
+    let history = GlobalWindowNavigationHistory(store: store)
+
+    history.installDashboardStateIfNeeded(route: .taskBoard)
+    history.recordSessionSelection(sessionID: "sess-a", selection: .route(.overview))
+
+    #expect(history.canGoBack)
+    #expect(!history.canGoForward)
+
+    history.navigateBack()
+
+    let dashboardRequest = try #require(history.pendingDashboardRestoreRequest)
+    #expect(dashboardRequest.route == .taskBoard)
+    #expect(!history.canGoBack)
+    #expect(history.canGoForward)
+
+    history.finishDashboardRestoreRequest(dashboardRequest.requestID)
+    history.navigateForward()
+
+    let sessionRequest = try #require(history.pendingSessionRestoreRequest)
+    #expect(sessionRequest.sessionID == "sess-a")
+    #expect(sessionRequest.selection == .route(.overview))
+    #expect(history.canGoBack)
+    #expect(!history.canGoForward)
+  }
+
+  @Test("Global window history skips non-restorable session entries")
+  func globalWindowHistorySkipsStaleSessions() async throws {
+    let store = try await makeNavigationStore()
+    let history = GlobalWindowNavigationHistory(store: store)
+
+    history.installDashboardStateIfNeeded(route: .taskBoard)
+    history.recordSessionSelection(sessionID: "sess-a", selection: .route(.overview))
+    history.recordSessionSelection(sessionID: "missing-session", selection: .route(.timeline))
+    history.recordDashboardRoute(.dependencies)
+
+    history.navigateBack()
+
+    let sessionRequest = try #require(history.pendingSessionRestoreRequest)
+    #expect(sessionRequest.sessionID == "sess-a")
+    #expect(sessionRequest.selection == .route(.overview))
+    #expect(history.canGoForward)
   }
 
   @Test("Command routing scope persists until the active window is explicitly cleared")

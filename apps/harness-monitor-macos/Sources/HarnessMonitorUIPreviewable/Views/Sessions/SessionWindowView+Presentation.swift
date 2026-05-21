@@ -240,7 +240,7 @@ extension SessionWindowView {
     SessionWindowToolbar(
       store: store,
       model: sessionToolbarModel,
-      state: stateCache,
+      navigation: windowNavigationState,
       focusMode: focusModeBinding,
       currentModifiers: presentedModifiers
     )
@@ -248,8 +248,8 @@ extension SessionWindowView {
 
   var sessionToolbarModel: SessionWindowToolbarModel {
     SessionWindowToolbarModel(
-      canNavigateBack: stateCache.navigationHistory.canGoBack,
-      canNavigateForward: stateCache.navigationHistory.canGoForward,
+      canNavigateBack: history.canGoBack,
+      canNavigateForward: history.canGoForward,
       sleepPreventionPresentation: SleepPreventionToolbarPresentation(
         isEnabled: store.contentUI.toolbar.sleepPreventionEnabled
       )

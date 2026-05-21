@@ -10,6 +10,7 @@ struct HarnessMonitorDashboardWindowContent: View {
   let keyWindowObserver: KeyWindowObserver
   let acpAttentionState: AcpPermissionAttentionState
   let windowCommandRouting: WindowCommandRoutingState
+  let windowNavigationHistory: GlobalWindowNavigationHistory
   let mcpWindowCommandRegistrar: HarnessMonitorMCPWindowCommandRegistrar
   @Binding var themeMode: HarnessMonitorThemeMode
   @Binding var settingsSelectedSection: SettingsSection
@@ -40,6 +41,7 @@ struct HarnessMonitorDashboardWindowContent: View {
       keyWindowObserver: keyWindowObserver,
       acpAttentionState: acpAttentionState,
       windowCommandRouting: windowCommandRouting,
+      windowNavigationHistory: windowNavigationHistory,
       mcpWindowCommandRegistrar: mcpWindowCommandRegistrar,
       themeMode: $themeMode,
       settingsSelectedSection: $settingsSelectedSection,

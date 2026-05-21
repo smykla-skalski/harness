@@ -1,13 +1,13 @@
 import Observation
 import SwiftUI
 
-@MainActor
-public struct WindowNavigationState {
+public struct WindowNavigationState: Equatable {
   public let canGoBack: Bool
   public let canGoForward: Bool
 
   private let handlers: WindowNavigationHandlers
 
+  @MainActor
   public init(
     canGoBack: Bool = false,
     canGoForward: Bool = false
@@ -19,6 +19,7 @@ public struct WindowNavigationState {
     )
   }
 
+  @MainActor
   private init(
     canGoBack: Bool,
     canGoForward: Bool,
@@ -29,6 +30,7 @@ public struct WindowNavigationState {
     self.handlers = handlers
   }
 
+  @MainActor
   public func updating(
     canGoBack: Bool,
     canGoForward: Bool
@@ -40,20 +42,28 @@ public struct WindowNavigationState {
     )
   }
 
+  @MainActor
   public func setHandlers(
-    back: (@MainActor () async -> Void)?,
-    forward: (@MainActor () async -> Void)?
+    back: (@MainActor () -> Void)?,
+    forward: (@MainActor () -> Void)?
   ) {
     handlers.backHandler = back
     handlers.forwardHandler = forward
   }
 
-  public func navigateBack() async {
-    await handlers.backHandler?()
+  @MainActor
+  public func navigateBack() {
+    handlers.backHandler?()
   }
 
-  public func navigateForward() async {
-    await handlers.forwardHandler?()
+  @MainActor
+  public func navigateForward() {
+    handlers.forwardHandler?()
+  }
+
+  public static func == (lhs: Self, rhs: Self) -> Bool {
+    lhs.canGoBack == rhs.canGoBack
+      && lhs.canGoForward == rhs.canGoForward
   }
 }
 
@@ -75,8 +85,8 @@ extension FocusedValues {
 
 @MainActor
 private final class WindowNavigationHandlers {
-  var backHandler: (@MainActor () async -> Void)?
-  var forwardHandler: (@MainActor () async -> Void)?
+  var backHandler: (@MainActor () -> Void)?
+  var forwardHandler: (@MainActor () -> Void)?
 }
 
 @MainActor
