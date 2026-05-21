@@ -290,11 +290,10 @@ private struct HarnessMarkdownAlertView: View {
   let settings: HarnessMarkdownRenderSettings
   let style: HarnessMarkdownResolvedRenderSettings
 
-  private let accentRuleWidth: CGFloat = 5
+  private let accentRuleWidth: CGFloat = 8
   private let cornerRadius = HarnessMonitorTheme.cornerRadiusMD
 
   var body: some View {
-    let metrics = HarnessMarkdownMarkerMetrics(style: style)
     let accent = style.colors.alertAccent(for: alert.kind)
     HStack(alignment: .top, spacing: cardContentSpacing) {
       accentRail(accent: accent)
@@ -304,7 +303,7 @@ private struct HarnessMarkdownAlertView: View {
           ? 0
           : max(style.spacing.nestedBlock, HarnessMonitorTheme.spacingSM)
       ) {
-        header(metrics: metrics, accent: accent)
+        header
         if !visibleBodyBlocks.isEmpty {
           HarnessMarkdownBlockStackView(
             blocks: visibleBodyBlocks,
@@ -312,7 +311,6 @@ private struct HarnessMarkdownAlertView: View {
             style: style,
             spacing: style.spacing.nestedBlock
           )
-          .padding(.leading, iconColumnWidth(metrics: metrics) + metrics.gap)
         }
       }
       .frame(maxWidth: .infinity, alignment: .leading)
@@ -325,33 +323,17 @@ private struct HarnessMarkdownAlertView: View {
     .background(cardBackground(accent: accent))
     .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
     .overlay(cardBorder(accent: accent))
-    .padding(.vertical, HarnessMonitorTheme.spacingXS)
+    .padding(.top, HarnessMonitorTheme.spacingXS)
+    .padding(.bottom, HarnessMonitorTheme.spacingXS + style.spacing.alertBottomMargin)
     .accessibilityElement(children: .contain)
     .fixedSize(horizontal: false, vertical: true)
   }
 
-  private func header(metrics: HarnessMarkdownMarkerMetrics, accent: Color) -> some View {
-    HStack(alignment: .top, spacing: metrics.gap) {
-      Image(systemName: alert.kind.symbolName)
-        .font(.system(size: max(metrics.firstLineHeight * 0.62, 14), weight: .semibold))
-        .foregroundStyle(accent)
-        .frame(
-          width: iconColumnWidth(metrics: metrics),
-          height: metrics.firstLineHeight,
-          alignment: .center
-        )
-        .accessibilityHidden(true)
-      Text(alert.kind.title)
-        .font(style.typography.body.font.weight(.semibold))
-        .foregroundStyle(style.colors.text)
-        .frame(minHeight: metrics.firstLineHeight, alignment: .center)
-    }
-    .accessibilityElement(children: .combine)
-    .accessibilityLabel(Text(alert.kind.title))
-  }
-
-  private func iconColumnWidth(metrics: HarnessMarkdownMarkerMetrics) -> CGFloat {
-    max(metrics.columnWidth, 20)
+  private var header: some View {
+    Text(alert.kind.title)
+      .font(style.typography.body.font.weight(.semibold))
+      .foregroundStyle(style.colors.text)
+      .accessibilityAddTraits(.isHeader)
   }
 
   private func backgroundGlyph(accent: Color) -> some View {

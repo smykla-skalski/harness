@@ -190,6 +190,7 @@ extension HarnessMarkdownUserSettings {
     var listSymbolWidth = 6.0
     var listMarkerWidth = 20.0
     var quoteContentGap = 8.0
+    var alertBottomMargin = 8.0
     var tableColumn = 12.0
     var tableRow = 4.0
 
@@ -220,6 +221,7 @@ extension HarnessMarkdownUserSettings {
       case listSymbolWidth
       case listMarkerWidth
       case quoteContentGap
+      case alertBottomMargin
       case tableColumn
       case tableRow
     }
@@ -244,6 +246,7 @@ extension HarnessMarkdownUserSettings {
         listSymbolWidth: CGFloat(max(0, listSymbolWidth)),
         listMarkerWidth: CGFloat(max(0, listMarkerWidth)),
         quoteContentGap: CGFloat(max(0, quoteContentGap)),
+        alertBottomMargin: CGFloat(max(0, alertBottomMargin)),
         tableColumn: CGFloat(max(0, tableColumn)),
         tableRow: CGFloat(max(0, tableRow))
       )
@@ -303,6 +306,8 @@ extension HarnessMarkdownUserSettings {
         try values.decodeIfPresent(Double.self, forKey: .listMarkerWidth) ?? listMarkerWidth
       quoteContentGap =
         try values.decodeIfPresent(Double.self, forKey: .quoteContentGap) ?? quoteContentGap
+      alertBottomMargin =
+        try values.decodeIfPresent(Double.self, forKey: .alertBottomMargin) ?? alertBottomMargin
       tableColumn = try values.decodeIfPresent(Double.self, forKey: .tableColumn) ?? tableColumn
       tableRow = try values.decodeIfPresent(Double.self, forKey: .tableRow) ?? tableRow
     }

@@ -55,11 +55,14 @@ struct HarnessMarkdownRenderingBehaviorTests {
     #expect(source.contains("HarnessMarkdownAlertView"))
     #expect(source.contains("case .alert(let alert):"))
     #expect(source.contains("style.colors.alertAccent(for: alert.kind)"))
+    #expect(source.contains("private let accentRuleWidth: CGFloat = 8"))
     #expect(source.contains("Image(systemName: alert.kind.symbolName)"))
     #expect(source.contains("HStack(alignment: .top, spacing: cardContentSpacing)"))
     #expect(source.contains("backgroundGlyph(accent: accent)"))
     #expect(source.contains(".background(alignment: .bottomTrailing)"))
     #expect(source.contains(".rotationEffect(.degrees(-8))"))
+    #expect(source.contains("style.spacing.alertBottomMargin"))
+    #expect(!source.contains("iconColumnWidth(metrics: metrics)"))
     #expect(source.contains(".background(cardBackground(accent: accent))"))
   }
 

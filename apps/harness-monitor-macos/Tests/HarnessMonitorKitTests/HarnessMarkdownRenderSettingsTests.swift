@@ -90,6 +90,7 @@ struct HarnessMarkdownRenderSettingsTests {
 
     #expect(decoded.documentBlock == 12)
     #expect(decoded.listMarkerGap == 2)
+    #expect(decoded.alertBottomMargin == 8)
     #expect(decoded.detailsMaxHeight == 420)
   }
 
@@ -131,6 +132,7 @@ struct HarnessMarkdownRenderSettingsTests {
       listSymbolWidth: 11,
       listMarkerWidth: 14,
       quoteContentGap: 11,
+      alertBottomMargin: 9,
       tableColumn: 12,
       tableRow: 13
     )
@@ -150,6 +152,7 @@ struct HarnessMarkdownRenderSettingsTests {
     #expect(resolved.spacing.listMarkerGap == 20)
     #expect(resolved.spacing.listSymbolWidth == 22)
     #expect(resolved.spacing.listMarkerWidth == 28)
+    #expect(resolved.spacing.alertBottomMargin == 18)
     #expect(resolved.spacing.tableColumn == 24)
     #expect(resolved.spacing.tableRow == 26)
   }
@@ -166,6 +169,7 @@ struct HarnessMarkdownRenderSettingsTests {
     #expect(spacing.listSymbolWidth + spacing.listMarkerGap == 12)
     #expect(spacing.listMarkerWidth + spacing.listMarkerGap == 26)
     #expect(spacing.listItem == 4)
+    #expect(spacing.alertBottomMargin == 8)
   }
 
   @Test("Settings window exposes markdown renderer controls")
@@ -192,11 +196,13 @@ struct HarnessMarkdownRenderSettingsTests {
     #expect(sectionSource.contains("Block Gaps"))
     #expect(sectionSource.contains("Layout Spacing"))
     #expect(sectionSource.contains("Details max height"))
+    #expect(sectionSource.contains("Alert bottom margin"))
     #expect(sectionSource.contains("Markdown Colors"))
     #expect(sectionSource.contains("Alert note"))
     #expect(sectionSource.contains("Alert caution"))
     #expect(sectionSource.contains("Code Token Colors"))
     #expect(rendererSource.contains("HarnessMarkdownStoredRenderSettings"))
+    #expect(rendererSource.contains("style.spacing.alertBottomMargin"))
   }
 
   private func readRepositoryFile(_ relativePath: String) throws -> String {
