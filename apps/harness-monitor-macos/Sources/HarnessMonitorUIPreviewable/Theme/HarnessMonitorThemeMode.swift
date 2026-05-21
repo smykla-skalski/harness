@@ -266,7 +266,7 @@ extension String {
     return String(dropFirst(prefix.count))
   }
 
-  fileprivate var nonEmpty: String? {
+  var nonEmpty: String? {
     isEmpty ? nil : self
   }
 }

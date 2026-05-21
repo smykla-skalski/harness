@@ -144,12 +144,6 @@ extension DependencyUpdateReviewEventState {
   }
 }
 
-extension String {
-  var nonEmpty: String? {
-    isEmpty ? nil : self
-  }
-}
-
 extension Array where Element == String {
   func removingDuplicates() -> [String] {
     var seen = Set<String>()
