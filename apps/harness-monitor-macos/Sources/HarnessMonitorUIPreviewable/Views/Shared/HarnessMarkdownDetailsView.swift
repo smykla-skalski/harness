@@ -34,16 +34,7 @@ struct HarnessMarkdownDetailsView: View {
     } label: {
       HStack(alignment: .top, spacing: metrics.gap) {
         chevron(metrics: metrics)
-        HarnessMarkdownInlineFlowView(
-          inlines: details.summary,
-          style: HarnessMarkdownInlineRenderStyle(
-            font: style.typography.body.font,
-            codeFont: style.typography.inlineCode.font,
-            colors: style.colors
-          ),
-          images: style.images,
-          imageLayout: .inline
-        )
+        summaryText(metrics: metrics)
         Spacer(minLength: 0)
       }
       .contentShape(Rectangle())
@@ -69,7 +60,21 @@ struct HarnessMarkdownDetailsView: View {
         height: metrics.firstLineHeight,
         alignment: .center
       )
-      .offset(y: metrics.chevronVisualYOffset)
+      .offset(y: metrics.firstLineMarkerYOffset)
+  }
+
+  private func summaryText(metrics: HarnessMarkdownMarkerMetrics) -> some View {
+    HarnessMarkdownInlineFlowView(
+      inlines: details.summary,
+      style: HarnessMarkdownInlineRenderStyle(
+        font: style.typography.body.font,
+        codeFont: style.typography.inlineCode.font,
+        colors: style.colors
+      ),
+      images: style.images,
+      imageLayout: .inline
+    )
+    .offset(y: metrics.firstLineTextYOffset)
   }
 
   private var summaryBackground: some View {

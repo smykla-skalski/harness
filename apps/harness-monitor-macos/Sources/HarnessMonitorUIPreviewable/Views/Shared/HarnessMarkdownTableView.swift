@@ -31,16 +31,20 @@ struct HarnessMarkdownTableView: View {
   private var tableContent: some View {
     HarnessMarkdownTableLayout(
       columnCount: columnCount,
+      rowCount: table.rows.count + 1,
       alignments: table.alignments,
       horizontalSpacing: style.spacing.tableColumn,
       verticalSpacing: style.spacing.tableRow
     ) {
       rowCells(table.headers, isHeader: true)
-      Rectangle()
-        .fill(style.colors.tableBorder)
-        .frame(height: 1)
+      if !table.rows.isEmpty {
+        rowDivider(isHeader: true)
+      }
       ForEach(table.rows.indices, id: \.self) { rowIndex in
         rowCells(table.rows[rowIndex], isHeader: false)
+        if rowIndex < table.rows.count - 1 {
+          rowDivider(isHeader: false)
+        }
       }
     }
   }
@@ -59,7 +63,14 @@ struct HarnessMarkdownTableView: View {
         imageLayout: .inline
       )
       .multilineTextAlignment(textAlignment(for: column))
+      .padding(.vertical, isHeader ? 1 : 3)
     }
+  }
+
+  private func rowDivider(isHeader: Bool) -> some View {
+    Rectangle()
+      .fill(style.colors.tableBorder.opacity(isHeader ? 1 : 0.55))
+      .frame(height: 1)
   }
 
   private var columnCount: Int {
@@ -85,6 +96,7 @@ struct HarnessMarkdownTableView: View {
 
 private struct HarnessMarkdownTableLayout: Layout {
   let columnCount: Int
+  let rowCount: Int
   let alignments: [HarnessMarkdownTable.Alignment]
   let horizontalSpacing: CGFloat
   let verticalSpacing: CGFloat
@@ -115,7 +127,6 @@ private struct HarnessMarkdownTableLayout: Layout {
     guard columnCount > 0, subviews.count >= columnCount else {
       return HarnessMarkdownTableMeasurement.empty
     }
-    let rowCount = tableRowCount(subviews: subviews)
     let intrinsicWidths = intrinsicColumnWidths(subviews: subviews, rowCount: rowCount)
     let spacingWidth = horizontalSpacing * CGFloat(max(0, columnCount - 1))
     let intrinsicContentWidth = intrinsicWidths.reduce(0, +) + spacingWidth
@@ -129,14 +140,14 @@ private struct HarnessMarkdownTableLayout: Layout {
       rowCount: rowCount,
       columnWidths: columnWidths
     )
-    let dividerHeight = dividerHeight(targetWidth: targetWidth, subviews: subviews)
-    let positions = verticalPositions(rowHeights: rowHeights, dividerHeight: dividerHeight)
+    let dividerHeights = measuredDividerHeights(targetWidth: targetWidth, subviews: subviews)
+    let positions = verticalPositions(rowHeights: rowHeights, dividerHeights: dividerHeights)
     return HarnessMarkdownTableMeasurement(
       columnWidths: columnWidths,
       rowHeights: rowHeights,
       rowY: positions.rowY,
       dividerY: positions.dividerY,
-      dividerHeight: dividerHeight,
+      dividerHeights: dividerHeights,
       size: CGSize(width: targetWidth, height: positions.height)
     )
   }
@@ -177,17 +188,20 @@ private struct HarnessMarkdownTableLayout: Layout {
 
   private func verticalPositions(
     rowHeights: [CGFloat],
-    dividerHeight: CGFloat
+    dividerHeights: [CGFloat]
   ) -> HarnessMarkdownTableVerticalPositions {
     guard !rowHeights.isEmpty else { return .empty }
     var rowY = Array(repeating: CGFloat(0), count: rowHeights.count)
-    var y = rowHeights[0]
-    let dividerY = y + verticalSpacing
-    y = dividerY + dividerHeight
-    for row in 1..<rowHeights.count {
-      y += verticalSpacing
+    var dividerY = Array(repeating: CGFloat(0), count: max(0, rowHeights.count - 1))
+    var y = CGFloat(0)
+    for row in rowHeights.indices {
       rowY[row] = y
       y += rowHeights[row]
+      guard row < rowHeights.count - 1 else { continue }
+      y += verticalSpacing / 2
+      dividerY[row] = y
+      y += dividerHeights[safe: row] ?? 0
+      y += verticalSpacing / 2
     }
     return HarnessMarkdownTableVerticalPositions(rowY: rowY, dividerY: dividerY, height: y)
   }
@@ -221,11 +235,21 @@ private struct HarnessMarkdownTableLayout: Layout {
     measurement: HarnessMarkdownTableMeasurement,
     subviews: Subviews
   ) {
-    guard let dividerY = measurement.dividerY, dividerIndex < subviews.count else { return }
-    subviews[dividerIndex].place(
-      at: CGPoint(x: bounds.minX, y: bounds.minY + dividerY),
-      proposal: ProposedViewSize(width: measurement.size.width, height: measurement.dividerHeight)
-    )
+    for dividerNumber in measurement.dividerHeights.indices {
+      guard let dividerIndex = dividerIndex(afterRow: dividerNumber),
+        dividerIndex < subviews.count,
+        dividerNumber < measurement.dividerY.count
+      else {
+        continue
+      }
+      subviews[dividerIndex].place(
+        at: CGPoint(x: bounds.minX, y: bounds.minY + measurement.dividerY[dividerNumber]),
+        proposal: ProposedViewSize(
+          width: measurement.size.width,
+          height: measurement.dividerHeights[dividerNumber]
+        )
+      )
+    }
   }
 
   private func xPosition(for column: Int, widths: [CGFloat]) -> CGFloat {
@@ -245,24 +269,28 @@ private struct HarnessMarkdownTableLayout: Layout {
     }
   }
 
-  private func dividerHeight(targetWidth: CGFloat, subviews: Subviews) -> CGFloat {
-    guard dividerIndex < subviews.count else { return 0 }
-    return subviews[dividerIndex].sizeThatFits(
-      ProposedViewSize(width: targetWidth, height: nil)
-    ).height
+  private func measuredDividerHeights(targetWidth: CGFloat, subviews: Subviews) -> [CGFloat] {
+    (0..<max(0, rowCount - 1)).map { row in
+      guard let dividerIndex = dividerIndex(afterRow: row), dividerIndex < subviews.count else {
+        return 0
+      }
+      return subviews[dividerIndex].sizeThatFits(
+        ProposedViewSize(width: targetWidth, height: nil)
+      ).height
+    }
   }
 
-  private func tableRowCount(subviews: Subviews) -> Int {
-    max(1, (subviews.count - columnCount - 1) / columnCount + 1)
+  private func rowStartIndex(_ row: Int) -> Int {
+    row * (columnCount + 1)
   }
 
-  private var dividerIndex: Int {
-    columnCount
+  private func dividerIndex(afterRow row: Int) -> Int? {
+    guard row < rowCount - 1 else { return nil }
+    return rowStartIndex(row) + columnCount
   }
 
   private func cellIndex(row: Int, column: Int) -> Int? {
-    if row == 0 { return column }
-    return columnCount + 1 + (row - 1) * columnCount + column
+    rowStartIndex(row) + column
   }
 
   private func alignment(for column: Int) -> HarnessMarkdownTable.Alignment {
@@ -275,23 +303,29 @@ private struct HarnessMarkdownTableMeasurement {
     columnWidths: [],
     rowHeights: [],
     rowY: [],
-    dividerY: nil,
-    dividerHeight: 0,
+    dividerY: [],
+    dividerHeights: [],
     size: .zero
   )
 
   let columnWidths: [CGFloat]
   let rowHeights: [CGFloat]
   let rowY: [CGFloat]
-  let dividerY: CGFloat?
-  let dividerHeight: CGFloat
+  let dividerY: [CGFloat]
+  let dividerHeights: [CGFloat]
   let size: CGSize
 }
 
 private struct HarnessMarkdownTableVerticalPositions {
-  static let empty = Self(rowY: [], dividerY: nil, height: 0)
+  static let empty = Self(rowY: [], dividerY: [], height: 0)
 
   let rowY: [CGFloat]
-  let dividerY: CGFloat?
+  let dividerY: [CGFloat]
   let height: CGFloat
+}
+
+extension Array {
+  fileprivate subscript(safe index: Index) -> Element? {
+    indices.contains(index) ? self[index] : nil
+  }
 }
