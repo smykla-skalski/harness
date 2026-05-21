@@ -328,13 +328,15 @@ extension HarnessMonitorStore {
     let snapshots = selectedAcpAgents
     let inspectSample = selectedAcpInspectState
     let output = await acpRuntimeWorker.eventPresentation(
-      payload: payload,
-      recordedAt: recordedAt,
-      selectedSessionID: selectedSessionID,
-      descriptorsByID: descriptorsByID,
-      sessionRegistrations: sessionRegistrations,
-      snapshots: snapshots,
-      inspectSample: inspectSample
+      input: AcpEventPresentationInput(
+        payload: payload,
+        recordedAt: recordedAt,
+        selectedSessionID: selectedSessionID,
+        descriptorsByID: descriptorsByID,
+        sessionRegistrations: sessionRegistrations,
+        snapshots: snapshots,
+        inspectSample: inspectSample
+      )
     )
     guard payload.sessionId == self.selectedSessionID, !Task.isCancelled else {
       return

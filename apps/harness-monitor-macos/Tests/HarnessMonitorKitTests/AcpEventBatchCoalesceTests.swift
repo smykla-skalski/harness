@@ -90,13 +90,15 @@ struct AcpEventBatchCoalesceTests {
     )
 
     let output = await store.acpRuntimeWorker.eventPresentation(
-      payload: payload,
-      recordedAt: recordedAt,
-      selectedSessionID: store.selectedSessionID,
-      descriptorsByID: store.acpAgentDescriptorsByID,
-      sessionRegistrations: store.selectedSession?.agents ?? [],
-      snapshots: store.selectedAcpAgents,
-      inspectSample: store.selectedAcpInspectState
+      input: AcpEventPresentationInput(
+        payload: payload,
+        recordedAt: recordedAt,
+        selectedSessionID: store.selectedSessionID,
+        descriptorsByID: store.acpAgentDescriptorsByID,
+        sessionRegistrations: store.selectedSession?.agents ?? [],
+        snapshots: store.selectedAcpAgents,
+        inspectSample: store.selectedAcpInspectState
+      )
     )
 
     #expect(output.entries == expectedEntries)
