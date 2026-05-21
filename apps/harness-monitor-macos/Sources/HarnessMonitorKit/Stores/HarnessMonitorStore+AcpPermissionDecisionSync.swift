@@ -8,17 +8,17 @@ extension HarnessMonitorStore {
     staleDecisionIDs: Set<String>,
     protectedDecisionIDs: Set<String> = []
   ) {
-    acpPermissionDecisionSyncTask?.cancel()
+    acpPermissionSync.decisionSyncTask?.cancel()
     guard let decisionStore = supervisorDecisionStore else {
       return
     }
     let payloads = Array(acpPermissionPayloadsByDecisionID.values)
-    acpPermissionDecisionSyncGeneration &+= 1
-    let generation = acpPermissionDecisionSyncGeneration
+    acpPermissionSync.decisionSyncGeneration &+= 1
+    let generation = acpPermissionSync.decisionSyncGeneration
     let task = makeCancellationAwareAcpPermissionTask { store in
       defer {
-        if store.acpPermissionDecisionSyncGeneration == generation {
-          store.acpPermissionDecisionSyncTask = nil
+        if store.acpPermissionSync.decisionSyncGeneration == generation {
+          store.acpPermissionSync.decisionSyncTask = nil
         }
       }
       await store.performAcpPermissionDecisionSync(
@@ -29,7 +29,7 @@ extension HarnessMonitorStore {
         generation: generation
       )
     }
-    acpPermissionDecisionSyncTask = task
+    acpPermissionSync.decisionSyncTask = task
   }
 
   private func performAcpPermissionDecisionSync(
@@ -43,7 +43,7 @@ extension HarnessMonitorStore {
     let payloads = payloadState.sortedPayloads
     var didPresentFailure = false
     let isCurrentGeneration = {
-      generation == self.acpPermissionDecisionSyncGeneration
+      generation == self.acpPermissionSync.decisionSyncGeneration
     }
     let reportFailure: AcpDecisionSyncFailureReporter = { operation, decisionID, error in
       self.reportAcpPermissionDecisionStoreFailure(
@@ -144,9 +144,9 @@ extension HarnessMonitorStore {
   }
 
   func invalidateAcpPermissionDecisionSync() {
-    acpPermissionDecisionSyncTask?.cancel()
-    acpPermissionDecisionSyncTask = nil
-    acpPermissionDecisionSyncGeneration &+= 1
+    acpPermissionSync.decisionSyncTask?.cancel()
+    acpPermissionSync.decisionSyncTask = nil
+    acpPermissionSync.decisionSyncGeneration &+= 1
   }
 
   func scheduleAcpPermissionDeadlineResolution(

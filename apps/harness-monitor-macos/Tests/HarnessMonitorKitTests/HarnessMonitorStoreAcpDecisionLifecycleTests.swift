@@ -35,7 +35,7 @@ final class HarnessMonitorStoreAcpDecisionLifecycleTests: XCTestCase {
 
     let persistedDecision = try await decisionStore.decision(id: decisionID)
     XCTAssertNil(persistedDecision)
-    XCTAssertNil(store.acpPermissionDecisionSyncTask)
+    XCTAssertNil(store.acpPermissionSync.decisionSyncTask)
   }
 
   func test_stoppingSupervisorCancelsQueuedSyncBeforeItPersistsDecision() async throws {
@@ -69,7 +69,7 @@ final class HarnessMonitorStoreAcpDecisionLifecycleTests: XCTestCase {
     let persistedDecision = try await decisionStore.decision(id: decisionID)
     XCTAssertNil(persistedDecision)
     XCTAssertNil(store.supervisorDecisionStore)
-    XCTAssertNil(store.acpPermissionDecisionSyncTask)
+    XCTAssertNil(store.acpPermissionSync.decisionSyncTask)
   }
 
   func test_startingSupervisorResyncsQueuedAcpDecisionsIntoFreshDecisionStore() async throws {
@@ -175,8 +175,8 @@ final class HarnessMonitorStoreAcpDecisionLifecycleTests: XCTestCase {
     XCTAssertNil(store.supervisorDecisionStore)
     XCTAssertTrue(store.acpPermissionPendingTimeoutDecisionIDs.isEmpty)
     XCTAssertTrue(store.acpPermissionPendingShutdownDecisionIDs.isEmpty)
-    XCTAssertTrue(store.acpPermissionDeadlineResolutionTasks.isEmpty)
-    XCTAssertTrue(store.acpPermissionShutdownResolutionTasks.isEmpty)
+    XCTAssertTrue(store.acpPermissionSync.deadlineResolutionTasks.isEmpty)
+    XCTAssertTrue(store.acpPermissionSync.shutdownResolutionTasks.isEmpty)
     XCTAssertTrue(store.acpPermissionTerminalOutcomesByID.isEmpty)
 
     let auditContext = ModelContext(container)
