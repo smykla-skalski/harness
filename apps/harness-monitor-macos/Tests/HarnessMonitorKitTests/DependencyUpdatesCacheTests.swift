@@ -1,0 +1,233 @@
+import Foundation
+import SwiftData
+import XCTest
+
+@testable import HarnessMonitorKit
+
+@MainActor
+final class DependencyUpdatesCacheTests: XCTestCase {
+  func testPreferencesHashIgnoresFreshnessAndOrder() {
+    let lhs = DependencyUpdatesQueryRequest(
+      authors: ["renovate[bot]", "dependabot[bot]"],
+      organizations: ["acme"],
+      repositories: ["acme/api"],
+      excludeRepositories: ["acme/archive"],
+      forceRefresh: false,
+      cacheMaxAgeSeconds: 600
+    )
+    let rhs = DependencyUpdatesQueryRequest(
+      authors: ["dependabot[bot]", "renovate[bot]"],
+      organizations: ["acme"],
+      repositories: ["acme/api"],
+      excludeRepositories: ["acme/archive"],
+      forceRefresh: true,
+      cacheMaxAgeSeconds: 30
+    )
+    XCTAssertEqual(
+      DependencyUpdatesCache.preferencesHash(for: lhs),
+      DependencyUpdatesCache.preferencesHash(for: rhs)
+    )
+  }
+
+  func testPreferencesHashChangesWhenBucketChanges() {
+    let base = DependencyUpdatesQueryRequest(authors: ["renovate[bot]"])
+    let widened = DependencyUpdatesQueryRequest(authors: ["renovate[bot]", "dependabot[bot]"])
+    XCTAssertNotEqual(
+      DependencyUpdatesCache.preferencesHash(for: base),
+      DependencyUpdatesCache.preferencesHash(for: widened)
+    )
+  }
+
+  func testSaveAndLoadRoundTrip() throws {
+    let context = try makeContext()
+    let cache = DependencyUpdatesCache(context: context)
+    let response = makeResponse(items: [
+      makeItem(pullRequestID: "pr_1"),
+      makeItem(pullRequestID: "pr_2"),
+    ])
+
+    cache.save(preferencesHash: "alpha", response: response)
+    let loaded = try XCTUnwrap(cache.load(preferencesHash: "alpha"))
+    XCTAssertEqual(loaded.items.map(\.pullRequestID), ["pr_1", "pr_2"])
+    XCTAssertEqual(loaded.summary.total, 2)
+  }
+
+  func testSaveReplacesPriorSnapshotAndDropsAbsentItems() throws {
+    let context = try makeContext()
+    let cache = DependencyUpdatesCache(context: context)
+    cache.save(
+      preferencesHash: "alpha",
+      response: makeResponse(items: [
+        makeItem(pullRequestID: "pr_1"),
+        makeItem(pullRequestID: "pr_2"),
+        makeItem(pullRequestID: "pr_3"),
+      ])
+    )
+    cache.save(
+      preferencesHash: "alpha",
+      response: makeResponse(items: [
+        makeItem(pullRequestID: "pr_1")
+      ])
+    )
+
+    let loaded = try XCTUnwrap(cache.load(preferencesHash: "alpha"))
+    XCTAssertEqual(loaded.items.map(\.pullRequestID), ["pr_1"])
+    XCTAssertEqual(rowCount(in: context), 1, "Wholesale replace must not multiply rows")
+  }
+
+  func testSnapshotsAreIsolatedByPreferencesHash() throws {
+    let context = try makeContext()
+    let cache = DependencyUpdatesCache(context: context)
+    cache.save(
+      preferencesHash: "alpha",
+      response: makeResponse(items: [makeItem(pullRequestID: "pr_1")])
+    )
+    cache.save(
+      preferencesHash: "beta",
+      response: makeResponse(items: [makeItem(pullRequestID: "pr_99")])
+    )
+
+    XCTAssertEqual(
+      cache.load(preferencesHash: "alpha")?.items.map(\.pullRequestID),
+      ["pr_1"]
+    )
+    XCTAssertEqual(
+      cache.load(preferencesHash: "beta")?.items.map(\.pullRequestID),
+      ["pr_99"]
+    )
+    XCTAssertEqual(rowCount(in: context), 2)
+  }
+
+  func testApplyRefreshReplacesMatchingOpenItem() {
+    let cached = [
+      makeItem(pullRequestID: "pr_1", reviewStatus: .reviewRequired),
+      makeItem(pullRequestID: "pr_2", reviewStatus: .reviewRequired),
+    ]
+    let refresh = DependencyUpdatesRefreshResponse(
+      fetchedAt: "2026-05-21T10:00:00Z",
+      items: [makeItem(pullRequestID: "pr_1", reviewStatus: .approved)]
+    )
+
+    let result = DependencyUpdatesCache.applyRefreshToItems(cached, refresh: refresh)
+    XCTAssertEqual(result.count, 2)
+    XCTAssertEqual(result[0].reviewStatus, .approved)
+    XCTAssertEqual(result[1].reviewStatus, .reviewRequired)
+  }
+
+  func testApplyRefreshDropsMergedAndClosedItems() {
+    let cached = [
+      makeItem(pullRequestID: "pr_1"),
+      makeItem(pullRequestID: "pr_2"),
+    ]
+    let refresh = DependencyUpdatesRefreshResponse(
+      fetchedAt: "2026-05-21T10:00:00Z",
+      items: [makeItem(pullRequestID: "pr_1", state: .merged)]
+    )
+
+    let result = DependencyUpdatesCache.applyRefreshToItems(cached, refresh: refresh)
+    XCTAssertEqual(result.map(\.pullRequestID), ["pr_2"])
+  }
+
+  func testApplyRefreshDropsMissingIDs() {
+    let cached = [
+      makeItem(pullRequestID: "pr_1"),
+      makeItem(pullRequestID: "pr_2"),
+    ]
+    let refresh = DependencyUpdatesRefreshResponse(
+      fetchedAt: "2026-05-21T10:00:00Z",
+      missingPullRequestIDs: ["pr_1"]
+    )
+
+    let result = DependencyUpdatesCache.applyRefreshToItems(cached, refresh: refresh)
+    XCTAssertEqual(result.map(\.pullRequestID), ["pr_2"])
+  }
+
+  func testApplyRefreshPersistsReconciledSnapshot() throws {
+    let context = try makeContext()
+    let cache = DependencyUpdatesCache(context: context)
+    cache.save(
+      preferencesHash: "alpha",
+      response: makeResponse(items: [
+        makeItem(pullRequestID: "pr_1"),
+        makeItem(pullRequestID: "pr_2"),
+        makeItem(pullRequestID: "pr_3"),
+      ])
+    )
+    let refresh = DependencyUpdatesRefreshResponse(
+      fetchedAt: "2026-05-21T11:00:00Z",
+      items: [makeItem(pullRequestID: "pr_2", state: .closed)],
+      missingPullRequestIDs: ["pr_1"]
+    )
+
+    let reconciled = try XCTUnwrap(
+      cache.applyRefresh(preferencesHash: "alpha", refresh: refresh)
+    )
+    XCTAssertEqual(reconciled.items.map(\.pullRequestID), ["pr_3"])
+    XCTAssertEqual(reconciled.fetchedAt, "2026-05-21T11:00:00Z")
+    XCTAssertEqual(reconciled.summary.total, 1)
+
+    let loaded = try XCTUnwrap(cache.load(preferencesHash: "alpha"))
+    XCTAssertEqual(loaded.items.map(\.pullRequestID), ["pr_3"])
+  }
+
+  func testApplyRefreshReturnsNilWhenNoSnapshotExists() {
+    let context = try? makeContext()
+    guard let context else {
+      XCTFail("Failed to build context")
+      return
+    }
+    let cache = DependencyUpdatesCache(context: context)
+    let refresh = DependencyUpdatesRefreshResponse(
+      fetchedAt: "2026-05-21T11:00:00Z",
+      items: [makeItem(pullRequestID: "pr_1")]
+    )
+    XCTAssertNil(cache.applyRefresh(preferencesHash: "missing", refresh: refresh))
+  }
+
+  // MARK: - Helpers
+
+  private func makeContext() throws -> ModelContext {
+    let container = try HarnessMonitorModelContainer.preview()
+    return ModelContext(container)
+  }
+
+  private func rowCount(in context: ModelContext) -> Int {
+    (try? context.fetch(FetchDescriptor<CachedDependencyUpdatesSnapshot>()).count) ?? -1
+  }
+
+  private func makeResponse(items: [DependencyUpdateItem]) -> DependencyUpdatesQueryResponse {
+    DependencyUpdatesQueryResponse(
+      fetchedAt: "2026-05-21T10:00:00Z",
+      fromCache: false,
+      summary: DependencyUpdatesSummary(items: items),
+      items: items
+    )
+  }
+
+  private func makeItem(
+    pullRequestID: String,
+    state: DependencyUpdatePullRequestState = .open,
+    reviewStatus: DependencyUpdateReviewStatus = .reviewRequired
+  ) -> DependencyUpdateItem {
+    DependencyUpdateItem(
+      pullRequestID: pullRequestID,
+      repositoryID: "repo_1",
+      repository: "acme/api",
+      number: 1,
+      title: "chore(deps): bump",
+      url: "https://example.com",
+      authorLogin: "renovate[bot]",
+      state: state,
+      mergeable: .mergeable,
+      reviewStatus: reviewStatus,
+      checkStatus: .success,
+      policyBlocked: false,
+      isDraft: false,
+      headSha: "abc123",
+      additions: 1,
+      deletions: 1,
+      createdAt: "2026-05-20T12:00:00Z",
+      updatedAt: "2026-05-20T12:00:00Z"
+    )
+  }
+}

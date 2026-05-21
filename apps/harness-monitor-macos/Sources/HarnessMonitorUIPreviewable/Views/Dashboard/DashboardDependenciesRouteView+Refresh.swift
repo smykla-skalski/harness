@@ -40,5 +40,6 @@ extension DashboardDependenciesRouteView {
       summary: DependencyUpdatesSummary(items: nextItems),
       items: nextItems
     )
+    persistDependenciesRefresh(refresh)
   }
 }

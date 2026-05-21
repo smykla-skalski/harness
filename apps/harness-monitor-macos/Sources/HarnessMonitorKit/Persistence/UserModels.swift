@@ -206,3 +206,50 @@ private func encodedOrchestratorStatus(
   }
   return try Codecs.encoder.encode(orchestratorStatus)
 }
+
+@Model
+public final class CachedDependencyUpdatesSnapshot {
+  #Unique<CachedDependencyUpdatesSnapshot>([\.preferencesHash])
+  #Index<CachedDependencyUpdatesSnapshot>([\.cachedAt])
+
+  public var preferencesHash: String
+  public var cachedAt: Date
+  public var responseData: Data
+
+  public init(
+    preferencesHash: String,
+    cachedAt: Date = .now,
+    responseData: Data = Data()
+  ) {
+    self.preferencesHash = preferencesHash
+    self.cachedAt = cachedAt
+    self.responseData = responseData
+  }
+}
+
+extension CachedDependencyUpdatesSnapshot {
+  static func make(
+    preferencesHash: String,
+    response: DependencyUpdatesQueryResponse
+  ) throws -> CachedDependencyUpdatesSnapshot {
+    try CachedDependencyUpdatesSnapshot(
+      preferencesHash: preferencesHash,
+      responseData: Codecs.encoder.encode(response)
+    )
+  }
+
+  func update(response: DependencyUpdatesQueryResponse) throws {
+    cachedAt = .now
+    responseData = try Codecs.encoder.encode(response)
+  }
+
+  func decodedResponse() throws -> DependencyUpdatesQueryResponse? {
+    guard !responseData.isEmpty else {
+      return nil
+    }
+    return try Codecs.decoder.decode(
+      DependencyUpdatesQueryResponse.self,
+      from: responseData
+    )
+  }
+}
