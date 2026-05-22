@@ -1,3 +1,6 @@
+pub use crate::dependency_updates::review_thread_resolve::{
+    DependencyUpdatesReviewThreadResolveRequest, DependencyUpdatesReviewThreadResolveResponse,
+};
 pub use crate::dependency_updates::timeline::{
     Actor as DependencyUpdateTimelineActor, CommitEntry as DependencyUpdateTimelineCommitEntry,
     DependencyUpdateTimelineEntry, DependencyUpdatesTimelineRequest,

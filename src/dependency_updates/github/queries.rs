@@ -321,6 +321,27 @@ mutation AddDependencyUpdateComment($id: ID!, $body: String!) {
 }
 ";
 
+/// Resolve a `PullRequestReviewThread` by its node ID. Returns the
+/// updated thread's `isResolved` flag so the daemon can echo the
+/// confirmed server-side state.
+pub(crate) const RESOLVE_REVIEW_THREAD_MUTATION: &str = r"
+mutation ResolveDependencyUpdateReviewThread($threadId: ID!) {
+  resolveReviewThread(input: { threadId: $threadId }) {
+    thread { id isResolved }
+  }
+}
+";
+
+/// Inverse of `RESOLVE_REVIEW_THREAD_MUTATION` — unresolves a
+/// previously-resolved review thread.
+pub(crate) const UNRESOLVE_REVIEW_THREAD_MUTATION: &str = r"
+mutation UnresolveDependencyUpdateReviewThread($threadId: ID!) {
+  unresolveReviewThread(input: { threadId: $threadId }) {
+    thread { id isResolved }
+  }
+}
+";
+
 pub(crate) const LIST_PR_FILES_QUERY: &str = r"
 query ListDependencyUpdatePullRequestFiles($id: ID!, $after: String) {
   node(id: $id) {
