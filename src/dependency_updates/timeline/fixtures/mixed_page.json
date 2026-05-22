@@ -1,0 +1,103 @@
+{
+  "data": {
+    "node": {
+      "id": "PR_test",
+      "viewerCanUpdate": true,
+      "timelineItems": {
+        "pageInfo": {
+          "startCursor": "c1",
+          "endCursor": "c5",
+          "hasNextPage": false,
+          "hasPreviousPage": false
+        },
+        "nodes": [
+          {
+            "__typename": "IssueComment",
+            "id": "IC_001",
+            "createdAt": "2026-05-20T10:00:00Z",
+            "updatedAt": "2026-05-20T10:05:00Z",
+            "body": "LGTM",
+            "bodyText": "LGTM",
+            "isMinimized": false,
+            "minimizedReason": null,
+            "reactions": { "totalCount": 2 },
+            "viewerDidAuthor": true,
+            "viewerCanUpdate": true,
+            "url": "https://github.com/owner/repo/pull/1#issuecomment-001",
+            "author": {
+              "login": "alice",
+              "avatarUrl": "https://avatars.githubusercontent.com/u/1?v=4"
+            }
+          },
+          {
+            "__typename": "LabeledEvent",
+            "id": "LE_001",
+            "createdAt": "2026-05-20T11:00:00Z",
+            "actor": {
+              "login": "renovate-bot",
+              "avatarUrl": "https://avatars.githubusercontent.com/in/1?v=4"
+            },
+            "label": { "name": "dependencies", "color": "0366d6" }
+          },
+          {
+            "__typename": "PullRequestCommit",
+            "id": "PRC_001",
+            "url": "https://github.com/owner/repo/pull/1/commits/abcd",
+            "commit": {
+              "oid": "abcd1234ef5678901234567890abcdef12345678",
+              "abbreviatedOid": "abcd123",
+              "messageHeadline": "Update dependency foo to v2",
+              "committedDate": "2026-05-20T11:30:00Z",
+              "author": {
+                "name": "Renovate Bot",
+                "user": {
+                  "login": "renovate",
+                  "avatarUrl": "https://avatars.githubusercontent.com/in/2?v=4"
+                }
+              }
+            }
+          },
+          {
+            "__typename": "PullRequestReview",
+            "id": "PRR_001",
+            "createdAt": "2026-05-20T12:00:00Z",
+            "state": "APPROVED",
+            "body": "Looks good",
+            "url": "https://github.com/owner/repo/pull/1#pullrequestreview-001",
+            "author": {
+              "login": "bob",
+              "avatarUrl": "https://avatars.githubusercontent.com/u/2?v=4"
+            },
+            "comments": {
+              "pageInfo": { "endCursor": "rc1", "hasNextPage": false },
+              "nodes": []
+            }
+          },
+          {
+            "__typename": "HeadRefForcePushedEvent",
+            "id": "HRFP_001",
+            "createdAt": "2026-05-20T13:00:00Z",
+            "actor": {
+              "login": "renovate-bot",
+              "avatarUrl": "https://avatars.githubusercontent.com/in/1?v=4"
+            },
+            "beforeCommit": {
+              "oid": "1111111111aaaaaaaaaa1111111111aaaaaaaaaa",
+              "abbreviatedOid": "1111111"
+            },
+            "afterCommit": {
+              "oid": "2222222222bbbbbbbbbb2222222222bbbbbbbbbb",
+              "abbreviatedOid": "2222222"
+            },
+            "ref": { "name": "renovate/foo-v2" }
+          }
+        ]
+      }
+    },
+    "rateLimit": {
+      "remaining": 4995,
+      "resetAt": "2026-05-20T15:00:00Z",
+      "cost": 1
+    }
+  }
+}

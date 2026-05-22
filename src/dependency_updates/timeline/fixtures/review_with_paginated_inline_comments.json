@@ -1,0 +1,43 @@
+{
+  "__typename": "PullRequestReview",
+  "id": "PRR_paged",
+  "createdAt": "2026-05-21T09:00:00Z",
+  "state": "CHANGES_REQUESTED",
+  "body": "Please address inline comments",
+  "url": "https://github.com/owner/repo/pull/2#pullrequestreview-002",
+  "author": {
+    "login": "charlie",
+    "avatarUrl": "https://avatars.githubusercontent.com/u/3?v=4"
+  },
+  "comments": {
+    "pageInfo": { "endCursor": "rc-end-1", "hasNextPage": true },
+    "nodes": [
+      {
+        "id": "PRRC_001",
+        "path": "src/foo.rs",
+        "position": 42,
+        "body": "Inline comment 1",
+        "createdAt": "2026-05-21T09:00:01Z",
+        "url": "https://github.com/owner/repo/pull/2#discussion_r1",
+        "replyTo": null,
+        "author": {
+          "login": "charlie",
+          "avatarUrl": "https://avatars.githubusercontent.com/u/3?v=4"
+        }
+      },
+      {
+        "id": "PRRC_002",
+        "path": "src/bar.rs",
+        "position": 7,
+        "body": "Inline comment 2",
+        "createdAt": "2026-05-21T09:00:02Z",
+        "url": "https://github.com/owner/repo/pull/2#discussion_r2",
+        "replyTo": { "id": "PRRC_001" },
+        "author": {
+          "login": "charlie",
+          "avatarUrl": "https://avatars.githubusercontent.com/u/3?v=4"
+        }
+      }
+    ]
+  }
+}
