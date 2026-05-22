@@ -158,6 +158,23 @@ fn serialized_action_response_always_emits_results_array() {
 }
 
 #[test]
+fn serialized_check_emits_details_url_when_present() {
+    let check = DependencyUpdateCheck {
+        name: "ci".into(),
+        status: DependencyUpdateCheckRunStatus::Completed,
+        conclusion: DependencyUpdateCheckConclusion::Success,
+        check_suite_id: Some("suite-1".into()),
+        details_url: Some("https://github.com/acme/api/actions/runs/1".into()),
+    };
+    let value = serde_json::to_value(&check).expect("serialize");
+    let object = value.as_object().expect("check is an object");
+    assert_eq!(
+        object.get("details_url").and_then(serde_json::Value::as_str),
+        Some("https://github.com/acme/api/actions/runs/1")
+    );
+}
+
+#[test]
 fn serialized_catalog_response_always_emits_repositories_array() {
     let response = DependencyUpdatesRepositoryCatalogResponse {
         organization: "acme".into(),
@@ -195,6 +212,78 @@ fn body_request_normalizes_pull_request_id_and_cache_age() {
     assert_eq!(request.normalized_pull_request_id(), "pr_node");
     assert_eq!(request.cache_max_age_seconds(), 1);
     assert!(request.validate().is_ok());
+}
+
+fn sample_body_update_request() -> DependencyUpdatesBodyUpdateRequest {
+    DependencyUpdatesBodyUpdateRequest {
+        pull_request_id: "pr_node".into(),
+        expected_prior_body_sha256:
+            "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef".into(),
+        new_body: "- [x] rebase".into(),
+    }
+}
+
+#[test]
+fn body_update_request_normalizes_pull_request_id_and_hash() {
+    let request = DependencyUpdatesBodyUpdateRequest {
+        pull_request_id: "  pr_node  ".into(),
+        expected_prior_body_sha256:
+            "  ABCDEFabcdef0123456789012345678901234567890123456789012345678901  ".into(),
+        new_body: "body".into(),
+    };
+    assert_eq!(request.normalized_pull_request_id(), "pr_node");
+    assert_eq!(
+        request.normalized_expected_prior_body_sha256(),
+        "abcdefabcdef0123456789012345678901234567890123456789012345678901"
+    );
+    assert!(request.validate().is_ok());
+}
+
+#[test]
+fn body_update_request_rejects_empty_pull_request_id() {
+    let mut request = sample_body_update_request();
+    request.pull_request_id = "   ".into();
+    assert!(request.validate().is_err());
+}
+
+#[test]
+fn body_update_request_rejects_short_hash() {
+    let mut request = sample_body_update_request();
+    request.expected_prior_body_sha256 = "abc".into();
+    assert!(request.validate().is_err());
+}
+
+#[test]
+fn body_update_request_rejects_non_hex_hash() {
+    let mut request = sample_body_update_request();
+    request.expected_prior_body_sha256 =
+        "g123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef".into();
+    assert!(request.validate().is_err());
+}
+
+#[test]
+fn body_update_request_rejects_oversize_body() {
+    let mut request = sample_body_update_request();
+    request.new_body =
+        "x".repeat(DependencyUpdatesBodyUpdateRequest::MAX_BODY_BYTES + 1);
+    assert!(request.validate().is_err());
+}
+
+#[test]
+fn body_update_request_accepts_max_size_body() {
+    let mut request = sample_body_update_request();
+    request.new_body = "x".repeat(DependencyUpdatesBodyUpdateRequest::MAX_BODY_BYTES);
+    assert!(request.validate().is_ok());
+}
+
+#[test]
+fn body_update_outcome_serializes_snake_case() {
+    let updated = serde_json::to_value(DependencyUpdatesBodyUpdateOutcome::Updated)
+        .expect("serialize updated");
+    assert_eq!(updated, serde_json::json!("updated"));
+    let drifted = serde_json::to_value(DependencyUpdatesBodyUpdateOutcome::BodyDrifted)
+        .expect("serialize drifted");
+    assert_eq!(drifted, serde_json::json!("body_drifted"));
 }
 
 #[test]
