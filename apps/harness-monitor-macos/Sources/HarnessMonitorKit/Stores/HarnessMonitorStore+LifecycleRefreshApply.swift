@@ -322,7 +322,7 @@ extension HarnessMonitorStore {
   }
 }
 
-extension RefreshSnapshot {
+extension HarnessMonitorStore.RefreshSnapshot {
   fileprivate func refreshTimings(recordedAt: Date = .now) -> HarnessMonitorRefreshTimings {
     HarnessMonitorRefreshTimings(
       recordedAt: recordedAt,
