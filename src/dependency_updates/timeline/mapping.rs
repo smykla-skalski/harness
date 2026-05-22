@@ -6,7 +6,7 @@ use serde_json::Value;
 use super::types::{
     Actor, CommitEntry, DependencyUpdateTimelineEntry, HeadRefForcePushedEntry, IssueCommentEntry,
     ReviewEntry, ReviewInlineCommentEntry, ReviewState, ReviewThreadCommentEntry,
-    ReviewThreadEntry,
+    ReviewThreadEntry, SimpleActorEventEntry, SimpleActorEventKind,
 };
 
 pub(super) fn parse_iso8601(value: Option<&Value>) -> Option<DateTime<Utc>> {
@@ -372,17 +372,220 @@ pub(super) fn parse_commit_oid(value: Option<&Value>) -> (String, String) {
 }
 
 /// Dispatches a single timeline node to its mapper based on
-/// `__typename`. The lightweight kinds (handled by `map_simple_actor_event`)
-/// and the forward-compat fallback land in A.5 and A.6 respectively;
-/// this stub returns `None` for typeenames that aren't covered yet so
-/// the upcoming commits can wire them in incrementally.
+/// `__typename`. Hot kinds get dedicated mappers; the 39 lightweight
+/// `SimpleActorEvent` typeenames funnel through `map_simple_actor_event`.
+/// The forward-compat fallback for unknown typeenames lands in A.6.
 pub(super) fn map_node(node: &Value) -> Option<DependencyUpdateTimelineEntry> {
-    match typename(node)? {
+    let name = typename(node)?;
+    match name {
         "IssueComment" => map_issue_comment(node),
         "PullRequestReview" => map_pull_request_review(node),
         "PullRequestReviewThread" => map_pull_request_review_thread(node),
         "PullRequestCommit" => map_pull_request_commit(node),
         "HeadRefForcePushedEvent" => map_head_ref_force_pushed(node),
-        _ => None,
+        other => map_simple_actor_event(other, node),
     }
+}
+
+fn typename_to_simple_kind(typename: &str) -> Option<SimpleActorEventKind> {
+    use SimpleActorEventKind::*;
+    Some(match typename {
+        "HeadRefDeletedEvent" => HeadRefDeleted,
+        "HeadRefRestoredEvent" => HeadRefRestored,
+        "BaseRefChangedEvent" => BaseRefChanged,
+        "BaseRefForcePushedEvent" => BaseRefForcePushed,
+        "BaseRefDeletedEvent" => BaseRefDeleted,
+        "LabeledEvent" => Labeled,
+        "UnlabeledEvent" => Unlabeled,
+        "AssignedEvent" => Assigned,
+        "UnassignedEvent" => Unassigned,
+        "MergedEvent" => Merged,
+        "ClosedEvent" => Closed,
+        "ReopenedEvent" => Reopened,
+        "RenamedTitleEvent" => RenamedTitle,
+        "ReviewRequestedEvent" => ReviewRequested,
+        "ReviewRequestRemovedEvent" => ReviewRequestRemoved,
+        "ReviewDismissedEvent" => ReviewDismissed,
+        "ReadyForReviewEvent" => ReadyForReview,
+        "ConvertToDraftEvent" => ConvertToDraft,
+        "AutoMergeEnabledEvent" => AutoMergeEnabled,
+        "AutoMergeDisabledEvent" => AutoMergeDisabled,
+        "AutoRebaseEnabledEvent" => AutoRebaseEnabled,
+        "AutoSquashEnabledEvent" => AutoSquashEnabled,
+        "LockedEvent" => Locked,
+        "UnlockedEvent" => Unlocked,
+        "PinnedEvent" => Pinned,
+        "UnpinnedEvent" => Unpinned,
+        "MilestonedEvent" => Milestoned,
+        "DemilestonedEvent" => Demilestoned,
+        "ReferencedEvent" => Referenced,
+        "CrossReferencedEvent" => CrossReferenced,
+        "MentionedEvent" => Mentioned,
+        "SubscribedEvent" => Subscribed,
+        "UnsubscribedEvent" => Unsubscribed,
+        "MarkedAsDuplicateEvent" => MarkedAsDuplicate,
+        "UnmarkedAsDuplicateEvent" => UnmarkedAsDuplicate,
+        "TransferredEvent" => Transferred,
+        "ConnectedEvent" => Connected,
+        "DisconnectedEvent" => Disconnected,
+        "PullRequestRevisionMarker" => RevisionMarker,
+        _ => return None,
+    })
+}
+
+fn synthesize_id(typename: &str, node: &Value) -> String {
+    let created = node
+        .get("createdAt")
+        .and_then(Value::as_str)
+        .unwrap_or("");
+    let marker_oid = node
+        .get("lastSeenCommit")
+        .and_then(Value::as_object)
+        .and_then(|c| c.get("oid"))
+        .and_then(Value::as_str)
+        .unwrap_or("");
+    format!("synthetic:{typename}:{marker_oid}:{created}")
+}
+
+pub(super) fn map_simple_actor_event(
+    typename: &str,
+    node: &Value,
+) -> Option<DependencyUpdateTimelineEntry> {
+    let event_kind = typename_to_simple_kind(typename)?;
+    let id = node
+        .get("id")
+        .and_then(Value::as_str)
+        .map(str::to_string)
+        .unwrap_or_else(|| synthesize_id(typename, node));
+    let created_at = parse_iso8601(node.get("createdAt"))?;
+    let actor = parse_actor(node.get("actor"));
+
+    let mut entry = SimpleActorEventEntry {
+        id,
+        created_at,
+        actor,
+        event_kind,
+        label: None,
+        label_color: None,
+        milestone_title: None,
+        old_title: None,
+        new_title: None,
+        source_url: None,
+        source_title: None,
+        source_number: None,
+        branch_name: None,
+        before_oid: None,
+        after_oid: None,
+        lock_reason: None,
+        dismissal_message: None,
+        requested_reviewer_login: None,
+        requested_reviewer_team_slug: None,
+        assignee_login: None,
+        source_repository: None,
+        destination_repository: None,
+    };
+
+    match event_kind {
+        SimpleActorEventKind::Labeled | SimpleActorEventKind::Unlabeled => {
+            if let Some(label) = node.get("label").and_then(Value::as_object) {
+                entry.label = parse_string(label.get("name"));
+                entry.label_color = parse_string(label.get("color"));
+            }
+        }
+        SimpleActorEventKind::Assigned | SimpleActorEventKind::Unassigned => {
+            entry.assignee_login = node
+                .get("assignee")
+                .and_then(Value::as_object)
+                .and_then(|a| a.get("login"))
+                .and_then(Value::as_str)
+                .map(str::to_string);
+        }
+        SimpleActorEventKind::Milestoned | SimpleActorEventKind::Demilestoned => {
+            entry.milestone_title = parse_string(node.get("milestoneTitle"));
+        }
+        SimpleActorEventKind::RenamedTitle => {
+            entry.old_title = parse_string(node.get("previousTitle"));
+            entry.new_title = parse_string(node.get("currentTitle"));
+        }
+        SimpleActorEventKind::ReviewRequested
+        | SimpleActorEventKind::ReviewRequestRemoved => {
+            if let Some(req) = node.get("requestedReviewer").and_then(Value::as_object) {
+                let reviewer_type = req.get("__typename").and_then(Value::as_str).unwrap_or("");
+                if reviewer_type == "Team" {
+                    entry.requested_reviewer_team_slug = parse_string(req.get("slug"));
+                } else {
+                    entry.requested_reviewer_login = parse_string(req.get("login"));
+                }
+            }
+        }
+        SimpleActorEventKind::ReviewDismissed => {
+            entry.dismissal_message = parse_string(node.get("dismissalMessage"));
+        }
+        SimpleActorEventKind::Locked => {
+            entry.lock_reason = parse_string(node.get("lockReason"));
+        }
+        SimpleActorEventKind::Referenced
+        | SimpleActorEventKind::Connected
+        | SimpleActorEventKind::Disconnected => {
+            if let Some(subject) = node.get("subject").and_then(Value::as_object) {
+                entry.source_url = parse_string(subject.get("url"));
+                entry.source_title = parse_string(subject.get("title"));
+                entry.source_number = subject.get("number").and_then(Value::as_i64);
+            }
+        }
+        SimpleActorEventKind::CrossReferenced => {
+            if let Some(src) = node.get("source").and_then(Value::as_object) {
+                entry.source_url = parse_string(src.get("url"));
+                entry.source_title = parse_string(src.get("title"));
+                entry.source_number = src.get("number").and_then(Value::as_i64);
+                entry.source_repository = src
+                    .get("repository")
+                    .and_then(Value::as_object)
+                    .and_then(|r| r.get("nameWithOwner"))
+                    .and_then(Value::as_str)
+                    .map(str::to_string);
+            }
+        }
+        SimpleActorEventKind::BaseRefChanged => {
+            entry.old_title = parse_string(node.get("previousRefName"));
+            entry.new_title = parse_string(node.get("currentRefName"));
+        }
+        SimpleActorEventKind::BaseRefForcePushed => {
+            let (before, _) = parse_commit_oid(node.get("beforeCommit"));
+            let (after, _) = parse_commit_oid(node.get("afterCommit"));
+            entry.before_oid = Some(before).filter(|s| !s.is_empty());
+            entry.after_oid = Some(after).filter(|s| !s.is_empty());
+            entry.branch_name = node
+                .get("ref")
+                .and_then(Value::as_object)
+                .and_then(|r| r.get("name"))
+                .and_then(Value::as_str)
+                .map(str::to_string);
+        }
+        SimpleActorEventKind::BaseRefDeleted => {
+            entry.branch_name = parse_string(node.get("baseRefName"));
+        }
+        SimpleActorEventKind::HeadRefDeleted => {
+            entry.branch_name = parse_string(node.get("headRefName"));
+        }
+        SimpleActorEventKind::Merged => {
+            let (oid, _) = parse_commit_oid(node.get("commit"));
+            entry.after_oid = Some(oid).filter(|s| !s.is_empty());
+            entry.branch_name = parse_string(node.get("mergeRefName"));
+        }
+        SimpleActorEventKind::Transferred => {
+            entry.source_repository = node
+                .get("fromRepository")
+                .and_then(Value::as_object)
+                .and_then(|r| r.get("nameWithOwner"))
+                .and_then(Value::as_str)
+                .map(str::to_string);
+        }
+        SimpleActorEventKind::RevisionMarker => {
+            let (oid, _) = parse_commit_oid(node.get("lastSeenCommit"));
+            entry.after_oid = Some(oid).filter(|s| !s.is_empty());
+        }
+        _ => {}
+    }
+    Some(DependencyUpdateTimelineEntry::SimpleActorEvent(entry))
 }
