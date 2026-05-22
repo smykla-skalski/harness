@@ -38,25 +38,9 @@ struct DashboardDependencyDetailView<Actions: View>: View {
   }
 
   var body: some View {
-    HarnessMonitorColumnScrollView(
-      horizontalPadding: 24,
-      verticalPadding: 24,
-      constrainContentWidth: true,
-      readableWidth: false,
-      topScrollEdgeEffect: .soft,
-      scrollSurfaceIdentifier: HarnessMonitorAccessibility.dashboardDependenciesDetail,
-      scrollSurfaceLabel: "Dependencies detail"
-    ) {
-      VStack(alignment: .leading, spacing: 18) {
-        DashboardDependencyDetailCard(
-          title: item.title,
-          subtitle: "\(item.repository)#\(item.number) · @\(item.authorLogin)"
-        ) {
-          VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingMD) {
-            actionBar()
-            DashboardDependencyStatusStrip(item: item)
-          }
-        }
+    let viewModel = store.dependencyUpdateTimelineViewModel(for: item.pullRequestID)
+    ScrollView(.vertical) {
+      LazyVStack(alignment: .leading, spacing: 18) {
         DashboardDependencyDetailSection(title: nil) {
           DashboardDependenciesDescriptionView(
             store: store,
@@ -95,18 +79,55 @@ struct DashboardDependencyDetailView<Actions: View>: View {
           DashboardDependencyConversationFeed(
             item: item,
             store: store,
-            actionHandler: store.supervisorDecisionActionHandler()
+            actionHandler: store.supervisorDecisionActionHandler(),
+            showsComposer: false
           )
         }
       }
       .frame(maxWidth: dependenciesDetailMaxWidth, alignment: .leading)
       .frame(maxWidth: .infinity, alignment: .center)
-      .task(
-        id: DependencyUpdateBodyTaskKey(
-          item: item, isDaemonOnline: store.connectionState == .online)
+      .padding(.horizontal, 24)
+      .padding(.vertical, 24)
+    }
+    .scrollIndicators(.visible)
+    .safeAreaInset(edge: .top, spacing: 0) {
+      DashboardDependencyDetailCard(
+        title: item.title,
+        subtitle: "\(item.repository)#\(item.number) · @\(item.authorLogin)"
       ) {
-        await store.prepareDependencyUpdateBody(for: item)
+        VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingMD) {
+          actionBar()
+          DashboardDependencyStatusStrip(item: item)
+        }
       }
+      .frame(maxWidth: dependenciesDetailMaxWidth, alignment: .leading)
+      .frame(maxWidth: .infinity, alignment: .center)
+      .padding(.horizontal, 24)
+      .padding(.top, 24)
+      .padding(.bottom, 8)
+      .background(.regularMaterial)
+    }
+    .safeAreaInset(edge: .bottom, spacing: 0) {
+      DashboardDependencyCommentComposer(
+        pullRequestID: item.pullRequestID,
+        initialDraft: store.dependencyUpdateCommentDraft(for: item.pullRequestID),
+        viewerCanComment: viewModel.viewerCanComment,
+        onDraftChange: { draft in
+          store.scheduleDependencyUpdateDraftWrite(item.pullRequestID, draft: draft)
+        },
+        onSend: { body in
+          await store.postDependencyUpdateComment(for: item, body: body)
+        }
+      )
+      .frame(maxWidth: dependenciesDetailMaxWidth, alignment: .leading)
+      .frame(maxWidth: .infinity, alignment: .center)
+      .background(.regularMaterial)
+    }
+    .task(
+      id: DependencyUpdateBodyTaskKey(
+        item: item, isDaemonOnline: store.connectionState == .online)
+    ) {
+      await store.prepareDependencyUpdateBody(for: item)
     }
   }
 }
