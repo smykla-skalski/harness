@@ -1,7 +1,7 @@
 mod api_contract;
 mod binding;
 mod codex;
-mod dependency_updates;
+mod reviews;
 mod managed_agents;
 mod openrouter_models;
 mod session_requests;
@@ -15,7 +15,7 @@ mod websocket;
 pub use api_contract::*;
 pub use binding::{ControlPlaneActorRequest, bind_control_plane_actor_value};
 pub use codex::*;
-pub use dependency_updates::*;
+pub use reviews::*;
 pub use managed_agents::*;
 pub use openrouter_models::*;
 pub use session_requests::*;
