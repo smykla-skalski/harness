@@ -9,7 +9,7 @@ extension TaskBoardAPIClientTests {
       records.map(\.method)
         == [
           "POST", "GET", "POST", "POST", "POST", "POST", "POST", "POST", "POST", "DELETE",
-          "POST", "POST",
+          "POST", "POST", "POST",
         ]
     )
     #expect(
@@ -27,6 +27,7 @@ extension TaskBoardAPIClientTests {
           "/v1/dependency-updates/cache",
           "/v1/dependency-updates/refresh",
           "/v1/dependency-updates/comment",
+          "/v1/dependency-updates/timeline",
         ]
     )
   }
@@ -115,6 +116,10 @@ extension TaskBoardAPIClientTests {
     #expect(result.cacheClear.clearedEntries == 2)
     #expect(result.refresh.missingPullRequestIDs == ["pr-42"])
     #expect(result.comment.results.first?.action == .comment)
+    #expect(result.timeline.pullRequestId == "pr-42")
+    #expect(result.timeline.entries.first?.id == "IC_001")
+    #expect(result.timeline.viewerCanComment)
+    #expect(result.timeline.pageInfo.hasOlder)
   }
 
   func makeClient() throws -> HarnessMonitorAPIClient {
@@ -160,4 +165,5 @@ struct DependencyUpdatesHTTPContractResult {
   let cacheClear: DependencyUpdatesCacheClearResponse
   let refresh: DependencyUpdatesRefreshResponse
   let comment: DependencyUpdatesActionResponse
+  let timeline: DependencyUpdatesTimelineResponse
 }
