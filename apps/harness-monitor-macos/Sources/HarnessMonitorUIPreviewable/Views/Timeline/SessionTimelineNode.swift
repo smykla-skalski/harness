@@ -112,6 +112,15 @@ struct SessionTimelineNode: Identifiable, Equatable, Sendable {
   var contextMenuItems: [TimelineContextMenuItem] = []
   var prefersCompactLayout: Bool?
   var actions: [SessionTimelineAction] = []
+  /// Number of 16pt indents to apply to the row when rendered. Used by
+  /// the dependency-PR timeline to indent inline review comments
+  /// beneath their parent review card without nesting the data model.
+  var indentLevel: Int = 0
+  /// GitHub login of the row's actor, when one exists. Drives the
+  /// gutter avatar slot (`AvatarImageView`) on rows that visualize a
+  /// user action. POD `String?` rather than `URL?` so Equatable stays
+  /// cheap and the avatar URL gets constructed lazily in the view.
+  var actorLogin: String?
 
   init(
     identity: Identity,
