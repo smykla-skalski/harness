@@ -1,0 +1,85 @@
+{
+  "__typename": "PullRequestReview",
+  "id": "PRR_kwDOCnTGG872zzzB",
+  "createdAt": "2026-04-20T14:16:44Z",
+  "state": "COMMENTED",
+  "body": "Did a first pass today, will do another tomorrow.",
+  "url": "https://github.com/kumahq/kuma/pull/16275#pullrequestreview-4140776641",
+  "author": {
+    "login": "slonka",
+    "avatarUrl": "https://avatars.githubusercontent.com/u/2753650?u=e47e35567de42f2bfc575b517eea0856ae69abce&v=4"
+  },
+  "comments": {
+    "pageInfo": {
+      "endCursor": "Y3Vyc29yOnYyOpK0MjAyNi0wNC0yMFQxNDozNTowOFrOuXTOsw==",
+      "hasNextPage": true
+    },
+    "nodes": [
+      {
+        "id": "PRRC_kwDOCnTGG865cvE8",
+        "path": "docs/madr/decisions/102-policy-matching-mesh-scoped-zone-proxy.md",
+        "position": 1,
+        "body": "MADR-062 also deferred `MeshFaultInjection` - do we want to covert it here? Should we explicitly mention that it's out of scope? There is also mentions of MFI below.",
+        "createdAt": "2026-04-20T14:16:44Z",
+        "url": "https://github.com/kumahq/kuma/pull/16275#discussion_r3111317820",
+        "replyTo": null,
+        "author": {
+          "login": "slonka",
+          "avatarUrl": "https://avatars.githubusercontent.com/u/2753650?u=e47e35567de42f2bfc575b517eea0856ae69abce&v=4"
+        }
+      },
+      {
+        "id": "PRRC_kwDOCnTGG865cvFB",
+        "path": "docs/madr/decisions/102-policy-matching-mesh-scoped-zone-proxy.md",
+        "position": 1,
+        "body": "nitpick: these could be numbered so it’s easier to refer to them later on",
+        "createdAt": "2026-04-20T14:16:44Z",
+        "url": "https://github.com/kumahq/kuma/pull/16275#discussion_r3111317825",
+        "replyTo": null,
+        "author": {
+          "login": "slonka",
+          "avatarUrl": "https://avatars.githubusercontent.com/u/2753650?u=e47e35567de42f2bfc575b517eea0856ae69abce&v=4"
+        }
+      },
+      {
+        "id": "PRRC_kwDOCnTGG865cvFJ",
+        "path": "docs/madr/decisions/102-policy-matching-mesh-scoped-zone-proxy.md",
+        "position": 1,
+        "body": "Should we highlight that this is a new functionality (compared to other user stories)?",
+        "createdAt": "2026-04-20T14:16:44Z",
+        "url": "https://github.com/kumahq/kuma/pull/16275#discussion_r3111317833",
+        "replyTo": null,
+        "author": {
+          "login": "slonka",
+          "avatarUrl": "https://avatars.githubusercontent.com/u/2753650?u=e47e35567de42f2bfc575b517eea0856ae69abce&v=4"
+        }
+      },
+      {
+        "id": "PRRC_kwDOCnTGG865dMrj",
+        "path": "docs/madr/decisions/102-policy-matching-mesh-scoped-zone-proxy.md",
+        "position": 1,
+        "body": "`fault injection` is mentioned here as a use case, but there's no corresponding user story for it",
+        "createdAt": "2026-04-20T14:35:00Z",
+        "url": "https://github.com/kumahq/kuma/pull/16275#discussion_r3111439075",
+        "replyTo": null,
+        "author": {
+          "login": "slonka",
+          "avatarUrl": "https://avatars.githubusercontent.com/u/2753650?u=e47e35567de42f2bfc575b517eea0856ae69abce&v=4"
+        }
+      },
+      {
+        "id": "PRRC_kwDOCnTGG865dM6z",
+        "path": "docs/madr/decisions/102-policy-matching-mesh-scoped-zone-proxy.md",
+        "position": 1,
+        "body": "You need a newline otherwise it looks like this:\n\n<img width=\"1078\" height=\"103\" alt=\"Image\" src=\"https://github.com/user-attachments/assets/73aa4512-7609-4319-9914-aaba61a3b5e2\" />\n\n```suggestion\n\nZone egress is NOT responsible for:\n```",
+        "createdAt": "2026-04-20T14:35:08Z",
+        "url": "https://github.com/kumahq/kuma/pull/16275#discussion_r3111440051",
+        "replyTo": null,
+        "author": {
+          "login": "slonka",
+          "avatarUrl": "https://avatars.githubusercontent.com/u/2753650?u=e47e35567de42f2bfc575b517eea0856ae69abce&v=4"
+        }
+      }
+    ]
+  }
+}
