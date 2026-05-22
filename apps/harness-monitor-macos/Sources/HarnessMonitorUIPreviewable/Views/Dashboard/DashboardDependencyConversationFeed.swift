@@ -27,8 +27,12 @@ struct DashboardDependencyConversationFeed: View {
   private var fontScale
   @AppStorage(DashboardDependenciesPreferences.storageKey)
   private var storedPreferences = ""
-  @State private var rows: [SessionTimelineRow] = []
-  @State private var generation: UInt64 = 0
+  // Per-feed @Observable @MainActor row source — owns the built rows
+  // + the generation counter + the off-main rebuild task. Extracting
+  // into a class lets future flat-LazyVStack restructures hand the
+  // same source to a sibling rows-region view without duplicating the
+  // build work. See `DependencyConversationRowSource`.
+  @State private var rowSource = DependencyConversationRowSource()
 
   init(
     item: DependencyUpdateItem,
@@ -57,7 +61,7 @@ struct DashboardDependencyConversationFeed: View {
         )
         .equatable()
         errorStrip(viewModel)
-        content(viewModel)
+        content(viewModel: viewModel, rowSource: rowSource)
       }
       if showsComposer {
         composer(viewModel)
@@ -72,10 +76,15 @@ struct DashboardDependencyConversationFeed: View {
     }
     .task(id: rebuildKey(viewModel, preferences: preferences)) {
       guard preferences.showActivityTimeline else {
-        rows = []
+        rowSource.clear()
         return
       }
-      await rebuildRows(for: viewModel, preferences: preferences)
+      await rowSource.refresh(
+        entries: viewModel.entries,
+        hiddenKinds: preferences.timelineHiddenKinds,
+        autoCollapseHeavyReviewThreads: preferences.timelineAutoCollapseHeavyReviewThreads,
+        configuration: dateTimeConfiguration
+      )
     }
   }
 
@@ -104,16 +113,19 @@ struct DashboardDependencyConversationFeed: View {
   }
 
   @ViewBuilder
-  private func content(_ viewModel: DependencyUpdateTimelineViewModel) -> some View {
-    if rows.isEmpty && viewModel.loadState == .loadingInitial {
+  private func content(
+    viewModel: DependencyUpdateTimelineViewModel,
+    rowSource: DependencyConversationRowSource
+  ) -> some View {
+    if rowSource.rows.isEmpty && viewModel.loadState == .loadingInitial {
       ProgressView().controlSize(.small)
-    } else if rows.isEmpty {
+    } else if rowSource.rows.isEmpty {
       Text("No activity yet on this PR.")
         .foregroundStyle(.secondary)
         .font(.subheadline)
     } else {
       SessionTimelineCards(
-        rows: rows,
+        rows: rowSource.rows,
         actionHandler: actionHandler,
         onSignalTap: onSignalTap
       )
@@ -176,34 +188,4 @@ struct DashboardDependencyConversationFeed: View {
     ].joined(separator: ":")
   }
 
-  private func rebuildRows(
-    for viewModel: DependencyUpdateTimelineViewModel,
-    preferences: DashboardDependenciesPreferences
-  ) async {
-    generation &+= 1
-    let snapshot = generation
-    let entries = viewModel.entries
-    let configuration = dateTimeConfiguration
-    let hiddenKinds = preferences.timelineHiddenKinds
-    let autoCollapseHeavyReviewThreads = preferences.timelineAutoCollapseHeavyReviewThreads
-    let nodeInterval = DependencyTimelinePerf.beginNodeBuild(
-      entries: entries.count,
-      hiddenKinds: hiddenKinds.count
-    )
-    let nodes = await Task.detached(priority: .userInitiated) { () -> [SessionTimelineNode] in
-      DependencyPullRequestTimelineNodeBuilder().buildNodes(
-        for: entries,
-        pullRequestID: "",
-        hiddenKinds: hiddenKinds,
-        autoCollapseHeavyReviewThreads: autoCollapseHeavyReviewThreads,
-        configuration: configuration
-      )
-    }.value
-    DependencyTimelinePerf.end(nodeInterval)
-    guard !Task.isCancelled, generation == snapshot else { return }
-    let presentationInterval = DependencyTimelinePerf.beginPresentationRebuild(nodes: nodes.count)
-    defer { DependencyTimelinePerf.end(presentationInterval) }
-    let computed = SessionTimelineRow.rows(for: nodes, configuration: configuration)
-    rows = computed
-  }
 }
