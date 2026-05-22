@@ -3,12 +3,16 @@ import SwiftUI
 
 /// Split-view diff with left (old) and right (new) panes side by side.
 /// Falls back to the unified renderer when the proposed width is below
-/// `minColumnPoints` so a narrow detail pane never produces unreadable
-/// columns.
+/// `minColumnPoints`. Both panes consume tokens produced once by
+/// `SyntaxHighlightCache` and split into left/right sides at render
+/// time.
 struct DashboardDependencyFileDiffSplit: View {
   let patch: DependencyUpdateFilePatch
   let language: HarnessDependencyFileLanguage
   var minColumnPoints: CGFloat = 280
+
+  @State private var leftText: AttributedString?
+  @State private var rightText: AttributedString?
 
   var body: some View {
     GeometryReader { proxy in
@@ -17,14 +21,19 @@ struct DashboardDependencyFileDiffSplit: View {
         DashboardDependencyFileDiffUnified(patch: patch, language: language)
       } else {
         HStack(alignment: .top, spacing: 8) {
-          column(text: leftColumnText())
+          column(text: leftText ?? AttributedString(patch.patch))
           Divider()
-          column(text: rightColumnText())
+          column(text: rightText ?? AttributedString(patch.patch))
         }
       }
     }
     .frame(minHeight: 80)
     .accessibilityIdentifier("dashboardDependencyFileDiffSplit")
+    .task(id: patch.patch) {
+      let tokens = await SyntaxHighlightCache.shared.tokenize(patch.patch, language: .diff)
+      leftText = Self.attributedColumn(tokens: tokens, includeAdditions: false)
+      rightText = Self.attributedColumn(tokens: tokens, includeAdditions: true)
+    }
   }
 
   private func column(text: AttributedString) -> some View {
@@ -36,32 +45,31 @@ struct DashboardDependencyFileDiffSplit: View {
     }
   }
 
-  private func leftColumnText() -> AttributedString {
+  static func attributedColumn(
+    tokens: [HarnessCodeToken],
+    includeAdditions: Bool
+  ) -> AttributedString {
     var result = AttributedString()
-    for line in patch.patch.split(separator: "\n", omittingEmptySubsequences: false) {
-      let leading = line.first
-      if leading == "+" { continue }
-      var fragment = AttributedString(String(line) + "\n")
-      if leading == "-" {
-        fragment.backgroundColor = .red.opacity(0.15)
+    for token in tokens {
+      switch token.kind {
+      case .inserted where !includeAdditions: continue
+      case .deleted where includeAdditions: continue
+      default:
+        var fragment = AttributedString(token.text)
+        switch token.kind {
+        case .inserted:
+          fragment.backgroundColor = .green.opacity(0.15)
+          fragment.foregroundColor = .primary
+        case .deleted:
+          fragment.backgroundColor = .red.opacity(0.15)
+          fragment.foregroundColor = .primary
+        case .heading:
+          fragment.foregroundColor = .secondary
+        default:
+          fragment.foregroundColor = .primary
+        }
+        result += fragment
       }
-      fragment.foregroundColor = leading == "@" ? .secondary : .primary
-      result += fragment
-    }
-    return result
-  }
-
-  private func rightColumnText() -> AttributedString {
-    var result = AttributedString()
-    for line in patch.patch.split(separator: "\n", omittingEmptySubsequences: false) {
-      let leading = line.first
-      if leading == "-" { continue }
-      var fragment = AttributedString(String(line) + "\n")
-      if leading == "+" {
-        fragment.backgroundColor = .green.opacity(0.15)
-      }
-      fragment.foregroundColor = leading == "@" ? .secondary : .primary
-      result += fragment
     }
     return result
   }
