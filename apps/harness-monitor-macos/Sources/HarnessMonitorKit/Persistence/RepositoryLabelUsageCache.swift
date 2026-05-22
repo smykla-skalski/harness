@@ -35,7 +35,7 @@ public struct RepositoryLabelUsageCache {
     } catch {
       HarnessMonitorLogger.store.warning(
         """
-        Failed to record dependency label usage; \
+        Failed to record review label usage; \
         repository=\(repository, privacy: .public) \
         label=\(label, privacy: .public) \
         error=\(String(reflecting: error), privacy: .public)

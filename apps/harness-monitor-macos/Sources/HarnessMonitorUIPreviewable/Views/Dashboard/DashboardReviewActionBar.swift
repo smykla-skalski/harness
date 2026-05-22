@@ -72,7 +72,7 @@ struct DashboardReviewActionBar: View {
     )
     .disabled(isBusy || items.isEmpty)
     .accessibilityIdentifier(
-      HarnessMonitorAccessibility.dependenciesRefreshSelectedButton
+      HarnessMonitorAccessibility.reviewsRefreshSelectedButton
     )
 
     DashboardReviewsLabelPickerActionMenu(

@@ -209,7 +209,7 @@ extension DashboardReviewsRouteView {
       body: dashboardReviewFixCIBody(for: item, activity: activitySnapshot(for: item)),
       priority: item.requiresAttention ? .high : .medium,
       agentMode: .headless,
-      tags: ["dependencies", "fix-ci"],
+      tags: ["reviews", "fix-ci"],
       externalRefs: [
         TaskBoardExternalRef(
           provider: .gitHub,

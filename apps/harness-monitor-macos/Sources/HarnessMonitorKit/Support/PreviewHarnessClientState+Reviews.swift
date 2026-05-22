@@ -73,7 +73,7 @@ extension PreviewHarnessClientState {
       }
     }
     return previewActionResponse(
-      summary: "Approved dependency updates",
+      summary: "Approved reviews",
       action: .approve,
       request.targets
     )
@@ -85,7 +85,7 @@ extension PreviewHarnessClientState {
     let mergedIDs = Set(request.targets.map(\.pullRequestID))
     reviewItems.removeAll { mergedIDs.contains($0.pullRequestID) }
     return previewActionResponse(
-      summary: "Merged dependency updates",
+      summary: "Merged reviews",
       action: .merge,
       request.targets
     )
@@ -111,7 +111,7 @@ extension PreviewHarnessClientState {
       }
     }
     return previewActionResponse(
-      summary: "Reran dependency update checks",
+      summary: "Reran review checks",
       action: .rerunChecks,
       request.targets
     )
@@ -132,7 +132,7 @@ extension PreviewHarnessClientState {
       }
     }
     return previewActionResponse(
-      summary: "Labeled dependency updates",
+      summary: "Labeled reviews",
       action: .addLabel,
       request.targets
     )
@@ -213,7 +213,7 @@ extension PreviewHarnessClientState {
     request: ReviewsCommentRequest
   ) -> ReviewsActionResponse {
     previewActionResponse(
-      summary: "Posted dependency update comment",
+      summary: "Posted review comment",
       action: .comment,
       request.targets
     )
@@ -343,7 +343,7 @@ extension PreviewHarnessClientState {
         ? nil
         : "Pull request is not eligible for auto mode"
     case .unknown:
-      return "Unknown dependency action"
+      return "Unknown review action"
     }
   }
 

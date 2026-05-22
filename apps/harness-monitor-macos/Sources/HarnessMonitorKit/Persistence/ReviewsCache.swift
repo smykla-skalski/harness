@@ -18,7 +18,7 @@ public struct ReviewsCache {
     } catch {
       HarnessMonitorLogger.store.warning(
         """
-        Failed to decode cached dependency updates response; \
+        Failed to decode cached reviews response; \
         preferences_hash=\(preferencesHash, privacy: .public) \
         error=\(String(reflecting: error), privacy: .public)
         """
@@ -47,7 +47,7 @@ public struct ReviewsCache {
     } catch {
       HarnessMonitorLogger.store.warning(
         """
-        Failed to persist dependency updates snapshot; \
+        Failed to persist reviews snapshot; \
         preferences_hash=\(preferencesHash, privacy: .public) \
         error=\(String(reflecting: error), privacy: .public)
         """
@@ -134,7 +134,7 @@ public struct ReviewsCache {
     } catch {
       HarnessMonitorLogger.store.warning(
         """
-        Failed to clear dependency updates cache; \
+        Failed to clear reviews cache; \
         error=\(String(reflecting: error), privacy: .public)
         """
       )

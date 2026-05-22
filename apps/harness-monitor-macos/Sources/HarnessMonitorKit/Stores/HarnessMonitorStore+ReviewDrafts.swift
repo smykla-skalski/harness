@@ -36,6 +36,6 @@ extension HarnessMonitorStore {
   }
 
   static func reviewDraftKey(for pullRequestID: String) -> String {
-    "dependency.composer.draft.\(pullRequestID)"
+    "review.composer.draft.\(pullRequestID)"
   }
 }

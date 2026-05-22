@@ -1,28 +1,28 @@
 extension HarnessMonitorAccessibility {
   public static let dashboardDiagnosticsRoot = "harness.dashboard.diagnostics"
-  public static let dashboardReviewsRoot = "harness.dashboard.dependencies"
+  public static let dashboardReviewsRoot = "harness.dashboard.reviews"
   public static let dashboardReviewsProvenance =
-    "harness.dashboard.dependencies.provenance"
-  public static let dashboardReviewsList = "harness.dashboard.dependencies.list"
-  public static let dashboardReviewsDetail = "harness.dashboard.dependencies.detail"
+    "harness.dashboard.reviews.provenance"
+  public static let dashboardReviewsList = "harness.dashboard.reviews.list"
+  public static let dashboardReviewsDetail = "harness.dashboard.reviews.detail"
   public static let dashboardReviewsDetailDivider =
-    "harness.dashboard.dependencies.content-detail-divider"
-  public static let dashboardReviewsRefreshButton = "harness.dashboard.dependencies.refresh"
-  public static let dependenciesRefreshSelectedButton =
-    "harness.dashboard.dependencies.refresh-selected"
+    "harness.dashboard.reviews.content-detail-divider"
+  public static let dashboardReviewsRefreshButton = "harness.dashboard.reviews.refresh"
+  public static let reviewsRefreshSelectedButton =
+    "harness.dashboard.reviews.refresh-selected"
   public static let dashboardReviewsConfigureButton =
-    "harness.dashboard.dependencies.configure"
-  public static let dashboardReviewsFixCIButton = "harness.dashboard.dependencies.fix-ci"
+    "harness.dashboard.reviews.configure"
+  public static let dashboardReviewsFixCIButton = "harness.dashboard.reviews.fix-ci"
   public static let dashboardReviewsCustomLabelSheet =
-    "harness.dashboard.dependencies.custom-label.sheet"
+    "harness.dashboard.reviews.custom-label.sheet"
   public static let dashboardReviewsCustomLabelField =
-    "harness.dashboard.dependencies.custom-label.field"
+    "harness.dashboard.reviews.custom-label.field"
   public static let dashboardReviewsCustomLabelCancel =
-    "harness.dashboard.dependencies.custom-label.cancel"
+    "harness.dashboard.reviews.custom-label.cancel"
   public static let dashboardReviewsCustomLabelApply =
-    "harness.dashboard.dependencies.custom-label.apply"
+    "harness.dashboard.reviews.custom-label.apply"
   public static let dashboardReviewsSelectionStatus =
-    "harness.dashboard.dependencies.selection"
+    "harness.dashboard.reviews.selection"
   public static let dashboardReviewsDescription =
-    "harness.dashboard.dependencies.description"
+    "harness.dashboard.reviews.description"
 }

@@ -94,28 +94,28 @@ public enum HarnessMonitorAccessibility {
   public static let dashboardNotificationsScrollView = "harness.dashboard.notifications.scroll"
   public static let dashboardNotificationsEmptyState = "harness.dashboard.notifications.empty-state"
   public static let dashboardReviewFilesSection =
-    "harness.dashboard.dependencies.files.section"
+    "harness.dashboard.reviews.files.section"
   public static let dashboardReviewFilesHeader =
-    "harness.dashboard.dependencies.files.header"
+    "harness.dashboard.reviews.files.header"
   public static let dashboardReviewFilesFilterField =
-    "harness.dashboard.dependencies.files.filter"
+    "harness.dashboard.reviews.files.filter"
   public static let dashboardReviewFilesSortMenu =
-    "harness.dashboard.dependencies.files.sort"
+    "harness.dashboard.reviews.files.sort"
   public static let dashboardReviewFilesTree =
-    "harness.dashboard.dependencies.files.tree"
+    "harness.dashboard.reviews.files.tree"
   public static let dashboardReviewFilesEmptyState =
-    "harness.dashboard.dependencies.files.empty"
+    "harness.dashboard.reviews.files.empty"
 
   public static func dashboardReviewFileCard(path: String) -> String {
-    "harness.dashboard.dependencies.files.card.\(slug(path))"
+    "harness.dashboard.reviews.files.card.\(slug(path))"
   }
 
   public static func dashboardReviewFileViewedToggle(path: String) -> String {
-    "harness.dashboard.dependencies.files.viewed-toggle.\(slug(path))"
+    "harness.dashboard.reviews.files.viewed-toggle.\(slug(path))"
   }
 
   public static func dashboardReviewFileViewModeMenu(path: String) -> String {
-    "harness.dashboard.dependencies.files.view-mode.\(slug(path))"
+    "harness.dashboard.reviews.files.view-mode.\(slug(path))"
   }
 
   public static let dashboardNewSessionButton = "harness.dashboard.new-session"

@@ -125,7 +125,7 @@ struct RepositoriesMonitoredSection: View {
       .toggleStyle(.switch)
       .frame(width: 116, alignment: .center)
       .accessibilityIdentifier(
-        HarnessMonitorAccessibility.settingsRepositoriesDependenciesToggle(index)
+        HarnessMonitorAccessibility.settingsRepositoriesReviewsToggle(index)
       )
       Toggle(
         "Task Board",

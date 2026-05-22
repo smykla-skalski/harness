@@ -1,7 +1,7 @@
 import Foundation
 import HarnessMonitorKit
 
-/// Shared off-main tokenization cache for the Dependencies > Files
+/// Shared off-main tokenization cache for the Reviews > Files
 /// diff renderer. Keyed by `(language, sha256(source))` so the same
 /// patch body tokenizes once even when several file cards render
 /// concurrently. Kept separate from `HarnessMarkdownRenderCache` to
@@ -37,11 +37,11 @@ actor SyntaxHighlightCache {
       promoteRecentlyUsed(key: key)
       return cached
     }
-    let interval = DependencyFilesPerf.beginTokenize(path: key.sourceHash)
+    let interval = ReviewFilesPerf.beginTokenize(path: key.sourceHash)
     let tokens = await Task.detached(priority: .utility) {
       HarnessCodeHighlighter.highlight(source, language: language)
     }.value
-    DependencyFilesPerf.end(interval)
+    ReviewFilesPerf.end(interval)
     insert(key: key, tokens: tokens)
     return tokens
   }

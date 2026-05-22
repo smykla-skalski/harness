@@ -27,7 +27,7 @@ public final class ReviewBodyStore: @unchecked Sendable {
   private static let decoder = JSONDecoder()
   private static let encoder = JSONEncoder()
   private static let persistQueue = DispatchQueue(
-    label: "io.harnessmonitor.dependency-update-bodies.persist",
+    label: "io.harnessmonitor.review-bodies.persist",
     qos: .utility
   )
 

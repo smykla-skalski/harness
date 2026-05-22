@@ -47,35 +47,35 @@ extension HarnessMonitorUITestAccessibilityRegistryTests {
   private func expectReviewsIdentifiersMirrorRegistry() {
     #expect(
       HarnessMonitorAccessibility.dashboardReviewsRoot
-        == "harness.dashboard.dependencies"
+        == "harness.dashboard.reviews"
     )
     #expect(
       HarnessMonitorAccessibility.dashboardReviewsProvenance
-        == "harness.dashboard.dependencies.provenance"
+        == "harness.dashboard.reviews.provenance"
     )
     #expect(
       HarnessMonitorAccessibility.dashboardReviewsList
-        == "harness.dashboard.dependencies.list"
+        == "harness.dashboard.reviews.list"
     )
     #expect(
       HarnessMonitorAccessibility.dashboardReviewsDetail
-        == "harness.dashboard.dependencies.detail"
+        == "harness.dashboard.reviews.detail"
     )
     #expect(
       HarnessMonitorAccessibility.dashboardReviewsDetailDivider
-        == "harness.dashboard.dependencies.content-detail-divider"
+        == "harness.dashboard.reviews.content-detail-divider"
     )
     #expect(
       HarnessMonitorAccessibility.dashboardReviewsRefreshButton
-        == "harness.dashboard.dependencies.refresh"
+        == "harness.dashboard.reviews.refresh"
     )
     #expect(
       HarnessMonitorAccessibility.dashboardReviewsFixCIButton
-        == "harness.dashboard.dependencies.fix-ci"
+        == "harness.dashboard.reviews.fix-ci"
     )
     #expect(
       HarnessMonitorAccessibility.dashboardReviewsSelectionStatus
-        == "harness.dashboard.dependencies.selection"
+        == "harness.dashboard.reviews.selection"
     )
   }
 
