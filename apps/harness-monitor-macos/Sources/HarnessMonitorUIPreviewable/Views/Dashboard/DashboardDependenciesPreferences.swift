@@ -11,6 +11,11 @@ struct DashboardDependenciesPreferences: Codable, Equatable {
   static let maximumFrequentLabelsCount: Int = 10
   static let defaultFrequentLabelsCount: Int = 5
 
+  static let minimumTimelinePageSize: Int = 10
+  static let maximumTimelinePageSize: Int = 100
+  static let defaultTimelinePageSize: Int = 50
+  static let defaultTimelineHiddenKindsRaw: String = "mentioned,subscribed,unsubscribed"
+
   var authorsText = "renovate[bot]"
   var organizationsText = ""
   var repositoriesText = ""
@@ -40,6 +45,11 @@ struct DashboardDependenciesPreferences: Codable, Equatable {
   var filesLocalCloneDiskBudgetMB: Int = 5_120
   var filesLocalCloneMaxAgeDays: Int = 30
   var filesAccessibilityPerLineMode: Bool = false
+  var showActivityTimeline: Bool = true
+  var timelineHiddenKindsRaw: String = defaultTimelineHiddenKindsRaw
+  var timelineInitialPageSize: Int = defaultTimelinePageSize
+  var timelineLoadOlderBatchSize: Int = defaultTimelinePageSize
+  var timelineAutoCollapseHeavyReviewThreads: Bool = true
 
   enum CodingKeys: String, CodingKey {
     case authorsText
@@ -71,6 +81,11 @@ struct DashboardDependenciesPreferences: Codable, Equatable {
     case filesLocalCloneDiskBudgetMB
     case filesLocalCloneMaxAgeDays
     case filesAccessibilityPerLineMode
+    case showActivityTimeline
+    case timelineHiddenKindsRaw
+    case timelineInitialPageSize
+    case timelineLoadOlderBatchSize
+    case timelineAutoCollapseHeavyReviewThreads
   }
 
   static let defaultGeneratedPatterns: [String] = [
@@ -180,6 +195,21 @@ struct DashboardDependenciesPreferences: Codable, Equatable {
     filesAccessibilityPerLineMode =
       try container.decodeIfPresent(Bool.self, forKey: .filesAccessibilityPerLineMode)
       ?? defaults.filesAccessibilityPerLineMode
+    showActivityTimeline =
+      try container.decodeIfPresent(Bool.self, forKey: .showActivityTimeline)
+      ?? defaults.showActivityTimeline
+    timelineHiddenKindsRaw =
+      try container.decodeIfPresent(String.self, forKey: .timelineHiddenKindsRaw)
+      ?? defaults.timelineHiddenKindsRaw
+    timelineInitialPageSize =
+      try container.decodeIfPresent(Int.self, forKey: .timelineInitialPageSize)
+      ?? defaults.timelineInitialPageSize
+    timelineLoadOlderBatchSize =
+      try container.decodeIfPresent(Int.self, forKey: .timelineLoadOlderBatchSize)
+      ?? defaults.timelineLoadOlderBatchSize
+    timelineAutoCollapseHeavyReviewThreads =
+      try container.decodeIfPresent(Bool.self, forKey: .timelineAutoCollapseHeavyReviewThreads)
+      ?? defaults.timelineAutoCollapseHeavyReviewThreads
   }
 
   var filesDefaultViewMode: FilesViewMode {
@@ -188,6 +218,27 @@ struct DashboardDependenciesPreferences: Codable, Equatable {
 
   var filesLargeDiffStrategy: FilesLargeDiffStrategy {
     FilesLargeDiffStrategy(rawValue: filesLargeDiffStrategyRaw) ?? .autoLocalClone
+  }
+
+  /// `Set<DependencyUpdateTimelineKind>` doesn't bridge into
+  /// `UserDefaults`, so the raw comma-separated form lives in
+  /// `timelineHiddenKindsRaw` and this computed property hops to/from
+  /// the typed set the views consume.
+  var timelineHiddenKinds: Set<DependencyUpdateTimelineKind> {
+    get {
+      Set(
+        timelineHiddenKindsRaw
+          .split(separator: ",")
+          .compactMap { DependencyUpdateTimelineKind(rawValue: String($0)) }
+      )
+    }
+    set {
+      timelineHiddenKindsRaw =
+        newValue
+        .map(\.rawValue)
+        .sorted()
+        .joined(separator: ",")
+    }
   }
 
   var mergeMethod: TaskBoardGitHubMergeMethod {
