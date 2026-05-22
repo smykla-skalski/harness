@@ -19,7 +19,7 @@ mod errors;
 mod ingest;
 mod mapping;
 mod pagination;
-mod queries;
+pub(super) mod queries;
 mod rate_limit;
 mod types;
 
