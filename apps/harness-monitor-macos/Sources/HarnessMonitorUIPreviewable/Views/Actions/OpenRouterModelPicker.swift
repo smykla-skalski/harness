@@ -9,8 +9,29 @@ struct OpenRouterModelPicker: View {
   @Binding var useCustomModel: Bool
   let onBrowseAll: () -> Void
 
-  @State private var presentationWorker = OpenRouterModelPickerPresentationWorker()
-  @State private var cachedPresentation = OpenRouterModelPickerPresentation.empty
+  @State private var presentationWorker: OpenRouterModelPickerPresentationWorker
+  @State private var cachedPresentation: OpenRouterModelPickerPresentation
+
+  init(
+    availableModels: [OpenRouterModelEntry],
+    usageSnapshot: OpenRouterModelUsageSnapshot,
+    selectedModelID: Binding<String>,
+    useCustomModel: Binding<Bool>,
+    onBrowseAll: @escaping () -> Void
+  ) {
+    self.availableModels = availableModels
+    self.usageSnapshot = usageSnapshot
+    self._selectedModelID = selectedModelID
+    self._useCustomModel = useCustomModel
+    self.onBrowseAll = onBrowseAll
+    let worker = OpenRouterModelPickerPresentationWorker()
+    let input = OpenRouterModelPickerPresentationInput(
+      availableModels: availableModels,
+      usageSnapshot: usageSnapshot
+    )
+    _presentationWorker = State(wrappedValue: worker)
+    _cachedPresentation = State(wrappedValue: worker.compute(input: input))
+  }
 
   private var presentationFingerprint: OpenRouterModelPickerInputFingerprint {
     OpenRouterModelPickerInputFingerprint(input: presentationInput)
