@@ -47,6 +47,9 @@ dependency[[:space:]]+injection
 [Dd]ependency [Ii]njection
 DependencyInject(or|ion)
 ### Dependency injection
+# @Observable Dependency Granularity is a SwiftUI architectural concept,
+# not the Reviews feature.
+@Observable Dependency
 # --- Migration-documentation comments (describe what old keys/schemas were called) ---
 HarnessMonitorApp\.swift:.*// Rename .*dependencies
 HarnessMonitorRecentSchemas\.swift:.*//.*dependency-updates
@@ -75,3 +78,8 @@ scripts/\.rename-allow\.txt
 
 # --- Plan file (records old names by design) ---
 \.claude/plans/immutable-wibbling-hanrahan\.md
+
+# --- Auto-memory tree (historical session notes with frozen commit messages
+# and pre-rename type names; the rename itself is recorded in
+# project_reviews_rename_2026_05_22.md) ---
+/\.claude/projects/.*/memory/.*\.md
