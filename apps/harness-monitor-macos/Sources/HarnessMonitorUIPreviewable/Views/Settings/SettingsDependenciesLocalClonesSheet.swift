@@ -11,6 +11,10 @@ struct SettingsDependenciesLocalClonesSheet: View {
   @State private var clones: [DependencyUpdateLocalCloneEntry] = []
   @State private var pendingDelete: DependencyUpdateLocalCloneEntry?
   @State private var isLoading = true
+  /// Latest in-flight progress event per repo full-name, populated by
+  /// the catch-all `observeAllLocalCloneProgress()` subscription.
+  /// Cleared on `.completed` / `.failed` so the row drops the badge.
+  @State private var inflightByRepo: [String: DependencyUpdateLocalCloneProgress] = [:]
 
   var body: some View {
     VStack(alignment: .leading, spacing: 12) {
@@ -21,6 +25,7 @@ struct SettingsDependenciesLocalClonesSheet: View {
     .padding(20)
     .frame(minWidth: 540, minHeight: 360)
     .task { await refresh() }
+    .task { await observeProgress() }
     .accessibilityIdentifier("settingsDependencyLocalClonesSheet")
     .alert(item: $pendingDelete) { entry in
       Alert(
@@ -65,7 +70,10 @@ struct SettingsDependenciesLocalClonesSheet: View {
     } else {
       Table(of: DependencyUpdateLocalCloneEntry.self) {
         TableColumn("Repo") { entry in
-          Text(entry.repoFullName).lineLimit(1)
+          HStack(spacing: 6) {
+            Text(entry.repoFullName).lineLimit(1)
+            inflightChip(for: entry)
+          }
         }
         TableColumn("Size") { entry in
           Text(humanizedBytes(entry.sizeBytes)).monospacedDigit()
@@ -93,6 +101,24 @@ struct SettingsDependenciesLocalClonesSheet: View {
     }
   }
 
+  @ViewBuilder
+  private func inflightChip(for entry: DependencyUpdateLocalCloneEntry) -> some View {
+    if let progress = inflightByRepo[entry.repoFullName],
+      progress.kind == .started
+    {
+      HStack(spacing: 4) {
+        ProgressView().scaleEffect(0.5).frame(width: 14, height: 14)
+        Text("\(progress.operation.presentLabel)…")
+          .font(.caption2)
+          .foregroundStyle(.secondary)
+      }
+      .accessibilityIdentifier(
+        "settingsDependencyLocalCloneProgressChip-\(entry.repoFullName)"
+      )
+      .accessibilityLabel("\(progress.operation.presentLabel) \(entry.repoFullName)")
+    }
+  }
+
   private var footer: some View {
     HStack {
       Text(totalsLabel).foregroundStyle(.secondary).font(.caption)
@@ -112,6 +138,27 @@ struct SettingsDependenciesLocalClonesSheet: View {
     isLoading = true
     clones = await store.listDependencyUpdateLocalClones()
     isLoading = false
+  }
+
+  /// Catch-all progress subscription so the sheet shows in-flight
+  /// clones even for repos not yet in the registry (first clone) and
+  /// drops the badge when the operation completes or fails. Lives for
+  /// the sheet's lifetime; cleaned up automatically via the
+  /// AsyncStream's `onTermination` hook.
+  private func observeProgress() async {
+    for await event in store.observeAllLocalCloneProgress() {
+      switch event.kind {
+      case .started:
+        inflightByRepo[event.repoFullName] = event
+      case .completed, .failed:
+        inflightByRepo.removeValue(forKey: event.repoFullName)
+        // Refresh so the size / last-fetched columns reflect reality
+        // immediately after a clone completes.
+        if event.kind == .completed {
+          await refresh()
+        }
+      }
+    }
   }
 
   private func humanizedBytes(_ bytes: UInt64) -> String {

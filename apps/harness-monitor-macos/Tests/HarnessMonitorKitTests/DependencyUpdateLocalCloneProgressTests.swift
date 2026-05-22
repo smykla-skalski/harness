@@ -63,6 +63,22 @@ struct DependencyUpdateLocalCloneProgressTests {
     #expect(DependencyUpdateLocalCloneProgress.Operation.fetch.presentLabel == "Fetching")
   }
 
+  @Test func operationLabelEnumRoundTripsViaDecoder() throws {
+    let wire = """
+      {
+        "kind": "started",
+        "repo_full_name": "owner/repo",
+        "operation": "fetch"
+      }
+      """
+    let payload = try DependencyUpdateLocalCloneProgress.snakeCaseDecoder().decode(
+      DependencyUpdateLocalCloneProgress.self,
+      from: Data(wire.utf8)
+    )
+    #expect(payload.operation == .fetch)
+    #expect(payload.operation.presentLabel == "Fetching")
+  }
+
   @Test func daemonPushEventDecodesLocalCloneProgressGlobalEvent() throws {
     let payloadJSON: [String: Any] = [
       "kind": "started",
