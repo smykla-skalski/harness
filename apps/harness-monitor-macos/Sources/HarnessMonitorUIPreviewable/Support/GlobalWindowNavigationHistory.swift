@@ -115,6 +115,17 @@ public final class GlobalWindowNavigationHistory {
     record(.dashboard(route: dashboardRoute))
   }
 
+  public func requestDashboardRoute(_ route: DashboardWindowRoute) {
+    restoreRequestSequence += 1
+    dashboardRoute = route
+    pendingSessionRestoreRequest = nil
+    pendingDashboardRestoreRequest = DashboardWindowNavigationRestoreRequest(
+      requestID: restoreRequestSequence,
+      route: route
+    )
+    navigator?(.dashboard(route: route))
+  }
+
   func recordSessionOpen(sessionID: String) {
     let selection = latestSessionSelections[sessionID] ?? .route(.overview)
     latestSessionSelections[sessionID] = selection

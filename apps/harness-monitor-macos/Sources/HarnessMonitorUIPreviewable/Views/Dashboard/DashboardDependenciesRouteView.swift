@@ -6,6 +6,7 @@ struct DashboardDependenciesRouteView: View {
   let store: HarnessMonitorStore
   @Binding var selectedRoute: DashboardWindowRoute
   let searchAutomationCommand: AppSearchAutomationCommand?
+  private let openAnythingDependencies = OpenAnythingDashboardDependencyRegistry.shared
 
   @Environment(\.openSettingsSection)
   var openSettingsSection
@@ -320,8 +321,14 @@ struct DashboardDependenciesRouteView: View {
       .onChange(of: response.repositoryLabels, initial: true) { _, _ in
         refreshLabelMenuData()
       }
+      .onChange(of: response.items, initial: true) { _, items in
+        openAnythingDependencies.replaceLoadedItems(items)
+      }
       .onChange(of: normalizedPreferences.frequentLabelsCount) { _, _ in
         refreshLabelMenuData()
+      }
+      .task(id: openAnythingDependencies.selectionRequest) {
+        applyPendingDependencySelectionIfNeeded()
       }
       .onChange(of: selectedRoute) { _, newValue in
         if newValue != .dependencies { cancelAllInFlightTasks() }
@@ -335,5 +342,15 @@ struct DashboardDependenciesRouteView: View {
         selectedIDs = [pullRequestID]
       }
       .focusedSceneValue(\.dashboardDependenciesCommands, dependencyCommandFocus)
+  }
+
+  private func applyPendingDependencySelectionIfNeeded() {
+    guard let request = openAnythingDependencies.selectionRequest else { return }
+    guard response.items.contains(where: { $0.pullRequestID == request.pullRequestID }) else {
+      return
+    }
+    selectedIDs = [request.pullRequestID]
+    persistedPrimarySelectionID = request.pullRequestID
+    openAnythingDependencies.finishSelection(requestID: request.requestID)
   }
 }

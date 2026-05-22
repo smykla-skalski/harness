@@ -113,15 +113,15 @@ struct DashboardPerfRouteHook: ViewModifier {
   }
 }
 
-enum DashboardWindowRoute: String, CaseIterable, Identifiable {
+public enum DashboardWindowRoute: String, CaseIterable, Identifiable, Sendable {
   case taskBoard
   case policyCanvas
   case notifications
   case dependencies
 
-  var id: String { rawValue }
+  public var id: String { rawValue }
 
-  var title: String {
+  public var title: String {
     switch self {
     case .taskBoard:
       "Board"
@@ -134,7 +134,7 @@ enum DashboardWindowRoute: String, CaseIterable, Identifiable {
     }
   }
 
-  var systemImage: String {
+  public var systemImage: String {
     switch self {
     case .taskBoard:
       "square.grid.2x2"
