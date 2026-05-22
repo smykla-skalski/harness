@@ -94,6 +94,17 @@ private struct DashboardDependenciesRepositoryHeaderPill: View {
 struct DashboardDependenciesDescriptionView: View {
   let store: HarnessMonitorStore
   let pullRequestID: String
+  let onCheckboxError: ((String) -> Void)?
+
+  init(
+    store: HarnessMonitorStore,
+    pullRequestID: String,
+    onCheckboxError: ((String) -> Void)? = nil
+  ) {
+    self.store = store
+    self.pullRequestID = pullRequestID
+    self.onCheckboxError = onCheckboxError
+  }
 
   var body: some View {
     switch store.dependencyUpdateBodyState[pullRequestID] {
@@ -104,6 +115,9 @@ struct DashboardDependenciesDescriptionView: View {
           .scaledFont(.callout)
       } else {
         HarnessMonitorMarkdownText(body, textSelection: .enabled)
+          .markdownCheckboxToggle { offset, newValue in
+            toggleCheckbox(currentBody: body, offset: offset, newValue: newValue)
+          }
       }
     case .failed(let message):
       Text(message)
@@ -116,6 +130,28 @@ struct DashboardDependenciesDescriptionView: View {
         Text("Loading description…")
           .foregroundStyle(HarnessMonitorTheme.secondaryInk)
           .scaledFont(.callout)
+      }
+    }
+  }
+
+  private func toggleCheckbox(currentBody: String, offset: Int, newValue: Bool) {
+    var bytes = Array(currentBody.utf8)
+    guard offset < bytes.count else { return }
+    bytes[offset] = newValue ? 0x78 : 0x20
+    guard let newBody = String(bytes: bytes, encoding: .utf8) else { return }
+    Task { @MainActor in
+      let outcome = await store.setDependencyUpdateBody(
+        pullRequestID: pullRequestID,
+        newBody: newBody,
+        priorBody: currentBody
+      )
+      switch outcome {
+      case .updated:
+        return
+      case .bodyDrifted:
+        onCheckboxError?("PR body changed since you opened it. Reloaded the latest version.")
+      case .failed(let message):
+        onCheckboxError?("Couldn't update PR body: \(message)")
       }
     }
   }
