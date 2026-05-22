@@ -88,9 +88,15 @@ pub(crate) async fn fetch_timeline_page<C: TimelineClient>(
         )
         .await?;
 
+    // octocrab's `.graphql()` unwraps the outer `{data: ...}` envelope before
+    // handing the value back, so the production payload looks like
+    // `{node: ..., rateLimit: ...}`. Tests' MockClient mirrors that shape
+    // verbatim — fixtures under `fixtures/*.json` keep the raw GitHub
+    // envelope for parser-level mapping tests, but the service layer never
+    // sees that wrapper.
     let pr_node = outer
-        .pointer("/data/node")
-        .ok_or_else(|| TimelineError::Mapping("data.node missing".into()))?;
+        .pointer("/node")
+        .ok_or_else(|| TimelineError::Mapping("node missing".into()))?;
     let viewer_can_comment = mapping::viewer_can_comment_from_pull_request(pr_node);
     let timeline_items = pr_node
         .pointer("/timelineItems")
@@ -225,7 +231,7 @@ async fn drain_review_comments<C: TimelineClient>(
             .list_review_comments(&review_id, CONTINUATION_PAGE_SIZE, cursor.as_deref())
             .await?;
         let nested = resp
-            .pointer("/data/node/comments")
+            .pointer("/node/comments")
             .ok_or_else(|| TimelineError::Mapping("continuation comments missing".into()))?;
         if let Some(nodes) = nested.get("nodes").and_then(Value::as_array) {
             comments_array.extend(nodes.iter().cloned());
@@ -286,7 +292,7 @@ async fn drain_review_thread_comments<C: TimelineClient>(
             .list_review_thread_comments(&thread_id, CONTINUATION_PAGE_SIZE, cursor.as_deref())
             .await?;
         let nested = resp
-            .pointer("/data/node/comments")
+            .pointer("/node/comments")
             .ok_or_else(|| TimelineError::Mapping("continuation thread comments missing".into()))?;
         if let Some(nodes) = nested.get("nodes").and_then(Value::as_array) {
             comments_array.extend(nodes.iter().cloned());
