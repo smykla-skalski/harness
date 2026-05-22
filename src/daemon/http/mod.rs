@@ -257,6 +257,31 @@ pub async fn serve(
     // Hand the broadcast sender to the dependency-updates files module so
     // local-clone progress events surface on the same WS push channel.
     crate::daemon::service::register_local_clone_progress_sender(state.sender.clone());
+
+    // Kick off a best-effort local-clone garbage-collection pass in the
+    // background. Drops stale + over-budget bare clones per the plan's
+    // §A.5 policy. Failures are logged and don't block daemon startup.
+    tokio::spawn(async {
+        match crate::daemon::service::run_local_clone_gc().await {
+            Ok(report) => {
+                if report.targets > 0 {
+                    tracing::info!(
+                        target = "harness::daemon::startup",
+                        targets = report.targets,
+                        removed = report.removed,
+                        bytes_freed = report.bytes_freed,
+                        "local-clone gc finished"
+                    );
+                }
+            }
+            Err(error) => tracing::warn!(
+                target = "harness::daemon::startup",
+                error = %error,
+                "local-clone gc failed at daemon startup"
+            ),
+        }
+    });
+
     let app = daemon_http_router().with_state(state);
 
     axum::serve(listener, app)
