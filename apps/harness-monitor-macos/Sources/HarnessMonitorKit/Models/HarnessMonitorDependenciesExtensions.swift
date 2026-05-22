@@ -51,7 +51,8 @@ extension DependencyUpdateItem {
   }
 
   public var canAttemptManualApproval: Bool {
-    state == .open && reviewStatus == .reviewRequired
+    guard state == .open else { return false }
+    return reviewStatus == .reviewRequired || reviewStatus == .none
   }
 
   public var canAttemptManualMerge: Bool {

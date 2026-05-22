@@ -57,6 +57,15 @@ struct DependencyUpdatesParityHelperTests {
     #expect(!item.isAutoApprovable)
   }
 
+  @Test("Manual approval is available when GitHub reports no review decision")
+  func manualApprovalAllowedWhenReviewStatusIsNone() {
+    #expect(makeItem(reviewStatus: .none).canAttemptManualApproval)
+    #expect(makeItem(reviewStatus: .reviewRequired).canAttemptManualApproval)
+    #expect(!makeItem(reviewStatus: .approved).canAttemptManualApproval)
+    #expect(!makeItem(reviewStatus: .changesRequested).canAttemptManualApproval)
+    #expect(!makeItem(state: .closed, reviewStatus: .none).canAttemptManualApproval)
+  }
+
   @Test("Fix CI is available only for failing checks")
   func fixCIRequiresFailingChecks() {
     #expect(makeItem(checkStatus: .failure).canStartFixCI)
