@@ -1,5 +1,6 @@
 #![allow(dead_code, unused_imports)]
 
+mod cache;
 mod mapping;
 mod queries;
 mod types;
@@ -27,7 +28,7 @@ pub struct DependencyUpdatesTimelineRequest {
     pub force_refresh: bool,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum TimelinePageDirection {
     Older,
