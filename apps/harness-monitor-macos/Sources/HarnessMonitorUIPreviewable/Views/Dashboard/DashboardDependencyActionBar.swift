@@ -17,6 +17,7 @@ struct DashboardDependencyActionBar: View {
   let onAuto: () -> Void
   let onOpenItem: () -> Void
   let onFixCI: () -> Void
+  let onRebaseViaBot: () -> Void
 
   var body: some View {
     HarnessMonitorGlassControlGroup(spacing: HarnessMonitorTheme.itemSpacing) {
@@ -100,6 +101,14 @@ struct DashboardDependencyActionBar: View {
       DashboardDependencyActionButton(
         title: "Open Pull Request", systemImage: "safari", prominence: .utility, action: onOpenItem
       )
+      if let bot = DependencyUpdateBot.detect(authorLogin: item.authorLogin) {
+        DashboardDependencyActionButton(
+          title: bot.rebaseActionTitle,
+          systemImage: "arrow.triangle.2.circlepath",
+          prominence: .secondary,
+          action: onRebaseViaBot
+        )
+      }
       if item.canStartFixCI {
         DashboardDependencyActionButton(
           title: "Fix CI",

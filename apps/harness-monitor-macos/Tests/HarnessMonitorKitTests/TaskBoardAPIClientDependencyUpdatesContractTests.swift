@@ -7,7 +7,7 @@ extension TaskBoardAPIClientTests {
   func assertDependencyUpdatesHTTPRouteContract(_ records: [TaskBoardURLProtocol.RecordedRequest]) {
     #expect(
       records.map(\.method)
-        == ["POST", "POST", "POST", "POST", "POST", "POST", "POST", "DELETE", "POST"]
+        == ["POST", "POST", "POST", "POST", "POST", "POST", "POST", "DELETE", "POST", "POST"]
     )
     #expect(
       records.map(\.path)
@@ -21,6 +21,7 @@ extension TaskBoardAPIClientTests {
           "/v1/dependency-updates/auto",
           "/v1/dependency-updates/cache",
           "/v1/dependency-updates/refresh",
+          "/v1/dependency-updates/comment",
         ]
     )
   }
@@ -44,6 +45,8 @@ extension TaskBoardAPIClientTests {
     #expect(records[5].body?["label"] as? String == "dependencies:ready")
     #expect(records[6].body?["method"] as? String == "squash")
     #expect(records[7].body == nil)
+    #expect(records[9].body?["body"] as? String == "@renovatebot rebase")
+    #expect(records[9].body?["targets"] is [[String: Any]])
   }
 
   func assertHTTPClientResults(_ result: TaskBoardHTTPContractResult) {
@@ -101,6 +104,7 @@ extension TaskBoardAPIClientTests {
     #expect(result.auto.results.first?.action == .autoMerge)
     #expect(result.cacheClear.clearedEntries == 2)
     #expect(result.refresh.missingPullRequestIDs == ["pr-42"])
+    #expect(result.comment.results.first?.action == .comment)
   }
 
   func makeClient() throws -> HarnessMonitorAPIClient {
@@ -143,4 +147,5 @@ struct DependencyUpdatesHTTPContractResult {
   let auto: DependencyUpdatesActionResponse
   let cacheClear: DependencyUpdatesCacheClearResponse
   let refresh: DependencyUpdatesRefreshResponse
+  let comment: DependencyUpdatesActionResponse
 }

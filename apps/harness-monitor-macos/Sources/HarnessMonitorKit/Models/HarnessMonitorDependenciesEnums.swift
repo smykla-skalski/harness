@@ -245,10 +245,11 @@ public enum DependencyUpdateActionKind: TaskBoardOpenEnum, CaseIterable, Identif
   case addLabel
   case autoApprove
   case autoMerge
+  case comment
   case unknown(String)
 
   public static let allCases: [Self] = [
-    .approve, .merge, .rerunChecks, .addLabel, .autoApprove, .autoMerge,
+    .approve, .merge, .rerunChecks, .addLabel, .autoApprove, .autoMerge, .comment,
   ]
   public var id: String { rawValue }
 
@@ -260,6 +261,7 @@ public enum DependencyUpdateActionKind: TaskBoardOpenEnum, CaseIterable, Identif
     case .addLabel: "add_label"
     case .autoApprove: "auto_approve"
     case .autoMerge: "auto_merge"
+    case .comment: "comment"
     case .unknown(let raw): raw
     }
   }
@@ -272,6 +274,7 @@ public enum DependencyUpdateActionKind: TaskBoardOpenEnum, CaseIterable, Identif
     case "add_label": self = .addLabel
     case "auto_approve": self = .autoApprove
     case "auto_merge": self = .autoMerge
+    case "comment": self = .comment
     default: self = .unknown(rawValue)
     }
   }

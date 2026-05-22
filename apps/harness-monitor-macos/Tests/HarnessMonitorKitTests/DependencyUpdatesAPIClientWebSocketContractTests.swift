@@ -56,6 +56,12 @@ extension TaskBoardAPIClientTests {
     let refresh = try await transport.refreshDependencyUpdates(
       request: DependencyUpdatesRefreshRequest(targets: [target])
     )
+    let comment = try await transport.commentDependencyUpdates(
+      request: DependencyUpdatesCommentRequest(
+        targets: [target],
+        body: "@renovatebot rebase"
+      )
+    )
 
     return DependencyUpdatesWebSocketContractResult(
       calls: await probe.calls,
@@ -67,7 +73,8 @@ extension TaskBoardAPIClientTests {
       label: label,
       auto: auto,
       cacheClear: cacheClear,
-      refresh: refresh
+      refresh: refresh,
+      comment: comment
     )
   }
 
@@ -84,12 +91,13 @@ extension TaskBoardAPIClientTests {
           .dependencyUpdatesAuto,
           .dependencyUpdatesClearCache,
           .dependencyUpdatesRefresh,
+          .dependencyUpdatesComment,
         ]
     )
   }
 
   func assertDependencyUpdatesWebSocketPayloadContract(_ calls: [RPCProbe.Call]) {
-    #expect(calls.count == 9)
+    #expect(calls.count == 10)
     #expect(objectValue(calls[0].params, key: "organization") == .string("example"))
     #expect(objectValue(calls[1].params, key: "authors") == .array([.string("renovate[bot]")]))
     #expect(objectValue(calls[1].params, key: "organizations") == .array([.string("example")]))
@@ -129,6 +137,11 @@ extension TaskBoardAPIClientTests {
       objectValue(calls[8].params, key: "targets")
         == .array([.object(dependencyUpdatesTargetJSON)])
     )
+    #expect(
+      objectValue(calls[9].params, key: "targets")
+        == .array([.object(dependencyUpdatesTargetJSON)])
+    )
+    #expect(objectValue(calls[9].params, key: "body") == .string("@renovatebot rebase"))
   }
 
   func assertDependencyUpdatesWebSocketResults(_ result: DependencyUpdatesWebSocketContractResult) {
@@ -145,6 +158,7 @@ extension TaskBoardAPIClientTests {
     #expect(result.auto.results.first?.action == .autoMerge)
     #expect(result.cacheClear.clearedEntries == 2)
     #expect(result.refresh.missingPullRequestIDs == ["pr-42"])
+    #expect(result.comment.results.first?.action == .comment)
   }
 
   private func objectValue(_ value: JSONValue?, key: String) -> JSONValue? {
@@ -182,6 +196,7 @@ struct DependencyUpdatesWebSocketContractResult {
   let auto: DependencyUpdatesActionResponse
   let cacheClear: DependencyUpdatesCacheClearResponse
   let refresh: DependencyUpdatesRefreshResponse
+  let comment: DependencyUpdatesActionResponse
 }
 
 private let dependencyUpdatesTargetJSON: [String: JSONValue] = [

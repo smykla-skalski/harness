@@ -156,6 +156,17 @@ extension DashboardDependenciesRouteView {
     }
   }
 
+  func rebaseViaBot(item: DependencyUpdateItem, bot: DependencyUpdateBot) async {
+    await performMutation(bot.rebaseActionTitle, items: [item]) { client in
+      try await client.commentDependencyUpdates(
+        request: DependencyUpdatesCommentRequest(
+          targets: [item.target],
+          body: bot.rebaseCommentBody
+        )
+      )
+    }
+  }
+
   func fixCI(item: DependencyUpdateItem) async {
     guard let client = store.apiClient else { return }
     routeInFlightActionTitle = "Creating Fix CI work…"

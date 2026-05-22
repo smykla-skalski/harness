@@ -95,6 +95,16 @@ public struct DependencyUpdatesAutoRequest: Codable, Equatable, Sendable {
   }
 }
 
+public struct DependencyUpdatesCommentRequest: Codable, Equatable, Sendable {
+  public let targets: [DependencyUpdateTarget]
+  public let body: String
+
+  public init(targets: [DependencyUpdateTarget], body: String) {
+    self.targets = targets
+    self.body = body
+  }
+}
+
 public struct DependencyUpdatesQueryResponse: Codable, Equatable, Sendable {
   public let fetchedAt: String
   public let fromCache: Bool

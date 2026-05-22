@@ -194,6 +194,12 @@ extension TaskBoardAPIClientTests {
     let refresh = try await client.refreshDependencyUpdates(
       request: DependencyUpdatesRefreshRequest(targets: [target])
     )
+    let comment = try await client.commentDependencyUpdates(
+      request: DependencyUpdatesCommentRequest(
+        targets: [target],
+        body: "@renovatebot rebase"
+      )
+    )
 
     return DependencyUpdatesHTTPContractResult(
       repositoryCatalog: repositoryCatalog,
@@ -204,7 +210,8 @@ extension TaskBoardAPIClientTests {
       label: label,
       auto: auto,
       cacheClear: cacheClear,
-      refresh: refresh
+      refresh: refresh,
+      comment: comment
     )
   }
 

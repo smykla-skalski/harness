@@ -191,6 +191,16 @@ extension PreviewHarnessClientState {
     )
   }
 
+  func commentDependencyUpdates(
+    request: DependencyUpdatesCommentRequest
+  ) -> DependencyUpdatesActionResponse {
+    previewActionResponse(
+      summary: "Posted dependency update comment",
+      action: .comment,
+      request.targets
+    )
+  }
+
   private func previewActionResponse(
     summary: String,
     action: DependencyUpdateActionKind,
