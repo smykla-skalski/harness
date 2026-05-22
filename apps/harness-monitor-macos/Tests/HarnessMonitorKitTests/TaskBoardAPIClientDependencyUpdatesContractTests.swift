@@ -87,6 +87,13 @@ extension TaskBoardAPIClientTests {
       result.query.items.first?.checks.first?.detailsURL
         == "https://github.com/example/harness/actions/runs/1001/job/2002"
     )
+    #expect(
+      result.query.items.first?.checks.map(\.detailsURL)
+        == [
+          "https://github.com/example/harness/actions/runs/1001/job/2002",
+          "https://ci.example.com/example/harness/builds/42",
+        ]
+    )
     #expect(result.approve.results.first?.action == .approve)
     #expect(result.merge.results.first?.action == .merge)
     #expect(result.rerun.results.first?.action == .rerunChecks)

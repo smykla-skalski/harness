@@ -67,4 +67,38 @@ extension HarnessMonitorStore {
       dependencyUpdateBodyState[id] = .failed(error.localizedDescription)
     }
   }
+
+  /// Push an edited dependency-update PR body through the daemon and refresh
+  /// the local body cache with the daemon-confirmed current body.
+  @discardableResult
+  public func updateDependencyUpdateBody(
+    pullRequestID: String,
+    expectedPriorBodySHA256: String,
+    newBody: String
+  ) async -> DependencyUpdatesBodyUpdateResponse? {
+    guard let client else {
+      dependencyUpdateBodyState[pullRequestID] = .failed("Daemon unavailable")
+      return nil
+    }
+    do {
+      let response = try await client.updateDependencyUpdateBody(
+        request: DependencyUpdatesBodyUpdateRequest(
+          pullRequestID: pullRequestID,
+          expectedPriorBodySHA256: expectedPriorBodySHA256,
+          newBody: newBody
+        )
+      )
+      dependencyUpdateBodies.store(
+        pullRequestID: response.pullRequestID,
+        body: response.currentBody,
+        prUpdatedAt: response.prUpdatedAt,
+        fetchedAt: response.fetchedAt
+      )
+      dependencyUpdateBodyState[response.pullRequestID] = .loaded(response.currentBody)
+      return response
+    } catch {
+      dependencyUpdateBodyState[pullRequestID] = .failed(error.localizedDescription)
+      return nil
+    }
+  }
 }

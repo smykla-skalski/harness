@@ -50,6 +50,19 @@ extension DependencyUpdateItem {
     !rerunnableCheckSuiteIDs.isEmpty
   }
 
+  public var rerunChecksUnavailableReason: String? {
+    guard !checks.isEmpty else {
+      return "No checks are reported for this dependency update."
+    }
+    guard checks.contains(where: { $0.checkSuiteID != nil }) else {
+      return "GitHub did not provide check suite IDs for these checks."
+    }
+    guard checks.contains(where: \.isRerunnable) else {
+      return "Only failed or timed-out completed check runs can be rerun."
+    }
+    return nil
+  }
+
   public var canAttemptManualApproval: Bool {
     guard state == .open else { return false }
     return reviewStatus == .reviewRequired || reviewStatus == .none
@@ -84,6 +97,19 @@ extension DependencyUpdateItem {
 }
 
 extension DependencyUpdateCheck {
+  public var detailsWebURL: URL? {
+    guard let detailsURL else { return nil }
+    let trimmed = detailsURL.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard
+      let url = URL(string: trimmed),
+      let scheme = url.scheme?.lowercased(),
+      scheme == "https" || scheme == "http"
+    else {
+      return nil
+    }
+    return url
+  }
+
   public var isRerunnable: Bool {
     guard checkSuiteID != nil, status == .completed else {
       return false

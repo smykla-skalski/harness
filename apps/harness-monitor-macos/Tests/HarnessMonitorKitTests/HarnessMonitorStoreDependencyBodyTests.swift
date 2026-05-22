@@ -180,6 +180,41 @@ final class HarnessMonitorStoreDependencyBodyTests: XCTestCase {
       "task key must stay stable across renders when item and connection are unchanged"
     )
   }
+
+  func testBodyUpdatePublishesDaemonConfirmedBodyAndRefreshesCache() async throws {
+    let client = RecordingHarnessClient()
+    client.configureDependencyBodyUpdate(
+      pullRequestID: "PR_1",
+      outcome: .updated,
+      currentBody: "Edited body",
+      currentBodySHA256: String(repeating: "b", count: 64),
+      prUpdatedAt: "2026-05-21T01:00:00Z",
+      fetchedAt: "2026-05-21T01:01:00Z"
+    )
+    let store = try makeStore(client: client)
+    defer { store.dependencyUpdateBodies.clear() }
+
+    let response = await store.updateDependencyUpdateBody(
+      pullRequestID: "PR_1",
+      expectedPriorBodySHA256: String(repeating: "a", count: 64),
+      newBody: "Draft body"
+    )
+
+    XCTAssertEqual(response?.outcome, .updated)
+    XCTAssertEqual(client.dependencyBodyUpdateCallCount(), 1)
+    XCTAssertEqual(client.lastDependencyBodyUpdateRequest()?.newBody, "Draft body")
+    if case .loaded(let body) = store.dependencyUpdateBodyState["PR_1"] {
+      XCTAssertEqual(body, "Edited body")
+    } else {
+      XCTFail("expected .loaded state with daemon-confirmed body")
+    }
+    let cached = store.dependencyUpdateBodies.cached(
+      forPullRequestID: "PR_1",
+      since: "2026-05-21T01:00:00Z"
+    )
+    XCTAssertEqual(cached?.body, "Edited body")
+    XCTAssertEqual(cached?.fetchedAt, "2026-05-21T01:01:00Z")
+  }
 }
 
 /// Minimal async semaphore (single-permit) used to suspend a fetch so a

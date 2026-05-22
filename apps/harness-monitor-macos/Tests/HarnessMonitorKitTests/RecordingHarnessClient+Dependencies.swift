@@ -88,6 +88,12 @@ extension RecordingHarnessClient {
     lock.withLock { dependencyBodyUpdateRequests.count }
   }
 
+  func lastDependencyBodyUpdateRequest() -> (
+    pullRequestID: String, expectedPriorBodySHA256: String, newBody: String
+  )? {
+    lock.withLock { dependencyBodyUpdateRequests.last }
+  }
+
   func updateDependencyUpdateBody(
     request: DependencyUpdatesBodyUpdateRequest
   ) async throws -> DependencyUpdatesBodyUpdateResponse {
