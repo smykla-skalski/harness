@@ -371,3 +371,61 @@ fn sample_dependency_update_item() -> DependencyUpdateItem {
         viewer_can_update: true,
     }
 }
+
+#[test]
+fn production_github_timeouts_match_documented_ceilings() {
+    assert_eq!(GITHUB_HTTP_CONNECT_TIMEOUT, std::time::Duration::from_secs(30));
+    assert_eq!(GITHUB_HTTP_READ_TIMEOUT, std::time::Duration::from_secs(60));
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn read_timeout_fires_when_github_holds_the_connection_open() {
+    use std::time::{Duration, Instant};
+    use octocrab::service::middleware::retry::RetryConfig;
+    use tokio::net::TcpListener;
+
+    ensure_rustls_provider();
+
+    let listener = TcpListener::bind("127.0.0.1:0").await.expect("bind");
+    let port = listener.local_addr().expect("local_addr").port();
+    let accept_handle = tokio::spawn(async move {
+        let mut held = Vec::new();
+        loop {
+            match listener.accept().await {
+                Ok((stream, _)) => held.push(stream),
+                Err(_) => break,
+            }
+        }
+        held
+    });
+
+    let client = Octocrab::builder()
+        .base_uri(format!("http://127.0.0.1:{port}"))
+        .expect("base_uri")
+        .personal_token("test-token".to_string())
+        .add_retry_config(RetryConfig::None)
+        .set_connect_timeout(Some(Duration::from_secs(5)))
+        .set_read_timeout(Some(Duration::from_secs(2)))
+        .build()
+        .expect("octocrab build");
+
+    let started = Instant::now();
+    let outcome = tokio::time::timeout(
+        Duration::from_secs(8),
+        client.repos("octocat", "Hello-World").get(),
+    )
+    .await;
+    let elapsed = started.elapsed();
+
+    accept_handle.abort();
+
+    let inner = outcome.expect("outer guard fired - read timeout did not");
+    assert!(
+        inner.is_err(),
+        "expected Octocrab to surface a timeout error, got success: {inner:?}"
+    );
+    assert!(
+        elapsed < Duration::from_secs(5),
+        "read_timeout took too long to fire: {elapsed:?}"
+    );
+}
