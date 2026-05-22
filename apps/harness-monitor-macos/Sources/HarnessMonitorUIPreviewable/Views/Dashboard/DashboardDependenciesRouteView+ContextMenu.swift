@@ -9,6 +9,7 @@ extension DashboardDependenciesRouteView {
       let isSingleItem = items.count == 1
       let availableLabels = contextMenuAvailableLabels(for: items)
       let frequentNames = contextMenuFrequentNames(for: items)
+      let isBusy = items.contains { isPullRequestRefreshing($0.pullRequestID) }
       if isSingleItem {
         Button("Open Pull Request") {
           openItem(primaryItem)
@@ -21,18 +22,19 @@ extension DashboardDependenciesRouteView {
       Button("Approve") {
         Task { await approve(items: items) }
       }
-      .disabled(!items.contains { $0.canAttemptManualApproval })
+      .disabled(isBusy || !items.contains { $0.canAttemptManualApproval })
       Button("Merge") {
         Task { await merge(items: items) }
       }
-      .disabled(!items.contains { $0.canAttemptManualMerge })
+      .disabled(isBusy || !items.contains { $0.canAttemptManualMerge })
       Button("Rerun Checks") {
         Task { await rerunChecks(items: items) }
       }
-      .disabled(!items.contains { $0.hasRerunnableChecks })
+      .disabled(isBusy || !items.contains { $0.hasRerunnableChecks })
       Button("Refresh") {
         refresh(items: items)
       }
+      .disabled(isBusy)
       DashboardDependenciesLabelPickerMenu(
         title: "Add Label",
         labels: availableLabels,
@@ -45,10 +47,11 @@ extension DashboardDependenciesRouteView {
           routeIsLabelSheetPresented = true
         }
       )
+      .disabled(isBusy)
       Button("Auto") {
         Task { await auto(items: items) }
       }
-      .disabled(!items.contains { $0.canRunAutoMode })
+      .disabled(isBusy || !items.contains { $0.canRunAutoMode })
       if isSingleItem, primaryItem.canStartFixCI {
         Button("Fix CI") {
           Task { await fixCI(item: primaryItem) }

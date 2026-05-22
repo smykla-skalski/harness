@@ -164,6 +164,7 @@ extension DashboardDependenciesRouteView {
       ),
       frequentNames: frequentLabelNames(for: items),
       showsDescriptions: normalizedPreferences.showLabelDescriptions,
+      isBusy: items.contains { isPullRequestRefreshing($0.pullRequestID) },
       onApprove: { Task { await approve(items: items) } },
       onMerge: { Task { await merge(items: items) } },
       onRerunChecks: { Task { await rerunChecks(items: items) } },
