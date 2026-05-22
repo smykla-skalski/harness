@@ -1,13 +1,13 @@
 import Foundation
 
 extension PreviewHarnessClientState {
-  func catalogDependencyUpdateRepositories(
-    request: DependencyUpdatesRepositoryCatalogRequest
-  ) -> DependencyUpdatesRepositoryCatalogResponse {
+  func catalogReviewRepositories(
+    request: ReviewsRepositoryCatalogRequest
+  ) -> ReviewsRepositoryCatalogResponse {
     let organization = request.organization.trimmingCharacters(in: .whitespacesAndNewlines)
       .lowercased()
     let knownRepositories =
-      dependencyUpdateItems.map(\.repository)
+      reviewItems.map(\.repository)
       + taskBoardOrchestratorSettings.githubInbox.repositories
     let repositories = Array(
       Set(
@@ -16,16 +16,16 @@ extension PreviewHarnessClientState {
         }
       )
     ).sorted { $0.localizedStandardCompare($1) == .orderedAscending }
-    return DependencyUpdatesRepositoryCatalogResponse(
+    return ReviewsRepositoryCatalogResponse(
       organization: organization,
       repositories: repositories
     )
   }
 
-  func currentDependencyUpdates(
-    request: DependencyUpdatesQueryRequest
-  ) -> DependencyUpdatesQueryResponse {
-    let items = dependencyUpdateItems.filter { item in
+  func currentReviews(
+    request: ReviewsQueryRequest
+  ) -> ReviewsQueryResponse {
+    let items = reviewItems.filter { item in
       let owner = item.repository.split(separator: "/").first.map(String.init)
       let matchesOrganizations =
         request.organizations.isEmpty
@@ -37,37 +37,37 @@ extension PreviewHarnessClientState {
       let matchesAuthors = request.authors.isEmpty || request.authors.contains(item.authorLogin)
       return matchesOrganizations && matchesRepositories && matchesExclusions && matchesAuthors
     }
-    return DependencyUpdatesQueryResponse(
+    return ReviewsQueryResponse(
       fetchedAt: Self.mutationTimestamp,
       fromCache: false,
-      summary: DependencyUpdatesSummary(items: items),
+      summary: ReviewsSummary(items: items),
       items: items
     )
   }
 
-  func previewDependencyUpdateAction(
-    request: DependencyUpdatesActionPreviewRequest
-  ) -> DependencyUpdatesActionPreviewResponse {
+  func previewReviewAction(
+    request: ReviewsActionPreviewRequest
+  ) -> ReviewsActionPreviewResponse {
     let targets = request.targets.map { target in
-      previewDependencyUpdateActionTarget(action: request.action, target: target)
+      previewReviewActionTarget(action: request.action, target: target)
     }
     let actionableCount = targets.count(where: \.eligible)
-    return DependencyUpdatesActionPreviewResponse(
+    return ReviewsActionPreviewResponse(
       action: request.action,
-      capabilities: DependencyUpdatesCapabilitiesResponse(),
+      capabilities: ReviewsCapabilitiesResponse(),
       totalCount: request.targets.count,
       actionableCount: actionableCount,
       skippedCount: request.targets.count - actionableCount,
-      warnings: previewDependencyUpdateWarnings(action: request.action, targets: request.targets),
+      warnings: previewReviewWarnings(action: request.action, targets: request.targets),
       targets: targets
     )
   }
 
-  func approveDependencyUpdates(
-    request: DependencyUpdatesApproveRequest
-  ) -> DependencyUpdatesActionResponse {
+  func approveReviews(
+    request: ReviewsApproveRequest
+  ) -> ReviewsActionResponse {
     for target in request.targets {
-      dependencyUpdateItems = dependencyUpdateItems.map { item in
+      reviewItems = reviewItems.map { item in
         guard item.pullRequestID == target.pullRequestID else { return item }
         return item.replacing(reviewStatus: .approved)
       }
@@ -79,11 +79,11 @@ extension PreviewHarnessClientState {
     )
   }
 
-  func mergeDependencyUpdates(
-    request: DependencyUpdatesMergeRequest
-  ) -> DependencyUpdatesActionResponse {
+  func mergeReviews(
+    request: ReviewsMergeRequest
+  ) -> ReviewsActionResponse {
     let mergedIDs = Set(request.targets.map(\.pullRequestID))
-    dependencyUpdateItems.removeAll { mergedIDs.contains($0.pullRequestID) }
+    reviewItems.removeAll { mergedIDs.contains($0.pullRequestID) }
     return previewActionResponse(
       summary: "Merged dependency updates",
       action: .merge,
@@ -91,15 +91,15 @@ extension PreviewHarnessClientState {
     )
   }
 
-  func rerunDependencyUpdateChecks(
-    request: DependencyUpdatesRerunChecksRequest
-  ) -> DependencyUpdatesActionResponse {
+  func rerunReviewChecks(
+    request: ReviewsRerunChecksRequest
+  ) -> ReviewsActionResponse {
     for target in request.targets {
-      dependencyUpdateItems = dependencyUpdateItems.map { item in
+      reviewItems = reviewItems.map { item in
         guard item.pullRequestID == target.pullRequestID else { return item }
         let rerunChecks = item.checks.map { check in
           guard target.checkSuiteIDs.contains(check.checkSuiteID ?? "") else { return check }
-          return DependencyUpdateCheck(
+          return ReviewCheck(
             name: check.name,
             status: .inProgress,
             conclusion: .none,
@@ -117,11 +117,11 @@ extension PreviewHarnessClientState {
     )
   }
 
-  func addDependencyUpdateLabel(
-    request: DependencyUpdatesLabelRequest
-  ) -> DependencyUpdatesActionResponse {
+  func addReviewLabel(
+    request: ReviewsLabelRequest
+  ) -> ReviewsActionResponse {
     for target in request.targets {
-      dependencyUpdateItems = dependencyUpdateItems.map { item in
+      reviewItems = reviewItems.map { item in
         guard item.pullRequestID == target.pullRequestID else { return item }
         var labels = item.labels
         if !labels.contains(request.label) {
@@ -138,44 +138,44 @@ extension PreviewHarnessClientState {
     )
   }
 
-  func autoDependencyUpdates(
-    request: DependencyUpdatesAutoRequest
-  ) -> DependencyUpdatesActionResponse {
+  func autoReviews(
+    request: ReviewsAutoRequest
+  ) -> ReviewsActionResponse {
     for target in request.targets where target.isAutoApprovable {
-      dependencyUpdateItems = dependencyUpdateItems.map { item in
+      reviewItems = reviewItems.map { item in
         guard item.pullRequestID == target.pullRequestID else { return item }
         return item.replacing(reviewStatus: .approved)
       }
     }
     let mergedIDs = Set(request.targets.filter { $0.isAutoMergeable }.map(\.pullRequestID))
     let newlyApprovedIDs = Set(request.targets.filter { $0.isAutoApprovable }.map(\.pullRequestID))
-    dependencyUpdateItems.removeAll {
+    reviewItems.removeAll {
       mergedIDs.contains($0.pullRequestID) || newlyApprovedIDs.contains($0.pullRequestID)
     }
     return previewActionResponse(summary: "Auto mode finished", action: .autoMerge, request.targets)
   }
 
-  func clearDependencyUpdatesCache() -> DependencyUpdatesCacheClearResponse {
-    DependencyUpdatesCacheClearResponse(clearedEntries: 1)
+  func clearReviewsCache() -> ReviewsCacheClearResponse {
+    ReviewsCacheClearResponse(clearedEntries: 1)
   }
 
-  func refreshDependencyUpdates(
-    request: DependencyUpdatesRefreshRequest
-  ) -> DependencyUpdatesRefreshResponse {
+  func refreshReviews(
+    request: ReviewsRefreshRequest
+  ) -> ReviewsRefreshResponse {
     let requestedIDs = Set(request.targets.map(\.pullRequestID))
-    let refreshed = dependencyUpdateItems.filter { requestedIDs.contains($0.pullRequestID) }
+    let refreshed = reviewItems.filter { requestedIDs.contains($0.pullRequestID) }
     let missing = requestedIDs.subtracting(refreshed.map(\.pullRequestID))
-    return DependencyUpdatesRefreshResponse(
+    return ReviewsRefreshResponse(
       fetchedAt: Self.mutationTimestamp,
       items: refreshed,
       missingPullRequestIDs: missing.sorted()
     )
   }
 
-  func fetchDependencyUpdateBody(
-    request: DependencyUpdatesBodyRequest
-  ) -> DependencyUpdatesBodyResponse {
-    let item = dependencyUpdateItems.first { $0.pullRequestID == request.pullRequestID }
+  func fetchReviewBody(
+    request: ReviewsBodyRequest
+  ) -> ReviewsBodyResponse {
+    let item = reviewItems.first { $0.pullRequestID == request.pullRequestID }
     let body =
       item.map {
         """
@@ -187,7 +187,7 @@ extension PreviewHarnessClientState {
         Closes a tracking issue and keeps dependencies current.
         """
       } ?? ""
-    return DependencyUpdatesBodyResponse(
+    return ReviewsBodyResponse(
       pullRequestID: request.pullRequestID,
       body: body,
       prUpdatedAt: item?.updatedAt ?? "2026-05-21T00:00:00Z",
@@ -196,10 +196,10 @@ extension PreviewHarnessClientState {
     )
   }
 
-  func updateDependencyUpdateBody(
-    request: DependencyUpdatesBodyUpdateRequest
-  ) -> DependencyUpdatesBodyUpdateResponse {
-    DependencyUpdatesBodyUpdateResponse(
+  func updateReviewBody(
+    request: ReviewsBodyUpdateRequest
+  ) -> ReviewsBodyUpdateResponse {
+    ReviewsBodyUpdateResponse(
       pullRequestID: request.pullRequestID,
       outcome: .updated,
       currentBody: request.newBody,
@@ -209,9 +209,9 @@ extension PreviewHarnessClientState {
     )
   }
 
-  func commentDependencyUpdates(
-    request: DependencyUpdatesCommentRequest
-  ) -> DependencyUpdatesActionResponse {
+  func commentReviews(
+    request: ReviewsCommentRequest
+  ) -> ReviewsActionResponse {
     previewActionResponse(
       summary: "Posted dependency update comment",
       action: .comment,
@@ -219,10 +219,10 @@ extension PreviewHarnessClientState {
     )
   }
 
-  func listDependencyUpdateFiles(
-    request: DependencyUpdatesFilesListRequest
-  ) -> DependencyUpdatesFilesListResponse {
-    DependencyUpdatesFilesListResponse(
+  func listReviewFiles(
+    request: ReviewsFilesListRequest
+  ) -> ReviewsFilesListResponse {
+    ReviewsFilesListResponse(
       pullRequestID: request.pullRequestID,
       headRefOid: "preview-head-\(request.pullRequestID)",
       viewerCanMarkViewed: true,
@@ -232,10 +232,10 @@ extension PreviewHarnessClientState {
     )
   }
 
-  func patchDependencyUpdateFiles(
-    request: DependencyUpdatesFilesPatchRequest
-  ) -> DependencyUpdatesFilesPatchResponse {
-    DependencyUpdatesFilesPatchResponse(
+  func patchReviewFiles(
+    request: ReviewsFilesPatchRequest
+  ) -> ReviewsFilesPatchResponse {
+    ReviewsFilesPatchResponse(
       pullRequestID: request.pullRequestID,
       patches: [],
       drifted: false,
@@ -244,13 +244,13 @@ extension PreviewHarnessClientState {
     )
   }
 
-  func viewedDependencyUpdateFiles(
-    request: DependencyUpdatesFilesViewedRequest
-  ) -> DependencyUpdatesFilesViewedResponse {
-    DependencyUpdatesFilesViewedResponse(
+  func viewedReviewFiles(
+    request: ReviewsFilesViewedRequest
+  ) -> ReviewsFilesViewedResponse {
+    ReviewsFilesViewedResponse(
       pullRequestID: request.pullRequestID,
       results: request.paths.map { target in
-        DependencyUpdateFilesViewedResult(
+        ReviewFilesViewedResult(
           path: target.path,
           outcome: .updated,
           viewerViewedState: target.markViewed ? .viewed : .unviewed
@@ -260,10 +260,10 @@ extension PreviewHarnessClientState {
     )
   }
 
-  func fetchDependencyUpdateFileBlob(
-    request: DependencyUpdatesFilesBlobRequest
-  ) -> DependencyUpdatesFilesBlobResponse {
-    DependencyUpdatesFilesBlobResponse(
+  func fetchReviewFileBlob(
+    request: ReviewsFilesBlobRequest
+  ) -> ReviewsFilesBlobResponse {
+    ReviewsFilesBlobResponse(
       path: request.path,
       oid: request.oid,
       mime: .png,
@@ -273,21 +273,21 @@ extension PreviewHarnessClientState {
     )
   }
 
-  func listDependencyUpdateLocalClones() -> [DependencyUpdateLocalCloneEntry] {
+  func listReviewLocalClones() -> [ReviewLocalCloneEntry] {
     []
   }
 
-  func deleteDependencyUpdateLocalClone(repoKeySegment _: String) {}
+  func deleteReviewLocalClone(repoKeySegment _: String) {}
 
   private func previewActionResponse(
     summary: String,
-    action: DependencyUpdateActionKind,
-    _ targets: [DependencyUpdateTarget]
-  ) -> DependencyUpdatesActionResponse {
-    DependencyUpdatesActionResponse(
+    action: ReviewActionKind,
+    _ targets: [ReviewTarget]
+  ) -> ReviewsActionResponse {
+    ReviewsActionResponse(
       summary: "\(summary): \(targets.count) applied, 0 skipped, 0 failed",
       results: targets.map { target in
-        DependencyUpdateActionResult(
+        ReviewActionResult(
           repository: target.repository,
           number: target.number,
           action: action,
@@ -297,24 +297,24 @@ extension PreviewHarnessClientState {
     )
   }
 
-  private func previewDependencyUpdateActionTarget(
-    action: DependencyUpdateActionPreviewKind,
-    target: DependencyUpdateTarget
-  ) -> DependencyUpdateActionPreviewTarget {
-    let reason = previewDependencyUpdateBlocker(action: action, target: target)
-    return DependencyUpdateActionPreviewTarget(
+  private func previewReviewActionTarget(
+    action: ReviewActionPreviewKind,
+    target: ReviewTarget
+  ) -> ReviewActionPreviewTarget {
+    let reason = previewReviewBlocker(action: action, target: target)
+    return ReviewActionPreviewTarget(
       pullRequestID: target.pullRequestID,
       repository: target.repository,
       number: target.number,
       eligible: reason == nil,
       reason: reason,
-      warnings: previewDependencyUpdateTargetWarnings(action: action, target: target)
+      warnings: previewReviewTargetWarnings(action: action, target: target)
     )
   }
 
-  private func previewDependencyUpdateBlocker(
-    action: DependencyUpdateActionPreviewKind,
-    target: DependencyUpdateTarget
+  private func previewReviewBlocker(
+    action: ReviewActionPreviewKind,
+    target: ReviewTarget
   ) -> String? {
     guard target.viewerCanUpdate else {
       return "Current GitHub token cannot update this pull request"
@@ -347,9 +347,9 @@ extension PreviewHarnessClientState {
     }
   }
 
-  private func previewDependencyUpdateWarnings(
-    action: DependencyUpdateActionPreviewKind,
-    targets: [DependencyUpdateTarget]
+  private func previewReviewWarnings(
+    action: ReviewActionPreviewKind,
+    targets: [ReviewTarget]
   ) -> [String] {
     var warnings: [String] = []
     if action == .approve || action == .merge {
@@ -373,9 +373,9 @@ extension PreviewHarnessClientState {
     return warnings
   }
 
-  private func previewDependencyUpdateTargetWarnings(
-    action: DependencyUpdateActionPreviewKind,
-    target: DependencyUpdateTarget
+  private func previewReviewTargetWarnings(
+    action: ReviewActionPreviewKind,
+    target: ReviewTarget
   ) -> [String] {
     var warnings: [String] = []
     if (action == .approve || action == .merge) && target.checkStatus == .failure {

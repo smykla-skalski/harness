@@ -3,7 +3,7 @@ import CoreGraphics
 import Foundation
 import WebKit
 
-/// Singleton SVG rasterizer for the Dependencies > Files image preview.
+/// Singleton SVG rasterizer for the Reviews > Files image preview.
 ///
 /// Two paths:
 /// - AppKit native: `NSImage(data:)` handles most SVGs on macOS 13+; if

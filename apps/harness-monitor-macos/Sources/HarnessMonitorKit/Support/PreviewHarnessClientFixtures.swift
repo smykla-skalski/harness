@@ -17,7 +17,7 @@ extension PreviewHarnessClient {
     let taskBoardGitRuntimeConfig: TaskBoardGitRuntimeConfig
     let taskBoardGitIdentityDefaults: TaskBoardGitIdentityDefaults
     let taskBoardItems: [TaskBoardItem]
-    let dependencyUpdatesResponse: DependencyUpdatesQueryResponse
+    let reviewsResponse: ReviewsQueryResponse
 
     public init(
       health: HealthResponse,
@@ -37,7 +37,7 @@ extension PreviewHarnessClient {
       taskBoardGitIdentityDefaults: TaskBoardGitIdentityDefaults = Self
         .defaultTaskBoardGitIdentityDefaults,
       taskBoardItems: [TaskBoardItem] = [],
-      dependencyUpdatesResponse: DependencyUpdatesQueryResponse = Self.defaultDependencyUpdates
+      reviewsResponse: ReviewsQueryResponse = Self.defaultReviews
     ) {
       self.health = health
       self.projects = projects
@@ -54,7 +54,7 @@ extension PreviewHarnessClient {
       self.taskBoardGitRuntimeConfig = taskBoardGitRuntimeConfig
       self.taskBoardGitIdentityDefaults = taskBoardGitIdentityDefaults
       self.taskBoardItems = taskBoardItems
-      self.dependencyUpdatesResponse = dependencyUpdatesResponse
+      self.reviewsResponse = reviewsResponse
     }
 
     func detail(for sessionID: String, scope: String?) -> SessionDetail? {

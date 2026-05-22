@@ -2,14 +2,14 @@ import CoreGraphics
 import Foundation
 import ImageIO
 
-/// Off-main image decoder for the Dependencies > Files image preview.
+/// Off-main image decoder for the Reviews > Files image preview.
 ///
 /// Wraps `CGImageSourceCreateThumbnailAtIndex` so decode happens on the
 /// actor's executor instead of on the main thread. The in-memory LRU is
 /// capped by approximate decoded byte count (default 64 MB) rather than
 /// entry count - one 4K asset is roughly 32 MB on its own, so an
 /// entry-count cap underestimates real cost.
-public actor DependencyUpdateImageDecoder {
+public actor ReviewImageDecoder {
   public struct PreparedImage: @unchecked Sendable, Equatable {
     public let cgImage: CGImage
     public let intrinsicSize: CGSize
@@ -52,7 +52,7 @@ public actor DependencyUpdateImageDecoder {
   private var insertionOrder: [CacheKey] = []
   private var currentByteTotal: Int = 0
 
-  public init(maxBytes: Int = DependencyUpdateImageDecoder.defaultMaxBytes) {
+  public init(maxBytes: Int = ReviewImageDecoder.defaultMaxBytes) {
     self.maxBytes = maxBytes
   }
 

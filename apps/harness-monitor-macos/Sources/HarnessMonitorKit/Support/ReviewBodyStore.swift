@@ -1,12 +1,12 @@
 import Foundation
 
-/// Per-user persistence for dependency update PR description bodies.
+/// Per-user persistence for review PR description bodies.
 ///
 /// Keyed by GitHub PR node id. Each entry stores the markdown body plus the
 /// PR's `updatedAt` at fetch time so the cache can be invalidated when the
 /// PR itself has been edited or commented on since the cached fetch.
-public final class DependencyUpdateBodyStore: @unchecked Sendable {
-  public static let defaultsKey = "HarnessMonitor.Dependencies.PullRequestBodies"
+public final class ReviewBodyStore: @unchecked Sendable {
+  public static let defaultsKey = "HarnessMonitor.Reviews.PullRequestBodies"
 
   public struct Entry: Codable, Equatable, Sendable {
     public let body: String
@@ -38,7 +38,7 @@ public final class DependencyUpdateBodyStore: @unchecked Sendable {
 
   public init(
     defaults: UserDefaults = .standard,
-    key: String = DependencyUpdateBodyStore.defaultsKey
+    key: String = ReviewBodyStore.defaultsKey
   ) {
     self.defaults = defaults
     self.key = key

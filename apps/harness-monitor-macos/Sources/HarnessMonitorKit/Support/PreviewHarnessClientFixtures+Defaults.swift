@@ -73,15 +73,15 @@ extension PreviewHarnessClient.Fixtures {
     ]
   )
 
-  public static let defaultDependencyUpdates = DependencyUpdatesQueryResponse(
+  public static let defaultReviews = ReviewsQueryResponse(
     fetchedAt: "2026-03-28T14:20:30Z",
     fromCache: false,
-    summary: DependencyUpdatesSummary(items: sampleDependencyUpdateItems),
-    items: sampleDependencyUpdateItems
+    summary: ReviewsSummary(items: sampleReviewItems),
+    items: sampleReviewItems
   )
 
-  private static let sampleDependencyUpdateItems: [DependencyUpdateItem] = [
-    DependencyUpdateItem(
+  private static let sampleReviewItems: [ReviewItem] = [
+    ReviewItem(
       pullRequestID: "preview-deps-1",
       repositoryID: "repo-preview-1",
       repository: "smykla-skalski/harness",
@@ -98,7 +98,7 @@ extension PreviewHarnessClient.Fixtures {
       headSha: "abc412",
       labels: ["dependencies", "renovate"],
       checks: [
-        DependencyUpdateCheck(
+        ReviewCheck(
           name: "ci / test",
           status: .completed,
           conclusion: .success,
@@ -106,13 +106,13 @@ extension PreviewHarnessClient.Fixtures {
           detailsURL: "https://github.com/smykla-skalski/harness/actions/runs/412"
         )
       ],
-      reviews: [DependencyUpdateReview(author: "teammate", state: .approved)],
+      reviews: [PullRequestReview(author: "teammate", state: .approved)],
       additions: 12,
       deletions: 8,
       createdAt: "2026-03-27T10:00:00Z",
       updatedAt: "2026-03-28T14:18:00Z"
     ),
-    DependencyUpdateItem(
+    ReviewItem(
       pullRequestID: "preview-deps-2",
       repositoryID: "repo-preview-2",
       repository: "smykla-skalski/harness-monitor",
@@ -129,7 +129,7 @@ extension PreviewHarnessClient.Fixtures {
       headSha: "abc091",
       labels: ["dependencies"],
       checks: [
-        DependencyUpdateCheck(
+        ReviewCheck(
           name: "ci / lint",
           status: .completed,
           conclusion: .success,
@@ -143,7 +143,7 @@ extension PreviewHarnessClient.Fixtures {
       createdAt: "2026-03-28T08:40:00Z",
       updatedAt: "2026-03-28T13:45:00Z"
     ),
-    DependencyUpdateItem(
+    ReviewItem(
       pullRequestID: "preview-deps-3",
       repositoryID: "repo-preview-3",
       repository: "smykla-skalski/gh-renovate-helper",
@@ -160,7 +160,7 @@ extension PreviewHarnessClient.Fixtures {
       headSha: "abc055",
       labels: ["dependencies", "automerge"],
       checks: [
-        DependencyUpdateCheck(
+        ReviewCheck(
           name: "ci / test",
           status: .inProgress,
           conclusion: .none,
@@ -168,13 +168,13 @@ extension PreviewHarnessClient.Fixtures {
           detailsURL: "https://github.com/smykla-skalski/gh-renovate-helper/actions/runs/55"
         )
       ],
-      reviews: [DependencyUpdateReview(author: "teammate", state: .approved)],
+      reviews: [PullRequestReview(author: "teammate", state: .approved)],
       additions: 7,
       deletions: 3,
       createdAt: "2026-03-28T09:20:00Z",
       updatedAt: "2026-03-28T13:30:00Z"
     ),
-    DependencyUpdateItem(
+    ReviewItem(
       pullRequestID: "preview-deps-4",
       repositoryID: "repo-preview-4",
       repository: "smykla-skalski/harness",
@@ -191,27 +191,27 @@ extension PreviewHarnessClient.Fixtures {
       headSha: "abc413",
       labels: ["dependencies", "needs-human"],
       checks: [
-        DependencyUpdateCheck(
+        ReviewCheck(
           name: "ci / test",
           status: .completed,
           conclusion: .failure,
           checkSuiteID: "suite-413",
           detailsURL: "https://github.com/smykla-skalski/harness/actions/runs/413"
         ),
-        DependencyUpdateCheck(
+        ReviewCheck(
           name: "Analyze (go)",
           status: .completed,
           conclusion: .success,
           checkSuiteID: "suite-413-go",
           detailsURL: "https://github.com/smykla-skalski/harness/actions/runs/413/job/2"
         ),
-        DependencyUpdateCheck(
+        ReviewCheck(
           name: "legacy/ci",
           status: .completed,
           conclusion: .failure,
         ),
       ],
-      reviews: [DependencyUpdateReview(author: "reviewer", state: .changesRequested)],
+      reviews: [PullRequestReview(author: "reviewer", state: .changesRequested)],
       additions: 10,
       deletions: 6,
       createdAt: "2026-03-27T16:00:00Z",

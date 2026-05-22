@@ -1,19 +1,19 @@
 import Foundation
 import OSLog
 
-/// Shared OSSignposter for the Dependencies > PR-Timeline perf surface.
-/// Mirrors `DependencyFilesPerf` (commit `252228513`): the interval-token
+/// Shared OSSignposter for the Reviews > PR-Timeline perf surface.
+/// Mirrors `ReviewFilesPerf` (commit `252228513`): the interval-token
 /// shape — `Interval` is returned by `begin*()` and passed back to
 /// `end(_:)` — avoids closure-wrapping callsites that capture
 /// `@MainActor`-isolated store state and would otherwise fail the Swift
 /// 6 Sendable / actor-isolation checks at `Task.detached` boundaries.
 ///
 /// **Callsite contract:** every `begin*()` MUST be paired with
-/// `defer { DependencyTimelinePerf.end(interval) }` in the same scope.
+/// `defer { ReviewTimelinePerf.end(interval) }` in the same scope.
 /// Without the defer, async cancellation leaves the interval unclosed
 /// and the Instruments / audit aggregations under-count the work as
 /// unterminated spans — `--top` reports become misleading.
-public enum DependencyTimelinePerf {
+public enum ReviewTimelinePerf {
   public static let signposter = OSSignposter(
     subsystem: "io.harnessmonitor",
     category: "perf/pr-timeline"
@@ -28,7 +28,7 @@ public enum DependencyTimelinePerf {
   }
 
   /// Begin a daemon-fetch interval covering one
-  /// `client.fetchDependencyUpdateTimeline(request:)` round trip. The
+  /// `client.fetchReviewTimeline(request:)` round trip. The
   /// `direction` tag distinguishes initial vs load-older fetches in the
   /// trace.
   public static func beginDaemonFetch(
@@ -45,7 +45,7 @@ public enum DependencyTimelinePerf {
   }
 
   /// Begin a node-build interval covering the off-main
-  /// `DependencyPullRequestTimelineNodeBuilder().buildNodes(...)` call.
+  /// `ReviewPullRequestTimelineNodeBuilder().buildNodes(...)` call.
   /// The `entries` / `hiddenKinds` counts give post-hoc sizing context
   /// in Instruments without leaking PR-specific PII.
   public static func beginNodeBuild(entries: Int, hiddenKinds: Int) -> Interval {

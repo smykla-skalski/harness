@@ -1,136 +1,136 @@
 import Foundation
 
 extension PreviewHarnessClient {
-  public func catalogDependencyUpdateRepositories(
-    request: DependencyUpdatesRepositoryCatalogRequest
-  ) async throws -> DependencyUpdatesRepositoryCatalogResponse {
+  public func catalogReviewRepositories(
+    request: ReviewsRepositoryCatalogRequest
+  ) async throws -> ReviewsRepositoryCatalogResponse {
     try await performActionDelay()
-    return await state.catalogDependencyUpdateRepositories(request: request)
+    return await state.catalogReviewRepositories(request: request)
   }
 
-  public func queryDependencyUpdates(
-    request: DependencyUpdatesQueryRequest
-  ) async throws -> DependencyUpdatesQueryResponse {
+  public func queryReviews(
+    request: ReviewsQueryRequest
+  ) async throws -> ReviewsQueryResponse {
     try await performActionDelay()
-    return await state.currentDependencyUpdates(request: request)
+    return await state.currentReviews(request: request)
   }
 
-  public func dependencyUpdatesCapabilities() async throws -> DependencyUpdatesCapabilitiesResponse
+  public func reviewsCapabilities() async throws -> ReviewsCapabilitiesResponse
   {
     try await performActionDelay()
-    return DependencyUpdatesCapabilitiesResponse()
+    return ReviewsCapabilitiesResponse()
   }
 
-  public func previewDependencyUpdateAction(
-    request: DependencyUpdatesActionPreviewRequest
-  ) async throws -> DependencyUpdatesActionPreviewResponse {
+  public func previewReviewAction(
+    request: ReviewsActionPreviewRequest
+  ) async throws -> ReviewsActionPreviewResponse {
     try await performActionDelay()
-    return await state.previewDependencyUpdateAction(request: request)
+    return await state.previewReviewAction(request: request)
   }
 
-  public func approveDependencyUpdates(
-    request: DependencyUpdatesApproveRequest
-  ) async throws -> DependencyUpdatesActionResponse {
+  public func approveReviews(
+    request: ReviewsApproveRequest
+  ) async throws -> ReviewsActionResponse {
     try await performActionDelay()
-    return await state.approveDependencyUpdates(request: request)
+    return await state.approveReviews(request: request)
   }
 
-  public func mergeDependencyUpdates(
-    request: DependencyUpdatesMergeRequest
-  ) async throws -> DependencyUpdatesActionResponse {
+  public func mergeReviews(
+    request: ReviewsMergeRequest
+  ) async throws -> ReviewsActionResponse {
     try await performActionDelay()
-    return await state.mergeDependencyUpdates(request: request)
+    return await state.mergeReviews(request: request)
   }
 
-  public func rerunDependencyUpdateChecks(
-    request: DependencyUpdatesRerunChecksRequest
-  ) async throws -> DependencyUpdatesActionResponse {
+  public func rerunReviewChecks(
+    request: ReviewsRerunChecksRequest
+  ) async throws -> ReviewsActionResponse {
     try await performActionDelay()
-    return await state.rerunDependencyUpdateChecks(request: request)
+    return await state.rerunReviewChecks(request: request)
   }
 
-  public func addDependencyUpdateLabel(
-    request: DependencyUpdatesLabelRequest
-  ) async throws -> DependencyUpdatesActionResponse {
+  public func addReviewLabel(
+    request: ReviewsLabelRequest
+  ) async throws -> ReviewsActionResponse {
     try await performActionDelay()
-    return await state.addDependencyUpdateLabel(request: request)
+    return await state.addReviewLabel(request: request)
   }
 
-  public func autoDependencyUpdates(
-    request: DependencyUpdatesAutoRequest
-  ) async throws -> DependencyUpdatesActionResponse {
+  public func autoReviews(
+    request: ReviewsAutoRequest
+  ) async throws -> ReviewsActionResponse {
     try await performActionDelay()
-    return await state.autoDependencyUpdates(request: request)
+    return await state.autoReviews(request: request)
   }
 
-  public func clearDependencyUpdatesCache() async throws -> DependencyUpdatesCacheClearResponse {
+  public func clearReviewsCache() async throws -> ReviewsCacheClearResponse {
     try await performActionDelay()
-    return await state.clearDependencyUpdatesCache()
+    return await state.clearReviewsCache()
   }
 
-  public func refreshDependencyUpdates(
-    request: DependencyUpdatesRefreshRequest
-  ) async throws -> DependencyUpdatesRefreshResponse {
+  public func refreshReviews(
+    request: ReviewsRefreshRequest
+  ) async throws -> ReviewsRefreshResponse {
     try await performActionDelay()
-    return await state.refreshDependencyUpdates(request: request)
+    return await state.refreshReviews(request: request)
   }
 
-  public func fetchDependencyUpdateBody(
-    request: DependencyUpdatesBodyRequest
-  ) async throws -> DependencyUpdatesBodyResponse {
+  public func fetchReviewBody(
+    request: ReviewsBodyRequest
+  ) async throws -> ReviewsBodyResponse {
     try await performActionDelay()
-    return await state.fetchDependencyUpdateBody(request: request)
+    return await state.fetchReviewBody(request: request)
   }
 
-  public func updateDependencyUpdateBody(
-    request: DependencyUpdatesBodyUpdateRequest
-  ) async throws -> DependencyUpdatesBodyUpdateResponse {
+  public func updateReviewBody(
+    request: ReviewsBodyUpdateRequest
+  ) async throws -> ReviewsBodyUpdateResponse {
     try await performActionDelay()
-    return await state.updateDependencyUpdateBody(request: request)
+    return await state.updateReviewBody(request: request)
   }
 
-  public func commentDependencyUpdates(
-    request: DependencyUpdatesCommentRequest
-  ) async throws -> DependencyUpdatesActionResponse {
+  public func commentReviews(
+    request: ReviewsCommentRequest
+  ) async throws -> ReviewsActionResponse {
     try await performActionDelay()
-    return await state.commentDependencyUpdates(request: request)
+    return await state.commentReviews(request: request)
   }
 
-  public func listDependencyUpdateFiles(
-    request: DependencyUpdatesFilesListRequest
-  ) async throws -> DependencyUpdatesFilesListResponse {
+  public func listReviewFiles(
+    request: ReviewsFilesListRequest
+  ) async throws -> ReviewsFilesListResponse {
     try await performActionDelay()
-    return await state.listDependencyUpdateFiles(request: request)
+    return await state.listReviewFiles(request: request)
   }
 
-  public func patchDependencyUpdateFiles(
-    request: DependencyUpdatesFilesPatchRequest
-  ) async throws -> DependencyUpdatesFilesPatchResponse {
+  public func patchReviewFiles(
+    request: ReviewsFilesPatchRequest
+  ) async throws -> ReviewsFilesPatchResponse {
     try await performActionDelay()
-    return await state.patchDependencyUpdateFiles(request: request)
+    return await state.patchReviewFiles(request: request)
   }
 
-  public func viewedDependencyUpdateFiles(
-    request: DependencyUpdatesFilesViewedRequest
-  ) async throws -> DependencyUpdatesFilesViewedResponse {
+  public func viewedReviewFiles(
+    request: ReviewsFilesViewedRequest
+  ) async throws -> ReviewsFilesViewedResponse {
     try await performActionDelay()
-    return await state.viewedDependencyUpdateFiles(request: request)
+    return await state.viewedReviewFiles(request: request)
   }
 
-  public func fetchDependencyUpdateFileBlob(
-    request: DependencyUpdatesFilesBlobRequest
-  ) async throws -> DependencyUpdatesFilesBlobResponse {
+  public func fetchReviewFileBlob(
+    request: ReviewsFilesBlobRequest
+  ) async throws -> ReviewsFilesBlobResponse {
     try await performActionDelay()
-    return await state.fetchDependencyUpdateFileBlob(request: request)
+    return await state.fetchReviewFileBlob(request: request)
   }
 
-  public func listDependencyUpdateLocalClones() async throws -> [DependencyUpdateLocalCloneEntry] {
+  public func listReviewLocalClones() async throws -> [ReviewLocalCloneEntry] {
     try await performActionDelay()
-    return await state.listDependencyUpdateLocalClones()
+    return await state.listReviewLocalClones()
   }
 
-  public func deleteDependencyUpdateLocalClone(repoKeySegment: String) async throws {
+  public func deleteReviewLocalClone(repoKeySegment: String) async throws {
     try await performActionDelay()
-    await state.deleteDependencyUpdateLocalClone(repoKeySegment: repoKeySegment)
+    await state.deleteReviewLocalClone(repoKeySegment: repoKeySegment)
   }
 }
