@@ -21,7 +21,7 @@ enum OpenAnythingRoutingStep: Equatable, Sendable {
   case openSessionWindow(sessionID: String)
   case requestSessionRoute(OpenAnythingSessionRouteTarget)
   case selectSupervisorDecision(id: String)
-  case selectDashboardDependency(pullRequestID: String)
+  case selectDashboardReview(pullRequestID: String)
 }
 
 enum OpenAnythingRouteExecutor {
@@ -51,10 +51,10 @@ enum OpenAnythingRouteExecutor {
       return taskBoardSteps(sessionID: sessionID, workItemID: workItemID)
     case .decision(let id, let sessionID):
       return decisionSteps(id: id, sessionID: sessionID)
-    case .dependency(let pullRequestID):
+    case .review(let pullRequestID):
       return [
-        .selectDashboardDependency(pullRequestID: pullRequestID),
-        .openDashboard(.dependencies),
+        .selectDashboardReview(pullRequestID: pullRequestID),
+        .openDashboard(.reviews),
       ]
     case .loadedSession(let target):
       return loadedSessionSteps(target)
@@ -77,7 +77,7 @@ enum OpenAnythingRouteExecutor {
     .attachExternalSession: [.attachExternalSession],
     .openDashboard: [.openWindow(.dashboard)],
     .openTaskBoard: [.openDashboard(.taskBoard)],
-    .openDependencies: [.openDashboard(.dependencies)],
+    .openReviews: [.openDashboard(.reviews)],
     .openNotifications: [.openDashboard(.notifications)],
     .openPolicyCanvas: [.openDashboard(.policyCanvas)],
     .openDiagnostics: [.openDashboard(.diagnostics)],

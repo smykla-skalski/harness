@@ -25,7 +25,7 @@ enum HarnessMonitorPerfScenario: String, CaseIterable, Sendable {
   case permissionModal = "permission-modal"
   case taskBoardSettings = "task-board-settings"
   case repositoriesSettings = "repositories-settings"
-  case dependenciesSettings = "dependencies-settings"
+  case reviewsSettings = "reviews-settings"
   case settingsBackdropCycle = "settings-backdrop-cycle"
   case settingsBackgroundCycle = "settings-background-cycle"
   case timelineBurst = "timeline-burst"
@@ -34,7 +34,7 @@ enum HarnessMonitorPerfScenario: String, CaseIterable, Sendable {
   case dashboardSearchSuggestions = "dashboard-search-suggestions"
   case dashboardLiveScroll = "dashboard-live-scroll"
   case dashboardLiveInteract = "dashboard-live-interact"
-  case dependencyDetailTimeline500 = "dependency-detail-timeline-500"
+  case reviewDetailTimeline500 = "review-detail-timeline-500"
 
   init?(environment: HarnessMonitorEnvironment) {
     let rawValue = environment.values[Self.environmentKey]?
@@ -140,7 +140,7 @@ extension HarnessMonitorPerfScenario {
     case .permissionModal: "permission-modal"
     case .taskBoardSettings: "task-board-settings"
     case .repositoriesSettings: "repositories-settings"
-    case .dependenciesSettings: "dependencies-settings"
+    case .reviewsSettings: "reviews-settings"
     case .settingsBackdropCycle: "settings-backdrop-cycle"
     case .settingsBackgroundCycle: "settings-background-cycle"
     case .timelineBurst: "timeline-burst"
@@ -149,7 +149,7 @@ extension HarnessMonitorPerfScenario {
     case .dashboardSearchSuggestions: "dashboard-search-suggestions"
     case .dashboardLiveScroll: "dashboard-live-scroll"
     case .dashboardLiveInteract: "dashboard-live-interact"
-    case .dependencyDetailTimeline500: "dependency-detail-timeline-500"
+    case .reviewDetailTimeline500: "review-detail-timeline-500"
     }
   }
 }

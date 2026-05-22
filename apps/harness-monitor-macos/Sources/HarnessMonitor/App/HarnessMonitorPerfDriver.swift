@@ -115,8 +115,8 @@ enum HarnessMonitorPerfDriver {
       return await runDashboardLiveScrollScenario(store: store)
     case .dashboardLiveInteract:
       return await runDashboardLiveInteractScenario(store: store)
-    case .dependencyDetailTimeline500:
-      return await runDependencyDetailTimeline500Scenario(store: store)
+    case .reviewDetailTimeline500:
+      return await runReviewDetailTimeline500Scenario(store: store)
     case .policyCanvas,
       .agentDetailForm,
       .agentDetailFormVisualOptionsDisabled,
@@ -131,7 +131,7 @@ enum HarnessMonitorPerfDriver {
       .permissionModal,
       .taskBoardSettings,
       .repositoriesSettings,
-      .dependenciesSettings,
+      .reviewsSettings,
       .settingsBackdropCycle,
       .settingsBackgroundCycle,
       .timelineBurst,
@@ -177,14 +177,14 @@ enum HarnessMonitorPerfDriver {
       .settingsBackgroundCycle,
       .taskBoardSettings,
       .repositoriesSettings,
-      .dependenciesSettings,
+      .reviewsSettings,
       .timelineBurst,
       .toastOverlayChurn,
       .offlineCachedOpen,
       .dashboardSearchSuggestions,
       .dashboardLiveScroll,
       .dashboardLiveInteract,
-      .dependencyDetailTimeline500:
+      .reviewDetailTimeline500:
       return nil
     }
   }
@@ -196,7 +196,7 @@ enum HarnessMonitorPerfDriver {
     switch scenario {
     case .taskBoardSettings,
       .repositoriesSettings,
-      .dependenciesSettings:
+      .reviewsSettings:
       return await runTaskBoardSettingsScenario(openWindow: openWindow)
     case .settingsBackdropCycle:
       return await runSettingsBackdropCycleScenario(openWindow: openWindow)
@@ -225,7 +225,7 @@ enum HarnessMonitorPerfDriver {
       .dashboardSearchSuggestions,
       .dashboardLiveScroll,
       .dashboardLiveInteract,
-      .dependencyDetailTimeline500:
+      .reviewDetailTimeline500:
       return nil
     }
   }
@@ -259,14 +259,14 @@ enum HarnessMonitorPerfDriver {
       .permissionModal,
       .taskBoardSettings,
       .repositoriesSettings,
-      .dependenciesSettings,
+      .reviewsSettings,
       .settingsBackdropCycle,
       .settingsBackgroundCycle,
       .offlineCachedOpen,
       .dashboardSearchSuggestions,
       .dashboardLiveScroll,
       .dashboardLiveInteract,
-      .dependencyDetailTimeline500:
+      .reviewDetailTimeline500:
       return .failed("unsupported-scenario")
     }
   }

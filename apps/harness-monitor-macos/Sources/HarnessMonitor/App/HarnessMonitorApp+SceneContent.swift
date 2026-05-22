@@ -136,7 +136,7 @@ extension HarnessMonitorApp {
     HarnessMonitorOpenAnythingHostModifier(
       windowID: windowID,
       model: appOpenAnythingPalette,
-      dependencyRegistry: appOpenAnythingDependencies,
+      reviewRegistry: appOpenAnythingReviews,
       store: appStore,
       keyWindowObserver: keyWindowObserver,
       windowNavigationHistory: appWindowNavigationHistory,
