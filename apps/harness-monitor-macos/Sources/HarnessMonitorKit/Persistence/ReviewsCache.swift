@@ -154,7 +154,7 @@ public struct ReviewsCache {
     _ items: [ReviewItem],
     refresh: ReviewsRefreshResponse
   ) -> [ReviewItem] {
-    applyDependencyRefresh(to: items, refresh: refresh)
+    applyReviewsRefresh(to: items, refresh: refresh)
   }
 
   /// Merge a per-repository response into a flat items list.
