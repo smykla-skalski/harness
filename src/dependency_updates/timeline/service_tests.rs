@@ -99,24 +99,28 @@ impl TimelineClient for MockClient {
     }
 }
 
+// Octocrab's `.graphql()` unwraps the outer `{data: ...}` envelope before
+// the response reaches the service handler, so the mock returns the inner
+// payload directly. Keep this aligned with `TimelineGitHubClient` in
+// `client.rs`; the fixture files under `fixtures/*.json` keep the raw
+// `{data: ...}` envelope because they exercise the lower-level mapping
+// layer instead.
 fn outer_page(pull_request_id: &str, nodes: Vec<Value>) -> Value {
     json!({
-        "data": {
-            "node": {
-                "id": pull_request_id,
-                "viewerCanUpdate": true,
-                "timelineItems": {
-                    "pageInfo": {
-                        "startCursor": "start",
-                        "endCursor": "end",
-                        "hasNextPage": false,
-                        "hasPreviousPage": false,
-                    },
-                    "nodes": nodes,
+        "node": {
+            "id": pull_request_id,
+            "viewerCanUpdate": true,
+            "timelineItems": {
+                "pageInfo": {
+                    "startCursor": "start",
+                    "endCursor": "end",
+                    "hasNextPage": false,
+                    "hasPreviousPage": false,
                 },
+                "nodes": nodes,
             },
-            "rateLimit": { "remaining": 4990, "resetAt": "2026-05-22T15:00:00Z", "cost": 1 },
-        }
+        },
+        "rateLimit": { "remaining": 4990, "resetAt": "2026-05-22T15:00:00Z", "cost": 1 },
     })
 }
 
@@ -151,15 +155,13 @@ fn inline_comment(id: &str, body: &str) -> Value {
 
 fn inline_continuation(nodes: Vec<Value>, has_next: bool) -> Value {
     json!({
-        "data": {
-            "node": {
-                "comments": {
-                    "pageInfo": { "endCursor": "ic-next", "hasNextPage": has_next },
-                    "nodes": nodes,
-                }
-            },
-            "rateLimit": { "remaining": 4980, "resetAt": "2026-05-22T15:00:00Z", "cost": 1 },
-        }
+        "node": {
+            "comments": {
+                "pageInfo": { "endCursor": "ic-next", "hasNextPage": has_next },
+                "nodes": nodes,
+            }
+        },
+        "rateLimit": { "remaining": 4980, "resetAt": "2026-05-22T15:00:00Z", "cost": 1 },
     })
 }
 
@@ -192,15 +194,13 @@ fn thread_comment(id: &str, body: &str) -> Value {
 
 fn thread_continuation(nodes: Vec<Value>, has_next: bool) -> Value {
     json!({
-        "data": {
-            "node": {
-                "comments": {
-                    "pageInfo": { "endCursor": "tc-next", "hasNextPage": has_next },
-                    "nodes": nodes,
-                }
-            },
-            "rateLimit": { "remaining": 4970, "resetAt": "2026-05-22T15:00:00Z", "cost": 1 },
-        }
+        "node": {
+            "comments": {
+                "pageInfo": { "endCursor": "tc-next", "hasNextPage": has_next },
+                "nodes": nodes,
+            }
+        },
+        "rateLimit": { "remaining": 4970, "resetAt": "2026-05-22T15:00:00Z", "cost": 1 },
     })
 }
 
