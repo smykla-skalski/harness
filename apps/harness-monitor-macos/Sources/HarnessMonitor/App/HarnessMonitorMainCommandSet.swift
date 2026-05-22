@@ -62,5 +62,6 @@ private struct HarnessMonitorSupplementalCommandSet: Commands {
     )
     SessionWindowCycleCommands()
     InspectorCommands()
+    AuditTimelineCommand()
   }
 }
