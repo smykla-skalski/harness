@@ -102,7 +102,8 @@ extension PreviewHarnessClient.Fixtures {
           name: "ci / test",
           status: .completed,
           conclusion: .success,
-          checkSuiteID: "suite-412"
+          checkSuiteID: "suite-412",
+          detailsURL: "https://github.com/smykla-skalski/harness/actions/runs/412"
         )
       ],
       reviews: [DependencyUpdateReview(author: "teammate", state: .approved)],
@@ -132,7 +133,8 @@ extension PreviewHarnessClient.Fixtures {
           name: "ci / lint",
           status: .completed,
           conclusion: .success,
-          checkSuiteID: "suite-91"
+          checkSuiteID: "suite-91",
+          detailsURL: "https://github.com/smykla-skalski/harness-monitor/actions/runs/91"
         )
       ],
       reviews: [],
@@ -162,7 +164,8 @@ extension PreviewHarnessClient.Fixtures {
           name: "ci / test",
           status: .inProgress,
           conclusion: .none,
-          checkSuiteID: "suite-55"
+          checkSuiteID: "suite-55",
+          detailsURL: "https://github.com/smykla-skalski/gh-renovate-helper/actions/runs/55"
         )
       ],
       reviews: [DependencyUpdateReview(author: "teammate", state: .approved)],
@@ -192,7 +195,8 @@ extension PreviewHarnessClient.Fixtures {
           name: "ci / test",
           status: .completed,
           conclusion: .failure,
-          checkSuiteID: "suite-413"
+          checkSuiteID: "suite-413",
+          detailsURL: "https://github.com/smykla-skalski/harness/actions/runs/413"
         )
       ],
       reviews: [DependencyUpdateReview(author: "reviewer", state: .changesRequested)],

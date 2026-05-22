@@ -5,19 +5,22 @@ public struct DependencyUpdateCheck: Codable, Equatable, Identifiable, Sendable 
   public let status: DependencyUpdateCheckRunStatus
   public let conclusion: DependencyUpdateCheckConclusion
   public let checkSuiteID: String?
+  public let detailsURL: String?
 
-  public var id: String { "\(name)-\(checkSuiteID ?? "none")" }
+  public var id: String { "\(name)-\(checkSuiteID ?? "none")-\(detailsURL ?? "none")" }
 
   public init(
     name: String,
     status: DependencyUpdateCheckRunStatus,
     conclusion: DependencyUpdateCheckConclusion,
-    checkSuiteID: String? = nil
+    checkSuiteID: String? = nil,
+    detailsURL: String? = nil
   ) {
     self.name = name
     self.status = status
     self.conclusion = conclusion
     self.checkSuiteID = checkSuiteID
+    self.detailsURL = detailsURL
   }
 
   enum CodingKeys: String, CodingKey {
@@ -25,6 +28,7 @@ public struct DependencyUpdateCheck: Codable, Equatable, Identifiable, Sendable 
     case status
     case conclusion
     case checkSuiteID = "checkSuiteId"
+    case detailsURL = "detailsUrl"
   }
 }
 

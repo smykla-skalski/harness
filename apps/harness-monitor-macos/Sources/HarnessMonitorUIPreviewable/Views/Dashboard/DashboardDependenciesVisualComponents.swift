@@ -195,11 +195,7 @@ struct DashboardDependencyListRow: View {
 
   var body: some View {
     HStack(alignment: .dashboardDependencyTitleLineCenter, spacing: HarnessMonitorTheme.spacingSM) {
-      Image(systemName: item.statusSystemImage)
-        .font(.system(size: 14, weight: .semibold))
-        .foregroundStyle(item.statusTint)
-        .frame(width: 18, alignment: .center)
-        .accessibilityHidden(true)
+      leadingStatusIndicator
 
       VStack(alignment: .leading, spacing: 2) {
         Text(item.title)
@@ -218,12 +214,6 @@ struct DashboardDependencyListRow: View {
           .truncationMode(.tail)
       }
       .layoutPriority(1)
-
-      if isRefreshing {
-        ProgressView()
-          .controlSize(.mini)
-          .accessibilityLabel("Refreshing pull request")
-      }
     }
     .padding(.horizontal, DashboardDependenciesVisualMetrics.dependencyRowHorizontalPadding)
     .padding(.vertical, DashboardDependenciesVisualMetrics.dependencyRowVerticalPadding)
@@ -236,16 +226,28 @@ struct DashboardDependencyListRow: View {
     .accessibilityElement(children: .combine)
   }
 
+  @ViewBuilder private var leadingStatusIndicator: some View {
+    if isRefreshing {
+      ProgressView()
+        .controlSize(.small)
+        .frame(width: 18, alignment: .center)
+        .accessibilityLabel("Working on pull request")
+    } else {
+      Image(systemName: item.statusSystemImage)
+        .font(.system(size: 14, weight: .semibold))
+        .foregroundStyle(item.statusTint)
+        .frame(width: 18, alignment: .center)
+        .accessibilityHidden(true)
+    }
+  }
+
   private var secondaryText: String {
     let scopedPullRequest =
       showsRepository
       ? "\(item.repository) #\(item.number)"
       : "#\(item.number)"
-    var parts = [scopedPullRequest, item.statusLabel, item.reviewStatus.label, updatedLabel]
-    if isRefreshing {
-      parts.insert("Refreshing", at: 1)
-    }
-    return parts.joined(separator: " · ")
+    return [scopedPullRequest, item.statusLabel, item.reviewStatus.label, updatedLabel]
+      .joined(separator: " · ")
   }
 }
 
