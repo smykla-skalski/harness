@@ -19,7 +19,7 @@ extension HarnessMonitorStore {
     }
 
     pruneRepositoryLabelUsageCache()
-    scheduleDependencyUpdateFilesVacuumIfNeeded()
+    scheduleReviewFilesVacuumIfNeeded()
 
     switch daemonOwnership {
     case .external:
@@ -39,36 +39,36 @@ extension HarnessMonitorStore {
   /// high-water mark. Runs on a detached background Task with its own
   /// ModelContext so launch is not blocked; only fires when the cached
   /// count crosses the trigger threshold.
-  private func scheduleDependencyUpdateFilesVacuumIfNeeded() {
+  private func scheduleReviewFilesVacuumIfNeeded() {
     guard let modelContext else { return }
-    let cache = DependencyUpdateFilesCache(context: modelContext)
+    let cache = ReviewFilesCache(context: modelContext)
     let rowCount = cache.countCachedFiles()
-    guard rowCount > Self.dependencyUpdateFilesVacuumTrigger else { return }
+    guard rowCount > Self.reviewFilesVacuumTrigger else { return }
     let container = modelContext.container
-    let cutoff = Date.now.addingTimeInterval(-Self.dependencyUpdateFilesVacuumMaxAge)
+    let cutoff = Date.now.addingTimeInterval(-Self.reviewFilesVacuumMaxAge)
     Task.detached(priority: .background) {
-      await Self.runDependencyUpdateFilesVacuum(container: container, cutoff: cutoff)
+      await Self.runReviewFilesVacuum(container: container, cutoff: cutoff)
     }
   }
 
-  private static func runDependencyUpdateFilesVacuum(
+  private static func runReviewFilesVacuum(
     container: ModelContainer,
     cutoff: Date
   ) async {
     let context = ModelContext(container)
-    let cache = DependencyUpdateFilesCache(context: context)
+    let cache = ReviewFilesCache(context: context)
     let pruned = cache.pruneStale(cutoff: cutoff)
     HarnessMonitorLogger.store.info(
       """
-      Dependency-files cache vacuum complete; \
+      Review-files cache vacuum complete; \
       pruned=\(pruned, privacy: .public) \
       cutoff=\(cutoff.timeIntervalSince1970, privacy: .public)
       """
     )
   }
 
-  static var dependencyUpdateFilesVacuumTrigger: Int { 100_000 }
-  static var dependencyUpdateFilesVacuumMaxAge: TimeInterval { 14 * 24 * 60 * 60 }
+  static var reviewFilesVacuumTrigger: Int { 100_000 }
+  static var reviewFilesVacuumMaxAge: TimeInterval { 14 * 24 * 60 * 60 }
 
   static func makeBookmarkStore() -> BookmarkStore? {
     #if DEBUG

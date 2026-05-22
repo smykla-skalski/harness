@@ -1,6 +1,6 @@
 import Foundation
 
-public enum DependencyUpdateReviewThreadResolveOutcome: Sendable, Equatable {
+public enum ReviewReviewThreadResolveOutcome: Sendable, Equatable {
   case resolved(threadID: String, isResolved: Bool)
   case failed(reason: String)
   case daemonOffline
@@ -9,7 +9,7 @@ public enum DependencyUpdateReviewThreadResolveOutcome: Sendable, Equatable {
 extension HarnessMonitorStore {
   /// Toggle a review thread's `isResolved` state on GitHub. Mirrors the
   /// comment-post optimistic-insert pattern from
-  /// `postDependencyUpdateComment`: mutate the in-memory entry FIRST so
+  /// `postReviewComment`: mutate the in-memory entry FIRST so
   /// the UI reflects the user's action without lag, then reconcile
   /// against the daemon's echoed `isResolved` value on success or
   /// revert on failure.
@@ -17,17 +17,17 @@ extension HarnessMonitorStore {
     threadID: String,
     pullRequestID: String,
     desired: Bool
-  ) async -> DependencyUpdateReviewThreadResolveOutcome {
+  ) async -> ReviewReviewThreadResolveOutcome {
     guard let client else {
       return .daemonOffline
     }
-    let viewModel = dependencyUpdateTimelineViewModel(for: pullRequestID)
+    let viewModel = reviewTimelineViewModel(for: pullRequestID)
     // Snapshot the prior state so we can revert on failure.
     let priorState = viewModel.threadResolvedState(threadID: threadID)
     viewModel.updateReviewThreadResolved(threadID: threadID, resolved: desired)
     do {
       let response = try await client.setReviewThreadResolved(
-        request: DependencyUpdatesReviewThreadResolveRequest(
+        request: ReviewsReviewThreadResolveRequest(
           threadId: threadID,
           resolved: desired,
           pullRequestId: pullRequestID

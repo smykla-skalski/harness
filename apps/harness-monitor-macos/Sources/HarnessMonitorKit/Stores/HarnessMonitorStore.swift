@@ -43,12 +43,12 @@ public final class HarnessMonitorStore {
   @ObservationIgnored var pendingSessionWindowQuitSnapshot: SessionWindowQuitSnapshot?
   @ObservationIgnored var isSuppressingNotificationHistoryToast = false
   @ObservationIgnored var suppressedNotificationHistoryToastIDs: Set<UUID> = []
-  @ObservationIgnored var dependencyFilesViewModels: [String: DependencyUpdateFilesViewModel] = [:]
-  @ObservationIgnored var dependencyFilesPendingFetches: Set<DependencyFilesFetchKey> = []
+  @ObservationIgnored var dependencyFilesViewModels: [String: ReviewFilesViewModel] = [:]
+  @ObservationIgnored var reviewFilesPendingFetches: Set<ReviewFilesFetchKey> = []
   @ObservationIgnored var dependencyFilesViewedBatchTasks: [String: Task<Void, Never>] = [:]
   @ObservationIgnored var dependencyFilesViewedPending:
-    [String: [String: DependencyUpdateFileViewedState]] = [:]
-  @ObservationIgnored var cloneProgressStreams = DependencyCloneProgressStreams()
+    [String: [String: ReviewFileViewedState]] = [:]
+  @ObservationIgnored var cloneProgressStreams = ReviewCloneProgressStreams()
 
   public var openFolderRequest = 0
   public var attachSessionRequest = 0
@@ -292,8 +292,8 @@ public final class HarnessMonitorStore {
   var openRouterRunsBySessionID: [String: [OpenRouterRunSnapshot]] = [:]
   @ObservationIgnored var openRouterRunMetadata: [String: OpenRouterRunMetadata] = [:]
   @ObservationIgnored public let openRouterModelUsage = OpenRouterModelUsageStore()
-  @ObservationIgnored var dependencyUpdates = DependencyUpdateStoreState()
-  public var dependencyUpdateBodyState: [String: DependencyUpdateBodyState] = [:]
+  @ObservationIgnored var reviews = ReviewStoreState()
+  public var reviewBodyState: [String: ReviewBodyState] = [:]
   @ObservationIgnored var locallyRemovedSessionIDs: Set<String> = []
   @ObservationIgnored var pendingListSelectionTask: Task<Void, Never>?
   @ObservationIgnored var pendingListSelectionTaskToken: UInt64 = 0

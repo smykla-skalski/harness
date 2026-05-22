@@ -3,7 +3,7 @@ import Foundation
 extension HarnessMonitorStore {
   /// Optimistically flip the cached viewed state for one file and queue
   /// a debounced batch mutation against the daemon. Multiple toggles
-  /// within `DependencyFilesViewedDebounce` (default 250ms) coalesce
+  /// within `ReviewFilesViewedDebounce` (default 250ms) coalesce
   /// into one daemon round-trip so end-of-review marking many files
   /// doesn't burn mutation rate-limit budget.
   public func setFileViewed(
@@ -12,7 +12,7 @@ extension HarnessMonitorStore {
     viewed: Bool
   ) {
     let viewModel = self.viewModel(forPullRequest: pullRequestID)
-    let nextState: DependencyUpdateFileViewedState = viewed ? .viewed : .unviewed
+    let nextState: ReviewFileViewedState = viewed ? .viewed : .unviewed
     viewModel.setViewedState(path: path, state: nextState)
     appendPendingViewed(
       pullRequestID: pullRequestID,
@@ -37,7 +37,7 @@ extension HarnessMonitorStore {
   private func appendPendingViewed(
     pullRequestID: String,
     path: String,
-    state: DependencyUpdateFileViewedState
+    state: ReviewFileViewedState
   ) {
     var pending = dependencyFilesViewedPending[pullRequestID] ?? [:]
     pending[path] = state
@@ -61,19 +61,19 @@ extension HarnessMonitorStore {
     else { return }
     let viewModel = self.viewModel(forPullRequest: pullRequestID)
     guard let client else { return }
-    let targets: [DependencyUpdateFilesViewedTarget] = pending.map { path, state in
-      DependencyUpdateFilesViewedTarget(
+    let targets: [ReviewFilesViewedTarget] = pending.map { path, state in
+      ReviewFilesViewedTarget(
         path: path,
         expectedPriorState: viewModel.viewedByPath[path] ?? .unviewed,
         markViewed: state == .viewed
       )
     }
-    let request = DependencyUpdatesFilesViewedRequest(
+    let request = ReviewsFilesViewedRequest(
       pullRequestID: pullRequestID,
       paths: targets
     )
     do {
-      let response = try await client.viewedDependencyUpdateFiles(request: request)
+      let response = try await client.viewedReviewFiles(request: request)
       for result in response.results {
         viewModel.setViewedState(path: result.path, state: result.viewerViewedState)
       }

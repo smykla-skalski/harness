@@ -1,6 +1,6 @@
 import Foundation
 
-public enum DependencyUpdateCommentPostOutcome: Sendable, Equatable {
+public enum ReviewCommentPostOutcome: Sendable, Equatable {
   case posted(optimisticID: String)
   case failed(reason: String)
   case daemonOffline
@@ -17,11 +17,11 @@ extension HarnessMonitorStore {
   /// timeline entry, so the synthetic optimistic id is replaced with
   /// the durable GitHub id. On failure the optimistic entry is removed
   /// and the outcome carries the reason string for the composer to surface.
-  public func postDependencyUpdateComment(
-    for item: DependencyUpdateItem,
+  public func postReviewComment(
+    for item: ReviewItem,
     body: String,
     viewerLogin: String? = nil
-  ) async -> DependencyUpdateCommentPostOutcome {
+  ) async -> ReviewCommentPostOutcome {
     let trimmed = body.trimmingCharacters(in: .whitespacesAndNewlines)
     if trimmed.isEmpty {
       return .empty
@@ -31,9 +31,9 @@ extension HarnessMonitorStore {
     }
 
     let optimisticID = "optimistic:\(UUID().uuidString)"
-    let actor = viewerLogin.map { DependencyUpdateTimelineActor(login: $0) }
+    let actor = viewerLogin.map { ReviewTimelineActor(login: $0) }
     let createdAt = HarnessMonitorStore.optimisticTimestamp()
-    let optimisticEntry = DependencyUpdateTimelineEntry.issueComment(
+    let optimisticEntry = ReviewTimelineEntry.issueComment(
       IssueCommentPayload(
         id: optimisticID,
         createdAt: createdAt,
@@ -43,16 +43,16 @@ extension HarnessMonitorStore {
         viewerCanEdit: true
       )
     )
-    let viewModel = dependencyUpdateTimelineViewModel(for: item.pullRequestID)
-    let interval = DependencyTimelinePerf.beginOptimisticInsert(
+    let viewModel = reviewTimelineViewModel(for: item.pullRequestID)
+    let interval = ReviewTimelinePerf.beginOptimisticInsert(
       pullRequestID: item.pullRequestID
     )
     viewModel.appendOptimistic(optimisticEntry)
-    DependencyTimelinePerf.end(interval)
+    ReviewTimelinePerf.end(interval)
 
     do {
-      let response = try await client.commentDependencyUpdates(
-        request: DependencyUpdatesCommentRequest(targets: [item.target], body: trimmed)
+      let response = try await client.commentReviews(
+        request: ReviewsCommentRequest(targets: [item.target], body: trimmed)
       )
       if let landedEntry = response.results.first(where: {
         $0.outcome == .applied && $0.timelineEntry != nil

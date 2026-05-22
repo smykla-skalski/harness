@@ -31,7 +31,7 @@ extension HarnessMonitorStore {
     for path in pendingPaths {
       viewModel.setPatchState(path: path, state: .loading)
     }
-    let request = DependencyUpdatesFilesPatchRequest(
+    let request = ReviewsFilesPatchRequest(
       pullRequestID: pullRequestID,
       headRefOidExpected: viewModel.headRefOid,
       paths: pendingPaths,
@@ -42,16 +42,16 @@ extension HarnessMonitorStore {
       baseRefName: viewModel.baseRefName,
       largeDiffStrategy: largeDiffStrategy
     )
-    let interval = DependencyFilesPerf.beginPatchFetch(
+    let interval = ReviewFilesPerf.beginPatchFetch(
       pullRequestID: pullRequestID,
       pathCount: pendingPaths.count
     )
-    defer { DependencyFilesPerf.end(interval) }
+    defer { ReviewFilesPerf.end(interval) }
     do {
-      let response = try await client.patchDependencyUpdateFiles(request: request)
+      let response = try await client.patchReviewFiles(request: request)
       if response.drifted {
         viewModel.patches.removeAll()
-        await refreshDependencyUpdateFiles(pullRequestID: pullRequestID)
+        await refreshReviewFiles(pullRequestID: pullRequestID)
         return
       }
       let returnedPaths = Set(response.patches.map(\.path))

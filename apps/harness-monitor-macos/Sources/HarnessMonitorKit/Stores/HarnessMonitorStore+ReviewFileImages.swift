@@ -4,9 +4,9 @@ import Foundation
 extension HarnessMonitorStore {
   /// Lazily-instantiated decoder shared across all PRs. The actor's
   /// internal LRU caps decoded image memory at 64 MB by default.
-  public var dependencyFileImageDecoder: DependencyUpdateImageDecoder {
+  public var dependencyFileImageDecoder: ReviewImageDecoder {
     if let cached = sharedImageDecoderStorage.decoder { return cached }
-    let decoder = DependencyUpdateImageDecoder()
+    let decoder = ReviewImageDecoder()
     sharedImageDecoderStorage.decoder = decoder
     return decoder
   }
@@ -21,7 +21,7 @@ extension HarnessMonitorStore {
     oid: String,
     path: String,
     displayMaxDimension: Int = 800
-  ) async -> DependencyUpdateImageDecoder.PreparedImage? {
+  ) async -> ReviewImageDecoder.PreparedImage? {
     if let cached = await dependencyFileImageDecoder.cached(
       repositoryID: repositoryID,
       oid: oid,
@@ -31,16 +31,16 @@ extension HarnessMonitorStore {
     }
     guard let client else { return nil }
     do {
-      let blob = try await client.fetchDependencyUpdateFileBlob(
-        request: DependencyUpdatesFilesBlobRequest(
+      let blob = try await client.fetchReviewFileBlob(
+        request: ReviewsFilesBlobRequest(
           repositoryID: repositoryID,
           oid: oid,
           path: path
         )
       )
       guard let data = Data(base64Encoded: blob.contentBase64) else { return nil }
-      let interval = DependencyFilesPerf.beginImageDecode(oid: oid)
-      defer { DependencyFilesPerf.end(interval) }
+      let interval = ReviewFilesPerf.beginImageDecode(oid: oid)
+      defer { ReviewFilesPerf.end(interval) }
       return try await dependencyFileImageDecoder.decode(
         repositoryID: repositoryID,
         oid: oid,
@@ -57,34 +57,34 @@ extension HarnessMonitorStore {
 /// the store with a new stored property. Keyed on the store's
 /// `ObjectIdentifier` so multiple stores in the test process keep
 /// independent decoders.
-private final class DependencyFileImageDecoderStorage: @unchecked Sendable {
-  var decoder: DependencyUpdateImageDecoder?
+private final class ReviewFileImageDecoderStorage: @unchecked Sendable {
+  var decoder: ReviewImageDecoder?
   init() {}
 }
 
 extension HarnessMonitorStore {
-  fileprivate var sharedImageDecoderStorage: DependencyFileImageDecoderStorage {
-    if let existing = DependencyFileImageDecoderRegistry.shared.storage(for: self) {
+  fileprivate var sharedImageDecoderStorage: ReviewFileImageDecoderStorage {
+    if let existing = ReviewFileImageDecoderRegistry.shared.storage(for: self) {
       return existing
     }
-    let storage = DependencyFileImageDecoderStorage()
-    DependencyFileImageDecoderRegistry.shared.register(storage, for: self)
+    let storage = ReviewFileImageDecoderStorage()
+    ReviewFileImageDecoderRegistry.shared.register(storage, for: self)
     return storage
   }
 }
 
 @MainActor
-private final class DependencyFileImageDecoderRegistry {
-  static let shared = DependencyFileImageDecoderRegistry()
+private final class ReviewFileImageDecoderRegistry {
+  static let shared = ReviewFileImageDecoderRegistry()
 
-  private var entries: [ObjectIdentifier: DependencyFileImageDecoderStorage] = [:]
+  private var entries: [ObjectIdentifier: ReviewFileImageDecoderStorage] = [:]
 
-  fileprivate func storage(for store: HarnessMonitorStore) -> DependencyFileImageDecoderStorage? {
+  fileprivate func storage(for store: HarnessMonitorStore) -> ReviewFileImageDecoderStorage? {
     entries[ObjectIdentifier(store)]
   }
 
   fileprivate func register(
-    _ storage: DependencyFileImageDecoderStorage,
+    _ storage: ReviewFileImageDecoderStorage,
     for store: HarnessMonitorStore
   ) {
     entries[ObjectIdentifier(store)] = storage

@@ -10,13 +10,13 @@ extension HarnessMonitorStore {
   ///
   /// Passing an empty / whitespace-only draft removes the key
   /// entirely so abandoned composer state doesn't accumulate.
-  public func scheduleDependencyUpdateDraftWrite(
+  public func scheduleReviewDraftWrite(
     _ pullRequestID: String,
     draft: String
   ) {
-    dependencyUpdateDraftWriteTasks[pullRequestID]?.cancel()
-    let key = Self.dependencyUpdateDraftKey(for: pullRequestID)
-    dependencyUpdateDraftWriteTasks[pullRequestID] = Task { @MainActor in
+    reviewDraftWriteTasks[pullRequestID]?.cancel()
+    let key = Self.reviewDraftKey(for: pullRequestID)
+    reviewDraftWriteTasks[pullRequestID] = Task { @MainActor in
       try? await Task.sleep(for: HarnessMonitorStore.draftDebounceDuration)
       guard !Task.isCancelled else { return }
       let trimmed = draft.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -30,12 +30,12 @@ extension HarnessMonitorStore {
 
   /// Reads the persisted draft for `pullRequestID`. Returns `""` when
   /// no draft is on disk so the composer can seed `@State` directly.
-  public func dependencyUpdateCommentDraft(for pullRequestID: String) -> String {
-    let key = Self.dependencyUpdateDraftKey(for: pullRequestID)
+  public func reviewCommentDraft(for pullRequestID: String) -> String {
+    let key = Self.reviewDraftKey(for: pullRequestID)
     return UserDefaults.standard.string(forKey: key) ?? ""
   }
 
-  static func dependencyUpdateDraftKey(for pullRequestID: String) -> String {
+  static func reviewDraftKey(for pullRequestID: String) -> String {
     "dependency.composer.draft.\(pullRequestID)"
   }
 }

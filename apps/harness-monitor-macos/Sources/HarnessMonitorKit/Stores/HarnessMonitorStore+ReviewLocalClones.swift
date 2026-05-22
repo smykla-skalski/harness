@@ -5,10 +5,10 @@ extension HarnessMonitorStore {
   /// Returns an empty array when the daemon client is not yet wired or
   /// the request fails so the UI can render the empty-state without
   /// extra error plumbing.
-  public func listDependencyUpdateLocalClones() async -> [DependencyUpdateLocalCloneEntry] {
+  public func listReviewLocalClones() async -> [ReviewLocalCloneEntry] {
     guard let client else { return [] }
     do {
-      return try await client.listDependencyUpdateLocalClones()
+      return try await client.listReviewLocalClones()
     } catch {
       return []
     }
@@ -19,12 +19,12 @@ extension HarnessMonitorStore {
   /// daemon-confirmed deletion, `false` when the daemon refuses or the
   /// client is unavailable.
   @discardableResult
-  public func deleteDependencyUpdateLocalClone(
+  public func deleteReviewLocalClone(
     repoKeySegment: String
   ) async -> Bool {
     guard let client else { return false }
     do {
-      try await client.deleteDependencyUpdateLocalClone(repoKeySegment: repoKeySegment)
+      try await client.deleteReviewLocalClone(repoKeySegment: repoKeySegment)
       return true
     } catch {
       return false

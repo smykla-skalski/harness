@@ -5,14 +5,14 @@ extension HarnessMonitorStore {
   /// lazily on first access. The dictionary itself is
   /// `@ObservationIgnored` so adding a new entry doesn't invalidate
   /// every reader; only the returned view model's mutations propagate.
-  public func dependencyUpdateTimelineViewModel(
+  public func reviewTimelineViewModel(
     for pullRequestID: String
-  ) -> DependencyUpdateTimelineViewModel {
-    if let existing = dependencyUpdateTimelineViewModels[pullRequestID] {
+  ) -> ReviewTimelineViewModel {
+    if let existing = reviewTimelineViewModels[pullRequestID] {
       return existing
     }
-    let created = DependencyUpdateTimelineViewModel()
-    dependencyUpdateTimelineViewModels[pullRequestID] = created
+    let created = ReviewTimelineViewModel()
+    reviewTimelineViewModels[pullRequestID] = created
     return created
   }
 
@@ -23,23 +23,23 @@ extension HarnessMonitorStore {
   /// `apply(initial:)`.
   ///
   /// Concurrent calls for the same PR collapse to one in-flight fetch
-  /// via `pendingDependencyUpdateTimelineFetches`.
-  public func prepareDependencyUpdateTimeline(
-    for item: DependencyUpdateItem,
+  /// via `pendingReviewTimelineFetches`.
+  public func prepareReviewTimeline(
+    for item: ReviewItem,
     forceRefresh: Bool = false,
     pageSize: UInt32 = 50
   ) async {
     let id = item.pullRequestID
-    let viewModel = dependencyUpdateTimelineViewModel(for: id)
+    let viewModel = reviewTimelineViewModel(for: id)
     if !forceRefresh && !viewModel.entries.isEmpty {
       return
     }
     let dedupeKey = "initial:\(id)"
-    if pendingDependencyUpdateTimelineFetches.contains(dedupeKey) {
+    if pendingReviewTimelineFetches.contains(dedupeKey) {
       return
     }
-    pendingDependencyUpdateTimelineFetches.insert(dedupeKey)
-    defer { pendingDependencyUpdateTimelineFetches.remove(dedupeKey) }
+    pendingReviewTimelineFetches.insert(dedupeKey)
+    defer { pendingReviewTimelineFetches.remove(dedupeKey) }
 
     viewModel.markLoading(forceRefresh ? .refreshing : .loadingInitial)
 
@@ -49,16 +49,16 @@ extension HarnessMonitorStore {
     }
 
     do {
-      let interval = DependencyTimelinePerf.beginDaemonFetch(
+      let interval = ReviewTimelinePerf.beginDaemonFetch(
         pullRequestID: id,
         direction: forceRefresh ? "refresh" : "initial"
       )
-      defer { DependencyTimelinePerf.end(interval) }
-      let response = try await client.fetchDependencyUpdateTimeline(
-        request: DependencyUpdatesTimelineRequest(
+      defer { ReviewTimelinePerf.end(interval) }
+      let response = try await client.fetchReviewTimeline(
+        request: ReviewsTimelineRequest(
           pullRequestId: id,
           cursor: nil,
-          pageSize: Self.normalizedDependencyTimelinePageSize(pageSize),
+          pageSize: Self.normalizedReviewTimelinePageSize(pageSize),
           direction: .older,
           forceRefresh: forceRefresh
         )
@@ -77,32 +77,32 @@ extension HarnessMonitorStore {
   /// stale chronological state.
   ///
   /// View models for PRs not in the list are untouched.
-  public func invalidateDependencyUpdateTimelines(for pullRequestIDs: [String]) {
+  public func invalidateReviewTimelines(for pullRequestIDs: [String]) {
     for id in pullRequestIDs {
-      dependencyUpdateTimelineViewModels[id]?.clear()
+      reviewTimelineViewModels[id]?.clear()
     }
   }
 
   /// Loads the next older page using the view model's current
   /// `startCursor`. No-op when no older page exists, a load is
   /// already in flight, or the cursor is missing.
-  public func loadOlderDependencyUpdateTimeline(
-    for item: DependencyUpdateItem,
+  public func loadOlderReviewTimeline(
+    for item: ReviewItem,
     pageSize: UInt32 = 50
   ) async {
     let id = item.pullRequestID
-    let viewModel = dependencyUpdateTimelineViewModel(for: id)
+    let viewModel = reviewTimelineViewModel(for: id)
     guard viewModel.hasOlder, viewModel.loadState == .idle,
       let cursor = viewModel.startCursor
     else {
       return
     }
     let dedupeKey = "older:\(id):\(cursor)"
-    if pendingDependencyUpdateTimelineFetches.contains(dedupeKey) {
+    if pendingReviewTimelineFetches.contains(dedupeKey) {
       return
     }
-    pendingDependencyUpdateTimelineFetches.insert(dedupeKey)
-    defer { pendingDependencyUpdateTimelineFetches.remove(dedupeKey) }
+    pendingReviewTimelineFetches.insert(dedupeKey)
+    defer { pendingReviewTimelineFetches.remove(dedupeKey) }
 
     viewModel.markLoading(.loadingOlder)
 
@@ -112,16 +112,16 @@ extension HarnessMonitorStore {
     }
 
     do {
-      let interval = DependencyTimelinePerf.beginDaemonFetch(
+      let interval = ReviewTimelinePerf.beginDaemonFetch(
         pullRequestID: id,
         direction: "older"
       )
-      defer { DependencyTimelinePerf.end(interval) }
-      let response = try await client.fetchDependencyUpdateTimeline(
-        request: DependencyUpdatesTimelineRequest(
+      defer { ReviewTimelinePerf.end(interval) }
+      let response = try await client.fetchReviewTimeline(
+        request: ReviewsTimelineRequest(
           pullRequestId: id,
           cursor: cursor,
-          pageSize: Self.normalizedDependencyTimelinePageSize(pageSize),
+          pageSize: Self.normalizedReviewTimelinePageSize(pageSize),
           direction: .older
         )
       )
@@ -131,7 +131,7 @@ extension HarnessMonitorStore {
     }
   }
 
-  private static func normalizedDependencyTimelinePageSize(_ pageSize: UInt32) -> UInt32 {
+  private static func normalizedReviewTimelinePageSize(_ pageSize: UInt32) -> UInt32 {
     min(max(pageSize, 10), 100)
   }
 }
