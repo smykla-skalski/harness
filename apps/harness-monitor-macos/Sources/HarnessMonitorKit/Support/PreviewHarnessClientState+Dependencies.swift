@@ -85,7 +85,8 @@ extension PreviewHarnessClientState {
             name: check.name,
             status: .inProgress,
             conclusion: .none,
-            checkSuiteID: check.checkSuiteID
+            checkSuiteID: check.checkSuiteID,
+            detailsURL: check.detailsURL
           )
         }
         return item.replacing(checkStatus: .pending, checks: rerunChecks)

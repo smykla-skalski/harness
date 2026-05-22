@@ -21,7 +21,8 @@ let sampleDependencyUpdateItemJSONString =
         "name": "ci",
         "status": "completed",
         "conclusion": "success",
-        "check_suite_id": "suite-1"
+        "check_suite_id": "suite-1",
+        "details_url": "https://github.com/example/harness/actions/runs/1001/job/2002"
       }
     ],
     "reviews": [

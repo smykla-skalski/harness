@@ -83,6 +83,10 @@ extension TaskBoardAPIClientTests {
     #expect(result.query.summary.autoApprovable == 1)
     #expect(result.query.items.first?.repository == "example/harness")
     #expect(result.query.items.first?.reviewStatus == .reviewRequired)
+    #expect(
+      result.query.items.first?.checks.first?.detailsURL
+        == "https://github.com/example/harness/actions/runs/1001/job/2002"
+    )
     #expect(result.approve.results.first?.action == .approve)
     #expect(result.merge.results.first?.action == .merge)
     #expect(result.rerun.results.first?.action == .rerunChecks)
