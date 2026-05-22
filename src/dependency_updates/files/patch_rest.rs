@@ -12,10 +12,13 @@
 //! The pure helpers below cover REST-response parsing and the drift /
 //! truncation logic used by the service.
 
+use axum::http;
+use octocrab::Octocrab;
 use serde::Deserialize;
 
 use super::{
     DependencyUpdateFileChangeType, DependencyUpdateFilePatch, DependencyUpdateFileServedBy,
+    FILES_PAGE_CAP,
 };
 
 /// GitHub's REST PR-files item shape. Documented at
@@ -124,6 +127,131 @@ pub fn select_patches_by_path(
         .map(rest_file_to_patch)
         .collect()
 }
+
+/// Convert an Octocrab `DiffEntry` (the typed REST response item) into our
+/// internal `RestPullFile` shape so the existing helpers
+/// (`rest_file_to_patch`, `select_patches_by_path`) keep working without
+/// branching on the source.
+#[must_use]
+pub fn diff_entry_to_rest_file(entry: &octocrab::models::repos::DiffEntry) -> RestPullFile {
+    use octocrab::models::repos::DiffEntryStatus;
+    let status_str = match entry.status {
+        DiffEntryStatus::Added => "added",
+        DiffEntryStatus::Removed => "removed",
+        DiffEntryStatus::Modified => "modified",
+        DiffEntryStatus::Renamed => "renamed",
+        DiffEntryStatus::Copied => "copied",
+        DiffEntryStatus::Changed => "changed",
+        DiffEntryStatus::Unchanged => "unchanged",
+        _ => "modified",
+    };
+    RestPullFile {
+        sha: entry.sha.clone(),
+        filename: entry.filename.clone(),
+        status: status_str.to_string(),
+        additions: u32::try_from(entry.additions).unwrap_or(u32::MAX),
+        deletions: u32::try_from(entry.deletions).unwrap_or(u32::MAX),
+        changes: u32::try_from(entry.changes).unwrap_or(u32::MAX),
+        blob_url: entry.blob_url.clone(),
+        raw_url: entry.raw_url.clone(),
+        contents_url: Some(entry.contents_url.to_string()),
+        patch: entry.patch.clone(),
+        previous_filename: entry.previous_filename.clone(),
+    }
+}
+
+/// Split a GitHub `owner/repo` slug into `(owner, repo)`. Returns `None`
+/// when the slug isn't in canonical form (no slash or empty segments).
+#[must_use]
+pub fn split_repo_full_name(full_name: &str) -> Option<(String, String)> {
+    let mut parts = full_name.splitn(2, '/');
+    let owner = parts.next()?.trim();
+    let repo = parts.next()?.trim();
+    if owner.is_empty() || repo.is_empty() {
+        return None;
+    }
+    Some((owner.to_string(), repo.to_string()))
+}
+
+/// Fetch the per-file patches for one PR via GitHub's REST endpoint.
+///
+/// Pagination is capped at `FILES_PAGE_CAP * 30` entries (GitHub's REST
+/// `pulls/.../files` endpoint returns up to 30 per page); pages beyond that
+/// surface as `truncated_pagination = true` so the UI can mention the gap.
+///
+/// `requested_paths` filters the result. Empty slice → return every file.
+///
+/// # Errors
+/// Returns `RestFetchError` on network / auth failures and on malformed
+/// `repo_full_name`.
+pub async fn fetch_patches(
+    client: &Octocrab,
+    repo_full_name: &str,
+    pr_number: u64,
+    head_ref_oid: &str,
+    requested_paths: &[String],
+) -> Result<Vec<DependencyUpdateFilePatch>, RestFetchError> {
+    let (owner, repo) = split_repo_full_name(repo_full_name)
+        .ok_or_else(|| RestFetchError::InvalidRequest("repo_full_name must be owner/name".into()))?;
+
+    let mut page = client
+        .pulls(&owner, &repo)
+        .list_files(pr_number)
+        .await
+        .map_err(|e| RestFetchError::Http(e.to_string()))?;
+
+    let mut all_entries: Vec<octocrab::models::repos::DiffEntry> = Vec::new();
+    let mut visited_pages = 0_u32;
+    let cap = FILES_PAGE_CAP;
+    loop {
+        all_entries.extend(page.items.into_iter());
+        visited_pages += 1;
+        if visited_pages >= cap {
+            break;
+        }
+        let Some(next) = page.next.clone() else { break };
+        let next_uri = next.to_string();
+        let Some(next_page) = client
+            .get_page::<octocrab::models::repos::DiffEntry>(&Some(
+                next_uri
+                    .parse::<http::Uri>()
+                    .map_err(|e| RestFetchError::InvalidRequest(format!("next link parse: {e}")))?,
+            ))
+            .await
+            .map_err(|e| RestFetchError::Http(e.to_string()))?
+        else {
+            break;
+        };
+        page = next_page;
+    }
+
+    let rest_files: Vec<RestPullFile> = all_entries.iter().map(diff_entry_to_rest_file).collect();
+    let mut patches = select_patches_by_path(&rest_files, requested_paths);
+    let head = head_ref_oid.to_string();
+    for patch in &mut patches {
+        patch.head_ref_oid = head.clone();
+    }
+    Ok(patches)
+}
+
+/// Failure modes the REST fetcher exposes. Mapped to `CliError` at the
+/// service-layer boundary.
+#[derive(Debug)]
+pub enum RestFetchError {
+    InvalidRequest(String),
+    Http(String),
+}
+
+impl std::fmt::Display for RestFetchError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::InvalidRequest(msg) => write!(f, "rest patch fetch: {msg}"),
+            Self::Http(msg) => write!(f, "rest patch fetch http: {msg}"),
+        }
+    }
+}
+
+impl std::error::Error for RestFetchError {}
 
 /// Decide whether the cached `head_ref_oid_expected` is still current.
 /// Returns `true` if the request should be considered drifted (a force-push

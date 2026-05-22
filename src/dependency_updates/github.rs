@@ -79,6 +79,14 @@ pub(crate) struct DependencyUpdatesGitHubClient {
 }
 
 impl DependencyUpdatesGitHubClient {
+    /// Borrow the underlying Octocrab client. Used by the REST patch
+    /// fetcher in `dependency_updates::files::patch_rest`, which needs
+    /// raw `pulls/<n>/files` access alongside the higher-level helpers
+    /// on this struct.
+    pub(crate) fn octocrab(&self) -> &Octocrab {
+        &self.client
+    }
+
     pub(crate) fn new(token: &str) -> Result<Self, CliError> {
         let token = token.trim();
         if token.is_empty() {
