@@ -372,3 +372,28 @@ mutation UnmarkDependencyUpdatePullRequestFileAsViewed($pullRequestId: ID!, $pat
   }
 }
 ";
+
+#[allow(dead_code)] // wired into service handler in A.10
+pub(crate) const REPOSITORY_BLOB_QUERY: &str = r"
+query DependencyUpdateRepositoryBlob($id: ID!, $expression: String!) {
+  node(id: $id) {
+    ... on Repository {
+      object(expression: $expression) {
+        ... on Blob {
+          oid
+          byteSize
+          isBinary
+          isTruncated
+          text
+        }
+      }
+    }
+  }
+  rateLimit {
+    limit
+    cost
+    remaining
+    resetAt
+  }
+}
+";
