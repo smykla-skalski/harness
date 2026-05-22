@@ -36,7 +36,7 @@ struct DashboardDependencyActionBar: View {
       title: "Approve",
       systemImage: "checkmark.seal",
       prominence: .primary,
-      helpText: DashboardDependenciesDisabledReason.approveReason(for: items),
+      helpText: helpTextOrBusy(DashboardDependenciesDisabledReason.approveReason(for: items)),
       action: onApprove
     )
     .disabled(isBusy || !items.contains { $0.canAttemptManualApproval })
@@ -45,7 +45,7 @@ struct DashboardDependencyActionBar: View {
       title: "Merge",
       systemImage: "arrow.triangle.merge",
       prominence: .success,
-      helpText: DashboardDependenciesDisabledReason.mergeReason(for: items),
+      helpText: helpTextOrBusy(DashboardDependenciesDisabledReason.mergeReason(for: items)),
       action: onMerge
     )
     .disabled(isBusy || !items.contains { $0.canAttemptManualMerge })
@@ -54,18 +54,18 @@ struct DashboardDependencyActionBar: View {
       title: "Rerun Checks",
       systemImage: "arrow.clockwise.circle",
       prominence: .secondary,
-      helpText: DashboardDependenciesDisabledReason.rerunReason(for: items),
+      helpText: helpTextOrBusy(DashboardDependenciesDisabledReason.rerunReason(for: items)),
       action: onRerunChecks
     )
     .disabled(isBusy || !items.contains { $0.canAttemptRerunChecks })
-    .help(rerunChecksHelp)
-    .accessibilityHint(rerunChecksHelp)
+    .help(isBusy ? Self.busyHelpText : rerunChecksHelp)
+    .accessibilityHint(isBusy ? Self.busyHelpText : rerunChecksHelp)
 
     DashboardDependencyActionButton(
       title: "Refresh",
       systemImage: "arrow.clockwise",
       prominence: .secondary,
-      helpText: DashboardDependenciesDisabledReason.emptySelectionReason(for: items),
+      helpText: helpTextOrBusy(DashboardDependenciesDisabledReason.emptySelectionReason(for: items)),
       action: onRefresh
     )
     .disabled(isBusy || items.isEmpty)
@@ -95,7 +95,7 @@ struct DashboardDependencyActionBar: View {
         title: "Auto",
         systemImage: "bolt",
         prominence: .utility,
-        helpText: DashboardDependenciesDisabledReason.autoReason(for: items),
+        helpText: helpTextOrBusy(DashboardDependenciesDisabledReason.autoReason(for: items)),
         action: onAuto
       )
       .disabled(isBusy || !item.canRunAutoMode)
@@ -126,12 +126,20 @@ struct DashboardDependencyActionBar: View {
         title: "Auto",
         systemImage: "bolt",
         prominence: .utility,
-        helpText: DashboardDependenciesDisabledReason.autoReason(for: items)
-          ?? DashboardDependenciesDisabledReason.autoPreview(for: items),
+        helpText: helpTextOrBusy(
+          DashboardDependenciesDisabledReason.autoReason(for: items)
+            ?? DashboardDependenciesDisabledReason.autoPreview(for: items)
+        ),
         action: onAuto
       )
       .disabled(isBusy || !items.contains { $0.canRunAutoMode })
     }
+  }
+
+  private static let busyHelpText = "Action in progress"
+
+  private func helpTextOrBusy(_ fallback: String?) -> String? {
+    isBusy ? Self.busyHelpText : fallback
   }
 
   private var rerunChecksHelp: String {
