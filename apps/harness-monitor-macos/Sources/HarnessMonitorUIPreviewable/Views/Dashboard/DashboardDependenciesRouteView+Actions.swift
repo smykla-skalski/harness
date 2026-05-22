@@ -195,7 +195,6 @@ extension DashboardDependenciesRouteView {
 
   func fixCI(item: DependencyUpdateItem) async {
     guard let client = store.apiClient else { return }
-    routeInFlightActionTitle = "Creating Fix CI work…"
     let request = TaskBoardCreateItemRequest(
       title: "Fix CI · \(item.repository)#\(item.number)",
       body: """
@@ -229,7 +228,6 @@ extension DashboardDependenciesRouteView {
     } catch {
       store.presentFailureFeedback(error.localizedDescription)
     }
-    routeInFlightActionTitle = nil
   }
 
   func performMutation(
@@ -244,9 +242,7 @@ extension DashboardDependenciesRouteView {
     guard let client = store.apiClient else { return }
     let trackedIDs = items.map(\.pullRequestID)
     beginRefreshing(pullRequestIDs: trackedIDs, actionTitle: title)
-    routeInFlightActionTitle = title
     defer {
-      routeInFlightActionTitle = nil
       endRefreshing(pullRequestIDs: trackedIDs)
     }
     do {
