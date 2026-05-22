@@ -9,8 +9,10 @@ struct DashboardDependencyFilesSection: View {
   let pullRequestID: String
   let repositoryID: String
 
-  @Environment(HarnessMonitorStore.self) private var store
-  @Environment(\.dependenciesPreferences) private var preferences
+  @Environment(HarnessMonitorStore.self)
+  private var store
+  @Environment(\.dependenciesPreferences)
+  private var preferences
   @State private var filter = DashboardDependencyFilesFilterState()
   /// Latest local-clone progress event for this PR's repository. Set
   /// from a per-repo `observeLocalCloneProgress` subscription started

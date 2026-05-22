@@ -66,7 +66,7 @@ struct DashboardDependencyFilesTree: View {
     var id: String { fullPath.isEmpty ? name : fullPath }
     let name: String
     let fullPath: String
-    var children: [Node]
+    var children: [Self]
   }
 }
 
@@ -85,12 +85,12 @@ private struct TreeRow: View {
         Button(action: handleTap) {
           Text(node.name).lineLimit(1)
         }
-        .buttonStyle(.plain)
+        .harnessPlainButtonStyle()
       }
       .padding(.leading, CGFloat(depth) * 12)
       if !node.children.isEmpty && expandedPaths.contains(node.fullPath) {
         ForEach(node.children, id: \.id) { child in
-          TreeRow(
+          Self(
             node: child,
             depth: depth + 1,
             expandedPaths: expandedPaths,

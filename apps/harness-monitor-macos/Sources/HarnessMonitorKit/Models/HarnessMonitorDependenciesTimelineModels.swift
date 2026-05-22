@@ -142,37 +142,37 @@ public enum DependencyUpdateTimelineEntry: Equatable, Sendable, Identifiable {
 
   public var id: String {
     switch self {
-    case .issueComment(let p): return p.id
-    case .review(let p): return p.id
-    case .reviewThread(let p): return p.id
-    case .commit(let p): return p.id
-    case .headRefForcePushed(let p): return p.id
-    case .simpleActorEvent(let p): return p.id
-    case .unknown(let p): return p.id
+    case .issueComment(let payload): return payload.id
+    case .review(let payload): return payload.id
+    case .reviewThread(let payload): return payload.id
+    case .commit(let payload): return payload.id
+    case .headRefForcePushed(let payload): return payload.id
+    case .simpleActorEvent(let payload): return payload.id
+    case .unknown(let payload): return payload.id
     }
   }
 
   public var recordedAt: String {
     switch self {
-    case .issueComment(let p): return p.createdAt
-    case .review(let p): return p.createdAt
-    case .reviewThread(let p): return p.createdAt
-    case .commit(let p): return p.createdAt
-    case .headRefForcePushed(let p): return p.createdAt
-    case .simpleActorEvent(let p): return p.createdAt
-    case .unknown(let p): return p.createdAt
+    case .issueComment(let payload): return payload.createdAt
+    case .review(let payload): return payload.createdAt
+    case .reviewThread(let payload): return payload.createdAt
+    case .commit(let payload): return payload.createdAt
+    case .headRefForcePushed(let payload): return payload.createdAt
+    case .simpleActorEvent(let payload): return payload.createdAt
+    case .unknown(let payload): return payload.createdAt
     }
   }
 
   public var actor: DependencyUpdateTimelineActor? {
     switch self {
-    case .issueComment(let p): return p.actor
-    case .review(let p): return p.actor
-    case .reviewThread(let p): return p.actor
-    case .commit(let p): return p.actor
-    case .headRefForcePushed(let p): return p.actor
-    case .simpleActorEvent(let p): return p.actor
-    case .unknown(let p): return p.actor
+    case .issueComment(let payload): return payload.actor
+    case .review(let payload): return payload.actor
+    case .reviewThread(let payload): return payload.actor
+    case .commit(let payload): return payload.actor
+    case .headRefForcePushed(let payload): return payload.actor
+    case .simpleActorEvent(let payload): return payload.actor
+    case .unknown(let payload): return payload.actor
     }
   }
 
@@ -183,7 +183,7 @@ public enum DependencyUpdateTimelineEntry: Equatable, Sendable, Identifiable {
     case .reviewThread: return .reviewThread
     case .commit: return .commit
     case .headRefForcePushed: return .headRefForcePushed
-    case .simpleActorEvent(let p): return p.eventKind.timelineKind
+    case .simpleActorEvent(let payload): return payload.eventKind.timelineKind
     case .unknown: return .unknown
     }
   }
@@ -228,27 +228,27 @@ extension DependencyUpdateTimelineEntry: Codable {
   public func encode(to encoder: Encoder) throws {
     var tagContainer = encoder.container(keyedBy: CodingKeys.self)
     switch self {
-    case .issueComment(let p):
+    case .issueComment(let payload):
       try tagContainer.encode(WireKind.issueComment, forKey: .kind)
-      try p.encode(to: encoder)
-    case .review(let p):
+      try payload.encode(to: encoder)
+    case .review(let payload):
       try tagContainer.encode(WireKind.review, forKey: .kind)
-      try p.encode(to: encoder)
-    case .reviewThread(let p):
+      try payload.encode(to: encoder)
+    case .reviewThread(let payload):
       try tagContainer.encode(WireKind.reviewThread, forKey: .kind)
-      try p.encode(to: encoder)
-    case .commit(let p):
+      try payload.encode(to: encoder)
+    case .commit(let payload):
       try tagContainer.encode(WireKind.commit, forKey: .kind)
-      try p.encode(to: encoder)
-    case .headRefForcePushed(let p):
+      try payload.encode(to: encoder)
+    case .headRefForcePushed(let payload):
       try tagContainer.encode(WireKind.headRefForcePushed, forKey: .kind)
-      try p.encode(to: encoder)
-    case .simpleActorEvent(let p):
+      try payload.encode(to: encoder)
+    case .simpleActorEvent(let payload):
       try tagContainer.encode(WireKind.simpleActorEvent, forKey: .kind)
-      try p.encode(to: encoder)
-    case .unknown(let p):
+      try payload.encode(to: encoder)
+    case .unknown(let payload):
       try tagContainer.encode(WireKind.unknown, forKey: .kind)
-      try p.encode(to: encoder)
+      try payload.encode(to: encoder)
     }
   }
 }

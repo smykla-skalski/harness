@@ -110,6 +110,15 @@ struct DashboardDependenciesPreferences: Codable, Equatable {
   init(from decoder: Decoder) throws {
     let container = try decoder.container(keyedBy: CodingKeys.self)
     let defaults = Self()
+    try decodeSourcePreferences(from: container, defaults: defaults)
+    try decodeFilesPreferences(from: container, defaults: defaults)
+    try decodeTimelinePreferences(from: container, defaults: defaults)
+  }
+
+  private mutating func decodeSourcePreferences(
+    from container: KeyedDecodingContainer<CodingKeys>,
+    defaults: Self
+  ) throws {
     authorsText =
       try container.decodeIfPresent(String.self, forKey: .authorsText) ?? defaults.authorsText
     organizationsText =
@@ -145,6 +154,12 @@ struct DashboardDependenciesPreferences: Codable, Equatable {
     expandOrganizations =
       try container.decodeIfPresent(Bool.self, forKey: .expandOrganizations)
       ?? defaults.expandOrganizations
+  }
+
+  private mutating func decodeFilesPreferences(
+    from container: KeyedDecodingContainer<CodingKeys>,
+    defaults: Self
+  ) throws {
     filesEnabled =
       try container.decodeIfPresent(Bool.self, forKey: .filesEnabled) ?? defaults.filesEnabled
     filesDefaultViewModeRaw =
@@ -195,6 +210,12 @@ struct DashboardDependenciesPreferences: Codable, Equatable {
     filesAccessibilityPerLineMode =
       try container.decodeIfPresent(Bool.self, forKey: .filesAccessibilityPerLineMode)
       ?? defaults.filesAccessibilityPerLineMode
+  }
+
+  private mutating func decodeTimelinePreferences(
+    from container: KeyedDecodingContainer<CodingKeys>,
+    defaults: Self
+  ) throws {
     showActivityTimeline =
       try container.decodeIfPresent(Bool.self, forKey: .showActivityTimeline)
       ?? defaults.showActivityTimeline

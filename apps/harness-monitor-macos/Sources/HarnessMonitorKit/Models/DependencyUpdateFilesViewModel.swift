@@ -50,7 +50,7 @@ public struct DependencyUpdateFilesGeneratedPathMatcher: Equatable, Sendable {
   private let matchClosure: @Sendable (String) -> Bool
   private let identifier: String
 
-  public static let empty = DependencyUpdateFilesGeneratedPathMatcher(
+  public static let empty = Self(
     identifier: "empty",
     match: { _ in false }
   )
@@ -63,8 +63,8 @@ public struct DependencyUpdateFilesGeneratedPathMatcher: Equatable, Sendable {
   public func matches(_ path: String) -> Bool { matchClosure(path) }
 
   public static func == (
-    lhs: DependencyUpdateFilesGeneratedPathMatcher,
-    rhs: DependencyUpdateFilesGeneratedPathMatcher
+    lhs: Self,
+    rhs: Self
   ) -> Bool {
     lhs.identifier == rhs.identifier
   }

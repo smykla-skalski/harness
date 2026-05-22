@@ -24,7 +24,7 @@ final class DashboardDependencyFilesFilterState {
     didSet { publishSnapshot() }
   }
 
-  private(set) var snapshotID: UUID = UUID()
+  private(set) var snapshotID = UUID()
   private(set) var snapshot: DependencyUpdateFilesFilter = .init()
   @ObservationIgnored private var pendingTextTask: Task<Void, Never>?
 

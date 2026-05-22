@@ -66,8 +66,7 @@ extension HarnessMonitorStore {
     }
   }
 
-  @MainActor
-  private static let optimisticISOFormatter: ISO8601DateFormatter = {
+  @MainActor private static let optimisticISOFormatter: ISO8601DateFormatter = {
     let formatter = ISO8601DateFormatter()
     formatter.formatOptions = [.withInternetDateTime]
     return formatter

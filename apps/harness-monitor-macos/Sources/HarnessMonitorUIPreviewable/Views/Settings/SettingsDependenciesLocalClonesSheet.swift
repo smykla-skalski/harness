@@ -6,8 +6,10 @@ import SwiftUI
 /// directly. Calls into the store's `listDependencyUpdateLocalClones`
 /// and `deleteDependencyUpdateLocalClone` helpers from B.8e.
 struct SettingsDependenciesLocalClonesSheet: View {
-  @Environment(HarnessMonitorStore.self) private var store
-  @Environment(\.dismiss) private var dismiss
+  @Environment(HarnessMonitorStore.self)
+  private var store
+  @Environment(\.dismiss)
+  private var dismiss
   @State private var clones: [DependencyUpdateLocalCloneEntry] = []
   @State private var pendingDelete: DependencyUpdateLocalCloneEntry?
   @State private var isLoading = true
@@ -30,9 +32,7 @@ struct SettingsDependenciesLocalClonesSheet: View {
     .alert(item: $pendingDelete) { entry in
       Alert(
         title: Text("Delete local clone?"),
-        message: Text(
-          "Removing \(entry.repoFullName) frees \(humanizedBytes(entry.sizeBytes)). The next time a PR for this repo opens, the daemon will re-clone it."
-        ),
+        message: Text(deleteConfirmationMessage(for: entry)),
         primaryButton: .destructive(Text("Delete")) {
           Task {
             await store.deleteDependencyUpdateLocalClone(
@@ -55,8 +55,14 @@ struct SettingsDependenciesLocalClonesSheet: View {
     }
   }
 
-  @ViewBuilder
-  private var content: some View {
+  private func deleteConfirmationMessage(for entry: DependencyUpdateLocalCloneEntry) -> String {
+    """
+    Removing \(entry.repoFullName) frees \(humanizedBytes(entry.sizeBytes)). The next time a PR \
+    for this repo opens, the daemon will re-clone it.
+    """
+  }
+
+  @ViewBuilder private var content: some View {
     if isLoading {
       VStack { ProgressView() }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -168,4 +174,3 @@ struct SettingsDependenciesLocalClonesSheet: View {
     return formatter.string(fromByteCount: Int64(bytes))
   }
 }
-

@@ -121,7 +121,7 @@ final class SVGWebKitRasterizer: NSObject, WKNavigationDelegate {
   private let webView: WKWebView
   private var pendingContinuation: CheckedContinuation<Void, Error>?
 
-  private override init() {
+  override private init() {
     let config = WKWebViewConfiguration()
     self.webView = WKWebView(frame: .zero, configuration: config)
     super.init()

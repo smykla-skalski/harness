@@ -2,6 +2,12 @@ import Foundation
 
 @testable import HarnessMonitorKit
 
+private struct DependencyTimelineFetchResult {
+  let hook: (@Sendable (String) async -> Void)?
+  let response: DependencyUpdatesTimelineResponse?
+  let error: (any Error)?
+}
+
 extension RecordingHarnessClient {
   func configureDependencyTimeline(
     pullRequestID: String,
@@ -53,27 +59,22 @@ extension RecordingHarnessClient {
   func fetchDependencyUpdateTimeline(
     request: DependencyUpdatesTimelineRequest
   ) async throws -> DependencyUpdatesTimelineResponse {
-    let (hook, queued, error):
-      (
-        (@Sendable (String) async -> Void)?,
-        DependencyUpdatesTimelineResponse?,
-        (any Error)?
-      ) = lock.withLock {
-        dependencyTimelineFetchedRequests.append(request)
-        let hook = dependencyTimelineFetchHook
-        let error = dependencyTimelineErrors[request.pullRequestId]
-        var queue = dependencyTimelineResponses[request.pullRequestId] ?? []
-        let next = queue.isEmpty ? nil : queue.removeFirst()
-        dependencyTimelineResponses[request.pullRequestId] = queue
-        return (hook, next, error)
-      }
-    if let hook {
+    let result = lock.withLock {
+      dependencyTimelineFetchedRequests.append(request)
+      let hook = dependencyTimelineFetchHook
+      let error = dependencyTimelineErrors[request.pullRequestId]
+      var queue = dependencyTimelineResponses[request.pullRequestId] ?? []
+      let next = queue.isEmpty ? nil : queue.removeFirst()
+      dependencyTimelineResponses[request.pullRequestId] = queue
+      return DependencyTimelineFetchResult(hook: hook, response: next, error: error)
+    }
+    if let hook = result.hook {
       await hook(request.pullRequestId)
     }
-    if let error {
+    if let error = result.error {
       throw error
     }
-    if let queued {
+    if let queued = result.response {
       return queued
     }
     return DependencyUpdatesTimelineResponse(

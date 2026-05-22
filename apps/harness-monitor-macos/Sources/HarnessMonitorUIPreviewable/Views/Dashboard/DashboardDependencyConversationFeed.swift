@@ -21,8 +21,10 @@ struct DashboardDependencyConversationFeed: View {
   let onSignalTap: ((String) -> Void)?
   let actionHandler: any DecisionActionHandler
   let showsComposer: Bool
-  @Environment(\.harnessDateTimeConfiguration) private var dateTimeConfiguration
-  @Environment(\.fontScale) private var fontScale
+  @Environment(\.harnessDateTimeConfiguration)
+  private var dateTimeConfiguration
+  @Environment(\.fontScale)
+  private var fontScale
   @AppStorage(DashboardDependenciesPreferences.storageKey)
   private var storedPreferences = ""
   @State private var rows: [SessionTimelineRow] = []

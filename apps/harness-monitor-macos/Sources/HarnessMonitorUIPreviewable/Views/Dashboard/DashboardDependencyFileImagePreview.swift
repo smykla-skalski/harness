@@ -12,8 +12,10 @@ struct DashboardDependencyFileImagePreview: View {
   let pullRequestID: String
   let repositoryID: String
 
-  @Environment(HarnessMonitorStore.self) private var store
-  @Environment(\.dependenciesPreferences) private var preferences
+  @Environment(HarnessMonitorStore.self)
+  private var store
+  @Environment(\.dependenciesPreferences)
+  private var preferences
   @State private var prepared: DependencyUpdateImageDecoder.PreparedImage?
   @State private var failed: Bool = false
   @State private var loading: Bool = true
@@ -45,7 +47,8 @@ struct DashboardDependencyFileImagePreview: View {
         .aspectRatio(contentMode: .fit)
         .frame(maxWidth: 800, maxHeight: 800)
       Text(
-        "\(Int(image.intrinsicSize.width))×\(Int(image.intrinsicSize.height)) · \(humanizedBytes(image.byteSize))"
+        "\(Int(image.intrinsicSize.width))×\(Int(image.intrinsicSize.height)) · "
+          + humanizedBytes(image.byteSize)
       )
       .font(.caption2)
       .foregroundStyle(.secondary)

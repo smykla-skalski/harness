@@ -226,22 +226,22 @@ struct DependencyUpdateFilePatchStoreTests {
 
   @Test("makeKey is stable for the same (pullRequestID, headRefOid, path)")
   func makeKeyStable() {
-    let a = DependencyUpdateFilePatchStore.makeKey(
+    let firstKey = DependencyUpdateFilePatchStore.makeKey(
       pullRequestID: "pr-1",
       headRefOid: "head-a",
       path: "src/a.swift"
     )
-    let b = DependencyUpdateFilePatchStore.makeKey(
+    let sameKey = DependencyUpdateFilePatchStore.makeKey(
       pullRequestID: "pr-1",
       headRefOid: "head-a",
       path: "src/a.swift"
     )
-    let c = DependencyUpdateFilePatchStore.makeKey(
+    let differentKey = DependencyUpdateFilePatchStore.makeKey(
       pullRequestID: "pr-1",
       headRefOid: "head-b",
       path: "src/a.swift"
     )
-    #expect(a == b)
-    #expect(a != c)
+    #expect(firstKey == sameKey)
+    #expect(firstKey != differentKey)
   }
 }

@@ -59,32 +59,44 @@ struct DashboardDependencyFileCardInternal: View {
 
   private var header: some View {
     HStack(spacing: 8) {
-      Button(action: { isExpanded.toggle() }) {
-        HStack(spacing: 6) {
-          Image(systemName: isExpanded ? "chevron.down" : "chevron.right")
-            .frame(width: 12)
-          pathLabel
-          Spacer(minLength: 0)
-          changeCounts
+      Button(
+        action: { isExpanded.toggle() },
+        label: {
+          HStack(spacing: 6) {
+            Image(systemName: isExpanded ? "chevron.down" : "chevron.right")
+              .frame(width: 12)
+            pathLabel
+            Spacer(minLength: 0)
+            changeCounts
+          }
         }
-      }
-      .buttonStyle(.plain)
+      )
+      .harnessPlainButtonStyle()
 
-      Toggle("", isOn: Binding(
-        get: { viewedState == .viewed },
-        set: { onToggleViewed($0) }
-      ))
+      Toggle(
+        "",
+        isOn: Binding(
+          get: { viewedState == .viewed },
+          set: { onToggleViewed($0) }
+        )
+      )
       .labelsHidden()
       .toggleStyle(.checkbox)
       .accessibilityIdentifier("dashboardDependencyFileViewedToggle(\(file.path))")
 
       Menu {
-        Button(action: { onChangeViewMode(.unified) }) {
-          Label("Unified", systemImage: viewMode == .unified ? "checkmark" : "")
-        }
-        Button(action: { onChangeViewMode(.split) }) {
-          Label("Split", systemImage: viewMode == .split ? "checkmark" : "")
-        }
+        Button(
+          action: { onChangeViewMode(.unified) },
+          label: {
+            Label("Unified", systemImage: viewMode == .unified ? "checkmark" : "")
+          }
+        )
+        Button(
+          action: { onChangeViewMode(.split) },
+          label: {
+            Label("Split", systemImage: viewMode == .split ? "checkmark" : "")
+          }
+        )
       } label: {
         Image(systemName: "rectangle.split.2x1")
       }
@@ -118,8 +130,7 @@ struct DashboardDependencyFileCardInternal: View {
     }
   }
 
-  @ViewBuilder
-  private var patchBody: some View {
+  @ViewBuilder private var patchBody: some View {
     switch patchState {
     case .notLoaded:
       Button("Load patch") { onLoadPatch() }

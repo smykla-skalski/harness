@@ -4,6 +4,41 @@
 
 import Foundation
 
+private let harnessGenericFilenames: Set<String> = [
+  "containerfile",
+  "dockerfile",
+  "makefile",
+]
+
+private let harnessJSONFilenames: Set<String> = [
+  "package-lock.json",
+  "package.json",
+  "tsconfig.json",
+]
+
+private let harnessMarkdownFilenames: Set<String> = [
+  "changelog.md",
+  "readme.md",
+]
+
+private let harnessLanguageByExtension: [String: HarnessDependencyFileLanguage] = [
+  "bash": .shell,
+  "diff": .diff,
+  "fish": .shell,
+  "json": .json,
+  "jsonc": .json,
+  "markdown": .markdown,
+  "md": .markdown,
+  "mdown": .markdown,
+  "patch": .diff,
+  "rs": .rust,
+  "sh": .shell,
+  "swift": .swift,
+  "yaml": .yaml,
+  "yml": .yaml,
+  "zsh": .shell,
+]
+
 /// Truth-table inference mirroring the daemon's `infer_language`.
 ///
 /// Kept verbatim so cached metadata round-trips have stable values even
@@ -11,32 +46,20 @@ import Foundation
 public func harnessInferLanguage(forPath path: String) -> HarnessDependencyFileLanguage {
   let lower = path.lowercased()
   if let name = lower.split(separator: "/").last.map(String.init) {
-    switch name {
-    case "dockerfile", "containerfile":
+    if harnessGenericFilenames.contains(name) {
       return .generic
-    case "makefile":
-      return .generic
-    case "package.json", "package-lock.json", "tsconfig.json":
+    }
+    if harnessJSONFilenames.contains(name) {
       return .json
-    case "readme.md", "changelog.md":
+    }
+    if harnessMarkdownFilenames.contains(name) {
       return .markdown
-    default:
-      break
     }
   }
   guard let ext = lower.split(separator: ".").last.map(String.init), ext != lower else {
     return .generic
   }
-  switch ext {
-  case "swift": return .swift
-  case "rs": return .rust
-  case "sh", "bash", "zsh", "fish": return .shell
-  case "json", "jsonc": return .json
-  case "yaml", "yml": return .yaml
-  case "md", "markdown", "mdown": return .markdown
-  case "patch", "diff": return .diff
-  default: return .generic
-  }
+  return harnessLanguageByExtension[ext] ?? .generic
 }
 
 /// Returns true when the path ends in a supported image extension.
@@ -68,10 +91,8 @@ public func harnessIsGeneratedPath(
   patterns: [NSRegularExpression]
 ) -> Bool {
   let range = NSRange(path.startIndex..<path.endIndex, in: path)
-  for regex in patterns {
-    if regex.firstMatch(in: path, options: [], range: range) != nil {
-      return true
-    }
+  for regex in patterns where regex.firstMatch(in: path, options: [], range: range) != nil {
+    return true
   }
   return false
 }

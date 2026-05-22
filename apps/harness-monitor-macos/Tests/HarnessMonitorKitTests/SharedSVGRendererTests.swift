@@ -5,7 +5,7 @@ import Testing
 @testable import HarnessMonitorKit
 
 struct SharedSVGRendererTests {
-  private static let trivialSVG: Data = Data(
+  private static let trivialSVG = Data(
     """
     <?xml version="1.0" encoding="UTF-8"?>
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="100" height="100">

@@ -2,6 +2,54 @@ import HarnessMonitorKit
 import SwiftUI
 
 struct SettingsDependenciesSection: View {
+  private static let kindDisplayNames: [DependencyUpdateTimelineKind: String] = [
+    .issueComment: "Comments",
+    .review: "Reviews",
+    .reviewThread: "Review threads",
+    .commit: "Commits",
+    .headRefForcePushed: "Force pushes",
+    .headRefDeleted: "Head branch deleted",
+    .headRefRestored: "Head branch restored",
+    .baseRefChanged: "Base branch changed",
+    .baseRefForcePushed: "Base branch force-pushed",
+    .baseRefDeleted: "Base branch deleted",
+    .labeled: "Label added",
+    .unlabeled: "Label removed",
+    .assigned: "Assigned",
+    .unassigned: "Unassigned",
+    .merged: "Merged",
+    .closed: "Closed",
+    .reopened: "Reopened",
+    .renamedTitle: "Renamed title",
+    .reviewRequested: "Review requested",
+    .reviewRequestRemoved: "Review request removed",
+    .reviewDismissed: "Review dismissed",
+    .readyForReview: "Ready for review",
+    .convertToDraft: "Converted to draft",
+    .autoMergeEnabled: "Auto-merge enabled",
+    .autoMergeDisabled: "Auto-merge disabled",
+    .autoRebaseEnabled: "Auto-rebase enabled",
+    .autoSquashEnabled: "Auto-squash enabled",
+    .locked: "Locked",
+    .unlocked: "Unlocked",
+    .pinned: "Pinned",
+    .unpinned: "Unpinned",
+    .milestoned: "Milestoned",
+    .demilestoned: "Demilestoned",
+    .referenced: "Referenced",
+    .crossReferenced: "Cross-referenced",
+    .mentioned: "Mentioned",
+    .subscribed: "Subscribed",
+    .unsubscribed: "Unsubscribed",
+    .markedAsDuplicate: "Marked as duplicate",
+    .unmarkedAsDuplicate: "Unmarked as duplicate",
+    .transferred: "Transferred",
+    .connected: "Linked",
+    .disconnected: "Unlinked",
+    .revisionMarker: "Revision marker",
+    .unknown: "Unknown event",
+  ]
+
   @Binding var navigationRequest: SettingsNavigationRequest?
   @AppStorage(DashboardDependenciesPreferences.storageKey)
   private var storedPreferences = ""
@@ -219,53 +267,7 @@ struct SettingsDependenciesSection: View {
   }
 
   private func kindDisplayName(_ kind: DependencyUpdateTimelineKind) -> String {
-    switch kind {
-    case .issueComment: return "Comments"
-    case .review: return "Reviews"
-    case .reviewThread: return "Review threads"
-    case .commit: return "Commits"
-    case .headRefForcePushed: return "Force pushes"
-    case .headRefDeleted: return "Head branch deleted"
-    case .headRefRestored: return "Head branch restored"
-    case .baseRefChanged: return "Base branch changed"
-    case .baseRefForcePushed: return "Base branch force-pushed"
-    case .baseRefDeleted: return "Base branch deleted"
-    case .labeled: return "Label added"
-    case .unlabeled: return "Label removed"
-    case .assigned: return "Assigned"
-    case .unassigned: return "Unassigned"
-    case .merged: return "Merged"
-    case .closed: return "Closed"
-    case .reopened: return "Reopened"
-    case .renamedTitle: return "Renamed title"
-    case .reviewRequested: return "Review requested"
-    case .reviewRequestRemoved: return "Review request removed"
-    case .reviewDismissed: return "Review dismissed"
-    case .readyForReview: return "Ready for review"
-    case .convertToDraft: return "Converted to draft"
-    case .autoMergeEnabled: return "Auto-merge enabled"
-    case .autoMergeDisabled: return "Auto-merge disabled"
-    case .autoRebaseEnabled: return "Auto-rebase enabled"
-    case .autoSquashEnabled: return "Auto-squash enabled"
-    case .locked: return "Locked"
-    case .unlocked: return "Unlocked"
-    case .pinned: return "Pinned"
-    case .unpinned: return "Unpinned"
-    case .milestoned: return "Milestoned"
-    case .demilestoned: return "Demilestoned"
-    case .referenced: return "Referenced"
-    case .crossReferenced: return "Cross-referenced"
-    case .mentioned: return "Mentioned"
-    case .subscribed: return "Subscribed"
-    case .unsubscribed: return "Unsubscribed"
-    case .markedAsDuplicate: return "Marked as duplicate"
-    case .unmarkedAsDuplicate: return "Unmarked as duplicate"
-    case .transferred: return "Transferred"
-    case .connected: return "Linked"
-    case .disconnected: return "Unlinked"
-    case .revisionMarker: return "Revision marker"
-    case .unknown: return "Unknown event"
-    }
+    Self.kindDisplayNames[kind] ?? "Unknown event"
   }
 
   private var refreshSection: some View {

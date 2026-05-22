@@ -4,7 +4,8 @@ import Testing
 @testable import HarnessMonitorKit
 
 struct DependencyUpdateLocalCloneProgressTests {
-  @Test func decodesStartedPayloadFromDaemonWireShape() throws {
+  @Test
+  func decodesStartedPayloadFromDaemonWireShape() throws {
     let wire = """
       {
         "kind": "started",
@@ -23,7 +24,8 @@ struct DependencyUpdateLocalCloneProgressTests {
     #expect(payload.message == nil)
   }
 
-  @Test func decodesCompletedPayloadWithDurationMillis() throws {
+  @Test
+  func decodesCompletedPayloadWithDurationMillis() throws {
     let wire = """
       {
         "kind": "completed",
@@ -41,7 +43,8 @@ struct DependencyUpdateLocalCloneProgressTests {
     #expect(payload.durationMillis == 1234)
   }
 
-  @Test func decodesFailedPayloadWithMessage() throws {
+  @Test
+  func decodesFailedPayloadWithMessage() throws {
     let wire = """
       {
         "kind": "failed",
@@ -58,12 +61,14 @@ struct DependencyUpdateLocalCloneProgressTests {
     #expect(payload.message == "auth denied")
   }
 
-  @Test func operationPresentLabelMatchesUserFacingCopy() {
+  @Test
+  func operationPresentLabelMatchesUserFacingCopy() {
     #expect(DependencyUpdateLocalCloneProgress.Operation.clone.presentLabel == "Cloning")
     #expect(DependencyUpdateLocalCloneProgress.Operation.fetch.presentLabel == "Fetching")
   }
 
-  @Test func operationLabelEnumRoundTripsViaDecoder() throws {
+  @Test
+  func operationLabelEnumRoundTripsViaDecoder() throws {
     let wire = """
       {
         "kind": "started",
@@ -79,7 +84,8 @@ struct DependencyUpdateLocalCloneProgressTests {
     #expect(payload.operation.presentLabel == "Fetching")
   }
 
-  @Test func daemonPushEventDecodesLocalCloneProgressGlobalEvent() throws {
+  @Test
+  func daemonPushEventDecodesLocalCloneProgressGlobalEvent() throws {
     let payloadJSON: [String: Any] = [
       "kind": "started",
       "repo_full_name": "owner/repo",

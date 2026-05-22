@@ -119,7 +119,9 @@ public actor DependencyUpdateFilePatchStore {
     flushTask?.cancel()
     flushTask = nil
     guard fileManager.fileExists(atPath: directory.path) else { return }
-    if let contents = try? fileManager.contentsOfDirectory(at: directory, includingPropertiesForKeys: nil) {
+    if let contents = try? fileManager.contentsOfDirectory(
+      at: directory, includingPropertiesForKeys: nil)
+    {
       for url in contents {
         try? fileManager.removeItem(at: url)
       }

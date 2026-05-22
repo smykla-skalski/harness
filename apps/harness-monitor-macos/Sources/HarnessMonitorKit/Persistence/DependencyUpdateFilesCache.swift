@@ -174,14 +174,18 @@ public struct DependencyUpdateFilesCache {
       for row in (try? context.fetch(FetchDescriptor<CachedDependencyUpdateFile>())) ?? [] {
         context.delete(row)
       }
-      for row in (try? context.fetch(
-        FetchDescriptor<CachedDependencyUpdateFileViewedState>()
-      )) ?? [] {
+      for row
+        in (try? context.fetch(
+          FetchDescriptor<CachedDependencyUpdateFileViewedState>()
+        )) ?? []
+      {
         context.delete(row)
       }
-      for row in (try? context.fetch(
-        FetchDescriptor<CachedDependencyUpdateFilesSummary>()
-      )) ?? [] {
+      for row
+        in (try? context.fetch(
+          FetchDescriptor<CachedDependencyUpdateFilesSummary>()
+        )) ?? []
+      {
         context.delete(row)
       }
       try context.save()

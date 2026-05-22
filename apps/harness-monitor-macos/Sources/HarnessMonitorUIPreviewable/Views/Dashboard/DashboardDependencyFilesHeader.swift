@@ -35,9 +35,12 @@ struct DashboardDependencyFilesHeader: View {
   private var sortMenu: some View {
     Menu {
       ForEach(DependencyUpdateFilesSortMode.allCases, id: \.self) { mode in
-        Button(action: { viewModel.applySort(mode) }) {
-          Label(label(for: mode), systemImage: viewModel.sortMode == mode ? "checkmark" : "")
-        }
+        Button(
+          action: { viewModel.applySort(mode) },
+          label: {
+            Label(label(for: mode), systemImage: viewModel.sortMode == mode ? "checkmark" : "")
+          }
+        )
       }
     } label: {
       Label("Sort", systemImage: "arrow.up.arrow.down")
@@ -52,10 +55,13 @@ struct DashboardDependencyFilesHeader: View {
         .textFieldStyle(.plain)
         .accessibilityIdentifier("dashboardDependencyFilesFilterField")
       if !filter.text.isEmpty {
-        Button(action: { filter.clearText() }) {
-          Image(systemName: "xmark.circle.fill")
-        }
-        .buttonStyle(.plain)
+        Button(
+          action: { filter.clearText() },
+          label: {
+            Image(systemName: "xmark.circle.fill")
+          }
+        )
+        .harnessPlainButtonStyle()
         .accessibilityLabel("Clear filter")
       }
       Toggle("Hide generated", isOn: $filter.hideGenerated)
@@ -66,7 +72,10 @@ struct DashboardDependencyFilesHeader: View {
         .controlSize(.mini)
     }
     .padding(8)
-    .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 6))
+    .background(
+      HarnessMonitorTheme.ink.opacity(0.06),
+      in: RoundedRectangle(cornerRadius: 6)
+    )
   }
 
   private func countChip(

@@ -92,19 +92,20 @@ public struct DependencyUpdatesFilesListResponse: Codable, Equatable, Sendable {
   }
 
   public init(from decoder: Decoder) throws {
-    let c = try decoder.container(keyedBy: CodingKeys.self)
-    pullRequestID = try c.decode(String.self, forKey: .pullRequestID)
-    number = try c.decodeIfPresent(UInt64.self, forKey: .number)
-    headRefOid = try c.decode(String.self, forKey: .headRefOid)
-    headRefName = try c.decodeIfPresent(String.self, forKey: .headRefName)
-    baseRefOid = try c.decodeIfPresent(String.self, forKey: .baseRefOid)
-    baseRefName = try c.decodeIfPresent(String.self, forKey: .baseRefName)
-    repositoryFullName = try c.decodeIfPresent(String.self, forKey: .repositoryFullName)
-    viewerCanMarkViewed = try c.decode(Bool.self, forKey: .viewerCanMarkViewed)
-    files = try c.decode([DependencyUpdateFile].self, forKey: .files)
-    fetchedAt = try c.decode(String.self, forKey: .fetchedAt)
-    paginationComplete = try c.decodeIfPresent(Bool.self, forKey: .paginationComplete) ?? true
-    rateLimitSnapshot = try c.decodeIfPresent(
+    let container = try decoder.container(keyedBy: CodingKeys.self)
+    pullRequestID = try container.decode(String.self, forKey: .pullRequestID)
+    number = try container.decodeIfPresent(UInt64.self, forKey: .number)
+    headRefOid = try container.decode(String.self, forKey: .headRefOid)
+    headRefName = try container.decodeIfPresent(String.self, forKey: .headRefName)
+    baseRefOid = try container.decodeIfPresent(String.self, forKey: .baseRefOid)
+    baseRefName = try container.decodeIfPresent(String.self, forKey: .baseRefName)
+    repositoryFullName = try container.decodeIfPresent(String.self, forKey: .repositoryFullName)
+    viewerCanMarkViewed = try container.decode(Bool.self, forKey: .viewerCanMarkViewed)
+    files = try container.decode([DependencyUpdateFile].self, forKey: .files)
+    fetchedAt = try container.decode(String.self, forKey: .fetchedAt)
+    paginationComplete =
+      try container.decodeIfPresent(Bool.self, forKey: .paginationComplete) ?? true
+    rateLimitSnapshot = try container.decodeIfPresent(
       DependencyUpdatesRateLimitSnapshot.self, forKey: .rateLimitSnapshot)
   }
 }
@@ -161,15 +162,15 @@ public struct DependencyUpdatesFilesPatchRequest: Codable, Equatable, Sendable {
   }
 
   public init(from decoder: Decoder) throws {
-    let c = try decoder.container(keyedBy: CodingKeys.self)
-    pullRequestID = try c.decode(String.self, forKey: .pullRequestID)
-    headRefOidExpected = try c.decode(String.self, forKey: .headRefOidExpected)
-    paths = try c.decode([String].self, forKey: .paths)
-    number = try c.decodeIfPresent(UInt64.self, forKey: .number)
-    repositoryFullName = try c.decodeIfPresent(String.self, forKey: .repositoryFullName)
-    baseRefOidExpected = try c.decodeIfPresent(String.self, forKey: .baseRefOidExpected)
-    headRefName = try c.decodeIfPresent(String.self, forKey: .headRefName)
-    baseRefName = try c.decodeIfPresent(String.self, forKey: .baseRefName)
+    let container = try decoder.container(keyedBy: CodingKeys.self)
+    pullRequestID = try container.decode(String.self, forKey: .pullRequestID)
+    headRefOidExpected = try container.decode(String.self, forKey: .headRefOidExpected)
+    paths = try container.decode([String].self, forKey: .paths)
+    number = try container.decodeIfPresent(UInt64.self, forKey: .number)
+    repositoryFullName = try container.decodeIfPresent(String.self, forKey: .repositoryFullName)
+    baseRefOidExpected = try container.decodeIfPresent(String.self, forKey: .baseRefOidExpected)
+    headRefName = try container.decodeIfPresent(String.self, forKey: .headRefName)
+    baseRefName = try container.decodeIfPresent(String.self, forKey: .baseRefName)
   }
 }
 
