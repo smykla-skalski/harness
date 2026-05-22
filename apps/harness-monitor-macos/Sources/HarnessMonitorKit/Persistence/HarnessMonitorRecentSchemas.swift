@@ -134,6 +134,7 @@ public enum HarnessMonitorMigrationPlan: SchemaMigrationPlan {
       HarnessMonitorSchemaV19.self,
       HarnessMonitorSchemaV20.self,
       HarnessMonitorSchemaV21.self,
+      HarnessMonitorSchemaV22.self,
     ]
   }
 
@@ -159,6 +160,7 @@ public enum HarnessMonitorMigrationPlan: SchemaMigrationPlan {
       migrateV18toV19,
       migrateV19toV20,
       migrateV20toV21,
+      migrateV21toV22,
     ]
   }
 
@@ -324,6 +326,14 @@ public enum HarnessMonitorMigrationPlan: SchemaMigrationPlan {
     fromVersion: HarnessMonitorSchemaV20.self,
     toVersion: HarnessMonitorSchemaV21.self
   )
+
+  // V22 renames the V17–V21 cached `CachedDependency*` entities to
+  // `CachedReview*` so the dashboard's "Reviews" feature stops carrying the
+  // historical "Dependencies" label. The class-name change makes SwiftData
+  // treat the old and new entities as distinct, so the V21→V22 stage is a
+  // custom migration that copies each row from the old class into the new
+  // class and deletes the source row.
+  static let migrateV21toV22 = HarnessMonitorMigrationV21ToV22.stage
 }
 
-public typealias HarnessMonitorCurrentSchema = HarnessMonitorSchemaV21
+public typealias HarnessMonitorCurrentSchema = HarnessMonitorSchemaV22
