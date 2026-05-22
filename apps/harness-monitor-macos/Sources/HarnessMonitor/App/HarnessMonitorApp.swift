@@ -36,6 +36,7 @@ struct HarnessMonitorApp: App {
   @State private var globalHotKeyController: GlobalHotKeyController
   @State private var settingsSelectedSection: SettingsSection
   @State private var settingsNavigationRequest: SettingsNavigationRequest?
+  @State var supervisorAuditTimelineDispatcher = SupervisorAuditTimelineFocusDispatcher()
   @State private var hasInstalledMainWindowLauncher = false
   @State private var hasScheduledInitialWindowRouting = false
   @State private var hasRunPerfScenario = false

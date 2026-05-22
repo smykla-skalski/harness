@@ -16,6 +16,7 @@ struct DashboardWindowRootView: View {
   @Binding var themeMode: HarnessMonitorThemeMode
   @Binding var settingsSelectedSection: SettingsSection
   @Binding var settingsNavigationRequest: SettingsNavigationRequest?
+  let supervisorAuditTimelineDispatcher: SupervisorAuditTimelineFocusDispatcher
   let perfScenario: HarnessMonitorPerfScenario?
   @Binding var hasRunPerfScenario: Bool
   @Binding var perfScenarioStatus: HarnessMonitorPerfScenarioStatus
@@ -136,7 +137,8 @@ struct DashboardWindowRootView: View {
     .modifier(
       SupervisorAuditTimelineSceneModifier(
         settingsSelectedSection: $settingsSelectedSection,
-        settingsNavigationRequest: $settingsNavigationRequest
+        settingsNavigationRequest: $settingsNavigationRequest,
+        dispatcher: supervisorAuditTimelineDispatcher
       )
     )
     .modifier(
