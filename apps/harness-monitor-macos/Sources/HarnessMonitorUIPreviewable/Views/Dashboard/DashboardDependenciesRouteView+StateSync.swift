@@ -41,4 +41,16 @@ extension DashboardDependenciesRouteView {
     guard nextPreferences != routeResolvedPreferences else { return }
     routeResolvedPreferences = nextPreferences
   }
+
+  func prefetchSelectedBodies(adding newlySelected: Set<String>) {
+    guard !newlySelected.isEmpty else { return }
+    let itemsByID = Dictionary(
+      routeResponse.items.map { ($0.pullRequestID, $0) },
+      uniquingKeysWith: { first, _ in first }
+    )
+    for id in newlySelected {
+      guard let item = itemsByID[id] else { continue }
+      Task { await store.prepareDependencyUpdateBody(for: item) }
+    }
+  }
 }

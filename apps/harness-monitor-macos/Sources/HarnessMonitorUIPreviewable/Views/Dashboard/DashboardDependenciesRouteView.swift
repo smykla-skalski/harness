@@ -393,8 +393,9 @@ struct DashboardDependenciesRouteView: View {
     .sheet(isPresented: $isLabelSheetPresented) {
       labelSheet
     }
-    .onChange(of: selectedIDs) { _, newValue in
+    .onChange(of: selectedIDs) { oldValue, newValue in
       persistedPrimarySelectionID = newValue.min() ?? persistedPrimarySelectionID
+      prefetchSelectedBodies(adding: newValue.subtracting(oldValue))
     }
     .onChange(of: storedPreferences, initial: true) { _, newValue in
       syncPreferencesFromStorage(newValue)
