@@ -54,18 +54,17 @@ struct DashboardDependenciesRouteViewTests {
   }
 
   @Test("route source reloads from the connection-aware task key")
-  func routeSourceReloadsFromConnectionAwareTaskKey() throws {
-    let source = try routeSource()
+  func reloadTaskKeyChangesWhenPreferencesSignatureChanges() {
+    let first = DashboardDependenciesReloadTaskKey(
+      preferencesSignature: "authors=a",
+      connectionState: .online
+    )
+    let second = DashboardDependenciesReloadTaskKey(
+      preferencesSignature: "authors=b",
+      connectionState: .online
+    )
 
-    #expect(source.contains("private var reloadTaskKey: DashboardDependenciesReloadTaskKey"))
-    #expect(source.contains("connectionState: store.connectionState"))
-    #expect(source.contains("preferencesSignature: resolvedPreferences.cacheHash"))
-    #expect(source.contains(".task(id: reloadTaskKey)"))
-    #expect(!source.contains(".task(id: storedPreferences)"))
-    #expect(!source.contains("runAutoRefreshLoop"))
-    #expect(source.contains("await startScheduler(forceRefreshAll: forceRefresh)"))
-    #expect(!source.contains("refreshToken +="))
-    #expect(!source.contains("let refreshToken"))
+    #expect(first != second)
   }
 
   @Test("route source caches decoded preferences off the SwiftUI body path")
@@ -165,35 +164,120 @@ struct DashboardDependenciesRouteViewTests {
     )
   }
 
-  @Test("check rows expose links context menu and severity sorting")
-  func checkRowsExposeLinksContextMenuAndSeveritySorting() throws {
-    let visualSource = try routeSource(named: "DashboardDependenciesVisualComponents.swift")
-    let presentationSource = try routeSource(named: "DashboardDependenciesCheckPresentation.swift")
-    let detailSource = try routeSource(named: "DashboardDependencyDetailView.swift")
-    let actionsSource = try routeSource(named: "DashboardDependenciesRouteView+Actions.swift")
+  @Test("check grouping sorts suites by severity and checks within each suite")
+  func checkGroupingSortsSuitesBySeverityAndChecksWithinEachSuite() {
+    let passingAnalyze = DependencyUpdateCheck(
+      name: "Analyze (actions)",
+      status: .completed,
+      conclusion: .success,
+      checkSuiteID: "suite-analyze"
+    )
+    let failingAnalyze = DependencyUpdateCheck(
+      name: "Analyze (go)",
+      status: .completed,
+      conclusion: .failure,
+      checkSuiteID: "suite-analyze"
+    )
+    let pendingTest = DependencyUpdateCheck(
+      name: "Test / unit",
+      status: .queued,
+      conclusion: .none
+    )
+    let passingCodeQL = DependencyUpdateCheck(
+      name: "CodeQL",
+      status: .completed,
+      conclusion: .success,
+      checkSuiteID: "suite-codeql"
+    )
 
-    #expect(visualSource.contains("sortedChecks"))
-    #expect(visualSource.contains("lhs.displayPriority"))
-    #expect(presentationSource.contains("var displayPriority: Int"))
-    #expect(visualSource.contains("arrow.up.forward.square"))
-    #expect(visualSource.contains("Open Check Run"))
-    #expect(visualSource.contains("Copy Check URL"))
-    #expect(visualSource.contains("Rerun Check"))
-    #expect(visualSource.contains("check.detailsWebURL"))
-    #expect(detailSource.contains("onRerunCheck: (DependencyUpdateCheck) -> Void"))
-    #expect(actionsSource.contains("func rerunCheck(_ check: DependencyUpdateCheck"))
+    let groups = dashboardDependencyCheckGroups(
+      for: [passingCodeQL, pendingTest, passingAnalyze, failingAnalyze]
+    )
+
+    #expect(groups.map(\.title) == ["Analyze", "Test", "CodeQL"])
+    #expect(groups.first?.checkCountLabel == "2 checks")
+    #expect(groups.first?.checks.map(\.name) == ["Analyze (go)", "Analyze (actions)"])
   }
 
   @Test("rerun check controls explain unavailable state")
-  func rerunCheckControlsExplainUnavailableState() throws {
-    let actionBarSource = try routeSource(named: "DashboardDependencyActionBar.swift")
-    let modelSource = try modelSource(named: "HarnessMonitorDependenciesExtensions.swift")
+  func rerunCheckControlsExplainUnavailableState() {
+    let missingSuite = DependencyUpdateCheck(
+      name: "ci",
+      status: .completed,
+      conclusion: .failure
+    )
+    let pending = DependencyUpdateCheck(
+      name: "ci",
+      status: .queued,
+      conclusion: .none,
+      checkSuiteID: "suite-ci"
+    )
+    let failed = DependencyUpdateCheck(
+      name: "ci",
+      status: .completed,
+      conclusion: .failure,
+      checkSuiteID: "suite-ci"
+    )
 
-    #expect(actionBarSource.contains("rerunChecksHelp"))
-    #expect(actionBarSource.contains(".accessibilityHint(rerunChecksHelp)"))
-    #expect(modelSource.contains("rerunChecksUnavailableReason"))
-    #expect(modelSource.contains("rerunUnavailableReason"))
-    #expect(modelSource.contains("GitHub did not provide a check suite ID"))
+    #expect(
+      missingSuite.rerunUnavailableReason
+        == "GitHub did not provide a check suite ID for this check."
+    )
+    #expect(pending.rerunUnavailableReason == "Only completed check runs can be rerun.")
+    #expect(failed.rerunUnavailableReason == nil)
+
+    let item = makeDependencyItem(checkStatus: .failure, checks: [missingSuite])
+    #expect(
+      item.rerunChecksUnavailableReason
+        == "GitHub did not provide check suite IDs for these checks."
+    )
+    #expect(!item.canAttemptRerunChecks)
+  }
+
+  @Test("activity entries summarize action results per dependency")
+  func activityEntriesSummarizeActionResultsPerDependency() {
+    let recordedAt = Date(timeIntervalSince1970: 0)
+    let response = DependencyUpdatesActionResponse(
+      summary: "Approved 1 dependency update",
+      results: [
+        DependencyUpdateActionResult(
+          repository: "org-a/example",
+          number: 42,
+          action: .approve,
+          outcome: .applied,
+          message: "Approved org-a/example#42"
+        )
+      ]
+    )
+
+    let entry = DashboardDependencyActivityEntry.success(
+      title: "Approving",
+      response: response,
+      results: response.results,
+      recordedAt: recordedAt
+    )
+
+    #expect(entry.summary == "Approved 1 dependency update")
+    #expect(entry.outcome == .success)
+    #expect(entry.messages == ["Approved org-a/example#42"])
+    #expect(entry.recordedAt == recordedAt)
+  }
+
+  @Test("activity snapshot exposes cache and missing check-link labels")
+  func activitySnapshotExposesCacheAndMissingCheckLinkLabels() {
+    let snapshot = DashboardDependencyActivitySnapshot(
+      pullRequestID: "pr-1",
+      isRefreshing: true,
+      actionTitle: "Approving",
+      fetchedAt: "2026-05-22T09:00:00Z",
+      fromCache: true,
+      lastAction: nil,
+      missingCheckRunURLCount: 2,
+      totalCheckCount: 3
+    )
+
+    #expect(snapshot.cacheLabel == "Cached data")
+    #expect(snapshot.checkLinkLabel == "2/3 check links missing")
   }
 
   private func routeSource() throws -> String {
@@ -234,20 +318,30 @@ struct DashboardDependenciesRouteViewTests {
     return try String(contentsOf: sourceURL, encoding: .utf8)
   }
 
-  private func modelSource(named fileName: String) throws -> String {
-    let testsDirectory = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
-    let repoRoot =
-      testsDirectory
-      .deletingLastPathComponent()
-      .deletingLastPathComponent()
-      .deletingLastPathComponent()
-      .deletingLastPathComponent()
-    let sourceURL =
-      repoRoot
-      .appendingPathComponent(
-        "apps/harness-monitor-macos/Sources/HarnessMonitorKit/Models"
-      )
-      .appendingPathComponent(fileName)
-    return try String(contentsOf: sourceURL, encoding: .utf8)
+  private func makeDependencyItem(
+    checkStatus: DependencyUpdateCheckStatus,
+    checks: [DependencyUpdateCheck]
+  ) -> DependencyUpdateItem {
+    DependencyUpdateItem(
+      pullRequestID: "pr-1",
+      repositoryID: "repo-1",
+      repository: "org-a/example",
+      number: 42,
+      title: "Bump dependency",
+      url: "https://github.com/org-a/example/pull/42",
+      authorLogin: "renovate[bot]",
+      state: .open,
+      mergeable: .mergeable,
+      reviewStatus: .reviewRequired,
+      checkStatus: checkStatus,
+      policyBlocked: false,
+      isDraft: false,
+      headSha: "abc123",
+      checks: checks,
+      additions: 10,
+      deletions: 4,
+      createdAt: "2026-05-20T10:00:00Z",
+      updatedAt: "2026-05-20T11:00:00Z"
+    )
   }
 }

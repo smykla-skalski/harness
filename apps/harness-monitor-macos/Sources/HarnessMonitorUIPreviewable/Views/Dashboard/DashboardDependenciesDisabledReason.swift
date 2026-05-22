@@ -4,10 +4,11 @@ enum DashboardDependenciesDisabledReason {
   static func approveReason(for items: [DependencyUpdateItem]) -> String? {
     if items.isEmpty { return "No pull requests selected" }
     if items.contains(where: { $0.canAttemptManualApproval }) { return nil }
+    if items.allSatisfy({ !$0.viewerCanUpdate }) { return updatePermissionReason }
     if items.allSatisfy({ $0.state != .open }) { return "Pull request is not open" }
     if items.allSatisfy({ $0.reviewStatus == .approved }) { return "Already approved" }
     if items.allSatisfy({ $0.reviewStatus == .changesRequested }) {
-      return "Changes requested — resolve review before approving"
+      return "Changes requested - resolve review before approving"
     }
     return "Nothing in this selection needs approval"
   }
@@ -15,6 +16,7 @@ enum DashboardDependenciesDisabledReason {
   static func mergeReason(for items: [DependencyUpdateItem]) -> String? {
     if items.isEmpty { return "No pull requests selected" }
     if items.contains(where: { $0.canAttemptManualMerge }) { return nil }
+    if items.allSatisfy({ !$0.viewerCanUpdate }) { return updatePermissionReason }
     if items.allSatisfy({ $0.state != .open }) { return "Pull request is not open" }
     if items.allSatisfy({ $0.isDraft }) { return "Pull request is a draft" }
     if items.allSatisfy({ $0.mergeable == .conflicting }) {
@@ -25,9 +27,10 @@ enum DashboardDependenciesDisabledReason {
 
   static func rerunReason(for items: [DependencyUpdateItem]) -> String? {
     if items.isEmpty { return "No pull requests selected" }
-    if items.contains(where: { $0.hasRerunnableChecks }) { return nil }
+    if items.contains(where: { $0.canAttemptRerunChecks }) { return nil }
+    if items.allSatisfy({ !$0.viewerCanUpdate }) { return updatePermissionReason }
     if items.allSatisfy({ $0.checkStatus == .success }) {
-      return "All checks passing — nothing to rerun"
+      return "All checks passing - nothing to rerun"
     }
     if items.allSatisfy({ $0.checkStatus == .pending }) {
       return "Checks are still running"
@@ -38,7 +41,23 @@ enum DashboardDependenciesDisabledReason {
   static func autoReason(for items: [DependencyUpdateItem]) -> String? {
     if items.isEmpty { return "No pull requests selected" }
     if items.contains(where: { $0.canRunAutoMode }) { return nil }
+    if items.allSatisfy({ !$0.viewerCanUpdate }) { return updatePermissionReason }
     return "Nothing in this selection matches the auto-mode rules"
+  }
+
+  static func labelReason(for items: [DependencyUpdateItem]) -> String? {
+    if items.isEmpty { return "No pull requests selected" }
+    if items.contains(where: { $0.canAddDependencyLabel }) { return nil }
+    if items.allSatisfy({ !$0.viewerCanUpdate }) { return updatePermissionReason }
+    if items.allSatisfy({ $0.state != .open }) { return "Pull request is not open" }
+    return "No selected pull request can be labeled"
+  }
+
+  static func rebaseReason(for item: DependencyUpdateItem) -> String? {
+    if item.canRebaseViaBot { return nil }
+    if !item.viewerCanUpdate { return updatePermissionReason }
+    if item.state != .open { return "Pull request is not open" }
+    return "This pull request cannot be rebased from the dashboard"
   }
 
   static func emptySelectionReason(for items: [DependencyUpdateItem]) -> String? {
@@ -47,8 +66,10 @@ enum DashboardDependenciesDisabledReason {
 
   static func autoPreview(for items: [DependencyUpdateItem]) -> String? {
     guard items.count > 1 else { return nil }
-    let approveCount = items.filter(\.isAutoApprovable).count
-    let mergeCount = items.filter { $0.isAutoMergeable || $0.isAutoApprovable }.count
+    let approveCount = items.count { $0.viewerCanUpdate && $0.isAutoApprovable }
+    let mergeCount = items.count {
+      $0.viewerCanUpdate && ($0.isAutoMergeable || $0.isAutoApprovable)
+    }
     let skipCount = items.count - mergeCount
     if approveCount == 0 && mergeCount == 0 {
       return "No PRs in this selection match the auto-mode rules"
@@ -56,5 +77,9 @@ enum DashboardDependenciesDisabledReason {
     return
       "Will approve \(approveCount), merge \(mergeCount) "
       + "(includes the \(approveCount) just approved), skip \(skipCount)"
+  }
+
+  private static var updatePermissionReason: String {
+    "Current GitHub token cannot update selected pull request(s)"
   }
 }

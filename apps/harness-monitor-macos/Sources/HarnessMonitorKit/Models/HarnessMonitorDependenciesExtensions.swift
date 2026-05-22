@@ -50,6 +50,10 @@ extension DependencyUpdateItem {
     !rerunnableCheckSuiteIDs.isEmpty
   }
 
+  public var canAttemptRerunChecks: Bool {
+    viewerCanUpdate && hasRerunnableChecks
+  }
+
   public var rerunChecksUnavailableReason: String? {
     guard !checks.isEmpty else {
       return "No checks are reported for this dependency update."
@@ -64,16 +68,25 @@ extension DependencyUpdateItem {
   }
 
   public var canAttemptManualApproval: Bool {
+    guard viewerCanUpdate else { return false }
     guard state == .open else { return false }
     return reviewStatus == .reviewRequired || reviewStatus == .none
   }
 
   public var canAttemptManualMerge: Bool {
-    state == .open && !isDraft && mergeable != .conflicting
+    viewerCanUpdate && state == .open && !isDraft && mergeable != .conflicting
   }
 
   public var canRunAutoMode: Bool {
-    isAutoApprovable || isAutoMergeable
+    viewerCanUpdate && (isAutoApprovable || isAutoMergeable)
+  }
+
+  public var canAddDependencyLabel: Bool {
+    viewerCanUpdate && state == .open
+  }
+
+  public var canRebaseViaBot: Bool {
+    viewerCanUpdate && state == .open
   }
 
   public var canStartFixCI: Bool {
@@ -183,7 +196,8 @@ extension DependencyUpdateItem {
       additions: additions,
       deletions: deletions,
       createdAt: createdAt,
-      updatedAt: updatedAt
+      updatedAt: updatedAt,
+      viewerCanUpdate: viewerCanUpdate
     )
   }
 }

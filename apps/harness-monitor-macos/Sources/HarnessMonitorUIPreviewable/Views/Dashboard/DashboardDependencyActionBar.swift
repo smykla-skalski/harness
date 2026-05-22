@@ -57,7 +57,7 @@ struct DashboardDependencyActionBar: View {
       helpText: DashboardDependenciesDisabledReason.rerunReason(for: items),
       action: onRerunChecks
     )
-    .disabled(isBusy || !items.contains { $0.hasRerunnableChecks })
+    .disabled(isBusy || !items.contains { $0.canAttemptRerunChecks })
     .help(rerunChecksHelp)
     .accessibilityHint(rerunChecksHelp)
 
@@ -80,7 +80,8 @@ struct DashboardDependencyActionBar: View {
       onSelect: onSelectLabel,
       onCustom: onCustomLabel
     )
-    .disabled(isBusy || items.isEmpty)
+    .disabled(isBusy || !items.contains { $0.canAddDependencyLabel })
+    .help(DashboardDependenciesDisabledReason.labelReason(for: items) ?? "Add a GitHub label")
 
     DashboardDependencyActionButton(
       title: "Copy Approval Links",
@@ -106,8 +107,10 @@ struct DashboardDependencyActionBar: View {
           title: bot.rebaseActionTitle,
           systemImage: "arrow.triangle.2.circlepath",
           prominence: .secondary,
+          helpText: DashboardDependenciesDisabledReason.rebaseReason(for: item),
           action: onRebaseViaBot
         )
+        .disabled(isBusy || !item.canRebaseViaBot)
       }
       if item.canStartFixCI {
         DashboardDependencyActionButton(
@@ -135,8 +138,11 @@ struct DashboardDependencyActionBar: View {
     if items.isEmpty {
       return "Select a dependency update to rerun failed checks."
     }
-    if items.contains(where: { $0.hasRerunnableChecks }) {
+    if items.contains(where: { $0.canAttemptRerunChecks }) {
       return "Rerun failed or timed-out GitHub check suites."
+    }
+    if let reason = DashboardDependenciesDisabledReason.rerunReason(for: items) {
+      return reason
     }
     if items.count == 1, let reason = items.first?.rerunChecksUnavailableReason {
       return reason
