@@ -43,20 +43,13 @@ public final class HarnessMonitorStore {
   @ObservationIgnored var pendingSessionWindowQuitSnapshot: SessionWindowQuitSnapshot?
   @ObservationIgnored var isSuppressingNotificationHistoryToast = false
   @ObservationIgnored var suppressedNotificationHistoryToastIDs: Set<UUID> = []
-  @ObservationIgnored
-  var dependencyFilesViewModels: [String: DependencyUpdateFilesViewModel] = [:]
-  @ObservationIgnored
-  var dependencyFilesPendingFetches: Set<DependencyFilesFetchKey> = []
-  @ObservationIgnored
-  var dependencyFilesViewedBatchTasks: [String: Task<Void, Never>] = [:]
-  @ObservationIgnored
-  var dependencyFilesViewedPending: [String: [String: DependencyUpdateFileViewedState]] = [:]
-  @ObservationIgnored
-  var dependencyLocalCloneProgressContinuations:
-    [String: [UUID: AsyncStream<DependencyUpdateLocalCloneProgress>.Continuation]] = [:]
-  @ObservationIgnored
-  var dependencyLocalCloneProgressAllContinuations:
-    [UUID: AsyncStream<DependencyUpdateLocalCloneProgress>.Continuation] = [:]
+  @ObservationIgnored var dependencyFilesViewModels: [String: DependencyUpdateFilesViewModel] = [:]
+  @ObservationIgnored var dependencyFilesPendingFetches: Set<DependencyFilesFetchKey> = []
+  @ObservationIgnored var dependencyFilesViewedBatchTasks: [String: Task<Void, Never>] = [:]
+  @ObservationIgnored var dependencyFilesViewedPending:
+    [String: [String: DependencyUpdateFileViewedState]] = [:]
+  @ObservationIgnored var dependencyLocalCloneProgressStreams =
+    DependencyLocalCloneProgressStreams()
 
   public var openFolderRequest = 0
   public var attachSessionRequest = 0
@@ -303,8 +296,8 @@ public final class HarnessMonitorStore {
   @ObservationIgnored public let dependencyUpdateBodies = DependencyUpdateBodyStore()
   public var dependencyUpdateBodyState: [String: DependencyUpdateBodyState] = [:]
   @ObservationIgnored var pendingDependencyUpdateBodyFetches: Set<String> = []
-  @ObservationIgnored
-  var dependencyUpdateTimelineViewModels: [String: DependencyUpdateTimelineViewModel] = [:]
+  @ObservationIgnored var dependencyUpdateTimelineViewModels:
+    [String: DependencyUpdateTimelineViewModel] = [:]
   @ObservationIgnored var pendingDependencyUpdateTimelineFetches: Set<String> = []
   @ObservationIgnored var dependencyUpdateDraftWriteTasks: [String: Task<Void, Never>] = [:]
   @ObservationIgnored var pendingDependencyUpdateBodyEdits:

@@ -135,43 +135,14 @@ extension HarnessMonitorStore {
       return
     }
 
-    var shouldTickSupervisor = false
-    switch event.kind {
-    case .ready:
-      break
-    case .sessionsUpdated(let payload):
-      scheduleSessionIndexSnapshotApply(
-        projects: payload.projects,
-        sessions: payload.sessions,
-        refreshSelectedSession: true
-      )
-      shouldTickSupervisor = true
-    case .sessionUpdated(let payload):
-      guard let sessionID = event.sessionId else {
-        return
-      }
-      handleGlobalSessionUpdate(sessionID: sessionID, payload: payload)
-      shouldTickSupervisor = true
-    case .sessionExtensions(let payload):
-      applySessionExtensions(payload)
-      shouldTickSupervisor = true
-    case .logLevelChanged(let response):
-      daemonLogLevel = response.level
-    case .codexRunUpdated, .codexApprovalRequested, .agentTuiUpdated, .acpAgentUpdated,
-      .acpInspect, .acpAgentsReconciled, .acpProcessIncident, .acpBridgeResyncIncident,
-      .acpEvents, .acpPermissionBatch, .acpPermissionBatchRemoved:
-      break
-    case .dependencyUpdatesLocalCloneProgress(let progress):
-      applyLocalCloneProgress(progress)
-    case .unknown:
-      break
-    }
-    if shouldTickSupervisor {
+    if applyGlobalSessionPushEvent(event) {
       scheduleSupervisorTick(reason: "global-session")
+      return
     }
+    applyGlobalNonSessionPushEvent(event)
   }
 
-  private func handleGlobalSessionUpdate(
+  func handleGlobalSessionUpdate(
     sessionID: String,
     payload: SessionUpdatedPayload
   ) {
@@ -417,5 +388,4 @@ extension HarnessMonitorStore {
     }
     return true
   }
-
 }
