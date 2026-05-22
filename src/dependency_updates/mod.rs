@@ -148,6 +148,12 @@ pub struct DependencyUpdatesAutoRequest {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct DependencyUpdatesCommentRequest {
+    pub targets: Vec<DependencyUpdateTarget>,
+    pub body: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct DependencyUpdatesActionResponse {
     pub summary: String,
     #[serde(default)]
@@ -299,6 +305,7 @@ pub enum DependencyUpdateActionKind {
     AddLabel,
     AutoApprove,
     AutoMerge,
+    Comment,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]

@@ -2,8 +2,9 @@ use crate::errors::{CliError, CliErrorKind};
 
 use super::{
     DependencyUpdateTarget, DependencyUpdatesApproveRequest, DependencyUpdatesAutoRequest,
-    DependencyUpdatesBodyRequest, DependencyUpdatesBodyUpdateRequest, DependencyUpdatesLabelRequest,
-    DependencyUpdatesMergeRequest, DependencyUpdatesQueryRequest, DependencyUpdatesRefreshRequest,
+    DependencyUpdatesBodyRequest, DependencyUpdatesBodyUpdateRequest,
+    DependencyUpdatesCommentRequest, DependencyUpdatesLabelRequest, DependencyUpdatesMergeRequest,
+    DependencyUpdatesQueryRequest, DependencyUpdatesRefreshRequest,
     DependencyUpdatesRepositoryCatalogRequest, DependencyUpdatesRerunChecksRequest,
 };
 
@@ -150,6 +151,23 @@ impl DependencyUpdatesAutoRequest {
     /// Returns `CliError` when no dependency update targets are provided.
     pub fn validate(&self) -> Result<(), CliError> {
         ensure_targets(&self.targets, "auto mode")
+    }
+}
+
+impl DependencyUpdatesCommentRequest {
+    /// Validate the comment request.
+    ///
+    /// # Errors
+    /// Returns `CliError` when no targets are provided or the body is empty.
+    pub fn validate(&self) -> Result<(), CliError> {
+        ensure_targets(&self.targets, "comment")?;
+        if self.body.trim().is_empty() {
+            return Err(CliErrorKind::workflow_parse(
+                "dependency-updates comment request requires a non-empty body",
+            )
+            .into());
+        }
+        Ok(())
     }
 }
 

@@ -29,8 +29,9 @@ use mapping::{
 };
 use pagination::resolve_continuation;
 use queries::{
-    APPROVE_MUTATION, NODES_BY_IDS_QUERY, ORGANIZATION_REPOSITORIES_QUERY, PULL_REQUEST_BODY_QUERY,
-    REREQUEST_CHECK_SUITE_MUTATION, SEARCH_QUERY, UPDATE_PULL_REQUEST_BODY_MUTATION,
+    ADD_COMMENT_MUTATION, APPROVE_MUTATION, NODES_BY_IDS_QUERY, ORGANIZATION_REPOSITORIES_QUERY,
+    PULL_REQUEST_BODY_QUERY, REREQUEST_CHECK_SUITE_MUTATION, SEARCH_QUERY,
+    UPDATE_PULL_REQUEST_BODY_MUTATION,
 };
 use types::{
     NodesResponse, OrganizationRepositoriesResponse, PullRequestBodyResponse, SearchResponse,
@@ -43,8 +44,8 @@ use super::{
     DependencyUpdateCheckStatus, DependencyUpdateItem, DependencyUpdateMergeableState,
     DependencyUpdatePullRequestState, DependencyUpdateRepositoryLabel, DependencyUpdateReview,
     DependencyUpdateReviewEventState, DependencyUpdateReviewStatus, DependencyUpdateTarget,
-    DependencyUpdatesApproveRequest, DependencyUpdatesAutoRequest, DependencyUpdatesLabelRequest,
-    DependencyUpdatesMergeRequest, DependencyUpdatesQueryRequest,
+    DependencyUpdatesApproveRequest, DependencyUpdatesAutoRequest, DependencyUpdatesCommentRequest,
+    DependencyUpdatesLabelRequest, DependencyUpdatesMergeRequest, DependencyUpdatesQueryRequest,
     DependencyUpdatesRerunChecksRequest,
 };
 
@@ -338,6 +339,31 @@ impl DependencyUpdatesGitHubClient {
             results.push(action_result(
                 target,
                 DependencyUpdateActionKind::Approve,
+                result.map(|_| ()).map_err(operation_error),
+            ));
+        }
+        Ok(results)
+    }
+
+    pub(crate) async fn comment(
+        &self,
+        request: &DependencyUpdatesCommentRequest,
+    ) -> Result<Vec<DependencyUpdateActionResult>, CliError> {
+        let mut results = Vec::with_capacity(request.targets.len());
+        for target in &request.targets {
+            let result = self
+                .client
+                .graphql::<serde_json::Value>(&json!({
+                    "query": ADD_COMMENT_MUTATION,
+                    "variables": {
+                        "id": target.pull_request_id,
+                        "body": request.body,
+                    },
+                }))
+                .await;
+            results.push(action_result(
+                target,
+                DependencyUpdateActionKind::Comment,
                 result.map(|_| ()).map_err(operation_error),
             ));
         }
