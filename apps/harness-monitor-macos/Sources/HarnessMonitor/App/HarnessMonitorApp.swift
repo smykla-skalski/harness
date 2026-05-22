@@ -31,6 +31,9 @@ struct HarnessMonitorApp: App {
   @State private var windowCommandRouting: WindowCommandRoutingState
   @State private var windowNavigationHistory: GlobalWindowNavigationHistory
   @State private var mcpWindowCommandRegistrar: HarnessMonitorMCPWindowCommandRegistrar
+  @State private var openAnythingPalette: OpenAnythingPaletteModel
+  @State private var openAnythingDependencies: OpenAnythingDashboardDependencyRegistry
+  @State private var globalHotKeyController: GlobalHotKeyController
   @State private var settingsSelectedSection: SettingsSection
   @State private var settingsNavigationRequest: SettingsNavigationRequest?
   @State private var hasInstalledMainWindowLauncher = false
@@ -48,6 +51,11 @@ struct HarnessMonitorApp: App {
   @AppStorage(HarnessMonitorLaunchBehavior.storageKey)
   var sessionWindowLaunchModeRawValue =
     HarnessMonitorLaunchBehavior.defaultValue.rawValue
+  @AppStorage(OpenAnythingHotKeyDefaults.enabledKey)
+  var globalOpenAnythingHotKeyEnabled = OpenAnythingHotKeyDefaults.enabledDefault
+  @AppStorage(OpenAnythingHotKeyDefaults.descriptorKey)
+  var globalOpenAnythingHotKeyDescriptor =
+    OpenAnythingHotKeyDefaults.descriptorDefault.storageValue
 
   init() {
     HarnessMonitorPerfLaunchMetricsRecorder.bootstrap()
@@ -56,6 +64,9 @@ struct HarnessMonitorApp: App {
       "NSUseAnimatedFocusRing": false,
       SessionWindowKeyboardShortcutOverlaySettings.storageKey:
         SessionWindowKeyboardShortcutOverlaySettings.defaultValue,
+      OpenAnythingHotKeyDefaults.enabledKey: OpenAnythingHotKeyDefaults.enabledDefault,
+      OpenAnythingHotKeyDefaults.descriptorKey:
+        OpenAnythingHotKeyDefaults.descriptorDefault.storageValue,
     ])
 
     let configuration = HarnessMonitorAppConfiguration.resolve()
@@ -132,6 +143,11 @@ struct HarnessMonitorApp: App {
         descriptors: HarnessMonitorMCPWindowCommandDescriptors.all
       )
     )
+    _openAnythingPalette = State(initialValue: OpenAnythingPaletteModel())
+    _openAnythingDependencies = State(
+      initialValue: OpenAnythingDashboardDependencyRegistry.shared
+    )
+    _globalHotKeyController = State(initialValue: GlobalHotKeyController())
     _settingsSelectedSection = State(
       initialValue: SettingsRestorationDefaults.initialSelectedSection(
         fallback: configuration.settingsInitialSection,
@@ -196,6 +212,18 @@ struct HarnessMonitorApp: App {
 
   var appWindowNavigationHistory: GlobalWindowNavigationHistory {
     windowNavigationHistory
+  }
+
+  var appOpenAnythingPalette: OpenAnythingPaletteModel {
+    openAnythingPalette
+  }
+
+  var appOpenAnythingDependencies: OpenAnythingDashboardDependencyRegistry {
+    openAnythingDependencies
+  }
+
+  var appGlobalHotKeyController: GlobalHotKeyController {
+    globalHotKeyController
   }
 
   var themeModeBinding: Binding<HarnessMonitorThemeMode> {

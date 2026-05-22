@@ -43,6 +43,11 @@ extension HarnessMonitorApp {
         perfScenarioStatus: perfScenarioStatusBinding,
         perfScenarioFailureReason: perfScenarioFailureReasonBinding
       )
+      .modifier(
+        openAnythingHostModifier(
+          windowID: HarnessMonitorWindowID.sessionWindow(tokenValue.sessionID)
+        )
+      )
       .harnessTrackMCPWindow()
       .environment(appStore)
     } else {
@@ -53,6 +58,7 @@ extension HarnessMonitorApp {
   @ViewBuilder var dashboardWindowSceneContent: some View {
     if rendersLiveSceneContent {
       dashboardWindowContent
+        .modifier(openAnythingHostModifier(windowID: HarnessMonitorWindowID.dashboard))
         .modifier(DashboardWindowAppKitBinding())
         .modifier(SessionWindowTabbing(role: .dashboard))
         .modifier(DashboardWindowLifecycleModifier())
@@ -75,6 +81,7 @@ extension HarnessMonitorApp {
         selectedSection: settingsSelectedSectionBinding,
         navigationRequest: settingsNavigationRequestBinding
       )
+      .modifier(openAnythingHostModifier(windowID: HarnessMonitorWindowID.settings))
       .harnessTrackMCPWindow(tracksElements: false)
       .environment(appStore)
     } else {
@@ -91,6 +98,7 @@ extension HarnessMonitorApp {
         mcpWindowCommandRegistrar: appMCPWindowCommandRegistrar,
         themeMode: themeModeBinding
       )
+      .modifier(openAnythingHostModifier(windowID: HarnessMonitorWindowID.policyCanvasLab))
       .harnessTrackMCPWindow()
       .environment(appStore)
     } else {
@@ -122,5 +130,24 @@ extension HarnessMonitorApp {
       presentOpenFolder()
     }
     .attachExternalSessionImporter(store: appStore)
+  }
+
+  func openAnythingHostModifier(windowID: String) -> HarnessMonitorOpenAnythingHostModifier {
+    HarnessMonitorOpenAnythingHostModifier(
+      windowID: windowID,
+      model: appOpenAnythingPalette,
+      dependencyRegistry: appOpenAnythingDependencies,
+      store: appStore,
+      keyWindowObserver: keyWindowObserver,
+      windowNavigationHistory: appWindowNavigationHistory,
+      showsPolicyCanvasLab: showsPolicyCanvasLab,
+      globalHotKeyController: appGlobalHotKeyController,
+      globalHotKeyEnabled: globalOpenAnythingHotKeyEnabled,
+      globalHotKeyDescriptorStorage: globalOpenAnythingHotKeyDescriptor,
+      presentPalette: presentOpenAnythingPalette,
+      refreshStore: refreshStore,
+      settingsSelectedSection: settingsSelectedSectionBinding,
+      settingsNavigationRequest: settingsNavigationRequestBinding
+    )
   }
 }

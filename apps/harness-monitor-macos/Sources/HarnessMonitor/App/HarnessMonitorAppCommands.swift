@@ -25,6 +25,7 @@ struct HarnessMonitorAppCommands: Commands {
   let decreaseTextSize: () -> Void
   let resetTextSize: () -> Void
   let refreshStore: () -> Void
+  let presentOpenAnything: () -> Void
 
   private var canIncreaseTextSize: Bool {
     HarnessMonitorTextSize.canIncrease(textSizeIndex)
@@ -74,7 +75,15 @@ struct HarnessMonitorAppCommands: Commands {
       .disabled(!displayState.hasSelectedSession || displayState.isSessionReadOnly)
     }
     searchCommands
+    openAnythingCommands
     sidebarSelectionCommands
+  }
+
+  @CommandsBuilder private var openAnythingCommands: some Commands {
+    CommandGroup(after: .pasteboard) {
+      Button("Open Anything", action: presentOpenAnything)
+        .keyboardShortcut("k", modifiers: .command)
+    }
   }
 
   @CommandsBuilder private var searchCommands: some Commands {
