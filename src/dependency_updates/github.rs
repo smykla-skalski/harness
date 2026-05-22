@@ -11,9 +11,11 @@ use rustls::crypto::ring::default_provider;
 use serde_json::json;
 
 use crate::errors::{CliError, CliErrorKind};
-use crate::github_api_errors;
 use crate::task_board::github::{GitHubApiAutomationClient, GitHubAutomationClient};
 
+mod check_status;
+mod coverage;
+mod errors;
 mod ingest;
 mod mapping;
 mod pagination;
@@ -22,6 +24,8 @@ mod types;
 
 use chrono::{DateTime, Utc};
 
+use coverage::log_check_details_url_coverage;
+use errors::{client_error, operation_error};
 use ingest::{ingest_nodes_chunk, ingest_search_node};
 use mapping::{
     NodeContinuation, action_result, github_project_config, next_cursor_or_scope_limit,
@@ -537,33 +541,6 @@ fn ensure_rustls_provider() {
     RUSTLS_PROVIDER.get_or_init(|| {
         let _ = default_provider().install_default();
     });
-}
-
-fn log_check_details_url_coverage(items: &[DependencyUpdateItem]) {
-    let mut check_count = 0_usize;
-    let mut missing_details_url_count = 0_usize;
-    for check in items.iter().flat_map(|item| &item.checks) {
-        check_count += 1;
-        if check.details_url.is_none() {
-            missing_details_url_count += 1;
-        }
-    }
-    if check_count > 0 {
-        tracing::debug!(
-            dependency_update_count = items.len(),
-            check_count,
-            missing_details_url_count,
-            "dependency-updates check details URL coverage"
-        );
-    }
-}
-
-fn client_error(error: octocrab::Error) -> CliError {
-    github_api_errors::client_error("create dependency-updates github client", error)
-}
-
-fn operation_error(error: octocrab::Error) -> CliError {
-    github_api_errors::operation_error("dependency-updates github request failed", error)
 }
 
 #[cfg(test)]

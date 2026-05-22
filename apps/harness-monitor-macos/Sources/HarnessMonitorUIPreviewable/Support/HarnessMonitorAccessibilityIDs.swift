@@ -99,7 +99,7 @@ public enum HarnessMonitorAccessibility {
   public static let dashboardDependenciesDetailDivider =
     "harness.dashboard.dependencies.content-detail-divider"
   public static let dashboardDependenciesRefreshButton = "harness.dashboard.dependencies.refresh"
-  public static let dashboardDependenciesRefreshSelectedButton =
+  public static let dependenciesRefreshSelectedButton =
     "harness.dashboard.dependencies.refresh-selected"
   public static let dashboardDependenciesConfigureButton =
     "harness.dashboard.dependencies.configure"

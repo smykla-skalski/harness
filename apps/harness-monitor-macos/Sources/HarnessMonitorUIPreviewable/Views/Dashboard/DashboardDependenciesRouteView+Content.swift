@@ -94,10 +94,11 @@ extension DashboardDependenciesRouteView {
           onDescriptionCheckboxError: { message in routeErrorMessage = message },
           onRerunCheck: { check in
             Task { await rerunCheck(check, for: item) }
+          },
+          actionBar: {
+            dependencyActionBar(items: [item])
           }
-        ) {
-          dependencyActionBar(items: [item])
-        }
+        )
       } else if routeIsLoading {
         ProgressView("Loading dependencies…")
           .frame(maxWidth: .infinity, maxHeight: .infinity)

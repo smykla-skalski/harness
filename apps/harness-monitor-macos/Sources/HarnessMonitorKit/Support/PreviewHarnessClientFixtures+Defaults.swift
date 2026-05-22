@@ -208,8 +208,8 @@ extension PreviewHarnessClient.Fixtures {
         DependencyUpdateCheck(
           name: "legacy/ci",
           status: .completed,
-          conclusion: .failure
-        )
+          conclusion: .failure,
+        ),
       ],
       reviews: [DependencyUpdateReview(author: "reviewer", state: .changesRequested)],
       additions: 10,

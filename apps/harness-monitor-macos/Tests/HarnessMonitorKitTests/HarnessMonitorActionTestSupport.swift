@@ -10,6 +10,12 @@ struct ProjectFixture {
   var totalSessionCount: Int
 }
 
+struct RecordedDependencyBodyUpdateRequest: Equatable {
+  let pullRequestID: String
+  let expectedPriorBodySHA256: String
+  let newBody: String
+}
+
 final class RecordingHarnessClient: HarnessMonitorClientProtocol, @unchecked Sendable {
   enum Call: Equatable {
     case assignTask(sessionID: String, taskID: String, agentID: String, actor: String)
@@ -302,8 +308,7 @@ final class RecordingHarnessClient: HarnessMonitorClientProtocol, @unchecked Sen
   var dependencyBodyFetchedIDs: [String] = []
   var dependencyBodyFetchHook: (@Sendable (String) async -> Void)?
   var dependencyBodyUpdateOutcomes: [String: DependencyUpdatesBodyUpdateResponse] = [:]
-  var dependencyBodyUpdateRequests:
-    [(pullRequestID: String, expectedPriorBodySHA256: String, newBody: String)] = []
+  var dependencyBodyUpdateRequests: [RecordedDependencyBodyUpdateRequest] = []
   var dependencyBodyUpdateErrors: [String: any Error] = [:]
   var codexRunsBySessionID: [String: [CodexRunSnapshot]] = [:]
   var codexRunsDelaysBySessionID: [String: Duration] = [:]

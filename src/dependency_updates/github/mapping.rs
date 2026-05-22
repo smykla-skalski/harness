@@ -5,6 +5,7 @@ use chrono::{DateTime, Utc};
 use crate::errors::{CliError, CliErrorKind};
 use crate::task_board::github::GitHubProjectConfig;
 
+use super::check_status::{is_failed_check_conclusion, normalized_details_url};
 use super::types::{
     CommitConnection, LabelNode, PageInfo, RepositoryLabelNode, ReviewNode, SearchNode,
     StatusContextNode,
@@ -304,30 +305,6 @@ impl CheckSummary {
         } else {
             DependencyUpdateCheckStatus::Success
         }
-    }
-}
-
-fn is_failed_check_conclusion(conclusion: DependencyUpdateCheckConclusion) -> bool {
-    matches!(
-        conclusion,
-        DependencyUpdateCheckConclusion::Failure
-            | DependencyUpdateCheckConclusion::Cancelled
-            | DependencyUpdateCheckConclusion::TimedOut
-            | DependencyUpdateCheckConclusion::ActionRequired
-            | DependencyUpdateCheckConclusion::StartupFailure
-    )
-}
-
-fn normalized_details_url(details_url: Option<String>) -> Option<String> {
-    let trimmed = details_url?.trim().to_string();
-    if trimmed.is_empty() {
-        return None;
-    }
-    let lower = trimmed.to_ascii_lowercase();
-    if lower.starts_with("https://") || lower.starts_with("http://") {
-        Some(trimmed)
-    } else {
-        None
     }
 }
 

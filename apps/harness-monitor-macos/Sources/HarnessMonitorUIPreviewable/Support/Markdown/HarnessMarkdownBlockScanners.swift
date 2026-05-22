@@ -6,6 +6,12 @@ struct FenceStart {
   let info: String
 }
 
+struct UnorderedMarker {
+  let content: String
+  let checkbox: Bool?
+  let checkboxMarkerColumn: Int?
+}
+
 func fenceStart(_ line: String) -> FenceStart? {
   let trimmed = line.trimmingLeadingSpaces()
   guard let marker = trimmed.first, marker == "`" || marker == "~" else { return nil }
@@ -44,9 +50,7 @@ func isThematicBreak(_ line: String) -> Bool {
   return compact.allSatisfy { $0 == first }
 }
 
-func unorderedMarker(_ line: String)
-  -> (content: String, checkbox: Bool?, checkboxMarkerColumn: Int?)?
-{
+func unorderedMarker(_ line: String) -> UnorderedMarker? {
   let trimmed = line.trimmingLeadingSpaces()
   guard let marker = trimmed.first, trimmed.count >= 2, ["-", "*", "+"].contains(marker),
     trimmed.dropFirst().first?.isWhitespace == true
@@ -56,7 +60,11 @@ func unorderedMarker(_ line: String)
   let (content, checkbox) = checkboxContent(String(trimmed.dropFirst(2)))
   let leadingByteCount = line.utf8.prefix { $0 == 0x20 || $0 == 0x09 }.count
   let checkboxMarkerColumn: Int? = checkbox == nil ? nil : leadingByteCount + 3
-  return (content, checkbox, checkboxMarkerColumn)
+  return UnorderedMarker(
+    content: content,
+    checkbox: checkbox,
+    checkboxMarkerColumn: checkboxMarkerColumn
+  )
 }
 
 func unorderedListContentByteOffset(in line: String, hasCheckbox: Bool) -> Int {
