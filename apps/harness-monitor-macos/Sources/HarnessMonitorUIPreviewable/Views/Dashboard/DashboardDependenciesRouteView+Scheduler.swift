@@ -50,12 +50,6 @@ extension DashboardDependenciesRouteView {
     }
   }
 
-  /// Mark every tracked repository for refresh on the next tick. Called from
-  /// the manual force-refresh button and after a daemon cache clear.
-  func schedulerForceRefreshAll() {
-    routeScheduler.forceRefreshAll()
-  }
-
   /// Mark a single repository for refresh on the next tick. Called from
   /// `scheduleAffectedRefresh` after a per-PR mutation when the targeted
   /// refresh path is not granular enough.

@@ -8,13 +8,6 @@ extension DashboardDependenciesRouteView {
   ) {
     guard !items.isEmpty else { return }
     let targetIDs = items.map(\.pullRequestID)
-    let coversFullCatalog =
-      !routeResponse.items.isEmpty
-      && Set(targetIDs) == Set(routeResponse.items.map(\.pullRequestID))
-    if coversFullCatalog {
-      schedulerForceRefreshAll()
-      return
-    }
     let targets = items.map(\.target)
     beginRefreshing(pullRequestIDs: targetIDs)
     Task {
