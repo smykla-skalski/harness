@@ -317,6 +317,28 @@ struct TaskBoardSwiftUXCorrectnessTests {
     #expect(failingSuite.rerunChecksUnavailableReason == nil)
   }
 
+  @Test("Dependency check display priority puts failures before pending then success")
+  func dependencyCheckDisplayPriorityPutsFailuresBeforePendingThenSuccess() {
+    let failure = DependencyUpdateCheck(
+      name: "failure",
+      status: .completed,
+      conclusion: .failure
+    )
+    let pending = DependencyUpdateCheck(
+      name: "pending",
+      status: .inProgress,
+      conclusion: .none
+    )
+    let success = DependencyUpdateCheck(
+      name: "success",
+      status: .completed,
+      conclusion: .success
+    )
+
+    #expect(failure.displayPriority < pending.displayPriority)
+    #expect(pending.displayPriority < success.displayPriority)
+  }
+
   // MARK: - sample fixtures
 
   private func sampleDraftDocument(revision: UInt64 = 7) -> TaskBoardPolicyPipelineDocument {

@@ -48,6 +48,8 @@ struct DashboardDependencyActionBar: View {
       action: onRerunChecks
     )
     .disabled(isBusy || !items.contains { $0.hasRerunnableChecks })
+    .help(rerunChecksHelp)
+    .accessibilityHint(rerunChecksHelp)
 
     DashboardDependencyActionButton(
       title: "Refresh",
@@ -99,5 +101,18 @@ struct DashboardDependencyActionBar: View {
       )
       .disabled(isBusy || !items.contains { $0.canRunAutoMode })
     }
+  }
+
+  private var rerunChecksHelp: String {
+    if items.isEmpty {
+      return "Select a dependency update to rerun failed checks."
+    }
+    if items.contains(where: { $0.hasRerunnableChecks }) {
+      return "Rerun failed or timed-out GitHub check suites."
+    }
+    if items.count == 1, let reason = items.first?.rerunChecksUnavailableReason {
+      return reason
+    }
+    return "No selected dependency update has rerunnable failed or timed-out checks."
   }
 }

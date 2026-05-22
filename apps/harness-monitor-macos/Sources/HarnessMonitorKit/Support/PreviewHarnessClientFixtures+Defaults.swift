@@ -197,6 +197,18 @@ extension PreviewHarnessClient.Fixtures {
           conclusion: .failure,
           checkSuiteID: "suite-413",
           detailsURL: "https://github.com/smykla-skalski/harness/actions/runs/413"
+        ),
+        DependencyUpdateCheck(
+          name: "Analyze (go)",
+          status: .completed,
+          conclusion: .success,
+          checkSuiteID: "suite-413-go",
+          detailsURL: "https://github.com/smykla-skalski/harness/actions/runs/413/job/2"
+        ),
+        DependencyUpdateCheck(
+          name: "legacy/ci",
+          status: .completed,
+          conclusion: .failure
         )
       ],
       reviews: [DependencyUpdateReview(author: "reviewer", state: .changesRequested)],

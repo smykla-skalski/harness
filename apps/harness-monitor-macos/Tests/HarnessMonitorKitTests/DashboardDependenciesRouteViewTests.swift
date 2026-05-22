@@ -165,6 +165,37 @@ struct DashboardDependenciesRouteViewTests {
     )
   }
 
+  @Test("check rows expose links context menu and severity sorting")
+  func checkRowsExposeLinksContextMenuAndSeveritySorting() throws {
+    let visualSource = try routeSource(named: "DashboardDependenciesVisualComponents.swift")
+    let presentationSource = try routeSource(named: "DashboardDependenciesCheckPresentation.swift")
+    let detailSource = try routeSource(named: "DashboardDependencyDetailView.swift")
+    let actionsSource = try routeSource(named: "DashboardDependenciesRouteView+Actions.swift")
+
+    #expect(visualSource.contains("sortedChecks"))
+    #expect(visualSource.contains("lhs.displayPriority"))
+    #expect(presentationSource.contains("var displayPriority: Int"))
+    #expect(visualSource.contains("arrow.up.forward.square"))
+    #expect(visualSource.contains("Open Check Run"))
+    #expect(visualSource.contains("Copy Check URL"))
+    #expect(visualSource.contains("Rerun Check"))
+    #expect(visualSource.contains("check.detailsWebURL"))
+    #expect(detailSource.contains("onRerunCheck: (DependencyUpdateCheck) -> Void"))
+    #expect(actionsSource.contains("func rerunCheck(_ check: DependencyUpdateCheck"))
+  }
+
+  @Test("rerun check controls explain unavailable state")
+  func rerunCheckControlsExplainUnavailableState() throws {
+    let actionBarSource = try routeSource(named: "DashboardDependencyActionBar.swift")
+    let modelSource = try modelSource(named: "HarnessMonitorDependenciesExtensions.swift")
+
+    #expect(actionBarSource.contains("rerunChecksHelp"))
+    #expect(actionBarSource.contains(".accessibilityHint(rerunChecksHelp)"))
+    #expect(modelSource.contains("rerunChecksUnavailableReason"))
+    #expect(modelSource.contains("rerunUnavailableReason"))
+    #expect(modelSource.contains("GitHub did not provide a check suite ID"))
+  }
+
   private func routeSource() throws -> String {
     try routeSource(named: "DashboardDependenciesRouteView.swift")
   }
@@ -198,6 +229,23 @@ struct DashboardDependenciesRouteViewTests {
       repoRoot
       .appendingPathComponent(
         "apps/harness-monitor-macos/Sources/HarnessMonitorUIPreviewable/Views/Dashboard/Previews"
+      )
+      .appendingPathComponent(fileName)
+    return try String(contentsOf: sourceURL, encoding: .utf8)
+  }
+
+  private func modelSource(named fileName: String) throws -> String {
+    let testsDirectory = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
+    let repoRoot =
+      testsDirectory
+      .deletingLastPathComponent()
+      .deletingLastPathComponent()
+      .deletingLastPathComponent()
+      .deletingLastPathComponent()
+    let sourceURL =
+      repoRoot
+      .appendingPathComponent(
+        "apps/harness-monitor-macos/Sources/HarnessMonitorKit/Models"
       )
       .appendingPathComponent(fileName)
     return try String(contentsOf: sourceURL, encoding: .utf8)

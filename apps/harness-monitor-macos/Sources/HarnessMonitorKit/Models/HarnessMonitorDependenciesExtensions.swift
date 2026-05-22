@@ -121,6 +121,21 @@ extension DependencyUpdateCheck {
       return false
     }
   }
+
+  public var rerunUnavailableReason: String? {
+    guard checkSuiteID != nil else {
+      return "GitHub did not provide a check suite ID for this check."
+    }
+    guard status == .completed else {
+      return "Only completed check runs can be rerun."
+    }
+    switch conclusion {
+    case .failure, .timedOut:
+      return nil
+    default:
+      return "Only failed or timed-out check runs can be rerun."
+    }
+  }
 }
 
 extension DependencyUpdateTarget {

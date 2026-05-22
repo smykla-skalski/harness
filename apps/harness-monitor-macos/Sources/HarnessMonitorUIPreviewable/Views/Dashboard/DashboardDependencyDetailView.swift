@@ -5,17 +5,20 @@ struct DashboardDependencyDetailView<Actions: View>: View {
   let item: DependencyUpdateItem
   let store: HarnessMonitorStore
   let onDescriptionCheckboxError: ((String) -> Void)?
+  let onRerunCheck: (DependencyUpdateCheck) -> Void
   @ViewBuilder let actionBar: () -> Actions
 
   init(
     item: DependencyUpdateItem,
     store: HarnessMonitorStore,
     onDescriptionCheckboxError: ((String) -> Void)? = nil,
+    onRerunCheck: @escaping (DependencyUpdateCheck) -> Void = { _ in },
     @ViewBuilder actionBar: @escaping () -> Actions
   ) {
     self.item = item
     self.store = store
     self.onDescriptionCheckboxError = onDescriptionCheckboxError
+    self.onRerunCheck = onRerunCheck
     self.actionBar = actionBar
   }
 
@@ -48,7 +51,10 @@ struct DashboardDependencyDetailView<Actions: View>: View {
         }
         .accessibilityIdentifier(HarnessMonitorAccessibility.dashboardDependenciesDescription)
         DashboardDependencyDetailSection(title: "Checks") {
-          DashboardDependencyCheckList(checks: item.checks)
+          DashboardDependencyCheckList(
+            checks: item.checks,
+            onRerunCheck: onRerunCheck
+          )
         }
         DashboardDependencyDetailSection(title: "Reviews") {
           DashboardDependencyReviewList(reviews: item.reviews)

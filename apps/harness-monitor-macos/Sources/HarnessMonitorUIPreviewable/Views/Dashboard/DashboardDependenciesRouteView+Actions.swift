@@ -100,6 +100,33 @@ extension DashboardDependenciesRouteView {
     }
   }
 
+  func rerunCheck(_ check: DependencyUpdateCheck, for item: DependencyUpdateItem) async {
+    guard check.isRerunnable, let checkSuiteID = check.checkSuiteID else {
+      store.toast.presentWarning(
+        check.rerunUnavailableReason ?? "This check cannot be rerun from the dashboard"
+      )
+      return
+    }
+    let target = DependencyUpdateTarget(
+      pullRequestID: item.pullRequestID,
+      repositoryID: item.repositoryID,
+      repository: item.repository,
+      number: item.number,
+      url: item.url,
+      headSha: item.headSha,
+      mergeable: item.mergeable,
+      reviewStatus: item.reviewStatus,
+      checkStatus: item.checkStatus,
+      policyBlocked: item.policyBlocked,
+      checkSuiteIDs: [checkSuiteID]
+    )
+    await performMutation("Rerunning \(check.name)", items: [item]) { client in
+      try await client.rerunDependencyUpdateChecks(
+        request: DependencyUpdatesRerunChecksRequest(targets: [target])
+      )
+    }
+  }
+
   func refresh(items: [DependencyUpdateItem]) {
     guard let client = store.apiClient, !items.isEmpty else { return }
     scheduleAffectedRefresh(for: items, using: client)

@@ -90,7 +90,10 @@ extension DashboardDependenciesRouteView {
         DashboardDependencyDetailView(
           item: item,
           store: store,
-          onDescriptionCheckboxError: { message in routeErrorMessage = message }
+          onDescriptionCheckboxError: { message in routeErrorMessage = message },
+          onRerunCheck: { check in
+            Task { await rerunCheck(check, for: item) }
+          }
         ) {
           dependencyActionBar(items: [item])
         }
