@@ -20,12 +20,12 @@ use crate::workspace::utc_now;
 #[path = "dependency_updates_cache.rs"]
 mod cache_internal;
 
+#[cfg(test)]
+pub(super) use cache_internal::apply_refresh_to_items;
 use cache_internal::{
     body_cache, cache, cached_body_response, cached_query_response, patch_cached_items,
     patch_cached_repository_labels, store_cached_body_response, store_cached_query_response,
 };
-#[cfg(test)]
-pub(super) use cache_internal::apply_refresh_to_items;
 
 #[derive(Clone)]
 struct TokenBoundRequest {
@@ -317,8 +317,7 @@ pub async fn fetch_dependency_update_body(
     request.validate()?;
     let cache_key = request.normalized_pull_request_id();
     if !request.force_refresh
-        && let Some(response) =
-            cached_body_response(&cache_key, request.cache_max_age_seconds())
+        && let Some(response) = cached_body_response(&cache_key, request.cache_max_age_seconds())
     {
         return Ok(response);
     }

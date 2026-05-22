@@ -4,12 +4,14 @@ import SwiftUI
 enum DashboardDependencyActionProminence {
   case primary
   case success
+  case warning
+  case destructive
   case secondary
   case utility
 
   var variant: HarnessMonitorAsyncActionButton.Variant {
     switch self {
-    case .primary, .success:
+    case .primary, .success, .warning, .destructive:
       .prominent
     case .secondary, .utility:
       .bordered
@@ -19,9 +21,13 @@ enum DashboardDependencyActionProminence {
   var tint: Color? {
     switch self {
     case .primary:
-      HarnessMonitorTheme.accent
+      nil
     case .success:
-      HarnessMonitorTheme.success
+      .green
+    case .warning:
+      .orange
+    case .destructive:
+      .red
     case .secondary:
       nil
     case .utility:

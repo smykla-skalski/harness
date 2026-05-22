@@ -1,3 +1,4 @@
+use std::collections::BTreeSet;
 use std::path::PathBuf;
 
 use chrono::{DateTime, Utc};
@@ -34,6 +35,7 @@ pub(super) struct NodeContinuation {
     pub(super) reviews: Option<InnerCursor>,
     pub(super) checks: Option<InnerCursor>,
     pub(super) repository_labels: Option<InnerCursor>,
+    pub(super) required_check_names: Vec<String>,
 }
 
 impl NodeContinuation {
@@ -88,6 +90,7 @@ pub(super) fn convert_node(
     let updated_at = parse_timestamp(node.updated_at.as_str())?;
     let pull_request_id = node.id.clone();
     let repository_id = node.repository.id.clone();
+    let required_check_names = required_check_names(node.base_ref.as_ref());
     let check_summary = CheckSummary::from_commits(node.commits);
     let checks_continuation = check_summary
         .next_page_cursor
@@ -95,6 +98,8 @@ pub(super) fn convert_node(
         .map(|cursor| InnerCursor {
             after: Some(cursor),
         });
+    let required_failed_check_names =
+        required_failed_check_names(&check_summary.checks, &required_check_names);
 
     let repository_name = node.repository.name_with_owner;
     let (repository_label_bundle, repository_labels_continuation) = match node.repository.labels {
@@ -176,7 +181,9 @@ pub(super) fn convert_node(
         deletions: node.deletions.max(0).cast_unsigned(),
         created_at,
         updated_at,
+        required_failed_check_names,
         viewer_can_update: node.viewer_can_update.unwrap_or(true),
+        viewer_can_merge_as_admin: node.viewer_can_merge_as_admin.unwrap_or(false),
     };
     let continuation = NodeContinuation {
         pull_request_id,
@@ -185,6 +192,7 @@ pub(super) fn convert_node(
         reviews: reviews_continuation,
         checks: checks_continuation,
         repository_labels: repository_labels_continuation,
+        required_check_names,
     };
     Ok((item, repository_label_bundle, continuation))
 }
@@ -332,6 +340,7 @@ pub(super) fn append_pull_request_reviews(
 pub(super) fn append_check_contexts(
     item: &mut DependencyUpdateItem,
     contexts: Vec<StatusContextNode>,
+    required_check_names: &[String],
 ) {
     let mut summary = CheckSummary::default();
     for context in contexts {
@@ -340,6 +349,8 @@ pub(super) fn append_check_contexts(
     item.policy_blocked = item.policy_blocked || summary.policy_blocked;
     item.checks.extend(summary.checks);
     item.check_status = recompute_check_status(&item.checks);
+    item.required_failed_check_names =
+        required_failed_check_names(&item.checks, required_check_names);
 }
 
 pub(super) fn append_repository_labels(
@@ -355,6 +366,42 @@ pub(super) fn append_repository_labels(
                 description: label.description.filter(|value| !value.is_empty()),
             }),
     );
+}
+
+fn required_check_names(base_ref: Option<&super::types::RefNode>) -> Vec<String> {
+    let Some(branch_protection) =
+        base_ref.and_then(|base_ref| base_ref.branch_protection_rule.as_ref())
+    else {
+        return Vec::new();
+    };
+    let mut names = BTreeSet::new();
+    for context in &branch_protection.required_status_check_contexts {
+        names.insert(context.clone());
+    }
+    for check in &branch_protection.required_status_checks {
+        names.insert(check.context.clone());
+    }
+    names.into_iter().collect()
+}
+
+fn required_failed_check_names(
+    checks: &[DependencyUpdateCheck],
+    required_check_names: &[String],
+) -> Vec<String> {
+    let required = required_check_names
+        .iter()
+        .map(String::as_str)
+        .collect::<BTreeSet<_>>();
+    checks
+        .iter()
+        .filter(|check| {
+            required.contains(check.name.as_str())
+                && is_failed_check_conclusion(check.conclusion)
+        })
+        .map(|check| check.name.clone())
+        .collect::<BTreeSet<_>>()
+        .into_iter()
+        .collect()
 }
 
 fn recompute_check_status(checks: &[DependencyUpdateCheck]) -> DependencyUpdateCheckStatus {

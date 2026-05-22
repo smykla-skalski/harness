@@ -2,7 +2,7 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use crate::errors::CliError;
 
-use super::mapping::{convert_node, NodeContinuation, RepositoryLabelBundle};
+use super::mapping::{NodeContinuation, RepositoryLabelBundle, convert_node};
 use super::types::SearchNode;
 use super::{DependencyUpdateItem, DependencyUpdateRepositoryLabel, DependencyUpdatesQueryRequest};
 
@@ -100,7 +100,10 @@ mod tests {
     fn empty_bundle_does_not_insert_repository_key() {
         let mut map: BTreeMap<String, Vec<DependencyUpdateRepositoryLabel>> = BTreeMap::new();
         merge_repository_label_bundle(&mut map, ("acme/api".to_string(), Vec::new()));
-        assert!(map.is_empty(), "empty bundle must not create a repository entry");
+        assert!(
+            map.is_empty(),
+            "empty bundle must not create a repository entry"
+        );
     }
 
     #[test]
@@ -114,10 +117,7 @@ mod tests {
     #[test]
     fn first_non_empty_bundle_fills_entry() {
         let mut map: BTreeMap<String, Vec<DependencyUpdateRepositoryLabel>> = BTreeMap::new();
-        merge_repository_label_bundle(
-            &mut map,
-            ("acme/api".to_string(), vec![make_label("bug")]),
-        );
+        merge_repository_label_bundle(&mut map, ("acme/api".to_string(), vec![make_label("bug")]));
         assert_eq!(
             map.get("acme/api").map(|labels| labels[0].name.clone()),
             Some("bug".to_string())
@@ -127,14 +127,8 @@ mod tests {
     #[test]
     fn subsequent_non_empty_bundle_does_not_overwrite_filled_entry() {
         let mut map: BTreeMap<String, Vec<DependencyUpdateRepositoryLabel>> = BTreeMap::new();
-        merge_repository_label_bundle(
-            &mut map,
-            ("acme/api".to_string(), vec![make_label("bug")]),
-        );
-        merge_repository_label_bundle(
-            &mut map,
-            ("acme/api".to_string(), vec![make_label("ci")]),
-        );
+        merge_repository_label_bundle(&mut map, ("acme/api".to_string(), vec![make_label("bug")]));
+        merge_repository_label_bundle(&mut map, ("acme/api".to_string(), vec![make_label("ci")]));
         assert_eq!(
             map.get("acme/api").map(|labels| labels[0].name.clone()),
             Some("bug".to_string())

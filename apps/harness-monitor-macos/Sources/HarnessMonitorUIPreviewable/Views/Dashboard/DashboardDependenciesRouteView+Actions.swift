@@ -54,6 +54,50 @@ extension DashboardDependenciesRouteView {
     }
   }
 
+  func requestApproveOrConfirm(items: [DependencyUpdateItem]) {
+    requestDependencyActionConfirmation(.approve, items: items)
+  }
+
+  func requestMergeOrConfirm(items: [DependencyUpdateItem]) {
+    requestDependencyActionConfirmation(.merge, items: items)
+  }
+
+  func confirmDependencyAction(_ confirmation: DashboardDependencyActionConfirmation) {
+    let items = currentItems(for: confirmation.pullRequestIDs)
+    guard !items.isEmpty else { return }
+    performRequestedDependencyAction(confirmation.action, items: items)
+  }
+
+  func requestDependencyActionConfirmation(
+    _ action: DashboardDependencyAttentionActionKind,
+    items: [DependencyUpdateItem]
+  ) {
+    if let confirmation = dashboardDependencyActionConfirmation(for: action, items: items) {
+      routePendingActionConfirmation = confirmation
+      return
+    }
+    performRequestedDependencyAction(action, items: items)
+  }
+
+  func performRequestedDependencyAction(
+    _ action: DashboardDependencyAttentionActionKind,
+    items: [DependencyUpdateItem]
+  ) {
+    switch action {
+    case .approve:
+      trackInFlight(Task { await approve(items: items) })
+    case .merge:
+      requestMerge(items: items)
+    }
+  }
+
+  func currentItems(for pullRequestIDs: [String]) -> [DependencyUpdateItem] {
+    let itemsByID = Dictionary(
+      uniqueKeysWithValues: routeResponse.items.map { ($0.pullRequestID, $0) }
+    )
+    return pullRequestIDs.compactMap { itemsByID[$0] }
+  }
+
   func approve(items: [DependencyUpdateItem]) async {
     let actionableItems = items.filter(\.canAttemptManualApproval)
     await performMutation("Approving", items: actionableItems) { client in

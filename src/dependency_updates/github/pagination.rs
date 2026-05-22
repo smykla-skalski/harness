@@ -7,8 +7,8 @@ use crate::errors::{CliError, CliErrorKind};
 use crate::github_api_errors;
 
 use super::mapping::{
-    append_check_contexts, append_pull_request_labels, append_pull_request_reviews,
-    append_repository_labels, next_cursor_or_scope_limit, InnerCursor, NodeContinuation,
+    InnerCursor, NodeContinuation, append_check_contexts, append_pull_request_labels,
+    append_pull_request_reviews, append_repository_labels, next_cursor_or_scope_limit,
 };
 use super::queries::{
     PR_CHECKS_PAGE_QUERY, PR_LABELS_PAGE_QUERY, PR_REVIEWS_PAGE_QUERY, REPO_LABELS_PAGE_QUERY,
@@ -33,9 +33,18 @@ pub(super) async fn resolve_continuation(
         reviews,
         checks,
         repository_labels: repo_labels_cursor,
+        required_check_names,
         ..
     } = continuation;
-    resolve_pull_request_pages(client, item, pr_labels, reviews, checks).await?;
+    resolve_pull_request_pages(
+        client,
+        item,
+        pr_labels,
+        reviews,
+        checks,
+        &required_check_names,
+    )
+    .await?;
     if let Some(cursor) = repo_labels_cursor {
         continue_repository_labels(
             client,
@@ -55,6 +64,7 @@ async fn resolve_pull_request_pages(
     pr_labels: Option<InnerCursor>,
     reviews: Option<InnerCursor>,
     checks: Option<InnerCursor>,
+    required_check_names: &[String],
 ) -> Result<(), CliError> {
     if let Some(cursor) = pr_labels {
         continue_pull_request_labels(client, item, cursor).await?;
@@ -63,7 +73,7 @@ async fn resolve_pull_request_pages(
         continue_pull_request_reviews(client, item, cursor).await?;
     }
     if let Some(cursor) = checks {
-        continue_check_contexts(client, item, cursor).await?;
+        continue_check_contexts(client, item, cursor, required_check_names).await?;
     }
     Ok(())
 }
@@ -152,6 +162,7 @@ async fn continue_check_contexts(
     client: &Octocrab,
     item: &mut DependencyUpdateItem,
     cursor: InnerCursor,
+    required_check_names: &[String],
 ) -> Result<(), CliError> {
     let mut after = cursor.after;
     let mut page = 1_u32;
@@ -181,7 +192,7 @@ async fn continue_check_contexts(
             return Ok(());
         };
         let page_info = rollup.contexts.page_info;
-        append_check_contexts(item, rollup.contexts.nodes);
+        append_check_contexts(item, rollup.contexts.nodes, required_check_names);
         if !page_info.has_next_page {
             return Ok(());
         }

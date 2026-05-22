@@ -21,7 +21,7 @@ extension DashboardDependenciesRouteView {
 
   func requestMerge(items: [DependencyUpdateItem]) {
     guard items.count > 1 else {
-      trackInFlight(Task { await merge(items: items) })
+      requestMergeOrConfirm(items: items)
       return
     }
     routePendingBatchConfirmation = .merge(
@@ -46,7 +46,7 @@ extension DashboardDependenciesRouteView {
     let items = liveItems(for: confirmation.pullRequestIDs)
     switch confirmation.action {
     case .merge:
-      trackInFlight(Task { await merge(items: items) })
+      requestMergeOrConfirm(items: items)
     case .auto:
       trackInFlight(Task { await auto(items: items) })
     }
