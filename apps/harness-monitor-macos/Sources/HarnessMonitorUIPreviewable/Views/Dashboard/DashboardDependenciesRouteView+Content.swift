@@ -197,6 +197,11 @@ extension DashboardDependenciesRouteView {
         if let item = items.first {
           Task { await fixCI(item: item) }
         }
+      },
+      onRebaseViaBot: {
+        if let item = items.first, let bot = DependencyUpdateBot.detect(authorLogin: item.authorLogin) {
+          Task { await rebaseViaBot(item: item, bot: bot) }
+        }
       }
     )
   }

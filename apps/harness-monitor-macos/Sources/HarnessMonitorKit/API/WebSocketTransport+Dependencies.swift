@@ -85,4 +85,12 @@ extension WebSocketTransport {
     let value = try await rpc(method: .dependencyUpdatesBodyUpdate, params: params)
     return try decode(value)
   }
+
+  public func commentDependencyUpdates(
+    request: DependencyUpdatesCommentRequest
+  ) async throws -> DependencyUpdatesActionResponse {
+    let params = try encodeParams(request, extra: [:])
+    let value = try await rpc(method: .dependencyUpdatesComment, params: params)
+    return try decode(value)
+  }
 }

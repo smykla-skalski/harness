@@ -32,6 +32,9 @@ public protocol HarnessMonitorDependenciesClientProtocol: Sendable {
   func updateDependencyUpdateBody(
     request: DependencyUpdatesBodyUpdateRequest
   ) async throws -> DependencyUpdatesBodyUpdateResponse
+  func commentDependencyUpdates(
+    request: DependencyUpdatesCommentRequest
+  ) async throws -> DependencyUpdatesActionResponse
 }
 
 extension HarnessMonitorDependenciesClientProtocol {
@@ -96,6 +99,12 @@ extension HarnessMonitorDependenciesClientProtocol {
   public func updateDependencyUpdateBody(
     request _: DependencyUpdatesBodyUpdateRequest
   ) async throws -> DependencyUpdatesBodyUpdateResponse {
+    throw HarnessMonitorAPIError.server(code: 501, message: "Dependencies unavailable")
+  }
+
+  public func commentDependencyUpdates(
+    request _: DependencyUpdatesCommentRequest
+  ) async throws -> DependencyUpdatesActionResponse {
     throw HarnessMonitorAPIError.server(code: 501, message: "Dependencies unavailable")
   }
 }
