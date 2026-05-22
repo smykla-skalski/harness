@@ -1,9 +1,13 @@
 use std::path::Path;
 use std::sync::OnceLock;
+use std::time::Duration;
 
 use async_trait::async_trait;
 use octocrab::models;
 use octocrab::params;
+
+const GITHUB_HTTP_CONNECT_TIMEOUT: Duration = Duration::from_secs(30);
+const GITHUB_HTTP_READ_TIMEOUT: Duration = Duration::from_secs(60);
 use rustls::crypto::ring::default_provider;
 use serde::{Deserialize, Serialize};
 
@@ -60,6 +64,8 @@ impl GitHubApiAutomationClient {
         ensure_rustls_provider();
         let client = octocrab::Octocrab::builder()
             .personal_token(token.to_string())
+            .set_connect_timeout(Some(GITHUB_HTTP_CONNECT_TIMEOUT))
+            .set_read_timeout(Some(GITHUB_HTTP_READ_TIMEOUT))
             .build()
             .map_err(client_error)?;
         Ok(Self {
