@@ -340,6 +340,9 @@ private struct HarnessMarkdownListView: View {
     }
   }
 
+  @Environment(\.harnessMarkdownCheckboxToggleHandler)
+  private var checkboxToggleHandler
+
   @ViewBuilder
   private func marker(
     for item: HarnessMarkdownListItem,
@@ -347,13 +350,21 @@ private struct HarnessMarkdownListView: View {
     metrics: HarnessMarkdownMarkerMetrics
   ) -> some View {
     if let checkbox = item.checkbox {
-      Toggle(isOn: .constant(checkbox)) {
+      let binding = Binding<Bool>(
+        get: { checkbox },
+        set: { newValue in
+          if let offset = item.checkboxSourceOffset, let checkboxToggleHandler {
+            checkboxToggleHandler.perform(offset, newValue)
+          }
+        }
+      )
+      Toggle(isOn: binding) {
         EmptyView()
       }
       .toggleStyle(.checkbox)
       .labelsHidden()
       .controlSize(.small)
-      .allowsHitTesting(false)
+      .disabled(item.checkboxSourceOffset == nil || checkboxToggleHandler == nil)
       .frame(width: metrics.columnWidth, height: metrics.firstLineHeight, alignment: .center)
     } else if ordered {
       Text("\(start + index).")
