@@ -44,9 +44,14 @@ DependencyInject(or|ion)
 # --- Migration shims (must keep V21 entity names for SwiftData migration) ---
 apps/harness-monitor-macos/Sources/HarnessMonitorKit/Persistence/HarnessMonitorSchemaV21\.swift
 apps/harness-monitor-macos/Sources/HarnessMonitorKit/Persistence/HarnessMonitorMigrationV21ToV22\.swift
+apps/harness-monitor-macos/Sources/HarnessMonitorKit/Persistence/CachedReviewLegacyV21Models\.swift
 apps/harness-monitor-macos/Sources/HarnessMonitorKit/Support/HarnessMonitorReviewsUserDefaultsMigration\.swift
 apps/harness-monitor-macos/Tests/HarnessMonitorKitTests/HarnessMonitorMigrationV21ToV22.*Tests\.swift
 apps/harness-monitor-macos/Tests/HarnessMonitorKitTests/HarnessMonitorReviewsUserDefaultsMigrationTests\.swift
+# Historical schema entries (V17 - V20) that introduced the now-renamed entities
+# must keep the OLD class names in HarnessMonitorSchema.swift and HarnessMonitorRecentSchemas.swift
+HarnessMonitorSchema\.swift:.*Cached(Dependency|DependencyUpdate|DependencyUpdates|DependencyLabelUsage|DependencyRepositoryLabels)
+HarnessMonitorRecentSchemas\.swift:.*Cached(Dependency|DependencyUpdate|DependencyUpdates|DependencyLabelUsage|DependencyRepositoryLabels)
 
 # --- The rename tooling and its allow-list ---
 scripts/rename-dependencies-to-reviews\.sh
