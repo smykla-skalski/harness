@@ -370,17 +370,12 @@ private struct HarnessMarkdownListView: View {
       Text("\(start + index).")
         .font(style.typography.listMarker.font)
         .foregroundStyle(style.colors.secondaryText)
-        .frame(width: metrics.columnWidth, height: metrics.firstLineHeight, alignment: .trailing)
+        .frame(width: metrics.columnWidth, alignment: .trailing)
     } else {
       Text("•")
         .font(style.typography.listMarker.font)
         .foregroundStyle(style.colors.secondaryText)
-        .frame(
-          width: metrics.listSymbolColumnWidth,
-          height: metrics.firstLineHeight,
-          alignment: .leading
-        )
-        .offset(y: metrics.listSymbolYOffset)
+        .frame(width: metrics.listSymbolColumnWidth, alignment: .leading)
     }
   }
 }
