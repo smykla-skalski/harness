@@ -96,6 +96,7 @@ pub const DEPENDENCY_UPDATES_FILES_LOCAL_CLONES: &str =
     "/v1/dependency-updates/files/local-clones";
 pub const DEPENDENCY_UPDATES_FILES_LOCAL_CLONES_DELETE: &str =
     "/v1/dependency-updates/files/local-clones/delete";
+pub const DEPENDENCY_UPDATES_TIMELINE: &str = "/v1/dependency-updates/timeline";
 pub const SESSION_AGENT_ROLE: &str = "/v1/sessions/{session_id}/agents/{session_agent_id}/role";
 pub const SESSION_AGENT_REMOVE: &str = "/v1/sessions/{session_id}/agents/{session_agent_id}/remove";
 pub const SESSION_LEADER_TRANSFER: &str = "/v1/sessions/{session_id}/leader";

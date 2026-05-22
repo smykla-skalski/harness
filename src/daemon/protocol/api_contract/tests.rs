@@ -458,6 +458,12 @@ fn dependency_update_routes_have_complete_ws_parity() {
                 ws_methods::DEPENDENCY_UPDATES_FILES_LOCAL_CLONES_DELETE,
                 true,
             ),
+            (
+                HttpRouteMethod::Post,
+                http_paths::DEPENDENCY_UPDATES_TIMELINE,
+                ws_methods::DEPENDENCY_UPDATES_TIMELINE,
+                true,
+            ),
         ]
     );
 }

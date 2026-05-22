@@ -75,6 +75,16 @@ pub(super) fn drain_all() {
     map.clear();
 }
 
+/// Same as [`drain_all`] but returns how many entries were evicted —
+/// used by the daemon's cache-clear endpoint to roll the timeline
+/// count into the existing `DependencyUpdatesCacheClearResponse`.
+pub(super) fn drain_all_counted() -> usize {
+    let mut map = cache().lock().expect("timeline cache lock poisoned");
+    let count = map.len();
+    map.clear();
+    count
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
