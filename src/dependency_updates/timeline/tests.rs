@@ -164,22 +164,25 @@ fn paginated_review_first_page_inline_comments() {
     // fixture got wrong. Asserting on the real state catches future
     // mappings that conflate the two.
     assert_eq!(r.state, ReviewState::Commented);
-    assert_eq!(r.inline_comments.len(), 5, "first page has 5/11 inline comments");
+    assert_eq!(
+        r.inline_comments.len(),
+        5,
+        "first page has 5/11 inline comments"
+    );
     assert_eq!(
         r.inline_comments[0].body,
         "MADR-062 also deferred `MeshFaultInjection` - do we want to covert it here? \
          Should we explicitly mention that it's out of scope? There is also mentions of MFI below."
     );
-    assert!(r.inline_comments[0].reply_to_id.is_none(),
-        "top-level review comments have null replyTo in real responses");
+    assert!(
+        r.inline_comments[0].reply_to_id.is_none(),
+        "top-level review comments have null replyTo in real responses"
+    );
     // Service-layer drain marks this true once it confirms the
     // continuation succeeded; the parser-layer fixture-only test
     // sees `comments_truncated: false` because mapping never sets it.
     assert!(!r.comments_truncated);
-    assert_eq!(
-        r.actor.as_ref().map(|a| a.login.as_str()),
-        Some("slonka"),
-    );
+    assert_eq!(r.actor.as_ref().map(|a| a.login.as_str()), Some("slonka"),);
 }
 
 #[test]

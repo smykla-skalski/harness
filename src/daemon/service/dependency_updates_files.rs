@@ -220,12 +220,17 @@ async fn run_rest_patch(
     paths: &[String],
 ) -> Result<DependencyUpdatesFilesPatchResponse, CliError> {
     let client = DependencyUpdatesGitHubClient::new(token)?;
-    let patches =
-        patch_rest::fetch_patches(client.octocrab(), repo_full_name, number, head_ref_oid, paths)
-            .await
-            .map_err(|error| -> CliError {
-                CliErrorKind::workflow_io(format!("rest patch fetch failed: {error}")).into()
-            })?;
+    let patches = patch_rest::fetch_patches(
+        client.octocrab(),
+        repo_full_name,
+        number,
+        head_ref_oid,
+        paths,
+    )
+    .await
+    .map_err(|error| -> CliError {
+        CliErrorKind::workflow_io(format!("rest patch fetch failed: {error}")).into()
+    })?;
     let fetched_at = utc_now();
     let patches = patches
         .into_iter()
@@ -333,6 +338,95 @@ fn branch_ref(name: &str) -> String {
 /// subsequent fetch will pick up the head OID directly.
 fn default_head_ref_branch() -> &'static str {
     "main"
+}
+
+/// One-shot garbage collection pass over the local-clone registry.
+///
+/// Plan §A.5 calls for the daemon to drop stale + over-budget clones at
+/// startup so disk usage stays bounded. The selector ([`LocalCloneRegistry::pick_gc_targets`])
+/// already encodes the two-pass policy: drop entries whose `last_used_at`
+/// is older than `max_age`, then evict LRU entries until total size is
+/// under `max_disk_bytes`. This wrapper materializes the targets:
+///
+/// 1. Load registry from `<root>/registry.json`.
+/// 2. Ask the selector for entries to drop, using the plan defaults
+///    (`LOCAL_CLONE_MAX_AGE_DAYS`, `LOCAL_CLONE_DISK_BUDGET_MB`).
+/// 3. For each target: remove the registry row + delete the bare clone
+///    directory.
+/// 4. Persist the trimmed registry.
+///
+/// Best-effort: per-entry filesystem failures are logged via `tracing::warn`
+/// but don't abort the GC pass. The registry write-back is required; an
+/// IO error there is surfaced as a `CliError`.
+///
+/// # Errors
+/// Returns `CliError` when the registry can't be loaded or saved.
+pub async fn run_local_clone_gc() -> Result<GcReport, CliError> {
+    use chrono::Duration;
+
+    use crate::dependency_updates::files::local_clone::{
+        LOCAL_CLONE_DISK_BUDGET_MB, LOCAL_CLONE_MAX_AGE_DAYS,
+    };
+
+    let root = clones_root();
+    let mut registry = load_registry(&root)?;
+    let now = chrono::Utc::now();
+    let max_age = Duration::days(LOCAL_CLONE_MAX_AGE_DAYS);
+    let max_disk_bytes = LOCAL_CLONE_DISK_BUDGET_MB.saturating_mul(1024 * 1024);
+    let targets = registry.pick_gc_targets(now, max_age, max_disk_bytes);
+    if targets.is_empty() {
+        return Ok(GcReport::default());
+    }
+    let mut report = GcReport {
+        targets: targets.len(),
+        bytes_freed: 0,
+        removed: 0,
+    };
+    for key in &targets {
+        let Some(entry) = registry.remove(key) else { continue };
+        let bytes = entry.size_bytes;
+        if entry.bare_path.exists() {
+            match fs::remove_dir_all(&entry.bare_path) {
+                Ok(_) => {
+                    report.removed += 1;
+                    report.bytes_freed = report.bytes_freed.saturating_add(bytes);
+                }
+                Err(error) => {
+                    tracing::warn!(
+                        target = "harness::dependency_updates::files",
+                        path = ?entry.bare_path,
+                        error = %error,
+                        "local-clone gc: failed to remove bare clone directory"
+                    );
+                }
+            }
+        } else {
+            // Entry pointed at a path that no longer exists. Removing the
+            // registry row is the cleanup.
+            report.removed += 1;
+        }
+    }
+    save_registry(&root, &registry)?;
+    tracing::info!(
+        target = "harness::dependency_updates::files",
+        targets = report.targets,
+        removed = report.removed,
+        bytes_freed = report.bytes_freed,
+        "local-clone gc completed"
+    );
+    Ok(report)
+}
+
+/// Summary of one GC pass. Returned by [`run_local_clone_gc`] so callers
+/// (tests, observability hooks) can assert on the outcome.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct GcReport {
+    /// How many registry entries the selector flagged for removal.
+    pub targets: usize,
+    /// How many bare clone directories were actually removed from disk.
+    pub removed: usize,
+    /// Sum of `size_bytes` across successfully-removed entries.
+    pub bytes_freed: u64,
 }
 
 /// Apply hash-guarded mark-viewed mutations across one or more paths.
