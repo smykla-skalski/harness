@@ -150,4 +150,12 @@ extension WebSocketTransport {
     let params = try encodeParams(request, extra: [:])
     _ = try await rpc(method: .dependencyUpdatesFilesLocalClonesDelete, params: params)
   }
+
+  public func fetchDependencyUpdateTimeline(
+    request: DependencyUpdatesTimelineRequest
+  ) async throws -> DependencyUpdatesTimelineResponse {
+    let params = try encodeParams(request, extra: [:])
+    let value = try await rpc(method: .dependencyUpdatesTimeline, params: params)
+    return try decode(value)
+  }
 }

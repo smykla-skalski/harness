@@ -70,6 +70,15 @@ extension TaskBoardAPIClientTests {
         body: "@renovatebot rebase"
       )
     )
+    let timeline = try await transport.fetchDependencyUpdateTimeline(
+      request: DependencyUpdatesTimelineRequest(
+        pullRequestId: target.pullRequestID,
+        cursor: nil,
+        pageSize: 50,
+        direction: .older,
+        forceRefresh: false
+      )
+    )
 
     return DependencyUpdatesWebSocketContractResult(
       calls: await probe.calls,
@@ -84,7 +93,8 @@ extension TaskBoardAPIClientTests {
       auto: auto,
       cacheClear: cacheClear,
       refresh: refresh,
-      comment: comment
+      comment: comment,
+      timeline: timeline
     )
   }
 
@@ -104,12 +114,13 @@ extension TaskBoardAPIClientTests {
           .dependencyUpdatesClearCache,
           .dependencyUpdatesRefresh,
           .dependencyUpdatesComment,
+          .dependencyUpdatesTimeline,
         ]
     )
   }
 
   func assertDependencyUpdatesWebSocketPayloadContract(_ calls: [RPCProbe.Call]) {
-    #expect(calls.count == 12)
+    #expect(calls.count == 13)
     #expect(objectValue(calls[0].params, key: "organization") == .string("example"))
     #expect(calls[1].params == nil)
     #expect(objectValue(calls[2].params, key: "authors") == .array([.string("renovate[bot]")]))
@@ -161,6 +172,9 @@ extension TaskBoardAPIClientTests {
         == .array([.object(dependencyUpdatesTargetJSON)])
     )
     #expect(objectValue(calls[11].params, key: "body") == .string("@renovatebot rebase"))
+    #expect(objectValue(calls[12].params, key: "pull_request_id") == .string("pr-42"))
+    #expect(objectValue(calls[12].params, key: "page_size") == .number(50))
+    #expect(objectValue(calls[12].params, key: "direction") == .string("older"))
   }
 
   func assertDependencyUpdatesWebSocketResults(_ result: DependencyUpdatesWebSocketContractResult) {
@@ -180,6 +194,10 @@ extension TaskBoardAPIClientTests {
     #expect(result.cacheClear.clearedEntries == 2)
     #expect(result.refresh.missingPullRequestIDs == ["pr-42"])
     #expect(result.comment.results.first?.action == .comment)
+    #expect(result.timeline.pullRequestId == "pr-42")
+    #expect(result.timeline.entries.first?.id == "IC_001")
+    #expect(result.timeline.viewerCanComment)
+    #expect(result.timeline.pageInfo.hasOlder)
   }
 
   private func objectValue(_ value: JSONValue?, key: String) -> JSONValue? {
@@ -220,6 +238,7 @@ struct DependencyUpdatesWebSocketContractResult {
   let cacheClear: DependencyUpdatesCacheClearResponse
   let refresh: DependencyUpdatesRefreshResponse
   let comment: DependencyUpdatesActionResponse
+  let timeline: DependencyUpdatesTimelineResponse
 }
 
 private let dependencyUpdatesTargetJSON: [String: JSONValue] = [
