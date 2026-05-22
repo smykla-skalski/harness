@@ -17,12 +17,20 @@ extension HarnessMonitorStore {
       replayQueuedReconnectAfterBootstrapIfNeeded()
     }
 
+    pruneRepositoryLabelUsageCache()
+
     switch daemonOwnership {
     case .external:
       await bootstrapExternalDaemon()
     case .managed:
       await bootstrapManagedDaemon()
     }
+  }
+
+  private func pruneRepositoryLabelUsageCache() {
+    guard let modelContext else { return }
+    let cache = RepositoryLabelUsageCache(context: modelContext)
+    cache.pruneStale()
   }
 
   static func makeBookmarkStore() -> BookmarkStore? {
