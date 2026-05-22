@@ -1,7 +1,7 @@
 import Foundation
 import HarnessMonitorKit
 
-private struct DependencyTimelineBaseNodeDescriptor {
+private struct ReviewTimelineBaseNodeDescriptor {
   let identityID: String
   let timestamp: Date
   let rawTimestamp: String
@@ -23,13 +23,13 @@ private struct DependencyTimelineBaseNodeDescriptor {
 /// `body` (see plan §4.3). Inline review comments are emitted as
 /// indented sibling rows beneath their parent review card; the
 /// renderer applies `indentLevel * 16pt` leading padding.
-struct DependencyPullRequestTimelineNodeBuilder: Sendable {
+struct ReviewPullRequestTimelineNodeBuilder: Sendable {
   private static let heavyReviewThreadCommentThreshold = 6
 
   func buildNodes(
-    for entries: [DependencyUpdateTimelineEntry],
+    for entries: [ReviewTimelineEntry],
     pullRequestID _: String,
-    hiddenKinds: Set<DependencyUpdateTimelineKind> = [],
+    hiddenKinds: Set<ReviewTimelineKind> = [],
     autoCollapseHeavyReviewThreads: Bool = false,
     configuration _: HarnessMonitorDateTimeConfiguration
   ) -> [SessionTimelineNode] {
@@ -282,7 +282,7 @@ struct DependencyPullRequestTimelineNodeBuilder: Sendable {
   // MARK: - Helpers
 
   private func makeBaseNode(
-    _ descriptor: DependencyTimelineBaseNodeDescriptor
+    _ descriptor: ReviewTimelineBaseNodeDescriptor
   ) -> SessionTimelineNode {
     var node = SessionTimelineNode(
       identity: .entry(descriptor.identityID),
@@ -305,7 +305,7 @@ struct DependencyPullRequestTimelineNodeBuilder: Sendable {
   }
 
   private static func actorTitle(
-    _ actor: DependencyUpdateTimelineActor?,
+    _ actor: ReviewTimelineActor?,
     fallback: String
   ) -> String {
     actor?.login ?? fallback
@@ -319,7 +319,7 @@ struct DependencyPullRequestTimelineNodeBuilder: Sendable {
     return prefix + "…"
   }
 
-  private static func reviewSourceLabel(_ state: DependencyUpdateReviewState) -> String {
+  private static func reviewSourceLabel(_ state: ReviewReviewState) -> String {
     switch state {
     case .pending: return "Pending review"
     case .commented: return "Review comment"
@@ -329,7 +329,7 @@ struct DependencyPullRequestTimelineNodeBuilder: Sendable {
     }
   }
 
-  private static func reviewTone(_ state: DependencyUpdateReviewState) -> SessionTimelineTone {
+  private static func reviewTone(_ state: ReviewReviewState) -> SessionTimelineTone {
     switch state {
     case .approved: return .success
     case .changesRequested: return .warning
@@ -338,14 +338,14 @@ struct DependencyPullRequestTimelineNodeBuilder: Sendable {
   }
 
   private static func reviewTitle(
-    actor: DependencyUpdateTimelineActor?,
-    state: DependencyUpdateReviewState
+    actor: ReviewTimelineActor?,
+    state: ReviewReviewState
   ) -> String {
     let who = actor?.login ?? "Someone"
     return "\(who) \(reviewActionPhrase(state))"
   }
 
-  private static func reviewActionPhrase(_ state: DependencyUpdateReviewState) -> String {
+  private static func reviewActionPhrase(_ state: ReviewReviewState) -> String {
     switch state {
     case .pending: return "started a review"
     case .commented: return "left review comments"

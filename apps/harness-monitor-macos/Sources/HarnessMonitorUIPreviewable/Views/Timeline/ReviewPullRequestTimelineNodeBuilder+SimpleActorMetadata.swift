@@ -1,6 +1,6 @@
 import HarnessMonitorKit
 
-extension DependencyPullRequestTimelineNodeBuilder {
+extension ReviewPullRequestTimelineNodeBuilder {
   static func metadataDescriptor(
     _ payload: SimpleActorEventPayload
   ) -> SimpleActorDescriptor? {

@@ -113,7 +113,7 @@ struct SessionTimelineNode: Identifiable, Equatable, Sendable {
   var prefersCompactLayout: Bool?
   var actions: [SessionTimelineAction] = []
   /// Number of 16pt indents to apply to the row when rendered. Used by
-  /// the dependency-PR timeline to indent inline review comments
+  /// the review-PR timeline to indent inline review comments
   /// beneath their parent review card without nesting the data model.
   var indentLevel: Int = 0
   /// GitHub login of the row's actor, when one exists. Drives the

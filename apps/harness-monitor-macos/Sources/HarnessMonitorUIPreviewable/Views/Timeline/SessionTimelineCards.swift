@@ -121,7 +121,7 @@ struct SessionTimelineNodeRow: View {
   // call expanded to `modifier(ScaledFontModifier)` plus a nested `.font(_:)`
   // inside its body — two ModifiedContent layers per text label. Direct
   // `.font(precomputedFont)` is one layer and skips the `@Environment(\.fontScale)`
-  // dependency edge that AG would otherwise wire from every label back to the
+  // view-graph edge that AG would otherwise wire from every label back to the
   // row root.
   var body: some View {
     HStack(alignment: .sessionTimelineMarkerCenter, spacing: HarnessMonitorTheme.itemSpacing) {
