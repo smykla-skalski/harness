@@ -88,6 +88,8 @@ struct DashboardDependencyCommentComposer: View {
         .frame(minHeight: 96, idealHeight: 96, maxHeight: 320)
         .focused($focused)
         .disabled(isPosting || !viewerCanComment)
+        .accessibilityLabel(Text("Comment body"))
+        .accessibilityValue(Text("\(draft.count) characters"))
     }
   }
 
@@ -100,7 +102,8 @@ struct DashboardDependencyCommentComposer: View {
       Button("Send", action: send)
         .keyboardShortcut(.return, modifiers: .command)
         .disabled(trimmed.isEmpty || isPosting || !viewerCanComment)
-        .modifier(SendButtonStyleModifier())
+        .accessibilityLabel(Text(isPosting ? "Sending comment" : "Send comment"))
+        .harnessActionButtonStyle(variant: .prominent)
     }
   }
 
@@ -127,16 +130,6 @@ struct DashboardDependencyCommentComposer: View {
         lastError = "Cannot send empty comment"
       }
       isPosting = false
-    }
-  }
-}
-
-private struct SendButtonStyleModifier: ViewModifier {
-  func body(content: Content) -> some View {
-    if #available(macOS 26, *) {
-      content.buttonStyle(.borderedProminent)
-    } else {
-      content.buttonStyle(.borderedProminent)
     }
   }
 }
