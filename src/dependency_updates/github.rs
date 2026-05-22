@@ -738,7 +738,7 @@ fn comment_action_result(
     }
 }
 
-fn ensure_rustls_provider() {
+pub(crate) fn ensure_rustls_provider() {
     RUSTLS_PROVIDER.get_or_init(|| {
         let _ = default_provider().install_default();
     });
