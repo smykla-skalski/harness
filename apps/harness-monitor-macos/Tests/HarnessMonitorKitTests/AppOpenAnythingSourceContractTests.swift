@@ -7,7 +7,7 @@ struct AppOpenAnythingSourceContractTests {
   func commandKExistsWithoutReplacingCommandF() throws {
     let commandsSource = try harnessSourceFile(named: "App/HarnessMonitorAppCommands.swift")
 
-    #expect(commandsSource.contains("Button(\"Open Anything\")"))
+    #expect(commandsSource.contains("Button(\"Open Anything\", action: presentOpenAnything)"))
     #expect(commandsSource.contains(".keyboardShortcut(\"k\", modifiers: .command)"))
     #expect(commandsSource.contains("Button(searchCommandTitle)"))
     #expect(commandsSource.contains(".keyboardShortcut(\"f\", modifiers: .command)"))
