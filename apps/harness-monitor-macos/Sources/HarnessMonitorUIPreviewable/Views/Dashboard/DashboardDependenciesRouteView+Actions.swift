@@ -197,13 +197,7 @@ extension DashboardDependenciesRouteView {
     guard let client = store.apiClient else { return }
     let request = TaskBoardCreateItemRequest(
       title: "Fix CI · \(item.repository)#\(item.number)",
-      body: """
-        Investigate and restore mergeability for \(item.repository)#\(item.number).
-
-        Pull request: \(item.url)
-        Review status: \(item.reviewStatus.label)
-        Check status: \(item.checkStatus.label)
-        """,
+      body: dashboardDependencyFixCIBody(for: item, activity: activitySnapshot(for: item)),
       priority: item.requiresAttention ? .high : .medium,
       agentMode: .headless,
       tags: ["dependencies", "fix-ci"],

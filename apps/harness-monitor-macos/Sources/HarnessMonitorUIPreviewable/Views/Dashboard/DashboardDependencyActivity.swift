@@ -78,6 +78,31 @@ struct DashboardDependencyActivitySnapshot: Equatable, Sendable {
     }
     return "\(missingCheckRunURLCount)/\(totalCheckCount) check links missing"
   }
+
+  var diagnosticsText: String {
+    var lines = [
+      "Pull request ID: \(pullRequestID)",
+      "Data: \(cacheLabel)",
+    ]
+    if !fetchedAt.isEmpty {
+      lines.append("Fetched at: \(fetchedAt)")
+    }
+    if let checkLinkLabel {
+      lines.append("Check links: \(checkLinkLabel)")
+    }
+    if let actionTitle {
+      lines.append("Current action: \(actionTitle)")
+    }
+    if let lastAction {
+      lines.append("Last action: \(lastAction.title)")
+      lines.append("Outcome: \(lastAction.outcome.diagnosticsLabel)")
+      lines.append("Summary: \(lastAction.summary)")
+      lines.append(contentsOf: lastAction.messages.map { "Message: \($0)" })
+    } else {
+      lines.append("Last action: none")
+    }
+    return lines.joined(separator: "\n")
+  }
 }
 
 struct DashboardDependencyActivitySummary: View {
@@ -130,6 +155,12 @@ struct DashboardDependencyActivitySummary: View {
           .scaledFont(.callout)
           .foregroundStyle(HarnessMonitorTheme.secondaryInk)
       }
+      Button {
+        HarnessMonitorClipboard.copy(snapshot.diagnosticsText)
+      } label: {
+        Label("Copy action diagnostics", systemImage: "doc.on.doc")
+      }
+      .controlSize(.small)
     }
   }
 }
@@ -185,6 +216,13 @@ extension DashboardDependencyActivityEntry.Outcome {
     switch self {
     case .success: "checkmark.circle.fill"
     case .failure: "exclamationmark.triangle.fill"
+    }
+  }
+
+  var diagnosticsLabel: String {
+    switch self {
+    case .success: "success"
+    case .failure: "failure"
     }
   }
 }
