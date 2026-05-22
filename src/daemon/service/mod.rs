@@ -215,10 +215,10 @@ use crate::daemon::voice;
 use crate::daemon::{is_local_websocket_endpoint, is_loopback_host};
 
 mod adopt;
-mod dependency_updates;
-mod dependency_updates_files;
-mod dependency_updates_thread_resolve;
-mod dependency_updates_timeline;
+mod reviews;
+mod reviews_files;
+mod reviews_thread_resolve;
+mod reviews_timeline;
 mod direct;
 mod improver_apply;
 mod leave;
@@ -254,23 +254,23 @@ mod wake_route;
 
 pub use adopt::adopt_session_record;
 pub(crate) use adopt::adopt_session_record_async;
-pub use dependency_updates::{
-    add_label_to_dependency_updates, approve_dependency_updates, auto_dependency_updates,
-    catalog_dependency_update_repositories, clear_dependency_updates_cache,
-    comment_on_dependency_updates, dependency_updates_capabilities, fetch_dependency_update_body,
-    merge_dependency_updates, preview_dependency_update_action, query_dependency_updates,
-    refresh_dependency_updates, rerun_dependency_updates_checks, update_dependency_update_body,
+pub use reviews::{
+    add_label_to_reviews, approve_reviews, auto_reviews,
+    catalog_review_repositories, clear_reviews_cache,
+    comment_on_reviews, reviews_capabilities, fetch_review_body,
+    merge_reviews, preview_review_action, query_reviews,
+    refresh_reviews, rerun_reviews_checks, update_review_body,
 };
-pub(crate) use dependency_updates_files::BlobTextProjection;
-pub use dependency_updates_files::{
-    GcReport, delete_dependency_update_local_clone, fetch_dependency_update_file_blob,
-    list_dependency_update_files, list_dependency_update_local_clones,
-    mark_dependency_update_files_viewed, patch_dependency_update_files,
+pub(crate) use reviews_files::BlobTextProjection;
+pub use reviews_files::{
+    GcReport, delete_review_local_clone, fetch_review_file_blob,
+    list_review_files, list_review_local_clones,
+    mark_review_files_viewed, patch_review_files,
     register_local_clone_progress_sender, run_local_clone_gc,
 };
-pub use dependency_updates_thread_resolve::set_review_thread_resolved;
-pub use dependency_updates_timeline::{
-    clear_dependency_updates_caches_with_timeline, fetch_dependency_update_timeline,
+pub use reviews_thread_resolve::set_review_thread_resolved;
+pub use reviews_timeline::{
+    clear_reviews_caches_with_timeline, fetch_review_timeline,
 };
 pub use direct::{
     delete_session_direct, disconnect_agent_direct, join_session_direct, record_signal_ack_direct,

@@ -1,6 +1,6 @@
 mod config;
 mod connection;
-mod dependency_updates;
+mod reviews;
 mod dispatch;
 mod frames;
 mod mutations;

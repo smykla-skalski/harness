@@ -4,7 +4,7 @@ use crate::daemon::http::DaemonHttpState;
 use crate::daemon::protocol::{WsRequest, WsResponse, ws_methods};
 
 use super::super::connection::ConnectionState;
-use super::super::dependency_updates::dispatch_dependency_updates_method;
+use super::super::reviews::dispatch_reviews_method;
 use super::super::frames::ok_response;
 use super::super::mutations::{dispatch_session_start, dispatch_set_log_level};
 use super::super::parity::{
@@ -44,7 +44,7 @@ pub(super) async fn dispatch_known_method(
     state: &DaemonHttpState,
     connection: &Arc<Mutex<ConnectionState>>,
 ) -> Option<WsResponse> {
-    if let Some(response) = dispatch_dependency_updates_method(request, state).await {
+    if let Some(response) = dispatch_reviews_method(request, state).await {
         return Some(response);
     }
     if let Some(response) = dispatch_task_board_method(request, state).await {

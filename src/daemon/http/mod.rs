@@ -32,7 +32,7 @@ use crate::telemetry::{apply_parent_context_from_headers, current_trace_id, with
 mod agents;
 mod auth;
 mod core;
-mod dependency_updates;
+mod reviews;
 mod improver;
 mod managed_agents;
 mod openrouter_models;
@@ -254,7 +254,7 @@ pub async fn serve(
     state: DaemonHttpState,
     mut shutdown_rx: watch::Receiver<bool>,
 ) -> Result<(), CliError> {
-    // Hand the broadcast sender to the dependency-updates files module so
+    // Hand the broadcast sender to the reviews files module so
     // local-clone progress events surface on the same WS push channel.
     crate::daemon::service::register_local_clone_progress_sender(state.sender.clone());
 
@@ -307,7 +307,7 @@ fn daemon_http_router() -> Router<DaemonHttpState> {
     Router::new()
         .merge(core::core_routes())
         .merge(sessions::session_routes())
-        .merge(dependency_updates::dependency_updates_routes())
+        .merge(reviews::reviews_routes())
         .merge(task_board::task_board_routes())
         .merge(tasks::task_routes())
         .merge(improver::improver_routes())
