@@ -100,6 +100,22 @@ extension SessionCacheService {
       for row in repoSyncStates {
         context.delete(row)
       }
+      let fileViewedStates = try context.fetch(
+        FetchDescriptor<CachedDependencyUpdateFileViewedState>()
+      )
+      for row in fileViewedStates {
+        context.delete(row)
+      }
+      let cachedFiles = try context.fetch(FetchDescriptor<CachedDependencyUpdateFile>())
+      for row in cachedFiles {
+        context.delete(row)
+      }
+      let fileSummaries = try context.fetch(
+        FetchDescriptor<CachedDependencyUpdateFilesSummary>()
+      )
+      for row in fileSummaries {
+        context.delete(row)
+      }
       try context.save()
       return true
     }
