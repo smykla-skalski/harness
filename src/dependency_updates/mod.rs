@@ -15,6 +15,9 @@ pub use body_update::{
     DependencyUpdatesBodyUpdateOutcome, DependencyUpdatesBodyUpdateRequest,
     DependencyUpdatesBodyUpdateResponse,
 };
+#[allow(unused_imports)] // RegistryEntry + RepoKey are used by daemon-service tests.
+pub(crate) use files::local_clone::{LocalCloneRegistry, LocalCloneRoot, RegistryEntry, RepoKey};
+pub(crate) use files::viewed::{ViewedMutation, classify_outcome};
 pub use files::{
     DependencyUpdateFile, DependencyUpdateFileChangeType, DependencyUpdateFilePatch,
     DependencyUpdateFileServedBy, DependencyUpdateFileViewedOutcome,
@@ -27,9 +30,6 @@ pub use files::{
     DependencyUpdatesRateLimitSnapshot, FilesLargeDiffStrategy, HarnessCodeLanguage,
     LocalCloneListEntry, image_mime_for_path, infer_language,
 };
-#[allow(unused_imports)] // RegistryEntry + RepoKey are used by daemon-service tests.
-pub(crate) use files::local_clone::{LocalCloneRegistry, LocalCloneRoot, RegistryEntry, RepoKey};
-pub(crate) use files::viewed::{ViewedMutation, classify_outcome};
 pub(crate) use github::DependencyUpdatesGitHubClient;
 
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
@@ -309,6 +309,8 @@ pub struct DependencyUpdateActionResult {
     pub outcome: DependencyUpdateActionOutcome,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub message: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub timeline_entry: Option<timeline::DependencyUpdateTimelineEntry>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]

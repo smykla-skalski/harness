@@ -23,6 +23,20 @@ pub enum DependencyUpdateTimelineEntry {
     Unknown(UnknownEntry),
 }
 
+impl DependencyUpdateTimelineEntry {
+    pub fn id(&self) -> &str {
+        match self {
+            Self::IssueComment(entry) => &entry.id,
+            Self::Review(entry) => &entry.id,
+            Self::ReviewThread(entry) => &entry.id,
+            Self::Commit(entry) => &entry.id,
+            Self::HeadRefForcePushed(entry) => &entry.id,
+            Self::SimpleActorEvent(entry) => &entry.id,
+            Self::Unknown(entry) => &entry.id,
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct IssueCommentEntry {
     pub id: String,

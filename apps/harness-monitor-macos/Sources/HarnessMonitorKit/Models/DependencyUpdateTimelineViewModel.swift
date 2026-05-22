@@ -13,6 +13,7 @@ import Observation
 @MainActor
 public final class DependencyUpdateTimelineViewModel {
   public var entries: [DependencyUpdateTimelineEntry] = []
+  public private(set) var revision: UInt64 = 0
   public var startCursor: String?
   public var endCursor: String?
   public var hasOlder: Bool = false
@@ -37,6 +38,7 @@ public final class DependencyUpdateTimelineViewModel {
   /// the view can drop any "Retry" affordance.
   public func apply(initial response: DependencyUpdatesTimelineResponse) {
     entries = response.entries
+    bumpRevision()
     startCursor = response.pageInfo.startCursor
     endCursor = response.pageInfo.endCursor
     hasOlder = response.pageInfo.hasOlder
@@ -53,6 +55,7 @@ public final class DependencyUpdateTimelineViewModel {
   /// pick up where this one left off.
   public func appendOlder(_ response: DependencyUpdatesTimelineResponse) {
     entries.insert(contentsOf: response.entries, at: 0)
+    bumpRevision()
     if response.pageInfo.startCursor != nil {
       startCursor = response.pageInfo.startCursor
     }
@@ -73,6 +76,7 @@ public final class DependencyUpdateTimelineViewModel {
 
   public func clear() {
     entries.removeAll()
+    bumpRevision()
     startCursor = nil
     endCursor = nil
     hasOlder = false
@@ -90,11 +94,29 @@ public final class DependencyUpdateTimelineViewModel {
   /// `removeOptimistic(id:)` on failure.
   public func appendOptimistic(_ entry: DependencyUpdateTimelineEntry) {
     entries.append(entry)
+    bumpRevision()
   }
 
   /// Removes a previously-appended optimistic entry, used after a
   /// failed Send so the UI doesn't show a comment that never landed.
   public func removeOptimistic(id: String) {
     entries.removeAll { $0.id == id }
+    bumpRevision()
+  }
+
+  /// Replaces a synthetic optimistic entry with the real GitHub-returned
+  /// timeline entry. If the optimistic entry has already disappeared, appends
+  /// the real entry unless it is already present.
+  public func replaceOptimistic(id: String, with entry: DependencyUpdateTimelineEntry) {
+    if let index = entries.firstIndex(where: { $0.id == id }) {
+      entries[index] = entry
+    } else if !entries.contains(where: { $0.id == entry.id }) {
+      entries.append(entry)
+    }
+    bumpRevision()
+  }
+
+  private func bumpRevision() {
+    revision &+= 1
   }
 }

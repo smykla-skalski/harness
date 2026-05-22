@@ -194,6 +194,7 @@ extension TaskBoardAPIClientTests {
     #expect(result.cacheClear.clearedEntries == 2)
     #expect(result.refresh.missingPullRequestIDs == ["pr-42"])
     #expect(result.comment.results.first?.action == .comment)
+    #expect(result.comment.results.first?.timelineEntry?.id == "IC_comment_001")
     #expect(result.timeline.pullRequestId == "pr-42")
     #expect(result.timeline.entries.first?.id == "IC_001")
     #expect(result.timeline.viewerCanComment)

@@ -45,6 +45,7 @@ final class DependencyUpdateTimelineViewModelTests: XCTestCase {
 
     XCTAssertEqual(vm.entries.count, 1)
     XCTAssertEqual(vm.entries[0].id, "IC_1")
+    XCTAssertEqual(vm.revision, 1)
     XCTAssertEqual(vm.startCursor, "start")
     XCTAssertTrue(vm.hasOlder)
     XCTAssertTrue(vm.viewerCanComment)
@@ -73,6 +74,7 @@ final class DependencyUpdateTimelineViewModelTests: XCTestCase {
 
     XCTAssertEqual(vm.entries.map(\.id), ["IC_1", "IC_2"])
     XCTAssertEqual(vm.startCursor, "start-0")
+    XCTAssertEqual(vm.revision, 2)
     XCTAssertFalse(vm.hasOlder)
     XCTAssertEqual(vm.loadState, .idle)
   }
@@ -93,5 +95,20 @@ final class DependencyUpdateTimelineViewModelTests: XCTestCase {
     XCTAssertNil(vm.startCursor)
     XCTAssertFalse(vm.hasOlder)
     XCTAssertEqual(vm.loadState, .idle)
+  }
+
+  func testReplaceOptimisticKeepsSameCountButBumpsRevision() {
+    let vm = DependencyUpdateTimelineViewModel()
+    vm.appendOptimistic(issueComment(id: "optimistic-1", body: "draft"))
+    let before = vm.revision
+
+    vm.replaceOptimistic(
+      id: "optimistic-1",
+      with: issueComment(id: "IC_real", body: "draft")
+    )
+
+    XCTAssertEqual(vm.entries.map(\.id), ["IC_real"])
+    XCTAssertEqual(vm.entries.count, 1)
+    XCTAssertGreaterThan(vm.revision, before)
   }
 }

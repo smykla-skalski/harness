@@ -45,7 +45,10 @@ fn mixed_page_maps_all_supported_kinds() {
             ..
         })
     ));
-    assert!(matches!(entries[1], DependencyUpdateTimelineEntry::Review(_)));
+    assert!(matches!(
+        entries[1],
+        DependencyUpdateTimelineEntry::Review(_)
+    ));
     assert!(matches!(
         entries[2],
         DependencyUpdateTimelineEntry::HeadRefForcePushed(_)
@@ -54,7 +57,10 @@ fn mixed_page_maps_all_supported_kinds() {
         entries[3],
         DependencyUpdateTimelineEntry::HeadRefForcePushed(_)
     ));
-    assert!(matches!(entries[4], DependencyUpdateTimelineEntry::Commit(_)));
+    assert!(matches!(
+        entries[4],
+        DependencyUpdateTimelineEntry::Commit(_)
+    ));
     assert!(matches!(
         entries[5],
         DependencyUpdateTimelineEntry::HeadRefForcePushed(_)
@@ -83,16 +89,16 @@ fn mixed_page_maps_all_supported_kinds() {
     };
     assert_eq!(l.label.as_deref(), Some("dependencies"));
     assert_eq!(l.label_color.as_deref(), Some("ededed"));
-    assert_eq!(
-        l.actor.as_ref().map(|a| a.login.as_str()),
-        Some("renovate"),
-    );
+    assert_eq!(l.actor.as_ref().map(|a| a.login.as_str()), Some("renovate"),);
 
     let DependencyUpdateTimelineEntry::Review(r) = &entries[1] else {
         panic!("expected Review");
     };
     assert_eq!(r.state, ReviewState::Approved);
-    assert!(r.body.is_empty(), "GitHub web ships approvals with empty body");
+    assert!(
+        r.body.as_deref().unwrap_or_default().is_empty(),
+        "GitHub web ships approvals with empty body"
+    );
     assert_eq!(r.inline_comments.len(), 0);
     assert!(!r.comments_truncated);
 

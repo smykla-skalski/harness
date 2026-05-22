@@ -187,19 +187,22 @@ public struct DependencyUpdateActionResult: Codable, Equatable, Sendable {
   public let action: DependencyUpdateActionKind
   public let outcome: DependencyUpdateActionOutcome
   public let message: String?
+  public let timelineEntry: DependencyUpdateTimelineEntry?
 
   public init(
     repository: String,
     number: UInt64,
     action: DependencyUpdateActionKind,
     outcome: DependencyUpdateActionOutcome,
-    message: String? = nil
+    message: String? = nil,
+    timelineEntry: DependencyUpdateTimelineEntry? = nil
   ) {
     self.repository = repository
     self.number = number
     self.action = action
     self.outcome = outcome
     self.message = message
+    self.timelineEntry = timelineEntry
   }
 }
 

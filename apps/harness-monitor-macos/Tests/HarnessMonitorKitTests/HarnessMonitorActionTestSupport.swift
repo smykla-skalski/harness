@@ -310,6 +310,9 @@ final class RecordingHarnessClient: HarnessMonitorClientProtocol, @unchecked Sen
   var dependencyBodyUpdateOutcomes: [String: DependencyUpdatesBodyUpdateResponse] = [:]
   var dependencyBodyUpdateRequests: [RecordedDependencyBodyUpdateRequest] = []
   var dependencyBodyUpdateErrors: [String: any Error] = [:]
+  var dependencyCommentResponse: DependencyUpdatesActionResponse?
+  var dependencyCommentRequests: [DependencyUpdatesCommentRequest] = []
+  var dependencyCommentError: (any Error)?
   var dependencyTimelineResponses: [String: [DependencyUpdatesTimelineResponse]] = [:]
   var dependencyTimelineFetchedRequests: [DependencyUpdatesTimelineRequest] = []
   var dependencyTimelineFetchHook: (@Sendable (String) async -> Void)?

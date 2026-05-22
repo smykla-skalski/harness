@@ -4,7 +4,11 @@ use std::collections::BTreeMap;
 use std::sync::{Mutex, OnceLock};
 use std::time::{Duration, Instant};
 
-use super::{DependencyUpdatesTimelineResponse, TimelinePageDirection};
+use chrono::Utc;
+
+use super::{
+    DependencyUpdateTimelineEntry, DependencyUpdatesTimelineResponse, TimelinePageDirection,
+};
 
 pub(super) const TIMELINE_CACHE_TTL: Duration = Duration::from_secs(5 * 60);
 
@@ -55,7 +59,13 @@ pub(super) fn store(
     now: Instant,
 ) {
     let mut map = cache().lock().expect("timeline cache lock poisoned");
-    map.insert(key, CachedTimelinePage { stored_at: now, response });
+    map.insert(
+        key,
+        CachedTimelinePage {
+            stored_at: now,
+            response,
+        },
+    );
 }
 
 /// Drops every cached page that belongs to the given pull request.
@@ -65,6 +75,32 @@ pub(super) fn store(
 pub(super) fn drain_pull_request(pull_request_id: &str) {
     let mut map = cache().lock().expect("timeline cache lock poisoned");
     map.retain(|key, _| key.pull_request_id != pull_request_id);
+}
+
+/// Appends a newly-created entry to cached first pages for the PR. Cursor pages
+/// stay untouched because a just-posted comment cannot belong to older pages.
+pub(super) fn append_entry(pull_request_id: &str, entry: DependencyUpdateTimelineEntry) {
+    let now = Instant::now();
+    let mut map = cache().lock().expect("timeline cache lock poisoned");
+    for (key, cached) in &mut *map {
+        if key.pull_request_id != pull_request_id
+            || key.cursor.is_some()
+            || key.direction != TimelinePageDirection::Older
+        {
+            continue;
+        }
+        if cached
+            .response
+            .entries
+            .iter()
+            .any(|existing| existing.id() == entry.id())
+        {
+            continue;
+        }
+        cached.response.entries.push(entry.clone());
+        cached.response.fetched_at = Utc::now();
+        cached.stored_at = now;
+    }
 }
 
 /// Drops every cached page. Wired into the existing
