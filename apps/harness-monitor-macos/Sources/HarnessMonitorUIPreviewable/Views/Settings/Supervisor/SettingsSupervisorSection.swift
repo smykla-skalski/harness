@@ -18,6 +18,13 @@ public enum SupervisorPaneKey: String, CaseIterable, Hashable, Identifiable, Sen
     case .audit: "Audit"
     }
   }
+
+  /// Panes that the toolbar segmented picker should surface today. The `.audit`
+  /// pane is reachable via the cross-link and command shortcut but stays out of
+  /// the live picker until its full content ships from sibling units.
+  public static let toolbarVisibleCases: [SupervisorPaneKey] = [
+    .rules, .notifications, .background,
+  ]
 }
 
 /// Root Supervisor section in the Settings window. The pane switcher lives in the window
@@ -69,7 +76,7 @@ struct SupervisorSettingsToolbarPicker: View {
 
   var body: some View {
     Picker("Pane", selection: $selection) {
-      ForEach(SupervisorPaneKey.allCases) { pane in
+      ForEach(SupervisorPaneKey.toolbarVisibleCases) { pane in
         Text(pane.title)
           .tag(pane)
           .accessibilityIdentifier(
