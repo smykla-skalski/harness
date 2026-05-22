@@ -139,6 +139,7 @@ enum WebSocketRPCMethod: String, CaseIterable, Equatable, Sendable {
   case dependencyUpdatesFilesLocalClonesDelete =
     "dependency_updates.files_local_clones_delete"
   case dependencyUpdatesTimeline = "dependency_updates.timeline"
+  case dependencyUpdatesReviewThreadsResolve = "dependency_updates.review_threads_resolve"
   case taskCreate = "task.create"
   case taskDelete = "task.delete"
   case taskAssign = "task.assign"

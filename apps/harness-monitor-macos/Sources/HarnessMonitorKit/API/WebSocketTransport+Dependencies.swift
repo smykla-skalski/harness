@@ -158,4 +158,12 @@ extension WebSocketTransport {
     let value = try await rpc(method: .dependencyUpdatesTimeline, params: params)
     return try decode(value)
   }
+
+  public func setReviewThreadResolved(
+    request: DependencyUpdatesReviewThreadResolveRequest
+  ) async throws -> DependencyUpdatesReviewThreadResolveResponse {
+    let params = try encodeParams(request, extra: [:])
+    let value = try await rpc(method: .dependencyUpdatesReviewThreadsResolve, params: params)
+    return try decode(value)
+  }
 }
