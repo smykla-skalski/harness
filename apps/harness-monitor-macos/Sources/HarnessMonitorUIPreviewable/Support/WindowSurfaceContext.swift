@@ -67,12 +67,45 @@ public struct OpenSettingsSectionAction: Sendable {
   }
 }
 
+/// Initial filter applied when opening the Supervisor audit timeline via a
+/// cross-link. The host wires this through to whatever filter store the
+/// audit-timeline pane uses; passing `nil` for a field means "no constraint".
+public struct SupervisorAuditTimelineQuery: Equatable, Hashable, Sendable {
+  public let ruleID: String?
+  public let decisionID: String?
+
+  public init(ruleID: String? = nil, decisionID: String? = nil) {
+    self.ruleID = ruleID
+    self.decisionID = decisionID
+  }
+}
+
+public struct OpenSupervisorAuditTimelineAction: Sendable {
+  private let action: @MainActor @Sendable (SupervisorAuditTimelineQuery) -> Void
+
+  public init(
+    _ action: @escaping @MainActor @Sendable (SupervisorAuditTimelineQuery) -> Void = { _ in }
+  ) {
+    self.action = action
+  }
+
+  @MainActor
+  public func callAsFunction(_ query: SupervisorAuditTimelineQuery = SupervisorAuditTimelineQuery())
+  {
+    action(query)
+  }
+}
+
 private struct OpenTaskBoardSettingsActionKey: EnvironmentKey {
   static let defaultValue = OpenTaskBoardSettingsAction()
 }
 
 private struct OpenSettingsSectionActionKey: EnvironmentKey {
   static let defaultValue = OpenSettingsSectionAction()
+}
+
+private struct OpenSupervisorAuditTimelineActionKey: EnvironmentKey {
+  static let defaultValue = OpenSupervisorAuditTimelineAction()
 }
 
 private struct WindowSurfaceContextKey: EnvironmentKey {
@@ -88,6 +121,11 @@ extension EnvironmentValues {
   public var openSettingsSection: OpenSettingsSectionAction {
     get { self[OpenSettingsSectionActionKey.self] }
     set { self[OpenSettingsSectionActionKey.self] = newValue }
+  }
+
+  public var openSupervisorAuditTimeline: OpenSupervisorAuditTimelineAction {
+    get { self[OpenSupervisorAuditTimelineActionKey.self] }
+    set { self[OpenSupervisorAuditTimelineActionKey.self] = newValue }
   }
 
   public var windowSurfaceContext: WindowSurfaceContext {
