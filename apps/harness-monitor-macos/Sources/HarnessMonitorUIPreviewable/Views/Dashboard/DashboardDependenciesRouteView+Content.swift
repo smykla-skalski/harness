@@ -57,7 +57,13 @@ extension DashboardDependenciesRouteView {
               }
             }
           } header: {
-            repositorySectionHeader(group.repository, itemCount: group.items.count)
+            repositorySectionHeader(
+              group.repository,
+              itemCount: group.items.count,
+              busyPullRequestCount: group.items.count {
+                isPullRequestRefreshing($0.pullRequestID)
+              }
+            )
           }
         }
       } else {
@@ -157,10 +163,15 @@ extension DashboardDependenciesRouteView {
     )
   }
 
-  func repositorySectionHeader(_ repository: String, itemCount: Int) -> some View {
+  func repositorySectionHeader(
+    _ repository: String,
+    itemCount: Int,
+    busyPullRequestCount: Int
+  ) -> some View {
     DashboardDependenciesRepositorySectionHeader(
       repository: repository,
       itemCount: itemCount,
+      busyPullRequestCount: busyPullRequestCount,
       isCollapsed: routeCollapsedRepositories.contains(repository),
       scheduler: routeScheduler,
       onToggleCollapse: { toggleRepositoryCollapse(repository) }

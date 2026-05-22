@@ -5,6 +5,7 @@ import SwiftUI
 struct DashboardDependenciesRepositorySectionHeader: View {
   let repository: String
   let itemCount: Int
+  let busyPullRequestCount: Int
   let isCollapsed: Bool
   let scheduler: DashboardDependenciesScheduler
   let onToggleCollapse: () -> Void
@@ -33,6 +34,18 @@ struct DashboardDependenciesRepositorySectionHeader: View {
             accessibilityLabel: "Last synced \(relative)"
           )
         }
+        if busyPullRequestCount > 0 {
+          HStack(spacing: HarnessMonitorTheme.spacingXS) {
+            ProgressView()
+              .controlSize(.small)
+            DashboardDependencyStatusPill(
+              label: "\(busyPullRequestCount) working",
+              tint: HarnessMonitorTheme.accent
+            )
+          }
+          .accessibilityElement(children: .combine)
+          .accessibilityLabel(busyAccessibilityLabel)
+        }
         DashboardDependenciesRepositoryHeaderPill(
           title: String(itemCount),
           accessibilityLabel: itemCountAccessibilityLabel
@@ -46,6 +59,12 @@ struct DashboardDependenciesRepositorySectionHeader: View {
 
   private var itemCountAccessibilityLabel: String {
     itemCount == 1 ? "1 dependency update" : "\(itemCount) dependency updates"
+  }
+
+  private var busyAccessibilityLabel: String {
+    busyPullRequestCount == 1
+      ? "1 pull request updating"
+      : "\(busyPullRequestCount) pull requests updating"
   }
 }
 
