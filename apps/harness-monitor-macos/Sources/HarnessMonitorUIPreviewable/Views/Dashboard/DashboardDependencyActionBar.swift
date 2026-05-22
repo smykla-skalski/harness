@@ -42,7 +42,7 @@ struct DashboardDependencyActionBar: View {
     .disabled(isBusy || !items.contains { $0.canAttemptManualApproval })
 
     DashboardDependencyActionButton(
-      title: "Merge",
+      title: dashboardDependencyMergeActionTitle(for: items),
       systemImage: "arrow.triangle.merge",
       prominence: mergeProminence,
       helpText: helpTextOrBusy(DashboardDependenciesDisabledReason.mergeReason(for: items)),

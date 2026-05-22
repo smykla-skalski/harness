@@ -24,7 +24,7 @@ struct DashboardDependencyListRow: View {
     HStack(alignment: .dashboardDependencyTitleLineCenter, spacing: HarnessMonitorTheme.spacingSM) {
       leadingStatusIndicator
 
-      VStack(alignment: .leading, spacing: 2) {
+      VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingXS) {
         Text(item.title)
           .scaledFont(.callout.weight(.semibold))
           .foregroundStyle(HarnessMonitorTheme.ink)
@@ -39,6 +39,10 @@ struct DashboardDependencyListRow: View {
           .foregroundStyle(HarnessMonitorTheme.secondaryInk)
           .lineLimit(1)
           .truncationMode(.tail)
+
+        if !attentionBadgeKinds.isEmpty {
+          DashboardDependencyAttentionBadgeStrip(kinds: attentionBadgeKinds)
+        }
       }
       .layoutPriority(1)
     }
@@ -80,6 +84,10 @@ struct DashboardDependencyListRow: View {
     }
   }
 
+  private var attentionBadgeKinds: [DashboardDependencyAttentionBadgeKind] {
+    dashboardDependencyAttentionBadgeKinds(for: item)
+  }
+
   private var secondaryText: String {
     let scopedPullRequest =
       showsRepository
@@ -87,5 +95,25 @@ struct DashboardDependencyListRow: View {
       : "#\(item.number)"
     return [scopedPullRequest, item.statusLabel, item.reviewStatus.label, updatedLabel]
       .joined(separator: " · ")
+  }
+}
+
+private struct DashboardDependencyAttentionBadgeStrip: View {
+  let kinds: [DashboardDependencyAttentionBadgeKind]
+
+  var body: some View {
+    HarnessMonitorWrapLayout(
+      spacing: HarnessMonitorTheme.spacingXS,
+      lineSpacing: HarnessMonitorTheme.spacingXS
+    ) {
+      ForEach(kinds) { kind in
+        DashboardDependencyStatusPill(
+          label: kind.label,
+          tint: kind.tint,
+          systemImage: kind.systemImage,
+          isQuiet: true
+        )
+      }
+    }
   }
 }
