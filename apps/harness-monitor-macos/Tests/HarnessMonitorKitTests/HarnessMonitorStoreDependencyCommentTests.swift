@@ -82,4 +82,46 @@ final class HarnessMonitorStoreDependencyCommentTests: XCTestCase {
       "optimistic entry must be reverted when the comment post fails"
     )
   }
+
+  func testSuccessReplacesOptimisticEntryWithGitHubEntry() async throws {
+    let client = RecordingHarnessClient()
+    let landedEntry = DependencyUpdateTimelineEntry.issueComment(
+      IssueCommentPayload(
+        id: "IC_landed",
+        createdAt: "2026-05-22T11:00:00Z",
+        actor: DependencyUpdateTimelineActor(login: "alice"),
+        body: "ship it",
+        viewerDidAuthor: true,
+        viewerCanEdit: true
+      )
+    )
+    client.configureDependencyCommentResponse(
+      DependencyUpdatesActionResponse(
+        summary: "Posted dependency update comment: 1 applied, 0 skipped, 0 failed",
+        results: [
+          DependencyUpdateActionResult(
+            repository: "acme/api",
+            number: 7,
+            action: .comment,
+            outcome: .applied,
+            timelineEntry: landedEntry
+          )
+        ]
+      )
+    )
+    let store = try makeStore(client: client)
+    let viewModel = store.dependencyUpdateTimelineViewModel(for: "PR_c1")
+
+    let outcome = await store.postDependencyUpdateComment(
+      for: makeItem(),
+      body: "ship it",
+      viewerLogin: "alice"
+    )
+
+    if case .posted = outcome {
+      XCTAssertEqual(viewModel.entries.map(\.id), ["IC_landed"])
+    } else {
+      XCTFail("expected .posted outcome, got \(outcome)")
+    }
+  }
 }

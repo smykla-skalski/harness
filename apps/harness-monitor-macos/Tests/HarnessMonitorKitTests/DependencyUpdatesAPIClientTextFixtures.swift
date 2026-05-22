@@ -218,7 +218,17 @@ let sampleDependencyCommentResponseText =
         "number": 42,
         "action": "comment",
         "outcome": "applied",
-        "message": null
+        "message": null,
+        "timeline_entry": {
+          "kind": "issue_comment",
+          "id": "IC_comment_001",
+          "created_at": "2026-05-22T11:00:00Z",
+          "body": "@renovatebot rebase",
+          "is_minimized": false,
+          "reactions_total": 0,
+          "viewer_did_author": true,
+          "viewer_can_edit": true
+        }
       }
     ]
   }

@@ -395,8 +395,7 @@ fn required_failed_check_names(
     checks
         .iter()
         .filter(|check| {
-            required.contains(check.name.as_str())
-                && is_failed_check_conclusion(check.conclusion)
+            required.contains(check.name.as_str()) && is_failed_check_conclusion(check.conclusion)
         })
         .map(|check| check.name.clone())
         .collect::<BTreeSet<_>>()
@@ -443,6 +442,7 @@ pub(super) fn action_result(
             action,
             outcome: DependencyUpdateActionOutcome::Applied,
             message: None,
+            timeline_entry: None,
         },
         Err(error) => DependencyUpdateActionResult {
             repository: target.repository.clone(),
@@ -450,6 +450,7 @@ pub(super) fn action_result(
             action,
             outcome: DependencyUpdateActionOutcome::Failed,
             message: Some(error.to_string()),
+            timeline_entry: None,
         },
     }
 }

@@ -13,10 +13,10 @@ extension HarnessMonitorStore {
   /// timeline view model so the UI reflects the user's action with no
   /// perceivable lag.
   ///
-  /// On success the optimistic entry stays in place — the daemon's
-  /// cache-append path (plan §2.7) covers any subsequent fetch. On
-  /// failure the optimistic entry is removed and the outcome carries
-  /// the reason string for the composer to surface.
+  /// On success the daemon returns the created GitHub comment as a
+  /// timeline entry, so the synthetic optimistic id is replaced with
+  /// the durable GitHub id. On failure the optimistic entry is removed
+  /// and the outcome carries the reason string for the composer to surface.
   public func postDependencyUpdateComment(
     for item: DependencyUpdateItem,
     body: String,
@@ -47,9 +47,14 @@ extension HarnessMonitorStore {
     viewModel.appendOptimistic(optimisticEntry)
 
     do {
-      _ = try await client.commentDependencyUpdates(
+      let response = try await client.commentDependencyUpdates(
         request: DependencyUpdatesCommentRequest(targets: [item.target], body: trimmed)
       )
+      if let landedEntry = response.results.first(where: {
+        $0.outcome == .applied && $0.timelineEntry != nil
+      })?.timelineEntry {
+        viewModel.replaceOptimistic(id: optimisticID, with: landedEntry)
+      }
       return .posted(optimisticID: optimisticID)
     } catch {
       viewModel.removeOptimistic(id: optimisticID)

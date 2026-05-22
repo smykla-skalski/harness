@@ -9,7 +9,7 @@ mod types;
 
 pub(crate) use client::TimelineGitHubClient;
 
-pub(crate) use service::{fetch_timeline_page, TimelineClient, TimelineError};
+pub(crate) use service::{TimelineClient, TimelineError, fetch_timeline_page};
 
 /// Clears the in-memory timeline cache and returns how many pages
 /// were evicted. Called from the daemon's combined cache-clear
@@ -17,6 +17,17 @@ pub(crate) use service::{fetch_timeline_page, TimelineClient, TimelineError};
 /// in one shot.
 pub(crate) fn drain_timeline_cache() -> usize {
     cache::drain_all_counted()
+}
+
+pub(crate) fn map_timeline_node(node: &serde_json::Value) -> Option<DependencyUpdateTimelineEntry> {
+    mapping::map_node(node)
+}
+
+pub(crate) fn append_timeline_entry_to_cache(
+    pull_request_id: &str,
+    entry: DependencyUpdateTimelineEntry,
+) {
+    cache::append_entry(pull_request_id, entry);
 }
 
 #[cfg(test)]
@@ -70,4 +81,3 @@ pub struct TimelinePageInfo {
     pub has_older: bool,
     pub has_newer: bool,
 }
-

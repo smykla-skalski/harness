@@ -51,7 +51,7 @@ use super::{
     DependencyUpdateReviewEventState, DependencyUpdateReviewStatus, DependencyUpdateTarget,
     DependencyUpdatesApproveRequest, DependencyUpdatesAutoRequest, DependencyUpdatesCommentRequest,
     DependencyUpdatesLabelRequest, DependencyUpdatesMergeRequest, DependencyUpdatesQueryRequest,
-    DependencyUpdatesRerunChecksRequest,
+    DependencyUpdatesRerunChecksRequest, timeline,
 };
 
 pub(crate) struct DependencyUpdatesFetch {
@@ -288,10 +288,7 @@ impl DependencyUpdatesGitHubClient {
         super::files::list::fetch_files(&self.client, request, Utc::now())
             .await
             .map_err(|err| {
-                CliErrorKind::workflow_io(format!(
-                    "dependency-updates files list: {err}"
-                ))
-                .into()
+                CliErrorKind::workflow_io(format!("dependency-updates files list: {err}")).into()
             })
     }
 
@@ -332,8 +329,7 @@ impl DependencyUpdatesGitHubClient {
         &self,
         repository_id: &str,
         oid: &str,
-    ) -> Result<crate::daemon::service::BlobTextProjection, CliError>
-    {
+    ) -> Result<crate::daemon::service::BlobTextProjection, CliError> {
         use base64::Engine as _;
         #[derive(Debug, serde::Deserialize)]
         struct RepositoryBlobResponse {
@@ -361,14 +357,11 @@ impl DependencyUpdatesGitHubClient {
             }))
             .await
             .map_err(operation_error)?;
-        let blob = response
-            .node
-            .and_then(|node| node.object)
-            .ok_or_else(|| {
-                CliErrorKind::workflow_parse(format!(
-                    "dependency-updates blob '{oid}' was not found in repository '{repository_id}'"
-                ))
-            })?;
+        let blob = response.node.and_then(|node| node.object).ok_or_else(|| {
+            CliErrorKind::workflow_parse(format!(
+                "dependency-updates blob '{oid}' was not found in repository '{repository_id}'"
+            ))
+        })?;
         let byte_size = blob.byte_size.unwrap_or_default();
         let content_base64 = blob
             .text
@@ -376,16 +369,13 @@ impl DependencyUpdatesGitHubClient {
             .map(|text| base64::engine::general_purpose::STANDARD.encode(text.as_bytes()))
             .unwrap_or_default();
         let is_truncated = blob.is_truncated.unwrap_or_default();
-        let is_too_large =
-            crate::dependency_updates::files::blob::blob_exceeds_cap(byte_size);
-        Ok(
-            crate::daemon::service::BlobTextProjection {
-                content_base64,
-                byte_size,
-                is_truncated,
-                is_too_large,
-            },
-        )
+        let is_too_large = crate::dependency_updates::files::blob::blob_exceeds_cap(byte_size);
+        Ok(crate::daemon::service::BlobTextProjection {
+            content_base64,
+            byte_size,
+            is_truncated,
+            is_too_large,
+        })
     }
 
     pub(crate) async fn fetch_pull_request_body(
@@ -473,12 +463,9 @@ impl DependencyUpdatesGitHubClient {
                         "body": request.body,
                     },
                 }))
-                .await;
-            results.push(action_result(
-                target,
-                DependencyUpdateActionKind::Comment,
-                result.map(|_| ()).map_err(operation_error),
-            ));
+                .await
+                .map_err(operation_error);
+            results.push(comment_action_result(target, result));
         }
         Ok(results)
     }
@@ -527,6 +514,7 @@ impl DependencyUpdatesGitHubClient {
                     action: DependencyUpdateActionKind::RerunChecks,
                     outcome: DependencyUpdateActionOutcome::Skipped,
                     message: Some("no rerunnable check suites were available".to_string()),
+                    timeline_entry: None,
                 });
                 continue;
             }
@@ -643,6 +631,38 @@ impl DependencyUpdatesGitHubClient {
             ));
         }
         Ok(results)
+    }
+}
+
+fn comment_action_result(
+    target: &DependencyUpdateTarget,
+    result: Result<serde_json::Value, CliError>,
+) -> DependencyUpdateActionResult {
+    match result {
+        Ok(value) => {
+            let entry = value
+                .pointer("/addComment/commentEdge/node")
+                .and_then(timeline::map_timeline_node);
+            if let Some(entry) = entry.clone() {
+                timeline::append_timeline_entry_to_cache(&target.pull_request_id, entry);
+            }
+            DependencyUpdateActionResult {
+                repository: target.repository.clone(),
+                number: target.number,
+                action: DependencyUpdateActionKind::Comment,
+                outcome: DependencyUpdateActionOutcome::Applied,
+                message: None,
+                timeline_entry: entry,
+            }
+        }
+        Err(error) => DependencyUpdateActionResult {
+            repository: target.repository.clone(),
+            number: target.number,
+            action: DependencyUpdateActionKind::Comment,
+            outcome: DependencyUpdateActionOutcome::Failed,
+            message: Some(error.to_string()),
+            timeline_entry: None,
+        },
     }
 }
 

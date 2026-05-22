@@ -84,6 +84,18 @@ extension RecordingHarnessClient {
     }
   }
 
+  func configureDependencyCommentResponse(_ response: DependencyUpdatesActionResponse) {
+    lock.withLock {
+      dependencyCommentResponse = response
+    }
+  }
+
+  func configureDependencyCommentError(_ error: any Error) {
+    lock.withLock {
+      dependencyCommentError = error
+    }
+  }
+
   func dependencyBodyUpdateCallCount() -> Int {
     lock.withLock { dependencyBodyUpdateRequests.count }
   }
@@ -122,5 +134,21 @@ extension RecordingHarnessClient {
       prUpdatedAt: "2026-05-21T00:00:00Z",
       fetchedAt: "2026-05-21T00:00:00Z"
     )
+  }
+
+  func commentDependencyUpdates(
+    request: DependencyUpdatesCommentRequest
+  ) async throws -> DependencyUpdatesActionResponse {
+    let (response, error): (DependencyUpdatesActionResponse?, (any Error)?) = lock.withLock {
+      dependencyCommentRequests.append(request)
+      return (dependencyCommentResponse, dependencyCommentError)
+    }
+    if let error {
+      throw error
+    }
+    if let response {
+      return response
+    }
+    throw HarnessMonitorAPIError.server(code: 501, message: "Dependencies unavailable")
   }
 }
