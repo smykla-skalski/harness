@@ -410,23 +410,3 @@ public enum HarnessMonitorAccessibility {
   public static let voiceInputFailureRetryButton = "harness.voice-input.failure.retry"
   public static let voiceInputFailureCloseButton = "harness.voice-input.failure.close"
 }
-
-/// Policy-canvas autosave decompensation + recovery affordances. Split out
-/// into an extension to keep the parent enum body within the
-/// `type_body_length` lint ceiling.
-extension HarnessMonitorAccessibility {
-  public static let policyCanvasAutosaveDisabledAffordance =
-    "harness.policy-canvas.autosave.disabled"
-  public static let policyCanvasAutosaveDisabledRetryButton =
-    "harness.policy-canvas.autosave.disabled.retry"
-  public static let policyCanvasRecoveryAffordance =
-    "harness.policy-canvas.autosave.recovery"
-  public static let policyCanvasRecoveryButton =
-    "harness.policy-canvas.autosave.recovery.button"
-  public static let policyCanvasRecoveryDismissButton =
-    "harness.policy-canvas.autosave.recovery.dismiss"
-  public static let policyCanvasShortcuts =
-    "harness.policy-canvas.shortcuts"
-  public static let policyCanvasShortcutsToggle =
-    "harness.policy-canvas.shortcuts.toggle"
-}
