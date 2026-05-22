@@ -116,6 +116,31 @@ public enum HarnessMonitorAccessibility {
     "harness.dashboard.dependencies.selection"
   public static let dashboardDependenciesDescription =
     "harness.dashboard.dependencies.description"
+  public static let dashboardDependencyFilesSection =
+    "harness.dashboard.dependencies.files.section"
+  public static let dashboardDependencyFilesHeader =
+    "harness.dashboard.dependencies.files.header"
+  public static let dashboardDependencyFilesFilterField =
+    "harness.dashboard.dependencies.files.filter"
+  public static let dashboardDependencyFilesSortMenu =
+    "harness.dashboard.dependencies.files.sort"
+  public static let dashboardDependencyFilesTree =
+    "harness.dashboard.dependencies.files.tree"
+  public static let dashboardDependencyFilesEmptyState =
+    "harness.dashboard.dependencies.files.empty"
+
+  public static func dashboardDependencyFileCard(path: String) -> String {
+    "harness.dashboard.dependencies.files.card.\(slug(path))"
+  }
+
+  public static func dashboardDependencyFileViewedToggle(path: String) -> String {
+    "harness.dashboard.dependencies.files.viewed-toggle.\(slug(path))"
+  }
+
+  public static func dashboardDependencyFileViewModeMenu(path: String) -> String {
+    "harness.dashboard.dependencies.files.view-mode.\(slug(path))"
+  }
+
   public static let dashboardNewSessionButton = "harness.dashboard.new-session"
   public static let dashboardOpenFolderButton = "harness.dashboard.open-folder"
   public static let sessionsBoardRoot = "harness.board.root"
