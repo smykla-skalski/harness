@@ -133,7 +133,12 @@ struct SessionTimelineNodeRow: View {
         .frame(width: SessionTimelineLayout.timeColumnWidth, alignment: .leading)
         .accessibilityHidden(true)
 
-      SessionTimelineDot(tint: cardTint)
+      if let login = node.actorLogin {
+        AvatarImageView(login: login, size: 18)
+          .frame(width: SessionTimelineLayout.railWidth, alignment: .center)
+      } else {
+        SessionTimelineDot(tint: cardTint)
+      }
 
       VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
         cardContent
