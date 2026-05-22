@@ -24,8 +24,10 @@ final class ActSurfaceAssertionTests: XCTestCase {
 
   func testAct1FindsCockpitAndSelectedSidebarRow() {
     let session = "sess-foo"
+    let toolbarChromeLabel =
+      "toolbarTitle=native-window, windowTitle=Cockpit, toolbarBackground=automatic"
     let text = """
-      Other, 0x1, {{0.0, 0.0}, {1.0, 1.0}}, identifier: 'harness.toolbar.chrome.state', label: 'toolbarTitle=native-window, windowTitle=Cockpit, toolbarBackground=automatic'
+      Other, 0x1, {{0.0, 0.0}, {1.0, 1.0}}, identifier: 'harness.toolbar.chrome.state', label: '\(toolbarChromeLabel)'
       Cell, 0x2, {{0.0, 0.0}, {1.0, 1.0}}, identifier: 'harness.sidebar.session.\(session)', label: 'foo', Selected
       """
     let findings = RecordingTriage.assertActSurface(

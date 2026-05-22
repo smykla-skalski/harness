@@ -157,7 +157,8 @@ struct DashboardDependenciesDisabledReasonTests {
     #expect(confirmation?.confirmButtonTitle == "Merge Anyway")
     #expect(confirmation?.confirmRole != nil)
     #expect(confirmation?.message.contains("Required checks failing: ci / test.") == true)
-    #expect(confirmation?.message.contains("bypass branch protections and merge immediately") == true)
+    #expect(
+      confirmation?.message.contains("bypass branch protections and merge immediately") == true)
   }
 
   @Test("Rerun reason distinguishes passing from pending checks")

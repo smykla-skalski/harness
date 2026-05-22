@@ -138,7 +138,7 @@ extension PersistenceOfflineDurabilityTests {
 
     #expect(projects.count == 1)
     #expect(migratedProject?.projectId == "proj-1")
-    #expect(migratedProject?.worktrees == [])
+    #expect(migratedProject?.worktrees.isEmpty == true)
 
     #expect(sessions.count == 1)
     #expect(migratedSession?.sessionId == "sess-1")

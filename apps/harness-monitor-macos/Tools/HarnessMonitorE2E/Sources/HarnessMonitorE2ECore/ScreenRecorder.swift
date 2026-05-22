@@ -324,8 +324,11 @@ private final class Runner: NSObject, SCRecordingOutputDelegate {
     let frameHeight = Int(ceil(captureWindow.frame.height))
     let originX = Int(captureWindow.frame.origin.x)
     let originY = Int(captureWindow.frame.origin.y)
+    let selectedWindowBundleID = selectedWindow.bundleIdentifier ?? "?"
+    let captureWindowFrameSummary = "\(frameWidth)x\(frameHeight)+\(originX)+\(originY)"
     try appendLog(
-      "selecting-window id=\(selectedWindow.windowID) bundle_id=\(selectedWindow.bundleIdentifier ?? "?") title=\(selectedWindow.title) frame=\(frameWidth)x\(frameHeight)+\(originX)+\(originY)"
+      "selecting-window id=\(selectedWindow.windowID) bundle_id=\(selectedWindowBundleID) "
+        + "title=\(selectedWindow.title) frame=\(captureWindowFrameSummary)"
     )
     let readiness = ScreenRecorderWindowReadiness.evaluate(
       windowFrame: captureWindow.frame,
@@ -342,7 +345,9 @@ private final class Runner: NSObject, SCRecordingOutputDelegate {
       selectedDisplayCandidate = candidate
     }
     try appendLog(
-      "using-window id=\(selectedWindow.windowID) title=\(selectedWindow.title) bundle_id=\(selectedWindow.bundleIdentifier ?? "?") display_id=\(selectedDisplayCandidate.displayID) size=\(frameWidth)x\(frameHeight) recording_scope=window"
+      "using-window id=\(selectedWindow.windowID) title=\(selectedWindow.title) "
+        + "bundle_id=\(selectedWindowBundleID) display_id=\(selectedDisplayCandidate.displayID) "
+        + "size=\(frameWidth)x\(frameHeight) recording_scope=window"
     )
     return CaptureTarget(window: captureWindow)
   }

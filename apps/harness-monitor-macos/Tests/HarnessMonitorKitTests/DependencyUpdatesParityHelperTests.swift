@@ -167,9 +167,9 @@ struct DependencyUpdatesParityHelperTests {
     decoder.keyDecodingStrategy = .convertFromSnakeCase
     let item = try decoder.decode(DependencyUpdateItem.self, from: Data(payload.utf8))
 
-    #expect(item.labels == [])
-    #expect(item.checks == [])
-    #expect(item.reviews == [])
+    #expect(item.labels.isEmpty)
+    #expect(item.checks.isEmpty)
+    #expect(item.reviews.isEmpty)
     #expect(item.pullRequestID == "pr-1")
   }
 

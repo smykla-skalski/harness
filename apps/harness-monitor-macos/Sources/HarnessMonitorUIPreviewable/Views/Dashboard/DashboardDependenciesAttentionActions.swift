@@ -38,7 +38,8 @@ func dashboardDependencyActionConfirmation(
   items: [DependencyUpdateItem]
 ) -> DashboardDependencyActionConfirmation? {
   guard items.contains(where: \.requiresAttention) else { return nil }
-  let destructiveMerge = action == .merge
+  let destructiveMerge =
+    action == .merge
     && items.contains(where: \.requiresAdminMergeForRequiredFailures)
   return DashboardDependencyActionConfirmation(
     action: action,
@@ -123,7 +124,8 @@ private func dashboardDependencyAttentionReasonMessages(
       )
     )
   }
-  let optionalFailures = items.filter { $0.checkStatus == .failure && !$0.hasRequiredFailedChecks }.count
+  let optionalFailures = items.filter { $0.checkStatus == .failure && !$0.hasRequiredFailedChecks }
+    .count
   if optionalFailures > 0 {
     messages.append(
       dashboardDependencyCountMessage(
