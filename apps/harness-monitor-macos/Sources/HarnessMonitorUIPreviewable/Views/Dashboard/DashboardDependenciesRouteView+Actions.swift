@@ -100,6 +100,11 @@ extension DashboardDependenciesRouteView {
     }
   }
 
+  func refresh(items: [DependencyUpdateItem]) {
+    guard let client = store.apiClient, !items.isEmpty else { return }
+    scheduleAffectedRefresh(for: items, using: client)
+  }
+
   func addLabel(_ label: String, to items: [DependencyUpdateItem]) async {
     await performMutation(
       "Labeling",

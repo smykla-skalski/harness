@@ -163,6 +163,7 @@ extension DashboardDependenciesRouteView {
       onApprove: { Task { await approve(items: items) } },
       onMerge: { Task { await merge(items: items) } },
       onRerunChecks: { Task { await rerunChecks(items: items) } },
+      onRefresh: { refresh(items: items) },
       onSelectLabel: { name in Task { await addLabel(name, to: items) } },
       onCustomLabel: {
         routeLabelTargetItems = items

@@ -9,6 +9,7 @@ struct DashboardDependencyActionBar: View {
   let onApprove: () -> Void
   let onMerge: () -> Void
   let onRerunChecks: () -> Void
+  let onRefresh: () -> Void
   let onSelectLabel: (String) -> Void
   let onCustomLabel: () -> Void
   let onCopyApprovalLinks: () -> Void
@@ -46,6 +47,17 @@ struct DashboardDependencyActionBar: View {
       action: onRerunChecks
     )
     .disabled(!items.contains { $0.hasRerunnableChecks })
+
+    DashboardDependencyActionButton(
+      title: "Refresh",
+      systemImage: "arrow.clockwise",
+      prominence: .secondary,
+      action: onRefresh
+    )
+    .disabled(items.isEmpty)
+    .accessibilityIdentifier(
+      HarnessMonitorAccessibility.dashboardDependenciesRefreshSelectedButton
+    )
 
     DashboardDependenciesLabelPickerActionMenu(
       labels: availableLabels,
