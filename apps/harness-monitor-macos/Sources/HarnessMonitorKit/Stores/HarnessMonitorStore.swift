@@ -297,6 +297,9 @@ public final class HarnessMonitorStore {
   @ObservationIgnored public let dependencyUpdateBodies = DependencyUpdateBodyStore()
   public var dependencyUpdateBodyState: [String: DependencyUpdateBodyState] = [:]
   @ObservationIgnored var pendingDependencyUpdateBodyFetches: Set<String> = []
+  @ObservationIgnored
+  var dependencyUpdateTimelineViewModels: [String: DependencyUpdateTimelineViewModel] = [:]
+  @ObservationIgnored var pendingDependencyUpdateTimelineFetches: Set<String> = []
   @ObservationIgnored var pendingDependencyUpdateBodyEdits:
     [String: PendingDependencyUpdateBodyEdit] = [:]
   @ObservationIgnored var locallyRemovedSessionIDs: Set<String> = []
