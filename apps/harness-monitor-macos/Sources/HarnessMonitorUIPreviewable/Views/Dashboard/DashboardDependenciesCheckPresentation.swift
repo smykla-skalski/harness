@@ -1,6 +1,20 @@
 import HarnessMonitorKit
 
 extension DependencyUpdateCheck {
+  var displayPriority: Int {
+    if status != .completed {
+      return 1
+    }
+    switch conclusion {
+    case .failure, .cancelled, .timedOut, .actionRequired, .startupFailure:
+      return 0
+    case .success:
+      return 2
+    case .none, .neutral, .skipped, .stale, .unknown:
+      return 3
+    }
+  }
+
   var isPassing: Bool {
     status == .completed && conclusion == .success
   }
