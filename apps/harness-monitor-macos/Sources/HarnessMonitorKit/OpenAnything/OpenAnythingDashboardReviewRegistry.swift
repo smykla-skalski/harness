@@ -1,7 +1,7 @@
 import Foundation
 import Observation
 
-public struct DashboardDependencySelectionRequest: Equatable, Hashable, Sendable {
+public struct DashboardReviewSelectionRequest: Equatable, Hashable, Sendable {
   public let requestID: Int
   public let pullRequestID: String
 
@@ -13,23 +13,23 @@ public struct DashboardDependencySelectionRequest: Equatable, Hashable, Sendable
 
 @MainActor
 @Observable
-public final class OpenAnythingDashboardDependencyRegistry {
-  public static let shared = OpenAnythingDashboardDependencyRegistry()
+public final class OpenAnythingDashboardReviewRegistry {
+  public static let shared = OpenAnythingDashboardReviewRegistry()
 
-  public private(set) var loadedItems: [DependencyUpdateItem] = []
-  public private(set) var selectionRequest: DashboardDependencySelectionRequest?
+  public private(set) var loadedItems: [ReviewItem] = []
+  public private(set) var selectionRequest: DashboardReviewSelectionRequest?
   private var selectionSequence = 0
 
   public init() {}
 
-  public func replaceLoadedItems(_ items: [DependencyUpdateItem]) {
+  public func replaceLoadedItems(_ items: [ReviewItem]) {
     guard loadedItems != items else { return }
     loadedItems = items
   }
 
   public func requestSelection(pullRequestID: String) {
     selectionSequence += 1
-    selectionRequest = DashboardDependencySelectionRequest(
+    selectionRequest = DashboardReviewSelectionRequest(
       requestID: selectionSequence,
       pullRequestID: pullRequestID
     )

@@ -36,7 +36,7 @@ public struct OpenAnythingCorpusInput: Sendable {
   public let sessions: [SessionSummary]
   public let taskBoardItems: [TaskBoardItem]
   public let decisions: [DecisionPresentationSnapshot]
-  public let dependencies: [DependencyUpdateItem]
+  public let dependencies: [ReviewItem]
   public let loadedSession: OpenAnythingLoadedSessionSnapshot?
   public let showsPolicyCanvasLab: Bool
 
@@ -45,7 +45,7 @@ public struct OpenAnythingCorpusInput: Sendable {
     sessions: [SessionSummary],
     taskBoardItems: [TaskBoardItem],
     decisions: [DecisionPresentationSnapshot],
-    dependencies: [DependencyUpdateItem],
+    dependencies: [ReviewItem],
     loadedSession: OpenAnythingLoadedSessionSnapshot?,
     showsPolicyCanvasLab: Bool
   ) {
@@ -79,7 +79,7 @@ public enum OpenAnythingCorpusBuilder {
       .attachExternalSession,
       .openDashboard,
       .openTaskBoard,
-      .openDependencies,
+      .openReviews,
       .openNotifications,
       .openDiagnostics,
       .refresh,
@@ -213,12 +213,12 @@ public enum OpenAnythingCorpusBuilder {
     }
   }
 
-  private static func dependencyRecords(_ items: [DependencyUpdateItem]) -> [OpenAnythingRecord] {
+  private static func dependencyRecords(_ items: [ReviewItem]) -> [OpenAnythingRecord] {
     items.map { item in
       OpenAnythingRecord(
         id: "dependency.\(item.pullRequestID)",
         domain: .dependencies,
-        target: .dependency(pullRequestID: item.pullRequestID),
+        target: .review(pullRequestID: item.pullRequestID),
         title: item.title,
         subtitle: "\(item.repository)#\(item.number)",
         trailing: item.checkStatus.rawValue,

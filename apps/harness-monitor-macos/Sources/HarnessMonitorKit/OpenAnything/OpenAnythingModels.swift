@@ -7,7 +7,7 @@ public enum OpenAnythingDomain: String, CaseIterable, Codable, Hashable, Identif
   case sessions
   case taskBoard
   case decisions
-  case dependencies
+  case reviews
   case loadedSession
 
   public var id: String { rawValue }
@@ -20,7 +20,7 @@ public enum OpenAnythingDomain: String, CaseIterable, Codable, Hashable, Identif
     case .sessions: "Sessions"
     case .taskBoard: "Task Board"
     case .decisions: "Decisions"
-    case .dependencies: "Dependencies"
+    case .reviews: "Reviews"
     case .loadedSession: "Loaded Session"
     }
   }
@@ -33,7 +33,7 @@ public enum OpenAnythingDomain: String, CaseIterable, Codable, Hashable, Identif
     case .sessions: "rectangle.stack"
     case .taskBoard: "checklist"
     case .decisions: "checkmark.diamond"
-    case .dependencies: "shippingbox"
+    case .reviews: "shippingbox"
     case .loadedSession: "sidebar.leading"
     }
   }
@@ -45,7 +45,7 @@ public enum OpenAnythingAction: String, Codable, CaseIterable, Hashable, Sendabl
   case attachExternalSession
   case openDashboard
   case openTaskBoard
-  case openDependencies
+  case openReviews
   case openNotifications
   case openPolicyCanvas
   case openDiagnostics
@@ -70,7 +70,7 @@ public enum OpenAnythingDashboardRoute: String, Codable, CaseIterable, Hashable,
   case policyCanvas
   case notifications
   case diagnostics
-  case dependencies
+  case reviews
 
   public var title: String {
     switch self {
@@ -78,7 +78,7 @@ public enum OpenAnythingDashboardRoute: String, Codable, CaseIterable, Hashable,
     case .policyCanvas: "Policy"
     case .notifications: "Notifications"
     case .diagnostics: "Diagnostics"
-    case .dependencies: "Dependencies"
+    case .reviews: "Reviews"
     }
   }
 
@@ -88,7 +88,7 @@ public enum OpenAnythingDashboardRoute: String, Codable, CaseIterable, Hashable,
     case .policyCanvas: "point.3.connected.trianglepath.dotted"
     case .notifications: "bell.badge"
     case .diagnostics: "stethoscope"
-    case .dependencies: "shippingbox.circle"
+    case .reviews: "shippingbox.circle"
     }
   }
 }
@@ -107,7 +107,7 @@ public enum OpenAnythingTarget: Codable, Hashable, Sendable {
   case session(sessionID: String)
   case taskBoardItem(id: String, sessionID: String?, workItemID: String?)
   case decision(id: String, sessionID: String?)
-  case dependency(pullRequestID: String)
+  case review(pullRequestID: String)
   case loadedSession(OpenAnythingLoadedSessionTarget)
 }
 

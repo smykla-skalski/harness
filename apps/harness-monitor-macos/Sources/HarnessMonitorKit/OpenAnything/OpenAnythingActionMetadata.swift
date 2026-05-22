@@ -7,7 +7,7 @@ extension OpenAnythingCorpusBuilder {
     switch action {
     case .newSession, .newTask, .attachExternalSession:
       "Create"
-    case .openDashboard, .openTaskBoard, .openDependencies, .openNotifications,
+    case .openDashboard, .openTaskBoard, .openReviews, .openNotifications,
       .openPolicyCanvas, .openDiagnostics:
       "Navigate"
     case .refresh:
@@ -36,7 +36,7 @@ extension OpenAnythingCorpusBuilder {
   static let suggestedActions: Set<OpenAnythingAction> = [
     .newSession,
     .openTaskBoard,
-    .openDependencies,
+    .openReviews,
     .openDiagnostics,
     .refresh,
   ]
@@ -45,7 +45,7 @@ extension OpenAnythingCorpusBuilder {
     switch action {
     case .openTaskBoard:
       "task board board operations dispatch"
-    case .openDependencies:
+    case .openReviews:
       "dependency pull requests prs renovate checks merge approvals"
     case .openDiagnostics, .refreshDiagnostics, .copyDiagnostics:
       "diagnostics health daemon cache provenance freshness mcp"
@@ -70,7 +70,7 @@ extension OpenAnythingCorpusBuilder {
     .attachExternalSession: "Attach External Session",
     .openDashboard: "Open Dashboard",
     .openTaskBoard: "Open Board",
-    .openDependencies: "Open Dependencies",
+    .openReviews: "Open Reviews",
     .openNotifications: "Open Notifications",
     .openPolicyCanvas: "Open Policy",
     .openDiagnostics: "Open Diagnostics",
@@ -90,7 +90,7 @@ extension OpenAnythingCorpusBuilder {
     .attachExternalSession: "link.badge.plus",
     .openDashboard: "square.grid.2x2",
     .openTaskBoard: "list.bullet.rectangle",
-    .openDependencies: "shippingbox.circle",
+    .openReviews: "shippingbox.circle",
     .openNotifications: "bell.badge",
     .openPolicyCanvas: "point.3.connected.trianglepath.dotted",
     .openDiagnostics: "stethoscope",
