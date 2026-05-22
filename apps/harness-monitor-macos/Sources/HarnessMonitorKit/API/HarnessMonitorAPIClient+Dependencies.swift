@@ -58,4 +58,10 @@ extension HarnessMonitorAPIClient {
   ) async throws -> DependencyUpdatesBodyResponse {
     try await post("/v1/dependency-updates/body", body: request)
   }
+
+  public func updateDependencyUpdateBody(
+    request: DependencyUpdatesBodyUpdateRequest
+  ) async throws -> DependencyUpdatesBodyUpdateResponse {
+    try await post("/v1/dependency-updates/body/update", body: request)
+  }
 }

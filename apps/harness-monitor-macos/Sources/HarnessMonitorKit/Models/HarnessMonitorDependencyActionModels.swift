@@ -229,3 +229,80 @@ public struct DependencyUpdatesBodyResponse: Codable, Equatable, Sendable {
     case fromCache
   }
 }
+
+public struct DependencyUpdatesBodyUpdateRequest: Codable, Equatable, Sendable {
+  public let pullRequestID: String
+  public let expectedPriorBodySHA256: String
+  public let newBody: String
+
+  public init(pullRequestID: String, expectedPriorBodySHA256: String, newBody: String) {
+    self.pullRequestID = pullRequestID
+    self.expectedPriorBodySHA256 = expectedPriorBodySHA256
+    self.newBody = newBody
+  }
+
+  enum CodingKeys: String, CodingKey {
+    case pullRequestID = "pullRequestId"
+    case expectedPriorBodySHA256 = "expectedPriorBodySha256"
+    case newBody
+  }
+}
+
+public enum DependencyUpdatesBodyUpdateOutcome: TaskBoardOpenEnum, CaseIterable, Identifiable {
+  case updated
+  case bodyDrifted
+  case unknown(String)
+
+  public static let allCases: [Self] = [.updated, .bodyDrifted]
+  public var id: String { rawValue }
+
+  public var rawValue: String {
+    switch self {
+    case .updated: "updated"
+    case .bodyDrifted: "body_drifted"
+    case .unknown(let raw): raw
+    }
+  }
+
+  public init(rawValue: String) {
+    switch rawValue {
+    case "updated": self = .updated
+    case "body_drifted": self = .bodyDrifted
+    default: self = .unknown(rawValue)
+    }
+  }
+}
+
+public struct DependencyUpdatesBodyUpdateResponse: Codable, Equatable, Sendable {
+  public let pullRequestID: String
+  public let outcome: DependencyUpdatesBodyUpdateOutcome
+  public let currentBody: String
+  public let currentBodySHA256: String
+  public let prUpdatedAt: String
+  public let fetchedAt: String
+
+  public init(
+    pullRequestID: String,
+    outcome: DependencyUpdatesBodyUpdateOutcome,
+    currentBody: String,
+    currentBodySHA256: String,
+    prUpdatedAt: String,
+    fetchedAt: String
+  ) {
+    self.pullRequestID = pullRequestID
+    self.outcome = outcome
+    self.currentBody = currentBody
+    self.currentBodySHA256 = currentBodySHA256
+    self.prUpdatedAt = prUpdatedAt
+    self.fetchedAt = fetchedAt
+  }
+
+  enum CodingKeys: String, CodingKey {
+    case pullRequestID = "pullRequestId"
+    case outcome
+    case currentBody
+    case currentBodySHA256 = "currentBodySha256"
+    case prUpdatedAt
+    case fetchedAt
+  }
+}
