@@ -107,4 +107,47 @@ extension WebSocketTransport {
     let value = try await rpc(method: .dependencyUpdatesComment, params: params)
     return try decode(value)
   }
+
+  public func listDependencyUpdateFiles(
+    request: DependencyUpdatesFilesListRequest
+  ) async throws -> DependencyUpdatesFilesListResponse {
+    let params = try encodeParams(request, extra: [:])
+    let value = try await rpc(method: .dependencyUpdatesFilesList, params: params)
+    return try decode(value)
+  }
+
+  public func patchDependencyUpdateFiles(
+    request: DependencyUpdatesFilesPatchRequest
+  ) async throws -> DependencyUpdatesFilesPatchResponse {
+    let params = try encodeParams(request, extra: [:])
+    let value = try await rpc(method: .dependencyUpdatesFilesPatch, params: params)
+    return try decode(value)
+  }
+
+  public func viewedDependencyUpdateFiles(
+    request: DependencyUpdatesFilesViewedRequest
+  ) async throws -> DependencyUpdatesFilesViewedResponse {
+    let params = try encodeParams(request, extra: [:])
+    let value = try await rpc(method: .dependencyUpdatesFilesViewed, params: params)
+    return try decode(value)
+  }
+
+  public func fetchDependencyUpdateFileBlob(
+    request: DependencyUpdatesFilesBlobRequest
+  ) async throws -> DependencyUpdatesFilesBlobResponse {
+    let params = try encodeParams(request, extra: [:])
+    let value = try await rpc(method: .dependencyUpdatesFilesBlob, params: params)
+    return try decode(value)
+  }
+
+  public func listDependencyUpdateLocalClones() async throws -> [DependencyUpdateLocalCloneEntry] {
+    let value = try await rpc(method: .dependencyUpdatesFilesLocalClonesList, params: nil)
+    return try decode(value)
+  }
+
+  public func deleteDependencyUpdateLocalClone(repoKeySegment: String) async throws {
+    let request = DependencyUpdatesFilesLocalClonesDeleteRequest(repoKeySegment: repoKeySegment)
+    let params = try encodeParams(request, extra: [:])
+    _ = try await rpc(method: .dependencyUpdatesFilesLocalClonesDelete, params: params)
+  }
 }

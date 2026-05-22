@@ -39,6 +39,22 @@ public protocol HarnessMonitorDependenciesClientProtocol: Sendable {
   func commentDependencyUpdates(
     request: DependencyUpdatesCommentRequest
   ) async throws -> DependencyUpdatesActionResponse
+  func listDependencyUpdateFiles(
+    request: DependencyUpdatesFilesListRequest
+  ) async throws -> DependencyUpdatesFilesListResponse
+  func patchDependencyUpdateFiles(
+    request: DependencyUpdatesFilesPatchRequest
+  ) async throws -> DependencyUpdatesFilesPatchResponse
+  func viewedDependencyUpdateFiles(
+    request: DependencyUpdatesFilesViewedRequest
+  ) async throws -> DependencyUpdatesFilesViewedResponse
+  func fetchDependencyUpdateFileBlob(
+    request: DependencyUpdatesFilesBlobRequest
+  ) async throws -> DependencyUpdatesFilesBlobResponse
+  func listDependencyUpdateLocalClones() async throws -> [DependencyUpdateLocalCloneEntry]
+  func deleteDependencyUpdateLocalClone(
+    repoKeySegment: String
+  ) async throws
 }
 
 extension HarnessMonitorDependenciesClientProtocol {
@@ -121,6 +137,38 @@ extension HarnessMonitorDependenciesClientProtocol {
   public func commentDependencyUpdates(
     request _: DependencyUpdatesCommentRequest
   ) async throws -> DependencyUpdatesActionResponse {
+    throw HarnessMonitorAPIError.server(code: 501, message: "Dependencies unavailable")
+  }
+
+  public func listDependencyUpdateFiles(
+    request _: DependencyUpdatesFilesListRequest
+  ) async throws -> DependencyUpdatesFilesListResponse {
+    throw HarnessMonitorAPIError.server(code: 501, message: "Dependencies unavailable")
+  }
+
+  public func patchDependencyUpdateFiles(
+    request _: DependencyUpdatesFilesPatchRequest
+  ) async throws -> DependencyUpdatesFilesPatchResponse {
+    throw HarnessMonitorAPIError.server(code: 501, message: "Dependencies unavailable")
+  }
+
+  public func viewedDependencyUpdateFiles(
+    request _: DependencyUpdatesFilesViewedRequest
+  ) async throws -> DependencyUpdatesFilesViewedResponse {
+    throw HarnessMonitorAPIError.server(code: 501, message: "Dependencies unavailable")
+  }
+
+  public func fetchDependencyUpdateFileBlob(
+    request _: DependencyUpdatesFilesBlobRequest
+  ) async throws -> DependencyUpdatesFilesBlobResponse {
+    throw HarnessMonitorAPIError.server(code: 501, message: "Dependencies unavailable")
+  }
+
+  public func listDependencyUpdateLocalClones() async throws -> [DependencyUpdateLocalCloneEntry] {
+    throw HarnessMonitorAPIError.server(code: 501, message: "Dependencies unavailable")
+  }
+
+  public func deleteDependencyUpdateLocalClone(repoKeySegment _: String) async throws {
     throw HarnessMonitorAPIError.server(code: 501, message: "Dependencies unavailable")
   }
 }

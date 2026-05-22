@@ -95,4 +95,42 @@ extension PreviewHarnessClient {
     try await performActionDelay()
     return await state.commentDependencyUpdates(request: request)
   }
+
+  public func listDependencyUpdateFiles(
+    request: DependencyUpdatesFilesListRequest
+  ) async throws -> DependencyUpdatesFilesListResponse {
+    try await performActionDelay()
+    return await state.listDependencyUpdateFiles(request: request)
+  }
+
+  public func patchDependencyUpdateFiles(
+    request: DependencyUpdatesFilesPatchRequest
+  ) async throws -> DependencyUpdatesFilesPatchResponse {
+    try await performActionDelay()
+    return await state.patchDependencyUpdateFiles(request: request)
+  }
+
+  public func viewedDependencyUpdateFiles(
+    request: DependencyUpdatesFilesViewedRequest
+  ) async throws -> DependencyUpdatesFilesViewedResponse {
+    try await performActionDelay()
+    return await state.viewedDependencyUpdateFiles(request: request)
+  }
+
+  public func fetchDependencyUpdateFileBlob(
+    request: DependencyUpdatesFilesBlobRequest
+  ) async throws -> DependencyUpdatesFilesBlobResponse {
+    try await performActionDelay()
+    return await state.fetchDependencyUpdateFileBlob(request: request)
+  }
+
+  public func listDependencyUpdateLocalClones() async throws -> [DependencyUpdateLocalCloneEntry] {
+    try await performActionDelay()
+    return await state.listDependencyUpdateLocalClones()
+  }
+
+  public func deleteDependencyUpdateLocalClone(repoKeySegment: String) async throws {
+    try await performActionDelay()
+    await state.deleteDependencyUpdateLocalClone(repoKeySegment: repoKeySegment)
+  }
 }
