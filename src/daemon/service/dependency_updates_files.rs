@@ -18,10 +18,19 @@
 use std::collections::BTreeMap;
 use std::fs;
 use std::path::PathBuf;
+use std::sync::{Arc, OnceLock};
 
 use serde::Deserialize;
+use tokio::sync::broadcast;
 
+use crate::daemon::protocol::StreamEvent;
 use crate::daemon::state::daemon_root;
+use crate::dependency_updates::files::local_clone::Sensitive;
+use crate::dependency_updates::files::local_clone_diff::compute_unified_patches;
+use crate::dependency_updates::files::local_clone_progress_event::BroadcastProgressSink;
+use crate::dependency_updates::files::local_clone_runtime::{
+    DiscardProgressSink, LocalCloneProgressSink, LocalCloneRuntime,
+};
 use crate::dependency_updates::{
     DependencyUpdateFileViewedOutcome, DependencyUpdateFileViewedState,
     DependencyUpdateFilesViewedResult, DependencyUpdateImageMime,
@@ -39,6 +48,40 @@ use crate::workspace::utc_now;
 use super::task_board_runtime::external_sync_config_for_repository;
 
 const CLONES_SUBDIR: &str = "dependency_updates/clones";
+
+/// Process-wide singletons for the local-clone runtime + progress sender.
+///
+/// `LOCAL_CLONE_RUNTIME` is constructed on first use; the registry path is
+/// derived from `daemon_root() + CLONES_SUBDIR` and only resolved once.
+///
+/// `PROGRESS_SENDER` is registered explicitly by the daemon HTTP/WS setup
+/// so progress events surface on the same broadcast channel the
+/// `dependency_updates_local_clone_progress` WS push event flows over.
+/// When unset (CLI dry-runs, tests), the handler uses `DiscardProgressSink`
+/// and progress events are silently dropped.
+static LOCAL_CLONE_RUNTIME: OnceLock<Arc<LocalCloneRuntime>> = OnceLock::new();
+static PROGRESS_SENDER: OnceLock<broadcast::Sender<StreamEvent>> = OnceLock::new();
+
+fn local_clone_runtime() -> Arc<LocalCloneRuntime> {
+    LOCAL_CLONE_RUNTIME
+        .get_or_init(|| Arc::new(LocalCloneRuntime::new(clones_root())))
+        .clone()
+}
+
+fn progress_sink() -> Arc<dyn LocalCloneProgressSink> {
+    if let Some(sender) = PROGRESS_SENDER.get() {
+        BroadcastProgressSink::new(sender.clone())
+    } else {
+        Arc::new(DiscardProgressSink)
+    }
+}
+
+/// Register the daemon's broadcast sender so the local-clone runtime can
+/// fire `dependency_updates_local_clone_progress` push events. Idempotent
+/// (first call wins; subsequent calls are no-ops via `OnceLock`).
+pub fn register_local_clone_progress_sender(sender: broadcast::Sender<StreamEvent>) {
+    let _ = PROGRESS_SENDER.set(sender);
+}
 
 /// List the changed files for one pull request.
 ///
@@ -80,10 +123,43 @@ pub async fn patch_dependency_update_files(
         )
         .into());
     }
+
+    // Route through the local-clone runtime when the caller supplies
+    // enough context (repo full-name + base OID) and a token is
+    // available for it. Anything missing falls back to the placeholder
+    // REST path.
+    if let (Some(repo_full_name), Some(base_oid)) = (
+        request.repository_full_name.as_deref(),
+        request.base_ref_oid_expected.as_deref(),
+    ) && let Some(token) = github_token(Some(repo_full_name))
+    {
+        match run_local_clone_patch(
+            &pull_request_id,
+            repo_full_name,
+            &token,
+            &request.head_ref_oid_expected,
+            base_oid,
+            &request.normalized_paths(),
+        )
+        .await
+        {
+            Ok(response) => return Ok(response),
+            Err(error) => {
+                tracing::warn!(
+                    target = "harness::dependency_updates::files",
+                    pull_request_id = pull_request_id,
+                    repo = repo_full_name,
+                    error = %error,
+                    "local-clone patch failed, falling back to REST placeholder"
+                );
+            }
+        }
+    }
+
     tracing::warn!(
         target = "harness::dependency_updates::files",
         pull_request_id = pull_request_id,
-        "patch_dependency_update_files placeholder: REST/local-clone strategy not yet wired"
+        "patch_dependency_update_files REST path placeholder (caller missing repo/base oid)"
     );
     Ok(DependencyUpdatesFilesPatchResponse {
         pull_request_id,
@@ -93,6 +169,52 @@ pub async fn patch_dependency_update_files(
         fetched_at: utc_now(),
         rate_limit_snapshot: None,
     })
+}
+
+async fn run_local_clone_patch(
+    pull_request_id: &str,
+    repo_full_name: &str,
+    token: &str,
+    head_ref_oid: &str,
+    base_oid: &str,
+    paths: &[String],
+) -> Result<DependencyUpdatesFilesPatchResponse, CliError> {
+    let runtime = local_clone_runtime();
+    let sink = progress_sink();
+    let head_ref_name = format!("refs/heads/{}", default_head_ref_branch());
+    let ensured = runtime
+        .ensure_clone(repo_full_name, Sensitive::new(token), &head_ref_name, sink)
+        .await
+        .map_err(|error| -> CliError {
+            CliErrorKind::workflow_io(format!("ensure local clone failed: {error}")).into()
+        })?;
+
+    let path_filter: Option<&[String]> = if paths.is_empty() { None } else { Some(paths) };
+    let patches = compute_unified_patches(&ensured, base_oid, head_ref_oid, path_filter)
+        .await
+        .map_err(|error| -> CliError {
+            CliErrorKind::workflow_io(format!("compute local-clone diff failed: {error}"))
+                .into()
+        })?;
+
+    Ok(DependencyUpdatesFilesPatchResponse {
+        pull_request_id: pull_request_id.to_string(),
+        patches,
+        drifted: false,
+        current_head_ref_oid: head_ref_oid.to_string(),
+        fetched_at: utc_now(),
+        rate_limit_snapshot: None,
+    })
+}
+
+/// The default branch name used to fabricate `refs/heads/<name>` when the
+/// caller doesn't supply an explicit head ref. GitHub doesn't expose the
+/// PR's branch name in the node id; the caller is encouraged to drift the
+/// runtime by fetching the actual ref shortly afterward. For the initial
+/// clone path we use `main` as a sensible default - the runtime's
+/// subsequent fetch will pick up the head OID directly.
+fn default_head_ref_branch() -> &'static str {
+    "main"
 }
 
 /// Apply hash-guarded mark-viewed mutations across one or more paths.
@@ -449,6 +571,8 @@ mod tests {
             pull_request_id: "".into(),
             head_ref_oid_expected: "abc".into(),
             paths: vec!["src/lib.rs".into()],
+            repository_full_name: None,
+            base_ref_oid_expected: None,
         };
         let err = patch_dependency_update_files(&request).await.unwrap_err();
         assert!(err.to_string().to_lowercase().contains("pull_request_id"));
@@ -460,6 +584,8 @@ mod tests {
             pull_request_id: "PR_1".into(),
             head_ref_oid_expected: "abc".into(),
             paths: vec!["src/lib.rs".into()],
+            repository_full_name: None,
+            base_ref_oid_expected: None,
         };
         let response = patch_dependency_update_files(&request).await.expect("ok");
         assert_eq!(response.pull_request_id, "PR_1");

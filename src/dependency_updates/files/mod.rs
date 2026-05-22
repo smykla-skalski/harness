@@ -186,6 +186,16 @@ pub struct DependencyUpdatesFilesPatchRequest {
     pub pull_request_id: String,
     pub head_ref_oid_expected: String,
     pub paths: Vec<String>,
+    /// Owner/name of the repository the PR lives in. When present, the
+    /// daemon can route the patch fetch through the local-clone runtime
+    /// (zero-rate-limit). When absent, the handler falls back to the
+    /// (still-stubbed) REST path.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub repository_full_name: Option<String>,
+    /// Merge-base OID against which to compute the diff. Required for the
+    /// local-clone path; when absent the handler falls back to REST.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub base_ref_oid_expected: Option<String>,
 }
 
 impl DependencyUpdatesFilesPatchRequest {

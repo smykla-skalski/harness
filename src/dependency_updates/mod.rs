@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 use crate::task_board::github::GitHubMergeMethod;
 
 mod body_update;
-mod files;
+pub(crate) mod files;
 mod github;
 pub(crate) mod timeline;
 mod validation;

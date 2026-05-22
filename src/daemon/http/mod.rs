@@ -254,6 +254,9 @@ pub async fn serve(
     state: DaemonHttpState,
     mut shutdown_rx: watch::Receiver<bool>,
 ) -> Result<(), CliError> {
+    // Hand the broadcast sender to the dependency-updates files module so
+    // local-clone progress events surface on the same WS push channel.
+    crate::daemon::service::register_local_clone_progress_sender(state.sender.clone());
     let app = daemon_http_router().with_state(state);
 
     axum::serve(listener, app)
