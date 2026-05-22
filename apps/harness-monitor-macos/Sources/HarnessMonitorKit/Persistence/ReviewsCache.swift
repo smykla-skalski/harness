@@ -2,14 +2,14 @@ import CryptoKit
 import Foundation
 import SwiftData
 
-public struct DependencyUpdatesCache {
+public struct ReviewsCache {
   private let context: ModelContext
 
   public init(context: ModelContext) {
     self.context = context
   }
 
-  public func load(preferencesHash: String) -> DependencyUpdatesQueryResponse? {
+  public func load(preferencesHash: String) -> ReviewsQueryResponse? {
     guard let row = fetchRow(preferencesHash: preferencesHash) else {
       return nil
     }
@@ -32,12 +32,12 @@ public struct DependencyUpdatesCache {
   /// Wholesale replace the cached snapshot for `preferencesHash`. PRs and
   /// repository labels that were present in the prior payload but absent in
   /// `response` drop with the row update; this is the primary cleanup hook.
-  public func save(preferencesHash: String, response: DependencyUpdatesQueryResponse) {
+  public func save(preferencesHash: String, response: ReviewsQueryResponse) {
     do {
       if let row = fetchRow(preferencesHash: preferencesHash) {
         try row.update(response: response)
       } else {
-        let row = try CachedDependencyUpdatesSnapshot.make(
+        let row = try CachedReviewsSnapshot.make(
           preferencesHash: preferencesHash,
           response: response
         )
@@ -63,8 +63,8 @@ public struct DependencyUpdatesCache {
   @discardableResult
   public func applyRefresh(
     preferencesHash: String,
-    refresh: DependencyUpdatesRefreshResponse
-  ) -> DependencyUpdatesQueryResponse? {
+    refresh: ReviewsRefreshResponse
+  ) -> ReviewsQueryResponse? {
     guard let row = fetchRow(preferencesHash: preferencesHash),
       let cached = try? row.decodedResponse()
     else {
@@ -74,10 +74,10 @@ public struct DependencyUpdatesCache {
       cached.items,
       refresh: refresh
     )
-    let nextResponse = DependencyUpdatesQueryResponse(
+    let nextResponse = ReviewsQueryResponse(
       fetchedAt: refresh.fetchedAt,
       fromCache: cached.fromCache,
-      summary: DependencyUpdatesSummary(items: nextItems),
+      summary: ReviewsSummary(items: nextItems),
       items: nextItems
     )
     save(preferencesHash: preferencesHash, response: nextResponse)
@@ -94,8 +94,8 @@ public struct DependencyUpdatesCache {
   public func applyPerRepoResponse(
     preferencesHash: String,
     repository: String,
-    response: DependencyUpdatesQueryResponse
-  ) -> DependencyUpdatesQueryResponse? {
+    response: ReviewsQueryResponse
+  ) -> ReviewsQueryResponse? {
     guard let row = fetchRow(preferencesHash: preferencesHash),
       let cached = try? row.decodedResponse()
     else {
@@ -112,10 +112,10 @@ public struct DependencyUpdatesCache {
     {
       nextLabels[repository] = updatedLabels
     }
-    let nextResponse = DependencyUpdatesQueryResponse(
+    let nextResponse = ReviewsQueryResponse(
       fetchedAt: response.fetchedAt,
       fromCache: cached.fromCache,
-      summary: DependencyUpdatesSummary(items: nextItems),
+      summary: ReviewsSummary(items: nextItems),
       items: nextItems,
       repositoryLabels: nextLabels
     )
@@ -125,7 +125,7 @@ public struct DependencyUpdatesCache {
 
   public func deleteAll() {
     do {
-      let descriptor = FetchDescriptor<CachedDependencyUpdatesSnapshot>()
+      let descriptor = FetchDescriptor<CachedReviewsSnapshot>()
       let rows = try context.fetch(descriptor)
       for row in rows {
         context.delete(row)
@@ -141,8 +141,8 @@ public struct DependencyUpdatesCache {
     }
   }
 
-  private func fetchRow(preferencesHash: String) -> CachedDependencyUpdatesSnapshot? {
-    let descriptor = FetchDescriptor<CachedDependencyUpdatesSnapshot>(
+  private func fetchRow(preferencesHash: String) -> CachedReviewsSnapshot? {
+    let descriptor = FetchDescriptor<CachedReviewsSnapshot>(
       predicate: #Predicate { $0.preferencesHash == preferencesHash }
     )
     return try? context.fetch(descriptor).first
@@ -151,9 +151,9 @@ public struct DependencyUpdatesCache {
   /// Apply a targeted refresh to a snapshot's items list. Pure function so
   /// tests can exercise it without a `ModelContext`.
   static func applyRefreshToItems(
-    _ items: [DependencyUpdateItem],
-    refresh: DependencyUpdatesRefreshResponse
-  ) -> [DependencyUpdateItem] {
+    _ items: [ReviewItem],
+    refresh: ReviewsRefreshResponse
+  ) -> [ReviewItem] {
     applyDependencyRefresh(to: items, refresh: refresh)
   }
 
@@ -169,17 +169,17 @@ public struct DependencyUpdatesCache {
   ///
   /// Pure function so tests can exercise it without a `ModelContext`.
   public static func applyPerRepoResponseToItems(
-    _ items: [DependencyUpdateItem],
+    _ items: [ReviewItem],
     repository: String,
-    response: DependencyUpdatesQueryResponse
-  ) -> [DependencyUpdateItem] {
-    let currentItems = normalizedDependencyUpdateItems(items)
-    let refreshedItems = normalizedDependencyUpdateItems(response.items)
-    let responseByID: [String: DependencyUpdateItem] = Dictionary(
+    response: ReviewsQueryResponse
+  ) -> [ReviewItem] {
+    let currentItems = normalizedReviewItems(items)
+    let refreshedItems = normalizedReviewItems(response.items)
+    let responseByID: [String: ReviewItem] = Dictionary(
       uniqueKeysWithValues: refreshedItems.map { ($0.pullRequestID, $0) }
     )
     var seenIDs = Set<String>()
-    var result: [DependencyUpdateItem] = []
+    var result: [ReviewItem] = []
     result.reserveCapacity(currentItems.count + refreshedItems.count)
     for item in currentItems {
       if item.repository != repository {
@@ -194,19 +194,19 @@ public struct DependencyUpdatesCache {
     for newItem in refreshedItems where !seenIDs.contains(newItem.pullRequestID) {
       result.append(newItem)
     }
-    return normalizedDependencyUpdateItems(result)
+    return normalizedReviewItems(result)
   }
 }
 
-extension DependencyUpdatesCache {
+extension ReviewsCache {
   /// Stable cache key derived from the bucket-determining fields of the
   /// daemon query request (authors / orgs / repos / excludes). Freshness
   /// inputs (`forceRefresh`, `cacheMaxAgeSeconds`) are excluded because they
   /// do not change which PRs the response represents.
   public static func preferencesHash(
-    for request: DependencyUpdatesQueryRequest
+    for request: ReviewsQueryRequest
   ) -> String {
-    let normalized = DependencyUpdatesCacheKey(
+    let normalized = ReviewsCacheKey(
       authors: request.authors.sorted(),
       organizations: request.organizations.sorted(),
       repositories: request.repositories.sorted(),
@@ -220,7 +220,7 @@ extension DependencyUpdatesCache {
   }
 }
 
-public actor DependencyUpdatesCachePersistenceWriter {
+public actor ReviewsCachePersistenceWriter {
   private let modelContainer: ModelContainer
 
   public init(modelContainer: ModelContainer) {
@@ -229,11 +229,11 @@ public actor DependencyUpdatesCachePersistenceWriter {
 
   public func saveResponse(
     preferencesHash: String,
-    response: DependencyUpdatesQueryResponse
+    response: ReviewsQueryResponse
   ) {
     let context = ModelContext(modelContainer)
     context.autosaveEnabled = false
-    DependencyUpdatesCache(context: context).save(
+    ReviewsCache(context: context).save(
       preferencesHash: preferencesHash,
       response: response
     )
@@ -242,11 +242,11 @@ public actor DependencyUpdatesCachePersistenceWriter {
 
   public func applyRefresh(
     preferencesHash: String,
-    refresh: DependencyUpdatesRefreshResponse
+    refresh: ReviewsRefreshResponse
   ) {
     let context = ModelContext(modelContainer)
     context.autosaveEnabled = false
-    _ = DependencyUpdatesCache(context: context).applyRefresh(
+    _ = ReviewsCache(context: context).applyRefresh(
       preferencesHash: preferencesHash,
       refresh: refresh
     )
@@ -255,12 +255,12 @@ public actor DependencyUpdatesCachePersistenceWriter {
   public func applyPerRepoResponse(
     preferencesHash: String,
     repository: String,
-    response: DependencyUpdatesQueryResponse,
-    fallbackResponse: DependencyUpdatesQueryResponse
+    response: ReviewsQueryResponse,
+    fallbackResponse: ReviewsQueryResponse
   ) {
     let context = ModelContext(modelContainer)
     context.autosaveEnabled = false
-    let cache = DependencyUpdatesCache(context: context)
+    let cache = ReviewsCache(context: context)
     let merged = cache.applyPerRepoResponse(
       preferencesHash: preferencesHash,
       repository: repository,
@@ -279,7 +279,7 @@ public actor DependencyUpdatesCachePersistenceWriter {
   ) {
     let context = ModelContext(modelContainer)
     context.autosaveEnabled = false
-    DependencyUpdatesRepoSyncStateCache(context: context).recordSyncedAt(
+    ReviewsRepoSyncStateCache(context: context).recordSyncedAt(
       preferencesHash: preferencesHash,
       repository: repository,
       syncedAt: syncedAt
@@ -287,7 +287,7 @@ public actor DependencyUpdatesCachePersistenceWriter {
   }
 }
 
-private struct DependencyUpdatesCacheKey: Codable {
+private struct ReviewsCacheKey: Codable {
   let authors: [String]
   let organizations: [String]
   let repositories: [String]

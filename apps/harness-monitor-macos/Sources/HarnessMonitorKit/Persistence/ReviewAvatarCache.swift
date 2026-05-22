@@ -14,8 +14,8 @@ import ImageIO
 /// `swiftui-performance-macos/references/image-optimization.md`
 /// reference: `kCGImageSourceShouldCache: false` on the source +
 /// `kCGImageSourceShouldCacheImmediately: true` on the thumbnail.
-public actor DependencyUpdateAvatarCache {
-  public static let shared = DependencyUpdateAvatarCache()
+public actor ReviewAvatarCache {
+  public static let shared = ReviewAvatarCache()
 
   private let cache: NSCache<NSURL, NSImage>
   private var inFlight: [URL: Task<NSImage?, Never>] = [:]
