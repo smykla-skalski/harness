@@ -137,6 +137,7 @@ fn append_check_contexts_preserves_check_details_urls() {
                 target_url: Some(status_context_url.into()),
             },
         ],
+        &[],
     );
 
     assert_eq!(item.checks.len(), 2);
@@ -168,6 +169,7 @@ fn append_check_contexts_drops_empty_and_non_web_details_urls() {
                 target_url: Some("javascript:alert(1)".into()),
             },
         ],
+        &[],
     );
 
     assert_eq!(item.checks.len(), 2);
@@ -193,6 +195,7 @@ fn graphql_payload_preserves_check_urls_into_daemon_json() {
                     "state": "OPEN",
                     "mergeable": "MERGEABLE",
                     "isDraft": false,
+                    "viewerCanMergeAsAdmin": true,
                     "reviewDecision": "REVIEW_REQUIRED",
                     "headRefOid": "abc123",
                     "author": { "login": "renovate[bot]" },
@@ -205,6 +208,12 @@ fn graphql_payload_preserves_check_urls_into_daemon_json() {
                                 "endCursor": null
                             },
                             "nodes": []
+                        }
+                    },
+                    "baseRef": {
+                        "branchProtectionRule": {
+                            "requiredStatusCheckContexts": ["legacy/ci"],
+                            "requiredStatusChecks": [{ "context": "Analyze (go)" }]
                         }
                     },
                     "commits": {
@@ -227,7 +236,7 @@ fn graphql_payload_preserves_check_urls_into_daemon_json() {
                                                 },
                                                 {
                                                     "context": "legacy/ci",
-                                                    "state": "SUCCESS",
+                                                    "state": "FAILURE",
                                                     "targetUrl": status_context_url
                                                 },
                                                 {
@@ -283,12 +292,21 @@ fn graphql_payload_preserves_check_urls_into_daemon_json() {
         Some(status_context_url)
     );
     assert_eq!(item.checks[2].details_url, None);
+    assert!(item.viewer_can_merge_as_admin);
+    assert_eq!(
+        item.required_failed_check_names,
+        vec!["legacy/ci".to_string()]
+    );
 
     let serialized = serde_json::to_value(&item).expect("serialize item");
     let checks = serialized["checks"].as_array().expect("checks");
     assert_eq!(checks[0]["details_url"].as_str(), Some(check_run_url));
     assert_eq!(checks[1]["details_url"].as_str(), Some(status_context_url));
     assert!(checks[2].get("details_url").is_none());
+    assert_eq!(
+        serialized["viewer_can_merge_as_admin"].as_bool(),
+        Some(true)
+    );
 }
 
 #[test]
@@ -307,6 +325,7 @@ fn paginated_check_contexts_preserve_later_page_details_urls() {
                 id: Some("suite-1".into()),
             }),
         }],
+        &[],
     );
 
     super::mapping::append_check_contexts(
@@ -320,6 +339,7 @@ fn paginated_check_contexts_preserve_later_page_details_urls() {
                 id: Some("suite-2".into()),
             }),
         }],
+        &[],
     );
 
     assert_eq!(
@@ -330,6 +350,36 @@ fn paginated_check_contexts_preserve_later_page_details_urls() {
         vec![first_page_url, later_page_url]
     );
     assert_eq!(item.check_status, DependencyUpdateCheckStatus::Success);
+}
+
+#[test]
+fn append_check_contexts_recomputes_required_failed_check_names() {
+    let mut item = sample_dependency_update_item();
+    super::mapping::append_check_contexts(
+        &mut item,
+        vec![
+            StatusContextNode::CheckRun {
+                name: "required/check".into(),
+                status: Some("COMPLETED".into()),
+                conclusion: Some("FAILURE".into()),
+                url: None,
+                check_suite: Some(CheckSuiteNode {
+                    id: Some("suite-required".into()),
+                }),
+            },
+            StatusContextNode::StatusContext {
+                context: "optional/check".into(),
+                state: Some("FAILURE".into()),
+                target_url: None,
+            },
+        ],
+        &["required/check".to_string()],
+    );
+
+    assert_eq!(
+        item.required_failed_check_names,
+        vec!["required/check".to_string()]
+    );
 }
 
 #[test]
@@ -368,20 +418,25 @@ fn sample_dependency_update_item() -> DependencyUpdateItem {
         deletions: 0,
         created_at: parse_timestamp("2026-01-01T00:00:00Z").expect("created timestamp"),
         updated_at: parse_timestamp("2026-01-01T00:01:00Z").expect("updated timestamp"),
+        required_failed_check_names: Vec::new(),
         viewer_can_update: true,
+        viewer_can_merge_as_admin: false,
     }
 }
 
 #[test]
 fn production_github_timeouts_match_documented_ceilings() {
-    assert_eq!(GITHUB_HTTP_CONNECT_TIMEOUT, std::time::Duration::from_secs(30));
+    assert_eq!(
+        GITHUB_HTTP_CONNECT_TIMEOUT,
+        std::time::Duration::from_secs(30)
+    );
     assert_eq!(GITHUB_HTTP_READ_TIMEOUT, std::time::Duration::from_secs(60));
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn read_timeout_fires_when_github_holds_the_connection_open() {
-    use std::time::{Duration, Instant};
     use octocrab::service::middleware::retry::RetryConfig;
+    use std::time::{Duration, Instant};
     use tokio::net::TcpListener;
 
     ensure_rustls_provider();

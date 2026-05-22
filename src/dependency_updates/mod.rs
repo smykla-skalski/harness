@@ -98,12 +98,20 @@ pub struct DependencyUpdateItem {
     pub deletions: u64,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
+    #[serde(default)]
+    pub required_failed_check_names: Vec<String>,
     #[serde(default = "default_viewer_can_update")]
     pub viewer_can_update: bool,
+    #[serde(default = "default_viewer_can_merge_as_admin")]
+    pub viewer_can_merge_as_admin: bool,
 }
 
 fn default_viewer_can_update() -> bool {
     true
+}
+
+fn default_viewer_can_merge_as_admin() -> bool {
+    false
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -500,8 +508,7 @@ impl DependencyUpdateTarget {
         self.check_status == DependencyUpdateCheckStatus::Success
             && matches!(
                 self.review_status,
-                DependencyUpdateReviewStatus::ReviewRequired
-                    | DependencyUpdateReviewStatus::None
+                DependencyUpdateReviewStatus::ReviewRequired | DependencyUpdateReviewStatus::None
             )
             && self.mergeable != DependencyUpdateMergeableState::Conflicting
     }

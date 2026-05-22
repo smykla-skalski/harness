@@ -9,8 +9,9 @@ use crate::dependency_updates::{
 
 static DEPENDENCY_UPDATES_CACHE: OnceLock<Mutex<BTreeMap<String, CachedDependencyUpdates>>> =
     OnceLock::new();
-static DEPENDENCY_UPDATES_BODY_CACHE: OnceLock<Mutex<BTreeMap<String, CachedDependencyUpdateBody>>> =
-    OnceLock::new();
+static DEPENDENCY_UPDATES_BODY_CACHE: OnceLock<
+    Mutex<BTreeMap<String, CachedDependencyUpdateBody>>,
+> = OnceLock::new();
 
 #[derive(Clone)]
 pub(crate) struct CachedDependencyUpdates {

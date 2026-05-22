@@ -2,8 +2,8 @@ use chrono::{DateTime, Utc};
 
 use crate::dependency_updates::{
     DependencyUpdateCheckStatus, DependencyUpdateItem, DependencyUpdateMergeableState,
-    DependencyUpdatePullRequestState, DependencyUpdateReviewStatus,
-    DependencyUpdatesBodyResponse, DependencyUpdatesQueryRequest, DependencyUpdatesQueryResponse,
+    DependencyUpdatePullRequestState, DependencyUpdateReviewStatus, DependencyUpdatesBodyResponse,
+    DependencyUpdatesQueryRequest, DependencyUpdatesQueryResponse,
 };
 
 use super::{
@@ -38,7 +38,9 @@ fn item(
         deletions: 1,
         created_at: parsed("2026-05-20T12:00:00Z"),
         updated_at: parsed("2026-05-20T12:00:00Z"),
+        required_failed_check_names: Vec::new(),
         viewer_can_update: true,
+        viewer_can_merge_as_admin: false,
     }
 }
 
@@ -119,8 +121,7 @@ fn apply_refresh_drops_missing_pull_request_ids() {
             DependencyUpdateReviewStatus::ReviewRequired,
         ),
     ];
-    let updated =
-        apply_refresh_to_items(&cached, &[], &["pr_1".into()]).expect("changed");
+    let updated = apply_refresh_to_items(&cached, &[], &["pr_1".into()]).expect("changed");
     assert_eq!(updated.len(), 1);
     assert_eq!(updated[0].pull_request_id, "pr_2");
 }
@@ -184,7 +185,10 @@ fn cached_body_response_flips_from_cache_on_hit() {
     store_cached_body_response(key.clone(), &stored);
 
     let hit = cached_body_response(&key, 600).expect("cache hit within TTL");
-    assert!(hit.from_cache, "second read should mark response from_cache");
+    assert!(
+        hit.from_cache,
+        "second read should mark response from_cache"
+    );
     assert_eq!(hit.pull_request_id, stored.pull_request_id);
     assert_eq!(hit.body, stored.body);
     assert_eq!(hit.pr_updated_at, stored.pr_updated_at);
@@ -261,7 +265,9 @@ fn one_repo_item(repository: &str, pr_id: &str) -> DependencyUpdateItem {
         deletions: 1,
         created_at: parsed("2026-05-20T12:00:00Z"),
         updated_at: parsed("2026-05-20T12:00:00Z"),
+        required_failed_check_names: Vec::new(),
         viewer_can_update: true,
+        viewer_can_merge_as_admin: false,
     }
 }
 
@@ -327,10 +333,8 @@ fn cached_query_response_returns_only_its_repo_bucket() {
     store_cached_query_response(scoped_a.cache_key(), &response_a);
     store_cached_query_response(scoped_b.cache_key(), &response_b);
 
-    let hit_a =
-        cached_query_response(&scoped_a.cache_key(), 600).expect("cache hit for acme/api");
-    let hit_b =
-        cached_query_response(&scoped_b.cache_key(), 600).expect("cache hit for acme/web");
+    let hit_a = cached_query_response(&scoped_a.cache_key(), 600).expect("cache hit for acme/api");
+    let hit_b = cached_query_response(&scoped_b.cache_key(), 600).expect("cache hit for acme/web");
 
     assert_eq!(hit_a.items.len(), 1);
     assert_eq!(hit_a.items[0].repository, "acme/api");

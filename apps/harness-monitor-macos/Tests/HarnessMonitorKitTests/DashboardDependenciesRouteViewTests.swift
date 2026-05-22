@@ -113,6 +113,24 @@ struct DashboardDependenciesRouteViewTests {
     #expect(refreshSource.contains("DashboardDependenciesRemoteLoader.refresh("))
   }
 
+  @Test("route source presents native confirmation for risky approve and merge actions")
+  func routeSourcePresentsNativeConfirmationForRiskyApproveAndMergeActions() throws {
+    let routeViewSource = try routeSource()
+    let contentSource = try routeSource(named: "DashboardDependenciesRouteView+Content.swift")
+    let actionsSource = try routeSource(named: "DashboardDependenciesRouteView+Actions.swift")
+    let attentionSource = try routeSource(named: "DashboardDependenciesAttentionActions.swift")
+
+    #expect(routeViewSource.contains("@State private var pendingActionConfirmation"))
+    #expect(routeViewSource.contains(".confirmationDialog("))
+    #expect(routeViewSource.contains("confirmDependencyAction(confirmation)"))
+    #expect(contentSource.contains("onApprove: { requestApproveOrConfirm(items: items) }"))
+    #expect(contentSource.contains("onMerge: { requestMergeOrConfirm(items: items) }"))
+    #expect(actionsSource.contains("requestDependencyActionConfirmation(.approve, items: items)"))
+    #expect(actionsSource.contains("requestDependencyActionConfirmation(.merge, items: items)"))
+    #expect(attentionSource.contains("struct DashboardDependencyActionConfirmation"))
+    #expect(attentionSource.contains("dashboardDependencyActionConfirmation("))
+  }
+
   @Test("dashboard preview exercises dependency alert rendering")
   func dashboardPreviewExercisesDependencyAlertRendering() throws {
     let source = try previewSource(named: "PreviewDashboardDependenciesRouteView.swift")

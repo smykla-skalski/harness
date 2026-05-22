@@ -35,7 +35,7 @@ struct DashboardDependencyActionBar: View {
     DashboardDependencyActionButton(
       title: "Approve",
       systemImage: "checkmark.seal",
-      prominence: .primary,
+      prominence: approveProminence,
       helpText: helpTextOrBusy(DashboardDependenciesDisabledReason.approveReason(for: items)),
       action: onApprove
     )
@@ -44,7 +44,7 @@ struct DashboardDependencyActionBar: View {
     DashboardDependencyActionButton(
       title: "Merge",
       systemImage: "arrow.triangle.merge",
-      prominence: .success,
+      prominence: mergeProminence,
       helpText: helpTextOrBusy(DashboardDependenciesDisabledReason.mergeReason(for: items)),
       action: onMerge
     )
@@ -139,6 +139,14 @@ struct DashboardDependencyActionBar: View {
   }
 
   private static let busyHelpText = "Action in progress"
+
+  private var approveProminence: DashboardDependencyActionProminence {
+    dashboardDependencyApproveProminence(for: items)
+  }
+
+  private var mergeProminence: DashboardDependencyActionProminence {
+    dashboardDependencyMergeProminence(for: items)
+  }
 
   private func helpTextOrBusy(_ fallback: String?) -> String? {
     isBusy ? Self.busyHelpText : fallback

@@ -93,6 +93,18 @@ extension DependencyUpdateItem {
     checkStatus == .failure
   }
 
+  public var hasRequiredFailedChecks: Bool {
+    !requiredFailedCheckNames.isEmpty
+  }
+
+  public var requiresAdminMergeForRequiredFailures: Bool {
+    canAttemptManualMerge
+      && viewerCanMergeAsAdmin
+      && hasRequiredFailedChecks
+      && reviewStatus != .changesRequested
+      && !policyBlocked
+  }
+
   public var isAutoApprovable: Bool {
     target.isAutoApprovable
   }
@@ -197,7 +209,9 @@ extension DependencyUpdateItem {
       deletions: deletions,
       createdAt: createdAt,
       updatedAt: updatedAt,
-      viewerCanUpdate: viewerCanUpdate
+      requiredFailedCheckNames: requiredFailedCheckNames,
+      viewerCanUpdate: viewerCanUpdate,
+      viewerCanMergeAsAdmin: viewerCanMergeAsAdmin
     )
   }
 }

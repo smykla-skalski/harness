@@ -32,7 +32,9 @@ fn sample_item(
         updated_at: DateTime::parse_from_rfc3339("2026-05-20T12:00:00Z")
             .expect("date")
             .with_timezone(&Utc),
+        required_failed_check_names: Vec::new(),
         viewer_can_update: true,
+        viewer_can_merge_as_admin: false,
     }
 }
 
@@ -244,6 +246,10 @@ fn serialized_item_always_emits_array_fields_for_swift_decoders() {
         "reviews key must be emitted"
     );
     assert!(
+        object.contains_key("required_failed_check_names"),
+        "required_failed_check_names key must be emitted"
+    );
+    assert!(
         object["labels"].as_array().is_some(),
         "labels must be an array"
     );
@@ -254,6 +260,10 @@ fn serialized_item_always_emits_array_fields_for_swift_decoders() {
     assert!(
         object["reviews"].as_array().is_some(),
         "reviews must be an array"
+    );
+    assert!(
+        object["required_failed_check_names"].as_array().is_some(),
+        "required_failed_check_names must be an array"
     );
 }
 
@@ -287,7 +297,9 @@ fn serialized_check_emits_details_url_when_present() {
     let value = serde_json::to_value(&check).expect("serialize");
     let object = value.as_object().expect("check is an object");
     assert_eq!(
-        object.get("details_url").and_then(serde_json::Value::as_str),
+        object
+            .get("details_url")
+            .and_then(serde_json::Value::as_str),
         Some("https://github.com/acme/api/actions/runs/1")
     );
 }
@@ -382,8 +394,7 @@ fn body_update_request_rejects_non_hex_hash() {
 #[test]
 fn body_update_request_rejects_oversize_body() {
     let mut request = sample_body_update_request();
-    request.new_body =
-        "x".repeat(DependencyUpdatesBodyUpdateRequest::MAX_BODY_BYTES + 1);
+    request.new_body = "x".repeat(DependencyUpdatesBodyUpdateRequest::MAX_BODY_BYTES + 1);
     assert!(request.validate().is_err());
 }
 

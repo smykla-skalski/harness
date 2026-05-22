@@ -20,11 +20,11 @@ extension DashboardDependenciesRouteView {
         Divider()
       }
       Button("Approve") {
-        Task { await approve(items: items) }
+        requestApproveOrConfirm(items: items)
       }
       .disabled(isBusy || !items.contains { $0.canAttemptManualApproval })
       Button("Merge") {
-        requestMerge(items: items)
+        requestMergeOrConfirm(items: items)
       }
       .disabled(isBusy || !items.contains { $0.canAttemptManualMerge })
       Button("Rerun Checks") {

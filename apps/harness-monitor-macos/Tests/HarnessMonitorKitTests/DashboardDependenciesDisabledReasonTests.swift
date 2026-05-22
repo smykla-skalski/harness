@@ -92,6 +92,74 @@ struct DashboardDependenciesDisabledReasonTests {
     #expect(DashboardDependenciesDisabledReason.mergeReason(for: [mergeable, conflict]) == nil)
   }
 
+  @Test("Approve prominence becomes warning when selection needs attention")
+  func approveProminenceBecomesWarningWhenSelectionNeedsAttention() {
+    let clean = makeItem(state: .open, reviewStatus: .reviewRequired, checkStatus: .success)
+    let failing = makeItem(state: .open, reviewStatus: .approved, checkStatus: .failure)
+
+    #expect(dashboardDependencyApproveProminence(for: [clean]) == .primary)
+    #expect(dashboardDependencyApproveProminence(for: [failing]) == .warning)
+  }
+
+  @Test("Merge prominence becomes destructive for admin bypass of required failing checks")
+  func mergeProminenceBecomesDestructiveForAdminBypassOfRequiredFailures() {
+    let adminBypass = makeItem(
+      state: .open,
+      reviewStatus: .approved,
+      checkStatus: .failure,
+      requiredFailedCheckNames: ["ci / test"],
+      viewerCanMergeAsAdmin: true
+    )
+
+    #expect(adminBypass.requiresAdminMergeForRequiredFailures)
+    #expect(dashboardDependencyMergeProminence(for: [adminBypass]) == .destructive)
+  }
+
+  @Test("Merge prominence becomes warning when attention does not require admin bypass")
+  func mergeProminenceBecomesWarningWithoutAdminBypass() {
+    let optionalFailure = makeItem(
+      state: .open,
+      reviewStatus: .approved,
+      checkStatus: .failure,
+      requiredFailedCheckNames: [],
+      viewerCanMergeAsAdmin: true
+    )
+
+    #expect(!optionalFailure.requiresAdminMergeForRequiredFailures)
+    #expect(dashboardDependencyMergeProminence(for: [optionalFailure]) == .warning)
+  }
+
+  @Test("Approve confirmation appears only for attention selections")
+  func approveConfirmationAppearsOnlyForAttentionSelections() {
+    let clean = makeItem(state: .open, reviewStatus: .reviewRequired, checkStatus: .success)
+    let failing = makeItem(state: .open, reviewStatus: .approved, checkStatus: .failure)
+
+    #expect(dashboardDependencyActionConfirmation(for: .approve, items: [clean]) == nil)
+    let confirmation = dashboardDependencyActionConfirmation(for: .approve, items: [failing])
+    #expect(confirmation != nil)
+    #expect(confirmation?.title == "Approve pull request that needs attention?")
+    #expect(confirmation?.confirmButtonTitle == "Approve Anyway")
+  }
+
+  @Test("Merge confirmation explains admin bypass when required checks fail")
+  func mergeConfirmationExplainsAdminBypassWhenRequiredChecksFail() {
+    let item = makeItem(
+      state: .open,
+      reviewStatus: .approved,
+      checkStatus: .failure,
+      requiredFailedCheckNames: ["ci / test"],
+      viewerCanMergeAsAdmin: true
+    )
+
+    let confirmation = dashboardDependencyActionConfirmation(for: .merge, items: [item])
+
+    #expect(confirmation?.title == "Merge despite required failing checks?")
+    #expect(confirmation?.confirmButtonTitle == "Merge Anyway")
+    #expect(confirmation?.confirmRole != nil)
+    #expect(confirmation?.message.contains("Required checks failing: ci / test.") == true)
+    #expect(confirmation?.message.contains("bypass branch protections and merge immediately") == true)
+  }
+
   @Test("Rerun reason distinguishes passing from pending checks")
   func rerunReasonDistinguishesPassingFromPending() {
     let passing = makeItem(checkStatus: .success)
@@ -226,7 +294,9 @@ struct DashboardDependenciesDisabledReasonTests {
     policyBlocked: Bool = false,
     isDraft: Bool = false,
     checks: [DependencyUpdateCheck] = [],
-    viewerCanUpdate: Bool = true
+    viewerCanUpdate: Bool = true,
+    requiredFailedCheckNames: [String] = [],
+    viewerCanMergeAsAdmin: Bool = false
   ) -> DependencyUpdateItem {
     DependencyUpdateItem(
       pullRequestID: "pr-1",
@@ -250,7 +320,9 @@ struct DashboardDependenciesDisabledReasonTests {
       deletions: 4,
       createdAt: "2026-05-20T10:00:00Z",
       updatedAt: "2026-05-20T11:00:00Z",
-      viewerCanUpdate: viewerCanUpdate
+      requiredFailedCheckNames: requiredFailedCheckNames,
+      viewerCanUpdate: viewerCanUpdate,
+      viewerCanMergeAsAdmin: viewerCanMergeAsAdmin
     )
   }
 }

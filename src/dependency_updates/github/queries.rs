@@ -14,6 +14,7 @@ query SearchDependencyUpdates($query: String!, $after: String) {
         state
         mergeable
         isDraft
+        viewerCanMergeAsAdmin
         reviewDecision
         headRefOid
         author { login }
@@ -52,6 +53,12 @@ query SearchDependencyUpdates($query: String!, $after: String) {
                 }
               }
             }
+          }
+        }
+        baseRef {
+          branchProtectionRule {
+            requiredStatusCheckContexts
+            requiredStatusChecks { context }
           }
         }
         reviews(first: 100) {
@@ -103,6 +110,7 @@ query DependencyUpdateNodes($ids: [ID!]!) {
       state
       mergeable
       isDraft
+      viewerCanMergeAsAdmin
       reviewDecision
       headRefOid
       author { login }
@@ -141,6 +149,12 @@ query DependencyUpdateNodes($ids: [ID!]!) {
               }
             }
           }
+        }
+      }
+      baseRef {
+        branchProtectionRule {
+          requiredStatusCheckContexts
+          requiredStatusChecks { context }
         }
       }
       reviews(first: 100) {

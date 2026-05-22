@@ -58,6 +58,8 @@ pub(super) struct SearchNode {
     pub(super) mergeable: Option<String>,
     #[serde(rename = "isDraft")]
     pub(super) is_draft: bool,
+    #[serde(rename = "viewerCanMergeAsAdmin", default)]
+    pub(super) viewer_can_merge_as_admin: Option<bool>,
     #[serde(rename = "reviewDecision")]
     pub(super) review_decision: Option<String>,
     #[serde(rename = "headRefOid")]
@@ -65,6 +67,8 @@ pub(super) struct SearchNode {
     pub(super) author: Option<LoginNode>,
     pub(super) repository: RepositoryNode,
     pub(super) commits: CommitConnection,
+    #[serde(rename = "baseRef", default)]
+    pub(super) base_ref: Option<RefNode>,
     pub(super) reviews: ReviewConnection,
     pub(super) labels: LabelConnection,
     pub(super) additions: i64,
@@ -89,6 +93,25 @@ pub(super) struct RepositoryNode {
     pub(super) name_with_owner: String,
     #[serde(default)]
     pub(super) labels: Option<RepositoryLabelConnection>,
+}
+
+#[derive(Debug, Deserialize)]
+pub(super) struct RefNode {
+    #[serde(rename = "branchProtectionRule", default)]
+    pub(super) branch_protection_rule: Option<BranchProtectionRuleNode>,
+}
+
+#[derive(Debug, Deserialize)]
+pub(super) struct BranchProtectionRuleNode {
+    #[serde(rename = "requiredStatusCheckContexts", default)]
+    pub(super) required_status_check_contexts: Vec<String>,
+    #[serde(rename = "requiredStatusChecks", default)]
+    pub(super) required_status_checks: Vec<RequiredStatusCheckNode>,
+}
+
+#[derive(Debug, Deserialize)]
+pub(super) struct RequiredStatusCheckNode {
+    pub(super) context: String,
 }
 
 #[derive(Debug, Deserialize)]

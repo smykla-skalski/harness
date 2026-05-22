@@ -61,6 +61,7 @@ struct DashboardDependenciesRouteView: View {
     [:]
   @State private var recentDependencyActions: [String: DashboardDependencyActivityEntry] = [:]
   @State private var pendingBatchConfirmation: DashboardDependencyBatchConfirmation?
+  @State private var pendingActionConfirmation: DashboardDependencyActionConfirmation?
 
   init(
     store: HarnessMonitorStore,
@@ -185,6 +186,26 @@ struct DashboardDependenciesRouteView: View {
     )
   }
 
+  var routePendingActionConfirmation: DashboardDependencyActionConfirmation? {
+    get { pendingActionConfirmation }
+    nonmutating set { pendingActionConfirmation = newValue }
+  }
+
+  var routePendingActionConfirmationTitle: String {
+    routePendingActionConfirmation?.title ?? ""
+  }
+
+  var routePendingActionConfirmationIsPresented: Binding<Bool> {
+    Binding(
+      get: { routePendingActionConfirmation != nil },
+      set: { isPresented in
+        if !isPresented {
+          routePendingActionConfirmation = nil
+        }
+      }
+    )
+  }
+
   var routePresentationWorker: DashboardDependenciesPresentationWorker {
     presentationWorker
   }
@@ -249,7 +270,7 @@ struct DashboardDependenciesRouteView: View {
   }
 
   var body: some View {
-    SessionContentDetailSplitView(
+    let splitView = SessionContentDetailSplitView(
       contentWidth: $contentDetailWidth,
       commitContentWidth: { contentDetailWidth = $0 },
       dividerAccessibilityIdentifier:
@@ -265,6 +286,8 @@ struct DashboardDependenciesRouteView: View {
     .task(id: presentationInput) {
       await rebuildPresentation(input: presentationInput)
     }
+
+    splitView
     .sheet(isPresented: $isLabelSheetPresented) {
       labelSheet
     }
@@ -275,6 +298,22 @@ struct DashboardDependenciesRouteView: View {
       actions: { batchConfirmationActions },
       message: { batchConfirmationMessage }
     )
+    .confirmationDialog(
+      routePendingActionConfirmationTitle,
+      isPresented: routePendingActionConfirmationIsPresented,
+      titleVisibility: .visible,
+      presenting: routePendingActionConfirmation
+    ) { confirmation in
+      Button(confirmation.confirmButtonTitle, role: confirmation.confirmRole) {
+        routePendingActionConfirmation = nil
+        confirmDependencyAction(confirmation)
+      }
+      Button("Cancel", role: .cancel) {
+        routePendingActionConfirmation = nil
+      }
+    } message: { confirmation in
+      Text(confirmation.message)
+    }
     .onChange(of: selectedIDs) { oldValue, newValue in
       persistedPrimarySelectionID = newValue.min() ?? persistedPrimarySelectionID
       prefetchSelectedBodies(adding: newValue.subtracting(oldValue))
