@@ -42,6 +42,21 @@ public final class SupervisorEvent {
   }
 }
 
+extension SupervisorEvent {
+  /// Stable raw strings persisted on `SupervisorEvent.kind`. The cases mirror the four event types
+  /// `PolicyExecutor` writes today; new cases must preserve existing raw values so old rows decode.
+  public enum Kind: String, Codable, Sendable, CaseIterable, Hashable {
+    case actionDispatched
+    case actionExecuted
+    case actionFailed
+    case actionSuppressed
+  }
+
+  /// Severity tag for an audit row. Mirrors `DecisionSeverity` so consumers can reuse the same
+  /// enum across decision and audit surfaces.
+  public typealias Severity = DecisionSeverity
+}
+
 public struct SupervisorEventSnapshot: Equatable, Hashable, Identifiable, Sendable {
   public let id: String
   public let tickID: String
