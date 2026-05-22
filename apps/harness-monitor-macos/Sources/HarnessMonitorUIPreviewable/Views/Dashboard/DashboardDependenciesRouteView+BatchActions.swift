@@ -2,8 +2,7 @@ import HarnessMonitorKit
 import SwiftUI
 
 extension DashboardDependenciesRouteView {
-  @ViewBuilder
-  var batchConfirmationActions: some View {
+  @ViewBuilder var batchConfirmationActions: some View {
     if let confirmation = routePendingBatchConfirmation {
       Button(confirmation.confirmTitle, role: .destructive) {
         confirmBatchAction(confirmation)
@@ -14,8 +13,7 @@ extension DashboardDependenciesRouteView {
     }
   }
 
-  @ViewBuilder
-  var batchConfirmationMessage: some View {
+  @ViewBuilder var batchConfirmationMessage: some View {
     if let confirmation = routePendingBatchConfirmation {
       Text(confirmation.message)
     }
