@@ -58,6 +58,13 @@ extension DashboardDependenciesRouteView {
     routeRefreshTracker = tracker
   }
 
+  func pruneRefreshTrackerToLiveItems() {
+    let liveIDs = Set(routeResponse.items.map(\.pullRequestID))
+    var tracker = routeRefreshTracker
+    tracker.prune(toLiveIDs: liveIDs)
+    routeRefreshTracker = tracker
+  }
+
   func applyRefreshedItems(_ refresh: DependencyUpdatesRefreshResponse) {
     let nextItems = applyDependencyRefresh(to: routeResponse.items, refresh: refresh)
     routeResponse = DependencyUpdatesQueryResponse(
@@ -66,6 +73,7 @@ extension DashboardDependenciesRouteView {
       summary: DependencyUpdatesSummary(items: nextItems),
       items: nextItems
     )
+    pruneRefreshTrackerToLiveItems()
     persistDependenciesRefresh(refresh)
   }
 }

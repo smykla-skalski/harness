@@ -113,6 +113,7 @@ extension DashboardDependenciesRouteView {
     if needsCacheBackfill {
       hydrateRepositoryLabelsFromCache()
     }
+    pruneRefreshTrackerToLiveItems()
     routeErrorMessage = nil
     reconcileSelection()
     persistDependenciesPerRepoResponse(

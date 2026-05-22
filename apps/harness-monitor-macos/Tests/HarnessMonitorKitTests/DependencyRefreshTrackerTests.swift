@@ -97,4 +97,26 @@ struct DependencyRefreshTrackerTests {
     #expect(!tracker.isRefreshing("pr-1"))
     #expect(tracker.isRefreshing("pr-2"), "pr-2 unaffected by pr-1's end")
   }
+
+  @Test("prune drops entries for pull requests no longer in the catalog")
+  func pruneDropsMissingIDs() {
+    var tracker = DependencyRefreshTracker()
+    tracker.begin(pullRequestIDs: ["pr-1"], actionTitle: "Approving")
+    tracker.begin(pullRequestIDs: ["pr-2"], actionTitle: "Merging")
+    tracker.prune(toLiveIDs: ["pr-1"])
+    #expect(tracker.isRefreshing("pr-1"))
+    #expect(!tracker.isRefreshing("pr-2"), "pr-2 was not in the live set")
+    #expect(tracker.actionTitle(for: "pr-2") == nil)
+  }
+
+  @Test("prune keeps live ids untouched including their action titles")
+  func prunePreservesLiveEntries() {
+    var tracker = DependencyRefreshTracker()
+    tracker.begin(pullRequestIDs: ["pr-1"], actionTitle: "Approving")
+    tracker.begin(pullRequestIDs: ["pr-1"], actionTitle: "Approving")
+    tracker.prune(toLiveIDs: ["pr-1", "pr-3"])
+    #expect(tracker.isRefreshing("pr-1"))
+    #expect(tracker.actionTitle(for: "pr-1") == "Approving")
+    #expect(tracker.counts["pr-1"] == 2, "ref count preserved across prune")
+  }
 }
