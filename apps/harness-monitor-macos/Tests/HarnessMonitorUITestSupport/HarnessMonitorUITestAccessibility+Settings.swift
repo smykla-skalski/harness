@@ -42,7 +42,7 @@ extension HarnessMonitorUITestAccessibility {
   static let settingsConnectionSection = "harness.settings.section.connection"
   static let settingsTaskBoardSection = "harness.settings.section.taskboard"
   static let settingsRepositoriesSection = "harness.settings.section.repositories"
-  static let settingsReviewsSection = "harness.settings.section.dependencies"
+  static let settingsReviewsSection = "harness.settings.section.reviews"
   static let settingsSecretsSection = "harness.settings.section.secrets"
   static let settingsDatabaseSection = "harness.settings.section.database"
   static let settingsDiagnosticsSection = "harness.settings.section.diagnostics"

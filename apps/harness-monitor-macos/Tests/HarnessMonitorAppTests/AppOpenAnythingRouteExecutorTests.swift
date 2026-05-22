@@ -6,8 +6,8 @@ import XCTest
 final class AppOpenAnythingRouteExecutorTests: XCTestCase {
   func testDashboardRouteOpensDashboardRoute() {
     XCTAssertEqual(
-      steps(for: .dashboardRoute(.dependencies)),
-      [.openDashboard(.dependencies)]
+      steps(for: .dashboardRoute(.reviews)),
+      [.openDashboard(.reviews)]
     )
   }
 
@@ -70,10 +70,10 @@ final class AppOpenAnythingRouteExecutorTests: XCTestCase {
 
   func testReviewSelectsPrAndOpensReviewsRoute() {
     XCTAssertEqual(
-      steps(for: .dependency(pullRequestID: "repo#42")),
+      steps(for: .review(pullRequestID: "repo#42")),
       [
         .selectDashboardReview(pullRequestID: "repo#42"),
-        .openDashboard(.dependencies),
+        .openDashboard(.reviews),
       ]
     )
   }

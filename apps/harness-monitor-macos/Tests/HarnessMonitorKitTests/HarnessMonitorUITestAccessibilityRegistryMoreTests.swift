@@ -97,7 +97,7 @@ struct HarnessMonitorUITestAccessibilityRegistryMoreTests {
     )
     #expect(
       HarnessMonitorAccessibility.settingsReviewsSection
-        == "harness.settings.section.dependencies"
+        == "harness.settings.section.reviews"
     )
     #expect(
       HarnessMonitorAccessibility.settingsSecretsSection
