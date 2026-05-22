@@ -65,7 +65,9 @@ class XcodeBuildPhaseEntryTests(unittest.TestCase):
             with self.subTest(required_input=required_input):
                 self.assertIn(required_input, source)
 
-        self.assertNotIn("basedOnDependencyAnalysis: false", source)
+        # bundleDaemonAgent opts out because cargo sources can't be enumerated
+        # in inputPaths; all other sandboxed phases must use dependency analysis.
+        self.assertEqual(source.count("basedOnDependencyAnalysis: false"), 1)
 
     def test_entry_script_unsets_swift_debug_environment_before_bash_starts(
         self,
