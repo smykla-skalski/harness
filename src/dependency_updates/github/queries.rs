@@ -69,6 +69,7 @@ query SearchDependencyUpdates($query: String!, $after: String) {
         deletions
         createdAt
         updatedAt
+        viewerCanUpdate
       }
     }
   }
@@ -157,6 +158,7 @@ query DependencyUpdateNodes($ids: [ID!]!) {
       deletions
       createdAt
       updatedAt
+      viewerCanUpdate
     }
   }
 }

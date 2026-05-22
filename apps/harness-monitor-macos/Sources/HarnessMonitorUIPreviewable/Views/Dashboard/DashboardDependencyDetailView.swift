@@ -46,6 +46,7 @@ struct DashboardDependencyDetailView<Actions: View>: View {
           DashboardDependenciesDescriptionView(
             store: store,
             pullRequestID: item.pullRequestID,
+            viewerCanUpdate: item.viewerCanUpdate,
             onCheckboxError: onDescriptionCheckboxError
           )
         }

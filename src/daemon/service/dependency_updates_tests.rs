@@ -38,6 +38,7 @@ fn item(
         deletions: 1,
         created_at: parsed("2026-05-20T12:00:00Z"),
         updated_at: parsed("2026-05-20T12:00:00Z"),
+        viewer_can_update: true,
     }
 }
 
@@ -260,6 +261,7 @@ fn one_repo_item(repository: &str, pr_id: &str) -> DependencyUpdateItem {
         deletions: 1,
         created_at: parsed("2026-05-20T12:00:00Z"),
         updated_at: parsed("2026-05-20T12:00:00Z"),
+        viewer_can_update: true,
     }
 }
 

@@ -368,5 +368,6 @@ fn sample_dependency_update_item() -> DependencyUpdateItem {
         deletions: 0,
         created_at: parse_timestamp("2026-01-01T00:00:00Z").expect("created timestamp"),
         updated_at: parse_timestamp("2026-01-01T00:01:00Z").expect("updated timestamp"),
+        viewer_can_update: true,
     }
 }

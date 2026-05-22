@@ -242,6 +242,7 @@ public struct DependencyUpdateItem: Codable, Equatable, Identifiable, Sendable {
   public let deletions: UInt64
   public let createdAt: String
   public let updatedAt: String
+  public let viewerCanUpdate: Bool
 
   public var id: String { pullRequestID }
 
@@ -266,7 +267,8 @@ public struct DependencyUpdateItem: Codable, Equatable, Identifiable, Sendable {
     additions: UInt64,
     deletions: UInt64,
     createdAt: String,
-    updatedAt: String
+    updatedAt: String,
+    viewerCanUpdate: Bool = true
   ) {
     self.pullRequestID = pullRequestID
     self.repositoryID = repositoryID
@@ -289,6 +291,7 @@ public struct DependencyUpdateItem: Codable, Equatable, Identifiable, Sendable {
     self.deletions = deletions
     self.createdAt = createdAt
     self.updatedAt = updatedAt
+    self.viewerCanUpdate = viewerCanUpdate
   }
 
   enum CodingKeys: String, CodingKey {
@@ -313,6 +316,7 @@ public struct DependencyUpdateItem: Codable, Equatable, Identifiable, Sendable {
     case deletions
     case createdAt
     case updatedAt
+    case viewerCanUpdate
   }
 
   public init(from decoder: Decoder) throws {
@@ -340,6 +344,7 @@ public struct DependencyUpdateItem: Codable, Equatable, Identifiable, Sendable {
     deletions = try container.decode(UInt64.self, forKey: .deletions)
     createdAt = try container.decode(String.self, forKey: .createdAt)
     updatedAt = try container.decode(String.self, forKey: .updatedAt)
+    viewerCanUpdate = try container.decodeIfPresent(Bool.self, forKey: .viewerCanUpdate) ?? true
   }
 }
 

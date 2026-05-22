@@ -98,6 +98,12 @@ pub struct DependencyUpdateItem {
     pub deletions: u64,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
+    #[serde(default = "default_viewer_can_update")]
+    pub viewer_can_update: bool,
+}
+
+fn default_viewer_can_update() -> bool {
+    true
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
