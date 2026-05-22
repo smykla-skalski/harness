@@ -363,23 +363,37 @@ fn default_head_ref_branch() -> &'static str {
 /// # Errors
 /// Returns `CliError` when the registry can't be loaded or saved.
 pub async fn run_local_clone_gc() -> Result<GcReport, CliError> {
-    use chrono::Duration;
-
     use crate::dependency_updates::files::local_clone::{
         LOCAL_CLONE_DISK_BUDGET_MB, LOCAL_CLONE_MAX_AGE_DAYS,
     };
+    run_local_clone_gc_with(
+        &clones_root(),
+        chrono::Utc::now(),
+        chrono::Duration::days(LOCAL_CLONE_MAX_AGE_DAYS),
+        LOCAL_CLONE_DISK_BUDGET_MB.saturating_mul(1024 * 1024),
+    )
+    .await
+}
 
-    let root = clones_root();
-    let mut registry = load_registry(&root)?;
-    let now = chrono::Utc::now();
-    let max_age = Duration::days(LOCAL_CLONE_MAX_AGE_DAYS);
-    let max_disk_bytes = LOCAL_CLONE_DISK_BUDGET_MB.saturating_mul(1024 * 1024);
+/// Same as [`run_local_clone_gc`] but with the root, `now`, max-age, and
+/// disk-budget injected. Lets tests exercise the full flow against a
+/// tempdir without monkeying with `daemon_root()`.
+///
+/// # Errors
+/// Returns `CliError` when the registry can't be loaded or saved.
+pub async fn run_local_clone_gc_with(
+    root: &LocalCloneRoot,
+    now: chrono::DateTime<chrono::Utc>,
+    max_age: chrono::Duration,
+    max_disk_bytes: u64,
+) -> Result<GcReport, CliError> {
+    let mut registry = load_registry(root)?;
     let targets = registry.pick_gc_targets(now, max_age, max_disk_bytes);
     if targets.is_empty() {
         return Ok(GcReport::default());
     }
     let report = apply_local_clone_gc_targets(&mut registry, &targets);
-    save_registry(&root, &registry)?;
+    save_registry(root, &registry)?;
     tracing::info!(
         target = "harness::dependency_updates::files",
         targets = report.targets,
@@ -1016,5 +1030,148 @@ mod tests {
             last_fetched_at: chrono::Utc::now(),
             last_known_head_ref_oid_by_pr: BTreeMap::new(),
         }
+    }
+
+    #[tokio::test]
+    async fn gc_drops_stale_entries_and_removes_bare_dirs() {
+        use crate::dependency_updates::files::local_clone::RepoKey;
+
+        let tempdir = tempfile::tempdir().expect("tempdir");
+        let root = LocalCloneRoot::new(tempdir.path().to_path_buf());
+        std::fs::create_dir_all(&root.path).expect("mkdir root");
+
+        // Old entry: last_used 60 days ago, bare dir actually present
+        // on disk. Should be dropped + removed.
+        let old_dir = root.path.join("old.git");
+        std::fs::create_dir_all(&old_dir).expect("mkdir old");
+        std::fs::write(old_dir.join("HEAD"), b"ref: refs/heads/main\n").expect("write");
+        let old_key = RepoKey::new("o/old");
+        let now = chrono::Utc::now();
+        let mut old_entry = make_registry_entry(&old_dir, "o/old", 100);
+        old_entry.last_used_at = now - chrono::Duration::days(60);
+        old_entry.last_fetched_at = now - chrono::Duration::days(60);
+
+        // Fresh entry: last_used today, bare dir present. Must survive.
+        let fresh_dir = root.path.join("fresh.git");
+        std::fs::create_dir_all(&fresh_dir).expect("mkdir fresh");
+        std::fs::write(fresh_dir.join("HEAD"), b"ref: refs/heads/main\n").expect("write");
+        let fresh_key = RepoKey::new("o/fresh");
+        let fresh_entry = make_registry_entry(&fresh_dir, "o/fresh", 200);
+
+        let mut registry = LocalCloneRegistry::default();
+        registry.insert_or_update(old_key.clone(), old_entry);
+        registry.insert_or_update(fresh_key.clone(), fresh_entry);
+        save_registry(&root, &registry).expect("save");
+
+        let report = run_local_clone_gc_with(
+            &root,
+            now,
+            chrono::Duration::days(30),
+            10 * 1024 * 1024 * 1024, // 10 GB - well above the 300 bytes we wrote
+        )
+        .await
+        .expect("gc");
+        assert_eq!(report.targets, 1, "exactly the old entry flagged");
+        assert_eq!(report.removed, 1, "old bare dir removed");
+        assert_eq!(report.bytes_freed, 100, "freed bytes match registry size");
+        // Old dir gone; fresh dir intact.
+        assert!(!old_dir.exists(), "old bare dir should be removed");
+        assert!(fresh_dir.exists(), "fresh bare dir should be untouched");
+        // Registry on disk reflects the deletion.
+        let reloaded = load_registry(&root).expect("reload");
+        assert_eq!(reloaded.entries.len(), 1);
+        assert!(reloaded.entries.contains_key(&fresh_key));
+        assert!(!reloaded.entries.contains_key(&old_key));
+    }
+
+    #[tokio::test]
+    async fn gc_evicts_lru_until_under_disk_budget() {
+        use crate::dependency_updates::files::local_clone::RepoKey;
+
+        let tempdir = tempfile::tempdir().expect("tempdir");
+        let root = LocalCloneRoot::new(tempdir.path().to_path_buf());
+        std::fs::create_dir_all(&root.path).expect("mkdir root");
+
+        // Three entries, all fresh-by-age but cumulative size > budget.
+        // Oldest-by-last_used should be evicted first.
+        let now = chrono::Utc::now();
+        let mut registry = LocalCloneRegistry::default();
+        let keys: Vec<RepoKey> = (0..3)
+            .map(|i| RepoKey::new(format!("o/r{i}")))
+            .collect();
+        for (i, key) in keys.iter().enumerate() {
+            let dir = root.path.join(format!("r{i}.git"));
+            std::fs::create_dir_all(&dir).expect("mkdir");
+            std::fs::write(dir.join("HEAD"), b"x\n").expect("write");
+            let mut entry = make_registry_entry(&dir, &format!("o/r{i}"), 1_000);
+            // Earlier index = older last_used (will be evicted first).
+            entry.last_used_at = now - chrono::Duration::hours(i64::try_from(3 - i).unwrap_or(0));
+            registry.insert_or_update(key.clone(), entry);
+        }
+        save_registry(&root, &registry).expect("save");
+
+        // Budget = 1500 bytes, but we have 3 × 1000 = 3000.
+        // Two oldest must be evicted.
+        let report = run_local_clone_gc_with(
+            &root,
+            now,
+            chrono::Duration::days(30),
+            1_500,
+        )
+        .await
+        .expect("gc");
+        assert_eq!(report.targets, 2, "two LRU evictions");
+        assert_eq!(report.removed, 2, "two bare dirs removed");
+        assert_eq!(report.bytes_freed, 2_000, "2 × 1000 bytes freed");
+        let reloaded = load_registry(&root).expect("reload");
+        assert_eq!(reloaded.entries.len(), 1);
+        // The newest survives (last index in our setup).
+        assert!(reloaded.entries.contains_key(&keys[0]));
+    }
+
+    #[tokio::test]
+    async fn gc_returns_empty_report_when_under_thresholds() {
+        let tempdir = tempfile::tempdir().expect("tempdir");
+        let root = LocalCloneRoot::new(tempdir.path().to_path_buf());
+        std::fs::create_dir_all(&root.path).expect("mkdir root");
+        let registry = LocalCloneRegistry::default();
+        save_registry(&root, &registry).expect("save");
+        let now = chrono::Utc::now();
+        let report = run_local_clone_gc_with(&root, now, chrono::Duration::days(30), u64::MAX)
+            .await
+            .expect("gc");
+        assert_eq!(report, GcReport::default());
+    }
+
+    #[tokio::test]
+    async fn gc_tolerates_missing_bare_dir() {
+        use crate::dependency_updates::files::local_clone::RepoKey;
+
+        let tempdir = tempfile::tempdir().expect("tempdir");
+        let root = LocalCloneRoot::new(tempdir.path().to_path_buf());
+        std::fs::create_dir_all(&root.path).expect("mkdir root");
+        // Registry entry pointing at a path that doesn't exist - simulates
+        // a clone that was manually rm -rf'd. GC should still drop the
+        // registry row + count it as removed.
+        let mut registry = LocalCloneRegistry::default();
+        let now = chrono::Utc::now();
+        let mut entry =
+            make_registry_entry(&root.path.join("missing.git"), "o/ghost", 500);
+        entry.last_used_at = now - chrono::Duration::days(60);
+        registry.insert_or_update(RepoKey::new("o/ghost"), entry);
+        save_registry(&root, &registry).expect("save");
+
+        let report = run_local_clone_gc_with(
+            &root,
+            now,
+            chrono::Duration::days(30),
+            u64::MAX,
+        )
+        .await
+        .expect("gc");
+        assert_eq!(report.targets, 1);
+        assert_eq!(report.removed, 1);
+        // bytes_freed = 0 because no actual filesystem removal happened.
+        assert_eq!(report.bytes_freed, 0);
     }
 }
