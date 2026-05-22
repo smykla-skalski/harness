@@ -3,16 +3,6 @@ import Foundation
 import HarnessMonitorKit
 import SwiftUI
 
-// MARK: - Stub (TEMPORARY — Unit 1 supersedes; coordinator removes during cherry-pick)
-//
-// Unit 1 owns the canonical `redactSupervisorPayloadJSON(_:)`. While that unit
-// has not landed in this worktree, fall back to a passthrough so the inspector
-// can still build and render fixtures during preview authoring. The local
-// implementation is `fileprivate` so the symbol resolves to the public one
-// once Unit 1 lands and the coordinator drops this block.
-private func redactSupervisorPayloadJSON(_ raw: String) -> String { raw }
-// MARK: - End stub
-
 /// Shared decoder used by `AuditTimelinePayloadInspectorView`. Allocated at
 /// module scope so the decode-once-in-init contract does not allocate a fresh
 /// decoder per inspector instance.
