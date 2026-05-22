@@ -1,0 +1,58 @@
+# Allow-list for scripts/validate-reviews-rename.sh
+#
+# Each non-comment line is an ERE pattern. If a flagged match record
+# (format: file:line:col:matched_line) matches any pattern here, the
+# match is considered legitimate (real package / DI / docker / Swift
+# Concurrency / docs commentary about "dependency") and is NOT counted
+# as a rename leftover.
+#
+# Add new patterns sparingly; over-broad patterns can hide real
+# rename misses. Group by category; comment WHY each pattern is allowed.
+
+# --- Cargo / SPM package management ---
+\[dependencies\]
+\[dev-dependencies\]
+\[build-dependencies\]
+\[workspace\.dependencies\]
+Cargo\.toml.*dependencies
+Cargo\.lock
+Package\.swift.*dependencies
+Project\.swift.*\.package\(
+Project\.swift.*kitDependencies
+Project\.swift.*monitorAppDependencies
+Project\.swift.*TargetDependency
+\.targetDependencies?
+TargetDependency
+
+# --- Rust internal DI containers (NOT the feature) ---
+src/run/.*RunDependencies
+src/run/.*dependencies:[[:space:]]*RunDependencies
+
+# --- Docker Compose (NOT the feature) ---
+src/infra/blocks/compose/.*ServiceDependency
+src/infra/blocks/compose/.*depends_on
+
+# --- Swift Concurrency / async ---
+dependsOn:
+\bdepends on\b
+
+# --- Architectural commentary (comments / doc-strings) ---
+(circular|injected|external|runtime|package|build|transitive|dev|task)[[:space:]]+dependency
+dependency[[:space:]]+injection
+DependencyInject(or|ion)
+
+# --- Migration shims (must keep V21 entity names for SwiftData migration) ---
+apps/harness-monitor-macos/Sources/HarnessMonitorKit/Persistence/HarnessMonitorSchemaV21\.swift
+apps/harness-monitor-macos/Sources/HarnessMonitorKit/Persistence/HarnessMonitorMigrationV21ToV22\.swift
+apps/harness-monitor-macos/Sources/HarnessMonitorKit/Support/HarnessMonitorReviewsUserDefaultsMigration\.swift
+apps/harness-monitor-macos/Tests/HarnessMonitorKitTests/HarnessMonitorMigrationV21ToV22.*Tests\.swift
+apps/harness-monitor-macos/Tests/HarnessMonitorKitTests/HarnessMonitorReviewsUserDefaultsMigrationTests\.swift
+
+# --- The rename tooling and its allow-list ---
+scripts/rename-dependencies-to-reviews\.sh
+scripts/rename-files\.sh
+scripts/validate-reviews-rename\.sh
+scripts/\.rename-allow\.txt
+
+# --- Plan file (records old names by design) ---
+\.claude/plans/immutable-wibbling-hanrahan\.md
