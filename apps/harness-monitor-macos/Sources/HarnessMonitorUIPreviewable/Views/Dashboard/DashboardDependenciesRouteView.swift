@@ -304,7 +304,9 @@ struct DashboardDependenciesRouteView: View {
       }
       .onChange(of: selectedIDs) { oldValue, newValue in
         persistedPrimarySelectionID = newValue.min() ?? persistedPrimarySelectionID
-        prefetchSelectedBodies(adding: newValue.subtracting(oldValue))
+        let added = newValue.subtracting(oldValue)
+        prefetchSelectedBodies(adding: added)
+        prefetchSelectedFiles(adding: added)
       }
       .onChange(of: storedPreferences, initial: true) { _, newValue in
         syncPreferencesFromStorage(newValue)
