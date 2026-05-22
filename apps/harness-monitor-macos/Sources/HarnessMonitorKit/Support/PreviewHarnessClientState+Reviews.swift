@@ -385,7 +385,7 @@ extension PreviewHarnessClientState {
       warnings.append("A reviewer requested changes")
     }
     if target.policyBlocked {
-      warnings.append("Dependency policy is blocking this pull request")
+      warnings.append("Review policy is blocking this pull request")
     }
     return warnings
   }
