@@ -203,15 +203,15 @@ pub struct DependencyUpdatesFilesPatchRequest {
     pub pull_request_id: String,
     pub head_ref_oid_expected: String,
     pub paths: Vec<String>,
-    /// Pull request number. When present, the local-clone runtime fetches
-    /// GitHub's synthetic `refs/pull/<number>/head` ref, which covers forks
-    /// and same-repo PR branches.
+    /// GitHub PR number (the integer in `pulls/{n}/files`). Required for
+    /// the REST path; when absent, the daemon can only route to the
+    /// local-clone path (which uses GitHub's synthetic
+    /// `refs/pull/<number>/head` ref for forks + same-repo PR branches).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub number: Option<u64>,
     /// Owner/name of the repository the PR lives in. When present, the
     /// daemon can route the patch fetch through the local-clone runtime
-    /// (zero-rate-limit). When absent, the handler falls back to the
-    /// (still-stubbed) REST path.
+    /// (zero-rate-limit) or the REST path.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub repository_full_name: Option<String>,
     /// Merge-base OID against which to compute the diff. Required for the
@@ -227,6 +227,11 @@ pub struct DependencyUpdatesFilesPatchRequest {
     /// before computing the expected base/head OID diff.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub base_ref_name: Option<String>,
+    /// User's `filesLargeDiffStrategy` choice from Settings. Daemon honors
+    /// `ForceGitHubRest` by skipping the local-clone runtime entirely.
+    /// Defaults to `AutoLocalClone` for callers that don't supply it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub large_diff_strategy: Option<service::FilesLargeDiffStrategy>,
 }
 
 impl DependencyUpdatesFilesPatchRequest {

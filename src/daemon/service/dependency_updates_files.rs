@@ -31,6 +31,8 @@ use crate::dependency_updates::files::local_clone_progress_event::BroadcastProgr
 use crate::dependency_updates::files::local_clone_runtime::{
     DiscardProgressSink, LocalCloneProgressSink, LocalCloneRuntime, diff::LocalCloneFetchRef,
 };
+use crate::dependency_updates::files::patch_rest;
+use crate::dependency_updates::files::service::FilesLargeDiffStrategy;
 use crate::dependency_updates::{
     DependencyUpdateFileViewedOutcome, DependencyUpdateFileViewedState,
     DependencyUpdateFilesViewedResult, DependencyUpdateImageMime,
@@ -124,14 +126,19 @@ pub async fn patch_dependency_update_files(
         .into());
     }
 
-    // Route through the local-clone runtime when the caller supplies
-    // enough context (repo full-name + base OID) and a token is
-    // available for it. Anything missing falls back to the placeholder
-    // REST path.
-    if let (Some(repo_full_name), Some(base_oid)) = (
-        request.repository_full_name.as_deref(),
-        request.base_ref_oid_expected.as_deref(),
-    ) && let Some(token) = github_token(Some(repo_full_name))
+    let strategy = request.large_diff_strategy.unwrap_or_default();
+    let normalized_paths = request.normalized_paths();
+    let repo_full_name = request.repository_full_name.as_deref();
+    let base_oid = request.base_ref_oid_expected.as_deref();
+
+    // Route through the local-clone runtime when the strategy allows it
+    // AND the caller supplied enough context (repo full-name + base OID)
+    // AND a token is available for the repo. ForceGitHubRest skips the
+    // runtime entirely.
+    let allow_local_clone = strategy != FilesLargeDiffStrategy::ForceGitHubRest;
+    if allow_local_clone
+        && let (Some(repo_full_name), Some(base_oid)) = (repo_full_name, base_oid)
+        && let Some(token) = github_token(Some(repo_full_name))
     {
         match run_local_clone_patch(
             &pull_request_id,
@@ -142,7 +149,7 @@ pub async fn patch_dependency_update_files(
             request.number,
             request.head_ref_name.as_deref(),
             request.base_ref_name.as_deref(),
-            &request.normalized_paths(),
+            &normalized_paths,
         )
         .await
         {
@@ -153,7 +160,37 @@ pub async fn patch_dependency_update_files(
                     pull_request_id = pull_request_id,
                     repo = repo_full_name,
                     error = %error,
-                    "local-clone patch failed, falling back to REST placeholder"
+                    "local-clone patch failed, falling back to REST"
+                );
+            }
+        }
+    }
+
+    // REST path: requires repo_full_name + PR number + token. When any
+    // are missing we surface an empty patches list (the Monitor renders
+    // a "no patches available" affordance).
+    if let (Some(repo_full_name), Some(number)) = (repo_full_name, request.number)
+        && let Some(token) = github_token(Some(repo_full_name))
+    {
+        match run_rest_patch(
+            &pull_request_id,
+            repo_full_name,
+            &token,
+            number,
+            &request.head_ref_oid_expected,
+            &normalized_paths,
+        )
+        .await
+        {
+            Ok(response) => return Ok(response),
+            Err(error) => {
+                tracing::warn!(
+                    target = "harness::dependency_updates::files",
+                    pull_request_id = pull_request_id,
+                    repo = repo_full_name,
+                    number = number,
+                    error = %error,
+                    "REST patch fetch failed"
                 );
             }
         }
@@ -162,7 +199,7 @@ pub async fn patch_dependency_update_files(
     tracing::warn!(
         target = "harness::dependency_updates::files",
         pull_request_id = pull_request_id,
-        "patch_dependency_update_files REST path placeholder (caller missing repo/base oid)"
+        "patch_dependency_update_files surfaced empty patches (caller missing repo + number)"
     );
     Ok(DependencyUpdatesFilesPatchResponse {
         pull_request_id,
@@ -170,6 +207,41 @@ pub async fn patch_dependency_update_files(
         drifted: false,
         current_head_ref_oid: request.head_ref_oid_expected.clone(),
         fetched_at: utc_now(),
+        rate_limit_snapshot: None,
+    })
+}
+
+async fn run_rest_patch(
+    pull_request_id: &str,
+    repo_full_name: &str,
+    token: &str,
+    number: u64,
+    head_ref_oid: &str,
+    paths: &[String],
+) -> Result<DependencyUpdatesFilesPatchResponse, CliError> {
+    let client = DependencyUpdatesGitHubClient::new(token)?;
+    let patches =
+        patch_rest::fetch_patches(client.octocrab(), repo_full_name, number, head_ref_oid, paths)
+            .await
+            .map_err(|error| -> CliError {
+                CliErrorKind::workflow_io(format!("rest patch fetch failed: {error}")).into()
+            })?;
+    let fetched_at = utc_now();
+    let patches = patches
+        .into_iter()
+        .map(|mut p| {
+            if p.fetched_at.is_empty() {
+                p.fetched_at = fetched_at.clone();
+            }
+            p
+        })
+        .collect();
+    Ok(DependencyUpdatesFilesPatchResponse {
+        pull_request_id: pull_request_id.to_string(),
+        patches,
+        drifted: false,
+        current_head_ref_oid: head_ref_oid.to_string(),
+        fetched_at,
         rate_limit_snapshot: None,
     })
 }
@@ -622,6 +694,7 @@ mod tests {
             base_ref_oid_expected: None,
             head_ref_name: None,
             base_ref_name: None,
+            large_diff_strategy: None,
         };
         let err = patch_dependency_update_files(&request).await.unwrap_err();
         assert!(err.to_string().to_lowercase().contains("pull_request_id"));
@@ -638,6 +711,7 @@ mod tests {
             base_ref_oid_expected: None,
             head_ref_name: None,
             base_ref_name: None,
+            large_diff_strategy: None,
         };
         let response = patch_dependency_update_files(&request).await.expect("ok");
         assert_eq!(response.pull_request_id, "PR_1");
