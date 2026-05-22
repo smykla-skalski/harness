@@ -9,52 +9,87 @@ struct DashboardDependenciesRepositorySectionHeader: View {
   let isCollapsed: Bool
   let scheduler: DashboardDependenciesScheduler
   let onToggleCollapse: () -> Void
+  let onRetryRepository: () -> Void
 
   var body: some View {
     let isSyncing = scheduler.repositoriesInFlight.contains(repository)
-    let lastSyncedAt = scheduler.states[repository]?.lastSyncedAt
-    Button(action: onToggleCollapse) {
-      HStack(alignment: .center, spacing: HarnessMonitorTheme.spacingSM) {
-        Image(systemName: isCollapsed ? "chevron.right" : "chevron.down")
-          .font(.caption.weight(.semibold))
-          .foregroundStyle(HarnessMonitorTheme.secondaryInk)
-          .frame(width: 12, alignment: .center)
-        Text(repository)
-        Spacer(minLength: HarnessMonitorTheme.spacingSM)
-        if isSyncing {
+    let state = scheduler.states[repository]
+    let lastSyncedAt = state?.lastSyncedAt
+    let errorMessage = state?.lastErrorMessage
+    HStack(alignment: .center, spacing: HarnessMonitorTheme.spacingSM) {
+      Button(action: onToggleCollapse) {
+        HStack(alignment: .center, spacing: HarnessMonitorTheme.spacingSM) {
+          Image(systemName: isCollapsed ? "chevron.right" : "chevron.down")
+            .font(.caption.weight(.semibold))
+            .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+            .frame(width: 12, alignment: .center)
+          Text(repository)
+        }
+        .contentShape(.rect)
+      }
+      .buttonStyle(.borderless)
+      Spacer(minLength: HarnessMonitorTheme.spacingSM)
+      repositorySyncStatus(
+        isSyncing: isSyncing,
+        lastSyncedAt: lastSyncedAt,
+        errorMessage: errorMessage
+      )
+      if busyPullRequestCount > 0 {
+        HStack(spacing: HarnessMonitorTheme.spacingXS) {
           ProgressView()
             .controlSize(.small)
-            .accessibilityLabel("Syncing \(repository)")
-        } else if let lastSyncedAt {
-          let relative = dependenciesRelativeFormatter.localizedString(
-            for: lastSyncedAt, relativeTo: .now)
-          DashboardDependenciesRepositoryHeaderPill(
-            title: relative,
-            systemImage: "arrow.triangle.2.circlepath",
-            accessibilityLabel: "Last synced \(relative)"
+          DashboardDependencyStatusPill(
+            label: "\(busyPullRequestCount) working",
+            tint: HarnessMonitorTheme.accent
           )
         }
-        if busyPullRequestCount > 0 {
-          HStack(spacing: HarnessMonitorTheme.spacingXS) {
-            ProgressView()
-              .controlSize(.small)
-            DashboardDependencyStatusPill(
-              label: "\(busyPullRequestCount) working",
-              tint: HarnessMonitorTheme.accent
-            )
-          }
-          .accessibilityElement(children: .combine)
-          .accessibilityLabel(busyAccessibilityLabel)
-        }
-        DashboardDependenciesRepositoryHeaderPill(
-          title: String(itemCount),
-          accessibilityLabel: itemCountAccessibilityLabel
-        )
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(busyAccessibilityLabel)
       }
-      .contentShape(.rect)
+      if let errorMessage, !isSyncing {
+        Button(action: onRetryRepository) {
+          Image(systemName: "arrow.clockwise.circle")
+            .imageScale(.medium)
+        }
+        .buttonStyle(.borderless)
+        .help("Retry \(repository): \(errorMessage)")
+        .accessibilityLabel("Retry \(repository)")
+        .accessibilityHint(errorMessage)
+      }
+      DashboardDependenciesRepositoryHeaderPill(
+        title: String(itemCount),
+        accessibilityLabel: itemCountAccessibilityLabel
+      )
     }
-    .buttonStyle(.borderless)
     .listRowInsets(EdgeInsets(top: 6, leading: 12, bottom: 6, trailing: 12))
+  }
+
+  @ViewBuilder
+  private func repositorySyncStatus(
+    isSyncing: Bool,
+    lastSyncedAt: Date?,
+    errorMessage: String?
+  ) -> some View {
+    if isSyncing {
+      ProgressView()
+        .controlSize(.small)
+        .accessibilityLabel("Syncing \(repository)")
+    } else if let errorMessage {
+      DashboardDependenciesRepositoryHeaderPill(
+        title: "Error",
+        systemImage: "exclamationmark.triangle",
+        accessibilityLabel: "Last sync failed: \(errorMessage)"
+      )
+      .help(errorMessage)
+    } else if let lastSyncedAt {
+      let relative = dependenciesRelativeFormatter.localizedString(
+        for: lastSyncedAt, relativeTo: .now)
+      DashboardDependenciesRepositoryHeaderPill(
+        title: relative,
+        systemImage: "arrow.triangle.2.circlepath",
+        accessibilityLabel: "Last synced \(relative)"
+      )
+    }
   }
 
   private var itemCountAccessibilityLabel: String {

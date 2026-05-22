@@ -148,6 +148,13 @@ final class DashboardDependenciesScheduler {
     states[repository]?.forceRefreshRequested = true
   }
 
+  /// Mark a repository for refresh and immediately try to dispatch it.
+  func retry(repository: String) async {
+    guard states[repository] != nil else { return }
+    forceRefresh(repository: repository)
+    await dispatchPending()
+  }
+
   private func runTickLoop() async {
     await dispatchPending()
     while !Task.isCancelled {

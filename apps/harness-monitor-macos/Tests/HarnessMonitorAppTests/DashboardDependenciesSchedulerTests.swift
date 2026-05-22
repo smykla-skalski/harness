@@ -62,6 +62,32 @@ struct DashboardDependenciesSchedulerTests {
     scheduler.stop()
   }
 
+  @Test("retry dispatches a fresh repository immediately")
+  func retryDispatchesFreshRepositoryImmediately() async throws {
+    let stub = SchedulerStub()
+    stub.responses = ["acme/api": stubResponse()]
+    let scheduler = DashboardDependenciesScheduler()
+
+    var prefs = DashboardDependenciesPreferences()
+    prefs.perRepositoryIntervalSeconds = 3_600
+    prefs.maxConcurrentRepositoryFetches = 1
+
+    scheduler.start(
+      repositories: ["acme/api"],
+      preferences: prefs,
+      client: stub,
+      initialLastSyncedAt: ["acme/api": Date()],
+      onMerge: { _, _ in }
+    )
+    try await Task.sleep(for: .milliseconds(100))
+    #expect(stub.totalCalls() == 0)
+
+    await scheduler.retry(repository: "acme/api")
+    try await waitUntilFetchCount(stub: stub, repo: "acme/api", target: 1)
+    #expect(scheduler.states["acme/api"]?.lastErrorMessage == nil)
+    scheduler.stop()
+  }
+
   @Test("stop cancels in-flight work and clears the in-flight set")
   func stopCancelsAndClears() async throws {
     let stub = SchedulerStub()
