@@ -24,7 +24,7 @@ extension HarnessMonitorUITestAccessibilityRegistryTests {
     )
     #expect(
       HarnessMonitorAccessibility.dashboardWindowRoute("dependencies")
-        == "harness.dashboard.route.dependencies"
+        == "harness.dashboard.route.reviews"
     )
     #expect(
       HarnessMonitorAccessibility.dashboardNotificationsRoot
