@@ -41,7 +41,7 @@ public enum SimpleActorEventKind: String, Codable, Equatable, Sendable {
   case disconnected
   case revisionMarker = "revision_marker"
 
-  public var timelineKind: DependencyUpdateTimelineKind {
+  public var timelineKind: ReviewTimelineKind {
     switch self {
     case .headRefDeleted: return .headRefDeleted
     case .headRefRestored: return .headRefRestored
@@ -89,7 +89,7 @@ public enum SimpleActorEventKind: String, Codable, Equatable, Sendable {
 public struct SimpleActorEventPayload: Codable, Equatable, Sendable {
   public let id: String
   public let createdAt: String
-  public let actor: DependencyUpdateTimelineActor?
+  public let actor: ReviewTimelineActor?
   public let eventKind: SimpleActorEventKind
   public let label: String?
   public let labelColor: String?
@@ -113,7 +113,7 @@ public struct SimpleActorEventPayload: Codable, Equatable, Sendable {
   public init(
     id: String,
     createdAt: String,
-    actor: DependencyUpdateTimelineActor? = nil,
+    actor: ReviewTimelineActor? = nil,
     eventKind: SimpleActorEventKind,
     label: String? = nil,
     labelColor: String? = nil,

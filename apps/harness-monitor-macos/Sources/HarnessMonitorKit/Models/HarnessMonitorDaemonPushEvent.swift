@@ -48,7 +48,7 @@ public struct DaemonPushEvent: Equatable, Identifiable, Sendable {
     case acpBridgeResyncIncident(AcpBridgeResyncIncidentPayload)
     case acpPermissionBatch(AcpPermissionBatch)
     case acpPermissionBatchRemoved(AcpPermissionBatchRemovedPayload)
-    case dependencyUpdatesLocalCloneProgress(DependencyUpdateLocalCloneProgress)
+    case reviewsLocalCloneProgress(ReviewLocalCloneProgress)
     case unknown(eventName: String, payload: JSONValue)
   }
 
@@ -100,12 +100,12 @@ public struct DaemonPushEvent: Equatable, Identifiable, Sendable {
           try streamEvent.decodePayload(as: AcpBridgeResyncIncidentPayload.self)
         )
       )
-    case "dependency_updates_local_clone_progress":
+    case "reviews_local_clone_progress":
       return Self(
         recordedAt: at,
         sessionId: nil,
-        kind: .dependencyUpdatesLocalCloneProgress(
-          try streamEvent.decodePayload(as: DependencyUpdateLocalCloneProgress.self)
+        kind: .reviewsLocalCloneProgress(
+          try streamEvent.decodePayload(as: ReviewLocalCloneProgress.self)
         )
       )
     default:

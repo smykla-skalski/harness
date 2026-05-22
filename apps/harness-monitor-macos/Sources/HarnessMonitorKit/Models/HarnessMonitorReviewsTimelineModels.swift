@@ -1,6 +1,6 @@
 import Foundation
 
-public struct DependencyUpdateTimelineActor: Codable, Equatable, Sendable {
+public struct ReviewTimelineActor: Codable, Equatable, Sendable {
   public let login: String
   public let avatarURL: URL?
 
@@ -15,7 +15,7 @@ public struct DependencyUpdateTimelineActor: Codable, Equatable, Sendable {
   }
 }
 
-public enum DependencyUpdateTimelineKind: String, Codable, Equatable, Sendable, CaseIterable {
+public enum ReviewTimelineKind: String, Codable, Equatable, Sendable, CaseIterable {
   case issueComment
   case review
   case reviewThread
@@ -63,12 +63,12 @@ public enum DependencyUpdateTimelineKind: String, Codable, Equatable, Sendable, 
   case unknown
 }
 
-public enum DependencyUpdateTimelinePageDirection: String, Codable, Equatable, Sendable {
+public enum ReviewTimelinePageDirection: String, Codable, Equatable, Sendable {
   case older
   case newer
 }
 
-public struct DependencyUpdateTimelinePageInfo: Codable, Equatable, Sendable {
+public struct ReviewTimelinePageInfo: Codable, Equatable, Sendable {
   public let startCursor: String?
   public let endCursor: String?
   public let hasOlder: Bool
@@ -87,18 +87,18 @@ public struct DependencyUpdateTimelinePageInfo: Codable, Equatable, Sendable {
   }
 }
 
-public struct DependencyUpdatesTimelineRequest: Codable, Equatable, Sendable {
+public struct ReviewsTimelineRequest: Codable, Equatable, Sendable {
   public let pullRequestId: String
   public let cursor: String?
   public let pageSize: UInt32
-  public let direction: DependencyUpdateTimelinePageDirection
+  public let direction: ReviewTimelinePageDirection
   public let forceRefresh: Bool
 
   public init(
     pullRequestId: String,
     cursor: String? = nil,
     pageSize: UInt32 = 50,
-    direction: DependencyUpdateTimelinePageDirection = .older,
+    direction: ReviewTimelinePageDirection = .older,
     forceRefresh: Bool = false
   ) {
     self.pullRequestId = pullRequestId
@@ -109,17 +109,17 @@ public struct DependencyUpdatesTimelineRequest: Codable, Equatable, Sendable {
   }
 }
 
-public struct DependencyUpdatesTimelineResponse: Codable, Equatable, Sendable {
+public struct ReviewsTimelineResponse: Codable, Equatable, Sendable {
   public let pullRequestId: String
-  public let entries: [DependencyUpdateTimelineEntry]
-  public let pageInfo: DependencyUpdateTimelinePageInfo
+  public let entries: [ReviewTimelineEntry]
+  public let pageInfo: ReviewTimelinePageInfo
   public let viewerCanComment: Bool
   public let fetchedAt: String
 
   public init(
     pullRequestId: String,
-    entries: [DependencyUpdateTimelineEntry],
-    pageInfo: DependencyUpdateTimelinePageInfo,
+    entries: [ReviewTimelineEntry],
+    pageInfo: ReviewTimelinePageInfo,
     viewerCanComment: Bool,
     fetchedAt: String
   ) {
@@ -131,7 +131,7 @@ public struct DependencyUpdatesTimelineResponse: Codable, Equatable, Sendable {
   }
 }
 
-public enum DependencyUpdateTimelineEntry: Equatable, Sendable, Identifiable {
+public enum ReviewTimelineEntry: Equatable, Sendable, Identifiable {
   case issueComment(IssueCommentPayload)
   case review(ReviewPayload)
   case reviewThread(ReviewThreadPayload)
@@ -164,7 +164,7 @@ public enum DependencyUpdateTimelineEntry: Equatable, Sendable, Identifiable {
     }
   }
 
-  public var actor: DependencyUpdateTimelineActor? {
+  public var actor: ReviewTimelineActor? {
     switch self {
     case .issueComment(let payload): return payload.actor
     case .review(let payload): return payload.actor
@@ -176,7 +176,7 @@ public enum DependencyUpdateTimelineEntry: Equatable, Sendable, Identifiable {
     }
   }
 
-  public var kind: DependencyUpdateTimelineKind {
+  public var kind: ReviewTimelineKind {
     switch self {
     case .issueComment: return .issueComment
     case .review: return .review
@@ -189,7 +189,7 @@ public enum DependencyUpdateTimelineEntry: Equatable, Sendable, Identifiable {
   }
 }
 
-extension DependencyUpdateTimelineEntry: Codable {
+extension ReviewTimelineEntry: Codable {
   private enum WireKind: String, Codable {
     case issueComment = "issue_comment"
     case review

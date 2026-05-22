@@ -1,8 +1,8 @@
 import Foundation
 
-extension DependencyUpdateItem {
-  public var target: DependencyUpdateTarget {
-    DependencyUpdateTarget(
+extension ReviewItem {
+  public var target: ReviewTarget {
+    ReviewTarget(
       pullRequestID: pullRequestID,
       repositoryID: repositoryID,
       repository: repository,
@@ -22,8 +22,8 @@ extension DependencyUpdateItem {
     )
   }
 
-  public var rerunTarget: DependencyUpdateTarget {
-    DependencyUpdateTarget(
+  public var rerunTarget: ReviewTarget {
+    ReviewTarget(
       pullRequestID: pullRequestID,
       repositoryID: repositoryID,
       repository: repository,
@@ -91,7 +91,7 @@ extension DependencyUpdateItem {
     viewerCanUpdate && (isAutoApprovable || isAutoMergeable)
   }
 
-  public var canAddDependencyLabel: Bool {
+  public var canAddReviewLabel: Bool {
     viewerCanUpdate && state == .open
   }
 
@@ -131,7 +131,7 @@ extension DependencyUpdateItem {
   }
 }
 
-extension DependencyUpdateCheck {
+extension ReviewCheck {
   public var detailsWebURL: URL? {
     guard let detailsURL else { return nil }
     let trimmed = detailsURL.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -173,7 +173,7 @@ extension DependencyUpdateCheck {
   }
 }
 
-extension DependencyUpdateTarget {
+extension ReviewTarget {
   public var isAutoApprovable: Bool {
     viewerCanUpdate
       && state == .open
@@ -193,16 +193,16 @@ extension DependencyUpdateTarget {
   }
 }
 
-extension DependencyUpdateItem {
+extension ReviewItem {
   public func replacing(
-    state: DependencyUpdatePullRequestState? = nil,
-    reviewStatus: DependencyUpdateReviewStatus? = nil,
-    checkStatus: DependencyUpdateCheckStatus? = nil,
+    state: ReviewPullRequestState? = nil,
+    reviewStatus: ReviewReviewStatus? = nil,
+    checkStatus: ReviewCheckStatus? = nil,
     labels: [String]? = nil,
-    checks: [DependencyUpdateCheck]? = nil,
+    checks: [ReviewCheck]? = nil,
     policyBlocked: Bool? = nil
   ) -> Self {
-    DependencyUpdateItem(
+    ReviewItem(
       pullRequestID: pullRequestID,
       repositoryID: repositoryID,
       repository: repository,

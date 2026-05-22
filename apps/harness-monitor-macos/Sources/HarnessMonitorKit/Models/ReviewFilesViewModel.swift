@@ -7,7 +7,7 @@ public enum FilesViewMode: String, Codable, Equatable, Sendable, CaseIterable {
 }
 
 /// Loading state for the metadata fetch of one PR's files.
-public enum DependencyUpdateFilesLoadState: Equatable, Sendable {
+public enum ReviewFilesLoadState: Equatable, Sendable {
   case idle
   case loading
   case loaded
@@ -15,26 +15,26 @@ public enum DependencyUpdateFilesLoadState: Equatable, Sendable {
 }
 
 /// Per-file patch state on the view model.
-public enum DependencyUpdateFilePatchState: Equatable, Sendable {
+public enum ReviewFilePatchState: Equatable, Sendable {
   case notLoaded
   case loading
-  case loaded(DependencyUpdateFilePatch)
+  case loaded(ReviewFilePatch)
   case failed(String)
 }
 
 /// Filter snapshot consumed by `applyFilter`. Lives here so the view
 /// layer can hand a Sendable value into the @MainActor view model.
-public struct DependencyUpdateFilesFilter: Equatable, Sendable {
+public struct ReviewFilesFilter: Equatable, Sendable {
   public let searchText: String
   public let hideGenerated: Bool
   public let hideWhitespaceOnly: Bool
-  public let generatedPathMatcher: DependencyUpdateFilesGeneratedPathMatcher
+  public let generatedPathMatcher: ReviewFilesGeneratedPathMatcher
 
   public init(
     searchText: String = "",
     hideGenerated: Bool = false,
     hideWhitespaceOnly: Bool = false,
-    generatedPathMatcher: DependencyUpdateFilesGeneratedPathMatcher = .empty
+    generatedPathMatcher: ReviewFilesGeneratedPathMatcher = .empty
   ) {
     self.searchText = searchText
     self.hideGenerated = hideGenerated
@@ -46,7 +46,7 @@ public struct DependencyUpdateFilesFilter: Equatable, Sendable {
 /// Pre-compiled "is this path generated" matcher. Wraps a closure so the
 /// regex compile can happen off-main and the resulting matcher stays
 /// `Sendable`.
-public struct DependencyUpdateFilesGeneratedPathMatcher: Equatable, Sendable {
+public struct ReviewFilesGeneratedPathMatcher: Equatable, Sendable {
   private let matchClosure: @Sendable (String) -> Bool
   private let identifier: String
 
@@ -70,7 +70,7 @@ public struct DependencyUpdateFilesGeneratedPathMatcher: Equatable, Sendable {
   }
 }
 
-public enum DependencyUpdateFilesSortMode: String, Codable, Equatable, Sendable, CaseIterable {
+public enum ReviewFilesSortMode: String, Codable, Equatable, Sendable, CaseIterable {
   case path
   case lineChangesDescending
   case viewedFirst
@@ -79,10 +79,10 @@ public enum DependencyUpdateFilesSortMode: String, Codable, Equatable, Sendable,
 
 @Observable
 @MainActor
-public final class DependencyUpdateFilesViewModel {
+public final class ReviewFilesViewModel {
   public let pullRequestID: String
 
-  public var state: DependencyUpdateFilesLoadState = .idle
+  public var state: ReviewFilesLoadState = .idle
   public var headRefOid: String = ""
   /// PR's source branch name (`refs/heads/<x>` qualifier dropped).
   /// Used by the local-clone patch dispatch so the daemon fetches the
@@ -99,17 +99,17 @@ public final class DependencyUpdateFilesViewModel {
   public var number: UInt64?
   public var viewerCanMarkViewed: Bool = true
   public var paginationComplete: Bool = true
-  public var files: [DependencyUpdateFile] = []
-  public var sortedFiles: [DependencyUpdateFile] = []
-  public var filteredFiles: [DependencyUpdateFile] = []
+  public var files: [ReviewFile] = []
+  public var sortedFiles: [ReviewFile] = []
+  public var filteredFiles: [ReviewFile] = []
 
-  public var patches: [String: DependencyUpdateFilePatchState] = [:]
-  public var viewedByPath: [String: DependencyUpdateFileViewedState] = [:]
+  public var patches: [String: ReviewFilePatchState] = [:]
+  public var viewedByPath: [String: ReviewFileViewedState] = [:]
   public var expandedPaths: Set<String> = []
   public var viewModeByPath: [String: FilesViewMode] = [:]
 
-  public var sortMode: DependencyUpdateFilesSortMode = .path
-  public var filter: DependencyUpdateFilesFilter = .init()
+  public var sortMode: ReviewFilesSortMode = .path
+  public var filter: ReviewFilesFilter = .init()
   public var defaultViewMode: FilesViewMode = .unified
 
   public init(pullRequestID: String) {
@@ -118,7 +118,7 @@ public final class DependencyUpdateFilesViewModel {
 
   // MARK: - Ingest
 
-  public func ingest(response: DependencyUpdatesFilesListResponse) {
+  public func ingest(response: ReviewsFilesListResponse) {
     state = .loaded
     headRefOid = response.headRefOid
     headRefName = response.headRefName
@@ -142,11 +142,11 @@ public final class DependencyUpdateFilesViewModel {
   public func setLoading() { state = .loading }
   public func setError(_ message: String) { state = .error(message) }
 
-  public func setPatchState(path: String, state: DependencyUpdateFilePatchState) {
+  public func setPatchState(path: String, state: ReviewFilePatchState) {
     patches[path] = state
   }
 
-  public func ingest(patches incoming: [DependencyUpdateFilePatch]) {
+  public func ingest(patches incoming: [ReviewFilePatch]) {
     for patch in incoming {
       patches[patch.path] = .loaded(patch)
     }
@@ -156,7 +156,7 @@ public final class DependencyUpdateFilesViewModel {
 
   public func setViewedState(
     path: String,
-    state: DependencyUpdateFileViewedState
+    state: ReviewFileViewedState
   ) {
     viewedByPath[path] = state
     recomputeSortedAndFiltered()
@@ -164,7 +164,7 @@ public final class DependencyUpdateFilesViewModel {
 
   public func markViewedBatch(
     paths: [String],
-    state: DependencyUpdateFileViewedState
+    state: ReviewFileViewedState
   ) {
     for path in paths {
       viewedByPath[path] = state
@@ -174,12 +174,12 @@ public final class DependencyUpdateFilesViewModel {
 
   // MARK: - Filter + sort
 
-  public func applyFilter(_ filter: DependencyUpdateFilesFilter) {
+  public func applyFilter(_ filter: ReviewFilesFilter) {
     self.filter = filter
     recomputeSortedAndFiltered()
   }
 
-  public func applySort(_ mode: DependencyUpdateFilesSortMode) {
+  public func applySort(_ mode: ReviewFilesSortMode) {
     self.sortMode = mode
     recomputeSortedAndFiltered()
   }
@@ -210,8 +210,8 @@ public final class DependencyUpdateFilesViewModel {
   }
 
   private func passesFilter(
-    _ file: DependencyUpdateFile,
-    snapshot: DependencyUpdateFilesFilter
+    _ file: ReviewFile,
+    snapshot: ReviewFilesFilter
   ) -> Bool {
     if snapshot.hideGenerated, snapshot.generatedPathMatcher.matches(file.path) {
       return false
@@ -226,8 +226,8 @@ public final class DependencyUpdateFilesViewModel {
   }
 
   private func comparator(
-    for mode: DependencyUpdateFilesSortMode
-  ) -> (DependencyUpdateFile, DependencyUpdateFile) -> Bool {
+    for mode: ReviewFilesSortMode
+  ) -> (ReviewFile, ReviewFile) -> Bool {
     let viewedSnapshot = self.viewedByPath
     switch mode {
     case .path:

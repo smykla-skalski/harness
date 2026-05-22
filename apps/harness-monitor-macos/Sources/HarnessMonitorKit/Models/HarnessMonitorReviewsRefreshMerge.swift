@@ -7,14 +7,14 @@ import Foundation
 /// - Drops items whose refreshed state is no longer `.open`.
 /// - Drops items whose id is in `missingPullRequestIDs`.
 /// - Leaves other items untouched.
-public func applyDependencyRefresh(
-  to items: [DependencyUpdateItem],
-  refresh: DependencyUpdatesRefreshResponse
-) -> [DependencyUpdateItem] {
-  let currentItems = normalizedDependencyUpdateItems(items)
-  let refreshedItems = normalizedDependencyUpdateItems(refresh.items)
+public func applyReviewsRefresh(
+  to items: [ReviewItem],
+  refresh: ReviewsRefreshResponse
+) -> [ReviewItem] {
+  let currentItems = normalizedReviewItems(items)
+  let refreshedItems = normalizedReviewItems(refresh.items)
   let droppedIDs = Set(refresh.missingPullRequestIDs)
-  let openItemsByID: [String: DependencyUpdateItem] = Dictionary(
+  let openItemsByID: [String: ReviewItem] = Dictionary(
     uniqueKeysWithValues:
       refreshedItems
       .filter { $0.state == .open }
@@ -23,7 +23,7 @@ public func applyDependencyRefresh(
   let closedIDs = Set(
     refreshedItems.filter { $0.state != .open }.map(\.pullRequestID)
   )
-  return currentItems.compactMap { item -> DependencyUpdateItem? in
+  return currentItems.compactMap { item -> ReviewItem? in
     if droppedIDs.contains(item.pullRequestID) || closedIDs.contains(item.pullRequestID) {
       return nil
     }

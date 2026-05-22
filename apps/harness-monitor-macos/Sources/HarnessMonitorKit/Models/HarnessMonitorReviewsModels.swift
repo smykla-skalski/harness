@@ -1,6 +1,6 @@
 import Foundation
 
-public struct DependencyUpdatesQueryRequest: Codable, Equatable, Sendable {
+public struct ReviewsQueryRequest: Codable, Equatable, Sendable {
   public let authors: [String]
   public let organizations: [String]
   public let repositories: [String]
@@ -25,7 +25,7 @@ public struct DependencyUpdatesQueryRequest: Codable, Equatable, Sendable {
   }
 }
 
-public struct DependencyUpdatesRepositoryCatalogRequest: Codable, Equatable, Sendable {
+public struct ReviewsRepositoryCatalogRequest: Codable, Equatable, Sendable {
   public let organization: String
 
   public init(organization: String) {
@@ -33,7 +33,7 @@ public struct DependencyUpdatesRepositoryCatalogRequest: Codable, Equatable, Sen
   }
 }
 
-public struct DependencyUpdatesRepositoryCatalogResponse: Codable, Equatable, Sendable {
+public struct ReviewsRepositoryCatalogResponse: Codable, Equatable, Sendable {
   public let organization: String
   public let repositories: [String]
 
@@ -43,20 +43,20 @@ public struct DependencyUpdatesRepositoryCatalogResponse: Codable, Equatable, Se
   }
 }
 
-public struct DependencyUpdatesApproveRequest: Codable, Equatable, Sendable {
-  public let targets: [DependencyUpdateTarget]
+public struct ReviewsApproveRequest: Codable, Equatable, Sendable {
+  public let targets: [ReviewTarget]
 
-  public init(targets: [DependencyUpdateTarget]) {
+  public init(targets: [ReviewTarget]) {
     self.targets = targets
   }
 }
 
-public struct DependencyUpdatesMergeRequest: Codable, Equatable, Sendable {
-  public let targets: [DependencyUpdateTarget]
+public struct ReviewsMergeRequest: Codable, Equatable, Sendable {
+  public let targets: [ReviewTarget]
   public let method: TaskBoardGitHubMergeMethod
 
   public init(
-    targets: [DependencyUpdateTarget],
+    targets: [ReviewTarget],
     method: TaskBoardGitHubMergeMethod = .squash
   ) {
     self.targets = targets
@@ -64,30 +64,30 @@ public struct DependencyUpdatesMergeRequest: Codable, Equatable, Sendable {
   }
 }
 
-public struct DependencyUpdatesRerunChecksRequest: Codable, Equatable, Sendable {
-  public let targets: [DependencyUpdateTarget]
+public struct ReviewsRerunChecksRequest: Codable, Equatable, Sendable {
+  public let targets: [ReviewTarget]
 
-  public init(targets: [DependencyUpdateTarget]) {
+  public init(targets: [ReviewTarget]) {
     self.targets = targets
   }
 }
 
-public struct DependencyUpdatesLabelRequest: Codable, Equatable, Sendable {
-  public let targets: [DependencyUpdateTarget]
+public struct ReviewsLabelRequest: Codable, Equatable, Sendable {
+  public let targets: [ReviewTarget]
   public let label: String
 
-  public init(targets: [DependencyUpdateTarget], label: String) {
+  public init(targets: [ReviewTarget], label: String) {
     self.targets = targets
     self.label = label
   }
 }
 
-public struct DependencyUpdatesAutoRequest: Codable, Equatable, Sendable {
-  public let targets: [DependencyUpdateTarget]
+public struct ReviewsAutoRequest: Codable, Equatable, Sendable {
+  public let targets: [ReviewTarget]
   public let method: TaskBoardGitHubMergeMethod
 
   public init(
-    targets: [DependencyUpdateTarget],
+    targets: [ReviewTarget],
     method: TaskBoardGitHubMergeMethod = .squash
   ) {
     self.targets = targets
@@ -95,37 +95,37 @@ public struct DependencyUpdatesAutoRequest: Codable, Equatable, Sendable {
   }
 }
 
-public struct DependencyUpdatesCommentRequest: Codable, Equatable, Sendable {
-  public let targets: [DependencyUpdateTarget]
+public struct ReviewsCommentRequest: Codable, Equatable, Sendable {
+  public let targets: [ReviewTarget]
   public let body: String
 
-  public init(targets: [DependencyUpdateTarget], body: String) {
+  public init(targets: [ReviewTarget], body: String) {
     self.targets = targets
     self.body = body
   }
 }
 
-public struct DependencyUpdatesQueryResponse: Codable, Equatable, Sendable {
+public struct ReviewsQueryResponse: Codable, Equatable, Sendable {
   public let fetchedAt: String
   public let fromCache: Bool
-  public let summary: DependencyUpdatesSummary
-  public let items: [DependencyUpdateItem]
-  public let repositoryLabels: [String: [DependencyUpdateRepositoryLabel]]
+  public let summary: ReviewsSummary
+  public let items: [ReviewItem]
+  public let repositoryLabels: [String: [ReviewRepositoryLabel]]
 
   public init(
     fetchedAt: String,
     fromCache: Bool,
-    summary: DependencyUpdatesSummary,
-    items: [DependencyUpdateItem],
-    repositoryLabels: [String: [DependencyUpdateRepositoryLabel]] = [:]
+    summary: ReviewsSummary,
+    items: [ReviewItem],
+    repositoryLabels: [String: [ReviewRepositoryLabel]] = [:]
   ) {
-    let normalizedItems = normalizedDependencyUpdateItems(items)
+    let normalizedItems = normalizedReviewItems(items)
     self.fetchedAt = fetchedAt
     self.fromCache = fromCache
     self.summary =
       normalizedItems.count == items.count
       ? summary
-      : DependencyUpdatesSummary(items: normalizedItems)
+      : ReviewsSummary(items: normalizedItems)
     self.items = normalizedItems
     self.repositoryLabels = repositoryLabels
   }
@@ -140,25 +140,25 @@ public struct DependencyUpdatesQueryResponse: Codable, Equatable, Sendable {
 
   public init(from decoder: Decoder) throws {
     let container = try decoder.container(keyedBy: CodingKeys.self)
-    let decodedSummary = try container.decode(DependencyUpdatesSummary.self, forKey: .summary)
-    let decodedItems = try container.decode([DependencyUpdateItem].self, forKey: .items)
-    let normalizedItems = normalizedDependencyUpdateItems(decodedItems)
+    let decodedSummary = try container.decode(ReviewsSummary.self, forKey: .summary)
+    let decodedItems = try container.decode([ReviewItem].self, forKey: .items)
+    let normalizedItems = normalizedReviewItems(decodedItems)
     fetchedAt = try container.decode(String.self, forKey: .fetchedAt)
     fromCache = try container.decode(Bool.self, forKey: .fromCache)
     summary =
       normalizedItems.count == decodedItems.count
       ? decodedSummary
-      : DependencyUpdatesSummary(items: normalizedItems)
+      : ReviewsSummary(items: normalizedItems)
     items = normalizedItems
     repositoryLabels =
       try container.decodeIfPresent(
-        [String: [DependencyUpdateRepositoryLabel]].self,
+        [String: [ReviewRepositoryLabel]].self,
         forKey: .repositoryLabels
       ) ?? [:]
   }
 }
 
-public struct DependencyUpdateRepositoryLabel: Codable, Equatable, Identifiable, Sendable, Hashable
+public struct ReviewRepositoryLabel: Codable, Equatable, Identifiable, Sendable, Hashable
 {
   public let name: String
   public let color: String?
@@ -186,7 +186,7 @@ public struct DependencyUpdateRepositoryLabel: Codable, Equatable, Identifiable,
   }
 }
 
-public struct DependencyUpdatesSummary: Codable, Equatable, Sendable {
+public struct ReviewsSummary: Codable, Equatable, Sendable {
   public let total: Int
   public let reviewRequired: Int
   public let readyToMerge: Int
@@ -210,7 +210,7 @@ public struct DependencyUpdatesSummary: Codable, Equatable, Sendable {
     self.blocked = blocked
   }
 
-  public init(items: [DependencyUpdateItem]) {
+  public init(items: [ReviewItem]) {
     total = items.count
     reviewRequired = items.count { $0.reviewStatus == .reviewRequired }
     readyToMerge = items.count { $0.isAutoMergeable }
@@ -220,7 +220,7 @@ public struct DependencyUpdatesSummary: Codable, Equatable, Sendable {
   }
 }
 
-public struct DependencyUpdateItem: Codable, Equatable, Identifiable, Sendable {
+public struct ReviewItem: Codable, Equatable, Identifiable, Sendable {
   public let pullRequestID: String
   public let repositoryID: String
   public let repository: String
@@ -228,16 +228,16 @@ public struct DependencyUpdateItem: Codable, Equatable, Identifiable, Sendable {
   public let title: String
   public let url: String
   public let authorLogin: String
-  public let state: DependencyUpdatePullRequestState
-  public let mergeable: DependencyUpdateMergeableState
-  public let reviewStatus: DependencyUpdateReviewStatus
-  public let checkStatus: DependencyUpdateCheckStatus
+  public let state: ReviewPullRequestState
+  public let mergeable: ReviewMergeableState
+  public let reviewStatus: ReviewReviewStatus
+  public let checkStatus: ReviewCheckStatus
   public let policyBlocked: Bool
   public let isDraft: Bool
   public let headSha: String
   public let labels: [String]
-  public let checks: [DependencyUpdateCheck]
-  public let reviews: [DependencyUpdateReview]
+  public let checks: [ReviewCheck]
+  public let reviews: [PullRequestReview]
   public let additions: UInt64
   public let deletions: UInt64
   public let createdAt: String
@@ -256,16 +256,16 @@ public struct DependencyUpdateItem: Codable, Equatable, Identifiable, Sendable {
     title: String,
     url: String,
     authorLogin: String,
-    state: DependencyUpdatePullRequestState,
-    mergeable: DependencyUpdateMergeableState,
-    reviewStatus: DependencyUpdateReviewStatus,
-    checkStatus: DependencyUpdateCheckStatus,
+    state: ReviewPullRequestState,
+    mergeable: ReviewMergeableState,
+    reviewStatus: ReviewReviewStatus,
+    checkStatus: ReviewCheckStatus,
     policyBlocked: Bool,
     isDraft: Bool,
     headSha: String,
     labels: [String] = [],
-    checks: [DependencyUpdateCheck] = [],
-    reviews: [DependencyUpdateReview] = [],
+    checks: [ReviewCheck] = [],
+    reviews: [PullRequestReview] = [],
     additions: UInt64,
     deletions: UInt64,
     createdAt: String,
@@ -336,18 +336,18 @@ public struct DependencyUpdateItem: Codable, Equatable, Identifiable, Sendable {
     title = try container.decode(String.self, forKey: .title)
     url = try container.decode(String.self, forKey: .url)
     authorLogin = try container.decode(String.self, forKey: .authorLogin)
-    state = try container.decode(DependencyUpdatePullRequestState.self, forKey: .state)
-    mergeable = try container.decode(DependencyUpdateMergeableState.self, forKey: .mergeable)
-    reviewStatus = try container.decode(DependencyUpdateReviewStatus.self, forKey: .reviewStatus)
-    checkStatus = try container.decode(DependencyUpdateCheckStatus.self, forKey: .checkStatus)
+    state = try container.decode(ReviewPullRequestState.self, forKey: .state)
+    mergeable = try container.decode(ReviewMergeableState.self, forKey: .mergeable)
+    reviewStatus = try container.decode(ReviewReviewStatus.self, forKey: .reviewStatus)
+    checkStatus = try container.decode(ReviewCheckStatus.self, forKey: .checkStatus)
     policyBlocked = try container.decode(Bool.self, forKey: .policyBlocked)
     isDraft = try container.decode(Bool.self, forKey: .isDraft)
     headSha = try container.decode(String.self, forKey: .headSha)
     labels = try container.decodeIfPresent([String].self, forKey: .labels) ?? []
     checks =
-      try container.decodeIfPresent([DependencyUpdateCheck].self, forKey: .checks) ?? []
+      try container.decodeIfPresent([ReviewCheck].self, forKey: .checks) ?? []
     reviews =
-      try container.decodeIfPresent([DependencyUpdateReview].self, forKey: .reviews) ?? []
+      try container.decodeIfPresent([PullRequestReview].self, forKey: .reviews) ?? []
     additions = try container.decode(UInt64.self, forKey: .additions)
     deletions = try container.decode(UInt64.self, forKey: .deletions)
     createdAt = try container.decode(String.self, forKey: .createdAt)
@@ -360,19 +360,19 @@ public struct DependencyUpdateItem: Codable, Equatable, Identifiable, Sendable {
   }
 }
 
-func normalizedDependencyUpdateItems(
-  _ items: [DependencyUpdateItem]
-) -> [DependencyUpdateItem] {
+func normalizedReviewItems(
+  _ items: [ReviewItem]
+) -> [ReviewItem] {
   guard items.count > 1 else { return items }
   let formatter = ISO8601DateFormatter()
-  var uniqueItems: [DependencyUpdateItem] = []
+  var uniqueItems: [ReviewItem] = []
   uniqueItems.reserveCapacity(items.count)
   var indexByPullRequestID: [String: Int] = [:]
 
   for item in items {
     if let existingIndex = indexByPullRequestID[item.pullRequestID] {
       let existingItem = uniqueItems[existingIndex]
-      if dependencyUpdateItem(item, shouldReplace: existingItem, using: formatter) {
+      if reviewItem(item, shouldReplace: existingItem, using: formatter) {
         uniqueItems[existingIndex] = item
       }
       continue
@@ -385,9 +385,9 @@ func normalizedDependencyUpdateItems(
   return uniqueItems
 }
 
-private func dependencyUpdateItem(
-  _ candidate: DependencyUpdateItem,
-  shouldReplace existing: DependencyUpdateItem,
+private func reviewItem(
+  _ candidate: ReviewItem,
+  shouldReplace existing: ReviewItem,
   using formatter: ISO8601DateFormatter
 ) -> Bool {
   let candidateDate = formatter.date(from: candidate.updatedAt)

@@ -1,7 +1,7 @@
 import Foundation
 import Observation
 
-/// Per-PR observable surface for the Dependencies detail-pane timeline.
+/// Per-PR observable surface for the Reviews detail-pane timeline.
 ///
 /// Storing entries on a per-PR `@Observable` rather than on the global
 /// `HarnessMonitorStore` keeps view invalidation scoped to the open
@@ -11,8 +11,8 @@ import Observation
 /// already-seen PR does not invalidate every reader.
 @Observable
 @MainActor
-public final class DependencyUpdateTimelineViewModel {
-  public var entries: [DependencyUpdateTimelineEntry] = []
+public final class ReviewTimelineViewModel {
+  public var entries: [ReviewTimelineEntry] = []
   public private(set) var revision: UInt64 = 0
   public var startCursor: String?
   public var endCursor: String?
@@ -36,7 +36,7 @@ public final class DependencyUpdateTimelineViewModel {
   /// Replaces the timeline with the fully-drained page returned by the
   /// daemon. `loadState` settles to `.idle` and `lastError` clears so
   /// the view can drop any "Retry" affordance.
-  public func apply(initial response: DependencyUpdatesTimelineResponse) {
+  public func apply(initial response: ReviewsTimelineResponse) {
     entries = response.entries
     bumpRevision()
     startCursor = response.pageInfo.startCursor
@@ -53,7 +53,7 @@ public final class DependencyUpdateTimelineViewModel {
   /// pushed onto the front; UI displays newest-first). Updates the
   /// cursor and `hasOlder` flags so subsequent "Load older" requests
   /// pick up where this one left off.
-  public func appendOlder(_ response: DependencyUpdatesTimelineResponse) {
+  public func appendOlder(_ response: ReviewsTimelineResponse) {
     entries.insert(contentsOf: response.entries, at: 0)
     bumpRevision()
     if response.pageInfo.startCursor != nil {
@@ -92,7 +92,7 @@ public final class DependencyUpdateTimelineViewModel {
   /// returned id and either lets the optimistic entry stand (the
   /// daemon's cache append covers the next fetch) or removes it via
   /// `removeOptimistic(id:)` on failure.
-  public func appendOptimistic(_ entry: DependencyUpdateTimelineEntry) {
+  public func appendOptimistic(_ entry: ReviewTimelineEntry) {
     entries.append(entry)
     bumpRevision()
   }
@@ -107,7 +107,7 @@ public final class DependencyUpdateTimelineViewModel {
   /// Replaces a synthetic optimistic entry with the real GitHub-returned
   /// timeline entry. If the optimistic entry has already disappeared, appends
   /// the real entry unless it is already present.
-  public func replaceOptimistic(id: String, with entry: DependencyUpdateTimelineEntry) {
+  public func replaceOptimistic(id: String, with entry: ReviewTimelineEntry) {
     if let index = entries.firstIndex(where: { $0.id == id }) {
       entries[index] = entry
     } else if !entries.contains(where: { $0.id == entry.id }) {
