@@ -16,7 +16,8 @@ struct AvatarImageView: View {
   let size: CGFloat
 
   @State private var image: NSImage?
-  @Environment(\.displayScale) private var displayScale
+  @Environment(\.displayScale)
+  private var displayScale
 
   var body: some View {
     Group {

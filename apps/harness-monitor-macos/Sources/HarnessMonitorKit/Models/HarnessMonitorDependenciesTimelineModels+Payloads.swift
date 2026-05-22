@@ -273,8 +273,8 @@ public enum AnyCodableJSONValue: Codable, Equatable, Sendable {
   case bool(Bool)
   case number(Double)
   case string(String)
-  case array([AnyCodableJSONValue])
-  case object([String: AnyCodableJSONValue])
+  case array([Self])
+  case object([String: Self])
 
   public init(from decoder: Decoder) throws {
     let single = try decoder.singleValueContainer()
@@ -286,9 +286,9 @@ public enum AnyCodableJSONValue: Codable, Equatable, Sendable {
       self = .number(value)
     } else if let value = try? single.decode(String.self) {
       self = .string(value)
-    } else if let value = try? single.decode([AnyCodableJSONValue].self) {
+    } else if let value = try? single.decode([Self].self) {
       self = .array(value)
-    } else if let value = try? single.decode([String: AnyCodableJSONValue].self) {
+    } else if let value = try? single.decode([String: Self].self) {
       self = .object(value)
     } else {
       throw DecodingError.dataCorruptedError(

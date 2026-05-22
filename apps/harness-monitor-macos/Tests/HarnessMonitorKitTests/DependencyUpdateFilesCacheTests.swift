@@ -84,8 +84,10 @@ struct DependencyUpdateFilesCacheTests {
     #expect(files.first?.languageHintRaw == HarnessDependencyFileLanguage.swift.rawValue)
 
     let viewed = cache.loadViewedStates(pullRequestID: "pr-1", headRefOid: "head-a")
-    #expect(viewed["src/a.swift"]?.viewedStateRaw == DependencyUpdateFileViewedState.unviewed.rawValue)
-    #expect(viewed["src/b.swift"]?.viewedStateRaw == DependencyUpdateFileViewedState.viewed.rawValue)
+    #expect(
+      viewed["src/a.swift"]?.viewedStateRaw == DependencyUpdateFileViewedState.unviewed.rawValue)
+    #expect(
+      viewed["src/b.swift"]?.viewedStateRaw == DependencyUpdateFileViewedState.viewed.rawValue)
   }
 
   @Test("record with new headRefOid replaces files atomically")
@@ -167,7 +169,8 @@ struct DependencyUpdateFilesCacheTests {
       viewedState: .viewed
     )
     let states = cache.loadViewedStates(pullRequestID: "pr-2", headRefOid: "head-z")
-    #expect(states["src/new.swift"]?.viewedStateRaw == DependencyUpdateFileViewedState.viewed.rawValue)
+    #expect(
+      states["src/new.swift"]?.viewedStateRaw == DependencyUpdateFileViewedState.viewed.rawValue)
   }
 
   @Test("deleteAll(pullRequestID:) scopes the deletion to that PR")

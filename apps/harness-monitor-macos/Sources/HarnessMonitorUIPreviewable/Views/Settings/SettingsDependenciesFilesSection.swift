@@ -46,7 +46,10 @@ struct SettingsDependenciesFilesSection: View {
       Toggle("Hide generated files", isOn: $draft.filesHideGenerated)
       if draft.filesHideGenerated {
         Text(
-          "Default patterns hide lock files, vendor/, dist/, *.pb.{go,cc}, and *.generated.{swift,ts,js}. Editing patterns is exposed in advanced settings."
+          """
+          Default patterns hide lock files, vendor/, dist/, *.pb.{go,cc}, and \
+          *.generated.{swift,ts,js}. Editing patterns is exposed in advanced settings.
+          """
         )
         .font(.caption2)
         .foregroundStyle(.secondary)

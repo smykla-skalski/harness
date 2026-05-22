@@ -26,7 +26,7 @@ struct DashboardDependencyCommentRetryStrip: View {
       Spacer()
       if canRetry {
         Button("Retry", action: onRetry)
-          .buttonStyle(.bordered)
+          .harnessActionButtonStyle(variant: .bordered)
           .controlSize(.small)
           .accessibilityLabel(Text("Retry sending previous comment"))
       }
@@ -34,7 +34,7 @@ struct DashboardDependencyCommentRetryStrip: View {
         Image(systemName: "xmark.circle.fill")
           .foregroundStyle(.secondary)
       }
-      .buttonStyle(.plain)
+      .harnessPlainButtonStyle()
       .accessibilityLabel(Text("Dismiss error"))
     }
     .padding(.vertical, 4)

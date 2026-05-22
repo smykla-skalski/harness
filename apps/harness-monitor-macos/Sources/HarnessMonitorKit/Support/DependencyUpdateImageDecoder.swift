@@ -106,10 +106,12 @@ public actor DependencyUpdateImageDecoder {
     else {
       throw DecodeError.thumbnailCreationFailed
     }
-    let intrinsicSize = Self.intrinsicSize(from: source) ?? CGSize(
-      width: CGFloat(cgImage.width),
-      height: CGFloat(cgImage.height)
-    )
+    let intrinsicSize =
+      Self.intrinsicSize(from: source)
+      ?? CGSize(
+        width: CGFloat(cgImage.width),
+        height: CGFloat(cgImage.height)
+      )
     let byteSize = cgImage.width * cgImage.height * 4
     let prepared = PreparedImage(
       cgImage: cgImage,

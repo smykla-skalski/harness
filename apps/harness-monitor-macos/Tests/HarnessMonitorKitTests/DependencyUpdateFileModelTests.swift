@@ -321,11 +321,11 @@ final class DependencyUpdateFileModelTests: XCTestCase {
       FilesLargeDiffStrategy.self, from: Data(json.utf8))
     XCTAssertEqual(parsed, .autoLocalClone)
     let encoded = try JSONEncoder().encode(FilesLargeDiffStrategy.forceGitHubRest)
-    XCTAssertEqual(String(decoding: encoded, as: UTF8.self), "\"force_git_hub_rest\"")
+    XCTAssertEqual(String(bytes: encoded, encoding: .utf8), "\"force_git_hub_rest\"")
   }
 
   func testServedByValueRoundTripsSnakeCase() throws {
     let encoded = try JSONEncoder().encode(DependencyUpdateFileServedBy.githubRestFallback)
-    XCTAssertEqual(String(decoding: encoded, as: UTF8.self), "\"github_rest_fallback\"")
+    XCTAssertEqual(String(bytes: encoded, encoding: .utf8), "\"github_rest_fallback\"")
   }
 }
