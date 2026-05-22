@@ -12,7 +12,7 @@ pub mod app;
 mod codec;
 pub mod create;
 pub mod daemon;
-pub mod dependency_updates;
+pub mod reviews;
 pub mod errors;
 pub mod feature_flags;
 pub(crate) mod git;
