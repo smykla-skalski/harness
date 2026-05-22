@@ -55,6 +55,9 @@ public protocol HarnessMonitorDependenciesClientProtocol: Sendable {
   func deleteDependencyUpdateLocalClone(
     repoKeySegment: String
   ) async throws
+  func fetchDependencyUpdateTimeline(
+    request: DependencyUpdatesTimelineRequest
+  ) async throws -> DependencyUpdatesTimelineResponse
 }
 
 extension HarnessMonitorDependenciesClientProtocol {
@@ -169,6 +172,12 @@ extension HarnessMonitorDependenciesClientProtocol {
   }
 
   public func deleteDependencyUpdateLocalClone(repoKeySegment _: String) async throws {
+    throw HarnessMonitorAPIError.server(code: 501, message: "Dependencies unavailable")
+  }
+
+  public func fetchDependencyUpdateTimeline(
+    request _: DependencyUpdatesTimelineRequest
+  ) async throws -> DependencyUpdatesTimelineResponse {
     throw HarnessMonitorAPIError.server(code: 501, message: "Dependencies unavailable")
   }
 }
