@@ -3,177 +3,177 @@ use super::{HttpApiRouteContract, HttpRouteMethod, HttpRouteParity, http_paths, 
 pub(crate) const ROUTES: &[HttpApiRouteContract] = &[
     HttpApiRouteContract {
         method: HttpRouteMethod::Post,
-        path: http_paths::DEPENDENCY_UPDATES_REPOSITORIES,
+        path: http_paths::REVIEWS_REPOSITORIES,
         parity: HttpRouteParity::Rpc {
-            ws_method: ws_methods::DEPENDENCY_UPDATES_REPOSITORY_CATALOG,
+            ws_method: ws_methods::REVIEWS_REPOSITORY_CATALOG,
         },
         swift_client_exposed: true,
     },
     HttpApiRouteContract {
         method: HttpRouteMethod::Get,
-        path: http_paths::DEPENDENCY_UPDATES_CAPABILITIES,
+        path: http_paths::REVIEWS_CAPABILITIES,
         parity: HttpRouteParity::Rpc {
-            ws_method: ws_methods::DEPENDENCY_UPDATES_CAPABILITIES,
+            ws_method: ws_methods::REVIEWS_CAPABILITIES,
         },
         swift_client_exposed: true,
     },
     HttpApiRouteContract {
         method: HttpRouteMethod::Post,
-        path: http_paths::DEPENDENCY_UPDATES_QUERY,
+        path: http_paths::REVIEWS_QUERY,
         parity: HttpRouteParity::Rpc {
-            ws_method: ws_methods::DEPENDENCY_UPDATES_QUERY,
+            ws_method: ws_methods::REVIEWS_QUERY,
         },
         swift_client_exposed: true,
     },
     HttpApiRouteContract {
         method: HttpRouteMethod::Post,
-        path: http_paths::DEPENDENCY_UPDATES_ACTION_PREVIEW,
+        path: http_paths::REVIEWS_ACTION_PREVIEW,
         parity: HttpRouteParity::Rpc {
-            ws_method: ws_methods::DEPENDENCY_UPDATES_ACTION_PREVIEW,
+            ws_method: ws_methods::REVIEWS_ACTION_PREVIEW,
         },
         swift_client_exposed: true,
     },
     HttpApiRouteContract {
         method: HttpRouteMethod::Post,
-        path: http_paths::DEPENDENCY_UPDATES_APPROVE,
+        path: http_paths::REVIEWS_APPROVE,
         parity: HttpRouteParity::Rpc {
-            ws_method: ws_methods::DEPENDENCY_UPDATES_APPROVE,
+            ws_method: ws_methods::REVIEWS_APPROVE,
         },
         swift_client_exposed: true,
     },
     HttpApiRouteContract {
         method: HttpRouteMethod::Post,
-        path: http_paths::DEPENDENCY_UPDATES_MERGE,
+        path: http_paths::REVIEWS_MERGE,
         parity: HttpRouteParity::Rpc {
-            ws_method: ws_methods::DEPENDENCY_UPDATES_MERGE,
+            ws_method: ws_methods::REVIEWS_MERGE,
         },
         swift_client_exposed: true,
     },
     HttpApiRouteContract {
         method: HttpRouteMethod::Post,
-        path: http_paths::DEPENDENCY_UPDATES_RERUN_CHECKS,
+        path: http_paths::REVIEWS_RERUN_CHECKS,
         parity: HttpRouteParity::Rpc {
-            ws_method: ws_methods::DEPENDENCY_UPDATES_RERUN_CHECKS,
+            ws_method: ws_methods::REVIEWS_RERUN_CHECKS,
         },
         swift_client_exposed: true,
     },
     HttpApiRouteContract {
         method: HttpRouteMethod::Post,
-        path: http_paths::DEPENDENCY_UPDATES_LABELS,
+        path: http_paths::REVIEWS_LABELS,
         parity: HttpRouteParity::Rpc {
-            ws_method: ws_methods::DEPENDENCY_UPDATES_ADD_LABEL,
+            ws_method: ws_methods::REVIEWS_ADD_LABEL,
         },
         swift_client_exposed: true,
     },
     HttpApiRouteContract {
         method: HttpRouteMethod::Post,
-        path: http_paths::DEPENDENCY_UPDATES_AUTO,
+        path: http_paths::REVIEWS_AUTO,
         parity: HttpRouteParity::Rpc {
-            ws_method: ws_methods::DEPENDENCY_UPDATES_AUTO,
+            ws_method: ws_methods::REVIEWS_AUTO,
         },
         swift_client_exposed: true,
     },
     HttpApiRouteContract {
         method: HttpRouteMethod::Delete,
-        path: http_paths::DEPENDENCY_UPDATES_CACHE,
+        path: http_paths::REVIEWS_CACHE,
         parity: HttpRouteParity::Rpc {
-            ws_method: ws_methods::DEPENDENCY_UPDATES_CLEAR_CACHE,
+            ws_method: ws_methods::REVIEWS_CLEAR_CACHE,
         },
         swift_client_exposed: true,
     },
     HttpApiRouteContract {
         method: HttpRouteMethod::Post,
-        path: http_paths::DEPENDENCY_UPDATES_REFRESH,
+        path: http_paths::REVIEWS_REFRESH,
         parity: HttpRouteParity::Rpc {
-            ws_method: ws_methods::DEPENDENCY_UPDATES_REFRESH,
+            ws_method: ws_methods::REVIEWS_REFRESH,
         },
         swift_client_exposed: true,
     },
     HttpApiRouteContract {
         method: HttpRouteMethod::Post,
-        path: http_paths::DEPENDENCY_UPDATES_BODY,
+        path: http_paths::REVIEWS_BODY,
         parity: HttpRouteParity::Rpc {
-            ws_method: ws_methods::DEPENDENCY_UPDATES_BODY,
+            ws_method: ws_methods::REVIEWS_BODY,
         },
         swift_client_exposed: true,
     },
     HttpApiRouteContract {
         method: HttpRouteMethod::Post,
-        path: http_paths::DEPENDENCY_UPDATES_BODY_UPDATE,
+        path: http_paths::REVIEWS_BODY_UPDATE,
         parity: HttpRouteParity::Rpc {
-            ws_method: ws_methods::DEPENDENCY_UPDATES_BODY_UPDATE,
+            ws_method: ws_methods::REVIEWS_BODY_UPDATE,
         },
         swift_client_exposed: true,
     },
     HttpApiRouteContract {
         method: HttpRouteMethod::Post,
-        path: http_paths::DEPENDENCY_UPDATES_COMMENT,
+        path: http_paths::REVIEWS_COMMENT,
         parity: HttpRouteParity::Rpc {
-            ws_method: ws_methods::DEPENDENCY_UPDATES_COMMENT,
+            ws_method: ws_methods::REVIEWS_COMMENT,
         },
         swift_client_exposed: true,
     },
     HttpApiRouteContract {
         method: HttpRouteMethod::Post,
-        path: http_paths::DEPENDENCY_UPDATES_FILES_LIST,
+        path: http_paths::REVIEWS_FILES_LIST,
         parity: HttpRouteParity::Rpc {
-            ws_method: ws_methods::DEPENDENCY_UPDATES_FILES_LIST,
+            ws_method: ws_methods::REVIEWS_FILES_LIST,
         },
         swift_client_exposed: true,
     },
     HttpApiRouteContract {
         method: HttpRouteMethod::Post,
-        path: http_paths::DEPENDENCY_UPDATES_FILES_PATCH,
+        path: http_paths::REVIEWS_FILES_PATCH,
         parity: HttpRouteParity::Rpc {
-            ws_method: ws_methods::DEPENDENCY_UPDATES_FILES_PATCH,
+            ws_method: ws_methods::REVIEWS_FILES_PATCH,
         },
         swift_client_exposed: true,
     },
     HttpApiRouteContract {
         method: HttpRouteMethod::Post,
-        path: http_paths::DEPENDENCY_UPDATES_FILES_VIEWED,
+        path: http_paths::REVIEWS_FILES_VIEWED,
         parity: HttpRouteParity::Rpc {
-            ws_method: ws_methods::DEPENDENCY_UPDATES_FILES_VIEWED,
+            ws_method: ws_methods::REVIEWS_FILES_VIEWED,
         },
         swift_client_exposed: true,
     },
     HttpApiRouteContract {
         method: HttpRouteMethod::Post,
-        path: http_paths::DEPENDENCY_UPDATES_FILES_BLOB,
+        path: http_paths::REVIEWS_FILES_BLOB,
         parity: HttpRouteParity::Rpc {
-            ws_method: ws_methods::DEPENDENCY_UPDATES_FILES_BLOB,
+            ws_method: ws_methods::REVIEWS_FILES_BLOB,
         },
         swift_client_exposed: true,
     },
     HttpApiRouteContract {
         method: HttpRouteMethod::Post,
-        path: http_paths::DEPENDENCY_UPDATES_FILES_LOCAL_CLONES,
+        path: http_paths::REVIEWS_FILES_LOCAL_CLONES,
         parity: HttpRouteParity::Rpc {
-            ws_method: ws_methods::DEPENDENCY_UPDATES_FILES_LOCAL_CLONES_LIST,
+            ws_method: ws_methods::REVIEWS_FILES_LOCAL_CLONES_LIST,
         },
         swift_client_exposed: true,
     },
     HttpApiRouteContract {
         method: HttpRouteMethod::Post,
-        path: http_paths::DEPENDENCY_UPDATES_FILES_LOCAL_CLONES_DELETE,
+        path: http_paths::REVIEWS_FILES_LOCAL_CLONES_DELETE,
         parity: HttpRouteParity::Rpc {
-            ws_method: ws_methods::DEPENDENCY_UPDATES_FILES_LOCAL_CLONES_DELETE,
+            ws_method: ws_methods::REVIEWS_FILES_LOCAL_CLONES_DELETE,
         },
         swift_client_exposed: true,
     },
     HttpApiRouteContract {
         method: HttpRouteMethod::Post,
-        path: http_paths::DEPENDENCY_UPDATES_TIMELINE,
+        path: http_paths::REVIEWS_TIMELINE,
         parity: HttpRouteParity::Rpc {
-            ws_method: ws_methods::DEPENDENCY_UPDATES_TIMELINE,
+            ws_method: ws_methods::REVIEWS_TIMELINE,
         },
         swift_client_exposed: true,
     },
     HttpApiRouteContract {
         method: HttpRouteMethod::Post,
-        path: http_paths::DEPENDENCY_UPDATES_REVIEW_THREADS_RESOLVE,
+        path: http_paths::REVIEWS_REVIEW_THREADS_RESOLVE,
         parity: HttpRouteParity::Rpc {
-            ws_method: ws_methods::DEPENDENCY_UPDATES_REVIEW_THREADS_RESOLVE,
+            ws_method: ws_methods::REVIEWS_REVIEW_THREADS_RESOLVE,
         },
         swift_client_exposed: true,
     },

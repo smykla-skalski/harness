@@ -1,27 +1,27 @@
 use std::collections::BTreeMap;
 
 use crate::daemon::service::task_board_runtime::external_sync_config_for_repository;
-use crate::dependency_updates::{
-    DependencyUpdateActionOutcome, DependencyUpdateActionPreviewKind,
-    DependencyUpdateActionPreviewTarget, DependencyUpdateActionResult, DependencyUpdateCheckStatus,
-    DependencyUpdateItem, DependencyUpdateMergeableState, DependencyUpdatePullRequestState,
-    DependencyUpdateRepositoryLabel, DependencyUpdateReviewStatus, DependencyUpdateTarget,
-    DependencyUpdatesActionPreviewRequest, DependencyUpdatesActionPreviewResponse,
-    DependencyUpdatesActionResponse, DependencyUpdatesApproveRequest, DependencyUpdatesAutoRequest,
-    DependencyUpdatesBodyRequest, DependencyUpdatesBodyResponse,
-    DependencyUpdatesBodyUpdateOutcome, DependencyUpdatesBodyUpdateRequest,
-    DependencyUpdatesBodyUpdateResponse, DependencyUpdatesCacheClearResponse,
-    DependencyUpdatesCapabilitiesResponse, DependencyUpdatesCommentRequest,
-    DependencyUpdatesGitHubClient, DependencyUpdatesLabelRequest, DependencyUpdatesMergeRequest,
-    DependencyUpdatesQueryRequest, DependencyUpdatesQueryResponse, DependencyUpdatesRefreshRequest,
-    DependencyUpdatesRefreshResponse, DependencyUpdatesRepositoryCatalogRequest,
-    DependencyUpdatesRepositoryCatalogResponse, DependencyUpdatesRerunChecksRequest,
+use crate::reviews::{
+    ReviewActionOutcome, ReviewActionPreviewKind,
+    ReviewActionPreviewTarget, ReviewActionResult, ReviewCheckStatus,
+    ReviewItem, ReviewMergeableState, ReviewPullRequestState,
+    ReviewRepositoryLabel, ReviewReviewStatus, ReviewTarget,
+    ReviewsActionPreviewRequest, ReviewsActionPreviewResponse,
+    ReviewsActionResponse, ReviewsApproveRequest, ReviewsAutoRequest,
+    ReviewsBodyRequest, ReviewsBodyResponse,
+    ReviewsBodyUpdateOutcome, ReviewsBodyUpdateRequest,
+    ReviewsBodyUpdateResponse, ReviewsCacheClearResponse,
+    ReviewsCapabilitiesResponse, ReviewsCommentRequest,
+    ReviewsGitHubClient, ReviewsLabelRequest, ReviewsMergeRequest,
+    ReviewsQueryRequest, ReviewsQueryResponse, ReviewsRefreshRequest,
+    ReviewsRefreshResponse, ReviewsRepositoryCatalogRequest,
+    ReviewsRepositoryCatalogResponse, ReviewsRerunChecksRequest,
 };
 use crate::errors::{CliError, CliErrorKind};
 use crate::task_board::ExternalProvider;
 use crate::workspace::utc_now;
 
-#[path = "dependency_updates_cache.rs"]
+#[path = "reviews_cache.rs"]
 mod cache_internal;
 
 #[cfg(test)]
@@ -34,13 +34,13 @@ use cache_internal::{
 #[derive(Clone)]
 struct TokenBoundRequest {
     token: String,
-    request: DependencyUpdatesQueryRequest,
+    request: ReviewsQueryRequest,
 }
 
 #[derive(Clone)]
 struct TokenBoundTargets {
     token: String,
-    targets: Vec<DependencyUpdateTarget>,
+    targets: Vec<ReviewTarget>,
 }
 
 /// Query dependency update pull requests through configured GitHub tokens.
@@ -48,9 +48,9 @@ struct TokenBoundTargets {
 /// # Errors
 /// Returns `CliError` when the request is invalid, a required token is missing,
 /// or GitHub cannot return the requested update data.
-pub async fn query_dependency_updates(
-    request: &DependencyUpdatesQueryRequest,
-) -> Result<DependencyUpdatesQueryResponse, CliError> {
+pub async fn query_reviews(
+    request: &ReviewsQueryRequest,
+) -> Result<ReviewsQueryResponse, CliError> {
     request.validate()?;
     let cache_key = request.cache_key();
     if !request.force_refresh
@@ -61,10 +61,10 @@ pub async fn query_dependency_updates(
 
     let segments = token_bound_requests(request)?;
     let mut items_by_key = BTreeMap::new();
-    let mut repository_labels: BTreeMap<String, Vec<DependencyUpdateRepositoryLabel>> =
+    let mut repository_labels: BTreeMap<String, Vec<ReviewRepositoryLabel>> =
         BTreeMap::new();
     for segment in segments {
-        let client = DependencyUpdatesGitHubClient::new(&segment.token)?;
+        let client = ReviewsGitHubClient::new(&segment.token)?;
         let fetch = client.fetch_updates(&segment.request).await?;
         for item in fetch.items {
             items_by_key
@@ -81,7 +81,7 @@ pub async fn query_dependency_updates(
 
     let mut items = items_by_key
         .into_values()
-        .collect::<Vec<DependencyUpdateItem>>();
+        .collect::<Vec<ReviewItem>>();
     items.sort_by(|left, right| {
         right
             .updated_at
@@ -89,7 +89,7 @@ pub async fn query_dependency_updates(
             .then_with(|| left.repository.cmp(&right.repository))
             .then_with(|| left.number.cmp(&right.number))
     });
-    let mut response = DependencyUpdatesQueryResponse::new(items, utc_now());
+    let mut response = ReviewsQueryResponse::new(items, utc_now());
     response.set_repository_labels(repository_labels);
     store_cached_query_response(cache_key, &response);
     Ok(response)
@@ -100,17 +100,17 @@ pub async fn query_dependency_updates(
 /// # Errors
 /// Returns `CliError` when the request is invalid, the GitHub token is missing,
 /// or GitHub cannot return the repository catalog.
-pub async fn catalog_dependency_update_repositories(
-    request: &DependencyUpdatesRepositoryCatalogRequest,
-) -> Result<DependencyUpdatesRepositoryCatalogResponse, CliError> {
+pub async fn catalog_review_repositories(
+    request: &ReviewsRepositoryCatalogRequest,
+) -> Result<ReviewsRepositoryCatalogResponse, CliError> {
     request.validate()?;
     let organization = request.normalized_organization();
     let token = github_token(None).ok_or_else(|| missing_token_error(None))?;
-    let client = DependencyUpdatesGitHubClient::new(&token)?;
+    let client = ReviewsGitHubClient::new(&token)?;
     let repositories = client
         .catalog_organization_repositories(&organization)
         .await?;
-    Ok(DependencyUpdatesRepositoryCatalogResponse {
+    Ok(ReviewsRepositoryCatalogResponse {
         organization,
         repositories,
     })
@@ -120,9 +120,9 @@ pub async fn catalog_dependency_update_repositories(
 ///
 /// # Errors
 /// This function currently does not return operational errors.
-pub fn dependency_updates_capabilities() -> Result<DependencyUpdatesCapabilitiesResponse, CliError>
+pub fn reviews_capabilities() -> Result<ReviewsCapabilitiesResponse, CliError>
 {
-    Ok(DependencyUpdatesCapabilitiesResponse::current())
+    Ok(ReviewsCapabilitiesResponse::current())
 }
 
 /// Preview which dependency-update targets a daemon action would affect.
@@ -131,9 +131,9 @@ pub fn dependency_updates_capabilities() -> Result<DependencyUpdatesCapabilities
 /// Returns `CliError` when the request is malformed. Missing repository tokens
 /// are represented per target so the UI can still explain the rest of the
 /// selection.
-pub fn preview_dependency_update_action(
-    request: &DependencyUpdatesActionPreviewRequest,
-) -> Result<DependencyUpdatesActionPreviewResponse, CliError> {
+pub fn preview_review_action(
+    request: &ReviewsActionPreviewRequest,
+) -> Result<ReviewsActionPreviewResponse, CliError> {
     request.validate()?;
     let targets = request
         .targets
@@ -143,9 +143,9 @@ pub fn preview_dependency_update_action(
     let actionable_count = targets.iter().filter(|target| target.eligible).count();
     let skipped_count = targets.len().saturating_sub(actionable_count);
     let warnings = preview_action_warnings(request.action, &request.targets);
-    Ok(DependencyUpdatesActionPreviewResponse {
+    Ok(ReviewsActionPreviewResponse {
         action: request.action,
-        capabilities: DependencyUpdatesCapabilitiesResponse::current(),
+        capabilities: ReviewsCapabilitiesResponse::current(),
         total_count: request.targets.len(),
         actionable_count,
         skipped_count,
@@ -159,16 +159,16 @@ pub fn preview_dependency_update_action(
 /// # Errors
 /// Returns `CliError` when the request is invalid, a required token is missing,
 /// or GitHub rejects an approval.
-pub async fn approve_dependency_updates(
-    request: &DependencyUpdatesApproveRequest,
-) -> Result<DependencyUpdatesActionResponse, CliError> {
+pub async fn approve_reviews(
+    request: &ReviewsApproveRequest,
+) -> Result<ReviewsActionResponse, CliError> {
     request.validate()?;
     let mut results = Vec::new();
     for segment in token_bound_targets(&request.targets)? {
-        let client = DependencyUpdatesGitHubClient::new(&segment.token)?;
+        let client = ReviewsGitHubClient::new(&segment.token)?;
         results.extend(
             client
-                .approve(&DependencyUpdatesApproveRequest {
+                .approve(&ReviewsApproveRequest {
                     targets: segment.targets,
                 })
                 .await?,
@@ -184,16 +184,16 @@ pub async fn approve_dependency_updates(
 /// # Errors
 /// Returns `CliError` when the request is invalid, a required token is missing,
 /// or GitHub rejects the comment write.
-pub async fn comment_on_dependency_updates(
-    request: &DependencyUpdatesCommentRequest,
-) -> Result<DependencyUpdatesActionResponse, CliError> {
+pub async fn comment_on_reviews(
+    request: &ReviewsCommentRequest,
+) -> Result<ReviewsActionResponse, CliError> {
     request.validate()?;
     let mut results = Vec::new();
     for segment in token_bound_targets(&request.targets)? {
-        let client = DependencyUpdatesGitHubClient::new(&segment.token)?;
+        let client = ReviewsGitHubClient::new(&segment.token)?;
         results.extend(
             client
-                .comment(&DependencyUpdatesCommentRequest {
+                .comment(&ReviewsCommentRequest {
                     targets: segment.targets,
                     body: request.body.clone(),
                 })
@@ -208,16 +208,16 @@ pub async fn comment_on_dependency_updates(
 /// # Errors
 /// Returns `CliError` when the request is invalid, a required token is missing,
 /// or GitHub rejects a merge.
-pub async fn merge_dependency_updates(
-    request: &DependencyUpdatesMergeRequest,
-) -> Result<DependencyUpdatesActionResponse, CliError> {
+pub async fn merge_reviews(
+    request: &ReviewsMergeRequest,
+) -> Result<ReviewsActionResponse, CliError> {
     request.validate()?;
     let mut results = Vec::new();
     for segment in token_bound_targets(&request.targets)? {
-        let client = DependencyUpdatesGitHubClient::new(&segment.token)?;
+        let client = ReviewsGitHubClient::new(&segment.token)?;
         results.extend(
             client
-                .merge(&DependencyUpdatesMergeRequest {
+                .merge(&ReviewsMergeRequest {
                     targets: segment.targets,
                     method: request.method,
                 })
@@ -232,16 +232,16 @@ pub async fn merge_dependency_updates(
 /// # Errors
 /// Returns `CliError` when the request is invalid, a required token is missing,
 /// or GitHub rejects the check rerun.
-pub async fn rerun_dependency_updates_checks(
-    request: &DependencyUpdatesRerunChecksRequest,
-) -> Result<DependencyUpdatesActionResponse, CliError> {
+pub async fn rerun_reviews_checks(
+    request: &ReviewsRerunChecksRequest,
+) -> Result<ReviewsActionResponse, CliError> {
     request.validate()?;
     let mut results = Vec::new();
     for segment in token_bound_targets(&request.targets)? {
-        let client = DependencyUpdatesGitHubClient::new(&segment.token)?;
+        let client = ReviewsGitHubClient::new(&segment.token)?;
         results.extend(
             client
-                .rerun_checks(&DependencyUpdatesRerunChecksRequest {
+                .rerun_checks(&ReviewsRerunChecksRequest {
                     targets: segment.targets,
                 })
                 .await?,
@@ -255,16 +255,16 @@ pub async fn rerun_dependency_updates_checks(
 /// # Errors
 /// Returns `CliError` when the request is invalid, a required token is missing,
 /// or GitHub rejects the label update.
-pub async fn add_label_to_dependency_updates(
-    request: &DependencyUpdatesLabelRequest,
-) -> Result<DependencyUpdatesActionResponse, CliError> {
+pub async fn add_label_to_reviews(
+    request: &ReviewsLabelRequest,
+) -> Result<ReviewsActionResponse, CliError> {
     request.validate()?;
     let mut results = Vec::new();
     for segment in token_bound_targets(&request.targets)? {
-        let client = DependencyUpdatesGitHubClient::new(&segment.token)?;
+        let client = ReviewsGitHubClient::new(&segment.token)?;
         results.extend(
             client
-                .add_label(&DependencyUpdatesLabelRequest {
+                .add_label(&ReviewsLabelRequest {
                     targets: segment.targets,
                     label: request.label.clone(),
                 })
@@ -279,9 +279,9 @@ pub async fn add_label_to_dependency_updates(
 /// # Errors
 /// Returns `CliError` when the request is invalid, a required token is missing,
 /// or GitHub rejects an automatic action.
-pub async fn auto_dependency_updates(
-    request: &DependencyUpdatesAutoRequest,
-) -> Result<DependencyUpdatesActionResponse, CliError> {
+pub async fn auto_reviews(
+    request: &ReviewsAutoRequest,
+) -> Result<ReviewsActionResponse, CliError> {
     request.validate()?;
     let eligible_targets = request
         .targets
@@ -290,7 +290,7 @@ pub async fn auto_dependency_updates(
         .cloned()
         .collect::<Vec<_>>();
     if eligible_targets.is_empty() {
-        return Ok(DependencyUpdatesActionResponse {
+        return Ok(ReviewsActionResponse {
             summary: "No dependency updates were eligible for auto mode".to_string(),
             results: Vec::new(),
         });
@@ -298,10 +298,10 @@ pub async fn auto_dependency_updates(
 
     let mut results = Vec::new();
     for segment in token_bound_targets(&eligible_targets)? {
-        let client = DependencyUpdatesGitHubClient::new(&segment.token)?;
+        let client = ReviewsGitHubClient::new(&segment.token)?;
         results.extend(
             client
-                .auto_mode(&DependencyUpdatesAutoRequest {
+                .auto_mode(&ReviewsAutoRequest {
                     targets: segment.targets,
                     method: request.method,
                 })
@@ -317,9 +317,9 @@ pub async fn auto_dependency_updates(
 /// # Errors
 /// Returns `CliError` when the request is invalid, a required token is missing,
 /// or GitHub cannot return the requested pull requests.
-pub async fn refresh_dependency_updates(
-    request: &DependencyUpdatesRefreshRequest,
-) -> Result<DependencyUpdatesRefreshResponse, CliError> {
+pub async fn refresh_reviews(
+    request: &ReviewsRefreshRequest,
+) -> Result<ReviewsRefreshResponse, CliError> {
     request.validate()?;
     let mut items = Vec::new();
     let mut missing = Vec::new();
@@ -329,7 +329,7 @@ pub async fn refresh_dependency_updates(
             .iter()
             .map(|target| target.pull_request_id.clone())
             .collect();
-        let client = DependencyUpdatesGitHubClient::new(&segment.token)?;
+        let client = ReviewsGitHubClient::new(&segment.token)?;
         let fetch = client.fetch_by_ids(&ids).await?;
         items.extend(fetch.items);
         missing.extend(fetch.missing);
@@ -338,7 +338,7 @@ pub async fn refresh_dependency_updates(
         }
     }
     patch_cached_items(&items, &missing);
-    Ok(DependencyUpdatesRefreshResponse {
+    Ok(ReviewsRefreshResponse {
         fetched_at: utc_now(),
         items,
         missing_pull_request_ids: missing,
@@ -353,9 +353,9 @@ pub async fn refresh_dependency_updates(
 /// # Errors
 /// Returns `CliError` when the request is invalid, the GitHub token is
 /// missing, or GitHub cannot return the pull request.
-pub async fn fetch_dependency_update_body(
-    request: &DependencyUpdatesBodyRequest,
-) -> Result<DependencyUpdatesBodyResponse, CliError> {
+pub async fn fetch_review_body(
+    request: &ReviewsBodyRequest,
+) -> Result<ReviewsBodyResponse, CliError> {
     request.validate()?;
     let cache_key = request.normalized_pull_request_id();
     if !request.force_refresh
@@ -365,9 +365,9 @@ pub async fn fetch_dependency_update_body(
     }
 
     let token = github_token(None).ok_or_else(|| missing_token_error(None))?;
-    let client = DependencyUpdatesGitHubClient::new(&token)?;
+    let client = ReviewsGitHubClient::new(&token)?;
     let (body, pr_updated_at) = client.fetch_pull_request_body(&cache_key).await?;
-    let response = DependencyUpdatesBodyResponse {
+    let response = ReviewsBodyResponse {
         pull_request_id: cache_key.clone(),
         body,
         pr_updated_at,
@@ -390,15 +390,15 @@ pub async fn fetch_dependency_update_body(
 /// # Errors
 /// Returns `CliError` when the request is invalid, the GitHub token is
 /// missing, or GitHub cannot return or accept the pull request body.
-pub async fn update_dependency_update_body(
-    request: &DependencyUpdatesBodyUpdateRequest,
-) -> Result<DependencyUpdatesBodyUpdateResponse, CliError> {
+pub async fn update_review_body(
+    request: &ReviewsBodyUpdateRequest,
+) -> Result<ReviewsBodyUpdateResponse, CliError> {
     request.validate()?;
     let pull_request_id = request.normalized_pull_request_id();
     let expected_sha = request.normalized_expected_prior_body_sha256();
 
     let token = github_token(None).ok_or_else(|| missing_token_error(None))?;
-    let client = DependencyUpdatesGitHubClient::new(&token)?;
+    let client = ReviewsGitHubClient::new(&token)?;
 
     let (current_body, current_updated_at) =
         client.fetch_pull_request_body(&pull_request_id).await?;
@@ -406,9 +406,9 @@ pub async fn update_dependency_update_body(
     let fetched_at = utc_now();
 
     if current_sha != expected_sha {
-        return Ok(DependencyUpdatesBodyUpdateResponse {
+        return Ok(ReviewsBodyUpdateResponse {
             pull_request_id,
-            outcome: DependencyUpdatesBodyUpdateOutcome::BodyDrifted,
+            outcome: ReviewsBodyUpdateOutcome::BodyDrifted,
             current_body,
             current_body_sha256: current_sha,
             pr_updated_at: current_updated_at,
@@ -420,15 +420,15 @@ pub async fn update_dependency_update_body(
         .update_pull_request_body(&pull_request_id, &request.new_body)
         .await?;
     let new_sha = sha256_hex(&new_body);
-    let response = DependencyUpdatesBodyUpdateResponse {
+    let response = ReviewsBodyUpdateResponse {
         pull_request_id: pull_request_id.clone(),
-        outcome: DependencyUpdatesBodyUpdateOutcome::Updated,
+        outcome: ReviewsBodyUpdateOutcome::Updated,
         current_body: new_body.clone(),
         current_body_sha256: new_sha,
         pr_updated_at: new_updated_at,
         fetched_at: fetched_at.clone(),
     };
-    let cached = DependencyUpdatesBodyResponse {
+    let cached = ReviewsBodyResponse {
         pull_request_id: pull_request_id.clone(),
         body: new_body,
         pr_updated_at: new_updated_at,
@@ -451,21 +451,21 @@ pub(crate) fn sha256_hex(input: &str) -> String {
 ///
 /// # Panics
 /// Panics if either dependency updates cache mutex is poisoned.
-pub fn clear_dependency_updates_cache() -> Result<DependencyUpdatesCacheClearResponse, CliError> {
-    let mut cache = cache().lock().expect("dependency-updates cache lock");
+pub fn clear_reviews_cache() -> Result<ReviewsCacheClearResponse, CliError> {
+    let mut cache = cache().lock().expect("reviews cache lock");
     let mut cleared_entries = cache.len();
     cache.clear();
     drop(cache);
     let mut body_cache = body_cache()
         .lock()
-        .expect("dependency-updates body cache lock");
+        .expect("reviews body cache lock");
     cleared_entries += body_cache.len();
     body_cache.clear();
-    Ok(DependencyUpdatesCacheClearResponse { cleared_entries })
+    Ok(ReviewsCacheClearResponse { cleared_entries })
 }
 
 fn token_bound_requests(
-    request: &DependencyUpdatesQueryRequest,
+    request: &ReviewsQueryRequest,
 ) -> Result<Vec<TokenBoundRequest>, CliError> {
     let global_token = github_token(None);
     let mut segments = Vec::new();
@@ -497,7 +497,7 @@ fn token_bound_requests(
 
     if segments.is_empty() {
         return Err(CliErrorKind::workflow_parse(
-            "dependency-updates query resolved to zero token-backed scopes",
+            "reviews query resolved to zero token-backed scopes",
         )
         .into());
     }
@@ -505,10 +505,10 @@ fn token_bound_requests(
 }
 
 fn token_bound_targets(
-    targets: &[DependencyUpdateTarget],
+    targets: &[ReviewTarget],
 ) -> Result<Vec<TokenBoundTargets>, CliError> {
     let global_token = github_token(None);
-    let mut grouped = BTreeMap::<String, Vec<DependencyUpdateTarget>>::new();
+    let mut grouped = BTreeMap::<String, Vec<ReviewTarget>>::new();
     for target in targets {
         let token = github_token(Some(target.repository.as_str()))
             .or_else(|| global_token.clone())
@@ -530,20 +530,20 @@ fn github_token(repository: Option<&str>) -> Option<String> {
 fn missing_token_error(repository: Option<&str>) -> CliError {
     match repository {
         Some(repository) => CliErrorKind::workflow_io(format!(
-            "dependency-updates requires a GitHub token for '{repository}'. Configure one in Settings > Secrets."
+            "reviews requires a GitHub token for '{repository}'. Configure one in Settings > Secrets."
         ))
         .into(),
         None => CliErrorKind::workflow_io(
-            "dependency-updates requires a GitHub token. Configure one in Settings > Secrets.",
+            "reviews requires a GitHub token. Configure one in Settings > Secrets.",
         )
         .into(),
     }
 }
 
 fn preview_action_target(
-    action: DependencyUpdateActionPreviewKind,
-    target: &DependencyUpdateTarget,
-) -> DependencyUpdateActionPreviewTarget {
+    action: ReviewActionPreviewKind,
+    target: &ReviewTarget,
+) -> ReviewActionPreviewTarget {
     let token_available =
         github_token(Some(target.repository.as_str())).or_else(|| github_token(None));
     let reason = if token_available.is_none() {
@@ -554,7 +554,7 @@ fn preview_action_target(
     } else {
         preview_action_blocker(action, target)
     };
-    DependencyUpdateActionPreviewTarget {
+    ReviewActionPreviewTarget {
         pull_request_id: target.pull_request_id.clone(),
         repository: target.repository.clone(),
         number: target.number,
@@ -565,47 +565,47 @@ fn preview_action_target(
 }
 
 fn preview_action_blocker(
-    action: DependencyUpdateActionPreviewKind,
-    target: &DependencyUpdateTarget,
+    action: ReviewActionPreviewKind,
+    target: &ReviewTarget,
 ) -> Option<String> {
     if !target.viewer_can_update {
         return Some("Current GitHub token cannot update this pull request".to_string());
     }
-    if target.state != DependencyUpdatePullRequestState::Open {
+    if target.state != ReviewPullRequestState::Open {
         return Some("Pull request is not open".to_string());
     }
     match action {
-        DependencyUpdateActionPreviewKind::Approve => {
+        ReviewActionPreviewKind::Approve => {
             if target.can_attempt_manual_approval() {
                 None
             } else {
                 Some("Pull request does not need manual approval".to_string())
             }
         }
-        DependencyUpdateActionPreviewKind::Merge => {
+        ReviewActionPreviewKind::Merge => {
             if target.is_draft {
                 Some("Draft pull requests cannot be merged".to_string())
-            } else if target.mergeable == DependencyUpdateMergeableState::Conflicting {
+            } else if target.mergeable == ReviewMergeableState::Conflicting {
                 Some("Merge conflicts must be resolved before merging".to_string())
             } else {
                 None
             }
         }
-        DependencyUpdateActionPreviewKind::RerunChecks => {
+        ReviewActionPreviewKind::RerunChecks => {
             if target.can_attempt_rerun_checks() {
                 None
             } else {
                 Some("No rerunnable check suites were reported".to_string())
             }
         }
-        DependencyUpdateActionPreviewKind::AddLabel => {
+        ReviewActionPreviewKind::AddLabel => {
             if target.can_add_label() {
                 None
             } else {
                 Some("Labels can only be added to open pull requests".to_string())
             }
         }
-        DependencyUpdateActionPreviewKind::Auto => {
+        ReviewActionPreviewKind::Auto => {
             if target.is_auto_approvable() || target.is_auto_mergeable() {
                 None
             } else {
@@ -616,17 +616,17 @@ fn preview_action_blocker(
 }
 
 fn preview_action_warnings(
-    action: DependencyUpdateActionPreviewKind,
-    targets: &[DependencyUpdateTarget],
+    action: ReviewActionPreviewKind,
+    targets: &[ReviewTarget],
 ) -> Vec<String> {
     let mut warnings = Vec::new();
     let failing = targets
         .iter()
-        .filter(|target| target.check_status == DependencyUpdateCheckStatus::Failure)
+        .filter(|target| target.check_status == ReviewCheckStatus::Failure)
         .count();
     if matches!(
         action,
-        DependencyUpdateActionPreviewKind::Approve | DependencyUpdateActionPreviewKind::Merge
+        ReviewActionPreviewKind::Approve | ReviewActionPreviewKind::Merge
     ) && failing > 0
     {
         warnings.push(counted_warning(
@@ -650,19 +650,19 @@ fn preview_action_warnings(
 }
 
 fn preview_target_warnings(
-    action: DependencyUpdateActionPreviewKind,
-    target: &DependencyUpdateTarget,
+    action: ReviewActionPreviewKind,
+    target: &ReviewTarget,
 ) -> Vec<String> {
     let mut warnings = Vec::new();
     if matches!(
         action,
-        DependencyUpdateActionPreviewKind::Approve | DependencyUpdateActionPreviewKind::Merge
-    ) && target.check_status == DependencyUpdateCheckStatus::Failure
+        ReviewActionPreviewKind::Approve | ReviewActionPreviewKind::Merge
+    ) && target.check_status == ReviewCheckStatus::Failure
     {
         if target.required_failed_check_names.is_empty() {
             warnings.push("Checks are failing".to_string());
         } else if target.viewer_can_merge_as_admin
-            && action == DependencyUpdateActionPreviewKind::Merge
+            && action == ReviewActionPreviewKind::Merge
         {
             warnings.push(format!(
                 "Required checks are failing: {}. Admin merge can bypass branch protections.",
@@ -675,11 +675,11 @@ fn preview_target_warnings(
             ));
         }
     }
-    if target.review_status == DependencyUpdateReviewStatus::ChangesRequested {
+    if target.review_status == ReviewReviewStatus::ChangesRequested {
         warnings.push("A reviewer requested changes".to_string());
     }
     if target.policy_blocked {
-        warnings.push("Dependency policy is blocking this pull request".to_string());
+        warnings.push("Review policy is blocking this pull request".to_string());
     }
     warnings
 }
@@ -694,26 +694,26 @@ fn counted_warning(count: usize, singular: &str, plural: &str) -> String {
 
 fn action_response(
     summary_prefix: &str,
-    results: Vec<DependencyUpdateActionResult>,
-) -> DependencyUpdatesActionResponse {
+    results: Vec<ReviewActionResult>,
+) -> ReviewsActionResponse {
     let applied = results
         .iter()
-        .filter(|result| result.outcome == DependencyUpdateActionOutcome::Applied)
+        .filter(|result| result.outcome == ReviewActionOutcome::Applied)
         .count();
     let skipped = results
         .iter()
-        .filter(|result| result.outcome == DependencyUpdateActionOutcome::Skipped)
+        .filter(|result| result.outcome == ReviewActionOutcome::Skipped)
         .count();
     let failed = results
         .iter()
-        .filter(|result| result.outcome == DependencyUpdateActionOutcome::Failed)
+        .filter(|result| result.outcome == ReviewActionOutcome::Failed)
         .count();
-    DependencyUpdatesActionResponse {
+    ReviewsActionResponse {
         summary: format!("{summary_prefix}: {applied} applied, {skipped} skipped, {failed} failed"),
         results,
     }
 }
 
 #[cfg(test)]
-#[path = "dependency_updates_tests.rs"]
+#[path = "reviews_tests.rs"]
 mod tests;

@@ -1,9 +1,9 @@
 use chrono::{DateTime, Utc};
 
-use crate::dependency_updates::{
-    DependencyUpdateCheckStatus, DependencyUpdateItem, DependencyUpdateMergeableState,
-    DependencyUpdatePullRequestState, DependencyUpdateReviewStatus, DependencyUpdatesBodyResponse,
-    DependencyUpdatesQueryRequest, DependencyUpdatesQueryResponse,
+use crate::reviews::{
+    ReviewCheckStatus, ReviewItem, ReviewMergeableState,
+    ReviewPullRequestState, ReviewReviewStatus, ReviewsBodyResponse,
+    ReviewsQueryRequest, ReviewsQueryResponse,
 };
 
 use super::{
@@ -13,10 +13,10 @@ use super::{
 
 fn item(
     pr_id: &str,
-    state: DependencyUpdatePullRequestState,
-    review_status: DependencyUpdateReviewStatus,
-) -> DependencyUpdateItem {
-    DependencyUpdateItem {
+    state: ReviewPullRequestState,
+    review_status: ReviewReviewStatus,
+) -> ReviewItem {
+    ReviewItem {
         pull_request_id: pr_id.into(),
         repository_id: "repo_1".into(),
         repository: "acme/api".into(),
@@ -25,9 +25,9 @@ fn item(
         url: "https://example.com".into(),
         author_login: "renovate[bot]".into(),
         state,
-        mergeable: DependencyUpdateMergeableState::Mergeable,
+        mergeable: ReviewMergeableState::Mergeable,
         review_status,
-        check_status: DependencyUpdateCheckStatus::Success,
+        check_status: ReviewCheckStatus::Success,
         policy_blocked: false,
         is_draft: false,
         head_sha: "abc123".into(),
@@ -55,30 +55,30 @@ fn apply_refresh_replaces_matching_open_item() {
     let cached = vec![
         item(
             "pr_1",
-            DependencyUpdatePullRequestState::Open,
-            DependencyUpdateReviewStatus::ReviewRequired,
+            ReviewPullRequestState::Open,
+            ReviewReviewStatus::ReviewRequired,
         ),
         item(
             "pr_2",
-            DependencyUpdatePullRequestState::Open,
-            DependencyUpdateReviewStatus::ReviewRequired,
+            ReviewPullRequestState::Open,
+            ReviewReviewStatus::ReviewRequired,
         ),
     ];
     let refreshed = vec![item(
         "pr_1",
-        DependencyUpdatePullRequestState::Open,
-        DependencyUpdateReviewStatus::Approved,
+        ReviewPullRequestState::Open,
+        ReviewReviewStatus::Approved,
     )];
 
     let updated = apply_refresh_to_items(&cached, &refreshed, &[]).expect("changed");
     assert_eq!(updated.len(), 2);
     assert_eq!(
         updated[0].review_status,
-        DependencyUpdateReviewStatus::Approved
+        ReviewReviewStatus::Approved
     );
     assert_eq!(
         updated[1].review_status,
-        DependencyUpdateReviewStatus::ReviewRequired
+        ReviewReviewStatus::ReviewRequired
     );
 }
 
@@ -87,19 +87,19 @@ fn apply_refresh_drops_closed_or_merged_items() {
     let cached = vec![
         item(
             "pr_1",
-            DependencyUpdatePullRequestState::Open,
-            DependencyUpdateReviewStatus::ReviewRequired,
+            ReviewPullRequestState::Open,
+            ReviewReviewStatus::ReviewRequired,
         ),
         item(
             "pr_2",
-            DependencyUpdatePullRequestState::Open,
-            DependencyUpdateReviewStatus::ReviewRequired,
+            ReviewPullRequestState::Open,
+            ReviewReviewStatus::ReviewRequired,
         ),
     ];
     let refreshed = vec![item(
         "pr_1",
-        DependencyUpdatePullRequestState::Merged,
-        DependencyUpdateReviewStatus::Approved,
+        ReviewPullRequestState::Merged,
+        ReviewReviewStatus::Approved,
     )];
 
     let updated = apply_refresh_to_items(&cached, &refreshed, &[]).expect("changed");
@@ -112,13 +112,13 @@ fn apply_refresh_drops_missing_pull_request_ids() {
     let cached = vec![
         item(
             "pr_1",
-            DependencyUpdatePullRequestState::Open,
-            DependencyUpdateReviewStatus::ReviewRequired,
+            ReviewPullRequestState::Open,
+            ReviewReviewStatus::ReviewRequired,
         ),
         item(
             "pr_2",
-            DependencyUpdatePullRequestState::Open,
-            DependencyUpdateReviewStatus::ReviewRequired,
+            ReviewPullRequestState::Open,
+            ReviewReviewStatus::ReviewRequired,
         ),
     ];
     let updated = apply_refresh_to_items(&cached, &[], &["pr_1".into()]).expect("changed");
@@ -130,13 +130,13 @@ fn apply_refresh_drops_missing_pull_request_ids() {
 fn apply_refresh_returns_none_when_no_match() {
     let cached = vec![item(
         "pr_1",
-        DependencyUpdatePullRequestState::Open,
-        DependencyUpdateReviewStatus::ReviewRequired,
+        ReviewPullRequestState::Open,
+        ReviewReviewStatus::ReviewRequired,
     )];
     let refreshed = vec![item(
         "pr_other",
-        DependencyUpdatePullRequestState::Open,
-        DependencyUpdateReviewStatus::Approved,
+        ReviewPullRequestState::Open,
+        ReviewReviewStatus::Approved,
     )];
     assert!(apply_refresh_to_items(&cached, &refreshed, &[]).is_none());
     assert!(apply_refresh_to_items(&cached, &[], &["pr_other".into()]).is_none());
@@ -146,25 +146,25 @@ fn apply_refresh_returns_none_when_no_match() {
 fn apply_refresh_keeps_closed_item_when_refresh_still_reports_open() {
     let cached = vec![item(
         "pr_1",
-        DependencyUpdatePullRequestState::Open,
-        DependencyUpdateReviewStatus::ReviewRequired,
+        ReviewPullRequestState::Open,
+        ReviewReviewStatus::ReviewRequired,
     )];
     let refreshed = vec![item(
         "pr_1",
-        DependencyUpdatePullRequestState::Open,
-        DependencyUpdateReviewStatus::Approved,
+        ReviewPullRequestState::Open,
+        ReviewReviewStatus::Approved,
     )];
     let updated = apply_refresh_to_items(&cached, &refreshed, &[]).expect("changed");
     assert_eq!(updated.len(), 1);
-    assert_eq!(updated[0].state, DependencyUpdatePullRequestState::Open);
+    assert_eq!(updated[0].state, ReviewPullRequestState::Open);
     assert_eq!(
         updated[0].review_status,
-        DependencyUpdateReviewStatus::Approved
+        ReviewReviewStatus::Approved
     );
 }
 
-fn body_response(pull_request_id: &str, body: &str) -> DependencyUpdatesBodyResponse {
-    DependencyUpdatesBodyResponse {
+fn body_response(pull_request_id: &str, body: &str) -> ReviewsBodyResponse {
+    ReviewsBodyResponse {
         pull_request_id: pull_request_id.into(),
         body: body.into(),
         pr_updated_at: parsed("2026-05-20T12:00:00Z"),
@@ -242,8 +242,8 @@ fn sha256_hex_matches_known_empty_string() {
     );
 }
 
-fn one_repo_item(repository: &str, pr_id: &str) -> DependencyUpdateItem {
-    DependencyUpdateItem {
+fn one_repo_item(repository: &str, pr_id: &str) -> ReviewItem {
+    ReviewItem {
         pull_request_id: pr_id.into(),
         repository_id: format!("{repository}#repo_id"),
         repository: repository.into(),
@@ -251,10 +251,10 @@ fn one_repo_item(repository: &str, pr_id: &str) -> DependencyUpdateItem {
         title: "chore(deps): bump".into(),
         url: format!("https://example.com/{pr_id}"),
         author_login: "renovate[bot]".into(),
-        state: DependencyUpdatePullRequestState::Open,
-        mergeable: DependencyUpdateMergeableState::Mergeable,
-        review_status: DependencyUpdateReviewStatus::ReviewRequired,
-        check_status: DependencyUpdateCheckStatus::Success,
+        state: ReviewPullRequestState::Open,
+        mergeable: ReviewMergeableState::Mergeable,
+        review_status: ReviewReviewStatus::ReviewRequired,
+        check_status: ReviewCheckStatus::Success,
         policy_blocked: false,
         is_draft: false,
         head_sha: "abc123".into(),
@@ -271,8 +271,8 @@ fn one_repo_item(repository: &str, pr_id: &str) -> DependencyUpdateItem {
     }
 }
 
-fn base_request_with_authors(authors: &[&str]) -> DependencyUpdatesQueryRequest {
-    DependencyUpdatesQueryRequest {
+fn base_request_with_authors(authors: &[&str]) -> ReviewsQueryRequest {
+    ReviewsQueryRequest {
         authors: authors.iter().map(|a| (*a).to_string()).collect(),
         organizations: vec!["acme".into()],
         repositories: vec!["acme/api".into(), "acme/web".into()],
@@ -322,11 +322,11 @@ fn cached_query_response_returns_only_its_repo_bucket() {
     let scoped_a = request.repository_only_request("acme/api");
     let scoped_b = request.repository_only_request("acme/web");
 
-    let response_a = DependencyUpdatesQueryResponse::new(
+    let response_a = ReviewsQueryResponse::new(
         vec![one_repo_item("acme/api", "pr_iso_a")],
         "2026-05-21T00:00:00Z".into(),
     );
-    let response_b = DependencyUpdatesQueryResponse::new(
+    let response_b = ReviewsQueryResponse::new(
         vec![one_repo_item("acme/web", "pr_iso_b")],
         "2026-05-21T00:00:00Z".into(),
     );

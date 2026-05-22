@@ -1,13 +1,13 @@
 //! Service handlers for the inline-PR Files section.
 //!
-//! Six endpoints back the Monitor's `Dependencies > Files` flow:
+//! Six endpoints back the Monitor's `Reviews > Files` flow:
 //!
-//! - `list_dependency_update_files`        - GraphQL metadata fetch.
-//! - `patch_dependency_update_files`       - REST or local-clone patches.
-//! - `mark_dependency_update_files_viewed` - hash-guarded mark-viewed batch.
-//! - `fetch_dependency_update_file_blob`   - image-preview blob fetch.
-//! - `list_dependency_update_local_clones` - Settings-panel listing.
-//! - `delete_dependency_update_local_clone` - Settings-panel deletion.
+//! - `list_review_files`        - GraphQL metadata fetch.
+//! - `patch_review_files`       - REST or local-clone patches.
+//! - `mark_review_files_viewed` - hash-guarded mark-viewed batch.
+//! - `fetch_review_file_blob`   - image-preview blob fetch.
+//! - `list_review_local_clones` - Settings-panel listing.
+//! - `delete_review_local_clone` - Settings-panel deletion.
 //!
 //! The list, patch, viewed, blob, and local-clone endpoints are real
 //! implementations. Patch fetching prefers the local-clone path when the
@@ -26,22 +26,22 @@ use tokio::sync::broadcast;
 
 use crate::daemon::protocol::StreamEvent;
 use crate::daemon::state::daemon_root;
-use crate::dependency_updates::files::local_clone::{Sensitive, pat_clone_url};
-use crate::dependency_updates::files::local_clone_diff::compute_unified_patches;
-use crate::dependency_updates::files::local_clone_progress_event::BroadcastProgressSink;
-use crate::dependency_updates::files::local_clone_runtime::{
+use crate::reviews::files::local_clone::{Sensitive, pat_clone_url};
+use crate::reviews::files::local_clone_diff::compute_unified_patches;
+use crate::reviews::files::local_clone_progress_event::BroadcastProgressSink;
+use crate::reviews::files::local_clone_runtime::{
     DiscardProgressSink, LocalCloneProgressSink, LocalCloneRuntime, diff::LocalCloneFetchRef,
 };
-use crate::dependency_updates::files::patch_rest;
-use crate::dependency_updates::files::service::FilesLargeDiffStrategy;
-use crate::dependency_updates::{
-    DependencyUpdateFileViewedOutcome, DependencyUpdateFileViewedState,
-    DependencyUpdateFilesViewedResult, DependencyUpdateImageMime,
-    DependencyUpdatesFilesBlobRequest, DependencyUpdatesFilesBlobResponse,
-    DependencyUpdatesFilesListRequest, DependencyUpdatesFilesListResponse,
-    DependencyUpdatesFilesPatchRequest, DependencyUpdatesFilesPatchResponse,
-    DependencyUpdatesFilesViewedRequest, DependencyUpdatesFilesViewedResponse,
-    DependencyUpdatesGitHubClient, LocalCloneListEntry, LocalCloneRegistry, LocalCloneRoot,
+use crate::reviews::files::patch_rest;
+use crate::reviews::files::service::FilesLargeDiffStrategy;
+use crate::reviews::{
+    ReviewFileViewedOutcome, ReviewFileViewedState,
+    ReviewFilesViewedResult, ReviewImageMime,
+    ReviewsFilesBlobRequest, ReviewsFilesBlobResponse,
+    ReviewsFilesListRequest, ReviewsFilesListResponse,
+    ReviewsFilesPatchRequest, ReviewsFilesPatchResponse,
+    ReviewsFilesViewedRequest, ReviewsFilesViewedResponse,
+    ReviewsGitHubClient, LocalCloneListEntry, LocalCloneRegistry, LocalCloneRoot,
     RepoKey, ViewedMutation, classify_outcome,
 };
 use crate::errors::{CliError, CliErrorKind};
@@ -50,7 +50,7 @@ use crate::workspace::utc_now;
 
 use super::task_board_runtime::external_sync_config_for_repository;
 
-const CLONES_SUBDIR: &str = "dependency_updates/clones";
+const CLONES_SUBDIR: &str = "reviews/clones";
 
 /// Process-wide singletons for the local-clone runtime + progress sender.
 ///
@@ -59,7 +59,7 @@ const CLONES_SUBDIR: &str = "dependency_updates/clones";
 ///
 /// `PROGRESS_SENDER` is registered explicitly by the daemon HTTP/WS setup
 /// so progress events surface on the same broadcast channel the
-/// `dependency_updates_local_clone_progress` WS push event flows over.
+/// `reviews_local_clone_progress` WS push event flows over.
 /// When unset (CLI dry-runs, tests), the handler uses `DiscardProgressSink`
 /// and progress events are silently dropped.
 static LOCAL_CLONE_RUNTIME: OnceLock<Arc<LocalCloneRuntime>> = OnceLock::new();
@@ -80,7 +80,7 @@ fn progress_sink() -> Arc<dyn LocalCloneProgressSink> {
 }
 
 /// Register the daemon's broadcast sender so the local-clone runtime can
-/// fire `dependency_updates_local_clone_progress` push events. Idempotent
+/// fire `reviews_local_clone_progress` push events. Idempotent
 /// (first call wins; subsequent calls are no-ops via `OnceLock`).
 pub fn register_local_clone_progress_sender(sender: broadcast::Sender<StreamEvent>) {
     let _ = PROGRESS_SENDER.set(sender);
@@ -91,18 +91,18 @@ pub fn register_local_clone_progress_sender(sender: broadcast::Sender<StreamEven
 /// # Errors
 /// Returns `CliError` when the GitHub token is missing or the GraphQL fetch
 /// fails.
-pub async fn list_dependency_update_files(
-    request: &DependencyUpdatesFilesListRequest,
-) -> Result<DependencyUpdatesFilesListResponse, CliError> {
+pub async fn list_review_files(
+    request: &ReviewsFilesListRequest,
+) -> Result<ReviewsFilesListResponse, CliError> {
     let pull_request_id = request.normalized_pull_request_id();
     if pull_request_id.is_empty() {
         return Err(CliErrorKind::workflow_parse(
-            "dependency-updates files list: pull_request_id must not be empty",
+            "reviews files list: pull_request_id must not be empty",
         )
         .into());
     }
     let token = github_token(None).ok_or_else(|| missing_token_error(None))?;
-    let client = DependencyUpdatesGitHubClient::new(&token)?;
+    let client = ReviewsGitHubClient::new(&token)?;
     client.fetch_pull_request_files(request).await
 }
 
@@ -116,13 +116,13 @@ pub async fn list_dependency_update_files(
 ///
 /// # Errors
 /// Returns `CliError` for invalid requests.
-pub async fn patch_dependency_update_files(
-    request: &DependencyUpdatesFilesPatchRequest,
-) -> Result<DependencyUpdatesFilesPatchResponse, CliError> {
+pub async fn patch_review_files(
+    request: &ReviewsFilesPatchRequest,
+) -> Result<ReviewsFilesPatchResponse, CliError> {
     let pull_request_id = request.normalized_pull_request_id();
     if pull_request_id.is_empty() {
         return Err(CliErrorKind::workflow_parse(
-            "dependency-updates files patch: pull_request_id must not be empty",
+            "reviews files patch: pull_request_id must not be empty",
         )
         .into());
     }
@@ -157,7 +157,7 @@ pub async fn patch_dependency_update_files(
             Ok(response) => return Ok(response),
             Err(error) => {
                 tracing::warn!(
-                    target = "harness::dependency_updates::files",
+                    target = "harness::reviews::files",
                     pull_request_id = pull_request_id,
                     repo = repo_full_name,
                     error = %error,
@@ -186,7 +186,7 @@ pub async fn patch_dependency_update_files(
             Ok(response) => return Ok(response),
             Err(error) => {
                 tracing::warn!(
-                    target = "harness::dependency_updates::files",
+                    target = "harness::reviews::files",
                     pull_request_id = pull_request_id,
                     repo = repo_full_name,
                     number = number,
@@ -198,11 +198,11 @@ pub async fn patch_dependency_update_files(
     }
 
     tracing::warn!(
-        target = "harness::dependency_updates::files",
+        target = "harness::reviews::files",
         pull_request_id = pull_request_id,
-        "patch_dependency_update_files surfaced empty patches (caller missing repo + number)"
+        "patch_review_files surfaced empty patches (caller missing repo + number)"
     );
-    Ok(DependencyUpdatesFilesPatchResponse {
+    Ok(ReviewsFilesPatchResponse {
         pull_request_id,
         patches: Vec::new(),
         drifted: false,
@@ -219,8 +219,8 @@ async fn run_rest_patch(
     number: u64,
     head_ref_oid: &str,
     paths: &[String],
-) -> Result<DependencyUpdatesFilesPatchResponse, CliError> {
-    let client = DependencyUpdatesGitHubClient::new(token)?;
+) -> Result<ReviewsFilesPatchResponse, CliError> {
+    let client = ReviewsGitHubClient::new(token)?;
     let patches = patch_rest::fetch_patches(
         client.octocrab(),
         repo_full_name,
@@ -242,7 +242,7 @@ async fn run_rest_patch(
             p
         })
         .collect();
-    Ok(DependencyUpdatesFilesPatchResponse {
+    Ok(ReviewsFilesPatchResponse {
         pull_request_id: pull_request_id.to_string(),
         patches,
         drifted: false,
@@ -262,7 +262,7 @@ async fn run_local_clone_patch(
     head_ref_name: Option<&str>,
     base_ref_name: Option<&str>,
     paths: &[String],
-) -> Result<DependencyUpdatesFilesPatchResponse, CliError> {
+) -> Result<ReviewsFilesPatchResponse, CliError> {
     let runtime = local_clone_runtime();
     let sink = progress_sink();
     let (fetch_refs, head_ref) = local_clone_fetch_context(number, head_ref_name, base_ref_name);
@@ -288,7 +288,7 @@ async fn run_local_clone_patch(
             CliErrorKind::workflow_io(format!("compute local-clone diff failed: {error}")).into()
         })?;
 
-    Ok(DependencyUpdatesFilesPatchResponse {
+    Ok(ReviewsFilesPatchResponse {
         pull_request_id: pull_request_id.to_string(),
         patches,
         drifted: false,
@@ -363,7 +363,7 @@ fn default_head_ref_branch() -> &'static str {
 /// # Errors
 /// Returns `CliError` when the registry can't be loaded or saved.
 pub async fn run_local_clone_gc() -> Result<GcReport, CliError> {
-    use crate::dependency_updates::files::local_clone::{
+    use crate::reviews::files::local_clone::{
         LOCAL_CLONE_DISK_BUDGET_MB, LOCAL_CLONE_MAX_AGE_DAYS,
     };
     run_local_clone_gc_with(
@@ -395,7 +395,7 @@ pub async fn run_local_clone_gc_with(
     let report = apply_local_clone_gc_targets(&mut registry, &targets);
     save_registry(root, &registry)?;
     tracing::info!(
-        target = "harness::dependency_updates::files",
+        target = "harness::reviews::files",
         targets = report.targets,
         removed = report.removed,
         bytes_freed = report.bytes_freed,
@@ -427,7 +427,7 @@ fn apply_local_clone_gc_targets(
                 }
                 Err(error) => {
                     tracing::warn!(
-                        target = "harness::dependency_updates::files",
+                        target = "harness::reviews::files",
                         path = ?entry.bare_path,
                         error = %error,
                         "local-clone gc: failed to remove bare clone directory"
@@ -467,37 +467,37 @@ pub struct GcReport {
 /// # Errors
 /// Returns `CliError` for empty payloads or when the GitHub token is
 /// missing.
-pub async fn mark_dependency_update_files_viewed(
-    request: &DependencyUpdatesFilesViewedRequest,
-) -> Result<DependencyUpdatesFilesViewedResponse, CliError> {
+pub async fn mark_review_files_viewed(
+    request: &ReviewsFilesViewedRequest,
+) -> Result<ReviewsFilesViewedResponse, CliError> {
     let pull_request_id = request.normalized_pull_request_id();
     if pull_request_id.is_empty() {
         return Err(CliErrorKind::workflow_parse(
-            "dependency-updates files viewed: pull_request_id must not be empty",
+            "reviews files viewed: pull_request_id must not be empty",
         )
         .into());
     }
     let normalized = request.normalized_paths();
     if normalized.is_empty() {
         return Err(CliErrorKind::workflow_parse(
-            "dependency-updates files viewed: at least one path is required",
+            "reviews files viewed: at least one path is required",
         )
         .into());
     }
 
     let token = github_token(None).ok_or_else(|| missing_token_error(None))?;
-    let client = DependencyUpdatesGitHubClient::new(&token)?;
+    let client = ReviewsGitHubClient::new(&token)?;
 
     // Refetch the file list once so we have a fresh per-path viewer state
     // and can drift-check every requested target without a round-trip per
     // path.
     let current_list = client
-        .fetch_pull_request_files(&DependencyUpdatesFilesListRequest {
+        .fetch_pull_request_files(&ReviewsFilesListRequest {
             pull_request_id: pull_request_id.clone(),
             force_refresh: true,
         })
         .await?;
-    let current_states: BTreeMap<String, DependencyUpdateFileViewedState> = current_list
+    let current_states: BTreeMap<String, ReviewFileViewedState> = current_list
         .files
         .iter()
         .map(|file| (file.path.clone(), file.viewer_viewed_state))
@@ -508,30 +508,30 @@ pub async fn mark_dependency_update_files_viewed(
         let current = current_states
             .get(&target.path)
             .copied()
-            .unwrap_or(DependencyUpdateFileViewedState::Unviewed);
+            .unwrap_or(ReviewFileViewedState::Unviewed);
         let outcome = classify_outcome(target.expected_prior_state, current)
-            .unwrap_or(DependencyUpdateFileViewedOutcome::Drifted);
-        if matches!(outcome, DependencyUpdateFileViewedOutcome::Drifted) {
-            results.push(DependencyUpdateFilesViewedResult {
+            .unwrap_or(ReviewFileViewedOutcome::Drifted);
+        if matches!(outcome, ReviewFileViewedOutcome::Drifted) {
+            results.push(ReviewFilesViewedResult {
                 path: target.path,
-                outcome: DependencyUpdateFileViewedOutcome::Drifted,
+                outcome: ReviewFileViewedOutcome::Drifted,
                 viewer_viewed_state: current,
             });
             continue;
         }
         match ViewedMutation::decide(current, target.mark_viewed) {
             ViewedMutation::Skip => {
-                results.push(DependencyUpdateFilesViewedResult {
+                results.push(ReviewFilesViewedResult {
                     path: target.path,
-                    outcome: DependencyUpdateFileViewedOutcome::Updated,
+                    outcome: ReviewFileViewedOutcome::Updated,
                     viewer_viewed_state: current,
                 });
             }
             ViewedMutation::Mark | ViewedMutation::Unmark => {
                 let next_state = if target.mark_viewed {
-                    DependencyUpdateFileViewedState::Viewed
+                    ReviewFileViewedState::Viewed
                 } else {
-                    DependencyUpdateFileViewedState::Unviewed
+                    ReviewFileViewedState::Unviewed
                 };
                 let mutation_result = client
                     .toggle_pull_request_file_viewed(
@@ -541,22 +541,22 @@ pub async fn mark_dependency_update_files_viewed(
                     )
                     .await;
                 match mutation_result {
-                    Ok(()) => results.push(DependencyUpdateFilesViewedResult {
+                    Ok(()) => results.push(ReviewFilesViewedResult {
                         path: target.path,
-                        outcome: DependencyUpdateFileViewedOutcome::Updated,
+                        outcome: ReviewFileViewedOutcome::Updated,
                         viewer_viewed_state: next_state,
                     }),
                     Err(error) => {
                         tracing::warn!(
-                            target = "harness::dependency_updates::files",
+                            target = "harness::reviews::files",
                             pull_request_id = pull_request_id,
                             path = target.path,
                             error = %error,
-                            "mark_dependency_update_files_viewed mutation failed"
+                            "mark_review_files_viewed mutation failed"
                         );
-                        results.push(DependencyUpdateFilesViewedResult {
+                        results.push(ReviewFilesViewedResult {
                             path: target.path,
-                            outcome: DependencyUpdateFileViewedOutcome::Failed,
+                            outcome: ReviewFileViewedOutcome::Failed,
                             viewer_viewed_state: current,
                         });
                     }
@@ -565,7 +565,7 @@ pub async fn mark_dependency_update_files_viewed(
         }
     }
 
-    Ok(DependencyUpdatesFilesViewedResponse {
+    Ok(ReviewsFilesViewedResponse {
         pull_request_id,
         results,
         fetched_at: utc_now(),
@@ -582,27 +582,27 @@ pub async fn mark_dependency_update_files_viewed(
 ///
 /// # Errors
 /// Returns `CliError` for invalid requests.
-pub async fn fetch_dependency_update_file_blob(
-    request: &DependencyUpdatesFilesBlobRequest,
-) -> Result<DependencyUpdatesFilesBlobResponse, CliError> {
+pub async fn fetch_review_file_blob(
+    request: &ReviewsFilesBlobRequest,
+) -> Result<ReviewsFilesBlobResponse, CliError> {
     let oid = request.normalized_oid();
     if oid.is_empty() {
         return Err(CliErrorKind::workflow_parse(
-            "dependency-updates files blob: oid must not be empty",
+            "reviews files blob: oid must not be empty",
         )
         .into());
     }
     let token = github_token(None).ok_or_else(|| missing_token_error(None))?;
-    let client = DependencyUpdatesGitHubClient::new(&token)?;
+    let client = ReviewsGitHubClient::new(&token)?;
     let response = client
         .fetch_repository_blob_text(&request.repository_id, &oid)
         .await;
-    let mime = crate::dependency_updates::image_mime_for_path(&request.path)
-        .unwrap_or(DependencyUpdateImageMime::Png);
+    let mime = crate::reviews::image_mime_for_path(&request.path)
+        .unwrap_or(ReviewImageMime::Png);
     match response {
         Ok(blob) => {
             let blob = fetch_binary_blob_when_needed(&client, blob, &oid).await;
-            Ok(DependencyUpdatesFilesBlobResponse {
+            Ok(ReviewsFilesBlobResponse {
                 path: request.path.clone(),
                 oid,
                 mime,
@@ -616,13 +616,13 @@ pub async fn fetch_dependency_update_file_blob(
         }
         Err(error) => {
             tracing::warn!(
-                target = "harness::dependency_updates::files",
+                target = "harness::reviews::files",
                 oid = oid,
                 path = request.path,
                 error = %error,
-                "fetch_dependency_update_file_blob graphql fetch failed - returning empty body"
+                "fetch_review_file_blob graphql fetch failed - returning empty body"
             );
-            Ok(DependencyUpdatesFilesBlobResponse {
+            Ok(ReviewsFilesBlobResponse {
                 path: request.path.clone(),
                 oid,
                 mime,
@@ -638,7 +638,7 @@ pub async fn fetch_dependency_update_file_blob(
 }
 
 async fn fetch_binary_blob_when_needed(
-    client: &DependencyUpdatesGitHubClient,
+    client: &ReviewsGitHubClient,
     blob: BlobTextProjection,
     oid: &str,
 ) -> BlobTextProjection {
@@ -647,7 +647,7 @@ async fn fetch_binary_blob_when_needed(
     }
     let Some(repo_full_name) = blob.repository_full_name.as_deref() else {
         tracing::warn!(
-            target = "harness::dependency_updates::files",
+            target = "harness::reviews::files",
             oid = oid,
             "binary blob fallback skipped because repository nameWithOwner was missing"
         );
@@ -660,7 +660,7 @@ async fn fetch_binary_blob_when_needed(
         Ok(rest_blob) => rest_blob,
         Err(error) => {
             tracing::warn!(
-                target = "harness::dependency_updates::files",
+                target = "harness::reviews::files",
                 oid = oid,
                 repo = repo_full_name,
                 error = %error,
@@ -673,13 +673,13 @@ async fn fetch_binary_blob_when_needed(
 
 /// List the local clones the daemon is currently maintaining.
 ///
-/// Loads `<daemon-root>/dependency_updates/clones/registry.json` and
+/// Loads `<daemon-root>/reviews/clones/registry.json` and
 /// projects each entry to the Settings-panel shape. Returns an empty list
 /// when the registry file is absent (no clones yet).
 ///
 /// # Errors
 /// Returns `CliError` when the registry file exists but cannot be parsed.
-pub async fn list_dependency_update_local_clones() -> Result<Vec<LocalCloneListEntry>, CliError> {
+pub async fn list_review_local_clones() -> Result<Vec<LocalCloneListEntry>, CliError> {
     let root = clones_root();
     let registry = load_registry(&root)?;
     Ok(registry
@@ -698,13 +698,13 @@ pub async fn list_dependency_update_local_clones() -> Result<Vec<LocalCloneListE
 /// # Errors
 /// Returns `CliError` for empty segments or filesystem errors during
 /// registry persistence.
-pub async fn delete_dependency_update_local_clone(
+pub async fn delete_review_local_clone(
     repo_key_segment: &str,
 ) -> Result<Vec<LocalCloneListEntry>, CliError> {
     let segment = repo_key_segment.trim();
     if segment.is_empty() {
         return Err(CliErrorKind::workflow_parse(
-            "dependency-updates files local-clone delete: repo_key_segment must not be empty",
+            "reviews files local-clone delete: repo_key_segment must not be empty",
         )
         .into());
     }
@@ -720,7 +720,7 @@ pub async fn delete_dependency_update_local_clone(
             if entry.bare_path.exists() {
                 if let Err(error) = fs::remove_dir_all(&entry.bare_path) {
                     tracing::warn!(
-                        target = "harness::dependency_updates::files",
+                        target = "harness::reviews::files",
                         path = ?entry.bare_path,
                         error = %error,
                         "failed to remove local clone directory"
@@ -750,12 +750,12 @@ fn load_registry(root: &LocalCloneRoot) -> Result<LocalCloneRegistry, CliError> 
     }
     let raw = fs::read_to_string(&path).map_err(|error| {
         CliErrorKind::workflow_io(format!(
-            "dependency-updates clones registry read failed: {error}"
+            "reviews clones registry read failed: {error}"
         ))
     })?;
     serde_json::from_str::<LocalCloneRegistry>(&raw).map_err(|error| {
         CliErrorKind::workflow_parse(format!(
-            "dependency-updates clones registry parse failed: {error}"
+            "reviews clones registry parse failed: {error}"
         ))
         .into()
     })
@@ -766,18 +766,18 @@ fn save_registry(root: &LocalCloneRoot, registry: &LocalCloneRegistry) -> Result
     if let Some(parent) = path.parent() {
         fs::create_dir_all(parent).map_err(|error| {
             CliErrorKind::workflow_io(format!(
-                "dependency-updates clones registry parent create failed: {error}"
+                "reviews clones registry parent create failed: {error}"
             ))
         })?;
     }
     let raw = serde_json::to_string_pretty(registry).map_err(|error| {
         CliErrorKind::workflow_parse(format!(
-            "dependency-updates clones registry serialize failed: {error}"
+            "reviews clones registry serialize failed: {error}"
         ))
     })?;
     fs::write(&path, raw).map_err(|error| {
         CliErrorKind::workflow_io(format!(
-            "dependency-updates clones registry write failed: {error}"
+            "reviews clones registry write failed: {error}"
         ))
         .into()
     })
@@ -792,12 +792,12 @@ fn github_token(repository: Option<&str>) -> Option<String> {
 fn missing_token_error(repository: Option<&str>) -> CliError {
     match repository {
         Some(repository) => CliErrorKind::workflow_io(format!(
-            "dependency-updates files requires a GitHub token for '{repository}'. \
+            "reviews files requires a GitHub token for '{repository}'. \
              Configure one in Settings > Secrets."
         ))
         .into(),
         None => CliErrorKind::workflow_io(
-            "dependency-updates files requires a GitHub token. \
+            "reviews files requires a GitHub token. \
              Configure one in Settings > Secrets.",
         )
         .into(),
@@ -820,21 +820,21 @@ pub(crate) struct BlobTextProjection {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::dependency_updates::DependencyUpdateFilesViewedTarget;
+    use crate::reviews::ReviewFilesViewedTarget;
 
     #[tokio::test]
     async fn list_request_rejects_empty_pull_request_id() {
-        let request = DependencyUpdatesFilesListRequest {
+        let request = ReviewsFilesListRequest {
             pull_request_id: "   ".into(),
             force_refresh: false,
         };
-        let err = list_dependency_update_files(&request).await.unwrap_err();
+        let err = list_review_files(&request).await.unwrap_err();
         assert!(err.to_string().to_lowercase().contains("pull_request_id"));
     }
 
     #[tokio::test]
     async fn patch_request_rejects_empty_pull_request_id() {
-        let request = DependencyUpdatesFilesPatchRequest {
+        let request = ReviewsFilesPatchRequest {
             pull_request_id: "".into(),
             head_ref_oid_expected: "abc".into(),
             paths: vec!["src/lib.rs".into()],
@@ -845,13 +845,13 @@ mod tests {
             base_ref_name: None,
             large_diff_strategy: None,
         };
-        let err = patch_dependency_update_files(&request).await.unwrap_err();
+        let err = patch_review_files(&request).await.unwrap_err();
         assert!(err.to_string().to_lowercase().contains("pull_request_id"));
     }
 
     #[tokio::test]
     async fn patch_request_returns_empty_patches_when_context_is_missing() {
-        let request = DependencyUpdatesFilesPatchRequest {
+        let request = ReviewsFilesPatchRequest {
             pull_request_id: "PR_1".into(),
             head_ref_oid_expected: "abc".into(),
             paths: vec!["src/lib.rs".into()],
@@ -862,7 +862,7 @@ mod tests {
             base_ref_name: None,
             large_diff_strategy: None,
         };
-        let response = patch_dependency_update_files(&request).await.expect("ok");
+        let response = patch_review_files(&request).await.expect("ok");
         assert_eq!(response.pull_request_id, "PR_1");
         assert!(response.patches.is_empty());
         assert!(!response.drifted);
@@ -871,11 +871,11 @@ mod tests {
 
     #[tokio::test]
     async fn viewed_request_rejects_empty_paths() {
-        let request = DependencyUpdatesFilesViewedRequest {
+        let request = ReviewsFilesViewedRequest {
             pull_request_id: "PR_1".into(),
             paths: vec![],
         };
-        let err = mark_dependency_update_files_viewed(&request)
+        let err = mark_review_files_viewed(&request)
             .await
             .unwrap_err();
         assert!(err.to_string().contains("path"));
@@ -883,12 +883,12 @@ mod tests {
 
     #[tokio::test]
     async fn blob_request_rejects_empty_oid() {
-        let request = DependencyUpdatesFilesBlobRequest {
+        let request = ReviewsFilesBlobRequest {
             repository_id: "MDEwOlJlcG9zaXRvcnk".into(),
             oid: "".into(),
             path: "logo.png".into(),
         };
-        let err = fetch_dependency_update_file_blob(&request)
+        let err = fetch_review_file_blob(&request)
             .await
             .unwrap_err();
         assert!(err.to_string().to_lowercase().contains("oid"));
@@ -899,7 +899,7 @@ mod tests {
         // The daemon_root() in test mode points at a tmp dir so the registry
         // file is absent until something writes it; the handler must return
         // Ok(vec![]) rather than an error.
-        let response = list_dependency_update_local_clones().await.expect("ok");
+        let response = list_review_local_clones().await.expect("ok");
         assert!(response.is_empty());
     }
 
@@ -908,7 +908,7 @@ mod tests {
         let (refs, head_ref) =
             local_clone_fetch_context(Some(7), Some("renovate/foo"), Some("main"));
 
-        assert_eq!(head_ref, "refs/harness/dependency-updates/pull/7/head");
+        assert_eq!(head_ref, "refs/harness/reviews/pull/7/head");
         assert!(refs.iter().any(|r| r.remote_ref == "refs/pull/7/head"));
         assert!(refs.iter().any(|r| r.remote_ref == "refs/heads/main"));
     }
@@ -919,7 +919,7 @@ mod tests {
 
         assert_eq!(
             head_ref,
-            "refs/harness/dependency-updates/heads/renovate/foo"
+            "refs/harness/reviews/heads/renovate/foo"
         );
         assert_eq!(refs.len(), 1);
         assert_eq!(refs[0].remote_ref, "refs/heads/renovate/foo");
@@ -930,9 +930,9 @@ mod tests {
         // Sanity check that the viewed-target struct is constructible from
         // the public type re-export so the service compiles against the
         // protocol surface as well as the file-module internal one.
-        let target = DependencyUpdateFilesViewedTarget {
+        let target = ReviewFilesViewedTarget {
             path: "src/lib.rs".into(),
-            expected_prior_state: DependencyUpdateFileViewedState::Unviewed,
+            expected_prior_state: ReviewFileViewedState::Unviewed,
             mark_viewed: true,
         };
         assert_eq!(target.path, "src/lib.rs");
@@ -941,7 +941,7 @@ mod tests {
 
     #[tokio::test]
     async fn delete_local_clone_rejects_empty_segment() {
-        let err = delete_dependency_update_local_clone("   ")
+        let err = delete_review_local_clone("   ")
             .await
             .unwrap_err();
         assert!(err.to_string().to_lowercase().contains("repo_key_segment"));
@@ -953,7 +953,7 @@ mod tests {
         assert!(
             root.registry_path()
                 .to_string_lossy()
-                .ends_with("dependency_updates/clones/registry.json")
+                .ends_with("reviews/clones/registry.json")
         );
     }
 
@@ -963,8 +963,8 @@ mod tests {
         let root = LocalCloneRoot::new(tmp.path().to_path_buf());
         let mut registry = LocalCloneRegistry::default();
         registry.insert_or_update(
-            crate::dependency_updates::RepoKey::new("owner/repo"),
-            crate::dependency_updates::RegistryEntry {
+            crate::reviews::RepoKey::new("owner/repo"),
+            crate::reviews::RegistryEntry {
                 repo_full_name: "owner/repo".into(),
                 bare_path: tmp.path().join("owner__repo.git"),
                 size_bytes: 1024,
@@ -982,7 +982,7 @@ mod tests {
     #[test]
     fn local_clone_gc_drops_registry_row_when_path_is_missing() {
         let tmp = tempfile::tempdir().expect("tmpdir");
-        let key = crate::dependency_updates::RepoKey::new("owner/repo");
+        let key = crate::reviews::RepoKey::new("owner/repo");
         let mut registry = LocalCloneRegistry::default();
         registry.insert_or_update(
             key.clone(),
@@ -999,7 +999,7 @@ mod tests {
     #[test]
     fn local_clone_gc_retains_registry_row_when_delete_fails() {
         let tmp = tempfile::tempdir().expect("tmpdir");
-        let key = crate::dependency_updates::RepoKey::new("owner/repo");
+        let key = crate::reviews::RepoKey::new("owner/repo");
         let bare_path = tmp.path().join("owner__repo.git");
         fs::write(&bare_path, b"not a directory").expect("fixture file");
         let mut registry = LocalCloneRegistry::default();
@@ -1020,8 +1020,8 @@ mod tests {
         repo_full_name: &str,
         bare_path: PathBuf,
         size_bytes: u64,
-    ) -> crate::dependency_updates::RegistryEntry {
-        crate::dependency_updates::RegistryEntry {
+    ) -> crate::reviews::RegistryEntry {
+        crate::reviews::RegistryEntry {
             repo_full_name: repo_full_name.into(),
             bare_path,
             size_bytes,
@@ -1036,13 +1036,13 @@ mod tests {
         bare_path: &std::path::Path,
         repo_full_name: &str,
         size_bytes: u64,
-    ) -> crate::dependency_updates::RegistryEntry {
+    ) -> crate::reviews::RegistryEntry {
         gc_registry_entry(repo_full_name, bare_path.to_path_buf(), size_bytes)
     }
 
     #[tokio::test]
     async fn gc_drops_stale_entries_and_removes_bare_dirs() {
-        use crate::dependency_updates::files::local_clone::RepoKey;
+        use crate::reviews::files::local_clone::RepoKey;
 
         let tempdir = tempfile::tempdir().expect("tempdir");
         let root = LocalCloneRoot::new(tempdir.path().to_path_buf());
@@ -1094,7 +1094,7 @@ mod tests {
 
     #[tokio::test]
     async fn gc_evicts_lru_until_under_disk_budget() {
-        use crate::dependency_updates::files::local_clone::RepoKey;
+        use crate::reviews::files::local_clone::RepoKey;
 
         let tempdir = tempfile::tempdir().expect("tempdir");
         let root = LocalCloneRoot::new(tempdir.path().to_path_buf());
@@ -1146,7 +1146,7 @@ mod tests {
 
     #[tokio::test]
     async fn gc_tolerates_missing_bare_dir() {
-        use crate::dependency_updates::files::local_clone::RepoKey;
+        use crate::reviews::files::local_clone::RepoKey;
 
         let tempdir = tempfile::tempdir().expect("tempdir");
         let root = LocalCloneRoot::new(tempdir.path().to_path_buf());

@@ -1,18 +1,18 @@
 use std::time::Instant;
 
 use crate::daemon::service::task_board_runtime::external_sync_config_for_repository;
-use crate::dependency_updates::DependencyUpdatesCacheClearResponse;
-use crate::dependency_updates::timeline::{
-    self, DependencyUpdatesTimelineRequest, DependencyUpdatesTimelineResponse, TimelineError,
+use crate::reviews::ReviewsCacheClearResponse;
+use crate::reviews::timeline::{
+    self, ReviewsTimelineRequest, ReviewsTimelineResponse, TimelineError,
     TimelineGitHubClient,
 };
 use crate::errors::{CliError, CliErrorKind};
 use crate::task_board::external::ExternalProvider;
 
-use super::dependency_updates as base_service;
+use super::reviews as base_service;
 
-/// Service-level entry point for the `/v1/dependency-updates/timeline`
-/// HTTP route and the matching `dependency_updates.timeline` WS
+/// Service-level entry point for the `/v1/reviews/timeline`
+/// HTTP route and the matching `reviews.timeline` WS
 /// method. Resolves the GitHub token, constructs a production
 /// `TimelineClient`, and hands off to
 /// [`timeline::fetch_timeline_page`] which enforces the full-drain
@@ -21,9 +21,9 @@ use super::dependency_updates as base_service;
 /// # Errors
 /// Returns `CliError` when the GitHub token is missing, the GraphQL
 /// transport fails, or the upstream API rate-limits the caller.
-pub async fn fetch_dependency_update_timeline(
-    request: &DependencyUpdatesTimelineRequest,
-) -> Result<DependencyUpdatesTimelineResponse, CliError> {
+pub async fn fetch_review_timeline(
+    request: &ReviewsTimelineRequest,
+) -> Result<ReviewsTimelineResponse, CliError> {
     let token = github_token().ok_or_else(missing_token_error)?;
     let client = TimelineGitHubClient::new(&token)?;
     timeline::fetch_timeline_page(request.clone(), &client, Instant::now())
@@ -33,14 +33,14 @@ pub async fn fetch_dependency_update_timeline(
 
 /// Combined cache-clear: drains the existing list + body caches via
 /// the established service fn, then drains the timeline cache so a
-/// single DELETE flushes every server-side dependency-updates state.
+/// single DELETE flushes every server-side reviews state.
 ///
 /// # Errors
 /// Propagates errors from
-/// [`base_service::clear_dependency_updates_cache`] verbatim.
-pub fn clear_dependency_updates_caches_with_timeline()
--> Result<DependencyUpdatesCacheClearResponse, CliError> {
-    let mut response = base_service::clear_dependency_updates_cache()?;
+/// [`base_service::clear_reviews_cache`] verbatim.
+pub fn clear_reviews_caches_with_timeline()
+-> Result<ReviewsCacheClearResponse, CliError> {
+    let mut response = base_service::clear_reviews_cache()?;
     response.cleared_entries += timeline::drain_timeline_cache();
     Ok(response)
 }
@@ -53,7 +53,7 @@ fn github_token() -> Option<String> {
 
 fn missing_token_error() -> CliError {
     CliErrorKind::workflow_io(
-        "dependency-updates timeline requires a GitHub token. Configure one in Settings > Secrets.",
+        "reviews timeline requires a GitHub token. Configure one in Settings > Secrets.",
     )
     .into()
 }
