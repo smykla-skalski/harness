@@ -60,8 +60,14 @@ public struct SettingsView: View {
     .onChange(of: navigationRequest, initial: true) { _, request in
       guard let request else { return }
       selectedSection = request.target.section
-      if case .section = request.target {
+      if let pane = request.supervisorPane {
+        selectedSupervisorPane = pane
+      }
+      switch request.target {
+      case .section, .supervisor:
         navigationRequest = nil
+      case .taskBoard:
+        break
       }
     }
     .overlay {

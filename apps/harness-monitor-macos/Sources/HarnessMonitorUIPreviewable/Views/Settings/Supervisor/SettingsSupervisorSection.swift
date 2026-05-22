@@ -2,7 +2,7 @@ import HarnessMonitorKit
 import SwiftUI
 
 /// Key identifying which Supervisor settings pane is currently selected.
-public enum SupervisorPaneKey: String, CaseIterable, Hashable, Identifiable {
+public enum SupervisorPaneKey: String, CaseIterable, Hashable, Identifiable, Sendable {
   case rules
   case notifications
   case background
