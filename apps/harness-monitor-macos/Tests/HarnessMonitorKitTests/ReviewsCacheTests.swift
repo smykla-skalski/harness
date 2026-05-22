@@ -5,9 +5,9 @@ import XCTest
 @testable import HarnessMonitorKit
 
 @MainActor
-final class DependencyUpdatesCacheTests: XCTestCase {
+final class ReviewsCacheTests: XCTestCase {
   func testPreferencesHashIgnoresFreshnessAndOrder() {
-    let lhs = DependencyUpdatesQueryRequest(
+    let lhs = ReviewsQueryRequest(
       authors: ["renovate[bot]", "dependabot[bot]"],
       organizations: ["acme"],
       repositories: ["acme/api"],
@@ -15,7 +15,7 @@ final class DependencyUpdatesCacheTests: XCTestCase {
       forceRefresh: false,
       cacheMaxAgeSeconds: 600
     )
-    let rhs = DependencyUpdatesQueryRequest(
+    let rhs = ReviewsQueryRequest(
       authors: ["dependabot[bot]", "renovate[bot]"],
       organizations: ["acme"],
       repositories: ["acme/api"],
@@ -24,23 +24,23 @@ final class DependencyUpdatesCacheTests: XCTestCase {
       cacheMaxAgeSeconds: 30
     )
     XCTAssertEqual(
-      DependencyUpdatesCache.preferencesHash(for: lhs),
-      DependencyUpdatesCache.preferencesHash(for: rhs)
+      ReviewsCache.preferencesHash(for: lhs),
+      ReviewsCache.preferencesHash(for: rhs)
     )
   }
 
   func testPreferencesHashChangesWhenBucketChanges() {
-    let base = DependencyUpdatesQueryRequest(authors: ["renovate[bot]"])
-    let widened = DependencyUpdatesQueryRequest(authors: ["renovate[bot]", "dependabot[bot]"])
+    let base = ReviewsQueryRequest(authors: ["renovate[bot]"])
+    let widened = ReviewsQueryRequest(authors: ["renovate[bot]", "dependabot[bot]"])
     XCTAssertNotEqual(
-      DependencyUpdatesCache.preferencesHash(for: base),
-      DependencyUpdatesCache.preferencesHash(for: widened)
+      ReviewsCache.preferencesHash(for: base),
+      ReviewsCache.preferencesHash(for: widened)
     )
   }
 
   func testSaveAndLoadRoundTrip() throws {
     let context = try makeContext()
-    let cache = DependencyUpdatesCache(context: context)
+    let cache = ReviewsCache(context: context)
     let response = makeResponse(items: [
       makeItem(pullRequestID: "pr_1"),
       makeItem(pullRequestID: "pr_2"),
@@ -54,7 +54,7 @@ final class DependencyUpdatesCacheTests: XCTestCase {
 
   func testSaveAndLoadCollapseDuplicatePullRequestIDs() throws {
     let context = try makeContext()
-    let cache = DependencyUpdatesCache(context: context)
+    let cache = ReviewsCache(context: context)
     let response = makeResponse(items: [
       makeItem(
         pullRequestID: "pr_1",
@@ -111,7 +111,7 @@ final class DependencyUpdatesCacheTests: XCTestCase {
     ]
 
     let data = try JSONSerialization.data(withJSONObject: payload)
-    let decoded = try JSONDecoder().decode(DependencyUpdatesQueryResponse.self, from: data)
+    let decoded = try JSONDecoder().decode(ReviewsQueryResponse.self, from: data)
 
     XCTAssertEqual(decoded.items.map(\.pullRequestID), ["pr_1"])
     XCTAssertEqual(decoded.items[0].reviewStatus, .approved)
@@ -120,7 +120,7 @@ final class DependencyUpdatesCacheTests: XCTestCase {
 
   func testSaveReplacesPriorSnapshotAndDropsAbsentItems() throws {
     let context = try makeContext()
-    let cache = DependencyUpdatesCache(context: context)
+    let cache = ReviewsCache(context: context)
     cache.save(
       preferencesHash: "alpha",
       response: makeResponse(items: [
@@ -143,7 +143,7 @@ final class DependencyUpdatesCacheTests: XCTestCase {
 
   func testSnapshotsAreIsolatedByPreferencesHash() throws {
     let context = try makeContext()
-    let cache = DependencyUpdatesCache(context: context)
+    let cache = ReviewsCache(context: context)
     cache.save(
       preferencesHash: "alpha",
       response: makeResponse(items: [makeItem(pullRequestID: "pr_1")])
@@ -169,12 +169,12 @@ final class DependencyUpdatesCacheTests: XCTestCase {
       makeItem(pullRequestID: "pr_1", reviewStatus: .reviewRequired),
       makeItem(pullRequestID: "pr_2", reviewStatus: .reviewRequired),
     ]
-    let refresh = DependencyUpdatesRefreshResponse(
+    let refresh = ReviewsRefreshResponse(
       fetchedAt: "2026-05-21T10:00:00Z",
       items: [makeItem(pullRequestID: "pr_1", reviewStatus: .approved)]
     )
 
-    let result = DependencyUpdatesCache.applyRefreshToItems(cached, refresh: refresh)
+    let result = ReviewsCache.applyRefreshToItems(cached, refresh: refresh)
     XCTAssertEqual(result.count, 2)
     XCTAssertEqual(result[0].reviewStatus, .approved)
     XCTAssertEqual(result[1].reviewStatus, .reviewRequired)
@@ -185,12 +185,12 @@ final class DependencyUpdatesCacheTests: XCTestCase {
       makeItem(pullRequestID: "pr_1"),
       makeItem(pullRequestID: "pr_2"),
     ]
-    let refresh = DependencyUpdatesRefreshResponse(
+    let refresh = ReviewsRefreshResponse(
       fetchedAt: "2026-05-21T10:00:00Z",
       items: [makeItem(pullRequestID: "pr_1", state: .merged)]
     )
 
-    let result = DependencyUpdatesCache.applyRefreshToItems(cached, refresh: refresh)
+    let result = ReviewsCache.applyRefreshToItems(cached, refresh: refresh)
     XCTAssertEqual(result.map(\.pullRequestID), ["pr_2"])
   }
 
@@ -199,18 +199,18 @@ final class DependencyUpdatesCacheTests: XCTestCase {
       makeItem(pullRequestID: "pr_1"),
       makeItem(pullRequestID: "pr_2"),
     ]
-    let refresh = DependencyUpdatesRefreshResponse(
+    let refresh = ReviewsRefreshResponse(
       fetchedAt: "2026-05-21T10:00:00Z",
       missingPullRequestIDs: ["pr_1"]
     )
 
-    let result = DependencyUpdatesCache.applyRefreshToItems(cached, refresh: refresh)
+    let result = ReviewsCache.applyRefreshToItems(cached, refresh: refresh)
     XCTAssertEqual(result.map(\.pullRequestID), ["pr_2"])
   }
 
   func testApplyRefreshPersistsReconciledSnapshot() throws {
     let context = try makeContext()
-    let cache = DependencyUpdatesCache(context: context)
+    let cache = ReviewsCache(context: context)
     cache.save(
       preferencesHash: "alpha",
       response: makeResponse(items: [
@@ -219,7 +219,7 @@ final class DependencyUpdatesCacheTests: XCTestCase {
         makeItem(pullRequestID: "pr_3"),
       ])
     )
-    let refresh = DependencyUpdatesRefreshResponse(
+    let refresh = ReviewsRefreshResponse(
       fetchedAt: "2026-05-21T11:00:00Z",
       items: [makeItem(pullRequestID: "pr_2", state: .closed)],
       missingPullRequestIDs: ["pr_1"]
@@ -242,8 +242,8 @@ final class DependencyUpdatesCacheTests: XCTestCase {
       XCTFail("Failed to build context")
       return
     }
-    let cache = DependencyUpdatesCache(context: context)
-    let refresh = DependencyUpdatesRefreshResponse(
+    let cache = ReviewsCache(context: context)
+    let refresh = ReviewsRefreshResponse(
       fetchedAt: "2026-05-21T11:00:00Z",
       items: [makeItem(pullRequestID: "pr_1")]
     )
@@ -258,14 +258,14 @@ final class DependencyUpdatesCacheTests: XCTestCase {
   }
 
   private func rowCount(in context: ModelContext) -> Int {
-    (try? context.fetch(FetchDescriptor<CachedDependencyUpdatesSnapshot>()).count) ?? -1
+    (try? context.fetch(FetchDescriptor<CachedReviewsSnapshot>()).count) ?? -1
   }
 
-  private func makeResponse(items: [DependencyUpdateItem]) -> DependencyUpdatesQueryResponse {
-    DependencyUpdatesQueryResponse(
+  private func makeResponse(items: [ReviewItem]) -> ReviewsQueryResponse {
+    ReviewsQueryResponse(
       fetchedAt: "2026-05-21T10:00:00Z",
       fromCache: false,
-      summary: DependencyUpdatesSummary(items: items),
+      summary: ReviewsSummary(items: items),
       items: items
     )
   }
@@ -273,11 +273,11 @@ final class DependencyUpdatesCacheTests: XCTestCase {
   private func makeItem(
     pullRequestID: String,
     repository: String = "acme/api",
-    state: DependencyUpdatePullRequestState = .open,
-    reviewStatus: DependencyUpdateReviewStatus = .reviewRequired,
+    state: ReviewPullRequestState = .open,
+    reviewStatus: ReviewReviewStatus = .reviewRequired,
     updatedAt: String = "2026-05-20T12:00:00Z"
-  ) -> DependencyUpdateItem {
-    DependencyUpdateItem(
+  ) -> ReviewItem {
+    ReviewItem(
       pullRequestID: pullRequestID,
       repositoryID: "\(repository)#node",
       repository: repository,

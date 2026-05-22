@@ -6,7 +6,7 @@ import UniformTypeIdentifiers
 
 @testable import HarnessMonitorKit
 
-struct DependencyUpdateImageDecoderTests {
+struct ReviewImageDecoderTests {
   /// Build a synthetic PNG with the requested pixel dimensions so the
   /// tests don't rely on bundled fixture assets.
   private static func makePNG(width: Int, height: Int) -> Data {
@@ -50,7 +50,7 @@ struct DependencyUpdateImageDecoderTests {
 
   @Test("decode produces a PreparedImage with the source pixel intrinsic size")
   func decodeProducesIntrinsicSize() async throws {
-    let decoder = DependencyUpdateImageDecoder()
+    let decoder = ReviewImageDecoder()
     let data = Self.makePNG(width: 320, height: 240)
     let prepared = try await decoder.decode(
       repositoryID: "repo-1",
@@ -65,7 +65,7 @@ struct DependencyUpdateImageDecoderTests {
 
   @Test("decode caches by (repositoryID, oid, displaySizeBucket)")
   func decodeCachesByKey() async throws {
-    let decoder = DependencyUpdateImageDecoder()
+    let decoder = ReviewImageDecoder()
     let data = Self.makePNG(width: 64, height: 64)
     let first = try await decoder.decode(
       repositoryID: "repo-1",
@@ -83,7 +83,7 @@ struct DependencyUpdateImageDecoderTests {
 
   @Test("same oid with different display buckets caches separately")
   func differentBucketsCacheSeparately() async throws {
-    let decoder = DependencyUpdateImageDecoder()
+    let decoder = ReviewImageDecoder()
     let data = Self.makePNG(width: 256, height: 256)
     _ = try await decoder.decode(
       repositoryID: "repo-1",
@@ -97,8 +97,8 @@ struct DependencyUpdateImageDecoderTests {
       displayMaxDimension: 1000,
       data: data
     )
-    let smallBucket = DependencyUpdateImageDecoder.bucket(forDisplayMaxDimension: 200)
-    let largeBucket = DependencyUpdateImageDecoder.bucket(forDisplayMaxDimension: 1000)
+    let smallBucket = ReviewImageDecoder.bucket(forDisplayMaxDimension: 200)
+    let largeBucket = ReviewImageDecoder.bucket(forDisplayMaxDimension: 1000)
     #expect(smallBucket != largeBucket)
     let small = await decoder.cached(
       repositoryID: "repo-1",
@@ -118,7 +118,7 @@ struct DependencyUpdateImageDecoderTests {
   func lruEvictsByBytes() async throws {
     // Cap to a single 64x64 RGBA tile (16 384 bytes) plus a hair extra so
     // the third decode forces eviction of the oldest.
-    let decoder = DependencyUpdateImageDecoder(maxBytes: 20_000)
+    let decoder = ReviewImageDecoder(maxBytes: 20_000)
     let data = Self.makePNG(width: 64, height: 64)
     _ = try await decoder.decode(
       repositoryID: "repo-1",
@@ -148,7 +148,7 @@ struct DependencyUpdateImageDecoderTests {
 
   @Test("clear drops all cached PreparedImage entries and zeroes currentBytes")
   func clearWipesEverything() async throws {
-    let decoder = DependencyUpdateImageDecoder()
+    let decoder = ReviewImageDecoder()
     _ = try await decoder.decode(
       repositoryID: "repo-1",
       oid: "oid-1",
@@ -168,16 +168,16 @@ struct DependencyUpdateImageDecoderTests {
 
   @Test("bucket(forDisplayMaxDimension:) rounds up to nearest power of two")
   func bucketRounding() {
-    #expect(DependencyUpdateImageDecoder.bucket(forDisplayMaxDimension: 200) == 256)
-    #expect(DependencyUpdateImageDecoder.bucket(forDisplayMaxDimension: 256) == 256)
-    #expect(DependencyUpdateImageDecoder.bucket(forDisplayMaxDimension: 257) == 512)
-    #expect(DependencyUpdateImageDecoder.bucket(forDisplayMaxDimension: 1000) == 1024)
-    #expect(DependencyUpdateImageDecoder.bucket(forDisplayMaxDimension: 0) == 1)
+    #expect(ReviewImageDecoder.bucket(forDisplayMaxDimension: 200) == 256)
+    #expect(ReviewImageDecoder.bucket(forDisplayMaxDimension: 256) == 256)
+    #expect(ReviewImageDecoder.bucket(forDisplayMaxDimension: 257) == 512)
+    #expect(ReviewImageDecoder.bucket(forDisplayMaxDimension: 1000) == 1024)
+    #expect(ReviewImageDecoder.bucket(forDisplayMaxDimension: 0) == 1)
   }
 
   @Test("decode of corrupt data throws imageSourceCreationFailed")
   func decodeRejectsBadData() async {
-    let decoder = DependencyUpdateImageDecoder()
+    let decoder = ReviewImageDecoder()
     let badData = Data([0xff, 0xfe, 0xfd])
     do {
       _ = try await decoder.decode(
@@ -187,7 +187,7 @@ struct DependencyUpdateImageDecoderTests {
         data: badData
       )
       Issue.record("Expected decode to throw on bogus bytes")
-    } catch let error as DependencyUpdateImageDecoder.DecodeError {
+    } catch let error as ReviewImageDecoder.DecodeError {
       #expect(error == .imageSourceCreationFailed || error == .thumbnailCreationFailed)
     } catch {
       Issue.record("Unexpected error type: \(error)")

@@ -3,12 +3,12 @@ import Testing
 
 @testable import HarnessMonitorKit
 
-@Suite("Dashboard dependencies repo resolver")
-struct DashboardDependenciesRepoResolverTests {
+@Suite("Dashboard reviews repo resolver")
+struct DashboardReviewsRepoResolverTests {
   @Test("explicit repositories pass through and dedupe")
   func explicitOnly() async throws {
     let client = RepoCatalogStub(orgs: [:])
-    let resolver = DashboardDependenciesRepoResolver(client: client)
+    let resolver = DashboardReviewsRepoResolver(client: client)
     let result = try await resolver.resolveRepositories(
       explicitRepositories: ["acme/api", "acme/web", "acme/api"],
       organizations: [],
@@ -24,7 +24,7 @@ struct DashboardDependenciesRepoResolverTests {
       "acme": ["acme/api", "acme/web"],
       "contoso": ["contoso/lib"],
     ])
-    let resolver = DashboardDependenciesRepoResolver(client: client)
+    let resolver = DashboardReviewsRepoResolver(client: client)
     let result = try await resolver.resolveRepositories(
       explicitRepositories: ["explicit/repo"],
       organizations: ["acme", "contoso"],
@@ -37,7 +37,7 @@ struct DashboardDependenciesRepoResolverTests {
   @Test("organizations are ignored when expansion is off")
   func orgExpansionOff() async throws {
     let client = RepoCatalogStub(orgs: ["acme": ["acme/api"]])
-    let resolver = DashboardDependenciesRepoResolver(client: client)
+    let resolver = DashboardReviewsRepoResolver(client: client)
     let result = try await resolver.resolveRepositories(
       explicitRepositories: ["explicit/repo"],
       organizations: ["acme"],
@@ -53,7 +53,7 @@ struct DashboardDependenciesRepoResolverTests {
     let client = RepoCatalogStub(orgs: [
       "acme": ["acme/api", "acme/web", "acme/legacy"]
     ])
-    let resolver = DashboardDependenciesRepoResolver(client: client)
+    let resolver = DashboardReviewsRepoResolver(client: client)
     let result = try await resolver.resolveRepositories(
       explicitRepositories: [],
       organizations: ["acme"],
@@ -66,7 +66,7 @@ struct DashboardDependenciesRepoResolverTests {
   @Test("dedupes when an org repo also appears explicitly")
   func dedupeAcrossOrgAndExplicit() async throws {
     let client = RepoCatalogStub(orgs: ["acme": ["acme/api", "acme/web"]])
-    let resolver = DashboardDependenciesRepoResolver(client: client)
+    let resolver = DashboardReviewsRepoResolver(client: client)
     let result = try await resolver.resolveRepositories(
       explicitRepositories: ["acme/api"],
       organizations: ["acme"],
@@ -79,7 +79,7 @@ struct DashboardDependenciesRepoResolverTests {
   @Test("catalog is called once per org per resolver lifetime")
   func catalogCachedPerOrg() async throws {
     let client = RepoCatalogStub(orgs: ["acme": ["acme/api"]])
-    let resolver = DashboardDependenciesRepoResolver(client: client)
+    let resolver = DashboardReviewsRepoResolver(client: client)
     _ = try await resolver.resolveRepositories(
       explicitRepositories: [],
       organizations: ["acme"],
@@ -100,7 +100,7 @@ struct DashboardDependenciesRepoResolverTests {
   @Test("invalidate refetches org catalog on the next resolve")
   func invalidateRefetches() async throws {
     let client = RepoCatalogStub(orgs: ["acme": ["acme/api"]])
-    let resolver = DashboardDependenciesRepoResolver(client: client)
+    let resolver = DashboardReviewsRepoResolver(client: client)
     _ = try await resolver.resolveRepositories(
       explicitRepositories: [],
       organizations: ["acme"],
@@ -118,7 +118,7 @@ struct DashboardDependenciesRepoResolverTests {
   }
 }
 
-private final class RepoCatalogStub: HarnessMonitorDependenciesClientProtocol, @unchecked Sendable {
+private final class RepoCatalogStub: HarnessMonitorReviewsClientProtocol, @unchecked Sendable {
   private let lock = NSLock()
   private var orgs: [String: [String]]
   private var fetchCounts: [String: Int] = [:]
@@ -131,14 +131,14 @@ private final class RepoCatalogStub: HarnessMonitorDependenciesClientProtocol, @
     lock.withLock { fetchCounts[organization] ?? 0 }
   }
 
-  func catalogDependencyUpdateRepositories(
-    request: DependencyUpdatesRepositoryCatalogRequest
-  ) async throws -> DependencyUpdatesRepositoryCatalogResponse {
+  func catalogReviewRepositories(
+    request: ReviewsRepositoryCatalogRequest
+  ) async throws -> ReviewsRepositoryCatalogResponse {
     let repositories: [String] = lock.withLock {
       fetchCounts[request.organization, default: 0] += 1
       return orgs[request.organization] ?? []
     }
-    return DependencyUpdatesRepositoryCatalogResponse(
+    return ReviewsRepositoryCatalogResponse(
       organization: request.organization,
       repositories: repositories
     )

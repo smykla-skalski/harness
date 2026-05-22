@@ -5,10 +5,10 @@ import Testing
 @testable import HarnessMonitorUIPreviewable
 
 @Suite("Dashboard dependencies preferences")
-struct DashboardDependenciesPreferencesTests {
+struct DashboardReviewsPreferencesTests {
   @Test("default initializer produces the documented defaults")
   func defaultsMatchDocumentation() {
-    let prefs = DashboardDependenciesPreferences()
+    let prefs = DashboardReviewsPreferences()
     #expect(prefs.refreshIntervalSeconds == 300)
     #expect(prefs.perRepositoryIntervalSeconds == 300)
     #expect(prefs.maxConcurrentRepositoryFetches == 2)
@@ -23,7 +23,7 @@ struct DashboardDependenciesPreferencesTests {
         "refreshIntervalSeconds": 900
       }
       """
-    let prefs = DashboardDependenciesPreferences.decode(from: legacy)
+    let prefs = DashboardReviewsPreferences.decode(from: legacy)
     #expect(prefs.refreshIntervalSeconds == 900)
     #expect(
       prefs.perRepositoryIntervalSeconds == 900,
@@ -43,7 +43,7 @@ struct DashboardDependenciesPreferencesTests {
         "expandOrganizations": false
       }
       """
-    let prefs = DashboardDependenciesPreferences.decode(from: payload)
+    let prefs = DashboardReviewsPreferences.decode(from: payload)
     #expect(prefs.refreshIntervalSeconds == 900)
     #expect(prefs.perRepositoryIntervalSeconds == 120)
     #expect(prefs.maxConcurrentRepositoryFetches == 4)
@@ -52,17 +52,17 @@ struct DashboardDependenciesPreferencesTests {
 
   @Test("normalized clamps interval and concurrency into safe bounds")
   func normalizedClampsBounds() {
-    var prefs = DashboardDependenciesPreferences()
+    var prefs = DashboardReviewsPreferences()
     prefs.perRepositoryIntervalSeconds = 5
     prefs.maxConcurrentRepositoryFetches = 0
     let lowClamped = prefs.normalized()
     #expect(
       lowClamped.perRepositoryIntervalSeconds
-        == DashboardDependenciesPreferences.minimumPerRepositoryIntervalSeconds
+        == DashboardReviewsPreferences.minimumPerRepositoryIntervalSeconds
     )
     #expect(
       lowClamped.maxConcurrentRepositoryFetches
-        == DashboardDependenciesPreferences.minimumConcurrentRepositoryFetches
+        == DashboardReviewsPreferences.minimumConcurrentRepositoryFetches
     )
 
     prefs.perRepositoryIntervalSeconds = 10_000
@@ -70,17 +70,17 @@ struct DashboardDependenciesPreferencesTests {
     let highClamped = prefs.normalized()
     #expect(
       highClamped.perRepositoryIntervalSeconds
-        == DashboardDependenciesPreferences.maximumPerRepositoryIntervalSeconds
+        == DashboardReviewsPreferences.maximumPerRepositoryIntervalSeconds
     )
     #expect(
       highClamped.maxConcurrentRepositoryFetches
-        == DashboardDependenciesPreferences.maximumConcurrentRepositoryFetches
+        == DashboardReviewsPreferences.maximumConcurrentRepositoryFetches
     )
   }
 
   @Test("per-repo query request scopes to a single repository and strips orgs")
   func perRepositoryRequestShape() {
-    var prefs = DashboardDependenciesPreferences()
+    var prefs = DashboardReviewsPreferences()
     prefs.authorsText = "renovate[bot], dependabot[bot]"
     prefs.organizationsText = "acme, contoso"
     prefs.repositoriesText = "acme/api, acme/web"
@@ -96,13 +96,13 @@ struct DashboardDependenciesPreferencesTests {
 
   @Test("re-encoding new preferences round-trips through Codable")
   func encodingRoundTripsNewFields() throws {
-    var prefs = DashboardDependenciesPreferences()
+    var prefs = DashboardReviewsPreferences()
     prefs.perRepositoryIntervalSeconds = 180
     prefs.maxConcurrentRepositoryFetches = 5
     prefs.expandOrganizations = false
 
     let encoded = prefs.encodedString
-    let decoded = DashboardDependenciesPreferences.decode(from: encoded)
+    let decoded = DashboardReviewsPreferences.decode(from: encoded)
     #expect(decoded.perRepositoryIntervalSeconds == 180)
     #expect(decoded.maxConcurrentRepositoryFetches == 5)
     #expect(!decoded.expandOrganizations)

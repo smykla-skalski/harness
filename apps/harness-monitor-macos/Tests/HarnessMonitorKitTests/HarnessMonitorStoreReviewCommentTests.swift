@@ -4,9 +4,9 @@ import XCTest
 @testable import HarnessMonitorKit
 
 @MainActor
-final class HarnessMonitorStoreDependencyCommentTests: XCTestCase {
-  private func makeItem(pullRequestID: String = "PR_c1") -> DependencyUpdateItem {
-    DependencyUpdateItem(
+final class HarnessMonitorStoreReviewCommentTests: XCTestCase {
+  private func makeItem(pullRequestID: String = "PR_c1") -> ReviewItem {
+    ReviewItem(
       pullRequestID: pullRequestID,
       repositoryID: "repo_1",
       repository: "acme/api",
@@ -42,16 +42,16 @@ final class HarnessMonitorStoreDependencyCommentTests: XCTestCase {
 
   func testEmptyBodyShortCircuits() async throws {
     let store = try makeStore(client: RecordingHarnessClient())
-    let outcome = await store.postDependencyUpdateComment(for: makeItem(), body: "   ")
+    let outcome = await store.postReviewComment(for: makeItem(), body: "   ")
     XCTAssertEqual(outcome, .empty)
   }
 
   func testNoClientReturnsDaemonOffline() async throws {
     let store = try makeStore(client: RecordingHarnessClient())
     store.client = nil
-    let outcome = await store.postDependencyUpdateComment(for: makeItem(), body: "hello")
+    let outcome = await store.postReviewComment(for: makeItem(), body: "hello")
     XCTAssertEqual(outcome, .daemonOffline)
-    let viewModel = store.dependencyUpdateTimelineViewModel(for: "PR_c1")
+    let viewModel = store.reviewTimelineViewModel(for: "PR_c1")
     XCTAssertTrue(
       viewModel.entries.isEmpty,
       "no optimistic entry should land when there is no client to deliver it"
@@ -59,14 +59,14 @@ final class HarnessMonitorStoreDependencyCommentTests: XCTestCase {
   }
 
   func testDaemonFailureRemovesOptimisticAndSurfacesReason() async throws {
-    // RecordingHarnessClient does not override commentDependencyUpdates, so
-    // the protocol default throws `HarnessMonitorAPIError.server(501, "Dependencies unavailable")`.
+    // RecordingHarnessClient does not override commentReviews, so
+    // the protocol default throws `HarnessMonitorAPIError.server(501, "Reviews unavailable")`.
     // The optimistic entry appended before the call must be reverted on the thrown
     // error and the outcome carry the readable reason.
     let store = try makeStore(client: RecordingHarnessClient())
-    let viewModel = store.dependencyUpdateTimelineViewModel(for: "PR_c1")
+    let viewModel = store.reviewTimelineViewModel(for: "PR_c1")
 
-    let outcome = await store.postDependencyUpdateComment(
+    let outcome = await store.postReviewComment(
       for: makeItem(),
       body: "ship it",
       viewerLogin: "alice"
@@ -85,21 +85,21 @@ final class HarnessMonitorStoreDependencyCommentTests: XCTestCase {
 
   func testSuccessReplacesOptimisticEntryWithGitHubEntry() async throws {
     let client = RecordingHarnessClient()
-    let landedEntry = DependencyUpdateTimelineEntry.issueComment(
+    let landedEntry = ReviewTimelineEntry.issueComment(
       IssueCommentPayload(
         id: "IC_landed",
         createdAt: "2026-05-22T11:00:00Z",
-        actor: DependencyUpdateTimelineActor(login: "alice"),
+        actor: ReviewTimelineActor(login: "alice"),
         body: "ship it",
         viewerDidAuthor: true,
         viewerCanEdit: true
       )
     )
-    client.configureDependencyCommentResponse(
-      DependencyUpdatesActionResponse(
+    client.configureReviewCommentResponse(
+      ReviewsActionResponse(
         summary: "Posted dependency update comment: 1 applied, 0 skipped, 0 failed",
         results: [
-          DependencyUpdateActionResult(
+          ReviewActionResult(
             repository: "acme/api",
             number: 7,
             action: .comment,
@@ -110,9 +110,9 @@ final class HarnessMonitorStoreDependencyCommentTests: XCTestCase {
       )
     )
     let store = try makeStore(client: client)
-    let viewModel = store.dependencyUpdateTimelineViewModel(for: "PR_c1")
+    let viewModel = store.reviewTimelineViewModel(for: "PR_c1")
 
-    let outcome = await store.postDependencyUpdateComment(
+    let outcome = await store.postReviewComment(
       for: makeItem(),
       body: "ship it",
       viewerLogin: "alice"

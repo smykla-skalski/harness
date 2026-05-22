@@ -5,13 +5,13 @@ import Testing
 @testable import HarnessMonitorKit
 
 @MainActor
-struct DependencyUpdatesRepoSyncStateCacheTests {
+struct ReviewsRepoSyncStateCacheTests {
   private func makeCache() throws -> (
-    DependencyUpdatesRepoSyncStateCache, ModelContext
+    ReviewsRepoSyncStateCache, ModelContext
   ) {
     let container = try HarnessMonitorModelContainer.preview()
     let context = ModelContext(container)
-    return (DependencyUpdatesRepoSyncStateCache(context: context), context)
+    return (ReviewsRepoSyncStateCache(context: context), context)
   }
 
   @Test("recordSyncedAt + loadStates round-trips a single repository")
@@ -48,7 +48,7 @@ struct DependencyUpdatesRepoSyncStateCacheTests {
     )
 
     let rows = try context.fetch(
-      FetchDescriptor<CachedDependencyUpdatesRepoSyncState>()
+      FetchDescriptor<CachedReviewsRepoSyncState>()
     )
     #expect(rows.count == 1)
     #expect(rows.first?.lastSyncedAt == second)
@@ -76,7 +76,7 @@ struct DependencyUpdatesRepoSyncStateCacheTests {
     cache.recordSyncedAt(preferencesHash: "hash-a", repository: "")
 
     let rows = try context.fetch(
-      FetchDescriptor<CachedDependencyUpdatesRepoSyncState>()
+      FetchDescriptor<CachedReviewsRepoSyncState>()
     )
     #expect(rows.isEmpty)
   }
@@ -125,7 +125,7 @@ struct DependencyUpdatesRepoSyncStateCacheTests {
     cache.deleteAll()
 
     let rows = try context.fetch(
-      FetchDescriptor<CachedDependencyUpdatesRepoSyncState>()
+      FetchDescriptor<CachedReviewsRepoSyncState>()
     )
     #expect(rows.isEmpty)
   }

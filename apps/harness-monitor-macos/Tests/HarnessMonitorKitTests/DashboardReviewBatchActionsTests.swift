@@ -4,23 +4,23 @@ import Testing
 @testable import HarnessMonitorUIPreviewable
 
 @Suite("Dashboard dependency batch actions")
-struct DashboardDependencyBatchActionsTests {
+struct DashboardReviewBatchActionsTests {
   @Test("batch eligibility summarizes actionable and skipped merge targets")
   func batchEligibilitySummarizesActionableAndSkippedMergeTargets() {
-    let ready = dependencyItem(
+    let ready = reviewItem(
       id: "ready",
       number: 1,
       reviewStatus: .approved,
       checkStatus: .success
     )
-    let readOnly = dependencyItem(
+    let readOnly = reviewItem(
       id: "readonly",
       number: 2,
       reviewStatus: .approved,
       checkStatus: .success,
       viewerCanUpdate: false
     )
-    let conflicting = dependencyItem(
+    let conflicting = reviewItem(
       id: "conflicting",
       number: 3,
       reviewStatus: .approved,
@@ -28,7 +28,7 @@ struct DashboardDependencyBatchActionsTests {
       checkStatus: .success
     )
 
-    let preview = DashboardDependencyBatchEligibility.preview(
+    let preview = DashboardReviewBatchEligibility.preview(
       kind: .merge,
       items: [ready, readOnly, conflicting]
     )
@@ -47,13 +47,13 @@ struct DashboardDependencyBatchActionsTests {
 
   @Test("local action preview includes skipped merge targets")
   func localActionPreviewIncludesSkippedMergeTargets() {
-    let ready = dependencyItem(
+    let ready = reviewItem(
       id: "ready",
       number: 1,
       reviewStatus: .approved,
       checkStatus: .success
     )
-    let blocked = dependencyItem(
+    let blocked = reviewItem(
       id: "blocked",
       number: 2,
       reviewStatus: .changesRequested,
@@ -61,7 +61,7 @@ struct DashboardDependencyBatchActionsTests {
       checkStatus: .success
     )
 
-    let preview = localDependencyActionPreview(
+    let preview = localReviewActionPreview(
       .merge,
       items: [ready, blocked]
     )
@@ -76,15 +76,15 @@ struct DashboardDependencyBatchActionsTests {
     )
   }
 
-  private func dependencyItem(
+  private func reviewItem(
     id: String,
     number: UInt64,
-    reviewStatus: DependencyUpdateReviewStatus,
-    mergeable: DependencyUpdateMergeableState = .mergeable,
-    checkStatus: DependencyUpdateCheckStatus,
+    reviewStatus: ReviewReviewStatus,
+    mergeable: ReviewMergeableState = .mergeable,
+    checkStatus: ReviewCheckStatus,
     viewerCanUpdate: Bool = true
-  ) -> DependencyUpdateItem {
-    DependencyUpdateItem(
+  ) -> ReviewItem {
+    ReviewItem(
       pullRequestID: id,
       repositoryID: "repo-1",
       repository: "org-a/example",

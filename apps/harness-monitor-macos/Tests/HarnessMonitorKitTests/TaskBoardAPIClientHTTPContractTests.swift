@@ -155,19 +155,19 @@ extension TaskBoardAPIClientTests {
     )
   }
 
-  func performDependencyUpdatesHTTPClientContractCalls() async throws
-    -> DependencyUpdatesHTTPContractResult
+  func performReviewsHTTPClientContractCalls() async throws
+    -> ReviewsHTTPContractResult
   {
     TaskBoardURLProtocol.reset()
     let client = try makeClient()
-    let target = dependencyUpdatesTarget()
+    let target = reviewsTarget()
 
-    let repositoryCatalog = try await client.catalogDependencyUpdateRepositories(
-      request: DependencyUpdatesRepositoryCatalogRequest(organization: "example")
+    let repositoryCatalog = try await client.catalogReviewRepositories(
+      request: ReviewsRepositoryCatalogRequest(organization: "example")
     )
-    let capabilities = try await client.dependencyUpdatesCapabilities()
-    let query = try await client.queryDependencyUpdates(
-      request: DependencyUpdatesQueryRequest(
+    let capabilities = try await client.reviewsCapabilities()
+    let query = try await client.queryReviews(
+      request: ReviewsQueryRequest(
         authors: ["renovate[bot]"],
         organizations: ["example"],
         repositories: ["example/harness"],
@@ -176,40 +176,40 @@ extension TaskBoardAPIClientTests {
         cacheMaxAgeSeconds: 120
       )
     )
-    let preview = try await client.previewDependencyUpdateAction(
-      request: DependencyUpdatesActionPreviewRequest(
+    let preview = try await client.previewReviewAction(
+      request: ReviewsActionPreviewRequest(
         action: .merge,
         targets: [target],
         method: .rebase
       )
     )
-    let approve = try await client.approveDependencyUpdates(
-      request: DependencyUpdatesApproveRequest(targets: [target])
+    let approve = try await client.approveReviews(
+      request: ReviewsApproveRequest(targets: [target])
     )
-    let merge = try await client.mergeDependencyUpdates(
-      request: DependencyUpdatesMergeRequest(targets: [target], method: .rebase)
+    let merge = try await client.mergeReviews(
+      request: ReviewsMergeRequest(targets: [target], method: .rebase)
     )
-    let rerun = try await client.rerunDependencyUpdateChecks(
-      request: DependencyUpdatesRerunChecksRequest(targets: [target])
+    let rerun = try await client.rerunReviewChecks(
+      request: ReviewsRerunChecksRequest(targets: [target])
     )
-    let label = try await client.addDependencyUpdateLabel(
-      request: DependencyUpdatesLabelRequest(targets: [target], label: "dependencies:ready")
+    let label = try await client.addReviewLabel(
+      request: ReviewsLabelRequest(targets: [target], label: "dependencies:ready")
     )
-    let auto = try await client.autoDependencyUpdates(
-      request: DependencyUpdatesAutoRequest(targets: [target], method: .squash)
+    let auto = try await client.autoReviews(
+      request: ReviewsAutoRequest(targets: [target], method: .squash)
     )
-    let cacheClear = try await client.clearDependencyUpdatesCache()
-    let refresh = try await client.refreshDependencyUpdates(
-      request: DependencyUpdatesRefreshRequest(targets: [target])
+    let cacheClear = try await client.clearReviewsCache()
+    let refresh = try await client.refreshReviews(
+      request: ReviewsRefreshRequest(targets: [target])
     )
-    let comment = try await client.commentDependencyUpdates(
-      request: DependencyUpdatesCommentRequest(
+    let comment = try await client.commentReviews(
+      request: ReviewsCommentRequest(
         targets: [target],
         body: "@renovatebot rebase"
       )
     )
-    let timeline = try await client.fetchDependencyUpdateTimeline(
-      request: DependencyUpdatesTimelineRequest(
+    let timeline = try await client.fetchReviewTimeline(
+      request: ReviewsTimelineRequest(
         pullRequestId: target.pullRequestID,
         cursor: nil,
         pageSize: 50,
@@ -218,7 +218,7 @@ extension TaskBoardAPIClientTests {
       )
     )
 
-    return DependencyUpdatesHTTPContractResult(
+    return ReviewsHTTPContractResult(
       repositoryCatalog: repositoryCatalog,
       capabilities: capabilities,
       query: query,

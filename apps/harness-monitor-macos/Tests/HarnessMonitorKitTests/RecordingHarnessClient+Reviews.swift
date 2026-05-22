@@ -3,14 +3,14 @@ import Foundation
 @testable import HarnessMonitorKit
 
 extension RecordingHarnessClient {
-  func configureDependencyBody(
+  func configureReviewBody(
     pullRequestID: String,
     body: String,
     prUpdatedAt: String = "2026-05-21T00:00:00Z",
     fetchedAt: String = "2026-05-21T00:00:00Z"
   ) {
     lock.withLock {
-      dependencyBodyResponses[pullRequestID] = DependencyUpdatesBodyResponse(
+      reviewBodyResponses[pullRequestID] = ReviewsBodyResponse(
         pullRequestID: pullRequestID,
         body: body,
         prUpdatedAt: prUpdatedAt,
@@ -20,28 +20,28 @@ extension RecordingHarnessClient {
     }
   }
 
-  /// Closure runs inside `fetchDependencyUpdateBody` before the response
+  /// Closure runs inside `fetchReviewBody` before the response
   /// resolves; lets tests suspend the first fetch so a concurrent caller
   /// can observe in-flight dedupe.
-  func setDependencyBodyFetchHook(_ hook: @escaping @Sendable (String) async -> Void) {
+  func setReviewBodyFetchHook(_ hook: @escaping @Sendable (String) async -> Void) {
     lock.withLock {
-      dependencyBodyFetchHook = hook
+      reviewBodyFetchHook = hook
     }
   }
 
-  func dependencyBodyFetchCount() -> Int {
-    lock.withLock { dependencyBodyFetchedIDs.count }
+  func reviewBodyFetchCount() -> Int {
+    lock.withLock { reviewBodyFetchedIDs.count }
   }
 
-  func fetchDependencyUpdateBody(
-    request: DependencyUpdatesBodyRequest
-  ) async throws -> DependencyUpdatesBodyResponse {
+  func fetchReviewBody(
+    request: ReviewsBodyRequest
+  ) async throws -> ReviewsBodyResponse {
     let (hook, response):
       (
-        (@Sendable (String) async -> Void)?, DependencyUpdatesBodyResponse?
+        (@Sendable (String) async -> Void)?, ReviewsBodyResponse?
       ) = lock.withLock {
-        dependencyBodyFetchedIDs.append(request.pullRequestID)
-        return (dependencyBodyFetchHook, dependencyBodyResponses[request.pullRequestID])
+        reviewBodyFetchedIDs.append(request.pullRequestID)
+        return (reviewBodyFetchHook, reviewBodyResponses[request.pullRequestID])
       }
     if let hook {
       await hook(request.pullRequestID)
@@ -49,7 +49,7 @@ extension RecordingHarnessClient {
     if let response {
       return response
     }
-    return DependencyUpdatesBodyResponse(
+    return ReviewsBodyResponse(
       pullRequestID: request.pullRequestID,
       body: "",
       prUpdatedAt: "2026-05-21T00:00:00Z",
@@ -58,16 +58,16 @@ extension RecordingHarnessClient {
     )
   }
 
-  func configureDependencyBodyUpdate(
+  func configureReviewBodyUpdate(
     pullRequestID: String,
-    outcome: DependencyUpdatesBodyUpdateOutcome,
+    outcome: ReviewsBodyUpdateOutcome,
     currentBody: String,
     currentBodySHA256: String = "",
     prUpdatedAt: String = "2026-05-21T00:00:00Z",
     fetchedAt: String = "2026-05-21T00:00:00Z"
   ) {
     lock.withLock {
-      dependencyBodyUpdateOutcomes[pullRequestID] = DependencyUpdatesBodyUpdateResponse(
+      reviewBodyUpdateOutcomes[pullRequestID] = ReviewsBodyUpdateResponse(
         pullRequestID: pullRequestID,
         outcome: outcome,
         currentBody: currentBody,
@@ -78,46 +78,46 @@ extension RecordingHarnessClient {
     }
   }
 
-  func configureDependencyBodyUpdateError(pullRequestID: String, error: any Error) {
+  func configureReviewBodyUpdateError(pullRequestID: String, error: any Error) {
     lock.withLock {
-      dependencyBodyUpdateErrors[pullRequestID] = error
+      reviewBodyUpdateErrors[pullRequestID] = error
     }
   }
 
-  func configureDependencyCommentResponse(_ response: DependencyUpdatesActionResponse) {
+  func configureReviewCommentResponse(_ response: ReviewsActionResponse) {
     lock.withLock {
-      dependencyCommentResponse = response
+      reviewCommentResponse = response
     }
   }
 
-  func configureDependencyCommentError(_ error: any Error) {
+  func configureReviewCommentError(_ error: any Error) {
     lock.withLock {
-      dependencyCommentError = error
+      reviewCommentError = error
     }
   }
 
-  func dependencyBodyUpdateCallCount() -> Int {
-    lock.withLock { dependencyBodyUpdateRequests.count }
+  func reviewBodyUpdateCallCount() -> Int {
+    lock.withLock { reviewBodyUpdateRequests.count }
   }
 
-  func lastDependencyBodyUpdateRequest() -> RecordedDependencyBodyUpdateRequest? {
-    lock.withLock { dependencyBodyUpdateRequests.last }
+  func lastReviewBodyUpdateRequest() -> RecordedReviewBodyUpdateRequest? {
+    lock.withLock { reviewBodyUpdateRequests.last }
   }
 
-  func updateDependencyUpdateBody(
-    request: DependencyUpdatesBodyUpdateRequest
-  ) async throws -> DependencyUpdatesBodyUpdateResponse {
-    let (response, error): (DependencyUpdatesBodyUpdateResponse?, (any Error)?) = lock.withLock {
-      dependencyBodyUpdateRequests.append(
-        RecordedDependencyBodyUpdateRequest(
+  func updateReviewBody(
+    request: ReviewsBodyUpdateRequest
+  ) async throws -> ReviewsBodyUpdateResponse {
+    let (response, error): (ReviewsBodyUpdateResponse?, (any Error)?) = lock.withLock {
+      reviewBodyUpdateRequests.append(
+        RecordedReviewBodyUpdateRequest(
           pullRequestID: request.pullRequestID,
           expectedPriorBodySHA256: request.expectedPriorBodySHA256,
           newBody: request.newBody
         )
       )
       return (
-        dependencyBodyUpdateOutcomes[request.pullRequestID],
-        dependencyBodyUpdateErrors[request.pullRequestID]
+        reviewBodyUpdateOutcomes[request.pullRequestID],
+        reviewBodyUpdateErrors[request.pullRequestID]
       )
     }
     if let error {
@@ -126,7 +126,7 @@ extension RecordingHarnessClient {
     if let response {
       return response
     }
-    return DependencyUpdatesBodyUpdateResponse(
+    return ReviewsBodyUpdateResponse(
       pullRequestID: request.pullRequestID,
       outcome: .updated,
       currentBody: request.newBody,
@@ -136,12 +136,12 @@ extension RecordingHarnessClient {
     )
   }
 
-  func commentDependencyUpdates(
-    request: DependencyUpdatesCommentRequest
-  ) async throws -> DependencyUpdatesActionResponse {
-    let (response, error): (DependencyUpdatesActionResponse?, (any Error)?) = lock.withLock {
-      dependencyCommentRequests.append(request)
-      return (dependencyCommentResponse, dependencyCommentError)
+  func commentReviews(
+    request: ReviewsCommentRequest
+  ) async throws -> ReviewsActionResponse {
+    let (response, error): (ReviewsActionResponse?, (any Error)?) = lock.withLock {
+      reviewCommentRequests.append(request)
+      return (reviewCommentResponse, reviewCommentError)
     }
     if let error {
       throw error
@@ -149,6 +149,6 @@ extension RecordingHarnessClient {
     if let response {
       return response
     }
-    throw HarnessMonitorAPIError.server(code: 501, message: "Dependencies unavailable")
+    throw HarnessMonitorAPIError.server(code: 501, message: "Reviews unavailable")
   }
 }

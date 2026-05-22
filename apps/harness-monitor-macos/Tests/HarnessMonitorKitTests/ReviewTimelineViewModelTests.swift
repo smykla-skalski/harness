@@ -4,22 +4,22 @@ import XCTest
 @testable import HarnessMonitorKit
 
 @MainActor
-final class DependencyUpdateTimelineViewModelTests: XCTestCase {
-  private func issueComment(id: String, body: String) -> DependencyUpdateTimelineEntry {
+final class ReviewTimelineViewModelTests: XCTestCase {
+  private func issueComment(id: String, body: String) -> ReviewTimelineEntry {
     .issueComment(
       IssueCommentPayload(id: id, createdAt: "2026-05-22T10:00:00Z", body: body)
     )
   }
 
   private func samplePage(
-    entries: [DependencyUpdateTimelineEntry],
+    entries: [ReviewTimelineEntry],
     hasOlder: Bool = false,
     startCursor: String? = nil
-  ) -> DependencyUpdatesTimelineResponse {
-    DependencyUpdatesTimelineResponse(
+  ) -> ReviewsTimelineResponse {
+    ReviewsTimelineResponse(
       pullRequestId: "PR_vm",
       entries: entries,
-      pageInfo: DependencyUpdateTimelinePageInfo(
+      pageInfo: ReviewTimelinePageInfo(
         startCursor: startCursor,
         endCursor: "end",
         hasOlder: hasOlder,
@@ -31,7 +31,7 @@ final class DependencyUpdateTimelineViewModelTests: XCTestCase {
   }
 
   func testApplyInitialPopulatesAndResetsState() {
-    let vm = DependencyUpdateTimelineViewModel()
+    let vm = ReviewTimelineViewModel()
     vm.loadState = .loadingInitial
     vm.lastError = "previous failure"
 
@@ -54,7 +54,7 @@ final class DependencyUpdateTimelineViewModelTests: XCTestCase {
   }
 
   func testAppendOlderPrependsAndUpdatesCursor() {
-    let vm = DependencyUpdateTimelineViewModel()
+    let vm = ReviewTimelineViewModel()
     vm.apply(
       initial: samplePage(
         entries: [issueComment(id: "IC_2", body: "second")],
@@ -80,7 +80,7 @@ final class DependencyUpdateTimelineViewModelTests: XCTestCase {
   }
 
   func testMarkFailedSurfacesReason() {
-    let vm = DependencyUpdateTimelineViewModel()
+    let vm = ReviewTimelineViewModel()
     vm.markLoading(.loadingInitial)
     vm.markFailed(reason: "rate limit reached")
     XCTAssertEqual(vm.loadState, .failed)
@@ -88,7 +88,7 @@ final class DependencyUpdateTimelineViewModelTests: XCTestCase {
   }
 
   func testClearResetsEverything() {
-    let vm = DependencyUpdateTimelineViewModel()
+    let vm = ReviewTimelineViewModel()
     vm.apply(initial: samplePage(entries: [issueComment(id: "x", body: "")], hasOlder: true))
     vm.clear()
     XCTAssertTrue(vm.entries.isEmpty)
@@ -98,7 +98,7 @@ final class DependencyUpdateTimelineViewModelTests: XCTestCase {
   }
 
   func testReplaceOptimisticKeepsSameCountButBumpsRevision() {
-    let vm = DependencyUpdateTimelineViewModel()
+    let vm = ReviewTimelineViewModel()
     vm.appendOptimistic(issueComment(id: "optimistic-1", body: "draft"))
     let before = vm.revision
 

@@ -3,12 +3,12 @@ import Testing
 @testable import HarnessMonitorKit
 @testable import HarnessMonitorUIPreviewable
 
-@Suite("Dashboard dependencies search suggestions")
-struct DashboardDependenciesSearchSuggestionsTests {
+@Suite("Dashboard reviews search suggestions")
+struct DashboardReviewsSearchSuggestionsTests {
   @Test("empty query yields no suggestions")
   func emptyQuery() {
     let items = [item(id: "pr-1", repository: "kong/a", number: 1, title: "Renovate one")]
-    let suggestions = dashboardDependenciesSearchSuggestions(query: "  ", items: items)
+    let suggestions = dashboardReviewsSearchSuggestions(query: "  ", items: items)
     #expect(suggestions.isEmpty)
   }
 
@@ -18,7 +18,7 @@ struct DashboardDependenciesSearchSuggestionsTests {
     let substringMatch = item(
       id: "pr-sub", repository: "kong/b", number: 2, title: "Maybe bump deps"
     )
-    let suggestions = dashboardDependenciesSearchSuggestions(
+    let suggestions = dashboardReviewsSearchSuggestions(
       query: "bump",
       items: [substringMatch, prefixMatch]
     )
@@ -46,19 +46,19 @@ struct DashboardDependenciesSearchSuggestionsTests {
       item(id: "pr-number", repository: "kong/c", number: 4242, title: "Unrelated"),
     ]
     #expect(
-      dashboardDependenciesSearchSuggestions(query: "kuma", items: items)
+      dashboardReviewsSearchSuggestions(query: "kuma", items: items)
         .map(\.pullRequestID) == ["pr-repo"]
     )
     #expect(
-      dashboardDependenciesSearchSuggestions(query: "smykla", items: items)
+      dashboardReviewsSearchSuggestions(query: "smykla", items: items)
         .map(\.pullRequestID) == ["pr-author"]
     )
     #expect(
-      dashboardDependenciesSearchSuggestions(query: "security", items: items)
+      dashboardReviewsSearchSuggestions(query: "security", items: items)
         .map(\.pullRequestID) == ["pr-label"]
     )
     #expect(
-      dashboardDependenciesSearchSuggestions(query: "#4242", items: items)
+      dashboardReviewsSearchSuggestions(query: "#4242", items: items)
         .map(\.pullRequestID) == ["pr-number"]
     )
   }
@@ -73,7 +73,7 @@ struct DashboardDependenciesSearchSuggestionsTests {
         title: "Bump dependency \(index)"
       )
     }
-    let suggestions = dashboardDependenciesSearchSuggestions(
+    let suggestions = dashboardReviewsSearchSuggestions(
       query: "bump", items: items, limit: 5
     )
     #expect(suggestions.count == 5)
@@ -82,7 +82,7 @@ struct DashboardDependenciesSearchSuggestionsTests {
   @Test("suggestion subtitle has the routing-friendly shape")
   func subtitleShape() {
     let entry = item(id: "pr-x", repository: "kong/a", number: 7, title: "Bump foo")
-    let suggestions = dashboardDependenciesSearchSuggestions(query: "bump", items: [entry])
+    let suggestions = dashboardReviewsSearchSuggestions(query: "bump", items: [entry])
     #expect(suggestions.first?.subtitle == "kong/a#7 · @renovate[bot]")
   }
 
@@ -93,8 +93,8 @@ struct DashboardDependenciesSearchSuggestionsTests {
     title: String,
     authorLogin: String = "renovate[bot]",
     labels: [String] = ["dependencies"]
-  ) -> DependencyUpdateItem {
-    DependencyUpdateItem(
+  ) -> ReviewItem {
+    ReviewItem(
       pullRequestID: id,
       repositoryID: "repo-\(repository)",
       repository: repository,

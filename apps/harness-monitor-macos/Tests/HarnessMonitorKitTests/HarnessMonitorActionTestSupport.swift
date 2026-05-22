@@ -10,7 +10,7 @@ struct ProjectFixture {
   var totalSessionCount: Int
 }
 
-struct RecordedDependencyBodyUpdateRequest: Equatable {
+struct RecordedReviewBodyUpdateRequest: Equatable {
   let pullRequestID: String
   let expectedPriorBodySHA256: String
   let newBody: String
@@ -304,19 +304,19 @@ final class RecordingHarnessClient: HarnessMonitorClientProtocol, @unchecked Sen
   var timelineBatchDelaysBySessionID: [String: Duration] = [:]
   var timelineErrorsBySessionID: [String: any Error] = [:]
   var timelineWindowErrorsBySessionID: [String: any Error] = [:]
-  var dependencyBodyResponses: [String: DependencyUpdatesBodyResponse] = [:]
-  var dependencyBodyFetchedIDs: [String] = []
-  var dependencyBodyFetchHook: (@Sendable (String) async -> Void)?
-  var dependencyBodyUpdateOutcomes: [String: DependencyUpdatesBodyUpdateResponse] = [:]
-  var dependencyBodyUpdateRequests: [RecordedDependencyBodyUpdateRequest] = []
-  var dependencyBodyUpdateErrors: [String: any Error] = [:]
-  var dependencyCommentResponse: DependencyUpdatesActionResponse?
-  var dependencyCommentRequests: [DependencyUpdatesCommentRequest] = []
-  var dependencyCommentError: (any Error)?
-  var dependencyTimelineResponses: [String: [DependencyUpdatesTimelineResponse]] = [:]
-  var dependencyTimelineFetchedRequests: [DependencyUpdatesTimelineRequest] = []
-  var dependencyTimelineFetchHook: (@Sendable (String) async -> Void)?
-  var dependencyTimelineErrors: [String: any Error] = [:]
+  var reviewBodyResponses: [String: ReviewsBodyResponse] = [:]
+  var reviewBodyFetchedIDs: [String] = []
+  var reviewBodyFetchHook: (@Sendable (String) async -> Void)?
+  var reviewBodyUpdateOutcomes: [String: ReviewsBodyUpdateResponse] = [:]
+  var reviewBodyUpdateRequests: [RecordedReviewBodyUpdateRequest] = []
+  var reviewBodyUpdateErrors: [String: any Error] = [:]
+  var reviewCommentResponse: ReviewsActionResponse?
+  var reviewCommentRequests: [ReviewsCommentRequest] = []
+  var reviewCommentError: (any Error)?
+  var reviewTimelineResponses: [String: [ReviewsTimelineResponse]] = [:]
+  var reviewTimelineFetchedRequests: [ReviewsTimelineRequest] = []
+  var reviewTimelineFetchHook: (@Sendable (String) async -> Void)?
+  var reviewTimelineErrors: [String: any Error] = [:]
   var codexRunsBySessionID: [String: [CodexRunSnapshot]] = [:]
   var codexRunsDelaysBySessionID: [String: Duration] = [:]
   var resolvedAcpSnapshotsByAgentID: [String: AcpAgentSnapshot] = [:]

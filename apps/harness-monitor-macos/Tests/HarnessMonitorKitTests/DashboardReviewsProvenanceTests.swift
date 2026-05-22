@@ -4,15 +4,15 @@ import Testing
 @testable import HarnessMonitorKit
 @testable import HarnessMonitorUIPreviewable
 
-@Suite("Dashboard dependencies provenance")
-struct DashboardDependenciesProvenanceTests {
+@Suite("Dashboard reviews provenance")
+struct DashboardReviewsProvenanceTests {
   @MainActor
   @Test("Snapshot distinguishes live cache offline and stale states")
   func snapshotDistinguishesLiveCacheOfflineAndStaleStates() {
     let fetchedAt = "2026-05-22T09:00:00Z"
     let freshNow = Date(timeIntervalSince1970: 1_779_440_700)
     let staleNow = Date(timeIntervalSince1970: 1_779_442_200)
-    let health = DashboardDependenciesSyncHealth(
+    let health = DashboardReviewsSyncHealth(
       totalRepositoryCount: 2,
       syncingRepositoryCount: 0,
       failedRepositories: [],
@@ -68,20 +68,20 @@ struct DashboardDependenciesProvenanceTests {
 
   @Test("Route wires provenance into list and detail surfaces")
   func routeWiresProvenanceIntoListAndDetailSurfaces() throws {
-    let routeSource = try dashboardSource(named: "DashboardDependenciesRouteView.swift")
-    let contentSource = try dashboardSource(named: "DashboardDependenciesRouteView+Content.swift")
-    let detailSource = try dashboardSource(named: "DashboardDependencyDetailView.swift")
-    let provenanceSource = try dashboardSource(named: "DashboardDependenciesProvenance.swift")
+    let routeSource = try dashboardSource(named: "DashboardReviewsRouteView.swift")
+    let contentSource = try dashboardSource(named: "DashboardReviewsRouteView+Content.swift")
+    let detailSource = try dashboardSource(named: "DashboardReviewDetailView.swift")
+    let provenanceSource = try dashboardSource(named: "DashboardReviewsProvenance.swift")
 
-    #expect(routeSource.contains("var normalizedPreferences: DashboardDependenciesPreferences"))
-    #expect(contentSource.contains("DashboardDependenciesProvenanceBar("))
+    #expect(routeSource.contains("var normalizedPreferences: DashboardReviewsPreferences"))
+    #expect(contentSource.contains("DashboardReviewsProvenanceBar("))
     #expect(contentSource.contains("snapshot: routeProvenanceSnapshot"))
     #expect(contentSource.contains("provenance: routeProvenanceSnapshot"))
-    #expect(detailSource.contains("DashboardDependencyProvenanceMiniBar("))
+    #expect(detailSource.contains("DashboardReviewProvenanceMiniBar("))
     #expect(provenanceSource.contains("var routeProvenanceSnapshot"))
     #expect(
       provenanceSource.contains(
-        "HarnessMonitorAccessibility.dashboardDependenciesProvenance"
+        "HarnessMonitorAccessibility.dashboardReviewsProvenance"
       )
     )
   }
@@ -91,14 +91,14 @@ struct DashboardDependenciesProvenanceTests {
     fetchedAt: String,
     fromCache: Bool,
     connectionState: HarnessMonitorStore.ConnectionState,
-    health: DashboardDependenciesSyncHealth,
+    health: DashboardReviewsSyncHealth,
     now: Date
-  ) -> DashboardDependenciesProvenanceSnapshot {
-    DashboardDependenciesProvenanceSnapshot(
-      response: DependencyUpdatesQueryResponse(
+  ) -> DashboardReviewsProvenanceSnapshot {
+    DashboardReviewsProvenanceSnapshot(
+      response: ReviewsQueryResponse(
         fetchedAt: fetchedAt,
         fromCache: fromCache,
-        summary: DependencyUpdatesSummary(items: []),
+        summary: ReviewsSummary(items: []),
         items: []
       ),
       connectionState: connectionState,

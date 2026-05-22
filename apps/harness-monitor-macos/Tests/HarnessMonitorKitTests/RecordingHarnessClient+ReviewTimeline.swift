@@ -2,71 +2,71 @@ import Foundation
 
 @testable import HarnessMonitorKit
 
-private struct DependencyTimelineFetchResult {
+private struct ReviewTimelineFetchResult {
   let hook: (@Sendable (String) async -> Void)?
-  let response: DependencyUpdatesTimelineResponse?
+  let response: ReviewsTimelineResponse?
   let error: (any Error)?
 }
 
 extension RecordingHarnessClient {
-  func configureDependencyTimeline(
+  func configureReviewTimeline(
     pullRequestID: String,
-    responses: [DependencyUpdatesTimelineResponse]
+    responses: [ReviewsTimelineResponse]
   ) {
     lock.withLock {
-      dependencyTimelineResponses[pullRequestID] = responses
+      reviewTimelineResponses[pullRequestID] = responses
     }
   }
 
-  func enqueueDependencyTimelineResponse(_ response: DependencyUpdatesTimelineResponse) {
+  func enqueueReviewTimelineResponse(_ response: ReviewsTimelineResponse) {
     lock.withLock {
-      dependencyTimelineResponses[response.pullRequestId, default: []].append(response)
+      reviewTimelineResponses[response.pullRequestId, default: []].append(response)
     }
   }
 
-  func setDependencyTimelineFetchHook(_ hook: @escaping @Sendable (String) async -> Void) {
+  func setReviewTimelineFetchHook(_ hook: @escaping @Sendable (String) async -> Void) {
     lock.withLock {
-      dependencyTimelineFetchHook = hook
+      reviewTimelineFetchHook = hook
     }
   }
 
-  func configureDependencyTimelineError(pullRequestID: String, error: any Error) {
+  func configureReviewTimelineError(pullRequestID: String, error: any Error) {
     lock.withLock {
-      dependencyTimelineErrors[pullRequestID] = error
+      reviewTimelineErrors[pullRequestID] = error
     }
   }
 
-  func dependencyTimelineFetchCount() -> Int {
-    lock.withLock { dependencyTimelineFetchedRequests.count }
+  func reviewTimelineFetchCount() -> Int {
+    lock.withLock { reviewTimelineFetchedRequests.count }
   }
 
-  func dependencyTimelineRequestedCursors(for pullRequestID: String) -> [String?] {
+  func reviewTimelineRequestedCursors(for pullRequestID: String) -> [String?] {
     lock.withLock {
-      dependencyTimelineFetchedRequests
+      reviewTimelineFetchedRequests
         .filter { $0.pullRequestId == pullRequestID }
         .map(\.cursor)
     }
   }
 
-  func dependencyTimelineRequestedPageSizes(for pullRequestID: String) -> [UInt32] {
+  func reviewTimelineRequestedPageSizes(for pullRequestID: String) -> [UInt32] {
     lock.withLock {
-      dependencyTimelineFetchedRequests
+      reviewTimelineFetchedRequests
         .filter { $0.pullRequestId == pullRequestID }
         .map(\.pageSize)
     }
   }
 
-  func fetchDependencyUpdateTimeline(
-    request: DependencyUpdatesTimelineRequest
-  ) async throws -> DependencyUpdatesTimelineResponse {
+  func fetchReviewTimeline(
+    request: ReviewsTimelineRequest
+  ) async throws -> ReviewsTimelineResponse {
     let result = lock.withLock {
-      dependencyTimelineFetchedRequests.append(request)
-      let hook = dependencyTimelineFetchHook
-      let error = dependencyTimelineErrors[request.pullRequestId]
-      var queue = dependencyTimelineResponses[request.pullRequestId] ?? []
+      reviewTimelineFetchedRequests.append(request)
+      let hook = reviewTimelineFetchHook
+      let error = reviewTimelineErrors[request.pullRequestId]
+      var queue = reviewTimelineResponses[request.pullRequestId] ?? []
       let next = queue.isEmpty ? nil : queue.removeFirst()
-      dependencyTimelineResponses[request.pullRequestId] = queue
-      return DependencyTimelineFetchResult(hook: hook, response: next, error: error)
+      reviewTimelineResponses[request.pullRequestId] = queue
+      return ReviewTimelineFetchResult(hook: hook, response: next, error: error)
     }
     if let hook = result.hook {
       await hook(request.pullRequestId)
@@ -77,10 +77,10 @@ extension RecordingHarnessClient {
     if let queued = result.response {
       return queued
     }
-    return DependencyUpdatesTimelineResponse(
+    return ReviewsTimelineResponse(
       pullRequestId: request.pullRequestId,
       entries: [],
-      pageInfo: DependencyUpdateTimelinePageInfo(),
+      pageInfo: ReviewTimelinePageInfo(),
       viewerCanComment: true,
       fetchedAt: "2026-05-22T00:00:00Z"
     )

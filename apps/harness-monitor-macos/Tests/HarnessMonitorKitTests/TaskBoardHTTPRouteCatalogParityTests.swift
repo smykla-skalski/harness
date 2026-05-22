@@ -12,12 +12,12 @@ struct TaskBoardHTTPRouteCatalogParityTests {
   }
 }
 
-@Suite("Dependencies HTTP route catalog parity")
-struct DependencyUpdatesHTTPRouteCatalogParityTests {
-  @Test("Swift dependency-updates HTTP paths match daemon catalog")
-  func swiftDependencyUpdatesHTTPPathsMatchDaemonCatalog() throws {
-    let daemonRoutes = try daemonDependencyUpdatesHTTPRoutes()
-    let swiftRoutes = try swiftDependencyUpdatesHTTPRoutes()
+@Suite("Reviews HTTP route catalog parity")
+struct ReviewsHTTPRouteCatalogParityTests {
+  @Test("Swift reviews HTTP paths match daemon catalog")
+  func swiftReviewsHTTPPathsMatchDaemonCatalog() throws {
+    let daemonRoutes = try daemonReviewsHTTPRoutes()
+    let swiftRoutes = try swiftReviewsHTTPRoutes()
 
     #expect(swiftRoutes == daemonRoutes)
   }
@@ -107,8 +107,8 @@ private func swiftTaskBoardHTTPRoutes() throws -> [TaskBoardHTTPRoute] {
   return routes.sorted()
 }
 
-private func daemonDependencyUpdatesHTTPRoutes() throws -> [TaskBoardHTTPRoute] {
-  let relativePath = "src/daemon/protocol/api_contract/routes_dependency_updates.rs"
+private func daemonReviewsHTTPRoutes() throws -> [TaskBoardHTTPRoute] {
+  let relativePath = "src/daemon/protocol/api_contract/routes_reviews.rs"
   let source = try repoFileContents(relativePath: relativePath)
   let pathConstants = try daemonHTTPPathConstants()
   let blocks = source.components(separatedBy: "HttpApiRouteContract {").dropFirst()
@@ -129,9 +129,9 @@ private func daemonDependencyUpdatesHTTPRoutes() throws -> [TaskBoardHTTPRoute] 
   return routes.sorted()
 }
 
-private func swiftDependencyUpdatesHTTPRoutes() throws -> [TaskBoardHTTPRoute] {
+private func swiftReviewsHTTPRoutes() throws -> [TaskBoardHTTPRoute] {
   let relativePath =
-    "apps/harness-monitor-macos/Sources/HarnessMonitorKit/API/HarnessMonitorAPIClient+Dependencies.swift"
+    "apps/harness-monitor-macos/Sources/HarnessMonitorKit/API/HarnessMonitorAPIClient+Reviews.swift"
   let source = try repoFileContents(relativePath: relativePath)
   let matches = try captures(
     in: source,
@@ -139,7 +139,7 @@ private func swiftDependencyUpdatesHTTPRoutes() throws -> [TaskBoardHTTPRoute] {
   )
   let routes = matches.compactMap { capture -> TaskBoardHTTPRoute? in
     let path = normalizedSwiftHTTPPath(capture[1])
-    guard path.hasPrefix("/v1/dependency-updates/") else {
+    guard path.hasPrefix("/v1/reviews/") else {
       return nil
     }
     return TaskBoardHTTPRoute(method: capture[0].uppercased(), path: path)

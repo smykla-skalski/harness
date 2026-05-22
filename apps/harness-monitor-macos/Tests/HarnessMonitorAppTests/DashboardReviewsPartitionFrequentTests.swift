@@ -4,15 +4,15 @@ import Testing
 @testable import HarnessMonitorUIPreviewable
 
 @MainActor
-struct DashboardDependenciesPartitionFrequentTests {
-  private func label(_ name: String) -> DependencyUpdateRepositoryLabel {
-    DependencyUpdateRepositoryLabel(name: name, color: nil, description: nil)
+struct DashboardReviewsPartitionFrequentTests {
+  private func label(_ name: String) -> ReviewRepositoryLabel {
+    ReviewRepositoryLabel(name: name, color: nil, description: nil)
   }
 
   @Test("partition with no frequent names returns everything in rest")
   func emptyFrequentNamesYieldsRestOnly() {
     let available = [label("a"), label("b"), label("c")]
-    let split = dashboardDependenciesPartitionFrequent(
+    let split = dashboardReviewsPartitionFrequent(
       available: available,
       frequentNames: []
     )
@@ -23,7 +23,7 @@ struct DashboardDependenciesPartitionFrequentTests {
   @Test("partition keeps frequent ordering and removes from rest")
   func frequentPreservesOrderAndStripsRest() {
     let available = [label("alpha"), label("beta"), label("gamma"), label("delta")]
-    let split = dashboardDependenciesPartitionFrequent(
+    let split = dashboardReviewsPartitionFrequent(
       available: available,
       frequentNames: ["gamma", "alpha"]
     )
@@ -34,7 +34,7 @@ struct DashboardDependenciesPartitionFrequentTests {
   @Test("partition skips frequent names missing from available")
   func unknownFrequentNamesAreDropped() {
     let available = [label("alpha"), label("beta")]
-    let split = dashboardDependenciesPartitionFrequent(
+    let split = dashboardReviewsPartitionFrequent(
       available: available,
       frequentNames: ["zeta", "alpha", "omicron"]
     )
@@ -45,7 +45,7 @@ struct DashboardDependenciesPartitionFrequentTests {
   @Test("partition deduplicates repeated frequent names")
   func duplicateFrequentNamesAreDeduped() {
     let available = [label("alpha"), label("beta")]
-    let split = dashboardDependenciesPartitionFrequent(
+    let split = dashboardReviewsPartitionFrequent(
       available: available,
       frequentNames: ["alpha", "alpha", "beta"]
     )

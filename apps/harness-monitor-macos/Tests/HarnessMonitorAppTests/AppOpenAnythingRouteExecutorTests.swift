@@ -68,11 +68,11 @@ final class AppOpenAnythingRouteExecutorTests: XCTestCase {
     )
   }
 
-  func testDependencySelectsPrAndOpensDependenciesRoute() {
+  func testReviewSelectsPrAndOpensReviewsRoute() {
     XCTAssertEqual(
       steps(for: .dependency(pullRequestID: "repo#42")),
       [
-        .selectDashboardDependency(pullRequestID: "repo#42"),
+        .selectDashboardReview(pullRequestID: "repo#42"),
         .openDashboard(.dependencies),
       ]
     )

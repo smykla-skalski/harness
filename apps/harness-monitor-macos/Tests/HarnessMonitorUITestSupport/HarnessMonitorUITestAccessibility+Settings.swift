@@ -42,26 +42,26 @@ extension HarnessMonitorUITestAccessibility {
   static let settingsConnectionSection = "harness.settings.section.connection"
   static let settingsTaskBoardSection = "harness.settings.section.taskboard"
   static let settingsRepositoriesSection = "harness.settings.section.repositories"
-  static let settingsDependenciesSection = "harness.settings.section.dependencies"
+  static let settingsReviewsSection = "harness.settings.section.dependencies"
   static let settingsSecretsSection = "harness.settings.section.secrets"
   static let settingsDatabaseSection = "harness.settings.section.database"
   static let settingsDiagnosticsSection = "harness.settings.section.diagnostics"
-  static let settingsDependenciesRoot = "harness.settings.dependencies"
-  static let settingsDependenciesReloadButton = "harness.settings.dependencies.reload"
-  static let settingsDependenciesSaveButton = "harness.settings.dependencies.save"
-  static let settingsDependenciesAuthorsField = "harness.settings.dependencies.authors"
-  static let settingsDependenciesRepositoriesSummary =
+  static let settingsReviewsRoot = "harness.settings.dependencies"
+  static let settingsReviewsReloadButton = "harness.settings.dependencies.reload"
+  static let settingsReviewsSaveButton = "harness.settings.dependencies.save"
+  static let settingsReviewsAuthorsField = "harness.settings.dependencies.authors"
+  static let settingsReviewsRepositoriesSummary =
     "harness.settings.dependencies.repositories.summary"
-  static let settingsDependenciesRepositoriesButton =
+  static let settingsReviewsRepositoriesButton =
     "harness.settings.dependencies.repositories.open"
-  static let settingsDependenciesOrganizationsField = "harness.settings.dependencies.organizations"
-  static let settingsDependenciesRepositoriesField = "harness.settings.dependencies.repositories"
-  static let settingsDependenciesExcludedReposField =
+  static let settingsReviewsOrganizationsField = "harness.settings.dependencies.organizations"
+  static let settingsReviewsRepositoriesField = "harness.settings.dependencies.repositories"
+  static let settingsReviewsExcludedReposField =
     "harness.settings.dependencies.exclude-repositories"
-  static let settingsDependenciesMergeMethodField = "harness.settings.dependencies.merge-method"
-  static let settingsDependenciesRefreshIntervalField =
+  static let settingsReviewsMergeMethodField = "harness.settings.dependencies.merge-method"
+  static let settingsReviewsRefreshIntervalField =
     "harness.settings.dependencies.refresh-interval"
-  static let settingsDependenciesCacheMaxAgeField =
+  static let settingsReviewsCacheMaxAgeField =
     "harness.settings.dependencies.cache-max-age"
   static let settingsSecretsRoot = "harness.settings.secrets"
   static let settingsSecretsStatus = "harness.settings.secrets.status"

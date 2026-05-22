@@ -4,7 +4,7 @@ import Testing
 @testable import HarnessMonitorKit
 
 extension TaskBoardAPIClientTests {
-  func assertDependencyUpdatesHTTPRouteContract(_ records: [TaskBoardURLProtocol.RecordedRequest]) {
+  func assertReviewsHTTPRouteContract(_ records: [TaskBoardURLProtocol.RecordedRequest]) {
     #expect(
       records.map(\.method)
         == [
@@ -15,24 +15,24 @@ extension TaskBoardAPIClientTests {
     #expect(
       records.map(\.path)
         == [
-          "/v1/dependency-updates/repositories",
-          "/v1/dependency-updates/capabilities",
-          "/v1/dependency-updates/query",
-          "/v1/dependency-updates/action-preview",
-          "/v1/dependency-updates/approve",
-          "/v1/dependency-updates/merge",
-          "/v1/dependency-updates/rerun-checks",
-          "/v1/dependency-updates/labels",
-          "/v1/dependency-updates/auto",
-          "/v1/dependency-updates/cache",
-          "/v1/dependency-updates/refresh",
-          "/v1/dependency-updates/comment",
-          "/v1/dependency-updates/timeline",
+          "/v1/reviews/repositories",
+          "/v1/reviews/capabilities",
+          "/v1/reviews/query",
+          "/v1/reviews/action-preview",
+          "/v1/reviews/approve",
+          "/v1/reviews/merge",
+          "/v1/reviews/rerun-checks",
+          "/v1/reviews/labels",
+          "/v1/reviews/auto",
+          "/v1/reviews/cache",
+          "/v1/reviews/refresh",
+          "/v1/reviews/comment",
+          "/v1/reviews/timeline",
         ]
     )
   }
 
-  func assertDependencyUpdatesHTTPBodyContract(_ records: [TaskBoardURLProtocol.RecordedRequest]) {
+  func assertReviewsHTTPBodyContract(_ records: [TaskBoardURLProtocol.RecordedRequest]) {
     #expect(records[0].body?["organization"] as? String == "example")
     #expect(records[1].body == nil)
     #expect(records[2].body?["authors"] as? [String] == ["renovate[bot]"])
@@ -88,7 +88,7 @@ extension TaskBoardAPIClientTests {
     #expect(result.todoistTokenSync.tokenConfigured == true)
   }
 
-  func assertDependencyUpdatesHTTPClientResults(_ result: DependencyUpdatesHTTPContractResult) {
+  func assertReviewsHTTPClientResults(_ result: ReviewsHTTPContractResult) {
     #expect(result.repositoryCatalog.organization == "example")
     #expect(result.capabilities.supportsActionPreview)
     #expect(result.repositoryCatalog.repositories == ["example/aff", "example/harness"])
@@ -136,8 +136,8 @@ extension TaskBoardAPIClientTests {
     )
   }
 
-  func dependencyUpdatesTarget() -> DependencyUpdateTarget {
-    DependencyUpdateTarget(
+  func reviewsTarget() -> ReviewTarget {
+    ReviewTarget(
       pullRequestID: "pr-42",
       repositoryID: "repo-1",
       repository: "example/harness",
@@ -153,18 +153,18 @@ extension TaskBoardAPIClientTests {
   }
 }
 
-struct DependencyUpdatesHTTPContractResult {
-  let repositoryCatalog: DependencyUpdatesRepositoryCatalogResponse
-  let capabilities: DependencyUpdatesCapabilitiesResponse
-  let query: DependencyUpdatesQueryResponse
-  let preview: DependencyUpdatesActionPreviewResponse
-  let approve: DependencyUpdatesActionResponse
-  let merge: DependencyUpdatesActionResponse
-  let rerun: DependencyUpdatesActionResponse
-  let label: DependencyUpdatesActionResponse
-  let auto: DependencyUpdatesActionResponse
-  let cacheClear: DependencyUpdatesCacheClearResponse
-  let refresh: DependencyUpdatesRefreshResponse
-  let comment: DependencyUpdatesActionResponse
-  let timeline: DependencyUpdatesTimelineResponse
+struct ReviewsHTTPContractResult {
+  let repositoryCatalog: ReviewsRepositoryCatalogResponse
+  let capabilities: ReviewsCapabilitiesResponse
+  let query: ReviewsQueryResponse
+  let preview: ReviewsActionPreviewResponse
+  let approve: ReviewsActionResponse
+  let merge: ReviewsActionResponse
+  let rerun: ReviewsActionResponse
+  let label: ReviewsActionResponse
+  let auto: ReviewsActionResponse
+  let cacheClear: ReviewsCacheClearResponse
+  let refresh: ReviewsRefreshResponse
+  let comment: ReviewsActionResponse
+  let timeline: ReviewsTimelineResponse
 }

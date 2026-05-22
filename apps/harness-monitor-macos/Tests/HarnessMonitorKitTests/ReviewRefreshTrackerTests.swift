@@ -3,18 +3,18 @@ import Testing
 
 @testable import HarnessMonitorUIPreviewable
 
-@Suite("DependencyRefreshTracker")
-struct DependencyRefreshTrackerTests {
+@Suite("ReviewRefreshTracker")
+struct ReviewRefreshTrackerTests {
   @Test("default state has nothing in flight")
   func defaultStateIsEmpty() {
-    let tracker = DependencyRefreshTracker()
+    let tracker = ReviewRefreshTracker()
     #expect(!tracker.isRefreshing("pr-1"))
     #expect(tracker.actionTitle(for: "pr-1") == nil)
   }
 
   @Test("begin then end clears the entry")
   func beginEndRoundTripClears() {
-    var tracker = DependencyRefreshTracker()
+    var tracker = ReviewRefreshTracker()
     tracker.begin(pullRequestIDs: ["pr-1"], actionTitle: "Approving")
     #expect(tracker.isRefreshing("pr-1"))
     #expect(tracker.actionTitle(for: "pr-1") == "Approving")
@@ -26,7 +26,7 @@ struct DependencyRefreshTrackerTests {
 
   @Test("overlapping begins keep the row lit until every end completes")
   func overlappingBeginsRefCount() {
-    var tracker = DependencyRefreshTracker()
+    var tracker = ReviewRefreshTracker()
     tracker.begin(pullRequestIDs: ["pr-1"], actionTitle: "Approving")
     tracker.begin(pullRequestIDs: ["pr-1"], actionTitle: "Approving")
     #expect(tracker.isRefreshing("pr-1"))
@@ -40,7 +40,7 @@ struct DependencyRefreshTrackerTests {
 
   @Test("duplicate ids inside a single begin increment by the duplicate count")
   func duplicateIDsInSingleCallStack() {
-    var tracker = DependencyRefreshTracker()
+    var tracker = ReviewRefreshTracker()
     tracker.begin(pullRequestIDs: ["pr-1", "pr-1"], actionTitle: "Merging")
     tracker.end(pullRequestIDs: ["pr-1"])
     #expect(tracker.isRefreshing("pr-1"), "second increment still in flight")
@@ -51,7 +51,7 @@ struct DependencyRefreshTrackerTests {
 
   @Test("empty arrays are no-ops on both ends")
   func emptyArrayIsNoOp() {
-    var tracker = DependencyRefreshTracker()
+    var tracker = ReviewRefreshTracker()
     tracker.begin(pullRequestIDs: [], actionTitle: "Approving")
     #expect(tracker.counts.isEmpty)
     #expect(tracker.actionTitles.isEmpty)
@@ -62,7 +62,7 @@ struct DependencyRefreshTrackerTests {
 
   @Test("end without prior begin removes nothing and does not go negative")
   func endWithoutBeginIsSafe() {
-    var tracker = DependencyRefreshTracker()
+    var tracker = ReviewRefreshTracker()
     tracker.end(pullRequestIDs: ["pr-1"])
     #expect(!tracker.isRefreshing("pr-1"))
     #expect(tracker.counts["pr-1"] == nil, "no negative bookkeeping")
@@ -70,7 +70,7 @@ struct DependencyRefreshTrackerTests {
 
   @Test("action title from the later begin overwrites the earlier one")
   func laterTitleOverwrites() {
-    var tracker = DependencyRefreshTracker()
+    var tracker = ReviewRefreshTracker()
     tracker.begin(pullRequestIDs: ["pr-1"], actionTitle: "Approving")
     tracker.begin(pullRequestIDs: ["pr-1"], actionTitle: "Merging")
     #expect(tracker.actionTitle(for: "pr-1") == "Merging")
@@ -78,7 +78,7 @@ struct DependencyRefreshTrackerTests {
 
   @Test("begin without a title leaves the existing title in place")
   func untitledBeginPreservesTitle() {
-    var tracker = DependencyRefreshTracker()
+    var tracker = ReviewRefreshTracker()
     tracker.begin(pullRequestIDs: ["pr-1"], actionTitle: "Approving")
     tracker.begin(pullRequestIDs: ["pr-1"], actionTitle: nil)
     #expect(tracker.actionTitle(for: "pr-1") == "Approving")
@@ -86,7 +86,7 @@ struct DependencyRefreshTrackerTests {
 
   @Test("multiple pull requests track independently")
   func multiplePullRequestsTrackIndependently() {
-    var tracker = DependencyRefreshTracker()
+    var tracker = ReviewRefreshTracker()
     tracker.begin(pullRequestIDs: ["pr-1", "pr-2"], actionTitle: "Labeling")
     #expect(tracker.isRefreshing("pr-1"))
     #expect(tracker.isRefreshing("pr-2"))
@@ -100,7 +100,7 @@ struct DependencyRefreshTrackerTests {
 
   @Test("prune drops entries for pull requests no longer in the catalog")
   func pruneDropsMissingIDs() {
-    var tracker = DependencyRefreshTracker()
+    var tracker = ReviewRefreshTracker()
     tracker.begin(pullRequestIDs: ["pr-1"], actionTitle: "Approving")
     tracker.begin(pullRequestIDs: ["pr-2"], actionTitle: "Merging")
     tracker.prune(toLiveIDs: ["pr-1"])
@@ -111,7 +111,7 @@ struct DependencyRefreshTrackerTests {
 
   @Test("prune keeps live ids untouched including their action titles")
   func prunePreservesLiveEntries() {
-    var tracker = DependencyRefreshTracker()
+    var tracker = ReviewRefreshTracker()
     tracker.begin(pullRequestIDs: ["pr-1"], actionTitle: "Approving")
     tracker.begin(pullRequestIDs: ["pr-1"], actionTitle: "Approving")
     tracker.prune(toLiveIDs: ["pr-1", "pr-3"])

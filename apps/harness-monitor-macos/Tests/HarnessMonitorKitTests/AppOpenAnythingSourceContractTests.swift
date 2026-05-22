@@ -21,8 +21,8 @@ struct AppOpenAnythingSourceContractTests {
     let settingsSource = try previewableSourceFile(
       named: "Views/Settings/SettingsGeneralSection.swift"
     )
-    let dependenciesSource = try previewableSourceFile(
-      named: "Views/Dashboard/DashboardDependenciesRouteView.swift"
+    let reviewsSource = try previewableSourceFile(
+      named: "Views/Dashboard/DashboardReviewsRouteView.swift"
     )
 
     #expect(hostSource.contains("struct HarnessMonitorOpenAnythingHostModifier: ViewModifier"))
@@ -35,7 +35,7 @@ struct AppOpenAnythingSourceContractTests {
     )
     #expect(!sessionSource.contains("OpenAnythingPaletteView("))
     #expect(!settingsSource.contains("OpenAnythingPaletteView("))
-    #expect(!dependenciesSource.contains("OpenAnythingPaletteView("))
+    #expect(!reviewsSource.contains("OpenAnythingPaletteView("))
   }
 
   @Test("Session AppSearchHost remains native toolbar search")
@@ -71,7 +71,7 @@ struct AppOpenAnythingSourceContractTests {
     #expect(corpusSource.contains("isSuggested: suggestedActions.contains(action)"))
     #expect(metadataSource.contains("static let suggestedActions"))
     #expect(metadataSource.contains(".openDiagnostics"))
-    #expect(metadataSource.contains(".openDependencies"))
+    #expect(metadataSource.contains(".openReviews"))
   }
 
   @Test("Command palette routes diagnostics and settings actions")

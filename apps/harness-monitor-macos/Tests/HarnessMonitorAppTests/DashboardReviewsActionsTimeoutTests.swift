@@ -4,8 +4,8 @@ import Testing
 
 @testable import HarnessMonitorUIPreviewable
 
-@Suite("Dashboard dependencies timeout racer", .serialized)
-struct DashboardDependenciesActionsTimeoutTests {
+@Suite("Dashboard reviews timeout racer", .serialized)
+struct DashboardReviewsActionsTimeoutTests {
   @Test("Race throws fetchTimedOut when the operation never returns")
   func raceTimesOutWhenOperationHangs() async throws {
     let waiter = ActionHangWaiter()
@@ -13,7 +13,7 @@ struct DashboardDependenciesActionsTimeoutTests {
     let started = ContinuousClock.now
     var captured: (any Error)?
     do {
-      _ = try await DashboardDependenciesTimeoutRacer.race(timeoutSeconds: 0.15) {
+      _ = try await DashboardReviewsTimeoutRacer.race(timeoutSeconds: 0.15) {
         try await waiter.waitForever()
       }
       Issue.record("expected fetchTimedOut, race returned successfully")
@@ -22,7 +22,7 @@ struct DashboardDependenciesActionsTimeoutTests {
     }
     let elapsed = started.duration(to: ContinuousClock.now)
 
-    #expect(captured as? DashboardDependenciesSchedulerError == .fetchTimedOut)
+    #expect(captured as? DashboardReviewsSchedulerError == .fetchTimedOut)
     #expect(elapsed < .seconds(2))
 
     waiter.release()
@@ -30,7 +30,7 @@ struct DashboardDependenciesActionsTimeoutTests {
 
   @Test("Race returns the operation result when it completes before the deadline")
   func raceReturnsOperationResultWhenFastEnough() async throws {
-    let result = try await DashboardDependenciesTimeoutRacer.race(timeoutSeconds: 5) {
+    let result = try await DashboardReviewsTimeoutRacer.race(timeoutSeconds: 5) {
       "completed"
     }
     #expect(result == "completed")
@@ -40,7 +40,7 @@ struct DashboardDependenciesActionsTimeoutTests {
   func raceRethrowsOperationErrors() async throws {
     var captured: (any Error)?
     do {
-      _ = try await DashboardDependenciesTimeoutRacer.race(timeoutSeconds: 5) {
+      _ = try await DashboardReviewsTimeoutRacer.race(timeoutSeconds: 5) {
         throw RaceTestError.operationFailed
       }
       Issue.record("expected operationFailed, race returned successfully")

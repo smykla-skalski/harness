@@ -1,4 +1,4 @@
-let sampleDependencyUpdateItemJSONString =
+let sampleReviewItemJSONString =
   """
   {
     "pull_request_id": "pr-42",
@@ -44,7 +44,7 @@ let sampleDependencyUpdateItemJSONString =
   }
   """
 
-let sampleDependencyUpdatesQueryResponseText =
+let sampleReviewsQueryResponseText =
   """
   {
     "fetched_at": "2026-05-20T12:45:00Z",
@@ -58,7 +58,7 @@ let sampleDependencyUpdatesQueryResponseText =
       "blocked": 0
     },
     "items": [
-      \(sampleDependencyUpdateItemJSONString)
+      \(sampleReviewItemJSONString)
     ]
   }
   """
@@ -74,7 +74,7 @@ let sampleDepsCatalogResponseText =
   }
   """
 
-let sampleDependencyCapabilitiesResponseText =
+let sampleReviewsCapabilitiesResponseText =
   """
   {
     "schema_version": 1,
@@ -128,7 +128,7 @@ let sampleDepsApproveResponseText =
   }
   """
 
-let sampleDependencyUpdatesMergeResponseText =
+let sampleReviewsMergeResponseText =
   """
   {
     "summary": "Merged 1 dependency update.",
@@ -144,7 +144,7 @@ let sampleDependencyUpdatesMergeResponseText =
   }
   """
 
-let sampleDependencyUpdatesRerunResponseText =
+let sampleReviewsRerunResponseText =
   """
   {
     "summary": "Reran checks for 1 dependency update.",
@@ -160,7 +160,7 @@ let sampleDependencyUpdatesRerunResponseText =
   }
   """
 
-let sampleDependencyUpdatesLabelResponseText =
+let sampleReviewsLabelResponseText =
   """
   {
     "summary": "Added labels to 1 dependency update.",
@@ -176,7 +176,7 @@ let sampleDependencyUpdatesLabelResponseText =
   }
   """
 
-let sampleDependencyUpdatesAutoResponseText =
+let sampleReviewsAutoResponseText =
   """
   {
     "summary": "Auto mode finished for 1 dependency update.",
@@ -199,7 +199,7 @@ let sampleDepsCacheClearResponseText =
   }
   """
 
-let sampleDependencyRefreshResponseText =
+let sampleReviewsRefreshResponseText =
   """
   {
     "fetched_at": "2026-05-21T12:00:00Z",
@@ -208,7 +208,7 @@ let sampleDependencyRefreshResponseText =
   }
   """
 
-let sampleDependencyCommentResponseText =
+let sampleReviewsCommentResponseText =
   """
   {
     "summary": "Posted dependency update comment.",
@@ -234,7 +234,7 @@ let sampleDependencyCommentResponseText =
   }
   """
 
-let sampleDependencyTimelineResponseText =
+let sampleReviewsTimelineResponseText =
   """
   {
     "pull_request_id": "pr-42",

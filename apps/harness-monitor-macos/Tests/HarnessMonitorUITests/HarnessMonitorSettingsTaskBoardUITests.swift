@@ -70,22 +70,22 @@ final class HarnessMonitorSettingsTaskBoardUITests: HarnessMonitorUITestCase {
 
 @MainActor
 final class HarnessMonitorSettingsDepsUITests: HarnessMonitorUITestCase {
-  func testDependenciesSectionAppearsInSettings() throws {
+  func testReviewsSectionAppearsInSettings() throws {
     let app = launch(mode: "preview")
 
     openSettings(in: app)
-    selectDependenciesSection(in: app)
+    selectReviewsSection(in: app)
 
-    let saveButton = element(in: app, identifier: Accessibility.settingsDependenciesSaveButton)
-    let reloadButton = element(in: app, identifier: Accessibility.settingsDependenciesReloadButton)
-    let authorsField = element(in: app, identifier: Accessibility.settingsDependenciesAuthorsField)
+    let saveButton = element(in: app, identifier: Accessibility.settingsReviewsSaveButton)
+    let reloadButton = element(in: app, identifier: Accessibility.settingsReviewsReloadButton)
+    let authorsField = element(in: app, identifier: Accessibility.settingsReviewsAuthorsField)
     let repositoriesButton = element(
       in: app,
-      identifier: Accessibility.settingsDependenciesRepositoriesButton
+      identifier: Accessibility.settingsReviewsRepositoriesButton
     )
     let mergeMethodField = element(
       in: app,
-      identifier: Accessibility.settingsDependenciesMergeMethodField
+      identifier: Accessibility.settingsReviewsMergeMethodField
     )
 
     XCTAssertTrue(saveButton.waitForExistence(timeout: Self.actionTimeout))
@@ -94,8 +94,8 @@ final class HarnessMonitorSettingsDepsUITests: HarnessMonitorUITestCase {
     XCTAssertTrue(repositoriesButton.exists)
     XCTAssertTrue(mergeMethodField.exists)
     XCTAssertFalse(
-      element(in: app, identifier: Accessibility.settingsDependenciesRepositoriesField).exists,
-      "Dependencies settings should not edit repository scope inline anymore"
+      element(in: app, identifier: Accessibility.settingsReviewsRepositoriesField).exists,
+      "Reviews settings should not edit repository scope inline anymore"
     )
   }
 

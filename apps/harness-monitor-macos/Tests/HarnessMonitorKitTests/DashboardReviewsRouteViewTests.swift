@@ -4,47 +4,47 @@ import Testing
 @testable import HarnessMonitorKit
 @testable import HarnessMonitorUIPreviewable
 
-@Suite("Dashboard dependencies route view")
-struct DashboardDependenciesRouteViewTests {
+@Suite("Dashboard reviews route view")
+struct DashboardReviewsRouteViewTests {
   @Test("missing-client state keeps the route loading while the daemon connects")
   func missingClientStateKeepsLoadingWhileConnecting() {
     #expect(
-      dashboardDependenciesMissingClientState(
+      dashboardReviewsMissingClientState(
         backgroundRefresh: false,
         connectionState: .connecting
       ) == .loading
     )
     #expect(
-      dashboardDependenciesMissingClientState(
+      dashboardReviewsMissingClientState(
         backgroundRefresh: true,
         connectionState: .connecting
       ) == .ignore
     )
     #expect(
-      dashboardDependenciesMissingClientState(
+      dashboardReviewsMissingClientState(
         backgroundRefresh: false,
         connectionState: .idle
-      ) == .error("The dependencies route needs a daemon client")
+      ) == .error("The reviews route needs a daemon client")
     )
     #expect(
-      dashboardDependenciesMissingClientState(
+      dashboardReviewsMissingClientState(
         backgroundRefresh: false,
         connectionState: .offline("Daemon stopped")
-      ) == .error("The dependencies route needs a daemon client")
+      ) == .error("The reviews route needs a daemon client")
     )
   }
 
   @Test("reload task key changes when connection state changes")
   func reloadTaskKeyChangesWhenConnectionStateChanges() {
-    let idle = DashboardDependenciesReloadTaskKey(
+    let idle = DashboardReviewsReloadTaskKey(
       preferencesSignature: "",
       connectionState: .idle
     )
-    let connecting = DashboardDependenciesReloadTaskKey(
+    let connecting = DashboardReviewsReloadTaskKey(
       preferencesSignature: "",
       connectionState: .connecting
     )
-    let online = DashboardDependenciesReloadTaskKey(
+    let online = DashboardReviewsReloadTaskKey(
       preferencesSignature: "",
       connectionState: .online
     )
@@ -55,11 +55,11 @@ struct DashboardDependenciesRouteViewTests {
 
   @Test("route source reloads from the connection-aware task key")
   func reloadTaskKeyChangesWhenPreferencesSignatureChanges() {
-    let first = DashboardDependenciesReloadTaskKey(
+    let first = DashboardReviewsReloadTaskKey(
       preferencesSignature: "authors=a",
       connectionState: .online
     )
-    let second = DashboardDependenciesReloadTaskKey(
+    let second = DashboardReviewsReloadTaskKey(
       preferencesSignature: "authors=b",
       connectionState: .online
     )
@@ -70,21 +70,21 @@ struct DashboardDependenciesRouteViewTests {
   @Test("route source caches decoded preferences off the SwiftUI body path")
   func routeSourceCachesDecodedPreferencesOffTheSwiftUIBodyPath() throws {
     let source = try routeSource()
-    let supportSource = try routeSource(named: "DashboardDependenciesRouteSupport.swift")
-    let cacheSource = try routeSource(named: "DashboardDependenciesRouteView+Cache.swift")
-    let schedulerSource = try routeSource(named: "DashboardDependenciesRouteView+Scheduler.swift")
+    let supportSource = try routeSource(named: "DashboardReviewsRouteSupport.swift")
+    let cacheSource = try routeSource(named: "DashboardReviewsRouteView+Cache.swift")
+    let schedulerSource = try routeSource(named: "DashboardReviewsRouteView+Scheduler.swift")
 
-    #expect(supportSource.contains("struct DashboardDependenciesResolvedPreferences"))
+    #expect(supportSource.contains("struct DashboardReviewsResolvedPreferences"))
     #expect(source.contains("@State private var resolvedPreferences"))
     #expect(
-      source.contains("var routeResolvedPreferences: DashboardDependenciesResolvedPreferences"))
+      source.contains("var routeResolvedPreferences: DashboardReviewsResolvedPreferences"))
     #expect(source.contains(".onChange(of: storedPreferences, initial: true)"))
     #expect(source.contains("syncPreferencesFromStorage(newValue)"))
     #expect(
-      !source.contains("get { DashboardDependenciesPreferences.decode(from: storedPreferences) }"))
+      !source.contains("get { DashboardReviewsPreferences.decode(from: storedPreferences) }"))
     #expect(
       !source.contains(
-        "var normalizedPreferences: DashboardDependenciesPreferences {\n    preferences.normalized()"
+        "var normalizedPreferences: DashboardReviewsPreferences {\n    preferences.normalized()"
       )
     )
     #expect(cacheSource.contains("routeResolvedPreferences.cacheHash"))
@@ -100,53 +100,53 @@ struct DashboardDependenciesRouteViewTests {
     #expect(!source.contains("searchText: \"\""))
   }
 
-  @Test("route source keeps dependency network decode off the view actor")
-  func routeSourceKeepsDependencyNetworkDecodeOffTheViewActor() throws {
-    let supportSource = try routeSource(named: "DashboardDependenciesRouteSupport.swift")
-    let refreshSource = try routeSource(named: "DashboardDependenciesRouteView+Refresh.swift")
-    let schedulerSource = try routeSource(named: "DashboardDependenciesScheduler.swift")
+  @Test("route source keeps review network decode off the view actor")
+  func routeSourceKeepsReviewNetworkDecodeOffTheViewActor() throws {
+    let supportSource = try routeSource(named: "DashboardReviewsRouteSupport.swift")
+    let refreshSource = try routeSource(named: "DashboardReviewsRouteView+Refresh.swift")
+    let schedulerSource = try routeSource(named: "DashboardReviewsScheduler.swift")
 
-    #expect(supportSource.contains("enum DashboardDependenciesRemoteLoader"))
+    #expect(supportSource.contains("enum DashboardReviewsRemoteLoader"))
     #expect(supportSource.contains("Task.detached(priority: .userInitiated)"))
-    #expect(schedulerSource.contains("DashboardDependenciesRemoteLoader.query("))
-    #expect(!schedulerSource.contains("client.queryDependencyUpdates(request: request)"))
-    #expect(refreshSource.contains("DashboardDependenciesRemoteLoader.refresh("))
+    #expect(schedulerSource.contains("DashboardReviewsRemoteLoader.query("))
+    #expect(!schedulerSource.contains("client.queryReviews(request: request)"))
+    #expect(refreshSource.contains("DashboardReviewsRemoteLoader.refresh("))
   }
 
   @Test("route source presents native confirmation for risky approve and merge actions")
   func routeSourcePresentsNativeConfirmationForRiskyApproveAndMergeActions() throws {
     let routeViewSource = try routeSource()
-    let contentSource = try routeSource(named: "DashboardDependenciesRouteView+Content.swift")
+    let contentSource = try routeSource(named: "DashboardReviewsRouteView+Content.swift")
     let actionPreviewSource = try routeSource(
-      named: "DashboardDependenciesRouteView+ActionPreview.swift"
+      named: "DashboardReviewsRouteView+ActionPreview.swift"
     )
-    let attentionSource = try routeSource(named: "DashboardDependenciesAttentionActions.swift")
-    let actionBarSource = try routeSource(named: "DashboardDependencyActionBar.swift")
+    let attentionSource = try routeSource(named: "DashboardReviewsAttentionActions.swift")
+    let actionBarSource = try routeSource(named: "DashboardReviewActionBar.swift")
     let contextMenuSource = try routeSource(
-      named: "DashboardDependenciesRouteView+ContextMenu.swift"
+      named: "DashboardReviewsRouteView+ContextMenu.swift"
     )
-    let rowSource = try routeSource(named: "DashboardDependencyListRow.swift")
+    let rowSource = try routeSource(named: "DashboardReviewListRow.swift")
 
     #expect(routeViewSource.contains("@State private var actionState"))
     #expect(routeViewSource.contains(".confirmationDialog("))
-    #expect(routeViewSource.contains("confirmDependencyAction(confirmation)"))
+    #expect(routeViewSource.contains("confirmReviewAction(confirmation)"))
     #expect(contentSource.contains("onApprove: { requestApproveOrConfirm(items: items) }"))
     #expect(contentSource.contains("onMerge: { requestMergeOrConfirm(items: items) }"))
-    #expect(actionPreviewSource.contains("requestDependencyAction(.approve, items: items)"))
-    #expect(actionPreviewSource.contains("requestDependencyAction(.merge, items: items)"))
-    #expect(actionPreviewSource.contains("dependencyActionPreview("))
+    #expect(actionPreviewSource.contains("requestReviewAction(.approve, items: items)"))
+    #expect(actionPreviewSource.contains("requestReviewAction(.merge, items: items)"))
+    #expect(actionPreviewSource.contains("reviewActionPreview("))
     #expect(actionPreviewSource.contains("routePendingActionConfirmation = confirmation"))
-    #expect(attentionSource.contains("struct DashboardDependencyActionConfirmation"))
-    #expect(attentionSource.contains("dashboardDependencyActionConfirmation("))
-    #expect(attentionSource.contains("func dashboardDependencyMergeActionTitle("))
-    #expect(actionBarSource.contains("title: dashboardDependencyMergeActionTitle(for: items)"))
-    #expect(contextMenuSource.contains("Button(dashboardDependencyMergeActionTitle(for: items))"))
-    #expect(rowSource.contains("dashboardDependencyAttentionBadgeKinds(for: item)"))
+    #expect(attentionSource.contains("struct DashboardReviewActionConfirmation"))
+    #expect(attentionSource.contains("dashboardReviewActionConfirmation("))
+    #expect(attentionSource.contains("func dashboardReviewMergeActionTitle("))
+    #expect(actionBarSource.contains("title: dashboardReviewMergeActionTitle(for: items)"))
+    #expect(contextMenuSource.contains("Button(dashboardReviewMergeActionTitle(for: items))"))
+    #expect(rowSource.contains("dashboardReviewAttentionBadgeKinds(for: item)"))
   }
 
-  @Test("dashboard preview exercises dependency alert rendering")
-  func dashboardPreviewExercisesDependencyAlertRendering() throws {
-    let source = try previewSource(named: "PreviewDashboardDependenciesRouteView.swift")
+  @Test("dashboard preview exercises review alert rendering")
+  func dashboardPreviewExercisesReviewAlertRendering() throws {
+    let source = try previewSource(named: "PreviewDashboardReviewsRouteView.swift")
 
     #expect(source.contains("> ℹ️ **Note**"))
     #expect(source.contains("This PR body was truncated due to platform limits."))
@@ -155,13 +155,13 @@ struct DashboardDependenciesRouteViewTests {
   @Test("error helper rewrites GitHub 401 messages into actionable copy")
   func errorHelperRewritesGitHubUnauthorizedIntoActionableCopy() {
     let envelope =
-      #"{"error":{"code":"WORKFLOW_IO","message":"dependency-updates github "#
+      #"{"error":{"code":"WORKFLOW_IO","message":"reviews github "#
       + #"request failed: GitHub API returned 401 Unauthorized: Bad credentials. "#
       + #"Check that the GitHub token is valid"}}"#
     let apiError = HarnessMonitorAPIError.server(code: 400, message: envelope)
 
     #expect(
-      dashboardDependenciesErrorMessage(for: apiError)
+      dashboardReviewsErrorMessage(for: apiError)
         == dashboardDepsGitHubAuthFailureMessage
     )
   }
@@ -170,12 +170,12 @@ struct DashboardDependenciesRouteViewTests {
   func errorHelperDetectsGitHubUnauthorizedInTransportLikeErrors() {
     struct LegacyTransportError: LocalizedError {
       var errorDescription: String? {
-        "dependency-updates github request failed: GitHub API returned 401 Unauthorized"
+        "reviews github request failed: GitHub API returned 401 Unauthorized"
       }
     }
 
     #expect(
-      dashboardDependenciesErrorMessage(for: LegacyTransportError())
+      dashboardReviewsErrorMessage(for: LegacyTransportError())
         == dashboardDepsGitHubAuthFailureMessage
     )
   }
@@ -188,7 +188,7 @@ struct DashboardDependenciesRouteViewTests {
     )
 
     #expect(
-      dashboardDependenciesErrorMessage(for: decodingError)
+      dashboardReviewsErrorMessage(for: decodingError)
         == dashboardDepsDecodingFailureMessage
     )
   }
@@ -200,37 +200,37 @@ struct DashboardDependenciesRouteViewTests {
     }
 
     #expect(
-      dashboardDependenciesErrorMessage(for: UnknownError()) == "everything is on fire"
+      dashboardReviewsErrorMessage(for: UnknownError()) == "everything is on fire"
     )
   }
 
   @Test("check grouping sorts suites by severity and checks within each suite")
   func checkGroupingSortsSuitesBySeverityAndChecksWithinEachSuite() {
-    let passingAnalyze = DependencyUpdateCheck(
+    let passingAnalyze = ReviewCheck(
       name: "Analyze (actions)",
       status: .completed,
       conclusion: .success,
       checkSuiteID: "suite-analyze"
     )
-    let failingAnalyze = DependencyUpdateCheck(
+    let failingAnalyze = ReviewCheck(
       name: "Analyze (go)",
       status: .completed,
       conclusion: .failure,
       checkSuiteID: "suite-analyze"
     )
-    let pendingTest = DependencyUpdateCheck(
+    let pendingTest = ReviewCheck(
       name: "Test / unit",
       status: .queued,
       conclusion: .none
     )
-    let passingCodeQL = DependencyUpdateCheck(
+    let passingCodeQL = ReviewCheck(
       name: "CodeQL",
       status: .completed,
       conclusion: .success,
       checkSuiteID: "suite-codeql"
     )
 
-    let groups = dashboardDependencyCheckGroups(
+    let groups = dashboardReviewCheckGroups(
       for: [passingCodeQL, pendingTest, passingAnalyze, failingAnalyze]
     )
 
@@ -241,18 +241,18 @@ struct DashboardDependenciesRouteViewTests {
 
   @Test("rerun check controls explain unavailable state")
   func rerunCheckControlsExplainUnavailableState() {
-    let missingSuite = DependencyUpdateCheck(
+    let missingSuite = ReviewCheck(
       name: "ci",
       status: .completed,
       conclusion: .failure
     )
-    let pending = DependencyUpdateCheck(
+    let pending = ReviewCheck(
       name: "ci",
       status: .queued,
       conclusion: .none,
       checkSuiteID: "suite-ci"
     )
-    let failed = DependencyUpdateCheck(
+    let failed = ReviewCheck(
       name: "ci",
       status: .completed,
       conclusion: .failure,
@@ -266,7 +266,7 @@ struct DashboardDependenciesRouteViewTests {
     #expect(pending.rerunUnavailableReason == "Only completed check runs can be rerun.")
     #expect(failed.rerunUnavailableReason == nil)
 
-    let item = makeDependencyItem(checkStatus: .failure, checks: [missingSuite])
+    let item = makeReviewItem(checkStatus: .failure, checks: [missingSuite])
     #expect(
       item.rerunChecksUnavailableReason
         == "GitHub did not provide check suite IDs for these checks."
@@ -274,13 +274,13 @@ struct DashboardDependenciesRouteViewTests {
     #expect(!item.canAttemptRerunChecks)
   }
 
-  @Test("activity entries summarize action results per dependency")
-  func activityEntriesSummarizeActionResultsPerDependency() {
+  @Test("activity entries summarize action results per review")
+  func activityEntriesSummarizeActionResultsPerReview() {
     let recordedAt = Date(timeIntervalSince1970: 0)
-    let response = DependencyUpdatesActionResponse(
-      summary: "Approved 1 dependency update",
+    let response = ReviewsActionResponse(
+      summary: "Approved 1 review",
       results: [
-        DependencyUpdateActionResult(
+        ReviewActionResult(
           repository: "org-a/example",
           number: 42,
           action: .approve,
@@ -290,14 +290,14 @@ struct DashboardDependenciesRouteViewTests {
       ]
     )
 
-    let entry = DashboardDependencyActivityEntry.success(
+    let entry = DashboardReviewActivityEntry.success(
       title: "Approving",
       response: response,
       results: response.results,
       recordedAt: recordedAt
     )
 
-    #expect(entry.summary == "Approved 1 dependency update")
+    #expect(entry.summary == "Approved 1 review")
     #expect(entry.outcome == .success)
     #expect(entry.messages == ["Approved org-a/example#42"])
     #expect(entry.recordedAt == recordedAt)
@@ -305,7 +305,7 @@ struct DashboardDependenciesRouteViewTests {
 
   @Test("activity snapshot exposes cache and missing check-link labels")
   func activitySnapshotExposesCacheAndMissingCheckLinkLabels() {
-    let snapshot = DashboardDependencyActivitySnapshot(
+    let snapshot = DashboardReviewActivitySnapshot(
       pullRequestID: "pr-1",
       isRefreshing: true,
       actionTitle: "Approving",
@@ -314,7 +314,7 @@ struct DashboardDependenciesRouteViewTests {
       lastAction: nil,
       missingCheckRunURLCount: 2,
       totalCheckCount: 3,
-      capabilities: DependencyUpdatesCapabilitiesResponse()
+      capabilities: ReviewsCapabilitiesResponse()
     )
 
     #expect(snapshot.cacheLabel == "Cached data")
@@ -322,7 +322,7 @@ struct DashboardDependenciesRouteViewTests {
   }
 
   private func routeSource() throws -> String {
-    try routeSource(named: "DashboardDependenciesRouteView.swift")
+    try routeSource(named: "DashboardReviewsRouteView.swift")
   }
 
   private func routeSource(named fileName: String) throws -> String {
@@ -359,11 +359,11 @@ struct DashboardDependenciesRouteViewTests {
     return try String(contentsOf: sourceURL, encoding: .utf8)
   }
 
-  private func makeDependencyItem(
-    checkStatus: DependencyUpdateCheckStatus,
-    checks: [DependencyUpdateCheck]
-  ) -> DependencyUpdateItem {
-    DependencyUpdateItem(
+  private func makeReviewItem(
+    checkStatus: ReviewCheckStatus,
+    checks: [ReviewCheck]
+  ) -> ReviewItem {
+    ReviewItem(
       pullRequestID: "pr-1",
       repositoryID: "repo-1",
       repository: "org-a/example",

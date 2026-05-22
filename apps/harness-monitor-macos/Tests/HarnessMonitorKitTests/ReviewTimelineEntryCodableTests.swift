@@ -3,7 +3,7 @@ import XCTest
 
 @testable import HarnessMonitorKit
 
-final class DependencyUpdateTimelineEntryCodableTests: XCTestCase {
+final class ReviewTimelineEntryCodableTests: XCTestCase {
   private func roundTrip<T: Codable & Equatable>(_ value: T) throws -> T {
     let encoder = JSONEncoder()
     encoder.keyEncodingStrategy = .convertToSnakeCase
@@ -20,11 +20,11 @@ final class DependencyUpdateTimelineEntryCodableTests: XCTestCase {
   }
 
   func testIssueCommentRoundTrips() throws {
-    let entry = DependencyUpdateTimelineEntry.issueComment(
+    let entry = ReviewTimelineEntry.issueComment(
       IssueCommentPayload(
         id: "IC_001",
         createdAt: "2026-05-22T10:00:00Z",
-        actor: DependencyUpdateTimelineActor(login: "alice"),
+        actor: ReviewTimelineActor(login: "alice"),
         body: "LGTM",
         reactionsTotal: 2,
         viewerDidAuthor: true,
@@ -38,11 +38,11 @@ final class DependencyUpdateTimelineEntryCodableTests: XCTestCase {
   }
 
   func testReviewRoundTripsWithInlineComments() throws {
-    let entry = DependencyUpdateTimelineEntry.review(
+    let entry = ReviewTimelineEntry.review(
       ReviewPayload(
         id: "PRR_001",
         createdAt: "2026-05-22T11:00:00Z",
-        actor: DependencyUpdateTimelineActor(login: "bob"),
+        actor: ReviewTimelineActor(login: "bob"),
         state: .approved,
         body: "Looks good",
         inlineComments: [
@@ -52,7 +52,7 @@ final class DependencyUpdateTimelineEntryCodableTests: XCTestCase {
             position: 7,
             body: "nit: rename",
             createdAt: "2026-05-22T11:00:05Z",
-            actor: DependencyUpdateTimelineActor(login: "bob"),
+            actor: ReviewTimelineActor(login: "bob"),
             replyToId: nil
           )
         ]
@@ -71,7 +71,7 @@ final class DependencyUpdateTimelineEntryCodableTests: XCTestCase {
   }
 
   func testReviewThreadRoundTrips() throws {
-    let entry = DependencyUpdateTimelineEntry.reviewThread(
+    let entry = ReviewTimelineEntry.reviewThread(
       ReviewThreadPayload(
         id: "PRRT_001",
         createdAt: "2026-05-22T12:00:00Z",
@@ -91,7 +91,7 @@ final class DependencyUpdateTimelineEntryCodableTests: XCTestCase {
   }
 
   func testCommitRoundTrips() throws {
-    let entry = DependencyUpdateTimelineEntry.commit(
+    let entry = ReviewTimelineEntry.commit(
       CommitPayload(
         id: "PRC_001",
         createdAt: "2026-05-22T13:00:00Z",
@@ -108,7 +108,7 @@ final class DependencyUpdateTimelineEntryCodableTests: XCTestCase {
   }
 
   func testHeadRefForcePushedRoundTrips() throws {
-    let entry = DependencyUpdateTimelineEntry.headRefForcePushed(
+    let entry = ReviewTimelineEntry.headRefForcePushed(
       HeadRefForcePushedPayload(
         id: "HRFP_001",
         createdAt: "2026-05-22T14:00:00Z",
@@ -124,11 +124,11 @@ final class DependencyUpdateTimelineEntryCodableTests: XCTestCase {
   }
 
   func testSimpleActorLabeledRoundTrips() throws {
-    let entry = DependencyUpdateTimelineEntry.simpleActorEvent(
+    let entry = ReviewTimelineEntry.simpleActorEvent(
       SimpleActorEventPayload(
         id: "LE_001",
         createdAt: "2026-05-22T15:00:00Z",
-        actor: DependencyUpdateTimelineActor(login: "renovate-bot"),
+        actor: ReviewTimelineActor(login: "renovate-bot"),
         eventKind: .labeled,
         label: "dependencies",
         labelColor: "0366d6"
@@ -140,7 +140,7 @@ final class DependencyUpdateTimelineEntryCodableTests: XCTestCase {
   }
 
   func testSimpleActorRenamedTitleCarriesOldNew() throws {
-    let entry = DependencyUpdateTimelineEntry.simpleActorEvent(
+    let entry = ReviewTimelineEntry.simpleActorEvent(
       SimpleActorEventPayload(
         id: "RTE_001",
         createdAt: "2026-05-22T15:30:00Z",
@@ -155,7 +155,7 @@ final class DependencyUpdateTimelineEntryCodableTests: XCTestCase {
   }
 
   func testUnknownRoundTrips() throws {
-    let entry = DependencyUpdateTimelineEntry.unknown(
+    let entry = ReviewTimelineEntry.unknown(
       UnknownTimelinePayload(
         id: "UNK_001",
         createdAt: "2026-05-22T16:00:00Z",
@@ -182,14 +182,14 @@ final class DependencyUpdateTimelineEntryCodableTests: XCTestCase {
         "actor": { "login": "alice", "avatar_url": null }
       }
       """
-    let entry = try decode(DependencyUpdateTimelineEntry.self, from: json)
+    let entry = try decode(ReviewTimelineEntry.self, from: json)
     XCTAssertEqual(entry.kind, .issueComment)
     XCTAssertEqual(entry.id, "IC_wire")
     XCTAssertEqual(entry.actor?.login, "alice")
   }
 
   func testResponseRoundTrips() throws {
-    let response = DependencyUpdatesTimelineResponse(
+    let response = ReviewsTimelineResponse(
       pullRequestId: "PR_response",
       entries: [
         .issueComment(
@@ -200,7 +200,7 @@ final class DependencyUpdateTimelineEntryCodableTests: XCTestCase {
           )
         )
       ],
-      pageInfo: DependencyUpdateTimelinePageInfo(
+      pageInfo: ReviewTimelinePageInfo(
         startCursor: "s",
         endCursor: "e",
         hasOlder: true,
@@ -214,6 +214,6 @@ final class DependencyUpdateTimelineEntryCodableTests: XCTestCase {
   }
 
   func testTimelineKindCaseIterableCoversFortyFiveCases() {
-    XCTAssertEqual(DependencyUpdateTimelineKind.allCases.count, 45)
+    XCTAssertEqual(ReviewTimelineKind.allCases.count, 45)
   }
 }

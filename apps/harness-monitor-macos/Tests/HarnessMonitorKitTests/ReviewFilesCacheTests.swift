@@ -5,21 +5,21 @@ import Testing
 @testable import HarnessMonitorKit
 
 @MainActor
-struct DependencyUpdateFilesCacheTests {
-  private func makeCache() throws -> (DependencyUpdateFilesCache, ModelContext) {
+struct ReviewFilesCacheTests {
+  private func makeCache() throws -> (ReviewFilesCache, ModelContext) {
     let container = try HarnessMonitorModelContainer.preview()
     let context = ModelContext(container)
-    return (DependencyUpdateFilesCache(context: context), context)
+    return (ReviewFilesCache(context: context), context)
   }
 
   private func makeResponse(
     pullRequestID: String = "pr-1",
     headRefOid: String = "head-a",
-    files: [DependencyUpdateFile] = [],
+    files: [ReviewFile] = [],
     paginationComplete: Bool = true,
     fetchedAt: Date = Date(timeIntervalSince1970: 1_716_300_000)
-  ) -> DependencyUpdatesFilesListResponse {
-    DependencyUpdatesFilesListResponse(
+  ) -> ReviewsFilesListResponse {
+    ReviewsFilesListResponse(
       pullRequestID: pullRequestID,
       headRefOid: headRefOid,
       viewerCanMarkViewed: true,
@@ -34,14 +34,14 @@ struct DependencyUpdateFilesCacheTests {
     path: String,
     additions: UInt32 = 0,
     deletions: UInt32 = 0,
-    viewed: DependencyUpdateFileViewedState = .unviewed,
-    changeType: DependencyUpdateFileChangeType = .modified,
+    viewed: ReviewFileViewedState = .unviewed,
+    changeType: ReviewFileChangeType = .modified,
     isBinary: Bool = false,
-    language: HarnessDependencyFileLanguage = .generic,
+    language: HarnessReviewFileLanguage = .generic,
     previousPath: String? = nil,
     modeChange: String? = nil
-  ) -> DependencyUpdateFile {
-    DependencyUpdateFile(
+  ) -> ReviewFile {
+    ReviewFile(
       path: path,
       previousPath: previousPath,
       changeType: changeType,
@@ -81,13 +81,13 @@ struct DependencyUpdateFilesCacheTests {
 
     let files = cache.loadFiles(pullRequestID: "pr-1", headRefOid: "head-a")
     #expect(files.map(\.path) == ["src/a.swift", "src/b.swift"])
-    #expect(files.first?.languageHintRaw == HarnessDependencyFileLanguage.swift.rawValue)
+    #expect(files.first?.languageHintRaw == HarnessReviewFileLanguage.swift.rawValue)
 
     let viewed = cache.loadViewedStates(pullRequestID: "pr-1", headRefOid: "head-a")
     #expect(
-      viewed["src/a.swift"]?.viewedStateRaw == DependencyUpdateFileViewedState.unviewed.rawValue)
+      viewed["src/a.swift"]?.viewedStateRaw == ReviewFileViewedState.unviewed.rawValue)
     #expect(
-      viewed["src/b.swift"]?.viewedStateRaw == DependencyUpdateFileViewedState.viewed.rawValue)
+      viewed["src/b.swift"]?.viewedStateRaw == ReviewFileViewedState.viewed.rawValue)
   }
 
   @Test("record with new headRefOid replaces files atomically")
@@ -115,7 +115,7 @@ struct DependencyUpdateFilesCacheTests {
     #expect(filesB.map(\.path) == ["src/a.swift"])
     #expect(filesB.first?.additions == 9)
 
-    let allFiles = try context.fetch(FetchDescriptor<CachedDependencyUpdateFile>())
+    let allFiles = try context.fetch(FetchDescriptor<CachedReviewFile>())
     #expect(allFiles.count == 1)
     #expect(cache.loadSummary(pullRequestID: "pr-1")?.headRefOid == "head-b")
   }
@@ -154,9 +154,9 @@ struct DependencyUpdateFilesCacheTests {
       viewedState: .dismissed
     )
 
-    let rows = try context.fetch(FetchDescriptor<CachedDependencyUpdateFileViewedState>())
+    let rows = try context.fetch(FetchDescriptor<CachedReviewFileViewedState>())
     #expect(rows.count == 1)
-    #expect(rows.first?.viewedStateRaw == DependencyUpdateFileViewedState.dismissed.rawValue)
+    #expect(rows.first?.viewedStateRaw == ReviewFileViewedState.dismissed.rawValue)
   }
 
   @Test("updateViewedState inserts a new row when none exists")
@@ -170,7 +170,7 @@ struct DependencyUpdateFilesCacheTests {
     )
     let states = cache.loadViewedStates(pullRequestID: "pr-2", headRefOid: "head-z")
     #expect(
-      states["src/new.swift"]?.viewedStateRaw == DependencyUpdateFileViewedState.viewed.rawValue)
+      states["src/new.swift"]?.viewedStateRaw == ReviewFileViewedState.viewed.rawValue)
   }
 
   @Test("deleteAll(pullRequestID:) scopes the deletion to that PR")
@@ -191,7 +191,7 @@ struct DependencyUpdateFilesCacheTests {
 
     cache.deleteAll(pullRequestID: "pr-1")
 
-    let files = try context.fetch(FetchDescriptor<CachedDependencyUpdateFile>())
+    let files = try context.fetch(FetchDescriptor<CachedReviewFile>())
     #expect(files.count == 1)
     #expect(files.first?.pullRequestID == "pr-2")
     #expect(cache.loadSummary(pullRequestID: "pr-1") == nil)
@@ -224,10 +224,10 @@ struct DependencyUpdateFilesCacheTests {
     #expect(pruned == 1)
 
     let summaries = try context.fetch(
-      FetchDescriptor<CachedDependencyUpdateFilesSummary>()
+      FetchDescriptor<CachedReviewFilesSummary>()
     )
     #expect(summaries.map(\.pullRequestID) == ["pr-new"])
-    let files = try context.fetch(FetchDescriptor<CachedDependencyUpdateFile>())
+    let files = try context.fetch(FetchDescriptor<CachedReviewFile>())
     #expect(files.map(\.pullRequestID) == ["pr-new"])
   }
 
@@ -254,8 +254,8 @@ struct DependencyUpdateFilesCacheTests {
     let (cache, context) = try makeCache()
     cache.record(response: makeResponse(pullRequestID: ""))
     cache.record(response: makeResponse(headRefOid: ""))
-    #expect(try context.fetch(FetchDescriptor<CachedDependencyUpdateFilesSummary>()).isEmpty)
-    #expect(try context.fetch(FetchDescriptor<CachedDependencyUpdateFile>()).isEmpty)
+    #expect(try context.fetch(FetchDescriptor<CachedReviewFilesSummary>()).isEmpty)
+    #expect(try context.fetch(FetchDescriptor<CachedReviewFile>()).isEmpty)
   }
 }
 
@@ -265,9 +265,9 @@ struct HarnessMonitorSchemaV21MigrationTests {
   func newTablesStartEmpty() throws {
     let container = try HarnessMonitorModelContainer.preview()
     let context = ModelContext(container)
-    #expect(try context.fetch(FetchDescriptor<CachedDependencyUpdateFilesSummary>()).isEmpty)
-    #expect(try context.fetch(FetchDescriptor<CachedDependencyUpdateFile>()).isEmpty)
-    #expect(try context.fetch(FetchDescriptor<CachedDependencyUpdateFileViewedState>()).isEmpty)
+    #expect(try context.fetch(FetchDescriptor<CachedReviewFilesSummary>()).isEmpty)
+    #expect(try context.fetch(FetchDescriptor<CachedReviewFile>()).isEmpty)
+    #expect(try context.fetch(FetchDescriptor<CachedReviewFileViewedState>()).isEmpty)
   }
 
   @Test("HarnessMonitorCurrentSchema is V21")
@@ -279,7 +279,7 @@ struct HarnessMonitorSchemaV21MigrationTests {
   func v20EntitiesStillReachable() throws {
     let container = try HarnessMonitorModelContainer.preview()
     let context = ModelContext(container)
-    let cache = DependencyUpdatesRepoSyncStateCache(context: context)
+    let cache = ReviewsRepoSyncStateCache(context: context)
     cache.recordSyncedAt(preferencesHash: "hash-a", repository: "acme/api")
     #expect(cache.loadStates(preferencesHash: "hash-a").count == 1)
   }

@@ -3,11 +3,11 @@ import XCTest
 
 @testable import HarnessMonitorKit
 
-private typealias DependencyBodySetContinuation =
-  CheckedContinuation<DependencyUpdateBodySetOutcome, Never>
+private typealias ReviewBodySetContinuation =
+  CheckedContinuation<ReviewBodySetOutcome, Never>
 
 @MainActor
-final class HarnessMonitorStoreDependencyBodyUpdateTests: XCTestCase {
+final class HarnessMonitorStoreReviewBodyUpdateTests: XCTestCase {
   private func makeStore(client: RecordingHarnessClient) throws -> HarnessMonitorStore {
     let harness = try PersistenceIntegrationTestHarness()
     let store = HarnessMonitorStore(
@@ -17,7 +17,7 @@ final class HarnessMonitorStoreDependencyBodyUpdateTests: XCTestCase {
     )
     store.connectionState = .online
     store.client = client
-    store.dependencyUpdateBodies.clear()
+    store.reviewBodies.clear()
     return store
   }
 
@@ -28,19 +28,19 @@ final class HarnessMonitorStoreDependencyBodyUpdateTests: XCTestCase {
     prUpdatedAt: String = "2026-05-21T00:00:00Z",
     fetchedAt: String = "2026-05-21T00:00:00Z"
   ) {
-    store.dependencyUpdateBodies.store(
+    store.reviewBodies.store(
       pullRequestID: id,
       body: body,
       prUpdatedAt: prUpdatedAt,
       fetchedAt: fetchedAt
     )
-    store.dependencyUpdateBodyState[id] = .loaded(body)
+    store.reviewBodyState[id] = .loaded(body)
   }
 
   func testUpdatedOutcomeConfirmsOptimisticBody() async throws {
     let client = RecordingHarnessClient()
     let id = "PR_1"
-    client.configureDependencyBodyUpdate(
+    client.configureReviewBodyUpdate(
       pullRequestID: id,
       outcome: .updated,
       currentBody: "- [x] rebase",
@@ -48,25 +48,25 @@ final class HarnessMonitorStoreDependencyBodyUpdateTests: XCTestCase {
       fetchedAt: "2026-05-22T00:00:00Z"
     )
     let store = try makeStore(client: client)
-    defer { store.dependencyUpdateBodies.clear() }
+    defer { store.reviewBodies.clear() }
     seedCache(store: store, id: id, body: "- [ ] rebase")
 
-    let outcome = await store.setDependencyUpdateBody(
+    let outcome = await store.setReviewBody(
       pullRequestID: id,
       newBody: "- [x] rebase",
       priorBody: "- [ ] rebase"
     )
 
     XCTAssertEqual(outcome, .updated)
-    XCTAssertEqual(client.dependencyBodyUpdateCallCount(), 1)
-    if case .loaded(let body) = store.dependencyUpdateBodyState[id] {
+    XCTAssertEqual(client.reviewBodyUpdateCallCount(), 1)
+    if case .loaded(let body) = store.reviewBodyState[id] {
       XCTAssertEqual(body, "- [x] rebase")
     } else {
       XCTFail("expected loaded state after successful update")
     }
-    XCTAssertEqual(store.dependencyUpdateBodies.cached(forPullRequestID: id)?.body, "- [x] rebase")
+    XCTAssertEqual(store.reviewBodies.cached(forPullRequestID: id)?.body, "- [x] rebase")
     XCTAssertEqual(
-      store.dependencyUpdateBodies.cached(forPullRequestID: id)?.prUpdatedAt,
+      store.reviewBodies.cached(forPullRequestID: id)?.prUpdatedAt,
       "2026-05-22T00:00:00Z"
     )
   }
@@ -74,7 +74,7 @@ final class HarnessMonitorStoreDependencyBodyUpdateTests: XCTestCase {
   func testBodyDriftedReplacesOptimisticWithReturnedCurrent() async throws {
     let client = RecordingHarnessClient()
     let id = "PR_1"
-    client.configureDependencyBodyUpdate(
+    client.configureReviewBodyUpdate(
       pullRequestID: id,
       outcome: .bodyDrifted,
       currentBody: "- [ ] rebase\n- [ ] new check from teammate",
@@ -82,23 +82,23 @@ final class HarnessMonitorStoreDependencyBodyUpdateTests: XCTestCase {
       fetchedAt: "2026-05-22T00:00:00Z"
     )
     let store = try makeStore(client: client)
-    defer { store.dependencyUpdateBodies.clear() }
+    defer { store.reviewBodies.clear() }
     seedCache(store: store, id: id, body: "- [ ] rebase")
 
-    let outcome = await store.setDependencyUpdateBody(
+    let outcome = await store.setReviewBody(
       pullRequestID: id,
       newBody: "- [x] rebase",
       priorBody: "- [ ] rebase"
     )
 
     XCTAssertEqual(outcome, .bodyDrifted)
-    if case .loaded(let body) = store.dependencyUpdateBodyState[id] {
+    if case .loaded(let body) = store.reviewBodyState[id] {
       XCTAssertEqual(body, "- [ ] rebase\n- [ ] new check from teammate")
     } else {
       XCTFail("expected loaded state with daemon-returned body after drift")
     }
     XCTAssertEqual(
-      store.dependencyUpdateBodies.cached(forPullRequestID: id)?.body,
+      store.reviewBodies.cached(forPullRequestID: id)?.body,
       "- [ ] rebase\n- [ ] new check from teammate"
     )
   }
@@ -106,15 +106,15 @@ final class HarnessMonitorStoreDependencyBodyUpdateTests: XCTestCase {
   func testTransportErrorRevertsToPriorBody() async throws {
     let client = RecordingHarnessClient()
     let id = "PR_1"
-    client.configureDependencyBodyUpdateError(
+    client.configureReviewBodyUpdateError(
       pullRequestID: id,
       error: HarnessMonitorAPIError.server(code: 500, message: "kaboom")
     )
     let store = try makeStore(client: client)
-    defer { store.dependencyUpdateBodies.clear() }
+    defer { store.reviewBodies.clear() }
     seedCache(store: store, id: id, body: "- [ ] rebase")
 
-    let outcome = await store.setDependencyUpdateBody(
+    let outcome = await store.setReviewBody(
       pullRequestID: id,
       newBody: "- [x] rebase",
       priorBody: "- [ ] rebase"
@@ -126,30 +126,30 @@ final class HarnessMonitorStoreDependencyBodyUpdateTests: XCTestCase {
     case .updated, .bodyDrifted:
       XCTFail("expected failed outcome, got \(outcome)")
     }
-    if case .loaded(let body) = store.dependencyUpdateBodyState[id] {
+    if case .loaded(let body) = store.reviewBodyState[id] {
       XCTAssertEqual(body, "- [ ] rebase")
     } else {
       XCTFail("expected revert to prior body")
     }
-    XCTAssertEqual(store.dependencyUpdateBodies.cached(forPullRequestID: id)?.body, "- [ ] rebase")
+    XCTAssertEqual(store.reviewBodies.cached(forPullRequestID: id)?.body, "- [ ] rebase")
   }
 
   func testMissingDaemonReturnsFailedAndReverts() async throws {
     let client = RecordingHarnessClient()
     let id = "PR_1"
     let store = try makeStore(client: client)
-    defer { store.dependencyUpdateBodies.clear() }
+    defer { store.reviewBodies.clear() }
     seedCache(store: store, id: id, body: "- [ ] rebase")
     store.client = nil
 
-    let outcome = await store.setDependencyUpdateBody(
+    let outcome = await store.setReviewBody(
       pullRequestID: id,
       newBody: "- [x] rebase",
       priorBody: "- [ ] rebase"
     )
 
     XCTAssertEqual(outcome, .failed("Daemon unavailable"))
-    if case .loaded(let body) = store.dependencyUpdateBodyState[id] {
+    if case .loaded(let body) = store.reviewBodyState[id] {
       XCTAssertEqual(body, "- [ ] rebase")
     } else {
       XCTFail("expected loaded state after revert")
@@ -160,23 +160,23 @@ final class HarnessMonitorStoreDependencyBodyUpdateTests: XCTestCase {
     let client = RecordingHarnessClient()
     let id = "PR_1"
     let priorBody = "- [ ] rebase\n"
-    client.configureDependencyBodyUpdate(
+    client.configureReviewBodyUpdate(
       pullRequestID: id,
       outcome: .updated,
       currentBody: "- [x] rebase\n"
     )
     let store = try makeStore(client: client)
-    defer { store.dependencyUpdateBodies.clear() }
+    defer { store.reviewBodies.clear() }
     seedCache(store: store, id: id, body: priorBody)
 
-    _ = await store.setDependencyUpdateBody(
+    _ = await store.setReviewBody(
       pullRequestID: id,
       newBody: "- [x] rebase\n",
       priorBody: priorBody
     )
 
     let expectedHash = HarnessMonitorStore.sha256Hex(of: priorBody)
-    let recorded = client.dependencyBodyUpdateRequests
+    let recorded = client.reviewBodyUpdateRequests
     XCTAssertEqual(recorded.count, 1)
     XCTAssertEqual(recorded.first?.expectedPriorBodySHA256, expectedHash)
     XCTAssertEqual(expectedHash.count, 64)
@@ -195,27 +195,27 @@ final class HarnessMonitorStoreDependencyBodyUpdateTests: XCTestCase {
     let priorBody = "- [ ] rebase\n"
     let intermediate = "- [x] rebase\n"
     let finalBody = "- [ ] rebase\n"
-    client.configureDependencyBodyUpdate(
+    client.configureReviewBodyUpdate(
       pullRequestID: id,
       outcome: .updated,
       currentBody: finalBody
     )
     let store = try makeStore(client: client)
-    defer { store.dependencyUpdateBodies.clear() }
+    defer { store.reviewBodies.clear() }
     seedCache(store: store, id: id, body: priorBody)
 
-    let outcome = await withCheckedContinuation { (continuation: DependencyBodySetContinuation) in
-      store.coalesceDependencyUpdateBodyEdit(
+    let outcome = await withCheckedContinuation { (continuation: ReviewBodySetContinuation) in
+      store.coalesceReviewBodyEdit(
         pullRequestID: id, newBody: intermediate, priorBody: priorBody, debounceMillis: 30
       )
-      store.coalesceDependencyUpdateBodyEdit(
+      store.coalesceReviewBodyEdit(
         pullRequestID: id, newBody: finalBody, priorBody: intermediate, debounceMillis: 30
       ) { result in continuation.resume(returning: result) }
     }
 
     XCTAssertEqual(outcome, .updated)
-    XCTAssertEqual(client.dependencyBodyUpdateCallCount(), 1)
-    let recorded = client.dependencyBodyUpdateRequests.first
+    XCTAssertEqual(client.reviewBodyUpdateCallCount(), 1)
+    let recorded = client.reviewBodyUpdateRequests.first
     XCTAssertEqual(recorded?.newBody, finalBody)
     XCTAssertEqual(
       recorded?.expectedPriorBodySHA256, HarnessMonitorStore.sha256Hex(of: priorBody))
@@ -225,26 +225,26 @@ final class HarnessMonitorStoreDependencyBodyUpdateTests: XCTestCase {
     let client = RecordingHarnessClient()
     let id = "PR_1"
     let priorBody = "- [ ] rebase\n"
-    client.configureDependencyBodyUpdate(
+    client.configureReviewBodyUpdate(
       pullRequestID: id, outcome: .updated, currentBody: "- [x] rebase\n")
     let store = try makeStore(client: client)
-    defer { store.dependencyUpdateBodies.clear() }
+    defer { store.reviewBodies.clear() }
     seedCache(store: store, id: id, body: priorBody)
 
-    store.coalesceDependencyUpdateBodyEdit(
+    store.coalesceReviewBodyEdit(
       pullRequestID: id,
       newBody: "- [x] rebase\n",
       priorBody: priorBody,
       debounceMillis: 1_000
     )
 
-    if case .loaded(let body) = store.dependencyUpdateBodyState[id] {
+    if case .loaded(let body) = store.reviewBodyState[id] {
       XCTAssertEqual(body, "- [x] rebase\n")
     } else {
       XCTFail("expected optimistic loaded state")
     }
-    XCTAssertEqual(client.dependencyBodyUpdateCallCount(), 0)
-    store.pendingDependencyUpdateBodyEdits[id]?.task.cancel()
-    store.pendingDependencyUpdateBodyEdits[id] = nil
+    XCTAssertEqual(client.reviewBodyUpdateCallCount(), 0)
+    store.pendingReviewBodyEdits[id]?.task.cancel()
+    store.pendingReviewBodyEdits[id] = nil
   }
 }

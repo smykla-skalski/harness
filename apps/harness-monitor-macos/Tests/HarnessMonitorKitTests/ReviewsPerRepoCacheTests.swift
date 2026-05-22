@@ -5,7 +5,7 @@ import XCTest
 @testable import HarnessMonitorKit
 
 @MainActor
-final class DependencyUpdatesPerRepoCacheTests: XCTestCase {
+final class ReviewsPerRepoCacheTests: XCTestCase {
   func testApplyPerRepoResponseLeavesOtherReposUntouched() {
     let cached = [
       makeItem(pullRequestID: "pr_a1", repository: "acme/api"),
@@ -16,7 +16,7 @@ final class DependencyUpdatesPerRepoCacheTests: XCTestCase {
       makeItem(pullRequestID: "pr_a1", repository: "acme/api", reviewStatus: .approved)
     ])
 
-    let result = DependencyUpdatesCache.applyPerRepoResponseToItems(
+    let result = ReviewsCache.applyPerRepoResponseToItems(
       cached,
       repository: "acme/api",
       response: response
@@ -37,7 +37,7 @@ final class DependencyUpdatesPerRepoCacheTests: XCTestCase {
       makeItem(pullRequestID: "pr_a2", repository: "acme/api", reviewStatus: .reviewRequired),
     ])
 
-    let result = DependencyUpdatesCache.applyPerRepoResponseToItems(
+    let result = ReviewsCache.applyPerRepoResponseToItems(
       cached,
       repository: "acme/api",
       response: response
@@ -73,7 +73,7 @@ final class DependencyUpdatesPerRepoCacheTests: XCTestCase {
       )
     ])
 
-    let result = DependencyUpdatesCache.applyPerRepoResponseToItems(
+    let result = ReviewsCache.applyPerRepoResponseToItems(
       cached,
       repository: "acme/api",
       response: response
@@ -93,7 +93,7 @@ final class DependencyUpdatesPerRepoCacheTests: XCTestCase {
       makeItem(pullRequestID: "pr_a1", repository: "acme/api")
     ])
 
-    let result = DependencyUpdatesCache.applyPerRepoResponseToItems(
+    let result = ReviewsCache.applyPerRepoResponseToItems(
       cached,
       repository: "acme/api",
       response: response
@@ -112,7 +112,7 @@ final class DependencyUpdatesPerRepoCacheTests: XCTestCase {
       makeItem(pullRequestID: "pr_a_new", repository: "acme/api"),
     ])
 
-    let result = DependencyUpdatesCache.applyPerRepoResponseToItems(
+    let result = ReviewsCache.applyPerRepoResponseToItems(
       cached,
       repository: "acme/api",
       response: response
@@ -129,7 +129,7 @@ final class DependencyUpdatesPerRepoCacheTests: XCTestCase {
     ]
     let response = makeResponse(items: [])
 
-    let result = DependencyUpdatesCache.applyPerRepoResponseToItems(
+    let result = ReviewsCache.applyPerRepoResponseToItems(
       cached,
       repository: "acme/api",
       response: response
@@ -140,7 +140,7 @@ final class DependencyUpdatesPerRepoCacheTests: XCTestCase {
 
   func testApplyPerRepoResponsePersistsAndReturnsReconciledSnapshot() throws {
     let context = try makeContext()
-    let cache = DependencyUpdatesCache(context: context)
+    let cache = ReviewsCache(context: context)
     cache.save(
       preferencesHash: "alpha",
       response: makeResponse(items: [
@@ -149,10 +149,10 @@ final class DependencyUpdatesPerRepoCacheTests: XCTestCase {
       ])
     )
 
-    let response = DependencyUpdatesQueryResponse(
+    let response = ReviewsQueryResponse(
       fetchedAt: "2026-05-21T12:00:00Z",
       fromCache: false,
-      summary: DependencyUpdatesSummary(items: []),
+      summary: ReviewsSummary(items: []),
       items: [makeItem(pullRequestID: "pr_a_new", repository: "acme/api")]
     )
     let reconciled = try XCTUnwrap(
@@ -176,7 +176,7 @@ final class DependencyUpdatesPerRepoCacheTests: XCTestCase {
 
   func testApplyPerRepoResponseReturnsNilWhenNoSnapshotExists() throws {
     let context = try makeContext()
-    let cache = DependencyUpdatesCache(context: context)
+    let cache = ReviewsCache(context: context)
     let response = makeResponse(items: [
       makeItem(pullRequestID: "pr_a1", repository: "acme/api")
     ])
@@ -191,17 +191,17 @@ final class DependencyUpdatesPerRepoCacheTests: XCTestCase {
 
   func testApplyPerRepoResponsePreservesLabelsWhenResponseLabelsEmpty() throws {
     let context = try makeContext()
-    let cache = DependencyUpdatesCache(context: context)
+    let cache = ReviewsCache(context: context)
     let seededLabels = [
-      DependencyUpdateRepositoryLabel(name: "bug", color: "d73a4a", description: nil),
-      DependencyUpdateRepositoryLabel(name: "release", color: "0e8a16", description: nil),
+      ReviewRepositoryLabel(name: "bug", color: "d73a4a", description: nil),
+      ReviewRepositoryLabel(name: "release", color: "0e8a16", description: nil),
     ]
     cache.save(
       preferencesHash: "alpha",
-      response: DependencyUpdatesQueryResponse(
+      response: ReviewsQueryResponse(
         fetchedAt: "2026-05-21T10:00:00Z",
         fromCache: false,
-        summary: DependencyUpdatesSummary(
+        summary: ReviewsSummary(
           items: [makeItem(pullRequestID: "pr_a1", repository: "acme/api")]
         ),
         items: [makeItem(pullRequestID: "pr_a1", repository: "acme/api")],
@@ -209,10 +209,10 @@ final class DependencyUpdatesPerRepoCacheTests: XCTestCase {
       )
     )
 
-    let response = DependencyUpdatesQueryResponse(
+    let response = ReviewsQueryResponse(
       fetchedAt: "2026-05-21T12:00:00Z",
       fromCache: false,
-      summary: DependencyUpdatesSummary(
+      summary: ReviewsSummary(
         items: [makeItem(pullRequestID: "pr_a1", repository: "acme/api")]
       ),
       items: [makeItem(pullRequestID: "pr_a1", repository: "acme/api")],
@@ -238,11 +238,11 @@ final class DependencyUpdatesPerRepoCacheTests: XCTestCase {
     return ModelContext(container)
   }
 
-  private func makeResponse(items: [DependencyUpdateItem]) -> DependencyUpdatesQueryResponse {
-    DependencyUpdatesQueryResponse(
+  private func makeResponse(items: [ReviewItem]) -> ReviewsQueryResponse {
+    ReviewsQueryResponse(
       fetchedAt: "2026-05-21T10:00:00Z",
       fromCache: false,
-      summary: DependencyUpdatesSummary(items: items),
+      summary: ReviewsSummary(items: items),
       items: items
     )
   }
@@ -250,11 +250,11 @@ final class DependencyUpdatesPerRepoCacheTests: XCTestCase {
   private func makeItem(
     pullRequestID: String,
     repository: String = "acme/api",
-    state: DependencyUpdatePullRequestState = .open,
-    reviewStatus: DependencyUpdateReviewStatus = .reviewRequired,
+    state: ReviewPullRequestState = .open,
+    reviewStatus: ReviewReviewStatus = .reviewRequired,
     updatedAt: String = "2026-05-20T12:00:00Z"
-  ) -> DependencyUpdateItem {
-    DependencyUpdateItem(
+  ) -> ReviewItem {
+    ReviewItem(
       pullRequestID: pullRequestID,
       repositoryID: "\(repository)#node",
       repository: repository,

@@ -19,7 +19,7 @@ struct RepositoryLabelUsageCacheTests {
     cache.recordUse(repository: "owner/repo", label: "renovate")
     cache.recordUse(repository: "owner/repo", label: "dependencies")
 
-    let rows = try context.fetch(FetchDescriptor<CachedDependencyLabelUsage>())
+    let rows = try context.fetch(FetchDescriptor<CachedReviewLabelUsage>())
     #expect(rows.count == 2)
     let renovate = try #require(rows.first { $0.label == "renovate" })
     let dependencies = try #require(rows.first { $0.label == "dependencies" })
@@ -34,7 +34,7 @@ struct RepositoryLabelUsageCacheTests {
     cache.recordUse(repository: "", label: "renovate")
     cache.recordUse(repository: "owner/repo", label: "")
 
-    let rows = try context.fetch(FetchDescriptor<CachedDependencyLabelUsage>())
+    let rows = try context.fetch(FetchDescriptor<CachedReviewLabelUsage>())
     #expect(rows.isEmpty)
   }
 
@@ -86,7 +86,7 @@ struct RepositoryLabelUsageCacheTests {
 
     cache.deleteAll()
 
-    let rows = try context.fetch(FetchDescriptor<CachedDependencyLabelUsage>())
+    let rows = try context.fetch(FetchDescriptor<CachedReviewLabelUsage>())
     #expect(rows.isEmpty)
   }
 }

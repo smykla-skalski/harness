@@ -4,9 +4,9 @@ import XCTest
 @testable import HarnessMonitorKit
 
 @MainActor
-final class HarnessMonitorStoreDependencyTimelineTests: XCTestCase {
-  private func makeItem(pullRequestID: String = "PR_t1") -> DependencyUpdateItem {
-    DependencyUpdateItem(
+final class HarnessMonitorStoreReviewTimelineTests: XCTestCase {
+  private func makeItem(pullRequestID: String = "PR_t1") -> ReviewItem {
+    ReviewItem(
       pullRequestID: pullRequestID,
       repositoryID: "repo_1",
       repository: "acme/api",
@@ -42,14 +42,14 @@ final class HarnessMonitorStoreDependencyTimelineTests: XCTestCase {
 
   private func samplePage(
     pullRequestID: String,
-    entries: [DependencyUpdateTimelineEntry],
+    entries: [ReviewTimelineEntry],
     startCursor: String? = nil,
     hasOlder: Bool = false
-  ) -> DependencyUpdatesTimelineResponse {
-    DependencyUpdatesTimelineResponse(
+  ) -> ReviewsTimelineResponse {
+    ReviewsTimelineResponse(
       pullRequestId: pullRequestID,
       entries: entries,
-      pageInfo: DependencyUpdateTimelinePageInfo(
+      pageInfo: ReviewTimelinePageInfo(
         startCursor: startCursor,
         endCursor: "end",
         hasOlder: hasOlder,
@@ -60,13 +60,13 @@ final class HarnessMonitorStoreDependencyTimelineTests: XCTestCase {
     )
   }
 
-  private func comment(id: String, body: String) -> DependencyUpdateTimelineEntry {
+  private func comment(id: String, body: String) -> ReviewTimelineEntry {
     .issueComment(IssueCommentPayload(id: id, createdAt: "2026-05-22T10:00:00Z", body: body))
   }
 
   func testPrepareFetchesAndPopulatesViewModel() async throws {
     let client = RecordingHarnessClient()
-    client.enqueueDependencyTimelineResponse(
+    client.enqueueReviewTimelineResponse(
       samplePage(
         pullRequestID: "PR_t1",
         entries: [comment(id: "IC_1", body: "first")],
@@ -76,11 +76,11 @@ final class HarnessMonitorStoreDependencyTimelineTests: XCTestCase {
     )
     let store = try makeStore(client: client)
 
-    await store.prepareDependencyUpdateTimeline(for: makeItem(), pageSize: 30)
+    await store.prepareReviewTimeline(for: makeItem(), pageSize: 30)
 
-    XCTAssertEqual(client.dependencyTimelineFetchCount(), 1)
-    XCTAssertEqual(client.dependencyTimelineRequestedPageSizes(for: "PR_t1"), [30])
-    let vm = store.dependencyUpdateTimelineViewModel(for: "PR_t1")
+    XCTAssertEqual(client.reviewTimelineFetchCount(), 1)
+    XCTAssertEqual(client.reviewTimelineRequestedPageSizes(for: "PR_t1"), [30])
+    let vm = store.reviewTimelineViewModel(for: "PR_t1")
     XCTAssertEqual(vm.entries.map(\.id), ["IC_1"])
     XCTAssertTrue(vm.hasOlder)
     XCTAssertEqual(vm.startCursor, "s1")
@@ -89,16 +89,16 @@ final class HarnessMonitorStoreDependencyTimelineTests: XCTestCase {
 
   func testPrepareIsIdempotentForCachedEntries() async throws {
     let client = RecordingHarnessClient()
-    client.enqueueDependencyTimelineResponse(
+    client.enqueueReviewTimelineResponse(
       samplePage(pullRequestID: "PR_t1", entries: [comment(id: "IC_1", body: "first")])
     )
     let store = try makeStore(client: client)
-    await store.prepareDependencyUpdateTimeline(for: makeItem())
-    XCTAssertEqual(client.dependencyTimelineFetchCount(), 1)
+    await store.prepareReviewTimeline(for: makeItem())
+    XCTAssertEqual(client.reviewTimelineFetchCount(), 1)
 
-    await store.prepareDependencyUpdateTimeline(for: makeItem())
+    await store.prepareReviewTimeline(for: makeItem())
     XCTAssertEqual(
-      client.dependencyTimelineFetchCount(),
+      client.reviewTimelineFetchCount(),
       1,
       "second call should short-circuit on populated view model"
     )
@@ -106,39 +106,39 @@ final class HarnessMonitorStoreDependencyTimelineTests: XCTestCase {
 
   func testForceRefreshRefetches() async throws {
     let client = RecordingHarnessClient()
-    client.enqueueDependencyTimelineResponse(
+    client.enqueueReviewTimelineResponse(
       samplePage(pullRequestID: "PR_t1", entries: [comment(id: "IC_1", body: "first")])
     )
-    client.enqueueDependencyTimelineResponse(
+    client.enqueueReviewTimelineResponse(
       samplePage(pullRequestID: "PR_t1", entries: [comment(id: "IC_2", body: "second")])
     )
     let store = try makeStore(client: client)
-    await store.prepareDependencyUpdateTimeline(for: makeItem())
-    await store.prepareDependencyUpdateTimeline(for: makeItem(), forceRefresh: true)
+    await store.prepareReviewTimeline(for: makeItem())
+    await store.prepareReviewTimeline(for: makeItem(), forceRefresh: true)
 
-    XCTAssertEqual(client.dependencyTimelineFetchCount(), 2)
-    let vm = store.dependencyUpdateTimelineViewModel(for: "PR_t1")
+    XCTAssertEqual(client.reviewTimelineFetchCount(), 2)
+    let vm = store.reviewTimelineViewModel(for: "PR_t1")
     XCTAssertEqual(vm.entries.map(\.id), ["IC_2"])
   }
 
   func testConcurrentPreparesCollapseToSingleFetch() async throws {
     let client = RecordingHarnessClient()
-    client.enqueueDependencyTimelineResponse(
+    client.enqueueReviewTimelineResponse(
       samplePage(pullRequestID: "PR_t1", entries: [comment(id: "IC_1", body: "first")])
     )
     let gate = AsyncGate()
-    client.setDependencyTimelineFetchHook { _ in await gate.wait() }
+    client.setReviewTimelineFetchHook { _ in await gate.wait() }
     let store = try makeStore(client: client)
     let item = makeItem()
 
-    async let first: () = store.prepareDependencyUpdateTimeline(for: item)
-    async let second: () = store.prepareDependencyUpdateTimeline(for: item)
+    async let first: () = store.prepareReviewTimeline(for: item)
+    async let second: () = store.prepareReviewTimeline(for: item)
     try await Task.sleep(nanoseconds: 20_000_000)
     await gate.open()
     _ = await (first, second)
 
     XCTAssertEqual(
-      client.dependencyTimelineFetchCount(),
+      client.reviewTimelineFetchCount(),
       1,
       "second concurrent call should dedupe on pending key"
     )
@@ -146,7 +146,7 @@ final class HarnessMonitorStoreDependencyTimelineTests: XCTestCase {
 
   func testLoadOlderAdvancesCursor() async throws {
     let client = RecordingHarnessClient()
-    client.enqueueDependencyTimelineResponse(
+    client.enqueueReviewTimelineResponse(
       samplePage(
         pullRequestID: "PR_t1",
         entries: [comment(id: "IC_2", body: "second")],
@@ -154,7 +154,7 @@ final class HarnessMonitorStoreDependencyTimelineTests: XCTestCase {
         hasOlder: true
       )
     )
-    client.enqueueDependencyTimelineResponse(
+    client.enqueueReviewTimelineResponse(
       samplePage(
         pullRequestID: "PR_t1",
         entries: [comment(id: "IC_1", body: "first")],
@@ -163,14 +163,14 @@ final class HarnessMonitorStoreDependencyTimelineTests: XCTestCase {
       )
     )
     let store = try makeStore(client: client)
-    await store.prepareDependencyUpdateTimeline(for: makeItem())
-    await store.loadOlderDependencyUpdateTimeline(for: makeItem(), pageSize: 20)
+    await store.prepareReviewTimeline(for: makeItem())
+    await store.loadOlderReviewTimeline(for: makeItem(), pageSize: 20)
 
-    XCTAssertEqual(client.dependencyTimelineFetchCount(), 2)
-    let cursors = client.dependencyTimelineRequestedCursors(for: "PR_t1")
+    XCTAssertEqual(client.reviewTimelineFetchCount(), 2)
+    let cursors = client.reviewTimelineRequestedCursors(for: "PR_t1")
     XCTAssertEqual(cursors, [nil, "s1"])
-    XCTAssertEqual(client.dependencyTimelineRequestedPageSizes(for: "PR_t1"), [50, 20])
-    let vm = store.dependencyUpdateTimelineViewModel(for: "PR_t1")
+    XCTAssertEqual(client.reviewTimelineRequestedPageSizes(for: "PR_t1"), [50, 20])
+    let vm = store.reviewTimelineViewModel(for: "PR_t1")
     XCTAssertEqual(vm.entries.map(\.id), ["IC_1", "IC_2"])
     XCTAssertFalse(vm.hasOlder)
   }
@@ -180,12 +180,12 @@ final class HarnessMonitorStoreDependencyTimelineTests: XCTestCase {
     struct Boom: Error, LocalizedError {
       var errorDescription: String? { "boom" }
     }
-    client.configureDependencyTimelineError(pullRequestID: "PR_t1", error: Boom())
+    client.configureReviewTimelineError(pullRequestID: "PR_t1", error: Boom())
     let store = try makeStore(client: client)
 
-    await store.prepareDependencyUpdateTimeline(for: makeItem())
+    await store.prepareReviewTimeline(for: makeItem())
 
-    let vm = store.dependencyUpdateTimelineViewModel(for: "PR_t1")
+    let vm = store.reviewTimelineViewModel(for: "PR_t1")
     XCTAssertEqual(vm.loadState, .failed)
     XCTAssertEqual(vm.lastError, "boom")
     XCTAssertTrue(vm.entries.isEmpty)
