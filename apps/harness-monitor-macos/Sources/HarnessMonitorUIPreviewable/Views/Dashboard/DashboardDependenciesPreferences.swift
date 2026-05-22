@@ -23,6 +23,23 @@ struct DashboardDependenciesPreferences: Codable, Equatable {
   var perRepositoryIntervalSeconds: UInt64 = 300
   var maxConcurrentRepositoryFetches: Int = 2
   var expandOrganizations: Bool = true
+  var filesEnabled: Bool = true
+  var filesDefaultViewModeRaw: String = FilesViewMode.unified.rawValue
+  var filesSplitMinColumnPoints: Int = 280
+  var filesAutoPrefetchPatchCap: Int = 25
+  var filesAutoCollapseHunkLineThreshold: Int = 500
+  var filesHideGenerated: Bool = true
+  var filesGeneratedPatterns: [String] = Self.defaultGeneratedPatterns
+  var filesHideWhitespaceOnly: Bool = false
+  var filesMarkViewedSyncWithGitHub: Bool = true
+  var filesShowImagePreview: Bool = true
+  var filesTreeDefaultExpandedDepth: Int = 2
+  var filesImagePreviewMaxBytes: Int = 5 * 1024 * 1024
+  var filesLargeDiffStrategyRaw: String = FilesLargeDiffStrategy.autoLocalClone.rawValue
+  var filesLocalCloneThresholdLines: Int = 500
+  var filesLocalCloneDiskBudgetMB: Int = 5_120
+  var filesLocalCloneMaxAgeDays: Int = 30
+  var filesAccessibilityPerLineMode: Bool = false
 
   enum CodingKeys: String, CodingKey {
     case authorsText
@@ -37,7 +54,41 @@ struct DashboardDependenciesPreferences: Codable, Equatable {
     case perRepositoryIntervalSeconds
     case maxConcurrentRepositoryFetches
     case expandOrganizations
+    case filesEnabled
+    case filesDefaultViewModeRaw
+    case filesSplitMinColumnPoints
+    case filesAutoPrefetchPatchCap
+    case filesAutoCollapseHunkLineThreshold
+    case filesHideGenerated
+    case filesGeneratedPatterns
+    case filesHideWhitespaceOnly
+    case filesMarkViewedSyncWithGitHub
+    case filesShowImagePreview
+    case filesTreeDefaultExpandedDepth
+    case filesImagePreviewMaxBytes
+    case filesLargeDiffStrategyRaw
+    case filesLocalCloneThresholdLines
+    case filesLocalCloneDiskBudgetMB
+    case filesLocalCloneMaxAgeDays
+    case filesAccessibilityPerLineMode
   }
+
+  static let defaultGeneratedPatterns: [String] = [
+    "(^|/)package-lock\\.json$",
+    "(^|/)yarn\\.lock$",
+    "(^|/)pnpm-lock\\.yaml$",
+    "(^|/)Cargo\\.lock$",
+    "(^|/)Package\\.resolved$",
+    "(^|/)Gemfile\\.lock$",
+    "(^|/)poetry\\.lock$",
+    "(^|/)go\\.sum$",
+    "(^|/)vendor/",
+    "(^|/)node_modules/",
+    "(^|/)dist/",
+    "\\.pb\\.go$",
+    "\\.pb\\.cc$",
+    "\\.generated\\.(swift|ts|js)$",
+  ]
 
   init() {}
 
@@ -79,6 +130,64 @@ struct DashboardDependenciesPreferences: Codable, Equatable {
     expandOrganizations =
       try container.decodeIfPresent(Bool.self, forKey: .expandOrganizations)
       ?? defaults.expandOrganizations
+    filesEnabled =
+      try container.decodeIfPresent(Bool.self, forKey: .filesEnabled) ?? defaults.filesEnabled
+    filesDefaultViewModeRaw =
+      try container.decodeIfPresent(String.self, forKey: .filesDefaultViewModeRaw)
+      ?? defaults.filesDefaultViewModeRaw
+    filesSplitMinColumnPoints =
+      try container.decodeIfPresent(Int.self, forKey: .filesSplitMinColumnPoints)
+      ?? defaults.filesSplitMinColumnPoints
+    filesAutoPrefetchPatchCap =
+      try container.decodeIfPresent(Int.self, forKey: .filesAutoPrefetchPatchCap)
+      ?? defaults.filesAutoPrefetchPatchCap
+    filesAutoCollapseHunkLineThreshold =
+      try container.decodeIfPresent(Int.self, forKey: .filesAutoCollapseHunkLineThreshold)
+      ?? defaults.filesAutoCollapseHunkLineThreshold
+    filesHideGenerated =
+      try container.decodeIfPresent(Bool.self, forKey: .filesHideGenerated)
+      ?? defaults.filesHideGenerated
+    filesGeneratedPatterns =
+      try container.decodeIfPresent([String].self, forKey: .filesGeneratedPatterns)
+      ?? defaults.filesGeneratedPatterns
+    filesHideWhitespaceOnly =
+      try container.decodeIfPresent(Bool.self, forKey: .filesHideWhitespaceOnly)
+      ?? defaults.filesHideWhitespaceOnly
+    filesMarkViewedSyncWithGitHub =
+      try container.decodeIfPresent(Bool.self, forKey: .filesMarkViewedSyncWithGitHub)
+      ?? defaults.filesMarkViewedSyncWithGitHub
+    filesShowImagePreview =
+      try container.decodeIfPresent(Bool.self, forKey: .filesShowImagePreview)
+      ?? defaults.filesShowImagePreview
+    filesTreeDefaultExpandedDepth =
+      try container.decodeIfPresent(Int.self, forKey: .filesTreeDefaultExpandedDepth)
+      ?? defaults.filesTreeDefaultExpandedDepth
+    filesImagePreviewMaxBytes =
+      try container.decodeIfPresent(Int.self, forKey: .filesImagePreviewMaxBytes)
+      ?? defaults.filesImagePreviewMaxBytes
+    filesLargeDiffStrategyRaw =
+      try container.decodeIfPresent(String.self, forKey: .filesLargeDiffStrategyRaw)
+      ?? defaults.filesLargeDiffStrategyRaw
+    filesLocalCloneThresholdLines =
+      try container.decodeIfPresent(Int.self, forKey: .filesLocalCloneThresholdLines)
+      ?? defaults.filesLocalCloneThresholdLines
+    filesLocalCloneDiskBudgetMB =
+      try container.decodeIfPresent(Int.self, forKey: .filesLocalCloneDiskBudgetMB)
+      ?? defaults.filesLocalCloneDiskBudgetMB
+    filesLocalCloneMaxAgeDays =
+      try container.decodeIfPresent(Int.self, forKey: .filesLocalCloneMaxAgeDays)
+      ?? defaults.filesLocalCloneMaxAgeDays
+    filesAccessibilityPerLineMode =
+      try container.decodeIfPresent(Bool.self, forKey: .filesAccessibilityPerLineMode)
+      ?? defaults.filesAccessibilityPerLineMode
+  }
+
+  var filesDefaultViewMode: FilesViewMode {
+    FilesViewMode(rawValue: filesDefaultViewModeRaw) ?? .unified
+  }
+
+  var filesLargeDiffStrategy: FilesLargeDiffStrategy {
+    FilesLargeDiffStrategy(rawValue: filesLargeDiffStrategyRaw) ?? .autoLocalClone
   }
 
   var mergeMethod: TaskBoardGitHubMergeMethod {
