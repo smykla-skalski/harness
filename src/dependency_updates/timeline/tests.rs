@@ -23,6 +23,12 @@ fn pull_request_node(envelope: &Value) -> &Value {
         .expect("envelope has /data/node")
 }
 
+// Real captured production response from smykla-skalski/harness#152 — a
+// Renovate PR closed without merge. Exercises the realistic Renovate flow
+// (label → approval review → multiple force-pushes → final commit → close
+// → branch delete → Renovate ignore notification) so the mapping contract
+// is verified against the actual GitHub GraphQL shape, not hand-built
+// approximations.
 #[test]
 fn mixed_page_maps_all_supported_kinds() {
     let env = parse(MIXED_PAGE);
@@ -31,54 +37,107 @@ fn mixed_page_maps_all_supported_kinds() {
         .and_then(Value::as_array)
         .expect("nodes array");
     let entries: Vec<_> = nodes.iter().filter_map(mapping::map_node).collect();
-    assert_eq!(entries.len(), 5, "all five nodes should map");
-    assert!(matches!(entries[0], DependencyUpdateTimelineEntry::IssueComment(_)));
+    assert_eq!(entries.len(), 9, "all nine nodes should map");
     assert!(matches!(
-        entries[1],
+        entries[0],
         DependencyUpdateTimelineEntry::SimpleActorEvent(SimpleActorEventEntry {
             event_kind: SimpleActorEventKind::Labeled,
             ..
         })
     ));
-    assert!(matches!(entries[2], DependencyUpdateTimelineEntry::Commit(_)));
-    assert!(matches!(entries[3], DependencyUpdateTimelineEntry::Review(_)));
+    assert!(matches!(entries[1], DependencyUpdateTimelineEntry::Review(_)));
     assert!(matches!(
-        entries[4],
+        entries[2],
         DependencyUpdateTimelineEntry::HeadRefForcePushed(_)
     ));
+    assert!(matches!(
+        entries[3],
+        DependencyUpdateTimelineEntry::HeadRefForcePushed(_)
+    ));
+    assert!(matches!(entries[4], DependencyUpdateTimelineEntry::Commit(_)));
+    assert!(matches!(
+        entries[5],
+        DependencyUpdateTimelineEntry::HeadRefForcePushed(_)
+    ));
+    assert!(matches!(
+        entries[6],
+        DependencyUpdateTimelineEntry::SimpleActorEvent(SimpleActorEventEntry {
+            event_kind: SimpleActorEventKind::Closed,
+            ..
+        })
+    ));
+    assert!(matches!(
+        entries[7],
+        DependencyUpdateTimelineEntry::SimpleActorEvent(SimpleActorEventEntry {
+            event_kind: SimpleActorEventKind::HeadRefDeleted,
+            ..
+        })
+    ));
+    assert!(matches!(
+        entries[8],
+        DependencyUpdateTimelineEntry::IssueComment(_)
+    ));
 
-    let DependencyUpdateTimelineEntry::IssueComment(c) = &entries[0] else {
-        panic!("expected IssueComment");
-    };
-    assert_eq!(c.body, "LGTM");
-    assert!(c.viewer_did_author);
-    assert_eq!(c.reactions_total, 2);
-
-    let DependencyUpdateTimelineEntry::SimpleActorEvent(l) = &entries[1] else {
-        panic!("expected SimpleActorEvent");
+    let DependencyUpdateTimelineEntry::SimpleActorEvent(l) = &entries[0] else {
+        panic!("expected LabeledEvent");
     };
     assert_eq!(l.label.as_deref(), Some("dependencies"));
-    assert_eq!(l.label_color.as_deref(), Some("0366d6"));
+    assert_eq!(l.label_color.as_deref(), Some("ededed"));
+    assert_eq!(
+        l.actor.as_ref().map(|a| a.login.as_str()),
+        Some("renovate"),
+    );
 
-    let DependencyUpdateTimelineEntry::Commit(commit) = &entries[2] else {
-        panic!("expected Commit");
-    };
-    assert_eq!(commit.abbreviated_oid, "abcd123");
-    assert_eq!(commit.author_login.as_deref(), Some("renovate"));
-
-    let DependencyUpdateTimelineEntry::Review(r) = &entries[3] else {
+    let DependencyUpdateTimelineEntry::Review(r) = &entries[1] else {
         panic!("expected Review");
     };
     assert_eq!(r.state, ReviewState::Approved);
+    assert!(r.body.is_empty(), "GitHub web ships approvals with empty body");
     assert_eq!(r.inline_comments.len(), 0);
     assert!(!r.comments_truncated);
 
-    let DependencyUpdateTimelineEntry::HeadRefForcePushed(f) = &entries[4] else {
+    let DependencyUpdateTimelineEntry::HeadRefForcePushed(f0) = &entries[2] else {
         panic!("expected HeadRefForcePushed");
     };
-    assert_eq!(f.before_abbreviated_oid, "1111111");
-    assert_eq!(f.after_abbreviated_oid, "2222222");
-    assert_eq!(f.ref_name.as_deref(), Some("renovate/foo-v2"));
+    assert_eq!(f0.before_abbreviated_oid, "aedcb8c");
+    assert_eq!(f0.after_abbreviated_oid, "b3b0183");
+    assert!(
+        f0.ref_name.is_none(),
+        "production responses leave ref null on Renovate force-pushes",
+    );
+
+    let DependencyUpdateTimelineEntry::Commit(commit) = &entries[4] else {
+        panic!("expected Commit");
+    };
+    assert_eq!(commit.abbreviated_oid, "c4de983");
+    assert_eq!(commit.author_login.as_deref(), Some("renovate[bot]"));
+    assert_eq!(
+        commit.message_headline,
+        "fix(deps): update opentelemetry-rust monorepo to 0.32.0",
+    );
+
+    let DependencyUpdateTimelineEntry::SimpleActorEvent(closed) = &entries[6] else {
+        panic!("expected ClosedEvent");
+    };
+    assert_eq!(
+        closed.actor.as_ref().map(|a| a.login.as_str()),
+        Some("bartsmykla"),
+    );
+
+    let DependencyUpdateTimelineEntry::SimpleActorEvent(deleted) = &entries[7] else {
+        panic!("expected HeadRefDeletedEvent");
+    };
+    assert_eq!(
+        deleted.branch_name.as_deref(),
+        Some("renovate/opentelemetry-rust-monorepo"),
+    );
+
+    let DependencyUpdateTimelineEntry::IssueComment(c) = &entries[8] else {
+        panic!("expected IssueComment");
+    };
+    assert!(c.body.starts_with("### Renovate Ignore Notification"));
+    assert_eq!(c.reactions_total, 0);
+    assert!(!c.viewer_did_author);
 }
 
 #[test]

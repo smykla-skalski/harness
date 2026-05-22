@@ -1,102 +1,165 @@
 {
   "data": {
     "node": {
-      "id": "PR_test",
+      "id": "PR_kwDORnAkk87cjLGD",
       "viewerCanUpdate": true,
       "timelineItems": {
         "pageInfo": {
-          "startCursor": "c1",
-          "endCursor": "c5",
+          "startCursor": "Y3Vyc29yOnYyOpPPAAABnjoAr4ABqzI1NjQ1NDU5ODgw",
+          "endCursor": "Y3Vyc29yOnYyOpPPAAABnjqCvHgAqjQ0NzY0ODkyMDc=",
           "hasNextPage": false,
           "hasPreviousPage": false
         },
         "nodes": [
           {
-            "__typename": "IssueComment",
-            "id": "IC_001",
-            "createdAt": "2026-05-20T10:00:00Z",
-            "updatedAt": "2026-05-20T10:05:00Z",
-            "body": "LGTM",
-            "bodyText": "LGTM",
-            "isMinimized": false,
-            "minimizedReason": null,
-            "reactions": { "totalCount": 2 },
-            "viewerDidAuthor": true,
-            "viewerCanUpdate": true,
-            "url": "https://github.com/owner/repo/pull/1#issuecomment-001",
-            "author": {
-              "login": "alice",
-              "avatarUrl": "https://avatars.githubusercontent.com/u/1?v=4"
-            }
-          },
-          {
             "__typename": "LabeledEvent",
-            "id": "LE_001",
-            "createdAt": "2026-05-20T11:00:00Z",
+            "id": "LE_lADORnAkk88AAAABCkNZ6c8AAAAF-JapqA",
+            "createdAt": "2026-05-18T07:33:04Z",
             "actor": {
-              "login": "renovate-bot",
-              "avatarUrl": "https://avatars.githubusercontent.com/in/1?v=4"
+              "login": "renovate",
+              "avatarUrl": "https://avatars.githubusercontent.com/in/2740?v=4"
             },
-            "label": { "name": "dependencies", "color": "0366d6" }
-          },
-          {
-            "__typename": "PullRequestCommit",
-            "id": "PRC_001",
-            "url": "https://github.com/owner/repo/pull/1/commits/abcd",
-            "commit": {
-              "oid": "abcd1234ef5678901234567890abcdef12345678",
-              "abbreviatedOid": "abcd123",
-              "messageHeadline": "Update dependency foo to v2",
-              "committedDate": "2026-05-20T11:30:00Z",
-              "author": {
-                "name": "Renovate Bot",
-                "user": {
-                  "login": "renovate",
-                  "avatarUrl": "https://avatars.githubusercontent.com/in/2?v=4"
-                }
-              }
+            "label": {
+              "name": "dependencies",
+              "color": "ededed"
             }
           },
           {
             "__typename": "PullRequestReview",
-            "id": "PRR_001",
-            "createdAt": "2026-05-20T12:00:00Z",
+            "id": "PRR_kwDORnAkk88AAAABAMis6Q",
+            "createdAt": "2026-05-18T07:34:36Z",
             "state": "APPROVED",
-            "body": "Looks good",
-            "url": "https://github.com/owner/repo/pull/1#pullrequestreview-001",
+            "body": "",
+            "url": "https://github.com/smykla-skalski/harness/pull/152#pullrequestreview-4308118761",
             "author": {
-              "login": "bob",
-              "avatarUrl": "https://avatars.githubusercontent.com/u/2?v=4"
+              "login": "bartsmykla",
+              "avatarUrl": "https://avatars.githubusercontent.com/u/11655498?u=3a567b5542657c846a4b55f369adc2f2e29ac55e&v=4"
             },
             "comments": {
-              "pageInfo": { "endCursor": "rc1", "hasNextPage": false },
+              "pageInfo": {
+                "endCursor": null,
+                "hasNextPage": false
+              },
               "nodes": []
             }
           },
           {
             "__typename": "HeadRefForcePushedEvent",
-            "id": "HRFP_001",
-            "createdAt": "2026-05-20T13:00:00Z",
+            "id": "HRFPE_lADORnAkk88AAAABCkNZ6c8AAAAF-Jjylw",
+            "createdAt": "2026-05-18T07:36:56Z",
             "actor": {
-              "login": "renovate-bot",
-              "avatarUrl": "https://avatars.githubusercontent.com/in/1?v=4"
+              "login": "renovate",
+              "avatarUrl": "https://avatars.githubusercontent.com/in/2740?v=4"
             },
             "beforeCommit": {
-              "oid": "1111111111aaaaaaaaaa1111111111aaaaaaaaaa",
-              "abbreviatedOid": "1111111"
+              "oid": "aedcb8c9085ff608b161def4d46de9b928140553",
+              "abbreviatedOid": "aedcb8c"
             },
             "afterCommit": {
-              "oid": "2222222222bbbbbbbbbb2222222222bbbbbbbbbb",
-              "abbreviatedOid": "2222222"
+              "oid": "b3b0183523bc42ee759ee5298405ff3c4664e8a5",
+              "abbreviatedOid": "b3b0183"
             },
-            "ref": { "name": "renovate/foo-v2" }
+            "ref": null
+          },
+          {
+            "__typename": "HeadRefForcePushedEvent",
+            "id": "HRFPE_lADORnAkk88AAAABCkNZ6c8AAAAF-JoJTA",
+            "createdAt": "2026-05-18T07:38:57Z",
+            "actor": {
+              "login": "renovate",
+              "avatarUrl": "https://avatars.githubusercontent.com/in/2740?v=4"
+            },
+            "beforeCommit": {
+              "oid": "b3b0183523bc42ee759ee5298405ff3c4664e8a5",
+              "abbreviatedOid": "b3b0183"
+            },
+            "afterCommit": {
+              "oid": "737e6b8bc0e5bd4be9767458f72eea950f822aa0",
+              "abbreviatedOid": "737e6b8"
+            },
+            "ref": null
+          },
+          {
+            "__typename": "PullRequestCommit",
+            "id": "PURC_lADORnAkk87cjLGD2gAoYzRkZTk4MzM5ZTMyMmViZmU3NmQ3ZGUyMmZiZGU1ODU2YmQ1MmNlZg",
+            "url": "https://github.com/smykla-skalski/harness/pull/152/commits/c4de98339e322ebfe76d7de22fbde5856bd52cef",
+            "commit": {
+              "oid": "c4de98339e322ebfe76d7de22fbde5856bd52cef",
+              "abbreviatedOid": "c4de983",
+              "messageHeadline": "fix(deps): update opentelemetry-rust monorepo to 0.32.0",
+              "committedDate": "2026-05-18T08:49:02Z",
+              "author": {
+                "name": "renovate[bot]",
+                "user": {
+                  "login": "renovate[bot]",
+                  "avatarUrl": "https://avatars.githubusercontent.com/in/2740?v=4"
+                }
+              }
+            }
+          },
+          {
+            "__typename": "HeadRefForcePushedEvent",
+            "id": "HRFPE_lADORnAkk88AAAABCkNZ6c8AAAAF-MNhBQ",
+            "createdAt": "2026-05-18T08:49:05Z",
+            "actor": {
+              "login": "renovate",
+              "avatarUrl": "https://avatars.githubusercontent.com/in/2740?v=4"
+            },
+            "beforeCommit": {
+              "oid": "737e6b8bc0e5bd4be9767458f72eea950f822aa0",
+              "abbreviatedOid": "737e6b8"
+            },
+            "afterCommit": {
+              "oid": "c4de98339e322ebfe76d7de22fbde5856bd52cef",
+              "abbreviatedOid": "c4de983"
+            },
+            "ref": null
+          },
+          {
+            "__typename": "ClosedEvent",
+            "id": "CE_lADORnAkk88AAAABCkNZ6c8AAAAF-NX6TQ",
+            "createdAt": "2026-05-18T09:19:10Z",
+            "actor": {
+              "login": "bartsmykla",
+              "avatarUrl": "https://avatars.githubusercontent.com/u/11655498?u=3a567b5542657c846a4b55f369adc2f2e29ac55e&v=4"
+            }
+          },
+          {
+            "__typename": "HeadRefDeletedEvent",
+            "id": "HRDE_lADORnAkk88AAAABCkNZ6c8AAAAF-NX-7w",
+            "createdAt": "2026-05-18T09:19:11Z",
+            "actor": {
+              "login": "bartsmykla",
+              "avatarUrl": "https://avatars.githubusercontent.com/u/11655498?u=3a567b5542657c846a4b55f369adc2f2e29ac55e&v=4"
+            },
+            "headRefName": "renovate/opentelemetry-rust-monorepo"
+          },
+          {
+            "__typename": "IssueComment",
+            "id": "IC_kwDORnAkk88AAAABCtHN9w",
+            "createdAt": "2026-05-18T09:55:07Z",
+            "updatedAt": "2026-05-18T09:55:07Z",
+            "body": "### Renovate Ignore Notification\n\nBecause you closed this PR without merging, Renovate will ignore this update (`0.32.0`). You will get a PR once a newer version is released. To ignore this dependency forever, add it to the `ignoreDeps` array of your Renovate config.\n\nIf you accidentally closed this PR, or if you changed your mind: rename this PR to get a fresh replacement PR.",
+            "bodyText": "Renovate Ignore Notification\nBecause you closed this PR without merging, Renovate will ignore this update (0.32.0). You will get a PR once a newer version is released. To ignore this dependency forever, add it to the ignoreDeps array of your Renovate config.\nIf you accidentally closed this PR, or if you changed your mind: rename this PR to get a fresh replacement PR.",
+            "isMinimized": false,
+            "minimizedReason": null,
+            "reactions": {
+              "totalCount": 0
+            },
+            "viewerDidAuthor": false,
+            "viewerCanUpdate": true,
+            "url": "https://github.com/smykla-skalski/harness/pull/152#issuecomment-4476489207",
+            "author": {
+              "login": "renovate",
+              "avatarUrl": "https://avatars.githubusercontent.com/in/2740?v=4"
+            }
           }
         ]
       }
     },
     "rateLimit": {
-      "remaining": 4995,
-      "resetAt": "2026-05-20T15:00:00Z",
+      "remaining": 2317,
+      "resetAt": "2026-05-22T16:53:17Z",
       "cost": 1
     }
   }
