@@ -34,6 +34,7 @@ enum HarnessMonitorPerfScenario: String, CaseIterable, Sendable {
   case dashboardSearchSuggestions = "dashboard-search-suggestions"
   case dashboardLiveScroll = "dashboard-live-scroll"
   case dashboardLiveInteract = "dashboard-live-interact"
+  case dependencyDetailTimeline500 = "dependency-detail-timeline-500"
 
   init?(environment: HarnessMonitorEnvironment) {
     let rawValue = environment.values[Self.environmentKey]?
@@ -148,6 +149,7 @@ extension HarnessMonitorPerfScenario {
     case .dashboardSearchSuggestions: "dashboard-search-suggestions"
     case .dashboardLiveScroll: "dashboard-live-scroll"
     case .dashboardLiveInteract: "dashboard-live-interact"
+    case .dependencyDetailTimeline500: "dependency-detail-timeline-500"
     }
   }
 }

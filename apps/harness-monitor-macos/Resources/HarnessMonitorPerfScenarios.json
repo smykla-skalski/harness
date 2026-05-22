@@ -566,6 +566,26 @@
         "hitches": 0,
         "potentialHangs": 0
       }
+    },
+    {
+      "id": "dependency-detail-timeline-500",
+      "signpostName": "dependency-detail-timeline-500",
+      "defaultPreviewScenario": "dashboard",
+      "initialSettingsSection": "general",
+      "disablesVisualOptions": false,
+      "needsPreviewAcpPermissionBatch": false,
+      "includesBootstrapInMeasurement": false,
+      "durationSeconds": 20,
+      "templates": ["swiftui"],
+      "swiftUIBudget": {
+        "totalUpdates": 30000,
+        "bodyUpdates": 3000,
+        "maxUpdateGroupMilliseconds": 50,
+        "hitches": 0,
+        "potentialHangs": 0,
+        "p95UpdateMilliseconds": 12,
+        "updateGroupP95Milliseconds": 45
+      }
     }
   ]
 }
