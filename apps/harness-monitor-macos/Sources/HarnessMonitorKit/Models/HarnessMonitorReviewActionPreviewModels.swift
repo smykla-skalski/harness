@@ -1,6 +1,6 @@
 import Foundation
 
-public struct DependencyUpdatesCapabilitiesResponse: Codable, Equatable, Sendable {
+public struct ReviewsCapabilitiesResponse: Codable, Equatable, Sendable {
   public let schemaVersion: UInt32
   public let supportsActionPreview: Bool
   public let supportsCheckRunLinks: Bool
@@ -30,7 +30,7 @@ public struct DependencyUpdatesCapabilitiesResponse: Codable, Equatable, Sendabl
   )
 }
 
-public enum DependencyUpdateActionPreviewKind: TaskBoardOpenEnum, CaseIterable, Identifiable {
+public enum ReviewActionPreviewKind: TaskBoardOpenEnum, CaseIterable, Identifiable {
   case approve
   case merge
   case rerunChecks
@@ -64,14 +64,14 @@ public enum DependencyUpdateActionPreviewKind: TaskBoardOpenEnum, CaseIterable, 
   }
 }
 
-public struct DependencyUpdatesActionPreviewRequest: Codable, Equatable, Sendable {
-  public let action: DependencyUpdateActionPreviewKind
-  public let targets: [DependencyUpdateTarget]
+public struct ReviewsActionPreviewRequest: Codable, Equatable, Sendable {
+  public let action: ReviewActionPreviewKind
+  public let targets: [ReviewTarget]
   public let method: TaskBoardGitHubMergeMethod
 
   public init(
-    action: DependencyUpdateActionPreviewKind,
-    targets: [DependencyUpdateTarget],
+    action: ReviewActionPreviewKind,
+    targets: [ReviewTarget],
     method: TaskBoardGitHubMergeMethod = .squash
   ) {
     self.action = action
@@ -80,23 +80,23 @@ public struct DependencyUpdatesActionPreviewRequest: Codable, Equatable, Sendabl
   }
 }
 
-public struct DependencyUpdatesActionPreviewResponse: Codable, Equatable, Sendable {
-  public let action: DependencyUpdateActionPreviewKind
-  public let capabilities: DependencyUpdatesCapabilitiesResponse
+public struct ReviewsActionPreviewResponse: Codable, Equatable, Sendable {
+  public let action: ReviewActionPreviewKind
+  public let capabilities: ReviewsCapabilitiesResponse
   public let totalCount: Int
   public let actionableCount: Int
   public let skippedCount: Int
   public let warnings: [String]
-  public let targets: [DependencyUpdateActionPreviewTarget]
+  public let targets: [ReviewActionPreviewTarget]
 
   public init(
-    action: DependencyUpdateActionPreviewKind,
-    capabilities: DependencyUpdatesCapabilitiesResponse = .fallback,
+    action: ReviewActionPreviewKind,
+    capabilities: ReviewsCapabilitiesResponse = .fallback,
     totalCount: Int,
     actionableCount: Int,
     skippedCount: Int,
     warnings: [String] = [],
-    targets: [DependencyUpdateActionPreviewTarget] = []
+    targets: [ReviewActionPreviewTarget] = []
   ) {
     self.action = action
     self.capabilities = capabilities
@@ -108,7 +108,7 @@ public struct DependencyUpdatesActionPreviewResponse: Codable, Equatable, Sendab
   }
 }
 
-public struct DependencyUpdateActionPreviewTarget: Codable, Equatable, Sendable {
+public struct ReviewActionPreviewTarget: Codable, Equatable, Sendable {
   public let pullRequestID: String
   public let repository: String
   public let number: UInt64

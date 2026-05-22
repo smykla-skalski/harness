@@ -4,7 +4,7 @@ public struct IssueCommentPayload: Codable, Equatable, Sendable {
   public let id: String
   public let createdAt: String
   public let updatedAt: String?
-  public let actor: DependencyUpdateTimelineActor?
+  public let actor: ReviewTimelineActor?
   public let body: String
   public let bodyText: String?
   public let isMinimized: Bool
@@ -18,7 +18,7 @@ public struct IssueCommentPayload: Codable, Equatable, Sendable {
     id: String,
     createdAt: String,
     updatedAt: String? = nil,
-    actor: DependencyUpdateTimelineActor? = nil,
+    actor: ReviewTimelineActor? = nil,
     body: String,
     bodyText: String? = nil,
     isMinimized: Bool = false,
@@ -43,7 +43,7 @@ public struct IssueCommentPayload: Codable, Equatable, Sendable {
   }
 }
 
-public enum DependencyUpdateReviewState: String, Codable, Equatable, Sendable {
+public enum ReviewReviewState: String, Codable, Equatable, Sendable {
   case pending
   case commented
   case approved
@@ -54,8 +54,8 @@ public enum DependencyUpdateReviewState: String, Codable, Equatable, Sendable {
 public struct ReviewPayload: Codable, Equatable, Sendable {
   public let id: String
   public let createdAt: String
-  public let actor: DependencyUpdateTimelineActor?
-  public let state: DependencyUpdateReviewState
+  public let actor: ReviewTimelineActor?
+  public let state: ReviewReviewState
   public let body: String?
   public let url: String?
   public let inlineComments: [ReviewInlineCommentPayload]
@@ -64,8 +64,8 @@ public struct ReviewPayload: Codable, Equatable, Sendable {
   public init(
     id: String,
     createdAt: String,
-    actor: DependencyUpdateTimelineActor? = nil,
-    state: DependencyUpdateReviewState,
+    actor: ReviewTimelineActor? = nil,
+    state: ReviewReviewState,
     body: String? = nil,
     url: String? = nil,
     inlineComments: [ReviewInlineCommentPayload] = [],
@@ -88,7 +88,7 @@ public struct ReviewInlineCommentPayload: Codable, Equatable, Sendable, Identifi
   public let position: Int32?
   public let body: String
   public let createdAt: String
-  public let actor: DependencyUpdateTimelineActor?
+  public let actor: ReviewTimelineActor?
   public let replyToId: String?
   public let url: String?
 
@@ -98,7 +98,7 @@ public struct ReviewInlineCommentPayload: Codable, Equatable, Sendable, Identifi
     position: Int32? = nil,
     body: String,
     createdAt: String,
-    actor: DependencyUpdateTimelineActor? = nil,
+    actor: ReviewTimelineActor? = nil,
     replyToId: String? = nil,
     url: String? = nil
   ) {
@@ -116,7 +116,7 @@ public struct ReviewInlineCommentPayload: Codable, Equatable, Sendable, Identifi
 public struct ReviewThreadPayload: Codable, Equatable, Sendable {
   public let id: String
   public let createdAt: String
-  public let actor: DependencyUpdateTimelineActor?
+  public let actor: ReviewTimelineActor?
   public let isResolved: Bool
   public let isCollapsed: Bool
   public let path: String
@@ -129,7 +129,7 @@ public struct ReviewThreadPayload: Codable, Equatable, Sendable {
   public init(
     id: String,
     createdAt: String,
-    actor: DependencyUpdateTimelineActor? = nil,
+    actor: ReviewTimelineActor? = nil,
     isResolved: Bool = false,
     isCollapsed: Bool = false,
     path: String,
@@ -155,7 +155,7 @@ public struct ReviewThreadPayload: Codable, Equatable, Sendable {
   /// Returns a copy of this thread with `isResolved` set to the given
   /// value, preserving every other field. Used by the per-PR view
   /// model when the store toggles `isResolved` optimistically — see
-  /// `DependencyUpdateTimelineViewModel.updateReviewThreadResolved`.
+  /// `ReviewTimelineViewModel.updateReviewThreadResolved`.
   public func updatingResolved(to resolved: Bool) -> Self {
     Self(
       id: id,
@@ -177,14 +177,14 @@ public struct ReviewThreadCommentPayload: Codable, Equatable, Sendable, Identifi
   public let id: String
   public let body: String
   public let createdAt: String
-  public let actor: DependencyUpdateTimelineActor?
+  public let actor: ReviewTimelineActor?
   public let url: String?
 
   public init(
     id: String,
     body: String,
     createdAt: String,
-    actor: DependencyUpdateTimelineActor? = nil,
+    actor: ReviewTimelineActor? = nil,
     url: String? = nil
   ) {
     self.id = id
@@ -198,7 +198,7 @@ public struct ReviewThreadCommentPayload: Codable, Equatable, Sendable, Identifi
 public struct CommitPayload: Codable, Equatable, Sendable {
   public let id: String
   public let createdAt: String
-  public let actor: DependencyUpdateTimelineActor?
+  public let actor: ReviewTimelineActor?
   public let oid: String
   public let abbreviatedOid: String
   public let messageHeadline: String
@@ -210,7 +210,7 @@ public struct CommitPayload: Codable, Equatable, Sendable {
   public init(
     id: String,
     createdAt: String,
-    actor: DependencyUpdateTimelineActor? = nil,
+    actor: ReviewTimelineActor? = nil,
     oid: String,
     abbreviatedOid: String,
     messageHeadline: String,
@@ -235,7 +235,7 @@ public struct CommitPayload: Codable, Equatable, Sendable {
 public struct HeadRefForcePushedPayload: Codable, Equatable, Sendable {
   public let id: String
   public let createdAt: String
-  public let actor: DependencyUpdateTimelineActor?
+  public let actor: ReviewTimelineActor?
   public let beforeOid: String
   public let beforeAbbreviatedOid: String
   public let afterOid: String
@@ -245,7 +245,7 @@ public struct HeadRefForcePushedPayload: Codable, Equatable, Sendable {
   public init(
     id: String,
     createdAt: String,
-    actor: DependencyUpdateTimelineActor? = nil,
+    actor: ReviewTimelineActor? = nil,
     beforeOid: String,
     beforeAbbreviatedOid: String,
     afterOid: String,
@@ -266,14 +266,14 @@ public struct HeadRefForcePushedPayload: Codable, Equatable, Sendable {
 public struct UnknownTimelinePayload: Codable, Equatable, Sendable {
   public let id: String
   public let createdAt: String
-  public let actor: DependencyUpdateTimelineActor?
+  public let actor: ReviewTimelineActor?
   public let typename: String
   public let rawPayload: AnyCodableJSONValue?
 
   public init(
     id: String,
     createdAt: String,
-    actor: DependencyUpdateTimelineActor? = nil,
+    actor: ReviewTimelineActor? = nil,
     typename: String,
     rawPayload: AnyCodableJSONValue? = nil
   ) {

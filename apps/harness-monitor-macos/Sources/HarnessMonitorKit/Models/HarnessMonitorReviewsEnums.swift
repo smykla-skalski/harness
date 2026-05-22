@@ -1,6 +1,6 @@
 import Foundation
 
-public enum DependencyUpdatePullRequestState: TaskBoardOpenEnum, CaseIterable, Identifiable {
+public enum ReviewPullRequestState: TaskBoardOpenEnum, CaseIterable, Identifiable {
   case open
   case closed
   case merged
@@ -28,7 +28,7 @@ public enum DependencyUpdatePullRequestState: TaskBoardOpenEnum, CaseIterable, I
   }
 }
 
-public enum DependencyUpdateMergeableState: TaskBoardOpenEnum, CaseIterable, Identifiable {
+public enum ReviewMergeableState: TaskBoardOpenEnum, CaseIterable, Identifiable {
   case mergeable
   case conflicting
   case unknown(String)
@@ -53,7 +53,7 @@ public enum DependencyUpdateMergeableState: TaskBoardOpenEnum, CaseIterable, Ide
   }
 }
 
-public enum DependencyUpdateReviewStatus: TaskBoardOpenEnum, CaseIterable, Identifiable {
+public enum ReviewReviewStatus: TaskBoardOpenEnum, CaseIterable, Identifiable {
   case none
   case reviewRequired
   case approved
@@ -84,7 +84,7 @@ public enum DependencyUpdateReviewStatus: TaskBoardOpenEnum, CaseIterable, Ident
   }
 }
 
-public enum DependencyUpdateCheckStatus: TaskBoardOpenEnum, CaseIterable, Identifiable {
+public enum ReviewCheckStatus: TaskBoardOpenEnum, CaseIterable, Identifiable {
   case none
   case success
   case failure
@@ -115,7 +115,7 @@ public enum DependencyUpdateCheckStatus: TaskBoardOpenEnum, CaseIterable, Identi
   }
 }
 
-public enum DependencyUpdateCheckRunStatus: TaskBoardOpenEnum, CaseIterable, Identifiable {
+public enum ReviewCheckRunStatus: TaskBoardOpenEnum, CaseIterable, Identifiable {
   case completed
   case inProgress
   case queued
@@ -149,7 +149,7 @@ public enum DependencyUpdateCheckRunStatus: TaskBoardOpenEnum, CaseIterable, Ide
   }
 }
 
-public enum DependencyUpdateCheckConclusion: TaskBoardOpenEnum, CaseIterable, Identifiable {
+public enum ReviewCheckConclusion: TaskBoardOpenEnum, CaseIterable, Identifiable {
   case none
   case success
   case failure
@@ -202,7 +202,7 @@ public enum DependencyUpdateCheckConclusion: TaskBoardOpenEnum, CaseIterable, Id
   }
 }
 
-public enum DependencyUpdateReviewEventState: TaskBoardOpenEnum, CaseIterable, Identifiable {
+public enum ReviewReviewEventState: TaskBoardOpenEnum, CaseIterable, Identifiable {
   case approved
   case changesRequested
   case commented
@@ -238,7 +238,7 @@ public enum DependencyUpdateReviewEventState: TaskBoardOpenEnum, CaseIterable, I
   }
 }
 
-public enum DependencyUpdateActionKind: TaskBoardOpenEnum, CaseIterable, Identifiable {
+public enum ReviewActionKind: TaskBoardOpenEnum, CaseIterable, Identifiable {
   case approve
   case merge
   case rerunChecks
@@ -280,7 +280,7 @@ public enum DependencyUpdateActionKind: TaskBoardOpenEnum, CaseIterable, Identif
   }
 }
 
-public enum DependencyUpdateActionOutcome: TaskBoardOpenEnum, CaseIterable, Identifiable {
+public enum ReviewActionOutcome: TaskBoardOpenEnum, CaseIterable, Identifiable {
   case applied
   case skipped
   case failed

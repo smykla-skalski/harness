@@ -1,11 +1,11 @@
 import Foundation
 
 /// Mirrors the daemon's `LocalCloneProgressEventPayload` wire shape sent
-/// over the `dependency_updates_local_clone_progress` WS push event.
+/// over the `reviews_local_clone_progress` WS push event.
 ///
 /// Decoded once by the transport layer, then fanned out to per-repo
 /// subscribers via `HarnessMonitorStore.observeLocalCloneProgress`.
-public struct DependencyUpdateLocalCloneProgress: Equatable, Sendable, Codable {
+public struct ReviewLocalCloneProgress: Equatable, Sendable, Codable {
   public enum Kind: String, Equatable, Sendable, Codable {
     case started
     case completed
@@ -55,7 +55,7 @@ public struct DependencyUpdateLocalCloneProgress: Equatable, Sendable, Codable {
   // would *break* that mapping by replacing the converted lookup key.
 }
 
-extension DependencyUpdateLocalCloneProgress {
+extension ReviewLocalCloneProgress {
   /// JSON decoder configured to consume the daemon's snake_case wire
   /// shape directly. Mirrors the strategy used by `StreamEvent.decodePayload`
   /// so direct-from-raw-JSON tests pass without going through the

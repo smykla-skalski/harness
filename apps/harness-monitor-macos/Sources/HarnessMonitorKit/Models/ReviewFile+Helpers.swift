@@ -1,5 +1,5 @@
 // Pure helpers mirroring the daemon's path-to-language and image-MIME
-// truth tables. Companion file to keep `DependencyUpdateFile.swift` under
+// truth tables. Companion file to keep `ReviewFile.swift` under
 // the 420-line cap.
 
 import Foundation
@@ -21,7 +21,7 @@ private let harnessMarkdownFilenames: Set<String> = [
   "readme.md",
 ]
 
-private let harnessLanguageByExtension: [String: HarnessDependencyFileLanguage] = [
+private let harnessLanguageByExtension: [String: HarnessReviewFileLanguage] = [
   "bash": .shell,
   "diff": .diff,
   "fish": .shell,
@@ -43,7 +43,7 @@ private let harnessLanguageByExtension: [String: HarnessDependencyFileLanguage] 
 ///
 /// Kept verbatim so cached metadata round-trips have stable values even
 /// when the daemon has not had a chance to annotate `language_hint`.
-public func harnessInferLanguage(forPath path: String) -> HarnessDependencyFileLanguage {
+public func harnessInferLanguage(forPath path: String) -> HarnessReviewFileLanguage {
   let lower = path.lowercased()
   if let name = lower.split(separator: "/").last.map(String.init) {
     if harnessGenericFilenames.contains(name) {
@@ -69,7 +69,7 @@ public func harnessIsImagePath(_ path: String) -> Bool {
 
 /// MIME inference mirroring the daemon helper. Returns nil for non-image
 /// paths.
-public func harnessImageMime(forPath path: String) -> HarnessDependencyImageMime? {
+public func harnessImageMime(forPath path: String) -> HarnessReviewImageMime? {
   let lower = path.lowercased()
   guard let ext = lower.split(separator: ".").last.map(String.init), ext != lower else {
     return nil

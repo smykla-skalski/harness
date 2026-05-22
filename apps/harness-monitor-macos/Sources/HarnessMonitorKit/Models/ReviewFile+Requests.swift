@@ -1,11 +1,11 @@
 // Request/response structs for the Files endpoints. Split out of
-// `DependencyUpdateFile.swift` so the type-models file stays under the
+// `ReviewFile.swift` so the type-models file stays under the
 // 420-line cap from CLAUDE.md.
 
 import Foundation
 
 /// Request to list a PR's changed files via the daemon.
-public struct DependencyUpdatesFilesListRequest: Codable, Equatable, Sendable {
+public struct ReviewsFilesListRequest: Codable, Equatable, Sendable {
   public let pullRequestID: String
   public let forceRefresh: Bool
 
@@ -29,7 +29,7 @@ public struct DependencyUpdatesFilesListRequest: Codable, Equatable, Sendable {
 /// surface a "and N more files not loaded" affordance. Older daemons
 /// that don't emit the field default to `true` for backwards
 /// compatibility.
-public struct DependencyUpdatesFilesListResponse: Codable, Equatable, Sendable {
+public struct ReviewsFilesListResponse: Codable, Equatable, Sendable {
   public let pullRequestID: String
   public let number: UInt64?
   public let headRefOid: String
@@ -43,10 +43,10 @@ public struct DependencyUpdatesFilesListResponse: Codable, Equatable, Sendable {
   /// `owner/name` of the repository the PR lives in.
   public let repositoryFullName: String?
   public let viewerCanMarkViewed: Bool
-  public let files: [DependencyUpdateFile]
+  public let files: [ReviewFile]
   public let fetchedAt: String
   public let paginationComplete: Bool
-  public let rateLimitSnapshot: DependencyUpdatesRateLimitSnapshot?
+  public let rateLimitSnapshot: ReviewsRateLimitSnapshot?
 
   public init(
     pullRequestID: String,
@@ -57,10 +57,10 @@ public struct DependencyUpdatesFilesListResponse: Codable, Equatable, Sendable {
     baseRefName: String? = nil,
     repositoryFullName: String? = nil,
     viewerCanMarkViewed: Bool,
-    files: [DependencyUpdateFile],
+    files: [ReviewFile],
     fetchedAt: String,
     paginationComplete: Bool = true,
-    rateLimitSnapshot: DependencyUpdatesRateLimitSnapshot? = nil
+    rateLimitSnapshot: ReviewsRateLimitSnapshot? = nil
   ) {
     self.pullRequestID = pullRequestID
     self.number = number
@@ -101,18 +101,18 @@ public struct DependencyUpdatesFilesListResponse: Codable, Equatable, Sendable {
     baseRefName = try container.decodeIfPresent(String.self, forKey: .baseRefName)
     repositoryFullName = try container.decodeIfPresent(String.self, forKey: .repositoryFullName)
     viewerCanMarkViewed = try container.decode(Bool.self, forKey: .viewerCanMarkViewed)
-    files = try container.decode([DependencyUpdateFile].self, forKey: .files)
+    files = try container.decode([ReviewFile].self, forKey: .files)
     fetchedAt = try container.decode(String.self, forKey: .fetchedAt)
     paginationComplete =
       try container.decodeIfPresent(Bool.self, forKey: .paginationComplete) ?? true
     rateLimitSnapshot = try container.decodeIfPresent(
-      DependencyUpdatesRateLimitSnapshot.self, forKey: .rateLimitSnapshot)
+      ReviewsRateLimitSnapshot.self, forKey: .rateLimitSnapshot)
   }
 }
 
 /// Patch fetch request. The Monitor sends its expected head_ref_oid so the
 /// daemon can detect force-push drift.
-public struct DependencyUpdatesFilesPatchRequest: Codable, Equatable, Sendable {
+public struct ReviewsFilesPatchRequest: Codable, Equatable, Sendable {
   public let pullRequestID: String
   public let headRefOidExpected: String
   public let paths: [String]
@@ -184,15 +184,15 @@ public struct DependencyUpdatesFilesPatchRequest: Codable, Equatable, Sendable {
 }
 
 /// One file's patch body plus metadata.
-public struct DependencyUpdateFilePatch: Codable, Equatable, Sendable, Identifiable {
+public struct ReviewFilePatch: Codable, Equatable, Sendable, Identifiable {
   public let path: String
   public let patch: String
-  public let status: DependencyUpdateFileChangeType
+  public let status: ReviewFileChangeType
   public let additions: UInt32
   public let deletions: UInt32
   public let truncated: Bool
   public let etag: String?
-  public let servedBy: DependencyUpdateFileServedBy
+  public let servedBy: ReviewFileServedBy
   public let fetchedAt: String
   public let headRefOid: String
 
@@ -201,12 +201,12 @@ public struct DependencyUpdateFilePatch: Codable, Equatable, Sendable, Identifia
   public init(
     path: String,
     patch: String,
-    status: DependencyUpdateFileChangeType = .modified,
+    status: ReviewFileChangeType = .modified,
     additions: UInt32 = 0,
     deletions: UInt32 = 0,
     truncated: Bool = false,
     etag: String? = nil,
-    servedBy: DependencyUpdateFileServedBy = .githubRest,
+    servedBy: ReviewFileServedBy = .githubRest,
     fetchedAt: String = "",
     headRefOid: String = ""
   ) {
@@ -224,21 +224,21 @@ public struct DependencyUpdateFilePatch: Codable, Equatable, Sendable, Identifia
 }
 
 /// Response carrying patches + drift flag.
-public struct DependencyUpdatesFilesPatchResponse: Codable, Equatable, Sendable {
+public struct ReviewsFilesPatchResponse: Codable, Equatable, Sendable {
   public let pullRequestID: String
-  public let patches: [DependencyUpdateFilePatch]
+  public let patches: [ReviewFilePatch]
   public let drifted: Bool
   public let currentHeadRefOid: String
   public let fetchedAt: String
-  public let rateLimitSnapshot: DependencyUpdatesRateLimitSnapshot?
+  public let rateLimitSnapshot: ReviewsRateLimitSnapshot?
 
   public init(
     pullRequestID: String,
-    patches: [DependencyUpdateFilePatch],
+    patches: [ReviewFilePatch],
     drifted: Bool,
     currentHeadRefOid: String,
     fetchedAt: String,
-    rateLimitSnapshot: DependencyUpdatesRateLimitSnapshot? = nil
+    rateLimitSnapshot: ReviewsRateLimitSnapshot? = nil
   ) {
     self.pullRequestID = pullRequestID
     self.patches = patches
@@ -259,14 +259,14 @@ public struct DependencyUpdatesFilesPatchResponse: Codable, Equatable, Sendable 
 }
 
 /// Per-path target for the mark-viewed mutation.
-public struct DependencyUpdateFilesViewedTarget: Codable, Equatable, Sendable {
+public struct ReviewFilesViewedTarget: Codable, Equatable, Sendable {
   public let path: String
-  public let expectedPriorState: DependencyUpdateFileViewedState
+  public let expectedPriorState: ReviewFileViewedState
   public let markViewed: Bool
 
   public init(
     path: String,
-    expectedPriorState: DependencyUpdateFileViewedState,
+    expectedPriorState: ReviewFileViewedState,
     markViewed: Bool
   ) {
     self.path = path
@@ -276,11 +276,11 @@ public struct DependencyUpdateFilesViewedTarget: Codable, Equatable, Sendable {
 }
 
 /// Batched mark-viewed request.
-public struct DependencyUpdatesFilesViewedRequest: Codable, Equatable, Sendable {
+public struct ReviewsFilesViewedRequest: Codable, Equatable, Sendable {
   public let pullRequestID: String
-  public let paths: [DependencyUpdateFilesViewedTarget]
+  public let paths: [ReviewFilesViewedTarget]
 
-  public init(pullRequestID: String, paths: [DependencyUpdateFilesViewedTarget]) {
+  public init(pullRequestID: String, paths: [ReviewFilesViewedTarget]) {
     self.pullRequestID = pullRequestID
     self.paths = paths
   }
@@ -292,15 +292,15 @@ public struct DependencyUpdatesFilesViewedRequest: Codable, Equatable, Sendable 
 }
 
 /// One result row inside the viewed response.
-public struct DependencyUpdateFilesViewedResult: Codable, Equatable, Sendable {
+public struct ReviewFilesViewedResult: Codable, Equatable, Sendable {
   public let path: String
-  public let outcome: DependencyUpdateFileViewedOutcome
-  public let viewerViewedState: DependencyUpdateFileViewedState
+  public let outcome: ReviewFileViewedOutcome
+  public let viewerViewedState: ReviewFileViewedState
 
   public init(
     path: String,
-    outcome: DependencyUpdateFileViewedOutcome,
-    viewerViewedState: DependencyUpdateFileViewedState
+    outcome: ReviewFileViewedOutcome,
+    viewerViewedState: ReviewFileViewedState
   ) {
     self.path = path
     self.outcome = outcome
@@ -309,14 +309,14 @@ public struct DependencyUpdateFilesViewedResult: Codable, Equatable, Sendable {
 }
 
 /// Response to a mark-viewed batch.
-public struct DependencyUpdatesFilesViewedResponse: Codable, Equatable, Sendable {
+public struct ReviewsFilesViewedResponse: Codable, Equatable, Sendable {
   public let pullRequestID: String
-  public let results: [DependencyUpdateFilesViewedResult]
+  public let results: [ReviewFilesViewedResult]
   public let fetchedAt: String
 
   public init(
     pullRequestID: String,
-    results: [DependencyUpdateFilesViewedResult],
+    results: [ReviewFilesViewedResult],
     fetchedAt: String
   ) {
     self.pullRequestID = pullRequestID
@@ -332,7 +332,7 @@ public struct DependencyUpdatesFilesViewedResponse: Codable, Equatable, Sendable
 }
 
 /// Image blob request.
-public struct DependencyUpdatesFilesBlobRequest: Codable, Equatable, Sendable {
+public struct ReviewsFilesBlobRequest: Codable, Equatable, Sendable {
   public let repositoryID: String
   public let oid: String
   public let path: String
@@ -351,27 +351,27 @@ public struct DependencyUpdatesFilesBlobRequest: Codable, Equatable, Sendable {
 }
 
 /// Image blob response.
-public struct DependencyUpdatesFilesBlobResponse: Codable, Equatable, Sendable {
+public struct ReviewsFilesBlobResponse: Codable, Equatable, Sendable {
   public let path: String
   public let oid: String
-  public let mime: HarnessDependencyImageMime
+  public let mime: HarnessReviewImageMime
   public let contentBase64: String
   public let byteSize: UInt64
   public let isTruncated: Bool
   public let isTooLarge: Bool
   public let fetchedAt: String
-  public let rateLimitSnapshot: DependencyUpdatesRateLimitSnapshot?
+  public let rateLimitSnapshot: ReviewsRateLimitSnapshot?
 
   public init(
     path: String,
     oid: String,
-    mime: HarnessDependencyImageMime,
+    mime: HarnessReviewImageMime,
     contentBase64: String,
     byteSize: UInt64,
     isTruncated: Bool = false,
     isTooLarge: Bool = false,
     fetchedAt: String,
-    rateLimitSnapshot: DependencyUpdatesRateLimitSnapshot? = nil
+    rateLimitSnapshot: ReviewsRateLimitSnapshot? = nil
   ) {
     self.path = path
     self.oid = oid

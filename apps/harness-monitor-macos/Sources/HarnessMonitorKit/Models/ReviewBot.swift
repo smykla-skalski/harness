@@ -1,6 +1,6 @@
 import Foundation
 
-public enum DependencyUpdateBot: String, Codable, Sendable, CaseIterable {
+public enum ReviewBot: String, Codable, Sendable, CaseIterable {
   case renovate
   case dependabot
 

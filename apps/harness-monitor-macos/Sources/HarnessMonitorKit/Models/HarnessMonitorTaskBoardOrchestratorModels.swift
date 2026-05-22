@@ -4,14 +4,14 @@ public enum TaskBoardOrchestratorWorkflow: TaskBoardOpenEnum, CaseIterable, Iden
   case defaultTask
   case prFix
   case prReview
-  case dependencyUpdate
+  case review
   case unknown(String)
 
   public static let allCases: [Self] = [
     .defaultTask,
     .prFix,
     .prReview,
-    .dependencyUpdate,
+    .review,
   ]
 
   public var rawValue: String {
@@ -19,7 +19,7 @@ public enum TaskBoardOrchestratorWorkflow: TaskBoardOpenEnum, CaseIterable, Iden
     case .defaultTask: "default_task"
     case .prFix: "pr_fix"
     case .prReview: "pr_review"
-    case .dependencyUpdate: "dependency_update"
+    case .review: "review"
     case .unknown(let raw): raw
     }
   }
@@ -29,7 +29,7 @@ public enum TaskBoardOrchestratorWorkflow: TaskBoardOpenEnum, CaseIterable, Iden
     case "default_task": self = .defaultTask
     case "pr_fix": self = .prFix
     case "pr_review": self = .prReview
-    case "dependency_update": self = .dependencyUpdate
+    case "review": self = .review
     default: self = .unknown(rawValue)
     }
   }

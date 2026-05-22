@@ -1,12 +1,12 @@
 // SwiftUI/Foundation DTOs mirroring the daemon's
-// src/dependency_updates/files/ surface. Names and JSON keys round-trip
+// src/reviews/files/ surface. Names and JSON keys round-trip
 // without translation so a Codable encode of these structs feeds the daemon
 // directly.
 
 import Foundation
 
 /// Snake-case-encoded enum mirroring HarnessCodeLanguage in the daemon.
-public enum HarnessDependencyFileLanguage: String, Codable, Equatable, Sendable, CaseIterable {
+public enum HarnessReviewFileLanguage: String, Codable, Equatable, Sendable, CaseIterable {
   case diff
   case generic
   case json
@@ -18,7 +18,7 @@ public enum HarnessDependencyFileLanguage: String, Codable, Equatable, Sendable,
 }
 
 /// Image MIME types the Files section previews inline.
-public enum HarnessDependencyImageMime: String, Codable, Equatable, Sendable {
+public enum HarnessReviewImageMime: String, Codable, Equatable, Sendable {
   case png
   case jpeg
   case gif
@@ -36,7 +36,7 @@ public enum HarnessDependencyImageMime: String, Codable, Equatable, Sendable {
 
 /// Change-type enum mirroring the daemon's GraphQL ingest. `other` is the
 /// forward-compat slot for unknown values.
-public enum DependencyUpdateFileChangeType: String, Codable, Equatable, Sendable, CaseIterable {
+public enum ReviewFileChangeType: String, Codable, Equatable, Sendable, CaseIterable {
   case added
   case copied
   case deleted
@@ -48,21 +48,21 @@ public enum DependencyUpdateFileChangeType: String, Codable, Equatable, Sendable
 
 /// Viewed-state enum mirroring GitHub's `FileViewedState`. `unviewed` is the
 /// default.
-public enum DependencyUpdateFileViewedState: String, Codable, Equatable, Sendable, CaseIterable {
+public enum ReviewFileViewedState: String, Codable, Equatable, Sendable, CaseIterable {
   case dismissed
   case viewed
   case unviewed
 }
 
 /// Provenance tag on a patch so the UI can label which path served it.
-public enum DependencyUpdateFileServedBy: String, Codable, Equatable, Sendable, CaseIterable {
+public enum ReviewFileServedBy: String, Codable, Equatable, Sendable, CaseIterable {
   case githubRest = "github_rest"
   case localClone = "local_clone"
   case githubRestFallback = "github_rest_fallback"
 }
 
 /// Outcome of a mark-viewed flip. Mirrors the daemon enum.
-public enum DependencyUpdateFileViewedOutcome: String, Codable, Equatable, Sendable, CaseIterable {
+public enum ReviewFileViewedOutcome: String, Codable, Equatable, Sendable, CaseIterable {
   case updated
   case drifted
   case failed
@@ -75,15 +75,15 @@ public enum FilesLargeDiffStrategy: String, Codable, Equatable, Sendable, CaseIt
 }
 
 /// Per-file metadata returned by the daemon's `files_list` endpoint.
-public struct DependencyUpdateFile: Codable, Equatable, Sendable, Identifiable {
+public struct ReviewFile: Codable, Equatable, Sendable, Identifiable {
   public let path: String
   public let previousPath: String?
-  public let changeType: DependencyUpdateFileChangeType
+  public let changeType: ReviewFileChangeType
   public let additions: UInt32
   public let deletions: UInt32
-  public let viewerViewedState: DependencyUpdateFileViewedState
+  public let viewerViewedState: ReviewFileViewedState
   public let isBinary: Bool
-  public let languageHint: HarnessDependencyFileLanguage
+  public let languageHint: HarnessReviewFileLanguage
   public let modeChange: String?
 
   public var id: String { path }
@@ -91,12 +91,12 @@ public struct DependencyUpdateFile: Codable, Equatable, Sendable, Identifiable {
   public init(
     path: String,
     previousPath: String? = nil,
-    changeType: DependencyUpdateFileChangeType = .modified,
+    changeType: ReviewFileChangeType = .modified,
     additions: UInt32 = 0,
     deletions: UInt32 = 0,
-    viewerViewedState: DependencyUpdateFileViewedState = .unviewed,
+    viewerViewedState: ReviewFileViewedState = .unviewed,
     isBinary: Bool = false,
-    languageHint: HarnessDependencyFileLanguage = .generic,
+    languageHint: HarnessReviewFileLanguage = .generic,
     modeChange: String? = nil
   ) {
     self.path = path
@@ -112,7 +112,7 @@ public struct DependencyUpdateFile: Codable, Equatable, Sendable, Identifiable {
 }
 
 /// Lightweight rate-limit snapshot the daemon attaches to most responses.
-public struct DependencyUpdatesRateLimitSnapshot: Codable, Equatable, Sendable {
+public struct ReviewsRateLimitSnapshot: Codable, Equatable, Sendable {
   public let remaining: UInt32
   public let limit: UInt32
   public let resetAt: String?
@@ -127,7 +127,7 @@ public struct DependencyUpdatesRateLimitSnapshot: Codable, Equatable, Sendable {
 }
 
 /// One local clone the daemon is maintaining.
-public struct DependencyUpdateLocalCloneEntry: Codable, Equatable, Sendable, Identifiable {
+public struct ReviewLocalCloneEntry: Codable, Equatable, Sendable, Identifiable {
   public let repoFullName: String
   public let repoKeySegment: String
   public let sizeBytes: UInt64
