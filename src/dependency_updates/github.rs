@@ -20,14 +20,13 @@ use chrono::{DateTime, Utc};
 
 use ingest::{ingest_nodes_chunk, ingest_search_node};
 use mapping::{
-    action_result, github_project_config, next_cursor_or_scope_limit, parse_timestamp, scopes,
-    NodeContinuation,
+    NodeContinuation, action_result, github_project_config, next_cursor_or_scope_limit,
+    parse_timestamp, scopes,
 };
 use pagination::resolve_continuation;
 use queries::{
-    APPROVE_MUTATION, NODES_BY_IDS_QUERY, ORGANIZATION_REPOSITORIES_QUERY,
-    PULL_REQUEST_BODY_QUERY, REREQUEST_CHECK_SUITE_MUTATION, SEARCH_QUERY,
-    UPDATE_PULL_REQUEST_BODY_MUTATION,
+    APPROVE_MUTATION, NODES_BY_IDS_QUERY, ORGANIZATION_REPOSITORIES_QUERY, PULL_REQUEST_BODY_QUERY,
+    REREQUEST_CHECK_SUITE_MUTATION, SEARCH_QUERY, UPDATE_PULL_REQUEST_BODY_MUTATION,
 };
 use types::{
     NodesResponse, OrganizationRepositoriesResponse, PullRequestBodyResponse, SearchResponse,
@@ -112,8 +111,10 @@ impl DependencyUpdatesGitHubClient {
                     .await?;
             }
         }
+        let items = deduped.into_values().collect::<Vec<_>>();
+        log_check_details_url_coverage(&items);
         Ok(DependencyUpdatesFetch {
-            items: deduped.into_values().collect(),
+            items,
             repository_labels,
         })
     }
@@ -209,6 +210,7 @@ impl DependencyUpdatesGitHubClient {
                     .await?;
             }
         }
+        log_check_details_url_coverage(&items);
         Ok(DependencyUpdatesFetchByIds {
             items,
             missing,
@@ -503,6 +505,25 @@ fn ensure_rustls_provider() {
     RUSTLS_PROVIDER.get_or_init(|| {
         let _ = default_provider().install_default();
     });
+}
+
+fn log_check_details_url_coverage(items: &[DependencyUpdateItem]) {
+    let mut check_count = 0_usize;
+    let mut missing_details_url_count = 0_usize;
+    for check in items.iter().flat_map(|item| &item.checks) {
+        check_count += 1;
+        if check.details_url.is_none() {
+            missing_details_url_count += 1;
+        }
+    }
+    if check_count > 0 {
+        tracing::debug!(
+            dependency_update_count = items.len(),
+            check_count,
+            missing_details_url_count,
+            "dependency-updates check details URL coverage"
+        );
+    }
 }
 
 fn client_error(error: octocrab::Error) -> CliError {

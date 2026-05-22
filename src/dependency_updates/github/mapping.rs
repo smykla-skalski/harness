@@ -266,7 +266,7 @@ impl CheckSummary {
             status,
             conclusion,
             check_suite_id,
-            details_url,
+            details_url: normalized_details_url(details_url),
         });
     }
 
@@ -290,7 +290,7 @@ impl CheckSummary {
             status: DependencyUpdateCheckRunStatus::Completed,
             conclusion,
             check_suite_id: None,
-            details_url,
+            details_url: normalized_details_url(details_url),
         });
     }
 
@@ -318,19 +318,37 @@ fn is_failed_check_conclusion(conclusion: DependencyUpdateCheckConclusion) -> bo
     )
 }
 
-pub(super) fn append_pull_request_labels(item: &mut DependencyUpdateItem, labels: Vec<LabelNode>) {
-    item.labels.extend(labels.into_iter().map(|label| label.name));
+fn normalized_details_url(details_url: Option<String>) -> Option<String> {
+    let trimmed = details_url?.trim().to_string();
+    if trimmed.is_empty() {
+        return None;
+    }
+    let lower = trimmed.to_ascii_lowercase();
+    if lower.starts_with("https://") || lower.starts_with("http://") {
+        Some(trimmed)
+    } else {
+        None
+    }
 }
 
-pub(super) fn append_pull_request_reviews(item: &mut DependencyUpdateItem, reviews: Vec<ReviewNode>) {
-    item.reviews
-        .extend(reviews.into_iter().map(|review| DependencyUpdateReview {
+pub(super) fn append_pull_request_labels(item: &mut DependencyUpdateItem, labels: Vec<LabelNode>) {
+    item.labels
+        .extend(labels.into_iter().map(|label| label.name));
+}
+
+pub(super) fn append_pull_request_reviews(
+    item: &mut DependencyUpdateItem,
+    reviews: Vec<ReviewNode>,
+) {
+    item.reviews.extend(reviews.into_iter().map(|review| {
+        DependencyUpdateReview {
             author: review
                 .author
                 .and_then(|author| author.login)
                 .unwrap_or_default(),
             state: map_review_event_state(review.state.as_deref()),
-        }));
+        }
+    }));
 }
 
 pub(super) fn append_check_contexts(

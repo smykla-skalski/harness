@@ -1,7 +1,8 @@
-use super::*;
-use super::types::{CheckSuiteNode, StatusContextNode};
 use super::types::PageInfo;
 use super::types::RepositoryLabelNode;
+use super::types::SearchResponse;
+use super::types::{CheckSuiteNode, StatusContextNode};
+use super::*;
 use crate::dependency_updates::DependencyUpdateRepositoryLabel;
 
 #[test]
@@ -100,7 +101,10 @@ fn append_repository_labels_preserves_color_into_response_struct() {
     assert_eq!(bundle[0].name, "kind/bug");
     assert_eq!(bundle[0].color.as_deref(), Some("d73a4a"));
     assert_eq!(bundle[1].color.as_deref(), Some("0e8a16"));
-    assert!(bundle[2].color.is_none(), "empty color string should normalize to None");
+    assert!(
+        bundle[2].color.is_none(),
+        "empty color string should normalize to None"
+    );
 
     let serialized = serde_json::to_string(&bundle).expect("serialize");
     assert!(
@@ -140,6 +144,190 @@ fn append_check_contexts_preserves_check_details_urls() {
     assert_eq!(
         item.checks[1].details_url.as_deref(),
         Some(status_context_url)
+    );
+    assert_eq!(item.check_status, DependencyUpdateCheckStatus::Success);
+}
+
+#[test]
+fn append_check_contexts_drops_empty_and_non_web_details_urls() {
+    let mut item = sample_dependency_update_item();
+
+    super::mapping::append_check_contexts(
+        &mut item,
+        vec![
+            StatusContextNode::CheckRun {
+                name: "empty".into(),
+                status: Some("COMPLETED".into()),
+                conclusion: Some("SUCCESS".into()),
+                url: Some("   ".into()),
+                check_suite: None,
+            },
+            StatusContextNode::StatusContext {
+                context: "scripted".into(),
+                state: Some("SUCCESS".into()),
+                target_url: Some("javascript:alert(1)".into()),
+            },
+        ],
+    );
+
+    assert_eq!(item.checks.len(), 2);
+    assert!(item.checks.iter().all(|check| check.details_url.is_none()));
+}
+
+#[test]
+fn graphql_payload_preserves_check_urls_into_daemon_json() {
+    let check_run_url = "https://github.com/acme/api/actions/runs/42/job/99";
+    let status_context_url = "https://ci.example.com/acme/api/42";
+    let response: SearchResponse = serde_json::from_value(serde_json::json!({
+        "search": {
+            "pageInfo": {
+                "hasNextPage": false,
+                "endCursor": null
+            },
+            "nodes": [
+                {
+                    "id": "PR_kwDO",
+                    "number": 42,
+                    "title": "chore(deps): bump actions/setup-go",
+                    "url": "https://github.com/acme/api/pull/42",
+                    "state": "OPEN",
+                    "mergeable": "MERGEABLE",
+                    "isDraft": false,
+                    "reviewDecision": "REVIEW_REQUIRED",
+                    "headRefOid": "abc123",
+                    "author": { "login": "renovate[bot]" },
+                    "repository": {
+                        "id": "R_1",
+                        "nameWithOwner": "acme/api",
+                        "labels": {
+                            "pageInfo": {
+                                "hasNextPage": false,
+                                "endCursor": null
+                            },
+                            "nodes": []
+                        }
+                    },
+                    "commits": {
+                        "nodes": [
+                            {
+                                "commit": {
+                                    "statusCheckRollup": {
+                                        "contexts": {
+                                            "pageInfo": {
+                                                "hasNextPage": false,
+                                                "endCursor": null
+                                            },
+                                            "nodes": [
+                                                {
+                                                    "name": "Analyze (go)",
+                                                    "status": "COMPLETED",
+                                                    "conclusion": "SUCCESS",
+                                                    "url": check_run_url,
+                                                    "checkSuite": { "id": "suite-1" }
+                                                },
+                                                {
+                                                    "context": "legacy/ci",
+                                                    "state": "SUCCESS",
+                                                    "targetUrl": status_context_url
+                                                },
+                                                {
+                                                    "name": "Skipped url",
+                                                    "status": "COMPLETED",
+                                                    "conclusion": "SUCCESS",
+                                                    "url": "mailto:ci@example.com",
+                                                    "checkSuite": null
+                                                }
+                                            ]
+                                        }
+                                    }
+                                }
+                            }
+                        ]
+                    },
+                    "reviews": {
+                        "pageInfo": {
+                            "hasNextPage": false,
+                            "endCursor": null
+                        },
+                        "nodes": []
+                    },
+                    "labels": {
+                        "pageInfo": {
+                            "hasNextPage": false,
+                            "endCursor": null
+                        },
+                        "nodes": [{ "name": "dependencies" }]
+                    },
+                    "additions": 12,
+                    "deletions": 4,
+                    "createdAt": "2026-01-01T00:00:00Z",
+                    "updatedAt": "2026-01-01T00:01:00Z"
+                }
+            ]
+        }
+    }))
+    .expect("GraphQL fixture decodes");
+
+    let node = response
+        .search
+        .nodes
+        .into_iter()
+        .next()
+        .expect("fixture node");
+    let (item, _, _) = super::mapping::convert_node(node).expect("convert node");
+
+    assert_eq!(item.checks.len(), 3);
+    assert_eq!(item.checks[0].details_url.as_deref(), Some(check_run_url));
+    assert_eq!(
+        item.checks[1].details_url.as_deref(),
+        Some(status_context_url)
+    );
+    assert_eq!(item.checks[2].details_url, None);
+
+    let serialized = serde_json::to_value(&item).expect("serialize item");
+    let checks = serialized["checks"].as_array().expect("checks");
+    assert_eq!(checks[0]["details_url"].as_str(), Some(check_run_url));
+    assert_eq!(checks[1]["details_url"].as_str(), Some(status_context_url));
+    assert!(checks[2].get("details_url").is_none());
+}
+
+#[test]
+fn paginated_check_contexts_preserve_later_page_details_urls() {
+    let first_page_url = "https://github.com/acme/api/actions/runs/1/job/2";
+    let later_page_url = "https://github.com/acme/api/actions/runs/1/job/3";
+    let mut item = sample_dependency_update_item();
+    super::mapping::append_check_contexts(
+        &mut item,
+        vec![StatusContextNode::CheckRun {
+            name: "Test".into(),
+            status: Some("COMPLETED".into()),
+            conclusion: Some("SUCCESS".into()),
+            url: Some(first_page_url.into()),
+            check_suite: Some(CheckSuiteNode {
+                id: Some("suite-1".into()),
+            }),
+        }],
+    );
+
+    super::mapping::append_check_contexts(
+        &mut item,
+        vec![StatusContextNode::CheckRun {
+            name: "Analyze".into(),
+            status: Some("COMPLETED".into()),
+            conclusion: Some("SUCCESS".into()),
+            url: Some(later_page_url.into()),
+            check_suite: Some(CheckSuiteNode {
+                id: Some("suite-2".into()),
+            }),
+        }],
+    );
+
+    assert_eq!(
+        item.checks
+            .iter()
+            .filter_map(|check| check.details_url.as_deref())
+            .collect::<Vec<_>>(),
+        vec![first_page_url, later_page_url]
     );
     assert_eq!(item.check_status, DependencyUpdateCheckStatus::Success);
 }
