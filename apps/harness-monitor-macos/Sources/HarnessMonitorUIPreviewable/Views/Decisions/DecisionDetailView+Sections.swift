@@ -62,7 +62,11 @@ extension DecisionDetailView {
     case .audit:
       DecisionAuditTrailTab(
         events: scopedAuditEvents,
-        payloadPresentations: auditEventPayloadPresentations
+        payloadPresentations: auditEventPayloadPresentations,
+        auditTimelineQuery: SupervisorAuditTimelineQuery(
+          ruleID: viewModel.decision.ruleID,
+          decisionID: viewModel.decision.id
+        )
       )
     }
   }

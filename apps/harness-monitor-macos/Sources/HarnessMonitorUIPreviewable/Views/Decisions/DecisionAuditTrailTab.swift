@@ -6,24 +6,32 @@ import SwiftUI
 public struct DecisionAuditTrailTab: View {
   @Environment(\.harnessDateTimeConfiguration)
   private var dateTimeConfiguration
+  @Environment(\.openSupervisorAuditTimeline)
+  private var openAuditTimeline
 
   private let events: [SupervisorEventSnapshot]
   private let payloadPresentations: [String: DecisionAuditTrailPayloadPresentation]
+  private let auditTimelineQuery: SupervisorAuditTimelineQuery?
 
   public init(events: [SupervisorEventSnapshot] = []) {
-    self.init(events: events, payloadPresentations: [:])
+    self.init(events: events, payloadPresentations: [:], auditTimelineQuery: nil)
   }
 
   init(
     events: [SupervisorEventSnapshot],
-    payloadPresentations: [String: DecisionAuditTrailPayloadPresentation]
+    payloadPresentations: [String: DecisionAuditTrailPayloadPresentation],
+    auditTimelineQuery: SupervisorAuditTimelineQuery? = nil
   ) {
     self.events = events
     self.payloadPresentations = payloadPresentations
+    self.auditTimelineQuery = auditTimelineQuery
   }
 
   public var body: some View {
     VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingMD) {
+      if let auditTimelineQuery {
+        openInAuditTimelineLink(query: auditTimelineQuery)
+      }
       if events.isEmpty {
         emptyState
       } else {
@@ -42,6 +50,21 @@ public struct DecisionAuditTrailTab: View {
     }
     .accessibilityElement(children: .contain)
     .accessibilityIdentifier(HarnessMonitorAccessibility.decisionAuditTrail)
+  }
+
+  private func openInAuditTimelineLink(query: SupervisorAuditTimelineQuery) -> some View {
+    HStack(spacing: HarnessMonitorTheme.spacingXS) {
+      Spacer(minLength: 0)
+      Button {
+        openAuditTimeline(query)
+      } label: {
+        Label("Open in audit timeline", systemImage: "arrow.up.forward.square")
+          .scaledFont(.caption.weight(.semibold))
+          .labelStyle(.titleAndIcon)
+      }
+      .buttonStyle(.borderless)
+      .accessibilityIdentifier(HarnessMonitorAccessibility.decisionAuditTrailOpenTimeline)
+    }
   }
 
   private var emptyState: some View {
