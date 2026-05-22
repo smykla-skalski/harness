@@ -16,11 +16,11 @@ public struct RepositoryLabelUsageCache {
   public func recordUse(repository: String, label: String) {
     guard !repository.isEmpty, !label.isEmpty else { return }
     do {
-      let key = CachedDependencyLabelUsage.makeCompoundKey(
+      let key = CachedReviewLabelUsage.makeCompoundKey(
         repository: repository,
         label: label
       )
-      let descriptor = FetchDescriptor<CachedDependencyLabelUsage>(
+      let descriptor = FetchDescriptor<CachedReviewLabelUsage>(
         predicate: #Predicate { $0.compoundKey == key }
       )
       let existing = try context.fetch(descriptor).first
@@ -28,7 +28,7 @@ public struct RepositoryLabelUsageCache {
         existing.usageCount += 1
         existing.lastUsedAt = .now
       } else {
-        let row = CachedDependencyLabelUsage(repository: repository, label: label)
+        let row = CachedReviewLabelUsage(repository: repository, label: label)
         context.insert(row)
       }
       try context.save()
@@ -50,7 +50,7 @@ public struct RepositoryLabelUsageCache {
   public func topUsed(repositories: [String], limit: Int) -> [String] {
     guard limit > 0, !repositories.isEmpty else { return [] }
     let repoSet = Set(repositories)
-    let descriptor = FetchDescriptor<CachedDependencyLabelUsage>()
+    let descriptor = FetchDescriptor<CachedReviewLabelUsage>()
     guard let rows = try? context.fetch(descriptor) else { return [] }
     var aggregated: [String: (count: Int, lastUsedAt: Date)] = [:]
     for row in rows where repoSet.contains(row.repository) {
@@ -77,7 +77,7 @@ public struct RepositoryLabelUsageCache {
   }
 
   public func deleteAll() {
-    let descriptor = FetchDescriptor<CachedDependencyLabelUsage>()
+    let descriptor = FetchDescriptor<CachedReviewLabelUsage>()
     guard let rows = try? context.fetch(descriptor) else { return }
     for row in rows {
       context.delete(row)
@@ -91,11 +91,11 @@ public struct RepositoryLabelUsageCache {
   /// the picker only ever shows the top N (where N is the configurable
   /// `frequentLabelsCount`, capped at 10) so trimming the tail does not
   /// change what the user sees. The label catalog lives in
-  /// `CachedDependencyRepositoryLabels`, so labels removed here are still
+  /// `CachedReviewRepositoryLabels`, so labels removed here are still
   /// pickable from the main list.
   public func pruneStale(perRepoCap: Int = 50) {
     guard perRepoCap > 0 else { return }
-    let allRowsDescriptor = FetchDescriptor<CachedDependencyLabelUsage>()
+    let allRowsDescriptor = FetchDescriptor<CachedReviewLabelUsage>()
     guard let rows = try? context.fetch(allRowsDescriptor) else { return }
     let groupedByRepo = Dictionary(grouping: rows, by: \.repository)
     var didDelete = false

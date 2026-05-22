@@ -1,7 +1,7 @@
 import Foundation
 import SwiftData
 
-public struct DependencyUpdatesRepoSyncStateCache {
+public struct ReviewsRepoSyncStateCache {
   private let context: ModelContext
 
   public init(context: ModelContext) {
@@ -12,7 +12,7 @@ public struct DependencyUpdatesRepoSyncStateCache {
   /// Used at scheduler start so a relaunch resumes oldest-first instead of
   /// re-fetching every repository as if cold.
   public func loadStates(preferencesHash: String) -> [String: Date] {
-    let descriptor = FetchDescriptor<CachedDependencyUpdatesRepoSyncState>(
+    let descriptor = FetchDescriptor<CachedReviewsRepoSyncState>(
       predicate: #Predicate { $0.preferencesHash == preferencesHash }
     )
     guard let rows = try? context.fetch(descriptor) else { return [:] }
@@ -33,17 +33,17 @@ public struct DependencyUpdatesRepoSyncStateCache {
   ) {
     guard !preferencesHash.isEmpty, !repository.isEmpty else { return }
     do {
-      let key = CachedDependencyUpdatesRepoSyncState.makeCompoundKey(
+      let key = CachedReviewsRepoSyncState.makeCompoundKey(
         preferencesHash: preferencesHash,
         repository: repository
       )
-      let descriptor = FetchDescriptor<CachedDependencyUpdatesRepoSyncState>(
+      let descriptor = FetchDescriptor<CachedReviewsRepoSyncState>(
         predicate: #Predicate { $0.compoundKey == key }
       )
       if let existing = try context.fetch(descriptor).first {
         existing.lastSyncedAt = syncedAt
       } else {
-        let row = CachedDependencyUpdatesRepoSyncState(
+        let row = CachedReviewsRepoSyncState(
           preferencesHash: preferencesHash,
           repository: repository,
           lastSyncedAt: syncedAt
@@ -66,7 +66,7 @@ public struct DependencyUpdatesRepoSyncStateCache {
   /// Remove every row for `preferencesHash`. Called when preferences change
   /// in a way that obsoletes the per-repo bucket.
   public func deleteAll(preferencesHash: String) {
-    let descriptor = FetchDescriptor<CachedDependencyUpdatesRepoSyncState>(
+    let descriptor = FetchDescriptor<CachedReviewsRepoSyncState>(
       predicate: #Predicate { $0.preferencesHash == preferencesHash }
     )
     guard let rows = try? context.fetch(descriptor) else { return }
@@ -79,7 +79,7 @@ public struct DependencyUpdatesRepoSyncStateCache {
   /// Remove every row regardless of bucket. Used by the diagnostic
   /// "Clear Session Cache" action.
   public func deleteAll() {
-    let descriptor = FetchDescriptor<CachedDependencyUpdatesRepoSyncState>()
+    let descriptor = FetchDescriptor<CachedReviewsRepoSyncState>()
     guard let rows = try? context.fetch(descriptor) else { return }
     for row in rows {
       context.delete(row)

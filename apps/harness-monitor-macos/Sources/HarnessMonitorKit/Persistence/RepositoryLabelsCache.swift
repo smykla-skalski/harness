@@ -11,11 +11,11 @@ public struct RepositoryLabelsCache {
   /// Load every cached repository → labels pair. The picker uses this on
   /// view appear so the menu shows labels for any previously-seen repo even
   /// when the daemon is offline.
-  public func loadAll() -> [String: [DependencyUpdateRepositoryLabel]] {
-    let descriptor = FetchDescriptor<CachedDependencyRepositoryLabels>()
+  public func loadAll() -> [String: [ReviewRepositoryLabel]] {
+    let descriptor = FetchDescriptor<CachedReviewRepositoryLabels>()
     guard let rows = try? context.fetch(descriptor) else { return [:] }
-    var result: [String: [DependencyUpdateRepositoryLabel]] = [:]
-    var stale: [CachedDependencyRepositoryLabels] = []
+    var result: [String: [ReviewRepositoryLabel]] = [:]
+    var stale: [CachedReviewRepositoryLabels] = []
     for row in rows {
       do {
         let labels = try row.decodedLabels()
@@ -43,7 +43,7 @@ public struct RepositoryLabelsCache {
   /// Upsert one row per repository with the freshly fetched labels. Empty
   /// label arrays are skipped so a transient GitHub blip does not wipe a
   /// repo's previously-cached labels.
-  public func upsert(_ snapshot: [String: [DependencyUpdateRepositoryLabel]]) {
+  public func upsert(_ snapshot: [String: [ReviewRepositoryLabel]]) {
     guard !snapshot.isEmpty else { return }
     do {
       let existing = try fetchByRepository()
@@ -52,7 +52,7 @@ public struct RepositoryLabelsCache {
         if let row = existing[repository] {
           try row.update(labels: labels)
         } else {
-          let row = try CachedDependencyRepositoryLabels.make(
+          let row = try CachedReviewRepositoryLabels.make(
             repository: repository,
             labels: labels
           )
@@ -71,7 +71,7 @@ public struct RepositoryLabelsCache {
   }
 
   public func deleteAll() {
-    let descriptor = FetchDescriptor<CachedDependencyRepositoryLabels>()
+    let descriptor = FetchDescriptor<CachedReviewRepositoryLabels>()
     guard let rows = try? context.fetch(descriptor) else { return }
     for row in rows {
       context.delete(row)
@@ -79,8 +79,8 @@ public struct RepositoryLabelsCache {
     try? context.save()
   }
 
-  private func fetchByRepository() throws -> [String: CachedDependencyRepositoryLabels] {
-    let descriptor = FetchDescriptor<CachedDependencyRepositoryLabels>()
+  private func fetchByRepository() throws -> [String: CachedReviewRepositoryLabels] {
+    let descriptor = FetchDescriptor<CachedReviewRepositoryLabels>()
     let rows = try context.fetch(descriptor)
     return Dictionary(uniqueKeysWithValues: rows.map { ($0.repository, $0) })
   }

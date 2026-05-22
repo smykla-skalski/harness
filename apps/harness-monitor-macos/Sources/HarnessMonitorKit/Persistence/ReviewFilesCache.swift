@@ -6,7 +6,7 @@ import SwiftData
 /// `pullRequestID + headRefOid + path` key for the file and viewed-state
 /// rows; a force-push that flips the head OID writes a fresh row set
 /// instead of mutating the old one in place.
-public struct DependencyUpdateFilesCache {
+public struct ReviewFilesCache {
   private let context: ModelContext
 
   public init(context: ModelContext) {
@@ -15,9 +15,9 @@ public struct DependencyUpdateFilesCache {
 
   // MARK: - Loads
 
-  public func loadSummary(pullRequestID: String) -> CachedDependencyUpdateFilesSummary? {
+  public func loadSummary(pullRequestID: String) -> CachedReviewFilesSummary? {
     guard !pullRequestID.isEmpty else { return nil }
-    let descriptor = FetchDescriptor<CachedDependencyUpdateFilesSummary>(
+    let descriptor = FetchDescriptor<CachedReviewFilesSummary>(
       predicate: #Predicate { $0.pullRequestID == pullRequestID }
     )
     return try? context.fetch(descriptor).first
@@ -26,9 +26,9 @@ public struct DependencyUpdateFilesCache {
   public func loadFiles(
     pullRequestID: String,
     headRefOid: String
-  ) -> [CachedDependencyUpdateFile] {
+  ) -> [CachedReviewFile] {
     guard !pullRequestID.isEmpty, !headRefOid.isEmpty else { return [] }
-    var descriptor = FetchDescriptor<CachedDependencyUpdateFile>(
+    var descriptor = FetchDescriptor<CachedReviewFile>(
       predicate: #Predicate {
         $0.pullRequestID == pullRequestID && $0.headRefOid == headRefOid
       },
@@ -41,15 +41,15 @@ public struct DependencyUpdateFilesCache {
   public func loadViewedStates(
     pullRequestID: String,
     headRefOid: String
-  ) -> [String: CachedDependencyUpdateFileViewedState] {
+  ) -> [String: CachedReviewFileViewedState] {
     guard !pullRequestID.isEmpty, !headRefOid.isEmpty else { return [:] }
-    let descriptor = FetchDescriptor<CachedDependencyUpdateFileViewedState>(
+    let descriptor = FetchDescriptor<CachedReviewFileViewedState>(
       predicate: #Predicate {
         $0.pullRequestID == pullRequestID && $0.headRefOid == headRefOid
       }
     )
     guard let rows = try? context.fetch(descriptor) else { return [:] }
-    var result: [String: CachedDependencyUpdateFileViewedState] = [:]
+    var result: [String: CachedReviewFileViewedState] = [:]
     for row in rows {
       result[row.path] = row
     }
@@ -57,12 +57,12 @@ public struct DependencyUpdateFilesCache {
   }
 
   public func countCachedFiles() -> Int {
-    (try? context.fetchCount(FetchDescriptor<CachedDependencyUpdateFile>())) ?? 0
+    (try? context.fetchCount(FetchDescriptor<CachedReviewFile>())) ?? 0
   }
 
   // MARK: - Writes
 
-  public func record(response: DependencyUpdatesFilesListResponse) {
+  public func record(response: ReviewsFilesListResponse) {
     let pullRequestID = response.pullRequestID
     let headRefOid = response.headRefOid
     guard !pullRequestID.isEmpty, !headRefOid.isEmpty else { return }
@@ -106,24 +106,24 @@ public struct DependencyUpdateFilesCache {
     pullRequestID: String,
     headRefOid: String,
     path: String,
-    viewedState: DependencyUpdateFileViewedState,
+    viewedState: ReviewFileViewedState,
     updatedAt: Date = .now
   ) {
     guard !pullRequestID.isEmpty, !headRefOid.isEmpty, !path.isEmpty else { return }
-    let key = CachedDependencyUpdateFileViewedState.makeCompoundKey(
+    let key = CachedReviewFileViewedState.makeCompoundKey(
       pullRequestID: pullRequestID,
       headRefOid: headRefOid,
       path: path
     )
     do {
-      let descriptor = FetchDescriptor<CachedDependencyUpdateFileViewedState>(
+      let descriptor = FetchDescriptor<CachedReviewFileViewedState>(
         predicate: #Predicate { $0.compoundKey == key }
       )
       if let existing = try context.fetch(descriptor).first {
         existing.viewedStateRaw = viewedState.rawValue
         existing.updatedAt = updatedAt
       } else {
-        let row = CachedDependencyUpdateFileViewedState(
+        let row = CachedReviewFileViewedState(
           pullRequestID: pullRequestID,
           headRefOid: headRefOid,
           path: path,
@@ -146,15 +146,15 @@ public struct DependencyUpdateFilesCache {
   public func deleteAll(pullRequestID: String) {
     guard !pullRequestID.isEmpty else { return }
     do {
-      let summaries = FetchDescriptor<CachedDependencyUpdateFilesSummary>(
+      let summaries = FetchDescriptor<CachedReviewFilesSummary>(
         predicate: #Predicate { $0.pullRequestID == pullRequestID }
       )
       for row in (try? context.fetch(summaries)) ?? [] { context.delete(row) }
-      let files = FetchDescriptor<CachedDependencyUpdateFile>(
+      let files = FetchDescriptor<CachedReviewFile>(
         predicate: #Predicate { $0.pullRequestID == pullRequestID }
       )
       for row in (try? context.fetch(files)) ?? [] { context.delete(row) }
-      let viewed = FetchDescriptor<CachedDependencyUpdateFileViewedState>(
+      let viewed = FetchDescriptor<CachedReviewFileViewedState>(
         predicate: #Predicate { $0.pullRequestID == pullRequestID }
       )
       for row in (try? context.fetch(viewed)) ?? [] { context.delete(row) }
@@ -171,19 +171,19 @@ public struct DependencyUpdateFilesCache {
 
   public func deleteAll() {
     do {
-      for row in (try? context.fetch(FetchDescriptor<CachedDependencyUpdateFile>())) ?? [] {
+      for row in (try? context.fetch(FetchDescriptor<CachedReviewFile>())) ?? [] {
         context.delete(row)
       }
       for row
         in (try? context.fetch(
-          FetchDescriptor<CachedDependencyUpdateFileViewedState>()
+          FetchDescriptor<CachedReviewFileViewedState>()
         )) ?? []
       {
         context.delete(row)
       }
       for row
         in (try? context.fetch(
-          FetchDescriptor<CachedDependencyUpdateFilesSummary>()
+          FetchDescriptor<CachedReviewFilesSummary>()
         )) ?? []
       {
         context.delete(row)
@@ -202,20 +202,20 @@ public struct DependencyUpdateFilesCache {
     var pruned = 0
     do {
       let staleSummaries = try context.fetch(
-        FetchDescriptor<CachedDependencyUpdateFilesSummary>(
+        FetchDescriptor<CachedReviewFilesSummary>(
           predicate: #Predicate { $0.fetchedAt < cutoff }
         )
       )
       let prIDs = staleSummaries.map(\.pullRequestID)
       for prID in prIDs {
-        let fileDescriptor = FetchDescriptor<CachedDependencyUpdateFile>(
+        let fileDescriptor = FetchDescriptor<CachedReviewFile>(
           predicate: #Predicate { $0.pullRequestID == prID }
         )
         for row in (try? context.fetch(fileDescriptor)) ?? [] {
           context.delete(row)
           pruned += 1
         }
-        let viewedDescriptor = FetchDescriptor<CachedDependencyUpdateFileViewedState>(
+        let viewedDescriptor = FetchDescriptor<CachedReviewFileViewedState>(
           predicate: #Predicate { $0.pullRequestID == prID }
         )
         for row in (try? context.fetch(viewedDescriptor)) ?? [] {
@@ -235,11 +235,11 @@ public struct DependencyUpdateFilesCache {
   // MARK: - Internals
 
   private func upsertSummary(
-    response: DependencyUpdatesFilesListResponse,
+    response: ReviewsFilesListResponse,
     fetchedAt: Date
   ) throws {
     let pullRequestID = response.pullRequestID
-    let descriptor = FetchDescriptor<CachedDependencyUpdateFilesSummary>(
+    let descriptor = FetchDescriptor<CachedReviewFilesSummary>(
       predicate: #Predicate { $0.pullRequestID == pullRequestID }
     )
     let additions = response.files.reduce(into: 0) { $0 += Int($1.additions) }
@@ -252,7 +252,7 @@ public struct DependencyUpdateFilesCache {
       existing.fileCount = response.files.count
       existing.paginationComplete = response.paginationComplete
     } else {
-      let row = CachedDependencyUpdateFilesSummary(
+      let row = CachedReviewFilesSummary(
         pullRequestID: response.pullRequestID,
         headRefOid: response.headRefOid,
         fetchedAt: fetchedAt,
@@ -268,16 +268,16 @@ public struct DependencyUpdateFilesCache {
   private func replaceFiles(
     pullRequestID: String,
     headRefOid: String,
-    files: [DependencyUpdateFile]
+    files: [ReviewFile]
   ) throws {
-    let existing = FetchDescriptor<CachedDependencyUpdateFile>(
+    let existing = FetchDescriptor<CachedReviewFile>(
       predicate: #Predicate { $0.pullRequestID == pullRequestID }
     )
     for row in try context.fetch(existing) {
       context.delete(row)
     }
     for (index, file) in files.enumerated() {
-      let row = CachedDependencyUpdateFile(
+      let row = CachedReviewFile(
         pullRequestID: pullRequestID,
         headRefOid: headRefOid,
         path: file.path,
@@ -297,17 +297,17 @@ public struct DependencyUpdateFilesCache {
   private func replaceViewedStates(
     pullRequestID: String,
     headRefOid: String,
-    files: [DependencyUpdateFile],
+    files: [ReviewFile],
     updatedAt: Date
   ) throws {
-    let existing = FetchDescriptor<CachedDependencyUpdateFileViewedState>(
+    let existing = FetchDescriptor<CachedReviewFileViewedState>(
       predicate: #Predicate { $0.pullRequestID == pullRequestID }
     )
     for row in try context.fetch(existing) {
       context.delete(row)
     }
     for file in files {
-      let row = CachedDependencyUpdateFileViewedState(
+      let row = CachedReviewFileViewedState(
         pullRequestID: pullRequestID,
         headRefOid: headRefOid,
         path: file.path,
