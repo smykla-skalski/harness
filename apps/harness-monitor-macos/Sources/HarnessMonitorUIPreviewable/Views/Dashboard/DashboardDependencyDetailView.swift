@@ -129,6 +129,7 @@ struct DashboardDependencyDetailView<Actions: View>: View {
     ) {
       await store.prepareDependencyUpdateBody(for: item)
     }
+    .environment(store)
   }
 }
 
