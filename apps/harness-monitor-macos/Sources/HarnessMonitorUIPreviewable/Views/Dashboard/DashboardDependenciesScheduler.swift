@@ -203,11 +203,14 @@ final class DashboardDependenciesScheduler {
     let timeout = fetchTimeoutSeconds
     let task = Task { @MainActor [weak self] in
       do {
-        let response = try await Self.raceFetchAgainstTimeout(
-          client: client,
-          request: request,
+        let response = try await DashboardDependenciesTimeoutRacer.race(
           timeoutSeconds: timeout
-        )
+        ) {
+          try await DashboardDependenciesRemoteLoader.query(
+            client: client,
+            request: request
+          )
+        }
         guard let self, self.fetchGeneration == generation else { return }
         self.states[repository]?.lastSyncedAt = Date()
         self.states[repository]?.lastErrorMessage = nil
@@ -231,67 +234,15 @@ final class DashboardDependenciesScheduler {
       guard let self, self.fetchGeneration == generation else { return }
       self.repositoriesInFlight.remove(repository)
       self.fetchTasks.removeValue(forKey: repository)
-      await self.dispatchPending()
+      if self.states[repository]?.lastErrorMessage == nil {
+        await self.dispatchPending()
+      }
     }
     fetchTasks[repository] = task
   }
 
-  /// Race the per-repository fetch against a `Task.sleep` timeout. Whichever
-  /// arrives first wins; the other side leaks (in practice the fetch task
-  /// keeps awaiting a stuck WS continuation that never resumes — that's the
-  /// whole point of having a timeout in the first place).
-  ///
-  /// Returns the fetched response on success, throws
-  /// `DashboardDependenciesSchedulerError.fetchTimedOut` on timeout, or
-  /// rethrows the loader's error.
-  static func raceFetchAgainstTimeout(
-    client: any HarnessMonitorDependenciesClientProtocol,
-    request: DependencyUpdatesQueryRequest,
-    timeoutSeconds: TimeInterval
-  ) async throws -> DependencyUpdatesQueryResponse {
-    let outcome = AsyncStream<FetchOutcome>.makeStream(
-      bufferingPolicy: .bufferingNewest(1)
-    )
-    let fetchTask = Task.detached(priority: .userInitiated) {
-      do {
-        let response = try await DashboardDependenciesRemoteLoader.query(
-          client: client,
-          request: request
-        )
-        outcome.continuation.yield(.success(response))
-      } catch {
-        outcome.continuation.yield(.failure(error))
-      }
-    }
-    let timeoutTask = Task.detached {
-      do {
-        try await Task.sleep(for: .seconds(timeoutSeconds))
-        outcome.continuation.yield(
-          .failure(DashboardDependenciesSchedulerError.fetchTimedOut)
-        )
-      } catch {
-        // sleep cancelled before timeout; whichever path cancelled us won
-      }
-    }
-    defer {
-      fetchTask.cancel()
-      timeoutTask.cancel()
-      outcome.continuation.finish()
-    }
-    var iterator = outcome.stream.makeAsyncIterator()
-    guard let first = await iterator.next() else {
-      throw DashboardDependenciesSchedulerError.fetchTimedOut
-    }
-    switch first {
-    case .success(let response): return response
-    case .failure(let error): throw error
-    }
-  }
-
-  private enum FetchOutcome: Sendable {
-    case success(DependencyUpdatesQueryResponse)
-    case failure(any Error)
-  }
+  // Per-fetch timeout-racing moved to `DashboardDependenciesTimeoutRacer.race`
+  // so refresh and per-PR action paths can reuse the same wake-zombie guard.
 }
 
 /// Errors emitted by `DashboardDependenciesScheduler`.
