@@ -1,4 +1,5 @@
 import Foundation
+import SwiftData
 
 extension HarnessMonitorStore {
   func bootstrapBody() async {
@@ -18,6 +19,7 @@ extension HarnessMonitorStore {
     }
 
     pruneRepositoryLabelUsageCache()
+    scheduleDependencyUpdateFilesVacuumIfNeeded()
 
     switch daemonOwnership {
     case .external:
@@ -32,6 +34,41 @@ extension HarnessMonitorStore {
     let cache = RepositoryLabelUsageCache(context: modelContext)
     cache.pruneStale()
   }
+
+  /// Vacuum old dependency-files rows when the per-file cache exceeds the
+  /// high-water mark. Runs on a detached background Task with its own
+  /// ModelContext so launch is not blocked; only fires when the cached
+  /// count crosses the trigger threshold.
+  private func scheduleDependencyUpdateFilesVacuumIfNeeded() {
+    guard let modelContext else { return }
+    let cache = DependencyUpdateFilesCache(context: modelContext)
+    let rowCount = cache.countCachedFiles()
+    guard rowCount > Self.dependencyUpdateFilesVacuumTrigger else { return }
+    let container = modelContext.container
+    let cutoff = Date.now.addingTimeInterval(-Self.dependencyUpdateFilesVacuumMaxAge)
+    Task.detached(priority: .background) {
+      await Self.runDependencyUpdateFilesVacuum(container: container, cutoff: cutoff)
+    }
+  }
+
+  private static func runDependencyUpdateFilesVacuum(
+    container: ModelContainer,
+    cutoff: Date
+  ) async {
+    let context = ModelContext(container)
+    let cache = DependencyUpdateFilesCache(context: context)
+    let pruned = cache.pruneStale(cutoff: cutoff)
+    HarnessMonitorLogger.store.info(
+      """
+      Dependency-files cache vacuum complete; \
+      pruned=\(pruned, privacy: .public) \
+      cutoff=\(cutoff.timeIntervalSince1970, privacy: .public)
+      """
+    )
+  }
+
+  static var dependencyUpdateFilesVacuumTrigger: Int { 100_000 }
+  static var dependencyUpdateFilesVacuumMaxAge: TimeInterval { 14 * 24 * 60 * 60 }
 
   static func makeBookmarkStore() -> BookmarkStore? {
     #if DEBUG

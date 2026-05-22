@@ -133,6 +133,7 @@ public enum HarnessMonitorMigrationPlan: SchemaMigrationPlan {
       HarnessMonitorSchemaV18.self,
       HarnessMonitorSchemaV19.self,
       HarnessMonitorSchemaV20.self,
+      HarnessMonitorSchemaV21.self,
     ]
   }
 
@@ -157,6 +158,7 @@ public enum HarnessMonitorMigrationPlan: SchemaMigrationPlan {
       migrateV17toV18,
       migrateV18toV19,
       migrateV19toV20,
+      migrateV20toV21,
     ]
   }
 
@@ -311,6 +313,17 @@ public enum HarnessMonitorMigrationPlan: SchemaMigrationPlan {
     fromVersion: HarnessMonitorSchemaV19.self,
     toVersion: HarnessMonitorSchemaV20.self
   )
+
+  // V21 is purely additive: three new entities for the Dependencies > Files
+  // per-PR file cache. `CachedDependencyUpdateFilesSummary` keys by
+  // `pullRequestID`; the per-file metadata and per-file viewed state both
+  // use a compound `pullRequestID + headRefOid + path` key. Lightweight
+  // migration adds the empty tables; the dashboard repopulates them on the
+  // next `list_dependency_update_files` daemon round-trip.
+  static let migrateV20toV21 = MigrationStage.lightweight(
+    fromVersion: HarnessMonitorSchemaV20.self,
+    toVersion: HarnessMonitorSchemaV21.self
+  )
 }
 
-public typealias HarnessMonitorCurrentSchema = HarnessMonitorSchemaV20
+public typealias HarnessMonitorCurrentSchema = HarnessMonitorSchemaV21
