@@ -16,9 +16,9 @@ extension DashboardDependenciesRouteView {
       return
     }
     let targets = items.map(\.target)
-    routeRefreshingPullRequestIDs.formUnion(targetIDs)
+    beginRefreshing(pullRequestIDs: targetIDs)
     Task {
-      defer { routeRefreshingPullRequestIDs.subtract(targetIDs) }
+      defer { endRefreshing(pullRequestIDs: targetIDs) }
       do {
         let refreshed = try await DashboardDependenciesRemoteLoader.refresh(
           client: client,
@@ -31,6 +31,31 @@ extension DashboardDependenciesRouteView {
         )
       }
     }
+  }
+
+  func isPullRequestRefreshing(_ pullRequestID: String) -> Bool {
+    (routeRefreshingPullRequestCounts[pullRequestID] ?? 0) > 0
+  }
+
+  func beginRefreshing(pullRequestIDs ids: [String]) {
+    var counts = routeRefreshingPullRequestCounts
+    for id in ids {
+      counts[id, default: 0] += 1
+    }
+    routeRefreshingPullRequestCounts = counts
+  }
+
+  func endRefreshing(pullRequestIDs ids: [String]) {
+    var counts = routeRefreshingPullRequestCounts
+    for id in ids {
+      let next = (counts[id] ?? 0) - 1
+      if next > 0 {
+        counts[id] = next
+      } else {
+        counts.removeValue(forKey: id)
+      }
+    }
+    routeRefreshingPullRequestCounts = counts
   }
 
   func applyRefreshedItems(_ refresh: DependencyUpdatesRefreshResponse) {

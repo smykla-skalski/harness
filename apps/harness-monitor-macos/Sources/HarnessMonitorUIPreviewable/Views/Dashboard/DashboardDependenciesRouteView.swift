@@ -202,7 +202,7 @@ struct DashboardDependenciesRouteView: View {
   @State private var presentationWorker = DashboardDependenciesPresentationWorker()
   @State private var cachedPresentation = DashboardDependenciesPresentation.empty
   @State private var presentationGeneration: UInt64 = 0
-  @State private var refreshingPullRequestIDs = Set<String>()
+  @State private var refreshingPullRequestCounts: [String: Int] = [:]
   @State private var scheduler = DashboardDependenciesScheduler()
   @State private var collapsedRepositories = DashboardDependenciesCollapsedRepositories()
   @State private var labelMenuDataByRepository: [String: DashboardDependenciesRepoLabelMenuData] =
@@ -286,9 +286,9 @@ struct DashboardDependenciesRouteView: View {
     nonmutating set { resolvedPreferences = newValue }
   }
 
-  var routeRefreshingPullRequestIDs: Set<String> {
-    get { refreshingPullRequestIDs }
-    nonmutating set { refreshingPullRequestIDs = newValue }
+  var routeRefreshingPullRequestCounts: [String: Int] {
+    get { refreshingPullRequestCounts }
+    nonmutating set { refreshingPullRequestCounts = newValue }
   }
 
   var routeScheduler: DashboardDependenciesScheduler {

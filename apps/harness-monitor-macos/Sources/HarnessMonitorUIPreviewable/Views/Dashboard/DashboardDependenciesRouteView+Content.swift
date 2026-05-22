@@ -136,7 +136,7 @@ extension DashboardDependenciesRouteView {
     DashboardDependencyRow(
       item: item,
       showsRepository: showsRepository,
-      isRefreshing: routeRefreshingPullRequestIDs.contains(item.pullRequestID),
+      isRefreshing: isPullRequestRefreshing(item.pullRequestID),
       updatedLabel: relativeUpdatedLabel(for: item)
     )
   }
