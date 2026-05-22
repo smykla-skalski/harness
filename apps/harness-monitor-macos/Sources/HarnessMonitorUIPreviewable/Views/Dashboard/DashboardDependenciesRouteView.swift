@@ -14,6 +14,8 @@ struct DashboardDependenciesRouteView: View {
 
   @AppStorage(DashboardDependenciesPreferences.storageKey)
   var storedPreferences = ""
+  @AppStorage("dashboard.dependencies.recent-actions")
+  var recentDependencyActionsStorage = ""
   @SceneStorage("dashboard.dependencies.filter")
   var filterModeRaw = DashboardDependenciesFilterMode.all.rawValue
   @SceneStorage("dashboard.dependencies.sort")
@@ -28,6 +30,8 @@ struct DashboardDependenciesRouteView: View {
   var collapsedRepositoriesStorage = ""
   @SceneStorage("dashboard.dependencies.content-detail-width")
   var contentDetailWidth = SessionContentDetailSplitLayout.defaultContentWidth
+  @SceneStorage("dashboard.dependencies.problem-checks-only")
+  var showsProblemChecksOnly = false
 
   @State private var response = DependencyUpdatesQueryResponse(
     fetchedAt: "",
@@ -59,9 +63,7 @@ struct DashboardDependenciesRouteView: View {
   @State private var collapsedRepositories = DashboardDependenciesCollapsedRepositories()
   @State private var labelMenuDataByRepository: [String: DashboardDependenciesRepoLabelMenuData] =
     [:]
-  @State private var recentDependencyActions: [String: DashboardDependencyActivityEntry] = [:]
-  @State private var pendingBatchConfirmation: DashboardDependencyBatchConfirmation?
-  @State private var pendingActionConfirmation: DashboardDependencyActionConfirmation?
+  @State private var actionState = DashboardDependenciesRouteActionState()
 
   init(
     store: HarnessMonitorStore,
@@ -166,36 +168,20 @@ struct DashboardDependenciesRouteView: View {
   }
 
   var routeRecentDependencyActions: [String: DashboardDependencyActivityEntry] {
-    get { recentDependencyActions }
-    nonmutating set { recentDependencyActions = newValue }
-  }
-
-  var routePendingBatchConfirmation: DashboardDependencyBatchConfirmation? {
-    get { pendingBatchConfirmation }
-    nonmutating set { pendingBatchConfirmation = newValue }
-  }
-
-  var routePendingBatchConfirmationIsPresented: Binding<Bool> {
-    Binding(
-      get: { pendingBatchConfirmation != nil },
-      set: { isPresented in
-        if !isPresented {
-          pendingBatchConfirmation = nil
-        }
-      }
-    )
+    get { actionState.recentActions }
+    nonmutating set { actionState.recentActions = newValue }
   }
 
   var routePendingActionConfirmation: DashboardDependencyActionConfirmation? {
-    get { pendingActionConfirmation }
-    nonmutating set { pendingActionConfirmation = newValue }
+    get { actionState.pendingConfirmation }
+    nonmutating set { actionState.pendingConfirmation = newValue }
   }
 
   var routePendingActionConfirmationTitle: String {
     routePendingActionConfirmation?.title ?? ""
   }
 
-  var routePendingActionPresented: Binding<Bool> {
+  var routeActionDialogPresented: Binding<Bool> {
     Binding(
       get: { routePendingActionConfirmation != nil },
       set: { isPresented in
@@ -204,6 +190,15 @@ struct DashboardDependenciesRouteView: View {
         }
       }
     )
+  }
+
+  var routeDependencyCapabilities: DependencyUpdatesCapabilitiesResponse {
+    get { actionState.capabilities }
+    nonmutating set { actionState.capabilities = newValue }
+  }
+
+  var routeShowsProblemChecksOnlyBinding: Binding<Bool> {
+    $showsProblemChecksOnly
   }
 
   var routePresentationWorker: DashboardDependenciesPresentationWorker {
@@ -292,15 +287,8 @@ struct DashboardDependenciesRouteView: View {
         labelSheet
       }
       .confirmationDialog(
-        routePendingBatchConfirmation?.title ?? "Confirm dependency action",
-        isPresented: routePendingBatchConfirmationIsPresented,
-        titleVisibility: .visible,
-        actions: { batchConfirmationActions },
-        message: { batchConfirmationMessage }
-      )
-      .confirmationDialog(
         routePendingActionConfirmationTitle,
-        isPresented: routePendingActionPresented,
+        isPresented: routeActionDialogPresented,
         titleVisibility: .visible,
         presenting: routePendingActionConfirmation
       ) { confirmation in
@@ -320,6 +308,9 @@ struct DashboardDependenciesRouteView: View {
       }
       .onChange(of: storedPreferences, initial: true) { _, newValue in
         syncPreferencesFromStorage(newValue)
+      }
+      .onChange(of: recentDependencyActionsStorage, initial: true) { _, newValue in
+        syncRecentDependencyActionsFromStorage(newValue)
       }
       .onChange(of: collapsedRepositoriesStorage, initial: true) { _, newValue in
         syncCollapsedRepositoriesFromStorage(newValue)
@@ -341,5 +332,6 @@ struct DashboardDependenciesRouteView: View {
       ) { pullRequestID in
         selectedIDs = [pullRequestID]
       }
+      .focusedSceneValue(\.dashboardDependenciesCommands, dependencyCommandFocus)
   }
 }

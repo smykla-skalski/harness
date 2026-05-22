@@ -173,7 +173,11 @@ struct DashboardDependenciesDisabledReasonTests {
     #expect(confirmation?.confirmRole != nil)
     #expect(confirmation?.message.contains("Required checks failing: ci / test.") == true)
     #expect(
-      confirmation?.message.contains("Merge as Admin uses your GitHub permissions") == true)
+      confirmation?.message.contains("Merge as Admin uses your GitHub permissions") == true
+    )
+    #expect(
+      confirmation?.message.contains("bypass branch protections and merge immediately") == true
+    )
   }
 
   @Test("Merge confirmation summarizes mixed selections")

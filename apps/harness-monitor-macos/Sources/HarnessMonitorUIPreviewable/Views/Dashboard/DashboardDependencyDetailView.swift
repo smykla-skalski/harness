@@ -5,6 +5,7 @@ struct DashboardDependencyDetailView<Actions: View>: View {
   let item: DependencyUpdateItem
   let store: HarnessMonitorStore
   let activity: DashboardDependencyActivitySnapshot
+  @Binding var showsProblemChecksOnly: Bool
   let onDescriptionCheckboxError: ((String) -> Void)?
   let onDescriptionCheckboxUpdated: (() -> Void)?
   let onRerunCheck: (DependencyUpdateCheck) -> Void
@@ -14,6 +15,7 @@ struct DashboardDependencyDetailView<Actions: View>: View {
     item: DependencyUpdateItem,
     store: HarnessMonitorStore,
     activity: DashboardDependencyActivitySnapshot,
+    showsProblemChecksOnly: Binding<Bool> = .constant(false),
     onDescriptionCheckboxError: ((String) -> Void)? = nil,
     onDescriptionCheckboxUpdated: (() -> Void)? = nil,
     onRerunCheck: @escaping (DependencyUpdateCheck) -> Void = { _ in },
@@ -22,6 +24,7 @@ struct DashboardDependencyDetailView<Actions: View>: View {
     self.item = item
     self.store = store
     self.activity = activity
+    _showsProblemChecksOnly = showsProblemChecksOnly
     self.onDescriptionCheckboxError = onDescriptionCheckboxError
     self.onDescriptionCheckboxUpdated = onDescriptionCheckboxUpdated
     self.onRerunCheck = onRerunCheck
@@ -61,6 +64,7 @@ struct DashboardDependencyDetailView<Actions: View>: View {
         DashboardDependencyDetailSection(title: "Checks") {
           DashboardDependencyCheckList(
             checks: item.checks,
+            showsProblemChecksOnly: $showsProblemChecksOnly,
             onRerunCheck: onRerunCheck
           )
         }

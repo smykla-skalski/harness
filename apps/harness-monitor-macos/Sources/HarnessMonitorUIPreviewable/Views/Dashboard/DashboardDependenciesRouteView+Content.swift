@@ -30,8 +30,15 @@ extension DashboardDependenciesRouteView {
       sortModeRaw: $sortModeRaw,
       groupModeRaw: $groupModeRaw,
       needsMeCount: routeResponse.items.lazy.filter(\.requiresAttention).count,
+      syncHealth: routeSyncHealth,
       onRefresh: {
         Task { await reload(forceRefresh: true) }
+      },
+      onRetryFailedRepositories: {
+        retryRepositories(routeSyncHealth.failedRepositories)
+      },
+      onRetryStaleRepositories: {
+        retryRepositories(routeSyncHealth.staleRepositories)
       },
       onClearCache: {
         Task { await clearCacheAndReload() }
@@ -98,6 +105,7 @@ extension DashboardDependenciesRouteView {
           item: item,
           store: store,
           activity: activitySnapshot(for: item),
+          showsProblemChecksOnly: routeShowsProblemChecksOnlyBinding,
           onDescriptionCheckboxError: { message in routeErrorMessage = message },
           onDescriptionCheckboxUpdated: {
             if let client = store.apiClient {
@@ -204,11 +212,7 @@ extension DashboardDependenciesRouteView {
       },
       onCopyApprovalLinks: { copyApprovalLinks(for: items) },
       onAuto: {
-        if items.count == 1, let item = items.first {
-          trackInFlight(Task { await auto(items: [item]) })
-        } else {
-          requestAuto(items: items)
-        }
+        requestAuto(items: items)
       },
       onOpenItem: {
         if let item = items.first {

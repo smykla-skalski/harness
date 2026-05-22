@@ -3,9 +3,9 @@ import SwiftUI
 
 struct DashboardDependencyCheckList: View {
   let checks: [DependencyUpdateCheck]
+  @Binding var showsProblemChecksOnly: Bool
   let onRerunCheck: (DependencyUpdateCheck) -> Void
 
-  @State private var showsProblemChecksOnly = false
   @State private var expandedPassingGroupIDs = Set<String>()
 
   var body: some View {

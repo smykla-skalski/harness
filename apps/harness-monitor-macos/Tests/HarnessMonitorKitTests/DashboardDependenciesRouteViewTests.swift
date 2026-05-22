@@ -117,19 +117,23 @@ struct DashboardDependenciesRouteViewTests {
   func routeSourcePresentsNativeConfirmationForRiskyApproveAndMergeActions() throws {
     let routeViewSource = try routeSource()
     let contentSource = try routeSource(named: "DashboardDependenciesRouteView+Content.swift")
-    let actionsSource = try routeSource(named: "DashboardDependenciesRouteView+Actions.swift")
+    let actionPreviewSource = try routeSource(
+      named: "DashboardDependenciesRouteView+ActionPreview.swift"
+    )
     let attentionSource = try routeSource(named: "DashboardDependenciesAttentionActions.swift")
     let actionBarSource = try routeSource(named: "DashboardDependencyActionBar.swift")
     let contextMenuSource = try routeSource(named: "DashboardDependenciesRouteView+ContextMenu.swift")
     let rowSource = try routeSource(named: "DashboardDependencyListRow.swift")
 
-    #expect(routeViewSource.contains("@State private var pendingActionConfirmation"))
+    #expect(routeViewSource.contains("@State private var actionState"))
     #expect(routeViewSource.contains(".confirmationDialog("))
     #expect(routeViewSource.contains("confirmDependencyAction(confirmation)"))
     #expect(contentSource.contains("onApprove: { requestApproveOrConfirm(items: items) }"))
     #expect(contentSource.contains("onMerge: { requestMergeOrConfirm(items: items) }"))
-    #expect(actionsSource.contains("requestDependencyActionConfirmation(.approve, items: items)"))
-    #expect(actionsSource.contains("requestDependencyActionConfirmation(.merge, items: items)"))
+    #expect(actionPreviewSource.contains("requestDependencyAction(.approve, items: items)"))
+    #expect(actionPreviewSource.contains("requestDependencyAction(.merge, items: items)"))
+    #expect(actionPreviewSource.contains("dependencyActionPreview("))
+    #expect(actionPreviewSource.contains("routePendingActionConfirmation = confirmation"))
     #expect(attentionSource.contains("struct DashboardDependencyActionConfirmation"))
     #expect(attentionSource.contains("dashboardDependencyActionConfirmation("))
     #expect(attentionSource.contains("func dashboardDependencyMergeActionTitle("))
@@ -307,7 +311,8 @@ struct DashboardDependenciesRouteViewTests {
       fromCache: true,
       lastAction: nil,
       missingCheckRunURLCount: 2,
-      totalCheckCount: 3
+      totalCheckCount: 3,
+      capabilities: DependencyUpdatesCapabilitiesResponse()
     )
 
     #expect(snapshot.cacheLabel == "Cached data")

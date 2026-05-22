@@ -45,8 +45,8 @@ struct DashboardDependencyBatchActionsTests {
     )
   }
 
-  @Test("batch confirmation includes merge method and skipped count")
-  func batchConfirmationIncludesMergeMethodAndSkippedCount() {
+  @Test("local action preview includes skipped merge targets")
+  func localActionPreviewIncludesSkippedMergeTargets() {
     let ready = dependencyItem(
       id: "ready",
       number: 1,
@@ -61,15 +61,19 @@ struct DashboardDependencyBatchActionsTests {
       checkStatus: .success
     )
 
-    let confirmation = DashboardDependencyBatchConfirmation.merge(
-      items: [ready, blocked],
-      mergeMethod: .squash
+    let preview = localDependencyActionPreview(
+      .merge,
+      items: [ready, blocked]
     )
 
-    #expect(confirmation.confirmTitle == "Merge 1 Pull Request")
-    #expect(confirmation.message.contains("using Squash"))
-    #expect(confirmation.message.contains("Skipping 1"))
-    #expect(confirmation.pullRequestIDs == ["ready", "blocked"])
+    #expect(preview.actionableCount == 1)
+    #expect(preview.skippedCount == 1)
+    #expect(
+      preview.targets.contains {
+        $0.pullRequestID == "blocked"
+          && $0.reason == "Merge conflicts must be resolved before merging"
+      }
+    )
   }
 
   private func dependencyItem(
