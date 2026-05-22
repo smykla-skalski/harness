@@ -20,6 +20,7 @@ struct DashboardDependencyConversationFeed: View {
   let store: HarnessMonitorStore
   let onSignalTap: ((String) -> Void)?
   let actionHandler: any DecisionActionHandler
+  let showsComposer: Bool
   @Environment(\.harnessDateTimeConfiguration) private var dateTimeConfiguration
   @Environment(\.fontScale) private var fontScale
   @AppStorage(DashboardDependenciesPreferences.storageKey)
@@ -31,12 +32,14 @@ struct DashboardDependencyConversationFeed: View {
     item: DependencyUpdateItem,
     store: HarnessMonitorStore,
     actionHandler: any DecisionActionHandler,
-    onSignalTap: ((String) -> Void)? = nil
+    onSignalTap: ((String) -> Void)? = nil,
+    showsComposer: Bool = true
   ) {
     self.item = item
     self.store = store
     self.actionHandler = actionHandler
     self.onSignalTap = onSignalTap
+    self.showsComposer = showsComposer
   }
 
   var body: some View {
@@ -48,7 +51,9 @@ struct DashboardDependencyConversationFeed: View {
         header(viewModel)
         content(viewModel)
       }
-      composer(viewModel)
+      if showsComposer {
+        composer(viewModel)
+      }
     }
     .task(id: item.pullRequestID) {
       guard preferences.showActivityTimeline else { return }
