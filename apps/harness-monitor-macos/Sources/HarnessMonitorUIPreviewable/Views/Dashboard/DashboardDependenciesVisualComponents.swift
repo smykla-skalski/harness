@@ -296,18 +296,14 @@ struct DashboardDependencyCheckList: View {
             systemImage: "checkmark.circle.fill"
           )
         }
-        VStack(alignment: .leading, spacing: 0) {
-          ForEach(Array(sortedChecks.enumerated()), id: \.element.id) { index, check in
-            DashboardDependencyCheckRow(
-              check: check,
+        VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
+          ForEach(checkGroups) { group in
+            DashboardDependencyCheckGroupView(
+              group: group,
               suppressPassingStatus: allPassing,
+              showsHeader: checkGroups.count > 1,
               onRerunCheck: onRerunCheck
             )
-            .overlay(alignment: .bottom) {
-              if index < sortedChecks.count - 1 {
-                Divider().opacity(0.45)
-              }
-            }
           }
         }
       }
@@ -319,12 +315,42 @@ struct DashboardDependencyCheckList: View {
     !checks.isEmpty && checks.allSatisfy(\.isPassing)
   }
 
-  private var sortedChecks: [DependencyUpdateCheck] {
-    checks.sorted { lhs, rhs in
-      if lhs.displayPriority != rhs.displayPriority {
-        return lhs.displayPriority < rhs.displayPriority
+  private var checkGroups: [DashboardDependencyCheckGroup] {
+    dashboardDependencyCheckGroups(for: checks)
+  }
+}
+
+private struct DashboardDependencyCheckGroupView: View {
+  let group: DashboardDependencyCheckGroup
+  let suppressPassingStatus: Bool
+  let showsHeader: Bool
+  let onRerunCheck: (DependencyUpdateCheck) -> Void
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      if showsHeader {
+        HStack(spacing: HarnessMonitorTheme.spacingSM) {
+          Text(group.title)
+            .scaledFont(.caption.weight(.semibold))
+            .foregroundStyle(HarnessMonitorTheme.ink)
+          Text(group.checkCountLabel)
+            .scaledFont(.caption.weight(.semibold))
+            .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+        }
+        .padding(.bottom, HarnessMonitorTheme.spacingXS)
       }
-      return lhs.name.localizedStandardCompare(rhs.name) == .orderedAscending
+      ForEach(Array(group.checks.enumerated()), id: \.element.id) { index, check in
+        DashboardDependencyCheckRow(
+          check: check,
+          suppressPassingStatus: suppressPassingStatus,
+          onRerunCheck: onRerunCheck
+        )
+        .overlay(alignment: .bottom) {
+          if index < group.checks.count - 1 {
+            Divider().opacity(0.45)
+          }
+        }
+      }
     }
   }
 }

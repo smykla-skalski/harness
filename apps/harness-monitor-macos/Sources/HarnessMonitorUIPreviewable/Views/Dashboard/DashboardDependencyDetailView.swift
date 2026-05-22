@@ -4,6 +4,7 @@ import SwiftUI
 struct DashboardDependencyDetailView<Actions: View>: View {
   let item: DependencyUpdateItem
   let store: HarnessMonitorStore
+  let activity: DashboardDependencyActivitySnapshot
   let onDescriptionCheckboxError: ((String) -> Void)?
   let onDescriptionCheckboxUpdated: (() -> Void)?
   let onRerunCheck: (DependencyUpdateCheck) -> Void
@@ -12,6 +13,7 @@ struct DashboardDependencyDetailView<Actions: View>: View {
   init(
     item: DependencyUpdateItem,
     store: HarnessMonitorStore,
+    activity: DashboardDependencyActivitySnapshot,
     onDescriptionCheckboxError: ((String) -> Void)? = nil,
     onDescriptionCheckboxUpdated: (() -> Void)? = nil,
     onRerunCheck: @escaping (DependencyUpdateCheck) -> Void = { _ in },
@@ -19,6 +21,7 @@ struct DashboardDependencyDetailView<Actions: View>: View {
   ) {
     self.item = item
     self.store = store
+    self.activity = activity
     self.onDescriptionCheckboxError = onDescriptionCheckboxError
     self.onDescriptionCheckboxUpdated = onDescriptionCheckboxUpdated
     self.onRerunCheck = onRerunCheck
@@ -60,6 +63,9 @@ struct DashboardDependencyDetailView<Actions: View>: View {
             checks: item.checks,
             onRerunCheck: onRerunCheck
           )
+        }
+        DashboardDependencyDetailSection(title: "Activity") {
+          DashboardDependencyActivitySummary(snapshot: activity)
         }
         DashboardDependencyDetailSection(title: "Reviews") {
           DashboardDependencyReviewList(reviews: item.reviews)

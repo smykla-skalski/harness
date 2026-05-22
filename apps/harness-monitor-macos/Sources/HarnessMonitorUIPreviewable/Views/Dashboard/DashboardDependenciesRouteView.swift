@@ -207,6 +207,7 @@ struct DashboardDependenciesRouteView: View {
   @State private var collapsedRepositories = DashboardDependenciesCollapsedRepositories()
   @State private var labelMenuDataByRepository: [String: DashboardDependenciesRepoLabelMenuData] =
     [:]
+  @State private var recentDependencyActions: [String: DashboardDependencyActivityEntry] = [:]
 
   init(
     store: HarnessMonitorStore,
@@ -308,6 +309,11 @@ struct DashboardDependenciesRouteView: View {
   var routeLabelMenuDataByRepository: [String: DashboardDependenciesRepoLabelMenuData] {
     get { labelMenuDataByRepository }
     nonmutating set { labelMenuDataByRepository = newValue }
+  }
+
+  var routeRecentDependencyActions: [String: DashboardDependencyActivityEntry] {
+    get { recentDependencyActions }
+    nonmutating set { recentDependencyActions = newValue }
   }
 
   var routePresentationWorker: DashboardDependenciesPresentationWorker {

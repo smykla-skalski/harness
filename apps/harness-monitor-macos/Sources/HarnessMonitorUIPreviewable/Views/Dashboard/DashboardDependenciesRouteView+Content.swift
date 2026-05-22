@@ -91,6 +91,7 @@ extension DashboardDependenciesRouteView {
         DashboardDependencyDetailView(
           item: item,
           store: store,
+          activity: activitySnapshot(for: item),
           onDescriptionCheckboxError: { message in routeErrorMessage = message },
           onDescriptionCheckboxUpdated: {
             if let client = store.apiClient {

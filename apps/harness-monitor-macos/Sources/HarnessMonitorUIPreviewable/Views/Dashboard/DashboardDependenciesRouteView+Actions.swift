@@ -55,18 +55,20 @@ extension DashboardDependenciesRouteView {
   }
 
   func approve(items: [DependencyUpdateItem]) async {
-    await performMutation("Approving", items: items) { client in
+    let actionableItems = items.filter(\.canAttemptManualApproval)
+    await performMutation("Approving", items: actionableItems) { client in
       try await client.approveDependencyUpdates(
-        request: DependencyUpdatesApproveRequest(targets: items.map(\.target))
+        request: DependencyUpdatesApproveRequest(targets: actionableItems.map(\.target))
       )
     }
   }
 
   func merge(items: [DependencyUpdateItem]) async {
-    let nextID = nextSelectionID(after: items)
+    let actionableItems = items.filter(\.canAttemptManualMerge)
+    let nextID = nextSelectionID(after: actionableItems)
     await performMutation(
       "Merging",
-      items: items,
+      items: actionableItems,
       onSuccess: {
         if let nextID {
           routeSelectedIDs = [nextID]
@@ -75,7 +77,7 @@ extension DashboardDependenciesRouteView {
       operation: { client in
         try await client.mergeDependencyUpdates(
           request: DependencyUpdatesMergeRequest(
-            targets: items.map(\.target),
+            targets: actionableItems.map(\.target),
             method: normalizedPreferences.mergeMethod
           )
         )
@@ -97,14 +99,22 @@ extension DashboardDependenciesRouteView {
   }
 
   func rerunChecks(items: [DependencyUpdateItem]) async {
-    await performMutation("Rerunning", items: items) { client in
+    let actionableItems = items.filter(\.canAttemptRerunChecks)
+    await performMutation("Rerunning", items: actionableItems) { client in
       try await client.rerunDependencyUpdateChecks(
-        request: DependencyUpdatesRerunChecksRequest(targets: items.map(\.rerunTarget))
+        request: DependencyUpdatesRerunChecksRequest(targets: actionableItems.map(\.rerunTarget))
       )
     }
   }
 
   func rerunCheck(_ check: DependencyUpdateCheck, for item: DependencyUpdateItem) async {
+    guard item.viewerCanUpdate else {
+      store.toast.presentWarning(
+        DashboardDependenciesDisabledReason.rerunReason(for: [item])
+          ?? "Current GitHub token cannot update this pull request"
+      )
+      return
+    }
     guard check.isRerunnable, let checkSuiteID = check.checkSuiteID else {
       store.toast.presentWarning(
         check.rerunUnavailableReason ?? "This check cannot be rerun from the dashboard"
@@ -137,23 +147,28 @@ extension DashboardDependenciesRouteView {
   }
 
   func addLabel(_ label: String, to items: [DependencyUpdateItem]) async {
+    let actionableItems = items.filter(\.canAddDependencyLabel)
     await performMutation(
       "Labeling",
-      items: items,
-      onSuccess: { recordLabelUsage(label, items: items) },
+      items: actionableItems,
+      onSuccess: { recordLabelUsage(label, items: actionableItems) },
       operation: { client in
         try await client.addDependencyUpdateLabel(
-          request: DependencyUpdatesLabelRequest(targets: items.map(\.target), label: label)
+          request: DependencyUpdatesLabelRequest(
+            targets: actionableItems.map(\.target),
+            label: label
+          )
         )
       }
     )
   }
 
   func auto(items: [DependencyUpdateItem]) async {
-    await performMutation("Running auto mode", items: items) { client in
+    let actionableItems = items.filter(\.canRunAutoMode)
+    await performMutation("Running auto mode", items: actionableItems) { client in
       try await client.autoDependencyUpdates(
         request: DependencyUpdatesAutoRequest(
-          targets: items.map(\.target),
+          targets: actionableItems.map(\.target),
           method: normalizedPreferences.mergeMethod
         )
       )
@@ -161,6 +176,13 @@ extension DashboardDependenciesRouteView {
   }
 
   func rebaseViaBot(item: DependencyUpdateItem, bot: DependencyUpdateBot) async {
+    guard item.canRebaseViaBot else {
+      store.toast.presentWarning(
+        DashboardDependenciesDisabledReason.rebaseReason(for: item)
+          ?? "This pull request cannot be rebased from the dashboard"
+      )
+      return
+    }
     await performMutation(bot.rebaseActionTitle, items: [item]) { client in
       try await client.commentDependencyUpdates(
         request: DependencyUpdatesCommentRequest(
@@ -218,6 +240,7 @@ extension DashboardDependenciesRouteView {
       @Sendable @escaping (any HarnessMonitorClientProtocol) async throws
       -> DependencyUpdatesActionResponse
   ) async {
+    guard !items.isEmpty else { return }
     guard let client = store.apiClient else { return }
     let trackedIDs = items.map(\.pullRequestID)
     beginRefreshing(pullRequestIDs: trackedIDs, actionTitle: title)
@@ -232,10 +255,12 @@ extension DashboardDependenciesRouteView {
       ) {
         try await operation(client)
       }
+      recordDependencyActionResponse(response, title: title, items: items)
       store.presentSuccessFeedback(response.summary)
       onSuccess()
       scheduleAffectedRefresh(for: items, using: client)
     } catch {
+      recordDependencyActionFailure(error, title: title, items: items)
       store.presentFailureFeedback(error.localizedDescription)
     }
   }

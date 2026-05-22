@@ -31,8 +31,19 @@ struct DashboardDependenciesDisabledReasonTests {
 
     #expect(
       DashboardDependenciesDisabledReason.approveReason(for: [changes])
-        == "Changes requested — resolve review before approving"
+        == "Changes requested - resolve review before approving"
     )
+  }
+
+  @Test("Approve reason reports selections the viewer cannot update")
+  func approveReasonReportsMissingUpdatePermission() {
+    let readOnly = makeItem(state: .open, reviewStatus: .reviewRequired, viewerCanUpdate: false)
+
+    #expect(
+      DashboardDependenciesDisabledReason.approveReason(for: [readOnly])
+        == "Current GitHub token cannot update selected pull request(s)"
+    )
+    #expect(!readOnly.canAttemptManualApproval)
   }
 
   @Test("Approve reason reports closed selections")
@@ -88,7 +99,7 @@ struct DashboardDependenciesDisabledReasonTests {
 
     #expect(
       DashboardDependenciesDisabledReason.rerunReason(for: [passing])
-        == "All checks passing — nothing to rerun"
+        == "All checks passing - nothing to rerun"
     )
     #expect(
       DashboardDependenciesDisabledReason.rerunReason(for: [pending])
@@ -113,6 +124,28 @@ struct DashboardDependenciesDisabledReasonTests {
     #expect(DashboardDependenciesDisabledReason.rerunReason(for: [failing]) == nil)
   }
 
+  @Test("Rerun reason requires update permission")
+  func rerunReasonRequiresUpdatePermission() {
+    let failing = makeItem(
+      checkStatus: .failure,
+      checks: [
+        DependencyUpdateCheck(
+          name: "ci",
+          status: .completed,
+          conclusion: .failure,
+          checkSuiteID: "suite-1"
+        )
+      ],
+      viewerCanUpdate: false
+    )
+
+    #expect(
+      DashboardDependenciesDisabledReason.rerunReason(for: [failing])
+        == "Current GitHub token cannot update selected pull request(s)"
+    )
+    #expect(!failing.canAttemptRerunChecks)
+  }
+
   @Test("Auto reason is nil when at least one item can run auto mode")
   func autoReasonIsNilWhenAnyItemAutoEligible() {
     let auto = makeItem(state: .open, reviewStatus: .none, checkStatus: .success)
@@ -128,6 +161,29 @@ struct DashboardDependenciesDisabledReasonTests {
       DashboardDependenciesDisabledReason.autoReason(for: [changes])
         == "Nothing in this selection matches the auto-mode rules"
     )
+  }
+
+  @Test("Label and rebase reasons require update permission")
+  func labelAndRebaseReasonsRequireUpdatePermission() {
+    let readOnly = makeItem(viewerCanUpdate: false)
+
+    #expect(
+      DashboardDependenciesDisabledReason.labelReason(for: [readOnly])
+        == "Current GitHub token cannot update selected pull request(s)"
+    )
+    #expect(
+      DashboardDependenciesDisabledReason.rebaseReason(for: readOnly)
+        == "Current GitHub token cannot update selected pull request(s)"
+    )
+    #expect(!readOnly.canAddDependencyLabel)
+    #expect(!readOnly.canRebaseViaBot)
+  }
+
+  @Test("Replacing dependency items preserves update permission")
+  func replacingDependencyItemsPreservesUpdatePermission() {
+    let readOnly = makeItem(viewerCanUpdate: false)
+
+    #expect(!readOnly.replacing(checkStatus: .failure).viewerCanUpdate)
   }
 
   @Test("Auto preview is nil for single-item selections")
@@ -169,7 +225,8 @@ struct DashboardDependenciesDisabledReasonTests {
     checkStatus: DependencyUpdateCheckStatus = .success,
     policyBlocked: Bool = false,
     isDraft: Bool = false,
-    checks: [DependencyUpdateCheck] = []
+    checks: [DependencyUpdateCheck] = [],
+    viewerCanUpdate: Bool = true
   ) -> DependencyUpdateItem {
     DependencyUpdateItem(
       pullRequestID: "pr-1",
@@ -192,7 +249,8 @@ struct DashboardDependenciesDisabledReasonTests {
       additions: 10,
       deletions: 4,
       createdAt: "2026-05-20T10:00:00Z",
-      updatedAt: "2026-05-20T11:00:00Z"
+      updatedAt: "2026-05-20T11:00:00Z",
+      viewerCanUpdate: viewerCanUpdate
     )
   }
 }
