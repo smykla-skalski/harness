@@ -6,12 +6,18 @@ use serde::{Deserialize, Serialize};
 use crate::task_board::github::GitHubMergeMethod;
 
 mod body_update;
+mod files;
 mod github;
 mod validation;
 
 pub use body_update::{
     DependencyUpdatesBodyUpdateOutcome, DependencyUpdatesBodyUpdateRequest,
     DependencyUpdatesBodyUpdateResponse,
+};
+pub use files::{
+    DependencyUpdateFile, DependencyUpdateFileChangeType, DependencyUpdateFileViewedState,
+    DependencyUpdatesFilesListRequest, DependencyUpdatesFilesListResponse,
+    DependencyUpdatesRateLimitSnapshot, HarnessCodeLanguage, infer_language,
 };
 pub(crate) use github::DependencyUpdatesGitHubClient;
 

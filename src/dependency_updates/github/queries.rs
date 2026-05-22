@@ -308,3 +308,33 @@ mutation AddDependencyUpdateComment($id: ID!, $body: String!) {
   }
 }
 ";
+
+pub(crate) const LIST_PR_FILES_QUERY: &str = r"
+query ListDependencyUpdatePullRequestFiles($id: ID!, $after: String) {
+  node(id: $id) {
+    ... on PullRequest {
+      headRefOid
+      viewerCanUpdate
+      files(first: 100, after: $after) {
+        pageInfo {
+          hasNextPage
+          endCursor
+        }
+        nodes {
+          path
+          additions
+          deletions
+          changeType
+          viewerViewedState
+        }
+      }
+    }
+  }
+  rateLimit {
+    limit
+    cost
+    remaining
+    resetAt
+  }
+}
+";
