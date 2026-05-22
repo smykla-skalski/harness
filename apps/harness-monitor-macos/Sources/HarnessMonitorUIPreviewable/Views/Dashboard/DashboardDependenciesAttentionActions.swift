@@ -240,11 +240,10 @@ private func dashboardDependencyActionConfirmationMessage(
         : "\(subject) still need attention before a normal merge."
     )
   }
+  paragraphs.append(dashboardDependencyActionPreviewMessage(preview))
   if let summary = dashboardDependencyAttentionSelectionSummary(for: action, items: items) {
-    paragraphs.append(dashboardDependencyActionPreviewMessage(preview))
     paragraphs.append(summary)
   } else {
-    paragraphs.append(dashboardDependencyActionPreviewMessage(preview))
     paragraphs.append(contentsOf: dashboardDependencyAttentionReasonMessages(for: items))
   }
   return paragraphs.joined(separator: "\n\n")
@@ -288,11 +287,13 @@ private func dashboardDependencyActionPreviewMessage(
     "\(preview.actionableCount) of \(preview.totalCount) selected pull requests are eligible."
   ]
   if preview.skippedCount > 0 {
+    var skippedReasonCounts: [String: Int] = [:]
+    for target in preview.targets where !target.eligible {
+      skippedReasonCounts[target.reason ?? "Unavailable", default: 0] += 1
+    }
     let skippedReasons =
-      Dictionary(grouping: preview.targets.filter { !$0.eligible }) { target in
-        target.reason ?? "Unavailable"
-      }
-      .map { reason, targets in "\(targets.count) \(reason)" }
+      skippedReasonCounts
+      .map { reason, count in "\(count) \(reason)" }
       .sorted()
       .prefix(3)
       .joined(separator: "\n")
@@ -310,7 +311,27 @@ private func dashboardDependencyAttentionReasonMessages(
     return dashboardDependencyAttentionReasonMessages(for: item)
   }
   var messages: [String] = []
-  let requiredFailures = items.filter(\.hasRequiredFailedChecks).count
+  var requiredFailures = 0
+  var optionalFailures = 0
+  var policyBlocked = 0
+  var changesRequested = 0
+  var conflicts = 0
+  for item in items {
+    if item.hasRequiredFailedChecks {
+      requiredFailures += 1
+    } else if item.checkStatus == .failure {
+      optionalFailures += 1
+    }
+    if item.policyBlocked {
+      policyBlocked += 1
+    }
+    if item.reviewStatus == .changesRequested {
+      changesRequested += 1
+    }
+    if item.mergeable == .conflicting {
+      conflicts += 1
+    }
+  }
   if requiredFailures > 0 {
     messages.append(
       dashboardDependencyCountMessage(
@@ -320,9 +341,6 @@ private func dashboardDependencyAttentionReasonMessages(
       )
     )
   }
-  let optionalFailures = items.filter {
-    $0.checkStatus == .failure && !$0.hasRequiredFailedChecks
-  }.count
   if optionalFailures > 0 {
     messages.append(
       dashboardDependencyCountMessage(
@@ -332,7 +350,6 @@ private func dashboardDependencyAttentionReasonMessages(
       )
     )
   }
-  let policyBlocked = items.filter(\.policyBlocked).count
   if policyBlocked > 0 {
     messages.append(
       dashboardDependencyCountMessage(
@@ -342,7 +359,6 @@ private func dashboardDependencyAttentionReasonMessages(
       )
     )
   }
-  let changesRequested = items.filter { $0.reviewStatus == .changesRequested }.count
   if changesRequested > 0 {
     messages.append(
       dashboardDependencyCountMessage(
@@ -352,7 +368,6 @@ private func dashboardDependencyAttentionReasonMessages(
       )
     )
   }
-  let conflicts = items.filter { $0.mergeable == .conflicting }.count
   if conflicts > 0 {
     messages.append(
       dashboardDependencyCountMessage(

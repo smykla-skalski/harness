@@ -49,8 +49,12 @@ struct DashboardDependenciesSyncHealth: Equatable {
     return Self(
       totalRepositoryCount: scheduler.states.count,
       syncingRepositoryCount: scheduler.repositoriesInFlight.count,
-      failedRepositories: failed.sorted(),
-      staleRepositories: stale.sorted()
+      failedRepositories: sortedIfNeeded(failed),
+      staleRepositories: sortedIfNeeded(stale)
     )
+  }
+
+  private static func sortedIfNeeded(_ repositories: [String]) -> [String] {
+    repositories.count > 1 ? repositories.sorted() : repositories
   }
 }
