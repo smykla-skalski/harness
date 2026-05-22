@@ -96,43 +96,71 @@ extension WebSocketTransport {
     onSemanticBatch: ResponseBatchHandler? = nil
   ) async throws -> JSONValue {
     if let rpcSender {
-      let timeout = rpcTimeout
-      let outcome = AsyncStream<RPCSenderOutcome>.makeStream(
-        bufferingPolicy: .bufferingNewest(1)
+      return try await rpcViaInjectedSender(
+        rpcSender,
+        method: method,
+        params: params,
+        onSemanticBatch: onSemanticBatch
       )
-      let workTask = Task.detached(priority: .userInitiated) {
-        do {
-          let value = try await rpcSender(method, params, onSemanticBatch)
-          outcome.continuation.yield(.success(value))
-        } catch {
-          outcome.continuation.yield(.failure(error))
-        }
-      }
-      let timeoutTask = Task.detached {
-        do {
-          try await Task.sleep(for: timeout)
-          outcome.continuation.yield(.failure(WebSocketTransportError.requestTimedOut))
-        } catch {
-          // sleep cancelled before timeout fired; the work task already won
-        }
-      }
-      defer {
-        workTask.cancel()
-        timeoutTask.cancel()
-        outcome.continuation.finish()
-      }
-      var iterator = outcome.stream.makeAsyncIterator()
-      guard let first = await iterator.next() else {
-        throw WebSocketTransportError.requestTimedOut
-      }
-      switch first {
-      case .success(let value): return value
-      case .failure(let error): throw error
-      }
     }
     guard !isShutDown, let webSocketTask else {
       throw WebSocketTransportError.connectionClosed
     }
+    return try await rpcOverWebSocket(
+      method: method,
+      params: params,
+      onSemanticBatch: onSemanticBatch,
+      webSocketTask: webSocketTask
+    )
+  }
+
+  private func rpcViaInjectedSender(
+    _ rpcSender: @escaping RPCSender,
+    method: WebSocketRPCMethod,
+    params: JSONValue?,
+    onSemanticBatch: ResponseBatchHandler?
+  ) async throws -> JSONValue {
+    let timeout = rpcTimeout
+    let outcome = AsyncStream<RPCSenderOutcome>.makeStream(
+      bufferingPolicy: .bufferingNewest(1)
+    )
+    let workTask = Task.detached(priority: .userInitiated) {
+      do {
+        let value = try await rpcSender(method, params, onSemanticBatch)
+        outcome.continuation.yield(.success(value))
+      } catch {
+        outcome.continuation.yield(.failure(error))
+      }
+    }
+    let timeoutTask = Task.detached {
+      do {
+        try await Task.sleep(for: timeout)
+        outcome.continuation.yield(.failure(WebSocketTransportError.requestTimedOut))
+      } catch {
+        // sleep cancelled before timeout fired; the work task already won
+      }
+    }
+    defer {
+      workTask.cancel()
+      timeoutTask.cancel()
+      outcome.continuation.finish()
+    }
+    var iterator = outcome.stream.makeAsyncIterator()
+    guard let first = await iterator.next() else {
+      throw WebSocketTransportError.requestTimedOut
+    }
+    switch first {
+    case .success(let value): return value
+    case .failure(let error): throw error
+    }
+  }
+
+  private func rpcOverWebSocket(
+    method: WebSocketRPCMethod,
+    params: JSONValue?,
+    onSemanticBatch: ResponseBatchHandler?,
+    webSocketTask task: URLSessionWebSocketTask
+  ) async throws -> JSONValue {
     #if HARNESS_FEATURE_OTEL
       let span = HarnessMonitorTelemetry.shared.startSpan(
         name: "daemon.websocket.rpc",
@@ -168,13 +196,51 @@ extension WebSocketTransport {
     #endif
     let data = try encoder.encode(request)
     let text = String(data: data, encoding: .utf8) ?? "{}"
-    let task = webSocketTask
     let store = pending
     if let onSemanticBatch {
       responseBatchHandlers[id] = onSemanticBatch
     }
+    let timeoutTask = makeRPCTimeoutTask(
+      id: id,
+      method: method,
+      store: store
+    )
+    defer { timeoutTask.cancel() }
+    do {
+      let result = try await sendRPCRequest(
+        method: method,
+        id: id,
+        text: text,
+        task: task,
+        store: store
+      )
+      #if HARNESS_FEATURE_OTEL
+        recordRPCSuccess(method: method.rawValue, startedAt: startedAt)
+      #else
+        _ = startedAt
+      #endif
+      return result
+    } catch {
+      #if HARNESS_FEATURE_OTEL
+        recordRPCFailure(
+          error: error,
+          method: method.rawValue,
+          requestID: id,
+          startedAt: startedAt,
+          span: span
+        )
+      #endif
+      throw error
+    }
+  }
+
+  private func makeRPCTimeoutTask(
+    id: String,
+    method: WebSocketRPCMethod,
+    store: PendingRequestStore
+  ) -> Task<Void, Never> {
     let timeout = rpcTimeout
-    let timeoutTask = Task { [weak self] in
+    return Task { [weak self] in
       do {
         try await Task.sleep(for: timeout)
       } catch {
@@ -193,42 +259,31 @@ extension WebSocketTransport {
         Task { await self.clearPendingRPCMethod(for: id) }
       }
     }
-    defer { timeoutTask.cancel() }
-    do {
-      let result = try await withCheckedThrowingContinuation { continuation in
-        store.register(id: id, continuation: continuation)
-        task.send(.string(text)) { error in
-          if let error {
-            let errorDescription = error.localizedDescription
-            HarnessMonitorLogger.websocket.warning(
-              """
-              WebSocket send failed for \(method.rawValue, privacy: .public): \
-              \(errorDescription, privacy: .public)
-              """
-            )
-            Task { await self.clearResponseBatchHandler(for: id) }
-            Task { await self.clearPendingRPCMethod(for: id) }
-            store.fail(id: id, error: error)
-          }
+  }
+
+  private func sendRPCRequest(
+    method: WebSocketRPCMethod,
+    id: String,
+    text: String,
+    task: URLSessionWebSocketTask,
+    store: PendingRequestStore
+  ) async throws -> JSONValue {
+    try await withCheckedThrowingContinuation { continuation in
+      store.register(id: id, continuation: continuation)
+      task.send(.string(text)) { error in
+        if let error {
+          let errorDescription = error.localizedDescription
+          HarnessMonitorLogger.websocket.warning(
+            """
+            WebSocket send failed for \(method.rawValue, privacy: .public): \
+            \(errorDescription, privacy: .public)
+            """
+          )
+          Task { await self.clearResponseBatchHandler(for: id) }
+          Task { await self.clearPendingRPCMethod(for: id) }
+          store.fail(id: id, error: error)
         }
       }
-      #if HARNESS_FEATURE_OTEL
-        recordRPCSuccess(method: method.rawValue, startedAt: startedAt)
-      #else
-        _ = startedAt
-      #endif
-      return result
-    } catch {
-      #if HARNESS_FEATURE_OTEL
-        recordRPCFailure(
-          error: error,
-          method: method.rawValue,
-          requestID: id,
-          startedAt: startedAt,
-          span: span
-        )
-      #endif
-      throw error
     }
   }
 

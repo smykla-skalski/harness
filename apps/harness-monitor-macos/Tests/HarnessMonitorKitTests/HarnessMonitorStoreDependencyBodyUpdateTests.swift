@@ -3,6 +3,9 @@ import XCTest
 
 @testable import HarnessMonitorKit
 
+private typealias DependencyBodySetContinuation =
+  CheckedContinuation<DependencyUpdateBodySetOutcome, Never>
+
 @MainActor
 final class HarnessMonitorStoreDependencyBodyUpdateTests: XCTestCase {
   private func makeStore(client: RecordingHarnessClient) throws -> HarnessMonitorStore {
@@ -201,8 +204,7 @@ final class HarnessMonitorStoreDependencyBodyUpdateTests: XCTestCase {
     defer { store.dependencyUpdateBodies.clear() }
     seedCache(store: store, id: id, body: priorBody)
 
-    let outcome = await withCheckedContinuation {
-      (continuation: CheckedContinuation<DependencyUpdateBodySetOutcome, Never>) in
+    let outcome = await withCheckedContinuation { (continuation: DependencyBodySetContinuation) in
       store.coalesceDependencyUpdateBodyEdit(
         pullRequestID: id, newBody: intermediate, priorBody: priorBody, debounceMillis: 30
       )

@@ -4,7 +4,7 @@ public enum DependencyUpdateBot: String, Codable, Sendable, CaseIterable {
   case renovate
   case dependabot
 
-  public static func detect(authorLogin: String) -> DependencyUpdateBot? {
+  public static func detect(authorLogin: String) -> Self? {
     let normalized = authorLogin.lowercased()
     if normalized == "renovate[bot]" || normalized == "renovate-bot" {
       return .renovate

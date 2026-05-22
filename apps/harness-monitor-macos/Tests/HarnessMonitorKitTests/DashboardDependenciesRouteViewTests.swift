@@ -70,10 +70,11 @@ struct DashboardDependenciesRouteViewTests {
   @Test("route source caches decoded preferences off the SwiftUI body path")
   func routeSourceCachesDecodedPreferencesOffTheSwiftUIBodyPath() throws {
     let source = try routeSource()
+    let supportSource = try routeSource(named: "DashboardDependenciesRouteSupport.swift")
     let cacheSource = try routeSource(named: "DashboardDependenciesRouteView+Cache.swift")
     let schedulerSource = try routeSource(named: "DashboardDependenciesRouteView+Scheduler.swift")
 
-    #expect(source.contains("struct DashboardDependenciesResolvedPreferences"))
+    #expect(supportSource.contains("struct DashboardDependenciesResolvedPreferences"))
     #expect(source.contains("@State private var resolvedPreferences"))
     #expect(
       source.contains("var routeResolvedPreferences: DashboardDependenciesResolvedPreferences"))
@@ -93,12 +94,12 @@ struct DashboardDependenciesRouteViewTests {
 
   @Test("route source keeps dependency network decode off the view actor")
   func routeSourceKeepsDependencyNetworkDecodeOffTheViewActor() throws {
-    let source = try routeSource()
+    let supportSource = try routeSource(named: "DashboardDependenciesRouteSupport.swift")
     let refreshSource = try routeSource(named: "DashboardDependenciesRouteView+Refresh.swift")
     let schedulerSource = try routeSource(named: "DashboardDependenciesScheduler.swift")
 
-    #expect(source.contains("enum DashboardDependenciesRemoteLoader"))
-    #expect(source.contains("Task.detached(priority: .userInitiated)"))
+    #expect(supportSource.contains("enum DashboardDependenciesRemoteLoader"))
+    #expect(supportSource.contains("Task.detached(priority: .userInitiated)"))
     #expect(schedulerSource.contains("DashboardDependenciesRemoteLoader.query("))
     #expect(!schedulerSource.contains("client.queryDependencyUpdates(request: request)"))
     #expect(refreshSource.contains("DashboardDependenciesRemoteLoader.refresh("))
