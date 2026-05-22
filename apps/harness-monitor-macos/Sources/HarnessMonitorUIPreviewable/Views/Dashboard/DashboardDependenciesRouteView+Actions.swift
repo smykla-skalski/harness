@@ -174,8 +174,13 @@ extension DashboardDependenciesRouteView {
       -> DependencyUpdatesActionResponse
   ) async {
     guard let client = store.apiClient else { return }
+    let trackedIDs = items.map(\.pullRequestID)
+    beginRefreshing(pullRequestIDs: trackedIDs)
     routeInFlightActionTitle = title
-    defer { routeInFlightActionTitle = nil }
+    defer {
+      routeInFlightActionTitle = nil
+      endRefreshing(pullRequestIDs: trackedIDs)
+    }
     do {
       let response = try await operation(client)
       store.presentSuccessFeedback(response.summary)
