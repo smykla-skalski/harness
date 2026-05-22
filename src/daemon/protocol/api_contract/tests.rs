@@ -318,15 +318,15 @@ fn mapped_ws_methods_are_unique() {
 }
 
 #[test]
-fn dependency_update_routes_have_complete_ws_parity() {
-    let dependency_update_routes = super::routes_dependency_updates::ROUTES;
-    let actual: Vec<_> = dependency_update_routes
+fn review_routes_have_complete_ws_parity() {
+    let review_routes = super::routes_reviews::ROUTES;
+    let actual: Vec<_> = review_routes
         .iter()
         .map(|route| {
             let ws_method = route
                 .parity
                 .ws_method()
-                .expect("dependency-updates route should map to websocket");
+                .expect("reviews route should map to websocket");
             (
                 route.method,
                 route.path,
@@ -340,128 +340,134 @@ fn dependency_update_routes_have_complete_ws_parity() {
         vec![
             (
                 HttpRouteMethod::Post,
-                http_paths::DEPENDENCY_UPDATES_REPOSITORIES,
-                ws_methods::DEPENDENCY_UPDATES_REPOSITORY_CATALOG,
+                http_paths::REVIEWS_REPOSITORIES,
+                ws_methods::REVIEWS_REPOSITORY_CATALOG,
                 true,
             ),
             (
                 HttpRouteMethod::Get,
-                http_paths::DEPENDENCY_UPDATES_CAPABILITIES,
-                ws_methods::DEPENDENCY_UPDATES_CAPABILITIES,
+                http_paths::REVIEWS_CAPABILITIES,
+                ws_methods::REVIEWS_CAPABILITIES,
                 true,
             ),
             (
                 HttpRouteMethod::Post,
-                http_paths::DEPENDENCY_UPDATES_QUERY,
-                ws_methods::DEPENDENCY_UPDATES_QUERY,
+                http_paths::REVIEWS_QUERY,
+                ws_methods::REVIEWS_QUERY,
                 true,
             ),
             (
                 HttpRouteMethod::Post,
-                http_paths::DEPENDENCY_UPDATES_ACTION_PREVIEW,
-                ws_methods::DEPENDENCY_UPDATES_ACTION_PREVIEW,
+                http_paths::REVIEWS_ACTION_PREVIEW,
+                ws_methods::REVIEWS_ACTION_PREVIEW,
                 true,
             ),
             (
                 HttpRouteMethod::Post,
-                http_paths::DEPENDENCY_UPDATES_APPROVE,
-                ws_methods::DEPENDENCY_UPDATES_APPROVE,
+                http_paths::REVIEWS_APPROVE,
+                ws_methods::REVIEWS_APPROVE,
                 true,
             ),
             (
                 HttpRouteMethod::Post,
-                http_paths::DEPENDENCY_UPDATES_MERGE,
-                ws_methods::DEPENDENCY_UPDATES_MERGE,
+                http_paths::REVIEWS_MERGE,
+                ws_methods::REVIEWS_MERGE,
                 true,
             ),
             (
                 HttpRouteMethod::Post,
-                http_paths::DEPENDENCY_UPDATES_RERUN_CHECKS,
-                ws_methods::DEPENDENCY_UPDATES_RERUN_CHECKS,
+                http_paths::REVIEWS_RERUN_CHECKS,
+                ws_methods::REVIEWS_RERUN_CHECKS,
                 true,
             ),
             (
                 HttpRouteMethod::Post,
-                http_paths::DEPENDENCY_UPDATES_LABELS,
-                ws_methods::DEPENDENCY_UPDATES_ADD_LABEL,
+                http_paths::REVIEWS_LABELS,
+                ws_methods::REVIEWS_ADD_LABEL,
                 true,
             ),
             (
                 HttpRouteMethod::Post,
-                http_paths::DEPENDENCY_UPDATES_AUTO,
-                ws_methods::DEPENDENCY_UPDATES_AUTO,
+                http_paths::REVIEWS_AUTO,
+                ws_methods::REVIEWS_AUTO,
                 true,
             ),
             (
                 HttpRouteMethod::Delete,
-                http_paths::DEPENDENCY_UPDATES_CACHE,
-                ws_methods::DEPENDENCY_UPDATES_CLEAR_CACHE,
+                http_paths::REVIEWS_CACHE,
+                ws_methods::REVIEWS_CLEAR_CACHE,
                 true,
             ),
             (
                 HttpRouteMethod::Post,
-                http_paths::DEPENDENCY_UPDATES_REFRESH,
-                ws_methods::DEPENDENCY_UPDATES_REFRESH,
+                http_paths::REVIEWS_REFRESH,
+                ws_methods::REVIEWS_REFRESH,
                 true,
             ),
             (
                 HttpRouteMethod::Post,
-                http_paths::DEPENDENCY_UPDATES_BODY,
-                ws_methods::DEPENDENCY_UPDATES_BODY,
+                http_paths::REVIEWS_BODY,
+                ws_methods::REVIEWS_BODY,
                 true,
             ),
             (
                 HttpRouteMethod::Post,
-                http_paths::DEPENDENCY_UPDATES_BODY_UPDATE,
-                ws_methods::DEPENDENCY_UPDATES_BODY_UPDATE,
+                http_paths::REVIEWS_BODY_UPDATE,
+                ws_methods::REVIEWS_BODY_UPDATE,
                 true,
             ),
             (
                 HttpRouteMethod::Post,
-                http_paths::DEPENDENCY_UPDATES_COMMENT,
-                ws_methods::DEPENDENCY_UPDATES_COMMENT,
+                http_paths::REVIEWS_COMMENT,
+                ws_methods::REVIEWS_COMMENT,
                 true,
             ),
             (
                 HttpRouteMethod::Post,
-                http_paths::DEPENDENCY_UPDATES_FILES_LIST,
-                ws_methods::DEPENDENCY_UPDATES_FILES_LIST,
+                http_paths::REVIEWS_FILES_LIST,
+                ws_methods::REVIEWS_FILES_LIST,
                 true,
             ),
             (
                 HttpRouteMethod::Post,
-                http_paths::DEPENDENCY_UPDATES_FILES_PATCH,
-                ws_methods::DEPENDENCY_UPDATES_FILES_PATCH,
+                http_paths::REVIEWS_FILES_PATCH,
+                ws_methods::REVIEWS_FILES_PATCH,
                 true,
             ),
             (
                 HttpRouteMethod::Post,
-                http_paths::DEPENDENCY_UPDATES_FILES_VIEWED,
-                ws_methods::DEPENDENCY_UPDATES_FILES_VIEWED,
+                http_paths::REVIEWS_FILES_VIEWED,
+                ws_methods::REVIEWS_FILES_VIEWED,
                 true,
             ),
             (
                 HttpRouteMethod::Post,
-                http_paths::DEPENDENCY_UPDATES_FILES_BLOB,
-                ws_methods::DEPENDENCY_UPDATES_FILES_BLOB,
+                http_paths::REVIEWS_FILES_BLOB,
+                ws_methods::REVIEWS_FILES_BLOB,
                 true,
             ),
             (
                 HttpRouteMethod::Post,
-                http_paths::DEPENDENCY_UPDATES_FILES_LOCAL_CLONES,
-                ws_methods::DEPENDENCY_UPDATES_FILES_LOCAL_CLONES_LIST,
+                http_paths::REVIEWS_FILES_LOCAL_CLONES,
+                ws_methods::REVIEWS_FILES_LOCAL_CLONES_LIST,
                 true,
             ),
             (
                 HttpRouteMethod::Post,
-                http_paths::DEPENDENCY_UPDATES_FILES_LOCAL_CLONES_DELETE,
-                ws_methods::DEPENDENCY_UPDATES_FILES_LOCAL_CLONES_DELETE,
+                http_paths::REVIEWS_FILES_LOCAL_CLONES_DELETE,
+                ws_methods::REVIEWS_FILES_LOCAL_CLONES_DELETE,
                 true,
             ),
             (
                 HttpRouteMethod::Post,
-                http_paths::DEPENDENCY_UPDATES_TIMELINE,
-                ws_methods::DEPENDENCY_UPDATES_TIMELINE,
+                http_paths::REVIEWS_TIMELINE,
+                ws_methods::REVIEWS_TIMELINE,
+                true,
+            ),
+            (
+                HttpRouteMethod::Post,
+                http_paths::REVIEWS_REVIEW_THREADS_RESOLVE,
+                ws_methods::REVIEWS_REVIEW_THREADS_RESOLVE,
                 true,
             ),
         ]

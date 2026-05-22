@@ -81,31 +81,31 @@ pub const TASK_BOARD_POLICY_PIPELINE_SAVE_DRAFT: &str = "task_board.policy_pipel
 pub const TASK_BOARD_POLICY_PIPELINE_SIMULATE: &str = "task_board.policy_pipeline_simulate";
 pub const TASK_BOARD_POLICY_PIPELINE_PROMOTE: &str = "task_board.policy_pipeline_promote";
 pub const TASK_BOARD_POLICY_PIPELINE_AUDIT: &str = "task_board.policy_pipeline_audit";
-pub const DEPENDENCY_UPDATES_REPOSITORY_CATALOG: &str = "dependency_updates.repository_catalog";
-pub const DEPENDENCY_UPDATES_CAPABILITIES: &str = "dependency_updates.capabilities";
-pub const DEPENDENCY_UPDATES_QUERY: &str = "dependency_updates.query";
-pub const DEPENDENCY_UPDATES_ACTION_PREVIEW: &str = "dependency_updates.action_preview";
-pub const DEPENDENCY_UPDATES_APPROVE: &str = "dependency_updates.approve";
-pub const DEPENDENCY_UPDATES_MERGE: &str = "dependency_updates.merge";
-pub const DEPENDENCY_UPDATES_RERUN_CHECKS: &str = "dependency_updates.rerun_checks";
-pub const DEPENDENCY_UPDATES_ADD_LABEL: &str = "dependency_updates.add_label";
-pub const DEPENDENCY_UPDATES_AUTO: &str = "dependency_updates.auto";
-pub const DEPENDENCY_UPDATES_CLEAR_CACHE: &str = "dependency_updates.clear_cache";
-pub const DEPENDENCY_UPDATES_REFRESH: &str = "dependency_updates.refresh";
-pub const DEPENDENCY_UPDATES_BODY: &str = "dependency_updates.body";
-pub const DEPENDENCY_UPDATES_BODY_UPDATE: &str = "dependency_updates.body_update";
-pub const DEPENDENCY_UPDATES_COMMENT: &str = "dependency_updates.comment";
-pub const DEPENDENCY_UPDATES_FILES_LIST: &str = "dependency_updates.files_list";
-pub const DEPENDENCY_UPDATES_FILES_PATCH: &str = "dependency_updates.files_patch";
-pub const DEPENDENCY_UPDATES_FILES_VIEWED: &str = "dependency_updates.files_viewed";
-pub const DEPENDENCY_UPDATES_FILES_BLOB: &str = "dependency_updates.files_blob";
-pub const DEPENDENCY_UPDATES_FILES_LOCAL_CLONES_LIST: &str =
-    "dependency_updates.files_local_clones_list";
-pub const DEPENDENCY_UPDATES_FILES_LOCAL_CLONES_DELETE: &str =
-    "dependency_updates.files_local_clones_delete";
-pub const DEPENDENCY_UPDATES_TIMELINE: &str = "dependency_updates.timeline";
-pub const DEPENDENCY_UPDATES_REVIEW_THREADS_RESOLVE: &str =
-    "dependency_updates.review_threads_resolve";
+pub const REVIEWS_REPOSITORY_CATALOG: &str = "reviews.repository_catalog";
+pub const REVIEWS_CAPABILITIES: &str = "reviews.capabilities";
+pub const REVIEWS_QUERY: &str = "reviews.query";
+pub const REVIEWS_ACTION_PREVIEW: &str = "reviews.action_preview";
+pub const REVIEWS_APPROVE: &str = "reviews.approve";
+pub const REVIEWS_MERGE: &str = "reviews.merge";
+pub const REVIEWS_RERUN_CHECKS: &str = "reviews.rerun_checks";
+pub const REVIEWS_ADD_LABEL: &str = "reviews.add_label";
+pub const REVIEWS_AUTO: &str = "reviews.auto";
+pub const REVIEWS_CLEAR_CACHE: &str = "reviews.clear_cache";
+pub const REVIEWS_REFRESH: &str = "reviews.refresh";
+pub const REVIEWS_BODY: &str = "reviews.body";
+pub const REVIEWS_BODY_UPDATE: &str = "reviews.body_update";
+pub const REVIEWS_COMMENT: &str = "reviews.comment";
+pub const REVIEWS_FILES_LIST: &str = "reviews.files_list";
+pub const REVIEWS_FILES_PATCH: &str = "reviews.files_patch";
+pub const REVIEWS_FILES_VIEWED: &str = "reviews.files_viewed";
+pub const REVIEWS_FILES_BLOB: &str = "reviews.files_blob";
+pub const REVIEWS_FILES_LOCAL_CLONES_LIST: &str =
+    "reviews.files_local_clones_list";
+pub const REVIEWS_FILES_LOCAL_CLONES_DELETE: &str =
+    "reviews.files_local_clones_delete";
+pub const REVIEWS_TIMELINE: &str = "reviews.timeline";
+pub const REVIEWS_REVIEW_THREADS_RESOLVE: &str =
+    "reviews.review_threads_resolve";
 pub const AGENT_CHANGE_ROLE: &str = "agent.change_role";
 pub const AGENT_REMOVE: &str = "agent.remove";
 pub const LEADER_TRANSFER: &str = "leader.transfer";
