@@ -84,6 +84,15 @@ public final class DependencyUpdateFilesViewModel {
 
   public var state: DependencyUpdateFilesLoadState = .idle
   public var headRefOid: String = ""
+  /// PR's source branch name (`refs/heads/<x>` qualifier dropped).
+  /// Used by the local-clone patch dispatch so the daemon fetches the
+  /// actual PR ref. `nil` keeps the daemon on its default-branch fallback.
+  public var headRefName: String?
+  /// Merge-base OID; the local-clone patch dispatch needs this to
+  /// compute `base..head` diffs. `nil` falls back to the REST path.
+  public var baseRefOid: String?
+  /// `owner/name` of the PR's repository. `nil` falls back to REST.
+  public var repositoryFullName: String?
   public var viewerCanMarkViewed: Bool = true
   public var paginationComplete: Bool = true
   public var files: [DependencyUpdateFile] = []
@@ -108,6 +117,9 @@ public final class DependencyUpdateFilesViewModel {
   public func ingest(response: DependencyUpdatesFilesListResponse) {
     state = .loaded
     headRefOid = response.headRefOid
+    headRefName = response.headRefName
+    baseRefOid = response.baseRefOid
+    repositoryFullName = response.repositoryFullName
     viewerCanMarkViewed = response.viewerCanMarkViewed
     paginationComplete = response.paginationComplete
     files = response.files

@@ -32,6 +32,15 @@ public struct DependencyUpdatesFilesListRequest: Codable, Equatable, Sendable {
 public struct DependencyUpdatesFilesListResponse: Codable, Equatable, Sendable {
   public let pullRequestID: String
   public let headRefOid: String
+  /// PR's source branch name (`refs/heads/<x>` qualifier dropped).
+  /// Optional for back-compat with older daemons that don't emit it.
+  public let headRefName: String?
+  /// Merge-base OID for the PR. Required for the local-clone diff path
+  /// to compute `base..head` patches; missing on older daemons.
+  public let baseRefOid: String?
+  public let baseRefName: String?
+  /// `owner/name` of the repository the PR lives in.
+  public let repositoryFullName: String?
   public let viewerCanMarkViewed: Bool
   public let files: [DependencyUpdateFile]
   public let fetchedAt: String
@@ -41,6 +50,10 @@ public struct DependencyUpdatesFilesListResponse: Codable, Equatable, Sendable {
   public init(
     pullRequestID: String,
     headRefOid: String,
+    headRefName: String? = nil,
+    baseRefOid: String? = nil,
+    baseRefName: String? = nil,
+    repositoryFullName: String? = nil,
     viewerCanMarkViewed: Bool,
     files: [DependencyUpdateFile],
     fetchedAt: String,
@@ -49,6 +62,10 @@ public struct DependencyUpdatesFilesListResponse: Codable, Equatable, Sendable {
   ) {
     self.pullRequestID = pullRequestID
     self.headRefOid = headRefOid
+    self.headRefName = headRefName
+    self.baseRefOid = baseRefOid
+    self.baseRefName = baseRefName
+    self.repositoryFullName = repositoryFullName
     self.viewerCanMarkViewed = viewerCanMarkViewed
     self.files = files
     self.fetchedAt = fetchedAt
@@ -59,6 +76,10 @@ public struct DependencyUpdatesFilesListResponse: Codable, Equatable, Sendable {
   enum CodingKeys: String, CodingKey {
     case pullRequestID = "pullRequestId"
     case headRefOid
+    case headRefName
+    case baseRefOid
+    case baseRefName
+    case repositoryFullName
     case viewerCanMarkViewed
     case files
     case fetchedAt
@@ -70,6 +91,10 @@ public struct DependencyUpdatesFilesListResponse: Codable, Equatable, Sendable {
     let c = try decoder.container(keyedBy: CodingKeys.self)
     pullRequestID = try c.decode(String.self, forKey: .pullRequestID)
     headRefOid = try c.decode(String.self, forKey: .headRefOid)
+    headRefName = try c.decodeIfPresent(String.self, forKey: .headRefName)
+    baseRefOid = try c.decodeIfPresent(String.self, forKey: .baseRefOid)
+    baseRefName = try c.decodeIfPresent(String.self, forKey: .baseRefName)
+    repositoryFullName = try c.decodeIfPresent(String.self, forKey: .repositoryFullName)
     viewerCanMarkViewed = try c.decode(Bool.self, forKey: .viewerCanMarkViewed)
     files = try c.decode([DependencyUpdateFile].self, forKey: .files)
     fetchedAt = try c.decode(String.self, forKey: .fetchedAt)
@@ -85,17 +110,48 @@ public struct DependencyUpdatesFilesPatchRequest: Codable, Equatable, Sendable {
   public let pullRequestID: String
   public let headRefOidExpected: String
   public let paths: [String]
+  /// `owner/name` of the repository. Enables the daemon's local-clone
+  /// dispatch path. Optional only for back-compat with older callers.
+  public let repositoryFullName: String?
+  /// Merge-base OID against which to compute the diff.
+  public let baseRefOidExpected: String?
+  /// PR's source branch name. Lets the local-clone path fetch the
+  /// actual PR ref instead of falling back to `refs/heads/main`.
+  public let headRefName: String?
 
-  public init(pullRequestID: String, headRefOidExpected: String, paths: [String]) {
+  public init(
+    pullRequestID: String,
+    headRefOidExpected: String,
+    paths: [String],
+    repositoryFullName: String? = nil,
+    baseRefOidExpected: String? = nil,
+    headRefName: String? = nil
+  ) {
     self.pullRequestID = pullRequestID
     self.headRefOidExpected = headRefOidExpected
     self.paths = paths
+    self.repositoryFullName = repositoryFullName
+    self.baseRefOidExpected = baseRefOidExpected
+    self.headRefName = headRefName
   }
 
   enum CodingKeys: String, CodingKey {
     case pullRequestID = "pullRequestId"
     case headRefOidExpected
     case paths
+    case repositoryFullName
+    case baseRefOidExpected
+    case headRefName
+  }
+
+  public init(from decoder: Decoder) throws {
+    let c = try decoder.container(keyedBy: CodingKeys.self)
+    pullRequestID = try c.decode(String.self, forKey: .pullRequestID)
+    headRefOidExpected = try c.decode(String.self, forKey: .headRefOidExpected)
+    paths = try c.decode([String].self, forKey: .paths)
+    repositoryFullName = try c.decodeIfPresent(String.self, forKey: .repositoryFullName)
+    baseRefOidExpected = try c.decodeIfPresent(String.self, forKey: .baseRefOidExpected)
+    headRefName = try c.decodeIfPresent(String.self, forKey: .headRefName)
   }
 }
 
