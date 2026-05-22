@@ -4,8 +4,8 @@ use reqwest::header::HeaderMap;
 use tokio::sync::Barrier;
 
 use super::{
-    CoolingReason, GithubRateBudget, GraphqlRateLimit, RateLimitResource,
-    DEFAULT_CONCURRENCY_CAP, DEFAULT_RESERVE_FLOOR,
+    CoolingReason, DEFAULT_CONCURRENCY_CAP, DEFAULT_RESERVE_FLOOR, GithubRateBudget,
+    GraphqlRateLimit, RateLimitResource,
 };
 
 fn headers(pairs: &[(&str, &str)]) -> HeaderMap {
@@ -58,8 +58,18 @@ async fn defaults_resource_to_core_when_header_missing() {
         ("x-ratelimit-reset", future_epoch_seconds(60).as_str()),
     ]);
     budget.observe_response(&map).await;
-    assert!(budget.current_state(RateLimitResource::Core).await.is_some());
-    assert!(budget.current_state(RateLimitResource::Graphql).await.is_none());
+    assert!(
+        budget
+            .current_state(RateLimitResource::Core)
+            .await
+            .is_some()
+    );
+    assert!(
+        budget
+            .current_state(RateLimitResource::Graphql)
+            .await
+            .is_none()
+    );
 }
 
 #[tokio::test]
@@ -67,7 +77,12 @@ async fn observe_response_without_remaining_header_is_noop() {
     let budget = GithubRateBudget::new(4, 50);
     let map = headers(&[("x-ratelimit-resource", "core")]);
     budget.observe_response(&map).await;
-    assert!(budget.current_state(RateLimitResource::Core).await.is_none());
+    assert!(
+        budget
+            .current_state(RateLimitResource::Core)
+            .await
+            .is_none()
+    );
 }
 
 #[tokio::test]
@@ -160,7 +175,12 @@ async fn expired_cooling_state_is_cleared_on_next_check() {
         .observe_secondary_limit(RateLimitResource::Core, Some(Duration::from_millis(50)))
         .await;
     tokio::time::sleep(Duration::from_millis(80)).await;
-    assert!(budget.current_cooling(RateLimitResource::Core).await.is_none());
+    assert!(
+        budget
+            .current_cooling(RateLimitResource::Core)
+            .await
+            .is_none()
+    );
     let guard = budget.acquire(RateLimitResource::Core, 1).await;
     assert!(guard.is_ok());
 }

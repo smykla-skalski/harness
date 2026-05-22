@@ -2,15 +2,15 @@
 #![allow(clippy::too_many_lines)]
 
 use std::collections::VecDeque;
-use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Mutex;
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::time::{Duration, Instant};
 
 use async_trait::async_trait;
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 
 use super::cache;
-use super::service::{fetch_timeline_page, TimelineClient, TimelineError};
+use super::service::{TimelineClient, TimelineError, fetch_timeline_page};
 use super::types::DependencyUpdateTimelineEntry;
 use super::{DependencyUpdatesTimelineRequest, TimelinePageDirection};
 
@@ -264,12 +264,18 @@ async fn review_with_paginated_inline_comments_is_fully_drained() {
     let client = MockClient::new();
     let review = review_node(
         "PRR_drain",
-        vec![inline_comment("c1", "first"), inline_comment("c2", "second")],
+        vec![
+            inline_comment("c1", "first"),
+            inline_comment("c2", "second"),
+        ],
         true,
     );
     client.enqueue_outer(Ok(outer_page(pr, vec![review])));
     client.enqueue_inline(Ok(inline_continuation(
-        vec![inline_comment("c3", "third"), inline_comment("c4", "fourth")],
+        vec![
+            inline_comment("c3", "third"),
+            inline_comment("c4", "fourth"),
+        ],
         false,
     )));
 
@@ -292,14 +298,13 @@ async fn review_thread_with_paginated_comments_is_fully_drained() {
     let pr = "service-drain-thread";
     cache::drain_pull_request(pr);
     let client = MockClient::new();
-    let thread = thread_node(
-        "PRRT_drain",
-        vec![thread_comment("t1", "first")],
-        true,
-    );
+    let thread = thread_node("PRRT_drain", vec![thread_comment("t1", "first")], true);
     client.enqueue_outer(Ok(outer_page(pr, vec![thread])));
     client.enqueue_thread(Ok(thread_continuation(
-        vec![thread_comment("t2", "second"), thread_comment("t3", "third")],
+        vec![
+            thread_comment("t2", "second"),
+            thread_comment("t3", "third"),
+        ],
         false,
     )));
 
@@ -320,11 +325,7 @@ async fn continuation_fetch_failure_fails_whole_outer_page() {
     let pr = "service-drain-fail";
     cache::drain_pull_request(pr);
     let client = MockClient::new();
-    let review = review_node(
-        "PRR_fail",
-        vec![inline_comment("c1", "first")],
-        true,
-    );
+    let review = review_node("PRR_fail", vec![inline_comment("c1", "first")], true);
     client.enqueue_outer(Ok(outer_page(pr, vec![review])));
     client.enqueue_inline(Err(TimelineError::Client("transient".into())));
 
@@ -351,11 +352,7 @@ async fn continuation_drain_respects_budget_and_flags_truncation() {
     let pr = "service-drain-budget";
     cache::drain_pull_request(pr);
     let client = MockClient::new();
-    let review = review_node(
-        "PRR_budget",
-        vec![inline_comment("c0", "head")],
-        true,
-    );
+    let review = review_node("PRR_budget", vec![inline_comment("c0", "head")], true);
     client.enqueue_outer(Ok(outer_page(pr, vec![review])));
     // 11 continuation pages all reporting hasNextPage=true; budget = 10
     for i in 0..11 {
@@ -368,15 +365,14 @@ async fn continuation_drain_respects_budget_and_flags_truncation() {
     let resp = fetch_timeline_page(request_for(pr), &client, Instant::now())
         .await
         .expect("budget ok");
-    assert_eq!(
-        client.inline_calls(),
-        10,
-        "drain stops at the budget cap",
-    );
+    assert_eq!(client.inline_calls(), 10, "drain stops at the budget cap",);
     let DependencyUpdateTimelineEntry::Review(r) = &resp.entries[0] else {
         panic!("expected Review");
     };
-    assert!(r.comments_truncated, "budget overflow surfaces as truncated");
+    assert!(
+        r.comments_truncated,
+        "budget overflow surfaces as truncated"
+    );
     // first-page (1) + 10 continuation pages * 1 comment each = 11
     assert_eq!(r.inline_comments.len(), 11);
     cache::drain_pull_request(pr);
@@ -387,11 +383,7 @@ async fn cache_only_stores_fully_drained_pages() {
     let pr = "service-cache-drained-only";
     cache::drain_pull_request(pr);
     let client = MockClient::new();
-    let review = review_node(
-        "PRR_cache_drain",
-        vec![inline_comment("c1", "first")],
-        true,
-    );
+    let review = review_node("PRR_cache_drain", vec![inline_comment("c1", "first")], true);
     client.enqueue_outer(Ok(outer_page(pr, vec![review.clone()])));
     client.enqueue_inline(Err(TimelineError::Client("boom".into())));
     let _ = fetch_timeline_page(request_for(pr), &client, Instant::now())
@@ -411,6 +403,10 @@ async fn cache_only_stores_fully_drained_pages() {
         panic!("expected Review");
     };
     assert_eq!(r.inline_comments.len(), 2);
-    assert_eq!(client.outer_calls(), 2, "second outer fetch needed after failure");
+    assert_eq!(
+        client.outer_calls(),
+        2,
+        "second outer fetch needed after failure"
+    );
     cache::drain_pull_request(pr);
 }

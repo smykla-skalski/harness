@@ -30,20 +30,22 @@ pub(super) fn map_issue_comment(node: &Value) -> Option<DependencyUpdateTimeline
     let viewer_can_edit = parse_bool(node.get("viewerCanUpdate"));
     let url = parse_string(node.get("url"));
     let actor = parse_actor(node.get("author"));
-    Some(DependencyUpdateTimelineEntry::IssueComment(IssueCommentEntry {
-        id,
-        created_at,
-        updated_at,
-        actor,
-        body,
-        body_text,
-        is_minimized,
-        minimized_reason,
-        reactions_total,
-        viewer_did_author,
-        viewer_can_edit,
-        url,
-    }))
+    Some(DependencyUpdateTimelineEntry::IssueComment(
+        IssueCommentEntry {
+            id,
+            created_at,
+            updated_at,
+            actor,
+            body,
+            body_text,
+            is_minimized,
+            minimized_reason,
+            reactions_total,
+            viewer_did_author,
+            viewer_can_edit,
+            url,
+        },
+    ))
 }
 
 pub(super) fn map_pull_request_review(node: &Value) -> Option<DependencyUpdateTimelineEntry> {
@@ -80,19 +82,21 @@ pub(super) fn map_pull_request_review_thread(
     let first_comment = comments.entries.first();
     let created_at = first_comment.map(|c| c.created_at)?;
     let actor = first_comment.and_then(|c| c.actor.clone());
-    Some(DependencyUpdateTimelineEntry::ReviewThread(ReviewThreadEntry {
-        id,
-        created_at,
-        actor,
-        is_resolved,
-        is_collapsed,
-        path,
-        line,
-        original_line,
-        diff_side,
-        comments: comments.entries,
-        comments_truncated: false,
-    }))
+    Some(DependencyUpdateTimelineEntry::ReviewThread(
+        ReviewThreadEntry {
+            id,
+            created_at,
+            actor,
+            is_resolved,
+            is_collapsed,
+            path,
+            line,
+            original_line,
+            diff_side,
+            comments: comments.entries,
+            comments_truncated: false,
+        },
+    ))
 }
 
 pub(super) fn map_pull_request_commit(node: &Value) -> Option<DependencyUpdateTimelineEntry> {
@@ -143,9 +147,7 @@ pub(super) fn map_pull_request_commit(node: &Value) -> Option<DependencyUpdateTi
     }))
 }
 
-pub(super) fn map_head_ref_force_pushed(
-    node: &Value,
-) -> Option<DependencyUpdateTimelineEntry> {
+pub(super) fn map_head_ref_force_pushed(node: &Value) -> Option<DependencyUpdateTimelineEntry> {
     let id = parse_string_required(node, "id")?;
     let created_at = parse_iso8601(node.get("createdAt"))?;
     let actor = parse_actor(node.get("actor"));

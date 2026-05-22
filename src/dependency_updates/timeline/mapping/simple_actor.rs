@@ -54,10 +54,7 @@ fn typename_to_simple_kind(typename: &str) -> Option<SimpleActorEventKind> {
 }
 
 fn synthesize_id(typename: &str, node: &Value) -> String {
-    let created = node
-        .get("createdAt")
-        .and_then(Value::as_str)
-        .unwrap_or("");
+    let created = node.get("createdAt").and_then(Value::as_str).unwrap_or("");
     let marker_oid = node
         .get("lastSeenCommit")
         .and_then(Value::as_object)
@@ -127,8 +124,7 @@ pub(super) fn map_simple_actor_event(
             entry.old_title = parse_string(node.get("previousTitle"));
             entry.new_title = parse_string(node.get("currentTitle"));
         }
-        SimpleActorEventKind::ReviewRequested
-        | SimpleActorEventKind::ReviewRequestRemoved => {
+        SimpleActorEventKind::ReviewRequested | SimpleActorEventKind::ReviewRequestRemoved => {
             if let Some(req) = node.get("requestedReviewer").and_then(Value::as_object) {
                 let reviewer_type = req.get("__typename").and_then(Value::as_str).unwrap_or("");
                 if reviewer_type == "Team" {

@@ -1,7 +1,8 @@
 pub use crate::dependency_updates::timeline::{
     Actor as DependencyUpdateTimelineActor, CommitEntry as DependencyUpdateTimelineCommitEntry,
     DependencyUpdateTimelineEntry, DependencyUpdatesTimelineRequest,
-    DependencyUpdatesTimelineResponse, HeadRefForcePushedEntry as DependencyUpdateHeadRefForcePushedEntry,
+    DependencyUpdatesTimelineResponse,
+    HeadRefForcePushedEntry as DependencyUpdateHeadRefForcePushedEntry,
     IssueCommentEntry as DependencyUpdateIssueCommentEntry,
     ReviewEntry as DependencyUpdateReviewEntry,
     ReviewInlineCommentEntry as DependencyUpdateReviewInlineCommentEntry,

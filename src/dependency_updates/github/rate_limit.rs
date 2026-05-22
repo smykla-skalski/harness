@@ -141,7 +141,8 @@ impl GithubRateBudget {
             return;
         };
         let limit = parse_u32(headers, "x-ratelimit-limit").unwrap_or(remaining);
-        let used = parse_u32(headers, "x-ratelimit-used").unwrap_or(limit.saturating_sub(remaining));
+        let used =
+            parse_u32(headers, "x-ratelimit-used").unwrap_or(limit.saturating_sub(remaining));
         let reset_at = parse_unix_seconds(headers, "x-ratelimit-reset")
             .unwrap_or_else(|| SystemTime::now() + Duration::from_secs(60));
 
