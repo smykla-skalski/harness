@@ -48,7 +48,7 @@ struct DashboardDependencyConversationFeed: View {
 
     VStack(alignment: .leading, spacing: 8) {
       if preferences.showActivityTimeline {
-        header(viewModel)
+        statusStrip(viewModel)
         content(viewModel)
       }
       if showsComposer {
@@ -75,19 +75,24 @@ struct DashboardDependencyConversationFeed: View {
     ) ?? DashboardDependenciesPreferences()
   }
 
+  // The detail view wraps this feed in a
+  // `DashboardDependencyDetailSection(title: "Conversation")` so the
+  // section header already provides the label. Emit only the status
+  // indicators here (loading spinner during refresh, error chip on
+  // failure); the empty/initial loading + empty-state copy lives in
+  // `content(_:)` below.
   @ViewBuilder
-  private func header(_ viewModel: DependencyUpdateTimelineViewModel) -> some View {
-    HStack(spacing: 8) {
-      Text("Conversation")
-        .scaledFont(.headline.weight(.semibold))
-      if viewModel.loadState == .loadingInitial {
+  private func statusStrip(_ viewModel: DependencyUpdateTimelineViewModel) -> some View {
+    if viewModel.loadState == .refreshing {
+      HStack(spacing: 8) {
         HarnessMonitorSpinner(size: 12)
-      } else if let error = viewModel.lastError {
-        Label(error, systemImage: "exclamationmark.triangle")
-          .foregroundStyle(.orange)
-          .font(.caption)
+        Text("Refreshing…").font(.caption).foregroundStyle(.secondary)
+        Spacer()
       }
-      Spacer()
+    } else if let error = viewModel.lastError {
+      Label(error, systemImage: "exclamationmark.triangle")
+        .foregroundStyle(.orange)
+        .font(.caption)
     }
   }
 
