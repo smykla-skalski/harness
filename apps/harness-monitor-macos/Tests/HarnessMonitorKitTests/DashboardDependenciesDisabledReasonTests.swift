@@ -209,9 +209,11 @@ struct DashboardDependenciesDisabledReasonTests {
     #expect(
       confirmation?.message.contains("1 selected PR can only merge with admin permissions.")
         == true)
+    let optionalFailureSummary =
+      "1 selected PR has failing checks that are not marked required."
     #expect(
-      confirmation?.message.contains("1 selected PR has failing checks that are not marked required.")
-        == true)
+      confirmation?.message.contains(optionalFailureSummary) == true
+    )
     #expect(
       confirmation?.message.contains("1 selected PR has changes requested.")
         == true)

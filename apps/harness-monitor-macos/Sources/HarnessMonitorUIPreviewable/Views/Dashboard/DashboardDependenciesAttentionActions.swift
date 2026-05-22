@@ -215,11 +215,16 @@ private func dashboardDependencyActionConfirmationMessage(
   let subject = items.count == 1 ? "This pull request" : "These \(items.count) pull requests"
   var paragraphs: [String] = []
   if destructiveMerge {
-    paragraphs.append(
-      items.count == 1
-        ? "This pull request can only be merged with admin permissions because required checks are failing."
-        : "Some selected pull requests can only be merged with admin permissions because required checks are failing."
-    )
+    if items.count == 1 {
+      paragraphs.append(
+        "This pull request can only be merged with admin permissions because required checks are failing."
+      )
+    } else {
+      paragraphs.append(
+        "Some selected pull requests can only be merged with admin permissions "
+          + "because required checks are failing."
+      )
+    }
     paragraphs.append(
       "Merge as Admin uses your GitHub permissions to bypass branch protections and merge immediately."
     )
@@ -311,67 +316,49 @@ private func dashboardDependencyAttentionReasonMessages(
     return dashboardDependencyAttentionReasonMessages(for: item)
   }
   var messages: [String] = []
-  var requiredFailures = 0
-  var optionalFailures = 0
-  var policyBlocked = 0
-  var changesRequested = 0
-  var conflicts = 0
-  for item in items {
-    if item.hasRequiredFailedChecks {
-      requiredFailures += 1
-    } else if item.checkStatus == .failure {
-      optionalFailures += 1
-    }
-    if item.policyBlocked {
-      policyBlocked += 1
-    }
-    if item.reviewStatus == .changesRequested {
-      changesRequested += 1
-    }
-    if item.mergeable == .conflicting {
-      conflicts += 1
-    }
+  let counts = items.reduce(into: DashboardDependencyAttentionReasonCounts()) { partial, item in
+    partial.record(item)
   }
-  if requiredFailures > 0 {
+  if counts.requiredFailures > 0 {
     messages.append(
       dashboardDependencyCountMessage(
-        count: requiredFailures,
+        count: counts.requiredFailures,
         singular: "selected PR has failing required checks.",
         plural: "selected PRs have failing required checks."
       )
     )
   }
-  if optionalFailures > 0 {
+  if counts.optionalFailures > 0 {
     messages.append(
       dashboardDependencyCountMessage(
-        count: optionalFailures,
+        count: counts.optionalFailures,
         singular: "selected PR has failing checks that are not marked required.",
         plural: "selected PRs have failing checks that are not marked required."
       )
     )
   }
-  if policyBlocked > 0 {
+  if counts.policyBlocked > 0 {
     messages.append(
       dashboardDependencyCountMessage(
-        count: policyBlocked,
+        count: counts.policyBlocked,
         singular: "selected PR is blocked by dependency policy.",
         plural: "selected PRs are blocked by dependency policy."
       )
     )
   }
-  if changesRequested > 0 {
+  if counts.changesRequested > 0 {
     messages.append(
       dashboardDependencyCountMessage(
-        count: changesRequested,
+        count: counts.changesRequested,
         singular: "selected PR has changes requested.",
         plural: "selected PRs have changes requested."
       )
     )
   }
-  if conflicts > 0 {
+  if counts.conflicts > 0 {
     messages.append(
       dashboardDependencyCountMessage(
-        count: conflicts,
+        count: counts.conflicts,
         singular: "selected PR has merge conflicts.",
         plural: "selected PRs have merge conflicts."
       )
