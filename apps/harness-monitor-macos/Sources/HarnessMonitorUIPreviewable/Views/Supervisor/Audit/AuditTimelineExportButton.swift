@@ -13,25 +13,6 @@ import UniformTypeIdentifiers
   return formatter
 }()
 
-/// Minimal filters envelope honoured by the audit-timeline export button.
-///
-/// Unit 5 owns the full filters type; until it lands, this carrier covers the
-/// free-text term that maps directly onto `SupervisorAuditExporter`'s string
-/// filter. Coordinator can replace this with the full type during cherry-pick
-/// without changing the export button's call surface.
-public struct SupervisorAuditFilters: Sendable, Equatable {
-  public var searchText: String
-
-  public init(searchText: String = "") {
-    self.searchText = searchText
-  }
-
-  var normalizedSearchText: String? {
-    let trimmed = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
-    return trimmed.isEmpty ? nil : trimmed
-  }
-}
-
 /// Toolbar button that exports the active Supervisor Audit Timeline view to a
 /// JSONL file via `SupervisorAuditExporter`. The save panel runs on the main
 /// actor; the actual write hops to a detached task so the menu bar does not
@@ -98,9 +79,10 @@ public struct AuditTimelineExportButton: View {
     isExporting = true
     defer { isExporting = false }
     do {
+      let trimmed = filters.searchText.trimmingCharacters(in: .whitespacesAndNewlines)
       try await SupervisorAuditExporter.exportEvents(
         toURL: destination,
-        filter: filters.normalizedSearchText,
+        filter: trimmed.isEmpty ? nil : trimmed,
         modelContainer: modelContainer
       )
     } catch {
