@@ -264,6 +264,7 @@ pub use dependency_updates_files::{
     delete_dependency_update_local_clone, fetch_dependency_update_file_blob,
     list_dependency_update_files, list_dependency_update_local_clones,
     mark_dependency_update_files_viewed, patch_dependency_update_files,
+    register_local_clone_progress_sender,
 };
 pub(crate) use dependency_updates_files::BlobTextProjection;
 pub use dependency_updates_timeline::{
