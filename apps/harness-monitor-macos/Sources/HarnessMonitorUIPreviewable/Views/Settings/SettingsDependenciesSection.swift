@@ -22,6 +22,7 @@ struct SettingsDependenciesSection: View {
       } header: {
         Text("Files").harnessNativeFormSectionHeader()
       }
+      timelineSection
     }
     .settingsDetailFormStyle()
     .accessibilityIdentifier(HarnessMonitorAccessibility.settingsDependenciesRoot)
@@ -131,6 +132,109 @@ struct SettingsDependenciesSection: View {
     }
   }
 
+  private var timelineSection: some View {
+    Section {
+      Toggle("Show activity timeline", isOn: $draft.showActivityTimeline)
+      Stepper(
+        "Initial page size: \(draft.timelineInitialPageSize)",
+        value: $draft.timelineInitialPageSize,
+        in: Self.timelinePageSizeRange,
+        step: 10
+      )
+      Stepper(
+        "Load older batch size: \(draft.timelineLoadOlderBatchSize)",
+        value: $draft.timelineLoadOlderBatchSize,
+        in: Self.timelinePageSizeRange,
+        step: 10
+      )
+      Toggle(
+        "Auto-collapse heavy review threads",
+        isOn: $draft.timelineAutoCollapseHeavyReviewThreads
+      )
+      DisclosureGroup("Hidden event types") {
+        ForEach(DependencyUpdateTimelineKind.allCases, id: \.self) { kind in
+          Toggle(
+            kindDisplayName(kind),
+            isOn: Binding(
+              get: { draft.timelineHiddenKinds.contains(kind) },
+              set: { hide in
+                var current = draft.timelineHiddenKinds
+                if hide {
+                  current.insert(kind)
+                } else {
+                  current.remove(kind)
+                }
+                draft.timelineHiddenKinds = current
+              }
+            )
+          )
+        }
+      }
+    } header: {
+      Text("Timeline")
+        .harnessNativeFormSectionHeader()
+    } footer: {
+      Text(
+        """
+        Toggle which GitHub event types appear in the dependency \
+        PR conversation feed. Stepper bounds: 10–100 in 10-step \
+        increments — `Picker(10…100)` would mount 91 rows on \
+        Settings open.
+        """
+      )
+    }
+  }
+
+  private func kindDisplayName(_ kind: DependencyUpdateTimelineKind) -> String {
+    switch kind {
+    case .issueComment: return "Comments"
+    case .review: return "Reviews"
+    case .reviewThread: return "Review threads"
+    case .commit: return "Commits"
+    case .headRefForcePushed: return "Force pushes"
+    case .headRefDeleted: return "Head branch deleted"
+    case .headRefRestored: return "Head branch restored"
+    case .baseRefChanged: return "Base branch changed"
+    case .baseRefForcePushed: return "Base branch force-pushed"
+    case .baseRefDeleted: return "Base branch deleted"
+    case .labeled: return "Label added"
+    case .unlabeled: return "Label removed"
+    case .assigned: return "Assigned"
+    case .unassigned: return "Unassigned"
+    case .merged: return "Merged"
+    case .closed: return "Closed"
+    case .reopened: return "Reopened"
+    case .renamedTitle: return "Renamed title"
+    case .reviewRequested: return "Review requested"
+    case .reviewRequestRemoved: return "Review request removed"
+    case .reviewDismissed: return "Review dismissed"
+    case .readyForReview: return "Ready for review"
+    case .convertToDraft: return "Converted to draft"
+    case .autoMergeEnabled: return "Auto-merge enabled"
+    case .autoMergeDisabled: return "Auto-merge disabled"
+    case .autoRebaseEnabled: return "Auto-rebase enabled"
+    case .autoSquashEnabled: return "Auto-squash enabled"
+    case .locked: return "Locked"
+    case .unlocked: return "Unlocked"
+    case .pinned: return "Pinned"
+    case .unpinned: return "Unpinned"
+    case .milestoned: return "Milestoned"
+    case .demilestoned: return "Demilestoned"
+    case .referenced: return "Referenced"
+    case .crossReferenced: return "Cross-referenced"
+    case .mentioned: return "Mentioned"
+    case .subscribed: return "Subscribed"
+    case .unsubscribed: return "Unsubscribed"
+    case .markedAsDuplicate: return "Marked as duplicate"
+    case .unmarkedAsDuplicate: return "Unmarked as duplicate"
+    case .transferred: return "Transferred"
+    case .connected: return "Linked"
+    case .disconnected: return "Unlinked"
+    case .revisionMarker: return "Revision marker"
+    case .unknown: return "Unknown event"
+    }
+  }
+
   private var refreshSection: some View {
     Section {
       SettingsDurationPickerRow(
@@ -178,6 +282,12 @@ struct SettingsDependenciesSection: View {
     uncheckedBounds: (
       lower: DashboardDependenciesPreferences.minimumConcurrentRepositoryFetches,
       upper: DashboardDependenciesPreferences.maximumConcurrentRepositoryFetches
+    )
+  )
+  static let timelinePageSizeRange: ClosedRange<Int> = ClosedRange(
+    uncheckedBounds: (
+      lower: DashboardDependenciesPreferences.minimumTimelinePageSize,
+      upper: DashboardDependenciesPreferences.maximumTimelinePageSize
     )
   )
   static let frequentLabelsCountRange = ClosedRange(
