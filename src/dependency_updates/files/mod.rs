@@ -26,6 +26,7 @@ pub(crate) mod cache;
 mod language;
 pub(crate) mod list;
 pub(crate) mod local_clone;
+pub(crate) mod local_clone_progress_event;
 pub(crate) mod local_clone_runtime;
 pub(crate) mod patch_local;
 pub(crate) mod patch_rest;
