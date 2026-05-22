@@ -48,7 +48,13 @@ struct DashboardDependencyConversationFeed: View {
 
     VStack(alignment: .leading, spacing: 8) {
       if preferences.showActivityTimeline {
-        statusStrip(viewModel)
+        DashboardDependencyConversationStatusBar(
+          loadState: viewModel.loadState,
+          entriesCount: viewModel.entries.count,
+          onRefresh: { Task { await refresh() } }
+        )
+        .equatable()
+        errorStrip(viewModel)
         content(viewModel)
       }
       if showsComposer {
@@ -78,25 +84,21 @@ struct DashboardDependencyConversationFeed: View {
     ) ?? DashboardDependenciesPreferences()
   }
 
-  // The detail view wraps this feed in a
-  // `DashboardDependencyDetailSection(title: "Conversation")` so the
-  // section header already provides the label. Emit only the status
-  // indicators here (loading spinner during refresh, error chip on
-  // failure); the empty/initial loading + empty-state copy lives in
-  // `content(_:)` below.
+  // The status bar above owns "Refreshing…" and the refresh button;
+  // this strip only surfaces transient load errors (e.g. a daemon
+  // timeout). Composer-side errors render via
+  // `DashboardDependencyCommentRetryStrip`.
   @ViewBuilder
-  private func statusStrip(_ viewModel: DependencyUpdateTimelineViewModel) -> some View {
-    if viewModel.loadState == .refreshing {
-      HStack(spacing: 8) {
-        HarnessMonitorSpinner(size: 12)
-        Text("Refreshing…").font(.caption).foregroundStyle(.secondary)
-        Spacer()
-      }
-    } else if let error = viewModel.lastError {
+  private func errorStrip(_ viewModel: DependencyUpdateTimelineViewModel) -> some View {
+    if let error = viewModel.lastError {
       Label(error, systemImage: "exclamationmark.triangle")
         .foregroundStyle(.orange)
         .font(.caption)
     }
+  }
+
+  private func refresh() async {
+    await store.prepareDependencyUpdateTimeline(for: item, forceRefresh: true)
   }
 
   @ViewBuilder
@@ -125,6 +127,11 @@ struct DashboardDependencyConversationFeed: View {
         .buttonStyle(.borderless)
         .disabled(viewModel.loadState == .loadingOlder)
       }
+      DashboardDependencyConversationPositionFooter(
+        entriesCount: viewModel.entries.count,
+        hasOlder: viewModel.hasOlder
+      )
+      .equatable()
     }
   }
 
