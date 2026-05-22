@@ -59,6 +59,21 @@ public actor OpenAnythingIndex {
     return OpenAnythingResults(query: trimmed, sections: sections)
   }
 
+  public func suggestedResults(limitPerDomain: Int = 5) -> OpenAnythingResults {
+    let suggested = records.filter(\.isSuggested)
+    let grouped = Dictionary(grouping: suggested) { $0.domain }
+    let sections = Self.domainOrder.compactMap { domain -> OpenAnythingSection? in
+      guard let domainRecords = grouped[domain], !domainRecords.isEmpty else {
+        return nil
+      }
+      let hits = domainRecords.prefix(max(0, limitPerDomain)).map { record in
+        OpenAnythingHit(record: record, highlights: .empty, score: 0)
+      }
+      return OpenAnythingSection(domain: domain, hits: Array(hits))
+    }
+    return OpenAnythingResults(query: "", sections: sections)
+  }
+
   public func recordCount() -> Int {
     records.count
   }

@@ -51,8 +51,57 @@ struct AppOpenAnythingSourceContractTests {
     #expect(!hostSource.contains("OpenAnythingPaletteView("))
   }
 
+  @Test("Empty palette surfaces suggested commands")
+  func emptyPaletteSurfacesSuggestedCommands() throws {
+    let modelSource = try harnessKitSourceFile(
+      named: "OpenAnything/OpenAnythingPaletteModel.swift"
+    )
+    let paletteSource = try previewableSourceFile(named: "Views/App/OpenAnythingPaletteView.swift")
+    let corpusSource = try harnessKitSourceFile(
+      named: "OpenAnything/OpenAnythingCorpusBuilder.swift"
+    )
+
+    #expect(modelSource.contains("public private(set) var suggestedResults"))
+    #expect(modelSource.contains("suggestedResults = await index.suggestedResults()"))
+    #expect(modelSource.contains("? suggestedResults"))
+    #expect(paletteSource.contains("model.suggestedResults"))
+    #expect(corpusSource.contains("private static let suggestedActions"))
+    #expect(corpusSource.contains(".openDiagnostics"))
+    #expect(corpusSource.contains(".openDependencies"))
+  }
+
+  @Test("Command palette routes diagnostics and settings actions")
+  func commandPaletteRoutesDiagnosticsAndSettingsActions() throws {
+    let executorSource = try harnessSourceFile(named: "App/OpenAnythingRouteExecutor.swift")
+    let hostSource = try harnessSourceFile(named: "App/HarnessMonitorApp+OpenAnything.swift")
+
+    #expect(executorSource.contains("case .openDiagnostics:"))
+    #expect(executorSource.contains("return [.openDashboard(.diagnostics)]"))
+    #expect(executorSource.contains("case .refreshDiagnostics:"))
+    #expect(executorSource.contains("return [.openDashboard(.diagnostics), .refreshDiagnostics]"))
+    #expect(executorSource.contains("case .reconnectDaemon:"))
+    #expect(executorSource.contains("return [.reconnectDaemon]"))
+    #expect(executorSource.contains("case .copyDiagnostics:"))
+    #expect(executorSource.contains("return [.copyDiagnostics]"))
+    #expect(executorSource.contains("case .openMCPSettings:"))
+    #expect(executorSource.contains("return [.openSettings(rawValue: \"mcp\")]"))
+    #expect(executorSource.contains("case .openDatabaseSettings:"))
+    #expect(executorSource.contains("return [.openSettings(rawValue: \"database\")]"))
+
+    #expect(hostSource.contains("case .refreshDiagnostics:"))
+    #expect(hostSource.contains("Task { await store.refreshDiagnostics() }"))
+    #expect(hostSource.contains("case .reconnectDaemon:"))
+    #expect(hostSource.contains("Task { await store.reconnect() }"))
+    #expect(hostSource.contains("case .copyDiagnostics:"))
+    #expect(hostSource.contains("copyMonitorDiagnostics()"))
+  }
+
   private func harnessSourceFile(named relativePath: String) throws -> String {
     try String(contentsOf: harnessSourceURL(named: relativePath), encoding: .utf8)
+  }
+
+  private func harnessKitSourceFile(named relativePath: String) throws -> String {
+    try String(contentsOf: harnessKitSourceURL(named: relativePath), encoding: .utf8)
   }
 
   private func previewableSourceFile(named relativePath: String) throws -> String {
@@ -62,6 +111,12 @@ struct AppOpenAnythingSourceContractTests {
   private func harnessSourceURL(named relativePath: String) -> URL {
     repoRoot()
       .appendingPathComponent("apps/harness-monitor-macos/Sources/HarnessMonitor")
+      .appendingPathComponent(relativePath)
+  }
+
+  private func harnessKitSourceURL(named relativePath: String) -> URL {
+    repoRoot()
+      .appendingPathComponent("apps/harness-monitor-macos/Sources/HarnessMonitorKit")
       .appendingPathComponent(relativePath)
   }
 

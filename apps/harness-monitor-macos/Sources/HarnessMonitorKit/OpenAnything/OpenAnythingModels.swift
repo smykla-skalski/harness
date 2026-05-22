@@ -43,8 +43,19 @@ public enum OpenAnythingAction: String, Codable, CaseIterable, Hashable, Sendabl
   case newSession
   case newTask
   case attachExternalSession
+  case openDashboard
+  case openTaskBoard
+  case openDependencies
+  case openNotifications
+  case openPolicyCanvas
+  case openDiagnostics
+  case refreshDiagnostics
+  case reconnectDaemon
+  case copyDiagnostics
   case refresh
   case settings
+  case openMCPSettings
+  case openDatabaseSettings
   case policyCanvasLab
 }
 
@@ -58,6 +69,7 @@ public enum OpenAnythingDashboardRoute: String, Codable, CaseIterable, Hashable,
   case taskBoard
   case policyCanvas
   case notifications
+  case diagnostics
   case dependencies
 
   public var title: String {
@@ -65,6 +77,7 @@ public enum OpenAnythingDashboardRoute: String, Codable, CaseIterable, Hashable,
     case .taskBoard: "Board"
     case .policyCanvas: "Policy"
     case .notifications: "Notifications"
+    case .diagnostics: "Diagnostics"
     case .dependencies: "Dependencies"
     }
   }
@@ -74,6 +87,7 @@ public enum OpenAnythingDashboardRoute: String, Codable, CaseIterable, Hashable,
     case .taskBoard: "square.grid.2x2"
     case .policyCanvas: "point.3.connected.trianglepath.dotted"
     case .notifications: "bell.badge"
+    case .diagnostics: "stethoscope"
     case .dependencies: "shippingbox.circle"
     }
   }
@@ -106,6 +120,7 @@ public struct OpenAnythingRecord: Identifiable, Hashable, Sendable {
   public let trailing: String?
   public let systemImage: String
   public let searchBody: String
+  public let isSuggested: Bool
 
   public init(
     id: String,
@@ -115,6 +130,7 @@ public struct OpenAnythingRecord: Identifiable, Hashable, Sendable {
     subtitle: String? = nil,
     trailing: String? = nil,
     systemImage: String? = nil,
+    isSuggested: Bool = false,
     searchBodyParts: [String?] = []
   ) {
     self.id = id
@@ -124,6 +140,7 @@ public struct OpenAnythingRecord: Identifiable, Hashable, Sendable {
     self.subtitle = subtitle
     self.trailing = trailing
     self.systemImage = systemImage ?? domain.systemImage
+    self.isSuggested = isSuggested
     searchBody = searchBodyParts.compactMap(Self.nonEmpty).joined(separator: " ")
   }
 

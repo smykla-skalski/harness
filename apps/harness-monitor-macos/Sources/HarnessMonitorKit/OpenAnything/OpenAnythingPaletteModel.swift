@@ -14,6 +14,7 @@ public final class OpenAnythingPaletteModel {
   public private(set) var isPresented = false
   public private(set) var targetWindowID: String?
   public private(set) var results = OpenAnythingResults.empty
+  public private(set) var suggestedResults = OpenAnythingResults.empty
   public private(set) var selectedHitID: String?
 
   @ObservationIgnored private let index: OpenAnythingIndex
@@ -23,12 +24,18 @@ public final class OpenAnythingPaletteModel {
   }
 
   public var selectedHit: OpenAnythingHit? {
-    let hits = results.allHits
+    let hits = displayedResults.allHits
     guard !hits.isEmpty else { return nil }
     if let selectedHitID, let selected = hits.first(where: { $0.id == selectedHitID }) {
       return selected
     }
     return hits.first
+  }
+
+  public var displayedResults: OpenAnythingResults {
+    query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+      ? suggestedResults
+      : results
   }
 
   public func present(targetWindowID: String?) {
@@ -58,7 +65,9 @@ public final class OpenAnythingPaletteModel {
 
   public func replaceCorpus(_ records: [OpenAnythingRecord]) async {
     await index.replace(records: records)
+    suggestedResults = await index.suggestedResults()
     guard isPresented, !query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+      normalizeSelection()
       return
     }
     await runSearch()
@@ -72,7 +81,7 @@ public final class OpenAnythingPaletteModel {
   }
 
   public func moveSelection(by delta: Int) {
-    let hits = results.allHits
+    let hits = displayedResults.allHits
     guard !hits.isEmpty else {
       selectedHitID = nil
       return
@@ -90,7 +99,7 @@ public final class OpenAnythingPaletteModel {
   }
 
   private func normalizeSelection() {
-    let hits = results.allHits
+    let hits = displayedResults.allHits
     guard !hits.isEmpty else {
       selectedHitID = nil
       return

@@ -76,11 +76,57 @@ struct AppOpenAnythingIndexTests {
     #expect(results.sections.first?.hits.map(\.id) == ["new"])
   }
 
+  @Test("Suggested results keep empty palette useful and grouped")
+  func suggestedResultsKeepEmptyPaletteUsefulAndGrouped() async {
+    let index = OpenAnythingIndex()
+    await index.replace(records: [
+      Self.record(id: "session", domain: .sessions, title: "Alpha Session"),
+      Self.record(
+        id: "action.refresh",
+        domain: .actions,
+        title: "Refresh",
+        isSuggested: true
+      ),
+      Self.record(
+        id: "window.dashboard",
+        domain: .windows,
+        title: "Dashboard",
+        isSuggested: true
+      ),
+      Self.record(
+        id: "window.diagnostics",
+        domain: .windows,
+        title: "Diagnostics",
+        isSuggested: true
+      ),
+      Self.record(
+        id: "settings.general",
+        domain: .settings,
+        title: "General",
+        isSuggested: true
+      ),
+    ])
+
+    let results = await index.suggestedResults(limitPerDomain: 1)
+
+    #expect(results.query.isEmpty)
+    #expect(results.sections.map(\.domain) == [.actions, .windows, .settings])
+    #expect(
+      results.sections.flatMap(\.hits).map(\.id) == [
+        "action.refresh",
+        "window.dashboard",
+        "settings.general",
+      ]
+    )
+    #expect(results.sections.flatMap(\.hits).allSatisfy { $0.highlights == .empty })
+  }
+
   private static func record(
     id: String,
     domain: OpenAnythingDomain,
     title: String,
     subtitle: String? = nil,
+    isSuggested: Bool = false,
     searchBodyParts: [String?] = []
   ) -> OpenAnythingRecord {
     OpenAnythingRecord(
@@ -89,6 +135,7 @@ struct AppOpenAnythingIndexTests {
       target: .action(.refresh),
       title: title,
       subtitle: subtitle,
+      isSuggested: isSuggested,
       searchBodyParts: searchBodyParts
     )
   }

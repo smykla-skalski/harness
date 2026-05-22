@@ -93,29 +93,6 @@ public enum HarnessMonitorAccessibility {
   public static let dashboardNotificationsRoot = "harness.dashboard.notifications"
   public static let dashboardNotificationsScrollView = "harness.dashboard.notifications.scroll"
   public static let dashboardNotificationsEmptyState = "harness.dashboard.notifications.empty-state"
-  public static let dashboardDependenciesRoot = "harness.dashboard.dependencies"
-  public static let dashboardDependenciesList = "harness.dashboard.dependencies.list"
-  public static let dashboardDependenciesDetail = "harness.dashboard.dependencies.detail"
-  public static let dashboardDependenciesDetailDivider =
-    "harness.dashboard.dependencies.content-detail-divider"
-  public static let dashboardDependenciesRefreshButton = "harness.dashboard.dependencies.refresh"
-  public static let dependenciesRefreshSelectedButton =
-    "harness.dashboard.dependencies.refresh-selected"
-  public static let dashboardDependenciesConfigureButton =
-    "harness.dashboard.dependencies.configure"
-  public static let dashboardDependenciesFixCIButton = "harness.dashboard.dependencies.fix-ci"
-  public static let dashboardDependenciesCustomLabelSheet =
-    "harness.dashboard.dependencies.custom-label.sheet"
-  public static let dashboardDependenciesCustomLabelField =
-    "harness.dashboard.dependencies.custom-label.field"
-  public static let dashboardDependenciesCustomLabelCancel =
-    "harness.dashboard.dependencies.custom-label.cancel"
-  public static let dashboardDependenciesCustomLabelApply =
-    "harness.dashboard.dependencies.custom-label.apply"
-  public static let dashboardDependenciesSelectionStatus =
-    "harness.dashboard.dependencies.selection"
-  public static let dashboardDependenciesDescription =
-    "harness.dashboard.dependencies.description"
   public static let dashboardDependencyFilesSection =
     "harness.dashboard.dependencies.files.section"
   public static let dashboardDependencyFilesHeader =
