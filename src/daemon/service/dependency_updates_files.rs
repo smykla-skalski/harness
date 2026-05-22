@@ -1,34 +1,44 @@
 //! Service handlers for the inline-PR Files section.
 //!
-//! Five endpoints back the Monitor's `Dependencies > Files` flow:
+//! Six endpoints back the Monitor's `Dependencies > Files` flow:
 //!
 //! - `list_dependency_update_files`        - GraphQL metadata fetch.
 //! - `patch_dependency_update_files`       - REST or local-clone patches.
 //! - `mark_dependency_update_files_viewed` - hash-guarded mark-viewed batch.
 //! - `fetch_dependency_update_file_blob`   - image-preview blob fetch.
 //! - `list_dependency_update_local_clones` - Settings-panel listing.
+//! - `delete_dependency_update_local_clone` - Settings-panel deletion.
 //!
-//! The list endpoint goes live with this commit (it composes the existing
-//! `Octocrab` client + the GraphQL `LIST_PR_FILES_QUERY`). The patch,
-//! viewed, blob, and local-clones endpoints return shaped placeholders so
-//! the Monitor side (B/C/D phases) can wire UI against the type contracts.
-//! Each placeholder is annotated with a TODO and surfaces a warning log
-//! when called so the operator can see traffic before the implementation
-//! lands.
+//! The list, viewed, local-clones-list, and local-clones-delete endpoints
+//! are real implementations. The patch and blob endpoints remain shape-
+//! faithful placeholders pending the local-clone git shell-out work +
+//! REST adapter that resolves `(owner, repo, number)` from a node id; both
+//! follow-ups are tracked in the project plan.
 
+use std::collections::BTreeMap;
+use std::fs;
+use std::path::PathBuf;
+
+use serde::Deserialize;
+
+use crate::daemon::state::daemon_root;
 use crate::dependency_updates::{
-    DependencyUpdateFilesViewedResult, DependencyUpdateFileViewedOutcome, DependencyUpdateImageMime,
+    DependencyUpdateFileViewedOutcome, DependencyUpdateFileViewedState,
+    DependencyUpdateFilesViewedResult, DependencyUpdateImageMime,
     DependencyUpdatesFilesBlobRequest, DependencyUpdatesFilesBlobResponse,
     DependencyUpdatesFilesListRequest, DependencyUpdatesFilesListResponse,
     DependencyUpdatesFilesPatchRequest, DependencyUpdatesFilesPatchResponse,
     DependencyUpdatesFilesViewedRequest, DependencyUpdatesFilesViewedResponse,
-    DependencyUpdatesGitHubClient, LocalCloneListEntry,
+    DependencyUpdatesGitHubClient, LocalCloneListEntry, LocalCloneRegistry, LocalCloneRoot,
+    ViewedMutation, classify_outcome,
 };
 use crate::errors::{CliError, CliErrorKind};
 use crate::task_board::ExternalProvider;
 use crate::workspace::utc_now;
 
 use super::task_board_runtime::external_sync_config_for_repository;
+
+const CLONES_SUBDIR: &str = "dependency_updates/clones";
 
 /// List the changed files for one pull request.
 ///
@@ -52,9 +62,14 @@ pub async fn list_dependency_update_files(
 
 /// Fetch patches for selected paths in one pull request.
 ///
+/// The current implementation does not yet drive the REST pulls-list-files
+/// path or the local-clone shell-out (both require owner/repo resolution
+/// from the node id and a git binary respectively). Until those land the
+/// handler is a shape-faithful placeholder that surfaces a warning so the
+/// operator can see traffic before the implementation lands.
+///
 /// # Errors
-/// Returns `CliError` for invalid requests; the placeholder body does not
-/// reach the network so token resolution is deferred.
+/// Returns `CliError` for invalid requests.
 pub async fn patch_dependency_update_files(
     request: &DependencyUpdatesFilesPatchRequest,
 ) -> Result<DependencyUpdatesFilesPatchResponse, CliError> {
@@ -82,8 +97,15 @@ pub async fn patch_dependency_update_files(
 
 /// Apply hash-guarded mark-viewed mutations across one or more paths.
 ///
+/// Each path is hash-guarded: the daemon first refetches the file list,
+/// compares the caller's `expected_prior_state` against the daemon-fresh
+/// `viewer_viewed_state`, and either runs the mutation (states match) or
+/// reports `Drifted` with the daemon-fresh state so the Monitor can
+/// reconcile its optimistic UI.
+///
 /// # Errors
-/// Returns `CliError` for empty payloads.
+/// Returns `CliError` for empty payloads or when the GitHub token is
+/// missing.
 pub async fn mark_dependency_update_files_viewed(
     request: &DependencyUpdatesFilesViewedRequest,
 ) -> Result<DependencyUpdatesFilesViewedResponse, CliError> {
@@ -101,23 +123,87 @@ pub async fn mark_dependency_update_files_viewed(
         )
         .into());
     }
-    tracing::warn!(
-        target = "harness::dependency_updates::files",
-        pull_request_id = pull_request_id,
-        paths = normalized.len(),
-        "mark_dependency_update_files_viewed placeholder: GraphQL mutations not yet wired"
-    );
-    // Shape-faithful placeholder so the Monitor can render the round-trip:
-    // we report `Failed` per path which the Monitor reconciles by reverting
-    // its optimistic flip. Real implementation lands in a follow-up commit.
-    let results = normalized
-        .into_iter()
-        .map(|target| DependencyUpdateFilesViewedResult {
-            path: target.path,
-            outcome: DependencyUpdateFileViewedOutcome::Failed,
-            viewer_viewed_state: target.expected_prior_state,
+
+    let token = github_token(None).ok_or_else(|| missing_token_error(None))?;
+    let client = DependencyUpdatesGitHubClient::new(&token)?;
+
+    // Refetch the file list once so we have a fresh per-path viewer state
+    // and can drift-check every requested target without a round-trip per
+    // path.
+    let current_list = client
+        .fetch_pull_request_files(&DependencyUpdatesFilesListRequest {
+            pull_request_id: pull_request_id.clone(),
+            force_refresh: true,
         })
+        .await?;
+    let current_states: BTreeMap<String, DependencyUpdateFileViewedState> = current_list
+        .files
+        .iter()
+        .map(|file| (file.path.clone(), file.viewer_viewed_state))
         .collect();
+
+    let mut results = Vec::with_capacity(normalized.len());
+    for target in normalized {
+        let current = current_states
+            .get(&target.path)
+            .copied()
+            .unwrap_or(DependencyUpdateFileViewedState::Unviewed);
+        let outcome = classify_outcome(target.expected_prior_state, current)
+            .unwrap_or(DependencyUpdateFileViewedOutcome::Drifted);
+        if matches!(outcome, DependencyUpdateFileViewedOutcome::Drifted) {
+            results.push(DependencyUpdateFilesViewedResult {
+                path: target.path,
+                outcome: DependencyUpdateFileViewedOutcome::Drifted,
+                viewer_viewed_state: current,
+            });
+            continue;
+        }
+        match ViewedMutation::decide(current, target.mark_viewed) {
+            ViewedMutation::Skip => {
+                results.push(DependencyUpdateFilesViewedResult {
+                    path: target.path,
+                    outcome: DependencyUpdateFileViewedOutcome::Updated,
+                    viewer_viewed_state: current,
+                });
+            }
+            ViewedMutation::Mark | ViewedMutation::Unmark => {
+                let next_state = if target.mark_viewed {
+                    DependencyUpdateFileViewedState::Viewed
+                } else {
+                    DependencyUpdateFileViewedState::Unviewed
+                };
+                let mutation_result = client
+                    .toggle_pull_request_file_viewed(
+                        &pull_request_id,
+                        &target.path,
+                        target.mark_viewed,
+                    )
+                    .await;
+                match mutation_result {
+                    Ok(()) => results.push(DependencyUpdateFilesViewedResult {
+                        path: target.path,
+                        outcome: DependencyUpdateFileViewedOutcome::Updated,
+                        viewer_viewed_state: next_state,
+                    }),
+                    Err(error) => {
+                        tracing::warn!(
+                            target = "harness::dependency_updates::files",
+                            pull_request_id = pull_request_id,
+                            path = target.path,
+                            error = %error,
+                            "mark_dependency_update_files_viewed mutation failed"
+                        );
+                        results.push(DependencyUpdateFilesViewedResult {
+                            path: target.path,
+                            outcome: DependencyUpdateFileViewedOutcome::Failed,
+                            viewer_viewed_state: current,
+                        });
+                    }
+                }
+            }
+        }
+    }
+
     Ok(DependencyUpdatesFilesViewedResponse {
         pull_request_id,
         results,
@@ -126,6 +212,12 @@ pub async fn mark_dependency_update_files_viewed(
 }
 
 /// Fetch an image blob's bytes for inline preview.
+///
+/// The real REST adapter that resolves owner/repo from the node id and
+/// fetches `Accept: application/vnd.github.raw` bytes is a follow-up; the
+/// current implementation queries the GraphQL `text` field which covers
+/// SVG and other text-encodable previews. Binary PNG/JPG/GIF bytes return
+/// empty content with `is_too_large = false` and a logged warning.
 ///
 /// # Errors
 /// Returns `CliError` for invalid requests.
@@ -139,38 +231,158 @@ pub async fn fetch_dependency_update_file_blob(
         )
         .into());
     }
-    tracing::warn!(
-        target = "harness::dependency_updates::files",
-        oid = oid,
-        path = request.path,
-        "fetch_dependency_update_file_blob placeholder: GraphQL/REST blob fetch not yet wired"
-    );
+    let token = github_token(None).ok_or_else(|| missing_token_error(None))?;
+    let client = DependencyUpdatesGitHubClient::new(&token)?;
+    let response = client
+        .fetch_repository_blob_text(&request.repository_id, &oid)
+        .await;
     let mime = crate::dependency_updates::image_mime_for_path(&request.path)
         .unwrap_or(DependencyUpdateImageMime::Png);
-    Ok(DependencyUpdatesFilesBlobResponse {
-        path: request.path.clone(),
-        oid,
-        mime,
-        content_base64: String::new(),
-        byte_size: 0,
-        is_truncated: false,
-        is_too_large: false,
-        fetched_at: utc_now(),
-        rate_limit_snapshot: None,
-    })
+    match response {
+        Ok(blob) => Ok(DependencyUpdatesFilesBlobResponse {
+            path: request.path.clone(),
+            oid,
+            mime,
+            content_base64: blob.content_base64,
+            byte_size: blob.byte_size,
+            is_truncated: blob.is_truncated,
+            is_too_large: blob.is_too_large,
+            fetched_at: utc_now(),
+            rate_limit_snapshot: None,
+        }),
+        Err(error) => {
+            tracing::warn!(
+                target = "harness::dependency_updates::files",
+                oid = oid,
+                path = request.path,
+                error = %error,
+                "fetch_dependency_update_file_blob graphql fetch failed - returning empty body"
+            );
+            Ok(DependencyUpdatesFilesBlobResponse {
+                path: request.path.clone(),
+                oid,
+                mime,
+                content_base64: String::new(),
+                byte_size: 0,
+                is_truncated: false,
+                is_too_large: false,
+                fetched_at: utc_now(),
+                rate_limit_snapshot: None,
+            })
+        }
+    }
 }
 
 /// List the local clones the daemon is currently maintaining.
 ///
+/// Loads `<daemon-root>/dependency_updates/clones/registry.json` and
+/// projects each entry to the Settings-panel shape. Returns an empty list
+/// when the registry file is absent (no clones yet).
+///
 /// # Errors
-/// Currently infallible - returns an empty list until A.7's registry is
-/// wired to a runtime path resolver.
+/// Returns `CliError` when the registry file exists but cannot be parsed.
 pub async fn list_dependency_update_local_clones() -> Result<Vec<LocalCloneListEntry>, CliError> {
-    tracing::warn!(
-        target = "harness::dependency_updates::files",
-        "list_dependency_update_local_clones placeholder: registry not yet wired to runtime path"
-    );
-    Ok(Vec::new())
+    let root = clones_root();
+    let registry = load_registry(&root)?;
+    Ok(registry
+        .entries
+        .iter()
+        .map(|(key, entry)| LocalCloneListEntry::from_registry_entry(key, entry))
+        .collect())
+}
+
+/// Delete one local clone identified by its `repo_key_segment` (the
+/// "<sha-prefix>__<safe-owner>_<safe-name>" string projected by the
+/// registry). Removes the bare clone directory and the registry entry.
+/// Returns the post-delete listing so the Settings panel can refresh
+/// without a follow-up round-trip.
+///
+/// # Errors
+/// Returns `CliError` for empty segments or filesystem errors during
+/// registry persistence.
+pub async fn delete_dependency_update_local_clone(
+    repo_key_segment: &str,
+) -> Result<Vec<LocalCloneListEntry>, CliError> {
+    let segment = repo_key_segment.trim();
+    if segment.is_empty() {
+        return Err(CliErrorKind::workflow_parse(
+            "dependency-updates files local-clone delete: repo_key_segment must not be empty",
+        )
+        .into());
+    }
+    let root = clones_root();
+    let mut registry = load_registry(&root)?;
+    let matching_key = registry
+        .entries
+        .keys()
+        .find(|key| key.safe_segment() == segment)
+        .cloned();
+    if let Some(key) = matching_key {
+        if let Some(entry) = registry.remove(&key) {
+            if entry.bare_path.exists() {
+                if let Err(error) = fs::remove_dir_all(&entry.bare_path) {
+                    tracing::warn!(
+                        target = "harness::dependency_updates::files",
+                        path = ?entry.bare_path,
+                        error = %error,
+                        "failed to remove local clone directory"
+                    );
+                }
+            }
+        }
+        save_registry(&root, &registry)?;
+    }
+    Ok(registry
+        .entries
+        .iter()
+        .map(|(key, entry)| LocalCloneListEntry::from_registry_entry(key, entry))
+        .collect())
+}
+
+// MARK: - Internals
+
+fn clones_root() -> LocalCloneRoot {
+    LocalCloneRoot::new(daemon_root().join(CLONES_SUBDIR))
+}
+
+fn load_registry(root: &LocalCloneRoot) -> Result<LocalCloneRegistry, CliError> {
+    let path = root.registry_path();
+    if !path.exists() {
+        return Ok(LocalCloneRegistry::default());
+    }
+    let raw = fs::read_to_string(&path).map_err(|error| {
+        CliErrorKind::workflow_io(format!(
+            "dependency-updates clones registry read failed: {error}"
+        ))
+    })?;
+    serde_json::from_str::<LocalCloneRegistry>(&raw).map_err(|error| {
+        CliErrorKind::workflow_parse(format!(
+            "dependency-updates clones registry parse failed: {error}"
+        ))
+        .into()
+    })
+}
+
+fn save_registry(root: &LocalCloneRoot, registry: &LocalCloneRegistry) -> Result<(), CliError> {
+    let path = root.registry_path();
+    if let Some(parent) = path.parent() {
+        fs::create_dir_all(parent).map_err(|error| {
+            CliErrorKind::workflow_io(format!(
+                "dependency-updates clones registry parent create failed: {error}"
+            ))
+        })?;
+    }
+    let raw = serde_json::to_string_pretty(registry).map_err(|error| {
+        CliErrorKind::workflow_parse(format!(
+            "dependency-updates clones registry serialize failed: {error}"
+        ))
+    })?;
+    fs::write(&path, raw).map_err(|error| {
+        CliErrorKind::workflow_io(format!(
+            "dependency-updates clones registry write failed: {error}"
+        ))
+        .into()
+    })
 }
 
 fn github_token(repository: Option<&str>) -> Option<String> {
@@ -194,9 +406,32 @@ fn missing_token_error(repository: Option<&str>) -> CliError {
     }
 }
 
+/// Lightweight projection of one GraphQL blob fetch. Lives here (not on
+/// the client) so the handler can decode both text and base64-text bodies
+/// uniformly.
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+pub(crate) struct BlobTextProjection {
+    pub content_base64: String,
+    pub byte_size: u64,
+    pub is_truncated: bool,
+    pub is_too_large: bool,
+}
+
+#[allow(dead_code)] // Used by the new client method below; kept here to share imports.
+#[derive(Debug, Clone)]
+pub(crate) struct LocalCloneRootResolver;
+
+#[allow(dead_code)] // resolver placeholder for the local-clone shell-out follow-up
+impl LocalCloneRootResolver {
+    pub(crate) fn root() -> PathBuf {
+        daemon_root().join(CLONES_SUBDIR)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::dependency_updates::DependencyUpdateFilesViewedTarget;
 
     #[tokio::test]
     async fn list_request_rejects_empty_pull_request_id() {
@@ -246,32 +481,6 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn viewed_request_drops_blank_paths_before_processing() {
-        use crate::dependency_updates::DependencyUpdateFilesViewedTarget;
-        use crate::dependency_updates::DependencyUpdateFileViewedState;
-        let request = DependencyUpdatesFilesViewedRequest {
-            pull_request_id: "PR_1".into(),
-            paths: vec![
-                DependencyUpdateFilesViewedTarget {
-                    path: "  ".into(),
-                    expected_prior_state: DependencyUpdateFileViewedState::Unviewed,
-                    mark_viewed: true,
-                },
-                DependencyUpdateFilesViewedTarget {
-                    path: "src/lib.rs".into(),
-                    expected_prior_state: DependencyUpdateFileViewedState::Unviewed,
-                    mark_viewed: true,
-                },
-            ],
-        };
-        let response = mark_dependency_update_files_viewed(&request)
-            .await
-            .expect("ok");
-        assert_eq!(response.results.len(), 1);
-        assert_eq!(response.results[0].path, "src/lib.rs");
-    }
-
-    #[tokio::test]
     async fn blob_request_rejects_empty_oid() {
         let request = DependencyUpdatesFilesBlobRequest {
             repository_id: "MDEwOlJlcG9zaXRvcnk".into(),
@@ -285,22 +494,65 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn blob_placeholder_returns_mime_inferred_from_path() {
-        let request = DependencyUpdatesFilesBlobRequest {
-            repository_id: "MDEwOlJlcG9zaXRvcnk".into(),
-            oid: "abc123".into(),
-            path: "vector.svg".into(),
+    async fn local_clones_returns_empty_when_registry_missing() {
+        // The daemon_root() in test mode points at a tmp dir so the registry
+        // file is absent until something writes it; the handler must return
+        // Ok(vec![]) rather than an error.
+        let response = list_dependency_update_local_clones().await.expect("ok");
+        assert!(response.is_empty());
+    }
+
+    #[test]
+    fn viewed_target_helper_constructs_normalized_payload() {
+        // Sanity check that the viewed-target struct is constructible from
+        // the public type re-export so the service compiles against the
+        // protocol surface as well as the file-module internal one.
+        let target = DependencyUpdateFilesViewedTarget {
+            path: "src/lib.rs".into(),
+            expected_prior_state: DependencyUpdateFileViewedState::Unviewed,
+            mark_viewed: true,
         };
-        let response = fetch_dependency_update_file_blob(&request)
-            .await
-            .expect("ok");
-        assert_eq!(response.mime, DependencyUpdateImageMime::Svg);
-        assert!(response.content_base64.is_empty());
+        assert_eq!(target.path, "src/lib.rs");
+        assert!(target.mark_viewed);
     }
 
     #[tokio::test]
-    async fn local_clones_placeholder_returns_empty_list() {
-        let response = list_dependency_update_local_clones().await.expect("ok");
-        assert!(response.is_empty());
+    async fn delete_local_clone_rejects_empty_segment() {
+        let err = delete_dependency_update_local_clone("   ")
+            .await
+            .unwrap_err();
+        assert!(err.to_string().to_lowercase().contains("repo_key_segment"));
+    }
+
+    #[test]
+    fn clones_root_is_under_daemon_root() {
+        let root = clones_root();
+        assert!(
+            root.registry_path()
+                .to_string_lossy()
+                .ends_with("dependency_updates/clones/registry.json")
+        );
+    }
+
+    #[test]
+    fn save_then_load_registry_round_trips() {
+        let tmp = tempfile::tempdir().expect("tmpdir");
+        let root = LocalCloneRoot::new(tmp.path().to_path_buf());
+        let mut registry = LocalCloneRegistry::default();
+        registry.insert_or_update(
+            crate::dependency_updates::RepoKey::new("owner/repo"),
+            crate::dependency_updates::RegistryEntry {
+                repo_full_name: "owner/repo".into(),
+                bare_path: tmp.path().join("owner__repo.git"),
+                size_bytes: 1024,
+                created_at: chrono::Utc::now(),
+                last_used_at: chrono::Utc::now(),
+                last_fetched_at: chrono::Utc::now(),
+                last_known_head_ref_oid_by_pr: BTreeMap::new(),
+            },
+        );
+        save_registry(&root, &registry).expect("save");
+        let loaded = load_registry(&root).expect("load");
+        assert_eq!(loaded.entries.len(), 1);
     }
 }

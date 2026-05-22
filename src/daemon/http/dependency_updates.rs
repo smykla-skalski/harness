@@ -110,6 +110,10 @@ pub(super) fn dependency_updates_routes() -> Router<DaemonHttpState> {
             http_paths::DEPENDENCY_UPDATES_FILES_LOCAL_CLONES,
             post(post_dependency_update_files_local_clones),
         )
+        .route(
+            http_paths::DEPENDENCY_UPDATES_FILES_LOCAL_CLONES_DELETE,
+            post(post_dependency_update_files_local_clones_delete),
+        )
 }
 
 async fn get_dependency_update_capabilities(
@@ -404,6 +408,34 @@ async fn post_dependency_update_files_local_clones(
     timed_json(
         "POST",
         http_paths::DEPENDENCY_UPDATES_FILES_LOCAL_CLONES,
+        &request_id,
+        start,
+        result,
+    )
+}
+
+#[derive(serde::Deserialize)]
+struct DeleteLocalClonePayload {
+    repo_key_segment: String,
+}
+
+#[derive(serde::Serialize)]
+struct DeleteLocalCloneResponseBody {
+    clones: Vec<crate::dependency_updates::LocalCloneListEntry>,
+}
+
+async fn post_dependency_update_files_local_clones_delete(
+    headers: HeaderMap,
+    State(state): State<DaemonHttpState>,
+    Json(payload): Json<DeleteLocalClonePayload>,
+) -> Response {
+    let (start, request_id) = authenticated_request!(headers, state);
+    let result = service::delete_dependency_update_local_clone(&payload.repo_key_segment)
+        .await
+        .map(|clones| DeleteLocalCloneResponseBody { clones });
+    timed_json(
+        "POST",
+        http_paths::DEPENDENCY_UPDATES_FILES_LOCAL_CLONES_DELETE,
         &request_id,
         start,
         result,

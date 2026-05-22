@@ -260,10 +260,11 @@ pub use dependency_updates::{
     refresh_dependency_updates, rerun_dependency_updates_checks, update_dependency_update_body,
 };
 pub use dependency_updates_files::{
-    fetch_dependency_update_file_blob, list_dependency_update_files,
-    list_dependency_update_local_clones, mark_dependency_update_files_viewed,
-    patch_dependency_update_files,
+    delete_dependency_update_local_clone, fetch_dependency_update_file_blob,
+    list_dependency_update_files, list_dependency_update_local_clones,
+    mark_dependency_update_files_viewed, patch_dependency_update_files,
 };
+pub(crate) use dependency_updates_files::BlobTextProjection;
 pub use direct::{
     delete_session_direct, disconnect_agent_direct, join_session_direct, record_signal_ack_direct,
     register_agent_runtime_session_direct, start_session_direct, update_session_title_direct,
