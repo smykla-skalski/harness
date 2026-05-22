@@ -121,8 +121,9 @@ struct HarnessMarkdownRenderingBehaviorTests {
         + "/Views/Shared/HarnessMonitorMarkdownText.swift"
     )
 
-    #expect(source.contains("Toggle(isOn: .constant(checkbox))"))
+    #expect(source.contains("Toggle(isOn: binding)"))
     #expect(source.contains(".toggleStyle(.checkbox)"))
+    #expect(source.contains(".disabled(item.checkboxSourceOffset == nil"))
     #expect(source.contains(".frame(width: metrics.columnWidth, height: metrics.firstLineHeight"))
     #expect(!source.contains(".alignmentGuide(.firstTextBaseline)"))
   }
