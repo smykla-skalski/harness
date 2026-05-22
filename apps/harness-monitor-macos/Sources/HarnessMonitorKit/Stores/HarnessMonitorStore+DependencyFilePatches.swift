@@ -33,7 +33,10 @@ extension HarnessMonitorStore {
     let request = DependencyUpdatesFilesPatchRequest(
       pullRequestID: pullRequestID,
       headRefOidExpected: viewModel.headRefOid,
-      paths: pendingPaths
+      paths: pendingPaths,
+      repositoryFullName: viewModel.repositoryFullName,
+      baseRefOidExpected: viewModel.baseRefOid,
+      headRefName: viewModel.headRefName
     )
     let interval = DependencyFilesPerf.beginPatchFetch(
       pullRequestID: pullRequestID,
