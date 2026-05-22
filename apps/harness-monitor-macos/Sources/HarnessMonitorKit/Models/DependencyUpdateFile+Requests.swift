@@ -21,12 +21,21 @@ public struct DependencyUpdatesFilesListRequest: Codable, Equatable, Sendable {
 }
 
 /// Response shape for the files_list endpoint.
+///
+/// `paginationComplete` is `true` when the daemon drained every page of
+/// the underlying GraphQL `pullRequest.files(...)` connection. `false`
+/// indicates the loop bailed under the page cap while GitHub still had
+/// `hasNextPage == true` - the response is partial and the UI should
+/// surface a "and N more files not loaded" affordance. Older daemons
+/// that don't emit the field default to `true` for backwards
+/// compatibility.
 public struct DependencyUpdatesFilesListResponse: Codable, Equatable, Sendable {
   public let pullRequestID: String
   public let headRefOid: String
   public let viewerCanMarkViewed: Bool
   public let files: [DependencyUpdateFile]
   public let fetchedAt: String
+  public let paginationComplete: Bool
   public let rateLimitSnapshot: DependencyUpdatesRateLimitSnapshot?
 
   public init(
@@ -35,6 +44,7 @@ public struct DependencyUpdatesFilesListResponse: Codable, Equatable, Sendable {
     viewerCanMarkViewed: Bool,
     files: [DependencyUpdateFile],
     fetchedAt: String,
+    paginationComplete: Bool = true,
     rateLimitSnapshot: DependencyUpdatesRateLimitSnapshot? = nil
   ) {
     self.pullRequestID = pullRequestID
@@ -42,6 +52,7 @@ public struct DependencyUpdatesFilesListResponse: Codable, Equatable, Sendable {
     self.viewerCanMarkViewed = viewerCanMarkViewed
     self.files = files
     self.fetchedAt = fetchedAt
+    self.paginationComplete = paginationComplete
     self.rateLimitSnapshot = rateLimitSnapshot
   }
 
@@ -51,7 +62,20 @@ public struct DependencyUpdatesFilesListResponse: Codable, Equatable, Sendable {
     case viewerCanMarkViewed
     case files
     case fetchedAt
+    case paginationComplete
     case rateLimitSnapshot
+  }
+
+  public init(from decoder: Decoder) throws {
+    let c = try decoder.container(keyedBy: CodingKeys.self)
+    pullRequestID = try c.decode(String.self, forKey: .pullRequestID)
+    headRefOid = try c.decode(String.self, forKey: .headRefOid)
+    viewerCanMarkViewed = try c.decode(Bool.self, forKey: .viewerCanMarkViewed)
+    files = try c.decode([DependencyUpdateFile].self, forKey: .files)
+    fetchedAt = try c.decode(String.self, forKey: .fetchedAt)
+    paginationComplete = try c.decodeIfPresent(Bool.self, forKey: .paginationComplete) ?? true
+    rateLimitSnapshot = try c.decodeIfPresent(
+      DependencyUpdatesRateLimitSnapshot.self, forKey: .rateLimitSnapshot)
   }
 }
 
