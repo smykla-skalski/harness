@@ -12,6 +12,7 @@
 //! labeling used by the service.
 
 use axum::http;
+use http_body_util::BodyExt;
 use octocrab::Octocrab;
 use serde::Deserialize;
 
@@ -172,57 +173,130 @@ pub fn split_repo_full_name(full_name: &str) -> Option<(String, String)> {
     Some((owner.to_string(), repo.to_string()))
 }
 
-/// Fetch the per-file patches for one PR via GitHub's REST endpoint.
+/// Outcome from a conditional REST fetch. `NotModified` means the server
+/// returned `304` because the caller's `If-None-Match` header matched the
+/// current resource — caller should reuse its cached entries.
+#[derive(Debug)]
+pub enum ConditionalFetchOutcome {
+    /// First-page ETag (when present) and the parsed patches.
+    Fetched {
+        etag: Option<String>,
+        patches: Vec<DependencyUpdateFilePatch>,
+    },
+    /// Server returned 304; cached entries are still authoritative.
+    NotModified,
+}
+
+/// Fetch the per-file patches for one PR via GitHub's REST endpoint with
+/// optional ETag-based revalidation.
 ///
-/// Pagination is capped at `FILES_PAGE_CAP * 30` entries (GitHub's REST
-/// `pulls/.../files` endpoint returns up to 30 per page); pages beyond that
-/// surface as `truncated_pagination = true` so the UI can mention the gap.
+/// Pagination is capped at `FILES_PAGE_CAP * 30` entries. The first page's
+/// `ETag` response header is surfaced on the [`ConditionalFetchOutcome`] so
+/// the caller can persist it for the next conditional revalidation.
 ///
-/// `requested_paths` filters the result. Empty slice → return every file.
+/// `if_none_match` is the prior ETag, if any. When set and the server
+/// returns `304 Not Modified`, the outcome is [`ConditionalFetchOutcome::NotModified`]
+/// with no body fetched. Without an etag the first call is unconditional.
 ///
 /// # Errors
 /// Returns `RestFetchError` on network / auth failures and on malformed
 /// `repo_full_name`.
-pub async fn fetch_patches(
+pub async fn fetch_patches_conditional(
     client: &Octocrab,
     repo_full_name: &str,
     pr_number: u64,
     head_ref_oid: &str,
     requested_paths: &[String],
-) -> Result<Vec<DependencyUpdateFilePatch>, RestFetchError> {
-    let (owner, repo) = split_repo_full_name(repo_full_name).ok_or_else(|| {
-        RestFetchError::InvalidRequest("repo_full_name must be owner/name".into())
-    })?;
+    if_none_match: Option<&str>,
+) -> Result<ConditionalFetchOutcome, RestFetchError> {
+    let (owner, repo) = split_repo_full_name(repo_full_name)
+        .ok_or_else(|| RestFetchError::InvalidRequest("repo_full_name must be owner/name".into()))?;
+    let route = format!("/repos/{owner}/{repo}/pulls/{pr_number}/files");
 
-    let mut page = client
-        .pulls(&owner, &repo)
-        .list_files(pr_number)
+    let mut request_headers = http::header::HeaderMap::new();
+    if let Some(etag) = if_none_match
+        && !etag.is_empty()
+    {
+        request_headers.insert(
+            http::header::IF_NONE_MATCH,
+            http::HeaderValue::from_str(etag)
+                .map_err(|e| RestFetchError::InvalidRequest(format!("etag header value: {e}")))?,
+        );
+    }
+
+    let uri = route
+        .parse::<http::Uri>()
+        .map_err(|e| RestFetchError::InvalidRequest(format!("uri parse: {e}")))?;
+    let response = client
+        ._get_with_headers(uri, Some(request_headers))
         .await
         .map_err(|e| RestFetchError::Http(e.to_string()))?;
 
-    let mut all_entries: Vec<octocrab::models::repos::DiffEntry> = Vec::new();
-    let mut visited_pages = 0_u32;
+    if response.status() == http::StatusCode::NOT_MODIFIED {
+        return Ok(ConditionalFetchOutcome::NotModified);
+    }
+    if !response.status().is_success() {
+        return Err(RestFetchError::Http(format!(
+            "rest patches status {}",
+            response.status()
+        )));
+    }
+
+    let etag = response
+        .headers()
+        .get(http::header::ETAG)
+        .and_then(|v| v.to_str().ok())
+        .map(ToString::to_string);
+    let next_link = response
+        .headers()
+        .get("link")
+        .and_then(|v| v.to_str().ok())
+        .and_then(parse_next_link);
+
+    let bytes = response
+        .into_body()
+        .collect()
+        .await
+        .map_err(|e| RestFetchError::Http(format!("rest patches body: {e}")))?
+        .to_bytes();
+    let first_page: Vec<octocrab::models::repos::DiffEntry> =
+        serde_json::from_slice(&bytes).map_err(|e| RestFetchError::Http(e.to_string()))?;
+
+    let mut all_entries: Vec<octocrab::models::repos::DiffEntry> = first_page;
+    let mut next_uri = next_link;
+    let mut visited_pages = 1_u32;
     let cap = FILES_PAGE_CAP;
-    loop {
-        all_entries.extend(page.items.into_iter());
-        visited_pages += 1;
-        if visited_pages >= cap {
-            break;
-        }
-        let Some(next) = page.next.clone() else { break };
-        let next_uri = next.to_string();
-        let Some(next_page) = client
-            .get_page::<octocrab::models::repos::DiffEntry>(&Some(
-                next_uri
-                    .parse::<http::Uri>()
-                    .map_err(|e| RestFetchError::InvalidRequest(format!("next link parse: {e}")))?,
-            ))
+    while visited_pages < cap
+        && let Some(uri_str) = next_uri.take()
+    {
+        let uri = uri_str
+            .parse::<http::Uri>()
+            .map_err(|e| RestFetchError::InvalidRequest(format!("next link parse: {e}")))?;
+        let response = client
+            ._get_with_headers(uri, None)
             .await
-            .map_err(|e| RestFetchError::Http(e.to_string()))?
-        else {
-            break;
-        };
-        page = next_page;
+            .map_err(|e| RestFetchError::Http(e.to_string()))?;
+        if !response.status().is_success() {
+            return Err(RestFetchError::Http(format!(
+                "rest patches paginated status {}",
+                response.status()
+            )));
+        }
+        next_uri = response
+            .headers()
+            .get("link")
+            .and_then(|v| v.to_str().ok())
+            .and_then(parse_next_link);
+        let bytes = response
+            .into_body()
+            .collect()
+            .await
+            .map_err(|e| RestFetchError::Http(format!("paginated body: {e}")))?
+            .to_bytes();
+        let page: Vec<octocrab::models::repos::DiffEntry> =
+            serde_json::from_slice(&bytes).map_err(|e| RestFetchError::Http(e.to_string()))?;
+        all_entries.extend(page);
+        visited_pages += 1;
     }
 
     let rest_files: Vec<RestPullFile> = all_entries.iter().map(diff_entry_to_rest_file).collect();
@@ -230,8 +304,37 @@ pub async fn fetch_patches(
     let head = head_ref_oid.to_string();
     for patch in &mut patches {
         patch.head_ref_oid = head.clone();
+        patch.etag = etag.clone();
     }
-    Ok(patches)
+    Ok(ConditionalFetchOutcome::Fetched { etag, patches })
+}
+
+/// Unconditional variant of [`fetch_patches_conditional`]. Returns just the
+/// patches; the response ETag (if any) is dropped. Kept for back-compat with
+/// callers that don't yet persist ETags.
+///
+/// # Errors
+/// Returns `RestFetchError` on network / auth failures.
+pub async fn fetch_patches(
+    client: &Octocrab,
+    repo_full_name: &str,
+    pr_number: u64,
+    head_ref_oid: &str,
+    requested_paths: &[String],
+) -> Result<Vec<DependencyUpdateFilePatch>, RestFetchError> {
+    match fetch_patches_conditional(
+        client,
+        repo_full_name,
+        pr_number,
+        head_ref_oid,
+        requested_paths,
+        None,
+    )
+    .await?
+    {
+        ConditionalFetchOutcome::Fetched { patches, .. } => Ok(patches),
+        ConditionalFetchOutcome::NotModified => Ok(Vec::new()),
+    }
 }
 
 /// Failure modes the REST fetcher exposes. Mapped to `CliError` at the
@@ -585,5 +688,87 @@ mod tests {
         assert!(split_repo_full_name("").is_none());
         assert!(split_repo_full_name("/repo").is_none());
         assert!(split_repo_full_name("owner/").is_none());
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn fetch_patches_conditional_returns_etag_from_response_header() {
+        use axum::Router;
+        use axum::response::IntoResponse;
+        use axum::routing::get;
+        use http::HeaderValue;
+        use serde_json::json;
+        use tokio::net::TcpListener;
+
+        let listener = TcpListener::bind("127.0.0.1:0").await.expect("bind");
+        let port = listener.local_addr().expect("addr").port();
+        let app = Router::new().route(
+            "/repos/{owner}/{repo}/pulls/{number}/files",
+            get(|| async {
+                let body = json!([
+                    {
+                        "sha": "a11", "filename": "src/a.rs", "status": "modified",
+                        "additions": 1, "deletions": 0, "changes": 1,
+                        "blob_url": "https://example.com/a", "raw_url": "https://example.com/a",
+                        "contents_url": "https://example.com/a",
+                        "patch": "@@ -1 +1 @@\n-a\n+A\n"
+                    }
+                ]);
+                let mut response = axum::Json(body).into_response();
+                response.headers_mut().insert(
+                    "etag",
+                    HeaderValue::from_static("W/\"abc-123\""),
+                );
+                response
+            }),
+        );
+        let server = tokio::spawn(async move {
+            let _ = axum::serve(listener, app).await;
+        });
+        let client = mock_octocrab_at(port);
+
+        let outcome = fetch_patches_conditional(&client, "o/r", 1, "head", &[], None)
+            .await
+            .expect("conditional");
+        match outcome {
+            ConditionalFetchOutcome::Fetched { etag, patches } => {
+                assert_eq!(etag.as_deref(), Some("W/\"abc-123\""));
+                assert_eq!(patches.len(), 1);
+                assert_eq!(patches[0].etag.as_deref(), Some("W/\"abc-123\""));
+            }
+            ConditionalFetchOutcome::NotModified => panic!("expected Fetched, got NotModified"),
+        }
+        server.abort();
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn fetch_patches_conditional_returns_not_modified_on_304() {
+        use axum::Router;
+        use axum::http::StatusCode;
+        use axum::routing::get;
+        use tokio::net::TcpListener;
+
+        let listener = TcpListener::bind("127.0.0.1:0").await.expect("bind");
+        let port = listener.local_addr().expect("addr").port();
+        let app = Router::new().route(
+            "/repos/{owner}/{repo}/pulls/{number}/files",
+            get(|| async { (StatusCode::NOT_MODIFIED, "") }),
+        );
+        let server = tokio::spawn(async move {
+            let _ = axum::serve(listener, app).await;
+        });
+        let client = mock_octocrab_at(port);
+
+        let outcome = fetch_patches_conditional(
+            &client,
+            "o/r",
+            1,
+            "head",
+            &[],
+            Some("W/\"existing-etag\""),
+        )
+        .await
+        .expect("conditional");
+        assert!(matches!(outcome, ConditionalFetchOutcome::NotModified));
+        server.abort();
     }
 }
