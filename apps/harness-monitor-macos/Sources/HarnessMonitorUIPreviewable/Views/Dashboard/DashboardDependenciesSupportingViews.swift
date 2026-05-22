@@ -96,17 +96,20 @@ struct DashboardDependenciesDescriptionView: View {
   let pullRequestID: String
   let viewerCanUpdate: Bool
   let onCheckboxError: ((String) -> Void)?
+  let onCheckboxUpdated: (() -> Void)?
 
   init(
     store: HarnessMonitorStore,
     pullRequestID: String,
     viewerCanUpdate: Bool = true,
-    onCheckboxError: ((String) -> Void)? = nil
+    onCheckboxError: ((String) -> Void)? = nil,
+    onCheckboxUpdated: (() -> Void)? = nil
   ) {
     self.store = store
     self.pullRequestID = pullRequestID
     self.viewerCanUpdate = viewerCanUpdate
     self.onCheckboxError = onCheckboxError
+    self.onCheckboxUpdated = onCheckboxUpdated
   }
 
   var body: some View {
@@ -152,7 +155,7 @@ struct DashboardDependenciesDescriptionView: View {
       )
       switch outcome {
       case .updated:
-        return
+        onCheckboxUpdated?()
       case .bodyDrifted:
         onCheckboxError?("PR body changed since you opened it. Reloaded the latest version.")
       case .failed(let message):

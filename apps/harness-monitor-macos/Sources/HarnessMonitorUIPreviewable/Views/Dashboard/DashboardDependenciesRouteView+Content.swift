@@ -92,6 +92,11 @@ extension DashboardDependenciesRouteView {
           item: item,
           store: store,
           onDescriptionCheckboxError: { message in routeErrorMessage = message },
+          onDescriptionCheckboxUpdated: {
+            if let client = store.apiClient {
+              scheduleAffectedRefresh(for: [item], using: client)
+            }
+          },
           onRerunCheck: { check in
             Task { await rerunCheck(check, for: item) }
           },
