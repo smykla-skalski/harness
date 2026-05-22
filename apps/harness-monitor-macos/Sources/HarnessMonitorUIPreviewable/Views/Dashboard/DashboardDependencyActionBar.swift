@@ -6,6 +6,7 @@ struct DashboardDependencyActionBar: View {
   let availableLabels: [DependencyUpdateRepositoryLabel]
   let frequentNames: [String]
   let showsDescriptions: Bool
+  let isBusy: Bool
   let onApprove: () -> Void
   let onMerge: () -> Void
   let onRerunChecks: () -> Void
@@ -33,12 +34,12 @@ struct DashboardDependencyActionBar: View {
     DashboardDependencyActionButton(
       title: "Approve", systemImage: "checkmark.seal", prominence: .primary, action: onApprove
     )
-    .disabled(!items.contains { $0.canAttemptManualApproval })
+    .disabled(isBusy || !items.contains { $0.canAttemptManualApproval })
 
     DashboardDependencyActionButton(
       title: "Merge", systemImage: "arrow.triangle.merge", prominence: .success, action: onMerge
     )
-    .disabled(!items.contains { $0.canAttemptManualMerge })
+    .disabled(isBusy || !items.contains { $0.canAttemptManualMerge })
 
     DashboardDependencyActionButton(
       title: "Rerun Checks",
@@ -46,7 +47,7 @@ struct DashboardDependencyActionBar: View {
       prominence: .secondary,
       action: onRerunChecks
     )
-    .disabled(!items.contains { $0.hasRerunnableChecks })
+    .disabled(isBusy || !items.contains { $0.hasRerunnableChecks })
 
     DashboardDependencyActionButton(
       title: "Refresh",
@@ -54,7 +55,7 @@ struct DashboardDependencyActionBar: View {
       prominence: .secondary,
       action: onRefresh
     )
-    .disabled(items.isEmpty)
+    .disabled(isBusy || items.isEmpty)
     .accessibilityIdentifier(
       HarnessMonitorAccessibility.dashboardDependenciesRefreshSelectedButton
     )
@@ -66,7 +67,7 @@ struct DashboardDependencyActionBar: View {
       onSelect: onSelectLabel,
       onCustom: onCustomLabel
     )
-    .disabled(items.isEmpty)
+    .disabled(isBusy || items.isEmpty)
 
     DashboardDependencyActionButton(
       title: "Copy Approval Links",
@@ -79,7 +80,7 @@ struct DashboardDependencyActionBar: View {
       DashboardDependencyActionButton(
         title: "Auto", systemImage: "bolt", prominence: .utility, action: onAuto
       )
-      .disabled(!item.canRunAutoMode)
+      .disabled(isBusy || !item.canRunAutoMode)
       DashboardDependencyActionButton(
         title: "Open Pull Request", systemImage: "safari", prominence: .utility, action: onOpenItem
       )
@@ -96,7 +97,7 @@ struct DashboardDependencyActionBar: View {
       DashboardDependencyActionButton(
         title: "Auto", systemImage: "bolt", prominence: .utility, action: onAuto
       )
-      .disabled(!items.contains { $0.canRunAutoMode })
+      .disabled(isBusy || !items.contains { $0.canRunAutoMode })
     }
   }
 }
