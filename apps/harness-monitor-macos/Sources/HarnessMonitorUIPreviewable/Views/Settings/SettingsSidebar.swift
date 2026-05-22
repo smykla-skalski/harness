@@ -11,7 +11,7 @@ public enum SettingsSection: String, CaseIterable, Identifiable, Hashable, Senda
   case connection
   case taskBoard
   case repositories
-  case dependencies
+  case reviews
   case secrets
   case policies
   case codex
@@ -35,7 +35,7 @@ public enum SettingsSection: String, CaseIterable, Identifiable, Hashable, Senda
     case .connection: "Connection"
     case .taskBoard: "Task Board"
     case .repositories: "Repositories"
-    case .dependencies: "Dependencies"
+    case .reviews: "Reviews"
     case .secrets: "Secrets"
     case .policies: "Policies"
     case .codex: "Codex"
@@ -66,7 +66,7 @@ public enum SettingsSection: String, CaseIterable, Identifiable, Hashable, Senda
     case .connection: "bolt.horizontal.circle"
     case .taskBoard: "list.bullet.rectangle"
     case .repositories: "shippingbox.circle"
-    case .dependencies: "shippingbox"
+    case .reviews: "shippingbox"
     case .secrets: "key"
     case .policies: "point.3.connected.trianglepath.dotted"
     case .codex: "terminal"

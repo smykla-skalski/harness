@@ -13,7 +13,7 @@ extension SettingsRepositoriesSection {
     } footer: {
       Text(
         """
-        Older Dependencies settings may still monitor whole organizations. Import them into \
+        Older Reviews settings may still monitor whole organizations. Import them into \
         concrete repository rows when you're ready, or remove them to stop querying that \
         organization.
         """
@@ -26,7 +26,7 @@ extension SettingsRepositoriesSection {
       VStack(alignment: .leading, spacing: 4) {
         Text(organization)
           .font(bodyFont.weight(.semibold))
-        Text("Dependencies still queries this legacy organization until you import or remove it.")
+        Text("Reviews still queries this legacy organization until you import or remove it.")
           .font(HarnessMonitorTextSize.scaledFont(.caption, by: fontScale))
           .foregroundStyle(HarnessMonitorTheme.secondaryInk)
       }
@@ -70,11 +70,11 @@ extension SettingsRepositoriesSection {
 
     do {
       try await ensureTaskBoardSettingsLoaded(forceReload: forceTaskBoardReload)
-      let dependenciesPreferences = DashboardDependenciesPreferences.decode(
-        from: storedDependenciesPreferences
+      let reviewsPreferences = DashboardReviewsPreferences.decode(
+        from: storedReviewsPreferences
       ).normalized()
       draft = SettingsSharedRepositoriesDraft(
-        dependenciesPreferences: dependenciesPreferences,
+        reviewsPreferences: reviewsPreferences,
         taskBoardDraft: taskBoardFormState.draft
       )
       hasLoadedDraft = true
@@ -143,7 +143,7 @@ extension SettingsRepositoriesSection {
     var taskBoardDraft = taskBoardFormState.draft
     taskBoardDraft.githubInboxRepositoriesText = draft.taskBoardRepositories.joined(separator: "\n")
 
-    let dependenciesRepositories = draft.dependenciesRepositories
+    let reviewsRepositories = draft.reviewsRepositories
     let legacyOrganizations = draft.legacyOrganizations
 
     let succeeded = await store.updateTaskBoardGitSettings(
@@ -152,13 +152,13 @@ extension SettingsRepositoriesSection {
     )
     guard succeeded else { return }
 
-    var dependenciesPreferences = DashboardDependenciesPreferences.decode(
-      from: storedDependenciesPreferences
+    var reviewsPreferences = DashboardReviewsPreferences.decode(
+      from: storedReviewsPreferences
     ).normalized()
-    dependenciesPreferences.repositoriesText = dependenciesRepositories.joined(separator: ", ")
-    dependenciesPreferences.organizationsText = legacyOrganizations.joined(separator: ", ")
-    let normalizedPreferences = dependenciesPreferences.normalized()
-    storedDependenciesPreferences = normalizedPreferences.encodedString
+    reviewsPreferences.repositoriesText = reviewsRepositories.joined(separator: ", ")
+    reviewsPreferences.organizationsText = legacyOrganizations.joined(separator: ", ")
+    let normalizedPreferences = reviewsPreferences.normalized()
+    storedReviewsPreferences = normalizedPreferences.encodedString
 
     do {
       let snapshot = try await store.taskBoardGitSettingsSnapshot()
@@ -166,7 +166,7 @@ extension SettingsRepositoriesSection {
       taskBoardFormState.loadError = nil
       taskBoardFormState.hasLoadedSettings = true
       draft = SettingsSharedRepositoriesDraft(
-        dependenciesPreferences: normalizedPreferences,
+        reviewsPreferences: normalizedPreferences,
         taskBoardDraft: taskBoardFormState.draft
       )
       hasLoadedDraft = true
@@ -176,7 +176,7 @@ extension SettingsRepositoriesSection {
       taskBoardFormState.loadError = nil
       taskBoardFormState.hasLoadedSettings = true
       draft = SettingsSharedRepositoriesDraft(
-        dependenciesPreferences: normalizedPreferences,
+        reviewsPreferences: normalizedPreferences,
         taskBoardDraft: taskBoardDraft
       )
       hasLoadedDraft = true

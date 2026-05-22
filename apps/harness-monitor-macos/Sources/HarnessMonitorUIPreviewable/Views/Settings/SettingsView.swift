@@ -145,7 +145,7 @@ private struct SettingsDetailSwitch: View {
     case .general, .focusMode, .banners, .appearance, .markdown, .notifications, .voice,
       .connection:
       primarySectionContent(section)
-    case .taskBoard, .repositories, .dependencies, .secrets:
+    case .taskBoard, .repositories, .reviews, .secrets:
       taskBoardSectionContent(section)
     case .policies, .codex, .mcp, .authorizedFolders:
       integrationSectionContent(section)
@@ -194,8 +194,8 @@ private struct SettingsDetailSwitch: View {
         formState: $taskBoardFormState
       )
       .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-    case .dependencies:
-      SettingsDependenciesSection(navigationRequest: $navigationRequest)
+    case .reviews:
+      SettingsReviewsSection(navigationRequest: $navigationRequest)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     case .secrets:
       SettingsSecretsSection(

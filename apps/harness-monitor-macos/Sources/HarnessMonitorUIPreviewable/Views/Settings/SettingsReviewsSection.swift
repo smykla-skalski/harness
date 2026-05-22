@@ -1,8 +1,8 @@
 import HarnessMonitorKit
 import SwiftUI
 
-struct SettingsDependenciesSection: View {
-  private static let kindDisplayNames: [DependencyUpdateTimelineKind: String] = [
+struct SettingsReviewsSection: View {
+  private static let kindDisplayNames: [ReviewTimelineKind: String] = [
     .issueComment: "Comments",
     .review: "Reviews",
     .reviewThread: "Review threads",
@@ -51,9 +51,9 @@ struct SettingsDependenciesSection: View {
   ]
 
   @Binding var navigationRequest: SettingsNavigationRequest?
-  @AppStorage(DashboardDependenciesPreferences.storageKey)
+  @AppStorage(DashboardReviewsPreferences.storageKey)
   private var storedPreferences = ""
-  @State private var draft = DashboardDependenciesPreferences()
+  @State private var draft = DashboardReviewsPreferences()
   @State private var hasLoadedDraft = false
   @State private var hiddenKindsSearchText = ""
   // Pre-filter via `.onChange(of: hiddenKindsSearchText)` rather than
@@ -61,8 +61,8 @@ struct SettingsDependenciesSection: View {
   // body call burns work that the debounce + cached @State path avoids.
   // ForEach(filteredHiddenKinds, id: \.rawValue) keeps toggle identity
   // stable as the list grows/shrinks with the search query.
-  @State private var filteredHiddenKinds: [DependencyUpdateTimelineKind] =
-    DependencyUpdateTimelineKind.allCases
+  @State private var filteredHiddenKinds: [ReviewTimelineKind] =
+    ReviewTimelineKind.allCases
   @State private var hiddenKindsSearchTask: Task<Void, Never>?
 
   init(navigationRequest: Binding<SettingsNavigationRequest?> = .constant(nil)) {
@@ -75,14 +75,14 @@ struct SettingsDependenciesSection: View {
       behaviorSection
       refreshSection
       Section {
-        SettingsDependenciesFilesSection(draft: $draft)
+        SettingsReviewsFilesSection(draft: $draft)
       } header: {
         Text("Files").harnessNativeFormSectionHeader()
       }
       timelineSection
     }
     .settingsDetailFormStyle()
-    .accessibilityIdentifier(HarnessMonitorAccessibility.settingsDependenciesRoot)
+    .accessibilityIdentifier(HarnessMonitorAccessibility.settingsReviewsRoot)
     .task {
       loadDraftIfNeeded()
     }
@@ -95,10 +95,10 @@ struct SettingsDependenciesSection: View {
     Section {
       monitoredRepositoriesSummary
       TextField("Authors", text: $draft.authorsText)
-        .accessibilityIdentifier(HarnessMonitorAccessibility.settingsDependenciesAuthorsField)
+        .accessibilityIdentifier(HarnessMonitorAccessibility.settingsReviewsAuthorsField)
       TextField("Excluded Repositories", text: $draft.excludeRepositoriesText)
         .accessibilityIdentifier(
-          HarnessMonitorAccessibility.settingsDependenciesExcludedReposField
+          HarnessMonitorAccessibility.settingsReviewsExcludedReposField
         )
       Toggle("Expand organizations to repositories", isOn: $draft.expandOrganizations)
         .accessibilityIdentifier(
@@ -111,7 +111,7 @@ struct SettingsDependenciesSection: View {
       Text(
         """
         Configure shared monitored repositories in Settings > Repositories. Authors and \
-        excluded repositories remain Dependencies-specific. When organization expansion is \
+        excluded repositories remain Reviews-specific. When organization expansion is \
         on, each org resolves to its repositories so per-repo syncs can stagger across the \
         schedule.
         """
@@ -147,10 +147,10 @@ struct SettingsDependenciesSection: View {
       .harnessActionButtonStyle(variant: .bordered, tint: .secondary)
       .fixedSize(horizontal: true, vertical: true)
       .accessibilityIdentifier(
-        HarnessMonitorAccessibility.settingsDependenciesRepositoriesButton
+        HarnessMonitorAccessibility.settingsReviewsRepositoriesButton
       )
     }
-    .accessibilityIdentifier(HarnessMonitorAccessibility.settingsDependenciesRepositoriesSummary)
+    .accessibilityIdentifier(HarnessMonitorAccessibility.settingsReviewsRepositoriesSummary)
   }
 
   private var behaviorSection: some View {
@@ -161,7 +161,7 @@ struct SettingsDependenciesSection: View {
         }
       }
       .pickerStyle(.menu)
-      .accessibilityIdentifier(HarnessMonitorAccessibility.settingsDependenciesMergeMethodField)
+      .accessibilityIdentifier(HarnessMonitorAccessibility.settingsReviewsMergeMethodField)
       Toggle("Show label descriptions in pickers", isOn: $draft.showLabelDescriptions)
         .accessibilityIdentifier(
           HarnessMonitorAccessibility.settingsDepsShowLabelDescriptionsToggle
@@ -243,9 +243,9 @@ struct SettingsDependenciesSection: View {
           guard !Task.isCancelled else { return }
           let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
           if trimmed.isEmpty {
-            filteredHiddenKinds = DependencyUpdateTimelineKind.allCases
+            filteredHiddenKinds = ReviewTimelineKind.allCases
           } else {
-            filteredHiddenKinds = DependencyUpdateTimelineKind.allCases.filter { kind in
+            filteredHiddenKinds = ReviewTimelineKind.allCases.filter { kind in
               kindDisplayName(kind).localizedCaseInsensitiveContains(trimmed)
             }
           }
@@ -257,7 +257,7 @@ struct SettingsDependenciesSection: View {
     } footer: {
       Text(
         """
-        Toggle which GitHub event types appear in the dependency \
+        Toggle which GitHub event types appear in the review \
         PR conversation feed. Stepper bounds: 10–100 in 10-step \
         increments — `Picker(10…100)` would mount 91 rows on \
         Settings open.
@@ -266,7 +266,7 @@ struct SettingsDependenciesSection: View {
     }
   }
 
-  private func kindDisplayName(_ kind: DependencyUpdateTimelineKind) -> String {
+  private func kindDisplayName(_ kind: ReviewTimelineKind) -> String {
     Self.kindDisplayNames[kind] ?? "Unknown event"
   }
 
@@ -278,7 +278,7 @@ struct SettingsDependenciesSection: View {
         minSeconds: Self.minimumDurationSeconds,
         seconds: $draft.perRepositoryIntervalSeconds,
         pickerAccessibilityIdentifier:
-          HarnessMonitorAccessibility.settingsDependenciesPerRepoIntervalField
+          HarnessMonitorAccessibility.settingsReviewsPerRepoIntervalField
       )
       Picker("Max Concurrent Fetches", selection: $draft.maxConcurrentRepositoryFetches) {
         ForEach(Self.maxConcurrentRange, id: \.self) { count in
@@ -287,7 +287,7 @@ struct SettingsDependenciesSection: View {
       }
       .pickerStyle(.menu)
       .accessibilityIdentifier(
-        HarnessMonitorAccessibility.settingsDependenciesMaxConcurrentField
+        HarnessMonitorAccessibility.settingsReviewsMaxConcurrentField
       )
       SettingsDurationPickerRow(
         title: "Cache Max Age",
@@ -295,7 +295,7 @@ struct SettingsDependenciesSection: View {
         minSeconds: Self.minimumDurationSeconds,
         seconds: $draft.cacheMaxAgeSeconds,
         pickerAccessibilityIdentifier:
-          HarnessMonitorAccessibility.settingsDependenciesCacheMaxAgeField
+          HarnessMonitorAccessibility.settingsReviewsCacheMaxAgeField
       )
     } header: {
       Text("Sync Schedule")
@@ -315,20 +315,20 @@ struct SettingsDependenciesSection: View {
   static let cachePresetsSeconds: [UInt64] = [60, 300, 600, 900, 1_800, 3_600, 7_200, 21_600]
   static let maxConcurrentRange = ClosedRange(
     uncheckedBounds: (
-      lower: DashboardDependenciesPreferences.minimumConcurrentRepositoryFetches,
-      upper: DashboardDependenciesPreferences.maximumConcurrentRepositoryFetches
+      lower: DashboardReviewsPreferences.minimumConcurrentRepositoryFetches,
+      upper: DashboardReviewsPreferences.maximumConcurrentRepositoryFetches
     )
   )
   static let timelinePageSizeRange: ClosedRange<Int> = ClosedRange(
     uncheckedBounds: (
-      lower: DashboardDependenciesPreferences.minimumTimelinePageSize,
-      upper: DashboardDependenciesPreferences.maximumTimelinePageSize
+      lower: DashboardReviewsPreferences.minimumTimelinePageSize,
+      upper: DashboardReviewsPreferences.maximumTimelinePageSize
     )
   )
   static let frequentLabelsCountRange = ClosedRange(
     uncheckedBounds: (
-      lower: DashboardDependenciesPreferences.minimumFrequentLabelsCount,
-      upper: DashboardDependenciesPreferences.maximumFrequentLabelsCount
+      lower: DashboardReviewsPreferences.minimumFrequentLabelsCount,
+      upper: DashboardReviewsPreferences.maximumFrequentLabelsCount
     )
   )
 
@@ -347,7 +347,7 @@ struct SettingsDependenciesSection: View {
               title: "Reload",
               tint: .secondary,
               variant: .bordered,
-              accessibilityIdentifier: HarnessMonitorAccessibility.settingsDependenciesReloadButton
+              accessibilityIdentifier: HarnessMonitorAccessibility.settingsReviewsReloadButton
             ) {
               reloadDraft()
             }
@@ -355,7 +355,7 @@ struct SettingsDependenciesSection: View {
               title: "Save",
               tint: nil,
               variant: .prominent,
-              accessibilityIdentifier: HarnessMonitorAccessibility.settingsDependenciesSaveButton
+              accessibilityIdentifier: HarnessMonitorAccessibility.settingsReviewsSaveButton
             ) {
               saveDraft()
             }
@@ -376,7 +376,7 @@ struct SettingsDependenciesSection: View {
   }
 
   private func reloadDraft() {
-    draft = DashboardDependenciesPreferences.decode(from: storedPreferences).normalized()
+    draft = DashboardReviewsPreferences.decode(from: storedPreferences).normalized()
     hasLoadedDraft = true
   }
 

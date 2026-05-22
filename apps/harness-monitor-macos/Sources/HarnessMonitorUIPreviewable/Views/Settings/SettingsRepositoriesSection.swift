@@ -4,8 +4,8 @@ import SwiftUI
 struct SettingsRepositoriesSection: View {
   let store: HarnessMonitorStore
   @Binding var taskBoardFormState: TaskBoardSettingsFormState
-  @AppStorage(DashboardDependenciesPreferences.storageKey)
-  var storedDependenciesPreferences = ""
+  @AppStorage(DashboardReviewsPreferences.storageKey)
+  var storedReviewsPreferences = ""
   @State private var draftStorage = SettingsSharedRepositoriesDraft()
   @State private var isLoadingStorage = false
   @State private var isSavingStorage = false

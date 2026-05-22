@@ -68,7 +68,7 @@ extension TaskBoardOrchestratorWorkflow {
     case .defaultTask: "Default Task"
     case .prFix: "PR Fix"
     case .prReview: "PR Review"
-    case .dependencyUpdate: "Dependency Update"
+    case .review: "Review"
     case .unknown(let raw): raw
     }
   }

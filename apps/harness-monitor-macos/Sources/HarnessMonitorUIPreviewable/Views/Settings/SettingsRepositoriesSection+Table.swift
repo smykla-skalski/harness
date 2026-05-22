@@ -33,7 +33,7 @@ struct RepositoriesMonitoredSection: View {
     } footer: {
       Text(
         """
-        Manage the shared repository scope for Dependencies and Task Board here. Turning both \
+        Manage the shared repository scope for Reviews and Task Board here. Turning both \
         feature toggles off removes the row.
         """
       )
@@ -81,7 +81,7 @@ struct RepositoriesMonitoredSection: View {
         .frame(maxWidth: .infinity, alignment: .leading)
       Text("Repository")
         .frame(maxWidth: .infinity, alignment: .leading)
-      Text("Dependencies")
+      Text("Reviews")
         .frame(width: 116, alignment: .center)
       Text("Task Board")
         .frame(width: 110, alignment: .center)
@@ -115,10 +115,10 @@ struct RepositoriesMonitoredSection: View {
         .textSelection(.enabled)
         .frame(maxWidth: .infinity, alignment: .leading)
       Toggle(
-        "Dependencies",
+        "Reviews",
         isOn: Binding(
-          get: { row.dependenciesEnabled },
-          set: { draft.setDependenciesEnabled($0, for: row.id) }
+          get: { row.reviewsEnabled },
+          set: { draft.setReviewsEnabled($0, for: row.id) }
         )
       )
       .labelsHidden()
