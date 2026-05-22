@@ -28,6 +28,7 @@ public final class SupervisorAuditRetention: @unchecked Sendable {
   private let interval: TimeInterval
   private let tolerance: TimeInterval
   private let identifier: String
+  private let userDefaults: UserDefaults
   private var scheduler: NSBackgroundActivityScheduler?
 
   public init(
@@ -35,13 +36,22 @@ public final class SupervisorAuditRetention: @unchecked Sendable {
     clock: @escaping @Sendable () -> Date = { Date() },
     interval: TimeInterval = defaultCompactionInterval,
     tolerance: TimeInterval = 60 * 60,
-    identifier: String = schedulerIdentifier
+    identifier: String = schedulerIdentifier,
+    userDefaults: UserDefaults = .standard
   ) {
     self.container = container
     self.clock = clock
     self.interval = interval
     self.tolerance = tolerance
     self.identifier = identifier
+    self.userDefaults = userDefaults
+  }
+
+  /// Retention window currently in effect, resolved from `SupervisorSettingsDefaults`
+  /// and clamped to the supported range. Background compaction reads this on every tick
+  /// so preference changes take effect on the next scheduled run without a relaunch.
+  public var configuredRetention: TimeInterval {
+    SupervisorSettingsDefaults.auditRetentionSeconds(from: userDefaults)
   }
 
   public func compactOlderThan(_ age: TimeInterval) async throws -> CompactionResult {
@@ -125,7 +135,7 @@ public final class SupervisorAuditRetention: @unchecked Sendable {
   }
 
   public func forceCompaction() async throws -> CompactionResult {
-    try await compactOlderThan(Self.defaultRetention)
+    try await compactOlderThan(configuredRetention)
   }
 
   private func deleteEvents(before cutoff: Date, in context: ModelContext) throws -> Int {
@@ -182,7 +192,7 @@ public final class SupervisorAuditRetention: @unchecked Sendable {
 
   private var runInBackgroundEnabled: Bool {
     let storedValue =
-      UserDefaults.standard.object(
+      userDefaults.object(
         forKey: SupervisorSettingsDefaults.runInBackgroundKey
       ) as? Bool
     return storedValue ?? SupervisorSettingsDefaults.runInBackgroundDefault
