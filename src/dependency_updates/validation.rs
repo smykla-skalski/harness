@@ -2,8 +2,8 @@ use crate::errors::{CliError, CliErrorKind};
 
 use super::{
     DependencyUpdateTarget, DependencyUpdatesApproveRequest, DependencyUpdatesAutoRequest,
-    DependencyUpdatesBodyRequest, DependencyUpdatesLabelRequest, DependencyUpdatesMergeRequest,
-    DependencyUpdatesQueryRequest, DependencyUpdatesRefreshRequest,
+    DependencyUpdatesBodyRequest, DependencyUpdatesBodyUpdateRequest, DependencyUpdatesLabelRequest,
+    DependencyUpdatesMergeRequest, DependencyUpdatesQueryRequest, DependencyUpdatesRefreshRequest,
     DependencyUpdatesRepositoryCatalogRequest, DependencyUpdatesRerunChecksRequest,
 };
 
@@ -105,6 +105,38 @@ impl DependencyUpdatesBodyRequest {
             return Err(CliErrorKind::workflow_parse(
                 "dependency-updates body request requires a pull request id",
             )
+            .into());
+        }
+        Ok(())
+    }
+}
+
+impl DependencyUpdatesBodyUpdateRequest {
+    /// Validate the pull request body update request.
+    ///
+    /// # Errors
+    /// Returns `CliError` when the pull request id is empty, the expected
+    /// prior-body hash is not a 64-character lowercase hex digest, or the new
+    /// body exceeds `MAX_BODY_BYTES`.
+    pub fn validate(&self) -> Result<(), CliError> {
+        if self.normalized_pull_request_id().is_empty() {
+            return Err(CliErrorKind::workflow_parse(
+                "dependency-updates body update request requires a pull request id",
+            )
+            .into());
+        }
+        let hash = self.normalized_expected_prior_body_sha256();
+        if hash.len() != 64 || !hash.bytes().all(|b| b.is_ascii_hexdigit()) {
+            return Err(CliErrorKind::workflow_parse(
+                "dependency-updates body update request requires a 64-character hex SHA-256",
+            )
+            .into());
+        }
+        if self.new_body.len() > Self::MAX_BODY_BYTES {
+            return Err(CliErrorKind::workflow_parse(format!(
+                "dependency-updates body update exceeds {} byte limit",
+                Self::MAX_BODY_BYTES
+            ))
             .into());
         }
         Ok(())

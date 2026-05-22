@@ -5,9 +5,14 @@ use serde::{Deserialize, Serialize};
 
 use crate::task_board::github::GitHubMergeMethod;
 
+mod body_update;
 mod github;
 mod validation;
 
+pub use body_update::{
+    DependencyUpdatesBodyUpdateOutcome, DependencyUpdatesBodyUpdateRequest,
+    DependencyUpdatesBodyUpdateResponse,
+};
 pub(crate) use github::DependencyUpdatesGitHubClient;
 
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
@@ -102,6 +107,8 @@ pub struct DependencyUpdateCheck {
     pub conclusion: DependencyUpdateCheckConclusion,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub check_suite_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub details_url: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -478,7 +485,11 @@ impl DependencyUpdateTarget {
     #[must_use]
     pub fn is_auto_approvable(&self) -> bool {
         self.check_status == DependencyUpdateCheckStatus::Success
-            && self.review_status == DependencyUpdateReviewStatus::ReviewRequired
+            && matches!(
+                self.review_status,
+                DependencyUpdateReviewStatus::ReviewRequired
+                    | DependencyUpdateReviewStatus::None
+            )
             && self.mergeable != DependencyUpdateMergeableState::Conflicting
     }
 
