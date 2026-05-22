@@ -191,8 +191,9 @@ pub async fn fetch_patches(
     head_ref_oid: &str,
     requested_paths: &[String],
 ) -> Result<Vec<DependencyUpdateFilePatch>, RestFetchError> {
-    let (owner, repo) = split_repo_full_name(repo_full_name)
-        .ok_or_else(|| RestFetchError::InvalidRequest("repo_full_name must be owner/name".into()))?;
+    let (owner, repo) = split_repo_full_name(repo_full_name).ok_or_else(|| {
+        RestFetchError::InvalidRequest("repo_full_name must be owner/name".into())
+    })?;
 
     let mut page = client
         .pulls(&owner, &repo)
