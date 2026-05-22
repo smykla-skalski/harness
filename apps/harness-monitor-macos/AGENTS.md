@@ -203,6 +203,30 @@ sandboxed app can resolve the manifest. The default `HarnessMonitor` scheme
 keeps managed mode enabled and is still the shipping validation lane. Details
 and bridge behavior live in `../../docs/agent-guides/monitor-reference.md`.
 
+## Supervisor audit timeline
+
+A filterable timeline of supervisor audit events with a per-event payload
+inspector and JSONL export. Lives in Settings under Supervisor > Audit, and is
+also reachable via `Cmd+Shift+A` and the "Open in audit timeline" cross-link
+from `DecisionAuditTrailTab`.
+
+The underlying model is `SupervisorEvent` (SwiftData schema V21). Retention is
+configurable via `SupervisorSettingsDefaults.auditRetentionSecondsKey`
+(default 14 days, clamped to 1-90 days); the background scheduler in
+`SupervisorAuditRetention` reads that key when computing the compaction
+cutoff.
+
+Payloads pass through `SupervisorAuditRedactor.redactSupervisorPayloadJSON(_:)`
+before display or export. The redactor masks values of known sensitive keys
+(`token`, `secret`, `password`, `api_key`, `Authorization`, `auth`) and
+provider-token prefixes (`xox`, `ghp_`, `ghs_`, `gho_`, `ghr_`, `sk-`,
+`pat_`). It also backs `redactSupervisorErrorMessage` so error strings and
+inspector payloads stay consistent.
+
+The repository is exposed via `HarnessMonitorStore` (see
+`supervisorAuditRepository`); UI surfaces read events through that accessor
+rather than touching the SwiftData container directly.
+
 ## Preview authoring
 
 All `#Preview` blocks live in `HarnessMonitorUIPreviewable` and render through
