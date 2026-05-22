@@ -1,17 +1,6 @@
 import Foundation
 import Observation
 
-// MARK: - Stub (TEMPORARY — Unit 3 supersedes; coordinator removes during cherry-pick)
-//
-// Unit 3 owns the canonical `auditRetentionSecondsKey` constant on
-// `SupervisorSettingsDefaults`. Until that lands we read and write the same
-// UserDefaults key through this local stub so the audit settings pane has a
-// stable backing key during the batch. The cherry-pick step removes the stub
-// and switches the references below to `SupervisorSettingsDefaults`.
-private enum SettingsSupervisorAuditDefaultsStub {
-  static let auditRetentionSecondsKey = "supervisor.audit.retentionSeconds"
-}
-
 /// View model for the Supervisor Audit settings pane.
 ///
 /// Round-trips the audit retention window through `UserDefaults` so the pane and the
@@ -38,7 +27,7 @@ public final class SettingsSupervisorAuditViewModel: @unchecked Sendable {
   }
 
   static var retentionStorageKey: String {
-    SettingsSupervisorAuditDefaultsStub.auditRetentionSecondsKey
+    SupervisorSettingsDefaults.auditRetentionSecondsKey
   }
 
   private static func normalize(_ value: Double) -> TimeInterval? {
