@@ -38,6 +38,8 @@ public actor WebSocketTransport: HarnessMonitorClientProtocol {
   static let reconnectDelays: [Duration] = [
     .milliseconds(500), .seconds(1), .seconds(2), .seconds(4), .seconds(8),
   ]
+  static let defaultRPCTimeout: Duration = .seconds(120)
+  var rpcTimeout: Duration = WebSocketTransport.defaultRPCTimeout
 
   public init(connection: HarnessMonitorConnection) {
     let configuration = URLSessionConfiguration.default
