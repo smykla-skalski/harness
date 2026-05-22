@@ -60,7 +60,11 @@ func redactSupervisorErrorMessage(_ message: String) -> String {
     return message
   }
 
-  let pattern = #"(?i)\b(token|secret|password|authorization|api[_-]?key)=([^\s,;]+)"#
+  let alternatives = SupervisorAuditSensitiveKeys.names
+    .map(escapeForRegexAlternation)
+    .sorted()
+    .joined(separator: "|")
+  let pattern = "(?i)\\b(\(alternatives))=([^\\s,;]+)"
   guard let regex = try? NSRegularExpression(pattern: pattern) else {
     return message
   }
@@ -69,6 +73,10 @@ func redactSupervisorErrorMessage(_ message: String) -> String {
     in: message,
     options: [],
     range: range,
-    withTemplate: "$1=[redacted]"
+    withTemplate: "$1=\(SupervisorAuditSensitiveKeys.redactionPlaceholder)"
   )
+}
+
+private func escapeForRegexAlternation(_ value: String) -> String {
+  NSRegularExpression.escapedPattern(for: value)
 }
