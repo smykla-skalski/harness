@@ -302,7 +302,7 @@ final class PersistenceOfflineDurabilityXCTests: XCTestCase {
 }
 
 @MainActor
-private func makeV11TranscriptStoreContainer(at url: URL) throws -> ModelContainer {
+func makeV11TranscriptStoreContainer(at url: URL) throws -> ModelContainer {
   let schema = Schema(versionedSchema: HarnessMonitorSchemaV11.self)
   let config = ModelConfiguration("HarnessMonitorStore", schema: schema, url: url)
   return try ModelContainer(for: schema, configurations: [config])
@@ -326,7 +326,7 @@ private func seedV11TranscriptStoreFixture(at url: URL) throws {
   try container.mainContext.save()
 }
 
-private enum HarnessMonitorUnknownModelVersionSchema: VersionedSchema {
+enum HarnessMonitorUnknownModelVersionSchema: VersionedSchema {
   static var versionIdentifier: Schema.Version { Schema.Version(999, 0, 0) }
 
   static var models: [any PersistentModel.Type] {
@@ -335,7 +335,7 @@ private enum HarnessMonitorUnknownModelVersionSchema: VersionedSchema {
 }
 
 @Model
-private final class UnknownCacheRecord {
+final class UnknownCacheRecord {
   var id: String
 
   init(id: String) {

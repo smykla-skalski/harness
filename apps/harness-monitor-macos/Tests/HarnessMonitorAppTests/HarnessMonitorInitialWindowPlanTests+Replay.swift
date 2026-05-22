@@ -237,7 +237,7 @@ extension HarnessMonitorInitialWindowPlanTests {
   }
 
   private struct MixedReplayContext {
-    let replayGroupings: [SessionWindowTabGroupReplayer.Grouping]
+    let replayGroupings: [HarnessMonitorStore.SessionTabGroupSnapshot]
     let registry: SessionWindowAppKitRegistry
     let restoredDashboard: NSWindow
     let restoredSessionA: NSWindow

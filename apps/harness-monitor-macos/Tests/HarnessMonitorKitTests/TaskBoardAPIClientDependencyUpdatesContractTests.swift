@@ -96,7 +96,7 @@ extension TaskBoardAPIClientTests {
     #expect(result.refresh.missingPullRequestIDs == ["pr-42"])
   }
 
-  private func makeClient() throws -> HarnessMonitorAPIClient {
+  func makeClient() throws -> HarnessMonitorAPIClient {
     let configuration = URLSessionConfiguration.ephemeral
     configuration.protocolClasses = [TaskBoardURLProtocol.self]
     let session = URLSession(configuration: configuration)
@@ -109,7 +109,7 @@ extension TaskBoardAPIClientTests {
     )
   }
 
-  private func dependencyUpdatesTarget() -> DependencyUpdateTarget {
+  func dependencyUpdatesTarget() -> DependencyUpdateTarget {
     DependencyUpdateTarget(
       pullRequestID: "pr-42",
       repositoryID: "repo-1",

@@ -75,7 +75,7 @@ struct DependencyUpdatesParityHelperTests {
     #expect(!makeItem(reviewStatus: .approved, checkStatus: .success).isAutoApprovable)
     #expect(
       !makeItem(
-        reviewStatus: .none, checkStatus: .success, mergeable: .conflicting
+        mergeable: .conflicting, reviewStatus: .none, checkStatus: .success
       ).isAutoApprovable
     )
   }

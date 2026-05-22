@@ -14,14 +14,14 @@ struct PersistenceOfflineDurabilityTests {
     previewContainer = try HarnessMonitorModelContainer.preview()
   }
 
-  private func makeStore() -> HarnessMonitorStore {
+  func makeStore() -> HarnessMonitorStore {
     HarnessMonitorStore(
       daemonController: RecordingDaemonController(),
       modelContainer: previewContainer
     )
   }
 
-  private func fetchNotes(
+  func fetchNotes(
     targetId: String,
     sessionId: String
   ) throws -> [UserNote] {
@@ -32,14 +32,14 @@ struct PersistenceOfflineDurabilityTests {
       .sorted { $0.createdAt > $1.createdAt }
   }
 
-  private func fetchRecentSearches() throws -> [RecentSearch] {
+  func fetchRecentSearches() throws -> [RecentSearch] {
     try previewContainer.mainContext.fetch(
       FetchDescriptor<RecentSearch>(
         sortBy: [SortDescriptor(\RecentSearch.lastUsedAt, order: .reverse)]
       ))
   }
 
-  private func makeTaskBoardItem(
+  func makeTaskBoardItem(
     id: String,
     provider: TaskBoardExternalRefProvider,
     externalId: String
@@ -72,7 +72,7 @@ struct PersistenceOfflineDurabilityTests {
     )
   }
 
-  private func makeTaskBoardOrchestratorStatus() -> TaskBoardOrchestratorStatus {
+  func makeTaskBoardOrchestratorStatus() -> TaskBoardOrchestratorStatus {
     TaskBoardOrchestratorStatus(
       enabled: true,
       running: false,
@@ -86,31 +86,31 @@ struct PersistenceOfflineDurabilityTests {
     )
   }
 
-  private func makeV1Container(at url: URL) throws -> ModelContainer {
+  func makeV1Container(at url: URL) throws -> ModelContainer {
     let schema = Schema(versionedSchema: HarnessMonitorSchemaV1.self)
     let config = ModelConfiguration("HarnessMonitorStore", schema: schema, url: url)
     return try ModelContainer(for: schema, configurations: [config])
   }
 
-  private func makeV6Container(at url: URL) throws -> ModelContainer {
+  func makeV6Container(at url: URL) throws -> ModelContainer {
     let schema = Schema(versionedSchema: HarnessMonitorSchemaV6.self)
     let config = ModelConfiguration("HarnessMonitorStore", schema: schema, url: url)
     return try ModelContainer(for: schema, configurations: [config])
   }
 
-  private func makeV11Container(at url: URL) throws -> ModelContainer {
+  func makeV11Container(at url: URL) throws -> ModelContainer {
     let schema = Schema(versionedSchema: HarnessMonitorSchemaV11.self)
     let config = ModelConfiguration("HarnessMonitorStore", schema: schema, url: url)
     return try ModelContainer(for: schema, configurations: [config])
   }
 
-  private func makeUnknownVersionContainer(at url: URL) throws -> ModelContainer {
+  func makeUnknownVersionContainer(at url: URL) throws -> ModelContainer {
     let schema = Schema(versionedSchema: HarnessMonitorUnknownModelVersionSchema.self)
     let config = ModelConfiguration("HarnessMonitorStore", schema: schema, url: url)
     return try ModelContainer(for: schema, configurations: [config])
   }
 
-  private func seedV1Store(
+  func seedV1Store(
     at url: URL,
     metricsData: Data,
     sessionCount: Int = 1
@@ -148,7 +148,7 @@ struct PersistenceOfflineDurabilityTests {
     try container.mainContext.save()
   }
 
-  private func seedV6Store(
+  func seedV6Store(
     at url: URL,
     metricsData: Data
   ) throws {
@@ -187,13 +187,13 @@ struct PersistenceOfflineDurabilityTests {
     try container.mainContext.save()
   }
 
-  private func seedUnknownVersionStore(at url: URL) throws {
+  func seedUnknownVersionStore(at url: URL) throws {
     let container = try makeUnknownVersionContainer(at: url)
     container.mainContext.insert(UnknownCacheRecord(id: "unknown-version-record"))
     try container.mainContext.save()
   }
 
-  private func seedV11TranscriptStore(at url: URL) throws {
+  func seedV11TranscriptStore(at url: URL) throws {
     let container = try makeV11TranscriptStoreContainer(at: url)
     let transcript = HarnessMonitorSchemaV11.CachedSessionTranscriptEntry(
       sessionId: "sess-v11",

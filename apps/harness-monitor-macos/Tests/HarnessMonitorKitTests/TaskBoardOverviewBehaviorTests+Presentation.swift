@@ -250,8 +250,10 @@ extension TaskBoardOverviewBehaviorTests {
     #expect(large.summaryPillHorizontalPadding > regular.summaryPillHorizontalPadding)
     #expect(large.summaryPillVerticalPadding > regular.summaryPillVerticalPadding)
   }
+}
 
-  private func inboxItem(
+extension TaskBoardOverviewBehaviorTests {
+  func inboxItem(
     taskID: String,
     status: TaskStatus = .inProgress
   ) -> TaskBoardInboxItem {
@@ -281,7 +283,7 @@ extension TaskBoardOverviewBehaviorTests {
     return item
   }
 
-  private func taskBoardItem(
+  func taskBoardItem(
     id: String,
     status: TaskBoardStatus,
     priority: TaskBoardPriority = .medium,
@@ -316,7 +318,7 @@ extension TaskBoardOverviewBehaviorTests {
     )
   }
 
-  private func decision(
+  func decision(
     id: String,
     severity: DecisionSeverity,
     statusRaw: String = "open"
