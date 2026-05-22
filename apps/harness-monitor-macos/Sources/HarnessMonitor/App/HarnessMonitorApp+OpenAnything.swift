@@ -42,7 +42,7 @@ extension HarnessMonitorApp {
 struct HarnessMonitorOpenAnythingHostModifier: ViewModifier {
   let windowID: String
   let model: OpenAnythingPaletteModel
-  let dependencyRegistry: OpenAnythingDashboardDependencyRegistry
+  let reviewRegistry: OpenAnythingDashboardReviewRegistry
   let store: HarnessMonitorStore
   let keyWindowObserver: KeyWindowObserver
   let windowNavigationHistory: GlobalWindowNavigationHistory
@@ -94,7 +94,7 @@ struct HarnessMonitorOpenAnythingHostModifier: ViewModifier {
     hashSessions(into: &hasher)
     hashTaskBoard(into: &hasher)
     hashDecisions(into: &hasher)
-    hashDependencies(into: &hasher)
+    hashReviews(into: &hasher)
     hashLoadedSession(into: &hasher)
     return hasher.finalize()
   }
@@ -112,7 +112,7 @@ struct HarnessMonitorOpenAnythingHostModifier: ViewModifier {
         sessions: store.sessions,
         taskBoardItems: store.globalTaskBoardItems,
         decisions: store.supervisorOpenDecisionPresentationItems,
-        dependencies: dependencyRegistry.loadedItems,
+        reviews: reviewRegistry.loadedItems,
         loadedSession: loadedSessionSnapshot,
         showsPolicyCanvasLab: showsPolicyCanvasLab
       )
@@ -154,8 +154,8 @@ struct HarnessMonitorOpenAnythingHostModifier: ViewModifier {
       requestSessionRoute(target)
     case .selectSupervisorDecision(let id):
       store.supervisorSelectedDecisionID = id
-    case .selectDashboardDependency(let pullRequestID):
-      dependencyRegistry.requestSelection(pullRequestID: pullRequestID)
+    case .selectDashboardReview(let pullRequestID):
+      reviewRegistry.requestSelection(pullRequestID: pullRequestID)
     case .presentNewSessionSheet, .presentNewTaskSheet, .attachExternalSession, .refresh,
       .refreshDiagnostics, .reconnectDaemon, .copyDiagnostics:
       break
@@ -321,8 +321,8 @@ struct HarnessMonitorOpenAnythingHostModifier: ViewModifier {
     }
   }
 
-  private func hashDependencies(into hasher: inout Hasher) {
-    for item in dependencyRegistry.loadedItems {
+  private func hashReviews(into hasher: inout Hasher) {
+    for item in reviewRegistry.loadedItems {
       hasher.combine(item.pullRequestID)
       hasher.combine(item.title)
       hasher.combine(item.updatedAt)
