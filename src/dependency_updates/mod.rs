@@ -8,6 +8,7 @@ use crate::task_board::github::GitHubMergeMethod;
 mod body_update;
 pub(crate) mod files;
 mod github;
+pub(crate) mod review_thread_resolve;
 pub(crate) mod timeline;
 mod validation;
 
