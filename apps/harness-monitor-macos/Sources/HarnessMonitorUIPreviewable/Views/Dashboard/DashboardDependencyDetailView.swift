@@ -11,6 +11,12 @@ struct DashboardDependencyDetailView<Actions: View>: View {
   let onRerunCheck: (DependencyUpdateCheck) -> Void
   @ViewBuilder let actionBar: () -> Actions
 
+  @Environment(\.dependenciesPreferences) private var dependenciesPreferences
+
+  private var filesEnabled: Bool {
+    dependenciesPreferences.snapshot.filesEnabled
+  }
+
   init(
     item: DependencyUpdateItem,
     store: HarnessMonitorStore,
@@ -61,6 +67,11 @@ struct DashboardDependencyDetailView<Actions: View>: View {
           )
         }
         .accessibilityIdentifier(HarnessMonitorAccessibility.dashboardDependenciesDescription)
+        if filesEnabled {
+          DashboardDependencyDetailSection(title: "Files") {
+            DashboardDependencyFilesSection(pullRequestID: item.pullRequestID)
+          }
+        }
         DashboardDependencyDetailSection(title: "Checks") {
           DashboardDependencyCheckList(
             checks: item.checks,
