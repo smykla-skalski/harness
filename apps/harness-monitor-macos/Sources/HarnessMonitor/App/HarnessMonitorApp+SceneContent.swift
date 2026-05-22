@@ -44,6 +44,7 @@ extension HarnessMonitorApp {
         perfScenarioFailureReason: perfScenarioFailureReasonBinding
       )
       .harnessTrackMCPWindow()
+      .environment(appStore)
     } else {
       Color.clear.accessibilityHidden(true)
     }
@@ -56,6 +57,7 @@ extension HarnessMonitorApp {
         .modifier(SessionWindowTabbing(role: .dashboard))
         .modifier(DashboardWindowLifecycleModifier())
         .harnessTrackMCPWindow()
+        .environment(appStore)
     } else {
       Color.clear.accessibilityHidden(true)
     }
@@ -74,6 +76,7 @@ extension HarnessMonitorApp {
         navigationRequest: settingsNavigationRequestBinding
       )
       .harnessTrackMCPWindow(tracksElements: false)
+      .environment(appStore)
     } else {
       Color.clear.accessibilityHidden(true)
     }
@@ -89,6 +92,7 @@ extension HarnessMonitorApp {
         themeMode: themeModeBinding
       )
       .harnessTrackMCPWindow()
+      .environment(appStore)
     } else {
       Color.clear.accessibilityHidden(true)
     }
