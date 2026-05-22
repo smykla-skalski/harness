@@ -19,11 +19,9 @@ public enum SupervisorPaneKey: String, CaseIterable, Hashable, Identifiable, Sen
     }
   }
 
-  /// Panes that the toolbar segmented picker should surface today. The `.audit`
-  /// pane is reachable via the cross-link and command shortcut but stays out of
-  /// the live picker until its full content ships from sibling units.
+  /// Panes that the toolbar segmented picker should surface.
   public static let toolbarVisibleCases: [SupervisorPaneKey] = [
-    .rules, .notifications, .background,
+    .rules, .notifications, .background, .audit,
   ]
 }
 
@@ -61,7 +59,7 @@ public struct SettingsSupervisorSection: View {
           }
         )
       case .audit:
-        SettingsSupervisorAuditPane()
+        SettingsSupervisorAuditPane(store: store)
       }
     }
   }
