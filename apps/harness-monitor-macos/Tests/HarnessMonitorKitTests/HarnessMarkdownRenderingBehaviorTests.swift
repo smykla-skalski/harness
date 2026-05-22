@@ -48,23 +48,27 @@ struct HarnessMarkdownRenderingBehaviorTests {
 
   @Test("Markdown alerts render through a dedicated card view")
   func markdownAlertsRenderThroughDedicatedCardView() throws {
-    let source = try readRepositoryFile(
+    let textSource = try readRepositoryFile(
       "apps/harness-monitor-macos/Sources/HarnessMonitorUIPreviewable"
         + "/Views/Shared/HarnessMonitorMarkdownText.swift"
     )
+    let alertSource = try readRepositoryFile(
+      "apps/harness-monitor-macos/Sources/HarnessMonitorUIPreviewable"
+        + "/Views/Shared/HarnessMarkdownAlertView.swift"
+    )
 
-    #expect(source.contains("HarnessMarkdownAlertView"))
-    #expect(source.contains("case .alert(let alert):"))
-    #expect(source.contains("style.colors.alertAccent(for: alert.kind)"))
-    #expect(source.contains("private let accentRuleWidth: CGFloat = 8"))
-    #expect(source.contains("Image(systemName: alert.kind.symbolName)"))
-    #expect(source.contains("HStack(alignment: .top, spacing: cardContentSpacing)"))
-    #expect(source.contains("backgroundGlyph(accent: accent)"))
-    #expect(source.contains(".background(alignment: .bottomTrailing)"))
-    #expect(source.contains(".rotationEffect(.degrees(-8))"))
-    #expect(source.contains("style.spacing.alertBottomMargin"))
-    #expect(!source.contains("iconColumnWidth(metrics: metrics)"))
-    #expect(source.contains(".background(cardBackground(accent: accent))"))
+    #expect(textSource.contains("HarnessMarkdownAlertView"))
+    #expect(textSource.contains("case .alert(let alert):"))
+    #expect(alertSource.contains("style.colors.alertAccent(for: alert.kind)"))
+    #expect(alertSource.contains("private let accentRuleWidth: CGFloat = 8"))
+    #expect(alertSource.contains("Image(systemName: alert.kind.symbolName)"))
+    #expect(alertSource.contains("HStack(alignment: .top, spacing: cardContentSpacing)"))
+    #expect(alertSource.contains("backgroundGlyph(accent: accent)"))
+    #expect(alertSource.contains(".background(alignment: .bottomTrailing)"))
+    #expect(alertSource.contains(".rotationEffect(.degrees(-8))"))
+    #expect(alertSource.contains("style.spacing.alertBottomMargin"))
+    #expect(!alertSource.contains("iconColumnWidth(metrics: metrics)"))
+    #expect(alertSource.contains(".background(cardBackground(accent: accent))"))
   }
 
   @Test("Markdown table renderer keeps content-width columns")
@@ -213,11 +217,11 @@ struct HarnessMarkdownRenderingBehaviorTests {
   func dependencyDescriptionCardOmitsDuplicateTitle() throws {
     let source = try readRepositoryFile(
       "apps/harness-monitor-macos/Sources/HarnessMonitorUIPreviewable"
-        + "/Views/Dashboard/DashboardDependenciesRouteView.swift"
+        + "/Views/Dashboard/DashboardDependencyDetailView.swift"
     )
 
-    #expect(source.contains("detailSection(nil)"))
-    #expect(!source.contains("detailSection(\"Description\")"))
+    #expect(source.contains("DashboardDependencyDetailSection(title: nil)"))
+    #expect(!source.contains("DashboardDependencyDetailSection(title: \"Description\")"))
   }
 
   private func readRepositoryFile(_ relativePath: String) throws -> String {
