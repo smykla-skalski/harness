@@ -60,12 +60,11 @@ extension DashboardDependenciesRouteView {
             repositorySectionHeader(
               group.repository,
               itemCount: group.items.count,
-      busyPullRequestCount: group.items.count {
-        isPullRequestRefreshing($0.pullRequestID)
-      },
-      onRetryRepository: { retryRepositorySync(group.repository) }
-    )
-  }
+              busyPullRequestCount: group.items.count {
+                isPullRequestRefreshing($0.pullRequestID)
+              }
+            )
+          }
         }
       } else {
         ForEach(filteredItems) { item in
@@ -145,6 +144,9 @@ extension DashboardDependenciesRouteView {
         ) {
           dependencyActionBar(items: selectedItems)
         }
+        DashboardDependencyDetailSection(title: nil) {
+          DashboardDependencyBatchEligibilityPreview(items: selectedItems)
+        }
       }
       .frame(maxWidth: dependenciesDetailMaxWidth, alignment: .leading)
       .frame(maxWidth: .infinity, alignment: .center)
@@ -175,7 +177,8 @@ extension DashboardDependenciesRouteView {
       busyPullRequestCount: busyPullRequestCount,
       isCollapsed: routeCollapsedRepositories.contains(repository),
       scheduler: routeScheduler,
-      onToggleCollapse: { toggleRepositoryCollapse(repository) }
+      onToggleCollapse: { toggleRepositoryCollapse(repository) },
+      onRetryRepository: { retryRepositorySync(repository) }
     )
   }
 
@@ -190,7 +193,7 @@ extension DashboardDependenciesRouteView {
       showsDescriptions: normalizedPreferences.showLabelDescriptions,
       isBusy: items.contains { isPullRequestRefreshing($0.pullRequestID) },
       onApprove: { trackInFlight(Task { await approve(items: items) }) },
-      onMerge: { trackInFlight(Task { await merge(items: items) }) },
+      onMerge: { requestMerge(items: items) },
       onRerunChecks: { trackInFlight(Task { await rerunChecks(items: items) }) },
       onRefresh: { refresh(items: items) },
       onSelectLabel: { name in trackInFlight(Task { await addLabel(name, to: items) }) },
@@ -204,7 +207,7 @@ extension DashboardDependenciesRouteView {
         if items.count == 1, let item = items.first {
           trackInFlight(Task { await auto(items: [item]) })
         } else {
-          trackInFlight(Task { await auto(items: items) })
+          requestAuto(items: items)
         }
       },
       onOpenItem: {
