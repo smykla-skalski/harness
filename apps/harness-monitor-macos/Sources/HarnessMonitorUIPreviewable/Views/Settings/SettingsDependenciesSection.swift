@@ -17,6 +17,11 @@ struct SettingsDependenciesSection: View {
       sourceScopeSection
       behaviorSection
       refreshSection
+      Section {
+        SettingsDependenciesFilesSection(draft: $draft)
+      } header: {
+        Text("Files").harnessNativeFormSectionHeader()
+      }
     }
     .settingsDetailFormStyle()
     .accessibilityIdentifier(HarnessMonitorAccessibility.settingsDependenciesRoot)
