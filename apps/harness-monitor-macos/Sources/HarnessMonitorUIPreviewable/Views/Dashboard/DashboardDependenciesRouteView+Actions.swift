@@ -165,7 +165,7 @@ extension DashboardDependenciesRouteView {
 
   func auto(items: [DependencyUpdateItem]) async {
     let actionableItems = items.filter(\.canRunAutoMode)
-    await performMutation("Running auto mode", items: actionableItems) { client in
+    await performMutation("Auto-merging", items: actionableItems) { client in
       try await client.autoDependencyUpdates(
         request: DependencyUpdatesAutoRequest(
           targets: actionableItems.map(\.target),
