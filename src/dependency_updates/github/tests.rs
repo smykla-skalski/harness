@@ -20,6 +20,13 @@ fn scope_query_cap_rejects_broad_cartesian_requests() {
 }
 
 #[test]
+fn normalize_git_blob_base64_strips_github_line_wrapping() {
+    let wrapped = "aGVs\nbG8=\r\n";
+
+    assert_eq!(normalize_git_blob_base64(wrapped), "aGVsbG8=");
+}
+
+#[test]
 fn scopes_keep_dependency_update_searches_author_scoped() {
     let request = DependencyUpdatesQueryRequest {
         authors: vec!["renovate[bot]".into(), "octo-user".into()],

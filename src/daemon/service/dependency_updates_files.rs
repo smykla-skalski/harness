@@ -9,11 +9,11 @@
 //! - `list_dependency_update_local_clones` - Settings-panel listing.
 //! - `delete_dependency_update_local_clone` - Settings-panel deletion.
 //!
-//! The list, viewed, local-clones-list, and local-clones-delete endpoints
-//! are real implementations. The patch and blob endpoints remain shape-
-//! faithful placeholders pending the local-clone git shell-out work +
-//! REST adapter that resolves `(owner, repo, number)` from a node id; both
-//! follow-ups are tracked in the project plan.
+//! The list, patch, viewed, blob, and local-clone endpoints are real
+//! implementations. Patch fetching prefers the local-clone path when the
+//! caller supplies PR ref context and falls back to GitHub REST. Blob fetching
+//! uses GraphQL for text/SVG payloads and falls back to the GitHub git-blob
+//! REST endpoint for binary image bytes.
 
 use std::collections::BTreeMap;
 use std::fs;
@@ -107,11 +107,11 @@ pub async fn list_dependency_update_files(
 
 /// Fetch patches for selected paths in one pull request.
 ///
-/// The current implementation does not yet drive the REST pulls-list-files
-/// path or the local-clone shell-out (both require owner/repo resolution
-/// from the node id and a git binary respectively). Until those land the
-/// handler is a shape-faithful placeholder that surfaces a warning so the
-/// operator can see traffic before the implementation lands.
+/// Uses the local-clone runtime when the request includes repository/ref
+/// context and the selected strategy allows it. If that path is unavailable
+/// or fails, falls back to GitHub REST when `repository_full_name` and the PR
+/// number are present. Missing context returns an empty patch list so older
+/// clients fail closed instead of making an unauthenticated GitHub call.
 ///
 /// # Errors
 /// Returns `CliError` for invalid requests.
@@ -559,11 +559,11 @@ pub async fn mark_dependency_update_files_viewed(
 
 /// Fetch an image blob's bytes for inline preview.
 ///
-/// The real REST adapter that resolves owner/repo from the node id and
-/// fetches `Accept: application/vnd.github.raw` bytes is a follow-up; the
-/// current implementation queries the GraphQL `text` field which covers
-/// SVG and other text-encodable previews. Binary PNG/JPG/GIF bytes return
-/// empty content with `is_too_large = false` and a logged warning.
+/// GraphQL covers text-encodable blobs such as SVG. Binary PNG/JPG/GIF blobs
+/// return `text = null`, so the handler falls back to GitHub's git-blob REST
+/// endpoint using the repository `nameWithOwner` returned by the same GraphQL
+/// query. Blobs over the configured byte cap return an empty body with
+/// `is_too_large = true`.
 ///
 /// # Errors
 /// Returns `CliError` for invalid requests.
@@ -585,17 +585,20 @@ pub async fn fetch_dependency_update_file_blob(
     let mime = crate::dependency_updates::image_mime_for_path(&request.path)
         .unwrap_or(DependencyUpdateImageMime::Png);
     match response {
-        Ok(blob) => Ok(DependencyUpdatesFilesBlobResponse {
-            path: request.path.clone(),
-            oid,
-            mime,
-            content_base64: blob.content_base64,
-            byte_size: blob.byte_size,
-            is_truncated: blob.is_truncated,
-            is_too_large: blob.is_too_large,
-            fetched_at: utc_now(),
-            rate_limit_snapshot: None,
-        }),
+        Ok(blob) => {
+            let blob = fetch_binary_blob_when_needed(&client, blob, &oid).await;
+            Ok(DependencyUpdatesFilesBlobResponse {
+                path: request.path.clone(),
+                oid,
+                mime,
+                content_base64: blob.content_base64,
+                byte_size: blob.byte_size,
+                is_truncated: blob.is_truncated,
+                is_too_large: blob.is_too_large,
+                fetched_at: utc_now(),
+                rate_limit_snapshot: None,
+            })
+        }
         Err(error) => {
             tracing::warn!(
                 target = "harness::dependency_updates::files",
@@ -615,6 +618,40 @@ pub async fn fetch_dependency_update_file_blob(
                 fetched_at: utc_now(),
                 rate_limit_snapshot: None,
             })
+        }
+    }
+}
+
+async fn fetch_binary_blob_when_needed(
+    client: &DependencyUpdatesGitHubClient,
+    blob: BlobTextProjection,
+    oid: &str,
+) -> BlobTextProjection {
+    if !blob.content_base64.is_empty() || blob.byte_size == 0 || blob.is_too_large {
+        return blob;
+    }
+    let Some(repo_full_name) = blob.repository_full_name.as_deref() else {
+        tracing::warn!(
+            target = "harness::dependency_updates::files",
+            oid = oid,
+            "binary blob fallback skipped because repository nameWithOwner was missing"
+        );
+        return blob;
+    };
+    match client
+        .fetch_repository_blob_base64(repo_full_name, oid)
+        .await
+    {
+        Ok(rest_blob) => rest_blob,
+        Err(error) => {
+            tracing::warn!(
+                target = "harness::dependency_updates::files",
+                oid = oid,
+                repo = repo_full_name,
+                error = %error,
+                "binary blob fallback failed"
+            );
+            blob
         }
     }
 }
@@ -757,6 +794,8 @@ fn missing_token_error(repository: Option<&str>) -> CliError {
 /// uniformly.
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
 pub(crate) struct BlobTextProjection {
+    #[serde(default)]
+    pub repository_full_name: Option<String>,
     pub content_base64: String,
     pub byte_size: u64,
     pub is_truncated: bool,
@@ -807,7 +846,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn patch_placeholder_returns_empty_patches_under_drift() {
+    async fn patch_request_returns_empty_patches_when_context_is_missing() {
         let request = DependencyUpdatesFilesPatchRequest {
             pull_request_id: "PR_1".into(),
             head_ref_oid_expected: "abc".into(),
