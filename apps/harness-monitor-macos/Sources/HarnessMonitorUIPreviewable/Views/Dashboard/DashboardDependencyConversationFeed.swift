@@ -55,9 +55,12 @@ struct DashboardDependencyConversationFeed: View {
         composer(viewModel)
       }
     }
-    .task(id: item.pullRequestID) {
+    .task(id: loadKey(preferences)) {
       guard preferences.showActivityTimeline else { return }
-      await store.prepareDependencyUpdateTimeline(for: item)
+      await store.prepareDependencyUpdateTimeline(
+        for: item,
+        pageSize: preferences.normalizedTimelineInitialPageSize
+      )
     }
     .task(id: rebuildKey(viewModel, preferences: preferences)) {
       guard preferences.showActivityTimeline else {
@@ -112,7 +115,12 @@ struct DashboardDependencyConversationFeed: View {
       )
       if viewModel.hasOlder {
         Button("Load older") {
-          Task { await store.loadOlderDependencyUpdateTimeline(for: item) }
+          Task {
+            await store.loadOlderDependencyUpdateTimeline(
+              for: item,
+              pageSize: decodedPreferences().normalizedTimelineLoadOlderBatchSize
+            )
+          }
         }
         .buttonStyle(.borderless)
         .disabled(viewModel.loadState == .loadingOlder)
@@ -141,7 +149,22 @@ struct DashboardDependencyConversationFeed: View {
   ) -> String {
     let zone = dateTimeConfiguration.customTimeZoneIdentifier
     let cursor = viewModel.startCursor ?? ""
-    return "\(viewModel.entries.count):\(cursor):\(zone):\(preferences.timelineHiddenKindsRaw)"
+    return [
+      "\(viewModel.revision)",
+      cursor,
+      zone,
+      preferences.timelineHiddenKindsRaw,
+      preferences.showActivityTimeline.description,
+      preferences.timelineAutoCollapseHeavyReviewThreads.description,
+    ].joined(separator: ":")
+  }
+
+  private func loadKey(_ preferences: DashboardDependenciesPreferences) -> String {
+    [
+      item.pullRequestID,
+      preferences.showActivityTimeline.description,
+      "\(preferences.normalizedTimelineInitialPageSize)",
+    ].joined(separator: ":")
   }
 
   private func rebuildRows(
@@ -153,15 +176,24 @@ struct DashboardDependencyConversationFeed: View {
     let entries = viewModel.entries
     let configuration = dateTimeConfiguration
     let hiddenKinds = preferences.timelineHiddenKinds
+    let autoCollapseHeavyReviewThreads = preferences.timelineAutoCollapseHeavyReviewThreads
+    let nodeInterval = DependencyTimelinePerf.beginNodeBuild(
+      entries: entries.count,
+      hiddenKinds: hiddenKinds.count
+    )
     let nodes = await Task.detached(priority: .userInitiated) { () -> [SessionTimelineNode] in
       DependencyPullRequestTimelineNodeBuilder().buildNodes(
         for: entries,
         pullRequestID: "",
         hiddenKinds: hiddenKinds,
+        autoCollapseHeavyReviewThreads: autoCollapseHeavyReviewThreads,
         configuration: configuration
       )
     }.value
+    DependencyTimelinePerf.end(nodeInterval)
     guard !Task.isCancelled, generation == snapshot else { return }
+    let presentationInterval = DependencyTimelinePerf.beginPresentationRebuild(nodes: nodes.count)
+    defer { DependencyTimelinePerf.end(presentationInterval) }
     let computed = SessionTimelineRow.rows(for: nodes, configuration: configuration)
     rows = computed
   }

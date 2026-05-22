@@ -302,7 +302,19 @@ struct DashboardDependenciesPreferences: Codable, Equatable {
       max(frequentLabelsCount, Self.minimumFrequentLabelsCount),
       Self.maximumFrequentLabelsCount
     )
+    copy.timelineInitialPageSize = Self.normalizedTimelinePageSize(timelineInitialPageSize)
+    copy.timelineLoadOlderBatchSize = Self.normalizedTimelinePageSize(
+      timelineLoadOlderBatchSize
+    )
     return copy
+  }
+
+  var normalizedTimelineInitialPageSize: UInt32 {
+    UInt32(Self.normalizedTimelinePageSize(timelineInitialPageSize))
+  }
+
+  var normalizedTimelineLoadOlderBatchSize: UInt32 {
+    UInt32(Self.normalizedTimelinePageSize(timelineLoadOlderBatchSize))
   }
 
   static func decode(from string: String) -> Self {
@@ -336,6 +348,10 @@ struct DashboardDependenciesPreferences: Codable, Equatable {
 
   private static func normalizedText(_ text: String) -> String {
     normalizedEntries(text).joined(separator: ", ")
+  }
+
+  private static func normalizedTimelinePageSize(_ pageSize: Int) -> Int {
+    min(max(pageSize, minimumTimelinePageSize), maximumTimelinePageSize)
   }
 
   private static func normalizedEntries(_ text: String) -> [String] {
