@@ -67,7 +67,11 @@ struct DashboardDependencyCheckList: View {
       }
       .disabled(problemCheckURLs.isEmpty)
       .controlSize(.small)
-      .help(problemCheckURLs.isEmpty ? "No failing check URLs are available" : "Copy failing check URLs")
+      .help(
+        problemCheckURLs.isEmpty
+          ? "No failing check URLs are available"
+          : "Copy failing check URLs"
+      )
     }
   }
 
