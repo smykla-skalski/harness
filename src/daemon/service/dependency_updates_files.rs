@@ -1032,6 +1032,14 @@ mod tests {
         }
     }
 
+    fn make_registry_entry(
+        bare_path: &std::path::Path,
+        repo_full_name: &str,
+        size_bytes: u64,
+    ) -> crate::dependency_updates::RegistryEntry {
+        gc_registry_entry(repo_full_name, bare_path.to_path_buf(), size_bytes)
+    }
+
     #[tokio::test]
     async fn gc_drops_stale_entries_and_removes_bare_dirs() {
         use crate::dependency_updates::files::local_clone::RepoKey;
@@ -1096,9 +1104,7 @@ mod tests {
         // Oldest-by-last_used should be evicted first.
         let now = chrono::Utc::now();
         let mut registry = LocalCloneRegistry::default();
-        let keys: Vec<RepoKey> = (0..3)
-            .map(|i| RepoKey::new(format!("o/r{i}")))
-            .collect();
+        let keys: Vec<RepoKey> = (0..3).map(|i| RepoKey::new(format!("o/r{i}"))).collect();
         for (i, key) in keys.iter().enumerate() {
             let dir = root.path.join(format!("r{i}.git"));
             std::fs::create_dir_all(&dir).expect("mkdir");
@@ -1112,21 +1118,16 @@ mod tests {
 
         // Budget = 1500 bytes, but we have 3 × 1000 = 3000.
         // Two oldest must be evicted.
-        let report = run_local_clone_gc_with(
-            &root,
-            now,
-            chrono::Duration::days(30),
-            1_500,
-        )
-        .await
-        .expect("gc");
+        let report = run_local_clone_gc_with(&root, now, chrono::Duration::days(30), 1_500)
+            .await
+            .expect("gc");
         assert_eq!(report.targets, 2, "two LRU evictions");
         assert_eq!(report.removed, 2, "two bare dirs removed");
         assert_eq!(report.bytes_freed, 2_000, "2 × 1000 bytes freed");
         let reloaded = load_registry(&root).expect("reload");
         assert_eq!(reloaded.entries.len(), 1);
         // The newest survives (last index in our setup).
-        assert!(reloaded.entries.contains_key(&keys[0]));
+        assert!(reloaded.entries.contains_key(&keys[2]));
     }
 
     #[tokio::test]
@@ -1155,20 +1156,14 @@ mod tests {
         // registry row + count it as removed.
         let mut registry = LocalCloneRegistry::default();
         let now = chrono::Utc::now();
-        let mut entry =
-            make_registry_entry(&root.path.join("missing.git"), "o/ghost", 500);
+        let mut entry = make_registry_entry(&root.path.join("missing.git"), "o/ghost", 500);
         entry.last_used_at = now - chrono::Duration::days(60);
         registry.insert_or_update(RepoKey::new("o/ghost"), entry);
         save_registry(&root, &registry).expect("save");
 
-        let report = run_local_clone_gc_with(
-            &root,
-            now,
-            chrono::Duration::days(30),
-            u64::MAX,
-        )
-        .await
-        .expect("gc");
+        let report = run_local_clone_gc_with(&root, now, chrono::Duration::days(30), u64::MAX)
+            .await
+            .expect("gc");
         assert_eq!(report.targets, 1);
         assert_eq!(report.removed, 1);
         // bytes_freed = 0 because no actual filesystem removal happened.
