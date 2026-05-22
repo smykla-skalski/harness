@@ -74,7 +74,7 @@ pub enum TaskBoardOrchestratorWorkflow {
     DefaultTask,
     PrFix,
     PrReview,
-    DependencyUpdate,
+    Review,
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
@@ -222,7 +222,7 @@ fn default_enabled_workflows() -> Vec<TaskBoardOrchestratorWorkflow> {
         TaskBoardOrchestratorWorkflow::DefaultTask,
         TaskBoardOrchestratorWorkflow::PrFix,
         TaskBoardOrchestratorWorkflow::PrReview,
-        TaskBoardOrchestratorWorkflow::DependencyUpdate,
+        TaskBoardOrchestratorWorkflow::Review,
     ]
 }
 
