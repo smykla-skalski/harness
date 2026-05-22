@@ -3,12 +3,12 @@ import SwiftData
 
 /// Persisted `viewerViewedState` for a single (pullRequestID, headRefOid,
 /// path) cell. Keeping this in its own table (rather than as a column on
-/// `CachedDependencyUpdateFile`) lets the daemon refresh the file list
+/// `CachedReviewFile`) lets the daemon refresh the file list
 /// without overwriting an in-flight mark-viewed mutation.
 @Model
-public final class CachedDependencyUpdateFileViewedState {
-  #Unique<CachedDependencyUpdateFileViewedState>([\.compoundKey])
-  #Index<CachedDependencyUpdateFileViewedState>(
+public final class CachedReviewFileViewedState {
+  #Unique<CachedReviewFileViewedState>([\.compoundKey])
+  #Index<CachedReviewFileViewedState>(
     [\.compoundKey],
     [\.pullRequestID, \.headRefOid],
     [\.updatedAt]
@@ -45,7 +45,7 @@ public final class CachedDependencyUpdateFileViewedState {
     headRefOid: String,
     path: String
   ) -> String {
-    CachedDependencyUpdateFile.makeCompoundKey(
+    CachedReviewFile.makeCompoundKey(
       pullRequestID: pullRequestID,
       headRefOid: headRefOid,
       path: path

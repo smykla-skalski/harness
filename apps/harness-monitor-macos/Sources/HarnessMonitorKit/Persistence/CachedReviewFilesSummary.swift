@@ -4,12 +4,12 @@ import SwiftData
 /// Summary row for the cached PR-files metadata fetched by the daemon. One
 /// row per pull request id; updating on a new `headRefOid` overwrites the
 /// existing row and the per-file detail rows get rewritten in
-/// `DependencyUpdateFilesCache`. The summary captures aggregate counts so
+/// `ReviewFilesCache`. The summary captures aggregate counts so
 /// header widgets can render without iterating all per-file rows.
 @Model
-public final class CachedDependencyUpdateFilesSummary {
-  #Unique<CachedDependencyUpdateFilesSummary>([\.pullRequestID])
-  #Index<CachedDependencyUpdateFilesSummary>(
+public final class CachedReviewFilesSummary {
+  #Unique<CachedReviewFilesSummary>([\.pullRequestID])
+  #Index<CachedReviewFilesSummary>(
     [\.pullRequestID],
     [\.pullRequestID, \.headRefOid],
     [\.fetchedAt]
