@@ -94,15 +94,18 @@ private struct DashboardDependenciesRepositoryHeaderPill: View {
 struct DashboardDependenciesDescriptionView: View {
   let store: HarnessMonitorStore
   let pullRequestID: String
+  let viewerCanUpdate: Bool
   let onCheckboxError: ((String) -> Void)?
 
   init(
     store: HarnessMonitorStore,
     pullRequestID: String,
+    viewerCanUpdate: Bool = true,
     onCheckboxError: ((String) -> Void)? = nil
   ) {
     self.store = store
     self.pullRequestID = pullRequestID
+    self.viewerCanUpdate = viewerCanUpdate
     self.onCheckboxError = onCheckboxError
   }
 
@@ -113,11 +116,13 @@ struct DashboardDependenciesDescriptionView: View {
         Text("No description")
           .foregroundStyle(HarnessMonitorTheme.secondaryInk)
           .scaledFont(.callout)
-      } else {
+      } else if viewerCanUpdate {
         HarnessMonitorMarkdownText(body, textSelection: .enabled)
           .markdownCheckboxToggle { offset, newValue in
             toggleCheckbox(currentBody: body, offset: offset, newValue: newValue)
           }
+      } else {
+        HarnessMonitorMarkdownText(body, textSelection: .enabled)
       }
     case .failed(let message):
       Text(message)

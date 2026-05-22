@@ -176,6 +176,7 @@ pub(super) fn convert_node(
         deletions: node.deletions.max(0).cast_unsigned(),
         created_at,
         updated_at,
+        viewer_can_update: node.viewer_can_update.unwrap_or(true),
     };
     let continuation = NodeContinuation {
         pull_request_id,

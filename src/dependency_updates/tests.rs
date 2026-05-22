@@ -32,6 +32,7 @@ fn sample_item(
         updated_at: DateTime::parse_from_rfc3339("2026-05-20T12:00:00Z")
             .expect("date")
             .with_timezone(&Utc),
+        viewer_can_update: true,
     }
 }
 
@@ -197,6 +198,32 @@ fn auto_mergeable_accepts_unreviewed_open_prs() {
     assert!(!unreviewed_conflicting.is_ready_to_merge());
     assert!(!unreviewed_policy_blocked.is_ready_to_merge());
     assert!(!changes_requested.is_ready_to_merge());
+}
+
+#[test]
+fn auto_approvable_accepts_unreviewed_open_prs() {
+    let no_review = sample_item(
+        DependencyUpdateReviewStatus::None,
+        DependencyUpdateCheckStatus::Success,
+        DependencyUpdateMergeableState::Mergeable,
+        false,
+    );
+    let no_review_failing_checks = sample_item(
+        DependencyUpdateReviewStatus::None,
+        DependencyUpdateCheckStatus::Failure,
+        DependencyUpdateMergeableState::Mergeable,
+        false,
+    );
+    let already_approved = sample_item(
+        DependencyUpdateReviewStatus::Approved,
+        DependencyUpdateCheckStatus::Success,
+        DependencyUpdateMergeableState::Mergeable,
+        false,
+    );
+
+    assert!(no_review.is_auto_approvable());
+    assert!(!no_review_failing_checks.is_auto_approvable());
+    assert!(!already_approved.is_auto_approvable());
 }
 
 #[test]

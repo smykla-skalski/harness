@@ -73,6 +73,8 @@ pub(super) struct SearchNode {
     pub(super) created_at: String,
     #[serde(rename = "updatedAt")]
     pub(super) updated_at: String,
+    #[serde(rename = "viewerCanUpdate", default)]
+    pub(super) viewer_can_update: Option<bool>,
 }
 
 #[derive(Debug, Deserialize)]
