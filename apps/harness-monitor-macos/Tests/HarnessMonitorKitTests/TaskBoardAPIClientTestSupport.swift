@@ -157,6 +157,7 @@ final class TaskBoardURLProtocol: URLProtocol, @unchecked Sendable {
       sampleDepsCacheClearResponseText,
     Route("/v1/dependency-updates/refresh"): sampleDependencyRefreshResponseText,
     Route("/v1/dependency-updates/comment"): sampleDependencyCommentResponseText,
+    Route("/v1/dependency-updates/timeline"): sampleDependencyTimelineResponseText,
   ]
 
   static var records: [RecordedRequest] {

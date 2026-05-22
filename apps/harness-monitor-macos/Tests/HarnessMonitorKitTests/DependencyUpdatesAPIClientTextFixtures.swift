@@ -223,3 +223,31 @@ let sampleDependencyCommentResponseText =
     ]
   }
   """
+
+let sampleDependencyTimelineResponseText =
+  """
+  {
+    "pull_request_id": "pr-42",
+    "entries": [
+      {
+        "kind": "issue_comment",
+        "id": "IC_001",
+        "created_at": "2026-05-22T10:00:00Z",
+        "body": "ship it",
+        "is_minimized": false,
+        "reactions_total": 0,
+        "viewer_did_author": false,
+        "viewer_can_edit": false,
+        "author": { "login": "alice", "avatarUrl": null }
+      }
+    ],
+    "page_info": {
+      "start_cursor": "start",
+      "end_cursor": "end",
+      "has_older": true,
+      "has_newer": false
+    },
+    "viewer_can_comment": true,
+    "fetched_at": "2026-05-22T15:00:00Z"
+  }
+  """

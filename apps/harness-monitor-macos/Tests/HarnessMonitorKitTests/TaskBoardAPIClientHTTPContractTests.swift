@@ -208,6 +208,15 @@ extension TaskBoardAPIClientTests {
         body: "@renovatebot rebase"
       )
     )
+    let timeline = try await client.fetchDependencyUpdateTimeline(
+      request: DependencyUpdatesTimelineRequest(
+        pullRequestId: target.pullRequestID,
+        cursor: nil,
+        pageSize: 50,
+        direction: .older,
+        forceRefresh: false
+      )
+    )
 
     return DependencyUpdatesHTTPContractResult(
       repositoryCatalog: repositoryCatalog,
@@ -221,7 +230,8 @@ extension TaskBoardAPIClientTests {
       auto: auto,
       cacheClear: cacheClear,
       refresh: refresh,
-      comment: comment
+      comment: comment,
+      timeline: timeline
     )
   }
 

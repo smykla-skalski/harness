@@ -118,6 +118,12 @@ extension HarnessMonitorAPIClient {
       body: body
     )
   }
+
+  public func fetchDependencyUpdateTimeline(
+    request: DependencyUpdatesTimelineRequest
+  ) async throws -> DependencyUpdatesTimelineResponse {
+    try await post("/v1/dependency-updates/timeline", body: request)
+  }
 }
 
 /// Empty request body for listing local clones. The daemon does not need
