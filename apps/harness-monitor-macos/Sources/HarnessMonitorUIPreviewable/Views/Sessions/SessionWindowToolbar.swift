@@ -129,44 +129,46 @@ struct SessionWindowToolbar: ToolbarContent {
   }
 
   var body: some ToolbarContent {
-    WindowHistoryToolbarItems(
-      navigation: navigation,
-      backAccessibilityIdentifier:
-        HarnessMonitorAccessibility.sessionNavigateBackButton,
-      forwardAccessibilityIdentifier:
-        HarnessMonitorAccessibility.sessionNavigateForwardButton,
-      shortcutOverlay: historyShortcutOverlay
-    )
-
-    ToolbarItem(placement: .automatic) {
-      Button {
-        toggleFocusMode()
-      } label: {
-        Label {
-          Text(focusMode ? "Exit focus mode" : "Enter focus mode")
-        } icon: {
-          Image(systemName: focusMode ? "moon.fill" : "moon")
-            .frame(width: 14, height: 14)
+    HarnessMonitorWindowToolbar {
+      WindowHistoryToolbarItems(
+        navigation: navigation,
+        backAccessibilityIdentifier:
+          HarnessMonitorAccessibility.sessionNavigateBackButton,
+        forwardAccessibilityIdentifier:
+          HarnessMonitorAccessibility.sessionNavigateForwardButton,
+        shortcutOverlay: historyShortcutOverlay
+      )
+    } automatic: {
+      ToolbarItem(placement: .automatic) {
+        Button {
+          toggleFocusMode()
+        } label: {
+          Label {
+            Text(focusMode ? "Exit focus mode" : "Enter focus mode")
+          } icon: {
+            Image(systemName: focusMode ? "moon.fill" : "moon")
+              .frame(width: 14, height: 14)
+          }
         }
+        .help(focusMode ? "Exit focus mode" : "Enter focus mode")
+        .accessibilityLabel("Focus mode")
+        .accessibilityValue(focusMode ? "On" : "Off")
+        .accessibilityHint("Shows or hides secondary session columns.")
+        .harnessMCPButton(
+          HarnessMonitorAccessibility.sessionWindowFocusModeButton,
+          label: "Focus mode",
+          value: focusMode ? "On" : "Off",
+          hint: "Shows or hides secondary session columns",
+          pressAction: { toggleFocusMode() }
+        )
       }
-      .help(focusMode ? "Exit focus mode" : "Enter focus mode")
-      .accessibilityLabel("Focus mode")
-      .accessibilityValue(focusMode ? "On" : "Off")
-      .accessibilityHint("Shows or hides secondary session columns.")
-      .harnessMCPButton(
-        HarnessMonitorAccessibility.sessionWindowFocusModeButton,
-        label: "Focus mode",
-        value: focusMode ? "On" : "Off",
-        hint: "Shows or hides secondary session columns",
-        pressAction: { toggleFocusMode() }
-      )
-    }
-
-    ToolbarItem(placement: .primaryAction) {
-      SleepPreventionToolbarButton(
-        store: store,
-        presentation: model.sleepPreventionPresentation
-      )
+    } primaryAction: {
+      ToolbarItem(placement: .primaryAction) {
+        SleepPreventionToolbarButton(
+          store: store,
+          presentation: model.sleepPreventionPresentation
+        )
+      }
     }
   }
 
