@@ -2,9 +2,9 @@ import Foundation
 import SwiftData
 
 @Model
-public final class CachedDependencyLabelUsage {
-  #Unique<CachedDependencyLabelUsage>([\.compoundKey])
-  #Index<CachedDependencyLabelUsage>(
+public final class CachedReviewLabelUsage {
+  #Unique<CachedReviewLabelUsage>([\.compoundKey])
+  #Index<CachedReviewLabelUsage>(
     [\.compoundKey],
     [\.repository],
     [\.repository, \.usageCount],

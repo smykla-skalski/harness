@@ -5,9 +5,9 @@ import SwiftData
 /// embeds `pullRequestID + headRefOid + path` so a force-push that flips the
 /// head OID writes a fresh row set without colliding with the prior state.
 @Model
-public final class CachedDependencyUpdateFile {
-  #Unique<CachedDependencyUpdateFile>([\.compoundKey])
-  #Index<CachedDependencyUpdateFile>(
+public final class CachedReviewFile {
+  #Unique<CachedReviewFile>([\.compoundKey])
+  #Index<CachedReviewFile>(
     [\.compoundKey],
     [\.pullRequestID, \.headRefOid],
     [\.path]

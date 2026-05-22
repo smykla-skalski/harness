@@ -2,9 +2,9 @@ import Foundation
 import SwiftData
 
 @Model
-public final class CachedDependencyUpdatesRepoSyncState {
-  #Unique<CachedDependencyUpdatesRepoSyncState>([\.compoundKey])
-  #Index<CachedDependencyUpdatesRepoSyncState>(
+public final class CachedReviewsRepoSyncState {
+  #Unique<CachedReviewsRepoSyncState>([\.compoundKey])
+  #Index<CachedReviewsRepoSyncState>(
     [\.compoundKey],
     [\.preferencesHash],
     [\.preferencesHash, \.lastSyncedAt]
