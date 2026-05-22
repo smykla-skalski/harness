@@ -70,6 +70,7 @@ gix = { version = "0.83.0", features = [
     "index",
     "blocking-http-transport-reqwest-rust-tls",
 ] }
+http-body-util = "0.1"
 pathdiff = "0.2.3"
 gray_matter = { version = "0.3.2", default-features = false, features = ["yaml"] }
 tar = "0.4.44"
