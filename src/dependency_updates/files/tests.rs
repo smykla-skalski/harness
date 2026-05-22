@@ -177,6 +177,10 @@ fn files_list_response_serializes_round_trip() {
     let response = DependencyUpdatesFilesListResponse {
         pull_request_id: "PR_kwDOABC".into(),
         head_ref_oid: "abc123".into(),
+        head_ref_name: Some("renovate/foo".into()),
+        base_ref_oid: Some("def456".into()),
+        base_ref_name: Some("main".into()),
+        repository_full_name: Some("owner/repo".into()),
         viewer_can_mark_viewed: true,
         files: vec![DependencyUpdateFile {
             path: "src/lib.rs".into(),
@@ -226,6 +230,10 @@ fn files_list_response_pagination_partial_survives_round_trip() {
     let response = DependencyUpdatesFilesListResponse {
         pull_request_id: "PR_1".into(),
         head_ref_oid: "abc".into(),
+        head_ref_name: None,
+        base_ref_oid: None,
+        base_ref_name: None,
+        repository_full_name: None,
         viewer_can_mark_viewed: true,
         files: vec![],
         fetched_at: "2026-05-22T10:00:00Z".into(),
@@ -254,6 +262,10 @@ fn files_list_response_omits_none_rate_limit() {
     let response = DependencyUpdatesFilesListResponse {
         pull_request_id: "PR_1".into(),
         head_ref_oid: "abc".into(),
+        head_ref_name: None,
+        base_ref_oid: None,
+        base_ref_name: None,
+        repository_full_name: None,
         viewer_can_mark_viewed: true,
         files: vec![],
         fetched_at: "2026-05-22T10:00:00Z".into(),
@@ -262,4 +274,27 @@ fn files_list_response_omits_none_rate_limit() {
     };
     let json = serde_json::to_value(&response).expect("serialize");
     assert!(json.get("rate_limit_snapshot").is_none());
+}
+
+#[test]
+fn files_list_response_back_compat_decode_without_new_fields() {
+    // Older daemon responses (or downgraded daemons) don't carry the
+    // new head_ref_name / base_ref_oid / base_ref_name /
+    // repository_full_name fields. Make sure they still decode and the
+    // fields default to None so the patch handler can still take the
+    // REST fallback path without crashing.
+    let json = r#"{
+        "pull_request_id": "PR_1",
+        "head_ref_oid": "abc",
+        "viewer_can_mark_viewed": true,
+        "files": [],
+        "fetched_at": "2026-05-22T10:00:00Z",
+        "pagination_complete": true
+    }"#;
+    let parsed: DependencyUpdatesFilesListResponse =
+        serde_json::from_str(json).expect("deserialize");
+    assert_eq!(parsed.head_ref_name, None);
+    assert_eq!(parsed.base_ref_oid, None);
+    assert_eq!(parsed.base_ref_name, None);
+    assert_eq!(parsed.repository_full_name, None);
 }

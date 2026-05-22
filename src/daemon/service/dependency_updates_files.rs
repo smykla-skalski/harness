@@ -139,6 +139,7 @@ pub async fn patch_dependency_update_files(
             &token,
             &request.head_ref_oid_expected,
             base_oid,
+            request.head_ref_name.as_deref(),
             &request.normalized_paths(),
         )
         .await
@@ -177,13 +178,26 @@ async fn run_local_clone_patch(
     token: &str,
     head_ref_oid: &str,
     base_oid: &str,
+    head_ref_name: Option<&str>,
     paths: &[String],
 ) -> Result<DependencyUpdatesFilesPatchResponse, CliError> {
     let runtime = local_clone_runtime();
     let sink = progress_sink();
-    let head_ref_name = format!("refs/heads/{}", default_head_ref_branch());
+    // Prefer the explicit PR head ref name when supplied; fall back to
+    // `refs/heads/main` as a sensible default. The fallback only matters
+    // for clients that haven't been updated to plumb the new field.
+    let ref_qualified = match head_ref_name {
+        Some(name) if name.starts_with("refs/") => name.to_string(),
+        Some(name) => format!("refs/heads/{name}"),
+        None => format!("refs/heads/{}", default_head_ref_branch()),
+    };
     let ensured = runtime
-        .ensure_clone(repo_full_name, Sensitive::new(token), &head_ref_name, sink)
+        .ensure_clone(
+            repo_full_name,
+            Sensitive::new(token),
+            &ref_qualified,
+            sink,
+        )
         .await
         .map_err(|error| -> CliError {
             CliErrorKind::workflow_io(format!("ensure local clone failed: {error}")).into()
@@ -573,6 +587,7 @@ mod tests {
             paths: vec!["src/lib.rs".into()],
             repository_full_name: None,
             base_ref_oid_expected: None,
+            head_ref_name: None,
         };
         let err = patch_dependency_update_files(&request).await.unwrap_err();
         assert!(err.to_string().to_lowercase().contains("pull_request_id"));
@@ -586,6 +601,7 @@ mod tests {
             paths: vec!["src/lib.rs".into()],
             repository_full_name: None,
             base_ref_oid_expected: None,
+            head_ref_name: None,
         };
         let response = patch_dependency_update_files(&request).await.expect("ok");
         assert_eq!(response.pull_request_id, "PR_1");

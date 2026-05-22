@@ -33,9 +33,22 @@ struct GraphqlData {
 struct PullRequestNode {
     #[serde(rename = "headRefOid")]
     head_ref_oid: Option<String>,
+    #[serde(rename = "headRefName")]
+    head_ref_name: Option<String>,
+    #[serde(rename = "baseRefOid")]
+    base_ref_oid: Option<String>,
+    #[serde(rename = "baseRefName")]
+    base_ref_name: Option<String>,
     #[serde(rename = "viewerCanUpdate")]
     viewer_can_update: Option<bool>,
+    repository: Option<RepositoryNode>,
     files: Option<FilesConnection>,
+}
+
+#[derive(Debug, Deserialize)]
+struct RepositoryNode {
+    #[serde(rename = "nameWithOwner")]
+    name_with_owner: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -97,6 +110,10 @@ pub(crate) async fn fetch_files(
     }
 
     let mut head_ref_oid = String::new();
+    let mut head_ref_name: Option<String> = None;
+    let mut base_ref_oid: Option<String> = None;
+    let mut base_ref_name: Option<String> = None;
+    let mut repository_full_name: Option<String> = None;
     let mut viewer_can_update = false;
     let mut files: Vec<DependencyUpdateFile> = Vec::new();
     let mut cursor: Option<String> = None;
@@ -130,6 +147,21 @@ pub(crate) async fn fetch_files(
 
         if head_ref_oid.is_empty() {
             head_ref_oid = node.head_ref_oid.clone().unwrap_or_default();
+        }
+        if head_ref_name.is_none() {
+            head_ref_name = node.head_ref_name.clone();
+        }
+        if base_ref_oid.is_none() {
+            base_ref_oid = node.base_ref_oid.clone();
+        }
+        if base_ref_name.is_none() {
+            base_ref_name = node.base_ref_name.clone();
+        }
+        if repository_full_name.is_none() {
+            repository_full_name = node
+                .repository
+                .as_ref()
+                .and_then(|r| r.name_with_owner.clone());
         }
         if let Some(can_update) = node.viewer_can_update {
             viewer_can_update = can_update;
@@ -183,6 +215,10 @@ pub(crate) async fn fetch_files(
     Ok(DependencyUpdatesFilesListResponse {
         pull_request_id,
         head_ref_oid,
+        head_ref_name,
+        base_ref_oid,
+        base_ref_name,
+        repository_full_name,
         viewer_can_mark_viewed: viewer_can_update,
         files,
         fetched_at: fetched_at.to_rfc3339(),
