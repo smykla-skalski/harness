@@ -109,11 +109,12 @@ struct DashboardDependencyFilesSection: View {
           onChangeViewMode: { mode in
             viewModel.setViewMode(mode, forPath: file.path)
           },
-          onLoadPatch: {
+          onLoadPatch: { [strategy = preferences.snapshot.filesLargeDiffStrategy] in
             Task {
               await store.preparePatches(
                 forPullRequest: pullRequestID,
-                paths: [file.path]
+                paths: [file.path],
+                largeDiffStrategy: strategy
               )
             }
           }
