@@ -72,7 +72,7 @@ extension DashboardReviewsRouteView {
   }
 
   func applyRefreshedItems(_ refresh: ReviewsRefreshResponse) {
-    let nextItems = applyReviewRefresh(to: routeResponse.items, refresh: refresh)
+    let nextItems = applyReviewsRefresh(to: routeResponse.items, refresh: refresh)
     routeResponse = ReviewsQueryResponse(
       fetchedAt: refresh.fetchedAt,
       fromCache: routeResponse.fromCache,
