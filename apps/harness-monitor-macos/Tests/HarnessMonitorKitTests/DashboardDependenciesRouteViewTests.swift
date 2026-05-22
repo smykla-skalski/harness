@@ -119,6 +119,9 @@ struct DashboardDependenciesRouteViewTests {
     let contentSource = try routeSource(named: "DashboardDependenciesRouteView+Content.swift")
     let actionsSource = try routeSource(named: "DashboardDependenciesRouteView+Actions.swift")
     let attentionSource = try routeSource(named: "DashboardDependenciesAttentionActions.swift")
+    let actionBarSource = try routeSource(named: "DashboardDependencyActionBar.swift")
+    let contextMenuSource = try routeSource(named: "DashboardDependenciesRouteView+ContextMenu.swift")
+    let rowSource = try routeSource(named: "DashboardDependencyListRow.swift")
 
     #expect(routeViewSource.contains("@State private var pendingActionConfirmation"))
     #expect(routeViewSource.contains(".confirmationDialog("))
@@ -129,6 +132,10 @@ struct DashboardDependenciesRouteViewTests {
     #expect(actionsSource.contains("requestDependencyActionConfirmation(.merge, items: items)"))
     #expect(attentionSource.contains("struct DashboardDependencyActionConfirmation"))
     #expect(attentionSource.contains("dashboardDependencyActionConfirmation("))
+    #expect(attentionSource.contains("func dashboardDependencyMergeActionTitle("))
+    #expect(actionBarSource.contains("title: dashboardDependencyMergeActionTitle(for: items)"))
+    #expect(contextMenuSource.contains("Button(dashboardDependencyMergeActionTitle(for: items))"))
+    #expect(rowSource.contains("dashboardDependencyAttentionBadgeKinds(for: item)"))
   }
 
   @Test("dashboard preview exercises dependency alert rendering")

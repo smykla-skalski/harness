@@ -6,6 +6,55 @@ enum DashboardDependencyAttentionActionKind {
   case merge
 }
 
+enum DashboardDependencyAttentionBadgeKind: String, Identifiable {
+  case requiredChecks
+  case failingChecks
+  case changesRequested
+  case policyBlocked
+  case mergeConflicts
+
+  var id: String { rawValue }
+
+  var label: String {
+    switch self {
+    case .requiredChecks:
+      "Required checks"
+    case .failingChecks:
+      "Checks failing"
+    case .changesRequested:
+      "Changes requested"
+    case .policyBlocked:
+      "Policy blocked"
+    case .mergeConflicts:
+      "Merge conflicts"
+    }
+  }
+
+  var systemImage: String? {
+    switch self {
+    case .requiredChecks:
+      "exclamationmark.triangle"
+    case .failingChecks:
+      "xmark.circle"
+    case .changesRequested:
+      "arrow.uturn.backward"
+    case .policyBlocked:
+      "hourglass"
+    case .mergeConflicts:
+      "arrow.triangle.branch"
+    }
+  }
+
+  var tint: Color {
+    switch self {
+    case .requiredChecks, .changesRequested, .mergeConflicts:
+      HarnessMonitorTheme.danger
+    case .failingChecks, .policyBlocked:
+      HarnessMonitorTheme.caution
+    }
+  }
+}
+
 struct DashboardDependencyActionConfirmation {
   let action: DashboardDependencyAttentionActionKind
   let pullRequestIDs: [String]
@@ -33,6 +82,31 @@ func dashboardDependencyMergeProminence(
   return .success
 }
 
+func dashboardDependencyMergeActionTitle(for items: [DependencyUpdateItem]) -> String {
+  items.contains(where: \.requiresAdminMergeForRequiredFailures) ? "Merge as Admin" : "Merge"
+}
+
+func dashboardDependencyAttentionBadgeKinds(
+  for item: DependencyUpdateItem
+) -> [DashboardDependencyAttentionBadgeKind] {
+  var badges: [DashboardDependencyAttentionBadgeKind] = []
+  if item.hasRequiredFailedChecks {
+    badges.append(.requiredChecks)
+  } else if item.checkStatus == .failure {
+    badges.append(.failingChecks)
+  }
+  if item.reviewStatus == .changesRequested {
+    badges.append(.changesRequested)
+  }
+  if item.policyBlocked {
+    badges.append(.policyBlocked)
+  }
+  if item.mergeable == .conflicting {
+    badges.append(.mergeConflicts)
+  }
+  return badges
+}
+
 func dashboardDependencyActionConfirmation(
   for action: DashboardDependencyAttentionActionKind,
   items: [DependencyUpdateItem]
@@ -54,7 +128,10 @@ func dashboardDependencyActionConfirmation(
       items: items,
       destructiveMerge: destructiveMerge
     ),
-    confirmButtonTitle: action == .approve ? "Approve Anyway" : "Merge Anyway",
+    confirmButtonTitle: dashboardDependencyActionConfirmationButtonTitle(
+      for: action,
+      destructiveMerge: destructiveMerge
+    ),
     confirmRole: destructiveMerge ? .destructive : nil
   )
 }
@@ -66,13 +143,27 @@ private func dashboardDependencyActionConfirmationTitle(
 ) -> String {
   if destructiveMerge {
     return itemCount == 1
-      ? "Merge despite required failing checks?"
-      : "Merge \(itemCount) pull requests despite required failing checks?"
+      ? "Merge as Admin despite required failing checks?"
+      : "Merge \(itemCount) pull requests as Admin despite required failing checks?"
   }
   let verb = action == .approve ? "Approve" : "Merge"
   return itemCount == 1
     ? "\(verb) pull request that needs attention?"
     : "\(verb) \(itemCount) pull requests that need attention?"
+}
+
+private func dashboardDependencyActionConfirmationButtonTitle(
+  for action: DashboardDependencyAttentionActionKind,
+  destructiveMerge: Bool
+) -> String {
+  switch action {
+  case .approve:
+    "Approve Anyway"
+  case .merge where destructiveMerge:
+    "Merge as Admin"
+  case .merge:
+    "Merge Anyway"
+  }
 }
 
 private func dashboardDependencyActionConfirmationMessage(
@@ -84,10 +175,12 @@ private func dashboardDependencyActionConfirmationMessage(
   var paragraphs: [String] = []
   if destructiveMerge {
     paragraphs.append(
-      "\(subject) cannot be merged normally because required checks are failing."
+      items.count == 1
+        ? "This pull request can only be merged with admin permissions because required checks are failing."
+        : "Some selected pull requests can only be merged with admin permissions because required checks are failing."
     )
     paragraphs.append(
-      "Your GitHub permissions can bypass branch protections and merge immediately."
+      "Merge as Admin uses your GitHub permissions to bypass branch protections and merge immediately."
     )
   } else if action == .approve {
     paragraphs.append(
@@ -102,8 +195,43 @@ private func dashboardDependencyActionConfirmationMessage(
         : "\(subject) still need attention before a normal merge."
     )
   }
-  paragraphs.append(contentsOf: dashboardDependencyAttentionReasonMessages(for: items))
+  if let summary = dashboardDependencyAttentionSelectionSummary(for: action, items: items) {
+    paragraphs.append(summary)
+  } else {
+    paragraphs.append(contentsOf: dashboardDependencyAttentionReasonMessages(for: items))
+  }
   return paragraphs.joined(separator: "\n\n")
+}
+
+private func dashboardDependencyAttentionSelectionSummary(
+  for action: DashboardDependencyAttentionActionKind,
+  items: [DependencyUpdateItem]
+) -> String? {
+  guard items.count > 1 else { return nil }
+  let summaryLines = dashboardDependencyAttentionSummaryLines(for: action, items: items)
+  guard !summaryLines.isEmpty else { return nil }
+  return "Selection summary:\n• " + summaryLines.joined(separator: "\n• ")
+}
+
+private func dashboardDependencyAttentionSummaryLines(
+  for action: DashboardDependencyAttentionActionKind,
+  items: [DependencyUpdateItem]
+) -> [String] {
+  var lines: [String] = []
+  if action == .merge {
+    let adminBypass = items.filter(\.requiresAdminMergeForRequiredFailures).count
+    if adminBypass > 0 {
+      lines.append(
+        dashboardDependencyCountMessage(
+          count: adminBypass,
+          singular: "selected PR can only merge with admin permissions.",
+          plural: "selected PRs can only merge with admin permissions."
+        )
+      )
+    }
+  }
+  lines.append(contentsOf: dashboardDependencyAttentionReasonMessages(for: items))
+  return lines
 }
 
 private func dashboardDependencyAttentionReasonMessages(

@@ -129,6 +129,21 @@ struct DashboardDependenciesDisabledReasonTests {
     #expect(dashboardDependencyMergeProminence(for: [optionalFailure]) == .warning)
   }
 
+  @Test("Merge action title becomes explicit for admin bypass")
+  func mergeActionTitleBecomesExplicitForAdminBypass() {
+    let clean = makeItem(state: .open, reviewStatus: .approved, checkStatus: .success)
+    let adminBypass = makeItem(
+      state: .open,
+      reviewStatus: .approved,
+      checkStatus: .failure,
+      requiredFailedCheckNames: ["ci / test"],
+      viewerCanMergeAsAdmin: true
+    )
+
+    #expect(dashboardDependencyMergeActionTitle(for: [clean]) == "Merge")
+    #expect(dashboardDependencyMergeActionTitle(for: [adminBypass]) == "Merge as Admin")
+  }
+
   @Test("Approve confirmation appears only for attention selections")
   func approveConfirmationAppearsOnlyForAttentionSelections() {
     let clean = makeItem(state: .open, reviewStatus: .reviewRequired, checkStatus: .success)
@@ -153,12 +168,72 @@ struct DashboardDependenciesDisabledReasonTests {
 
     let confirmation = dashboardDependencyActionConfirmation(for: .merge, items: [item])
 
-    #expect(confirmation?.title == "Merge despite required failing checks?")
-    #expect(confirmation?.confirmButtonTitle == "Merge Anyway")
+    #expect(confirmation?.title == "Merge as Admin despite required failing checks?")
+    #expect(confirmation?.confirmButtonTitle == "Merge as Admin")
     #expect(confirmation?.confirmRole != nil)
     #expect(confirmation?.message.contains("Required checks failing: ci / test.") == true)
     #expect(
-      confirmation?.message.contains("bypass branch protections and merge immediately") == true)
+      confirmation?.message.contains("Merge as Admin uses your GitHub permissions") == true)
+  }
+
+  @Test("Merge confirmation summarizes mixed selections")
+  func mergeConfirmationSummarizesMixedSelections() {
+    let adminBypass = makeItem(
+      state: .open,
+      reviewStatus: .approved,
+      checkStatus: .failure,
+      requiredFailedCheckNames: ["ci / required"],
+      viewerCanMergeAsAdmin: true
+    )
+    let optionalFailure = makeItem(
+      state: .open,
+      reviewStatus: .approved,
+      checkStatus: .failure
+    )
+    let changesRequested = makeItem(
+      state: .open,
+      reviewStatus: .changesRequested,
+      checkStatus: .success
+    )
+
+    let confirmation = dashboardDependencyActionConfirmation(
+      for: .merge,
+      items: [adminBypass, optionalFailure, changesRequested]
+    )
+
+    #expect(confirmation?.message.contains("Selection summary:") == true)
+    #expect(
+      confirmation?.message.contains("1 selected PR can only merge with admin permissions.")
+        == true)
+    #expect(
+      confirmation?.message.contains("1 selected PR has failing checks that are not marked required.")
+        == true)
+    #expect(
+      confirmation?.message.contains("1 selected PR has changes requested.")
+        == true)
+  }
+
+  @Test("Attention badge kinds cover visible list reasons")
+  func attentionBadgeKindsCoverVisibleListReasons() {
+    let item = makeItem(
+      state: .open,
+      mergeable: .conflicting,
+      reviewStatus: .changesRequested,
+      checkStatus: .failure,
+      policyBlocked: true,
+      requiredFailedCheckNames: ["ci / required"]
+    )
+    let optionalFailure = makeItem(
+      state: .open,
+      reviewStatus: .approved,
+      checkStatus: .failure
+    )
+
+    #expect(
+      dashboardDependencyAttentionBadgeKinds(for: item)
+        == [.requiredChecks, .changesRequested, .policyBlocked, .mergeConflicts]
+    )
+    #expect(dashboardDependencyAttentionBadgeKinds(for: optionalFailure) == [.failingChecks])
   }
 
   @Test("Rerun reason distinguishes passing from pending checks")

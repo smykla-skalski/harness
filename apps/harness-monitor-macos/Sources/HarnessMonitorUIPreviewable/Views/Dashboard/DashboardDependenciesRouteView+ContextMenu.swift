@@ -23,7 +23,7 @@ extension DashboardDependenciesRouteView {
         requestApproveOrConfirm(items: items)
       }
       .disabled(isBusy || !items.contains { $0.canAttemptManualApproval })
-      Button("Merge") {
+      Button(dashboardDependencyMergeActionTitle(for: items)) {
         requestMergeOrConfirm(items: items)
       }
       .disabled(isBusy || !items.contains { $0.canAttemptManualMerge })
