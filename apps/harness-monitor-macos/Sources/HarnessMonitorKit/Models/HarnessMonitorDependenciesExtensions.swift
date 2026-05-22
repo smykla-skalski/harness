@@ -146,7 +146,7 @@ extension DependencyUpdateTarget {
   }
 
   public var isAutoMergeable: Bool {
-    reviewStatus == .approved
+    (reviewStatus == .approved || reviewStatus == .none)
       && checkStatus == .success
       && mergeable != .conflicting
       && !policyBlocked
