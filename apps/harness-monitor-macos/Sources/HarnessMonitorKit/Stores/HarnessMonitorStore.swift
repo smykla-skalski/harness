@@ -43,6 +43,14 @@ public final class HarnessMonitorStore {
   @ObservationIgnored var pendingSessionWindowQuitSnapshot: SessionWindowQuitSnapshot?
   @ObservationIgnored var isSuppressingNotificationHistoryToast = false
   @ObservationIgnored var suppressedNotificationHistoryToastIDs: Set<UUID> = []
+  @ObservationIgnored
+  var dependencyFilesViewModels: [String: DependencyUpdateFilesViewModel] = [:]
+  @ObservationIgnored
+  var dependencyFilesPendingFetches: Set<DependencyFilesFetchKey> = []
+  @ObservationIgnored
+  var dependencyFilesViewedBatchTasks: [String: Task<Void, Never>] = [:]
+  @ObservationIgnored
+  var dependencyFilesViewedPending: [String: [String: DependencyUpdateFileViewedState]] = [:]
 
   public var openFolderRequest = 0
   public var attachSessionRequest = 0
