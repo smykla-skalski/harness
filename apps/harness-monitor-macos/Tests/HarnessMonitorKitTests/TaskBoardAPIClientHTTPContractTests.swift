@@ -165,6 +165,7 @@ extension TaskBoardAPIClientTests {
     let repositoryCatalog = try await client.catalogDependencyUpdateRepositories(
       request: DependencyUpdatesRepositoryCatalogRequest(organization: "example")
     )
+    let capabilities = try await client.dependencyUpdatesCapabilities()
     let query = try await client.queryDependencyUpdates(
       request: DependencyUpdatesQueryRequest(
         authors: ["renovate[bot]"],
@@ -173,6 +174,13 @@ extension TaskBoardAPIClientTests {
         excludeRepositories: ["example/archive"],
         forceRefresh: true,
         cacheMaxAgeSeconds: 120
+      )
+    )
+    let preview = try await client.previewDependencyUpdateAction(
+      request: DependencyUpdatesActionPreviewRequest(
+        action: .merge,
+        targets: [target],
+        method: .rebase
       )
     )
     let approve = try await client.approveDependencyUpdates(
@@ -203,7 +211,9 @@ extension TaskBoardAPIClientTests {
 
     return DependencyUpdatesHTTPContractResult(
       repositoryCatalog: repositoryCatalog,
+      capabilities: capabilities,
       query: query,
+      preview: preview,
       approve: approve,
       merge: merge,
       rerun: rerun,

@@ -8,12 +8,17 @@ extension DependencyUpdateItem {
       repository: repository,
       number: number,
       url: url,
+      state: state,
+      isDraft: isDraft,
       headSha: headSha,
       mergeable: mergeable,
       reviewStatus: reviewStatus,
       checkStatus: checkStatus,
       policyBlocked: policyBlocked,
-      checkSuiteIDs: checks.compactMap(\.checkSuiteID)
+      requiredFailedCheckNames: requiredFailedCheckNames,
+      viewerCanMergeAsAdmin: viewerCanMergeAsAdmin,
+      checkSuiteIDs: checks.compactMap(\.checkSuiteID),
+      viewerCanUpdate: viewerCanUpdate
     )
   }
 
@@ -24,12 +29,17 @@ extension DependencyUpdateItem {
       repository: repository,
       number: number,
       url: url,
+      state: state,
+      isDraft: isDraft,
       headSha: headSha,
       mergeable: mergeable,
       reviewStatus: reviewStatus,
       checkStatus: checkStatus,
       policyBlocked: policyBlocked,
-      checkSuiteIDs: rerunnableCheckSuiteIDs
+      requiredFailedCheckNames: requiredFailedCheckNames,
+      viewerCanMergeAsAdmin: viewerCanMergeAsAdmin,
+      checkSuiteIDs: rerunnableCheckSuiteIDs,
+      viewerCanUpdate: viewerCanUpdate
     )
   }
 
@@ -165,13 +175,18 @@ extension DependencyUpdateCheck {
 
 extension DependencyUpdateTarget {
   public var isAutoApprovable: Bool {
-    checkStatus == .success
+    viewerCanUpdate
+      && state == .open
+      && checkStatus == .success
       && (reviewStatus == .reviewRequired || reviewStatus == .none)
       && mergeable != .conflicting
   }
 
   public var isAutoMergeable: Bool {
-    (reviewStatus == .approved || reviewStatus == .none)
+    viewerCanUpdate
+      && state == .open
+      && !isDraft
+      && (reviewStatus == .approved || reviewStatus == .none)
       && checkStatus == .success
       && mergeable != .conflicting
       && !policyBlocked

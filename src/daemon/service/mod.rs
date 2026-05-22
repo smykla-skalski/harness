@@ -254,9 +254,9 @@ pub(crate) use adopt::adopt_session_record_async;
 pub use dependency_updates::{
     add_label_to_dependency_updates, approve_dependency_updates, auto_dependency_updates,
     catalog_dependency_update_repositories, clear_dependency_updates_cache,
-    comment_on_dependency_updates, fetch_dependency_update_body, merge_dependency_updates,
-    query_dependency_updates, refresh_dependency_updates, rerun_dependency_updates_checks,
-    update_dependency_update_body,
+    comment_on_dependency_updates, dependency_updates_capabilities, fetch_dependency_update_body,
+    merge_dependency_updates, preview_dependency_update_action, query_dependency_updates,
+    refresh_dependency_updates, rerun_dependency_updates_checks, update_dependency_update_body,
 };
 pub use direct::{
     delete_session_direct, disconnect_agent_direct, join_session_direct, record_signal_ack_direct,

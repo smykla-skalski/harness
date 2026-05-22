@@ -17,6 +17,20 @@ extension WebSocketTransport {
     return try decode(value)
   }
 
+  public func dependencyUpdatesCapabilities() async throws -> DependencyUpdatesCapabilitiesResponse
+  {
+    let value = try await rpc(method: .dependencyUpdatesCapabilities, params: nil)
+    return try decode(value)
+  }
+
+  public func previewDependencyUpdateAction(
+    request: DependencyUpdatesActionPreviewRequest
+  ) async throws -> DependencyUpdatesActionPreviewResponse {
+    let params = try encodeParams(request, extra: [:])
+    let value = try await rpc(method: .dependencyUpdatesActionPreview, params: params)
+    return try decode(value)
+  }
+
   public func approveDependencyUpdates(
     request: DependencyUpdatesApproveRequest
   ) async throws -> DependencyUpdatesActionResponse {

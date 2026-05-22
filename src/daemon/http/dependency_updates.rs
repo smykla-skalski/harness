@@ -3,15 +3,15 @@ use std::time::Instant;
 use axum::extract::State;
 use axum::http::HeaderMap;
 use axum::response::Response;
-use axum::routing::{delete, post};
+use axum::routing::{delete, get, post};
 use axum::{Json, Router};
 
 use crate::daemon::protocol::{
-    DependencyUpdatesApproveRequest, DependencyUpdatesAutoRequest, DependencyUpdatesBodyRequest,
-    DependencyUpdatesBodyUpdateRequest, DependencyUpdatesCommentRequest,
-    DependencyUpdatesLabelRequest, DependencyUpdatesMergeRequest, DependencyUpdatesQueryRequest,
-    DependencyUpdatesRefreshRequest, DependencyUpdatesRepositoryCatalogRequest,
-    DependencyUpdatesRerunChecksRequest, http_paths,
+    DependencyUpdatesActionPreviewRequest, DependencyUpdatesApproveRequest,
+    DependencyUpdatesAutoRequest, DependencyUpdatesBodyRequest, DependencyUpdatesBodyUpdateRequest,
+    DependencyUpdatesCommentRequest, DependencyUpdatesLabelRequest, DependencyUpdatesMergeRequest,
+    DependencyUpdatesQueryRequest, DependencyUpdatesRefreshRequest,
+    DependencyUpdatesRepositoryCatalogRequest, DependencyUpdatesRerunChecksRequest, http_paths,
 };
 use crate::daemon::service;
 
@@ -37,8 +37,16 @@ pub(super) fn dependency_updates_routes() -> Router<DaemonHttpState> {
             post(post_dependency_update_repositories),
         )
         .route(
+            http_paths::DEPENDENCY_UPDATES_CAPABILITIES,
+            get(get_dependency_update_capabilities),
+        )
+        .route(
             http_paths::DEPENDENCY_UPDATES_QUERY,
             post(post_query_dependency_updates),
+        )
+        .route(
+            http_paths::DEPENDENCY_UPDATES_ACTION_PREVIEW,
+            post(post_dependency_update_action_preview),
         )
         .route(
             http_paths::DEPENDENCY_UPDATES_APPROVE,
@@ -82,6 +90,20 @@ pub(super) fn dependency_updates_routes() -> Router<DaemonHttpState> {
         )
 }
 
+async fn get_dependency_update_capabilities(
+    headers: HeaderMap,
+    State(state): State<DaemonHttpState>,
+) -> Response {
+    let (start, request_id) = authenticated_request!(headers, state);
+    timed_json(
+        "GET",
+        http_paths::DEPENDENCY_UPDATES_CAPABILITIES,
+        &request_id,
+        start,
+        service::dependency_updates_capabilities(),
+    )
+}
+
 async fn post_dependency_update_repositories(
     headers: HeaderMap,
     State(state): State<DaemonHttpState>,
@@ -111,6 +133,21 @@ async fn post_query_dependency_updates(
         &request_id,
         start,
         result,
+    )
+}
+
+async fn post_dependency_update_action_preview(
+    headers: HeaderMap,
+    State(state): State<DaemonHttpState>,
+    Json(request): Json<DependencyUpdatesActionPreviewRequest>,
+) -> Response {
+    let (start, request_id) = authenticated_request!(headers, state);
+    timed_json(
+        "POST",
+        http_paths::DEPENDENCY_UPDATES_ACTION_PREVIEW,
+        &request_id,
+        start,
+        service::preview_dependency_update_action(&request),
     )
 }
 

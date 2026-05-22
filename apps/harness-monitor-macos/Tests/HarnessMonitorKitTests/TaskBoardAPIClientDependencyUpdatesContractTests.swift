@@ -7,13 +7,18 @@ extension TaskBoardAPIClientTests {
   func assertDependencyUpdatesHTTPRouteContract(_ records: [TaskBoardURLProtocol.RecordedRequest]) {
     #expect(
       records.map(\.method)
-        == ["POST", "POST", "POST", "POST", "POST", "POST", "POST", "DELETE", "POST", "POST"]
+        == [
+          "POST", "GET", "POST", "POST", "POST", "POST", "POST", "POST", "POST", "DELETE",
+          "POST", "POST",
+        ]
     )
     #expect(
       records.map(\.path)
         == [
           "/v1/dependency-updates/repositories",
+          "/v1/dependency-updates/capabilities",
           "/v1/dependency-updates/query",
+          "/v1/dependency-updates/action-preview",
           "/v1/dependency-updates/approve",
           "/v1/dependency-updates/merge",
           "/v1/dependency-updates/rerun-checks",
@@ -28,25 +33,28 @@ extension TaskBoardAPIClientTests {
 
   func assertDependencyUpdatesHTTPBodyContract(_ records: [TaskBoardURLProtocol.RecordedRequest]) {
     #expect(records[0].body?["organization"] as? String == "example")
-    #expect(records[1].body?["authors"] as? [String] == ["renovate[bot]"])
-    #expect(records[1].body?["organizations"] as? [String] == ["example"])
-    #expect(records[1].body?["repositories"] as? [String] == ["example/harness"])
-    #expect(records[1].body?["exclude_repositories"] as? [String] == ["example/archive"])
-    #expect(records[1].body?["force_refresh"] as? Bool == true)
-    #expect(records[1].body?["cache_max_age_seconds"] as? Int == 120)
+    #expect(records[1].body == nil)
+    #expect(records[2].body?["authors"] as? [String] == ["renovate[bot]"])
+    #expect(records[2].body?["organizations"] as? [String] == ["example"])
+    #expect(records[2].body?["repositories"] as? [String] == ["example/harness"])
+    #expect(records[2].body?["exclude_repositories"] as? [String] == ["example/archive"])
+    #expect(records[2].body?["force_refresh"] as? Bool == true)
+    #expect(records[2].body?["cache_max_age_seconds"] as? Int == 120)
+    #expect(records[3].body?["action"] as? String == "merge")
+    #expect(records[3].body?["method"] as? String == "rebase")
 
-    let approveTarget = (records[2].body?["targets"] as? [[String: Any]])?.first
+    let approveTarget = (records[4].body?["targets"] as? [[String: Any]])?.first
     #expect(approveTarget?["pull_request_id"] as? String == "pr-42")
     #expect(approveTarget?["repository"] as? String == "example/harness")
     #expect(approveTarget?["check_suite_ids"] as? [String] == ["suite-1"])
 
-    #expect(records[3].body?["method"] as? String == "rebase")
-    #expect(records[4].body?["targets"] is [[String: Any]])
-    #expect(records[5].body?["label"] as? String == "dependencies:ready")
-    #expect(records[6].body?["method"] as? String == "squash")
-    #expect(records[7].body == nil)
-    #expect(records[9].body?["body"] as? String == "@renovatebot rebase")
-    #expect(records[9].body?["targets"] is [[String: Any]])
+    #expect(records[5].body?["method"] as? String == "rebase")
+    #expect(records[6].body?["targets"] is [[String: Any]])
+    #expect(records[7].body?["label"] as? String == "dependencies:ready")
+    #expect(records[8].body?["method"] as? String == "squash")
+    #expect(records[9].body == nil)
+    #expect(records[11].body?["body"] as? String == "@renovatebot rebase")
+    #expect(records[11].body?["targets"] is [[String: Any]])
   }
 
   func assertHTTPClientResults(_ result: TaskBoardHTTPContractResult) {
@@ -81,11 +89,13 @@ extension TaskBoardAPIClientTests {
 
   func assertDependencyUpdatesHTTPClientResults(_ result: DependencyUpdatesHTTPContractResult) {
     #expect(result.repositoryCatalog.organization == "example")
+    #expect(result.capabilities.supportsActionPreview)
     #expect(result.repositoryCatalog.repositories == ["example/aff", "example/harness"])
     #expect(result.query.summary.total == 1)
     #expect(result.query.summary.autoApprovable == 1)
     #expect(result.query.items.first?.repository == "example/harness")
     #expect(result.query.items.first?.reviewStatus == .reviewRequired)
+    #expect(result.preview.actionableCount == 1)
     #expect(
       result.query.items.first?.checks.first?.detailsURL
         == "https://github.com/example/harness/actions/runs/1001/job/2002"
@@ -139,7 +149,9 @@ extension TaskBoardAPIClientTests {
 
 struct DependencyUpdatesHTTPContractResult {
   let repositoryCatalog: DependencyUpdatesRepositoryCatalogResponse
+  let capabilities: DependencyUpdatesCapabilitiesResponse
   let query: DependencyUpdatesQueryResponse
+  let preview: DependencyUpdatesActionPreviewResponse
   let approve: DependencyUpdatesActionResponse
   let merge: DependencyUpdatesActionResponse
   let rerun: DependencyUpdatesActionResponse

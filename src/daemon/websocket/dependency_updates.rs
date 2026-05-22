@@ -1,10 +1,11 @@
 use crate::daemon::http::DaemonHttpState;
 use crate::daemon::protocol::{
-    DependencyUpdatesApproveRequest, DependencyUpdatesAutoRequest, DependencyUpdatesBodyRequest,
-    DependencyUpdatesBodyUpdateRequest, DependencyUpdatesCommentRequest,
-    DependencyUpdatesLabelRequest, DependencyUpdatesMergeRequest, DependencyUpdatesQueryRequest,
-    DependencyUpdatesRefreshRequest, DependencyUpdatesRepositoryCatalogRequest,
-    DependencyUpdatesRerunChecksRequest, WsRequest, WsResponse, ws_methods,
+    DependencyUpdatesActionPreviewRequest, DependencyUpdatesApproveRequest,
+    DependencyUpdatesAutoRequest, DependencyUpdatesBodyRequest, DependencyUpdatesBodyUpdateRequest,
+    DependencyUpdatesCommentRequest, DependencyUpdatesLabelRequest, DependencyUpdatesMergeRequest,
+    DependencyUpdatesQueryRequest, DependencyUpdatesRefreshRequest,
+    DependencyUpdatesRepositoryCatalogRequest, DependencyUpdatesRerunChecksRequest, WsRequest,
+    WsResponse, ws_methods,
 };
 use crate::daemon::service;
 use serde::de::DeserializeOwned;
@@ -24,8 +25,15 @@ pub(crate) async fn dispatch_dependency_updates_method(
         ws_methods::DEPENDENCY_UPDATES_REPOSITORY_CATALOG => {
             Some(dispatch_dependency_updates_repository_catalog(request).await)
         }
+        ws_methods::DEPENDENCY_UPDATES_CAPABILITIES => Some(dispatch_query_result(
+            &request.id,
+            service::dependency_updates_capabilities(),
+        )),
         ws_methods::DEPENDENCY_UPDATES_QUERY => {
             Some(dispatch_dependency_updates_query(request).await)
+        }
+        ws_methods::DEPENDENCY_UPDATES_ACTION_PREVIEW => {
+            Some(dispatch_dependency_updates_action_preview(request).await)
         }
         ws_methods::DEPENDENCY_UPDATES_APPROVE => {
             Some(dispatch_dependency_updates_approve(request).await)
@@ -60,6 +68,16 @@ pub(crate) async fn dispatch_dependency_updates_method(
         }
         _ => None,
     }
+}
+
+async fn dispatch_dependency_updates_action_preview(request: &WsRequest) -> WsResponse {
+    let Ok(body) = parse_params::<DependencyUpdatesActionPreviewRequest>(request) else {
+        return invalid_params(request);
+    };
+    dispatch_query_result(
+        &request.id,
+        service::preview_dependency_update_action(&body),
+    )
 }
 
 async fn dispatch_dependency_updates_repository_catalog(request: &WsRequest) -> WsResponse {

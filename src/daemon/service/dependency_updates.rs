@@ -2,12 +2,16 @@ use std::collections::BTreeMap;
 
 use crate::daemon::service::task_board_runtime::external_sync_config_for_repository;
 use crate::dependency_updates::{
-    DependencyUpdateActionOutcome, DependencyUpdateActionResult, DependencyUpdateItem,
-    DependencyUpdateRepositoryLabel, DependencyUpdateTarget, DependencyUpdatesActionResponse,
-    DependencyUpdatesApproveRequest, DependencyUpdatesAutoRequest, DependencyUpdatesBodyRequest,
-    DependencyUpdatesBodyResponse, DependencyUpdatesBodyUpdateOutcome,
-    DependencyUpdatesBodyUpdateRequest, DependencyUpdatesBodyUpdateResponse,
-    DependencyUpdatesCacheClearResponse, DependencyUpdatesCommentRequest,
+    DependencyUpdateActionOutcome, DependencyUpdateActionPreviewKind,
+    DependencyUpdateActionPreviewTarget, DependencyUpdateActionResult, DependencyUpdateCheckStatus,
+    DependencyUpdateItem, DependencyUpdateMergeableState, DependencyUpdatePullRequestState,
+    DependencyUpdateRepositoryLabel, DependencyUpdateReviewStatus, DependencyUpdateTarget,
+    DependencyUpdatesActionPreviewRequest, DependencyUpdatesActionPreviewResponse,
+    DependencyUpdatesActionResponse, DependencyUpdatesApproveRequest, DependencyUpdatesAutoRequest,
+    DependencyUpdatesBodyRequest, DependencyUpdatesBodyResponse,
+    DependencyUpdatesBodyUpdateOutcome, DependencyUpdatesBodyUpdateRequest,
+    DependencyUpdatesBodyUpdateResponse, DependencyUpdatesCacheClearResponse,
+    DependencyUpdatesCapabilitiesResponse, DependencyUpdatesCommentRequest,
     DependencyUpdatesGitHubClient, DependencyUpdatesLabelRequest, DependencyUpdatesMergeRequest,
     DependencyUpdatesQueryRequest, DependencyUpdatesQueryResponse, DependencyUpdatesRefreshRequest,
     DependencyUpdatesRefreshResponse, DependencyUpdatesRepositoryCatalogRequest,
@@ -109,6 +113,44 @@ pub async fn catalog_dependency_update_repositories(
     Ok(DependencyUpdatesRepositoryCatalogResponse {
         organization,
         repositories,
+    })
+}
+
+/// Return the dependency-update daemon contract supported by this process.
+///
+/// # Errors
+/// This function currently does not return operational errors.
+pub fn dependency_updates_capabilities() -> Result<DependencyUpdatesCapabilitiesResponse, CliError>
+{
+    Ok(DependencyUpdatesCapabilitiesResponse::current())
+}
+
+/// Preview which dependency-update targets a daemon action would affect.
+///
+/// # Errors
+/// Returns `CliError` when the request is malformed. Missing repository tokens
+/// are represented per target so the UI can still explain the rest of the
+/// selection.
+pub fn preview_dependency_update_action(
+    request: &DependencyUpdatesActionPreviewRequest,
+) -> Result<DependencyUpdatesActionPreviewResponse, CliError> {
+    request.validate()?;
+    let targets = request
+        .targets
+        .iter()
+        .map(|target| preview_action_target(request.action, target))
+        .collect::<Vec<_>>();
+    let actionable_count = targets.iter().filter(|target| target.eligible).count();
+    let skipped_count = targets.len().saturating_sub(actionable_count);
+    let warnings = preview_action_warnings(request.action, &request.targets);
+    Ok(DependencyUpdatesActionPreviewResponse {
+        action: request.action,
+        capabilities: DependencyUpdatesCapabilitiesResponse::current(),
+        total_count: request.targets.len(),
+        actionable_count,
+        skipped_count,
+        warnings,
+        targets,
     })
 }
 
@@ -495,6 +537,158 @@ fn missing_token_error(repository: Option<&str>) -> CliError {
             "dependency-updates requires a GitHub token. Configure one in Settings > Secrets.",
         )
         .into(),
+    }
+}
+
+fn preview_action_target(
+    action: DependencyUpdateActionPreviewKind,
+    target: &DependencyUpdateTarget,
+) -> DependencyUpdateActionPreviewTarget {
+    let token_available =
+        github_token(Some(target.repository.as_str())).or_else(|| github_token(None));
+    let reason = if token_available.is_none() {
+        Some(format!(
+            "No GitHub token is configured for '{}'",
+            target.repository
+        ))
+    } else {
+        preview_action_blocker(action, target)
+    };
+    DependencyUpdateActionPreviewTarget {
+        pull_request_id: target.pull_request_id.clone(),
+        repository: target.repository.clone(),
+        number: target.number,
+        eligible: reason.is_none(),
+        reason,
+        warnings: preview_target_warnings(action, target),
+    }
+}
+
+fn preview_action_blocker(
+    action: DependencyUpdateActionPreviewKind,
+    target: &DependencyUpdateTarget,
+) -> Option<String> {
+    if !target.viewer_can_update {
+        return Some("Current GitHub token cannot update this pull request".to_string());
+    }
+    if target.state != DependencyUpdatePullRequestState::Open {
+        return Some("Pull request is not open".to_string());
+    }
+    match action {
+        DependencyUpdateActionPreviewKind::Approve => {
+            if target.can_attempt_manual_approval() {
+                None
+            } else {
+                Some("Pull request does not need manual approval".to_string())
+            }
+        }
+        DependencyUpdateActionPreviewKind::Merge => {
+            if target.is_draft {
+                Some("Draft pull requests cannot be merged".to_string())
+            } else if target.mergeable == DependencyUpdateMergeableState::Conflicting {
+                Some("Merge conflicts must be resolved before merging".to_string())
+            } else {
+                None
+            }
+        }
+        DependencyUpdateActionPreviewKind::RerunChecks => {
+            if target.can_attempt_rerun_checks() {
+                None
+            } else {
+                Some("No rerunnable check suites were reported".to_string())
+            }
+        }
+        DependencyUpdateActionPreviewKind::AddLabel => {
+            if target.can_add_label() {
+                None
+            } else {
+                Some("Labels can only be added to open pull requests".to_string())
+            }
+        }
+        DependencyUpdateActionPreviewKind::Auto => {
+            if target.is_auto_approvable() || target.is_auto_mergeable() {
+                None
+            } else {
+                Some("Pull request is not eligible for auto mode".to_string())
+            }
+        }
+    }
+}
+
+fn preview_action_warnings(
+    action: DependencyUpdateActionPreviewKind,
+    targets: &[DependencyUpdateTarget],
+) -> Vec<String> {
+    let mut warnings = Vec::new();
+    let failing = targets
+        .iter()
+        .filter(|target| target.check_status == DependencyUpdateCheckStatus::Failure)
+        .count();
+    if matches!(
+        action,
+        DependencyUpdateActionPreviewKind::Approve | DependencyUpdateActionPreviewKind::Merge
+    ) && failing > 0
+    {
+        warnings.push(counted_warning(
+            failing,
+            "pull request has failing checks",
+            "pull requests have failing checks",
+        ));
+    }
+    let policy_blocked = targets
+        .iter()
+        .filter(|target| target.policy_blocked)
+        .count();
+    if policy_blocked > 0 {
+        warnings.push(counted_warning(
+            policy_blocked,
+            "pull request is policy-blocked",
+            "pull requests are policy-blocked",
+        ));
+    }
+    warnings
+}
+
+fn preview_target_warnings(
+    action: DependencyUpdateActionPreviewKind,
+    target: &DependencyUpdateTarget,
+) -> Vec<String> {
+    let mut warnings = Vec::new();
+    if matches!(
+        action,
+        DependencyUpdateActionPreviewKind::Approve | DependencyUpdateActionPreviewKind::Merge
+    ) && target.check_status == DependencyUpdateCheckStatus::Failure
+    {
+        if target.required_failed_check_names.is_empty() {
+            warnings.push("Checks are failing".to_string());
+        } else if target.viewer_can_merge_as_admin
+            && action == DependencyUpdateActionPreviewKind::Merge
+        {
+            warnings.push(format!(
+                "Required checks are failing: {}. Admin merge can bypass branch protections.",
+                target.required_failed_check_names.join(", ")
+            ));
+        } else {
+            warnings.push(format!(
+                "Required checks are failing: {}",
+                target.required_failed_check_names.join(", ")
+            ));
+        }
+    }
+    if target.review_status == DependencyUpdateReviewStatus::ChangesRequested {
+        warnings.push("A reviewer requested changes".to_string());
+    }
+    if target.policy_blocked {
+        warnings.push("Dependency policy is blocking this pull request".to_string());
+    }
+    warnings
+}
+
+fn counted_warning(count: usize, singular: &str, plural: &str) -> String {
+    if count == 1 {
+        format!("1 {singular}")
+    } else {
+        format!("{count} {plural}")
     }
 }
 

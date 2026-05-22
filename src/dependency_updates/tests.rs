@@ -120,12 +120,17 @@ fn comment_request_rejects_empty_body() {
             repository: "acme/api".into(),
             number: 1,
             url: "https://example.com".into(),
+            state: DependencyUpdatePullRequestState::Open,
+            is_draft: false,
             head_sha: "abc".into(),
             mergeable: DependencyUpdateMergeableState::Mergeable,
             review_status: DependencyUpdateReviewStatus::None,
             check_status: DependencyUpdateCheckStatus::None,
             policy_blocked: false,
+            required_failed_check_names: Vec::new(),
+            viewer_can_merge_as_admin: false,
             check_suite_ids: Vec::new(),
+            viewer_can_update: true,
         }],
         body: "   ".into(),
     };
@@ -150,16 +155,42 @@ fn comment_request_accepts_well_formed_payload() {
             repository: "acme/api".into(),
             number: 1,
             url: "https://example.com".into(),
+            state: DependencyUpdatePullRequestState::Open,
+            is_draft: false,
             head_sha: "abc".into(),
             mergeable: DependencyUpdateMergeableState::Mergeable,
             review_status: DependencyUpdateReviewStatus::None,
             check_status: DependencyUpdateCheckStatus::None,
             policy_blocked: false,
+            required_failed_check_names: Vec::new(),
+            viewer_can_merge_as_admin: false,
             check_suite_ids: Vec::new(),
+            viewer_can_update: true,
         }],
         body: "@renovatebot rebase".into(),
     };
     assert!(request.validate().is_ok());
+}
+
+#[test]
+fn action_preview_request_rejects_empty_targets() {
+    let request = DependencyUpdatesActionPreviewRequest {
+        action: DependencyUpdateActionPreviewKind::Merge,
+        targets: Vec::new(),
+        method: GitHubMergeMethod::Squash,
+    };
+    assert!(request.validate().is_err());
+}
+
+#[test]
+fn current_capabilities_advertise_action_preview_schema() {
+    let capabilities = DependencyUpdatesCapabilitiesResponse::current();
+
+    assert_eq!(capabilities.schema_version, 1);
+    assert!(capabilities.supports_action_preview);
+    assert!(capabilities.supports_check_run_links);
+    assert!(capabilities.supports_repository_sync_health);
+    assert!(capabilities.supports_persistent_action_diagnostics);
 }
 
 #[test]
@@ -423,17 +454,26 @@ fn serialized_target_always_emits_check_suite_ids_array() {
         repository: "acme/api".into(),
         number: 1,
         url: "https://example.com".into(),
+        state: DependencyUpdatePullRequestState::Open,
+        is_draft: false,
         head_sha: "abc".into(),
         mergeable: DependencyUpdateMergeableState::Mergeable,
         review_status: DependencyUpdateReviewStatus::None,
         check_status: DependencyUpdateCheckStatus::None,
         policy_blocked: false,
+        required_failed_check_names: Vec::new(),
+        viewer_can_merge_as_admin: false,
         check_suite_ids: Vec::new(),
+        viewer_can_update: true,
     };
     let value = serde_json::to_value(&target).expect("serialize");
     let object = value.as_object().expect("target is an object");
     assert!(
         object.contains_key("check_suite_ids"),
         "check_suite_ids key must be emitted"
+    );
+    assert!(
+        object.contains_key("viewer_can_update"),
+        "viewer_can_update key must be emitted"
     );
 }

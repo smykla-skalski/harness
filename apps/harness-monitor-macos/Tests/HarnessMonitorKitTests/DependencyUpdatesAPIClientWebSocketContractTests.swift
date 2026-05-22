@@ -24,6 +24,7 @@ extension TaskBoardAPIClientTests {
     let repositoryCatalog = try await transport.catalogDependencyUpdateRepositories(
       request: DependencyUpdatesRepositoryCatalogRequest(organization: "example")
     )
+    let capabilities = try await transport.dependencyUpdatesCapabilities()
     let query = try await transport.queryDependencyUpdates(
       request: DependencyUpdatesQueryRequest(
         authors: ["renovate[bot]"],
@@ -32,6 +33,13 @@ extension TaskBoardAPIClientTests {
         excludeRepositories: ["example/archive"],
         forceRefresh: true,
         cacheMaxAgeSeconds: 120
+      )
+    )
+    let preview = try await transport.previewDependencyUpdateAction(
+      request: DependencyUpdatesActionPreviewRequest(
+        action: .merge,
+        targets: [target],
+        method: .rebase
       )
     )
     let approve = try await transport.approveDependencyUpdates(
@@ -66,7 +74,9 @@ extension TaskBoardAPIClientTests {
     return DependencyUpdatesWebSocketContractResult(
       calls: await probe.calls,
       repositoryCatalog: repositoryCatalog,
+      capabilities: capabilities,
       query: query,
+      preview: preview,
       approve: approve,
       merge: merge,
       rerun: rerun,
@@ -83,7 +93,9 @@ extension TaskBoardAPIClientTests {
       calls.map(\.method)
         == [
           .dependencyUpdatesRepositoryCatalog,
+          .dependencyUpdatesCapabilities,
           .dependencyUpdatesQuery,
+          .dependencyUpdatesActionPreview,
           .dependencyUpdatesApprove,
           .dependencyUpdatesMerge,
           .dependencyUpdatesRerunChecks,
@@ -97,22 +109,20 @@ extension TaskBoardAPIClientTests {
   }
 
   func assertDependencyUpdatesWebSocketPayloadContract(_ calls: [RPCProbe.Call]) {
-    #expect(calls.count == 10)
+    #expect(calls.count == 12)
     #expect(objectValue(calls[0].params, key: "organization") == .string("example"))
-    #expect(objectValue(calls[1].params, key: "authors") == .array([.string("renovate[bot]")]))
-    #expect(objectValue(calls[1].params, key: "organizations") == .array([.string("example")]))
+    #expect(calls[1].params == nil)
+    #expect(objectValue(calls[2].params, key: "authors") == .array([.string("renovate[bot]")]))
+    #expect(objectValue(calls[2].params, key: "organizations") == .array([.string("example")]))
     #expect(
-      objectValue(calls[1].params, key: "repositories") == .array([.string("example/harness")]))
+      objectValue(calls[2].params, key: "repositories") == .array([.string("example/harness")]))
     #expect(
-      objectValue(calls[1].params, key: "exclude_repositories")
+      objectValue(calls[2].params, key: "exclude_repositories")
         == .array([.string("example/archive")])
     )
-    #expect(objectValue(calls[1].params, key: "force_refresh") == .bool(true))
-    #expect(objectValue(calls[1].params, key: "cache_max_age_seconds") == .number(120))
-    #expect(
-      objectValue(calls[2].params, key: "targets")
-        == .array([.object(dependencyUpdatesTargetJSON)])
-    )
+    #expect(objectValue(calls[2].params, key: "force_refresh") == .bool(true))
+    #expect(objectValue(calls[2].params, key: "cache_max_age_seconds") == .number(120))
+    #expect(objectValue(calls[3].params, key: "action") == .string("merge"))
     #expect(
       objectValue(calls[3].params, key: "targets")
         == .array([.object(dependencyUpdatesTargetJSON)])
@@ -126,31 +136,42 @@ extension TaskBoardAPIClientTests {
       objectValue(calls[5].params, key: "targets")
         == .array([.object(dependencyUpdatesTargetJSON)])
     )
-    #expect(objectValue(calls[5].params, key: "label") == .string("dependencies:ready"))
+    #expect(objectValue(calls[5].params, key: "method") == .string("rebase"))
     #expect(
       objectValue(calls[6].params, key: "targets")
         == .array([.object(dependencyUpdatesTargetJSON)])
     )
-    #expect(objectValue(calls[6].params, key: "method") == .string("squash"))
-    #expect(calls[7].params == nil)
+    #expect(
+      objectValue(calls[7].params, key: "targets")
+        == .array([.object(dependencyUpdatesTargetJSON)])
+    )
+    #expect(objectValue(calls[7].params, key: "label") == .string("dependencies:ready"))
     #expect(
       objectValue(calls[8].params, key: "targets")
         == .array([.object(dependencyUpdatesTargetJSON)])
     )
+    #expect(objectValue(calls[8].params, key: "method") == .string("squash"))
+    #expect(calls[9].params == nil)
     #expect(
-      objectValue(calls[9].params, key: "targets")
+      objectValue(calls[10].params, key: "targets")
         == .array([.object(dependencyUpdatesTargetJSON)])
     )
-    #expect(objectValue(calls[9].params, key: "body") == .string("@renovatebot rebase"))
+    #expect(
+      objectValue(calls[11].params, key: "targets")
+        == .array([.object(dependencyUpdatesTargetJSON)])
+    )
+    #expect(objectValue(calls[11].params, key: "body") == .string("@renovatebot rebase"))
   }
 
   func assertDependencyUpdatesWebSocketResults(_ result: DependencyUpdatesWebSocketContractResult) {
     #expect(result.repositoryCatalog.organization == "example")
+    #expect(result.capabilities.supportsActionPreview)
     #expect(result.repositoryCatalog.repositories == ["example/aff", "example/harness"])
     #expect(result.query.summary.total == 1)
     #expect(result.query.summary.autoApprovable == 1)
     #expect(result.query.items.first?.repository == "example/harness")
     #expect(result.query.items.first?.reviewStatus == .reviewRequired)
+    #expect(result.preview.actionableCount == 1)
     #expect(result.approve.results.first?.action == .approve)
     #expect(result.merge.results.first?.action == .merge)
     #expect(result.rerun.results.first?.action == .rerunChecks)
@@ -188,7 +209,9 @@ extension TaskBoardAPIClientTests {
 struct DependencyUpdatesWebSocketContractResult {
   let calls: [RPCProbe.Call]
   let repositoryCatalog: DependencyUpdatesRepositoryCatalogResponse
+  let capabilities: DependencyUpdatesCapabilitiesResponse
   let query: DependencyUpdatesQueryResponse
+  let preview: DependencyUpdatesActionPreviewResponse
   let approve: DependencyUpdatesActionResponse
   let merge: DependencyUpdatesActionResponse
   let rerun: DependencyUpdatesActionResponse

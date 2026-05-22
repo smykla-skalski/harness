@@ -345,9 +345,21 @@ fn dependency_update_routes_have_complete_ws_parity() {
                 true,
             ),
             (
+                HttpRouteMethod::Get,
+                http_paths::DEPENDENCY_UPDATES_CAPABILITIES,
+                ws_methods::DEPENDENCY_UPDATES_CAPABILITIES,
+                true,
+            ),
+            (
                 HttpRouteMethod::Post,
                 http_paths::DEPENDENCY_UPDATES_QUERY,
                 ws_methods::DEPENDENCY_UPDATES_QUERY,
+                true,
+            ),
+            (
+                HttpRouteMethod::Post,
+                http_paths::DEPENDENCY_UPDATES_ACTION_PREVIEW,
+                ws_methods::DEPENDENCY_UPDATES_ACTION_PREVIEW,
                 true,
             ),
             (

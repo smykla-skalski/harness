@@ -168,6 +168,52 @@ pub struct DependencyUpdatesCommentRequest {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct DependencyUpdatesCapabilitiesResponse {
+    pub schema_version: u32,
+    #[serde(default)]
+    pub supports_action_preview: bool,
+    #[serde(default)]
+    pub supports_check_run_links: bool,
+    #[serde(default)]
+    pub supports_repository_sync_health: bool,
+    #[serde(default)]
+    pub supports_persistent_action_diagnostics: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct DependencyUpdatesActionPreviewRequest {
+    pub action: DependencyUpdateActionPreviewKind,
+    pub targets: Vec<DependencyUpdateTarget>,
+    #[serde(default)]
+    pub method: GitHubMergeMethod,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct DependencyUpdatesActionPreviewResponse {
+    pub action: DependencyUpdateActionPreviewKind,
+    pub capabilities: DependencyUpdatesCapabilitiesResponse,
+    pub total_count: usize,
+    pub actionable_count: usize,
+    pub skipped_count: usize,
+    #[serde(default)]
+    pub warnings: Vec<String>,
+    #[serde(default)]
+    pub targets: Vec<DependencyUpdateActionPreviewTarget>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct DependencyUpdateActionPreviewTarget {
+    pub pull_request_id: String,
+    pub repository: String,
+    pub number: u64,
+    pub eligible: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub reason: Option<String>,
+    #[serde(default)]
+    pub warnings: Vec<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct DependencyUpdatesActionResponse {
     pub summary: String,
     #[serde(default)]
@@ -219,13 +265,23 @@ pub struct DependencyUpdateTarget {
     pub repository: String,
     pub number: u64,
     pub url: String,
+    #[serde(default = "default_pull_request_state")]
+    pub state: DependencyUpdatePullRequestState,
+    #[serde(default)]
+    pub is_draft: bool,
     pub head_sha: String,
     pub mergeable: DependencyUpdateMergeableState,
     pub review_status: DependencyUpdateReviewStatus,
     pub check_status: DependencyUpdateCheckStatus,
     pub policy_blocked: bool,
     #[serde(default)]
+    pub required_failed_check_names: Vec<String>,
+    #[serde(default = "default_viewer_can_merge_as_admin")]
+    pub viewer_can_merge_as_admin: bool,
+    #[serde(default)]
     pub check_suite_ids: Vec<String>,
+    #[serde(default = "default_viewer_can_update")]
+    pub viewer_can_update: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -324,6 +380,16 @@ pub enum DependencyUpdateActionKind {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
+pub enum DependencyUpdateActionPreviewKind {
+    Approve,
+    Merge,
+    RerunChecks,
+    AddLabel,
+    Auto,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub enum DependencyUpdateActionOutcome {
     Applied,
     Skipped,
@@ -332,6 +398,10 @@ pub enum DependencyUpdateActionOutcome {
 
 fn default_cache_max_age_seconds() -> u64 {
     600
+}
+
+fn default_pull_request_state() -> DependencyUpdatePullRequestState {
+    DependencyUpdatePullRequestState::Open
 }
 
 impl DependencyUpdatesQueryRequest {
@@ -435,6 +505,19 @@ impl DependencyUpdatesQueryResponse {
     }
 }
 
+impl DependencyUpdatesCapabilitiesResponse {
+    #[must_use]
+    pub fn current() -> Self {
+        Self {
+            schema_version: 1,
+            supports_action_preview: true,
+            supports_check_run_links: true,
+            supports_repository_sync_health: true,
+            supports_persistent_action_diagnostics: true,
+        }
+    }
+}
+
 impl DependencyUpdatesSummary {
     #[must_use]
     pub fn from_items(items: &[DependencyUpdateItem]) -> Self {
@@ -470,16 +553,21 @@ impl DependencyUpdateItem {
             repository: self.repository.clone(),
             number: self.number,
             url: self.url.clone(),
+            state: self.state,
+            is_draft: self.is_draft,
             head_sha: self.head_sha.clone(),
             mergeable: self.mergeable,
             review_status: self.review_status,
             check_status: self.check_status,
             policy_blocked: self.policy_blocked,
+            required_failed_check_names: self.required_failed_check_names.clone(),
+            viewer_can_merge_as_admin: self.viewer_can_merge_as_admin,
             check_suite_ids: self
                 .checks
                 .iter()
                 .filter_map(|check| check.check_suite_id.clone())
                 .collect(),
+            viewer_can_update: self.viewer_can_update,
         }
     }
 
@@ -504,8 +592,38 @@ impl DependencyUpdateItem {
 
 impl DependencyUpdateTarget {
     #[must_use]
+    pub fn can_attempt_manual_approval(&self) -> bool {
+        self.viewer_can_update
+            && self.state == DependencyUpdatePullRequestState::Open
+            && matches!(
+                self.review_status,
+                DependencyUpdateReviewStatus::ReviewRequired | DependencyUpdateReviewStatus::None
+            )
+    }
+
+    #[must_use]
+    pub fn can_attempt_manual_merge(&self) -> bool {
+        self.viewer_can_update
+            && self.state == DependencyUpdatePullRequestState::Open
+            && !self.is_draft
+            && self.mergeable != DependencyUpdateMergeableState::Conflicting
+    }
+
+    #[must_use]
+    pub fn can_attempt_rerun_checks(&self) -> bool {
+        self.viewer_can_update && !self.check_suite_ids.is_empty()
+    }
+
+    #[must_use]
+    pub fn can_add_label(&self) -> bool {
+        self.viewer_can_update && self.state == DependencyUpdatePullRequestState::Open
+    }
+
+    #[must_use]
     pub fn is_auto_approvable(&self) -> bool {
-        self.check_status == DependencyUpdateCheckStatus::Success
+        self.viewer_can_update
+            && self.state == DependencyUpdatePullRequestState::Open
+            && self.check_status == DependencyUpdateCheckStatus::Success
             && matches!(
                 self.review_status,
                 DependencyUpdateReviewStatus::ReviewRequired | DependencyUpdateReviewStatus::None
@@ -515,10 +633,14 @@ impl DependencyUpdateTarget {
 
     #[must_use]
     pub fn is_auto_mergeable(&self) -> bool {
-        matches!(
-            self.review_status,
-            DependencyUpdateReviewStatus::Approved | DependencyUpdateReviewStatus::None
-        ) && self.check_status == DependencyUpdateCheckStatus::Success
+        self.viewer_can_update
+            && self.state == DependencyUpdatePullRequestState::Open
+            && !self.is_draft
+            && matches!(
+                self.review_status,
+                DependencyUpdateReviewStatus::Approved | DependencyUpdateReviewStatus::None
+            )
+            && self.check_status == DependencyUpdateCheckStatus::Success
             && self.mergeable != DependencyUpdateMergeableState::Conflicting
             && !self.policy_blocked
     }
