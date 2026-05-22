@@ -26,11 +26,11 @@ import HarnessMonitorKit
 /// transition.
 @MainActor
 @Observable
-public final class DependencyConversationRowSource {
-  public private(set) var rows: [SessionTimelineRow] = []
+final class DependencyConversationRowSource {
+  private(set) var rows: [SessionTimelineRow] = []
   @ObservationIgnored private var generation: UInt64 = 0
 
-  public init() {}
+  init() {}
 
   /// Replaces `rows` with the result of building from `entries`,
   /// `hiddenKinds`, etc. Builds nodes off-main in a detached task and
@@ -39,7 +39,7 @@ public final class DependencyConversationRowSource {
   /// Concurrent calls drop earlier results: each invocation bumps the
   /// generation counter, captures a snapshot, and only commits if the
   /// snapshot still matches when the build returns.
-  public func refresh(
+  func refresh(
     entries: [DependencyUpdateTimelineEntry],
     hiddenKinds: Set<DependencyUpdateTimelineKind>,
     autoCollapseHeavyReviewThreads: Bool,
@@ -72,7 +72,7 @@ public final class DependencyConversationRowSource {
   /// Clear the rebuilt rows; called when the consumer's preferences
   /// hide the timeline entirely so stale rows don't linger across
   /// re-opens.
-  public func clear() {
+  func clear() {
     rows = []
   }
 }
