@@ -81,4 +81,20 @@ public final class DependencyUpdateTimelineViewModel {
     loadState = .idle
     lastError = nil
   }
+
+  /// Appends an optimistic entry — typically the just-sent comment —
+  /// to the end of the timeline so the UI reflects the user's action
+  /// before the daemon roundtrip completes. The caller keeps the
+  /// returned id and either lets the optimistic entry stand (the
+  /// daemon's cache append covers the next fetch) or removes it via
+  /// `removeOptimistic(id:)` on failure.
+  public func appendOptimistic(_ entry: DependencyUpdateTimelineEntry) {
+    entries.append(entry)
+  }
+
+  /// Removes a previously-appended optimistic entry, used after a
+  /// failed Send so the UI doesn't show a comment that never landed.
+  public func removeOptimistic(id: String) {
+    entries.removeAll { $0.id == id }
+  }
 }
