@@ -147,13 +147,13 @@ struct DashboardDependenciesDisabledReasonTests {
   @Test("Approve confirmation appears only for attention selections")
   func approveConfirmationAppearsOnlyForAttentionSelections() {
     let clean = makeItem(state: .open, reviewStatus: .reviewRequired, checkStatus: .success)
-    let failing = makeItem(state: .open, reviewStatus: .approved, checkStatus: .failure)
+    let failing = makeItem(state: .open, reviewStatus: .reviewRequired, checkStatus: .failure)
 
     #expect(dashboardDependencyActionConfirmation(for: .approve, items: [clean]) == nil)
     let confirmation = dashboardDependencyActionConfirmation(for: .approve, items: [failing])
     #expect(confirmation != nil)
     #expect(confirmation?.title == "Approve pull request that needs attention?")
-    #expect(confirmation?.confirmButtonTitle == "Approve Anyway")
+    #expect(confirmation?.confirmButtonTitle == "Approve 1 Pull Request")
   }
 
   @Test("Merge confirmation explains admin bypass when required checks fail")
