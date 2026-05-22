@@ -6,7 +6,7 @@
 //! offline. This avoids GitHub's REST patch truncation and consumes zero
 //! HTTP rate-limit budget.
 //!
-//! This commit ships:
+//! This module owns:
 //!
 //! - `RepoKey` (sha256-prefixed owner/name) + `LocalCloneRoot` (filesystem
 //!   layout)
@@ -18,9 +18,8 @@
 //!   until under `max_disk_bytes`.
 //! - `LocalCloneListEntry` projection used by the Settings panel.
 //!
-//! The actual `tokio::process::Command` shell-outs to `git` (clone, fetch,
-//! diff, show, cat-file blob) plus the per-RepoKey mutex live with the
-//! service handler in A.10 / A.8.
+//! The actual git operations and per-RepoKey mutex live in
+//! `local_clone_runtime`; diff rendering lives in `local_clone_runtime::diff`.
 
 use std::collections::BTreeMap;
 use std::fmt;
