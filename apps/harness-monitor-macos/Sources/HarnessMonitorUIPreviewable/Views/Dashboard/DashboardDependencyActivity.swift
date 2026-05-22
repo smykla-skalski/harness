@@ -166,22 +166,22 @@ private struct DashboardDependencyLastActionRow: View {
   }
 }
 
-private extension DashboardDependencyActivityEntry.Outcome {
-  var label: String {
+extension DashboardDependencyActivityEntry.Outcome {
+  fileprivate var label: String {
     switch self {
     case .success: "Last action succeeded"
     case .failure: "Last action failed"
     }
   }
 
-  var tint: Color {
+  fileprivate var tint: Color {
     switch self {
     case .success: HarnessMonitorTheme.success
     case .failure: HarnessMonitorTheme.danger
     }
   }
 
-  var systemImage: String {
+  fileprivate var systemImage: String {
     switch self {
     case .success: "checkmark.circle.fill"
     case .failure: "exclamationmark.triangle.fill"
@@ -189,8 +189,8 @@ private extension DashboardDependencyActivityEntry.Outcome {
   }
 }
 
-private extension DependencyUpdateActionResult {
-  var activityMessage: String? {
+extension DependencyUpdateActionResult {
+  fileprivate var activityMessage: String? {
     if let message, !message.isEmpty {
       return message
     }
@@ -198,8 +198,8 @@ private extension DependencyUpdateActionResult {
   }
 }
 
-private extension DependencyUpdateActionKind {
-  var activityLabel: String {
+extension DependencyUpdateActionKind {
+  fileprivate var activityLabel: String {
     switch self {
     case .approve: "Approve"
     case .merge: "Merge"
@@ -213,8 +213,8 @@ private extension DependencyUpdateActionKind {
   }
 }
 
-private extension DependencyUpdateActionOutcome {
-  var activityLabel: String {
+extension DependencyUpdateActionOutcome {
+  fileprivate var activityLabel: String {
     switch self {
     case .applied: "applied"
     case .skipped: "skipped"
