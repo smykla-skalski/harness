@@ -74,6 +74,44 @@ let sampleDepsCatalogResponseText =
   }
   """
 
+let sampleDependencyCapabilitiesResponseText =
+  """
+  {
+    "schema_version": 1,
+    "supports_action_preview": true,
+    "supports_check_run_links": true,
+    "supports_repository_sync_health": true,
+    "supports_persistent_action_diagnostics": true
+  }
+  """
+
+let sampleActionPreviewText =
+  """
+  {
+    "action": "merge",
+    "capabilities": {
+      "schema_version": 1,
+      "supports_action_preview": true,
+      "supports_check_run_links": true,
+      "supports_repository_sync_health": true,
+      "supports_persistent_action_diagnostics": true
+    },
+    "total_count": 1,
+    "actionable_count": 1,
+    "skipped_count": 0,
+    "warnings": [],
+    "targets": [
+      {
+        "pull_request_id": "pr-42",
+        "repository": "example/harness",
+        "number": 42,
+        "eligible": true,
+        "warnings": []
+      }
+    ]
+  }
+  """
+
 let sampleDepsApproveResponseText =
   """
   {
@@ -167,5 +205,21 @@ let sampleDependencyRefreshResponseText =
     "fetched_at": "2026-05-21T12:00:00Z",
     "items": [],
     "missing_pull_request_ids": ["pr-42"]
+  }
+  """
+
+let sampleDependencyCommentResponseText =
+  """
+  {
+    "summary": "Posted dependency update comment.",
+    "results": [
+      {
+        "repository": "example/harness",
+        "number": 42,
+        "action": "comment",
+        "outcome": "applied",
+        "message": null
+      }
+    ]
   }
   """

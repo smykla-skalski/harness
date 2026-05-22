@@ -10,10 +10,26 @@ pub(crate) const ROUTES: &[HttpApiRouteContract] = &[
         swift_client_exposed: true,
     },
     HttpApiRouteContract {
+        method: HttpRouteMethod::Get,
+        path: http_paths::DEPENDENCY_UPDATES_CAPABILITIES,
+        parity: HttpRouteParity::Rpc {
+            ws_method: ws_methods::DEPENDENCY_UPDATES_CAPABILITIES,
+        },
+        swift_client_exposed: true,
+    },
+    HttpApiRouteContract {
         method: HttpRouteMethod::Post,
         path: http_paths::DEPENDENCY_UPDATES_QUERY,
         parity: HttpRouteParity::Rpc {
             ws_method: ws_methods::DEPENDENCY_UPDATES_QUERY,
+        },
+        swift_client_exposed: true,
+    },
+    HttpApiRouteContract {
+        method: HttpRouteMethod::Post,
+        path: http_paths::DEPENDENCY_UPDATES_ACTION_PREVIEW,
+        parity: HttpRouteParity::Rpc {
+            ws_method: ws_methods::DEPENDENCY_UPDATES_ACTION_PREVIEW,
         },
         swift_client_exposed: true,
     },

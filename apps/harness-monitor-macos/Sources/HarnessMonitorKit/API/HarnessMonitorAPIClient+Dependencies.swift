@@ -13,6 +13,17 @@ extension HarnessMonitorAPIClient {
     try await post("/v1/dependency-updates/query", body: request)
   }
 
+  public func dependencyUpdatesCapabilities() async throws -> DependencyUpdatesCapabilitiesResponse
+  {
+    try await get("/v1/dependency-updates/capabilities")
+  }
+
+  public func previewDependencyUpdateAction(
+    request: DependencyUpdatesActionPreviewRequest
+  ) async throws -> DependencyUpdatesActionPreviewResponse {
+    try await post("/v1/dependency-updates/action-preview", body: request)
+  }
+
   public func approveDependencyUpdates(
     request: DependencyUpdatesApproveRequest
   ) async throws -> DependencyUpdatesActionResponse {

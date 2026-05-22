@@ -1,8 +1,8 @@
 use crate::errors::{CliError, CliErrorKind};
 
 use super::{
-    DependencyUpdateTarget, DependencyUpdatesApproveRequest, DependencyUpdatesAutoRequest,
-    DependencyUpdatesBodyRequest, DependencyUpdatesBodyUpdateRequest,
+    DependencyUpdateTarget, DependencyUpdatesActionPreviewRequest, DependencyUpdatesApproveRequest,
+    DependencyUpdatesAutoRequest, DependencyUpdatesBodyRequest, DependencyUpdatesBodyUpdateRequest,
     DependencyUpdatesCommentRequest, DependencyUpdatesLabelRequest, DependencyUpdatesMergeRequest,
     DependencyUpdatesQueryRequest, DependencyUpdatesRefreshRequest,
     DependencyUpdatesRepositoryCatalogRequest, DependencyUpdatesRerunChecksRequest,
@@ -168,6 +168,16 @@ impl DependencyUpdatesCommentRequest {
             .into());
         }
         Ok(())
+    }
+}
+
+impl DependencyUpdatesActionPreviewRequest {
+    /// Validate the action preview request.
+    ///
+    /// # Errors
+    /// Returns `CliError` when no dependency update targets are provided.
+    pub fn validate(&self) -> Result<(), CliError> {
+        ensure_targets(&self.targets, "action preview")
     }
 }
 

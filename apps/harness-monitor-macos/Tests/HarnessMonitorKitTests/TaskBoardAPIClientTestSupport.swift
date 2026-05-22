@@ -83,7 +83,9 @@ private let taskBoardRPCResponses: [WebSocketRPCMethod: JSONValue] = [
   .taskBoardPolicyPipelineAudit: .object(samplePolicyAuditJSON),
   .dependencyUpdatesRepositoryCatalog:
     fixtureJSONValue(sampleDepsCatalogResponseText),
+  .dependencyUpdatesCapabilities: fixtureJSONValue(sampleDependencyCapabilitiesResponseText),
   .dependencyUpdatesQuery: fixtureJSONValue(sampleDependencyUpdatesQueryResponseText),
+  .dependencyUpdatesActionPreview: fixtureJSONValue(sampleActionPreviewText),
   .dependencyUpdatesApprove: fixtureJSONValue(sampleDepsApproveResponseText),
   .dependencyUpdatesMerge: fixtureJSONValue(sampleDependencyUpdatesMergeResponseText),
   .dependencyUpdatesRerunChecks: fixtureJSONValue(sampleDependencyUpdatesRerunResponseText),
@@ -91,6 +93,7 @@ private let taskBoardRPCResponses: [WebSocketRPCMethod: JSONValue] = [
   .dependencyUpdatesAuto: fixtureJSONValue(sampleDependencyUpdatesAutoResponseText),
   .dependencyUpdatesClearCache: fixtureJSONValue(sampleDepsCacheClearResponseText),
   .dependencyUpdatesRefresh: fixtureJSONValue(sampleDependencyRefreshResponseText),
+  .dependencyUpdatesComment: fixtureJSONValue(sampleDependencyCommentResponseText),
 ]
 
 final class TaskBoardURLProtocol: URLProtocol, @unchecked Sendable {
@@ -140,7 +143,11 @@ final class TaskBoardURLProtocol: URLProtocol, @unchecked Sendable {
     Route("/v1/task-board/policy/audit"): samplePolicyAuditText,
     Route("/v1/dependency-updates/repositories"):
       sampleDepsCatalogResponseText,
+    Route("/v1/dependency-updates/capabilities", method: "GET"):
+      sampleDependencyCapabilitiesResponseText,
     Route("/v1/dependency-updates/query"): sampleDependencyUpdatesQueryResponseText,
+    Route("/v1/dependency-updates/action-preview"):
+      sampleActionPreviewText,
     Route("/v1/dependency-updates/approve"): sampleDepsApproveResponseText,
     Route("/v1/dependency-updates/merge"): sampleDependencyUpdatesMergeResponseText,
     Route("/v1/dependency-updates/rerun-checks"): sampleDependencyUpdatesRerunResponseText,
@@ -149,6 +156,7 @@ final class TaskBoardURLProtocol: URLProtocol, @unchecked Sendable {
     Route("/v1/dependency-updates/cache", method: "DELETE"):
       sampleDepsCacheClearResponseText,
     Route("/v1/dependency-updates/refresh"): sampleDependencyRefreshResponseText,
+    Route("/v1/dependency-updates/comment"): sampleDependencyCommentResponseText,
   ]
 
   static var records: [RecordedRequest] {

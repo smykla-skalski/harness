@@ -15,6 +15,19 @@ extension PreviewHarnessClient {
     return await state.currentDependencyUpdates(request: request)
   }
 
+  public func dependencyUpdatesCapabilities() async throws -> DependencyUpdatesCapabilitiesResponse
+  {
+    try await performActionDelay()
+    return DependencyUpdatesCapabilitiesResponse()
+  }
+
+  public func previewDependencyUpdateAction(
+    request: DependencyUpdatesActionPreviewRequest
+  ) async throws -> DependencyUpdatesActionPreviewResponse {
+    try await performActionDelay()
+    return await state.previewDependencyUpdateAction(request: request)
+  }
+
   public func approveDependencyUpdates(
     request: DependencyUpdatesApproveRequest
   ) async throws -> DependencyUpdatesActionResponse {
