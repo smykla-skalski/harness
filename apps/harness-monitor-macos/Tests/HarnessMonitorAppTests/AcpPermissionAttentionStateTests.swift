@@ -76,7 +76,7 @@ struct AcpPermissionAttentionStateTests {
 
     let pendingRequests = await center.pendingNotificationRequests()
     #expect(pendingRequests.count == 1)
-    #expect(controller.lastResult == "Scheduled ACP permission batch-1.")
+    #expect(controller.lastResult == "Scheduled ACP permission batch-1")
   }
 
   @Test("route decision resolution gate rejects unresolved IDs")

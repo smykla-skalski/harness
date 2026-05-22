@@ -32,7 +32,7 @@ struct DashboardWindowRootView: View {
       && !completedInitialBootstrap
   }
 
-  var hostsSharedShellPresentation: Bool {
+  private var hostsSharedShellPresentation: Bool {
     keyWindowObserver.isKey(windowID: HarnessMonitorWindowID.dashboard)
   }
 
