@@ -1,28 +1,27 @@
 use std::collections::BTreeMap;
 
-use crate::daemon::service::task_board_runtime::external_sync_config_for_repository;
 use crate::reviews::{
-    ReviewActionOutcome, ReviewActionPreviewKind,
-    ReviewActionPreviewTarget, ReviewActionResult, ReviewCheckStatus,
-    ReviewItem, ReviewMergeableState, ReviewPullRequestState,
-    ReviewRepositoryLabel, ReviewReviewStatus, ReviewTarget,
-    ReviewsActionPreviewRequest, ReviewsActionPreviewResponse,
-    ReviewsActionResponse, ReviewsApproveRequest, ReviewsAutoRequest,
-    ReviewsBodyRequest, ReviewsBodyResponse,
-    ReviewsBodyUpdateOutcome, ReviewsBodyUpdateRequest,
-    ReviewsBodyUpdateResponse, ReviewsCacheClearResponse,
-    ReviewsCapabilitiesResponse, ReviewsCommentRequest,
-    ReviewsGitHubClient, ReviewsLabelRequest, ReviewsMergeRequest,
-    ReviewsQueryRequest, ReviewsQueryResponse, ReviewsRefreshRequest,
-    ReviewsRefreshResponse, ReviewsRepositoryCatalogRequest,
-    ReviewsRepositoryCatalogResponse, ReviewsRerunChecksRequest,
+    ReviewActionOutcome, ReviewActionResult, ReviewItem,
+    ReviewRepositoryLabel, ReviewsActionPreviewRequest,
+    ReviewsActionPreviewResponse, ReviewsActionResponse,
+    ReviewsApproveRequest, ReviewsAutoRequest, ReviewsBodyRequest,
+    ReviewsBodyResponse, ReviewsBodyUpdateOutcome,
+    ReviewsBodyUpdateRequest, ReviewsBodyUpdateResponse,
+    ReviewsCacheClearResponse, ReviewsCapabilitiesResponse,
+    ReviewsCommentRequest, ReviewsGitHubClient, ReviewsLabelRequest,
+    ReviewsMergeRequest, ReviewsQueryRequest, ReviewsQueryResponse,
+    ReviewsRefreshRequest, ReviewsRefreshResponse,
+    ReviewsRepositoryCatalogRequest, ReviewsRepositoryCatalogResponse,
+    ReviewsRerunChecksRequest,
 };
-use crate::errors::{CliError, CliErrorKind};
-use crate::task_board::ExternalProvider;
+use crate::errors::CliError;
 use crate::workspace::utc_now;
 
 #[path = "reviews_cache.rs"]
 mod cache_internal;
+
+mod preview;
+mod token;
 
 #[cfg(test)]
 pub(super) use cache_internal::apply_refresh_to_items;
@@ -30,18 +29,8 @@ use cache_internal::{
     body_cache, cache, cached_body_response, cached_query_response, patch_cached_items,
     patch_cached_repository_labels, store_cached_body_response, store_cached_query_response,
 };
-
-#[derive(Clone)]
-struct TokenBoundRequest {
-    token: String,
-    request: ReviewsQueryRequest,
-}
-
-#[derive(Clone)]
-struct TokenBoundTargets {
-    token: String,
-    targets: Vec<ReviewTarget>,
-}
+use preview::{preview_action_target, preview_action_warnings};
+use token::{github_token, missing_token_error, token_bound_requests, token_bound_targets};
 
 /// Query dependency update pull requests through configured GitHub tokens.
 ///
@@ -462,234 +451,6 @@ pub fn clear_reviews_cache() -> Result<ReviewsCacheClearResponse, CliError> {
     cleared_entries += body_cache.len();
     body_cache.clear();
     Ok(ReviewsCacheClearResponse { cleared_entries })
-}
-
-fn token_bound_requests(
-    request: &ReviewsQueryRequest,
-) -> Result<Vec<TokenBoundRequest>, CliError> {
-    let global_token = github_token(None);
-    let mut segments = Vec::new();
-
-    let org_request = request.organization_only_request();
-    if !org_request.normalized_organizations().is_empty() {
-        let token = global_token
-            .clone()
-            .ok_or_else(|| missing_token_error(None))?;
-        segments.push(TokenBoundRequest {
-            token,
-            request: org_request,
-        });
-    }
-
-    let excluded = request.normalized_exclude_repositories();
-    for repository in request.normalized_repositories() {
-        if excluded.contains(&repository) {
-            continue;
-        }
-        let token = github_token(Some(repository.as_str()))
-            .or_else(|| global_token.clone())
-            .ok_or_else(|| missing_token_error(Some(repository.as_str())))?;
-        segments.push(TokenBoundRequest {
-            token,
-            request: request.repository_only_request(&repository),
-        });
-    }
-
-    if segments.is_empty() {
-        return Err(CliErrorKind::workflow_parse(
-            "reviews query resolved to zero token-backed scopes",
-        )
-        .into());
-    }
-    Ok(segments)
-}
-
-fn token_bound_targets(
-    targets: &[ReviewTarget],
-) -> Result<Vec<TokenBoundTargets>, CliError> {
-    let global_token = github_token(None);
-    let mut grouped = BTreeMap::<String, Vec<ReviewTarget>>::new();
-    for target in targets {
-        let token = github_token(Some(target.repository.as_str()))
-            .or_else(|| global_token.clone())
-            .ok_or_else(|| missing_token_error(Some(target.repository.as_str())))?;
-        grouped.entry(token).or_default().push(target.clone());
-    }
-    Ok(grouped
-        .into_iter()
-        .map(|(token, targets)| TokenBoundTargets { token, targets })
-        .collect())
-}
-
-fn github_token(repository: Option<&str>) -> Option<String> {
-    external_sync_config_for_repository(repository, &[])
-        .token_for(ExternalProvider::GitHub)
-        .map(ToString::to_string)
-}
-
-fn missing_token_error(repository: Option<&str>) -> CliError {
-    match repository {
-        Some(repository) => CliErrorKind::workflow_io(format!(
-            "reviews requires a GitHub token for '{repository}'. Configure one in Settings > Secrets."
-        ))
-        .into(),
-        None => CliErrorKind::workflow_io(
-            "reviews requires a GitHub token. Configure one in Settings > Secrets.",
-        )
-        .into(),
-    }
-}
-
-fn preview_action_target(
-    action: ReviewActionPreviewKind,
-    target: &ReviewTarget,
-) -> ReviewActionPreviewTarget {
-    let token_available =
-        github_token(Some(target.repository.as_str())).or_else(|| github_token(None));
-    let reason = if token_available.is_none() {
-        Some(format!(
-            "No GitHub token is configured for '{}'",
-            target.repository
-        ))
-    } else {
-        preview_action_blocker(action, target)
-    };
-    ReviewActionPreviewTarget {
-        pull_request_id: target.pull_request_id.clone(),
-        repository: target.repository.clone(),
-        number: target.number,
-        eligible: reason.is_none(),
-        reason,
-        warnings: preview_target_warnings(action, target),
-    }
-}
-
-fn preview_action_blocker(
-    action: ReviewActionPreviewKind,
-    target: &ReviewTarget,
-) -> Option<String> {
-    if !target.viewer_can_update {
-        return Some("Current GitHub token cannot update this pull request".to_string());
-    }
-    if target.state != ReviewPullRequestState::Open {
-        return Some("Pull request is not open".to_string());
-    }
-    match action {
-        ReviewActionPreviewKind::Approve => {
-            if target.can_attempt_manual_approval() {
-                None
-            } else {
-                Some("Pull request does not need manual approval".to_string())
-            }
-        }
-        ReviewActionPreviewKind::Merge => {
-            if target.is_draft {
-                Some("Draft pull requests cannot be merged".to_string())
-            } else if target.mergeable == ReviewMergeableState::Conflicting {
-                Some("Merge conflicts must be resolved before merging".to_string())
-            } else {
-                None
-            }
-        }
-        ReviewActionPreviewKind::RerunChecks => {
-            if target.can_attempt_rerun_checks() {
-                None
-            } else {
-                Some("No rerunnable check suites were reported".to_string())
-            }
-        }
-        ReviewActionPreviewKind::AddLabel => {
-            if target.can_add_label() {
-                None
-            } else {
-                Some("Labels can only be added to open pull requests".to_string())
-            }
-        }
-        ReviewActionPreviewKind::Auto => {
-            if target.is_auto_approvable() || target.is_auto_mergeable() {
-                None
-            } else {
-                Some("Pull request is not eligible for auto mode".to_string())
-            }
-        }
-    }
-}
-
-fn preview_action_warnings(
-    action: ReviewActionPreviewKind,
-    targets: &[ReviewTarget],
-) -> Vec<String> {
-    let mut warnings = Vec::new();
-    let failing = targets
-        .iter()
-        .filter(|target| target.check_status == ReviewCheckStatus::Failure)
-        .count();
-    if matches!(
-        action,
-        ReviewActionPreviewKind::Approve | ReviewActionPreviewKind::Merge
-    ) && failing > 0
-    {
-        warnings.push(counted_warning(
-            failing,
-            "pull request has failing checks",
-            "pull requests have failing checks",
-        ));
-    }
-    let policy_blocked = targets
-        .iter()
-        .filter(|target| target.policy_blocked)
-        .count();
-    if policy_blocked > 0 {
-        warnings.push(counted_warning(
-            policy_blocked,
-            "pull request is policy-blocked",
-            "pull requests are policy-blocked",
-        ));
-    }
-    warnings
-}
-
-fn preview_target_warnings(
-    action: ReviewActionPreviewKind,
-    target: &ReviewTarget,
-) -> Vec<String> {
-    let mut warnings = Vec::new();
-    if matches!(
-        action,
-        ReviewActionPreviewKind::Approve | ReviewActionPreviewKind::Merge
-    ) && target.check_status == ReviewCheckStatus::Failure
-    {
-        if target.required_failed_check_names.is_empty() {
-            warnings.push("Checks are failing".to_string());
-        } else if target.viewer_can_merge_as_admin
-            && action == ReviewActionPreviewKind::Merge
-        {
-            warnings.push(format!(
-                "Required checks are failing: {}. Admin merge can bypass branch protections.",
-                target.required_failed_check_names.join(", ")
-            ));
-        } else {
-            warnings.push(format!(
-                "Required checks are failing: {}",
-                target.required_failed_check_names.join(", ")
-            ));
-        }
-    }
-    if target.review_status == ReviewReviewStatus::ChangesRequested {
-        warnings.push("A reviewer requested changes".to_string());
-    }
-    if target.policy_blocked {
-        warnings.push("Review policy is blocking this pull request".to_string());
-    }
-    warnings
-}
-
-fn counted_warning(count: usize, singular: &str, plural: &str) -> String {
-    if count == 1 {
-        format!("1 {singular}")
-    } else {
-        format!("{count} {plural}")
-    }
 }
 
 fn action_response(
