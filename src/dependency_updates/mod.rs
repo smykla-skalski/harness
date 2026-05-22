@@ -495,8 +495,10 @@ impl DependencyUpdateTarget {
 
     #[must_use]
     pub fn is_auto_mergeable(&self) -> bool {
-        self.review_status == DependencyUpdateReviewStatus::Approved
-            && self.check_status == DependencyUpdateCheckStatus::Success
+        matches!(
+            self.review_status,
+            DependencyUpdateReviewStatus::Approved | DependencyUpdateReviewStatus::None
+        ) && self.check_status == DependencyUpdateCheckStatus::Success
             && self.mergeable != DependencyUpdateMergeableState::Conflicting
             && !self.policy_blocked
     }

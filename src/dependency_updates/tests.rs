@@ -109,6 +109,46 @@ fn auto_mode_rules_match_helper_contract() {
 }
 
 #[test]
+fn auto_mergeable_accepts_unreviewed_open_prs() {
+    let unreviewed = sample_item(
+        DependencyUpdateReviewStatus::None,
+        DependencyUpdateCheckStatus::Success,
+        DependencyUpdateMergeableState::Mergeable,
+        false,
+    );
+    let unreviewed_pending = sample_item(
+        DependencyUpdateReviewStatus::None,
+        DependencyUpdateCheckStatus::Pending,
+        DependencyUpdateMergeableState::Mergeable,
+        false,
+    );
+    let unreviewed_conflicting = sample_item(
+        DependencyUpdateReviewStatus::None,
+        DependencyUpdateCheckStatus::Success,
+        DependencyUpdateMergeableState::Conflicting,
+        false,
+    );
+    let unreviewed_policy_blocked = sample_item(
+        DependencyUpdateReviewStatus::None,
+        DependencyUpdateCheckStatus::Success,
+        DependencyUpdateMergeableState::Mergeable,
+        true,
+    );
+    let changes_requested = sample_item(
+        DependencyUpdateReviewStatus::ChangesRequested,
+        DependencyUpdateCheckStatus::Success,
+        DependencyUpdateMergeableState::Mergeable,
+        false,
+    );
+
+    assert!(unreviewed.is_ready_to_merge());
+    assert!(!unreviewed_pending.is_ready_to_merge());
+    assert!(!unreviewed_conflicting.is_ready_to_merge());
+    assert!(!unreviewed_policy_blocked.is_ready_to_merge());
+    assert!(!changes_requested.is_ready_to_merge());
+}
+
+#[test]
 fn serialized_item_always_emits_array_fields_for_swift_decoders() {
     let item = sample_item(
         DependencyUpdateReviewStatus::ReviewRequired,
