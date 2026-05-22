@@ -81,5 +81,8 @@ extension DashboardDependenciesRouteView {
     )
     pruneRefreshTrackerToLiveItems()
     persistDependenciesRefresh(refresh)
+    store.invalidateDependencyUpdateTimelines(
+      for: refresh.items.map(\.pullRequestID)
+    )
   }
 }
