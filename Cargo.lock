@@ -2610,6 +2610,7 @@ dependencies = [
  "gix-submodule",
  "gix-tempfile",
  "gix-trace",
+ "gix-transport",
  "gix-traverse",
  "gix-url",
  "gix-utils",
@@ -3121,7 +3122,9 @@ dependencies = [
  "gix-hashtable",
  "gix-object",
  "gix-path",
+ "gix-tempfile",
  "memmap2 0.9.10",
+ "parking_lot",
  "smallvec",
  "thiserror 2.0.18",
  "uluru",
@@ -3186,11 +3189,18 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "aa4bee82db63ec635996b96efae71cf467c155fa3f34a556184373224a26c4fd"
 dependencies = [
  "bstr",
+ "gix-credentials",
  "gix-date",
  "gix-features",
  "gix-hash",
+ "gix-lock",
+ "gix-negotiate",
+ "gix-object",
  "gix-ref",
+ "gix-refspec",
+ "gix-revwalk",
  "gix-shallow",
+ "gix-trace",
  "gix-transport",
  "gix-utils",
  "maybe-async",
@@ -3370,13 +3380,16 @@ version = "0.57.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ffd6a5c676b92d4ead5f5a2b2935024415dec69edc997b6090ca9cac010a3018"
 dependencies = [
+ "base64 0.22.1",
  "bstr",
  "gix-command",
+ "gix-credentials",
  "gix-features",
  "gix-packetline",
  "gix-quote",
  "gix-sec",
  "gix-url",
+ "reqwest 0.13.3",
  "thiserror 2.0.18",
 ]
 
