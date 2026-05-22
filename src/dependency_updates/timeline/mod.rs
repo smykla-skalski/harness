@@ -1,4 +1,12 @@
-#![allow(dead_code)]
+#![allow(dead_code, unused_imports)]
+
+mod types;
+
+pub use types::{
+    Actor, CommitEntry, DependencyUpdateTimelineEntry, HeadRefForcePushedEntry, IssueCommentEntry,
+    ReviewEntry, ReviewInlineCommentEntry, ReviewState, ReviewThreadCommentEntry,
+    ReviewThreadEntry, SimpleActorEventEntry, SimpleActorEventKind, UnknownEntry,
+};
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
@@ -40,7 +48,3 @@ pub struct TimelinePageInfo {
     pub has_newer: bool,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct DependencyUpdateTimelineEntry {
-    pub id: String,
-}
