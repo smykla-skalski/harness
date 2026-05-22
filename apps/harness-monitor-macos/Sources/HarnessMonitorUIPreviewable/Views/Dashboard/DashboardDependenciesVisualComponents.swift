@@ -227,18 +227,23 @@ struct DashboardDependencyListRow: View {
   }
 
   @ViewBuilder private var leadingStatusIndicator: some View {
-    if isRefreshing {
-      ProgressView()
-        .controlSize(.small)
-        .frame(width: 18, alignment: .center)
-        .accessibilityLabel("Working on pull request")
-    } else {
-      Image(systemName: item.statusSystemImage)
-        .font(.system(size: 14, weight: .semibold))
-        .foregroundStyle(item.statusTint)
-        .frame(width: 18, alignment: .center)
-        .accessibilityHidden(true)
+    ZStack {
+      if isRefreshing {
+        ProgressView()
+          .controlSize(.small)
+          .tint(item.statusTint)
+          .accessibilityLabel("Working on pull request")
+          .transition(.opacity)
+      } else {
+        Image(systemName: item.statusSystemImage)
+          .font(.system(size: 14, weight: .semibold))
+          .foregroundStyle(item.statusTint)
+          .accessibilityHidden(true)
+          .transition(.opacity)
+      }
     }
+    .frame(width: 18, alignment: .center)
+    .animation(.easeInOut(duration: 0.18), value: isRefreshing)
   }
 
   private var secondaryText: String {
