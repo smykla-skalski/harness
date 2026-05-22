@@ -387,7 +387,10 @@ struct DashboardDependenciesRouteViewTests {
 
     #expect(preview.actionableCount == 1)
     #expect(preview.skippedCount == 2)
-    #expect(preview.skippedReasons.map(\.reason).contains("Merge conflicts must be resolved before merging"))
+    #expect(
+      preview.skippedReasons.map(\.reason)
+        .contains("Merge conflicts must be resolved before merging")
+    )
     #expect(
       preview.skippedReasons.map(\.reason)
         .contains("Current GitHub token cannot update selected pull request(s)")
