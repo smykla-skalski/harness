@@ -7,6 +7,15 @@ struct SettingsDependenciesSection: View {
   private var storedPreferences = ""
   @State private var draft = DashboardDependenciesPreferences()
   @State private var hasLoadedDraft = false
+  @State private var hiddenKindsSearchText = ""
+  // Pre-filter via `.onChange(of: hiddenKindsSearchText)` rather than
+  // computing `.filter(...)` inline in ForEach: filtering O(45) every
+  // body call burns work that the debounce + cached @State path avoids.
+  // ForEach(filteredHiddenKinds, id: \.rawValue) keeps toggle identity
+  // stable as the list grows/shrinks with the search query.
+  @State private var filteredHiddenKinds: [DependencyUpdateTimelineKind] =
+    DependencyUpdateTimelineKind.allCases
+  @State private var hiddenKindsSearchTask: Task<Void, Never>?
 
   init(navigationRequest: Binding<SettingsNavigationRequest?> = .constant(nil)) {
     _navigationRequest = navigationRequest
@@ -152,22 +161,46 @@ struct SettingsDependenciesSection: View {
         isOn: $draft.timelineAutoCollapseHeavyReviewThreads
       )
       DisclosureGroup("Hidden event types") {
-        ForEach(DependencyUpdateTimelineKind.allCases, id: \.self) { kind in
-          Toggle(
-            kindDisplayName(kind),
-            isOn: Binding(
-              get: { draft.timelineHiddenKinds.contains(kind) },
-              set: { hide in
-                var current = draft.timelineHiddenKinds
-                if hide {
-                  current.insert(kind)
-                } else {
-                  current.remove(kind)
+        TextField("Search", text: $hiddenKindsSearchText)
+          .textFieldStyle(.roundedBorder)
+          .accessibilityLabel("Search hidden event types")
+        if filteredHiddenKinds.isEmpty {
+          ContentUnavailableView.search(text: hiddenKindsSearchText)
+        } else {
+          ForEach(filteredHiddenKinds, id: \.rawValue) { kind in
+            Toggle(
+              kindDisplayName(kind),
+              isOn: Binding(
+                get: { draft.timelineHiddenKinds.contains(kind) },
+                set: { hide in
+                  var current = draft.timelineHiddenKinds
+                  if hide {
+                    current.insert(kind)
+                  } else {
+                    current.remove(kind)
+                  }
+                  draft.timelineHiddenKinds = current
                 }
-                draft.timelineHiddenKinds = current
-              }
+              )
             )
-          )
+          }
+        }
+      }
+      .onChange(of: hiddenKindsSearchText) { _, query in
+        hiddenKindsSearchTask?.cancel()
+        hiddenKindsSearchTask = Task { @MainActor in
+          // 200ms debounce keeps the O(45) filter off the per-keystroke
+          // body path. Cancellation propagates if the user keeps typing.
+          try? await Task.sleep(for: .milliseconds(200))
+          guard !Task.isCancelled else { return }
+          let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
+          if trimmed.isEmpty {
+            filteredHiddenKinds = DependencyUpdateTimelineKind.allCases
+          } else {
+            filteredHiddenKinds = DependencyUpdateTimelineKind.allCases.filter { kind in
+              kindDisplayName(kind).localizedCaseInsensitiveContains(trimmed)
+            }
+          }
         }
       }
     } header: {
