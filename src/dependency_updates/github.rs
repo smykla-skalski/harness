@@ -20,6 +20,7 @@ mod ingest;
 mod mapping;
 mod pagination;
 mod queries;
+mod rate_limit;
 mod types;
 
 use chrono::{DateTime, Utc};
