@@ -80,6 +80,26 @@ struct DependencyUpdatesParityHelperTests {
     )
   }
 
+  @Test("Auto merge targets approved or unreviewed PRs that pass checks")
+  func autoMergeableAllowedWhenReviewStatusIsNone() {
+    #expect(makeItem(reviewStatus: .approved, checkStatus: .success).isAutoMergeable)
+    #expect(makeItem(reviewStatus: .none, checkStatus: .success).isAutoMergeable)
+    #expect(!makeItem(reviewStatus: .reviewRequired, checkStatus: .success).isAutoMergeable)
+    #expect(!makeItem(reviewStatus: .changesRequested, checkStatus: .success).isAutoMergeable)
+    #expect(!makeItem(reviewStatus: .none, checkStatus: .pending).isAutoMergeable)
+    #expect(!makeItem(reviewStatus: .none, checkStatus: .failure).isAutoMergeable)
+    #expect(
+      !makeItem(
+        reviewStatus: .none, checkStatus: .success, mergeable: .conflicting
+      ).isAutoMergeable
+    )
+    #expect(
+      !makeItem(
+        reviewStatus: .none, checkStatus: .success, policyBlocked: true
+      ).isAutoMergeable
+    )
+  }
+
   @Test("Fix CI is available only for failing checks")
   func fixCIRequiresFailingChecks() {
     #expect(makeItem(checkStatus: .failure).canStartFixCI)
@@ -158,6 +178,7 @@ struct DependencyUpdatesParityHelperTests {
     mergeable: DependencyUpdateMergeableState = .mergeable,
     reviewStatus: DependencyUpdateReviewStatus = .reviewRequired,
     checkStatus: DependencyUpdateCheckStatus = .success,
+    policyBlocked: Bool = false,
     isDraft: Bool = false,
     checks: [DependencyUpdateCheck] = []
   ) -> DependencyUpdateItem {
@@ -173,7 +194,7 @@ struct DependencyUpdatesParityHelperTests {
       mergeable: mergeable,
       reviewStatus: reviewStatus,
       checkStatus: checkStatus,
-      policyBlocked: false,
+      policyBlocked: policyBlocked,
       isDraft: isDraft,
       headSha: "abc123",
       labels: [],
