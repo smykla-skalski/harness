@@ -1,56 +1,56 @@
 import HarnessMonitorUIPreviewable
 import SwiftUI
 
-struct DependencyCommands: Commands {
-  @FocusedValue(\.dashboardDependenciesCommands)
-  private var dependencyCommands
+struct ReviewCommands: Commands {
+  @FocusedValue(\.dashboardReviewsCommands)
+  private var reviewCommands
 
   var body: some Commands {
-    CommandMenu("Dependencies") {
+    CommandMenu("Reviews") {
       Button("Approve Selection") {
-        dependencyCommands?.approve()
+        reviewCommands?.approve()
       }
       .keyboardShortcut("a", modifiers: [.command, .option, .shift])
-      .disabled(dependencyCommands?.canApprove != true)
+      .disabled(reviewCommands?.canApprove != true)
 
       Button("Merge Selection") {
-        dependencyCommands?.merge()
+        reviewCommands?.merge()
       }
       .keyboardShortcut("m", modifiers: [.command, .option, .shift])
-      .disabled(dependencyCommands?.canMerge != true)
+      .disabled(reviewCommands?.canMerge != true)
 
       Button("Rerun Checks") {
-        dependencyCommands?.rerunChecks()
+        reviewCommands?.rerunChecks()
       }
       .keyboardShortcut("r", modifiers: [.command, .option, .shift])
-      .disabled(dependencyCommands?.canRerunChecks != true)
+      .disabled(reviewCommands?.canRerunChecks != true)
 
       Divider()
 
       Button("Open Pull Request") {
-        dependencyCommands?.openPullRequest()
+        reviewCommands?.openPullRequest()
       }
       .keyboardShortcut("o", modifiers: [.command, .option, .shift])
-      .disabled(dependencyCommands?.canOpenPullRequest != true)
+      .disabled(reviewCommands?.canOpenPullRequest != true)
 
       Button("Copy Diagnostics") {
-        dependencyCommands?.copyDiagnostics()
+        reviewCommands?.copyDiagnostics()
       }
       .keyboardShortcut("d", modifiers: [.command, .option, .shift])
-      .disabled(dependencyCommands?.canCopyDiagnostics != true)
+      .disabled(reviewCommands?.canCopyDiagnostics != true)
 
       Divider()
 
       Toggle("Failed Checks Only", isOn: failedChecksOnlyBinding)
         .keyboardShortcut("f", modifiers: [.command, .option, .shift])
-        .disabled(dependencyCommands == nil)
+        .disabled(reviewCommands == nil)
     }
   }
 
   private var failedChecksOnlyBinding: Binding<Bool> {
     Binding(
-      get: { dependencyCommands?.hasProblemChecksFilter ?? false },
-      set: { _ in dependencyCommands?.toggleProblemChecksFilter() }
+      get: { reviewCommands?.hasProblemChecksFilter ?? false },
+      set: { _ in reviewCommands?.toggleProblemChecksFilter() }
     )
   }
 }
