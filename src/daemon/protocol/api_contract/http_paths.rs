@@ -88,6 +88,12 @@ pub const DEPENDENCY_UPDATES_REFRESH: &str = "/v1/dependency-updates/refresh";
 pub const DEPENDENCY_UPDATES_BODY: &str = "/v1/dependency-updates/body";
 pub const DEPENDENCY_UPDATES_BODY_UPDATE: &str = "/v1/dependency-updates/body/update";
 pub const DEPENDENCY_UPDATES_COMMENT: &str = "/v1/dependency-updates/comment";
+pub const DEPENDENCY_UPDATES_FILES_LIST: &str = "/v1/dependency-updates/files/list";
+pub const DEPENDENCY_UPDATES_FILES_PATCH: &str = "/v1/dependency-updates/files/patch";
+pub const DEPENDENCY_UPDATES_FILES_VIEWED: &str = "/v1/dependency-updates/files/viewed";
+pub const DEPENDENCY_UPDATES_FILES_BLOB: &str = "/v1/dependency-updates/files/blob";
+pub const DEPENDENCY_UPDATES_FILES_LOCAL_CLONES: &str =
+    "/v1/dependency-updates/files/local-clones";
 pub const SESSION_AGENT_ROLE: &str = "/v1/sessions/{session_id}/agents/{session_agent_id}/role";
 pub const SESSION_AGENT_REMOVE: &str = "/v1/sessions/{session_id}/agents/{session_agent_id}/remove";
 pub const SESSION_LEADER_TRANSFER: &str = "/v1/sessions/{session_id}/leader";
