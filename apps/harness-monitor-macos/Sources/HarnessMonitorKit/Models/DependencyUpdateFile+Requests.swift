@@ -1,0 +1,278 @@
+// Request/response structs for the Files endpoints. Split out of
+// `DependencyUpdateFile.swift` so the type-models file stays under the
+// 420-line cap from CLAUDE.md.
+
+import Foundation
+
+/// Request to list a PR's changed files via the daemon.
+public struct DependencyUpdatesFilesListRequest: Codable, Equatable, Sendable {
+  public let pullRequestID: String
+  public let forceRefresh: Bool
+
+  public init(pullRequestID: String, forceRefresh: Bool = false) {
+    self.pullRequestID = pullRequestID
+    self.forceRefresh = forceRefresh
+  }
+
+  enum CodingKeys: String, CodingKey {
+    case pullRequestID = "pullRequestId"
+    case forceRefresh
+  }
+}
+
+/// Response shape for the files_list endpoint.
+public struct DependencyUpdatesFilesListResponse: Codable, Equatable, Sendable {
+  public let pullRequestID: String
+  public let headRefOid: String
+  public let viewerCanMarkViewed: Bool
+  public let files: [DependencyUpdateFile]
+  public let fetchedAt: String
+  public let rateLimitSnapshot: DependencyUpdatesRateLimitSnapshot?
+
+  public init(
+    pullRequestID: String,
+    headRefOid: String,
+    viewerCanMarkViewed: Bool,
+    files: [DependencyUpdateFile],
+    fetchedAt: String,
+    rateLimitSnapshot: DependencyUpdatesRateLimitSnapshot? = nil
+  ) {
+    self.pullRequestID = pullRequestID
+    self.headRefOid = headRefOid
+    self.viewerCanMarkViewed = viewerCanMarkViewed
+    self.files = files
+    self.fetchedAt = fetchedAt
+    self.rateLimitSnapshot = rateLimitSnapshot
+  }
+
+  enum CodingKeys: String, CodingKey {
+    case pullRequestID = "pullRequestId"
+    case headRefOid
+    case viewerCanMarkViewed
+    case files
+    case fetchedAt
+    case rateLimitSnapshot
+  }
+}
+
+/// Patch fetch request. The Monitor sends its expected head_ref_oid so the
+/// daemon can detect force-push drift.
+public struct DependencyUpdatesFilesPatchRequest: Codable, Equatable, Sendable {
+  public let pullRequestID: String
+  public let headRefOidExpected: String
+  public let paths: [String]
+
+  public init(pullRequestID: String, headRefOidExpected: String, paths: [String]) {
+    self.pullRequestID = pullRequestID
+    self.headRefOidExpected = headRefOidExpected
+    self.paths = paths
+  }
+
+  enum CodingKeys: String, CodingKey {
+    case pullRequestID = "pullRequestId"
+    case headRefOidExpected
+    case paths
+  }
+}
+
+/// One file's patch body plus metadata.
+public struct DependencyUpdateFilePatch: Codable, Equatable, Sendable, Identifiable {
+  public let path: String
+  public let patch: String
+  public let status: DependencyUpdateFileChangeType
+  public let additions: UInt32
+  public let deletions: UInt32
+  public let truncated: Bool
+  public let etag: String?
+  public let servedBy: DependencyUpdateFileServedBy
+  public let fetchedAt: String
+  public let headRefOid: String
+
+  public var id: String { path }
+
+  public init(
+    path: String,
+    patch: String,
+    status: DependencyUpdateFileChangeType = .modified,
+    additions: UInt32 = 0,
+    deletions: UInt32 = 0,
+    truncated: Bool = false,
+    etag: String? = nil,
+    servedBy: DependencyUpdateFileServedBy = .githubRest,
+    fetchedAt: String = "",
+    headRefOid: String = ""
+  ) {
+    self.path = path
+    self.patch = patch
+    self.status = status
+    self.additions = additions
+    self.deletions = deletions
+    self.truncated = truncated
+    self.etag = etag
+    self.servedBy = servedBy
+    self.fetchedAt = fetchedAt
+    self.headRefOid = headRefOid
+  }
+}
+
+/// Response carrying patches + drift flag.
+public struct DependencyUpdatesFilesPatchResponse: Codable, Equatable, Sendable {
+  public let pullRequestID: String
+  public let patches: [DependencyUpdateFilePatch]
+  public let drifted: Bool
+  public let currentHeadRefOid: String
+  public let fetchedAt: String
+  public let rateLimitSnapshot: DependencyUpdatesRateLimitSnapshot?
+
+  public init(
+    pullRequestID: String,
+    patches: [DependencyUpdateFilePatch],
+    drifted: Bool,
+    currentHeadRefOid: String,
+    fetchedAt: String,
+    rateLimitSnapshot: DependencyUpdatesRateLimitSnapshot? = nil
+  ) {
+    self.pullRequestID = pullRequestID
+    self.patches = patches
+    self.drifted = drifted
+    self.currentHeadRefOid = currentHeadRefOid
+    self.fetchedAt = fetchedAt
+    self.rateLimitSnapshot = rateLimitSnapshot
+  }
+
+  enum CodingKeys: String, CodingKey {
+    case pullRequestID = "pullRequestId"
+    case patches
+    case drifted
+    case currentHeadRefOid
+    case fetchedAt
+    case rateLimitSnapshot
+  }
+}
+
+/// Per-path target for the mark-viewed mutation.
+public struct DependencyUpdateFilesViewedTarget: Codable, Equatable, Sendable {
+  public let path: String
+  public let expectedPriorState: DependencyUpdateFileViewedState
+  public let markViewed: Bool
+
+  public init(
+    path: String,
+    expectedPriorState: DependencyUpdateFileViewedState,
+    markViewed: Bool
+  ) {
+    self.path = path
+    self.expectedPriorState = expectedPriorState
+    self.markViewed = markViewed
+  }
+}
+
+/// Batched mark-viewed request.
+public struct DependencyUpdatesFilesViewedRequest: Codable, Equatable, Sendable {
+  public let pullRequestID: String
+  public let paths: [DependencyUpdateFilesViewedTarget]
+
+  public init(pullRequestID: String, paths: [DependencyUpdateFilesViewedTarget]) {
+    self.pullRequestID = pullRequestID
+    self.paths = paths
+  }
+
+  enum CodingKeys: String, CodingKey {
+    case pullRequestID = "pullRequestId"
+    case paths
+  }
+}
+
+/// One result row inside the viewed response.
+public struct DependencyUpdateFilesViewedResult: Codable, Equatable, Sendable {
+  public let path: String
+  public let outcome: DependencyUpdateFileViewedOutcome
+  public let viewerViewedState: DependencyUpdateFileViewedState
+
+  public init(
+    path: String,
+    outcome: DependencyUpdateFileViewedOutcome,
+    viewerViewedState: DependencyUpdateFileViewedState
+  ) {
+    self.path = path
+    self.outcome = outcome
+    self.viewerViewedState = viewerViewedState
+  }
+}
+
+/// Response to a mark-viewed batch.
+public struct DependencyUpdatesFilesViewedResponse: Codable, Equatable, Sendable {
+  public let pullRequestID: String
+  public let results: [DependencyUpdateFilesViewedResult]
+  public let fetchedAt: String
+
+  public init(
+    pullRequestID: String,
+    results: [DependencyUpdateFilesViewedResult],
+    fetchedAt: String
+  ) {
+    self.pullRequestID = pullRequestID
+    self.results = results
+    self.fetchedAt = fetchedAt
+  }
+
+  enum CodingKeys: String, CodingKey {
+    case pullRequestID = "pullRequestId"
+    case results
+    case fetchedAt
+  }
+}
+
+/// Image blob request.
+public struct DependencyUpdatesFilesBlobRequest: Codable, Equatable, Sendable {
+  public let repositoryID: String
+  public let oid: String
+  public let path: String
+
+  public init(repositoryID: String, oid: String, path: String) {
+    self.repositoryID = repositoryID
+    self.oid = oid
+    self.path = path
+  }
+
+  enum CodingKeys: String, CodingKey {
+    case repositoryID = "repositoryId"
+    case oid
+    case path
+  }
+}
+
+/// Image blob response.
+public struct DependencyUpdatesFilesBlobResponse: Codable, Equatable, Sendable {
+  public let path: String
+  public let oid: String
+  public let mime: HarnessDependencyImageMime
+  public let contentBase64: String
+  public let byteSize: UInt64
+  public let isTruncated: Bool
+  public let isTooLarge: Bool
+  public let fetchedAt: String
+  public let rateLimitSnapshot: DependencyUpdatesRateLimitSnapshot?
+
+  public init(
+    path: String,
+    oid: String,
+    mime: HarnessDependencyImageMime,
+    contentBase64: String,
+    byteSize: UInt64,
+    isTruncated: Bool = false,
+    isTooLarge: Bool = false,
+    fetchedAt: String,
+    rateLimitSnapshot: DependencyUpdatesRateLimitSnapshot? = nil
+  ) {
+    self.path = path
+    self.oid = oid
+    self.mime = mime
+    self.contentBase64 = contentBase64
+    self.byteSize = byteSize
+    self.isTruncated = isTruncated
+    self.isTooLarge = isTooLarge
+    self.fetchedAt = fetchedAt
+    self.rateLimitSnapshot = rateLimitSnapshot
+  }
+}
