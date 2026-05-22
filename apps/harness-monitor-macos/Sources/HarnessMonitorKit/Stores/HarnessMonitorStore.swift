@@ -300,6 +300,7 @@ public final class HarnessMonitorStore {
   @ObservationIgnored
   var dependencyUpdateTimelineViewModels: [String: DependencyUpdateTimelineViewModel] = [:]
   @ObservationIgnored var pendingDependencyUpdateTimelineFetches: Set<String> = []
+  @ObservationIgnored var dependencyUpdateDraftWriteTasks: [String: Task<Void, Never>] = [:]
   @ObservationIgnored var pendingDependencyUpdateBodyEdits:
     [String: PendingDependencyUpdateBodyEdit] = [:]
   @ObservationIgnored var locallyRemovedSessionIDs: Set<String> = []
