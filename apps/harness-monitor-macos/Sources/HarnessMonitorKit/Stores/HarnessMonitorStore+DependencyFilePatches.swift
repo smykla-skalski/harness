@@ -35,6 +35,11 @@ extension HarnessMonitorStore {
       headRefOidExpected: viewModel.headRefOid,
       paths: pendingPaths
     )
+    let interval = DependencyFilesPerf.beginPatchFetch(
+      pullRequestID: pullRequestID,
+      pathCount: pendingPaths.count
+    )
+    defer { DependencyFilesPerf.end(interval) }
     do {
       let response = try await client.patchDependencyUpdateFiles(request: request)
       if response.drifted {
