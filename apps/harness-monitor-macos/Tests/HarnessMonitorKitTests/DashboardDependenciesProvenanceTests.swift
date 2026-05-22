@@ -86,6 +86,7 @@ struct DashboardDependenciesProvenanceTests {
     )
   }
 
+  @MainActor
   private func provenanceSnapshot(
     fetchedAt: String,
     fromCache: Bool,
