@@ -5,15 +5,15 @@ enum SettingsRepositoriesCatalogLoader {
   static func load(
     client: any HarnessMonitorClientProtocol,
     organization: String
-  ) async throws -> DependencyUpdatesRepositoryCatalogResponse {
+  ) async throws -> ReviewsRepositoryCatalogResponse {
     let task = Task.detached(priority: .userInitiated) {
-      let response = try await client.catalogDependencyUpdateRepositories(
-        request: DependencyUpdatesRepositoryCatalogRequest(organization: organization)
+      let response = try await client.catalogReviewRepositories(
+        request: ReviewsRepositoryCatalogRequest(organization: organization)
       )
       let repositories = response.repositories.sorted {
         $0.localizedStandardCompare($1) == .orderedAscending
       }
-      return DependencyUpdatesRepositoryCatalogResponse(
+      return ReviewsRepositoryCatalogResponse(
         organization: response.organization,
         repositories: repositories
       )
@@ -112,7 +112,7 @@ extension SettingsRepositoriesSection {
       Text(
         """
         Search and import repositories from a GitHub organization, then tune each row's \
-        Dependencies and Task Board toggles in the shared table above.
+        Reviews and Task Board toggles in the shared table above.
         """
       )
     }

@@ -288,7 +288,7 @@ struct TaskBoardMonitoredReposSection: View, SettingsTaskBoardEditingSurface {
       Text("Monitored Repositories")
         .harnessNativeFormSectionHeader()
     } footer: {
-      Text("Dependencies and Task Board share repository scope in Settings > Repositories.")
+      Text("Reviews and Task Board share repository scope in Settings > Repositories.")
     }
   }
 }

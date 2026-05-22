@@ -1,18 +1,18 @@
 import HarnessMonitorKit
 import SwiftUI
 
-/// Settings panel for the Dependencies > Files surface. Edits write
-/// through the @Binding draft owned by `SettingsDependenciesSection`
+/// Settings panel for the Reviews > Files surface. Edits write
+/// through the @Binding draft owned by `SettingsReviewsSection`
 /// so the existing Save / Restore Defaults workflow keeps working
 /// without per-toggle persistence churn.
-struct SettingsDependenciesFilesSection: View {
-  @Binding var draft: DashboardDependenciesPreferences
+struct SettingsReviewsFilesSection: View {
+  @Binding var draft: DashboardReviewsPreferences
   @State private var showsLocalClonesSheet = false
 
   var body: some View {
     DisclosureGroup("Files") {
       Toggle("Show file changes", isOn: $draft.filesEnabled)
-        .accessibilityIdentifier("settingsDependencyFilesEnabledToggle")
+        .accessibilityIdentifier("settingsReviewFilesEnabledToggle")
       defaultViewModePicker
       autoPrefetchStepper
       autoCollapseStepper
@@ -26,9 +26,9 @@ struct SettingsDependenciesFilesSection: View {
       manageClonesButton
       Toggle("Per-line VoiceOver mode", isOn: $draft.filesAccessibilityPerLineMode)
     }
-    .accessibilityIdentifier("settingsDependencyFilesSection")
+    .accessibilityIdentifier("settingsReviewFilesSection")
     .sheet(isPresented: $showsLocalClonesSheet) {
-      SettingsDependenciesLocalClonesSheet()
+      SettingsReviewsLocalClonesSheet()
     }
   }
 
@@ -128,7 +128,7 @@ struct SettingsDependenciesFilesSection: View {
     Button("Manage local clones…") {
       showsLocalClonesSheet = true
     }
-    .accessibilityIdentifier("settingsDependencyFilesManageClonesButton")
+    .accessibilityIdentifier("settingsReviewFilesManageClonesButton")
   }
 
   // MARK: - Bindings

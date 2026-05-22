@@ -1,22 +1,22 @@
 import HarnessMonitorKit
 import SwiftUI
 
-/// Lists every dependency-update local clone the daemon is maintaining
+/// Lists every review local clone the daemon is maintaining
 /// so the user can free disk space without inspecting the runtime path
-/// directly. Calls into the store's `listDependencyUpdateLocalClones`
-/// and `deleteDependencyUpdateLocalClone` helpers from B.8e.
-struct SettingsDependenciesLocalClonesSheet: View {
+/// directly. Calls into the store's `listReviewLocalClones`
+/// and `deleteReviewLocalClone` helpers from B.8e.
+struct SettingsReviewsLocalClonesSheet: View {
   @Environment(HarnessMonitorStore.self)
   private var store
   @Environment(\.dismiss)
   private var dismiss
-  @State private var clones: [DependencyUpdateLocalCloneEntry] = []
-  @State private var pendingDelete: DependencyUpdateLocalCloneEntry?
+  @State private var clones: [ReviewLocalCloneEntry] = []
+  @State private var pendingDelete: ReviewLocalCloneEntry?
   @State private var isLoading = true
   /// Latest in-flight progress event per repo full-name, populated by
   /// the catch-all `observeAllLocalCloneProgress()` subscription.
   /// Cleared on `.completed` / `.failed` so the row drops the badge.
-  @State private var inflightByRepo: [String: DependencyUpdateLocalCloneProgress] = [:]
+  @State private var inflightByRepo: [String: ReviewLocalCloneProgress] = [:]
 
   var body: some View {
     VStack(alignment: .leading, spacing: 12) {
@@ -28,14 +28,14 @@ struct SettingsDependenciesLocalClonesSheet: View {
     .frame(minWidth: 540, minHeight: 360)
     .task { await refresh() }
     .task { await observeProgress() }
-    .accessibilityIdentifier("settingsDependencyLocalClonesSheet")
+    .accessibilityIdentifier("settingsReviewLocalClonesSheet")
     .alert(item: $pendingDelete) { entry in
       Alert(
         title: Text("Delete local clone?"),
         message: Text(deleteConfirmationMessage(for: entry)),
         primaryButton: .destructive(Text("Delete")) {
           Task {
-            await store.deleteDependencyUpdateLocalClone(
+            await store.deleteReviewLocalClone(
               repoKeySegment: entry.repoKeySegment
             )
             await refresh()
@@ -55,7 +55,7 @@ struct SettingsDependenciesLocalClonesSheet: View {
     }
   }
 
-  private func deleteConfirmationMessage(for entry: DependencyUpdateLocalCloneEntry) -> String {
+  private func deleteConfirmationMessage(for entry: ReviewLocalCloneEntry) -> String {
     """
     Removing \(entry.repoFullName) frees \(humanizedBytes(entry.sizeBytes)). The next time a PR \
     for this repo opens, the daemon will re-clone it.
@@ -74,7 +74,7 @@ struct SettingsDependenciesLocalClonesSheet: View {
       }
       .frame(maxWidth: .infinity, alignment: .leading)
     } else {
-      Table(of: DependencyUpdateLocalCloneEntry.self) {
+      Table(of: ReviewLocalCloneEntry.self) {
         TableColumn("Repo") { entry in
           HStack(spacing: 6) {
             Text(entry.repoFullName).lineLimit(1)
@@ -108,7 +108,7 @@ struct SettingsDependenciesLocalClonesSheet: View {
   }
 
   @ViewBuilder
-  private func inflightChip(for entry: DependencyUpdateLocalCloneEntry) -> some View {
+  private func inflightChip(for entry: ReviewLocalCloneEntry) -> some View {
     if let progress = inflightByRepo[entry.repoFullName],
       progress.kind == .started
     {
@@ -119,7 +119,7 @@ struct SettingsDependenciesLocalClonesSheet: View {
           .foregroundStyle(.secondary)
       }
       .accessibilityIdentifier(
-        "settingsDependencyLocalCloneProgressChip-\(entry.repoFullName)"
+        "settingsReviewLocalCloneProgressChip-\(entry.repoFullName)"
       )
       .accessibilityLabel("\(progress.operation.presentLabel) \(entry.repoFullName)")
     }
@@ -142,7 +142,7 @@ struct SettingsDependenciesLocalClonesSheet: View {
 
   private func refresh() async {
     isLoading = true
-    clones = await store.listDependencyUpdateLocalClones()
+    clones = await store.listReviewLocalClones()
     isLoading = false
   }
 

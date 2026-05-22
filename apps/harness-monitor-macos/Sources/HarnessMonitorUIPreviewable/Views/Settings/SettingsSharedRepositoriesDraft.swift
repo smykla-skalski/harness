@@ -4,7 +4,7 @@ import SwiftUI
 struct SettingsSharedRepositoryRow: Identifiable, Equatable {
   let owner: String
   let repository: String
-  var dependenciesEnabled: Bool
+  var reviewsEnabled: Bool
   var taskBoardEnabled: Bool
 
   var repositoryPath: String { "\(owner)/\(repository)" }
@@ -21,21 +21,21 @@ struct SettingsSharedRepositoriesDraft: Equatable {
   init() {}
 
   init(
-    dependenciesPreferences: DashboardDependenciesPreferences,
+    reviewsPreferences: DashboardReviewsPreferences,
     taskBoardDraft: TaskBoardGitSettingsDraft
   ) {
     insert(
-      repositories: dependenciesPreferences.normalizedRepositories,
-      dependenciesEnabled: true,
+      repositories: reviewsPreferences.normalizedRepositories,
+      reviewsEnabled: true,
       taskBoardEnabled: false
     )
     insert(
       repositories: taskBoardDraft.githubInboxRepositoryEntries,
-      dependenciesEnabled: false,
+      reviewsEnabled: false,
       taskBoardEnabled: true
     )
     legacyOrganizations = Self.normalizedOrganizations(
-      dependenciesPreferences.normalizedOrganizations)
+      reviewsPreferences.normalizedOrganizations)
   }
 
   var canAddManualRepository: Bool {
@@ -45,8 +45,8 @@ struct SettingsSharedRepositoriesDraft: Equatable {
     ) != nil
   }
 
-  var dependenciesRepositories: [String] {
-    rows.filter(\.dependenciesEnabled).map(\.repositoryPath)
+  var reviewsRepositories: [String] {
+    rows.filter(\.reviewsEnabled).map(\.repositoryPath)
   }
 
   var taskBoardRepositories: [String] {
@@ -68,7 +68,7 @@ struct SettingsSharedRepositoriesDraft: Equatable {
     }
     insert(
       repository: repository,
-      dependenciesEnabled: true,
+      reviewsEnabled: true,
       taskBoardEnabled: true
     )
     ownerInput = ""
@@ -78,14 +78,14 @@ struct SettingsSharedRepositoriesDraft: Equatable {
   mutating func addImportedRepositories(_ repositories: [String]) {
     insert(
       repositories: repositories,
-      dependenciesEnabled: true,
+      reviewsEnabled: true,
       taskBoardEnabled: true
     )
   }
 
-  mutating func setDependenciesEnabled(_ isEnabled: Bool, for rowID: String) {
+  mutating func setReviewsEnabled(_ isEnabled: Bool, for rowID: String) {
     guard let index = rowIndexes[rowID] else { return }
-    rows[index].dependenciesEnabled = isEnabled
+    rows[index].reviewsEnabled = isEnabled
     removeIfDisabled(index: index)
   }
 
@@ -108,13 +108,13 @@ struct SettingsSharedRepositoriesDraft: Equatable {
 
   private mutating func insert(
     repositories: [String],
-    dependenciesEnabled: Bool,
+    reviewsEnabled: Bool,
     taskBoardEnabled: Bool
   ) {
     for repository in repositories {
       insert(
         repository: repository,
-        dependenciesEnabled: dependenciesEnabled,
+        reviewsEnabled: reviewsEnabled,
         taskBoardEnabled: taskBoardEnabled
       )
     }
@@ -122,7 +122,7 @@ struct SettingsSharedRepositoriesDraft: Equatable {
 
   private mutating func insert(
     repository: String,
-    dependenciesEnabled: Bool,
+    reviewsEnabled: Bool,
     taskBoardEnabled: Bool
   ) {
     guard let normalized = SettingsGitHubRepositoryNormalization.repositoryEntry(repository) else {
@@ -133,11 +133,11 @@ struct SettingsSharedRepositoriesDraft: Equatable {
     let candidate = SettingsSharedRepositoryRow(
       owner: parts[0],
       repository: parts[1],
-      dependenciesEnabled: dependenciesEnabled,
+      reviewsEnabled: reviewsEnabled,
       taskBoardEnabled: taskBoardEnabled
     )
     if let index = rowIndexes[candidate.id] {
-      rows[index].dependenciesEnabled = rows[index].dependenciesEnabled || dependenciesEnabled
+      rows[index].reviewsEnabled = rows[index].reviewsEnabled || reviewsEnabled
       rows[index].taskBoardEnabled = rows[index].taskBoardEnabled || taskBoardEnabled
       return
     }
@@ -147,7 +147,7 @@ struct SettingsSharedRepositoriesDraft: Equatable {
 
   private mutating func removeIfDisabled(index: Int) {
     guard rows.indices.contains(index) else { return }
-    guard !rows[index].dependenciesEnabled, !rows[index].taskBoardEnabled else { return }
+    guard !rows[index].reviewsEnabled, !rows[index].taskBoardEnabled else { return }
     rows.remove(at: index)
     rebuildRowIndexes()
   }
