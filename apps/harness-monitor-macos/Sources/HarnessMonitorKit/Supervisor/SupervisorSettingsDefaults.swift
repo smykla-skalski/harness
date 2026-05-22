@@ -57,6 +57,22 @@ public enum SupervisorSettingsDefaults {
     )
   }
 
+  /// `@AppStorage` key for the audit retention window stored in seconds.
+  ///
+  /// Type: `TimeInterval` (`Double`). Default: `defaultAuditRetentionSeconds` (14 days).
+  /// `SupervisorAuditRetention` reads this when computing the compaction cutoff and
+  /// clamps the value to `[minAuditRetentionSeconds, maxAuditRetentionSeconds]`.
+  public static let auditRetentionSecondsKey = "supervisor.audit.retentionSeconds"
+
+  /// Default audit retention window: 14 days.
+  public static let defaultAuditRetentionSeconds: TimeInterval = 14 * 24 * 60 * 60
+
+  /// Minimum retention window: 1 day.
+  public static let minAuditRetentionSeconds: TimeInterval = 24 * 60 * 60
+
+  /// Maximum retention window: 90 days.
+  public static let maxAuditRetentionSeconds: TimeInterval = 90 * 24 * 60 * 60
+
   /// Background activity identifier passed to `NSBackgroundActivityScheduler`.
   public static let activityIdentifier = "io.harnessmonitor.supervisor"
 
@@ -68,6 +84,29 @@ public enum SupervisorSettingsDefaults {
   /// `SupervisorLifecycle` clamps this below the active interval because AppKit requires
   /// tolerance to stay strictly less than `interval`.
   public static let schedulerTolerance: TimeInterval = 30
+
+  /// Resolves the configured audit retention window from `userDefaults`.
+  ///
+  /// Reads `auditRetentionSecondsKey`, clamps to `[minAuditRetentionSeconds, maxAuditRetentionSeconds]`,
+  /// and falls back to `defaultAuditRetentionSeconds` when the key is missing or stored as a value
+  /// that does not bridge to a finite `TimeInterval` (e.g. a non-numeric string).
+  public static func auditRetentionSeconds(
+    from userDefaults: UserDefaults = .standard
+  ) -> TimeInterval {
+    let stored = userDefaults.object(forKey: auditRetentionSecondsKey)
+    let resolved: TimeInterval
+    if let numeric = stored as? NSNumber {
+      resolved = numeric.doubleValue
+    } else if let numeric = stored as? TimeInterval {
+      resolved = numeric
+    } else {
+      return defaultAuditRetentionSeconds
+    }
+    guard resolved.isFinite else {
+      return defaultAuditRetentionSeconds
+    }
+    return min(maxAuditRetentionSeconds, max(minAuditRetentionSeconds, resolved))
+  }
 
   private static func storedQuietHoursMinutes(
     from userDefaults: UserDefaults,
