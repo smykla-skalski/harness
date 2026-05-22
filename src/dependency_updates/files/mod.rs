@@ -22,6 +22,7 @@
 use serde::{Deserialize, Serialize};
 
 pub(crate) mod blob;
+pub(crate) mod cache;
 mod language;
 pub(crate) mod list;
 pub(crate) mod patch_rest;
