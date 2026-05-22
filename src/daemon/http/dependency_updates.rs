@@ -9,8 +9,10 @@ use axum::{Json, Router};
 use crate::daemon::protocol::{
     DependencyUpdatesActionPreviewRequest, DependencyUpdatesApproveRequest,
     DependencyUpdatesAutoRequest, DependencyUpdatesBodyRequest, DependencyUpdatesBodyUpdateRequest,
-    DependencyUpdatesCommentRequest, DependencyUpdatesLabelRequest, DependencyUpdatesMergeRequest,
-    DependencyUpdatesQueryRequest, DependencyUpdatesRefreshRequest,
+    DependencyUpdatesCommentRequest, DependencyUpdatesFilesBlobRequest,
+    DependencyUpdatesFilesListRequest, DependencyUpdatesFilesPatchRequest,
+    DependencyUpdatesFilesViewedRequest, DependencyUpdatesLabelRequest,
+    DependencyUpdatesMergeRequest, DependencyUpdatesQueryRequest, DependencyUpdatesRefreshRequest,
     DependencyUpdatesRepositoryCatalogRequest, DependencyUpdatesRerunChecksRequest, http_paths,
 };
 use crate::daemon::service;
@@ -87,6 +89,26 @@ pub(super) fn dependency_updates_routes() -> Router<DaemonHttpState> {
         .route(
             http_paths::DEPENDENCY_UPDATES_COMMENT,
             post(post_comment_dependency_updates),
+        )
+        .route(
+            http_paths::DEPENDENCY_UPDATES_FILES_LIST,
+            post(post_dependency_update_files_list),
+        )
+        .route(
+            http_paths::DEPENDENCY_UPDATES_FILES_PATCH,
+            post(post_dependency_update_files_patch),
+        )
+        .route(
+            http_paths::DEPENDENCY_UPDATES_FILES_VIEWED,
+            post(post_dependency_update_files_viewed),
+        )
+        .route(
+            http_paths::DEPENDENCY_UPDATES_FILES_BLOB,
+            post(post_dependency_update_files_blob),
+        )
+        .route(
+            http_paths::DEPENDENCY_UPDATES_FILES_LOCAL_CLONES,
+            post(post_dependency_update_files_local_clones),
         )
 }
 
@@ -303,6 +325,85 @@ async fn post_comment_dependency_updates(
     timed_json(
         "POST",
         http_paths::DEPENDENCY_UPDATES_COMMENT,
+        &request_id,
+        start,
+        result,
+    )
+}
+
+async fn post_dependency_update_files_list(
+    headers: HeaderMap,
+    State(state): State<DaemonHttpState>,
+    Json(request): Json<DependencyUpdatesFilesListRequest>,
+) -> Response {
+    let (start, request_id) = authenticated_request!(headers, state);
+    let result = service::list_dependency_update_files(&request).await;
+    timed_json(
+        "POST",
+        http_paths::DEPENDENCY_UPDATES_FILES_LIST,
+        &request_id,
+        start,
+        result,
+    )
+}
+
+async fn post_dependency_update_files_patch(
+    headers: HeaderMap,
+    State(state): State<DaemonHttpState>,
+    Json(request): Json<DependencyUpdatesFilesPatchRequest>,
+) -> Response {
+    let (start, request_id) = authenticated_request!(headers, state);
+    let result = service::patch_dependency_update_files(&request).await;
+    timed_json(
+        "POST",
+        http_paths::DEPENDENCY_UPDATES_FILES_PATCH,
+        &request_id,
+        start,
+        result,
+    )
+}
+
+async fn post_dependency_update_files_viewed(
+    headers: HeaderMap,
+    State(state): State<DaemonHttpState>,
+    Json(request): Json<DependencyUpdatesFilesViewedRequest>,
+) -> Response {
+    let (start, request_id) = authenticated_request!(headers, state);
+    let result = service::mark_dependency_update_files_viewed(&request).await;
+    timed_json(
+        "POST",
+        http_paths::DEPENDENCY_UPDATES_FILES_VIEWED,
+        &request_id,
+        start,
+        result,
+    )
+}
+
+async fn post_dependency_update_files_blob(
+    headers: HeaderMap,
+    State(state): State<DaemonHttpState>,
+    Json(request): Json<DependencyUpdatesFilesBlobRequest>,
+) -> Response {
+    let (start, request_id) = authenticated_request!(headers, state);
+    let result = service::fetch_dependency_update_file_blob(&request).await;
+    timed_json(
+        "POST",
+        http_paths::DEPENDENCY_UPDATES_FILES_BLOB,
+        &request_id,
+        start,
+        result,
+    )
+}
+
+async fn post_dependency_update_files_local_clones(
+    headers: HeaderMap,
+    State(state): State<DaemonHttpState>,
+) -> Response {
+    let (start, request_id) = authenticated_request!(headers, state);
+    let result = service::list_dependency_update_local_clones().await;
+    timed_json(
+        "POST",
+        http_paths::DEPENDENCY_UPDATES_FILES_LOCAL_CLONES,
         &request_id,
         start,
         result,

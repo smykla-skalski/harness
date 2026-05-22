@@ -422,6 +422,36 @@ fn dependency_update_routes_have_complete_ws_parity() {
                 ws_methods::DEPENDENCY_UPDATES_COMMENT,
                 true,
             ),
+            (
+                HttpRouteMethod::Post,
+                http_paths::DEPENDENCY_UPDATES_FILES_LIST,
+                ws_methods::DEPENDENCY_UPDATES_FILES_LIST,
+                true,
+            ),
+            (
+                HttpRouteMethod::Post,
+                http_paths::DEPENDENCY_UPDATES_FILES_PATCH,
+                ws_methods::DEPENDENCY_UPDATES_FILES_PATCH,
+                true,
+            ),
+            (
+                HttpRouteMethod::Post,
+                http_paths::DEPENDENCY_UPDATES_FILES_VIEWED,
+                ws_methods::DEPENDENCY_UPDATES_FILES_VIEWED,
+                true,
+            ),
+            (
+                HttpRouteMethod::Post,
+                http_paths::DEPENDENCY_UPDATES_FILES_BLOB,
+                ws_methods::DEPENDENCY_UPDATES_FILES_BLOB,
+                true,
+            ),
+            (
+                HttpRouteMethod::Post,
+                http_paths::DEPENDENCY_UPDATES_FILES_LOCAL_CLONES,
+                ws_methods::DEPENDENCY_UPDATES_FILES_LOCAL_CLONES_LIST,
+                true,
+            ),
         ]
     );
 }

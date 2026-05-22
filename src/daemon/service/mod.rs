@@ -216,6 +216,7 @@ use crate::daemon::{is_local_websocket_endpoint, is_loopback_host};
 
 mod adopt;
 mod dependency_updates;
+mod dependency_updates_files;
 mod direct;
 mod improver_apply;
 mod leave;
@@ -257,6 +258,11 @@ pub use dependency_updates::{
     comment_on_dependency_updates, dependency_updates_capabilities, fetch_dependency_update_body,
     merge_dependency_updates, preview_dependency_update_action, query_dependency_updates,
     refresh_dependency_updates, rerun_dependency_updates_checks, update_dependency_update_body,
+};
+pub use dependency_updates_files::{
+    fetch_dependency_update_file_blob, list_dependency_update_files,
+    list_dependency_update_local_clones, mark_dependency_update_files_viewed,
+    patch_dependency_update_files,
 };
 pub use direct::{
     delete_session_direct, disconnect_agent_direct, join_session_direct, record_signal_ack_direct,

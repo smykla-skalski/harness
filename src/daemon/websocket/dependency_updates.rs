@@ -2,8 +2,10 @@ use crate::daemon::http::DaemonHttpState;
 use crate::daemon::protocol::{
     DependencyUpdatesActionPreviewRequest, DependencyUpdatesApproveRequest,
     DependencyUpdatesAutoRequest, DependencyUpdatesBodyRequest, DependencyUpdatesBodyUpdateRequest,
-    DependencyUpdatesCommentRequest, DependencyUpdatesLabelRequest, DependencyUpdatesMergeRequest,
-    DependencyUpdatesQueryRequest, DependencyUpdatesRefreshRequest,
+    DependencyUpdatesCommentRequest, DependencyUpdatesFilesBlobRequest,
+    DependencyUpdatesFilesListRequest, DependencyUpdatesFilesPatchRequest,
+    DependencyUpdatesFilesViewedRequest, DependencyUpdatesLabelRequest,
+    DependencyUpdatesMergeRequest, DependencyUpdatesQueryRequest, DependencyUpdatesRefreshRequest,
     DependencyUpdatesRepositoryCatalogRequest, DependencyUpdatesRerunChecksRequest, WsRequest,
     WsResponse, ws_methods,
 };
@@ -66,6 +68,22 @@ pub(crate) async fn dispatch_dependency_updates_method(
         ws_methods::DEPENDENCY_UPDATES_COMMENT => {
             Some(dispatch_dependency_updates_comment(request).await)
         }
+        ws_methods::DEPENDENCY_UPDATES_FILES_LIST => {
+            Some(dispatch_dependency_updates_files_list(request).await)
+        }
+        ws_methods::DEPENDENCY_UPDATES_FILES_PATCH => {
+            Some(dispatch_dependency_updates_files_patch(request).await)
+        }
+        ws_methods::DEPENDENCY_UPDATES_FILES_VIEWED => {
+            Some(dispatch_dependency_updates_files_viewed(request).await)
+        }
+        ws_methods::DEPENDENCY_UPDATES_FILES_BLOB => {
+            Some(dispatch_dependency_updates_files_blob(request).await)
+        }
+        ws_methods::DEPENDENCY_UPDATES_FILES_LOCAL_CLONES_LIST => Some(dispatch_query_result(
+            &request.id,
+            service::list_dependency_update_local_clones().await,
+        )),
         _ => None,
     }
 }
@@ -178,6 +196,46 @@ async fn dispatch_dependency_updates_comment(request: &WsRequest) -> WsResponse 
     dispatch_query_result(
         &request.id,
         service::comment_on_dependency_updates(&body).await,
+    )
+}
+
+async fn dispatch_dependency_updates_files_list(request: &WsRequest) -> WsResponse {
+    let Ok(body) = parse_params::<DependencyUpdatesFilesListRequest>(request) else {
+        return invalid_params(request);
+    };
+    dispatch_query_result(
+        &request.id,
+        service::list_dependency_update_files(&body).await,
+    )
+}
+
+async fn dispatch_dependency_updates_files_patch(request: &WsRequest) -> WsResponse {
+    let Ok(body) = parse_params::<DependencyUpdatesFilesPatchRequest>(request) else {
+        return invalid_params(request);
+    };
+    dispatch_query_result(
+        &request.id,
+        service::patch_dependency_update_files(&body).await,
+    )
+}
+
+async fn dispatch_dependency_updates_files_viewed(request: &WsRequest) -> WsResponse {
+    let Ok(body) = parse_params::<DependencyUpdatesFilesViewedRequest>(request) else {
+        return invalid_params(request);
+    };
+    dispatch_query_result(
+        &request.id,
+        service::mark_dependency_update_files_viewed(&body).await,
+    )
+}
+
+async fn dispatch_dependency_updates_files_blob(request: &WsRequest) -> WsResponse {
+    let Ok(body) = parse_params::<DependencyUpdatesFilesBlobRequest>(request) else {
+        return invalid_params(request);
+    };
+    dispatch_query_result(
+        &request.id,
+        service::fetch_dependency_update_file_blob(&body).await,
     )
 }
 

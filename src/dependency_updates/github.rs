@@ -280,6 +280,21 @@ impl DependencyUpdatesGitHubClient {
         Ok(repositories)
     }
 
+    pub(crate) async fn fetch_pull_request_files(
+        &self,
+        request: &super::DependencyUpdatesFilesListRequest,
+    ) -> Result<super::DependencyUpdatesFilesListResponse, CliError> {
+        use chrono::Utc;
+        super::files::list::fetch_files(&self.client, request, Utc::now())
+            .await
+            .map_err(|err| {
+                CliErrorKind::workflow_io(format!(
+                    "dependency-updates files list: {err}"
+                ))
+                .into()
+            })
+    }
+
     pub(crate) async fn fetch_pull_request_body(
         &self,
         pull_request_id: &str,
