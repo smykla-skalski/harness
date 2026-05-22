@@ -28,6 +28,7 @@ pub(crate) mod list;
 pub(crate) mod local_clone;
 pub(crate) mod patch_local;
 pub(crate) mod patch_rest;
+pub(crate) mod service;
 pub(crate) mod viewed;
 
 #[cfg(test)]
@@ -39,6 +40,7 @@ pub use blob::{
 };
 pub use language::{HarnessCodeLanguage, infer_language};
 pub use local_clone::LocalCloneListEntry;
+pub use service::FilesLargeDiffStrategy;
 pub use viewed::{
     DependencyUpdateFileViewedOutcome, DependencyUpdateFilesViewedResult,
     DependencyUpdateFilesViewedTarget, DependencyUpdatesFilesViewedRequest,

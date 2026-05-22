@@ -23,8 +23,8 @@ pub use files::{
     DependencyUpdatesFilesListRequest, DependencyUpdatesFilesListResponse,
     DependencyUpdatesFilesPatchRequest, DependencyUpdatesFilesPatchResponse,
     DependencyUpdatesFilesViewedRequest, DependencyUpdatesFilesViewedResponse,
-    DependencyUpdatesRateLimitSnapshot, HarnessCodeLanguage, LocalCloneListEntry,
-    image_mime_for_path, infer_language,
+    DependencyUpdatesRateLimitSnapshot, FilesLargeDiffStrategy, HarnessCodeLanguage,
+    LocalCloneListEntry, image_mime_for_path, infer_language,
 };
 pub(crate) use github::DependencyUpdatesGitHubClient;
 
