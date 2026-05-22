@@ -161,6 +161,8 @@ extension HarnessMonitorStore {
       .acpInspect, .acpAgentsReconciled, .acpProcessIncident, .acpBridgeResyncIncident,
       .acpEvents, .acpPermissionBatch, .acpPermissionBatchRemoved:
       break
+    case .dependencyUpdatesLocalCloneProgress(let progress):
+      applyLocalCloneProgress(progress)
     case .unknown:
       break
     }
@@ -248,6 +250,8 @@ extension HarnessMonitorStore {
       .acpInspect, .acpAgentsReconciled, .acpProcessIncident, .acpBridgeResyncIncident,
       .acpEvents, .acpPermissionBatch, .acpPermissionBatchRemoved:
       break
+    case .dependencyUpdatesLocalCloneProgress(let progress):
+      applyLocalCloneProgress(progress)
     }
     if shouldTickSupervisor {
       scheduleSupervisorTick(reason: "session-update")

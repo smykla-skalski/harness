@@ -51,6 +51,9 @@ public final class HarnessMonitorStore {
   var dependencyFilesViewedBatchTasks: [String: Task<Void, Never>] = [:]
   @ObservationIgnored
   var dependencyFilesViewedPending: [String: [String: DependencyUpdateFileViewedState]] = [:]
+  @ObservationIgnored
+  var dependencyLocalCloneProgressContinuations:
+    [String: [UUID: AsyncStream<DependencyUpdateLocalCloneProgress>.Continuation]] = [:]
 
   public var openFolderRequest = 0
   public var attachSessionRequest = 0
