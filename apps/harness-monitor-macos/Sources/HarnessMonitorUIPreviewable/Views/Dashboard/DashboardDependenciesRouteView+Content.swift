@@ -144,6 +144,7 @@ extension DashboardDependenciesRouteView {
       item: item,
       showsRepository: showsRepository,
       isRefreshing: isPullRequestRefreshing(item.pullRequestID),
+      actionTitle: pullRequestActionTitle(item.pullRequestID),
       updatedLabel: relativeUpdatedLabel(for: item)
     )
   }

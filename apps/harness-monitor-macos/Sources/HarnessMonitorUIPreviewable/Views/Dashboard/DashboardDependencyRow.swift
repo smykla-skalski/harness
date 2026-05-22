@@ -5,6 +5,7 @@ struct DashboardDependencyRow: View {
   let item: DependencyUpdateItem
   let showsRepository: Bool
   let isRefreshing: Bool
+  let actionTitle: String?
   let updatedLabel: String
 
   var body: some View {
@@ -12,6 +13,7 @@ struct DashboardDependencyRow: View {
       item: item,
       showsRepository: showsRepository,
       isRefreshing: isRefreshing,
+      actionTitle: actionTitle,
       updatedLabel: updatedLabel
     )
     .tag(item.pullRequestID)
