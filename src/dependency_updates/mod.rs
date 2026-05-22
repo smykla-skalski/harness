@@ -16,10 +16,13 @@ pub use body_update::{
 };
 pub use files::{
     DependencyUpdateFile, DependencyUpdateFileChangeType, DependencyUpdateFilePatch,
-    DependencyUpdateFileServedBy, DependencyUpdateFileViewedState,
-    DependencyUpdatesFilesListRequest, DependencyUpdatesFilesListResponse,
-    DependencyUpdatesFilesPatchRequest, DependencyUpdatesFilesPatchResponse,
-    DependencyUpdatesRateLimitSnapshot, HarnessCodeLanguage, infer_language,
+    DependencyUpdateFileServedBy, DependencyUpdateFileViewedOutcome,
+    DependencyUpdateFileViewedState, DependencyUpdateFilesViewedResult,
+    DependencyUpdateFilesViewedTarget, DependencyUpdatesFilesListRequest,
+    DependencyUpdatesFilesListResponse, DependencyUpdatesFilesPatchRequest,
+    DependencyUpdatesFilesPatchResponse, DependencyUpdatesFilesViewedRequest,
+    DependencyUpdatesFilesViewedResponse, DependencyUpdatesRateLimitSnapshot,
+    HarnessCodeLanguage, infer_language,
 };
 pub(crate) use github::DependencyUpdatesGitHubClient;
 

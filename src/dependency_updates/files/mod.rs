@@ -24,11 +24,17 @@ use serde::{Deserialize, Serialize};
 mod language;
 pub(crate) mod list;
 pub(crate) mod patch_rest;
+pub(crate) mod viewed;
 
 #[cfg(test)]
 mod tests;
 
 pub use language::{HarnessCodeLanguage, infer_language};
+pub use viewed::{
+    DependencyUpdateFileViewedOutcome, DependencyUpdateFilesViewedResult,
+    DependencyUpdateFilesViewedTarget, DependencyUpdatesFilesViewedRequest,
+    DependencyUpdatesFilesViewedResponse,
+};
 
 /// Soft cap on paginated `pullRequest.files` queries. GitHub returns up to 100
 /// nodes per page; this cap times 100 is the per-PR file limit we'll surface.
