@@ -190,6 +190,7 @@ fn files_list_response_serializes_round_trip() {
             mode_change: None,
         }],
         fetched_at: "2026-05-22T10:00:00Z".into(),
+        pagination_complete: true,
         rate_limit_snapshot: Some(DependencyUpdatesRateLimitSnapshot {
             remaining: 4998,
             limit: 5000,
@@ -201,6 +202,40 @@ fn files_list_response_serializes_round_trip() {
     let parsed: DependencyUpdatesFilesListResponse =
         serde_json::from_str(&json).expect("deserialize");
     assert_eq!(parsed, response);
+}
+
+#[test]
+fn files_list_response_pagination_complete_defaults_true_when_absent() {
+    // Older daemon responses that don't carry the field should still
+    // deserialize and read pagination_complete = true so the caller
+    // doesn't surface a spurious warning.
+    let json = r#"{
+        "pull_request_id": "PR_1",
+        "head_ref_oid": "abc",
+        "viewer_can_mark_viewed": true,
+        "files": [],
+        "fetched_at": "2026-05-22T10:00:00Z"
+    }"#;
+    let parsed: DependencyUpdatesFilesListResponse =
+        serde_json::from_str(json).expect("deserialize");
+    assert!(parsed.pagination_complete);
+}
+
+#[test]
+fn files_list_response_pagination_partial_survives_round_trip() {
+    let response = DependencyUpdatesFilesListResponse {
+        pull_request_id: "PR_1".into(),
+        head_ref_oid: "abc".into(),
+        viewer_can_mark_viewed: true,
+        files: vec![],
+        fetched_at: "2026-05-22T10:00:00Z".into(),
+        pagination_complete: false,
+        rate_limit_snapshot: None,
+    };
+    let json = serde_json::to_string(&response).expect("serialize");
+    let parsed: DependencyUpdatesFilesListResponse =
+        serde_json::from_str(&json).expect("deserialize");
+    assert!(!parsed.pagination_complete);
 }
 
 #[test]
@@ -222,6 +257,7 @@ fn files_list_response_omits_none_rate_limit() {
         viewer_can_mark_viewed: true,
         files: vec![],
         fetched_at: "2026-05-22T10:00:00Z".into(),
+        pagination_complete: true,
         rate_limit_snapshot: None,
     };
     let json = serde_json::to_value(&response).expect("serialize");

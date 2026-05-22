@@ -101,8 +101,9 @@ pub(crate) async fn fetch_files(
     let mut files: Vec<DependencyUpdateFile> = Vec::new();
     let mut cursor: Option<String> = None;
     let mut rate_limit_snapshot: Option<DependencyUpdatesRateLimitSnapshot> = None;
+    let mut pagination_complete = true;
 
-    for _page in 0..FILES_PAGE_CAP {
+    for page_index in 0..FILES_PAGE_CAP {
         let data: GraphqlData = client
             .graphql(&json!({
                 "query": LIST_PR_FILES_QUERY,
@@ -167,7 +168,15 @@ pub(crate) async fn fetch_files(
         }
         cursor = connection.page_info.end_cursor;
         if cursor.is_none() {
+            // GitHub said hasNextPage=true but didn't return a cursor. Treat
+            // as partial so the caller can surface a warning.
+            pagination_complete = false;
             break;
+        }
+        // The cap is exclusive: if we've consumed the last allowed page and
+        // GitHub still has more, mark the response as partial.
+        if page_index + 1 == FILES_PAGE_CAP && connection.page_info.has_next_page {
+            pagination_complete = false;
         }
     }
 
@@ -177,6 +186,7 @@ pub(crate) async fn fetch_files(
         viewer_can_mark_viewed: viewer_can_update,
         files,
         fetched_at: fetched_at.to_rfc3339(),
+        pagination_complete,
         rate_limit_snapshot,
     })
 }

@@ -77,8 +77,20 @@ pub struct DependencyUpdatesFilesListResponse {
     pub viewer_can_mark_viewed: bool,
     pub files: Vec<DependencyUpdateFile>,
     pub fetched_at: String,
+    /// `true` when the pagination loop drained every page from GitHub.
+    /// `false` when the loop bailed out under `FILES_PAGE_CAP` while
+    /// GitHub still had `hasNextPage == true` - the response is partial
+    /// and the caller should surface a warning. Defaults to `true` for
+    /// backwards compatibility with older callers that don't read this
+    /// field.
+    #[serde(default = "default_pagination_complete")]
+    pub pagination_complete: bool,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub rate_limit_snapshot: Option<DependencyUpdatesRateLimitSnapshot>,
+}
+
+fn default_pagination_complete() -> bool {
+    true
 }
 
 /// Metadata for one file inside a PR. No patch body here - patches arrive

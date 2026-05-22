@@ -148,6 +148,43 @@ final class DependencyUpdateFileModelTests: XCTestCase {
     XCTAssertEqual(parsed.files.count, 1)
     XCTAssertEqual(parsed.files[0].languageHint, .rust)
     XCTAssertEqual(parsed.rateLimitSnapshot?.remaining, 4998)
+    // New responses default to paginationComplete = true.
+    XCTAssertTrue(parsed.paginationComplete)
+  }
+
+  func testFilesListResponsePaginationCompleteDefaultsTrueWhenAbsent() throws {
+    // Older daemon responses omit the field; the Monitor should treat
+    // them as complete so it doesn't surface a spurious warning.
+    let json = """
+      {
+        "pullRequestId": "PR_1",
+        "headRefOid": "abc",
+        "viewerCanMarkViewed": true,
+        "files": [],
+        "fetchedAt": "2026-05-22T10:00:00Z"
+      }
+      """
+    let data = Data(json.utf8)
+    let parsed = try JSONDecoder().decode(
+      DependencyUpdatesFilesListResponse.self, from: data)
+    XCTAssertTrue(parsed.paginationComplete)
+  }
+
+  func testFilesListResponsePaginationPartialSurfaced() throws {
+    let json = """
+      {
+        "pullRequestId": "PR_1",
+        "headRefOid": "abc",
+        "viewerCanMarkViewed": true,
+        "files": [],
+        "fetchedAt": "2026-05-22T10:00:00Z",
+        "paginationComplete": false
+      }
+      """
+    let data = Data(json.utf8)
+    let parsed = try JSONDecoder().decode(
+      DependencyUpdatesFilesListResponse.self, from: data)
+    XCTAssertFalse(parsed.paginationComplete)
   }
 
   func testFilesListResponseDecodesSnakeCaseFromDaemon() throws {
