@@ -59,6 +59,18 @@ func unorderedMarker(_ line: String)
   return (content, checkbox, checkboxMarkerColumn)
 }
 
+func unorderedListContentByteOffset(in line: String, hasCheckbox: Bool) -> Int {
+  let leadingByteCount = line.utf8.prefix { $0 == 0x20 || $0 == 0x09 }.count
+  return leadingByteCount + 2 + (hasCheckbox ? 4 : 0)
+}
+
+func orderedListContentByteOffset(in line: String) -> Int {
+  let utf8 = line.utf8
+  let leadingByteCount = utf8.prefix { $0 == 0x20 || $0 == 0x09 }.count
+  let digitBytes = utf8.dropFirst(leadingByteCount).prefix { (0x30...0x39).contains($0) }.count
+  return leadingByteCount + digitBytes + 2
+}
+
 func orderedMarker(_ line: String) -> (number: Int, content: String)? {
   let trimmed = line.trimmingLeadingSpaces()
   var digits = ""

@@ -202,13 +202,20 @@ private struct HarnessMarkdownBlockParser {
     var items: [HarnessMarkdownListItem] = []
     while index < lines.count, let marker = unorderedMarker(lines[index]) {
       guard !shouldCancel() else { break }
+      let firstLineSrcIdx = index
       let checkboxSourceOffset = marker.checkboxMarkerColumn.flatMap { column in
-        lineOffsets.map { $0[index] + column }
+        lineOffsets.map { $0[firstLineSrcIdx] + column }
+      }
+      let firstLineSourceOffset = lineOffsets.map { offsets in
+        offsets[firstLineSrcIdx]
+          + unorderedListContentByteOffset(
+            in: lines[firstLineSrcIdx], hasCheckbox: marker.checkbox != nil)
       }
       index += 1
       items.append(
         parseListItem(
           firstLine: marker.content,
+          firstLineSourceOffset: firstLineSourceOffset,
           checkbox: marker.checkbox,
           checkboxSourceOffset: checkboxSourceOffset))
     }
@@ -220,32 +227,48 @@ private struct HarnessMarkdownBlockParser {
     var items: [HarnessMarkdownListItem] = []
     while index < lines.count, let marker = orderedMarker(lines[index]) {
       guard !shouldCancel() else { break }
+      let firstLineSrcIdx = index
+      let firstLineSourceOffset = lineOffsets.map { offsets in
+        offsets[firstLineSrcIdx] + orderedListContentByteOffset(in: lines[firstLineSrcIdx])
+      }
       index += 1
       items.append(
-        parseListItem(firstLine: marker.content, checkbox: nil, checkboxSourceOffset: nil))
+        parseListItem(
+          firstLine: marker.content,
+          firstLineSourceOffset: firstLineSourceOffset,
+          checkbox: nil,
+          checkboxSourceOffset: nil))
     }
     return .orderedList(start: start, items: items)
   }
 
   private mutating func parseListItem(
     firstLine: String,
+    firstLineSourceOffset: Int?,
     checkbox: Bool?,
     checkboxSourceOffset: Int?
   ) -> HarnessMarkdownListItem {
     var itemLines = [firstLine]
+    var continuationSrcIndices: [Int] = []
     while index < lines.count {
       guard !shouldCancel() else { break }
       if lines[index].isBlank {
         itemLines.append("")
+        continuationSrcIndices.append(index)
         index += 1
       } else if lines[index].leadingSpaceCount >= 2 {
         itemLines.append(lines[index].droppingLeadingSpaces(2))
+        continuationSrcIndices.append(index)
         index += 1
       } else {
         break
       }
     }
-    var parser = childParser(lines: itemLines)
+    let childOffsets: [Int]? = lineOffsets.flatMap { parentOffsets -> [Int]? in
+      guard let firstLineSourceOffset else { return nil }
+      return [firstLineSourceOffset] + continuationSrcIndices.map { parentOffsets[$0] + 2 }
+    }
+    var parser = childParser(lines: itemLines, lineOffsets: childOffsets)
     return HarnessMarkdownListItem(
       checkbox: checkbox,
       checkboxSourceOffset: checkboxSourceOffset,
@@ -361,8 +384,9 @@ private struct HarnessMarkdownBlockParser {
     )
   }
 
-  private func childParser(lines: [String]) -> Self {
-    Self(lines: lines, references: references, shouldCancel: shouldCancel, lineOffsets: nil)
+  private func childParser(lines: [String], lineOffsets: [Int]? = nil) -> Self {
+    Self(
+      lines: lines, references: references, shouldCancel: shouldCancel, lineOffsets: lineOffsets)
   }
 }
 

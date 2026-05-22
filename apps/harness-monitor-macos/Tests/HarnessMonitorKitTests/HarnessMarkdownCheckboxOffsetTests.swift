@@ -68,6 +68,59 @@ struct HarnessMarkdownCheckboxOffsetTests {
     #expect(utf8[offset - 1] == 0x5B)
   }
 
+  @Test("Nested checkbox inside list item carries source offset")
+  func nestedCheckboxInsideListItemCarriesSourceOffset() {
+    let body = "- [ ] outer\n  - [ ] inner\n"
+    let document = HarnessMarkdownParser.parse(body)
+    guard case .unorderedList(let outerItems) = document.blocks.first,
+      let outer = outerItems.first
+    else {
+      Issue.record("Expected unordered list")
+      return
+    }
+    #expect(outer.checkboxSourceOffset == 3)
+    let nestedList = outer.blocks.first { block in
+      if case .unorderedList = block { return true }
+      return false
+    }
+    guard case .unorderedList(let innerItems) = nestedList,
+      let inner = innerItems.first,
+      let innerOffset = inner.checkboxSourceOffset
+    else {
+      Issue.record("Expected nested unordered list with checkbox offset")
+      return
+    }
+    let utf8 = Array(body.utf8)
+    #expect(utf8[innerOffset] == 0x20)
+    #expect(utf8[innerOffset - 1] == 0x5B)
+  }
+
+  @Test("Nested checkbox under ordered list parent carries source offset")
+  func nestedCheckboxUnderOrderedListCarriesSourceOffset() {
+    let body = "1. outer\n  - [x] inner\n"
+    let document = HarnessMarkdownParser.parse(body)
+    guard case .orderedList(_, let outerItems) = document.blocks.first,
+      let outer = outerItems.first
+    else {
+      Issue.record("Expected ordered list")
+      return
+    }
+    let nestedList = outer.blocks.first { block in
+      if case .unorderedList = block { return true }
+      return false
+    }
+    guard case .unorderedList(let innerItems) = nestedList,
+      let inner = innerItems.first,
+      let innerOffset = inner.checkboxSourceOffset
+    else {
+      Issue.record("Expected nested unordered list with checkbox offset")
+      return
+    }
+    let utf8 = Array(body.utf8)
+    #expect(utf8[innerOffset] == 0x78)
+    #expect(utf8[innerOffset - 1] == 0x5B)
+  }
+
   @Test("Plain bullets and ordered items carry no checkbox offset")
   func nonCheckboxItemsCarryNoOffset() {
     let document = HarnessMarkdownParser.parse(
