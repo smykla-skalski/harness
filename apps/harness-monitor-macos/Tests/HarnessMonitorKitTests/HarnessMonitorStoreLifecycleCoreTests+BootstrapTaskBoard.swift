@@ -165,7 +165,7 @@ extension HarnessMonitorStoreLifecycleCoreTests {
     #expect(store.globalTaskBoardItems.isEmpty)
   }
 
-  private func makeBootstrapTaskBoardItem(
+  func makeBootstrapTaskBoardItem(
     id: String,
     provider: TaskBoardExternalRefProvider,
     externalId: String
@@ -199,7 +199,7 @@ extension HarnessMonitorStoreLifecycleCoreTests {
   }
 }
 
-private struct SnapshotCodingKey: CodingKey, Sendable {
+struct SnapshotCodingKey: CodingKey, Sendable {
   let stringValue: String
   let intValue: Int?
 

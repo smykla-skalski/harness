@@ -129,7 +129,10 @@ extension SessionWindowRouteContentSelectionTests {
     #expect(!wrapLayout.contains("cache = Cache()"))
   }
 
-  private func sessionRouteContentSource() throws -> String {
+}
+
+extension SessionWindowRouteContentSelectionTests {
+  func sessionRouteContentSource() throws -> String {
     try [
       "SessionWindowRouteContent.swift",
       "SessionWindowRouteContent+Tasks.swift",
@@ -139,7 +142,7 @@ extension SessionWindowRouteContentSelectionTests {
     .joined(separator: "\n")
   }
 
-  private func sourceFile(named name: String) throws -> String {
+  func sourceFile(named name: String) throws -> String {
     let testsDirectory = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
     let repoRoot =
       testsDirectory
@@ -161,7 +164,7 @@ extension SessionWindowRouteContentSelectionTests {
     )
   }
 
-  private func agent(id: String, name: String) -> AgentRegistration {
+  func agent(id: String, name: String) -> AgentRegistration {
     AgentRegistration(
       agentId: id,
       name: name,
@@ -187,7 +190,7 @@ extension SessionWindowRouteContentSelectionTests {
     )
   }
 
-  private func task(id: String, title: String, context: String?) -> WorkItem {
+  func task(id: String, title: String, context: String?) -> WorkItem {
     WorkItem(
       taskId: id,
       title: title,
