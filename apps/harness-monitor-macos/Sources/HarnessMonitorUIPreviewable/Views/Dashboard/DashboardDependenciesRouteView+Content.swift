@@ -188,11 +188,11 @@ extension DashboardDependenciesRouteView {
       frequentNames: frequentLabelNames(for: items),
       showsDescriptions: normalizedPreferences.showLabelDescriptions,
       isBusy: items.contains { isPullRequestRefreshing($0.pullRequestID) },
-      onApprove: { Task { await approve(items: items) } },
-      onMerge: { Task { await merge(items: items) } },
-      onRerunChecks: { Task { await rerunChecks(items: items) } },
+      onApprove: { trackInFlight(Task { await approve(items: items) }) },
+      onMerge: { trackInFlight(Task { await merge(items: items) }) },
+      onRerunChecks: { trackInFlight(Task { await rerunChecks(items: items) }) },
       onRefresh: { refresh(items: items) },
-      onSelectLabel: { name in Task { await addLabel(name, to: items) } },
+      onSelectLabel: { name in trackInFlight(Task { await addLabel(name, to: items) }) },
       onCustomLabel: {
         routeLabelTargetItems = items
         routeLabelDraft = ""
@@ -201,9 +201,9 @@ extension DashboardDependenciesRouteView {
       onCopyApprovalLinks: { copyApprovalLinks(for: items) },
       onAuto: {
         if items.count == 1, let item = items.first {
-          Task { await auto(items: [item]) }
+          trackInFlight(Task { await auto(items: [item]) })
         } else {
-          Task { await auto(items: items) }
+          trackInFlight(Task { await auto(items: items) })
         }
       },
       onOpenItem: {
@@ -213,14 +213,14 @@ extension DashboardDependenciesRouteView {
       },
       onFixCI: {
         if let item = items.first {
-          Task { await fixCI(item: item) }
+          trackInFlight(Task { await fixCI(item: item) })
         }
       },
       onRebaseViaBot: {
         if let item = items.first,
           let bot = DependencyUpdateBot.detect(authorLogin: item.authorLogin)
         {
-          Task { await rebaseViaBot(item: item, bot: bot) }
+          trackInFlight(Task { await rebaseViaBot(item: item, bot: bot) })
         }
       }
     )

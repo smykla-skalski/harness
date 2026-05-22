@@ -10,7 +10,7 @@ extension DashboardDependenciesRouteView {
     let targetIDs = items.map(\.pullRequestID)
     let targets = items.map(\.target)
     beginRefreshing(pullRequestIDs: targetIDs)
-    Task {
+    trackInFlight(Task {
       defer { endRefreshing(pullRequestIDs: targetIDs) }
       do {
         let refreshed = try await DashboardDependenciesTimeoutRacer.race(
@@ -35,7 +35,7 @@ extension DashboardDependenciesRouteView {
           "Dependency targeted refresh failed: \(String(reflecting: error), privacy: .public)"
         )
       }
-    }
+    })
   }
 
   func isPullRequestRefreshing(_ pullRequestID: String) -> Bool {

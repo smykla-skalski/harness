@@ -54,6 +54,7 @@ struct DashboardDependenciesRouteView: View {
   @State private var cachedPresentation = DashboardDependenciesPresentation.empty
   @State private var presentationGeneration: UInt64 = 0
   @State private var refreshTracker = DependencyRefreshTracker()
+  @State var inFlightTasks: [Task<Void, Never>] = []
   @State private var scheduler = DashboardDependenciesScheduler()
   @State private var collapsedRepositories = DashboardDependenciesCollapsedRepositories()
   @State private var labelMenuDataByRepository: [String: DashboardDependenciesRepoLabelMenuData] =
@@ -260,6 +261,9 @@ struct DashboardDependenciesRouteView: View {
     }
     .onChange(of: normalizedPreferences.frequentLabelsCount) { _, _ in
       refreshLabelMenuData()
+    }
+    .onChange(of: selectedRoute) { _, newValue in
+      if newValue != .dependencies { cancelAllInFlightTasks() }
     }
     .dashboardDependenciesOnSystemWake(perform: handleSystemWake)
     .dashboardDependenciesToolbarSearch(
