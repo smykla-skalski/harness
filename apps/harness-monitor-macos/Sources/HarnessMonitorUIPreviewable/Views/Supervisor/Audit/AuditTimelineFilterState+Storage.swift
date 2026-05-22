@@ -49,12 +49,12 @@ extension AuditTimelineFilterState {
   static func encodeFilters(_ filters: SupervisorAuditFilters) -> String? {
     let storage = Storage(
       ruleIDs: filters.ruleIDs.sorted(),
-      kinds: filters.kinds.sorted(),
+      kinds: filters.kinds.map(\.rawValue).sorted(),
       severities: filters.severities.map(\.rawValue).sorted(),
-      dateRangeStart: filters.dateRange.map { Self.formatter.string(from: $0.start) },
-      dateRangeEnd: filters.dateRange.map { Self.formatter.string(from: $0.end) },
-      searchText: filters.trimmedSearchText,
-      decisionID: filters.decisionID
+      dateRangeStart: filters.dateRange.map { Self.formatter.string(from: $0.lowerBound) },
+      dateRangeEnd: filters.dateRange.map { Self.formatter.string(from: $0.upperBound) },
+      searchText: filters.searchText.trimmingCharacters(in: .whitespacesAndNewlines),
+      decisionID: filters.decisionID?.uuidString
     )
     guard let data = try? Self.encoder.encode(storage) else { return nil }
     return String(data: data, encoding: .utf8)
@@ -69,26 +69,29 @@ extension AuditTimelineFilterState {
       return nil
     }
 
+    let kinds = Set(storage.kinds.compactMap(SupervisorEvent.Kind.init(rawValue:)))
     let severities = Set(storage.severities.compactMap(DecisionSeverity.init(rawValue:)))
-    let dateRange: SupervisorAuditDateRange?
+    let dateRange: ClosedRange<Date>?
     if
       let startRaw = storage.dateRangeStart,
       let endRaw = storage.dateRangeEnd,
       let start = Self.formatter.date(from: startRaw),
-      let end = Self.formatter.date(from: endRaw)
+      let end = Self.formatter.date(from: endRaw),
+      start <= end
     {
-      dateRange = SupervisorAuditDateRange(start: start, end: end)
+      dateRange = start...end
     } else {
       dateRange = nil
     }
+    let decisionID = storage.decisionID.flatMap(UUID.init(uuidString:))
 
     return SupervisorAuditFilters(
       ruleIDs: Set(storage.ruleIDs),
-      kinds: Set(storage.kinds),
+      kinds: kinds,
       severities: severities,
       dateRange: dateRange,
       searchText: storage.searchText,
-      decisionID: storage.decisionID
+      decisionID: decisionID
     )
   }
 

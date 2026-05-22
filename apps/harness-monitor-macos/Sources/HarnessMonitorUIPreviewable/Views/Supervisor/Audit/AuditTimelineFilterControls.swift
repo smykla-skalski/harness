@@ -20,21 +20,21 @@ public enum AuditTimelineDateRangePreset: String, CaseIterable, Identifiable, Se
     }
   }
 
-  /// Resolve a `SupervisorAuditDateRange` ending at `reference`.
-  public func range(reference: Date = Date(), calendar: Calendar = .current) -> SupervisorAuditDateRange {
+  /// Resolve a `ClosedRange<Date>` ending at `reference`.
+  public func range(reference: Date = Date(), calendar: Calendar = .current) -> ClosedRange<Date> {
     let endOfDay = calendar.endOfDay(for: reference) ?? reference
     switch self {
     case .today:
       let start = calendar.startOfDay(for: reference)
-      return SupervisorAuditDateRange(start: start, end: endOfDay)
+      return start...endOfDay
     case .last7Days:
       let start = calendar.date(byAdding: .day, value: -6, to: calendar.startOfDay(for: reference))
         ?? reference
-      return SupervisorAuditDateRange(start: start, end: endOfDay)
+      return start...endOfDay
     case .last30Days:
       let start = calendar.date(byAdding: .day, value: -29, to: calendar.startOfDay(for: reference))
         ?? reference
-      return SupervisorAuditDateRange(start: start, end: endOfDay)
+      return start...endOfDay
     }
   }
 }
@@ -56,12 +56,12 @@ extension Calendar {
 public struct AuditTimelineFilterControls: View {
   @Bindable var state: AuditTimelineFilterState
   let ruleIDs: [String]
-  let kinds: [String]
+  let kinds: [SupervisorEvent.Kind]
 
   public init(
     state: AuditTimelineFilterState,
     ruleIDs: [String],
-    kinds: [String] = []
+    kinds: [SupervisorEvent.Kind] = SupervisorEvent.Kind.allCases
   ) {
     self.state = state
     self.ruleIDs = ruleIDs
@@ -118,7 +118,7 @@ public struct AuditTimelineFilterControls: View {
 
   // MARK: - Kind chip (multi-select Apply / Clear)
 
-  @State private var kindDraft: Set<String> = []
+  @State private var kindDraft: Set<SupervisorEvent.Kind> = []
 
   private var kindChip: some View {
     Menu {
@@ -128,9 +128,9 @@ public struct AuditTimelineFilterControls: View {
             toggleKindDraft(kind)
           } label: {
             if kindDraft.contains(kind) {
-              Label(kind, systemImage: "checkmark")
+              Label(kind.rawValue, systemImage: "checkmark")
             } else {
-              Text(kind)
+              Text(kind.rawValue)
             }
           }
         }
@@ -163,7 +163,7 @@ public struct AuditTimelineFilterControls: View {
     }
   }
 
-  private func toggleKindDraft(_ kind: String) {
+  private func toggleKindDraft(_ kind: SupervisorEvent.Kind) {
     if kindDraft.contains(kind) {
       kindDraft.remove(kind)
     } else {
@@ -234,8 +234,8 @@ public struct AuditTimelineFilterControls: View {
         Divider()
         Button("Custom…") {
           if let current = state.filters.dateRange {
-            customStart = current.start
-            customEnd = current.end
+            customStart = current.lowerBound
+            customEnd = current.upperBound
           } else {
             customStart = Calendar.current.date(byAdding: .day, value: -6, to: Date()) ?? Date()
             customEnd = Date()
@@ -272,9 +272,7 @@ public struct AuditTimelineFilterControls: View {
         Spacer()
         Button("Cancel") { showsCustomDateSheet = false }
         Button("Apply") {
-          state.setDateRange(
-            SupervisorAuditDateRange(start: customStart, end: customEnd)
-          )
+          state.setDateRange(customStart...customEnd)
           showsCustomDateSheet = false
         }
         .keyboardShortcut(.defaultAction)
