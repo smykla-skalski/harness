@@ -246,6 +246,77 @@ struct TaskBoardSwiftUXCorrectnessTests {
         == ["platform", "sre"])
   }
 
+  // MARK: - Dependency update checks
+
+  @Test("Dependency check details URLs are limited to web links")
+  func dependencyCheckDetailsURLsAreLimitedToWebLinks() {
+    let web = DependencyUpdateCheck(
+      name: "ci",
+      status: .completed,
+      conclusion: .success,
+      detailsURL: " https://github.com/acme/api/actions/runs/1 "
+    )
+    let script = DependencyUpdateCheck(
+      name: "script",
+      status: .completed,
+      conclusion: .success,
+      detailsURL: "javascript:alert(1)"
+    )
+    let empty = DependencyUpdateCheck(
+      name: "empty",
+      status: .completed,
+      conclusion: .success,
+      detailsURL: "   "
+    )
+
+    #expect(web.detailsWebURL?.absoluteString == "https://github.com/acme/api/actions/runs/1")
+    #expect(script.detailsWebURL == nil)
+    #expect(empty.detailsWebURL == nil)
+  }
+
+  @Test("Dependency rerun unavailable reason distinguishes missing check suites")
+  func dependencyRerunUnavailableReasonDistinguishesMissingCheckSuites() {
+    let noSuite = sampleDependencyUpdate(
+      checks: [
+        DependencyUpdateCheck(
+          name: "legacy/ci",
+          status: .completed,
+          conclusion: .failure
+        )
+      ]
+    )
+    let passingSuite = sampleDependencyUpdate(
+      checks: [
+        DependencyUpdateCheck(
+          name: "ci",
+          status: .completed,
+          conclusion: .success,
+          checkSuiteID: "suite-1"
+        )
+      ]
+    )
+    let failingSuite = sampleDependencyUpdate(
+      checks: [
+        DependencyUpdateCheck(
+          name: "ci",
+          status: .completed,
+          conclusion: .failure,
+          checkSuiteID: "suite-1"
+        )
+      ]
+    )
+
+    #expect(
+      noSuite.rerunChecksUnavailableReason
+        == "GitHub did not provide check suite IDs for these checks."
+    )
+    #expect(
+      passingSuite.rerunChecksUnavailableReason
+        == "Only failed or timed-out completed check runs can be rerun."
+    )
+    #expect(failingSuite.rerunChecksUnavailableReason == nil)
+  }
+
   // MARK: - sample fixtures
 
   private func sampleDraftDocument(revision: UInt64 = 7) -> TaskBoardPolicyPipelineDocument {
@@ -284,6 +355,32 @@ struct TaskBoardSwiftUXCorrectnessTests {
       createdAt: "2026-05-14T10:00:00Z",
       updatedAt: "2026-05-14T10:01:00Z",
       deletedAt: nil
+    )
+  }
+
+  private func sampleDependencyUpdate(
+    checks: [DependencyUpdateCheck]
+  ) -> DependencyUpdateItem {
+    DependencyUpdateItem(
+      pullRequestID: "pr-1",
+      repositoryID: "repo-1",
+      repository: "acme/api",
+      number: 1,
+      title: "Dependency update",
+      url: "https://github.com/acme/api/pull/1",
+      authorLogin: "renovate[bot]",
+      state: .open,
+      mergeable: .mergeable,
+      reviewStatus: .reviewRequired,
+      checkStatus: .failure,
+      policyBlocked: false,
+      isDraft: false,
+      headSha: "abc123",
+      checks: checks,
+      additions: 1,
+      deletions: 0,
+      createdAt: "2026-05-14T10:00:00Z",
+      updatedAt: "2026-05-14T10:01:00Z"
     )
   }
 }
