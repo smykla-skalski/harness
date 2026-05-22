@@ -2,11 +2,15 @@ import SwiftUI
 
 extension DashboardDependenciesRouteView {
   func trackInFlight(_ task: Task<Void, Never>) {
-    inFlightTasks.append(task)
+    var tasks = routeInFlightTasks
+    tasks.append(task)
+    routeInFlightTasks = tasks
   }
 
   func cancelAllInFlightTasks() {
-    inFlightTasks.forEach { $0.cancel() }
-    inFlightTasks.removeAll()
+    for task in routeInFlightTasks {
+      task.cancel()
+    }
+    routeInFlightTasks = []
   }
 }
