@@ -65,7 +65,9 @@ struct DashboardDependencyActionBar: View {
       title: "Refresh",
       systemImage: "arrow.clockwise",
       prominence: .secondary,
-      helpText: helpTextOrBusy(DashboardDependenciesDisabledReason.emptySelectionReason(for: items)),
+      helpText: helpTextOrBusy(
+        DashboardDependenciesDisabledReason.emptySelectionReason(for: items)
+      ),
       action: onRefresh
     )
     .disabled(isBusy || items.isEmpty)

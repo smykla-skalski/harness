@@ -10,32 +10,34 @@ extension DashboardDependenciesRouteView {
     let targetIDs = items.map(\.pullRequestID)
     let targets = items.map(\.target)
     beginRefreshing(pullRequestIDs: targetIDs)
-    trackInFlight(Task {
-      defer { endRefreshing(pullRequestIDs: targetIDs) }
-      do {
-        let refreshed = try await DashboardDependenciesTimeoutRacer.race(
-          timeoutSeconds: DashboardDependenciesTimeoutRacer.defaultRefreshTimeoutSeconds
-        ) {
-          try await DashboardDependenciesRemoteLoader.refresh(
-            client: client,
-            request: DependencyUpdatesRefreshRequest(targets: targets)
+    trackInFlight(
+      Task {
+        defer { endRefreshing(pullRequestIDs: targetIDs) }
+        do {
+          let refreshed = try await DashboardDependenciesTimeoutRacer.race(
+            timeoutSeconds: DashboardDependenciesTimeoutRacer.defaultRefreshTimeoutSeconds
+          ) {
+            try await DashboardDependenciesRemoteLoader.refresh(
+              client: client,
+              request: DependencyUpdatesRefreshRequest(targets: targets)
+            )
+          }
+          applyRefreshedItems(refreshed)
+        } catch let error as DashboardDependenciesSchedulerError {
+          HarnessMonitorLogger.api.warning(
+            """
+            Dependency targeted refresh timed out: \
+            targets=\(targetIDs.count, privacy: .public) \
+            error=\(String(reflecting: error), privacy: .public)
+            """
+          )
+        } catch {
+          HarnessMonitorLogger.api.warning(
+            "Dependency targeted refresh failed: \(String(reflecting: error), privacy: .public)"
           )
         }
-        applyRefreshedItems(refreshed)
-      } catch let error as DashboardDependenciesSchedulerError {
-        HarnessMonitorLogger.api.warning(
-          """
-          Dependency targeted refresh timed out: \
-          targets=\(targetIDs.count, privacy: .public) \
-          error=\(String(reflecting: error), privacy: .public)
-          """
-        )
-      } catch {
-        HarnessMonitorLogger.api.warning(
-          "Dependency targeted refresh failed: \(String(reflecting: error), privacy: .public)"
-        )
       }
-    })
+    )
   }
 
   func isPullRequestRefreshing(_ pullRequestID: String) -> Bool {
