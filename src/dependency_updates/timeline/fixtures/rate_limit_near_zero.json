@@ -1,0 +1,22 @@
+{
+  "data": {
+    "node": {
+      "id": "PR_low_quota",
+      "viewerCanUpdate": false,
+      "timelineItems": {
+        "pageInfo": {
+          "startCursor": "c1",
+          "endCursor": "c1",
+          "hasNextPage": false,
+          "hasPreviousPage": false
+        },
+        "nodes": []
+      }
+    },
+    "rateLimit": {
+      "remaining": 5,
+      "resetAt": "2026-06-01T12:00:00Z",
+      "cost": 1
+    }
+  }
+}

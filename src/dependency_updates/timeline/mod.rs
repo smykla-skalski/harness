@@ -4,6 +4,9 @@ mod mapping;
 mod queries;
 mod types;
 
+#[cfg(test)]
+mod tests;
+
 pub use types::{
     Actor, CommitEntry, DependencyUpdateTimelineEntry, HeadRefForcePushedEntry, IssueCommentEntry,
     ReviewEntry, ReviewInlineCommentEntry, ReviewState, ReviewThreadCommentEntry,
