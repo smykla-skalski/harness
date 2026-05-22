@@ -6,6 +6,7 @@ public enum SupervisorPaneKey: String, CaseIterable, Hashable, Identifiable {
   case rules
   case notifications
   case background
+  case audit
 
   public var id: String { rawValue }
 
@@ -14,6 +15,7 @@ public enum SupervisorPaneKey: String, CaseIterable, Hashable, Identifiable {
     case .rules: "Rules"
     case .notifications: "Notifications"
     case .background: "Background"
+    case .audit: "Audit"
     }
   }
 }
@@ -51,6 +53,8 @@ public struct SettingsSupervisorSection: View {
             store.setSupervisorQuietHoursWindow(window)
           }
         )
+      case .audit:
+        SettingsSupervisorAuditPane()
       }
     }
   }
