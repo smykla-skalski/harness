@@ -90,8 +90,9 @@ public struct OpenSupervisorAuditTimelineAction: Sendable {
   }
 
   @MainActor
-  public func callAsFunction(_ query: SupervisorAuditTimelineQuery = SupervisorAuditTimelineQuery())
-  {
+  public func callAsFunction(
+    _ query: SupervisorAuditTimelineQuery = SupervisorAuditTimelineQuery()
+  ) {
     action(query)
   }
 }
