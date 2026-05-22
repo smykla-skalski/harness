@@ -29,6 +29,7 @@ extension DashboardDependenciesRouteView {
       filterModeRaw: $filterModeRaw,
       sortModeRaw: $sortModeRaw,
       groupModeRaw: $groupModeRaw,
+      needsMeCount: routeResponse.items.lazy.filter(\.requiresAttention).count,
       onRefresh: {
         Task { await reload(forceRefresh: true) }
       },

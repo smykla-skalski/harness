@@ -161,6 +161,7 @@ struct DashboardDependenciesControlStrip: View {
   @Binding var filterModeRaw: String
   @Binding var sortModeRaw: String
   @Binding var groupModeRaw: String
+  let needsMeCount: Int
   let onRefresh: () -> Void
   let onClearCache: () -> Void
 
@@ -171,6 +172,7 @@ struct DashboardDependenciesControlStrip: View {
           spacing: HarnessMonitorTheme.spacingSM,
           lineSpacing: HarnessMonitorTheme.spacingSM
         ) {
+          needsMeChip
           filterPicker
           sortPicker
           groupPicker
@@ -182,6 +184,34 @@ struct DashboardDependenciesControlStrip: View {
       }
     }
     .frame(maxWidth: .infinity, alignment: .leading)
+  }
+
+  private var isNeedsMeActive: Bool {
+    filterModeRaw == DashboardDependenciesFilterMode.blocked.rawValue
+  }
+
+  private var needsMeChip: some View {
+    Toggle(isOn: needsMeBinding) {
+      if needsMeCount > 0 {
+        Text("Needs Me (\(needsMeCount))")
+      } else {
+        Text("Needs Me")
+      }
+    }
+    .toggleStyle(.button)
+    .controlSize(.regular)
+    .accessibilityLabel("Filter to pull requests that need your attention")
+  }
+
+  private var needsMeBinding: Binding<Bool> {
+    Binding(
+      get: { isNeedsMeActive },
+      set: { newValue in
+        filterModeRaw =
+          (newValue ? DashboardDependenciesFilterMode.blocked
+            : DashboardDependenciesFilterMode.all).rawValue
+      }
+    )
   }
 
   private var filterPicker: some View {
