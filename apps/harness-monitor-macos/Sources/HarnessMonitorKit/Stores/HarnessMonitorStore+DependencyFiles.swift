@@ -61,6 +61,8 @@ extension HarnessMonitorStore {
     dependencyFilesPendingFetches.insert(fetchKey)
     viewModel.setLoading()
     defer { dependencyFilesPendingFetches.remove(fetchKey) }
+    let interval = DependencyFilesPerf.beginMetadataFetch(pullRequestID: pullRequestID)
+    defer { DependencyFilesPerf.end(interval) }
     do {
       let response = try await fetchListFromClient(
         pullRequestID: pullRequestID,

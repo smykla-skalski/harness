@@ -1,4 +1,5 @@
 import Foundation
+import HarnessMonitorKit
 
 /// Shared off-main tokenization cache for the Dependencies > Files
 /// diff renderer. Keyed by `(language, sha256(source))` so the same
@@ -36,9 +37,11 @@ actor SyntaxHighlightCache {
       promoteRecentlyUsed(key: key)
       return cached
     }
+    let interval = DependencyFilesPerf.beginTokenize(path: key.sourceHash)
     let tokens = await Task.detached(priority: .utility) {
       HarnessCodeHighlighter.highlight(source, language: language)
     }.value
+    DependencyFilesPerf.end(interval)
     insert(key: key, tokens: tokens)
     return tokens
   }

@@ -39,6 +39,8 @@ extension HarnessMonitorStore {
         )
       )
       guard let data = Data(base64Encoded: blob.contentBase64) else { return nil }
+      let interval = DependencyFilesPerf.beginImageDecode(oid: oid)
+      defer { DependencyFilesPerf.end(interval) }
       return try await dependencyFileImageDecoder.decode(
         repositoryID: repositoryID,
         oid: oid,
