@@ -302,7 +302,19 @@ mutation AddDependencyUpdateComment($id: ID!, $body: String!) {
   addComment(input: { subjectId: $id, body: $body }) {
     commentEdge {
       node {
+        __typename
         id
+        author { login avatarUrl }
+        body
+        bodyText
+        createdAt
+        updatedAt
+        isMinimized
+        minimizedReason
+        reactions { totalCount }
+        viewerDidAuthor
+        viewerCanUpdate
+        url
       }
     }
   }
@@ -313,6 +325,7 @@ pub(crate) const LIST_PR_FILES_QUERY: &str = r"
 query ListDependencyUpdatePullRequestFiles($id: ID!, $after: String) {
   node(id: $id) {
     ... on PullRequest {
+      number
       headRefOid
       headRefName
       baseRefOid

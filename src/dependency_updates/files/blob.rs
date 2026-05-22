@@ -115,9 +115,7 @@ pub fn encode_blob_bytes(bytes: &[u8]) -> String {
 
 /// Decode helper - returns `Err` on invalid base64 so the service can surface
 /// a clean error rather than panicking.
-pub fn decode_blob_bytes(
-    encoded: &str,
-) -> Result<Vec<u8>, base64::DecodeError> {
+pub fn decode_blob_bytes(encoded: &str) -> Result<Vec<u8>, base64::DecodeError> {
     use base64::Engine as _;
     base64::engine::general_purpose::STANDARD.decode(encoded)
 }

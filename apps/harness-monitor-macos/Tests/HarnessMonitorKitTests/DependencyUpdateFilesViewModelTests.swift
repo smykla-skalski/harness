@@ -26,7 +26,12 @@ struct DependencyUpdateFilesViewModelTests {
   ) -> DependencyUpdatesFilesListResponse {
     DependencyUpdatesFilesListResponse(
       pullRequestID: "pr-1",
+      number: 42,
       headRefOid: headRefOid,
+      headRefName: "renovate/foo",
+      baseRefOid: "base-a",
+      baseRefName: "main",
+      repositoryFullName: "owner/repo",
       viewerCanMarkViewed: true,
       files: files,
       fetchedAt: "2026-05-22T12:00:00Z"
@@ -46,6 +51,11 @@ struct DependencyUpdateFilesViewModelTests {
     )
     #expect(vm.state == .loaded)
     #expect(vm.headRefOid == "head-a")
+    #expect(vm.number == 42)
+    #expect(vm.headRefName == "renovate/foo")
+    #expect(vm.baseRefOid == "base-a")
+    #expect(vm.baseRefName == "main")
+    #expect(vm.repositoryFullName == "owner/repo")
     #expect(vm.files.map(\.path) == ["src/a.swift", "src/b.swift"])
     #expect(vm.viewedByPath["src/a.swift"] == .viewed)
     #expect(vm.viewedByPath["src/b.swift"] == .unviewed)

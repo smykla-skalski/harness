@@ -91,8 +91,12 @@ public final class DependencyUpdateFilesViewModel {
   /// Merge-base OID; the local-clone patch dispatch needs this to
   /// compute `base..head` diffs. `nil` falls back to the REST path.
   public var baseRefOid: String?
+  /// PR base branch name. The daemon fetches this ref before local diffing.
+  public var baseRefName: String?
   /// `owner/name` of the PR's repository. `nil` falls back to REST.
   public var repositoryFullName: String?
+  /// Pull request number, used to fetch `refs/pull/<number>/head`.
+  public var number: UInt64?
   public var viewerCanMarkViewed: Bool = true
   public var paginationComplete: Bool = true
   public var files: [DependencyUpdateFile] = []
@@ -119,7 +123,9 @@ public final class DependencyUpdateFilesViewModel {
     headRefOid = response.headRefOid
     headRefName = response.headRefName
     baseRefOid = response.baseRefOid
+    baseRefName = response.baseRefName
     repositoryFullName = response.repositoryFullName
+    number = response.number
     viewerCanMarkViewed = response.viewerCanMarkViewed
     paginationComplete = response.paginationComplete
     files = response.files

@@ -31,6 +31,7 @@ struct GraphqlData {
 
 #[derive(Debug, Deserialize)]
 struct PullRequestNode {
+    number: Option<u64>,
     #[serde(rename = "headRefOid")]
     head_ref_oid: Option<String>,
     #[serde(rename = "headRefName")]
@@ -110,6 +111,7 @@ pub(crate) async fn fetch_files(
     }
 
     let mut head_ref_oid = String::new();
+    let mut number: Option<u64> = None;
     let mut head_ref_name: Option<String> = None;
     let mut base_ref_oid: Option<String> = None;
     let mut base_ref_name: Option<String> = None;
@@ -147,6 +149,9 @@ pub(crate) async fn fetch_files(
 
         if head_ref_oid.is_empty() {
             head_ref_oid = node.head_ref_oid.clone().unwrap_or_default();
+        }
+        if number.is_none() {
+            number = node.number;
         }
         if head_ref_name.is_none() {
             head_ref_name = node.head_ref_name.clone();
@@ -214,6 +219,7 @@ pub(crate) async fn fetch_files(
 
     Ok(DependencyUpdatesFilesListResponse {
         pull_request_id,
+        number,
         head_ref_oid,
         head_ref_name,
         base_ref_oid,

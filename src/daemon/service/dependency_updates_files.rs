@@ -25,11 +25,11 @@ use tokio::sync::broadcast;
 
 use crate::daemon::protocol::StreamEvent;
 use crate::daemon::state::daemon_root;
-use crate::dependency_updates::files::local_clone::Sensitive;
+use crate::dependency_updates::files::local_clone::{Sensitive, pat_clone_url};
 use crate::dependency_updates::files::local_clone_diff::compute_unified_patches;
 use crate::dependency_updates::files::local_clone_progress_event::BroadcastProgressSink;
 use crate::dependency_updates::files::local_clone_runtime::{
-    DiscardProgressSink, LocalCloneProgressSink, LocalCloneRuntime,
+    DiscardProgressSink, LocalCloneProgressSink, LocalCloneRuntime, diff::LocalCloneFetchRef,
 };
 use crate::dependency_updates::{
     DependencyUpdateFileViewedOutcome, DependencyUpdateFileViewedState,
@@ -139,7 +139,9 @@ pub async fn patch_dependency_update_files(
             &token,
             &request.head_ref_oid_expected,
             base_oid,
+            request.number,
             request.head_ref_name.as_deref(),
+            request.base_ref_name.as_deref(),
             &request.normalized_paths(),
         )
         .await
@@ -178,24 +180,22 @@ async fn run_local_clone_patch(
     token: &str,
     head_ref_oid: &str,
     base_oid: &str,
+    number: Option<u64>,
     head_ref_name: Option<&str>,
+    base_ref_name: Option<&str>,
     paths: &[String],
 ) -> Result<DependencyUpdatesFilesPatchResponse, CliError> {
     let runtime = local_clone_runtime();
     let sink = progress_sink();
-    // Prefer the explicit PR head ref name when supplied; fall back to
-    // `refs/heads/main` as a sensible default. The fallback only matters
-    // for clients that haven't been updated to plumb the new field.
-    let ref_qualified = match head_ref_name {
-        Some(name) if name.starts_with("refs/") => name.to_string(),
-        Some(name) => format!("refs/heads/{name}"),
-        None => format!("refs/heads/{}", default_head_ref_branch()),
-    };
+    let (fetch_refs, head_ref) = local_clone_fetch_context(number, head_ref_name, base_ref_name);
+    let token = Sensitive::new(token);
+    let clone_url = pat_clone_url(repo_full_name, &token);
     let ensured = runtime
-        .ensure_clone(
+        .ensure_clone_refs_with_url(
             repo_full_name,
-            Sensitive::new(token),
-            &ref_qualified,
+            clone_url.expose(),
+            &fetch_refs,
+            &head_ref,
             sink,
         )
         .await
@@ -207,8 +207,7 @@ async fn run_local_clone_patch(
     let patches = compute_unified_patches(&ensured, base_oid, head_ref_oid, path_filter)
         .await
         .map_err(|error| -> CliError {
-            CliErrorKind::workflow_io(format!("compute local-clone diff failed: {error}"))
-                .into()
+            CliErrorKind::workflow_io(format!("compute local-clone diff failed: {error}")).into()
         })?;
 
     Ok(DependencyUpdatesFilesPatchResponse {
@@ -219,6 +218,39 @@ async fn run_local_clone_patch(
         fetched_at: utc_now(),
         rate_limit_snapshot: None,
     })
+}
+
+fn local_clone_fetch_context(
+    number: Option<u64>,
+    head_ref_name: Option<&str>,
+    base_ref_name: Option<&str>,
+) -> (Vec<LocalCloneFetchRef>, String) {
+    let mut refs = Vec::new();
+    let head_ref = if let Some(number) = number {
+        let pull_ref = LocalCloneFetchRef::github_pull_head(number);
+        let local_ref = pull_ref.local_ref.clone();
+        refs.push(pull_ref);
+        local_ref
+    } else if let Some(name) = head_ref_name {
+        let head_ref = LocalCloneFetchRef::mirrored(branch_ref(name));
+        let local_ref = head_ref.local_ref.clone();
+        refs.push(head_ref);
+        local_ref
+    } else {
+        format!("refs/heads/{}", default_head_ref_branch())
+    };
+    if let Some(name) = base_ref_name {
+        refs.push(LocalCloneFetchRef::mirrored(branch_ref(name)));
+    }
+    (refs, head_ref)
+}
+
+fn branch_ref(name: &str) -> String {
+    if name.starts_with("refs/") {
+        name.to_string()
+    } else {
+        format!("refs/heads/{name}")
+    }
 }
 
 /// The default branch name used to fabricate `refs/heads/<name>` when the
@@ -585,9 +617,11 @@ mod tests {
             pull_request_id: "".into(),
             head_ref_oid_expected: "abc".into(),
             paths: vec!["src/lib.rs".into()],
+            number: None,
             repository_full_name: None,
             base_ref_oid_expected: None,
             head_ref_name: None,
+            base_ref_name: None,
         };
         let err = patch_dependency_update_files(&request).await.unwrap_err();
         assert!(err.to_string().to_lowercase().contains("pull_request_id"));
@@ -599,9 +633,11 @@ mod tests {
             pull_request_id: "PR_1".into(),
             head_ref_oid_expected: "abc".into(),
             paths: vec!["src/lib.rs".into()],
+            number: None,
             repository_full_name: None,
             base_ref_oid_expected: None,
             head_ref_name: None,
+            base_ref_name: None,
         };
         let response = patch_dependency_update_files(&request).await.expect("ok");
         assert_eq!(response.pull_request_id, "PR_1");
@@ -642,6 +678,28 @@ mod tests {
         // Ok(vec![]) rather than an error.
         let response = list_dependency_update_local_clones().await.expect("ok");
         assert!(response.is_empty());
+    }
+
+    #[test]
+    fn local_clone_fetch_context_prefers_github_pull_ref() {
+        let (refs, head_ref) =
+            local_clone_fetch_context(Some(7), Some("renovate/foo"), Some("main"));
+
+        assert_eq!(head_ref, "refs/harness/dependency-updates/pull/7/head");
+        assert!(refs.iter().any(|r| r.remote_ref == "refs/pull/7/head"));
+        assert!(refs.iter().any(|r| r.remote_ref == "refs/heads/main"));
+    }
+
+    #[test]
+    fn local_clone_fetch_context_uses_branch_when_number_missing() {
+        let (refs, head_ref) = local_clone_fetch_context(None, Some("renovate/foo"), None);
+
+        assert_eq!(
+            head_ref,
+            "refs/harness/dependency-updates/heads/renovate/foo"
+        );
+        assert_eq!(refs.len(), 1);
+        assert_eq!(refs[0].remote_ref, "refs/heads/renovate/foo");
     }
 
     #[test]

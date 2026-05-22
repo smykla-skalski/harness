@@ -21,10 +21,15 @@
 //! tree of percentage counters: the UI only needs to render a "cloning..."
 //! state, not a precise progress bar.
 
+pub(crate) mod diff;
+
+#[cfg(test)]
+mod tests;
+
 use std::collections::BTreeMap;
 use std::path::PathBuf;
-use std::sync::atomic::AtomicBool;
 use std::sync::Arc;
+use std::sync::atomic::AtomicBool;
 use std::time::Duration;
 
 use chrono::Utc;
@@ -32,8 +37,10 @@ use gix::progress::Discard;
 use gix::remote::Direction;
 use tokio::sync::Mutex;
 
+use diff::LocalCloneFetchRef;
+
 use super::local_clone::{
-    pat_clone_url, LocalCloneRegistry, LocalCloneRoot, RegistryEntry, RepoKey, Sensitive,
+    LocalCloneRegistry, LocalCloneRoot, RegistryEntry, RepoKey, Sensitive, pat_clone_url,
 };
 
 /// One progress event broadcast for a long-running local-clone operation.
@@ -114,6 +121,12 @@ pub enum LocalCloneRuntimeError {
     RefMissing(String),
     #[error("blob not found in clone: {0}")]
     BlobMissing(String),
+    #[error("gix diff failed: {0}")]
+    Diff(String),
+    #[error("merge base not found: {0}")]
+    MergeBase(String),
+    #[error("invalid fetch refspec: {0}")]
+    RefSpec(String),
     #[error("io error: {0}")]
     Io(String),
     #[error("join error: {0}")]
@@ -126,6 +139,7 @@ pub enum LocalCloneRuntimeError {
 pub struct LocalCloneRuntime {
     root: LocalCloneRoot,
     locks: Mutex<BTreeMap<RepoKey, Arc<Mutex<()>>>>,
+    registry_lock: Mutex<()>,
 }
 
 impl LocalCloneRuntime {
@@ -134,6 +148,7 @@ impl LocalCloneRuntime {
         Self {
             root,
             locks: Mutex::new(BTreeMap::new()),
+            registry_lock: Mutex::new(()),
         }
     }
 
@@ -166,7 +181,7 @@ impl LocalCloneRuntime {
         sink: Arc<dyn LocalCloneProgressSink>,
     ) -> Result<EnsuredClone, LocalCloneRuntimeError> {
         let url = pat_clone_url(repo_full_name, &pat);
-        self.ensure_clone_with_url(repo_full_name, url.expose(), head_ref_name, sink)
+        self.ensure_clone_refs_with_url(repo_full_name, url.expose(), &[], head_ref_name, sink)
             .await
     }
 
@@ -180,10 +195,32 @@ impl LocalCloneRuntime {
         head_ref_name: &str,
         sink: Arc<dyn LocalCloneProgressSink>,
     ) -> Result<EnsuredClone, LocalCloneRuntimeError> {
+        self.ensure_clone_refs_with_url(repo_full_name, clone_url, &[], head_ref_name, sink)
+            .await
+    }
+
+    /// Same as [`ensure_clone_with_url`] but fetches additional exact refs
+    /// into local tracking refs before resolving `head_ref_name`.
+    ///
+    /// Callers use this for PR heads and base refs such as
+    /// `refs/pull/123/head`, which are not covered by the default
+    /// `refs/heads/*` clone refspec.
+    pub async fn ensure_clone_refs_with_url(
+        self: &Arc<Self>,
+        repo_full_name: &str,
+        clone_url: &str,
+        extra_refs: &[LocalCloneFetchRef],
+        head_ref_name: &str,
+        sink: Arc<dyn LocalCloneProgressSink>,
+    ) -> Result<EnsuredClone, LocalCloneRuntimeError> {
         let key = RepoKey::new(repo_full_name);
         let bare_path = key.bare_path(&self.root.path);
         let repo_label = repo_full_name.to_string();
         let head_ref = head_ref_name.to_string();
+        let extra_refspecs = extra_refs
+            .iter()
+            .map(LocalCloneFetchRef::refspec)
+            .collect::<Vec<_>>();
         let lock = self.lock_for(&key).await;
         let _guard = lock.lock().await;
 
@@ -207,10 +244,11 @@ impl LocalCloneRuntime {
         let task_url = clone_url.to_string();
         let task_path = bare_path.clone();
         let task_ref = head_ref.clone();
-        let result =
-            tokio::task::spawn_blocking(move || run_ensure(operation, task_url, task_path, task_ref))
-                .await
-                .map_err(|join| LocalCloneRuntimeError::Join(join.to_string()))?;
+        let result = tokio::task::spawn_blocking(move || {
+            run_ensure(operation, task_url, task_path, task_ref, extra_refspecs)
+        })
+        .await
+        .map_err(|join| LocalCloneRuntimeError::Join(join.to_string()))?;
 
         match result {
             Ok(head_oid) => {
@@ -266,14 +304,15 @@ impl LocalCloneRuntime {
     }
 
     /// Refresh the on-disk registry's `last_used_at` / `last_fetched_at`
-    /// and persist atomically. Best-effort: filesystem errors are non-fatal
-    /// (logged but the ensure-result is preserved).
+    /// and persist with a same-process mutex plus atomic rename so
+    /// concurrent different-repo clones cannot lose each other's entries.
     async fn update_registry_on_success(
         &self,
         key: &RepoKey,
         repo_full_name: &str,
         bare_path: &std::path::Path,
     ) -> Result<(), LocalCloneRuntimeError> {
+        let _guard = self.registry_lock.lock().await;
         let registry_path = self.root.registry_path();
         let bare_path = bare_path.to_path_buf();
         let key = key.clone();
@@ -304,11 +343,8 @@ impl LocalCloneRuntime {
             entry.size_bytes = size;
             entry.last_used_at = now;
             entry.last_fetched_at = now;
-            if let Some(parent) = registry_path.parent() {
-                let _ = std::fs::create_dir_all(parent);
-            }
             let body = serde_json::to_vec_pretty(&registry).map_err(|e| e.to_string())?;
-            std::fs::write(&registry_path, body).map_err(|e| e.to_string())?;
+            write_registry_atomically(&registry_path, &body)?;
             Ok::<(), String>(())
         })
         .await
@@ -336,6 +372,20 @@ fn directory_size(path: &std::path::Path) -> std::io::Result<u64> {
     walk(path)
 }
 
+fn write_registry_atomically(registry_path: &std::path::Path, body: &[u8]) -> Result<(), String> {
+    let parent = registry_path
+        .parent()
+        .ok_or_else(|| format!("registry path has no parent: {}", registry_path.display()))?;
+    std::fs::create_dir_all(parent).map_err(|e| e.to_string())?;
+    let tmp_path = registry_path.with_extension(format!("json.tmp.{}", std::process::id()));
+    std::fs::write(&tmp_path, body).map_err(|e| e.to_string())?;
+    std::fs::rename(&tmp_path, registry_path).map_err(|e| {
+        let _ = std::fs::remove_file(&tmp_path);
+        e.to_string()
+    })?;
+    Ok(())
+}
+
 /// Synchronous gix wrapper executed inside `spawn_blocking`. Returns the OID
 /// the requested ref resolves to after the clone or fetch completes.
 fn run_ensure(
@@ -343,6 +393,7 @@ fn run_ensure(
     url: String,
     bare_path: PathBuf,
     head_ref: String,
+    extra_refspecs: Vec<String>,
 ) -> Result<String, LocalCloneRuntimeError> {
     let interrupted = AtomicBool::new(false);
     match operation {
@@ -352,14 +403,15 @@ fn run_ensure(
                     .map_err(|e| LocalCloneRuntimeError::Io(e.to_string()))?;
             }
             let mut prepare = gix::prepare_clone_bare(url.as_str(), &bare_path)
-                .map_err(|e| LocalCloneRuntimeError::Clone(e.to_string()))?;
+                .map_err(|e| LocalCloneRuntimeError::Clone(e.to_string()))?
+                .with_fetch_options(fetch_options(&extra_refspecs)?);
             let (_repo, _outcome) = prepare
                 .fetch_only(Discard, &interrupted)
                 .map_err(|e| LocalCloneRuntimeError::Clone(e.to_string()))?;
         }
         LocalCloneOperation::Fetch => {
-            let repo = gix::open(&bare_path)
-                .map_err(|e| LocalCloneRuntimeError::Open(e.to_string()))?;
+            let repo =
+                gix::open(&bare_path).map_err(|e| LocalCloneRuntimeError::Open(e.to_string()))?;
             let remote = repo
                 .find_remote("origin")
                 .map_err(|e| LocalCloneRuntimeError::Fetch(e.to_string()))?;
@@ -367,7 +419,7 @@ fn run_ensure(
                 .connect(Direction::Fetch)
                 .map_err(|e| LocalCloneRuntimeError::Fetch(e.to_string()))?;
             let prepare = connection
-                .prepare_fetch(Discard, gix::remote::ref_map::Options::default())
+                .prepare_fetch(Discard, fetch_options(&extra_refspecs)?)
                 .map_err(|e| LocalCloneRuntimeError::Fetch(e.to_string()))?;
             let _outcome = prepare
                 .receive(Discard, &interrupted)
@@ -375,16 +427,33 @@ fn run_ensure(
         }
     }
 
-    let repo =
-        gix::open(&bare_path).map_err(|e| LocalCloneRuntimeError::Open(e.to_string()))?;
+    let repo = gix::open(&bare_path).map_err(|e| LocalCloneRuntimeError::Open(e.to_string()))?;
     let oid = resolve_ref(&repo, &head_ref)?;
     Ok(oid.to_hex().to_string())
+}
+
+fn fetch_options(
+    extra_refspecs: &[String],
+) -> Result<gix::remote::ref_map::Options, LocalCloneRuntimeError> {
+    let mut options = gix::remote::ref_map::Options::default();
+    for refspec in extra_refspecs {
+        let parsed = gix::refspec::parse(
+            refspec.as_str().into(),
+            gix::refspec::parse::Operation::Fetch,
+        )
+        .map_err(|error| LocalCloneRuntimeError::RefSpec(error.to_string()))?;
+        options.extra_refspecs.push(parsed.to_owned());
+    }
+    Ok(options)
 }
 
 fn resolve_ref(
     repo: &gix::Repository,
     head_ref: &str,
 ) -> Result<gix::ObjectId, LocalCloneRuntimeError> {
+    if let Ok(id) = gix::ObjectId::from_hex(head_ref.as_bytes()) {
+        return Ok(id);
+    }
     let mut reference = repo
         .find_reference(head_ref)
         .map_err(|_| LocalCloneRuntimeError::RefMissing(head_ref.to_string()))?;
@@ -392,190 +461,4 @@ fn resolve_ref(
         .peel_to_id()
         .map_err(|e| LocalCloneRuntimeError::RefMissing(e.to_string()))?;
     Ok(id.detach())
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    use std::sync::Mutex as StdMutex;
-
-    /// Test sink that captures every reported event so assertions can
-    /// inspect the start/completed sequence.
-    #[derive(Default)]
-    struct RecordingSink {
-        events: StdMutex<Vec<LocalCloneProgress>>,
-    }
-
-    impl LocalCloneProgressSink for RecordingSink {
-        fn report(&self, event: LocalCloneProgress) {
-            self.events.lock().unwrap().push(event);
-        }
-    }
-
-    impl RecordingSink {
-        fn snapshot(&self) -> Vec<LocalCloneProgress> {
-            self.events.lock().unwrap().clone()
-        }
-    }
-
-    /// Build a tiny bare source repo with one commit on `refs/heads/main`
-    /// and a single blob, using gix only - no `git` shell-outs.
-    fn make_source_repo(path: &std::path::Path) -> (gix::ObjectId, gix::ObjectId) {
-        let repo = gix::init_bare(path).expect("init bare");
-        let blob_oid = repo
-            .write_blob(b"hello fixture\n" as &[u8])
-            .expect("blob")
-            .detach();
-        let mut tree = gix::objs::Tree::empty();
-        tree.entries.push(gix::objs::tree::Entry {
-            mode: gix::objs::tree::EntryKind::Blob.into(),
-            filename: "fixture.txt".into(),
-            oid: blob_oid,
-        });
-        let tree_oid = repo.write_object(&tree).expect("write tree").detach();
-        let commit_oid = repo
-            .commit(
-                "refs/heads/main",
-                "fixture commit",
-                tree_oid,
-                Vec::<gix::ObjectId>::new(),
-            )
-            .expect("commit")
-            .detach();
-        (commit_oid, blob_oid)
-    }
-
-    #[tokio::test]
-    async fn ensure_clone_via_file_url_creates_bare_clone_and_resolves_ref() {
-        let dir = tempfile::tempdir().expect("tempdir");
-        let source = dir.path().join("source.git");
-        let (commit_oid, _) = make_source_repo(&source);
-
-        let clones_root = LocalCloneRoot::new(dir.path().join("clones"));
-        let runtime = Arc::new(LocalCloneRuntime::new(clones_root));
-        let sink = Arc::new(RecordingSink::default());
-
-        let url = format!("file://{}", source.display());
-        let ensured = runtime
-            .ensure_clone_with_url(
-                "fixture/source",
-                &url,
-                "refs/heads/main",
-                sink.clone() as Arc<dyn LocalCloneProgressSink>,
-            )
-            .await
-            .expect("ensure clone");
-        assert_eq!(ensured.head_oid, commit_oid.to_hex().to_string());
-        assert!(ensured.bare_path.exists());
-
-        let events = sink.snapshot();
-        assert!(matches!(
-            events.first(),
-            Some(LocalCloneProgress::Started {
-                operation: LocalCloneOperation::Clone,
-                ..
-            })
-        ));
-        assert!(matches!(
-            events.last(),
-            Some(LocalCloneProgress::Completed {
-                operation: LocalCloneOperation::Clone,
-                ..
-            })
-        ));
-    }
-
-    #[tokio::test]
-    async fn read_blob_returns_raw_bytes_from_existing_clone() {
-        let dir = tempfile::tempdir().expect("tempdir");
-        let source = dir.path().join("source.git");
-        let (_, blob_oid) = make_source_repo(&source);
-
-        let clones_root = LocalCloneRoot::new(dir.path().join("clones"));
-        let runtime = Arc::new(LocalCloneRuntime::new(clones_root));
-        let sink: Arc<dyn LocalCloneProgressSink> = Arc::new(DiscardProgressSink);
-
-        let url = format!("file://{}", source.display());
-        let ensured = runtime
-            .ensure_clone_with_url("fixture/source", &url, "refs/heads/main", sink)
-            .await
-            .expect("ensure clone");
-        let bytes = runtime
-            .read_blob(&ensured, &blob_oid.to_hex().to_string())
-            .await
-            .expect("blob");
-        assert_eq!(bytes, b"hello fixture\n");
-    }
-
-    #[tokio::test]
-    async fn ensure_clone_twice_reuses_existing_bare_dir_via_fetch_path() {
-        let dir = tempfile::tempdir().expect("tempdir");
-        let source = dir.path().join("source.git");
-        let (_, _) = make_source_repo(&source);
-
-        let clones_root = LocalCloneRoot::new(dir.path().join("clones"));
-        let runtime = Arc::new(LocalCloneRuntime::new(clones_root));
-        let url = format!("file://{}", source.display());
-
-        let sink1: Arc<dyn LocalCloneProgressSink> = Arc::new(DiscardProgressSink);
-        let _first = runtime
-            .ensure_clone_with_url("fixture/source", &url, "refs/heads/main", sink1)
-            .await
-            .expect("first ensure");
-
-        let sink2 = Arc::new(RecordingSink::default());
-        let _second = runtime
-            .ensure_clone_with_url(
-                "fixture/source",
-                &url,
-                "refs/heads/main",
-                sink2.clone() as Arc<dyn LocalCloneProgressSink>,
-            )
-            .await
-            .expect("second ensure");
-        let events = sink2.snapshot();
-        assert!(matches!(
-            events.first(),
-            Some(LocalCloneProgress::Started {
-                operation: LocalCloneOperation::Fetch,
-                ..
-            })
-        ));
-    }
-
-    #[test]
-    fn operation_label_round_trips() {
-        assert_eq!(LocalCloneOperation::Clone.label(), "clone");
-        assert_eq!(LocalCloneOperation::Fetch.label(), "fetch");
-    }
-
-    #[test]
-    fn discard_sink_swallows_events_without_panic() {
-        let sink = DiscardProgressSink;
-        sink.report(LocalCloneProgress::Started {
-            repo_full_name: "x".into(),
-            operation: LocalCloneOperation::Clone,
-        });
-    }
-
-    #[test]
-    fn directory_size_sums_files_recursively() {
-        let dir = tempfile::tempdir().expect("tempdir");
-        std::fs::write(dir.path().join("a"), [0u8; 100]).expect("write");
-        let sub = dir.path().join("sub");
-        std::fs::create_dir_all(&sub).expect("mkdir");
-        std::fs::write(sub.join("b"), [0u8; 250]).expect("write");
-        let total = directory_size(dir.path()).expect("walk");
-        assert_eq!(total, 350);
-    }
-
-    #[tokio::test]
-    async fn runtime_lock_for_returns_same_arc_per_key() {
-        let runtime = LocalCloneRuntime::new(LocalCloneRoot::new(PathBuf::from("/tmp/x")));
-        let key = RepoKey::new("owner/repo");
-        let a = runtime.lock_for(&key).await;
-        let b = runtime.lock_for(&key).await;
-        assert!(Arc::ptr_eq(&a, &b));
-    }
 }

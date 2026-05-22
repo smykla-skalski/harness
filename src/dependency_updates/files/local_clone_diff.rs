@@ -13,12 +13,11 @@
 
 use std::collections::HashSet;
 
-use gix::diff::blob::{
-    diff_with_slider_heuristics,
-    unified_diff::{ConsumeHunk, ContextSize, DiffLineKind, HunkHeader},
-    Algorithm, InternedInput, UnifiedDiff,
-};
 use gix::ObjectId;
+use gix::diff::blob::{
+    Algorithm, InternedInput, UnifiedDiff, diff_with_slider_heuristics,
+    unified_diff::{ConsumeHunk, ContextSize, DiffLineKind, HunkHeader},
+};
 
 use crate::workspace::utc_now;
 
@@ -50,8 +49,7 @@ pub async fn compute_unified_patches(
     let bare_path = ensured.bare_path.clone();
     let base = base_oid.to_string();
     let head = head_oid.to_string();
-    let filter: Option<HashSet<String>> =
-        path_filter.map(|paths| paths.iter().cloned().collect());
+    let filter: Option<HashSet<String>> = path_filter.map(|paths| paths.iter().cloned().collect());
     tokio::task::spawn_blocking(move || run_compute(&bare_path, &base, &head, filter.as_ref()))
         .await
         .map_err(|join| LocalCloneRuntimeError::Join(join.to_string()))?
@@ -63,8 +61,7 @@ fn run_compute(
     head_oid: &str,
     filter: Option<&HashSet<String>>,
 ) -> Result<Vec<DependencyUpdateFilePatch>, LocalCloneRuntimeError> {
-    let repo = gix::open(bare_path)
-        .map_err(|e| LocalCloneRuntimeError::Open(e.to_string()))?;
+    let repo = gix::open(bare_path).map_err(|e| LocalCloneRuntimeError::Open(e.to_string()))?;
     let base_id = ObjectId::from_hex(base_oid.as_bytes())
         .map_err(|e| LocalCloneRuntimeError::BlobMissing(e.to_string()))?;
     let head_id = ObjectId::from_hex(head_oid.as_bytes())
