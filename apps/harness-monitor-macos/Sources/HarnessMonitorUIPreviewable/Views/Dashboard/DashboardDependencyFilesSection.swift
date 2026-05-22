@@ -7,10 +7,16 @@ import SwiftUI
 /// files don't invalidate other detail panes mounted in tab groups.
 struct DashboardDependencyFilesSection: View {
   let pullRequestID: String
+  let repositoryID: String
 
   @Environment(HarnessMonitorStore.self) private var store
   @Environment(\.dependenciesPreferences) private var preferences
   @State private var filter = DashboardDependencyFilesFilterState()
+
+  init(pullRequestID: String, repositoryID: String = "") {
+    self.pullRequestID = pullRequestID
+    self.repositoryID = repositoryID
+  }
 
   var body: some View {
     let viewModel = store.viewModel(forPullRequest: pullRequestID)
@@ -52,6 +58,8 @@ struct DashboardDependencyFilesSection: View {
           viewedState: viewModel.viewedByPath[file.path] ?? file.viewerViewedState,
           patchState: viewModel.patches[file.path] ?? .notLoaded,
           viewMode: viewModel.viewMode(forPath: file.path),
+          pullRequestID: pullRequestID,
+          repositoryID: repositoryID,
           onToggleViewed: { newValue in
             store.setFileViewed(
               pullRequestID: pullRequestID,

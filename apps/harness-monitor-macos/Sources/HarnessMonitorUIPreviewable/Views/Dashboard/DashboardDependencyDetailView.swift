@@ -69,7 +69,10 @@ struct DashboardDependencyDetailView<Actions: View>: View {
         .accessibilityIdentifier(HarnessMonitorAccessibility.dashboardDependenciesDescription)
         if filesEnabled {
           DashboardDependencyDetailSection(title: "Files") {
-            DashboardDependencyFilesSection(pullRequestID: item.pullRequestID)
+            DashboardDependencyFilesSection(
+              pullRequestID: item.pullRequestID,
+              repositoryID: item.repositoryID
+            )
           }
         }
         DashboardDependencyDetailSection(title: "Checks") {

@@ -9,6 +9,8 @@ struct DashboardDependencyFileCard: View {
   let viewedState: DependencyUpdateFileViewedState
   let patchState: DependencyUpdateFilePatchState
   let viewMode: FilesViewMode
+  let pullRequestID: String
+  let repositoryID: String
   let onToggleViewed: @MainActor (Bool) -> Void
   let onChangeViewMode: @MainActor (FilesViewMode) -> Void
   let onLoadPatch: @MainActor () -> Void
@@ -19,6 +21,8 @@ struct DashboardDependencyFileCard: View {
       viewedState: viewedState,
       patchState: patchState,
       viewMode: viewMode,
+      pullRequestID: pullRequestID,
+      repositoryID: repositoryID,
       onToggleViewed: onToggleViewed,
       onChangeViewMode: onChangeViewMode,
       onLoadPatch: onLoadPatch
@@ -31,6 +35,8 @@ struct DashboardDependencyFileCardInternal: View {
   let viewedState: DependencyUpdateFileViewedState
   let patchState: DependencyUpdateFilePatchState
   let viewMode: FilesViewMode
+  let pullRequestID: String
+  let repositoryID: String
   let onToggleViewed: @MainActor (Bool) -> Void
   let onChangeViewMode: @MainActor (FilesViewMode) -> Void
   let onLoadPatch: @MainActor () -> Void
@@ -122,7 +128,12 @@ struct DashboardDependencyFileCardInternal: View {
       ProgressView().controlSize(.small)
     case .loaded(let patch):
       if file.isBinary {
-        DashboardDependencyFileImagePreview(file: file, patch: patch)
+        DashboardDependencyFileImagePreview(
+          file: file,
+          patch: patch,
+          pullRequestID: pullRequestID,
+          repositoryID: repositoryID
+        )
       } else if viewMode == .split {
         DashboardDependencyFileDiffSplit(patch: patch, language: file.languageHint)
       } else {
