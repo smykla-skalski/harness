@@ -34,6 +34,9 @@ extension DashboardDependenciesRouteView {
         routeIsLoading = false
       }
     }
+    if let client = store.apiClient {
+      await loadDependencyCapabilitiesIfNeeded(client: client)
+    }
     await startScheduler(forceRefreshAll: forceRefresh)
   }
 
@@ -48,54 +51,11 @@ extension DashboardDependenciesRouteView {
       store.presentSuccessFeedback(
         "Cleared \(cleared.clearedEntries) cached dependency query bucket(s)"
       )
+      clearRecentDependencyActions()
       await reload(forceRefresh: true)
     } catch {
       store.presentFailureFeedback(error.localizedDescription)
     }
-  }
-
-  func requestApproveOrConfirm(items: [DependencyUpdateItem]) {
-    requestDependencyActionConfirmation(.approve, items: items)
-  }
-
-  func requestMergeOrConfirm(items: [DependencyUpdateItem]) {
-    requestDependencyActionConfirmation(.merge, items: items)
-  }
-
-  func confirmDependencyAction(_ confirmation: DashboardDependencyActionConfirmation) {
-    let items = currentItems(for: confirmation.pullRequestIDs)
-    guard !items.isEmpty else { return }
-    performRequestedDependencyAction(confirmation.action, items: items)
-  }
-
-  func requestDependencyActionConfirmation(
-    _ action: DashboardDependencyAttentionActionKind,
-    items: [DependencyUpdateItem]
-  ) {
-    if let confirmation = dashboardDependencyActionConfirmation(for: action, items: items) {
-      routePendingActionConfirmation = confirmation
-      return
-    }
-    performRequestedDependencyAction(action, items: items)
-  }
-
-  func performRequestedDependencyAction(
-    _ action: DashboardDependencyAttentionActionKind,
-    items: [DependencyUpdateItem]
-  ) {
-    switch action {
-    case .approve:
-      trackInFlight(Task { await approve(items: items) })
-    case .merge:
-      requestMerge(items: items)
-    }
-  }
-
-  func currentItems(for pullRequestIDs: [String]) -> [DependencyUpdateItem] {
-    let itemsByID = Dictionary(
-      uniqueKeysWithValues: routeResponse.items.map { ($0.pullRequestID, $0) }
-    )
-    return pullRequestIDs.compactMap { itemsByID[$0] }
   }
 
   func approve(items: [DependencyUpdateItem]) async {
@@ -171,12 +131,17 @@ extension DashboardDependenciesRouteView {
       repository: item.repository,
       number: item.number,
       url: item.url,
+      state: item.state,
+      isDraft: item.isDraft,
       headSha: item.headSha,
       mergeable: item.mergeable,
       reviewStatus: item.reviewStatus,
       checkStatus: item.checkStatus,
       policyBlocked: item.policyBlocked,
-      checkSuiteIDs: [checkSuiteID]
+      requiredFailedCheckNames: item.requiredFailedCheckNames,
+      viewerCanMergeAsAdmin: item.viewerCanMergeAsAdmin,
+      checkSuiteIDs: [checkSuiteID],
+      viewerCanUpdate: item.viewerCanUpdate
     )
     await performMutation("Rerunning \(check.name)", items: [item]) { client in
       try await client.rerunDependencyUpdateChecks(

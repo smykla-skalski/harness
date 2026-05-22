@@ -112,68 +112,6 @@ struct DashboardDependencyBatchEligibility: Equatable, Identifiable {
   }
 }
 
-struct DashboardDependencyBatchConfirmation: Equatable, Identifiable {
-  enum Action: Equatable {
-    case merge
-    case auto
-  }
-
-  let id: String
-  let action: Action
-  let pullRequestIDs: [String]
-  let title: String
-  let message: String
-  let confirmTitle: String
-
-  static func merge(
-    items: [DependencyUpdateItem],
-    mergeMethod: TaskBoardGitHubMergeMethod
-  ) -> Self {
-    let eligibility = DashboardDependencyBatchEligibility.preview(kind: .merge, items: items)
-    return Self(
-      id: "merge:\(items.map(\.pullRequestID).joined(separator: ","))",
-      action: .merge,
-      pullRequestIDs: items.map(\.pullRequestID),
-      title: "Confirm merge",
-      message:
-        "Merge \(eligibility.actionableCount) of \(items.count) selected pull requests "
-        + "using \(mergeMethod.title).\(skippedSummary(for: eligibility))",
-      confirmTitle: "Merge \(pullRequestLabel(eligibility.actionableCount))"
-    )
-  }
-
-  static func auto(
-    items: [DependencyUpdateItem],
-    mergeMethod: TaskBoardGitHubMergeMethod
-  ) -> Self {
-    let eligibility = DashboardDependencyBatchEligibility.preview(kind: .auto, items: items)
-    return Self(
-      id: "auto:\(items.map(\.pullRequestID).joined(separator: ","))",
-      action: .auto,
-      pullRequestIDs: items.map(\.pullRequestID),
-      title: "Confirm auto mode",
-      message:
-        "Run auto mode on \(eligibility.actionableCount) of \(items.count) selected pull "
-        + "requests using \(mergeMethod.title).\(skippedSummary(for: eligibility))",
-      confirmTitle: "Run Auto on \(pullRequestLabel(eligibility.actionableCount))"
-    )
-  }
-
-  private static func pullRequestLabel(_ count: Int) -> String {
-    count == 1 ? "1 Pull Request" : "\(count) Pull Requests"
-  }
-
-  private static func skippedSummary(
-    for eligibility: DashboardDependencyBatchEligibility
-  ) -> String {
-    guard eligibility.skippedCount > 0 else { return "" }
-    let reasons = eligibility.skippedReasons.prefix(2)
-      .map { "\($0.count) \($0.reason)" }
-      .joined(separator: "; ")
-    return " Skipping \(eligibility.skippedCount): \(reasons)."
-  }
-}
-
 struct DashboardDependencyBatchEligibilityPreview: View {
   let items: [DependencyUpdateItem]
 

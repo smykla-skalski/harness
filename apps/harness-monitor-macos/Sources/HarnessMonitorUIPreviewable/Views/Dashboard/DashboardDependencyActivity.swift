@@ -2,8 +2,8 @@ import Foundation
 import HarnessMonitorKit
 import SwiftUI
 
-struct DashboardDependencyActivityEntry: Equatable, Identifiable, Sendable {
-  enum Outcome: Equatable, Sendable {
+struct DashboardDependencyActivityEntry: Codable, Equatable, Identifiable, Sendable {
+  enum Outcome: String, Codable, Equatable, Sendable {
     case success
     case failure
   }
@@ -66,6 +66,7 @@ struct DashboardDependencyActivitySnapshot: Equatable, Sendable {
   let lastAction: DashboardDependencyActivityEntry?
   let missingCheckRunURLCount: Int
   let totalCheckCount: Int
+  let capabilities: DependencyUpdatesCapabilitiesResponse
 
   var cacheLabel: String {
     fromCache ? "Cached data" : "Live data"
@@ -90,6 +91,8 @@ struct DashboardDependencyActivitySnapshot: Equatable, Sendable {
     if let checkLinkLabel {
       lines.append("Check links: \(checkLinkLabel)")
     }
+    lines.append("Dependency schema: \(capabilities.schemaVersion)")
+    lines.append("Action preview: \(capabilities.supportsActionPreview ? "supported" : "fallback")")
     if let actionTitle {
       lines.append("Current action: \(actionTitle)")
     }
@@ -151,7 +154,7 @@ struct DashboardDependencyActivitySummary: View {
       if let lastAction = snapshot.lastAction {
         DashboardDependencyLastActionRow(entry: lastAction)
       } else {
-        Text("No dependency action has run for this pull request in the current session.")
+        Text("No recent dependency action is recorded for this pull request.")
           .scaledFont(.callout)
           .foregroundStyle(HarnessMonitorTheme.secondaryInk)
       }

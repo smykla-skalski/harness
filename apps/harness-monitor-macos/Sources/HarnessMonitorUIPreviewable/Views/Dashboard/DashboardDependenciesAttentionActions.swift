@@ -4,6 +4,15 @@ import SwiftUI
 enum DashboardDependencyAttentionActionKind {
   case approve
   case merge
+  case auto
+
+  var previewKind: DependencyUpdateActionPreviewKind {
+    switch self {
+    case .approve: .approve
+    case .merge: .merge
+    case .auto: .auto
+    }
+  }
 }
 
 enum DashboardDependencyAttentionBadgeKind: String, Identifiable {
@@ -111,10 +120,32 @@ func dashboardDependencyActionConfirmation(
   for action: DashboardDependencyAttentionActionKind,
   items: [DependencyUpdateItem]
 ) -> DashboardDependencyActionConfirmation? {
-  guard items.contains(where: \.requiresAttention) else { return nil }
+  dashboardDependencyActionConfirmation(
+    for: action,
+    items: items,
+    preview: localDependencyActionPreview(action.previewKind, items: items),
+    mergeMethod: .squash
+  )
+}
+
+func dashboardDependencyActionConfirmation(
+  for action: DashboardDependencyAttentionActionKind,
+  items: [DependencyUpdateItem],
+  preview: DependencyUpdatesActionPreviewResponse,
+  mergeMethod: TaskBoardGitHubMergeMethod
+) -> DashboardDependencyActionConfirmation? {
+  let needsAttention = items.contains(where: \.requiresAttention)
+  let needsBatchConfirmation = items.count > 1 && (action == .merge || action == .auto)
+  let hasPreviewWarnings = preview.skippedCount > 0 || !preview.warnings.isEmpty
+  guard needsAttention || needsBatchConfirmation || hasPreviewWarnings else { return nil }
   let destructiveMerge =
     action == .merge
     && items.contains(where: \.requiresAdminMergeForRequiredFailures)
+  let confirmTitle = dashboardDependencyActionConfirmButtonTitle(
+    for: action,
+    actionableCount: preview.actionableCount,
+    destructiveMerge: destructiveMerge
+  )
   return DashboardDependencyActionConfirmation(
     action: action,
     pullRequestIDs: items.map(\.pullRequestID),
@@ -126,13 +157,12 @@ func dashboardDependencyActionConfirmation(
     message: dashboardDependencyActionConfirmationMessage(
       for: action,
       items: items,
+      preview: preview,
+      mergeMethod: mergeMethod,
       destructiveMerge: destructiveMerge
     ),
-    confirmButtonTitle: dashboardDependencyActionConfirmationButtonTitle(
-      for: action,
-      destructiveMerge: destructiveMerge
-    ),
-    confirmRole: destructiveMerge ? .destructive : nil
+    confirmButtonTitle: confirmTitle,
+    confirmRole: destructiveMerge || action == .merge ? .destructive : nil
   )
 }
 
@@ -146,29 +176,40 @@ private func dashboardDependencyActionConfirmationTitle(
       ? "Merge as Admin despite required failing checks?"
       : "Merge \(itemCount) pull requests as Admin despite required failing checks?"
   }
-  let verb = action == .approve ? "Approve" : "Merge"
+  let verb =
+    switch action {
+    case .approve: "Approve"
+    case .merge: "Merge"
+    case .auto: "Run auto mode on"
+    }
   return itemCount == 1
     ? "\(verb) pull request that needs attention?"
     : "\(verb) \(itemCount) pull requests that need attention?"
 }
 
-private func dashboardDependencyActionConfirmationButtonTitle(
+private func dashboardDependencyActionConfirmButtonTitle(
   for action: DashboardDependencyAttentionActionKind,
+  actionableCount: Int,
   destructiveMerge: Bool
 ) -> String {
+  let countLabel = actionableCount == 1 ? "1 Pull Request" : "\(actionableCount) Pull Requests"
   switch action {
   case .approve:
-    "Approve Anyway"
+    return "Approve \(countLabel)"
   case .merge where destructiveMerge:
-    "Merge as Admin"
+    return actionableCount == 1 ? "Merge as Admin" : "Merge \(countLabel) as Admin"
   case .merge:
-    "Merge Anyway"
+    return "Merge \(countLabel)"
+  case .auto:
+    return "Run Auto on \(countLabel)"
   }
 }
 
 private func dashboardDependencyActionConfirmationMessage(
   for action: DashboardDependencyAttentionActionKind,
   items: [DependencyUpdateItem],
+  preview: DependencyUpdatesActionPreviewResponse,
+  mergeMethod: TaskBoardGitHubMergeMethod,
   destructiveMerge: Bool
 ) -> String {
   let subject = items.count == 1 ? "This pull request" : "These \(items.count) pull requests"
@@ -188,6 +229,10 @@ private func dashboardDependencyActionConfirmationMessage(
         ? "This pull request still needs attention before approval."
         : "\(subject) still need attention before approval."
     )
+  } else if action == .auto {
+    paragraphs.append(
+      "Auto mode will approve or merge eligible dependency updates using \(mergeMethod.title)."
+    )
   } else {
     paragraphs.append(
       items.count == 1
@@ -196,8 +241,10 @@ private func dashboardDependencyActionConfirmationMessage(
     )
   }
   if let summary = dashboardDependencyAttentionSelectionSummary(for: action, items: items) {
+    paragraphs.append(dashboardDependencyActionPreviewMessage(preview))
     paragraphs.append(summary)
   } else {
+    paragraphs.append(dashboardDependencyActionPreviewMessage(preview))
     paragraphs.append(contentsOf: dashboardDependencyAttentionReasonMessages(for: items))
   }
   return paragraphs.joined(separator: "\n\n")
@@ -234,6 +281,27 @@ private func dashboardDependencyAttentionSummaryLines(
   return lines
 }
 
+private func dashboardDependencyActionPreviewMessage(
+  _ preview: DependencyUpdatesActionPreviewResponse
+) -> String {
+  var lines = [
+    "\(preview.actionableCount) of \(preview.totalCount) selected pull requests are eligible."
+  ]
+  if preview.skippedCount > 0 {
+    let skippedReasons =
+      Dictionary(grouping: preview.targets.filter { !$0.eligible }) { target in
+        target.reason ?? "Unavailable"
+      }
+      .map { reason, targets in "\(targets.count) \(reason)" }
+      .sorted()
+      .prefix(3)
+      .joined(separator: "\n")
+    lines.append("Skipping \(preview.skippedCount):\n\(skippedReasons)")
+  }
+  lines.append(contentsOf: preview.warnings)
+  return lines.joined(separator: "\n")
+}
+
 private func dashboardDependencyAttentionReasonMessages(
   for items: [DependencyUpdateItem]
 ) -> [String] {
@@ -252,8 +320,9 @@ private func dashboardDependencyAttentionReasonMessages(
       )
     )
   }
-  let optionalFailures = items.filter { $0.checkStatus == .failure && !$0.hasRequiredFailedChecks }
-    .count
+  let optionalFailures = items.filter {
+    $0.checkStatus == .failure && !$0.hasRequiredFailedChecks
+  }.count
   if optionalFailures > 0 {
     messages.append(
       dashboardDependencyCountMessage(

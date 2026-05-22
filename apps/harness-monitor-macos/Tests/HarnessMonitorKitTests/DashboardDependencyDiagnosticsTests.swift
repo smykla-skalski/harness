@@ -21,7 +21,8 @@ struct DashboardDependencyDiagnosticsTests {
       fromCache: false,
       lastAction: entry,
       missingCheckRunURLCount: 1,
-      totalCheckCount: 2
+      totalCheckCount: 2,
+      capabilities: DependencyUpdatesCapabilitiesResponse()
     )
 
     #expect(snapshot.diagnosticsText.contains("Pull request ID: pr-1"))
@@ -58,7 +59,8 @@ struct DashboardDependencyDiagnosticsTests {
         outcome: .failure
       ),
       missingCheckRunURLCount: 1,
-      totalCheckCount: 2
+      totalCheckCount: 2,
+      capabilities: DependencyUpdatesCapabilitiesResponse()
     )
 
     let body = dashboardDependencyFixCIBody(for: item, activity: activity)

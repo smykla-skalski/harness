@@ -6,7 +6,10 @@ struct DashboardDependenciesControlStrip: View {
   @Binding var sortModeRaw: String
   @Binding var groupModeRaw: String
   let needsMeCount: Int
+  let syncHealth: DashboardDependenciesSyncHealth
   let onRefresh: () -> Void
+  let onRetryFailedRepositories: () -> Void
+  let onRetryStaleRepositories: () -> Void
   let onClearCache: () -> Void
 
   var body: some View {
@@ -17,6 +20,7 @@ struct DashboardDependenciesControlStrip: View {
           lineSpacing: HarnessMonitorTheme.spacingSM
         ) {
           needsMeChip
+          syncHealthChip
           filterPicker
           sortPicker
           groupPicker
@@ -59,6 +63,27 @@ struct DashboardDependenciesControlStrip: View {
     )
   }
 
+  private var syncHealthChip: some View {
+    Label(syncHealth.summaryLabel, systemImage: syncHealthSystemImage)
+      .scaledFont(.callout.weight(.semibold))
+      .foregroundStyle(syncHealth.hasFailures ? HarnessMonitorTheme.danger : .secondary)
+      .padding(.horizontal, 10)
+      .frame(height: 30)
+      .harnessControlPillGlass(
+        tint: syncHealth.hasFailures
+          ? HarnessMonitorTheme.danger
+          : HarnessMonitorTheme.controlBorder
+      )
+      .accessibilityLabel("Dependency sync health: \(syncHealth.summaryLabel)")
+  }
+
+  private var syncHealthSystemImage: String {
+    if syncHealth.hasFailures { return "exclamationmark.triangle" }
+    if syncHealth.syncingRepositoryCount > 0 { return "arrow.triangle.2.circlepath" }
+    if syncHealth.hasStaleRepositories { return "clock.badge.exclamationmark" }
+    return "checkmark.circle"
+  }
+
   private var filterPicker: some View {
     Picker("Filter", selection: $filterModeRaw) {
       ForEach(DashboardDependenciesFilterMode.pickerCases) { mode in
@@ -93,6 +118,25 @@ struct DashboardDependenciesControlStrip: View {
         Label("Refresh", systemImage: "arrow.clockwise")
       }
       .accessibilityIdentifier(HarnessMonitorAccessibility.dashboardDependenciesRefreshButton)
+
+      if syncHealth.hasFailures || syncHealth.hasStaleRepositories {
+        Divider()
+      }
+
+      if syncHealth.hasFailures {
+        Button(action: onRetryFailedRepositories) {
+          Label(
+            "Retry Failed Repositories",
+            systemImage: "exclamationmark.arrow.triangle.2.circlepath"
+          )
+        }
+      }
+
+      if syncHealth.hasStaleRepositories {
+        Button(action: onRetryStaleRepositories) {
+          Label("Retry Stale Repositories", systemImage: "clock.arrow.circlepath")
+        }
+      }
 
       Divider()
 

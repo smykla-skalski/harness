@@ -63,6 +63,22 @@ extension DashboardDependenciesRouteView {
     }
   }
 
+  func retryRepositories(_ repositories: [String]) {
+    guard !repositories.isEmpty else { return }
+    Task {
+      for repository in repositories {
+        await routeScheduler.retry(repository: repository)
+      }
+    }
+  }
+
+  var routeSyncHealth: DashboardDependenciesSyncHealth {
+    DashboardDependenciesSyncHealth.snapshot(
+      scheduler: routeScheduler,
+      staleAfterSeconds: TimeInterval(normalizedPreferences.perRepositoryIntervalSeconds)
+    )
+  }
+
   /// True while any tracked repository is currently being fetched.
   var isAnyRepositorySyncing: Bool {
     !routeScheduler.repositoriesInFlight.isEmpty

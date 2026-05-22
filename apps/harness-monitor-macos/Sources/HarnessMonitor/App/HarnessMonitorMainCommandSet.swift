@@ -38,6 +38,7 @@ struct HarnessMonitorMainCommandSet: Commands {
       store: store,
       displayState: store.commandsDisplayState
     )
+    DependencyCommands()
     HarnessMonitorSupplementalCommandSet(
       store: store,
       displayState: store.commandsDisplayState
