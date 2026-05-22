@@ -326,7 +326,7 @@ public struct ReviewFilesCache {
   ) {
     HarnessMonitorLogger.store.warning(
       """
-      Dependency files cache op failed; \
+      Review files cache op failed; \
       op=\(op, privacy: .public) \
       pull_request_id=\(pullRequestID ?? "-", privacy: .public) \
       head_ref_oid=\(headRefOid ?? "-", privacy: .public) \

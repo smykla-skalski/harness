@@ -21,8 +21,11 @@ Project\.swift.*\.package\(
 Project\.swift.*kitDependencies
 Project\.swift.*monitorAppDependencies
 Project\.swift.*TargetDependency
+Project\.swift.*AdditionalDependencies
 \.targetDependencies?
 TargetDependency
+# --- Tuist build phase dependency analysis (Xcode flag, not the feature) ---
+basedOnDependencyAnalysis
 
 # --- Rust internal DI containers (NOT the feature) ---
 src/run/.*RunDependencies
@@ -31,6 +34,8 @@ src/run/.*dependencies:[[:space:]]*RunDependencies
 # --- Docker Compose (NOT the feature) ---
 src/infra/blocks/compose/.*ServiceDependency
 src/infra/blocks/compose/.*depends_on
+src/infra/blocks/.*ServiceDependency
+src/infra/blocks/.*depends_on
 
 # --- Swift Concurrency / async ---
 dependsOn:
@@ -39,7 +44,16 @@ dependsOn:
 # --- Architectural commentary (comments / doc-strings) ---
 (circular|injected|external|runtime|package|build|transitive|dev|task)[[:space:]]+dependency
 dependency[[:space:]]+injection
+[Dd]ependency [Ii]njection
 DependencyInject(or|ion)
+### Dependency injection
+# --- Migration-documentation comments (describe what old keys/schemas were called) ---
+HarnessMonitorApp\.swift:.*// Rename .*dependencies
+HarnessMonitorRecentSchemas\.swift:.*//.*dependency-updates
+HarnessMonitorRecentSchemas\.swift:.*//.*list_dependency_update_files
+HarnessMonitorRecentSchemas\.swift:.*//.*Dependencies > Files
+HarnessMonitorRecentSchemas\.swift:.*//.*historical .Dependencies. label
+HarnessMonitorSchemaV22\.swift:.*///.*CachedDependency
 
 # --- Migration shims (must keep V21 entity names for SwiftData migration) ---
 apps/harness-monitor-macos/Sources/HarnessMonitorKit/Persistence/HarnessMonitorSchemaV21\.swift
