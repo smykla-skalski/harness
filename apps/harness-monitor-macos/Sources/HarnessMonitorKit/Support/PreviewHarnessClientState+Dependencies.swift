@@ -178,6 +178,19 @@ extension PreviewHarnessClientState {
     )
   }
 
+  func updateDependencyUpdateBody(
+    request: DependencyUpdatesBodyUpdateRequest
+  ) -> DependencyUpdatesBodyUpdateResponse {
+    DependencyUpdatesBodyUpdateResponse(
+      pullRequestID: request.pullRequestID,
+      outcome: .updated,
+      currentBody: request.newBody,
+      currentBodySHA256: request.expectedPriorBodySHA256,
+      prUpdatedAt: "2026-05-21T00:00:00Z",
+      fetchedAt: "2026-05-21T00:00:00Z"
+    )
+  }
+
   private func previewActionResponse(
     summary: String,
     action: DependencyUpdateActionKind,

@@ -77,4 +77,12 @@ extension WebSocketTransport {
     let value = try await rpc(method: .dependencyUpdatesBody, params: params)
     return try decode(value)
   }
+
+  public func updateDependencyUpdateBody(
+    request: DependencyUpdatesBodyUpdateRequest
+  ) async throws -> DependencyUpdatesBodyUpdateResponse {
+    let params = try encodeParams(request, extra: [:])
+    let value = try await rpc(method: .dependencyUpdatesBodyUpdate, params: params)
+    return try decode(value)
+  }
 }
