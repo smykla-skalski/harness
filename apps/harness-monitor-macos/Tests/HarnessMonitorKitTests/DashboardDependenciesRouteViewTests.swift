@@ -92,6 +92,14 @@ struct DashboardDependenciesRouteViewTests {
     #expect(schedulerSource.contains("preferences: preferences"))
   }
 
+  @Test("route presentation input consumes toolbar search text")
+  func routePresentationInputConsumesToolbarSearchText() throws {
+    let source = try routeSource()
+
+    #expect(source.contains("searchText: searchText"))
+    #expect(!source.contains("searchText: \"\""))
+  }
+
   @Test("route source keeps dependency network decode off the view actor")
   func routeSourceKeepsDependencyNetworkDecodeOffTheViewActor() throws {
     let supportSource = try routeSource(named: "DashboardDependenciesRouteSupport.swift")

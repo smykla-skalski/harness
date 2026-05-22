@@ -203,7 +203,7 @@ struct DashboardDependenciesRouteView: View {
       items: response.items,
       filterModeRaw: filterModeRaw,
       sortModeRaw: sortModeRaw,
-      searchText: "",
+      searchText: searchText,
       configuredRepositories: preferences.repositories,
       configuredOrganizations: preferences.organizations,
       selectedIDs: selectedIDs,

@@ -60,11 +60,12 @@ extension DashboardDependenciesRouteView {
             repositorySectionHeader(
               group.repository,
               itemCount: group.items.count,
-              busyPullRequestCount: group.items.count {
-                isPullRequestRefreshing($0.pullRequestID)
-              }
-            )
-          }
+      busyPullRequestCount: group.items.count {
+        isPullRequestRefreshing($0.pullRequestID)
+      },
+      onRetryRepository: { retryRepositorySync(group.repository) }
+    )
+  }
         }
       } else {
         ForEach(filteredItems) { item in

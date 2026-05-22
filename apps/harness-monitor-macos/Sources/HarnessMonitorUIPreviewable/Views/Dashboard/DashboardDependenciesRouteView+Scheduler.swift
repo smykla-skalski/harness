@@ -57,6 +57,12 @@ extension DashboardDependenciesRouteView {
     routeScheduler.forceRefresh(repository: repository)
   }
 
+  func retryRepositorySync(_ repository: String) {
+    Task {
+      await routeScheduler.retry(repository: repository)
+    }
+  }
+
   /// True while any tracked repository is currently being fetched.
   var isAnyRepositorySyncing: Bool {
     !routeScheduler.repositoriesInFlight.isEmpty
