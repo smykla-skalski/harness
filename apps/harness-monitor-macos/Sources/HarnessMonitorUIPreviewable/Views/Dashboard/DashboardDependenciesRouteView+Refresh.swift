@@ -49,13 +49,17 @@ extension DashboardDependenciesRouteView {
   func beginRefreshing(pullRequestIDs ids: [String], actionTitle title: String? = nil) {
     var tracker = routeRefreshTracker
     tracker.begin(pullRequestIDs: ids, actionTitle: title)
-    routeRefreshTracker = tracker
+    withAnimation(.easeInOut(duration: 0.18)) {
+      routeRefreshTracker = tracker
+    }
   }
 
   func endRefreshing(pullRequestIDs ids: [String]) {
     var tracker = routeRefreshTracker
     tracker.end(pullRequestIDs: ids)
-    routeRefreshTracker = tracker
+    withAnimation(.easeInOut(duration: 0.18)) {
+      routeRefreshTracker = tracker
+    }
   }
 
   func pruneRefreshTrackerToLiveItems() {
