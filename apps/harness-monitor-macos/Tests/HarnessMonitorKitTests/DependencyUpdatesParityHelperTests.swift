@@ -90,7 +90,7 @@ struct DependencyUpdatesParityHelperTests {
     #expect(!makeItem(reviewStatus: .none, checkStatus: .failure).isAutoMergeable)
     #expect(
       !makeItem(
-        reviewStatus: .none, checkStatus: .success, mergeable: .conflicting
+        mergeable: .conflicting, reviewStatus: .none, checkStatus: .success
       ).isAutoMergeable
     )
     #expect(
