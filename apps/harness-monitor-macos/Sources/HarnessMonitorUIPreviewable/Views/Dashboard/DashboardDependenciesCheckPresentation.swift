@@ -19,6 +19,11 @@ extension DependencyUpdateCheck {
     status == .completed && conclusion == .success
   }
 
+  var requiresAttention: Bool {
+    status == .completed
+      && [.failure, .cancelled, .timedOut, .actionRequired, .startupFailure].contains(conclusion)
+  }
+
   var isNeutralStatus: Bool {
     switch conclusion {
     case .none, .neutral, .skipped, .stale, .unknown:
