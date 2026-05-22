@@ -27,28 +27,23 @@ extension DashboardDependenciesRouteView {
   }
 
   func isPullRequestRefreshing(_ pullRequestID: String) -> Bool {
-    (routeRefreshingPullRequestCounts[pullRequestID] ?? 0) > 0
+    routeRefreshTracker.isRefreshing(pullRequestID)
   }
 
-  func beginRefreshing(pullRequestIDs ids: [String]) {
-    var counts = routeRefreshingPullRequestCounts
-    for id in ids {
-      counts[id, default: 0] += 1
-    }
-    routeRefreshingPullRequestCounts = counts
+  func pullRequestActionTitle(_ pullRequestID: String) -> String? {
+    routeRefreshTracker.actionTitle(for: pullRequestID)
+  }
+
+  func beginRefreshing(pullRequestIDs ids: [String], actionTitle title: String? = nil) {
+    var tracker = routeRefreshTracker
+    tracker.begin(pullRequestIDs: ids, actionTitle: title)
+    routeRefreshTracker = tracker
   }
 
   func endRefreshing(pullRequestIDs ids: [String]) {
-    var counts = routeRefreshingPullRequestCounts
-    for id in ids {
-      let next = (counts[id] ?? 0) - 1
-      if next > 0 {
-        counts[id] = next
-      } else {
-        counts.removeValue(forKey: id)
-      }
-    }
-    routeRefreshingPullRequestCounts = counts
+    var tracker = routeRefreshTracker
+    tracker.end(pullRequestIDs: ids)
+    routeRefreshTracker = tracker
   }
 
   func applyRefreshedItems(_ refresh: DependencyUpdatesRefreshResponse) {

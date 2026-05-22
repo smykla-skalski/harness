@@ -202,7 +202,7 @@ extension DashboardDependenciesRouteView {
   ) async {
     guard let client = store.apiClient else { return }
     let trackedIDs = items.map(\.pullRequestID)
-    beginRefreshing(pullRequestIDs: trackedIDs)
+    beginRefreshing(pullRequestIDs: trackedIDs, actionTitle: title)
     routeInFlightActionTitle = title
     defer {
       routeInFlightActionTitle = nil
