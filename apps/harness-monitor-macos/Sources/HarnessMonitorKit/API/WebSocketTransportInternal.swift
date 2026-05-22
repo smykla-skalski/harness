@@ -96,7 +96,39 @@ extension WebSocketTransport {
     onSemanticBatch: ResponseBatchHandler? = nil
   ) async throws -> JSONValue {
     if let rpcSender {
-      return try await rpcSender(method, params, onSemanticBatch)
+      let timeout = rpcTimeout
+      let outcome = AsyncStream<RPCSenderOutcome>.makeStream(
+        bufferingPolicy: .bufferingNewest(1)
+      )
+      let workTask = Task.detached(priority: .userInitiated) {
+        do {
+          let value = try await rpcSender(method, params, onSemanticBatch)
+          outcome.continuation.yield(.success(value))
+        } catch {
+          outcome.continuation.yield(.failure(error))
+        }
+      }
+      let timeoutTask = Task.detached {
+        do {
+          try await Task.sleep(for: timeout)
+          outcome.continuation.yield(.failure(WebSocketTransportError.requestTimedOut))
+        } catch {
+          // sleep cancelled before timeout fired; the work task already won
+        }
+      }
+      defer {
+        workTask.cancel()
+        timeoutTask.cancel()
+        outcome.continuation.finish()
+      }
+      var iterator = outcome.stream.makeAsyncIterator()
+      guard let first = await iterator.next() else {
+        throw WebSocketTransportError.requestTimedOut
+      }
+      switch first {
+      case .success(let value): return value
+      case .failure(let error): throw error
+      }
     }
     guard !isShutDown, let webSocketTask else {
       throw WebSocketTransportError.connectionClosed
@@ -141,6 +173,27 @@ extension WebSocketTransport {
     if let onSemanticBatch {
       responseBatchHandlers[id] = onSemanticBatch
     }
+    let timeout = rpcTimeout
+    let timeoutTask = Task { [weak self] in
+      do {
+        try await Task.sleep(for: timeout)
+      } catch {
+        return
+      }
+      store.fail(id: id, error: WebSocketTransportError.requestTimedOut)
+      HarnessMonitorLogger.websocket.warning(
+        """
+        WebSocket RPC \(method.rawValue, privacy: .public) timed out after \
+        \(timeout.components.seconds, privacy: .public)s; failing pending request \
+        \(id, privacy: .public)
+        """
+      )
+      if let self {
+        Task { await self.clearResponseBatchHandler(for: id) }
+        Task { await self.clearPendingRPCMethod(for: id) }
+      }
+    }
+    defer { timeoutTask.cancel() }
     do {
       let result = try await withCheckedThrowingContinuation { continuation in
         store.register(id: id, continuation: continuation)
@@ -177,6 +230,13 @@ extension WebSocketTransport {
       #endif
       throw error
     }
+  }
+
+  /// Used by the rpcSender timeout race in `rpc(method:params:onSemanticBatch:)`
+  /// to wedge results and timeouts onto the same single-slot `AsyncStream`.
+  private enum RPCSenderOutcome: Sendable {
+    case success(JSONValue)
+    case failure(any Error)
   }
 
   func makeRequest(

@@ -379,13 +379,14 @@ final class PendingRequestStore: Sendable {
   }
 }
 
-enum WebSocketTransportError: LocalizedError {
+enum WebSocketTransportError: LocalizedError, Equatable {
   case serverError(code: String, message: String)
   case connectionClosed
   case upgradeRejected
   case unexpectedResponse
   case invalidChunk(String)
   case invalidBatch(String)
+  case requestTimedOut
 
   var errorDescription: String? {
     switch self {
@@ -395,6 +396,7 @@ enum WebSocketTransportError: LocalizedError {
     case .unexpectedResponse: "Unexpected response from server"
     case .invalidChunk(let message): "Invalid WebSocket chunk: \(message)"
     case .invalidBatch(let message): "Invalid WebSocket response batch: \(message)"
+    case .requestTimedOut: "Daemon did not respond before the request timeout"
     }
   }
 }
