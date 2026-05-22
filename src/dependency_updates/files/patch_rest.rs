@@ -462,4 +462,129 @@ mod tests {
         assert!(!detect_drift("", "abc123"));
         assert!(!detect_drift("abc123", ""));
     }
+
+    /// Spawn a tiny axum mock that serves `payload` for every
+    /// `GET /repos/{o}/{r}/pulls/{n}/files`. Returns the bound port + the
+    /// JoinHandle so the test can shut it down.
+    async fn spawn_mock_pulls_files(
+        payload: serde_json::Value,
+    ) -> (u16, tokio::task::JoinHandle<()>) {
+        use axum::Router;
+        use axum::routing::get;
+        use tokio::net::TcpListener;
+
+        let listener = TcpListener::bind("127.0.0.1:0").await.expect("bind");
+        let port = listener.local_addr().expect("addr").port();
+        let app = Router::new().route(
+            "/repos/{owner}/{repo}/pulls/{number}/files",
+            get(move || {
+                let payload = payload.clone();
+                async move { axum::Json(payload) }
+            }),
+        );
+        let server = tokio::spawn(async move {
+            let _ = axum::serve(listener, app).await;
+        });
+        (port, server)
+    }
+
+    fn mock_octocrab_at(port: u16) -> Octocrab {
+        crate::dependency_updates::github::ensure_rustls_provider();
+        Octocrab::builder()
+            .base_uri(format!("http://127.0.0.1:{port}"))
+            .expect("base_uri")
+            .personal_token("test-token".to_string())
+            .add_retry_config(octocrab::service::middleware::retry::RetryConfig::None)
+            .build()
+            .expect("octocrab")
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn fetch_patches_returns_all_files_against_mock_server() {
+        use serde_json::json;
+        let body = json!([
+            {
+                "sha": "a11", "filename": "src/a.rs", "status": "modified",
+                "additions": 1, "deletions": 1, "changes": 2,
+                "blob_url": "https://example.com/a", "raw_url": "https://example.com/a",
+                "contents_url": "https://example.com/a",
+                "patch": "@@ -1 +1 @@\n-a\n+A\n"
+            },
+            {
+                "sha": "b22", "filename": "src/b.rs", "status": "added",
+                "additions": 2, "deletions": 0, "changes": 2,
+                "blob_url": "https://example.com/b", "raw_url": "https://example.com/b",
+                "contents_url": "https://example.com/b",
+                "patch": "@@ -0,0 +1,2 @@\n+b1\n+b2\n"
+            }
+        ]);
+        let (port, server) = spawn_mock_pulls_files(body).await;
+        let client = mock_octocrab_at(port);
+
+        let patches = fetch_patches(&client, "o/r", 1, "deadbeef", &[])
+            .await
+            .expect("fetch");
+        assert_eq!(patches.len(), 2);
+        let paths: Vec<_> = patches.iter().map(|p| p.path.as_str()).collect();
+        assert!(paths.contains(&"src/a.rs"));
+        assert!(paths.contains(&"src/b.rs"));
+        for patch in &patches {
+            assert_eq!(patch.served_by, DependencyUpdateFileServedBy::GithubRest);
+            assert_eq!(patch.head_ref_oid, "deadbeef");
+        }
+        let added = patches.iter().find(|p| p.path == "src/b.rs").expect("b");
+        assert_eq!(added.status, DependencyUpdateFileChangeType::Added);
+        assert_eq!(added.additions, 2);
+        assert_eq!(added.deletions, 0);
+        server.abort();
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn fetch_patches_path_filter_drops_unrequested_files() {
+        use serde_json::json;
+        let body = json!([
+            {
+                "sha": "aaa", "filename": "want.rs", "status": "modified",
+                "additions": 1, "deletions": 0, "changes": 1,
+                "blob_url": "https://example.com/x", "raw_url": "https://example.com/x",
+                "contents_url": "https://example.com/x",
+                "patch": "@@ -1 +1 @@\n-a\n+A\n"
+            },
+            {
+                "sha": "bbb", "filename": "skip.rs", "status": "modified",
+                "additions": 1, "deletions": 0, "changes": 1,
+                "blob_url": "https://example.com/y", "raw_url": "https://example.com/y",
+                "contents_url": "https://example.com/y",
+                "patch": "@@ -1 +1 @@\n-b\n+B\n"
+            }
+        ]);
+        let (port, server) = spawn_mock_pulls_files(body).await;
+        let client = mock_octocrab_at(port);
+
+        let patches = fetch_patches(&client, "o/r", 1, "head", &["want.rs".to_string()])
+            .await
+            .expect("fetch");
+        assert_eq!(patches.len(), 1);
+        assert_eq!(patches[0].path, "want.rs");
+        server.abort();
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn fetch_patches_rejects_malformed_repo_full_name_at_runtime() {
+        let (port, server) = spawn_mock_pulls_files(serde_json::json!([])).await;
+        let client = mock_octocrab_at(port);
+        let err = fetch_patches(&client, "no-slash", 1, "head", &[])
+            .await
+            .unwrap_err();
+        assert!(matches!(err, RestFetchError::InvalidRequest(_)));
+        server.abort();
+    }
+
+    #[test]
+    fn fetch_patches_rejects_malformed_repo_full_name() {
+        assert!(split_repo_full_name("no-slash").is_none());
+        assert!(split_repo_full_name("").is_none());
+        assert!(split_repo_full_name("/repo").is_none());
+        assert!(split_repo_full_name("owner/").is_none());
+    }
 }
