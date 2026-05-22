@@ -1,5 +1,6 @@
 #![allow(dead_code, unused_imports)]
 
+mod mapping;
 mod queries;
 mod types;
 
