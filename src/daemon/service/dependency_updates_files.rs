@@ -383,7 +383,9 @@ pub async fn run_local_clone_gc() -> Result<GcReport, CliError> {
         removed: 0,
     };
     for key in &targets {
-        let Some(entry) = registry.remove(key) else { continue };
+        let Some(entry) = registry.remove(key) else {
+            continue;
+        };
         let bytes = entry.size_bytes;
         if entry.bare_path.exists() {
             match fs::remove_dir_all(&entry.bare_path) {
