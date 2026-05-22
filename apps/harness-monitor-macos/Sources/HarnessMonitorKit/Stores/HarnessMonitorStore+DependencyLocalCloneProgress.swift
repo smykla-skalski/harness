@@ -1,5 +1,12 @@
 import Foundation
 
+struct DependencyLocalCloneProgressStreams {
+  typealias Continuation = AsyncStream<DependencyUpdateLocalCloneProgress>.Continuation
+
+  var byRepository: [String: [UUID: Continuation]] = [:]
+  var all: [UUID: Continuation] = [:]
+}
+
 /// Per-repo subscription surface for the daemon's
 /// `dependency_updates_local_clone_progress` WS push event.
 ///
@@ -43,8 +50,7 @@ extension HarnessMonitorStore {
   /// know about (e.g. first clone of a brand-new dep PR repo). Stored
   /// under the `nil`-keyed bucket so the dispatch fan-out delivers
   /// every event without needing repo-name lookup at emit time.
-  public func observeAllLocalCloneProgress(
-  ) -> AsyncStream<DependencyUpdateLocalCloneProgress> {
+  public func observeAllLocalCloneProgress() -> AsyncStream<DependencyUpdateLocalCloneProgress> {
     AsyncStream(bufferingPolicy: .bufferingNewest(1)) { continuation in
       let id = UUID()
       addAllLocalCloneProgressSubscriber(id: id, continuation: continuation)
@@ -61,12 +67,12 @@ extension HarnessMonitorStore {
   /// subscriber registered for the event's `repoFullName` and to every
   /// catch-all subscriber registered via `observeAllLocalCloneProgress`.
   func applyLocalCloneProgress(_ progress: DependencyUpdateLocalCloneProgress) {
-    if let bucket = dependencyLocalCloneProgressContinuations[progress.repoFullName] {
+    if let bucket = dependencyLocalCloneProgressStreams.byRepository[progress.repoFullName] {
       for continuation in bucket.values {
         continuation.yield(progress)
       }
     }
-    for continuation in dependencyLocalCloneProgressAllContinuations.values {
+    for continuation in dependencyLocalCloneProgressStreams.all.values {
       continuation.yield(progress)
     }
   }
@@ -77,7 +83,7 @@ extension HarnessMonitorStore {
   public func dependencyLocalCloneProgressSubscriberCount(
     repoFullName: String
   ) -> Int {
-    dependencyLocalCloneProgressContinuations[repoFullName]?.count ?? 0
+    dependencyLocalCloneProgressStreams.byRepository[repoFullName]?.count ?? 0
   }
 
   // MARK: - Subscriber registry
@@ -87,21 +93,23 @@ extension HarnessMonitorStore {
     id: UUID,
     continuation: DependencyLocalCloneProgressContinuation
   ) {
-    var bucket = dependencyLocalCloneProgressContinuations[repoFullName] ?? [:]
+    var bucket = dependencyLocalCloneProgressStreams.byRepository[repoFullName] ?? [:]
     bucket[id] = continuation
-    dependencyLocalCloneProgressContinuations[repoFullName] = bucket
+    dependencyLocalCloneProgressStreams.byRepository[repoFullName] = bucket
   }
 
   private func removeLocalCloneProgressSubscriber(
     repoFullName: String,
     id: UUID
   ) {
-    guard var bucket = dependencyLocalCloneProgressContinuations[repoFullName] else { return }
+    guard var bucket = dependencyLocalCloneProgressStreams.byRepository[repoFullName] else {
+      return
+    }
     bucket.removeValue(forKey: id)
     if bucket.isEmpty {
-      dependencyLocalCloneProgressContinuations.removeValue(forKey: repoFullName)
+      dependencyLocalCloneProgressStreams.byRepository.removeValue(forKey: repoFullName)
     } else {
-      dependencyLocalCloneProgressContinuations[repoFullName] = bucket
+      dependencyLocalCloneProgressStreams.byRepository[repoFullName] = bucket
     }
   }
 
@@ -109,10 +117,10 @@ extension HarnessMonitorStore {
     id: UUID,
     continuation: DependencyLocalCloneProgressContinuation
   ) {
-    dependencyLocalCloneProgressAllContinuations[id] = continuation
+    dependencyLocalCloneProgressStreams.all[id] = continuation
   }
 
   private func removeAllLocalCloneProgressSubscriber(id: UUID) {
-    dependencyLocalCloneProgressAllContinuations.removeValue(forKey: id)
+    dependencyLocalCloneProgressStreams.all.removeValue(forKey: id)
   }
 }
