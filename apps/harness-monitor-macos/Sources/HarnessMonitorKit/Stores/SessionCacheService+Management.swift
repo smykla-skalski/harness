@@ -85,33 +85,33 @@ extension SessionCacheService {
         context.delete(project)
       }
       let repositoryLabels = try context.fetch(
-        FetchDescriptor<CachedDependencyRepositoryLabels>()
+        FetchDescriptor<CachedReviewRepositoryLabels>()
       )
       for row in repositoryLabels {
         context.delete(row)
       }
-      let labelUsage = try context.fetch(FetchDescriptor<CachedDependencyLabelUsage>())
+      let labelUsage = try context.fetch(FetchDescriptor<CachedReviewLabelUsage>())
       for row in labelUsage {
         context.delete(row)
       }
       let repoSyncStates = try context.fetch(
-        FetchDescriptor<CachedDependencyUpdatesRepoSyncState>()
+        FetchDescriptor<CachedReviewsRepoSyncState>()
       )
       for row in repoSyncStates {
         context.delete(row)
       }
       let fileViewedStates = try context.fetch(
-        FetchDescriptor<CachedDependencyUpdateFileViewedState>()
+        FetchDescriptor<CachedReviewFileViewedState>()
       )
       for row in fileViewedStates {
         context.delete(row)
       }
-      let cachedFiles = try context.fetch(FetchDescriptor<CachedDependencyUpdateFile>())
+      let cachedFiles = try context.fetch(FetchDescriptor<CachedReviewFile>())
       for row in cachedFiles {
         context.delete(row)
       }
       let fileSummaries = try context.fetch(
-        FetchDescriptor<CachedDependencyUpdateFilesSummary>()
+        FetchDescriptor<CachedReviewFilesSummary>()
       )
       for row in fileSummaries {
         context.delete(row)

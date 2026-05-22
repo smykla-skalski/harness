@@ -1,16 +1,16 @@
 import Foundation
 
-struct DependencyCloneProgressStreams {
-  typealias Continuation = AsyncStream<DependencyUpdateLocalCloneProgress>.Continuation
+struct ReviewCloneProgressStreams {
+  typealias Continuation = AsyncStream<ReviewLocalCloneProgress>.Continuation
 
   var byRepository: [String: [UUID: Continuation]] = [:]
   var all: [UUID: Continuation] = [:]
 }
 
 /// Per-repo subscription surface for the daemon's
-/// `dependency_updates_local_clone_progress` WS push event.
+/// `reviews_local_clone_progress` WS push event.
 ///
-/// Subscribers obtain an `AsyncStream<DependencyUpdateLocalCloneProgress>`
+/// Subscribers obtain an `AsyncStream<ReviewLocalCloneProgress>`
 /// for a given repo full-name and receive every event whose payload's
 /// `repo_full_name` matches. Multiple subscribers per repo are supported;
 /// each gets the same value via a fan-out registered through `UUID` keys.
@@ -19,15 +19,15 @@ struct DependencyCloneProgressStreams {
 /// when the UI thread is slow to consume - we only ever care about the
 /// most recent state for a "Cloning..." badge.
 extension HarnessMonitorStore {
-  public typealias DependencyLocalCloneProgressContinuation =
-    AsyncStream<DependencyUpdateLocalCloneProgress>.Continuation
+  public typealias ReviewLocalCloneProgressContinuation =
+    AsyncStream<ReviewLocalCloneProgress>.Continuation
 
   /// Subscribe to progress events for a single repository. Drop the
   /// returned stream (or break out of its `for await` loop) to
   /// automatically unsubscribe via the stream's `onTermination` hook.
   public func observeLocalCloneProgress(
     repoFullName: String
-  ) -> AsyncStream<DependencyUpdateLocalCloneProgress> {
+  ) -> AsyncStream<ReviewLocalCloneProgress> {
     let key = repoFullName
     return AsyncStream(bufferingPolicy: .bufferingNewest(1)) { continuation in
       let id = UUID()
@@ -50,7 +50,7 @@ extension HarnessMonitorStore {
   /// know about (e.g. first clone of a brand-new dep PR repo). Stored
   /// under the `nil`-keyed bucket so the dispatch fan-out delivers
   /// every event without needing repo-name lookup at emit time.
-  public func observeAllLocalCloneProgress() -> AsyncStream<DependencyUpdateLocalCloneProgress> {
+  public func observeAllLocalCloneProgress() -> AsyncStream<ReviewLocalCloneProgress> {
     AsyncStream(bufferingPolicy: .bufferingNewest(1)) { continuation in
       let id = UUID()
       addAllLocalCloneProgressSubscriber(id: id, continuation: continuation)
@@ -66,7 +66,7 @@ extension HarnessMonitorStore {
   /// Dispatch hook called from the streaming layer. Fans out to every
   /// subscriber registered for the event's `repoFullName` and to every
   /// catch-all subscriber registered via `observeAllLocalCloneProgress`.
-  func applyLocalCloneProgress(_ progress: DependencyUpdateLocalCloneProgress) {
+  func applyLocalCloneProgress(_ progress: ReviewLocalCloneProgress) {
     if let bucket = cloneProgressStreams.byRepository[progress.repoFullName] {
       for continuation in bucket.values {
         continuation.yield(progress)
@@ -91,7 +91,7 @@ extension HarnessMonitorStore {
   private func addLocalCloneProgressSubscriber(
     repoFullName: String,
     id: UUID,
-    continuation: DependencyLocalCloneProgressContinuation
+    continuation: ReviewLocalCloneProgressContinuation
   ) {
     var bucket = cloneProgressStreams.byRepository[repoFullName] ?? [:]
     bucket[id] = continuation
@@ -115,7 +115,7 @@ extension HarnessMonitorStore {
 
   private func addAllLocalCloneProgressSubscriber(
     id: UUID,
-    continuation: DependencyLocalCloneProgressContinuation
+    continuation: ReviewLocalCloneProgressContinuation
   ) {
     cloneProgressStreams.all[id] = continuation
   }

@@ -1,9 +1,9 @@
 import Foundation
 
 /// View-facing state of a dependency-update PR body fetch keyed by
-/// pull-request id. Drives the Description section in the Dependencies
+/// pull-request id. Drives the Description section in the Reviews
 /// detail pane.
-public enum DependencyUpdateBodyState: Equatable, Sendable {
+public enum ReviewBodyState: Equatable, Sendable {
   case loading
   case loaded(String)
   case failed(String)
@@ -13,12 +13,12 @@ public enum DependencyUpdateBodyState: Equatable, Sendable {
 /// Re-fires when the visible PR changes or when the daemon comes back online,
 /// so a `.failed("Daemon unavailable")` state recovers automatically without
 /// the user having to navigate away and back.
-public struct DependencyUpdateBodyTaskKey: Hashable, Sendable {
+public struct ReviewBodyTaskKey: Hashable, Sendable {
   public let pullRequestID: String
   public let prUpdatedAt: String
   public let isDaemonOnline: Bool
 
-  public init(item: DependencyUpdateItem, isDaemonOnline: Bool) {
+  public init(item: ReviewItem, isDaemonOnline: Bool) {
     self.pullRequestID = item.pullRequestID
     self.prUpdatedAt = item.updatedAt
     self.isDaemonOnline = isDaemonOnline
@@ -27,77 +27,77 @@ public struct DependencyUpdateBodyTaskKey: Hashable, Sendable {
 
 extension HarnessMonitorStore {
   /// Ensure the description body for `item` is loaded into
-  /// `dependencyUpdateBodyState`. Returns immediately when a fresh entry is
+  /// `reviewBodyState`. Returns immediately when a fresh entry is
   /// cached (relative to `item.updatedAt`); otherwise marks state as
   /// `.loading`, fetches via the client, persists to disk, and publishes
   /// `.loaded` or `.failed`.
   ///
   /// Concurrent calls for the same pull request id collapse to a single
   /// in-flight fetch.
-  public func prepareDependencyUpdateBody(for item: DependencyUpdateItem) async {
+  public func prepareReviewBody(for item: ReviewItem) async {
     let id = item.pullRequestID
-    if let entry = dependencyUpdateBodies.cached(forPullRequestID: id, since: item.updatedAt) {
-      dependencyUpdateBodyState[id] = .loaded(entry.body)
+    if let entry = reviewBodies.cached(forPullRequestID: id, since: item.updatedAt) {
+      reviewBodyState[id] = .loaded(entry.body)
       return
     }
-    if pendingDependencyUpdateBodyFetches.contains(id) {
+    if pendingReviewBodyFetches.contains(id) {
       return
     }
-    pendingDependencyUpdateBodyFetches.insert(id)
-    dependencyUpdateBodyState[id] = .loading
-    defer { pendingDependencyUpdateBodyFetches.remove(id) }
+    pendingReviewBodyFetches.insert(id)
+    reviewBodyState[id] = .loading
+    defer { pendingReviewBodyFetches.remove(id) }
 
     guard let client else {
-      dependencyUpdateBodyState[id] = .failed("Daemon unavailable")
+      reviewBodyState[id] = .failed("Daemon unavailable")
       return
     }
 
     do {
-      let response = try await client.fetchDependencyUpdateBody(
-        request: DependencyUpdatesBodyRequest(pullRequestID: id)
+      let response = try await client.fetchReviewBody(
+        request: ReviewsBodyRequest(pullRequestID: id)
       )
-      dependencyUpdateBodies.store(
+      reviewBodies.store(
         pullRequestID: response.pullRequestID,
         body: response.body,
         prUpdatedAt: response.prUpdatedAt,
         fetchedAt: response.fetchedAt
       )
-      dependencyUpdateBodyState[id] = .loaded(response.body)
+      reviewBodyState[id] = .loaded(response.body)
     } catch {
-      dependencyUpdateBodyState[id] = .failed(error.localizedDescription)
+      reviewBodyState[id] = .failed(error.localizedDescription)
     }
   }
 
   /// Push an edited dependency-update PR body through the daemon and refresh
   /// the local body cache with the daemon-confirmed current body.
   @discardableResult
-  public func updateDependencyUpdateBody(
+  public func updateReviewBody(
     pullRequestID: String,
     expectedPriorBodySHA256: String,
     newBody: String
-  ) async -> DependencyUpdatesBodyUpdateResponse? {
+  ) async -> ReviewsBodyUpdateResponse? {
     guard let client else {
-      dependencyUpdateBodyState[pullRequestID] = .failed("Daemon unavailable")
+      reviewBodyState[pullRequestID] = .failed("Daemon unavailable")
       return nil
     }
     do {
-      let response = try await client.updateDependencyUpdateBody(
-        request: DependencyUpdatesBodyUpdateRequest(
+      let response = try await client.updateReviewBody(
+        request: ReviewsBodyUpdateRequest(
           pullRequestID: pullRequestID,
           expectedPriorBodySHA256: expectedPriorBodySHA256,
           newBody: newBody
         )
       )
-      dependencyUpdateBodies.store(
+      reviewBodies.store(
         pullRequestID: response.pullRequestID,
         body: response.currentBody,
         prUpdatedAt: response.prUpdatedAt,
         fetchedAt: response.fetchedAt
       )
-      dependencyUpdateBodyState[response.pullRequestID] = .loaded(response.currentBody)
+      reviewBodyState[response.pullRequestID] = .loaded(response.currentBody)
       return response
     } catch {
-      dependencyUpdateBodyState[pullRequestID] = .failed(error.localizedDescription)
+      reviewBodyState[pullRequestID] = .failed(error.localizedDescription)
       return nil
     }
   }

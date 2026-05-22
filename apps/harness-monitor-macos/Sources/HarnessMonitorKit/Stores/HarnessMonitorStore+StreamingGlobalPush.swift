@@ -32,7 +32,7 @@ extension HarnessMonitorStore {
       .acpInspect, .acpAgentsReconciled, .acpProcessIncident, .acpBridgeResyncIncident,
       .acpEvents, .acpPermissionBatch, .acpPermissionBatchRemoved:
       break
-    case .dependencyUpdatesLocalCloneProgress(let progress):
+    case .reviewsLocalCloneProgress(let progress):
       applyLocalCloneProgress(progress)
     case .unknown:
       break
