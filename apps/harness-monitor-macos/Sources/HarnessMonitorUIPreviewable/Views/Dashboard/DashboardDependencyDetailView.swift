@@ -11,7 +11,8 @@ struct DashboardDependencyDetailView<Actions: View>: View {
   let onRerunCheck: (DependencyUpdateCheck) -> Void
   @ViewBuilder let actionBar: () -> Actions
 
-  @Environment(\.dependenciesPreferences) private var dependenciesPreferences
+  @Environment(\.dependenciesPreferences)
+  private var dependenciesPreferences
 
   private var filesEnabled: Bool {
     dependenciesPreferences.snapshot.filesEnabled
@@ -105,7 +106,7 @@ struct DashboardDependencyDetailView<Actions: View>: View {
       .padding(.horizontal, 24)
       .padding(.top, 24)
       .padding(.bottom, 8)
-      .background(.regularMaterial)
+      .background(Color(nsColor: .windowBackgroundColor))
     }
     .safeAreaInset(edge: .bottom, spacing: 0) {
       DashboardDependencyCommentComposer(
@@ -121,7 +122,7 @@ struct DashboardDependencyDetailView<Actions: View>: View {
       )
       .frame(maxWidth: dependenciesDetailMaxWidth, alignment: .leading)
       .frame(maxWidth: .infinity, alignment: .center)
-      .background(.regularMaterial)
+      .background(Color(nsColor: .windowBackgroundColor))
     }
     .task(
       id: DependencyUpdateBodyTaskKey(
