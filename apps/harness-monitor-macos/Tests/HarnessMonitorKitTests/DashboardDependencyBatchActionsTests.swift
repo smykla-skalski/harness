@@ -57,6 +57,7 @@ struct DashboardDependencyBatchActionsTests {
       id: "blocked",
       number: 2,
       reviewStatus: .changesRequested,
+      mergeable: .conflicting,
       checkStatus: .success
     )
 
