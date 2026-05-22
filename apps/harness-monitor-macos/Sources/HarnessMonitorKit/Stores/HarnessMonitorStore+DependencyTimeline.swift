@@ -63,6 +63,20 @@ extension HarnessMonitorStore {
     }
   }
 
+  /// Invalidates the cached timeline for each pull-request id by
+  /// clearing its view model's entries. Used by the route-level
+  /// affected-refresh hook after a daemon-side mutation (approve,
+  /// merge, comment, rerun, labels): the next detail-pane visit for
+  /// the affected PR triggers a fresh fetch instead of showing the
+  /// stale chronological state.
+  ///
+  /// View models for PRs not in the list are untouched.
+  public func invalidateDependencyUpdateTimelines(for pullRequestIDs: [String]) {
+    for id in pullRequestIDs {
+      dependencyUpdateTimelineViewModels[id]?.clear()
+    }
+  }
+
   /// Loads the next older page using the view model's current
   /// `startCursor`. No-op when no older page exists, a load is
   /// already in flight, or the cursor is missing.
