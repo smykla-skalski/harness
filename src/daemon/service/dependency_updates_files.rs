@@ -41,7 +41,7 @@ use crate::dependency_updates::{
     DependencyUpdatesFilesPatchRequest, DependencyUpdatesFilesPatchResponse,
     DependencyUpdatesFilesViewedRequest, DependencyUpdatesFilesViewedResponse,
     DependencyUpdatesGitHubClient, LocalCloneListEntry, LocalCloneRegistry, LocalCloneRoot,
-    ViewedMutation, classify_outcome,
+    RepoKey, ViewedMutation, classify_outcome,
 };
 use crate::errors::{CliError, CliErrorKind};
 use crate::task_board::ExternalProvider;
@@ -377,19 +377,36 @@ pub async fn run_local_clone_gc() -> Result<GcReport, CliError> {
     if targets.is_empty() {
         return Ok(GcReport::default());
     }
+    let report = apply_local_clone_gc_targets(&mut registry, &targets);
+    save_registry(&root, &registry)?;
+    tracing::info!(
+        target = "harness::dependency_updates::files",
+        targets = report.targets,
+        removed = report.removed,
+        bytes_freed = report.bytes_freed,
+        "local-clone gc completed"
+    );
+    Ok(report)
+}
+
+fn apply_local_clone_gc_targets(
+    registry: &mut LocalCloneRegistry,
+    targets: &[RepoKey],
+) -> GcReport {
     let mut report = GcReport {
         targets: targets.len(),
         bytes_freed: 0,
         removed: 0,
     };
-    for key in &targets {
-        let Some(entry) = registry.remove(key) else {
+    for key in targets {
+        let Some(entry) = registry.entries.get(key).cloned() else {
             continue;
         };
         let bytes = entry.size_bytes;
         if entry.bare_path.exists() {
             match fs::remove_dir_all(&entry.bare_path) {
                 Ok(_) => {
+                    registry.remove(key);
                     report.removed += 1;
                     report.bytes_freed = report.bytes_freed.saturating_add(bytes);
                 }
@@ -405,18 +422,11 @@ pub async fn run_local_clone_gc() -> Result<GcReport, CliError> {
         } else {
             // Entry pointed at a path that no longer exists. Removing the
             // registry row is the cleanup.
+            registry.remove(key);
             report.removed += 1;
         }
     }
-    save_registry(&root, &registry)?;
-    tracing::info!(
-        target = "harness::dependency_updates::files",
-        targets = report.targets,
-        removed = report.removed,
-        bytes_freed = report.bytes_freed,
-        "local-clone gc completed"
-    );
-    Ok(report)
+    report
 }
 
 /// Summary of one GC pass. Returned by [`run_local_clone_gc`] so callers
@@ -924,5 +934,58 @@ mod tests {
         save_registry(&root, &registry).expect("save");
         let loaded = load_registry(&root).expect("load");
         assert_eq!(loaded.entries.len(), 1);
+    }
+
+    #[test]
+    fn local_clone_gc_drops_registry_row_when_path_is_missing() {
+        let tmp = tempfile::tempdir().expect("tmpdir");
+        let key = crate::dependency_updates::RepoKey::new("owner/repo");
+        let mut registry = LocalCloneRegistry::default();
+        registry.insert_or_update(
+            key.clone(),
+            gc_registry_entry("owner/repo", tmp.path().join("missing.git"), 1024),
+        );
+
+        let report = apply_local_clone_gc_targets(&mut registry, &[key]);
+
+        assert_eq!(report.targets, 1);
+        assert_eq!(report.removed, 1);
+        assert!(registry.entries.is_empty());
+    }
+
+    #[test]
+    fn local_clone_gc_retains_registry_row_when_delete_fails() {
+        let tmp = tempfile::tempdir().expect("tmpdir");
+        let key = crate::dependency_updates::RepoKey::new("owner/repo");
+        let bare_path = tmp.path().join("owner__repo.git");
+        fs::write(&bare_path, b"not a directory").expect("fixture file");
+        let mut registry = LocalCloneRegistry::default();
+        registry.insert_or_update(
+            key.clone(),
+            gc_registry_entry("owner/repo", bare_path.clone(), 1024),
+        );
+
+        let report = apply_local_clone_gc_targets(&mut registry, &[key.clone()]);
+
+        assert_eq!(report.targets, 1);
+        assert_eq!(report.removed, 0);
+        assert!(registry.entries.contains_key(&key));
+        assert!(bare_path.exists());
+    }
+
+    fn gc_registry_entry(
+        repo_full_name: &str,
+        bare_path: PathBuf,
+        size_bytes: u64,
+    ) -> crate::dependency_updates::RegistryEntry {
+        crate::dependency_updates::RegistryEntry {
+            repo_full_name: repo_full_name.into(),
+            bare_path,
+            size_bytes,
+            created_at: chrono::Utc::now(),
+            last_used_at: chrono::Utc::now(),
+            last_fetched_at: chrono::Utc::now(),
+            last_known_head_ref_oid_by_pr: BTreeMap::new(),
+        }
     }
 }
