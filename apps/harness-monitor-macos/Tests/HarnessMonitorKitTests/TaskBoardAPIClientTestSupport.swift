@@ -94,6 +94,7 @@ private let taskBoardRPCResponses: [WebSocketRPCMethod: JSONValue] = [
   .dependencyUpdatesClearCache: fixtureJSONValue(sampleDepsCacheClearResponseText),
   .dependencyUpdatesRefresh: fixtureJSONValue(sampleDependencyRefreshResponseText),
   .dependencyUpdatesComment: fixtureJSONValue(sampleDependencyCommentResponseText),
+  .dependencyUpdatesTimeline: fixtureJSONValue(sampleDependencyTimelineResponseText),
 ]
 
 final class TaskBoardURLProtocol: URLProtocol, @unchecked Sendable {
