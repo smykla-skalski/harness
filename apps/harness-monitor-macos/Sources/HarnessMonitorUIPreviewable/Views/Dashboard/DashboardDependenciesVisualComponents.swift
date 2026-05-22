@@ -211,7 +211,22 @@ struct DashboardDependencyActionButton: View {
   let title: String
   let systemImage: String
   let prominence: DashboardDependencyActionProminence
+  let helpText: String?
   let action: () -> Void
+
+  init(
+    title: String,
+    systemImage: String,
+    prominence: DashboardDependencyActionProminence,
+    helpText: String? = nil,
+    action: @escaping () -> Void
+  ) {
+    self.title = title
+    self.systemImage = systemImage
+    self.prominence = prominence
+    self.helpText = helpText
+    self.action = action
+  }
 
   var body: some View {
     Button(action: action) {
@@ -220,6 +235,19 @@ struct DashboardDependencyActionButton: View {
     }
     .harnessActionButtonStyle(variant: prominence.variant, tint: prominence.tint)
     .fixedSize(horizontal: true, vertical: true)
+    .modifier(DashboardDependencyActionButtonHelpModifier(helpText: helpText))
+  }
+}
+
+private struct DashboardDependencyActionButtonHelpModifier: ViewModifier {
+  let helpText: String?
+
+  func body(content: Content) -> some View {
+    if let helpText {
+      content.help(helpText)
+    } else {
+      content
+    }
   }
 }
 

@@ -32,12 +32,20 @@ struct DashboardDependencyActionBar: View {
 
   @ViewBuilder private var buttons: some View {
     DashboardDependencyActionButton(
-      title: "Approve", systemImage: "checkmark.seal", prominence: .primary, action: onApprove
+      title: "Approve",
+      systemImage: "checkmark.seal",
+      prominence: .primary,
+      helpText: DashboardDependenciesDisabledReason.approveReason(for: items),
+      action: onApprove
     )
     .disabled(isBusy || !items.contains { $0.canAttemptManualApproval })
 
     DashboardDependencyActionButton(
-      title: "Merge", systemImage: "arrow.triangle.merge", prominence: .success, action: onMerge
+      title: "Merge",
+      systemImage: "arrow.triangle.merge",
+      prominence: .success,
+      helpText: DashboardDependenciesDisabledReason.mergeReason(for: items),
+      action: onMerge
     )
     .disabled(isBusy || !items.contains { $0.canAttemptManualMerge })
 
@@ -45,6 +53,7 @@ struct DashboardDependencyActionBar: View {
       title: "Rerun Checks",
       systemImage: "arrow.clockwise.circle",
       prominence: .secondary,
+      helpText: DashboardDependenciesDisabledReason.rerunReason(for: items),
       action: onRerunChecks
     )
     .disabled(isBusy || !items.contains { $0.hasRerunnableChecks })
@@ -55,6 +64,7 @@ struct DashboardDependencyActionBar: View {
       title: "Refresh",
       systemImage: "arrow.clockwise",
       prominence: .secondary,
+      helpText: DashboardDependenciesDisabledReason.emptySelectionReason(for: items),
       action: onRefresh
     )
     .disabled(isBusy || items.isEmpty)
@@ -80,7 +90,11 @@ struct DashboardDependencyActionBar: View {
 
     if items.count == 1, let item = items.first {
       DashboardDependencyActionButton(
-        title: "Auto", systemImage: "bolt", prominence: .utility, action: onAuto
+        title: "Auto",
+        systemImage: "bolt",
+        prominence: .utility,
+        helpText: DashboardDependenciesDisabledReason.autoReason(for: items),
+        action: onAuto
       )
       .disabled(isBusy || !item.canRunAutoMode)
       DashboardDependencyActionButton(
@@ -97,7 +111,12 @@ struct DashboardDependencyActionBar: View {
       }
     } else {
       DashboardDependencyActionButton(
-        title: "Auto", systemImage: "bolt", prominence: .utility, action: onAuto
+        title: "Auto",
+        systemImage: "bolt",
+        prominence: .utility,
+        helpText: DashboardDependenciesDisabledReason.autoReason(for: items)
+          ?? DashboardDependenciesDisabledReason.autoPreview(for: items),
+        action: onAuto
       )
       .disabled(isBusy || !items.contains { $0.canRunAutoMode })
     }
