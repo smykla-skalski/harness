@@ -31,6 +31,7 @@ public struct DependencyUpdatesFilesListRequest: Codable, Equatable, Sendable {
 /// compatibility.
 public struct DependencyUpdatesFilesListResponse: Codable, Equatable, Sendable {
   public let pullRequestID: String
+  public let number: UInt64?
   public let headRefOid: String
   /// PR's source branch name (`refs/heads/<x>` qualifier dropped).
   /// Optional for back-compat with older daemons that don't emit it.
@@ -49,6 +50,7 @@ public struct DependencyUpdatesFilesListResponse: Codable, Equatable, Sendable {
 
   public init(
     pullRequestID: String,
+    number: UInt64? = nil,
     headRefOid: String,
     headRefName: String? = nil,
     baseRefOid: String? = nil,
@@ -61,6 +63,7 @@ public struct DependencyUpdatesFilesListResponse: Codable, Equatable, Sendable {
     rateLimitSnapshot: DependencyUpdatesRateLimitSnapshot? = nil
   ) {
     self.pullRequestID = pullRequestID
+    self.number = number
     self.headRefOid = headRefOid
     self.headRefName = headRefName
     self.baseRefOid = baseRefOid
@@ -75,6 +78,7 @@ public struct DependencyUpdatesFilesListResponse: Codable, Equatable, Sendable {
 
   enum CodingKeys: String, CodingKey {
     case pullRequestID = "pullRequestId"
+    case number
     case headRefOid
     case headRefName
     case baseRefOid
@@ -90,6 +94,7 @@ public struct DependencyUpdatesFilesListResponse: Codable, Equatable, Sendable {
   public init(from decoder: Decoder) throws {
     let c = try decoder.container(keyedBy: CodingKeys.self)
     pullRequestID = try c.decode(String.self, forKey: .pullRequestID)
+    number = try c.decodeIfPresent(UInt64.self, forKey: .number)
     headRefOid = try c.decode(String.self, forKey: .headRefOid)
     headRefName = try c.decodeIfPresent(String.self, forKey: .headRefName)
     baseRefOid = try c.decodeIfPresent(String.self, forKey: .baseRefOid)
@@ -110,6 +115,9 @@ public struct DependencyUpdatesFilesPatchRequest: Codable, Equatable, Sendable {
   public let pullRequestID: String
   public let headRefOidExpected: String
   public let paths: [String]
+  /// Pull request number. Enables the daemon to fetch GitHub's synthetic
+  /// `refs/pull/<number>/head` ref, which works for forks and same-repo PRs.
+  public let number: UInt64?
   /// `owner/name` of the repository. Enables the daemon's local-clone
   /// dispatch path. Optional only for back-compat with older callers.
   public let repositoryFullName: String?
@@ -118,30 +126,38 @@ public struct DependencyUpdatesFilesPatchRequest: Codable, Equatable, Sendable {
   /// PR's source branch name. Lets the local-clone path fetch the
   /// actual PR ref instead of falling back to `refs/heads/main`.
   public let headRefName: String?
+  /// PR base branch name. Lets the daemon fetch the base ref before diffing.
+  public let baseRefName: String?
 
   public init(
     pullRequestID: String,
     headRefOidExpected: String,
     paths: [String],
+    number: UInt64? = nil,
     repositoryFullName: String? = nil,
     baseRefOidExpected: String? = nil,
-    headRefName: String? = nil
+    headRefName: String? = nil,
+    baseRefName: String? = nil
   ) {
     self.pullRequestID = pullRequestID
     self.headRefOidExpected = headRefOidExpected
     self.paths = paths
+    self.number = number
     self.repositoryFullName = repositoryFullName
     self.baseRefOidExpected = baseRefOidExpected
     self.headRefName = headRefName
+    self.baseRefName = baseRefName
   }
 
   enum CodingKeys: String, CodingKey {
     case pullRequestID = "pullRequestId"
     case headRefOidExpected
     case paths
+    case number
     case repositoryFullName
     case baseRefOidExpected
     case headRefName
+    case baseRefName
   }
 
   public init(from decoder: Decoder) throws {
@@ -149,9 +165,11 @@ public struct DependencyUpdatesFilesPatchRequest: Codable, Equatable, Sendable {
     pullRequestID = try c.decode(String.self, forKey: .pullRequestID)
     headRefOidExpected = try c.decode(String.self, forKey: .headRefOidExpected)
     paths = try c.decode([String].self, forKey: .paths)
+    number = try c.decodeIfPresent(UInt64.self, forKey: .number)
     repositoryFullName = try c.decodeIfPresent(String.self, forKey: .repositoryFullName)
     baseRefOidExpected = try c.decodeIfPresent(String.self, forKey: .baseRefOidExpected)
     headRefName = try c.decodeIfPresent(String.self, forKey: .headRefName)
+    baseRefName = try c.decodeIfPresent(String.self, forKey: .baseRefName)
   }
 }
 

@@ -76,6 +76,8 @@ impl DependencyUpdatesFilesListRequest {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct DependencyUpdatesFilesListResponse {
     pub pull_request_id: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub number: Option<u64>,
     pub head_ref_oid: String,
     /// PR's source branch name (e.g. `renovate/foo`). Used by the local-clone
     /// path so `ensure_clone` fetches the right ref instead of always
@@ -201,6 +203,11 @@ pub struct DependencyUpdatesFilesPatchRequest {
     pub pull_request_id: String,
     pub head_ref_oid_expected: String,
     pub paths: Vec<String>,
+    /// Pull request number. When present, the local-clone runtime fetches
+    /// GitHub's synthetic `refs/pull/<number>/head` ref, which covers forks
+    /// and same-repo PR branches.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub number: Option<u64>,
     /// Owner/name of the repository the PR lives in. When present, the
     /// daemon can route the patch fetch through the local-clone runtime
     /// (zero-rate-limit). When absent, the handler falls back to the
@@ -216,6 +223,10 @@ pub struct DependencyUpdatesFilesPatchRequest {
     /// daemon's default-branch fallback.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub head_ref_name: Option<String>,
+    /// PR base branch name. When present, the local clone fetches it directly
+    /// before computing the expected base/head OID diff.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub base_ref_name: Option<String>,
 }
 
 impl DependencyUpdatesFilesPatchRequest {

@@ -36,8 +36,7 @@ pub fn parse_git_diff(raw: &str) -> Vec<DependencyUpdateFilePatch> {
             }
             in_hunk = false;
             let trimmed = header.trim_end_matches('\n');
-            let path = parse_diff_git_header(trimmed)
-                .unwrap_or_else(|| "<unknown>".to_string());
+            let path = parse_diff_git_header(trimmed).unwrap_or_else(|| "<unknown>".to_string());
             current = Some(DependencyUpdateFilePatch {
                 path,
                 patch: String::new(),
@@ -185,7 +184,10 @@ mod tests {
         assert_eq!(patches[1].status, DependencyUpdateFileChangeType::Added);
         assert_eq!(patches[1].additions, 2);
         assert_eq!(patches[1].deletions, 0);
-        assert_eq!(patches[0].served_by, DependencyUpdateFileServedBy::LocalClone);
+        assert_eq!(
+            patches[0].served_by,
+            DependencyUpdateFileServedBy::LocalClone
+        );
         // Body retained for consumers to render.
         assert!(patches[0].patch.contains("@@"));
     }

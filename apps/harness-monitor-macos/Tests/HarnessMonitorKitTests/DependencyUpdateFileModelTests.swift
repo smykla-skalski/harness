@@ -121,7 +121,12 @@ final class DependencyUpdateFileModelTests: XCTestCase {
   func testFilesListResponseRoundTrips() throws {
     let response = DependencyUpdatesFilesListResponse(
       pullRequestID: "PR_kwDOABC",
+      number: 42,
       headRefOid: "abc123",
+      headRefName: "renovate/foo",
+      baseRefOid: "def456",
+      baseRefName: "main",
+      repositoryFullName: "owner/repo",
       viewerCanMarkViewed: true,
       files: [
         DependencyUpdateFile(
@@ -144,7 +149,12 @@ final class DependencyUpdateFileModelTests: XCTestCase {
     let parsed = try JSONDecoder().decode(
       DependencyUpdatesFilesListResponse.self, from: data)
     XCTAssertEqual(parsed.pullRequestID, response.pullRequestID)
+    XCTAssertEqual(parsed.number, 42)
     XCTAssertEqual(parsed.headRefOid, response.headRefOid)
+    XCTAssertEqual(parsed.headRefName, "renovate/foo")
+    XCTAssertEqual(parsed.baseRefOid, "def456")
+    XCTAssertEqual(parsed.baseRefName, "main")
+    XCTAssertEqual(parsed.repositoryFullName, "owner/repo")
     XCTAssertEqual(parsed.files.count, 1)
     XCTAssertEqual(parsed.files[0].languageHint, .rust)
     XCTAssertEqual(parsed.rateLimitSnapshot?.remaining, 4998)
@@ -246,6 +256,27 @@ final class DependencyUpdateFileModelTests: XCTestCase {
       DependencyUpdatesFilesPatchResponse.self, from: data)
     XCTAssertEqual(parsed.patches[0].servedBy, .localClone)
     XCTAssertFalse(parsed.drifted)
+  }
+
+  func testFilesPatchRequestCarriesLocalCloneContext() throws {
+    let request = DependencyUpdatesFilesPatchRequest(
+      pullRequestID: "PR_1",
+      headRefOidExpected: "head",
+      paths: ["src/lib.rs"],
+      number: 42,
+      repositoryFullName: "owner/repo",
+      baseRefOidExpected: "base",
+      headRefName: "renovate/foo",
+      baseRefName: "main"
+    )
+    let data = try JSONEncoder().encode(request)
+    let parsed = try JSONDecoder().decode(
+      DependencyUpdatesFilesPatchRequest.self, from: data)
+    XCTAssertEqual(parsed.number, 42)
+    XCTAssertEqual(parsed.repositoryFullName, "owner/repo")
+    XCTAssertEqual(parsed.baseRefOidExpected, "base")
+    XCTAssertEqual(parsed.headRefName, "renovate/foo")
+    XCTAssertEqual(parsed.baseRefName, "main")
   }
 
   func testFilesViewedRoundTrips() throws {

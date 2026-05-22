@@ -96,10 +96,7 @@ impl ViewedMutation {
     /// what to do. If the user wants viewed and the file is already viewed,
     /// we skip (idempotent). Same for unmark.
     #[must_use]
-    pub fn decide(
-        current: DependencyUpdateFileViewedState,
-        mark_viewed: bool,
-    ) -> ViewedMutation {
+    pub fn decide(current: DependencyUpdateFileViewedState, mark_viewed: bool) -> ViewedMutation {
         match (current, mark_viewed) {
             (DependencyUpdateFileViewedState::Viewed, true) => Self::Skip,
             (_, true) => Self::Mark,

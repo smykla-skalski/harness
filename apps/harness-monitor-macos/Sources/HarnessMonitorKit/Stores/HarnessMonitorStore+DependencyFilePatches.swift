@@ -34,9 +34,11 @@ extension HarnessMonitorStore {
       pullRequestID: pullRequestID,
       headRefOidExpected: viewModel.headRefOid,
       paths: pendingPaths,
+      number: viewModel.number,
       repositoryFullName: viewModel.repositoryFullName,
       baseRefOidExpected: viewModel.baseRefOid,
-      headRefName: viewModel.headRefName
+      headRefName: viewModel.headRefName,
+      baseRefName: viewModel.baseRefName
     )
     let interval = DependencyFilesPerf.beginPatchFetch(
       pullRequestID: pullRequestID,

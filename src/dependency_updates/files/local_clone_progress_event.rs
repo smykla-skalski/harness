@@ -2,7 +2,7 @@
 //!
 //! Wraps a `tokio::sync::broadcast::Sender<StreamEvent>` and translates
 //! each `LocalCloneProgress` event into a `StreamEvent` payload published
-//! under the `dependency_updates.local_clone_progress` event name. The
+//! under the `dependency_updates_local_clone_progress` event name. The
 //! Monitor side subscribes via its existing transport and decodes the
 //! payload into a typed `LocalCloneProgress` value.
 //!

@@ -117,8 +117,14 @@ fn infer_language_yaml_extensions() {
 
 #[test]
 fn infer_language_markdown_extensions() {
-    assert_eq!(infer_language("docs/Guide.md"), HarnessCodeLanguage::Markdown);
-    assert_eq!(infer_language("docs/Guide.MARKDOWN"), HarnessCodeLanguage::Markdown);
+    assert_eq!(
+        infer_language("docs/Guide.md"),
+        HarnessCodeLanguage::Markdown
+    );
+    assert_eq!(
+        infer_language("docs/Guide.MARKDOWN"),
+        HarnessCodeLanguage::Markdown
+    );
     assert_eq!(infer_language("README.md"), HarnessCodeLanguage::Markdown);
 }
 
@@ -130,30 +136,18 @@ fn infer_language_diff_extensions() {
 
 #[test]
 fn infer_language_filename_special_cases() {
-    assert_eq!(
-        infer_language("Dockerfile"),
-        HarnessCodeLanguage::Generic
-    );
+    assert_eq!(infer_language("Dockerfile"), HarnessCodeLanguage::Generic);
     assert_eq!(
         infer_language("path/to/Dockerfile"),
         HarnessCodeLanguage::Generic
     );
-    assert_eq!(
-        infer_language("Makefile"),
-        HarnessCodeLanguage::Generic
-    );
-    assert_eq!(
-        infer_language("package.json"),
-        HarnessCodeLanguage::Json
-    );
+    assert_eq!(infer_language("Makefile"), HarnessCodeLanguage::Generic);
+    assert_eq!(infer_language("package.json"), HarnessCodeLanguage::Json);
     assert_eq!(
         infer_language("package-lock.json"),
         HarnessCodeLanguage::Json
     );
-    assert_eq!(
-        infer_language("tsconfig.json"),
-        HarnessCodeLanguage::Json
-    );
+    assert_eq!(infer_language("tsconfig.json"), HarnessCodeLanguage::Json);
 }
 
 #[test]
@@ -162,10 +156,7 @@ fn infer_language_unknown_extension_is_generic() {
         infer_language("path/to/binary.exe"),
         HarnessCodeLanguage::Generic
     );
-    assert_eq!(
-        infer_language("LICENSE"),
-        HarnessCodeLanguage::Generic
-    );
+    assert_eq!(infer_language("LICENSE"), HarnessCodeLanguage::Generic);
     assert_eq!(
         infer_language("path/no-extension"),
         HarnessCodeLanguage::Generic
@@ -176,6 +167,7 @@ fn infer_language_unknown_extension_is_generic() {
 fn files_list_response_serializes_round_trip() {
     let response = DependencyUpdatesFilesListResponse {
         pull_request_id: "PR_kwDOABC".into(),
+        number: Some(42),
         head_ref_oid: "abc123".into(),
         head_ref_name: Some("renovate/foo".into()),
         base_ref_oid: Some("def456".into()),
@@ -229,6 +221,7 @@ fn files_list_response_pagination_complete_defaults_true_when_absent() {
 fn files_list_response_pagination_partial_survives_round_trip() {
     let response = DependencyUpdatesFilesListResponse {
         pull_request_id: "PR_1".into(),
+        number: None,
         head_ref_oid: "abc".into(),
         head_ref_name: None,
         base_ref_oid: None,
@@ -261,6 +254,7 @@ fn files_list_request_serializes_force_refresh_default() {
 fn files_list_response_omits_none_rate_limit() {
     let response = DependencyUpdatesFilesListResponse {
         pull_request_id: "PR_1".into(),
+        number: None,
         head_ref_oid: "abc".into(),
         head_ref_name: None,
         base_ref_oid: None,
@@ -294,6 +288,7 @@ fn files_list_response_back_compat_decode_without_new_fields() {
     let parsed: DependencyUpdatesFilesListResponse =
         serde_json::from_str(json).expect("deserialize");
     assert_eq!(parsed.head_ref_name, None);
+    assert_eq!(parsed.number, None);
     assert_eq!(parsed.base_ref_oid, None);
     assert_eq!(parsed.base_ref_name, None);
     assert_eq!(parsed.repository_full_name, None);

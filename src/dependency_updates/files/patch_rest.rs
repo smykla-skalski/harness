@@ -144,7 +144,10 @@ mod tests {
 
     #[test]
     fn parse_rest_status_known_values() {
-        assert_eq!(parse_rest_status("added"), DependencyUpdateFileChangeType::Added);
+        assert_eq!(
+            parse_rest_status("added"),
+            DependencyUpdateFileChangeType::Added
+        );
         assert_eq!(
             parse_rest_status("removed"),
             DependencyUpdateFileChangeType::Deleted
@@ -173,10 +176,7 @@ mod tests {
             parse_rest_status("unchanged"),
             DependencyUpdateFileChangeType::Other
         );
-        assert_eq!(
-            parse_rest_status(""),
-            DependencyUpdateFileChangeType::Other
-        );
+        assert_eq!(parse_rest_status(""), DependencyUpdateFileChangeType::Other);
     }
 
     #[test]
@@ -245,7 +245,10 @@ mod tests {
     fn parse_next_link_extracts_url() {
         let header = r#"<https://api.github.com/repos/a/b/pulls/1/files?page=2>; rel="next", <https://api.github.com/repos/a/b/pulls/1/files?page=4>; rel="last""#;
         let next = parse_next_link(header).expect("next link");
-        assert_eq!(next, "https://api.github.com/repos/a/b/pulls/1/files?page=2");
+        assert_eq!(
+            next,
+            "https://api.github.com/repos/a/b/pulls/1/files?page=2"
+        );
     }
 
     #[test]

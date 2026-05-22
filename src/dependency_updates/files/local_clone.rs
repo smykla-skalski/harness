@@ -143,11 +143,7 @@ impl LocalCloneRegistry {
         }
     }
 
-    pub fn insert_or_update(
-        &mut self,
-        key: RepoKey,
-        entry: RegistryEntry,
-    ) {
+    pub fn insert_or_update(&mut self, key: RepoKey, entry: RegistryEntry) {
         self.entries.insert(key, entry);
     }
 
