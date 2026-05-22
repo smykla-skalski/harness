@@ -185,4 +185,64 @@ final class HarnessMonitorStoreDependencyBodyUpdateTests: XCTestCase {
       "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
     )
   }
+
+  func testCoalesceCoalescesRapidClicksIntoSingleDaemonWrite() async throws {
+    let client = RecordingHarnessClient()
+    let id = "PR_1"
+    let priorBody = "- [ ] rebase\n"
+    let intermediate = "- [x] rebase\n"
+    let finalBody = "- [ ] rebase\n"
+    client.configureDependencyBodyUpdate(
+      pullRequestID: id,
+      outcome: .updated,
+      currentBody: finalBody
+    )
+    let store = try makeStore(client: client)
+    defer { store.dependencyUpdateBodies.clear() }
+    seedCache(store: store, id: id, body: priorBody)
+
+    let outcome = await withCheckedContinuation {
+      (continuation: CheckedContinuation<DependencyUpdateBodySetOutcome, Never>) in
+      store.coalesceDependencyUpdateBodyEdit(
+        pullRequestID: id, newBody: intermediate, priorBody: priorBody, debounceMillis: 30
+      )
+      store.coalesceDependencyUpdateBodyEdit(
+        pullRequestID: id, newBody: finalBody, priorBody: intermediate, debounceMillis: 30
+      ) { result in continuation.resume(returning: result) }
+    }
+
+    XCTAssertEqual(outcome, .updated)
+    XCTAssertEqual(client.dependencyBodyUpdateCallCount(), 1)
+    let recorded = client.dependencyBodyUpdateRequests.first
+    XCTAssertEqual(recorded?.newBody, finalBody)
+    XCTAssertEqual(
+      recorded?.expectedPriorBodySHA256, HarnessMonitorStore.sha256Hex(of: priorBody))
+  }
+
+  func testCoalesceFlipsLocalBodyStateImmediately() async throws {
+    let client = RecordingHarnessClient()
+    let id = "PR_1"
+    let priorBody = "- [ ] rebase\n"
+    client.configureDependencyBodyUpdate(
+      pullRequestID: id, outcome: .updated, currentBody: "- [x] rebase\n")
+    let store = try makeStore(client: client)
+    defer { store.dependencyUpdateBodies.clear() }
+    seedCache(store: store, id: id, body: priorBody)
+
+    store.coalesceDependencyUpdateBodyEdit(
+      pullRequestID: id,
+      newBody: "- [x] rebase\n",
+      priorBody: priorBody,
+      debounceMillis: 1_000
+    )
+
+    if case .loaded(let body) = store.dependencyUpdateBodyState[id] {
+      XCTAssertEqual(body, "- [x] rebase\n")
+    } else {
+      XCTFail("expected optimistic loaded state")
+    }
+    XCTAssertEqual(client.dependencyBodyUpdateCallCount(), 0)
+    store.pendingDependencyUpdateBodyEdits[id]?.task.cancel()
+    store.pendingDependencyUpdateBodyEdits[id] = nil
+  }
 }

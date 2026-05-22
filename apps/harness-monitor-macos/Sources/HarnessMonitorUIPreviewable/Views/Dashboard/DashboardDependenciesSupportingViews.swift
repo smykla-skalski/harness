@@ -147,19 +147,20 @@ struct DashboardDependenciesDescriptionView: View {
     guard offset < bytes.count else { return }
     bytes[offset] = newValue ? 0x78 : 0x20
     guard let newBody = String(bytes: bytes, encoding: .utf8) else { return }
-    Task { @MainActor in
-      let outcome = await store.setDependencyUpdateBody(
-        pullRequestID: pullRequestID,
-        newBody: newBody,
-        priorBody: currentBody
-      )
+    let onUpdated = onCheckboxUpdated
+    let onError = onCheckboxError
+    store.coalesceDependencyUpdateBodyEdit(
+      pullRequestID: pullRequestID,
+      newBody: newBody,
+      priorBody: currentBody
+    ) { outcome in
       switch outcome {
       case .updated:
-        onCheckboxUpdated?()
+        onUpdated?()
       case .bodyDrifted:
-        onCheckboxError?("PR body changed since you opened it. Reloaded the latest version.")
+        onError?("PR body changed since you opened it. Reloaded the latest version.")
       case .failed(let message):
-        onCheckboxError?("Couldn't update PR body: \(message)")
+        onError?("Couldn't update PR body: \(message)")
       }
     }
   }
