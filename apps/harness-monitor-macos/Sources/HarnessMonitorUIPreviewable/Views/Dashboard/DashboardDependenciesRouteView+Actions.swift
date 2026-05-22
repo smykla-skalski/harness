@@ -40,7 +40,11 @@ extension DashboardDependenciesRouteView {
   func clearCacheAndReload() async {
     guard let client = store.apiClient else { return }
     do {
-      let cleared = try await client.clearDependencyUpdatesCache()
+      let cleared = try await DashboardDependenciesTimeoutRacer.race(
+        timeoutSeconds: DashboardDependenciesTimeoutRacer.defaultMutationTimeoutSeconds
+      ) {
+        try await client.clearDependencyUpdatesCache()
+      }
       store.presentSuccessFeedback(
         "Cleared \(cleared.clearedEntries) cached dependency query bucket(s)"
       )
@@ -170,32 +174,35 @@ extension DashboardDependenciesRouteView {
   func fixCI(item: DependencyUpdateItem) async {
     guard let client = store.apiClient else { return }
     routeInFlightActionTitle = "Creating Fix CI work…"
-    do {
-      _ = try await client.createTaskBoardItem(
-        request: TaskBoardCreateItemRequest(
-          title: "Fix CI · \(item.repository)#\(item.number)",
-          body: """
-            Investigate and restore mergeability for \(item.repository)#\(item.number).
+    let request = TaskBoardCreateItemRequest(
+      title: "Fix CI · \(item.repository)#\(item.number)",
+      body: """
+        Investigate and restore mergeability for \(item.repository)#\(item.number).
 
-            Pull request: \(item.url)
-            Review status: \(item.reviewStatus.label)
-            Check status: \(item.checkStatus.label)
-            """,
-          priority: item.requiresAttention ? .high : .medium,
-          agentMode: .headless,
-          tags: ["dependencies", "fix-ci"],
-          externalRefs: [
-            TaskBoardExternalRef(
-              provider: .gitHub,
-              externalId: "\(item.repository)#\(item.number)",
-              url: item.url
-            )
-          ],
-          planning: TaskBoardPlanningState(
-            summary: "Repair dependency-update CI failures and restore mergeability"
-          )
+        Pull request: \(item.url)
+        Review status: \(item.reviewStatus.label)
+        Check status: \(item.checkStatus.label)
+        """,
+      priority: item.requiresAttention ? .high : .medium,
+      agentMode: .headless,
+      tags: ["dependencies", "fix-ci"],
+      externalRefs: [
+        TaskBoardExternalRef(
+          provider: .gitHub,
+          externalId: "\(item.repository)#\(item.number)",
+          url: item.url
         )
+      ],
+      planning: TaskBoardPlanningState(
+        summary: "Repair dependency-update CI failures and restore mergeability"
       )
+    )
+    do {
+      _ = try await DashboardDependenciesTimeoutRacer.race(
+        timeoutSeconds: DashboardDependenciesTimeoutRacer.defaultMutationTimeoutSeconds
+      ) {
+        try await client.createTaskBoardItem(request: request)
+      }
       selectedRoute = .taskBoard
     } catch {
       store.presentFailureFeedback(error.localizedDescription)
@@ -208,7 +215,7 @@ extension DashboardDependenciesRouteView {
     items: [DependencyUpdateItem],
     onSuccess: @MainActor () -> Void = {},
     operation:
-      @escaping (any HarnessMonitorClientProtocol) async throws
+      @Sendable @escaping (any HarnessMonitorClientProtocol) async throws
       -> DependencyUpdatesActionResponse
   ) async {
     guard let client = store.apiClient else { return }
@@ -220,7 +227,11 @@ extension DashboardDependenciesRouteView {
       endRefreshing(pullRequestIDs: trackedIDs)
     }
     do {
-      let response = try await operation(client)
+      let response = try await DashboardDependenciesTimeoutRacer.race(
+        timeoutSeconds: DashboardDependenciesTimeoutRacer.defaultMutationTimeoutSeconds
+      ) {
+        try await operation(client)
+      }
       store.presentSuccessFeedback(response.summary)
       onSuccess()
       scheduleAffectedRefresh(for: items, using: client)
