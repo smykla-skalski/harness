@@ -116,6 +116,38 @@ public final class DependencyUpdateTimelineViewModel {
     bumpRevision()
   }
 
+  /// Returns the current `isResolved` flag for the review thread with
+  /// the given GraphQL node id, or `nil` if no matching entry is in
+  /// the timeline. Used by the store's optimistic-toggle path to
+  /// snapshot the prior state before the daemon round-trip so a
+  /// failed mutation can revert cleanly.
+  public func threadResolvedState(threadID: String) -> Bool? {
+    for entry in entries {
+      if case .reviewThread(let payload) = entry, payload.id == threadID {
+        return payload.isResolved
+      }
+    }
+    return nil
+  }
+
+  /// Mutates the in-memory review-thread entry's `isResolved` flag.
+  /// Called by the store immediately after the user toggles the
+  /// Resolve / Unresolve button (before the daemon round-trip), and
+  /// again on success to reconcile against the server-side echo
+  /// when it differs from the optimistic value.
+  public func updateReviewThreadResolved(threadID: String, resolved: Bool) {
+    var changed = false
+    for index in entries.indices {
+      if case .reviewThread(let payload) = entries[index], payload.id == threadID {
+        entries[index] = .reviewThread(payload.updatingResolved(to: resolved))
+        changed = true
+      }
+    }
+    if changed {
+      bumpRevision()
+    }
+  }
+
   private func bumpRevision() {
     revision &+= 1
   }

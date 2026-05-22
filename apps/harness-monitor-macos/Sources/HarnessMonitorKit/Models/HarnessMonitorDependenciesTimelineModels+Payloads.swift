@@ -151,6 +151,26 @@ public struct ReviewThreadPayload: Codable, Equatable, Sendable {
     self.comments = comments
     self.commentsTruncated = commentsTruncated
   }
+
+  /// Returns a copy of this thread with `isResolved` set to the given
+  /// value, preserving every other field. Used by the per-PR view
+  /// model when the store toggles `isResolved` optimistically — see
+  /// `DependencyUpdateTimelineViewModel.updateReviewThreadResolved`.
+  public func updatingResolved(to resolved: Bool) -> ReviewThreadPayload {
+    ReviewThreadPayload(
+      id: id,
+      createdAt: createdAt,
+      actor: actor,
+      isResolved: resolved,
+      isCollapsed: isCollapsed,
+      path: path,
+      line: line,
+      originalLine: originalLine,
+      diffSide: diffSide,
+      comments: comments,
+      commentsTruncated: commentsTruncated
+    )
+  }
 }
 
 public struct ReviewThreadCommentPayload: Codable, Equatable, Sendable, Identifiable {
