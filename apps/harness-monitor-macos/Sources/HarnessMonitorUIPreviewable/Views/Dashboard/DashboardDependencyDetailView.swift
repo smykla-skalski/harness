@@ -91,6 +91,13 @@ struct DashboardDependencyDetailView<Actions: View>: View {
         DashboardDependencyDetailSection(title: "Labels") {
           DashboardDependencyLabelStrip(labels: item.labels)
         }
+        DashboardDependencyDetailSection(title: "Conversation") {
+          DashboardDependencyConversationFeed(
+            item: item,
+            store: store,
+            actionHandler: store.supervisorDecisionActionHandler()
+          )
+        }
       }
       .frame(maxWidth: dependenciesDetailMaxWidth, alignment: .leading)
       .frame(maxWidth: .infinity, alignment: .center)
