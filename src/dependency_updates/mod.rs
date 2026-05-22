@@ -26,6 +26,9 @@ pub use files::{
     DependencyUpdatesRateLimitSnapshot, FilesLargeDiffStrategy, HarnessCodeLanguage,
     LocalCloneListEntry, image_mime_for_path, infer_language,
 };
+#[allow(unused_imports)] // RegistryEntry + RepoKey are used by daemon-service tests.
+pub(crate) use files::local_clone::{LocalCloneRegistry, LocalCloneRoot, RegistryEntry, RepoKey};
+pub(crate) use files::viewed::{ViewedMutation, classify_outcome};
 pub(crate) use github::DependencyUpdatesGitHubClient;
 
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]

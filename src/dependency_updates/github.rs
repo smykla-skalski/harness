@@ -295,6 +295,99 @@ impl DependencyUpdatesGitHubClient {
             })
     }
 
+    /// Run a `markFileAsViewed` or `unmarkFileAsViewed` GraphQL mutation
+    /// against one (pullRequestId, path) pair. The mutation response is
+    /// inspected only for success/failure; daemon-side drift detection
+    /// happens before this method is called.
+    pub(crate) async fn toggle_pull_request_file_viewed(
+        &self,
+        pull_request_id: &str,
+        path: &str,
+        mark_viewed: bool,
+    ) -> Result<(), CliError> {
+        let query = if mark_viewed {
+            queries::MARK_PR_FILE_AS_VIEWED_MUTATION
+        } else {
+            queries::UNMARK_PR_FILE_AS_VIEWED_MUTATION
+        };
+        self.client
+            .graphql::<serde_json::Value>(&json!({
+                "query": query,
+                "variables": {
+                    "pullRequestId": pull_request_id,
+                    "path": path,
+                },
+            }))
+            .await
+            .map(|_| ())
+            .map_err(operation_error)
+    }
+
+    /// Fetch the text payload of one blob via GraphQL. Returns
+    /// `(content_base64, byte_size, is_truncated, is_too_large)`. Binary
+    /// blobs return empty content (`text == null` on the GraphQL side);
+    /// callers should fall through to a REST raw-bytes fetch when the
+    /// byte_size is non-zero but the content is empty.
+    pub(crate) async fn fetch_repository_blob_text(
+        &self,
+        repository_id: &str,
+        oid: &str,
+    ) -> Result<crate::daemon::service::BlobTextProjection, CliError>
+    {
+        use base64::Engine as _;
+        #[derive(Debug, serde::Deserialize)]
+        struct RepositoryBlobResponse {
+            node: Option<RepositoryBlobNode>,
+        }
+        #[derive(Debug, serde::Deserialize)]
+        struct RepositoryBlobNode {
+            object: Option<RepositoryBlobObject>,
+        }
+        #[derive(Debug, serde::Deserialize)]
+        #[serde(rename_all = "camelCase")]
+        struct RepositoryBlobObject {
+            byte_size: Option<u64>,
+            text: Option<String>,
+            is_truncated: Option<bool>,
+        }
+        let response: RepositoryBlobResponse = self
+            .client
+            .graphql(&json!({
+                "query": queries::REPOSITORY_BLOB_QUERY,
+                "variables": {
+                    "id": repository_id,
+                    "expression": oid,
+                },
+            }))
+            .await
+            .map_err(operation_error)?;
+        let blob = response
+            .node
+            .and_then(|node| node.object)
+            .ok_or_else(|| {
+                CliErrorKind::workflow_parse(format!(
+                    "dependency-updates blob '{oid}' was not found in repository '{repository_id}'"
+                ))
+            })?;
+        let byte_size = blob.byte_size.unwrap_or_default();
+        let content_base64 = blob
+            .text
+            .as_deref()
+            .map(|text| base64::engine::general_purpose::STANDARD.encode(text.as_bytes()))
+            .unwrap_or_default();
+        let is_truncated = blob.is_truncated.unwrap_or_default();
+        let is_too_large =
+            crate::dependency_updates::files::blob::blob_exceeds_cap(byte_size);
+        Ok(
+            crate::daemon::service::BlobTextProjection {
+                content_base64,
+                byte_size,
+                is_truncated,
+                is_too_large,
+            },
+        )
+    }
+
     pub(crate) async fn fetch_pull_request_body(
         &self,
         pull_request_id: &str,

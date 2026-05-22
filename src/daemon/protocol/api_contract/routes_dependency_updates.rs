@@ -153,4 +153,12 @@ pub(crate) const ROUTES: &[HttpApiRouteContract] = &[
         },
         swift_client_exposed: true,
     },
+    HttpApiRouteContract {
+        method: HttpRouteMethod::Post,
+        path: http_paths::DEPENDENCY_UPDATES_FILES_LOCAL_CLONES_DELETE,
+        parity: HttpRouteParity::Rpc {
+            ws_method: ws_methods::DEPENDENCY_UPDATES_FILES_LOCAL_CLONES_DELETE,
+        },
+        swift_client_exposed: true,
+    },
 ];
