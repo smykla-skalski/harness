@@ -66,6 +66,20 @@ struct DependencyUpdatesParityHelperTests {
     #expect(!makeItem(state: .closed, reviewStatus: .none).canAttemptManualApproval)
   }
 
+  @Test("Auto mode targets unreviewed open PRs that pass checks")
+  func autoApprovableAllowedWhenReviewStatusIsNone() {
+    #expect(makeItem(reviewStatus: .none, checkStatus: .success).isAutoApprovable)
+    #expect(makeItem(reviewStatus: .reviewRequired, checkStatus: .success).isAutoApprovable)
+    #expect(!makeItem(reviewStatus: .none, checkStatus: .pending).isAutoApprovable)
+    #expect(!makeItem(reviewStatus: .none, checkStatus: .failure).isAutoApprovable)
+    #expect(!makeItem(reviewStatus: .approved, checkStatus: .success).isAutoApprovable)
+    #expect(
+      !makeItem(
+        reviewStatus: .none, checkStatus: .success, mergeable: .conflicting
+      ).isAutoApprovable
+    )
+  }
+
   @Test("Fix CI is available only for failing checks")
   func fixCIRequiresFailingChecks() {
     #expect(makeItem(checkStatus: .failure).canStartFixCI)

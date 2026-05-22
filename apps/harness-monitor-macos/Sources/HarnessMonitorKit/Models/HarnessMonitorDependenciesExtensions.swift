@@ -100,7 +100,7 @@ extension DependencyUpdateCheck {
 extension DependencyUpdateTarget {
   public var isAutoApprovable: Bool {
     checkStatus == .success
-      && reviewStatus == .reviewRequired
+      && (reviewStatus == .reviewRequired || reviewStatus == .none)
       && mergeable != .conflicting
   }
 
