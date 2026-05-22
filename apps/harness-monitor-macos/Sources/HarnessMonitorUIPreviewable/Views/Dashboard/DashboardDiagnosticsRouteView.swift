@@ -254,13 +254,17 @@ struct DashboardDiagnosticsRouteView: View {
           return nil
         }
       }
-    let daemonEvents = (store.diagnostics?.recentEvents ?? []).compactMap { event in
+    let recentEvents = store.diagnostics?.recentEvents ?? [DaemonAuditEvent]()
+    let daemonEvents = recentEvents.compactMap { event -> DashboardDiagnosticsEvent? in
       let level = event.level.lowercased()
       guard level != "info" && level != "debug" else { return nil }
       return DashboardDiagnosticsEvent(
         source: "Daemon",
         level: event.level.uppercased(),
-        recordedAt: formatTimestamp(event.recordedAt, configuration: dateTimeConfiguration),
+        recordedAt: formatTimestamp(
+          event.recordedAt,
+          configuration: dateTimeConfiguration
+        ),
         message: event.message
       )
     }
