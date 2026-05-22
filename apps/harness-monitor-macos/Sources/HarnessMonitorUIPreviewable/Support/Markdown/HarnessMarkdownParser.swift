@@ -9,10 +9,25 @@ enum HarnessMarkdownParser {
     let normalized = markdown.replacingOccurrences(of: "\r\n", with: "\n")
       .replacingOccurrences(of: "\r", with: "\n")
     let lines = normalized.split(separator: "\n", omittingEmptySubsequences: false).map(String.init)
+    let lineOffsets = computeLineOffsets(for: lines)
     let references = HarnessMarkdownReferenceDefinitions.parse(in: lines)
     var parser = HarnessMarkdownBlockParser(
-      lines: lines, references: references, shouldCancel: shouldCancel)
+      lines: lines,
+      references: references,
+      shouldCancel: shouldCancel,
+      lineOffsets: lineOffsets)
     return HarnessMarkdownDocument(blocks: parser.parseBlocks())
+  }
+
+  private static func computeLineOffsets(for lines: [String]) -> [Int] {
+    var offsets: [Int] = []
+    offsets.reserveCapacity(lines.count)
+    var cursor = 0
+    for line in lines {
+      offsets.append(cursor)
+      cursor += line.utf8.count + 1
+    }
+    return offsets
   }
 }
 
@@ -20,16 +35,19 @@ private struct HarnessMarkdownBlockParser {
   private let lines: [String]
   private let references: [String: HarnessMarkdownReference]
   private let shouldCancel: @Sendable () -> Bool
+  private let lineOffsets: [Int]?
   private var index = 0
 
   init(
     lines: [String],
     references: [String: HarnessMarkdownReference],
-    shouldCancel: @escaping @Sendable () -> Bool
+    shouldCancel: @escaping @Sendable () -> Bool,
+    lineOffsets: [Int]? = nil
   ) {
     self.lines = lines
     self.references = references
     self.shouldCancel = shouldCancel
+    self.lineOffsets = lineOffsets
   }
 
   mutating func parseBlocks() -> [HarnessMarkdownBlock] {
@@ -184,8 +202,15 @@ private struct HarnessMarkdownBlockParser {
     var items: [HarnessMarkdownListItem] = []
     while index < lines.count, let marker = unorderedMarker(lines[index]) {
       guard !shouldCancel() else { break }
+      let checkboxSourceOffset = marker.checkboxMarkerColumn.flatMap { column in
+        lineOffsets.map { $0[index] + column }
+      }
       index += 1
-      items.append(parseListItem(firstLine: marker.content, checkbox: marker.checkbox))
+      items.append(
+        parseListItem(
+          firstLine: marker.content,
+          checkbox: marker.checkbox,
+          checkboxSourceOffset: checkboxSourceOffset))
     }
     return .unorderedList(items)
   }
@@ -196,13 +221,17 @@ private struct HarnessMarkdownBlockParser {
     while index < lines.count, let marker = orderedMarker(lines[index]) {
       guard !shouldCancel() else { break }
       index += 1
-      items.append(parseListItem(firstLine: marker.content, checkbox: nil))
+      items.append(
+        parseListItem(firstLine: marker.content, checkbox: nil, checkboxSourceOffset: nil))
     }
     return .orderedList(start: start, items: items)
   }
 
-  private mutating func parseListItem(firstLine: String, checkbox: Bool?) -> HarnessMarkdownListItem
-  {
+  private mutating func parseListItem(
+    firstLine: String,
+    checkbox: Bool?,
+    checkboxSourceOffset: Int?
+  ) -> HarnessMarkdownListItem {
     var itemLines = [firstLine]
     while index < lines.count {
       guard !shouldCancel() else { break }
@@ -217,7 +246,10 @@ private struct HarnessMarkdownBlockParser {
       }
     }
     var parser = childParser(lines: itemLines)
-    return HarnessMarkdownListItem(checkbox: checkbox, blocks: parser.parseBlocks())
+    return HarnessMarkdownListItem(
+      checkbox: checkbox,
+      checkboxSourceOffset: checkboxSourceOffset,
+      blocks: parser.parseBlocks())
   }
 
   private mutating func parseTable() -> HarnessMarkdownBlock {
@@ -330,7 +362,7 @@ private struct HarnessMarkdownBlockParser {
   }
 
   private func childParser(lines: [String]) -> Self {
-    Self(lines: lines, references: references, shouldCancel: shouldCancel)
+    Self(lines: lines, references: references, shouldCancel: shouldCancel, lineOffsets: nil)
   }
 }
 
