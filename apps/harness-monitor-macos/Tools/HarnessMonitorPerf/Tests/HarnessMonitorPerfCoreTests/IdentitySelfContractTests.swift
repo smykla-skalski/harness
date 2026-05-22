@@ -59,7 +59,7 @@ final class IdentitySelfContractTests: XCTestCase {
         // Decision sidebar groups store decision IDs, which are unique within
         // each grouped section by construction.
         "group.decisionIDs",
-        // Dependencies settings picker ranges are fixed integer domains.
+        // Reviews settings picker ranges are fixed integer domains.
         "Self.frequentLabelsCountRange",
         "Self.maxConcurrentRange",
         // Duration picker presets are curated fixed arrays of unique seconds.
