@@ -3,10 +3,16 @@
 mod cache;
 mod mapping;
 mod queries;
+mod service;
 mod types;
+
+pub(crate) use service::{fetch_timeline_page, TimelineClient, TimelineError};
 
 #[cfg(test)]
 mod tests;
+
+#[cfg(test)]
+mod service_tests;
 
 pub use types::{
     Actor, CommitEntry, DependencyUpdateTimelineEntry, HeadRefForcePushedEntry, IssueCommentEntry,
