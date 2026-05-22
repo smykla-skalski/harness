@@ -140,6 +140,7 @@ struct HarnessMonitorOpenAnythingHostModifier: ViewModifier {
 
   private func executeRoutingStep(_ step: OpenAnythingRoutingStep) {
     guard !executePresentationStep(step) else { return }
+    guard !executeCommandStep(step) else { return }
     switch step {
     case .openWindow(let target):
       openWindowTarget(target)
@@ -155,9 +156,24 @@ struct HarnessMonitorOpenAnythingHostModifier: ViewModifier {
       store.supervisorSelectedDecisionID = id
     case .selectDashboardDependency(let pullRequestID):
       dependencyRegistry.requestSelection(pullRequestID: pullRequestID)
-    case .presentNewSessionSheet, .presentNewTaskSheet, .attachExternalSession, .refresh:
+    case .presentNewSessionSheet, .presentNewTaskSheet, .attachExternalSession, .refresh,
+      .refreshDiagnostics, .reconnectDaemon, .copyDiagnostics:
       break
     }
+  }
+
+  private func executeCommandStep(_ step: OpenAnythingRoutingStep) -> Bool {
+    switch step {
+    case .refreshDiagnostics:
+      Task { await store.refreshDiagnostics() }
+    case .reconnectDaemon:
+      Task { await store.reconnect() }
+    case .copyDiagnostics:
+      copyMonitorDiagnostics()
+    default:
+      return false
+    }
+    return true
   }
 
   private func executePresentationStep(_ step: OpenAnythingRoutingStep) -> Bool {
@@ -193,6 +209,57 @@ struct HarnessMonitorOpenAnythingHostModifier: ViewModifier {
     let dashboardRoute = DashboardWindowRoute(rawValue: route.rawValue) ?? .taskBoard
     windowNavigationHistory.requestDashboardRoute(dashboardRoute)
     openWindow.openHarnessDashboardWindow()
+  }
+
+  private func copyMonitorDiagnostics() {
+    let pasteboard = NSPasteboard.general
+    pasteboard.clearContents()
+    pasteboard.setString(monitorDiagnosticsClipboardText(), forType: .string)
+    store.presentSuccessFeedback("Diagnostics copied")
+  }
+
+  private func monitorDiagnosticsClipboardText() -> String {
+    let metrics = store.connectionMetrics
+    let diagnostics = store.diagnostics?.workspace ?? store.daemonStatus?.diagnostics
+    let health = store.health
+    let mcp = store.mcpStatus
+    return [
+      "Harness Monitor diagnostics",
+      "Connection: \(connectionTitle(store.connectionState))",
+      "Transport: \(metrics.transportKind.title)",
+      "Last request latency: \(optionalMilliseconds(metrics.requestLatencyMs))",
+      "Average request latency: \(optionalMilliseconds(metrics.averageRequestLatencyMs))",
+      "Daemon version: \(health?.version ?? "unknown")",
+      "Daemon pid: \(health.map { String($0.pid) } ?? "unknown")",
+      "Daemon endpoint: \(health?.endpoint ?? "unknown")",
+      "Manifest: \(diagnostics?.manifestPath ?? "unavailable")",
+      "Database: \(diagnostics?.databasePath ?? "unavailable")",
+      "Events: \(diagnostics?.eventsPath ?? "unavailable")",
+      "Sessions: \(store.sessions.count)",
+      "Selected session: \(store.selectedSessionID ?? "none")",
+      "Timeline rows: \(store.timeline.count)",
+      "MCP: \(mcp.title)",
+      "MCP socket: \(mcp.socketPath ?? "unavailable")",
+    ]
+    .joined(separator: "\n")
+  }
+
+  private func connectionTitle(_ state: HarnessMonitorStore.ConnectionState) -> String {
+    switch state {
+    case .idle:
+      "Idle"
+    case .connecting:
+      "Connecting"
+    case .online:
+      "Online"
+    case .offline(let reason):
+      "Offline: \(reason)"
+    }
+  }
+
+  private func optionalMilliseconds(_ value: Int?) -> String {
+    guard let value else { return "n/a" }
+    return "\(value) ms"
   }
 
   private func openSettings(rawValue: String) {

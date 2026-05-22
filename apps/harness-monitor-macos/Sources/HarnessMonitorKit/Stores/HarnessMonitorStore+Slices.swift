@@ -50,6 +50,12 @@ extension HarnessMonitorStore {
         onChanged?(.metrics)
       }
     }
+    public var lastRefreshTimings: HarnessMonitorRefreshTimings? {
+      didSet {
+        guard oldValue != lastRefreshTimings else { return }
+        onChanged?(.metrics)
+      }
+    }
     public var connectionEvents: [ConnectionEvent] = []
     public var subscribedSessionIDs: Set<String> = []
     public var daemonLogLevel: String?

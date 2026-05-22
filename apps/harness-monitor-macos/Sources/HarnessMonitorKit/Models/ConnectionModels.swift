@@ -178,6 +178,36 @@ public struct ConnectionMetrics: Equatable, Sendable {
   }()
 }
 
+public struct HarnessMonitorRefreshTimings: Equatable, Sendable {
+  public let recordedAt: Date
+  public let diagnosticsLatencyMs: Int
+  public let projectsLatencyMs: Int
+  public let sessionsLatencyMs: Int
+  public let taskBoardItemsLatencyMs: Int?
+  public let taskBoardOrchestratorLatencyMs: Int?
+
+  public init(
+    recordedAt: Date,
+    diagnosticsLatencyMs: Int,
+    projectsLatencyMs: Int,
+    sessionsLatencyMs: Int,
+    taskBoardItemsLatencyMs: Int?,
+    taskBoardOrchestratorLatencyMs: Int?
+  ) {
+    self.recordedAt = recordedAt
+    self.diagnosticsLatencyMs = diagnosticsLatencyMs
+    self.projectsLatencyMs = projectsLatencyMs
+    self.sessionsLatencyMs = sessionsLatencyMs
+    self.taskBoardItemsLatencyMs = taskBoardItemsLatencyMs
+    self.taskBoardOrchestratorLatencyMs = taskBoardOrchestratorLatencyMs
+  }
+
+  public var totalMeasuredLatencyMs: Int {
+    diagnosticsLatencyMs + projectsLatencyMs + sessionsLatencyMs
+      + (taskBoardItemsLatencyMs ?? 0) + (taskBoardOrchestratorLatencyMs ?? 0)
+  }
+}
+
 public struct ConnectionEvent: Identifiable, Equatable, Sendable {
   public let id: UUID
   public let timestamp: Date

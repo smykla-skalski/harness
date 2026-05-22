@@ -5,6 +5,12 @@ extension DashboardDependenciesRouteView {
   var contentPane: some View {
     VStack(alignment: .leading, spacing: 14) {
       filterBar
+      DashboardDependenciesProvenanceBar(
+        snapshot: routeProvenanceSnapshot,
+        onRefresh: {
+          Task { await reload(forceRefresh: true) }
+        }
+      )
       contentListPane
     }
     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
@@ -105,6 +111,7 @@ extension DashboardDependenciesRouteView {
           item: item,
           store: store,
           activity: activitySnapshot(for: item),
+          provenance: routeProvenanceSnapshot,
           showsProblemChecksOnly: routeShowsProblemChecksOnlyBinding,
           onDescriptionCheckboxError: { message in routeErrorMessage = message },
           onDescriptionCheckboxUpdated: {

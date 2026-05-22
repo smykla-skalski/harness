@@ -65,11 +65,15 @@ public struct OpenAnythingPaletteView: View {
       Divider()
 
       if model.query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-        emptyState("Start typing")
+        if model.suggestedResults.isEmpty {
+          emptyState("Start typing")
+        } else {
+          resultsList(model.suggestedResults)
+        }
       } else if model.results.isEmpty {
         emptyState("No results")
       } else {
-        resultsList
+        resultsList(model.results)
       }
     }
     .frame(maxWidth: 720)
@@ -78,10 +82,10 @@ public struct OpenAnythingPaletteView: View {
     .shadow(color: .black.opacity(0.25), radius: 28, y: 16)
   }
 
-  private var resultsList: some View {
+  private func resultsList(_ results: OpenAnythingResults) -> some View {
     ScrollView {
       LazyVStack(alignment: .leading, spacing: 0, pinnedViews: [.sectionHeaders]) {
-        ForEach(model.results.sections) { section in
+        ForEach(results.sections) { section in
           Section {
             ForEach(section.hits) { hit in
               resultRow(hit)

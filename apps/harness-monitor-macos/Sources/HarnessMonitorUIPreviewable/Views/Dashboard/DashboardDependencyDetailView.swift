@@ -5,6 +5,7 @@ struct DashboardDependencyDetailView<Actions: View>: View {
   let item: DependencyUpdateItem
   let store: HarnessMonitorStore
   let activity: DashboardDependencyActivitySnapshot
+  let provenance: DashboardDependenciesProvenanceSnapshot?
   @Binding var showsProblemChecksOnly: Bool
   let onDescriptionCheckboxError: ((String) -> Void)?
   let onDescriptionCheckboxUpdated: (() -> Void)?
@@ -22,6 +23,7 @@ struct DashboardDependencyDetailView<Actions: View>: View {
     item: DependencyUpdateItem,
     store: HarnessMonitorStore,
     activity: DashboardDependencyActivitySnapshot,
+    provenance: DashboardDependenciesProvenanceSnapshot? = nil,
     showsProblemChecksOnly: Binding<Bool> = .constant(false),
     onDescriptionCheckboxError: ((String) -> Void)? = nil,
     onDescriptionCheckboxUpdated: (() -> Void)? = nil,
@@ -31,6 +33,7 @@ struct DashboardDependencyDetailView<Actions: View>: View {
     self.item = item
     self.store = store
     self.activity = activity
+    self.provenance = provenance
     _showsProblemChecksOnly = showsProblemChecksOnly
     self.onDescriptionCheckboxError = onDescriptionCheckboxError
     self.onDescriptionCheckboxUpdated = onDescriptionCheckboxUpdated
@@ -99,6 +102,9 @@ struct DashboardDependencyDetailView<Actions: View>: View {
         VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingMD) {
           actionBar()
           DashboardDependencyStatusStrip(item: item)
+          if let provenance {
+            DashboardDependencyProvenanceMiniBar(snapshot: provenance)
+          }
         }
       }
       .frame(maxWidth: dependenciesDetailMaxWidth, alignment: .leading)

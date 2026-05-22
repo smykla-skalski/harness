@@ -31,6 +31,10 @@ extension HarnessMonitorUITestAccessibilityRegistryTests {
         == "harness.dashboard.notifications"
     )
     #expect(
+      HarnessMonitorAccessibility.dashboardDiagnosticsRoot
+        == "harness.dashboard.diagnostics"
+    )
+    #expect(
       HarnessMonitorAccessibility.dashboardNotificationsScrollView
         == "harness.dashboard.notifications.scroll"
     )
@@ -44,6 +48,10 @@ extension HarnessMonitorUITestAccessibilityRegistryTests {
     #expect(
       HarnessMonitorAccessibility.dashboardDependenciesRoot
         == "harness.dashboard.dependencies"
+    )
+    #expect(
+      HarnessMonitorAccessibility.dashboardDependenciesProvenance
+        == "harness.dashboard.dependencies.provenance"
     )
     #expect(
       HarnessMonitorAccessibility.dashboardDependenciesList
@@ -138,6 +146,7 @@ extension HarnessMonitorUITestAccessibilityRegistryTests {
       named: "DashboardSidebarRecentSessionsSection.swift"
     )
     let notificationsView = try sourceFile(named: "DashboardNotificationsRouteView.swift")
+    let diagnosticsView = try sourceFile(named: "DashboardDiagnosticsRouteView.swift")
     let dashboardToolbar = try sourceFile(named: "DashboardWindowToolbar.swift")
 
     #expect(
@@ -156,6 +165,7 @@ extension HarnessMonitorUITestAccessibilityRegistryTests {
     #expect(
       notificationsView.contains("HarnessMonitorAccessibility.dashboardNotificationsRoot")
     )
+    #expect(diagnosticsView.contains("HarnessMonitorAccessibility.dashboardDiagnosticsRoot"))
     #expect(dashboardView.contains("HarnessMonitorSidebar("))
     #expect(dashboardView.contains("List(selection: dashboardSelectionBinding)"))
     #expect(dashboardView.contains("SessionSidebarRow("))
@@ -179,9 +189,13 @@ extension HarnessMonitorUITestAccessibilityRegistryTests {
 
   private func expectDependenciesIdentifierUsage() throws {
     let dependenciesView = try sourceFile(named: "DashboardDependenciesRouteView.swift")
+    let provenanceView = try sourceFile(named: "DashboardDependenciesProvenance.swift")
 
     #expect(
       dependenciesView.contains("HarnessMonitorAccessibility.dashboardDependenciesRoot")
+    )
+    #expect(
+      provenanceView.contains("HarnessMonitorAccessibility.dashboardDependenciesProvenance")
     )
     #expect(
       dependenciesView.contains("HarnessMonitorAccessibility.dashboardDependenciesList")

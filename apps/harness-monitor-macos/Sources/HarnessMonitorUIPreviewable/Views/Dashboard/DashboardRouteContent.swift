@@ -9,11 +9,13 @@ struct DashboardRouteContent: View {
   let sessionCatalog: HarnessMonitorStore.SessionCatalogSlice
   @State private var dependenciesSearchAutomationCommand = AppSearchAutomationCommand.idle
   @State private var notificationsHasBeenMounted = false
+  @State private var diagnosticsHasBeenMounted = false
   @State private var policyCanvasHasBeenMounted = false
   @State private var dependenciesHasBeenMounted = false
 
   private var isTaskBoardVisible: Bool { route == .taskBoard }
   private var isNotificationsVisible: Bool { route == .notifications }
+  private var isDiagnosticsVisible: Bool { route == .diagnostics }
   private var isPolicyCanvasVisible: Bool { route == .policyCanvas }
   private var isDependenciesVisible: Bool { route == .dependencies }
   private var dependenciesSearchAutomation: AppSearchAutomationCommand? {
@@ -55,6 +57,19 @@ struct DashboardRouteContent: View {
           .onAppear {
             policyCanvasHasBeenMounted = true
           }
+      }
+
+      if diagnosticsHasBeenMounted || isDiagnosticsVisible {
+        DashboardDiagnosticsRouteView(
+          store: store,
+          selectedRoute: route
+        )
+        .opacity(isDiagnosticsVisible ? 1 : 0)
+        .allowsHitTesting(isDiagnosticsVisible)
+        .accessibilityHidden(!isDiagnosticsVisible)
+        .onAppear {
+          diagnosticsHasBeenMounted = true
+        }
       }
 
       if dependenciesHasBeenMounted || isDependenciesVisible {

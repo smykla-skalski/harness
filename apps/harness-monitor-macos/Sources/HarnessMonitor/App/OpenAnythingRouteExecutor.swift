@@ -12,6 +12,9 @@ enum OpenAnythingRoutingStep: Equatable, Sendable {
   case presentNewTaskSheet
   case attachExternalSession
   case refresh
+  case refreshDiagnostics
+  case reconnectDaemon
+  case copyDiagnostics
   case openWindow(OpenAnythingWindowTarget)
   case openDashboard(OpenAnythingDashboardRoute)
   case openSettings(rawValue: String)
@@ -62,21 +65,30 @@ enum OpenAnythingRouteExecutor {
     _ action: OpenAnythingAction,
     showsPolicyCanvasLab: Bool
   ) -> [OpenAnythingRoutingStep] {
-    switch action {
-    case .newSession:
-      return [.presentNewSessionSheet]
-    case .newTask:
-      return [.presentNewTaskSheet]
-    case .attachExternalSession:
-      return [.attachExternalSession]
-    case .refresh:
-      return [.refresh]
-    case .settings:
-      return [.openWindow(.settings)]
-    case .policyCanvasLab:
+    if action == .policyCanvasLab {
       return showsPolicyCanvasLab ? [.openWindow(.policyCanvasLab)] : []
     }
+    return baseActionSteps[action] ?? []
   }
+
+  private static let baseActionSteps: [OpenAnythingAction: [OpenAnythingRoutingStep]] = [
+    .newSession: [.presentNewSessionSheet],
+    .newTask: [.presentNewTaskSheet],
+    .attachExternalSession: [.attachExternalSession],
+    .openDashboard: [.openWindow(.dashboard)],
+    .openTaskBoard: [.openDashboard(.taskBoard)],
+    .openDependencies: [.openDashboard(.dependencies)],
+    .openNotifications: [.openDashboard(.notifications)],
+    .openPolicyCanvas: [.openDashboard(.policyCanvas)],
+    .openDiagnostics: [.openDashboard(.diagnostics)],
+    .refresh: [.refresh],
+    .refreshDiagnostics: [.openDashboard(.diagnostics), .refreshDiagnostics],
+    .reconnectDaemon: [.reconnectDaemon],
+    .copyDiagnostics: [.copyDiagnostics],
+    .settings: [.openWindow(.settings)],
+    .openMCPSettings: [.openSettings(rawValue: "mcp")],
+    .openDatabaseSettings: [.openSettings(rawValue: "database")],
+  ]
 
   private static func taskBoardSteps(
     sessionID: String?,

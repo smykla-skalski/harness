@@ -77,10 +77,21 @@ public enum OpenAnythingCorpusBuilder {
       .newSession,
       .newTask,
       .attachExternalSession,
+      .openDashboard,
+      .openTaskBoard,
+      .openDependencies,
+      .openNotifications,
+      .openDiagnostics,
       .refresh,
+      .refreshDiagnostics,
+      .reconnectDaemon,
+      .copyDiagnostics,
       .settings,
+      .openMCPSettings,
+      .openDatabaseSettings,
     ]
     if showsPolicyCanvasLab {
+      actions.append(.openPolicyCanvas)
       actions.append(.policyCanvasLab)
     }
     return actions.map { action in
@@ -91,7 +102,8 @@ public enum OpenAnythingCorpusBuilder {
         title: actionTitle(action),
         subtitle: actionSubtitle(action),
         systemImage: actionSystemImage(action),
-        searchBodyParts: [action.rawValue]
+        isSuggested: suggestedActions.contains(action),
+        searchBodyParts: [action.rawValue, actionSearchAliases(action)]
       )
     }
   }
@@ -109,6 +121,7 @@ public enum OpenAnythingCorpusBuilder {
         title: windowTitle(window),
         subtitle: "Window",
         systemImage: windowSystemImage(window),
+        isSuggested: window == .dashboard,
         searchBodyParts: [window.rawValue]
       )
     }
@@ -139,6 +152,7 @@ public enum OpenAnythingCorpusBuilder {
         title: route.title,
         subtitle: "Dashboard",
         systemImage: route.systemImage,
+        isSuggested: route == .taskBoard || route == .dependencies || route == .diagnostics,
         searchBodyParts: [route.rawValue]
       )
     }
@@ -284,41 +298,6 @@ public enum OpenAnythingCorpusBuilder {
         systemImage: "clock.arrow.circlepath",
         searchBodyParts: [entry.entryId, entry.agentId, entry.taskId]
       )
-    }
-  }
-
-  private static func actionTitle(_ action: OpenAnythingAction) -> String {
-    switch action {
-    case .newSession: "New Session"
-    case .newTask: "New Task"
-    case .attachExternalSession: "Attach External Session"
-    case .refresh: "Refresh"
-    case .settings: "Settings"
-    case .policyCanvasLab: "Policy Canvas Lab"
-    }
-  }
-
-  private static func actionSubtitle(_ action: OpenAnythingAction) -> String {
-    switch action {
-    case .newSession, .newTask, .attachExternalSession:
-      "Create"
-    case .refresh:
-      "Reload Monitor data"
-    case .settings:
-      "Open Settings"
-    case .policyCanvasLab:
-      "Open experimental window"
-    }
-  }
-
-  private static func actionSystemImage(_ action: OpenAnythingAction) -> String {
-    switch action {
-    case .newSession: "plus.rectangle.on.folder"
-    case .newTask: "checklist"
-    case .attachExternalSession: "link.badge.plus"
-    case .refresh: "arrow.clockwise"
-    case .settings: "gearshape"
-    case .policyCanvasLab: "point.3.connected.trianglepath.dotted"
     }
   }
 

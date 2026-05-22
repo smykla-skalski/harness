@@ -14,6 +14,7 @@ extension HarnessMonitorStore {
     let measuredDiagnostics = refreshSnapshot.diagnostics
     let measuredProjects = refreshSnapshot.projects
     let measuredSessions = refreshSnapshot.sessions
+    let refreshTimings = refreshSnapshot.refreshTimings()
     let generation = beginSessionIndexSnapshotApply()
     guard
       let filteredSnapshot = await preparedSessionIndexSnapshot(
@@ -45,6 +46,7 @@ extension HarnessMonitorStore {
       daemonLogLevel =
         measuredDiagnostics.value.health?.logLevel
         ?? HarnessMonitorLogger.defaultDaemonLogLevel
+      lastRefreshTimings = refreshTimings
       adoptManifestURL(from: measuredDiagnostics.value.workspace.manifestPath)
       globalTaskBoardItems = resolvedTaskBoardSnapshot.items
       globalTaskBoardOrchestratorStatus = resolvedTaskBoardSnapshot.orchestratorStatus
@@ -317,5 +319,18 @@ extension HarnessMonitorStore {
         orchestratorStatus: tick.resolvedStatus
       )
     }
+  }
+}
+
+extension RefreshSnapshot {
+  fileprivate func refreshTimings(recordedAt: Date = .now) -> HarnessMonitorRefreshTimings {
+    HarnessMonitorRefreshTimings(
+      recordedAt: recordedAt,
+      diagnosticsLatencyMs: diagnostics.latencyMs,
+      projectsLatencyMs: projects.latencyMs,
+      sessionsLatencyMs: sessions.latencyMs,
+      taskBoardItemsLatencyMs: taskBoardItems.measured?.latencyMs,
+      taskBoardOrchestratorLatencyMs: taskBoardOrchestratorStatus.measured?.latencyMs
+    )
   }
 }

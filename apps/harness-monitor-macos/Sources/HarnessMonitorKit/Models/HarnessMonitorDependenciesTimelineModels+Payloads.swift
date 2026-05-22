@@ -156,8 +156,8 @@ public struct ReviewThreadPayload: Codable, Equatable, Sendable {
   /// value, preserving every other field. Used by the per-PR view
   /// model when the store toggles `isResolved` optimistically — see
   /// `DependencyUpdateTimelineViewModel.updateReviewThreadResolved`.
-  public func updatingResolved(to resolved: Bool) -> ReviewThreadPayload {
-    ReviewThreadPayload(
+  public func updatingResolved(to resolved: Bool) -> Self {
+    Self(
       id: id,
       createdAt: createdAt,
       actor: actor,
