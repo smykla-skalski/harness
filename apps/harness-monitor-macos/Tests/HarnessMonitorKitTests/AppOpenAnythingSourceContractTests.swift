@@ -77,5 +77,6 @@ struct AppOpenAnythingSourceContractTests {
       .deletingLastPathComponent()
       .deletingLastPathComponent()
       .deletingLastPathComponent()
+      .deletingLastPathComponent()
   }
 }
