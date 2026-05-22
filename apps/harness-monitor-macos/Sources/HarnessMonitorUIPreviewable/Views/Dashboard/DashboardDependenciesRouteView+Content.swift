@@ -87,7 +87,11 @@ extension DashboardDependenciesRouteView {
       } else if selectedItems.count > 1 {
         batchDetail
       } else if let item = primaryDetailItem {
-        DashboardDependencyDetailView(item: item, store: store) {
+        DashboardDependencyDetailView(
+          item: item,
+          store: store,
+          onDescriptionCheckboxError: { message in routeErrorMessage = message }
+        ) {
           dependencyActionBar(items: [item])
         }
       } else if routeIsLoading {

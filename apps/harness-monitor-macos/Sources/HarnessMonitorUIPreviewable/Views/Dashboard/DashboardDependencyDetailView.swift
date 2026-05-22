@@ -4,7 +4,20 @@ import SwiftUI
 struct DashboardDependencyDetailView<Actions: View>: View {
   let item: DependencyUpdateItem
   let store: HarnessMonitorStore
+  let onDescriptionCheckboxError: ((String) -> Void)?
   @ViewBuilder let actionBar: () -> Actions
+
+  init(
+    item: DependencyUpdateItem,
+    store: HarnessMonitorStore,
+    onDescriptionCheckboxError: ((String) -> Void)? = nil,
+    @ViewBuilder actionBar: @escaping () -> Actions
+  ) {
+    self.item = item
+    self.store = store
+    self.onDescriptionCheckboxError = onDescriptionCheckboxError
+    self.actionBar = actionBar
+  }
 
   var body: some View {
     HarnessMonitorColumnScrollView(
@@ -28,7 +41,9 @@ struct DashboardDependencyDetailView<Actions: View>: View {
         }
         DashboardDependencyDetailSection(title: nil) {
           DashboardDependenciesDescriptionView(
-            store: store, pullRequestID: item.pullRequestID
+            store: store,
+            pullRequestID: item.pullRequestID,
+            onCheckboxError: onDescriptionCheckboxError
           )
         }
         .accessibilityIdentifier(HarnessMonitorAccessibility.dashboardDependenciesDescription)
