@@ -19,6 +19,8 @@ struct SessionTimelineRowView: View {
     self.fontScale = fontScale
   }
 
+  private static let indentStep: CGFloat = 16
+
   var body: some View {
     SessionTimelineNodeCluster(
       row: row,
@@ -30,7 +32,7 @@ struct SessionTimelineRowView: View {
     .padding(
       EdgeInsets(
         top: 0,
-        leading: 0,
+        leading: CGFloat(row.node.indentLevel) * Self.indentStep,
         bottom: HarnessMonitorTheme.spacingMD,
         trailing: HarnessMonitorTheme.spacingXS
       )
