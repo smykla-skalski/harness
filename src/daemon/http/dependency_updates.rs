@@ -8,9 +8,9 @@ use axum::{Json, Router};
 
 use crate::daemon::protocol::{
     DependencyUpdatesApproveRequest, DependencyUpdatesAutoRequest, DependencyUpdatesBodyRequest,
-    DependencyUpdatesLabelRequest, DependencyUpdatesMergeRequest, DependencyUpdatesQueryRequest,
-    DependencyUpdatesRefreshRequest, DependencyUpdatesRepositoryCatalogRequest,
-    DependencyUpdatesRerunChecksRequest, http_paths,
+    DependencyUpdatesBodyUpdateRequest, DependencyUpdatesLabelRequest, DependencyUpdatesMergeRequest,
+    DependencyUpdatesQueryRequest, DependencyUpdatesRefreshRequest,
+    DependencyUpdatesRepositoryCatalogRequest, DependencyUpdatesRerunChecksRequest, http_paths,
 };
 use crate::daemon::service;
 
@@ -70,6 +70,10 @@ pub(super) fn dependency_updates_routes() -> Router<DaemonHttpState> {
         .route(
             http_paths::DEPENDENCY_UPDATES_BODY,
             post(post_dependency_update_body),
+        )
+        .route(
+            http_paths::DEPENDENCY_UPDATES_BODY_UPDATE,
+            post(post_dependency_update_body_update),
         )
 }
 
@@ -225,6 +229,22 @@ async fn post_dependency_update_body(
     timed_json(
         "POST",
         http_paths::DEPENDENCY_UPDATES_BODY,
+        &request_id,
+        start,
+        result,
+    )
+}
+
+async fn post_dependency_update_body_update(
+    headers: HeaderMap,
+    State(state): State<DaemonHttpState>,
+    Json(request): Json<DependencyUpdatesBodyUpdateRequest>,
+) -> Response {
+    let (start, request_id) = authenticated_request!(headers, state);
+    let result = service::update_dependency_update_body(&request).await;
+    timed_json(
+        "POST",
+        http_paths::DEPENDENCY_UPDATES_BODY_UPDATE,
         &request_id,
         start,
         result,

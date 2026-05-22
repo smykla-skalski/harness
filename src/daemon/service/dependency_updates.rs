@@ -5,11 +5,13 @@ use crate::dependency_updates::{
     DependencyUpdateActionOutcome, DependencyUpdateActionResult, DependencyUpdateItem,
     DependencyUpdateRepositoryLabel, DependencyUpdateTarget, DependencyUpdatesActionResponse,
     DependencyUpdatesApproveRequest, DependencyUpdatesAutoRequest, DependencyUpdatesBodyRequest,
-    DependencyUpdatesBodyResponse, DependencyUpdatesCacheClearResponse,
-    DependencyUpdatesGitHubClient, DependencyUpdatesLabelRequest, DependencyUpdatesMergeRequest,
-    DependencyUpdatesQueryRequest, DependencyUpdatesQueryResponse, DependencyUpdatesRefreshRequest,
-    DependencyUpdatesRefreshResponse, DependencyUpdatesRepositoryCatalogRequest,
-    DependencyUpdatesRepositoryCatalogResponse, DependencyUpdatesRerunChecksRequest,
+    DependencyUpdatesBodyResponse, DependencyUpdatesBodyUpdateOutcome,
+    DependencyUpdatesBodyUpdateRequest, DependencyUpdatesBodyUpdateResponse,
+    DependencyUpdatesCacheClearResponse, DependencyUpdatesGitHubClient,
+    DependencyUpdatesLabelRequest, DependencyUpdatesMergeRequest, DependencyUpdatesQueryRequest,
+    DependencyUpdatesQueryResponse, DependencyUpdatesRefreshRequest, DependencyUpdatesRefreshResponse,
+    DependencyUpdatesRepositoryCatalogRequest, DependencyUpdatesRepositoryCatalogResponse,
+    DependencyUpdatesRerunChecksRequest,
 };
 use crate::errors::{CliError, CliErrorKind};
 use crate::task_board::ExternalProvider;
@@ -307,6 +309,72 @@ pub async fn fetch_dependency_update_body(
     };
     store_cached_body_response(cache_key, &response);
     Ok(response)
+}
+
+/// Post a new pull-request body to GitHub after verifying the caller had
+/// observed the latest body.
+///
+/// Re-fetches the current body (bypassing the daemon cache) and compares its
+/// SHA-256 with `expected_prior_body_sha256`. On match the new body is sent via
+/// the `updatePullRequest` mutation and the body cache is written through. On
+/// mismatch the response carries the current body so the caller can re-render
+/// without writing.
+///
+/// # Errors
+/// Returns `CliError` when the request is invalid, the GitHub token is
+/// missing, or GitHub cannot return or accept the pull request body.
+pub async fn update_dependency_update_body(
+    request: &DependencyUpdatesBodyUpdateRequest,
+) -> Result<DependencyUpdatesBodyUpdateResponse, CliError> {
+    request.validate()?;
+    let pull_request_id = request.normalized_pull_request_id();
+    let expected_sha = request.normalized_expected_prior_body_sha256();
+
+    let token = github_token(None).ok_or_else(|| missing_token_error(None))?;
+    let client = DependencyUpdatesGitHubClient::new(&token)?;
+
+    let (current_body, current_updated_at) =
+        client.fetch_pull_request_body(&pull_request_id).await?;
+    let current_sha = sha256_hex(&current_body);
+    let fetched_at = utc_now();
+
+    if current_sha != expected_sha {
+        return Ok(DependencyUpdatesBodyUpdateResponse {
+            pull_request_id,
+            outcome: DependencyUpdatesBodyUpdateOutcome::BodyDrifted,
+            current_body,
+            current_body_sha256: current_sha,
+            pr_updated_at: current_updated_at,
+            fetched_at,
+        });
+    }
+
+    let (new_body, new_updated_at) = client
+        .update_pull_request_body(&pull_request_id, &request.new_body)
+        .await?;
+    let new_sha = sha256_hex(&new_body);
+    let response = DependencyUpdatesBodyUpdateResponse {
+        pull_request_id: pull_request_id.clone(),
+        outcome: DependencyUpdatesBodyUpdateOutcome::Updated,
+        current_body: new_body.clone(),
+        current_body_sha256: new_sha,
+        pr_updated_at: new_updated_at,
+        fetched_at: fetched_at.clone(),
+    };
+    let cached = DependencyUpdatesBodyResponse {
+        pull_request_id: pull_request_id.clone(),
+        body: new_body,
+        pr_updated_at: new_updated_at,
+        fetched_at,
+        from_cache: false,
+    };
+    store_cached_body_response(pull_request_id, &cached);
+    Ok(response)
+}
+
+pub(crate) fn sha256_hex(input: &str) -> String {
+    use sha2::{Digest, Sha256};
+    hex::encode(Sha256::digest(input.as_bytes()))
 }
 
 /// Clear the in-memory dependency updates query cache (list + body).

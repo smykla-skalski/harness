@@ -27,9 +27,11 @@ use pagination::resolve_continuation;
 use queries::{
     APPROVE_MUTATION, NODES_BY_IDS_QUERY, ORGANIZATION_REPOSITORIES_QUERY,
     PULL_REQUEST_BODY_QUERY, REREQUEST_CHECK_SUITE_MUTATION, SEARCH_QUERY,
+    UPDATE_PULL_REQUEST_BODY_MUTATION,
 };
 use types::{
     NodesResponse, OrganizationRepositoriesResponse, PullRequestBodyResponse, SearchResponse,
+    UpdatePullRequestBodyResponse,
 };
 
 use super::{
@@ -281,6 +283,31 @@ impl DependencyUpdatesGitHubClient {
                 "dependency-updates pull request '{pull_request_id}' was not found or is not accessible"
             ))
         })?;
+        let updated_at = parse_timestamp(node.updated_at.as_str())?;
+        Ok((node.body.unwrap_or_default(), updated_at))
+    }
+
+    pub(crate) async fn update_pull_request_body(
+        &self,
+        pull_request_id: &str,
+        body: &str,
+    ) -> Result<(String, DateTime<Utc>), CliError> {
+        let response: UpdatePullRequestBodyResponse = self
+            .client
+            .graphql(&json!({
+                "query": UPDATE_PULL_REQUEST_BODY_MUTATION,
+                "variables": { "id": pull_request_id, "body": body },
+            }))
+            .await
+            .map_err(operation_error)?;
+        let node = response
+            .update_pull_request
+            .and_then(|payload| payload.pull_request)
+            .ok_or_else(|| {
+                CliErrorKind::workflow_parse(format!(
+                    "dependency-updates pull request '{pull_request_id}' rejected the body update"
+                ))
+            })?;
         let updated_at = parse_timestamp(node.updated_at.as_str())?;
         Ok((node.body.unwrap_or_default(), updated_at))
     }
