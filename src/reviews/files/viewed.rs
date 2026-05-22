@@ -100,8 +100,9 @@ impl ViewedMutation {
         match (current, mark_viewed) {
             (ReviewFileViewedState::Viewed, true) => Self::Skip,
             (_, true) => Self::Mark,
-            (ReviewFileViewedState::Unviewed, false)
-            | (ReviewFileViewedState::Dismissed, false) => Self::Skip,
+            (ReviewFileViewedState::Unviewed | ReviewFileViewedState::Dismissed, false) => {
+                Self::Skip
+            }
             (ReviewFileViewedState::Viewed, false) => Self::Unmark,
         }
     }

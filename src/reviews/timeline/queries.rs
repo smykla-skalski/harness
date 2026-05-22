@@ -6,7 +6,7 @@
 /// via [`LIST_PR_REVIEW_COMMENTS_QUERY`] and
 /// [`LIST_PR_REVIEW_THREAD_COMMENTS_QUERY`] until every connection is
 /// fully drained — no partial state crosses the daemon/Monitor boundary.
-pub const PR_TIMELINE_PAGE_QUERY: &str = r#"
+pub const PR_TIMELINE_PAGE_QUERY: &str = r"
 query PullRequestTimelinePage(
   $pullRequestID: ID!,
   $pageSize: Int!,
@@ -397,7 +397,7 @@ fragment RevisionMarkerFields on PullRequestRevisionMarker {
   createdAt
   lastSeenCommit { oid abbreviatedOid }
 }
-"#;
+";
 
 /// Continuation query: fetch the next page of inline comments for a
 /// single `PullRequestReview` node identified by `$reviewID`. The
@@ -405,7 +405,7 @@ fragment RevisionMarkerFields on PullRequestRevisionMarker {
 /// `PullRequestReviewFields.comments` reports `hasNextPage: true`, and
 /// keeps invoking it until the connection is exhausted (subject to the
 /// drain budget defined in the plan §2.6).
-pub const LIST_PR_REVIEW_COMMENTS_QUERY: &str = r#"
+pub const LIST_PR_REVIEW_COMMENTS_QUERY: &str = r"
 query ListPRReviewComments($reviewID: ID!, $pageSize: Int!, $cursor: String) {
   node(id: $reviewID) {
     ... on PullRequestReview {
@@ -426,12 +426,12 @@ query ListPRReviewComments($reviewID: ID!, $pageSize: Int!, $cursor: String) {
   }
   rateLimit { remaining resetAt cost }
 }
-"#;
+";
 
 /// Continuation query: fetch the next page of comments for a single
 /// `PullRequestReviewThread` node identified by `$threadID`. Used in
 /// the same drain loop as [`LIST_PR_REVIEW_COMMENTS_QUERY`].
-pub const LIST_PR_REVIEW_THREAD_COMMENTS_QUERY: &str = r#"
+pub const LIST_PR_REVIEW_THREAD_COMMENTS_QUERY: &str = r"
 query ListPRReviewThreadComments($threadID: ID!, $pageSize: Int!, $cursor: String) {
   node(id: $threadID) {
     ... on PullRequestReviewThread {
@@ -449,4 +449,4 @@ query ListPRReviewThreadComments($threadID: ID!, $pageSize: Int!, $cursor: Strin
   }
   rateLimit { remaining resetAt cost }
 }
-"#;
+";

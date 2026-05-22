@@ -62,19 +62,19 @@ fn run_compute(
     filter: Option<&HashSet<String>>,
 ) -> Result<Vec<ReviewFilePatch>, LocalCloneRuntimeError> {
     let repo = gix::open(bare_path).map_err(|e| LocalCloneRuntimeError::Open(e.to_string()))?;
-    let base_id = ObjectId::from_hex(base_oid.as_bytes())
+    let base_object_id = ObjectId::from_hex(base_oid.as_bytes())
         .map_err(|e| LocalCloneRuntimeError::BlobMissing(e.to_string()))?;
-    let head_id = ObjectId::from_hex(head_oid.as_bytes())
+    let head_object_id = ObjectId::from_hex(head_oid.as_bytes())
         .map_err(|e| LocalCloneRuntimeError::BlobMissing(e.to_string()))?;
     let base_tree = repo
-        .find_object(base_id)
+        .find_object(base_object_id)
         .map_err(|e| LocalCloneRuntimeError::BlobMissing(e.to_string()))?
         .try_into_commit()
         .map_err(|e| LocalCloneRuntimeError::BlobMissing(e.to_string()))?
         .tree()
         .map_err(|e| LocalCloneRuntimeError::BlobMissing(e.to_string()))?;
     let head_tree = repo
-        .find_object(head_id)
+        .find_object(head_object_id)
         .map_err(|e| LocalCloneRuntimeError::BlobMissing(e.to_string()))?
         .try_into_commit()
         .map_err(|e| LocalCloneRuntimeError::BlobMissing(e.to_string()))?
