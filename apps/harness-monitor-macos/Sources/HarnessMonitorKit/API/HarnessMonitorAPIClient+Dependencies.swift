@@ -81,4 +81,72 @@ extension HarnessMonitorAPIClient {
   ) async throws -> DependencyUpdatesActionResponse {
     try await post("/v1/dependency-updates/comment", body: request)
   }
+
+  public func listDependencyUpdateFiles(
+    request: DependencyUpdatesFilesListRequest
+  ) async throws -> DependencyUpdatesFilesListResponse {
+    try await post("/v1/dependency-updates/files/list", body: request)
+  }
+
+  public func patchDependencyUpdateFiles(
+    request: DependencyUpdatesFilesPatchRequest
+  ) async throws -> DependencyUpdatesFilesPatchResponse {
+    try await post("/v1/dependency-updates/files/patch", body: request)
+  }
+
+  public func viewedDependencyUpdateFiles(
+    request: DependencyUpdatesFilesViewedRequest
+  ) async throws -> DependencyUpdatesFilesViewedResponse {
+    try await post("/v1/dependency-updates/files/viewed", body: request)
+  }
+
+  public func fetchDependencyUpdateFileBlob(
+    request: DependencyUpdatesFilesBlobRequest
+  ) async throws -> DependencyUpdatesFilesBlobResponse {
+    try await post("/v1/dependency-updates/files/blob", body: request)
+  }
+
+  public func listDependencyUpdateLocalClones() async throws -> [DependencyUpdateLocalCloneEntry] {
+    let body = DependencyUpdatesFilesLocalClonesListRequest()
+    return try await post("/v1/dependency-updates/files/local-clones", body: body)
+  }
+
+  public func deleteDependencyUpdateLocalClone(repoKeySegment: String) async throws {
+    let body = DependencyUpdatesFilesLocalClonesDeleteRequest(repoKeySegment: repoKeySegment)
+    let _: DependencyUpdatesFilesLocalClonesDeleteResponse = try await post(
+      "/v1/dependency-updates/files/local-clones/delete",
+      body: body
+    )
+  }
+}
+
+/// Empty request body for listing local clones. The daemon does not need
+/// any parameters but the HTTP route expects a POST so we send an empty
+/// payload to satisfy the contract.
+public struct DependencyUpdatesFilesLocalClonesListRequest: Codable, Equatable, Sendable {
+  public init() {}
+}
+
+/// Request body for deleting a single local clone by repo key segment.
+public struct DependencyUpdatesFilesLocalClonesDeleteRequest: Codable, Equatable, Sendable {
+  public let repoKeySegment: String
+
+  public init(repoKeySegment: String) {
+    self.repoKeySegment = repoKeySegment
+  }
+
+  enum CodingKeys: String, CodingKey {
+    case repoKeySegment = "repo_key_segment"
+  }
+}
+
+/// Response body for the local clones delete handler. Returns the post-
+/// delete listing so the Settings panel can refresh without an extra
+/// round-trip.
+public struct DependencyUpdatesFilesLocalClonesDeleteResponse: Codable, Equatable, Sendable {
+  public let clones: [DependencyUpdateLocalCloneEntry]
+
+  public init(clones: [DependencyUpdateLocalCloneEntry] = []) {
+    self.clones = clones
+  }
 }

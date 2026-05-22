@@ -219,6 +219,66 @@ extension PreviewHarnessClientState {
     )
   }
 
+  func listDependencyUpdateFiles(
+    request: DependencyUpdatesFilesListRequest
+  ) -> DependencyUpdatesFilesListResponse {
+    DependencyUpdatesFilesListResponse(
+      pullRequestID: request.pullRequestID,
+      headRefOid: "preview-head-\(request.pullRequestID)",
+      viewerCanMarkViewed: true,
+      files: [],
+      fetchedAt: Self.mutationTimestamp,
+      paginationComplete: true
+    )
+  }
+
+  func patchDependencyUpdateFiles(
+    request: DependencyUpdatesFilesPatchRequest
+  ) -> DependencyUpdatesFilesPatchResponse {
+    DependencyUpdatesFilesPatchResponse(
+      pullRequestID: request.pullRequestID,
+      patches: [],
+      drifted: false,
+      currentHeadRefOid: request.headRefOidExpected,
+      fetchedAt: Self.mutationTimestamp
+    )
+  }
+
+  func viewedDependencyUpdateFiles(
+    request: DependencyUpdatesFilesViewedRequest
+  ) -> DependencyUpdatesFilesViewedResponse {
+    DependencyUpdatesFilesViewedResponse(
+      pullRequestID: request.pullRequestID,
+      results: request.paths.map { target in
+        DependencyUpdateFilesViewedResult(
+          path: target.path,
+          outcome: .updated,
+          viewerViewedState: target.markViewed ? .viewed : .unviewed
+        )
+      },
+      fetchedAt: Self.mutationTimestamp
+    )
+  }
+
+  func fetchDependencyUpdateFileBlob(
+    request: DependencyUpdatesFilesBlobRequest
+  ) -> DependencyUpdatesFilesBlobResponse {
+    DependencyUpdatesFilesBlobResponse(
+      path: request.path,
+      oid: request.oid,
+      mime: .png,
+      contentBase64: "",
+      byteSize: 0,
+      fetchedAt: Self.mutationTimestamp
+    )
+  }
+
+  func listDependencyUpdateLocalClones() -> [DependencyUpdateLocalCloneEntry] {
+    []
+  }
+
+  func deleteDependencyUpdateLocalClone(repoKeySegment _: String) {}
+
   private func previewActionResponse(
     summary: String,
     action: DependencyUpdateActionKind,
