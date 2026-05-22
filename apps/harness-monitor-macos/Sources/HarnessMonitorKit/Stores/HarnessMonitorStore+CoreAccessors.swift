@@ -34,7 +34,8 @@ extension HarnessMonitorStore {
       daemonOwnership: daemonOwnership,
       modelContainer: modelContainer,
       persistenceError: persistenceError,
-      cacheService: cacheService
+      cacheService: cacheService,
+      taskBoardSettingsWorker: TaskBoardSettingsWorker()
     )
   }
 
