@@ -24,13 +24,13 @@ extension DashboardDependenciesRouteView {
       }
       .disabled(isBusy || !items.contains { $0.canAttemptManualApproval })
       Button("Merge") {
-        Task { await merge(items: items) }
+        requestMerge(items: items)
       }
       .disabled(isBusy || !items.contains { $0.canAttemptManualMerge })
       Button("Rerun Checks") {
         Task { await rerunChecks(items: items) }
       }
-      .disabled(isBusy || !items.contains { $0.hasRerunnableChecks })
+      .disabled(isBusy || !items.contains { $0.canAttemptRerunChecks })
       Button("Refresh") {
         refresh(items: items)
       }
@@ -47,9 +47,9 @@ extension DashboardDependenciesRouteView {
           routeIsLabelSheetPresented = true
         }
       )
-      .disabled(isBusy)
+      .disabled(isBusy || !items.contains { $0.canAddDependencyLabel })
       Button("Auto") {
-        Task { await auto(items: items) }
+        requestAuto(items: items)
       }
       .disabled(isBusy || !items.contains { $0.canRunAutoMode })
       if isSingleItem, primaryItem.canStartFixCI {

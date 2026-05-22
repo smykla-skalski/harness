@@ -60,6 +60,7 @@ struct DashboardDependenciesRouteView: View {
   @State private var labelMenuDataByRepository: [String: DashboardDependenciesRepoLabelMenuData] =
     [:]
   @State private var recentDependencyActions: [String: DashboardDependencyActivityEntry] = [:]
+  @State private var pendingBatchConfirmation: DashboardDependencyBatchConfirmation?
 
   init(
     store: HarnessMonitorStore,
@@ -168,6 +169,22 @@ struct DashboardDependenciesRouteView: View {
     nonmutating set { recentDependencyActions = newValue }
   }
 
+  var routePendingBatchConfirmation: DashboardDependencyBatchConfirmation? {
+    get { pendingBatchConfirmation }
+    nonmutating set { pendingBatchConfirmation = newValue }
+  }
+
+  var routePendingBatchConfirmationIsPresented: Binding<Bool> {
+    Binding(
+      get: { pendingBatchConfirmation != nil },
+      set: { isPresented in
+        if !isPresented {
+          pendingBatchConfirmation = nil
+        }
+      }
+    )
+  }
+
   var routePresentationWorker: DashboardDependenciesPresentationWorker {
     presentationWorker
   }
@@ -251,6 +268,13 @@ struct DashboardDependenciesRouteView: View {
     .sheet(isPresented: $isLabelSheetPresented) {
       labelSheet
     }
+    .confirmationDialog(
+      routePendingBatchConfirmation?.title ?? "Confirm dependency action",
+      isPresented: routePendingBatchConfirmationIsPresented,
+      titleVisibility: .visible,
+      actions: { batchConfirmationActions },
+      message: { batchConfirmationMessage }
+    )
     .onChange(of: selectedIDs) { oldValue, newValue in
       persistedPrimarySelectionID = newValue.min() ?? persistedPrimarySelectionID
       prefetchSelectedBodies(adding: newValue.subtracting(oldValue))
