@@ -70,7 +70,6 @@ struct DashboardDependencyListRow: View {
       }
     }
     .frame(width: 18, alignment: .center)
-    .animation(.easeInOut(duration: 0.18), value: isRefreshing)
   }
 
   private var progressAccessibilityLabel: String {
