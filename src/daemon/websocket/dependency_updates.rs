@@ -7,7 +7,8 @@ use crate::daemon::protocol::{
     DependencyUpdatesFilesViewedRequest, DependencyUpdatesLabelRequest,
     DependencyUpdatesMergeRequest, DependencyUpdatesQueryRequest, DependencyUpdatesRefreshRequest,
     DependencyUpdatesRepositoryCatalogRequest, DependencyUpdatesRerunChecksRequest,
-    DependencyUpdatesTimelineRequest, WsRequest, WsResponse, ws_methods,
+    DependencyUpdatesReviewThreadResolveRequest, DependencyUpdatesTimelineRequest, WsRequest,
+    WsResponse, ws_methods,
 };
 use crate::daemon::service;
 use serde::de::DeserializeOwned;
@@ -89,6 +90,9 @@ pub(crate) async fn dispatch_dependency_updates_method(
         }
         ws_methods::DEPENDENCY_UPDATES_TIMELINE => {
             Some(dispatch_dependency_updates_timeline(request).await)
+        }
+        ws_methods::DEPENDENCY_UPDATES_REVIEW_THREADS_RESOLVE => {
+            Some(dispatch_dependency_updates_review_threads_resolve(request).await)
         }
         _ => None,
     }
@@ -267,6 +271,16 @@ async fn dispatch_dependency_updates_timeline(request: &WsRequest) -> WsResponse
     dispatch_query_result(
         &request.id,
         service::fetch_dependency_update_timeline(&body).await,
+    )
+}
+
+async fn dispatch_dependency_updates_review_threads_resolve(request: &WsRequest) -> WsResponse {
+    let Ok(body) = parse_params::<DependencyUpdatesReviewThreadResolveRequest>(request) else {
+        return invalid_params(request);
+    };
+    dispatch_query_result(
+        &request.id,
+        service::set_review_thread_resolved(&body).await,
     )
 }
 

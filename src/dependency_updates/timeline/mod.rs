@@ -30,6 +30,14 @@ pub(crate) fn append_timeline_entry_to_cache(
     cache::append_entry(pull_request_id, entry);
 }
 
+/// Drain the cached timeline pages for `pull_request_id`. Called by
+/// the daemon service layer after a write action (comment-post,
+/// review-thread resolve) succeeds so the next fetch reflects the new
+/// server-side state without an extra GitHub round-trip.
+pub(crate) fn drain_pull_request_cache(pull_request_id: &str) {
+    cache::drain_pull_request(pull_request_id);
+}
+
 #[cfg(test)]
 mod tests;
 

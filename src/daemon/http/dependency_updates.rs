@@ -14,7 +14,7 @@ use crate::daemon::protocol::{
     DependencyUpdatesFilesViewedRequest, DependencyUpdatesLabelRequest,
     DependencyUpdatesMergeRequest, DependencyUpdatesQueryRequest, DependencyUpdatesRefreshRequest,
     DependencyUpdatesRepositoryCatalogRequest, DependencyUpdatesRerunChecksRequest,
-    DependencyUpdatesTimelineRequest, http_paths,
+    DependencyUpdatesReviewThreadResolveRequest, DependencyUpdatesTimelineRequest, http_paths,
 };
 use crate::daemon::service;
 
@@ -118,6 +118,10 @@ pub(super) fn dependency_updates_routes() -> Router<DaemonHttpState> {
         .route(
             http_paths::DEPENDENCY_UPDATES_TIMELINE,
             post(post_dependency_update_timeline),
+        )
+        .route(
+            http_paths::DEPENDENCY_UPDATES_REVIEW_THREADS_RESOLVE,
+            post(post_dependency_update_review_threads_resolve),
         )
 }
 
@@ -457,6 +461,22 @@ async fn post_dependency_update_timeline(
     timed_json(
         "POST",
         http_paths::DEPENDENCY_UPDATES_TIMELINE,
+        &request_id,
+        start,
+        result,
+    )
+}
+
+async fn post_dependency_update_review_threads_resolve(
+    headers: HeaderMap,
+    State(state): State<DaemonHttpState>,
+    Json(request): Json<DependencyUpdatesReviewThreadResolveRequest>,
+) -> Response {
+    let (start, request_id) = authenticated_request!(headers, state);
+    let result = service::set_review_thread_resolved(&request).await;
+    timed_json(
+        "POST",
+        http_paths::DEPENDENCY_UPDATES_REVIEW_THREADS_RESOLVE,
         &request_id,
         start,
         result,

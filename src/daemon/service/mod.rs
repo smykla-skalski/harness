@@ -217,6 +217,7 @@ use crate::daemon::{is_local_websocket_endpoint, is_loopback_host};
 mod adopt;
 mod dependency_updates;
 mod dependency_updates_files;
+mod dependency_updates_thread_resolve;
 mod dependency_updates_timeline;
 mod direct;
 mod improver_apply;
@@ -267,6 +268,7 @@ pub use dependency_updates_files::{
     mark_dependency_update_files_viewed, patch_dependency_update_files,
     register_local_clone_progress_sender, run_local_clone_gc,
 };
+pub use dependency_updates_thread_resolve::set_review_thread_resolved;
 pub use dependency_updates_timeline::{
     clear_dependency_updates_caches_with_timeline, fetch_dependency_update_timeline,
 };
