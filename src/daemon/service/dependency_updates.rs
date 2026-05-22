@@ -7,11 +7,11 @@ use crate::dependency_updates::{
     DependencyUpdatesApproveRequest, DependencyUpdatesAutoRequest, DependencyUpdatesBodyRequest,
     DependencyUpdatesBodyResponse, DependencyUpdatesBodyUpdateOutcome,
     DependencyUpdatesBodyUpdateRequest, DependencyUpdatesBodyUpdateResponse,
-    DependencyUpdatesCacheClearResponse, DependencyUpdatesGitHubClient,
-    DependencyUpdatesLabelRequest, DependencyUpdatesMergeRequest, DependencyUpdatesQueryRequest,
-    DependencyUpdatesQueryResponse, DependencyUpdatesRefreshRequest, DependencyUpdatesRefreshResponse,
-    DependencyUpdatesRepositoryCatalogRequest, DependencyUpdatesRepositoryCatalogResponse,
-    DependencyUpdatesRerunChecksRequest,
+    DependencyUpdatesCacheClearResponse, DependencyUpdatesCommentRequest,
+    DependencyUpdatesGitHubClient, DependencyUpdatesLabelRequest, DependencyUpdatesMergeRequest,
+    DependencyUpdatesQueryRequest, DependencyUpdatesQueryResponse, DependencyUpdatesRefreshRequest,
+    DependencyUpdatesRefreshResponse, DependencyUpdatesRepositoryCatalogRequest,
+    DependencyUpdatesRepositoryCatalogResponse, DependencyUpdatesRerunChecksRequest,
 };
 use crate::errors::{CliError, CliErrorKind};
 use crate::task_board::ExternalProvider;
@@ -133,6 +133,32 @@ pub async fn approve_dependency_updates(
         );
     }
     Ok(action_response("Approved dependency updates", results))
+}
+
+/// Post a comment on each selected dependency update pull request. Used to
+/// nudge bots like Renovate (`@renovatebot rebase`) and Dependabot
+/// (`@dependabot recreate`) to recreate their PR head.
+///
+/// # Errors
+/// Returns `CliError` when the request is invalid, a required token is missing,
+/// or GitHub rejects the comment write.
+pub async fn comment_on_dependency_updates(
+    request: &DependencyUpdatesCommentRequest,
+) -> Result<DependencyUpdatesActionResponse, CliError> {
+    request.validate()?;
+    let mut results = Vec::new();
+    for segment in token_bound_targets(&request.targets)? {
+        let client = DependencyUpdatesGitHubClient::new(&segment.token)?;
+        results.extend(
+            client
+                .comment(&DependencyUpdatesCommentRequest {
+                    targets: segment.targets,
+                    body: request.body.clone(),
+                })
+                .await?,
+        );
+    }
+    Ok(action_response("Posted dependency update comment", results))
 }
 
 /// Merge selected dependency update pull requests.

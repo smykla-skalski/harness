@@ -404,6 +404,12 @@ fn dependency_update_routes_have_complete_ws_parity() {
                 ws_methods::DEPENDENCY_UPDATES_BODY_UPDATE,
                 true,
             ),
+            (
+                HttpRouteMethod::Post,
+                http_paths::DEPENDENCY_UPDATES_COMMENT,
+                ws_methods::DEPENDENCY_UPDATES_COMMENT,
+                true,
+            ),
         ]
     );
 }

@@ -85,6 +85,7 @@ pub const DEPENDENCY_UPDATES_CACHE: &str = "/v1/dependency-updates/cache";
 pub const DEPENDENCY_UPDATES_REFRESH: &str = "/v1/dependency-updates/refresh";
 pub const DEPENDENCY_UPDATES_BODY: &str = "/v1/dependency-updates/body";
 pub const DEPENDENCY_UPDATES_BODY_UPDATE: &str = "/v1/dependency-updates/body/update";
+pub const DEPENDENCY_UPDATES_COMMENT: &str = "/v1/dependency-updates/comment";
 pub const SESSION_AGENT_ROLE: &str = "/v1/sessions/{session_id}/agents/{session_agent_id}/role";
 pub const SESSION_AGENT_REMOVE: &str = "/v1/sessions/{session_id}/agents/{session_agent_id}/remove";
 pub const SESSION_LEADER_TRANSFER: &str = "/v1/sessions/{session_id}/leader";

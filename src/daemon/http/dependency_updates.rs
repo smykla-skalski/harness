@@ -8,9 +8,10 @@ use axum::{Json, Router};
 
 use crate::daemon::protocol::{
     DependencyUpdatesApproveRequest, DependencyUpdatesAutoRequest, DependencyUpdatesBodyRequest,
-    DependencyUpdatesBodyUpdateRequest, DependencyUpdatesLabelRequest, DependencyUpdatesMergeRequest,
-    DependencyUpdatesQueryRequest, DependencyUpdatesRefreshRequest,
-    DependencyUpdatesRepositoryCatalogRequest, DependencyUpdatesRerunChecksRequest, http_paths,
+    DependencyUpdatesBodyUpdateRequest, DependencyUpdatesCommentRequest,
+    DependencyUpdatesLabelRequest, DependencyUpdatesMergeRequest, DependencyUpdatesQueryRequest,
+    DependencyUpdatesRefreshRequest, DependencyUpdatesRepositoryCatalogRequest,
+    DependencyUpdatesRerunChecksRequest, http_paths,
 };
 use crate::daemon::service;
 
@@ -74,6 +75,10 @@ pub(super) fn dependency_updates_routes() -> Router<DaemonHttpState> {
         .route(
             http_paths::DEPENDENCY_UPDATES_BODY_UPDATE,
             post(post_dependency_update_body_update),
+        )
+        .route(
+            http_paths::DEPENDENCY_UPDATES_COMMENT,
+            post(post_comment_dependency_updates),
         )
 }
 
@@ -245,6 +250,22 @@ async fn post_dependency_update_body_update(
     timed_json(
         "POST",
         http_paths::DEPENDENCY_UPDATES_BODY_UPDATE,
+        &request_id,
+        start,
+        result,
+    )
+}
+
+async fn post_comment_dependency_updates(
+    headers: HeaderMap,
+    State(state): State<DaemonHttpState>,
+    Json(request): Json<DependencyUpdatesCommentRequest>,
+) -> Response {
+    let (start, request_id) = authenticated_request!(headers, state);
+    let result = service::comment_on_dependency_updates(&request).await;
+    timed_json(
+        "POST",
+        http_paths::DEPENDENCY_UPDATES_COMMENT,
         &request_id,
         start,
         result,

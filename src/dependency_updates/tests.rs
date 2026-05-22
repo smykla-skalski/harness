@@ -109,6 +109,57 @@ fn auto_mode_rules_match_helper_contract() {
 }
 
 #[test]
+fn comment_request_rejects_empty_body() {
+    let request = DependencyUpdatesCommentRequest {
+        targets: vec![DependencyUpdateTarget {
+            pull_request_id: "pr_1".into(),
+            repository_id: "repo_1".into(),
+            repository: "acme/api".into(),
+            number: 1,
+            url: "https://example.com".into(),
+            head_sha: "abc".into(),
+            mergeable: DependencyUpdateMergeableState::Mergeable,
+            review_status: DependencyUpdateReviewStatus::None,
+            check_status: DependencyUpdateCheckStatus::None,
+            policy_blocked: false,
+            check_suite_ids: Vec::new(),
+        }],
+        body: "   ".into(),
+    };
+    assert!(request.validate().is_err());
+}
+
+#[test]
+fn comment_request_rejects_empty_targets() {
+    let request = DependencyUpdatesCommentRequest {
+        targets: Vec::new(),
+        body: "@renovatebot rebase".into(),
+    };
+    assert!(request.validate().is_err());
+}
+
+#[test]
+fn comment_request_accepts_well_formed_payload() {
+    let request = DependencyUpdatesCommentRequest {
+        targets: vec![DependencyUpdateTarget {
+            pull_request_id: "pr_1".into(),
+            repository_id: "repo_1".into(),
+            repository: "acme/api".into(),
+            number: 1,
+            url: "https://example.com".into(),
+            head_sha: "abc".into(),
+            mergeable: DependencyUpdateMergeableState::Mergeable,
+            review_status: DependencyUpdateReviewStatus::None,
+            check_status: DependencyUpdateCheckStatus::None,
+            policy_blocked: false,
+            check_suite_ids: Vec::new(),
+        }],
+        body: "@renovatebot rebase".into(),
+    };
+    assert!(request.validate().is_ok());
+}
+
+#[test]
 fn auto_mergeable_accepts_unreviewed_open_prs() {
     let unreviewed = sample_item(
         DependencyUpdateReviewStatus::None,

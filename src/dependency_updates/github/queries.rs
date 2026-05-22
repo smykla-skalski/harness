@@ -280,3 +280,15 @@ mutation UpdateDependencyUpdatePullRequestBody($id: ID!, $body: String!) {
   }
 }
 ";
+
+pub(super) const ADD_COMMENT_MUTATION: &str = r"
+mutation AddDependencyUpdateComment($id: ID!, $body: String!) {
+  addComment(input: { subjectId: $id, body: $body }) {
+    commentEdge {
+      node {
+        id
+      }
+    }
+  }
+}
+";
