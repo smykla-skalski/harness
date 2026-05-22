@@ -226,15 +226,21 @@ impl CheckSummary {
                 name,
                 status,
                 conclusion,
+                url,
                 check_suite,
             } => self.push_check_run(
                 name,
                 status.as_deref(),
                 conclusion.as_deref(),
                 check_suite.and_then(|suite| suite.id),
+                url,
             ),
-            StatusContextNode::StatusContext { context, state } => {
-                self.push_status_context(context, state.as_deref());
+            StatusContextNode::StatusContext {
+                context,
+                state,
+                target_url,
+            } => {
+                self.push_status_context(context, state.as_deref(), target_url);
             }
         }
     }
@@ -245,6 +251,7 @@ impl CheckSummary {
         status: Option<&str>,
         conclusion: Option<&str>,
         check_suite_id: Option<String>,
+        details_url: Option<String>,
     ) {
         self.total += 1;
         let status = map_check_run_status(status);
@@ -259,10 +266,16 @@ impl CheckSummary {
             status,
             conclusion,
             check_suite_id,
+            details_url,
         });
     }
 
-    fn push_status_context(&mut self, context: String, state: Option<&str>) {
+    fn push_status_context(
+        &mut self,
+        context: String,
+        state: Option<&str>,
+        details_url: Option<String>,
+    ) {
         if context == "renovate/stability-days" && !matches!(state, Some("SUCCESS")) {
             self.policy_blocked = true;
             return;
@@ -277,6 +290,7 @@ impl CheckSummary {
             status: DependencyUpdateCheckRunStatus::Completed,
             conclusion,
             check_suite_id: None,
+            details_url,
         });
     }
 

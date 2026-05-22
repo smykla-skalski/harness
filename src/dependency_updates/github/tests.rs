@@ -1,4 +1,5 @@
 use super::*;
+use super::types::{CheckSuiteNode, StatusContextNode};
 use super::types::PageInfo;
 use super::types::RepositoryLabelNode;
 use crate::dependency_updates::DependencyUpdateRepositoryLabel;
@@ -109,6 +110,41 @@ fn append_repository_labels_preserves_color_into_response_struct() {
 }
 
 #[test]
+fn append_check_contexts_preserves_check_details_urls() {
+    let check_run_url = "https://github.com/acme/api/actions/runs/1/job/2";
+    let status_context_url = "https://ci.example.com/acme/api/build/1";
+    let mut item = sample_dependency_update_item();
+
+    super::mapping::append_check_contexts(
+        &mut item,
+        vec![
+            StatusContextNode::CheckRun {
+                name: "Analyze (go)".into(),
+                status: Some("COMPLETED".into()),
+                conclusion: Some("SUCCESS".into()),
+                url: Some(check_run_url.into()),
+                check_suite: Some(CheckSuiteNode {
+                    id: Some("suite-1".into()),
+                }),
+            },
+            StatusContextNode::StatusContext {
+                context: "legacy/ci".into(),
+                state: Some("SUCCESS".into()),
+                target_url: Some(status_context_url.into()),
+            },
+        ],
+    );
+
+    assert_eq!(item.checks.len(), 2);
+    assert_eq!(item.checks[0].details_url.as_deref(), Some(check_run_url));
+    assert_eq!(
+        item.checks[1].details_url.as_deref(),
+        Some(status_context_url)
+    );
+    assert_eq!(item.check_status, DependencyUpdateCheckStatus::Success);
+}
+
+#[test]
 fn page_limit_requires_cursor_for_continuation() {
     let page_info = PageInfo {
         has_next_page: true,
@@ -119,4 +155,30 @@ fn page_limit_requires_cursor_for_continuation() {
         next_cursor_or_scope_limit(&page_info, 1, SEARCH_PAGE_CAP, "scope").expect_err("cursor");
 
     assert!(error.message().contains("without a cursor"));
+}
+
+fn sample_dependency_update_item() -> DependencyUpdateItem {
+    DependencyUpdateItem {
+        pull_request_id: "pr-1".into(),
+        repository_id: "repo-1".into(),
+        repository: "acme/api".into(),
+        number: 1,
+        title: "Update dependencies".into(),
+        url: "https://github.com/acme/api/pull/1".into(),
+        author_login: "renovate[bot]".into(),
+        state: DependencyUpdatePullRequestState::Open,
+        mergeable: DependencyUpdateMergeableState::Mergeable,
+        review_status: DependencyUpdateReviewStatus::None,
+        check_status: DependencyUpdateCheckStatus::None,
+        policy_blocked: false,
+        is_draft: false,
+        head_sha: "abc123".into(),
+        labels: Vec::new(),
+        checks: Vec::new(),
+        reviews: Vec::new(),
+        additions: 1,
+        deletions: 0,
+        created_at: parse_timestamp("2026-01-01T00:00:00Z").expect("created timestamp"),
+        updated_at: parse_timestamp("2026-01-01T00:01:00Z").expect("updated timestamp"),
+    }
 }
