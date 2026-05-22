@@ -146,6 +146,12 @@ fn mixed_page_maps_all_supported_kinds() {
     assert!(!c.viewer_did_author);
 }
 
+// Real captured production response from kumahq/kuma#16275's
+// PullRequestReview `PRR_kwDOCnTGG872zzzB` ("docs(MADR): added policy
+// matching", reviewer @slonka, 11 inline comments). Captured via
+// `gh api graphql` with `inlineCommentPageSize: 5` so the first page
+// returns 5 + `hasNextPage: true` — forces the drain contract to
+// kick in against real GitHub wire format.
 #[test]
 fn paginated_review_first_page_inline_comments() {
     let node = parse(REVIEW_PAGED);
@@ -153,15 +159,27 @@ fn paginated_review_first_page_inline_comments() {
     let DependencyUpdateTimelineEntry::Review(r) = entry else {
         panic!("expected Review");
     };
-    assert_eq!(r.state, ReviewState::ChangesRequested);
-    assert_eq!(r.inline_comments.len(), 2);
-    assert_eq!(r.inline_comments[0].body, "Inline comment 1");
-    assert!(r.inline_comments[0].reply_to_id.is_none());
+    // Real reviews come back as COMMENTED most often (general feedback
+    // pass), not CHANGES_REQUESTED — that's what the hand-built
+    // fixture got wrong. Asserting on the real state catches future
+    // mappings that conflate the two.
+    assert_eq!(r.state, ReviewState::Commented);
+    assert_eq!(r.inline_comments.len(), 5, "first page has 5/11 inline comments");
     assert_eq!(
-        r.inline_comments[1].reply_to_id.as_deref(),
-        Some("PRRC_001"),
+        r.inline_comments[0].body,
+        "MADR-062 also deferred `MeshFaultInjection` - do we want to covert it here? \
+         Should we explicitly mention that it's out of scope? There is also mentions of MFI below."
     );
+    assert!(r.inline_comments[0].reply_to_id.is_none(),
+        "top-level review comments have null replyTo in real responses");
+    // Service-layer drain marks this true once it confirms the
+    // continuation succeeded; the parser-layer fixture-only test
+    // sees `comments_truncated: false` because mapping never sets it.
     assert!(!r.comments_truncated);
+    assert_eq!(
+        r.actor.as_ref().map(|a| a.login.as_str()),
+        Some("slonka"),
+    );
 }
 
 #[test]
