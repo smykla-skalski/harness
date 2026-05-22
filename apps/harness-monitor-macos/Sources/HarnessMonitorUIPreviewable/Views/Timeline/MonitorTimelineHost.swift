@@ -1,13 +1,9 @@
 import Foundation
 
 public struct MonitorTimelineHost: Hashable, Sendable {
-  // Single-variant enum reserved for future host kinds (e.g. codex run
-  // panes, swarm dashboards). Today only `.session` exists; the agent
-  // case was deleted when the agent pane stopped reusing the cockpit
-  // pipeline. Delete this type entirely if it still has one variant the
-  // next time it gets touched without a new consumer landing.
   public enum Kind: String, Hashable, Sendable {
     case session
+    case dependencyPullRequest
   }
 
   public let kind: Kind
@@ -20,6 +16,10 @@ public struct MonitorTimelineHost: Hashable, Sendable {
 
   public static func session(_ sessionID: String) -> Self {
     Self(kind: .session, id: sessionID)
+  }
+
+  public static func dependencyPullRequest(_ pullRequestID: String) -> Self {
+    Self(kind: .dependencyPullRequest, id: pullRequestID)
   }
 
   public var storageKey: String {
