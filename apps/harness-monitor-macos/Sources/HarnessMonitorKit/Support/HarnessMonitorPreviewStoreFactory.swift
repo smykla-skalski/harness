@@ -88,7 +88,8 @@ public enum HarnessMonitorPreviewStoreFactory {
       ),
       voiceCapture: voiceCapture,
       modelContainer: modelContainer,
-      persistenceError: persistenceError
+      persistenceError: persistenceError,
+      taskBoardSettingsWorker: TaskBoardSettingsWorker()
     )
     store.connectionState = configuration.connectionState
     store.health = configuration.fixtures.health

@@ -180,7 +180,8 @@ public enum AgentTuiPreviewSupport {
         hostBridgeOverride: hostBridgeOverride
       ),
       voiceCapture: PreviewVoiceCaptureService(),
-      modelContainer: HarnessMonitorPreviewStoreFactory.previewContainer
+      modelContainer: HarnessMonitorPreviewStoreFactory.previewContainer,
+      taskBoardSettingsWorker: TaskBoardSettingsWorker()
     )
 
     store.connectionState = .online
