@@ -8,11 +8,11 @@ import Foundation
 /// the resolver calls the daemon's catalog endpoint once per org and caches
 /// the result for the lifetime of the resolver (use `invalidate()` to drop
 /// the cache, e.g. when the user changes orgs).
-public actor DashboardDependenciesRepoResolver {
-  private let client: any HarnessMonitorDependenciesClientProtocol
+public actor DashboardReviewsRepoResolver {
+  private let client: any HarnessMonitorReviewsClientProtocol
   private var cachedOrgRepositories: [String: [String]] = [:]
 
-  public init(client: any HarnessMonitorDependenciesClientProtocol) {
+  public init(client: any HarnessMonitorReviewsClientProtocol) {
     self.client = client
   }
 
@@ -60,8 +60,8 @@ public actor DashboardDependenciesRepoResolver {
     if let cached = cachedOrgRepositories[organization] {
       return cached
     }
-    let response = try await client.catalogDependencyUpdateRepositories(
-      request: DependencyUpdatesRepositoryCatalogRequest(organization: organization)
+    let response = try await client.catalogReviewRepositories(
+      request: ReviewsRepositoryCatalogRequest(organization: organization)
     )
     cachedOrgRepositories[organization] = response.repositories
     return response.repositories
