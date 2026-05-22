@@ -195,7 +195,7 @@ struct DashboardDependenciesRouteView: View {
     routePendingActionConfirmation?.title ?? ""
   }
 
-  var routePendingActionConfirmationIsPresented: Binding<Bool> {
+  var routePendingActionPresented: Binding<Bool> {
     Binding(
       get: { routePendingActionConfirmation != nil },
       set: { isPresented in
@@ -288,58 +288,58 @@ struct DashboardDependenciesRouteView: View {
     }
 
     splitView
-    .sheet(isPresented: $isLabelSheetPresented) {
-      labelSheet
-    }
-    .confirmationDialog(
-      routePendingBatchConfirmation?.title ?? "Confirm dependency action",
-      isPresented: routePendingBatchConfirmationIsPresented,
-      titleVisibility: .visible,
-      actions: { batchConfirmationActions },
-      message: { batchConfirmationMessage }
-    )
-    .confirmationDialog(
-      routePendingActionConfirmationTitle,
-      isPresented: routePendingActionConfirmationIsPresented,
-      titleVisibility: .visible,
-      presenting: routePendingActionConfirmation
-    ) { confirmation in
-      Button(confirmation.confirmButtonTitle, role: confirmation.confirmRole) {
-        routePendingActionConfirmation = nil
-        confirmDependencyAction(confirmation)
+      .sheet(isPresented: $isLabelSheetPresented) {
+        labelSheet
       }
-      Button("Cancel", role: .cancel) {
-        routePendingActionConfirmation = nil
+      .confirmationDialog(
+        routePendingBatchConfirmation?.title ?? "Confirm dependency action",
+        isPresented: routePendingBatchConfirmationIsPresented,
+        titleVisibility: .visible,
+        actions: { batchConfirmationActions },
+        message: { batchConfirmationMessage }
+      )
+      .confirmationDialog(
+        routePendingActionConfirmationTitle,
+        isPresented: routePendingActionPresented,
+        titleVisibility: .visible,
+        presenting: routePendingActionConfirmation
+      ) { confirmation in
+        Button(confirmation.confirmButtonTitle, role: confirmation.confirmRole) {
+          routePendingActionConfirmation = nil
+          confirmDependencyAction(confirmation)
+        }
+        Button("Cancel", role: .cancel) {
+          routePendingActionConfirmation = nil
+        }
+      } message: { confirmation in
+        Text(confirmation.message)
       }
-    } message: { confirmation in
-      Text(confirmation.message)
-    }
-    .onChange(of: selectedIDs) { oldValue, newValue in
-      persistedPrimarySelectionID = newValue.min() ?? persistedPrimarySelectionID
-      prefetchSelectedBodies(adding: newValue.subtracting(oldValue))
-    }
-    .onChange(of: storedPreferences, initial: true) { _, newValue in
-      syncPreferencesFromStorage(newValue)
-    }
-    .onChange(of: collapsedRepositoriesStorage, initial: true) { _, newValue in
-      syncCollapsedRepositoriesFromStorage(newValue)
-    }
-    .onChange(of: response.repositoryLabels, initial: true) { _, _ in
-      refreshLabelMenuData()
-    }
-    .onChange(of: normalizedPreferences.frequentLabelsCount) { _, _ in
-      refreshLabelMenuData()
-    }
-    .onChange(of: selectedRoute) { _, newValue in
-      if newValue != .dependencies { cancelAllInFlightTasks() }
-    }
-    .dashboardDependenciesOnSystemWake(perform: handleSystemWake)
-    .dashboardDependenciesToolbarSearch(
-      query: $searchText,
-      items: response.items,
-      automationCommand: searchAutomationCommand
-    ) { pullRequestID in
-      selectedIDs = [pullRequestID]
-    }
+      .onChange(of: selectedIDs) { oldValue, newValue in
+        persistedPrimarySelectionID = newValue.min() ?? persistedPrimarySelectionID
+        prefetchSelectedBodies(adding: newValue.subtracting(oldValue))
+      }
+      .onChange(of: storedPreferences, initial: true) { _, newValue in
+        syncPreferencesFromStorage(newValue)
+      }
+      .onChange(of: collapsedRepositoriesStorage, initial: true) { _, newValue in
+        syncCollapsedRepositoriesFromStorage(newValue)
+      }
+      .onChange(of: response.repositoryLabels, initial: true) { _, _ in
+        refreshLabelMenuData()
+      }
+      .onChange(of: normalizedPreferences.frequentLabelsCount) { _, _ in
+        refreshLabelMenuData()
+      }
+      .onChange(of: selectedRoute) { _, newValue in
+        if newValue != .dependencies { cancelAllInFlightTasks() }
+      }
+      .dashboardDependenciesOnSystemWake(perform: handleSystemWake)
+      .dashboardDependenciesToolbarSearch(
+        query: $searchText,
+        items: response.items,
+        automationCommand: searchAutomationCommand
+      ) { pullRequestID in
+        selectedIDs = [pullRequestID]
+      }
   }
 }
