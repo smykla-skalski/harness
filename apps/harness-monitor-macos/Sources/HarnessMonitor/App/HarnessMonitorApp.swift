@@ -60,6 +60,12 @@ struct HarnessMonitorApp: App {
   init() {
     HarnessMonitorPerfLaunchMetricsRecorder.bootstrap()
 
+    // Rename `dashboard.dependencies.*` / `dependencies.*` / `settingsDependencies*`
+    // keys to their `dashboard.reviews.*` / `reviews.*` / `settingsReviews*`
+    // equivalents before any other code reads or registers defaults. The
+    // helper is idempotent via a completion flag, so subsequent launches no-op.
+    HarnessMonitorReviewsUserDefaultsMigration.runIfNeeded()
+
     UserDefaults.standard.register(defaults: [
       "NSUseAnimatedFocusRing": false,
       SessionWindowKeyboardShortcutOverlaySettings.storageKey:
