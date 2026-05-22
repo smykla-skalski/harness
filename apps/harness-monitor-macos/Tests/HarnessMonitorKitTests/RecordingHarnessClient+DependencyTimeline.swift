@@ -42,22 +42,31 @@ extension RecordingHarnessClient {
     }
   }
 
+  func dependencyTimelineRequestedPageSizes(for pullRequestID: String) -> [UInt32] {
+    lock.withLock {
+      dependencyTimelineFetchedRequests
+        .filter { $0.pullRequestId == pullRequestID }
+        .map(\.pageSize)
+    }
+  }
+
   func fetchDependencyUpdateTimeline(
     request: DependencyUpdatesTimelineRequest
   ) async throws -> DependencyUpdatesTimelineResponse {
-    let (hook, queued, error): (
-      (@Sendable (String) async -> Void)?,
-      DependencyUpdatesTimelineResponse?,
-      (any Error)?
-    ) = lock.withLock {
-      dependencyTimelineFetchedRequests.append(request)
-      let hook = dependencyTimelineFetchHook
-      let error = dependencyTimelineErrors[request.pullRequestId]
-      var queue = dependencyTimelineResponses[request.pullRequestId] ?? []
-      let next = queue.isEmpty ? nil : queue.removeFirst()
-      dependencyTimelineResponses[request.pullRequestId] = queue
-      return (hook, next, error)
-    }
+    let (hook, queued, error):
+      (
+        (@Sendable (String) async -> Void)?,
+        DependencyUpdatesTimelineResponse?,
+        (any Error)?
+      ) = lock.withLock {
+        dependencyTimelineFetchedRequests.append(request)
+        let hook = dependencyTimelineFetchHook
+        let error = dependencyTimelineErrors[request.pullRequestId]
+        var queue = dependencyTimelineResponses[request.pullRequestId] ?? []
+        let next = queue.isEmpty ? nil : queue.removeFirst()
+        dependencyTimelineResponses[request.pullRequestId] = queue
+        return (hook, next, error)
+      }
     if let hook {
       await hook(request.pullRequestId)
     }

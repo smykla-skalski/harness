@@ -44,7 +44,11 @@ extension HarnessMonitorStore {
       )
     )
     let viewModel = dependencyUpdateTimelineViewModel(for: item.pullRequestID)
+    let interval = DependencyTimelinePerf.beginOptimisticInsert(
+      pullRequestID: item.pullRequestID
+    )
     viewModel.appendOptimistic(optimisticEntry)
+    DependencyTimelinePerf.end(interval)
 
     do {
       let response = try await client.commentDependencyUpdates(

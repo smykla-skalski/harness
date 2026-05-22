@@ -76,9 +76,10 @@ final class HarnessMonitorStoreDependencyTimelineTests: XCTestCase {
     )
     let store = try makeStore(client: client)
 
-    await store.prepareDependencyUpdateTimeline(for: makeItem())
+    await store.prepareDependencyUpdateTimeline(for: makeItem(), pageSize: 30)
 
     XCTAssertEqual(client.dependencyTimelineFetchCount(), 1)
+    XCTAssertEqual(client.dependencyTimelineRequestedPageSizes(for: "PR_t1"), [30])
     let vm = store.dependencyUpdateTimelineViewModel(for: "PR_t1")
     XCTAssertEqual(vm.entries.map(\.id), ["IC_1"])
     XCTAssertTrue(vm.hasOlder)
@@ -163,11 +164,12 @@ final class HarnessMonitorStoreDependencyTimelineTests: XCTestCase {
     )
     let store = try makeStore(client: client)
     await store.prepareDependencyUpdateTimeline(for: makeItem())
-    await store.loadOlderDependencyUpdateTimeline(for: makeItem())
+    await store.loadOlderDependencyUpdateTimeline(for: makeItem(), pageSize: 20)
 
     XCTAssertEqual(client.dependencyTimelineFetchCount(), 2)
     let cursors = client.dependencyTimelineRequestedCursors(for: "PR_t1")
     XCTAssertEqual(cursors, [nil, "s1"])
+    XCTAssertEqual(client.dependencyTimelineRequestedPageSizes(for: "PR_t1"), [50, 20])
     let vm = store.dependencyUpdateTimelineViewModel(for: "PR_t1")
     XCTAssertEqual(vm.entries.map(\.id), ["IC_1", "IC_2"])
     XCTAssertFalse(vm.hasOlder)

@@ -26,7 +26,8 @@ extension HarnessMonitorStore {
   /// via `pendingDependencyUpdateTimelineFetches`.
   public func prepareDependencyUpdateTimeline(
     for item: DependencyUpdateItem,
-    forceRefresh: Bool = false
+    forceRefresh: Bool = false,
+    pageSize: UInt32 = 50
   ) async {
     let id = item.pullRequestID
     let viewModel = dependencyUpdateTimelineViewModel(for: id)
@@ -48,11 +49,16 @@ extension HarnessMonitorStore {
     }
 
     do {
+      let interval = DependencyTimelinePerf.beginDaemonFetch(
+        pullRequestID: id,
+        direction: forceRefresh ? "refresh" : "initial"
+      )
+      defer { DependencyTimelinePerf.end(interval) }
       let response = try await client.fetchDependencyUpdateTimeline(
         request: DependencyUpdatesTimelineRequest(
           pullRequestId: id,
           cursor: nil,
-          pageSize: 50,
+          pageSize: Self.normalizedDependencyTimelinePageSize(pageSize),
           direction: .older,
           forceRefresh: forceRefresh
         )
@@ -80,7 +86,10 @@ extension HarnessMonitorStore {
   /// Loads the next older page using the view model's current
   /// `startCursor`. No-op when no older page exists, a load is
   /// already in flight, or the cursor is missing.
-  public func loadOlderDependencyUpdateTimeline(for item: DependencyUpdateItem) async {
+  public func loadOlderDependencyUpdateTimeline(
+    for item: DependencyUpdateItem,
+    pageSize: UInt32 = 50
+  ) async {
     let id = item.pullRequestID
     let viewModel = dependencyUpdateTimelineViewModel(for: id)
     guard viewModel.hasOlder, viewModel.loadState == .idle,
@@ -103,11 +112,16 @@ extension HarnessMonitorStore {
     }
 
     do {
+      let interval = DependencyTimelinePerf.beginDaemonFetch(
+        pullRequestID: id,
+        direction: "older"
+      )
+      defer { DependencyTimelinePerf.end(interval) }
       let response = try await client.fetchDependencyUpdateTimeline(
         request: DependencyUpdatesTimelineRequest(
           pullRequestId: id,
           cursor: cursor,
-          pageSize: 50,
+          pageSize: Self.normalizedDependencyTimelinePageSize(pageSize),
           direction: .older
         )
       )
@@ -115,5 +129,9 @@ extension HarnessMonitorStore {
     } catch {
       viewModel.markFailed(reason: error.localizedDescription)
     }
+  }
+
+  private static func normalizedDependencyTimelinePageSize(_ pageSize: UInt32) -> UInt32 {
+    min(max(pageSize, 10), 100)
   }
 }

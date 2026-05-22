@@ -12,12 +12,13 @@ import HarnessMonitorKit
 /// indented sibling rows beneath their parent review card; the
 /// renderer applies `indentLevel * 16pt` leading padding.
 struct DependencyPullRequestTimelineNodeBuilder: Sendable {
-  init() {}
+  private static let heavyReviewThreadCommentThreshold = 6
 
   func buildNodes(
     for entries: [DependencyUpdateTimelineEntry],
     pullRequestID _: String,
     hiddenKinds: Set<DependencyUpdateTimelineKind> = [],
+    autoCollapseHeavyReviewThreads: Bool = false,
     configuration _: HarnessMonitorDateTimeConfiguration
   ) -> [SessionTimelineNode] {
     var output: [SessionTimelineNode] = []
@@ -30,7 +31,12 @@ struct DependencyPullRequestTimelineNodeBuilder: Sendable {
       case .review(let payload):
         output.append(contentsOf: reviewNodes(payload))
       case .reviewThread(let payload):
-        output.append(contentsOf: reviewThreadNodes(payload))
+        output.append(
+          contentsOf: reviewThreadNodes(
+            payload,
+            autoCollapseHeavyReviewThreads: autoCollapseHeavyReviewThreads
+          )
+        )
       case .commit(let payload):
         output.append(commitNode(payload))
       case .headRefForcePushed(let payload):
@@ -119,9 +125,15 @@ struct DependencyPullRequestTimelineNodeBuilder: Sendable {
 
   // MARK: - Review thread (parent + comment children)
 
-  private func reviewThreadNodes(_ payload: ReviewThreadPayload) -> [SessionTimelineNode] {
+  private func reviewThreadNodes(
+    _ payload: ReviewThreadPayload,
+    autoCollapseHeavyReviewThreads: Bool
+  ) -> [SessionTimelineNode] {
     var nodes: [SessionTimelineNode] = []
     let lineLabel = payload.line.map { "line \($0)" } ?? "(line unknown)"
+    let isHeavyThread =
+      autoCollapseHeavyReviewThreads
+      && payload.comments.count > Self.heavyReviewThreadCommentThreshold
     var parent = makeBaseNode(
       identityID: payload.id,
       timestamp: Self.parse(payload.createdAt),
@@ -136,8 +148,11 @@ struct DependencyPullRequestTimelineNodeBuilder: Sendable {
     parent.statusBadgeLabel = payload.isResolved ? "Resolved" : nil
     if payload.commentsTruncated {
       parent.statusBadgeLabel = "Truncated"
+    } else if isHeavyThread {
+      parent.statusBadgeLabel = "\(payload.comments.count) comments"
     }
     nodes.append(parent)
+    if isHeavyThread { return nodes }
     for comment in payload.comments {
       var child = makeBaseNode(
         identityID: "\(payload.id):\(comment.id)",
