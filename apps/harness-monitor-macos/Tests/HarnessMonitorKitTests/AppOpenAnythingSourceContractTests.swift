@@ -60,14 +60,18 @@ struct AppOpenAnythingSourceContractTests {
     let corpusSource = try harnessKitSourceFile(
       named: "OpenAnything/OpenAnythingCorpusBuilder.swift"
     )
+    let metadataSource = try harnessKitSourceFile(
+      named: "OpenAnything/OpenAnythingActionMetadata.swift"
+    )
 
     #expect(modelSource.contains("public private(set) var suggestedResults"))
     #expect(modelSource.contains("suggestedResults = await index.suggestedResults()"))
     #expect(modelSource.contains("? suggestedResults"))
     #expect(paletteSource.contains("model.suggestedResults"))
-    #expect(corpusSource.contains("private static let suggestedActions"))
-    #expect(corpusSource.contains(".openDiagnostics"))
-    #expect(corpusSource.contains(".openDependencies"))
+    #expect(corpusSource.contains("isSuggested: suggestedActions.contains(action)"))
+    #expect(metadataSource.contains("static let suggestedActions"))
+    #expect(metadataSource.contains(".openDiagnostics"))
+    #expect(metadataSource.contains(".openDependencies"))
   }
 
   @Test("Command palette routes diagnostics and settings actions")
@@ -75,18 +79,20 @@ struct AppOpenAnythingSourceContractTests {
     let executorSource = try harnessSourceFile(named: "App/OpenAnythingRouteExecutor.swift")
     let hostSource = try harnessSourceFile(named: "App/HarnessMonitorApp+OpenAnything.swift")
 
-    #expect(executorSource.contains("case .openDiagnostics:"))
-    #expect(executorSource.contains("return [.openDashboard(.diagnostics)]"))
-    #expect(executorSource.contains("case .refreshDiagnostics:"))
-    #expect(executorSource.contains("return [.openDashboard(.diagnostics), .refreshDiagnostics]"))
-    #expect(executorSource.contains("case .reconnectDaemon:"))
-    #expect(executorSource.contains("return [.reconnectDaemon]"))
-    #expect(executorSource.contains("case .copyDiagnostics:"))
-    #expect(executorSource.contains("return [.copyDiagnostics]"))
-    #expect(executorSource.contains("case .openMCPSettings:"))
-    #expect(executorSource.contains("return [.openSettings(rawValue: \"mcp\")]"))
-    #expect(executorSource.contains("case .openDatabaseSettings:"))
-    #expect(executorSource.contains("return [.openSettings(rawValue: \"database\")]"))
+    #expect(executorSource.contains(".openDiagnostics: [.openDashboard(.diagnostics)]"))
+    #expect(
+      executorSource.contains(
+        ".refreshDiagnostics: [.openDashboard(.diagnostics), .refreshDiagnostics]"
+      )
+    )
+    #expect(executorSource.contains(".reconnectDaemon: [.reconnectDaemon]"))
+    #expect(executorSource.contains(".copyDiagnostics: [.copyDiagnostics]"))
+    #expect(executorSource.contains(".openMCPSettings: [.openSettings(rawValue: \"mcp\")]"))
+    #expect(
+      executorSource.contains(
+        ".openDatabaseSettings: [.openSettings(rawValue: \"database\")]"
+      )
+    )
 
     #expect(hostSource.contains("case .refreshDiagnostics:"))
     #expect(hostSource.contains("Task { await store.refreshDiagnostics() }"))

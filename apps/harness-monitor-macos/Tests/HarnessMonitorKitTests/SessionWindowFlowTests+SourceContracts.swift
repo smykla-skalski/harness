@@ -139,7 +139,7 @@ extension SessionWindowFlowTests {
     #expect(toolbarGlassSource.contains("let titlebarAppearsTransparent: Bool"))
     #expect(
       toolbarGlassSource.contains(
-        "window?.titlebarAppearsTransparent = titlebarAppearsTransparent"
+        "window.titlebarAppearsTransparent = titlebarAppearsTransparent"
       )
     )
     #expect(settingsSource.contains("settingsToolbarSeparatorSuppressed"))

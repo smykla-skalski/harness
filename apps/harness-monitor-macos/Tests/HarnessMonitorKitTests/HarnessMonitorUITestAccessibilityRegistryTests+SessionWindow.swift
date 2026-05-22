@@ -189,6 +189,9 @@ extension HarnessMonitorUITestAccessibilityRegistryTests {
 
   private func expectDependenciesIdentifierUsage() throws {
     let dependenciesView = try sourceFile(named: "DashboardDependenciesRouteView.swift")
+    let contentView = try sourceFile(named: "DashboardDependenciesRouteView+Content.swift")
+    let controlStripView = try sourceFile(named: "DashboardDependenciesControlStrip.swift")
+    let actionBarView = try sourceFile(named: "DashboardDependencyActionBar.swift")
     let provenanceView = try sourceFile(named: "DashboardDependenciesProvenance.swift")
 
     #expect(
@@ -198,10 +201,10 @@ extension HarnessMonitorUITestAccessibilityRegistryTests {
       provenanceView.contains("HarnessMonitorAccessibility.dashboardDependenciesProvenance")
     )
     #expect(
-      dependenciesView.contains("HarnessMonitorAccessibility.dashboardDependenciesList")
+      contentView.contains("HarnessMonitorAccessibility.dashboardDependenciesList")
     )
     #expect(
-      dependenciesView.contains("HarnessMonitorAccessibility.dashboardDependenciesDetail")
+      contentView.contains("HarnessMonitorAccessibility.dashboardDependenciesDetail")
     )
     #expect(
       dependenciesView.contains(
@@ -209,13 +212,15 @@ extension HarnessMonitorUITestAccessibilityRegistryTests {
       )
     )
     #expect(
-      dependenciesView.contains("HarnessMonitorAccessibility.dashboardDependenciesRefreshButton")
+      controlStripView.contains("HarnessMonitorAccessibility.dashboardDependenciesRefreshButton")
     )
     #expect(
-      dependenciesView.contains("HarnessMonitorAccessibility.dashboardDependenciesFixCIButton")
+      actionBarView.contains("HarnessMonitorAccessibility.dashboardDependenciesFixCIButton")
     )
     #expect(
-      dependenciesView.contains("HarnessMonitorAccessibility.dashboardDependenciesSelectionStatus")
+      controlStripView.contains(
+        "HarnessMonitorAccessibility.dashboardDependenciesSelectionStatus"
+      )
     )
     #expect(dependenciesView.contains("SessionContentDetailSplitView("))
   }

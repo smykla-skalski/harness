@@ -168,7 +168,7 @@ extension SessionWindowFlowTests {
     )
 
     #expect(toolbarSource.contains("private var shouldRenderShortcutOverlay"))
-    #expect(toolbarSource.contains("if shouldRenderShortcutOverlay"))
+    #expect(toolbarSource.contains("if let shortcutOverlay, shouldRenderShortcutOverlay"))
     #expect(toolbarSource.contains("shouldRenderShortcutOverlay ? 1 : 0"))
     #expect(sidebarSource.contains("var shouldRenderShortcutOverlays"))
     #expect(sidebarSource.contains("createShortcut.isRevealed(by: currentModifiers)"))
