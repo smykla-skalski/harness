@@ -15,6 +15,7 @@ struct HarnessMonitorDashboardWindowContent: View {
   @Binding var themeMode: HarnessMonitorThemeMode
   @Binding var settingsSelectedSection: SettingsSection
   @Binding var settingsNavigationRequest: SettingsNavigationRequest?
+  let supervisorAuditTimelineDispatcher: SupervisorAuditTimelineFocusDispatcher
   let perfScenario: HarnessMonitorPerfScenario?
   @Binding var hasRunPerfScenario: Bool
   @Binding var perfScenarioStatus: HarnessMonitorPerfScenarioStatus
@@ -46,6 +47,7 @@ struct HarnessMonitorDashboardWindowContent: View {
       themeMode: $themeMode,
       settingsSelectedSection: $settingsSelectedSection,
       settingsNavigationRequest: $settingsNavigationRequest,
+      supervisorAuditTimelineDispatcher: supervisorAuditTimelineDispatcher,
       perfScenario: perfScenario,
       hasRunPerfScenario: $hasRunPerfScenario,
       perfScenarioStatus: $perfScenarioStatus,
