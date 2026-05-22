@@ -134,6 +134,12 @@ struct DashboardWindowRootView: View {
       }
     )
     .modifier(
+      SupervisorAuditTimelineSceneModifier(
+        settingsSelectedSection: $settingsSelectedSection,
+        settingsNavigationRequest: $settingsNavigationRequest
+      )
+    )
+    .modifier(
       HarnessMonitorPerfScenarioModifier(
         delegate: delegate,
         store: store,
