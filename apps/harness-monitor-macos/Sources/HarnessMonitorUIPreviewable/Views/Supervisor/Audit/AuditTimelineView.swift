@@ -7,10 +7,10 @@ import SwiftUI
 /// Mirrors the shape of `SessionTimelineList`: `ScrollView` + `LazyVStack` for
 /// row diffing, a footer "Load older" button for cursor-driven pagination, and
 /// a filtered empty state when the active filters return no events.
-struct AuditTimelineView: View {
+public struct AuditTimelineView: View {
   let repository: SupervisorAuditRepository?
   let filters: SupervisorAuditFilters
-  @Binding var selectedEventID: String?
+  @Binding var selectedEvent: SupervisorEventSnapshot?
 
   @State private var events: [SupervisorEventSnapshot] = []
   @State private var isLoading = false
@@ -20,17 +20,17 @@ struct AuditTimelineView: View {
 
   private static let pageSize = 50
 
-  init(
+  public init(
     repository: SupervisorAuditRepository?,
     filters: SupervisorAuditFilters = .init(),
-    selectedEventID: Binding<String?>
+    selectedEvent: Binding<SupervisorEventSnapshot?>
   ) {
     self.repository = repository
     self.filters = filters
-    self._selectedEventID = selectedEventID
+    self._selectedEvent = selectedEvent
   }
 
-  var body: some View {
+  public var body: some View {
     Group {
       if events.isEmpty && isLoading {
         HarnessMonitorSpinner(size: 14)
@@ -55,13 +55,13 @@ struct AuditTimelineView: View {
         ForEach(events) { event in
           AuditTimelineRow(
             event: event,
-            isSelected: selectedEventID == event.id
+            isSelected: selectedEvent?.id == event.id
           )
           .equatable()
           .id(event.id)
           .contentShape(Rectangle())
           .onTapGesture {
-            selectedEventID = event.id
+            selectedEvent = event
           }
         }
         if hasOlder {
