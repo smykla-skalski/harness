@@ -77,6 +77,21 @@ impl DependencyUpdatesFilesListRequest {
 pub struct DependencyUpdatesFilesListResponse {
     pub pull_request_id: String,
     pub head_ref_oid: String,
+    /// PR's source branch name (e.g. `renovate/foo`). Used by the local-clone
+    /// path so `ensure_clone` fetches the right ref instead of always
+    /// opening `refs/heads/main`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub head_ref_name: Option<String>,
+    /// Merge-base OID for the PR. Required for the local-clone diff path
+    /// to compute `base..head` patches.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub base_ref_oid: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub base_ref_name: Option<String>,
+    /// `owner/name` of the repository the PR lives in. Lets the Monitor
+    /// hand the patch request a clone target without re-querying GraphQL.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub repository_full_name: Option<String>,
     pub viewer_can_mark_viewed: bool,
     pub files: Vec<DependencyUpdateFile>,
     pub fetched_at: String,
@@ -196,6 +211,11 @@ pub struct DependencyUpdatesFilesPatchRequest {
     /// local-clone path; when absent the handler falls back to REST.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub base_ref_oid_expected: Option<String>,
+    /// PR's source branch name (e.g. `renovate/foo`). When present, the
+    /// local-clone runtime fetches that ref directly instead of the
+    /// daemon's default-branch fallback.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub head_ref_name: Option<String>,
 }
 
 impl DependencyUpdatesFilesPatchRequest {

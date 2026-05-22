@@ -314,7 +314,13 @@ query ListDependencyUpdatePullRequestFiles($id: ID!, $after: String) {
   node(id: $id) {
     ... on PullRequest {
       headRefOid
+      headRefName
+      baseRefOid
+      baseRefName
       viewerCanUpdate
+      repository {
+        nameWithOwner
+      }
       files(first: 100, after: $after) {
         pageInfo {
           hasNextPage
