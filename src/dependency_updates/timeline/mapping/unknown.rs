@@ -10,10 +10,7 @@ use super::helpers::{parse_actor, parse_iso8601};
 /// `SimpleActorEvent` table. Preserves the raw JSON in
 /// `UnknownEntry.raw_payload` so the Swift side can render whatever
 /// it can extract while still surfacing a row in the timeline.
-pub(super) fn map_unknown(
-    typename: &str,
-    node: &Value,
-) -> Option<DependencyUpdateTimelineEntry> {
+pub(super) fn map_unknown(typename: &str, node: &Value) -> Option<DependencyUpdateTimelineEntry> {
     let id = node
         .get("id")
         .and_then(Value::as_str)

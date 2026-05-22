@@ -3,9 +3,7 @@
 use chrono::{DateTime, Utc};
 use serde_json::Value;
 
-use super::super::types::{
-    Actor, ReviewInlineCommentEntry, ReviewState, ReviewThreadCommentEntry,
-};
+use super::super::types::{Actor, ReviewInlineCommentEntry, ReviewState, ReviewThreadCommentEntry};
 
 pub(super) fn parse_iso8601(value: Option<&Value>) -> Option<DateTime<Utc>> {
     value
@@ -88,9 +86,7 @@ pub(super) struct InlineCommentsPage {
     pub has_next_page: bool,
 }
 
-pub(super) fn parse_review_inline_comments(
-    comments_field: Option<&Value>,
-) -> InlineCommentsPage {
+pub(super) fn parse_review_inline_comments(comments_field: Option<&Value>) -> InlineCommentsPage {
     let Some(connection) = comments_field.and_then(Value::as_object) else {
         return InlineCommentsPage {
             entries: Vec::new(),
@@ -156,9 +152,7 @@ pub(super) struct ThreadCommentsPage {
     pub has_next_page: bool,
 }
 
-pub(super) fn parse_review_thread_comments(
-    comments_field: Option<&Value>,
-) -> ThreadCommentsPage {
+pub(super) fn parse_review_thread_comments(comments_field: Option<&Value>) -> ThreadCommentsPage {
     let Some(connection) = comments_field.and_then(Value::as_object) else {
         return ThreadCommentsPage {
             entries: Vec::new(),

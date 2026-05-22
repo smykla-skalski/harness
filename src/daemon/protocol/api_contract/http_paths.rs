@@ -92,8 +92,7 @@ pub const DEPENDENCY_UPDATES_FILES_LIST: &str = "/v1/dependency-updates/files/li
 pub const DEPENDENCY_UPDATES_FILES_PATCH: &str = "/v1/dependency-updates/files/patch";
 pub const DEPENDENCY_UPDATES_FILES_VIEWED: &str = "/v1/dependency-updates/files/viewed";
 pub const DEPENDENCY_UPDATES_FILES_BLOB: &str = "/v1/dependency-updates/files/blob";
-pub const DEPENDENCY_UPDATES_FILES_LOCAL_CLONES: &str =
-    "/v1/dependency-updates/files/local-clones";
+pub const DEPENDENCY_UPDATES_FILES_LOCAL_CLONES: &str = "/v1/dependency-updates/files/local-clones";
 pub const DEPENDENCY_UPDATES_FILES_LOCAL_CLONES_DELETE: &str =
     "/v1/dependency-updates/files/local-clones/delete";
 pub const DEPENDENCY_UPDATES_TIMELINE: &str = "/v1/dependency-updates/timeline";

@@ -248,7 +248,10 @@ async fn drain_review_comments<C: TimelineClient>(
         calls += 1;
     }
     let mut reconstructed = review_node.clone();
-    if let Some(obj) = reconstructed.get_mut("comments").and_then(Value::as_object_mut) {
+    if let Some(obj) = reconstructed
+        .get_mut("comments")
+        .and_then(Value::as_object_mut)
+    {
         obj.insert("nodes".into(), Value::Array(comments_array));
         if let Some(pi) = obj.get_mut("pageInfo").and_then(Value::as_object_mut) {
             pi.insert("hasNextPage".into(), Value::Bool(false));
@@ -309,7 +312,10 @@ async fn drain_review_thread_comments<C: TimelineClient>(
         calls += 1;
     }
     let mut reconstructed = thread_node.clone();
-    if let Some(obj) = reconstructed.get_mut("comments").and_then(Value::as_object_mut) {
+    if let Some(obj) = reconstructed
+        .get_mut("comments")
+        .and_then(Value::as_object_mut)
+    {
         obj.insert("nodes".into(), Value::Array(comments_array));
         if let Some(pi) = obj.get_mut("pageInfo").and_then(Value::as_object_mut) {
             pi.insert("hasNextPage".into(), Value::Bool(false));

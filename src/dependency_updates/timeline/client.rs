@@ -4,7 +4,7 @@ use std::time::Duration;
 
 use async_trait::async_trait;
 use octocrab::Octocrab;
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 
 use super::queries::{
     LIST_PR_REVIEW_COMMENTS_QUERY, LIST_PR_REVIEW_THREAD_COMMENTS_QUERY, PR_TIMELINE_PAGE_QUERY,
@@ -23,10 +23,7 @@ impl TimelineGitHubClient {
     pub(crate) fn new(token: &str) -> Result<Self, CliError> {
         let token = token.trim();
         if token.is_empty() {
-            return Err(CliErrorKind::workflow_io(
-                "timeline github client token missing",
-            )
-            .into());
+            return Err(CliErrorKind::workflow_io("timeline github client token missing").into());
         }
         let client = Octocrab::builder()
             .personal_token(token.to_string())

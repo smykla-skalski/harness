@@ -1,11 +1,11 @@
 use std::time::Instant;
 
 use crate::daemon::service::task_board_runtime::external_sync_config_for_repository;
+use crate::dependency_updates::DependencyUpdatesCacheClearResponse;
 use crate::dependency_updates::timeline::{
     self, DependencyUpdatesTimelineRequest, DependencyUpdatesTimelineResponse, TimelineError,
     TimelineGitHubClient,
 };
-use crate::dependency_updates::DependencyUpdatesCacheClearResponse;
 use crate::errors::{CliError, CliErrorKind};
 use crate::task_board::external::ExternalProvider;
 
@@ -38,8 +38,8 @@ pub async fn fetch_dependency_update_timeline(
 /// # Errors
 /// Propagates errors from
 /// [`base_service::clear_dependency_updates_cache`] verbatim.
-pub fn clear_dependency_updates_caches_with_timeline(
-) -> Result<DependencyUpdatesCacheClearResponse, CliError> {
+pub fn clear_dependency_updates_caches_with_timeline()
+-> Result<DependencyUpdatesCacheClearResponse, CliError> {
     let mut response = base_service::clear_dependency_updates_cache()?;
     response.cleared_entries += timeline::drain_timeline_cache();
     Ok(response)

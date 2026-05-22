@@ -99,9 +99,7 @@ struct DeleteLocalClonePayload {
     repo_key_segment: String,
 }
 
-async fn dispatch_dependency_updates_files_local_clones_delete(
-    request: &WsRequest,
-) -> WsResponse {
+async fn dispatch_dependency_updates_files_local_clones_delete(request: &WsRequest) -> WsResponse {
     let Ok(payload) = parse_params::<DeleteLocalClonePayload>(request) else {
         return invalid_params(request);
     };
