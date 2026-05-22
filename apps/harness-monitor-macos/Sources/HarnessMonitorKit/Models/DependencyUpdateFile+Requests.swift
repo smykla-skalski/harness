@@ -129,6 +129,10 @@ public struct DependencyUpdatesFilesPatchRequest: Codable, Equatable, Sendable {
   public let headRefName: String?
   /// PR base branch name. Lets the daemon fetch the base ref before diffing.
   public let baseRefName: String?
+  /// User's `filesLargeDiffStrategy` choice from Settings. Daemon honors
+  /// `.forceGitHubRest` by skipping the local-clone runtime entirely;
+  /// `.autoLocalClone` keeps the default behavior.
+  public let largeDiffStrategy: FilesLargeDiffStrategy?
 
   public init(
     pullRequestID: String,
@@ -138,7 +142,8 @@ public struct DependencyUpdatesFilesPatchRequest: Codable, Equatable, Sendable {
     repositoryFullName: String? = nil,
     baseRefOidExpected: String? = nil,
     headRefName: String? = nil,
-    baseRefName: String? = nil
+    baseRefName: String? = nil,
+    largeDiffStrategy: FilesLargeDiffStrategy? = nil
   ) {
     self.pullRequestID = pullRequestID
     self.headRefOidExpected = headRefOidExpected
@@ -148,6 +153,7 @@ public struct DependencyUpdatesFilesPatchRequest: Codable, Equatable, Sendable {
     self.baseRefOidExpected = baseRefOidExpected
     self.headRefName = headRefName
     self.baseRefName = baseRefName
+    self.largeDiffStrategy = largeDiffStrategy
   }
 
   enum CodingKeys: String, CodingKey {
@@ -159,6 +165,7 @@ public struct DependencyUpdatesFilesPatchRequest: Codable, Equatable, Sendable {
     case baseRefOidExpected
     case headRefName
     case baseRefName
+    case largeDiffStrategy
   }
 
   public init(from decoder: Decoder) throws {
@@ -171,6 +178,8 @@ public struct DependencyUpdatesFilesPatchRequest: Codable, Equatable, Sendable {
     baseRefOidExpected = try container.decodeIfPresent(String.self, forKey: .baseRefOidExpected)
     headRefName = try container.decodeIfPresent(String.self, forKey: .headRefName)
     baseRefName = try container.decodeIfPresent(String.self, forKey: .baseRefName)
+    largeDiffStrategy = try container.decodeIfPresent(
+      FilesLargeDiffStrategy.self, forKey: .largeDiffStrategy)
   }
 }
 
