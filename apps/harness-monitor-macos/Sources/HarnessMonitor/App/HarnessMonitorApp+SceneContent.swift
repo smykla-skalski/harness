@@ -144,7 +144,7 @@ extension HarnessMonitorApp {
       globalHotKeyController: appGlobalHotKeyController,
       globalHotKeyEnabled: globalOpenAnythingHotKeyEnabled,
       globalHotKeyDescriptorStorage: globalOpenAnythingHotKeyDescriptor,
-      presentPalette: presentOpenAnythingPalette,
+      presentPalette: { presentOpenAnythingPalette() },
       refreshStore: refreshStore,
       settingsSelectedSection: settingsSelectedSectionBinding,
       settingsNavigationRequest: settingsNavigationRequestBinding

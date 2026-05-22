@@ -7,12 +7,12 @@ extension HarnessMonitorApp {
   func presentOpenAnythingPalette() {
     keyWindowObserver.refresh()
     if let windowID = openAnythingTargetWindowID() {
-      openAnythingPalette.present(targetWindowID: windowID)
+      appOpenAnythingPalette.present(targetWindowID: windowID)
       return
     }
     openWindow.openHarnessDashboardWindow()
     focusDashboardWindowIfPossible()
-    openAnythingPalette.present(targetWindowID: HarnessMonitorWindowID.dashboard)
+    appOpenAnythingPalette.present(targetWindowID: HarnessMonitorWindowID.dashboard)
   }
 
   private func openAnythingTargetWindowID() -> String? {
@@ -50,7 +50,7 @@ struct HarnessMonitorOpenAnythingHostModifier: ViewModifier {
   let globalHotKeyController: GlobalHotKeyController
   let globalHotKeyEnabled: Bool
   let globalHotKeyDescriptorStorage: String
-  let presentPalette: () -> Void
+  let presentPalette: @MainActor @Sendable () -> Void
   let refreshStore: () -> Void
   @Binding var settingsSelectedSection: SettingsSection
   @Binding var settingsNavigationRequest: SettingsNavigationRequest?

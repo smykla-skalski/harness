@@ -6,12 +6,12 @@ final class GlobalHotKeyController {
   private var hotKeyRef: EventHotKeyRef?
   private var eventHandlerRef: EventHandlerRef?
   private var installedDescriptor: OpenAnythingHotKeyDescriptor?
-  private var onInvoke: (@MainActor () -> Void)?
+  private var onInvoke: (@MainActor @Sendable () -> Void)?
 
   func configure(
     enabled: Bool,
     descriptor: OpenAnythingHotKeyDescriptor,
-    onInvoke: @escaping @MainActor () -> Void
+    onInvoke: @escaping @MainActor @Sendable () -> Void
   ) {
     self.onInvoke = onInvoke
     guard enabled, descriptor.isValid else {
@@ -47,7 +47,7 @@ final class GlobalHotKeyController {
   }
 
   private func registerHotKey(_ descriptor: OpenAnythingHotKeyDescriptor) {
-    var hotKeyID = EventHotKeyID(signature: Self.signature, id: 1)
+    let hotKeyID = EventHotKeyID(signature: Self.signature, id: 1)
     let status = RegisterEventHotKey(
       descriptor.keyCode,
       descriptor.modifiers.carbonFlags,
