@@ -1,7 +1,7 @@
 import CryptoKit
 import Foundation
 
-/// Debounced on-disk patch cache for the Dependencies > Files feature.
+/// Debounced on-disk patch cache for the Reviews > Files feature.
 ///
 /// One JSON file per `(pullRequestID, headRefOid, path)` triple. The actor
 /// coalesces writes that arrive within a 300ms window so a burst of patches
@@ -12,15 +12,15 @@ import Foundation
 /// Reads are async because callers already `await` on patch fetch; the
 /// actor isolation lets them see in-memory pending writes before the disk
 /// flush lands.
-public actor DependencyUpdateFilePatchStore {
+public actor ReviewFilePatchStore {
   public struct Entry: Codable, Equatable, Sendable {
     public let patch: String
     public let etag: String?
     public let additions: UInt32
     public let deletions: UInt32
     public let truncated: Bool
-    public let status: DependencyUpdateFileChangeType
-    public let servedBy: DependencyUpdateFileServedBy
+    public let status: ReviewFileChangeType
+    public let servedBy: ReviewFileServedBy
     public let fetchedAt: String
 
     public init(
@@ -29,8 +29,8 @@ public actor DependencyUpdateFilePatchStore {
       additions: UInt32 = 0,
       deletions: UInt32 = 0,
       truncated: Bool = false,
-      status: DependencyUpdateFileChangeType = .modified,
-      servedBy: DependencyUpdateFileServedBy = .githubRest,
+      status: ReviewFileChangeType = .modified,
+      servedBy: ReviewFileServedBy = .githubRest,
       fetchedAt: String = ""
     ) {
       self.patch = patch
@@ -59,8 +59,8 @@ public actor DependencyUpdateFilePatchStore {
 
   public init(
     directory: URL,
-    diskCapBytes: Int = DependencyUpdateFilePatchStore.defaultDiskCapBytes,
-    debounceNanoseconds: UInt64 = DependencyUpdateFilePatchStore.defaultDebounceNanoseconds,
+    diskCapBytes: Int = ReviewFilePatchStore.defaultDiskCapBytes,
+    debounceNanoseconds: UInt64 = ReviewFilePatchStore.defaultDebounceNanoseconds,
     fileManager: FileManager = .default
   ) {
     self.directory = directory
@@ -173,7 +173,7 @@ public actor DependencyUpdateFilePatchStore {
         } catch {
           HarnessMonitorLogger.store.warning(
             """
-            DependencyUpdateFilePatchStore flush failed; \
+            ReviewFilePatchStore flush failed; \
             key=\(key, privacy: .public) \
             error=\(String(reflecting: error), privacy: .public)
             """
@@ -186,7 +186,7 @@ public actor DependencyUpdateFilePatchStore {
     } catch {
       HarnessMonitorLogger.store.warning(
         """
-        DependencyUpdateFilePatchStore directory create failed; \
+        ReviewFilePatchStore directory create failed; \
         path=\(self.directory.path, privacy: .public) \
         error=\(String(reflecting: error), privacy: .public)
         """
@@ -206,7 +206,7 @@ public actor DependencyUpdateFilePatchStore {
       } catch {
         HarnessMonitorLogger.store.warning(
           """
-          DependencyUpdateFilePatchStore LRU evict failed; \
+          ReviewFilePatchStore LRU evict failed; \
           path=\(entry.url.path, privacy: .public) \
           error=\(String(reflecting: error), privacy: .public)
           """

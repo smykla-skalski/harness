@@ -1,13 +1,13 @@
 import Foundation
 import OSLog
 
-/// Shared OSSignposter for the Dependencies > Files perf surface. Use
+/// Shared OSSignposter for the Reviews > Files perf surface. Use
 /// the `Interval` helpers below to wrap fetch / decode / render hot
 /// paths so Instruments' SwiftUI + Time Profiler templates can name
 /// them. The interval-token shape (instead of closure wrapping)
 /// sidesteps Sendable/MainActor checks on async bodies that capture
 /// store state.
-public enum DependencyFilesPerf {
+public enum ReviewFilesPerf {
   public static let signposter = OSSignposter(
     subsystem: "io.harnessmonitor",
     category: "perf/pr-diffs"
