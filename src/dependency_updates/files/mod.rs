@@ -21,6 +21,7 @@
 
 use serde::{Deserialize, Serialize};
 
+pub(crate) mod blob;
 mod language;
 pub(crate) mod list;
 pub(crate) mod patch_rest;
@@ -29,6 +30,10 @@ pub(crate) mod viewed;
 #[cfg(test)]
 mod tests;
 
+pub use blob::{
+    DependencyUpdateImageMime, DependencyUpdatesFilesBlobRequest,
+    DependencyUpdatesFilesBlobResponse, image_mime_for_path,
+};
 pub use language::{HarnessCodeLanguage, infer_language};
 pub use viewed::{
     DependencyUpdateFileViewedOutcome, DependencyUpdateFilesViewedResult,

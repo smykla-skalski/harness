@@ -18,11 +18,13 @@ pub use files::{
     DependencyUpdateFile, DependencyUpdateFileChangeType, DependencyUpdateFilePatch,
     DependencyUpdateFileServedBy, DependencyUpdateFileViewedOutcome,
     DependencyUpdateFileViewedState, DependencyUpdateFilesViewedResult,
-    DependencyUpdateFilesViewedTarget, DependencyUpdatesFilesListRequest,
-    DependencyUpdatesFilesListResponse, DependencyUpdatesFilesPatchRequest,
-    DependencyUpdatesFilesPatchResponse, DependencyUpdatesFilesViewedRequest,
-    DependencyUpdatesFilesViewedResponse, DependencyUpdatesRateLimitSnapshot,
-    HarnessCodeLanguage, infer_language,
+    DependencyUpdateFilesViewedTarget, DependencyUpdateImageMime,
+    DependencyUpdatesFilesBlobRequest, DependencyUpdatesFilesBlobResponse,
+    DependencyUpdatesFilesListRequest, DependencyUpdatesFilesListResponse,
+    DependencyUpdatesFilesPatchRequest, DependencyUpdatesFilesPatchResponse,
+    DependencyUpdatesFilesViewedRequest, DependencyUpdatesFilesViewedResponse,
+    DependencyUpdatesRateLimitSnapshot, HarnessCodeLanguage, image_mime_for_path,
+    infer_language,
 };
 pub(crate) use github::DependencyUpdatesGitHubClient;
 
