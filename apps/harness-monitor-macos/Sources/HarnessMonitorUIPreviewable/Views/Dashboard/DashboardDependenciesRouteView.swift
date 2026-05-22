@@ -49,7 +49,6 @@ struct DashboardDependenciesRouteView: View {
   @State private var isLabelSheetPresented = false
   @State private var labelDraft = ""
   @State private var labelTargetItems = [DependencyUpdateItem]()
-  @State private var inFlightActionTitle: String?
   @State private var resolvedPreferences: DashboardDependenciesResolvedPreferences
   @State private var presentationWorker = DashboardDependenciesPresentationWorker()
   @State private var cachedPresentation = DashboardDependenciesPresentation.empty
@@ -127,11 +126,6 @@ struct DashboardDependenciesRouteView: View {
   var routeLabelTargetItems: [DependencyUpdateItem] {
     get { labelTargetItems }
     nonmutating set { labelTargetItems = newValue }
-  }
-
-  var routeInFlightActionTitle: String? {
-    get { inFlightActionTitle }
-    nonmutating set { inFlightActionTitle = newValue }
   }
 
   var routeResolvedPreferences: DashboardDependenciesResolvedPreferences {
