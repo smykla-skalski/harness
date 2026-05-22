@@ -93,7 +93,8 @@ struct DashboardDependencyBatchEligibility: Equatable, Identifiable {
         skippedCounts[kind.unavailableReason(for: item), default: 0] += 1
       }
     }
-    let skippedReasons = skippedCounts
+    let skippedReasons =
+      skippedCounts
       .map { reason, count in
         DashboardDependencyBatchSkippedReason(reason: reason, count: count)
       }
@@ -162,7 +163,9 @@ struct DashboardDependencyBatchConfirmation: Equatable, Identifiable {
     count == 1 ? "1 Pull Request" : "\(count) Pull Requests"
   }
 
-  private static func skippedSummary(for eligibility: DashboardDependencyBatchEligibility) -> String {
+  private static func skippedSummary(
+    for eligibility: DashboardDependencyBatchEligibility
+  ) -> String {
     guard eligibility.skippedCount > 0 else { return "" }
     let reasons = eligibility.skippedReasons.prefix(2)
       .map { "\($0.count) \($0.reason)" }
