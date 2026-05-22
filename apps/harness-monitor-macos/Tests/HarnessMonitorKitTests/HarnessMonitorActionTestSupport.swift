@@ -310,6 +310,10 @@ final class RecordingHarnessClient: HarnessMonitorClientProtocol, @unchecked Sen
   var dependencyBodyUpdateOutcomes: [String: DependencyUpdatesBodyUpdateResponse] = [:]
   var dependencyBodyUpdateRequests: [RecordedDependencyBodyUpdateRequest] = []
   var dependencyBodyUpdateErrors: [String: any Error] = [:]
+  var dependencyTimelineResponses: [String: [DependencyUpdatesTimelineResponse]] = [:]
+  var dependencyTimelineFetchedRequests: [DependencyUpdatesTimelineRequest] = []
+  var dependencyTimelineFetchHook: (@Sendable (String) async -> Void)?
+  var dependencyTimelineErrors: [String: any Error] = [:]
   var codexRunsBySessionID: [String: [CodexRunSnapshot]] = [:]
   var codexRunsDelaysBySessionID: [String: Duration] = [:]
   var resolvedAcpSnapshotsByAgentID: [String: AcpAgentSnapshot] = [:]
