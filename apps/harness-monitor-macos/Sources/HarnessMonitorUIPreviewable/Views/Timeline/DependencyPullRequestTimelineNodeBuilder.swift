@@ -29,10 +29,16 @@ struct DependencyPullRequestTimelineNodeBuilder: Sendable {
         output.append(issueCommentNode(payload))
       case .review(let payload):
         output.append(contentsOf: reviewNodes(payload))
-      default:
-        // Remaining variants land in subsequent C.7 / C.8 / C.9
-        // commits via family-grouped companion files.
-        continue
+      case .reviewThread(let payload):
+        output.append(contentsOf: reviewThreadNodes(payload))
+      case .commit(let payload):
+        output.append(commitNode(payload))
+      case .headRefForcePushed(let payload):
+        output.append(headRefForcePushedNode(payload))
+      case .simpleActorEvent(let payload):
+        output.append(simpleActorEventNode(payload))
+      case .unknown(let payload):
+        output.append(unknownNode(payload))
       }
     }
     return output
@@ -108,6 +114,123 @@ struct DependencyPullRequestTimelineNodeBuilder: Sendable {
     if let position = payload.position {
       node.statusBadgeLabel = "Line \(position)"
     }
+    return node
+  }
+
+  // MARK: - Review thread (parent + comment children)
+
+  private func reviewThreadNodes(_ payload: ReviewThreadPayload) -> [SessionTimelineNode] {
+    var nodes: [SessionTimelineNode] = []
+    let lineLabel = payload.line.map { "line \($0)" } ?? "(line unknown)"
+    var parent = makeBaseNode(
+      identityID: payload.id,
+      timestamp: Self.parse(payload.createdAt),
+      rawTimestamp: payload.createdAt,
+      sourceLabel: payload.isResolved ? "Review thread (resolved)" : "Review thread",
+      entryKind: "pr.review_thread",
+      title: "\(payload.path) · \(lineLabel)",
+      detail: nil,
+      tone: payload.isResolved ? .info : .info,
+      actorLogin: payload.actor?.login
+    )
+    parent.statusBadgeLabel = payload.isResolved ? "Resolved" : nil
+    if payload.commentsTruncated {
+      parent.statusBadgeLabel = "Truncated"
+    }
+    nodes.append(parent)
+    for comment in payload.comments {
+      var child = makeBaseNode(
+        identityID: "\(payload.id):\(comment.id)",
+        timestamp: Self.parse(comment.createdAt),
+        rawTimestamp: comment.createdAt,
+        sourceLabel: "Thread comment",
+        entryKind: "pr.review_thread.comment",
+        title: Self.actorTitle(comment.actor, fallback: "Reviewer"),
+        detail: Self.compactBody(comment.body),
+        tone: .info,
+        actorLogin: comment.actor?.login
+      )
+      child.indentLevel = 1
+      child.prefersCompactLayout = true
+      nodes.append(child)
+    }
+    return nodes
+  }
+
+  // MARK: - Commit + head-ref force-push
+
+  private func commitNode(_ payload: CommitPayload) -> SessionTimelineNode {
+    let who = payload.authorLogin ?? payload.authorName ?? "Someone"
+    var node = makeBaseNode(
+      identityID: payload.id,
+      timestamp: Self.parse(payload.createdAt),
+      rawTimestamp: payload.createdAt,
+      sourceLabel: "Commit",
+      entryKind: "pr.commit",
+      title: "\(who) pushed \(payload.abbreviatedOid)",
+      detail: Self.compactBody(payload.messageHeadline),
+      tone: .info,
+      actorLogin: payload.authorLogin
+    )
+    node.statusBadgeLabel = payload.abbreviatedOid
+    return node
+  }
+
+  private func headRefForcePushedNode(
+    _ payload: HeadRefForcePushedPayload
+  ) -> SessionTimelineNode {
+    let branch = payload.refName ?? "branch"
+    var node = makeBaseNode(
+      identityID: payload.id,
+      timestamp: Self.parse(payload.createdAt),
+      rawTimestamp: payload.createdAt,
+      sourceLabel: "Force push",
+      entryKind: "pr.head_ref_force_pushed",
+      title: "\(Self.actorTitle(payload.actor, fallback: "Someone")) force-pushed \(branch)",
+      detail: "\(payload.beforeAbbreviatedOid) → \(payload.afterAbbreviatedOid)",
+      tone: .warning,
+      actorLogin: payload.actor?.login
+    )
+    node.statusBadgeLabel = "Force push"
+    return node
+  }
+
+  // MARK: - Simple actor events (39 lightweight kinds)
+
+  private func simpleActorEventNode(
+    _ payload: SimpleActorEventPayload
+  ) -> SessionTimelineNode {
+    let descriptor = Self.simpleActorDescriptor(payload)
+    var node = makeBaseNode(
+      identityID: payload.id,
+      timestamp: Self.parse(payload.createdAt),
+      rawTimestamp: payload.createdAt,
+      sourceLabel: descriptor.sourceLabel,
+      entryKind: "pr.\(payload.eventKind.rawValue)",
+      title: descriptor.title(actor: payload.actor),
+      detail: descriptor.detail,
+      tone: descriptor.tone,
+      actorLogin: payload.actor?.login
+    )
+    if let badge = descriptor.statusBadge {
+      node.statusBadgeLabel = badge
+    }
+    return node
+  }
+
+  private func unknownNode(_ payload: UnknownTimelinePayload) -> SessionTimelineNode {
+    var node = makeBaseNode(
+      identityID: payload.id,
+      timestamp: Self.parse(payload.createdAt),
+      rawTimestamp: payload.createdAt,
+      sourceLabel: "GitHub event",
+      entryKind: "pr.unknown",
+      title: payload.typename,
+      detail: payload.actor?.login,
+      tone: .info,
+      actorLogin: payload.actor?.login
+    )
+    node.statusBadgeLabel = "New event type"
     return node
   }
 
@@ -194,4 +317,5 @@ struct DependencyPullRequestTimelineNodeBuilder: Sendable {
     case .dismissed: return "dismissed a review"
     }
   }
+
 }
