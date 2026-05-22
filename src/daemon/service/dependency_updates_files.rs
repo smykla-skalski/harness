@@ -17,6 +17,7 @@
 
 use std::collections::BTreeMap;
 use std::fs;
+#[cfg(test)]
 use std::path::PathBuf;
 use std::sync::{Arc, OnceLock};
 
@@ -800,17 +801,6 @@ pub(crate) struct BlobTextProjection {
     pub byte_size: u64,
     pub is_truncated: bool,
     pub is_too_large: bool,
-}
-
-#[allow(dead_code)] // Used by the new client method below; kept here to share imports.
-#[derive(Debug, Clone)]
-pub(crate) struct LocalCloneRootResolver;
-
-#[allow(dead_code)] // resolver placeholder for the local-clone shell-out follow-up
-impl LocalCloneRootResolver {
-    pub(crate) fn root() -> PathBuf {
-        daemon_root().join(CLONES_SUBDIR)
-    }
 }
 
 #[cfg(test)]

@@ -358,7 +358,6 @@ query ListDependencyUpdatePullRequestFiles($id: ID!, $after: String) {
 }
 ";
 
-#[allow(dead_code)] // wired into service handler in A.10
 pub(crate) const MARK_PR_FILE_AS_VIEWED_MUTATION: &str = r"
 mutation MarkDependencyUpdatePullRequestFileAsViewed($pullRequestId: ID!, $path: String!) {
   markFileAsViewed(input: { pullRequestId: $pullRequestId, path: $path }) {
@@ -375,7 +374,6 @@ mutation MarkDependencyUpdatePullRequestFileAsViewed($pullRequestId: ID!, $path:
 }
 ";
 
-#[allow(dead_code)] // wired into service handler in A.10
 pub(crate) const UNMARK_PR_FILE_AS_VIEWED_MUTATION: &str = r"
 mutation UnmarkDependencyUpdatePullRequestFileAsViewed($pullRequestId: ID!, $path: String!) {
   unmarkFileAsViewed(input: { pullRequestId: $pullRequestId, path: $path }) {

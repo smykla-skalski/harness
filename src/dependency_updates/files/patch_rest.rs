@@ -7,10 +7,9 @@
 //! `If-None-Match: <etag>` per cached file; a 304 response is treated as
 //! "still valid".
 //!
-//! This module is metadata-shape only in A.3 - the actual `Octocrab` /
-//! `reqwest` wiring is folded in by A.10 when the service handler exists.
-//! The pure helpers below cover REST-response parsing and the drift /
-//! truncation logic used by the service.
+//! This module includes the `Octocrab` REST fetcher plus pure helpers for
+//! REST-response parsing, path filtering, drift checks, and truncation
+//! labeling used by the service.
 
 use axum::http;
 use octocrab::Octocrab;

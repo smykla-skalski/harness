@@ -6,9 +6,9 @@
 //! `Arc<FilesEntry>`; the on-disk layer is a per-file JSON blob under
 //! `<runtime>/dependency_updates/patches/<repo>/<pr>/<head>/<path_sha>.json`.
 //!
-//! This commit ships the pure-data layer: cache-key derivation, on-disk
-//! path layout, LRU comparisons, and serde for the JSON envelope. Tokio
-//! filesystem wiring + GC scan is folded in by the service handler (A.10).
+//! This module owns cache-key derivation, on-disk path layout, LRU
+//! comparisons, and serde for the JSON envelope. Service handlers compose it
+//! with the GitHub REST/local-clone fetch paths.
 
 use std::path::{Path, PathBuf};
 
