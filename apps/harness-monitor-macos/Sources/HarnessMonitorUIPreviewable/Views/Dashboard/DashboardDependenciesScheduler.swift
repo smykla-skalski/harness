@@ -19,6 +19,13 @@ final class DashboardDependenciesScheduler {
     var forceRefreshRequested: Bool = false
   }
 
+  /// Per-fetch upper bound. The daemon's WebSocket RPC has no resource timeout,
+  /// so a sleep/wake or zombie TCP connection can leave a query awaiting
+  /// forever. This bound guarantees `repositoriesInFlight` clears within a
+  /// fixed window even if the response never arrives; the next tick can then
+  /// retry.
+  static let defaultFetchTimeoutSeconds: TimeInterval = 60
+
   /// Repositories currently being fetched. SwiftUI reads this to render
   /// per-section progress indicators.
   private(set) var repositoriesInFlight: Set<String> = []
@@ -37,6 +44,15 @@ final class DashboardDependenciesScheduler {
   )
   @ObservationIgnored private var onMerge:
     (@MainActor (String, DependencyUpdatesQueryResponse) -> Void)?
+
+  /// Bumped on every `stop()` (which `start()` calls first). Tasks capture the
+  /// generation at launch and skip cleanup if the value has moved on — this
+  /// prevents a stale task whose timeout fires after a `start()` restart from
+  /// removing the new task's `repositoriesInFlight` marker.
+  @ObservationIgnored private var fetchGeneration: UInt = 0
+
+  /// Per-fetch timeout. Tests override this to make race scenarios feasible.
+  @ObservationIgnored var fetchTimeoutSeconds: TimeInterval = defaultFetchTimeoutSeconds
 
   /// Begin or restart the scheduler with a fresh set of inputs.
   ///
@@ -109,6 +125,7 @@ final class DashboardDependenciesScheduler {
   /// repeatedly. `states` is preserved so a subsequent `start` can resume
   /// from prior `lastSyncedAt` markers within the same session.
   func stop() {
+    fetchGeneration &+= 1
     tickTask?.cancel()
     tickTask = nil
     for (_, task) in fetchTasks {
@@ -182,25 +199,113 @@ final class DashboardDependenciesScheduler {
       for: repository,
       forceRefresh: true
     )
+    let generation = fetchGeneration
+    let timeout = fetchTimeoutSeconds
     let task = Task { @MainActor [weak self] in
+      do {
+        let response = try await Self.raceFetchAgainstTimeout(
+          client: client,
+          request: request,
+          timeoutSeconds: timeout
+        )
+        guard let self, self.fetchGeneration == generation else { return }
+        self.states[repository]?.lastSyncedAt = Date()
+        self.states[repository]?.lastErrorMessage = nil
+        onMerge(repository, response)
+      } catch is CancellationError {
+        return
+      } catch let error as DashboardDependenciesSchedulerError {
+        guard let self, self.fetchGeneration == generation else { return }
+        self.states[repository]?.lastErrorMessage = error.localizedDescription
+        HarnessMonitorLogger.api.warning(
+          """
+          Per-repository dependency fetch timed out: \
+          repository=\(repository, privacy: .public) \
+          timeout=\(timeout, privacy: .public)s
+          """
+        )
+      } catch {
+        guard let self, self.fetchGeneration == generation else { return }
+        self.states[repository]?.lastErrorMessage = error.localizedDescription
+      }
+      guard let self, self.fetchGeneration == generation else { return }
+      self.repositoriesInFlight.remove(repository)
+      self.fetchTasks.removeValue(forKey: repository)
+      await self.dispatchPending()
+    }
+    fetchTasks[repository] = task
+  }
+
+  /// Race the per-repository fetch against a `Task.sleep` timeout. Whichever
+  /// arrives first wins; the other side leaks (in practice the fetch task
+  /// keeps awaiting a stuck WS continuation that never resumes — that's the
+  /// whole point of having a timeout in the first place).
+  ///
+  /// Returns the fetched response on success, throws
+  /// `DashboardDependenciesSchedulerError.fetchTimedOut` on timeout, or
+  /// rethrows the loader's error.
+  static func raceFetchAgainstTimeout(
+    client: any HarnessMonitorDependenciesClientProtocol,
+    request: DependencyUpdatesQueryRequest,
+    timeoutSeconds: TimeInterval
+  ) async throws -> DependencyUpdatesQueryResponse {
+    let outcome = AsyncStream<FetchOutcome>.makeStream(
+      bufferingPolicy: .bufferingNewest(1)
+    )
+    let fetchTask = Task.detached(priority: .userInitiated) {
       do {
         let response = try await DashboardDependenciesRemoteLoader.query(
           client: client,
           request: request
         )
-        guard let self, !Task.isCancelled else { return }
-        self.states[repository]?.lastSyncedAt = Date()
-        self.states[repository]?.lastErrorMessage = nil
-        onMerge(repository, response)
+        outcome.continuation.yield(.success(response))
       } catch {
-        guard let self, !Task.isCancelled else { return }
-        self.states[repository]?.lastErrorMessage = error.localizedDescription
+        outcome.continuation.yield(.failure(error))
       }
-      self?.repositoriesInFlight.remove(repository)
-      self?.fetchTasks.removeValue(forKey: repository)
-      guard !Task.isCancelled else { return }
-      await self?.dispatchPending()
     }
-    fetchTasks[repository] = task
+    let timeoutTask = Task.detached {
+      do {
+        try await Task.sleep(for: .seconds(timeoutSeconds))
+        outcome.continuation.yield(
+          .failure(DashboardDependenciesSchedulerError.fetchTimedOut)
+        )
+      } catch {
+        // sleep cancelled before timeout; whichever path cancelled us won
+      }
+    }
+    defer {
+      fetchTask.cancel()
+      timeoutTask.cancel()
+      outcome.continuation.finish()
+    }
+    var iterator = outcome.stream.makeAsyncIterator()
+    guard let first = await iterator.next() else {
+      throw DashboardDependenciesSchedulerError.fetchTimedOut
+    }
+    switch first {
+    case .success(let response): return response
+    case .failure(let error): throw error
+    }
+  }
+
+  private enum FetchOutcome: Sendable {
+    case success(DependencyUpdatesQueryResponse)
+    case failure(any Error)
+  }
+}
+
+/// Errors emitted by `DashboardDependenciesScheduler`.
+enum DashboardDependenciesSchedulerError: LocalizedError, Equatable {
+  /// The per-repository fetch did not complete within the configured timeout.
+  /// In practice this means the daemon's WebSocket response never arrived —
+  /// most commonly because the underlying TCP connection went zombie during
+  /// sleep/wake.
+  case fetchTimedOut
+
+  var errorDescription: String? {
+    switch self {
+    case .fetchTimedOut:
+      return "Dependency refresh timed out. The daemon will be retried on the next tick."
+    }
   }
 }

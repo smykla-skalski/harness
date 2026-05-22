@@ -408,6 +408,7 @@ struct DashboardDependenciesRouteView: View {
     .onChange(of: normalizedPreferences.frequentLabelsCount) { _, _ in
       refreshLabelMenuData()
     }
+    .dashboardDependenciesOnSystemWake(perform: handleSystemWake)
     .dashboardDependenciesToolbarSearch(
       query: $searchText,
       items: response.items,
