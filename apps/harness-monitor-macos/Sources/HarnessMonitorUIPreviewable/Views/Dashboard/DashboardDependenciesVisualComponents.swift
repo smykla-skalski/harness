@@ -9,14 +9,14 @@ enum DashboardDependenciesVisualMetrics {
   static let checksMaxWidth: CGFloat = 680
 }
 
-private enum DashboardDependencyCheckTextCenterAlignment: AlignmentID {
+enum DashboardDependencyCheckTextCenterAlignment: AlignmentID {
   static func defaultValue(in context: ViewDimensions) -> CGFloat {
     context[VerticalAlignment.center]
   }
 }
 
 extension VerticalAlignment {
-  fileprivate static let dashboardDependencyCheckTextCenter = VerticalAlignment(
+  static let dashboardDependencyCheckTextCenter = VerticalAlignment(
     DashboardDependencyCheckTextCenterAlignment.self
   )
 }
