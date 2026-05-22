@@ -104,7 +104,7 @@ struct HarnessMonitorUITestAccessibilityRegistryMoreTests {
         == "harness.settings.section.secrets"
     )
     #expect(HarnessMonitorAccessibility.settingsRepositoriesRoot == "harness.settings.repositories")
-    #expect(HarnessMonitorAccessibility.settingsReviewsRoot == "harness.settings.dependencies")
+    #expect(HarnessMonitorAccessibility.settingsReviewsRoot == "harness.settings.reviews")
     #expect(HarnessMonitorAccessibility.settingsSecretsRoot == "harness.settings.secrets")
     #expect(
       HarnessMonitorAccessibility.settingsRepositoriesSaveButton
@@ -112,7 +112,7 @@ struct HarnessMonitorUITestAccessibilityRegistryMoreTests {
     )
     #expect(
       HarnessMonitorAccessibility.settingsReviewsSaveButton
-        == "harness.settings.dependencies.save"
+        == "harness.settings.reviews.save"
     )
     #expect(
       HarnessMonitorAccessibility.settingsSecretsSaveButton

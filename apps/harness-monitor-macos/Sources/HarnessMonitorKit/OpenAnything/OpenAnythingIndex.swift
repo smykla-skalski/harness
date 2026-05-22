@@ -19,7 +19,7 @@ public actor OpenAnythingIndex {
     .sessions,
     .taskBoard,
     .decisions,
-    .dependencies,
+    .reviews,
     .loadedSession,
   ]
 

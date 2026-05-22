@@ -54,7 +54,7 @@ public struct ReviewsRepoSyncStateCache {
     } catch {
       HarnessMonitorLogger.store.warning(
         """
-        Failed to record dependency repo sync state; \
+        Failed to record review repo sync state; \
         preferences_hash=\(preferencesHash, privacy: .public) \
         repository=\(repository, privacy: .public) \
         error=\(String(reflecting: error), privacy: .public)

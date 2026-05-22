@@ -66,7 +66,7 @@ extension ReviewItem {
 
   public var rerunChecksUnavailableReason: String? {
     guard !checks.isEmpty else {
-      return "No checks are reported for this dependency update."
+      return "No checks are reported for this review."
     }
     guard checks.contains(where: { $0.checkSuiteID != nil }) else {
       return "GitHub did not provide check suite IDs for these checks."

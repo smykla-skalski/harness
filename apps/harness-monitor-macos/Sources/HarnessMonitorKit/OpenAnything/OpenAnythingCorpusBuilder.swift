@@ -36,7 +36,7 @@ public struct OpenAnythingCorpusInput: Sendable {
   public let sessions: [SessionSummary]
   public let taskBoardItems: [TaskBoardItem]
   public let decisions: [DecisionPresentationSnapshot]
-  public let dependencies: [ReviewItem]
+  public let reviews: [ReviewItem]
   public let loadedSession: OpenAnythingLoadedSessionSnapshot?
   public let showsPolicyCanvasLab: Bool
 
@@ -45,7 +45,7 @@ public struct OpenAnythingCorpusInput: Sendable {
     sessions: [SessionSummary],
     taskBoardItems: [TaskBoardItem],
     decisions: [DecisionPresentationSnapshot],
-    dependencies: [ReviewItem],
+    reviews: [ReviewItem],
     loadedSession: OpenAnythingLoadedSessionSnapshot?,
     showsPolicyCanvasLab: Bool
   ) {
@@ -53,7 +53,7 @@ public struct OpenAnythingCorpusInput: Sendable {
     self.sessions = sessions
     self.taskBoardItems = taskBoardItems
     self.decisions = decisions
-    self.dependencies = dependencies
+    self.reviews = reviews
     self.loadedSession = loadedSession
     self.showsPolicyCanvasLab = showsPolicyCanvasLab
   }
@@ -68,7 +68,7 @@ public enum OpenAnythingCorpusBuilder {
       + sessionRecords(input.sessions)
       + taskBoardRecords(input.taskBoardItems)
       + decisionRecords(input.decisions)
-      + dependencyRecords(input.dependencies)
+      + reviewRecords(input.reviews)
       + loadedSessionRecords(input.loadedSession)
   }
 
@@ -152,7 +152,7 @@ public enum OpenAnythingCorpusBuilder {
         title: route.title,
         subtitle: "Dashboard",
         systemImage: route.systemImage,
-        isSuggested: route == .taskBoard || route == .dependencies || route == .diagnostics,
+        isSuggested: route == .taskBoard || route == .reviews || route == .diagnostics,
         searchBodyParts: [route.rawValue]
       )
     }
@@ -213,11 +213,11 @@ public enum OpenAnythingCorpusBuilder {
     }
   }
 
-  private static func dependencyRecords(_ items: [ReviewItem]) -> [OpenAnythingRecord] {
+  private static func reviewRecords(_ items: [ReviewItem]) -> [OpenAnythingRecord] {
     items.map { item in
       OpenAnythingRecord(
-        id: "dependency.\(item.pullRequestID)",
-        domain: .dependencies,
+        id: "review.\(item.pullRequestID)",
+        domain: .reviews,
         target: .review(pullRequestID: item.pullRequestID),
         title: item.title,
         subtitle: "\(item.repository)#\(item.number)",

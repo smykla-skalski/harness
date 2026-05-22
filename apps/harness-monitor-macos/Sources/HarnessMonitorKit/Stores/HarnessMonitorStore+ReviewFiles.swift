@@ -89,7 +89,7 @@ extension HarnessMonitorStore {
     guard let client else {
       throw HarnessMonitorAPIError.server(
         code: 503,
-        message: "Daemon client not available for dependency files"
+        message: "Daemon client not available for review files"
       )
     }
     let request = ReviewsFilesListRequest(

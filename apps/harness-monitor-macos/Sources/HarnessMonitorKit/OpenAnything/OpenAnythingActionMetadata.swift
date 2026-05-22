@@ -46,7 +46,7 @@ extension OpenAnythingCorpusBuilder {
     case .openTaskBoard:
       "task board board operations dispatch"
     case .openReviews:
-      "dependency pull requests prs renovate checks merge approvals"
+      "review pull requests prs renovate checks merge approvals"
     case .openDiagnostics, .refreshDiagnostics, .copyDiagnostics:
       "diagnostics health daemon cache provenance freshness mcp"
     case .reconnectDaemon:
