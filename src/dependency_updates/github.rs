@@ -344,7 +344,9 @@ impl DependencyUpdatesGitHubClient {
             node: Option<RepositoryBlobNode>,
         }
         #[derive(Debug, serde::Deserialize)]
+        #[serde(rename_all = "camelCase")]
         struct RepositoryBlobNode {
+            name_with_owner: Option<String>,
             object: Option<RepositoryBlobObject>,
         }
         #[derive(Debug, serde::Deserialize)]
@@ -365,23 +367,81 @@ impl DependencyUpdatesGitHubClient {
             }))
             .await
             .map_err(operation_error)?;
-        let blob = response.node.and_then(|node| node.object).ok_or_else(|| {
+        let node = response.node.ok_or_else(|| {
+            CliErrorKind::workflow_parse(format!(
+                "dependency-updates blob '{oid}' was not found in repository '{repository_id}'"
+            ))
+        })?;
+        let repository_full_name = node.name_with_owner;
+        let blob = node.object.ok_or_else(|| {
             CliErrorKind::workflow_parse(format!(
                 "dependency-updates blob '{oid}' was not found in repository '{repository_id}'"
             ))
         })?;
         let byte_size = blob.byte_size.unwrap_or_default();
+        let is_too_large = crate::dependency_updates::files::blob::blob_exceeds_cap(byte_size);
         let content_base64 = blob
             .text
             .as_deref()
+            .filter(|_| !is_too_large)
             .map(|text| base64::engine::general_purpose::STANDARD.encode(text.as_bytes()))
             .unwrap_or_default();
         let is_truncated = blob.is_truncated.unwrap_or_default();
-        let is_too_large = crate::dependency_updates::files::blob::blob_exceeds_cap(byte_size);
         Ok(crate::daemon::service::BlobTextProjection {
+            repository_full_name,
             content_base64,
             byte_size,
             is_truncated,
+            is_too_large,
+        })
+    }
+
+    /// Fetch one git blob through GitHub REST and return its base64 payload.
+    /// Used as the binary-image fallback after GraphQL has resolved the
+    /// repository `nameWithOwner`.
+    pub(crate) async fn fetch_repository_blob_base64(
+        &self,
+        repo_full_name: &str,
+        oid: &str,
+    ) -> Result<crate::daemon::service::BlobTextProjection, CliError> {
+        #[derive(Debug, serde::Deserialize)]
+        struct GitBlobResponse {
+            content: String,
+            encoding: String,
+            size: u64,
+        }
+
+        let (owner, repo) =
+            crate::dependency_updates::files::patch_rest::split_repo_full_name(repo_full_name)
+                .ok_or_else(|| {
+                    CliErrorKind::workflow_parse(format!(
+                        "dependency-updates blob: repository '{repo_full_name}' is not owner/name"
+                    ))
+                })?;
+        let route = format!("/repos/{owner}/{repo}/git/blobs/{oid}");
+        let blob: GitBlobResponse = self
+            .client
+            .get(route, None::<&()>)
+            .await
+            .map_err(operation_error)?;
+        if !blob.encoding.eq_ignore_ascii_case("base64") {
+            return Err(CliErrorKind::workflow_parse(format!(
+                "dependency-updates blob '{oid}' returned unsupported encoding '{}'",
+                blob.encoding
+            ))
+            .into());
+        }
+        let is_too_large = crate::dependency_updates::files::blob::blob_exceeds_cap(blob.size);
+        let content_base64 = if is_too_large {
+            String::new()
+        } else {
+            normalize_git_blob_base64(&blob.content)
+        };
+        Ok(crate::daemon::service::BlobTextProjection {
+            repository_full_name: Some(repo_full_name.to_string()),
+            content_base64,
+            byte_size: blob.size,
+            is_truncated: false,
             is_too_large,
         })
     }
@@ -640,6 +700,10 @@ impl DependencyUpdatesGitHubClient {
         }
         Ok(results)
     }
+}
+
+fn normalize_git_blob_base64(content: &str) -> String {
+    content.chars().filter(|c| !c.is_whitespace()).collect()
 }
 
 fn comment_action_result(

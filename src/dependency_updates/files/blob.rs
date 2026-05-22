@@ -6,12 +6,12 @@
 //!   `... on Blob { oid byteSize isBinary isTruncated text }`. Text blobs
 //!   come back inline; binary blobs need the REST path because `text` is
 //!   null for binary.
-//! - **REST raw bytes** for binary blobs: `GET /repos/{owner}/{repo}/git/blobs/{sha}`
-//!   with `Accept: application/vnd.github.raw` returns the raw image bytes.
+//! - **REST git blob JSON** for binary blobs:
+//!   `GET /repos/{owner}/{repo}/git/blobs/{sha}` returns base64 image bytes.
 //!
-//! This commit defines the request/response types + pure helpers (path
+//! This module defines the request/response types + pure helpers (path
 //! → MIME, size cap enforcement, base64 round-trip). The Octocrab wiring
-//! is folded into the service handler in A.10.
+//! lives in the service handler and `DependencyUpdatesGitHubClient`.
 
 use serde::{Deserialize, Serialize};
 
