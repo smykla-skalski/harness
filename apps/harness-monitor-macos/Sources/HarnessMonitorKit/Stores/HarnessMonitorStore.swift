@@ -54,6 +54,9 @@ public final class HarnessMonitorStore {
   @ObservationIgnored
   var dependencyLocalCloneProgressContinuations:
     [String: [UUID: AsyncStream<DependencyUpdateLocalCloneProgress>.Continuation]] = [:]
+  @ObservationIgnored
+  var dependencyLocalCloneProgressAllContinuations:
+    [UUID: AsyncStream<DependencyUpdateLocalCloneProgress>.Continuation] = [:]
 
   public var openFolderRequest = 0
   public var attachSessionRequest = 0

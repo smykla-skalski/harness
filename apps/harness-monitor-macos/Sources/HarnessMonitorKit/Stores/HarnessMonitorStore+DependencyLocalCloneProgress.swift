@@ -38,13 +38,35 @@ extension HarnessMonitorStore {
     }
   }
 
+  /// Subscribe to progress events for every repository. Useful when the
+  /// UI needs to surface in-flight progress for repos it doesn't yet
+  /// know about (e.g. first clone of a brand-new dep PR repo). Stored
+  /// under the `nil`-keyed bucket so the dispatch fan-out delivers
+  /// every event without needing repo-name lookup at emit time.
+  public func observeAllLocalCloneProgress(
+  ) -> AsyncStream<DependencyUpdateLocalCloneProgress> {
+    AsyncStream(bufferingPolicy: .bufferingNewest(1)) { continuation in
+      let id = UUID()
+      addAllLocalCloneProgressSubscriber(id: id, continuation: continuation)
+      continuation.onTermination = { [weak self] _ in
+        guard let self else { return }
+        Task { @MainActor [weak self] in
+          self?.removeAllLocalCloneProgressSubscriber(id: id)
+        }
+      }
+    }
+  }
+
   /// Dispatch hook called from the streaming layer. Fans out to every
-  /// subscriber registered for the event's `repoFullName` and yields the
-  /// payload. No-op when no subscribers are registered for that repo.
+  /// subscriber registered for the event's `repoFullName` and to every
+  /// catch-all subscriber registered via `observeAllLocalCloneProgress`.
   func applyLocalCloneProgress(_ progress: DependencyUpdateLocalCloneProgress) {
-    let bucket = dependencyLocalCloneProgressContinuations[progress.repoFullName]
-    guard let bucket, !bucket.isEmpty else { return }
-    for continuation in bucket.values {
+    if let bucket = dependencyLocalCloneProgressContinuations[progress.repoFullName] {
+      for continuation in bucket.values {
+        continuation.yield(progress)
+      }
+    }
+    for continuation in dependencyLocalCloneProgressAllContinuations.values {
       continuation.yield(progress)
     }
   }
@@ -81,5 +103,16 @@ extension HarnessMonitorStore {
     } else {
       dependencyLocalCloneProgressContinuations[repoFullName] = bucket
     }
+  }
+
+  private func addAllLocalCloneProgressSubscriber(
+    id: UUID,
+    continuation: DependencyLocalCloneProgressContinuation
+  ) {
+    dependencyLocalCloneProgressAllContinuations[id] = continuation
+  }
+
+  private func removeAllLocalCloneProgressSubscriber(id: UUID) {
+    dependencyLocalCloneProgressAllContinuations.removeValue(forKey: id)
   }
 }
