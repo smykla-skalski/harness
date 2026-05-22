@@ -30,6 +30,9 @@ extension DashboardDependenciesRouteView {
         Task { await rerunChecks(items: items) }
       }
       .disabled(!items.contains { $0.hasRerunnableChecks })
+      Button("Refresh") {
+        refresh(items: items)
+      }
       DashboardDependenciesLabelPickerMenu(
         title: "Add Label",
         labels: availableLabels,
