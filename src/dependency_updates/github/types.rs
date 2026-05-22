@@ -140,12 +140,15 @@ pub(super) enum StatusContextNode {
         name: String,
         status: Option<String>,
         conclusion: Option<String>,
+        url: Option<String>,
         #[serde(rename = "checkSuite")]
         check_suite: Option<CheckSuiteNode>,
     },
     StatusContext {
         context: String,
         state: Option<String>,
+        #[serde(rename = "targetUrl")]
+        target_url: Option<String>,
     },
 }
 
@@ -232,4 +235,16 @@ pub(super) struct PullRequestBodyNode {
     pub(super) body: Option<String>,
     #[serde(rename = "updatedAt")]
     pub(super) updated_at: String,
+}
+
+#[derive(Debug, Deserialize)]
+pub(super) struct UpdatePullRequestBodyResponse {
+    #[serde(rename = "updatePullRequest")]
+    pub(super) update_pull_request: Option<UpdatePullRequestBodyPayload>,
+}
+
+#[derive(Debug, Deserialize)]
+pub(super) struct UpdatePullRequestBodyPayload {
+    #[serde(rename = "pullRequest")]
+    pub(super) pull_request: Option<PullRequestBodyNode>,
 }

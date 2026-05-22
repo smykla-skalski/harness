@@ -255,7 +255,7 @@ pub use dependency_updates::{
     add_label_to_dependency_updates, approve_dependency_updates, auto_dependency_updates,
     catalog_dependency_update_repositories, clear_dependency_updates_cache,
     fetch_dependency_update_body, merge_dependency_updates, query_dependency_updates,
-    refresh_dependency_updates, rerun_dependency_updates_checks,
+    refresh_dependency_updates, rerun_dependency_updates_checks, update_dependency_update_body,
 };
 pub use direct::{
     delete_session_direct, disconnect_agent_direct, join_session_direct, record_signal_ack_direct,

@@ -91,6 +91,7 @@ pub const DEPENDENCY_UPDATES_AUTO: &str = "dependency_updates.auto";
 pub const DEPENDENCY_UPDATES_CLEAR_CACHE: &str = "dependency_updates.clear_cache";
 pub const DEPENDENCY_UPDATES_REFRESH: &str = "dependency_updates.refresh";
 pub const DEPENDENCY_UPDATES_BODY: &str = "dependency_updates.body";
+pub const DEPENDENCY_UPDATES_BODY_UPDATE: &str = "dependency_updates.body_update";
 pub const AGENT_CHANGE_ROLE: &str = "agent.change_role";
 pub const AGENT_REMOVE: &str = "agent.remove";
 pub const LEADER_TRANSFER: &str = "leader.transfer";

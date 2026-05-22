@@ -7,7 +7,7 @@ use crate::dependency_updates::{
 };
 
 use super::{
-    apply_refresh_to_items, cached_body_response, cached_query_response,
+    apply_refresh_to_items, cached_body_response, cached_query_response, sha256_hex,
     store_cached_body_response, store_cached_query_response,
 };
 
@@ -211,6 +211,30 @@ fn store_cached_body_response_overwrites_existing_entry() {
     let hit = cached_body_response(&key, 600).expect("cache hit");
     assert_eq!(hit.pull_request_id, "pr_body_v2");
     assert_eq!(hit.body, "second");
+}
+
+#[test]
+fn sha256_hex_is_deterministic_lowercase_hex() {
+    let digest = sha256_hex("- [ ] rebase\n");
+    assert_eq!(digest.len(), 64);
+    assert!(digest.bytes().all(|byte| byte.is_ascii_hexdigit()));
+    assert!(digest.bytes().all(|byte| !byte.is_ascii_uppercase()));
+    assert_eq!(digest, sha256_hex("- [ ] rebase\n"));
+}
+
+#[test]
+fn sha256_hex_differs_on_single_char_flip() {
+    let unchecked = sha256_hex("- [ ] rebase\n");
+    let checked = sha256_hex("- [x] rebase\n");
+    assert_ne!(unchecked, checked);
+}
+
+#[test]
+fn sha256_hex_matches_known_empty_string() {
+    assert_eq!(
+        sha256_hex(""),
+        "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    );
 }
 
 fn one_repo_item(repository: &str, pr_id: &str) -> DependencyUpdateItem {
