@@ -1,3 +1,19 @@
+pub use crate::dependency_updates::timeline::{
+    Actor as DependencyUpdateTimelineActor, CommitEntry as DependencyUpdateTimelineCommitEntry,
+    DependencyUpdateTimelineEntry, DependencyUpdatesTimelineRequest,
+    DependencyUpdatesTimelineResponse, HeadRefForcePushedEntry as DependencyUpdateHeadRefForcePushedEntry,
+    IssueCommentEntry as DependencyUpdateIssueCommentEntry,
+    ReviewEntry as DependencyUpdateReviewEntry,
+    ReviewInlineCommentEntry as DependencyUpdateReviewInlineCommentEntry,
+    ReviewState as DependencyUpdateTimelineReviewState,
+    ReviewThreadCommentEntry as DependencyUpdateReviewThreadCommentEntry,
+    ReviewThreadEntry as DependencyUpdateReviewThreadEntry,
+    SimpleActorEventEntry as DependencyUpdateSimpleActorEventEntry,
+    SimpleActorEventKind as DependencyUpdateSimpleActorEventKind,
+    TimelinePageDirection as DependencyUpdateTimelinePageDirection,
+    TimelinePageInfo as DependencyUpdateTimelinePageInfo,
+    UnknownEntry as DependencyUpdateUnknownTimelineEntry,
+};
 pub use crate::dependency_updates::{
     DependencyUpdateActionKind, DependencyUpdateActionOutcome, DependencyUpdateActionPreviewKind,
     DependencyUpdateActionPreviewTarget, DependencyUpdateActionResult, DependencyUpdateCheck,

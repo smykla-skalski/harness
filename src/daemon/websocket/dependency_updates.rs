@@ -6,8 +6,8 @@ use crate::daemon::protocol::{
     DependencyUpdatesFilesListRequest, DependencyUpdatesFilesPatchRequest,
     DependencyUpdatesFilesViewedRequest, DependencyUpdatesLabelRequest,
     DependencyUpdatesMergeRequest, DependencyUpdatesQueryRequest, DependencyUpdatesRefreshRequest,
-    DependencyUpdatesRepositoryCatalogRequest, DependencyUpdatesRerunChecksRequest, WsRequest,
-    WsResponse, ws_methods,
+    DependencyUpdatesRepositoryCatalogRequest, DependencyUpdatesRerunChecksRequest,
+    DependencyUpdatesTimelineRequest, WsRequest, WsResponse, ws_methods,
 };
 use crate::daemon::service;
 use serde::de::DeserializeOwned;
@@ -54,7 +54,7 @@ pub(crate) async fn dispatch_dependency_updates_method(
         }
         ws_methods::DEPENDENCY_UPDATES_CLEAR_CACHE => Some(dispatch_query_result(
             &request.id,
-            service::clear_dependency_updates_cache(),
+            service::clear_dependency_updates_caches_with_timeline(),
         )),
         ws_methods::DEPENDENCY_UPDATES_REFRESH => {
             Some(dispatch_dependency_updates_refresh(request).await)
@@ -86,6 +86,9 @@ pub(crate) async fn dispatch_dependency_updates_method(
         )),
         ws_methods::DEPENDENCY_UPDATES_FILES_LOCAL_CLONES_DELETE => {
             Some(dispatch_dependency_updates_files_local_clones_delete(request).await)
+        }
+        ws_methods::DEPENDENCY_UPDATES_TIMELINE => {
+            Some(dispatch_dependency_updates_timeline(request).await)
         }
         _ => None,
     }
@@ -256,6 +259,16 @@ async fn dispatch_dependency_updates_files_blob(request: &WsRequest) -> WsRespon
     dispatch_query_result(
         &request.id,
         service::fetch_dependency_update_file_blob(&body).await,
+    )
+}
+
+async fn dispatch_dependency_updates_timeline(request: &WsRequest) -> WsResponse {
+    let Ok(body) = parse_params::<DependencyUpdatesTimelineRequest>(request) else {
+        return invalid_params(request);
+    };
+    dispatch_query_result(
+        &request.id,
+        service::fetch_dependency_update_timeline(&body).await,
     )
 }
 

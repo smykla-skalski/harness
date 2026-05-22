@@ -1,12 +1,23 @@
 #![allow(dead_code, unused_imports)]
 
 mod cache;
+mod client;
 mod mapping;
 mod queries;
 mod service;
 mod types;
 
+pub(crate) use client::TimelineGitHubClient;
+
 pub(crate) use service::{fetch_timeline_page, TimelineClient, TimelineError};
+
+/// Clears the in-memory timeline cache and returns how many pages
+/// were evicted. Called from the daemon's combined cache-clear
+/// endpoint so a single DELETE drops body, query, and timeline state
+/// in one shot.
+pub(crate) fn drain_timeline_cache() -> usize {
+    cache::drain_all_counted()
+}
 
 #[cfg(test)]
 mod tests;

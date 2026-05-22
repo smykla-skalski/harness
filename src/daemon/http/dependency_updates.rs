@@ -13,7 +13,8 @@ use crate::daemon::protocol::{
     DependencyUpdatesFilesListRequest, DependencyUpdatesFilesPatchRequest,
     DependencyUpdatesFilesViewedRequest, DependencyUpdatesLabelRequest,
     DependencyUpdatesMergeRequest, DependencyUpdatesQueryRequest, DependencyUpdatesRefreshRequest,
-    DependencyUpdatesRepositoryCatalogRequest, DependencyUpdatesRerunChecksRequest, http_paths,
+    DependencyUpdatesRepositoryCatalogRequest, DependencyUpdatesRerunChecksRequest,
+    DependencyUpdatesTimelineRequest, http_paths,
 };
 use crate::daemon::service;
 
@@ -113,6 +114,10 @@ pub(super) fn dependency_updates_routes() -> Router<DaemonHttpState> {
         .route(
             http_paths::DEPENDENCY_UPDATES_FILES_LOCAL_CLONES_DELETE,
             post(post_dependency_update_files_local_clones_delete),
+        )
+        .route(
+            http_paths::DEPENDENCY_UPDATES_TIMELINE,
+            post(post_dependency_update_timeline),
         )
 }
 
@@ -267,7 +272,7 @@ async fn delete_dependency_updates_cache(
         http_paths::DEPENDENCY_UPDATES_CACHE,
         &request_id,
         start,
-        service::clear_dependency_updates_cache(),
+        service::clear_dependency_updates_caches_with_timeline(),
     )
 }
 
@@ -436,6 +441,22 @@ async fn post_dependency_update_files_local_clones_delete(
     timed_json(
         "POST",
         http_paths::DEPENDENCY_UPDATES_FILES_LOCAL_CLONES_DELETE,
+        &request_id,
+        start,
+        result,
+    )
+}
+
+async fn post_dependency_update_timeline(
+    headers: HeaderMap,
+    State(state): State<DaemonHttpState>,
+    Json(request): Json<DependencyUpdatesTimelineRequest>,
+) -> Response {
+    let (start, request_id) = authenticated_request!(headers, state);
+    let result = service::fetch_dependency_update_timeline(&request).await;
+    timed_json(
+        "POST",
+        http_paths::DEPENDENCY_UPDATES_TIMELINE,
         &request_id,
         start,
         result,

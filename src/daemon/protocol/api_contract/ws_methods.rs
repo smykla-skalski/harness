@@ -103,6 +103,7 @@ pub const DEPENDENCY_UPDATES_FILES_LOCAL_CLONES_LIST: &str =
     "dependency_updates.files_local_clones_list";
 pub const DEPENDENCY_UPDATES_FILES_LOCAL_CLONES_DELETE: &str =
     "dependency_updates.files_local_clones_delete";
+pub const DEPENDENCY_UPDATES_TIMELINE: &str = "dependency_updates.timeline";
 pub const AGENT_CHANGE_ROLE: &str = "agent.change_role";
 pub const AGENT_REMOVE: &str = "agent.remove";
 pub const LEADER_TRANSFER: &str = "leader.transfer";
