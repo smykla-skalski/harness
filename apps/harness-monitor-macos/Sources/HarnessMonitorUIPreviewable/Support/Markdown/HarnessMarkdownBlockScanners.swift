@@ -44,14 +44,19 @@ func isThematicBreak(_ line: String) -> Bool {
   return compact.allSatisfy { $0 == first }
 }
 
-func unorderedMarker(_ line: String) -> (content: String, checkbox: Bool?)? {
+func unorderedMarker(_ line: String)
+  -> (content: String, checkbox: Bool?, checkboxMarkerColumn: Int?)?
+{
   let trimmed = line.trimmingLeadingSpaces()
   guard let marker = trimmed.first, trimmed.count >= 2, ["-", "*", "+"].contains(marker),
     trimmed.dropFirst().first?.isWhitespace == true
   else {
     return nil
   }
-  return checkboxContent(String(trimmed.dropFirst(2)))
+  let (content, checkbox) = checkboxContent(String(trimmed.dropFirst(2)))
+  let leadingByteCount = line.utf8.prefix { $0 == 0x20 || $0 == 0x09 }.count
+  let checkboxMarkerColumn: Int? = checkbox == nil ? nil : leadingByteCount + 3
+  return (content, checkbox, checkboxMarkerColumn)
 }
 
 func orderedMarker(_ line: String) -> (number: Int, content: String)? {

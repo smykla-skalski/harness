@@ -82,7 +82,18 @@ indirect enum HarnessMarkdownBlock: Equatable, Sendable {
 
 struct HarnessMarkdownListItem: Equatable, Sendable {
   let checkbox: Bool?
+  let checkboxSourceOffset: Int?
   let blocks: [HarnessMarkdownBlock]
+
+  init(
+    checkbox: Bool?,
+    checkboxSourceOffset: Int? = nil,
+    blocks: [HarnessMarkdownBlock]
+  ) {
+    self.checkbox = checkbox
+    self.checkboxSourceOffset = checkboxSourceOffset
+    self.blocks = blocks
+  }
 }
 
 struct HarnessMarkdownDetails: Equatable, Sendable {
