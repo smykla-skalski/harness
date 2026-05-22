@@ -38,4 +38,13 @@ struct DependencyRefreshTracker: Equatable, Sendable {
       }
     }
   }
+
+  /// Drop tracker entries for pull requests that are no longer in the
+  /// catalog (e.g. merged or vanished after a remote refresh). Live IDs
+  /// keep their counts and titles untouched so in-flight actions on those
+  /// PRs continue to render correctly.
+  mutating func prune(toLiveIDs liveIDs: Set<String>) {
+    counts = counts.filter { liveIDs.contains($0.key) }
+    actionTitles = actionTitles.filter { liveIDs.contains($0.key) }
+  }
 }
