@@ -205,7 +205,9 @@ extension DashboardDependenciesRouteView {
         }
       },
       onRebaseViaBot: {
-        if let item = items.first, let bot = DependencyUpdateBot.detect(authorLogin: item.authorLogin) {
+        if let item = items.first,
+          let bot = DependencyUpdateBot.detect(authorLogin: item.authorLogin)
+        {
           Task { await rebaseViaBot(item: item, bot: bot) }
         }
       }

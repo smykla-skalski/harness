@@ -216,9 +216,7 @@ struct DashboardDependenciesControlStrip: View {
     Binding(
       get: { isNeedsMeActive },
       set: { newValue in
-        filterModeRaw =
-          (newValue ? DashboardDependenciesFilterMode.blocked
-            : DashboardDependenciesFilterMode.all).rawValue
+        filterModeRaw = (newValue ? DashboardDependenciesFilterMode.blocked : .all).rawValue
       }
     )
   }
