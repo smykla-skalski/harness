@@ -10,6 +10,7 @@
 #   - Global build caches:   ~/Library/Caches/go-build, Mozilla.sccache, Yarn,
 #                            ~/.cache/tuist
 #   - Tool caches:           JetBrains, Homebrew prune, swiftpm
+#                            (ms-playwright is reported but NOT removed; pass --force/-f to remove it)
 #
 # --aggressive also wipes Xcode UI HarnessMonitor-* DerivedData (slow regen,
 # loses SourcePackages cache - only use when truly desperate for space).
@@ -25,14 +26,16 @@ readonly ROOT
 
 DRY_RUN=0
 AGGRESSIVE=0
+FORCE=0
 TOTAL_RECLAIMED_KB=0
 
 usage() {
   cat <<EOF
-Usage: $(basename "$0") [--dry-run] [--aggressive] [-h|--help]
+Usage: $(basename "$0") [--dry-run] [--aggressive] [-f|--force] [-h|--help]
 
   --dry-run     Print targets and sizes; do not delete.
   --aggressive  Also wipe Xcode UI HarnessMonitor-* DerivedData slots.
+  -f, --force   Also remove ms-playwright cache (reported-only by default).
   -h, --help    Show this help.
 EOF
 }
@@ -41,6 +44,7 @@ while (($#)); do
   case "$1" in
     --dry-run) DRY_RUN=1 ;;
     --aggressive) AGGRESSIVE=1 ;;
+    -f|--force) FORCE=1 ;;
     -h|--help) usage; exit 0 ;;
     *) echo "unknown flag: $1" >&2; usage >&2; exit 2 ;;
   esac
@@ -145,7 +149,9 @@ remove_path 'tuist cache'                           "$HOME/.cache/tuist"
 
 section 'Tool caches'
 remove_path 'JetBrains caches'                      "$HOME/Library/Caches/JetBrains"
-remove_path 'ms-playwright cache'                   "$HOME/Library/Caches/ms-playwright"
+if (( FORCE )); then
+  remove_path 'ms-playwright cache'                 "$HOME/Library/Caches/ms-playwright"
+fi
 # Keep Copilot warm state intact; clean:caches is meant to reclaim disposable build/test caches.
 if command -v brew >/dev/null 2>&1; then
   run_cmd 'brew cleanup --prune=all'                brew cleanup -s --prune=all
@@ -172,4 +178,10 @@ printf '\n== summary ==\n'
 printf 'reclaimed (target sizes summed): %s\n' "$(bytes_to_human "$TOTAL_RECLAIMED_KB")"
 printf 'after:  %s\n' "$(disk_free_g)"
 (( DRY_RUN )) && printf '(dry-run; no files were deleted)\n'
+if ! (( FORCE )); then
+  _pw_kb=$(path_size_kb "$HOME/Library/Caches/ms-playwright")
+  if [[ -e "$HOME/Library/Caches/ms-playwright" ]]; then
+    printf 'ms-playwright cache: %s (pass -f/--force to remove)\n' "$(bytes_to_human "$_pw_kb")"
+  fi
+fi
 exit 0
