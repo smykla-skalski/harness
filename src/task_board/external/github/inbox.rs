@@ -1,6 +1,10 @@
 use std::fmt;
+use std::time::Duration;
 
 use async_trait::async_trait;
+
+const GITHUB_HTTP_CONNECT_TIMEOUT: Duration = Duration::from_secs(30);
+const GITHUB_HTTP_READ_TIMEOUT: Duration = Duration::from_secs(60);
 
 use crate::errors::{CliError, CliErrorKind};
 use crate::task_board::external::{
@@ -49,6 +53,8 @@ impl GitHubInboxSyncClient {
         ensure_rustls_provider();
         let client = octocrab::Octocrab::builder()
             .personal_token(token)
+            .set_connect_timeout(Some(GITHUB_HTTP_CONNECT_TIMEOUT))
+            .set_read_timeout(Some(GITHUB_HTTP_READ_TIMEOUT))
             .build()
             .map_err(github_client_error)?;
         let repositories = repositories

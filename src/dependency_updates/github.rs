@@ -1,8 +1,12 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::slice;
 use std::sync::OnceLock;
+use std::time::Duration;
 
 use octocrab::Octocrab;
+
+const GITHUB_HTTP_CONNECT_TIMEOUT: Duration = Duration::from_secs(30);
+const GITHUB_HTTP_READ_TIMEOUT: Duration = Duration::from_secs(60);
 use rustls::crypto::ring::default_provider;
 use serde_json::json;
 
@@ -79,6 +83,8 @@ impl DependencyUpdatesGitHubClient {
         ensure_rustls_provider();
         let client = Octocrab::builder()
             .personal_token(token.to_string())
+            .set_connect_timeout(Some(GITHUB_HTTP_CONNECT_TIMEOUT))
+            .set_read_timeout(Some(GITHUB_HTTP_READ_TIMEOUT))
             .build()
             .map_err(client_error)?;
         let automation = GitHubApiAutomationClient::new(token)?;
