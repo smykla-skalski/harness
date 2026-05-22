@@ -52,8 +52,8 @@ struct DashboardWindowPerfScenarioScript: ViewModifier {
   }
 
   private func runDashboardSearchSuggestionsScript() async {
-    await runMeasuredStep("route.dependencies") {
-      selectedRoute = .dependencies
+    await runMeasuredStep("route.reviews") {
+      selectedRoute = .reviews
       await Task.yield()
       try? await Task.sleep(for: .milliseconds(180))
     }

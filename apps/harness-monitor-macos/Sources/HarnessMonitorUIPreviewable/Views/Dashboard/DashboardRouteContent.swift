@@ -7,20 +7,20 @@ struct DashboardRouteContent: View {
   let store: HarnessMonitorStore
   let dashboardUI: HarnessMonitorStore.ContentDashboardSlice
   let sessionCatalog: HarnessMonitorStore.SessionCatalogSlice
-  @State private var dependenciesSearchAutomationCommand = AppSearchAutomationCommand.idle
+  @State private var reviewsSearchAutomationCommand = AppSearchAutomationCommand.idle
   @State private var notificationsHasBeenMounted = false
   @State private var diagnosticsHasBeenMounted = false
   @State private var policyCanvasHasBeenMounted = false
-  @State private var dependenciesHasBeenMounted = false
+  @State private var reviewsHasBeenMounted = false
 
   private var isTaskBoardVisible: Bool { route == .taskBoard }
   private var isNotificationsVisible: Bool { route == .notifications }
   private var isDiagnosticsVisible: Bool { route == .diagnostics }
   private var isPolicyCanvasVisible: Bool { route == .policyCanvas }
-  private var isDependenciesVisible: Bool { route == .dependencies }
-  private var dependenciesSearchAutomation: AppSearchAutomationCommand? {
+  private var isReviewsVisible: Bool { route == .reviews }
+  private var reviewsSearchAutomation: AppSearchAutomationCommand? {
     HarnessMonitorUITestEnvironment.isPerfScenarioActive
-      ? dependenciesSearchAutomationCommand
+      ? reviewsSearchAutomationCommand
       : nil
   }
 
@@ -72,24 +72,24 @@ struct DashboardRouteContent: View {
         }
       }
 
-      if dependenciesHasBeenMounted || isDependenciesVisible {
-        DashboardDependenciesRouteView(
+      if reviewsHasBeenMounted || isReviewsVisible {
+        DashboardReviewsRouteView(
           store: store,
           selectedRoute: $selectedRoute,
-          searchAutomationCommand: dependenciesSearchAutomation
+          searchAutomationCommand: reviewsSearchAutomation
         )
-        .opacity(isDependenciesVisible ? 1 : 0)
-        .allowsHitTesting(isDependenciesVisible)
-        .accessibilityHidden(!isDependenciesVisible)
+        .opacity(isReviewsVisible ? 1 : 0)
+        .allowsHitTesting(isReviewsVisible)
+        .accessibilityHidden(!isReviewsVisible)
         .onAppear {
-          dependenciesHasBeenMounted = true
+          reviewsHasBeenMounted = true
         }
       }
     }
     .modifier(
       DashboardWindowPerfScenarioScript(
         selectedRoute: $selectedRoute,
-        searchAutomationCommand: $dependenciesSearchAutomationCommand
+        searchAutomationCommand: $reviewsSearchAutomationCommand
       )
     )
   }

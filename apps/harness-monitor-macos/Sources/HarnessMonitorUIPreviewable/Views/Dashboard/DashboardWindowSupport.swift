@@ -118,7 +118,7 @@ public enum DashboardWindowRoute: String, CaseIterable, Identifiable, Sendable {
   case policyCanvas
   case notifications
   case diagnostics
-  case dependencies
+  case reviews
 
   public var id: String { rawValue }
 
@@ -132,8 +132,8 @@ public enum DashboardWindowRoute: String, CaseIterable, Identifiable, Sendable {
       "Notifications"
     case .diagnostics:
       "Diagnostics"
-    case .dependencies:
-      "Dependencies"
+    case .reviews:
+      "Reviews"
     }
   }
 
@@ -147,7 +147,7 @@ public enum DashboardWindowRoute: String, CaseIterable, Identifiable, Sendable {
       "bell.badge"
     case .diagnostics:
       "stethoscope"
-    case .dependencies:
+    case .reviews:
       "shippingbox.circle"
     }
   }
