@@ -15,8 +15,10 @@ pub use body_update::{
     DependencyUpdatesBodyUpdateResponse,
 };
 pub use files::{
-    DependencyUpdateFile, DependencyUpdateFileChangeType, DependencyUpdateFileViewedState,
+    DependencyUpdateFile, DependencyUpdateFileChangeType, DependencyUpdateFilePatch,
+    DependencyUpdateFileServedBy, DependencyUpdateFileViewedState,
     DependencyUpdatesFilesListRequest, DependencyUpdatesFilesListResponse,
+    DependencyUpdatesFilesPatchRequest, DependencyUpdatesFilesPatchResponse,
     DependencyUpdatesRateLimitSnapshot, HarnessCodeLanguage, infer_language,
 };
 pub(crate) use github::DependencyUpdatesGitHubClient;

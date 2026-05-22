@@ -23,6 +23,7 @@ use serde::{Deserialize, Serialize};
 
 mod language;
 pub(crate) mod list;
+pub(crate) mod patch_rest;
 
 #[cfg(test)]
 mod tests;
@@ -143,4 +144,81 @@ pub struct DependencyUpdatesRateLimitSnapshot {
     pub reset_at: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub cost: Option<u32>,
+}
+
+/// Batched patch request for one PR. The caller supplies the head ref oid it
+/// believes it's still on; the daemon compares against the current head and
+/// returns `drifted: true` with the fresh oid if a force-push intervened.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct DependencyUpdatesFilesPatchRequest {
+    pub pull_request_id: String,
+    pub head_ref_oid_expected: String,
+    pub paths: Vec<String>,
+}
+
+impl DependencyUpdatesFilesPatchRequest {
+    #[must_use]
+    pub fn normalized_pull_request_id(&self) -> String {
+        self.pull_request_id.trim().to_string()
+    }
+
+    #[must_use]
+    pub fn normalized_paths(&self) -> Vec<String> {
+        self.paths
+            .iter()
+            .filter_map(|raw| {
+                let trimmed = raw.trim();
+                if trimmed.is_empty() {
+                    None
+                } else {
+                    Some(trimmed.to_string())
+                }
+            })
+            .collect()
+    }
+}
+
+/// Response carrying the per-path patches plus drift detection.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct DependencyUpdatesFilesPatchResponse {
+    pub pull_request_id: String,
+    pub patches: Vec<DependencyUpdateFilePatch>,
+    pub drifted: bool,
+    pub current_head_ref_oid: String,
+    pub fetched_at: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub rate_limit_snapshot: Option<DependencyUpdatesRateLimitSnapshot>,
+}
+
+/// Annotates which path produced a patch body so the UI can label provenance.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum DependencyUpdateFileServedBy {
+    #[default]
+    GithubRest,
+    LocalClone,
+    /// Local-clone path was attempted but fell back to REST due to a clone
+    /// failure. Surfaces a different UI affordance ("via local clone
+    /// (fallback)").
+    GithubRestFallback,
+}
+
+/// One file's patch body + metadata produced by either REST or local clone.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct DependencyUpdateFilePatch {
+    pub path: String,
+    pub patch: String,
+    pub status: DependencyUpdateFileChangeType,
+    pub additions: u32,
+    pub deletions: u32,
+    #[serde(default)]
+    pub truncated: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub etag: Option<String>,
+    #[serde(default)]
+    pub served_by: DependencyUpdateFileServedBy,
+    #[serde(default)]
+    pub fetched_at: String,
+    #[serde(default)]
+    pub head_ref_oid: String,
 }
