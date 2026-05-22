@@ -45,7 +45,7 @@ extension HarnessMonitorAccessibility {
   public static let settingsConnectionSection = "harness.settings.section.connection"
   public static let settingsTaskBoardSection = "harness.settings.section.taskboard"
   public static let settingsRepositoriesSection = "harness.settings.section.repositories"
-  public static let settingsDependenciesSection = "harness.settings.section.dependencies"
+  public static let settingsReviewsSection = "harness.settings.section.dependencies"
   public static let settingsSecretsSection = "harness.settings.section.secrets"
   public static let settingsDatabaseSection = "harness.settings.section.database"
   public static let settingsDiagnosticsSection = "harness.settings.section.diagnostics"
@@ -143,37 +143,37 @@ extension HarnessMonitorAccessibility {
     "harness.settings.repositories.catalog.add-selected"
   public static let settingsRepositoriesCatalogAddAllButton =
     "harness.settings.repositories.catalog.add-all"
-  public static let settingsDependenciesRoot = "harness.settings.dependencies"
-  public static let settingsDependenciesReloadButton = "harness.settings.dependencies.reload"
-  public static let settingsDependenciesSaveButton = "harness.settings.dependencies.save"
-  public static let settingsDependenciesAuthorsField = "harness.settings.dependencies.authors"
-  public static let settingsDependenciesRepositoriesSummary =
+  public static let settingsReviewsRoot = "harness.settings.dependencies"
+  public static let settingsReviewsReloadButton = "harness.settings.dependencies.reload"
+  public static let settingsReviewsSaveButton = "harness.settings.dependencies.save"
+  public static let settingsReviewsAuthorsField = "harness.settings.dependencies.authors"
+  public static let settingsReviewsRepositoriesSummary =
     "harness.settings.dependencies.repositories.summary"
-  public static let settingsDependenciesRepositoriesButton =
+  public static let settingsReviewsRepositoriesButton =
     "harness.settings.dependencies.repositories.open"
-  public static let settingsDependenciesOrganizationsField =
+  public static let settingsReviewsOrganizationsField =
     "harness.settings.dependencies.organizations"
-  public static let settingsDependenciesRepositoriesField =
+  public static let settingsReviewsRepositoriesField =
     "harness.settings.dependencies.repositories"
-  public static let settingsDependenciesExcludedReposField =
+  public static let settingsReviewsExcludedReposField =
     "harness.settings.dependencies.exclude-repositories"
-  public static let settingsDependenciesMergeMethodField =
+  public static let settingsReviewsMergeMethodField =
     "harness.settings.dependencies.merge-method"
   public static let settingsDepsShowLabelDescriptionsToggle =
     "harness.settings.dependencies.show-label-descriptions"
   public static let settingsDepsFrequentLabelsCountField =
     "harness.settings.dependencies.frequent-labels-count"
-  public static let settingsDependenciesRefreshIntervalField =
+  public static let settingsReviewsRefreshIntervalField =
     "harness.settings.dependencies.refresh-interval"
-  public static let settingsDependenciesPerRepoIntervalField =
+  public static let settingsReviewsPerRepoIntervalField =
     "harness.settings.dependencies.per-repo-interval"
-  public static let settingsDependenciesMaxConcurrentField =
+  public static let settingsReviewsMaxConcurrentField =
     "harness.settings.dependencies.max-concurrent"
   public static let settingsDepsExpandOrganizationsToggle =
     "harness.settings.dependencies.expand-organizations"
-  public static let dashboardDependenciesSchedulerBadge =
+  public static let dashboardReviewsSchedulerBadge =
     "harness.dashboard.dependencies.scheduler-badge"
-  public static let settingsDependenciesCacheMaxAgeField =
+  public static let settingsReviewsCacheMaxAgeField =
     "harness.settings.dependencies.cache-max-age"
   public static let settingsSecretsRoot = "harness.settings.secrets"
   public static let settingsSecretsStatus = "harness.settings.secrets.status"
@@ -277,7 +277,7 @@ extension HarnessMonitorAccessibility {
     "harness.settings.repositories.\(index).row"
   }
 
-  public static func settingsRepositoriesDependenciesToggle(_ index: Int) -> String {
+  public static func settingsRepositoriesReviewsToggle(_ index: Int) -> String {
     "harness.settings.repositories.\(index).dependencies"
   }
 

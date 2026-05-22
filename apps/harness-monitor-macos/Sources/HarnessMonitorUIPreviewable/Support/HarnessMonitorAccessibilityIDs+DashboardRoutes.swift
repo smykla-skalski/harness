@@ -1,28 +1,28 @@
 extension HarnessMonitorAccessibility {
   public static let dashboardDiagnosticsRoot = "harness.dashboard.diagnostics"
-  public static let dashboardDependenciesRoot = "harness.dashboard.dependencies"
-  public static let dashboardDependenciesProvenance =
+  public static let dashboardReviewsRoot = "harness.dashboard.dependencies"
+  public static let dashboardReviewsProvenance =
     "harness.dashboard.dependencies.provenance"
-  public static let dashboardDependenciesList = "harness.dashboard.dependencies.list"
-  public static let dashboardDependenciesDetail = "harness.dashboard.dependencies.detail"
-  public static let dashboardDependenciesDetailDivider =
+  public static let dashboardReviewsList = "harness.dashboard.dependencies.list"
+  public static let dashboardReviewsDetail = "harness.dashboard.dependencies.detail"
+  public static let dashboardReviewsDetailDivider =
     "harness.dashboard.dependencies.content-detail-divider"
-  public static let dashboardDependenciesRefreshButton = "harness.dashboard.dependencies.refresh"
+  public static let dashboardReviewsRefreshButton = "harness.dashboard.dependencies.refresh"
   public static let dependenciesRefreshSelectedButton =
     "harness.dashboard.dependencies.refresh-selected"
-  public static let dashboardDependenciesConfigureButton =
+  public static let dashboardReviewsConfigureButton =
     "harness.dashboard.dependencies.configure"
-  public static let dashboardDependenciesFixCIButton = "harness.dashboard.dependencies.fix-ci"
-  public static let dashboardDependenciesCustomLabelSheet =
+  public static let dashboardReviewsFixCIButton = "harness.dashboard.dependencies.fix-ci"
+  public static let dashboardReviewsCustomLabelSheet =
     "harness.dashboard.dependencies.custom-label.sheet"
-  public static let dashboardDependenciesCustomLabelField =
+  public static let dashboardReviewsCustomLabelField =
     "harness.dashboard.dependencies.custom-label.field"
-  public static let dashboardDependenciesCustomLabelCancel =
+  public static let dashboardReviewsCustomLabelCancel =
     "harness.dashboard.dependencies.custom-label.cancel"
-  public static let dashboardDependenciesCustomLabelApply =
+  public static let dashboardReviewsCustomLabelApply =
     "harness.dashboard.dependencies.custom-label.apply"
-  public static let dashboardDependenciesSelectionStatus =
+  public static let dashboardReviewsSelectionStatus =
     "harness.dashboard.dependencies.selection"
-  public static let dashboardDependenciesDescription =
+  public static let dashboardReviewsDescription =
     "harness.dashboard.dependencies.description"
 }

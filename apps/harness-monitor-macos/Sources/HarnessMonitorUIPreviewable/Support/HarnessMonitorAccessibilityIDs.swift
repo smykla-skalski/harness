@@ -93,28 +93,28 @@ public enum HarnessMonitorAccessibility {
   public static let dashboardNotificationsRoot = "harness.dashboard.notifications"
   public static let dashboardNotificationsScrollView = "harness.dashboard.notifications.scroll"
   public static let dashboardNotificationsEmptyState = "harness.dashboard.notifications.empty-state"
-  public static let dashboardDependencyFilesSection =
+  public static let dashboardReviewFilesSection =
     "harness.dashboard.dependencies.files.section"
-  public static let dashboardDependencyFilesHeader =
+  public static let dashboardReviewFilesHeader =
     "harness.dashboard.dependencies.files.header"
-  public static let dashboardDependencyFilesFilterField =
+  public static let dashboardReviewFilesFilterField =
     "harness.dashboard.dependencies.files.filter"
-  public static let dashboardDependencyFilesSortMenu =
+  public static let dashboardReviewFilesSortMenu =
     "harness.dashboard.dependencies.files.sort"
-  public static let dashboardDependencyFilesTree =
+  public static let dashboardReviewFilesTree =
     "harness.dashboard.dependencies.files.tree"
-  public static let dashboardDependencyFilesEmptyState =
+  public static let dashboardReviewFilesEmptyState =
     "harness.dashboard.dependencies.files.empty"
 
-  public static func dashboardDependencyFileCard(path: String) -> String {
+  public static func dashboardReviewFileCard(path: String) -> String {
     "harness.dashboard.dependencies.files.card.\(slug(path))"
   }
 
-  public static func dashboardDependencyFileViewedToggle(path: String) -> String {
+  public static func dashboardReviewFileViewedToggle(path: String) -> String {
     "harness.dashboard.dependencies.files.viewed-toggle.\(slug(path))"
   }
 
-  public static func dashboardDependencyFileViewModeMenu(path: String) -> String {
+  public static func dashboardReviewFileViewModeMenu(path: String) -> String {
     "harness.dashboard.dependencies.files.view-mode.\(slug(path))"
   }
 
