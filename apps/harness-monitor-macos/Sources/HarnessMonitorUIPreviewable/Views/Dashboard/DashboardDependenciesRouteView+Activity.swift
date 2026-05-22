@@ -21,15 +21,19 @@ extension DashboardDependenciesRouteView {
     title: String,
     items: [DependencyUpdateItem]
   ) {
+    let resultsByTarget = Dictionary(grouping: response.results) { result in
+      DashboardDependencyActionResultKey(repository: result.repository, number: result.number)
+    }
     var actions = routeRecentDependencyActions
     for item in items {
-      let matchingResults = response.results.filter {
-        $0.repository == item.repository && $0.number == item.number
-      }
+      let targetKey = DashboardDependencyActionResultKey(
+        repository: item.repository,
+        number: item.number
+      )
       actions[item.pullRequestID] = DashboardDependencyActivityEntry.success(
         title: title,
         response: response,
-        results: matchingResults
+        results: resultsByTarget[targetKey] ?? []
       )
     }
     routeRecentDependencyActions = actions
@@ -53,21 +57,21 @@ extension DashboardDependenciesRouteView {
   }
 
   func syncRecentDependencyActionsFromStorage(_ storedValue: String) {
-    guard let data = storedValue.data(using: .utf8), !data.isEmpty else {
+    guard !storedValue.isEmpty else {
       routeRecentDependencyActions = [:]
       return
     }
-    do {
-      routeRecentDependencyActions = try JSONDecoder().decode(
-        [String: DashboardDependencyActivityEntry].self,
-        from: data
-      )
-    } catch {
+    guard let decoded = DashboardDependenciesStorageCodec.decode(
+      [String: DashboardDependencyActivityEntry].self,
+      from: storedValue
+    ) else {
       HarnessMonitorLogger.swiftui.warning(
-        "Dependency action diagnostics decode failed: \(String(reflecting: error), privacy: .public)"
+        "Dependency action diagnostics decode failed"
       )
       routeRecentDependencyActions = [:]
+      return
     }
+    routeRecentDependencyActions = decoded
   }
 
   func persistRecentDependencyActions() {
@@ -79,20 +83,23 @@ extension DashboardDependenciesRouteView {
         .map { ($0.key, $0.value) }
     )
     routeRecentDependencyActions = limited
-    do {
-      let data = try JSONEncoder().encode(limited)
-      if let encoded = String(bytes: data, encoding: .utf8) {
-        recentDependencyActionsStorage = encoded
-      }
-    } catch {
+    let encoded = DashboardDependenciesStorageCodec.encodeToString(limited)
+    if encoded.isEmpty {
       HarnessMonitorLogger.swiftui.warning(
-        "Dependency action diagnostics encode failed: \(String(reflecting: error), privacy: .public)"
+        "Dependency action diagnostics encode failed"
       )
+      return
     }
+    recentDependencyActionsStorage = encoded
   }
 
   func clearRecentDependencyActions() {
     routeRecentDependencyActions = [:]
     recentDependencyActionsStorage = ""
   }
+}
+
+private struct DashboardDependencyActionResultKey: Hashable {
+  let repository: String
+  let number: UInt64
 }
