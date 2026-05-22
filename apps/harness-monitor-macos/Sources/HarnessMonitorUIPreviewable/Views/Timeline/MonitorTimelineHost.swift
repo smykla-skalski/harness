@@ -3,7 +3,7 @@ import Foundation
 public struct MonitorTimelineHost: Hashable, Sendable {
   public enum Kind: String, Hashable, Sendable {
     case session
-    case dependencyPullRequest
+    case reviewPullRequest
   }
 
   public let kind: Kind
@@ -18,8 +18,8 @@ public struct MonitorTimelineHost: Hashable, Sendable {
     Self(kind: .session, id: sessionID)
   }
 
-  public static func dependencyPullRequest(_ pullRequestID: String) -> Self {
-    Self(kind: .dependencyPullRequest, id: pullRequestID)
+  public static func reviewPullRequest(_ pullRequestID: String) -> Self {
+    Self(kind: .reviewPullRequest, id: pullRequestID)
   }
 
   public var storageKey: String {

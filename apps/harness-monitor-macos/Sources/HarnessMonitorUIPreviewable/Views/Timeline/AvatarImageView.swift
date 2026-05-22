@@ -2,7 +2,7 @@ import HarnessMonitorKit
 import SwiftUI
 
 /// SwiftUI view that resolves and displays a downsampled GitHub avatar
-/// for the given login through [`DependencyUpdateAvatarCache`].
+/// for the given login through [`ReviewAvatarCache`].
 ///
 /// Renders a circular avatar of `size × size` points; while the cache
 /// resolves the image, shows a neutral secondary-colored circle so the
@@ -40,7 +40,7 @@ struct AvatarImageView: View {
       else {
         return
       }
-      let resolved = await DependencyUpdateAvatarCache.shared.avatar(
+      let resolved = await ReviewAvatarCache.shared.avatar(
         for: url,
         targetPixel: pixel
       )

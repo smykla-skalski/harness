@@ -11,13 +11,13 @@ struct SimpleActorDescriptor {
   let tone: SessionTimelineTone
   let statusBadge: String?
 
-  func title(actor: DependencyUpdateTimelineActor?) -> String {
+  func title(actor: ReviewTimelineActor?) -> String {
     let who = actor?.login ?? "Someone"
     return "\(who) \(actionPhrase)"
   }
 }
 
-extension DependencyPullRequestTimelineNodeBuilder {
+extension ReviewPullRequestTimelineNodeBuilder {
   static func simpleActorDescriptor(
     _ payload: SimpleActorEventPayload
   ) -> SimpleActorDescriptor {
