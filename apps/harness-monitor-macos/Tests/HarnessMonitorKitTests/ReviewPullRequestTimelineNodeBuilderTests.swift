@@ -3,9 +3,9 @@ import XCTest
 @testable import HarnessMonitorKit
 @testable import HarnessMonitorUIPreviewable
 
-final class DependencyPullRequestTimelineNodeBuilderTests: XCTestCase {
+final class ReviewPullRequestTimelineNodeBuilderTests: XCTestCase {
   func testHeavyReviewThreadAutoCollapseSuppressesChildRows() {
-    let thread = DependencyUpdateTimelineEntry.reviewThread(
+    let thread = ReviewTimelineEntry.reviewThread(
       ReviewThreadPayload(
         id: "thread-1",
         createdAt: "2026-05-22T11:00:00Z",
@@ -21,13 +21,13 @@ final class DependencyPullRequestTimelineNodeBuilderTests: XCTestCase {
       )
     )
 
-    let collapsed = DependencyPullRequestTimelineNodeBuilder().buildNodes(
+    let collapsed = ReviewPullRequestTimelineNodeBuilder().buildNodes(
       for: [thread],
       pullRequestID: "PR_1",
       autoCollapseHeavyReviewThreads: true,
       configuration: .default
     )
-    let expanded = DependencyPullRequestTimelineNodeBuilder().buildNodes(
+    let expanded = ReviewPullRequestTimelineNodeBuilder().buildNodes(
       for: [thread],
       pullRequestID: "PR_1",
       autoCollapseHeavyReviewThreads: false,

@@ -153,7 +153,7 @@ let sampleTaskBoardOrchestratorSettingsJSON: [String: JSONValue] = [
     .string("default_task"),
     .string("pr_fix"),
     .string("pr_review"),
-    .string("dependency_update"),
+    .string("review"),
   ]),
   "dry_run_default": .bool(false),
   "dispatch_status_filter": .string("todo"),

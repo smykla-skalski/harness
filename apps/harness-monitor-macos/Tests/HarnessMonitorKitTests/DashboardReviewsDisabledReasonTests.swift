@@ -5,14 +5,14 @@ import Testing
 @testable import HarnessMonitorUIPreviewable
 
 @Suite("Dashboard dependencies disabled reason helpers")
-struct DashboardDependenciesDisabledReasonTests {
+struct DashboardReviewsDisabledReasonTests {
   @Test("Approve reason is nil when at least one item is approvable")
   func approveReasonIsNilWhenAnyItemIsApprovable() {
     let approvable = makeItem(state: .open, reviewStatus: .reviewRequired)
     let approved = makeItem(state: .open, reviewStatus: .approved)
 
-    #expect(DashboardDependenciesDisabledReason.approveReason(for: [approvable]) == nil)
-    #expect(DashboardDependenciesDisabledReason.approveReason(for: [approved, approvable]) == nil)
+    #expect(DashboardReviewsDisabledReason.approveReason(for: [approvable]) == nil)
+    #expect(DashboardReviewsDisabledReason.approveReason(for: [approved, approvable]) == nil)
   }
 
   @Test("Approve reason reports already-approved selections")
@@ -20,7 +20,7 @@ struct DashboardDependenciesDisabledReasonTests {
     let approved = makeItem(state: .open, reviewStatus: .approved)
 
     #expect(
-      DashboardDependenciesDisabledReason.approveReason(for: [approved])
+      DashboardReviewsDisabledReason.approveReason(for: [approved])
         == "Already approved"
     )
   }
@@ -30,7 +30,7 @@ struct DashboardDependenciesDisabledReasonTests {
     let changes = makeItem(state: .open, reviewStatus: .changesRequested)
 
     #expect(
-      DashboardDependenciesDisabledReason.approveReason(for: [changes])
+      DashboardReviewsDisabledReason.approveReason(for: [changes])
         == "Changes requested - resolve review before approving"
     )
   }
@@ -40,7 +40,7 @@ struct DashboardDependenciesDisabledReasonTests {
     let readOnly = makeItem(state: .open, reviewStatus: .reviewRequired, viewerCanUpdate: false)
 
     #expect(
-      DashboardDependenciesDisabledReason.approveReason(for: [readOnly])
+      DashboardReviewsDisabledReason.approveReason(for: [readOnly])
         == "Current GitHub token cannot update selected pull request(s)"
     )
     #expect(!readOnly.canAttemptManualApproval)
@@ -51,7 +51,7 @@ struct DashboardDependenciesDisabledReasonTests {
     let closed = makeItem(state: .closed, reviewStatus: .reviewRequired)
 
     #expect(
-      DashboardDependenciesDisabledReason.approveReason(for: [closed])
+      DashboardReviewsDisabledReason.approveReason(for: [closed])
         == "Pull request is not open"
     )
   }
@@ -59,7 +59,7 @@ struct DashboardDependenciesDisabledReasonTests {
   @Test("Approve reason is the empty fallback for an empty selection")
   func approveReasonForEmptySelection() {
     #expect(
-      DashboardDependenciesDisabledReason.approveReason(for: [])
+      DashboardReviewsDisabledReason.approveReason(for: [])
         == "No pull requests selected"
     )
   }
@@ -71,15 +71,15 @@ struct DashboardDependenciesDisabledReasonTests {
     let closed = makeItem(state: .closed)
 
     #expect(
-      DashboardDependenciesDisabledReason.mergeReason(for: [draft])
+      DashboardReviewsDisabledReason.mergeReason(for: [draft])
         == "Pull request is a draft"
     )
     #expect(
-      DashboardDependenciesDisabledReason.mergeReason(for: [conflict])
+      DashboardReviewsDisabledReason.mergeReason(for: [conflict])
         == "Merge conflicts must be resolved before merging"
     )
     #expect(
-      DashboardDependenciesDisabledReason.mergeReason(for: [closed])
+      DashboardReviewsDisabledReason.mergeReason(for: [closed])
         == "Pull request is not open"
     )
   }
@@ -89,7 +89,7 @@ struct DashboardDependenciesDisabledReasonTests {
     let mergeable = makeItem(state: .open, mergeable: .mergeable)
     let conflict = makeItem(state: .open, mergeable: .conflicting)
 
-    #expect(DashboardDependenciesDisabledReason.mergeReason(for: [mergeable, conflict]) == nil)
+    #expect(DashboardReviewsDisabledReason.mergeReason(for: [mergeable, conflict]) == nil)
   }
 
   @Test("Approve prominence becomes warning when selection needs attention")
@@ -97,8 +97,8 @@ struct DashboardDependenciesDisabledReasonTests {
     let clean = makeItem(state: .open, reviewStatus: .reviewRequired, checkStatus: .success)
     let failing = makeItem(state: .open, reviewStatus: .approved, checkStatus: .failure)
 
-    #expect(dashboardDependencyApproveProminence(for: [clean]) == .primary)
-    #expect(dashboardDependencyApproveProminence(for: [failing]) == .warning)
+    #expect(dashboardReviewApproveProminence(for: [clean]) == .primary)
+    #expect(dashboardReviewApproveProminence(for: [failing]) == .warning)
   }
 
   @Test("Merge prominence becomes destructive for admin bypass of required failing checks")
@@ -112,7 +112,7 @@ struct DashboardDependenciesDisabledReasonTests {
     )
 
     #expect(adminBypass.requiresAdminMergeForRequiredFailures)
-    #expect(dashboardDependencyMergeProminence(for: [adminBypass]) == .destructive)
+    #expect(dashboardReviewMergeProminence(for: [adminBypass]) == .destructive)
   }
 
   @Test("Merge prominence becomes warning when attention does not require admin bypass")
@@ -126,7 +126,7 @@ struct DashboardDependenciesDisabledReasonTests {
     )
 
     #expect(!optionalFailure.requiresAdminMergeForRequiredFailures)
-    #expect(dashboardDependencyMergeProminence(for: [optionalFailure]) == .warning)
+    #expect(dashboardReviewMergeProminence(for: [optionalFailure]) == .warning)
   }
 
   @Test("Merge action title becomes explicit for admin bypass")
@@ -140,8 +140,8 @@ struct DashboardDependenciesDisabledReasonTests {
       viewerCanMergeAsAdmin: true
     )
 
-    #expect(dashboardDependencyMergeActionTitle(for: [clean]) == "Merge")
-    #expect(dashboardDependencyMergeActionTitle(for: [adminBypass]) == "Merge as Admin")
+    #expect(dashboardReviewMergeActionTitle(for: [clean]) == "Merge")
+    #expect(dashboardReviewMergeActionTitle(for: [adminBypass]) == "Merge as Admin")
   }
 
   @Test("Approve confirmation appears only for attention selections")
@@ -149,8 +149,8 @@ struct DashboardDependenciesDisabledReasonTests {
     let clean = makeItem(state: .open, reviewStatus: .reviewRequired, checkStatus: .success)
     let failing = makeItem(state: .open, reviewStatus: .reviewRequired, checkStatus: .failure)
 
-    #expect(dashboardDependencyActionConfirmation(for: .approve, items: [clean]) == nil)
-    let confirmation = dashboardDependencyActionConfirmation(for: .approve, items: [failing])
+    #expect(dashboardReviewActionConfirmation(for: .approve, items: [clean]) == nil)
+    let confirmation = dashboardReviewActionConfirmation(for: .approve, items: [failing])
     #expect(confirmation != nil)
     #expect(confirmation?.title == "Approve pull request that needs attention?")
     #expect(confirmation?.confirmButtonTitle == "Approve 1 Pull Request")
@@ -166,7 +166,7 @@ struct DashboardDependenciesDisabledReasonTests {
       viewerCanMergeAsAdmin: true
     )
 
-    let confirmation = dashboardDependencyActionConfirmation(for: .merge, items: [item])
+    let confirmation = dashboardReviewActionConfirmation(for: .merge, items: [item])
 
     #expect(confirmation?.title == "Merge as Admin despite required failing checks?")
     #expect(confirmation?.confirmButtonTitle == "Merge as Admin")
@@ -200,7 +200,7 @@ struct DashboardDependenciesDisabledReasonTests {
       checkStatus: .success
     )
 
-    let confirmation = dashboardDependencyActionConfirmation(
+    let confirmation = dashboardReviewActionConfirmation(
       for: .merge,
       items: [adminBypass, optionalFailure, changesRequested]
     )
@@ -236,10 +236,10 @@ struct DashboardDependenciesDisabledReasonTests {
     )
 
     #expect(
-      dashboardDependencyAttentionBadgeKinds(for: item)
+      dashboardReviewAttentionBadgeKinds(for: item)
         == [.requiredChecks, .changesRequested, .policyBlocked, .mergeConflicts]
     )
-    #expect(dashboardDependencyAttentionBadgeKinds(for: optionalFailure) == [.failingChecks])
+    #expect(dashboardReviewAttentionBadgeKinds(for: optionalFailure) == [.failingChecks])
   }
 
   @Test("Rerun reason distinguishes passing from pending checks")
@@ -248,11 +248,11 @@ struct DashboardDependenciesDisabledReasonTests {
     let pending = makeItem(checkStatus: .pending)
 
     #expect(
-      DashboardDependenciesDisabledReason.rerunReason(for: [passing])
+      DashboardReviewsDisabledReason.rerunReason(for: [passing])
         == "All checks passing - nothing to rerun"
     )
     #expect(
-      DashboardDependenciesDisabledReason.rerunReason(for: [pending])
+      DashboardReviewsDisabledReason.rerunReason(for: [pending])
         == "Checks are still running"
     )
   }
@@ -262,7 +262,7 @@ struct DashboardDependenciesDisabledReasonTests {
     let failing = makeItem(
       checkStatus: .failure,
       checks: [
-        DependencyUpdateCheck(
+        ReviewCheck(
           name: "ci",
           status: .completed,
           conclusion: .failure,
@@ -271,7 +271,7 @@ struct DashboardDependenciesDisabledReasonTests {
       ]
     )
 
-    #expect(DashboardDependenciesDisabledReason.rerunReason(for: [failing]) == nil)
+    #expect(DashboardReviewsDisabledReason.rerunReason(for: [failing]) == nil)
   }
 
   @Test("Rerun reason requires update permission")
@@ -279,7 +279,7 @@ struct DashboardDependenciesDisabledReasonTests {
     let failing = makeItem(
       checkStatus: .failure,
       checks: [
-        DependencyUpdateCheck(
+        ReviewCheck(
           name: "ci",
           status: .completed,
           conclusion: .failure,
@@ -290,7 +290,7 @@ struct DashboardDependenciesDisabledReasonTests {
     )
 
     #expect(
-      DashboardDependenciesDisabledReason.rerunReason(for: [failing])
+      DashboardReviewsDisabledReason.rerunReason(for: [failing])
         == "Current GitHub token cannot update selected pull request(s)"
     )
     #expect(!failing.canAttemptRerunChecks)
@@ -300,7 +300,7 @@ struct DashboardDependenciesDisabledReasonTests {
   func autoReasonIsNilWhenAnyItemAutoEligible() {
     let auto = makeItem(state: .open, reviewStatus: .none, checkStatus: .success)
 
-    #expect(DashboardDependenciesDisabledReason.autoReason(for: [auto]) == nil)
+    #expect(DashboardReviewsDisabledReason.autoReason(for: [auto]) == nil)
   }
 
   @Test("Auto reason reports when nothing in the selection matches")
@@ -308,7 +308,7 @@ struct DashboardDependenciesDisabledReasonTests {
     let changes = makeItem(state: .open, reviewStatus: .changesRequested, checkStatus: .success)
 
     #expect(
-      DashboardDependenciesDisabledReason.autoReason(for: [changes])
+      DashboardReviewsDisabledReason.autoReason(for: [changes])
         == "Nothing in this selection matches the auto-mode rules"
     )
   }
@@ -318,19 +318,19 @@ struct DashboardDependenciesDisabledReasonTests {
     let readOnly = makeItem(viewerCanUpdate: false)
 
     #expect(
-      DashboardDependenciesDisabledReason.labelReason(for: [readOnly])
+      DashboardReviewsDisabledReason.labelReason(for: [readOnly])
         == "Current GitHub token cannot update selected pull request(s)"
     )
     #expect(
-      DashboardDependenciesDisabledReason.rebaseReason(for: readOnly)
+      DashboardReviewsDisabledReason.rebaseReason(for: readOnly)
         == "Current GitHub token cannot update selected pull request(s)"
     )
-    #expect(!readOnly.canAddDependencyLabel)
+    #expect(!readOnly.canAddReviewLabel)
     #expect(!readOnly.canRebaseViaBot)
   }
 
   @Test("Replacing dependency items preserves update permission")
-  func replacingDependencyItemsPreservesUpdatePermission() {
+  func replacingReviewItemsPreservesUpdatePermission() {
     let readOnly = makeItem(viewerCanUpdate: false)
 
     #expect(!readOnly.replacing(checkStatus: .failure).viewerCanUpdate)
@@ -340,7 +340,7 @@ struct DashboardDependenciesDisabledReasonTests {
   func autoPreviewIsNilForSingleItem() {
     let item = makeItem(state: .open, reviewStatus: .reviewRequired, checkStatus: .success)
 
-    #expect(DashboardDependenciesDisabledReason.autoPreview(for: [item]) == nil)
+    #expect(DashboardReviewsDisabledReason.autoPreview(for: [item]) == nil)
   }
 
   @Test("Auto preview counts approve, merge, and skip")
@@ -349,7 +349,7 @@ struct DashboardDependenciesDisabledReasonTests {
     let approved = makeItem(state: .open, reviewStatus: .approved, checkStatus: .success)
     let blocked = makeItem(state: .open, reviewStatus: .changesRequested, checkStatus: .success)
 
-    let preview = DashboardDependenciesDisabledReason.autoPreview(
+    let preview = DashboardReviewsDisabledReason.autoPreview(
       for: [unreviewed, unreviewed, approved, blocked]
     )
 
@@ -363,24 +363,24 @@ struct DashboardDependenciesDisabledReasonTests {
   func autoPreviewReportsNoMatch() {
     let blocked = makeItem(state: .open, reviewStatus: .changesRequested, checkStatus: .success)
 
-    let preview = DashboardDependenciesDisabledReason.autoPreview(for: [blocked, blocked])
+    let preview = DashboardReviewsDisabledReason.autoPreview(for: [blocked, blocked])
 
     #expect(preview == "No PRs in this selection match the auto-mode rules")
   }
 
   private func makeItem(
-    state: DependencyUpdatePullRequestState = .open,
-    mergeable: DependencyUpdateMergeableState = .mergeable,
-    reviewStatus: DependencyUpdateReviewStatus = .reviewRequired,
-    checkStatus: DependencyUpdateCheckStatus = .success,
+    state: ReviewPullRequestState = .open,
+    mergeable: ReviewMergeableState = .mergeable,
+    reviewStatus: ReviewReviewStatus = .reviewRequired,
+    checkStatus: ReviewCheckStatus = .success,
     policyBlocked: Bool = false,
     isDraft: Bool = false,
-    checks: [DependencyUpdateCheck] = [],
+    checks: [ReviewCheck] = [],
     viewerCanUpdate: Bool = true,
     requiredFailedCheckNames: [String] = [],
     viewerCanMergeAsAdmin: Bool = false
-  ) -> DependencyUpdateItem {
-    DependencyUpdateItem(
+  ) -> ReviewItem {
+    ReviewItem(
       pullRequestID: "pr-1",
       repositoryID: "repo-1",
       repository: "org-a/example",

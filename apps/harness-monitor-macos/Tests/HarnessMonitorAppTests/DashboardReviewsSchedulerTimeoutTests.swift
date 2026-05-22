@@ -5,15 +5,15 @@ import Testing
 @testable import HarnessMonitorUIPreviewable
 
 @MainActor
-@Suite("Dashboard dependencies scheduler timeout + race")
-struct DashboardDependenciesSchedulerTimeoutTests {
+@Suite("Dashboard reviews scheduler timeout + race")
+struct DashboardReviewsSchedulerTimeoutTests {
   @Test("fetch that never returns clears in-flight after the configured timeout")
   func neverReturningFetchTimesOut() async throws {
     let stub = HangingStub()
-    let scheduler = DashboardDependenciesScheduler()
+    let scheduler = DashboardReviewsScheduler()
     scheduler.fetchTimeoutSeconds = 0.2
 
-    var prefs = DashboardDependenciesPreferences()
+    var prefs = DashboardReviewsPreferences()
     prefs.perRepositoryIntervalSeconds = 3_600
     prefs.maxConcurrentRepositoryFetches = 1
 
@@ -37,10 +37,10 @@ struct DashboardDependenciesSchedulerTimeoutTests {
   @Test("stop+start during a hung fetch doesn't let the stale task corrupt new state")
   func stopRestartDuringHungFetchIsRaceSafe() async throws {
     let stub = HangingStub()
-    let scheduler = DashboardDependenciesScheduler()
+    let scheduler = DashboardReviewsScheduler()
     scheduler.fetchTimeoutSeconds = 0.2
 
-    var prefs = DashboardDependenciesPreferences()
+    var prefs = DashboardReviewsPreferences()
     prefs.perRepositoryIntervalSeconds = 3_600
     prefs.maxConcurrentRepositoryFetches = 1
 
@@ -78,7 +78,7 @@ struct DashboardDependenciesSchedulerTimeoutTests {
 
   @Test("timeout error message is human-readable")
   func timeoutErrorHasUserFacingDescription() {
-    let error = DashboardDependenciesSchedulerError.fetchTimedOut
+    let error = DashboardReviewsSchedulerError.fetchTimedOut
     #expect(error.errorDescription?.isEmpty == false)
     #expect(error.errorDescription?.lowercased().contains("timed out") == true)
   }
@@ -86,7 +86,7 @@ struct DashboardDependenciesSchedulerTimeoutTests {
   // MARK: - Helpers
 
   private func waitUntilInFlightContains(
-    scheduler: DashboardDependenciesScheduler,
+    scheduler: DashboardReviewsScheduler,
     repo: String
   ) async throws {
     for _ in 0..<200 where !scheduler.repositoriesInFlight.contains(repo) {
@@ -95,7 +95,7 @@ struct DashboardDependenciesSchedulerTimeoutTests {
   }
 
   private func waitUntilInFlightCleared(
-    scheduler: DashboardDependenciesScheduler
+    scheduler: DashboardReviewsScheduler
   ) async throws {
     for _ in 0..<200 where !scheduler.repositoriesInFlight.isEmpty {
       try await Task.sleep(for: .milliseconds(10))
@@ -103,12 +103,12 @@ struct DashboardDependenciesSchedulerTimeoutTests {
   }
 }
 
-/// A client stub whose `queryDependencyUpdates` never completes until
+/// A client stub whose `queryReviews` never completes until
 /// `release()` is called. Models the wake-from-sleep zombie connection: the
 /// WebSocket RPC continuation never resumes, so the awaiting Task hangs.
 @MainActor
 private final class HangingStub:
-  HarnessMonitorDependenciesClientProtocol, @unchecked Sendable
+  HarnessMonitorReviewsClientProtocol, @unchecked Sendable
 {
   private let lock = NSLock()
   private var continuations: [CheckedContinuation<Void, Never>] = []
@@ -123,18 +123,18 @@ private final class HangingStub:
     }
   }
 
-  func queryDependencyUpdates(
-    request _: DependencyUpdatesQueryRequest
-  ) async throws -> DependencyUpdatesQueryResponse {
+  func queryReviews(
+    request _: ReviewsQueryRequest
+  ) async throws -> ReviewsQueryResponse {
     await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
       lock.lock()
       continuations.append(continuation)
       lock.unlock()
     }
-    return DependencyUpdatesQueryResponse(
+    return ReviewsQueryResponse(
       fetchedAt: "2026-05-22T00:00:00Z",
       fromCache: false,
-      summary: DependencyUpdatesSummary(items: []),
+      summary: ReviewsSummary(items: []),
       items: []
     )
   }

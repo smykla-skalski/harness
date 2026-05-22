@@ -2,17 +2,17 @@ import Testing
 
 @testable import HarnessMonitorKit
 
-@Suite("applyDependencyRefresh merges targeted refresh results")
-struct DependencyUpdatesRefreshMergeTests {
+@Suite("applyReviewsRefresh merges targeted refresh results")
+struct ReviewsRefreshMergeTests {
   @Test("replaces matching open item in place and leaves others untouched")
   func replacesMatchingOpenItem() {
     let original = item(id: "pr-1", reviewStatus: .reviewRequired)
     let other = item(id: "pr-2", reviewStatus: .reviewRequired)
     let refreshedOne = item(id: "pr-1", reviewStatus: .approved)
 
-    let next = applyDependencyRefresh(
+    let next = applyReviewsRefresh(
       to: [original, other],
-      refresh: DependencyUpdatesRefreshResponse(
+      refresh: ReviewsRefreshResponse(
         fetchedAt: "2026-05-21T12:00:00Z",
         items: [refreshedOne]
       )
@@ -31,9 +31,9 @@ struct DependencyUpdatesRefreshMergeTests {
     let other = item(id: "pr-2", state: .open)
     let mergedRefresh = item(id: "pr-1", state: .merged)
 
-    let next = applyDependencyRefresh(
+    let next = applyReviewsRefresh(
       to: [original, other],
-      refresh: DependencyUpdatesRefreshResponse(
+      refresh: ReviewsRefreshResponse(
         fetchedAt: "2026-05-21T12:00:00Z",
         items: [mergedRefresh]
       )
@@ -47,9 +47,9 @@ struct DependencyUpdatesRefreshMergeTests {
     let first = item(id: "pr-1")
     let second = item(id: "pr-2")
 
-    let next = applyDependencyRefresh(
+    let next = applyReviewsRefresh(
       to: [first, second],
-      refresh: DependencyUpdatesRefreshResponse(
+      refresh: ReviewsRefreshResponse(
         fetchedAt: "2026-05-21T12:00:00Z",
         missingPullRequestIDs: ["pr-1"]
       )
@@ -63,9 +63,9 @@ struct DependencyUpdatesRefreshMergeTests {
     let only = item(id: "pr-1", reviewStatus: .reviewRequired)
     let unknown = item(id: "pr-other", reviewStatus: .approved)
 
-    let next = applyDependencyRefresh(
+    let next = applyReviewsRefresh(
       to: [only],
-      refresh: DependencyUpdatesRefreshResponse(
+      refresh: ReviewsRefreshResponse(
         fetchedAt: "2026-05-21T12:00:00Z",
         items: [unknown]
       )
@@ -95,9 +95,9 @@ struct DependencyUpdatesRefreshMergeTests {
       updatedAt: "2026-05-21T12:00:00Z"
     )
 
-    let next = applyDependencyRefresh(
+    let next = applyReviewsRefresh(
       to: [older, duplicate, other],
-      refresh: DependencyUpdatesRefreshResponse(
+      refresh: ReviewsRefreshResponse(
         fetchedAt: "2026-05-21T12:00:00Z",
         items: [refreshed]
       )
@@ -112,9 +112,9 @@ struct DependencyUpdatesRefreshMergeTests {
     let one = item(id: "pr-1", state: .open)
     let two = item(id: "pr-2", state: .open)
 
-    let next = applyDependencyRefresh(
+    let next = applyReviewsRefresh(
       to: [one, two],
-      refresh: DependencyUpdatesRefreshResponse(
+      refresh: ReviewsRefreshResponse(
         fetchedAt: "2026-05-21T12:00:00Z",
         items: [item(id: "pr-1", state: .merged)],
         missingPullRequestIDs: ["pr-2"]
@@ -126,16 +126,16 @@ struct DependencyUpdatesRefreshMergeTests {
 
   private func item(
     id: String,
-    state: DependencyUpdatePullRequestState = .open,
-    reviewStatus: DependencyUpdateReviewStatus = .reviewRequired,
+    state: ReviewPullRequestState = .open,
+    reviewStatus: ReviewReviewStatus = .reviewRequired,
     updatedAt: String = "2026-05-20T12:00:00Z"
-  ) -> DependencyUpdateItem {
-    DependencyUpdateItem(
+  ) -> ReviewItem {
+    ReviewItem(
       pullRequestID: id,
       repositoryID: "repo-1",
       repository: "acme/api",
       number: 1,
-      title: "Dependency update",
+      title: "Review",
       url: "https://github.com/acme/api/pull/1",
       authorLogin: "renovate[bot]",
       state: state,

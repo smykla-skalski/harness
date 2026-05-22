@@ -176,16 +176,16 @@ final class HarnessMonitorPerfTests: HarnessMonitorUITestCase {
     let app = XCUIApplication(bundleIdentifier: Self.uiTestHostBundleIdentifier)
     let launched = launchForPerf(app: app, scenario: "dashboard-search-suggestions")
     let dashboardRoot = element(in: launched, identifier: Accessibility.dashboardWindowRoot)
-    let dependenciesRoot = element(
+    let reviewsRoot = element(
       in: launched,
-      identifier: Accessibility.dashboardDependenciesRoot
+      identifier: Accessibility.dashboardReviewsRoot
     )
     let searchField = mainWindow(in: launched).searchFields.firstMatch
 
     waitForScenarioCompletion(app: launched, scenario: "dashboard-search-suggestions")
 
     XCTAssertTrue(dashboardRoot.waitForExistence(timeout: Self.uiTimeout))
-    XCTAssertTrue(waitForElement(dependenciesRoot, timeout: Self.uiTimeout))
+    XCTAssertTrue(waitForElement(reviewsRoot, timeout: Self.uiTimeout))
     XCTAssertTrue(waitForElement(searchField, timeout: Self.uiTimeout))
 
     launched.terminate()
@@ -298,23 +298,23 @@ final class HarnessMonitorPerfTests: HarnessMonitorUITestCase {
     launched.terminate()
   }
 
-  func testDependenciesSettingsScenarioState() {
+  func testReviewsSettingsScenarioState() {
     let app = XCUIApplication(bundleIdentifier: Self.uiTestHostBundleIdentifier)
-    let launched = launchForPerf(app: app, scenario: "dependencies-settings")
+    let launched = launchForPerf(app: app, scenario: "reviews-settings")
     let settingsRoot = element(in: launched, identifier: Accessibility.settingsRoot)
-    let dependenciesRoot = element(in: launched, identifier: Accessibility.settingsDependenciesRoot)
-    let saveButton = element(in: launched, identifier: Accessibility.settingsDependenciesSaveButton)
+    let reviewsRoot = element(in: launched, identifier: Accessibility.settingsReviewsRoot)
+    let saveButton = element(in: launched, identifier: Accessibility.settingsReviewsSaveButton)
     let authorsField = element(
       in: launched,
-      identifier: Accessibility.settingsDependenciesAuthorsField
+      identifier: Accessibility.settingsReviewsAuthorsField
     )
 
-    waitForScenarioCompletion(app: launched, scenario: "dependencies-settings")
+    waitForScenarioCompletion(app: launched, scenario: "reviews-settings")
 
     XCTAssertTrue(waitForElement(settingsRoot, timeout: Self.uiTimeout))
     XCTAssertTrue(
-      waitForElement(dependenciesRoot, timeout: Self.actionTimeout),
-      "Dependencies settings perf scenario should render the Dependencies pane"
+      waitForElement(reviewsRoot, timeout: Self.actionTimeout),
+      "Reviews settings perf scenario should render the Reviews pane"
     )
     XCTAssertTrue(waitForElement(saveButton, timeout: Self.actionTimeout))
     XCTAssertTrue(waitForElement(authorsField, timeout: Self.actionTimeout))

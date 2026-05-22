@@ -3,11 +3,11 @@ import Testing
 @testable import HarnessMonitorKit
 @testable import HarnessMonitorUIPreviewable
 
-@Suite("Dashboard dependencies presentation worker")
-struct DashboardDependenciesPresentationWorkerTests {
-  @Test("filters, groups, and selects dependency update rows off main")
-  func filtersGroupsAndSelectsDependencyRows() async {
-    let first = dependencyItem(
+@Suite("Dashboard reviews presentation worker")
+struct DashboardReviewsPresentationWorkerTests {
+  @Test("filters, groups, and selects review rows off main")
+  func filtersGroupsAndSelectsReviewRows() async {
+    let first = reviewItem(
       id: "pr-1",
       repository: "kong/a",
       number: 1,
@@ -16,7 +16,7 @@ struct DashboardDependenciesPresentationWorkerTests {
       checkStatus: .success,
       createdAt: "2026-05-01T10:00:00Z"
     )
-    let second = dependencyItem(
+    let second = reviewItem(
       id: "pr-2",
       repository: "kong/b",
       number: 2,
@@ -25,7 +25,7 @@ struct DashboardDependenciesPresentationWorkerTests {
       checkStatus: .success,
       createdAt: "2026-05-02T10:00:00Z"
     )
-    let third = dependencyItem(
+    let third = reviewItem(
       id: "pr-3",
       repository: "kumahq/kuma",
       number: 3,
@@ -36,12 +36,12 @@ struct DashboardDependenciesPresentationWorkerTests {
       createdAt: "2026-05-03T10:00:00Z"
     )
 
-    let worker = DashboardDependenciesPresentationWorker()
+    let worker = DashboardReviewsPresentationWorker()
     let output = await worker.compute(
-      input: DashboardDependenciesPresentationInput(
+      input: DashboardReviewsPresentationInput(
         items: [third, second, first],
-        filterModeRaw: DashboardDependenciesFilterMode.review.rawValue,
-        sortModeRaw: DashboardDependenciesSortMode.repository.rawValue,
+        filterModeRaw: DashboardReviewsFilterMode.review.rawValue,
+        sortModeRaw: DashboardReviewsSortMode.repository.rawValue,
         searchText: "security",
         configuredRepositories: ["kong/b", "kong/a"],
         configuredOrganizations: ["kumahq"],
@@ -59,15 +59,15 @@ struct DashboardDependenciesPresentationWorkerTests {
 
   @Test("uses configured repository order and persisted primary selection")
   func usesConfiguredRepositoryOrderAndPersistedSelection() async {
-    let first = dependencyItem(id: "pr-1", repository: "kong/a", number: 1)
-    let second = dependencyItem(id: "pr-2", repository: "kong/b", number: 2)
-    let third = dependencyItem(id: "pr-3", repository: "kumahq/kuma", number: 3)
+    let first = reviewItem(id: "pr-1", repository: "kong/a", number: 1)
+    let second = reviewItem(id: "pr-2", repository: "kong/b", number: 2)
+    let third = reviewItem(id: "pr-3", repository: "kumahq/kuma", number: 3)
 
-    let output = await DashboardDependenciesPresentationWorker().compute(
-      input: DashboardDependenciesPresentationInput(
+    let output = await DashboardReviewsPresentationWorker().compute(
+      input: DashboardReviewsPresentationInput(
         items: [first, second, third],
-        filterModeRaw: DashboardDependenciesFilterMode.all.rawValue,
-        sortModeRaw: DashboardDependenciesSortMode.repository.rawValue,
+        filterModeRaw: DashboardReviewsFilterMode.all.rawValue,
+        sortModeRaw: DashboardReviewsSortMode.repository.rawValue,
         searchText: "",
         configuredRepositories: ["kong/b", "kong/a"],
         configuredOrganizations: ["kumahq"],
@@ -82,18 +82,18 @@ struct DashboardDependenciesPresentationWorkerTests {
 
   @Test("precomputes row relative date labels with fallback for bad timestamps")
   func precomputesRowRelativeDateLabelsWithFallback() async {
-    let item = dependencyItem(
+    let item = reviewItem(
       id: "pr-invalid",
       repository: "kong/a",
       number: 1,
       updatedAt: "not-a-date"
     )
 
-    let output = await DashboardDependenciesPresentationWorker().compute(
-      input: DashboardDependenciesPresentationInput(
+    let output = await DashboardReviewsPresentationWorker().compute(
+      input: DashboardReviewsPresentationInput(
         items: [item],
-        filterModeRaw: DashboardDependenciesFilterMode.all.rawValue,
-        sortModeRaw: DashboardDependenciesSortMode.repository.rawValue,
+        filterModeRaw: DashboardReviewsFilterMode.all.rawValue,
+        sortModeRaw: DashboardReviewsSortMode.repository.rawValue,
         searchText: "",
         configuredRepositories: [],
         configuredOrganizations: [],
@@ -107,24 +107,24 @@ struct DashboardDependenciesPresentationWorkerTests {
 
   @Test("precomputing row labels tolerates duplicate pull request ids")
   func precomputingRowLabelsToleratesDuplicatePullRequestIDs() async {
-    let first = dependencyItem(
+    let first = reviewItem(
       id: "pr-duplicate",
       repository: "kong/a",
       number: 1,
       updatedAt: "not-a-date"
     )
-    let second = dependencyItem(
+    let second = reviewItem(
       id: "pr-duplicate",
       repository: "kong/a",
       number: 2,
       updatedAt: "2026-05-01T10:00:00Z"
     )
 
-    let output = await DashboardDependenciesPresentationWorker().compute(
-      input: DashboardDependenciesPresentationInput(
+    let output = await DashboardReviewsPresentationWorker().compute(
+      input: DashboardReviewsPresentationInput(
         items: [first, second],
-        filterModeRaw: DashboardDependenciesFilterMode.all.rawValue,
-        sortModeRaw: DashboardDependenciesSortMode.repository.rawValue,
+        filterModeRaw: DashboardReviewsFilterMode.all.rawValue,
+        sortModeRaw: DashboardReviewsSortMode.repository.rawValue,
         searchText: "",
         configuredRepositories: [],
         configuredOrganizations: [],
@@ -136,18 +136,18 @@ struct DashboardDependenciesPresentationWorkerTests {
     #expect(output.relativeUpdatedLabels["pr-duplicate"] != nil)
   }
 
-  private func dependencyItem(
+  private func reviewItem(
     id: String,
     repository: String,
     number: UInt64,
-    title: String = "Dependency update",
+    title: String = "Review",
     authorLogin: String = "renovate[bot]",
-    reviewStatus: DependencyUpdateReviewStatus = .none,
-    checkStatus: DependencyUpdateCheckStatus = .success,
+    reviewStatus: ReviewReviewStatus = .none,
+    checkStatus: ReviewCheckStatus = .success,
     createdAt: String = "2026-05-01T10:00:00Z",
     updatedAt: String? = nil
-  ) -> DependencyUpdateItem {
-    DependencyUpdateItem(
+  ) -> ReviewItem {
+    ReviewItem(
       pullRequestID: id,
       repositoryID: "repo-\(repository)",
       repository: repository,

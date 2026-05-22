@@ -5,11 +5,11 @@ import XCTest
 
 @testable import HarnessMonitorKit
 
-final class DependencyUpdateAvatarCacheTests: XCTestCase {
+final class ReviewAvatarCacheTests: XCTestCase {
   func testDownsampleReturnsBitmapAtMostTargetPixelSize() throws {
     let original = try Self.makeSolidColorPNG(size: NSSize(width: 256, height: 256))
     let image = try XCTUnwrap(
-      DependencyUpdateAvatarCache.downsample(data: original, targetPixel: 64)
+      ReviewAvatarCache.downsample(data: original, targetPixel: 64)
     )
     XCTAssertLessThanOrEqual(image.size.width, 64)
     XCTAssertLessThanOrEqual(image.size.height, 64)
@@ -18,13 +18,13 @@ final class DependencyUpdateAvatarCacheTests: XCTestCase {
   func testDownsampleClampsToFloorWhenTargetSmall() throws {
     let original = try Self.makeSolidColorPNG(size: NSSize(width: 256, height: 256))
     let image = try XCTUnwrap(
-      DependencyUpdateAvatarCache.downsample(data: original, targetPixel: 8)
+      ReviewAvatarCache.downsample(data: original, targetPixel: 8)
     )
     XCTAssertGreaterThanOrEqual(image.size.width, 32)
   }
 
   func testDownsampleReturnsNilForInvalidData() {
-    let result = DependencyUpdateAvatarCache.downsample(
+    let result = ReviewAvatarCache.downsample(
       data: Data([0x00, 0x01, 0x02]),
       targetPixel: 64
     )

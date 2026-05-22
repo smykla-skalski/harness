@@ -82,8 +82,8 @@ extension HarnessMonitorPerfTests {
     measureScenario("repositories-settings")
   }
 
-  func testDependenciesSettingsHitchRate() {
-    measureScenario("dependencies-settings")
+  func testReviewsSettingsHitchRate() {
+    measureScenario("reviews-settings")
   }
 
   func testSettingsBackdropCycleHitchRate() {

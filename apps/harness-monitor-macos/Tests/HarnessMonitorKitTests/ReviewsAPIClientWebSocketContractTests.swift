@@ -4,8 +4,8 @@ import Testing
 @testable import HarnessMonitorKit
 
 extension TaskBoardAPIClientTests {
-  func performDependencyUpdatesWebSocketContractCalls() async throws
-    -> DependencyUpdatesWebSocketContractResult
+  func performReviewsWebSocketContractCalls() async throws
+    -> ReviewsWebSocketContractResult
   {
     let probe = RPCProbe()
     let transport = WebSocketTransport(
@@ -19,14 +19,14 @@ extension TaskBoardAPIClientTests {
         return try taskBoardRPCResponse(for: method)
       }
     )
-    let target = dependencyUpdatesWebSocketTarget()
+    let target = reviewsWebSocketTarget()
 
-    let repositoryCatalog = try await transport.catalogDependencyUpdateRepositories(
-      request: DependencyUpdatesRepositoryCatalogRequest(organization: "example")
+    let repositoryCatalog = try await transport.catalogReviewRepositories(
+      request: ReviewsRepositoryCatalogRequest(organization: "example")
     )
-    let capabilities = try await transport.dependencyUpdatesCapabilities()
-    let query = try await transport.queryDependencyUpdates(
-      request: DependencyUpdatesQueryRequest(
+    let capabilities = try await transport.reviewsCapabilities()
+    let query = try await transport.queryReviews(
+      request: ReviewsQueryRequest(
         authors: ["renovate[bot]"],
         organizations: ["example"],
         repositories: ["example/harness"],
@@ -35,43 +35,43 @@ extension TaskBoardAPIClientTests {
         cacheMaxAgeSeconds: 120
       )
     )
-    let preview = try await transport.previewDependencyUpdateAction(
-      request: DependencyUpdatesActionPreviewRequest(
+    let preview = try await transport.previewReviewAction(
+      request: ReviewsActionPreviewRequest(
         action: .merge,
         targets: [target],
         method: .rebase
       )
     )
-    let approve = try await transport.approveDependencyUpdates(
-      request: DependencyUpdatesApproveRequest(targets: [target])
+    let approve = try await transport.approveReviews(
+      request: ReviewsApproveRequest(targets: [target])
     )
-    let merge = try await transport.mergeDependencyUpdates(
-      request: DependencyUpdatesMergeRequest(targets: [target], method: .rebase)
+    let merge = try await transport.mergeReviews(
+      request: ReviewsMergeRequest(targets: [target], method: .rebase)
     )
-    let rerun = try await transport.rerunDependencyUpdateChecks(
-      request: DependencyUpdatesRerunChecksRequest(targets: [target])
+    let rerun = try await transport.rerunReviewChecks(
+      request: ReviewsRerunChecksRequest(targets: [target])
     )
-    let label = try await transport.addDependencyUpdateLabel(
-      request: DependencyUpdatesLabelRequest(
+    let label = try await transport.addReviewLabel(
+      request: ReviewsLabelRequest(
         targets: [target],
         label: "dependencies:ready"
       )
     )
-    let auto = try await transport.autoDependencyUpdates(
-      request: DependencyUpdatesAutoRequest(targets: [target], method: .squash)
+    let auto = try await transport.autoReviews(
+      request: ReviewsAutoRequest(targets: [target], method: .squash)
     )
-    let cacheClear = try await transport.clearDependencyUpdatesCache()
-    let refresh = try await transport.refreshDependencyUpdates(
-      request: DependencyUpdatesRefreshRequest(targets: [target])
+    let cacheClear = try await transport.clearReviewsCache()
+    let refresh = try await transport.refreshReviews(
+      request: ReviewsRefreshRequest(targets: [target])
     )
-    let comment = try await transport.commentDependencyUpdates(
-      request: DependencyUpdatesCommentRequest(
+    let comment = try await transport.commentReviews(
+      request: ReviewsCommentRequest(
         targets: [target],
         body: "@renovatebot rebase"
       )
     )
-    let timeline = try await transport.fetchDependencyUpdateTimeline(
-      request: DependencyUpdatesTimelineRequest(
+    let timeline = try await transport.fetchReviewTimeline(
+      request: ReviewsTimelineRequest(
         pullRequestId: target.pullRequestID,
         cursor: nil,
         pageSize: 50,
@@ -80,7 +80,7 @@ extension TaskBoardAPIClientTests {
       )
     )
 
-    return DependencyUpdatesWebSocketContractResult(
+    return ReviewsWebSocketContractResult(
       calls: await probe.calls,
       repositoryCatalog: repositoryCatalog,
       capabilities: capabilities,
@@ -98,28 +98,28 @@ extension TaskBoardAPIClientTests {
     )
   }
 
-  func assertDependencyUpdatesWebSocketRPCContract(_ calls: [RPCProbe.Call]) {
+  func assertReviewsWebSocketRPCContract(_ calls: [RPCProbe.Call]) {
     #expect(
       calls.map(\.method)
         == [
-          .dependencyUpdatesRepositoryCatalog,
-          .dependencyUpdatesCapabilities,
-          .dependencyUpdatesQuery,
-          .dependencyUpdatesActionPreview,
-          .dependencyUpdatesApprove,
-          .dependencyUpdatesMerge,
-          .dependencyUpdatesRerunChecks,
-          .dependencyUpdatesAddLabel,
-          .dependencyUpdatesAuto,
-          .dependencyUpdatesClearCache,
-          .dependencyUpdatesRefresh,
-          .dependencyUpdatesComment,
-          .dependencyUpdatesTimeline,
+          .reviewsRepositoryCatalog,
+          .reviewsCapabilities,
+          .reviewsQuery,
+          .reviewsActionPreview,
+          .reviewsApprove,
+          .reviewsMerge,
+          .reviewsRerunChecks,
+          .reviewsAddLabel,
+          .reviewsAuto,
+          .reviewsClearCache,
+          .reviewsRefresh,
+          .reviewsComment,
+          .reviewsTimeline,
         ]
     )
   }
 
-  func assertDependencyUpdatesWebSocketPayloadContract(_ calls: [RPCProbe.Call]) {
+  func assertReviewsWebSocketPayloadContract(_ calls: [RPCProbe.Call]) {
     #expect(calls.count == 13)
     #expect(objectValue(calls[0].params, key: "organization") == .string("example"))
     #expect(calls[1].params == nil)
@@ -136,40 +136,40 @@ extension TaskBoardAPIClientTests {
     #expect(objectValue(calls[3].params, key: "action") == .string("merge"))
     #expect(
       objectValue(calls[3].params, key: "targets")
-        == .array([.object(dependencyUpdatesTargetJSON)])
+        == .array([.object(reviewsTargetJSON)])
     )
     #expect(objectValue(calls[3].params, key: "method") == .string("rebase"))
     #expect(
       objectValue(calls[4].params, key: "targets")
-        == .array([.object(dependencyUpdatesTargetJSON)])
+        == .array([.object(reviewsTargetJSON)])
     )
     #expect(
       objectValue(calls[5].params, key: "targets")
-        == .array([.object(dependencyUpdatesTargetJSON)])
+        == .array([.object(reviewsTargetJSON)])
     )
     #expect(objectValue(calls[5].params, key: "method") == .string("rebase"))
     #expect(
       objectValue(calls[6].params, key: "targets")
-        == .array([.object(dependencyUpdatesTargetJSON)])
+        == .array([.object(reviewsTargetJSON)])
     )
     #expect(
       objectValue(calls[7].params, key: "targets")
-        == .array([.object(dependencyUpdatesTargetJSON)])
+        == .array([.object(reviewsTargetJSON)])
     )
     #expect(objectValue(calls[7].params, key: "label") == .string("dependencies:ready"))
     #expect(
       objectValue(calls[8].params, key: "targets")
-        == .array([.object(dependencyUpdatesTargetJSON)])
+        == .array([.object(reviewsTargetJSON)])
     )
     #expect(objectValue(calls[8].params, key: "method") == .string("squash"))
     #expect(calls[9].params == nil)
     #expect(
       objectValue(calls[10].params, key: "targets")
-        == .array([.object(dependencyUpdatesTargetJSON)])
+        == .array([.object(reviewsTargetJSON)])
     )
     #expect(
       objectValue(calls[11].params, key: "targets")
-        == .array([.object(dependencyUpdatesTargetJSON)])
+        == .array([.object(reviewsTargetJSON)])
     )
     #expect(objectValue(calls[11].params, key: "body") == .string("@renovatebot rebase"))
     #expect(objectValue(calls[12].params, key: "pull_request_id") == .string("pr-42"))
@@ -177,7 +177,7 @@ extension TaskBoardAPIClientTests {
     #expect(objectValue(calls[12].params, key: "direction") == .string("older"))
   }
 
-  func assertDependencyUpdatesWebSocketResults(_ result: DependencyUpdatesWebSocketContractResult) {
+  func assertReviewsWebSocketResults(_ result: ReviewsWebSocketContractResult) {
     #expect(result.repositoryCatalog.organization == "example")
     #expect(result.capabilities.supportsActionPreview)
     #expect(result.repositoryCatalog.repositories == ["example/aff", "example/harness"])
@@ -208,8 +208,8 @@ extension TaskBoardAPIClientTests {
     return object[key]
   }
 
-  private func dependencyUpdatesWebSocketTarget() -> DependencyUpdateTarget {
-    DependencyUpdateTarget(
+  private func reviewsWebSocketTarget() -> ReviewTarget {
+    ReviewTarget(
       pullRequestID: "pr-42",
       repositoryID: "repo-1",
       repository: "example/harness",
@@ -225,24 +225,24 @@ extension TaskBoardAPIClientTests {
   }
 }
 
-struct DependencyUpdatesWebSocketContractResult {
+struct ReviewsWebSocketContractResult {
   let calls: [RPCProbe.Call]
-  let repositoryCatalog: DependencyUpdatesRepositoryCatalogResponse
-  let capabilities: DependencyUpdatesCapabilitiesResponse
-  let query: DependencyUpdatesQueryResponse
-  let preview: DependencyUpdatesActionPreviewResponse
-  let approve: DependencyUpdatesActionResponse
-  let merge: DependencyUpdatesActionResponse
-  let rerun: DependencyUpdatesActionResponse
-  let label: DependencyUpdatesActionResponse
-  let auto: DependencyUpdatesActionResponse
-  let cacheClear: DependencyUpdatesCacheClearResponse
-  let refresh: DependencyUpdatesRefreshResponse
-  let comment: DependencyUpdatesActionResponse
-  let timeline: DependencyUpdatesTimelineResponse
+  let repositoryCatalog: ReviewsRepositoryCatalogResponse
+  let capabilities: ReviewsCapabilitiesResponse
+  let query: ReviewsQueryResponse
+  let preview: ReviewsActionPreviewResponse
+  let approve: ReviewsActionResponse
+  let merge: ReviewsActionResponse
+  let rerun: ReviewsActionResponse
+  let label: ReviewsActionResponse
+  let auto: ReviewsActionResponse
+  let cacheClear: ReviewsCacheClearResponse
+  let refresh: ReviewsRefreshResponse
+  let comment: ReviewsActionResponse
+  let timeline: ReviewsTimelineResponse
 }
 
-private let dependencyUpdatesTargetJSON: [String: JSONValue] = [
+private let reviewsTargetJSON: [String: JSONValue] = [
   "pull_request_id": .string("pr-42"),
   "repository_id": .string("repo-1"),
   "repository": .string("example/harness"),

@@ -5,8 +5,8 @@ import Testing
 @testable import HarnessMonitorUIPreviewable
 
 extension SessionWindowFlowTests {
-  @Test("Session search dependencies are anchored outside the root window graph")
-  func sessionSearchDependenciesAreAnchoredOutsideRootWindowGraph() throws {
+  @Test("Session search reviews are anchored outside the root window graph")
+  func sessionSearchReviewsAreAnchoredOutsideRootWindowGraph() throws {
     let rootSource = try previewableSourceFile(named: "Views/Sessions/SessionWindowView.swift")
     let anchorSource = try previewableSourceFile(
       named: "Views/Sessions/SessionWindowView+BackgroundAnchors.swift"

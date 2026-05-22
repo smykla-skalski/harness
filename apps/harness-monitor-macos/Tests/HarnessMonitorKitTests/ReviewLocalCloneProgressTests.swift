@@ -3,7 +3,7 @@ import Testing
 
 @testable import HarnessMonitorKit
 
-struct DependencyUpdateLocalCloneProgressTests {
+struct ReviewLocalCloneProgressTests {
   @Test
   func decodesStartedPayloadFromDaemonWireShape() throws {
     let wire = """
@@ -13,8 +13,8 @@ struct DependencyUpdateLocalCloneProgressTests {
         "operation": "clone"
       }
       """
-    let payload = try DependencyUpdateLocalCloneProgress.snakeCaseDecoder().decode(
-      DependencyUpdateLocalCloneProgress.self,
+    let payload = try ReviewLocalCloneProgress.snakeCaseDecoder().decode(
+      ReviewLocalCloneProgress.self,
       from: Data(wire.utf8)
     )
     #expect(payload.kind == .started)
@@ -34,8 +34,8 @@ struct DependencyUpdateLocalCloneProgressTests {
         "duration_millis": 1234
       }
       """
-    let payload = try DependencyUpdateLocalCloneProgress.snakeCaseDecoder().decode(
-      DependencyUpdateLocalCloneProgress.self,
+    let payload = try ReviewLocalCloneProgress.snakeCaseDecoder().decode(
+      ReviewLocalCloneProgress.self,
       from: Data(wire.utf8)
     )
     #expect(payload.kind == .completed)
@@ -53,8 +53,8 @@ struct DependencyUpdateLocalCloneProgressTests {
         "message": "auth denied"
       }
       """
-    let payload = try DependencyUpdateLocalCloneProgress.snakeCaseDecoder().decode(
-      DependencyUpdateLocalCloneProgress.self,
+    let payload = try ReviewLocalCloneProgress.snakeCaseDecoder().decode(
+      ReviewLocalCloneProgress.self,
       from: Data(wire.utf8)
     )
     #expect(payload.kind == .failed)
@@ -63,8 +63,8 @@ struct DependencyUpdateLocalCloneProgressTests {
 
   @Test
   func operationPresentLabelMatchesUserFacingCopy() {
-    #expect(DependencyUpdateLocalCloneProgress.Operation.clone.presentLabel == "Cloning")
-    #expect(DependencyUpdateLocalCloneProgress.Operation.fetch.presentLabel == "Fetching")
+    #expect(ReviewLocalCloneProgress.Operation.clone.presentLabel == "Cloning")
+    #expect(ReviewLocalCloneProgress.Operation.fetch.presentLabel == "Fetching")
   }
 
   @Test
@@ -76,8 +76,8 @@ struct DependencyUpdateLocalCloneProgressTests {
         "operation": "fetch"
       }
       """
-    let payload = try DependencyUpdateLocalCloneProgress.snakeCaseDecoder().decode(
-      DependencyUpdateLocalCloneProgress.self,
+    let payload = try ReviewLocalCloneProgress.snakeCaseDecoder().decode(
+      ReviewLocalCloneProgress.self,
       from: Data(wire.utf8)
     )
     #expect(payload.operation == .fetch)
@@ -94,18 +94,18 @@ struct DependencyUpdateLocalCloneProgressTests {
     let payloadData = try JSONSerialization.data(withJSONObject: payloadJSON)
     let payload = try JSONDecoder().decode(JSONValue.self, from: payloadData)
     let streamEvent = StreamEvent(
-      event: "dependency_updates_local_clone_progress",
+      event: "reviews_local_clone_progress",
       recordedAt: "2026-05-22T12:00:00Z",
       sessionId: nil,
       payload: payload
     )
     let pushEvent = try DaemonPushEvent(streamEvent: streamEvent)
     switch pushEvent.kind {
-    case .dependencyUpdatesLocalCloneProgress(let progress):
+    case .reviewsLocalCloneProgress(let progress):
       #expect(progress.repoFullName == "owner/repo")
       #expect(progress.kind == .started)
     default:
-      Issue.record("expected dependencyUpdatesLocalCloneProgress, got \(pushEvent.kind)")
+      Issue.record("expected reviewsLocalCloneProgress, got \(pushEvent.kind)")
     }
   }
 }

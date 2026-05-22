@@ -89,14 +89,14 @@ struct HarnessMonitorUITestAccessibilityRegistryMoreTests {
     )
   }
 
-  @Test("Settings repositories, dependencies, and secrets identifiers match UI-test mirror")
-  func settingsRepositoriesDependenciesAndSecretsIdentifiersMirror() {
+  @Test("Settings repositories, reviews, and secrets identifiers match UI-test mirror")
+  func settingsRepositoriesReviewsAndSecretsIdentifiersMirror() {
     #expect(
       HarnessMonitorAccessibility.settingsRepositoriesSection
         == "harness.settings.section.repositories"
     )
     #expect(
-      HarnessMonitorAccessibility.settingsDependenciesSection
+      HarnessMonitorAccessibility.settingsReviewsSection
         == "harness.settings.section.dependencies"
     )
     #expect(
@@ -104,14 +104,14 @@ struct HarnessMonitorUITestAccessibilityRegistryMoreTests {
         == "harness.settings.section.secrets"
     )
     #expect(HarnessMonitorAccessibility.settingsRepositoriesRoot == "harness.settings.repositories")
-    #expect(HarnessMonitorAccessibility.settingsDependenciesRoot == "harness.settings.dependencies")
+    #expect(HarnessMonitorAccessibility.settingsReviewsRoot == "harness.settings.dependencies")
     #expect(HarnessMonitorAccessibility.settingsSecretsRoot == "harness.settings.secrets")
     #expect(
       HarnessMonitorAccessibility.settingsRepositoriesSaveButton
         == "harness.settings.repositories.save"
     )
     #expect(
-      HarnessMonitorAccessibility.settingsDependenciesSaveButton
+      HarnessMonitorAccessibility.settingsReviewsSaveButton
         == "harness.settings.dependencies.save"
     )
     #expect(

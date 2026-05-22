@@ -153,15 +153,15 @@ enum HarnessMonitorUITestAccessibility {
   static let dashboardNotificationsRoot = "harness.dashboard.notifications"
   static let dashboardNotificationsScrollView = "harness.dashboard.notifications.scroll"
   static let dashboardNotificationsEmptyState = "harness.dashboard.notifications.empty-state"
-  static let dashboardDependenciesRoot = "harness.dashboard.dependencies"
-  static let dashboardDependenciesList = "harness.dashboard.dependencies.list"
-  static let dashboardDependenciesDetail = "harness.dashboard.dependencies.detail"
-  static let dashboardDependenciesDetailDivider =
+  static let dashboardReviewsRoot = "harness.dashboard.dependencies"
+  static let dashboardReviewsList = "harness.dashboard.dependencies.list"
+  static let dashboardReviewsDetail = "harness.dashboard.dependencies.detail"
+  static let dashboardReviewsDetailDivider =
     "harness.dashboard.dependencies.content-detail-divider"
-  static let dashboardDependenciesRefreshButton = "harness.dashboard.dependencies.refresh"
-  static let dashboardDependenciesConfigureButton = "harness.dashboard.dependencies.configure"
-  static let dashboardDependenciesFixCIButton = "harness.dashboard.dependencies.fix-ci"
-  static let dashboardDependenciesSelectionStatus = "harness.dashboard.dependencies.selection"
+  static let dashboardReviewsRefreshButton = "harness.dashboard.dependencies.refresh"
+  static let dashboardReviewsConfigureButton = "harness.dashboard.dependencies.configure"
+  static let dashboardReviewsFixCIButton = "harness.dashboard.dependencies.fix-ci"
+  static let dashboardReviewsSelectionStatus = "harness.dashboard.dependencies.selection"
   static let dashboardNewSessionButton = "harness.dashboard.new-session"
   static let dashboardOpenFolderButton = "harness.dashboard.open-folder"
   static let sessionsBoardRoot = dashboardWindowRoot

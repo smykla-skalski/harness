@@ -4,38 +4,38 @@ import Testing
 @testable import HarnessMonitorKit
 @testable import HarnessMonitorUIPreviewable
 
-@Suite("Dependency update parity helpers")
-struct DependencyUpdatesParityHelperTests {
+@Suite("Review parity helpers")
+struct ReviewsParityHelperTests {
   @Test("Rerun targets include only failed or timed-out check suites")
   func rerunTargetsFilterToRerunnableSuites() {
     let item = makeItem(
       checkStatus: .failure,
       checks: [
-        DependencyUpdateCheck(
+        ReviewCheck(
           name: "failed",
           status: .completed,
           conclusion: .failure,
           checkSuiteID: "suite-failed"
         ),
-        DependencyUpdateCheck(
+        ReviewCheck(
           name: "timed out",
           status: .completed,
           conclusion: .timedOut,
           checkSuiteID: "suite-timeout"
         ),
-        DependencyUpdateCheck(
+        ReviewCheck(
           name: "pending",
           status: .inProgress,
           conclusion: .none,
           checkSuiteID: "suite-pending"
         ),
-        DependencyUpdateCheck(
+        ReviewCheck(
           name: "passing",
           status: .completed,
           conclusion: .success,
           checkSuiteID: "suite-success"
         ),
-        DependencyUpdateCheck(
+        ReviewCheck(
           name: "status-context",
           status: .completed,
           conclusion: .failure,
@@ -109,7 +109,7 @@ struct DependencyUpdatesParityHelperTests {
 
   @Test("Repository ordering prefers configured repos then configured orgs")
   func repositoryOrderingHonorsConfiguredPriority() {
-    let ordering = DashboardDependenciesRepositoryOrdering(
+    let ordering = DashboardReviewsRepositoryOrdering(
       configuredRepositories: ["beta/explicit", "alpha/explicit"],
       configuredOrganizations: ["org-b", "org-a"]
     )
@@ -165,7 +165,7 @@ struct DependencyUpdatesParityHelperTests {
 
     let decoder = JSONDecoder()
     decoder.keyDecodingStrategy = .convertFromSnakeCase
-    let item = try decoder.decode(DependencyUpdateItem.self, from: Data(payload.utf8))
+    let item = try decoder.decode(ReviewItem.self, from: Data(payload.utf8))
 
     #expect(item.labels.isEmpty)
     #expect(item.checks.isEmpty)
@@ -174,15 +174,15 @@ struct DependencyUpdatesParityHelperTests {
   }
 
   private func makeItem(
-    state: DependencyUpdatePullRequestState = .open,
-    mergeable: DependencyUpdateMergeableState = .mergeable,
-    reviewStatus: DependencyUpdateReviewStatus = .reviewRequired,
-    checkStatus: DependencyUpdateCheckStatus = .success,
+    state: ReviewPullRequestState = .open,
+    mergeable: ReviewMergeableState = .mergeable,
+    reviewStatus: ReviewReviewStatus = .reviewRequired,
+    checkStatus: ReviewCheckStatus = .success,
     policyBlocked: Bool = false,
     isDraft: Bool = false,
-    checks: [DependencyUpdateCheck] = []
-  ) -> DependencyUpdateItem {
-    DependencyUpdateItem(
+    checks: [ReviewCheck] = []
+  ) -> ReviewItem {
+    ReviewItem(
       pullRequestID: "pr-1",
       repositoryID: "repo-1",
       repository: "org-a/example",

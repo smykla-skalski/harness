@@ -81,20 +81,20 @@ private let taskBoardRPCResponses: [WebSocketRPCMethod: JSONValue] = [
   .taskBoardPolicyPipelineSimulate: .object(samplePolicySimulationJSON),
   .taskBoardPolicyPipelinePromote: .object(samplePolicyPromotionJSON),
   .taskBoardPolicyPipelineAudit: .object(samplePolicyAuditJSON),
-  .dependencyUpdatesRepositoryCatalog:
+  .reviewsRepositoryCatalog:
     fixtureJSONValue(sampleDepsCatalogResponseText),
-  .dependencyUpdatesCapabilities: fixtureJSONValue(sampleDependencyCapabilitiesResponseText),
-  .dependencyUpdatesQuery: fixtureJSONValue(sampleDependencyUpdatesQueryResponseText),
-  .dependencyUpdatesActionPreview: fixtureJSONValue(sampleActionPreviewText),
-  .dependencyUpdatesApprove: fixtureJSONValue(sampleDepsApproveResponseText),
-  .dependencyUpdatesMerge: fixtureJSONValue(sampleDependencyUpdatesMergeResponseText),
-  .dependencyUpdatesRerunChecks: fixtureJSONValue(sampleDependencyUpdatesRerunResponseText),
-  .dependencyUpdatesAddLabel: fixtureJSONValue(sampleDependencyUpdatesLabelResponseText),
-  .dependencyUpdatesAuto: fixtureJSONValue(sampleDependencyUpdatesAutoResponseText),
-  .dependencyUpdatesClearCache: fixtureJSONValue(sampleDepsCacheClearResponseText),
-  .dependencyUpdatesRefresh: fixtureJSONValue(sampleDependencyRefreshResponseText),
-  .dependencyUpdatesComment: fixtureJSONValue(sampleDependencyCommentResponseText),
-  .dependencyUpdatesTimeline: fixtureJSONValue(sampleDependencyTimelineResponseText),
+  .reviewsCapabilities: fixtureJSONValue(sampleReviewsCapabilitiesResponseText),
+  .reviewsQuery: fixtureJSONValue(sampleReviewsQueryResponseText),
+  .reviewsActionPreview: fixtureJSONValue(sampleActionPreviewText),
+  .reviewsApprove: fixtureJSONValue(sampleDepsApproveResponseText),
+  .reviewsMerge: fixtureJSONValue(sampleReviewsMergeResponseText),
+  .reviewsRerunChecks: fixtureJSONValue(sampleReviewsRerunResponseText),
+  .reviewsAddLabel: fixtureJSONValue(sampleReviewsLabelResponseText),
+  .reviewsAuto: fixtureJSONValue(sampleReviewsAutoResponseText),
+  .reviewsClearCache: fixtureJSONValue(sampleDepsCacheClearResponseText),
+  .reviewsRefresh: fixtureJSONValue(sampleReviewsRefreshResponseText),
+  .reviewsComment: fixtureJSONValue(sampleReviewsCommentResponseText),
+  .reviewsTimeline: fixtureJSONValue(sampleReviewsTimelineResponseText),
 ]
 
 final class TaskBoardURLProtocol: URLProtocol, @unchecked Sendable {
@@ -142,23 +142,23 @@ final class TaskBoardURLProtocol: URLProtocol, @unchecked Sendable {
     Route("/v1/task-board/policy/simulate"): samplePolicySimulationText,
     Route("/v1/task-board/policy/promote"): samplePolicyPromotionText,
     Route("/v1/task-board/policy/audit"): samplePolicyAuditText,
-    Route("/v1/dependency-updates/repositories"):
+    Route("/v1/reviews/repositories"):
       sampleDepsCatalogResponseText,
-    Route("/v1/dependency-updates/capabilities", method: "GET"):
-      sampleDependencyCapabilitiesResponseText,
-    Route("/v1/dependency-updates/query"): sampleDependencyUpdatesQueryResponseText,
-    Route("/v1/dependency-updates/action-preview"):
+    Route("/v1/reviews/capabilities", method: "GET"):
+      sampleReviewsCapabilitiesResponseText,
+    Route("/v1/reviews/query"): sampleReviewsQueryResponseText,
+    Route("/v1/reviews/action-preview"):
       sampleActionPreviewText,
-    Route("/v1/dependency-updates/approve"): sampleDepsApproveResponseText,
-    Route("/v1/dependency-updates/merge"): sampleDependencyUpdatesMergeResponseText,
-    Route("/v1/dependency-updates/rerun-checks"): sampleDependencyUpdatesRerunResponseText,
-    Route("/v1/dependency-updates/labels"): sampleDependencyUpdatesLabelResponseText,
-    Route("/v1/dependency-updates/auto"): sampleDependencyUpdatesAutoResponseText,
-    Route("/v1/dependency-updates/cache", method: "DELETE"):
+    Route("/v1/reviews/approve"): sampleDepsApproveResponseText,
+    Route("/v1/reviews/merge"): sampleReviewsMergeResponseText,
+    Route("/v1/reviews/rerun-checks"): sampleReviewsRerunResponseText,
+    Route("/v1/reviews/labels"): sampleReviewsLabelResponseText,
+    Route("/v1/reviews/auto"): sampleReviewsAutoResponseText,
+    Route("/v1/reviews/cache", method: "DELETE"):
       sampleDepsCacheClearResponseText,
-    Route("/v1/dependency-updates/refresh"): sampleDependencyRefreshResponseText,
-    Route("/v1/dependency-updates/comment"): sampleDependencyCommentResponseText,
-    Route("/v1/dependency-updates/timeline"): sampleDependencyTimelineResponseText,
+    Route("/v1/reviews/refresh"): sampleReviewsRefreshResponseText,
+    Route("/v1/reviews/comment"): sampleReviewsCommentResponseText,
+    Route("/v1/reviews/timeline"): sampleReviewsTimelineResponseText,
   ]
 
   static var records: [RecordedRequest] {

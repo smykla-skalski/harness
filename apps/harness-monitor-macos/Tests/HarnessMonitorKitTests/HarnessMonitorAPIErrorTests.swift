@@ -89,7 +89,7 @@ struct HarnessMonitorAPIErrorTests {
   @Test("GitHub 401 server errors surface as an actionable secrets message")
   func githubUnauthorizedSurfacesAsActionableSecretsMessage() {
     let envelope =
-      #"{"error":{"code":"WORKFLOW_IO","message":"dependency-updates github "#
+      #"{"error":{"code":"WORKFLOW_IO","message":"reviews github "#
       + #"request failed: GitHub API returned 401 Unauthorized: Bad credentials. "#
       + #"Check that the GitHub token is valid"}}"#
     let error = HarnessMonitorAPIError.server(code: 400, message: envelope)

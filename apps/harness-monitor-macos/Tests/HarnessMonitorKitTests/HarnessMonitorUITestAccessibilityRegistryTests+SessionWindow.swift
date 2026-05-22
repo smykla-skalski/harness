@@ -6,7 +6,7 @@ extension HarnessMonitorUITestAccessibilityRegistryTests {
   @Test("Dashboard and session window identifiers match UI-test mirror")
   func dashboardAndSessionWindowIdentifiersMirror() {
     expectDashboardIdentifiersMirrorRegistry()
-    expectDependenciesIdentifiersMirrorRegistry()
+    expectReviewsIdentifiersMirrorRegistry()
     expectSessionWindowIdentifiersMirrorRegistry()
   }
 
@@ -44,37 +44,37 @@ extension HarnessMonitorUITestAccessibilityRegistryTests {
     )
   }
 
-  private func expectDependenciesIdentifiersMirrorRegistry() {
+  private func expectReviewsIdentifiersMirrorRegistry() {
     #expect(
-      HarnessMonitorAccessibility.dashboardDependenciesRoot
+      HarnessMonitorAccessibility.dashboardReviewsRoot
         == "harness.dashboard.dependencies"
     )
     #expect(
-      HarnessMonitorAccessibility.dashboardDependenciesProvenance
+      HarnessMonitorAccessibility.dashboardReviewsProvenance
         == "harness.dashboard.dependencies.provenance"
     )
     #expect(
-      HarnessMonitorAccessibility.dashboardDependenciesList
+      HarnessMonitorAccessibility.dashboardReviewsList
         == "harness.dashboard.dependencies.list"
     )
     #expect(
-      HarnessMonitorAccessibility.dashboardDependenciesDetail
+      HarnessMonitorAccessibility.dashboardReviewsDetail
         == "harness.dashboard.dependencies.detail"
     )
     #expect(
-      HarnessMonitorAccessibility.dashboardDependenciesDetailDivider
+      HarnessMonitorAccessibility.dashboardReviewsDetailDivider
         == "harness.dashboard.dependencies.content-detail-divider"
     )
     #expect(
-      HarnessMonitorAccessibility.dashboardDependenciesRefreshButton
+      HarnessMonitorAccessibility.dashboardReviewsRefreshButton
         == "harness.dashboard.dependencies.refresh"
     )
     #expect(
-      HarnessMonitorAccessibility.dashboardDependenciesFixCIButton
+      HarnessMonitorAccessibility.dashboardReviewsFixCIButton
         == "harness.dashboard.dependencies.fix-ci"
     )
     #expect(
-      HarnessMonitorAccessibility.dashboardDependenciesSelectionStatus
+      HarnessMonitorAccessibility.dashboardReviewsSelectionStatus
         == "harness.dashboard.dependencies.selection"
     )
   }
@@ -134,7 +134,7 @@ extension HarnessMonitorUITestAccessibilityRegistryTests {
   @Test("Dashboard and session window identifiers are attached by production views")
   func dashboardAndSessionWindowAccessibilityIdentifiersAreAttachedByProductionViews() throws {
     try expectDashboardIdentifierUsage()
-    try expectDependenciesIdentifierUsage()
+    try expectReviewsIdentifierUsage()
     try expectSessionWindowIdentifierUsage()
   }
 
@@ -183,46 +183,46 @@ extension HarnessMonitorUITestAccessibilityRegistryTests {
     #expect(dashboardToolbar.contains("HarnessMonitorAccessibility.dashboardNewSessionButton"))
     #expect(dashboardToolbar.contains("HarnessMonitorAccessibility.dashboardOpenFolderButton"))
     #expect(dashboardRouteContent.contains("DashboardNotificationsRouteView("))
-    #expect(dashboardRouteContent.contains("DashboardDependenciesRouteView("))
+    #expect(dashboardRouteContent.contains("DashboardReviewsRouteView("))
     #expect(dashboardToolbar.contains("SleepPreventionToolbarButton("))
   }
 
-  private func expectDependenciesIdentifierUsage() throws {
-    let dependenciesView = try sourceFile(named: "DashboardDependenciesRouteView.swift")
-    let contentView = try sourceFile(named: "DashboardDependenciesRouteView+Content.swift")
-    let controlStripView = try sourceFile(named: "DashboardDependenciesControlStrip.swift")
-    let actionBarView = try sourceFile(named: "DashboardDependencyActionBar.swift")
-    let provenanceView = try sourceFile(named: "DashboardDependenciesProvenance.swift")
+  private func expectReviewsIdentifierUsage() throws {
+    let reviewsView = try sourceFile(named: "DashboardReviewsRouteView.swift")
+    let contentView = try sourceFile(named: "DashboardReviewsRouteView+Content.swift")
+    let controlStripView = try sourceFile(named: "DashboardReviewsControlStrip.swift")
+    let actionBarView = try sourceFile(named: "DashboardReviewActionBar.swift")
+    let provenanceView = try sourceFile(named: "DashboardReviewsProvenance.swift")
 
     #expect(
-      dependenciesView.contains("HarnessMonitorAccessibility.dashboardDependenciesRoot")
+      reviewsView.contains("HarnessMonitorAccessibility.dashboardReviewsRoot")
     )
     #expect(
-      provenanceView.contains("HarnessMonitorAccessibility.dashboardDependenciesProvenance")
+      provenanceView.contains("HarnessMonitorAccessibility.dashboardReviewsProvenance")
     )
     #expect(
-      contentView.contains("HarnessMonitorAccessibility.dashboardDependenciesList")
+      contentView.contains("HarnessMonitorAccessibility.dashboardReviewsList")
     )
     #expect(
-      contentView.contains("HarnessMonitorAccessibility.dashboardDependenciesDetail")
+      contentView.contains("HarnessMonitorAccessibility.dashboardReviewsDetail")
     )
     #expect(
-      dependenciesView.contains(
-        "HarnessMonitorAccessibility.dashboardDependenciesDetailDivider"
+      reviewsView.contains(
+        "HarnessMonitorAccessibility.dashboardReviewsDetailDivider"
       )
     )
     #expect(
-      controlStripView.contains("HarnessMonitorAccessibility.dashboardDependenciesRefreshButton")
+      controlStripView.contains("HarnessMonitorAccessibility.dashboardReviewsRefreshButton")
     )
     #expect(
-      actionBarView.contains("HarnessMonitorAccessibility.dashboardDependenciesFixCIButton")
+      actionBarView.contains("HarnessMonitorAccessibility.dashboardReviewsFixCIButton")
     )
     #expect(
       controlStripView.contains(
-        "HarnessMonitorAccessibility.dashboardDependenciesSelectionStatus"
+        "HarnessMonitorAccessibility.dashboardReviewsSelectionStatus"
       )
     )
-    #expect(dependenciesView.contains("SessionContentDetailSplitView("))
+    #expect(reviewsView.contains("SessionContentDetailSplitView("))
   }
 
   private func expectSessionWindowIdentifierUsage() throws {

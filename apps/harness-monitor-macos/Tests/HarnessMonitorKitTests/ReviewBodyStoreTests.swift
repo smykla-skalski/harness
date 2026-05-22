@@ -3,18 +3,18 @@ import XCTest
 
 @testable import HarnessMonitorKit
 
-final class DependencyUpdateBodyStoreTests: XCTestCase {
+final class ReviewBodyStoreTests: XCTestCase {
   private struct BodyStoreFixture {
-    let store: DependencyUpdateBodyStore
+    let store: ReviewBodyStore
     let suite: String
   }
 
   private func makeStore() -> BodyStoreFixture {
-    let suite = "DependencyUpdateBodyStoreTests.\(UUID().uuidString)"
+    let suite = "ReviewBodyStoreTests.\(UUID().uuidString)"
     let defaults = UserDefaults(suiteName: suite)!
     let key = "test-bodies"
     return BodyStoreFixture(
-      store: DependencyUpdateBodyStore(defaults: defaults, key: key),
+      store: ReviewBodyStore(defaults: defaults, key: key),
       suite: suite
     )
   }
@@ -78,10 +78,10 @@ final class DependencyUpdateBodyStoreTests: XCTestCase {
   }
 
   func testStorePersistsAcrossInstances() async {
-    let suite = "DependencyUpdateBodyStoreTests.\(UUID().uuidString)"
+    let suite = "ReviewBodyStoreTests.\(UUID().uuidString)"
     let defaults = UserDefaults(suiteName: suite)!
     defer { UserDefaults().removePersistentDomain(forName: suite) }
-    let writer = DependencyUpdateBodyStore(defaults: defaults, key: "k")
+    let writer = ReviewBodyStore(defaults: defaults, key: "k")
     writer.store(
       pullRequestID: "PR_1",
       body: "Persisted",
@@ -91,7 +91,7 @@ final class DependencyUpdateBodyStoreTests: XCTestCase {
     // Persist queue is background; give it a moment to flush.
     try? await Task.sleep(nanoseconds: 50_000_000)
 
-    let reader = DependencyUpdateBodyStore(defaults: defaults, key: "k")
+    let reader = ReviewBodyStore(defaults: defaults, key: "k")
     let entry = reader.cached(forPullRequestID: "PR_1")
     XCTAssertEqual(entry?.body, "Persisted")
   }

@@ -3,14 +3,14 @@ import Testing
 
 @testable import HarnessMonitorKit
 
-struct DependencyUpdateFilePatchStoreTests {
+struct ReviewFilePatchStoreTests {
   private func makeStore(
     diskCapBytes: Int = 100 * 1024 * 1024,
     debounceNanoseconds: UInt64 = 5_000_000
-  ) -> (DependencyUpdateFilePatchStore, URL) {
+  ) -> (ReviewFilePatchStore, URL) {
     let directory = FileManager.default.temporaryDirectory
       .appendingPathComponent("dep-files-patch-\(UUID().uuidString)", isDirectory: true)
-    let store = DependencyUpdateFilePatchStore(
+    let store = ReviewFilePatchStore(
       directory: directory,
       diskCapBytes: diskCapBytes,
       debounceNanoseconds: debounceNanoseconds
@@ -24,11 +24,11 @@ struct DependencyUpdateFilePatchStoreTests {
     additions: UInt32 = 1,
     deletions: UInt32 = 1,
     truncated: Bool = false,
-    status: DependencyUpdateFileChangeType = .modified,
-    servedBy: DependencyUpdateFileServedBy = .githubRest,
+    status: ReviewFileChangeType = .modified,
+    servedBy: ReviewFileServedBy = .githubRest,
     fetchedAt: String = "2026-05-22T12:00:00Z"
-  ) -> DependencyUpdateFilePatchStore.Entry {
-    DependencyUpdateFilePatchStore.Entry(
+  ) -> ReviewFilePatchStore.Entry {
+    ReviewFilePatchStore.Entry(
       patch: patch,
       etag: etag,
       additions: additions,
@@ -226,17 +226,17 @@ struct DependencyUpdateFilePatchStoreTests {
 
   @Test("makeKey is stable for the same (pullRequestID, headRefOid, path)")
   func makeKeyStable() {
-    let firstKey = DependencyUpdateFilePatchStore.makeKey(
+    let firstKey = ReviewFilePatchStore.makeKey(
       pullRequestID: "pr-1",
       headRefOid: "head-a",
       path: "src/a.swift"
     )
-    let sameKey = DependencyUpdateFilePatchStore.makeKey(
+    let sameKey = ReviewFilePatchStore.makeKey(
       pullRequestID: "pr-1",
       headRefOid: "head-a",
       path: "src/a.swift"
     )
-    let differentKey = DependencyUpdateFilePatchStore.makeKey(
+    let differentKey = ReviewFilePatchStore.makeKey(
       pullRequestID: "pr-1",
       headRefOid: "head-b",
       path: "src/a.swift"

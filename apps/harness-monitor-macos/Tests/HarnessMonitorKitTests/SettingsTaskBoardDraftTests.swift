@@ -218,7 +218,7 @@ struct SettingsRepositoriesCatalogErrorPresentationTests {
     let presentation = SettingsRepositoriesCatalogErrorPresentation(
       error: HarnessMonitorAPIError.server(
         code: 400,
-        message: "dependency-updates requires a GitHub token. Configure one in Settings > Secrets."
+        message: "reviews requires a GitHub token. Configure one in Settings > Secrets."
       ),
       organization: "smykla-skalski"
     )
@@ -234,7 +234,7 @@ struct SettingsRepositoriesCatalogErrorPresentationTests {
   @Test("Fine-grained token lifetime errors surface friendly recovery copy")
   func fineGrainedTokenLifetimeErrorsSurfaceFriendlyRecoveryCopy() throws {
     let message =
-      "dependency-updates github request failed: GraphQL Error: The 'smykla-skalski' organization "
+      "reviews github request failed: GraphQL Error: The 'smykla-skalski' organization "
       + "forbids access via a fine-grained personal access tokens if the token's lifetime is "
       + "greater than 366 days. Please adjust your token's lifetime at the following URL: "
       + "https://github.com/settings/personal-access-tokens/14799622 (path: [Path(\"organization\")])"

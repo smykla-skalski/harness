@@ -246,23 +246,23 @@ struct TaskBoardSwiftUXCorrectnessTests {
         == ["platform", "sre"])
   }
 
-  // MARK: - Dependency update checks
+  // MARK: - Review checks
 
-  @Test("Dependency check details URLs are limited to web links")
-  func dependencyCheckDetailsURLsAreLimitedToWebLinks() {
-    let web = DependencyUpdateCheck(
+  @Test("Review check details URLs are limited to web links")
+  func reviewCheckDetailsURLsAreLimitedToWebLinks() {
+    let web = ReviewCheck(
       name: "ci",
       status: .completed,
       conclusion: .success,
       detailsURL: " https://github.com/acme/api/actions/runs/1 "
     )
-    let script = DependencyUpdateCheck(
+    let script = ReviewCheck(
       name: "script",
       status: .completed,
       conclusion: .success,
       detailsURL: "javascript:alert(1)"
     )
-    let empty = DependencyUpdateCheck(
+    let empty = ReviewCheck(
       name: "empty",
       status: .completed,
       conclusion: .success,
@@ -274,20 +274,20 @@ struct TaskBoardSwiftUXCorrectnessTests {
     #expect(empty.detailsWebURL == nil)
   }
 
-  @Test("Dependency rerun unavailable reason distinguishes missing check suites")
-  func dependencyRerunUnavailableReasonDistinguishesMissingCheckSuites() {
-    let noSuite = sampleDependencyUpdate(
+  @Test("Review rerun unavailable reason distinguishes missing check suites")
+  func reviewRerunUnavailableReasonDistinguishesMissingCheckSuites() {
+    let noSuite = sampleReview(
       checks: [
-        DependencyUpdateCheck(
+        ReviewCheck(
           name: "legacy/ci",
           status: .completed,
           conclusion: .failure
         )
       ]
     )
-    let passingSuite = sampleDependencyUpdate(
+    let passingSuite = sampleReview(
       checks: [
-        DependencyUpdateCheck(
+        ReviewCheck(
           name: "ci",
           status: .completed,
           conclusion: .success,
@@ -295,9 +295,9 @@ struct TaskBoardSwiftUXCorrectnessTests {
         )
       ]
     )
-    let failingSuite = sampleDependencyUpdate(
+    let failingSuite = sampleReview(
       checks: [
-        DependencyUpdateCheck(
+        ReviewCheck(
           name: "ci",
           status: .completed,
           conclusion: .failure,
@@ -317,19 +317,19 @@ struct TaskBoardSwiftUXCorrectnessTests {
     #expect(failingSuite.rerunChecksUnavailableReason == nil)
   }
 
-  @Test("Dependency check display priority puts failures before pending then success")
-  func dependencyCheckDisplayPriorityPutsFailuresBeforePendingThenSuccess() {
-    let failure = DependencyUpdateCheck(
+  @Test("Review check display priority puts failures before pending then success")
+  func reviewCheckDisplayPriorityPutsFailuresBeforePendingThenSuccess() {
+    let failure = ReviewCheck(
       name: "failure",
       status: .completed,
       conclusion: .failure
     )
-    let pending = DependencyUpdateCheck(
+    let pending = ReviewCheck(
       name: "pending",
       status: .inProgress,
       conclusion: .none
     )
-    let success = DependencyUpdateCheck(
+    let success = ReviewCheck(
       name: "success",
       status: .completed,
       conclusion: .success
@@ -380,15 +380,15 @@ struct TaskBoardSwiftUXCorrectnessTests {
     )
   }
 
-  private func sampleDependencyUpdate(
-    checks: [DependencyUpdateCheck]
-  ) -> DependencyUpdateItem {
-    DependencyUpdateItem(
+  private func sampleReview(
+    checks: [ReviewCheck]
+  ) -> ReviewItem {
+    ReviewItem(
       pullRequestID: "pr-1",
       repositoryID: "repo-1",
       repository: "acme/api",
       number: 1,
-      title: "Dependency update",
+      title: "Review",
       url: "https://github.com/acme/api/pull/1",
       authorLogin: "renovate[bot]",
       state: .open,

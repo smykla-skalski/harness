@@ -4,20 +4,20 @@ import Testing
 @testable import HarnessMonitorUIPreviewable
 
 @MainActor
-struct DashboardDependenciesGroupByPrefixTests {
-  private func label(_ name: String) -> DependencyUpdateRepositoryLabel {
-    DependencyUpdateRepositoryLabel(name: name, color: nil, description: nil)
+struct DashboardReviewsGroupByPrefixTests {
+  private func label(_ name: String) -> ReviewRepositoryLabel {
+    ReviewRepositoryLabel(name: name, color: nil, description: nil)
   }
 
   @Test("empty input yields no groups")
   func emptyInputYieldsNoGroups() {
-    let groups = dashboardDependenciesGroupByPrefix([])
+    let groups = dashboardReviewsGroupByPrefix([])
     #expect(groups.isEmpty)
   }
 
   @Test("labels with no slash live in a single leading group")
   func unprefixedLabelsCollapseIntoOneGroup() {
-    let groups = dashboardDependenciesGroupByPrefix([
+    let groups = dashboardReviewsGroupByPrefix([
       label("bug"),
       label("dependencies"),
       label("enhancement"),
@@ -28,7 +28,7 @@ struct DashboardDependenciesGroupByPrefixTests {
 
   @Test("prefixed labels split into per-prefix groups in alphabetical order")
   func prefixedLabelsSplitByPrefix() {
-    let groups = dashboardDependenciesGroupByPrefix([
+    let groups = dashboardReviewsGroupByPrefix([
       label("ci/auto-merge"),
       label("ci/revert"),
       label("kind/bug"),
@@ -44,7 +44,7 @@ struct DashboardDependenciesGroupByPrefixTests {
 
   @Test("unprefixed labels lead, prefix groups follow alphabetically")
   func mixedLabelsPlaceUnprefixedFirst() {
-    let groups = dashboardDependenciesGroupByPrefix([
+    let groups = dashboardReviewsGroupByPrefix([
       label("bug"),
       label("ci/auto-merge"),
       label("ci/revert"),
@@ -62,7 +62,7 @@ struct DashboardDependenciesGroupByPrefixTests {
 
   @Test("labels starting with slash are treated as unprefixed")
   func leadingSlashLabelsAreUnprefixed() {
-    let groups = dashboardDependenciesGroupByPrefix([
+    let groups = dashboardReviewsGroupByPrefix([
       label("/odd"),
       label("kind/bug"),
     ])
@@ -73,7 +73,7 @@ struct DashboardDependenciesGroupByPrefixTests {
 
   @Test("labels with multiple slashes group by the first segment")
   func nestedSlashesUseFirstSegment() {
-    let groups = dashboardDependenciesGroupByPrefix([
+    let groups = dashboardReviewsGroupByPrefix([
       label("area/api/auth"),
       label("area/frontend/web"),
       label("kind/bug"),

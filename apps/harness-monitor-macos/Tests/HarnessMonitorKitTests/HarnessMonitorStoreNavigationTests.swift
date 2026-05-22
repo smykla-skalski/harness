@@ -185,7 +185,7 @@ struct HarnessMonitorStoreNavigationTests {
     history.installDashboardStateIfNeeded(route: .taskBoard)
     history.recordSessionSelection(sessionID: "sess-a", selection: .route(.overview))
     history.recordSessionSelection(sessionID: "missing-session", selection: .route(.timeline))
-    history.recordDashboardRoute(.dependencies)
+    history.recordDashboardRoute(.reviews)
 
     history.navigateBack()
 

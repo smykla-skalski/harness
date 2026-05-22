@@ -64,11 +64,11 @@ extension HarnessMonitorUITestCase {
     )
   }
 
-  func selectDependenciesSection(in app: XCUIApplication) {
+  func selectReviewsSection(in app: XCUIApplication) {
     selectSettingsSection(
       in: app,
-      identifier: HarnessMonitorUITestAccessibility.settingsDependenciesSection,
-      expectedTitle: "Dependencies"
+      identifier: HarnessMonitorUITestAccessibility.settingsReviewsSection,
+      expectedTitle: "Reviews"
     )
   }
 

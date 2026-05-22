@@ -6,7 +6,7 @@ import XCTest
 /// Parity tests for the Swift mirrors of the daemon's files-section types.
 /// Asserts on the truth-table inference helpers + JSON round-trip with the
 /// daemon's snake_case-encoded shapes.
-final class DependencyUpdateFileModelTests: XCTestCase {
+final class ReviewFileModelTests: XCTestCase {
 
   // MARK: - Language inference parity
 
@@ -87,10 +87,10 @@ final class DependencyUpdateFileModelTests: XCTestCase {
   }
 
   func testMimeTypeIanaStrings() {
-    XCTAssertEqual(HarnessDependencyImageMime.png.ianaString, "image/png")
-    XCTAssertEqual(HarnessDependencyImageMime.jpeg.ianaString, "image/jpeg")
-    XCTAssertEqual(HarnessDependencyImageMime.gif.ianaString, "image/gif")
-    XCTAssertEqual(HarnessDependencyImageMime.svg.ianaString, "image/svg+xml")
+    XCTAssertEqual(HarnessReviewImageMime.png.ianaString, "image/png")
+    XCTAssertEqual(HarnessReviewImageMime.jpeg.ianaString, "image/jpeg")
+    XCTAssertEqual(HarnessReviewImageMime.gif.ianaString, "image/gif")
+    XCTAssertEqual(HarnessReviewImageMime.svg.ianaString, "image/svg+xml")
   }
 
   // MARK: - Generated-path detection
@@ -119,7 +119,7 @@ final class DependencyUpdateFileModelTests: XCTestCase {
   // MARK: - JSON round-trip parity with daemon
 
   func testFilesListResponseRoundTrips() throws {
-    let response = DependencyUpdatesFilesListResponse(
+    let response = ReviewsFilesListResponse(
       pullRequestID: "PR_kwDOABC",
       number: 42,
       headRefOid: "abc123",
@@ -129,7 +129,7 @@ final class DependencyUpdateFileModelTests: XCTestCase {
       repositoryFullName: "owner/repo",
       viewerCanMarkViewed: true,
       files: [
-        DependencyUpdateFile(
+        ReviewFile(
           path: "src/lib.rs",
           changeType: .modified,
           additions: 12,
@@ -138,7 +138,7 @@ final class DependencyUpdateFileModelTests: XCTestCase {
         )
       ],
       fetchedAt: "2026-05-22T10:00:00Z",
-      rateLimitSnapshot: DependencyUpdatesRateLimitSnapshot(
+      rateLimitSnapshot: ReviewsRateLimitSnapshot(
         remaining: 4998,
         limit: 5000,
         resetAt: "2026-05-22T11:00:00Z",
@@ -147,7 +147,7 @@ final class DependencyUpdateFileModelTests: XCTestCase {
     )
     let data = try JSONEncoder().encode(response)
     let parsed = try JSONDecoder().decode(
-      DependencyUpdatesFilesListResponse.self, from: data)
+      ReviewsFilesListResponse.self, from: data)
     XCTAssertEqual(parsed.pullRequestID, response.pullRequestID)
     XCTAssertEqual(parsed.number, 42)
     XCTAssertEqual(parsed.headRefOid, response.headRefOid)
@@ -176,7 +176,7 @@ final class DependencyUpdateFileModelTests: XCTestCase {
       """
     let data = Data(json.utf8)
     let parsed = try JSONDecoder().decode(
-      DependencyUpdatesFilesListResponse.self, from: data)
+      ReviewsFilesListResponse.self, from: data)
     XCTAssertTrue(parsed.paginationComplete)
   }
 
@@ -193,7 +193,7 @@ final class DependencyUpdateFileModelTests: XCTestCase {
       """
     let data = Data(json.utf8)
     let parsed = try JSONDecoder().decode(
-      DependencyUpdatesFilesListResponse.self, from: data)
+      ReviewsFilesListResponse.self, from: data)
     XCTAssertFalse(parsed.paginationComplete)
   }
 
@@ -224,7 +224,7 @@ final class DependencyUpdateFileModelTests: XCTestCase {
       """
     let data = Data(json.utf8)
     let parsed = try JSONDecoder().decode(
-      DependencyUpdatesFilesListResponse.self, from: data)
+      ReviewsFilesListResponse.self, from: data)
     XCTAssertEqual(parsed.files.count, 1)
     XCTAssertEqual(parsed.files[0].changeType, .modified)
     XCTAssertEqual(parsed.files[0].viewerViewedState, .unviewed)
@@ -233,10 +233,10 @@ final class DependencyUpdateFileModelTests: XCTestCase {
   }
 
   func testFilesPatchResponseRoundTrips() throws {
-    let response = DependencyUpdatesFilesPatchResponse(
+    let response = ReviewsFilesPatchResponse(
       pullRequestID: "PR_1",
       patches: [
-        DependencyUpdateFilePatch(
+        ReviewFilePatch(
           path: "src/lib.rs",
           patch: "@@ -1 +1 @@\n-a\n+b",
           status: .modified,
@@ -253,13 +253,13 @@ final class DependencyUpdateFileModelTests: XCTestCase {
     )
     let data = try JSONEncoder().encode(response)
     let parsed = try JSONDecoder().decode(
-      DependencyUpdatesFilesPatchResponse.self, from: data)
+      ReviewsFilesPatchResponse.self, from: data)
     XCTAssertEqual(parsed.patches[0].servedBy, .localClone)
     XCTAssertFalse(parsed.drifted)
   }
 
   func testFilesPatchRequestCarriesLocalCloneContext() throws {
-    let request = DependencyUpdatesFilesPatchRequest(
+    let request = ReviewsFilesPatchRequest(
       pullRequestID: "PR_1",
       headRefOidExpected: "head",
       paths: ["src/lib.rs"],
@@ -271,7 +271,7 @@ final class DependencyUpdateFileModelTests: XCTestCase {
     )
     let data = try JSONEncoder().encode(request)
     let parsed = try JSONDecoder().decode(
-      DependencyUpdatesFilesPatchRequest.self, from: data)
+      ReviewsFilesPatchRequest.self, from: data)
     XCTAssertEqual(parsed.number, 42)
     XCTAssertEqual(parsed.repositoryFullName, "owner/repo")
     XCTAssertEqual(parsed.baseRefOidExpected, "base")
@@ -280,10 +280,10 @@ final class DependencyUpdateFileModelTests: XCTestCase {
   }
 
   func testFilesViewedRoundTrips() throws {
-    let request = DependencyUpdatesFilesViewedRequest(
+    let request = ReviewsFilesViewedRequest(
       pullRequestID: "PR_1",
       paths: [
-        DependencyUpdateFilesViewedTarget(
+        ReviewFilesViewedTarget(
           path: "src/lib.rs",
           expectedPriorState: .unviewed,
           markViewed: true
@@ -292,14 +292,14 @@ final class DependencyUpdateFileModelTests: XCTestCase {
     )
     let data = try JSONEncoder().encode(request)
     let parsed = try JSONDecoder().decode(
-      DependencyUpdatesFilesViewedRequest.self, from: data)
+      ReviewsFilesViewedRequest.self, from: data)
     XCTAssertEqual(parsed.paths.count, 1)
     XCTAssertEqual(parsed.paths[0].expectedPriorState, .unviewed)
     XCTAssertTrue(parsed.paths[0].markViewed)
   }
 
   func testFilesBlobResponseRoundTrips() throws {
-    let response = DependencyUpdatesFilesBlobResponse(
+    let response = ReviewsFilesBlobResponse(
       path: "logo.png",
       oid: "abc",
       mime: .png,
@@ -309,7 +309,7 @@ final class DependencyUpdateFileModelTests: XCTestCase {
     )
     let data = try JSONEncoder().encode(response)
     let parsed = try JSONDecoder().decode(
-      DependencyUpdatesFilesBlobResponse.self, from: data)
+      ReviewsFilesBlobResponse.self, from: data)
     XCTAssertEqual(parsed.mime, .png)
     XCTAssertEqual(parsed.byteSize, 12)
     XCTAssertFalse(parsed.isTooLarge)
@@ -325,7 +325,7 @@ final class DependencyUpdateFileModelTests: XCTestCase {
   }
 
   func testServedByValueRoundTripsSnakeCase() throws {
-    let encoded = try JSONEncoder().encode(DependencyUpdateFileServedBy.githubRestFallback)
+    let encoded = try JSONEncoder().encode(ReviewFileServedBy.githubRestFallback)
     XCTAssertEqual(String(bytes: encoded, encoding: .utf8), "\"github_rest_fallback\"")
   }
 }

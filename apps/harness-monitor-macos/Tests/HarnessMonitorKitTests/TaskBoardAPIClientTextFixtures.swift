@@ -82,7 +82,7 @@ let sampleTaskBoardPlanningResponseText =
 let sampleOrchestratorSettingsText =
   """
   {
-    "enabled_workflows": ["default_task", "pr_fix", "pr_review", "dependency_update"],
+    "enabled_workflows": ["default_task", "pr_fix", "pr_review", "review"],
     "dry_run_default": false,
     "dispatch_status_filter": "todo",
     "project_dir": "/tmp/harness",

@@ -213,15 +213,15 @@ struct HarnessMarkdownRenderingBehaviorTests {
     #expect(source.contains("case .heading = blocks[index + 1]"))
   }
 
-  @Test("Dependency description card omits duplicate title")
-  func dependencyDescriptionCardOmitsDuplicateTitle() throws {
+  @Test("Review description card omits duplicate title")
+  func reviewDescriptionCardOmitsDuplicateTitle() throws {
     let source = try readRepositoryFile(
       "apps/harness-monitor-macos/Sources/HarnessMonitorUIPreviewable"
-        + "/Views/Dashboard/DashboardDependencyDetailView.swift"
+        + "/Views/Dashboard/DashboardReviewDetailView.swift"
     )
 
-    #expect(source.contains("DashboardDependencyDetailSection(title: nil)"))
-    #expect(!source.contains("DashboardDependencyDetailSection(title: \"Description\")"))
+    #expect(source.contains("DashboardReviewDetailSection(title: nil)"))
+    #expect(!source.contains("DashboardReviewDetailSection(title: \"Description\")"))
   }
 
   private func readRepositoryFile(_ relativePath: String) throws -> String {

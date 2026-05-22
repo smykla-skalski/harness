@@ -5,8 +5,8 @@ import Testing
 @testable import HarnessMonitorUIPreviewable
 
 @MainActor
-@Suite("Dashboard dependencies scheduler")
-struct DashboardDependenciesSchedulerTests {
+@Suite("Dashboard reviews scheduler")
+struct DashboardReviewsSchedulerTests {
   @Test("cold start enqueues every repository under the concurrency cap")
   func coldStartEnqueuesEveryRepo() async throws {
     let stub = SchedulerStub()
@@ -15,10 +15,10 @@ struct DashboardDependenciesSchedulerTests {
       "acme/web": stubResponse(),
       "acme/cli": stubResponse(),
     ]
-    let scheduler = DashboardDependenciesScheduler()
+    let scheduler = DashboardReviewsScheduler()
     var merges: [String] = []
 
-    var prefs = DashboardDependenciesPreferences()
+    var prefs = DashboardReviewsPreferences()
     prefs.perRepositoryIntervalSeconds = 3_600
     prefs.maxConcurrentRepositoryFetches = 2
 
@@ -41,10 +41,10 @@ struct DashboardDependenciesSchedulerTests {
       "acme/api": stubResponse(),
       "acme/web": stubResponse(),
     ]
-    let scheduler = DashboardDependenciesScheduler()
+    let scheduler = DashboardReviewsScheduler()
     var merges: [String] = []
 
-    var prefs = DashboardDependenciesPreferences()
+    var prefs = DashboardReviewsPreferences()
     prefs.perRepositoryIntervalSeconds = 60
     prefs.maxConcurrentRepositoryFetches = 1
 
@@ -66,9 +66,9 @@ struct DashboardDependenciesSchedulerTests {
   func retryDispatchesFreshRepositoryImmediately() async throws {
     let stub = SchedulerStub()
     stub.responses = ["acme/api": stubResponse()]
-    let scheduler = DashboardDependenciesScheduler()
+    let scheduler = DashboardReviewsScheduler()
 
-    var prefs = DashboardDependenciesPreferences()
+    var prefs = DashboardReviewsPreferences()
     prefs.perRepositoryIntervalSeconds = 3_600
     prefs.maxConcurrentRepositoryFetches = 1
 
@@ -93,9 +93,9 @@ struct DashboardDependenciesSchedulerTests {
     let stub = SchedulerStub()
     stub.responses = ["acme/api": stubResponse()]
     stub.delaySeconds = 0.5
-    let scheduler = DashboardDependenciesScheduler()
+    let scheduler = DashboardReviewsScheduler()
 
-    var prefs = DashboardDependenciesPreferences()
+    var prefs = DashboardReviewsPreferences()
     prefs.perRepositoryIntervalSeconds = 30
     prefs.maxConcurrentRepositoryFetches = 1
     scheduler.start(
@@ -116,9 +116,9 @@ struct DashboardDependenciesSchedulerTests {
       "acme/api": stubResponse(),
       "acme/web": stubResponse(),
     ]
-    let scheduler = DashboardDependenciesScheduler()
+    let scheduler = DashboardReviewsScheduler()
 
-    var prefs = DashboardDependenciesPreferences()
+    var prefs = DashboardReviewsPreferences()
     prefs.perRepositoryIntervalSeconds = 3_600
     prefs.maxConcurrentRepositoryFetches = 1
 
@@ -148,9 +148,9 @@ struct DashboardDependenciesSchedulerTests {
       "acme/api": stubResponse(),
       "acme/web": stubResponse(),
     ]
-    let scheduler = DashboardDependenciesScheduler()
+    let scheduler = DashboardReviewsScheduler()
 
-    var prefs = DashboardDependenciesPreferences()
+    var prefs = DashboardReviewsPreferences()
     prefs.perRepositoryIntervalSeconds = 3_600
     prefs.maxConcurrentRepositoryFetches = 4
     scheduler.start(
@@ -179,9 +179,9 @@ struct DashboardDependenciesSchedulerTests {
       "acme/api": stubResponse(),
       "acme/web": stubResponse(),
     ]
-    let scheduler = DashboardDependenciesScheduler()
+    let scheduler = DashboardReviewsScheduler()
 
-    var prefs = DashboardDependenciesPreferences()
+    var prefs = DashboardReviewsPreferences()
     prefs.perRepositoryIntervalSeconds = 3_600
     prefs.maxConcurrentRepositoryFetches = 2
     let fresh = Date()
@@ -214,18 +214,18 @@ struct DashboardDependenciesSchedulerTests {
 
   // MARK: - Helpers
 
-  private func stubResponse() -> DependencyUpdatesQueryResponse {
-    DependencyUpdatesQueryResponse(
+  private func stubResponse() -> ReviewsQueryResponse {
+    ReviewsQueryResponse(
       fetchedAt: "2026-05-21T00:00:00Z",
       fromCache: false,
-      summary: DependencyUpdatesSummary(items: []),
+      summary: ReviewsSummary(items: []),
       items: []
     )
   }
 
   private func waitUntilSettled(
     stub: SchedulerStub,
-    scheduler: DashboardDependenciesScheduler
+    scheduler: DashboardReviewsScheduler
   ) async throws {
     for _ in 0..<60
     where !scheduler.repositoriesInFlight.isEmpty
@@ -247,9 +247,9 @@ struct DashboardDependenciesSchedulerTests {
 }
 
 @MainActor
-private final class SchedulerStub: HarnessMonitorDependenciesClientProtocol, @unchecked Sendable {
+private final class SchedulerStub: HarnessMonitorReviewsClientProtocol, @unchecked Sendable {
   private let lock = NSLock()
-  var responses: [String: DependencyUpdatesQueryResponse] = [:]
+  var responses: [String: ReviewsQueryResponse] = [:]
   var delaySeconds: Double = 0
   private var fetchCounts: [String: Int] = [:]
   private var inFlightCount: Int = 0
@@ -270,19 +270,19 @@ private final class SchedulerStub: HarnessMonitorDependenciesClientProtocol, @un
     lock.withLock { fetchCounts.values.reduce(0, +) }
   }
 
-  func queryDependencyUpdates(
-    request: DependencyUpdatesQueryRequest
-  ) async throws -> DependencyUpdatesQueryResponse {
+  func queryReviews(
+    request: ReviewsQueryRequest
+  ) async throws -> ReviewsQueryResponse {
     let repository = request.repositories.first ?? ""
-    let response: DependencyUpdatesQueryResponse = lock.withLock {
+    let response: ReviewsQueryResponse = lock.withLock {
       fetchCounts[repository, default: 0] += 1
       inFlightCount += 1
       observedMaxConcurrent = max(observedMaxConcurrent, inFlightCount)
       return responses[repository]
-        ?? DependencyUpdatesQueryResponse(
+        ?? ReviewsQueryResponse(
           fetchedAt: "2026-05-21T00:00:00Z",
           fromCache: false,
-          summary: DependencyUpdatesSummary(items: []),
+          summary: ReviewsSummary(items: []),
           items: []
         )
     }

@@ -4,14 +4,14 @@ import Testing
 @testable import HarnessMonitorKit
 
 @MainActor
-struct DependencyUpdateFilesViewModelTests {
+struct ReviewFilesViewModelTests {
   private func makeFile(
     path: String,
     additions: UInt32 = 0,
     deletions: UInt32 = 0,
-    viewed: DependencyUpdateFileViewedState = .unviewed
-  ) -> DependencyUpdateFile {
-    DependencyUpdateFile(
+    viewed: ReviewFileViewedState = .unviewed
+  ) -> ReviewFile {
+    ReviewFile(
       path: path,
       changeType: .modified,
       additions: additions,
@@ -21,10 +21,10 @@ struct DependencyUpdateFilesViewModelTests {
   }
 
   private func makeResponse(
-    files: [DependencyUpdateFile],
+    files: [ReviewFile],
     headRefOid: String = "head-a"
-  ) -> DependencyUpdatesFilesListResponse {
-    DependencyUpdatesFilesListResponse(
+  ) -> ReviewsFilesListResponse {
+    ReviewsFilesListResponse(
       pullRequestID: "pr-1",
       number: 42,
       headRefOid: headRefOid,
@@ -40,7 +40,7 @@ struct DependencyUpdateFilesViewModelTests {
 
   @Test("ingest(response:) populates files, viewedByPath, and the load state")
   func ingestResponsePopulates() {
-    let vm = DependencyUpdateFilesViewModel(pullRequestID: "pr-1")
+    let vm = ReviewFilesViewModel(pullRequestID: "pr-1")
     vm.ingest(
       response: makeResponse(
         files: [
@@ -63,7 +63,7 @@ struct DependencyUpdateFilesViewModelTests {
 
   @Test("applyFilter restricts filteredFiles by searchText")
   func applyFilterSearchText() {
-    let vm = DependencyUpdateFilesViewModel(pullRequestID: "pr-1")
+    let vm = ReviewFilesViewModel(pullRequestID: "pr-1")
     vm.ingest(
       response: makeResponse(
         files: [
@@ -73,17 +73,17 @@ struct DependencyUpdateFilesViewModelTests {
         ]
       )
     )
-    vm.applyFilter(DependencyUpdateFilesFilter(searchText: "Tests"))
+    vm.applyFilter(ReviewFilesFilter(searchText: "Tests"))
     #expect(vm.filteredFiles.map(\.path) == ["src/Tests/b.swift"])
   }
 
   @Test("applyFilter with hideGenerated drops paths matched by the generated matcher")
   func applyFilterHideGenerated() {
-    let matcher = DependencyUpdateFilesGeneratedPathMatcher(
+    let matcher = ReviewFilesGeneratedPathMatcher(
       identifier: "lockfiles",
       match: { $0.hasSuffix("Package.resolved") }
     )
-    let vm = DependencyUpdateFilesViewModel(pullRequestID: "pr-1")
+    let vm = ReviewFilesViewModel(pullRequestID: "pr-1")
     vm.ingest(
       response: makeResponse(
         files: [
@@ -93,7 +93,7 @@ struct DependencyUpdateFilesViewModelTests {
       )
     )
     vm.applyFilter(
-      DependencyUpdateFilesFilter(
+      ReviewFilesFilter(
         hideGenerated: true,
         generatedPathMatcher: matcher
       )
@@ -103,7 +103,7 @@ struct DependencyUpdateFilesViewModelTests {
 
   @Test("applyFilter with hideWhitespaceOnly drops zero-change files")
   func applyFilterWhitespaceOnly() {
-    let vm = DependencyUpdateFilesViewModel(pullRequestID: "pr-1")
+    let vm = ReviewFilesViewModel(pullRequestID: "pr-1")
     vm.ingest(
       response: makeResponse(
         files: [
@@ -112,13 +112,13 @@ struct DependencyUpdateFilesViewModelTests {
         ]
       )
     )
-    vm.applyFilter(DependencyUpdateFilesFilter(hideWhitespaceOnly: true))
+    vm.applyFilter(ReviewFilesFilter(hideWhitespaceOnly: true))
     #expect(vm.filteredFiles.map(\.path) == ["src/a.swift"])
   }
 
   @Test("applySort(.lineChangesDescending) orders by total changes")
   func applySortByLineChanges() {
-    let vm = DependencyUpdateFilesViewModel(pullRequestID: "pr-1")
+    let vm = ReviewFilesViewModel(pullRequestID: "pr-1")
     vm.ingest(
       response: makeResponse(
         files: [
@@ -134,7 +134,7 @@ struct DependencyUpdateFilesViewModelTests {
 
   @Test("markViewedBatch flips viewedByPath for all listed paths")
   func markViewedBatchFlipsAll() {
-    let vm = DependencyUpdateFilesViewModel(pullRequestID: "pr-1")
+    let vm = ReviewFilesViewModel(pullRequestID: "pr-1")
     vm.ingest(
       response: makeResponse(
         files: [
@@ -152,7 +152,7 @@ struct DependencyUpdateFilesViewModelTests {
 
   @Test("setPatchState replaces the cached patch entry per path")
   func setPatchStateRoundTrip() {
-    let vm = DependencyUpdateFilesViewModel(pullRequestID: "pr-1")
+    let vm = ReviewFilesViewModel(pullRequestID: "pr-1")
     vm.setPatchState(path: "src/a.swift", state: .loading)
     if case .loading = vm.patches["src/a.swift"] ?? .notLoaded {
       #expect(true)
@@ -163,7 +163,7 @@ struct DependencyUpdateFilesViewModelTests {
 
   @Test("viewMode(forPath:) falls back to defaultViewMode when no override is set")
   func viewModeFallsBackToDefault() {
-    let vm = DependencyUpdateFilesViewModel(pullRequestID: "pr-1")
+    let vm = ReviewFilesViewModel(pullRequestID: "pr-1")
     vm.defaultViewMode = .split
     #expect(vm.viewMode(forPath: "any.swift") == .split)
     vm.setViewMode(.unified, forPath: "any.swift")
@@ -173,7 +173,7 @@ struct DependencyUpdateFilesViewModelTests {
 
   @Test("ingest(response:) on a new headRefOid drops patches whose paths no longer exist")
   func ingestEvictsStalePatchesOnNewHead() {
-    let vm = DependencyUpdateFilesViewModel(pullRequestID: "pr-1")
+    let vm = ReviewFilesViewModel(pullRequestID: "pr-1")
     vm.ingest(
       response: makeResponse(
         files: [makeFile(path: "old.swift"), makeFile(path: "shared.swift")],
@@ -183,7 +183,7 @@ struct DependencyUpdateFilesViewModelTests {
     vm.setPatchState(
       path: "old.swift",
       state: .loaded(
-        DependencyUpdateFilePatch(
+        ReviewFilePatch(
           path: "old.swift",
           patch: "diff",
           status: .modified,
@@ -197,7 +197,7 @@ struct DependencyUpdateFilesViewModelTests {
     vm.setPatchState(
       path: "shared.swift",
       state: .loaded(
-        DependencyUpdateFilePatch(
+        ReviewFilePatch(
           path: "shared.swift",
           patch: "diff",
           status: .modified,
@@ -220,7 +220,7 @@ struct DependencyUpdateFilesViewModelTests {
 
   @Test("toggleExpansion toggles membership in expandedPaths")
   func toggleExpansionFlipsMembership() {
-    let vm = DependencyUpdateFilesViewModel(pullRequestID: "pr-1")
+    let vm = ReviewFilesViewModel(pullRequestID: "pr-1")
     vm.toggleExpansion(path: "src/a.swift")
     #expect(vm.expandedPaths.contains("src/a.swift"))
     vm.toggleExpansion(path: "src/a.swift")

@@ -64,8 +64,8 @@ extension SessionWindowFlowTests {
     #expect(DashboardWindowRoute.notifications.systemImage == "bell.badge")
     #expect(DashboardWindowRoute.diagnostics.title == "Diagnostics")
     #expect(DashboardWindowRoute.diagnostics.systemImage == "stethoscope")
-    #expect(DashboardWindowRoute.dependencies.title == "Dependencies")
-    #expect(DashboardWindowRoute.dependencies.systemImage == "shippingbox.circle")
+    #expect(DashboardWindowRoute.reviews.title == "Reviews")
+    #expect(DashboardWindowRoute.reviews.systemImage == "shippingbox.circle")
   }
 
   @Test("Session routes expose stable layout policy")
