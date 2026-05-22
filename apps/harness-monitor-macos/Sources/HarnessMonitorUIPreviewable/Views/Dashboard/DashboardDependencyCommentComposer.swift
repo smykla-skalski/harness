@@ -37,11 +37,16 @@ struct DashboardDependencyCommentComposer: View {
   // Cleared on successful send or explicit dismiss.
   @State private var lastFailedBody: String?
   @FocusState private var focused: Bool
+  // Persistent collapse preference shared across all dependency PR
+  // detail panes. Default expanded so first-time users see the editor.
+  @AppStorage(Self.collapsedDefaultsKey)
+  private var isCollapsed: Bool = false
 
   // GitHub's hard limit is ~65,536 characters for issue/PR comments;
   // soft-warn at 60k so the user has room to abort before hitting the
   // ceiling.
   private static let softCharacterLimit = 60_000
+  private static let collapsedDefaultsKey = "DashboardDependencyComposer.isCollapsed"
 
   init(
     pullRequestID: String,
@@ -61,8 +66,8 @@ struct DashboardDependencyCommentComposer: View {
   }
 
   var body: some View {
-    VStack(alignment: .leading, spacing: 8) {
-      header
+    VStack(spacing: 0) {
+      Divider().opacity(0.42)
       if let message = lastError {
         DashboardDependencyCommentRetryStrip(
           message: message,
@@ -70,15 +75,18 @@ struct DashboardDependencyCommentComposer: View {
           onRetry: retry,
           onDismiss: dismissError
         )
+        .padding(.horizontal, 16)
+        .padding(.top, 8)
       }
-      editorOrPreview
-      controlsRow
+      if isCollapsed {
+        collapsedBar
+      } else {
+        expandedComposer
+      }
     }
-    .padding(.horizontal, 16)
-    .padding(.vertical, 12)
-    .background(.thickMaterial)
     .accessibilityElement(children: .contain)
     .accessibilityLabel(Text("New comment composer"))
+    .animation(.smooth(duration: 0.18), value: isCollapsed)
     .task(id: draft) {
       try? await Task.sleep(for: .milliseconds(300))
       guard !Task.isCancelled else { return }
@@ -87,7 +95,48 @@ struct DashboardDependencyCommentComposer: View {
       onDraftChange(draft)
     }
     .onExitCommand { focused = false }
-    .onAppear { focused = true }
+    .onAppear {
+      if !isCollapsed && viewerCanComment { focused = true }
+    }
+    .onChange(of: isCollapsed) { _, collapsed in
+      guard !collapsed, viewerCanComment else { return }
+      Task {
+        try? await Task.sleep(for: .milliseconds(120))
+        focused = true
+      }
+    }
+  }
+
+  @ViewBuilder private var collapsedBar: some View {
+    Button {
+      isCollapsed = false
+    } label: {
+      HStack(spacing: 8) {
+        Image(systemName: "text.bubble")
+        Text(viewerCanComment ? "Add a comment…" : "Comments disabled")
+          .foregroundStyle(.secondary)
+        Spacer(minLength: 8)
+        Image(systemName: "chevron.up")
+          .foregroundStyle(.tertiary)
+          .font(.caption)
+      }
+      .contentShape(.rect)
+      .padding(.horizontal, 16)
+      .padding(.vertical, 8)
+    }
+    .harnessPlainButtonStyle()
+    .disabled(!viewerCanComment)
+    .accessibilityLabel(Text("Expand comment composer"))
+  }
+
+  @ViewBuilder private var expandedComposer: some View {
+    VStack(alignment: .leading, spacing: 8) {
+      header
+      editorOrPreview
+      controlsRow
+    }
+    .padding(.horizontal, 16)
+    .padding(.vertical, 12)
   }
 
   @ViewBuilder private var header: some View {
@@ -95,6 +144,19 @@ struct DashboardDependencyCommentComposer: View {
       Image(systemName: "text.bubble")
       Text("Comment")
       Spacer()
+      Button {
+        isCollapsed = true
+      } label: {
+        Image(systemName: "chevron.down")
+          .foregroundStyle(.secondary)
+          .font(.caption)
+          .padding(.horizontal, 6)
+          .padding(.vertical, 2)
+          .contentShape(.rect)
+      }
+      .harnessPlainButtonStyle()
+      .help("Collapse composer")
+      .accessibilityLabel(Text("Collapse comment composer"))
     }
   }
 
@@ -104,8 +166,9 @@ struct DashboardDependencyCommentComposer: View {
         .id(debouncedDraft)
         .frame(maxWidth: .infinity, alignment: .leading)
     } else {
-      TextEditor(text: $draft)
-        .frame(minHeight: 96, idealHeight: 96, maxHeight: 320)
+      TextField("Write a comment…", text: $draft, axis: .vertical)
+        .textFieldStyle(.roundedBorder)
+        .lineLimit(2...10)
         .focused($focused)
         .disabled(isPosting || !viewerCanComment)
         .accessibilityLabel(Text("Comment body"))
