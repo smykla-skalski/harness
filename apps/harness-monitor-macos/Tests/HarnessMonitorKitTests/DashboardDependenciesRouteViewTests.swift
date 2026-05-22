@@ -122,7 +122,9 @@ struct DashboardDependenciesRouteViewTests {
     )
     let attentionSource = try routeSource(named: "DashboardDependenciesAttentionActions.swift")
     let actionBarSource = try routeSource(named: "DashboardDependencyActionBar.swift")
-    let contextMenuSource = try routeSource(named: "DashboardDependenciesRouteView+ContextMenu.swift")
+    let contextMenuSource = try routeSource(
+      named: "DashboardDependenciesRouteView+ContextMenu.swift"
+    )
     let rowSource = try routeSource(named: "DashboardDependencyListRow.swift")
 
     #expect(routeViewSource.contains("@State private var actionState"))

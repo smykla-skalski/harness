@@ -61,10 +61,13 @@ extension DashboardDependenciesRouteView {
       routeRecentDependencyActions = [:]
       return
     }
-    guard let decoded = DashboardDependenciesStorageCodec.decode(
-      [String: DashboardDependencyActivityEntry].self,
-      from: storedValue
-    ) else {
+
+    guard
+      let decoded = DashboardDependenciesStorageCodec.decode(
+        [String: DashboardDependencyActivityEntry].self,
+        from: storedValue
+      )
+    else {
       HarnessMonitorLogger.swiftui.warning(
         "Dependency action diagnostics decode failed"
       )
