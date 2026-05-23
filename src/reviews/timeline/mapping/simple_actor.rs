@@ -8,7 +8,15 @@ use super::super::types::{
 use super::helpers::{parse_actor, parse_commit_oid, parse_iso8601, parse_string};
 
 fn typename_to_simple_kind(typename: &str) -> Option<SimpleActorEventKind> {
-    use SimpleActorEventKind::*;
+    use SimpleActorEventKind::{
+        Assigned, AutoMergeDisabled, AutoMergeEnabled, AutoRebaseEnabled, AutoSquashEnabled,
+        BaseRefChanged, BaseRefDeleted, BaseRefForcePushed, Closed, Connected, ConvertToDraft,
+        CrossReferenced, Demilestoned, Disconnected, HeadRefDeleted, HeadRefRestored, Labeled,
+        Locked, MarkedAsDuplicate, Mentioned, Merged, Milestoned, Pinned, ReadyForReview,
+        Referenced, RenamedTitle, Reopened, RevisionMarker, ReviewDismissed, ReviewRequestRemoved,
+        ReviewRequested, Subscribed, Transferred, Unassigned, Unlabeled, Unlocked, UnmarkedAsDuplicate,
+        Unpinned, Unsubscribed,
+    };
     Some(match typename {
         "HeadRefDeletedEvent" => HeadRefDeleted,
         "HeadRefRestoredEvent" => HeadRefRestored,
@@ -72,11 +80,9 @@ pub(super) fn map_simple_actor_event(
     let id = node
         .get("id")
         .and_then(Value::as_str)
-        .map(str::to_string)
-        .unwrap_or_else(|| synthesize_id(typename, node));
+        .map_or_else(|| synthesize_id(typename, node), str::to_string);
     let created_at = parse_iso8601(node.get("createdAt"))?;
     let actor = parse_actor(node.get("actor"));
-
     let mut entry = SimpleActorEventEntry {
         id,
         created_at,
@@ -101,8 +107,12 @@ pub(super) fn map_simple_actor_event(
         source_repository: None,
         destination_repository: None,
     };
+    fill_entry_fields(&mut entry, event_kind, node);
+    Some(ReviewTimelineEntry::SimpleActorEvent(entry))
+}
 
-    match event_kind {
+fn fill_entry_fields(entry: &mut SimpleActorEventEntry, kind: SimpleActorEventKind, node: &Value) {
+    match kind {
         SimpleActorEventKind::Labeled | SimpleActorEventKind::Unlabeled => {
             if let Some(label) = node.get("label").and_then(Value::as_object) {
                 entry.label = parse_string(label.get("name"));
@@ -125,14 +135,7 @@ pub(super) fn map_simple_actor_event(
             entry.new_title = parse_string(node.get("currentTitle"));
         }
         SimpleActorEventKind::ReviewRequested | SimpleActorEventKind::ReviewRequestRemoved => {
-            if let Some(req) = node.get("requestedReviewer").and_then(Value::as_object) {
-                let reviewer_type = req.get("__typename").and_then(Value::as_str).unwrap_or("");
-                if reviewer_type == "Team" {
-                    entry.requested_reviewer_team_slug = parse_string(req.get("slug"));
-                } else {
-                    entry.requested_reviewer_login = parse_string(req.get("login"));
-                }
-            }
+            fill_review_requested(entry, node);
         }
         SimpleActorEventKind::ReviewDismissed => {
             entry.dismissal_message = parse_string(node.get("dismissalMessage"));
@@ -150,33 +153,14 @@ pub(super) fn map_simple_actor_event(
             }
         }
         SimpleActorEventKind::CrossReferenced => {
-            if let Some(src) = node.get("source").and_then(Value::as_object) {
-                entry.source_url = parse_string(src.get("url"));
-                entry.source_title = parse_string(src.get("title"));
-                entry.source_number = src.get("number").and_then(Value::as_i64);
-                entry.source_repository = src
-                    .get("repository")
-                    .and_then(Value::as_object)
-                    .and_then(|r| r.get("nameWithOwner"))
-                    .and_then(Value::as_str)
-                    .map(str::to_string);
-            }
+            fill_cross_referenced(entry, node);
         }
         SimpleActorEventKind::BaseRefChanged => {
             entry.old_title = parse_string(node.get("previousRefName"));
             entry.new_title = parse_string(node.get("currentRefName"));
         }
         SimpleActorEventKind::BaseRefForcePushed => {
-            let (before, _) = parse_commit_oid(node.get("beforeCommit"));
-            let (after, _) = parse_commit_oid(node.get("afterCommit"));
-            entry.before_oid = Some(before).filter(|s| !s.is_empty());
-            entry.after_oid = Some(after).filter(|s| !s.is_empty());
-            entry.branch_name = node
-                .get("ref")
-                .and_then(Value::as_object)
-                .and_then(|r| r.get("name"))
-                .and_then(Value::as_str)
-                .map(str::to_string);
+            fill_base_ref_force_pushed(entry, node);
         }
         SimpleActorEventKind::BaseRefDeleted => {
             entry.branch_name = parse_string(node.get("baseRefName"));
@@ -203,5 +187,42 @@ pub(super) fn map_simple_actor_event(
         }
         _ => {}
     }
-    Some(ReviewTimelineEntry::SimpleActorEvent(entry))
+}
+
+fn fill_review_requested(entry: &mut SimpleActorEventEntry, node: &Value) {
+    if let Some(req) = node.get("requestedReviewer").and_then(Value::as_object) {
+        let reviewer_type = req.get("__typename").and_then(Value::as_str).unwrap_or("");
+        if reviewer_type == "Team" {
+            entry.requested_reviewer_team_slug = parse_string(req.get("slug"));
+        } else {
+            entry.requested_reviewer_login = parse_string(req.get("login"));
+        }
+    }
+}
+
+fn fill_cross_referenced(entry: &mut SimpleActorEventEntry, node: &Value) {
+    if let Some(src) = node.get("source").and_then(Value::as_object) {
+        entry.source_url = parse_string(src.get("url"));
+        entry.source_title = parse_string(src.get("title"));
+        entry.source_number = src.get("number").and_then(Value::as_i64);
+        entry.source_repository = src
+            .get("repository")
+            .and_then(Value::as_object)
+            .and_then(|r| r.get("nameWithOwner"))
+            .and_then(Value::as_str)
+            .map(str::to_string);
+    }
+}
+
+fn fill_base_ref_force_pushed(entry: &mut SimpleActorEventEntry, node: &Value) {
+    let (before, _) = parse_commit_oid(node.get("beforeCommit"));
+    let (after, _) = parse_commit_oid(node.get("afterCommit"));
+    entry.before_oid = Some(before).filter(|s| !s.is_empty());
+    entry.after_oid = Some(after).filter(|s| !s.is_empty());
+    entry.branch_name = node
+        .get("ref")
+        .and_then(Value::as_object)
+        .and_then(|r| r.get("name"))
+        .and_then(Value::as_str)
+        .map(str::to_string);
 }

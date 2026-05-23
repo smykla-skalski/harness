@@ -1,4 +1,5 @@
 use std::collections::BTreeSet;
+use std::mem;
 use std::path::PathBuf;
 
 use chrono::{DateTime, Utc};
@@ -8,8 +9,8 @@ use crate::task_board::github::GitHubProjectConfig;
 
 use super::check_status::{is_failed_check_conclusion, normalized_details_url};
 use super::types::{
-    CommitConnection, LabelNode, PageInfo, RepositoryLabelNode, ReviewNode, SearchNode,
-    StatusContextNode,
+    CommitConnection, LabelNode, PageInfo, RefNode, RepositoryLabelConnection, RepositoryLabelNode,
+    ReviewNode, SearchNode, StatusContextNode,
 };
 use super::{
     ReviewActionKind, ReviewActionOutcome, ReviewActionResult,
@@ -83,7 +84,7 @@ pub(super) fn scopes(request: &ReviewsQueryRequest) -> Result<Vec<ScopeQuery>, C
 }
 
 pub(super) fn convert_node(
-    node: SearchNode,
+    mut node: SearchNode,
 ) -> Result<
     (
         ReviewItem,
@@ -97,18 +98,63 @@ pub(super) fn convert_node(
     let pull_request_id = node.id.clone();
     let repository_id = node.repository.id.clone();
     let required_check_names = required_check_names(node.base_ref.as_ref());
-    let check_summary = CheckSummary::from_commits(node.commits);
+
+    // Extract fields from node before any partial moves.
+    let repository_name = node.repository.name_with_owner.clone();
+    let repository_labels = node.repository.labels.take();
+    let pr_labels_has_next = node.labels.page_info.has_next_page;
+    let pr_labels_cursor = node.labels.page_info.end_cursor.clone();
+    let reviews_has_next = node.reviews.page_info.has_next_page;
+    let reviews_cursor = node.reviews.page_info.end_cursor.clone();
+    let commits = mem::replace(
+        &mut node.commits,
+        CommitConnection { nodes: Vec::new() },
+    );
+    let check_summary = CheckSummary::from_commits(commits);
     let checks_continuation = check_summary
         .next_page_cursor
         .clone()
-        .map(|cursor| InnerCursor {
-            after: Some(cursor),
-        });
+        .map(|cursor| InnerCursor { after: Some(cursor) });
     let required_failed_check_names =
         required_failed_check_names(&check_summary.checks, &required_check_names);
 
-    let repository_name = node.repository.name_with_owner;
-    let (repository_label_bundle, repository_labels_continuation) = match node.repository.labels {
+    let (repository_label_bundle, repository_labels_continuation) =
+        convert_repository_labels(repository_labels, &repository_name);
+
+    let pr_labels_continuation = pr_labels_has_next
+        .then(|| InnerCursor { after: pr_labels_cursor });
+    let reviews_continuation = reviews_has_next
+        .then(|| InnerCursor { after: reviews_cursor });
+
+    let item = build_review_item(
+        NodeItemContext {
+            pull_request_id: pull_request_id.clone(),
+            repository_id: repository_id.clone(),
+            repository_name,
+            check_summary,
+            required_failed_check_names,
+            created_at,
+            updated_at,
+        },
+        node,
+    );
+    let continuation = NodeContinuation {
+        pull_request_id,
+        repository_id,
+        pr_labels: pr_labels_continuation,
+        reviews: reviews_continuation,
+        checks: checks_continuation,
+        repository_labels: repository_labels_continuation,
+        required_check_names,
+    };
+    Ok((item, repository_label_bundle, continuation))
+}
+
+fn convert_repository_labels(
+    labels: Option<RepositoryLabelConnection>,
+    repository_name: &str,
+) -> (Option<RepositoryLabelBundle>, Option<InnerCursor>) {
+    match labels {
         Some(connection) => {
             let labels = connection
                 .nodes
@@ -119,37 +165,29 @@ pub(super) fn convert_node(
                     description: label.description.filter(|value| !value.is_empty()),
                 })
                 .collect::<Vec<_>>();
-            let continuation = if connection.page_info.has_next_page {
-                Some(InnerCursor {
-                    after: connection.page_info.end_cursor,
-                })
-            } else {
-                None
-            };
-            (Some((repository_name.clone(), labels)), continuation)
+            let continuation = connection.page_info.has_next_page.then(|| InnerCursor {
+                after: connection.page_info.end_cursor,
+            });
+            (Some((repository_name.to_string(), labels)), continuation)
         }
         None => (None, None),
-    };
+    }
+}
 
-    let pr_labels_continuation = if node.labels.page_info.has_next_page {
-        Some(InnerCursor {
-            after: node.labels.page_info.end_cursor.clone(),
-        })
-    } else {
-        None
-    };
-    let reviews_continuation = if node.reviews.page_info.has_next_page {
-        Some(InnerCursor {
-            after: node.reviews.page_info.end_cursor.clone(),
-        })
-    } else {
-        None
-    };
-
-    let item = ReviewItem {
-        pull_request_id: pull_request_id.clone(),
-        repository_id: repository_id.clone(),
-        repository: repository_name,
+struct NodeItemContext {
+    pull_request_id: String,
+    repository_id: String,
+    repository_name: String,
+    check_summary: CheckSummary,
+    required_failed_check_names: Vec<String>,
+    created_at: chrono::DateTime<chrono::Utc>,
+    updated_at: chrono::DateTime<chrono::Utc>,
+}
+fn build_review_item(ctx: NodeItemContext, node: SearchNode) -> ReviewItem {
+    ReviewItem {
+        pull_request_id: ctx.pull_request_id,
+        repository_id: ctx.repository_id,
+        repository: ctx.repository_name,
         number: node.number,
         title: node.title,
         url: node.url,
@@ -160,17 +198,16 @@ pub(super) fn convert_node(
         state: map_pull_request_state(node.state.as_deref()),
         mergeable: map_mergeable_state(node.mergeable.as_deref()),
         review_status: map_review_status(node.review_decision.as_deref()),
-        check_status: check_summary.status(),
-        policy_blocked: check_summary.policy_blocked,
-        is_draft: node.is_draft,
+        check_status: ctx.check_summary.status(),
+        flags: super::super::ReviewItemFlags {
+            policy_blocked: ctx.check_summary.policy_blocked,
+            is_draft: node.is_draft,
+            viewer_can_update: node.viewer_can_update.unwrap_or(true),
+        },
+        viewer_can_merge_as_admin: node.viewer_can_merge_as_admin.unwrap_or(false),
         head_sha: node.head_ref_oid.unwrap_or_default(),
-        labels: node
-            .labels
-            .nodes
-            .into_iter()
-            .map(|label| label.name)
-            .collect(),
-        checks: check_summary.checks,
+        labels: node.labels.nodes.into_iter().map(|l| l.name).collect(),
+        checks: ctx.check_summary.checks,
         reviews: node
             .reviews
             .nodes
@@ -185,22 +222,10 @@ pub(super) fn convert_node(
             .collect(),
         additions: node.additions.max(0).cast_unsigned(),
         deletions: node.deletions.max(0).cast_unsigned(),
-        created_at,
-        updated_at,
-        required_failed_check_names,
-        viewer_can_update: node.viewer_can_update.unwrap_or(true),
-        viewer_can_merge_as_admin: node.viewer_can_merge_as_admin.unwrap_or(false),
-    };
-    let continuation = NodeContinuation {
-        pull_request_id,
-        repository_id,
-        pr_labels: pr_labels_continuation,
-        reviews: reviews_continuation,
-        checks: checks_continuation,
-        repository_labels: repository_labels_continuation,
-        required_check_names,
-    };
-    Ok((item, repository_label_bundle, continuation))
+        created_at: ctx.created_at,
+        updated_at: ctx.updated_at,
+        required_failed_check_names: ctx.required_failed_check_names,
+    }
 }
 
 #[derive(Default)]
@@ -352,7 +377,7 @@ pub(super) fn append_check_contexts(
     for context in contexts {
         summary.push_context(context);
     }
-    item.policy_blocked = item.policy_blocked || summary.policy_blocked;
+    item.flags.policy_blocked = item.flags.policy_blocked || summary.policy_blocked;
     item.checks.extend(summary.checks);
     item.check_status = recompute_check_status(&item.checks);
     item.required_failed_check_names =
@@ -374,7 +399,7 @@ pub(super) fn append_repository_labels(
     );
 }
 
-fn required_check_names(base_ref: Option<&super::types::RefNode>) -> Vec<String> {
+fn required_check_names(base_ref: Option<&RefNode>) -> Vec<String> {
     let Some(branch_protection) =
         base_ref.and_then(|base_ref| base_ref.branch_protection_rule.as_ref())
     else {
@@ -471,7 +496,6 @@ pub(super) fn parse_timestamp(value: &str) -> Result<DateTime<Utc>, CliError> {
             .into()
         })
 }
-
 pub(super) fn next_cursor_or_scope_limit(
     page_info: &PageInfo,
     page: u32,

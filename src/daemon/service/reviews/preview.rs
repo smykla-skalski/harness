@@ -38,49 +38,46 @@ fn preview_action_blocker(
     action: ReviewActionPreviewKind,
     target: &ReviewTarget,
 ) -> Option<String> {
-    if !target.viewer_can_update {
+    if !target.flags.viewer_can_update {
         return Some("Current GitHub token cannot update this pull request".to_string());
     }
     if target.state != ReviewPullRequestState::Open {
         return Some("Pull request is not open".to_string());
     }
+    preview_action_kind_blocker(action, target)
+}
+
+fn blocker_unless(ok: bool, msg: &str) -> Option<String> {
+    if ok { None } else { Some(msg.to_string()) }
+}
+
+fn merge_blocker(target: &ReviewTarget) -> Option<String> {
+    if target.flags.is_draft {
+        return Some("Draft pull requests cannot be merged".to_string());
+    }
+    if target.mergeable == ReviewMergeableState::Conflicting {
+        return Some("Merge conflicts must be resolved before merging".to_string());
+    }
+    None
+}
+
+fn preview_action_kind_blocker(
+    action: ReviewActionPreviewKind,
+    target: &ReviewTarget,
+) -> Option<String> {
     match action {
         ReviewActionPreviewKind::Approve => {
-            if target.can_attempt_manual_approval() {
-                None
-            } else {
-                Some("Pull request does not need manual approval".to_string())
-            }
+            blocker_unless(target.can_attempt_manual_approval(), "Pull request does not need manual approval")
         }
-        ReviewActionPreviewKind::Merge => {
-            if target.is_draft {
-                Some("Draft pull requests cannot be merged".to_string())
-            } else if target.mergeable == ReviewMergeableState::Conflicting {
-                Some("Merge conflicts must be resolved before merging".to_string())
-            } else {
-                None
-            }
-        }
+        ReviewActionPreviewKind::Merge => merge_blocker(target),
         ReviewActionPreviewKind::RerunChecks => {
-            if target.can_attempt_rerun_checks() {
-                None
-            } else {
-                Some("No rerunnable check suites were reported".to_string())
-            }
+            blocker_unless(target.can_attempt_rerun_checks(), "No rerunnable check suites were reported")
         }
         ReviewActionPreviewKind::AddLabel => {
-            if target.can_add_label() {
-                None
-            } else {
-                Some("Labels can only be added to open pull requests".to_string())
-            }
+            blocker_unless(target.can_add_label(), "Labels can only be added to open pull requests")
         }
         ReviewActionPreviewKind::Auto => {
-            if target.is_auto_approvable() || target.is_auto_mergeable() {
-                None
-            } else {
-                Some("Pull request is not eligible for auto mode".to_string())
-            }
+            blocker_unless(target.is_auto_approvable() || target.is_auto_mergeable(), "Pull request is not eligible for auto mode")
         }
     }
 }
@@ -107,7 +104,7 @@ pub(super) fn preview_action_warnings(
     }
     let policy_blocked = targets
         .iter()
-        .filter(|target| target.policy_blocked)
+        .filter(|target| target.flags.policy_blocked)
         .count();
     if policy_blocked > 0 {
         warnings.push(counted_warning(
@@ -148,7 +145,7 @@ fn preview_target_warnings(
     if target.review_status == ReviewReviewStatus::ChangesRequested {
         warnings.push("A reviewer requested changes".to_string());
     }
-    if target.policy_blocked {
+    if target.flags.policy_blocked {
         warnings.push("Review policy is blocking this pull request".to_string());
     }
     warnings

@@ -2,6 +2,7 @@
 //! and truncation labeling. Kept free of network IO so callers and tests
 //! can exercise them without touching `octocrab` client state.
 
+use octocrab::models::repos::DiffEntry;
 use serde::Deserialize;
 
 use crate::reviews::files::{
@@ -120,12 +121,11 @@ pub fn select_patches_by_path(
 /// (`rest_file_to_patch`, `select_patches_by_path`) keep working without
 /// branching on the source.
 #[must_use]
-pub fn diff_entry_to_rest_file(entry: &octocrab::models::repos::DiffEntry) -> RestPullFile {
+pub fn diff_entry_to_rest_file(entry: &DiffEntry) -> RestPullFile {
     use octocrab::models::repos::DiffEntryStatus;
     let status_str = match entry.status {
         DiffEntryStatus::Added => "added",
         DiffEntryStatus::Removed => "removed",
-        DiffEntryStatus::Modified => "modified",
         DiffEntryStatus::Renamed => "renamed",
         DiffEntryStatus::Copied => "copied",
         DiffEntryStatus::Changed => "changed",

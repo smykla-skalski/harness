@@ -5,8 +5,8 @@ use std::collections::BTreeMap;
 use crate::errors::{CliError, CliErrorKind};
 use crate::reviews::{
     ReviewFileViewedOutcome, ReviewFileViewedState, ReviewFilesViewedResult,
-    ReviewsFilesListRequest, ReviewsFilesViewedRequest, ReviewsFilesViewedResponse,
-    ReviewsGitHubClient, ViewedMutation, classify_outcome,
+    ReviewFilesViewedTarget, ReviewsFilesListRequest, ReviewsFilesViewedRequest,
+    ReviewsFilesViewedResponse, ReviewsGitHubClient, ViewedMutation, classify_outcome,
 };
 use crate::workspace::utc_now;
 
@@ -43,7 +43,14 @@ pub async fn mark_review_files_viewed(
 
     let token = github_token(None).ok_or_else(|| missing_token_error(None))?;
     let client = ReviewsGitHubClient::new(&token)?;
+    apply_viewed_mutations(&client, pull_request_id, normalized).await
+}
 
+async fn apply_viewed_mutations(
+    client: &ReviewsGitHubClient,
+    pull_request_id: String,
+    normalized: Vec<ReviewFilesViewedTarget>,
+) -> Result<ReviewsFilesViewedResponse, CliError> {
     // Refetch the file list once so we have a fresh per-path viewer state
     // and can drift-check every requested target without a round-trip per
     // path.
@@ -65,8 +72,7 @@ pub async fn mark_review_files_viewed(
             .get(&target.path)
             .copied()
             .unwrap_or(ReviewFileViewedState::Unviewed);
-        let outcome = classify_outcome(target.expected_prior_state, current)
-            .unwrap_or(ReviewFileViewedOutcome::Drifted);
+        let outcome = classify_outcome(target.expected_prior_state, current);
         if matches!(outcome, ReviewFileViewedOutcome::Drifted) {
             results.push(ReviewFilesViewedResult {
                 path: target.path,
@@ -75,50 +81,7 @@ pub async fn mark_review_files_viewed(
             });
             continue;
         }
-        match ViewedMutation::decide(current, target.mark_viewed) {
-            ViewedMutation::Skip => {
-                results.push(ReviewFilesViewedResult {
-                    path: target.path,
-                    outcome: ReviewFileViewedOutcome::Updated,
-                    viewer_viewed_state: current,
-                });
-            }
-            ViewedMutation::Mark | ViewedMutation::Unmark => {
-                let next_state = if target.mark_viewed {
-                    ReviewFileViewedState::Viewed
-                } else {
-                    ReviewFileViewedState::Unviewed
-                };
-                let mutation_result = client
-                    .toggle_pull_request_file_viewed(
-                        &pull_request_id,
-                        &target.path,
-                        target.mark_viewed,
-                    )
-                    .await;
-                match mutation_result {
-                    Ok(()) => results.push(ReviewFilesViewedResult {
-                        path: target.path,
-                        outcome: ReviewFileViewedOutcome::Updated,
-                        viewer_viewed_state: next_state,
-                    }),
-                    Err(error) => {
-                        tracing::warn!(
-                            target = "harness::reviews::files",
-                            pull_request_id = pull_request_id,
-                            path = target.path,
-                            error = %error,
-                            "mark_review_files_viewed mutation failed"
-                        );
-                        results.push(ReviewFilesViewedResult {
-                            path: target.path,
-                            outcome: ReviewFileViewedOutcome::Failed,
-                            viewer_viewed_state: current,
-                        });
-                    }
-                }
-            }
-        }
+        apply_one_viewed_mutation(client, &pull_request_id, target, current, &mut results).await;
     }
 
     Ok(ReviewsFilesViewedResponse {
@@ -126,4 +89,63 @@ pub async fn mark_review_files_viewed(
         results,
         fetched_at: utc_now(),
     })
+}
+
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "tracing macro expansion inflates the score; tokio-rs/tracing#553"
+)]
+async fn toggle_viewed(
+    client: &ReviewsGitHubClient,
+    pull_request_id: &str,
+    target: ReviewFilesViewedTarget,
+    current: ReviewFileViewedState,
+    results: &mut Vec<ReviewFilesViewedResult>,
+) {
+    let next_state = if target.mark_viewed {
+        ReviewFileViewedState::Viewed
+    } else {
+        ReviewFileViewedState::Unviewed
+    };
+    match client
+        .toggle_pull_request_file_viewed(pull_request_id, &target.path, target.mark_viewed)
+        .await
+    {
+        Ok(()) => results.push(ReviewFilesViewedResult {
+            path: target.path,
+            outcome: ReviewFileViewedOutcome::Updated,
+            viewer_viewed_state: next_state,
+        }),
+        Err(error) => {
+            tracing::warn!(
+                target = "harness::reviews::files",
+                "mark_review_files_viewed mutation failed: pull_request_id={pull_request_id} path={} error={error}",
+                target.path,
+            );
+            results.push(ReviewFilesViewedResult {
+                path: target.path,
+                outcome: ReviewFileViewedOutcome::Failed,
+                viewer_viewed_state: current,
+            });
+        }
+    }
+}
+
+async fn apply_one_viewed_mutation(
+    client: &ReviewsGitHubClient,
+    pull_request_id: &str,
+    target: ReviewFilesViewedTarget,
+    current: ReviewFileViewedState,
+    results: &mut Vec<ReviewFilesViewedResult>,
+) {
+    match ViewedMutation::decide(current, target.mark_viewed) {
+        ViewedMutation::Skip => results.push(ReviewFilesViewedResult {
+            path: target.path,
+            outcome: ReviewFileViewedOutcome::Updated,
+            viewer_viewed_state: current,
+        }),
+        ViewedMutation::Mark | ViewedMutation::Unmark => {
+            toggle_viewed(client, pull_request_id, target, current, results).await;
+        }
+    }
 }

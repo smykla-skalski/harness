@@ -299,7 +299,7 @@ fn graphql_payload_preserves_check_urls_into_daemon_json() {
         Some(status_context_url)
     );
     assert_eq!(item.checks[2].details_url, None);
-    assert!(item.viewer_can_merge_as_admin);
+    assert!(item.flags.viewer_can_merge_as_admin);
     assert_eq!(
         item.required_failed_check_names,
         vec!["legacy/ci".to_string()]
@@ -415,8 +415,12 @@ fn sample_review_item() -> ReviewItem {
         mergeable: ReviewMergeableState::Mergeable,
         review_status: ReviewReviewStatus::None,
         check_status: ReviewCheckStatus::None,
-        policy_blocked: false,
-        is_draft: false,
+        flags: crate::reviews::ReviewItemFlags {
+            policy_blocked: false,
+            is_draft: false,
+            viewer_can_update: true,
+            viewer_can_merge_as_admin: false,
+        },
         head_sha: "abc123".into(),
         labels: Vec::new(),
         checks: Vec::new(),
@@ -426,8 +430,6 @@ fn sample_review_item() -> ReviewItem {
         created_at: parse_timestamp("2026-01-01T00:00:00Z").expect("created timestamp"),
         updated_at: parse_timestamp("2026-01-01T00:01:00Z").expect("updated timestamp"),
         required_failed_check_names: Vec::new(),
-        viewer_can_update: true,
-        viewer_can_merge_as_admin: false,
     }
 }
 

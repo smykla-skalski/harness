@@ -7,7 +7,7 @@ use async_trait::async_trait;
 use octocrab::models::IssueState;
 
 const GITHUB_HTTP_CONNECT_TIMEOUT: Duration = Duration::from_secs(30);
-const GITHUB_HTTP_READ_TIMEOUT: Duration = Duration::from_secs(60);
+const GITHUB_HTTP_READ_TIMEOUT: Duration = Duration::from_mins(1);
 use rustls::crypto::ring::default_provider;
 
 use crate::errors::{CliError, CliErrorKind};

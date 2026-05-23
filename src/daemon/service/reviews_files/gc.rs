@@ -3,7 +3,7 @@
 use std::fs;
 
 use crate::errors::CliError;
-use crate::reviews::{LocalCloneRegistry, LocalCloneRoot, RepoKey};
+use crate::reviews::{LocalCloneRegistry, LocalCloneRoot, RegistryEntry, RepoKey};
 
 use super::clones::{clones_root, load_registry, save_registry};
 
@@ -38,7 +38,6 @@ pub async fn run_local_clone_gc() -> Result<GcReport, CliError> {
         chrono::Duration::days(LOCAL_CLONE_MAX_AGE_DAYS),
         LOCAL_CLONE_DISK_BUDGET_MB.saturating_mul(1024 * 1024),
     )
-    .await
 }
 
 /// Same as [`run_local_clone_gc`] but with the root, `now`, max-age, and
@@ -47,7 +46,7 @@ pub async fn run_local_clone_gc() -> Result<GcReport, CliError> {
 ///
 /// # Errors
 /// Returns `CliError` when the registry can't be loaded or saved.
-pub async fn run_local_clone_gc_with(
+pub fn run_local_clone_gc_with(
     root: &LocalCloneRoot,
     now: chrono::DateTime<chrono::Utc>,
     max_age: chrono::Duration,
@@ -60,14 +59,31 @@ pub async fn run_local_clone_gc_with(
     }
     let report = apply_local_clone_gc_targets(&mut registry, &targets);
     save_registry(root, &registry)?;
-    tracing::info!(
-        target = "harness::reviews::files",
-        targets = report.targets,
-        removed = report.removed,
-        bytes_freed = report.bytes_freed,
-        "local-clone gc completed"
-    );
+    log_gc_report(&report);
     Ok(report)
+}
+
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "tracing macro expansion inflates the score; tokio-rs/tracing#553"
+)]
+fn warn_gc_msg(msg: &str) {
+    tracing::warn!(target = "harness::reviews::files", "{msg}");
+}
+
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "tracing macro expansion inflates the score; tokio-rs/tracing#553"
+)]
+fn info_gc_msg(msg: &str) {
+    tracing::info!(target = "harness::reviews::files", "{msg}");
+}
+
+fn log_gc_report(report: &GcReport) {
+    info_gc_msg(&format!(
+        "local-clone gc completed: targets={} removed={} bytes_freed={}",
+        report.targets, report.removed, report.bytes_freed
+    ));
 }
 
 pub(super) fn apply_local_clone_gc_targets(
@@ -83,31 +99,41 @@ pub(super) fn apply_local_clone_gc_targets(
         let Some(entry) = registry.entries.get(key).cloned() else {
             continue;
         };
-        let bytes = entry.size_bytes;
-        if entry.bare_path.exists() {
-            match fs::remove_dir_all(&entry.bare_path) {
-                Ok(_) => {
-                    registry.remove(key);
-                    report.removed += 1;
-                    report.bytes_freed = report.bytes_freed.saturating_add(bytes);
-                }
-                Err(error) => {
-                    tracing::warn!(
-                        target = "harness::reviews::files",
-                        path = ?entry.bare_path,
-                        error = %error,
-                        "local-clone gc: failed to remove bare clone directory"
-                    );
-                }
-            }
-        } else {
-            // Entry pointed at a path that no longer exists. Removing the
-            // registry row is the cleanup.
-            registry.remove(key);
-            report.removed += 1;
-        }
+        gc_one_entry(registry, key, &entry, &mut report);
     }
     report
+}
+
+fn remove_entry_path(
+    registry: &mut LocalCloneRegistry,
+    key: &RepoKey,
+    entry: &RegistryEntry,
+    report: &mut GcReport,
+) {
+    match fs::remove_dir_all(&entry.bare_path) {
+        Ok(()) => {
+            registry.remove(key);
+            report.removed += 1;
+            report.bytes_freed = report.bytes_freed.saturating_add(entry.size_bytes);
+        }
+        Err(error) => warn_gc_msg(&format!("local-clone gc: failed to remove bare clone directory: path={} error={error}", entry.bare_path.display())),
+    }
+}
+
+fn gc_one_entry(
+    registry: &mut LocalCloneRegistry,
+    key: &RepoKey,
+    entry: &RegistryEntry,
+    report: &mut GcReport,
+) {
+    if entry.bare_path.exists() {
+        remove_entry_path(registry, key, entry, report);
+    } else {
+        // Entry pointed at a path that no longer exists. Removing the
+        // registry row is the cleanup.
+        registry.remove(key);
+        report.removed += 1;
+    }
 }
 
 /// Summary of one GC pass. Returned by [`run_local_clone_gc`] so callers

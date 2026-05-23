@@ -5,6 +5,7 @@ use serde::Deserialize;
 use crate::errors::{CliError, CliErrorKind};
 use crate::reviews::{
     ReviewImageMime, ReviewsFilesBlobRequest, ReviewsFilesBlobResponse, ReviewsGitHubClient,
+    image_mime_for_path,
 };
 use crate::workspace::utc_now;
 
@@ -45,47 +46,70 @@ pub async fn fetch_review_file_blob(
     }
     let token = github_token(None).ok_or_else(|| missing_token_error(None))?;
     let client = ReviewsGitHubClient::new(&token)?;
-    let response = client
+    let mime = image_mime_for_path(&request.path)
+        .unwrap_or(ReviewImageMime::Png);
+    fetch_blob_with_client(&client, request, oid, mime).await
+}
+
+fn blob_response(path: String, oid: String, mime: ReviewImageMime, blob: BlobTextProjection) -> ReviewsFilesBlobResponse {
+    ReviewsFilesBlobResponse {
+        path,
+        oid,
+        mime,
+        content_base64: blob.content_base64,
+        byte_size: blob.byte_size,
+        is_truncated: blob.is_truncated,
+        is_too_large: blob.is_too_large,
+        fetched_at: utc_now(),
+        rate_limit_snapshot: None,
+    }
+}
+
+fn empty_blob_response(path: String, oid: String, mime: ReviewImageMime) -> ReviewsFilesBlobResponse {
+    ReviewsFilesBlobResponse {
+        path,
+        oid,
+        mime,
+        content_base64: String::new(),
+        byte_size: 0,
+        is_truncated: false,
+        is_too_large: false,
+        fetched_at: utc_now(),
+        rate_limit_snapshot: None,
+    }
+}
+
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "tracing macro expansion inflates the score; tokio-rs/tracing#553"
+)]
+fn warn_blob_msg(msg: &str) {
+    tracing::warn!(target = "harness::reviews::files", "{msg}");
+}
+
+async fn fetch_blob_with_client(
+    client: &ReviewsGitHubClient,
+    request: &ReviewsFilesBlobRequest,
+    oid: String,
+    mime: ReviewImageMime,
+) -> Result<ReviewsFilesBlobResponse, CliError> {
+    let result = client
         .fetch_repository_blob_text(&request.repository_id, &oid)
         .await;
-    let mime = crate::reviews::image_mime_for_path(&request.path)
-        .unwrap_or(ReviewImageMime::Png);
-    match response {
+    match result {
         Ok(blob) => {
-            let blob = fetch_binary_blob_when_needed(&client, blob, &oid).await;
-            Ok(ReviewsFilesBlobResponse {
-                path: request.path.clone(),
-                oid,
-                mime,
-                content_base64: blob.content_base64,
-                byte_size: blob.byte_size,
-                is_truncated: blob.is_truncated,
-                is_too_large: blob.is_too_large,
-                fetched_at: utc_now(),
-                rate_limit_snapshot: None,
-            })
+            let blob = fetch_binary_blob_when_needed(client, blob, &oid).await;
+            Ok(blob_response(request.path.clone(), oid, mime, blob))
         }
         Err(error) => {
-            tracing::warn!(
-                target = "harness::reviews::files",
-                oid = oid,
-                path = request.path,
-                error = %error,
-                "fetch_review_file_blob graphql fetch failed - returning empty body"
-            );
-            Ok(ReviewsFilesBlobResponse {
-                path: request.path.clone(),
-                oid,
-                mime,
-                content_base64: String::new(),
-                byte_size: 0,
-                is_truncated: false,
-                is_too_large: false,
-                fetched_at: utc_now(),
-                rate_limit_snapshot: None,
-            })
+            warn_blob_msg(&format!("graphql blob fetch failed (returning empty body): oid={oid} path={} error={error}", request.path));
+            Ok(empty_blob_response(request.path.clone(), oid, mime))
         }
     }
+}
+
+fn needs_binary_fallback(blob: &BlobTextProjection) -> bool {
+    blob.content_base64.is_empty() && blob.byte_size > 0 && !blob.is_too_large
 }
 
 async fn fetch_binary_blob_when_needed(
@@ -93,15 +117,19 @@ async fn fetch_binary_blob_when_needed(
     blob: BlobTextProjection,
     oid: &str,
 ) -> BlobTextProjection {
-    if !blob.content_base64.is_empty() || blob.byte_size == 0 || blob.is_too_large {
-        return blob;
+    if needs_binary_fallback(&blob) {
+        return fetch_binary_blob_fallback(client, blob, oid).await;
     }
+    blob
+}
+
+async fn fetch_binary_blob_fallback(
+    client: &ReviewsGitHubClient,
+    blob: BlobTextProjection,
+    oid: &str,
+) -> BlobTextProjection {
     let Some(repo_full_name) = blob.repository_full_name.as_deref() else {
-        tracing::warn!(
-            target = "harness::reviews::files",
-            oid = oid,
-            "binary blob fallback skipped because repository nameWithOwner was missing"
-        );
+        warn_blob_msg(&format!("binary blob fallback skipped: missing nameWithOwner oid={oid}"));
         return blob;
     };
     match client
@@ -110,13 +138,7 @@ async fn fetch_binary_blob_when_needed(
     {
         Ok(rest_blob) => rest_blob,
         Err(error) => {
-            tracing::warn!(
-                target = "harness::reviews::files",
-                oid = oid,
-                repo = repo_full_name,
-                error = %error,
-                "binary blob fallback failed"
-            );
+            warn_blob_msg(&format!("binary blob fallback failed: oid={oid} repo={repo_full_name} error={error}"));
             blob
         }
     }

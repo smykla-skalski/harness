@@ -36,11 +36,13 @@ pub use files::{
 pub(crate) use github::ReviewsGitHubClient;
 pub use types::{
     PullRequestReview, ReviewActionPreviewTarget, ReviewActionResult,
-    ReviewCheck, ReviewItem, ReviewRepositoryLabel, ReviewTarget,
+    ReviewCheck, ReviewItem, ReviewItemFlags, ReviewRepositoryLabel,
+    ReviewTarget, ReviewTargetFlags,
     ReviewsActionPreviewRequest, ReviewsActionPreviewResponse,
     ReviewsActionResponse, ReviewsApproveRequest, ReviewsAutoRequest,
     ReviewsBodyRequest, ReviewsBodyResponse, ReviewsCacheClearResponse,
-    ReviewsCapabilitiesResponse, ReviewsCommentRequest, ReviewsLabelRequest,
+    ReviewsActionCapabilities, ReviewsCapabilitiesResponse,
+    ReviewsCommentRequest, ReviewsLabelRequest,
     ReviewsMergeRequest, ReviewsQueryRequest, ReviewsQueryResponse,
     ReviewsRefreshRequest, ReviewsRefreshResponse,
     ReviewsRepositoryCatalogRequest, ReviewsRepositoryCatalogResponse,

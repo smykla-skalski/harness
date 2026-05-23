@@ -106,7 +106,7 @@ fn duration_millis_from(value: Duration) -> u64 {
 /// `LocalCloneProgressSink` implementation that pushes every event into
 /// the daemon's broadcast channel as a `StreamEvent`.
 ///
-/// Cloneable via Arc; safe to share across the runtime's spawn_blocking
+/// Cloneable via Arc; safe to share across the runtime's `spawn_blocking`
 /// boundary because `broadcast::Sender` is itself Send + Sync + Clone.
 pub struct BroadcastProgressSink {
     sender: broadcast::Sender<StreamEvent>,
@@ -122,20 +122,31 @@ impl BroadcastProgressSink {
 impl LocalCloneProgressSink for BroadcastProgressSink {
     fn report(&self, event: LocalCloneProgress) {
         let payload: LocalCloneProgressEventPayload = event.into();
-        match build_stream_event(&payload) {
+        self.send_stream_event(&payload);
+    }
+}
+
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "tracing macro expansion inflates the score; tokio-rs/tracing#553"
+)]
+fn warn_serialize_error(error: &serde_json::Error) {
+    warn!(
+        target = "harness::reviews::files",
+        "failed to serialize local-clone progress event (event={REVIEWS_LOCAL_CLONE_PROGRESS_EVENT}): {error}",
+    );
+}
+
+impl BroadcastProgressSink {
+    fn send_stream_event(&self, payload: &LocalCloneProgressEventPayload) {
+        match build_stream_event(payload) {
             Ok(stream_event) => {
                 // The send result is "no active receivers", not an error.
                 // We expect bursts of subscribe/unsubscribe across Monitor
                 // launches; ignore the result rather than warn-spam.
                 let _ = self.sender.send(stream_event);
             }
-            Err(error) => {
-                warn!(
-                    target = "harness::reviews::files",
-                    event = REVIEWS_LOCAL_CLONE_PROGRESS_EVENT,
-                    "failed to serialize local-clone progress event: {error}"
-                );
-            }
+            Err(error) => warn_serialize_error(&error),
         }
     }
 }

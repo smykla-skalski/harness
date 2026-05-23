@@ -13,7 +13,7 @@ use super::{TimelineClient, TimelineError};
 use crate::errors::{CliError, CliErrorKind};
 
 const TIMELINE_CONNECT_TIMEOUT: Duration = Duration::from_secs(30);
-const TIMELINE_READ_TIMEOUT: Duration = Duration::from_secs(60);
+const TIMELINE_READ_TIMEOUT: Duration = Duration::from_mins(1);
 
 pub(crate) struct TimelineGitHubClient {
     client: Octocrab,
@@ -37,7 +37,7 @@ impl TimelineGitHubClient {
     }
 }
 
-fn graphql_err(err: octocrab::Error) -> TimelineError {
+fn graphql_err(err: &octocrab::Error) -> TimelineError {
     let text = err.to_string();
     if text.contains("rate limit") || text.contains("API rate limit") {
         TimelineError::RateLimited
@@ -71,7 +71,7 @@ impl TimelineClient for TimelineGitHubClient {
                 "variables": variables,
             }))
             .await
-            .map_err(graphql_err)
+            .map_err(|e| graphql_err(&e))
     }
 
     async fn list_review_comments(
@@ -93,7 +93,7 @@ impl TimelineClient for TimelineGitHubClient {
                 "variables": variables,
             }))
             .await
-            .map_err(graphql_err)
+            .map_err(|e| graphql_err(&e))
     }
 
     async fn list_review_thread_comments(
@@ -115,6 +115,6 @@ impl TimelineClient for TimelineGitHubClient {
                 "variables": variables,
             }))
             .await
-            .map_err(graphql_err)
+            .map_err(|e| graphql_err(&e))
     }
 }

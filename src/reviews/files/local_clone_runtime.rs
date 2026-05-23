@@ -12,7 +12,7 @@
 //! - [`LocalCloneRuntime::read_blob`] - return the raw bytes of a single
 //!   blob, used by the image preview pipeline as the zero-rate-limit path.
 //! - Per-repo mutex serialization via [`LocalCloneRuntime::lock_for`]
-//!   prevents two concurrent ensure_clone calls for the same repo from
+//!   prevents two concurrent `ensure_clone` calls for the same repo from
 //!   double-cloning.
 //!
 //! Progress is reported via a [`LocalCloneProgressSink`] that the daemon
@@ -27,15 +27,23 @@ pub(crate) mod diff;
 mod tests;
 
 use std::collections::BTreeMap;
-use std::path::PathBuf;
+use std::fs;
+use std::io::Result as IoResult;
+use std::path::{Path, PathBuf};
+use std::process;
 use std::sync::Arc;
 use std::sync::atomic::AtomicBool;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use chrono::Utc;
 use gix::progress::Discard;
+use gix::refspec;
+use gix::refspec::parse::Operation as RefspecOperation;
 use gix::remote::Direction;
+use gix::remote::ref_map::Options as RefMapOptions;
+use tokio::fs as tokio_fs;
 use tokio::sync::Mutex;
+use tokio::task::spawn_blocking;
 
 use diff::LocalCloneFetchRef;
 
@@ -224,11 +232,7 @@ impl LocalCloneRuntime {
         let lock = self.lock_for(&key).await;
         let _guard = lock.lock().await;
 
-        if !self.root.path.exists() {
-            tokio::fs::create_dir_all(&self.root.path)
-                .await
-                .map_err(|e| LocalCloneRuntimeError::Io(e.to_string()))?;
-        }
+        ensure_root_dir(&self.root.path).await?;
 
         let operation = if bare_path.exists() {
             LocalCloneOperation::Fetch
@@ -240,24 +244,37 @@ impl LocalCloneRuntime {
             operation,
         });
 
-        let start = std::time::Instant::now();
+        let start = Instant::now();
         let task_url = clone_url.to_string();
         let task_path = bare_path.clone();
         let task_ref = head_ref.clone();
-        let result = tokio::task::spawn_blocking(move || {
-            run_ensure(operation, task_url, task_path, task_ref, extra_refspecs)
+        let result = spawn_blocking(move || {
+            run_ensure(operation, &task_url, &task_path, &task_ref, &extra_refspecs)
         })
         .await
         .map_err(|join| LocalCloneRuntimeError::Join(join.to_string()))?;
 
+        self.handle_ensure_result(result, sink, &repo_label, operation, start.elapsed(), &key, bare_path).await
+    }
+
+    async fn handle_ensure_result(
+        &self,
+        result: Result<String, LocalCloneRuntimeError>,
+        sink: Arc<dyn LocalCloneProgressSink>,
+        repo_label: &str,
+        operation: LocalCloneOperation,
+        elapsed: Duration,
+        key: &RepoKey,
+        bare_path: PathBuf,
+    ) -> Result<EnsuredClone, LocalCloneRuntimeError> {
         match result {
             Ok(head_oid) => {
                 sink.report(LocalCloneProgress::Completed {
-                    repo_full_name: repo_label.clone(),
+                    repo_full_name: repo_label.to_string(),
                     operation,
-                    duration: start.elapsed(),
+                    duration: elapsed,
                 });
-                self.update_registry_on_success(&key, &repo_label, &bare_path)
+                self.update_registry_on_success(key, repo_label, &bare_path)
                     .await?;
                 Ok(EnsuredClone {
                     bare_path,
@@ -266,7 +283,7 @@ impl LocalCloneRuntime {
             }
             Err(error) => {
                 sink.report(LocalCloneProgress::Failed {
-                    repo_full_name: repo_label,
+                    repo_full_name: repo_label.to_string(),
                     operation,
                     message: error.to_string(),
                 });
@@ -289,7 +306,7 @@ impl LocalCloneRuntime {
     ) -> Result<Vec<u8>, LocalCloneRuntimeError> {
         let bare_path = ensured.bare_path.clone();
         let oid_string = oid.to_string();
-        tokio::task::spawn_blocking(move || {
+        spawn_blocking(move || {
             let repo =
                 gix::open(&bare_path).map_err(|e| LocalCloneRuntimeError::Open(e.to_string()))?;
             let parsed_oid = gix::ObjectId::from_hex(oid_string.as_bytes())
@@ -310,16 +327,16 @@ impl LocalCloneRuntime {
         &self,
         key: &RepoKey,
         repo_full_name: &str,
-        bare_path: &std::path::Path,
+        bare_path: &Path,
     ) -> Result<(), LocalCloneRuntimeError> {
         let _guard = self.registry_lock.lock().await;
         let registry_path = self.root.registry_path();
         let bare_path = bare_path.to_path_buf();
         let key = key.clone();
         let repo_full_name = repo_full_name.to_string();
-        tokio::task::spawn_blocking(move || {
+        spawn_blocking(move || {
             let mut registry = if registry_path.exists() {
-                let raw = std::fs::read(&registry_path).unwrap_or_default();
+                let raw = fs::read(&registry_path).unwrap_or_default();
                 serde_json::from_slice::<LocalCloneRegistry>(&raw).unwrap_or_default()
             } else {
                 LocalCloneRegistry::default()
@@ -353,16 +370,25 @@ impl LocalCloneRuntime {
     }
 }
 
+async fn ensure_root_dir(path: &Path) -> Result<(), LocalCloneRuntimeError> {
+    if path.exists() {
+        return Ok(());
+    }
+    tokio_fs::create_dir_all(path)
+        .await
+        .map_err(|e| LocalCloneRuntimeError::Io(e.to_string()))
+}
+
 /// Walk `path` recursively summing file sizes. Best-effort - any unreadable
 /// entry is silently skipped. Returns 0 on root-level error.
-fn directory_size(path: &std::path::Path) -> std::io::Result<u64> {
-    fn walk(p: &std::path::Path) -> std::io::Result<u64> {
-        let meta = std::fs::metadata(p)?;
+fn directory_size(path: &Path) -> IoResult<u64> {
+    fn walk(p: &Path) -> IoResult<u64> {
+        let meta = fs::metadata(p)?;
         if meta.is_file() {
             return Ok(meta.len());
         }
         let mut total = 0_u64;
-        for entry in std::fs::read_dir(p)?.flatten() {
+        for entry in fs::read_dir(p)?.flatten() {
             if let Ok(sub) = walk(&entry.path()) {
                 total = total.saturating_add(sub);
             }
@@ -372,15 +398,15 @@ fn directory_size(path: &std::path::Path) -> std::io::Result<u64> {
     walk(path)
 }
 
-fn write_registry_atomically(registry_path: &std::path::Path, body: &[u8]) -> Result<(), String> {
+fn write_registry_atomically(registry_path: &Path, body: &[u8]) -> Result<(), String> {
     let parent = registry_path
         .parent()
         .ok_or_else(|| format!("registry path has no parent: {}", registry_path.display()))?;
-    std::fs::create_dir_all(parent).map_err(|e| e.to_string())?;
-    let tmp_path = registry_path.with_extension(format!("json.tmp.{}", std::process::id()));
-    std::fs::write(&tmp_path, body).map_err(|e| e.to_string())?;
-    std::fs::rename(&tmp_path, registry_path).map_err(|e| {
-        let _ = std::fs::remove_file(&tmp_path);
+    fs::create_dir_all(parent).map_err(|e| e.to_string())?;
+    let tmp_path = registry_path.with_extension(format!("json.tmp.{}", process::id()));
+    fs::write(&tmp_path, body).map_err(|e| e.to_string())?;
+    fs::rename(&tmp_path, registry_path).map_err(|e| {
+        let _ = fs::remove_file(&tmp_path);
         e.to_string()
     })?;
     Ok(())
@@ -390,28 +416,28 @@ fn write_registry_atomically(registry_path: &std::path::Path, body: &[u8]) -> Re
 /// the requested ref resolves to after the clone or fetch completes.
 fn run_ensure(
     operation: LocalCloneOperation,
-    url: String,
-    bare_path: PathBuf,
-    head_ref: String,
-    extra_refspecs: Vec<String>,
+    url: &str,
+    bare_path: &PathBuf,
+    head_ref: &str,
+    extra_refspecs: &[String],
 ) -> Result<String, LocalCloneRuntimeError> {
     let interrupted = AtomicBool::new(false);
     match operation {
         LocalCloneOperation::Clone => {
             if let Some(parent) = bare_path.parent() {
-                std::fs::create_dir_all(parent)
+                fs::create_dir_all(parent)
                     .map_err(|e| LocalCloneRuntimeError::Io(e.to_string()))?;
             }
-            let mut prepare = gix::prepare_clone_bare(url.as_str(), &bare_path)
+            let mut prepare = gix::prepare_clone_bare(url, bare_path)
                 .map_err(|e| LocalCloneRuntimeError::Clone(e.to_string()))?
-                .with_fetch_options(fetch_options(&extra_refspecs)?);
+                .with_fetch_options(fetch_options(extra_refspecs)?);
             let (_repo, _outcome) = prepare
                 .fetch_only(Discard, &interrupted)
                 .map_err(|e| LocalCloneRuntimeError::Clone(e.to_string()))?;
         }
         LocalCloneOperation::Fetch => {
             let repo =
-                gix::open(&bare_path).map_err(|e| LocalCloneRuntimeError::Open(e.to_string()))?;
+                gix::open(bare_path).map_err(|e| LocalCloneRuntimeError::Open(e.to_string()))?;
             let remote = repo
                 .find_remote("origin")
                 .map_err(|e| LocalCloneRuntimeError::Fetch(e.to_string()))?;
@@ -419,7 +445,7 @@ fn run_ensure(
                 .connect(Direction::Fetch)
                 .map_err(|e| LocalCloneRuntimeError::Fetch(e.to_string()))?;
             let prepare = connection
-                .prepare_fetch(Discard, fetch_options(&extra_refspecs)?)
+                .prepare_fetch(Discard, fetch_options(extra_refspecs)?)
                 .map_err(|e| LocalCloneRuntimeError::Fetch(e.to_string()))?;
             let _outcome = prepare
                 .receive(Discard, &interrupted)
@@ -427,19 +453,19 @@ fn run_ensure(
         }
     }
 
-    let repo = gix::open(&bare_path).map_err(|e| LocalCloneRuntimeError::Open(e.to_string()))?;
-    let oid = resolve_ref(&repo, &head_ref)?;
+    let repo = gix::open(bare_path).map_err(|e| LocalCloneRuntimeError::Open(e.to_string()))?;
+    let oid = resolve_ref(&repo, head_ref)?;
     Ok(oid.to_hex().to_string())
 }
 
 fn fetch_options(
     extra_refspecs: &[String],
-) -> Result<gix::remote::ref_map::Options, LocalCloneRuntimeError> {
-    let mut options = gix::remote::ref_map::Options::default();
+) -> Result<RefMapOptions, LocalCloneRuntimeError> {
+    let mut options = RefMapOptions::default();
     for refspec in extra_refspecs {
-        let parsed = gix::refspec::parse(
+        let parsed = refspec::parse(
             refspec.as_str().into(),
-            gix::refspec::parse::Operation::Fetch,
+            RefspecOperation::Fetch,
         )
         .map_err(|error| LocalCloneRuntimeError::RefSpec(error.to_string()))?;
         options.extra_refspecs.push(parsed.to_owned());

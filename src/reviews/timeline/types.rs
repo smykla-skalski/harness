@@ -24,6 +24,7 @@ pub enum ReviewTimelineEntry {
 }
 
 impl ReviewTimelineEntry {
+    #[must_use]
     pub fn id(&self) -> &str {
         match self {
             Self::IssueComment(entry) => &entry.id,

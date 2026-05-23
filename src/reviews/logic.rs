@@ -12,8 +12,9 @@ use super::enums::{
 };
 use super::types::{
     ReviewItem, ReviewRepositoryLabel, ReviewTarget,
-    ReviewsBodyRequest, ReviewsCapabilitiesResponse, ReviewsQueryRequest,
-    ReviewsQueryResponse, ReviewsRepositoryCatalogRequest, ReviewsSummary,
+    ReviewTargetFlags, ReviewsActionCapabilities, ReviewsBodyRequest,
+    ReviewsCapabilitiesResponse, ReviewsQueryRequest, ReviewsQueryResponse,
+    ReviewsRepositoryCatalogRequest, ReviewsSummary,
 };
 
 pub(super) fn default_viewer_can_update() -> bool {
@@ -138,9 +139,11 @@ impl ReviewsCapabilitiesResponse {
     pub fn current() -> Self {
         Self {
             schema_version: 1,
-            supports_action_preview: true,
-            supports_check_run_links: true,
-            supports_repository_sync_health: true,
+            features: ReviewsActionCapabilities {
+                supports_action_preview: true,
+                supports_check_run_links: true,
+                supports_repository_sync_health: true,
+            },
             supports_persistent_action_diagnostics: true,
         }
     }
@@ -182,20 +185,22 @@ impl ReviewItem {
             number: self.number,
             url: self.url.clone(),
             state: self.state,
-            is_draft: self.is_draft,
             head_sha: self.head_sha.clone(),
             mergeable: self.mergeable,
             review_status: self.review_status,
             check_status: self.check_status,
-            policy_blocked: self.policy_blocked,
-            required_failed_check_names: self.required_failed_check_names.clone(),
+            flags: ReviewTargetFlags {
+                is_draft: self.flags.is_draft,
+                policy_blocked: self.flags.policy_blocked,
+                viewer_can_update: self.flags.viewer_can_update,
+            },
             viewer_can_merge_as_admin: self.viewer_can_merge_as_admin,
+            required_failed_check_names: self.required_failed_check_names.clone(),
             check_suite_ids: self
                 .checks
                 .iter()
                 .filter_map(|check| check.check_suite_id.clone())
                 .collect(),
-            viewer_can_update: self.viewer_can_update,
         }
     }
 
@@ -211,7 +216,7 @@ impl ReviewItem {
 
     #[must_use]
     pub fn requires_attention(&self) -> bool {
-        self.policy_blocked
+        self.flags.policy_blocked
             || self.mergeable == ReviewMergeableState::Conflicting
             || self.review_status == ReviewReviewStatus::ChangesRequested
             || self.check_status == ReviewCheckStatus::Failure
@@ -221,7 +226,7 @@ impl ReviewItem {
 impl ReviewTarget {
     #[must_use]
     pub fn can_attempt_manual_approval(&self) -> bool {
-        self.viewer_can_update
+        self.flags.viewer_can_update
             && self.state == ReviewPullRequestState::Open
             && matches!(
                 self.review_status,
@@ -231,25 +236,25 @@ impl ReviewTarget {
 
     #[must_use]
     pub fn can_attempt_manual_merge(&self) -> bool {
-        self.viewer_can_update
+        self.flags.viewer_can_update
             && self.state == ReviewPullRequestState::Open
-            && !self.is_draft
+            && !self.flags.is_draft
             && self.mergeable != ReviewMergeableState::Conflicting
     }
 
     #[must_use]
     pub fn can_attempt_rerun_checks(&self) -> bool {
-        self.viewer_can_update && !self.check_suite_ids.is_empty()
+        self.flags.viewer_can_update && !self.check_suite_ids.is_empty()
     }
 
     #[must_use]
     pub fn can_add_label(&self) -> bool {
-        self.viewer_can_update && self.state == ReviewPullRequestState::Open
+        self.flags.viewer_can_update && self.state == ReviewPullRequestState::Open
     }
 
     #[must_use]
     pub fn is_auto_approvable(&self) -> bool {
-        self.viewer_can_update
+        self.flags.viewer_can_update
             && self.state == ReviewPullRequestState::Open
             && self.check_status == ReviewCheckStatus::Success
             && matches!(
@@ -261,16 +266,16 @@ impl ReviewTarget {
 
     #[must_use]
     pub fn is_auto_mergeable(&self) -> bool {
-        self.viewer_can_update
+        self.flags.viewer_can_update
             && self.state == ReviewPullRequestState::Open
-            && !self.is_draft
+            && !self.flags.is_draft
             && matches!(
                 self.review_status,
                 ReviewReviewStatus::Approved | ReviewReviewStatus::None
             )
             && self.check_status == ReviewCheckStatus::Success
             && self.mergeable != ReviewMergeableState::Conflicting
-            && !self.policy_blocked
+            && !self.flags.policy_blocked
     }
 }
 

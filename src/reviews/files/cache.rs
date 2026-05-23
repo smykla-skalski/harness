@@ -10,6 +10,8 @@
 //! comparisons, and serde for the JSON envelope. Service handlers compose it
 //! with the GitHub REST/local-clone fetch paths.
 
+use std::cmp::Ordering;
+use std::fmt::Write as _;
 use std::path::{Path, PathBuf};
 
 use chrono::{DateTime, Utc};
@@ -64,7 +66,7 @@ impl PatchCacheKey {
 }
 
 /// On-disk envelope. The cached patch carries provenance + freshness so the
-/// service can decide whether to revalidate (ETag) or expire.
+/// service can decide whether to revalidate (`ETag`) or expire.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct PatchCacheEntry {
     pub patch: ReviewFilePatch,
@@ -79,7 +81,7 @@ impl PatchCacheEntry {
     #[must_use]
     pub fn is_expired(&self, now: DateTime<Utc>, max_age_seconds: u64) -> bool {
         let age = now.signed_duration_since(self.last_validated_at);
-        let max_age = chrono::Duration::seconds(max_age_seconds as i64);
+        let max_age = chrono::Duration::seconds(max_age_seconds.cast_signed());
         age > max_age
     }
 
@@ -103,13 +105,13 @@ pub struct PatchCacheLruRow {
 }
 
 impl PartialOrd for PatchCacheLruRow {
-    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         Some(self.cmp(other))
     }
 }
 
 impl Ord for PatchCacheLruRow {
-    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+    fn cmp(&self, other: &Self) -> Ordering {
         self.last_validated_at
             .cmp(&other.last_validated_at)
             .then(self.key.path.cmp(&other.key.path))
@@ -148,7 +150,10 @@ pub fn sha256_hex(bytes: &[u8]) -> String {
     let mut hasher = Sha256::new();
     hasher.update(bytes);
     let digest = hasher.finalize();
-    digest.iter().map(|b| format!("{b:02x}")).collect()
+    digest.iter().fold(String::new(), |mut acc, b| {
+        let _ = write!(acc, "{b:02x}");
+        acc
+    })
 }
 
 #[cfg(test)]

@@ -14,8 +14,7 @@ pub(super) fn map_unknown(typename: &str, node: &Value) -> Option<ReviewTimeline
     let id = node
         .get("id")
         .and_then(Value::as_str)
-        .map(str::to_string)
-        .unwrap_or_else(|| format!("unknown:{typename}"));
+        .map_or_else(|| format!("unknown:{typename}"), str::to_string);
     let created_at = parse_iso8601(node.get("createdAt"))?;
     let actor = parse_actor(node.get("actor"));
     Some(ReviewTimelineEntry::Unknown(UnknownEntry {
