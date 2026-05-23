@@ -1,3 +1,4 @@
+import HarnessMonitorIntents
 import HarnessMonitorKit
 import SwiftUI
 
@@ -60,6 +61,7 @@ extension DashboardReviewsRouteView {
 
   func approve(items: [ReviewItem]) async {
     let actionableItems = items.filter(\.canAttemptManualApproval)
+    HarnessMonitorIntentDonations.donateApprove(items: actionableItems)
     await performMutation("Approving", items: actionableItems) { client in
       try await client.approveReviews(
         request: ReviewsApproveRequest(targets: actionableItems.map(\.target))
@@ -69,6 +71,7 @@ extension DashboardReviewsRouteView {
 
   func merge(items: [ReviewItem]) async {
     let actionableItems = items.filter(\.canAttemptManualMerge)
+    HarnessMonitorIntentDonations.donateMerge(items: actionableItems)
     let nextID = nextSelectionID(after: actionableItems)
     await performMutation(
       "Merging",
@@ -104,6 +107,7 @@ extension DashboardReviewsRouteView {
 
   func rerunChecks(items: [ReviewItem]) async {
     let actionableItems = items.filter(\.canAttemptRerunChecks)
+    HarnessMonitorIntentDonations.donateRerunChecks(items: actionableItems)
     await performMutation("Rerunning", items: actionableItems) { client in
       try await client.rerunReviewChecks(
         request: ReviewsRerunChecksRequest(targets: actionableItems.map(\.rerunTarget))
@@ -157,6 +161,7 @@ extension DashboardReviewsRouteView {
 
   func addLabel(_ label: String, to items: [ReviewItem]) async {
     let actionableItems = items.filter(\.canAddReviewLabel)
+    HarnessMonitorIntentDonations.donateAddLabel(label, to: actionableItems)
     await performMutation(
       "Labeling",
       items: actionableItems,
