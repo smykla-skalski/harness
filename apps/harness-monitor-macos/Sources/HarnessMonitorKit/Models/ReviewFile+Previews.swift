@@ -53,7 +53,7 @@ public struct ReviewsFilesPreviewRequest: Codable, Equatable, Sendable {
 
 /// First-line patch body used by the file-card expansion hot path.
 public struct ReviewFilePreview: Codable, Equatable, Sendable, Identifiable {
-  public static let defaultLineLimit: UInt32 = 200
+  public static let defaultLineLimit: UInt32 = 1_000
 
   public let path: String
   public let patch: String
