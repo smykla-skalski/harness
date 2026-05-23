@@ -28,7 +28,7 @@ public struct GetNeedsMeCountIntent: AppIntent {
     return .result(value: count, dialog: Self.dialog(for: count))
   }
 
-  func resolveCount() async throws -> Int {
+  public func resolveCount() async throws -> Int {
     let items = try await source.suggested(limit: 1000)
     return items.filter(\.requiresAttention).count
   }
