@@ -1,2 +1,18 @@
 [toolchain]
-channel = "nightly"
+# Pin to a dated nightly so every cargo invocation (Xcode UI Cmd+R,
+# `mise run monitor:build`, XcodeBuildMCP, parallel agents) resolves the same
+# rustc. With the previous `channel = "nightly"`, rustup auto-updated the
+# underlying toolchain slot whenever a fresh nightly landed and cargo's
+# fingerprint of `rustc -V -v` changed -- which silently invalidated the
+# shared daemon cargo cache at `.cache/harness-monitor-xcode-daemon/` and
+# forced a full rebuild of ring, aws-lc-sys, rustls, sqlx, octocrab, kube,
+# gix, pyroscope, etc. (5-15 min per Cmd+R).
+#
+# Bumping this date is a deliberate cold rebuild. Do it on purpose, not by
+# accident. To bump: pick a current nightly date, update this file, update
+# `.mise.toml` (`rust = "nightly-YYYY-MM-DD"`) to match, then run any cargo
+# command once to install the toolchain.
+channel = "nightly-2026-05-19"
+components = ["rustfmt", "clippy", "rust-src"]
+profile = "minimal"
+targets = ["aarch64-apple-darwin"]

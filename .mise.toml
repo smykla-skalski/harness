@@ -1,5 +1,8 @@
 [tools]
-rust = "nightly"
+# Must match `rust-toolchain.toml` so mise's `RUSTUP_TOOLCHAIN` export and
+# rustup's toolchain-file resolution agree. Mismatch invalidates the daemon
+# cargo cache on every context switch.
+rust = "nightly-2026-05-19"
 shellcheck = "0.11.0"
 tuist = "4.195.0"
 xcbeautify = "3.2.1"

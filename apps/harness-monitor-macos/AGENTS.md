@@ -237,6 +237,31 @@ scheme. For structure and naming rules, follow
 Preview render scripts are not part of the current lane model. Use Xcode canvas
 or a targeted `monitor:build` / `monitor:test` lane for compile verification.
 
+## Daemon cargo cache contract
+
+The `Bundle Daemon Agent` Xcode build phase compiles the harness daemon
+through a shared cargo target dir at `.cache/harness-monitor-xcode-daemon/`.
+Three invariants keep that cache incremental across Xcode UI Cmd+R, terminal
+`mise run monitor:build`, XcodeBuildMCP, and parallel agents:
+
+1. **Single pinned toolchain.** `rust-toolchain.toml` at the repo root pins
+   `channel = "nightly-YYYY-MM-DD"`. `.mise.toml` must hold the exact same
+   string so rustup's `RUSTUP_TOOLCHAIN` export and toolchain-file resolution
+   agree. Rolling channel names (`nightly`, `stable`) auto-bump and silently
+   invalidate the cache.
+2. **Sanitized cargo env.** `Scripts/lib/daemon-cargo-build.sh::run_daemon_cargo`
+   strips `RUSTFLAGS`, `CARGO_BUILD_RUSTFLAGS`, `CARGO_ENCODED_RUSTFLAGS`,
+   `CARGO_BIN`, and `RUSTC` before invoking cargo, then exports the pinned
+   `RUSTUP_TOOLCHAIN`. The only source of rustflags is `.cargo/config.toml`.
+3. **Hard-fail on drift.** `assert_daemon_cargo_toolchain` runs `rustup show
+   active-toolchain` and aborts the build if the result does not match the
+   pin. `record_daemon_build_context` writes the resolved (rustc, wrapper,
+   flags) tuple to `<target_dir>/.daemon-context` and diffs it on every
+   subsequent run.
+
+Bumping the pin is a one-line edit in both `rust-toolchain.toml` and
+`.mise.toml`. Treat it as a deliberate cold rebuild.
+
 ## Gotchas
 
 - Keep `HarnessMonitor.xcodeproj`, shared workspace/scheme files, and Swift
