@@ -66,9 +66,14 @@ struct DashboardReviewFileCardInternal: View {
   }
 
   private var header: some View {
-    HStack(spacing: 8) {
+    HStack(spacing: 12) {
       Button(
-        action: { isExpanded.toggle() },
+        action: {
+          isExpanded.toggle()
+          if isExpanded, case .notLoaded = patchState {
+            onLoadPatch()
+          }
+        },
         label: {
           Image(systemName: isExpanded ? "chevron.down" : "chevron.right")
             .font(.caption.weight(.semibold))
@@ -114,7 +119,6 @@ struct DashboardReviewFileCardInternal: View {
       } label: {
         Label(viewMode.label, systemImage: "rectangle.split.2x1")
       }
-      .controlSize(.small)
       .help("Change diff view")
       .accessibilityIdentifier(
         HarnessMonitorAccessibility.dashboardReviewFileViewModeMenu(path: file.path)
@@ -131,10 +135,13 @@ struct DashboardReviewFileCardInternal: View {
         .truncationMode(.middle)
         .layoutPriority(1)
       if let previousPath = file.previousPath, previousPath != file.path {
-        Text("renamed from \(previousPath)")
+        Label("renamed from \(previousPath)", systemImage: "arrow.right")
+          .labelStyle(.titleAndIcon)
           .font(.caption2)
           .foregroundStyle(.secondary)
-          .lineLimit(1)
+          .lineLimit(2)
+          .truncationMode(.middle)
+          .help("renamed from \(previousPath)")
       }
     }
   }
@@ -172,7 +179,12 @@ struct DashboardReviewFileCardInternal: View {
         DashboardReviewFileDiffUnified(patch: patch, language: file.languageHint)
       }
     case .failed(let message):
-      Text(message).font(.caption).foregroundStyle(.orange)
+      VStack(alignment: .leading, spacing: 6) {
+        Text(message).font(.caption).foregroundStyle(.orange)
+        Button("Retry patch load") { onLoadPatch() }
+          .controlSize(.small)
+          .accessibilityIdentifier("dashboardReviewFileRetryPatch(\(file.path))")
+      }
     }
   }
 
