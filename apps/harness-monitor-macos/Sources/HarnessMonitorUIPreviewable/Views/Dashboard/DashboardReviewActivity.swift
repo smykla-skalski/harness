@@ -115,22 +115,23 @@ struct DashboardReviewActivitySnapshot: Equatable, Sendable {
 
 /// ISO-8601 parser reused across activity-metadata rendering. Allocated once
 /// at module scope so the per-render Date conversion does not allocate a
-/// fresh formatter.
-private let dashboardReviewActivityISOParser: ISO8601DateFormatter = {
+/// fresh formatter. Apple's DateFormatter family is thread-safe in practice
+/// even though it doesn't conform to `Sendable`.
+nonisolated(unsafe) private let dashboardReviewActivityISOParser: ISO8601DateFormatter = {
   let formatter = ISO8601DateFormatter()
   formatter.formatOptions = [.withInternetDateTime]
   return formatter
 }()
 
 /// Absolute-time formatter for tooltips: locale-sensitive, friendly date+time.
-private let dashboardReviewActivityAbsoluteFormatter: DateFormatter = {
+nonisolated(unsafe) private let dashboardReviewActivityAbsoluteFormatter: DateFormatter = {
   let formatter = DateFormatter()
   formatter.dateStyle = .medium
   formatter.timeStyle = .short
   return formatter
 }()
 
-private let dashboardReviewActivityRelativeFormatter: RelativeDateTimeFormatter = {
+nonisolated(unsafe) private let dashboardReviewActivityRelativeFormatter: RelativeDateTimeFormatter = {
   let formatter = RelativeDateTimeFormatter()
   formatter.unitsStyle = .short
   return formatter
@@ -197,22 +198,25 @@ struct DashboardReviewActivitySummary: View {
     }
   }
 
-  @ViewBuilder
   private var checkLinksChip: some View {
-    let label = snapshot.checkLinkLabel
-    let tint: Color
-    let icon: String
+    metadataChip(
+      snapshot.checkLinkLabel,
+      systemImage: checkLinksChipIcon,
+      tint: checkLinksChipTint
+    )
+  }
+
+  private var checkLinksChipTint: Color {
+    snapshot.totalCheckCount > 0 && snapshot.missingCheckRunURLCount > 0
+      ? HarnessMonitorTheme.caution
+      : HarnessMonitorTheme.secondaryInk
+  }
+
+  private var checkLinksChipIcon: String {
     if snapshot.totalCheckCount == 0 {
-      tint = HarnessMonitorTheme.secondaryInk
-      icon = "circle.dashed"
-    } else if snapshot.missingCheckRunURLCount == 0 {
-      tint = HarnessMonitorTheme.secondaryInk
-      icon = "link"
-    } else {
-      tint = HarnessMonitorTheme.caution
-      icon = "exclamationmark.triangle"
+      return "circle.dashed"
     }
-    metadataChip(label, systemImage: icon, tint: tint)
+    return snapshot.missingCheckRunURLCount == 0 ? "link" : "exclamationmark.triangle"
   }
 
   private var emptyActionRow: some View {
