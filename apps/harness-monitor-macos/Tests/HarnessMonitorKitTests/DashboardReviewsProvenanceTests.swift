@@ -56,14 +56,14 @@ struct DashboardReviewsProvenanceTests {
     )
 
     #expect(live.source == .live)
-    #expect(live.warningTitle == nil)
+    #expect(live.warnings.isEmpty)
     #expect(cache.source == .cache)
     #expect(offlineCache.source == .offlineCache("daemon stopped"))
-    #expect(offlineCache.warningTitle == "Daemon offline: daemon stopped")
+    #expect(offlineCache.warnings == ["Daemon offline: daemon stopped"])
     #expect(lastLive.source == .lastLiveSnapshot("daemon stopped"))
-    #expect(lastLive.warningTitle == "Daemon offline: daemon stopped")
+    #expect(lastLive.warnings == ["Daemon offline: daemon stopped"])
     #expect(stale.fetchedSnapshotIsStale)
-    #expect(stale.warningTitle == "Fetched snapshot exceeds 10m")
+    #expect(stale.warnings == ["Fetched snapshot exceeds 10m"])
   }
 
   @MainActor
@@ -103,9 +103,9 @@ struct DashboardReviewsProvenanceTests {
     )
 
     #expect(!onSchedule.fetchedSnapshotIsStale)
-    #expect(onSchedule.warningTitle == nil)
+    #expect(onSchedule.warnings.isEmpty)
     #expect(pastCeiling.fetchedSnapshotIsStale)
-    #expect(pastCeiling.warningTitle == "Fetched snapshot exceeds 50m")
+    #expect(pastCeiling.warnings == ["Fetched snapshot exceeds 50m"])
   }
 
   @Test("Route wires provenance into list and detail surfaces")
