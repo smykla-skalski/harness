@@ -14,7 +14,8 @@ public struct OpenPullRequestIntent: AppIntent {
   }
   public static var openAppWhenRun: Bool { true }
 
-  @Parameter(title: "Pull Request") public var pullRequest: PullRequestEntity
+  @Parameter(title: "Pull Request")
+  public var pullRequest: PullRequestEntity
 
   public init() {}
 

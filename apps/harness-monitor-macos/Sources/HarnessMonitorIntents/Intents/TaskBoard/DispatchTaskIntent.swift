@@ -12,7 +12,8 @@ public struct DispatchTaskIntent: AppIntent {
     )
   }
 
-  @Parameter(title: "Task") public var item: TaskBoardItemEntity
+  @Parameter(title: "Task")
+  public var item: TaskBoardItemEntity
 
   let source: TaskBoardItemSource
 
