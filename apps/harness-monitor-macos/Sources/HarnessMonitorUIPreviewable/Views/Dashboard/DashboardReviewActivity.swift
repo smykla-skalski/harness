@@ -72,12 +72,19 @@ struct DashboardReviewActivitySnapshot: Equatable, Sendable {
     fromCache ? "Cached data" : "Live data"
   }
 
-  var checkLinkLabel: String? {
-    guard totalCheckCount > 0 else { return nil }
+  var checkLinkLabel: String {
+    if totalCheckCount == 0 {
+      return "No checks configured"
+    }
     if missingCheckRunURLCount == 0 {
       return "All check links available"
     }
     return "\(missingCheckRunURLCount)/\(totalCheckCount) check links missing"
+  }
+
+  var fetchedAtDate: Date? {
+    guard !fetchedAt.isEmpty else { return nil }
+    return dashboardReviewActivityISOParser.date(from: fetchedAt)
   }
 
   var diagnosticsText: String {
@@ -88,9 +95,7 @@ struct DashboardReviewActivitySnapshot: Equatable, Sendable {
     if !fetchedAt.isEmpty {
       lines.append("Fetched at: \(fetchedAt)")
     }
-    if let checkLinkLabel {
-      lines.append("Check links: \(checkLinkLabel)")
-    }
+    lines.append("Check links: \(checkLinkLabel)")
     lines.append("Review schema: \(capabilities.schemaVersion)")
     lines.append("Action preview: \(capabilities.supportsActionPreview ? "supported" : "fallback")")
     if let actionTitle {
@@ -106,6 +111,37 @@ struct DashboardReviewActivitySnapshot: Equatable, Sendable {
     }
     return lines.joined(separator: "\n")
   }
+}
+
+/// ISO-8601 parser reused across activity-metadata rendering. Allocated once
+/// at module scope so the per-render Date conversion does not allocate a
+/// fresh formatter.
+private let dashboardReviewActivityISOParser: ISO8601DateFormatter = {
+  let formatter = ISO8601DateFormatter()
+  formatter.formatOptions = [.withInternetDateTime]
+  return formatter
+}()
+
+/// Absolute-time formatter for tooltips: locale-sensitive, friendly date+time.
+private let dashboardReviewActivityAbsoluteFormatter: DateFormatter = {
+  let formatter = DateFormatter()
+  formatter.dateStyle = .medium
+  formatter.timeStyle = .short
+  return formatter
+}()
+
+private let dashboardReviewActivityRelativeFormatter: RelativeDateTimeFormatter = {
+  let formatter = RelativeDateTimeFormatter()
+  formatter.unitsStyle = .short
+  return formatter
+}()
+
+func dashboardReviewActivityAbsoluteLabel(for date: Date) -> String {
+  dashboardReviewActivityAbsoluteFormatter.string(from: date)
+}
+
+func dashboardReviewActivityRelativeLabel(for date: Date, reference: Date = Date()) -> String {
+  dashboardReviewActivityRelativeFormatter.localizedString(for: date, relativeTo: reference)
 }
 
 struct DashboardReviewActivitySummary: View {
@@ -129,32 +165,54 @@ struct DashboardReviewActivitySummary: View {
       lineSpacing: HarnessMonitorTheme.spacingSM
     ) {
       if snapshot.isRefreshing {
-        metadataLabel(
+        metadataChip(
           snapshot.actionTitle ?? "Refreshing",
           systemImage: "arrow.clockwise",
           tint: HarnessMonitorTheme.accent
         )
-      }
-      metadataLabel(
-        snapshot.cacheLabel,
-        systemImage: snapshot.fromCache ? "archivebox" : "network",
-        tint: snapshot.fromCache ? HarnessMonitorTheme.caution : HarnessMonitorTheme.secondaryInk
-      )
-      if !snapshot.fetchedAt.isEmpty {
-        metadataLabel("Fetched \(snapshot.fetchedAt)", systemImage: "clock")
-      }
-      if let checkLinkLabel = snapshot.checkLinkLabel {
-        metadataLabel(
-          checkLinkLabel,
-          systemImage: snapshot.missingCheckRunURLCount == 0
-            ? "link"
-            : "exclamationmark.triangle",
-          tint: snapshot.missingCheckRunURLCount == 0
-            ? HarnessMonitorTheme.secondaryInk
-            : HarnessMonitorTheme.caution
+      } else {
+        metadataChip(
+          snapshot.cacheLabel,
+          systemImage: snapshot.fromCache ? "archivebox" : "network",
+          tint: snapshot.fromCache ? HarnessMonitorTheme.caution : HarnessMonitorTheme.secondaryInk
         )
       }
+      fetchedAtChip
+      checkLinksChip
     }
+  }
+
+  @ViewBuilder
+  private var fetchedAtChip: some View {
+    if let fetchedAtDate = snapshot.fetchedAtDate {
+      metadataChip(
+        "Loaded \(dashboardReviewActivityRelativeLabel(for: fetchedAtDate))",
+        systemImage: "clock"
+      )
+      .help("Fetched \(dashboardReviewActivityAbsoluteLabel(for: fetchedAtDate))")
+    } else if !snapshot.fetchedAt.isEmpty {
+      // Fallback for unparseable strings: still surface what we have rather
+      // than dropping the chip entirely.
+      metadataChip("Fetched \(snapshot.fetchedAt)", systemImage: "clock")
+    }
+  }
+
+  @ViewBuilder
+  private var checkLinksChip: some View {
+    let label = snapshot.checkLinkLabel
+    let tint: Color
+    let icon: String
+    if snapshot.totalCheckCount == 0 {
+      tint = HarnessMonitorTheme.secondaryInk
+      icon = "circle.dashed"
+    } else if snapshot.missingCheckRunURLCount == 0 {
+      tint = HarnessMonitorTheme.secondaryInk
+      icon = "link"
+    } else {
+      tint = HarnessMonitorTheme.caution
+      icon = "exclamationmark.triangle"
+    }
+    metadataChip(label, systemImage: icon, tint: tint)
   }
 
   private var emptyActionRow: some View {
@@ -174,7 +232,7 @@ struct DashboardReviewActivitySummary: View {
     }
   }
 
-  private func metadataLabel(
+  private func metadataChip(
     _ title: String,
     systemImage: String,
     tint: Color = HarnessMonitorTheme.secondaryInk
@@ -183,6 +241,19 @@ struct DashboardReviewActivitySummary: View {
       .scaledFont(.caption.weight(.semibold))
       .foregroundStyle(tint)
       .lineLimit(1)
+      .padding(.horizontal, 8)
+      .padding(.vertical, 4)
+      .background(
+        HarnessMonitorTheme.ink.opacity(0.05),
+        in: Capsule(style: .continuous)
+      )
+      .overlay(
+        Capsule(style: .continuous)
+          .strokeBorder(
+            HarnessMonitorTheme.controlBorder.opacity(0.5),
+            lineWidth: 0.5
+          )
+      )
   }
 }
 
@@ -203,6 +274,7 @@ private struct DashboardReviewLastActionRow: View {
         Text(entry.recordedAt, style: .relative)
           .scaledFont(.caption.weight(.semibold))
           .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+          .help(dashboardReviewActivityAbsoluteLabel(for: entry.recordedAt))
       }
       Text(entry.summary)
         .scaledFont(.callout)
