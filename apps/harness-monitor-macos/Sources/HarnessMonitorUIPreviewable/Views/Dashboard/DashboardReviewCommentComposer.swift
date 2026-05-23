@@ -18,17 +18,17 @@ struct DashboardReviewCommentComposer: View {
   let pullRequestID: String
   let initialDraft: String
   let viewerCanComment: Bool
+  let viewerLogin: String?
   let onDraftChange: (String) -> Void
   let onSend: (String) async -> ReviewCommentPostOutcome
 
   @State private var draft: String
   @State private var debouncedDraft: String
-  // `String.count` walks grapheme clusters → O(n) per call. For a
-  // 65k-character draft typed actively, that's 65k Unicode scans per
-  // keystroke. `unicodeScalars.count` skips grapheme clustering and is
-  // cheaper for display. Compute it inside the debounced task so the
-  // figure updates 300ms after the user stops typing — not per keystroke.
-  @State private var debouncedCharCount: Int = 0
+  // The character counter reads `draft.unicodeScalars.count` directly
+  // so the figure stays in sync with the editor near the 60k soft cap.
+  // `unicodeScalars.count` skips grapheme-cluster bookkeeping that
+  // `String.count` triggers, so the cost is bounded even for a maxed
+  // 65k draft (a few hundred microseconds on Apple silicon).
   @State private var showPreview: Bool = false
   @State private var isPosting = false
   @State private var lastError: String?
@@ -37,32 +37,33 @@ struct DashboardReviewCommentComposer: View {
   // Cleared on successful send or explicit dismiss.
   @State private var lastFailedBody: String?
   @FocusState private var focused: Bool
-  // Persistent collapse preference shared across all review PR
-  // detail panes. Default expanded so first-time users see the editor.
-  @AppStorage(Self.collapsedDefaultsKey)
-  private var isCollapsed: Bool = false
+  // Collapse state lives per-detail-pane (not in `@AppStorage`) so the
+  // user's collapse on one PR doesn't follow them to the next. The
+  // parent applies `.id(pullRequestID)` on the composer so each PR
+  // gets a fresh `@State` that starts expanded.
+  @State private var isCollapsed: Bool = false
 
   // GitHub's hard limit is ~65,536 characters for issue/PR comments;
   // soft-warn at 60k so the user has room to abort before hitting the
   // ceiling.
   private static let softCharacterLimit = 60_000
-  private static let collapsedDefaultsKey = "DashboardReviewComposer.isCollapsed"
 
   init(
     pullRequestID: String,
     initialDraft: String,
     viewerCanComment: Bool,
+    viewerLogin: String? = nil,
     onDraftChange: @escaping (String) -> Void,
     onSend: @escaping (String) async -> ReviewCommentPostOutcome
   ) {
     self.pullRequestID = pullRequestID
     self.initialDraft = initialDraft
     self.viewerCanComment = viewerCanComment
+    self.viewerLogin = viewerLogin
     self.onDraftChange = onDraftChange
     self.onSend = onSend
     _draft = State(initialValue: initialDraft)
     _debouncedDraft = State(initialValue: initialDraft)
-    _debouncedCharCount = State(initialValue: initialDraft.unicodeScalars.count)
   }
 
   var body: some View {
@@ -91,14 +92,14 @@ struct DashboardReviewCommentComposer: View {
       try? await Task.sleep(for: .milliseconds(300))
       guard !Task.isCancelled else { return }
       debouncedDraft = draft
-      debouncedCharCount = draft.unicodeScalars.count
       onDraftChange(draft)
     }
     .onExitCommand { focused = false }
-    .onAppear {
-      if !isCollapsed && viewerCanComment { focused = true }
-    }
     .onChange(of: isCollapsed) { _, collapsed in
+      // Focus the editor only when the user explicitly expands the
+      // composer. Auto-focusing on every detail-pane appearance traps
+      // keyboard shortcuts (Cmd+W, arrow keys) inside the TextField
+      // before the user has signalled intent to type.
       guard !collapsed, viewerCanComment else { return }
       Task {
         try? await Task.sleep(for: .milliseconds(120))
@@ -126,6 +127,11 @@ struct DashboardReviewCommentComposer: View {
     }
     .harnessPlainButtonStyle()
     .disabled(!viewerCanComment)
+    .help(
+      viewerCanComment
+        ? ""
+        : "Your access token doesn't grant the `repo` / `pull_request` write scopes for this repository. Check Settings → Connections."
+    )
     .accessibilityLabel(Text("Expand comment composer"))
   }
 
@@ -134,6 +140,7 @@ struct DashboardReviewCommentComposer: View {
       header
       editorOrPreview
       controlsRow
+      hintsRow
     }
     .padding(.horizontal, 16)
     .padding(.vertical, 12)
@@ -166,7 +173,7 @@ struct DashboardReviewCommentComposer: View {
         .id(debouncedDraft)
         .frame(maxWidth: .infinity, alignment: .leading)
     } else {
-      TextField("Write a comment…", text: $draft, axis: .vertical)
+      TextField("Add a comment…", text: $draft, axis: .vertical)
         .textFieldStyle(.roundedBorder)
         .lineLimit(2...10)
         .focused($focused)
@@ -178,17 +185,23 @@ struct DashboardReviewCommentComposer: View {
 
   @ViewBuilder private var controlsRow: some View {
     HStack {
-      Toggle("Preview", isOn: $showPreview)
-        .toggleStyle(.button)
-        .disabled(trimmed.isEmpty)
+      Picker("", selection: $showPreview) {
+        Text("Edit").tag(false)
+        Text("Preview").tag(true)
+      }
+      .pickerStyle(.segmented)
+      .labelsHidden()
+      .fixedSize()
+      .disabled(trimmed.isEmpty)
+      .help(trimmed.isEmpty ? "Type a comment to preview it." : "")
       Spacer()
-      Text("\(debouncedCharCount) characters")
+      Text("\(charCount) characters")
         .font(.caption2.monospacedDigit())
         .foregroundStyle(
-          debouncedCharCount > Self.softCharacterLimit ? .red : .secondary
+          charCount > Self.softCharacterLimit ? .red : .secondary
         )
         .accessibilityLabel(
-          Text("\(debouncedCharCount) characters drafted")
+          Text("\(charCount) characters drafted")
         )
       Button("Send", action: send)
         .keyboardShortcut(.return, modifiers: .command)
@@ -198,21 +211,60 @@ struct DashboardReviewCommentComposer: View {
     }
   }
 
+  @ViewBuilder private var hintsRow: some View {
+    HStack(spacing: 8) {
+      if let viewerLogin {
+        Text("Commenting as @\(viewerLogin)")
+          .accessibilityLabel(Text("Commenting as \(viewerLogin)"))
+      }
+      Spacer(minLength: 0)
+      Text("⌘↩ to send · Markdown supported")
+        .accessibilityLabel(Text("Command return to send. Markdown formatting supported."))
+    }
+    .font(.caption2)
+    .foregroundStyle(.tertiary)
+  }
+
+  private var charCount: Int {
+    draft.unicodeScalars.count
+  }
+
   private var trimmed: String {
     draft.trimmingCharacters(in: .whitespacesAndNewlines)
   }
 
   private func send() {
-    let body = trimmed
+    sendBody(trimmed, clearOnSuccess: true)
+  }
+
+  /// Retry: resend the last failed body without disturbing whatever the
+  /// user has since typed into the editor. If the failed body is
+  /// recoverable the strip's "Restore" button can put it back into the
+  /// editor, but a click on Retry alone leaves the editor untouched.
+  private func retry() {
+    guard let body = lastFailedBody, !isPosting else { return }
+    sendBody(body, clearOnSuccess: false)
+  }
+
+  private func restoreFailedBody() {
+    guard let body = lastFailedBody else { return }
+    draft = body
+    debouncedDraft = body
+    lastError = nil
+    lastFailedBody = nil
+  }
+
+  private func sendBody(_ body: String, clearOnSuccess: Bool) {
     isPosting = true
     Task {
       let outcome = await onSend(body)
       switch outcome {
       case .posted:
-        draft = ""
-        debouncedDraft = ""
-        debouncedCharCount = 0
-        onDraftChange("")
+        if clearOnSuccess {
+          draft = ""
+          debouncedDraft = ""
+          onDraftChange("")
+        }
         lastError = nil
         lastFailedBody = nil
       case .failed(let reason):
@@ -229,17 +281,6 @@ struct DashboardReviewCommentComposer: View {
       }
       isPosting = false
     }
-  }
-
-  private func retry() {
-    guard let body = lastFailedBody, !isPosting else { return }
-    // Restore the editor to the failed body so the user SEES exactly
-    // what's about to resend. Avoids the "phantom retry" UX bug where
-    // the editor has diverged since the failure.
-    draft = body
-    debouncedDraft = body
-    debouncedCharCount = body.unicodeScalars.count
-    send()
   }
 
   private func dismissError() {
