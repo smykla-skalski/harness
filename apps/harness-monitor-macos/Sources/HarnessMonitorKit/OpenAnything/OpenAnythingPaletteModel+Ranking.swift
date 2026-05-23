@@ -66,7 +66,7 @@ extension OpenAnythingPaletteModel {
   private func pinnedCandidates(
     rankedSections: [OpenAnythingSection],
     records: [OpenAnythingRecord]?,
-    pinned: Set<String>
+    pinned: [String]
   ) -> [OpenAnythingHit] {
     let allHits = rankedSections.flatMap(\.hits)
     if let records, allHits.isEmpty {

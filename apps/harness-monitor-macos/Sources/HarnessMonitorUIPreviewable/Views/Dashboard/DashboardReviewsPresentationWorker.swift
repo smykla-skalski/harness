@@ -288,7 +288,7 @@ actor DashboardReviewsPresentationWorker {
     _ filteredItems: [ReviewItem],
     groupMode: DashboardReviewsGroupMode,
     sort comparator: (ReviewItem, ReviewItem) -> Bool,
-    input: DashboardReviewsPresentationInput
+    input: DashboardReviewsListPresentationInput
   ) -> [DashboardReviewsRepositoryGroup] {
     switch groupMode {
     case .repository:
