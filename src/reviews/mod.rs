@@ -48,7 +48,7 @@ pub use types::{
     ReviewsMergeRequest, ReviewsQueryRequest, ReviewsQueryResponse,
     ReviewsRefreshRequest, ReviewsRefreshResponse,
     ReviewsRepositoryCatalogRequest, ReviewsRepositoryCatalogResponse,
-    ReviewsRerunChecksRequest, ReviewsSummary,
+    ReviewsRequestReviewRequest, ReviewsRerunChecksRequest, ReviewsSummary,
 };
 
 // Re-exports used by `mod tests;` via `use super::*;`. These were previously

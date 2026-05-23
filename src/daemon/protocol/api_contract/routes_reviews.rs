@@ -74,6 +74,14 @@ pub(crate) const ROUTES: &[HttpApiRouteContract] = &[
         swift_client_exposed: true,
     },
     HttpApiRouteContract {
+        method: HttpRouteMethod::Post,
+        path: http_paths::REVIEWS_REQUEST_REVIEW,
+        parity: HttpRouteParity::Rpc {
+            ws_method: ws_methods::REVIEWS_REQUEST_REVIEW,
+        },
+        swift_client_exposed: true,
+    },
+    HttpApiRouteContract {
         method: HttpRouteMethod::Delete,
         path: http_paths::REVIEWS_CACHE,
         parity: HttpRouteParity::Rpc {

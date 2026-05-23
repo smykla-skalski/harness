@@ -6,7 +6,7 @@ use crate::daemon::protocol::{
     ReviewsFilesListRequest, ReviewsFilesPatchRequest,
     ReviewsFilesViewedRequest, ReviewsLabelRequest,
     ReviewsMergeRequest, ReviewsQueryRequest, ReviewsRefreshRequest,
-    ReviewsRepositoryCatalogRequest, ReviewsRerunChecksRequest,
+    ReviewsRepositoryCatalogRequest, ReviewsRequestReviewRequest, ReviewsRerunChecksRequest,
     ReviewsReviewThreadResolveRequest, ReviewsTimelineRequest, WsRequest,
     WsResponse, ws_methods,
 };
@@ -52,6 +52,9 @@ pub(crate) async fn dispatch_reviews_method(
         }
         ws_methods::REVIEWS_AUTO => {
             Some(dispatch_reviews_auto(request).await)
+        }
+        ws_methods::REVIEWS_REQUEST_REVIEW => {
+            Some(dispatch_reviews_request_review(request).await)
         }
         ws_methods::REVIEWS_CLEAR_CACHE => Some(dispatch_query_result(
             &request.id,
@@ -185,6 +188,16 @@ async fn dispatch_reviews_auto(request: &WsRequest) -> WsResponse {
         return invalid_params(request);
     };
     dispatch_query_result(&request.id, service::auto_reviews(&body).await)
+}
+
+async fn dispatch_reviews_request_review(request: &WsRequest) -> WsResponse {
+    let Ok(body) = parse_params::<ReviewsRequestReviewRequest>(request) else {
+        return invalid_params(request);
+    };
+    dispatch_query_result(
+        &request.id,
+        service::request_review_for_reviews(&body).await,
+    )
 }
 
 async fn dispatch_reviews_refresh(request: &WsRequest) -> WsResponse {

@@ -87,6 +87,7 @@ pub enum ReviewActionKind {
     AutoApprove,
     AutoMerge,
     Comment,
+    RequestReview,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]

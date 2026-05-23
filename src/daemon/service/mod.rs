@@ -260,7 +260,7 @@ pub use reviews::{
     catalog_review_repositories, clear_reviews_cache,
     comment_on_reviews, reviews_capabilities, fetch_review_body,
     merge_reviews, preview_review_action, query_reviews,
-    refresh_reviews, rerun_reviews_checks, update_review_body,
+    refresh_reviews, request_review_for_reviews, rerun_reviews_checks, update_review_body,
 };
 pub(crate) use reviews_files::BlobTextProjection;
 pub use reviews_files::{

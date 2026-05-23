@@ -13,7 +13,7 @@ use crate::daemon::protocol::{
     ReviewsFilesListRequest, ReviewsFilesPatchRequest,
     ReviewsFilesViewedRequest, ReviewsLabelRequest,
     ReviewsMergeRequest, ReviewsQueryRequest, ReviewsRefreshRequest,
-    ReviewsRepositoryCatalogRequest, ReviewsRerunChecksRequest,
+    ReviewsRepositoryCatalogRequest, ReviewsRequestReviewRequest, ReviewsRerunChecksRequest,
     ReviewsReviewThreadResolveRequest, ReviewsTimelineRequest, http_paths,
 };
 use crate::daemon::service;
@@ -71,6 +71,10 @@ pub(super) fn reviews_routes() -> Router<DaemonHttpState> {
         .route(
             http_paths::REVIEWS_AUTO,
             post(post_auto_reviews),
+        )
+        .route(
+            http_paths::REVIEWS_REQUEST_REVIEW,
+            post(post_request_review),
         )
         .route(
             http_paths::REVIEWS_CACHE,
@@ -265,6 +269,22 @@ async fn post_auto_reviews(
     timed_json(
         "POST",
         http_paths::REVIEWS_AUTO,
+        &request_id,
+        start,
+        result,
+    )
+}
+
+async fn post_request_review(
+    headers: HeaderMap,
+    State(state): State<DaemonHttpState>,
+    Json(request): Json<ReviewsRequestReviewRequest>,
+) -> Response {
+    let (start, request_id) = authenticated_request!(headers, state);
+    let result = service::request_review_for_reviews(&request).await;
+    timed_json(
+        "POST",
+        http_paths::REVIEWS_REQUEST_REVIEW,
         &request_id,
         start,
         result,

@@ -83,6 +83,7 @@ pub const REVIEWS_MERGE: &str = "/v1/reviews/merge";
 pub const REVIEWS_RERUN_CHECKS: &str = "/v1/reviews/rerun-checks";
 pub const REVIEWS_LABELS: &str = "/v1/reviews/labels";
 pub const REVIEWS_AUTO: &str = "/v1/reviews/auto";
+pub const REVIEWS_REQUEST_REVIEW: &str = "/v1/reviews/request-review";
 pub const REVIEWS_CACHE: &str = "/v1/reviews/cache";
 pub const REVIEWS_REFRESH: &str = "/v1/reviews/refresh";
 pub const REVIEWS_BODY: &str = "/v1/reviews/body";

@@ -14,7 +14,7 @@ use super::queries::{
 use super::{
     ReviewActionKind, ReviewActionOutcome, ReviewActionResult, ReviewTarget,
     ReviewsApproveRequest, ReviewsAutoRequest, ReviewsCommentRequest, ReviewsLabelRequest,
-    ReviewsMergeRequest, ReviewsRerunChecksRequest, timeline,
+    ReviewsMergeRequest, ReviewsRequestReviewRequest, ReviewsRerunChecksRequest, timeline,
 };
 
 impl ReviewsGitHubClient {
@@ -188,6 +188,39 @@ impl ReviewsGitHubClient {
             results.push(action_result(
                 target,
                 ReviewActionKind::AddLabel,
+                result,
+            ));
+        }
+        Ok(results)
+    }
+
+    pub(crate) async fn request_review(
+        &self,
+        request: &ReviewsRequestReviewRequest,
+    ) -> Result<Vec<ReviewActionResult>, CliError> {
+        let mut results = Vec::with_capacity(request.targets.len());
+        let reviewer = request.reviewer_login.trim().to_string();
+        let reviewers = slice::from_ref(&reviewer);
+        for target in &request.targets {
+            let result = if let Some(config) = github_project_config(&target.repository) {
+                self.automation
+                    .request_pull_request_reviewers(
+                        &config,
+                        target.number,
+                        reviewers,
+                        &[],
+                    )
+                    .await
+            } else {
+                Err(CliErrorKind::workflow_parse(format!(
+                    "invalid reviews repository '{}'",
+                    target.repository
+                ))
+                .into())
+            };
+            results.push(action_result(
+                target,
+                ReviewActionKind::RequestReview,
                 result,
             ));
         }
