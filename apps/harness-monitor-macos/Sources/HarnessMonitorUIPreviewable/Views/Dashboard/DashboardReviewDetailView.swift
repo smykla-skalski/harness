@@ -51,9 +51,10 @@ struct DashboardReviewDetailView<Actions: View>: View {
 
   var body: some View {
     let viewModel = store.reviewTimelineViewModel(for: item.pullRequestID)
+    let showsConversation = reviewsPreferences.snapshot.showActivityTimeline
     ScrollView(.vertical) {
       LazyVStack(alignment: .leading, spacing: 14) {
-        DashboardReviewDetailSection(title: nil) {
+        DashboardReviewDetailSection(title: "Description") {
           DashboardReviewsDescriptionView(
             store: store,
             pullRequestID: item.pullRequestID,
@@ -96,13 +97,15 @@ struct DashboardReviewDetailView<Actions: View>: View {
             repositoryLabels: repositoryLabels
           )
         }
-        DashboardReviewDetailSection(title: "Conversation") {
-          DashboardReviewConversationFeed(
-            item: item,
-            store: store,
-            actionHandler: store.supervisorDecisionActionHandler(),
-            showsComposer: false
-          )
+        if showsConversation {
+          DashboardReviewDetailSection(title: "Conversation") {
+            DashboardReviewConversationFeed(
+              item: item,
+              store: store,
+              actionHandler: store.supervisorDecisionActionHandler(),
+              showsComposer: false
+            )
+          }
         }
       }
       .frame(maxWidth: reviewsDetailMaxWidth, alignment: .leading)
@@ -244,9 +247,9 @@ private struct DashboardReviewDetailHeader<Actions: View>: View {
     }
     .frame(maxWidth: reviewsDetailMaxWidth, alignment: .leading)
     .padding(.bottom, HarnessMonitorTheme.spacingMD)
-    .overlay(alignment: .bottom) {
-      Divider().opacity(0.24)
-    }
+    // No bottom divider here — the first detail section's top divider
+    // sits flush against the sticky header otherwise, doubling the
+    // visual weight at the seam.
   }
 }
 
@@ -291,7 +294,7 @@ struct DashboardReviewDetailSection<Content: View>: View {
     .frame(maxWidth: reviewsDetailMaxWidth, alignment: .leading)
     .padding(.vertical, HarnessMonitorTheme.spacingMD)
     .overlay(alignment: .top) {
-      Divider().opacity(0.24)
+      Divider().opacity(0.40)
     }
   }
 }
