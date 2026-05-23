@@ -117,7 +117,7 @@ public struct OpenAnythingPaletteView: View {
       OpenAnythingPaletteFooter(recordCount: model.recordCount)
     }
     .frame(maxWidth: OpenAnythingPaletteConstants.maxWidth)
-    .frame(maxHeight: OpenAnythingPaletteConstants.maxHeight, alignment: .top)
+    .fixedSize(horizontal: false, vertical: true)
     .harnessFloatingControlGlass(
       cornerRadius: OpenAnythingPaletteConstants.cornerRadius,
       tint: nil
@@ -278,6 +278,7 @@ public struct OpenAnythingPaletteView: View {
       .padding(.top, 8)
     }
     .frame(maxHeight: OpenAnythingPaletteConstants.resultsMaxHeight)
+    .fixedSize(horizontal: false, vertical: true)
   }
 
   private func emptyState(text: String) -> some View {
