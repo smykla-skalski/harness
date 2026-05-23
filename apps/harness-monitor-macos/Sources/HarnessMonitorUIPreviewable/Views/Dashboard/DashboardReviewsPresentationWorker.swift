@@ -58,10 +58,12 @@ struct DashboardReviewsPresentationInput: Equatable, Sendable {
     items: [ReviewItem],
     filterModeRaw: String,
     sortModeRaw: String,
+    groupModeRaw: String = DashboardReviewsGroupMode.repository.rawValue,
     categoryModeRaw: String,
     searchText: String,
     configuredRepositories: [String],
     configuredOrganizations: [String],
+    configuredAuthors: [String] = [],
     selectedIDs: Set<String>,
     persistedPrimarySelectionID: String,
     needsMeOn: Bool = false,
@@ -70,10 +72,12 @@ struct DashboardReviewsPresentationInput: Equatable, Sendable {
     self.items = items
     self.filterModeRaw = filterModeRaw
     self.sortModeRaw = sortModeRaw
+    self.groupModeRaw = groupModeRaw
     self.categoryModeRaw = categoryModeRaw
     self.searchText = searchText
     self.configuredRepositories = configuredRepositories
     self.configuredOrganizations = configuredOrganizations
+    self.configuredAuthors = configuredAuthors
     self.selectedIDs = selectedIDs
     self.persistedPrimarySelectionID = persistedPrimarySelectionID
     self.needsMeOn = needsMeOn
