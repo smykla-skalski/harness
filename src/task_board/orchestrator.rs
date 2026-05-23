@@ -21,7 +21,8 @@ use self::run_record::{
     workflow_statuses,
 };
 use self::settings::{
-    apply_settings_update, dispatch_input, normalize_github_inbox, normalize_todoist_inbox,
+    apply_settings_update, dispatch_input, migrate_persisted_settings, normalize_github_inbox,
+    normalize_todoist_inbox,
 };
 pub use self::types::*;
 
@@ -48,7 +49,9 @@ impl TaskBoardOrchestrator {
     /// # Errors
     /// Returns `CliError` when the settings JSON exists but cannot be read.
     pub fn settings(&self) -> Result<TaskBoardOrchestratorSettings, CliError> {
-        read_or_default(&self.settings_path())
+        let path = self.settings_path();
+        migrate_persisted_settings(&path)?;
+        read_or_default(&path)
     }
 
     /// Persist a partial settings update and return the merged settings.

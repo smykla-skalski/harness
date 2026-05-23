@@ -1,6 +1,10 @@
 use std::collections::BTreeSet;
+use std::path::Path;
+
+use serde_json::Value;
 
 use crate::errors::{CliError, CliErrorKind};
+use crate::infra::io::{read_json_typed, write_json_pretty};
 use crate::task_board::normalize_repository_slug;
 
 use super::types::{
@@ -8,6 +12,56 @@ use super::types::{
     TaskBoardOrchestratorRunOnceRequest, TaskBoardOrchestratorSettings,
     TaskBoardOrchestratorSettingsUpdateRequest, TaskBoardTodoistInboxConfig,
 };
+
+/// Rewrite legacy `enabled_workflows` entries on disk so the strict enum
+/// deserializer can load settings written before the Dependencies → Reviews
+/// rename. Idempotent: once the file holds only current variants, no write
+/// happens.
+///
+/// # Errors
+/// Returns `CliError` when the file is malformed JSON or cannot be rewritten.
+pub(super) fn migrate_persisted_settings(path: &Path) -> Result<(), CliError> {
+    if !path.exists() {
+        return Ok(());
+    }
+    let mut document: Value = read_json_typed(path)?;
+    if normalize_enabled_workflows(&mut document) {
+        write_json_pretty(path, &document)?;
+    }
+    Ok(())
+}
+
+fn normalize_enabled_workflows(document: &mut Value) -> bool {
+    let Some(workflows) = document
+        .as_object_mut()
+        .and_then(|map| map.get_mut("enabled_workflows"))
+        .and_then(Value::as_array_mut)
+    else {
+        return false;
+    };
+    let mut changed = false;
+    let mut seen: BTreeSet<String> = BTreeSet::new();
+    let mut normalized: Vec<Value> = Vec::with_capacity(workflows.len());
+    for entry in workflows.drain(..) {
+        let Some(raw) = entry.as_str() else {
+            normalized.push(entry);
+            continue;
+        };
+        let canonical = if raw == "dependency_update" {
+            changed = true;
+            "review".to_owned()
+        } else {
+            raw.to_owned()
+        };
+        if seen.insert(canonical.clone()) {
+            normalized.push(Value::String(canonical));
+        } else {
+            changed = true;
+        }
+    }
+    *workflows = normalized;
+    changed
+}
 
 pub(super) fn apply_settings_update(
     settings: &mut TaskBoardOrchestratorSettings,
