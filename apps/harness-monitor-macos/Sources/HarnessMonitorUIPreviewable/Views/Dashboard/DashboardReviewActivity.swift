@@ -343,6 +343,7 @@ extension ReviewActionKind {
     case .autoApprove: "Auto approve"
     case .autoMerge: "Auto merge"
     case .comment: "Comment"
+    case .requestReview: "Re-request review"
     case .unknown(let raw): raw
     }
   }

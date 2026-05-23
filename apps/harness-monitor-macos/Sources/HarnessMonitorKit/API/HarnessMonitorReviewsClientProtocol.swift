@@ -26,6 +26,9 @@ public protocol HarnessMonitorReviewsClientProtocol: Sendable {
   func autoReviews(
     request: ReviewsAutoRequest
   ) async throws -> ReviewsActionResponse
+  func reRequestReview(
+    request: ReviewsRequestReviewRequest
+  ) async throws -> ReviewsActionResponse
   func clearReviewsCache() async throws -> ReviewsCacheClearResponse
   func refreshReviews(
     request: ReviewsRefreshRequest
@@ -117,6 +120,12 @@ extension HarnessMonitorReviewsClientProtocol {
 
   public func autoReviews(
     request _: ReviewsAutoRequest
+  ) async throws -> ReviewsActionResponse {
+    throw HarnessMonitorAPIError.server(code: 501, message: "Reviews unavailable")
+  }
+
+  public func reRequestReview(
+    request _: ReviewsRequestReviewRequest
   ) async throws -> ReviewsActionResponse {
     throw HarnessMonitorAPIError.server(code: 501, message: "Reviews unavailable")
   }

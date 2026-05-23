@@ -11,6 +11,7 @@ struct DashboardReviewDetailView<Actions: View>: View {
   let onDescriptionCheckboxError: ((String) -> Void)?
   let onDescriptionCheckboxUpdated: (() -> Void)?
   let onRerunCheck: (ReviewCheck) -> Void
+  let onReRequestReview: ((String) -> Void)?
   @ViewBuilder let actionBar: () -> Actions
 
   @Environment(\.reviewsPreferences)
@@ -39,6 +40,7 @@ struct DashboardReviewDetailView<Actions: View>: View {
     onDescriptionCheckboxError: ((String) -> Void)? = nil,
     onDescriptionCheckboxUpdated: (() -> Void)? = nil,
     onRerunCheck: @escaping (ReviewCheck) -> Void = { _ in },
+    onReRequestReview: ((String) -> Void)? = nil,
     @ViewBuilder actionBar: @escaping () -> Actions
   ) {
     self.item = item
@@ -50,6 +52,7 @@ struct DashboardReviewDetailView<Actions: View>: View {
     self.onDescriptionCheckboxError = onDescriptionCheckboxError
     self.onDescriptionCheckboxUpdated = onDescriptionCheckboxUpdated
     self.onRerunCheck = onRerunCheck
+    self.onReRequestReview = onReRequestReview
     self.actionBar = actionBar
   }
 
@@ -123,7 +126,12 @@ struct DashboardReviewDetailView<Actions: View>: View {
           }
           .id(DashboardReviewDetailSectionID.activity.rawValue)
           DashboardReviewDetailSection(title: "Reviews") {
-            DashboardReviewReviewList(reviews: item.reviews, viewerLogin: viewerLogin)
+            DashboardReviewReviewList(
+              reviews: item.reviews,
+              viewerLogin: viewerLogin,
+              canReRequestReview: item.viewerCanUpdate && onReRequestReview != nil,
+              onReRequestReview: onReRequestReview
+            )
           }
           .id(DashboardReviewDetailSectionID.reviews.rawValue)
           DashboardReviewDetailSection(title: "Labels") {

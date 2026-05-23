@@ -170,6 +170,9 @@ extension DashboardReviewsRouteView {
           onRerunCheck: { check in
             Task { await rerunCheck(check, for: item) }
           },
+          onReRequestReview: { reviewer in
+            Task { await reRequestReview(from: reviewer, on: item) }
+          },
           actionBar: {
             reviewActionBar(items: [item])
           }

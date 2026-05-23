@@ -105,6 +105,25 @@ public struct ReviewsCommentRequest: Codable, Equatable, Sendable {
   }
 }
 
+/// Re-request a fresh review from a specific GitHub login on each target.
+/// The daemon delegates to GitHub's `requestedReviewers` endpoint, which
+/// drops the reviewer back into the requested-reviewers list so the
+/// pending dot returns next time the PR is fetched.
+public struct ReviewsRequestReviewRequest: Codable, Equatable, Sendable {
+  public let targets: [ReviewTarget]
+  public let reviewerLogin: String
+
+  public init(targets: [ReviewTarget], reviewerLogin: String) {
+    self.targets = targets
+    self.reviewerLogin = reviewerLogin
+  }
+
+  enum CodingKeys: String, CodingKey {
+    case targets
+    case reviewerLogin = "reviewer_login"
+  }
+}
+
 public struct ReviewsQueryResponse: Codable, Equatable, Sendable {
   public let fetchedAt: String
   public let fromCache: Bool

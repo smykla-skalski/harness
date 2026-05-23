@@ -70,6 +70,14 @@ extension WebSocketTransport {
     return try decode(value)
   }
 
+  public func reRequestReview(
+    request: ReviewsRequestReviewRequest
+  ) async throws -> ReviewsActionResponse {
+    let params = try encodeParams(request, extra: [:])
+    let value = try await rpc(method: .reviewsRequestReview, params: params)
+    return try decode(value)
+  }
+
   public func clearReviewsCache() async throws -> ReviewsCacheClearResponse {
     let value = try await rpc(method: .reviewsClearCache, params: nil)
     return try decode(value)

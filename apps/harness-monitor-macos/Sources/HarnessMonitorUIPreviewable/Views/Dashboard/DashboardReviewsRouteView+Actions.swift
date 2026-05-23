@@ -172,6 +172,19 @@ extension DashboardReviewsRouteView {
     )
   }
 
+  func reRequestReview(from reviewer: String, on item: ReviewItem) async {
+    let trimmed = reviewer.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard !trimmed.isEmpty else { return }
+    await performMutation("Re-requesting review from @\(trimmed)", items: [item]) { client in
+      try await client.reRequestReview(
+        request: ReviewsRequestReviewRequest(
+          targets: [item.target],
+          reviewerLogin: trimmed
+        )
+      )
+    }
+  }
+
   func auto(items: [ReviewItem]) async {
     let actionableItems = items.filter(\.canRunAutoMode)
     await performMutation("Auto-merging", items: actionableItems) { client in
