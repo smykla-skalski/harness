@@ -5,34 +5,29 @@ import Testing
 struct AppOpenAnythingSourceContractTests {
   @Test("Command-K command exists and Command-F session search remains")
   func commandKExistsWithoutReplacingCommandF() throws {
+    let menuSource = try harnessSourceFile(named: "Commands/OpenAnythingMenuCommands.swift")
     let commandsSource = try harnessSourceFile(named: "App/HarnessMonitorAppCommands.swift")
 
-    #expect(commandsSource.contains("Button(openAnythingMenuTitle, action: presentOpenAnything)"))
-    #expect(commandsSource.contains(".keyboardShortcut(\"k\", modifiers: .command)"))
+    #expect(menuSource.contains("Button(menuTitle, action: presentOpenAnything)"))
+    #expect(menuSource.contains(".keyboardShortcut(\"k\", modifiers: .command)"))
     #expect(
-      commandsSource.contains(
+      menuSource.contains(
         "Button(\"Open Anything (Sessions)\", action: presentOpenAnythingSessions)"
       )
     )
-    #expect(commandsSource.contains(".keyboardShortcut(\"k\", modifiers: [.command, .shift])"))
-    // Audit #11: Open Anything anchors to the File menu (after `.newItem`),
-    // not the Edit menu's pasteboard cluster.
-    #expect(
-      commandsSource.contains(
-        """
-          @CommandsBuilder private var openAnythingCommands: some Commands {
-            CommandGroup(after: .newItem) {
-        """
-      )
-    )
+    #expect(menuSource.contains(".keyboardShortcut(\"k\", modifiers: [.command, .shift])"))
+    // Audit #11: Open Anything anchors to the File menu (after `.newItem`).
+    #expect(menuSource.contains("CommandGroup(after: .newItem)"))
+    // Edit-menu Cmd-F session search is still owned by HarnessMonitorAppCommands.
     #expect(commandsSource.contains("Button(searchCommandTitle)"))
     #expect(commandsSource.contains(".keyboardShortcut(\"f\", modifiers: .command)"))
   }
 
-  @Test("Palette overlay is mounted through the shared scene modifier")
-  func paletteOverlayUsesSharedSceneModifier() throws {
+  @Test("Palette is presented in a floating NSPanel above all windows")
+  func palettePresentsInFloatingPanel() throws {
+    let panelSource = try harnessSourceFile(named: "App/OpenAnythingPaletteWindow.swift")
+    let appSource = try harnessSourceFile(named: "App/HarnessMonitorApp.swift")
     let hostSource = try harnessSourceFile(named: "App/HarnessMonitorApp+OpenAnything.swift")
-    let sceneSource = try harnessSourceFile(named: "App/HarnessMonitorApp+SceneContent.swift")
     let sessionSource = try previewableSourceFile(named: "Views/Sessions/SessionWindowView.swift")
     let settingsSource = try previewableSourceFile(
       named: "Views/Settings/SettingsGeneralSection.swift"
@@ -41,14 +36,18 @@ struct AppOpenAnythingSourceContractTests {
       named: "Views/Dashboard/DashboardReviewsRouteView.swift"
     )
 
-    #expect(hostSource.contains("struct HarnessMonitorOpenAnythingHostModifier: ViewModifier"))
-    #expect(hostSource.contains("OpenAnythingPaletteView(model: model, execute: execute)"))
-    #expect(
-      sceneSource.contains("openAnythingHostModifier(windowID: HarnessMonitorWindowID.dashboard)")
-    )
-    #expect(
-      sceneSource.contains("openAnythingHostModifier(windowID: HarnessMonitorWindowID.settings)")
-    )
+    // The floating panel + controller is the single mount point for the
+    // palette - it owns key focus, click-outside dismissal, and the global
+    // (cross-window) presentation behavior.
+    #expect(panelSource.contains("final class OpenAnythingFloatingPanel: NSPanel"))
+    #expect(panelSource.contains("final class OpenAnythingPaletteWindowController"))
+    #expect(panelSource.contains("isFloatingPanel = true"))
+    #expect(panelSource.contains("level = .floating"))
+    #expect(panelSource.contains("NSHostingView"))
+    #expect(appSource.contains("OpenAnythingPaletteWindowController"))
+    #expect(hostSource.contains("appOpenAnythingPaletteController.toggle("))
+    #expect(hostSource.contains("struct HarnessMonitorOpenAnythingExecutorBinder: ViewModifier"))
+    // No other view tree mounts the palette directly.
     #expect(!sessionSource.contains("OpenAnythingPaletteView("))
     #expect(!settingsSource.contains("OpenAnythingPaletteView("))
     #expect(!reviewsSource.contains("OpenAnythingPaletteView("))
@@ -81,13 +80,12 @@ struct AppOpenAnythingSourceContractTests {
     )
 
     #expect(modelSource.contains("public private(set) var suggestedResults"))
-    // Audit #78: assignment now passes through the model-side scope filter,
-    // so the contract only requires the actor call to live inside that line.
-    #expect(
-      modelSource.contains(
-        "suggestedResults = Self.filtered(await index.suggestedResults(), by: scope)"
-      )
-    )
+    // Audit #78: assignment must reach the actor's `suggestedResults`
+    // factory. Ranking + scope filtering layer on top; both currently route
+    // through `applyRanking` so the contract just requires the suggested
+    // pipeline to be in place rather than pinning to a single literal.
+    #expect(modelSource.contains("await index.suggestedResults("))
+    #expect(modelSource.contains("suggestedResults = applyRanking"))
     #expect(modelSource.contains("? suggestedResults"))
     #expect(paletteSource.contains("model.suggestedResults"))
     #expect(corpusSource.contains("isSuggested: suggestedActions.contains(action)"))

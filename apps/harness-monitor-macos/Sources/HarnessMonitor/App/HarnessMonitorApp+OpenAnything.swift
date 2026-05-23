@@ -18,24 +18,20 @@ extension HarnessMonitorApp {
 
   func presentOpenAnythingPaletteScoped(to scope: OpenAnythingDomain?) {
     keyWindowObserver.refresh()
-    let resolvedWindowID = openAnythingTargetWindowID()
     applyOpenAnythingPreferences()
-    let resolvedScope = scope ?? scopeDerivedFromWindowID(resolvedWindowID)
+    let resolvedScope = scope ?? scopeDerivedFromWindowID(openAnythingTargetWindowID())
     let restore = UserDefaults.standard.bool(
       forKey: OpenAnythingPreferencesDefaults.restoreLastQueryKey
     )
-    if let windowID = resolvedWindowID {
-      appOpenAnythingPalette.present(
-        targetWindowID: windowID,
-        scope: resolvedScope,
-        restoreLastQuery: restore
-      )
-      return
+    // If no Monitor window is currently key, surface the dashboard so the
+    // panel has something to anchor above. The panel itself does not require
+    // a host window, but the user expects Cmd+K (or the global hot key) to
+    // bring the app forward as well.
+    if openAnythingTargetWindowID() == nil {
+      openWindow.openHarnessDashboardWindow()
+      focusDashboardWindowIfPossible()
     }
-    openWindow.openHarnessDashboardWindow()
-    focusDashboardWindowIfPossible()
-    appOpenAnythingPalette.present(
-      targetWindowID: HarnessMonitorWindowID.dashboard,
+    appOpenAnythingPaletteController.toggle(
       scope: resolvedScope,
       restoreLastQuery: restore
     )
@@ -181,40 +177,35 @@ struct OpenAnythingEngineHost: View {
   }
 }
 
-struct HarnessMonitorOpenAnythingHostModifier: ViewModifier {
-  let windowID: String
-  let model: OpenAnythingPaletteModel
+/// Binds the Open Anything route executor to the floating-panel controller
+/// the first time it mounts. The palette itself lives in an NSPanel that
+/// floats above whichever Monitor window is key (see
+/// `OpenAnythingPaletteWindowController`), so this modifier no longer renders
+/// an overlay - it only carries the SwiftUI environment values (`openWindow`,
+/// store bindings) needed to build the execute closure and hands them off to
+/// the controller once.
+struct HarnessMonitorOpenAnythingExecutorBinder: ViewModifier {
+  let controller: OpenAnythingPaletteWindowController
   let reviewRegistry: OpenAnythingDashboardReviewRegistry
   let store: HarnessMonitorStore
-  let keyWindowObserver: KeyWindowObserver
   let windowNavigationHistory: GlobalWindowNavigationHistory
   let showsPolicyCanvasLab: Bool
   let refreshStore: () -> Void
   @Binding var settingsSelectedSection: SettingsSection
   @Binding var settingsNavigationRequest: SettingsNavigationRequest?
+  @Binding var hasBound: Bool
   @Environment(\.openWindow)
   private var openWindow
 
-  @Environment(\.accessibilityReduceMotion) private var reduceMotion
-
   func body(content: Content) -> some View {
-    let showing = model.isPresented(
-      in: windowID,
-      isKeyWindow: keyWindowObserver.isKey(windowID: windowID)
-    )
-    return content
-      .overlay {
-        if showing {
-          OpenAnythingPaletteView(model: model, execute: execute)
-            .zIndex(1_000)
+    content
+      .task {
+        guard !hasBound else { return }
+        hasBound = true
+        controller.bindExecutor { hit in
+          execute(hit)
         }
       }
-      .animation(
-        showing
-          ? OpenAnythingMotionPolicy.presentAnimation(reduceMotion: reduceMotion)
-          : OpenAnythingMotionPolicy.dismissAnimation(reduceMotion: reduceMotion),
-        value: showing
-      )
   }
 
   private func execute(_ hit: OpenAnythingHit) {

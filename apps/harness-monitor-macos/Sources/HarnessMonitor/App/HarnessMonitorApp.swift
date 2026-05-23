@@ -33,7 +33,9 @@ struct HarnessMonitorApp: App {
   @State private var mcpWindowCommandRegistrar: HarnessMonitorMCPWindowCommandRegistrar
   @State private var openAnythingCoordinator: OpenAnythingCorpusCoordinator
   @State private var openAnythingReviews: OpenAnythingDashboardReviewRegistry
+  @State private var openAnythingPaletteController: OpenAnythingPaletteWindowController
   @State private var globalHotKeyController: GlobalHotKeyController
+  @State private var hasBoundOpenAnythingExecutor = false
   @State private var settingsSelectedSection: SettingsSection
   @State private var settingsNavigationRequest: SettingsNavigationRequest?
   @State private var supervisorAuditTimelineDispatcher = SupervisorAuditTimelineFocusDispatcher()
@@ -158,9 +160,13 @@ struct HarnessMonitorApp: App {
         descriptors: HarnessMonitorMCPWindowCommandDescriptors.all
       )
     )
-    _openAnythingCoordinator = State(initialValue: OpenAnythingCorpusCoordinator())
+    let coordinator = OpenAnythingCorpusCoordinator()
+    _openAnythingCoordinator = State(initialValue: coordinator)
     _openAnythingReviews = State(
       initialValue: OpenAnythingDashboardReviewRegistry()
+    )
+    _openAnythingPaletteController = State(
+      initialValue: OpenAnythingPaletteWindowController(model: coordinator.palette)
     )
     _globalHotKeyController = State(initialValue: GlobalHotKeyController())
     _settingsSelectedSection = State(
@@ -239,6 +245,22 @@ struct HarnessMonitorApp: App {
 
   var appOpenAnythingReviews: OpenAnythingDashboardReviewRegistry {
     openAnythingReviews
+  }
+
+  var appOpenAnythingPaletteController: OpenAnythingPaletteWindowController {
+    openAnythingPaletteController
+  }
+
+  var hasBoundOpenAnythingExecutorFlag: Bool {
+    get { hasBoundOpenAnythingExecutor }
+    nonmutating set { hasBoundOpenAnythingExecutor = newValue }
+  }
+
+  var hasBoundOpenAnythingExecutorBinding: Binding<Bool> {
+    Binding(
+      get: { hasBoundOpenAnythingExecutor },
+      set: { hasBoundOpenAnythingExecutor = $0 }
+    )
   }
 
   var appGlobalHotKeyController: GlobalHotKeyController {
