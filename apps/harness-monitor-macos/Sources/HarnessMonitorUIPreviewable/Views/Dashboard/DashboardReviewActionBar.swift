@@ -104,6 +104,9 @@ struct DashboardReviewActionBar: View {
       title: "Copy approval links",
       systemImage: "doc.on.doc",
       prominence: .secondary,
+      helpText: items.count == 1
+        ? "Copy a link to this pull request to the clipboard."
+        : "Copy one URL per selected pull request, newline-separated.",
       action: onCopyApprovalLinks
     )
 
@@ -117,7 +120,11 @@ struct DashboardReviewActionBar: View {
       )
       .disabled(isBusy || !item.canRunAutoMode)
       DashboardReviewActionButton(
-        title: "Open pull request", systemImage: "safari", prominence: .utility, action: onOpenItem
+        title: "Open pull request",
+        systemImage: "safari",
+        prominence: .utility,
+        helpText: "Open this pull request on github.com in your default browser.",
+        action: onOpenItem
       )
       if let bot = ReviewBot.detect(authorLogin: item.authorLogin) {
         DashboardReviewActionButton(

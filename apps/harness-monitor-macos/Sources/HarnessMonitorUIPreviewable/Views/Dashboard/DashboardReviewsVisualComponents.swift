@@ -34,7 +34,6 @@ enum DashboardReviewsVisualMetrics {
   static let reviewRowHorizontalPadding: CGFloat = 4
   static let reviewRowVerticalPadding: CGFloat = 10
   static let sectionMaxWidth: CGFloat = 940
-  static let checksMaxWidth: CGFloat = 680
 }
 
 enum DashboardReviewCheckTextCenterAlignment: AlignmentID {
