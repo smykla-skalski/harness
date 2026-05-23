@@ -78,6 +78,31 @@ struct LaunchWindowRestorerMigratorTests {
     #expect(Set(ids) == ["sess-a", "sess-b"])
   }
 
+  @Test("Empty AppKit quit snapshot still preserves open session windows at termination")
+  func emptyQuitSnapshotFallsBackToOpenSessionWindows() async throws {
+    let store = makeStore(cacheService: cacheService)
+    let defaults = try isolatedDefaults()
+    defer { defaults.userDefaults.removePersistentDomain(forName: defaults.suiteName) }
+
+    let firstWindow = NSObject()
+    let secondWindow = NSObject()
+    let firstWindowID = ObjectIdentifier(firstWindow)
+    let secondWindowID = ObjectIdentifier(secondWindow)
+    store.registerOpenSessionWindow(windowID: firstWindowID, sessionID: "sess-a")
+    store.registerOpenSessionWindow(windowID: secondWindowID, sessionID: "sess-b")
+
+    store.beginSessionWindowTerminationSnapshot(
+      quitSnapshot: HarnessMonitorStore.SessionWindowQuitSnapshot()
+    )
+    store.unregisterOpenSessionWindow(windowID: firstWindowID)
+    store.unregisterOpenSessionWindow(windowID: secondWindowID)
+
+    await store.flushSessionWindowsOpenAtQuit(userDefaults: defaults.userDefaults)
+
+    let ids = await cacheService.sessionWindowIDsOpenAtQuit(limit: 10)
+    #expect(Set(ids) == ["sess-a", "sess-b"])
+  }
+
   @Test("Flush without a snapshot uses the current registry contents")
   func flushWithoutSnapshotUsesCurrentRegistry() async throws {
     let store = makeStore(cacheService: cacheService)

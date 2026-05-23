@@ -176,8 +176,9 @@ extension HarnessMonitorStore {
   public func beginSessionWindowTerminationSnapshot(
     quitSnapshot: SessionWindowQuitSnapshot
   ) {
-    pendingSessionWindowTerminationSnapshot = quitSnapshot.sessionIDs
-    pendingSessionWindowQuitSnapshot = quitSnapshot
+    let resolvedQuitSnapshot = resolvedSessionWindowQuitSnapshot(quitSnapshot)
+    pendingSessionWindowTerminationSnapshot = resolvedQuitSnapshot.sessionIDs
+    pendingSessionWindowQuitSnapshot = resolvedQuitSnapshot
   }
 
   public func flushSessionWindowsOpenAtQuit() async {
@@ -212,6 +213,15 @@ extension HarnessMonitorStore {
   private func rawRecentlyViewedSessionIDs() async -> [String] {
     guard let cacheService else { return [] }
     return await cacheService.recentlyViewedSessionIDs()
+  }
+
+  private func resolvedSessionWindowQuitSnapshot(
+    _ quitSnapshot: SessionWindowQuitSnapshot
+  ) -> SessionWindowQuitSnapshot {
+    SessionWindowQuitSnapshot(
+      sessionIDs: quitSnapshot.sessionIDs.union(openSessionWindowIDsSnapshot),
+      groupings: quitSnapshot.groupings
+    )
   }
 
   private func hasCompletedLaunchWindowBridgeFallback(
