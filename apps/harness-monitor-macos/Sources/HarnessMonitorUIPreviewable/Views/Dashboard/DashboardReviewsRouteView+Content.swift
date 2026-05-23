@@ -15,6 +15,8 @@ extension DashboardReviewsRouteView {
       ToolbarItem(placement: .principal) {
         DashboardReviewsToolbarCenterpiece(snapshot: routeProvenanceSnapshot)
       }
+      .sharedBackgroundVisibility(.hidden)
+      ToolbarSpacer(.fixed, placement: .primaryAction)
       ToolbarItem(placement: .primaryAction) {
         DashboardReviewsRefreshToolbarButton(onRefresh: {
           Task { await reload(forceRefresh: true) }
