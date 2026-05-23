@@ -113,20 +113,24 @@ extension DashboardReviewsRouteView {
     repository: String,
     response perResponse: ReviewsQueryResponse
   ) {
+    let normalizedPerResponse = HarnessMonitorReviewsDaemonNormalizer.normalize(
+      response: perResponse,
+      daemonWireVersion: store.health?.wireVersion
+    )
     let nextItems = ReviewsCache.applyPerRepoResponseToItems(
       routeResponse.items,
       repository: repository,
-      response: perResponse
+      response: normalizedPerResponse
     )
     var mergedLabels = routeResponse.repositoryLabels
-    if let updatedLabels = perResponse.repositoryLabels[repository],
+    if let updatedLabels = normalizedPerResponse.repositoryLabels[repository],
       !updatedLabels.isEmpty
     {
       mergedLabels[repository] = updatedLabels
     }
     let needsCacheBackfill = mergedLabels[repository, default: []].isEmpty
     routeResponse = ReviewsQueryResponse(
-      fetchedAt: perResponse.fetchedAt,
+      fetchedAt: normalizedPerResponse.fetchedAt,
       fromCache: false,
       summary: ReviewsSummary(items: nextItems),
       items: nextItems,
@@ -140,7 +144,7 @@ extension DashboardReviewsRouteView {
     reconcileSelection()
     persistReviewsPerRepoResponse(
       repository: repository,
-      response: perResponse,
+      response: normalizedPerResponse,
       fallbackResponse: routeResponse
     )
   }

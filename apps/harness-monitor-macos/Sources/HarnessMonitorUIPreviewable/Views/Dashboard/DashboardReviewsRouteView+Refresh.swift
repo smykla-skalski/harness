@@ -104,20 +104,25 @@ extension DashboardReviewsRouteView {
   }
 
   func applyRefreshedItems(_ refresh: ReviewsRefreshResponse) {
-    let nextItems = applyReviewsRefresh(to: routeResponse.items, refresh: refresh)
+    let normalizedRefresh = HarnessMonitorReviewsDaemonNormalizer.normalize(
+      refresh: refresh,
+      daemonWireVersion: store.health?.wireVersion
+    )
+    let nextItems = applyReviewsRefresh(to: routeResponse.items, refresh: normalizedRefresh)
     routeResponse = ReviewsQueryResponse(
-      fetchedAt: refresh.fetchedAt,
+      fetchedAt: normalizedRefresh.fetchedAt,
       fromCache: routeResponse.fromCache,
       summary: ReviewsSummary(items: nextItems),
       items: nextItems
     )
     pruneRefreshTrackerToLiveItems()
-    persistReviewsRefresh(refresh)
+    persistReviewsRefresh(normalizedRefresh)
     // Invalidate only timelines whose detail pane is currently subscribed.
     // Without this guard, every targeted refresh clears the cached timeline
     // for PRs nobody is looking at, forcing a fresh fetch on the next visit
-    // (item 53).
-    let subscribed = refresh.items
+    // (item 53). Uses normalizedRefresh.items so the back-compat shim's
+    // viewerCanUpdate fill-in is honoured before any subscriber lookup.
+    let subscribed = normalizedRefresh.items
       .map(\.pullRequestID)
       .filter { store.activeTimelineSubscriptions.contains($0) }
     if !subscribed.isEmpty {
