@@ -42,6 +42,7 @@ private struct SessionWindowAppKitBindingAccessor: NSViewRepresentable {
 final class SessionWindowAppKitBindingNSView: NSView {
   fileprivate var sessionID: String
   private weak var observedWindow: NSWindow?
+  private var windowCloseToken: (any NSObjectProtocol)?
 
   init(sessionID: String) {
     self.sessionID = sessionID
@@ -52,7 +53,9 @@ final class SessionWindowAppKitBindingNSView: NSView {
   required init?(coder: NSCoder) { fatalError() }
 
   deinit {
-    NotificationCenter.default.removeObserver(self)
+    if let token = windowCloseToken {
+      NotificationCenter.default.removeObserver(token)
+    }
   }
 
   override func viewDidMoveToWindow() {
@@ -76,38 +79,29 @@ final class SessionWindowAppKitBindingNSView: NSView {
   }
 
   private func beginObserving(window: NSWindow) {
-    guard observedWindow !== window else {
-      return
-    }
+    guard observedWindow !== window else { return }
     if let observedWindow {
       stopObserving(window: observedWindow)
     }
     observedWindow = window
-    NotificationCenter.default.addObserver(
-      self,
-      selector: #selector(boundWindowWillClose(_:)),
-      name: NSWindow.willCloseNotification,
-      object: window
-    )
+    windowCloseToken = NotificationCenter.default.addObserver(
+      forName: NSWindow.willCloseNotification,
+      object: window,
+      queue: .main
+    ) { [weak self] notification in
+      guard let closingWindow = notification.object as? NSWindow else { return }
+      self?.stopObserving(window: closingWindow)
+      SessionWindowAppKitRegistry.shared.unbind(window: closingWindow)
+    }
   }
 
   private func stopObserving(window: NSWindow) {
-    NotificationCenter.default.removeObserver(
-      self,
-      name: NSWindow.willCloseNotification,
-      object: window
-    )
+    if let token = windowCloseToken {
+      NotificationCenter.default.removeObserver(token)
+      windowCloseToken = nil
+    }
     if observedWindow === window {
       observedWindow = nil
     }
-  }
-
-  @objc
-  private func boundWindowWillClose(_ notification: Notification) {
-    guard let closingWindow = notification.object as? NSWindow else {
-      return
-    }
-    stopObserving(window: closingWindow)
-    SessionWindowAppKitRegistry.shared.unbind(window: closingWindow)
   }
 }

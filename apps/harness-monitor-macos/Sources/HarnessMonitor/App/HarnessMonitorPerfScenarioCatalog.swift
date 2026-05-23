@@ -67,7 +67,7 @@ enum HarnessMonitorPerfScenarioCatalog {
   }
 
   private static func loadDefinitions() throws -> [String: HarnessMonitorPerfScenarioDefinition] {
-    let candidates = [Bundle.main, Bundle(for: BundleToken.self)]
+    let candidates = [Bundle.main, Bundle.module]
     guard
       let url = candidates.first(where: {
         $0.url(forResource: resourceName, withExtension: resourceExtension) != nil
@@ -88,8 +88,6 @@ enum HarnessMonitorPerfScenarioCatalog {
     }
     return definitions
   }
-
-  private final class BundleToken: NSObject {}
 }
 
 extension HarnessMonitorPerfScenarioDefinition {
