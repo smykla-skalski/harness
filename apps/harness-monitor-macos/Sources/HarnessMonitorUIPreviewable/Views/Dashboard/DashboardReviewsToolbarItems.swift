@@ -5,8 +5,12 @@ import SwiftUI
 struct DashboardReviewsToolbarCenterpiece: View {
   let snapshot: DashboardReviewsProvenanceSnapshot
 
+  private static let padding: CGFloat = 8
+  private static let cornerRadius: CGFloat = 10
+  private static let width: CGFloat = 480
+
   var body: some View {
-    HStack(spacing: HarnessMonitorTheme.spacingSM) {
+    HStack(spacing: 6) {
       Circle()
         .fill(snapshot.sourceTint)
         .frame(width: 8, height: 8)
@@ -15,16 +19,26 @@ struct DashboardReviewsToolbarCenterpiece: View {
         .scaledFont(.callout.weight(.semibold))
         .foregroundStyle(snapshot.sourceTint)
         .lineLimit(1)
-      Text("·")
-        .scaledFont(.callout)
-        .foregroundStyle(HarnessMonitorTheme.secondaryInk)
-        .accessibilityHidden(true)
+      Spacer(minLength: 12)
       Text(snapshot.detailTitle)
         .scaledFont(.callout)
         .foregroundStyle(HarnessMonitorTheme.secondaryInk)
         .lineLimit(1)
         .truncationMode(.tail)
     }
+    .padding(Self.padding)
+    .frame(width: Self.width)
+    .background(
+      RoundedRectangle(cornerRadius: Self.cornerRadius, style: .continuous)
+        .fill(.ultraThinMaterial)
+    )
+    .overlay(
+      RoundedRectangle(cornerRadius: Self.cornerRadius, style: .continuous)
+        .strokeBorder(
+          HarnessMonitorTheme.controlBorder.opacity(0.25),
+          lineWidth: 0.5
+        )
+    )
     .accessibilityIdentifier(HarnessMonitorAccessibility.dashboardReviewsToolbarProvenance)
     .accessibilityElement(children: .combine)
     .accessibilityLabel("Review data provenance")
