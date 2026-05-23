@@ -32,6 +32,7 @@ mod integration {
     mod mcp;
     mod policy_drift;
     mod swarm_e2e_iterate;
+    mod task_board_orchestrator_settings_migration;
 
     mod cluster;
     mod commands;
