@@ -3,7 +3,7 @@ import WidgetKit
 
 @main
 struct HarnessMonitorWatchWidgetsBundle: WidgetBundle {
-    var body: some Widget {
-        NeedsMeCountWatchWidget()
-    }
+  var body: some Widget {
+    NeedsMeCountWatchWidget()
+  }
 }
