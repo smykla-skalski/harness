@@ -3,6 +3,11 @@ import ProjectDescriptionHelpers
 
 private let macOSDestinations: Destinations = [.mac]
 private let macOSDeploymentTargets: DeploymentTargets = .macOS("26.0")
+private let crossPlatformDestinations: Destinations = [.mac, .appleWatch]
+private let crossPlatformDeploymentTargets: DeploymentTargets = .multiplatform(
+    macOS: "26.0",
+    watchOS: "10.0"
+)
 private let xcodeVisibleAppEntitlementsPath: Path = "HarnessMonitorBase.entitlements"
 private let xcodeVisibleExternalDaemonEntitlementsPath: Path =
     "HarnessMonitorExternalDaemon.entitlements"
@@ -77,6 +82,31 @@ private let intentsTarget: Target = .target(
     ],
     settings: intentsSettings,
     metadata: .metadata(tags: ["tag:feature:intents", "tag:layer:integration"])
+)
+
+private let cloudKitSources: SourceFilesList = SourceFilesList(globs: [
+    .glob("Sources/HarnessMonitorCloudKit/**/*.swift")
+])
+
+private let cloudKitTarget: Target = .target(
+    name: "HarnessMonitorCloudKit",
+    destinations: crossPlatformDestinations,
+    product: .framework,
+    bundleId: "io.harnessmonitor.cloudkit",
+    deploymentTargets: crossPlatformDeploymentTargets,
+    sources: cloudKitSources,
+    dependencies: [
+        .sdk(name: "CloudKit", type: .framework)
+    ],
+    settings: .settings(
+        base: [
+            "CODE_SIGN_STYLE": "Automatic",
+            "PRODUCT_BUNDLE_IDENTIFIER": "io.harnessmonitor.cloudkit",
+            "PRODUCT_MODULE_NAME": "HarnessMonitorCloudKit",
+            "SWIFT_ACTIVE_COMPILATION_CONDITIONS": FeatureFlags.compilationConditionSetting()
+        ]
+    ),
+    metadata: .metadata(tags: ["tag:feature:cloudkit", "tag:layer:integration"])
 )
 
 private let intentsExtensionTarget: Target = .target(
@@ -454,6 +484,28 @@ private let intentsTestsTarget: Target = .target(
     metadata: .metadata(tags: ["tag:feature:intents", "tag:layer:test"])
 )
 
+private let cloudKitTestsSources: SourceFilesList = SourceFilesList(globs: [
+    .glob("Tests/HarnessMonitorCloudKitTests/**/*.swift")
+])
+
+private let cloudKitTestsTarget: Target = .target(
+    name: "HarnessMonitorCloudKitTests",
+    destinations: macOSDestinations,
+    product: .unitTests,
+    bundleId: "io.harnessmonitor.cloudkit-tests",
+    deploymentTargets: macOSDeploymentTargets,
+    sources: cloudKitTestsSources,
+    dependencies: [
+        .target(name: "HarnessMonitorCloudKit")
+    ],
+    settings: .settings(base: [
+        "CODE_SIGN_STYLE": "Automatic",
+        "PRODUCT_BUNDLE_IDENTIFIER": "io.harnessmonitor.cloudkit-tests",
+        "SWIFT_ACTIVE_COMPILATION_CONDITIONS": FeatureFlags.compilationConditionSetting()
+    ]),
+    metadata: .metadata(tags: ["tag:feature:cloudkit", "tag:layer:test"])
+)
+
 private let uiTestsTarget: Target = .target(
     name: "HarnessMonitorUITests",
     destinations: macOSDestinations,
@@ -541,6 +593,7 @@ private let monitorScheme: Scheme = .scheme(
         [
             .testableTarget(target: .target("HarnessMonitorKitTests")),
             .testableTarget(target: .target("HarnessMonitorIntentsTests")),
+            .testableTarget(target: .target("HarnessMonitorCloudKitTests")),
             .testableTarget(target: .target("HarnessMonitorAppTests")),
             .testableTarget(target: .target("HarnessMonitorUITests"))
         ],
@@ -573,6 +626,18 @@ private let intentsTestsScheme: Scheme = .scheme(
     buildAction: .buildAction(targets: [.target("HarnessMonitorIntentsTests")]),
     testAction: .targets(
         [.testableTarget(target: .target("HarnessMonitorIntentsTests"))],
+        arguments: Arguments.arguments(environmentVariables: monitorTestEnv),
+        configuration: "Debug",
+        options: .options(coverage: true)
+    )
+)
+
+private let cloudKitTestsScheme: Scheme = .scheme(
+    name: "HarnessMonitorCloudKitTests",
+    shared: true,
+    buildAction: .buildAction(targets: [.target("HarnessMonitorCloudKitTests")]),
+    testAction: .targets(
+        [.testableTarget(target: .target("HarnessMonitorCloudKitTests"))],
         arguments: Arguments.arguments(environmentVariables: monitorTestEnv),
         configuration: "Debug",
         options: .options(coverage: true)
@@ -674,6 +739,7 @@ let project = Project(
         intentsTarget,
         intentsExtensionTarget,
         widgetsExtensionTarget,
+        cloudKitTarget,
         uiPreviewableTarget,
         previewHostTarget,
         monitorAppTarget,
@@ -682,6 +748,7 @@ let project = Project(
         appTestsTarget,
         kitTestsTarget,
         intentsTestsTarget,
+        cloudKitTestsTarget,
         uiTestsTarget,
         agentsE2ETarget
     ],
@@ -689,6 +756,7 @@ let project = Project(
         monitorScheme,
         kitTestsScheme,
         intentsTestsScheme,
+        cloudKitTestsScheme,
         appTestsScheme,
         externalDaemonScheme,
         uiTestHostScheme,
