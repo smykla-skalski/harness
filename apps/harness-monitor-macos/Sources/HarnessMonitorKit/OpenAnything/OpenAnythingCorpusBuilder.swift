@@ -60,11 +60,16 @@ public struct OpenAnythingCorpusInput: Sendable {
 }
 
 public enum OpenAnythingCorpusBuilder {
+  /// Builds the unified record list consumed by ``OpenAnythingIndex``.
+  ///
+  /// Dashboard routes (`.openTaskBoard`, `.openReviews`, `.openNotifications`,
+  /// `.openDiagnostics`, `.openPolicyCanvas`) ship exclusively as action
+  /// records - the prior `dashboardRouteRecords()` helper produced duplicate
+  /// entries that resolved to the same routing step.
   public static func records(input: OpenAnythingCorpusInput) -> [OpenAnythingRecord] {
     actionRecords(showsPolicyCanvasLab: input.showsPolicyCanvasLab)
       + windowRecords(showsPolicyCanvasLab: input.showsPolicyCanvasLab)
       + settingsRecords(input.settingsSections)
-      + dashboardRouteRecords()
       + sessionRecords(input.sessions)
       + taskBoardRecords(input.taskBoardItems)
       + decisionRecords(input.decisions)
@@ -118,9 +123,9 @@ public enum OpenAnythingCorpusBuilder {
         id: "window.\(window.rawValue)",
         domain: .windows,
         target: .window(window),
-        title: windowTitle(window),
+        title: window.title,
         subtitle: "Window",
-        systemImage: windowSystemImage(window),
+        systemImage: window.systemImage,
         isSuggested: window == .dashboard,
         searchBodyParts: [window.rawValue]
       )
@@ -143,21 +148,6 @@ public enum OpenAnythingCorpusBuilder {
     }
   }
 
-  private static func dashboardRouteRecords() -> [OpenAnythingRecord] {
-    OpenAnythingDashboardRoute.allCases.map { route in
-      OpenAnythingRecord(
-        id: "dashboard.\(route.rawValue)",
-        domain: .windows,
-        target: .dashboardRoute(route),
-        title: route.title,
-        subtitle: "Dashboard",
-        systemImage: route.systemImage,
-        isSuggested: route == .taskBoard || route == .reviews || route == .diagnostics,
-        searchBodyParts: [route.rawValue]
-      )
-    }
-  }
-
   private static func sessionRecords(_ sessions: [SessionSummary]) -> [OpenAnythingRecord] {
     sessions.map { session in
       OpenAnythingRecord(
@@ -165,8 +155,8 @@ public enum OpenAnythingCorpusBuilder {
         domain: .sessions,
         target: .session(sessionID: session.sessionId),
         title: session.displayTitle,
-        subtitle: session.projectName.isEmpty ? session.contextRoot : session.projectName,
-        trailing: session.status.rawValue,
+        subtitle: sessionSubtitle(session),
+        trailing: displayLabel(session.status.rawValue),
         systemImage: "rectangle.stack",
         searchBodyParts: [
           session.sessionId,
@@ -190,8 +180,8 @@ public enum OpenAnythingCorpusBuilder {
           workItemID: item.workItemId
         ),
         title: item.title,
-        subtitle: item.status.rawValue,
-        trailing: item.priority.rawValue,
+        subtitle: displayLabel(item.status.rawValue),
+        trailing: displayLabel(item.priority.rawValue),
         searchBodyParts: [item.id, item.body, item.tags.joined(separator: " ")]
       )
     }
@@ -207,7 +197,7 @@ public enum OpenAnythingCorpusBuilder {
         target: .decision(id: decision.id, sessionID: decision.sessionID),
         title: decision.summary,
         subtitle: decision.ruleID,
-        trailing: decision.severityRaw,
+        trailing: displayLabel(decision.severityRaw),
         searchBodyParts: [decision.id, decision.agentID, decision.taskID]
       )
     }
@@ -220,8 +210,8 @@ public enum OpenAnythingCorpusBuilder {
         domain: .reviews,
         target: .review(pullRequestID: item.pullRequestID),
         title: item.title,
-        subtitle: "\(item.repository)#\(item.number)",
-        trailing: item.checkStatus.rawValue,
+        subtitle: reviewSubtitle(item),
+        trailing: displayLabel(item.checkStatus.rawValue),
         searchBodyParts: [item.pullRequestID, item.authorLogin, item.labels.joined(separator: " ")]
       )
     }
@@ -236,6 +226,11 @@ public enum OpenAnythingCorpusBuilder {
       + loadedTimelineRecords(snapshot)
   }
 
+  /// Loaded-session entries (Agent/Task/Timeline) are only emitted when a
+  /// session is currently loaded in the dashboard (i.e. when the corpus host
+  /// passes a non-nil snapshot). This is intentional: these entries reference
+  /// the active session's identifiers, so surfacing them without a loaded
+  /// session would route to dead targets.
   private static func loadedAgentRecords(
     _ snapshot: OpenAnythingLoadedSessionSnapshot
   ) -> [OpenAnythingRecord] {
@@ -270,7 +265,7 @@ public enum OpenAnythingCorpusBuilder {
         target: .loadedSession(.task(sessionID: snapshot.sessionID, taskID: task.taskId)),
         title: task.title,
         subtitle: "Task",
-        trailing: task.status.rawValue,
+        trailing: displayLabel(task.status.rawValue),
         systemImage: "checklist",
         searchBodyParts: [
           task.taskId,
@@ -282,6 +277,10 @@ public enum OpenAnythingCorpusBuilder {
     }
   }
 
+  /// `HarnessMonitorStore.timeline` is sorted newest-first (see
+  /// `HarnessMonitorStore+AcpTimeline.timelineEntrySortOrder`), so `prefix(200)`
+  /// surfaces the most recent 200 entries. If the store's ordering contract
+  /// ever changes, switch to `suffix(200)` to preserve the recency bias.
   private static func loadedTimelineRecords(
     _ snapshot: OpenAnythingLoadedSessionSnapshot
   ) -> [OpenAnythingRecord] {
@@ -301,19 +300,42 @@ public enum OpenAnythingCorpusBuilder {
     }
   }
 
-  private static func windowTitle(_ window: OpenAnythingWindowTarget) -> String {
-    switch window {
-    case .dashboard: "Dashboard"
-    case .settings: "Settings"
-    case .policyCanvasLab: "Policy Canvas Lab"
+  private static func sessionSubtitle(_ session: SessionSummary) -> String {
+    let projectComponent =
+      session.projectName.isEmpty ? session.contextRoot : session.projectName
+    let branchRef = session.branchRef.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard !branchRef.isEmpty else {
+      return projectComponent
     }
+    if projectComponent.isEmpty {
+      return branchRef
+    }
+    return "\(projectComponent) · \(branchRef)"
   }
 
-  private static func windowSystemImage(_ window: OpenAnythingWindowTarget) -> String {
-    switch window {
-    case .dashboard: "square.grid.2x2"
-    case .settings: "gearshape"
-    case .policyCanvasLab: "point.3.connected.trianglepath.dotted"
+  private static func reviewSubtitle(_ item: ReviewItem) -> String {
+    let trimmedLogin = item.authorLogin.trimmingCharacters(in: .whitespacesAndNewlines)
+    let base = "\(item.repository)#\(item.number)"
+    guard !trimmedLogin.isEmpty else {
+      return base
     }
+    return "\(base) · @\(trimmedLogin)"
+  }
+
+  /// Converts a snake_case raw value (`"in_progress"`, `"needs_user"`, `"p0"`)
+  /// into a Title Case display label (`"In Progress"`, `"Needs User"`, `"P0"`).
+  /// Used inline so that touching enums like ``TaskBoardStatus`` or
+  /// ``DecisionSeverity`` is not required.
+  static func displayLabel(_ raw: String) -> String {
+    let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard !trimmed.isEmpty else { return trimmed }
+    return
+      trimmed
+      .split(separator: "_", omittingEmptySubsequences: true)
+      .map { component -> String in
+        guard let first = component.first else { return "" }
+        return first.uppercased() + component.dropFirst()
+      }
+      .joined(separator: " ")
   }
 }
