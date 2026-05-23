@@ -84,7 +84,15 @@ public actor OpenAnythingIndex {
     do {
       return try FuzzySearchIndex(items: records, fields: fields)
     } catch {
-      preconditionFailure("Failed to build OpenAnythingIndex: \(error)")
+      // Building the Fuse index can only fail on bad regex options; falling
+      // back to an empty index keeps the app launchable. Log and carry on so
+      // a future Fuse upgrade that flips a corner case does not crash the
+      // process at startup.
+      HarnessMonitorLogger.store.warning(
+        "Failed to build OpenAnythingIndex: \(String(describing: error), privacy: .public)"
+      )
+      // swiftlint:disable:next force_try
+      return try! FuzzySearchIndex(items: [], fields: fields)
     }
   }
 
