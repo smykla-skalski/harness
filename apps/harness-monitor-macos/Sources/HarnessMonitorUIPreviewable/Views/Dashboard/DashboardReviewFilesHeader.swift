@@ -6,6 +6,7 @@ import SwiftUI
 struct DashboardReviewFilesHeader: View {
   let viewModel: ReviewFilesViewModel
   @Bindable var filter: DashboardReviewFilesFilterState
+  let fontScale: CGFloat
 
   var body: some View {
     VStack(alignment: .leading, spacing: 10) {
@@ -132,7 +133,7 @@ struct DashboardReviewFilesHeader: View {
     tint: Color = .secondary
   ) -> some View {
     Label(label, systemImage: systemImage)
-      .font(.subheadline)
+      .font(HarnessMonitorTextSize.scaledFont(.subheadline, by: fontScale))
       .foregroundStyle(tint)
   }
 

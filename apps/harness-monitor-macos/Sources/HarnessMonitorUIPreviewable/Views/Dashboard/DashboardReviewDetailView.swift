@@ -16,6 +16,8 @@ struct DashboardReviewDetailView<Actions: View>: View {
 
   @Environment(\.reviewsPreferences)
   private var reviewsPreferences
+  @Environment(\.fontScale)
+  private var fontScale
   /// Per-PR escape hatch from the cloning empty-state. When the daemon
   /// is taking a long time to clone, the user can dismiss the Files
   /// section for this PR without touching the global Files-enabled
@@ -182,50 +184,51 @@ struct DashboardReviewDetailView<Actions: View>: View {
         .padding(.bottom, 10)
         .background(Color(nsColor: .windowBackgroundColor))
       }
-    .safeAreaInset(edge: .bottom, spacing: 12) {
-      DashboardReviewCommentComposer(
-        pullRequestID: item.pullRequestID,
-        initialDraft: store.reviewCommentDraft(for: item.pullRequestID),
-        viewerCanComment: viewModel.viewerCanComment,
-        viewerLogin: viewerLogin,
-        onDraftChange: { draft in
-          store.scheduleReviewDraftWrite(item.pullRequestID, draft: draft)
-        },
-        onSend: { body in
-          await store.postReviewComment(for: item, body: body)
-        }
-      )
-      // Per-PR `@State` reset — see DashboardReviewCommentComposer's
-      // `isCollapsed` declaration. Tying the composer's identity to
-      // the pull request id makes SwiftUI re-init its state when the
-      // user navigates to a different PR.
-      .id(item.pullRequestID)
-      .frame(maxWidth: reviewsDetailMaxWidth, alignment: .leading)
-      .frame(maxWidth: .infinity, alignment: .center)
+      .safeAreaInset(edge: .bottom, spacing: 12) {
+        DashboardReviewCommentComposer(
+          pullRequestID: item.pullRequestID,
+          initialDraft: store.reviewCommentDraft(for: item.pullRequestID),
+          viewerCanComment: viewModel.viewerCanComment,
+          viewerLogin: viewerLogin,
+          onDraftChange: { draft in
+            store.scheduleReviewDraftWrite(item.pullRequestID, draft: draft)
+          },
+          onSend: { body in
+            await store.postReviewComment(for: item, body: body)
+          }
+        )
+        // Per-PR `@State` reset — see DashboardReviewCommentComposer's
+        // `isCollapsed` declaration. Tying the composer's identity to
+        // the pull request id makes SwiftUI re-init its state when the
+        // user navigates to a different PR.
+        .id(item.pullRequestID)
+        .frame(maxWidth: reviewsDetailMaxWidth, alignment: .leading)
+        .frame(maxWidth: .infinity, alignment: .center)
+        .background(Color(nsColor: .windowBackgroundColor))
+      }
       .background(Color(nsColor: .windowBackgroundColor))
-    }
-    .background(Color(nsColor: .windowBackgroundColor))
-    .task(
-      id: ReviewBodyTaskKey(
-        item: item, isDaemonOnline: store.connectionState == .online)
-    ) {
-      await store.prepareReviewBody(for: item)
-    }
-    .onAppear {
-      store.registerTimelineSubscription(pullRequestID: item.pullRequestID)
-    }
-    .onDisappear {
-      store.unregisterTimelineSubscription(pullRequestID: item.pullRequestID)
-    }
-    .onChange(of: item.id) { oldValue, _ in
-      filesHiddenForCurrentPR = false
-      // The structural identity stays stable while `item` updates to a new PR;
-      // mirror the appear/disappear pair so the route guard tracks the
-      // currently-visible PR, not the one that originally mounted the pane.
-      store.unregisterTimelineSubscription(pullRequestID: oldValue)
-      store.registerTimelineSubscription(pullRequestID: item.pullRequestID)
-    }
-    .environment(store)
+      .task(
+        id: ReviewBodyTaskKey(
+          item: item, isDaemonOnline: store.connectionState == .online)
+      ) {
+        await store.prepareReviewBody(for: item)
+      }
+      .onAppear {
+        store.registerTimelineSubscription(pullRequestID: item.pullRequestID)
+      }
+      .onDisappear {
+        store.unregisterTimelineSubscription(pullRequestID: item.pullRequestID)
+      }
+      .onChange(of: item.id) { oldValue, _ in
+        filesHiddenForCurrentPR = false
+        // The structural identity stays stable while `item` updates to a new PR;
+        // mirror the appear/disappear pair so the route guard tracks the
+        // currently-visible PR, not the one that originally mounted the pane.
+        store.unregisterTimelineSubscription(pullRequestID: oldValue)
+        store.registerTimelineSubscription(pullRequestID: item.pullRequestID)
+      }
+      .font(HarnessMonitorTextSize.scaledFont(.body, by: fontScale))
+      .environment(store)
     }
   }
 }

@@ -12,6 +12,7 @@ struct DashboardReviewFileCard: View {
   let viewMode: FilesViewMode
   let pullRequestID: String
   let repositoryID: String
+  let fontScale: CGFloat
   let onToggleViewed: @MainActor (Bool) -> Void
   let onChangeViewMode: @MainActor (FilesViewMode) -> Void
   let onLoadPreview: @MainActor () -> Void
@@ -26,6 +27,7 @@ struct DashboardReviewFileCard: View {
       viewMode: viewMode,
       pullRequestID: pullRequestID,
       repositoryID: repositoryID,
+      fontScale: fontScale,
       onToggleViewed: onToggleViewed,
       onChangeViewMode: onChangeViewMode,
       onLoadPreview: onLoadPreview,
@@ -42,12 +44,57 @@ struct DashboardReviewFileCardInternal: View {
   let viewMode: FilesViewMode
   let pullRequestID: String
   let repositoryID: String
+  let fontScale: CGFloat
   let onToggleViewed: @MainActor (Bool) -> Void
   let onChangeViewMode: @MainActor (FilesViewMode) -> Void
   let onLoadPreview: @MainActor () -> Void
   let onLoadPatch: @MainActor () -> Void
+  let chevronFont: Font
+  let pathFont: Font
+  let renameFont: Font
+  let changeCountFont: Font
+  let errorFont: Font
 
   @State private var isExpanded: Bool = false
+
+  init(
+    file: ReviewFile,
+    viewedState: ReviewFileViewedState,
+    previewState: ReviewFilePreviewState,
+    patchState: ReviewFilePatchState,
+    viewMode: FilesViewMode,
+    pullRequestID: String,
+    repositoryID: String,
+    fontScale: CGFloat,
+    onToggleViewed: @escaping @MainActor (Bool) -> Void,
+    onChangeViewMode: @escaping @MainActor (FilesViewMode) -> Void,
+    onLoadPreview: @escaping @MainActor () -> Void,
+    onLoadPatch: @escaping @MainActor () -> Void
+  ) {
+    self.file = file
+    self.viewedState = viewedState
+    self.previewState = previewState
+    self.patchState = patchState
+    self.viewMode = viewMode
+    self.pullRequestID = pullRequestID
+    self.repositoryID = repositoryID
+    self.fontScale = fontScale
+    self.onToggleViewed = onToggleViewed
+    self.onChangeViewMode = onChangeViewMode
+    self.onLoadPreview = onLoadPreview
+    self.onLoadPatch = onLoadPatch
+    chevronFont = HarnessMonitorTextSize.scaledFont(
+      .caption.weight(.semibold),
+      by: fontScale
+    )
+    pathFont = HarnessMonitorTextSize.scaledFont(.body.monospaced(), by: fontScale)
+    renameFont = HarnessMonitorTextSize.scaledFont(.caption2, by: fontScale)
+    changeCountFont = HarnessMonitorTextSize.scaledFont(
+      .caption.monospacedDigit(),
+      by: fontScale
+    )
+    errorFont = HarnessMonitorTextSize.scaledFont(.caption, by: fontScale)
+  }
 
   var body: some View {
     VStack(alignment: .leading, spacing: 8) {
@@ -87,7 +134,7 @@ struct DashboardReviewFileCardInternal: View {
         },
         label: {
           Image(systemName: isExpanded ? "chevron.down" : "chevron.right")
-            .font(.caption.weight(.semibold))
+            .font(chevronFont)
             .frame(width: 28, height: 28)
             .contentShape(.rect)
         }
@@ -141,14 +188,14 @@ struct DashboardReviewFileCardInternal: View {
   private var pathLabel: some View {
     VStack(alignment: .leading, spacing: 2) {
       Text(file.path)
-        .font(.body.monospaced())
+        .font(pathFont)
         .lineLimit(1)
         .truncationMode(.middle)
         .layoutPriority(1)
       if let previousPath = file.previousPath, previousPath != file.path {
         Label("renamed from \(previousPath)", systemImage: "arrow.right")
           .labelStyle(.titleAndIcon)
-          .font(.caption2)
+          .font(renameFont)
           .foregroundStyle(.secondary)
           .lineLimit(2)
           .truncationMode(.middle)
@@ -160,10 +207,10 @@ struct DashboardReviewFileCardInternal: View {
   private var changeCounts: some View {
     HStack(spacing: 4) {
       if file.additions > 0 {
-        Text("+\(file.additions)").foregroundStyle(.green).font(.caption.monospacedDigit())
+        Text("+\(file.additions)").foregroundStyle(.green).font(changeCountFont)
       }
       if file.deletions > 0 {
-        Text("-\(file.deletions)").foregroundStyle(.red).font(.caption.monospacedDigit())
+        Text("-\(file.deletions)").foregroundStyle(.red).font(changeCountFont)
       }
     }
     .frame(minWidth: 58, alignment: .trailing)
@@ -185,12 +232,21 @@ struct DashboardReviewFileCardInternal: View {
           file: file,
           patch: patch,
           pullRequestID: pullRequestID,
-          repositoryID: repositoryID
+          repositoryID: repositoryID,
+          fontScale: fontScale
         )
       } else if viewMode == .split {
-        DashboardReviewFileDiffSplit(patch: patch, language: file.languageHint)
+        DashboardReviewFileDiffSplit(
+          patch: patch,
+          language: file.languageHint,
+          fontScale: fontScale
+        )
       } else {
-        DashboardReviewFileDiffUnified(patch: patch, language: file.languageHint)
+        DashboardReviewFileDiffUnified(
+          patch: patch,
+          language: file.languageHint,
+          fontScale: fontScale
+        )
       }
     case .failed:
       if case .loaded = previewState {
@@ -204,7 +260,7 @@ struct DashboardReviewFileCardInternal: View {
   @ViewBuilder private var patchFailureBody: some View {
     if case .failed(let message) = patchState {
       VStack(alignment: .leading, spacing: 6) {
-        Text(message).font(.caption).foregroundStyle(.orange)
+        Text(message).font(errorFont).foregroundStyle(.orange)
       }
     }
   }
@@ -222,7 +278,7 @@ struct DashboardReviewFileCardInternal: View {
       }
     case .failed(let message):
       VStack(alignment: .leading, spacing: 6) {
-        Text(message).font(.caption).foregroundStyle(.orange)
+        Text(message).font(errorFont).foregroundStyle(.orange)
       }
     }
   }

@@ -14,16 +14,36 @@ import SwiftUI
 struct DashboardReviewConversationStatusBar: View {
   let loadState: ReviewTimelineViewModel.LoadState
   let entriesCount: Int
+  let fontScale: CGFloat
   let onRefresh: () -> Void
+  let captionFont: Font
+  let captionMonospacedFont: Font
+
+  init(
+    loadState: ReviewTimelineViewModel.LoadState,
+    entriesCount: Int,
+    fontScale: CGFloat,
+    onRefresh: @escaping () -> Void
+  ) {
+    self.loadState = loadState
+    self.entriesCount = entriesCount
+    self.fontScale = fontScale
+    self.onRefresh = onRefresh
+    captionFont = HarnessMonitorTextSize.scaledFont(.caption, by: fontScale)
+    captionMonospacedFont = HarnessMonitorTextSize.scaledFont(
+      .caption.monospacedDigit(),
+      by: fontScale
+    )
+  }
 
   var body: some View {
     HStack(spacing: 8) {
       if loadState == .refreshing {
         HarnessMonitorSpinner(size: 12)
-        Text("Refreshing…").font(.caption).foregroundStyle(.secondary)
+        Text("Refreshing…").font(captionFont).foregroundStyle(.secondary)
       } else if entriesCount > 0 {
         Text("\(entriesCount) events")
-          .font(.caption.monospacedDigit())
+          .font(captionMonospacedFont)
           .foregroundStyle(.secondary)
       }
       Spacer()
@@ -49,6 +69,7 @@ extension DashboardReviewConversationStatusBar: @MainActor Equatable {
     // the same parent points at the same logic). SwiftUI invalidates
     // when loadState or entriesCount actually change.
     lhs.loadState == rhs.loadState && lhs.entriesCount == rhs.entriesCount
+      && lhs.fontScale == rhs.fontScale
   }
 }
 
@@ -60,10 +81,30 @@ struct DashboardReviewConversationPositionFooter: View {
   let visibleRowsCount: Int
   let totalRowsCount: Int
   let hasOlder: Bool
+  let fontScale: CGFloat
+  let captionMonospacedFont: Font
+
+  init(
+    entriesCount: Int,
+    visibleRowsCount: Int,
+    totalRowsCount: Int,
+    hasOlder: Bool,
+    fontScale: CGFloat
+  ) {
+    self.entriesCount = entriesCount
+    self.visibleRowsCount = visibleRowsCount
+    self.totalRowsCount = totalRowsCount
+    self.hasOlder = hasOlder
+    self.fontScale = fontScale
+    captionMonospacedFont = HarnessMonitorTextSize.scaledFont(
+      .caption.monospacedDigit(),
+      by: fontScale
+    )
+  }
 
   var body: some View {
     Text(label)
-      .font(.caption.monospacedDigit())
+      .font(captionMonospacedFont)
       .foregroundStyle(.secondary)
       .accessibilityLabel(Text(accessibilityLabel))
   }
@@ -96,5 +137,6 @@ extension DashboardReviewConversationPositionFooter: @MainActor Equatable {
   ) -> Bool {
     lhs.entriesCount == rhs.entriesCount && lhs.visibleRowsCount == rhs.visibleRowsCount
       && lhs.totalRowsCount == rhs.totalRowsCount && lhs.hasOlder == rhs.hasOlder
+      && lhs.fontScale == rhs.fontScale
   }
 }

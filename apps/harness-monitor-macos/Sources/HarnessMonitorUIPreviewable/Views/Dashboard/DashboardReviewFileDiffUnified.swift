@@ -10,16 +10,20 @@ import SwiftUI
 struct DashboardReviewFileDiffUnified: View {
   let patch: ReviewFilePatch
   let language: HarnessReviewFileLanguage
+  let fontScale: CGFloat
 
   @State private var attributed: AttributedString?
 
   var body: some View {
+    let captionFont = HarnessMonitorTextSize.scaledFont(.caption, by: fontScale)
+    let caption2Font = HarnessMonitorTextSize.scaledFont(.caption2, by: fontScale)
+    let diffFont = DashboardReviewDiffTypography.font(for: fontScale)
     if patch.patch.isEmpty {
-      Text("No patch content").font(.caption).foregroundStyle(.secondary)
+      Text("No patch content").font(captionFont).foregroundStyle(.secondary)
     } else {
       ScrollView(.horizontal) {
         Text(attributed ?? AttributedString(patch.patch))
-          .font(.system(size: 12, design: .monospaced))
+          .font(diffFont)
           .textSelection(.enabled)
           .frame(maxWidth: .infinity, alignment: .leading)
       }
@@ -29,7 +33,7 @@ struct DashboardReviewFileDiffUnified: View {
       }
       if patch.truncated {
         Text("Truncated by GitHub at 3000 lines. Open the PR on github.com for the full diff.")
-          .font(.caption2)
+          .font(caption2Font)
           .foregroundStyle(.orange)
       }
     }
