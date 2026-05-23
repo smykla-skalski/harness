@@ -90,6 +90,7 @@ pub const REVIEWS_MERGE: &str = "reviews.merge";
 pub const REVIEWS_RERUN_CHECKS: &str = "reviews.rerun_checks";
 pub const REVIEWS_ADD_LABEL: &str = "reviews.add_label";
 pub const REVIEWS_AUTO: &str = "reviews.auto";
+pub const REVIEWS_REQUEST_REVIEW: &str = "reviews.request_review";
 pub const REVIEWS_CLEAR_CACHE: &str = "reviews.clear_cache";
 pub const REVIEWS_REFRESH: &str = "reviews.refresh";
 pub const REVIEWS_BODY: &str = "reviews.body";

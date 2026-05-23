@@ -12,7 +12,7 @@ use crate::reviews::{
     ReviewsMergeRequest, ReviewsQueryRequest, ReviewsQueryResponse,
     ReviewsRefreshRequest, ReviewsRefreshResponse,
     ReviewsRepositoryCatalogRequest, ReviewsRepositoryCatalogResponse,
-    ReviewsRerunChecksRequest,
+    ReviewsRequestReviewRequest, ReviewsRerunChecksRequest,
 };
 use crate::errors::CliError;
 use crate::workspace::utc_now;
@@ -270,6 +270,31 @@ pub async fn add_label_to_reviews(
         );
     }
     Ok(action_response("Labeled dependency updates", results))
+}
+
+/// Re-request a fresh review from a specific GitHub login on each target
+/// pull request. Reuses the configured token per repository.
+///
+/// # Errors
+/// Returns `CliError` when the request is invalid, a required token is missing,
+/// or GitHub rejects the request-review write.
+pub async fn request_review_for_reviews(
+    request: &ReviewsRequestReviewRequest,
+) -> Result<ReviewsActionResponse, CliError> {
+    request.validate()?;
+    let mut results = Vec::new();
+    for segment in token_bound_targets(&request.targets)? {
+        let client = ReviewsGitHubClient::new(&segment.token)?;
+        results.extend(
+            client
+                .request_review(&ReviewsRequestReviewRequest {
+                    targets: segment.targets,
+                    reviewer_login: request.reviewer_login.clone(),
+                })
+                .await?,
+        );
+    }
+    Ok(action_response("Re-requested review", results))
 }
 
 /// Apply automatic approve or merge actions to eligible dependency updates.

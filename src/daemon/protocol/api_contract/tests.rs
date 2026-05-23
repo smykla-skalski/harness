@@ -393,6 +393,12 @@ fn review_routes_have_complete_ws_parity() {
                 true,
             ),
             (
+                HttpRouteMethod::Post,
+                http_paths::REVIEWS_REQUEST_REVIEW,
+                ws_methods::REVIEWS_REQUEST_REVIEW,
+                true,
+            ),
+            (
                 HttpRouteMethod::Delete,
                 http_paths::REVIEWS_CACHE,
                 ws_methods::REVIEWS_CLEAR_CACHE,

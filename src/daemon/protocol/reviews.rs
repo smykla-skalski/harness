@@ -43,6 +43,6 @@ pub use crate::reviews::{
     ReviewsQueryResponse, ReviewsRateLimitSnapshot,
     ReviewsRefreshRequest, ReviewsRefreshResponse,
     ReviewsRepositoryCatalogRequest, ReviewsRepositoryCatalogResponse,
-    ReviewsRerunChecksRequest, ReviewsSummary, FilesLargeDiffStrategy,
+    ReviewsRequestReviewRequest, ReviewsRerunChecksRequest, ReviewsSummary, FilesLargeDiffStrategy,
     HarnessCodeLanguage, LocalCloneListEntry,
 };

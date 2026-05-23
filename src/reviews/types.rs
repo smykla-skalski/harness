@@ -183,6 +183,17 @@ pub struct ReviewsCommentRequest {
     pub body: String,
 }
 
+/// Re-request a fresh review from a specific GitHub login on each target
+/// pull request. Mirrors GitHub's "Re-request review" affordance: when a
+/// reviewer has already submitted a review (approved, dismissed, or
+/// requested changes), this drops them back into the requested-reviewers
+/// list so they get notified to look again.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ReviewsRequestReviewRequest {
+    pub targets: Vec<ReviewTarget>,
+    pub reviewer_login: String,
+}
+
 /// Action-related feature flags for [`ReviewsCapabilitiesResponse`].
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
 pub struct ReviewsActionCapabilities {

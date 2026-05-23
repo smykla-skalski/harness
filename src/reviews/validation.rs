@@ -5,7 +5,7 @@ use super::{
     ReviewsAutoRequest, ReviewsBodyRequest, ReviewsBodyUpdateRequest,
     ReviewsCommentRequest, ReviewsLabelRequest, ReviewsMergeRequest,
     ReviewsQueryRequest, ReviewsRefreshRequest,
-    ReviewsRepositoryCatalogRequest, ReviewsRerunChecksRequest,
+    ReviewsRepositoryCatalogRequest, ReviewsRequestReviewRequest, ReviewsRerunChecksRequest,
 };
 
 impl ReviewsQueryRequest {
@@ -159,6 +159,24 @@ impl ReviewsCommentRequest {
         if self.body.trim().is_empty() {
             return Err(CliErrorKind::workflow_parse(
                 "reviews comment request requires a non-empty body",
+            )
+            .into());
+        }
+        Ok(())
+    }
+}
+
+impl ReviewsRequestReviewRequest {
+    /// Validate the request-review request.
+    ///
+    /// # Errors
+    /// Returns `CliError` when no targets are provided or the reviewer
+    /// login is empty after trimming.
+    pub fn validate(&self) -> Result<(), CliError> {
+        ensure_targets(&self.targets, "request review")?;
+        if self.reviewer_login.trim().is_empty() {
+            return Err(CliErrorKind::workflow_parse(
+                "reviews request-review request requires a non-empty reviewer login",
             )
             .into());
         }
