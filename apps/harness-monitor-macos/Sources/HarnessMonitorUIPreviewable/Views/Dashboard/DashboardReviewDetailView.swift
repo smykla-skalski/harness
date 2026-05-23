@@ -132,8 +132,19 @@ struct DashboardReviewDetailView<Actions: View>: View {
     ) {
       await store.prepareReviewBody(for: item)
     }
-    .onChange(of: item.id) { _, _ in
+    .onAppear {
+      store.registerTimelineSubscription(pullRequestID: item.pullRequestID)
+    }
+    .onDisappear {
+      store.unregisterTimelineSubscription(pullRequestID: item.pullRequestID)
+    }
+    .onChange(of: item.id) { oldValue, _ in
       filesHiddenForCurrentPR = false
+      // The structural identity stays stable while `item` updates to a new PR;
+      // mirror the appear/disappear pair so the route guard tracks the
+      // currently-visible PR, not the one that originally mounted the pane.
+      store.unregisterTimelineSubscription(pullRequestID: oldValue)
+      store.registerTimelineSubscription(pullRequestID: item.pullRequestID)
     }
     .environment(store)
   }
