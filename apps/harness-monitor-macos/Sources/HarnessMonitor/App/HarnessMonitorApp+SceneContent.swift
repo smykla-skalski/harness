@@ -87,10 +87,8 @@ extension HarnessMonitorApp {
     case .pullRequest(let id):
       appOpenAnythingReviews.requestSelection(pullRequestID: id)
     case .reviews, .taskBoard:
-      // TODO(intents-foundation): wire route switching once the deep-link
-      // router can drive `selectedRoute` + `needsMeOn` SceneStorage. The URL
-      // scheme is registered and parsed; only the dispatch into route state
-      // is deferred to Unit 2.
+      // Route switching into reviews/taskBoard is deferred (intents-foundation Unit 2):
+      // once the deep-link router can drive `selectedRoute` + `needsMeOn` SceneStorage.
       break
     }
   }

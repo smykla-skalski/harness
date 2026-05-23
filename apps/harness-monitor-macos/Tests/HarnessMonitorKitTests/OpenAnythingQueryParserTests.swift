@@ -24,7 +24,7 @@ struct OpenAnythingQueryParserTests {
   func emptyTerm() {
     let parsed = OpenAnythingQueryParser.parse("@settings")
     #expect(parsed.scope == .settings)
-    #expect(parsed.term == "")
+    #expect(parsed.term.isEmpty)
     #expect(parsed.prefixConsumed)
   }
 
