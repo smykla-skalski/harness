@@ -119,6 +119,20 @@ struct DashboardReviewsPreferencesTests {
     #expect(prefs.authorsText == "renovate[bot], dependabot[bot]")
   }
 
+  @Test("legacy renovate[bot] blob produces a queryRequest with no authors")
+  func legacyBlobProducesQueryRequestWithoutAuthors() {
+    let legacy = """
+      {
+        "authorsText": "renovate[bot]",
+        "organizationsText": "acme"
+      }
+      """
+    let prefs = DashboardReviewsPreferences.decode(from: legacy)
+    let request = prefs.queryRequest(forceRefresh: false)
+    #expect(request.authors.isEmpty)
+    #expect(request.organizations == ["acme"])
+  }
+
   @Test("re-encoding new preferences round-trips through Codable")
   func encodingRoundTripsNewFields() throws {
     var prefs = DashboardReviewsPreferences()
