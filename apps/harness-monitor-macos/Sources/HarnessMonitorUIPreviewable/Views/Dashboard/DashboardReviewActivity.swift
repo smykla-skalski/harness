@@ -124,7 +124,7 @@ nonisolated(unsafe) private let dashboardReviewActivityISOParser: ISO8601DateFor
 }()
 
 /// Absolute-time formatter for tooltips: locale-sensitive, friendly date+time.
-nonisolated(unsafe) private let dashboardReviewActivityAbsoluteFormatter: DateFormatter = {
+private let dashboardReviewActivityAbsoluteFormatter: DateFormatter = {
   let formatter = DateFormatter()
   formatter.dateStyle = .medium
   formatter.timeStyle = .short
