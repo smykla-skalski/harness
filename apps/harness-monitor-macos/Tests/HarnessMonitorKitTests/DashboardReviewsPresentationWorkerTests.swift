@@ -5,7 +5,7 @@ import Testing
 
 @Suite("Dashboard reviews presentation worker")
 struct DashboardReviewsPresentationWorkerTests {
-  @Test("category=dependencies narrows results to Renovate and Dependabot")
+  @Test("category=dependencies narrows results to dependency PR bots")
   func categoryFilterKeepsOnlyDependencyBots() async {
     let humanPR = reviewItem(
       id: "pr-human",
@@ -28,10 +28,17 @@ struct DashboardReviewsPresentationWorkerTests {
       title: "Bump bar",
       authorLogin: "dependabot[bot]"
     )
+    let legacyRenovatePR = reviewItem(
+      id: "pr-renovate-legacy",
+      repository: "kong/c",
+      number: 4,
+      title: "chore(deps): bump baz",
+      authorLogin: "renovate-bot"
+    )
 
     let output = await DashboardReviewsPresentationWorker().compute(
       input: DashboardReviewsPresentationInput(
-        items: [humanPR, renovatePR, dependabotPR],
+        items: [humanPR, renovatePR, dependabotPR, legacyRenovatePR],
         filterModeRaw: DashboardReviewsFilterMode.all.rawValue,
         sortModeRaw: DashboardReviewsSortMode.repository.rawValue,
         groupModeRaw: DashboardReviewsGroupMode.repository.rawValue,
@@ -47,7 +54,7 @@ struct DashboardReviewsPresentationWorkerTests {
 
     #expect(
       Set(output.filteredItems.map(\.pullRequestID))
-        == Set(["pr-renovate", "pr-dependabot"])
+        == Set(["pr-renovate", "pr-dependabot", "pr-renovate-legacy"])
     )
   }
 

@@ -176,7 +176,6 @@ enum DashboardReviewsCategoryMode: String, CaseIterable, Identifiable {
   case dependencies
 
   static let pickerCases: [Self] = [.all, .dependencies]
-  static let dependencyBotLogins: Set<String> = ["renovate[bot]", "dependabot[bot]"]
   static var defaultMode: Self { .all }
 
   var id: String { rawValue }
@@ -191,7 +190,7 @@ enum DashboardReviewsCategoryMode: String, CaseIterable, Identifiable {
   func matches(_ item: ReviewItem) -> Bool {
     switch self {
     case .all: true
-    case .dependencies: Self.dependencyBotLogins.contains(item.authorLogin)
+    case .dependencies: ReviewBot.detect(authorLogin: item.authorLogin) != nil
     }
   }
 }
