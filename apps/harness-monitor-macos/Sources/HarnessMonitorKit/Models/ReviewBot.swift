@@ -5,7 +5,8 @@ public enum ReviewBot: String, Codable, Sendable, CaseIterable {
   case dependabot
 
   public static func detect(authorLogin: String) -> Self? {
-    let normalized = authorLogin
+    let normalized =
+      authorLogin
       .trimmingCharacters(in: .whitespacesAndNewlines)
       .lowercased()
     if normalized == "renovate[bot]" || normalized == "renovate-bot" || normalized == "renovate" {

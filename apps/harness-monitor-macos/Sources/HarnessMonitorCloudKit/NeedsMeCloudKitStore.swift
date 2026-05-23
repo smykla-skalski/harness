@@ -66,41 +66,42 @@ public actor NeedsMeCloudKitStore {
     }
   }
 
+  private static let codeNames: [CKError.Code: String] = [
+    .internalError: "internalError",
+    .partialFailure: "partialFailure",
+    .badContainer: "badContainer",
+    .serviceUnavailable: "serviceUnavailable",
+    .requestRateLimited: "requestRateLimited",
+    .missingEntitlement: "missingEntitlement",
+    .permissionFailure: "permissionFailure",
+    .unknownItem: "unknownItem",
+    .invalidArguments: "invalidArguments",
+    .serverRecordChanged: "serverRecordChanged",
+    .serverRejectedRequest: "serverRejectedRequest",
+    .assetFileNotFound: "assetFileNotFound",
+    .assetFileModified: "assetFileModified",
+    .incompatibleVersion: "incompatibleVersion",
+    .constraintViolation: "constraintViolation",
+    .operationCancelled: "operationCancelled",
+    .changeTokenExpired: "changeTokenExpired",
+    .batchRequestFailed: "batchRequestFailed",
+    .zoneBusy: "zoneBusy",
+    .badDatabase: "badDatabase",
+    .zoneNotFound: "zoneNotFound",
+    .limitExceeded: "limitExceeded",
+    .userDeletedZone: "userDeletedZone",
+    .referenceViolation: "referenceViolation",
+    .managedAccountRestricted: "managedAccountRestricted",
+    .participantMayNeedVerification: "participantMayNeedVerification",
+    .serverResponseLost: "serverResponseLost",
+    .assetNotAvailable: "assetNotAvailable",
+  ]
+
   private static func describe(_ error: CKError) -> String {
     let code = error.code
-    let codeName: String
-    switch code {
-    case .internalError: codeName = "internalError"
-    case .partialFailure: codeName = "partialFailure"
-    case .badContainer: codeName = "badContainer"
-    case .serviceUnavailable: codeName = "serviceUnavailable"
-    case .requestRateLimited: codeName = "requestRateLimited"
-    case .missingEntitlement: codeName = "missingEntitlement"
-    case .permissionFailure: codeName = "permissionFailure"
-    case .unknownItem: codeName = "unknownItem"
-    case .invalidArguments: codeName = "invalidArguments"
-    case .serverRecordChanged: codeName = "serverRecordChanged"
-    case .serverRejectedRequest: codeName = "serverRejectedRequest"
-    case .assetFileNotFound: codeName = "assetFileNotFound"
-    case .assetFileModified: codeName = "assetFileModified"
-    case .incompatibleVersion: codeName = "incompatibleVersion"
-    case .constraintViolation: codeName = "constraintViolation"
-    case .operationCancelled: codeName = "operationCancelled"
-    case .changeTokenExpired: codeName = "changeTokenExpired"
-    case .batchRequestFailed: codeName = "batchRequestFailed"
-    case .zoneBusy: codeName = "zoneBusy"
-    case .badDatabase: codeName = "badDatabase"
-    case .zoneNotFound: codeName = "zoneNotFound"
-    case .limitExceeded: codeName = "limitExceeded"
-    case .userDeletedZone: codeName = "userDeletedZone"
-    case .referenceViolation: codeName = "referenceViolation"
-    case .managedAccountRestricted: codeName = "managedAccountRestricted"
-    case .participantMayNeedVerification: codeName = "participantMayNeedVerification"
-    case .serverResponseLost: codeName = "serverResponseLost"
-    case .assetNotAvailable: codeName = "assetNotAvailable"
-    default: codeName = "code\(code.rawValue)"
-    }
-    let serverMessage = error.userInfo["CKErrorDescription"]
+    let codeName = Self.codeNames[code] ?? "code\(code.rawValue)"
+    let serverMessage =
+      error.userInfo["CKErrorDescription"]
       ?? error.userInfo["NSLocalizedDescription"]
       ?? error.localizedDescription
     return "\(codeName)(\(code.rawValue)): \(serverMessage)"
