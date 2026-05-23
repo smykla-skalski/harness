@@ -143,31 +143,9 @@ class ResolveCargoTargetDirTests(unittest.TestCase):
 class BuildDaemonBinaryTests(unittest.TestCase):
     def test_unsets_xcode_only_swift_debug_environment_before_cargo(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_dir:
-            repo_root = Path(tmp_dir) / "repo"
-            project_dir = repo_root / "apps" / "harness-monitor-macos"
-            launch_agents_dir = project_dir / "Resources" / "LaunchAgents"
-            target_dir = repo_root / "target"
-            captured_env_path = Path(tmp_dir) / "captured-env.txt"
-            fake_cargo = Path(tmp_dir) / "fake-cargo.sh"
-
-            (repo_root / ".git").mkdir(parents=True)
-            launch_agents_dir.mkdir(parents=True, exist_ok=True)
-            launch_agents_dir.joinpath("io.harnessmonitor.daemon.Info.plist").write_text(
-                """<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0">
-<dict>
-    <key>CFBundleIdentifier</key>
-    <string>Q498EB36N4.io.harnessmonitor.daemon</string>
-</dict>
-</plist>
-"""
+            project_dir, target_dir, captured_env_path, fake_cargo = _setup_fake_daemon_layout(
+                Path(tmp_dir)
             )
-            fake_cargo.write_text(
-                "#!/bin/bash\n"
-                "env | sort > \"$CAPTURED_ENV_PATH\"\n"
-            )
-            fake_cargo.chmod(0o755)
 
             run_build_helper(
                 f'export PROJECT_DIR="{project_dir}"; '
@@ -182,6 +160,160 @@ class BuildDaemonBinaryTests(unittest.TestCase):
             captured_env = captured_env_path.read_text()
             self.assertNotIn("SWIFT_DEBUG_INFORMATION_FORMAT=", captured_env)
             self.assertNotIn("SWIFT_DEBUG_INFORMATION_VERSION=", captured_env)
+
+    def test_strips_rustflags_env_vars_before_cargo(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            project_dir, target_dir, captured_env_path, fake_cargo = _setup_fake_daemon_layout(
+                Path(tmp_dir)
+            )
+
+            run_build_helper(
+                f'export PROJECT_DIR="{project_dir}"; '
+                f'export CARGO_BIN="{fake_cargo}"; '
+                f'export CARGO_TARGET_DIR="{target_dir}"; '
+                f'export CAPTURED_ENV_PATH="{captured_env_path}"; '
+                'export RUSTFLAGS="--cfg tokio_unstable --cfg tokio_unstable"; '
+                'export CARGO_ENCODED_RUSTFLAGS="--cfg\x1ftokio_unstable"; '
+                'export CARGO_BUILD_RUSTFLAGS="--cfg tokio_unstable"; '
+                "build_daemon_binary >/dev/null"
+            )
+
+            captured_env = captured_env_path.read_text()
+            self.assertNotIn("RUSTFLAGS=", captured_env)
+            self.assertNotIn("CARGO_ENCODED_RUSTFLAGS=", captured_env)
+            self.assertNotIn("CARGO_BUILD_RUSTFLAGS=", captured_env)
+
+    def test_exports_pinned_rustup_toolchain_when_rust_toolchain_file_present(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            project_dir, target_dir, captured_env_path, fake_cargo = _setup_fake_daemon_layout(
+                Path(tmp_dir)
+            )
+            repo_root = project_dir.parent.parent
+            (repo_root / "rust-toolchain.toml").write_text(
+                '[toolchain]\nchannel = "nightly-2026-05-19"\n'
+            )
+
+            run_build_helper(
+                f'export PROJECT_DIR="{project_dir}"; '
+                f'export CARGO_BIN="{fake_cargo}"; '
+                f'export CARGO_TARGET_DIR="{target_dir}"; '
+                f'export CAPTURED_ENV_PATH="{captured_env_path}"; '
+                # Override the assertion so the test does not require rustup on
+                # the test machine; the env-sanitization path is the contract.
+                "assert_daemon_cargo_toolchain() { :; }; "
+                'export RUSTUP_TOOLCHAIN="some-other-channel"; '
+                "build_daemon_binary >/dev/null"
+            )
+
+            captured_env = captured_env_path.read_text()
+            self.assertIn("RUSTUP_TOOLCHAIN=nightly-2026-05-19", captured_env)
+
+    def test_records_build_context_for_drift_detection(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            project_dir, target_dir, captured_env_path, fake_cargo = _setup_fake_daemon_layout(
+                Path(tmp_dir)
+            )
+
+            run_build_helper(
+                f'export PROJECT_DIR="{project_dir}"; '
+                f'export CARGO_BIN="{fake_cargo}"; '
+                f'export CARGO_TARGET_DIR="{target_dir}"; '
+                f'export CAPTURED_ENV_PATH="{captured_env_path}"; '
+                "assert_daemon_cargo_toolchain() { :; }; "
+                "build_daemon_binary >/dev/null"
+            )
+
+            context_path = target_dir / ".daemon-context"
+            self.assertTrue(context_path.is_file())
+            self.assertIn(f"cargo={fake_cargo}", context_path.read_text())
+
+
+class ResolvePinnedToolchainChannelTests(unittest.TestCase):
+    def test_returns_empty_when_rust_toolchain_file_missing(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            resolved = run_build_helper(
+                f'resolve_pinned_toolchain_channel "{tmp_dir}"'
+            )
+            self.assertEqual(resolved, "")
+
+    def test_returns_quoted_channel_value(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            (Path(tmp_dir) / "rust-toolchain.toml").write_text(
+                '[toolchain]\nchannel = "nightly-2026-05-19"\ncomponents = ["rustfmt"]\n'
+            )
+            resolved = run_build_helper(
+                f'resolve_pinned_toolchain_channel "{tmp_dir}"'
+            )
+            self.assertEqual(resolved, "nightly-2026-05-19")
+
+    def test_ignores_channel_keys_outside_toolchain_section(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            (Path(tmp_dir) / "rust-toolchain.toml").write_text(
+                '[other]\nchannel = "stable"\n\n[toolchain]\nchannel = "nightly-2026-05-19"\n'
+            )
+            resolved = run_build_helper(
+                f'resolve_pinned_toolchain_channel "{tmp_dir}"'
+            )
+            self.assertEqual(resolved, "nightly-2026-05-19")
+
+
+class FindCargoTests(unittest.TestCase):
+    def test_prefers_rustup_proxy_over_homebrew(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            rustup_cargo = Path(tmp_dir) / ".cargo" / "bin" / "cargo"
+            rustup_cargo.parent.mkdir(parents=True)
+            rustup_cargo.write_text("#!/bin/bash\necho rustup\n")
+            rustup_cargo.chmod(0o755)
+
+            resolved = run_build_helper(
+                f'export HOME="{tmp_dir}"; '
+                "unset CARGO_BIN; "
+                "find_cargo"
+            )
+            self.assertEqual(resolved, str(rustup_cargo))
+
+    def test_honors_explicit_cargo_bin_override(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            explicit = Path(tmp_dir) / "explicit-cargo"
+            explicit.write_text("#!/bin/bash\necho explicit\n")
+            explicit.chmod(0o755)
+
+            resolved = run_build_helper(
+                f'export CARGO_BIN="{explicit}"; '
+                "find_cargo"
+            )
+            self.assertEqual(resolved, str(explicit))
+
+
+def _setup_fake_daemon_layout(tmp_dir: Path):
+    repo_root = tmp_dir / "repo"
+    project_dir = repo_root / "apps" / "harness-monitor-macos"
+    launch_agents_dir = project_dir / "Resources" / "LaunchAgents"
+    target_dir = repo_root / "target"
+    captured_env_path = tmp_dir / "captured-env.txt"
+    fake_cargo = tmp_dir / "fake-cargo.sh"
+
+    (repo_root / ".git").mkdir(parents=True)
+    launch_agents_dir.mkdir(parents=True, exist_ok=True)
+    launch_agents_dir.joinpath("io.harnessmonitor.daemon.Info.plist").write_text(
+        """<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>CFBundleIdentifier</key>
+    <string>Q498EB36N4.io.harnessmonitor.daemon</string>
+</dict>
+</plist>
+"""
+    )
+    fake_cargo.write_text(
+        "#!/bin/bash\n"
+        "env | sort > \"$CAPTURED_ENV_PATH\"\n"
+    )
+    fake_cargo.chmod(0o755)
+    return project_dir, target_dir, captured_env_path, fake_cargo
 
 
 if __name__ == "__main__":
