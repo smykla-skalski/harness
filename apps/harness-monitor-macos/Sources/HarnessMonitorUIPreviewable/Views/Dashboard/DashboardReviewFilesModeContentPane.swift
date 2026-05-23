@@ -156,29 +156,30 @@ struct DashboardReviewFilesModeContentPane: View {
     files: [ReviewFile],
     threadIndex: DashboardReviewFileThreadIndex
   ) -> some View {
-    ScrollView {
-      LazyVStack(alignment: .leading, spacing: 12) {
-        ForEach(grouped(files: files), id: \.folder) { group in
-          VStack(alignment: .leading, spacing: 4) {
-            Text(group.folder)
-              .font(.caption.weight(.semibold))
-              .foregroundStyle(.secondary)
-              .lineLimit(1)
-            ForEach(group.files) { file in
-              DashboardReviewFilesNavigatorRow(
-                file: file,
-                viewedState: viewModel.viewedByPath[file.path] ?? file.viewerViewedState,
-                threads: threadIndex.anchors(forPath: file.path),
-                isSelected: viewModel.selectedPath == file.path,
-                onSelect: { onSelectPath(file.path) }
-              )
-            }
+    List(selection: selectedPathBinding) {
+      ForEach(grouped(files: files), id: \.folder) { group in
+        Section {
+          ForEach(group.files) { file in
+            DashboardReviewFilesNavigatorRow(
+              file: file,
+              viewedState: viewModel.viewedByPath[file.path] ?? file.viewerViewedState,
+              threads: threadIndex.anchors(forPath: file.path)
+            )
+            .tag(file.path)
+            .listRowInsets(EdgeInsets(top: 4, leading: 0, bottom: 4, trailing: 0))
           }
         }
       }
-      .frame(maxWidth: .infinity, alignment: .topLeading)
     }
-    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+    .listStyle(.sidebar)
+    .scrollContentBackground(.hidden)
+  }
+
+  private var selectedPathBinding: Binding<String?> {
+    Binding(
+      get: { viewModel.selectedPath },
+      set: { onSelectPath($0) }
+    )
   }
 
   private func visibleFiles(threadIndex: DashboardReviewFileThreadIndex) -> [ReviewFile] {
@@ -272,61 +273,40 @@ private struct DashboardReviewFilesNavigatorRow: View {
   let file: ReviewFile
   let viewedState: ReviewFileViewedState
   let threads: [DashboardReviewFileThreadAnchor]
-  let isSelected: Bool
-  let onSelect: () -> Void
 
   var body: some View {
-    Button(action: onSelect) {
-      HStack(spacing: 10) {
-        Image(systemName: file.isBinary ? "photo" : "doc.text")
-          .foregroundStyle(secondaryColor)
-          .frame(width: 16)
+    HStack(spacing: 10) {
+      Image(systemName: file.isBinary ? "photo" : "doc.text")
+        .foregroundStyle(.secondary)
+        .frame(width: 16)
+      VStack(alignment: .leading, spacing: 2) {
         Text(fileName)
           .font(.body.weight(.semibold))
-          .foregroundStyle(primaryColor)
           .lineLimit(1)
           .truncationMode(.middle)
-        Spacer(minLength: 8)
-        if threads.contains(where: { !$0.isResolved }) {
-          Image(systemName: "text.bubble.fill").foregroundStyle(.orange)
-        }
-        Text("+\(file.additions) -\(file.deletions)")
-          .font(.caption.monospacedDigit().weight(.semibold))
-          .foregroundStyle(secondaryColor)
-        Image(systemName: viewedState == .viewed ? "checkmark.circle.fill" : "circle")
-          .foregroundStyle(viewedState == .viewed ? selectedAwareGreen : secondaryColor)
+        Text(file.path)
+          .font(.caption2)
+          .foregroundStyle(.secondary)
+          .lineLimit(1)
+          .truncationMode(.middle)
       }
-      .padding(.horizontal, 10)
-      .padding(.vertical, 9)
-      .frame(maxWidth: .infinity, alignment: .leading)
-      .background(selectionBackground)
-      .contentShape(RoundedRectangle(cornerRadius: 8))
+      Spacer(minLength: 8)
+      if threads.contains(where: { !$0.isResolved }) {
+        Image(systemName: "text.bubble.fill").foregroundStyle(.orange)
+      }
+      Text("+\(file.additions) -\(file.deletions)")
+        .font(.caption.monospacedDigit().weight(.semibold))
+        .foregroundStyle(.secondary)
+      Image(systemName: viewedState == .viewed ? "checkmark.circle.fill" : "circle")
+        .foregroundStyle(viewedState == .viewed ? .green : .secondary.opacity(0.45))
     }
-    .buttonStyle(.plain)
+    .padding(.horizontal, 10)
+    .padding(.vertical, 9)
+    .frame(maxWidth: .infinity, alignment: .leading)
     .help(file.path)
   }
 
   private var fileName: String {
     file.path.split(separator: "/").last.map(String.init) ?? file.path
-  }
-
-  private var primaryColor: Color {
-    isSelected ? .white : .primary
-  }
-
-  private var secondaryColor: Color {
-    isSelected ? .white.opacity(0.78) : .secondary
-  }
-
-  private var selectedAwareGreen: Color {
-    isSelected ? .white.opacity(0.82) : .green
-  }
-
-  @ViewBuilder
-  private var selectionBackground: some View {
-    if isSelected {
-      RoundedRectangle(cornerRadius: 8)
-        .fill(Color.accentColor.opacity(0.72))
-    }
   }
 }
