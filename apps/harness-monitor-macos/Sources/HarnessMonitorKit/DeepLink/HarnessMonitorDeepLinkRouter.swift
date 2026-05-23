@@ -22,6 +22,12 @@ public enum HarnessMonitorDeepLinkRoute: Sendable, Equatable {
   case taskBoard(itemID: String?)
 }
 
+private struct HarnessMonitorPullRequestDeepLink: Sendable, Equatable {
+  let owner: String
+  let repo: String
+  let number: String
+}
+
 /// Pure URL -> Route parser. No SwiftUI / AppKit dependency.
 public enum HarnessMonitorDeepLinkRouter {
   public static let scheme = "harness"
@@ -85,7 +91,7 @@ public enum HarnessMonitorDeepLinkRouter {
 
   private static func parsePullRequestID(
     _ id: String
-  ) -> (owner: String, repo: String, number: String)? {
+  ) -> HarnessMonitorPullRequestDeepLink? {
     let hashSplit = id.split(separator: "#", maxSplits: 1, omittingEmptySubsequences: false)
     guard hashSplit.count == 2 else { return nil }
     let repoFull = String(hashSplit[0])
@@ -95,6 +101,6 @@ public enum HarnessMonitorDeepLinkRouter {
     let owner = String(slashSplit[0])
     let repo = String(slashSplit[1])
     guard !owner.isEmpty, !repo.isEmpty, !number.isEmpty else { return nil }
-    return (owner, repo, number)
+    return HarnessMonitorPullRequestDeepLink(owner: owner, repo: repo, number: number)
   }
 }

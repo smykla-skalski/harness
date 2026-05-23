@@ -69,22 +69,7 @@ struct HarnessMonitorApp: App {
     // helper is idempotent via a completion flag, so subsequent launches no-op.
     HarnessMonitorReviewsUserDefaultsMigration.runIfNeeded()
 
-    UserDefaults.standard.register(defaults: [
-      "NSUseAnimatedFocusRing": false,
-      SessionWindowKeyboardShortcutOverlaySettings.storageKey:
-        SessionWindowKeyboardShortcutOverlaySettings.defaultValue,
-      OpenAnythingHotKeyDefaults.enabledKey: OpenAnythingHotKeyDefaults.enabledDefault,
-      OpenAnythingHotKeyDefaults.descriptorKey:
-        OpenAnythingHotKeyDefaults.descriptorDefault.storageValue,
-      OpenAnythingPreferencesDefaults.showPinnedKey:
-        OpenAnythingPreferencesDefaults.showPinnedDefault,
-      OpenAnythingPreferencesDefaults.showRecentKey:
-        OpenAnythingPreferencesDefaults.showRecentDefault,
-      OpenAnythingPreferencesDefaults.cmdClickBackgroundKey:
-        OpenAnythingPreferencesDefaults.cmdClickBackgroundDefault,
-      OpenAnythingPreferencesDefaults.restoreLastQueryKey:
-        OpenAnythingPreferencesDefaults.restoreLastQueryDefault,
-    ])
+    Self.registerLaunchDefaults()
 
     let configuration = HarnessMonitorAppConfiguration.resolve()
     let isTestRun =
@@ -176,6 +161,25 @@ struct HarnessMonitorApp: App {
       )
     )
     delegate.bind(store: store)
+  }
+
+  static func registerLaunchDefaults() {
+    UserDefaults.standard.register(defaults: [
+      "NSUseAnimatedFocusRing": false,
+      SessionWindowKeyboardShortcutOverlaySettings.storageKey:
+        SessionWindowKeyboardShortcutOverlaySettings.defaultValue,
+      OpenAnythingHotKeyDefaults.enabledKey: OpenAnythingHotKeyDefaults.enabledDefault,
+      OpenAnythingHotKeyDefaults.descriptorKey:
+        OpenAnythingHotKeyDefaults.descriptorDefault.storageValue,
+      OpenAnythingPreferencesDefaults.showPinnedKey:
+        OpenAnythingPreferencesDefaults.showPinnedDefault,
+      OpenAnythingPreferencesDefaults.showRecentKey:
+        OpenAnythingPreferencesDefaults.showRecentDefault,
+      OpenAnythingPreferencesDefaults.cmdClickBackgroundKey:
+        OpenAnythingPreferencesDefaults.cmdClickBackgroundDefault,
+      OpenAnythingPreferencesDefaults.restoreLastQueryKey:
+        OpenAnythingPreferencesDefaults.restoreLastQueryDefault,
+    ])
   }
 
   static func scheduleLaunchFilesystemMaintenance(

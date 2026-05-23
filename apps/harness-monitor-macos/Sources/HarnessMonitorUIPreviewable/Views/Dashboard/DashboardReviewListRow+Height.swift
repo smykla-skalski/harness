@@ -10,28 +10,29 @@ import Foundation
 /// Heights are passed in by the row's `@ScaledMetric` values so Dynamic Type
 /// flows through to the final ideal-height value.
 enum DashboardReviewListRowHeight {
-  static func idealHeight(
-    titleLineHeight: CGFloat,
-    captionLineHeight: CGFloat,
-    pillStripHeight: CGFloat,
-    hasAttentionStrip: Bool,
-    hasRequiredFailedChecks: Bool,
-    hasLabels: Bool,
-    verticalPadding: CGFloat,
-    lineSpacing: CGFloat
-  ) -> CGFloat {
+  struct Layout {
+    let titleLineHeight: CGFloat
+    let captionLineHeight: CGFloat
+    let pillStripHeight: CGFloat
+    let hasAttentionStrip: Bool
+    let hasRequiredFailedChecks: Bool
+    let hasLabels: Bool
+    let verticalPadding: CGFloat
+    let lineSpacing: CGFloat
+  }
+
+  static func idealHeight(_ layout: Layout) -> CGFloat {
     var components: [CGFloat] = []
-    // Title line + secondary line + status line are always rendered.
-    components.append(titleLineHeight)
-    components.append(captionLineHeight)
-    components.append(pillStripHeight)
-    if hasAttentionStrip { components.append(pillStripHeight) }
-    if hasRequiredFailedChecks { components.append(pillStripHeight) }
-    if hasLabels { components.append(pillStripHeight) }
+    components.append(layout.titleLineHeight)
+    components.append(layout.captionLineHeight)
+    components.append(layout.pillStripHeight)
+    if layout.hasAttentionStrip { components.append(layout.pillStripHeight) }
+    if layout.hasRequiredFailedChecks { components.append(layout.pillStripHeight) }
+    if layout.hasLabels { components.append(layout.pillStripHeight) }
 
     let lineCount = CGFloat(components.count)
-    let spacingTotal = max(0, lineCount - 1) * lineSpacing
+    let spacingTotal = max(0, lineCount - 1) * layout.lineSpacing
     let contentTotal = components.reduce(0, +)
-    return contentTotal + spacingTotal + verticalPadding * 2
+    return contentTotal + spacingTotal + layout.verticalPadding * 2
   }
 }

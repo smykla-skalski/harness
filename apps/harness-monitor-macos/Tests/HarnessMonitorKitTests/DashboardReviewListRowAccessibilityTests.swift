@@ -74,35 +74,38 @@ struct DashboardReviewListRowAccessibilityTests {
   @Test("row idealHeight grows for each optional strip")
   func rowIdealHeightGrowsForEachOptionalStrip() {
     let bare = DashboardReviewListRowHeight.idealHeight(
-      titleLineHeight: 18,
-      captionLineHeight: 14,
-      pillStripHeight: 22,
-      hasAttentionStrip: false,
-      hasRequiredFailedChecks: false,
-      hasLabels: false,
-      verticalPadding: 10,
-      lineSpacing: 4
-    )
+      DashboardReviewListRowHeight.Layout(
+        titleLineHeight: 18,
+        captionLineHeight: 14,
+        pillStripHeight: 22,
+        hasAttentionStrip: false,
+        hasRequiredFailedChecks: false,
+        hasLabels: false,
+        verticalPadding: 10,
+        lineSpacing: 4
+      ))
     let withAttention = DashboardReviewListRowHeight.idealHeight(
-      titleLineHeight: 18,
-      captionLineHeight: 14,
-      pillStripHeight: 22,
-      hasAttentionStrip: true,
-      hasRequiredFailedChecks: false,
-      hasLabels: false,
-      verticalPadding: 10,
-      lineSpacing: 4
-    )
+      DashboardReviewListRowHeight.Layout(
+        titleLineHeight: 18,
+        captionLineHeight: 14,
+        pillStripHeight: 22,
+        hasAttentionStrip: true,
+        hasRequiredFailedChecks: false,
+        hasLabels: false,
+        verticalPadding: 10,
+        lineSpacing: 4
+      ))
     let withAttentionAndLabels = DashboardReviewListRowHeight.idealHeight(
-      titleLineHeight: 18,
-      captionLineHeight: 14,
-      pillStripHeight: 22,
-      hasAttentionStrip: true,
-      hasRequiredFailedChecks: false,
-      hasLabels: true,
-      verticalPadding: 10,
-      lineSpacing: 4
-    )
+      DashboardReviewListRowHeight.Layout(
+        titleLineHeight: 18,
+        captionLineHeight: 14,
+        pillStripHeight: 22,
+        hasAttentionStrip: true,
+        hasRequiredFailedChecks: false,
+        hasLabels: true,
+        verticalPadding: 10,
+        lineSpacing: 4
+      ))
 
     #expect(withAttention > bare)
     #expect(withAttentionAndLabels > withAttention)
@@ -111,25 +114,27 @@ struct DashboardReviewListRowAccessibilityTests {
   @Test("row idealHeight is identical for the same content shape")
   func rowIdealHeightIsIdenticalForTheSameContentShape() {
     let first = DashboardReviewListRowHeight.idealHeight(
-      titleLineHeight: 18,
-      captionLineHeight: 14,
-      pillStripHeight: 22,
-      hasAttentionStrip: true,
-      hasRequiredFailedChecks: true,
-      hasLabels: true,
-      verticalPadding: 10,
-      lineSpacing: 4
-    )
+      DashboardReviewListRowHeight.Layout(
+        titleLineHeight: 18,
+        captionLineHeight: 14,
+        pillStripHeight: 22,
+        hasAttentionStrip: true,
+        hasRequiredFailedChecks: true,
+        hasLabels: true,
+        verticalPadding: 10,
+        lineSpacing: 4
+      ))
     let second = DashboardReviewListRowHeight.idealHeight(
-      titleLineHeight: 18,
-      captionLineHeight: 14,
-      pillStripHeight: 22,
-      hasAttentionStrip: true,
-      hasRequiredFailedChecks: true,
-      hasLabels: true,
-      verticalPadding: 10,
-      lineSpacing: 4
-    )
+      DashboardReviewListRowHeight.Layout(
+        titleLineHeight: 18,
+        captionLineHeight: 14,
+        pillStripHeight: 22,
+        hasAttentionStrip: true,
+        hasRequiredFailedChecks: true,
+        hasLabels: true,
+        verticalPadding: 10,
+        lineSpacing: 4
+      ))
     #expect(first == second)
   }
 

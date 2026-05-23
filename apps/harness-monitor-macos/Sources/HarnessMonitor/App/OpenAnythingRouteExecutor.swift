@@ -49,6 +49,13 @@ enum OpenAnythingRoutingStep: Equatable, Sendable {
   case revealInFinder(URL)
 }
 
+private enum OpenAnythingActionRoutingGroup {
+  case session
+  case dashboard
+  case maintenance
+  case settings
+}
+
 enum OpenAnythingRouteExecutor {
   static func steps(
     for target: OpenAnythingTarget,
@@ -95,6 +102,37 @@ enum OpenAnythingRouteExecutor {
   }
 
   private static func steps(forAction action: OpenAnythingAction) -> [OpenAnythingRoutingStep] {
+    switch routingGroup(for: action) {
+    case .session:
+      return sessionActionSteps(action)
+    case .dashboard:
+      return dashboardActionSteps(action)
+    case .maintenance:
+      return maintenanceActionSteps(action)
+    case .settings:
+      return settingsActionSteps(action)
+    }
+  }
+
+  private static func routingGroup(for action: OpenAnythingAction)
+    -> OpenAnythingActionRoutingGroup
+  {
+    switch action {
+    case .newSession, .newTask, .attachExternalSession:
+      return .session
+    case .openDashboard, .openTaskBoard, .openReviews, .openNotifications,
+      .openPolicyCanvas, .openDiagnostics:
+      return .dashboard
+    case .refresh, .refreshDiagnostics, .reconnectDaemon, .copyDiagnostics:
+      return .maintenance
+    case .settings, .openMCPSettings, .openDatabaseSettings, .policyCanvasLab:
+      return .settings
+    }
+  }
+
+  private static func sessionActionSteps(
+    _ action: OpenAnythingAction
+  ) -> [OpenAnythingRoutingStep] {
     switch action {
     case .newSession:
       return [.presentNewSessionSheet]
@@ -102,6 +140,15 @@ enum OpenAnythingRouteExecutor {
       return [.presentNewTaskSheet]
     case .attachExternalSession:
       return [.attachExternalSession]
+    default:
+      return []
+    }
+  }
+
+  private static func dashboardActionSteps(
+    _ action: OpenAnythingAction
+  ) -> [OpenAnythingRoutingStep] {
+    switch action {
     case .openDashboard:
       return [.openWindow(.dashboard)]
     case .openTaskBoard:
@@ -114,6 +161,15 @@ enum OpenAnythingRouteExecutor {
       return [.openDashboard(.policyCanvas)]
     case .openDiagnostics:
       return [.openDashboard(.diagnostics)]
+    default:
+      return []
+    }
+  }
+
+  private static func maintenanceActionSteps(
+    _ action: OpenAnythingAction
+  ) -> [OpenAnythingRoutingStep] {
+    switch action {
     case .refresh:
       return [.refresh]
     case .refreshDiagnostics:
@@ -122,6 +178,15 @@ enum OpenAnythingRouteExecutor {
       return [.reconnectDaemon]
     case .copyDiagnostics:
       return [.copyDiagnostics]
+    default:
+      return []
+    }
+  }
+
+  private static func settingsActionSteps(
+    _ action: OpenAnythingAction
+  ) -> [OpenAnythingRoutingStep] {
+    switch action {
     case .settings:
       return [.openWindow(.settings)]
     case .openMCPSettings:
@@ -130,6 +195,8 @@ enum OpenAnythingRouteExecutor {
       return [.openSettings(rawValue: "database")]
     case .policyCanvasLab:
       return [.openWindow(.policyCanvasLab)]
+    default:
+      return []
     }
   }
 
