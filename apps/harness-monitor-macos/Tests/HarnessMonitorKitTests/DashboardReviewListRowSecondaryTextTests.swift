@@ -40,16 +40,16 @@ struct DashboardReviewListRowSecondaryTextTests {
       PullRequestReview(author: "carol", state: .approved),
     ]
 
-    let summary = DashboardReviewListRowReviewerSummaryData(reviews: reviews)
+    let summary = DashboardReviewerSummary(reviews: reviews)
 
-    #expect(summary?.unique == 3)
-    #expect(summary?.approved == 2)
+    #expect(summary.reviewerCount == 3)
+    #expect(summary.approvedCount == 2)
   }
 
   @Test("empty reviews collapse the reviewer summary entirely")
   func emptyReviewsCollapseTheReviewerSummary() {
-    let summary = DashboardReviewListRowReviewerSummaryData(reviews: [])
-    #expect(summary == nil)
+    let summary = DashboardReviewerSummary(reviews: [])
+    #expect(summary.reviewerCount == 0)
   }
 
   private func makeRow(

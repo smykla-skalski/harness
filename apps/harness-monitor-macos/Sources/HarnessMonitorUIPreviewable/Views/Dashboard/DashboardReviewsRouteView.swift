@@ -41,7 +41,7 @@ struct DashboardReviewsRouteView: View {
   @SceneStorage("dashboard.reviews.problem-checks-only")
   var showsProblemChecksOnly = false
 
-  @State private var response = ReviewsQueryResponse(
+  @State var response = ReviewsQueryResponse(
     fetchedAt: "",
     fromCache: false,
     summary: ReviewsSummary(
@@ -54,40 +54,49 @@ struct DashboardReviewsRouteView: View {
     ),
     items: []
   )
-  @State private var isLoading = false
-  @State private var isBackgroundRefreshing = false
-  @State private var errorMessage: String?
-  @State private var selectedIDs = Set<String>()
-  @State private var isLabelSheetPresented = false
-  @State private var labelDraft = ""
-  @State private var labelTargetItems = [ReviewItem]()
-  @State private var resolvedPreferences: DashboardReviewsResolvedPreferences
-  @State private var presentationWorker = DashboardReviewsPresentationWorker()
-  @State private var cachedPresentation = DashboardReviewsPresentation.empty
-  @State private var presentationGeneration: UInt64 = 0
-  @State private var refreshTracker = ReviewRefreshTracker()
-  @State private var inFlightTasks: [Task<Void, Never>] = []
+  @State var isLoading = false
+  @State var isBackgroundRefreshing = false
+  @State var errorMessage: String?
+  @State var selectedIDs = Set<String>()
+  @State var isLabelSheetPresented = false
+  @State var labelDraft = ""
+  @State var labelTargetItems = [ReviewItem]()
+  @State var resolvedPreferences: DashboardReviewsResolvedPreferences
+  @State var presentationWorker = DashboardReviewsPresentationWorker()
+  @State var cachedPresentation = DashboardReviewsPresentation.empty
+  @State var presentationGeneration: UInt64 = 0
+  @State var refreshTracker = ReviewRefreshTracker()
+  @State var inFlightTasks: [Task<Void, Never>] = []
   /// The set of items whose most recent targeted refresh timed out. Drives
   /// the inline tap-to-retry banner mounted in the content pane. Set when
   /// `scheduleAffectedRefresh` catches `DashboardReviewsSchedulerError`,
   /// cleared on retry, dismissal, or successful refresh of the same items.
-  @State private var refreshTimeoutItems: [ReviewItem]?
-  @State private var scheduler = DashboardReviewsScheduler()
-  @State private var collapsedRepositories = DashboardReviewsCollapsedRepositories()
-  @State private var labelMenuDataByRepository: [String: DashboardReviewsRepoLabelMenuData] =
+  @State var refreshTimeoutItems: [ReviewItem]?
+  /// Tracker that compares the previous and current response item sets to
+  /// surface a one-shot toast for each pull request that disappeared
+  /// (merged, closed, or fell out of scope). The first call after view
+  /// appearance establishes a silent baseline.
+  @State var disappearedTracker = DashboardReviewsDisappearedItemTracker()
+  /// Disappeared-item descriptors emitted on the most recent items-arrival
+  /// diff. Consumed by the transient-banner zone in the content pane and
+  /// cleared once the user dismisses the banner.
+  @State var disappearedDescriptors: [DashboardReviewsDisappearedItemTracker.Descriptor] = []
+  @State var scheduler = DashboardReviewsScheduler()
+  @State var collapsedRepositories = DashboardReviewsCollapsedRepositories()
+  @State var labelMenuDataByRepository: [String: DashboardReviewsRepoLabelMenuData] =
     [:]
-  @State private var actionState = DashboardReviewsRouteActionState()
-  @State private var legacyFilterMigrationApplied = false
-  @State private var lastPrimaryClickedID: String?
-  @State private var isReviewsRouteActive = true
-  @State private var pendingResumeAfterReturn = false
+  @State var actionState = DashboardReviewsRouteActionState()
+  @State var legacyFilterMigrationApplied = false
+  @State var lastPrimaryClickedID: String?
+  @State var isReviewsRouteActive = true
+  @State var pendingResumeAfterReturn = false
   // Skip the JSON decode in `syncPreferencesFromStorage` when the raw stored
   // string is byte-identical to the last value we already decoded. The
   // `.onChange(of: storedPreferences)` handler fires `initial: true` and
   // re-fires on every UserDefaults write the surface emits; the decode itself
   // is non-trivial.
-  @State private var lastStoredPreferencesHash: Int?
-  @State private var needsMeCount: Int = 0
+  @State var lastStoredPreferencesHash: Int?
+  @State var needsMeCount: Int = 0
 
   init(
     store: HarnessMonitorStore,
@@ -106,171 +115,6 @@ struct DashboardReviewsRouteView: View {
     )
   }
 
-  var routeResponse: ReviewsQueryResponse {
-    get { response }
-    nonmutating set { response = newValue }
-  }
-
-  var routeErrorMessage: String? {
-    get { errorMessage }
-    nonmutating set { errorMessage = newValue }
-  }
-
-  var routeIsLoading: Bool {
-    get { isLoading }
-    nonmutating set { isLoading = newValue }
-  }
-
-  var routeIsBackgroundRefreshing: Bool {
-    get { isBackgroundRefreshing }
-    nonmutating set { isBackgroundRefreshing = newValue }
-  }
-
-  var routeSelectedIDs: Set<String> {
-    get { selectedIDs }
-    nonmutating set { selectedIDs = newValue }
-  }
-
-  var routeSelectedIDsBinding: Binding<Set<String>> {
-    Binding(
-      get: { selectedIDs },
-      set: { selectedIDs = $0 }
-    )
-  }
-
-  var routeIsLabelSheetPresented: Bool {
-    get { isLabelSheetPresented }
-    nonmutating set { isLabelSheetPresented = newValue }
-  }
-
-  var routeLabelDraft: String {
-    get { labelDraft }
-    nonmutating set { labelDraft = newValue }
-  }
-
-  var routeLabelDraftBinding: Binding<String> {
-    $labelDraft
-  }
-
-  var routeLabelTargetItems: [ReviewItem] {
-    get { labelTargetItems }
-    nonmutating set { labelTargetItems = newValue }
-  }
-
-  var routeResolvedPreferences: DashboardReviewsResolvedPreferences {
-    get { resolvedPreferences }
-    nonmutating set { resolvedPreferences = newValue }
-  }
-
-  var routeLastStoredPreferencesHash: Int? {
-    get { lastStoredPreferencesHash }
-    nonmutating set { lastStoredPreferencesHash = newValue }
-  }
-
-  var routeNeedsMeCount: Int {
-    get { needsMeCount }
-    nonmutating set { needsMeCount = newValue }
-  }
-
-  var routeRefreshTracker: ReviewRefreshTracker {
-    get { refreshTracker }
-    nonmutating set { refreshTracker = newValue }
-  }
-
-  var routeInFlightTasks: [Task<Void, Never>] {
-    get { inFlightTasks }
-    nonmutating set { inFlightTasks = newValue }
-  }
-
-  var routeRefreshTimeoutItems: [ReviewItem]? {
-    get { refreshTimeoutItems }
-    nonmutating set { refreshTimeoutItems = newValue }
-  }
-
-  var routeScheduler: DashboardReviewsScheduler {
-    scheduler
-  }
-
-  var routeCollapsedRepositories: DashboardReviewsCollapsedRepositories {
-    get { collapsedRepositories }
-    nonmutating set { collapsedRepositories = newValue }
-  }
-
-  var routeCollapsedRepositoriesStorage: String {
-    get { collapsedRepositoriesStorage }
-    nonmutating set { collapsedRepositoriesStorage = newValue }
-  }
-
-  var routeLabelMenuDataByRepository: [String: DashboardReviewsRepoLabelMenuData] {
-    get { labelMenuDataByRepository }
-    nonmutating set { labelMenuDataByRepository = newValue }
-  }
-
-  var routeRecentReviewActions: [String: DashboardReviewActivityEntry] {
-    get { actionState.recentActions }
-    nonmutating set { actionState.recentActions = newValue }
-  }
-
-  var routePendingActionConfirmation: DashboardReviewActionConfirmation? {
-    get { actionState.pendingConfirmation }
-    nonmutating set { actionState.pendingConfirmation = newValue }
-  }
-
-  var routePendingActionConfirmationTitle: String {
-    routePendingActionConfirmation?.title ?? ""
-  }
-
-  var routeActionDialogPresented: Binding<Bool> {
-    Binding(
-      get: { routePendingActionConfirmation != nil },
-      set: { isPresented in
-        if !isPresented {
-          routePendingActionConfirmation = nil
-        }
-      }
-    )
-  }
-
-  var routeReviewCapabilities: ReviewsCapabilitiesResponse {
-    get { actionState.capabilities }
-    nonmutating set { actionState.capabilities = newValue }
-  }
-
-  var routeShowsProblemChecksOnlyBinding: Binding<Bool> {
-    $showsProblemChecksOnly
-  }
-
-  var routeNeedsMeOnBinding: Binding<Bool> {
-    $needsMeOn
-  }
-
-  var routeDependenciesOnlyOnBinding: Binding<Bool> {
-    $dependenciesOnlyOn
-  }
-
-  var routePresentationWorker: DashboardReviewsPresentationWorker {
-    presentationWorker
-  }
-
-  var routeCachedPresentation: DashboardReviewsPresentation {
-    get { cachedPresentation }
-    nonmutating set { cachedPresentation = newValue }
-  }
-
-  var routePresentationGeneration: UInt64 {
-    get { presentationGeneration }
-    nonmutating set { presentationGeneration = newValue }
-  }
-
-  var routeIsReviewsRouteActive: Bool {
-    get { isReviewsRouteActive }
-    nonmutating set { isReviewsRouteActive = newValue }
-  }
-
-  var routePendingResumeAfterReturn: Bool {
-    get { pendingResumeAfterReturn }
-    nonmutating set { pendingResumeAfterReturn = newValue }
-  }
 
   var reloadTaskKey: DashboardReviewsReloadTaskKey {
     DashboardReviewsReloadTaskKey(
@@ -402,6 +246,14 @@ struct DashboardReviewsRouteView: View {
         // task-triggered call is a no-op.
         applyPendingReviewSelectionIfNeeded()
         needsMeCount = DashboardReviewsRouteView.recomputeNeedsMeCount(items: items)
+        // Run the disappeared-item diff after every items change. The first
+        // call after appearance is silently swallowed by the tracker so the
+        // initial response never emits toasts for items the user has not
+        // previously observed.
+        let descriptors = disappearedTracker.diff(currentItems: items)
+        if !descriptors.isEmpty {
+          disappearedDescriptors.append(contentsOf: descriptors)
+        }
       }
       .onChange(of: normalizedPreferences.frequentLabelsCount) { _, _ in
         refreshLabelMenuData()

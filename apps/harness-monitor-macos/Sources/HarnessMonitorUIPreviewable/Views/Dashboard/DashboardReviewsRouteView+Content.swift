@@ -11,6 +11,7 @@ extension DashboardReviewsRouteView {
           Task { await reload(forceRefresh: true) }
         }
       )
+      transientBannerZone
       inContentSearchField
       contentListPane
     }
