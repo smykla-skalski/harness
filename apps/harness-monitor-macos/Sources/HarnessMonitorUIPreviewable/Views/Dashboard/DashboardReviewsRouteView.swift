@@ -220,8 +220,17 @@ struct DashboardReviewsRouteView: View {
           routeState.disappearedDescriptors.append(contentsOf: descriptors)
         }
       }
-      .onChange(of: routeState.needsMeCount, initial: true) { _, newValue in
+      .onChange(of: routeState.needsMeCount) { _, newValue in
+        // Skip while the scheduler is paginating through repos so we don't
+        // publish intermediate counts (0 -> 57 -> 65 -> ...). The follow-up
+        // onChange below pushes the settled count once `repositoriesInFlight`
+        // empties.
+        guard routeScheduler.repositoriesInFlight.isEmpty else { return }
         NeedsMeCloudKitWriter.shared.submit(count: newValue)
+      }
+      .onChange(of: routeScheduler.repositoriesInFlight) { _, newValue in
+        guard newValue.isEmpty else { return }
+        NeedsMeCloudKitWriter.shared.submit(count: routeState.needsMeCount)
       }
       .onChange(of: normalizedPreferences.frequentLabelsCount) { _, _ in
         refreshLabelMenuData()
