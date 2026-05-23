@@ -1,22 +1,45 @@
 import HarnessMonitorKit
 import SwiftUI
 
+struct DashboardReviewsStatusOrderKey: Comparable {
+  let bucket: Int
+  let reviewTier: Int
+  let checkTier: Int
+  let updatedAt: String
+  let number: UInt64
+
+  static func < (lhs: Self, rhs: Self) -> Bool {
+    if lhs.bucket != rhs.bucket { return lhs.bucket < rhs.bucket }
+    if lhs.reviewTier != rhs.reviewTier { return lhs.reviewTier < rhs.reviewTier }
+    if lhs.checkTier != rhs.checkTier { return lhs.checkTier < rhs.checkTier }
+    if lhs.updatedAt != rhs.updatedAt { return lhs.updatedAt > rhs.updatedAt }
+    return lhs.number < rhs.number
+  }
+}
+
 extension ReviewItem {
-  var statusWeight: Int {
-    switch true {
-    case reviewStatus == .approved && checkStatus == .success:
-      0
-    case checkStatus == .pending:
-      1
-    case reviewStatus == .reviewRequired:
-      2
-    case checkStatus == .failure:
-      3
-    case mergeable == .conflicting:
-      4
-    default:
-      5
-    }
+  var statusOrderKey: DashboardReviewsStatusOrderKey {
+    DashboardReviewsStatusOrderKey(
+      bucket: statusBucket,
+      reviewTier: reviewStatus.orderTier,
+      checkTier: checkStatus.orderTier,
+      updatedAt: updatedAt,
+      number: number
+    )
+  }
+
+  fileprivate var statusBucket: Int {
+    if isDraft { return 10 }
+    if isAutoMergeable { return 0 }
+    if isAutoApprovable { return 1 }
+    if reviewStatus == .approved { return 2 }
+    if checkStatus == .pending { return 3 }
+    if reviewStatus == .reviewRequired { return 4 }
+    if reviewStatus == .changesRequested { return 5 }
+    if checkStatus == .failure { return 6 }
+    if mergeable == .conflicting { return 7 }
+    if policyBlocked { return 8 }
+    return 9
   }
 
   var statusLabel: String {
@@ -69,6 +92,16 @@ extension ReviewReviewStatus {
     case .none, .unknown: HarnessMonitorTheme.secondaryInk
     }
   }
+
+  var orderTier: Int {
+    switch self {
+    case .approved: 0
+    case .reviewRequired: 1
+    case .changesRequested: 2
+    case .none: 3
+    case .unknown: 4
+    }
+  }
 }
 
 extension ReviewCheckStatus {
@@ -79,6 +112,16 @@ extension ReviewCheckStatus {
     case .failure: "Checks failing"
     case .pending: "Checks pending"
     case .unknown(let raw): raw
+    }
+  }
+
+  var orderTier: Int {
+    switch self {
+    case .success: 0
+    case .pending: 1
+    case .failure: 2
+    case .none: 3
+    case .unknown: 4
     }
   }
 }

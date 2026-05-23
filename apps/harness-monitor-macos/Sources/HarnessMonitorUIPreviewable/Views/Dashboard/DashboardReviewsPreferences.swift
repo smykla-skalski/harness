@@ -343,7 +343,7 @@ struct DashboardReviewsPreferences: Codable, Equatable {
     // Why: legacy installs persisted the "renovate[bot]" default, which now scopes
     // the dashboard to a single author. The Reviews route fetches all PRs and lets
     // the Category picker surface bot authors, so silently drop the legacy seed.
-    if decoded.authorsText == "renovate[bot]" {
+    if decoded.normalizedAuthors == ["renovate[bot]"] {
       decoded.authorsText = ""
     }
     return decoded
