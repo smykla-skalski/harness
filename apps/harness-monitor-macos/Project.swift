@@ -56,6 +56,29 @@ private let kitTarget: Target = .target(
     metadata: .metadata(tags: ["tag:feature:monitor", "tag:layer:core"])
 )
 
+private let intentsSources: SourceFilesList = SourceFilesList(globs: [
+    .glob("Sources/HarnessMonitorIntents/**/*.swift")
+])
+
+private let intentsSettings: Settings = BuildSettings.frameworkSettings(
+    bundleId: "io.harnessmonitor.intents",
+    extraBase: ["SWIFT_ACTIVE_COMPILATION_CONDITIONS": FeatureFlags.compilationConditionSetting()]
+)
+
+private let intentsTarget: Target = .target(
+    name: "HarnessMonitorIntents",
+    destinations: macOSDestinations,
+    product: .framework,
+    bundleId: "io.harnessmonitor.intents",
+    deploymentTargets: macOSDeploymentTargets,
+    sources: intentsSources,
+    dependencies: [
+        .target(name: "HarnessMonitorKit")
+    ],
+    settings: intentsSettings,
+    metadata: .metadata(tags: ["tag:feature:intents", "tag:layer:integration"])
+)
+
 private let uiPreviewableTarget: Target = {
     var deps: [TargetDependency] = [
         .target(name: "HarnessMonitorKit"),
@@ -131,6 +154,7 @@ private let previewHostTarget: Target = .target(
 private let monitorAppDependencies: [TargetDependency] = {
     var deps: [TargetDependency] = [
         .target(name: "HarnessMonitorKit"),
+        .target(name: "HarnessMonitorIntents"),
         .target(name: "HarnessMonitorUIPreviewable")
     ]
     deps.append(contentsOf: FeatureFlags.appAdditionalDependencies())
@@ -537,6 +561,7 @@ let project = Project(
     settings: BuildSettings.projectSettings(),
     targets: [
         kitTarget,
+        intentsTarget,
         uiPreviewableTarget,
         previewHostTarget,
         monitorAppTarget,
