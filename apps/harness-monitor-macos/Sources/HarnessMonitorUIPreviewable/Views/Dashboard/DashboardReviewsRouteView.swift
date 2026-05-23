@@ -239,10 +239,12 @@ struct DashboardReviewsRouteView: View {
       items: response.items,
       filterModeRaw: filterModeRaw,
       sortModeRaw: sortModeRaw,
+      groupModeRaw: groupModeRaw,
       categoryModeRaw: categoryModeRaw,
       searchText: searchText,
       configuredRepositories: preferences.repositories,
       configuredOrganizations: preferences.organizations,
+      configuredAuthors: preferences.authors,
       selectedIDs: selectedIDs,
       persistedPrimarySelectionID: persistedPrimarySelectionID
     )
