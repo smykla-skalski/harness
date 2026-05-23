@@ -133,21 +133,31 @@ public struct OpenAnythingPaletteView: View {
     HStack(spacing: 10) {
       Image(systemName: "magnifyingglass")
         .font(.system(size: OpenAnythingPaletteConstants.searchIconSize, weight: .medium))
-        .foregroundStyle(.secondary)
+        .foregroundStyle(HarnessMonitorTheme.secondaryInk)
         .accessibilityHidden(true)
-      TextField(placeholder, text: $model.query)
-        .textFieldStyle(.plain)
-        .font(.title3)
-        .focused($isFieldFocused)
-        .accessibilityIdentifier(HarnessMonitorAccessibility.openAnythingField)
-        .accessibilityValue(accessibilityValueForField)
-        .onSubmit(submitSelectedHit)
+      // `prompt:` accepts a styled `Text`, which is the only way to raise
+      // the placeholder from SwiftUI's near-invisible `.placeholderText`
+      // system color to the audited `secondaryInk` token. Keep an explicit
+      // `.accessibilityLabel` so VoiceOver still names the field after the
+      // visible text title is dropped.
+      TextField(
+        "",
+        text: $model.query,
+        prompt: Text(placeholder).foregroundStyle(HarnessMonitorTheme.secondaryInk)
+      )
+      .textFieldStyle(.plain)
+      .font(.title3)
+      .focused($isFieldFocused)
+      .accessibilityLabel(placeholder)
+      .accessibilityIdentifier(HarnessMonitorAccessibility.openAnythingField)
+      .accessibilityValue(accessibilityValueForField)
+      .onSubmit(submitSelectedHit)
       if !model.query.isEmpty {
         Button {
           model.query = ""
         } label: {
           Image(systemName: "xmark.circle.fill")
-            .foregroundStyle(.tertiary)
+            .foregroundStyle(HarnessMonitorTheme.tertiaryInk)
         }
         .harnessPlainButtonStyle()
         .accessibilityLabel("Clear query")
@@ -200,7 +210,7 @@ public struct OpenAnythingPaletteView: View {
         .controlSize(.small)
       Text("Loading...")
         .font(.callout)
-        .foregroundStyle(.secondary)
+        .foregroundStyle(HarnessMonitorTheme.secondaryInk)
     }
     .frame(maxWidth: .infinity)
     .padding(.vertical, 32)
@@ -224,7 +234,7 @@ public struct OpenAnythingPaletteView: View {
       Text("to open")
     }
     .font(.caption)
-    .foregroundStyle(.tertiary)
+    .foregroundStyle(HarnessMonitorTheme.tertiaryInk)
     .padding(.horizontal, 14)
     .padding(.vertical, 6)
   }
@@ -273,7 +283,7 @@ public struct OpenAnythingPaletteView: View {
   private func emptyState(text: String) -> some View {
     Text(text)
       .font(.callout)
-      .foregroundStyle(.secondary)
+      .foregroundStyle(HarnessMonitorTheme.secondaryInk)
       .multilineTextAlignment(.center)
       .frame(maxWidth: .infinity)
       .padding(.horizontal, 24)

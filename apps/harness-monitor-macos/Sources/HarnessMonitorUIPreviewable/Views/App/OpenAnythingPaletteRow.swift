@@ -74,7 +74,7 @@ struct OpenAnythingPaletteRow: View {
     Image(systemName: hit.record.systemImage)
       .symbolRenderingMode(.hierarchical)
       .frame(width: OpenAnythingPaletteConstants.rowIconColumnWidth)
-      .foregroundStyle(isSelected ? Color.accentColor : .secondary)
+      .foregroundStyle(isSelected ? Color.accentColor : HarnessMonitorTheme.secondaryInk)
   }
 
   private var title: some View {
@@ -86,7 +86,7 @@ struct OpenAnythingPaletteRow: View {
     if let subtitle = hit.record.subtitle, !subtitle.isEmpty {
       SearchHighlightedText(text: subtitle, highlights: hit.highlights.subtitle)
         .font(.caption)
-        .foregroundStyle(.secondary)
+        .foregroundStyle(HarnessMonitorTheme.secondaryInk)
         .lineLimit(1)
     }
   }
@@ -95,7 +95,7 @@ struct OpenAnythingPaletteRow: View {
     if let value = hit.record.trailing, !value.isEmpty {
       SearchHighlightedText(text: value, highlights: hit.highlights.trailing)
         .font(.caption)
-        .foregroundStyle(.secondary)
+        .foregroundStyle(HarnessMonitorTheme.secondaryInk)
         .lineLimit(1)
     }
   }
@@ -110,7 +110,7 @@ struct OpenAnythingPaletteRow: View {
           RoundedRectangle(cornerRadius: 4, style: .continuous)
             .fill(.secondary.opacity(0.12))
         )
-        .foregroundStyle(.secondary)
+        .foregroundStyle(HarnessMonitorTheme.secondaryInk)
         .accessibilityHidden(true)
     }
   }
@@ -119,7 +119,7 @@ struct OpenAnythingPaletteRow: View {
     if isPinned {
       Image(systemName: "pin.fill")
         .font(.caption2)
-        .foregroundStyle(.tertiary)
+        .foregroundStyle(HarnessMonitorTheme.tertiaryInk)
         .accessibilityHidden(true)
     }
   }

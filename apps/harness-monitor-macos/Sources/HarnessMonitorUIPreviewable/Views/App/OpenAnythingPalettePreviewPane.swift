@@ -54,7 +54,7 @@ struct OpenAnythingPalettePreviewPane: View {
       Image(systemName: hit.record.systemImage)
         .symbolRenderingMode(.hierarchical)
         .font(.title3)
-        .foregroundStyle(.secondary)
+        .foregroundStyle(HarnessMonitorTheme.secondaryInk)
       Text(hit.record.title)
         .font(.headline)
         .lineLimit(2)
@@ -69,7 +69,7 @@ struct OpenAnythingPalettePreviewPane: View {
     VStack(alignment: .leading, spacing: 2) {
       Text(title.uppercased())
         .font(.caption2)
-        .foregroundStyle(.tertiary)
+        .foregroundStyle(HarnessMonitorTheme.tertiaryInk)
       Text(value)
         .font(isMonospaced ? .callout.monospaced() : .callout)
         .foregroundStyle(.primary)
@@ -81,10 +81,10 @@ struct OpenAnythingPalettePreviewPane: View {
     VStack(spacing: 6) {
       Image(systemName: "doc.text.magnifyingglass")
         .font(.title2)
-        .foregroundStyle(.tertiary)
+        .foregroundStyle(HarnessMonitorTheme.tertiaryInk)
       Text("Select a result to preview")
         .font(.callout)
-        .foregroundStyle(.secondary)
+        .foregroundStyle(HarnessMonitorTheme.secondaryInk)
         .multilineTextAlignment(.center)
     }
     .frame(maxWidth: .infinity, maxHeight: .infinity)

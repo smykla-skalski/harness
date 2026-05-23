@@ -15,14 +15,14 @@ struct OpenAnythingPaletteFooter: View {
       chord(symbol: "⎋", label: "Cancel")
       if recordCount > 0 {
         Text("·")
-          .foregroundStyle(.tertiary)
+          .foregroundStyle(HarnessMonitorTheme.tertiaryInk)
         Text("\(recordCount) items")
           .font(.caption2)
-          .foregroundStyle(.tertiary)
+          .foregroundStyle(HarnessMonitorTheme.tertiaryInk)
       }
     }
     .font(.callout.monospaced())
-    .foregroundStyle(.tertiary)
+    .foregroundStyle(HarnessMonitorTheme.tertiaryInk)
     .padding(.horizontal, OpenAnythingPaletteConstants.footerHorizontalPadding)
     .padding(.vertical, OpenAnythingPaletteConstants.footerVerticalPadding)
     .frame(maxWidth: .infinity)
