@@ -25,6 +25,10 @@ struct DashboardReviewsRouteView: View {
   var groupModeRaw = DashboardReviewsGroupMode.repository.rawValue
   @SceneStorage("dashboard.reviews.category")
   var categoryModeRaw = DashboardReviewsCategoryMode.all.rawValue
+  @SceneStorage("dashboard.reviews.needs-me")
+  var needsMeOn = false
+  @SceneStorage("dashboard.reviews.dependencies-only")
+  var dependenciesOnlyOn = false
   @SceneStorage("dashboard.reviews.search")
   var searchText = ""
   @SceneStorage("dashboard.reviews.primary-selection")
@@ -67,6 +71,7 @@ struct DashboardReviewsRouteView: View {
   @State private var labelMenuDataByRepository: [String: DashboardReviewsRepoLabelMenuData] =
     [:]
   @State private var actionState = DashboardReviewsRouteActionState()
+  @State private var legacyFilterMigrationApplied = false
 
   init(
     store: HarnessMonitorStore,
@@ -204,6 +209,14 @@ struct DashboardReviewsRouteView: View {
     $showsProblemChecksOnly
   }
 
+  var routeNeedsMeOnBinding: Binding<Bool> {
+    $needsMeOn
+  }
+
+  var routeDependenciesOnlyOnBinding: Binding<Bool> {
+    $dependenciesOnlyOn
+  }
+
   var routePresentationWorker: DashboardReviewsPresentationWorker {
     presentationWorker
   }
@@ -246,7 +259,9 @@ struct DashboardReviewsRouteView: View {
       configuredOrganizations: preferences.organizations,
       configuredAuthors: preferences.authors,
       selectedIDs: selectedIDs,
-      persistedPrimarySelectionID: persistedPrimarySelectionID
+      persistedPrimarySelectionID: persistedPrimarySelectionID,
+      needsMeOn: needsMeOn,
+      dependenciesOnlyOn: dependenciesOnlyOn
     )
   }
 
@@ -309,6 +324,9 @@ struct DashboardReviewsRouteView: View {
       } message: { confirmation in
         Text(confirmation.message)
       }
+      .onAppear {
+        applyLegacyFilterMigrationIfNeeded()
+      }
       .onChange(of: selectedIDs) { oldValue, newValue in
         persistedPrimarySelectionID = newValue.min() ?? persistedPrimarySelectionID
         let added = newValue.subtracting(oldValue)
@@ -358,5 +376,20 @@ struct DashboardReviewsRouteView: View {
     selectedIDs = [request.pullRequestID]
     persistedPrimarySelectionID = request.pullRequestID
     openAnythingReviews.finishSelection(requestID: request.requestID)
+  }
+
+  // Legacy filter values - `"blocked"` filter and `"dependencies"` category -
+  // migrate once per session to the new toggle-based flags.
+  private func applyLegacyFilterMigrationIfNeeded() {
+    guard !legacyFilterMigrationApplied else { return }
+    legacyFilterMigrationApplied = true
+    if filterModeRaw == "blocked" {
+      needsMeOn = true
+      filterModeRaw = DashboardReviewsFilterMode.all.rawValue
+    }
+    if categoryModeRaw == DashboardReviewsCategoryMode.dependencies.rawValue {
+      dependenciesOnlyOn = true
+      categoryModeRaw = DashboardReviewsCategoryMode.defaultMode.rawValue
+    }
   }
 }

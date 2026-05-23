@@ -5,7 +5,8 @@ struct DashboardReviewsControlStrip: View {
   @Binding var filterModeRaw: String
   @Binding var sortModeRaw: String
   @Binding var groupModeRaw: String
-  @Binding var categoryModeRaw: String
+  @Binding var needsMeOn: Bool
+  @Binding var dependenciesOnlyOn: Bool
   let needsMeCount: Int
   let syncHealth: DashboardReviewsSyncHealth
   let onRetryFailedRepositories: () -> Void
@@ -21,7 +22,6 @@ struct DashboardReviewsControlStrip: View {
         ) {
           needsMeChip
           filterPicker
-          categoryPicker
           sortPicker
           groupPicker
         }
@@ -34,12 +34,8 @@ struct DashboardReviewsControlStrip: View {
     .frame(maxWidth: .infinity, alignment: .leading)
   }
 
-  private var isNeedsMeActive: Bool {
-    filterModeRaw == DashboardReviewsFilterMode.blocked.rawValue
-  }
-
   private var needsMeChip: some View {
-    Toggle(isOn: needsMeBinding) {
+    Toggle(isOn: $needsMeOn) {
       if needsMeCount > 0 {
         Text("Needs Me (\(needsMeCount))")
       } else {
@@ -50,18 +46,6 @@ struct DashboardReviewsControlStrip: View {
     .controlSize(.regular)
     .accessibilityIdentifier(HarnessMonitorAccessibility.dashboardReviewsNeedsMeToggle)
     .accessibilityLabel("Filter to pull requests that need your attention")
-  }
-
-  private var needsMeBinding: Binding<Bool> {
-    Binding(
-      get: { isNeedsMeActive },
-      set: { newValue in
-        filterModeRaw =
-          newValue
-          ? DashboardReviewsFilterMode.blocked.rawValue
-          : DashboardReviewsFilterMode.all.rawValue
-      }
-    )
   }
 
   // Legacy identifier `HarnessMonitorAccessibility.dashboardReviewsSelectionStatus`
@@ -100,19 +84,14 @@ struct DashboardReviewsControlStrip: View {
     .accessibilityIdentifier(HarnessMonitorAccessibility.dashboardReviewsGroupPicker)
   }
 
-  private var categoryPicker: some View {
-    Picker("Category", selection: $categoryModeRaw) {
-      ForEach(DashboardReviewsCategoryMode.pickerCases) { mode in
-        Text(mode.title).tag(mode.rawValue)
-      }
-    }
-    .pickerStyle(.menu)
-    .controlSize(.regular)
-    .accessibilityIdentifier(HarnessMonitorAccessibility.dashboardReviewsCategoryToggle)
-  }
-
   private var actionsMenu: some View {
     Menu {
+      Toggle("Dependencies only", isOn: $dependenciesOnlyOn)
+        .accessibilityIdentifier(HarnessMonitorAccessibility.dashboardReviewsCategoryToggle)
+        .accessibilityLabel("Show only dependency bot pull requests")
+
+      Divider()
+
       if syncHealth.hasFailures {
         Button(action: onRetryFailedRepositories) {
           Label(
