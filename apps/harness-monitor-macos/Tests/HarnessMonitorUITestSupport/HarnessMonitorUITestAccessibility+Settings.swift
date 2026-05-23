@@ -49,7 +49,6 @@ extension HarnessMonitorUITestAccessibility {
   static let settingsReviewsRoot = "harness.settings.reviews"
   static let settingsReviewsReloadButton = "harness.settings.reviews.reload"
   static let settingsReviewsSaveButton = "harness.settings.reviews.save"
-  static let settingsReviewsAuthorsField = "harness.settings.reviews.authors"
   static let settingsReviewsRepositoriesSummary =
     "harness.settings.reviews.repositories.summary"
   static let settingsReviewsRepositoriesButton =

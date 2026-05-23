@@ -146,7 +146,6 @@ extension HarnessMonitorAccessibility {
   public static let settingsReviewsRoot = "harness.settings.reviews"
   public static let settingsReviewsReloadButton = "harness.settings.reviews.reload"
   public static let settingsReviewsSaveButton = "harness.settings.reviews.save"
-  public static let settingsReviewsAuthorsField = "harness.settings.reviews.authors"
   public static let settingsReviewsRepositoriesSummary =
     "harness.settings.reviews.repositories.summary"
   public static let settingsReviewsRepositoriesButton =

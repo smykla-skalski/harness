@@ -94,8 +94,6 @@ struct SettingsReviewsSection: View {
   private var sourceScopeSection: some View {
     Section {
       monitoredRepositoriesSummary
-      TextField("Authors", text: $draft.authorsText)
-        .accessibilityIdentifier(HarnessMonitorAccessibility.settingsReviewsAuthorsField)
       TextField("Excluded Repositories", text: $draft.excludeRepositoriesText)
         .accessibilityIdentifier(
           HarnessMonitorAccessibility.settingsReviewsExcludedReposField
@@ -110,8 +108,8 @@ struct SettingsReviewsSection: View {
     } footer: {
       Text(
         """
-        Configure shared monitored repositories in Settings > Repositories. Authors and \
-        excluded repositories remain Reviews-specific. When organization expansion is \
+        Configure shared monitored repositories in Settings > Repositories. \
+        Excluded repositories remain Reviews-specific. When organization expansion is \
         on, each org resolves to its repositories so per-repo syncs can stagger across the \
         schedule.
         """
