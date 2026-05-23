@@ -8,7 +8,9 @@ use crate::task_board::github::GitHubAutomationClient;
 use super::client::ReviewsGitHubClient;
 use super::errors::operation_error;
 use super::mapping::{action_result, github_project_config};
-use super::queries::{ADD_COMMENT_MUTATION, APPROVE_MUTATION, REREQUEST_CHECK_SUITE_MUTATION};
+use super::queries::{
+    ADD_COMMENT_MUTATION, APPROVE_MUTATION, REREQUEST_CHECK_SUITE_MUTATION, VIEWER_LOGIN_QUERY,
+};
 use super::{
     ReviewActionKind, ReviewActionOutcome, ReviewActionResult, ReviewTarget,
     ReviewsApproveRequest, ReviewsAutoRequest, ReviewsCommentRequest, ReviewsLabelRequest,
@@ -16,6 +18,30 @@ use super::{
 };
 
 impl ReviewsGitHubClient {
+    /// Resolve the authenticated GitHub viewer's login via the simplest
+    /// `viewer { login }` GraphQL query. Used to mark "(you)" on the
+    /// current viewer's reviewer pill and surface the "Commenting as
+    /// @viewer" caption in the composer. Returns `None` when GitHub
+    /// either rejects the call (revoked token) or returns an empty
+    /// login — both are non-fatal: the UI just doesn't surface the
+    /// affordances.
+    pub(crate) async fn fetch_viewer_login(&self) -> Option<String> {
+        let response: serde_json::Value = self
+            .client
+            .graphql(&json!({ "query": VIEWER_LOGIN_QUERY }))
+            .await
+            .ok()?;
+        let login = response
+            .pointer("/data/viewer/login")
+            .and_then(serde_json::Value::as_str)?
+            .trim();
+        if login.is_empty() {
+            None
+        } else {
+            Some(login.to_string())
+        }
+    }
+
     pub(crate) async fn approve(
         &self,
         request: &ReviewsApproveRequest,

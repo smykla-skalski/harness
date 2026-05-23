@@ -59,6 +59,13 @@ pub struct ReviewsQueryResponse {
     pub items: Vec<ReviewItem>,
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub repository_labels: BTreeMap<String, Vec<ReviewRepositoryLabel>>,
+    /// GitHub login of the authenticated viewer that fetched this set of
+    /// pull requests. Drives the Reviews detail pane's "(you)" reviewer
+    /// marker and the comment composer's "Commenting as @viewer" caption.
+    /// `None` when the daemon could not resolve the login (revoked token,
+    /// network error). The UI degrades gracefully.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub viewer_login: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]

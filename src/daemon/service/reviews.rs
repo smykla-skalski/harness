@@ -52,8 +52,16 @@ pub async fn query_reviews(
     let mut items_by_key = BTreeMap::new();
     let mut repository_labels: BTreeMap<String, Vec<ReviewRepositoryLabel>> =
         BTreeMap::new();
+    let mut viewer_login: Option<String> = None;
     for segment in segments {
         let client = ReviewsGitHubClient::new(&segment.token)?;
+        if viewer_login.is_none() {
+            // Resolve the viewer once across token segments. Same-token
+            // segments share a login; cross-token splits are rare and
+            // the first resolved login matches the token whose PRs
+            // dominate the response in practice.
+            viewer_login = client.fetch_viewer_login().await;
+        }
         let fetch = client.fetch_updates(&segment.request).await?;
         for item in fetch.items {
             items_by_key
@@ -80,6 +88,7 @@ pub async fn query_reviews(
     });
     let mut response = ReviewsQueryResponse::new(items, utc_now());
     response.set_repository_labels(repository_labels);
+    response.set_viewer_login(viewer_login);
     store_cached_query_response(cache_key, &response);
     Ok(response)
 }
