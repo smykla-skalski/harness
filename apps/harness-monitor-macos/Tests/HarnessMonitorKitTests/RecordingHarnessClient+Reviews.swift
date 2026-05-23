@@ -96,6 +96,16 @@ extension RecordingHarnessClient {
     }
   }
 
+  func configureReviewPreviewDelay(_ delay: Duration?) {
+    lock.withLock {
+      reviewPreviewDelay = delay
+    }
+  }
+
+  func recordedReviewPreviewRequests() -> [ReviewsFilesPreviewRequest] {
+    lock.withLock { reviewPreviewRequests }
+  }
+
   func reviewBodyUpdateCallCount() -> Int {
     lock.withLock { reviewBodyUpdateRequests.count }
   }
@@ -150,5 +160,36 @@ extension RecordingHarnessClient {
       return response
     }
     throw HarnessMonitorAPIError.server(code: 501, message: "Reviews unavailable")
+  }
+
+  func previewReviewFiles(
+    request: ReviewsFilesPreviewRequest
+  ) async throws -> ReviewsFilesPreviewResponse {
+    let delay = lock.withLock {
+      reviewPreviewRequests.append(request)
+      return reviewPreviewDelay
+    }
+    try await sleepIfNeeded(delay)
+    return ReviewsFilesPreviewResponse(
+      pullRequestID: request.pullRequestID,
+      previews: request.paths.map {
+        ReviewFilePreview(
+          path: $0,
+          patch: "@@ -1 +1 @@\n-\($0)\n+\($0)\n",
+          status: .modified,
+          additions: 1,
+          deletions: 1,
+          servedBy: .githubRest,
+          fetchedAt: "2026-05-23T12:00:00Z",
+          headRefOid: request.headRefOidExpected,
+          lineCount: 3,
+          lineLimit: request.lineLimit,
+          hasMore: false
+        )
+      },
+      drifted: false,
+      currentHeadRefOid: request.headRefOidExpected,
+      fetchedAt: "2026-05-23T12:00:00Z"
+    )
   }
 }

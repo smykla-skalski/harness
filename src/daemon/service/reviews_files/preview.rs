@@ -1,6 +1,7 @@
 //! Bounded patch previews for the inline-PR Files section.
 
 use crate::errors::{CliError, CliErrorKind};
+use crate::reviews::files::service::FilesLargeDiffStrategy;
 use crate::reviews::{
     ReviewsFilesPatchRequest, ReviewsFilesPreviewRequest, ReviewsFilesPreviewResponse,
     preview_from_patch,
@@ -50,7 +51,20 @@ fn patch_request_from_preview(request: &ReviewsFilesPreviewRequest) -> ReviewsFi
         base_ref_oid_expected: request.base_ref_oid_expected.clone(),
         head_ref_name: request.head_ref_name.clone(),
         base_ref_name: request.base_ref_name.clone(),
-        large_diff_strategy: request.large_diff_strategy,
+        large_diff_strategy: preview_patch_strategy(request),
+    }
+}
+
+fn preview_patch_strategy(request: &ReviewsFilesPreviewRequest) -> Option<FilesLargeDiffStrategy> {
+    if request.number.is_some()
+        && request
+            .repository_full_name
+            .as_deref()
+            .is_some_and(|name| !name.trim().is_empty())
+    {
+        Some(FilesLargeDiffStrategy::ForceGitHubRest)
+    } else {
+        request.large_diff_strategy
     }
 }
 
@@ -79,5 +93,32 @@ mod tests {
         assert_eq!(patch.number, Some(7));
         assert_eq!(patch.repository_full_name.as_deref(), Some("owner/repo"));
         assert_eq!(patch.base_ref_oid_expected.as_deref(), Some("base"));
+        assert_eq!(
+            patch.large_diff_strategy,
+            Some(FilesLargeDiffStrategy::ForceGitHubRest)
+        );
+    }
+
+    #[test]
+    fn patch_request_from_preview_preserves_strategy_without_rest_context() {
+        let request = ReviewsFilesPreviewRequest {
+            pull_request_id: "PR_1".into(),
+            head_ref_oid_expected: "head".into(),
+            paths: vec!["src/lib.rs".into()],
+            number: None,
+            repository_full_name: None,
+            base_ref_oid_expected: Some("base".into()),
+            head_ref_name: Some("feature".into()),
+            base_ref_name: Some("main".into()),
+            large_diff_strategy: Some(FilesLargeDiffStrategy::AutoLocalClone),
+            line_limit: 50,
+        };
+
+        let patch = patch_request_from_preview(&request);
+
+        assert_eq!(
+            patch.large_diff_strategy,
+            Some(FilesLargeDiffStrategy::AutoLocalClone)
+        );
     }
 }

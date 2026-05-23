@@ -313,6 +313,8 @@ final class RecordingHarnessClient: HarnessMonitorClientProtocol, @unchecked Sen
   var reviewCommentResponse: ReviewsActionResponse?
   var reviewCommentRequests: [ReviewsCommentRequest] = []
   var reviewCommentError: (any Error)?
+  var reviewPreviewRequests: [ReviewsFilesPreviewRequest] = []
+  var reviewPreviewDelay: Duration?
   var reviewTimelineResponses: [String: [ReviewsTimelineResponse]] = [:]
   var reviewTimelineFetchedRequests: [ReviewsTimelineRequest] = []
   var reviewTimelineFetchHook: (@Sendable (String) async -> Void)?

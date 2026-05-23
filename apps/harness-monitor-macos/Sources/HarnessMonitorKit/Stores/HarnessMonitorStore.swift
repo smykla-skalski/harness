@@ -46,7 +46,8 @@ public final class HarnessMonitorStore {
   @ObservationIgnored var dependencyFilesViewModels: [String: ReviewFilesViewModel] = [:]
   @ObservationIgnored var reviewFilesPendingFetches: Set<ReviewFilesFetchKey> = []
   @ObservationIgnored var reviewFilesPreviewPendingFetches: Set<ReviewFilesPreviewFetchKey> = []
-  @ObservationIgnored var reviewFilesPreviewWarmTasks: [String: Task<Void, Never>] = [:]
+  @ObservationIgnored var reviewFilesPreviewWarmState = ReviewFilesPreviewWarmState()
+  @ObservationIgnored let reviewFilePreviewStore: ReviewFilePreviewStore
   @ObservationIgnored var dependencyFilesViewedBatchTasks: [String: Task<Void, Never>] = [:]
   @ObservationIgnored var dependencyFilesViewedPending: [String: [String: ReviewFileViewedState]] =
     [:]
@@ -347,7 +348,10 @@ public final class HarnessMonitorStore {
     modelContainer: ModelContainer? = nil,
     persistenceError: String? = nil,
     cacheService: SessionCacheService? = nil,
-    taskBoardSettingsWorker: TaskBoardSettingsWorker
+    taskBoardSettingsWorker: TaskBoardSettingsWorker,
+    reviewFilePreviewStore: ReviewFilePreviewStore = ReviewFilePreviewStore(
+      directory: HarnessMonitorPaths.reviewFilePreviewCacheRoot()
+    )
   ) {
     self.connection = ConnectionSlice()
     self.sessionIndex = SessionIndexSlice()
@@ -363,6 +367,7 @@ public final class HarnessMonitorStore {
     self.fileViewer = fileViewer
     self.voiceCapture = voiceCapture
     self.taskBoardSettingsWorker = taskBoardSettingsWorker
+    self.reviewFilePreviewStore = reviewFilePreviewStore
     self.modelContext = modelContainer?.mainContext
     self.userDataService = modelContainer.map {
       UserDataPersistenceService(

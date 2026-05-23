@@ -20,6 +20,20 @@ public struct ReviewFilesPreviewFetchKey: Hashable, Sendable {
   }
 }
 
+struct ReviewFilesPreviewWarmState {
+  var tasks: [String: Task<Void, Never>] = [:]
+  var generations: [String: UInt64] = [:]
+}
+
+private struct ReviewFilesPreviewPrewarmPlan: Sendable {
+  let pullRequestID: String
+  let generation: UInt64
+  let visiblePaths: [String]
+  let backgroundPaths: [String]
+  let lineLimit: UInt32
+  let largeDiffStrategy: FilesLargeDiffStrategy?
+}
+
 extension HarnessMonitorStore {
   /// Start aggressive background warming for first-line patch previews.
   public func startPatchPreviewPrewarm(
@@ -28,16 +42,46 @@ extension HarnessMonitorStore {
     lineLimit: UInt32 = ReviewFilePreview.defaultLineLimit,
     largeDiffStrategy: FilesLargeDiffStrategy? = nil
   ) {
-    let uniquePaths = dedupePaths(paths)
-    guard !uniquePaths.isEmpty else { return }
-    reviewFilesPreviewWarmTasks[pullRequestID]?.cancel()
-    reviewFilesPreviewWarmTasks[pullRequestID] = Task { [weak self] in
-      await self?.runPatchPreviewPrewarm(
-        pullRequestID: pullRequestID,
-        paths: uniquePaths,
-        lineLimit: lineLimit,
-        largeDiffStrategy: largeDiffStrategy
-      )
+    startPatchPreviewPrewarm(
+      forPullRequest: pullRequestID,
+      visiblePaths: paths,
+      backgroundPaths: [],
+      lineLimit: lineLimit,
+      largeDiffStrategy: largeDiffStrategy
+    )
+  }
+
+  /// Start background warming with the currently rendered files first.
+  /// Reissuing this method cancels the previous warmer for the PR, so
+  /// filter/sort/visible-batch changes do not spend work on stale rows.
+  public func startPatchPreviewPrewarm(
+    forPullRequest pullRequestID: String,
+    visiblePaths: [String],
+    backgroundPaths: [String],
+    lineLimit: UInt32 = ReviewFilePreview.defaultLineLimit,
+    largeDiffStrategy: FilesLargeDiffStrategy? = nil
+  ) {
+    let visible = dedupePaths(visiblePaths)
+    let visibleSet = Set(visible)
+    let background = dedupePaths(backgroundPaths).filter { !visibleSet.contains($0) }
+    reviewFilesPreviewWarmState.tasks[pullRequestID]?.cancel()
+    guard !visible.isEmpty || !background.isEmpty else {
+      reviewFilesPreviewWarmState.tasks.removeValue(forKey: pullRequestID)
+      reviewFilesPreviewWarmState.generations.removeValue(forKey: pullRequestID)
+      return
+    }
+    let generation = (reviewFilesPreviewWarmState.generations[pullRequestID] ?? 0) + 1
+    reviewFilesPreviewWarmState.generations[pullRequestID] = generation
+    let plan = ReviewFilesPreviewPrewarmPlan(
+      pullRequestID: pullRequestID,
+      generation: generation,
+      visiblePaths: visible,
+      backgroundPaths: background,
+      lineLimit: lineLimit,
+      largeDiffStrategy: largeDiffStrategy
+    )
+    reviewFilesPreviewWarmState.tasks[pullRequestID] = Task { [weak self] in
+      await self?.runPatchPreviewPrewarm(plan)
     }
   }
 
@@ -51,8 +95,18 @@ extension HarnessMonitorStore {
     largeDiffStrategy: FilesLargeDiffStrategy? = nil
   ) async {
     let viewModel = self.viewModel(forPullRequest: pullRequestID)
-    let pendingPaths = pendingPreviewPaths(
+    let candidatePaths = candidatePreviewPaths(
       paths: paths,
+      viewModel: viewModel
+    )
+    let cacheMissPaths = await applyCachedPreviews(
+      candidatePaths,
+      viewModel: viewModel,
+      lineLimit: lineLimit
+    )
+    guard !Task.isCancelled else { return }
+    let pendingPaths = pendingPreviewPaths(
+      paths: cacheMissPaths,
       viewModel: viewModel,
       lineLimit: lineLimit
     )
@@ -91,26 +145,48 @@ extension HarnessMonitorStore {
         await refreshReviewFiles(pullRequestID: pullRequestID)
         return
       }
+      await persistPreviewResponse(response, viewModel: viewModel)
       ingestPreviewResponse(response, pendingPaths: pendingPaths, viewModel: viewModel)
     } catch {
       failPreviewPaths(pendingPaths, viewModel: viewModel, message: error.localizedDescription)
     }
   }
 
-  private func runPatchPreviewPrewarm(
+  private func runPatchPreviewPrewarm(_ plan: ReviewFilesPreviewPrewarmPlan) async {
+    let pathCount = plan.visiblePaths.count + plan.backgroundPaths.count
+    let interval = ReviewFilesPerf.beginPreviewPrewarm(
+      pullRequestID: plan.pullRequestID,
+      pathCount: pathCount,
+      visiblePathCount: plan.visiblePaths.count
+    )
+    defer {
+      ReviewFilesPerf.end(interval)
+      if reviewFilesPreviewWarmState.generations[plan.pullRequestID] == plan.generation {
+        reviewFilesPreviewWarmState.tasks.removeValue(forKey: plan.pullRequestID)
+        reviewFilesPreviewWarmState.generations.removeValue(forKey: plan.pullRequestID)
+      }
+    }
+    await warmPreviewBatches(
+      pullRequestID: plan.pullRequestID,
+      paths: plan.visiblePaths,
+      lineLimit: plan.lineLimit,
+      largeDiffStrategy: plan.largeDiffStrategy
+    )
+    guard !Task.isCancelled else { return }
+    await warmPreviewBatches(
+      pullRequestID: plan.pullRequestID,
+      paths: plan.backgroundPaths,
+      lineLimit: plan.lineLimit,
+      largeDiffStrategy: plan.largeDiffStrategy
+    )
+  }
+
+  private func warmPreviewBatches(
     pullRequestID: String,
     paths: [String],
     lineLimit: UInt32,
     largeDiffStrategy: FilesLargeDiffStrategy?
   ) async {
-    let interval = ReviewFilesPerf.beginPreviewPrewarm(
-      pullRequestID: pullRequestID,
-      pathCount: paths.count
-    )
-    defer {
-      ReviewFilesPerf.end(interval)
-      reviewFilesPreviewWarmTasks.removeValue(forKey: pullRequestID)
-    }
     for batch in paths.chunked(into: 24) {
       guard !Task.isCancelled else { return }
       await preparePatchPreviews(
@@ -122,12 +198,50 @@ extension HarnessMonitorStore {
     }
   }
 
+  private func candidatePreviewPaths(
+    paths: [String],
+    viewModel: ReviewFilesViewModel
+  ) -> [String] {
+    dedupePaths(paths).filter { path in
+      !isPatchLoaded(path: path, viewModel: viewModel)
+        && !isPreviewLoadedOrLoading(path: path, viewModel: viewModel)
+    }
+  }
+
+  private func applyCachedPreviews(
+    _ paths: [String],
+    viewModel: ReviewFilesViewModel,
+    lineLimit: UInt32
+  ) async -> [String] {
+    guard !paths.isEmpty else { return [] }
+    let interval = ReviewFilesPerf.beginPreviewCacheRead(
+      pullRequestID: viewModel.pullRequestID,
+      pathCount: paths.count
+    )
+    defer { ReviewFilesPerf.end(interval) }
+
+    var misses: [String] = []
+    for path in paths {
+      if let preview = await reviewFilePreviewStore.read(
+        pullRequestID: viewModel.pullRequestID,
+        headRefOid: viewModel.headRefOid,
+        path: path,
+        lineLimit: lineLimit
+      ) {
+        viewModel.setPreviewState(path: path, state: .loaded(preview))
+      } else {
+        misses.append(path)
+      }
+    }
+    return misses
+  }
+
   private func pendingPreviewPaths(
     paths: [String],
     viewModel: ReviewFilesViewModel,
     lineLimit: UInt32
   ) -> [String] {
-    dedupePaths(paths).filter { path in
+    candidatePreviewPaths(paths: paths, viewModel: viewModel).filter { path in
       if isPatchLoaded(path: path, viewModel: viewModel) { return false }
       if isPreviewLoadedOrLoading(path: path, viewModel: viewModel) { return false }
       let key = ReviewFilesPreviewFetchKey(
@@ -170,6 +284,25 @@ extension HarnessMonitorStore {
       )
     }
     viewModel.ingest(previews: response.previews)
+  }
+
+  private func persistPreviewResponse(
+    _ response: ReviewsFilesPreviewResponse,
+    viewModel: ReviewFilesViewModel
+  ) async {
+    guard !response.previews.isEmpty else { return }
+    let interval = ReviewFilesPerf.beginPreviewCacheStore(
+      pullRequestID: viewModel.pullRequestID,
+      pathCount: response.previews.count
+    )
+    defer { ReviewFilesPerf.end(interval) }
+    for preview in response.previews {
+      await reviewFilePreviewStore.store(
+        pullRequestID: viewModel.pullRequestID,
+        headRefOid: viewModel.headRefOid,
+        preview: preview
+      )
+    }
   }
 
   private func failPreviewPaths(

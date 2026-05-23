@@ -340,6 +340,13 @@ public enum HarnessMonitorPaths {
       .appendingPathComponent("notifications", isDirectory: true)
   }
 
+  public static func reviewFilePreviewCacheRoot(
+    using environment: HarnessMonitorEnvironment = .current
+  ) -> URL {
+    Self.generatedCacheRoot(using: environment)
+      .appendingPathComponent("review-file-previews", isDirectory: true)
+  }
+
   public static func migrateLegacyGeneratedCaches(
     using environment: HarnessMonitorEnvironment = .current,
     fileManager: FileManager = .default
