@@ -51,6 +51,34 @@ struct DashboardReviewsPresentationInput: Equatable, Sendable {
   let configuredAuthors: [String]
   let selectedIDs: Set<String>
   let persistedPrimarySelectionID: String
+  let needsMeOn: Bool
+  let dependenciesOnlyOn: Bool
+
+  init(
+    items: [ReviewItem],
+    filterModeRaw: String,
+    sortModeRaw: String,
+    categoryModeRaw: String,
+    searchText: String,
+    configuredRepositories: [String],
+    configuredOrganizations: [String],
+    selectedIDs: Set<String>,
+    persistedPrimarySelectionID: String,
+    needsMeOn: Bool = false,
+    dependenciesOnlyOn: Bool = false
+  ) {
+    self.items = items
+    self.filterModeRaw = filterModeRaw
+    self.sortModeRaw = sortModeRaw
+    self.categoryModeRaw = categoryModeRaw
+    self.searchText = searchText
+    self.configuredRepositories = configuredRepositories
+    self.configuredOrganizations = configuredOrganizations
+    self.selectedIDs = selectedIDs
+    self.persistedPrimarySelectionID = persistedPrimarySelectionID
+    self.needsMeOn = needsMeOn
+    self.dependenciesOnlyOn = dependenciesOnlyOn
+  }
 }
 
 private struct DashboardReviewsListPresentationInput: Equatable, Sendable {
@@ -63,6 +91,8 @@ private struct DashboardReviewsListPresentationInput: Equatable, Sendable {
   let configuredRepositories: [String]
   let configuredOrganizations: [String]
   let configuredAuthors: [String]
+  let needsMeOn: Bool
+  let dependenciesOnlyOn: Bool
 
   init(_ input: DashboardReviewsPresentationInput) {
     items = input.items
@@ -74,6 +104,8 @@ private struct DashboardReviewsListPresentationInput: Equatable, Sendable {
     configuredRepositories = input.configuredRepositories
     configuredOrganizations = input.configuredOrganizations
     configuredAuthors = input.configuredAuthors
+    needsMeOn = input.needsMeOn
+    dependenciesOnlyOn = input.dependenciesOnlyOn
   }
 }
 
@@ -177,10 +209,20 @@ actor DashboardReviewsPresentationWorker {
     let categoryMode = DashboardReviewsCategoryMode(rawValue: input.categoryModeRaw) ?? .all
     let comparator = sortMode.comparator
     let query = input.searchText.trimmingCharacters(in: .whitespacesAndNewlines)
+    let needsMeOn = input.needsMeOn
+    let dependenciesOnlyOn = input.dependenciesOnlyOn
 
     let filteredItems = input.items
       .filter { categoryMode.matches($0) }
       .filter { filterMode.matches($0) }
+      .filter { item in
+        guard needsMeOn else { return true }
+        return item.requiresAttention
+      }
+      .filter { item in
+        guard dependenciesOnlyOn else { return true }
+        return DashboardReviewsCategoryMode.dependencies.matches(item)
+      }
       .filter { item in
         guard !query.isEmpty else { return true }
         let haystacks = [
