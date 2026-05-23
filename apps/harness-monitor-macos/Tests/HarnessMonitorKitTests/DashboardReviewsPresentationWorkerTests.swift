@@ -34,10 +34,12 @@ struct DashboardReviewsPresentationWorkerTests {
         items: [humanPR, renovatePR, dependabotPR],
         filterModeRaw: DashboardReviewsFilterMode.all.rawValue,
         sortModeRaw: DashboardReviewsSortMode.repository.rawValue,
+        groupModeRaw: DashboardReviewsGroupMode.repository.rawValue,
         categoryModeRaw: DashboardReviewsCategoryMode.dependencies.rawValue,
         searchText: "",
         configuredRepositories: ["kong/a", "kong/b"],
         configuredOrganizations: [],
+        configuredAuthors: [],
         selectedIDs: [],
         persistedPrimarySelectionID: ""
       )
@@ -86,10 +88,12 @@ struct DashboardReviewsPresentationWorkerTests {
         items: [third, second, first],
         filterModeRaw: DashboardReviewsFilterMode.review.rawValue,
         sortModeRaw: DashboardReviewsSortMode.repository.rawValue,
+        groupModeRaw: DashboardReviewsGroupMode.repository.rawValue,
         categoryModeRaw: DashboardReviewsCategoryMode.all.rawValue,
         searchText: "security",
         configuredRepositories: ["kong/b", "kong/a"],
         configuredOrganizations: ["kumahq"],
+        configuredAuthors: [],
         selectedIDs: [second.pullRequestID],
         persistedPrimarySelectionID: ""
       )
@@ -113,10 +117,12 @@ struct DashboardReviewsPresentationWorkerTests {
         items: [first, second, third],
         filterModeRaw: DashboardReviewsFilterMode.all.rawValue,
         sortModeRaw: DashboardReviewsSortMode.repository.rawValue,
+        groupModeRaw: DashboardReviewsGroupMode.repository.rawValue,
         categoryModeRaw: DashboardReviewsCategoryMode.all.rawValue,
         searchText: "",
         configuredRepositories: ["kong/b", "kong/a"],
         configuredOrganizations: ["kumahq"],
+        configuredAuthors: [],
         selectedIDs: [],
         persistedPrimarySelectionID: third.pullRequestID
       )
@@ -140,10 +146,12 @@ struct DashboardReviewsPresentationWorkerTests {
         items: [item],
         filterModeRaw: DashboardReviewsFilterMode.all.rawValue,
         sortModeRaw: DashboardReviewsSortMode.repository.rawValue,
+        groupModeRaw: DashboardReviewsGroupMode.repository.rawValue,
         categoryModeRaw: DashboardReviewsCategoryMode.all.rawValue,
         searchText: "",
         configuredRepositories: [],
         configuredOrganizations: [],
+        configuredAuthors: [],
         selectedIDs: [],
         persistedPrimarySelectionID: ""
       )
@@ -172,10 +180,12 @@ struct DashboardReviewsPresentationWorkerTests {
         items: [first, second],
         filterModeRaw: DashboardReviewsFilterMode.all.rawValue,
         sortModeRaw: DashboardReviewsSortMode.repository.rawValue,
+        groupModeRaw: DashboardReviewsGroupMode.repository.rawValue,
         categoryModeRaw: DashboardReviewsCategoryMode.all.rawValue,
         searchText: "",
         configuredRepositories: [],
         configuredOrganizations: [],
+        configuredAuthors: [],
         selectedIDs: [],
         persistedPrimarySelectionID: ""
       )
