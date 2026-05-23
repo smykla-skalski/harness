@@ -134,17 +134,66 @@ private struct DashboardReviewDetailHeader<Actions: View>: View {
   let item: ReviewItem
   @ViewBuilder let actionBar: () -> Actions
 
+  @Environment(\.openURL)
+  private var openURL
+
+  private var pullRequestURL: URL? {
+    URL(string: item.url)
+  }
+
+  private var authorProfileURL: URL? {
+    URL(string: "https://github.com/\(item.authorLogin)")
+  }
+
   var body: some View {
     VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingMD) {
       VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingXS) {
-        Text(item.title)
-          .scaledFont(.system(.title2, design: .rounded, weight: .semibold))
-          .foregroundStyle(HarnessMonitorTheme.ink)
-          .lineLimit(3)
-          .fixedSize(horizontal: false, vertical: true)
-        Text("\(item.repository)#\(item.number) · @\(item.authorLogin)")
-          .scaledFont(.callout.weight(.semibold))
-          .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+        Button {
+          if let pullRequestURL {
+            openURL(pullRequestURL)
+          }
+        } label: {
+          Text(item.title)
+            .scaledFont(.system(.title2, design: .rounded, weight: .semibold))
+            .foregroundStyle(HarnessMonitorTheme.ink)
+            .lineLimit(2)
+            .truncationMode(.tail)
+            .fixedSize(horizontal: false, vertical: true)
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .buttonStyle(.plain)
+        .disabled(pullRequestURL == nil)
+        .help("Open pull request on GitHub")
+        .accessibilityHint("Opens the pull request on GitHub")
+
+        HStack(spacing: 0) {
+          Text("\(item.repository)")
+          Button {
+            if let pullRequestURL {
+              openURL(pullRequestURL)
+            }
+          } label: {
+            Text("#\(item.number)")
+          }
+          .buttonStyle(.plain)
+          .disabled(pullRequestURL == nil)
+          .help("Open pull request on GitHub")
+          .accessibilityHint("Opens the pull request on GitHub")
+          Text(" · @")
+          Button {
+            if let authorProfileURL {
+              openURL(authorProfileURL)
+            }
+          } label: {
+            Text(item.authorLogin)
+          }
+          .buttonStyle(.plain)
+          .disabled(authorProfileURL == nil)
+          .help("Open author profile on GitHub")
+          .accessibilityHint("Opens the author profile on GitHub")
+        }
+        .scaledFont(.callout.weight(.semibold))
+        .foregroundStyle(HarnessMonitorTheme.secondaryInk)
       }
 
       actionBar()
