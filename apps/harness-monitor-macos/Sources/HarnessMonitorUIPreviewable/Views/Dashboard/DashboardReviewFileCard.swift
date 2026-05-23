@@ -165,13 +165,13 @@ struct DashboardReviewFileCardInternal: View {
         Button(
           action: { onChangeViewMode(.unified) },
           label: {
-            Label("Unified", systemImage: viewMode == .unified ? "checkmark" : "")
+            viewModeMenuLabel(for: .unified)
           }
         )
         Button(
           action: { onChangeViewMode(.split) },
           label: {
-            Label("Split", systemImage: viewMode == .split ? "checkmark" : "")
+            viewModeMenuLabel(for: .split)
           }
         )
       } label: {
@@ -214,6 +214,16 @@ struct DashboardReviewFileCardInternal: View {
       }
     }
     .frame(minWidth: 58, alignment: .trailing)
+  }
+
+  private func viewModeMenuLabel(for mode: FilesViewMode) -> some View {
+    HStack(spacing: HarnessMonitorTheme.spacingSM) {
+      Text(mode.label)
+      Spacer(minLength: HarnessMonitorTheme.spacingSM)
+      Image(systemName: "checkmark")
+        .opacity(viewMode == mode ? 1 : 0)
+        .accessibilityHidden(viewMode != mode)
+    }
   }
 
   @ViewBuilder private var patchBody: some View {
