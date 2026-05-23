@@ -73,8 +73,30 @@ extension HarnessMonitorApp {
         .harnessTrackMCPWindow()
         .environment(appStore)
         .environment(\.openAnythingDashboardReviewRegistry, appOpenAnythingReviews)
+        .onOpenURL { url in
+          handleHarnessDeepLink(url)
+        }
     } else {
       Color.clear.accessibilityHidden(true)
+    }
+  }
+
+  /// Bridges incoming `harness://` URLs into the running app's selection
+  /// surfaces. Pull-request links route through the existing Open Anything
+  /// review registry so the dashboard's selection plumbing is reused; review
+  /// and task-board routes are reserved for follow-up units that wire route
+  /// switching and per-route scene storage.
+  func handleHarnessDeepLink(_ url: URL) {
+    guard let route = HarnessMonitorDeepLinkRouter.parse(url: url) else { return }
+    switch route {
+    case .pullRequest(let id):
+      appOpenAnythingReviews.requestSelection(pullRequestID: id)
+    case .reviews, .taskBoard:
+      // TODO(intents-foundation): wire route switching once the deep-link
+      // router can drive `selectedRoute` + `needsMeOn` SceneStorage. The URL
+      // scheme is registered and parsed; only the dispatch into route state
+      // is deferred to Unit 2.
+      break
     }
   }
 
