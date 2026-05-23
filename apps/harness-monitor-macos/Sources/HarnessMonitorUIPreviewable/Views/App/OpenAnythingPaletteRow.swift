@@ -63,6 +63,12 @@ struct OpenAnythingPaletteRow: View {
       Button(isPinned ? "Unpin" : "Pin to top", action: onTogglePin)
       Button("Copy ID", action: onCopyID)
     }
+    // Audit #93: rows are draggable as their visible title so users can drag
+    // a session or review name into another app (text editor, Slack
+    // composer, etc.). The dragged payload is the title string - drop
+    // targets that take text see a useful identifier without needing a
+    // structured URL scheme.
+    .draggable(hit.record.title)
   }
 
   private var icon: some View {

@@ -10,9 +10,15 @@ public enum OpenAnythingPreferencesDefaults {
   public static let showRecentKey = "harness.openAnything.showRecent"
   public static let cmdClickBackgroundKey = "harness.openAnything.cmdClickBackground"
   public static let restoreLastQueryKey = "harness.openAnything.restoreLastQuery"
+  public static let perDomainLimitKey = "harness.openAnything.perDomainLimit"
+  public static let scopeToWindowKey = "harness.openAnything.scopeToWindow"
 
   public static let showPinnedDefault = true
   public static let showRecentDefault = true
   public static let cmdClickBackgroundDefault = true
   public static let restoreLastQueryDefault = false
+  public static let perDomainLimitDefault = 6
+  public static let perDomainLimitMin = 3
+  public static let perDomainLimitMax = 12
+  public static let scopeToWindowDefault = false
 }

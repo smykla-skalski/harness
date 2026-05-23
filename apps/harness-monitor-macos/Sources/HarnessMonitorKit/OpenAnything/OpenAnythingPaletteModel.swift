@@ -32,6 +32,15 @@ public final class OpenAnythingPaletteModel {
   /// `replaceCorpus` accepts a new corpus. Lets read-only callers (Commands,
   /// debug badges) observe corpus size without dropping into the actor.
   public private(set) var recordCount: Int = 0
+  /// Last user-submitted query so present(restoreLastQuery: true) can offer
+  /// it back to the user. Set when the user executes a hit; cleared on
+  /// explicit clear via the field's xmark button.
+  public private(set) var lastSubmittedQuery: String = ""
+  /// Audit #89: per-section cap surfaced through Settings so a user with a
+  /// large corpus can choose to see more matches per domain at the cost of
+  /// scroll length. Defaults match the index's own defaults so unchanged
+  /// callers behave identically.
+  public var limitPerDomain: Int = OpenAnythingPreferencesDefaults.perDomainLimitDefault
 
   @ObservationIgnored private let index: OpenAnythingIndex
   @ObservationIgnored public let recency: OpenAnythingRecencyStore
@@ -63,7 +72,11 @@ public final class OpenAnythingPaletteModel {
       : results
   }
 
-  public func present(targetWindowID: String?, scope: OpenAnythingDomain? = nil) {
+  public func present(
+    targetWindowID: String?,
+    scope: OpenAnythingDomain? = nil,
+    restoreLastQuery: Bool = false
+  ) {
     let signpost = OpenAnythingSignposter.shared.beginInterval(
       OpenAnythingSignposter.Interval.present
     )
@@ -74,7 +87,11 @@ public final class OpenAnythingPaletteModel {
     self.targetWindowID = targetWindowID
     let scopeChanged = self.scope != scope
     self.scope = scope
-    query = ""
+    // Audit #95: when the Settings toggle is on, the model offers up the
+    // last query the user submitted so reopening the palette resumes where
+    // they were. The default is off so opening the palette stays a clean
+    // surface for most users.
+    query = restoreLastQuery ? lastSubmittedQuery : ""
     results = .empty
     selectedHitID = nil
     isPresented = true
@@ -118,7 +135,10 @@ public final class OpenAnythingPaletteModel {
     )
     await index.replace(records: records)
     suggestedResults = applyRanking(
-      to: Self.filtered(await index.suggestedResults(), by: scope),
+      to: Self.filtered(
+        await index.suggestedResults(limitPerDomain: limitPerDomain),
+        by: scope
+      ),
       records: records
     )
     recordCount = records.count
@@ -144,7 +164,7 @@ public final class OpenAnythingPaletteModel {
     let signpost = OpenAnythingSignposter.shared.beginInterval(
       OpenAnythingSignposter.Interval.search
     )
-    let snapshot = await index.search(query: trimmed)
+    let snapshot = await index.search(query: trimmed, limitPerDomain: limitPerDomain)
     OpenAnythingSignposter.shared.endInterval(
       OpenAnythingSignposter.Interval.search,
       signpost
@@ -196,6 +216,10 @@ public final class OpenAnythingPaletteModel {
   /// when the user picks a hit.
   public func recordExecution(of recordID: String) {
     recency.record(recordID)
+    let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
+    if !trimmed.isEmpty {
+      lastSubmittedQuery = trimmed
+    }
     lastDismissReason = .hitExecuted(recordID: recordID)
   }
 
@@ -212,7 +236,10 @@ public final class OpenAnythingPaletteModel {
   }
 
   private func refreshSuggestedResults() async {
-    let raw = Self.filtered(await index.suggestedResults(), by: scope)
+    let raw = Self.filtered(
+      await index.suggestedResults(limitPerDomain: limitPerDomain),
+      by: scope
+    )
     suggestedResults = applyRanking(to: raw, records: nil)
     normalizeSelection()
   }

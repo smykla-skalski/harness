@@ -21,6 +21,10 @@ struct SettingsOpenAnythingSection: View {
   @AppStorage(OpenAnythingPreferencesDefaults.restoreLastQueryKey)
   private var restoreLastQuery =
     OpenAnythingPreferencesDefaults.restoreLastQueryDefault
+  @AppStorage(OpenAnythingPreferencesDefaults.perDomainLimitKey)
+  private var perDomainLimit = OpenAnythingPreferencesDefaults.perDomainLimitDefault
+  @AppStorage(OpenAnythingPreferencesDefaults.scopeToWindowKey)
+  private var scopeToWindow = OpenAnythingPreferencesDefaults.scopeToWindowDefault
 
   var body: some View {
     Section {
@@ -52,13 +56,33 @@ struct SettingsOpenAnythingSection: View {
         .accessibilityHint(
           "When enabled, reopening the palette restores the previous search query."
         )
+      Toggle("Scope to current window", isOn: $scopeToWindow)
+        .accessibilityHint(
+          "When enabled, the palette scopes results to the kind of window you opened it from."
+        )
+      Stepper(value: $perDomainLimit, in: perDomainLimitRange) {
+        Text("Results per section: \(perDomainLimit)")
+      }
+      .accessibilityHint(
+        "Caps how many hits each section in the palette shows before scrolling."
+      )
     } header: {
       Text("Open Anything")
     } footer: {
-      Text(
-        "Open Anything is the command palette opened with ⌘K. "
-          + "The global hotkey activates it from anywhere on the system."
-      )
+      footerText
     }
+  }
+
+  private var perDomainLimitRange: ClosedRange<Int> {
+    OpenAnythingPreferencesDefaults.perDomainLimitMin
+      ... OpenAnythingPreferencesDefaults.perDomainLimitMax
+  }
+
+  @ViewBuilder
+  private var footerText: some View {
+    Text(
+      "Open Anything is the command palette opened with ⌘K. "
+        + "The global hotkey activates it from anywhere on the system."
+    )
   }
 }
