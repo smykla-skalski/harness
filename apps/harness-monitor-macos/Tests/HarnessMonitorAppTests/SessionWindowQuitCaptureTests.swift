@@ -71,6 +71,30 @@
       )
     }
 
+    func testWillCloseNotificationExcludesSessionWindowFromQuitCaptureImmediately() throws {
+      let sessionA = makeWindow(origin: .zero)
+      let sessionB = makeWindow(origin: .init(x: 24, y: 24))
+      let bindingA = try mountSessionBinding(sessionA, sessionID: "sess-a")
+      let bindingB = try mountSessionBinding(sessionB, sessionID: "sess-b")
+      defer { cleanUp(windows: [sessionA, sessionB], views: [bindingA, bindingB]) }
+
+      showAndDrain([sessionA, sessionB])
+      XCTAssertEqual(
+        Set(SessionWindowAppKitRegistry.shared.currentBindings().map(\.sessionID)),
+        Set(["sess-a", "sess-b"])
+      )
+
+      NotificationCenter.default.post(
+        name: NSWindow.willCloseNotification,
+        object: sessionB
+      )
+
+      let snapshot = SessionWindowQuitCapture.captureSnapshot()
+
+      XCTAssertEqual(snapshot.sessionIDs, ["sess-a"])
+      XCTAssertTrue(snapshot.groupings.isEmpty)
+    }
+
     func testLiveDashboardTabStateIncludesSingleTabbedSessionAtQuit() throws {
       let tracker = DashboardWindowLifecycleTracker(userDefaults: userDefaults)
       let dashboardWindow = makeWindow(origin: .zero)

@@ -41,6 +41,7 @@ private struct SessionWindowAppKitBindingAccessor: NSViewRepresentable {
 
 final class SessionWindowAppKitBindingNSView: NSView {
   fileprivate var sessionID: String
+  private weak var observedWindow: NSWindow?
 
   init(sessionID: String) {
     self.sessionID = sessionID
@@ -50,20 +51,62 @@ final class SessionWindowAppKitBindingNSView: NSView {
   @available(*, unavailable)
   required init?(coder: NSCoder) { fatalError() }
 
+  deinit {
+    NotificationCenter.default.removeObserver(self)
+  }
+
   override func viewDidMoveToWindow() {
     super.viewDidMoveToWindow()
     refreshBinding()
   }
 
   override func viewWillMove(toWindow newWindow: NSWindow?) {
+    let currentWindow = window
     super.viewWillMove(toWindow: newWindow)
-    if let currentWindow = window {
+    if let currentWindow {
+      stopObserving(window: currentWindow)
       SessionWindowAppKitRegistry.shared.unbind(window: currentWindow)
     }
   }
 
   fileprivate func refreshBinding() {
     guard let window else { return }
+    beginObserving(window: window)
     SessionWindowAppKitRegistry.shared.bind(window: window, sessionID: sessionID)
+  }
+
+  private func beginObserving(window: NSWindow) {
+    guard observedWindow !== window else {
+      return
+    }
+    if let observedWindow {
+      stopObserving(window: observedWindow)
+    }
+    observedWindow = window
+    NotificationCenter.default.addObserver(
+      self,
+      selector: #selector(boundWindowWillClose(_:)),
+      name: NSWindow.willCloseNotification,
+      object: window
+    )
+  }
+
+  private func stopObserving(window: NSWindow) {
+    NotificationCenter.default.removeObserver(
+      self,
+      name: NSWindow.willCloseNotification,
+      object: window
+    )
+    if observedWindow === window {
+      observedWindow = nil
+    }
+  }
+
+  @objc private func boundWindowWillClose(_ notification: Notification) {
+    guard let closingWindow = notification.object as? NSWindow else {
+      return
+    }
+    stopObserving(window: closingWindow)
+    SessionWindowAppKitRegistry.shared.unbind(window: closingWindow)
   }
 }

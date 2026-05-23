@@ -10,7 +10,9 @@ import HarnessMonitorUIPreviewable
 @MainActor
 enum SessionWindowQuitCapture {
   static func captureSnapshot() -> HarnessMonitorStore.SessionWindowQuitSnapshot {
-    let bindings = SessionWindowAppKitRegistry.shared.currentBindings()
+    let bindings = liveBindingsPresentInApplicationWindows(
+      SessionWindowAppKitRegistry.shared.currentBindings()
+    )
     guard !bindings.isEmpty else {
       return HarnessMonitorStore.SessionWindowQuitSnapshot()
     }
@@ -72,5 +74,14 @@ enum SessionWindowQuitCapture {
       )
     }
     return snapshots
+  }
+
+  private static func liveBindingsPresentInApplicationWindows(
+    _ bindings: [(window: NSWindow, sessionID: String)]
+  ) -> [(window: NSWindow, sessionID: String)] {
+    let openWindowIDs = Set(NSApplication.shared.windows.map(ObjectIdentifier.init))
+    return bindings.filter { binding in
+      openWindowIDs.contains(ObjectIdentifier(binding.window))
+    }
   }
 }
