@@ -277,12 +277,27 @@ mod tests {
     };
     use std::sync::Arc;
 
+    // Write a fixed user identity into the repo's local config so commits don't
+    // fall back to ~/.gitconfig when a parallel test redirects HOME via
+    // temp_env::with_var.
+    fn set_test_user(repo_path: &std::path::Path) {
+        use std::io::Write;
+        let mut f = std::fs::OpenOptions::new()
+            .append(true)
+            .open(repo_path.join("config"))
+            .expect("open repo config");
+        writeln!(f, "[user]\n\tname = Test\n\temail = test@example.com")
+            .expect("write user config");
+    }
+
     /// Build a bare source repo with two commits: c0 establishes the
     /// initial state, c1 modifies one file, adds another, and deletes a
     /// third. Returns (c0, c1) so the tests can drive the diff between
     /// them.
     fn make_two_commit_source(path: &std::path::Path) -> (gix::ObjectId, gix::ObjectId) {
-        let repo = gix::init_bare(path).expect("init bare");
+        gix::init_bare(path).expect("init bare");
+        set_test_user(path);
+        let repo = gix::open(path).expect("reopen bare");
 
         // c0: alpha.txt + delete-me.txt
         let alpha_v0 = repo
@@ -425,7 +440,9 @@ mod tests {
     async fn compute_patches_marks_binary_with_empty_patch() {
         let dir = tempfile::tempdir().expect("tempdir");
         let source = dir.path().join("source.git");
-        let repo = gix::init_bare(&source).expect("init");
+        gix::init_bare(&source).expect("init");
+        set_test_user(&source);
+        let repo = gix::open(&source).expect("reopen");
         let mut bin = Vec::from(b"PNG-like\0\x01\x02\x03" as &[u8]);
         bin.extend_from_slice(&[0u8; 32]);
         let bin_oid = repo.write_blob(bin.as_slice()).expect("bin").detach();
