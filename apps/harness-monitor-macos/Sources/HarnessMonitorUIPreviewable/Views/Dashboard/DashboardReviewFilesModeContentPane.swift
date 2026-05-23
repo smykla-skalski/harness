@@ -156,30 +156,29 @@ struct DashboardReviewFilesModeContentPane: View {
     files: [ReviewFile],
     threadIndex: DashboardReviewFileThreadIndex
   ) -> some View {
-    List(selection: selectedPathBinding) {
-      ForEach(grouped(files: files), id: \.folder) { group in
-        Section(group.folder) {
-          ForEach(group.files) { file in
-            DashboardReviewFilesNavigatorRow(
-              file: file,
-              viewedState: viewModel.viewedByPath[file.path] ?? file.viewerViewedState,
-              threads: threadIndex.anchors(forPath: file.path)
-            )
-            .tag(file.path)
-            .listRowInsets(EdgeInsets(top: 4, leading: 0, bottom: 4, trailing: 0))
+    ScrollView {
+      LazyVStack(alignment: .leading, spacing: 12) {
+        ForEach(grouped(files: files), id: \.folder) { group in
+          VStack(alignment: .leading, spacing: 4) {
+            Text(group.folder)
+              .font(.caption.weight(.semibold))
+              .foregroundStyle(.secondary)
+              .lineLimit(1)
+            ForEach(group.files) { file in
+              DashboardReviewFilesNavigatorRow(
+                file: file,
+                viewedState: viewModel.viewedByPath[file.path] ?? file.viewerViewedState,
+                threads: threadIndex.anchors(forPath: file.path),
+                isSelected: viewModel.selectedPath == file.path,
+                onSelect: { onSelectPath(file.path) }
+              )
+            }
           }
         }
       }
+      .frame(maxWidth: .infinity, alignment: .topLeading)
     }
-    .listStyle(.sidebar)
-    .scrollContentBackground(.hidden)
-  }
-
-  private var selectedPathBinding: Binding<String?> {
-    Binding(
-      get: { viewModel.selectedPath },
-      set: { onSelectPath($0) }
-    )
+    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
   }
 
   private func visibleFiles(threadIndex: DashboardReviewFileThreadIndex) -> [ReviewFile] {
@@ -198,12 +197,23 @@ struct DashboardReviewFilesModeContentPane: View {
   }
 
   private func grouped(files: [ReviewFile]) -> [(folder: String, files: [ReviewFile])] {
+    let rootLabel = "Repository root"
     let groups = Dictionary(grouping: files) { file in
-      file.path.split(separator: "/").first.map(String.init) ?? "Files"
+      parentDirectory(for: file.path) ?? rootLabel
     }
-    return groups.keys.sorted().map { key in
+    let sortedKeys = groups.keys.sorted { lhs, rhs in
+      if lhs == rootLabel { return true }
+      if rhs == rootLabel { return false }
+      return lhs.localizedStandardCompare(rhs) == .orderedAscending
+    }
+    return sortedKeys.map { key in
       (folder: key, files: groups[key] ?? [])
     }
+  }
+
+  private func parentDirectory(for path: String) -> String? {
+    guard let slashIndex = path.lastIndex(of: "/") else { return nil }
+    return String(path[..<slashIndex])
   }
 
   private func syncFilterFromPreferences() {
@@ -262,31 +272,61 @@ private struct DashboardReviewFilesNavigatorRow: View {
   let file: ReviewFile
   let viewedState: ReviewFileViewedState
   let threads: [DashboardReviewFileThreadAnchor]
+  let isSelected: Bool
+  let onSelect: () -> Void
 
   var body: some View {
-    HStack(spacing: 8) {
-      Image(systemName: file.isBinary ? "photo" : "doc.text")
-        .foregroundStyle(.secondary)
-        .frame(width: 16)
-      VStack(alignment: .leading, spacing: 2) {
-        Text(file.path.split(separator: "/").last.map(String.init) ?? file.path)
-          .lineLimit(1)
-        Text(file.path)
-          .font(.caption2)
-          .foregroundStyle(.secondary)
+    Button(action: onSelect) {
+      HStack(spacing: 10) {
+        Image(systemName: file.isBinary ? "photo" : "doc.text")
+          .foregroundStyle(secondaryColor)
+          .frame(width: 16)
+        Text(fileName)
+          .font(.body.weight(.semibold))
+          .foregroundStyle(primaryColor)
           .lineLimit(1)
           .truncationMode(.middle)
+        Spacer(minLength: 8)
+        if threads.contains(where: { !$0.isResolved }) {
+          Image(systemName: "text.bubble.fill").foregroundStyle(.orange)
+        }
+        Text("+\(file.additions) -\(file.deletions)")
+          .font(.caption.monospacedDigit().weight(.semibold))
+          .foregroundStyle(secondaryColor)
+        Image(systemName: viewedState == .viewed ? "checkmark.circle.fill" : "circle")
+          .foregroundStyle(viewedState == .viewed ? selectedAwareGreen : secondaryColor)
       }
-      Spacer(minLength: 4)
-      if threads.contains(where: { !$0.isResolved }) {
-        Image(systemName: "text.bubble.fill").foregroundStyle(.orange)
-      }
-      Text("+\(file.additions) -\(file.deletions)")
-        .font(.caption2.monospacedDigit())
-        .foregroundStyle(.secondary)
-      Image(systemName: viewedState == .viewed ? "checkmark.circle.fill" : "circle")
-        .foregroundStyle(viewedState == .viewed ? .green : .secondary.opacity(0.45))
+      .padding(.horizontal, 10)
+      .padding(.vertical, 9)
+      .frame(maxWidth: .infinity, alignment: .leading)
+      .background(selectionBackground)
+      .contentShape(RoundedRectangle(cornerRadius: 8))
     }
+    .buttonStyle(.plain)
     .help(file.path)
+  }
+
+  private var fileName: String {
+    file.path.split(separator: "/").last.map(String.init) ?? file.path
+  }
+
+  private var primaryColor: Color {
+    isSelected ? .white : .primary
+  }
+
+  private var secondaryColor: Color {
+    isSelected ? .white.opacity(0.78) : .secondary
+  }
+
+  private var selectedAwareGreen: Color {
+    isSelected ? .white.opacity(0.82) : .green
+  }
+
+  @ViewBuilder
+  private var selectionBackground: some View {
+    if isSelected {
+      RoundedRectangle(cornerRadius: 8)
+        .fill(Color.accentColor.opacity(0.72))
+    }
   }
 }
