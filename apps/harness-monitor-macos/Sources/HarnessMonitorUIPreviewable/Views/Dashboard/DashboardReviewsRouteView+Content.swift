@@ -112,21 +112,34 @@ extension DashboardReviewsRouteView {
         emptyStateContent
           .frame(maxWidth: .infinity, minHeight: 280)
       } else if groupMode == .repository {
-        ForEach(groupedItems, id: \.repository) { group in
-          Section {
-            if !routeCollapsedRepositories.contains(group.repository) {
+        ForEach(groupedItems) { group in
+          switch group.kind {
+          case .pinned:
+            Section {
               ForEach(group.items) { item in
-                reviewRow(item, showsRepository: false)
+                reviewRow(item, showsRepository: true)
               }
+            } header: {
+              pinnedSectionHeader(itemCount: group.items.count)
             }
-          } header: {
-            repositorySectionHeader(
-              group.repository,
-              itemCount: group.items.count,
-              busyPullRequestCount: group.items.count {
-                isPullRequestRefreshing($0.pullRequestID)
+          case .repository(let repository):
+            Section {
+              if !routeCollapsedRepositories.contains(repository) {
+                ForEach(group.items) { item in
+                  reviewRow(item, showsRepository: false)
+                }
               }
-            )
+            } header: {
+              repositorySectionHeader(
+                repository,
+                itemCount: group.items.count,
+                busyPullRequestCount: group.items.count {
+                  isPullRequestRefreshing($0.pullRequestID)
+                }
+              )
+            }
+          case .status, .author:
+            EmptyView()
           }
         }
       } else {
@@ -236,6 +249,7 @@ extension DashboardReviewsRouteView {
     DashboardReviewRow(
       item: item,
       showsRepository: showsRepository,
+      isPinned: isPullRequestPinned(item.pullRequestID),
       isRefreshing: isPullRequestRefreshing(item.pullRequestID),
       actionTitle: pullRequestActionTitle(item.pullRequestID),
       updatedLabel: relativeUpdatedLabel(for: item)
@@ -256,6 +270,10 @@ extension DashboardReviewsRouteView {
       onToggleCollapse: { toggleRepositoryCollapse(repository) },
       onRetryRepository: { retryRepositorySync(repository) }
     )
+  }
+
+  func pinnedSectionHeader(itemCount: Int) -> some View {
+    DashboardReviewsPinnedSectionHeader(itemCount: itemCount)
   }
 
   func reviewActionBar(items: [ReviewItem]) -> some View {
@@ -300,6 +318,36 @@ extension DashboardReviewsRouteView {
         }
       }
     )
+  }
+
+  @MainActor
+  private struct DashboardReviewsPinnedSectionHeader: View {
+    let itemCount: Int
+
+    @ScaledMetric(relativeTo: .caption)
+    private var height = 22.0
+    @ScaledMetric(relativeTo: .caption)
+    private var horizontalPadding = 8.0
+
+    var body: some View {
+      HStack(alignment: .center, spacing: HarnessMonitorTheme.spacingSM) {
+        Label("Pinned", systemImage: "pin.fill")
+          .scaledFont(.caption.weight(.semibold))
+          .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+        Spacer(minLength: HarnessMonitorTheme.spacingSM)
+        Text(verbatim: "\(itemCount)")
+          .monospacedDigit()
+          .scaledFont(.caption.weight(.semibold))
+          .lineLimit(1)
+          .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+          .padding(.horizontal, horizontalPadding)
+          .frame(height: height, alignment: .center)
+          .harnessControlPillGlass(tint: HarnessMonitorTheme.controlBorder)
+          .accessibilityLabel(itemCount == 1 ? "1 pinned review" : "\(itemCount) pinned reviews")
+      }
+      .listRowInsets(EdgeInsets(top: 6, leading: 12, bottom: 6, trailing: 12))
+      .accessibilityIdentifier(HarnessMonitorAccessibility.dashboardReviewsPinnedSectionHeader)
+    }
   }
 
   /// True when any reviews filter is currently narrowing the visible items.

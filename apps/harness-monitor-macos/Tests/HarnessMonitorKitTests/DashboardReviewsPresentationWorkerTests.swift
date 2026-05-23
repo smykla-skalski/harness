@@ -194,6 +194,51 @@ struct DashboardReviewsPresentationWorkerTests {
     #expect(output.relativeUpdatedLabels["pr-duplicate"] != nil)
   }
 
+  @Test("pinning invalidates the worker cache and reorders visible items")
+  func pinningInvalidatesTheWorkerCacheAndReordersVisibleItems() async {
+    let first = reviewItem(id: "pr-1", repository: "kong/a", number: 1)
+    let second = reviewItem(id: "pr-2", repository: "kong/b", number: 2)
+    let third = reviewItem(id: "pr-3", repository: "kong/c", number: 3)
+    let worker = DashboardReviewsPresentationWorker()
+
+    let initial = await worker.compute(
+      input: DashboardReviewsPresentationInput(
+        items: [first, second, third],
+        filterModeRaw: DashboardReviewsFilterMode.all.rawValue,
+        sortModeRaw: DashboardReviewsSortMode.repository.rawValue,
+        groupModeRaw: DashboardReviewsGroupMode.flat.rawValue,
+        categoryModeRaw: DashboardReviewsCategoryMode.all.rawValue,
+        searchText: "",
+        configuredRepositories: [],
+        configuredOrganizations: [],
+        configuredAuthors: [],
+        selectedIDs: [],
+        persistedPrimarySelectionID: "",
+        pinnedPullRequestIDs: ["pr-1"]
+      )
+    )
+    let repinned = await worker.compute(
+      input: DashboardReviewsPresentationInput(
+        items: [first, second, third],
+        filterModeRaw: DashboardReviewsFilterMode.all.rawValue,
+        sortModeRaw: DashboardReviewsSortMode.repository.rawValue,
+        groupModeRaw: DashboardReviewsGroupMode.flat.rawValue,
+        categoryModeRaw: DashboardReviewsCategoryMode.all.rawValue,
+        searchText: "",
+        configuredRepositories: [],
+        configuredOrganizations: [],
+        configuredAuthors: [],
+        selectedIDs: [],
+        persistedPrimarySelectionID: "",
+        pinnedPullRequestIDs: ["pr-3"]
+      )
+    )
+
+    #expect(initial.filteredItems.map(\.pullRequestID) == ["pr-1", "pr-2", "pr-3"])
+    #expect(repinned.filteredItems.map(\.pullRequestID) == ["pr-3", "pr-1", "pr-2"])
+    #expect(repinned.primaryDetailItem?.pullRequestID == "pr-3")
+  }
+
   private func reviewItem(
     id: String,
     repository: String,

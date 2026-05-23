@@ -32,6 +32,7 @@ extension VerticalAlignment {
 struct DashboardReviewListRow: View {
   let item: ReviewItem
   let showsRepository: Bool
+  let isPinned: Bool
   let isRefreshing: Bool
   let actionTitle: String?
   let updatedLabel: String
@@ -44,6 +45,22 @@ struct DashboardReviewListRow: View {
   private var captionLineHeight: CGFloat = 14
   @ScaledMetric(relativeTo: .caption)
   private var pillStripHeight: CGFloat = 22
+
+  init(
+    item: ReviewItem,
+    showsRepository: Bool,
+    isPinned: Bool = false,
+    isRefreshing: Bool,
+    actionTitle: String?,
+    updatedLabel: String
+  ) {
+    self.item = item
+    self.showsRepository = showsRepository
+    self.isPinned = isPinned
+    self.isRefreshing = isRefreshing
+    self.actionTitle = actionTitle
+    self.updatedLabel = updatedLabel
+  }
 
   var body: some View {
     HStack(alignment: .dashboardReviewTitleLineCenter, spacing: HarnessMonitorTheme.spacingSM) {
@@ -112,6 +129,17 @@ struct DashboardReviewListRow: View {
         .focused($isFocused)
 
       Spacer(minLength: HarnessMonitorTheme.spacingXS)
+
+      if isPinned {
+        Image(systemName: "pin.fill")
+          .imageScale(.small)
+          .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+          .accessibilityIdentifier(
+            HarnessMonitorAccessibility.dashboardReviewPinnedIndicator(item.pullRequestID)
+          )
+          .accessibilityLabel("Pinned pull request")
+          .help("Pinned pull request")
+      }
 
       if item.additions > 0 || item.deletions > 0 {
         DashboardReviewChangePill(
@@ -194,9 +222,7 @@ struct DashboardReviewListRow: View {
       : "#\(item.number)"
   }
 
-  private var visibleRequiredFailedCheckNames:
-    (visible: [String], overflow: Int)?
-  {
+  private var visibleRequiredFailedCheckNames: (visible: [String], overflow: Int)? {
     guard item.hasRequiredFailedChecks else { return nil }
     let names = item.requiredFailedCheckNames
     guard !names.isEmpty else { return nil }

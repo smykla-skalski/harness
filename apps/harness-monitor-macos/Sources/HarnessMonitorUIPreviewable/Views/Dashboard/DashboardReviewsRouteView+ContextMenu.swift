@@ -10,6 +10,7 @@ extension DashboardReviewsRouteView {
       let availableLabels = contextMenuAvailableLabels(for: items)
       let frequentNames = contextMenuFrequentNames(for: items)
       let isBusy = items.contains { isPullRequestRefreshing($0.pullRequestID) }
+      let pinTitle = pinSelectionMenuTitle(for: items)
       // Right-clicking an unselected row leaves `routeSelectedIDs` stale: the
       // list-level `forSelectionType:` API hands us the row's tag for items
       // resolution, but the visible selection is unchanged. Sync it
@@ -29,13 +30,15 @@ extension DashboardReviewsRouteView {
         Button("Copy Link") {
           HarnessMonitorClipboard.copy(primaryItem.url)
         }
-        Divider()
-      } else {
+      } else if items.count > 1 {
         Button(dashboardReviewsCopyLinksMenuTitle(itemCount: items.count)) {
           HarnessMonitorClipboard.copy(items.map(\.url).joined(separator: "\n"))
         }
-        Divider()
       }
+      Button(pinTitle) {
+        togglePinnedSelection(items: items)
+      }
+      Divider()
       Button("Approve") {
         requestApproveOrConfirm(items: items)
       }

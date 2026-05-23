@@ -4,12 +4,14 @@ import OSLog
 
 struct DashboardReviewsItemGroup: Equatable, Identifiable, Sendable {
   enum Kind: Equatable, Sendable {
+    case pinned
     case repository(String)
     case status(String)
     case author(String)
 
     var title: String {
       switch self {
+      case .pinned: "Pinned"
       case .repository(let value): value
       case .status(let value): value
       case .author(let value): value
@@ -18,6 +20,7 @@ struct DashboardReviewsItemGroup: Equatable, Identifiable, Sendable {
 
     var rawValue: String {
       switch self {
+      case .pinned: "pinned"
       case .repository(let value): "repository:\(value)"
       case .status(let value): "status:\(value)"
       case .author(let value): "author:\(value)"
@@ -51,6 +54,7 @@ struct DashboardReviewsPresentationInput: Equatable, Sendable {
   let configuredAuthors: [String]
   let selectedIDs: Set<String>
   let persistedPrimarySelectionID: String
+  let pinnedPullRequestIDs: [String]
   let needsMeOn: Bool
   let dependenciesOnlyOn: Bool
 
@@ -66,6 +70,7 @@ struct DashboardReviewsPresentationInput: Equatable, Sendable {
     configuredAuthors: [String] = [],
     selectedIDs: Set<String>,
     persistedPrimarySelectionID: String,
+    pinnedPullRequestIDs: [String] = [],
     needsMeOn: Bool = false,
     dependenciesOnlyOn: Bool = false
   ) {
@@ -80,6 +85,7 @@ struct DashboardReviewsPresentationInput: Equatable, Sendable {
     self.configuredAuthors = configuredAuthors
     self.selectedIDs = selectedIDs
     self.persistedPrimarySelectionID = persistedPrimarySelectionID
+    self.pinnedPullRequestIDs = pinnedPullRequestIDs
     self.needsMeOn = needsMeOn
     self.dependenciesOnlyOn = dependenciesOnlyOn
   }
@@ -95,6 +101,7 @@ private struct DashboardReviewsListPresentationInput: Equatable, Sendable {
   let configuredRepositories: [String]
   let configuredOrganizations: [String]
   let configuredAuthors: [String]
+  let pinnedPullRequestIDs: [String]
   let needsMeOn: Bool
   let dependenciesOnlyOn: Bool
 
@@ -108,6 +115,7 @@ private struct DashboardReviewsListPresentationInput: Equatable, Sendable {
     configuredRepositories = input.configuredRepositories
     configuredOrganizations = input.configuredOrganizations
     configuredAuthors = input.configuredAuthors
+    pinnedPullRequestIDs = input.pinnedPullRequestIDs
     needsMeOn = input.needsMeOn
     dependenciesOnlyOn = input.dependenciesOnlyOn
   }
@@ -210,6 +218,7 @@ actor DashboardReviewsPresentationWorker {
   ) -> DashboardReviewsListPresentation {
     let filterMode = DashboardReviewsFilterMode(rawValue: input.filterModeRaw) ?? .all
     let sortMode = DashboardReviewsSortMode(rawValue: input.sortModeRaw) ?? .status
+    let groupMode = DashboardReviewsGroupMode(rawValue: input.groupModeRaw) ?? .repository
     let categoryMode = DashboardReviewsCategoryMode(rawValue: input.categoryModeRaw) ?? .all
     let comparator = sortMode.comparator
     let query = input.searchText.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -239,16 +248,24 @@ actor DashboardReviewsPresentationWorker {
       }
       .sorted(by: comparator)
 
-    let groupedItems = Self.groupedItems(
+    let pinnedItemsFirst = Self.pinnedItemsFirst(
       filteredItems,
+      pinnedPullRequestIDs: input.pinnedPullRequestIDs
+    )
+
+    let groupedItems = Self.groupedItems(
+      pinnedItemsFirst,
+      groupMode: groupMode,
       sort: comparator,
       configuredRepositories: input.configuredRepositories,
-      configuredOrganizations: input.configuredOrganizations
+      configuredOrganizations: input.configuredOrganizations,
+      configuredAuthors: input.configuredAuthors,
+      pinnedPullRequestIDs: input.pinnedPullRequestIDs
     )
     return DashboardReviewsListPresentation(
-      filteredItems: filteredItems,
+      filteredItems: pinnedItemsFirst,
       groupedItems: groupedItems,
-      relativeUpdatedLabels: relativeUpdatedLabels(for: filteredItems)
+      relativeUpdatedLabels: relativeUpdatedLabels(for: pinnedItemsFirst)
     )
   }
 
@@ -272,16 +289,63 @@ actor DashboardReviewsPresentationWorker {
 
   private static func groupedItems(
     _ filteredItems: [ReviewItem],
+    groupMode: DashboardReviewsGroupMode,
     sort comparator: (ReviewItem, ReviewItem) -> Bool,
     configuredRepositories: [String],
-    configuredOrganizations: [String]
+    configuredOrganizations: [String],
+    configuredAuthors: [String],
+    pinnedPullRequestIDs: [String]
   ) -> [DashboardReviewsRepositoryGroup] {
-    let grouped = Dictionary(grouping: filteredItems, by: \.repository)
+    switch groupMode {
+    case .repository:
+      repositoryGroupedItems(
+        filteredItems,
+        sort: comparator,
+        configuredRepositories: configuredRepositories,
+        configuredOrganizations: configuredOrganizations,
+        pinnedPullRequestIDs: pinnedPullRequestIDs
+      )
+    case .status:
+      statusGroupedItems(filteredItems, sort: comparator)
+    case .author:
+      authorGroupedItems(
+        filteredItems,
+        sort: comparator,
+        configuredAuthors: configuredAuthors
+      )
+    case .flat:
+      []
+    }
+  }
+
+  private static func pinnedItemsFirst(
+    _ items: [ReviewItem],
+    pinnedPullRequestIDs: [String]
+  ) -> [ReviewItem] {
+    guard !pinnedPullRequestIDs.isEmpty else { return items }
+    let pinned = Set(pinnedPullRequestIDs)
+    let pinnedItems = items.filter { pinned.contains($0.pullRequestID) }
+    guard !pinnedItems.isEmpty else { return items }
+    let unpinnedItems = items.filter { !pinned.contains($0.pullRequestID) }
+    return pinnedItems + unpinnedItems
+  }
+
+  private static func repositoryGroupedItems(
+    _ filteredItems: [ReviewItem],
+    sort comparator: (ReviewItem, ReviewItem) -> Bool,
+    configuredRepositories: [String],
+    configuredOrganizations: [String],
+    pinnedPullRequestIDs: [String]
+  ) -> [DashboardReviewsRepositoryGroup] {
+    let pinned = Set(pinnedPullRequestIDs)
+    let pinnedItems = filteredItems.filter { pinned.contains($0.pullRequestID) }
+    let repositoryItems = filteredItems.filter { !pinned.contains($0.pullRequestID) }
+    let grouped = Dictionary(grouping: repositoryItems, by: \.repository)
     let ordering = DashboardReviewsRepositoryOrdering(
       configuredRepositories: configuredRepositories,
       configuredOrganizations: configuredOrganizations
     )
-    return
+    let repositoryGroups =
       grouped
       .map { repository, items in
         DashboardReviewsRepositoryGroup(
@@ -290,6 +354,46 @@ actor DashboardReviewsPresentationWorker {
         )
       }
       .sorted { ordering.compare($0.repository, $1.repository) }
+
+    guard !pinnedItems.isEmpty else { return repositoryGroups }
+    return [DashboardReviewsRepositoryGroup(kind: .pinned, items: pinnedItems)] + repositoryGroups
+  }
+
+  private static func statusGroupedItems(
+    _ filteredItems: [ReviewItem],
+    sort comparator: (ReviewItem, ReviewItem) -> Bool
+  ) -> [DashboardReviewsRepositoryGroup] {
+    Dictionary(grouping: filteredItems, by: \.statusLabel)
+      .map { status, items in
+        DashboardReviewsRepositoryGroup(
+          kind: .status(status),
+          items: items.sorted(by: comparator)
+        )
+      }
+      .sorted { lhs, rhs in
+        let lhsBucket = lhs.items.map { $0.statusOrderKey.bucket }.min() ?? Int.max
+        let rhsBucket = rhs.items.map { $0.statusOrderKey.bucket }.min() ?? Int.max
+        if lhsBucket != rhsBucket { return lhsBucket < rhsBucket }
+        return lhs.kind.title.localizedStandardCompare(rhs.kind.title) == .orderedAscending
+      }
+  }
+
+  private static func authorGroupedItems(
+    _ filteredItems: [ReviewItem],
+    sort comparator: (ReviewItem, ReviewItem) -> Bool,
+    configuredAuthors: [String]
+  ) -> [DashboardReviewsRepositoryGroup] {
+    let grouped = Dictionary(grouping: filteredItems, by: \.authorLogin)
+    let ordering = DashboardReviewsAuthorOrdering(configuredAuthors: configuredAuthors)
+    return
+      grouped
+      .map { author, items in
+        DashboardReviewsRepositoryGroup(
+          kind: .author(author),
+          items: items.sorted(by: comparator)
+        )
+      }
+      .sorted { ordering.compare($0.kind.title, $1.kind.title) }
   }
 
   private static func primaryDetailItem(
@@ -304,5 +408,40 @@ actor DashboardReviewsPresentationWorker {
       return filteredItems.first { $0.pullRequestID == persistedPrimarySelectionID }
     }
     return selectedItems.isEmpty ? filteredItems.first : nil
+  }
+}
+
+private struct DashboardReviewsAuthorOrdering {
+  let configuredAuthors: [String]
+
+  func compare(_ lhs: String, _ rhs: String) -> Bool {
+    sortKey(for: lhs) < sortKey(for: rhs)
+  }
+
+  private func sortKey(for author: String) -> DashboardReviewsAuthorSortKey {
+    if let index = configuredAuthors.firstIndex(of: author) {
+      return DashboardReviewsAuthorSortKey(bucket: 0, configuredIndex: index, author: author)
+    }
+    return DashboardReviewsAuthorSortKey(
+      bucket: 1,
+      configuredIndex: Int.max,
+      author: author
+    )
+  }
+}
+
+private struct DashboardReviewsAuthorSortKey: Comparable {
+  let bucket: Int
+  let configuredIndex: Int
+  let author: String
+
+  static func < (lhs: Self, rhs: Self) -> Bool {
+    if lhs.bucket != rhs.bucket {
+      return lhs.bucket < rhs.bucket
+    }
+    if lhs.configuredIndex != rhs.configuredIndex {
+      return lhs.configuredIndex < rhs.configuredIndex
+    }
+    return lhs.author.localizedStandardCompare(rhs.author) == .orderedAscending
   }
 }

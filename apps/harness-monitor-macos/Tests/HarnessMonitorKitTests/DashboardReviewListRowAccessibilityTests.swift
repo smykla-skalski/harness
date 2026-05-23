@@ -20,9 +20,13 @@ struct DashboardReviewListRowAccessibilityTests {
     let source = try rowSource(named: "DashboardReviewListRow.swift")
     // Items 32 / 67: status icon must carry its own accessibility label.
     #expect(source.contains(".accessibilityLabel(item.statusAccessibilityLabel)"))
-    #expect(!source.contains("Image(systemName: item.statusSystemImage)\n          .font"
-      + "(.system(size: 14, weight: .semibold))\n          .foregroundStyle(item.statusTint)\n"
-      + "          .accessibilityHidden(true)"))
+    #expect(
+      !source.contains(
+        "Image(systemName: item.statusSystemImage)\n          .font"
+          + "(.system(size: 14, weight: .semibold))\n          .foregroundStyle(item.statusTint)\n"
+          + "          .accessibilityHidden(true)"
+      )
+    )
   }
 
   @Test("row source attaches help on title and secondary line")
@@ -58,6 +62,13 @@ struct DashboardReviewListRowAccessibilityTests {
     #expect(source.contains("DashboardReviewListRowReviewerSummary("))
     #expect(source.contains("DashboardReviewChangePill("))
     #expect(source.contains("DashboardReviewRequiredFailedCheckStrip("))
+  }
+
+  @Test("row source exposes a pinned indicator with a dedicated accessibility label")
+  func rowSourceExposesPinnedIndicatorAccessibility() throws {
+    let source = try rowSource(named: "DashboardReviewListRow.swift")
+    #expect(source.contains("dashboardReviewPinnedIndicator(item.pullRequestID)"))
+    #expect(source.contains(".accessibilityLabel(\"Pinned pull request\")"))
   }
 
   @Test("row idealHeight grows for each optional strip")

@@ -170,7 +170,9 @@ struct DashboardReviewsRouteViewTests {
 
     // The buggy lexical-min assignment must be gone from the onChange body.
     #expect(
-      !source.contains("persistedPrimarySelectionID = newValue.min() ?? persistedPrimarySelectionID")
+      !source.contains(
+        "persistedPrimarySelectionID = newValue.min() ?? persistedPrimarySelectionID"
+      )
     )
     // The route must delegate to the pure resolver and track the last
     // click so future passes can disambiguate select-all vs single-click.
@@ -425,6 +427,33 @@ struct DashboardReviewsRouteViewTests {
     #expect(contextMenuSource.contains("Task { @MainActor in"))
   }
 
+  @Test("commands and context menu expose pinning controls")
+  func commandsAndContextMenuExposePinningControls() throws {
+    let contextMenuSource = try routeSource(
+      named: "DashboardReviewsRouteView+ContextMenu.swift"
+    )
+    let routeCommandsSource = try routeSource(
+      named: "DashboardReviewsRouteView+Commands.swift"
+    )
+    let commandsSource = try appSource(
+      "apps/harness-monitor-macos/Sources/HarnessMonitor/Commands/ReviewCommands.swift"
+    )
+
+    #expect(contextMenuSource.contains("let pinTitle = pinSelectionMenuTitle(for: items)"))
+    #expect(contextMenuSource.contains("Button(pinTitle)"))
+    #expect(contextMenuSource.contains("togglePinnedSelection(items: items)"))
+    #expect(routeCommandsSource.contains("canTogglePinSelection"))
+    #expect(routeCommandsSource.contains("togglePinnedSelection(items: commandItems)"))
+    #expect(
+      commandsSource.contains("Button(reviewCommands?.pinSelectionTitle ?? \"Pin Selection\")")
+    )
+    #expect(
+      commandsSource.contains(
+        ".keyboardShortcut(\"p\", modifiers: [.command, .option, .shift])"
+      )
+    )
+  }
+
   @Test("activity snapshot exposes cache and missing check-link labels")
   func activitySnapshotExposesCacheAndMissingCheckLinkLabels() {
     let snapshot = DashboardReviewActivitySnapshot(
@@ -478,6 +507,18 @@ struct DashboardReviewsRouteViewTests {
         "apps/harness-monitor-macos/Sources/HarnessMonitorUIPreviewable/Views/Dashboard/Previews"
       )
       .appendingPathComponent(fileName)
+    return try String(contentsOf: sourceURL, encoding: .utf8)
+  }
+
+  private func appSource(_ relativePath: String) throws -> String {
+    let testsDirectory = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
+    let repoRoot =
+      testsDirectory
+      .deletingLastPathComponent()
+      .deletingLastPathComponent()
+      .deletingLastPathComponent()
+      .deletingLastPathComponent()
+    let sourceURL = repoRoot.appendingPathComponent(relativePath)
     return try String(contentsOf: sourceURL, encoding: .utf8)
   }
 

@@ -18,6 +18,8 @@ struct DashboardReviewsRouteView: View {
   var storedPreferences = ""
   @AppStorage("dashboard.reviews.recent-actions")
   var recentReviewActionsStorage = ""
+  @AppStorage(DashboardReviewsPinnedPullRequests.storageKey)
+  var pinnedPullRequestIDsStorage = ""
   @SceneStorage("dashboard.reviews.filter")
   var filterModeRaw = DashboardReviewsFilterMode.all.rawValue
   @SceneStorage("dashboard.reviews.sort")
@@ -61,7 +63,7 @@ struct DashboardReviewsRouteView: View {
   @State var isLabelSheetPresented = false
   @State var labelDraft = ""
   @State var labelTargetItems = [ReviewItem]()
-  @State var resolvedPreferences: DashboardReviewsResolvedPreferences
+  @State private var resolvedPreferences: DashboardReviewsResolvedPreferences
   @State var presentationWorker = DashboardReviewsPresentationWorker()
   @State var cachedPresentation = DashboardReviewsPresentation.empty
   @State var presentationGeneration: UInt64 = 0
@@ -85,9 +87,9 @@ struct DashboardReviewsRouteView: View {
   @State var collapsedRepositories = DashboardReviewsCollapsedRepositories()
   @State var labelMenuDataByRepository: [String: DashboardReviewsRepoLabelMenuData] =
     [:]
-  @State var actionState = DashboardReviewsRouteActionState()
+  @State private var actionState = DashboardReviewsRouteActionState()
   @State var legacyFilterMigrationApplied = false
-  @State var lastPrimaryClickedID: String?
+  @State private var lastPrimaryClickedID: String?
   @State var isReviewsRouteActive = true
   @State var pendingResumeAfterReturn = false
   // Skip the JSON decode in `syncPreferencesFromStorage` when the raw stored
@@ -97,6 +99,7 @@ struct DashboardReviewsRouteView: View {
   // is non-trivial.
   @State var lastStoredPreferencesHash: Int?
   @State var needsMeCount: Int = 0
+  @State private var pinnedPullRequests: DashboardReviewsPinnedPullRequests
 
   init(
     store: HarnessMonitorStore,
@@ -113,8 +116,54 @@ struct DashboardReviewsRouteView: View {
         ) ?? ""
       )
     )
+    _pinnedPullRequests = State(
+      initialValue: DashboardReviewsPinnedPullRequests(
+        storedValue: UserDefaults.standard.string(
+          forKey: DashboardReviewsPinnedPullRequests.storageKey
+        ) ?? ""
+      )
+    )
   }
 
+  var routeResolvedPreferences: DashboardReviewsResolvedPreferences {
+    get { resolvedPreferences }
+    nonmutating set { resolvedPreferences = newValue }
+  }
+
+  var routeRecentReviewActions: [String: DashboardReviewActivityEntry] {
+    get { actionState.recentActions }
+    nonmutating set { actionState.recentActions = newValue }
+  }
+
+  var routePinnedPullRequests: DashboardReviewsPinnedPullRequests {
+    get { pinnedPullRequests }
+    nonmutating set { pinnedPullRequests = newValue }
+  }
+
+  var routePendingActionConfirmation: DashboardReviewActionConfirmation? {
+    get { actionState.pendingConfirmation }
+    nonmutating set { actionState.pendingConfirmation = newValue }
+  }
+
+  var routePendingActionConfirmationTitle: String {
+    routePendingActionConfirmation?.title ?? ""
+  }
+
+  var routeActionDialogPresented: Binding<Bool> {
+    Binding(
+      get: { routePendingActionConfirmation != nil },
+      set: { isPresented in
+        if !isPresented {
+          routePendingActionConfirmation = nil
+        }
+      }
+    )
+  }
+
+  var routeReviewCapabilities: ReviewsCapabilitiesResponse {
+    get { actionState.capabilities }
+    nonmutating set { actionState.capabilities = newValue }
+  }
 
   var reloadTaskKey: DashboardReviewsReloadTaskKey {
     DashboardReviewsReloadTaskKey(
@@ -145,6 +194,7 @@ struct DashboardReviewsRouteView: View {
       configuredAuthors: preferences.authors,
       selectedIDs: selectedIDs,
       persistedPrimarySelectionID: persistedPrimarySelectionID,
+      pinnedPullRequestIDs: pinnedPullRequests.pullRequestIDs,
       needsMeOn: needsMeOn,
       dependenciesOnlyOn: dependenciesOnlyOn
     )
@@ -232,6 +282,9 @@ struct DashboardReviewsRouteView: View {
       .onChange(of: recentReviewActionsStorage, initial: true) { _, newValue in
         syncRecentReviewActionsFromStorage(newValue)
       }
+      .onChange(of: pinnedPullRequestIDsStorage, initial: true) { _, newValue in
+        syncPinnedPullRequestsFromStorage(newValue)
+      }
       .onChange(of: collapsedRepositoriesStorage, initial: true) { _, newValue in
         syncCollapsedRepositoriesFromStorage(newValue)
       }
@@ -272,7 +325,7 @@ struct DashboardReviewsRouteView: View {
       ) { pullRequestID in
         selectedIDs = [pullRequestID]
       }
-      .harnessFocusedSceneValue(\.dashboardReviewsCommands, reviewCommandFocus)
+      .focusedSceneValue(\.dashboardReviewsCommands, reviewCommandFocus)
   }
 
   private func applyPendingReviewSelectionIfNeeded() {
