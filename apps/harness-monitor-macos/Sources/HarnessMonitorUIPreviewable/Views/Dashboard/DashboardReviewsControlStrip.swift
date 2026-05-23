@@ -48,6 +48,7 @@ struct DashboardReviewsControlStrip: View {
     }
     .toggleStyle(.button)
     .controlSize(.regular)
+    .accessibilityIdentifier(HarnessMonitorAccessibility.dashboardReviewsNeedsMeToggle)
     .accessibilityLabel("Filter to pull requests that need your attention")
   }
 
@@ -63,6 +64,9 @@ struct DashboardReviewsControlStrip: View {
     )
   }
 
+  // Legacy identifier `HarnessMonitorAccessibility.dashboardReviewsSelectionStatus`
+  // is superseded by `dashboardReviewsFilterPicker`; the constant stays declared so
+  // any older XCUITest binary still resolves it without crashing.
   private var filterPicker: some View {
     Picker("Filter", selection: $filterModeRaw) {
       ForEach(DashboardReviewsFilterMode.pickerCases) { mode in
@@ -70,7 +74,8 @@ struct DashboardReviewsControlStrip: View {
       }
     }
     .pickerStyle(.menu)
-    .accessibilityIdentifier(HarnessMonitorAccessibility.dashboardReviewsSelectionStatus)
+    .controlSize(.regular)
+    .accessibilityIdentifier(HarnessMonitorAccessibility.dashboardReviewsFilterPicker)
   }
 
   private var sortPicker: some View {
@@ -80,6 +85,8 @@ struct DashboardReviewsControlStrip: View {
       }
     }
     .pickerStyle(.menu)
+    .controlSize(.regular)
+    .accessibilityIdentifier(HarnessMonitorAccessibility.dashboardReviewsSortPicker)
   }
 
   private var groupPicker: some View {
@@ -89,6 +96,8 @@ struct DashboardReviewsControlStrip: View {
       }
     }
     .pickerStyle(.menu)
+    .controlSize(.regular)
+    .accessibilityIdentifier(HarnessMonitorAccessibility.dashboardReviewsGroupPicker)
   }
 
   private var categoryPicker: some View {
@@ -98,6 +107,8 @@ struct DashboardReviewsControlStrip: View {
       }
     }
     .pickerStyle(.menu)
+    .controlSize(.regular)
+    .accessibilityIdentifier(HarnessMonitorAccessibility.dashboardReviewsCategoryToggle)
   }
 
   private var actionsMenu: some View {
@@ -128,6 +139,7 @@ struct DashboardReviewsControlStrip: View {
       Image(systemName: "ellipsis.circle")
         .imageScale(.medium)
         .frame(width: 18, height: 18)
+        .frame(width: 28, height: 28)
         .accessibilityLabel("More review actions")
     }
     .menuStyle(.button)
