@@ -66,12 +66,18 @@ struct DashboardReviewsRouteView: View {
   @State private var presentationGeneration: UInt64 = 0
   @State private var refreshTracker = ReviewRefreshTracker()
   @State private var inFlightTasks: [Task<Void, Never>] = []
+  /// The set of items whose most recent targeted refresh timed out. Drives
+  /// the inline tap-to-retry banner mounted in the content pane. Set when
+  /// `scheduleAffectedRefresh` catches `DashboardReviewsSchedulerError`,
+  /// cleared on retry, dismissal, or successful refresh of the same items.
+  @State private var refreshTimeoutItems: [ReviewItem]?
   @State private var scheduler = DashboardReviewsScheduler()
   @State private var collapsedRepositories = DashboardReviewsCollapsedRepositories()
   @State private var labelMenuDataByRepository: [String: DashboardReviewsRepoLabelMenuData] =
     [:]
   @State private var actionState = DashboardReviewsRouteActionState()
   @State private var legacyFilterMigrationApplied = false
+  @State private var lastPrimaryClickedID: String?
 
   init(
     store: HarnessMonitorStore,
@@ -154,6 +160,11 @@ struct DashboardReviewsRouteView: View {
   var routeInFlightTasks: [Task<Void, Never>] {
     get { inFlightTasks }
     nonmutating set { inFlightTasks = newValue }
+  }
+
+  var routeRefreshTimeoutItems: [ReviewItem]? {
+    get { refreshTimeoutItems }
+    nonmutating set { refreshTimeoutItems = newValue }
   }
 
   var routeScheduler: DashboardReviewsScheduler {
@@ -328,8 +339,16 @@ struct DashboardReviewsRouteView: View {
         applyLegacyFilterMigrationIfNeeded()
       }
       .onChange(of: selectedIDs) { oldValue, newValue in
-        persistedPrimarySelectionID = newValue.min() ?? persistedPrimarySelectionID
+        let nextPrimary = DashboardReviewsPrimarySelectionResolver.resolve(
+          oldSelection: oldValue,
+          newSelection: newValue,
+          currentPrimary: persistedPrimarySelectionID
+        )
+        persistedPrimarySelectionID = nextPrimary
         let added = newValue.subtracting(oldValue)
+        if added.count == 1 {
+          lastPrimaryClickedID = added.first
+        }
         prefetchSelectedBodies(adding: added)
         prefetchSelectedFiles(adding: added)
       }
@@ -347,6 +366,11 @@ struct DashboardReviewsRouteView: View {
       }
       .onChange(of: response.items, initial: true) { _, items in
         openAnythingReviews.replaceLoadedItems(items)
+        // Pending Open Anything requests that fired before items finished
+        // loading need a second chance once the items arrive. The helper is
+        // idempotent: `finishSelection` clears the request, so a follow-up
+        // task-triggered call is a no-op.
+        applyPendingReviewSelectionIfNeeded()
       }
       .onChange(of: normalizedPreferences.frequentLabelsCount) { _, _ in
         refreshLabelMenuData()

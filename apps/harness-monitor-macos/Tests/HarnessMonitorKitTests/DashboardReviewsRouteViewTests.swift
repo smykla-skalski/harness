@@ -144,6 +144,61 @@ struct DashboardReviewsRouteViewTests {
     #expect(rowSource.contains("dashboardReviewAttentionBadgeKinds(for: item)"))
   }
 
+  @Test("route source resolves primary selection via the delta-aware helper")
+  func routeSourceResolvesPrimarySelectionViaDeltaAwareHelper() throws {
+    let source = try routeSource()
+    let selectionSource = try routeSource(named: "DashboardReviewsRouteView+Selection.swift")
+
+    // The buggy lexical-min assignment must be gone from the onChange body.
+    #expect(
+      !source.contains("persistedPrimarySelectionID = newValue.min() ?? persistedPrimarySelectionID")
+    )
+    // The route must delegate to the pure resolver and track the last
+    // click so future passes can disambiguate select-all vs single-click.
+    #expect(source.contains("DashboardReviewsPrimarySelectionResolver.resolve("))
+    #expect(source.contains("lastPrimaryClickedID = added.first"))
+    #expect(source.contains("@State private var lastPrimaryClickedID: String?"))
+    #expect(selectionSource.contains("enum DashboardReviewsPrimarySelectionResolver"))
+    #expect(selectionSource.contains("static func resolve("))
+  }
+
+  @Test("route source replays pending selection when items finally load")
+  func routeSourceReplaysPendingSelectionWhenItemsFinallyLoad() throws {
+    let source = try routeSource()
+
+    // The original .task(id: openAnythingReviews.selectionRequest) trigger
+    // must still be there - it covers the case where items are already loaded.
+    #expect(source.contains(".task(id: openAnythingReviews.selectionRequest)"))
+    // The items-arrival onChange handler must also call the apply helper so
+    // a request that fired before items loaded gets a second chance.
+    #expect(
+      source.contains(
+        ".onChange(of: response.items, initial: true) { _, items in\n"
+          + "        openAnythingReviews.replaceLoadedItems(items)\n"
+      )
+    )
+    #expect(source.contains("applyPendingReviewSelectionIfNeeded()"))
+  }
+
+  @Test("pending review selection request stops replaying once finished")
+  @MainActor
+  func pendingReviewSelectionRequestStopsReplayingOnceFinished() {
+    // Drive the registry directly to confirm the idempotency contract the
+    // route helper relies on: requesting selection sets a request, finishing
+    // clears it, and a redundant finish is a no-op.
+    let registry = OpenAnythingDashboardReviewRegistry()
+    registry.requestSelection(pullRequestID: "PR_kwAOXXX")
+    let firstRequest = registry.selectionRequest
+    #expect(firstRequest?.pullRequestID == "PR_kwAOXXX")
+
+    registry.finishSelection(requestID: firstRequest?.requestID ?? -1)
+    #expect(registry.selectionRequest == nil)
+
+    // A second call after the request has been cleared must be a no-op.
+    registry.finishSelection(requestID: firstRequest?.requestID ?? -1)
+    #expect(registry.selectionRequest == nil)
+  }
+
   @Test("dashboard preview exercises review alert rendering")
   func dashboardPreviewExercisesReviewAlertRendering() throws {
     let source = try previewSource(named: "PreviewDashboardReviewsRouteView.swift")
@@ -301,6 +356,54 @@ struct DashboardReviewsRouteViewTests {
     #expect(entry.outcome == .success)
     #expect(entry.messages == ["Approved org-a/example#42"])
     #expect(entry.recordedAt == recordedAt)
+  }
+
+  @Test("multi-select context menu offers a Copy N Links action")
+  func multiSelectContextMenuOffersCopyNLinksAction() throws {
+    let contextMenuSource = try routeSource(
+      named: "DashboardReviewsRouteView+ContextMenu.swift"
+    )
+
+    // Defect 47: the single-item branch keeps "Open Pull Request" / "Copy
+    // Link"; the multi-item branch must produce a "Copy N Links" Button
+    // backed by the pure helper so the rule is unit-testable.
+    #expect(contextMenuSource.contains("else if items.count > 1"))
+    #expect(
+      contextMenuSource.contains(
+        "Button(dashboardReviewsCopyLinksMenuTitle(itemCount: items.count))"
+      )
+    )
+    #expect(
+      contextMenuSource.contains(
+        "HarnessMonitorClipboard.copy(items.map(\\.url).joined(separator: \"\\n\"))"
+      )
+    )
+  }
+
+  @Test("copy links menu title pluralises with the selection count")
+  func copyLinksMenuTitlePluralisesWithCount() {
+    // Pure helper, so verify the exact title shape rather than introspecting
+    // a SwiftUI Button. The helper is the single source of truth used by
+    // both the context menu builder and any future surfaces.
+    #expect(dashboardReviewsCopyLinksMenuTitle(itemCount: 2) == "Copy 2 Links")
+    #expect(dashboardReviewsCopyLinksMenuTitle(itemCount: 5) == "Copy 5 Links")
+    #expect(dashboardReviewsCopyLinksMenuTitle(itemCount: 42) == "Copy 42 Links")
+  }
+
+  @Test("context menu primes selection state on menu open")
+  func contextMenuPrimesSelectionOnMenuOpen() throws {
+    let contextMenuSource = try routeSource(
+      named: "DashboardReviewsRouteView+ContextMenu.swift"
+    )
+
+    // Defect 44: right-clicking an unselected row leaves `routeSelectedIDs`
+    // stale because the list-level `forSelectionType:` API only updates the
+    // closure argument, not the visible selection. The fallback primes the
+    // state asynchronously so action handlers and the detail pane reflect
+    // the menu's scope.
+    #expect(contextMenuSource.contains("func primeSelectionForContextMenu"))
+    #expect(contextMenuSource.contains("primeSelectionForContextMenu(items: items)"))
+    #expect(contextMenuSource.contains("Task { @MainActor in"))
   }
 
   @Test("activity snapshot exposes cache and missing check-link labels")

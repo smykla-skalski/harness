@@ -4,6 +4,8 @@ extension HarnessMonitorAccessibility {
   public static let dashboardReviewsProvenance =
     "harness.dashboard.reviews.provenance"
   public static let dashboardReviewsList = "harness.dashboard.reviews.list"
+  public static let dashboardReviewsInContentSearch =
+    "harness.dashboard.reviews.in-content-search"
   public static let dashboardReviewsDetail = "harness.dashboard.reviews.detail"
   public static let dashboardReviewsDetailDivider =
     "harness.dashboard.reviews.content-detail-divider"
@@ -35,4 +37,12 @@ extension HarnessMonitorAccessibility {
     "harness.dashboard.reviews.category"
   public static let dashboardReviewsNeedsMeToggle =
     "harness.dashboard.reviews.needs-me"
+  public static let dashboardReviewsRefreshTimeoutBanner =
+    "harness.dashboard.reviews.refresh-timeout-banner"
+  public static let dashboardReviewsRefreshTimeoutRetryButton =
+    "harness.dashboard.reviews.refresh-timeout-retry"
+  public static let dashboardReviewsRefreshTimeoutDismissButton =
+    "harness.dashboard.reviews.refresh-timeout-dismiss"
+  public static let dashboardReviewsRefreshTimeoutToast =
+    "harness.dashboard.reviews.refresh-timeout-toast"
 }
