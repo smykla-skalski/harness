@@ -124,6 +124,10 @@ struct DashboardReviewsProvenanceTests {
     #expect(!contentSource.contains("DashboardReviewsProvenanceBar("))
     #expect(!detailSource.contains("DashboardReviewProvenanceMiniBar"))
     #expect(provenanceSource.contains("var routeProvenanceSnapshot"))
+    #expect(toolbarItemsSource.contains(".glassEffect(in: Capsule())"))
+    #expect(toolbarItemsSource.contains("@ScaledMetric"))
+    #expect(!toolbarItemsSource.contains(".ultraThinMaterial"))
+    #expect(!toolbarItemsSource.contains(".buttonStyle(.glass)"))
     #expect(
       toolbarItemsSource.contains(
         "HarnessMonitorAccessibility.dashboardReviewsToolbarProvenance"

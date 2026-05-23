@@ -5,40 +5,33 @@ import SwiftUI
 struct DashboardReviewsToolbarCenterpiece: View {
   let snapshot: DashboardReviewsProvenanceSnapshot
 
-  private static let padding: CGFloat = 8
-  private static let cornerRadius: CGFloat = 10
-  private static let width: CGFloat = 480
+  @ScaledMetric private var dotSize: CGFloat = 6
+  @ScaledMetric private var horizontalPadding: CGFloat = 14
+  @ScaledMetric private var verticalPadding: CGFloat = 6
+  @ScaledMetric private var contentMaxWidth: CGFloat = 480
+  @ScaledMetric private var detailMinSpacing: CGFloat = 12
 
   var body: some View {
     HStack(spacing: 6) {
       Circle()
         .fill(snapshot.sourceTint)
-        .frame(width: 8, height: 8)
+        .frame(width: dotSize, height: dotSize)
+        .animation(.smooth(duration: 0.25), value: snapshot.sourceTint)
         .accessibilityHidden(true)
       Text(snapshot.sourceTitle)
         .scaledFont(.callout.weight(.semibold))
-        .foregroundStyle(snapshot.sourceTint)
         .lineLimit(1)
-      Spacer(minLength: 12)
+      Spacer(minLength: detailMinSpacing)
       Text(snapshot.detailTitle)
         .scaledFont(.callout)
-        .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+        .foregroundStyle(.secondary)
         .lineLimit(1)
         .truncationMode(.tail)
     }
-    .padding(Self.padding)
-    .frame(width: Self.width)
-    .background(
-      RoundedRectangle(cornerRadius: Self.cornerRadius, style: .continuous)
-        .fill(.ultraThinMaterial)
-    )
-    .overlay(
-      RoundedRectangle(cornerRadius: Self.cornerRadius, style: .continuous)
-        .strokeBorder(
-          HarnessMonitorTheme.controlBorder.opacity(0.25),
-          lineWidth: 0.5
-        )
-    )
+    .padding(.horizontal, horizontalPadding)
+    .padding(.vertical, verticalPadding)
+    .frame(maxWidth: contentMaxWidth)
+    .glassEffect(in: Capsule())
     .accessibilityIdentifier(HarnessMonitorAccessibility.dashboardReviewsToolbarProvenance)
     .accessibilityElement(children: .combine)
     .accessibilityLabel("Review data provenance")
