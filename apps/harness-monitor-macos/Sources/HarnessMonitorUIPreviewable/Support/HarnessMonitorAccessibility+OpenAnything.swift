@@ -9,6 +9,14 @@ extension HarnessMonitorAccessibility {
     "harness.settings.open-anything.global-hotkey.record"
   public static let openAnythingGlobalHotKeyResetButton =
     "harness.settings.open-anything.global-hotkey.reset"
+  public static let openAnythingShowPinnedToggle =
+    "harness.settings.open-anything.show-pinned"
+  public static let openAnythingShowRecentToggle =
+    "harness.settings.open-anything.show-recent"
+  public static let openAnythingCmdClickBackgroundToggle =
+    "harness.settings.open-anything.cmd-click-background"
+  public static let openAnythingRestoreLastQueryToggle =
+    "harness.settings.open-anything.restore-last-query"
 
   public static func openAnythingRow(_ id: String) -> String {
     "harness.open-anything.row.\(slug(id))"

@@ -74,6 +74,14 @@ struct HarnessMonitorApp: App {
       OpenAnythingHotKeyDefaults.enabledKey: OpenAnythingHotKeyDefaults.enabledDefault,
       OpenAnythingHotKeyDefaults.descriptorKey:
         OpenAnythingHotKeyDefaults.descriptorDefault.storageValue,
+      OpenAnythingPreferencesDefaults.showPinnedKey:
+        OpenAnythingPreferencesDefaults.showPinnedDefault,
+      OpenAnythingPreferencesDefaults.showRecentKey:
+        OpenAnythingPreferencesDefaults.showRecentDefault,
+      OpenAnythingPreferencesDefaults.cmdClickBackgroundKey:
+        OpenAnythingPreferencesDefaults.cmdClickBackgroundDefault,
+      OpenAnythingPreferencesDefaults.restoreLastQueryKey:
+        OpenAnythingPreferencesDefaults.restoreLastQueryDefault,
     ])
 
     let configuration = HarnessMonitorAppConfiguration.resolve()
