@@ -5,7 +5,6 @@ struct DashboardReviewDetailView<Actions: View>: View {
   let item: ReviewItem
   let store: HarnessMonitorStore
   let activity: DashboardReviewActivitySnapshot
-  let provenance: DashboardReviewsProvenanceSnapshot?
   @Binding var showsProblemChecksOnly: Bool
   let onDescriptionCheckboxError: ((String) -> Void)?
   let onDescriptionCheckboxUpdated: (() -> Void)?
@@ -23,7 +22,6 @@ struct DashboardReviewDetailView<Actions: View>: View {
     item: ReviewItem,
     store: HarnessMonitorStore,
     activity: DashboardReviewActivitySnapshot,
-    provenance: DashboardReviewsProvenanceSnapshot? = nil,
     showsProblemChecksOnly: Binding<Bool> = .constant(false),
     onDescriptionCheckboxError: ((String) -> Void)? = nil,
     onDescriptionCheckboxUpdated: (() -> Void)? = nil,
@@ -33,7 +31,6 @@ struct DashboardReviewDetailView<Actions: View>: View {
     self.item = item
     self.store = store
     self.activity = activity
-    self.provenance = provenance
     _showsProblemChecksOnly = showsProblemChecksOnly
     self.onDescriptionCheckboxError = onDescriptionCheckboxError
     self.onDescriptionCheckboxUpdated = onDescriptionCheckboxUpdated
@@ -102,9 +99,6 @@ struct DashboardReviewDetailView<Actions: View>: View {
         VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingMD) {
           actionBar()
           DashboardReviewStatusStrip(item: item)
-          if let provenance {
-            DashboardReviewProvenanceMiniBar(snapshot: provenance)
-          }
         }
       }
       .frame(maxWidth: reviewsDetailMaxWidth, alignment: .leading)
