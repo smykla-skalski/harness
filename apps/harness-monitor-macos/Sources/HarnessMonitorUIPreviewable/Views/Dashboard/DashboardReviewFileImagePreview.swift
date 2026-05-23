@@ -1,3 +1,4 @@
+import Foundation
 import HarnessMonitorKit
 import SwiftUI
 
@@ -11,6 +12,7 @@ struct DashboardReviewFileImagePreview: View {
   let patch: ReviewFilePatch
   let pullRequestID: String
   let repositoryID: String
+  let fontScale: CGFloat
 
   @Environment(HarnessMonitorStore.self)
   private var store
@@ -19,6 +21,13 @@ struct DashboardReviewFileImagePreview: View {
   @State private var prepared: ReviewImageDecoder.PreparedImage?
   @State private var failed: Bool = false
   @State private var loading: Bool = true
+
+  @MainActor private static let byteCountFormatter: ByteCountFormatter = {
+    let formatter = ByteCountFormatter()
+    formatter.allowedUnits = [.useKB, .useMB]
+    formatter.countStyle = .file
+    return formatter
+  }()
 
   var body: some View {
     Group {
@@ -48,13 +57,13 @@ struct DashboardReviewFileImagePreview: View {
         .frame(maxWidth: 800, maxHeight: 800)
       Text(
         "\(Int(image.intrinsicSize.width))×\(Int(image.intrinsicSize.height)) · "
-          + humanizedBytes(image.byteSize)
+          + Self.humanizedBytes(image.byteSize)
       )
-      .font(.caption2)
+      .font(caption2Font)
       .foregroundStyle(.secondary)
       if patch.truncated {
         Text("Truncated by GitHub. Open on github.com for the full asset.")
-          .font(.caption2)
+          .font(caption2Font)
           .foregroundStyle(.orange)
       }
     }
@@ -63,7 +72,7 @@ struct DashboardReviewFileImagePreview: View {
   private var loadingRow: some View {
     HStack(spacing: 8) {
       ProgressView().controlSize(.small)
-      Text("Decoding preview…").font(.caption).foregroundStyle(.secondary)
+      Text("Decoding preview…").font(captionFont).foregroundStyle(.secondary)
     }
   }
 
@@ -72,26 +81,26 @@ struct DashboardReviewFileImagePreview: View {
       "Preview unavailable — daemon couldn't fetch the blob",
       systemImage: "exclamationmark.triangle"
     )
-    .font(.caption)
+    .font(captionFont)
     .foregroundStyle(.orange)
   }
 
   private var overBudgetRow: some View {
     VStack(alignment: .leading, spacing: 4) {
       Label("Image too large to preview", systemImage: "photo.badge.exclamationmark")
-        .font(.caption)
+        .font(captionFont)
         .foregroundStyle(.secondary)
       Text(
         "Larger than the configured limit (\(preferences.snapshot.filesImagePreviewMaxBytes / 1_048_576) MB)."
       )
-      .font(.caption2)
+      .font(caption2Font)
       .foregroundStyle(.secondary)
     }
   }
 
   private var nonImageBinaryRow: some View {
     Label("Binary file — no inline preview available", systemImage: "doc")
-      .font(.caption)
+      .font(captionFont)
       .foregroundStyle(.secondary)
   }
 
@@ -129,10 +138,16 @@ struct DashboardReviewFileImagePreview: View {
     failed = result == nil
   }
 
-  private func humanizedBytes(_ bytes: Int) -> String {
-    let formatter = ByteCountFormatter()
-    formatter.allowedUnits = [.useKB, .useMB]
-    formatter.countStyle = .file
-    return formatter.string(fromByteCount: Int64(bytes))
+  private var captionFont: Font {
+    HarnessMonitorTextSize.scaledFont(.caption, by: fontScale)
+  }
+
+  private var caption2Font: Font {
+    HarnessMonitorTextSize.scaledFont(.caption2, by: fontScale)
+  }
+
+  @MainActor
+  private static func humanizedBytes(_ bytes: Int) -> String {
+    byteCountFormatter.string(fromByteCount: Int64(bytes))
   }
 }

@@ -60,6 +60,7 @@ struct DashboardReviewConversationFeed: View {
         DashboardReviewConversationStatusBar(
           loadState: viewModel.loadState,
           entriesCount: viewModel.entries.count,
+          fontScale: fontScale,
           onRefresh: { Task { await refresh() } }
         )
         .equatable()
@@ -111,7 +112,7 @@ struct DashboardReviewConversationFeed: View {
     if let error = viewModel.lastError {
       Label(error, systemImage: "exclamationmark.triangle")
         .foregroundStyle(.orange)
-        .font(.caption)
+        .font(captionFont)
     }
   }
 
@@ -129,7 +130,7 @@ struct DashboardReviewConversationFeed: View {
     } else if rowSource.rows.isEmpty {
       Text("No activity yet on this PR.")
         .foregroundStyle(.secondary)
-        .font(.subheadline)
+        .font(subheadlineFont)
     } else {
       let visibleRows = Array(rowSource.rows.prefix(visibleTimelineRowLimit))
       SessionTimelineCards(
@@ -167,7 +168,8 @@ struct DashboardReviewConversationFeed: View {
         entriesCount: viewModel.entries.count,
         visibleRowsCount: visibleRows.count,
         totalRowsCount: rowSource.rows.count,
-        hasOlder: viewModel.hasOlder
+        hasOlder: viewModel.hasOlder,
+        fontScale: fontScale
       )
       .equatable()
     }
@@ -214,5 +216,13 @@ struct DashboardReviewConversationFeed: View {
 
   private var hiddenTimelineRowCount: Int {
     max(rowSource.rows.count - visibleTimelineRowLimit, 0)
+  }
+
+  private var captionFont: Font {
+    HarnessMonitorTextSize.scaledFont(.caption, by: fontScale)
+  }
+
+  private var subheadlineFont: Font {
+    HarnessMonitorTextSize.scaledFont(.subheadline, by: fontScale)
   }
 }

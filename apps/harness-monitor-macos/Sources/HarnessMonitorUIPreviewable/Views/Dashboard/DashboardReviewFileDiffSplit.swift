@@ -9,21 +9,27 @@ import SwiftUI
 struct DashboardReviewFileDiffSplit: View {
   let patch: ReviewFilePatch
   let language: HarnessReviewFileLanguage
+  let fontScale: CGFloat
   var minColumnPoints: CGFloat = 280
 
   @State private var leftText: AttributedString?
   @State private var rightText: AttributedString?
 
   var body: some View {
+    let diffFont = DashboardReviewDiffTypography.font(for: fontScale)
     GeometryReader { proxy in
       let width = proxy.size.width
       if width / 2 < minColumnPoints {
-        DashboardReviewFileDiffUnified(patch: patch, language: language)
+        DashboardReviewFileDiffUnified(
+          patch: patch,
+          language: language,
+          fontScale: fontScale
+        )
       } else {
         HStack(alignment: .top, spacing: 8) {
-          column(text: leftText ?? AttributedString(patch.patch))
+          column(text: leftText ?? AttributedString(patch.patch), diffFont: diffFont)
           Divider()
-          column(text: rightText ?? AttributedString(patch.patch))
+          column(text: rightText ?? AttributedString(patch.patch), diffFont: diffFont)
         }
       }
     }
@@ -36,10 +42,10 @@ struct DashboardReviewFileDiffSplit: View {
     }
   }
 
-  private func column(text: AttributedString) -> some View {
+  private func column(text: AttributedString, diffFont: Font) -> some View {
     ScrollView(.horizontal) {
       Text(text)
-        .font(.system(size: 12, design: .monospaced))
+        .font(diffFont)
         .textSelection(.enabled)
         .frame(maxWidth: .infinity, alignment: .leading)
     }

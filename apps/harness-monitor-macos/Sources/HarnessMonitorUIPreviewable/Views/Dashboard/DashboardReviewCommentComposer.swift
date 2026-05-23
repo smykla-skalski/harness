@@ -21,6 +21,8 @@ struct DashboardReviewCommentComposer: View {
   let viewerLogin: String?
   let onDraftChange: (String) -> Void
   let onSend: (String) async -> ReviewCommentPostOutcome
+  @Environment(\.fontScale)
+  private var fontScale
 
   @State private var draft: String
   @State private var debouncedDraft: String
@@ -72,6 +74,7 @@ struct DashboardReviewCommentComposer: View {
       if let message = lastError {
         DashboardReviewCommentRetryStrip(
           message: message,
+          fontScale: fontScale,
           canRetry: lastFailedBody != nil && !isPosting,
           onRetry: retry,
           onDismiss: dismissError
@@ -87,6 +90,7 @@ struct DashboardReviewCommentComposer: View {
     }
     .accessibilityElement(children: .contain)
     .accessibilityLabel(Text("New comment composer"))
+    .font(HarnessMonitorTextSize.scaledFont(.body, by: fontScale))
     .animation(.smooth(duration: 0.18), value: isCollapsed)
     .task(id: draft) {
       try? await Task.sleep(for: .milliseconds(300))
@@ -119,7 +123,7 @@ struct DashboardReviewCommentComposer: View {
         Spacer(minLength: 8)
         Image(systemName: "chevron.up")
           .foregroundStyle(.tertiary)
-          .font(.caption)
+          .font(captionFont)
       }
       .contentShape(.rect)
       .padding(.horizontal, 16)
@@ -156,7 +160,7 @@ struct DashboardReviewCommentComposer: View {
       } label: {
         Image(systemName: "chevron.down")
           .foregroundStyle(.secondary)
-          .font(.caption)
+          .font(captionFont)
           .padding(.horizontal, 6)
           .padding(.vertical, 2)
           .contentShape(.rect)
@@ -196,7 +200,7 @@ struct DashboardReviewCommentComposer: View {
       .help(trimmed.isEmpty ? "Type a comment to preview it." : "")
       Spacer()
       Text("\(charCount) characters")
-        .font(.caption2.monospacedDigit())
+        .font(caption2MonospacedFont)
         .foregroundStyle(
           charCount > Self.softCharacterLimit ? .red : .secondary
         )
@@ -221,7 +225,7 @@ struct DashboardReviewCommentComposer: View {
       Text("⌘↩ to send · Markdown supported")
         .accessibilityLabel(Text("Command return to send. Markdown formatting supported."))
     }
-    .font(.caption2)
+    .font(caption2Font)
     .foregroundStyle(.tertiary)
   }
 
@@ -286,5 +290,17 @@ struct DashboardReviewCommentComposer: View {
   private func dismissError() {
     lastError = nil
     lastFailedBody = nil
+  }
+
+  private var captionFont: Font {
+    HarnessMonitorTextSize.scaledFont(.caption, by: fontScale)
+  }
+
+  private var caption2Font: Font {
+    HarnessMonitorTextSize.scaledFont(.caption2, by: fontScale)
+  }
+
+  private var caption2MonospacedFont: Font {
+    HarnessMonitorTextSize.scaledFont(.caption2.monospacedDigit(), by: fontScale)
   }
 }

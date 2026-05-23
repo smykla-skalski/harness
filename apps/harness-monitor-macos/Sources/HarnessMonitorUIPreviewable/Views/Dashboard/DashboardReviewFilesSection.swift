@@ -14,6 +14,8 @@ struct DashboardReviewFilesSection: View {
 
   @Environment(HarnessMonitorStore.self)
   private var store
+  @Environment(\.fontScale)
+  private var fontScale
   @Environment(\.reviewsPreferences)
   private var preferences
   @State private var filter = DashboardReviewFilesFilterState()
@@ -38,7 +40,11 @@ struct DashboardReviewFilesSection: View {
     let viewModel = store.viewModel(forPullRequest: pullRequestID)
     let isDaemonOnline = store.connectionState == .online && store.apiClient != nil
     return VStack(alignment: .leading, spacing: 12) {
-      DashboardReviewFilesHeader(viewModel: viewModel, filter: filter)
+      DashboardReviewFilesHeader(
+        viewModel: viewModel,
+        filter: filter,
+        fontScale: fontScale
+      )
       contentBody(viewModel: viewModel, isDaemonOnline: isDaemonOnline)
     }
     .task(
@@ -82,25 +88,31 @@ struct DashboardReviewFilesSection: View {
     switch viewModel.state {
     case .idle, .loading:
       if !isDaemonOnline {
-        DashboardReviewFilesEmptyState(reason: .waitingForDaemon)
+        DashboardReviewFilesEmptyState(reason: .waitingForDaemon, fontScale: fontScale)
       } else if let cloning = activeCloningProgress {
         DashboardReviewFilesEmptyState(
           reason: .cloning(progress: cloning),
+          fontScale: fontScale,
           onHideFilesForPR: onHideFilesForPR
         )
       } else {
-        DashboardReviewFilesEmptyState(reason: .loading)
+        DashboardReviewFilesEmptyState(reason: .loading, fontScale: fontScale)
       }
     case .error(let message):
       if !isDaemonOnline {
-        DashboardReviewFilesEmptyState(reason: .waitingForDaemon)
+        DashboardReviewFilesEmptyState(reason: .waitingForDaemon, fontScale: fontScale)
       } else {
-        DashboardReviewFilesEmptyState(reason: .error(message: message))
+        DashboardReviewFilesEmptyState(
+          reason: .error(message: message),
+          fontScale: fontScale
+        )
       }
     case .loaded:
       if viewModel.filteredFiles.isEmpty {
         DashboardReviewFilesEmptyState(
-          reason: viewModel.files.isEmpty ? .noFiles : .filteredOut)
+          reason: viewModel.files.isEmpty ? .noFiles : .filteredOut,
+          fontScale: fontScale
+        )
       } else {
         filesList(viewModel: viewModel)
       }
@@ -142,6 +154,7 @@ struct DashboardReviewFilesSection: View {
           viewMode: viewModel.viewMode(forPath: file.path),
           pullRequestID: pullRequestID,
           repositoryID: repositoryID,
+          fontScale: fontScale,
           onToggleViewed: { newValue in
             store.setFileViewed(
               pullRequestID: pullRequestID,
@@ -239,6 +252,7 @@ struct DashboardReviewFilesEmptyState: View {
   }
 
   let reason: Reason
+  let fontScale: CGFloat
   /// Optional escape hatch surfaced only while the daemon is cloning.
   /// When provided, the cloning empty-state offers a "Hide Files for
   /// this PR" button that dismisses the section locally without
@@ -247,17 +261,22 @@ struct DashboardReviewFilesEmptyState: View {
 
   @State private var cloningStartedAt: Date?
 
-  init(reason: Reason, onHideFilesForPR: (() -> Void)? = nil) {
+  init(
+    reason: Reason,
+    fontScale: CGFloat,
+    onHideFilesForPR: (() -> Void)? = nil
+  ) {
     self.reason = reason
+    self.fontScale = fontScale
     self.onHideFilesForPR = onHideFilesForPR
   }
 
   var body: some View {
     VStack(alignment: .center, spacing: 6) {
       icon
-      Text(title).font(.headline)
+      Text(title).font(titleFont)
       if let subtitle {
-        Text(subtitle).font(.subheadline).foregroundStyle(.secondary)
+        Text(subtitle).font(subtitleFont).foregroundStyle(.secondary)
       }
       cloningEscapeHatch
     }
@@ -282,7 +301,7 @@ struct DashboardReviewFilesEmptyState: View {
         let startedAt = cloningStartedAt ?? context.date
         let elapsed = max(0, Int(context.date.timeIntervalSince(startedAt)))
         Text("Cloning for \(elapsed)s")
-          .font(.caption)
+          .font(captionFont)
           .foregroundStyle(.secondary)
           .monospacedDigit()
           .accessibilityLabel("Cloning has been running for \(elapsed) seconds")
@@ -349,5 +368,17 @@ struct DashboardReviewFilesEmptyState: View {
   private var cloningIdentity: String? {
     guard case .cloning(let progress) = reason else { return nil }
     return progress.repoFullName
+  }
+
+  private var titleFont: Font {
+    HarnessMonitorTextSize.scaledFont(.headline, by: fontScale)
+  }
+
+  private var subtitleFont: Font {
+    HarnessMonitorTextSize.scaledFont(.subheadline, by: fontScale)
+  }
+
+  private var captionFont: Font {
+    HarnessMonitorTextSize.scaledFont(.caption, by: fontScale)
   }
 }

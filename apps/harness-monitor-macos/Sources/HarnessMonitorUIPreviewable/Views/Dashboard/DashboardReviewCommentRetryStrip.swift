@@ -12,15 +12,32 @@ import SwiftUI
 /// view a pure presentation layer with no @State of its own.
 struct DashboardReviewCommentRetryStrip: View {
   let message: String
+  let fontScale: CGFloat
   let canRetry: Bool
   let onRetry: () -> Void
   let onDismiss: () -> Void
+  let messageFont: Font
+
+  init(
+    message: String,
+    fontScale: CGFloat,
+    canRetry: Bool,
+    onRetry: @escaping () -> Void,
+    onDismiss: @escaping () -> Void
+  ) {
+    self.message = message
+    self.fontScale = fontScale
+    self.canRetry = canRetry
+    self.onRetry = onRetry
+    self.onDismiss = onDismiss
+    messageFont = HarnessMonitorTextSize.scaledFont(.caption, by: fontScale)
+  }
 
   var body: some View {
     HStack(spacing: 8) {
       Label(message, systemImage: "exclamationmark.triangle")
         .foregroundStyle(.orange)
-        .font(.caption)
+        .font(messageFont)
         .lineLimit(2)
         .accessibilityLabel(Text("Comment failed to send: \(message)"))
       Spacer()
