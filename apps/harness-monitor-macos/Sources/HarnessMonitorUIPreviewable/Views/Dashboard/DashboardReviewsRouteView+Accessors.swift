@@ -2,109 +2,109 @@ import HarnessMonitorKit
 import SwiftUI
 
 /// `route*` computed properties exposed to the extension files in this
-/// directory. They proxy through `routeState` so the `+Refresh`,
-/// `+Content`, `+ContextMenu`, `+ToolbarSearch`, `+TransientBanners`,
-/// and similar companions can read and write the shared state without
-/// each one declaring its own `@Binding` plumbing.
+/// directory. They proxy through the private route state storage so the
+/// `+Refresh`, `+Content`, `+ContextMenu`, `+ToolbarSearch`,
+/// `+TransientBanners`, and similar companions can read and write shared
+/// state without each one declaring its own `@Binding` plumbing.
 extension DashboardReviewsRouteView {
   var routeResponse: ReviewsQueryResponse {
-    get { routeState.response }
-    nonmutating set { routeState.response = newValue }
+    get { routeStateStorage.response }
+    nonmutating set { routeStateStorage.response = newValue }
   }
 
   var routeErrorMessage: String? {
-    get { routeState.errorMessage }
-    nonmutating set { routeState.errorMessage = newValue }
+    get { routeStateStorage.errorMessage }
+    nonmutating set { routeStateStorage.errorMessage = newValue }
   }
 
   var routeIsLoading: Bool {
-    get { routeState.isLoading }
-    nonmutating set { routeState.isLoading = newValue }
+    get { routeStateStorage.isLoading }
+    nonmutating set { routeStateStorage.isLoading = newValue }
   }
 
   var routeIsBackgroundRefreshing: Bool {
-    get { routeState.isBackgroundRefreshing }
-    nonmutating set { routeState.isBackgroundRefreshing = newValue }
+    get { routeStateStorage.isBackgroundRefreshing }
+    nonmutating set { routeStateStorage.isBackgroundRefreshing = newValue }
   }
 
   var routeSelectedIDs: Set<String> {
-    get { routeState.selectedIDs }
-    nonmutating set { routeState.selectedIDs = newValue }
+    get { routeStateStorage.selectedIDs }
+    nonmutating set { routeStateStorage.selectedIDs = newValue }
   }
 
   var routeSelectedIDsBinding: Binding<Set<String>> {
     Binding(
-      get: { routeState.selectedIDs },
-      set: { routeState.selectedIDs = $0 }
+      get: { routeStateStorage.selectedIDs },
+      set: { routeStateStorage.selectedIDs = $0 }
     )
   }
 
   var routeIsLabelSheetPresented: Bool {
-    get { routeState.isLabelSheetPresented }
-    nonmutating set { routeState.isLabelSheetPresented = newValue }
+    get { routeStateStorage.isLabelSheetPresented }
+    nonmutating set { routeStateStorage.isLabelSheetPresented = newValue }
   }
 
   var routeIsLabelSheetPresentedBinding: Binding<Bool> {
     Binding(
-      get: { routeState.isLabelSheetPresented },
-      set: { routeState.isLabelSheetPresented = $0 }
+      get: { routeStateStorage.isLabelSheetPresented },
+      set: { routeStateStorage.isLabelSheetPresented = $0 }
     )
   }
 
   var routeLabelDraft: String {
-    get { routeState.labelDraft }
-    nonmutating set { routeState.labelDraft = newValue }
+    get { routeStateStorage.labelDraft }
+    nonmutating set { routeStateStorage.labelDraft = newValue }
   }
 
   var routeLabelDraftBinding: Binding<String> {
     Binding(
-      get: { routeState.labelDraft },
-      set: { routeState.labelDraft = $0 }
+      get: { routeStateStorage.labelDraft },
+      set: { routeStateStorage.labelDraft = $0 }
     )
   }
 
   var routeLabelTargetItems: [ReviewItem] {
-    get { routeState.labelTargetItems }
-    nonmutating set { routeState.labelTargetItems = newValue }
+    get { routeStateStorage.labelTargetItems }
+    nonmutating set { routeStateStorage.labelTargetItems = newValue }
   }
 
   var routeLastStoredPreferencesHash: Int? {
-    get { routeState.lastStoredPreferencesHash }
-    nonmutating set { routeState.lastStoredPreferencesHash = newValue }
+    get { routeStateStorage.lastStoredPreferencesHash }
+    nonmutating set { routeStateStorage.lastStoredPreferencesHash = newValue }
   }
 
   var routeNeedsMeCount: Int {
-    get { routeState.needsMeCount }
-    nonmutating set { routeState.needsMeCount = newValue }
+    get { routeStateStorage.needsMeCount }
+    nonmutating set { routeStateStorage.needsMeCount = newValue }
   }
 
   var routeRefreshTracker: ReviewRefreshTracker {
-    get { routeState.refreshTracker }
-    nonmutating set { routeState.refreshTracker = newValue }
+    get { routeStateStorage.refreshTracker }
+    nonmutating set { routeStateStorage.refreshTracker = newValue }
   }
 
   var routeInFlightTasks: [Task<Void, Never>] {
-    get { routeState.inFlightTasks }
-    nonmutating set { routeState.inFlightTasks = newValue }
+    get { routeStateStorage.inFlightTasks }
+    nonmutating set { routeStateStorage.inFlightTasks = newValue }
   }
 
   var routeRefreshTimeoutItems: [ReviewItem]? {
-    get { routeState.refreshTimeoutItems }
-    nonmutating set { routeState.refreshTimeoutItems = newValue }
+    get { routeStateStorage.refreshTimeoutItems }
+    nonmutating set { routeStateStorage.refreshTimeoutItems = newValue }
   }
 
   var routeDisappearedDescriptors: [DashboardReviewsDisappearedItemTracker.Descriptor] {
-    get { routeState.disappearedDescriptors }
-    nonmutating set { routeState.disappearedDescriptors = newValue }
+    get { routeStateStorage.disappearedDescriptors }
+    nonmutating set { routeStateStorage.disappearedDescriptors = newValue }
   }
 
   var routeScheduler: DashboardReviewsScheduler {
-    routeState.scheduler
+    routeStateStorage.scheduler
   }
 
   var routeCollapsedRepositories: DashboardReviewsCollapsedRepositories {
-    get { routeState.collapsedRepositories }
-    nonmutating set { routeState.collapsedRepositories = newValue }
+    get { routeStateStorage.collapsedRepositories }
+    nonmutating set { routeStateStorage.collapsedRepositories = newValue }
   }
 
   var routeCollapsedRepositoriesStorage: String {
@@ -113,8 +113,8 @@ extension DashboardReviewsRouteView {
   }
 
   var routeLabelMenuDataByRepository: [String: DashboardReviewsRepoLabelMenuData] {
-    get { routeState.labelMenuDataByRepository }
-    nonmutating set { routeState.labelMenuDataByRepository = newValue }
+    get { routeStateStorage.labelMenuDataByRepository }
+    nonmutating set { routeStateStorage.labelMenuDataByRepository = newValue }
   }
 
   var routePinnedPullRequestIDsStorage: String {
@@ -135,47 +135,47 @@ extension DashboardReviewsRouteView {
   }
 
   var routePresentationWorker: DashboardReviewsPresentationWorker {
-    routeState.presentationWorker
+    routeStateStorage.presentationWorker
   }
 
   var routeCachedPresentation: DashboardReviewsPresentation {
-    get { routeState.cachedPresentation }
-    nonmutating set { routeState.cachedPresentation = newValue }
+    get { routeStateStorage.cachedPresentation }
+    nonmutating set { routeStateStorage.cachedPresentation = newValue }
   }
 
   var routePresentationGeneration: UInt64 {
-    get { routeState.presentationGeneration }
-    nonmutating set { routeState.presentationGeneration = newValue }
+    get { routeStateStorage.presentationGeneration }
+    nonmutating set { routeStateStorage.presentationGeneration = newValue }
   }
 
   var routeIsReviewsRouteActive: Bool {
-    get { routeState.isReviewsRouteActive }
-    nonmutating set { routeState.isReviewsRouteActive = newValue }
+    get { routeStateStorage.isReviewsRouteActive }
+    nonmutating set { routeStateStorage.isReviewsRouteActive = newValue }
   }
 
   var routePendingResumeAfterReturn: Bool {
-    get { routeState.pendingResumeAfterReturn }
-    nonmutating set { routeState.pendingResumeAfterReturn = newValue }
+    get { routeStateStorage.pendingResumeAfterReturn }
+    nonmutating set { routeStateStorage.pendingResumeAfterReturn = newValue }
   }
 
   var routeResolvedPreferences: DashboardReviewsResolvedPreferences {
-    get { routeState.resolvedPreferences }
-    nonmutating set { routeState.resolvedPreferences = newValue }
+    get { routeStateStorage.resolvedPreferences }
+    nonmutating set { routeStateStorage.resolvedPreferences = newValue }
   }
 
   var routeRecentReviewActions: [String: DashboardReviewActivityEntry] {
-    get { routeState.actionState.recentActions }
-    nonmutating set { routeState.actionState.recentActions = newValue }
+    get { routeStateStorage.actionState.recentActions }
+    nonmutating set { routeStateStorage.actionState.recentActions = newValue }
   }
 
   var routePinnedPullRequests: DashboardReviewsPinnedPullRequests {
-    get { routeState.pinnedPullRequests }
-    nonmutating set { routeState.pinnedPullRequests = newValue }
+    get { routeStateStorage.pinnedPullRequests }
+    nonmutating set { routeStateStorage.pinnedPullRequests = newValue }
   }
 
   var routePendingActionConfirmation: DashboardReviewActionConfirmation? {
-    get { routeState.actionState.pendingConfirmation }
-    nonmutating set { routeState.actionState.pendingConfirmation = newValue }
+    get { routeStateStorage.actionState.pendingConfirmation }
+    nonmutating set { routeStateStorage.actionState.pendingConfirmation = newValue }
   }
 
   var routePendingActionConfirmationTitle: String {
@@ -194,7 +194,7 @@ extension DashboardReviewsRouteView {
   }
 
   var routeReviewCapabilities: ReviewsCapabilitiesResponse {
-    get { routeState.actionState.capabilities }
-    nonmutating set { routeState.actionState.capabilities = newValue }
+    get { routeStateStorage.actionState.capabilities }
+    nonmutating set { routeStateStorage.actionState.capabilities = newValue }
   }
 }

@@ -80,6 +80,10 @@ struct DashboardReviewsRouteView: View {
     routeResolvedPreferences.preferences
   }
 
+  var routeStateStorage: DashboardReviewsRouteViewState {
+    routeState
+  }
+
   var groupMode: DashboardReviewsGroupMode {
     DashboardReviewsGroupMode(rawValue: groupModeRaw) ?? .repository
   }

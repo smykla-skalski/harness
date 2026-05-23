@@ -257,10 +257,7 @@ actor DashboardReviewsPresentationWorker {
       pinnedItemsFirst,
       groupMode: groupMode,
       sort: comparator,
-      configuredRepositories: input.configuredRepositories,
-      configuredOrganizations: input.configuredOrganizations,
-      configuredAuthors: input.configuredAuthors,
-      pinnedPullRequestIDs: input.pinnedPullRequestIDs
+      input: input
     )
     return DashboardReviewsListPresentation(
       filteredItems: pinnedItemsFirst,
@@ -291,19 +288,16 @@ actor DashboardReviewsPresentationWorker {
     _ filteredItems: [ReviewItem],
     groupMode: DashboardReviewsGroupMode,
     sort comparator: (ReviewItem, ReviewItem) -> Bool,
-    configuredRepositories: [String],
-    configuredOrganizations: [String],
-    configuredAuthors: [String],
-    pinnedPullRequestIDs: [String]
+    input: DashboardReviewsPresentationInput
   ) -> [DashboardReviewsRepositoryGroup] {
     switch groupMode {
     case .repository:
       repositoryGroupedItems(
         filteredItems,
         sort: comparator,
-        configuredRepositories: configuredRepositories,
-        configuredOrganizations: configuredOrganizations,
-        pinnedPullRequestIDs: pinnedPullRequestIDs
+        configuredRepositories: input.configuredRepositories,
+        configuredOrganizations: input.configuredOrganizations,
+        pinnedPullRequestIDs: input.pinnedPullRequestIDs
       )
     case .status:
       statusGroupedItems(filteredItems, sort: comparator)
@@ -311,7 +305,7 @@ actor DashboardReviewsPresentationWorker {
       authorGroupedItems(
         filteredItems,
         sort: comparator,
-        configuredAuthors: configuredAuthors
+        configuredAuthors: input.configuredAuthors
       )
     case .flat:
       []

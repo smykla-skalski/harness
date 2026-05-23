@@ -146,7 +146,8 @@ struct DashboardReviewCommentComposer: View {
     .help(
       viewerCanComment
         ? ""
-        : "Your access token doesn't grant the `repo` / `pull_request` write scopes for this repository. Check Settings → Connections."
+        : "Your access token doesn't grant the `repo` / `pull_request` write scopes "
+          + "for this repository. Check Settings → Connections."
     )
     .accessibilityLabel(Text("Expand comment composer"))
   }

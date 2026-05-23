@@ -235,14 +235,16 @@ struct DashboardReviewListRow: View {
 
   fileprivate var rowIdealHeight: CGFloat {
     DashboardReviewListRowHeight.idealHeight(
-      titleLineHeight: titleLineHeight,
-      captionLineHeight: captionLineHeight,
-      pillStripHeight: pillStripHeight,
-      hasAttentionStrip: !attentionBadgeKinds.isEmpty,
-      hasRequiredFailedChecks: visibleRequiredFailedCheckNames != nil,
-      hasLabels: !item.labels.isEmpty,
-      verticalPadding: DashboardReviewsVisualMetrics.reviewRowVerticalPadding,
-      lineSpacing: HarnessMonitorTheme.spacingXS
+      DashboardReviewListRowHeight.Layout(
+        titleLineHeight: titleLineHeight,
+        captionLineHeight: captionLineHeight,
+        pillStripHeight: pillStripHeight,
+        hasAttentionStrip: !attentionBadgeKinds.isEmpty,
+        hasRequiredFailedChecks: visibleRequiredFailedCheckNames != nil,
+        hasLabels: !item.labels.isEmpty,
+        verticalPadding: DashboardReviewsVisualMetrics.reviewRowVerticalPadding,
+        lineSpacing: HarnessMonitorTheme.spacingXS
+      )
     )
   }
 }

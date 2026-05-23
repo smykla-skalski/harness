@@ -88,10 +88,12 @@ struct DashboardReviewsRouteViewTests {
 
   @Test("route source caches decoded preferences off the SwiftUI body path")
   func routeSourceCachesDecodedPreferencesOffTheSwiftUIBodyPath() throws {
-    let source = try routeSource()
-    let supportSource = try routeSource(named: "DashboardReviewsRouteSupport.swift")
-    let cacheSource = try routeSource(named: "DashboardReviewsRouteView+Cache.swift")
-    let schedulerSource = try routeSource(named: "DashboardReviewsRouteView+Scheduler.swift")
+    let source = try dashboardReviewsRouteSource()
+    let supportSource = try dashboardReviewsRouteSource(named: "DashboardReviewsRouteSupport.swift")
+    let cacheSource = try dashboardReviewsRouteSource(
+      named: "DashboardReviewsRouteView+Cache.swift")
+    let schedulerSource = try dashboardReviewsRouteSource(
+      named: "DashboardReviewsRouteView+Scheduler.swift")
 
     #expect(supportSource.contains("struct DashboardReviewsResolvedPreferences"))
     #expect(source.contains("@State private var resolvedPreferences"))
@@ -113,7 +115,7 @@ struct DashboardReviewsRouteViewTests {
 
   @Test("route presentation input consumes toolbar search text")
   func routePresentationInputConsumesToolbarSearchText() throws {
-    let source = try routeSource()
+    let source = try dashboardReviewsRouteSource()
 
     #expect(source.contains("searchText: searchText"))
     #expect(!source.contains("searchText: \"\""))
@@ -121,9 +123,10 @@ struct DashboardReviewsRouteViewTests {
 
   @Test("route source keeps review network decode off the view actor")
   func routeSourceKeepsReviewNetworkDecodeOffTheViewActor() throws {
-    let supportSource = try routeSource(named: "DashboardReviewsRouteSupport.swift")
-    let refreshSource = try routeSource(named: "DashboardReviewsRouteView+Refresh.swift")
-    let schedulerSource = try routeSource(named: "DashboardReviewsScheduler.swift")
+    let supportSource = try dashboardReviewsRouteSource(named: "DashboardReviewsRouteSupport.swift")
+    let refreshSource = try dashboardReviewsRouteSource(
+      named: "DashboardReviewsRouteView+Refresh.swift")
+    let schedulerSource = try dashboardReviewsRouteSource(named: "DashboardReviewsScheduler.swift")
 
     #expect(supportSource.contains("enum DashboardReviewsRemoteLoader"))
     #expect(supportSource.contains("Task.detached(priority: .userInitiated)"))
@@ -134,17 +137,19 @@ struct DashboardReviewsRouteViewTests {
 
   @Test("route source presents native confirmation for risky approve and merge actions")
   func routeSourcePresentsNativeConfirmationForRiskyApproveAndMergeActions() throws {
-    let routeViewSource = try routeSource()
-    let contentSource = try routeSource(named: "DashboardReviewsRouteView+Content.swift")
-    let actionPreviewSource = try routeSource(
+    let routeViewSource = try dashboardReviewsRouteSource()
+    let contentSource = try dashboardReviewsRouteSource(
+      named: "DashboardReviewsRouteView+Content.swift")
+    let actionPreviewSource = try dashboardReviewsRouteSource(
       named: "DashboardReviewsRouteView+ActionPreview.swift"
     )
-    let attentionSource = try routeSource(named: "DashboardReviewsAttentionActions.swift")
-    let actionBarSource = try routeSource(named: "DashboardReviewActionBar.swift")
-    let contextMenuSource = try routeSource(
+    let attentionSource = try dashboardReviewsRouteSource(
+      named: "DashboardReviewsAttentionActions.swift")
+    let actionBarSource = try dashboardReviewsRouteSource(named: "DashboardReviewActionBar.swift")
+    let contextMenuSource = try dashboardReviewsRouteSource(
       named: "DashboardReviewsRouteView+ContextMenu.swift"
     )
-    let rowSource = try routeSource(named: "DashboardReviewListRow.swift")
+    let rowSource = try dashboardReviewsRouteSource(named: "DashboardReviewListRow.swift")
 
     #expect(routeViewSource.contains("@State private var actionState"))
     #expect(routeViewSource.contains(".confirmationDialog("))
@@ -165,8 +170,9 @@ struct DashboardReviewsRouteViewTests {
 
   @Test("route source resolves primary selection via the delta-aware helper")
   func routeSourceResolvesPrimarySelectionViaDeltaAwareHelper() throws {
-    let source = try routeSource()
-    let selectionSource = try routeSource(named: "DashboardReviewsRouteView+Selection.swift")
+    let source = try dashboardReviewsRouteSource()
+    let selectionSource = try dashboardReviewsRouteSource(
+      named: "DashboardReviewsRouteView+Selection.swift")
 
     // The buggy lexical-min assignment must be gone from the onChange body.
     #expect(
@@ -185,7 +191,7 @@ struct DashboardReviewsRouteViewTests {
 
   @Test("route source replays pending selection when items finally load")
   func routeSourceReplaysPendingSelectionWhenItemsFinallyLoad() throws {
-    let source = try routeSource()
+    let source = try dashboardReviewsRouteSource()
 
     // The original .task(id: openAnythingReviews.selectionRequest) trigger
     // must still be there - it covers the case where items are already loaded.
@@ -222,7 +228,8 @@ struct DashboardReviewsRouteViewTests {
 
   @Test("dashboard preview exercises review alert rendering")
   func dashboardPreviewExercisesReviewAlertRendering() throws {
-    let source = try previewSource(named: "PreviewDashboardReviewsRouteView.swift")
+    let source = try dashboardReviewsRoutePreviewSource(
+      named: "PreviewDashboardReviewsRouteView.swift")
 
     #expect(source.contains("> ℹ️ **Note**"))
     #expect(source.contains("This PR body was truncated due to platform limits."))
@@ -342,7 +349,7 @@ struct DashboardReviewsRouteViewTests {
     #expect(pending.rerunUnavailableReason == "Only completed check runs can be rerun.")
     #expect(failed.rerunUnavailableReason == nil)
 
-    let item = makeReviewItem(checkStatus: .failure, checks: [missingSuite])
+    let item = dashboardReviewsTestReviewItem(checkStatus: .failure, checks: [missingSuite])
     #expect(
       item.rerunChecksUnavailableReason
         == "GitHub did not provide check suite IDs for these checks."
@@ -379,173 +386,4 @@ struct DashboardReviewsRouteViewTests {
     #expect(entry.recordedAt == recordedAt)
   }
 
-  @Test("multi-select context menu offers a Copy N Links action")
-  func multiSelectContextMenuOffersCopyNLinksAction() throws {
-    let contextMenuSource = try routeSource(
-      named: "DashboardReviewsRouteView+ContextMenu.swift"
-    )
-
-    // Defect 47: the single-item branch keeps "Open Pull Request" / "Copy
-    // Link"; the multi-item branch must produce a "Copy N Links" Button
-    // backed by the pure helper so the rule is unit-testable.
-    #expect(contextMenuSource.contains("else if items.count > 1"))
-    #expect(
-      contextMenuSource.contains(
-        "Button(dashboardReviewsCopyLinksMenuTitle(itemCount: items.count))"
-      )
-    )
-    #expect(
-      contextMenuSource.contains(
-        "HarnessMonitorClipboard.copy(items.map(\\.url).joined(separator: \"\\n\"))"
-      )
-    )
-  }
-
-  @Test("copy links menu title pluralises with the selection count")
-  func copyLinksMenuTitlePluralisesWithCount() {
-    // Pure helper, so verify the exact title shape rather than introspecting
-    // a SwiftUI Button. The helper is the single source of truth used by
-    // both the context menu builder and any future surfaces.
-    #expect(dashboardReviewsCopyLinksMenuTitle(itemCount: 2) == "Copy 2 Links")
-    #expect(dashboardReviewsCopyLinksMenuTitle(itemCount: 5) == "Copy 5 Links")
-    #expect(dashboardReviewsCopyLinksMenuTitle(itemCount: 42) == "Copy 42 Links")
-  }
-
-  @Test("context menu primes selection state on menu open")
-  func contextMenuPrimesSelectionOnMenuOpen() throws {
-    let contextMenuSource = try routeSource(
-      named: "DashboardReviewsRouteView+ContextMenu.swift"
-    )
-
-    // Defect 44: right-clicking an unselected row leaves `routeSelectedIDs`
-    // stale because the list-level `forSelectionType:` API only updates the
-    // closure argument, not the visible selection. The fallback primes the
-    // state asynchronously so action handlers and the detail pane reflect
-    // the menu's scope.
-    #expect(contextMenuSource.contains("func primeSelectionForContextMenu"))
-    #expect(contextMenuSource.contains("primeSelectionForContextMenu(items: items)"))
-    #expect(contextMenuSource.contains("Task { @MainActor in"))
-  }
-
-  @Test("commands and context menu expose pinning controls")
-  func commandsAndContextMenuExposePinningControls() throws {
-    let contextMenuSource = try routeSource(
-      named: "DashboardReviewsRouteView+ContextMenu.swift"
-    )
-    let routeCommandsSource = try routeSource(
-      named: "DashboardReviewsRouteView+Commands.swift"
-    )
-    let commandsSource = try appSource(
-      "apps/harness-monitor-macos/Sources/HarnessMonitor/Commands/ReviewCommands.swift"
-    )
-
-    #expect(contextMenuSource.contains("let pinTitle = pinSelectionMenuTitle(for: items)"))
-    #expect(contextMenuSource.contains("Button(pinTitle)"))
-    #expect(contextMenuSource.contains("togglePinnedSelection(items: items)"))
-    #expect(routeCommandsSource.contains("canTogglePinSelection"))
-    #expect(routeCommandsSource.contains("togglePinnedSelection(items: commandItems)"))
-    #expect(
-      commandsSource.contains("Button(reviewCommands?.pinSelectionTitle ?? \"Pin Selection\")")
-    )
-    #expect(
-      commandsSource.contains(
-        ".keyboardShortcut(\"p\", modifiers: [.command, .option, .shift])"
-      )
-    )
-  }
-
-  @Test("activity snapshot exposes cache and missing check-link labels")
-  func activitySnapshotExposesCacheAndMissingCheckLinkLabels() {
-    let snapshot = DashboardReviewActivitySnapshot(
-      pullRequestID: "pr-1",
-      isRefreshing: true,
-      actionTitle: "Approving",
-      fetchedAt: "2026-05-22T09:00:00Z",
-      fromCache: true,
-      lastAction: nil,
-      missingCheckRunURLCount: 2,
-      totalCheckCount: 3,
-      capabilities: ReviewsCapabilitiesResponse()
-    )
-
-    #expect(snapshot.cacheLabel == "Cached data")
-    #expect(snapshot.checkLinkLabel == "2/3 check links missing")
-  }
-
-  private func routeSource() throws -> String {
-    try routeSource(named: "DashboardReviewsRouteView.swift")
-  }
-
-  private func routeSource(named fileName: String) throws -> String {
-    let testsDirectory = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
-    let repoRoot =
-      testsDirectory
-      .deletingLastPathComponent()
-      .deletingLastPathComponent()
-      .deletingLastPathComponent()
-      .deletingLastPathComponent()
-    let sourceURL =
-      repoRoot
-      .appendingPathComponent(
-        "apps/harness-monitor-macos/Sources/HarnessMonitorUIPreviewable/Views/Dashboard"
-      )
-      .appendingPathComponent(fileName)
-    return try String(contentsOf: sourceURL, encoding: .utf8)
-  }
-
-  private func previewSource(named fileName: String) throws -> String {
-    let testsDirectory = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
-    let repoRoot =
-      testsDirectory
-      .deletingLastPathComponent()
-      .deletingLastPathComponent()
-      .deletingLastPathComponent()
-      .deletingLastPathComponent()
-    let sourceURL =
-      repoRoot
-      .appendingPathComponent(
-        "apps/harness-monitor-macos/Sources/HarnessMonitorUIPreviewable/Views/Dashboard/Previews"
-      )
-      .appendingPathComponent(fileName)
-    return try String(contentsOf: sourceURL, encoding: .utf8)
-  }
-
-  private func appSource(_ relativePath: String) throws -> String {
-    let testsDirectory = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
-    let repoRoot =
-      testsDirectory
-      .deletingLastPathComponent()
-      .deletingLastPathComponent()
-      .deletingLastPathComponent()
-      .deletingLastPathComponent()
-    let sourceURL = repoRoot.appendingPathComponent(relativePath)
-    return try String(contentsOf: sourceURL, encoding: .utf8)
-  }
-
-  private func makeReviewItem(
-    checkStatus: ReviewCheckStatus,
-    checks: [ReviewCheck]
-  ) -> ReviewItem {
-    ReviewItem(
-      pullRequestID: "pr-1",
-      repositoryID: "repo-1",
-      repository: "org-a/example",
-      number: 42,
-      title: "Bump dependency",
-      url: "https://github.com/org-a/example/pull/42",
-      authorLogin: "renovate[bot]",
-      state: .open,
-      mergeable: .mergeable,
-      reviewStatus: .reviewRequired,
-      checkStatus: checkStatus,
-      policyBlocked: false,
-      isDraft: false,
-      headSha: "abc123",
-      checks: checks,
-      additions: 10,
-      deletions: 4,
-      createdAt: "2026-05-20T10:00:00Z",
-      updatedAt: "2026-05-20T11:00:00Z"
-    )
-  }
 }
