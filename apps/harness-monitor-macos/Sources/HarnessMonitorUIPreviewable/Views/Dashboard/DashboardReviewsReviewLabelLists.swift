@@ -4,10 +4,19 @@ import SwiftUI
 struct DashboardReviewReviewList: View {
   let reviews: [PullRequestReview]
   let viewerLogin: String?
+  let canReRequestReview: Bool
+  let onReRequestReview: ((String) -> Void)?
 
-  init(reviews: [PullRequestReview], viewerLogin: String? = nil) {
+  init(
+    reviews: [PullRequestReview],
+    viewerLogin: String? = nil,
+    canReRequestReview: Bool = false,
+    onReRequestReview: ((String) -> Void)? = nil
+  ) {
     self.reviews = reviews
     self.viewerLogin = viewerLogin
+    self.canReRequestReview = canReRequestReview
+    self.onReRequestReview = onReRequestReview
   }
 
   var body: some View {
@@ -25,9 +34,12 @@ struct DashboardReviewReviewList: View {
           lineSpacing: HarnessMonitorTheme.spacingSM
         ) {
           ForEach(reviews) { review in
+            let isViewer = viewerLogin?.caseInsensitiveCompare(review.author) == .orderedSame
             DashboardReviewReviewerPill(
               review: review,
-              isViewer: viewerLogin?.caseInsensitiveCompare(review.author) == .orderedSame
+              isViewer: isViewer,
+              canReRequestReview: canReRequestReview && !isViewer,
+              onReRequestReview: onReRequestReview
             )
           }
         }
@@ -58,6 +70,8 @@ struct DashboardReviewReviewList: View {
 private struct DashboardReviewReviewerPill: View {
   let review: PullRequestReview
   let isViewer: Bool
+  let canReRequestReview: Bool
+  let onReRequestReview: ((String) -> Void)?
 
   private var avatarURL: URL? {
     URL(string: "https://github.com/\(review.author).png?size=24")
@@ -96,6 +110,13 @@ private struct DashboardReviewReviewerPill: View {
     .overlay {
       RoundedRectangle(cornerRadius: DashboardReviewsVisualMetrics.pillCornerRadius)
         .strokeBorder(review.state.tint.opacity(0.24), lineWidth: 1)
+    }
+    .contextMenu {
+      if canReRequestReview, let onReRequestReview {
+        Button("Re-request review from @\(review.author)") {
+          onReRequestReview(review.author)
+        }
+      }
     }
     .accessibilityElement(children: .combine)
     .accessibilityLabel(

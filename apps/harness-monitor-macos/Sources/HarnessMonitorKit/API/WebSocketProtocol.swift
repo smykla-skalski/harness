@@ -125,6 +125,7 @@ enum WebSocketRPCMethod: String, CaseIterable, Equatable, Sendable {
   case reviewsRerunChecks = "reviews.rerun_checks"
   case reviewsAddLabel = "reviews.add_label"
   case reviewsAuto = "reviews.auto"
+  case reviewsRequestReview = "reviews.request_review"
   case reviewsClearCache = "reviews.clear_cache"
   case reviewsRefresh = "reviews.refresh"
   case reviewsBody = "reviews.body"

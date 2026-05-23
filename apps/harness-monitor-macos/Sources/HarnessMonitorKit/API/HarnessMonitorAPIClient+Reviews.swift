@@ -53,6 +53,12 @@ extension HarnessMonitorAPIClient {
     try await post("/v1/reviews/auto", body: request)
   }
 
+  public func reRequestReview(
+    request: ReviewsRequestReviewRequest
+  ) async throws -> ReviewsActionResponse {
+    try await post("/v1/reviews/request-review", body: request)
+  }
+
   public func clearReviewsCache() async throws -> ReviewsCacheClearResponse {
     try await delete("/v1/reviews/cache")
   }

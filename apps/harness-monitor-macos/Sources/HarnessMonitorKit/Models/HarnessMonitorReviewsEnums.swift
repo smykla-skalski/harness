@@ -246,10 +246,11 @@ public enum ReviewActionKind: TaskBoardOpenEnum, CaseIterable, Identifiable {
   case autoApprove
   case autoMerge
   case comment
+  case requestReview
   case unknown(String)
 
   public static let allCases: [Self] = [
-    .approve, .merge, .rerunChecks, .addLabel, .autoApprove, .autoMerge, .comment,
+    .approve, .merge, .rerunChecks, .addLabel, .autoApprove, .autoMerge, .comment, .requestReview,
   ]
   public var id: String { rawValue }
 
@@ -262,6 +263,7 @@ public enum ReviewActionKind: TaskBoardOpenEnum, CaseIterable, Identifiable {
     case .autoApprove: "auto_approve"
     case .autoMerge: "auto_merge"
     case .comment: "comment"
+    case .requestReview: "request_review"
     case .unknown(let raw): raw
     }
   }
@@ -275,6 +277,7 @@ public enum ReviewActionKind: TaskBoardOpenEnum, CaseIterable, Identifiable {
     case "auto_approve": self = .autoApprove
     case "auto_merge": self = .autoMerge
     case "comment": self = .comment
+    case "request_review": self = .requestReview
     default: self = .unknown(rawValue)
     }
   }
