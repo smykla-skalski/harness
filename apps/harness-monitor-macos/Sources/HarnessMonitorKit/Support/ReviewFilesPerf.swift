@@ -50,14 +50,38 @@ public enum ReviewFilesPerf {
     return Interval(state: state, name: "files.preview.fetch")
   }
 
-  public static func beginPreviewPrewarm(pullRequestID: String, pathCount: Int) -> Interval {
+  public static func beginPreviewPrewarm(
+    pullRequestID: String,
+    pathCount: Int,
+    visiblePathCount: Int
+  ) -> Interval {
     let id = signposter.makeSignpostID()
     let state = signposter.beginInterval(
       "files.preview.prewarm",
       id: id,
-      "pr=\(pullRequestID, privacy: .public) paths=\(pathCount)"
+      "pr=\(pullRequestID, privacy: .public) paths=\(pathCount) visible=\(visiblePathCount)"
     )
     return Interval(state: state, name: "files.preview.prewarm")
+  }
+
+  public static func beginPreviewCacheRead(pullRequestID: String, pathCount: Int) -> Interval {
+    let id = signposter.makeSignpostID()
+    let state = signposter.beginInterval(
+      "files.preview.cache.read",
+      id: id,
+      "pr=\(pullRequestID, privacy: .public) paths=\(pathCount)"
+    )
+    return Interval(state: state, name: "files.preview.cache.read")
+  }
+
+  public static func beginPreviewCacheStore(pullRequestID: String, pathCount: Int) -> Interval {
+    let id = signposter.makeSignpostID()
+    let state = signposter.beginInterval(
+      "files.preview.cache.store",
+      id: id,
+      "pr=\(pullRequestID, privacy: .public) paths=\(pathCount)"
+    )
+    return Interval(state: state, name: "files.preview.cache.store")
   }
 
   public static func beginTokenize(path: String) -> Interval {

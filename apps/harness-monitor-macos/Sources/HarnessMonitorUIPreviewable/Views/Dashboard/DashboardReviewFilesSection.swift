@@ -64,6 +64,7 @@ struct DashboardReviewFilesSection: View {
     .onChange(of: filter.snapshotID) { _, _ in
       viewModel.applyFilter(filter.snapshot)
       resetVisibleFiles()
+      startPreviewPrewarm(viewModel: viewModel)
     }
     .onChange(of: filter.hideGenerated) { _, newValue in
       preferences.update { $0.filesHideGenerated = newValue }
@@ -73,9 +74,13 @@ struct DashboardReviewFilesSection: View {
     }
     .onChange(of: viewModel.sortMode) { _, newMode in
       preferences.update { $0.filesSortModeRaw = newMode.rawValue }
+      startPreviewPrewarm(viewModel: viewModel)
     }
     .onChange(of: pullRequestID) { _, _ in
       resetVisibleFiles()
+    }
+    .onChange(of: visibleFileLimit) { _, _ in
+      startPreviewPrewarm(viewModel: viewModel)
     }
     .accessibilityIdentifier("dashboardReviewFilesSection")
   }
@@ -218,16 +223,27 @@ struct DashboardReviewFilesSection: View {
   }
 
   private func startPreviewPrewarm(viewModel: ReviewFilesViewModel) {
+    guard store.connectionState == .online, store.apiClient != nil else {
+      store.startPatchPreviewPrewarm(
+        forPullRequest: pullRequestID,
+        visiblePaths: [],
+        backgroundPaths: []
+      )
+      return
+    }
     let visiblePaths = viewModel.filteredFiles
+      .prefix(visibleFileLimit)
       .filter { !$0.isBinary }
       .map(\.path)
     let visibleSet = Set(visiblePaths)
-    let remainingPaths = viewModel.files
+    let remainingPaths = viewModel.filteredFiles
+      .dropFirst(visibleFileLimit)
       .filter { !$0.isBinary && !visibleSet.contains($0.path) }
       .map(\.path)
     store.startPatchPreviewPrewarm(
       forPullRequest: pullRequestID,
-      paths: visiblePaths + remainingPaths,
+      visiblePaths: visiblePaths,
+      backgroundPaths: remainingPaths,
       largeDiffStrategy: preferences.snapshot.filesLargeDiffStrategy
     )
   }
