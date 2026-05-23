@@ -183,6 +183,14 @@ public final class OpenAnythingPaletteModel {
     normalizeSelection()
   }
 
+  /// Set the selection to a specific hit id, but only if that id appears in
+  /// the currently displayed results. No-op otherwise so callers (hover,
+  /// section-jump shortcuts) cannot leak a stale id past a corpus refresh.
+  public func selectHit(id: String) {
+    guard displayedResults.allHits.contains(where: { $0.id == id }) else { return }
+    selectedHitID = id
+  }
+
   /// Record that the user just executed a record so the recency store can
   /// promote it next time the palette is opened. Call from the palette view
   /// when the user picks a hit.

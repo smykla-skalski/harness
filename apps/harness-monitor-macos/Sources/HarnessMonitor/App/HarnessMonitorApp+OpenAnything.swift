@@ -149,15 +149,26 @@ struct HarnessMonitorOpenAnythingHostModifier: ViewModifier {
   @Environment(\.openWindow)
   private var openWindow
 
+  @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
   func body(content: Content) -> some View {
-    content
+    let showing = model.isPresented(
+      in: windowID,
+      isKeyWindow: keyWindowObserver.isKey(windowID: windowID)
+    )
+    return content
       .overlay {
-        if model.isPresented(in: windowID, isKeyWindow: keyWindowObserver.isKey(windowID: windowID))
-        {
+        if showing {
           OpenAnythingPaletteView(model: model, execute: execute)
             .zIndex(1_000)
         }
       }
+      .animation(
+        showing
+          ? OpenAnythingMotionPolicy.presentAnimation(reduceMotion: reduceMotion)
+          : OpenAnythingMotionPolicy.dismissAnimation(reduceMotion: reduceMotion),
+        value: showing
+      )
   }
 
   private func execute(_ hit: OpenAnythingHit) {
