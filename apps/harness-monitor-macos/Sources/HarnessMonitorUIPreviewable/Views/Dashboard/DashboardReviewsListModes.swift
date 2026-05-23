@@ -190,7 +190,13 @@ enum DashboardReviewsCategoryMode: String, CaseIterable, Identifiable {
   func matches(_ item: ReviewItem) -> Bool {
     switch self {
     case .all: true
-    case .dependencies: ReviewBot.detect(authorLogin: item.authorLogin) != nil
+    case .dependencies:
+      ReviewBot.detect(authorLogin: item.authorLogin) != nil
+        || item.labels.contains(where: Self.isDependencyLabel)
     }
+  }
+
+  private static func isDependencyLabel(_ label: String) -> Bool {
+    label.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() == "dependencies"
   }
 }
