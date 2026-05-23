@@ -81,7 +81,7 @@ extension DashboardReviewsRouteView {
       groupModeRaw: $groupModeRaw,
       needsMeOn: routeNeedsMeOnBinding,
       dependenciesOnlyOn: routeDependenciesOnlyOnBinding,
-      needsMeCount: routeResponse.items.lazy.filter(\.requiresAttention).count,
+      needsMeCount: routeNeedsMeCount,
       syncHealth: routeSyncHealth,
       onRetryFailedRepositories: {
         retryRepositories(routeSyncHealth.failedRepositories)
