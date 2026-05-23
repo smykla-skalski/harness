@@ -63,7 +63,8 @@ func dashboardReviewCheckWorkflowTitle(for check: ReviewCheck) -> String {
   if let slashRange = name.range(of: " / ") {
     raw = String(name[..<slashRange.lowerBound]).trimmingCharacters(in: .whitespacesAndNewlines)
   } else if let parentheticalRange = name.range(of: " (", options: .backwards),
-    name.hasSuffix(")") {
+    name.hasSuffix(")")
+  {
     let prefix = String(name[..<parentheticalRange.lowerBound])
       .trimmingCharacters(in: .whitespacesAndNewlines)
     raw = prefix.isEmpty ? name : prefix
