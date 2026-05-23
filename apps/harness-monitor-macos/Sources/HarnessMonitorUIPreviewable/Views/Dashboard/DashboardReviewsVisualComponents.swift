@@ -148,10 +148,22 @@ private struct DashboardReviewChangePill: View {
     HStack(spacing: HarnessMonitorTheme.spacingSM) {
       Text("Files")
         .foregroundStyle(HarnessMonitorTheme.secondaryInk)
-      Text(verbatim: "+\(additions)")
-        .foregroundStyle(HarnessMonitorTheme.success)
-      Text(verbatim: "-\(deletions)")
-        .foregroundStyle(HarnessMonitorTheme.danger)
+      HStack(spacing: HarnessMonitorTheme.spacingXS) {
+        Image(systemName: "arrow.up")
+          .imageScale(.small)
+          .foregroundStyle(HarnessMonitorTheme.success)
+          .accessibilityHidden(true)
+        Text(verbatim: "+\(additions)")
+          .foregroundStyle(HarnessMonitorTheme.success)
+      }
+      HStack(spacing: HarnessMonitorTheme.spacingXS) {
+        Image(systemName: "arrow.down")
+          .imageScale(.small)
+          .foregroundStyle(HarnessMonitorTheme.danger)
+          .accessibilityHidden(true)
+        Text(verbatim: "-\(deletions)")
+          .foregroundStyle(HarnessMonitorTheme.danger)
+      }
     }
     .scaledFont(.caption.weight(.semibold).monospacedDigit())
     .lineLimit(1)
@@ -175,8 +187,8 @@ private struct DashboardReviewChangePill: View {
   }
 
   private var accessibilityLabel: String {
-    "\(additions) \(additions == 1 ? "addition" : "additions"), \(deletions) "
-      + (deletions == 1 ? "deletion" : "deletions")
+    "Files: \(additions) \(additions == 1 ? "addition" : "additions"), "
+      + "\(deletions) \(deletions == 1 ? "deletion" : "deletions")"
   }
 }
 
@@ -189,7 +201,7 @@ struct DashboardReviewStatusStrip: View {
         DashboardReviewStatusPill(
           label: item.statusLabel,
           tint: item.statusTint,
-          systemImage: item.statusSystemImage
+          systemImage: item.requiresAttention ? nil : item.statusSystemImage
         )
         Text(item.statusSentence)
           .scaledFont(.callout)
@@ -201,11 +213,13 @@ struct DashboardReviewStatusStrip: View {
         spacing: HarnessMonitorTheme.spacingSM,
         lineSpacing: HarnessMonitorTheme.spacingSM
       ) {
-        DashboardReviewStatusPill(
-          label: item.reviewStatus.label,
-          tint: item.reviewStatus.tint,
-          isQuiet: true
-        )
+        if !(item.requiresAttention && item.reviewStatus == .approved) {
+          DashboardReviewStatusPill(
+            label: item.reviewStatus.label,
+            tint: item.reviewStatus.tint,
+            isQuiet: true
+          )
+        }
         DashboardReviewStatusPill(
           label: item.checkStatus.label,
           tint: item.checkStatus.tint,
