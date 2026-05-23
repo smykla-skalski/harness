@@ -2,10 +2,22 @@ import AppKit
 import HarnessMonitorKit
 import SwiftUI
 
+/// Carries the palette's measured content size up to the NSPanel host so the
+/// floating window can shrink to fit. Without this, the panel stays at its
+/// fixed maxWidth x maxHeight and AppKit's cached auto-shadow renders below
+/// the visible glass card as a ghost rectangle.
+public struct OpenAnythingContentSizePreferenceKey: PreferenceKey {
+  public static let defaultValue: CGSize = .zero
+  public static func reduce(value: inout CGSize, nextValue: () -> CGSize) {
+    value = nextValue()
+  }
+}
+
 public struct OpenAnythingPaletteView: View {
   @Bindable var model: OpenAnythingPaletteModel
   private let execute: (OpenAnythingHit) -> Void
   private let onDismiss: (() -> Void)?
+  private let onContentSizeChange: ((CGSize) -> Void)?
   @FocusState private var isFieldFocused: Bool
   @Environment(\.accessibilityReduceMotion)
   var reduceMotion
@@ -15,11 +27,13 @@ public struct OpenAnythingPaletteView: View {
   public init(
     model: OpenAnythingPaletteModel,
     execute: @escaping (OpenAnythingHit) -> Void,
-    onDismiss: (() -> Void)? = nil
+    onDismiss: (() -> Void)? = nil,
+    onContentSizeChange: ((CGSize) -> Void)? = nil
   ) {
     self.model = model
     self.execute = execute
     self.onDismiss = onDismiss
+    self.onContentSizeChange = onContentSizeChange
   }
 
   public var body: some View {
@@ -79,6 +93,9 @@ public struct OpenAnythingPaletteView: View {
     }
     .onAppear { installWheelMonitor() }
     .onDisappear { removeWheelMonitor() }
+    .onPreferenceChange(OpenAnythingContentSizePreferenceKey.self) { size in
+      onContentSizeChange?(size)
+    }
   }
 
   @ViewBuilder
@@ -118,6 +135,12 @@ public struct OpenAnythingPaletteView: View {
     }
     .frame(maxWidth: OpenAnythingPaletteConstants.maxWidth)
     .fixedSize(horizontal: false, vertical: true)
+    .background {
+      GeometryReader { proxy in
+        Color.clear
+          .preference(key: OpenAnythingContentSizePreferenceKey.self, value: proxy.size)
+      }
+    }
     .harnessFloatingControlGlass(
       cornerRadius: OpenAnythingPaletteConstants.cornerRadius,
       tint: nil

@@ -190,7 +190,12 @@ final class OpenAnythingPaletteWindowController: NSObject {
     // shows.
     panel.backgroundColor = .clear
     panel.isOpaque = false
-    panel.hasShadow = true
+    // Disable AppKit's window auto-shadow. It caches a shape based on the
+    // content's alpha and goes stale every time the SwiftUI tree resizes,
+    // bleeding a ghost rounded-rectangle outline under the visible glass
+    // card. SwiftUI's `.shadow` on the palette VStack already paints the
+    // depth at the correct content shape.
+    panel.hasShadow = false
     panel.contentView = makeHostingView()
     panel.onResignMain = { [weak self] in
       // resignMain fires when the user clicks elsewhere in the app or
@@ -205,17 +210,36 @@ final class OpenAnythingPaletteWindowController: NSObject {
     let root = OpenAnythingPaletteContent(
       model: model,
       execute: captured,
-      onDismiss: { [weak self] in self?.didDismissModel() }
+      onDismiss: { [weak self] in self?.didDismissModel() },
+      onContentSizeChange: { [weak self] size in
+        self?.resizePanelToContent(size)
+      }
     )
     let hosting = NSHostingView(rootView: root)
-    // Panel size is fixed by `contentRect`; the SwiftUI tree has no
-    // intrinsic size we need to honor. Default `sizingOptions` of
-    // `[.minSize, .intrinsicContentSize, .maxSize]` probes the rootView
-    // every view update and "comes with a performance cost" per Apple's
-    // documentation, which is pure overhead here.
+    // Panel size tracks the SwiftUI content via `resizePanelToContent`;
+    // the hosting view itself does not need to probe for intrinsics.
+    // Default `sizingOptions` of `[.minSize, .intrinsicContentSize,
+    // .maxSize]` probes the rootView every view update and "comes with
+    // a performance cost" per Apple's documentation.
     // https://developer.apple.com/documentation/swiftui/nshostingview/sizingoptions
     hosting.sizingOptions = []
     return hosting
+  }
+
+  /// Match the NSPanel's frame to the SwiftUI palette's measured content
+  /// size, preserving the top edge so the panel grows and shrinks downward
+  /// as results come and go. Mirrors Raycast/Spotlight where the floating
+  /// card visibly resizes as the user types.
+  private func resizePanelToContent(_ size: CGSize) {
+    guard let panel else { return }
+    guard size.width > 0, size.height > 0 else { return }
+    let oldFrame = panel.frame
+    if abs(oldFrame.size.height - size.height) < 0.5 { return }
+    let topEdge = oldFrame.maxY
+    var newFrame = oldFrame
+    newFrame.size.height = size.height
+    newFrame.origin.y = topEdge - size.height
+    panel.setFrame(newFrame, display: false, animate: false)
   }
 
   private func positionAboveKeyWindow(_ panel: OpenAnythingFloatingPanel) {
@@ -258,12 +282,14 @@ private struct OpenAnythingPaletteContent: View {
   let model: OpenAnythingPaletteModel
   let execute: (OpenAnythingHit) -> Void
   let onDismiss: () -> Void
+  let onContentSizeChange: (CGSize) -> Void
 
   var body: some View {
     OpenAnythingPaletteView(
       model: model,
       execute: execute,
-      onDismiss: onDismiss
+      onDismiss: onDismiss,
+      onContentSizeChange: onContentSizeChange
     )
     .ignoresSafeArea()
   }
