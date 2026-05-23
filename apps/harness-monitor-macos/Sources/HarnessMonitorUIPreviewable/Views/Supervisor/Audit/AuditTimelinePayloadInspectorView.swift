@@ -35,7 +35,7 @@ public struct AuditTimelinePayloadInspectorView: View {
       errorMessage = "Payload is not valid JSON. Showing raw text."
       return
     }
-    node = Self.from(value: decoded, label: nil)
+    node = AuditPayloadNode.from(value: decoded, label: nil)
     errorMessage = nil
   }
 
