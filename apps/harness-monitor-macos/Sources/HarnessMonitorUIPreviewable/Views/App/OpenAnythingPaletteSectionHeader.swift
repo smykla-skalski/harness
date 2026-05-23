@@ -18,12 +18,12 @@ struct OpenAnythingPaletteSectionHeader: View {
       collapseChevron
       Image(systemName: domain.systemImage)
         .font(.caption)
-        .foregroundStyle(.secondary)
+        .foregroundStyle(HarnessMonitorTheme.secondaryInk)
         .accessibilityHidden(true)
       Text(domain.label.uppercased())
         .font(.caption)
         .fontWeight(.semibold)
-        .foregroundStyle(.secondary)
+        .foregroundStyle(HarnessMonitorTheme.secondaryInk)
       countLabel
       Spacer()
       showAllButton
@@ -45,7 +45,7 @@ struct OpenAnythingPaletteSectionHeader: View {
   private var collapseChevron: some View {
     Image(systemName: isCollapsed ? "chevron.right" : "chevron.down")
       .font(.caption2)
-      .foregroundStyle(.tertiary)
+      .foregroundStyle(HarnessMonitorTheme.tertiaryInk)
       .frame(width: 10)
       .accessibilityHidden(true)
   }
@@ -53,7 +53,7 @@ struct OpenAnythingPaletteSectionHeader: View {
   private var countLabel: some View {
     Text(countLabelText)
       .font(.caption)
-      .foregroundStyle(.tertiary)
+      .foregroundStyle(HarnessMonitorTheme.tertiaryInk)
   }
 
   private var countLabelText: String {
