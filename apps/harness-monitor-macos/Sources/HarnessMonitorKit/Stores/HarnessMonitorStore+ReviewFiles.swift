@@ -13,6 +13,20 @@ public struct ReviewFilesFetchKey: Hashable, Sendable {
   }
 }
 
+/// Identity used by SwiftUI `.task(id:)` to drive the files fetch.
+/// Re-fires when the visible PR changes or when the daemon comes back online,
+/// so an early cached-detail render does not pin a stale unavailable-client
+/// error in the Files section.
+public struct ReviewFilesTaskKey: Hashable, Sendable {
+  public let pullRequestID: String
+  public let isDaemonOnline: Bool
+
+  public init(pullRequestID: String, isDaemonOnline: Bool) {
+    self.pullRequestID = pullRequestID
+    self.isDaemonOnline = isDaemonOnline
+  }
+}
+
 extension HarnessMonitorStore {
   /// Lazily return (and cache) the per-PR view model for the Files
   /// section. Lifecycle is owned by the store; the view layer reads via

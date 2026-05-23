@@ -27,11 +27,18 @@ struct DashboardReviewFilesSection: View {
 
   var body: some View {
     let viewModel = store.viewModel(forPullRequest: pullRequestID)
+    let isDaemonOnline = store.connectionState == .online && store.apiClient != nil
     return VStack(alignment: .leading, spacing: 12) {
       DashboardReviewFilesHeader(viewModel: viewModel, filter: filter)
-      contentBody(viewModel: viewModel)
+      contentBody(viewModel: viewModel, isDaemonOnline: isDaemonOnline)
     }
-    .task(id: pullRequestID) {
+    .task(
+      id: ReviewFilesTaskKey(
+        pullRequestID: pullRequestID,
+        isDaemonOnline: isDaemonOnline
+      )
+    ) {
+      guard isDaemonOnline else { return }
       await store.prepareReviewFiles(pullRequestID: pullRequestID)
     }
     .task(id: viewModel.repositoryFullName ?? "") {
@@ -45,16 +52,25 @@ struct DashboardReviewFilesSection: View {
   }
 
   @ViewBuilder
-  private func contentBody(viewModel: ReviewFilesViewModel) -> some View {
+  private func contentBody(
+    viewModel: ReviewFilesViewModel,
+    isDaemonOnline: Bool
+  ) -> some View {
     switch viewModel.state {
     case .idle, .loading:
-      if let cloning = activeCloningProgress {
+      if !isDaemonOnline {
+        DashboardReviewFilesEmptyState(reason: .waitingForDaemon)
+      } else if let cloning = activeCloningProgress {
         DashboardReviewFilesEmptyState(reason: .cloning(progress: cloning))
       } else {
         DashboardReviewFilesEmptyState(reason: .loading)
       }
     case .error(let message):
-      DashboardReviewFilesEmptyState(reason: .error(message: message))
+      if !isDaemonOnline {
+        DashboardReviewFilesEmptyState(reason: .waitingForDaemon)
+      } else {
+        DashboardReviewFilesEmptyState(reason: .error(message: message))
+      }
     case .loaded:
       if viewModel.filteredFiles.isEmpty {
         DashboardReviewFilesEmptyState(
@@ -143,6 +159,10 @@ struct DashboardReviewFilesEmptyState: View {
     /// in flight so the user understands why "Loading files..." takes
     /// longer than usual.
     case cloning(progress: ReviewLocalCloneProgress)
+    /// Cached Reviews detail can render before daemon bootstrap finishes.
+    /// Keep the Files section recoverable instead of storing a one-shot
+    /// unavailable-client error.
+    case waitingForDaemon
   }
 
   let reason: Reason
@@ -167,6 +187,8 @@ struct DashboardReviewFilesEmptyState: View {
       switch reason {
       case .loading, .cloning:
         ProgressView()
+      case .waitingForDaemon:
+        Image(systemName: "antenna.radiowaves.left.and.right")
       case .noFiles:
         Image(systemName: "doc.text.magnifyingglass")
       case .filteredOut:
@@ -181,6 +203,7 @@ struct DashboardReviewFilesEmptyState: View {
   private var title: String {
     switch reason {
     case .loading: return "Loading files…"
+    case .waitingForDaemon: return "Waiting for daemon connection"
     case .noFiles: return "No files changed in this pull request"
     case .filteredOut: return "All files are hidden by the current filter"
     case .error: return "Failed to load files"
@@ -192,6 +215,8 @@ struct DashboardReviewFilesEmptyState: View {
   private var subtitle: String? {
     switch reason {
     case .error(let message): return message
+    case .waitingForDaemon:
+      return "Files will load automatically when the daemon is available."
     case .cloning: return "Local clone in progress so we can show the diff offline."
     default: return nil
     }
