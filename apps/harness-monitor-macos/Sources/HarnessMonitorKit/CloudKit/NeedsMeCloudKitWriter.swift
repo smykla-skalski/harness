@@ -4,13 +4,7 @@ import os
 
 @MainActor
 public final class NeedsMeCloudKitWriter {
-  // Shared singleton is disabled until the macOS app bundle gains the iCloud
-  // entitlement + the CloudKit container is registered in the Apple Developer
-  // portal (Phase E of the Watch widget plan). Constructing `CKContainer` from
-  // a process without `com.apple.developer.icloud-services` entitlements aborts
-  // inside CloudKit (EXC_BREAKPOINT in `CKContainer` init). Flip the flag to
-  // `true` once Phase E has landed.
-  public static let shared = NeedsMeCloudKitWriter(isEnabled: false)
+  public static let shared = NeedsMeCloudKitWriter(isEnabled: true)
 
   private let store: NeedsMeCloudKitStore
   private let debounceInterval: Duration
