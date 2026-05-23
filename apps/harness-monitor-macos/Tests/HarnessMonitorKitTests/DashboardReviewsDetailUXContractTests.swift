@@ -106,6 +106,8 @@ struct DashboardReviewsDetailUXContractTests {
     #expect(visuals.contains("Image(systemName: \"arrow.down\")"))
     #expect(visuals.contains("style == .compact ? \"+\\(additions)\" : \"\\(additions)\""))
     #expect(visuals.contains("style == .compact ? \"-\\(deletions)\" : \"\\(deletions)\""))
+    #expect(
+      visuals.contains("HStack(spacing: style == .compact ? HarnessMonitorTheme.spacingXS : 0)"))
     #expect(visuals.contains(".fixedSize(horizontal: true, vertical: false)"))
   }
 
