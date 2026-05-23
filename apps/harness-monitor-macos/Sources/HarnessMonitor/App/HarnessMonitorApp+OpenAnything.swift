@@ -18,16 +18,62 @@ extension HarnessMonitorApp {
 
   func presentOpenAnythingPaletteScoped(to scope: OpenAnythingDomain?) {
     keyWindowObserver.refresh()
-    if let windowID = openAnythingTargetWindowID() {
-      appOpenAnythingPalette.present(targetWindowID: windowID, scope: scope)
+    let resolvedWindowID = openAnythingTargetWindowID()
+    applyOpenAnythingPreferences()
+    let resolvedScope = scope ?? scopeDerivedFromWindowID(resolvedWindowID)
+    let restore = UserDefaults.standard.bool(
+      forKey: OpenAnythingPreferencesDefaults.restoreLastQueryKey
+    )
+    if let windowID = resolvedWindowID {
+      appOpenAnythingPalette.present(
+        targetWindowID: windowID,
+        scope: resolvedScope,
+        restoreLastQuery: restore
+      )
       return
     }
     openWindow.openHarnessDashboardWindow()
     focusDashboardWindowIfPossible()
     appOpenAnythingPalette.present(
       targetWindowID: HarnessMonitorWindowID.dashboard,
-      scope: scope
+      scope: resolvedScope,
+      restoreLastQuery: restore
     )
+  }
+
+  /// Audit #89: push the user's per-section cap into the palette model just
+  /// before presenting so the next search and the suggested lane both honor
+  /// the live Settings value without a relaunch.
+  private func applyOpenAnythingPreferences() {
+    let defaults = UserDefaults.standard
+    let storedLimit = defaults.object(
+      forKey: OpenAnythingPreferencesDefaults.perDomainLimitKey
+    ) as? Int ?? OpenAnythingPreferencesDefaults.perDomainLimitDefault
+    let clamped = max(
+      OpenAnythingPreferencesDefaults.perDomainLimitMin,
+      min(OpenAnythingPreferencesDefaults.perDomainLimitMax, storedLimit)
+    )
+    appOpenAnythingPalette.limitPerDomain = clamped
+  }
+
+  /// Audit #79: when the "Scope to current window" toggle is on, derive a
+  /// scope from the window the palette opens against - session windows get
+  /// loadedSession, the settings window narrows to settings, dashboard / lab
+  /// surfaces stay unscoped because they are intentionally cross-cutting.
+  private func scopeDerivedFromWindowID(_ windowID: String?) -> OpenAnythingDomain? {
+    guard
+      UserDefaults.standard.bool(
+        forKey: OpenAnythingPreferencesDefaults.scopeToWindowKey
+      )
+    else { return nil }
+    guard let windowID else { return nil }
+    if windowID == HarnessMonitorWindowID.settings {
+      return .settings
+    }
+    if windowID.hasPrefix("session-") {
+      return .loadedSession
+    }
+    return nil
   }
 
   // Use `KeyWindowObserver.isKey(windowID:)` for every candidate so the

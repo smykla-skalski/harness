@@ -8,8 +8,15 @@ import Foundation
 /// to the signature, because `OpenAnythingRecord` is `Hashable` and the
 /// synthesized conformance covers all stored properties.
 public enum OpenAnythingCorpusSignature {
+  /// Stable salt mixed into every signature so two unrelated empty inputs in
+  /// the same process cannot collide with neighbouring use of `Hasher`. The
+  /// value is arbitrary; it just needs to be a non-zero compile-time
+  /// constant. The audit (#71) called out the missing salt explicitly.
+  public static let salt: UInt64 = 0x4F70_656E_416E_7974
+
   public static func compute(_ records: [OpenAnythingRecord]) -> Int {
     var hasher = Hasher()
+    hasher.combine(salt)
     hasher.combine(records.count)
     for record in records {
       hasher.combine(record)

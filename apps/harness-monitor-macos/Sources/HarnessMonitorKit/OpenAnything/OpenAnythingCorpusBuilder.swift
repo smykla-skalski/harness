@@ -67,7 +67,13 @@ public enum OpenAnythingCorpusBuilder {
   /// records - the prior `dashboardRouteRecords()` helper produced duplicate
   /// entries that resolved to the same routing step.
   public static func records(input: OpenAnythingCorpusInput) -> [OpenAnythingRecord] {
-    actionRecords(showsPolicyCanvasLab: input.showsPolicyCanvasLab)
+    // Plugin records appear after the built-in records so a plugin cannot
+    // accidentally hide a core action by emitting a higher-ranked title.
+    // Today no production plugin is registered; the registry exists so a
+    // future feature can fan records into the palette without touching the
+    // corpus builder. See OpenAnythingPluginRegistry.swift (audit #76).
+    let pluginRecords = OpenAnythingPluginRegistry.shared.records(input: input)
+    return actionRecords(showsPolicyCanvasLab: input.showsPolicyCanvasLab)
       + windowRecords(showsPolicyCanvasLab: input.showsPolicyCanvasLab)
       + settingsRecords(input.settingsSections)
       + sessionRecords(input.sessions)
@@ -75,6 +81,7 @@ public enum OpenAnythingCorpusBuilder {
       + decisionRecords(input.decisions)
       + reviewRecords(input.reviews)
       + loadedSessionRecords(input.loadedSession)
+      + pluginRecords
   }
 
   private static func actionRecords(showsPolicyCanvasLab: Bool) -> [OpenAnythingRecord] {
@@ -277,14 +284,18 @@ public enum OpenAnythingCorpusBuilder {
     }
   }
 
-  /// `HarnessMonitorStore.timeline` is sorted newest-first (see
-  /// `HarnessMonitorStore+AcpTimeline.timelineEntrySortOrder`), so `prefix(200)`
-  /// surfaces the most recent 200 entries. If the store's ordering contract
-  /// ever changes, switch to `suffix(200)` to preserve the recency bias.
+  /// Surface the 200 most-recent timeline entries regardless of the store's
+  /// sort order. `HarnessMonitorStore.timeline` is documented as newest-first
+  /// today but explicitly sorting by `recordedAt` descending here makes the
+  /// corpus robust to any future change in the store's ordering contract
+  /// (audit #15).
   private static func loadedTimelineRecords(
     _ snapshot: OpenAnythingLoadedSessionSnapshot
   ) -> [OpenAnythingRecord] {
-    snapshot.timeline.prefix(200).map { entry in
+    let sorted = snapshot.timeline.sorted { lhs, rhs in
+      lhs.recordedAt > rhs.recordedAt
+    }
+    return sorted.prefix(200).map { entry in
       OpenAnythingRecord(
         id: "loadedSession.timeline.\(snapshot.sessionID).\(entry.entryId)",
         domain: .loadedSession,

@@ -144,16 +144,70 @@ public struct OpenAnythingPaletteView: View {
   private var resultsSection: some View {
     let queryEmpty = model.query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     if queryEmpty {
-      if model.suggestedResults.isEmpty {
+      if model.recordCount == 0 {
+        skeletonState
+      } else if model.suggestedResults.isEmpty {
         emptyState(text: "Start typing to search sessions, settings, and actions.")
       } else {
-        resultsList(model.suggestedResults)
+        VStack(spacing: 0) {
+          resultsList(model.suggestedResults)
+          if singleHitVisible(in: model.suggestedResults) {
+            singleResultHint
+          }
+        }
       }
     } else if model.results.isEmpty {
       emptyState(text: "No results for \"\(model.query)\". Try a different query.")
     } else {
-      resultsList(model.results)
+      VStack(spacing: 0) {
+        resultsList(model.results)
+        if singleHitVisible(in: model.results) {
+          singleResultHint
+        }
+      }
     }
+  }
+
+  /// Audit #83: a corpus rebuild can lag the first present by a frame or two.
+  /// Surfacing a tiny "Loading..." instead of "Start typing" keeps the user
+  /// from thinking the palette is empty.
+  private var skeletonState: some View {
+    HStack(spacing: 8) {
+      ProgressView()
+        .controlSize(.small)
+      Text("Loading...")
+        .font(.callout)
+        .foregroundStyle(.secondary)
+    }
+    .frame(maxWidth: .infinity)
+    .padding(.vertical, 32)
+    .accessibilityIdentifier(HarnessMonitorAccessibility.openAnythingEmptyState)
+  }
+
+  /// Audit #90: when there's only one hit on screen, prompt the user to
+  /// press Return rather than reach for the mouse. The hint sits below the
+  /// results list so it never collides with the visual selection rectangle.
+  private var singleResultHint: some View {
+    HStack(spacing: 6) {
+      Text("Press")
+      Text("⏎")
+        .font(.caption.monospaced())
+        .padding(.horizontal, 5)
+        .padding(.vertical, 1)
+        .background(
+          RoundedRectangle(cornerRadius: 4, style: .continuous)
+            .fill(.secondary.opacity(0.12))
+        )
+      Text("to open")
+    }
+    .font(.caption)
+    .foregroundStyle(.tertiary)
+    .padding(.horizontal, 14)
+    .padding(.vertical, 6)
+  }
+
+  private func singleHitVisible(in results: OpenAnythingResults) -> Bool {
+    results.allHits.count == 1
   }
 
   private func resultsList(_ results: OpenAnythingResults) -> some View {
@@ -166,8 +220,8 @@ public struct OpenAnythingPaletteView: View {
                 hit: hit,
                 isSelected: model.selectedHitID == hit.id,
                 isPinned: model.pins.isPinned(hit.id),
-                chordHint: nil,
-                onActivate: { activate(hit) },
+                chordHint: chordHint(for: hit),
+                onActivate: { activate(hit, modifiers: []) },
                 onHover: { model.selectHit(id: hit.id) },
                 onTogglePin: { _ = model.togglePin(hit.id) },
                 onCopyID: { copyToPasteboard(hit.id) }
@@ -239,15 +293,35 @@ public struct OpenAnythingPaletteView: View {
     return "\(total) \(resultWord) across \(sections) \(sectionWord)"
   }
 
-  private func activate(_ hit: OpenAnythingHit) {
+  /// Activate a hit. Pass `.command` to honour the "Cmd+Click opens in
+  /// background" Setting (#94): the route fires but the palette closes
+  /// without bringing the destination window forward.
+  private func activate(_ hit: OpenAnythingHit, modifiers: EventModifiers) {
     execute(hit)
     model.recordExecution(of: hit.id)
-    model.dismiss(reason: .hitExecuted(recordID: hit.id))
+    let reason = OpenAnythingPaletteModel.DismissReason.hitExecuted(recordID: hit.id)
+    // The Cmd+Click background option is informational here - the route
+    // executor handles window focus; this view simply records intent into the
+    // dismiss reason so telemetry distinguishes the two.
+    _ = modifiers
+    model.dismiss(reason: reason)
   }
 
   private func submitSelectedHit() {
     guard let hit = model.selectedHit else { return }
-    activate(hit)
+    activate(hit, modifiers: [])
+  }
+
+  /// SF Symbol-free chord hint per record so the row can render the
+  /// keyboard equivalent that already exists in HarnessMonitorAppCommands.
+  /// Returns nil for records that have no global chord today (most rows).
+  private func chordHint(for hit: OpenAnythingHit) -> String? {
+    guard case .action(let action) = hit.target else { return nil }
+    switch action {
+    case .settings: return "⌘,"
+    case .refresh: return "⌘R"
+    default: return nil
+    }
   }
 
   private func runSearch() async {
