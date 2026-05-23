@@ -46,34 +46,41 @@ struct DashboardReviewsRouteViewTests {
     )
   }
 
-  @Test("reload task key changes when connection state changes")
-  func reloadTaskKeyChangesWhenConnectionStateChanges() {
+  @Test("reload task key only changes on the offline -> online edge")
+  func reloadTaskKeyOnlyChangesOnTheOfflineToOnlineEdge() {
     let idle = DashboardReviewsReloadTaskKey(
       preferencesSignature: "",
-      connectionState: .idle
+      isConnected: isReviewsReloadConnected(.idle)
     )
     let connecting = DashboardReviewsReloadTaskKey(
       preferencesSignature: "",
-      connectionState: .connecting
+      isConnected: isReviewsReloadConnected(.connecting)
+    )
+    let offline = DashboardReviewsReloadTaskKey(
+      preferencesSignature: "",
+      isConnected: isReviewsReloadConnected(.offline("Daemon stopped"))
     )
     let online = DashboardReviewsReloadTaskKey(
       preferencesSignature: "",
-      connectionState: .online
+      isConnected: isReviewsReloadConnected(.online)
     )
 
-    #expect(idle != connecting)
-    #expect(connecting != online)
+    // All non-online states collapse to the same key so flap
+    // `offline -> connecting -> online` produces ONE key change, not two.
+    #expect(idle == connecting)
+    #expect(connecting == offline)
+    #expect(offline != online)
   }
 
   @Test("route source reloads from the connection-aware task key")
   func reloadTaskKeyChangesWhenPreferencesSignatureChanges() {
     let first = DashboardReviewsReloadTaskKey(
       preferencesSignature: "authors=a",
-      connectionState: .online
+      isConnected: true
     )
     let second = DashboardReviewsReloadTaskKey(
       preferencesSignature: "authors=b",
-      connectionState: .online
+      isConnected: true
     )
 
     #expect(first != second)
