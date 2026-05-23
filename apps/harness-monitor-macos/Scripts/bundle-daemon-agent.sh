@@ -9,6 +9,13 @@ if [ "${HARNESS_MONITOR_SKIP_DAEMON_AGENT_BUNDLE:-}" = "1" ]; then
   exit 0
 fi
 
+# Xcode fires `<BuildAction>` pre-actions during Clean (and may fire build
+# phases under unusual configurations). Compiling and re-signing the daemon
+# helper only to have its destination dir wiped wastes minutes.
+case "${ACTION:-}" in
+  clean|cleanBuild) exit 0 ;;
+esac
+
 is_test_bundle_target() {
   [ -n "${TEST_TARGET_NAME:-}" ] || [ "${WRAPPER_EXTENSION:-}" = "xctest" ]
 }

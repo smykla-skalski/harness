@@ -14,24 +14,47 @@ CARGO_HELPER_PATH = (
 )
 
 
+def _isolated_subprocess_env() -> dict:
+    """Drop BASH_ENV so user `.bash_env` (which runs `mise hook-env`) cannot
+    re-scrub the env between when run_daemon_cargo sets RUSTUP_TOOLCHAIN and
+    when fake-cargo (bash) reports it. In production cargo runs inside the
+    real repo where mise's hook-env re-affirms the pinned toolchain instead
+    of stripping it; the test repo lacks `.mise.toml`, so unsetting BASH_ENV
+    is the equivalent isolation."""
+    import os
+
+    isolated = dict(os.environ)
+    isolated.pop("BASH_ENV", None)
+    return isolated
+
+
 def run_helper(script: str) -> str:
-    command = f"source {HELPER_PATH}; {script}"
+    command = f"unset BASH_ENV; source {HELPER_PATH}; {script}"
     completed = subprocess.run(
         ["bash", "-lc", command],
         check=True,
         capture_output=True,
         text=True,
+        env=_isolated_subprocess_env(),
     )
     return completed.stdout.strip()
 
 
 def run_build_helper(script: str) -> str:
-    command = f"source {HELPER_PATH}; source {CARGO_HELPER_PATH}; {script}"
+    # `unset BASH_ENV` before invoking any child bash (e.g., the test's
+    # fake-cargo script). Without this, the child bash sources ~/.bash_env
+    # which calls `mise hook-env`; in the test's tmpdir fake repo (no
+    # `.mise.toml`), that hook strips RUSTUP_TOOLCHAIN and the assertion that
+    # `run_daemon_cargo` exported the pin sees an empty value. In a real
+    # build cargo is a native binary, not a bash script, so this path does
+    # not exist outside the test harness.
+    command = f"unset BASH_ENV; source {HELPER_PATH}; source {CARGO_HELPER_PATH}; {script}"
     completed = subprocess.run(
         ["bash", "-lc", command],
         check=True,
         capture_output=True,
         text=True,
+        env=_isolated_subprocess_env(),
     )
     return completed.stdout.strip()
 
@@ -285,6 +308,51 @@ class FindCargoTests(unittest.TestCase):
                 "find_cargo"
             )
             self.assertEqual(resolved, str(explicit))
+
+
+class CleanActionGuardTests(unittest.TestCase):
+    SCRIPTS_DIR = Path(__file__).resolve().parents[1]
+    BUILD_SCRIPT = SCRIPTS_DIR / "build-daemon-agent.sh"
+    BUNDLE_SCRIPT = SCRIPTS_DIR / "bundle-daemon-agent.sh"
+
+    def _run_with_action(self, script: Path, action: str) -> subprocess.CompletedProcess:
+        sentinel_dir = Path(tempfile.mkdtemp(prefix="clean-guard-"))
+        cargo_sentinel = sentinel_dir / "cargo-invoked"
+        fake_cargo = sentinel_dir / "fake-cargo.sh"
+        # Any cargo invocation by the script body would touch this sentinel;
+        # the guard contract is that it never runs when ACTION=clean.
+        fake_cargo.write_text(f"#!/bin/bash\ntouch {cargo_sentinel}\n")
+        fake_cargo.chmod(0o755)
+        env = {
+            "HOME": tempfile.gettempdir(),
+            "PATH": "/usr/bin:/bin",
+            "ACTION": action,
+            "CARGO_BIN": str(fake_cargo),
+            "PROJECT_DIR": str(sentinel_dir),
+        }
+        completed = subprocess.run(
+            ["bash", str(script)],
+            env=env,
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
+        return completed, cargo_sentinel
+
+    def test_build_pre_action_no_ops_on_clean(self) -> None:
+        completed, sentinel = self._run_with_action(self.BUILD_SCRIPT, "clean")
+        self.assertEqual(completed.returncode, 0, msg=completed.stderr)
+        self.assertFalse(sentinel.exists(), "cargo must not run on Clean")
+
+    def test_build_pre_action_no_ops_on_clean_build_variant(self) -> None:
+        completed, sentinel = self._run_with_action(self.BUILD_SCRIPT, "cleanBuild")
+        self.assertEqual(completed.returncode, 0, msg=completed.stderr)
+        self.assertFalse(sentinel.exists())
+
+    def test_bundle_phase_no_ops_on_clean(self) -> None:
+        completed, sentinel = self._run_with_action(self.BUNDLE_SCRIPT, "clean")
+        self.assertEqual(completed.returncode, 0, msg=completed.stderr)
+        self.assertFalse(sentinel.exists())
 
 
 def _setup_fake_daemon_layout(tmp_dir: Path):

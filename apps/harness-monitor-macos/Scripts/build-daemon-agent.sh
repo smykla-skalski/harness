@@ -13,6 +13,14 @@ if [ "${HARNESS_MONITOR_SKIP_DAEMON_AGENT_BUILD:-}" = "1" ]; then
   exit 0
 fi
 
+# Xcode fires `<BuildAction>` pre-actions during Clean too (Cmd+Shift+K shows
+# `HarnessMonitor > Clean > Run pre-actions > Build harness daemon`). Compiling
+# the Rust workspace just so the output can be deleted seconds later wastes
+# minutes and produces no useful artifact. Skip on every Clean variant.
+case "${ACTION:-}" in
+  clean|cleanBuild) exit 0 ;;
+esac
+
 SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)"
 # shellcheck source=apps/harness-monitor-macos/Scripts/lib/daemon-bundle-env.sh
 source "$SCRIPT_DIR/lib/daemon-bundle-env.sh"
