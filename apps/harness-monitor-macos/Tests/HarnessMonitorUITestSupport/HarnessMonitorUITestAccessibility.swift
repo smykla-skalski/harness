@@ -162,6 +162,11 @@ enum HarnessMonitorUITestAccessibility {
   static let dashboardReviewsConfigureButton = "harness.dashboard.reviews.configure"
   static let dashboardReviewsFixCIButton = "harness.dashboard.reviews.fix-ci"
   static let dashboardReviewsSelectionStatus = "harness.dashboard.reviews.selection"
+  static let dashboardReviewsFilterPicker = "harness.dashboard.reviews.filter"
+  static let dashboardReviewsSortPicker = "harness.dashboard.reviews.sort"
+  static let dashboardReviewsGroupPicker = "harness.dashboard.reviews.group"
+  static let dashboardReviewsCategoryToggle = "harness.dashboard.reviews.category"
+  static let dashboardReviewsNeedsMeToggle = "harness.dashboard.reviews.needs-me"
   static let dashboardNewSessionButton = "harness.dashboard.new-session"
   static let dashboardOpenFolderButton = "harness.dashboard.open-folder"
   static let sessionsBoardRoot = dashboardWindowRoot
