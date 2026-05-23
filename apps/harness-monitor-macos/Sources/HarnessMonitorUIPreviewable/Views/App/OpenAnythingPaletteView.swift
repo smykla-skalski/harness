@@ -3,11 +3,13 @@ import HarnessMonitorKit
 import SwiftUI
 
 public struct OpenAnythingPaletteView: View {
-  @Bindable private var model: OpenAnythingPaletteModel
+  @Bindable var model: OpenAnythingPaletteModel
   private let execute: (OpenAnythingHit) -> Void
   @FocusState private var isFieldFocused: Bool
-  @Environment(\.accessibilityReduceMotion) private var reduceMotion
+  @Environment(\.accessibilityReduceMotion) var reduceMotion
   @Environment(\.controlActiveState) private var controlActiveState
+  @State private var wheelMonitor: Any?
+  @State private var wheelAccumulator: CGFloat = 0
 
   public init(
     model: OpenAnythingPaletteModel,
@@ -18,11 +20,13 @@ public struct OpenAnythingPaletteView: View {
   }
 
   public var body: some View {
-    ZStack(alignment: .top) {
-      backdrop
-      palette
-        .padding(.top, OpenAnythingPaletteConstants.topInset)
-        .padding(.horizontal, OpenAnythingPaletteConstants.horizontalPadding)
+    GeometryReader { proxy in
+      ZStack(alignment: .top) {
+        backdrop
+        layoutContent(width: proxy.size.width)
+          .padding(.top, OpenAnythingPaletteConstants.topInset)
+          .padding(.horizontal, OpenAnythingPaletteConstants.horizontalPadding)
+      }
     }
     .accessibilityIdentifier(HarnessMonitorAccessibility.openAnythingPalette)
     .accessibilityElement(children: .contain)
@@ -71,6 +75,43 @@ public struct OpenAnythingPaletteView: View {
       }
       jumpToSection(index: digit - 1)
       return .handled
+    }
+    .onAppear { installWheelMonitor() }
+    .onDisappear { removeWheelMonitor() }
+    .animation(
+      OpenAnythingMotionPolicy.resultShiftAnimation(reduceMotion: reduceMotion),
+      value: model.results.sections.count
+    )
+    .animation(
+      OpenAnythingMotionPolicy.resultShiftAnimation(reduceMotion: reduceMotion),
+      value: model.expandedDomains
+    )
+    .animation(
+      OpenAnythingMotionPolicy.resultShiftAnimation(reduceMotion: reduceMotion),
+      value: model.collapsedDomains
+    )
+  }
+
+  @ViewBuilder
+  private func layoutContent(width: CGFloat) -> some View {
+    if width >= OpenAnythingPaletteConstants.previewPaneActivationWidth {
+      HStack(alignment: .top, spacing: 16) {
+        palette
+        OpenAnythingPalettePreviewPane(hit: model.selectedHit)
+          .frame(maxHeight: OpenAnythingPaletteConstants.maxHeight, alignment: .top)
+          .harnessFloatingControlGlass(
+            cornerRadius: OpenAnythingPaletteConstants.cornerRadius,
+            tint: nil
+          )
+          .shadow(
+            color: .black.opacity(OpenAnythingPaletteConstants.shadowOpacity),
+            radius: OpenAnythingPaletteConstants.shadowRadius,
+            y: OpenAnythingPaletteConstants.shadowYOffset
+          )
+      }
+      .frame(maxWidth: .infinity, alignment: .top)
+    } else {
+      palette
     }
   }
 
@@ -215,53 +256,36 @@ public struct OpenAnythingPaletteView: View {
       LazyVStack(alignment: .leading, spacing: 0, pinnedViews: [.sectionHeaders]) {
         ForEach(results.sections) { section in
           Section {
-            ForEach(section.hits) { hit in
-              OpenAnythingPaletteRow(
-                hit: hit,
-                isSelected: model.selectedHitID == hit.id,
-                isPinned: model.pins.isPinned(hit.id),
-                chordHint: chordHint(for: hit),
-                onActivate: { activate(hit, modifiers: []) },
-                onHover: { model.selectHit(id: hit.id) },
-                onTogglePin: { _ = model.togglePin(hit.id) },
-                onCopyID: { copyToPasteboard(hit.id) }
-              )
+            if !model.isCollapsed(section.domain) {
+              ForEach(section.hits) { hit in
+                OpenAnythingPaletteRow(
+                  hit: hit,
+                  isSelected: model.selectedHitID == hit.id,
+                  isPinned: model.pins.isPinned(hit.id),
+                  chordHint: chordHint(for: hit),
+                  onActivate: { activate(hit, modifiers: []) },
+                  onHover: { model.selectHit(id: hit.id) },
+                  onTogglePin: { _ = model.togglePin(hit.id) },
+                  onCopyID: { copyToPasteboard(hit.id) }
+                )
+              }
             }
           } header: {
-            sectionHeader(domain: section.domain, count: section.hits.count)
+            OpenAnythingPaletteSectionHeader(
+              domain: section.domain,
+              visibleCount: section.hits.count,
+              totalCount: results.totalCount(for: section.domain),
+              isCollapsed: model.isCollapsed(section.domain),
+              isExpanded: model.isExpanded(section.domain),
+              onToggleCollapse: { model.toggleCollapsed(section.domain) },
+              onToggleExpand: { model.toggleExpanded(section.domain) }
+            )
           }
         }
       }
       .padding(.vertical, 8)
     }
     .frame(maxHeight: OpenAnythingPaletteConstants.resultsMaxHeight)
-  }
-
-  private func sectionHeader(domain: OpenAnythingDomain, count: Int) -> some View {
-    HStack(spacing: 6) {
-      Image(systemName: domain.systemImage)
-        .font(.caption)
-        .foregroundStyle(.secondary)
-        .accessibilityHidden(true)
-      Text(domain.label.uppercased())
-        .font(.caption)
-        .fontWeight(.semibold)
-        .foregroundStyle(.secondary)
-      Text("· \(count)")
-        .font(.caption)
-        .foregroundStyle(.tertiary)
-      Spacer()
-    }
-    .padding(.horizontal, OpenAnythingPaletteConstants.sectionHeaderHorizontalPadding)
-    .padding(.vertical, OpenAnythingPaletteConstants.sectionHeaderVerticalPadding)
-    .background(
-      HarnessMonitorTheme.ink
-        .opacity(OpenAnythingPaletteConstants.sectionHeaderFillOpacity)
-    )
-    .accessibilityElement(children: .ignore)
-    .accessibilityLabel(
-      "\(domain.label) section, \(count) result\(count == 1 ? "" : "s")"
-    )
   }
 
   private func emptyState(text: String) -> some View {
@@ -340,39 +364,36 @@ public struct OpenAnythingPaletteView: View {
     NSPasteboard.general.setString(value, forType: .string)
   }
 
-  private func jumpSection(by delta: Int) {
-    let sections = model.displayedResults.sections
-    guard !sections.isEmpty else { return }
-    let currentIndex = currentSectionIndex(sections: sections)
-    let count = sections.count
-    let nextIndex = ((currentIndex + delta) % count + count) % count
-    if let firstHitID = sections[nextIndex].hits.first?.id {
-      withAnimation(
-        OpenAnythingMotionPolicy.selectionAnimation(reduceMotion: reduceMotion)
-      ) {
-        model.selectHit(id: firstHitID)
+  /// Audit #87: a low-amplitude scroll wheel tick on a key-equivalent
+  /// device (Apple Mouse, trackpad with momentum disabled) reads as a
+  /// selection nudge rather than a ScrollView pan. We accumulate small
+  /// deltas in `wheelAccumulator` and fire a single move per "step" so a
+  /// gentle swipe does not race the selection past the visible window.
+  private func installWheelMonitor() {
+    guard wheelMonitor == nil else { return }
+    wheelMonitor = NSEvent.addLocalMonitorForEvents(matching: .scrollWheel) { event in
+      guard model.isPresented else { return event }
+      let delta = event.scrollingDeltaY
+      wheelAccumulator += delta
+      let threshold: CGFloat = 12
+      while abs(wheelAccumulator) >= threshold {
+        let direction = wheelAccumulator > 0 ? -1 : 1
+        withAnimation(
+          OpenAnythingMotionPolicy.selectionAnimation(reduceMotion: reduceMotion)
+        ) {
+          model.moveSelection(by: direction)
+        }
+        wheelAccumulator -= CGFloat(direction) * -threshold
       }
+      return event
     }
   }
 
-  private func jumpToSection(index: Int) {
-    let sections = model.displayedResults.sections
-    guard sections.indices.contains(index),
-      let firstHitID = sections[index].hits.first?.id
-    else { return }
-    withAnimation(
-      OpenAnythingMotionPolicy.selectionAnimation(reduceMotion: reduceMotion)
-    ) {
-      model.selectHit(id: firstHitID)
+  private func removeWheelMonitor() {
+    if let monitor = wheelMonitor {
+      NSEvent.removeMonitor(monitor)
+      wheelMonitor = nil
     }
-  }
-
-  private func currentSectionIndex(sections: [OpenAnythingSection]) -> Int {
-    guard let selectedID = model.selectedHitID else { return 0 }
-    for (index, section) in sections.enumerated()
-    where section.hits.contains(where: { $0.id == selectedID }) {
-      return index
-    }
-    return 0
+    wheelAccumulator = 0
   }
 }
