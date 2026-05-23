@@ -65,7 +65,7 @@ struct DashboardReviewsFilterPredicateTests {
     )
     let expected =
       fixture
-      .filter { DashboardReviewsCategoryMode.dependencyBotLogins.contains($0.authorLogin) }
+      .filter { ReviewBot.detect(authorLogin: $0.authorLogin) != nil }
       .map(\.pullRequestID)
     #expect(Set(output.filteredItems.map(\.pullRequestID)) == Set(expected))
     #expect(!output.filteredItems.isEmpty)
@@ -82,8 +82,7 @@ struct DashboardReviewsFilterPredicateTests {
     let expected =
       fixture
       .filter {
-        $0.requiresAttention
-          && DashboardReviewsCategoryMode.dependencyBotLogins.contains($0.authorLogin)
+        $0.requiresAttention && ReviewBot.detect(authorLogin: $0.authorLogin) != nil
       }
       .map(\.pullRequestID)
     #expect(Set(output.filteredItems.map(\.pullRequestID)) == Set(expected))
@@ -159,6 +158,13 @@ struct DashboardReviewsFilterPredicateTests {
         id: "pr-dep-review",
         authorLogin: "renovate[bot]",
         reviewStatus: .reviewRequired,
+        checkStatus: .success
+      ),
+      // dependency bot using the legacy Renovate login variant.
+      reviewItem(
+        id: "pr-dep-legacy-attention",
+        authorLogin: "renovate-bot",
+        reviewStatus: .changesRequested,
         checkStatus: .success
       ),
     ]
