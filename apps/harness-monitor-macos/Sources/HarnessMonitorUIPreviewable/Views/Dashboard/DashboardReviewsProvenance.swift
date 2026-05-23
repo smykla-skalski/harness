@@ -175,12 +175,21 @@ struct DashboardReviewsProvenanceSnapshot: Equatable {
       lines.append("Repository sync failed for \(repositoryList(failedRepositories))")
     }
     if fetchedSnapshotIsStale {
-      lines.append("Fetched snapshot exceeds \(harnessMonitorDuration(freshnessCeilingSeconds))")
+      lines.append(
+        "Fetched snapshot older than \(harnessMonitorDuration(freshnessCeilingSeconds)) "
+          + "(\(thresholdSource))"
+      )
     }
     if !staleRepositories.isEmpty {
       lines.append("Repository sync stale for \(repositoryList(staleRepositories))")
     }
     return lines
+  }
+
+  private var thresholdSource: String {
+    cacheMaxAgeSeconds >= perRepositoryIntervalSeconds
+      ? "cache TTL"
+      : "per-repo sync interval"
   }
 
   private static func resolveSource(
