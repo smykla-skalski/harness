@@ -5,6 +5,8 @@ struct DashboardReviewDetailView<Actions: View>: View {
   let item: ReviewItem
   let store: HarnessMonitorStore
   let activity: DashboardReviewActivitySnapshot
+  let repositoryLabels: [ReviewRepositoryLabel]
+  let viewerLogin: String?
   @Binding var showsProblemChecksOnly: Bool
   let onDescriptionCheckboxError: ((String) -> Void)?
   let onDescriptionCheckboxUpdated: (() -> Void)?
@@ -27,6 +29,8 @@ struct DashboardReviewDetailView<Actions: View>: View {
     item: ReviewItem,
     store: HarnessMonitorStore,
     activity: DashboardReviewActivitySnapshot,
+    repositoryLabels: [ReviewRepositoryLabel] = [],
+    viewerLogin: String? = nil,
     showsProblemChecksOnly: Binding<Bool> = .constant(false),
     onDescriptionCheckboxError: ((String) -> Void)? = nil,
     onDescriptionCheckboxUpdated: (() -> Void)? = nil,
@@ -36,6 +40,8 @@ struct DashboardReviewDetailView<Actions: View>: View {
     self.item = item
     self.store = store
     self.activity = activity
+    self.repositoryLabels = repositoryLabels
+    self.viewerLogin = viewerLogin
     _showsProblemChecksOnly = showsProblemChecksOnly
     self.onDescriptionCheckboxError = onDescriptionCheckboxError
     self.onDescriptionCheckboxUpdated = onDescriptionCheckboxUpdated
@@ -82,10 +88,13 @@ struct DashboardReviewDetailView<Actions: View>: View {
           DashboardReviewActivitySummary(snapshot: activity)
         }
         DashboardReviewDetailSection(title: "Reviews") {
-          DashboardReviewReviewList(reviews: item.reviews)
+          DashboardReviewReviewList(reviews: item.reviews, viewerLogin: viewerLogin)
         }
         DashboardReviewDetailSection(title: "Labels") {
-          DashboardReviewLabelStrip(labels: item.labels)
+          DashboardReviewLabelStrip(
+            labels: item.labels,
+            repositoryLabels: repositoryLabels
+          )
         }
         DashboardReviewDetailSection(title: "Conversation") {
           DashboardReviewConversationFeed(
