@@ -42,7 +42,7 @@ private struct SessionWindowAppKitBindingAccessor: NSViewRepresentable {
 final class SessionWindowAppKitBindingNSView: NSView {
   fileprivate var sessionID: String
   private weak var observedWindow: NSWindow?
-  private var windowCloseToken: (any NSObjectProtocol)?
+  nonisolated(unsafe) private var windowCloseToken: (any NSObjectProtocol)?
 
   init(sessionID: String) {
     self.sessionID = sessionID
