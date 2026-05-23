@@ -111,13 +111,19 @@ public struct ReviewsQueryResponse: Codable, Equatable, Sendable {
   public let summary: ReviewsSummary
   public let items: [ReviewItem]
   public let repositoryLabels: [String: [ReviewRepositoryLabel]]
+  /// GitHub login of the authenticated viewer that fetched these PRs.
+  /// Drives the "(you)" marker on the reviewer pill and the "Commenting
+  /// as @viewer" caption in the composer. `nil` when the daemon could
+  /// not resolve the viewer (revoked token, transient GraphQL failure).
+  public let viewerLogin: String?
 
   public init(
     fetchedAt: String,
     fromCache: Bool,
     summary: ReviewsSummary,
     items: [ReviewItem],
-    repositoryLabels: [String: [ReviewRepositoryLabel]] = [:]
+    repositoryLabels: [String: [ReviewRepositoryLabel]] = [:],
+    viewerLogin: String? = nil
   ) {
     let normalizedItems = normalizedReviewItems(items)
     self.fetchedAt = fetchedAt
@@ -128,6 +134,7 @@ public struct ReviewsQueryResponse: Codable, Equatable, Sendable {
       : ReviewsSummary(items: normalizedItems)
     self.items = normalizedItems
     self.repositoryLabels = repositoryLabels
+    self.viewerLogin = viewerLogin
   }
 
   enum CodingKeys: String, CodingKey {
@@ -136,6 +143,7 @@ public struct ReviewsQueryResponse: Codable, Equatable, Sendable {
     case summary
     case items
     case repositoryLabels
+    case viewerLogin
   }
 
   public init(from decoder: Decoder) throws {
@@ -155,6 +163,7 @@ public struct ReviewsQueryResponse: Codable, Equatable, Sendable {
         [String: [ReviewRepositoryLabel]].self,
         forKey: .repositoryLabels
       ) ?? [:]
+    viewerLogin = try container.decodeIfPresent(String.self, forKey: .viewerLogin)
   }
 }
 

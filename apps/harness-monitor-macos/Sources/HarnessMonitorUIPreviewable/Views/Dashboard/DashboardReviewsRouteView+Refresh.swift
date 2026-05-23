@@ -113,7 +113,9 @@ extension DashboardReviewsRouteView {
       fetchedAt: normalizedRefresh.fetchedAt,
       fromCache: routeResponse.fromCache,
       summary: ReviewsSummary(items: nextItems),
-      items: nextItems
+      items: nextItems,
+      repositoryLabels: routeResponse.repositoryLabels,
+      viewerLogin: routeResponse.viewerLogin
     )
     pruneRefreshTrackerToLiveItems()
     persistReviewsRefresh(normalizedRefresh)

@@ -134,7 +134,8 @@ extension DashboardReviewsRouteView {
       fromCache: false,
       summary: ReviewsSummary(items: nextItems),
       items: nextItems,
-      repositoryLabels: mergedLabels
+      repositoryLabels: mergedLabels,
+      viewerLogin: routeResponse.viewerLogin
     )
     if needsCacheBackfill {
       hydrateRepositoryLabelsFromCache()
