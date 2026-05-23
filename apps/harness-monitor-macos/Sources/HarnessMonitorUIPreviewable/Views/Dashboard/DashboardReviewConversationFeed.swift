@@ -16,6 +16,8 @@ import SwiftUI
 /// agent's `DashboardReviewFilesSection` — Phase D-strict comes
 /// later when that file lands on main.
 struct DashboardReviewConversationFeed: View {
+  private static let timelineRowBatchSize = 16
+
   let item: ReviewItem
   let store: HarnessMonitorStore
   let onSignalTap: ((String) -> Void)?
@@ -33,6 +35,7 @@ struct DashboardReviewConversationFeed: View {
   // same source to a sibling rows-region view without duplicating the
   // build work. See `ReviewConversationRowSource`.
   @State private var rowSource = ReviewConversationRowSource()
+  @State private var visibleTimelineRowLimit = Self.timelineRowBatchSize
 
   init(
     item: ReviewItem,
@@ -86,6 +89,10 @@ struct DashboardReviewConversationFeed: View {
         configuration: dateTimeConfiguration
       )
     }
+    .onChange(of: item.pullRequestID, initial: true) { _, _ in
+      visibleTimelineRowLimit = Self.timelineRowBatchSize
+      rowSource.clear()
+    }
   }
 
   private func decodedPreferences() -> DashboardReviewsPreferences {
@@ -124,12 +131,20 @@ struct DashboardReviewConversationFeed: View {
         .foregroundStyle(.secondary)
         .font(.subheadline)
     } else {
+      let visibleRows = Array(rowSource.rows.prefix(visibleTimelineRowLimit))
       SessionTimelineCards(
-        rows: rowSource.rows,
+        rows: visibleRows,
         actionHandler: actionHandler,
         onSignalTap: onSignalTap
       )
-      if viewModel.hasOlder {
+      if hiddenTimelineRowCount > 0 {
+        Button("Show \(min(Self.timelineRowBatchSize, hiddenTimelineRowCount)) more events") {
+          visibleTimelineRowLimit += Self.timelineRowBatchSize
+        }
+        .buttonStyle(.borderless)
+        .controlSize(.small)
+        .help("Render the next batch of review activity")
+      } else if viewModel.hasOlder {
         Button("Load older") {
           Task {
             await store.loadOlderReviewTimeline(
@@ -143,6 +158,8 @@ struct DashboardReviewConversationFeed: View {
       }
       DashboardReviewConversationPositionFooter(
         entriesCount: viewModel.entries.count,
+        visibleRowsCount: visibleRows.count,
+        totalRowsCount: rowSource.rows.count,
         hasOlder: viewModel.hasOlder
       )
       .equatable()
@@ -188,4 +205,7 @@ struct DashboardReviewConversationFeed: View {
     ].joined(separator: ":")
   }
 
+  private var hiddenTimelineRowCount: Int {
+    max(rowSource.rows.count - visibleTimelineRowLimit, 0)
+  }
 }

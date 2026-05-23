@@ -53,29 +53,39 @@ extension DashboardReviewConversationStatusBar: @MainActor Equatable {
 }
 
 /// POD position footer — "Showing N (more available)" / "N events" —
-/// for the conversation feed's Load Older region. Takes only the two
-/// scalars it needs.
+/// for the conversation feed's Load Older region. Tracks both loaded
+/// entry count and the currently rendered row window.
 struct DashboardReviewConversationPositionFooter: View {
   let entriesCount: Int
+  let visibleRowsCount: Int
+  let totalRowsCount: Int
   let hasOlder: Bool
 
   var body: some View {
-    Group {
-      if hasOlder {
-        Text("Showing \(entriesCount) (more available)")
-      } else {
-        Text("\(entriesCount) events")
-      }
+    Text(label)
+      .font(.caption.monospacedDigit())
+      .foregroundStyle(.secondary)
+      .accessibilityLabel(Text(accessibilityLabel))
+  }
+
+  private var label: String {
+    if visibleRowsCount < totalRowsCount {
+      "Showing \(visibleRowsCount) of \(totalRowsCount) events"
+    } else if hasOlder {
+      "Showing \(entriesCount) (more available)"
+    } else {
+      "\(entriesCount) events"
     }
-    .font(.caption.monospacedDigit())
-    .foregroundStyle(.secondary)
-    .accessibilityLabel(
-      Text(
-        hasOlder
-          ? "Showing \(entriesCount) events, more available"
-          : "Showing all \(entriesCount) events"
-      )
-    )
+  }
+
+  private var accessibilityLabel: String {
+    if visibleRowsCount < totalRowsCount {
+      "Showing \(visibleRowsCount) of \(totalRowsCount) events"
+    } else if hasOlder {
+      "Showing \(entriesCount) events, more available"
+    } else {
+      "Showing all \(entriesCount) events"
+    }
   }
 }
 
@@ -84,6 +94,7 @@ extension DashboardReviewConversationPositionFooter: @MainActor Equatable {
     lhs: DashboardReviewConversationPositionFooter,
     rhs: DashboardReviewConversationPositionFooter
   ) -> Bool {
-    lhs.entriesCount == rhs.entriesCount && lhs.hasOlder == rhs.hasOlder
+    lhs.entriesCount == rhs.entriesCount && lhs.visibleRowsCount == rhs.visibleRowsCount
+      && lhs.totalRowsCount == rhs.totalRowsCount && lhs.hasOlder == rhs.hasOlder
   }
 }

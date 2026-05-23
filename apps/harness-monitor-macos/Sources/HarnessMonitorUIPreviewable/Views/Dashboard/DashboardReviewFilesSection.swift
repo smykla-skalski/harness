@@ -6,6 +6,8 @@ import SwiftUI
 /// detail view passes only the pullRequestID so changes to one PR's
 /// files don't invalidate other detail panes mounted in tab groups.
 struct DashboardReviewFilesSection: View {
+  private static let fileBatchSize = 24
+
   let pullRequestID: String
   let repositoryID: String
 
@@ -19,6 +21,7 @@ struct DashboardReviewFilesSection: View {
   /// once we know the `repositoryFullName`. Cleared on
   /// `.completed`/`.failed` so the chip disappears.
   @State private var cloningProgress: ReviewLocalCloneProgress?
+  @State private var visibleFileLimit = Self.fileBatchSize
 
   init(pullRequestID: String, repositoryID: String = "") {
     self.pullRequestID = pullRequestID
@@ -47,6 +50,10 @@ struct DashboardReviewFilesSection: View {
     .onAppear { syncFilterFromPreferences() }
     .onChange(of: filter.snapshotID) { _, _ in
       viewModel.applyFilter(filter.snapshot)
+      resetVisibleFiles()
+    }
+    .onChange(of: pullRequestID) { _, _ in
+      resetVisibleFiles()
     }
     .accessibilityIdentifier("dashboardReviewFilesSection")
   }
@@ -107,7 +114,7 @@ struct DashboardReviewFilesSection: View {
 
   private func filesList(viewModel: ReviewFilesViewModel) -> some View {
     LazyVStack(alignment: .leading, spacing: 8) {
-      ForEach(viewModel.filteredFiles, id: \.path) { file in
+      ForEach(Array(viewModel.filteredFiles.prefix(visibleFileLimit)), id: \.path) { file in
         DashboardReviewFileCard(
           file: file,
           viewedState: viewModel.viewedByPath[file.path] ?? file.viewerViewedState,
@@ -136,6 +143,21 @@ struct DashboardReviewFilesSection: View {
           }
         )
       }
+      showMoreFilesButton(totalCount: viewModel.filteredFiles.count)
+    }
+  }
+
+  @ViewBuilder
+  private func showMoreFilesButton(totalCount: Int) -> some View {
+    let hiddenCount = max(totalCount - visibleFileLimit, 0)
+    if hiddenCount > 0 {
+      Button("Show \(min(Self.fileBatchSize, hiddenCount)) more files") {
+        visibleFileLimit += Self.fileBatchSize
+      }
+      .buttonStyle(.borderless)
+      .controlSize(.small)
+      .help("Render the next batch of changed files")
+      .accessibilityLabel("Show more changed files")
     }
   }
 
@@ -144,6 +166,10 @@ struct DashboardReviewFilesSection: View {
     filter.hideGenerated = prefs.filesHideGenerated
     filter.hideWhitespaceOnly = prefs.filesHideWhitespaceOnly
     filter.generatedPathMatcher = preferences.compiledGeneratedPatternMatcher
+  }
+
+  private func resetVisibleFiles() {
+    visibleFileLimit = Self.fileBatchSize
   }
 }
 
