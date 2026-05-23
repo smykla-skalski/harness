@@ -212,7 +212,7 @@ extension HarnessMonitorUITestAccessibilityRegistryTests {
       )
     )
     #expect(
-      controlStripView.contains("HarnessMonitorAccessibility.dashboardReviewsRefreshButton")
+      provenanceView.contains("HarnessMonitorAccessibility.dashboardReviewsRefreshButton")
     )
     #expect(
       actionBarView.contains("HarnessMonitorAccessibility.dashboardReviewsFixCIButton")

@@ -12,6 +12,15 @@ struct DashboardReviewsProvenanceSnapshot: Equatable {
     case empty
   }
 
+  /// Aggregate health state combining source freshness with per-repo sync
+  /// health. Drives both the dot tint and the source-label weight so they
+  /// never contradict each other.
+  enum OverallHealth: Equatable {
+    case success
+    case caution
+    case danger
+  }
+
   let source: Source
   let fetchedAt: String
   let fetchedDate: Date?
@@ -61,13 +70,11 @@ struct DashboardReviewsProvenanceSnapshot: Equatable {
   var sourceTitle: String {
     switch source {
     case .live:
-      "Live daemon"
+      hasFreshnessRisk ? "Live daemon (stale)" : "Live daemon"
     case .cache:
       "Persisted cache"
-    case .offlineCache:
-      "Offline cache"
-    case .lastLiveSnapshot:
-      "Last live snapshot"
+    case .offlineCache, .lastLiveSnapshot:
+      "Daemon offline"
     case .empty:
       "No data"
     }
@@ -79,23 +86,34 @@ struct DashboardReviewsProvenanceSnapshot: Equatable {
       "checkmark.circle"
     case .cache:
       "archivebox"
-    case .offlineCache:
+    case .offlineCache, .lastLiveSnapshot:
       "wifi.slash"
-    case .lastLiveSnapshot:
-      "clock.badge.exclamationmark"
     case .empty:
       "shippingbox"
     }
   }
 
-  var sourceTint: Color {
+  var overallHealth: OverallHealth {
     switch source {
-    case .live where !hasFreshnessRisk:
-      HarnessMonitorTheme.success
+    case .live:
+      hasFreshnessRisk ? .caution : .success
     case .empty:
-      HarnessMonitorTheme.secondaryInk
-    case .cache, .offlineCache, .lastLiveSnapshot, .live:
+      .caution
+    case .cache:
+      hasFreshnessRisk ? .danger : .caution
+    case .offlineCache, .lastLiveSnapshot:
+      .danger
+    }
+  }
+
+  var sourceTint: Color {
+    switch overallHealth {
+    case .success:
+      HarnessMonitorTheme.success
+    case .caution:
       HarnessMonitorTheme.caution
+    case .danger:
+      HarnessMonitorTheme.danger
     }
   }
 
@@ -116,15 +134,18 @@ struct DashboardReviewsProvenanceSnapshot: Equatable {
   }
 
   var cachePolicyTitle: String {
-    "cache max \(durationTitle(cacheMaxAgeSeconds))"
+    "cache max \(harnessMonitorDuration(cacheMaxAgeSeconds))"
   }
 
   var repositoryPolicyTitle: String {
-    "repo sync \(durationTitle(perRepositoryIntervalSeconds))"
+    "repo sync \(harnessMonitorDuration(perRepositoryIntervalSeconds))"
   }
 
+  /// Compact tail used to the right of the source label in the single-line
+  /// status bar. Intentionally omits `sourceTitle` so it doesn't repeat the
+  /// label rendered immediately to its left.
   var detailTitle: String {
-    var parts = [sourceTitle, "\(itemCount) PRs"]
+    var parts = ["\(itemCount) PRs"]
     if fetchedDate != nil || !fetchedAt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
       parts.append(fetchedAgeTitle)
     }
@@ -140,23 +161,26 @@ struct DashboardReviewsProvenanceSnapshot: Equatable {
     return parts.joined(separator: " · ")
   }
 
-  var warningTitle: String? {
+  /// All applicable warnings stacked, not just the first match. Surfaced as
+  /// separate Label rows in the info popover.
+  var warnings: [String] {
+    var lines: [String] = []
     if case .offlineCache(let reason) = source {
-      return "Daemon offline: \(reason)"
+      lines.append("Daemon offline: \(reason)")
     }
     if case .lastLiveSnapshot(let reason) = source {
-      return "Daemon offline: \(reason)"
+      lines.append("Daemon offline: \(reason)")
     }
     if !failedRepositories.isEmpty {
-      return "Repository sync failed for \(repositoryList(failedRepositories))"
+      lines.append("Repository sync failed for \(repositoryList(failedRepositories))")
     }
     if fetchedSnapshotIsStale {
-      return "Fetched snapshot exceeds \(durationTitle(freshnessCeilingSeconds))"
+      lines.append("Fetched snapshot exceeds \(harnessMonitorDuration(freshnessCeilingSeconds))")
     }
     if !staleRepositories.isEmpty {
-      return "Repository sync stale for \(repositoryList(staleRepositories))"
+      lines.append("Repository sync stale for \(repositoryList(staleRepositories))")
     }
-    return nil
+    return lines
   }
 
   private static func resolveSource(
@@ -181,17 +205,7 @@ struct DashboardReviewsProvenanceSnapshot: Equatable {
     return fractional.date(from: value) ?? regular.date(from: value)
   }
 
-  private func durationTitle(_ seconds: UInt64) -> String {
-    if seconds < 60 {
-      return "\(seconds)s"
-    }
-    if seconds < 3_600 {
-      return "\(seconds / 60)m"
-    }
-    return "\(seconds / 3_600)h"
-  }
-
-  private func repositoryList(_ repositories: [String]) -> String {
+  func repositoryList(_ repositories: [String]) -> String {
     let visible = repositories.prefix(3).joined(separator: ", ")
     guard repositories.count > 3 else { return visible }
     return "\(visible), +\(repositories.count - 3)"
@@ -214,69 +228,71 @@ struct DashboardReviewsProvenanceBar: View {
   let snapshot: DashboardReviewsProvenanceSnapshot
   let onRefresh: () -> Void
 
+  @State private var isInfoPopoverPresented = false
+
   var body: some View {
-    VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
-      HStack(alignment: .firstTextBaseline, spacing: HarnessMonitorTheme.spacingSM) {
-        Label(snapshot.sourceTitle, systemImage: snapshot.sourceSystemImage)
-          .scaledFont(.callout.weight(.semibold))
-          .foregroundStyle(snapshot.sourceTint)
-        Text(snapshot.detailTitle)
-          .scaledFont(.callout)
-          .foregroundStyle(HarnessMonitorTheme.secondaryInk)
-          .lineLimit(2)
-        Spacer(minLength: HarnessMonitorTheme.spacingMD)
-        Button(action: onRefresh) {
-          Image(systemName: "arrow.clockwise")
-            .imageScale(.medium)
-            .frame(width: 18, height: 18)
-        }
-        .harnessPlainButtonStyle()
-        .help("Refresh review data")
-        .accessibilityLabel("Refresh review data")
-      }
-
-      HarnessMonitorWrapLayout(
-        spacing: HarnessMonitorTheme.spacingSM,
-        lineSpacing: HarnessMonitorTheme.spacingSM
-      ) {
-        DashboardReviewStatusPill(
-          label: snapshot.fetchedAtTitle,
-          tint: HarnessMonitorTheme.secondaryInk,
-          systemImage: "clock"
-        )
-        DashboardReviewStatusPill(
-          label: snapshot.cachePolicyTitle,
-          tint: HarnessMonitorTheme.secondaryInk,
-          systemImage: "archivebox"
-        )
-        DashboardReviewStatusPill(
-          label: snapshot.repositoryPolicyTitle,
-          tint: HarnessMonitorTheme.secondaryInk,
-          systemImage: "arrow.triangle.2.circlepath"
-        )
-        if snapshot.repositoryCount > 0 {
-          DashboardReviewStatusPill(
-            label: "\(snapshot.repositoryCount) repos",
-            tint: HarnessMonitorTheme.secondaryInk,
-            systemImage: "tray.full"
-          )
-        }
-      }
-
-      if let warningTitle = snapshot.warningTitle {
-        Label(warningTitle, systemImage: "exclamationmark.triangle")
-          .scaledFont(.caption.weight(.semibold))
-          .foregroundStyle(HarnessMonitorTheme.caution)
-          .lineLimit(2)
-      }
+    HStack(alignment: .center, spacing: HarnessMonitorTheme.spacingSM) {
+      healthDot
+      Text(snapshot.sourceTitle)
+        .scaledFont(.callout.weight(.semibold))
+        .foregroundStyle(snapshot.sourceTint)
+        .lineLimit(1)
+      Text("·")
+        .scaledFont(.callout)
+        .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+        .accessibilityHidden(true)
+      Text(snapshot.detailTitle)
+        .scaledFont(.callout)
+        .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+        .lineLimit(1)
+        .truncationMode(.tail)
+      Spacer(minLength: HarnessMonitorTheme.spacingMD)
+      refreshButton
+      infoButton
     }
     .padding(.horizontal, 12)
-    .padding(.vertical, 10)
+    .padding(.vertical, 8)
     .harnessFloatingControlGlass(cornerRadius: 8, tint: snapshot.sourceTint)
     .accessibilityIdentifier(HarnessMonitorAccessibility.dashboardReviewsProvenance)
     .accessibilityElement(children: .combine)
     .accessibilityLabel("Review data provenance")
-    .accessibilityValue(snapshot.detailTitle)
+    .accessibilityValue("\(snapshot.sourceTitle) · \(snapshot.detailTitle)")
+  }
+
+  private var healthDot: some View {
+    Circle()
+      .fill(snapshot.sourceTint)
+      .frame(width: 8, height: 8)
+      .accessibilityHidden(true)
+  }
+
+  private var refreshButton: some View {
+    Button(action: onRefresh) {
+      Image(systemName: "arrow.clockwise")
+        .imageScale(.medium)
+        .frame(width: 18, height: 18)
+    }
+    .frame(width: 28, height: 28)
+    .harnessActionButtonStyle(variant: .bordered, tint: .secondary)
+    .help("Refresh review data")
+    .accessibilityLabel("Refresh review data")
+    .accessibilityIdentifier(HarnessMonitorAccessibility.dashboardReviewsRefreshButton)
+  }
+
+  private var infoButton: some View {
+    Button {
+      isInfoPopoverPresented.toggle()
+    } label: {
+      Image(systemName: "info.circle")
+        .imageScale(.medium)
+        .frame(width: 18, height: 18)
+    }
+    .frame(width: 28, height: 28)
+    .harnessActionButtonStyle(variant: .bordered, tint: .secondary)
+    .help("Review data details")
+    .accessibilityLabel("Show review data details")
+    .popover(isPresented: $isInfoPopoverPresented, arrowEdge: .top) {
+      DashboardReviewsProvenancePopover(snapshot: snapshot)
+    }
   }
 }
-
