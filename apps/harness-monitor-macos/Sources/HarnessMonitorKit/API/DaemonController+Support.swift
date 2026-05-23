@@ -56,11 +56,20 @@ public struct ServiceManagementDaemonLaunchAgentManager: DaemonLaunchAgentManagi
 /// `io.harnessmonitor.daemon`. We try to unregister both silently on the first
 /// launch under the new layout and accept any failure.
 public enum LegacyManagedLaunchAgentCleanup {
+  /// UserDefaults key tracking which legacy plist names we have already
+  /// attempted to evict on this machine. Once a name is in here we skip the
+  /// per-launch attempt; SMAppService throws "Operation not permitted" when
+  /// the plist file is absent from the bundle whether or not BTM still holds
+  /// a record, so we cannot tell success from failure and one try is all the
+  /// framework gives us.
+  public static let completedNamesDefaultsKey =
+    "HarnessMonitor.LegacyLaunchAgentCleanup.CompletedNames"
   private static let lock = NSLock()
   nonisolated(unsafe) private static var didAttempt = false
 
-  /// Runs once per process. Subsequent calls are no-ops.
-  public static func runOnce() {
+  /// Runs once per process. Subsequent calls are no-ops. Within the first
+  /// call, also skips any legacy plist name already recorded in `defaults`.
+  public static func runOnce(defaults: UserDefaults = .standard) {
     lock.lock()
     let alreadyAttempted = didAttempt
     didAttempt = true
@@ -68,14 +77,18 @@ public enum LegacyManagedLaunchAgentCleanup {
     guard !alreadyAttempted else { return }
 
     let currentName = HarnessMonitorPaths.launchAgentPlistName
-    let legacyNames = HarnessMonitorPaths.legacyLaunchAgentPlistNames
-      .filter { $0 != currentName }
-    guard legacyNames.isEmpty == false else { return }
+    let completedNames = Set(
+      defaults.stringArray(forKey: completedNamesDefaultsKey) ?? []
+    )
+    let pendingNames = HarnessMonitorPaths.legacyLaunchAgentPlistNames
+      .filter { $0 != currentName && !completedNames.contains($0) }
+    guard pendingNames.isEmpty == false else { return }
 
-    for legacyName in legacyNames {
-      // Always attempt the unregister, even when `SMAppService.status` reports
-      // `.notFound`. BTM may still hold a disposition record for an old label,
-      // and `unregister()` is the framework-owned eviction path.
+    for legacyName in pendingNames {
+      // Attempt the unregister regardless of `SMAppService.status`. BTM may
+      // still hold a disposition record for an old label, and `unregister()`
+      // is the framework-owned eviction path. The marker below ensures we
+      // only burn the one attempt SMAppService allows per machine.
       let legacyService = SMAppService.agent(plistName: legacyName)
       HarnessMonitorLogger.lifecycle.info(
         """
@@ -86,6 +99,9 @@ public enum LegacyManagedLaunchAgentCleanup {
       )
       attemptUnregister(legacyService, name: legacyName)
     }
+
+    let updated = completedNames.union(pendingNames)
+    defaults.set(updated.sorted(), forKey: completedNamesDefaultsKey)
   }
 
   /// Test-only escape hatch: clears the once-guard so a unit test can verify
