@@ -186,6 +186,23 @@ struct DashboardReviewsDetailUXContractTests {
     #expect(reviews.contains("\"approval\""))
   }
 
+  @Test("Review detail avoids duplicate ForEach ids and empty SF Symbols")
+  func reviewDetailAvoidsInvalidSwiftUIConfiguration() throws {
+    let reviews = try source(
+      "Sources/HarnessMonitorUIPreviewable/Views/Dashboard/DashboardReviewsReviewLabelLists.swift"
+    )
+    let fileCard = try source(
+      "Sources/HarnessMonitorUIPreviewable/Views/Dashboard/DashboardReviewFileCard.swift"
+    )
+
+    #expect(reviews.contains("Array(reviews.enumerated())"))
+    #expect(!reviews.contains("ForEach(reviews)"))
+    #expect(fileCard.contains("viewModeMenuLabel(for: .unified)"))
+    #expect(fileCard.contains("viewModeMenuLabel(for: .split)"))
+    #expect(!fileCard.contains("systemImage: viewMode == .unified ? \"checkmark\" : \"\""))
+    #expect(!fileCard.contains("systemImage: viewMode == .split ? \"checkmark\" : \"\""))
+  }
+
   @Test("Large review detail collections render in bounded batches")
   func largeReviewDetailCollectionsRenderInBoundedBatches() throws {
     let checks = try source(
