@@ -112,59 +112,77 @@ struct DashboardReviewActivitySummary: View {
   let snapshot: DashboardReviewActivitySnapshot
 
   var body: some View {
-    VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
-      HarnessMonitorWrapLayout(
-        spacing: HarnessMonitorTheme.spacingSM,
-        lineSpacing: HarnessMonitorTheme.spacingSM
-      ) {
-        if snapshot.isRefreshing {
-          DashboardReviewStatusPill(
-            label: snapshot.actionTitle ?? "Refreshing",
-            tint: HarnessMonitorTheme.accent,
-            systemImage: "arrow.clockwise"
-          )
-        }
-        DashboardReviewStatusPill(
-          label: snapshot.cacheLabel,
-          tint: snapshot.fromCache ? HarnessMonitorTheme.caution : HarnessMonitorTheme.success,
-          systemImage: snapshot.fromCache ? "archivebox" : "network"
-        )
-        if !snapshot.fetchedAt.isEmpty {
-          DashboardReviewStatusPill(
-            label: "Fetched \(snapshot.fetchedAt)",
-            tint: HarnessMonitorTheme.secondaryInk,
-            systemImage: "clock",
-            isQuiet: true
-          )
-        }
-        if let checkLinkLabel = snapshot.checkLinkLabel {
-          DashboardReviewStatusPill(
-            label: checkLinkLabel,
-            tint: snapshot.missingCheckRunURLCount == 0
-              ? HarnessMonitorTheme.success
-              : HarnessMonitorTheme.caution,
-            systemImage: snapshot.missingCheckRunURLCount == 0
-              ? "link"
-              : "exclamationmark.triangle",
-            isQuiet: snapshot.missingCheckRunURLCount == 0
-          )
-        }
-      }
+    VStack(alignment: .leading, spacing: 10) {
+      metadataLine
 
       if let lastAction = snapshot.lastAction {
         DashboardReviewLastActionRow(entry: lastAction)
       } else {
-        Text("No recent review action is recorded for this pull request.")
-          .scaledFont(.callout)
-          .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+        emptyActionRow
       }
+    }
+  }
+
+  private var metadataLine: some View {
+    HarnessMonitorWrapLayout(
+      spacing: HarnessMonitorTheme.spacingSM,
+      lineSpacing: HarnessMonitorTheme.spacingSM
+    ) {
+      if snapshot.isRefreshing {
+        metadataLabel(
+          snapshot.actionTitle ?? "Refreshing",
+          systemImage: "arrow.clockwise",
+          tint: HarnessMonitorTheme.accent
+        )
+      }
+      metadataLabel(
+        snapshot.cacheLabel,
+        systemImage: snapshot.fromCache ? "archivebox" : "network",
+        tint: snapshot.fromCache ? HarnessMonitorTheme.caution : HarnessMonitorTheme.secondaryInk
+      )
+      if !snapshot.fetchedAt.isEmpty {
+        metadataLabel("Fetched \(snapshot.fetchedAt)", systemImage: "clock")
+      }
+      if let checkLinkLabel = snapshot.checkLinkLabel {
+        metadataLabel(
+          checkLinkLabel,
+          systemImage: snapshot.missingCheckRunURLCount == 0
+            ? "link"
+            : "exclamationmark.triangle",
+          tint: snapshot.missingCheckRunURLCount == 0
+            ? HarnessMonitorTheme.secondaryInk
+            : HarnessMonitorTheme.caution
+        )
+      }
+    }
+  }
+
+  private var emptyActionRow: some View {
+    HStack(alignment: .firstTextBaseline, spacing: HarnessMonitorTheme.spacingSM) {
+      Image(systemName: "clock")
+        .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+      Text("No monitor action has run for this pull request.")
+        .scaledFont(.callout)
+        .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+      Spacer(minLength: HarnessMonitorTheme.spacingSM)
       Button {
         HarnessMonitorClipboard.copy(snapshot.diagnosticsText)
       } label: {
-        Label("Copy action diagnostics", systemImage: "doc.on.doc")
+        Label("Copy diagnostics", systemImage: "doc.on.doc")
       }
       .controlSize(.small)
     }
+  }
+
+  private func metadataLabel(
+    _ title: String,
+    systemImage: String,
+    tint: Color = HarnessMonitorTheme.secondaryInk
+  ) -> some View {
+    Label(title, systemImage: systemImage)
+      .scaledFont(.caption.weight(.semibold))
+      .foregroundStyle(tint)
+      .lineLimit(1)
   }
 }
 

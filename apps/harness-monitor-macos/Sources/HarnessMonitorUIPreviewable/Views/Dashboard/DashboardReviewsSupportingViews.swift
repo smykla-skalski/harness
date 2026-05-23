@@ -36,10 +36,15 @@ struct DashboardReviewsDescriptionView: View {
           .foregroundStyle(HarnessMonitorTheme.secondaryInk)
           .scaledFont(.callout)
       } else if viewerCanUpdate {
-        HarnessMonitorMarkdownText(body, textSelection: .enabled)
-          .markdownCheckboxToggle { offset, newValue in
-            toggleCheckbox(currentBody: body, offset: offset, newValue: newValue)
+        VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
+          if body.contains("- [") {
+            DashboardReviewDescriptionCheckboxNotice()
           }
+          HarnessMonitorMarkdownText(body, textSelection: .enabled)
+            .markdownCheckboxToggle { offset, newValue in
+              toggleCheckbox(currentBody: body, offset: offset, newValue: newValue)
+            }
+        }
       } else {
         HarnessMonitorMarkdownText(body, textSelection: .enabled)
       }
@@ -79,5 +84,23 @@ struct DashboardReviewsDescriptionView: View {
         onError?("Couldn't update PR body: \(message)")
       }
     }
+  }
+}
+
+private struct DashboardReviewDescriptionCheckboxNotice: View {
+  var body: some View {
+    Label(
+      "Task-list checkboxes update the pull request description.",
+      systemImage: "checklist"
+    )
+    .scaledFont(.caption.weight(.semibold))
+    .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+    .padding(.horizontal, 9)
+    .padding(.vertical, 6)
+    .background(
+      HarnessMonitorTheme.accent.opacity(0.08),
+      in: RoundedRectangle(cornerRadius: 7, style: .continuous)
+    )
+    .accessibilityElement(children: .combine)
   }
 }

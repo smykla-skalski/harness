@@ -35,7 +35,8 @@ struct DashboardReviewCheckRow: View {
     HStack(alignment: .dashboardReviewCheckTextCenter, spacing: HarnessMonitorTheme.spacingSM) {
       Image(systemName: check.systemImage)
         .foregroundStyle(check.tint)
-        .frame(width: 16, alignment: .center)
+        .imageScale(.medium)
+        .frame(width: 18, alignment: .center)
       Text(check.name)
         .scaledFont(.callout)
         .foregroundStyle(HarnessMonitorTheme.ink)
@@ -45,8 +46,9 @@ struct DashboardReviewCheckRow: View {
         }
         .layoutPriority(1)
       if check.detailsWebURL != nil {
-        Image(systemName: "arrow.up.forward.square")
-          .imageScale(.small)
+        Label("Open", systemImage: "arrow.up.forward.square")
+          .labelStyle(.iconOnly)
+          .imageScale(.medium)
           .foregroundStyle(HarnessMonitorTheme.accent)
           .accessibilityHidden(true)
       }
@@ -60,6 +62,7 @@ struct DashboardReviewCheckRow: View {
       Spacer(minLength: 0)
     }
     .padding(.vertical, 8)
+    .frame(minHeight: 34)
   }
 
   @ViewBuilder private var contextMenu: some View {

@@ -146,6 +146,8 @@ private struct DashboardReviewChangePill: View {
 
   var body: some View {
     HStack(spacing: HarnessMonitorTheme.spacingSM) {
+      Text("Files")
+        .foregroundStyle(HarnessMonitorTheme.secondaryInk)
       Text(verbatim: "+\(additions)")
         .foregroundStyle(HarnessMonitorTheme.success)
       Text(verbatim: "-\(deletions)")
@@ -182,25 +184,163 @@ struct DashboardReviewStatusStrip: View {
   let item: ReviewItem
 
   var body: some View {
-    HarnessMonitorWrapLayout(
-      spacing: HarnessMonitorTheme.spacingSM,
-      lineSpacing: HarnessMonitorTheme.spacingSM
-    ) {
-      DashboardReviewStatusPill(label: item.statusLabel, tint: item.statusTint)
-      DashboardReviewStatusPill(
-        label: item.reviewStatus.label,
-        tint: item.reviewStatus.tint,
-        isQuiet: true
-      )
-      DashboardReviewChangePill(additions: item.additions, deletions: item.deletions)
-      if item.policyBlocked {
+    VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
+      HStack(alignment: .firstTextBaseline, spacing: HarnessMonitorTheme.spacingSM) {
         DashboardReviewStatusPill(
-          label: "Policy wait",
-          tint: HarnessMonitorTheme.caution,
-          systemImage: "hourglass",
+          label: item.statusLabel,
+          tint: item.statusTint,
+          systemImage: item.statusSystemImage
+        )
+        Text(item.statusSentence)
+          .scaledFont(.callout)
+          .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+          .fixedSize(horizontal: false, vertical: true)
+      }
+
+      HarnessMonitorWrapLayout(
+        spacing: HarnessMonitorTheme.spacingSM,
+        lineSpacing: HarnessMonitorTheme.spacingSM
+      ) {
+        DashboardReviewStatusPill(
+          label: item.reviewStatus.label,
+          tint: item.reviewStatus.tint,
           isQuiet: true
         )
+        DashboardReviewStatusPill(
+          label: item.checkStatus.label,
+          tint: item.checkStatus.tint,
+          isQuiet: true
+        )
+        DashboardReviewChangePill(additions: item.additions, deletions: item.deletions)
+        if item.policyBlocked {
+          DashboardReviewStatusPill(
+            label: "Policy blocked",
+            tint: HarnessMonitorTheme.caution,
+            systemImage: "hourglass",
+            isQuiet: true
+          )
+        }
       }
+    }
+  }
+}
+
+struct DashboardReviewAttentionSummary: View {
+  let item: ReviewItem
+
+  var body: some View {
+    HStack(alignment: .top, spacing: HarnessMonitorTheme.spacingSM) {
+      Image(systemName: "exclamationmark.triangle.fill")
+        .foregroundStyle(HarnessMonitorTheme.caution)
+        .imageScale(.medium)
+        .frame(width: 18)
+      VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingXS) {
+        Text("Needs attention before merge")
+          .scaledFont(.caption.weight(.semibold))
+          .foregroundStyle(HarnessMonitorTheme.ink)
+        Text(item.attentionSentence)
+          .scaledFont(.caption)
+          .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+          .fixedSize(horizontal: false, vertical: true)
+      }
+    }
+    .padding(.horizontal, 10)
+    .padding(.vertical, 8)
+    .background(
+      HarnessMonitorTheme.caution.opacity(0.10),
+      in: RoundedRectangle(cornerRadius: 8, style: .continuous)
+    )
+    .overlay {
+      RoundedRectangle(cornerRadius: 8, style: .continuous)
+        .strokeBorder(HarnessMonitorTheme.caution.opacity(0.24), lineWidth: 1)
+    }
+    .accessibilityElement(children: .combine)
+    .accessibilityLabel("Review needs attention")
+    .accessibilityValue(item.attentionSentence)
+  }
+}
+
+extension ReviewCheckStatus {
+  var tint: Color {
+    switch self {
+    case .success:
+      HarnessMonitorTheme.success
+    case .failure:
+      HarnessMonitorTheme.danger
+    case .pending:
+      HarnessMonitorTheme.caution
+    case .none, .unknown:
+      HarnessMonitorTheme.secondaryInk
+    }
+  }
+}
+
+extension ReviewItem {
+  var statusSentence: String {
+    var parts: [String] = []
+    parts.append(reviewStatus.statusSentenceFragment)
+    parts.append(checkStatus.statusSentenceFragment)
+    if policyBlocked {
+      parts.append("review policy is blocking merge")
+    }
+    if mergeable == .conflicting {
+      parts.append("merge conflicts need resolution")
+    }
+    return parts.joined(separator: ", ") + "."
+  }
+
+  var attentionSentence: String {
+    var reasons: [String] = []
+    if hasRequiredFailedChecks {
+      reasons.append(
+        "Required checks are failing: \(requiredFailedCheckNames.joined(separator: ", "))."
+      )
+    } else if checkStatus == .failure {
+      reasons.append("Checks are failing.")
+    }
+    if policyBlocked {
+      reasons.append("Review policy is blocking merge even though review state can be approved.")
+    }
+    if reviewStatus == .changesRequested {
+      reasons.append("A reviewer requested changes.")
+    }
+    if mergeable == .conflicting {
+      reasons.append("Merge conflicts must be resolved.")
+    }
+    return reasons.isEmpty ? "No attention reason is reported." : reasons.joined(separator: " ")
+  }
+}
+
+extension ReviewReviewStatus {
+  fileprivate var statusSentenceFragment: String {
+    switch self {
+    case .approved:
+      "approved review"
+    case .reviewRequired:
+      "review required"
+    case .changesRequested:
+      "changes requested"
+    case .none:
+      "no review submitted"
+    case .unknown(let raw):
+      "review state \(raw)"
+    }
+  }
+}
+
+extension ReviewCheckStatus {
+  fileprivate var statusSentenceFragment: String {
+    switch self {
+    case .success:
+      "checks passing"
+    case .failure:
+      "checks failing"
+    case .pending:
+      "checks still running"
+    case .none:
+      "no checks reported"
+    case .unknown(let raw):
+      "check state \(raw)"
     }
   }
 }
