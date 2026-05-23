@@ -219,6 +219,18 @@ extension PreviewHarnessClientState {
     )
   }
 
+  func addReviewFileComment(
+    request: ReviewsFileCommentRequest
+  ) -> ReviewsFileCommentResponse {
+    ReviewsFileCommentResponse(
+      pullRequestId: request.pullRequestId,
+      threadId: request.threadId ?? "preview-thread",
+      commentId: "preview-comment",
+      url: nil,
+      fetchedAt: Self.mutationTimestamp
+    )
+  }
+
   func listReviewFiles(
     request: ReviewsFilesListRequest
   ) -> ReviewsFilesListResponse {

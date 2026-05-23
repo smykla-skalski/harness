@@ -2,6 +2,7 @@ import Foundation
 import Testing
 
 @testable import HarnessMonitorKit
+@testable import HarnessMonitorUIPreviewable
 
 @Suite("Dashboard reviews route view context menus")
 struct DashboardReviewsRouteViewContextMenuTests {

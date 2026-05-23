@@ -1,6 +1,7 @@
 mod avatar;
 mod body_update;
 mod enums;
+mod file_comment;
 pub(crate) mod files;
 mod github;
 mod logic;
@@ -13,6 +14,10 @@ pub use avatar::{ReviewsAvatarRequest, ReviewsAvatarResponse, fetch_review_avata
 pub use body_update::{
     ReviewsBodyUpdateOutcome, ReviewsBodyUpdateRequest,
     ReviewsBodyUpdateResponse,
+};
+pub use file_comment::{
+    ReviewsFileCommentKind, ReviewsFileCommentRequest,
+    ReviewsFileCommentResponse,
 };
 pub use enums::{
     ReviewActionKind, ReviewActionOutcome, ReviewActionPreviewKind,

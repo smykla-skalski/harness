@@ -143,6 +143,7 @@ enum WebSocketRPCMethod: String, CaseIterable, Equatable, Sendable {
   case reviewsAvatar = "reviews.avatar"
   case reviewsTimeline = "reviews.timeline"
   case reviewsReviewThreadsResolve = "reviews.review_threads_resolve"
+  case reviewsFilesComment = "reviews.files_comment"
   case taskCreate = "task.create"
   case taskDelete = "task.delete"
   case taskAssign = "task.assign"

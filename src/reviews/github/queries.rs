@@ -350,6 +350,42 @@ mutation UnresolveReviewReviewThread($threadId: ID!) {
 }
 ";
 
+pub(super) const ADD_REVIEW_THREAD_MUTATION: &str = r"
+mutation AddReviewFileThread(
+  $pullRequestId: ID!,
+  $body: String!,
+  $path: String!,
+  $line: Int!,
+  $side: DiffSide!
+) {
+  addPullRequestReviewThread(input: {
+    pullRequestId: $pullRequestId,
+    body: $body,
+    path: $path,
+    line: $line,
+    side: $side
+  }) {
+    thread {
+      id
+      comments(first: 1) {
+        nodes { id url }
+      }
+    }
+  }
+}
+";
+
+pub(super) const ADD_REVIEW_THREAD_REPLY_MUTATION: &str = r"
+mutation AddReviewFileThreadReply($threadId: ID!, $body: String!) {
+  addPullRequestReviewThreadReply(input: {
+    pullRequestReviewThreadId: $threadId,
+    body: $body
+  }) {
+    comment { id url }
+  }
+}
+";
+
 pub(crate) const LIST_PR_FILES_QUERY: &str = r"
 query ListReviewPullRequestFiles($id: ID!, $after: String) {
   node(id: $id) {

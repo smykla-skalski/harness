@@ -42,6 +42,10 @@ struct DashboardReviewsRouteView: View {
   var contentDetailWidth = SessionContentDetailSplitLayout.defaultContentWidth
   @SceneStorage("dashboard.reviews.problem-checks-only")
   var showsProblemChecksOnly = false
+  @SceneStorage("dashboard.reviews.detail-mode")
+  var detailModeRaw = DashboardReviewsDetailMode.overview.rawValue
+  @SceneStorage("dashboard.reviews.file-selections")
+  var fileSelectionsRaw = ""
 
   @State private var routeState: DashboardReviewsRouteViewState
 

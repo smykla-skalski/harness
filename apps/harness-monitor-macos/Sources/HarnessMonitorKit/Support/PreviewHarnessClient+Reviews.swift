@@ -95,6 +95,13 @@ extension PreviewHarnessClient {
     return await state.commentReviews(request: request)
   }
 
+  public func addReviewFileComment(
+    request: ReviewsFileCommentRequest
+  ) async throws -> ReviewsFileCommentResponse {
+    try await performActionDelay()
+    return await state.addReviewFileComment(request: request)
+  }
+
   public func listReviewFiles(
     request: ReviewsFilesListRequest
   ) async throws -> ReviewsFilesListResponse {

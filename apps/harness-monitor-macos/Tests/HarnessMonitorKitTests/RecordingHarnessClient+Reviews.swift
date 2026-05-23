@@ -172,6 +172,18 @@ extension RecordingHarnessClient {
     throw HarnessMonitorAPIError.server(code: 501, message: "Reviews unavailable")
   }
 
+  func addReviewFileComment(
+    request: ReviewsFileCommentRequest
+  ) async throws -> ReviewsFileCommentResponse {
+    return ReviewsFileCommentResponse(
+      pullRequestId: request.pullRequestId,
+      threadId: request.threadId ?? "recording-thread",
+      commentId: "recording-comment",
+      url: nil,
+      fetchedAt: "2026-05-23T12:00:00Z"
+    )
+  }
+
   func previewReviewFiles(
     request: ReviewsFilesPreviewRequest
   ) async throws -> ReviewsFilesPreviewResponse {

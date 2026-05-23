@@ -3,6 +3,7 @@ use crate::daemon::protocol::{
     ReviewsActionPreviewRequest, ReviewsApproveRequest,
     ReviewsAutoRequest, ReviewsAvatarRequest, ReviewsBodyRequest, ReviewsBodyUpdateRequest,
     ReviewsCommentRequest, ReviewsFilesBlobRequest,
+    ReviewsFileCommentRequest,
     ReviewsFilesListRequest, ReviewsFilesPatchRequest, ReviewsFilesPreviewRequest,
     ReviewsFilesViewedRequest, ReviewsLabelRequest,
     ReviewsMergeRequest, ReviewsQueryRequest, ReviewsRefreshRequest,
@@ -86,6 +87,9 @@ pub(crate) async fn dispatch_reviews_method(
         }
         ws_methods::REVIEWS_FILES_BLOB => {
             Some(dispatch_reviews_files_blob(request).await)
+        }
+        ws_methods::REVIEWS_FILES_COMMENT => {
+            Some(dispatch_reviews_files_comment(request).await)
         }
         ws_methods::REVIEWS_FILES_LOCAL_CLONES_LIST => Some(dispatch_query_result(
             &request.id,
@@ -290,6 +294,16 @@ async fn dispatch_reviews_files_blob(request: &WsRequest) -> WsResponse {
     dispatch_query_result(
         &request.id,
         service::fetch_review_file_blob(&body).await,
+    )
+}
+
+async fn dispatch_reviews_files_comment(request: &WsRequest) -> WsResponse {
+    let Ok(body) = parse_params::<ReviewsFileCommentRequest>(request) else {
+        return invalid_params(request);
+    };
+    dispatch_query_result(
+        &request.id,
+        service::add_review_file_comment(&body).await,
     )
 }
 

@@ -115,6 +115,7 @@ public final class ReviewFilesViewModel {
   public var previews: [String: ReviewFilePreviewState] = [:]
   public var viewedByPath: [String: ReviewFileViewedState] = [:]
   public var expandedPaths: Set<String> = []
+  public var selectedPath: String?
 
   public var sortMode: ReviewFilesSortMode = .path
   public var filter: ReviewFilesFilter = .init()
@@ -146,6 +147,7 @@ public final class ReviewFilesViewModel {
     patches = patches.filter { validPaths.contains($0.key) }
     previews = previews.filter { validPaths.contains($0.key) }
     recomputeSortedAndFiltered()
+    ensureSelectedPath()
   }
 
   public func setLoading() { state = .loading }
@@ -196,11 +198,13 @@ public final class ReviewFilesViewModel {
   public func applyFilter(_ filter: ReviewFilesFilter) {
     self.filter = filter
     recomputeSortedAndFiltered()
+    ensureSelectedPath()
   }
 
   public func applySort(_ mode: ReviewFilesSortMode) {
     self.sortMode = mode
     recomputeSortedAndFiltered()
+    ensureSelectedPath()
   }
 
   // MARK: - Expansion / view mode
@@ -217,11 +221,61 @@ public final class ReviewFilesViewModel {
     defaultViewMode
   }
 
+  // MARK: - Selection
+
+  public var selectedFile: ReviewFile? {
+    guard let selectedPath else { return nil }
+    return files.first { $0.path == selectedPath }
+  }
+
+  public func select(path: String?) {
+    guard let path else {
+      selectedPath = nil
+      return
+    }
+    if files.contains(where: { $0.path == path }) {
+      selectedPath = path
+    }
+  }
+
+  public func ensureSelectedPath() {
+    if let selectedPath, filteredFiles.contains(where: { $0.path == selectedPath }) {
+      return
+    }
+    selectedPath = preferredSelection(in: filteredFiles)?.path
+  }
+
+  public func selectNextUnviewed() {
+    guard !filteredFiles.isEmpty else {
+      selectedPath = nil
+      return
+    }
+    let startIndex =
+      selectedPath.flatMap { selected in
+        filteredFiles.firstIndex { $0.path == selected }
+      } ?? -1
+    let trailingIndices = Array(filteredFiles.indices.dropFirst(startIndex + 1))
+    let leadingIndices = Array(filteredFiles.indices.prefix(max(startIndex + 1, 0)))
+    let ordered = trailingIndices + leadingIndices
+    if let index = ordered.first(where: { index in
+      let file = filteredFiles[index]
+      return (viewedByPath[file.path] ?? file.viewerViewedState) != .viewed
+    }) {
+      selectedPath = filteredFiles[index].path
+    }
+  }
+
   // MARK: - Internals
 
   func recomputeSortedAndFiltered() {
     sortedFiles = files.sorted(by: comparator(for: sortMode))
     filteredFiles = sortedFiles.filter { passesFilter($0, snapshot: filter) }
+  }
+
+  private func preferredSelection(in candidates: [ReviewFile]) -> ReviewFile? {
+    candidates.first { file in
+      (viewedByPath[file.path] ?? file.viewerViewedState) != .viewed
+    } ?? candidates.first
   }
 
   private func passesFilter(

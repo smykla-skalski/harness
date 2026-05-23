@@ -12,6 +12,7 @@ struct DashboardReviewDetailView<Actions: View>: View {
   let onDescriptionCheckboxUpdated: (() -> Void)?
   let onRerunCheck: (ReviewCheck) -> Void
   let onReRequestReview: ((String) -> Void)?
+  let onOpenFilesMode: () -> Void
   @ViewBuilder let actionBar: () -> Actions
 
   @Environment(\.reviewsPreferences)
@@ -43,6 +44,7 @@ struct DashboardReviewDetailView<Actions: View>: View {
     onDescriptionCheckboxUpdated: (() -> Void)? = nil,
     onRerunCheck: @escaping (ReviewCheck) -> Void = { _ in },
     onReRequestReview: ((String) -> Void)? = nil,
+    onOpenFilesMode: @escaping () -> Void = {},
     @ViewBuilder actionBar: @escaping () -> Actions
   ) {
     self.item = item
@@ -55,6 +57,7 @@ struct DashboardReviewDetailView<Actions: View>: View {
     self.onDescriptionCheckboxUpdated = onDescriptionCheckboxUpdated
     self.onRerunCheck = onRerunCheck
     self.onReRequestReview = onReRequestReview
+    self.onOpenFilesMode = onOpenFilesMode
     self.actionBar = actionBar
   }
 
@@ -87,10 +90,12 @@ struct DashboardReviewDetailView<Actions: View>: View {
           .accessibilityIdentifier(HarnessMonitorAccessibility.dashboardReviewsDescription)
           if filesEnabled, !filesHiddenForCurrentPR {
             DashboardReviewDetailSection(title: "Files") {
-              DashboardReviewFilesSection(
+              DashboardReviewFilesOverviewSummary(
+                item: item,
+                store: store,
                 pullRequestID: item.pullRequestID,
                 repositoryID: item.repositoryID,
-                onHideFilesForPR: { filesHiddenForCurrentPR = true }
+                onOpenFiles: onOpenFilesMode
               )
             }
             .id(DashboardReviewDetailSectionID.files.rawValue)
@@ -173,7 +178,13 @@ struct DashboardReviewDetailView<Actions: View>: View {
         DashboardReviewDetailHeader(
           item: item,
           jumpTargets: jumpTargets,
-          onJumpTo: { jumpTarget = $0 },
+          onJumpTo: { target in
+            if target == DashboardReviewDetailSectionID.files.rawValue {
+              onOpenFilesMode()
+            } else {
+              jumpTarget = target
+            }
+          },
           actionBar: {
             actionBar()
           }

@@ -41,6 +41,8 @@ pub use crate::reviews::{
     ReviewsFilesPatchRequest, ReviewsFilesPatchResponse,
     ReviewsFilesPreviewRequest, ReviewsFilesPreviewResponse,
     ReviewsFilesViewedRequest, ReviewsFilesViewedResponse,
+    ReviewsFileCommentKind, ReviewsFileCommentRequest,
+    ReviewsFileCommentResponse,
     ReviewsLabelRequest, ReviewsMergeRequest, ReviewsQueryRequest,
     ReviewsQueryResponse, ReviewsRateLimitSnapshot,
     ReviewsRefreshRequest, ReviewsRefreshResponse,
