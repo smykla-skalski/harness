@@ -92,13 +92,13 @@ struct DashboardReviewsDisabledReasonTests {
     #expect(DashboardReviewsDisabledReason.mergeReason(for: [mergeable, conflict]) == nil)
   }
 
-  @Test("Approve prominence becomes warning when selection needs attention")
-  func approveProminenceBecomesWarningWhenSelectionNeedsAttention() {
+  @Test("Approve prominence stays primary regardless of attention state")
+  func approveProminenceStaysPrimaryRegardlessOfAttentionState() {
     let clean = makeItem(state: .open, reviewStatus: .reviewRequired, checkStatus: .success)
     let failing = makeItem(state: .open, reviewStatus: .approved, checkStatus: .failure)
 
     #expect(dashboardReviewApproveProminence(for: [clean]) == .primary)
-    #expect(dashboardReviewApproveProminence(for: [failing]) == .warning)
+    #expect(dashboardReviewApproveProminence(for: [failing]) == .primary)
   }
 
   @Test("Merge prominence becomes destructive for admin bypass of required failing checks")

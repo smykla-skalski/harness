@@ -76,7 +76,11 @@ struct DashboardReviewActionConfirmation {
 func dashboardReviewApproveProminence(
   for items: [ReviewItem]
 ) -> DashboardReviewActionProminence {
-  items.contains(where: \.requiresAttention) ? .warning : .primary
+  // Approve stays neutrally inviting regardless of attention state so that
+  // only one prominent action signals danger at a time. The confirmation
+  // dialog already gates risky approves with an explicit prompt, so the user
+  // can intentionally override.
+  .primary
 }
 
 func dashboardReviewMergeProminence(
