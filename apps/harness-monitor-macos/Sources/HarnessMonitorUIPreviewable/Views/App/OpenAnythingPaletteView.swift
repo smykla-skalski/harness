@@ -275,7 +275,7 @@ public struct OpenAnythingPaletteView: View {
           }
         }
       }
-      .padding(.vertical, 8)
+      .padding(.top, 8)
     }
     .frame(maxHeight: OpenAnythingPaletteConstants.resultsMaxHeight)
   }
