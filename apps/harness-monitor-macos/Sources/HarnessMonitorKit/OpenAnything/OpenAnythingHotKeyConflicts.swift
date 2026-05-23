@@ -21,17 +21,17 @@ public enum OpenAnythingHotKeyConflicts {
   /// file stays a pure logic layer with no Carbon dependency.
   enum KeyCode {
     static let space: UInt32 = 49
-    static let q: UInt32 = 12
-    static let w: UInt32 = 13
+    static let keyQ: UInt32 = 12
+    static let keyW: UInt32 = 13
     static let tab: UInt32 = 48
-    static let k: UInt32 = 40
-    static let f: UInt32 = 3
-    static let p: UInt32 = 35
-    static let t: UInt32 = 17
-    static let s: UInt32 = 1
-    static let n: UInt32 = 45
-    static let o: UInt32 = 31
-    static let z: UInt32 = 6
+    static let keyK: UInt32 = 40
+    static let keyF: UInt32 = 3
+    static let keyP: UInt32 = 35
+    static let keyT: UInt32 = 17
+    static let keyS: UInt32 = 1
+    static let keyN: UInt32 = 45
+    static let keyO: UInt32 = 31
+    static let keyZ: UInt32 = 6
   }
 
   /// Returns the conflict severity for the supplied descriptor.
@@ -70,7 +70,7 @@ public enum OpenAnythingHotKeyConflicts {
     let isCommandOnly = descriptor.modifiers == [.command]
     guard isCommandOnly else { return false }
     switch descriptor.keyCode {
-    case KeyCode.space, KeyCode.q, KeyCode.w, KeyCode.tab:
+    case KeyCode.space, KeyCode.keyQ, KeyCode.keyW, KeyCode.tab:
       return true
     default:
       return false
@@ -85,14 +85,14 @@ public enum OpenAnythingHotKeyConflicts {
     let isCommandOnly = descriptor.modifiers == [.command]
     guard isCommandOnly else { return false }
     switch descriptor.keyCode {
-    case KeyCode.k,
-      KeyCode.f,
-      KeyCode.p,
-      KeyCode.t,
-      KeyCode.s,
-      KeyCode.n,
-      KeyCode.o,
-      KeyCode.z:
+    case KeyCode.keyK,
+      KeyCode.keyF,
+      KeyCode.keyP,
+      KeyCode.keyT,
+      KeyCode.keyS,
+      KeyCode.keyN,
+      KeyCode.keyO,
+      KeyCode.keyZ:
       return true
     default:
       return false

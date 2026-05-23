@@ -110,7 +110,7 @@ struct DashboardReviewListRowAccessibilityTests {
 
   @Test("row idealHeight is identical for the same content shape")
   func rowIdealHeightIsIdenticalForTheSameContentShape() {
-    let a = DashboardReviewListRowHeight.idealHeight(
+    let first = DashboardReviewListRowHeight.idealHeight(
       titleLineHeight: 18,
       captionLineHeight: 14,
       pillStripHeight: 22,
@@ -120,7 +120,7 @@ struct DashboardReviewListRowAccessibilityTests {
       verticalPadding: 10,
       lineSpacing: 4
     )
-    let b = DashboardReviewListRowHeight.idealHeight(
+    let second = DashboardReviewListRowHeight.idealHeight(
       titleLineHeight: 18,
       captionLineHeight: 14,
       pillStripHeight: 22,
@@ -130,7 +130,7 @@ struct DashboardReviewListRowAccessibilityTests {
       verticalPadding: 10,
       lineSpacing: 4
     )
-    #expect(a == b)
+    #expect(first == second)
   }
 
   @Test("labels strip caps visible chips at six and surfaces overflow")
