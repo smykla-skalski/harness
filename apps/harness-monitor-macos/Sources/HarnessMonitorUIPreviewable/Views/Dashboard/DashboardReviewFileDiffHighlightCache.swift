@@ -54,15 +54,59 @@ enum DashboardReviewFileDiffHighlightCache {
   }
 
   private static func tokenColor(for kind: HarnessCodeToken.Kind) -> NSColor {
+    DashboardReviewFileDiffMonokaiPalette.tokenColor(for: kind)
+  }
+}
+
+enum DashboardReviewFileDiffMonokaiPalette {
+  static let background = nsColor(hex: 0x272822)
+  static let foreground = nsColor(hex: 0xF8F8F2)
+  static let comment = nsColor(hex: 0x75715E)
+  static let selection = nsColor(hex: 0x49483E)
+  static let red = nsColor(hex: 0xF92672)
+  static let orange = nsColor(hex: 0xFD971F)
+  static let yellow = nsColor(hex: 0xE6DB74)
+  static let green = nsColor(hex: 0xA6E22E)
+  static let blue = nsColor(hex: 0x66D9EF)
+  static let purple = nsColor(hex: 0xAE81FF)
+
+  static let contextBackground = background
+  static let additionBackground = nsColor(hex: 0x34481F)
+  static let deletionBackground = nsColor(hex: 0x4A2031)
+  static let hunkBackground = nsColor(hex: 0x293C40)
+  static let contextGapBackground = nsColor(hex: 0x33342B)
+  static let metadataBackground = nsColor(hex: 0x45341F)
+  static let separator = nsColor(hex: 0x3E3D32)
+
+  static func tokenColor(for kind: HarnessCodeToken.Kind) -> NSColor {
     switch kind {
-    case .comment: .secondaryLabelColor
-    case .keyword, .property: .controlAccentColor
-    case .literal, .number, .type: .systemOrange
-    case .operatorSymbol, .punctuation, .whitespace: .tertiaryLabelColor
-    case .string: .systemGreen
-    case .deleted: .systemRed
-    case .heading, .inserted: .controlAccentColor
-    case .plain: .labelColor
+    case .comment:
+      comment
+    case .keyword, .operatorSymbol:
+      red
+    case .literal, .number:
+      purple
+    case .property, .type:
+      blue
+    case .punctuation, .whitespace:
+      comment
+    case .string:
+      yellow
+    case .deleted:
+      red
+    case .heading:
+      orange
+    case .inserted:
+      green
+    case .plain:
+      foreground
     }
+  }
+
+  private static func nsColor(hex: UInt32) -> NSColor {
+    let red = CGFloat((hex >> 16) & 0xFF) / 255
+    let green = CGFloat((hex >> 8) & 0xFF) / 255
+    let blue = CGFloat(hex & 0xFF) / 255
+    return NSColor(srgbRed: red, green: green, blue: blue, alpha: 1)
   }
 }
