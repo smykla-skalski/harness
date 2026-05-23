@@ -55,9 +55,10 @@ extension HarnessMonitorApp {
   /// the live Settings value without a relaunch.
   private func applyOpenAnythingPreferences() {
     let defaults = UserDefaults.standard
-    let storedLimit = defaults.object(
-      forKey: OpenAnythingPreferencesDefaults.perDomainLimitKey
-    ) as? Int ?? OpenAnythingPreferencesDefaults.perDomainLimitDefault
+    let storedLimit =
+      defaults.object(
+        forKey: OpenAnythingPreferencesDefaults.perDomainLimitKey
+      ) as? Int ?? OpenAnythingPreferencesDefaults.perDomainLimitDefault
     let clamped = max(
       OpenAnythingPreferencesDefaults.perDomainLimitMin,
       min(OpenAnythingPreferencesDefaults.perDomainLimitMax, storedLimit)

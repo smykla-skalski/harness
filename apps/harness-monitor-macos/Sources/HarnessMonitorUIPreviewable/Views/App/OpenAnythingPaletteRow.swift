@@ -128,15 +128,15 @@ struct OpenAnythingPaletteRow: View {
   }
 
   private var rowBackground: some View {
-    let baseOpacity: Double = isSelected
+    let baseOpacity: Double =
+      isSelected
       ? OpenAnythingPaletteConstants.rowSelectedFillOpacity
       : (isHovered ? OpenAnythingPaletteConstants.rowHoverFillOpacity : 0)
-    return RoundedRectangle(
-      cornerRadius: OpenAnythingPaletteConstants.rowCornerRadius,
-      style: .continuous
-    )
-    .fill(Color.accentColor.opacity(baseOpacity))
-    .padding(.horizontal, 6)
+    // Full-width, square-edged tint - matches Spotlight / Raycast where the
+    // selection bar spans the entire row width with no inset and no corner
+    // rounding.
+    return Rectangle()
+      .fill(Color.accentColor.opacity(baseOpacity))
   }
 
   private var accessibilityLabelText: String {
