@@ -1,8 +1,36 @@
 import HarnessMonitorKit
 import SwiftUI
 
+// Pill rule for the Reviews surface (2026-05-23):
+// - `harnessControlPillGlass`        -> infrastructure signals (sync, count,
+//                                       refresh-time, source).
+// - `DashboardReviewStatusPill`      -> content signals (review state, check
+//                                       state, attention, draft, labels).
+// - `DashboardReviewMetricPill`      -> summary aggregates (Total / Ready /
+//                                       Blocked counts).
+// - `DashboardReviewAttentionSummary` -> page-level alert blocks only.
+//
+// `isQuiet` convention:
+// - `isQuiet: true` (the default) is for attention badges, label chips, draft
+//   chip, and any secondary status pill on a row.
+// - `isQuiet: false` is reserved for the one primary status pill per row
+//   (the status-line pill in `DashboardReviewStatusStrip`, "All checks
+//   passed" / "N failing" check summary, "Cached" summary marker, and
+//   `Live daemon` source label). Callers that need the louder weight must
+//   pass `isQuiet: false` explicitly.
+//
+// Corner radii:
+// - Tinted pills share `HarnessMonitorTheme.pillCornerRadius` (7).
+// - Glass-capsule pills use `harnessControlPillGlass`'s own rounding.
+// - `DashboardReviewAttentionSummary` is an alert block, not a pill; it
+//   stays at 8pt to read as "alert chrome" distinct from the tinted-pill
+//   family and the 12pt card chrome (`HarnessMonitorTheme.cornerRadiusSM`).
+
 enum DashboardReviewsVisualMetrics {
-  static let pillCornerRadius: CGFloat = 7
+  /// Forwards to `HarnessMonitorTheme.pillCornerRadius` so non-dashboard
+  /// surfaces can share the same value through the theme. Kept here as a
+  /// transitional alias; new code should prefer the theme constant.
+  static let pillCornerRadius: CGFloat = HarnessMonitorTheme.pillCornerRadius
   static let reviewRowHorizontalPadding: CGFloat = 4
   static let reviewRowVerticalPadding: CGFloat = 10
   static let sectionMaxWidth: CGFloat = 940
@@ -46,7 +74,9 @@ struct DashboardReviewsSummaryStatStrip: View {
           DashboardReviewStatusPill(
             label: "Cached",
             tint: HarnessMonitorTheme.secondaryInk,
-            systemImage: "archivebox"
+            systemImage: "archivebox",
+            isQuiet: false,
+            help: "Results loaded from local cache, not the live daemon"
           )
         }
       }
@@ -63,6 +93,14 @@ struct DashboardReviewMetricPill: View {
   let title: String
   let value: Int
   let tint: Color
+  let help: String?
+
+  init(title: String, value: Int, tint: Color, help: String? = nil) {
+    self.title = title
+    self.value = value
+    self.tint = tint
+    self.help = help
+  }
 
   var body: some View {
     HStack(spacing: HarnessMonitorTheme.spacingXS) {
@@ -77,18 +115,29 @@ struct DashboardReviewMetricPill: View {
     .padding(.vertical, 4)
     .background {
       RoundedRectangle(
-        cornerRadius: DashboardReviewsVisualMetrics.pillCornerRadius,
+        cornerRadius: HarnessMonitorTheme.pillCornerRadius,
         style: .continuous
       )
       .fill(tint.opacity(0.14))
     }
     .overlay {
       RoundedRectangle(
-        cornerRadius: DashboardReviewsVisualMetrics.pillCornerRadius,
+        cornerRadius: HarnessMonitorTheme.pillCornerRadius,
         style: .continuous
       )
       .strokeBorder(tint.opacity(0.34), lineWidth: 1)
     }
+    .help(expandedHelp)
+  }
+
+  /// Expanded summary surfaced via `.help` so abbreviated metric labels
+  /// like "Ready" or "Blocked" read in full to screen readers and tooltip
+  /// surfaces. Falls back to the explicit `help` override when supplied.
+  private var expandedHelp: String {
+    if let help, !help.isEmpty {
+      return help
+    }
+    return "\(title): \(value)"
   }
 }
 
@@ -96,18 +145,24 @@ struct DashboardReviewStatusPill: View {
   let label: String
   let tint: Color
   var systemImage: String?
-  var isQuiet = false
+  /// Defaults to `true` per the convention documented at the top of this
+  /// file. Callers that want the louder weight (the one primary pill per
+  /// row's status line) must pass `isQuiet: false` explicitly.
+  var isQuiet = true
+  let help: String?
 
   init(
     label: String,
     tint: Color,
     systemImage: String? = nil,
-    isQuiet: Bool = false
+    isQuiet: Bool = true,
+    help: String? = nil
   ) {
     self.label = label
     self.tint = tint
     self.systemImage = systemImage
     self.isQuiet = isQuiet
+    self.help = help
   }
 
   var body: some View {
@@ -124,19 +179,20 @@ struct DashboardReviewStatusPill: View {
     .padding(.vertical, 3)
     .background {
       RoundedRectangle(
-        cornerRadius: DashboardReviewsVisualMetrics.pillCornerRadius,
+        cornerRadius: HarnessMonitorTheme.pillCornerRadius,
         style: .continuous
       )
       .fill(tint.opacity(isQuiet ? 0.10 : 0.18))
     }
     .overlay {
       RoundedRectangle(
-        cornerRadius: DashboardReviewsVisualMetrics.pillCornerRadius,
+        cornerRadius: HarnessMonitorTheme.pillCornerRadius,
         style: .continuous
       )
       .strokeBorder(tint.opacity(isQuiet ? 0.22 : 0.38), lineWidth: 1)
     }
     .foregroundStyle(tint)
+    .help(help ?? label)
   }
 }
 
@@ -196,19 +252,20 @@ struct DashboardReviewChangePill: View {
     .padding(.vertical, 3)
     .background {
       RoundedRectangle(
-        cornerRadius: DashboardReviewsVisualMetrics.pillCornerRadius,
+        cornerRadius: HarnessMonitorTheme.pillCornerRadius,
         style: .continuous
       )
       .fill(HarnessMonitorTheme.secondaryInk.opacity(0.10))
     }
     .overlay {
       RoundedRectangle(
-        cornerRadius: DashboardReviewsVisualMetrics.pillCornerRadius,
+        cornerRadius: HarnessMonitorTheme.pillCornerRadius,
         style: .continuous
       )
       .strokeBorder(HarnessMonitorTheme.secondaryInk.opacity(0.22), lineWidth: 1)
     }
     .accessibilityLabel(accessibilityLabel)
+    .help(accessibilityLabel)
   }
 
   private var accessibilityLabel: String {
@@ -226,7 +283,8 @@ struct DashboardReviewStatusStrip: View {
         DashboardReviewStatusPill(
           label: item.statusLabel,
           tint: item.statusTint,
-          systemImage: item.requiresAttention ? nil : item.statusSystemImage
+          systemImage: item.requiresAttention ? nil : item.statusSystemImage,
+          isQuiet: false
         )
         Text(item.statusSentence)
           .scaledFont(.callout)
