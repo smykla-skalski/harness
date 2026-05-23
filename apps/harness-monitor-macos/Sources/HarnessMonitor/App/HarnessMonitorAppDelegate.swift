@@ -193,7 +193,7 @@ final class HarnessMonitorAppDelegate: NSObject, NSApplicationDelegate {
     using store: HarnessMonitorStore,
     userDefaults: UserDefaults = .standard
   ) async {
-    let quitSnapshot = SessionWindowQuitCapture.captureSnapshot()
+    let quitSnapshot = sessionWindowQuitSnapshot(using: store)
     DashboardWindowLifecycleTracker.shared.flushOpenAtQuit(userDefaults: userDefaults)
     await store.persistSessionWindowRestoreSnapshot(
       quitSnapshot,
@@ -291,6 +291,16 @@ final class HarnessMonitorAppDelegate: NSObject, NSApplicationDelegate {
     signal(handledSignal, SIG_DFL)
     kill(getpid(), handledSignal)
     _exit(128 + handledSignal)
+  }
+
+  private func sessionWindowQuitSnapshot(
+    using store: HarnessMonitorStore
+  ) -> HarnessMonitorStore.SessionWindowQuitSnapshot {
+    let appKitSnapshot = SessionWindowQuitCapture.captureSnapshot()
+    return HarnessMonitorStore.SessionWindowQuitSnapshot(
+      sessionIDs: appKitSnapshot.sessionIDs.union(store.openSessionWindowIDsSnapshot),
+      groupings: appKitSnapshot.groupings
+    )
   }
 
   private func shouldSuspendLiveConnectionOnResignActive() -> Bool {

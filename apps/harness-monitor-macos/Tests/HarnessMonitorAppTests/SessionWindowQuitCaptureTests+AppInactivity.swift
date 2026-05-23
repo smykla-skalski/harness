@@ -122,5 +122,53 @@
       XCTAssertEqual(restorePlan.sessionIDs, [inactivitySessionID])
       XCTAssertTrue(restorePlan.tabGroupings.isEmpty)
     }
+
+    func testAppInactivityPersistenceKeepsOpenStoreSessionsWhenAppKitSnapshotIsEmpty() async throws {
+      let container = try HarnessMonitorModelContainer.preview()
+      let cacheService = SessionCacheService(modelContainer: container)
+      let store = makeStore(modelContainer: container, cacheService: cacheService)
+      let delegate = HarnessMonitorAppDelegate()
+      let sessionID = PreviewFixtures.summary.sessionId
+      XCTAssertTrue(store.sessionIndex.applySessionSummary(PreviewFixtures.summary))
+
+      let storeWindow = NSObject()
+      let storeWindowID = ObjectIdentifier(storeWindow)
+      store.registerOpenSessionWindow(windowID: storeWindowID, sessionID: sessionID)
+
+      let sessionWindow = makeWindow(origin: .init(x: 24, y: 24))
+      let sessionHost = mountHostingContent(
+        sessionWindow,
+        rootView: AnyView(
+          Color.clear
+            .frame(width: 16, height: 16)
+            .modifier(SessionWindowAppKitBinding(sessionID: sessionID))
+            .modifier(SessionWindowTabbing(role: .session, tabTitle: "bart"))
+        )
+      )
+      defer {
+        store.unregisterOpenSessionWindow(windowID: storeWindowID)
+        cleanUp(windows: [sessionWindow], views: [sessionHost])
+      }
+
+      show([sessionWindow])
+      drainMainRunLoop()
+
+      NotificationCenter.default.post(
+        name: NSWindow.willCloseNotification,
+        object: sessionWindow
+      )
+
+      XCTAssertTrue(SessionWindowQuitCapture.captureSnapshot().sessionIDs.isEmpty)
+      XCTAssertEqual(store.openSessionWindowIDsSnapshot, [sessionID])
+
+      await delegate.persistWindowRestoreStateForAppInactivity(
+        using: store,
+        userDefaults: userDefaults
+      )
+
+      let restorePlan = await store.launchWindowRestorePlan(userDefaults: userDefaults)
+      XCTAssertEqual(restorePlan.sessionIDs, [sessionID])
+      XCTAssertTrue(restorePlan.tabGroupings.isEmpty)
+    }
   }
 #endif
