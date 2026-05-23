@@ -2,12 +2,15 @@ import HarnessMonitorKit
 import SwiftUI
 
 struct DashboardReviewCheckList: View {
+  private static let checkBatchSize = 20
+
   let checks: [ReviewCheck]
   @Binding var showsProblemChecksOnly: Bool
   let onRerunCheck: (ReviewCheck) -> Void
 
   @State private var expandedPassingGroupIDs = Set<String>()
   @State private var showsPassingChecks = false
+  @State private var visibleNonProblemCheckLimit = Self.checkBatchSize
 
   var body: some View {
     if checks.isEmpty {
@@ -16,24 +19,26 @@ struct DashboardReviewCheckList: View {
         .foregroundStyle(HarnessMonitorTheme.secondaryInk)
     } else {
       VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
-        if allPassing {
-          DashboardReviewPassingChecksSummary(
-            checkCount: checks.count,
-            groupCount: checkGroups.count,
-            isExpanded: $showsPassingChecks
-          )
-          if showsPassingChecks {
-            checkGroupsView
-          }
-        } else {
+        if hasProblemChecks {
           checkSummary
-          if hasProblemChecks {
-            checkDiagnosticsControls
+          checkDiagnosticsControls
+          checkGroupsView(groups: problemCheckGroups, suppressPassingStatus: false)
+          nonProblemChecksDisclosure
+        } else {
+          nonProblemChecksSummary
+          if showsPassingChecks {
+            checkGroupsView(
+              groups: visibleNonProblemCheckGroups,
+              suppressPassingStatus: allPassing
+            )
+            showMoreNonProblemChecksButton
           }
-          checkGroupsView
         }
       }
       .frame(maxWidth: DashboardReviewsVisualMetrics.checksMaxWidth, alignment: .leading)
+      .onChange(of: checks) { _, _ in
+        resetCheckExpansion()
+      }
     }
   }
 
@@ -88,26 +93,81 @@ struct DashboardReviewCheckList: View {
     checks.filter(\.requiresAttention)
   }
 
-  private var visibleChecks: [ReviewCheck] {
-    showsProblemChecksOnly && hasProblemChecks ? problemChecks : checks
+  private var nonProblemChecks: [ReviewCheck] {
+    checks.filter { !$0.requiresAttention }
   }
 
-  private var checkGroups: [DashboardReviewCheckGroup] {
-    dashboardReviewCheckGroups(for: visibleChecks)
+  private var visibleNonProblemChecks: [ReviewCheck] {
+    Array(nonProblemChecks.prefix(visibleNonProblemCheckLimit))
+  }
+
+  private var problemCheckGroups: [DashboardReviewCheckGroup] {
+    dashboardReviewCheckGroups(for: problemChecks)
+  }
+
+  private var nonProblemCheckGroups: [DashboardReviewCheckGroup] {
+    dashboardReviewCheckGroups(for: nonProblemChecks)
+  }
+
+  private var visibleNonProblemCheckGroups: [DashboardReviewCheckGroup] {
+    dashboardReviewCheckGroups(for: visibleNonProblemChecks)
   }
 
   private var problemCheckURLs: [URL] {
     problemChecks.compactMap(\.detailsWebURL)
   }
 
-  private var checkGroupsView: some View {
+  private var hiddenNonProblemCheckCount: Int {
+    max(nonProblemChecks.count - visibleNonProblemCheckLimit, 0)
+  }
+
+  private var nonProblemChecksSummary: some View {
+    DashboardReviewPassingChecksSummary(
+      label: allPassing ? "All checks passed" : "No failing checks",
+      systemImage: allPassing ? "checkmark.circle.fill" : "circle",
+      checkCount: nonProblemChecks.count,
+      groupCount: nonProblemCheckGroups.count,
+      expandedTitle: allPassing ? "Hide passing checks" : "Hide checks",
+      collapsedTitle: allPassing ? "Show passing checks" : "Show checks",
+      isExpanded: $showsPassingChecks
+    )
+  }
+
+  @ViewBuilder private var nonProblemChecksDisclosure: some View {
+    if !showsProblemChecksOnly && !nonProblemChecks.isEmpty {
+      nonProblemChecksSummary
+      if showsPassingChecks {
+        checkGroupsView(
+          groups: visibleNonProblemCheckGroups,
+          suppressPassingStatus: false
+        )
+        showMoreNonProblemChecksButton
+      }
+    }
+  }
+
+  @ViewBuilder private var showMoreNonProblemChecksButton: some View {
+    if hiddenNonProblemCheckCount > 0 {
+      Button("Show \(min(Self.checkBatchSize, hiddenNonProblemCheckCount)) more checks") {
+        visibleNonProblemCheckLimit += Self.checkBatchSize
+      }
+      .buttonStyle(.borderless)
+      .controlSize(.small)
+      .help("Render the next batch of checks")
+    }
+  }
+
+  private func checkGroupsView(
+    groups: [DashboardReviewCheckGroup],
+    suppressPassingStatus: Bool
+  ) -> some View {
     VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
-      ForEach(checkGroups) { group in
+      ForEach(groups) { group in
         DashboardReviewCheckGroupView(
           group: group,
-          suppressPassingStatus: allPassing,
-          showsHeader: checkGroups.count > 1,
-          hasProblemChecks: hasProblemChecks,
+          suppressPassingStatus: suppressPassingStatus,
+          showsHeader: groups.count > 1,
+          hasProblemChecks: false,
           expandedPassingGroupIDs: $expandedPassingGroupIDs,
           onRerunCheck: onRerunCheck
         )
@@ -120,29 +180,57 @@ struct DashboardReviewCheckList: View {
     guard !urls.isEmpty else { return }
     HarnessMonitorClipboard.copy(urls.joined(separator: "\n"))
   }
+
+  private func resetCheckExpansion() {
+    visibleNonProblemCheckLimit = Self.checkBatchSize
+    showsPassingChecks = false
+    expandedPassingGroupIDs.removeAll()
+  }
 }
 
 private struct DashboardReviewPassingChecksSummary: View {
+  let label: String
+  let systemImage: String
   let checkCount: Int
   let groupCount: Int
+  let expandedTitle: String
+  let collapsedTitle: String
   @Binding var isExpanded: Bool
+
+  init(
+    label: String = "All checks passed",
+    systemImage: String = "checkmark.circle.fill",
+    checkCount: Int,
+    groupCount: Int,
+    expandedTitle: String = "Hide passing checks",
+    collapsedTitle: String = "Show passing checks",
+    isExpanded: Binding<Bool>
+  ) {
+    self.label = label
+    self.systemImage = systemImage
+    self.checkCount = checkCount
+    self.groupCount = groupCount
+    self.expandedTitle = expandedTitle
+    self.collapsedTitle = collapsedTitle
+    _isExpanded = isExpanded
+  }
 
   var body: some View {
     HStack(alignment: .firstTextBaseline, spacing: HarnessMonitorTheme.spacingSM) {
       DashboardReviewStatusPill(
-        label: "All checks passed",
+        label: label,
         tint: HarnessMonitorTheme.success,
-        systemImage: "checkmark.circle.fill"
+        systemImage: systemImage
       )
       Text(summary)
         .scaledFont(.callout)
         .foregroundStyle(HarnessMonitorTheme.secondaryInk)
       Spacer(minLength: HarnessMonitorTheme.spacingSM)
-      Button(isExpanded ? "Hide passing checks" : "Show passing checks") {
+      Button(isExpanded ? expandedTitle : collapsedTitle) {
         isExpanded.toggle()
       }
       .controlSize(.small)
-      .help(isExpanded ? "Hide passing check details" : "Show passing check details")
+      .help(isExpanded ? "Hide check details" : "Show check details")
     }
   }
 

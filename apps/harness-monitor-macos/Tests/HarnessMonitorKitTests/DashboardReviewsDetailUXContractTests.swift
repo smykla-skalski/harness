@@ -185,6 +185,40 @@ struct DashboardReviewsDetailUXContractTests {
     #expect(reviews.contains("\"approval\""))
   }
 
+  @Test("Large review detail collections render in bounded batches")
+  func largeReviewDetailCollectionsRenderInBoundedBatches() throws {
+    let checks = try source(
+      "Sources/HarnessMonitorUIPreviewable/Views/Dashboard/DashboardReviewCheckList.swift"
+    )
+    let files = try source(
+      "Sources/HarnessMonitorUIPreviewable/Views/Dashboard/DashboardReviewFilesSection.swift"
+    )
+    let conversation = try source(
+      "Sources/HarnessMonitorUIPreviewable/Views/Dashboard/DashboardReviewConversationFeed.swift"
+    )
+    let conversationFooter = try source(
+      "Sources/HarnessMonitorUIPreviewable/Views/Dashboard/DashboardReviewConversationStatusBar.swift"
+    )
+
+    #expect(checks.contains("private static let checkBatchSize = 20"))
+    #expect(checks.contains("visibleNonProblemCheckLimit"))
+    #expect(checks.contains("Array(nonProblemChecks.prefix(visibleNonProblemCheckLimit))"))
+    #expect(checks.contains("Show \\(min(Self.checkBatchSize, hiddenNonProblemCheckCount))"))
+
+    #expect(files.contains("private static let fileBatchSize = 24"))
+    #expect(files.contains("viewModel.filteredFiles.prefix(visibleFileLimit)"))
+    #expect(files.contains("Show \\(min(Self.fileBatchSize, hiddenCount)) more files"))
+
+    #expect(conversation.contains("private static let timelineRowBatchSize = 16"))
+    #expect(conversation.contains("rowSource.rows.prefix(visibleTimelineRowLimit)"))
+    #expect(
+      conversation.contains(
+        "Show \\(min(Self.timelineRowBatchSize, hiddenTimelineRowCount)) more events"
+      )
+    )
+    #expect(conversationFooter.contains("visibleRowsCount < totalRowsCount"))
+  }
+
   private func source(_ appLocalPath: String) throws -> String {
     let testsDirectory = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
     let appRoot =
