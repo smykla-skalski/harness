@@ -79,6 +79,36 @@ private let intentsTarget: Target = .target(
     metadata: .metadata(tags: ["tag:feature:intents", "tag:layer:integration"])
 )
 
+private let intentsExtensionTarget: Target = .target(
+    name: "HarnessMonitorIntentsExtension",
+    destinations: macOSDestinations,
+    product: .appExtension,
+    bundleId: "io.harnessmonitor.app.intents-extension",
+    deploymentTargets: macOSDeploymentTargets,
+    infoPlist: .file(path: "Resources/HarnessMonitorIntentsExtension-Info.plist"),
+    sources: ["Sources/HarnessMonitorIntentsExtension/**/*.swift"],
+    entitlements: .file(path: "HarnessMonitorIntentsExtension.entitlements"),
+    dependencies: [
+        .target(name: "HarnessMonitorIntents")
+    ],
+    settings: .settings(
+        base: [
+            "CODE_SIGN_IDENTITY[sdk=macosx*]": "Apple Development",
+            "CODE_SIGN_STYLE": "Automatic",
+            "ENABLE_APP_SANDBOX": "YES",
+            "ENABLE_INCOMING_NETWORK_CONNECTIONS": "NO",
+            "ENABLE_OUTGOING_NETWORK_CONNECTIONS": "YES",
+            "GENERATE_INFOPLIST_FILE": "NO",
+            "INFOPLIST_FILE": "Resources/HarnessMonitorIntentsExtension-Info.plist",
+            "PRODUCT_BUNDLE_IDENTIFIER": "io.harnessmonitor.app.intents-extension",
+            "PRODUCT_MODULE_NAME": "HarnessMonitorIntentsExtension",
+            "PRODUCT_NAME": "HarnessMonitorIntentsExtension",
+            "SWIFT_ACTIVE_COMPILATION_CONDITIONS": FeatureFlags.compilationConditionSetting()
+        ]
+    ),
+    metadata: .metadata(tags: ["tag:feature:intents", "tag:layer:extension"])
+)
+
 private let uiPreviewableTarget: Target = {
     var deps: [TargetDependency] = [
         .target(name: "HarnessMonitorKit"),
@@ -155,6 +185,7 @@ private let monitorAppDependencies: [TargetDependency] = {
     var deps: [TargetDependency] = [
         .target(name: "HarnessMonitorKit"),
         .target(name: "HarnessMonitorIntents"),
+        .target(name: "HarnessMonitorIntentsExtension"),
         .target(name: "HarnessMonitorUIPreviewable")
     ]
     deps.append(contentsOf: FeatureFlags.appAdditionalDependencies())
@@ -598,6 +629,7 @@ let project = Project(
     targets: [
         kitTarget,
         intentsTarget,
+        intentsExtensionTarget,
         uiPreviewableTarget,
         previewHostTarget,
         monitorAppTarget,
