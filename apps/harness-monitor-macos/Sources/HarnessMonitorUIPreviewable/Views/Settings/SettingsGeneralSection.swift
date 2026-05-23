@@ -155,6 +155,7 @@ public struct SettingsGeneralSection: View {
       GeneralDateTimeSection()
       GeneralTimelineSection()
       GeneralWindowsSection()
+      SettingsOpenAnythingSection()
 
       if isFullyExpanded {
         SettingsLoggingSection(store: store)
@@ -322,11 +323,6 @@ private struct GeneralWindowsSection: View {
   private var closeOpenRecentAfterPick = OpenRecentCloseAfterPickDefaults.defaultValue
   @AppStorage(SessionWindowTabbingPreference.storageKey)
   private var sessionWindowTabbingRawValue = SessionWindowTabbingPreference.defaultValue.rawValue
-  @AppStorage(OpenAnythingHotKeyDefaults.enabledKey)
-  private var globalOpenAnythingHotKeyEnabled = OpenAnythingHotKeyDefaults.enabledDefault
-  @AppStorage(OpenAnythingHotKeyDefaults.descriptorKey)
-  private var globalOpenAnythingHotKeyDescriptor =
-    OpenAnythingHotKeyDefaults.descriptorDefault.storageValue
 
   private var launchBehavior: HarnessMonitorLaunchBehavior {
     HarnessMonitorLaunchBehavior.resolved(rawValue: launchBehaviorRawValue)
@@ -358,11 +354,6 @@ private struct GeneralWindowsSection: View {
       .harnessNativeFormControl()
       .accessibilityLabel("Session window tabs")
       .accessibilityHint("Controls whether session windows prefer native macOS tabs.")
-
-      OpenAnythingHotKeySettingsView(
-        isEnabled: $globalOpenAnythingHotKeyEnabled,
-        descriptorStorage: $globalOpenAnythingHotKeyDescriptor
-      )
     } header: {
       Text("Windows")
     } footer: {
