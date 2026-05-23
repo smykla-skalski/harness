@@ -12,7 +12,8 @@ public struct ApprovePullRequestIntent: AppIntent {
     )
   }
 
-  @Parameter(title: "Pull Request") public var pullRequest: PullRequestEntity
+  @Parameter(title: "Pull Request")
+  public var pullRequest: PullRequestEntity
 
   let source: ReviewsActionSource
 

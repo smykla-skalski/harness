@@ -15,8 +15,10 @@ public struct MergePullRequestIntent: AppIntent {
     )
   }
 
-  @Parameter(title: "Pull Request") public var pullRequest: PullRequestEntity
-  @Parameter(title: "Method", default: .squash) public var method: MergeMethodEnum
+  @Parameter(title: "Pull Request")
+  public var pullRequest: PullRequestEntity
+  @Parameter(title: "Method", default: .squash)
+  public var method: MergeMethodEnum
 
   let source: ReviewsActionSource
 

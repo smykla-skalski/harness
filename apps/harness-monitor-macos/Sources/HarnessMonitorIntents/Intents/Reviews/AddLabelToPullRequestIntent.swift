@@ -12,8 +12,10 @@ public struct AddLabelToPullRequestIntent: AppIntent {
     )
   }
 
-  @Parameter(title: "Pull Request") public var pullRequest: PullRequestEntity
-  @Parameter(title: "Label") public var label: String
+  @Parameter(title: "Pull Request")
+  public var pullRequest: PullRequestEntity
+  @Parameter(title: "Label")
+  public var label: String
 
   let source: ReviewsActionSource
 

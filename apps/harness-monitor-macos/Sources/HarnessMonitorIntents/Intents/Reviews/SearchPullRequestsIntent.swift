@@ -13,7 +13,8 @@ public struct SearchPullRequestsIntent: AppIntent {
     )
   }
 
-  @Parameter(title: "Query") public var query: String
+  @Parameter(title: "Query")
+  public var query: String
 
   let source: PullRequestSource
 

@@ -16,7 +16,8 @@ public struct RefreshRepositoryIntent: AppIntent {
     )
   }
 
-  @Parameter(title: "Repository") public var repository: RepositoryEntity
+  @Parameter(title: "Repository")
+  public var repository: RepositoryEntity
 
   let source: ReviewsRefreshSource
 

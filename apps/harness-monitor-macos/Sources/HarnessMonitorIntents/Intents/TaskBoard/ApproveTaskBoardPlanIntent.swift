@@ -14,7 +14,8 @@ public struct ApproveTaskBoardPlanIntent: AppIntent {
 
   public static let intentApproverIdentity = "harness-intent"
 
-  @Parameter(title: "Task") public var item: TaskBoardItemEntity
+  @Parameter(title: "Task")
+  public var item: TaskBoardItemEntity
 
   let source: TaskBoardItemSource
   let approver: String
