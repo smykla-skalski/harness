@@ -9,7 +9,7 @@ public struct PullRequestQuery: EntityQuery, EntityStringQuery, Sendable {
   let source: PullRequestSource
 
   public init() {
-    self.source = UnwiredPullRequestSource()
+    self.source = DaemonPullRequestSource()
   }
 
   init(source: PullRequestSource) {
