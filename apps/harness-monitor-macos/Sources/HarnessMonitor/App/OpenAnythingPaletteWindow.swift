@@ -61,19 +61,24 @@ final class OpenAnythingPaletteWindowController: NSObject {
     }
   }
 
-  /// Briefly orders the panel onscreen far offscreen so macOS finishes the
-  /// CALayer + NSHostingView first-render work before the user presses
-  /// Cmd+K. Without this the first invocation pays for the lazy layout
-  /// inline with the keystroke and reads as a perceptible delay.
+  /// Orders the panel onscreen offscreen at `alphaValue = 0` so macOS
+  /// finishes the CALayer + NSHostingView first-render work AND keeps the
+  /// panel registered with the WindowServer. Subsequent shows are just an
+  /// alpha + position flip with no `orderFront` activation pipeline and -
+  /// critically on macOS 26 - no system-level window-open fade animation,
+  /// which `animationBehavior = .none` does not suppress in Tahoe (Gus
+  /// Mueller, https://mastodon.social/@ccgus/115499330805867015). Raycast
+  /// uses the same "keep visually hidden via alphaValue=0" pattern
+  /// (https://www.raycast.com/blog/a-technical-deep-dive-into-the-new-raycast).
   private func prewarm(_ panel: OpenAnythingFloatingPanel) {
     let size = panel.frame.size
+    panel.alphaValue = 0
     panel.setFrame(
       NSRect(x: -20_000, y: -20_000, width: size.width, height: size.height),
       display: false
     )
     panel.orderFront(nil)
     panel.displayIfNeeded()
-    panel.orderOut(nil)
   }
 
   func toggle(scope: OpenAnythingDomain?, restoreLastQuery: Bool) {
@@ -89,7 +94,17 @@ final class OpenAnythingPaletteWindowController: NSObject {
     self.panel = panel
     model.present(targetWindowID: nil, scope: scope, restoreLastQuery: restoreLastQuery)
     positionAboveKeyWindow(panel)
-    panel.makeKeyAndOrderFront(nil)
+    panel.alphaValue = 1
+    if panel.isVisible {
+      // Pre-warmed / not yet dismissed via app-deactivate: panel is still
+      // ordered front, just at alpha 0. A bare `makeKey` skips the slow
+      // `orderFront` activation pipeline AND the Tahoe show animation.
+      panel.makeKey()
+    } else {
+      // `hidesOnDeactivate = true` removed us from screen on app deactivate.
+      // Fall back to the full activation path on the next show.
+      panel.makeKeyAndOrderFront(nil)
+    }
   }
 
   func hide() {
@@ -99,17 +114,19 @@ final class OpenAnythingPaletteWindowController: NSObject {
     if model.isPresented {
       model.dismiss(reason: .userCanceled)
     }
-    panel?.orderOut(nil)
+    // Keep ordered front; just flip alpha so the next show is instant. See
+    // `prewarm` for the macOS 26 rationale.
+    panel?.alphaValue = 0
   }
 
   /// Called from the palette view when the model dismisses for an in-flight
-  /// reason (ESC, hit executed, window resigned). Orders the panel out
-  /// without re-dismissing the model.
+  /// reason (ESC, hit executed, window resigned). Hides via alpha-flip so
+  /// the panel stays warm for the next show.
   func didDismissModel() {
     guard !isClosing else { return }
     isClosing = true
     defer { isClosing = false }
-    panel?.orderOut(nil)
+    panel?.alphaValue = 0
   }
 
   private func buildPanel() -> OpenAnythingFloatingPanel {
@@ -125,9 +142,18 @@ final class OpenAnythingPaletteWindowController: NSObject {
       defer: false
     )
     panel.isFloatingPanel = true
-    panel.level = .floating
-    panel.collectionBehavior.insert(.fullScreenAuxiliary)
-    panel.collectionBehavior.insert(.transient)
+    // `.statusBar` (level 25) is the canonical Spotlight-style level - above
+    // any normal app window AND above the notification surface. Ardent
+    // Swift's spotlight-clone recipe uses this, vs `.floating` (level 3)
+    // which can be occluded by full-screen content.
+    // https://ardentswift.com/posts/hotkey-window/
+    panel.level = .statusBar
+    // Canonical Spotlight collection behavior: float across spaces, joinable
+    // in fullscreen, transient (no Mission Control thumbnail), stationary so
+    // space switches do not move the panel, and ignored by Cmd-` cycle.
+    panel.collectionBehavior = [
+      .canJoinAllSpaces, .fullScreenAuxiliary, .transient, .stationary, .ignoresCycle,
+    ]
     panel.titleVisibility = .hidden
     panel.titlebarAppearsTransparent = true
     panel.isMovableByWindowBackground = true
@@ -162,7 +188,15 @@ final class OpenAnythingPaletteWindowController: NSObject {
       execute: captured,
       onDismiss: { [weak self] in self?.didDismissModel() }
     )
-    return NSHostingView(rootView: root)
+    let hosting = NSHostingView(rootView: root)
+    // Panel size is fixed by `contentRect`; the SwiftUI tree has no
+    // intrinsic size we need to honor. Default `sizingOptions` of
+    // `[.minSize, .intrinsicContentSize, .maxSize]` probes the rootView
+    // every view update and "comes with a performance cost" per Apple's
+    // documentation, which is pure overhead here.
+    // https://developer.apple.com/documentation/swiftui/nshostingview/sizingoptions
+    hosting.sizingOptions = []
+    return hosting
   }
 
   private func positionAboveKeyWindow(_ panel: OpenAnythingFloatingPanel) {

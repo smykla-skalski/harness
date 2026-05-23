@@ -39,7 +39,15 @@ public struct OpenAnythingPaletteView: View {
       await runSearch()
     }
     .onChange(of: model.isPresented) { _, presented in
-      if !presented {
+      if presented {
+        // Panel hides via `alphaValue = 0` (keeping the SwiftUI tree
+        // mounted), so `.onAppear` only fires during pre-warm and cannot
+        // re-drive focus on subsequent shows. Re-asserting focus on every
+        // `isPresented` flip restores first-responder when the panel
+        // becomes key after a hide.
+        isFieldFocused = true
+        model.selectFirstHitIfNeeded()
+      } else {
         onDismiss?()
       }
     }
