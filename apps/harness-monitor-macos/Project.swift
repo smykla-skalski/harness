@@ -174,16 +174,51 @@ private let widgetsExtensionTarget: Target = .target(
     metadata: .metadata(tags: ["tag:feature:widgets", "tag:layer:extension"])
 )
 
+private let watchWidgetsTarget: Target = .target(
+    name: "HarnessMonitorWatchWidgets",
+    destinations: watchDestinations,
+    product: .appExtension,
+    bundleId: "io.harnessmonitor.app.watch.widgets",
+    deploymentTargets: watchDeploymentTargets,
+    infoPlist: .file(path: "Resources/HarnessMonitorWatchWidgets-Info.plist"),
+    sources: ["Sources/HarnessMonitorWatchWidgets/**/*.swift"],
+    entitlements: .file(path: "HarnessMonitorWatchWidgets.entitlements"),
+    dependencies: [
+        .target(name: "HarnessMonitorCloudKit"),
+        .sdk(name: "WidgetKit", type: .framework),
+        .sdk(name: "SwiftUI", type: .framework)
+    ],
+    settings: .settings(
+        base: [
+            "CODE_SIGN_IDENTITY[sdk=watchos*]": "Apple Development",
+            "CODE_SIGN_STYLE": "Automatic",
+            "CODE_SIGNING_ALLOWED": "YES",
+            "GENERATE_INFOPLIST_FILE": "NO",
+            "INFOPLIST_FILE": "Resources/HarnessMonitorWatchWidgets-Info.plist",
+            "PRODUCT_BUNDLE_IDENTIFIER": "io.harnessmonitor.app.watch.widgets",
+            "PRODUCT_MODULE_NAME": "HarnessMonitorWatchWidgets",
+            "PRODUCT_NAME": "HarnessMonitorWatchWidgets",
+            "SDKROOT": "watchos",
+            "SUPPORTED_PLATFORMS": "watchos watchsimulator",
+            "TARGETED_DEVICE_FAMILY": "4",
+            "WATCHOS_DEPLOYMENT_TARGET": "26.0"
+        ]
+    ),
+    metadata: .metadata(tags: ["tag:feature:watch", "tag:layer:extension"])
+)
+
 private let watchAppTarget: Target = .target(
     name: "HarnessMonitorWatch",
     destinations: watchDestinations,
-    product: .watch2App,
+    product: .app,
     bundleId: "io.harnessmonitor.app.watch",
     deploymentTargets: watchDeploymentTargets,
     infoPlist: .file(path: "Resources/HarnessMonitorWatch-Info.plist"),
     sources: ["Sources/HarnessMonitorWatch/**/*.swift"],
     entitlements: .file(path: "HarnessMonitorWatch.entitlements"),
-    dependencies: [],
+    dependencies: [
+        .target(name: "HarnessMonitorWatchWidgets")
+    ],
     settings: .settings(
         base: [
             "CODE_SIGN_IDENTITY[sdk=watchos*]": "Apple Development",
@@ -783,6 +818,7 @@ let project = Project(
         intentsExtensionTarget,
         widgetsExtensionTarget,
         cloudKitTarget,
+        watchWidgetsTarget,
         watchAppTarget,
         uiPreviewableTarget,
         previewHostTarget,
