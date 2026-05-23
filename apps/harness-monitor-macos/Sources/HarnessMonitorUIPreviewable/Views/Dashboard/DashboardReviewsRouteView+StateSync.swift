@@ -36,6 +36,12 @@ extension DashboardReviewsRouteView {
     routeCollapsedRepositories = next
   }
 
+  func syncPinnedPullRequestsFromStorage(_ storedValue: String) {
+    let next = DashboardReviewsPinnedPullRequests.decode(from: storedValue)
+    guard next != routePinnedPullRequests else { return }
+    routePinnedPullRequests = next
+  }
+
   func syncPreferencesFromStorage(_ storedValue: String) {
     // Why: `.onChange(of: storedPreferences)` fires with `initial: true` and
     // re-fires on every UserDefaults write the surface emits. Hash the raw

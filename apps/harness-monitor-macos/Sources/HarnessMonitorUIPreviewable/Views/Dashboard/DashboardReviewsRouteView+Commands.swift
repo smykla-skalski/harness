@@ -5,6 +5,7 @@ extension DashboardReviewsRouteView {
   var reviewCommandFocus: DashboardReviewsCommandFocus {
     let commandItems = selectedItems
     let primaryItem = primaryDetailItem
+    let pinSelectionTitle = pinSelectionMenuTitle(for: commandItems)
     return DashboardReviewsCommandFocus(
       selectionCount: commandItems.count,
       hasProblemChecksFilter: showsProblemChecksOnly,
@@ -13,6 +14,8 @@ extension DashboardReviewsRouteView {
       canRerunChecks: commandItems.contains(where: \.canAttemptRerunChecks),
       canOpenPullRequest: primaryItem != nil,
       canCopyDiagnostics: primaryItem != nil,
+      canTogglePinSelection: !commandItems.isEmpty,
+      pinSelectionTitle: pinSelectionTitle,
       approve: { requestApproveOrConfirm(items: commandItems) },
       merge: { requestMergeOrConfirm(items: commandItems) },
       rerunChecks: { trackInFlight(Task { await rerunChecks(items: commandItems) }) },
@@ -25,6 +28,9 @@ extension DashboardReviewsRouteView {
         if let primaryItem {
           copyDiagnostics(for: primaryItem)
         }
+      },
+      togglePinSelection: {
+        togglePinnedSelection(items: commandItems)
       },
       toggleProblemChecksFilter: {
         showsProblemChecksOnly.toggle()

@@ -8,11 +8,14 @@ public struct DashboardReviewsCommandFocus: Equatable, @unchecked Sendable {
   public let canRerunChecks: Bool
   public let canOpenPullRequest: Bool
   public let canCopyDiagnostics: Bool
+  public let canTogglePinSelection: Bool
+  public let pinSelectionTitle: String
   public let approve: () -> Void
   public let merge: () -> Void
   public let rerunChecks: () -> Void
   public let openPullRequest: () -> Void
   public let copyDiagnostics: () -> Void
+  public let togglePinSelection: () -> Void
   public let toggleProblemChecksFilter: () -> Void
 
   public init(
@@ -23,11 +26,14 @@ public struct DashboardReviewsCommandFocus: Equatable, @unchecked Sendable {
     canRerunChecks: Bool,
     canOpenPullRequest: Bool,
     canCopyDiagnostics: Bool,
+    canTogglePinSelection: Bool,
+    pinSelectionTitle: String,
     approve: @escaping () -> Void,
     merge: @escaping () -> Void,
     rerunChecks: @escaping () -> Void,
     openPullRequest: @escaping () -> Void,
     copyDiagnostics: @escaping () -> Void,
+    togglePinSelection: @escaping () -> Void,
     toggleProblemChecksFilter: @escaping () -> Void
   ) {
     self.selectionCount = selectionCount
@@ -37,11 +43,14 @@ public struct DashboardReviewsCommandFocus: Equatable, @unchecked Sendable {
     self.canRerunChecks = canRerunChecks
     self.canOpenPullRequest = canOpenPullRequest
     self.canCopyDiagnostics = canCopyDiagnostics
+    self.canTogglePinSelection = canTogglePinSelection
+    self.pinSelectionTitle = pinSelectionTitle
     self.approve = approve
     self.merge = merge
     self.rerunChecks = rerunChecks
     self.openPullRequest = openPullRequest
     self.copyDiagnostics = copyDiagnostics
+    self.togglePinSelection = togglePinSelection
     self.toggleProblemChecksFilter = toggleProblemChecksFilter
   }
 
@@ -53,6 +62,8 @@ public struct DashboardReviewsCommandFocus: Equatable, @unchecked Sendable {
       && lhs.canRerunChecks == rhs.canRerunChecks
       && lhs.canOpenPullRequest == rhs.canOpenPullRequest
       && lhs.canCopyDiagnostics == rhs.canCopyDiagnostics
+      && lhs.canTogglePinSelection == rhs.canTogglePinSelection
+      && lhs.pinSelectionTitle == rhs.pinSelectionTitle
   }
 }
 

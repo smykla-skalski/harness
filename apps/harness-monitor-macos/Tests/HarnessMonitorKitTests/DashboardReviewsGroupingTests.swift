@@ -156,6 +156,33 @@ struct DashboardReviewsGroupingTests {
     #expect(kinds == [.repository("kong/b"), .repository("kong/a")])
   }
 
+  @Test("repository grouping lifts pinned PRs into a top-level pinned section")
+  func repositoryGroupingLiftsPinnedPRsIntoATopLevelSection() async {
+    let pinned = item(id: "pinned", repository: "kong/b", number: 2)
+    let remaining = item(id: "remaining", repository: "kong/a", number: 1)
+
+    let output = await DashboardReviewsPresentationWorker().compute(
+      input: DashboardReviewsPresentationInput(
+        items: [remaining, pinned],
+        filterModeRaw: DashboardReviewsFilterMode.all.rawValue,
+        sortModeRaw: DashboardReviewsSortMode.repository.rawValue,
+        groupModeRaw: DashboardReviewsGroupMode.repository.rawValue,
+        categoryModeRaw: DashboardReviewsCategoryMode.all.rawValue,
+        searchText: "",
+        configuredRepositories: ["kong/a", "kong/b"],
+        configuredOrganizations: [],
+        configuredAuthors: [],
+        selectedIDs: [],
+        persistedPrimarySelectionID: "",
+        pinnedPullRequestIDs: ["pinned"]
+      )
+    )
+
+    #expect(output.groupedItems.first?.kind == .pinned)
+    #expect(output.groupedItems.first?.items.map(\.pullRequestID) == ["pinned"])
+    #expect(output.groupedItems.dropFirst().map(\.kind) == [.repository("kong/a")])
+  }
+
   @Test("flat grouping returns no groups; consumers fall back to filtered items")
   func flatGroupingReturnsEmptySections() async {
     let pr = item(id: "pr", repository: "kong/a", number: 1)

@@ -12,6 +12,8 @@ extension HarnessMonitorAccessibility {
   public static let dashboardReviewsDetailDivider =
     "harness.dashboard.reviews.content-detail-divider"
   public static let dashboardReviewsRefreshButton = "harness.dashboard.reviews.refresh"
+  public static let dashboardReviewsPinnedSectionHeader =
+    "harness.dashboard.reviews.section.pinned"
   public static let reviewsRefreshSelectedButton =
     "harness.dashboard.reviews.refresh-selected"
   public static let dashboardReviewsConfigureButton =
@@ -47,4 +49,8 @@ extension HarnessMonitorAccessibility {
     "harness.dashboard.reviews.refresh-timeout-dismiss"
   public static let dashboardReviewsRefreshTimeoutToast =
     "harness.dashboard.reviews.refresh-timeout-toast"
+
+  public static func dashboardReviewPinnedIndicator(_ pullRequestID: String) -> String {
+    "harness.dashboard.reviews.pinned.\(slug(pullRequestID))"
+  }
 }

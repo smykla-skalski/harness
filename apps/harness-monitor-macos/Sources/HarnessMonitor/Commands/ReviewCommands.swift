@@ -25,6 +25,12 @@ struct ReviewCommands: Commands {
       .keyboardShortcut("r", modifiers: [.command, .option, .shift])
       .disabled(reviewCommands?.canRerunChecks != true)
 
+      Button(reviewCommands?.pinSelectionTitle ?? "Pin Selection") {
+        reviewCommands?.togglePinSelection()
+      }
+      .keyboardShortcut("p", modifiers: [.command, .option, .shift])
+      .disabled(reviewCommands?.canTogglePinSelection != true)
+
       Divider()
 
       Button("Open Pull Request") {

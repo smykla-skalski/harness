@@ -159,6 +159,8 @@ enum HarnessMonitorUITestAccessibility {
   static let dashboardReviewsDetailDivider =
     "harness.dashboard.reviews.content-detail-divider"
   static let dashboardReviewsRefreshButton = "harness.dashboard.reviews.refresh"
+  static let dashboardReviewsPinnedSectionHeader =
+    "harness.dashboard.reviews.section.pinned"
   static let dashboardReviewsConfigureButton = "harness.dashboard.reviews.configure"
   static let dashboardReviewsFixCIButton = "harness.dashboard.reviews.fix-ci"
   static let dashboardReviewsSelectionStatus = "harness.dashboard.reviews.selection"
@@ -167,6 +169,9 @@ enum HarnessMonitorUITestAccessibility {
   static let dashboardReviewsGroupPicker = "harness.dashboard.reviews.group"
   static let dashboardReviewsCategoryToggle = "harness.dashboard.reviews.category"
   static let dashboardReviewsNeedsMeToggle = "harness.dashboard.reviews.needs-me"
+  static func dashboardReviewPinnedIndicator(_ pullRequestID: String) -> String {
+    "harness.dashboard.reviews.pinned.\(slug(pullRequestID))"
+  }
   static let dashboardNewSessionButton = "harness.dashboard.new-session"
   static let dashboardOpenFolderButton = "harness.dashboard.open-folder"
   static let sessionsBoardRoot = dashboardWindowRoot

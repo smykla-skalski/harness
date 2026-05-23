@@ -58,11 +58,6 @@ extension DashboardReviewsRouteView {
     nonmutating set { labelTargetItems = newValue }
   }
 
-  var routeResolvedPreferences: DashboardReviewsResolvedPreferences {
-    get { resolvedPreferences }
-    nonmutating set { resolvedPreferences = newValue }
-  }
-
   var routeLastStoredPreferencesHash: Int? {
     get { lastStoredPreferencesHash }
     nonmutating set { lastStoredPreferencesHash = newValue }
@@ -112,34 +107,9 @@ extension DashboardReviewsRouteView {
     nonmutating set { labelMenuDataByRepository = newValue }
   }
 
-  var routeRecentReviewActions: [String: DashboardReviewActivityEntry] {
-    get { actionState.recentActions }
-    nonmutating set { actionState.recentActions = newValue }
-  }
-
-  var routePendingActionConfirmation: DashboardReviewActionConfirmation? {
-    get { actionState.pendingConfirmation }
-    nonmutating set { actionState.pendingConfirmation = newValue }
-  }
-
-  var routePendingActionConfirmationTitle: String {
-    routePendingActionConfirmation?.title ?? ""
-  }
-
-  var routeActionDialogPresented: Binding<Bool> {
-    Binding(
-      get: { routePendingActionConfirmation != nil },
-      set: { isPresented in
-        if !isPresented {
-          routePendingActionConfirmation = nil
-        }
-      }
-    )
-  }
-
-  var routeReviewCapabilities: ReviewsCapabilitiesResponse {
-    get { actionState.capabilities }
-    nonmutating set { actionState.capabilities = newValue }
+  var routePinnedPullRequestIDsStorage: String {
+    get { pinnedPullRequestIDsStorage }
+    nonmutating set { pinnedPullRequestIDsStorage = newValue }
   }
 
   var routeShowsProblemChecksOnlyBinding: Binding<Bool> {
