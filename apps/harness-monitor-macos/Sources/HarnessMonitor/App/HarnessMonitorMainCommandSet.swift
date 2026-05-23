@@ -16,6 +16,17 @@ struct HarnessMonitorMainCommandSet: Commands {
   let openAnythingCorpusSize: () -> Int
 
   var body: some Commands {
+    // `NewSessionCommand` contributes `CommandGroup(replacing: .newItem)` -
+    // any sibling `CommandGroup(after: .newItem)` placed BEFORE it in this
+    // result-builder body is silently dropped by macOS. Keep the replacing
+    // group first so every `(after: .newItem)` sibling below actually
+    // renders (Open Anything + the New Task / Send Signal pair were both
+    // lost by being authored before this line).
+    NewSessionCommand(
+      store: store,
+      keyWindowObserver: keyWindowObserver,
+      windowCommandRouting: windowCommandRouting
+    )
     HarnessMonitorAppCommands(
       store: store,
       displayState: store.commandsDisplayState,
@@ -25,20 +36,10 @@ struct HarnessMonitorMainCommandSet: Commands {
       resetTextSize: resetTextSize,
       refreshStore: refreshStore
     )
-    // Lifted out of `HarnessMonitorAppCommands.fileAndEditCommands` because a
-    // single Commands struct cannot reliably contribute multiple
-    // `CommandGroup(after: .newItem)` blocks - macOS only renders one and
-    // silently drops the rest. As a sibling here it composes with the other
-    // file-menu contributors and the Cmd+K chord actually reaches the menu.
     OpenAnythingMenuCommands(
       presentOpenAnything: presentOpenAnything,
       presentOpenAnythingSessions: presentOpenAnythingSessions,
       openAnythingCorpusSize: openAnythingCorpusSize
-    )
-    NewSessionCommand(
-      store: store,
-      keyWindowObserver: keyWindowObserver,
-      windowCommandRouting: windowCommandRouting
     )
     SessionCreateCommands(
       store: store,
