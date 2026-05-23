@@ -7,7 +7,8 @@ public struct OpenAnythingPaletteView: View {
   private let execute: (OpenAnythingHit) -> Void
   private let onDismiss: (() -> Void)?
   @FocusState private var isFieldFocused: Bool
-  @Environment(\.accessibilityReduceMotion) var reduceMotion
+  @Environment(\.accessibilityReduceMotion)
+  var reduceMotion
   @State private var wheelMonitor: Any?
   @State private var wheelAccumulator: CGFloat = 0
 
@@ -156,8 +157,7 @@ public struct OpenAnythingPaletteView: View {
     .padding(.vertical, OpenAnythingPaletteConstants.searchFieldVerticalPadding)
   }
 
-  @ViewBuilder
-  private var resultsSection: some View {
+  @ViewBuilder private var resultsSection: some View {
     let queryEmpty = model.query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     if queryEmpty {
       if model.recordCount == 0 {

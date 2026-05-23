@@ -63,8 +63,7 @@ struct OpenAnythingPaletteSectionHeader: View {
     return "· \(visibleCount) of \(totalCount)"
   }
 
-  @ViewBuilder
-  private var showAllButton: some View {
+  @ViewBuilder private var showAllButton: some View {
     if !isCollapsed, totalCount > visibleCount || isExpanded {
       Button(action: onToggleExpand) {
         Text(isExpanded ? "Show less" : "Show all (\(totalCount))")

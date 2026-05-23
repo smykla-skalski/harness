@@ -14,7 +14,8 @@ struct OpenAnythingPaletteRow: View {
   let onTogglePin: () -> Void
   let onCopyID: () -> Void
 
-  @Environment(\.accessibilityReduceMotion) private var reduceMotion
+  @Environment(\.accessibilityReduceMotion)
+  private var reduceMotion
   @State private var isHovered = false
 
   var body: some View {
@@ -81,8 +82,7 @@ struct OpenAnythingPaletteRow: View {
       .lineLimit(1)
   }
 
-  @ViewBuilder
-  private var subtitle: some View {
+  @ViewBuilder private var subtitle: some View {
     if let subtitle = hit.record.subtitle, !subtitle.isEmpty {
       SearchHighlightedText(text: subtitle, highlights: hit.highlights.subtitle)
         .font(.caption)
@@ -91,8 +91,7 @@ struct OpenAnythingPaletteRow: View {
     }
   }
 
-  @ViewBuilder
-  private var trailing: some View {
+  @ViewBuilder private var trailing: some View {
     if let value = hit.record.trailing, !value.isEmpty {
       SearchHighlightedText(text: value, highlights: hit.highlights.trailing)
         .font(.caption)
@@ -101,8 +100,7 @@ struct OpenAnythingPaletteRow: View {
     }
   }
 
-  @ViewBuilder
-  private var chordChip: some View {
+  @ViewBuilder private var chordChip: some View {
     if let chord = chordHint {
       Text(chord)
         .font(.caption.monospaced())
@@ -117,8 +115,7 @@ struct OpenAnythingPaletteRow: View {
     }
   }
 
-  @ViewBuilder
-  private var pinIndicator: some View {
+  @ViewBuilder private var pinIndicator: some View {
     if isPinned {
       Image(systemName: "pin.fill")
         .font(.caption2)

@@ -48,8 +48,7 @@ public final class OpenAnythingDashboardReviewRegistry {
 /// injection still get a working (but empty) registry rather than the
 /// process-wide singleton that used to back this surface.
 private struct OpenAnythingDashboardReviewRegistryKey: @preconcurrency EnvironmentKey {
-  @MainActor
-  static let defaultValue = OpenAnythingDashboardReviewRegistry()
+  @MainActor static let defaultValue = OpenAnythingDashboardReviewRegistry()
 }
 
 extension EnvironmentValues {

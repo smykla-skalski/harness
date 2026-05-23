@@ -78,8 +78,7 @@ struct SettingsOpenAnythingSection: View {
       .perDomainLimitMin...OpenAnythingPreferencesDefaults.perDomainLimitMax
   }
 
-  @ViewBuilder
-  private var footerText: some View {
+  @ViewBuilder private var footerText: some View {
     Text(
       "Open Anything is the command palette opened with ⌘K. "
         + "The global hotkey activates it from anywhere on the system."
