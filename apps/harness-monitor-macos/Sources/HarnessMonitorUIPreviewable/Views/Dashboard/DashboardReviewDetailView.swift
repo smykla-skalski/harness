@@ -53,7 +53,12 @@ struct DashboardReviewDetailView<Actions: View>: View {
             pullRequestID: item.pullRequestID,
             viewerCanUpdate: item.viewerCanUpdate,
             onCheckboxError: onDescriptionCheckboxError,
-            onCheckboxUpdated: onDescriptionCheckboxUpdated
+            onCheckboxUpdated: onDescriptionCheckboxUpdated,
+            onRetryLoad: { [item] in
+              Task { @MainActor in
+                await store.prepareReviewBody(for: item)
+              }
+            }
           )
         }
         .accessibilityIdentifier(HarnessMonitorAccessibility.dashboardReviewsDescription)
