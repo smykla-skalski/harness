@@ -123,11 +123,12 @@ struct DashboardReviewDetailView<Actions: View>: View {
       .padding(.bottom, 10)
       .background(Color(nsColor: .windowBackgroundColor))
     }
-    .safeAreaInset(edge: .bottom, spacing: 0) {
+    .safeAreaInset(edge: .bottom, spacing: 12) {
       DashboardReviewCommentComposer(
         pullRequestID: item.pullRequestID,
         initialDraft: store.reviewCommentDraft(for: item.pullRequestID),
         viewerCanComment: viewModel.viewerCanComment,
+        viewerLogin: viewerLogin,
         onDraftChange: { draft in
           store.scheduleReviewDraftWrite(item.pullRequestID, draft: draft)
         },
@@ -135,6 +136,11 @@ struct DashboardReviewDetailView<Actions: View>: View {
           await store.postReviewComment(for: item, body: body)
         }
       )
+      // Per-PR `@State` reset — see DashboardReviewCommentComposer's
+      // `isCollapsed` declaration. Tying the composer's identity to
+      // the pull request id makes SwiftUI re-init its state when the
+      // user navigates to a different PR.
+      .id(item.pullRequestID)
       .frame(maxWidth: reviewsDetailMaxWidth, alignment: .leading)
       .frame(maxWidth: .infinity, alignment: .center)
       .background(Color(nsColor: .windowBackgroundColor))
