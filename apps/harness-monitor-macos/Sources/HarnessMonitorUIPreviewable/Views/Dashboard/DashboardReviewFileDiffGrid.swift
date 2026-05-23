@@ -193,7 +193,7 @@ final class DashboardReviewFileDiffGridContentView: NSView {
   private func draw(row: DashboardReviewFileDiffRow, in rect: NSRect) {
     fillBackground(for: row.kind, in: rect)
     if row.id == selectedRowID {
-      NSColor.controlAccentColor.withAlphaComponent(0.14).setFill()
+      DashboardReviewFileDiffMonokaiPalette.selection.withAlphaComponent(0.72).setFill()
       rect.fill()
     }
     switch viewMode {
@@ -223,7 +223,7 @@ final class DashboardReviewFileDiffGridContentView: NSView {
       return
     }
     let columnWidth = floor((bounds.width - 1) / 2)
-    NSColor.separatorColor.setFill()
+    DashboardReviewFileDiffMonokaiPalette.separator.setFill()
     NSRect(x: columnWidth, y: rect.minY, width: 1, height: rect.height).fill()
     drawSplitSide(row: row, side: .old, x: 0, width: columnWidth, rect: rect)
     drawSplitSide(row: row, side: .new, x: columnWidth + 1, width: columnWidth, rect: rect)
@@ -257,20 +257,22 @@ final class DashboardReviewFileDiffGridContentView: NSView {
   }
 
   private func fillBackground(for kind: DashboardReviewFileDiffRow.Kind, in rect: NSRect) {
-    switch kind {
-    case .addition:
-      NSColor.systemGreen.withAlphaComponent(0.13).setFill()
-    case .deletion:
-      NSColor.systemRed.withAlphaComponent(0.12).setFill()
-    case .hunk:
-      NSColor.controlAccentColor.withAlphaComponent(0.10).setFill()
-    case .contextGap:
-      NSColor.controlAccentColor.withAlphaComponent(0.07).setFill()
-    case .metadata:
-      NSColor.systemOrange.withAlphaComponent(0.10).setFill()
-    case .context:
-      NSColor.textBackgroundColor.withAlphaComponent(0.22).setFill()
-    }
+    let color =
+      switch kind {
+      case .addition:
+        DashboardReviewFileDiffMonokaiPalette.additionBackground
+      case .deletion:
+        DashboardReviewFileDiffMonokaiPalette.deletionBackground
+      case .hunk:
+        DashboardReviewFileDiffMonokaiPalette.hunkBackground
+      case .contextGap:
+        DashboardReviewFileDiffMonokaiPalette.contextGapBackground
+      case .metadata:
+        DashboardReviewFileDiffMonokaiPalette.metadataBackground
+      case .context:
+        DashboardReviewFileDiffMonokaiPalette.contextBackground
+      }
+    color.setFill()
     rect.fill()
   }
 
@@ -291,13 +293,13 @@ final class DashboardReviewFileDiffGridContentView: NSView {
     let color: NSColor =
       switch kind {
       case .contextGap:
-        .tertiaryLabelColor
+        DashboardReviewFileDiffMonokaiPalette.comment
       case .metadata:
-        .systemOrange
+        DashboardReviewFileDiffMonokaiPalette.orange
       case .hunk:
-        .secondaryLabelColor
+        DashboardReviewFileDiffMonokaiPalette.blue
       case .addition, .context, .deletion:
-        .labelColor
+        DashboardReviewFileDiffMonokaiPalette.foreground
       }
     drawString(text, x: x, y: y, color: color)
   }
@@ -314,7 +316,7 @@ final class DashboardReviewFileDiffGridContentView: NSView {
   }
 
   private var dimAttributes: [NSAttributedString.Key: Any] {
-    [.font: font, .foregroundColor: NSColor.tertiaryLabelColor]
+    [.font: font, .foregroundColor: DashboardReviewFileDiffMonokaiPalette.comment]
   }
 
   private func splitPrefix(
@@ -331,10 +333,12 @@ final class DashboardReviewFileDiffGridContentView: NSView {
 
   private func prefixColor(for kind: DashboardReviewFileDiffRow.Kind) -> NSColor {
     switch kind {
-    case .addition: .systemGreen
-    case .deletion: .systemRed
-    case .context: .tertiaryLabelColor
-    case .contextGap, .hunk, .metadata: .secondaryLabelColor
+    case .addition: DashboardReviewFileDiffMonokaiPalette.green
+    case .deletion: DashboardReviewFileDiffMonokaiPalette.red
+    case .context: DashboardReviewFileDiffMonokaiPalette.comment
+    case .contextGap: DashboardReviewFileDiffMonokaiPalette.comment
+    case .hunk: DashboardReviewFileDiffMonokaiPalette.blue
+    case .metadata: DashboardReviewFileDiffMonokaiPalette.orange
     }
   }
 
@@ -360,13 +364,13 @@ final class DashboardReviewFileDiffGridContentView: NSView {
     guard !anchors.isEmpty else { return }
     let title = anchors.count == 1 ? anchors[0].badgeTitle : "\(anchors.count)"
     let rect = NSRect(x: x, y: y - 1, width: 20, height: 15)
-    NSColor.controlAccentColor.withAlphaComponent(0.18).setFill()
+    DashboardReviewFileDiffMonokaiPalette.purple.withAlphaComponent(0.24).setFill()
     NSBezierPath(roundedRect: rect, xRadius: 7, yRadius: 7).fill()
     (title as NSString).draw(
       at: NSPoint(x: rect.midX - 3.5, y: rect.minY + 1),
       withAttributes: [
         .font: NSFont.systemFont(ofSize: 9, weight: .semibold),
-        .foregroundColor: NSColor.controlAccentColor,
+        .foregroundColor: DashboardReviewFileDiffMonokaiPalette.purple,
       ]
     )
   }
