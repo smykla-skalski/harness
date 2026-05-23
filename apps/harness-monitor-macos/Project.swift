@@ -185,12 +185,19 @@ private let monitorAppDependencies: [TargetDependency] = {
     var deps: [TargetDependency] = [
         .target(name: "HarnessMonitorKit"),
         .target(name: "HarnessMonitorIntents"),
-        .target(name: "HarnessMonitorIntentsExtension"),
         .target(name: "HarnessMonitorUIPreviewable")
     ]
     deps.append(contentsOf: FeatureFlags.appAdditionalDependencies())
     return deps
 }()
+
+// Production-app dependencies embed the App Intents extension as a plug-in.
+// HarnessMonitorUITestHost cannot embed it because its bundle id
+// `io.harnessmonitor.app.ui-testing` is not a prefix of
+// `io.harnessmonitor.app.intents-extension`, which would trip the
+// ValidateEmbeddedBinary build step.
+private let monitorProductionAppDependencies: [TargetDependency] =
+    monitorAppDependencies + [.target(name: "HarnessMonitorIntentsExtension")]
 
 private let monitorAppSettings: Settings = .settings(
     base: [
@@ -228,7 +235,7 @@ private let monitorAppTarget: Target = .target(
         BuildPhases.bundleDaemonAgent(),
         BuildPhases.clearGatekeeperMetadata(variant: .monitorApp)
     ],
-    dependencies: monitorAppDependencies,
+    dependencies: monitorProductionAppDependencies,
     settings: monitorAppSettings,
     metadata: .metadata(tags: ["tag:feature:monitor", "tag:layer:app"])
 )
@@ -280,7 +287,7 @@ private let externalDaemonAppTarget: Target = .target(
         BuildPhases.bundleDaemonAgent(),
         BuildPhases.clearGatekeeperMetadata(variant: .monitorApp)
     ],
-    dependencies: monitorAppDependencies,
+    dependencies: monitorProductionAppDependencies,
     settings: externalDaemonAppSettings,
     metadata: .metadata(tags: ["tag:feature:monitor", "tag:layer:app"])
 )
