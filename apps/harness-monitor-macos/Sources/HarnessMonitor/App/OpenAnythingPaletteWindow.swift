@@ -219,7 +219,12 @@ final class OpenAnythingPaletteWindowController: NSObject {
   }
 
   private func positionAboveKeyWindow(_ panel: OpenAnythingFloatingPanel) {
-    let anchor = NSApp.keyWindow ?? NSApp.mainWindow
+    // CRITICAL: exclude the palette itself from the anchor candidates. After
+    // an alpha-hide cycle the panel stays key, so `NSApp.keyWindow` returns
+    // the panel - anchoring against `panel.frame` shifts the origin down by
+    // `topInset` (~80pt) on every reopen, and the palette drifts toward the
+    // bottom of the screen one cycle at a time.
+    let anchor = bestAnchorWindow(excluding: panel)
     guard let anchor else {
       panel.center()
       return
@@ -231,6 +236,17 @@ final class OpenAnythingPaletteWindowController: NSObject {
     // overlay's `topInset`.
     let y = anchorFrame.maxY - OpenAnythingPaletteConstants.topInset - panelSize.height
     panel.setFrameOrigin(NSPoint(x: x, y: y))
+  }
+
+  private func bestAnchorWindow(excluding panel: NSWindow) -> NSWindow? {
+    if let key = NSApp.keyWindow, key !== panel { return key }
+    if let main = NSApp.mainWindow, main !== panel { return main }
+    return NSApp.windows.first { window in
+      window !== panel
+        && window.isVisible
+        && window.styleMask.contains(.titled)
+        && !window.isExcludedFromWindowsMenu
+    }
   }
 }
 
