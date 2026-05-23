@@ -25,9 +25,6 @@ struct HarnessMonitorAppCommands: Commands {
   let decreaseTextSize: () -> Void
   let resetTextSize: () -> Void
   let refreshStore: () -> Void
-  let presentOpenAnything: () -> Void
-  let presentOpenAnythingSessions: () -> Void
-  let openAnythingCorpusSize: () -> Int
 
   private var canIncreaseTextSize: Bool {
     HarnessMonitorTextSize.canIncrease(textSizeIndex)
@@ -76,34 +73,8 @@ struct HarnessMonitorAppCommands: Commands {
       .keyboardShortcut("s", modifiers: [.command, .shift])
       .disabled(!displayState.hasSelectedSession || displayState.isSessionReadOnly)
     }
-    openAnythingCommands
     searchCommands
     sidebarSelectionCommands
-  }
-
-  // Audit #11: Open Anything anchors to the File menu (after `.newItem`) so the
-  // Cmd+K chord lives alongside New Task / Send Signal rather than under Edit's
-  // pasteboard cluster.
-  // Audit #78: Cmd+Shift+K opens the palette scoped to the `.sessions` domain
-  // so users can quick-switch between session windows without ever seeing
-  // settings or action results.
-  // Audit #96: in DEBUG builds the menu title carries the current corpus size
-  // so the engineer can spot stale-corpus regressions at a glance.
-  @CommandsBuilder private var openAnythingCommands: some Commands {
-    CommandGroup(after: .newItem) {
-      Button(openAnythingMenuTitle, action: presentOpenAnything)
-        .keyboardShortcut("k", modifiers: .command)
-      Button("Open Anything (Sessions)", action: presentOpenAnythingSessions)
-        .keyboardShortcut("k", modifiers: [.command, .shift])
-    }
-  }
-
-  private var openAnythingMenuTitle: LocalizedStringKey {
-    #if DEBUG
-      "Open Anything (\(openAnythingCorpusSize()))"
-    #else
-      "Open Anything"
-    #endif
   }
 
   @CommandsBuilder private var searchCommands: some Commands {
