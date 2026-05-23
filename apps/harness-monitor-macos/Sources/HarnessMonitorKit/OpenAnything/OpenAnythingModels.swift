@@ -1,4 +1,5 @@
 import Foundation
+import SwiftUI
 
 public enum OpenAnythingDomain: String, CaseIterable, Codable, Hashable, Identifiable, Sendable {
   case actions
@@ -12,6 +13,9 @@ public enum OpenAnythingDomain: String, CaseIterable, Codable, Hashable, Identif
 
   public var id: String { rawValue }
 
+  /// Plain-text section label. Kept as `String` because the palette view applies
+  /// `.uppercased()` before rendering. Use ``labelKey`` for a localized variant
+  /// suitable for direct SwiftUI consumers.
   public var label: String {
     switch self {
     case .actions: "Actions"
@@ -23,6 +27,12 @@ public enum OpenAnythingDomain: String, CaseIterable, Codable, Hashable, Identif
     case .reviews: "Reviews"
     case .loadedSession: "Loaded Session"
     }
+  }
+
+  /// Localization-friendly accessor for ``label`` at the type boundary. Future
+  /// view rewrites should consume this when handing copy to SwiftUI directly.
+  public var labelKey: LocalizedStringKey {
+    LocalizedStringKey(label)
   }
 
   public var systemImage: String {
@@ -57,12 +67,134 @@ public enum OpenAnythingAction: String, Codable, CaseIterable, Hashable, Sendabl
   case openMCPSettings
   case openDatabaseSettings
   case policyCanvasLab
+
+  /// Plain-text title for the action. Stays `String` because the corpus
+  /// builder writes it into `OpenAnythingRecord.title` which is `String` for
+  /// now. Localized variant exposed via ``titleKey``.
+  public var title: String {
+    switch self {
+    case .newSession: "New Session"
+    case .newTask: "New Task"
+    case .attachExternalSession: "Attach External Session"
+    case .openDashboard: "Open Dashboard"
+    case .openTaskBoard: "Open Board"
+    case .openReviews: "Open Reviews"
+    case .openNotifications: "Open Notifications"
+    case .openPolicyCanvas: "Open Policy"
+    case .openDiagnostics: "Open Diagnostics"
+    case .refreshDiagnostics: "Refresh Diagnostics"
+    case .reconnectDaemon: "Reconnect Daemon"
+    case .copyDiagnostics: "Copy Diagnostics"
+    case .refresh: "Refresh"
+    case .settings: "Settings"
+    case .openMCPSettings: "Open MCP Settings"
+    case .openDatabaseSettings: "Open Database Settings"
+    case .policyCanvasLab: "Policy Canvas Lab"
+    }
+  }
+
+  /// Localization-friendly accessor for ``title`` at the type boundary.
+  public var titleKey: LocalizedStringKey {
+    LocalizedStringKey(title)
+  }
+
+  public var subtitle: String {
+    switch self {
+    case .newSession, .newTask, .attachExternalSession:
+      "Create"
+    case .openDashboard, .openTaskBoard, .openReviews, .openNotifications,
+      .openPolicyCanvas, .openDiagnostics:
+      "Navigate"
+    case .refresh:
+      "Reload Monitor data"
+    case .refreshDiagnostics:
+      "Reload daemon diagnostics"
+    case .reconnectDaemon:
+      "Restart the Monitor connection"
+    case .copyDiagnostics:
+      "Copy Monitor state"
+    case .settings:
+      "Open Settings"
+    case .openMCPSettings:
+      "Open Settings > MCP"
+    case .openDatabaseSettings:
+      "Open Settings > Database"
+    case .policyCanvasLab:
+      "Open experimental window"
+    }
+  }
+
+  /// Localization-friendly accessor for ``subtitle`` at the type boundary.
+  public var subtitleKey: LocalizedStringKey {
+    LocalizedStringKey(subtitle)
+  }
+
+  public var systemImage: String {
+    switch self {
+    case .newSession: "plus.rectangle.on.folder"
+    case .newTask: "checklist"
+    case .attachExternalSession: "link.badge.plus"
+    case .openDashboard: "square.grid.2x2"
+    case .openTaskBoard: "list.bullet.rectangle"
+    case .openReviews: "shippingbox.circle"
+    case .openNotifications: "bell.badge"
+    case .openPolicyCanvas: "point.3.connected.trianglepath.dotted"
+    case .openDiagnostics: "stethoscope"
+    case .refresh: "arrow.clockwise"
+    case .refreshDiagnostics: "stethoscope.circle"
+    case .reconnectDaemon: "arrow.triangle.2.circlepath"
+    case .copyDiagnostics: "doc.on.clipboard"
+    case .settings: "gearshape"
+    case .openMCPSettings: "point.3.connected.trianglepath.dotted"
+    case .openDatabaseSettings: "internaldrive"
+    case .policyCanvasLab: "point.3.connected.trianglepath.dotted"
+    }
+  }
+
+  public var searchAliases: String {
+    switch self {
+    case .openTaskBoard:
+      "task board board operations dispatch"
+    case .openReviews:
+      "review pull requests prs renovate checks merge approvals"
+    case .openDiagnostics, .refreshDiagnostics, .copyDiagnostics:
+      "diagnostics health daemon cache provenance freshness mcp"
+    case .reconnectDaemon:
+      "reconnect daemon offline stale connection"
+    case .openMCPSettings:
+      "mcp accessibility registry host"
+    case .openDatabaseSettings:
+      "database cache sqlite persistence"
+    case .openNotifications:
+      "alerts notification history"
+    case .openPolicyCanvas, .policyCanvasLab:
+      "policy canvas graph"
+    case .newSession, .newTask, .attachExternalSession, .openDashboard, .refresh, .settings:
+      ""
+    }
+  }
 }
 
 public enum OpenAnythingWindowTarget: String, Codable, CaseIterable, Hashable, Sendable {
   case dashboard
   case settings
   case policyCanvasLab
+
+  public var title: String {
+    switch self {
+    case .dashboard: "Dashboard"
+    case .settings: "Settings"
+    case .policyCanvasLab: "Policy Canvas Lab"
+    }
+  }
+
+  public var systemImage: String {
+    switch self {
+    case .dashboard: "square.grid.2x2"
+    case .settings: "gearshape"
+    case .policyCanvasLab: "point.3.connected.trianglepath.dotted"
+    }
+  }
 }
 
 public enum OpenAnythingDashboardRoute: String, Codable, CaseIterable, Hashable, Sendable {
@@ -80,6 +212,11 @@ public enum OpenAnythingDashboardRoute: String, Codable, CaseIterable, Hashable,
     case .diagnostics: "Diagnostics"
     case .reviews: "Reviews"
     }
+  }
+
+  /// Localization-friendly accessor for ``title`` at the type boundary.
+  public var titleKey: LocalizedStringKey {
+    LocalizedStringKey(title)
   }
 
   public var systemImage: String {
