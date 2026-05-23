@@ -108,6 +108,20 @@ struct DashboardReviewsPreferencesTests {
     #expect(prefs.organizationsText == "acme")
   }
 
+  @Test("legacy authorsText with whitespace-wrapped renovate bot still clears on decode")
+  func legacyRenovateBotAuthorsWithWhitespaceClears() {
+    let legacy = """
+      {
+        "authorsText": "  renovate[bot]  \\n",
+        "organizationsText": "acme"
+      }
+      """
+    let prefs = DashboardReviewsPreferences.decode(from: legacy)
+    #expect(prefs.authorsText.isEmpty)
+    #expect(prefs.normalizedAuthors.isEmpty)
+    #expect(prefs.organizationsText == "acme")
+  }
+
   @Test("user-customized authorsText survives decode untouched")
   func userCustomizedAuthorsSurvives() {
     let payload = """

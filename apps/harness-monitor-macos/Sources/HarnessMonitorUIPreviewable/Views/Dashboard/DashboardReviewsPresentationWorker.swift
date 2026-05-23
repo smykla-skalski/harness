@@ -2,21 +2,53 @@ import Foundation
 import HarnessMonitorKit
 import OSLog
 
-struct DashboardReviewsRepositoryGroup: Equatable, Identifiable, Sendable {
-  let repository: String
+struct DashboardReviewsItemGroup: Equatable, Identifiable, Sendable {
+  enum Kind: Equatable, Sendable {
+    case repository(String)
+    case status(String)
+    case author(String)
+
+    var title: String {
+      switch self {
+      case .repository(let value): value
+      case .status(let value): value
+      case .author(let value): value
+      }
+    }
+
+    var rawValue: String {
+      switch self {
+      case .repository(let value): "repository:\(value)"
+      case .status(let value): "status:\(value)"
+      case .author(let value): "author:\(value)"
+      }
+    }
+  }
+
+  let kind: Kind
   let items: [ReviewItem]
 
-  var id: String { repository }
+  var id: String { kind.rawValue }
+
+  // Back-compat accessor for callers that only handle repository groups.
+  var repository: String {
+    if case .repository(let value) = kind { return value }
+    return ""
+  }
 }
+
+typealias DashboardReviewsRepositoryGroup = DashboardReviewsItemGroup
 
 struct DashboardReviewsPresentationInput: Equatable, Sendable {
   let items: [ReviewItem]
   let filterModeRaw: String
   let sortModeRaw: String
+  let groupModeRaw: String
   let categoryModeRaw: String
   let searchText: String
   let configuredRepositories: [String]
   let configuredOrganizations: [String]
+  let configuredAuthors: [String]
   let selectedIDs: Set<String>
   let persistedPrimarySelectionID: String
 }
@@ -25,19 +57,23 @@ private struct DashboardReviewsListPresentationInput: Equatable, Sendable {
   let items: [ReviewItem]
   let filterModeRaw: String
   let sortModeRaw: String
+  let groupModeRaw: String
   let categoryModeRaw: String
   let searchText: String
   let configuredRepositories: [String]
   let configuredOrganizations: [String]
+  let configuredAuthors: [String]
 
   init(_ input: DashboardReviewsPresentationInput) {
     items = input.items
     filterModeRaw = input.filterModeRaw
     sortModeRaw = input.sortModeRaw
+    groupModeRaw = input.groupModeRaw
     categoryModeRaw = input.categoryModeRaw
     searchText = input.searchText
     configuredRepositories = input.configuredRepositories
     configuredOrganizations = input.configuredOrganizations
+    configuredAuthors = input.configuredAuthors
   }
 }
 
@@ -203,7 +239,7 @@ actor DashboardReviewsPresentationWorker {
       grouped
       .map { repository, items in
         DashboardReviewsRepositoryGroup(
-          repository: repository,
+          kind: .repository(repository),
           items: items.sorted(by: comparator)
         )
       }

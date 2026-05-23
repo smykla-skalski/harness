@@ -123,17 +123,19 @@ enum DashboardReviewsFilterMode: String, CaseIterable, Identifiable {
 
 enum DashboardReviewsSortMode: String, CaseIterable, Identifiable {
   case status
-  case age
+  case updated
+  case created
   case repository
 
-  static let pickerCases: [Self] = [.status, .age, .repository]
+  static let pickerCases: [Self] = [.status, .updated, .created, .repository]
 
   var id: String { rawValue }
 
   var title: String {
     switch self {
     case .status: "Status"
-    case .age: "Age"
+    case .updated: "Updated"
+    case .created: "Created"
     case .repository: "Repository"
     }
   }
@@ -141,13 +143,10 @@ enum DashboardReviewsSortMode: String, CaseIterable, Identifiable {
   var comparator: (ReviewItem, ReviewItem) -> Bool {
     switch self {
     case .status:
-      { lhs, rhs in
-        if lhs.statusWeight == rhs.statusWeight {
-          return lhs.repository.localizedStandardCompare(rhs.repository) == .orderedAscending
-        }
-        return lhs.statusWeight < rhs.statusWeight
-      }
-    case .age:
+      { lhs, rhs in lhs.statusOrderKey < rhs.statusOrderKey }
+    case .updated:
+      { lhs, rhs in lhs.updatedAt > rhs.updatedAt }
+    case .created:
       { lhs, rhs in lhs.createdAt > rhs.createdAt }
     case .repository:
       { lhs, rhs in lhs.repository.localizedStandardCompare(rhs.repository) == .orderedAscending }
@@ -157,15 +156,19 @@ enum DashboardReviewsSortMode: String, CaseIterable, Identifiable {
 
 enum DashboardReviewsGroupMode: String, CaseIterable, Identifiable {
   case repository
+  case status
+  case author
   case flat
 
-  static let pickerCases: [Self] = [.repository, .flat]
+  static let pickerCases: [Self] = [.repository, .status, .author, .flat]
 
   var id: String { rawValue }
 
   var title: String {
     switch self {
-    case .repository: "By Repo"
+    case .repository: "By Repository"
+    case .status: "By Status"
+    case .author: "By Author"
     case .flat: "Flat"
     }
   }
