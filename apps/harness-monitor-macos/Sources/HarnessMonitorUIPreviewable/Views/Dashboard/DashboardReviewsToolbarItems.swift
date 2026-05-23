@@ -6,9 +6,10 @@ struct DashboardReviewsToolbarCenterpiece: View {
   let snapshot: DashboardReviewsProvenanceSnapshot
 
   @ScaledMetric private var dotSize: CGFloat = 6
+  @ScaledMetric private var iconFrame: CGFloat = 14
   @ScaledMetric private var horizontalPadding: CGFloat = 14
-  @ScaledMetric private var verticalPadding: CGFloat = 6
-  @ScaledMetric private var contentMaxWidth: CGFloat = 480
+  @ScaledMetric private var verticalPadding: CGFloat = 8
+  @ScaledMetric private var contentWidth: CGFloat = 480
   @ScaledMetric private var detailMinSpacing: CGFloat = 12
 
   var body: some View {
@@ -16,6 +17,7 @@ struct DashboardReviewsToolbarCenterpiece: View {
       Circle()
         .fill(snapshot.sourceTint)
         .frame(width: dotSize, height: dotSize)
+        .frame(width: iconFrame, height: iconFrame)
         .animation(.smooth(duration: 0.25), value: snapshot.sourceTint)
         .accessibilityHidden(true)
       Text(snapshot.sourceTitle)
@@ -30,8 +32,8 @@ struct DashboardReviewsToolbarCenterpiece: View {
     }
     .padding(.horizontal, horizontalPadding)
     .padding(.vertical, verticalPadding)
-    .frame(maxWidth: contentMaxWidth)
-    .glassEffect(in: Capsule())
+    .frame(width: contentWidth)
+    .harnessControlPillGlass()
     .accessibilityIdentifier(HarnessMonitorAccessibility.dashboardReviewsToolbarProvenance)
     .accessibilityElement(children: .combine)
     .accessibilityLabel("Review data provenance")
