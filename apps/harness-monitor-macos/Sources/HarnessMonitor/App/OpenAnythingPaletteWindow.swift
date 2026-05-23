@@ -33,6 +33,12 @@ final class OpenAnythingPaletteWindowController: NSObject {
   let model: OpenAnythingPaletteModel
   private var executor: ((OpenAnythingHit) -> Void)?
   private var panel: OpenAnythingFloatingPanel?
+
+  /// True when the floating panel is currently the key window. The menu
+  /// presenter uses this to skip the "surface dashboard" branch on Cmd+K
+  /// when we are simply re-showing an alpha-hidden panel - opening dashboard
+  /// would resign the panel's main status and flap the toggle.
+  var isPanelKey: Bool { panel?.isKeyWindow ?? false }
   /// Re-entrancy guard so the model->panel sync and panel->model sync do not
   /// chase each other into a loop on dismiss.
   private var isClosing = false
@@ -73,6 +79,11 @@ final class OpenAnythingPaletteWindowController: NSObject {
   private func prewarm(_ panel: OpenAnythingFloatingPanel) {
     let size = panel.frame.size
     panel.alphaValue = 0
+    // Hidden panels MUST pass mouse events through - `alphaValue = 0` only
+    // hides pixels, it does not disable hit-testing, so without this the
+    // panel would silently swallow clicks anywhere in its frame even while
+    // invisible.
+    panel.ignoresMouseEvents = true
     panel.setFrame(
       NSRect(x: -20_000, y: -20_000, width: size.width, height: size.height),
       display: false
@@ -95,6 +106,10 @@ final class OpenAnythingPaletteWindowController: NSObject {
     model.present(targetWindowID: nil, scope: scope, restoreLastQuery: restoreLastQuery)
     positionAboveKeyWindow(panel)
     panel.alphaValue = 1
+    // Re-enable hit-testing for the visible panel; prewarm/hide set this
+    // to `true` so the alpha-hidden panel does not swallow clicks behind
+    // its frame.
+    panel.ignoresMouseEvents = false
     if panel.isVisible {
       // Pre-warmed / not yet dismissed via app-deactivate: panel is still
       // ordered front, just at alpha 0. A bare `makeKey` skips the slow
@@ -114,9 +129,12 @@ final class OpenAnythingPaletteWindowController: NSObject {
     if model.isPresented {
       model.dismiss(reason: .userCanceled)
     }
-    // Keep ordered front; just flip alpha so the next show is instant. See
-    // `prewarm` for the macOS 26 rationale.
+    // Keep ordered front; just flip alpha + disable hit-testing so the next
+    // show is instant. `ignoresMouseEvents = true` is critical - alpha=0
+    // alone leaves the panel catching clicks at its frame and silently
+    // hijacking pointer input from the windows behind it.
     panel?.alphaValue = 0
+    panel?.ignoresMouseEvents = true
   }
 
   /// Called from the palette view when the model dismisses for an in-flight
@@ -127,6 +145,7 @@ final class OpenAnythingPaletteWindowController: NSObject {
     isClosing = true
     defer { isClosing = false }
     panel?.alphaValue = 0
+    panel?.ignoresMouseEvents = true
   }
 
   private func buildPanel() -> OpenAnythingFloatingPanel {

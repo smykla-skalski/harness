@@ -17,6 +17,15 @@ extension HarnessMonitorApp {
   }
 
   func presentOpenAnythingPaletteScoped(to scope: OpenAnythingDomain?) {
+    let controller = appOpenAnythingPaletteController
+    // If the palette is already presented, Cmd+K is a toggle-off. Bail
+    // immediately - recomputing window state and surfacing dashboard from
+    // here resigns the panel's main status and the resignMain callback
+    // races the toggle into a re-show.
+    if controller.model.isPresented {
+      controller.hide()
+      return
+    }
     // Resolve the active window ID once - the previous implementation called
     // `openAnythingTargetWindowID()` three times per keystroke, each one
     // walking NSApp.windows. That overhead added up on the hot path.
@@ -26,15 +35,16 @@ extension HarnessMonitorApp {
     let restore = UserDefaults.standard.bool(
       forKey: OpenAnythingPreferencesDefaults.restoreLastQueryKey
     )
-    // If no Monitor window is currently key, surface the dashboard so the
-    // panel has something to anchor above. The panel itself does not require
-    // a host window, but the user expects Cmd+K (or the global hot key) to
-    // bring the app forward as well.
-    if activeWindowID == nil {
+    // Surface dashboard only if no Monitor scene is key AND the palette
+    // panel is not itself key. After an alpha-hide cycle the panel stays
+    // ordered front + key, but `openAnythingTargetWindowID()` does not
+    // match it; calling `openHarnessDashboardWindow` in that state opens
+    // dashboard for no user-visible reason and slows the show pipeline.
+    if activeWindowID == nil && !controller.isPanelKey {
       openWindow.openHarnessDashboardWindow()
       focusDashboardWindowIfPossible()
     }
-    appOpenAnythingPaletteController.toggle(
+    controller.toggle(
       scope: resolvedScope,
       restoreLastQuery: restore
     )
