@@ -27,6 +27,31 @@ fn normalize_git_blob_base64_strips_github_line_wrapping() {
 }
 
 #[test]
+fn scopes_drop_author_clause_when_authors_empty() {
+    let request = ReviewsQueryRequest {
+        authors: Vec::new(),
+        organizations: vec!["acme".into()],
+        repositories: vec!["acme/api".into()],
+        exclude_repositories: Vec::new(),
+        force_refresh: false,
+        cache_max_age_seconds: 600,
+    };
+    let queries = scopes(&request)
+        .expect("scopes")
+        .into_iter()
+        .map(|scope| scope.query)
+        .collect::<Vec<_>>();
+
+    assert_eq!(
+        queries,
+        vec![
+            "org:acme is:pr is:open",
+            "repo:acme/api is:pr is:open",
+        ]
+    );
+}
+
+#[test]
 fn scopes_keep_review_searches_author_scoped() {
     let request = ReviewsQueryRequest {
         authors: vec!["renovate[bot]".into(), "octo-user".into()],

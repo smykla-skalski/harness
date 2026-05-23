@@ -58,9 +58,9 @@ pub(super) fn scopes(request: &ReviewsQueryRequest) -> Result<Vec<ScopeQuery>, C
     let authors = request.normalized_authors();
     let organizations = request.normalized_organizations();
     let repositories = request.normalized_repositories();
-    let scope_count = authors
-        .len()
-        .saturating_mul(organizations.len().saturating_add(repositories.len()));
+    let author_fanout = authors.len().max(1);
+    let scope_count =
+        author_fanout.saturating_mul(organizations.len().saturating_add(repositories.len()));
     if scope_count > SCOPE_QUERY_CAP {
         return Err(CliErrorKind::workflow_parse(format!(
             "reviews query resolves to {scope_count} GitHub searches; narrow authors, organizations, or repositories to at most {SCOPE_QUERY_CAP} searches"
@@ -68,16 +68,29 @@ pub(super) fn scopes(request: &ReviewsQueryRequest) -> Result<Vec<ScopeQuery>, C
         .into());
     }
     let mut scopes = Vec::new();
-    for author in &authors {
+    if authors.is_empty() {
         for organization in &organizations {
             scopes.push(ScopeQuery {
-                query: format!("org:{organization} author:{author} is:pr is:open"),
+                query: format!("org:{organization} is:pr is:open"),
             });
         }
         for repository in &repositories {
             scopes.push(ScopeQuery {
-                query: format!("repo:{repository} author:{author} is:pr is:open"),
+                query: format!("repo:{repository} is:pr is:open"),
             });
+        }
+    } else {
+        for author in &authors {
+            for organization in &organizations {
+                scopes.push(ScopeQuery {
+                    query: format!("org:{organization} author:{author} is:pr is:open"),
+                });
+            }
+            for repository in &repositories {
+                scopes.push(ScopeQuery {
+                    query: format!("repo:{repository} author:{author} is:pr is:open"),
+                });
+            }
         }
     }
     Ok(scopes)
