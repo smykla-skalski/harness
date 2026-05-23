@@ -110,7 +110,7 @@ extension ReviewCheckStatus {
     case .none: "No checks"
     case .success: "Checks passing"
     case .failure: "Checks failing"
-    case .pending: "Checks pending"
+    case .pending: "Checks running"
     case .unknown(let raw): raw
     }
   }

@@ -59,19 +59,24 @@ func dashboardReviewCheckWorkflowTitle(for check: ReviewCheck) -> String {
   guard !name.isEmpty else {
     return check.checkSuiteID.map { "Suite \($0.suffix(6))" } ?? "Other checks"
   }
+  let raw: String
   if let slashRange = name.range(of: " / ") {
-    return String(name[..<slashRange.lowerBound]).trimmingCharacters(in: .whitespacesAndNewlines)
-  }
-  if let parentheticalRange = name.range(of: " (", options: .backwards),
-    name.hasSuffix(")")
-  {
+    raw = String(name[..<slashRange.lowerBound]).trimmingCharacters(in: .whitespacesAndNewlines)
+  } else if let parentheticalRange = name.range(of: " (", options: .backwards),
+    name.hasSuffix(")") {
     let prefix = String(name[..<parentheticalRange.lowerBound])
       .trimmingCharacters(in: .whitespacesAndNewlines)
-    if !prefix.isEmpty {
-      return prefix
-    }
+    raw = prefix.isEmpty ? name : prefix
+  } else {
+    raw = name
   }
-  return name
+  return dashboardReviewCheckTitleCapitalizingFirstLetter(raw)
+}
+
+func dashboardReviewCheckTitleCapitalizingFirstLetter(_ title: String) -> String {
+  guard let first = title.first else { return title }
+  if first.isUppercase || !first.isLetter { return title }
+  return String(first).uppercased() + title.dropFirst()
 }
 
 private func dashboardReviewCheckGroupID(
