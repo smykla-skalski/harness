@@ -76,8 +76,7 @@ struct DashboardReviewsProvenanceTests {
     #expect(routeSource.contains("var normalizedPreferences: DashboardReviewsPreferences"))
     #expect(contentSource.contains("DashboardReviewsProvenanceBar("))
     #expect(contentSource.contains("snapshot: routeProvenanceSnapshot"))
-    #expect(contentSource.contains("provenance: routeProvenanceSnapshot"))
-    #expect(detailSource.contains("DashboardReviewProvenanceMiniBar("))
+    #expect(!detailSource.contains("DashboardReviewProvenanceMiniBar"))
     #expect(provenanceSource.contains("var routeProvenanceSnapshot"))
     #expect(
       provenanceSource.contains(

@@ -273,25 +273,3 @@ struct DashboardReviewsProvenanceBar: View {
   }
 }
 
-struct DashboardReviewProvenanceMiniBar: View {
-  let snapshot: DashboardReviewsProvenanceSnapshot
-
-  var body: some View {
-    HStack(spacing: HarnessMonitorTheme.spacingSM) {
-      Label(snapshot.sourceTitle, systemImage: snapshot.sourceSystemImage)
-        .foregroundStyle(snapshot.sourceTint)
-      Text(snapshot.fetchedAgeTitle)
-        .foregroundStyle(HarnessMonitorTheme.secondaryInk)
-      if let warningTitle = snapshot.warningTitle {
-        Text(warningTitle)
-          .foregroundStyle(HarnessMonitorTheme.caution)
-          .lineLimit(1)
-      }
-    }
-    .scaledFont(.caption.weight(.semibold))
-    .lineLimit(1)
-    .accessibilityElement(children: .combine)
-    .accessibilityLabel("Review data source")
-    .accessibilityValue(snapshot.detailTitle)
-  }
-}

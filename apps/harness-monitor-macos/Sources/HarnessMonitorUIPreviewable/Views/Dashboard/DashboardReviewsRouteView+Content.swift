@@ -111,7 +111,6 @@ extension DashboardReviewsRouteView {
           item: item,
           store: store,
           activity: activitySnapshot(for: item),
-          provenance: routeProvenanceSnapshot,
           showsProblemChecksOnly: routeShowsProblemChecksOnlyBinding,
           onDescriptionCheckboxError: { message in routeErrorMessage = message },
           onDescriptionCheckboxUpdated: {
