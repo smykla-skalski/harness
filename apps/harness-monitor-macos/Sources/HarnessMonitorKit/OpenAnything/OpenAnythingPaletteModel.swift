@@ -28,6 +28,11 @@ public final class OpenAnythingPaletteModel {
   public private(set) var suggestedResults = OpenAnythingResults.empty
   public private(set) var selectedHitID: String?
   public private(set) var lastDismissReason: DismissReason?
+  /// The most recent query that `runSearch` actually completed for. Used by
+  /// the view to tell "search has caught up - results.isEmpty really means
+  /// no matches" from "search has not run yet - hold the empty state until
+  /// the debounced search lands so we never flash 'No results'".
+  public private(set) var lastSearchedQuery: String = ""
   /// Synchronous mirror of `index.recordCount()`, updated whenever
   /// `replaceCorpus` accepts a new corpus. Lets read-only callers (Commands,
   /// debug badges) observe corpus size without dropping into the actor.
@@ -107,6 +112,7 @@ public final class OpenAnythingPaletteModel {
     // surface for most users.
     query = restoreLastQuery ? lastSubmittedQuery : ""
     results = .empty
+    lastSearchedQuery = ""
     selectedHitID = nil
     isPresented = true
     lastDismissReason = nil
@@ -130,6 +136,7 @@ public final class OpenAnythingPaletteModel {
     pendingSearchTask = nil
     query = ""
     results = .empty
+    lastSearchedQuery = ""
     selectedHitID = nil
     targetWindowID = nil
     scope = nil
@@ -206,12 +213,14 @@ public final class OpenAnythingPaletteModel {
   }
 
   public func runSearch() async {
-    let parsed = OpenAnythingQueryParser.parse(query)
+    let queryAtStart = query
+    let parsed = OpenAnythingQueryParser.parse(queryAtStart)
     queryScope = parsed.scope
     let trimmed = parsed.term
     guard !trimmed.isEmpty else {
       // Empty queries display the suggested lane; skip the actor hop entirely.
       results = .empty
+      lastSearchedQuery = queryAtStart
       normalizeSelection()
       return
     }
@@ -229,6 +238,7 @@ public final class OpenAnythingPaletteModel {
     )
     guard !Task.isCancelled else { return }
     results = applyRanking(to: Self.filtered(snapshot, by: effectiveScope), records: nil)
+    lastSearchedQuery = queryAtStart
     normalizeSelection()
   }
 
