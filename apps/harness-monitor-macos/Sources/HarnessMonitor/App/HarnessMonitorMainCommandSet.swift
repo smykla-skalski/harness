@@ -12,6 +12,8 @@ struct HarnessMonitorMainCommandSet: Commands {
   let resetTextSize: () -> Void
   let refreshStore: () -> Void
   let presentOpenAnything: () -> Void
+  let presentOpenAnythingSessions: () -> Void
+  let openAnythingCorpusSize: () -> Int
 
   var body: some Commands {
     HarnessMonitorAppCommands(
@@ -22,7 +24,9 @@ struct HarnessMonitorMainCommandSet: Commands {
       decreaseTextSize: decreaseTextSize,
       resetTextSize: resetTextSize,
       refreshStore: refreshStore,
-      presentOpenAnything: presentOpenAnything
+      presentOpenAnything: presentOpenAnything,
+      presentOpenAnythingSessions: presentOpenAnythingSessions,
+      openAnythingCorpusSize: openAnythingCorpusSize
     )
     NewSessionCommand(
       store: store,

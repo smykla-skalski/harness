@@ -87,7 +87,9 @@ extension HarnessMonitorApp {
       decreaseTextSize: decreaseTextSize,
       resetTextSize: resetTextSize,
       refreshStore: refreshStore,
-      presentOpenAnything: presentOpenAnythingPalette
+      presentOpenAnything: presentOpenAnythingPalette,
+      presentOpenAnythingSessions: presentOpenAnythingPaletteSessions,
+      openAnythingCorpusSize: { appOpenAnythingPalette.recordCount }
     )
   }
 
