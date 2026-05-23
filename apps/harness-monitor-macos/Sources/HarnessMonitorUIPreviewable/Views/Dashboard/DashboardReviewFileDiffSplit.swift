@@ -9,6 +9,8 @@ struct DashboardReviewFileDiffSplit: View {
   let language: HarnessReviewFileLanguage
   let fontScale: CGFloat
   var minColumnPoints: CGFloat = 280
+  let threads: [DashboardReviewFileThreadAnchor]
+  let repositoryFullName: String?
   let document: DashboardReviewFileDiffDocument
   let diffFont: Font
 
@@ -16,12 +18,16 @@ struct DashboardReviewFileDiffSplit: View {
     patch: ReviewFilePatch,
     language: HarnessReviewFileLanguage,
     fontScale: CGFloat,
-    minColumnPoints: CGFloat = 280
+    minColumnPoints: CGFloat = 280,
+    threads: [DashboardReviewFileThreadAnchor] = [],
+    repositoryFullName: String? = nil
   ) {
     self.patch = patch
     self.language = language
     self.fontScale = fontScale
     self.minColumnPoints = minColumnPoints
+    self.threads = threads
+    self.repositoryFullName = repositoryFullName
     document = DashboardReviewFileDiffDocument(patch: patch, language: language)
     diffFont = DashboardReviewDiffTypography.font(for: fontScale)
   }
@@ -39,7 +45,9 @@ struct DashboardReviewFileDiffSplit: View {
         DashboardReviewFileDiffGrid(
           document: document,
           viewMode: .split,
-          fontScale: fontScale
+          fontScale: fontScale,
+          threads: threads,
+          repositoryFullName: repositoryFullName
         )
         .font(diffFont)
       }

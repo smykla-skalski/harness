@@ -9,6 +9,8 @@ struct DashboardReviewFileDiffUnified: View {
   let patch: ReviewFilePatch
   let language: HarnessReviewFileLanguage
   let fontScale: CGFloat
+  let threads: [DashboardReviewFileThreadAnchor]
+  let repositoryFullName: String?
   let document: DashboardReviewFileDiffDocument
   let captionFont: Font
   let caption2Font: Font
@@ -17,11 +19,15 @@ struct DashboardReviewFileDiffUnified: View {
   init(
     patch: ReviewFilePatch,
     language: HarnessReviewFileLanguage,
-    fontScale: CGFloat
+    fontScale: CGFloat,
+    threads: [DashboardReviewFileThreadAnchor] = [],
+    repositoryFullName: String? = nil
   ) {
     self.patch = patch
     self.language = language
     self.fontScale = fontScale
+    self.threads = threads
+    self.repositoryFullName = repositoryFullName
     document = DashboardReviewFileDiffDocument(patch: patch, language: language)
     captionFont = HarnessMonitorTextSize.scaledFont(.caption, by: fontScale)
     caption2Font = HarnessMonitorTextSize.scaledFont(.caption2, by: fontScale)
@@ -35,7 +41,9 @@ struct DashboardReviewFileDiffUnified: View {
       DashboardReviewFileDiffGrid(
         document: document,
         viewMode: .unified,
-        fontScale: fontScale
+        fontScale: fontScale,
+        threads: threads,
+        repositoryFullName: repositoryFullName
       )
       .frame(
         height: DashboardReviewFileDiffGrid.viewportHeight(

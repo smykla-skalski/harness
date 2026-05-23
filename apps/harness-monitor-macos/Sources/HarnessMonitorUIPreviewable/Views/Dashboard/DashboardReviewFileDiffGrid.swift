@@ -6,6 +6,22 @@ struct DashboardReviewFileDiffGrid: NSViewRepresentable {
   let document: DashboardReviewFileDiffDocument
   let viewMode: FilesViewMode
   let fontScale: CGFloat
+  let threads: [DashboardReviewFileThreadAnchor]
+  let repositoryFullName: String?
+
+  init(
+    document: DashboardReviewFileDiffDocument,
+    viewMode: FilesViewMode,
+    fontScale: CGFloat,
+    threads: [DashboardReviewFileThreadAnchor] = [],
+    repositoryFullName: String? = nil
+  ) {
+    self.document = document
+    self.viewMode = viewMode
+    self.fontScale = fontScale
+    self.threads = threads
+    self.repositoryFullName = repositoryFullName
+  }
 
   func makeCoordinator() -> Coordinator {
     Coordinator()
@@ -29,7 +45,13 @@ struct DashboardReviewFileDiffGrid: NSViewRepresentable {
     if scrollView.documentView !== contentView {
       scrollView.documentView = contentView
     }
-    contentView.configure(document: document, viewMode: viewMode, fontScale: fontScale)
+    contentView.configure(
+      document: document,
+      viewMode: viewMode,
+      fontScale: fontScale,
+      threads: threads,
+      repositoryFullName: repositoryFullName
+    )
     let size = contentView.preferredSize(containerWidth: scrollView.contentSize.width)
     if contentView.frame.size != size {
       contentView.setFrameSize(size)
@@ -47,40 +69,50 @@ struct DashboardReviewFileDiffGrid: NSViewRepresentable {
 }
 
 @MainActor
-private final class DashboardReviewFileDiffGridContentView: NSView {
-  private var rows: [DashboardReviewFileDiffRow] = []
+final class DashboardReviewFileDiffGridContentView: NSView {
+  var rows: [DashboardReviewFileDiffRow] = []
   private var viewMode: FilesViewMode = .unified
   private var codeLanguage: HarnessCodeLanguage = .generic
   private var longestCodeCharacterCount = 0
-  private var codeCache: [Int: NSAttributedString] = [:]
+  var threadsByRowID: [Int: [DashboardReviewFileThreadAnchor]] = [:]
+  var selectedRowID: Int?
+  var documentPath = ""
+  var headRefOid = ""
+  var repositoryFullName: String?
   private var font = NSFont.monospacedSystemFont(ofSize: 12, weight: .regular)
-  private var rowHeight: CGFloat = 19
+  var rowHeight: CGFloat = 19
   private var characterWidth: CGFloat = 7.2
+  var contextMenuRowID: Int?
 
   override var isFlipped: Bool { true }
+  override var acceptsFirstResponder: Bool { true }
 
   func configure(
     document: DashboardReviewFileDiffDocument,
     viewMode: FilesViewMode,
-    fontScale: CGFloat
+    fontScale: CGFloat,
+    threads: [DashboardReviewFileThreadAnchor],
+    repositoryFullName: String?
   ) {
     let nextFont = NSFont.monospacedSystemFont(
       ofSize: DashboardReviewDiffTypography.pointSize(fontScale: fontScale),
       weight: .regular
     )
     let nextLanguage = HarnessCodeLanguage(reviewLanguage: document.language)
-    let shouldResetCache =
-      rows != document.rows || font.pointSize != nextFont.pointSize || codeLanguage != nextLanguage
     rows = document.rows
     self.viewMode = viewMode
     codeLanguage = nextLanguage
     longestCodeCharacterCount = document.longestCodeCharacterCount
+    threadsByRowID = Self.buildThreadMap(rows: document.rows, threads: threads)
+    selectedRowID = selectedRowID.flatMap { selected in
+      document.rows.contains(where: { $0.id == selected }) ? selected : nil
+    }
+    documentPath = document.path
+    headRefOid = document.headRefOid
+    self.repositoryFullName = repositoryFullName
     font = nextFont
     rowHeight = max(18, font.pointSize + 7)
     characterWidth = max(6, ("M" as NSString).size(withAttributes: [.font: font]).width)
-    if shouldResetCache {
-      codeCache.removeAll(keepingCapacity: true)
-    }
     needsDisplay = true
   }
 
@@ -119,8 +151,47 @@ private final class DashboardReviewFileDiffGridContentView: NSView {
     }
   }
 
+  override func mouseDown(with event: NSEvent) {
+    window?.makeFirstResponder(self)
+    selectedRowID = row(at: convert(event.locationInWindow, from: nil))?.id
+    needsDisplay = true
+    super.mouseDown(with: event)
+  }
+
+  override func keyDown(with event: NSEvent) {
+    if event.modifierFlags.contains(.command), event.charactersIgnoringModifiers == "c" {
+      copySelectedSourceLine()
+      return
+    }
+    super.keyDown(with: event)
+  }
+
+  override func menu(for event: NSEvent) -> NSMenu? {
+    guard let row = row(at: convert(event.locationInWindow, from: nil)) else { return nil }
+    contextMenuRowID = row.id
+    selectedRowID = row.id
+    needsDisplay = true
+    let menu = NSMenu()
+    addMenuItem("Copy Source Line", action: #selector(copyContextSourceLine), to: menu)
+    addMenuItem("Copy Line Anchor", action: #selector(copyContextLineAnchor), to: menu)
+    if githubPermalink(for: row) != nil {
+      addMenuItem("Copy GitHub Permalink", action: #selector(copyContextPermalink), to: menu)
+    }
+    if let url = threadsByRowID[row.id]?.compactMap(\.url).first {
+      addMenuItem("Copy Thread URL", action: #selector(copyContextThreadURL(_:)), to: menu)
+      menu.item(at: menu.items.count - 1)?.representedObject = url
+    }
+    menu.addItem(.separator())
+    addMenuItem("Copy File Path", action: #selector(copyFilePath), to: menu)
+    return menu
+  }
+
   private func draw(row: DashboardReviewFileDiffRow, in rect: NSRect) {
     fillBackground(for: row.kind, in: rect)
+    if row.id == selectedRowID {
+      NSColor.controlAccentColor.withAlphaComponent(0.14).setFill()
+      rect.fill()
+    }
     switch viewMode {
     case .unified:
       drawUnified(row: row, in: rect)
@@ -131,10 +202,11 @@ private final class DashboardReviewFileDiffGridContentView: NSView {
 
   private func drawUnified(row: DashboardReviewFileDiffRow, in rect: NSRect) {
     let y = textY(in: rect)
-    if row.kind == .hunk || row.kind == .metadata {
+    if row.kind == .hunk || row.kind == .metadata || row.kind == .contextGap {
       drawControlText(row.text, x: 12, y: y, kind: row.kind)
       return
     }
+    drawThreadBadge(for: row, x: 7, y: y)
     drawLineNumber(row.oldLine, rightX: 42, y: y)
     drawLineNumber(row.newLine, rightX: 84, y: y)
     drawString(row.unifiedPrefix, x: 101, y: y, color: prefixColor(for: row.kind))
@@ -142,7 +214,7 @@ private final class DashboardReviewFileDiffGridContentView: NSView {
   }
 
   private func drawSplit(row: DashboardReviewFileDiffRow, in rect: NSRect) {
-    if row.kind == .hunk || row.kind == .metadata {
+    if row.kind == .hunk || row.kind == .metadata || row.kind == .contextGap {
       drawControlText(row.text, x: 12, y: textY(in: rect), kind: row.kind)
       return
     }
@@ -164,6 +236,7 @@ private final class DashboardReviewFileDiffGridContentView: NSView {
     let y = textY(in: rect)
     let line = side == .old ? row.oldLine : row.newLine
     let prefix = splitPrefix(for: row.kind, side: side)
+    drawThreadBadge(for: row, side: side, x: x + 7, y: y)
     drawLineNumber(line, rightX: x + 42, y: y)
     drawString(prefix, x: x + 58, y: y, color: prefixColor(for: row.kind))
     attributedCode(for: row).draw(
@@ -172,21 +245,11 @@ private final class DashboardReviewFileDiffGridContentView: NSView {
   }
 
   private func attributedCode(for row: DashboardReviewFileDiffRow) -> NSAttributedString {
-    if let cached = codeCache[row.id] {
-      return cached
-    }
-    let tokens = HarnessCodeHighlighter.highlight(row.text, language: codeLanguage)
-    let result = NSMutableAttributedString()
-    for token in tokens {
-      result.append(
-        NSAttributedString(
-          string: token.text,
-          attributes: [.font: font, .foregroundColor: tokenColor(for: token.kind)]
-        )
-      )
-    }
-    codeCache[row.id] = result
-    return result
+    DashboardReviewFileDiffHighlightCache.attributed(
+      text: row.text,
+      language: codeLanguage,
+      font: font
+    )
   }
 
   private func fillBackground(for kind: DashboardReviewFileDiffRow.Kind, in rect: NSRect) {
@@ -197,6 +260,8 @@ private final class DashboardReviewFileDiffGridContentView: NSView {
       NSColor.systemRed.withAlphaComponent(0.12).setFill()
     case .hunk:
       NSColor.controlAccentColor.withAlphaComponent(0.10).setFill()
+    case .contextGap:
+      NSColor.controlAccentColor.withAlphaComponent(0.07).setFill()
     case .metadata:
       NSColor.systemOrange.withAlphaComponent(0.10).setFill()
     case .context:
@@ -219,7 +284,18 @@ private final class DashboardReviewFileDiffGridContentView: NSView {
     y: CGFloat,
     kind: DashboardReviewFileDiffRow.Kind
   ) {
-    drawString(text, x: x, y: y, color: kind == .metadata ? .systemOrange : .secondaryLabelColor)
+    let color: NSColor =
+      switch kind {
+      case .contextGap:
+        .tertiaryLabelColor
+      case .metadata:
+        .systemOrange
+      case .hunk:
+        .secondaryLabelColor
+      case .addition, .context, .deletion:
+        .labelColor
+      }
+    drawString(text, x: x, y: y, color: color)
   }
 
   private func drawString(_ text: String, x: CGFloat, y: CGFloat, color: NSColor) {
@@ -254,20 +330,7 @@ private final class DashboardReviewFileDiffGridContentView: NSView {
     case .addition: .systemGreen
     case .deletion: .systemRed
     case .context: .tertiaryLabelColor
-    case .hunk, .metadata: .secondaryLabelColor
-    }
-  }
-
-  private func tokenColor(for kind: HarnessCodeToken.Kind) -> NSColor {
-    switch kind {
-    case .comment: .secondaryLabelColor
-    case .keyword, .property: .controlAccentColor
-    case .literal, .number, .type: .systemOrange
-    case .operatorSymbol, .punctuation, .whitespace: .tertiaryLabelColor
-    case .string: .systemGreen
-    case .deleted: .systemRed
-    case .heading, .inserted: .controlAccentColor
-    case .plain: .labelColor
+    case .contextGap, .hunk, .metadata: .secondaryLabelColor
     }
   }
 
@@ -282,9 +345,50 @@ private final class DashboardReviewFileDiffGridContentView: NSView {
       false
     }
   }
-}
 
-private enum DashboardReviewFileDiffSide {
-  case old
-  case new
+  private func drawThreadBadge(
+    for row: DashboardReviewFileDiffRow,
+    side: DashboardReviewFileDiffSide? = nil,
+    x: CGFloat,
+    y: CGFloat
+  ) {
+    let anchors = threads(for: row, side: side)
+    guard !anchors.isEmpty else { return }
+    let title = anchors.count == 1 ? anchors[0].badgeTitle : "\(anchors.count)"
+    let rect = NSRect(x: x, y: y - 1, width: 20, height: 15)
+    NSColor.controlAccentColor.withAlphaComponent(0.18).setFill()
+    NSBezierPath(roundedRect: rect, xRadius: 7, yRadius: 7).fill()
+    (title as NSString).draw(
+      at: NSPoint(x: rect.midX - 3.5, y: rect.minY + 1),
+      withAttributes: [
+        .font: NSFont.systemFont(ofSize: 9, weight: .semibold),
+        .foregroundColor: NSColor.controlAccentColor,
+      ]
+    )
+  }
+
+  private func threads(
+    for row: DashboardReviewFileDiffRow,
+    side: DashboardReviewFileDiffSide? = nil
+  ) -> [DashboardReviewFileThreadAnchor] {
+    let anchors = threadsByRowID[row.id] ?? []
+    guard let side else { return anchors }
+    return anchors.filter { $0.side == nil || $0.side == side }
+  }
+
+  private static func buildThreadMap(
+    rows: [DashboardReviewFileDiffRow],
+    threads: [DashboardReviewFileThreadAnchor]
+  ) -> [Int: [DashboardReviewFileThreadAnchor]] {
+    guard !threads.isEmpty else { return [:] }
+    var out: [Int: [DashboardReviewFileThreadAnchor]] = [:]
+    for row in rows {
+      let matched = threads.filter { row.matches(anchor: $0) }
+      if !matched.isEmpty {
+        out[row.id] = matched
+      }
+    }
+    return out
+  }
+
 }
