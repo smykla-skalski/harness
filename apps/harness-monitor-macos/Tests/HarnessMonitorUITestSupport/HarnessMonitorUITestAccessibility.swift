@@ -307,7 +307,16 @@ enum HarnessMonitorUITestAccessibility {
   }
 
   static func dashboardWindowRoute(_ route: String) -> String {
-    "harness.dashboard.route.\(slug(route))"
+    "harness.dashboard.route.\(slug(dashboardWindowRouteAlias(route)))"
+  }
+
+  private static func dashboardWindowRouteAlias(_ route: String) -> String {
+    // Mirrors HarnessMonitorAccessibility.dashboardWindowRoute: Dependencies
+    // was renamed to Reviews in 2026-05-22 but the route raw value did not
+    // change.
+    let lowered = route.lowercased()
+    if lowered == "dependencies" { return "reviews" }
+    return route
   }
 
   static func dashboardNotificationRow(_ entryID: String) -> String {
