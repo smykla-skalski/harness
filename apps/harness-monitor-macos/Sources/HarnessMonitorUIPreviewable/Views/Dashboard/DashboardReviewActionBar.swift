@@ -28,14 +28,28 @@ struct DashboardReviewActionBar: View {
         .padding(.vertical, 1)
       }
       .scrollIndicators(.hidden)
+      .mask(Self.overflowFadeGradient)
     }
     .frame(maxWidth: .infinity, alignment: .leading)
   }
 
+  /// Trailing fade affordance hinting at horizontal overflow when the inner
+  /// HStack exceeds the scroll viewport. Invisible when content fits because
+  /// the fade only affects the trailing edge which is empty in that case.
+  private static let overflowFadeGradient = LinearGradient(
+    stops: [
+      .init(color: .black, location: 0.0),
+      .init(color: .black, location: 0.94),
+      .init(color: .clear, location: 1.0),
+    ],
+    startPoint: .leading,
+    endPoint: .trailing
+  )
+
   @ViewBuilder private var buttons: some View {
     DashboardReviewActionButton(
-      title: "Approve",
-      systemImage: "checkmark.seal",
+      title: approveButtonTitle,
+      systemImage: approveButtonSystemImage,
       prominence: approveProminence,
       helpText: helpTextOrBusy(DashboardReviewsDisabledReason.approveReason(for: items)),
       action: onApprove
@@ -52,7 +66,7 @@ struct DashboardReviewActionBar: View {
     .disabled(isBusy || !items.contains { $0.canAttemptManualMerge })
 
     DashboardReviewActionButton(
-      title: "Rerun Checks",
+      title: "Rerun checks",
       systemImage: "arrow.clockwise.circle",
       prominence: .secondary,
       helpText: helpTextOrBusy(DashboardReviewsDisabledReason.rerunReason(for: items)),
@@ -110,7 +124,8 @@ struct DashboardReviewActionBar: View {
           title: bot.rebaseActionTitle,
           systemImage: "arrow.triangle.2.circlepath",
           prominence: .secondary,
-          helpText: DashboardReviewsDisabledReason.rebaseReason(for: item),
+          helpText: DashboardReviewsDisabledReason.rebaseReason(for: item)
+            ?? "Available because @\(item.authorLogin) is a known bot",
           action: onRebaseViaBot
         )
         .disabled(isBusy || !item.canRebaseViaBot)
@@ -120,6 +135,7 @@ struct DashboardReviewActionBar: View {
           title: "Fix CI",
           systemImage: "wrench.and.screwdriver",
           prominence: .secondary,
+          helpText: "Available because required checks are failing",
           action: onFixCI
         )
         .accessibilityIdentifier(HarnessMonitorAccessibility.dashboardReviewsFixCIButton)
@@ -143,6 +159,26 @@ struct DashboardReviewActionBar: View {
 
   private var approveProminence: DashboardReviewActionProminence {
     dashboardReviewApproveProminence(for: items)
+  }
+
+  /// True when the detail pane shows a single review whose approve action is
+  /// disabled because the PR is already approved (with at least one approval
+  /// record on file). Used to swap the button copy from "Approve" to
+  /// "Approved by you" so the disabled state reads as an affirmation rather
+  /// than a dead control.
+  private var isShowingApprovedAffirmation: Bool {
+    guard items.count == 1, let item = items.first else { return false }
+    return !item.canAttemptManualApproval
+      && item.reviewStatus == .approved
+      && item.reviews.contains { $0.state == .approved }
+  }
+
+  private var approveButtonTitle: String {
+    isShowingApprovedAffirmation ? "Approved by you" : "Approve"
+  }
+
+  private var approveButtonSystemImage: String {
+    isShowingApprovedAffirmation ? "checkmark.seal.fill" : "checkmark.seal"
   }
 
   private var mergeProminence: DashboardReviewActionProminence {

@@ -45,6 +45,42 @@ struct DashboardReviewsDetailUXContractTests {
     #expect(actionBar.contains("\"Open pull request\""))
   }
 
+  @Test("Header command row hints horizontal overflow with a trailing fade mask")
+  func headerCommandRowHintsHorizontalOverflowWithFadeMask() throws {
+    let actionBar = try source(
+      "Sources/HarnessMonitorUIPreviewable/Views/Dashboard/DashboardReviewActionBar.swift"
+    )
+
+    #expect(actionBar.contains(".mask("))
+    #expect(actionBar.contains("LinearGradient("))
+    #expect(actionBar.contains("startPoint: .leading"))
+    #expect(actionBar.contains("endPoint: .trailing"))
+  }
+
+  @Test("Bot rebase and Fix CI buttons explain their conditional appearance")
+  func botRebaseAndFixCIButtonsExplainConditionalAppearance() throws {
+    let actionBar = try source(
+      "Sources/HarnessMonitorUIPreviewable/Views/Dashboard/DashboardReviewActionBar.swift"
+    )
+
+    #expect(actionBar.contains("Available because @\\(item.authorLogin) is a known bot"))
+    #expect(actionBar.contains("\"Available because required checks are failing\""))
+    #expect(actionBar.contains("\"Rerun checks\""))
+    #expect(!actionBar.contains("\"Rerun Checks\""))
+  }
+
+  @Test("Approve button reads as an affirmation once the viewer has approved")
+  func approveButtonReadsAsAffirmationOnceViewerHasApproved() throws {
+    let actionBar = try source(
+      "Sources/HarnessMonitorUIPreviewable/Views/Dashboard/DashboardReviewActionBar.swift"
+    )
+
+    #expect(actionBar.contains("\"Approved by you\""))
+    #expect(actionBar.contains("\"checkmark.seal.fill\""))
+    #expect(actionBar.contains("isShowingApprovedAffirmation"))
+    #expect(actionBar.contains("item.reviewStatus == .approved"))
+  }
+
   @Test("Status summary explains policy blocks instead of piling up ambiguous chips")
   func statusSummaryExplainsPolicyBlocks() throws {
     let visuals = try source(
