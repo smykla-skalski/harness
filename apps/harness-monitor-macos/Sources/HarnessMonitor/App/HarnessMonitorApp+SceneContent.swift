@@ -43,11 +43,6 @@ extension HarnessMonitorApp {
         perfScenarioStatus: perfScenarioStatusBinding,
         perfScenarioFailureReason: perfScenarioFailureReasonBinding
       )
-      .modifier(
-        openAnythingHostModifier(
-          windowID: HarnessMonitorWindowID.sessionWindow(tokenValue.sessionID)
-        )
-      )
       .harnessTrackMCPWindow()
       .environment(appStore)
     } else {
@@ -58,7 +53,7 @@ extension HarnessMonitorApp {
   @ViewBuilder var dashboardWindowSceneContent: some View {
     if rendersLiveSceneContent {
       dashboardWindowContent
-        .modifier(openAnythingHostModifier(windowID: HarnessMonitorWindowID.dashboard))
+        .modifier(openAnythingExecutorBinder)
         .background {
           // Dashboard is always present in a live session and outlives every
           // other window, so it is the right place to mount the single-instance
@@ -112,7 +107,6 @@ extension HarnessMonitorApp {
         selectedSection: settingsSelectedSectionBinding,
         navigationRequest: settingsNavigationRequestBinding
       )
-      .modifier(openAnythingHostModifier(windowID: HarnessMonitorWindowID.settings))
       .harnessTrackMCPWindow(tracksElements: false)
       .environment(appStore)
       .environment(\.supervisorAuditTimelineDispatcher, appAuditTimelineDispatcher)
@@ -130,7 +124,6 @@ extension HarnessMonitorApp {
         mcpWindowCommandRegistrar: appMCPWindowCommandRegistrar,
         themeMode: themeModeBinding
       )
-      .modifier(openAnythingHostModifier(windowID: HarnessMonitorWindowID.policyCanvasLab))
       .harnessTrackMCPWindow()
       .environment(appStore)
     } else {
@@ -165,18 +158,17 @@ extension HarnessMonitorApp {
     .attachExternalSessionImporter(store: appStore)
   }
 
-  func openAnythingHostModifier(windowID: String) -> HarnessMonitorOpenAnythingHostModifier {
-    HarnessMonitorOpenAnythingHostModifier(
-      windowID: windowID,
-      model: appOpenAnythingPalette,
+  var openAnythingExecutorBinder: HarnessMonitorOpenAnythingExecutorBinder {
+    HarnessMonitorOpenAnythingExecutorBinder(
+      controller: appOpenAnythingPaletteController,
       reviewRegistry: appOpenAnythingReviews,
       store: appStore,
-      keyWindowObserver: keyWindowObserver,
       windowNavigationHistory: appWindowNavigationHistory,
       showsPolicyCanvasLab: showsPolicyCanvasLab,
       refreshStore: refreshStore,
       settingsSelectedSection: settingsSelectedSectionBinding,
-      settingsNavigationRequest: settingsNavigationRequestBinding
+      settingsNavigationRequest: settingsNavigationRequestBinding,
+      hasBound: hasBoundOpenAnythingExecutorBinding
     )
   }
 

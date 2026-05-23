@@ -5,50 +5,54 @@ import SwiftUI
 public struct OpenAnythingPaletteView: View {
   @Bindable var model: OpenAnythingPaletteModel
   private let execute: (OpenAnythingHit) -> Void
+  private let onDismiss: (() -> Void)?
   @FocusState private var isFieldFocused: Bool
   @Environment(\.accessibilityReduceMotion) var reduceMotion
-  @Environment(\.controlActiveState) private var controlActiveState
   @State private var wheelMonitor: Any?
   @State private var wheelAccumulator: CGFloat = 0
 
   public init(
     model: OpenAnythingPaletteModel,
-    execute: @escaping (OpenAnythingHit) -> Void
+    execute: @escaping (OpenAnythingHit) -> Void,
+    onDismiss: (() -> Void)? = nil
   ) {
     self.model = model
     self.execute = execute
+    self.onDismiss = onDismiss
   }
 
   public var body: some View {
     GeometryReader { proxy in
-      ZStack(alignment: .top) {
-        backdrop
-        layoutContent(width: proxy.size.width)
-          .padding(.top, OpenAnythingPaletteConstants.topInset)
-          .padding(.horizontal, OpenAnythingPaletteConstants.horizontalPadding)
-      }
+      layoutContent(width: proxy.size.width)
     }
     .accessibilityIdentifier(HarnessMonitorAccessibility.openAnythingPalette)
     .accessibilityElement(children: .contain)
     .accessibilityLabel("Open Anything search")
     .accessibilityAction(.escape) {
-      model.dismiss(reason: .userCanceled)
+      requestDismiss(reason: .userCanceled)
     }
     .transition(.opacity.combined(with: .scale(scale: 0.96, anchor: .top)))
     .onAppear {
-      isFieldFocused = true
+      // Defer focus until after the hosting window has finished becoming
+      // key. Without the dispatch hop the @FocusState assignment races
+      // first-responder installation inside NSHostingController and the
+      // TextField never lands as first responder, which is what manifested
+      // as "no keys work in the palette".
+      DispatchQueue.main.async {
+        isFieldFocused = true
+      }
       model.selectFirstHitIfNeeded()
     }
     .task(id: model.query) {
       await runSearch()
     }
-    .onChange(of: controlActiveState) { _, newState in
-      if newState == .inactive {
-        model.dismiss(reason: .windowResignedKey)
+    .onChange(of: model.isPresented) { _, presented in
+      if !presented {
+        onDismiss?()
       }
     }
     .onKeyPress(.escape, phases: .down) { _ in
-      model.dismiss(reason: .userCanceled)
+      requestDismiss(reason: .userCanceled)
       return .handled
     }
     .onKeyPress(.upArrow, phases: [.down, .repeat]) { _ in
@@ -115,21 +119,8 @@ public struct OpenAnythingPaletteView: View {
     }
   }
 
-  private var backdrop: some View {
-    Color.clear
-      .background {
-        Rectangle()
-          .fill(
-            HarnessMonitorTheme.overlayScrim
-              .opacity(OpenAnythingPaletteConstants.scrimOpacity)
-          )
-      }
-      .ignoresSafeArea()
-      .contentShape(Rectangle())
-      .onTapGesture {
-        model.dismiss(reason: .userCanceled)
-      }
-      .accessibilityHidden(true)
+  private func requestDismiss(reason: OpenAnythingPaletteModel.DismissReason) {
+    model.dismiss(reason: reason)
   }
 
   private var palette: some View {
