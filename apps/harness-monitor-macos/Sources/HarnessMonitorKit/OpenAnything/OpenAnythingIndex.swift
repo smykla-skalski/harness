@@ -35,7 +35,8 @@ public actor OpenAnythingIndex {
 
   public func search(
     query: String,
-    limitPerDomain: Int = 6
+    limitPerDomain: Int = 6,
+    unboundedDomains: Set<OpenAnythingDomain> = []
   ) -> OpenAnythingResults {
     let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
     guard !trimmed.isEmpty else {
@@ -43,11 +44,17 @@ public actor OpenAnythingIndex {
     }
     let matches = index.search(trimmed).sorted(by: sortsBefore)
     let grouped = Dictionary(grouping: matches) { $0.item.domain }
+    var totals: [OpenAnythingDomain: Int] = [:]
     let sections = Self.domainOrder.compactMap { domain -> OpenAnythingSection? in
       guard let domainMatches = grouped[domain], !domainMatches.isEmpty else {
         return nil
       }
-      let hits = domainMatches.prefix(max(0, limitPerDomain)).map { match in
+      totals[domain] = domainMatches.count
+      // Audit #25: when the user taps "Show all" on a section, the model
+      // passes the domain through `unboundedDomains` and the index returns
+      // every match for that domain instead of capping at limitPerDomain.
+      let cap = unboundedDomains.contains(domain) ? domainMatches.count : max(0, limitPerDomain)
+      let hits = domainMatches.prefix(cap).map { match in
         OpenAnythingHit(
           record: match.item,
           highlights: match.highlights,
@@ -56,22 +63,28 @@ public actor OpenAnythingIndex {
       }
       return OpenAnythingSection(domain: domain, hits: Array(hits))
     }
-    return OpenAnythingResults(query: trimmed, sections: sections)
+    return OpenAnythingResults(query: trimmed, sections: sections, domainTotals: totals)
   }
 
-  public func suggestedResults(limitPerDomain: Int = 5) -> OpenAnythingResults {
+  public func suggestedResults(
+    limitPerDomain: Int = 5,
+    unboundedDomains: Set<OpenAnythingDomain> = []
+  ) -> OpenAnythingResults {
     let suggested = records.filter(\.isSuggested)
     let grouped = Dictionary(grouping: suggested) { $0.domain }
+    var totals: [OpenAnythingDomain: Int] = [:]
     let sections = Self.domainOrder.compactMap { domain -> OpenAnythingSection? in
       guard let domainRecords = grouped[domain], !domainRecords.isEmpty else {
         return nil
       }
-      let hits = domainRecords.prefix(max(0, limitPerDomain)).map { record in
+      totals[domain] = domainRecords.count
+      let cap = unboundedDomains.contains(domain) ? domainRecords.count : max(0, limitPerDomain)
+      let hits = domainRecords.prefix(cap).map { record in
         OpenAnythingHit(record: record, highlights: .empty, score: 0)
       }
       return OpenAnythingSection(domain: domain, hits: Array(hits))
     }
-    return OpenAnythingResults(query: "", sections: sections)
+    return OpenAnythingResults(query: "", sections: sections, domainTotals: totals)
   }
 
   public func recordCount() -> Int {
