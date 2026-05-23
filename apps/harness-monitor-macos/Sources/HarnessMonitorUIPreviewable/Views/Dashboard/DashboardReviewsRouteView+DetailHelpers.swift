@@ -18,5 +18,11 @@ extension DashboardReviewsRouteView {
       }
     }
     .frame(maxWidth: .infinity, maxHeight: .infinity)
+    .help(
+      """
+      The daemon is Harness Monitor's local sync engine - it talks to GitHub \
+      and serves your reviews. Settings > Diagnostics shows its state.
+      """
+    )
   }
 }

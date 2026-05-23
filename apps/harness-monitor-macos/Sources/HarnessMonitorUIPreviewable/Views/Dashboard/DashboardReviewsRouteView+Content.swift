@@ -98,12 +98,8 @@ extension DashboardReviewsRouteView {
   var reviewsList: some View {
     List(selection: routeSelectedIDsBinding) {
       if filteredItems.isEmpty, !routeIsLoading {
-        ContentUnavailableView {
-          Label("No reviews", systemImage: "shippingbox")
-        } description: {
-          Text("Adjust your filters or configure a broader source scope")
-        }
-        .frame(maxWidth: .infinity, minHeight: 280)
+        emptyStateContent
+          .frame(maxWidth: .infinity, minHeight: 280)
       } else if groupMode == .repository {
         ForEach(groupedItems, id: \.repository) { group in
           Section {
@@ -142,7 +138,7 @@ extension DashboardReviewsRouteView {
           // Soft dim so the spinner reads as the foreground action while the
           // `.disabled` modifier above blocks taps on the underlying list.
           Color.black.opacity(0.18).ignoresSafeArea()
-          ProgressView("Loading reviews…")
+          ProgressView(reviewsLoadingLabel)
             .controlSize(.large)
         }
         .transition(.opacity)
@@ -176,7 +172,7 @@ extension DashboardReviewsRouteView {
           }
         )
       } else if routeIsLoading {
-        ProgressView("Loading reviews…")
+        ProgressView(reviewsLoadingLabel)
           .frame(maxWidth: .infinity, maxHeight: .infinity)
       } else {
         ContentUnavailableView {
@@ -288,6 +284,59 @@ extension DashboardReviewsRouteView {
         }
       }
     )
+  }
+
+  /// True when any reviews filter is currently narrowing the visible items.
+  /// Drives the filter-aware variant of the empty state so we can offer
+  /// "Clear filters" instead of the generic "configure a broader scope" copy.
+  var hasActiveFilters: Bool {
+    needsMeOn || dependenciesOnlyOn || filterModeRaw != DashboardReviewsFilterMode.all.rawValue
+      || !searchText.isEmpty
+  }
+
+  /// Reset every filter back to its default. Used by the empty-state
+  /// "Clear filters" action so a one-click recovery is always available.
+  func clearAllFilters() {
+    filterModeRaw = DashboardReviewsFilterMode.all.rawValue
+    needsMeOn = false
+    dependenciesOnlyOn = false
+    searchText = ""
+  }
+
+  /// Loading copy. When the per-repo scheduler has tracked state we surface
+  /// the synced/total progress so the spinner doesn't read as "nothing is
+  /// happening" on cold launches with many repositories.
+  var reviewsLoadingLabel: String {
+    dashboardReviewsLoadingLabel(
+      totalRepositories: routeScheduler.states.count,
+      syncedRepositories: routeScheduler.states.values.lazy.filter { $0.lastSyncedAt != nil }.count
+    )
+  }
+
+  @ViewBuilder var emptyStateContent: some View {
+    if hasActiveFilters {
+      ContentUnavailableView {
+        Label(
+          "No reviews match your filters",
+          systemImage: "line.3.horizontal.decrease.circle"
+        )
+      } description: {
+        Text("Try widening the criteria.")
+      } actions: {
+        Button("Clear filters") {
+          clearAllFilters()
+        }
+        Button("Configure scope") {
+          openSettingsSection(.repositories)
+        }
+      }
+    } else {
+      ContentUnavailableView {
+        Label("No reviews", systemImage: "shippingbox")
+      } description: {
+        Text("Adjust your filters or configure a broader source scope")
+      }
+    }
   }
 
   var labelSheet: some View {
