@@ -12,9 +12,10 @@ struct DashboardReviewFileDiffPreview: View {
   var repositoryFullName: String?
   let isLoadingFullPatch: Bool
   let fullPatchFailed: Bool
+  var fillsAvailableSpace: Bool = false
 
   var body: some View {
-    VStack(alignment: .leading, spacing: 6) {
+    VStack(alignment: .leading, spacing: 0) {
       if preview.patch.isEmpty {
         Text("No patch preview").font(.caption).foregroundStyle(.secondary)
       } else {
@@ -22,6 +23,11 @@ struct DashboardReviewFileDiffPreview: View {
       }
       footer
     }
+    .frame(
+      maxWidth: .infinity,
+      maxHeight: fillsAvailableSpace ? .infinity : nil,
+      alignment: .topLeading
+    )
     .accessibilityIdentifier("dashboardReviewFileDiffPreview")
   }
 
@@ -32,7 +38,8 @@ struct DashboardReviewFileDiffPreview: View {
         language: language,
         fontScale: fontScale,
         threads: threads,
-        repositoryFullName: repositoryFullName
+        repositoryFullName: repositoryFullName,
+        fillsAvailableSpace: fillsAvailableSpace
       )
     } else {
       DashboardReviewFileDiffUnified(
@@ -40,7 +47,8 @@ struct DashboardReviewFileDiffPreview: View {
         language: language,
         fontScale: fontScale,
         threads: threads,
-        repositoryFullName: repositoryFullName
+        repositoryFullName: repositoryFullName,
+        fillsAvailableSpace: fillsAvailableSpace
       )
     }
   }
@@ -55,6 +63,8 @@ struct DashboardReviewFileDiffPreview: View {
           .font(.caption2)
           .foregroundStyle(fullPatchFailed ? .orange : .secondary)
       }
+      .padding(.horizontal, 12)
+      .padding(.vertical, 6)
     }
   }
 

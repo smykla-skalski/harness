@@ -11,6 +11,7 @@ struct DashboardReviewFileDiffSplit: View {
   var minColumnPoints: CGFloat = 280
   let threads: [DashboardReviewFileThreadAnchor]
   let repositoryFullName: String?
+  let fillsAvailableSpace: Bool
   let document: DashboardReviewFileDiffDocument
   let diffFont: Font
 
@@ -20,7 +21,8 @@ struct DashboardReviewFileDiffSplit: View {
     fontScale: CGFloat,
     minColumnPoints: CGFloat = 280,
     threads: [DashboardReviewFileThreadAnchor] = [],
-    repositoryFullName: String? = nil
+    repositoryFullName: String? = nil,
+    fillsAvailableSpace: Bool = false
   ) {
     self.patch = patch
     self.language = language
@@ -28,18 +30,29 @@ struct DashboardReviewFileDiffSplit: View {
     self.minColumnPoints = minColumnPoints
     self.threads = threads
     self.repositoryFullName = repositoryFullName
+    self.fillsAvailableSpace = fillsAvailableSpace
     document = DashboardReviewFileDiffDocument(patch: patch, language: language)
     diffFont = DashboardReviewDiffTypography.font(for: fontScale)
   }
 
   var body: some View {
+    let height =
+      fillsAvailableSpace
+      ? nil
+      : DashboardReviewFileDiffGrid.viewportHeight(
+        rowCount: document.rows.count,
+        fontScale: fontScale
+      )
     GeometryReader { proxy in
       let width = proxy.size.width
       if width / 2 < minColumnPoints {
         DashboardReviewFileDiffUnified(
           patch: patch,
           language: language,
-          fontScale: fontScale
+          fontScale: fontScale,
+          threads: threads,
+          repositoryFullName: repositoryFullName,
+          fillsAvailableSpace: fillsAvailableSpace
         )
       } else {
         DashboardReviewFileDiffGrid(
@@ -53,10 +66,12 @@ struct DashboardReviewFileDiffSplit: View {
       }
     }
     .frame(
-      height: DashboardReviewFileDiffGrid.viewportHeight(
-        rowCount: document.rows.count,
-        fontScale: fontScale
-      )
+      maxWidth: .infinity,
+      maxHeight: fillsAvailableSpace ? .infinity : nil,
+      alignment: .leading
+    )
+    .frame(
+      height: height
     )
     .accessibilityIdentifier("dashboardReviewFileDiffSplit")
   }

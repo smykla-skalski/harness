@@ -62,15 +62,10 @@ struct DashboardReviewFilesModeDetailPane: View {
     VStack(spacing: 0) {
       header(file: file, threadIndex: threadIndex)
       Divider()
-      ScrollView {
-        VStack(alignment: .leading, spacing: 12) {
-          diffBody(file: file, threads: threadIndex.anchors(forPath: file.path))
-          reviewRail(file: file, threadIndex: threadIndex)
-        }
-        .padding(18)
-        .frame(maxWidth: .infinity, alignment: .leading)
-      }
+      diffBody(file: file, threads: threadIndex.anchors(forPath: file.path))
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     }
+    .frame(maxWidth: .infinity, maxHeight: .infinity)
     .background(Color(nsColor: .windowBackgroundColor))
   }
 
@@ -201,7 +196,8 @@ struct DashboardReviewFilesModeDetailPane: View {
         language: file.languageHint,
         fontScale: fontScale,
         threads: threads,
-        repositoryFullName: viewModel.repositoryFullName
+        repositoryFullName: viewModel.repositoryFullName,
+        fillsAvailableSpace: true
       )
     } else {
       DashboardReviewFileDiffUnified(
@@ -209,7 +205,8 @@ struct DashboardReviewFilesModeDetailPane: View {
         language: file.languageHint,
         fontScale: fontScale,
         threads: threads,
-        repositoryFullName: viewModel.repositoryFullName
+        repositoryFullName: viewModel.repositoryFullName,
+        fillsAvailableSpace: true
       )
     }
   }
@@ -228,29 +225,8 @@ struct DashboardReviewFilesModeDetailPane: View {
       threads: threads,
       repositoryFullName: viewModel.repositoryFullName,
       isLoadingFullPatch: isLoading,
-      fullPatchFailed: (viewModel.patches[file.path] ?? .notLoaded).isFailedForFilesMode
-    )
-  }
-
-  private func reviewRail(
-    file: ReviewFile,
-    threadIndex: DashboardReviewFileThreadIndex
-  ) -> some View {
-    DashboardReviewFileReviewRail(
-      file: file,
-      threads: threadIndex.anchors(forPath: file.path),
-      onResolve: { threadID, resolved in
-        Task {
-          _ = await store.setReviewThreadResolved(
-            threadID: threadID,
-            pullRequestID: item.pullRequestID,
-            desired: resolved
-          )
-        }
-      },
-      onReply: { anchor in
-        commentDraft = DashboardReviewFileCommentDraft.reply(file: file, thread: anchor)
-      }
+      fullPatchFailed: (viewModel.patches[file.path] ?? .notLoaded).isFailedForFilesMode,
+      fillsAvailableSpace: true
     )
   }
 
