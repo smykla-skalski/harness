@@ -74,8 +74,8 @@ struct SettingsOpenAnythingSection: View {
   }
 
   private var perDomainLimitRange: ClosedRange<Int> {
-    OpenAnythingPreferencesDefaults.perDomainLimitMin
-      ... OpenAnythingPreferencesDefaults.perDomainLimitMax
+    OpenAnythingPreferencesDefaults
+      .perDomainLimitMin...OpenAnythingPreferencesDefaults.perDomainLimitMax
   }
 
   @ViewBuilder

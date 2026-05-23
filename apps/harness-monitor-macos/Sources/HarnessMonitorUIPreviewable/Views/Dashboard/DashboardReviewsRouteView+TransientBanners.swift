@@ -24,7 +24,8 @@ extension DashboardReviewsRouteView {
   /// label re-runs `scheduleAffectedRefresh` for the same items; the close
   /// affordance dismisses the banner without retrying.
   func refreshTimeoutBanner(items: [ReviewItem]) -> some View {
-    let label = items.count == 1
+    let label =
+      items.count == 1
       ? "Refresh for 1 pull request timed out."
       : "Refresh for \(items.count) pull requests timed out."
     return HStack(alignment: .center, spacing: HarnessMonitorTheme.spacingSM) {

@@ -131,11 +131,12 @@ private let dashboardReviewActivityAbsoluteFormatter: DateFormatter = {
   return formatter
 }()
 
-nonisolated(unsafe) private let dashboardReviewActivityRelativeFormatter: RelativeDateTimeFormatter = {
-  let formatter = RelativeDateTimeFormatter()
-  formatter.unitsStyle = .short
-  return formatter
-}()
+nonisolated(unsafe) private let dashboardReviewActivityRelativeFormatter:
+  RelativeDateTimeFormatter = {
+    let formatter = RelativeDateTimeFormatter()
+    formatter.unitsStyle = .short
+    return formatter
+  }()
 
 func dashboardReviewActivityAbsoluteLabel(for date: Date) -> String {
   dashboardReviewActivityAbsoluteFormatter.string(from: date)

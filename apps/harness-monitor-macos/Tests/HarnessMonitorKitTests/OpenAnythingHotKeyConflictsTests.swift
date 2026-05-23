@@ -76,7 +76,7 @@ struct OpenAnythingHotKeyConflictsTests {
       (1, "S"),
       (45, "N"),
       (31, "O"),
-      (6, "Z")
+      (6, "Z"),
     ]
     for (keyCode, key) in chords {
       let descriptor = OpenAnythingHotKeyDescriptor(

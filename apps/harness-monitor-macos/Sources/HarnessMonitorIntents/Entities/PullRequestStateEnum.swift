@@ -12,12 +12,12 @@ public enum PullRequestStateEnum: String, AppEnum, Sendable {
     .init(name: "Pull Request State")
   }
 
-  public static var caseDisplayRepresentations: [PullRequestStateEnum: DisplayRepresentation] {
+  public static var caseDisplayRepresentations: [Self: DisplayRepresentation] {
     [
       .open: DisplayRepresentation(title: "Open"),
       .draft: DisplayRepresentation(title: "Draft"),
       .closed: DisplayRepresentation(title: "Closed"),
-      .merged: DisplayRepresentation(title: "Merged")
+      .merged: DisplayRepresentation(title: "Merged"),
     ]
   }
 

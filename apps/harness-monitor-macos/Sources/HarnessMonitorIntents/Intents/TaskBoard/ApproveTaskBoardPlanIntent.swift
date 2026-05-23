@@ -27,7 +27,7 @@ public struct ApproveTaskBoardPlanIntent: AppIntent {
   init(
     item: TaskBoardItemEntity,
     source: TaskBoardItemSource,
-    approver: String = ApproveTaskBoardPlanIntent.intentApproverIdentity
+    approver: String = Self.intentApproverIdentity
   ) {
     self.source = source
     self.approver = approver

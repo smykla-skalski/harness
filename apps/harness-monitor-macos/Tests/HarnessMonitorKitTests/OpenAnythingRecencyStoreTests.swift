@@ -46,7 +46,7 @@ struct OpenAnythingRecencyStoreTests {
     let halfLifeScore = store.score(for: "a", now: now)
 
     #expect(halfLifeScore > 0)
-    #expect(halfLifeScore < 1.0) // useCount 1 * 2^-1 = 0.5
+    #expect(halfLifeScore < 1.0)  // useCount 1 * 2^-1 = 0.5
     #expect(abs(halfLifeScore - 0.5) < 0.0001)
   }
 

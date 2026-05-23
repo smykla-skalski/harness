@@ -11,11 +11,11 @@ public enum MergeMethodEnum: String, AppEnum, Sendable {
     .init(name: "Merge Method")
   }
 
-  public static var caseDisplayRepresentations: [MergeMethodEnum: DisplayRepresentation] {
+  public static var caseDisplayRepresentations: [Self: DisplayRepresentation] {
     [
       .squash: DisplayRepresentation(title: "Squash and merge"),
       .merge: DisplayRepresentation(title: "Create a merge commit"),
-      .rebase: DisplayRepresentation(title: "Rebase and merge")
+      .rebase: DisplayRepresentation(title: "Rebase and merge"),
     ]
   }
 
