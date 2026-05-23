@@ -50,6 +50,7 @@ struct DashboardReviewsPreferences: Codable, Equatable {
   var timelineInitialPageSize: Int = defaultTimelinePageSize
   var timelineLoadOlderBatchSize: Int = defaultTimelinePageSize
   var timelineAutoCollapseHeavyReviewThreads: Bool = true
+  var checksShowPassingByDefault: Bool = false
 
   enum CodingKeys: String, CodingKey {
     case authorsText
@@ -86,6 +87,7 @@ struct DashboardReviewsPreferences: Codable, Equatable {
     case timelineInitialPageSize
     case timelineLoadOlderBatchSize
     case timelineAutoCollapseHeavyReviewThreads
+    case checksShowPassingByDefault
   }
 
   static let defaultGeneratedPatterns: [String] = [
@@ -113,6 +115,7 @@ struct DashboardReviewsPreferences: Codable, Equatable {
     try decodeSourcePreferences(from: container, defaults: defaults)
     try decodeFilesPreferences(from: container, defaults: defaults)
     try decodeTimelinePreferences(from: container, defaults: defaults)
+    try decodeChecksPreferences(from: container, defaults: defaults)
   }
 
   private mutating func decodeSourcePreferences(
@@ -231,6 +234,15 @@ struct DashboardReviewsPreferences: Codable, Equatable {
     timelineAutoCollapseHeavyReviewThreads =
       try container.decodeIfPresent(Bool.self, forKey: .timelineAutoCollapseHeavyReviewThreads)
       ?? defaults.timelineAutoCollapseHeavyReviewThreads
+  }
+
+  private mutating func decodeChecksPreferences(
+    from container: KeyedDecodingContainer<CodingKeys>,
+    defaults: Self
+  ) throws {
+    checksShowPassingByDefault =
+      try container.decodeIfPresent(Bool.self, forKey: .checksShowPassingByDefault)
+      ?? defaults.checksShowPassingByDefault
   }
 
   var filesDefaultViewMode: FilesViewMode {
