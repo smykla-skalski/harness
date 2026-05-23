@@ -157,6 +157,7 @@ extension DashboardReviewsRouteView {
           item: item,
           store: store,
           activity: activitySnapshot(for: item),
+          repositoryLabels: routeResponse.repositoryLabels[item.repository] ?? [],
           showsProblemChecksOnly: routeShowsProblemChecksOnlyBinding,
           onDescriptionCheckboxError: { message in routeErrorMessage = message },
           onDescriptionCheckboxUpdated: {
