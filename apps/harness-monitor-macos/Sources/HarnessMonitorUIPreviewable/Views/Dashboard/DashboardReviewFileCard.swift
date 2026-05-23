@@ -1,9 +1,9 @@
 import HarnessMonitorKit
 import SwiftUI
 
-/// POD wrapper around `DashboardReviewFileCardInternal`. Holds only
-/// plain value types so SwiftUI's diff can `memcmp`-compare across body
-/// invocations.
+/// Value-driven wrapper around `DashboardReviewFileCardInternal`. Keeps
+/// the repeated row's inputs explicit so font-scale changes don't add
+/// another environment dependency to every file card.
 struct DashboardReviewFileCard: View {
   let file: ReviewFile
   let viewedState: ReviewFileViewedState

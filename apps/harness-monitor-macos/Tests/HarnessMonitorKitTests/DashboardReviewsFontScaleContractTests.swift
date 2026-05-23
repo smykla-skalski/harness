@@ -61,6 +61,24 @@ struct DashboardReviewsFontScaleContractTests {
     #expect(!split.contains(".font(.system(size: 12"))
   }
 
+  @Test("Comment composer takes font scale as a plain value")
+  func commentComposerUsesPlainFontScaleInput() throws {
+    let source = try dashboardSource(named: "DashboardReviewCommentComposer.swift")
+
+    #expect(source.contains("let fontScale: CGFloat"))
+    #expect(!source.contains("@Environment(\\.fontScale)"))
+    #expect(source.contains("bodyFont = HarnessMonitorTextSize.scaledFont(.body, by: fontScale)"))
+  }
+
+  @Test("Image preview caches its byte-count formatter")
+  func imagePreviewCachesFormatter() throws {
+    let source = try dashboardSource(named: "DashboardReviewFileImagePreview.swift")
+
+    #expect(source.contains("@MainActor private static let byteCountFormatter"))
+    #expect(source.contains("private static func humanizedBytes"))
+    #expect(!source.contains("private func humanizedBytes"))
+  }
+
   @Test("Conversation chrome equality includes font scale")
   func conversationChromeEqualityIncludesFontScale() throws {
     let source = try dashboardSource(named: "DashboardReviewConversationStatusBar.swift")

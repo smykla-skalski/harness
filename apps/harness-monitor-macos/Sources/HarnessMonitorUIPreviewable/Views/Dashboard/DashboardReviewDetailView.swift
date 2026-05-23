@@ -189,6 +189,7 @@ struct DashboardReviewDetailView<Actions: View>: View {
           pullRequestID: item.pullRequestID,
           initialDraft: store.reviewCommentDraft(for: item.pullRequestID),
           viewerCanComment: viewModel.viewerCanComment,
+          fontScale: fontScale,
           viewerLogin: viewerLogin,
           onDraftChange: { draft in
             store.scheduleReviewDraftWrite(item.pullRequestID, draft: draft)

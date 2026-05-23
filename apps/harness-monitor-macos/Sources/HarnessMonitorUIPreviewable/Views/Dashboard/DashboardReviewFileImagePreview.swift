@@ -13,6 +13,8 @@ struct DashboardReviewFileImagePreview: View {
   let pullRequestID: String
   let repositoryID: String
   let fontScale: CGFloat
+  let captionFont: Font
+  let caption2Font: Font
 
   @Environment(HarnessMonitorStore.self)
   private var store
@@ -28,6 +30,22 @@ struct DashboardReviewFileImagePreview: View {
     formatter.countStyle = .file
     return formatter
   }()
+
+  init(
+    file: ReviewFile,
+    patch: ReviewFilePatch,
+    pullRequestID: String,
+    repositoryID: String,
+    fontScale: CGFloat
+  ) {
+    self.file = file
+    self.patch = patch
+    self.pullRequestID = pullRequestID
+    self.repositoryID = repositoryID
+    self.fontScale = fontScale
+    captionFont = HarnessMonitorTextSize.scaledFont(.caption, by: fontScale)
+    caption2Font = HarnessMonitorTextSize.scaledFont(.caption2, by: fontScale)
+  }
 
   var body: some View {
     Group {
@@ -136,14 +154,6 @@ struct DashboardReviewFileImagePreview: View {
     loading = false
     prepared = result
     failed = result == nil
-  }
-
-  private var captionFont: Font {
-    HarnessMonitorTextSize.scaledFont(.caption, by: fontScale)
-  }
-
-  private var caption2Font: Font {
-    HarnessMonitorTextSize.scaledFont(.caption2, by: fontScale)
   }
 
   @MainActor
