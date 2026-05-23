@@ -8,8 +8,11 @@ struct DashboardReviewCheckList: View {
   @Binding var showsProblemChecksOnly: Bool
   let onRerunCheck: (ReviewCheck) -> Void
 
+  @Environment(\.reviewsPreferences)
+  private var preferences
+
   @State private var expandedPassingGroupIDs = Set<String>()
-  @State private var showsPassingChecks = false
+  @State private var showsPassingChecks: Bool = false
   @State private var visibleNonProblemCheckLimit = Self.checkBatchSize
 
   var body: some View {
@@ -26,6 +29,7 @@ struct DashboardReviewCheckList: View {
           nonProblemChecksDisclosure
         } else {
           nonProblemChecksSummary
+          checkDiagnosticsControls
           if showsPassingChecks {
             checkGroupsView(
               groups: visibleNonProblemCheckGroups,
@@ -35,7 +39,13 @@ struct DashboardReviewCheckList: View {
           }
         }
       }
-      .frame(maxWidth: DashboardReviewsVisualMetrics.checksMaxWidth, alignment: .leading)
+      .frame(maxWidth: DashboardReviewsVisualMetrics.sectionMaxWidth, alignment: .leading)
+      .onAppear {
+        showsPassingChecks = preferences.snapshot.checksShowPassingByDefault
+      }
+      .onChange(of: showsPassingChecks) { _, newValue in
+        preferences.update { $0.checksShowPassingByDefault = newValue }
+      }
       .onChange(of: checks) { _, _ in
         resetCheckExpansion()
       }
@@ -63,20 +73,27 @@ struct DashboardReviewCheckList: View {
       spacing: HarnessMonitorTheme.spacingSM,
       lineSpacing: HarnessMonitorTheme.spacingSM
     ) {
-      Toggle("Failed only", isOn: $showsProblemChecksOnly)
-        .toggleStyle(.button)
-        .controlSize(.small)
-      Button {
-        copyProblemCheckURLs()
-      } label: {
-        Label("Copy failing check URLs", systemImage: "doc.on.doc")
+      if hasProblemChecks {
+        Toggle("Failed only", isOn: $showsProblemChecksOnly)
+          .toggleStyle(.button)
+          .controlSize(.small)
       }
-      .disabled(problemCheckURLs.isEmpty)
+      let onlyFailing = hasProblemChecks
+      let copyURLs = targetCheckURLs(onlyFailing: onlyFailing)
+      Button {
+        copyCheckURLs(onlyFailing: onlyFailing)
+      } label: {
+        Label(
+          onlyFailing ? "Copy failing check URLs" : "Copy check URLs",
+          systemImage: "doc.on.doc"
+        )
+      }
+      .disabled(copyURLs.isEmpty)
       .controlSize(.small)
       .help(
-        problemCheckURLs.isEmpty
-          ? "No failing check URLs are available"
-          : "Copy failing check URLs"
+        copyURLs.isEmpty
+          ? "No check URLs are available"
+          : (onlyFailing ? "Copy failing check URLs" : "Copy URLs for every check")
       )
     }
   }
@@ -111,10 +128,6 @@ struct DashboardReviewCheckList: View {
 
   private var visibleNonProblemCheckGroups: [DashboardReviewCheckGroup] {
     dashboardReviewCheckGroups(for: visibleNonProblemChecks)
-  }
-
-  private var problemCheckURLs: [URL] {
-    problemChecks.compactMap(\.detailsWebURL)
   }
 
   private var hiddenNonProblemCheckCount: Int {
@@ -168,6 +181,7 @@ struct DashboardReviewCheckList: View {
           suppressPassingStatus: suppressPassingStatus,
           showsHeader: groups.count > 1,
           hasProblemChecks: false,
+          hasMultipleGroups: groups.count > 1,
           expandedPassingGroupIDs: $expandedPassingGroupIDs,
           onRerunCheck: onRerunCheck
         )
@@ -175,15 +189,20 @@ struct DashboardReviewCheckList: View {
     }
   }
 
-  private func copyProblemCheckURLs() {
-    let urls = problemCheckURLs.map(\.absoluteString)
+  private func targetCheckURLs(onlyFailing: Bool) -> [URL] {
+    let pool = onlyFailing ? problemChecks : checks
+    return pool.compactMap(\.detailsWebURL)
+  }
+
+  private func copyCheckURLs(onlyFailing: Bool) {
+    let urls = targetCheckURLs(onlyFailing: onlyFailing).map(\.absoluteString)
     guard !urls.isEmpty else { return }
     HarnessMonitorClipboard.copy(urls.joined(separator: "\n"))
   }
 
   private func resetCheckExpansion() {
     visibleNonProblemCheckLimit = Self.checkBatchSize
-    showsPassingChecks = false
+    showsPassingChecks = preferences.snapshot.checksShowPassingByDefault
     expandedPassingGroupIDs.removeAll()
   }
 }
@@ -245,8 +264,11 @@ private struct DashboardReviewCheckGroupView: View {
   let suppressPassingStatus: Bool
   let showsHeader: Bool
   let hasProblemChecks: Bool
+  let hasMultipleGroups: Bool
   @Binding var expandedPassingGroupIDs: Set<String>
   let onRerunCheck: (ReviewCheck) -> Void
+
+  @State private var isHeaderHovered = false
 
   var body: some View {
     VStack(alignment: .leading, spacing: 0) {
@@ -274,10 +296,20 @@ private struct DashboardReviewCheckGroupView: View {
             tint: HarnessMonitorTheme.success,
             isQuiet: true
           )
+          Spacer(minLength: 0)
         }
+        .contentShape(Rectangle())
+        .padding(.horizontal, 4)
+        .padding(.vertical, 2)
+        .background(
+          RoundedRectangle(cornerRadius: 6, style: .continuous)
+            .fill(HarnessMonitorTheme.ink.opacity(isHeaderHovered ? 0.06 : 0))
+        )
       }
       .buttonStyle(.borderless)
       .padding(.bottom, HarnessMonitorTheme.spacingXS)
+      .animation(.easeOut(duration: 0.12), value: isHeaderHovered)
+      .onHover { isHeaderHovered = $0 }
       .accessibilityLabel("\(group.title), \(group.checkCountLabel), passed")
     } else {
       HStack(spacing: HarnessMonitorTheme.spacingSM) {
@@ -314,7 +346,7 @@ private struct DashboardReviewCheckGroupView: View {
   }
 
   private var canCollapse: Bool {
-    hasProblemChecks && group.checks.allSatisfy(\.isPassing)
+    group.checks.allSatisfy(\.isPassing) && hasMultipleGroups
   }
 
   private var isCollapsed: Bool {
