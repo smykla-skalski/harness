@@ -236,7 +236,8 @@ public struct SettingsSupervisorAuditPane: View {
   /// Built-in supervisor rule IDs surfaced as filter options. Sourced from the
   /// shared catalog so adding a rule there flows into the chip without a
   /// settings-pane edit.
-  static let builtInRuleIDs: [String] = HarnessMonitorSupervisorRuleCatalog
+  static let builtInRuleIDs: [String] =
+    HarnessMonitorSupervisorRuleCatalog
     .makeRules()
     .map(\.id)
     .sorted()

@@ -13,8 +13,7 @@ extension HarnessMonitorAPIClient {
     try await post("/v1/reviews/query", body: request)
   }
 
-  public func reviewsCapabilities() async throws -> ReviewsCapabilitiesResponse
-  {
+  public func reviewsCapabilities() async throws -> ReviewsCapabilitiesResponse {
     try await get("/v1/reviews/capabilities")
   }
 

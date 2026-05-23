@@ -119,8 +119,10 @@ public struct AuditTimelineView: View {
     let rules = filters.ruleIDs.sorted().joined(separator: ",")
     let kinds = filters.kinds.map(\.rawValue).sorted().joined(separator: ",")
     let range =
-      filters.dateRange.map { "\($0.lowerBound.timeIntervalSince1970)-\($0.upperBound.timeIntervalSince1970)" }
-        ?? ""
+      filters.dateRange.map {
+        "\($0.lowerBound.timeIntervalSince1970)-\($0.upperBound.timeIntervalSince1970)"
+      }
+      ?? ""
     let decision = filters.decisionID?.uuidString ?? ""
     return [
       "search=\(filters.searchText)",

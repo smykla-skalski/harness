@@ -72,8 +72,7 @@ extension AuditTimelineFilterState {
     let kinds = Set(storage.kinds.compactMap(SupervisorEvent.Kind.init(rawValue:)))
     let severities = Set(storage.severities.compactMap(DecisionSeverity.init(rawValue:)))
     let dateRange: ClosedRange<Date>?
-    if
-      let startRaw = storage.dateRangeStart,
+    if let startRaw = storage.dateRangeStart,
       let endRaw = storage.dateRangeEnd,
       let start = Self.formatter.date(from: startRaw),
       let end = Self.formatter.date(from: endRaw),

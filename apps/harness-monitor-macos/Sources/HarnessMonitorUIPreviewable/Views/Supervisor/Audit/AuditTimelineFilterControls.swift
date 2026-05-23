@@ -28,11 +28,13 @@ public enum AuditTimelineDateRangePreset: String, CaseIterable, Identifiable, Se
       let start = calendar.startOfDay(for: reference)
       return start...endOfDay
     case .last7Days:
-      let start = calendar.date(byAdding: .day, value: -6, to: calendar.startOfDay(for: reference))
+      let start =
+        calendar.date(byAdding: .day, value: -6, to: calendar.startOfDay(for: reference))
         ?? reference
       return start...endOfDay
     case .last30Days:
-      let start = calendar.date(byAdding: .day, value: -29, to: calendar.startOfDay(for: reference))
+      let start =
+        calendar.date(byAdding: .day, value: -29, to: calendar.startOfDay(for: reference))
         ?? reference
       return start...endOfDay
     }

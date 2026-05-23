@@ -127,7 +127,8 @@ public actor SupervisorAuditRepository {
   /// Over-fetch when in-memory filters (severity, rule, decision-id, search) will trim rows after
   /// SwiftData returns. The cap stays in line with the existing 128-default to keep work bounded.
   private static func fetchLimit(for filters: SupervisorAuditFilters, requested: Int) -> Int {
-    let needsInMemory = !filters.severities.isEmpty
+    let needsInMemory =
+      !filters.severities.isEmpty
       || !filters.ruleIDs.isEmpty
       || filters.decisionID != nil
       || !filters.searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
@@ -155,7 +156,8 @@ public actor SupervisorAuditRepository {
         }
       }
       if let decisionIDString,
-        !event.payloadJSON.lowercased().contains(decisionIDString) {
+        !event.payloadJSON.lowercased().contains(decisionIDString)
+      {
         return false
       }
       if !needle.isEmpty {

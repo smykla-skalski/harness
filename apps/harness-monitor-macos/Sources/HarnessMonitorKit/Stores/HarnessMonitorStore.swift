@@ -46,8 +46,8 @@ public final class HarnessMonitorStore {
   @ObservationIgnored var dependencyFilesViewModels: [String: ReviewFilesViewModel] = [:]
   @ObservationIgnored var reviewFilesPendingFetches: Set<ReviewFilesFetchKey> = []
   @ObservationIgnored var dependencyFilesViewedBatchTasks: [String: Task<Void, Never>] = [:]
-  @ObservationIgnored var dependencyFilesViewedPending:
-    [String: [String: ReviewFileViewedState]] = [:]
+  @ObservationIgnored var dependencyFilesViewedPending: [String: [String: ReviewFileViewedState]] =
+    [:]
   @ObservationIgnored var cloneProgressStreams = ReviewCloneProgressStreams()
 
   public var openFolderRequest = 0
