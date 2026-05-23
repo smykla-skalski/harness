@@ -35,7 +35,8 @@ extension DashboardReviewsRouteView {
       filterModeRaw: $filterModeRaw,
       sortModeRaw: $sortModeRaw,
       groupModeRaw: $groupModeRaw,
-      categoryModeRaw: $categoryModeRaw,
+      needsMeOn: routeNeedsMeOnBinding,
+      dependenciesOnlyOn: routeDependenciesOnlyOnBinding,
       needsMeCount: routeResponse.items.lazy.filter(\.requiresAttention).count,
       syncHealth: routeSyncHealth,
       onRetryFailedRepositories: {
