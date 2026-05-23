@@ -17,9 +17,12 @@ extension HarnessMonitorApp {
   }
 
   func presentOpenAnythingPaletteScoped(to scope: OpenAnythingDomain?) {
-    keyWindowObserver.refresh()
+    // Resolve the active window ID once - the previous implementation called
+    // `openAnythingTargetWindowID()` three times per keystroke, each one
+    // walking NSApp.windows. That overhead added up on the hot path.
+    let activeWindowID = openAnythingTargetWindowID()
     applyOpenAnythingPreferences()
-    let resolvedScope = scope ?? scopeDerivedFromWindowID(openAnythingTargetWindowID())
+    let resolvedScope = scope ?? scopeDerivedFromWindowID(activeWindowID)
     let restore = UserDefaults.standard.bool(
       forKey: OpenAnythingPreferencesDefaults.restoreLastQueryKey
     )
@@ -27,7 +30,7 @@ extension HarnessMonitorApp {
     // panel has something to anchor above. The panel itself does not require
     // a host window, but the user expects Cmd+K (or the global hot key) to
     // bring the app forward as well.
-    if openAnythingTargetWindowID() == nil {
+    if activeWindowID == nil {
       openWindow.openHarnessDashboardWindow()
       focusDashboardWindowIfPossible()
     }

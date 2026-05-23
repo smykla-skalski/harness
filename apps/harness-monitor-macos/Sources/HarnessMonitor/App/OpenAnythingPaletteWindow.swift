@@ -55,8 +55,25 @@ final class OpenAnythingPaletteWindowController: NSObject {
     if let panel {
       panel.contentView = makeHostingView()
     } else {
-      panel = buildPanel()
+      let built = buildPanel()
+      panel = built
+      prewarm(built)
     }
+  }
+
+  /// Briefly orders the panel onscreen far offscreen so macOS finishes the
+  /// CALayer + NSHostingView first-render work before the user presses
+  /// Cmd+K. Without this the first invocation pays for the lazy layout
+  /// inline with the keystroke and reads as a perceptible delay.
+  private func prewarm(_ panel: OpenAnythingFloatingPanel) {
+    let size = panel.frame.size
+    panel.setFrame(
+      NSRect(x: -20_000, y: -20_000, width: size.width, height: size.height),
+      display: false
+    )
+    panel.orderFront(nil)
+    panel.displayIfNeeded()
+    panel.orderOut(nil)
   }
 
   func toggle(scope: OpenAnythingDomain?, restoreLastQuery: Bool) {

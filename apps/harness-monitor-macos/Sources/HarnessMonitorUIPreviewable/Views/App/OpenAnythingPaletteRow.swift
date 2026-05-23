@@ -38,9 +38,7 @@ struct OpenAnythingPaletteRow: View {
     .background(rowBackground)
     .foregroundStyle(.primary)
     .onHover { hovering in
-      withAnimation(OpenAnythingMotionPolicy.hoverAnimation(reduceMotion: reduceMotion)) {
-        isHovered = hovering
-      }
+      isHovered = hovering
       if hovering {
         onHover()
       }
