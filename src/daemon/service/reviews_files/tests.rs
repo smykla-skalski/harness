@@ -236,8 +236,8 @@ fn make_registry_entry(
     gc_registry_entry(repo_full_name, bare_path.to_path_buf(), size_bytes)
 }
 
-#[tokio::test]
-async fn gc_drops_stale_entries_and_removes_bare_dirs() {
+#[test]
+fn gc_drops_stale_entries_and_removes_bare_dirs() {
     use crate::reviews::files::local_clone::RepoKey;
 
     let tempdir = tempfile::tempdir().expect("tempdir");
@@ -273,7 +273,6 @@ async fn gc_drops_stale_entries_and_removes_bare_dirs() {
         chrono::Duration::days(30),
         10 * 1024 * 1024 * 1024, // 10 GB - well above the 300 bytes we wrote
     )
-    .await
     .expect("gc");
     assert_eq!(report.targets, 1, "exactly the old entry flagged");
     assert_eq!(report.removed, 1, "old bare dir removed");
@@ -288,8 +287,8 @@ async fn gc_drops_stale_entries_and_removes_bare_dirs() {
     assert!(!reloaded.entries.contains_key(&old_key));
 }
 
-#[tokio::test]
-async fn gc_evicts_lru_until_under_disk_budget() {
+#[test]
+fn gc_evicts_lru_until_under_disk_budget() {
     use crate::reviews::files::local_clone::RepoKey;
 
     let tempdir = tempfile::tempdir().expect("tempdir");
@@ -315,7 +314,6 @@ async fn gc_evicts_lru_until_under_disk_budget() {
     // Budget = 1500 bytes, but we have 3 × 1000 = 3000.
     // Two oldest must be evicted.
     let report = run_local_clone_gc_with(&root, now, chrono::Duration::days(30), 1_500)
-        .await
         .expect("gc");
     assert_eq!(report.targets, 2, "two LRU evictions");
     assert_eq!(report.removed, 2, "two bare dirs removed");
@@ -326,8 +324,8 @@ async fn gc_evicts_lru_until_under_disk_budget() {
     assert!(reloaded.entries.contains_key(&keys[2]));
 }
 
-#[tokio::test]
-async fn gc_returns_empty_report_when_under_thresholds() {
+#[test]
+fn gc_returns_empty_report_when_under_thresholds() {
     let tempdir = tempfile::tempdir().expect("tempdir");
     let root = LocalCloneRoot::new(tempdir.path().to_path_buf());
     std::fs::create_dir_all(&root.path).expect("mkdir root");
@@ -335,13 +333,12 @@ async fn gc_returns_empty_report_when_under_thresholds() {
     save_registry(&root, &registry).expect("save");
     let now = chrono::Utc::now();
     let report = run_local_clone_gc_with(&root, now, chrono::Duration::days(30), u64::MAX)
-        .await
         .expect("gc");
     assert_eq!(report, GcReport::default());
 }
 
-#[tokio::test]
-async fn gc_tolerates_missing_bare_dir() {
+#[test]
+fn gc_tolerates_missing_bare_dir() {
     use crate::reviews::files::local_clone::RepoKey;
 
     let tempdir = tempfile::tempdir().expect("tempdir");
@@ -358,7 +355,6 @@ async fn gc_tolerates_missing_bare_dir() {
     save_registry(&root, &registry).expect("save");
 
     let report = run_local_clone_gc_with(&root, now, chrono::Duration::days(30), u64::MAX)
-        .await
         .expect("gc");
     assert_eq!(report.targets, 1);
     assert_eq!(report.removed, 1);
