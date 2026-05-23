@@ -5,14 +5,29 @@ import SwiftUI
 
 extension HarnessMonitorApp {
   func presentOpenAnythingPalette() {
+    presentOpenAnythingPaletteScoped(to: nil)
+  }
+
+  /// Audit #78: Cmd+Shift+K opens the palette with only one domain visible so
+  /// the session-only quick switcher never collides with action / settings
+  /// results. Plumbing the scope through `present(targetWindowID:scope:)` lets
+  /// the model carry the constraint until the next dismiss.
+  func presentOpenAnythingPaletteSessions() {
+    presentOpenAnythingPaletteScoped(to: .sessions)
+  }
+
+  func presentOpenAnythingPaletteScoped(to scope: OpenAnythingDomain?) {
     keyWindowObserver.refresh()
     if let windowID = openAnythingTargetWindowID() {
-      appOpenAnythingPalette.present(targetWindowID: windowID)
+      appOpenAnythingPalette.present(targetWindowID: windowID, scope: scope)
       return
     }
     openWindow.openHarnessDashboardWindow()
     focusDashboardWindowIfPossible()
-    appOpenAnythingPalette.present(targetWindowID: HarnessMonitorWindowID.dashboard)
+    appOpenAnythingPalette.present(
+      targetWindowID: HarnessMonitorWindowID.dashboard,
+      scope: scope
+    )
   }
 
   // Use `KeyWindowObserver.isKey(windowID:)` for every candidate so the

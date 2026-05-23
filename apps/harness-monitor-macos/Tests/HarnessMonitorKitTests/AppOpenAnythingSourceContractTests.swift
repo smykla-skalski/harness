@@ -7,8 +7,24 @@ struct AppOpenAnythingSourceContractTests {
   func commandKExistsWithoutReplacingCommandF() throws {
     let commandsSource = try harnessSourceFile(named: "App/HarnessMonitorAppCommands.swift")
 
-    #expect(commandsSource.contains("Button(\"Open Anything\", action: presentOpenAnything)"))
+    #expect(commandsSource.contains("Button(openAnythingMenuTitle, action: presentOpenAnything)"))
     #expect(commandsSource.contains(".keyboardShortcut(\"k\", modifiers: .command)"))
+    #expect(
+      commandsSource.contains(
+        "Button(\"Open Anything (Sessions)\", action: presentOpenAnythingSessions)"
+      )
+    )
+    #expect(commandsSource.contains(".keyboardShortcut(\"k\", modifiers: [.command, .shift])"))
+    // Audit #11: Open Anything anchors to the File menu (after `.newItem`),
+    // not the Edit menu's pasteboard cluster.
+    #expect(
+      commandsSource.contains(
+        """
+          @CommandsBuilder private var openAnythingCommands: some Commands {
+            CommandGroup(after: .newItem) {
+        """
+      )
+    )
     #expect(commandsSource.contains("Button(searchCommandTitle)"))
     #expect(commandsSource.contains(".keyboardShortcut(\"f\", modifiers: .command)"))
   }
@@ -65,7 +81,13 @@ struct AppOpenAnythingSourceContractTests {
     )
 
     #expect(modelSource.contains("public private(set) var suggestedResults"))
-    #expect(modelSource.contains("suggestedResults = await index.suggestedResults()"))
+    // Audit #78: assignment now passes through the model-side scope filter,
+    // so the contract only requires the actor call to live inside that line.
+    #expect(
+      modelSource.contains(
+        "suggestedResults = Self.filtered(await index.suggestedResults(), by: scope)"
+      )
+    )
     #expect(modelSource.contains("? suggestedResults"))
     #expect(paletteSource.contains("model.suggestedResults"))
     #expect(corpusSource.contains("isSuggested: suggestedActions.contains(action)"))
