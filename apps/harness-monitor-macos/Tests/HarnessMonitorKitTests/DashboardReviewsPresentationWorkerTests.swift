@@ -5,14 +5,15 @@ import Testing
 
 @Suite("Dashboard reviews presentation worker")
 struct DashboardReviewsPresentationWorkerTests {
-  @Test("category=dependencies narrows results to dependency PR bots")
-  func categoryFilterKeepsOnlyDependencyBots() async {
+  @Test("category=dependencies narrows results to dependency reviews")
+  func categoryFilterKeepsOnlyDependencyReviews() async {
     let humanPR = reviewItem(
       id: "pr-human",
       repository: "kong/a",
       number: 1,
       title: "feat: add X",
-      authorLogin: "octo-user"
+      authorLogin: "octo-user",
+      labels: []
     )
     let renovatePR = reviewItem(
       id: "pr-renovate",
@@ -35,10 +36,33 @@ struct DashboardReviewsPresentationWorkerTests {
       title: "chore(deps): bump baz",
       authorLogin: "renovate-bot"
     )
+    let bareRenovatePR = reviewItem(
+      id: "pr-renovate-bare",
+      repository: "kong/d",
+      number: 5,
+      title: "chore(deps): bump qux",
+      authorLogin: "renovate",
+      labels: []
+    )
+    let labeledDependencyPR = reviewItem(
+      id: "pr-labeled-dependency",
+      repository: "kong/e",
+      number: 6,
+      title: "chore: update runtime pin",
+      authorLogin: "octo-user",
+      labels: ["dependencies"]
+    )
 
     let output = await DashboardReviewsPresentationWorker().compute(
       input: DashboardReviewsPresentationInput(
-        items: [humanPR, renovatePR, dependabotPR, legacyRenovatePR],
+        items: [
+          humanPR,
+          renovatePR,
+          dependabotPR,
+          legacyRenovatePR,
+          bareRenovatePR,
+          labeledDependencyPR,
+        ],
         filterModeRaw: DashboardReviewsFilterMode.all.rawValue,
         sortModeRaw: DashboardReviewsSortMode.repository.rawValue,
         groupModeRaw: DashboardReviewsGroupMode.repository.rawValue,
@@ -54,7 +78,13 @@ struct DashboardReviewsPresentationWorkerTests {
 
     #expect(
       Set(output.filteredItems.map(\.pullRequestID))
-        == Set(["pr-renovate", "pr-dependabot", "pr-renovate-legacy"])
+        == Set([
+          "pr-renovate",
+          "pr-dependabot",
+          "pr-renovate-legacy",
+          "pr-renovate-bare",
+          "pr-labeled-dependency",
+        ])
     )
   }
 
@@ -252,6 +282,7 @@ struct DashboardReviewsPresentationWorkerTests {
     number: UInt64,
     title: String = "Review",
     authorLogin: String = "renovate[bot]",
+    labels: [String] = ["dependencies"],
     reviewStatus: ReviewReviewStatus = .none,
     checkStatus: ReviewCheckStatus = .success,
     createdAt: String = "2026-05-01T10:00:00Z",
@@ -272,7 +303,7 @@ struct DashboardReviewsPresentationWorkerTests {
       policyBlocked: false,
       isDraft: false,
       headSha: "sha-\(id)",
-      labels: ["dependencies"],
+      labels: labels,
       additions: 1,
       deletions: 1,
       createdAt: createdAt,

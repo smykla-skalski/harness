@@ -55,8 +55,8 @@ struct DashboardReviewsFilterPredicateTests {
     #expect(Set(allAndNeedsMe.filteredItems.map(\.pullRequestID)) == Set(attentionOnly))
   }
 
-  @Test("Dependencies-only narrows results to dependency bots")
-  func dependenciesOnlyNarrowsToDependencyBots() async {
+  @Test("Dependencies-only narrows results to dependency reviews")
+  func dependenciesOnlyNarrowsToDependencyReviews() async {
     let fixture = makeFixture()
     let worker = DashboardReviewsPresentationWorker()
 
@@ -65,7 +65,7 @@ struct DashboardReviewsFilterPredicateTests {
     )
     let expected =
       fixture
-      .filter { ReviewBot.detect(authorLogin: $0.authorLogin) != nil }
+      .filter(isDependencyReview)
       .map(\.pullRequestID)
     #expect(Set(output.filteredItems.map(\.pullRequestID)) == Set(expected))
     #expect(!output.filteredItems.isEmpty)
@@ -82,7 +82,7 @@ struct DashboardReviewsFilterPredicateTests {
     let expected =
       fixture
       .filter {
-        $0.requiresAttention && ReviewBot.detect(authorLogin: $0.authorLogin) != nil
+        $0.requiresAttention && isDependencyReview($0)
       }
       .map(\.pullRequestID)
     #expect(Set(output.filteredItems.map(\.pullRequestID)) == Set(expected))
@@ -160,6 +160,13 @@ struct DashboardReviewsFilterPredicateTests {
         reviewStatus: .reviewRequired,
         checkStatus: .success
       ),
+      // dependency bot using the bare Renovate login variant.
+      reviewItem(
+        id: "pr-dep-bare-renovate",
+        authorLogin: "renovate",
+        reviewStatus: .approved,
+        checkStatus: .success
+      ),
       // dependency bot using the legacy Renovate login variant.
       reviewItem(
         id: "pr-dep-legacy-attention",
@@ -167,14 +174,30 @@ struct DashboardReviewsFilterPredicateTests {
         reviewStatus: .changesRequested,
         checkStatus: .success
       ),
+      // dependency review identified by label even with a human author.
+      reviewItem(
+        id: "pr-dep-labeled-human",
+        authorLogin: "octo-user",
+        reviewStatus: .approved,
+        checkStatus: .success,
+        labels: ["dependencies"]
+      ),
     ]
+  }
+
+  private func isDependencyReview(_ item: ReviewItem) -> Bool {
+    ReviewBot.detect(authorLogin: item.authorLogin) != nil
+      || item.labels.contains {
+        $0.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() == "dependencies"
+      }
   }
 
   private func reviewItem(
     id: String,
     authorLogin: String,
     reviewStatus: ReviewReviewStatus,
-    checkStatus: ReviewCheckStatus
+    checkStatus: ReviewCheckStatus,
+    labels: [String] = []
   ) -> ReviewItem {
     ReviewItem(
       pullRequestID: id,
@@ -191,7 +214,7 @@ struct DashboardReviewsFilterPredicateTests {
       policyBlocked: false,
       isDraft: false,
       headSha: "sha-\(id)",
-      labels: [],
+      labels: labels,
       additions: 1,
       deletions: 1,
       createdAt: "2026-05-01T10:00:00Z",

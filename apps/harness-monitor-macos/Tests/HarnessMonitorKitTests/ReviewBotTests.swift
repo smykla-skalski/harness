@@ -9,12 +9,14 @@ struct ReviewBotTests {
     #expect(ReviewBot.detect(authorLogin: "renovate[bot]") == .renovate)
     #expect(ReviewBot.detect(authorLogin: "Renovate[bot]") == .renovate)
     #expect(ReviewBot.detect(authorLogin: "renovate-bot") == .renovate)
+    #expect(ReviewBot.detect(authorLogin: "renovate") == .renovate)
   }
 
   @Test("Dependabot resolves to .dependabot")
   func dependabotResolvesToDependabot() {
     #expect(ReviewBot.detect(authorLogin: "dependabot[bot]") == .dependabot)
     #expect(ReviewBot.detect(authorLogin: "DEPENDABOT[bot]") == .dependabot)
+    #expect(ReviewBot.detect(authorLogin: "dependabot") == .dependabot)
   }
 
   @Test("Unknown authors do not resolve to a bot")
