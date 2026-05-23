@@ -357,6 +357,29 @@ private let kitTestsTarget: Target = .target(
     metadata: .metadata(tags: ["tag:feature:monitor", "tag:layer:test"])
 )
 
+private let intentsTestsSources: SourceFilesList = SourceFilesList(globs: [
+    .glob("Tests/HarnessMonitorIntentsTests/**/*.swift")
+])
+
+private let intentsTestsTarget: Target = .target(
+    name: "HarnessMonitorIntentsTests",
+    destinations: macOSDestinations,
+    product: .unitTests,
+    bundleId: "io.harnessmonitor.intents-tests",
+    deploymentTargets: macOSDeploymentTargets,
+    sources: intentsTestsSources,
+    dependencies: [
+        .target(name: "HarnessMonitorIntents"),
+        .target(name: "HarnessMonitorKit")
+    ],
+    settings: .settings(base: [
+        "CODE_SIGN_STYLE": "Automatic",
+        "PRODUCT_BUNDLE_IDENTIFIER": "io.harnessmonitor.intents-tests",
+        "SWIFT_ACTIVE_COMPILATION_CONDITIONS": FeatureFlags.compilationConditionSetting()
+    ]),
+    metadata: .metadata(tags: ["tag:feature:intents", "tag:layer:test"])
+)
+
 private let uiTestsTarget: Target = .target(
     name: "HarnessMonitorUITests",
     destinations: macOSDestinations,
@@ -443,6 +466,7 @@ private let monitorScheme: Scheme = .scheme(
     testAction: .targets(
         [
             .testableTarget(target: .target("HarnessMonitorKitTests")),
+            .testableTarget(target: .target("HarnessMonitorIntentsTests")),
             .testableTarget(target: .target("HarnessMonitorAppTests")),
             .testableTarget(target: .target("HarnessMonitorUITests"))
         ],
@@ -463,6 +487,18 @@ private let kitTestsScheme: Scheme = .scheme(
     buildAction: .buildAction(targets: [.target("HarnessMonitorKitTests")]),
     testAction: .targets(
         [.testableTarget(target: .target("HarnessMonitorKitTests"))],
+        arguments: Arguments.arguments(environmentVariables: monitorTestEnv),
+        configuration: "Debug",
+        options: .options(coverage: true)
+    )
+)
+
+private let intentsTestsScheme: Scheme = .scheme(
+    name: "HarnessMonitorIntentsTests",
+    shared: true,
+    buildAction: .buildAction(targets: [.target("HarnessMonitorIntentsTests")]),
+    testAction: .targets(
+        [.testableTarget(target: .target("HarnessMonitorIntentsTests"))],
         arguments: Arguments.arguments(environmentVariables: monitorTestEnv),
         configuration: "Debug",
         options: .options(coverage: true)
@@ -569,12 +605,14 @@ let project = Project(
         uiTestHostTarget,
         appTestsTarget,
         kitTestsTarget,
+        intentsTestsTarget,
         uiTestsTarget,
         agentsE2ETarget
     ],
     schemes: [
         monitorScheme,
         kitTestsScheme,
+        intentsTestsScheme,
         appTestsScheme,
         externalDaemonScheme,
         uiTestHostScheme,
