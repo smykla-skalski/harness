@@ -104,6 +104,9 @@ struct DashboardReviewsDetailUXContractTests {
     #expect(visuals.contains("Files: \\(additions)"))
     #expect(visuals.contains("Image(systemName: \"arrow.up\")"))
     #expect(visuals.contains("Image(systemName: \"arrow.down\")"))
+    #expect(visuals.contains("style == .compact ? \"+\\(additions)\" : \"\\(additions)\""))
+    #expect(visuals.contains("style == .compact ? \"-\\(deletions)\" : \"\\(deletions)\""))
+    #expect(visuals.contains(".fixedSize(horizontal: true, vertical: false)"))
   }
 
   @Test("Status pill drops icon when attention summary owns it")
