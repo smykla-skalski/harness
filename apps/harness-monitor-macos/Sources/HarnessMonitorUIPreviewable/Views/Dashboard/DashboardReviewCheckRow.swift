@@ -6,11 +6,16 @@ struct DashboardReviewCheckRow: View {
   private var openURL
 
   let check: ReviewCheck
-  let suppressPassingStatus: Bool
+  // Kept for source-compat with CheckList; passing pill always renders now.
+  var suppressPassingStatus: Bool = false
   let onRerunCheck: (ReviewCheck) -> Void
+
+  @State private var isHovered = false
 
   var body: some View {
     content
+      .harnessReviewRowHoverTint(isHovered: isHovered)
+      .onHover { isHovered = $0 }
       .contextMenu { contextMenu }
       .help(rowHelp)
       .accessibilityElement(children: .combine)
@@ -45,6 +50,14 @@ struct DashboardReviewCheckRow: View {
           dimensions[VerticalAlignment.center]
         }
         .layoutPriority(1)
+
+      Spacer(minLength: HarnessMonitorTheme.spacingSM)
+
+      if isHovered {
+        inlineActions
+          .transition(.opacity)
+      }
+
       if check.detailsWebURL != nil {
         Label("Open", systemImage: "arrow.up.forward.square")
           .labelStyle(.iconOnly)
@@ -52,17 +65,48 @@ struct DashboardReviewCheckRow: View {
           .foregroundStyle(HarnessMonitorTheme.accent)
           .accessibilityHidden(true)
       }
-      if !suppressPassingStatus {
-        DashboardReviewStatusPill(
-          label: check.statusLabel,
-          tint: check.tint,
-          isQuiet: check.isNeutralStatus
-        )
-      }
-      Spacer(minLength: 0)
+
+      DashboardReviewStatusPill(
+        label: check.statusLabel,
+        tint: check.tint,
+        isQuiet: check.isNeutralStatus
+      )
     }
     .padding(.vertical, 8)
+    .padding(.horizontal, HarnessMonitorTheme.spacingSM)
     .frame(minHeight: 34)
+    .animation(.easeOut(duration: 0.12), value: isHovered)
+  }
+
+  @ViewBuilder private var inlineActions: some View {
+    HStack(spacing: HarnessMonitorTheme.spacingXS) {
+      Button {
+        onRerunCheck(check)
+      } label: {
+        Image(systemName: "arrow.clockwise")
+          .imageScale(.medium)
+          .frame(width: 22, height: 22)
+          .contentShape(.rect)
+      }
+      .harnessPlainButtonStyle()
+      .disabled(!check.isRerunnable)
+      .help(check.isRerunnable ? "Rerun check" : (check.rerunUnavailableReason ?? "Rerun is not available"))
+      .accessibilityLabel("Rerun check \(check.name)")
+
+      if let detailsURL = check.detailsWebURL {
+        Button {
+          HarnessMonitorClipboard.copy(detailsURL.absoluteString)
+        } label: {
+          Image(systemName: "doc.on.doc")
+            .imageScale(.medium)
+            .frame(width: 22, height: 22)
+            .contentShape(.rect)
+        }
+        .harnessPlainButtonStyle()
+        .help("Copy check URL")
+        .accessibilityLabel("Copy URL for \(check.name)")
+      }
+    }
   }
 
   @ViewBuilder private var contextMenu: some View {
