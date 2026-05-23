@@ -15,14 +15,24 @@ extension HarnessMonitorApp {
     appOpenAnythingPalette.present(targetWindowID: HarnessMonitorWindowID.dashboard)
   }
 
+  // Use `KeyWindowObserver.isKey(windowID:)` for every candidate so the
+  // matcher stays consistent with the same observer used to gate the overlay
+  // visibility in the host modifier. The old exact-equality fallback drifted
+  // from `isKey`'s tokenised matcher and could fail silently when AppKit
+  // decorated the key window's identifier.
   private func openAnythingTargetWindowID() -> String? {
-    guard let identifier = keyWindowObserver.snapshot.keyWindowIdentifier else {
-      return nil
+    let observer = keyWindowObserver
+    if observer.isKey(windowID: HarnessMonitorWindowID.dashboard) {
+      return HarnessMonitorWindowID.dashboard
     }
-    if identifier == HarnessMonitorWindowID.dashboard
-      || identifier == HarnessMonitorWindowID.settings
-      || identifier == HarnessMonitorWindowID.policyCanvasLab
-      || identifier.hasPrefix("session-")
+    if observer.isKey(windowID: HarnessMonitorWindowID.settings) {
+      return HarnessMonitorWindowID.settings
+    }
+    if observer.isKey(windowID: HarnessMonitorWindowID.policyCanvasLab) {
+      return HarnessMonitorWindowID.policyCanvasLab
+    }
+    if let identifier = observer.snapshot.keyWindowIdentifier,
+      identifier.hasPrefix("session-")
     {
       return identifier
     }
@@ -39,64 +49,44 @@ extension HarnessMonitorApp {
   }
 }
 
-struct HarnessMonitorOpenAnythingHostModifier: ViewModifier {
-  let windowID: String
-  let model: OpenAnythingPaletteModel
-  let reviewRegistry: OpenAnythingDashboardReviewRegistry
+/// Single-mount engine driver for the Open Anything palette.
+///
+/// Previously, every window's host modifier carried its own corpus-rebuild
+/// task plus its own Carbon hot-key registration call. With N session windows
+/// open, every store change triggered N redundant hashes (200-entry timeline
+/// included) and N redundant `RegisterEventHotKey` cycles. Mounting this
+/// driver exactly once in the dashboard scene centralises both responsibilities
+/// behind a deterministic content signature.
+struct OpenAnythingEngineHost: View {
+  let coordinator: OpenAnythingCorpusCoordinator
   let store: HarnessMonitorStore
-  let keyWindowObserver: KeyWindowObserver
-  let windowNavigationHistory: GlobalWindowNavigationHistory
+  let reviewRegistry: OpenAnythingDashboardReviewRegistry
   let showsPolicyCanvasLab: Bool
   let globalHotKeyController: GlobalHotKeyController
   let globalHotKeyEnabled: Bool
   let globalHotKeyDescriptorStorage: String
   let presentPalette: @MainActor @Sendable () -> Void
-  let refreshStore: () -> Void
-  @Binding var settingsSelectedSection: SettingsSection
-  @Binding var settingsNavigationRequest: SettingsNavigationRequest?
-  @Environment(\.openWindow)
-  private var openWindow
 
-  func body(content: Content) -> some View {
-    content
-      .overlay {
-        if model.isPresented(in: windowID, isKeyWindow: keyWindowObserver.isKey(windowID: windowID))
-        {
-          OpenAnythingPaletteView(model: model, execute: execute)
-            .zIndex(1_000)
-        }
+  var body: some View {
+    let records = makeRecords()
+    let signature = OpenAnythingCorpusSignature.compute(records)
+    return Color.clear
+      .frame(width: 0, height: 0)
+      .accessibilityHidden(true)
+      .task(id: signature) {
+        await coordinator.acceptCorpus(records, signature: signature)
       }
-      .background {
-        Color.clear
-          .frame(width: 0, height: 0)
-          .accessibilityHidden(true)
-          .task(id: corpusSignature) {
-            await model.replaceCorpus(makeRecords())
-          }
-          .task(id: hotKeySignature) {
-            globalHotKeyController.configure(
-              enabled: globalHotKeyEnabled,
-              descriptor: OpenAnythingHotKeyDescriptor.decode(globalHotKeyDescriptorStorage),
-              onInvoke: presentPalette
-            )
-          }
+      .task(id: hotKeySignature) {
+        globalHotKeyController.configure(
+          enabled: globalHotKeyEnabled,
+          descriptor: OpenAnythingHotKeyDescriptor.decode(globalHotKeyDescriptorStorage),
+          onInvoke: presentPalette
+        )
       }
   }
 
   private var hotKeySignature: String {
     "\(globalHotKeyEnabled)-\(globalHotKeyDescriptorStorage)"
-  }
-
-  private var corpusSignature: Int {
-    var hasher = Hasher()
-    hasher.combine(showsPolicyCanvasLab)
-    hashSettings(into: &hasher)
-    hashSessions(into: &hasher)
-    hashTaskBoard(into: &hasher)
-    hashDecisions(into: &hasher)
-    hashReviews(into: &hasher)
-    hashLoadedSession(into: &hasher)
-    return hasher.finalize()
   }
 
   private func makeRecords() -> [OpenAnythingRecord] {
@@ -127,6 +117,32 @@ struct HarnessMonitorOpenAnythingHostModifier: ViewModifier {
       tasks: store.selectedSessionTasks,
       timeline: store.timeline
     )
+  }
+}
+
+struct HarnessMonitorOpenAnythingHostModifier: ViewModifier {
+  let windowID: String
+  let model: OpenAnythingPaletteModel
+  let reviewRegistry: OpenAnythingDashboardReviewRegistry
+  let store: HarnessMonitorStore
+  let keyWindowObserver: KeyWindowObserver
+  let windowNavigationHistory: GlobalWindowNavigationHistory
+  let showsPolicyCanvasLab: Bool
+  let refreshStore: () -> Void
+  @Binding var settingsSelectedSection: SettingsSection
+  @Binding var settingsNavigationRequest: SettingsNavigationRequest?
+  @Environment(\.openWindow)
+  private var openWindow
+
+  func body(content: Content) -> some View {
+    content
+      .overlay {
+        if model.isPresented(in: windowID, isKeyWindow: keyWindowObserver.isKey(windowID: windowID))
+        {
+          OpenAnythingPaletteView(model: model, execute: execute)
+            .zIndex(1_000)
+        }
+      }
   }
 
   private func execute(_ hit: OpenAnythingHit) {
@@ -283,69 +299,6 @@ struct HarnessMonitorOpenAnythingHostModifier: ViewModifier {
         .decision(sessionID: sessionID, decisionID: decisionID),
         resetDecisionFilters: resetDecisionFilters
       )
-    }
-  }
-
-  private func hashSettings(into hasher: inout Hasher) {
-    for section in SettingsSection.allCases {
-      hasher.combine(section.rawValue)
-      hasher.combine(section.title)
-    }
-  }
-
-  private func hashSessions(into hasher: inout Hasher) {
-    for session in store.sessions {
-      hasher.combine(session.sessionId)
-      hasher.combine(session.title)
-      hasher.combine(session.updatedAt)
-      hasher.combine(session.status.rawValue)
-    }
-  }
-
-  private func hashTaskBoard(into hasher: inout Hasher) {
-    for item in store.globalTaskBoardItems {
-      hasher.combine(item.id)
-      hasher.combine(item.title)
-      hasher.combine(item.updatedAt)
-      hasher.combine(item.sessionId)
-      hasher.combine(item.workItemId)
-    }
-  }
-
-  private func hashDecisions(into hasher: inout Hasher) {
-    for decision in store.supervisorOpenDecisionPresentationItems {
-      hasher.combine(decision.id)
-      hasher.combine(decision.summary)
-      hasher.combine(decision.sessionID)
-      hasher.combine(decision.statusRaw)
-    }
-  }
-
-  private func hashReviews(into hasher: inout Hasher) {
-    for item in reviewRegistry.loadedItems {
-      hasher.combine(item.pullRequestID)
-      hasher.combine(item.title)
-      hasher.combine(item.updatedAt)
-      hasher.combine(item.checkStatus.rawValue)
-    }
-  }
-
-  private func hashLoadedSession(into hasher: inout Hasher) {
-    hasher.combine(store.selectedSessionID)
-    for agent in store.selectedSessionAgents {
-      hasher.combine(agent.agentId)
-      hasher.combine(agent.name)
-      hasher.combine(agent.runtime)
-    }
-    for task in store.selectedSessionTasks {
-      hasher.combine(task.taskId)
-      hasher.combine(task.title)
-      hasher.combine(task.status.rawValue)
-    }
-    for entry in store.timeline.prefix(200) {
-      hasher.combine(entry.entryId)
-      hasher.combine(entry.summary)
-      hasher.combine(entry.kind)
     }
   }
 }

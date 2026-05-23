@@ -31,7 +31,7 @@ struct HarnessMonitorApp: App {
   @State private var windowCommandRouting: WindowCommandRoutingState
   @State private var windowNavigationHistory: GlobalWindowNavigationHistory
   @State private var mcpWindowCommandRegistrar: HarnessMonitorMCPWindowCommandRegistrar
-  @State private var openAnythingPalette: OpenAnythingPaletteModel
+  @State private var openAnythingCoordinator: OpenAnythingCorpusCoordinator
   @State private var openAnythingReviews: OpenAnythingDashboardReviewRegistry
   @State private var globalHotKeyController: GlobalHotKeyController
   @State private var settingsSelectedSection: SettingsSection
@@ -150,7 +150,7 @@ struct HarnessMonitorApp: App {
         descriptors: HarnessMonitorMCPWindowCommandDescriptors.all
       )
     )
-    _openAnythingPalette = State(initialValue: OpenAnythingPaletteModel())
+    _openAnythingCoordinator = State(initialValue: OpenAnythingCorpusCoordinator())
     _openAnythingReviews = State(
       initialValue: OpenAnythingDashboardReviewRegistry.shared
     )
@@ -222,7 +222,11 @@ struct HarnessMonitorApp: App {
   }
 
   var appOpenAnythingPalette: OpenAnythingPaletteModel {
-    openAnythingPalette
+    openAnythingCoordinator.palette
+  }
+
+  var appOpenAnythingCoordinator: OpenAnythingCorpusCoordinator {
+    openAnythingCoordinator
   }
 
   var appOpenAnythingReviews: OpenAnythingDashboardReviewRegistry {

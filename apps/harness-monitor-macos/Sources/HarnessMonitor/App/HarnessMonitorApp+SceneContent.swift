@@ -59,6 +59,14 @@ extension HarnessMonitorApp {
     if rendersLiveSceneContent {
       dashboardWindowContent
         .modifier(openAnythingHostModifier(windowID: HarnessMonitorWindowID.dashboard))
+        .background {
+          // Dashboard is always present in a live session and outlives every
+          // other window, so it is the right place to mount the single-instance
+          // engine driver that owns corpus rebuilds and Carbon hot-key
+          // registration. Mounting on per-window host modifiers caused N-way
+          // duplication.
+          openAnythingEngineHost
+        }
         .modifier(DashboardWindowAppKitBinding())
         .modifier(SessionWindowTabbing(role: .dashboard))
         .modifier(DashboardWindowLifecycleModifier())
@@ -143,13 +151,22 @@ extension HarnessMonitorApp {
       keyWindowObserver: keyWindowObserver,
       windowNavigationHistory: appWindowNavigationHistory,
       showsPolicyCanvasLab: showsPolicyCanvasLab,
-      globalHotKeyController: appGlobalHotKeyController,
-      globalHotKeyEnabled: globalOpenAnythingHotKeyEnabled,
-      globalHotKeyDescriptorStorage: globalOpenAnythingHotKeyDescriptor,
-      presentPalette: { presentOpenAnythingPalette() },
       refreshStore: refreshStore,
       settingsSelectedSection: settingsSelectedSectionBinding,
       settingsNavigationRequest: settingsNavigationRequestBinding
+    )
+  }
+
+  private var openAnythingEngineHost: some View {
+    OpenAnythingEngineHost(
+      coordinator: appOpenAnythingCoordinator,
+      store: appStore,
+      reviewRegistry: appOpenAnythingReviews,
+      showsPolicyCanvasLab: showsPolicyCanvasLab,
+      globalHotKeyController: appGlobalHotKeyController,
+      globalHotKeyEnabled: globalOpenAnythingHotKeyEnabled,
+      globalHotKeyDescriptorStorage: globalOpenAnythingHotKeyDescriptor,
+      presentPalette: { presentOpenAnythingPalette() }
     )
   }
 }
