@@ -15,7 +15,12 @@ public enum HarnessMonitorModelContainer {
       attributes: nil
     )
     let url = HarnessMonitorPaths.cacheStoreURL(using: environment)
-    let config = ModelConfiguration("HarnessMonitorStore", schema: schema, url: url)
+    let config = ModelConfiguration(
+      "HarnessMonitorStore",
+      schema: schema,
+      url: url,
+      cloudKitDatabase: .none
+    )
 
     #if HARNESS_FEATURE_OTEL
       return try HarnessMonitorTelemetry.shared.withSQLiteOperation(
@@ -34,7 +39,11 @@ public enum HarnessMonitorModelContainer {
   public static func preview() throws -> ModelContainer {
     let schema = Schema(versionedSchema: HarnessMonitorCurrentSchema.self)
     let config = ModelConfiguration(
-      "HarnessMonitorPreview", schema: schema, isStoredInMemoryOnly: true)
+      "HarnessMonitorPreview",
+      schema: schema,
+      isStoredInMemoryOnly: true,
+      cloudKitDatabase: .none
+    )
     return try ModelContainer(for: schema, configurations: [config])
   }
 
