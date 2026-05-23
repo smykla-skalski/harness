@@ -35,6 +35,7 @@ extension DashboardReviewsRouteView {
       filterModeRaw: $filterModeRaw,
       sortModeRaw: $sortModeRaw,
       groupModeRaw: $groupModeRaw,
+      categoryModeRaw: $categoryModeRaw,
       needsMeCount: routeResponse.items.lazy.filter(\.requiresAttention).count,
       syncHealth: routeSyncHealth,
       onRefresh: {

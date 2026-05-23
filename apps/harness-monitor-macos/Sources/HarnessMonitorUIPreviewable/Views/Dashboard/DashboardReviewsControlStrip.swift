@@ -5,6 +5,7 @@ struct DashboardReviewsControlStrip: View {
   @Binding var filterModeRaw: String
   @Binding var sortModeRaw: String
   @Binding var groupModeRaw: String
+  @Binding var categoryModeRaw: String
   let needsMeCount: Int
   let syncHealth: DashboardReviewsSyncHealth
   let onRefresh: () -> Void
@@ -22,6 +23,7 @@ struct DashboardReviewsControlStrip: View {
           needsMeChip
           syncHealthChip
           filterPicker
+          categoryPicker
           sortPicker
           groupPicker
         }
@@ -106,6 +108,15 @@ struct DashboardReviewsControlStrip: View {
   private var groupPicker: some View {
     Picker("Group", selection: $groupModeRaw) {
       ForEach(DashboardReviewsGroupMode.pickerCases) { mode in
+        Text(mode.title).tag(mode.rawValue)
+      }
+    }
+    .pickerStyle(.menu)
+  }
+
+  private var categoryPicker: some View {
+    Picker("Category", selection: $categoryModeRaw) {
+      ForEach(DashboardReviewsCategoryMode.pickerCases) { mode in
         Text(mode.title).tag(mode.rawValue)
       }
     }

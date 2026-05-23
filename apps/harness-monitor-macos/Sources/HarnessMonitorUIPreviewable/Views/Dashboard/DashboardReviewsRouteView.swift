@@ -23,6 +23,8 @@ struct DashboardReviewsRouteView: View {
   var sortModeRaw = DashboardReviewsSortMode.status.rawValue
   @SceneStorage("dashboard.reviews.group")
   var groupModeRaw = DashboardReviewsGroupMode.repository.rawValue
+  @SceneStorage("dashboard.reviews.category")
+  var categoryModeRaw = DashboardReviewsCategoryMode.all.rawValue
   @SceneStorage("dashboard.reviews.search")
   var searchText = ""
   @SceneStorage("dashboard.reviews.primary-selection")
@@ -237,6 +239,7 @@ struct DashboardReviewsRouteView: View {
       items: response.items,
       filterModeRaw: filterModeRaw,
       sortModeRaw: sortModeRaw,
+      categoryModeRaw: categoryModeRaw,
       searchText: searchText,
       configuredRepositories: preferences.repositories,
       configuredOrganizations: preferences.organizations,

@@ -13,6 +13,7 @@ struct DashboardReviewsPresentationInput: Equatable, Sendable {
   let items: [ReviewItem]
   let filterModeRaw: String
   let sortModeRaw: String
+  let categoryModeRaw: String
   let searchText: String
   let configuredRepositories: [String]
   let configuredOrganizations: [String]
@@ -24,6 +25,7 @@ private struct DashboardReviewsListPresentationInput: Equatable, Sendable {
   let items: [ReviewItem]
   let filterModeRaw: String
   let sortModeRaw: String
+  let categoryModeRaw: String
   let searchText: String
   let configuredRepositories: [String]
   let configuredOrganizations: [String]
@@ -32,6 +34,7 @@ private struct DashboardReviewsListPresentationInput: Equatable, Sendable {
     items = input.items
     filterModeRaw = input.filterModeRaw
     sortModeRaw = input.sortModeRaw
+    categoryModeRaw = input.categoryModeRaw
     searchText = input.searchText
     configuredRepositories = input.configuredRepositories
     configuredOrganizations = input.configuredOrganizations
@@ -135,10 +138,12 @@ actor DashboardReviewsPresentationWorker {
   ) -> DashboardReviewsListPresentation {
     let filterMode = DashboardReviewsFilterMode(rawValue: input.filterModeRaw) ?? .all
     let sortMode = DashboardReviewsSortMode(rawValue: input.sortModeRaw) ?? .status
+    let categoryMode = DashboardReviewsCategoryMode(rawValue: input.categoryModeRaw) ?? .all
     let comparator = sortMode.comparator
     let query = input.searchText.trimmingCharacters(in: .whitespacesAndNewlines)
 
     let filteredItems = input.items
+      .filter { categoryMode.matches($0) }
       .filter { filterMode.matches($0) }
       .filter { item in
         guard !query.isEmpty else { return true }

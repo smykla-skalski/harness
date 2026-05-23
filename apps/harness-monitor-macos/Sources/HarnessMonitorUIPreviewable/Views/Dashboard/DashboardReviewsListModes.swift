@@ -170,3 +170,27 @@ enum DashboardReviewsGroupMode: String, CaseIterable, Identifiable {
     }
   }
 }
+
+enum DashboardReviewsCategoryMode: String, CaseIterable, Identifiable {
+  case all
+  case dependencies
+
+  static let pickerCases: [Self] = [.all, .dependencies]
+  static let dependencyBotLogins: Set<String> = ["renovate[bot]", "dependabot[bot]"]
+
+  var id: String { rawValue }
+
+  var title: String {
+    switch self {
+    case .all: "All"
+    case .dependencies: "Dependencies"
+    }
+  }
+
+  func matches(_ item: ReviewItem) -> Bool {
+    switch self {
+    case .all: true
+    case .dependencies: Self.dependencyBotLogins.contains(item.authorLogin)
+    }
+  }
+}
