@@ -44,34 +44,54 @@ extension ReviewItem {
 
   var statusLabel: String {
     switch true {
+    case isDraft: "Draft"
     case isAutoMergeable: "Ready to merge"
-    case isAutoApprovable: "Ready for approval"
-    case checkStatus == .pending: "Checks running"
+    case isViewerActionable: "Ready for your approval"
     case requiresAttention: "Needs attention"
+    case checkStatus == .pending: "Checks running"
+    case reviewStatus == .approved: "Approved"
     default: "Open"
     }
   }
 
   var statusTint: Color {
     switch true {
+    case isDraft: HarnessMonitorTheme.secondaryInk
     case isAutoMergeable: HarnessMonitorTheme.success
-    case isAutoApprovable: HarnessMonitorTheme.accent
-    case checkStatus == .pending: HarnessMonitorTheme.caution
+    case isViewerActionable: HarnessMonitorTheme.accent
     case requiresAttention: HarnessMonitorTheme.danger
+    case checkStatus == .pending: HarnessMonitorTheme.caution
+    case reviewStatus == .approved: HarnessMonitorTheme.success
     default: HarnessMonitorTheme.secondaryInk
     }
   }
 
   var statusSystemImage: String {
     switch true {
+    case isDraft: "pencil.tip.crop.circle"
     case isAutoMergeable: "checkmark.circle.fill"
-    case isAutoApprovable: "checkmark.seal.fill"
-    case checkStatus == .pending: "clock.arrow.circlepath"
+    case isViewerActionable: "checkmark.seal.fill"
     case requiresAttention: "exclamationmark.triangle.fill"
+    case checkStatus == .pending: "clock.arrow.circlepath"
+    case reviewStatus == .approved: "checkmark.circle.fill"
     default: "circle"
     }
   }
 
+  /// Voice-over friendly description matching the visible status icon and tint.
+  /// Used by the row's status indicator so the visual signal has a screen-reader
+  /// counterpart instead of being `accessibilityHidden(true)`.
+  var statusAccessibilityLabel: String {
+    statusLabel
+  }
+
+  /// True when the viewer can approve next - i.e. the blue `.accent`
+  /// `checkmark.seal.fill` should appear instead of the green merge state.
+  /// Ties the icon's accent role to actual viewer permission, not just the
+  /// PR-side eligibility check.
+  fileprivate var isViewerActionable: Bool {
+    viewerCanUpdate && isAutoApprovable && !isDraft
+  }
 }
 
 extension ReviewReviewStatus {
