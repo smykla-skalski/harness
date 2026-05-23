@@ -224,7 +224,7 @@ struct DashboardReviewChangePill: View {
         Text("Files")
           .foregroundStyle(HarnessMonitorTheme.secondaryInk)
       }
-      HStack(spacing: HarnessMonitorTheme.spacingXS) {
+      HStack(spacing: style == .compact ? HarnessMonitorTheme.spacingXS : 0) {
         if style == .verbose {
           Image(systemName: "arrow.up")
             .imageScale(.small)
@@ -235,7 +235,7 @@ struct DashboardReviewChangePill: View {
           .foregroundStyle(HarnessMonitorTheme.success)
           .fixedSize(horizontal: true, vertical: false)
       }
-      HStack(spacing: HarnessMonitorTheme.spacingXS) {
+      HStack(spacing: style == .compact ? HarnessMonitorTheme.spacingXS : 0) {
         if style == .verbose {
           Image(systemName: "arrow.down")
             .imageScale(.small)
