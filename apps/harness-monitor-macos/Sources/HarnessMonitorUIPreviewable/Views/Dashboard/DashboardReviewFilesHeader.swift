@@ -22,14 +22,9 @@ struct DashboardReviewFilesHeader: View {
         label: "\(viewModel.filteredFiles.count) visible of \(viewModel.files.count) files"
       )
       countChip(
-        systemImage: "plus.circle.fill",
-        label: "+\(totalAdditions)",
-        tint: HarnessMonitorTheme.success
-      )
-      countChip(
-        systemImage: "minus.circle.fill",
-        label: "-\(totalDeletions)",
-        tint: HarnessMonitorTheme.danger
+        systemImage: "checkmark.circle",
+        label: "\(viewedCount) viewed",
+        tint: HarnessMonitorTheme.secondaryInk
       )
       Spacer(minLength: 0)
     }
@@ -57,16 +52,20 @@ struct DashboardReviewFilesHeader: View {
 
   private var sortMenu: some View {
     Menu {
-      ForEach(ReviewFilesSortMode.allCases, id: \.self) { mode in
-        Button(
-          action: { viewModel.applySort(mode) },
-          label: {
-            Label(label(for: mode), systemImage: viewModel.sortMode == mode ? "checkmark" : "")
-          }
+      Picker(
+        "Sort",
+        selection: Binding(
+          get: { viewModel.sortMode },
+          set: { viewModel.applySort($0) }
         )
+      ) {
+        ForEach(ReviewFilesSortMode.allCases, id: \.self) { mode in
+          Text(label(for: mode)).tag(mode)
+        }
       }
+      .pickerStyle(.inline)
     } label: {
-      Label("Sort", systemImage: "arrow.up.arrow.down")
+      Label("Sort: \(label(for: viewModel.sortMode))", systemImage: "arrow.up.arrow.down")
     }
     .controlSize(.small)
     .accessibilityIdentifier(HarnessMonitorAccessibility.dashboardReviewFilesSortMenu)
@@ -91,25 +90,39 @@ struct DashboardReviewFilesHeader: View {
     }
     .padding(8)
     .background(
-      HarnessMonitorTheme.ink.opacity(0.06),
+      HarnessMonitorTheme.ink.opacity(0.10),
       in: RoundedRectangle(cornerRadius: 6)
     )
+    .overlay {
+      RoundedRectangle(cornerRadius: 6)
+        .strokeBorder(HarnessMonitorTheme.controlBorder, lineWidth: 1)
+    }
   }
 
   private var filterToggles: some View {
     HStack(spacing: 10) {
-      Toggle("Hide generated files", isOn: $filter.hideGenerated)
-        .toggleStyle(.switch)
-        .controlSize(.small)
-        .help(filter.hideGenerated ? "Generated files are hidden" : "Generated files are shown")
-      Toggle("Hide whitespace-only", isOn: $filter.hideWhitespaceOnly)
-        .toggleStyle(.switch)
-        .controlSize(.small)
-        .help(
-          filter.hideWhitespaceOnly
-            ? "Whitespace-only file changes are hidden"
-            : "Whitespace-only file changes are shown"
-        )
+      Toggle(isOn: $filter.hideGenerated) {
+        Text("Hide generated files")
+          .allowsTightening(true)
+          .minimumScaleFactor(0.9)
+          .lineLimit(1)
+      }
+      .toggleStyle(.switch)
+      .controlSize(.small)
+      .help(
+        "Hide files matching the generated-files patterns "
+          + "(e.g. package-lock.json, yarn.lock, vendor/, dist/). "
+          + "Configure patterns in Settings > Reviews > Files."
+      )
+      Toggle(isOn: $filter.hideWhitespaceOnly) {
+        Text("Hide whitespace-only")
+          .allowsTightening(true)
+          .minimumScaleFactor(0.9)
+          .lineLimit(1)
+      }
+      .toggleStyle(.switch)
+      .controlSize(.small)
+      .help("Hide files whose only differences are whitespace or trailing-newline changes.")
     }
   }
 
@@ -123,12 +136,11 @@ struct DashboardReviewFilesHeader: View {
       .foregroundStyle(tint)
   }
 
-  private var totalAdditions: UInt32 {
-    viewModel.files.reduce(into: 0) { $0 += $1.additions }
-  }
-
-  private var totalDeletions: UInt32 {
-    viewModel.files.reduce(into: 0) { $0 += $1.deletions }
+  private var viewedCount: Int {
+    viewModel.files.reduce(into: 0) { count, file in
+      let state = viewModel.viewedByPath[file.path] ?? file.viewerViewedState
+      if state == .viewed { count += 1 }
+    }
   }
 
   private func label(for mode: ReviewFilesSortMode) -> String {
