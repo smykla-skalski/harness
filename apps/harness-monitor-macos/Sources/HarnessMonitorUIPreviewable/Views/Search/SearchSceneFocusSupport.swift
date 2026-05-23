@@ -65,7 +65,7 @@ extension FocusedValues {
 }
 
 extension View {
-  func harnessFocusedSceneValue<Value: Equatable>(
+  public func harnessFocusedSceneValue<Value: Equatable>(
     _ keyPath: WritableKeyPath<FocusedValues, Value?>,
     _ value: Value?
   ) -> some View {
