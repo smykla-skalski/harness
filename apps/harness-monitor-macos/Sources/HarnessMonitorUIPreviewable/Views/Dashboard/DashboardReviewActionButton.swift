@@ -31,7 +31,7 @@ enum DashboardReviewActionProminence {
     case .secondary:
       nil
     case .utility:
-      .secondary
+      nil
     }
   }
 }
