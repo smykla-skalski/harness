@@ -23,7 +23,14 @@ struct HarnessMonitorMainCommandSet: Commands {
       increaseTextSize: increaseTextSize,
       decreaseTextSize: decreaseTextSize,
       resetTextSize: resetTextSize,
-      refreshStore: refreshStore,
+      refreshStore: refreshStore
+    )
+    // Lifted out of `HarnessMonitorAppCommands.fileAndEditCommands` because a
+    // single Commands struct cannot reliably contribute multiple
+    // `CommandGroup(after: .newItem)` blocks - macOS only renders one and
+    // silently drops the rest. As a sibling here it composes with the other
+    // file-menu contributors and the Cmd+K chord actually reaches the menu.
+    OpenAnythingMenuCommands(
       presentOpenAnything: presentOpenAnything,
       presentOpenAnythingSessions: presentOpenAnythingSessions,
       openAnythingCorpusSize: openAnythingCorpusSize
