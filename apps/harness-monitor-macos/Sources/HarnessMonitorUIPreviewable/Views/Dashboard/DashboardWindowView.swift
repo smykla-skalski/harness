@@ -149,7 +149,7 @@ public struct DashboardWindowView: View {
           )
         }
         .navigationTitle("Dashboard")
-        .navigationSubtitle(route.title)
+        .navigationSubtitle(route == .reviews ? "" : route.title)
       }
       .harnessFocusedSceneValue(\.windowNavigation, windowNavigationState)
       .accessibilityElement(children: .contain)

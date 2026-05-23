@@ -5,18 +5,26 @@ extension DashboardReviewsRouteView {
   var contentPane: some View {
     VStack(alignment: .leading, spacing: 14) {
       filterBar
-      DashboardReviewsProvenanceBar(
-        snapshot: routeProvenanceSnapshot,
-        onRefresh: {
-          Task { await reload(forceRefresh: true) }
-        }
-      )
       transientBannerZone
       inContentSearchField
       contentListPane
     }
     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     .padding(20)
+    .toolbar {
+      ToolbarItem(placement: .principal) {
+        DashboardReviewsToolbarCenterpiece(snapshot: routeProvenanceSnapshot)
+      }
+      ToolbarItem(placement: .primaryAction) {
+        DashboardReviewsRefreshToolbarButton(onRefresh: {
+          Task { await reload(forceRefresh: true) }
+        })
+      }
+      ToolbarSpacer(.fixed, placement: .primaryAction)
+      ToolbarItem(placement: .primaryAction) {
+        DashboardReviewsInfoToolbarButton(snapshot: routeProvenanceSnapshot)
+      }
+    }
   }
 
   /// In-content search field. The toolbar `.searchable` field remains for

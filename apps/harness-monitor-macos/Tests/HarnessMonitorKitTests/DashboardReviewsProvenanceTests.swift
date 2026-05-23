@@ -108,21 +108,25 @@ struct DashboardReviewsProvenanceTests {
     #expect(pastCeiling.warnings == ["Fetched snapshot older than 50m (per-repo sync interval)"])
   }
 
-  @Test("Route wires provenance into list and detail surfaces")
-  func routeWiresProvenanceIntoListAndDetailSurfaces() throws {
+  @Test("Route wires provenance into toolbar centerpiece and detail surfaces")
+  func routeWiresProvenanceIntoToolbarCenterpieceAndDetailSurfaces() throws {
     let routeSource = try dashboardSource(named: "DashboardReviewsRouteView.swift")
     let contentSource = try dashboardSource(named: "DashboardReviewsRouteView+Content.swift")
     let detailSource = try dashboardSource(named: "DashboardReviewDetailView.swift")
     let provenanceSource = try dashboardSource(named: "DashboardReviewsProvenance.swift")
+    let toolbarItemsSource = try dashboardSource(named: "DashboardReviewsToolbarItems.swift")
 
     #expect(routeSource.contains("var normalizedPreferences: DashboardReviewsPreferences"))
-    #expect(contentSource.contains("DashboardReviewsProvenanceBar("))
-    #expect(contentSource.contains("snapshot: routeProvenanceSnapshot"))
+    #expect(contentSource.contains("ToolbarItem(placement: .principal)"))
+    #expect(contentSource.contains("DashboardReviewsToolbarCenterpiece(snapshot: routeProvenanceSnapshot)"))
+    #expect(contentSource.contains("DashboardReviewsRefreshToolbarButton(onRefresh:"))
+    #expect(contentSource.contains("DashboardReviewsInfoToolbarButton(snapshot: routeProvenanceSnapshot)"))
+    #expect(!contentSource.contains("DashboardReviewsProvenanceBar("))
     #expect(!detailSource.contains("DashboardReviewProvenanceMiniBar"))
     #expect(provenanceSource.contains("var routeProvenanceSnapshot"))
     #expect(
-      provenanceSource.contains(
-        "HarnessMonitorAccessibility.dashboardReviewsProvenance"
+      toolbarItemsSource.contains(
+        "HarnessMonitorAccessibility.dashboardReviewsToolbarProvenance"
       )
     )
   }
