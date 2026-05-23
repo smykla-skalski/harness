@@ -46,7 +46,7 @@ extension HarnessMonitorMCPAccessibilityService {
   }
 
   func pingSocket(at path: String) async -> PingResult? {
-    try? await socketClient.ping(at: path)
+    try? await socketClient.withAuthToken(registryAuthToken).ping(at: path)
   }
 
   func attachToRemoteHost(at socket: URL) async {
@@ -84,7 +84,10 @@ extension HarnessMonitorMCPAccessibilityService {
     )
 
     do {
-      let ack = try await socketClient.sendReplacementNotice(notice, toSocketAt: socket.path)
+      let ack = try await socketClient.withAuthToken(registryAuthToken).sendReplacementNotice(
+        notice,
+        toSocketAt: socket.path
+      )
       if ack.applied == false {
         return .denied(
           ack.message ?? "existing registry host rejected coordinated replacement"

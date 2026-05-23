@@ -3,9 +3,15 @@ import Foundation
 
 public struct RegistrySocketClient: Sendable {
   public let timeout: TimeInterval
+  private let authToken: String?
 
-  public init(timeout: TimeInterval = 1) {
+  public init(timeout: TimeInterval = 1, authToken: String? = nil) {
     self.timeout = timeout
+    self.authToken = authToken
+  }
+
+  public func withAuthToken(_ authToken: String?) -> RegistrySocketClient {
+    RegistrySocketClient(timeout: timeout, authToken: authToken)
   }
 
   public func ping(at socketPath: String) async throws -> PingResult {
@@ -138,9 +144,12 @@ public struct RegistrySocketClient: Sendable {
       socklen_t(MemoryLayout<timeval>.size)
     )
 
+    var authenticatedRequest = request
+    authenticatedRequest.token = authToken
+
     let encoder = JSONEncoder()
     encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
-    var payload = try encoder.encode(request)
+    var payload = try encoder.encode(authenticatedRequest)
     payload.append(0x0A)
     try sendAll(payload, on: fd)
     let responseData = try receiveResponseLine(from: fd)

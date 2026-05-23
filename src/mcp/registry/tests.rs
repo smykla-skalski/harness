@@ -10,7 +10,10 @@ use tokio::sync::oneshot;
 use tokio::time::sleep;
 
 use super::client::{RegistryClient, RegistryError};
-use super::path::{DEFAULT_APP_GROUP, SOCKET_FILENAME, SOCKET_OVERRIDE_ENV, default_socket_path};
+use super::path::{
+    DEFAULT_APP_GROUP, SOCKET_FILENAME, SOCKET_OVERRIDE_ENV, TOKEN_FILE_OVERRIDE_ENV,
+    TOKEN_FILENAME, TOKEN_OVERRIDE_ENV, default_socket_path, default_token_path,
+};
 use super::types::{ListWindowsResult, RegistryRequest, RegistrySemanticAction};
 use crate::workspace::socket_paths::session_socket;
 
@@ -270,6 +273,84 @@ async fn perform_action_sends_semantic_action_request() {
     assert!(line.contains("\"action\":\"press\""));
 }
 
+#[tokio::test]
+async fn request_includes_registry_auth_token_when_configured() {
+    let dir = TempDir::new().unwrap();
+    let path = socket_path(&dir);
+    let received = spawn_fake_server(path.clone(), |line| {
+        let parsed: Value = serde_json::from_str(line).unwrap();
+        let id = parsed.get("id").and_then(Value::as_u64).unwrap();
+        json!({
+            "id": id,
+            "ok": true,
+            "result": {"windows": []},
+        })
+        .to_string()
+    });
+
+    temp_env::async_with_vars(
+        [(TOKEN_OVERRIDE_ENV, Some("test-capability-token"))],
+        async move {
+            let client = RegistryClient::with_socket_path(path);
+            let id = client.next_request_id();
+            let result: ListWindowsResult = client
+                .request(&RegistryRequest::ListWindows { id })
+                .await
+                .expect("ok result");
+            assert!(result.windows.is_empty());
+        },
+    )
+    .await;
+
+    let line = received.await.unwrap();
+    let parsed: Value = serde_json::from_str(line.trim()).unwrap();
+    assert_eq!(
+        parsed.get("token").and_then(Value::as_str),
+        Some("test-capability-token")
+    );
+}
+
+#[tokio::test]
+async fn request_reads_registry_auth_token_next_to_custom_socket() {
+    let dir = TempDir::new().unwrap();
+    let path = socket_path(&dir);
+    fs::write(path.with_file_name(TOKEN_FILENAME), "custom-socket-token\n").unwrap();
+    let received = spawn_fake_server(path.clone(), |line| {
+        let parsed: Value = serde_json::from_str(line).unwrap();
+        let id = parsed.get("id").and_then(Value::as_u64).unwrap();
+        json!({
+            "id": id,
+            "ok": true,
+            "result": {"windows": []},
+        })
+        .to_string()
+    });
+
+    temp_env::async_with_vars(
+        [
+            (TOKEN_OVERRIDE_ENV, None::<&str>),
+            (TOKEN_FILE_OVERRIDE_ENV, None::<&str>),
+        ],
+        async move {
+            let client = RegistryClient::with_socket_path(path);
+            let id = client.next_request_id();
+            let result: ListWindowsResult = client
+                .request(&RegistryRequest::ListWindows { id })
+                .await
+                .expect("ok result");
+            assert!(result.windows.is_empty());
+        },
+    )
+    .await;
+
+    let line = received.await.unwrap();
+    let parsed: Value = serde_json::from_str(line.trim()).unwrap();
+    assert_eq!(
+        parsed.get("token").and_then(Value::as_str),
+        Some("custom-socket-token")
+    );
+}
+
 #[test]
 fn default_socket_path_respects_override_env() {
     temp_env::with_var(SOCKET_OVERRIDE_ENV, Some("/tmp/custom.sock"), || {
@@ -297,7 +378,11 @@ fn default_socket_path_falls_back_to_group_container() {
 fn default_socket_path_uses_short_filename_for_realistic_group_container_paths() {
     let home = "/Users/bart.smykla@konghq.com";
     temp_env::with_vars(
-        [(SOCKET_OVERRIDE_ENV, None::<&str>), ("HOME", Some(home))],
+        [
+            (SOCKET_OVERRIDE_ENV, None::<&str>),
+            (TOKEN_FILE_OVERRIDE_ENV, None::<&str>),
+            ("HOME", Some(home)),
+        ],
         || {
             let path = default_socket_path();
             let text = path.to_string_lossy();
@@ -313,6 +398,22 @@ fn default_socket_path_uses_short_filename_for_realistic_group_container_paths()
                 "{home}/Library/Group Containers/{DEFAULT_APP_GROUP}/harness-monitor-mcp.sock"
             );
             assert!(legacy.len() >= 104);
+        },
+    );
+}
+
+#[test]
+fn default_token_path_sits_next_to_default_socket_path() {
+    let home = "/Users/fake";
+    temp_env::with_vars(
+        [(SOCKET_OVERRIDE_ENV, None::<&str>), ("HOME", Some(home))],
+        || {
+            let path = default_token_path();
+            let text = path.to_string_lossy();
+            assert_eq!(
+                text,
+                format!("{home}/Library/Group Containers/{DEFAULT_APP_GROUP}/{TOKEN_FILENAME}"),
+            );
         },
     );
 }

@@ -5,6 +5,7 @@ public let registryProtocolVersion: Int = 1
 public let registryMaximumFrameBytes: Int = 1 << 20
 /// Keep short - Unix domain sockets have a 104-byte path limit on macOS.
 public let registrySocketFilename: String = "mcp.sock"
+public let registryTokenFilename: String = "mcp.token"
 public let registryAppGroupIdentifier: String = "Q498EB36N4.io.harnessmonitor"
 
 public enum RegistryCapability: String, Sendable, Codable, CaseIterable {

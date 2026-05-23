@@ -14,6 +14,7 @@ public enum RegistryRequestOp: String, Sendable, Codable {
 public struct RegistryRequest: Sendable, Codable {
   public var id: Int
   public var op: RegistryRequestOp
+  public var token: String?
   public var identifier: String?
   public var action: RegistrySemanticAction?
   public var windowID: Int?
@@ -26,6 +27,7 @@ public struct RegistryRequest: Sendable, Codable {
   public init(
     id: Int,
     op: RegistryRequestOp,
+    token: String? = nil,
     identifier: String? = nil,
     action: RegistrySemanticAction? = nil,
     windowID: Int? = nil,
@@ -37,6 +39,7 @@ public struct RegistryRequest: Sendable, Codable {
   ) {
     self.id = id
     self.op = op
+    self.token = token
     self.identifier = identifier
     self.action = action
     self.windowID = windowID

@@ -43,23 +43,30 @@ public struct RegistryRequestDispatcher: Sendable {
   }
 
   public let registry: AccessibilityRegistry
+  public let requiredAuthToken: String?
   public let pingInfo: @Sendable () -> PingResult
   public let semanticActionHandler: (@Sendable (String, RegistrySemanticAction) async -> SemanticActionDisposition)?
   public let replacementHandler: (@Sendable (RegistryReplacementNotice) async -> ReplacementDisposition)?
 
   public init(
     registry: AccessibilityRegistry,
+    requiredAuthToken: String? = nil,
     pingInfo: @escaping @Sendable () -> PingResult,
     semanticActionHandler: (@Sendable (String, RegistrySemanticAction) async -> SemanticActionDisposition)? = nil,
     replacementHandler: (@Sendable (RegistryReplacementNotice) async -> ReplacementDisposition)? = nil
   ) {
     self.registry = registry
+    self.requiredAuthToken = requiredAuthToken
     self.pingInfo = pingInfo
     self.semanticActionHandler = semanticActionHandler
     self.replacementHandler = replacementHandler
   }
 
   public func dispatch(_ request: RegistryRequest) async -> DispatchResult {
+    if let authorizationFailure = authorize(request) {
+      return authorizationFailure
+    }
+
     switch request.op {
     case .ping:
       return DispatchResult(response: .success(id: request.id, result: .ping(pingInfo())))
@@ -229,5 +236,39 @@ public struct RegistryRequestDispatcher: Sendable {
         closeConnectionAfterDelivery: disposition.closeConnectionAfterDelivery
       )
     }
+  }
+
+  private func authorize(_ request: RegistryRequest) -> DispatchResult? {
+    guard let requiredAuthToken, requiredAuthToken.isEmpty == false else {
+      return nil
+    }
+    guard
+      let suppliedToken = request.token,
+      constantTimeEquals(suppliedToken, requiredAuthToken)
+    else {
+      return DispatchResult(
+        response: .failure(
+          id: request.id,
+          error: RegistryErrorPayload(
+            code: "unauthorized",
+            message: "registry request requires a valid capability token"
+          )
+        )
+      )
+    }
+    return nil
+  }
+
+  private func constantTimeEquals(_ lhs: String, _ rhs: String) -> Bool {
+    let lhsBytes = Array(lhs.utf8)
+    let rhsBytes = Array(rhs.utf8)
+    let maxCount = max(lhsBytes.count, rhsBytes.count)
+    var difference = lhsBytes.count ^ rhsBytes.count
+    for index in 0..<maxCount {
+      let lhsByte = index < lhsBytes.count ? lhsBytes[index] : 0
+      let rhsByte = index < rhsBytes.count ? rhsBytes[index] : 0
+      difference |= Int(lhsByte ^ rhsByte)
+    }
+    return difference == 0
   }
 }

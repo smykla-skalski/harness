@@ -41,10 +41,37 @@ extension HarnessMonitorMCPContractTests {
     defer { Task { await service.setEnabled(false) } }
 
     try await waitForSocket(at: socketURL.path, timeout: 2)
-    let response = try sendLine("{\"id\":1,\"op\":\"ping\"}", toSocketAt: socketURL.path)
+    let response = try sendRequest(
+      RegistryRequest(id: 1, op: .ping, token: service.registryAuthToken),
+      toSocketAt: socketURL.path
+    )
 
     #expect(response.contains("\"ok\":true"))
     #expect(service.runtimeState == .healthy(socketPath: socketURL.path))
+    let tokenURL = HarnessMonitorMCPRegistryTokenStore.tokenURL(for: socketURL)
+    let tokenAttributes = try FileManager.default.attributesOfItem(atPath: tokenURL.path)
+    let tokenPermissions = tokenAttributes[.posixPermissions] as? NSNumber
+    #expect(tokenPermissions?.intValue == 0o600)
+  }
+
+  @Test("enabled registry rejects unauthenticated socket requests")
+  func enabledRegistryRejectsUnauthenticatedSocketRequests() async throws {
+    let root = try temporaryDirectory()
+    defer { try? FileManager.default.removeItem(at: root) }
+    let socketURL = root.appendingPathComponent("mcp.sock", isDirectory: false)
+
+    let service = HarnessMonitorMCPAccessibilityService(
+      socketPathResolver: { socketURL }
+    )
+    await service.setEnabled(true)
+    defer { Task { await service.setEnabled(false) } }
+
+    try await waitForSocket(at: socketURL.path, timeout: 2)
+
+    let response = try sendLine("{\"id\":5,\"op\":\"listElements\"}", toSocketAt: socketURL.path)
+
+    #expect(response.contains("\"ok\":false"))
+    #expect(response.contains("\"code\":\"unauthorized\""))
   }
 
   @Test("semantic actions round-trip over the live registry socket")
@@ -55,13 +82,16 @@ extension HarnessMonitorMCPContractTests {
     let service = HarnessMonitorMCPAccessibilityService(
       socketPathResolver: { socketURL }
     )
-    let socketClient = RegistrySocketClient(timeout: 2)
     let identifier = "harness.test.live-semantic-press"
     let probe = MCPContractSemanticPressProbe()
 
     await service.setEnabled(true)
     defer { Task { await service.setEnabled(false) } }
     try await waitForSocket(at: socketURL.path, timeout: 2)
+    let socketClient = RegistrySocketClient(
+      timeout: 2,
+      authToken: service.registryAuthToken
+    )
     await service.registry.unregisterElement(identifier: identifier)
 
     let host = NSHostingView(
@@ -90,7 +120,11 @@ extension HarnessMonitorMCPContractTests {
     window.layoutIfNeeded()
     host.layoutSubtreeIfNeeded()
 
-    try await waitForSocketResponse(at: socketURL.path, timeout: 2) { response in
+    try await waitForSocketResponse(
+      at: socketURL.path,
+      token: service.registryAuthToken,
+      timeout: 2
+    ) { response in
       response.contains(#""identifier":"\#(identifier)""#)
         && response.contains(#""actions":["press"]"#)
     }
@@ -137,18 +171,20 @@ extension HarnessMonitorMCPContractTests {
     #expect(removed == nil)
   }
 
-  @Test("enabled reconciliation reuses a compatible registry socket and forwards local snapshots")
-  func enabledReconciliationReusesCompatibleRegistrySocket() async throws {
+  @Test("enabled reconciliation replaces a compatible pre-bound socket instead of reusing it")
+  func enabledReconciliationReplacesCompatiblePreboundSocket() async throws {
     let root = try temporaryDirectory()
     defer { try? FileManager.default.removeItem(at: root) }
     let socketURL = root.appendingPathComponent("mcp.sock", isDirectory: false)
     let hostService = HarnessMonitorMCPAccessibilityService(socketPathResolver: { socketURL })
-    let reusedService = HarnessMonitorMCPAccessibilityService(socketPathResolver: { socketURL })
+    let replacementService = HarnessMonitorMCPAccessibilityService(
+      socketPathResolver: { socketURL }
+    )
 
     await hostService.setEnabled(true)
     defer {
       Task {
-        await reusedService.setEnabled(false)
+        await replacementService.setEnabled(false)
         await hostService.setEnabled(false)
       }
     }
@@ -163,8 +199,8 @@ extension HarnessMonitorMCPContractTests {
       )
     )
 
-    await reusedService.setEnabled(true)
-    await reusedService.registry.registerElement(
+    await replacementService.setEnabled(true)
+    await replacementService.registry.registerElement(
       RegistryElement(
         identifier: "client.refresh",
         kind: .button,
@@ -173,17 +209,21 @@ extension HarnessMonitorMCPContractTests {
       )
     )
 
-    try await waitForSocketResponse(at: socketURL.path, timeout: 2) { response in
-      response.contains("\"identifier\":\"host.refresh\"")
-        && response.contains("\"identifier\":\"client.refresh\"")
+    try await waitForSocketResponse(
+      at: socketURL.path,
+      token: replacementService.registryAuthToken,
+      timeout: 2
+    ) { response in
+      response.contains("\"identifier\":\"client.refresh\"")
+        && !response.contains("\"identifier\":\"host.refresh\"")
     }
 
-    #expect(reusedService.isRunning == false)
-    #expect(reusedService.runtimeState == .healthy(socketPath: socketURL.path))
+    #expect(replacementService.isRunning == true)
+    #expect(replacementService.runtimeState == .healthy(socketPath: socketURL.path))
   }
 
-  @Test("enabled reconciliation replaces an incompatible socket and old host reregisters")
-  func enabledReconciliationReplacesIncompatibleSocketAndReregisters() async throws {
+  @Test("enabled reconciliation replaces an incompatible socket without trusting the old host")
+  func enabledReconciliationReplacesIncompatibleSocketWithoutTrustingOldHost() async throws {
     let root = try temporaryDirectory()
     defer { try? FileManager.default.removeItem(at: root) }
     let socketURL = root.appendingPathComponent("mcp.sock", isDirectory: false)
@@ -247,28 +287,31 @@ extension HarnessMonitorMCPContractTests {
       )
     )
 
-    try await waitForSocketResponse(at: socketURL.path, timeout: 2) { response in
-      response.contains("\"identifier\":\"legacy.refresh\"")
-        && response.contains("\"identifier\":\"replacement.refresh\"")
+    try await waitForSocketResponse(
+      at: socketURL.path,
+      token: replacementHost.registryAuthToken,
+      timeout: 2
+    ) { response in
+      response.contains("\"identifier\":\"replacement.refresh\"")
+        && !response.contains("\"identifier\":\"legacy.refresh\"")
     }
 
     #expect(replacementHost.isRunning == true)
     #expect(replacementHost.runtimeState == .healthy(socketPath: socketURL.path))
-    #expect(legacyHost.isRunning == false)
   }
 
-  @Test("enabled reconciliation rejects foreign bundle registry hosts")
-  func enabledReconciliationRejectsForeignBundleRegistryHosts() async throws {
+  @Test("enabled reconciliation replaces spoofed compatible registry hosts")
+  func enabledReconciliationReplacesSpoofedCompatibleRegistryHosts() async throws {
     let root = try temporaryDirectory()
     defer { try? FileManager.default.removeItem(at: root) }
     let socketURL = root.appendingPathComponent("mcp.sock", isDirectory: false)
-    let foreignHost = HarnessMonitorMCPAccessibilityService(
+    let spoofedHost = HarnessMonitorMCPAccessibilityService(
       socketPathResolver: { socketURL },
       pingInfoProvider: {
         PingResult(
           protocolVersion: registryProtocolVersion,
           appVersion: "30.32.0",
-          bundleIdentifier: "io.foreign.registry",
+          bundleIdentifier: "io.harnessmonitor.app",
           capabilities: [
             .clientSnapshots,
             .clientSnapshotLeases,
@@ -280,24 +323,19 @@ extension HarnessMonitorMCPContractTests {
     )
     let localService = HarnessMonitorMCPAccessibilityService(socketPathResolver: { socketURL })
 
-    await foreignHost.setEnabled(true)
+    await spoofedHost.setEnabled(true)
     defer {
       Task {
         await localService.setEnabled(false)
-        await foreignHost.setEnabled(false)
+        await spoofedHost.setEnabled(false)
       }
     }
     try await waitForSocket(at: socketURL.path, timeout: 2)
 
     await localService.setEnabled(true)
 
-    #expect(localService.isRunning == false)
-    guard case .degraded(let socketPath, let reason) = localService.runtimeState else {
-      Issue.record("expected degraded runtime state, got \(localService.runtimeState)")
-      return
-    }
-    #expect(socketPath == socketURL.path)
-    #expect(reason.contains("io.foreign.registry"))
+    #expect(localService.isRunning == true)
+    #expect(localService.runtimeState == .healthy(socketPath: socketURL.path))
   }
 
   @Test("real service degrades when the socket path cannot be resolved")

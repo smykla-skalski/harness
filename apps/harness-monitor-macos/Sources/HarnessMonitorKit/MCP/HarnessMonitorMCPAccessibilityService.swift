@@ -41,6 +41,7 @@ public final class HarnessMonitorMCPAccessibilityService: HarnessMonitorMCPStart
   var persistentSemanticElementOwners: [String: UUID] = [:]
   var trackedSemanticActionOwners: [String: UUID] = [:]
   var trackedSemanticActions: [String: TrackedSemanticActionRegistration] = [:]
+  internal private(set) var registryAuthToken: String?
   enum ReplacementDecision {
     case approved
     case denied(String)
@@ -53,25 +54,6 @@ public final class HarnessMonitorMCPAccessibilityService: HarnessMonitorMCPStart
   // notice, the listener flushes that ack, and only then does the old host yield
   // and republish into the replacement socket. That keeps the wire contract
   // load-bearing instead of optimistic.
-  lazy var dispatcher = RegistryRequestDispatcher(
-    registry: self.registry,
-    pingInfo: self.pingInfoProvider,
-    semanticActionHandler: { [weak self] identifier, action in
-      guard let self else {
-        return .actionUnavailable
-      }
-      return await self.performSemanticAction(identifier: identifier, action: action)
-    },
-    replacementHandler: { [weak self] notice in
-      guard let self else {
-        return RegistryRequestDispatcher.ReplacementDisposition(
-          ack: RegistryAckResult(applied: false, message: "registry service released")
-        )
-      }
-      return await self.handleReplacementNotice(notice)
-    }
-  )
-
   public init(
     registry: AccessibilityRegistry = AccessibilityRegistry(),
     logger: Logger = Logger(subsystem: "io.harnessmonitor", category: "mcp-registry"),
@@ -153,20 +135,33 @@ public final class HarnessMonitorMCPAccessibilityService: HarnessMonitorMCPStart
     [.clientSnapshots, .clientSnapshotLeases]
   }
 
+  func makeDispatcher(requiredAuthToken: String) -> RegistryRequestDispatcher {
+    RegistryRequestDispatcher(
+      registry: self.registry,
+      requiredAuthToken: requiredAuthToken,
+      pingInfo: self.pingInfoProvider,
+      semanticActionHandler: { [weak self] identifier, action in
+        guard let self else {
+          return .actionUnavailable
+        }
+        return await self.performSemanticAction(identifier: identifier, action: action)
+      },
+      replacementHandler: { [weak self] notice in
+        guard let self else {
+          return RegistryRequestDispatcher.ReplacementDisposition(
+            ack: RegistryAckResult(applied: false, message: "registry service released")
+          )
+        }
+        return await self.handleReplacementNotice(notice)
+      }
+    )
+  }
+
   func startIfNeeded() async {
     guard let socket = resolvedSocketForStartup() else {
       return
     }
     if await reconcileExistingLocalListener(at: socket) {
-      return
-    }
-    if await reuseCompatibleRemoteHost(at: socket) {
-      return
-    }
-    if await resumePendingReplacementIfNeeded(at: socket) {
-      return
-    }
-    if await evaluateExistingHostReplacement(at: socket) == false {
       return
     }
     await startLocalListener(at: socket)
@@ -295,6 +290,9 @@ public final class HarnessMonitorMCPAccessibilityService: HarnessMonitorMCPStart
   }
 
   func startLocalListener(at socket: URL) async {
+    guard let authToken = loadRegistryAuthToken(for: socket) else {
+      return
+    }
     await registry.setRemoteSocketPath(nil)
     remoteSocketURL = nil
     acknowledgedReplacement = nil
@@ -302,7 +300,10 @@ public final class HarnessMonitorMCPAccessibilityService: HarnessMonitorMCPStart
     runtimeState = .starting(socketPath: socket.path)
 
     for attempt in 1...startupAttempts {
-      let nextListener = RegistryListener(dispatcher: dispatcher, logger: logger)
+      let nextListener = RegistryListener(
+        dispatcher: makeDispatcher(requiredAuthToken: authToken),
+        logger: logger
+      )
       do {
         try await nextListener.start(at: socket.path, replaceExistingSocketFile: true)
       } catch {
@@ -344,6 +345,29 @@ public final class HarnessMonitorMCPAccessibilityService: HarnessMonitorMCPStart
       socketPath: socket.path,
       reason: "listener never passed the local ping probe"
     )
+  }
+
+  func loadRegistryAuthToken(for socket: URL) -> String? {
+    if let registryAuthToken {
+      return registryAuthToken
+    }
+    do {
+      let token = try HarnessMonitorMCPRegistryTokenStore.loadOrCreateToken(for: socket)
+      registryAuthToken = token
+      return token
+    } catch {
+      runtimeState = .degraded(
+        socketPath: socket.path,
+        reason: "registry auth token unavailable: \(error.localizedDescription)"
+      )
+      logger.error(
+        """
+        MCP start failed at \(socket.path, privacy: .public): \
+        registry auth token unavailable: \(error.localizedDescription, privacy: .public)
+        """
+      )
+      return nil
+    }
   }
 
 }

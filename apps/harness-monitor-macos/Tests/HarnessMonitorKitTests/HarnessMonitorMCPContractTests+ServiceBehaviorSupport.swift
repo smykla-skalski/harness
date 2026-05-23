@@ -27,20 +27,35 @@ extension HarnessMonitorMCPContractTests {
 
   func waitForSocketResponse(
     at path: String,
+    token: String? = nil,
     timeout: TimeInterval,
     predicate: (String) -> Bool
   ) async throws {
     let deadline = Date().addingTimeInterval(timeout)
     while Date() < deadline {
-      if let response = try? sendLine("{\"id\":5,\"op\":\"listElements\"}", toSocketAt: path),
+      if let response = try? sendRequest(
+        RegistryRequest(id: 5, op: .listElements, token: token),
+        toSocketAt: path
+      ),
         predicate(response)
       {
         return
       }
       try await Task.sleep(nanoseconds: 20_000_000)
     }
-    let response = try sendLine("{\"id\":5,\"op\":\"listElements\"}", toSocketAt: path)
+    let response = try sendRequest(
+      RegistryRequest(id: 5, op: .listElements, token: token),
+      toSocketAt: path
+    )
     #expect(predicate(response))
+  }
+
+  func sendRequest(_ request: RegistryRequest, toSocketAt path: String) throws -> String {
+    let data = try JSONEncoder().encode(request)
+    guard let line = String(data: data, encoding: .utf8) else {
+      throw MCPContractTestError.invalidUTF8Response
+    }
+    return try sendLine(line, toSocketAt: path)
   }
 
   func sendLine(_ line: String, toSocketAt path: String) throws -> String {

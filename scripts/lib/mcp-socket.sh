@@ -4,11 +4,26 @@ mcp_probe_socket() {
   local socket_path="$1"
   python3 - "$socket_path" <<'PY'
 import json
+import os
 import socket
 import sys
 
 path = sys.argv[1]
-request = b'{"id":1,"op":"ping"}\n'
+token = os.environ.get("HARNESS_MONITOR_MCP_TOKEN")
+if not token:
+    token_path = os.environ.get("HARNESS_MONITOR_MCP_TOKEN_FILE")
+    if not token_path:
+        token_path = os.path.join(os.path.dirname(path), "mcp.token")
+    try:
+        with open(token_path, encoding="utf-8") as handle:
+            token = handle.read().strip()
+    except FileNotFoundError:
+        token = None
+
+request_payload = {"id": 1, "op": "ping"}
+if token:
+    request_payload["token"] = token
+request = json.dumps(request_payload, separators=(",", ":")).encode("utf-8") + b"\n"
 sock = None
 
 try:
