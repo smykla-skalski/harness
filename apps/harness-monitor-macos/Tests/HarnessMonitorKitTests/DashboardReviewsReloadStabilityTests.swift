@@ -48,7 +48,7 @@ struct DashboardReviewsReloadStabilityTests {
       )
     }
     var changes = 0
-    for i in 1..<keys.count where keys[i] != keys[i - 1] {
+    for idx in 1..<keys.count where keys[idx] != keys[idx - 1] {
       changes += 1
     }
     #expect(changes == 1)
@@ -68,7 +68,7 @@ struct DashboardReviewsReloadStabilityTests {
       )
     }
     var changes = 0
-    for i in 1..<keys.count where keys[i] != keys[i - 1] {
+    for idx in 1..<keys.count where keys[idx] != keys[idx - 1] {
       changes += 1
     }
     #expect(changes == 1)

@@ -43,9 +43,9 @@ extension HarnessMonitorAccessibility {
     "harness.dashboard.reviews.needs-me"
   public static let dashboardReviewsRefreshTimeoutBanner =
     "harness.dashboard.reviews.refresh-timeout-banner"
-  public static let dashboardReviewsRefreshTimeoutRetryButton =
+  public static let dashboardReviewsTimeoutRetryButton =
     "harness.dashboard.reviews.refresh-timeout-retry"
-  public static let dashboardReviewsRefreshTimeoutDismissButton =
+  public static let dashboardReviewsTimeoutDismissButton =
     "harness.dashboard.reviews.refresh-timeout-dismiss"
   public static let dashboardReviewsRefreshTimeoutToast =
     "harness.dashboard.reviews.refresh-timeout-toast"
