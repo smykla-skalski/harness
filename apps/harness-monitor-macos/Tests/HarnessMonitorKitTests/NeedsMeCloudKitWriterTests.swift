@@ -100,6 +100,27 @@ final class NeedsMeCloudKitWriterTests: XCTestCase {
     let upserts = await stub.upsertCount
     XCTAssertEqual(upserts, 0)
   }
+
+  func testDisabledWriterSkipsAllWrites() async {
+    let stub = StubDatabase()
+    let store = NeedsMeCloudKitStore(database: stub)
+    let writer = NeedsMeCloudKitWriter(
+      store: store,
+      debounceInterval: .zero,
+      isEnabled: false
+    )
+
+    writer.submit(count: 5)
+    writer.submit(count: 9)
+    await writer.flush()
+
+    let upserts = await stub.upsertCount
+    XCTAssertEqual(
+      upserts,
+      0,
+      "Disabled writer must never construct CKContainer via the store"
+    )
+  }
 }
 
 actor StubDatabase: NeedsMeCloudKitDatabase {

@@ -4,10 +4,17 @@ import os
 
 @MainActor
 public final class NeedsMeCloudKitWriter {
-  public static let shared = NeedsMeCloudKitWriter()
+  // Shared singleton is disabled until the macOS app bundle gains the iCloud
+  // entitlement + the CloudKit container is registered in the Apple Developer
+  // portal (Phase E of the Watch widget plan). Constructing `CKContainer` from
+  // a process without `com.apple.developer.icloud-services` entitlements aborts
+  // inside CloudKit (EXC_BREAKPOINT in `CKContainer` init). Flip the flag to
+  // `true` once Phase E has landed.
+  public static let shared = NeedsMeCloudKitWriter(isEnabled: false)
 
   private let store: NeedsMeCloudKitStore
   private let debounceInterval: Duration
+  private let isEnabled: Bool
   private var lastWrittenCount: Int?
   private var pendingTask: Task<Void, Never>?
   private let logger = Logger(
@@ -17,13 +24,18 @@ public final class NeedsMeCloudKitWriter {
 
   public init(
     store: NeedsMeCloudKitStore = NeedsMeCloudKitStore(),
-    debounceInterval: Duration = .seconds(5)
+    debounceInterval: Duration = .seconds(5),
+    isEnabled: Bool = true
   ) {
     self.store = store
     self.debounceInterval = debounceInterval
+    self.isEnabled = isEnabled
   }
 
   public func submit(count: Int) {
+    guard isEnabled else {
+      return
+    }
     if lastWrittenCount == count {
       return
     }
