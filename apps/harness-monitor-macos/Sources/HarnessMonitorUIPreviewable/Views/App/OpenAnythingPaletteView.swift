@@ -32,14 +32,7 @@ public struct OpenAnythingPaletteView: View {
       requestDismiss(reason: .userCanceled)
     }
     .onAppear {
-      // Defer focus until after the hosting window has finished becoming
-      // key. Without the dispatch hop the @FocusState assignment races
-      // first-responder installation inside NSHostingController and the
-      // TextField never lands as first responder, which is what manifested
-      // as "no keys work in the palette".
-      DispatchQueue.main.async {
-        isFieldFocused = true
-      }
+      isFieldFocused = true
       model.selectFirstHitIfNeeded()
     }
     .task(id: model.query) {
@@ -55,15 +48,11 @@ public struct OpenAnythingPaletteView: View {
       return .handled
     }
     .onKeyPress(.upArrow, phases: [.down, .repeat]) { _ in
-      withAnimation(OpenAnythingMotionPolicy.selectionAnimation(reduceMotion: reduceMotion)) {
-        model.moveSelection(by: -1)
-      }
+      model.moveSelection(by: -1)
       return .handled
     }
     .onKeyPress(.downArrow, phases: [.down, .repeat]) { _ in
-      withAnimation(OpenAnythingMotionPolicy.selectionAnimation(reduceMotion: reduceMotion)) {
-        model.moveSelection(by: 1)
-      }
+      model.moveSelection(by: 1)
       return .handled
     }
     .onKeyPress(.tab, phases: .down) { keyPress in
@@ -81,18 +70,6 @@ public struct OpenAnythingPaletteView: View {
     }
     .onAppear { installWheelMonitor() }
     .onDisappear { removeWheelMonitor() }
-    .animation(
-      OpenAnythingMotionPolicy.resultShiftAnimation(reduceMotion: reduceMotion),
-      value: model.results.sections.count
-    )
-    .animation(
-      OpenAnythingMotionPolicy.resultShiftAnimation(reduceMotion: reduceMotion),
-      value: model.expandedDomains
-    )
-    .animation(
-      OpenAnythingMotionPolicy.resultShiftAnimation(reduceMotion: reduceMotion),
-      value: model.collapsedDomains
-    )
   }
 
   @ViewBuilder
@@ -346,13 +323,8 @@ public struct OpenAnythingPaletteView: View {
   }
 
   private func runSearch() async {
-    do {
-      try await Task.sleep(
-        nanoseconds: OpenAnythingPaletteConstants.searchDebounceNanoseconds
-      )
-    } catch {
-      return
-    }
+    // No debounce - the index runs fast enough that hitting it on every
+    // keystroke is cheaper than the 80ms perceived input lag.
     await model.runSearch()
   }
 
@@ -375,11 +347,7 @@ public struct OpenAnythingPaletteView: View {
       let threshold: CGFloat = 12
       while abs(wheelAccumulator) >= threshold {
         let direction = wheelAccumulator > 0 ? -1 : 1
-        withAnimation(
-          OpenAnythingMotionPolicy.selectionAnimation(reduceMotion: reduceMotion)
-        ) {
-          model.moveSelection(by: direction)
-        }
+        model.moveSelection(by: direction)
         wheelAccumulator -= CGFloat(direction) * -threshold
       }
       return event

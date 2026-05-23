@@ -10,11 +10,7 @@ extension OpenAnythingPaletteView {
     let count = sections.count
     let nextIndex = ((currentIndex + delta) % count + count) % count
     if let firstHitID = sections[nextIndex].hits.first?.id {
-      withAnimation(
-        OpenAnythingMotionPolicy.selectionAnimation(reduceMotion: reduceMotion)
-      ) {
-        model.selectHit(id: firstHitID)
-      }
+      model.selectHit(id: firstHitID)
     }
   }
 
@@ -23,11 +19,7 @@ extension OpenAnythingPaletteView {
     guard sections.indices.contains(index),
       let firstHitID = sections[index].hits.first?.id
     else { return }
-    withAnimation(
-      OpenAnythingMotionPolicy.selectionAnimation(reduceMotion: reduceMotion)
-    ) {
-      model.selectHit(id: firstHitID)
-    }
+    model.selectHit(id: firstHitID)
   }
 
   func currentSectionIndex(sections: [OpenAnythingSection]) -> Int {
