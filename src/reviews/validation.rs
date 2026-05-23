@@ -12,15 +12,10 @@ impl ReviewsQueryRequest {
     /// Validate the query request.
     ///
     /// # Errors
-    /// Returns `CliError` when the request has no author filters or no
-    /// organization/repository scope.
+    /// Returns `CliError` when the request has no organization/repository
+    /// scope. Authors are optional - an empty list fetches every open PR in
+    /// the configured scopes.
     pub fn validate(&self) -> Result<(), CliError> {
-        if self.normalized_authors().is_empty() {
-            return Err(CliErrorKind::workflow_parse(
-                "reviews query requires at least one author",
-            )
-            .into());
-        }
         if self.normalized_organizations().is_empty() && self.normalized_repositories().is_empty() {
             return Err(CliErrorKind::workflow_parse(
                 "reviews query requires at least one organization or repository",

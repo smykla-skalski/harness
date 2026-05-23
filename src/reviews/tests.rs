@@ -60,6 +60,34 @@ fn query_request_normalizes_cache_key_inputs() {
 }
 
 #[test]
+fn query_request_accepts_empty_authors_when_scope_is_present() {
+    let request = ReviewsQueryRequest {
+        authors: Vec::new(),
+        organizations: vec!["acme".into()],
+        repositories: Vec::new(),
+        exclude_repositories: Vec::new(),
+        force_refresh: false,
+        cache_max_age_seconds: 600,
+    };
+
+    assert!(request.validate().is_ok());
+}
+
+#[test]
+fn query_request_rejects_empty_scope_even_with_authors() {
+    let request = ReviewsQueryRequest {
+        authors: vec!["renovate[bot]".into()],
+        organizations: Vec::new(),
+        repositories: Vec::new(),
+        exclude_repositories: Vec::new(),
+        force_refresh: false,
+        cache_max_age_seconds: 600,
+    };
+
+    assert!(request.validate().is_err());
+}
+
+#[test]
 fn repository_catalog_request_rejects_empty_and_slashed_organizations() {
     assert!(
         ReviewsRepositoryCatalogRequest {
