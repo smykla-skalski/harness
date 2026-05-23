@@ -118,9 +118,13 @@ struct DashboardReviewsProvenanceTests {
 
     #expect(routeSource.contains("var normalizedPreferences: DashboardReviewsPreferences"))
     #expect(contentSource.contains("ToolbarItem(placement: .principal)"))
-    #expect(contentSource.contains("DashboardReviewsToolbarCenterpiece(snapshot: routeProvenanceSnapshot)"))
+    #expect(
+      contentSource.contains(
+        "DashboardReviewsToolbarCenterpiece(snapshot: routeProvenanceSnapshot)"))
     #expect(contentSource.contains("DashboardReviewsRefreshToolbarButton(onRefresh:"))
-    #expect(contentSource.contains("DashboardReviewsInfoToolbarButton(snapshot: routeProvenanceSnapshot)"))
+    #expect(
+      contentSource.contains("DashboardReviewsInfoToolbarButton(snapshot: routeProvenanceSnapshot)")
+    )
     #expect(!contentSource.contains("DashboardReviewsProvenanceBar("))
     #expect(!detailSource.contains("DashboardReviewProvenanceMiniBar"))
     #expect(provenanceSource.contains("var routeProvenanceSnapshot"))

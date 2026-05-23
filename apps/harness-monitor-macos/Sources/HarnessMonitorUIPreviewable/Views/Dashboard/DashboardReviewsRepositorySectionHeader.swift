@@ -16,7 +16,7 @@ public enum DashboardReviewsRepositorySectionHeaderStatus: Equatable {
     isSyncing: Bool,
     lastSyncedAt: Date?,
     errorMessage: String?
-  ) -> DashboardReviewsRepositorySectionHeaderStatus {
+  ) -> Self {
     if isSyncing {
       return .syncing
     }

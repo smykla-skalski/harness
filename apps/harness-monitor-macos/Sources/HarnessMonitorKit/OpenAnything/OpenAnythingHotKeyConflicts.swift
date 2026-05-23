@@ -85,8 +85,7 @@ public enum OpenAnythingHotKeyConflicts {
     let isCommandOnly = descriptor.modifiers == [.command]
     guard isCommandOnly else { return false }
     switch descriptor.keyCode {
-    case
-      KeyCode.k,
+    case KeyCode.k,
       KeyCode.f,
       KeyCode.p,
       KeyCode.t,

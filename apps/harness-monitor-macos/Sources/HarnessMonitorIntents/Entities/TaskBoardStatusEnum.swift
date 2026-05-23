@@ -17,7 +17,7 @@ public enum TaskBoardStatusEnum: String, AppEnum, Sendable {
     .init(name: "Task Status")
   }
 
-  public static var caseDisplayRepresentations: [TaskBoardStatusEnum: DisplayRepresentation] {
+  public static var caseDisplayRepresentations: [Self: DisplayRepresentation] {
     [
       .new: DisplayRepresentation(title: "New"),
       .planning: DisplayRepresentation(title: "Planning"),
@@ -27,7 +27,7 @@ public enum TaskBoardStatusEnum: String, AppEnum, Sendable {
       .inProgress: DisplayRepresentation(title: "In Progress"),
       .inReview: DisplayRepresentation(title: "In Review"),
       .done: DisplayRepresentation(title: "Done"),
-      .blocked: DisplayRepresentation(title: "Blocked")
+      .blocked: DisplayRepresentation(title: "Blocked"),
     ]
   }
 

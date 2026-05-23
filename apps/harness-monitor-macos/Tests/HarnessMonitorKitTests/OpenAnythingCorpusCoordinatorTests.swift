@@ -1,4 +1,5 @@
 import Testing
+
 @testable import HarnessMonitorKit
 
 /// Audit #55: integration coverage for the coordinator + palette wiring.

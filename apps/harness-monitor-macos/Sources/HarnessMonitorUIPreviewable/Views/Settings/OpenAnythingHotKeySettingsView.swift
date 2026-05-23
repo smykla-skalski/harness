@@ -65,7 +65,7 @@ struct OpenAnythingHotKeySettingsView: View {
     case .hard:
       conflictSeverity = .hard
       conflictMessage = "This shortcut breaks a system feature - try a different one."
-      // Hard chord: do not save, stay in recording so the user can pick another.
+    // Hard chord: do not save, stay in recording so the user can pick another.
     case .soft:
       conflictSeverity = .soft
       conflictMessage =

@@ -1,4 +1,5 @@
 import Testing
+
 @testable import HarnessMonitorKit
 
 /// Audit #25 + #69: cover the per-section "Show all" path and the

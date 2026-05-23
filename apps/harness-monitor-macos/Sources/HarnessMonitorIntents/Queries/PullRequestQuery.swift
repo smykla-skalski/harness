@@ -16,7 +16,8 @@ public struct PullRequestQuery: EntityQuery, EntityStringQuery, Sendable {
     self.source = source
   }
 
-  public func entities(for identifiers: [PullRequestEntity.ID]) async throws -> [PullRequestEntity] {
+  public func entities(for identifiers: [PullRequestEntity.ID]) async throws -> [PullRequestEntity]
+  {
     let unique = Array(NSOrderedSet(array: identifiers)) as? [String] ?? identifiers
     guard !unique.isEmpty else { return [] }
     let items = try await source.fetch(ids: unique)

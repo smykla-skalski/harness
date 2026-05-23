@@ -96,10 +96,12 @@ public final class OpenAnythingPaletteModel {
     let signpost = OpenAnythingSignposter.shared.beginInterval(
       OpenAnythingSignposter.Interval.present
     )
-    defer { OpenAnythingSignposter.shared.endInterval(
-      OpenAnythingSignposter.Interval.present,
-      signpost
-    ) }
+    defer {
+      OpenAnythingSignposter.shared.endInterval(
+        OpenAnythingSignposter.Interval.present,
+        signpost
+      )
+    }
     self.targetWindowID = targetWindowID
     let scopeChanged = self.scope != scope
     self.scope = scope
@@ -294,13 +296,12 @@ public final class OpenAnythingPaletteModel {
   /// Toggle the pinned status of `recordID`. Returns the new pinned state.
   @discardableResult
   public func togglePin(_ recordID: String) -> Bool {
-    if pins.isPinned(recordID) {
-      pins.unpin(recordID)
-      return false
-    } else {
+    guard pins.isPinned(recordID) else {
       pins.pin(recordID)
       return true
     }
+    pins.unpin(recordID)
+    return false
   }
 
   private func refreshSuggestedResults() async {
