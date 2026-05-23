@@ -37,9 +37,68 @@ enum DashboardReviewsRemoteLoader {
   }
 }
 
-struct DashboardReviewsReloadTaskKey: Equatable {
+struct DashboardReviewsReloadTaskKey: Hashable {
   let preferencesSignature: String
-  let connectionState: HarnessMonitorStore.ConnectionState
+  let isConnected: Bool
+}
+
+/// Classify a `HarnessMonitorStore.ConnectionState` into a stable boolean for the
+/// reviews reload task key. Only terminal "we have a live link" states are
+/// considered connected; transient states like `.connecting` are folded into
+/// `false` so that a flap `offline -> connecting -> online` produces a single
+/// key flip (the offline -> online edge) instead of two reloads.
+func isReviewsReloadConnected(_ state: HarnessMonitorStore.ConnectionState) -> Bool {
+  switch state {
+  case .online:
+    return true
+  case .idle, .connecting, .offline:
+    return false
+  }
+}
+
+/// Decision produced by `dashboardReviewsRouteChangeDecision`. The route view
+/// owns the SwiftUI plumbing; this enum lets the policy be tested as a pure
+/// transform from `(was the reviews route active?, did work survive the leave?,
+/// new route)` to "what should happen next?".
+enum DashboardReviewsRouteChangeDecision: Equatable {
+  /// User left the reviews route. Mark it inactive and remember whether a
+  /// resume-on-return reload is owed because in-flight refreshes were still
+  /// running when they navigated away.
+  case leave(armPendingResume: Bool)
+  /// User came back to the reviews route. If `triggerReload` is true the
+  /// caller must run a soft `reload(forceRefresh: false, backgroundRefresh:
+  /// true)` so the user sees fresh data without a loading spinner.
+  case returnToRoute(triggerReload: Bool)
+  /// The new route equals the old route (e.g. the route picker re-emitted
+  /// without actually changing). No state mutation needed.
+  case noChange
+}
+
+/// Pure transform from "route picker changed" to the resume-on-leave
+/// decision the view should apply. The route view delegates to this so the
+/// pause-on-leave heuristic can be tested without a SwiftUI hosting context
+/// or a daemon store.
+///
+/// Inputs:
+/// - `newRoute`: the route the picker just selected.
+/// - `wasOnReviews`: whether the previous selection was the reviews route.
+/// - `hasInFlightWork`: whether any tracked refresh or mutation task may
+///   still be running when the route is leaving.
+/// - `hasPendingResume`: whether a previous leave already armed a
+///   resume-on-return reload.
+func dashboardReviewsRouteChangeDecision(
+  newRoute: DashboardWindowRoute,
+  wasOnReviews: Bool,
+  hasInFlightWork: Bool,
+  hasPendingResume: Bool
+) -> DashboardReviewsRouteChangeDecision {
+  let goingToReviews = newRoute == .reviews
+  if goingToReviews {
+    guard !wasOnReviews else { return .noChange }
+    return .returnToRoute(triggerReload: hasPendingResume)
+  }
+  guard wasOnReviews else { return .noChange }
+  return .leave(armPendingResume: hasInFlightWork)
 }
 
 struct DashboardReviewsQueryRequestParts {

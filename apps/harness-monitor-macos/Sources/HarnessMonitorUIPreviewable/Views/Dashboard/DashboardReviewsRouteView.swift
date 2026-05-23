@@ -78,6 +78,8 @@ struct DashboardReviewsRouteView: View {
   @State private var actionState = DashboardReviewsRouteActionState()
   @State private var legacyFilterMigrationApplied = false
   @State private var lastPrimaryClickedID: String?
+  @State private var isReviewsRouteActive = true
+  @State private var pendingResumeAfterReturn = false
 
   init(
     store: HarnessMonitorStore,
@@ -242,10 +244,20 @@ struct DashboardReviewsRouteView: View {
     nonmutating set { presentationGeneration = newValue }
   }
 
+  var routeIsReviewsRouteActive: Bool {
+    get { isReviewsRouteActive }
+    nonmutating set { isReviewsRouteActive = newValue }
+  }
+
+  var routePendingResumeAfterReturn: Bool {
+    get { pendingResumeAfterReturn }
+    nonmutating set { pendingResumeAfterReturn = newValue }
+  }
+
   var reloadTaskKey: DashboardReviewsReloadTaskKey {
     DashboardReviewsReloadTaskKey(
       preferencesSignature: resolvedPreferences.cacheHash,
-      connectionState: store.connectionState
+      isConnected: isReviewsReloadConnected(store.connectionState)
     )
   }
 
@@ -379,7 +391,7 @@ struct DashboardReviewsRouteView: View {
         applyPendingReviewSelectionIfNeeded()
       }
       .onChange(of: selectedRoute) { _, newValue in
-        if newValue != .reviews { cancelAllInFlightTasks() }
+        handleSelectedRouteChange(newValue)
       }
       .dashboardReviewsOnSystemWake(perform: handleSystemWake)
       .dashboardReviewsToolbarSearch(
