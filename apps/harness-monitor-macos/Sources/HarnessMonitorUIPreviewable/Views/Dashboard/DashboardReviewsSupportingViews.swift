@@ -49,15 +49,10 @@ struct DashboardReviewsDescriptionView: View {
         .foregroundStyle(HarnessMonitorTheme.secondaryInk)
         .scaledFont(.callout)
     } else if viewerCanUpdate {
-      VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
-        if dashboardReviewBodyHasTaskListCheckbox(body) {
-          DashboardReviewDescriptionCheckboxNotice()
+      HarnessMonitorMarkdownText(body, textSelection: .enabled)
+        .markdownCheckboxToggle { offset, newValue in
+          toggleCheckbox(currentBody: body, offset: offset, newValue: newValue)
         }
-        HarnessMonitorMarkdownText(body, textSelection: .enabled)
-          .markdownCheckboxToggle { offset, newValue in
-            toggleCheckbox(currentBody: body, offset: offset, newValue: newValue)
-          }
-      }
     } else {
       VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
         if dashboardReviewBodyHasTaskListCheckbox(body) {
@@ -101,24 +96,6 @@ struct DashboardReviewsDescriptionView: View {
 /// false-positive on Markdown links such as `- [text](url)`.
 func dashboardReviewBodyHasTaskListCheckbox(_ body: String) -> Bool {
   body.range(of: #"(?m)^[ \t]*-[ \t]+\[[ xX]\]"#, options: .regularExpression) != nil
-}
-
-private struct DashboardReviewDescriptionCheckboxNotice: View {
-  var body: some View {
-    Label(
-      "Task-list checkboxes update the pull request description.",
-      systemImage: "checklist"
-    )
-    .scaledFont(.caption.weight(.semibold))
-    .foregroundStyle(HarnessMonitorTheme.secondaryInk)
-    .padding(.horizontal, 9)
-    .padding(.vertical, 6)
-    .background(
-      HarnessMonitorTheme.accent.opacity(0.08),
-      in: RoundedRectangle(cornerRadius: 7, style: .continuous)
-    )
-    .accessibilityElement(children: .combine)
-  }
 }
 
 private struct DashboardReviewDescriptionReadOnlyNotice: View {
@@ -188,14 +165,14 @@ private struct DashboardReviewDescriptionFailedView: View {
       HStack(spacing: HarnessMonitorTheme.spacingSM) {
         if let onRetry {
           Button("Retry") { onRetry() }
-            .buttonStyle(.borderedProminent)
+            .harnessActionButtonStyle(variant: .prominent)
             .controlSize(.small)
             .accessibilityHint("Re-fetches the pull request description.")
         }
         Button(showsDetails ? "Hide details" : "Show details") {
           showsDetails.toggle()
         }
-        .buttonStyle(.bordered)
+        .harnessGlassButtonStyle()
         .controlSize(.small)
         .accessibilityHint("Shows the daemon error string that caused the failure.")
       }

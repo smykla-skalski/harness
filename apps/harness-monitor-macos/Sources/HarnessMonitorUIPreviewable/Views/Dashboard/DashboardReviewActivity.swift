@@ -184,8 +184,7 @@ struct DashboardReviewActivitySummary: View {
     }
   }
 
-  @ViewBuilder
-  private var fetchedAtChip: some View {
+  @ViewBuilder private var fetchedAtChip: some View {
     if let fetchedAtDate = snapshot.fetchedAtDate {
       metadataChip(
         "Loaded \(dashboardReviewActivityRelativeLabel(for: fetchedAtDate))",

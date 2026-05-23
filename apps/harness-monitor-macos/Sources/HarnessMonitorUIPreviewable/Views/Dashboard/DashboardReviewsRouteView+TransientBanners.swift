@@ -42,7 +42,7 @@ extension DashboardReviewsRouteView {
           scheduleAffectedRefresh(for: items, using: client)
         }
       }
-      .buttonStyle(.borderless)
+      .harnessPlainButtonStyle()
       Button {
         routeRefreshTimeoutItems = nil
       } label: {
@@ -50,7 +50,7 @@ extension DashboardReviewsRouteView {
           .imageScale(.small)
           .foregroundStyle(HarnessMonitorTheme.secondaryInk)
       }
-      .buttonStyle(.plain)
+      .harnessPlainButtonStyle()
       .accessibilityLabel("Dismiss refresh-timeout banner")
     }
     .padding(.horizontal, HarnessMonitorTheme.spacingMD)
@@ -89,7 +89,7 @@ extension DashboardReviewsRouteView {
           .imageScale(.small)
           .foregroundStyle(HarnessMonitorTheme.secondaryInk)
       }
-      .buttonStyle(.plain)
+      .harnessPlainButtonStyle()
       .accessibilityLabel("Dismiss \(descriptor.toastMessage)")
     }
     .padding(.horizontal, HarnessMonitorTheme.spacingMD)

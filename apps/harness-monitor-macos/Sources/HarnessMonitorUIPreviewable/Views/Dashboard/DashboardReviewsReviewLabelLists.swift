@@ -57,15 +57,15 @@ struct DashboardReviewReviewList: View {
     switch (approvals, changesRequested) {
     case (0, 0):
       return "\(reviews.count) \(reviews.count == 1 ? "review" : "reviews") recorded"
-    case (let a, 0):
-      return "\(a) \(a == 1 ? "approval" : "approvals") recorded"
-    case (0, let c):
-      let noun = c == 1 ? "review" : "reviews"
-      return "\(c) change-request \(noun) recorded"
-    case (let a, let c):
-      let approvalNoun = a == 1 ? "approval" : "approvals"
-      let changeNoun = c == 1 ? "change-request" : "change-requests"
-      return "\(a) \(approvalNoun), \(c) \(changeNoun) recorded"
+    case (let approvalCount, 0):
+      return "\(approvalCount) \(approvalCount == 1 ? "approval" : "approvals") recorded"
+    case (0, let changesCount):
+      let noun = changesCount == 1 ? "review" : "reviews"
+      return "\(changesCount) change-request \(noun) recorded"
+    case (let approvalCount, let changesCount):
+      let approvalNoun = approvalCount == 1 ? "approval" : "approvals"
+      let changeNoun = changesCount == 1 ? "change-request" : "change-requests"
+      return "\(approvalCount) \(approvalNoun), \(changesCount) \(changeNoun) recorded"
     }
   }
 }
