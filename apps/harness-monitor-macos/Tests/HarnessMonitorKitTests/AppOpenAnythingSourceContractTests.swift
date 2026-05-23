@@ -42,8 +42,22 @@ struct AppOpenAnythingSourceContractTests {
     #expect(panelSource.contains("final class OpenAnythingFloatingPanel: NSPanel"))
     #expect(panelSource.contains("final class OpenAnythingPaletteWindowController"))
     #expect(panelSource.contains("isFloatingPanel = true"))
-    #expect(panelSource.contains("level = .floating"))
+    // Canonical Spotlight-style level - keeps the palette above full-screen
+    // and notification surfaces. Reverting to `.floating` would let other
+    // floating windows occlude it.
+    #expect(panelSource.contains("level = .statusBar"))
     #expect(panelSource.contains("NSHostingView"))
+    // macOS 26 (Tahoe) animates window-open regardless of
+    // `animationBehavior = .none`. The palette MUST hide via
+    // `alphaValue = 0` (keeping the panel ordered front) and show by
+    // restoring alpha + `makeKey` so the second-and-subsequent show skips
+    // the system show animation entirely.
+    #expect(panelSource.contains("panel?.alphaValue = 0"))
+    #expect(panelSource.contains("panel.alphaValue = 1"))
+    // Hosting view must skip the `[.minSize, .intrinsicContentSize, .maxSize]`
+    // probe pass on every view update - the panel size is fixed by
+    // `contentRect`, the probe is pure overhead.
+    #expect(panelSource.contains("hosting.sizingOptions = []"))
     #expect(appSource.contains("OpenAnythingPaletteWindowController"))
     #expect(hostSource.contains("appOpenAnythingPaletteController.toggle("))
     #expect(hostSource.contains("struct HarnessMonitorOpenAnythingExecutorBinder: ViewModifier"))
