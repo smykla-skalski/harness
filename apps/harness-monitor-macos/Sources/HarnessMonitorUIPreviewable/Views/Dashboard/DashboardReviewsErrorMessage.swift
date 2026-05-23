@@ -4,12 +4,12 @@ import HarnessMonitorKit
 /// User-facing copy for the most common GitHub auth failure that the daemon
 /// can report. Kept as a constant so tests can verify the exact text without
 /// depending on the daemon error envelope.
-let dashboardDepsGitHubAuthFailureMessage = """
+let dashboardReviewsGitHubAuthFailureMessage = """
   GitHub rejected the configured token (HTTP 401 Bad credentials). The token \
   may have expired or been revoked. Update it in Settings > Secrets and try again
   """
 
-let dashboardDepsDecodingFailureMessage = """
+let dashboardReviewsDecodingFailureMessage = """
   Harness Monitor could not read the daemon's reviews response. The daemon \
   and app may be on different versions - restart the daemon, then retry
   """
@@ -27,12 +27,12 @@ func dashboardReviewsErrorMessage(for error: any Error) -> String {
   }
 
   if error is DecodingError {
-    return dashboardDepsDecodingFailureMessage
+    return dashboardReviewsDecodingFailureMessage
   }
 
   let description = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
   if description.contains("GitHub API returned 401") {
-    return dashboardDepsGitHubAuthFailureMessage
+    return dashboardReviewsGitHubAuthFailureMessage
   }
   return description
 }

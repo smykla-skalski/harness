@@ -130,6 +130,20 @@ struct DashboardReviewsResolvedPreferences: Equatable {
   }
 }
 
+/// Formats the loading copy shown while the per-repo scheduler is fetching
+/// reviews. When the scheduler is tracking repositories we surface
+/// "Loading reviews… (X / Y repositories)" so the user can see progress on
+/// cold launches with many repositories; otherwise we fall back to the bare
+/// "Loading reviews…" copy.
+func dashboardReviewsLoadingLabel(
+  totalRepositories: Int,
+  syncedRepositories: Int
+) -> String {
+  guard totalRepositories > 0 else { return "Loading reviews…" }
+  let clamped = min(max(syncedRepositories, 0), totalRepositories)
+  return "Loading reviews… (\(clamped) / \(totalRepositories) repositories)"
+}
+
 enum DashboardReviewsMissingClientState: Equatable {
   case ignore
   case loading
@@ -146,5 +160,10 @@ func dashboardReviewsMissingClientState(
   if connectionState == .connecting {
     return .loading
   }
-  return .error("The reviews route needs a daemon client")
+  return .error(
+    """
+    Harness Monitor is starting up. The local sync engine isn't ready yet. \
+    Retry in a moment or check Settings > Diagnostics.
+    """
+  )
 }

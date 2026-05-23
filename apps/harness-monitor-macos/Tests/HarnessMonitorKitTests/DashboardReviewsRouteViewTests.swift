@@ -24,13 +24,25 @@ struct DashboardReviewsRouteViewTests {
       dashboardReviewsMissingClientState(
         backgroundRefresh: false,
         connectionState: .idle
-      ) == .error("The reviews route needs a daemon client")
+      )
+        == .error(
+          """
+          Harness Monitor is starting up. The local sync engine isn't ready yet. \
+          Retry in a moment or check Settings > Diagnostics.
+          """
+        )
     )
     #expect(
       dashboardReviewsMissingClientState(
         backgroundRefresh: false,
         connectionState: .offline("Daemon stopped")
-      ) == .error("The reviews route needs a daemon client")
+      )
+        == .error(
+          """
+          Harness Monitor is starting up. The local sync engine isn't ready yet. \
+          Retry in a moment or check Settings > Diagnostics.
+          """
+        )
     )
   }
 
@@ -217,7 +229,7 @@ struct DashboardReviewsRouteViewTests {
 
     #expect(
       dashboardReviewsErrorMessage(for: apiError)
-        == dashboardDepsGitHubAuthFailureMessage
+        == dashboardReviewsGitHubAuthFailureMessage
     )
   }
 
@@ -231,7 +243,7 @@ struct DashboardReviewsRouteViewTests {
 
     #expect(
       dashboardReviewsErrorMessage(for: LegacyTransportError())
-        == dashboardDepsGitHubAuthFailureMessage
+        == dashboardReviewsGitHubAuthFailureMessage
     )
   }
 
@@ -244,7 +256,7 @@ struct DashboardReviewsRouteViewTests {
 
     #expect(
       dashboardReviewsErrorMessage(for: decodingError)
-        == dashboardDepsDecodingFailureMessage
+        == dashboardReviewsDecodingFailureMessage
     )
   }
 
