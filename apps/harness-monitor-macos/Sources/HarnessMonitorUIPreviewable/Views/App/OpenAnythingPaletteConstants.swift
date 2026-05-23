@@ -24,7 +24,6 @@ public enum OpenAnythingPaletteConstants {
   public static let rowVerticalPadding: CGFloat = 9
   public static let rowHorizontalPadding: CGFloat = 14
   public static let rowSpacing: CGFloat = 12
-  public static let rowCornerRadius: CGFloat = 8
   public static let rowSelectedFillOpacity: Double = 0.16
   public static let rowHoverFillOpacity: Double = 0.06
 
