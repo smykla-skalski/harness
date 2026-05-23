@@ -71,8 +71,13 @@ struct HarnessMarkdownTableView: View {
   }
 
   private func rowDivider(isHeader: Bool) -> some View {
+    // Body-row dividers used to render at opacity 0.55 over an already
+    // half-opacity tableBorder — combined they vanished against dark
+    // canvases and rows ran together. Bump body rows to 0.85 so the
+    // border ink stays visible at any system theme without competing
+    // with the firm header divider above.
     Rectangle()
-      .fill(style.colors.tableBorder.opacity(isHeader ? 1 : 0.55))
+      .fill(style.colors.tableBorder.opacity(isHeader ? 1 : 0.85))
       .frame(height: 1)
   }
 
