@@ -94,6 +94,31 @@ struct DashboardReviewsPreferencesTests {
     #expect(request.forceRefresh)
   }
 
+  @Test("legacy authorsText defaulting to renovate[bot] clears on decode")
+  func legacyRenovateBotAuthorsClears() {
+    let legacy = """
+      {
+        "authorsText": "renovate[bot]",
+        "organizationsText": "acme"
+      }
+      """
+    let prefs = DashboardReviewsPreferences.decode(from: legacy)
+    #expect(prefs.authorsText.isEmpty)
+    #expect(prefs.normalizedAuthors.isEmpty)
+    #expect(prefs.organizationsText == "acme")
+  }
+
+  @Test("user-customized authorsText survives decode untouched")
+  func userCustomizedAuthorsSurvives() {
+    let payload = """
+      {
+        "authorsText": "renovate[bot], dependabot[bot]"
+      }
+      """
+    let prefs = DashboardReviewsPreferences.decode(from: payload)
+    #expect(prefs.authorsText == "renovate[bot], dependabot[bot]")
+  }
+
   @Test("re-encoding new preferences round-trips through Codable")
   func encodingRoundTripsNewFields() throws {
     var prefs = DashboardReviewsPreferences()

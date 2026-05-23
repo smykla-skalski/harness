@@ -78,7 +78,10 @@ final class HarnessMonitorSettingsDepsUITests: HarnessMonitorUITestCase {
 
     let saveButton = element(in: app, identifier: Accessibility.settingsReviewsSaveButton)
     let reloadButton = element(in: app, identifier: Accessibility.settingsReviewsReloadButton)
-    let authorsField = element(in: app, identifier: Accessibility.settingsReviewsAuthorsField)
+    let excludedReposField = element(
+      in: app,
+      identifier: Accessibility.settingsReviewsExcludedReposField
+    )
     let repositoriesButton = element(
       in: app,
       identifier: Accessibility.settingsReviewsRepositoriesButton
@@ -90,7 +93,7 @@ final class HarnessMonitorSettingsDepsUITests: HarnessMonitorUITestCase {
 
     XCTAssertTrue(saveButton.waitForExistence(timeout: Self.actionTimeout))
     XCTAssertTrue(reloadButton.waitForExistence(timeout: Self.actionTimeout))
-    XCTAssertTrue(authorsField.waitForExistence(timeout: Self.actionTimeout))
+    XCTAssertTrue(excludedReposField.waitForExistence(timeout: Self.actionTimeout))
     XCTAssertTrue(repositoriesButton.exists)
     XCTAssertTrue(mergeMethodField.exists)
     XCTAssertFalse(

@@ -304,9 +304,9 @@ final class HarnessMonitorPerfTests: HarnessMonitorUITestCase {
     let settingsRoot = element(in: launched, identifier: Accessibility.settingsRoot)
     let reviewsRoot = element(in: launched, identifier: Accessibility.settingsReviewsRoot)
     let saveButton = element(in: launched, identifier: Accessibility.settingsReviewsSaveButton)
-    let authorsField = element(
+    let excludedReposField = element(
       in: launched,
-      identifier: Accessibility.settingsReviewsAuthorsField
+      identifier: Accessibility.settingsReviewsExcludedReposField
     )
 
     waitForScenarioCompletion(app: launched, scenario: "reviews-settings")
@@ -317,7 +317,7 @@ final class HarnessMonitorPerfTests: HarnessMonitorUITestCase {
       "Reviews settings perf scenario should render the Reviews pane"
     )
     XCTAssertTrue(waitForElement(saveButton, timeout: Self.actionTimeout))
-    XCTAssertTrue(waitForElement(authorsField, timeout: Self.actionTimeout))
+    XCTAssertTrue(waitForElement(excludedReposField, timeout: Self.actionTimeout))
 
     launched.terminate()
   }

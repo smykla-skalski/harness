@@ -16,7 +16,7 @@ struct DashboardReviewsPreferences: Codable, Equatable {
   static let defaultTimelinePageSize: Int = 50
   static let defaultTimelineHiddenKindsRaw: String = "mentioned,subscribed,unsubscribed"
 
-  var authorsText = "renovate[bot]"
+  var authorsText = ""
   var organizationsText = ""
   var repositoriesText = ""
   var excludeRepositoriesText = ""
@@ -339,7 +339,14 @@ struct DashboardReviewsPreferences: Codable, Equatable {
   }
 
   static func decode(from string: String) -> Self {
-    DashboardReviewsStorageCodec.decode(Self.self, from: string) ?? Self()
+    var decoded = DashboardReviewsStorageCodec.decode(Self.self, from: string) ?? Self()
+    // Why: legacy installs persisted the "renovate[bot]" default, which now scopes
+    // the dashboard to a single author. The Reviews route fetches all PRs and lets
+    // the Category picker surface bot authors, so silently drop the legacy seed.
+    if decoded.authorsText == "renovate[bot]" {
+      decoded.authorsText = ""
+    }
+    return decoded
   }
 
   func queryRequest(forceRefresh: Bool) -> ReviewsQueryRequest {
