@@ -19,12 +19,14 @@ struct DashboardReviewsFilterPredicateTests {
         let expected = fixture.filter(\.isAutoMergeable).map(\.pullRequestID)
         #expect(Set(output.filteredItems.map(\.pullRequestID)) == Set(expected))
       case .review:
-        let expected = fixture
+        let expected =
+          fixture
           .filter { $0.reviewStatus == .reviewRequired }
           .map(\.pullRequestID)
         #expect(Set(output.filteredItems.map(\.pullRequestID)) == Set(expected))
       case .waiting:
-        let expected = fixture
+        let expected =
+          fixture
           .filter { $0.checkStatus == .pending }
           .map(\.pullRequestID)
         #expect(Set(output.filteredItems.map(\.pullRequestID)) == Set(expected))
@@ -40,7 +42,8 @@ struct DashboardReviewsFilterPredicateTests {
     let readyAndNeedsMe = await worker.compute(
       input: input(items: fixture, filter: .ready, needsMeOn: true)
     )
-    let expected = fixture
+    let expected =
+      fixture
       .filter { $0.isAutoMergeable && $0.requiresAttention }
       .map(\.pullRequestID)
     #expect(Set(readyAndNeedsMe.filteredItems.map(\.pullRequestID)) == Set(expected))
@@ -60,7 +63,8 @@ struct DashboardReviewsFilterPredicateTests {
     let output = await worker.compute(
       input: input(items: fixture, filter: .all, dependenciesOnlyOn: true)
     )
-    let expected = fixture
+    let expected =
+      fixture
       .filter { DashboardReviewsCategoryMode.dependencyBotLogins.contains($0.authorLogin) }
       .map(\.pullRequestID)
     #expect(Set(output.filteredItems.map(\.pullRequestID)) == Set(expected))
@@ -75,7 +79,8 @@ struct DashboardReviewsFilterPredicateTests {
     let output = await worker.compute(
       input: input(items: fixture, filter: .all, needsMeOn: true, dependenciesOnlyOn: true)
     )
-    let expected = fixture
+    let expected =
+      fixture
       .filter {
         $0.requiresAttention
           && DashboardReviewsCategoryMode.dependencyBotLogins.contains($0.authorLogin)
