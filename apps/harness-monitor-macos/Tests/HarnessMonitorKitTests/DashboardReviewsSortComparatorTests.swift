@@ -50,22 +50,25 @@ struct DashboardReviewsSortComparatorTests {
       checkStatus: .success
     )
 
-    let inputs = [draft, failing, changes, reviewRequired, pending, approved, approvable, mergeable]
+    let inputs = [
+      draft, failing, changes, reviewRequired, pending, approved, approvable, mergeable,
+    ]
     let sorted = inputs.sorted(by: DashboardReviewsSortMode.status.comparator)
 
     let ids = sorted.map { $0.pullRequestID }
     // Within the "pending checks" bucket the reviewTier tiebreaker pulls
     // explicit review-required PRs ahead of plain pending PRs.
-    #expect(ids == [
-      "merge",
-      "approve",
-      "approved-only",
-      "review",
-      "pending",
-      "changes",
-      "failing",
-      "draft",
-    ])
+    #expect(
+      ids == [
+        "merge",
+        "approve",
+        "approved-only",
+        "review",
+        "pending",
+        "changes",
+        "failing",
+        "draft",
+      ])
   }
 
   @Test("status comparator breaks ties with review tier, check tier, then updated desc")

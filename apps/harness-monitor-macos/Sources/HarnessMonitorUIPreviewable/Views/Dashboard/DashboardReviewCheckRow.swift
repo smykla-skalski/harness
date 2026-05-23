@@ -90,7 +90,10 @@ struct DashboardReviewCheckRow: View {
       }
       .harnessPlainButtonStyle()
       .disabled(!check.isRerunnable)
-      .help(check.isRerunnable ? "Rerun check" : (check.rerunUnavailableReason ?? "Rerun is not available"))
+      .help(
+        check.isRerunnable
+          ? "Rerun check" : (check.rerunUnavailableReason ?? "Rerun is not available")
+      )
       .accessibilityLabel("Rerun check \(check.name)")
 
       if let detailsURL = check.detailsWebURL {
