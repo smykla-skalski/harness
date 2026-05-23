@@ -8,17 +8,7 @@ extension TaskBoardAPIClientTests {
     -> ReviewsWebSocketContractResult
   {
     let probe = RPCProbe()
-    let transport = WebSocketTransport(
-      connection: HarnessMonitorConnection(
-        endpoint: try #require(URL(string: "http://127.0.0.1:1")),
-        token: "token"
-      ),
-      session: URLSession(configuration: .ephemeral),
-      rpcSender: { method, params, _ in
-        await probe.record(method: method, params: params)
-        return try taskBoardRPCResponse(for: method)
-      }
-    )
+    let transport = try makeReviewsWebSocketTransport(probe: probe)
     let target = reviewsWebSocketTarget()
 
     let repositoryCatalog = try await transport.catalogReviewRepositories(
@@ -234,6 +224,20 @@ extension TaskBoardAPIClientTests {
       checkStatus: .success,
       policyBlocked: false,
       checkSuiteIDs: ["suite-1"]
+    )
+  }
+
+  private func makeReviewsWebSocketTransport(probe: RPCProbe) throws -> WebSocketTransport {
+    WebSocketTransport(
+      connection: HarnessMonitorConnection(
+        endpoint: try #require(URL(string: "http://127.0.0.1:1")),
+        token: "token"
+      ),
+      session: URLSession(configuration: .ephemeral),
+      rpcSender: { method, params, _ in
+        await probe.record(method: method, params: params)
+        return try taskBoardRPCResponse(for: method)
+      }
     )
   }
 }

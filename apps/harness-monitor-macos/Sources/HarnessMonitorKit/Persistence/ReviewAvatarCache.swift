@@ -60,7 +60,7 @@ public actor ReviewAvatarCache {
     cache.removeAllObjects()
   }
 
-  public nonisolated static func fallbackAvatarURL(login: String) -> URL? {
+  nonisolated public static func fallbackAvatarURL(login: String) -> URL? {
     let trimmed = login.trimmingCharacters(in: .whitespacesAndNewlines)
     guard !trimmed.isEmpty else { return nil }
     var components = URLComponents()
