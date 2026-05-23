@@ -89,10 +89,36 @@ private final class DashboardReviewsSearchIndex {
   }
 }
 
-private struct DashboardReviewsSearchIndexSignature: Hashable {
+struct DashboardReviewsSearchIndexSignature: Hashable {
   let count: Int
-  let lastID: String?
   let contentFingerprint: Int
+}
+
+// Build an order-independent signature for the search-index inputs. Each
+// item's per-field tuple is hashed independently and then folded together with
+// overflow-wrapped addition so reordering the input produces the same combined
+// fingerprint. Addition is associative and commutative (so order is ignored)
+// and unlike XOR it does not collapse duplicate hashes to zero. This keeps the
+// `DashboardReviewsSearchIndex` from rebuilding when only the presentation
+// order changes (filter/sort flips) but content is unchanged.
+func dashboardReviewsSearchIndexSignature(
+  items: [ReviewItem]
+) -> DashboardReviewsSearchIndexSignature {
+  var combined: Int = 0
+  for item in items {
+    var hasher = Hasher()
+    hasher.combine(item.pullRequestID)
+    hasher.combine(item.title)
+    hasher.combine(item.repository)
+    hasher.combine(item.authorLogin)
+    hasher.combine(item.number)
+    hasher.combine(item.labels)
+    combined = combined &+ hasher.finalize()
+  }
+  return DashboardReviewsSearchIndexSignature(
+    count: items.count,
+    contentFingerprint: combined
+  )
 }
 
 func dashboardReviewsSearchSuggestions(
@@ -139,21 +165,7 @@ private struct DashboardReviewsToolbarSearchModifier: ViewModifier {
   }
 
   private var searchIndexSignature: DashboardReviewsSearchIndexSignature {
-    DashboardReviewsSearchIndexSignature(
-      count: items.count,
-      lastID: items.last?.pullRequestID,
-      contentFingerprint: Self.fingerprint(
-        items.flatMap { item in
-          [
-            item.pullRequestID,
-            item.title,
-            item.repository,
-            item.authorLogin,
-            "#\(item.number)",
-          ] + item.labels
-        }
-      )
-    )
+    dashboardReviewsSearchIndexSignature(items: items)
   }
 
   private var searchFocusAction: HarnessSidebarSearchFocus {
@@ -247,11 +259,4 @@ private struct DashboardReviewsToolbarSearchModifier: ViewModifier {
     }
   }
 
-  private static func fingerprint(_ values: [String]) -> Int {
-    var hasher = Hasher()
-    for value in values {
-      hasher.combine(value)
-    }
-    return hasher.finalize()
-  }
 }
