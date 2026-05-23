@@ -17,9 +17,10 @@ struct LegacyManagedLaunchAgentCleanupTests {
 
     LegacyManagedLaunchAgentCleanup.runOnce(defaults: defaults)
 
-    let stored = defaults.stringArray(
-      forKey: LegacyManagedLaunchAgentCleanup.completedNamesDefaultsKey
-    ) ?? []
+    let stored =
+      defaults.stringArray(
+        forKey: LegacyManagedLaunchAgentCleanup.completedNamesDefaultsKey
+      ) ?? []
     let expected = HarnessMonitorPaths.legacyLaunchAgentPlistNames
       .filter { $0 != HarnessMonitorPaths.launchAgentPlistName }
       .sorted()
@@ -46,9 +47,10 @@ struct LegacyManagedLaunchAgentCleanupTests {
 
     LegacyManagedLaunchAgentCleanup.runOnce(defaults: defaults)
 
-    let stored = defaults.stringArray(
-      forKey: LegacyManagedLaunchAgentCleanup.completedNamesDefaultsKey
-    ) ?? []
+    let stored =
+      defaults.stringArray(
+        forKey: LegacyManagedLaunchAgentCleanup.completedNamesDefaultsKey
+      ) ?? []
     #expect(stored.sorted() == preExisting)
   }
 
@@ -72,9 +74,10 @@ struct LegacyManagedLaunchAgentCleanupTests {
 
     LegacyManagedLaunchAgentCleanup.runOnce(defaults: defaults)
 
-    let stored = defaults.stringArray(
-      forKey: LegacyManagedLaunchAgentCleanup.completedNamesDefaultsKey
-    ) ?? []
+    let stored =
+      defaults.stringArray(
+        forKey: LegacyManagedLaunchAgentCleanup.completedNamesDefaultsKey
+      ) ?? []
     #expect(stored.sorted() == legacy.sorted())
   }
 }

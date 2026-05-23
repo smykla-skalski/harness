@@ -17,8 +17,7 @@ extension WebSocketTransport {
     return try decode(value)
   }
 
-  public func reviewsCapabilities() async throws -> ReviewsCapabilitiesResponse
-  {
+  public func reviewsCapabilities() async throws -> ReviewsCapabilitiesResponse {
     let value = try await rpc(method: .reviewsCapabilities, params: nil)
     return try decode(value)
   }

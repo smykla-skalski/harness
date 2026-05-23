@@ -15,8 +15,7 @@ extension PreviewHarnessClient {
     return await state.currentReviews(request: request)
   }
 
-  public func reviewsCapabilities() async throws -> ReviewsCapabilitiesResponse
-  {
+  public func reviewsCapabilities() async throws -> ReviewsCapabilitiesResponse {
     try await performActionDelay()
     return ReviewsCapabilitiesResponse()
   }

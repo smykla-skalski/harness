@@ -158,8 +158,7 @@ public struct ReviewsQueryResponse: Codable, Equatable, Sendable {
   }
 }
 
-public struct ReviewRepositoryLabel: Codable, Equatable, Identifiable, Sendable, Hashable
-{
+public struct ReviewRepositoryLabel: Codable, Equatable, Identifiable, Sendable, Hashable {
   public let name: String
   public let color: String?
   public let description: String?

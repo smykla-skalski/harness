@@ -42,8 +42,7 @@ final class DashboardReviewsScheduler {
   @ObservationIgnored private var preferences = DashboardReviewsResolvedPreferences(
     preferences: .init()
   )
-  @ObservationIgnored private var onMerge:
-    (@MainActor (String, ReviewsQueryResponse) -> Void)?
+  @ObservationIgnored private var onMerge: (@MainActor (String, ReviewsQueryResponse) -> Void)?
 
   /// Bumped on every `stop()` (which `start()` calls first). Tasks capture the
   /// generation at launch and skip cleanup if the value has moved on — this

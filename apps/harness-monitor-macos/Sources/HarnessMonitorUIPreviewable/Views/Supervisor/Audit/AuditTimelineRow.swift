@@ -106,7 +106,8 @@ struct AuditTimelineRow: View {
 
   private var summary: String {
     let redacted = redactSupervisorPayloadJSON(event.payloadJSON)
-    let collapsed = redacted
+    let collapsed =
+      redacted
       .replacingOccurrences(of: "\n", with: " ")
       .replacingOccurrences(of: "\r", with: " ")
       .trimmingCharacters(in: .whitespacesAndNewlines)
