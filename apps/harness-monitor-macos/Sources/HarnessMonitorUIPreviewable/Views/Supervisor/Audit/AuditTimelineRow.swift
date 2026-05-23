@@ -71,8 +71,7 @@ struct AuditTimelineRow: View {
       .truncationMode(.tail)
   }
 
-  @ViewBuilder
-  private var severityChip: some View {
+  @ViewBuilder private var severityChip: some View {
     if let severity {
       Text(severity.chipLabel)
         .scaledFont(.caption2.weight(.semibold))

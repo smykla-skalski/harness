@@ -20,7 +20,7 @@ public enum SupervisorPaneKey: String, CaseIterable, Hashable, Identifiable, Sen
   }
 
   /// Panes that the toolbar segmented picker should surface.
-  public static let toolbarVisibleCases: [SupervisorPaneKey] = [
+  public static let toolbarVisibleCases: [Self] = [
     .rules, .notifications, .background, .audit,
   ]
 }

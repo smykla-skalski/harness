@@ -35,7 +35,7 @@ public struct AuditTimelinePayloadInspectorView: View {
       errorMessage = "Payload is not valid JSON. Showing raw text."
       return
     }
-    node = AuditPayloadNode.from(value: decoded, label: nil)
+    node = Self.from(value: decoded, label: nil)
     errorMessage = nil
   }
 
@@ -66,16 +66,16 @@ indirect enum AuditPayloadNode {
   case container(
     label: String?,
     kind: AuditPayloadContainerKind,
-    children: [AuditPayloadNode],
+    children: [Self],
     prettyJSON: String
   )
 
-  static func from(value: JSONValue, label: String?) -> AuditPayloadNode {
+  static func from(value: JSONValue, label: String?) -> Self {
     switch value {
     case .object(let dictionary):
       let sortedKeys = dictionary.keys.sorted()
       let children = sortedKeys.map { key in
-        AuditPayloadNode.from(value: dictionary[key] ?? .null, label: key)
+        Self.from(value: dictionary[key] ?? .null, label: key)
       }
       return .container(
         label: label,
@@ -85,7 +85,7 @@ indirect enum AuditPayloadNode {
       )
     case .array(let items):
       let children = items.enumerated().map { index, item in
-        AuditPayloadNode.from(value: item, label: "[\(index)]")
+        Self.from(value: item, label: "[\(index)]")
       }
       return .container(
         label: label,
@@ -117,7 +117,7 @@ struct AuditPayloadSummary: Sendable {
       displayValue = flag ? "true" : "false"
       copyValue = displayValue
     case .number(let number):
-      let formatted = AuditPayloadSummary.formatNumber(number)
+      let formatted = Self.formatNumber(number)
       displayValue = formatted
       copyValue = formatted
     case .string(let text):
@@ -134,7 +134,7 @@ struct AuditPayloadSummary: Sendable {
     copyValue = rawText
   }
 
-  static let empty = AuditPayloadSummary(rawText: "")
+  static let empty = Self(rawText: "")
 
   private static func formatNumber(_ value: Double) -> String {
     if value.rounded() == value, abs(value) < 1e15 {

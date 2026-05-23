@@ -76,6 +76,5 @@ extension EnvironmentValues {
   /// The dispatcher lives at app scope so the dashboard scene (which sets the
   /// navigation handler) and the Settings scene (where the pane mounts and
   /// installs the filter handler) reach the same instance.
-  @Entry public var supervisorAuditTimelineDispatcher: SupervisorAuditTimelineFocusDispatcher? =
-    nil
+  @Entry public var supervisorAuditTimelineDispatcher: SupervisorAuditTimelineFocusDispatcher?
 }

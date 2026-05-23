@@ -84,7 +84,7 @@ extension HarnessMonitorApp {
       .modifier(openAnythingHostModifier(windowID: HarnessMonitorWindowID.settings))
       .harnessTrackMCPWindow(tracksElements: false)
       .environment(appStore)
-      .environment(\.supervisorAuditTimelineDispatcher, supervisorAuditTimelineDispatcher)
+      .environment(\.supervisorAuditTimelineDispatcher, appAuditTimelineDispatcher)
     } else {
       Color.clear.accessibilityHidden(true)
     }
@@ -120,7 +120,7 @@ extension HarnessMonitorApp {
       themeMode: themeModeBinding,
       settingsSelectedSection: settingsSelectedSectionBinding,
       settingsNavigationRequest: settingsNavigationRequestBinding,
-      supervisorAuditTimelineDispatcher: supervisorAuditTimelineDispatcher,
+      supervisorAuditTimelineDispatcher: appAuditTimelineDispatcher,
       perfScenario: perfScenario,
       hasRunPerfScenario: hasRunPerfScenarioBinding,
       perfScenarioStatus: perfScenarioStatusBinding,

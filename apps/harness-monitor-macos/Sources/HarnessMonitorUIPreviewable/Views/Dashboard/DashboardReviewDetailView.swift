@@ -161,7 +161,7 @@ private struct DashboardReviewDetailHeader<Actions: View>: View {
             .fixedSize(horizontal: false, vertical: true)
             .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .buttonStyle(.plain)
+        .harnessPlainButtonStyle()
         .disabled(pullRequestURL == nil)
         .help("Open pull request on GitHub")
         .accessibilityHint("Opens the pull request on GitHub")
@@ -175,7 +175,7 @@ private struct DashboardReviewDetailHeader<Actions: View>: View {
           } label: {
             Text("#\(item.number)")
           }
-          .buttonStyle(.plain)
+          .harnessPlainButtonStyle()
           .disabled(pullRequestURL == nil)
           .help("Open pull request on GitHub")
           .accessibilityHint("Opens the pull request on GitHub")
@@ -187,7 +187,7 @@ private struct DashboardReviewDetailHeader<Actions: View>: View {
           } label: {
             Text(item.authorLogin)
           }
-          .buttonStyle(.plain)
+          .harnessPlainButtonStyle()
           .disabled(authorProfileURL == nil)
           .help("Open author profile on GitHub")
           .accessibilityHint("Opens the author profile on GitHub")

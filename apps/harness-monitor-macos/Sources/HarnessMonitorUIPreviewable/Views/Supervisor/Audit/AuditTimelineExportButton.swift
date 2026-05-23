@@ -34,7 +34,7 @@ public struct AuditTimelineExportButton: View {
     self.init(
       filters: filters,
       modelContainer: modelContainer,
-      presentSavePanel: AuditTimelineExportButton.runDefaultSavePanel(suggestedFilename:)
+      presentSavePanel: Self.runDefaultSavePanel(suggestedFilename:)
     )
   }
 

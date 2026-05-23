@@ -19,12 +19,10 @@ public final class AuditTimelineFilterState: @unchecked Sendable {
   }
 
   /// UserDefaults instance to round-trip through. Tests inject a transient one.
-  @ObservationIgnored
-  public let userDefaults: UserDefaults
+  @ObservationIgnored public let userDefaults: UserDefaults
 
   /// Storage key for the round-trip blob.
-  @ObservationIgnored
-  public let storageKey: String
+  @ObservationIgnored public let storageKey: String
 
   public init(
     filters: SupervisorAuditFilters = .init(),

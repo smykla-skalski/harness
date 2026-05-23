@@ -102,7 +102,8 @@ final class SessionWindowAppKitBindingNSView: NSView {
     }
   }
 
-  @objc private func boundWindowWillClose(_ notification: Notification) {
+  @objc
+  private func boundWindowWillClose(_ notification: Notification) {
     guard let closingWindow = notification.object as? NSWindow else {
       return
     }
