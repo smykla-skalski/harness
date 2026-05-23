@@ -126,8 +126,8 @@ struct ReviewItemViewerCanUpdateDefaultTests {
   }
 
   private func makeQueryResponseJSON(viewerCanUpdate: Bool?) -> Data {
-    let itemJSON = String(
-      decoding: makeReviewItemJSON(viewerCanUpdate: viewerCanUpdate), as: UTF8.self)
+    let itemJSON =
+      String(bytes: makeReviewItemJSON(viewerCanUpdate: viewerCanUpdate), encoding: .utf8) ?? ""
     let body = """
       {
         "fetchedAt": "2026-05-01T09:00:00Z",
@@ -155,8 +155,8 @@ struct ReviewItemViewerCanUpdateDefaultTests {
   }
 
   private func makeRefreshResponseJSON(viewerCanUpdate: Bool?) -> Data {
-    let itemJSON = String(
-      decoding: makeReviewItemJSON(viewerCanUpdate: viewerCanUpdate), as: UTF8.self)
+    let itemJSON =
+      String(bytes: makeReviewItemJSON(viewerCanUpdate: viewerCanUpdate), encoding: .utf8) ?? ""
     let body = """
       {
         "fetchedAt": "2026-05-01T09:00:00Z",

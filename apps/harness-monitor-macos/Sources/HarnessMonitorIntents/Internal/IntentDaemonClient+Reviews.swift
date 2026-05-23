@@ -19,11 +19,11 @@ extension IntentDaemonClient {
     let response = try await queryReviewsCurrentSnapshot()
     let needle = query.lowercased()
     guard !needle.isEmpty else { return [] }
-    return
+    return Array(
       response.items
-      .filter { Self.matches(item: $0, needle: needle) }
-      .prefix(max(0, limit))
-      .map { $0 }
+        .filter { Self.matches(item: $0, needle: needle) }
+        .prefix(max(0, limit))
+    )
   }
 
   public func countNeedsMeReviewItems() async throws -> Int {

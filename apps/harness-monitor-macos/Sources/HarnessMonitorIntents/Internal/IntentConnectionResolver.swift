@@ -57,8 +57,7 @@ public enum IntentConnectionResolver {
     }
   }
 
-  // TODO: revisit keychain-backed token storage.
-  // See memory: project-daemon-auth-token-storage-discussion-2026-05-23
+  // Keychain-backed token storage is a future improvement; see project-daemon-auth-token-storage.
   static func readAuthToken(at url: URL) throws -> String {
     let raw: String
     do {
