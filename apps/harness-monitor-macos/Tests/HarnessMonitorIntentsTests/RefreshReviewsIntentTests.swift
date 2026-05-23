@@ -6,23 +6,10 @@ import XCTest
 @testable import HarnessMonitorIntents
 
 final class RefreshReviewsIntentTests: XCTestCase {
-  func testRefreshRepositoryReturnsZeroForBlankInput() async throws {
-    let stub = StubReviewsRefreshSource(repositoryResult: 5)
-    let intent = RefreshRepositoryIntent(repository: "   \t", source: stub)
-
-    let count = try await intent.resolveRefreshCount()
-
-    XCTAssertEqual(count, 0)
-    let recorded = await stub.recordedRepositories
-    XCTAssertTrue(recorded.isEmpty, "blank input should not call the source")
-  }
-
-  func testRefreshRepositoryTrimsAndForwardsToSource() async throws {
+  func testRefreshRepositoryForwardsEntityIDToSource() async throws {
     let stub = StubReviewsRefreshSource(repositoryResult: 3)
-    let intent = RefreshRepositoryIntent(
-      repository: "  octo/Hello-World  ",
-      source: stub
-    )
+    let entity = RepositoryEntity(id: "octo/Hello-World", owner: "octo", name: "Hello-World")
+    let intent = RefreshRepositoryIntent(repository: entity, source: stub)
 
     let count = try await intent.resolveRefreshCount()
 
