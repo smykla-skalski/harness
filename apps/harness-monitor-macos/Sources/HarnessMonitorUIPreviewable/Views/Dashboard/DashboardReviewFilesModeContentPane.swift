@@ -29,7 +29,7 @@ struct DashboardReviewFilesModeContentPane: View {
 
     VStack(alignment: .leading, spacing: 12) {
       header(summary: summary)
-      searchAndLayout
+      searchField
       quickFilters
       fileList(files: files, threadIndex: threadIndex)
     }
@@ -67,7 +67,6 @@ struct DashboardReviewFilesModeContentPane: View {
     [
       item.pullRequestID,
       store.connectionState == .online ? "online" : "offline",
-      preferences.snapshot.filesDefaultViewModeRaw,
     ].joined(separator: ":")
   }
 
@@ -113,34 +112,23 @@ struct DashboardReviewFilesModeContentPane: View {
     }
   }
 
-  private var searchAndLayout: some View {
-    VStack(alignment: .leading, spacing: 8) {
-      HStack(spacing: 8) {
-        Image(systemName: "magnifyingglass").foregroundStyle(.secondary)
-        TextField("Filter files", text: $filter.text)
-          .textFieldStyle(.plain)
-        if !filter.text.isEmpty {
-          Button {
-            filter.clearText()
-          } label: {
-            Image(systemName: "xmark.circle.fill")
-          }
-          .harnessPlainButtonStyle()
-          .accessibilityLabel("Clear file filter")
+  private var searchField: some View {
+    HStack(spacing: 8) {
+      Image(systemName: "magnifyingglass").foregroundStyle(.secondary)
+      TextField("Filter files", text: $filter.text)
+        .textFieldStyle(.plain)
+      if !filter.text.isEmpty {
+        Button {
+          filter.clearText()
+        } label: {
+          Image(systemName: "xmark.circle.fill")
         }
+        .harnessPlainButtonStyle()
+        .accessibilityLabel("Clear file filter")
       }
-      .padding(8)
-      .background(Color.secondary.opacity(0.10), in: RoundedRectangle(cornerRadius: 8))
-
-      Picker("Layout", selection: viewModeBinding) {
-        ForEach(FilesViewMode.allCases, id: \.self) { mode in
-          Text(mode == .unified ? "Unified" : "Split").tag(mode)
-        }
-      }
-      .pickerStyle(.segmented)
-      .labelsHidden()
-      .controlSize(.small)
     }
+    .padding(8)
+    .background(Color.secondary.opacity(0.10), in: RoundedRectangle(cornerRadius: 8))
   }
 
   private var quickFilters: some View {
@@ -178,6 +166,7 @@ struct DashboardReviewFilesModeContentPane: View {
               threads: threadIndex.anchors(forPath: file.path)
             )
             .tag(file.path)
+            .listRowInsets(EdgeInsets(top: 4, leading: 0, bottom: 4, trailing: 0))
           }
         }
       }
@@ -190,13 +179,6 @@ struct DashboardReviewFilesModeContentPane: View {
     Binding(
       get: { viewModel.selectedPath },
       set: { onSelectPath($0) }
-    )
-  }
-
-  private var viewModeBinding: Binding<FilesViewMode> {
-    Binding(
-      get: { preferences.snapshot.filesDefaultViewMode },
-      set: { mode in preferences.update { $0.filesDefaultViewModeRaw = mode.rawValue } }
     )
   }
 
