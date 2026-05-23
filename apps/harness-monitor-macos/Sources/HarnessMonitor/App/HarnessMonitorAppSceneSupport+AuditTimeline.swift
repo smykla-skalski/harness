@@ -19,7 +19,7 @@ struct SupervisorAuditTimelineSceneModifier: ViewModifier {
     content
       .environment(\.openSupervisorAuditTimeline, openAuditTimelineEnvAction)
       .environment(\.supervisorAuditTimelineDispatcher, dispatcher)
-      .focusedSceneValue(
+      .harnessFocusedSceneValue(
         \.supervisorAuditTimelineFocus,
         SupervisorAuditTimelineFocus(dispatcher: dispatcher)
       )

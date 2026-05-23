@@ -207,7 +207,7 @@ struct PolicyCanvasViewport: View {
             viewModel.clearPinchAnchor()
           }
         }
-        .focusedSceneValue(\.harnessPolicyCanvasZoomFocus, zoomFocus)
+        .harnessFocusedSceneValue(\.harnessPolicyCanvasZoomFocus, zoomFocus)
         .task(id: routeKey) {
           await rebuildRoutes()
         }
