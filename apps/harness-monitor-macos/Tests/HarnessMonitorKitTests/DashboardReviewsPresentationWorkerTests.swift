@@ -5,6 +5,50 @@ import Testing
 
 @Suite("Dashboard reviews presentation worker")
 struct DashboardReviewsPresentationWorkerTests {
+  @Test("category=dependencies narrows results to Renovate and Dependabot")
+  func categoryFilterKeepsOnlyDependencyBots() async {
+    let humanPR = reviewItem(
+      id: "pr-human",
+      repository: "kong/a",
+      number: 1,
+      title: "feat: add X",
+      authorLogin: "octo-user"
+    )
+    let renovatePR = reviewItem(
+      id: "pr-renovate",
+      repository: "kong/a",
+      number: 2,
+      title: "chore(deps): bump foo",
+      authorLogin: "renovate[bot]"
+    )
+    let dependabotPR = reviewItem(
+      id: "pr-dependabot",
+      repository: "kong/b",
+      number: 3,
+      title: "Bump bar",
+      authorLogin: "dependabot[bot]"
+    )
+
+    let output = await DashboardReviewsPresentationWorker().compute(
+      input: DashboardReviewsPresentationInput(
+        items: [humanPR, renovatePR, dependabotPR],
+        filterModeRaw: DashboardReviewsFilterMode.all.rawValue,
+        sortModeRaw: DashboardReviewsSortMode.repository.rawValue,
+        categoryModeRaw: DashboardReviewsCategoryMode.dependencies.rawValue,
+        searchText: "",
+        configuredRepositories: ["kong/a", "kong/b"],
+        configuredOrganizations: [],
+        selectedIDs: [],
+        persistedPrimarySelectionID: ""
+      )
+    )
+
+    #expect(
+      Set(output.filteredItems.map(\.pullRequestID))
+        == Set(["pr-renovate", "pr-dependabot"])
+    )
+  }
+
   @Test("filters, groups, and selects review rows off main")
   func filtersGroupsAndSelectsReviewRows() async {
     let first = reviewItem(
@@ -42,6 +86,7 @@ struct DashboardReviewsPresentationWorkerTests {
         items: [third, second, first],
         filterModeRaw: DashboardReviewsFilterMode.review.rawValue,
         sortModeRaw: DashboardReviewsSortMode.repository.rawValue,
+        categoryModeRaw: DashboardReviewsCategoryMode.all.rawValue,
         searchText: "security",
         configuredRepositories: ["kong/b", "kong/a"],
         configuredOrganizations: ["kumahq"],
@@ -68,6 +113,7 @@ struct DashboardReviewsPresentationWorkerTests {
         items: [first, second, third],
         filterModeRaw: DashboardReviewsFilterMode.all.rawValue,
         sortModeRaw: DashboardReviewsSortMode.repository.rawValue,
+        categoryModeRaw: DashboardReviewsCategoryMode.all.rawValue,
         searchText: "",
         configuredRepositories: ["kong/b", "kong/a"],
         configuredOrganizations: ["kumahq"],
@@ -94,6 +140,7 @@ struct DashboardReviewsPresentationWorkerTests {
         items: [item],
         filterModeRaw: DashboardReviewsFilterMode.all.rawValue,
         sortModeRaw: DashboardReviewsSortMode.repository.rawValue,
+        categoryModeRaw: DashboardReviewsCategoryMode.all.rawValue,
         searchText: "",
         configuredRepositories: [],
         configuredOrganizations: [],
@@ -125,6 +172,7 @@ struct DashboardReviewsPresentationWorkerTests {
         items: [first, second],
         filterModeRaw: DashboardReviewsFilterMode.all.rawValue,
         sortModeRaw: DashboardReviewsSortMode.repository.rawValue,
+        categoryModeRaw: DashboardReviewsCategoryMode.all.rawValue,
         searchText: "",
         configuredRepositories: [],
         configuredOrganizations: [],
