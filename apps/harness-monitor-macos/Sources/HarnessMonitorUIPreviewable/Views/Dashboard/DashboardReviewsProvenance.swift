@@ -18,6 +18,11 @@ struct DashboardReviewsProvenanceSnapshot: Equatable {
   let fetchedSnapshotIsStale: Bool
   let cacheMaxAgeSeconds: UInt64
   let perRepositoryIntervalSeconds: UInt64
+  /// Ceiling beyond which the aggregate snapshot is considered stale. Set to
+  /// the larger of the daemon's cache TTL and the user's chosen per-repository
+  /// refresh interval so users who pick a longer cadence don't see a "10m"
+  /// warning fire every cycle while their schedule is on time.
+  let freshnessCeilingSeconds: UInt64
   let repositoryCount: Int
   let syncingRepositoryCount: Int
   let failedRepositories: [String]
@@ -34,9 +39,11 @@ struct DashboardReviewsProvenanceSnapshot: Equatable {
   ) {
     fetchedAt = response.fetchedAt
     fetchedDate = Self.parseDate(response.fetchedAt)
+    let ceiling = max(cacheMaxAgeSeconds, perRepositoryIntervalSeconds)
+    freshnessCeilingSeconds = ceiling
     fetchedSnapshotIsStale =
       fetchedDate.map {
-        now.timeIntervalSince($0) > TimeInterval(cacheMaxAgeSeconds)
+        now.timeIntervalSince($0) > TimeInterval(ceiling)
       } ?? false
     self.cacheMaxAgeSeconds = cacheMaxAgeSeconds
     self.perRepositoryIntervalSeconds = perRepositoryIntervalSeconds
@@ -144,7 +151,7 @@ struct DashboardReviewsProvenanceSnapshot: Equatable {
       return "Repository sync failed for \(repositoryList(failedRepositories))"
     }
     if fetchedSnapshotIsStale {
-      return "Fetched snapshot exceeds \(durationTitle(cacheMaxAgeSeconds))"
+      return "Fetched snapshot exceeds \(durationTitle(freshnessCeilingSeconds))"
     }
     if !staleRepositories.isEmpty {
       return "Repository sync stale for \(repositoryList(staleRepositories))"

@@ -66,6 +66,48 @@ struct DashboardReviewsProvenanceTests {
     #expect(stale.warningTitle == "Fetched snapshot exceeds 10m")
   }
 
+  @MainActor
+  @Test("Staleness threshold respects a per-repository interval longer than cache TTL")
+  func stalenessThresholdRespectsLongerPerRepositoryInterval() {
+    let fetchedAt = "2026-05-22T09:00:00Z"
+    // Daemon cache TTL stays at the 10-minute default; user picks a 50-minute
+    // per-repository refresh cadence. Twenty minutes after the fetch the
+    // scheduler is still on schedule, so the snapshot must not be flagged.
+    let fetchedAtEpoch: TimeInterval = 1_779_440_400  // 2026-05-22T09:00:00Z
+    let twentyMinutesAfter = Date(timeIntervalSince1970: fetchedAtEpoch + 1_200)
+    let sixtyMinutesAfter = Date(timeIntervalSince1970: fetchedAtEpoch + 3_600)
+    let health = DashboardReviewsSyncHealth(
+      totalRepositoryCount: 5,
+      syncingRepositoryCount: 0,
+      failedRepositories: [],
+      staleRepositories: []
+    )
+
+    let onSchedule = provenanceSnapshot(
+      fetchedAt: fetchedAt,
+      fromCache: false,
+      connectionState: .online,
+      health: health,
+      cacheMaxAgeSeconds: 600,
+      perRepositoryIntervalSeconds: 3_000,
+      now: twentyMinutesAfter
+    )
+    let pastCeiling = provenanceSnapshot(
+      fetchedAt: fetchedAt,
+      fromCache: false,
+      connectionState: .online,
+      health: health,
+      cacheMaxAgeSeconds: 600,
+      perRepositoryIntervalSeconds: 3_000,
+      now: sixtyMinutesAfter
+    )
+
+    #expect(!onSchedule.fetchedSnapshotIsStale)
+    #expect(onSchedule.warningTitle == nil)
+    #expect(pastCeiling.fetchedSnapshotIsStale)
+    #expect(pastCeiling.warningTitle == "Fetched snapshot exceeds 50m")
+  }
+
   @Test("Route wires provenance into list and detail surfaces")
   func routeWiresProvenanceIntoListAndDetailSurfaces() throws {
     let routeSource = try dashboardSource(named: "DashboardReviewsRouteView.swift")
@@ -91,6 +133,8 @@ struct DashboardReviewsProvenanceTests {
     fromCache: Bool,
     connectionState: HarnessMonitorStore.ConnectionState,
     health: DashboardReviewsSyncHealth,
+    cacheMaxAgeSeconds: UInt64 = 600,
+    perRepositoryIntervalSeconds: UInt64 = 300,
     now: Date
   ) -> DashboardReviewsProvenanceSnapshot {
     DashboardReviewsProvenanceSnapshot(
@@ -102,8 +146,8 @@ struct DashboardReviewsProvenanceTests {
       ),
       connectionState: connectionState,
       syncHealth: health,
-      cacheMaxAgeSeconds: 600,
-      perRepositoryIntervalSeconds: 300,
+      cacheMaxAgeSeconds: cacheMaxAgeSeconds,
+      perRepositoryIntervalSeconds: perRepositoryIntervalSeconds,
       now: now
     )
   }
