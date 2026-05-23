@@ -39,7 +39,7 @@ public enum OpenAnythingPaletteConstants {
 
   // Footer
   public static let footerHorizontalPadding: CGFloat = 14
-  public static let footerVerticalPadding: CGFloat = 8
+  public static let footerVerticalPadding: CGFloat = 4
 
   // Optional preview pane
   /// When the host window is at least this wide, the palette renders a
