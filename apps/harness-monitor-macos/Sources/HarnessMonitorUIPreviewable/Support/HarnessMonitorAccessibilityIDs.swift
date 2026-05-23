@@ -74,7 +74,18 @@ public enum HarnessMonitorAccessibility {
   }
 
   public static func dashboardWindowRoute(_ route: String) -> String {
-    "harness.dashboard.route.\(slug(route))"
+    "harness.dashboard.route.\(slug(dashboardWindowRouteAlias(route)))"
+  }
+
+  private static func dashboardWindowRouteAlias(_ route: String) -> String {
+    // The Dependencies route was renamed to Reviews in the 2026-05-22 rename
+    // project. The route enum still uses `.dependencies` as its raw value so
+    // any caller (SwiftUI route case, persisted SceneStorage, MCP target) can
+    // address it by either name, but the public accessibility identifier
+    // tracks the user-visible name `reviews`.
+    let lowered = route.lowercased()
+    if lowered == "dependencies" { return "reviews" }
+    return route
   }
 
   public static func sessionWindowAgentRow(_ agentID: String) -> String {
