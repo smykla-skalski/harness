@@ -107,6 +107,7 @@ extension DashboardReviewsRouteView {
   /// against the row under the cursor, but the visual selection and
   /// `routeSelectedIDs` do not change. This brings them in sync so action
   /// handlers and detail-pane bindings reflect the menu's scope.
+  @discardableResult
   func primeSelectionForContextMenu(items: [ReviewItem]) -> Bool {
     let menuIDs = Set(items.map(\.pullRequestID))
     guard !menuIDs.isEmpty, menuIDs != routeSelectedIDs else { return false }
