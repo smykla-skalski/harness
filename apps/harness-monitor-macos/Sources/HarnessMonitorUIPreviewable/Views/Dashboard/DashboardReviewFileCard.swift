@@ -12,7 +12,10 @@ struct DashboardReviewFileCard: View {
   let viewMode: FilesViewMode
   let pullRequestID: String
   let repositoryID: String
+  let repositoryFullName: String?
+  let headRefOid: String
   let fontScale: CGFloat
+  let threads: [DashboardReviewFileThreadAnchor]
   let onToggleViewed: @MainActor (Bool) -> Void
   let onChangeViewMode: @MainActor (FilesViewMode) -> Void
   let onLoadPreview: @MainActor () -> Void
@@ -27,7 +30,10 @@ struct DashboardReviewFileCard: View {
       viewMode: viewMode,
       pullRequestID: pullRequestID,
       repositoryID: repositoryID,
+      repositoryFullName: repositoryFullName,
+      headRefOid: headRefOid,
       fontScale: fontScale,
+      threads: threads,
       onToggleViewed: onToggleViewed,
       onChangeViewMode: onChangeViewMode,
       onLoadPreview: onLoadPreview,
@@ -44,7 +50,10 @@ struct DashboardReviewFileCardInternal: View {
   let viewMode: FilesViewMode
   let pullRequestID: String
   let repositoryID: String
+  let repositoryFullName: String?
+  let headRefOid: String
   let fontScale: CGFloat
+  let threads: [DashboardReviewFileThreadAnchor]
   let onToggleViewed: @MainActor (Bool) -> Void
   let onChangeViewMode: @MainActor (FilesViewMode) -> Void
   let onLoadPreview: @MainActor () -> Void
@@ -56,6 +65,8 @@ struct DashboardReviewFileCardInternal: View {
   let errorFont: Font
 
   @State private var isExpanded: Bool = false
+  @Environment(\.openURL)
+  var openURL
 
   init(
     file: ReviewFile,
@@ -65,7 +76,10 @@ struct DashboardReviewFileCardInternal: View {
     viewMode: FilesViewMode,
     pullRequestID: String,
     repositoryID: String,
+    repositoryFullName: String?,
+    headRefOid: String,
     fontScale: CGFloat,
+    threads: [DashboardReviewFileThreadAnchor] = [],
     onToggleViewed: @escaping @MainActor (Bool) -> Void,
     onChangeViewMode: @escaping @MainActor (FilesViewMode) -> Void,
     onLoadPreview: @escaping @MainActor () -> Void,
@@ -78,7 +92,10 @@ struct DashboardReviewFileCardInternal: View {
     self.viewMode = viewMode
     self.pullRequestID = pullRequestID
     self.repositoryID = repositoryID
+    self.repositoryFullName = repositoryFullName
+    self.headRefOid = headRefOid
     self.fontScale = fontScale
+    self.threads = threads
     self.onToggleViewed = onToggleViewed
     self.onChangeViewMode = onChangeViewMode
     self.onLoadPreview = onLoadPreview
@@ -146,6 +163,7 @@ struct DashboardReviewFileCardInternal: View {
       pathLabel
       Spacer(minLength: 0)
       changeCounts
+      fileActionsMenu
 
       Toggle(
         "Viewed",
@@ -249,13 +267,17 @@ struct DashboardReviewFileCardInternal: View {
         DashboardReviewFileDiffSplit(
           patch: patch,
           language: file.languageHint,
-          fontScale: fontScale
+          fontScale: fontScale,
+          threads: threads,
+          repositoryFullName: repositoryFullName
         )
       } else {
         DashboardReviewFileDiffUnified(
           patch: patch,
           language: file.languageHint,
-          fontScale: fontScale
+          fontScale: fontScale,
+          threads: threads,
+          repositoryFullName: repositoryFullName
         )
       }
     case .failed:
@@ -287,6 +309,8 @@ struct DashboardReviewFileCardInternal: View {
         viewMode: viewMode,
         language: file.languageHint,
         fontScale: fontScale,
+        threads: threads,
+        repositoryFullName: repositoryFullName,
         isLoadingFullPatch: patchState == .loading,
         fullPatchFailed: patchState.isFailed
       )
@@ -343,6 +367,7 @@ struct DashboardReviewFileCardInternal: View {
       """
     )
   }
+
 }
 
 extension ReviewFilePatchState {

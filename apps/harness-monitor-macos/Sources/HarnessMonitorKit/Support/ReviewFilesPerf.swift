@@ -134,6 +134,26 @@ public enum ReviewFilesPerf {
     return Interval(state: state, name: "files.diff.draw")
   }
 
+  public static func beginLatencyProof(size: String, lineCount: Int) -> Interval {
+    let id = signposter.makeSignpostID()
+    let state = signposter.beginInterval(
+      "files.diff.latency_proof",
+      id: id,
+      "size=\(size, privacy: .public) lines=\(lineCount)"
+    )
+    return Interval(state: state, name: "files.diff.latency_proof")
+  }
+
+  public static func beginVisibleHighlight(size: String, rowCount: Int) -> Interval {
+    let id = signposter.makeSignpostID()
+    let state = signposter.beginInterval(
+      "files.diff.visible_highlight",
+      id: id,
+      "size=\(size, privacy: .public) rows=\(rowCount)"
+    )
+    return Interval(state: state, name: "files.diff.visible_highlight")
+  }
+
   public static func beginImageDecode(oid: String) -> Interval {
     let id = signposter.makeSignpostID()
     let state = signposter.beginInterval(

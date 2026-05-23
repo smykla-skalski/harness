@@ -38,6 +38,9 @@ struct DashboardReviewFilesSection: View {
 
   var body: some View {
     let viewModel = store.viewModel(forPullRequest: pullRequestID)
+    let threadIndex = DashboardReviewFileThreadIndex(
+      entries: store.reviewTimelineViewModel(for: pullRequestID).entries
+    )
     let isDaemonOnline = store.connectionState == .online && store.apiClient != nil
     return VStack(alignment: .leading, spacing: 12) {
       DashboardReviewFilesHeader(
@@ -45,7 +48,11 @@ struct DashboardReviewFilesSection: View {
         filter: filter,
         fontScale: fontScale
       )
-      contentBody(viewModel: viewModel, isDaemonOnline: isDaemonOnline)
+      contentBody(
+        viewModel: viewModel,
+        threadIndex: threadIndex,
+        isDaemonOnline: isDaemonOnline
+      )
     }
     .task(
       id: ReviewFilesTaskKey(
@@ -88,6 +95,7 @@ struct DashboardReviewFilesSection: View {
   @ViewBuilder
   private func contentBody(
     viewModel: ReviewFilesViewModel,
+    threadIndex: DashboardReviewFileThreadIndex,
     isDaemonOnline: Bool
   ) -> some View {
     switch viewModel.state {
@@ -119,7 +127,7 @@ struct DashboardReviewFilesSection: View {
           fontScale: fontScale
         )
       } else {
-        filesList(viewModel: viewModel)
+        filesList(viewModel: viewModel, threadIndex: threadIndex)
       }
     }
   }
@@ -148,7 +156,10 @@ struct DashboardReviewFilesSection: View {
     }
   }
 
-  private func filesList(viewModel: ReviewFilesViewModel) -> some View {
+  private func filesList(
+    viewModel: ReviewFilesViewModel,
+    threadIndex: DashboardReviewFileThreadIndex
+  ) -> some View {
     LazyVStack(alignment: .leading, spacing: 8) {
       ForEach(Array(viewModel.filteredFiles.prefix(visibleFileLimit)), id: \.path) { file in
         DashboardReviewFileCard(
@@ -159,7 +170,10 @@ struct DashboardReviewFilesSection: View {
           viewMode: viewModel.viewMode(forPath: file.path),
           pullRequestID: pullRequestID,
           repositoryID: repositoryID,
+          repositoryFullName: viewModel.repositoryFullName,
+          headRefOid: viewModel.headRefOid,
           fontScale: fontScale,
+          threads: threadIndex.anchors(forPath: file.path),
           onToggleViewed: { newValue in
             store.setFileViewed(
               pullRequestID: pullRequestID,

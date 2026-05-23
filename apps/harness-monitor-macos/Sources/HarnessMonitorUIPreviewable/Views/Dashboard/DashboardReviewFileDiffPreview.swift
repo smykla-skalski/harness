@@ -8,6 +8,8 @@ struct DashboardReviewFileDiffPreview: View {
   let viewMode: FilesViewMode
   let language: HarnessReviewFileLanguage
   let fontScale: CGFloat
+  var threads: [DashboardReviewFileThreadAnchor] = []
+  var repositoryFullName: String?
   let isLoadingFullPatch: Bool
   let fullPatchFailed: Bool
 
@@ -28,13 +30,17 @@ struct DashboardReviewFileDiffPreview: View {
       DashboardReviewFileDiffSplit(
         patch: preview.projectedPatch,
         language: language,
-        fontScale: fontScale
+        fontScale: fontScale,
+        threads: threads,
+        repositoryFullName: repositoryFullName
       )
     } else {
       DashboardReviewFileDiffUnified(
         patch: preview.projectedPatch,
         language: language,
-        fontScale: fontScale
+        fontScale: fontScale,
+        threads: threads,
+        repositoryFullName: repositoryFullName
       )
     }
   }
