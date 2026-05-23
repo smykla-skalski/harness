@@ -72,6 +72,7 @@ extension HarnessMonitorApp {
         .modifier(DashboardWindowLifecycleModifier())
         .harnessTrackMCPWindow()
         .environment(appStore)
+        .environment(\.openAnythingDashboardReviewRegistry, appOpenAnythingReviews)
     } else {
       Color.clear.accessibilityHidden(true)
     }
