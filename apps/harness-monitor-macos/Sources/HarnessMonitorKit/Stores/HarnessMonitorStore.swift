@@ -8,6 +8,8 @@ struct PendingSessionDetailCacheWrite: Sendable {
   let preservesTimeline: Bool
 }
 
+typealias NotificationHistoryRuntimeActions = [String: @MainActor () async -> Void]
+
 @MainActor
 @Observable
 public final class HarnessMonitorStore {
@@ -48,6 +50,7 @@ public final class HarnessMonitorStore {
   @ObservationIgnored var reviewFilesPreviewPendingFetches: Set<ReviewFilesPreviewFetchKey> = []
   @ObservationIgnored var reviewFilesPreviewWarmState = ReviewFilesPreviewWarmState()
   @ObservationIgnored let reviewFilePreviewStore: ReviewFilePreviewStore
+  @ObservationIgnored let reviewFilePatchStore: ReviewFilePatchStore
   @ObservationIgnored var dependencyFilesViewedBatchTasks: [String: Task<Void, Never>] = [:]
   @ObservationIgnored var dependencyFilesViewedPending: [String: [String: ReviewFileViewedState]] =
     [:]
@@ -337,8 +340,7 @@ public final class HarnessMonitorStore {
   @ObservationIgnored var pendingUISyncAreas: Set<UISyncArea> = []
   @ObservationIgnored var isApplyingUISyncBatch = false
   @ObservationIgnored var debugUISyncCounts: [UISyncArea: Int] = [:]
-  @ObservationIgnored var notificationHistoryRuntimeActions: [String: @MainActor () async -> Void] =
-    [:]
+  @ObservationIgnored var notificationHistoryRuntimeActions: NotificationHistoryRuntimeActions = [:]
 
   init(
     daemonController: any DaemonControlling,
@@ -349,9 +351,8 @@ public final class HarnessMonitorStore {
     persistenceError: String? = nil,
     cacheService: SessionCacheService? = nil,
     taskBoardSettingsWorker: TaskBoardSettingsWorker,
-    reviewFilePreviewStore: ReviewFilePreviewStore = ReviewFilePreviewStore(
-      directory: HarnessMonitorPaths.reviewFilePreviewCacheRoot()
-    )
+    reviewFilePreviewStore: ReviewFilePreviewStore = ReviewFileStoreDefaults.preview(),
+    reviewFilePatchStore: ReviewFilePatchStore = ReviewFileStoreDefaults.patch()
   ) {
     self.connection = ConnectionSlice()
     self.sessionIndex = SessionIndexSlice()
@@ -368,6 +369,7 @@ public final class HarnessMonitorStore {
     self.voiceCapture = voiceCapture
     self.taskBoardSettingsWorker = taskBoardSettingsWorker
     self.reviewFilePreviewStore = reviewFilePreviewStore
+    self.reviewFilePatchStore = reviewFilePatchStore
     self.modelContext = modelContainer?.mainContext
     self.userDataService = modelContainer.map {
       UserDataPersistenceService(

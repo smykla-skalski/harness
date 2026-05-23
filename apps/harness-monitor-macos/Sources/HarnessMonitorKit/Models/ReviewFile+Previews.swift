@@ -100,6 +100,21 @@ public struct ReviewFilePreview: Codable, Equatable, Sendable, Identifiable {
     self.lineLimit = lineLimit
     self.hasMore = hasMore
   }
+
+  public var projectedPatch: ReviewFilePatch {
+    ReviewFilePatch(
+      path: path,
+      patch: patch,
+      status: status,
+      additions: additions,
+      deletions: deletions,
+      truncated: truncated,
+      etag: etag,
+      servedBy: servedBy,
+      fetchedAt: fetchedAt,
+      headRefOid: headRefOid
+    )
+  }
 }
 
 /// Response carrying bounded previews plus drift detection.

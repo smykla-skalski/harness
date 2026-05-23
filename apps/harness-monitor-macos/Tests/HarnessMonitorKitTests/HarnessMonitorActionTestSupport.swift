@@ -1,5 +1,4 @@
 import Foundation
-
 @testable import HarnessMonitorKit
 
 struct ProjectFixture {
@@ -314,7 +313,8 @@ final class RecordingHarnessClient: HarnessMonitorClientProtocol, @unchecked Sen
   var reviewCommentRequests: [ReviewsCommentRequest] = []
   var reviewCommentError: (any Error)?
   var reviewPreviewRequests: [ReviewsFilesPreviewRequest] = []
-  var reviewPreviewDelay: Duration?
+  var reviewPatchRequests: [ReviewsFilesPatchRequest] = []
+  var reviewPreviewDelay: Duration?, reviewPatchDelay: Duration?
   var reviewTimelineResponses: [String: [ReviewsTimelineResponse]] = [:]
   var reviewTimelineFetchedRequests: [ReviewsTimelineRequest] = []
   var reviewTimelineFetchHook: (@Sendable (String) async -> Void)?

@@ -84,6 +84,26 @@ public enum ReviewFilesPerf {
     return Interval(state: state, name: "files.preview.cache.store")
   }
 
+  public static func beginPatchCacheRead(pullRequestID: String, pathCount: Int) -> Interval {
+    let id = signposter.makeSignpostID()
+    let state = signposter.beginInterval(
+      "files.patch.cache.read",
+      id: id,
+      "pr=\(pullRequestID, privacy: .public) paths=\(pathCount)"
+    )
+    return Interval(state: state, name: "files.patch.cache.read")
+  }
+
+  public static func beginPatchCacheStore(pullRequestID: String, pathCount: Int) -> Interval {
+    let id = signposter.makeSignpostID()
+    let state = signposter.beginInterval(
+      "files.patch.cache.store",
+      id: id,
+      "pr=\(pullRequestID, privacy: .public) paths=\(pathCount)"
+    )
+    return Interval(state: state, name: "files.patch.cache.store")
+  }
+
   public static func beginTokenize(path: String) -> Interval {
     let id = signposter.makeSignpostID()
     let state = signposter.beginInterval(

@@ -42,6 +42,7 @@ struct DashboardReviewFileDiffUnified: View {
       }
       .accessibilityIdentifier("dashboardReviewFileDiffUnified")
       .task(id: patch.patch) {
+        attributed = nil
         attributed = await Self.tokenize(patch: patch.patch)
       }
       if patch.truncated {

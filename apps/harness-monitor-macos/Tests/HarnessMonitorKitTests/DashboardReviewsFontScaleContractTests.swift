@@ -1,4 +1,5 @@
 import Foundation
+import HarnessMonitorKit
 import Testing
 
 @testable import HarnessMonitorUIPreviewable
@@ -61,6 +62,15 @@ struct DashboardReviewsFontScaleContractTests {
     #expect(!split.contains(".font(.system(size: 12"))
   }
 
+  @Test("Diff preview reuses highlighted full diff renderers")
+  func diffPreviewReusesHighlightedRenderers() throws {
+    let preview = try dashboardSource(named: "DashboardReviewFileDiffPreview.swift")
+
+    #expect(preview.contains("DashboardReviewFileDiffUnified("))
+    #expect(preview.contains("DashboardReviewFileDiffSplit("))
+    #expect(!preview.contains(".font(.system(size: 12"))
+  }
+
   @Test("Comment composer takes font scale as a plain value")
   func commentComposerUsesPlainFontScaleInput() throws {
     let source = try dashboardSource(named: "DashboardReviewCommentComposer.swift")
@@ -85,6 +95,68 @@ struct DashboardReviewsFontScaleContractTests {
 
     #expect(source.contains("let fontScale: CGFloat"))
     #expect(source.contains("&& lhs.fontScale == rhs.fontScale"))
+  }
+
+  @Test("Complete previews do not trigger a full patch fetch")
+  func completePreviewsDoNotTriggerFullPatchFetch() {
+    #expect(
+      !DashboardReviewFileCardInternal.shouldLoadFullPatch(
+        previewState: .loaded(preview(hasMore: false)),
+        patchState: .notLoaded
+      )
+    )
+  }
+
+  @Test("Truncated previews load the remaining patch in the background")
+  func truncatedPreviewsLoadRemainingPatch() {
+    #expect(
+      DashboardReviewFileCardInternal.shouldLoadFullPatch(
+        previewState: .loaded(preview(hasMore: true)),
+        patchState: .notLoaded
+      )
+    )
+  }
+
+  @Test("Binary previews still load the full patch payload")
+  func binaryPreviewsLoadFullPatchPayload() {
+    #expect(
+      DashboardReviewFileCardInternal.shouldLoadFullPatch(
+        previewState: .loaded(preview(hasMore: false)),
+        patchState: .notLoaded,
+        isBinary: true
+      )
+    )
+  }
+
+  @Test("Patch state gates duplicate full patch fetches")
+  func patchStateGatesDuplicateFetches() {
+    #expect(
+      !DashboardReviewFileCardInternal.shouldLoadFullPatch(
+        previewState: .loaded(preview(hasMore: true)),
+        patchState: .loading
+      )
+    )
+    #expect(
+      DashboardReviewFileCardInternal.shouldLoadFullPatch(
+        previewState: .failed("preview unavailable"),
+        patchState: .notLoaded
+      )
+    )
+  }
+
+  private func preview(hasMore: Bool) -> ReviewFilePreview {
+    ReviewFilePreview(
+      path: "src/file.swift",
+      patch: "@@ -1 +1 @@\n-old\n+new\n",
+      status: .modified,
+      additions: 1,
+      deletions: 1,
+      fetchedAt: "2026-05-23T12:00:00Z",
+      headRefOid: "head-a",
+      lineCount: 3,
+      lineLimit: 200,
+      hasMore: hasMore
+    )
   }
 
   private func dashboardSource(named fileName: String) throws -> String {
