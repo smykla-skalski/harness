@@ -106,10 +106,16 @@ struct DashboardReviewsProvenanceSnapshot: Equatable {
     }
   }
 
+  /// Data-source tint follows the colour-role table on
+  /// `HarnessMonitorTheme`: `.accent` for the healthy live feed (the
+  /// "feed is alive" affordance), `.caution` for in-progress sync or
+  /// stale-but-live state, `.danger` for offline or broken data. Green
+  /// is intentionally reserved for content states so users do not
+  /// conflate "data is live" with "this PR is good".
   var sourceTint: Color {
     switch overallHealth {
     case .success:
-      HarnessMonitorTheme.success
+      HarnessMonitorTheme.accent
     case .caution:
       HarnessMonitorTheme.caution
     case .danger:
