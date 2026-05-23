@@ -81,7 +81,8 @@ extension DashboardReviewsRouteView {
         fromCache: routeResponse.fromCache,
         summary: routeResponse.summary,
         items: routeResponse.items,
-        repositoryLabels: merged
+        repositoryLabels: merged,
+        viewerLogin: routeResponse.viewerLogin
       )
     }
   }

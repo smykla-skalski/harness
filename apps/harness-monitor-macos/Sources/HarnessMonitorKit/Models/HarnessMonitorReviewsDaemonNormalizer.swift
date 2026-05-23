@@ -35,7 +35,8 @@ public enum HarnessMonitorReviewsDaemonNormalizer {
       fromCache: response.fromCache,
       summary: summary,
       items: adjustedItems,
-      repositoryLabels: response.repositoryLabels
+      repositoryLabels: response.repositoryLabels,
+      viewerLogin: response.viewerLogin
     )
   }
 

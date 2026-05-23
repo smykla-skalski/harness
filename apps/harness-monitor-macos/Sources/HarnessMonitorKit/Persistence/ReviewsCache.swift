@@ -78,7 +78,9 @@ public struct ReviewsCache {
       fetchedAt: refresh.fetchedAt,
       fromCache: cached.fromCache,
       summary: ReviewsSummary(items: nextItems),
-      items: nextItems
+      items: nextItems,
+      repositoryLabels: cached.repositoryLabels,
+      viewerLogin: cached.viewerLogin
     )
     save(preferencesHash: preferencesHash, response: nextResponse)
     return nextResponse
@@ -117,7 +119,8 @@ public struct ReviewsCache {
       fromCache: cached.fromCache,
       summary: ReviewsSummary(items: nextItems),
       items: nextItems,
-      repositoryLabels: nextLabels
+      repositoryLabels: nextLabels,
+      viewerLogin: response.viewerLogin ?? cached.viewerLogin
     )
     save(preferencesHash: preferencesHash, response: nextResponse)
     return nextResponse
