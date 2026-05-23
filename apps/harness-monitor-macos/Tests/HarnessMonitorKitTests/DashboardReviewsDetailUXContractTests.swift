@@ -84,6 +84,24 @@ struct DashboardReviewsDetailUXContractTests {
     #expect(fileCard.contains("Label(viewMode.label, systemImage: \"rectangle.split.2x1\")"))
   }
 
+  @Test("Files section waits for daemon and retries when the daemon comes online")
+  func filesSectionWaitsForDaemonAndRetries() throws {
+    let files = try source(
+      "Sources/HarnessMonitorUIPreviewable/Views/Dashboard/DashboardReviewFilesSection.swift"
+    )
+
+    #expect(
+      files.contains(
+        "let isDaemonOnline = store.connectionState == .online "
+          + "&& store.apiClient != nil"
+      )
+    )
+    #expect(files.contains("ReviewFilesTaskKey("))
+    #expect(files.contains("guard isDaemonOnline else { return }"))
+    #expect(files.contains("case waitingForDaemon"))
+    #expect(files.contains("\"Waiting for daemon connection\""))
+  }
+
   @Test("Checks Activity and Reviews sections reduce repetition by default")
   func lowerSectionsReduceRepetitionByDefault() throws {
     let checks = try source(

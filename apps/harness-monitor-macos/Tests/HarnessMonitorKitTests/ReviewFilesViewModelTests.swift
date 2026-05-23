@@ -5,6 +5,14 @@ import Testing
 
 @MainActor
 struct ReviewFilesViewModelTests {
+  @Test("files task key changes when the daemon comes online")
+  func filesTaskKeyChangesWhenDaemonComesOnline() {
+    let connecting = ReviewFilesTaskKey(pullRequestID: "pr-1", isDaemonOnline: false)
+    let online = ReviewFilesTaskKey(pullRequestID: "pr-1", isDaemonOnline: true)
+
+    #expect(connecting != online)
+  }
+
   private func makeFile(
     path: String,
     additions: UInt32 = 0,
