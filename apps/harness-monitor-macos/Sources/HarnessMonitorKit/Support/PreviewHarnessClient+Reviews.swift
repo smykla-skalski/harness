@@ -109,6 +109,13 @@ extension PreviewHarnessClient {
     return await state.patchReviewFiles(request: request)
   }
 
+  public func previewReviewFiles(
+    request: ReviewsFilesPreviewRequest
+  ) async throws -> ReviewsFilesPreviewResponse {
+    try await performActionDelay()
+    return await state.previewReviewFiles(request: request)
+  }
+
   public func viewedReviewFiles(
     request: ReviewsFilesViewedRequest
   ) async throws -> ReviewsFilesViewedResponse {

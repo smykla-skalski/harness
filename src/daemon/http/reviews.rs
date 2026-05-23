@@ -10,7 +10,7 @@ use crate::daemon::protocol::{
     ReviewsActionPreviewRequest, ReviewsApproveRequest,
     ReviewsAutoRequest, ReviewsAvatarRequest, ReviewsBodyRequest, ReviewsBodyUpdateRequest,
     ReviewsCommentRequest, ReviewsFilesBlobRequest,
-    ReviewsFilesListRequest, ReviewsFilesPatchRequest,
+    ReviewsFilesListRequest, ReviewsFilesPatchRequest, ReviewsFilesPreviewRequest,
     ReviewsFilesViewedRequest, ReviewsLabelRequest,
     ReviewsMergeRequest, ReviewsQueryRequest, ReviewsRefreshRequest,
     ReviewsRepositoryCatalogRequest, ReviewsRequestReviewRequest, ReviewsRerunChecksRequest,
@@ -103,6 +103,10 @@ pub(super) fn reviews_routes() -> Router<DaemonHttpState> {
         .route(
             http_paths::REVIEWS_FILES_PATCH,
             post(post_review_files_patch),
+        )
+        .route(
+            http_paths::REVIEWS_FILES_PREVIEW,
+            post(post_review_files_preview),
         )
         .route(
             http_paths::REVIEWS_FILES_VIEWED,
@@ -395,6 +399,22 @@ async fn post_review_files_patch(
     timed_json(
         "POST",
         http_paths::REVIEWS_FILES_PATCH,
+        &request_id,
+        start,
+        result,
+    )
+}
+
+async fn post_review_files_preview(
+    headers: HeaderMap,
+    State(state): State<DaemonHttpState>,
+    Json(request): Json<ReviewsFilesPreviewRequest>,
+) -> Response {
+    let (start, request_id) = authenticated_request!(headers, state);
+    let result = service::preview_review_files(&request).await;
+    timed_json(
+        "POST",
+        http_paths::REVIEWS_FILES_PREVIEW,
         &request_id,
         start,
         result,

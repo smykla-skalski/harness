@@ -30,6 +30,7 @@ mod clones;
 mod gc;
 mod list;
 mod patch;
+mod preview;
 #[cfg(test)]
 mod tests;
 mod token;
@@ -41,6 +42,7 @@ pub use clones::{delete_review_local_clone, list_review_local_clones};
 pub use gc::{GcReport, run_local_clone_gc};
 pub use list::list_review_files;
 pub use patch::patch_review_files;
+pub use preview::preview_review_files;
 pub use viewed::mark_review_files_viewed;
 
 const CLONES_SUBDIR: &str = "reviews/clones";

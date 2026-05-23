@@ -31,6 +31,7 @@ pub(crate) mod local_clone_progress_event;
 pub(crate) mod local_clone_runtime;
 pub(crate) mod patch_local;
 pub(crate) mod patch_rest;
+pub(crate) mod preview;
 pub(crate) mod service;
 pub(crate) mod viewed;
 
@@ -43,6 +44,7 @@ pub use blob::{
 };
 pub use language::{HarnessCodeLanguage, infer_language};
 pub use local_clone::LocalCloneListEntry;
+pub use preview::{preview_from_patch, preview_line_limit};
 pub use service::FilesLargeDiffStrategy;
 pub use viewed::{
     ReviewFileViewedOutcome, ReviewFilesViewedResult,
@@ -263,6 +265,87 @@ impl ReviewsFilesPatchRequest {
 pub struct ReviewsFilesPatchResponse {
     pub pull_request_id: String,
     pub patches: Vec<ReviewFilePatch>,
+    pub drifted: bool,
+    pub current_head_ref_oid: String,
+    pub fetched_at: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub rate_limit_snapshot: Option<ReviewsRateLimitSnapshot>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ReviewsFilesPreviewRequest {
+    pub pull_request_id: String,
+    pub head_ref_oid_expected: String,
+    pub paths: Vec<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub number: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub repository_full_name: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub base_ref_oid_expected: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub head_ref_name: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub base_ref_name: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub large_diff_strategy: Option<service::FilesLargeDiffStrategy>,
+    #[serde(default = "preview_line_limit")]
+    pub line_limit: u32,
+}
+
+impl ReviewsFilesPreviewRequest {
+    #[must_use]
+    pub fn normalized_pull_request_id(&self) -> String {
+        self.pull_request_id.trim().to_string()
+    }
+
+    #[must_use]
+    pub fn normalized_paths(&self) -> Vec<String> {
+        self.paths
+            .iter()
+            .filter_map(|raw| {
+                let trimmed = raw.trim();
+                if trimmed.is_empty() {
+                    None
+                } else {
+                    Some(trimmed.to_string())
+                }
+            })
+            .collect()
+    }
+
+    #[must_use]
+    pub fn normalized_line_limit(&self) -> u32 {
+        self.line_limit.clamp(1, preview_line_limit())
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ReviewFilePreview {
+    pub path: String,
+    pub patch: String,
+    pub status: ReviewFileChangeType,
+    pub additions: u32,
+    pub deletions: u32,
+    #[serde(default)]
+    pub truncated: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub etag: Option<String>,
+    #[serde(default)]
+    pub served_by: ReviewFileServedBy,
+    #[serde(default)]
+    pub fetched_at: String,
+    #[serde(default)]
+    pub head_ref_oid: String,
+    pub line_count: u32,
+    pub line_limit: u32,
+    pub has_more: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ReviewsFilesPreviewResponse {
+    pub pull_request_id: String,
+    pub previews: Vec<ReviewFilePreview>,
     pub drifted: bool,
     pub current_head_ref_oid: String,
     pub fetched_at: String,

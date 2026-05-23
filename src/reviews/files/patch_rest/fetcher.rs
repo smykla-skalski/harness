@@ -106,7 +106,7 @@ pub async fn fetch_patches_conditional(
     let first_page: Vec<DiffEntry> =
         serde_json::from_slice(&bytes).map_err(|e| RestFetchError::Http(e.to_string()))?;
 
-    let all_entries = fetch_remaining_pages(client, first_page, next_link).await?;
+    let all_entries = fetch_remaining_pages(client, first_page, next_link, requested_paths).await?;
 
     let rest_files: Vec<RestPullFile> = all_entries.iter().map(diff_entry_to_rest_file).collect();
     let mut patches = select_patches_by_path(&rest_files, requested_paths);
@@ -122,8 +122,12 @@ async fn fetch_remaining_pages(
     client: &Octocrab,
     first_page: Vec<DiffEntry>,
     next_link: Option<String>,
+    requested_paths: &[String],
 ) -> Result<Vec<DiffEntry>, RestFetchError> {
     let mut all_entries = first_page;
+    if all_requested_paths_found(&all_entries, requested_paths) {
+        return Ok(all_entries);
+    }
     let mut next_uri = next_link;
     let mut visited_pages = 1_u32;
     while visited_pages < FILES_PAGE_CAP
@@ -157,8 +161,18 @@ async fn fetch_remaining_pages(
             serde_json::from_slice(&bytes).map_err(|e| RestFetchError::Http(e.to_string()))?;
         all_entries.extend(page);
         visited_pages += 1;
+        if all_requested_paths_found(&all_entries, requested_paths) {
+            break;
+        }
     }
     Ok(all_entries)
+}
+
+fn all_requested_paths_found(entries: &[DiffEntry], requested_paths: &[String]) -> bool {
+    !requested_paths.is_empty()
+        && requested_paths
+            .iter()
+            .all(|path| entries.iter().any(|entry| &entry.filename == path))
 }
 
 /// Unconditional variant of [`fetch_patches_conditional`]. Returns just the

@@ -131,6 +131,14 @@ extension WebSocketTransport {
     return try decode(value)
   }
 
+  public func previewReviewFiles(
+    request: ReviewsFilesPreviewRequest
+  ) async throws -> ReviewsFilesPreviewResponse {
+    let params = try encodeParams(request, extra: [:])
+    let value = try await rpc(method: .reviewsFilesPreview, params: params)
+    return try decode(value)
+  }
+
   public func viewedReviewFiles(
     request: ReviewsFilesViewedRequest
   ) async throws -> ReviewsFilesViewedResponse {

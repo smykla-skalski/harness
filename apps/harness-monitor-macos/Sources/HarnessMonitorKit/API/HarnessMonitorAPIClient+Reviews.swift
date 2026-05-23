@@ -99,6 +99,12 @@ extension HarnessMonitorAPIClient {
     try await post("/v1/reviews/files/patch", body: request)
   }
 
+  public func previewReviewFiles(
+    request: ReviewsFilesPreviewRequest
+  ) async throws -> ReviewsFilesPreviewResponse {
+    try await post("/v1/reviews/files/preview", body: request)
+  }
+
   public func viewedReviewFiles(
     request: ReviewsFilesViewedRequest
   ) async throws -> ReviewsFilesViewedResponse {

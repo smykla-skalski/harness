@@ -52,6 +52,11 @@ extension HarnessMonitorStore {
     }
     for key in toDrop {
       dependencyFilesViewModels.removeValue(forKey: key)
+      reviewFilesPreviewWarmTasks[key]?.cancel()
+      reviewFilesPreviewWarmTasks.removeValue(forKey: key)
+      reviewFilesPreviewPendingFetches = reviewFilesPreviewPendingFetches.filter {
+        $0.pullRequestID != key
+      }
       dependencyFilesViewedBatchTasks[key]?.cancel()
       dependencyFilesViewedBatchTasks.removeValue(forKey: key)
       dependencyFilesViewedPending.removeValue(forKey: key)

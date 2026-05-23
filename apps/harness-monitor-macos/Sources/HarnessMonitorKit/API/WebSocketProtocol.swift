@@ -133,6 +133,7 @@ enum WebSocketRPCMethod: String, CaseIterable, Equatable, Sendable {
   case reviewsComment = "reviews.comment"
   case reviewsFilesList = "reviews.files_list"
   case reviewsFilesPatch = "reviews.files_patch"
+  case reviewsFilesPreview = "reviews.files_preview"
   case reviewsFilesViewed = "reviews.files_viewed"
   case reviewsFilesBlob = "reviews.files_blob"
   case reviewsFilesLocalClonesList =

@@ -3,7 +3,7 @@ use crate::daemon::protocol::{
     ReviewsActionPreviewRequest, ReviewsApproveRequest,
     ReviewsAutoRequest, ReviewsAvatarRequest, ReviewsBodyRequest, ReviewsBodyUpdateRequest,
     ReviewsCommentRequest, ReviewsFilesBlobRequest,
-    ReviewsFilesListRequest, ReviewsFilesPatchRequest,
+    ReviewsFilesListRequest, ReviewsFilesPatchRequest, ReviewsFilesPreviewRequest,
     ReviewsFilesViewedRequest, ReviewsLabelRequest,
     ReviewsMergeRequest, ReviewsQueryRequest, ReviewsRefreshRequest,
     ReviewsRepositoryCatalogRequest, ReviewsRequestReviewRequest, ReviewsRerunChecksRequest,
@@ -77,6 +77,9 @@ pub(crate) async fn dispatch_reviews_method(
         }
         ws_methods::REVIEWS_FILES_PATCH => {
             Some(dispatch_reviews_files_patch(request).await)
+        }
+        ws_methods::REVIEWS_FILES_PREVIEW => {
+            Some(dispatch_reviews_files_preview(request).await)
         }
         ws_methods::REVIEWS_FILES_VIEWED => {
             Some(dispatch_reviews_files_viewed(request).await)
@@ -257,6 +260,16 @@ async fn dispatch_reviews_files_patch(request: &WsRequest) -> WsResponse {
     dispatch_query_result(
         &request.id,
         service::patch_review_files(&body).await,
+    )
+}
+
+async fn dispatch_reviews_files_preview(request: &WsRequest) -> WsResponse {
+    let Ok(body) = parse_params::<ReviewsFilesPreviewRequest>(request) else {
+        return invalid_params(request);
+    };
+    dispatch_query_result(
+        &request.id,
+        service::preview_review_files(&body).await,
     )
 }
 

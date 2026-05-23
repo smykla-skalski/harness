@@ -169,6 +169,28 @@ struct ReviewFilesViewModelTests {
     }
   }
 
+  @Test("ingest(previews:) stores first-line preview entries")
+  func ingestPreviewStoresEntry() {
+    let vm = ReviewFilesViewModel(pullRequestID: "pr-1")
+    vm.ingest(
+      previews: [
+        ReviewFilePreview(
+          path: "src/a.swift",
+          patch: "@@ -1 +1 @@\n-a\n+b\n",
+          lineCount: 3,
+          lineLimit: 200,
+          hasMore: false
+        )
+      ]
+    )
+    if case .loaded(let preview) = vm.previews["src/a.swift"] ?? .notLoaded {
+      #expect(preview.lineCount == 3)
+      #expect(!preview.hasMore)
+    } else {
+      Issue.record("Expected .loaded preview state")
+    }
+  }
+
   @Test("viewMode(forPath:) falls back to defaultViewMode when no override is set")
   func viewModeFallsBackToDefault() {
     let vm = ReviewFilesViewModel(pullRequestID: "pr-1")
@@ -224,6 +246,31 @@ struct ReviewFilesViewModelTests {
     )
     #expect(vm.patches["old.swift"] == nil)
     #expect(vm.patches["shared.swift"] != nil)
+  }
+
+  @Test("ingest(response:) drops previews whose paths no longer exist")
+  func ingestEvictsStalePreviewsOnNewHead() {
+    let vm = ReviewFilesViewModel(pullRequestID: "pr-1")
+    vm.ingest(
+      response: makeResponse(
+        files: [makeFile(path: "old.swift"), makeFile(path: "shared.swift")],
+        headRefOid: "head-a"
+      )
+    )
+    vm.ingest(
+      previews: [
+        ReviewFilePreview(path: "old.swift", patch: "old", lineCount: 1),
+        ReviewFilePreview(path: "shared.swift", patch: "shared", lineCount: 1),
+      ]
+    )
+    vm.ingest(
+      response: makeResponse(
+        files: [makeFile(path: "shared.swift"), makeFile(path: "new.swift")],
+        headRefOid: "head-b"
+      )
+    )
+    #expect(vm.previews["old.swift"] == nil)
+    #expect(vm.previews["shared.swift"] != nil)
   }
 
   @Test("toggleExpansion toggles membership in expandedPaths")

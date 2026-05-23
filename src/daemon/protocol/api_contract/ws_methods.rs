@@ -98,6 +98,7 @@ pub const REVIEWS_BODY_UPDATE: &str = "reviews.body_update";
 pub const REVIEWS_COMMENT: &str = "reviews.comment";
 pub const REVIEWS_FILES_LIST: &str = "reviews.files_list";
 pub const REVIEWS_FILES_PATCH: &str = "reviews.files_patch";
+pub const REVIEWS_FILES_PREVIEW: &str = "reviews.files_preview";
 pub const REVIEWS_FILES_VIEWED: &str = "reviews.files_viewed";
 pub const REVIEWS_FILES_BLOB: &str = "reviews.files_blob";
 pub const REVIEWS_FILES_LOCAL_CLONES_LIST: &str =

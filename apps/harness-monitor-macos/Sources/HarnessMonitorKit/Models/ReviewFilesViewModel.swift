@@ -22,6 +22,14 @@ public enum ReviewFilePatchState: Equatable, Sendable {
   case failed(String)
 }
 
+/// Per-file first-lines preview state on the view model.
+public enum ReviewFilePreviewState: Equatable, Sendable {
+  case notLoaded
+  case loading
+  case loaded(ReviewFilePreview)
+  case failed(String)
+}
+
 /// Filter snapshot consumed by `applyFilter`. Lives here so the view
 /// layer can hand a Sendable value into the @MainActor view model.
 public struct ReviewFilesFilter: Equatable, Sendable {
@@ -104,6 +112,7 @@ public final class ReviewFilesViewModel {
   public var filteredFiles: [ReviewFile] = []
 
   public var patches: [String: ReviewFilePatchState] = [:]
+  public var previews: [String: ReviewFilePreviewState] = [:]
   public var viewedByPath: [String: ReviewFileViewedState] = [:]
   public var expandedPaths: Set<String> = []
   public var viewModeByPath: [String: FilesViewMode] = [:]
@@ -136,6 +145,7 @@ public final class ReviewFilesViewModel {
     // patches that survive (e.g. on refresh of an unchanged file list).
     let validPaths = Set(response.files.map(\.path))
     patches = patches.filter { validPaths.contains($0.key) }
+    previews = previews.filter { validPaths.contains($0.key) }
     recomputeSortedAndFiltered()
   }
 
@@ -146,9 +156,19 @@ public final class ReviewFilesViewModel {
     patches[path] = state
   }
 
+  public func setPreviewState(path: String, state: ReviewFilePreviewState) {
+    previews[path] = state
+  }
+
   public func ingest(patches incoming: [ReviewFilePatch]) {
     for patch in incoming {
       patches[patch.path] = .loaded(patch)
+    }
+  }
+
+  public func ingest(previews incoming: [ReviewFilePreview]) {
+    for preview in incoming {
+      previews[preview.path] = .loaded(preview)
     }
   }
 

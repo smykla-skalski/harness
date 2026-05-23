@@ -40,6 +40,26 @@ public enum ReviewFilesPerf {
     return Interval(state: state, name: "files.patch.fetch")
   }
 
+  public static func beginPreviewFetch(pullRequestID: String, pathCount: Int) -> Interval {
+    let id = signposter.makeSignpostID()
+    let state = signposter.beginInterval(
+      "files.preview.fetch",
+      id: id,
+      "pr=\(pullRequestID, privacy: .public) paths=\(pathCount)"
+    )
+    return Interval(state: state, name: "files.preview.fetch")
+  }
+
+  public static func beginPreviewPrewarm(pullRequestID: String, pathCount: Int) -> Interval {
+    let id = signposter.makeSignpostID()
+    let state = signposter.beginInterval(
+      "files.preview.prewarm",
+      id: id,
+      "pr=\(pullRequestID, privacy: .public) paths=\(pathCount)"
+    )
+    return Interval(state: state, name: "files.preview.prewarm")
+  }
+
   public static func beginTokenize(path: String) -> Interval {
     let id = signposter.makeSignpostID()
     let state = signposter.beginInterval(
