@@ -191,14 +191,15 @@ struct ReviewFilesViewModelTests {
     }
   }
 
-  @Test("viewMode(forPath:) falls back to defaultViewMode when no override is set")
-  func viewModeFallsBackToDefault() {
+  @Test("viewMode(forPath:) follows the global default for every file")
+  func viewModeFollowsGlobalDefaultForEveryFile() {
     let vm = ReviewFilesViewModel(pullRequestID: "pr-1")
     vm.defaultViewMode = .split
     #expect(vm.viewMode(forPath: "any.swift") == .split)
-    vm.setViewMode(.unified, forPath: "any.swift")
-    #expect(vm.viewMode(forPath: "any.swift") == .unified)
     #expect(vm.viewMode(forPath: "other.swift") == .split)
+    vm.defaultViewMode = .unified
+    #expect(vm.viewMode(forPath: "any.swift") == .unified)
+    #expect(vm.viewMode(forPath: "other.swift") == .unified)
   }
 
   @Test("ingest(response:) on a new headRefOid drops patches whose paths no longer exist")

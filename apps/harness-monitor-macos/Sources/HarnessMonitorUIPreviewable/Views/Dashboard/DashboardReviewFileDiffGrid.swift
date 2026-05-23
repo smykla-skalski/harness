@@ -28,7 +28,7 @@ struct DashboardReviewFileDiffGrid: NSViewRepresentable {
   }
 
   func makeNSView(context: Context) -> NSScrollView {
-    let scrollView = NSScrollView()
+    let scrollView = DashboardReviewFileDiffScrollView()
     scrollView.borderType = .noBorder
     scrollView.drawsBackground = false
     scrollView.hasHorizontalScroller = true
@@ -52,10 +52,7 @@ struct DashboardReviewFileDiffGrid: NSViewRepresentable {
       threads: threads,
       repositoryFullName: repositoryFullName
     )
-    let size = contentView.preferredSize(containerWidth: scrollView.contentSize.width)
-    if contentView.frame.size != size {
-      contentView.setFrameSize(size)
-    }
+    contentView.resizeForViewportWidth(scrollView.contentSize.width)
   }
 
   static func viewportHeight(rowCount: Int, fontScale: CGFloat) -> CGFloat {
@@ -128,6 +125,13 @@ final class DashboardReviewFileDiffGridContentView: NSView {
       }
     let height = CGFloat(max(rows.count, 1)) * rowHeight + 2
     return CGSize(width: ceil(width), height: ceil(height))
+  }
+
+  func resizeForViewportWidth(_ viewportWidth: CGFloat) {
+    let size = preferredSize(containerWidth: viewportWidth)
+    if frame.size != size {
+      setFrameSize(size)
+    }
   }
 
   override func draw(_ dirtyRect: NSRect) {

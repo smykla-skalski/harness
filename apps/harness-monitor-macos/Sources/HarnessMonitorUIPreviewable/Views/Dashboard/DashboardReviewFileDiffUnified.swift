@@ -45,6 +45,7 @@ struct DashboardReviewFileDiffUnified: View {
         threads: threads,
         repositoryFullName: repositoryFullName
       )
+      .frame(maxWidth: .infinity, alignment: .leading)
       .frame(
         height: DashboardReviewFileDiffGrid.viewportHeight(
           rowCount: document.rows.count,

@@ -142,7 +142,7 @@ struct DashboardReviewsDetailUXContractTests {
       "Sources/HarnessMonitorUIPreviewable/Views/Dashboard/DashboardReviewFileCard.swift"
     )
 
-    #expect(description.contains("Task-list checkboxes update the pull request description."))
+    #expect(!description.contains("Task-list checkboxes update the pull request description."))
     #expect(markdown.contains(".controlSize(.regular)"))
     #expect(markdown.contains("Toggle pull request task-list item"))
     #expect(header.contains("visible of"))

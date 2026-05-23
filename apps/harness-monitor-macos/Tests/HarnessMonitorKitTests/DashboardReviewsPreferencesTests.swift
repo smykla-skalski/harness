@@ -153,11 +153,13 @@ struct DashboardReviewsPreferencesTests {
     prefs.perRepositoryIntervalSeconds = 180
     prefs.maxConcurrentRepositoryFetches = 5
     prefs.expandOrganizations = false
+    prefs.filesDefaultViewModeRaw = FilesViewMode.split.rawValue
 
     let encoded = prefs.encodedString
     let decoded = DashboardReviewsPreferences.decode(from: encoded)
     #expect(decoded.perRepositoryIntervalSeconds == 180)
     #expect(decoded.maxConcurrentRepositoryFetches == 5)
     #expect(!decoded.expandOrganizations)
+    #expect(decoded.filesDefaultViewMode == .split)
   }
 }
