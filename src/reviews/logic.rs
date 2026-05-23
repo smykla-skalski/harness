@@ -123,6 +123,7 @@ impl ReviewsQueryResponse {
             summary: ReviewsSummary::from_items(&items),
             items,
             repository_labels: BTreeMap::new(),
+            viewer_login: None,
         }
     }
 
@@ -131,6 +132,10 @@ impl ReviewsQueryResponse {
         repository_labels: BTreeMap<String, Vec<ReviewRepositoryLabel>>,
     ) {
         self.repository_labels = repository_labels;
+    }
+
+    pub fn set_viewer_login(&mut self, viewer_login: Option<String>) {
+        self.viewer_login = viewer_login;
     }
 }
 
