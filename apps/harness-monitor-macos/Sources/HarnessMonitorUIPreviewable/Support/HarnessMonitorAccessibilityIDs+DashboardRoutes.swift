@@ -25,4 +25,14 @@ extension HarnessMonitorAccessibility {
     "harness.dashboard.reviews.selection"
   public static let dashboardReviewsDescription =
     "harness.dashboard.reviews.description"
+  public static let dashboardReviewsFilterPicker =
+    "harness.dashboard.reviews.filter"
+  public static let dashboardReviewsSortPicker =
+    "harness.dashboard.reviews.sort"
+  public static let dashboardReviewsGroupPicker =
+    "harness.dashboard.reviews.group"
+  public static let dashboardReviewsCategoryToggle =
+    "harness.dashboard.reviews.category"
+  public static let dashboardReviewsNeedsMeToggle =
+    "harness.dashboard.reviews.needs-me"
 }
