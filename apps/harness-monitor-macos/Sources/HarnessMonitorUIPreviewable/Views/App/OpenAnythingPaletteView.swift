@@ -31,7 +31,6 @@ public struct OpenAnythingPaletteView: View {
     .accessibilityAction(.escape) {
       requestDismiss(reason: .userCanceled)
     }
-    .transition(.opacity.combined(with: .scale(scale: 0.96, anchor: .top)))
     .onAppear {
       // Defer focus until after the hosting window has finished becoming
       // key. Without the dispatch hop the @FocusState assignment races
@@ -189,7 +188,14 @@ public struct OpenAnythingPaletteView: View {
         }
       }
     } else if model.results.isEmpty {
-      emptyState(text: "No results for \"\(model.query)\". Try a different query.")
+      // Only declare "no matches" once the search has actually caught up to
+      // the current query. Otherwise we are mid-debounce and the panel was
+      // flashing "No results for 'a'" before the first search even ran.
+      if model.lastSearchedQuery == model.query {
+        emptyState(text: "No results for \"\(model.query)\". Try a different query.")
+      } else {
+        skeletonState
+      }
     } else {
       VStack(spacing: 0) {
         resultsList(model.results)

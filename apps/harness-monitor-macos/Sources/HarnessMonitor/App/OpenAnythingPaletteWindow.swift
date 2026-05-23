@@ -45,10 +45,17 @@ final class OpenAnythingPaletteWindowController: NSObject {
   /// Bind the route executor late: the App's scene wiring needs `openWindow`,
   /// store, and review registry to build the closure, none of which are
   /// available at `HarnessMonitorApp.init` time. Safe to call repeatedly.
+  ///
+  /// Also eagerly constructs the panel + NSHostingView the first time
+  /// binding lands so the first Cmd+K does not pay the SwiftUI tree
+  /// instantiation cost on the keystroke (which read as a perceptible
+  /// delay before the floating card appeared).
   func bindExecutor(_ executor: @escaping (OpenAnythingHit) -> Void) {
     self.executor = executor
     if let panel {
       panel.contentView = makeHostingView()
+    } else {
+      panel = buildPanel()
     }
   }
 
@@ -112,7 +119,9 @@ final class OpenAnythingPaletteWindowController: NSObject {
     panel.standardWindowButton(.closeButton)?.isHidden = true
     panel.standardWindowButton(.miniaturizeButton)?.isHidden = true
     panel.standardWindowButton(.zoomButton)?.isHidden = true
-    panel.animationBehavior = .utilityWindow
+    // `.utilityWindow` adds a fade-in/out which read as a "delay" before
+    // the palette appears. Command palettes are expected to feel instant.
+    panel.animationBehavior = .none
     panel.isReleasedWhenClosed = false
     // Transparent backing - the SwiftUI palette paints the visible glass
     // card; everything outside it stays see-through so no panel chrome
