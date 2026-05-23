@@ -38,7 +38,8 @@ private let kitDependencies: [TargetDependency] = {
         .sdk(name: "IOKit", type: .framework),
         .sdk(name: "ServiceManagement", type: .framework),
         .sdk(name: "UserNotifications", type: .framework),
-        .external(name: "HarnessMonitorRegistry")
+        .external(name: "HarnessMonitorRegistry"),
+        .target(name: "HarnessMonitorCloudKit")
     ]
     deps.append(contentsOf: FeatureFlags.kitAdditionalDependencies())
     return deps
@@ -451,7 +452,8 @@ private let kitTestsTarget: Target = .target(
     sources: kitTestsSources,
     dependencies: [
         .target(name: "HarnessMonitorKit"),
-        .target(name: "HarnessMonitorUIPreviewable")
+        .target(name: "HarnessMonitorUIPreviewable"),
+        .target(name: "HarnessMonitorCloudKit")
     ],
     settings: .settings(base: [
         "CODE_SIGN_STYLE": "Automatic",

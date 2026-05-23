@@ -43,7 +43,7 @@ struct DashboardReviewsRouteView: View {
   @SceneStorage("dashboard.reviews.problem-checks-only")
   var showsProblemChecksOnly = false
 
-  @State private var routeState: DashboardReviewsRouteViewState
+  @State var routeState: DashboardReviewsRouteViewState
 
   init(
     store: HarnessMonitorStore,
@@ -215,6 +215,9 @@ struct DashboardReviewsRouteView: View {
         if !descriptors.isEmpty {
           routeState.disappearedDescriptors.append(contentsOf: descriptors)
         }
+      }
+      .onChange(of: routeState.needsMeCount, initial: true) { _, newValue in
+        NeedsMeCloudKitWriter.shared.submit(count: newValue)
       }
       .onChange(of: normalizedPreferences.frequentLabelsCount) { _, _ in
         refreshLabelMenuData()

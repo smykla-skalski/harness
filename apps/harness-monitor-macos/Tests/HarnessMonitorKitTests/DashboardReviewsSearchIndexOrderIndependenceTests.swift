@@ -48,7 +48,7 @@ struct DashboardReviewsSearchIndexOrderIndependenceTests {
   @Test("count and empty-input signatures are stable")
   func countAndEmptyInputSignaturesAreStable() {
     let empty = dashboardReviewsSearchIndexSignature(items: [])
-    #expect(empty.isEmpty)
+    #expect(empty.count == 0)
     #expect(empty.contentFingerprint == 0)
 
     let one = dashboardReviewsSearchIndexSignature(items: [
