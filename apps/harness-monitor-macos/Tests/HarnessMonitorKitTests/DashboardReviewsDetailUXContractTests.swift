@@ -95,6 +95,32 @@ struct DashboardReviewsDetailUXContractTests {
     #expect(!visuals.contains("\"Policy wait\""))
   }
 
+  @Test("Change pill exposes Files framing to assistive tech and adds shape glyphs")
+  func changePillExposesFilesFramingAndShapeGlyphs() throws {
+    let visuals = try source(
+      "Sources/HarnessMonitorUIPreviewable/Views/Dashboard/DashboardReviewsVisualComponents.swift"
+    )
+    #expect(visuals.contains("Files: \\(additions)"))
+    #expect(visuals.contains("Image(systemName: \"arrow.up\")"))
+    #expect(visuals.contains("Image(systemName: \"arrow.down\")"))
+  }
+
+  @Test("Status pill drops icon when attention summary owns it")
+  func statusPillDropsIconWhenAttentionSummaryOwnsIt() throws {
+    let visuals = try source(
+      "Sources/HarnessMonitorUIPreviewable/Views/Dashboard/DashboardReviewsVisualComponents.swift"
+    )
+    #expect(visuals.contains("item.requiresAttention ? nil : item.statusSystemImage"))
+  }
+
+  @Test("Approved pill is suppressed when attention is required")
+  func approvedPillSuppressedWhenAttentionRequired() throws {
+    let visuals = try source(
+      "Sources/HarnessMonitorUIPreviewable/Views/Dashboard/DashboardReviewsVisualComponents.swift"
+    )
+    #expect(visuals.contains("!(item.requiresAttention && item.reviewStatus == .approved)"))
+  }
+
   @Test("Description and file controls expose editable state with clear labels")
   func descriptionAndFileControlsExposeEditableState() throws {
     let description = try source(
