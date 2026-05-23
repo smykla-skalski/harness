@@ -353,7 +353,13 @@ public struct ReviewItem: Codable, Equatable, Identifiable, Sendable {
     updatedAt = try container.decode(String.self, forKey: .updatedAt)
     requiredFailedCheckNames =
       try container.decodeIfPresent([String].self, forKey: .requiredFailedCheckNames) ?? []
-    viewerCanUpdate = try container.decodeIfPresent(Bool.self, forKey: .viewerCanUpdate) ?? true
+    // 2026-05-23: default flipped from `true` to `false`. A daemon that
+    // does not populate this field for any reason (encoding bug, partial
+    // payload, fixture omission) should land action controls as disabled
+    // rather than enabled. The version-skew shim in
+    // `HarnessMonitorReviewsDaemonNormalizer` re-enables the field when
+    // the connected daemon predates the wire schema that added it.
+    viewerCanUpdate = try container.decodeIfPresent(Bool.self, forKey: .viewerCanUpdate) ?? false
     viewerCanMergeAsAdmin =
       try container.decodeIfPresent(Bool.self, forKey: .viewerCanMergeAsAdmin) ?? false
   }
