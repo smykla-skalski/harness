@@ -152,7 +152,7 @@ struct HarnessMonitorApp: App {
     )
     _openAnythingCoordinator = State(initialValue: OpenAnythingCorpusCoordinator())
     _openAnythingReviews = State(
-      initialValue: OpenAnythingDashboardReviewRegistry.shared
+      initialValue: OpenAnythingDashboardReviewRegistry()
     )
     _globalHotKeyController = State(initialValue: GlobalHotKeyController())
     _settingsSelectedSection = State(

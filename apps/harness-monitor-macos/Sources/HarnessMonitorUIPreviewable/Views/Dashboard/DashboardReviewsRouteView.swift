@@ -6,8 +6,9 @@ struct DashboardReviewsRouteView: View {
   let store: HarnessMonitorStore
   @Binding var selectedRoute: DashboardWindowRoute
   let searchAutomationCommand: AppSearchAutomationCommand?
-  private let openAnythingReviews = OpenAnythingDashboardReviewRegistry.shared
 
+  @Environment(\.openAnythingDashboardReviewRegistry)
+  private var openAnythingReviews
   @Environment(\.openSettingsSection)
   var openSettingsSection
   @Environment(\.openURL)
