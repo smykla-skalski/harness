@@ -127,6 +127,124 @@ struct RegistryListenerIntegrationTests {
     }
   }
 
+  @Test("authenticated listener rejects unauthenticated listElements and performAction")
+  func authenticatedListenerRejectsUnauthenticatedOperations() async throws {
+    try await withTempSocket { socketPath in
+      let registry = AccessibilityRegistry()
+      let probe = SemanticActionProbe()
+      let dispatcher = RegistryRequestDispatcher(
+        registry: registry,
+        requiredAuthToken: "registry-secret",
+        pingInfo: {
+          PingResult(
+            protocolVersion: 1,
+            appVersion: "test",
+            bundleIdentifier: "io.test",
+            capabilities: [.clientSnapshots, .clientSnapshotLeases, .replacementNotice, .semanticActions]
+          )
+        },
+        semanticActionHandler: { identifier, action in
+          await probe.record(identifier: identifier, action: action)
+          return .performed
+        }
+      )
+      let listener = RegistryListener(dispatcher: dispatcher)
+      try await listener.start(at: socketPath)
+      defer { Task { await listener.stop() } }
+      try await waitForSocket(at: socketPath, timeout: 2)
+
+      let listResponse = try sendLine("{\"id\":5,\"op\":\"listElements\"}", toSocketAt: socketPath)
+      let actionResponse = try sendLine(
+        "{\"action\":\"press\",\"id\":6,\"identifier\":\"workspace.refresh\",\"op\":\"performAction\"}",
+        toSocketAt: socketPath
+      )
+
+      #expect(listResponse.contains("\"ok\":false"))
+      #expect(listResponse.contains("\"code\":\"unauthorized\""))
+      #expect(actionResponse.contains("\"ok\":false"))
+      #expect(actionResponse.contains("\"code\":\"unauthorized\""))
+      #expect(await probe.invocations().isEmpty)
+    }
+  }
+
+  @Test("authenticated listener accepts requests with the capability token")
+  func authenticatedListenerAcceptsCapabilityToken() async throws {
+    try await withTempSocket { socketPath in
+      let registry = AccessibilityRegistry()
+      await registry.registerElement(
+        RegistryElement(
+          identifier: "toolbar.refresh",
+          label: "Refresh",
+          kind: .button,
+          frame: RegistryRect(x: 100, y: 50, width: 32, height: 32),
+          windowID: 42
+        )
+      )
+      let dispatcher = RegistryRequestDispatcher(
+        registry: registry,
+        requiredAuthToken: "registry-secret",
+        pingInfo: {
+          PingResult(
+            protocolVersion: 1,
+            appVersion: "test",
+            bundleIdentifier: "io.test",
+            capabilities: [.clientSnapshots, .clientSnapshotLeases, .replacementNotice, .semanticActions]
+          )
+        }
+      )
+      let listener = RegistryListener(dispatcher: dispatcher)
+      try await listener.start(at: socketPath)
+      defer { Task { await listener.stop() } }
+      try await waitForSocket(at: socketPath, timeout: 2)
+
+      let response = try sendLine(
+        "{\"id\":5,\"op\":\"listElements\",\"token\":\"registry-secret\"}",
+        toSocketAt: socketPath
+      )
+
+      #expect(response.contains("\"identifier\":\"toolbar.refresh\""))
+      #expect(response.contains("\"ok\":true"))
+    }
+  }
+
+  @Test("registry socket client sends the capability token")
+  func registrySocketClientSendsCapabilityToken() async throws {
+    try await withTempSocket { socketPath in
+      let registry = AccessibilityRegistry()
+      let probe = SemanticActionProbe()
+      let dispatcher = RegistryRequestDispatcher(
+        registry: registry,
+        requiredAuthToken: "registry-secret",
+        pingInfo: {
+          PingResult(
+            protocolVersion: 1,
+            appVersion: "test",
+            bundleIdentifier: "io.test",
+            capabilities: [.clientSnapshots, .clientSnapshotLeases, .replacementNotice, .semanticActions]
+          )
+        },
+        semanticActionHandler: { identifier, action in
+          await probe.record(identifier: identifier, action: action)
+          return .performed
+        }
+      )
+      let listener = RegistryListener(dispatcher: dispatcher)
+      let socketClient = RegistrySocketClient(authToken: "registry-secret")
+      try await listener.start(at: socketPath)
+      defer { Task { await listener.stop() } }
+      try await waitForSocket(at: socketPath, timeout: 2)
+
+      let ack = try await socketClient.performAction(
+        identifier: "workspace.refresh",
+        action: .press,
+        toSocketAt: socketPath
+      )
+
+      #expect(ack.applied == true)
+      #expect(await probe.invocations() == [SemanticActionProbe.Invocation(identifier: "workspace.refresh", action: .press)])
+    }
+  }
+
   @Test("round-trips oversized snapshot payloads without truncating the stream")
   func oversizedSnapshotRoundTrip() async throws {
     try await withTempSocket { socketPath in

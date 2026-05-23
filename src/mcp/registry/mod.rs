@@ -12,7 +12,7 @@ mod types;
 mod tests;
 
 pub use client::{RegistryClient, RegistryError};
-pub use path::{DEFAULT_APP_GROUP, SOCKET_FILENAME, default_socket_path};
+pub use path::{DEFAULT_APP_GROUP, SOCKET_FILENAME, default_socket_path, default_token_path};
 pub use types::{
     ElementKind, GetElementResult, ListElementsResult, ListWindowsResult, Rect, RegistryAckResult,
     RegistryElement, RegistryRequest, RegistryResponse, RegistrySemanticAction, RegistryWindow,

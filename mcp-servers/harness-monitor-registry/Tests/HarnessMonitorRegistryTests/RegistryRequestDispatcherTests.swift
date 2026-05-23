@@ -129,6 +129,97 @@ struct RegistryRequestDispatcherTests {
     #expect(await registry.element(identifier: "client.refresh")?.windowID == 7)
   }
 
+  @Test("authenticated dispatcher rejects unauthenticated state-changing and read operations")
+  func authenticatedDispatcherRejectsUnauthenticatedOperations() async {
+    let registry = AccessibilityRegistry()
+    let probe = SemanticActionProbe()
+    let dispatcher = RegistryRequestDispatcher(
+      registry: registry,
+      requiredAuthToken: "registry-secret",
+      pingInfo: {
+        PingResult(protocolVersion: 1, appVersion: "1.2.3", bundleIdentifier: "io.harnessmonitor.app")
+      },
+      semanticActionHandler: { identifier, action in
+        await probe.record(identifier: identifier, action: action)
+        return .performed
+      },
+      replacementHandler: { _ in
+        RegistryRequestDispatcher.ReplacementDisposition(
+          ack: RegistryAckResult(applied: true)
+        )
+      }
+    )
+
+    let unauthenticatedRequests = [
+      RegistryRequest(id: 20, op: .ping),
+      RegistryRequest(id: 21, op: .listElements),
+      RegistryRequest(id: 22, op: .performAction, identifier: "session.task.open", action: .press),
+      RegistryRequest(
+        id: 23,
+        op: .syncClientSnapshot,
+        clientSnapshot: RegistryClientSnapshot(
+          clientID: UUID(),
+          appVersion: "1.2.3",
+          bundleIdentifier: "io.test.client",
+          snapshot: RegistrySnapshot(elements: [], windows: [])
+        )
+      ),
+      RegistryRequest(
+        id: 24,
+        op: .replacementNotice,
+        replacementNotice: RegistryReplacementNotice(
+          socketPath: "/tmp/mcp.sock",
+          protocolVersion: 1,
+          appVersion: "1.2.4",
+          bundleIdentifier: "io.harnessmonitor.app",
+          message: "replacement incoming"
+        )
+      ),
+    ]
+
+    for request in unauthenticatedRequests {
+      let response = await dispatcher.dispatch(request).response
+      guard case .failure(let id, let error) = response else {
+        Issue.record("expected unauthorized failure for \(request.op)")
+        continue
+      }
+      #expect(id == request.id)
+      #expect(error.code == "unauthorized")
+    }
+    #expect(await probe.invocations().isEmpty)
+    #expect(await registry.storedClientSnapshotCount() == 0)
+  }
+
+  @Test("authenticated dispatcher accepts requests with the capability token")
+  func authenticatedDispatcherAcceptsRequestsWithTheCapabilityToken() async {
+    let (registry, _) = makeDispatcher()
+    await registry.registerElement(
+      RegistryElement(
+        identifier: "btn",
+        kind: .button,
+        frame: RegistryRect(x: 0, y: 0, width: 0, height: 0),
+        windowID: 42
+      )
+    )
+    let dispatcher = RegistryRequestDispatcher(
+      registry: registry,
+      requiredAuthToken: "registry-secret",
+      pingInfo: {
+        PingResult(protocolVersion: 1, appVersion: "1.2.3", bundleIdentifier: "io.harnessmonitor.app")
+      }
+    )
+
+    let response = await dispatcher.dispatch(
+      RegistryRequest(id: 25, op: .listElements, token: "registry-secret")
+    ).response
+
+    guard case .success(_, .listElements(let payload)) = response else {
+      Issue.record("expected authenticated listElements success")
+      return
+    }
+    #expect(payload.elements.map(\.identifier) == ["btn"])
+  }
+
   @Test("replacementNotice delegates to the handler")
   func replacementNoticeDelegatesToTheHandler() async {
     let registry = AccessibilityRegistry()

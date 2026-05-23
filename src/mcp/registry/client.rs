@@ -1,4 +1,6 @@
+use std::env;
 use std::fmt::Display;
+use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::Duration;
@@ -11,7 +13,9 @@ use tokio::net::unix::{OwnedReadHalf, OwnedWriteHalf};
 use tokio::sync::{Mutex, MutexGuard};
 use tokio::time::timeout;
 
-use super::path::default_socket_path;
+use super::path::{
+    TOKEN_FILE_OVERRIDE_ENV, TOKEN_FILENAME, TOKEN_OVERRIDE_ENV, default_socket_path,
+};
 use super::types::{
     RegistryAckResult, RegistryOutcome, RegistryRequest, RegistryResponse, RegistrySemanticAction,
 };
@@ -192,11 +196,55 @@ impl RegistryClient {
         connection: &mut Connection,
         request: &RegistryRequest,
     ) -> Result<RegistryResponse, RegistryError> {
-        let payload = serde_json::to_vec(request).map_err(|error| RegistryError::Protocol {
-            detail: format!("encode request: {error}"),
-        })?;
+        let payload = self.encode_request(request)?;
         write_line(&mut connection.writer, &payload).await?;
         read_response(&mut connection.reader, self.request_timeout).await
+    }
+
+    fn encode_request(&self, request: &RegistryRequest) -> Result<Vec<u8>, RegistryError> {
+        let mut payload =
+            serde_json::to_value(request).map_err(|error| RegistryError::Protocol {
+                detail: format!("encode request: {error}"),
+            })?;
+        if let Some(token) = self.current_auth_token()? {
+            let Some(object) = payload.as_object_mut() else {
+                return Err(RegistryError::Protocol {
+                    detail: "registry request did not encode as a JSON object".to_string(),
+                });
+            };
+            object.insert("token".to_string(), serde_json::Value::String(token));
+        }
+        serde_json::to_vec(&payload).map_err(|error| RegistryError::Protocol {
+            detail: format!("encode authenticated request: {error}"),
+        })
+    }
+
+    fn current_auth_token(&self) -> Result<Option<String>, RegistryError> {
+        if let Some(token) = env::var_os(TOKEN_OVERRIDE_ENV) {
+            return Ok(non_empty_token(token.to_string_lossy().as_ref()));
+        }
+        let token_path = self.token_file_path();
+        match fs::read_to_string(&token_path) {
+            Ok(raw) => Ok(non_empty_token(&raw)),
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(None),
+            Err(error) => Err(RegistryError::Protocol {
+                detail: format!(
+                    "read registry auth token at {}: {error}",
+                    token_path.display()
+                ),
+            }),
+        }
+    }
+
+    fn token_file_path(&self) -> PathBuf {
+        if let Some(override_path) = env::var_os(TOKEN_FILE_OVERRIDE_ENV)
+            && !override_path.is_empty()
+        {
+            return PathBuf::from(override_path);
+        }
+        let mut token_path = self.socket_path.clone();
+        token_path.set_file_name(TOKEN_FILENAME);
+        token_path
     }
 }
 
@@ -222,6 +270,15 @@ async fn write_line(writer: &mut OwnedWriteHalf, payload: &[u8]) -> Result<(), R
     writer.flush().await.map_err(|error| RegistryError::Closed {
         detail: format!("socket flush: {error}"),
     })
+}
+
+fn non_empty_token(raw: &str) -> Option<String> {
+    let token = raw.trim();
+    if token.is_empty() {
+        None
+    } else {
+        Some(token.to_string())
+    }
 }
 
 async fn read_response(

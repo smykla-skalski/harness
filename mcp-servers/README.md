@@ -8,6 +8,7 @@ MCP pieces that let agents drive the Harness Monitor macOS app.
 | [`harness-monitor-registry/`](harness-monitor-registry/) | Swift (SPM) | App-side actor + POSIX Unix-socket NDJSON listener that the Rust server connects to. Includes `.trackWindow(...)` for scene-root auto-harvest, `.trackAccessibility(...)` for explicit per-view registration, and the bundled `harness-monitor-input` helper for input, screenshots, and AX fallback queries. |
 
 The old Node.js implementation under `harness-monitor/` was replaced by the native Rust server to drop the Node.js runtime dependency. The JSON wire protocol to the Swift host is unchanged.
+Harness Monitor writes a per-registry capability token next to the socket as `mcp.token`; the Rust MCP client reads that token and includes it with every registry request. Raw local peers that only know the predictable socket path are rejected by the app-side listener.
 
 ## Architecture
 
@@ -29,6 +30,7 @@ Claude Code / MCP client
                            $HOME/Library/Group Containers/
                            Q498EB36N4.io.harnessmonitor/
                            mcp.sock
+                           mcp.token
                                        ^
                                        |
 +---------------------------------------+

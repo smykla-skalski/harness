@@ -30,6 +30,11 @@ public enum HarnessMonitorMCPSettingsDefaults {
   /// limit on macOS, and the Group Containers path is already long.
   public static let socketFilename = "mcp.sock"
 
+  /// Filename of the registry capability token inside the app-group
+  /// container. The token gates local socket operations even when another
+  /// same-user process can discover the socket path.
+  public static let tokenFilename = "mcp.token"
+
   /// Environment variable that forces the registry host on regardless of
   /// the `@AppStorage` toggle. DEBUG builds only - release builds ignore
   /// the variable so production users cannot be tricked into opening the
