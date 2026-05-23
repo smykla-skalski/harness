@@ -109,6 +109,38 @@ private let intentsExtensionTarget: Target = .target(
     metadata: .metadata(tags: ["tag:feature:intents", "tag:layer:extension"])
 )
 
+private let widgetsExtensionTarget: Target = .target(
+    name: "HarnessMonitorWidgets",
+    destinations: macOSDestinations,
+    product: .appExtension,
+    bundleId: "io.harnessmonitor.app.widgets",
+    deploymentTargets: macOSDeploymentTargets,
+    infoPlist: .file(path: "Resources/HarnessMonitorWidgets-Info.plist"),
+    sources: ["Sources/HarnessMonitorWidgets/**/*.swift"],
+    entitlements: .file(path: "HarnessMonitorWidgets.entitlements"),
+    dependencies: [
+        .target(name: "HarnessMonitorIntents"),
+        .sdk(name: "WidgetKit", type: .framework),
+        .sdk(name: "SwiftUI", type: .framework)
+    ],
+    settings: .settings(
+        base: [
+            "CODE_SIGN_IDENTITY[sdk=macosx*]": "Apple Development",
+            "CODE_SIGN_STYLE": "Automatic",
+            "ENABLE_APP_SANDBOX": "YES",
+            "ENABLE_INCOMING_NETWORK_CONNECTIONS": "NO",
+            "ENABLE_OUTGOING_NETWORK_CONNECTIONS": "YES",
+            "GENERATE_INFOPLIST_FILE": "NO",
+            "INFOPLIST_FILE": "Resources/HarnessMonitorWidgets-Info.plist",
+            "PRODUCT_BUNDLE_IDENTIFIER": "io.harnessmonitor.app.widgets",
+            "PRODUCT_MODULE_NAME": "HarnessMonitorWidgets",
+            "PRODUCT_NAME": "HarnessMonitorWidgets",
+            "SWIFT_ACTIVE_COMPILATION_CONDITIONS": FeatureFlags.compilationConditionSetting()
+        ]
+    ),
+    metadata: .metadata(tags: ["tag:feature:widgets", "tag:layer:extension"])
+)
+
 private let uiPreviewableTarget: Target = {
     var deps: [TargetDependency] = [
         .target(name: "HarnessMonitorKit"),
@@ -198,7 +230,10 @@ private let monitorAppDependencies: [TargetDependency] = {
 // `io.harnessmonitor.app.intents-extension`, which would trip the
 // ValidateEmbeddedBinary build step.
 private let monitorProductionAppDependencies: [TargetDependency] =
-    monitorAppDependencies + [.target(name: "HarnessMonitorIntentsExtension")]
+    monitorAppDependencies + [
+        .target(name: "HarnessMonitorIntentsExtension"),
+        .target(name: "HarnessMonitorWidgets")
+    ]
 
 private let monitorAppSettings: Settings = .settings(
     base: [
@@ -638,6 +673,7 @@ let project = Project(
         kitTarget,
         intentsTarget,
         intentsExtensionTarget,
+        widgetsExtensionTarget,
         uiPreviewableTarget,
         previewHostTarget,
         monitorAppTarget,
