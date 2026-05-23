@@ -72,54 +72,16 @@ extension SessionCacheService {
   func deleteAllCacheData() -> Bool {
     let deleteBody: () throws -> Bool = { [self] in
       let context = makeContext()
-      let transcriptEntries = try context.fetch(FetchDescriptor<CachedSessionTranscriptEntry>())
-      for entry in transcriptEntries {
-        context.delete(entry)
-      }
-      let sessions = try context.fetch(FetchDescriptor<CachedSession>())
-      for session in sessions {
-        context.delete(session)
-      }
-      let projects = try context.fetch(FetchDescriptor<CachedProject>())
-      for project in projects {
-        context.delete(project)
-      }
-      let repositoryLabels = try context.fetch(
-        FetchDescriptor<CachedReviewRepositoryLabels>()
-      )
-      for row in repositoryLabels {
-        context.delete(row)
-      }
-      let labelUsage = try context.fetch(FetchDescriptor<CachedReviewLabelUsage>())
-      for row in labelUsage {
-        context.delete(row)
-      }
-      let repoSyncStates = try context.fetch(
-        FetchDescriptor<CachedReviewsRepoSyncState>()
-      )
-      for row in repoSyncStates {
-        context.delete(row)
-      }
-      let fileViewedStates = try context.fetch(
-        FetchDescriptor<CachedReviewFileViewedState>()
-      )
-      for row in fileViewedStates {
-        context.delete(row)
-      }
-      let cachedFiles = try context.fetch(FetchDescriptor<CachedReviewFile>())
-      for row in cachedFiles {
-        context.delete(row)
-      }
-      let fileSummaries = try context.fetch(
-        FetchDescriptor<CachedReviewFilesSummary>()
-      )
-      for row in fileSummaries {
-        context.delete(row)
-      }
-      let avatars = try context.fetch(FetchDescriptor<CachedReviewAvatar>())
-      for row in avatars {
-        context.delete(row)
-      }
+      try deleteAll(CachedSessionTranscriptEntry.self, from: context)
+      try deleteAll(CachedSession.self, from: context)
+      try deleteAll(CachedProject.self, from: context)
+      try deleteAll(CachedReviewRepositoryLabels.self, from: context)
+      try deleteAll(CachedReviewLabelUsage.self, from: context)
+      try deleteAll(CachedReviewsRepoSyncState.self, from: context)
+      try deleteAll(CachedReviewFileViewedState.self, from: context)
+      try deleteAll(CachedReviewFile.self, from: context)
+      try deleteAll(CachedReviewFilesSummary.self, from: context)
+      try deleteAll(CachedReviewAvatar.self, from: context)
       try context.save()
       return true
     }
@@ -137,6 +99,13 @@ extension SessionCacheService {
       #endif
     } catch {
       return false
+    }
+  }
+
+  private func deleteAll<T: PersistentModel>(_: T.Type, from context: ModelContext) throws {
+    let records = try context.fetch(FetchDescriptor<T>())
+    for record in records {
+      context.delete(record)
     }
   }
 }
