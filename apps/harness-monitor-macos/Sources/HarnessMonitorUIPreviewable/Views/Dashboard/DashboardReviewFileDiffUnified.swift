@@ -11,13 +11,26 @@ struct DashboardReviewFileDiffUnified: View {
   let patch: ReviewFilePatch
   let language: HarnessReviewFileLanguage
   let fontScale: CGFloat
+  let captionFont: Font
+  let caption2Font: Font
+  let diffFont: Font
 
   @State private var attributed: AttributedString?
 
+  init(
+    patch: ReviewFilePatch,
+    language: HarnessReviewFileLanguage,
+    fontScale: CGFloat
+  ) {
+    self.patch = patch
+    self.language = language
+    self.fontScale = fontScale
+    captionFont = HarnessMonitorTextSize.scaledFont(.caption, by: fontScale)
+    caption2Font = HarnessMonitorTextSize.scaledFont(.caption2, by: fontScale)
+    diffFont = DashboardReviewDiffTypography.font(for: fontScale)
+  }
+
   var body: some View {
-    let captionFont = HarnessMonitorTextSize.scaledFont(.caption, by: fontScale)
-    let caption2Font = HarnessMonitorTextSize.scaledFont(.caption2, by: fontScale)
-    let diffFont = DashboardReviewDiffTypography.font(for: fontScale)
     if patch.patch.isEmpty {
       Text("No patch content").font(captionFont).foregroundStyle(.secondary)
     } else {

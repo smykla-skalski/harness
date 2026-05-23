@@ -18,11 +18,14 @@ struct DashboardReviewCommentComposer: View {
   let pullRequestID: String
   let initialDraft: String
   let viewerCanComment: Bool
+  let fontScale: CGFloat
   let viewerLogin: String?
   let onDraftChange: (String) -> Void
   let onSend: (String) async -> ReviewCommentPostOutcome
-  @Environment(\.fontScale)
-  private var fontScale
+  let bodyFont: Font
+  let captionFont: Font
+  let caption2Font: Font
+  let caption2MonospacedFont: Font
 
   @State private var draft: String
   @State private var debouncedDraft: String
@@ -54,6 +57,7 @@ struct DashboardReviewCommentComposer: View {
     pullRequestID: String,
     initialDraft: String,
     viewerCanComment: Bool,
+    fontScale: CGFloat,
     viewerLogin: String? = nil,
     onDraftChange: @escaping (String) -> Void,
     onSend: @escaping (String) async -> ReviewCommentPostOutcome
@@ -61,9 +65,17 @@ struct DashboardReviewCommentComposer: View {
     self.pullRequestID = pullRequestID
     self.initialDraft = initialDraft
     self.viewerCanComment = viewerCanComment
+    self.fontScale = fontScale
     self.viewerLogin = viewerLogin
     self.onDraftChange = onDraftChange
     self.onSend = onSend
+    bodyFont = HarnessMonitorTextSize.scaledFont(.body, by: fontScale)
+    captionFont = HarnessMonitorTextSize.scaledFont(.caption, by: fontScale)
+    caption2Font = HarnessMonitorTextSize.scaledFont(.caption2, by: fontScale)
+    caption2MonospacedFont = HarnessMonitorTextSize.scaledFont(
+      .caption2.monospacedDigit(),
+      by: fontScale
+    )
     _draft = State(initialValue: initialDraft)
     _debouncedDraft = State(initialValue: initialDraft)
   }
@@ -90,7 +102,7 @@ struct DashboardReviewCommentComposer: View {
     }
     .accessibilityElement(children: .contain)
     .accessibilityLabel(Text("New comment composer"))
-    .font(HarnessMonitorTextSize.scaledFont(.body, by: fontScale))
+    .font(bodyFont)
     .animation(.smooth(duration: 0.18), value: isCollapsed)
     .task(id: draft) {
       try? await Task.sleep(for: .milliseconds(300))
@@ -290,17 +302,5 @@ struct DashboardReviewCommentComposer: View {
   private func dismissError() {
     lastError = nil
     lastFailedBody = nil
-  }
-
-  private var captionFont: Font {
-    HarnessMonitorTextSize.scaledFont(.caption, by: fontScale)
-  }
-
-  private var caption2Font: Font {
-    HarnessMonitorTextSize.scaledFont(.caption2, by: fontScale)
-  }
-
-  private var caption2MonospacedFont: Font {
-    HarnessMonitorTextSize.scaledFont(.caption2.monospacedDigit(), by: fontScale)
   }
 }

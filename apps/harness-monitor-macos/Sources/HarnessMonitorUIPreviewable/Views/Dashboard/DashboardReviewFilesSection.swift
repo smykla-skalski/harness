@@ -253,6 +253,9 @@ struct DashboardReviewFilesEmptyState: View {
 
   let reason: Reason
   let fontScale: CGFloat
+  let titleFont: Font
+  let subtitleFont: Font
+  let captionFont: Font
   /// Optional escape hatch surfaced only while the daemon is cloning.
   /// When provided, the cloning empty-state offers a "Hide Files for
   /// this PR" button that dismisses the section locally without
@@ -268,6 +271,9 @@ struct DashboardReviewFilesEmptyState: View {
   ) {
     self.reason = reason
     self.fontScale = fontScale
+    titleFont = HarnessMonitorTextSize.scaledFont(.headline, by: fontScale)
+    subtitleFont = HarnessMonitorTextSize.scaledFont(.subheadline, by: fontScale)
+    captionFont = HarnessMonitorTextSize.scaledFont(.caption, by: fontScale)
     self.onHideFilesForPR = onHideFilesForPR
   }
 
@@ -368,17 +374,5 @@ struct DashboardReviewFilesEmptyState: View {
   private var cloningIdentity: String? {
     guard case .cloning(let progress) = reason else { return nil }
     return progress.repoFullName
-  }
-
-  private var titleFont: Font {
-    HarnessMonitorTextSize.scaledFont(.headline, by: fontScale)
-  }
-
-  private var subtitleFont: Font {
-    HarnessMonitorTextSize.scaledFont(.subheadline, by: fontScale)
-  }
-
-  private var captionFont: Font {
-    HarnessMonitorTextSize.scaledFont(.caption, by: fontScale)
   }
 }

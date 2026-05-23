@@ -11,12 +11,25 @@ struct DashboardReviewFileDiffSplit: View {
   let language: HarnessReviewFileLanguage
   let fontScale: CGFloat
   var minColumnPoints: CGFloat = 280
+  let diffFont: Font
 
   @State private var leftText: AttributedString?
   @State private var rightText: AttributedString?
 
+  init(
+    patch: ReviewFilePatch,
+    language: HarnessReviewFileLanguage,
+    fontScale: CGFloat,
+    minColumnPoints: CGFloat = 280
+  ) {
+    self.patch = patch
+    self.language = language
+    self.fontScale = fontScale
+    self.minColumnPoints = minColumnPoints
+    diffFont = DashboardReviewDiffTypography.font(for: fontScale)
+  }
+
   var body: some View {
-    let diffFont = DashboardReviewDiffTypography.font(for: fontScale)
     GeometryReader { proxy in
       let width = proxy.size.width
       if width / 2 < minColumnPoints {
