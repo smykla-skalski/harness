@@ -140,27 +140,52 @@ struct DashboardReviewStatusPill: View {
   }
 }
 
-private struct DashboardReviewChangePill: View {
+/// Pill that summarises lines-added vs lines-removed for a pull request.
+///
+/// Two visual modes:
+/// - `style == .verbose` (default): the original `"Files +N -M"` strip used
+///   by `DashboardReviewStatusStrip`.
+/// - `style == .compact`: a tighter `"+N -M"` pill the row uses next to the
+///   refresh spinner so the change size fits the single-line title row.
+struct DashboardReviewChangePill: View {
+  enum Style {
+    case verbose
+    case compact
+  }
+
   let additions: UInt64
   let deletions: UInt64
+  let style: Style
+
+  init(additions: UInt64, deletions: UInt64, style: Style = .verbose) {
+    self.additions = additions
+    self.deletions = deletions
+    self.style = style
+  }
 
   var body: some View {
     HStack(spacing: HarnessMonitorTheme.spacingSM) {
-      Text("Files")
-        .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+      if style == .verbose {
+        Text("Files")
+          .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+      }
       HStack(spacing: HarnessMonitorTheme.spacingXS) {
-        Image(systemName: "arrow.up")
-          .imageScale(.small)
-          .foregroundStyle(HarnessMonitorTheme.success)
-          .accessibilityHidden(true)
+        if style == .verbose {
+          Image(systemName: "arrow.up")
+            .imageScale(.small)
+            .foregroundStyle(HarnessMonitorTheme.success)
+            .accessibilityHidden(true)
+        }
         Text(verbatim: "+\(additions)")
           .foregroundStyle(HarnessMonitorTheme.success)
       }
       HStack(spacing: HarnessMonitorTheme.spacingXS) {
-        Image(systemName: "arrow.down")
-          .imageScale(.small)
-          .foregroundStyle(HarnessMonitorTheme.danger)
-          .accessibilityHidden(true)
+        if style == .verbose {
+          Image(systemName: "arrow.down")
+            .imageScale(.small)
+            .foregroundStyle(HarnessMonitorTheme.danger)
+            .accessibilityHidden(true)
+        }
         Text(verbatim: "-\(deletions)")
           .foregroundStyle(HarnessMonitorTheme.danger)
       }
