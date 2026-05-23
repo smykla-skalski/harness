@@ -3,10 +3,32 @@ import HarnessMonitorKit
 
 @MainActor
 final class GlobalHotKeyController {
-  private var hotKeyRef: EventHotKeyRef?
-  private var eventHandlerRef: EventHandlerRef?
+  // Carbon callback storage. The Carbon event handler runs on its own thread
+  // and dereferences the controller via an `Unmanaged.passUnretained` pointer,
+  // so the deinit cleanup must be safe to run from outside the main actor.
+  // `nonisolated(unsafe)` lets `deinit` call `UnregisterEventHotKey` and
+  // `RemoveEventHandler` without hopping back to MainActor (which is itself
+  // unsafe from a deinit on a deallocating instance).
+  nonisolated(unsafe) private var hotKeyRef: EventHotKeyRef?
+  nonisolated(unsafe) private var eventHandlerRef: EventHandlerRef?
   private var installedDescriptor: OpenAnythingHotKeyDescriptor?
   private var onInvoke: (@MainActor @Sendable () -> Void)?
+
+  deinit {
+    // Tear down Carbon registrations inline to avoid leaking the event handler
+    // ref or the hot key ref. The Carbon callback closes over
+    // `Unmanaged.passUnretained(self).toOpaque()`, so the handler MUST be
+    // removed before the hot key is unregistered: `RemoveEventHandler` blocks
+    // any in-flight callback and prevents new invocations, making the
+    // unretained pointer safe to abandon. Reversing this order leaves a window
+    // where Carbon could dispatch into a deallocating controller.
+    if let eventHandlerRef {
+      RemoveEventHandler(eventHandlerRef)
+    }
+    if let hotKeyRef {
+      UnregisterEventHotKey(hotKeyRef)
+    }
+  }
 
   func configure(
     enabled: Bool,
@@ -71,13 +93,14 @@ final class GlobalHotKeyController {
     hotKeyRef = nil
   }
 
-  private static let signature: OSType = {
-    var result: UInt32 = 0
-    for scalar in "OANY".unicodeScalars {
-      result = (result << 8) + UInt32(scalar.value)
-    }
-    return OSType(result)
-  }()
+  /// Carbon four-character code for the Open Anything hot key signature.
+  ///
+  /// ASCII bytes of `"OANY"` packed into a `UInt32`:
+  /// `0x4F` ('O'), `0x41` ('A'), `0x4E` ('N'), `0x59` ('Y').
+  /// Kept as a literal so the value is grep-able and obviously stable across
+  /// releases — Carbon uses this signature to disambiguate our hot key from
+  /// other apps registering the same key combination.
+  private static let signature: OSType = 0x4F41_4E59
 }
 
 private let globalOpenAnythingHotKeyHandler: EventHandlerUPP = { _, _, userData in
@@ -89,15 +112,4 @@ private let globalOpenAnythingHotKeyHandler: EventHandlerUPP = { _, _, userData 
     controller.handleHotKey()
   }
   return noErr
-}
-
-extension OpenAnythingHotKeyModifiers {
-  fileprivate var carbonFlags: UInt32 {
-    var flags: UInt32 = 0
-    if contains(.control) { flags |= UInt32(controlKey) }
-    if contains(.option) { flags |= UInt32(optionKey) }
-    if contains(.command) { flags |= UInt32(cmdKey) }
-    if contains(.shift) { flags |= UInt32(shiftKey) }
-    return flags
-  }
 }
