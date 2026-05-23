@@ -121,8 +121,7 @@ public struct SettingsSupervisorAuditPane: View {
     .frame(maxWidth: .infinity, maxHeight: .infinity)
   }
 
-  @ViewBuilder
-  private var detailColumn: some View {
+  @ViewBuilder private var detailColumn: some View {
     if let selectedEvent {
       AuditTimelineDetailView(event: selectedEvent)
     } else {

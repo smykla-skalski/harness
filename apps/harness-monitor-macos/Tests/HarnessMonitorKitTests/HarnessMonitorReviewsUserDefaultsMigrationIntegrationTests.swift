@@ -8,7 +8,7 @@ import Testing
 /// "write old keys in build N, run migration on first launch of build N+1"
 /// app-launch flow that the in-process unit test cannot model.
 @Suite("Reviews UserDefaults migration cross-instance round-trip")
-struct HarnessMonitorReviewsUserDefaultsMigrationIntegrationTests {
+struct ReviewsUDMigrationIntegrationTests {
   @Test("Old keys written by one defaults instance migrate when another opens the suite")
   func crossInstanceRoundTripPreservesEveryPrefixFamily() throws {
     let suite = try makeSuiteName()
