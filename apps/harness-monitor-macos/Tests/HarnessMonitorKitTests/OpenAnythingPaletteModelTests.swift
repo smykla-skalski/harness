@@ -94,9 +94,9 @@ struct OpenAnythingPaletteModelTests {
   }
 
   private static func makeModel() -> OpenAnythingPaletteModel {
-    let defaults = UserDefaults(
-      suiteName: "OpenAnythingPaletteModelTests-\(UUID().uuidString)"
-    )!
+    let defaults =
+      UserDefaults(suiteName: "OpenAnythingPaletteModelTests-\(UUID().uuidString)")
+      ?? UserDefaults.standard
     return OpenAnythingPaletteModel(
       recency: OpenAnythingRecencyStore(defaults: defaults, key: "recency"),
       pins: OpenAnythingPinStore(defaults: defaults, key: "pins")

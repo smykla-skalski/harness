@@ -104,8 +104,10 @@ public actor OpenAnythingIndex {
       HarnessMonitorLogger.store.warning(
         "Failed to build OpenAnythingIndex: \(String(describing: error), privacy: .public)"
       )
-      // swiftlint:disable:next force_try
-      return try! FuzzySearchIndex(items: [], fields: fields)
+      guard let fallback = try? FuzzySearchIndex(items: [], fields: fields) else {
+        fatalError("FuzzySearchIndex with empty items should never throw")
+      }
+      return fallback
     }
   }
 
