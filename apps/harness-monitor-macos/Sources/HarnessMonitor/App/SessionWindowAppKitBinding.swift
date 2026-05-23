@@ -90,8 +90,10 @@ final class SessionWindowAppKitBindingNSView: NSView {
       queue: .main
     ) { [weak self] notification in
       guard let closingWindow = notification.object as? NSWindow else { return }
-      self?.stopObserving(window: closingWindow)
-      SessionWindowAppKitRegistry.shared.unbind(window: closingWindow)
+      MainActor.assumeIsolated {
+        self?.stopObserving(window: closingWindow)
+        SessionWindowAppKitRegistry.shared.unbind(window: closingWindow)
+      }
     }
   }
 
