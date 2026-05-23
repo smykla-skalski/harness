@@ -16,11 +16,7 @@ public struct RefreshRepositoryIntent: AppIntent {
     )
   }
 
-  @Parameter(
-    title: "Repository",
-    description: "The repository to refresh, formatted as \"owner/name\"."
-  )
-  public var repository: String
+  @Parameter(title: "Repository") public var repository: RepositoryEntity
 
   let source: ReviewsRefreshSource
 
@@ -28,20 +24,18 @@ public struct RefreshRepositoryIntent: AppIntent {
     self.source = DaemonReviewsRefreshSource()
   }
 
-  init(repository: String, source: ReviewsRefreshSource) {
+  init(repository: RepositoryEntity, source: ReviewsRefreshSource) {
     self.source = source
     self.repository = repository
   }
 
   public func perform() async throws -> some IntentResult & ReturnsValue<Int> & ProvidesDialog {
     let count = try await resolveRefreshCount()
-    return .result(value: count, dialog: Self.dialog(for: count, repository: repository))
+    return .result(value: count, dialog: Self.dialog(for: count, repository: repository.id))
   }
 
   func resolveRefreshCount() async throws -> Int {
-    let trimmed = repository.trimmingCharacters(in: .whitespacesAndNewlines)
-    guard !trimmed.isEmpty else { return 0 }
-    return try await source.refreshRepository(trimmed)
+    try await source.refreshRepository(repository.id)
   }
 
   static func dialog(for count: Int, repository: String) -> IntentDialog {
