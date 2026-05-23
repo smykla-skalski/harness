@@ -198,7 +198,7 @@ struct DashboardReviewStatusPill: View {
 /// Pill that summarises lines-added vs lines-removed for a pull request.
 ///
 /// Two visual modes:
-/// - `style == .verbose` (default): the original `"Files +N -M"` strip used
+/// - `style == .verbose` (default): the detail-strip `"Files ↑N ↓M"` pill used
 ///   by `DashboardReviewStatusStrip`.
 /// - `style == .compact`: a tighter `"+N -M"` pill the row uses next to the
 ///   refresh spinner so the change size fits the single-line title row.
@@ -231,8 +231,9 @@ struct DashboardReviewChangePill: View {
             .foregroundStyle(HarnessMonitorTheme.success)
             .accessibilityHidden(true)
         }
-        Text(verbatim: "+\(additions)")
+        Text(verbatim: style == .compact ? "+\(additions)" : "\(additions)")
           .foregroundStyle(HarnessMonitorTheme.success)
+          .fixedSize(horizontal: true, vertical: false)
       }
       HStack(spacing: HarnessMonitorTheme.spacingXS) {
         if style == .verbose {
@@ -241,12 +242,14 @@ struct DashboardReviewChangePill: View {
             .foregroundStyle(HarnessMonitorTheme.danger)
             .accessibilityHidden(true)
         }
-        Text(verbatim: "-\(deletions)")
+        Text(verbatim: style == .compact ? "-\(deletions)" : "\(deletions)")
           .foregroundStyle(HarnessMonitorTheme.danger)
+          .fixedSize(horizontal: true, vertical: false)
       }
     }
     .scaledFont(.caption.weight(.semibold).monospacedDigit())
     .lineLimit(1)
+    .fixedSize(horizontal: true, vertical: false)
     .padding(.horizontal, 7)
     .padding(.vertical, 3)
     .background {
