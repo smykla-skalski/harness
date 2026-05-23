@@ -6,8 +6,10 @@ private let macOSDeploymentTargets: DeploymentTargets = .macOS("26.0")
 private let crossPlatformDestinations: Destinations = [.mac, .appleWatch]
 private let crossPlatformDeploymentTargets: DeploymentTargets = .multiplatform(
     macOS: "26.0",
-    watchOS: "10.0"
+    watchOS: "26.0"
 )
+private let watchDestinations: Destinations = [.appleWatch]
+private let watchDeploymentTargets: DeploymentTargets = .watchOS("26.0")
 private let xcodeVisibleAppEntitlementsPath: Path = "HarnessMonitorBase.entitlements"
 private let xcodeVisibleExternalDaemonEntitlementsPath: Path =
     "HarnessMonitorExternalDaemon.entitlements"
@@ -170,6 +172,35 @@ private let widgetsExtensionTarget: Target = .target(
         ]
     ),
     metadata: .metadata(tags: ["tag:feature:widgets", "tag:layer:extension"])
+)
+
+private let watchAppTarget: Target = .target(
+    name: "HarnessMonitorWatch",
+    destinations: watchDestinations,
+    product: .watch2App,
+    bundleId: "io.harnessmonitor.app.watch",
+    deploymentTargets: watchDeploymentTargets,
+    infoPlist: .file(path: "Resources/HarnessMonitorWatch-Info.plist"),
+    sources: ["Sources/HarnessMonitorWatch/**/*.swift"],
+    entitlements: .file(path: "HarnessMonitorWatch.entitlements"),
+    dependencies: [],
+    settings: .settings(
+        base: [
+            "CODE_SIGN_IDENTITY[sdk=watchos*]": "Apple Development",
+            "CODE_SIGN_STYLE": "Automatic",
+            "CODE_SIGNING_ALLOWED": "YES",
+            "GENERATE_INFOPLIST_FILE": "NO",
+            "INFOPLIST_FILE": "Resources/HarnessMonitorWatch-Info.plist",
+            "PRODUCT_BUNDLE_IDENTIFIER": "io.harnessmonitor.app.watch",
+            "PRODUCT_MODULE_NAME": "HarnessMonitorWatch",
+            "PRODUCT_NAME": "Harness Monitor",
+            "SDKROOT": "watchos",
+            "SUPPORTED_PLATFORMS": "watchos watchsimulator",
+            "TARGETED_DEVICE_FAMILY": "4",
+            "WATCHOS_DEPLOYMENT_TARGET": "26.0"
+        ]
+    ),
+    metadata: .metadata(tags: ["tag:feature:watch", "tag:layer:app"])
 )
 
 private let uiPreviewableTarget: Target = {
@@ -695,6 +726,16 @@ private let agentsE2EScheme: Scheme = .scheme(
     )
 )
 
+private let watchAppScheme: Scheme = .scheme(
+    name: "HarnessMonitorWatch",
+    shared: true,
+    buildAction: .buildAction(targets: [.target("HarnessMonitorWatch")]),
+    runAction: .runAction(
+        configuration: "Debug",
+        executable: .target("HarnessMonitorWatch")
+    )
+)
+
 private let uiPreviewableScheme: Scheme = .scheme(
     name: "HarnessMonitorUIPreviewable",
     shared: true,
@@ -742,6 +783,7 @@ let project = Project(
         intentsExtensionTarget,
         widgetsExtensionTarget,
         cloudKitTarget,
+        watchAppTarget,
         uiPreviewableTarget,
         previewHostTarget,
         monitorAppTarget,
@@ -763,6 +805,7 @@ let project = Project(
         externalDaemonScheme,
         uiTestHostScheme,
         agentsE2EScheme,
+        watchAppScheme,
         uiPreviewableScheme,
         uiPreviewsScheme
     ]
