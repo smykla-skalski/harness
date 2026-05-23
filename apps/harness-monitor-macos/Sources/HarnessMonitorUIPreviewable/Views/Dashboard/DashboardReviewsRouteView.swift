@@ -80,6 +80,13 @@ struct DashboardReviewsRouteView: View {
   @State private var lastPrimaryClickedID: String?
   @State private var isReviewsRouteActive = true
   @State private var pendingResumeAfterReturn = false
+  // Skip the JSON decode in `syncPreferencesFromStorage` when the raw stored
+  // string is byte-identical to the last value we already decoded. The
+  // `.onChange(of: storedPreferences)` handler fires `initial: true` and
+  // re-fires on every UserDefaults write the surface emits; the decode itself
+  // is non-trivial.
+  @State private var lastStoredPreferencesHash: Int?
+  @State private var needsMeCount: Int = 0
 
   init(
     store: HarnessMonitorStore,
@@ -152,6 +159,16 @@ struct DashboardReviewsRouteView: View {
   var routeResolvedPreferences: DashboardReviewsResolvedPreferences {
     get { resolvedPreferences }
     nonmutating set { resolvedPreferences = newValue }
+  }
+
+  var routeLastStoredPreferencesHash: Int? {
+    get { lastStoredPreferencesHash }
+    nonmutating set { lastStoredPreferencesHash = newValue }
+  }
+
+  var routeNeedsMeCount: Int {
+    get { needsMeCount }
+    nonmutating set { needsMeCount = newValue }
   }
 
   var routeRefreshTracker: ReviewRefreshTracker {
@@ -383,6 +400,7 @@ struct DashboardReviewsRouteView: View {
         // idempotent: `finishSelection` clears the request, so a follow-up
         // task-triggered call is a no-op.
         applyPendingReviewSelectionIfNeeded()
+        needsMeCount = DashboardReviewsRouteView.recomputeNeedsMeCount(items: items)
       }
       .onChange(of: normalizedPreferences.frequentLabelsCount) { _, _ in
         refreshLabelMenuData()
