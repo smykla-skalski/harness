@@ -94,19 +94,17 @@ enum DashboardReviewsFilterMode: String, CaseIterable, Identifiable {
   case ready
   case review
   case waiting
-  case blocked
 
-  static let pickerCases: [Self] = [.all, .ready, .review, .waiting, .blocked]
+  static let pickerCases: [Self] = [.all, .ready, .review, .waiting]
 
   var id: String { rawValue }
 
   var title: String {
     switch self {
-    case .all: "All"
-    case .ready: "Ready"
-    case .review: "Review"
-    case .waiting: "Waiting"
-    case .blocked: "Blocked"
+    case .all: "All open"
+    case .ready: "Ready to merge"
+    case .review: "Needs review"
+    case .waiting: "Waiting on checks"
     }
   }
 
@@ -116,7 +114,6 @@ enum DashboardReviewsFilterMode: String, CaseIterable, Identifiable {
     case .ready: item.isAutoMergeable
     case .review: item.reviewStatus == .reviewRequired
     case .waiting: item.checkStatus == .pending
-    case .blocked: item.requiresAttention
     }
   }
 }
@@ -180,6 +177,7 @@ enum DashboardReviewsCategoryMode: String, CaseIterable, Identifiable {
 
   static let pickerCases: [Self] = [.all, .dependencies]
   static let dependencyBotLogins: Set<String> = ["renovate[bot]", "dependabot[bot]"]
+  static var defaultMode: Self { .all }
 
   var id: String { rawValue }
 
