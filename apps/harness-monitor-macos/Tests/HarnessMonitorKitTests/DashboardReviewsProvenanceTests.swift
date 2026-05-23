@@ -63,7 +63,7 @@ struct DashboardReviewsProvenanceTests {
     #expect(lastLive.source == .lastLiveSnapshot("daemon stopped"))
     #expect(lastLive.warnings == ["Daemon offline: daemon stopped"])
     #expect(stale.fetchedSnapshotIsStale)
-    #expect(stale.warnings == ["Fetched snapshot exceeds 10m"])
+    #expect(stale.warnings == ["Fetched snapshot older than 10m (cache TTL)"])
   }
 
   @MainActor
@@ -105,7 +105,7 @@ struct DashboardReviewsProvenanceTests {
     #expect(!onSchedule.fetchedSnapshotIsStale)
     #expect(onSchedule.warnings.isEmpty)
     #expect(pastCeiling.fetchedSnapshotIsStale)
-    #expect(pastCeiling.warnings == ["Fetched snapshot exceeds 50m"])
+    #expect(pastCeiling.warnings == ["Fetched snapshot older than 50m (per-repo sync interval)"])
   }
 
   @Test("Route wires provenance into list and detail surfaces")
