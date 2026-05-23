@@ -282,10 +282,14 @@ struct DashboardReviewFileCardInternal: View {
     case .loading:
       ProgressView().controlSize(.small)
     case .loaded(let preview):
-      DashboardReviewFileDiffPreview(preview: preview)
-      if case .loading = patchState {
-        ProgressView().controlSize(.small)
-      }
+      DashboardReviewFileDiffPreview(
+        preview: preview,
+        viewMode: viewMode,
+        language: file.languageHint,
+        fontScale: fontScale,
+        isLoadingFullPatch: patchState == .loading,
+        fullPatchFailed: patchState.isFailed
+      )
     case .failed(let message):
       VStack(alignment: .leading, spacing: 6) {
         Text(message).font(errorFont).foregroundStyle(.orange)
@@ -303,12 +307,31 @@ struct DashboardReviewFileCardInternal: View {
   }
 
   private func loadFullPatchIfPreviewFinished() {
+    guard
+      Self.shouldLoadFullPatch(
+        previewState: previewState,
+        patchState: patchState,
+        isBinary: file.isBinary
+      )
+    else {
+      return
+    }
+    onLoadPatch()
+  }
+
+  nonisolated static func shouldLoadFullPatch(
+    previewState: ReviewFilePreviewState,
+    patchState: ReviewFilePatchState,
+    isBinary: Bool = false
+  ) -> Bool {
+    guard case .notLoaded = patchState else { return false }
     switch previewState {
-    case .loaded, .failed:
-      guard case .notLoaded = patchState else { return }
-      onLoadPatch()
+    case .loaded(let preview):
+      return preview.hasMore || isBinary
+    case .failed:
+      return true
     case .notLoaded, .loading:
-      break
+      return false
     }
   }
 
@@ -319,6 +342,17 @@ struct DashboardReviewFileCardInternal: View {
       \(viewedState == .viewed ? "viewed" : "not viewed")
       """
     )
+  }
+}
+
+extension ReviewFilePatchState {
+  fileprivate var isFailed: Bool {
+    switch self {
+    case .failed:
+      return true
+    case .notLoaded, .loading, .loaded:
+      return false
+    }
   }
 }
 

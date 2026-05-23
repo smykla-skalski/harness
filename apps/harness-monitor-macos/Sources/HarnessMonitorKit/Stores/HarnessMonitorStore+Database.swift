@@ -159,6 +159,7 @@ extension HarnessMonitorStore {
     let success = await cacheService.deleteAllCacheData()
     if success {
       await reviewFilePreviewStore.clear()
+      await reviewFilePatchStore.clear()
       persistedSessionCount = 0
       lastPersistedSnapshotAt = nil
       presentSuccessFeedback("Session cache cleared")

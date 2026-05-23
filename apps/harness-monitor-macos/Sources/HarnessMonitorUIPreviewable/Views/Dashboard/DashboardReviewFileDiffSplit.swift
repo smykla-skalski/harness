@@ -49,6 +49,8 @@ struct DashboardReviewFileDiffSplit: View {
     .frame(minHeight: 80)
     .accessibilityIdentifier("dashboardReviewFileDiffSplit")
     .task(id: patch.patch) {
+      leftText = nil
+      rightText = nil
       let tokens = await SyntaxHighlightCache.shared.tokenize(patch.patch, language: .diff)
       leftText = Self.attributedColumn(tokens: tokens, includeAdditions: false)
       rightText = Self.attributedColumn(tokens: tokens, includeAdditions: true)

@@ -64,6 +64,101 @@ struct ReviewFilePreviewLatencyProofTests {
     }
   }
 
+  @Test("cache-hot full patch access skips daemon after app restart")
+  func cacheHotPatchAccessSkipsDaemonAfterRestart() async throws {
+    let pullRequestID = "pr-patch-cache"
+    let headRefOid = "head-patch-cache"
+    let path = "src/only-line-201.swift"
+    let directory = FileManager.default.temporaryDirectory
+      .appendingPathComponent("review-patch-latency-\(UUID().uuidString)", isDirectory: true)
+    defer { try? FileManager.default.removeItem(at: directory) }
+
+    let seedStore = ReviewFilePatchStore(directory: directory, debounceNanoseconds: 1_000_000)
+    await seedStore.store(
+      pullRequestID: pullRequestID,
+      headRefOid: headRefOid,
+      path: path,
+      entry: ReviewFilePatchStore.Entry(
+        patch: "@@ -200,0 +201,1 @@\n+cached tail\n",
+        additions: 1,
+        deletions: 0,
+        fetchedAt: "2026-05-23T12:00:00Z"
+      )
+    )
+    await seedStore.flushPending()
+
+    let client = RecordingHarnessClient()
+    let store = HarnessMonitorStore(
+      daemonController: RecordingDaemonController(client: client),
+      reviewFilePatchStore: ReviewFilePatchStore(directory: directory)
+    )
+    store.client = client
+    let viewModel = store.viewModel(forPullRequest: pullRequestID)
+    viewModel.ingest(
+      response: response(paths: [path], pullRequestID: pullRequestID, headRefOid: headRefOid)
+    )
+
+    let started = DispatchTime.now().uptimeNanoseconds
+    await store.preparePatches(forPullRequest: pullRequestID, paths: [path])
+    let elapsedMs = Double(DispatchTime.now().uptimeNanoseconds - started) / 1_000_000
+
+    #expect(elapsedMs < 100)
+    #expect(client.recordedReviewPatchRequests().isEmpty)
+    guard case .loaded(let patch) = viewModel.patches[path] else {
+      Issue.record("Expected cached full patch")
+      return
+    }
+    #expect(patch.patch.contains("cached tail"))
+  }
+
+  @Test("full patch response persists for the next app launch")
+  func fullPatchResponsePersistsForNextLaunch() async throws {
+    let pullRequestID = "pr-patch-persist"
+    let headRefOid = "head-patch-persist"
+    let path = "src/persisted.swift"
+    let directory = FileManager.default.temporaryDirectory
+      .appendingPathComponent("review-patch-persist-\(UUID().uuidString)", isDirectory: true)
+    defer { try? FileManager.default.removeItem(at: directory) }
+
+    let firstClient = RecordingHarnessClient()
+    let firstStore = HarnessMonitorStore(
+      daemonController: RecordingDaemonController(client: firstClient),
+      reviewFilePatchStore: ReviewFilePatchStore(
+        directory: directory,
+        debounceNanoseconds: 1_000_000
+      )
+    )
+    firstStore.client = firstClient
+    let firstViewModel = firstStore.viewModel(forPullRequest: pullRequestID)
+    firstViewModel.ingest(
+      response: response(paths: [path], pullRequestID: pullRequestID, headRefOid: headRefOid)
+    )
+
+    await firstStore.preparePatches(forPullRequest: pullRequestID, paths: [path])
+    await firstStore.reviewFilePatchStore.flushPending()
+    #expect(firstClient.recordedReviewPatchRequests().map(\.paths) == [[path]])
+
+    let secondClient = RecordingHarnessClient()
+    let secondStore = HarnessMonitorStore(
+      daemonController: RecordingDaemonController(client: secondClient),
+      reviewFilePatchStore: ReviewFilePatchStore(directory: directory)
+    )
+    secondStore.client = secondClient
+    let secondViewModel = secondStore.viewModel(forPullRequest: pullRequestID)
+    secondViewModel.ingest(
+      response: response(paths: [path], pullRequestID: pullRequestID, headRefOid: headRefOid)
+    )
+
+    await secondStore.preparePatches(forPullRequest: pullRequestID, paths: [path])
+
+    #expect(secondClient.recordedReviewPatchRequests().isEmpty)
+    guard case .loaded(let patch) = secondViewModel.patches[path] else {
+      Issue.record("Expected persisted full patch")
+      return
+    }
+    #expect(patch.patch.contains("+\(path)-full"))
+  }
+
   private func makeFiles(count: Int) -> [ReviewFile] {
     (0..<count).map { index in
       ReviewFile(
@@ -89,6 +184,22 @@ struct ReviewFilePreviewLatencyProofTests {
       lineCount: 200,
       lineLimit: ReviewFilePreview.defaultLineLimit,
       hasMore: false
+    )
+  }
+
+  private func response(
+    paths: [String],
+    pullRequestID: String,
+    headRefOid: String
+  ) -> ReviewsFilesListResponse {
+    ReviewsFilesListResponse(
+      pullRequestID: pullRequestID,
+      number: 1,
+      headRefOid: headRefOid,
+      repositoryFullName: "owner/repo",
+      viewerCanMarkViewed: true,
+      files: paths.map { ReviewFile(path: $0, additions: 1, languageHint: .swift) },
+      fetchedAt: "2026-05-23T12:00:00Z"
     )
   }
 }

@@ -309,6 +309,31 @@ final class ReviewFileModelTests: XCTestCase {
     XCTAssertFalse(parsed.previews[0].hasMore)
   }
 
+  func testFilePreviewProjectsToPatchForHighlightedRendering() {
+    let preview = ReviewFilePreview(
+      path: "src/lib.rs",
+      patch: "@@ -1 +1 @@\n-a\n+b",
+      status: .modified,
+      additions: 1,
+      deletions: 1,
+      truncated: false,
+      etag: "etag-1",
+      servedBy: .localClone,
+      fetchedAt: "2026-05-22T10:00:00Z",
+      headRefOid: "abc",
+      lineCount: 3,
+      lineLimit: 200,
+      hasMore: true
+    )
+    let patch = preview.projectedPatch
+
+    XCTAssertEqual(patch.path, preview.path)
+    XCTAssertEqual(patch.patch, preview.patch)
+    XCTAssertEqual(patch.etag, preview.etag)
+    XCTAssertEqual(patch.headRefOid, preview.headRefOid)
+    XCTAssertFalse(patch.truncated)
+  }
+
   func testFilesViewedRoundTrips() throws {
     let request = ReviewsFilesViewedRequest(
       pullRequestID: "PR_1",

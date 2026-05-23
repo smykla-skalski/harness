@@ -26,9 +26,8 @@ extension HarnessMonitorStore {
     modelContainer: ModelContainer? = nil,
     persistenceError: String? = nil,
     cacheService: SessionCacheService? = nil,
-    reviewFilePreviewStore: ReviewFilePreviewStore = ReviewFilePreviewStore(
-      directory: HarnessMonitorPaths.reviewFilePreviewCacheRoot()
-    )
+    reviewFilePreviewStore: ReviewFilePreviewStore = ReviewFileStoreDefaults.preview(),
+    reviewFilePatchStore: ReviewFilePatchStore = ReviewFileStoreDefaults.patch()
   ) {
     self.init(
       daemonController: daemonController,
@@ -39,7 +38,8 @@ extension HarnessMonitorStore {
       persistenceError: persistenceError,
       cacheService: cacheService,
       taskBoardSettingsWorker: TaskBoardSettingsWorker(),
-      reviewFilePreviewStore: reviewFilePreviewStore
+      reviewFilePreviewStore: reviewFilePreviewStore,
+      reviewFilePatchStore: reviewFilePatchStore
     )
   }
 

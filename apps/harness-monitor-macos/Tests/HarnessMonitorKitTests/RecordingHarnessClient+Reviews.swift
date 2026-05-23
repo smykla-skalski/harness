@@ -106,6 +106,16 @@ extension RecordingHarnessClient {
     lock.withLock { reviewPreviewRequests }
   }
 
+  func configureReviewPatchDelay(_ delay: Duration?) {
+    lock.withLock {
+      reviewPatchDelay = delay
+    }
+  }
+
+  func recordedReviewPatchRequests() -> [ReviewsFilesPatchRequest] {
+    lock.withLock { reviewPatchRequests }
+  }
+
   func reviewBodyUpdateCallCount() -> Int {
     lock.withLock { reviewBodyUpdateRequests.count }
   }
@@ -185,6 +195,34 @@ extension RecordingHarnessClient {
           lineCount: 3,
           lineLimit: request.lineLimit,
           hasMore: false
+        )
+      },
+      drifted: false,
+      currentHeadRefOid: request.headRefOidExpected,
+      fetchedAt: "2026-05-23T12:00:00Z"
+    )
+  }
+
+  func patchReviewFiles(
+    request: ReviewsFilesPatchRequest
+  ) async throws -> ReviewsFilesPatchResponse {
+    let delay = lock.withLock {
+      reviewPatchRequests.append(request)
+      return reviewPatchDelay
+    }
+    try await sleepIfNeeded(delay)
+    return ReviewsFilesPatchResponse(
+      pullRequestID: request.pullRequestID,
+      patches: request.paths.map {
+        ReviewFilePatch(
+          path: $0,
+          patch: "@@ -1 +1 @@\n-\($0)\n+\($0)-full\n",
+          status: .modified,
+          additions: 1,
+          deletions: 1,
+          servedBy: .githubRest,
+          fetchedAt: "2026-05-23T12:00:00Z",
+          headRefOid: request.headRefOidExpected
         )
       },
       drifted: false,
