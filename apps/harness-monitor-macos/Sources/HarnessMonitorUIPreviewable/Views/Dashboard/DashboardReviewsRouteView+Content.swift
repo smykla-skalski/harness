@@ -38,9 +38,6 @@ extension DashboardReviewsRouteView {
       categoryModeRaw: $categoryModeRaw,
       needsMeCount: routeResponse.items.lazy.filter(\.requiresAttention).count,
       syncHealth: routeSyncHealth,
-      onRefresh: {
-        Task { await reload(forceRefresh: true) }
-      },
       onRetryFailedRepositories: {
         retryRepositories(routeSyncHealth.failedRepositories)
       },

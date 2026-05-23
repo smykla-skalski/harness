@@ -8,7 +8,6 @@ struct DashboardReviewsControlStrip: View {
   @Binding var categoryModeRaw: String
   let needsMeCount: Int
   let syncHealth: DashboardReviewsSyncHealth
-  let onRefresh: () -> Void
   let onRetryFailedRepositories: () -> Void
   let onRetryStaleRepositories: () -> Void
   let onClearCache: () -> Void
@@ -21,7 +20,6 @@ struct DashboardReviewsControlStrip: View {
           lineSpacing: HarnessMonitorTheme.spacingSM
         ) {
           needsMeChip
-          syncHealthChip
           filterPicker
           categoryPicker
           sortPicker
@@ -65,27 +63,6 @@ struct DashboardReviewsControlStrip: View {
     )
   }
 
-  private var syncHealthChip: some View {
-    Label(syncHealth.summaryLabel, systemImage: syncHealthSystemImage)
-      .scaledFont(.callout.weight(.semibold))
-      .foregroundStyle(syncHealth.hasFailures ? HarnessMonitorTheme.danger : .secondary)
-      .padding(.horizontal, 10)
-      .frame(height: 30)
-      .harnessControlPillGlass(
-        tint: syncHealth.hasFailures
-          ? HarnessMonitorTheme.danger
-          : HarnessMonitorTheme.controlBorder
-      )
-      .accessibilityLabel("Review sync health: \(syncHealth.summaryLabel)")
-  }
-
-  private var syncHealthSystemImage: String {
-    if syncHealth.hasFailures { return "exclamationmark.triangle" }
-    if syncHealth.syncingRepositoryCount > 0 { return "arrow.triangle.2.circlepath" }
-    if syncHealth.hasStaleRepositories { return "clock.badge.exclamationmark" }
-    return "checkmark.circle"
-  }
-
   private var filterPicker: some View {
     Picker("Filter", selection: $filterModeRaw) {
       ForEach(DashboardReviewsFilterMode.pickerCases) { mode in
@@ -125,15 +102,6 @@ struct DashboardReviewsControlStrip: View {
 
   private var actionsMenu: some View {
     Menu {
-      Button(action: onRefresh) {
-        Label("Refresh", systemImage: "arrow.clockwise")
-      }
-      .accessibilityIdentifier(HarnessMonitorAccessibility.dashboardReviewsRefreshButton)
-
-      if syncHealth.hasFailures || syncHealth.hasStaleRepositories {
-        Divider()
-      }
-
       if syncHealth.hasFailures {
         Button(action: onRetryFailedRepositories) {
           Label(
@@ -149,7 +117,9 @@ struct DashboardReviewsControlStrip: View {
         }
       }
 
-      Divider()
+      if syncHealth.hasFailures || syncHealth.hasStaleRepositories {
+        Divider()
+      }
 
       Button(action: onClearCache) {
         Label("Clear Cache", systemImage: "trash")
