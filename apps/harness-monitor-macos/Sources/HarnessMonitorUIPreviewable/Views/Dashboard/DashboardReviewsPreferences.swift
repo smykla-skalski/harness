@@ -51,6 +51,7 @@ struct DashboardReviewsPreferences: Codable, Equatable {
   var timelineLoadOlderBatchSize: Int = defaultTimelinePageSize
   var timelineAutoCollapseHeavyReviewThreads: Bool = true
   var checksShowPassingByDefault: Bool = false
+  var filesSortModeRaw: String = ReviewFilesSortMode.path.rawValue
 
   enum CodingKeys: String, CodingKey {
     case authorsText
@@ -88,6 +89,7 @@ struct DashboardReviewsPreferences: Codable, Equatable {
     case timelineLoadOlderBatchSize
     case timelineAutoCollapseHeavyReviewThreads
     case checksShowPassingByDefault
+    case filesSortModeRaw
   }
 
   static let defaultGeneratedPatterns: [String] = [
@@ -213,6 +215,9 @@ struct DashboardReviewsPreferences: Codable, Equatable {
     filesAccessibilityPerLineMode =
       try container.decodeIfPresent(Bool.self, forKey: .filesAccessibilityPerLineMode)
       ?? defaults.filesAccessibilityPerLineMode
+    filesSortModeRaw =
+      try container.decodeIfPresent(String.self, forKey: .filesSortModeRaw)
+      ?? defaults.filesSortModeRaw
   }
 
   private mutating func decodeTimelinePreferences(
@@ -251,6 +256,10 @@ struct DashboardReviewsPreferences: Codable, Equatable {
 
   var filesLargeDiffStrategy: FilesLargeDiffStrategy {
     FilesLargeDiffStrategy(rawValue: filesLargeDiffStrategyRaw) ?? .autoLocalClone
+  }
+
+  var filesSortMode: ReviewFilesSortMode {
+    ReviewFilesSortMode(rawValue: filesSortModeRaw) ?? .path
   }
 
   /// `Set<ReviewTimelineKind>` doesn't bridge into

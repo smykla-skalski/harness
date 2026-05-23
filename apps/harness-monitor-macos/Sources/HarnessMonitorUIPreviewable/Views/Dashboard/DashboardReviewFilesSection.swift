@@ -10,6 +10,7 @@ struct DashboardReviewFilesSection: View {
 
   let pullRequestID: String
   let repositoryID: String
+  let onHideFilesForPR: () -> Void
 
   @Environment(HarnessMonitorStore.self)
   private var store
@@ -23,9 +24,14 @@ struct DashboardReviewFilesSection: View {
   @State private var cloningProgress: ReviewLocalCloneProgress?
   @State private var visibleFileLimit = Self.fileBatchSize
 
-  init(pullRequestID: String, repositoryID: String = "") {
+  init(
+    pullRequestID: String,
+    repositoryID: String = "",
+    onHideFilesForPR: @escaping () -> Void = {}
+  ) {
     self.pullRequestID = pullRequestID
     self.repositoryID = repositoryID
+    self.onHideFilesForPR = onHideFilesForPR
   }
 
   var body: some View {
@@ -47,10 +53,19 @@ struct DashboardReviewFilesSection: View {
     .task(id: viewModel.repositoryFullName ?? "") {
       await subscribeToCloneProgress(repoFullName: viewModel.repositoryFullName)
     }
-    .onAppear { syncFilterFromPreferences() }
+    .onAppear { syncFilterFromPreferences(viewModel: viewModel) }
     .onChange(of: filter.snapshotID) { _, _ in
       viewModel.applyFilter(filter.snapshot)
       resetVisibleFiles()
+    }
+    .onChange(of: filter.hideGenerated) { _, newValue in
+      preferences.update { $0.filesHideGenerated = newValue }
+    }
+    .onChange(of: filter.hideWhitespaceOnly) { _, newValue in
+      preferences.update { $0.filesHideWhitespaceOnly = newValue }
+    }
+    .onChange(of: viewModel.sortMode) { _, newMode in
+      preferences.update { $0.filesSortModeRaw = newMode.rawValue }
     }
     .onChange(of: pullRequestID) { _, _ in
       resetVisibleFiles()
@@ -68,7 +83,10 @@ struct DashboardReviewFilesSection: View {
       if !isDaemonOnline {
         DashboardReviewFilesEmptyState(reason: .waitingForDaemon)
       } else if let cloning = activeCloningProgress {
-        DashboardReviewFilesEmptyState(reason: .cloning(progress: cloning))
+        DashboardReviewFilesEmptyState(
+          reason: .cloning(progress: cloning),
+          onHideFilesForPR: onHideFilesForPR
+        )
       } else {
         DashboardReviewFilesEmptyState(reason: .loading)
       }
@@ -161,11 +179,14 @@ struct DashboardReviewFilesSection: View {
     }
   }
 
-  private func syncFilterFromPreferences() {
+  private func syncFilterFromPreferences(viewModel: ReviewFilesViewModel) {
     let prefs = preferences.snapshot
     filter.hideGenerated = prefs.filesHideGenerated
     filter.hideWhitespaceOnly = prefs.filesHideWhitespaceOnly
     filter.generatedPathMatcher = preferences.compiledGeneratedPatternMatcher
+    if viewModel.sortMode != prefs.filesSortMode {
+      viewModel.applySort(prefs.filesSortMode)
+    }
   }
 
   private func resetVisibleFiles() {
@@ -192,6 +213,18 @@ struct DashboardReviewFilesEmptyState: View {
   }
 
   let reason: Reason
+  /// Optional escape hatch surfaced only while the daemon is cloning.
+  /// When provided, the cloning empty-state offers a "Hide Files for
+  /// this PR" button that dismisses the section locally without
+  /// stopping the background clone or toggling the global setting.
+  let onHideFilesForPR: (() -> Void)?
+
+  @State private var cloningStartedAt: Date?
+
+  init(reason: Reason, onHideFilesForPR: (() -> Void)? = nil) {
+    self.reason = reason
+    self.onHideFilesForPR = onHideFilesForPR
+  }
 
   var body: some View {
     VStack(alignment: .center, spacing: 6) {
@@ -200,12 +233,47 @@ struct DashboardReviewFilesEmptyState: View {
       if let subtitle {
         Text(subtitle).font(.subheadline).foregroundStyle(.secondary)
       }
+      cloningEscapeHatch
     }
     .frame(maxWidth: .infinity, alignment: .center)
     .padding(.vertical, 20)
     .accessibilityIdentifier("dashboardReviewFilesEmptyState")
     .accessibilityElement(children: .combine)
     .accessibilityLabel(Text(title))
+    .onAppear {
+      if case .cloning = reason, cloningStartedAt == nil {
+        cloningStartedAt = Date.now
+      }
+    }
+    .onChange(of: cloningIdentity) { _, newIdentity in
+      cloningStartedAt = newIdentity == nil ? nil : Date.now
+    }
+  }
+
+  @ViewBuilder private var cloningEscapeHatch: some View {
+    if case .cloning = reason {
+      TimelineView(.periodic(from: .now, by: 1)) { context in
+        let startedAt = cloningStartedAt ?? context.date
+        let elapsed = max(0, Int(context.date.timeIntervalSince(startedAt)))
+        Text("Cloning for \(elapsed)s")
+          .font(.caption)
+          .foregroundStyle(.secondary)
+          .monospacedDigit()
+          .accessibilityLabel("Cloning has been running for \(elapsed) seconds")
+      }
+      .padding(.top, 2)
+      if let onHide = onHideFilesForPR {
+        Button("Hide Files for this PR", action: onHide)
+          .controlSize(.small)
+          .help(
+            "Hides the Files section for this pull request only. "
+              + "The daemon keeps cloning in the background. "
+              + "Re-enable globally in Settings > Reviews > Files."
+          )
+          .accessibilityIdentifier("dashboardReviewFilesHideForPRButton")
+          .padding(.top, 4)
+      }
+    }
   }
 
   private var icon: some View {
@@ -246,5 +314,14 @@ struct DashboardReviewFilesEmptyState: View {
     case .cloning: return "Local clone in progress so we can show the diff offline."
     default: return nil
     }
+  }
+
+  /// Stable identity for the in-flight clone. `nil` when the reason
+  /// isn't `.cloning`, otherwise the daemon-reported repo so that
+  /// navigating between two cloning PRs (different repos) resets the
+  /// elapsed-time counter instead of accumulating across PRs.
+  private var cloningIdentity: String? {
+    guard case .cloning(let progress) = reason else { return nil }
+    return progress.repoFullName
   }
 }
