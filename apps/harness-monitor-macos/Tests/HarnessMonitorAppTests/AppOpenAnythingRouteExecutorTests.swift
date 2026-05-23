@@ -88,6 +88,48 @@ final class AppOpenAnythingRouteExecutorTests: XCTestCase {
     )
   }
 
+  func testLoadedSessionTaskRoutesToOwningSession() {
+    XCTAssertEqual(
+      steps(for: .loadedSession(.task(sessionID: "sess-1", taskID: "task-9"))),
+      [
+        .requestSessionRoute(.task(sessionID: "sess-1", taskID: "task-9")),
+        .openSessionWindow(sessionID: "sess-1"),
+      ]
+    )
+  }
+
+  func testLoadedSessionTimelineOpensSession() {
+    XCTAssertEqual(
+      steps(for: .loadedSession(.timeline(sessionID: "sess-1", entryID: "entry-1"))),
+      [.openSessionWindow(sessionID: "sess-1")]
+    )
+  }
+
+  func testWindowSettingsOpensSettingsWindow() {
+    XCTAssertEqual(
+      steps(for: .window(.settings)),
+      [.openWindow(.settings)]
+    )
+  }
+
+  func testWindowDashboardOpensDashboardWindow() {
+    XCTAssertEqual(
+      steps(for: .window(.dashboard)),
+      [.openWindow(.dashboard)]
+    )
+  }
+
+  func testWindowPolicyCanvasLabIsGated() {
+    XCTAssertEqual(
+      steps(for: .window(.policyCanvasLab), showsPolicyCanvasLab: false),
+      []
+    )
+    XCTAssertEqual(
+      steps(for: .window(.policyCanvasLab), showsPolicyCanvasLab: true),
+      [.openWindow(.policyCanvasLab)]
+    )
+  }
+
   func testPolicyCanvasLabActionIsGated() {
     XCTAssertEqual(
       steps(for: .action(.policyCanvasLab), showsPolicyCanvasLab: false),
@@ -96,6 +138,166 @@ final class AppOpenAnythingRouteExecutorTests: XCTestCase {
     XCTAssertEqual(
       steps(for: .action(.policyCanvasLab), showsPolicyCanvasLab: true),
       [.openWindow(.policyCanvasLab)]
+    )
+  }
+
+  // MARK: - Audit #54: every OpenAnythingAction case has a step mapping.
+
+  func testActionNewSessionPresentsSessionSheet() {
+    XCTAssertEqual(
+      steps(for: .action(.newSession)),
+      [.presentNewSessionSheet]
+    )
+  }
+
+  func testActionNewTaskPresentsTaskSheet() {
+    XCTAssertEqual(
+      steps(for: .action(.newTask)),
+      [.presentNewTaskSheet]
+    )
+  }
+
+  func testActionAttachExternalSessionTriggersAttach() {
+    XCTAssertEqual(
+      steps(for: .action(.attachExternalSession)),
+      [.attachExternalSession]
+    )
+  }
+
+  func testActionOpenDashboardOpensDashboardWindow() {
+    XCTAssertEqual(
+      steps(for: .action(.openDashboard)),
+      [.openWindow(.dashboard)]
+    )
+  }
+
+  func testActionOpenTaskBoardOpensBoardRoute() {
+    XCTAssertEqual(
+      steps(for: .action(.openTaskBoard)),
+      [.openDashboard(.taskBoard)]
+    )
+  }
+
+  func testActionOpenReviewsOpensReviewsRoute() {
+    XCTAssertEqual(
+      steps(for: .action(.openReviews)),
+      [.openDashboard(.reviews)]
+    )
+  }
+
+  func testActionOpenNotificationsOpensNotificationsRoute() {
+    XCTAssertEqual(
+      steps(for: .action(.openNotifications)),
+      [.openDashboard(.notifications)]
+    )
+  }
+
+  func testActionOpenPolicyCanvasOpensPolicyRoute() {
+    XCTAssertEqual(
+      steps(for: .action(.openPolicyCanvas)),
+      [.openDashboard(.policyCanvas)]
+    )
+  }
+
+  func testActionOpenDiagnosticsOpensDiagnosticsRoute() {
+    XCTAssertEqual(
+      steps(for: .action(.openDiagnostics)),
+      [.openDashboard(.diagnostics)]
+    )
+  }
+
+  func testActionRefreshTriggersRefresh() {
+    XCTAssertEqual(
+      steps(for: .action(.refresh)),
+      [.refresh]
+    )
+  }
+
+  func testActionRefreshDiagnosticsNavigatesThenRefreshes() {
+    XCTAssertEqual(
+      steps(for: .action(.refreshDiagnostics)),
+      [
+        .openDashboard(.diagnostics),
+        .refreshDiagnostics,
+      ]
+    )
+  }
+
+  func testActionReconnectDaemonReconnects() {
+    XCTAssertEqual(
+      steps(for: .action(.reconnectDaemon)),
+      [.reconnectDaemon]
+    )
+  }
+
+  func testActionCopyDiagnosticsCopies() {
+    XCTAssertEqual(
+      steps(for: .action(.copyDiagnostics)),
+      [.copyDiagnostics]
+    )
+  }
+
+  func testActionSettingsOpensSettingsWindow() {
+    XCTAssertEqual(
+      steps(for: .action(.settings)),
+      [.openWindow(.settings)]
+    )
+  }
+
+  func testActionOpenMCPSettingsOpensMCPSection() {
+    XCTAssertEqual(
+      steps(for: .action(.openMCPSettings)),
+      [.openSettings(rawValue: "mcp")]
+    )
+  }
+
+  func testActionOpenDatabaseSettingsOpensDatabaseSection() {
+    XCTAssertEqual(
+      steps(for: .action(.openDatabaseSettings)),
+      [.openSettings(rawValue: "database")]
+    )
+  }
+
+  /// Audit #54 belt-and-braces: every `OpenAnythingAction` case must produce
+  /// at least one step when the lab gate is on. A new case without a mapping
+  /// would assert here even if a future contributor forgot to add a per-case
+  /// test above.
+  func testEveryOpenAnythingActionProducesSteps() {
+    for action in OpenAnythingAction.allCases {
+      let result = OpenAnythingRouteExecutor.steps(
+        for: .action(action),
+        showsPolicyCanvasLab: true
+      )
+      XCTAssertFalse(
+        result.isEmpty,
+        "Action \(action) produced no steps under the lab gate"
+      )
+    }
+  }
+
+  // MARK: - Audit #77: deep-link steps are Equatable + reachable.
+
+  func testDeepLinkOpenExternalURLEquality() {
+    let url = URL(string: "https://github.com/example/repo/pull/42")!
+    XCTAssertEqual(
+      OpenAnythingRoutingStep.openExternalURL(url),
+      .openExternalURL(url)
+    )
+    XCTAssertNotEqual(
+      OpenAnythingRoutingStep.openExternalURL(url),
+      .openExternalURL(URL(string: "https://example.com")!)
+    )
+  }
+
+  func testDeepLinkRevealInFinderEquality() {
+    let url = URL(fileURLWithPath: "/tmp/worktrees/session-1")
+    XCTAssertEqual(
+      OpenAnythingRoutingStep.revealInFinder(url),
+      .revealInFinder(url)
+    )
+    XCTAssertNotEqual(
+      OpenAnythingRoutingStep.revealInFinder(url),
+      .revealInFinder(URL(fileURLWithPath: "/tmp/elsewhere"))
     )
   }
 

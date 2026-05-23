@@ -161,8 +161,11 @@ struct HarnessMonitorOpenAnythingHostModifier: ViewModifier {
   }
 
   private func execute(_ hit: OpenAnythingHit) {
+    // Audit #43: the `steps(for: hit, ...)` wrapper just forwarded to
+    // `steps(for: target, ...)`. Inlined here so the executor surface is a
+    // single entry point keyed on `OpenAnythingTarget`.
     for step in OpenAnythingRouteExecutor.steps(
-      for: hit,
+      for: hit.target,
       showsPolicyCanvasLab: showsPolicyCanvasLab
     ) {
       executeRoutingStep(step)
@@ -188,7 +191,8 @@ struct HarnessMonitorOpenAnythingHostModifier: ViewModifier {
     case .selectDashboardReview(let pullRequestID):
       reviewRegistry.requestSelection(pullRequestID: pullRequestID)
     case .presentNewSessionSheet, .presentNewTaskSheet, .attachExternalSession, .refresh,
-      .refreshDiagnostics, .reconnectDaemon, .copyDiagnostics:
+      .refreshDiagnostics, .reconnectDaemon, .copyDiagnostics, .openExternalURL,
+      .revealInFinder:
       break
     }
   }
@@ -201,6 +205,14 @@ struct HarnessMonitorOpenAnythingHostModifier: ViewModifier {
       Task { await store.reconnect() }
     case .copyDiagnostics:
       copyMonitorDiagnostics()
+    // Audit #77: deep-link steps. No current target emits these - they are
+    // hooks for row context-menu actions in the palette view ("Open in
+    // browser", "Reveal in Finder"). Treated as command-type steps so the
+    // routing switch below stays a navigation-only fallback.
+    case .openExternalURL(let url):
+      NSWorkspace.shared.open(url)
+    case .revealInFinder(let url):
+      NSWorkspace.shared.activateFileViewerSelecting([url])
     default:
       return false
     }
