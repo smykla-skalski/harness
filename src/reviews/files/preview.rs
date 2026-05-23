@@ -2,7 +2,7 @@
 
 use super::{ReviewFilePatch, ReviewFilePreview};
 
-const DEFAULT_PREVIEW_LINE_LIMIT: u32 = 200;
+const DEFAULT_PREVIEW_LINE_LIMIT: u32 = 1_000;
 
 /// Default number of unified-diff lines returned for a preview.
 #[must_use]
@@ -104,5 +104,12 @@ mod tests {
         assert_eq!(preview.patch, "a\nb");
         assert_eq!(preview.line_count, 2);
         assert!(!preview.has_more);
+    }
+
+    #[test]
+    fn default_preview_window_covers_files_just_over_two_hundred_lines() {
+        assert!(preview_line_limit() >= 1_000);
+        let preview = preview_from_patch(patch("a\nb\n"), preview_line_limit() + 1);
+        assert_eq!(preview.line_limit, preview_line_limit());
     }
 }

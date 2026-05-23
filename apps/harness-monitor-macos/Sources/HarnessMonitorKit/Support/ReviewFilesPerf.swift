@@ -114,6 +114,26 @@ public enum ReviewFilesPerf {
     return Interval(state: state, name: "files.tokenize")
   }
 
+  public static func beginDiffParse(path: String, lineCount: Int) -> Interval {
+    let id = signposter.makeSignpostID()
+    let state = signposter.beginInterval(
+      "files.diff.parse",
+      id: id,
+      "path=\(path, privacy: .public) lines=\(lineCount)"
+    )
+    return Interval(state: state, name: "files.diff.parse")
+  }
+
+  public static func beginAppKitDraw(rowCount: Int) -> Interval {
+    let id = signposter.makeSignpostID()
+    let state = signposter.beginInterval(
+      "files.diff.draw",
+      id: id,
+      "rows=\(rowCount)"
+    )
+    return Interval(state: state, name: "files.diff.draw")
+  }
+
   public static func beginImageDecode(oid: String) -> Interval {
     let id = signposter.makeSignpostID()
     let state = signposter.beginInterval(
