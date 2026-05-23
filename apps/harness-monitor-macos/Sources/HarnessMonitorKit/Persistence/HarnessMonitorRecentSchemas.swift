@@ -135,6 +135,7 @@ public enum HarnessMonitorMigrationPlan: SchemaMigrationPlan {
       HarnessMonitorSchemaV20.self,
       HarnessMonitorSchemaV21.self,
       HarnessMonitorSchemaV22.self,
+      HarnessMonitorSchemaV23.self,
     ]
   }
 
@@ -161,6 +162,7 @@ public enum HarnessMonitorMigrationPlan: SchemaMigrationPlan {
       migrateV19toV20,
       migrateV20toV21,
       migrateV21toV22,
+      migrateV22toV23,
     ]
   }
 
@@ -334,6 +336,13 @@ public enum HarnessMonitorMigrationPlan: SchemaMigrationPlan {
   // custom migration that copies each row from the old class into the new
   // class and deletes the source row.
   static let migrateV21toV22 = HarnessMonitorMigrationV21ToV22.stage
+
+  // V23 is purely additive: one avatar cache table keyed by exact GitHub
+  // `avatarUrl`, with no relationships into the existing V22 graph.
+  static let migrateV22toV23 = MigrationStage.lightweight(
+    fromVersion: HarnessMonitorSchemaV22.self,
+    toVersion: HarnessMonitorSchemaV23.self
+  )
 }
 
-public typealias HarnessMonitorCurrentSchema = HarnessMonitorSchemaV22
+public typealias HarnessMonitorCurrentSchema = HarnessMonitorSchemaV23

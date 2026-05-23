@@ -135,7 +135,14 @@ struct DashboardReviewConversationFeed: View {
       SessionTimelineCards(
         rows: visibleRows,
         actionHandler: actionHandler,
-        onSignalTap: onSignalTap
+        onSignalTap: onSignalTap,
+        avatarImageLoader: { login, avatarURL, targetPixel in
+          await store.reviewAvatarImage(
+            login: login,
+            avatarURL: avatarURL,
+            targetPixel: targetPixel
+          )
+        }
       )
       if hiddenTimelineRowCount > 0 {
         Button("Show \(min(Self.timelineRowBatchSize, hiddenTimelineRowCount)) more events") {

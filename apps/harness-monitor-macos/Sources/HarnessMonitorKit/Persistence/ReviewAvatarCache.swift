@@ -1,51 +1,55 @@
 import AppKit
 import Foundation
 import ImageIO
+import SwiftData
 
-/// In-memory avatar cache for the dependency-update PR timeline.
+/// Avatar cache for the review PR timeline.
 ///
-/// Built on `NSCache<NSURL, NSImage>` with a 64-entry cap plus an
-/// in-flight dedupe table so multiple visible rows requesting the
-/// same avatar do not fan out into N concurrent fetches. Downsamples
-/// images via `CGImageSourceCreateThumbnailAtIndex` to the
-/// view-requested pixel size so the cache stores compact pre-decoded
-/// thumbnails rather than full-resolution PNGs — per the perf
-/// discipline in plan §4.6 and the
-/// `swiftui-performance-macos/references/image-optimization.md`
-/// reference: `kCGImageSourceShouldCache: false` on the source +
-/// `kCGImageSourceShouldCacheImmediately: true` on the thumbnail.
+/// SwiftData persists daemon-fetched raw image bytes keyed by the exact
+/// GitHub `avatarUrl`, while `NSCache` keeps bounded decoded thumbnails
+/// per requested pixel size for scroll performance.
 public actor ReviewAvatarCache {
   public static let shared = ReviewAvatarCache()
 
-  private let cache: NSCache<NSURL, NSImage>
-  private var inFlight: [URL: Task<NSImage?, Never>] = [:]
-  private let urlSession: URLSession
+  private let cache: NSCache<NSString, NSImage>
+  private var inFlight: [String: Task<NSImage?, Never>] = [:]
 
-  public init(countLimit: Int = 64, urlSession: URLSession = .shared) {
-    let nsCache = NSCache<NSURL, NSImage>()
+  public init(countLimit: Int = 64) {
+    let nsCache = NSCache<NSString, NSImage>()
     nsCache.countLimit = countLimit
     self.cache = nsCache
-    self.urlSession = urlSession
   }
 
-  /// Returns a downsampled avatar for `url` sized for the given
-  /// `targetPixel` (point × backing scale). Coalesces concurrent
-  /// requests for the same URL into a single network fetch.
-  public func avatar(for url: URL, targetPixel: CGFloat) async -> NSImage? {
-    if let cached = cache.object(forKey: url as NSURL) {
+  /// Returns a downsampled avatar for `avatarURL` sized for the given
+  /// `targetPixel` (point × backing scale). Coalesces concurrent requests
+  /// and only asks the daemon when SwiftData does not already hold bytes
+  /// for this exact avatar URL.
+  public func avatar(
+    for avatarURL: URL,
+    targetPixel: CGFloat,
+    modelContainer: ModelContainer,
+    client: any HarnessMonitorReviewsClientProtocol
+  ) async -> NSImage? {
+    let key = Self.cacheKey(avatarURL: avatarURL, targetPixel: targetPixel)
+    if let cached = cache.object(forKey: key as NSString) {
       return cached
     }
-    if let inflight = inFlight[url] {
+    if let inflight = inFlight[key] {
       return await inflight.value
     }
-    let task = Task { [self, url, targetPixel] in
-      await Self.fetchAndDownsample(url: url, targetPixel: targetPixel, session: urlSession)
+    let task = Task { [avatarURL, targetPixel, modelContainer, client] in
+      await Self.loadOrFetchAndDownsample(
+        avatarURL: avatarURL,
+        targetPixel: targetPixel,
+        modelContainer: modelContainer,
+        client: client
+      )
     }
-    inFlight[url] = task
-    defer { inFlight[url] = nil }
+    inFlight[key] = task
+    defer { inFlight[key] = nil }
     let image = await task.value
     if let image {
-      cache.setObject(image, forKey: url as NSURL)
+      cache.setObject(image, forKey: key as NSString)
     }
     return image
   }
@@ -56,20 +60,106 @@ public actor ReviewAvatarCache {
     cache.removeAllObjects()
   }
 
-  private static func fetchAndDownsample(
-    url: URL,
+  public nonisolated static func fallbackAvatarURL(login: String) -> URL? {
+    let trimmed = login.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard !trimmed.isEmpty else { return nil }
+    var components = URLComponents()
+    components.scheme = "https"
+    components.host = "github.com"
+    components.path = "/\(trimmed).png"
+    components.queryItems = [URLQueryItem(name: "size", value: "64")]
+    return components.url
+  }
+
+  private static func loadOrFetchAndDownsample(
+    avatarURL: URL,
     targetPixel: CGFloat,
-    session: URLSession
+    modelContainer: ModelContainer,
+    client: any HarnessMonitorReviewsClientProtocol
   ) async -> NSImage? {
+    if let data = cachedData(avatarURL: avatarURL, modelContainer: modelContainer) {
+      return downsample(data: data, targetPixel: targetPixel)
+    }
     do {
-      let (data, response) = try await session.data(from: url)
-      if let http = response as? HTTPURLResponse, !(200..<400).contains(http.statusCode) {
-        return nil
-      }
+      let response = try await client.fetchReviewAvatar(
+        request: ReviewsAvatarRequest(avatarURL: avatarURL.absoluteString)
+      )
+      guard let data = response.contentData else { return nil }
+      store(
+        response: response,
+        data: data,
+        modelContainer: modelContainer
+      )
       return downsample(data: data, targetPixel: targetPixel)
     } catch {
       return nil
     }
+  }
+
+  private static func cachedData(
+    avatarURL: URL,
+    modelContainer: ModelContainer
+  ) -> Data? {
+    let key = avatarURL.absoluteString
+    let context = ModelContext(modelContainer)
+    let descriptor = FetchDescriptor<CachedReviewAvatar>(
+      predicate: #Predicate { $0.avatarURL == key }
+    )
+    guard let row = try? context.fetch(descriptor).first else { return nil }
+    row.lastAccessedAt = .now
+    try? context.save()
+    return row.contentData
+  }
+
+  private static func store(
+    response: ReviewsAvatarResponse,
+    data: Data,
+    modelContainer: ModelContainer
+  ) {
+    let key = response.avatarURL
+    let fetchedAt = parseFetchedAt(response.fetchedAt) ?? .now
+    let context = ModelContext(modelContainer)
+    let descriptor = FetchDescriptor<CachedReviewAvatar>(
+      predicate: #Predicate { $0.avatarURL == key }
+    )
+    do {
+      if let row = try context.fetch(descriptor).first {
+        row.mimeType = response.mimeType
+        row.contentData = data
+        row.fetchedAt = fetchedAt
+        row.lastAccessedAt = .now
+      } else {
+        context.insert(
+          CachedReviewAvatar(
+            avatarURL: key,
+            mimeType: response.mimeType,
+            contentData: data,
+            fetchedAt: fetchedAt,
+            lastAccessedAt: .now
+          )
+        )
+      }
+      try context.save()
+    } catch {
+      HarnessMonitorLogger.store.warning(
+        "review.avatar_cache_write_failed error=\(String(describing: error), privacy: .public)"
+      )
+    }
+  }
+
+  private static func parseFetchedAt(_ string: String) -> Date? {
+    if let date = try? Date(string, strategy: .iso8601) { return date }
+    return try? Date(
+      string,
+      strategy: .iso8601.year().month().day()
+        .dateSeparator(.dash)
+        .time(includingFractionalSeconds: true)
+        .timeZone(separator: .colon)
+    )
+  }
+
+  private static func cacheKey(avatarURL: URL, targetPixel: CGFloat) -> String {
+    "\(avatarURL.absoluteString)#\(Int(max(targetPixel, 32)))"
   }
 
   static func downsample(data: Data, targetPixel: CGFloat) -> NSImage? {

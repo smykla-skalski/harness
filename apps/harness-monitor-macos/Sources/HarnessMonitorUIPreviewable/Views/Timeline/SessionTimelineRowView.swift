@@ -5,17 +5,20 @@ struct SessionTimelineRowView: View {
   let row: SessionTimelineRow
   let actionHandler: any DecisionActionHandler
   let onSignalTap: ((String) -> Void)?
+  let avatarImageLoader: TimelineAvatarImageLoader?
   let fontScale: CGFloat
 
   init(
     row: SessionTimelineRow,
     actionHandler: any DecisionActionHandler,
     onSignalTap: ((String) -> Void)?,
+    avatarImageLoader: TimelineAvatarImageLoader? = nil,
     fontScale: CGFloat
   ) {
     self.row = row
     self.actionHandler = actionHandler
     self.onSignalTap = onSignalTap
+    self.avatarImageLoader = avatarImageLoader
     self.fontScale = fontScale
   }
 
@@ -26,6 +29,7 @@ struct SessionTimelineRowView: View {
       row: row,
       actionHandler: actionHandler,
       onSignalTap: onSignalTap,
+      avatarImageLoader: avatarImageLoader,
       fontScale: fontScale
     )
     .equatable()
@@ -47,6 +51,7 @@ extension SessionTimelineRowView: @MainActor Equatable {
     lhs.row == rhs.row
       && lhs.fontScale == rhs.fontScale
       && (lhs.onSignalTap == nil) == (rhs.onSignalTap == nil)
+      && (lhs.avatarImageLoader == nil) == (rhs.avatarImageLoader == nil)
       && ObjectIdentifier(lhs.actionHandler as AnyObject)
         == ObjectIdentifier(rhs.actionHandler as AnyObject)
   }

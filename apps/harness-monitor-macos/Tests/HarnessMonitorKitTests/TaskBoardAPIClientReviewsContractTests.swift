@@ -9,7 +9,7 @@ extension TaskBoardAPIClientTests {
       records.map(\.method)
         == [
           "POST", "GET", "POST", "POST", "POST", "POST", "POST", "POST", "POST", "DELETE",
-          "POST", "POST", "POST",
+          "POST", "POST", "POST", "POST",
         ]
     )
     #expect(
@@ -27,6 +27,7 @@ extension TaskBoardAPIClientTests {
           "/v1/reviews/cache",
           "/v1/reviews/refresh",
           "/v1/reviews/comment",
+          "/v1/reviews/avatar",
           "/v1/reviews/timeline",
         ]
     )
@@ -56,6 +57,10 @@ extension TaskBoardAPIClientTests {
     #expect(records[9].body == nil)
     #expect(records[11].body?["body"] as? String == "@renovatebot rebase")
     #expect(records[11].body?["targets"] is [[String: Any]])
+    #expect(
+      records[12].body?["avatar_url"] as? String
+        == "https://avatars.githubusercontent.com/in/2740?v=4"
+    )
   }
 
   func assertHTTPClientResults(_ result: TaskBoardHTTPContractResult) {
@@ -117,6 +122,8 @@ extension TaskBoardAPIClientTests {
     #expect(result.refresh.missingPullRequestIDs == ["pr-42"])
     #expect(result.comment.results.first?.action == .comment)
     #expect(result.comment.results.first?.timelineEntry?.id == "IC_comment_001")
+    #expect(result.avatar.avatarURL == "https://avatars.githubusercontent.com/in/2740?v=4")
+    #expect(result.avatar.mimeType == "image/png")
     #expect(result.timeline.pullRequestId == "pr-42")
     #expect(result.timeline.entries.first?.id == "IC_001")
     #expect(result.timeline.viewerCanComment)
@@ -166,5 +173,6 @@ struct ReviewsHTTPContractResult {
   let cacheClear: ReviewsCacheClearResponse
   let refresh: ReviewsRefreshResponse
   let comment: ReviewsActionResponse
+  let avatar: ReviewsAvatarResponse
   let timeline: ReviewsTimelineResponse
 }

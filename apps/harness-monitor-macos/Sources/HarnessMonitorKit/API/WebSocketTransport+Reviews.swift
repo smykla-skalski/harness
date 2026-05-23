@@ -158,6 +158,14 @@ extension WebSocketTransport {
     return try decode(value)
   }
 
+  public func fetchReviewAvatar(
+    request: ReviewsAvatarRequest
+  ) async throws -> ReviewsAvatarResponse {
+    let params = try encodeParams(request, extra: [:])
+    let value = try await rpc(method: .reviewsAvatar, params: params)
+    return try decode(value)
+  }
+
   public func setReviewThreadResolved(
     request: ReviewsReviewThreadResolveRequest
   ) async throws -> ReviewsReviewThreadResolveResponse {

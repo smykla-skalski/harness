@@ -103,6 +103,7 @@ pub const REVIEWS_FILES_LOCAL_CLONES_LIST: &str =
     "reviews.files_local_clones_list";
 pub const REVIEWS_FILES_LOCAL_CLONES_DELETE: &str =
     "reviews.files_local_clones_delete";
+pub const REVIEWS_AVATAR: &str = "reviews.avatar";
 pub const REVIEWS_TIMELINE: &str = "reviews.timeline";
 pub const REVIEWS_REVIEW_THREADS_RESOLVE: &str =
     "reviews.review_threads_resolve";

@@ -95,6 +95,7 @@ pub const REVIEWS_FILES_BLOB: &str = "/v1/reviews/files/blob";
 pub const REVIEWS_FILES_LOCAL_CLONES: &str = "/v1/reviews/files/local-clones";
 pub const REVIEWS_FILES_LOCAL_CLONES_DELETE: &str =
     "/v1/reviews/files/local-clones/delete";
+pub const REVIEWS_AVATAR: &str = "/v1/reviews/avatar";
 pub const REVIEWS_TIMELINE: &str = "/v1/reviews/timeline";
 pub const REVIEWS_REVIEW_THREADS_RESOLVE: &str =
     "/v1/reviews/review-threads/resolve";

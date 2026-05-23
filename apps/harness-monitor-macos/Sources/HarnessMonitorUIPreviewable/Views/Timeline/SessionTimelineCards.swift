@@ -5,8 +5,21 @@ struct SessionTimelineCards: View {
   let rows: [SessionTimelineRow]
   let actionHandler: any DecisionActionHandler
   let onSignalTap: ((String) -> Void)?
+  let avatarImageLoader: TimelineAvatarImageLoader?
   @Environment(\.fontScale)
   var fontScale
+
+  init(
+    rows: [SessionTimelineRow],
+    actionHandler: any DecisionActionHandler,
+    onSignalTap: ((String) -> Void)? = nil,
+    avatarImageLoader: TimelineAvatarImageLoader? = nil
+  ) {
+    self.rows = rows
+    self.actionHandler = actionHandler
+    self.onSignalTap = onSignalTap
+    self.avatarImageLoader = avatarImageLoader
+  }
 
   var body: some View {
     LazyVStack(alignment: .leading, spacing: HarnessMonitorTheme.itemSpacing) {
@@ -15,6 +28,7 @@ struct SessionTimelineCards: View {
           row: row,
           actionHandler: actionHandler,
           onSignalTap: onSignalTap,
+          avatarImageLoader: avatarImageLoader,
           fontScale: fontScale
         )
         .equatable()
@@ -34,6 +48,7 @@ struct SessionTimelineNodeCluster: View {
   let row: SessionTimelineRow
   let actionHandler: any DecisionActionHandler
   let onSignalTap: ((String) -> Void)?
+  let avatarImageLoader: TimelineAvatarImageLoader?
   let fontScale: CGFloat
 
   var body: some View {
@@ -45,6 +60,7 @@ struct SessionTimelineNodeCluster: View {
         row: row,
         actionHandler: actionHandler,
         onSignalTap: onSignalTap,
+        avatarImageLoader: avatarImageLoader,
         fontScale: fontScale
       )
     }
@@ -63,6 +79,7 @@ extension SessionTimelineNodeCluster: @MainActor Equatable {
       && ObjectIdentifier(lhs.actionHandler as AnyObject)
         == ObjectIdentifier(rhs.actionHandler as AnyObject)
       && (lhs.onSignalTap == nil) == (rhs.onSignalTap == nil)
+      && (lhs.avatarImageLoader == nil) == (rhs.avatarImageLoader == nil)
   }
 }
 
@@ -70,6 +87,7 @@ struct SessionTimelineNodeRow: View {
   let row: SessionTimelineRow
   let actionHandler: any DecisionActionHandler
   let onSignalTap: ((String) -> Void)?
+  let avatarImageLoader: TimelineAvatarImageLoader?
   let statusBadges: [SessionTimelineStatusBadge]
   let fontScale: CGFloat
   let timestampFont: Font
@@ -82,11 +100,13 @@ struct SessionTimelineNodeRow: View {
     row: SessionTimelineRow,
     actionHandler: any DecisionActionHandler,
     onSignalTap: ((String) -> Void)? = nil,
+    avatarImageLoader: TimelineAvatarImageLoader? = nil,
     fontScale: CGFloat
   ) {
     self.row = row
     self.actionHandler = actionHandler
     self.onSignalTap = onSignalTap
+    self.avatarImageLoader = avatarImageLoader
     self.fontScale = fontScale
     statusBadges = Self.makeStatusBadges(for: row.node)
     timestampFont = HarnessMonitorTextSize.scaledFont(
@@ -134,8 +154,13 @@ struct SessionTimelineNodeRow: View {
         .accessibilityHidden(true)
 
       if let login = node.actorLogin {
-        AvatarImageView(login: login, size: 18)
-          .frame(width: SessionTimelineLayout.railWidth, alignment: .center)
+        AvatarImageView(
+          login: login,
+          avatarURL: node.actorAvatarURL,
+          size: 18,
+          loadImage: avatarImageLoader
+        )
+        .frame(width: SessionTimelineLayout.railWidth, alignment: .center)
       } else {
         SessionTimelineDot(tint: cardTint)
       }
