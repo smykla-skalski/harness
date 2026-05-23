@@ -22,15 +22,17 @@ pub use enums::{
 };
 #[allow(unused_imports)] // RegistryEntry + RepoKey are used by daemon-service tests.
 pub(crate) use files::local_clone::{LocalCloneRegistry, LocalCloneRoot, RegistryEntry, RepoKey};
+pub(crate) use files::preview_from_patch;
 pub(crate) use files::viewed::{ViewedMutation, classify_outcome};
 pub use files::{
     ReviewFile, ReviewFileChangeType, ReviewFilePatch,
-    ReviewFileServedBy, ReviewFileViewedOutcome,
+    ReviewFilePreview, ReviewFileServedBy, ReviewFileViewedOutcome,
     ReviewFileViewedState, ReviewFilesViewedResult,
     ReviewFilesViewedTarget, ReviewImageMime,
     ReviewsFilesBlobRequest, ReviewsFilesBlobResponse,
     ReviewsFilesListRequest, ReviewsFilesListResponse,
     ReviewsFilesPatchRequest, ReviewsFilesPatchResponse,
+    ReviewsFilesPreviewRequest, ReviewsFilesPreviewResponse,
     ReviewsFilesViewedRequest, ReviewsFilesViewedResponse,
     ReviewsRateLimitSnapshot, FilesLargeDiffStrategy, HarnessCodeLanguage,
     LocalCloneListEntry, image_mime_for_path, infer_language,

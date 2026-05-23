@@ -91,6 +91,7 @@ pub const REVIEWS_BODY_UPDATE: &str = "/v1/reviews/body/update";
 pub const REVIEWS_COMMENT: &str = "/v1/reviews/comment";
 pub const REVIEWS_FILES_LIST: &str = "/v1/reviews/files/list";
 pub const REVIEWS_FILES_PATCH: &str = "/v1/reviews/files/patch";
+pub const REVIEWS_FILES_PREVIEW: &str = "/v1/reviews/files/preview";
 pub const REVIEWS_FILES_VIEWED: &str = "/v1/reviews/files/viewed";
 pub const REVIEWS_FILES_BLOB: &str = "/v1/reviews/files/blob";
 pub const REVIEWS_FILES_LOCAL_CLONES: &str = "/v1/reviews/files/local-clones";

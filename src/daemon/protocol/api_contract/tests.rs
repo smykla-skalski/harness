@@ -442,6 +442,12 @@ fn review_routes_have_complete_ws_parity() {
             ),
             (
                 HttpRouteMethod::Post,
+                http_paths::REVIEWS_FILES_PREVIEW,
+                ws_methods::REVIEWS_FILES_PREVIEW,
+                true,
+            ),
+            (
+                HttpRouteMethod::Post,
                 http_paths::REVIEWS_FILES_VIEWED,
                 ws_methods::REVIEWS_FILES_VIEWED,
                 true,

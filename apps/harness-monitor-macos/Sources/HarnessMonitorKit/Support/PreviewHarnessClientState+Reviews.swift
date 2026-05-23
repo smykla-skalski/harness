@@ -244,6 +244,18 @@ extension PreviewHarnessClientState {
     )
   }
 
+  func previewReviewFiles(
+    request: ReviewsFilesPreviewRequest
+  ) -> ReviewsFilesPreviewResponse {
+    ReviewsFilesPreviewResponse(
+      pullRequestID: request.pullRequestID,
+      previews: [],
+      drifted: false,
+      currentHeadRefOid: request.headRefOidExpected,
+      fetchedAt: Self.mutationTimestamp
+    )
+  }
+
   func viewedReviewFiles(
     request: ReviewsFilesViewedRequest
   ) -> ReviewsFilesViewedResponse {

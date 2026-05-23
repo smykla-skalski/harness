@@ -312,6 +312,81 @@ async fn fetch_patches_path_filter_drops_unrequested_files() {
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn fetch_patches_stops_paging_when_requested_path_is_found() {
+    use axum::Router;
+    use axum::extract::Query;
+    use axum::http::HeaderValue;
+    use axum::response::IntoResponse;
+    use axum::routing::get;
+    use serde::Deserialize;
+    use serde_json::json;
+    use std::sync::Arc;
+    use std::sync::atomic::{AtomicUsize, Ordering};
+    use tokio::net::TcpListener;
+
+    #[derive(Deserialize)]
+    struct PageQuery {
+        page: Option<u8>,
+    }
+
+    let listener = TcpListener::bind("127.0.0.1:0").await.expect("bind");
+    let port = listener.local_addr().expect("addr").port();
+    let calls = Arc::new(AtomicUsize::new(0));
+    let route_calls = Arc::clone(&calls);
+    let app = Router::new().route(
+        "/repos/{owner}/{repo}/pulls/{number}/files",
+        get(move |Query(query): Query<PageQuery>| {
+            let calls = Arc::clone(&route_calls);
+            async move {
+                calls.fetch_add(1, Ordering::SeqCst);
+                let body = match query.page {
+                    Some(2) => json!([{
+                        "sha": "want", "filename": "want.rs", "status": "modified",
+                        "additions": 1, "deletions": 0, "changes": 1,
+                        "blob_url": "https://example.com/w",
+                        "raw_url": "https://example.com/w",
+                        "contents_url": "https://example.com/w",
+                        "patch": "@@ -1 +1 @@\n-a\n+A\n"
+                    }]),
+                    _ => json!([{
+                        "sha": "skip", "filename": "skip.rs", "status": "modified",
+                        "additions": 1, "deletions": 0, "changes": 1,
+                        "blob_url": "https://example.com/s",
+                        "raw_url": "https://example.com/s",
+                        "contents_url": "https://example.com/s",
+                        "patch": "@@ -1 +1 @@\n-b\n+B\n"
+                    }]),
+                };
+                let mut response = axum::Json(body).into_response();
+                if query.page.is_none() || query.page == Some(2) {
+                    let next_page = query.page.unwrap_or(1) + 1;
+                    response.headers_mut().insert(
+                        "link",
+                        HeaderValue::from_str(&format!(
+                            "<http://127.0.0.1:{port}/repos/o/r/pulls/1/files?page={next_page}>; rel=\"next\""
+                        ))
+                        .expect("link header"),
+                    );
+                }
+                response
+            }
+        }),
+    );
+    let server = tokio::spawn(async move {
+        let _ = axum::serve(listener, app).await;
+    });
+    let client = mock_octocrab_at(port);
+
+    let patches = fetch_patches(&client, "o/r", 1, "head", &["want.rs".to_string()])
+        .await
+        .expect("fetch");
+    assert_eq!(patches.len(), 1);
+    assert_eq!(patches[0].path, "want.rs");
+    assert_eq!(calls.load(Ordering::SeqCst), 2);
+    server.abort();
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn fetch_patches_rejects_malformed_repo_full_name_at_runtime() {
     let (port, server) = spawn_mock_pulls_files(serde_json::json!([])).await;
     let client = mock_octocrab_at(port);

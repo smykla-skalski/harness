@@ -49,6 +49,7 @@ struct DashboardReviewFilesSection: View {
     ) {
       guard isDaemonOnline else { return }
       await store.prepareReviewFiles(pullRequestID: pullRequestID)
+      startPreviewPrewarm(viewModel: viewModel)
     }
     .task(id: viewModel.repositoryFullName ?? "") {
       await subscribeToCloneProgress(repoFullName: viewModel.repositoryFullName)
@@ -136,6 +137,7 @@ struct DashboardReviewFilesSection: View {
         DashboardReviewFileCard(
           file: file,
           viewedState: viewModel.viewedByPath[file.path] ?? file.viewerViewedState,
+          previewState: viewModel.previews[file.path] ?? .notLoaded,
           patchState: viewModel.patches[file.path] ?? .notLoaded,
           viewMode: viewModel.viewMode(forPath: file.path),
           pullRequestID: pullRequestID,
@@ -149,6 +151,15 @@ struct DashboardReviewFilesSection: View {
           },
           onChangeViewMode: { mode in
             viewModel.setViewMode(mode, forPath: file.path)
+          },
+          onLoadPreview: { [strategy = preferences.snapshot.filesLargeDiffStrategy] in
+            Task {
+              await store.preparePatchPreviews(
+                forPullRequest: pullRequestID,
+                paths: [file.path],
+                largeDiffStrategy: strategy
+              )
+            }
           },
           onLoadPatch: { [strategy = preferences.snapshot.filesLargeDiffStrategy] in
             Task {
@@ -191,6 +202,21 @@ struct DashboardReviewFilesSection: View {
 
   private func resetVisibleFiles() {
     visibleFileLimit = Self.fileBatchSize
+  }
+
+  private func startPreviewPrewarm(viewModel: ReviewFilesViewModel) {
+    let visiblePaths = viewModel.filteredFiles
+      .filter { !$0.isBinary }
+      .map(\.path)
+    let visibleSet = Set(visiblePaths)
+    let remainingPaths = viewModel.files
+      .filter { !$0.isBinary && !visibleSet.contains($0.path) }
+      .map(\.path)
+    store.startPatchPreviewPrewarm(
+      forPullRequest: pullRequestID,
+      paths: visiblePaths + remainingPaths,
+      largeDiffStrategy: preferences.snapshot.filesLargeDiffStrategy
+    )
   }
 }
 

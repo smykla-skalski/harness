@@ -267,6 +267,7 @@ pub use reviews_files::{
     GcReport, delete_review_local_clone, fetch_review_file_blob,
     list_review_files, list_review_local_clones,
     mark_review_files_viewed, patch_review_files,
+    preview_review_files,
     register_local_clone_progress_sender, run_local_clone_gc,
 };
 pub use reviews_thread_resolve::set_review_thread_resolved;

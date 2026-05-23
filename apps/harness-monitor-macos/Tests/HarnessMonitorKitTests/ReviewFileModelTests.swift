@@ -279,6 +279,36 @@ final class ReviewFileModelTests: XCTestCase {
     XCTAssertEqual(parsed.baseRefName, "main")
   }
 
+  func testFilesPreviewResponseRoundTrips() throws {
+    let response = ReviewsFilesPreviewResponse(
+      pullRequestID: "PR_1",
+      previews: [
+        ReviewFilePreview(
+          path: "src/lib.rs",
+          patch: "@@ -1 +1 @@\n-a\n+b",
+          status: .modified,
+          additions: 1,
+          deletions: 1,
+          servedBy: .localClone,
+          fetchedAt: "2026-05-22T10:00:00Z",
+          headRefOid: "abc",
+          lineCount: 3,
+          lineLimit: 200,
+          hasMore: false
+        )
+      ],
+      drifted: false,
+      currentHeadRefOid: "abc",
+      fetchedAt: "2026-05-22T10:00:00Z"
+    )
+    let data = try JSONEncoder().encode(response)
+    let parsed = try JSONDecoder().decode(
+      ReviewsFilesPreviewResponse.self, from: data)
+    XCTAssertEqual(parsed.previews[0].servedBy, .localClone)
+    XCTAssertEqual(parsed.previews[0].lineLimit, 200)
+    XCTAssertFalse(parsed.previews[0].hasMore)
+  }
+
   func testFilesViewedRoundTrips() throws {
     let request = ReviewsFilesViewedRequest(
       pullRequestID: "PR_1",

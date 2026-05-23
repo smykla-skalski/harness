@@ -7,24 +7,28 @@ import SwiftUI
 struct DashboardReviewFileCard: View {
   let file: ReviewFile
   let viewedState: ReviewFileViewedState
+  let previewState: ReviewFilePreviewState
   let patchState: ReviewFilePatchState
   let viewMode: FilesViewMode
   let pullRequestID: String
   let repositoryID: String
   let onToggleViewed: @MainActor (Bool) -> Void
   let onChangeViewMode: @MainActor (FilesViewMode) -> Void
+  let onLoadPreview: @MainActor () -> Void
   let onLoadPatch: @MainActor () -> Void
 
   var body: some View {
     DashboardReviewFileCardInternal(
       file: file,
       viewedState: viewedState,
+      previewState: previewState,
       patchState: patchState,
       viewMode: viewMode,
       pullRequestID: pullRequestID,
       repositoryID: repositoryID,
       onToggleViewed: onToggleViewed,
       onChangeViewMode: onChangeViewMode,
+      onLoadPreview: onLoadPreview,
       onLoadPatch: onLoadPatch
     )
   }
@@ -33,12 +37,14 @@ struct DashboardReviewFileCard: View {
 struct DashboardReviewFileCardInternal: View {
   let file: ReviewFile
   let viewedState: ReviewFileViewedState
+  let previewState: ReviewFilePreviewState
   let patchState: ReviewFilePatchState
   let viewMode: FilesViewMode
   let pullRequestID: String
   let repositoryID: String
   let onToggleViewed: @MainActor (Bool) -> Void
   let onChangeViewMode: @MainActor (FilesViewMode) -> Void
+  let onLoadPreview: @MainActor () -> Void
   let onLoadPatch: @MainActor () -> Void
 
   @State private var isExpanded: Bool = false
@@ -60,6 +66,10 @@ struct DashboardReviewFileCardInternal: View {
       RoundedRectangle(cornerRadius: 6, style: .continuous)
         .strokeBorder(HarnessMonitorTheme.ink.opacity(0.10), lineWidth: 1)
     }
+    .onChange(of: previewState) { _, _ in
+      guard isExpanded else { return }
+      loadFullPatchIfPreviewFinished()
+    }
     .accessibilityElement(children: .contain)
     .accessibilityLabel(accessibilityLabel)
     .accessibilityIdentifier(HarnessMonitorAccessibility.dashboardReviewFileCard(path: file.path))
@@ -70,8 +80,9 @@ struct DashboardReviewFileCardInternal: View {
       Button(
         action: {
           isExpanded.toggle()
-          if isExpanded, case .notLoaded = patchState {
-            onLoadPatch()
+          if isExpanded {
+            loadPreviewIfNeeded()
+            loadFullPatchIfPreviewFinished()
           }
         },
         label: {
@@ -161,10 +172,13 @@ struct DashboardReviewFileCardInternal: View {
   @ViewBuilder private var patchBody: some View {
     switch patchState {
     case .notLoaded:
-      Button("Load patch") { onLoadPatch() }
-        .accessibilityIdentifier("dashboardReviewFileLoadPatch(\(file.path))")
+      previewBody
     case .loading:
-      ProgressView().controlSize(.small)
+      if case .loaded = previewState {
+        previewBody
+      } else {
+        ProgressView().controlSize(.small)
+      }
     case .loaded(let patch):
       if file.isBinary {
         DashboardReviewFileImagePreview(
@@ -178,13 +192,57 @@ struct DashboardReviewFileCardInternal: View {
       } else {
         DashboardReviewFileDiffUnified(patch: patch, language: file.languageHint)
       }
+    case .failed:
+      if case .loaded = previewState {
+        previewBody
+      } else {
+        patchFailureBody
+      }
+    }
+  }
+
+  @ViewBuilder private var patchFailureBody: some View {
+    if case .failed(let message) = patchState {
+      VStack(alignment: .leading, spacing: 6) {
+        Text(message).font(.caption).foregroundStyle(.orange)
+      }
+    }
+  }
+
+  @ViewBuilder private var previewBody: some View {
+    switch previewState {
+    case .notLoaded:
+      ProgressView().controlSize(.small)
+    case .loading:
+      ProgressView().controlSize(.small)
+    case .loaded(let preview):
+      DashboardReviewFileDiffPreview(preview: preview)
+      if case .loading = patchState {
+        ProgressView().controlSize(.small)
+      }
     case .failed(let message):
       VStack(alignment: .leading, spacing: 6) {
         Text(message).font(.caption).foregroundStyle(.orange)
-        Button("Retry patch load") { onLoadPatch() }
-          .controlSize(.small)
-          .accessibilityIdentifier("dashboardReviewFileRetryPatch(\(file.path))")
       }
+    }
+  }
+
+  private func loadPreviewIfNeeded() {
+    switch previewState {
+    case .notLoaded, .failed:
+      onLoadPreview()
+    case .loading, .loaded:
+      break
+    }
+  }
+
+  private func loadFullPatchIfPreviewFinished() {
+    switch previewState {
+    case .loaded, .failed:
+      guard case .notLoaded = patchState else { return }
+      onLoadPatch()
+    case .notLoaded, .loading:
+      break
     }
   }
 
