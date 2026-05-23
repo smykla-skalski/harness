@@ -24,6 +24,18 @@ impl RecordingSink {
     }
 }
 
+// Write a fixed user identity into the repo's local config so commits don't
+// fall back to ~/.gitconfig, which may be inaccessible when a parallel test
+// temporarily redirects HOME via temp_env::with_var.
+fn set_test_user(repo_path: &std::path::Path) {
+    use std::io::Write;
+    let mut f = std::fs::OpenOptions::new()
+        .append(true)
+        .open(repo_path.join("config"))
+        .expect("open repo config");
+    writeln!(f, "[user]\n\tname = Test\n\temail = test@example.com").expect("write user config");
+}
+
 fn commit_file(
     repo: &gix::Repository,
     ref_name: &str,
@@ -47,7 +59,9 @@ fn commit_file(
 }
 
 fn make_source_repo(path: &std::path::Path) -> (gix::ObjectId, gix::ObjectId) {
-    let repo = gix::init_bare(path).expect("init bare");
+    gix::init_bare(path).expect("init bare");
+    set_test_user(path);
+    let repo = gix::open(path).expect("reopen bare");
     commit_file(
         &repo,
         "refs/heads/main",
@@ -58,7 +72,9 @@ fn make_source_repo(path: &std::path::Path) -> (gix::ObjectId, gix::ObjectId) {
 }
 
 fn make_two_commit_source(path: &std::path::Path) -> (gix::ObjectId, gix::ObjectId) {
-    let repo = gix::init_bare(path).expect("init bare");
+    gix::init_bare(path).expect("init bare");
+    set_test_user(path);
+    let repo = gix::open(path).expect("reopen bare");
     let (base_oid, _) = commit_file(
         &repo,
         "refs/heads/main",
