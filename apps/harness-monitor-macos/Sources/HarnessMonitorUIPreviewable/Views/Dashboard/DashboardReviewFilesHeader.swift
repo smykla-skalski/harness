@@ -7,6 +7,7 @@ struct DashboardReviewFilesHeader: View {
   let viewModel: ReviewFilesViewModel
   @Bindable var filter: DashboardReviewFilesFilterState
   let fontScale: CGFloat
+  @Binding var viewMode: FilesViewMode
 
   var body: some View {
     VStack(alignment: .leading, spacing: 10) {
@@ -38,6 +39,7 @@ struct DashboardReviewFilesHeader: View {
           .frame(minWidth: 260, idealWidth: 360, maxWidth: 440)
         Spacer(minLength: 8)
         filterToggles
+        viewModePicker
         sortMenu
       }
       VStack(alignment: .leading, spacing: 8) {
@@ -45,10 +47,25 @@ struct DashboardReviewFilesHeader: View {
         HStack(spacing: 10) {
           filterToggles
           Spacer(minLength: 8)
+          viewModePicker
           sortMenu
         }
       }
     }
+  }
+
+  private var viewModePicker: some View {
+    Picker("Diff layout", selection: $viewMode) {
+      ForEach(FilesViewMode.allCases, id: \.self) { mode in
+        Label(viewModeLabel(for: mode), systemImage: viewModeSystemImage(for: mode))
+          .tag(mode)
+      }
+    }
+    .pickerStyle(.segmented)
+    .controlSize(.small)
+    .frame(width: 172)
+    .help("Choose the file diff layout for every changed file")
+    .accessibilityIdentifier(HarnessMonitorAccessibility.dashboardReviewFilesViewModePicker)
   }
 
   private var sortMenu: some View {
@@ -150,6 +167,20 @@ struct DashboardReviewFilesHeader: View {
     case .lineChangesDescending: return "Line changes ↓"
     case .viewedFirst: return "Viewed first"
     case .unviewedFirst: return "Unviewed first"
+    }
+  }
+
+  private func viewModeLabel(for mode: FilesViewMode) -> String {
+    switch mode {
+    case .unified: return "Unified"
+    case .split: return "Split"
+    }
+  }
+
+  private func viewModeSystemImage(for mode: FilesViewMode) -> String {
+    switch mode {
+    case .unified: return "rectangle.split.1x2"
+    case .split: return "rectangle.split.2x1"
     }
   }
 }

@@ -112,6 +112,8 @@ public enum HarnessMonitorAccessibility {
     "harness.dashboard.reviews.files.filter"
   public static let dashboardReviewFilesSortMenu =
     "harness.dashboard.reviews.files.sort"
+  public static let dashboardReviewFilesViewModePicker =
+    "harness.dashboard.reviews.files.view-mode"
   public static let dashboardReviewFilesTree =
     "harness.dashboard.reviews.files.tree"
   public static let dashboardReviewFilesEmptyState =
@@ -123,10 +125,6 @@ public enum HarnessMonitorAccessibility {
 
   public static func dashboardReviewFileViewedToggle(path: String) -> String {
     "harness.dashboard.reviews.files.viewed-toggle.\(slug(path))"
-  }
-
-  public static func dashboardReviewFileViewModeMenu(path: String) -> String {
-    "harness.dashboard.reviews.files.view-mode.\(slug(path))"
   }
 
   public static let dashboardNewSessionButton = "harness.dashboard.new-session"

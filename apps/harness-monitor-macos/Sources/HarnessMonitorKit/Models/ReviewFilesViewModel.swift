@@ -115,7 +115,6 @@ public final class ReviewFilesViewModel {
   public var previews: [String: ReviewFilePreviewState] = [:]
   public var viewedByPath: [String: ReviewFileViewedState] = [:]
   public var expandedPaths: Set<String> = []
-  public var viewModeByPath: [String: FilesViewMode] = [:]
 
   public var sortMode: ReviewFilesSortMode = .path
   public var filter: ReviewFilesFilter = .init()
@@ -214,12 +213,8 @@ public final class ReviewFilesViewModel {
     }
   }
 
-  public func viewMode(forPath path: String) -> FilesViewMode {
-    viewModeByPath[path] ?? defaultViewMode
-  }
-
-  public func setViewMode(_ mode: FilesViewMode, forPath path: String) {
-    viewModeByPath[path] = mode
+  public func viewMode(forPath _: String) -> FilesViewMode {
+    defaultViewMode
   }
 
   // MARK: - Internals

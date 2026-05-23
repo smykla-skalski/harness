@@ -17,7 +17,6 @@ struct DashboardReviewFileCard: View {
   let fontScale: CGFloat
   let threads: [DashboardReviewFileThreadAnchor]
   let onToggleViewed: @MainActor (Bool) -> Void
-  let onChangeViewMode: @MainActor (FilesViewMode) -> Void
   let onLoadPreview: @MainActor () -> Void
   let onLoadPatch: @MainActor () -> Void
 
@@ -35,7 +34,6 @@ struct DashboardReviewFileCard: View {
       fontScale: fontScale,
       threads: threads,
       onToggleViewed: onToggleViewed,
-      onChangeViewMode: onChangeViewMode,
       onLoadPreview: onLoadPreview,
       onLoadPatch: onLoadPatch
     )
@@ -55,7 +53,6 @@ struct DashboardReviewFileCardInternal: View {
   let fontScale: CGFloat
   let threads: [DashboardReviewFileThreadAnchor]
   let onToggleViewed: @MainActor (Bool) -> Void
-  let onChangeViewMode: @MainActor (FilesViewMode) -> Void
   let onLoadPreview: @MainActor () -> Void
   let onLoadPatch: @MainActor () -> Void
   let chevronFont: Font
@@ -81,7 +78,6 @@ struct DashboardReviewFileCardInternal: View {
     fontScale: CGFloat,
     threads: [DashboardReviewFileThreadAnchor] = [],
     onToggleViewed: @escaping @MainActor (Bool) -> Void,
-    onChangeViewMode: @escaping @MainActor (FilesViewMode) -> Void,
     onLoadPreview: @escaping @MainActor () -> Void,
     onLoadPatch: @escaping @MainActor () -> Void
   ) {
@@ -97,7 +93,6 @@ struct DashboardReviewFileCardInternal: View {
     self.fontScale = fontScale
     self.threads = threads
     self.onToggleViewed = onToggleViewed
-    self.onChangeViewMode = onChangeViewMode
     self.onLoadPreview = onLoadPreview
     self.onLoadPatch = onLoadPatch
     chevronFont = HarnessMonitorTextSize.scaledFont(
@@ -178,27 +173,6 @@ struct DashboardReviewFileCardInternal: View {
       .accessibilityIdentifier(
         HarnessMonitorAccessibility.dashboardReviewFileViewedToggle(path: file.path)
       )
-
-      Menu {
-        Button(
-          action: { onChangeViewMode(.unified) },
-          label: {
-            viewModeMenuLabel(for: .unified)
-          }
-        )
-        Button(
-          action: { onChangeViewMode(.split) },
-          label: {
-            viewModeMenuLabel(for: .split)
-          }
-        )
-      } label: {
-        Label(viewMode.label, systemImage: "rectangle.split.2x1")
-      }
-      .help("Change diff view")
-      .accessibilityIdentifier(
-        HarnessMonitorAccessibility.dashboardReviewFileViewModeMenu(path: file.path)
-      )
     }
     .frame(minHeight: 32)
   }
@@ -232,16 +206,6 @@ struct DashboardReviewFileCardInternal: View {
       }
     }
     .frame(minWidth: 58, alignment: .trailing)
-  }
-
-  private func viewModeMenuLabel(for mode: FilesViewMode) -> some View {
-    HStack(spacing: HarnessMonitorTheme.spacingSM) {
-      Text(mode.label)
-      Spacer(minLength: HarnessMonitorTheme.spacingSM)
-      Image(systemName: "checkmark")
-        .opacity(viewMode == mode ? 1 : 0)
-        .accessibilityHidden(viewMode != mode)
-    }
   }
 
   @ViewBuilder private var patchBody: some View {
@@ -377,17 +341,6 @@ extension ReviewFilePatchState {
       return true
     case .notLoaded, .loading, .loaded:
       return false
-    }
-  }
-}
-
-extension FilesViewMode {
-  fileprivate var label: String {
-    switch self {
-    case .unified:
-      "Unified"
-    case .split:
-      "Split"
     }
   }
 }

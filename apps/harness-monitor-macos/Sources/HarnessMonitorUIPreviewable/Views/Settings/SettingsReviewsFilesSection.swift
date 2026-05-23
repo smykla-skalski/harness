@@ -13,7 +13,7 @@ struct SettingsReviewsFilesSection: View {
     DisclosureGroup("Files") {
       Toggle("Show file changes", isOn: $draft.filesEnabled)
         .accessibilityIdentifier("settingsReviewFilesEnabledToggle")
-      defaultViewModePicker
+      filesLayoutPicker
       autoPrefetchStepper
       autoCollapseStepper
       hideGeneratedToggleGroup
@@ -32,13 +32,15 @@ struct SettingsReviewsFilesSection: View {
     }
   }
 
-  private var defaultViewModePicker: some View {
-    Picker("Default view mode", selection: viewModeBinding) {
+  private var filesLayoutPicker: some View {
+    Picker("Files layout", selection: viewModeBinding) {
       ForEach(FilesViewMode.allCases, id: \.self) { mode in
         Text(label(for: mode)).tag(mode)
       }
     }
     .pickerStyle(.menu)
+    .help("Default Unified/Split layout used by the Reviews Files list")
+    .accessibilityIdentifier("settingsReviewFilesViewModePicker")
   }
 
   private var hideGeneratedToggleGroup: some View {
