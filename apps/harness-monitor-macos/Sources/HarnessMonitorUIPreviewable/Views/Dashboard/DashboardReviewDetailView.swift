@@ -41,7 +41,7 @@ struct DashboardReviewDetailView<Actions: View>: View {
   var body: some View {
     let viewModel = store.reviewTimelineViewModel(for: item.pullRequestID)
     ScrollView(.vertical) {
-      LazyVStack(alignment: .leading, spacing: 18) {
+      LazyVStack(alignment: .leading, spacing: 14) {
         DashboardReviewDetailSection(title: nil) {
           DashboardReviewsDescriptionView(
             store: store,
@@ -87,25 +87,20 @@ struct DashboardReviewDetailView<Actions: View>: View {
       }
       .frame(maxWidth: reviewsDetailMaxWidth, alignment: .leading)
       .frame(maxWidth: .infinity, alignment: .center)
-      .padding(.horizontal, 24)
-      .padding(.vertical, 24)
+      .padding(.horizontal, 28)
+      .padding(.vertical, 18)
     }
     .scrollIndicators(.visible)
+    .background(Color(nsColor: .windowBackgroundColor))
     .safeAreaInset(edge: .top, spacing: 0) {
-      DashboardReviewDetailCard(
-        title: item.title,
-        subtitle: "\(item.repository)#\(item.number) · @\(item.authorLogin)"
-      ) {
-        VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingMD) {
-          actionBar()
-          DashboardReviewStatusStrip(item: item)
-        }
+      DashboardReviewDetailHeader(item: item) {
+        actionBar()
       }
       .frame(maxWidth: reviewsDetailMaxWidth, alignment: .leading)
       .frame(maxWidth: .infinity, alignment: .center)
-      .padding(.horizontal, 24)
-      .padding(.top, 24)
-      .padding(.bottom, 8)
+      .padding(.horizontal, 28)
+      .padding(.top, 18)
+      .padding(.bottom, 10)
       .background(Color(nsColor: .windowBackgroundColor))
     }
     .safeAreaInset(edge: .bottom, spacing: 0) {
@@ -124,6 +119,7 @@ struct DashboardReviewDetailView<Actions: View>: View {
       .frame(maxWidth: .infinity, alignment: .center)
       .background(Color(nsColor: .windowBackgroundColor))
     }
+    .background(Color(nsColor: .windowBackgroundColor))
     .task(
       id: ReviewBodyTaskKey(
         item: item, isDaemonOnline: store.connectionState == .online)
@@ -131,6 +127,37 @@ struct DashboardReviewDetailView<Actions: View>: View {
       await store.prepareReviewBody(for: item)
     }
     .environment(store)
+  }
+}
+
+private struct DashboardReviewDetailHeader<Actions: View>: View {
+  let item: ReviewItem
+  @ViewBuilder let actionBar: () -> Actions
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingMD) {
+      VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingXS) {
+        Text(item.title)
+          .scaledFont(.system(.title2, design: .rounded, weight: .semibold))
+          .foregroundStyle(HarnessMonitorTheme.ink)
+          .lineLimit(3)
+          .fixedSize(horizontal: false, vertical: true)
+        Text("\(item.repository)#\(item.number) · @\(item.authorLogin)")
+          .scaledFont(.callout.weight(.semibold))
+          .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+      }
+
+      actionBar()
+      DashboardReviewStatusStrip(item: item)
+      if item.requiresAttention {
+        DashboardReviewAttentionSummary(item: item)
+      }
+    }
+    .frame(maxWidth: reviewsDetailMaxWidth, alignment: .leading)
+    .padding(.bottom, HarnessMonitorTheme.spacingMD)
+    .overlay(alignment: .bottom) {
+      Divider().opacity(0.24)
+    }
   }
 }
 
@@ -167,15 +194,15 @@ struct DashboardReviewDetailSection<Content: View>: View {
     VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
       if let title {
         Text(title)
-          .scaledFont(.headline.weight(.semibold))
+          .scaledFont(.subheadline.weight(.semibold))
           .foregroundStyle(HarnessMonitorTheme.ink)
       }
       content()
     }
     .frame(maxWidth: reviewsDetailMaxWidth, alignment: .leading)
-    .padding(.vertical, HarnessMonitorTheme.spacingLG)
+    .padding(.vertical, HarnessMonitorTheme.spacingMD)
     .overlay(alignment: .top) {
-      Divider().opacity(0.34)
+      Divider().opacity(0.24)
     }
   }
 }

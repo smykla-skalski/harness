@@ -50,11 +50,19 @@ struct DashboardReviewFileCardInternal: View {
         patchBody
       }
     }
-    .padding(12)
-    .background(.background.secondary, in: RoundedRectangle(cornerRadius: 8))
+    .padding(.horizontal, 10)
+    .padding(.vertical, 9)
+    .background(
+      HarnessMonitorTheme.ink.opacity(0.035),
+      in: RoundedRectangle(cornerRadius: 6, style: .continuous)
+    )
+    .overlay {
+      RoundedRectangle(cornerRadius: 6, style: .continuous)
+        .strokeBorder(HarnessMonitorTheme.ink.opacity(0.10), lineWidth: 1)
+    }
     .accessibilityElement(children: .contain)
     .accessibilityLabel(accessibilityLabel)
-    .accessibilityIdentifier("dashboardReviewFileCard(\(file.path))")
+    .accessibilityIdentifier(HarnessMonitorAccessibility.dashboardReviewFileCard(path: file.path))
   }
 
   private var header: some View {
@@ -62,27 +70,33 @@ struct DashboardReviewFileCardInternal: View {
       Button(
         action: { isExpanded.toggle() },
         label: {
-          HStack(spacing: 6) {
-            Image(systemName: isExpanded ? "chevron.down" : "chevron.right")
-              .frame(width: 12)
-            pathLabel
-            Spacer(minLength: 0)
-            changeCounts
-          }
+          Image(systemName: isExpanded ? "chevron.down" : "chevron.right")
+            .font(.caption.weight(.semibold))
+            .frame(width: 28, height: 28)
+            .contentShape(.rect)
         }
       )
       .harnessPlainButtonStyle()
+      .help(isExpanded ? "Collapse file diff" : "Expand file diff")
+      .accessibilityLabel(isExpanded ? "Collapse \(file.path)" : "Expand \(file.path)")
+
+      pathLabel
+      Spacer(minLength: 0)
+      changeCounts
 
       Toggle(
-        "",
+        "Viewed",
         isOn: Binding(
           get: { viewedState == .viewed },
           set: { onToggleViewed($0) }
         )
       )
-      .labelsHidden()
       .toggleStyle(.checkbox)
-      .accessibilityIdentifier("dashboardReviewFileViewedToggle(\(file.path))")
+      .controlSize(.small)
+      .help(viewedState == .viewed ? "Mark file unviewed" : "Mark file viewed")
+      .accessibilityIdentifier(
+        HarnessMonitorAccessibility.dashboardReviewFileViewedToggle(path: file.path)
+      )
 
       Menu {
         Button(
@@ -98,10 +112,15 @@ struct DashboardReviewFileCardInternal: View {
           }
         )
       } label: {
-        Image(systemName: "rectangle.split.2x1")
+        Label(viewMode.label, systemImage: "rectangle.split.2x1")
       }
-      .accessibilityIdentifier("dashboardReviewFileViewModeMenu(\(file.path))")
+      .controlSize(.small)
+      .help("Change diff view")
+      .accessibilityIdentifier(
+        HarnessMonitorAccessibility.dashboardReviewFileViewModeMenu(path: file.path)
+      )
     }
+    .frame(minHeight: 32)
   }
 
   private var pathLabel: some View {
@@ -110,6 +129,7 @@ struct DashboardReviewFileCardInternal: View {
         .font(.body.monospaced())
         .lineLimit(1)
         .truncationMode(.middle)
+        .layoutPriority(1)
       if let previousPath = file.previousPath, previousPath != file.path {
         Text("renamed from \(previousPath)")
           .font(.caption2)
@@ -128,6 +148,7 @@ struct DashboardReviewFileCardInternal: View {
         Text("-\(file.deletions)").foregroundStyle(.red).font(.caption.monospacedDigit())
       }
     }
+    .frame(minWidth: 58, alignment: .trailing)
   }
 
   @ViewBuilder private var patchBody: some View {
@@ -162,5 +183,16 @@ struct DashboardReviewFileCardInternal: View {
       \(viewedState == .viewed ? "viewed" : "not viewed")
       """
     )
+  }
+}
+
+extension FilesViewMode {
+  fileprivate var label: String {
+    switch self {
+    case .unified:
+      "Unified"
+    case .split:
+      "Split"
+    }
   }
 }

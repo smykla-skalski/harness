@@ -21,12 +21,13 @@ struct DashboardReviewActionBar: View {
 
   var body: some View {
     HarnessMonitorGlassControlGroup(spacing: HarnessMonitorTheme.itemSpacing) {
-      HarnessMonitorWrapLayout(
-        spacing: HarnessMonitorTheme.itemSpacing,
-        lineSpacing: HarnessMonitorTheme.itemSpacing
-      ) {
-        buttons
+      ScrollView(.horizontal) {
+        HStack(spacing: HarnessMonitorTheme.itemSpacing) {
+          buttons
+        }
+        .padding(.vertical, 1)
       }
+      .scrollIndicators(.hidden)
     }
     .frame(maxWidth: .infinity, alignment: .leading)
   }
@@ -86,7 +87,7 @@ struct DashboardReviewActionBar: View {
     .help(DashboardReviewsDisabledReason.labelReason(for: items) ?? "Add a GitHub label")
 
     DashboardReviewActionButton(
-      title: "Copy Approval Links",
+      title: "Copy approval links",
       systemImage: "doc.on.doc",
       prominence: .secondary,
       action: onCopyApprovalLinks
@@ -102,7 +103,7 @@ struct DashboardReviewActionBar: View {
       )
       .disabled(isBusy || !item.canRunAutoMode)
       DashboardReviewActionButton(
-        title: "Open Pull Request", systemImage: "safari", prominence: .utility, action: onOpenItem
+        title: "Open pull request", systemImage: "safari", prominence: .utility, action: onOpenItem
       )
       if let bot = ReviewBot.detect(authorLogin: item.authorLogin) {
         DashboardReviewActionButton(

@@ -52,6 +52,7 @@ struct SessionContentDetailSplitView<Content: View, Detail: View>: View {
   @State private var isDragging = false
   private let commitContentWidth: (Double) -> Void
   private let dividerAccessibilityIdentifier: String
+  private let showsDividerLine: Bool
   private let content: Content
   private let detail: Detail
 
@@ -61,6 +62,7 @@ struct SessionContentDetailSplitView<Content: View, Detail: View>: View {
     commitContentWidth: @escaping (Double) -> Void,
     dividerAccessibilityIdentifier: String = HarnessMonitorAccessibility
       .sessionWindowContentDetailDivider,
+    showsDividerLine: Bool = true,
     @ViewBuilder content: () -> Content,
     @ViewBuilder detail: () -> Detail
   ) {
@@ -69,6 +71,7 @@ struct SessionContentDetailSplitView<Content: View, Detail: View>: View {
     _liveContentWidth = State(wrappedValue: contentWidth.wrappedValue)
     self.commitContentWidth = commitContentWidth
     self.dividerAccessibilityIdentifier = dividerAccessibilityIdentifier
+    self.showsDividerLine = showsDividerLine
     self.content = content()
     self.detail = detail()
   }
@@ -93,7 +96,8 @@ struct SessionContentDetailSplitView<Content: View, Detail: View>: View {
           isDragging: $isDragging,
           commitContentWidth: commitContentWidth,
           widthRange: contentRange,
-          accessibilityIdentifier: dividerAccessibilityIdentifier
+          accessibilityIdentifier: dividerAccessibilityIdentifier,
+          showsDividerLine: showsDividerLine
         )
 
         detail
@@ -155,6 +159,7 @@ private struct SessionContentDetailDivider: View {
   let commitContentWidth: (Double) -> Void
   let widthRange: ClosedRange<Double>
   let accessibilityIdentifier: String
+  let showsDividerLine: Bool
   @FocusState private var isKeyboardFocused: Bool
   @ScaledMetric(relativeTo: .body)
   private var interactiveWidth = 24.0
@@ -185,6 +190,9 @@ private struct SessionContentDetailDivider: View {
   }
 
   private var separatorTint: Color {
+    if !showsDividerLine, !isKeyboardFocused, !isHovered, !isDragging {
+      return .clear
+    }
     if isKeyboardFocused {
       return focusTint.opacity(0.92)
     }
@@ -195,6 +203,9 @@ private struct SessionContentDetailDivider: View {
   }
 
   private var separatorLineWidth: CGFloat {
+    if !showsDividerLine, !isKeyboardFocused, !isHovered, !isDragging {
+      return 0
+    }
     if isKeyboardFocused {
       return 3
     }

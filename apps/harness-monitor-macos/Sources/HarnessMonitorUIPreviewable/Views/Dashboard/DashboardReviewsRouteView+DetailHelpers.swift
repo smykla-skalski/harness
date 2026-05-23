@@ -1,7 +1,7 @@
 import HarnessMonitorKit
 import SwiftUI
 
-let reviewsDetailMaxWidth: CGFloat = 940
+let reviewsDetailMaxWidth: CGFloat = 1_180
 
 extension DashboardReviewsRouteView {
   func errorState(message: String) -> some View {

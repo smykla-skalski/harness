@@ -363,9 +363,15 @@ private struct HarnessMarkdownListView: View {
       }
       .toggleStyle(.checkbox)
       .labelsHidden()
-      .controlSize(.small)
+      .controlSize(.regular)
       .disabled(item.checkboxSourceOffset == nil || checkboxToggleHandler == nil)
-      .frame(width: metrics.columnWidth, height: metrics.firstLineHeight, alignment: .center)
+      .frame(
+        width: max(metrics.columnWidth, 24),
+        height: max(metrics.firstLineHeight, 24),
+        alignment: .center
+      )
+      .help("Toggle pull request task-list item")
+      .accessibilityLabel(checkbox ? "Mark task-list item incomplete" : "Mark task-list item done")
     } else if ordered {
       Text("\(start + index).")
         .font(style.typography.listMarker.font)

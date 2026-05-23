@@ -7,6 +7,7 @@ struct DashboardReviewCheckList: View {
   let onRerunCheck: (ReviewCheck) -> Void
 
   @State private var expandedPassingGroupIDs = Set<String>()
+  @State private var showsPassingChecks = false
 
   var body: some View {
     if checks.isEmpty {
@@ -15,21 +16,21 @@ struct DashboardReviewCheckList: View {
         .foregroundStyle(HarnessMonitorTheme.secondaryInk)
     } else {
       VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
-        checkSummary
-        if hasProblemChecks {
-          checkDiagnosticsControls
-        }
-        VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
-          ForEach(checkGroups) { group in
-            DashboardReviewCheckGroupView(
-              group: group,
-              suppressPassingStatus: allPassing,
-              showsHeader: checkGroups.count > 1,
-              hasProblemChecks: hasProblemChecks,
-              expandedPassingGroupIDs: $expandedPassingGroupIDs,
-              onRerunCheck: onRerunCheck
-            )
+        if allPassing {
+          DashboardReviewPassingChecksSummary(
+            checkCount: checks.count,
+            groupCount: checkGroups.count,
+            isExpanded: $showsPassingChecks
+          )
+          if showsPassingChecks {
+            checkGroupsView
           }
+        } else {
+          checkSummary
+          if hasProblemChecks {
+            checkDiagnosticsControls
+          }
+          checkGroupsView
         }
       }
       .frame(maxWidth: DashboardReviewsVisualMetrics.checksMaxWidth, alignment: .leading)
@@ -99,10 +100,55 @@ struct DashboardReviewCheckList: View {
     problemChecks.compactMap(\.detailsWebURL)
   }
 
+  private var checkGroupsView: some View {
+    VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
+      ForEach(checkGroups) { group in
+        DashboardReviewCheckGroupView(
+          group: group,
+          suppressPassingStatus: allPassing,
+          showsHeader: checkGroups.count > 1,
+          hasProblemChecks: hasProblemChecks,
+          expandedPassingGroupIDs: $expandedPassingGroupIDs,
+          onRerunCheck: onRerunCheck
+        )
+      }
+    }
+  }
+
   private func copyProblemCheckURLs() {
     let urls = problemCheckURLs.map(\.absoluteString)
     guard !urls.isEmpty else { return }
     HarnessMonitorClipboard.copy(urls.joined(separator: "\n"))
+  }
+}
+
+private struct DashboardReviewPassingChecksSummary: View {
+  let checkCount: Int
+  let groupCount: Int
+  @Binding var isExpanded: Bool
+
+  var body: some View {
+    HStack(alignment: .firstTextBaseline, spacing: HarnessMonitorTheme.spacingSM) {
+      DashboardReviewStatusPill(
+        label: "All checks passed",
+        tint: HarnessMonitorTheme.success,
+        systemImage: "checkmark.circle.fill"
+      )
+      Text(summary)
+        .scaledFont(.callout)
+        .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+      Spacer(minLength: HarnessMonitorTheme.spacingSM)
+      Button(isExpanded ? "Hide passing checks" : "Show passing checks") {
+        isExpanded.toggle()
+      }
+      .controlSize(.small)
+      .help(isExpanded ? "Hide passing check details" : "Show passing check details")
+    }
+  }
+
+  private var summary: String {
+    "\(checkCount) \(checkCount == 1 ? "check" : "checks") across \(groupCount) "
+      + "\(groupCount == 1 ? "group" : "groups")."
   }
 }
 

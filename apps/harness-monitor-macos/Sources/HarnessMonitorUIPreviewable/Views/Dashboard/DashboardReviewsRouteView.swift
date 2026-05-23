@@ -274,6 +274,7 @@ struct DashboardReviewsRouteView: View {
       commitContentWidth: { contentDetailWidth = $0 },
       dividerAccessibilityIdentifier:
         HarnessMonitorAccessibility.dashboardReviewsDetailDivider,
+      showsDividerLine: false,
       content: { contentPane },
       detail: { detailPane }
     )
