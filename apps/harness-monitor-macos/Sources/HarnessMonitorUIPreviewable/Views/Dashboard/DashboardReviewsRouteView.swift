@@ -43,63 +43,7 @@ struct DashboardReviewsRouteView: View {
   @SceneStorage("dashboard.reviews.problem-checks-only")
   var showsProblemChecksOnly = false
 
-  @State private var response = ReviewsQueryResponse(
-    fetchedAt: "",
-    fromCache: false,
-    summary: ReviewsSummary(
-      total: 0,
-      reviewRequired: 0,
-      readyToMerge: 0,
-      autoApprovable: 0,
-      waitingOnChecks: 0,
-      blocked: 0
-    ),
-    items: []
-  )
-  @State private var isLoading = false
-  @State private var isBackgroundRefreshing = false
-  @State private var errorMessage: String?
-  @State private var selectedIDs = Set<String>()
-  @State private var isLabelSheetPresented = false
-  @State private var labelDraft = ""
-  @State private var labelTargetItems = [ReviewItem]()
-  @State private var resolvedPreferences: DashboardReviewsResolvedPreferences
-  @State private var presentationWorker = DashboardReviewsPresentationWorker()
-  @State private var cachedPresentation = DashboardReviewsPresentation.empty
-  @State private var presentationGeneration: UInt64 = 0
-  @State private var refreshTracker = ReviewRefreshTracker()
-  @State private var inFlightTasks: [Task<Void, Never>] = []
-  /// The set of items whose most recent targeted refresh timed out. Drives
-  /// the inline tap-to-retry banner mounted in the content pane. Set when
-  /// `scheduleAffectedRefresh` catches `DashboardReviewsSchedulerError`,
-  /// cleared on retry, dismissal, or successful refresh of the same items.
-  @State private var refreshTimeoutItems: [ReviewItem]?
-  /// Tracker that compares the previous and current response item sets to
-  /// surface a one-shot toast for each pull request that disappeared
-  /// (merged, closed, or fell out of scope). The first call after view
-  /// appearance establishes a silent baseline.
-  @State private var disappearedTracker = DashboardReviewsDisappearedItemTracker()
-  /// Disappeared-item descriptors emitted on the most recent items-arrival
-  /// diff. Consumed by the transient-banner zone in the content pane and
-  /// cleared once the user dismisses the banner.
-  @State private var disappearedDescriptors: [DashboardReviewsDisappearedItemTracker.Descriptor] = []
-  @State private var scheduler = DashboardReviewsScheduler()
-  @State private var collapsedRepositories = DashboardReviewsCollapsedRepositories()
-  @State private var labelMenuDataByRepository: [String: DashboardReviewsRepoLabelMenuData] =
-    [:]
-  @State private var actionState = DashboardReviewsRouteActionState()
-  @State private var legacyFilterMigrationApplied = false
-  @State private var lastPrimaryClickedID: String?
-  @State private var isReviewsRouteActive = true
-  @State private var pendingResumeAfterReturn = false
-  // Skip the JSON decode in `syncPreferencesFromStorage` when the raw stored
-  // string is byte-identical to the last value we already decoded. The
-  // `.onChange(of: storedPreferences)` handler fires `initial: true` and
-  // re-fires on every UserDefaults write the surface emits; the decode itself
-  // is non-trivial.
-  @State private var lastStoredPreferencesHash: Int?
-  @State private var needsMeCount: Int = 0
-  @State private var pinnedPullRequests: DashboardReviewsPinnedPullRequests
+  @State private var routeState: DashboardReviewsRouteViewState
 
   init(
     store: HarnessMonitorStore,
@@ -109,71 +53,31 @@ struct DashboardReviewsRouteView: View {
     self.store = store
     _selectedRoute = selectedRoute
     self.searchAutomationCommand = searchAutomationCommand
-    _resolvedPreferences = State(
-      initialValue: DashboardReviewsResolvedPreferences(
-        storedValue: UserDefaults.standard.string(
-          forKey: DashboardReviewsPreferences.storageKey
-        ) ?? ""
+    _routeState = State(
+      initialValue: DashboardReviewsRouteViewState(
+        resolvedPreferences: DashboardReviewsResolvedPreferences(
+          storedValue: UserDefaults.standard.string(
+            forKey: DashboardReviewsPreferences.storageKey
+          ) ?? ""
+        ),
+        pinnedPullRequests: DashboardReviewsPinnedPullRequests(
+          storedValue: UserDefaults.standard.string(
+            forKey: DashboardReviewsPinnedPullRequests.storageKey
+          ) ?? ""
+        )
       )
     )
-    _pinnedPullRequests = State(
-      initialValue: DashboardReviewsPinnedPullRequests(
-        storedValue: UserDefaults.standard.string(
-          forKey: DashboardReviewsPinnedPullRequests.storageKey
-        ) ?? ""
-      )
-    )
-  }
-
-  var routeResolvedPreferences: DashboardReviewsResolvedPreferences {
-    get { resolvedPreferences }
-    nonmutating set { resolvedPreferences = newValue }
-  }
-
-  var routeRecentReviewActions: [String: DashboardReviewActivityEntry] {
-    get { actionState.recentActions }
-    nonmutating set { actionState.recentActions = newValue }
-  }
-
-  var routePinnedPullRequests: DashboardReviewsPinnedPullRequests {
-    get { pinnedPullRequests }
-    nonmutating set { pinnedPullRequests = newValue }
-  }
-
-  var routePendingActionConfirmation: DashboardReviewActionConfirmation? {
-    get { actionState.pendingConfirmation }
-    nonmutating set { actionState.pendingConfirmation = newValue }
-  }
-
-  var routePendingActionConfirmationTitle: String {
-    routePendingActionConfirmation?.title ?? ""
-  }
-
-  var routeActionDialogPresented: Binding<Bool> {
-    Binding(
-      get: { routePendingActionConfirmation != nil },
-      set: { isPresented in
-        if !isPresented {
-          routePendingActionConfirmation = nil
-        }
-      }
-    )
-  }
-
-  var routeReviewCapabilities: ReviewsCapabilitiesResponse {
-    get { actionState.capabilities }
-    nonmutating set { actionState.capabilities = newValue }
   }
 
   var reloadTaskKey: DashboardReviewsReloadTaskKey {
     DashboardReviewsReloadTaskKey(
-      preferencesSignature: resolvedPreferences.cacheHash,
+      preferencesSignature: routeResolvedPreferences.cacheHash,
       isConnected: isReviewsReloadConnected(store.connectionState)
     )
   }
 
   var normalizedPreferences: DashboardReviewsPreferences {
-    resolvedPreferences.preferences
+    routeResolvedPreferences.preferences
   }
 
   var groupMode: DashboardReviewsGroupMode {
@@ -181,9 +85,9 @@ struct DashboardReviewsRouteView: View {
   }
 
   var presentationInput: DashboardReviewsPresentationInput {
-    let preferences = resolvedPreferences
+    let preferences = routeResolvedPreferences
     return DashboardReviewsPresentationInput(
-      items: response.items,
+      items: routeResponse.items,
       filterModeRaw: filterModeRaw,
       sortModeRaw: sortModeRaw,
       groupModeRaw: groupModeRaw,
@@ -192,32 +96,32 @@ struct DashboardReviewsRouteView: View {
       configuredRepositories: preferences.repositories,
       configuredOrganizations: preferences.organizations,
       configuredAuthors: preferences.authors,
-      selectedIDs: selectedIDs,
+      selectedIDs: routeSelectedIDs,
       persistedPrimarySelectionID: persistedPrimarySelectionID,
-      pinnedPullRequestIDs: pinnedPullRequests.pullRequestIDs,
+      pinnedPullRequestIDs: routePinnedPullRequests.pullRequestIDs,
       needsMeOn: needsMeOn,
       dependenciesOnlyOn: dependenciesOnlyOn
     )
   }
 
   var filteredItems: [ReviewItem] {
-    cachedPresentation.filteredItems
+    routeCachedPresentation.filteredItems
   }
 
   var groupedItems: [DashboardReviewsRepositoryGroup] {
-    cachedPresentation.groupedItems
+    routeCachedPresentation.groupedItems
   }
 
   var selectedItems: [ReviewItem] {
-    cachedPresentation.selectedItems
+    routeCachedPresentation.selectedItems
   }
 
   var primaryDetailItem: ReviewItem? {
-    cachedPresentation.primaryDetailItem
+    routeCachedPresentation.primaryDetailItem
   }
 
   var relativeUpdatedLabels: [String: String] {
-    cachedPresentation.relativeUpdatedLabels
+    routeCachedPresentation.relativeUpdatedLabels
   }
 
   var body: some View {
@@ -240,7 +144,7 @@ struct DashboardReviewsRouteView: View {
     }
 
     splitView
-      .sheet(isPresented: $isLabelSheetPresented) {
+      .sheet(isPresented: routeIsLabelSheetPresentedBinding) {
         labelSheet
       }
       .confirmationDialog(
@@ -262,7 +166,7 @@ struct DashboardReviewsRouteView: View {
       .onAppear {
         applyLegacyFilterMigrationIfNeeded()
       }
-      .onChange(of: selectedIDs) { oldValue, newValue in
+      .onChange(of: routeSelectedIDs) { oldValue, newValue in
         let nextPrimary = DashboardReviewsPrimarySelectionResolver.resolve(
           oldSelection: oldValue,
           newSelection: newValue,
@@ -271,7 +175,7 @@ struct DashboardReviewsRouteView: View {
         persistedPrimarySelectionID = nextPrimary
         let added = newValue.subtracting(oldValue)
         if added.count == 1 {
-          lastPrimaryClickedID = added.first
+          routeState.lastPrimaryClickedID = added.first
         }
         prefetchSelectedBodies(adding: added)
         prefetchSelectedFiles(adding: added)
@@ -288,24 +192,24 @@ struct DashboardReviewsRouteView: View {
       .onChange(of: collapsedRepositoriesStorage, initial: true) { _, newValue in
         syncCollapsedRepositoriesFromStorage(newValue)
       }
-      .onChange(of: response.repositoryLabels, initial: true) { _, _ in
+      .onChange(of: routeResponse.repositoryLabels, initial: true) { _, _ in
         refreshLabelMenuData()
       }
-      .onChange(of: response.items, initial: true) { _, items in
+      .onChange(of: routeResponse.items, initial: true) { _, items in
         openAnythingReviews.replaceLoadedItems(items)
         // Pending Open Anything requests that fired before items finished
         // loading need a second chance once the items arrive. The helper is
         // idempotent: `finishSelection` clears the request, so a follow-up
         // task-triggered call is a no-op.
         applyPendingReviewSelectionIfNeeded()
-        needsMeCount = Self.recomputeNeedsMeCount(items: items)
+        routeState.needsMeCount = Self.recomputeNeedsMeCount(items: items)
         // Run the disappeared-item diff after every items change. The first
         // call after appearance is silently swallowed by the tracker so the
         // initial response never emits toasts for items the user has not
         // previously observed.
-        let descriptors = disappearedTracker.diff(currentItems: items)
+        let descriptors = routeState.disappearedTracker.diff(currentItems: items)
         if !descriptors.isEmpty {
-          disappearedDescriptors.append(contentsOf: descriptors)
+          routeState.disappearedDescriptors.append(contentsOf: descriptors)
         }
       }
       .onChange(of: normalizedPreferences.frequentLabelsCount) { _, _ in
@@ -320,20 +224,20 @@ struct DashboardReviewsRouteView: View {
       .dashboardReviewsOnSystemWake(perform: handleSystemWake)
       .dashboardReviewsToolbarSearch(
         query: $searchText,
-        items: response.items,
+        items: routeResponse.items,
         automationCommand: searchAutomationCommand
       ) { pullRequestID in
-        selectedIDs = [pullRequestID]
+        routeSelectedIDs = [pullRequestID]
       }
       .focusedSceneValue(\.dashboardReviewsCommands, reviewCommandFocus)
   }
 
   private func applyPendingReviewSelectionIfNeeded() {
     guard let request = openAnythingReviews.selectionRequest else { return }
-    guard response.items.contains(where: { $0.pullRequestID == request.pullRequestID }) else {
+    guard routeResponse.items.contains(where: { $0.pullRequestID == request.pullRequestID }) else {
       return
     }
-    selectedIDs = [request.pullRequestID]
+    routeSelectedIDs = [request.pullRequestID]
     persistedPrimarySelectionID = request.pullRequestID
     openAnythingReviews.finishSelection(requestID: request.requestID)
   }
@@ -341,8 +245,8 @@ struct DashboardReviewsRouteView: View {
   // Legacy filter values - `"blocked"` filter and `"dependencies"` category -
   // migrate once per session to the new toggle-based flags.
   private func applyLegacyFilterMigrationIfNeeded() {
-    guard !legacyFilterMigrationApplied else { return }
-    legacyFilterMigrationApplied = true
+    guard !routeState.legacyFilterMigrationApplied else { return }
+    routeState.legacyFilterMigrationApplied = true
     if filterModeRaw == "blocked" {
       needsMeOn = true
       filterModeRaw = DashboardReviewsFilterMode.all.rawValue
