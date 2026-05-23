@@ -85,6 +85,58 @@ struct ReviewFilesViewModelTests {
     #expect(vm.filteredFiles.map(\.path) == ["src/Tests/b.swift"])
   }
 
+  @Test("ingest(response:) selects the first unviewed file")
+  func ingestSelectsFirstUnviewedFile() {
+    let vm = ReviewFilesViewModel(pullRequestID: "pr-1")
+    vm.ingest(
+      response: makeResponse(
+        files: [
+          makeFile(path: "src/a.swift", viewed: .viewed),
+          makeFile(path: "src/b.swift", viewed: .unviewed),
+          makeFile(path: "src/c.swift", viewed: .unviewed),
+        ]
+      )
+    )
+    #expect(vm.selectedPath == "src/b.swift")
+    #expect(vm.selectedFile?.path == "src/b.swift")
+  }
+
+  @Test("applyFilter preserves visible selection and moves hidden selection")
+  func applyFilterMaintainsValidSelection() {
+    let vm = ReviewFilesViewModel(pullRequestID: "pr-1")
+    vm.ingest(
+      response: makeResponse(
+        files: [
+          makeFile(path: "src/a.swift"),
+          makeFile(path: "tests/b.swift"),
+          makeFile(path: "docs/c.md"),
+        ]
+      )
+    )
+    vm.select(path: "tests/b.swift")
+    vm.applyFilter(ReviewFilesFilter(searchText: "tests"))
+    #expect(vm.selectedPath == "tests/b.swift")
+    vm.applyFilter(ReviewFilesFilter(searchText: "docs"))
+    #expect(vm.selectedPath == "docs/c.md")
+  }
+
+  @Test("selectNextUnviewed wraps from the selected file")
+  func selectNextUnviewedWraps() {
+    let vm = ReviewFilesViewModel(pullRequestID: "pr-1")
+    vm.ingest(
+      response: makeResponse(
+        files: [
+          makeFile(path: "src/a.swift", viewed: .unviewed),
+          makeFile(path: "src/b.swift", viewed: .viewed),
+          makeFile(path: "src/c.swift", viewed: .viewed),
+        ]
+      )
+    )
+    vm.select(path: "src/c.swift")
+    vm.selectNextUnviewed()
+    #expect(vm.selectedPath == "src/a.swift")
+  }
+
   @Test("applyFilter with hideGenerated drops paths matched by the generated matcher")
   func applyFilterHideGenerated() {
     let matcher = ReviewFilesGeneratedPathMatcher(

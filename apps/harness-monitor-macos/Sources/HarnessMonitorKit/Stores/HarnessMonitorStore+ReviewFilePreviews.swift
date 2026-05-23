@@ -64,7 +64,11 @@ extension HarnessMonitorStore {
     let visible = dedupePaths(visiblePaths)
     let visibleSet = Set(visible)
     let background = dedupePaths(backgroundPaths).filter { !visibleSet.contains($0) }
-    reviewFilesPreviewWarmState.tasks[pullRequestID]?.cancel()
+    if let existing = reviewFilesPreviewWarmState.tasks[pullRequestID] {
+      let interval = ReviewFilesPerf.beginPrewarmCancel(pullRequestID: pullRequestID)
+      existing.cancel()
+      ReviewFilesPerf.end(interval)
+    }
     guard !visible.isEmpty || !background.isEmpty else {
       reviewFilesPreviewWarmState.tasks.removeValue(forKey: pullRequestID)
       reviewFilesPreviewWarmState.generations.removeValue(forKey: pullRequestID)

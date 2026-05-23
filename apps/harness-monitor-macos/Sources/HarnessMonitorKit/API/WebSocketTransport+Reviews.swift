@@ -189,4 +189,12 @@ extension WebSocketTransport {
     let value = try await rpc(method: .reviewsReviewThreadsResolve, params: params)
     return try decode(value)
   }
+
+  public func addReviewFileComment(
+    request: ReviewsFileCommentRequest
+  ) async throws -> ReviewsFileCommentResponse {
+    let params = try encodeParams(request, extra: [:])
+    let value = try await rpc(method: .reviewsFilesComment, params: params)
+    return try decode(value)
+  }
 }

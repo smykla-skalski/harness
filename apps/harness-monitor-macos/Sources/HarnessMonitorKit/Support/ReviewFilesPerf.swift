@@ -64,6 +64,36 @@ public enum ReviewFilesPerf {
     return Interval(state: state, name: "files.preview.prewarm")
   }
 
+  public static func beginFilesModeEnter(pullRequestID: String) -> Interval {
+    let id = signposter.makeSignpostID()
+    let state = signposter.beginInterval(
+      "files.mode.enter",
+      id: id,
+      "pr=\(pullRequestID, privacy: .public)"
+    )
+    return Interval(state: state, name: "files.mode.enter")
+  }
+
+  public static func beginSelectedFileFirstRows(path: String) -> Interval {
+    let id = signposter.makeSignpostID()
+    let state = signposter.beginInterval(
+      "files.selected.first_rows",
+      id: id,
+      "path=\(path, privacy: .public)"
+    )
+    return Interval(state: state, name: "files.selected.first_rows")
+  }
+
+  public static func beginPrewarmCancel(pullRequestID: String) -> Interval {
+    let id = signposter.makeSignpostID()
+    let state = signposter.beginInterval(
+      "files.preview.prewarm.cancel",
+      id: id,
+      "pr=\(pullRequestID, privacy: .public)"
+    )
+    return Interval(state: state, name: "files.preview.prewarm.cancel")
+  }
+
   public static func beginPreviewCacheRead(pullRequestID: String, pathCount: Int) -> Interval {
     let id = signposter.makeSignpostID()
     let state = signposter.beginInterval(

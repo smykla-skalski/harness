@@ -9,11 +9,15 @@ use super::client::ReviewsGitHubClient;
 use super::errors::operation_error;
 use super::mapping::{action_result, github_project_config};
 use super::queries::{
-    ADD_COMMENT_MUTATION, APPROVE_MUTATION, REREQUEST_CHECK_SUITE_MUTATION, VIEWER_LOGIN_QUERY,
+    ADD_COMMENT_MUTATION, ADD_REVIEW_THREAD_MUTATION,
+    ADD_REVIEW_THREAD_REPLY_MUTATION, APPROVE_MUTATION,
+    REREQUEST_CHECK_SUITE_MUTATION, VIEWER_LOGIN_QUERY,
 };
 use super::{
     ReviewActionKind, ReviewActionOutcome, ReviewActionResult, ReviewTarget,
-    ReviewsApproveRequest, ReviewsAutoRequest, ReviewsCommentRequest, ReviewsLabelRequest,
+    ReviewsApproveRequest, ReviewsAutoRequest, ReviewsCommentRequest,
+    ReviewsFileCommentKind, ReviewsFileCommentRequest,
+    ReviewsFileCommentResponse, ReviewsLabelRequest,
     ReviewsMergeRequest, ReviewsRequestReviewRequest, ReviewsRerunChecksRequest, timeline,
 };
 
@@ -86,6 +90,77 @@ impl ReviewsGitHubClient {
             results.push(comment_action_result(target, result));
         }
         Ok(results)
+    }
+
+    pub(crate) async fn add_file_comment(
+        &self,
+        request: &ReviewsFileCommentRequest,
+    ) -> Result<ReviewsFileCommentResponse, CliError> {
+        match request.kind {
+            ReviewsFileCommentKind::NewThread => {
+                self.add_file_comment_thread(request).await
+            }
+            ReviewsFileCommentKind::Reply => self.add_file_comment_reply(request).await,
+        }
+    }
+
+    async fn add_file_comment_thread(
+        &self,
+        request: &ReviewsFileCommentRequest,
+    ) -> Result<ReviewsFileCommentResponse, CliError> {
+        let response: serde_json::Value = self
+            .client
+            .graphql(&json!({
+                "query": ADD_REVIEW_THREAD_MUTATION,
+                "variables": {
+                    "pullRequestId": request.pull_request_id.as_str(),
+                    "body": request.normalized_body(),
+                    "path": request.path.as_deref(),
+                    "line": request.line,
+                    "side": request.side.as_deref(),
+                },
+            }))
+            .await
+            .map_err(operation_error)?;
+        let thread_id = response
+            .pointer("/data/addPullRequestReviewThread/thread/id")
+            .and_then(serde_json::Value::as_str)
+            .map(ToString::to_string);
+        let comment_id = response
+            .pointer("/data/addPullRequestReviewThread/thread/comments/nodes/0/id")
+            .and_then(serde_json::Value::as_str)
+            .map(ToString::to_string);
+        let url = response
+            .pointer("/data/addPullRequestReviewThread/thread/comments/nodes/0/url")
+            .and_then(serde_json::Value::as_str)
+            .map(ToString::to_string);
+        Ok(request.response(thread_id, comment_id, url))
+    }
+
+    async fn add_file_comment_reply(
+        &self,
+        request: &ReviewsFileCommentRequest,
+    ) -> Result<ReviewsFileCommentResponse, CliError> {
+        let response: serde_json::Value = self
+            .client
+            .graphql(&json!({
+                "query": ADD_REVIEW_THREAD_REPLY_MUTATION,
+                "variables": {
+                    "threadId": request.thread_id.as_deref(),
+                    "body": request.normalized_body(),
+                },
+            }))
+            .await
+            .map_err(operation_error)?;
+        let comment_id = response
+            .pointer("/data/addPullRequestReviewThreadReply/comment/id")
+            .and_then(serde_json::Value::as_str)
+            .map(ToString::to_string);
+        let url = response
+            .pointer("/data/addPullRequestReviewThreadReply/comment/url")
+            .and_then(serde_json::Value::as_str)
+            .map(ToString::to_string);
+        Ok(request.response(request.thread_id.clone(), comment_id, url))
     }
 
     pub(crate) async fn merge(

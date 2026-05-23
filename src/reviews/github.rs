@@ -46,6 +46,8 @@ pub(super) use super::{
     ReviewPullRequestState, ReviewRepositoryLabel, PullRequestReview,
     ReviewReviewEventState, ReviewReviewStatus, ReviewTarget,
     ReviewsApproveRequest, ReviewsAutoRequest, ReviewsCommentRequest,
+    ReviewsFileCommentKind, ReviewsFileCommentRequest,
+    ReviewsFileCommentResponse,
     ReviewsLabelRequest, ReviewsMergeRequest, ReviewsQueryRequest,
     ReviewsRequestReviewRequest, ReviewsRerunChecksRequest, timeline,
 };

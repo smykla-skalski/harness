@@ -11,9 +11,11 @@ use crate::reviews::{
     ReviewsCommentRequest, ReviewsGitHubClient, ReviewsLabelRequest,
     ReviewsMergeRequest, ReviewsQueryRequest, ReviewsQueryResponse,
     ReviewsRefreshRequest, ReviewsRefreshResponse,
+    ReviewsFileCommentRequest, ReviewsFileCommentResponse,
     ReviewsRepositoryCatalogRequest, ReviewsRepositoryCatalogResponse,
     ReviewsRequestReviewRequest, ReviewsRerunChecksRequest,
 };
+use crate::reviews::timeline;
 use crate::errors::CliError;
 use crate::workspace::utc_now;
 
@@ -199,6 +201,25 @@ pub async fn comment_on_reviews(
         );
     }
     Ok(action_response("Posted dependency update comment", results))
+}
+
+/// Add or reply to an inline pull-request file review comment.
+///
+/// # Errors
+/// Returns `CliError` when the request is invalid, a GitHub token is missing,
+/// or GitHub rejects the inline comment mutation.
+pub async fn add_review_file_comment(
+    request: &ReviewsFileCommentRequest,
+) -> Result<ReviewsFileCommentResponse, CliError> {
+    request.validate()?;
+    let repository = request.repository.as_deref();
+    let token = github_token(repository)
+        .or_else(|| github_token(None))
+        .ok_or_else(|| missing_token_error(repository))?;
+    let client = ReviewsGitHubClient::new(&token)?;
+    let response = client.add_file_comment(request).await?;
+    timeline::drain_pull_request_cache(&request.pull_request_id);
+    Ok(response)
 }
 
 /// Merge selected dependency update pull requests.

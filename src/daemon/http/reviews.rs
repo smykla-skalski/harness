@@ -10,6 +10,7 @@ use crate::daemon::protocol::{
     ReviewsActionPreviewRequest, ReviewsApproveRequest,
     ReviewsAutoRequest, ReviewsAvatarRequest, ReviewsBodyRequest, ReviewsBodyUpdateRequest,
     ReviewsCommentRequest, ReviewsFilesBlobRequest,
+    ReviewsFileCommentRequest,
     ReviewsFilesListRequest, ReviewsFilesPatchRequest, ReviewsFilesPreviewRequest,
     ReviewsFilesViewedRequest, ReviewsLabelRequest,
     ReviewsMergeRequest, ReviewsQueryRequest, ReviewsRefreshRequest,
@@ -115,6 +116,10 @@ pub(super) fn reviews_routes() -> Router<DaemonHttpState> {
         .route(
             http_paths::REVIEWS_FILES_BLOB,
             post(post_review_files_blob),
+        )
+        .route(
+            http_paths::REVIEWS_FILES_COMMENT,
+            post(post_review_files_comment),
         )
         .route(
             http_paths::REVIEWS_FILES_LOCAL_CLONES,
@@ -447,6 +452,22 @@ async fn post_review_files_blob(
     timed_json(
         "POST",
         http_paths::REVIEWS_FILES_BLOB,
+        &request_id,
+        start,
+        result,
+    )
+}
+
+async fn post_review_files_comment(
+    headers: HeaderMap,
+    State(state): State<DaemonHttpState>,
+    Json(request): Json<ReviewsFileCommentRequest>,
+) -> Response {
+    let (start, request_id) = authenticated_request!(headers, state);
+    let result = service::add_review_file_comment(&request).await;
+    timed_json(
+        "POST",
+        http_paths::REVIEWS_FILES_COMMENT,
         &request_id,
         start,
         result,

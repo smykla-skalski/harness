@@ -3,14 +3,17 @@ import SwiftUI
 
 extension DashboardReviewsRouteView {
   var contentPane: some View {
-    VStack(alignment: .leading, spacing: 14) {
-      filterBar
-      transientBannerZone
-      inContentSearchField
-      contentListPane
+    Group {
+      if routeDetailMode == .files, selectedItems.count <= 1, let item = primaryDetailItem {
+        filesModeContentPane(for: item)
+          .transition(.asymmetric(insertion: .move(edge: .trailing), removal: .opacity))
+      } else {
+        reviewsOverviewContentPane
+          .transition(.asymmetric(insertion: .opacity, removal: .move(edge: .leading)))
+      }
     }
     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-    .padding(20)
+    .animation(.smooth(duration: 0.22), value: routeDetailMode)
     .toolbar {
       ToolbarItem(placement: .principal) {
         DashboardReviewsToolbarCenterpiece(snapshot: routeProvenanceSnapshot)
@@ -27,6 +30,16 @@ extension DashboardReviewsRouteView {
         DashboardReviewsInfoToolbarButton(snapshot: routeProvenanceSnapshot)
       }
     }
+  }
+
+  var reviewsOverviewContentPane: some View {
+    VStack(alignment: .leading, spacing: 14) {
+      filterBar
+      transientBannerZone
+      inContentSearchField
+      contentListPane
+    }
+    .padding(20)
   }
 
   /// In-content search field. The toolbar `.searchable` field remains for
@@ -174,6 +187,9 @@ extension DashboardReviewsRouteView {
     Group {
       if let routeErrorMessage, !routeIsLoading {
         errorState(message: routeErrorMessage)
+      } else if routeDetailMode == .files, selectedItems.count <= 1, let item = primaryDetailItem {
+        filesModeDetailPane(for: item)
+          .transition(.opacity.combined(with: .scale(scale: 0.995)))
       } else if selectedItems.count > 1 {
         batchDetail
       } else if let item = primaryDetailItem {
@@ -195,6 +211,9 @@ extension DashboardReviewsRouteView {
           },
           onReRequestReview: { reviewer in
             Task { await reRequestReview(from: reviewer, on: item) }
+          },
+          onOpenFilesMode: {
+            enterFilesMode(for: item)
           },
           actionBar: {
             reviewActionBar(items: [item])

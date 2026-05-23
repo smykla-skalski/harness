@@ -147,6 +147,12 @@ extension HarnessMonitorAPIClient {
   ) async throws -> ReviewsReviewThreadResolveResponse {
     try await post("/v1/reviews/review-threads/resolve", body: request)
   }
+
+  public func addReviewFileComment(
+    request: ReviewsFileCommentRequest
+  ) async throws -> ReviewsFileCommentResponse {
+    try await post("/v1/reviews/files/comment", body: request)
+  }
 }
 
 /// Empty request body for listing local clones. The daemon does not need

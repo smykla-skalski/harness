@@ -70,6 +70,9 @@ public protocol HarnessMonitorReviewsClientProtocol: Sendable {
   func setReviewThreadResolved(
     request: ReviewsReviewThreadResolveRequest
   ) async throws -> ReviewsReviewThreadResolveResponse
+  func addReviewFileComment(
+    request: ReviewsFileCommentRequest
+  ) async throws -> ReviewsFileCommentResponse
 }
 
 extension HarnessMonitorReviewsClientProtocol {
@@ -214,6 +217,12 @@ extension HarnessMonitorReviewsClientProtocol {
   public func setReviewThreadResolved(
     request _: ReviewsReviewThreadResolveRequest
   ) async throws -> ReviewsReviewThreadResolveResponse {
+    throw HarnessMonitorAPIError.server(code: 501, message: "Reviews unavailable")
+  }
+
+  public func addReviewFileComment(
+    request _: ReviewsFileCommentRequest
+  ) async throws -> ReviewsFileCommentResponse {
     throw HarnessMonitorAPIError.server(code: 501, message: "Reviews unavailable")
   }
 }
