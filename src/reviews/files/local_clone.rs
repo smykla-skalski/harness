@@ -23,6 +23,7 @@
 
 use std::collections::BTreeMap;
 use std::fmt;
+use std::fmt::Write as _;
 use std::path::{Path, PathBuf};
 
 use chrono::{DateTime, Duration, Utc};
@@ -63,7 +64,10 @@ impl RepoKey {
         let mut hasher = Sha256::new();
         hasher.update(self.repo_full_name.as_bytes());
         let digest = hasher.finalize();
-        digest.iter().take(4).map(|b| format!("{b:02x}")).collect()
+        digest.iter().take(4).fold(String::new(), |mut acc, b| {
+            let _ = write!(acc, "{b:02x}");
+            acc
+        })
     }
 
     /// Sanitized owner+name segment safe for filesystem use.
@@ -75,7 +79,6 @@ impl RepoKey {
             .chars()
             .map(|c| match c {
                 'a'..='z' | 'A'..='Z' | '0'..='9' | '-' | '_' | '.' => c,
-                '/' => '_',
                 _ => '_',
             })
             .collect();

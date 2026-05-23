@@ -12,7 +12,7 @@ use super::super::{ReviewItem, ReviewRepositoryLabel};
 use super::errors::client_error;
 
 pub(in crate::reviews) const GITHUB_HTTP_CONNECT_TIMEOUT: Duration = Duration::from_secs(30);
-pub(in crate::reviews) const GITHUB_HTTP_READ_TIMEOUT: Duration = Duration::from_secs(60);
+pub(in crate::reviews) const GITHUB_HTTP_READ_TIMEOUT: Duration = Duration::from_mins(1);
 
 pub(in crate::reviews) const GRAPHQL_PAGE_SIZE: u32 = 100;
 pub(in crate::reviews) const SEARCH_PAGE_CAP: u32 = 10;

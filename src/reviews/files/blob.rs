@@ -13,6 +13,8 @@
 //! → MIME, size cap enforcement, base64 round-trip). The Octocrab wiring
 //! lives in the service handler and `ReviewsGitHubClient`.
 
+use base64::Engine as _;
+use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
 use serde::{Deserialize, Serialize};
 
 use super::ReviewsRateLimitSnapshot;
@@ -109,15 +111,13 @@ pub fn blob_exceeds_cap(byte_size: u64) -> bool {
 /// in tests without pulling in the base64 crate inside the test harness).
 #[must_use]
 pub fn encode_blob_bytes(bytes: &[u8]) -> String {
-    use base64::Engine as _;
-    base64::engine::general_purpose::STANDARD.encode(bytes)
+    BASE64_STANDARD.encode(bytes)
 }
 
 /// Decode helper - returns `Err` on invalid base64 so the service can surface
 /// a clean error rather than panicking.
 pub fn decode_blob_bytes(encoded: &str) -> Result<Vec<u8>, base64::DecodeError> {
-    use base64::Engine as _;
-    base64::engine::general_purpose::STANDARD.decode(encoded)
+    BASE64_STANDARD.decode(encoded)
 }
 
 #[cfg(test)]

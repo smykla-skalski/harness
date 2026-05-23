@@ -4,7 +4,7 @@ use std::fs;
 
 use crate::daemon::state::daemon_root;
 use crate::errors::{CliError, CliErrorKind};
-use crate::reviews::{LocalCloneListEntry, LocalCloneRegistry, LocalCloneRoot};
+use crate::reviews::{LocalCloneListEntry, LocalCloneRegistry, LocalCloneRoot, RegistryEntry, RepoKey};
 
 use super::CLONES_SUBDIR;
 
@@ -100,18 +100,7 @@ pub async fn delete_review_local_clone(
         .find(|key| key.safe_segment() == segment)
         .cloned();
     if let Some(key) = matching_key {
-        if let Some(entry) = registry.remove(&key) {
-            if entry.bare_path.exists() {
-                if let Err(error) = fs::remove_dir_all(&entry.bare_path) {
-                    tracing::warn!(
-                        target = "harness::reviews::files",
-                        path = ?entry.bare_path,
-                        error = %error,
-                        "failed to remove local clone directory"
-                    );
-                }
-            }
-        }
+        remove_clone_entry(&mut registry, &key);
         save_registry(&root, &registry)?;
     }
     Ok(registry
@@ -119,4 +108,27 @@ pub async fn delete_review_local_clone(
         .iter()
         .map(|(key, entry)| LocalCloneListEntry::from_registry_entry(key, entry))
         .collect())
+}
+
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "tracing macro expansion inflates the score; tokio-rs/tracing#553"
+)]
+fn warn_clone_msg(msg: &str) {
+    tracing::warn!(target = "harness::reviews::files", "{msg}");
+}
+
+fn try_remove_clone_dir(entry: &RegistryEntry) {
+    if !entry.bare_path.exists() {
+        return;
+    }
+    if let Err(error) = fs::remove_dir_all(&entry.bare_path) {
+        warn_clone_msg(&format!("failed to remove local clone directory: path={} error={error}", entry.bare_path.display()));
+    }
+}
+
+fn remove_clone_entry(registry: &mut LocalCloneRegistry, key: &RepoKey) {
+    if let Some(entry) = registry.remove(key) {
+        try_remove_clone_dir(&entry);
+    }
 }

@@ -10,7 +10,7 @@ use super::{
     ReviewTimelineEntry, ReviewsTimelineResponse, TimelinePageDirection,
 };
 
-pub(super) const TIMELINE_CACHE_TTL: Duration = Duration::from_secs(5 * 60);
+pub(super) const TIMELINE_CACHE_TTL: Duration = Duration::from_mins(5);
 
 #[derive(Debug, Clone, PartialEq, Eq, Ord, PartialOrd)]
 pub(super) struct TimelineCacheKey {
@@ -79,7 +79,7 @@ pub(super) fn drain_pull_request(pull_request_id: &str) {
 
 /// Appends a newly-created entry to cached first pages for the PR. Cursor pages
 /// stay untouched because a just-posted comment cannot belong to older pages.
-pub(super) fn append_entry(pull_request_id: &str, entry: ReviewTimelineEntry) {
+pub(super) fn append_entry(pull_request_id: &str, entry: &ReviewTimelineEntry) {
     let now = Instant::now();
     let mut map = cache().lock().expect("timeline cache lock poisoned");
     for (key, cached) in &mut *map {

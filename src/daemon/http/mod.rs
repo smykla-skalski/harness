@@ -23,7 +23,7 @@ use crate::daemon::agent_tui::AgentTuiManagerHandle;
 use crate::daemon::codex_controller::CodexControllerHandle;
 use crate::daemon::db::{AsyncDaemonDb, DaemonDb, canonical_db_unavailable};
 use crate::daemon::protocol::StreamEvent;
-use crate::daemon::service::WakeDispatch;
+use crate::daemon::service::{WakeDispatch, register_local_clone_progress_sender, run_local_clone_gc};
 use crate::daemon::state::DaemonManifest;
 use crate::daemon::websocket::ReplayBuffer;
 use crate::errors::{CliError, CliErrorKind};
@@ -256,13 +256,13 @@ pub async fn serve(
 ) -> Result<(), CliError> {
     // Hand the broadcast sender to the reviews files module so
     // local-clone progress events surface on the same WS push channel.
-    crate::daemon::service::register_local_clone_progress_sender(state.sender.clone());
+    register_local_clone_progress_sender(state.sender.clone());
 
     // Kick off a best-effort local-clone garbage-collection pass in the
     // background. Drops stale + over-budget bare clones per the plan's
     // §A.5 policy. Failures are logged and don't block daemon startup.
     tokio::spawn(async {
-        match crate::daemon::service::run_local_clone_gc().await {
+        match run_local_clone_gc().await {
             Ok(report) => {
                 if report.targets > 0 {
                     tracing::info!(

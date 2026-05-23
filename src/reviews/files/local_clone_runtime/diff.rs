@@ -1,9 +1,16 @@
 use std::collections::BTreeSet;
+use std::fmt::Write as _;
 use std::ops::ControlFlow;
+use std::path::PathBuf;
 
 use chrono::Utc;
-use gix::bstr::ByteSlice;
+use gix::bstr::{BStr, ByteSlice};
+use gix::diff::blob::Diff as BlobDiff;
+use gix::diff::blob::Platform as BlobPlatform;
+use gix::diff::blob::platform::prepare_diff::Operation as PrepDiffOp;
+use gix::diff::blob::unified_diff::ContextSize;
 use gix::object::tree::diff::Change;
+use tokio::task::spawn_blocking;
 
 use super::{EnsuredClone, LocalCloneRuntime, LocalCloneRuntimeError, resolve_ref};
 use crate::reviews::files::{
@@ -79,8 +86,8 @@ impl LocalCloneRuntime {
         let base_ref = base_ref.to_string();
         let head_ref = head_ref.to_string();
         let requested = paths.iter().cloned().collect::<BTreeSet<_>>();
-        tokio::task::spawn_blocking(move || {
-            run_diff_refs(bare_path, &base_ref, &head_ref, &requested)
+        spawn_blocking(move || {
+            run_diff_refs(&bare_path, &base_ref, &head_ref, &requested)
         })
         .await
         .map_err(|join| LocalCloneRuntimeError::Join(join.to_string()))?
@@ -88,12 +95,12 @@ impl LocalCloneRuntime {
 }
 
 fn run_diff_refs(
-    bare_path: std::path::PathBuf,
+    bare_path: &PathBuf,
     base_ref: &str,
     head_ref: &str,
     requested: &BTreeSet<String>,
 ) -> Result<LocalCloneDiff, LocalCloneRuntimeError> {
-    let repo = gix::open(&bare_path).map_err(|e| LocalCloneRuntimeError::Open(e.to_string()))?;
+    let repo = gix::open(bare_path).map_err(|e| LocalCloneRuntimeError::Open(e.to_string()))?;
     let base_oid = resolve_ref(&repo, base_ref)?;
     let head_oid = resolve_ref(&repo, head_ref)?;
     let merge_base = repo
@@ -146,7 +153,7 @@ fn run_diff_refs(
 
 fn patch_for_change(
     change: &Change<'_, '_, '_>,
-    blob_cache: &mut gix::diff::blob::Platform,
+    blob_cache: &mut BlobPlatform,
     fetched_at: &str,
     head_oid: &str,
 ) -> Result<ReviewFilePatch, LocalCloneRuntimeError> {
@@ -169,7 +176,7 @@ fn patch_for_change(
 
 fn render_hunks(
     change: &Change<'_, '_, '_>,
-    blob_cache: &mut gix::diff::blob::Platform,
+    blob_cache: &mut BlobPlatform,
     paths: &ChangePaths,
 ) -> Result<String, LocalCloneRuntimeError> {
     let platform = change
@@ -184,25 +191,25 @@ fn render_hunks(
         .prepare_diff()
         .map_err(|e| LocalCloneRuntimeError::Diff(e.to_string()))?;
     match prepared.operation {
-        gix::diff::blob::platform::prepare_diff::Operation::InternalDiff { algorithm } => {
+        PrepDiffOp::InternalDiff { algorithm } => {
             let input = prepared.interned_input();
-            let diff = gix::diff::blob::Diff::compute(algorithm, &input);
+            let diff = BlobDiff::compute(algorithm, &input);
             gix::diff::blob::UnifiedDiff::new(
                 &diff,
                 &input,
                 gix::diff::blob::unified_diff::ConsumeBinaryHunk::new(String::new(), "\n"),
-                gix::diff::blob::unified_diff::ContextSize::symmetrical(3),
+                ContextSize::symmetrical(3),
             )
             .consume()
             .map_err(|e| LocalCloneRuntimeError::Diff(e.to_string()))
         }
-        gix::diff::blob::platform::prepare_diff::Operation::SourceOrDestinationIsBinary => {
+        PrepDiffOp::SourceOrDestinationIsBinary => {
             Ok(format!(
                 "Binary files a/{} and b/{} differ\n",
                 paths.old_path, paths.new_path
             ))
         }
-        gix::diff::blob::platform::prepare_diff::Operation::ExternalCommand { .. } => Err(
+        PrepDiffOp::ExternalCommand { .. } => Err(
             LocalCloneRuntimeError::Diff("external diff command was not expected".to_string()),
         ),
     }
@@ -212,11 +219,11 @@ fn render_patch(change: &Change<'_, '_, '_>, paths: &ChangePaths, hunk: &str) ->
     let mut patch = format!("diff --git a/{} b/{}\n", paths.old_path, paths.new_path);
     match change {
         Change::Addition { .. } => patch.push_str("--- /dev/null\n"),
-        _ => patch.push_str(&format!("--- a/{}\n", paths.old_path)),
+        _ => { let _ = write!(patch, "--- a/{}\n", paths.old_path); }
     }
     match change {
         Change::Deletion { .. } => patch.push_str("+++ /dev/null\n"),
-        _ => patch.push_str(&format!("+++ b/{}\n", paths.new_path)),
+        _ => { let _ = write!(patch, "+++ b/{}\n", paths.new_path); }
     }
     patch.push_str(hunk);
     patch
@@ -252,14 +259,9 @@ struct ChangePaths {
 
 fn change_paths(change: &Change<'_, '_, '_>) -> ChangePaths {
     match change {
-        Change::Addition { location, .. } => {
-            let path = path_to_string(location);
-            ChangePaths {
-                old_path: path.clone(),
-                new_path: path,
-            }
-        }
-        Change::Deletion { location, .. } | Change::Modification { location, .. } => {
+        Change::Addition { location, .. }
+        | Change::Deletion { location, .. }
+        | Change::Modification { location, .. } => {
             let path = path_to_string(location);
             ChangePaths {
                 old_path: path.clone(),
@@ -277,7 +279,7 @@ fn change_paths(change: &Change<'_, '_, '_>) -> ChangePaths {
     }
 }
 
-fn path_to_string(path: &gix::bstr::BStr) -> String {
+fn path_to_string(path: &BStr) -> String {
     path.to_str_lossy().into_owned()
 }
 

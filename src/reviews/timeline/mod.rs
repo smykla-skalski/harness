@@ -25,7 +25,7 @@ pub(crate) fn map_timeline_node(node: &serde_json::Value) -> Option<ReviewTimeli
 
 pub(crate) fn append_timeline_entry_to_cache(
     pull_request_id: &str,
-    entry: ReviewTimelineEntry,
+    entry: &ReviewTimelineEntry,
 ) {
     cache::append_entry(pull_request_id, entry);
 }

@@ -12,12 +12,17 @@
 //! and surfaced with `patch == ""` plus zero additions / deletions.
 
 use std::collections::HashSet;
+use std::io;
+use std::path::Path;
+use std::str::from_utf8;
 
 use gix::ObjectId;
 use gix::diff::blob::{
     Algorithm, InternedInput, UnifiedDiff, diff_with_slider_heuristics,
     unified_diff::{ConsumeHunk, ContextSize, DiffLineKind, HunkHeader},
 };
+use gix::object::tree::diff::ChangeDetached;
+use tokio::task::spawn_blocking;
 
 use crate::workspace::utc_now;
 
@@ -50,13 +55,13 @@ pub async fn compute_unified_patches(
     let base = base_oid.to_string();
     let head = head_oid.to_string();
     let filter: Option<HashSet<String>> = path_filter.map(|paths| paths.iter().cloned().collect());
-    tokio::task::spawn_blocking(move || run_compute(&bare_path, &base, &head, filter.as_ref()))
+    spawn_blocking(move || run_compute(&bare_path, &base, &head, filter.as_ref()))
         .await
         .map_err(|join| LocalCloneRuntimeError::Join(join.to_string()))?
 }
 
 fn run_compute(
-    bare_path: &std::path::Path,
+    bare_path: &Path,
     base_oid: &str,
     head_oid: &str,
     filter: Option<&HashSet<String>>,
@@ -98,12 +103,11 @@ fn run_compute(
 #[allow(clippy::too_many_lines)]
 fn patch_for_change(
     repo: &gix::Repository,
-    change: gix::object::tree::diff::ChangeDetached,
+    change: ChangeDetached,
     filter: Option<&HashSet<String>>,
     fetched_at: &str,
     head_ref_oid: &str,
 ) -> Result<Option<ReviewFilePatch>, LocalCloneRuntimeError> {
-    use gix::object::tree::diff::ChangeDetached;
 
     let (path, before_id, after_id, status) = match change {
         ChangeDetached::Addition { location, id, .. } => (
@@ -189,8 +193,8 @@ fn looks_binary(bytes: &[u8]) -> bool {
 }
 
 fn render_unified_diff(before: &[u8], after: &[u8]) -> (String, u32, u32) {
-    let before_str = std::str::from_utf8(before).unwrap_or("");
-    let after_str = std::str::from_utf8(after).unwrap_or("");
+    let before_str = from_utf8(before).unwrap_or("");
+    let after_str = from_utf8(after).unwrap_or("");
     let input = InternedInput::new(before_str, after_str);
     let diff = diff_with_slider_heuristics(Algorithm::Histogram, &input);
     // gix-diff exposes a `ConsumeHunk` trait. We implement it inline so
@@ -218,7 +222,7 @@ impl ConsumeHunk for StringHunkSink {
         &mut self,
         header: HunkHeader,
         lines: &[(DiffLineKind, &[u8])],
-    ) -> std::io::Result<()> {
+    ) -> io::Result<()> {
         use std::fmt::Write as _;
         let _ = writeln!(
             &mut self.buf,

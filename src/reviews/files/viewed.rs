@@ -115,11 +115,11 @@ impl ViewedMutation {
 pub fn classify_outcome(
     expected_prior: ReviewFileViewedState,
     current_actual: ReviewFileViewedState,
-) -> Option<ReviewFileViewedOutcome> {
+) -> ReviewFileViewedOutcome {
     if expected_prior == current_actual {
-        Some(ReviewFileViewedOutcome::Updated)
+        ReviewFileViewedOutcome::Updated
     } else {
-        Some(ReviewFileViewedOutcome::Drifted)
+        ReviewFileViewedOutcome::Drifted
     }
 }
 
@@ -205,7 +205,7 @@ mod tests {
             ReviewFileViewedState::Unviewed,
             ReviewFileViewedState::Unviewed,
         );
-        assert_eq!(outcome, Some(ReviewFileViewedOutcome::Updated));
+        assert_eq!(outcome, ReviewFileViewedOutcome::Updated);
     }
 
     #[test]
@@ -214,7 +214,7 @@ mod tests {
             ReviewFileViewedState::Unviewed,
             ReviewFileViewedState::Viewed,
         );
-        assert_eq!(outcome, Some(ReviewFileViewedOutcome::Drifted));
+        assert_eq!(outcome, ReviewFileViewedOutcome::Drifted);
     }
 
     #[test]

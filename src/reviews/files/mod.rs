@@ -9,7 +9,7 @@
 //! subsequent commits (A.3 through A.10):
 //!
 //! - `list` - GraphQL paginated metadata fetch (this commit, A.2)
-//! - `patch_rest` - REST patch fetch with ETag (A.3)
+//! - `patch_rest` - REST patch fetch with `ETag` (A.3)
 //! - `viewed` - GraphQL mark-viewed mutations + hash guard (A.4)
 //! - `blob` - GraphQL image blob fetch (A.5)
 //! - `cache` - per-PR on-disk patch cache + GC (A.6)
@@ -148,6 +148,7 @@ pub enum ReviewFileChangeType {
 
 impl ReviewFileChangeType {
     /// Parse a GraphQL enum value (uppercase) into a known variant.
+    #[must_use]
     pub fn parse(value: &str) -> Self {
         match value {
             "ADDED" => Self::Added,
@@ -173,6 +174,7 @@ pub enum ReviewFileViewedState {
 
 impl ReviewFileViewedState {
     /// Parse a GraphQL enum value (uppercase) into a known variant.
+    #[must_use]
     pub fn parse(value: &str) -> Self {
         match value {
             "DISMISSED" => Self::Dismissed,

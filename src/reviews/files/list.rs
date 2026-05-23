@@ -9,6 +9,9 @@
 //! Patches are NOT fetched here - this surface is metadata only. The Monitor
 //! requests patches on-demand for the files the user expands.
 
+use std::error::Error;
+use std::fmt;
+
 use chrono::{DateTime, Utc};
 use octocrab::Octocrab;
 use serde::Deserialize;
@@ -109,14 +112,66 @@ pub(crate) async fn fetch_files(
             "reviews files list: pull_request_id is empty".into(),
         ));
     }
+    fetch_files_paginated(client, pull_request_id, fetched_at).await
+}
 
-    let mut head_ref_oid = String::new();
-    let mut number: Option<u64> = None;
-    let mut head_ref_name: Option<String> = None;
-    let mut base_ref_oid: Option<String> = None;
-    let mut base_ref_name: Option<String> = None;
-    let mut repository_full_name: Option<String> = None;
-    let mut viewer_can_update = false;
+/// Return value for one page step: `None` = done, `Some(cursor)` = continue.
+enum PageStep {
+    Done,
+    Partial,
+    Continue(String),
+}
+
+fn apply_rate_limit(
+    snapshot: &mut Option<ReviewsRateLimitSnapshot>,
+    rate: GraphqlRateLimitNode,
+) {
+    *snapshot = Some(ReviewsRateLimitSnapshot {
+        remaining: rate.remaining,
+        limit: rate.limit,
+        reset_at: rate.reset_at,
+        cost: Some(rate.cost),
+    });
+}
+
+fn process_files_page(
+    state: &mut FilesPageState,
+    files: &mut Vec<ReviewFile>,
+    data: GraphqlData,
+    pull_request_id: &str,
+    page_index: u32,
+    rate_limit_snapshot: &mut Option<ReviewsRateLimitSnapshot>,
+) -> Result<PageStep, ListError> {
+    if let Some(rate) = data.rate_limit {
+        apply_rate_limit(rate_limit_snapshot, rate);
+    }
+    let node = data
+        .node
+        .ok_or_else(|| ListError::NotFound(pull_request_id.to_string()))?;
+    state.merge_node(&node);
+    let Some(connection) = node.files else {
+        return Ok(PageStep::Done);
+    };
+    files.extend(connection.nodes.into_iter().map(file_node_to_review_file));
+    if !connection.page_info.has_next_page {
+        return Ok(PageStep::Done);
+    }
+    match connection.page_info.end_cursor {
+        None => Ok(PageStep::Partial),
+        Some(cursor) if page_index + 1 == FILES_PAGE_CAP => {
+            let _ = cursor;
+            Ok(PageStep::Partial)
+        }
+        Some(cursor) => Ok(PageStep::Continue(cursor)),
+    }
+}
+
+async fn fetch_files_paginated(
+    client: &Octocrab,
+    pull_request_id: String,
+    fetched_at: DateTime<Utc>,
+) -> Result<ReviewsFilesListResponse, ListError> {
+    let mut state = FilesPageState::new();
     let mut files: Vec<ReviewFile> = Vec::new();
     let mut cursor: Option<String> = None;
     let mut rate_limit_snapshot: Option<ReviewsRateLimitSnapshot> = None;
@@ -134,103 +189,114 @@ pub(crate) async fn fetch_files(
             .await
             .map_err(|err| ListError::Graphql(err.to_string()))?;
 
-        if let Some(rate) = data.rate_limit {
-            rate_limit_snapshot = Some(ReviewsRateLimitSnapshot {
-                remaining: rate.remaining,
-                limit: rate.limit,
-                reset_at: rate.reset_at,
-                cost: Some(rate.cost),
-            });
-        }
-
-        let node = data
-            .node
-            .ok_or_else(|| ListError::NotFound(pull_request_id.clone()))?;
-
-        if head_ref_oid.is_empty() {
-            head_ref_oid = node.head_ref_oid.clone().unwrap_or_default();
-        }
-        if number.is_none() {
-            number = node.number;
-        }
-        if head_ref_name.is_none() {
-            head_ref_name = node.head_ref_name.clone();
-        }
-        if base_ref_oid.is_none() {
-            base_ref_oid = node.base_ref_oid.clone();
-        }
-        if base_ref_name.is_none() {
-            base_ref_name = node.base_ref_name.clone();
-        }
-        if repository_full_name.is_none() {
-            repository_full_name = node
-                .repository
-                .as_ref()
-                .and_then(|r| r.name_with_owner.clone());
-        }
-        if let Some(can_update) = node.viewer_can_update {
-            viewer_can_update = can_update;
-        }
-
-        let Some(connection) = node.files else {
-            // PR exists but no `files` field (e.g. permission gated). Return
-            // what we have so far.
-            break;
-        };
-
-        for raw in connection.nodes {
-            files.push(ReviewFile {
-                language_hint: infer_language(&raw.path),
-                change_type: raw
-                    .change_type
-                    .as_deref()
-                    .map(ReviewFileChangeType::parse)
-                    .unwrap_or_default(),
-                viewer_viewed_state: raw
-                    .viewer_viewed_state
-                    .as_deref()
-                    .map(ReviewFileViewedState::parse)
-                    .unwrap_or_default(),
-                path: raw.path,
-                previous_path: None,
-                additions: raw.additions,
-                deletions: raw.deletions,
-                is_binary: false,
-                mode_change: None,
-            });
-        }
-
-        if !connection.page_info.has_next_page {
-            break;
-        }
-        cursor = connection.page_info.end_cursor;
-        if cursor.is_none() {
-            // GitHub said hasNextPage=true but didn't return a cursor. Treat
-            // as partial so the caller can surface a warning.
-            pagination_complete = false;
-            break;
-        }
-        // The cap is exclusive: if we've consumed the last allowed page and
-        // GitHub still has more, mark the response as partial.
-        if page_index + 1 == FILES_PAGE_CAP && connection.page_info.has_next_page {
-            pagination_complete = false;
+        match process_files_page(
+            &mut state,
+            &mut files,
+            data,
+            &pull_request_id,
+            page_index,
+            &mut rate_limit_snapshot,
+        )? {
+            PageStep::Done => break,
+            PageStep::Partial => {
+                pagination_complete = false;
+                break;
+            }
+            PageStep::Continue(next) => cursor = Some(next),
         }
     }
 
     Ok(ReviewsFilesListResponse {
         pull_request_id,
-        number,
-        head_ref_oid,
-        head_ref_name,
-        base_ref_oid,
-        base_ref_name,
-        repository_full_name,
-        viewer_can_mark_viewed: viewer_can_update,
+        number: state.number,
+        head_ref_oid: state.head_ref_oid,
+        head_ref_name: state.head_ref_name,
+        base_ref_oid: state.base_ref_oid,
+        base_ref_name: state.base_ref_name,
+        repository_full_name: state.repository_full_name,
+        viewer_can_mark_viewed: state.viewer_can_update,
         files,
         fetched_at: fetched_at.to_rfc3339(),
         pagination_complete,
         rate_limit_snapshot,
     })
+}
+
+struct FilesPageState {
+    head_ref_oid: String,
+    number: Option<u64>,
+    head_ref_name: Option<String>,
+    base_ref_oid: Option<String>,
+    base_ref_name: Option<String>,
+    repository_full_name: Option<String>,
+    viewer_can_update: bool,
+}
+
+impl FilesPageState {
+    fn new() -> Self {
+        Self {
+            head_ref_oid: String::new(),
+            number: None,
+            head_ref_name: None,
+            base_ref_oid: None,
+            base_ref_name: None,
+            repository_full_name: None,
+            viewer_can_update: false,
+        }
+    }
+
+    fn merge_node(&mut self, node: &PullRequestNode) {
+        merge_option_first_wins(&mut self.head_ref_name, node.head_ref_name.as_ref());
+        merge_option_first_wins(&mut self.base_ref_oid, node.base_ref_oid.as_ref());
+        merge_option_first_wins(&mut self.base_ref_name, node.base_ref_name.as_ref());
+        merge_scalar_fields(self, node);
+    }
+}
+
+fn merge_option_first_wins(target: &mut Option<String>, source: Option<&String>) {
+    if target.is_none() {
+        *target = source.cloned();
+    }
+}
+
+fn merge_scalar_fields(state: &mut FilesPageState, node: &PullRequestNode) {
+    if state.head_ref_oid.is_empty() {
+        state.head_ref_oid = node.head_ref_oid.clone().unwrap_or_default();
+    }
+    if state.number.is_none() {
+        state.number = node.number;
+    }
+    if state.repository_full_name.is_none() {
+        state.repository_full_name = node
+            .repository
+            .as_ref()
+            .and_then(|r| r.name_with_owner.clone());
+    }
+    if let Some(can_update) = node.viewer_can_update {
+        state.viewer_can_update = can_update;
+    }
+}
+
+fn file_node_to_review_file(raw: FileNode) -> ReviewFile {
+    ReviewFile {
+        language_hint: infer_language(&raw.path),
+        change_type: raw
+            .change_type
+            .as_deref()
+            .map(ReviewFileChangeType::parse)
+            .unwrap_or_default(),
+        viewer_viewed_state: raw
+            .viewer_viewed_state
+            .as_deref()
+            .map(ReviewFileViewedState::parse)
+            .unwrap_or_default(),
+        path: raw.path,
+        previous_path: None,
+        additions: raw.additions,
+        deletions: raw.deletions,
+        is_binary: false,
+        mode_change: None,
+    }
 }
 
 /// Error variants surfaced from the list call. Wrapped into the caller's
@@ -242,8 +308,8 @@ pub(crate) enum ListError {
     NotFound(String),
 }
 
-impl std::fmt::Display for ListError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl fmt::Display for ListError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::InvalidRequest(msg) => write!(f, "{msg}"),
             Self::Graphql(msg) => write!(f, "reviews files list graphql: {msg}"),
@@ -255,4 +321,4 @@ impl std::fmt::Display for ListError {
     }
 }
 
-impl std::error::Error for ListError {}
+impl Error for ListError {}

@@ -35,7 +35,7 @@ pub(crate) const DEFAULT_RESERVE_FLOOR: u32 = 200;
 /// Synthetic cooldown applied when the reserve floor blocks an acquire. We
 /// don't know exactly when GitHub will reset (the state may be stale) so this
 /// is a conservative back-off used when no `reset_at` is available.
-pub(crate) const FALLBACK_RESERVE_COOLDOWN: Duration = Duration::from_secs(60);
+pub(crate) const FALLBACK_RESERVE_COOLDOWN: Duration = Duration::from_mins(1);
 
 /// GitHub's discrete rate-limit resources. Each has an independent budget.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -144,7 +144,7 @@ impl GithubRateBudget {
         let used =
             parse_u32(headers, "x-ratelimit-used").unwrap_or(limit.saturating_sub(remaining));
         let reset_at = parse_unix_seconds(headers, "x-ratelimit-reset")
-            .unwrap_or_else(|| SystemTime::now() + Duration::from_secs(60));
+            .unwrap_or_else(|| SystemTime::now() + Duration::from_mins(1));
 
         let state = RateLimitState {
             remaining,
@@ -162,7 +162,7 @@ impl GithubRateBudget {
         resource: RateLimitResource,
         retry_after: Option<Duration>,
     ) {
-        let until = Instant::now() + retry_after.unwrap_or(Duration::from_secs(60));
+        let until = Instant::now() + retry_after.unwrap_or(Duration::from_mins(1));
         self.cooling.write().await.insert(
             resource,
             CoolingState {

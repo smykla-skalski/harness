@@ -14,7 +14,7 @@
 
 use serde::{Deserialize, Serialize};
 
-/// User-facing toggle in Settings. Picked from the SwiftUI Picker;
+/// User-facing toggle in Settings. Picked from the `SwiftUI` Picker;
 /// serialized through to the daemon on each request.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "snake_case")]

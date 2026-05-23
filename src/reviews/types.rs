@@ -80,6 +80,17 @@ pub struct ReviewsSummary {
     pub blocked: usize,
 }
 
+/// Per-PR state flags bundled into at most 3 booleans.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
+pub struct ReviewItemFlags {
+    #[serde(default)]
+    pub is_draft: bool,
+    #[serde(default)]
+    pub policy_blocked: bool,
+    #[serde(default = "default_viewer_can_update")]
+    pub viewer_can_update: bool,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ReviewItem {
     pub pull_request_id: String,
@@ -93,8 +104,10 @@ pub struct ReviewItem {
     pub mergeable: ReviewMergeableState,
     pub review_status: ReviewReviewStatus,
     pub check_status: ReviewCheckStatus,
-    pub policy_blocked: bool,
-    pub is_draft: bool,
+    #[serde(flatten)]
+    pub flags: ReviewItemFlags,
+    #[serde(default = "default_viewer_can_merge_as_admin")]
+    pub viewer_can_merge_as_admin: bool,
     pub head_sha: String,
     #[serde(default)]
     pub labels: Vec<String>,
@@ -108,10 +121,6 @@ pub struct ReviewItem {
     pub updated_at: DateTime<Utc>,
     #[serde(default)]
     pub required_failed_check_names: Vec<String>,
-    #[serde(default = "default_viewer_can_update")]
-    pub viewer_can_update: bool,
-    #[serde(default = "default_viewer_can_merge_as_admin")]
-    pub viewer_can_merge_as_admin: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -167,15 +176,22 @@ pub struct ReviewsCommentRequest {
     pub body: String,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct ReviewsCapabilitiesResponse {
-    pub schema_version: u32,
+/// Action-related feature flags for [`ReviewsCapabilitiesResponse`].
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
+pub struct ReviewsActionCapabilities {
     #[serde(default)]
     pub supports_action_preview: bool,
     #[serde(default)]
     pub supports_check_run_links: bool,
     #[serde(default)]
     pub supports_repository_sync_health: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ReviewsCapabilitiesResponse {
+    pub schema_version: u32,
+    #[serde(flatten)]
+    pub features: ReviewsActionCapabilities,
     #[serde(default)]
     pub supports_persistent_action_diagnostics: bool,
 }
@@ -258,6 +274,17 @@ pub struct ReviewsBodyResponse {
     pub from_cache: bool,
 }
 
+/// State flags embedded in [`ReviewTarget`] (at most 3 booleans).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
+pub struct ReviewTargetFlags {
+    #[serde(default)]
+    pub is_draft: bool,
+    #[serde(default)]
+    pub policy_blocked: bool,
+    #[serde(default = "default_viewer_can_update")]
+    pub viewer_can_update: bool,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ReviewTarget {
     pub pull_request_id: String,
@@ -267,21 +294,18 @@ pub struct ReviewTarget {
     pub url: String,
     #[serde(default = "default_pull_request_state")]
     pub state: ReviewPullRequestState,
-    #[serde(default)]
-    pub is_draft: bool,
     pub head_sha: String,
     pub mergeable: ReviewMergeableState,
     pub review_status: ReviewReviewStatus,
     pub check_status: ReviewCheckStatus,
-    pub policy_blocked: bool,
-    #[serde(default)]
-    pub required_failed_check_names: Vec<String>,
+    #[serde(flatten)]
+    pub flags: ReviewTargetFlags,
     #[serde(default = "default_viewer_can_merge_as_admin")]
     pub viewer_can_merge_as_admin: bool,
     #[serde(default)]
+    pub required_failed_check_names: Vec<String>,
+    #[serde(default)]
     pub check_suite_ids: Vec<String>,
-    #[serde(default = "default_viewer_can_update")]
-    pub viewer_can_update: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]

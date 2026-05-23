@@ -9,7 +9,7 @@ use serde_json::Value;
 
 use super::types::ReviewTimelineEntry;
 
-fn typename<'a>(node: &'a Value) -> Option<&'a str> {
+fn typename(node: &Value) -> Option<&str> {
     node.get("__typename").and_then(Value::as_str)
 }
 

@@ -1,7 +1,12 @@
+use base64::Engine as _;
+use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
 use chrono::{DateTime, Utc};
 use serde_json::json;
 
+use crate::daemon::service::BlobTextProjection;
 use crate::errors::{CliError, CliErrorKind};
+use crate::reviews::files::blob::blob_exceeds_cap;
+use crate::reviews::files::patch_rest::split_repo_full_name;
 
 use super::client::{ReviewsGitHubClient, normalize_git_blob_base64};
 use super::errors::operation_error;
@@ -50,16 +55,15 @@ impl ReviewsGitHubClient {
     }
 
     /// Fetch the text payload of one blob via GraphQL. Returns
-    /// `(content_base64, byte_size, is_truncated, is_too_large)`. Binary
-    /// blobs return empty content (`text == null` on the GraphQL side);
+    /// `(content_base64, byte_size, is_truncated, is_too_large)`. Binary blobs
+    /// return empty content (`text == null` on the GraphQL side);
     /// callers should fall through to a REST raw-bytes fetch when the
-    /// byte_size is non-zero but the content is empty.
+    /// `byte_size` is non-zero but the content is empty.
     pub(crate) async fn fetch_repository_blob_text(
         &self,
         repository_id: &str,
         oid: &str,
-    ) -> Result<crate::daemon::service::BlobTextProjection, CliError> {
-        use base64::Engine as _;
+    ) -> Result<BlobTextProjection, CliError> {
         #[derive(Debug, serde::Deserialize)]
         struct RepositoryBlobResponse {
             node: Option<RepositoryBlobNode>,
@@ -100,15 +104,15 @@ impl ReviewsGitHubClient {
             ))
         })?;
         let byte_size = blob.byte_size.unwrap_or_default();
-        let is_too_large = crate::reviews::files::blob::blob_exceeds_cap(byte_size);
+        let is_too_large = blob_exceeds_cap(byte_size);
         let content_base64 = blob
             .text
             .as_deref()
             .filter(|_| !is_too_large)
-            .map(|text| base64::engine::general_purpose::STANDARD.encode(text.as_bytes()))
+            .map(|text| BASE64_STANDARD.encode(text.as_bytes()))
             .unwrap_or_default();
         let is_truncated = blob.is_truncated.unwrap_or_default();
-        Ok(crate::daemon::service::BlobTextProjection {
+        Ok(BlobTextProjection {
             repository_full_name,
             content_base64,
             byte_size,
@@ -124,7 +128,7 @@ impl ReviewsGitHubClient {
         &self,
         repo_full_name: &str,
         oid: &str,
-    ) -> Result<crate::daemon::service::BlobTextProjection, CliError> {
+    ) -> Result<BlobTextProjection, CliError> {
         #[derive(Debug, serde::Deserialize)]
         struct GitBlobResponse {
             content: String,
@@ -133,7 +137,7 @@ impl ReviewsGitHubClient {
         }
 
         let (owner, repo) =
-            crate::reviews::files::patch_rest::split_repo_full_name(repo_full_name)
+            split_repo_full_name(repo_full_name)
                 .ok_or_else(|| {
                     CliErrorKind::workflow_parse(format!(
                         "reviews blob: repository '{repo_full_name}' is not owner/name"
@@ -152,13 +156,13 @@ impl ReviewsGitHubClient {
             ))
             .into());
         }
-        let is_too_large = crate::reviews::files::blob::blob_exceeds_cap(blob.size);
+        let is_too_large = blob_exceeds_cap(blob.size);
         let content_base64 = if is_too_large {
             String::new()
         } else {
             normalize_git_blob_base64(&blob.content)
         };
-        Ok(crate::daemon::service::BlobTextProjection {
+        Ok(BlobTextProjection {
             repository_full_name: Some(repo_full_name.to_string()),
             content_base64,
             byte_size: blob.size,

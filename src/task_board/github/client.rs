@@ -7,7 +7,7 @@ use octocrab::models;
 use octocrab::params;
 
 const GITHUB_HTTP_CONNECT_TIMEOUT: Duration = Duration::from_secs(30);
-const GITHUB_HTTP_READ_TIMEOUT: Duration = Duration::from_secs(60);
+const GITHUB_HTTP_READ_TIMEOUT: Duration = Duration::from_mins(1);
 use rustls::crypto::ring::default_provider;
 use serde::{Deserialize, Serialize};
 

@@ -11,6 +11,8 @@
 //! shape: `diff --git`, `rename` headers, `--- / +++` markers, binary
 //! markers, and hunk bodies.
 
+use std::mem;
+
 use super::{
     ReviewFileChangeType, ReviewFilePatch, ReviewFileServedBy,
 };
@@ -29,29 +31,9 @@ pub fn parse_git_diff(raw: &str) -> Vec<ReviewFilePatch> {
 
     for line in raw.split_inclusive('\n') {
         if let Some(header) = line.strip_prefix("diff --git ") {
-            // Flush the previous file into the output list.
-            if let Some(mut patch) = current.take() {
-                patch.patch = std::mem::take(&mut current_body);
-                out.push(patch);
-            }
+            flush_current_patch(&mut current, &mut current_body, &mut out);
             in_hunk = false;
-            let trimmed = header.trim_end_matches('\n');
-            let path = parse_diff_git_header(trimmed).unwrap_or_else(|| "<unknown>".to_string());
-            current = Some(ReviewFilePatch {
-                path,
-                patch: String::new(),
-                status: ReviewFileChangeType::Modified,
-                additions: 0,
-                deletions: 0,
-                truncated: false,
-                etag: None,
-                served_by: ReviewFileServedBy::LocalClone,
-                fetched_at: String::new(),
-                head_ref_oid: String::new(),
-            });
-            // Keep the diff header in the patch body so consumers can show
-            // the full unified diff including the `diff --git` line.
-            current_body.push_str(line);
+            start_new_patch(header, line, &mut current, &mut current_body);
             continue;
         }
 
@@ -59,52 +41,100 @@ pub fn parse_git_diff(raw: &str) -> Vec<ReviewFilePatch> {
             continue;
         };
 
-        if line.starts_with("Binary files ") {
-            patch.status = ReviewFileChangeType::Modified;
-            current_body.push_str(line);
-            continue;
-        }
-        if line.starts_with("new file mode ") {
-            patch.status = ReviewFileChangeType::Added;
-            current_body.push_str(line);
-            continue;
-        }
-        if line.starts_with("deleted file mode ") {
-            patch.status = ReviewFileChangeType::Deleted;
-            current_body.push_str(line);
-            continue;
-        }
-        if line.starts_with("rename from ") || line.starts_with("rename to ") {
-            patch.status = ReviewFileChangeType::Renamed;
-            current_body.push_str(line);
-            continue;
-        }
-        if line.starts_with("copy from ") || line.starts_with("copy to ") {
-            patch.status = ReviewFileChangeType::Copied;
-            current_body.push_str(line);
-            continue;
-        }
-        if line.starts_with("@@ ") {
-            in_hunk = true;
-            current_body.push_str(line);
-            continue;
-        }
-        if in_hunk {
-            if let Some(first) = line.chars().next() {
-                match first {
-                    '+' if !line.starts_with("+++") => patch.additions += 1,
-                    '-' if !line.starts_with("---") => patch.deletions += 1,
-                    _ => {}
-                }
-            }
-        }
-        current_body.push_str(line);
+        process_diff_line(line, patch, &mut current_body, &mut in_hunk);
     }
     if let Some(mut patch) = current.take() {
         patch.patch = current_body;
         out.push(patch);
     }
     out
+}
+
+fn flush_current_patch(
+    current: &mut Option<ReviewFilePatch>,
+    current_body: &mut String,
+    out: &mut Vec<ReviewFilePatch>,
+) {
+    if let Some(mut patch) = current.take() {
+        patch.patch = mem::take(current_body);
+        out.push(patch);
+    }
+}
+
+fn start_new_patch(
+    header: &str,
+    line: &str,
+    current: &mut Option<ReviewFilePatch>,
+    current_body: &mut String,
+) {
+    let trimmed = header.trim_end_matches('\n');
+    let path = parse_diff_git_header(trimmed).unwrap_or_else(|| "<unknown>".to_string());
+    *current = Some(ReviewFilePatch {
+        path,
+        patch: String::new(),
+        status: ReviewFileChangeType::Modified,
+        additions: 0,
+        deletions: 0,
+        truncated: false,
+        etag: None,
+        served_by: ReviewFileServedBy::LocalClone,
+        fetched_at: String::new(),
+        head_ref_oid: String::new(),
+    });
+    // Keep the diff header in the patch body so consumers can show
+    // the full unified diff including the `diff --git` line.
+    current_body.push_str(line);
+}
+
+fn detect_status_prefix(line: &str) -> Option<ReviewFileChangeType> {
+    if line.starts_with("Binary files ") {
+        return Some(ReviewFileChangeType::Modified);
+    }
+    if line.starts_with("new file mode ") {
+        return Some(ReviewFileChangeType::Added);
+    }
+    if line.starts_with("deleted file mode ") {
+        return Some(ReviewFileChangeType::Deleted);
+    }
+    if line.starts_with("rename from ") || line.starts_with("rename to ") {
+        return Some(ReviewFileChangeType::Renamed);
+    }
+    if line.starts_with("copy from ") || line.starts_with("copy to ") {
+        return Some(ReviewFileChangeType::Copied);
+    }
+    None
+}
+
+fn update_hunk_counts(patch: &mut ReviewFilePatch, line: &str) {
+    if let Some(first) = line.chars().next() {
+        match first {
+            '+' if !line.starts_with("+++") => patch.additions += 1,
+            '-' if !line.starts_with("---") => patch.deletions += 1,
+            _ => {}
+        }
+    }
+}
+
+fn process_diff_line(
+    line: &str,
+    patch: &mut ReviewFilePatch,
+    current_body: &mut String,
+    in_hunk: &mut bool,
+) {
+    if let Some(status) = detect_status_prefix(line) {
+        patch.status = status;
+        current_body.push_str(line);
+        return;
+    }
+    if line.starts_with("@@ ") {
+        *in_hunk = true;
+        current_body.push_str(line);
+        return;
+    }
+    if *in_hunk {
+        update_hunk_counts(patch, line);
+    }
+    current_body.push_str(line);
 }
 
 /// Given a `diff --git a/<path> b/<path>` header line (without the leading

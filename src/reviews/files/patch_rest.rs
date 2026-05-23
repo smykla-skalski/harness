@@ -3,7 +3,7 @@
 //! GitHub's REST endpoint `GET /repos/{owner}/{repo}/pulls/{n}/files` returns
 //! up to 30 files per page with a per-file `patch` string (possibly
 //! truncated at ~3000 lines). We page until `Link: rel="next"` is exhausted
-//! or `FILES_PAGE_CAP` pages have been visited. ETag support: callers pass
+//! or `FILES_PAGE_CAP` pages have been visited. `ETag` support: callers pass
 //! `If-None-Match: <etag>` per cached file; a 304 response is treated as
 //! "still valid".
 //!

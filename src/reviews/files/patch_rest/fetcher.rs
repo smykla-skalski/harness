@@ -1,10 +1,15 @@
 //! REST-path patch fetcher. Pages until `Link: rel="next"` is exhausted or
 //! `FILES_PAGE_CAP` pages have been visited. Supports `If-None-Match`
-//! conditional revalidation so callers can short-circuit on cached ETags.
+//! conditional revalidation so callers can short-circuit on cached `ETags`.
+
+use std::error::Error;
+use std::fmt;
 
 use axum::http;
+use http::header::{ETAG, IF_NONE_MATCH, HeaderMap};
 use http_body_util::BodyExt;
 use octocrab::Octocrab;
+use octocrab::models::repos::DiffEntry;
 
 use super::parsing::{
     diff_entry_to_rest_file, parse_next_link, select_patches_by_path,
@@ -17,7 +22,7 @@ use crate::reviews::files::{ReviewFilePatch, FILES_PAGE_CAP};
 /// current resource — caller should reuse its cached entries.
 #[derive(Debug)]
 pub enum ConditionalFetchOutcome {
-    /// First-page ETag (when present) and the parsed patches.
+    /// First-page `ETag` (when present) and the parsed patches.
     Fetched {
         etag: Option<String>,
         patches: Vec<ReviewFilePatch>,
@@ -33,7 +38,7 @@ pub enum ConditionalFetchOutcome {
 /// `ETag` response header is surfaced on the [`ConditionalFetchOutcome`] so
 /// the caller can persist it for the next conditional revalidation.
 ///
-/// `if_none_match` is the prior ETag, if any. When set and the server
+/// `if_none_match` is the prior `ETag`, if any. When set and the server
 /// returns `304 Not Modified`, the outcome is [`ConditionalFetchOutcome::NotModified`]
 /// with no body fetched. Without an etag the first call is unconditional.
 ///
@@ -52,12 +57,12 @@ pub async fn fetch_patches_conditional(
         .ok_or_else(|| RestFetchError::InvalidRequest("repo_full_name must be owner/name".into()))?;
     let route = format!("/repos/{owner}/{repo}/pulls/{pr_number}/files");
 
-    let mut request_headers = http::header::HeaderMap::new();
+    let mut request_headers = HeaderMap::new();
     if let Some(etag) = if_none_match
         && !etag.is_empty()
     {
         request_headers.insert(
-            http::header::IF_NONE_MATCH,
+            IF_NONE_MATCH,
             http::HeaderValue::from_str(etag)
                 .map_err(|e| RestFetchError::InvalidRequest(format!("etag header value: {e}")))?,
         );
@@ -83,7 +88,7 @@ pub async fn fetch_patches_conditional(
 
     let etag = response
         .headers()
-        .get(http::header::ETAG)
+        .get(ETAG)
         .and_then(|v| v.to_str().ok())
         .map(ToString::to_string);
     let next_link = response
@@ -98,14 +103,30 @@ pub async fn fetch_patches_conditional(
         .await
         .map_err(|e| RestFetchError::Http(format!("rest patches body: {e}")))?
         .to_bytes();
-    let first_page: Vec<octocrab::models::repos::DiffEntry> =
+    let first_page: Vec<DiffEntry> =
         serde_json::from_slice(&bytes).map_err(|e| RestFetchError::Http(e.to_string()))?;
 
-    let mut all_entries: Vec<octocrab::models::repos::DiffEntry> = first_page;
+    let all_entries = fetch_remaining_pages(client, first_page, next_link).await?;
+
+    let rest_files: Vec<RestPullFile> = all_entries.iter().map(diff_entry_to_rest_file).collect();
+    let mut patches = select_patches_by_path(&rest_files, requested_paths);
+    let head = head_ref_oid.to_string();
+    for patch in &mut patches {
+        patch.head_ref_oid.clone_from(&head);
+        patch.etag.clone_from(&etag);
+    }
+    Ok(ConditionalFetchOutcome::Fetched { etag, patches })
+}
+
+async fn fetch_remaining_pages(
+    client: &Octocrab,
+    first_page: Vec<DiffEntry>,
+    next_link: Option<String>,
+) -> Result<Vec<DiffEntry>, RestFetchError> {
+    let mut all_entries = first_page;
     let mut next_uri = next_link;
     let mut visited_pages = 1_u32;
-    let cap = FILES_PAGE_CAP;
-    while visited_pages < cap
+    while visited_pages < FILES_PAGE_CAP
         && let Some(uri_str) = next_uri.take()
     {
         let uri = uri_str
@@ -132,25 +153,17 @@ pub async fn fetch_patches_conditional(
             .await
             .map_err(|e| RestFetchError::Http(format!("paginated body: {e}")))?
             .to_bytes();
-        let page: Vec<octocrab::models::repos::DiffEntry> =
+        let page: Vec<DiffEntry> =
             serde_json::from_slice(&bytes).map_err(|e| RestFetchError::Http(e.to_string()))?;
         all_entries.extend(page);
         visited_pages += 1;
     }
-
-    let rest_files: Vec<RestPullFile> = all_entries.iter().map(diff_entry_to_rest_file).collect();
-    let mut patches = select_patches_by_path(&rest_files, requested_paths);
-    let head = head_ref_oid.to_string();
-    for patch in &mut patches {
-        patch.head_ref_oid = head.clone();
-        patch.etag = etag.clone();
-    }
-    Ok(ConditionalFetchOutcome::Fetched { etag, patches })
+    Ok(all_entries)
 }
 
 /// Unconditional variant of [`fetch_patches_conditional`]. Returns just the
-/// patches; the response ETag (if any) is dropped. Kept for back-compat with
-/// callers that don't yet persist ETags.
+/// patches; the response `ETag` (if any) is dropped. Kept for back-compat with
+/// callers that don't yet persist `ETags`.
 ///
 /// # Errors
 /// Returns `RestFetchError` on network / auth failures.
@@ -184,8 +197,8 @@ pub enum RestFetchError {
     Http(String),
 }
 
-impl std::fmt::Display for RestFetchError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl fmt::Display for RestFetchError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::InvalidRequest(msg) => write!(f, "rest patch fetch: {msg}"),
             Self::Http(msg) => write!(f, "rest patch fetch http: {msg}"),
@@ -193,4 +206,4 @@ impl std::fmt::Display for RestFetchError {
     }
 }
 
-impl std::error::Error for RestFetchError {}
+impl Error for RestFetchError {}

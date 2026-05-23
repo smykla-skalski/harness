@@ -124,8 +124,31 @@ pub(crate) async fn fetch_timeline_page<C: TimelineClient>(
         .cloned()
         .unwrap_or_default();
 
+    let entries = map_timeline_nodes(&nodes, client).await?;
+
+    let response = ReviewsTimelineResponse {
+        pull_request_id: request.pull_request_id.clone(),
+        entries,
+        page_info: TimelinePageInfo {
+            start_cursor,
+            end_cursor,
+            has_older,
+            has_newer,
+        },
+        viewer_can_comment,
+        fetched_at: Utc::now(),
+    };
+
+    cache::store(key, response.clone(), now);
+    Ok(response)
+}
+
+async fn map_timeline_nodes<C: TimelineClient>(
+    nodes: &[Value],
+    client: &C,
+) -> Result<Vec<ReviewTimelineEntry>, TimelineError> {
     let mut entries: Vec<ReviewTimelineEntry> = Vec::with_capacity(nodes.len());
-    for node in &nodes {
+    for node in nodes {
         let typename = node
             .get("__typename")
             .and_then(Value::as_str)
@@ -152,22 +175,7 @@ pub(crate) async fn fetch_timeline_page<C: TimelineClient>(
             }
         }
     }
-
-    let response = ReviewsTimelineResponse {
-        pull_request_id: request.pull_request_id.clone(),
-        entries,
-        page_info: TimelinePageInfo {
-            start_cursor,
-            end_cursor,
-            has_older,
-            has_newer,
-        },
-        viewer_can_comment,
-        fetched_at: Utc::now(),
-    };
-
-    cache::store(key, response.clone(), now);
-    Ok(response)
+    Ok(entries)
 }
 
 fn push_with_review_truncation(

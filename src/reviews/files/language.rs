@@ -35,8 +35,7 @@ pub fn infer_language(path: &str) -> HarnessCodeLanguage {
     // Filename-based matches first (Dockerfile, Makefile etc.).
     if let Some(name) = lower.rsplit('/').next() {
         match name {
-            "dockerfile" | "containerfile" => return HarnessCodeLanguage::Generic,
-            "makefile" => return HarnessCodeLanguage::Generic,
+            "dockerfile" | "containerfile" | "makefile" => return HarnessCodeLanguage::Generic,
             "package.json" | "package-lock.json" | "tsconfig.json" => {
                 return HarnessCodeLanguage::Json;
             }

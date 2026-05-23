@@ -18,8 +18,12 @@ fn sample_item(
         mergeable,
         review_status,
         check_status,
-        policy_blocked,
-        is_draft: false,
+        flags: ReviewItemFlags {
+            policy_blocked,
+            is_draft: false,
+            viewer_can_update: true,
+            viewer_can_merge_as_admin: false,
+        },
         head_sha: "abc123".into(),
         labels: Vec::new(),
         checks: Vec::new(),
@@ -33,8 +37,6 @@ fn sample_item(
             .expect("date")
             .with_timezone(&Utc),
         required_failed_check_names: Vec::new(),
-        viewer_can_update: true,
-        viewer_can_merge_as_admin: false,
     }
 }
 
@@ -121,16 +123,18 @@ fn comment_request_rejects_empty_body() {
             number: 1,
             url: "https://example.com".into(),
             state: ReviewPullRequestState::Open,
-            is_draft: false,
             head_sha: "abc".into(),
             mergeable: ReviewMergeableState::Mergeable,
             review_status: ReviewReviewStatus::None,
             check_status: ReviewCheckStatus::None,
-            policy_blocked: false,
+            flags: ReviewTargetFlags {
+                is_draft: false,
+                policy_blocked: false,
+                viewer_can_merge_as_admin: false,
+                viewer_can_update: true,
+            },
             required_failed_check_names: Vec::new(),
-            viewer_can_merge_as_admin: false,
             check_suite_ids: Vec::new(),
-            viewer_can_update: true,
         }],
         body: "   ".into(),
     };
@@ -156,16 +160,18 @@ fn comment_request_accepts_well_formed_payload() {
             number: 1,
             url: "https://example.com".into(),
             state: ReviewPullRequestState::Open,
-            is_draft: false,
             head_sha: "abc".into(),
             mergeable: ReviewMergeableState::Mergeable,
             review_status: ReviewReviewStatus::None,
             check_status: ReviewCheckStatus::None,
-            policy_blocked: false,
+            flags: ReviewTargetFlags {
+                is_draft: false,
+                policy_blocked: false,
+                viewer_can_merge_as_admin: false,
+                viewer_can_update: true,
+            },
             required_failed_check_names: Vec::new(),
-            viewer_can_merge_as_admin: false,
             check_suite_ids: Vec::new(),
-            viewer_can_update: true,
         }],
         body: "@renovatebot rebase".into(),
     };
@@ -187,9 +193,9 @@ fn current_capabilities_advertise_action_preview_schema() {
     let capabilities = ReviewsCapabilitiesResponse::current();
 
     assert_eq!(capabilities.schema_version, 1);
-    assert!(capabilities.supports_action_preview);
-    assert!(capabilities.supports_check_run_links);
-    assert!(capabilities.supports_repository_sync_health);
+    assert!(capabilities.features.supports_action_preview);
+    assert!(capabilities.features.supports_check_run_links);
+    assert!(capabilities.features.supports_repository_sync_health);
     assert!(capabilities.supports_persistent_action_diagnostics);
 }
 
@@ -455,16 +461,18 @@ fn serialized_target_always_emits_check_suite_ids_array() {
         number: 1,
         url: "https://example.com".into(),
         state: ReviewPullRequestState::Open,
-        is_draft: false,
         head_sha: "abc".into(),
         mergeable: ReviewMergeableState::Mergeable,
         review_status: ReviewReviewStatus::None,
         check_status: ReviewCheckStatus::None,
-        policy_blocked: false,
+        flags: ReviewTargetFlags {
+            is_draft: false,
+            policy_blocked: false,
+            viewer_can_merge_as_admin: false,
+            viewer_can_update: true,
+        },
         required_failed_check_names: Vec::new(),
-        viewer_can_merge_as_admin: false,
         check_suite_ids: Vec::new(),
-        viewer_can_update: true,
     };
     let value = serde_json::to_value(&target).expect("serialize");
     let object = value.as_object().expect("target is an object");

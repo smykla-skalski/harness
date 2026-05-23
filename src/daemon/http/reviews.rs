@@ -17,6 +17,7 @@ use crate::daemon::protocol::{
     ReviewsReviewThreadResolveRequest, ReviewsTimelineRequest, http_paths,
 };
 use crate::daemon::service;
+use crate::reviews::LocalCloneListEntry;
 
 use super::DaemonHttpState;
 use super::auth::require_auth;
@@ -430,7 +431,7 @@ struct DeleteLocalClonePayload {
 
 #[derive(serde::Serialize)]
 struct DeleteLocalCloneResponseBody {
-    clones: Vec<crate::reviews::LocalCloneListEntry>,
+    clones: Vec<LocalCloneListEntry>,
 }
 
 async fn post_review_files_local_clones_delete(

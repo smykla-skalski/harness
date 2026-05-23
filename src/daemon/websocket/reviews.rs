@@ -36,7 +36,7 @@ pub(crate) async fn dispatch_reviews_method(
             Some(dispatch_reviews_query(request).await)
         }
         ws_methods::REVIEWS_ACTION_PREVIEW => {
-            Some(dispatch_reviews_action_preview(request).await)
+            Some(dispatch_reviews_action_preview(request))
         }
         ws_methods::REVIEWS_APPROVE => {
             Some(dispatch_reviews_approve(request).await)
@@ -113,7 +113,7 @@ async fn dispatch_reviews_files_local_clones_delete(request: &WsRequest) -> WsRe
     )
 }
 
-async fn dispatch_reviews_action_preview(request: &WsRequest) -> WsResponse {
+fn dispatch_reviews_action_preview(request: &WsRequest) -> WsResponse {
     let Ok(body) = parse_params::<ReviewsActionPreviewRequest>(request) else {
         return invalid_params(request);
     };

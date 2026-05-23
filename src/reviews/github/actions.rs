@@ -235,8 +235,8 @@ fn comment_action_result(
             let entry = value
                 .pointer("/addComment/commentEdge/node")
                 .and_then(timeline::map_timeline_node);
-            if let Some(entry) = entry.clone() {
-                timeline::append_timeline_entry_to_cache(&target.pull_request_id, entry);
+            if let Some(ref e) = entry {
+                timeline::append_timeline_entry_to_cache(&target.pull_request_id, e);
             }
             ReviewActionResult {
                 repository: target.repository.clone(),
