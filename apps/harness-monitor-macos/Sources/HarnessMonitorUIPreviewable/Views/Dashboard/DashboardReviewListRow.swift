@@ -20,6 +20,9 @@ struct DashboardReviewListRow: View {
   let actionTitle: String?
   let updatedLabel: String
 
+  @State private var isHovered: Bool = false
+  @FocusState private var isFocused: Bool
+
   var body: some View {
     HStack(alignment: .dashboardReviewTitleLineCenter, spacing: HarnessMonitorTheme.spacingSM) {
       leadingStatusIndicator
@@ -33,6 +36,7 @@ struct DashboardReviewListRow: View {
           .alignmentGuide(.dashboardReviewTitleLineCenter) { dimensions in
             dimensions[VerticalAlignment.center]
           }
+          .focused($isFocused)
 
         Text(secondaryText)
           .scaledFont(.caption)
@@ -53,7 +57,12 @@ struct DashboardReviewListRow: View {
       Divider()
         .accessibilityHidden(true)
     }
+    .background(isHovered ? HarnessMonitorTheme.ink.opacity(0.05) : Color.clear)
     .contentShape(Rectangle())
+    .scaleEffect(isFocused ? 0.995 : 1.0)
+    .onHover { hovering in
+      isHovered = hovering
+    }
     .accessibilityElement(children: .combine)
   }
 
