@@ -13,6 +13,11 @@ struct DashboardReviewDetailView<Actions: View>: View {
 
   @Environment(\.reviewsPreferences)
   private var reviewsPreferences
+  /// Per-PR escape hatch from the cloning empty-state. When the daemon
+  /// is taking a long time to clone, the user can dismiss the Files
+  /// section for this PR without touching the global Files-enabled
+  /// preference. Resets when the user navigates to a different PR.
+  @State private var filesHiddenForCurrentPR: Bool = false
 
   private var filesEnabled: Bool {
     reviewsPreferences.snapshot.filesEnabled
@@ -52,11 +57,12 @@ struct DashboardReviewDetailView<Actions: View>: View {
           )
         }
         .accessibilityIdentifier(HarnessMonitorAccessibility.dashboardReviewsDescription)
-        if filesEnabled {
+        if filesEnabled, !filesHiddenForCurrentPR {
           DashboardReviewDetailSection(title: "Files") {
             DashboardReviewFilesSection(
               pullRequestID: item.pullRequestID,
-              repositoryID: item.repositoryID
+              repositoryID: item.repositoryID,
+              onHideFilesForPR: { filesHiddenForCurrentPR = true }
             )
           }
         }
@@ -125,6 +131,9 @@ struct DashboardReviewDetailView<Actions: View>: View {
         item: item, isDaemonOnline: store.connectionState == .online)
     ) {
       await store.prepareReviewBody(for: item)
+    }
+    .onChange(of: item.id) { _, _ in
+      filesHiddenForCurrentPR = false
     }
     .environment(store)
   }
