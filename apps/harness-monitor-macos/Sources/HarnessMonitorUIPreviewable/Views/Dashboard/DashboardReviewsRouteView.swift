@@ -43,7 +43,7 @@ struct DashboardReviewsRouteView: View {
   @SceneStorage("dashboard.reviews.problem-checks-only")
   var showsProblemChecksOnly = false
 
-  @State var routeState: DashboardReviewsRouteViewState
+  @State private var routeState: DashboardReviewsRouteViewState
 
   init(
     store: HarnessMonitorStore,

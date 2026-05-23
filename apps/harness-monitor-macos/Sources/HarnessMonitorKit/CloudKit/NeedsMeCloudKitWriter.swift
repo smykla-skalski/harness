@@ -4,57 +4,58 @@ import os
 
 @MainActor
 public final class NeedsMeCloudKitWriter {
-    public static let shared = NeedsMeCloudKitWriter()
+  public static let shared = NeedsMeCloudKitWriter()
 
-    private let store: NeedsMeCloudKitStore
-    private let debounceInterval: Duration
-    private var lastWrittenCount: Int?
-    private var pendingTask: Task<Void, Never>?
-    private let logger = Logger(
-        subsystem: "io.harnessmonitor.kit",
-        category: "needsme-cloudkit-writer"
-    )
+  private let store: NeedsMeCloudKitStore
+  private let debounceInterval: Duration
+  private var lastWrittenCount: Int?
+  private var pendingTask: Task<Void, Never>?
+  private let logger = Logger(
+    subsystem: "io.harnessmonitor.kit",
+    category: "needsme-cloudkit-writer"
+  )
 
-    public init(
-        store: NeedsMeCloudKitStore = NeedsMeCloudKitStore(),
-        debounceInterval: Duration = .seconds(5)
-    ) {
-        self.store = store
-        self.debounceInterval = debounceInterval
+  public init(
+    store: NeedsMeCloudKitStore = NeedsMeCloudKitStore(),
+    debounceInterval: Duration = .seconds(5)
+  ) {
+    self.store = store
+    self.debounceInterval = debounceInterval
+  }
+
+  public func submit(count: Int) {
+    if lastWrittenCount == count {
+      return
     }
-
-    public func submit(count: Int) {
-        if lastWrittenCount == count {
-            return
-        }
-        pendingTask?.cancel()
-        let interval = debounceInterval
-        let pendingCount = count
-        pendingTask = Task { [weak self] in
-            do {
-                try await Task.sleep(for: interval)
-            } catch {
-                return
-            }
-            await self?.performWrite(count: pendingCount)
-        }
+    pendingTask?.cancel()
+    let interval = debounceInterval
+    let pendingCount = count
+    pendingTask = Task { [weak self] in
+      do {
+        try await Task.sleep(for: interval)
+      } catch {
+        return
+      }
+      await self?.performWrite(count: pendingCount)
     }
+  }
 
-    public func flush() async {
-        _ = await pendingTask?.value
-    }
+  public func flush() async {
+    _ = await pendingTask?.value
+  }
 
-    private func performWrite(count: Int) async {
-        do {
-            _ = try await store.upsert(count: Int64(count), updatedAt: Date())
-            lastWrittenCount = count
-            logger.info("Wrote needs-me count \(count, privacy: .public) to CloudKit")
-        } catch NeedsMeCloudKitError.notAuthenticated {
-            logger.info("Skipped CloudKit write (user not signed into iCloud)")
-        } catch let error as NeedsMeCloudKitError {
-            logger.warning("CloudKit upsert failed: \(String(describing: error), privacy: .public)")
-        } catch {
-            logger.warning("Unexpected CloudKit upsert failure: \(error.localizedDescription, privacy: .public)")
-        }
+  private func performWrite(count: Int) async {
+    do {
+      _ = try await store.upsert(count: Int64(count), updatedAt: Date())
+      lastWrittenCount = count
+      logger.info("Wrote needs-me count \(count, privacy: .public) to CloudKit")
+    } catch NeedsMeCloudKitError.notAuthenticated {
+      logger.info("Skipped CloudKit write (user not signed into iCloud)")
+    } catch let error as NeedsMeCloudKitError {
+      logger.warning("CloudKit upsert failed: \(String(describing: error), privacy: .public)")
+    } catch {
+      logger.warning(
+        "Unexpected CloudKit upsert failure: \(error.localizedDescription, privacy: .public)")
     }
+  }
 }
