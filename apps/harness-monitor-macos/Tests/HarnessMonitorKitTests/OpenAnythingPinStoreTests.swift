@@ -67,6 +67,7 @@ struct OpenAnythingPinStoreTests {
   }
 
   private static func ephemeralDefaults() -> UserDefaults {
-    UserDefaults(suiteName: "OpenAnythingPinStoreTests-\(UUID().uuidString)")!
+    UserDefaults(suiteName: "OpenAnythingPinStoreTests-\(UUID().uuidString)")
+      ?? UserDefaults.standard
   }
 }
