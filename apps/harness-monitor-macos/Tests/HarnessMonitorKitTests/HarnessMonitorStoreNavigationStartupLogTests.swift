@@ -33,6 +33,41 @@ struct HarnessMonitorStoreNavigationStartupLogTests {
     )
   }
 
+  @Test("Dashboard and scene focus publishers route through the deferred helper")
+  func dashboardAndSceneFocusPublishersUseDeferredHelper() throws {
+    let reviewsRouteSource = try previewableSourceFile(
+      named: "Views/Dashboard/DashboardReviewsRouteView.swift"
+    )
+    let reviewsSearchSource = try previewableSourceFile(
+      named: "Views/Dashboard/DashboardReviewsRouteView+ToolbarSearch.swift"
+    )
+    let policyCanvasSource = try previewableSourceFile(
+      named: "Views/PolicyCanvas/PolicyCanvasWorkspaceViews.swift"
+    )
+    let auditTimelineSource = try harnessSourceFile(
+      named: "App/HarnessMonitorAppSceneSupport+AuditTimeline.swift"
+    )
+
+    #expect(reviewsRouteSource.contains(".harnessFocusedSceneValue(\\.dashboardReviewsCommands"))
+    #expect(!reviewsRouteSource.contains(".focusedSceneValue(\\.dashboardReviewsCommands"))
+    #expect(
+      reviewsSearchSource.contains(
+        ".harnessFocusedSceneValue(\\.harnessSidebarSearchFocusAction"
+      )
+    )
+    #expect(
+      !reviewsSearchSource.contains(
+        ".focusedSceneValue(\\.harnessSidebarSearchFocusAction"
+      )
+    )
+    #expect(
+      policyCanvasSource.contains(".harnessFocusedSceneValue(\\.harnessPolicyCanvasZoomFocus")
+    )
+    #expect(!policyCanvasSource.contains(".focusedSceneValue(\\.harnessPolicyCanvasZoomFocus"))
+    #expect(auditTimelineSource.contains(".harnessFocusedSceneValue("))
+    #expect(!auditTimelineSource.contains(".focusedSceneValue("))
+  }
+
   @Test(
     "Startup with restoration bridge does not emit FocusedValue warnings",
     .disabled(
@@ -196,4 +231,34 @@ private struct LogStreamCapture {
   let process: Process
   let stdout: Pipe
   let stderr: Pipe
+}
+
+private func previewableSourceFile(named name: String) throws -> String {
+  try appSourceFile(
+    root: "Sources/HarnessMonitorUIPreviewable",
+    named: name
+  )
+}
+
+private func harnessSourceFile(named name: String) throws -> String {
+  try appSourceFile(
+    root: "Sources/HarnessMonitor",
+    named: name
+  )
+}
+
+private func appSourceFile(
+  root: String,
+  named name: String
+) throws -> String {
+  let testsDirectory = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
+  let appRoot =
+    testsDirectory
+    .deletingLastPathComponent()
+    .deletingLastPathComponent()
+  let sourceURL =
+    appRoot
+    .appendingPathComponent(root)
+    .appendingPathComponent(name)
+  return try String(contentsOf: sourceURL, encoding: .utf8)
 }
