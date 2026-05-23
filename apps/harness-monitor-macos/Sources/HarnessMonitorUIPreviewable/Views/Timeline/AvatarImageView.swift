@@ -1,8 +1,11 @@
+import AppKit
 import HarnessMonitorKit
 import SwiftUI
 
+typealias TimelineAvatarImageLoader = (String, URL?, CGFloat) async -> NSImage?
+
 /// SwiftUI view that resolves and displays a downsampled GitHub avatar
-/// for the given login through [`ReviewAvatarCache`].
+/// for the given login through the injected daemon-backed loader.
 ///
 /// Renders a circular avatar of `size × size` points; while the cache
 /// resolves the image, shows a neutral secondary-colored circle so the
@@ -13,11 +16,25 @@ import SwiftUI
 /// avatar gets requested without a stale flash.
 struct AvatarImageView: View {
   let login: String
+  let avatarURL: URL?
   let size: CGFloat
+  let loadImage: TimelineAvatarImageLoader?
 
   @State private var image: NSImage?
   @Environment(\.displayScale)
   private var displayScale
+
+  init(
+    login: String,
+    avatarURL: URL? = nil,
+    size: CGFloat,
+    loadImage: TimelineAvatarImageLoader? = nil
+  ) {
+    self.login = login
+    self.avatarURL = avatarURL
+    self.size = size
+    self.loadImage = loadImage
+  }
 
   var body: some View {
     Group {
@@ -33,20 +50,18 @@ struct AvatarImageView: View {
     .frame(width: size, height: size)
     .clipShape(Circle())
     .accessibilityLabel(Text("Avatar for \(login)"))
-    .task(id: login) {
+    .task(id: taskID) {
       let pixel = max(size * max(displayScale, 1), 32)
-      guard
-        let url = URL(string: "https://github.com/\(login).png?size=\(Int(pixel))")
-      else {
-        return
-      }
-      let resolved = await ReviewAvatarCache.shared.avatar(
-        for: url,
-        targetPixel: pixel
-      )
+      image = nil
+      guard let loadImage else { return }
+      let resolved = await loadImage(login, avatarURL, pixel)
       if !Task.isCancelled {
         image = resolved
       }
     }
+  }
+
+  private var taskID: String {
+    "\(login)|\(avatarURL?.absoluteString ?? "")"
   }
 }

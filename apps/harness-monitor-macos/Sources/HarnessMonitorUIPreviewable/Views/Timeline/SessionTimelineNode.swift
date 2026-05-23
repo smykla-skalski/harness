@@ -118,9 +118,13 @@ struct SessionTimelineNode: Identifiable, Equatable, Sendable {
   var indentLevel: Int = 0
   /// GitHub login of the row's actor, when one exists. Drives the
   /// gutter avatar slot (`AvatarImageView`) on rows that visualize a
-  /// user action. POD `String?` rather than `URL?` so Equatable stays
-  /// cheap and the avatar URL gets constructed lazily in the view.
+  /// user action.
   var actorLogin: String?
+  /// Exact avatar URL returned by GitHub for the row actor. Bot and
+  /// integration actors can resolve to avatar hosts that differ from
+  /// `github.com/<login>.png`, so review timelines preserve this when
+  /// the daemon supplies it.
+  var actorAvatarURL: URL?
 
   init(
     identity: Identity,

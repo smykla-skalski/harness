@@ -11,6 +11,7 @@ private struct ReviewTimelineBaseNodeDescriptor {
   let detail: String?
   let tone: SessionTimelineTone
   let actorLogin: String?
+  let actorAvatarURL: URL?
 }
 
 /// Off-main builder that converts the daemon's PR timeline entries
@@ -77,7 +78,8 @@ struct ReviewPullRequestTimelineNodeBuilder: Sendable {
           + " commented",
         detail: Self.compactBody(payload.body),
         tone: .info,
-        actorLogin: payload.actor?.login
+        actorLogin: payload.actor?.login,
+        actorAvatarURL: payload.actor?.avatarURL
       )
     )
     node.statusBadgeLabel = payload.isMinimized ? "Hidden" : nil
@@ -100,7 +102,8 @@ struct ReviewPullRequestTimelineNodeBuilder: Sendable {
         title: Self.reviewTitle(actor: payload.actor, state: payload.state),
         detail: Self.compactBody(payload.body ?? ""),
         tone: Self.reviewTone(payload.state),
-        actorLogin: payload.actor?.login
+        actorLogin: payload.actor?.login,
+        actorAvatarURL: payload.actor?.avatarURL
       )
     )
     parent.statusBadgeLabel = payload.commentsTruncated ? "Truncated" : nil
@@ -130,7 +133,8 @@ struct ReviewPullRequestTimelineNodeBuilder: Sendable {
         title: Self.actorTitle(payload.actor, fallback: "Reviewer") + " on \(payload.path)",
         detail: Self.compactBody(payload.body),
         tone: .info,
-        actorLogin: payload.actor?.login
+        actorLogin: payload.actor?.login,
+        actorAvatarURL: payload.actor?.avatarURL
       )
     )
     node.indentLevel = 1
@@ -162,7 +166,8 @@ struct ReviewPullRequestTimelineNodeBuilder: Sendable {
         title: "\(payload.path) · \(lineLabel)",
         detail: nil,
         tone: payload.isResolved ? .info : .info,
-        actorLogin: payload.actor?.login
+        actorLogin: payload.actor?.login,
+        actorAvatarURL: payload.actor?.avatarURL
       )
     )
     parent.statusBadgeLabel = payload.isResolved ? "Resolved" : nil
@@ -184,7 +189,8 @@ struct ReviewPullRequestTimelineNodeBuilder: Sendable {
           title: Self.actorTitle(comment.actor, fallback: "Reviewer"),
           detail: Self.compactBody(comment.body),
           tone: .info,
-          actorLogin: comment.actor?.login
+          actorLogin: comment.actor?.login,
+          actorAvatarURL: comment.actor?.avatarURL
         )
       )
       child.indentLevel = 1
@@ -208,7 +214,8 @@ struct ReviewPullRequestTimelineNodeBuilder: Sendable {
         title: "\(who) pushed \(payload.abbreviatedOid)",
         detail: Self.compactBody(payload.messageHeadline),
         tone: .info,
-        actorLogin: payload.authorLogin
+        actorLogin: payload.authorLogin,
+        actorAvatarURL: payload.actor?.avatarURL
       )
     )
     node.statusBadgeLabel = payload.abbreviatedOid
@@ -229,7 +236,8 @@ struct ReviewPullRequestTimelineNodeBuilder: Sendable {
         title: "\(Self.actorTitle(payload.actor, fallback: "Someone")) force-pushed \(branch)",
         detail: "\(payload.beforeAbbreviatedOid) → \(payload.afterAbbreviatedOid)",
         tone: .warning,
-        actorLogin: payload.actor?.login
+        actorLogin: payload.actor?.login,
+        actorAvatarURL: payload.actor?.avatarURL
       )
     )
     node.statusBadgeLabel = "Force push"
@@ -252,7 +260,8 @@ struct ReviewPullRequestTimelineNodeBuilder: Sendable {
         title: descriptor.title(actor: payload.actor),
         detail: descriptor.detail,
         tone: descriptor.tone,
-        actorLogin: payload.actor?.login
+        actorLogin: payload.actor?.login,
+        actorAvatarURL: payload.actor?.avatarURL
       )
     )
     if let badge = descriptor.statusBadge {
@@ -272,7 +281,8 @@ struct ReviewPullRequestTimelineNodeBuilder: Sendable {
         title: payload.typename,
         detail: payload.actor?.login,
         tone: .info,
-        actorLogin: payload.actor?.login
+        actorLogin: payload.actor?.login,
+        actorAvatarURL: payload.actor?.avatarURL
       )
     )
     node.statusBadgeLabel = "New event type"
@@ -297,6 +307,7 @@ struct ReviewPullRequestTimelineNodeBuilder: Sendable {
       decision: nil
     )
     node.actorLogin = descriptor.actorLogin
+    node.actorAvatarURL = descriptor.actorAvatarURL
     return node
   }
 

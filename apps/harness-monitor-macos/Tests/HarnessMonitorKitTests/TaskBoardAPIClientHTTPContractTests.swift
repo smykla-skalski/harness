@@ -208,6 +208,11 @@ extension TaskBoardAPIClientTests {
         body: "@renovatebot rebase"
       )
     )
+    let avatar = try await client.fetchReviewAvatar(
+      request: ReviewsAvatarRequest(
+        avatarURL: "https://avatars.githubusercontent.com/in/2740?v=4"
+      )
+    )
     let timeline = try await client.fetchReviewTimeline(
       request: ReviewsTimelineRequest(
         pullRequestId: target.pullRequestID,
@@ -231,6 +236,7 @@ extension TaskBoardAPIClientTests {
       cacheClear: cacheClear,
       refresh: refresh,
       comment: comment,
+      avatar: avatar,
       timeline: timeline
     )
   }

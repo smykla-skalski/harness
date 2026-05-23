@@ -8,7 +8,7 @@ use axum::{Json, Router};
 
 use crate::daemon::protocol::{
     ReviewsActionPreviewRequest, ReviewsApproveRequest,
-    ReviewsAutoRequest, ReviewsBodyRequest, ReviewsBodyUpdateRequest,
+    ReviewsAutoRequest, ReviewsAvatarRequest, ReviewsBodyRequest, ReviewsBodyUpdateRequest,
     ReviewsCommentRequest, ReviewsFilesBlobRequest,
     ReviewsFilesListRequest, ReviewsFilesPatchRequest,
     ReviewsFilesViewedRequest, ReviewsLabelRequest,
@@ -115,6 +115,10 @@ pub(super) fn reviews_routes() -> Router<DaemonHttpState> {
         .route(
             http_paths::REVIEWS_FILES_LOCAL_CLONES_DELETE,
             post(post_review_files_local_clones_delete),
+        )
+        .route(
+            http_paths::REVIEWS_AVATAR,
+            post(post_review_avatar),
         )
         .route(
             http_paths::REVIEWS_TIMELINE,
@@ -462,6 +466,22 @@ async fn post_review_timeline(
     timed_json(
         "POST",
         http_paths::REVIEWS_TIMELINE,
+        &request_id,
+        start,
+        result,
+    )
+}
+
+async fn post_review_avatar(
+    headers: HeaderMap,
+    State(state): State<DaemonHttpState>,
+    Json(request): Json<ReviewsAvatarRequest>,
+) -> Response {
+    let (start, request_id) = authenticated_request!(headers, state);
+    let result = service::fetch_review_avatar(&request).await;
+    timed_json(
+        "POST",
+        http_paths::REVIEWS_AVATAR,
         &request_id,
         start,
         result,

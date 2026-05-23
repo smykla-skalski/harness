@@ -1,7 +1,7 @@
 use crate::daemon::http::DaemonHttpState;
 use crate::daemon::protocol::{
     ReviewsActionPreviewRequest, ReviewsApproveRequest,
-    ReviewsAutoRequest, ReviewsBodyRequest, ReviewsBodyUpdateRequest,
+    ReviewsAutoRequest, ReviewsAvatarRequest, ReviewsBodyRequest, ReviewsBodyUpdateRequest,
     ReviewsCommentRequest, ReviewsFilesBlobRequest,
     ReviewsFilesListRequest, ReviewsFilesPatchRequest,
     ReviewsFilesViewedRequest, ReviewsLabelRequest,
@@ -87,6 +87,9 @@ pub(crate) async fn dispatch_reviews_method(
         )),
         ws_methods::REVIEWS_FILES_LOCAL_CLONES_DELETE => {
             Some(dispatch_reviews_files_local_clones_delete(request).await)
+        }
+        ws_methods::REVIEWS_AVATAR => {
+            Some(dispatch_reviews_avatar(request).await)
         }
         ws_methods::REVIEWS_TIMELINE => {
             Some(dispatch_reviews_timeline(request).await)
@@ -272,6 +275,13 @@ async fn dispatch_reviews_timeline(request: &WsRequest) -> WsResponse {
         &request.id,
         service::fetch_review_timeline(&body).await,
     )
+}
+
+async fn dispatch_reviews_avatar(request: &WsRequest) -> WsResponse {
+    let Ok(body) = parse_params::<ReviewsAvatarRequest>(request) else {
+        return invalid_params(request);
+    };
+    dispatch_query_result(&request.id, service::fetch_review_avatar(&body).await)
 }
 
 async fn dispatch_reviews_review_threads_resolve(request: &WsRequest) -> WsResponse {

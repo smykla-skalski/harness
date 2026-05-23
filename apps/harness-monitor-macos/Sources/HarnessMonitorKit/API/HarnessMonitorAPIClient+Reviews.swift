@@ -124,6 +124,12 @@ extension HarnessMonitorAPIClient {
     try await post("/v1/reviews/timeline", body: request)
   }
 
+  public func fetchReviewAvatar(
+    request: ReviewsAvatarRequest
+  ) async throws -> ReviewsAvatarResponse {
+    try await post("/v1/reviews/avatar", body: request)
+  }
+
   public func setReviewThreadResolved(
     request: ReviewsReviewThreadResolveRequest
   ) async throws -> ReviewsReviewThreadResolveResponse {

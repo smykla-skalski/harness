@@ -261,3 +261,13 @@ let sampleReviewsTimelineResponseText =
     "fetched_at": "2026-05-22T15:00:00Z"
   }
   """
+
+let sampleReviewsAvatarResponseText =
+  """
+  {
+    "avatar_url": "https://avatars.githubusercontent.com/in/2740?v=4",
+    "mime_type": "image/png",
+    "content_base64": "iVBORw0KGgo=",
+    "fetched_at": "2026-05-22T10:00:00Z"
+  }
+  """

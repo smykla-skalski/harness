@@ -116,6 +116,10 @@ extension SessionCacheService {
       for row in fileSummaries {
         context.delete(row)
       }
+      let avatars = try context.fetch(FetchDescriptor<CachedReviewAvatar>())
+      for row in avatars {
+        context.delete(row)
+      }
       try context.save()
       return true
     }

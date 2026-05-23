@@ -460,6 +460,12 @@ fn review_routes_have_complete_ws_parity() {
             ),
             (
                 HttpRouteMethod::Post,
+                http_paths::REVIEWS_AVATAR,
+                ws_methods::REVIEWS_AVATAR,
+                true,
+            ),
+            (
+                HttpRouteMethod::Post,
                 http_paths::REVIEWS_TIMELINE,
                 ws_methods::REVIEWS_TIMELINE,
                 true,

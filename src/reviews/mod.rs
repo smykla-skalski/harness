@@ -1,3 +1,4 @@
+mod avatar;
 mod body_update;
 mod enums;
 pub(crate) mod files;
@@ -8,6 +9,7 @@ pub(crate) mod timeline;
 mod types;
 mod validation;
 
+pub use avatar::{ReviewsAvatarRequest, ReviewsAvatarResponse, fetch_review_avatar};
 pub use body_update::{
     ReviewsBodyUpdateOutcome, ReviewsBodyUpdateRequest,
     ReviewsBodyUpdateResponse,

@@ -254,6 +254,7 @@ mod wake_route;
 
 pub use adopt::adopt_session_record;
 pub(crate) use adopt::adopt_session_record_async;
+pub use crate::reviews::fetch_review_avatar;
 pub use reviews::{
     add_label_to_reviews, approve_reviews, auto_reviews,
     catalog_review_repositories, clear_reviews_cache,

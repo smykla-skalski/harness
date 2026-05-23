@@ -19,6 +19,7 @@ pub use crate::reviews::timeline::{
     UnknownEntry as ReviewUnknownTimelineEntry,
 };
 pub use crate::reviews::{
+    ReviewsAvatarRequest, ReviewsAvatarResponse,
     ReviewActionKind, ReviewActionOutcome, ReviewActionPreviewKind,
     ReviewActionPreviewTarget, ReviewActionResult, ReviewCheck,
     ReviewCheckConclusion, ReviewCheckRunStatus, ReviewCheckStatus,

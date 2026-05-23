@@ -70,6 +70,11 @@ extension TaskBoardAPIClientTests {
         body: "@renovatebot rebase"
       )
     )
+    let avatar = try await transport.fetchReviewAvatar(
+      request: ReviewsAvatarRequest(
+        avatarURL: "https://avatars.githubusercontent.com/in/2740?v=4"
+      )
+    )
     let timeline = try await transport.fetchReviewTimeline(
       request: ReviewsTimelineRequest(
         pullRequestId: target.pullRequestID,
@@ -94,6 +99,7 @@ extension TaskBoardAPIClientTests {
       cacheClear: cacheClear,
       refresh: refresh,
       comment: comment,
+      avatar: avatar,
       timeline: timeline
     )
   }
@@ -114,13 +120,14 @@ extension TaskBoardAPIClientTests {
           .reviewsClearCache,
           .reviewsRefresh,
           .reviewsComment,
+          .reviewsAvatar,
           .reviewsTimeline,
         ]
     )
   }
 
   func assertReviewsWebSocketPayloadContract(_ calls: [RPCProbe.Call]) {
-    #expect(calls.count == 13)
+    #expect(calls.count == 14)
     #expect(objectValue(calls[0].params, key: "organization") == .string("example"))
     #expect(calls[1].params == nil)
     #expect(objectValue(calls[2].params, key: "authors") == .array([.string("renovate[bot]")]))
@@ -172,9 +179,13 @@ extension TaskBoardAPIClientTests {
         == .array([.object(reviewsTargetJSON)])
     )
     #expect(objectValue(calls[11].params, key: "body") == .string("@renovatebot rebase"))
-    #expect(objectValue(calls[12].params, key: "pull_request_id") == .string("pr-42"))
-    #expect(objectValue(calls[12].params, key: "page_size") == .number(50))
-    #expect(objectValue(calls[12].params, key: "direction") == .string("older"))
+    #expect(
+      objectValue(calls[12].params, key: "avatar_url")
+        == .string("https://avatars.githubusercontent.com/in/2740?v=4")
+    )
+    #expect(objectValue(calls[13].params, key: "pull_request_id") == .string("pr-42"))
+    #expect(objectValue(calls[13].params, key: "page_size") == .number(50))
+    #expect(objectValue(calls[13].params, key: "direction") == .string("older"))
   }
 
   func assertReviewsWebSocketResults(_ result: ReviewsWebSocketContractResult) {
@@ -195,6 +206,8 @@ extension TaskBoardAPIClientTests {
     #expect(result.refresh.missingPullRequestIDs == ["pr-42"])
     #expect(result.comment.results.first?.action == .comment)
     #expect(result.comment.results.first?.timelineEntry?.id == "IC_comment_001")
+    #expect(result.avatar.avatarURL == "https://avatars.githubusercontent.com/in/2740?v=4")
+    #expect(result.avatar.mimeType == "image/png")
     #expect(result.timeline.pullRequestId == "pr-42")
     #expect(result.timeline.entries.first?.id == "IC_001")
     #expect(result.timeline.viewerCanComment)
@@ -239,6 +252,7 @@ struct ReviewsWebSocketContractResult {
   let cacheClear: ReviewsCacheClearResponse
   let refresh: ReviewsRefreshResponse
   let comment: ReviewsActionResponse
+  let avatar: ReviewsAvatarResponse
   let timeline: ReviewsTimelineResponse
 }
 

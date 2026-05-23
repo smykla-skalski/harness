@@ -58,6 +58,9 @@ public protocol HarnessMonitorReviewsClientProtocol: Sendable {
   func fetchReviewTimeline(
     request: ReviewsTimelineRequest
   ) async throws -> ReviewsTimelineResponse
+  func fetchReviewAvatar(
+    request: ReviewsAvatarRequest
+  ) async throws -> ReviewsAvatarResponse
   func setReviewThreadResolved(
     request: ReviewsReviewThreadResolveRequest
   ) async throws -> ReviewsReviewThreadResolveResponse
@@ -181,6 +184,12 @@ extension HarnessMonitorReviewsClientProtocol {
   public func fetchReviewTimeline(
     request _: ReviewsTimelineRequest
   ) async throws -> ReviewsTimelineResponse {
+    throw HarnessMonitorAPIError.server(code: 501, message: "Reviews unavailable")
+  }
+
+  public func fetchReviewAvatar(
+    request _: ReviewsAvatarRequest
+  ) async throws -> ReviewsAvatarResponse {
     throw HarnessMonitorAPIError.server(code: 501, message: "Reviews unavailable")
   }
 
