@@ -142,20 +142,27 @@ assert_daemon_cargo_toolchain() {
 # archaeology on .fingerprint/. Compares against the previous tuple and
 # logs a diff when any dimension changes -- the cache contents stay valid
 # only when the tuple is stable.
+#
+# Records the *effective* env that cargo will see, not the script's shell
+# env. `run_daemon_cargo` strips RUSTFLAGS variants and sets RUSTUP_TOOLCHAIN
+# from the pinned channel, so the recorded tuple must reflect those overrides
+# or every Xcode-UI run (which has no mise-injected RUSTUP_TOOLCHAIN) would
+# diff against every terminal run (which has one) and report false drift.
 record_daemon_build_context() {
   local cargo_bin="$1"
   local target_dir="$2"
+  local pinned_channel="${3:-}"
   /bin/mkdir -p "$target_dir"
   local context_path="$target_dir/.daemon-context"
   local summary
   summary="$(
     printf 'cargo=%s\n' "$cargo_bin"
-    "$cargo_bin" --version --verbose 2>/dev/null | /usr/bin/sed -n '1,8p'
-    printf 'RUSTUP_TOOLCHAIN=%s\n' "${RUSTUP_TOOLCHAIN:-}"
+    env "RUSTUP_TOOLCHAIN=${pinned_channel:-${RUSTUP_TOOLCHAIN:-}}" "$cargo_bin" --version --verbose 2>/dev/null | /usr/bin/sed -n '1,8p'
+    printf 'RUSTUP_TOOLCHAIN=%s\n' "$pinned_channel"
     printf 'RUSTC_WRAPPER=%s\n' "${RUSTC_WRAPPER:-}"
-    printf 'RUSTFLAGS=%s\n' "${RUSTFLAGS:-}"
-    printf 'CARGO_ENCODED_RUSTFLAGS=%s\n' "${CARGO_ENCODED_RUSTFLAGS:-}"
-    printf 'CARGO_BUILD_RUSTFLAGS=%s\n' "${CARGO_BUILD_RUSTFLAGS:-}"
+    printf 'RUSTFLAGS=\n'
+    printf 'CARGO_ENCODED_RUSTFLAGS=\n'
+    printf 'CARGO_BUILD_RUSTFLAGS=\n'
   )"
   if [ -r "$context_path" ]; then
     local previous
@@ -218,7 +225,7 @@ build_daemon_binary() {
     /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString ${MARKETING_VERSION}" "$daemon_info_link_plist"
   fi
 
-  record_daemon_build_context "$cargo_bin" "$target_dir"
+  record_daemon_build_context "$cargo_bin" "$target_dir" "$pinned_channel"
 
   (
     cd "$repo_root" || exit 1

@@ -252,6 +252,49 @@ class BuildDaemonBinaryTests(unittest.TestCase):
             self.assertTrue(context_path.is_file())
             self.assertIn(f"cargo={fake_cargo}", context_path.read_text())
 
+    def test_recorded_context_uses_pinned_channel_not_shell_env(self) -> None:
+        # Regression: previously the drift detector recorded
+        # `RUSTUP_TOOLCHAIN=${RUSTUP_TOOLCHAIN:-}` (the script's shell env).
+        # Xcode UI has no mise activation, so the shell env had an empty
+        # value, while a terminal run had the pinned channel. The detector
+        # then reported false drift every time. Must record the effective
+        # value that cargo will see, i.e. the pinned channel.
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            project_dir, target_dir, captured_env_path, fake_cargo = _setup_fake_daemon_layout(
+                Path(tmp_dir)
+            )
+            repo_root = project_dir.parent.parent
+            (repo_root / "rust-toolchain.toml").write_text(
+                '[toolchain]\nchannel = "nightly-2026-05-19"\n'
+            )
+
+            run_build_helper(
+                f'export PROJECT_DIR="{project_dir}"; '
+                f'export CARGO_BIN="{fake_cargo}"; '
+                f'export CARGO_TARGET_DIR="{target_dir}"; '
+                f'export CAPTURED_ENV_PATH="{captured_env_path}"; '
+                "assert_daemon_cargo_toolchain() { :; }; "
+                # Two runs with different shell-side RUSTUP_TOOLCHAIN values
+                # must produce identical .daemon-context (same pin).
+                'export RUSTUP_TOOLCHAIN=""; '
+                "build_daemon_binary >/dev/null"
+            )
+            first = (target_dir / ".daemon-context").read_text()
+
+            run_build_helper(
+                f'export PROJECT_DIR="{project_dir}"; '
+                f'export CARGO_BIN="{fake_cargo}"; '
+                f'export CARGO_TARGET_DIR="{target_dir}"; '
+                f'export CAPTURED_ENV_PATH="{captured_env_path}"; '
+                "assert_daemon_cargo_toolchain() { :; }; "
+                'export RUSTUP_TOOLCHAIN="some-other-channel"; '
+                "build_daemon_binary >/dev/null"
+            )
+            second = (target_dir / ".daemon-context").read_text()
+
+            self.assertEqual(first, second)
+            self.assertIn("RUSTUP_TOOLCHAIN=nightly-2026-05-19", first)
+
 
 class ResolvePinnedToolchainChannelTests(unittest.TestCase):
     def test_returns_empty_when_rust_toolchain_file_missing(self) -> None:
