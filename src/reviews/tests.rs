@@ -22,8 +22,8 @@ fn sample_item(
             policy_blocked,
             is_draft: false,
             viewer_can_update: true,
-            viewer_can_merge_as_admin: false,
         },
+        viewer_can_merge_as_admin: false,
         head_sha: "abc123".into(),
         labels: Vec::new(),
         checks: Vec::new(),
@@ -130,9 +130,9 @@ fn comment_request_rejects_empty_body() {
             flags: ReviewTargetFlags {
                 is_draft: false,
                 policy_blocked: false,
-                viewer_can_merge_as_admin: false,
                 viewer_can_update: true,
             },
+            viewer_can_merge_as_admin: false,
             required_failed_check_names: Vec::new(),
             check_suite_ids: Vec::new(),
         }],
@@ -167,9 +167,9 @@ fn comment_request_accepts_well_formed_payload() {
             flags: ReviewTargetFlags {
                 is_draft: false,
                 policy_blocked: false,
-                viewer_can_merge_as_admin: false,
                 viewer_can_update: true,
             },
+            viewer_can_merge_as_admin: false,
             required_failed_check_names: Vec::new(),
             check_suite_ids: Vec::new(),
         }],
@@ -468,9 +468,9 @@ fn serialized_target_always_emits_check_suite_ids_array() {
         flags: ReviewTargetFlags {
             is_draft: false,
             policy_blocked: false,
-            viewer_can_merge_as_admin: false,
             viewer_can_update: true,
         },
+        viewer_can_merge_as_admin: false,
         required_failed_check_names: Vec::new(),
         check_suite_ids: Vec::new(),
     };

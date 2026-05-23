@@ -28,8 +28,12 @@ fn item(
         mergeable: ReviewMergeableState::Mergeable,
         review_status,
         check_status: ReviewCheckStatus::Success,
-        policy_blocked: false,
-        is_draft: false,
+        flags: crate::reviews::ReviewItemFlags {
+            policy_blocked: false,
+            is_draft: false,
+            viewer_can_update: true,
+        },
+        viewer_can_merge_as_admin: false,
         head_sha: "abc123".into(),
         labels: Vec::new(),
         checks: Vec::new(),
@@ -39,8 +43,6 @@ fn item(
         created_at: parsed("2026-05-20T12:00:00Z"),
         updated_at: parsed("2026-05-20T12:00:00Z"),
         required_failed_check_names: Vec::new(),
-        viewer_can_update: true,
-        viewer_can_merge_as_admin: false,
     }
 }
 
@@ -255,8 +257,12 @@ fn one_repo_item(repository: &str, pr_id: &str) -> ReviewItem {
         mergeable: ReviewMergeableState::Mergeable,
         review_status: ReviewReviewStatus::ReviewRequired,
         check_status: ReviewCheckStatus::Success,
-        policy_blocked: false,
-        is_draft: false,
+        flags: crate::reviews::ReviewItemFlags {
+            policy_blocked: false,
+            is_draft: false,
+            viewer_can_update: true,
+        },
+        viewer_can_merge_as_admin: false,
         head_sha: "abc123".into(),
         labels: Vec::new(),
         checks: Vec::new(),
@@ -266,8 +272,6 @@ fn one_repo_item(repository: &str, pr_id: &str) -> ReviewItem {
         created_at: parsed("2026-05-20T12:00:00Z"),
         updated_at: parsed("2026-05-20T12:00:00Z"),
         required_failed_check_names: Vec::new(),
-        viewer_can_update: true,
-        viewer_can_merge_as_admin: false,
     }
 }
 
