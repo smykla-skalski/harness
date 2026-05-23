@@ -27,7 +27,8 @@ struct DashboardReviewsDetailUXContractTests {
       "Sources/HarnessMonitorUIPreviewable/Views/Dashboard/DashboardReviewDetailView.swift"
     )
 
-    #expect(detail.contains("DashboardReviewDetailHeader(item: item)"))
+    #expect(detail.contains("DashboardReviewDetailHeader("))
+    #expect(detail.contains("item: item,"))
     #expect(detail.contains(".background(Color(nsColor: .windowBackgroundColor))"))
     #expect(detail.contains("DashboardReviewAttentionSummary(item: item)"))
     #expect(!detail.contains("DashboardReviewProvenanceMiniBar"))
