@@ -5,19 +5,27 @@ struct DashboardReviewCheckGroup: Equatable, Identifiable {
   let id: String
   let title: String
   let checks: [ReviewCheck]
+  let displayPriority: Int
 
   var checkCountLabel: String {
     "\(checks.count) \(checks.count == 1 ? "check" : "checks")"
   }
 
-  var displayPriority: Int {
-    checks.map(\.displayPriority).min() ?? Int.max
+  init(
+    id: String,
+    title: String,
+    checks: [ReviewCheck]
+  ) {
+    self.id = id
+    self.title = title
+    self.checks = checks
+    displayPriority = checks.lazy.map(\.displayPriority).min() ?? Int.max
   }
 }
 
-func dashboardReviewCheckGroups(
-  for checks: [ReviewCheck]
-) -> [DashboardReviewCheckGroup] {
+func dashboardReviewCheckGroups<Checks: Sequence>(
+  for checks: Checks
+) -> [DashboardReviewCheckGroup] where Checks.Element == ReviewCheck {
   var buckets: [String: [ReviewCheck]] = [:]
   var titlesByID: [String: String] = [:]
 

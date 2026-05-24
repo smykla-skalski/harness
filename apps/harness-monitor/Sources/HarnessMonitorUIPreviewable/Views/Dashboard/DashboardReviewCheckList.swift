@@ -21,21 +21,25 @@ struct DashboardReviewCheckList: View {
         .scaledFont(.callout)
         .foregroundStyle(HarnessMonitorTheme.secondaryInk)
     } else {
+      let presentation = DashboardReviewCheckListPresentation(
+        checks: checks,
+        visibleNonProblemCheckLimit: visibleNonProblemCheckLimit
+      )
       VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
-        if hasProblemChecks {
-          checkSummary
-          checkDiagnosticsControls
-          checkGroupsView(groups: problemCheckGroups, suppressPassingStatus: false)
-          nonProblemChecksDisclosure
+        if presentation.hasProblemChecks {
+          checkSummary(presentation)
+          checkDiagnosticsControls(presentation)
+          checkGroupsView(groups: presentation.problemCheckGroups, suppressPassingStatus: false)
+          nonProblemChecksDisclosure(presentation)
         } else {
-          nonProblemChecksSummary
-          checkDiagnosticsControls
+          nonProblemChecksSummary(presentation)
+          checkDiagnosticsControls(presentation)
           if showsPassingChecks {
             checkGroupsView(
-              groups: visibleNonProblemCheckGroups,
-              suppressPassingStatus: allPassing
+              groups: presentation.visibleNonProblemCheckGroups,
+              suppressPassingStatus: presentation.allPassing
             )
-            showMoreNonProblemChecksButton
+            showMoreNonProblemChecksButton(presentation)
           }
         }
       }
@@ -52,36 +56,41 @@ struct DashboardReviewCheckList: View {
     }
   }
 
-  @ViewBuilder private var checkSummary: some View {
-    if allPassing {
+  @ViewBuilder
+  private func checkSummary(
+    _ presentation: DashboardReviewCheckListPresentation
+  ) -> some View {
+    if presentation.allPassing {
       DashboardReviewStatusPill(
         label: "All checks passed",
         tint: HarnessMonitorTheme.success,
         systemImage: "checkmark.circle.fill"
       )
-    } else if hasProblemChecks {
+    } else if presentation.hasProblemChecks {
       DashboardReviewStatusPill(
-        label: "\(problemChecks.count) failing",
+        label: "\(presentation.problemChecks.count) failing",
         tint: HarnessMonitorTheme.danger,
         systemImage: "xmark.octagon.fill"
       )
     }
   }
 
-  private var checkDiagnosticsControls: some View {
+  private func checkDiagnosticsControls(
+    _ presentation: DashboardReviewCheckListPresentation
+  ) -> some View {
     HarnessMonitorWrapLayout(
       spacing: HarnessMonitorTheme.spacingSM,
       lineSpacing: HarnessMonitorTheme.spacingSM
     ) {
-      if hasProblemChecks {
+      if presentation.hasProblemChecks {
         Toggle("Failed only", isOn: $showsProblemChecksOnly)
           .toggleStyle(.button)
           .controlSize(.small)
       }
-      let onlyFailing = hasProblemChecks
-      let copyURLs = targetCheckURLs(onlyFailing: onlyFailing)
+      let onlyFailing = presentation.hasProblemChecks
+      let copyURLs = presentation.targetCheckURLs(onlyFailing: onlyFailing)
       Button {
-        copyCheckURLs(onlyFailing: onlyFailing)
+        copyCheckURLs(onlyFailing: onlyFailing, presentation: presentation)
       } label: {
         Label(
           onlyFailing ? "Copy failing check URLs" : "Copy check URLs",
@@ -98,70 +107,43 @@ struct DashboardReviewCheckList: View {
     }
   }
 
-  private var allPassing: Bool {
-    !checks.isEmpty && checks.allSatisfy(\.isPassing)
-  }
-
-  private var hasProblemChecks: Bool {
-    !problemChecks.isEmpty
-  }
-
-  private var problemChecks: [ReviewCheck] {
-    checks.filter(\.requiresAttention)
-  }
-
-  private var nonProblemChecks: [ReviewCheck] {
-    checks.filter { !$0.requiresAttention }
-  }
-
-  private var visibleNonProblemChecks: [ReviewCheck] {
-    Array(nonProblemChecks.prefix(visibleNonProblemCheckLimit))
-  }
-
-  private var problemCheckGroups: [DashboardReviewCheckGroup] {
-    dashboardReviewCheckGroups(for: problemChecks)
-  }
-
-  private var nonProblemCheckGroups: [DashboardReviewCheckGroup] {
-    dashboardReviewCheckGroups(for: nonProblemChecks)
-  }
-
-  private var visibleNonProblemCheckGroups: [DashboardReviewCheckGroup] {
-    dashboardReviewCheckGroups(for: visibleNonProblemChecks)
-  }
-
-  private var hiddenNonProblemCheckCount: Int {
-    max(nonProblemChecks.count - visibleNonProblemCheckLimit, 0)
-  }
-
-  private var nonProblemChecksSummary: some View {
+  private func nonProblemChecksSummary(
+    _ presentation: DashboardReviewCheckListPresentation
+  ) -> some View {
     DashboardReviewPassingChecksSummary(
-      label: allPassing ? "All checks passed" : "No failing checks",
-      systemImage: allPassing ? "checkmark.circle.fill" : "circle",
-      checkCount: nonProblemChecks.count,
-      groupCount: nonProblemCheckGroups.count,
-      expandedTitle: allPassing ? "Hide passing checks" : "Hide checks",
-      collapsedTitle: allPassing ? "Show passing checks" : "Show checks",
+      label: presentation.allPassing ? "All checks passed" : "No failing checks",
+      systemImage: presentation.allPassing ? "checkmark.circle.fill" : "circle",
+      checkCount: presentation.nonProblemChecks.count,
+      groupCount: presentation.nonProblemCheckGroups.count,
+      expandedTitle: presentation.allPassing ? "Hide passing checks" : "Hide checks",
+      collapsedTitle: presentation.allPassing ? "Show passing checks" : "Show checks",
       isExpanded: $showsPassingChecks
     )
   }
 
-  @ViewBuilder private var nonProblemChecksDisclosure: some View {
-    if !showsProblemChecksOnly && !nonProblemChecks.isEmpty {
-      nonProblemChecksSummary
+  @ViewBuilder
+  private func nonProblemChecksDisclosure(
+    _ presentation: DashboardReviewCheckListPresentation
+  ) -> some View {
+    if !showsProblemChecksOnly && !presentation.nonProblemChecks.isEmpty {
+      nonProblemChecksSummary(presentation)
       if showsPassingChecks {
         checkGroupsView(
-          groups: visibleNonProblemCheckGroups,
+          groups: presentation.visibleNonProblemCheckGroups,
           suppressPassingStatus: false
         )
-        showMoreNonProblemChecksButton
+        showMoreNonProblemChecksButton(presentation)
       }
     }
   }
 
-  @ViewBuilder private var showMoreNonProblemChecksButton: some View {
-    if hiddenNonProblemCheckCount > 0 {
-      Button("Show \(min(Self.checkBatchSize, hiddenNonProblemCheckCount)) more checks") {
+  @ViewBuilder
+  private func showMoreNonProblemChecksButton(
+    _ presentation: DashboardReviewCheckListPresentation
+  ) -> some View {
+    if presentation.hiddenNonProblemCheckCount > 0 {
+      let nextBatchSize = min(Self.checkBatchSize, presentation.hiddenNonProblemCheckCount)
+      Button("Show \(nextBatchSize) more checks") {
         visibleNonProblemCheckLimit += Self.checkBatchSize
       }
       .buttonStyle(.borderless)
@@ -189,13 +171,11 @@ struct DashboardReviewCheckList: View {
     }
   }
 
-  private func targetCheckURLs(onlyFailing: Bool) -> [URL] {
-    let pool = onlyFailing ? problemChecks : checks
-    return pool.compactMap(\.detailsWebURL)
-  }
-
-  private func copyCheckURLs(onlyFailing: Bool) {
-    let urls = targetCheckURLs(onlyFailing: onlyFailing).map(\.absoluteString)
+  private func copyCheckURLs(
+    onlyFailing: Bool,
+    presentation: DashboardReviewCheckListPresentation
+  ) {
+    let urls = presentation.targetCheckURLs(onlyFailing: onlyFailing).map(\.absoluteString)
     guard !urls.isEmpty else { return }
     HarnessMonitorClipboard.copy(urls.joined(separator: "\n"))
   }
@@ -204,6 +184,72 @@ struct DashboardReviewCheckList: View {
     visibleNonProblemCheckLimit = Self.checkBatchSize
     showsPassingChecks = preferences.snapshot.checksShowPassingByDefault
     expandedPassingGroupIDs.removeAll()
+  }
+}
+
+private struct DashboardReviewCheckListPresentation {
+  let problemChecks: [ReviewCheck]
+  let nonProblemChecks: [ReviewCheck]
+  let problemCheckURLs: [URL]
+  let allCheckURLs: [URL]
+  let problemCheckGroups: [DashboardReviewCheckGroup]
+  let nonProblemCheckGroups: [DashboardReviewCheckGroup]
+  let visibleNonProblemCheckGroups: [DashboardReviewCheckGroup]
+  let hiddenNonProblemCheckCount: Int
+  let allPassing: Bool
+
+  init(
+    checks: [ReviewCheck],
+    visibleNonProblemCheckLimit: Int
+  ) {
+    var problemChecks: [ReviewCheck] = []
+    var nonProblemChecks: [ReviewCheck] = []
+    var problemCheckURLs: [URL] = []
+    var allCheckURLs: [URL] = []
+    var allPassing = !checks.isEmpty
+
+    problemChecks.reserveCapacity(checks.count)
+    nonProblemChecks.reserveCapacity(checks.count)
+    problemCheckURLs.reserveCapacity(checks.count)
+    allCheckURLs.reserveCapacity(checks.count)
+
+    for check in checks {
+      let requiresAttention = check.requiresAttention
+      if !check.isPassing {
+        allPassing = false
+      }
+      if let detailsWebURL = check.detailsWebURL {
+        allCheckURLs.append(detailsWebURL)
+        if requiresAttention {
+          problemCheckURLs.append(detailsWebURL)
+        }
+      }
+      if requiresAttention {
+        problemChecks.append(check)
+      } else {
+        nonProblemChecks.append(check)
+      }
+    }
+
+    self.problemChecks = problemChecks
+    self.nonProblemChecks = nonProblemChecks
+    self.problemCheckURLs = problemCheckURLs
+    self.allCheckURLs = allCheckURLs
+    problemCheckGroups = dashboardReviewCheckGroups(for: problemChecks)
+    nonProblemCheckGroups = dashboardReviewCheckGroups(for: nonProblemChecks)
+    visibleNonProblemCheckGroups = dashboardReviewCheckGroups(
+      for: nonProblemChecks.prefix(visibleNonProblemCheckLimit)
+    )
+    hiddenNonProblemCheckCount = max(nonProblemChecks.count - visibleNonProblemCheckLimit, 0)
+    self.allPassing = allPassing
+  }
+
+  var hasProblemChecks: Bool {
+    !problemChecks.isEmpty
+  }
+
+  func targetCheckURLs(onlyFailing: Bool) -> [URL] {
+    onlyFailing ? problemCheckURLs : allCheckURLs
   }
 }
 

@@ -37,11 +37,14 @@ struct DashboardReviewsDetailUXContractTests {
     let detail = try source(
       "Sources/HarnessMonitorUIPreviewable/Views/Dashboard/DashboardReviewDetailView.swift"
     )
+    let support = try source(
+      "Sources/HarnessMonitorUIPreviewable/Views/Dashboard/DashboardReviewDetailSupport.swift"
+    )
 
     #expect(detail.contains("DashboardReviewDetailHeader("))
     #expect(detail.contains("item: item,"))
     #expect(detail.contains(".background(Color(nsColor: .windowBackgroundColor))"))
-    #expect(detail.contains("DashboardReviewAttentionSummary(item: item)"))
+    #expect(support.contains("DashboardReviewAttentionSummary(item: item)"))
     #expect(!detail.contains("DashboardReviewProvenanceMiniBar"))
   }
 
@@ -159,8 +162,11 @@ struct DashboardReviewsDetailUXContractTests {
     #expect(header.contains("visible of"))
     #expect(header.contains("\"Hide generated files\""))
     #expect(header.contains("\"Hide whitespace-only\""))
-    #expect(fileCard.contains("Toggle(\n        \"Viewed\""))
-    #expect(fileCard.contains("Label(viewMode.label, systemImage: \"rectangle.split.2x1\")"))
+    #expect(fileCard.contains("Toggle("))
+    #expect(fileCard.contains("\"Viewed\""))
+    #expect(
+      header.contains(
+        "Label(viewModeLabel(for: mode), systemImage: viewModeSystemImage(for: mode))"))
   }
 
   @Test("Files section waits for daemon and retries when the daemon comes online")
@@ -168,17 +174,19 @@ struct DashboardReviewsDetailUXContractTests {
     let files = try source(
       "Sources/HarnessMonitorUIPreviewable/Views/Dashboard/DashboardReviewFilesSection.swift"
     )
+    let emptyState = try source(
+      "Sources/HarnessMonitorUIPreviewable/Views/Dashboard/DashboardReviewFilesEmptyState.swift"
+    )
 
     #expect(
       files.contains(
-        "let isDaemonOnline = store.connectionState == .online "
-          + "&& store.apiClient != nil"
+        "let isDaemonOnline = store.connectionState == .online && store.apiClient != nil"
       )
     )
     #expect(files.contains("ReviewFilesTaskKey("))
     #expect(files.contains("guard isDaemonOnline else { return }"))
-    #expect(files.contains("case waitingForDaemon"))
-    #expect(files.contains("\"Waiting for daemon connection\""))
+    #expect(emptyState.contains("case waitingForDaemon"))
+    #expect(emptyState.contains("\"Waiting for daemon connection\""))
   }
 
   @Test("Checks Activity and Reviews sections reduce repetition by default")
@@ -210,11 +218,14 @@ struct DashboardReviewsDetailUXContractTests {
     let fileCard = try source(
       "Sources/HarnessMonitorUIPreviewable/Views/Dashboard/DashboardReviewFileCard.swift"
     )
+    let header = try source(
+      "Sources/HarnessMonitorUIPreviewable/Views/Dashboard/DashboardReviewFilesHeader.swift"
+    )
 
-    #expect(reviews.contains("Array(reviews.enumerated())"))
-    #expect(!reviews.contains("ForEach(reviews)"))
-    #expect(fileCard.contains("viewModeMenuLabel(for: .unified)"))
-    #expect(fileCard.contains("viewModeMenuLabel(for: .split)"))
+    #expect(reviews.contains("ForEach(reviews) { review in"))
+    #expect(!reviews.contains("Array(reviews.enumerated())"))
+    #expect(header.contains("viewModeLabel(for: mode)"))
+    #expect(header.contains("viewModeSystemImage(for: mode)"))
     #expect(!fileCard.contains("systemImage: viewMode == .unified ? \"checkmark\" : \"\""))
     #expect(!fileCard.contains("systemImage: viewMode == .split ? \"checkmark\" : \"\""))
   }
@@ -236,8 +247,9 @@ struct DashboardReviewsDetailUXContractTests {
 
     #expect(checks.contains("private static let checkBatchSize = 20"))
     #expect(checks.contains("visibleNonProblemCheckLimit"))
-    #expect(checks.contains("Array(nonProblemChecks.prefix(visibleNonProblemCheckLimit))"))
-    #expect(checks.contains("Show \\(min(Self.checkBatchSize, hiddenNonProblemCheckCount))"))
+    #expect(checks.contains("nonProblemChecks.prefix(visibleNonProblemCheckLimit)"))
+    #expect(checks.contains("let nextBatchSize = min(Self.checkBatchSize"))
+    #expect(checks.contains("Show \\(nextBatchSize) more checks"))
 
     #expect(files.contains("private static let fileBatchSize = 24"))
     #expect(files.contains("viewModel.filteredFiles.prefix(visibleFileLimit)"))
