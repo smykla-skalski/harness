@@ -87,7 +87,7 @@ struct DashboardReviewListRowStatusIconTests {
       checkStatus: .pending
     )
     #expect(mergeConflicts.statusLabel == "Needs attention")
-    #expect(mergeConflicts.statusSystemImage == "arrow.triangle.branch")
+    #expect(mergeConflicts.statusSystemImage == "arrow.triangle.merge")
 
     let policyBlocked = makeItem(
       reviewStatus: .reviewRequired,
@@ -130,13 +130,74 @@ struct DashboardReviewListRowStatusIconTests {
     #expect(item.statusAccessibilityLabel == item.statusLabel)
   }
 
+  /// Pins the attention-icon cascade order for PRs with several active
+  /// attention reasons at once. The icon must always name the *worst*
+  /// reason so the row's at-a-glance signal matches the most severe item
+  /// in the attention pill strip below it.
+  ///
+  /// Priority (top to bottom = worst to least-bad):
+  /// 1. `hasRequiredFailedChecks` — required CI is broken (admin merge)
+  /// 2. `checkStatus == .failure` — non-required CI is broken
+  /// 3. `reviewStatus == .changesRequested` — reviewer blocked the PR
+  /// 4. `policyBlocked` — branch / review policy still gating
+  /// 5. `mergeable == .conflicting` — merge conflicts to resolve
+  /// 6. fallback `exclamationmark.triangle.fill`
+  @Test("attention-icon cascade picks the most severe reason when multiple apply")
+  func attentionIconCascadePicksTheMostSevereReason() {
+    // Required failed checks beat every other reason.
+    let everythingWrong = makeItem(
+      reviewStatus: .changesRequested,
+      mergeable: .conflicting,
+      checkStatus: .failure,
+      policyBlocked: true,
+      hasRequiredFailedChecks: true
+    )
+    #expect(everythingWrong.statusSystemImage == "xmark.octagon.fill")
+
+    // Non-required check failure beats changes-requested / policy / conflicts.
+    let failureBeatsRest = makeItem(
+      reviewStatus: .changesRequested,
+      mergeable: .conflicting,
+      checkStatus: .failure,
+      policyBlocked: true
+    )
+    #expect(failureBeatsRest.statusSystemImage == "xmark.circle.fill")
+
+    // Changes-requested beats policy + conflicts when checks are pending.
+    let changesRequestedBeatsPolicy = makeItem(
+      reviewStatus: .changesRequested,
+      mergeable: .conflicting,
+      checkStatus: .pending,
+      policyBlocked: true
+    )
+    #expect(changesRequestedBeatsPolicy.statusSystemImage == "arrow.uturn.backward.circle.fill")
+
+    // Policy block beats conflicts when nothing more severe applies.
+    let policyBeatsConflicts = makeItem(
+      reviewStatus: .reviewRequired,
+      mergeable: .conflicting,
+      checkStatus: .pending,
+      policyBlocked: true
+    )
+    #expect(policyBeatsConflicts.statusSystemImage == "hourglass.circle.fill")
+
+    // Conflicts win when they're the only attention reason.
+    let conflictsAlone = makeItem(
+      reviewStatus: .reviewRequired,
+      mergeable: .conflicting,
+      checkStatus: .pending
+    )
+    #expect(conflictsAlone.statusSystemImage == "arrow.triangle.merge")
+  }
+
   private func makeItem(
     isDraft: Bool = false,
     reviewStatus: ReviewReviewStatus,
     mergeable: ReviewMergeableState = .mergeable,
     checkStatus: ReviewCheckStatus,
     viewerCanUpdate: Bool = true,
-    policyBlocked: Bool = false
+    policyBlocked: Bool = false,
+    hasRequiredFailedChecks: Bool = false
   ) -> ReviewItem {
     ReviewItem(
       pullRequestID: "pr-1",
@@ -157,6 +218,7 @@ struct DashboardReviewListRowStatusIconTests {
       deletions: 4,
       createdAt: "2026-05-22T10:00:00Z",
       updatedAt: "2026-05-22T11:00:00Z",
+      requiredFailedCheckNames: hasRequiredFailedChecks ? ["required/lint"] : [],
       viewerCanUpdate: viewerCanUpdate
     )
   }

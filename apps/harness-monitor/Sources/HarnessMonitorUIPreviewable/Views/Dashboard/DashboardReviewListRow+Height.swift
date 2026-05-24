@@ -14,6 +14,12 @@ enum DashboardReviewListRowHeight {
     let titleLineHeight: CGFloat
     let captionLineHeight: CGFloat
     let pillStripHeight: CGFloat
+    /// `true` when the row is judged likely to wrap its title to two lines
+    /// at the current Reviews-pane width. The caller computes this via
+    /// `titleLikelyWraps(_:)` before constructing the layout so the
+    /// idealHeight hint accounts for the extra title line only when it's
+    /// expected, not always. Short titles stay compact.
+    let hasWrappedTitle: Bool
     let hasSecondaryLine: Bool
     let hasAttentionStrip: Bool
     let hasRequiredFailedChecks: Bool
@@ -22,14 +28,29 @@ enum DashboardReviewListRowHeight {
     let lineSpacing: CGFloat
   }
 
-  /// Title is allowed up to two lines so the meaningful suffix of
-  /// `ci(deps): update golangci/golangci-lint-action to v6.5.0` stays visible
-  /// inside the narrow Reviews pane instead of truncating mid-word.
-  static let titleMaxLines: CGFloat = 2
+  /// Conservative character cap used to predict whether the title will wrap
+  /// to two lines at the typical Reviews-pane width. Below the cap the row
+  /// stays at one title line; above it (or with a manual newline) the row
+  /// pre-allocates the second line so wrapping doesn't shift sibling rows
+  /// the first time SwiftUI lays them out.
+  ///
+  /// The cap was eyeballed for the narrow dashboard column (~340 pt
+  /// effective title width after the status icon, avatar, and change pill
+  /// take their cut). It is intentionally conservative: a couple of
+  /// false-positive 2-line rows on short titles cost a small height bump,
+  /// while a false-negative on a wrapping title causes a visible content
+  /// jump as the row resolves its real height. Bias toward false positives.
+  static let titleWrapCharacterThreshold = 32
+
+  static func titleLikelyWraps(_ title: String) -> Bool {
+    if title.contains("\n") { return true }
+    return title.count > titleWrapCharacterThreshold
+  }
 
   static func idealHeight(_ layout: Layout) -> CGFloat {
     var components: [CGFloat] = []
-    components.append(layout.titleLineHeight * titleMaxLines)
+    let titleLines: CGFloat = layout.hasWrappedTitle ? 2 : 1
+    components.append(layout.titleLineHeight * titleLines)
     if layout.hasSecondaryLine { components.append(layout.captionLineHeight) }
     components.append(layout.pillStripHeight)
     if layout.hasAttentionStrip { components.append(layout.pillStripHeight) }

@@ -50,7 +50,7 @@ enum DashboardReviewAttentionBadgeKind: String, Identifiable {
     case .policyBlocked:
       "hourglass"
     case .mergeConflicts:
-      "arrow.triangle.branch"
+      "arrow.triangle.merge"
     }
   }
 

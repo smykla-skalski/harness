@@ -1,8 +1,8 @@
 import HarnessMonitorKit
 import SwiftUI
 
-/// Small avatar + `@login` chip rendered to the left of the title in the
-/// Reviews route list row.
+/// Compact author avatar rendered to the left of the title in the Reviews
+/// route list row.
 ///
 /// The avatar is fetched through `HarnessMonitorStore.reviewAvatarImage` so
 /// it shares the SwiftData-backed `ReviewAvatarCache` with the conversation
@@ -10,8 +10,11 @@ import SwiftUI
 /// can still fall back to the login-derived URL when the explicit avatar is
 /// absent.
 ///
-/// The `.help(...)` tooltip on hover surfaces the full author handle even
-/// when the visible label truncates in dense layouts.
+/// Visual contract is *avatar only* — the previous `@login` text node was
+/// almost always truncated in the narrow Reviews pane and read as noise
+/// next to the title. The handle is still recoverable on hover via
+/// `.help(...)` and via VoiceOver via `accessibilityLabel`, but it never
+/// occupies horizontal space the title row needs.
 struct DashboardReviewListRowAuthorChip: View {
   let login: String
   let avatarURL: URL?
@@ -24,7 +27,7 @@ struct DashboardReviewListRowAuthorChip: View {
   }
 
   var body: some View {
-    HStack(spacing: HarnessMonitorTheme.spacingXS) {
+    Group {
       if trimmedLogin.isEmpty {
         // No author info at all: render a neutral placeholder so the row
         // still claims the same horizontal space (keeps row geometry stable).
@@ -45,11 +48,6 @@ struct DashboardReviewListRowAuthorChip: View {
             )
           }
         )
-        Text("@\(trimmedLogin)")
-          .scaledFont(.caption.weight(.medium))
-          .foregroundStyle(HarnessMonitorTheme.secondaryInk)
-          .lineLimit(1)
-          .truncationMode(.tail)
       }
     }
     .help(trimmedLogin.isEmpty ? "Unknown author" : "@\(trimmedLogin)")
