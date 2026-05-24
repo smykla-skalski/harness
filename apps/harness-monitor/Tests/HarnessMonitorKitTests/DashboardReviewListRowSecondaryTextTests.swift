@@ -12,10 +12,12 @@ struct DashboardReviewListRowSecondaryTextTests {
     #expect(row.secondaryText == "octocat/example · #42")
   }
 
-  @Test("repository-hidden row shows `#N` only")
-  func repositoryHiddenRowShowsNumberOnly() {
+  @Test("repository-hidden row collapses the secondary line")
+  func repositoryHiddenRowCollapsesTheSecondaryLine() {
     let row = makeRow(showsRepository: false)
-    #expect(row.secondaryText == "#42")
+    // When the list is grouped by repository, `#N` rides inline on the status
+    // line so the row never burns a caption line on the PR number alone.
+    #expect(row.secondaryText == nil)
   }
 
   @Test("status label drops the redundant review-status joiner")
@@ -25,10 +27,11 @@ struct DashboardReviewListRowSecondaryTextTests {
       reviewStatus: .approved,
       checkStatus: .success
     )
+    let secondary = row.secondaryText ?? ""
     // Items 21 + 35: the second line is identity-only now.
-    #expect(!row.secondaryText.contains("Ready"))
-    #expect(!row.secondaryText.contains("Approved"))
-    #expect(!row.secondaryText.contains("Review required"))
+    #expect(!secondary.contains("Ready"))
+    #expect(!secondary.contains("Approved"))
+    #expect(!secondary.contains("Review required"))
   }
 
   @Test("reviewer summary derives unique reviewer count and approvals")

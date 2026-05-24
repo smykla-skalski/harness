@@ -71,11 +71,26 @@ extension ReviewItem {
     case isDraft: "pencil.tip.crop.circle"
     case isAutoMergeable: "checkmark.circle.fill"
     case isViewerActionable: "checkmark.seal.fill"
-    case requiresAttention: "exclamationmark.triangle.fill"
+    case requiresAttention: primaryAttentionSystemImage
     case checkStatus == .pending: "clock.arrow.circlepath"
     case reviewStatus == .approved: "checkmark.circle.fill"
     default: "circle"
     }
+  }
+
+  /// Maps the primary attention reason to a specific SF Symbol so the row's
+  /// leading icon names the actual problem (failing checks, conflicts,
+  /// changes requested, blocked by policy) instead of repeating a generic
+  /// warning-triangle next to the textual pill below it. The order mirrors
+  /// `dashboardReviewAttentionBadgeKinds` so the icon and the first pill in
+  /// the attention strip stay aligned.
+  fileprivate var primaryAttentionSystemImage: String {
+    if hasRequiredFailedChecks { return "xmark.octagon.fill" }
+    if checkStatus == .failure { return "xmark.circle.fill" }
+    if reviewStatus == .changesRequested { return "arrow.uturn.backward.circle.fill" }
+    if policyBlocked { return "hourglass.circle.fill" }
+    if mergeable == .conflicting { return "arrow.triangle.branch" }
+    return "exclamationmark.triangle.fill"
   }
 
   /// Voice-over friendly description matching the visible status icon and tint.

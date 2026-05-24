@@ -34,7 +34,9 @@ struct DashboardReviewListRowAccessibilityTests {
     let source = try rowSource(named: "DashboardReviewListRow.swift")
     // Item 30: truncated content must be recoverable on hover.
     #expect(source.contains(".help(item.title)"))
-    #expect(source.contains(".help(secondaryText)"))
+    // Secondary text is optional now (collapsed when the list is grouped by
+    // repository); the help attaches against the unwrapped local binding.
+    #expect(source.contains(".help(secondary)"))
   }
 
   @Test("row source dims the status icon when viewer can't update")
@@ -87,6 +89,7 @@ struct DashboardReviewListRowAccessibilityTests {
         titleLineHeight: 18,
         captionLineHeight: 14,
         pillStripHeight: 22,
+        hasSecondaryLine: false,
         hasAttentionStrip: false,
         hasRequiredFailedChecks: false,
         hasLabels: false,
@@ -98,6 +101,7 @@ struct DashboardReviewListRowAccessibilityTests {
         titleLineHeight: 18,
         captionLineHeight: 14,
         pillStripHeight: 22,
+        hasSecondaryLine: false,
         hasAttentionStrip: true,
         hasRequiredFailedChecks: false,
         hasLabels: false,
@@ -109,6 +113,7 @@ struct DashboardReviewListRowAccessibilityTests {
         titleLineHeight: 18,
         captionLineHeight: 14,
         pillStripHeight: 22,
+        hasSecondaryLine: false,
         hasAttentionStrip: true,
         hasRequiredFailedChecks: false,
         hasLabels: true,
@@ -127,6 +132,7 @@ struct DashboardReviewListRowAccessibilityTests {
         titleLineHeight: 18,
         captionLineHeight: 14,
         pillStripHeight: 22,
+        hasSecondaryLine: true,
         hasAttentionStrip: true,
         hasRequiredFailedChecks: true,
         hasLabels: true,
@@ -138,6 +144,7 @@ struct DashboardReviewListRowAccessibilityTests {
         titleLineHeight: 18,
         captionLineHeight: 14,
         pillStripHeight: 22,
+        hasSecondaryLine: true,
         hasAttentionStrip: true,
         hasRequiredFailedChecks: true,
         hasLabels: true,

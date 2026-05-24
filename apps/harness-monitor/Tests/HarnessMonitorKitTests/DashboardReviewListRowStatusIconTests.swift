@@ -63,14 +63,39 @@ struct DashboardReviewListRowStatusIconTests {
     #expect(item.statusSystemImage == "clock.arrow.circlepath")
   }
 
-  @Test("requires-attention shows the danger triangle")
-  func requiresAttentionShowsTheDangerTriangle() {
-    let item = makeItem(
+  @Test("requires-attention picks an attention-specific icon, not a generic triangle")
+  func requiresAttentionPicksAnAttentionSpecificIcon() {
+    // The icon must name the actual problem so it complements (rather than
+    // duplicates) the textual pill the row renders below the title.
+    let changesRequested = makeItem(
       reviewStatus: .changesRequested,
       checkStatus: .pending
     )
-    #expect(item.statusLabel == "Needs attention")
-    #expect(item.statusSystemImage == "exclamationmark.triangle.fill")
+    #expect(changesRequested.statusLabel == "Needs attention")
+    #expect(changesRequested.statusSystemImage == "arrow.uturn.backward.circle.fill")
+
+    let failingChecks = makeItem(
+      reviewStatus: .reviewRequired,
+      checkStatus: .failure
+    )
+    #expect(failingChecks.statusLabel == "Needs attention")
+    #expect(failingChecks.statusSystemImage == "xmark.circle.fill")
+
+    let mergeConflicts = makeItem(
+      reviewStatus: .reviewRequired,
+      mergeable: .conflicting,
+      checkStatus: .pending
+    )
+    #expect(mergeConflicts.statusLabel == "Needs attention")
+    #expect(mergeConflicts.statusSystemImage == "arrow.triangle.branch")
+
+    let policyBlocked = makeItem(
+      reviewStatus: .reviewRequired,
+      checkStatus: .pending,
+      policyBlocked: true
+    )
+    #expect(policyBlocked.statusLabel == "Needs attention")
+    #expect(policyBlocked.statusSystemImage == "hourglass.circle.fill")
   }
 
   @Test("approved-without-merge gets the green check (not blue seal)")
