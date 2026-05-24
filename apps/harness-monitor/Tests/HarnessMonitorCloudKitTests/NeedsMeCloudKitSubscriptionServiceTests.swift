@@ -114,18 +114,22 @@ final class NeedsMeCloudKitSubscriptionServiceTests: XCTestCase {
 
     func testUserDefaultsRegistryPersistsAcrossInstances() async {
         let suiteName = "NeedsMeCloudKitSubscriptionServiceTests.persist.\(UUID().uuidString)"
-        guard let defaults = UserDefaults(suiteName: suiteName) else {
+        let suite = UserDefaultsRegistrySuite(suiteName: suiteName)
+        addTeardownBlock {
+            await suite.removePersistentDomain()
+        }
+
+        guard let writer = await suite.makeRegistry() else {
             XCTFail("Failed to create UserDefaults suite")
             return
         }
-        defer {
-            defaults.removePersistentDomain(forName: suiteName)
-        }
 
-        let writer = UserDefaultsSubscriptionRegistry(defaults: defaults)
         await writer.markRegistered(forAccountID: "user-X")
 
-        let reader = UserDefaultsSubscriptionRegistry(defaults: defaults)
+        guard let reader = await suite.makeRegistry() else {
+            XCTFail("Failed to create UserDefaults suite")
+            return
+        }
         let read = await reader.registeredAccountID()
         XCTAssertEqual(read, "user-X")
 
@@ -181,5 +185,23 @@ actor AccountIDBox {
 
     func set(_ accountID: String?) async {
         stored = accountID
+    }
+}
+
+actor UserDefaultsRegistrySuite {
+    private let suiteName: String
+    private let defaults: UserDefaults?
+
+    init(suiteName: String) {
+        self.suiteName = suiteName
+        defaults = UserDefaults(suiteName: suiteName)
+    }
+
+    func makeRegistry() -> UserDefaultsSubscriptionRegistry? {
+        defaults.map(UserDefaultsSubscriptionRegistry.init(defaults:))
+    }
+
+    func removePersistentDomain() {
+        defaults?.removePersistentDomain(forName: suiteName)
     }
 }
