@@ -138,7 +138,7 @@ final class MobileWatchPairingSessionBridge: NSObject, MobileWatchPairingSyncing
         validCredentials.append(credential)
         identitiesByID[identity.id] = identity
       }
-      let snapshot = try? sharedSnapshotStore?.loadSnapshot()
+      let snapshot = try? sharedSnapshotStore?.loadLatestSnapshot()
       await publish(
         identities: identitiesByID.values.sorted { $0.id < $1.id },
         credentials: validCredentials,

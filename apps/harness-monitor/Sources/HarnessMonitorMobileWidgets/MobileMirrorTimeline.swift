@@ -36,7 +36,7 @@ struct MobileMirrorTimelineProvider: TimelineProvider {
       return MobileDemoFixtures.snapshot(now: now)
     }
     guard let store = MobileSharedSnapshotStore(),
-      let snapshot = try? store.loadSnapshot(now: now)
+      let snapshot = try? store.loadLatestSnapshot()
     else {
       return .empty(now: now)
     }

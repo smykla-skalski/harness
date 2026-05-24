@@ -287,7 +287,9 @@ final class MobileMonitorStore {
     notificationDefaults: UserDefaults = .standard,
     notificationScheduler: any MobileNotificationScheduling = LiveMobileNotificationScheduler()
   ) {
-    let initialSnapshot = snapshot ?? (demoModeEnabled ? MobileDemoFixtures.snapshot() : .empty())
+    let cachedSnapshot = try? sharedSnapshotStore?.loadLatestSnapshot()
+    let initialSnapshot =
+      snapshot ?? cachedSnapshot ?? (demoModeEnabled ? MobileDemoFixtures.snapshot() : .empty())
     self.snapshot = initialSnapshot
     self.injectedSyncClient = syncClient
     self.defaultStationID = defaultStationID
@@ -307,7 +309,13 @@ final class MobileMonitorStore {
     )
     self.notificationSettings = MobileNotificationSettings.load(from: notificationDefaults)
     self.syncStatus =
-      demoModeEnabled ? .demo : (syncClient == nil ? .unpaired : .syncing)
+      if demoModeEnabled {
+        .demo
+      } else if let cachedSnapshot {
+        .stale("Showing last known mirror from \(cachedSnapshot.generatedAt.formatted(.relative(presentation: .numeric))).")
+      } else {
+        syncClient == nil ? .unpaired : .syncing
+      }
     self.selectedStationID =
       defaultStationID
       ?? initialSnapshot.stations.first(where: \.defaultStation)?.id
@@ -385,10 +393,7 @@ final class MobileMonitorStore {
       let stationID = preferredLiveStationID(),
       let syncClient = syncClient(for: stationID)
     else {
-      snapshot = .empty()
-      selectedStationID = ""
-      persistSharedSnapshot(snapshot)
-      reconcileLiveActivity(snapshot)
+      applyCachedSnapshotIfAvailable()
       syncStatus = .unpaired
       return
     }
@@ -397,6 +402,7 @@ final class MobileMonitorStore {
     do {
       guard let fetched = try await syncClient.fetchLatestSnapshot(stationID: stationID, now: .now)
       else {
+        applyCachedSnapshotIfAvailable()
         syncStatus = .stale("No encrypted mirror snapshot found.")
         return
       }
@@ -404,11 +410,13 @@ final class MobileMonitorStore {
       syncStatus = .live(fetched.generatedAt)
       await scheduleNotifications(previous: previous, next: fetched)
     } catch MobileCloudMirrorSyncError.staleSnapshot(let expiresAt) {
+      applyCachedSnapshotIfAvailable()
       syncStatus =
         .stale(
           "Last encrypted mirror expired \(expiresAt.formatted(.relative(presentation: .numeric)))."
         )
     } catch {
+      applyCachedSnapshotIfAvailable()
       syncStatus = mobileMonitorSyncStatus(for: error)
     }
   }
@@ -812,6 +820,21 @@ final class MobileMonitorStore {
         exportedAt: .now
       )
     }
+  }
+
+  private func applyCachedSnapshotIfAvailable() {
+    guard let cachedSnapshot = try? sharedSnapshotStore?.loadLatestSnapshot() else {
+      return
+    }
+    snapshot = cachedSnapshot
+    if selectedStationID.isEmpty || snapshot.station(id: selectedStationID) == nil {
+      selectedStationID =
+        defaultStationID
+        ?? snapshot.stations.first(where: \.defaultStation)?.id
+        ?? snapshot.stations.first?.id
+        ?? ""
+    }
+    reconcileLiveActivity(cachedSnapshot)
   }
 
   private func refreshAfterPairingBootstrap() async {

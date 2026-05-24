@@ -85,14 +85,21 @@ final class WatchMonitorStore {
     sharedSnapshotStore: MobileSharedSnapshotStore? = MobileSharedSnapshotStore()
   ) {
     self.demoModeEnabled = demoModeEnabled
-    let cachedSnapshot = try? sharedSnapshotStore?.loadSnapshot()
+    let cachedSnapshot = try? sharedSnapshotStore?.loadLatestSnapshot()
     let initialSnapshot =
       snapshot ?? cachedSnapshot ?? (demoModeEnabled ? MobileDemoFixtures.snapshot() : .empty())
     self.snapshot = initialSnapshot
     self.identityStore = identityStore
     self.credentialStore = credentialStore
     self.sharedSnapshotStore = sharedSnapshotStore
-    self.status = demoModeEnabled ? .demo : (cachedSnapshot == nil ? .loading : .stale("Cached"))
+    self.status =
+      if demoModeEnabled {
+        .demo
+      } else if let cachedSnapshot {
+        .stale("Showing last known mirror from \(cachedSnapshot.generatedAt.formatted(.relative(presentation: .numeric))).")
+      } else {
+        .loading
+      }
     self.selectedStationID =
       initialSnapshot.stations.first(where: \.defaultStation)?.id
       ?? initialSnapshot.stations.first?.id
@@ -341,7 +348,7 @@ final class WatchMonitorStore {
   }
 
   private func applyCachedSnapshotIfAvailable() {
-    guard let cachedSnapshot = try? sharedSnapshotStore?.loadSnapshot() else {
+    guard let cachedSnapshot = try? sharedSnapshotStore?.loadLatestSnapshot() else {
       return
     }
     snapshot = cachedSnapshot
