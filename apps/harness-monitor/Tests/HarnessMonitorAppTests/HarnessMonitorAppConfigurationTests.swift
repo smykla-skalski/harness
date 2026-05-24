@@ -206,6 +206,23 @@ final class HarnessMonitorAppConfigurationTests: XCTestCase {
     }
   }
 
+  func testSettingsPerfScenarioCatalogSectionsAreCurrent() {
+    let expectedSections: [HarnessMonitorPerfScenario: SettingsSection] = [
+      .taskBoardSettings: .taskBoard,
+      .repositoriesSettings: .repositories,
+      .reviewsSettings: .reviews,
+    ]
+
+    for (scenario, expectedSection) in expectedSections {
+      let definition = HarnessMonitorPerfScenarioCatalog.definition(for: scenario)
+      XCTAssertEqual(
+        SettingsSection(rawValue: definition.initialSettingsSection),
+        expectedSection,
+        "\(scenario.rawValue) must point at a current settings section"
+      )
+    }
+  }
+
   @MainActor
   func testLaunchMetricsRecorderWritesScenarioReadySample() throws {
     let outputURL = FileManager.default.temporaryDirectory

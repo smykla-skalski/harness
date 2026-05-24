@@ -1,8 +1,7 @@
 import Foundation
+import HarnessMonitorKit
 import OSLog
 import SwiftUI
-
-@testable import HarnessMonitorKit
 
 struct ToolCallTimelineOverflowAnnouncement: Equatable, Sendable {
   let id: String
