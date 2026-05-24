@@ -159,7 +159,7 @@ fn monitor_and_daemon_logging_defaults_stay_production_safe() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR"));
     let app_info = read_repo_file(
         root,
-        "apps/harness-monitor-macos/Resources/HarnessMonitor-Info.plist",
+        "apps/harness-monitor/Resources/HarnessMonitor-Info.plist",
     );
     let agents = read_repo_file(root, "AGENTS.md");
     let claude = read_repo_file(root, "CLAUDE.md");

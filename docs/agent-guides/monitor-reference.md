@@ -1,6 +1,6 @@
 # Harness Monitor Agent Reference
 
-Load this file only when `apps/harness-monitor-macos/AGENTS.md` routes the
+Load this file only when `apps/harness-monitor/AGENTS.md` routes the
 current task here. The app `AGENTS.md` contains the mandatory contract; this
 file keeps the longer macOS reference material out of the default prompt path.
 
@@ -141,7 +141,7 @@ Treat those files as a stable contract:
 | `debug-retention.json` | sentinel proving the run intentionally retained raw traces, exported XML, and extraction intermediates |
 
 Machine-readable schema snapshots for the JSON outputs live under
-`apps/harness-monitor-macos/Tools/HarnessMonitorPerf/Schemas/`.
+`apps/harness-monitor/Tools/HarnessMonitorPerf/Schemas/`.
 Regenerate them with `mise run monitor:tools:generate:schemas`.
 
 Before trusting a regression result, verify at least:
@@ -183,7 +183,7 @@ Rule content lives in skills under `.claude/skills/`, loaded on demand:
 - `swiftui-platform-rules` - macOS conventions, iOS conventions, and XCUITest
   reliability patterns.
 
-Research backing lives under `apps/harness-monitor-macos/docs/research/`:
+Research backing lives under `apps/harness-monitor/docs/research/`:
 
 - `docs/research/ux/` - HIG principles, interaction patterns, visual design,
   accessibility, SwiftUI practices, psychology, performance, error handling,

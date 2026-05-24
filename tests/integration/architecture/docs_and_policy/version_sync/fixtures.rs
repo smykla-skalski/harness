@@ -219,11 +219,11 @@ pub(super) fn setup_version_script_fixture_with_pbxproj(
         "testkit/Cargo.toml",
         "src/observe/output.rs",
         "scripts/version.sh",
-        "apps/harness-monitor-macos/Scripts/lib/swift-tool-env.sh",
-        "apps/harness-monitor-macos/Scripts/lib/xcode-version.sh",
-        "apps/harness-monitor-macos/Scripts/patch-tuist-pbxproj.py",
-        "apps/harness-monitor-macos/Tuist/ProjectDescriptionHelpers/BuildSettings.swift",
-        "apps/harness-monitor-macos/Resources/LaunchAgents/io.harnessmonitor.daemon.Info.plist",
+        "apps/harness-monitor/Scripts/lib/swift-tool-env.sh",
+        "apps/harness-monitor/Scripts/lib/xcode-version.sh",
+        "apps/harness-monitor/Scripts/patch-tuist-pbxproj.py",
+        "apps/harness-monitor/Tuist/ProjectDescriptionHelpers/BuildSettings.swift",
+        "apps/harness-monitor/Resources/LaunchAgents/io.harnessmonitor.daemon.Info.plist",
     ] {
         let source = root.join(relative_path);
         let destination = fixture_root.path().join(relative_path);
@@ -235,7 +235,7 @@ pub(super) fn setup_version_script_fixture_with_pbxproj(
 
     let generated_project = fixture_root
         .path()
-        .join("apps/harness-monitor-macos/HarnessMonitor.xcodeproj");
+        .join("apps/harness-monitor/HarnessMonitor.xcodeproj");
     fs::create_dir_all(&generated_project).expect("generated project dir");
     fs::write(generated_project.join("project.pbxproj"), pbxproj_fixture)
         .expect("stale generated pbxproj");

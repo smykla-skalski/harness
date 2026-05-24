@@ -1,0 +1,430 @@
+{
+  "$id" : "https:\/\/github.com\/smykla-skalski\/harness\/apps\/harness-monitor\/Tools\/HarnessMonitorPerf\/Schemas\/manifest.schema.json",
+  "$schema" : "https:\/\/json-schema.org\/draft\/2020-12\/schema",
+  "additionalProperties" : false,
+  "properties" : {
+    "build_provenance" : {
+      "additionalProperties" : false,
+      "properties" : {
+        "audit_daemon_bundle" : {
+          "additionalProperties" : false,
+          "properties" : {
+            "cargo_target_dir" : {
+              "type" : "string"
+            },
+            "mode" : {
+              "type" : "string"
+            },
+            "requested_skip" : {
+              "type" : "boolean"
+            }
+          },
+          "required" : [
+            "requested_skip",
+            "mode",
+            "cargo_target_dir"
+          ],
+          "type" : "object"
+        },
+        "host" : {
+          "additionalProperties" : false,
+          "properties" : {
+            "binary_mtime_utc" : {
+              "type" : "string"
+            },
+            "binary_sha256" : {
+              "type" : "string"
+            },
+            "bundle_sha256" : {
+              "type" : "string"
+            },
+            "embedded_commit" : {
+              "type" : "string"
+            },
+            "embedded_dirty" : {
+              "type" : "string"
+            },
+            "embedded_started_at_utc" : {
+              "type" : "string"
+            },
+            "embedded_workspace_fingerprint" : {
+              "type" : "string"
+            }
+          },
+          "required" : [
+            "embedded_commit",
+            "embedded_dirty",
+            "embedded_workspace_fingerprint",
+            "embedded_started_at_utc",
+            "binary_sha256",
+            "bundle_sha256",
+            "binary_mtime_utc"
+          ],
+          "type" : "object"
+        },
+        "shipping" : {
+          "additionalProperties" : false,
+          "properties" : {
+            "binary_mtime_utc" : {
+              "type" : "string"
+            },
+            "binary_sha256" : {
+              "type" : "string"
+            },
+            "built" : {
+              "type" : "boolean"
+            },
+            "bundle_sha256" : {
+              "type" : "string"
+            },
+            "embedded_commit" : {
+              "type" : "string"
+            },
+            "embedded_dirty" : {
+              "type" : "string"
+            },
+            "embedded_started_at_utc" : {
+              "type" : "string"
+            },
+            "embedded_workspace_fingerprint" : {
+              "type" : "string"
+            }
+          },
+          "required" : [
+            "built",
+            "embedded_commit",
+            "embedded_dirty",
+            "embedded_workspace_fingerprint",
+            "embedded_started_at_utc",
+            "binary_sha256",
+            "bundle_sha256",
+            "binary_mtime_utc"
+          ],
+          "type" : "object"
+        }
+      },
+      "required" : [
+        "audit_daemon_bundle",
+        "host",
+        "shipping"
+      ],
+      "type" : "object"
+    },
+    "captures" : {
+      "items" : {
+        "additionalProperties" : false,
+        "properties" : {
+          "app_trace_relpath" : {
+            "type" : [
+              "string",
+              "null"
+            ]
+          },
+          "daemon_data_home_probe" : {
+            "additionalProperties" : false,
+            "properties" : {
+              "contains_daemon_manifest" : {
+                "type" : "boolean"
+              },
+              "contains_sqlite_database" : {
+                "type" : "boolean"
+              },
+              "contains_sqlite_shm" : {
+                "type" : "boolean"
+              },
+              "contains_sqlite_wal" : {
+                "type" : "boolean"
+              },
+              "data_home" : {
+                "type" : "string"
+              },
+              "exists" : {
+                "type" : "boolean"
+              },
+              "regular_file_count" : {
+                "type" : "integer"
+              },
+              "total_bytes" : {
+                "type" : "integer"
+              }
+            },
+            "required" : [
+              "data_home",
+              "exists",
+              "regular_file_count",
+              "total_bytes",
+              "contains_daemon_manifest",
+              "contains_sqlite_database",
+              "contains_sqlite_wal",
+              "contains_sqlite_shm"
+            ],
+            "type" : "object"
+          },
+          "duration_seconds" : {
+            "type" : "integer"
+          },
+          "end_reason" : {
+            "type" : "string"
+          },
+          "environment" : {
+            "additionalProperties" : {
+              "type" : "string"
+            },
+            "type" : "object"
+          },
+          "exit_status" : {
+            "type" : "integer"
+          },
+          "launch_arguments" : {
+            "items" : {
+              "type" : "string"
+            },
+            "type" : "array"
+          },
+          "launch_metrics" : {
+            "additionalProperties" : false,
+            "properties" : {
+              "app_init_to_ready_ms" : {
+                "type" : "number"
+              },
+              "includes_bootstrap_in_scenario_measurement" : {
+                "type" : "boolean"
+              },
+              "measured_from" : {
+                "type" : "string"
+              },
+              "state_label" : {
+                "type" : "string"
+              },
+              "window_id" : {
+                "type" : "string"
+              }
+            },
+            "required" : [
+              "app_init_to_ready_ms",
+              "measured_from",
+              "state_label",
+              "window_id",
+              "includes_bootstrap_in_scenario_measurement"
+            ],
+            "type" : "object"
+          },
+          "launched_process_path" : {
+            "type" : "string"
+          },
+          "metric_tiers" : {
+            "additionalProperties" : false,
+            "properties" : {
+              "hard_budget" : {
+                "items" : {
+                  "type" : "string"
+                },
+                "type" : "array"
+              },
+              "investigative" : {
+                "items" : {
+                  "type" : "string"
+                },
+                "type" : "array"
+              }
+            },
+            "required" : [
+              "hard_budget",
+              "investigative"
+            ],
+            "type" : "object"
+          },
+          "preview_scenario" : {
+            "type" : "string"
+          },
+          "scenario" : {
+            "type" : "string"
+          },
+          "template" : {
+            "type" : "string"
+          },
+          "trace_relpath" : {
+            "type" : "string"
+          }
+        },
+        "required" : [
+          "scenario",
+          "template",
+          "duration_seconds",
+          "trace_relpath",
+          "exit_status",
+          "end_reason",
+          "preview_scenario",
+          "launched_process_path",
+          "environment",
+          "launch_arguments",
+          "daemon_data_home_probe",
+          "metric_tiers"
+        ],
+        "type" : "object"
+      },
+      "type" : "array"
+    },
+    "created_at_utc" : {
+      "type" : "string"
+    },
+    "default_environment" : {
+      "additionalProperties" : {
+        "type" : "string"
+      },
+      "type" : "object"
+    },
+    "git" : {
+      "additionalProperties" : false,
+      "properties" : {
+        "build_started_at_utc" : {
+          "type" : "string"
+        },
+        "commit" : {
+          "type" : "string"
+        },
+        "dirty" : {
+          "type" : "boolean"
+        },
+        "workspace_fingerprint" : {
+          "type" : "string"
+        }
+      },
+      "required" : [
+        "commit",
+        "dirty",
+        "workspace_fingerprint",
+        "build_started_at_utc"
+      ],
+      "type" : "object"
+    },
+    "label" : {
+      "type" : "string"
+    },
+    "launch_arguments" : {
+      "items" : {
+        "type" : "string"
+      },
+      "type" : "array"
+    },
+    "run_id" : {
+      "type" : "string"
+    },
+    "selected_scenarios" : {
+      "items" : {
+        "type" : "string"
+      },
+      "type" : "array"
+    },
+    "system" : {
+      "additionalProperties" : false,
+      "properties" : {
+        "arch" : {
+          "type" : "string"
+        },
+        "macos_build" : {
+          "type" : "string"
+        },
+        "macos_version" : {
+          "type" : "string"
+        },
+        "xcode_version" : {
+          "type" : "string"
+        },
+        "xctrace_version" : {
+          "type" : "string"
+        }
+      },
+      "required" : [
+        "xcode_version",
+        "xctrace_version",
+        "macos_version",
+        "macos_build",
+        "arch"
+      ],
+      "type" : "object"
+    },
+    "targets" : {
+      "additionalProperties" : false,
+      "properties" : {
+        "host_app_path" : {
+          "type" : "string"
+        },
+        "host_bundle_id" : {
+          "type" : "string"
+        },
+        "host_scheme" : {
+          "type" : "string"
+        },
+        "project" : {
+          "type" : "string"
+        },
+        "shipping_app_path" : {
+          "type" : "string"
+        },
+        "shipping_scheme" : {
+          "type" : "string"
+        },
+        "staged_host_app_path" : {
+          "type" : "string"
+        },
+        "staged_host_binary_path" : {
+          "type" : "string"
+        },
+        "staged_host_bundle_id" : {
+          "type" : "string"
+        }
+      },
+      "required" : [
+        "project",
+        "shipping_scheme",
+        "host_scheme",
+        "shipping_app_path",
+        "host_app_path",
+        "host_bundle_id",
+        "staged_host_app_path",
+        "staged_host_binary_path",
+        "staged_host_bundle_id"
+      ],
+      "type" : "object"
+    },
+    "templates" : {
+      "additionalProperties" : false,
+      "properties" : {
+        "allocations" : {
+          "items" : {
+            "type" : "string"
+          },
+          "type" : "array"
+        },
+        "swiftui" : {
+          "items" : {
+            "type" : "string"
+          },
+          "type" : "array"
+        }
+      },
+      "required" : [
+        "swiftui",
+        "allocations"
+      ],
+      "type" : "object"
+    }
+  },
+  "required" : [
+    "label",
+    "run_id",
+    "created_at_utc",
+    "git",
+    "system",
+    "targets",
+    "build_provenance",
+    "templates",
+    "default_environment",
+    "launch_arguments",
+    "selected_scenarios",
+    "captures"
+  ],
+  "title" : "Harness Monitor audit manifest",
+  "type" : "object"
+}

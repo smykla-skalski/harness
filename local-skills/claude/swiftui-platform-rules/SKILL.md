@@ -248,7 +248,7 @@ Use the `dragUp(in:element:distanceRatio:)` helper anchored on a visible element
 
 ## Research backing
 
-Rationale for these rules lives under `apps/harness-monitor-macos/docs/research/`:
+Rationale for these rules lives under `apps/harness-monitor/docs/research/`:
 
 - `ux/01-apple-hig-principles.md` - HIG principles for macOS and iOS
 - `xcuitest-speed.md` - XCUITest reliability and speed investigation report

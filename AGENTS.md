@@ -9,8 +9,8 @@ overrides this file for its subtree.
 | Work area | Start here |
 | --- | --- |
 | Rust CLI, hooks, orchestration, agent assets | This file, then `docs/agent-guides/root-reference.md` when details are needed |
-| Harness Monitor macOS app | `apps/harness-monitor-macos/AGENTS.md` |
-| Monitor previewable SwiftUI layer | `apps/harness-monitor-macos/Sources/HarnessMonitorUIPreviewable/AGENTS.md` |
+| Harness Monitor macOS app | `apps/harness-monitor/AGENTS.md` |
+| Monitor previewable SwiftUI layer | `apps/harness-monitor/Sources/HarnessMonitorUIPreviewable/AGENTS.md` |
 | Generated plugin/skill output roots | The local generated-root `AGENTS.md`; update canonical sources, not outputs |
 | Runtime config layering | `docs/agents/runtime-config-layering.md` |
 

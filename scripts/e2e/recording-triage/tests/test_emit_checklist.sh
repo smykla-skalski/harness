@@ -23,7 +23,7 @@ cat >"$TRIAGE_DIR/launch-args.json" <<'EOM'
   "allConfigured": true,
   "files": [
     {
-      "path": "apps/harness-monitor-macos/Tests/HarnessMonitorAgentsE2ETests/SwarmFixture.swift",
+      "path": "apps/harness-monitor/Tests/HarnessMonitorAgentsE2ETests/SwarmFixture.swift",
       "hasPersistenceIgnoreState": true
     }
   ]

@@ -1,0 +1,136 @@
+import Foundation
+import XCTest
+
+final class HarnessMonitorWindowShellTests: XCTestCase {
+  func testMainRootDelegatesSharedChromeToSceneShell() throws {
+    let mainRootSource = try appSourceFile(named: "HarnessMonitorAppSceneSupport.swift")
+    let mainRoot = try mainRootSource.slice(
+      from: "struct DashboardWindowRootView",
+      to: "enum HarnessMonitorPerfScenarioStatus"
+    )
+
+    XCTAssertTrue(mainRoot.contains("HarnessMonitorWindowShell("))
+    XCTAssertTrue(mainRoot.contains("WindowContentReadiness("))
+    XCTAssertTrue(mainRoot.contains("windowToolbarBackgroundVisibility: .automatic"))
+    XCTAssertTrue(mainRoot.contains(".suppressToolbarBaselineSeparator("))
+    XCTAssertTrue(
+      mainRoot.contains("HarnessMonitorAccessibility.dashboardToolbarSeparatorSuppressed")
+    )
+    XCTAssertFalse(mainRoot.contains("titlebarAppearsTransparent: true"))
+    XCTAssertTrue(mainRoot.contains(".toolbar {"))
+    XCTAssertTrue(mainRoot.contains("private var hostsSharedShellPresentation"))
+    XCTAssertTrue(mainRoot.contains("HarnessMonitorConfirmationDialogModifier("))
+    XCTAssertTrue(mainRoot.contains("HarnessMonitorSheetModifier("))
+    XCTAssertTrue(mainRoot.contains("isEnabled: hostsSharedShellPresentation"))
+
+    for modifier in duplicatedChromeModifiers {
+      XCTAssertFalse(mainRoot.contains(modifier), "main root still owns \(modifier)")
+    }
+  }
+
+  func testPerfScenariosBypassDeferredDashboardPlaceholder() throws {
+    let source = try appSourceFile(named: "HarnessMonitorAppSceneSupport.swift")
+    let mainRoot = try source.slice(
+      from: "struct DashboardWindowRootView",
+      to: "enum HarnessMonitorPerfScenarioStatus"
+    )
+
+    XCTAssertTrue(mainRoot.contains("&& perfScenario == nil"))
+  }
+
+  func testSceneShellOwnsSharedWindowChrome() throws {
+    let shell = try appSourceFile(named: "HarnessMonitorWindowSceneShell.swift")
+
+    for modifier in duplicatedChromeModifiers {
+      XCTAssertTrue(shell.contains(modifier), "scene shell is missing \(modifier)")
+    }
+    XCTAssertTrue(shell.contains("OptionalWindowToolbarBackgroundVisibilityModifier("))
+    XCTAssertFalse(shell.contains(".toolbarBackground(.bar, for: .windowToolbar)"))
+    XCTAssertTrue(shell.contains(".toolbarBackgroundVisibility(visibility, for: .windowToolbar)"))
+    XCTAssertTrue(shell.contains("HarnessMonitorBackdropDefaults.modeKey"))
+    XCTAssertTrue(shell.contains("HarnessMonitorBackgroundDefaults.imageKey"))
+    XCTAssertTrue(shell.contains("WindowContentReadinessGate("))
+    XCTAssertTrue(shell.contains(".environment(\\.windowSurfaceContext"))
+    XCTAssertTrue(shell.contains("HarnessMonitorAccessibility.windowShellState(windowID)"))
+    XCTAssertTrue(shell.contains("windowID: windowID"))
+    XCTAssertTrue(shell.contains("openMainWindow: {"))
+    XCTAssertTrue(shell.contains("openWindow.openHarnessDashboardWindow()"))
+  }
+
+  func testWindowCommandTrackingPinsLogicalWindowIdentifiers() throws {
+    let source = try appSourceFile(named: "HarnessMonitorAppWindowCommandSupport.swift")
+
+    XCTAssertTrue(source.contains("let windowID: String"))
+    XCTAssertTrue(source.contains("private var logicalWindowID = \"\""))
+    XCTAssertTrue(source.contains("window.identifier = expectedIdentifier"))
+    XCTAssertTrue(source.contains("NSUserInterfaceItemIdentifier(logicalWindowID)"))
+  }
+
+  func testSettingsWindowUsesLightweightMCPTracking() throws {
+    let source = try appSourceFile(named: "HarnessMonitorApp+SceneContent.swift")
+    let settingsScene = try source.slice(
+      from: "@ViewBuilder var settingsSceneContent",
+      to: "@ViewBuilder var policyCanvasLabWindowSceneContent"
+    )
+    let dashboardScene = try source.slice(
+      from: "@ViewBuilder var dashboardWindowSceneContent",
+      to: "@ViewBuilder var settingsSceneContent"
+    )
+
+    XCTAssertTrue(settingsScene.contains(".harnessTrackMCPWindow(tracksElements: false)"))
+    XCTAssertTrue(dashboardScene.contains(".harnessTrackMCPWindow()"))
+  }
+
+  func testPerfScenarioStateMarkerIsNotInstalledWhenDisabled() throws {
+    let source = try appSourceFile(named: "HarnessMonitorAppSceneSupport.swift")
+    let sessionRoot = try appSourceFile(named: "SessionWindowRootView.swift")
+
+    XCTAssertTrue(source.contains(".modifier(PerfScenarioStateMarker(text: perfScenarioStateText))"))
+    XCTAssertTrue(
+      sessionRoot.contains(
+        ".modifier(PerfScenarioStateMarker(text: sessionPerfScenarioStateText))"
+      )
+    )
+    XCTAssertTrue(source.contains("struct PerfScenarioStateMarker: ViewModifier"))
+    XCTAssertFalse(source.contains(".overlay {\n        if let perfScenarioStateText"))
+  }
+
+  private var duplicatedChromeModifiers: [String] {
+    [
+      ".writingToolsBehavior(.disabled)",
+      "HarnessMonitorSceneAppearanceModifier(",
+      "PinchToZoomTextSizeModifier()",
+      "HarnessMonitorWindowBackdropModifier(",
+      "WindowCommandScopeTrackingModifier(",
+      ".harnessMonitorMCPWindowCommands(",
+      "HarnessMonitorUITestAnimationModifier()",
+    ]
+  }
+
+  private func appSourceFile(named name: String) throws -> String {
+    let testsDirectory = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
+    let repoRoot =
+      testsDirectory
+      .deletingLastPathComponent()
+      .deletingLastPathComponent()
+      .deletingLastPathComponent()
+      .deletingLastPathComponent()
+    let fileURL =
+      repoRoot
+      .appendingPathComponent("apps/harness-monitor/Sources/HarnessMonitor/App")
+      .appendingPathComponent(name)
+    return try String(contentsOf: fileURL, encoding: .utf8)
+  }
+}
+
+private extension String {
+  func slice(from startMarker: String, to endMarker: String) throws -> String {
+    guard
+      let start = range(of: startMarker)?.lowerBound,
+      let end = range(of: endMarker, range: start..<endIndex)?.lowerBound
+    else {
+      throw CocoaError(.fileReadCorruptFile)
+    }
+    return String(self[start..<end])
+  }
+}

@@ -40,7 +40,7 @@ pub const RUNTIME_PROFILES_DIR: &str = "runtime-profiles";
 
 /// Prefix attached to every agent-session profile name. Mirrors the
 /// `agent-` token that the shell helpers in
-/// `apps/harness-monitor-macos/Scripts/lib/runtime-profile.sh` apply to
+/// `apps/harness-monitor/Scripts/lib/runtime-profile.sh` apply to
 /// `CLAUDE_SESSION_ID`/`CODEX_SESSION_ID` etc, so classification stays
 /// consistent end-to-end.
 pub const AGENT_PROFILE_PREFIX: &str = "agent-";

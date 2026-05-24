@@ -3,7 +3,7 @@
     "scripts",
     "agents/shared",
     "resources/observability",
-    "apps/harness-monitor-macos/Scripts"
+    "apps/harness-monitor/Scripts"
   ],
   "exclude": [
     "**/__pycache__",
@@ -14,9 +14,9 @@
     "tmp",
     "output",
     "vendor",
-    "apps/harness-monitor-macos/Tuist",
-    "apps/harness-monitor-macos/build",
-    "apps/harness-monitor-macos/tmp",
-    "apps/harness-monitor-macos/xcode-derived"
+    "apps/harness-monitor/Tuist",
+    "apps/harness-monitor/build",
+    "apps/harness-monitor/tmp",
+    "apps/harness-monitor/xcode-derived"
   ]
 }

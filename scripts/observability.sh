@@ -5,8 +5,8 @@ ROOT="$(CDPATH='' cd -- "$(dirname -- "$0")/.." && pwd)"
 # shellcheck source=scripts/lib/common-repo-root.sh
 source "$ROOT/scripts/lib/common-repo-root.sh"
 COMMON_REPO_ROOT="$(resolve_common_repo_root "$ROOT")"
-# shellcheck source=apps/harness-monitor-macos/Scripts/lib/xcodebuild-destination.sh
-source "$ROOT/apps/harness-monitor-macos/Scripts/lib/xcodebuild-destination.sh"
+# shellcheck source=apps/harness-monitor/Scripts/lib/xcodebuild-destination.sh
+source "$ROOT/apps/harness-monitor/Scripts/lib/xcodebuild-destination.sh"
 STACK_ROOT="$ROOT/resources/observability"
 COMPOSE_FILE="$STACK_ROOT/docker-compose.yml"
 PROJECT_NAME="${HARNESS_OBSERVABILITY_PROJECT_NAME:-harness-observability}"
@@ -837,8 +837,8 @@ run_monitor_smoke() {
   trap 'write_shared_config false >/dev/null || true; remove_monitor_smoke_data_home_marker; rm -f "$log_path"' RETURN
   if ! XDG_DATA_HOME="$(resolve_data_root)" \
     run_with_cleared_otel_env \
-      "$ROOT/apps/harness-monitor-macos/Scripts/monitor-xcodebuild.sh" \
-        -project "$ROOT/apps/harness-monitor-macos/HarnessMonitor.xcodeproj" \
+      "$ROOT/apps/harness-monitor/Scripts/monitor-xcodebuild.sh" \
+        -project "$ROOT/apps/harness-monitor/HarnessMonitor.xcodeproj" \
         -scheme "HarnessMonitor" \
         -configuration Debug \
         -derivedDataPath "$COMMON_REPO_ROOT/xcode-derived" \

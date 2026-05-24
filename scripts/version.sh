@@ -2,18 +2,18 @@
 set -euo pipefail
 
 ROOT="$(CDPATH='' cd -- "$(dirname -- "$0")/.." && pwd)"
-# shellcheck source=apps/harness-monitor-macos/Scripts/lib/swift-tool-env.sh
-source "$ROOT/apps/harness-monitor-macos/Scripts/lib/swift-tool-env.sh"
-# shellcheck source=apps/harness-monitor-macos/Scripts/lib/xcode-version.sh
-source "$ROOT/apps/harness-monitor-macos/Scripts/lib/xcode-version.sh"
+# shellcheck source=apps/harness-monitor/Scripts/lib/swift-tool-env.sh
+source "$ROOT/apps/harness-monitor/Scripts/lib/swift-tool-env.sh"
+# shellcheck source=apps/harness-monitor/Scripts/lib/xcode-version.sh
+source "$ROOT/apps/harness-monitor/Scripts/lib/xcode-version.sh"
 sanitize_xcode_only_swift_environment
 CARGO_TOML="$ROOT/Cargo.toml"
 TESTKIT_CARGO_TOML="$ROOT/testkit/Cargo.toml"
 AFF_CARGO_TOML="$ROOT/aff/Cargo.toml"
 CARGO_LOCK="$ROOT/Cargo.lock"
-MONITOR_APP_ROOT="$ROOT/apps/harness-monitor-macos"
-MONITOR_BUILD_SETTINGS="$ROOT/apps/harness-monitor-macos/Tuist/ProjectDescriptionHelpers/BuildSettings.swift"
-MONITOR_DAEMON_INFO_PLIST="$ROOT/apps/harness-monitor-macos/Resources/LaunchAgents/io.harnessmonitor.daemon.Info.plist"
+MONITOR_APP_ROOT="$ROOT/apps/harness-monitor"
+MONITOR_BUILD_SETTINGS="$ROOT/apps/harness-monitor/Tuist/ProjectDescriptionHelpers/BuildSettings.swift"
+MONITOR_DAEMON_INFO_PLIST="$ROOT/apps/harness-monitor/Resources/LaunchAgents/io.harnessmonitor.daemon.Info.plist"
 MONITOR_GENERATED_PBXPROJ="$MONITOR_APP_ROOT/HarnessMonitor.xcodeproj/project.pbxproj"
 MONITOR_TUIST_PATCHER="$MONITOR_APP_ROOT/Scripts/patch-tuist-pbxproj.py"
 MONITOR_DEFAULT_LAST_UPGRADE_CHECK="$(harness_monitor_default_xcode_upgrade_check)"
@@ -239,10 +239,10 @@ check_sync() {
   [ "$lock_harness_version" = "$version" ] || errors+=("Cargo.lock harness version $lock_harness_version != Cargo.toml version $version")
   [ "$lock_testkit_version" = "$version" ] || errors+=("Cargo.lock harness-testkit version $lock_testkit_version != Cargo.toml version $version")
   [ "$lock_aff_version" = "$version" ] || errors+=("Cargo.lock aff version $lock_aff_version != Cargo.toml version $version")
-  [ "$marketing_version" = "$version" ] || errors+=("apps/harness-monitor-macos/Tuist/ProjectDescriptionHelpers/BuildSettings.swift MARKETING_VERSION $marketing_version != Cargo.toml version $version")
-  [ "$current_version" = "$version" ] || errors+=("apps/harness-monitor-macos/Tuist/ProjectDescriptionHelpers/BuildSettings.swift CURRENT_PROJECT_VERSION $current_version != Cargo.toml version $version")
-  [ "$daemon_version" = "$version" ] || errors+=("apps/harness-monitor-macos/Resources/LaunchAgents/io.harnessmonitor.daemon.Info.plist version $daemon_version != Cargo.toml version $version")
-  [ "$daemon_build_version" = "$version" ] || errors+=("apps/harness-monitor-macos/Resources/LaunchAgents/io.harnessmonitor.daemon.Info.plist build version $daemon_build_version != Cargo.toml version $version")
+  [ "$marketing_version" = "$version" ] || errors+=("apps/harness-monitor/Tuist/ProjectDescriptionHelpers/BuildSettings.swift MARKETING_VERSION $marketing_version != Cargo.toml version $version")
+  [ "$current_version" = "$version" ] || errors+=("apps/harness-monitor/Tuist/ProjectDescriptionHelpers/BuildSettings.swift CURRENT_PROJECT_VERSION $current_version != Cargo.toml version $version")
+  [ "$daemon_version" = "$version" ] || errors+=("apps/harness-monitor/Resources/LaunchAgents/io.harnessmonitor.daemon.Info.plist version $daemon_version != Cargo.toml version $version")
+  [ "$daemon_build_version" = "$version" ] || errors+=("apps/harness-monitor/Resources/LaunchAgents/io.harnessmonitor.daemon.Info.plist build version $daemon_build_version != Cargo.toml version $version")
 
   if generated_monitor_pbxproj_exists; then
     while IFS= read -r generated_marketing_version; do
@@ -253,18 +253,18 @@ check_sync() {
     done < <(generated_pbxproj_current_versions)
 
     if [ "${#generated_marketing_versions[@]}" -eq 0 ]; then
-      errors+=("apps/harness-monitor-macos/HarnessMonitor.xcodeproj/project.pbxproj is missing semver MARKETING_VERSION entries")
+      errors+=("apps/harness-monitor/HarnessMonitor.xcodeproj/project.pbxproj is missing semver MARKETING_VERSION entries")
     else
       for generated_marketing_version in "${generated_marketing_versions[@]}"; do
-        [ "$generated_marketing_version" = "$version" ] || errors+=("apps/harness-monitor-macos/HarnessMonitor.xcodeproj/project.pbxproj MARKETING_VERSION $generated_marketing_version != Cargo.toml version $version")
+        [ "$generated_marketing_version" = "$version" ] || errors+=("apps/harness-monitor/HarnessMonitor.xcodeproj/project.pbxproj MARKETING_VERSION $generated_marketing_version != Cargo.toml version $version")
       done
     fi
 
     if [ "${#generated_current_versions[@]}" -eq 0 ]; then
-      errors+=("apps/harness-monitor-macos/HarnessMonitor.xcodeproj/project.pbxproj is missing semver CURRENT_PROJECT_VERSION entries")
+      errors+=("apps/harness-monitor/HarnessMonitor.xcodeproj/project.pbxproj is missing semver CURRENT_PROJECT_VERSION entries")
     else
       for generated_current_version in "${generated_current_versions[@]}"; do
-        [ "$generated_current_version" = "$version" ] || errors+=("apps/harness-monitor-macos/HarnessMonitor.xcodeproj/project.pbxproj CURRENT_PROJECT_VERSION $generated_current_version != Cargo.toml version $version")
+        [ "$generated_current_version" = "$version" ] || errors+=("apps/harness-monitor/HarnessMonitor.xcodeproj/project.pbxproj CURRENT_PROJECT_VERSION $generated_current_version != Cargo.toml version $version")
       done
     fi
   fi

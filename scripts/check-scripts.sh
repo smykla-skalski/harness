@@ -92,11 +92,11 @@ shell_scripts=(
 )
 python_scripts=("$ROOT"/scripts/*.py)
 monitor_shell_scripts=(
-  "$ROOT"/apps/harness-monitor-macos/Scripts/*.sh
-  "$ROOT"/apps/harness-monitor-macos/Scripts/lib/*.sh
+  "$ROOT"/apps/harness-monitor/Scripts/*.sh
+  "$ROOT"/apps/harness-monitor/Scripts/lib/*.sh
 )
-monitor_python_tests_dir="$ROOT/apps/harness-monitor-macos/Scripts/tests"
-monitor_python_tests=("$ROOT"/apps/harness-monitor-macos/Scripts/tests/*.py)
+monitor_python_tests_dir="$ROOT/apps/harness-monitor/Scripts/tests"
+monitor_python_tests=("$ROOT"/apps/harness-monitor/Scripts/tests/*.py)
 monitor_python_fast_tests=()
 
 for script_path in "${shell_scripts[@]}"; do

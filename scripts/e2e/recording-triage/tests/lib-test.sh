@@ -18,8 +18,8 @@ recording_triage_test_skip_unless_ffmpeg() {
 
 recording_triage_test_skip_unless_binary() {
   local repo_root="$1"
-  local debug_path="$repo_root/apps/harness-monitor-macos/Tools/HarnessMonitorE2E/.build/debug/harness-monitor-e2e"
-  local release_path="$repo_root/apps/harness-monitor-macos/Tools/HarnessMonitorE2E/.build/release/harness-monitor-e2e"
+  local debug_path="$repo_root/apps/harness-monitor/Tools/HarnessMonitorE2E/.build/debug/harness-monitor-e2e"
+  local release_path="$repo_root/apps/harness-monitor/Tools/HarnessMonitorE2E/.build/release/harness-monitor-e2e"
   # Prefer the freshly-compiled debug binary so tests always exercise the
   # current source instead of a stale release artefact left over from a prior
   # mise run monitor:macos:tools:build:e2e invocation.

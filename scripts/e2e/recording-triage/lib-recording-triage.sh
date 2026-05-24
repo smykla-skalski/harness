@@ -15,8 +15,8 @@ recording_triage_resolve_binary() {
     printf '%s\n' "$HARNESS_MONITOR_E2E_TOOL_BINARY"
     return 0
   fi
-  local release_path="$repo_root/apps/harness-monitor-macos/Tools/HarnessMonitorE2E/.build/release/harness-monitor-e2e"
-  local debug_path="$repo_root/apps/harness-monitor-macos/Tools/HarnessMonitorE2E/.build/debug/harness-monitor-e2e"
+  local release_path="$repo_root/apps/harness-monitor/Tools/HarnessMonitorE2E/.build/release/harness-monitor-e2e"
+  local debug_path="$repo_root/apps/harness-monitor/Tools/HarnessMonitorE2E/.build/debug/harness-monitor-e2e"
   if [[ -x "$release_path" ]]; then
     printf '%s\n' "$release_path"
     return 0

@@ -10,7 +10,7 @@ SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)"
 . "$SCRIPT_DIR/../lib.sh"
 
 REPO_ROOT="$(e2e_repo_root)"
-OUTPUT_DIR_DEFAULT="$REPO_ROOT/apps/harness-monitor-macos/Tools/HarnessMonitorE2E/Tests/Fixtures"
+OUTPUT_DIR_DEFAULT="$REPO_ROOT/apps/harness-monitor/Tools/HarnessMonitorE2E/Tests/Fixtures"
 OUTPUT_DIR="${1:-$OUTPUT_DIR_DEFAULT}"
 
 e2e_require_command ffmpeg

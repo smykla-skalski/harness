@@ -1,6 +1,6 @@
 ---
 name: swiftui-performance-macos
-description: SwiftUI and Harness Monitor performance rules. Covers no DateFormatter/JSONEncoder/NumberFormatter allocation in view body, cached @MainActor formatters, no .repeatForever on always-visible views, no persisted state in .inspector/.searchable on first frame, no mirror-state loops for store-backed selection, no geometry feedback loops during animation, OSSignposter contract (io.harnessmonitor/perf/<scenario>), perf test env vars (HARNESS_MONITOR_KEEP_ANIMATIONS), and isolated worktree requirements for `mise run monitor:audit`. Invoke when writing or reviewing performance-sensitive SwiftUI code, animations, formatters, startup flow, persisted layout state, XCTest perf tests, or running Instruments audits in apps/harness-monitor-macos.
+description: SwiftUI and Harness Monitor performance rules. Covers no DateFormatter/JSONEncoder/NumberFormatter allocation in view body, cached @MainActor formatters, no .repeatForever on always-visible views, no persisted state in .inspector/.searchable on first frame, no mirror-state loops for store-backed selection, no geometry feedback loops during animation, OSSignposter contract (io.harnessmonitor/perf/<scenario>), perf test env vars (HARNESS_MONITOR_KEEP_ANIMATIONS), and isolated worktree requirements for `mise run monitor:audit`. Invoke when writing or reviewing performance-sensitive SwiftUI code, animations, formatters, startup flow, persisted layout state, XCTest perf tests, or running Instruments audits in apps/harness-monitor.
 ---
 
 # SwiftUI performance rules for Harness Monitor
@@ -311,7 +311,7 @@ Leaving audit worktrees behind is not acceptable. If cleanup fails because a pro
 
 ### xctrace scripts
 
-The Python scripts under `apps/harness-monitor-macos/Scripts/` parse Instruments XML exports. They must stay compatible with the xctrace export format, which uses ref-based deduplication for elements. The `dereference` function in `extract-instruments-metrics.py` handles transitive refs (ref -> ref -> element).
+The Python scripts under `apps/harness-monitor/Scripts/` parse Instruments XML exports. They must stay compatible with the xctrace export format, which uses ref-based deduplication for elements. The `dereference` function in `extract-instruments-metrics.py` handles transitive refs (ref -> ref -> element).
 
 When modifying the extractor, comparator, or audit contracts, run the perf tool
 tests and the parser regression tests:
@@ -328,7 +328,7 @@ Test fixtures in `Scripts/tests/fixtures/` are minimal XML samples. Update them 
 
 ## Research backing
 
-Rationale for these rules lives under `apps/harness-monitor-macos/docs/research/ux/`:
+Rationale for these rules lives under `apps/harness-monitor/docs/research/ux/`:
 
 - `07-performance-responsiveness.md` - response time thresholds, 60fps budget, main thread budget
 - `05-swiftui-best-practices.md` - SwiftUI body performance, @Observable observation rules

@@ -1,11 +1,11 @@
 ---
 name: swiftui-design-rules
-description: SwiftUI/macOS UX rules covering accessibility (VoiceOver, Dynamic Type, contrast, target sizes), visual design (typography, 8pt spacing, color, dark mode, motion timing), interaction patterns (feedback, loading states, destructive actions, forms, truncation, notifications), and performance targets (60fps, launch time, scroll, memory). Invoke when writing or reviewing SwiftUI views, forms, lists, or any visible UI surface in apps/harness-monitor-macos.
+description: SwiftUI/macOS UX rules covering accessibility (VoiceOver, Dynamic Type, contrast, target sizes), visual design (typography, 8pt spacing, color, dark mode, motion timing), interaction patterns (feedback, loading states, destructive actions, forms, truncation, notifications), and performance targets (60fps, launch time, scroll, memory). Invoke when writing or reviewing SwiftUI views, forms, lists, or any visible UI surface in apps/harness-monitor.
 ---
 
 # SwiftUI design rules
 
-Hard requirements for any SwiftUI view surface in `apps/harness-monitor-macos`. Every feature ships meeting these rules or it doesn't ship.
+Hard requirements for any SwiftUI view surface in `apps/harness-monitor`. Every feature ships meeting these rules or it doesn't ship.
 
 ## Accessibility
 
@@ -422,7 +422,7 @@ Rules:
 
 ## Research backing
 
-Rationale and edge-case research for these rules lives under `apps/harness-monitor-macos/docs/research/ux/`:
+Rationale and edge-case research for these rules lives under `apps/harness-monitor/docs/research/ux/`:
 
 - `04-accessibility-requirements.md` - VoiceOver, Dynamic Type, contrast, target size sources
 - `03-visual-design-fundamentals.md` - typography, color, 8pt grid origins

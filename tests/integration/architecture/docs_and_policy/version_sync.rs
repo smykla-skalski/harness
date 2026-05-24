@@ -18,11 +18,11 @@ fn repo_version_surfaces_stay_in_sync() {
     let cargo_lock = read_repo_file(root, "Cargo.lock");
     let build_settings = read_repo_file(
         root,
-        "apps/harness-monitor-macos/Tuist/ProjectDescriptionHelpers/BuildSettings.swift",
+        "apps/harness-monitor/Tuist/ProjectDescriptionHelpers/BuildSettings.swift",
     );
     let daemon_info_plist = read_repo_file(
         root,
-        "apps/harness-monitor-macos/Resources/LaunchAgents/io.harnessmonitor.daemon.Info.plist",
+        "apps/harness-monitor/Resources/LaunchAgents/io.harnessmonitor.daemon.Info.plist",
     );
     let observe_output = read_repo_file(root, "src/observe/output.rs");
 
@@ -85,7 +85,7 @@ fn docs_describe_automatic_version_sync_workflow() {
     let agents = read_repo_file(root, "AGENTS.md");
     let claude = read_repo_file(root, "CLAUDE.md");
     let readme = read_repo_file(root, "README.md");
-    let monitor_readme = read_repo_file(root, "apps/harness-monitor-macos/README.md");
+    let monitor_readme = read_repo_file(root, "apps/harness-monitor/README.md");
     let mise = read_repo_file(root, ".mise.toml");
     let docs = [
         agents.as_str(),
@@ -130,8 +130,8 @@ fn docs_describe_automatic_version_sync_workflow() {
 #[test]
 fn monitor_generate_script_invokes_tuist_then_post_generate() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR"));
-    let script = read_repo_file(root, "apps/harness-monitor-macos/Scripts/generate.sh");
-    let post_generate = read_repo_file(root, "apps/harness-monitor-macos/Scripts/post-generate.sh");
+    let script = read_repo_file(root, "apps/harness-monitor/Scripts/generate.sh");
+    let post_generate = read_repo_file(root, "apps/harness-monitor/Scripts/post-generate.sh");
 
     let tuist_index = script
         .rfind("tuist")
@@ -156,7 +156,7 @@ fn monitor_generate_task_forces_regenerate_by_default() {
 
     assert!(
         mise.contains(
-            "run = \"HARNESS_MONITOR_FORCE_GENERATE=1 apps/harness-monitor-macos/Scripts/generate.sh\""
+            "run = \"HARNESS_MONITOR_FORCE_GENERATE=1 apps/harness-monitor/Scripts/generate.sh\""
         ),
         "monitor:generate should force Tuist regeneration by default"
     );
@@ -165,10 +165,10 @@ fn monitor_generate_task_forces_regenerate_by_default() {
 #[test]
 fn monitor_pbxproj_stays_on_current_xcode_format() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR"));
-    let post_generate = read_repo_file(root, "apps/harness-monitor-macos/Scripts/post-generate.sh");
+    let post_generate = read_repo_file(root, "apps/harness-monitor/Scripts/post-generate.sh");
     let patcher = read_repo_file(
         root,
-        "apps/harness-monitor-macos/Scripts/patch-tuist-pbxproj.py",
+        "apps/harness-monitor/Scripts/patch-tuist-pbxproj.py",
     );
 
     assert!(
@@ -188,7 +188,7 @@ fn monitor_pbxproj_stays_on_current_xcode_format() {
     fs::write(&pbxproj_path, STALE_MONITOR_PBXPROJ_FIXTURE).expect("fixture pbxproj");
 
     let status = Command::new("/usr/bin/python3")
-        .arg(root.join("apps/harness-monitor-macos/Scripts/patch-tuist-pbxproj.py"))
+        .arg(root.join("apps/harness-monitor/Scripts/patch-tuist-pbxproj.py"))
         .env("HARNESS_MONITOR_PBXPROJ", &pbxproj_path)
         .env("HARNESS_MONITOR_LAST_UPGRADE_CHECK", "2640")
         .env("HARNESS_MONITOR_LAST_SWIFT_UPDATE_CHECK", "2640")
@@ -234,7 +234,7 @@ fn monitor_pbxproj_version_sync_updates_semver_entries_only() {
     fs::write(&pbxproj_path, STALE_MONITOR_PBXPROJ_VERSION_FIXTURE).expect("fixture pbxproj");
 
     let status = Command::new("/usr/bin/python3")
-        .arg(root.join("apps/harness-monitor-macos/Scripts/patch-tuist-pbxproj.py"))
+        .arg(root.join("apps/harness-monitor/Scripts/patch-tuist-pbxproj.py"))
         .env("HARNESS_MONITOR_PBXPROJ", &pbxproj_path)
         .env("HARNESS_MONITOR_LAST_UPGRADE_CHECK", "2640")
         .env("HARNESS_MONITOR_LAST_SWIFT_UPDATE_CHECK", "2640")
@@ -327,7 +327,7 @@ fn version_script_syncs_generated_monitor_pbxproj_when_present() {
     let patched = fs::read_to_string(
         fixture_root
             .path()
-            .join("apps/harness-monitor-macos/HarnessMonitor.xcodeproj/project.pbxproj"),
+            .join("apps/harness-monitor/HarnessMonitor.xcodeproj/project.pbxproj"),
     )
     .expect("patched generated pbxproj");
     let expected_marketing = format!("MARKETING_VERSION = {};", env!("CARGO_PKG_VERSION"));
