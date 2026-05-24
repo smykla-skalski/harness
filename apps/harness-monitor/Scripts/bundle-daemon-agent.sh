@@ -133,6 +133,64 @@ launch_agent_label="Q498EB36N4.io.harnessmonitor.daemon"
 app_group_id="$(harness_monitor_runtime_app_group_id)"
 bundle_stamp_path="${SCRIPT_OUTPUT_FILE_8:-${DERIVED_FILE_DIR:-$TARGET_BUILD_DIR}/$TARGET_NAME-bundle-daemon-agent.stamp}"
 
+# Resolve a codesign identity. Xcode populates EXPANDED_CODE_SIGN_IDENTITY
+# only when CODE_SIGNING_ALLOWED=YES; the `monitor:build` and named build
+# lanes pass NO so Xcode skips the embedded-binary sign
+# phase. Without a fallback the helper would carry only the linker
+# ad-hoc signature (TeamIdentifier=not set), which Group Container
+# access denies — daemon would either crash on `cs_mtime != mtime` or
+# exit EX_CONFIG (78) on first sandbox file read. Falling back to the
+# first Apple Development identity from the user's keychain mirrors
+# what Xcode would have picked, gives the helper a Team-ID signature,
+# and keeps the timestamp service out of the build path so EDR-driven
+# DNS races (Falcon, Kandji) cannot stall codesign mid-bundle.
+codesign_identity="${EXPANDED_CODE_SIGN_IDENTITY:-}"
+if [ -z "$codesign_identity" ] || [ "$codesign_identity" = "-" ]; then
+  codesign_identity="$(/usr/bin/security find-identity -v -p codesigning 2>/dev/null \
+    | /usr/bin/awk -F'"' '/Apple Development:/ { print $2; exit }')"
+fi
+timestamp_flag="ad-hoc"
+if [ -n "$codesign_identity" ]; then
+  # Xcode-driven Release lanes provide a real timestamp via env;
+  # local debug lanes opt out so codesign never blocks on the network.
+  timestamp_flag="${HARNESS_DAEMON_CODESIGN_TIMESTAMP:---timestamp=none}"
+fi
+
+bundle_stamp_contents="$(
+  {
+    printf 'daemon_source=%s\n' "$daemon_source"
+    printf 'daemon_source_stat=%s\n' "$(file_stat_signature "$daemon_source")"
+    printf 'codesign_identity=%s\n' "${codesign_identity:--}"
+    printf 'timestamp_flag=%s\n' "$timestamp_flag"
+    printf 'launch_agent_label=%s\n' "$launch_agent_label"
+    printf 'app_group_id=%s\n' "$app_group_id"
+    printf 'marketing_version=%s\n' "${MARKETING_VERSION:-}"
+    printf 'daemon_data_home=%s\n' "${HARNESS_DAEMON_DATA_HOME:-}"
+    printf 'codex_ws_port=%s\n' "${HARNESS_CODEX_WS_PORT:-}"
+    printf 'runtime_lane=%s\n' "${HARNESS_MONITOR_RUNTIME_LANE:-}"
+    printf 'daemon_plist_sha=%s\n' "$(file_sha256 "$PROJECT_DIR/Resources/LaunchAgents/$plist_name")"
+    printf 'legacy_managed_plist_sha=%s\n' \
+      "$(file_sha256 "$PROJECT_DIR/Resources/LaunchAgents/io.harnessmonitor.daemon.managed.plist")"
+    printf 'legacy_plist_sha=%s\n' \
+      "$(file_sha256 "$PROJECT_DIR/Resources/LaunchAgents/io.harnessmonitor.daemon.plist")"
+    printf 'entitlements_sha=%s\n' "$(file_sha256 "$PROJECT_DIR/HarnessMonitorDaemon.entitlements")"
+  }
+)"
+
+# Keep the stamp comparison ahead of the expensive copy/plutil/otool/codesign
+# path. The old order still spent ~15s re-signing the daemon helper on every
+# no-op Xcode build before discovering nothing had changed.
+if [ -f "$bundle_stamp_path" ] \
+  && [ -x "$daemon_target" ] \
+  && [ -f "$plist_target" ] \
+  && { [ ! -f "$PROJECT_DIR/Resources/LaunchAgents/io.harnessmonitor.daemon.managed.plist" ] \
+    || [ -f "$launch_agents_dir/io.harnessmonitor.daemon.managed.plist" ]; } \
+  && { [ ! -f "$PROJECT_DIR/Resources/LaunchAgents/io.harnessmonitor.daemon.plist" ] \
+    || [ -f "$launch_agents_dir/io.harnessmonitor.daemon.plist" ]; } \
+  && [ "$(/bin/cat "$bundle_stamp_path")" = "$bundle_stamp_contents" ]; then
+  exit 0
+fi
+
 /bin/mkdir -p "$helpers_dir" "$launch_agents_dir"
 
 # Stage every mutation through `*.staging` paths in the destination
@@ -156,6 +214,9 @@ cleanup_staging() {
   /bin/rm -f "$daemon_target_staging" "$plist_target_staging" 2>/dev/null || true
 }
 trap cleanup_staging EXIT
+
+package_version="$(resolve_package_version)"
+validate_package_version "$package_version" "${MARKETING_VERSION:-}"
 
 # `cp -p` preserves the linker-signed cs_mtime alignment from
 # `target/debug/harness` (rustc/lld embeds an ad-hoc CodeDirectory whose
@@ -203,31 +264,7 @@ if ! /usr/bin/otool -l "$daemon_target_staging" | /usr/bin/grep -q "__info_plist
   exit 1
 fi
 
-package_version="$(resolve_package_version)"
-validate_package_version "$package_version" "${MARKETING_VERSION:-}"
-
-# Resolve a codesign identity. Xcode populates EXPANDED_CODE_SIGN_IDENTITY
-# only when CODE_SIGNING_ALLOWED=YES; the `monitor:build` and named build
-# lanes pass NO so Xcode skips the embedded-binary sign
-# phase. Without a fallback the helper would carry only the linker
-# ad-hoc signature (TeamIdentifier=not set), which Group Container
-# access denies — daemon would either crash on `cs_mtime != mtime` or
-# exit EX_CONFIG (78) on first sandbox file read. Falling back to the
-# first Apple Development identity from the user's keychain mirrors
-# what Xcode would have picked, gives the helper a Team-ID signature,
-# and keeps the timestamp service out of the build path so EDR-driven
-# DNS races (Falcon, Kandji) cannot stall codesign mid-bundle.
-codesign_identity="${EXPANDED_CODE_SIGN_IDENTITY:-}"
-if [ -z "$codesign_identity" ] || [ "$codesign_identity" = "-" ]; then
-  codesign_identity="$(/usr/bin/security find-identity -v -p codesigning 2>/dev/null \
-    | /usr/bin/awk -F'"' '/Apple Development:/ { print $2; exit }')"
-fi
-timestamp_flag="ad-hoc"
-
 if [ -n "$codesign_identity" ]; then
-  # Xcode-driven Release lanes provide a real timestamp via env;
-  # local debug lanes opt out so codesign never blocks on the network.
-  timestamp_flag="${HARNESS_DAEMON_CODESIGN_TIMESTAMP:---timestamp=none}"
   /usr/bin/codesign \
     --force \
     --sign "$codesign_identity" \
@@ -246,38 +283,6 @@ else
     --sign - \
     --identifier "$launch_agent_label" \
     "$daemon_target_staging"
-fi
-
-bundle_stamp_contents="$(
-  {
-    printf 'daemon_source=%s\n' "$daemon_source"
-    printf 'daemon_source_stat=%s\n' "$(file_stat_signature "$daemon_source")"
-    printf 'codesign_identity=%s\n' "${codesign_identity:--}"
-    printf 'timestamp_flag=%s\n' "$timestamp_flag"
-    printf 'launch_agent_label=%s\n' "$launch_agent_label"
-    printf 'app_group_id=%s\n' "$app_group_id"
-    printf 'marketing_version=%s\n' "${MARKETING_VERSION:-}"
-    printf 'daemon_data_home=%s\n' "${HARNESS_DAEMON_DATA_HOME:-}"
-    printf 'codex_ws_port=%s\n' "${HARNESS_CODEX_WS_PORT:-}"
-    printf 'runtime_lane=%s\n' "${HARNESS_MONITOR_RUNTIME_LANE:-}"
-    printf 'daemon_plist_sha=%s\n' "$(file_sha256 "$PROJECT_DIR/Resources/LaunchAgents/$plist_name")"
-    printf 'legacy_managed_plist_sha=%s\n' \
-      "$(file_sha256 "$PROJECT_DIR/Resources/LaunchAgents/io.harnessmonitor.daemon.managed.plist")"
-    printf 'legacy_plist_sha=%s\n' \
-      "$(file_sha256 "$PROJECT_DIR/Resources/LaunchAgents/io.harnessmonitor.daemon.plist")"
-    printf 'entitlements_sha=%s\n' "$(file_sha256 "$PROJECT_DIR/HarnessMonitorDaemon.entitlements")"
-  }
-)"
-
-if [ -f "$bundle_stamp_path" ] \
-  && [ -x "$daemon_target" ] \
-  && [ -f "$plist_target" ] \
-  && { [ ! -f "$PROJECT_DIR/Resources/LaunchAgents/io.harnessmonitor.daemon.managed.plist" ] \
-    || [ -f "$launch_agents_dir/io.harnessmonitor.daemon.managed.plist" ]; } \
-  && { [ ! -f "$PROJECT_DIR/Resources/LaunchAgents/io.harnessmonitor.daemon.plist" ] \
-    || [ -f "$launch_agents_dir/io.harnessmonitor.daemon.plist" ]; } \
-  && [ "$(/bin/cat "$bundle_stamp_path")" = "$bundle_stamp_contents" ]; then
-  exit 0
 fi
 
 # Atomically replace the destination paths. `mv` on the same filesystem
