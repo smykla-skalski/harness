@@ -97,6 +97,20 @@ struct DashboardReviewFileThreadIndex: Equatable {
   }
 }
 
+@MainActor
+final class DashboardReviewFileThreadIndexCache {
+  private var cachedRevision: UInt64?
+  private var cachedIndex = DashboardReviewFileThreadIndex(entries: [])
+
+  func index(for timeline: ReviewTimelineViewModel) -> DashboardReviewFileThreadIndex {
+    let revision = timeline.revision
+    guard cachedRevision != revision else { return cachedIndex }
+    cachedRevision = revision
+    cachedIndex = DashboardReviewFileThreadIndex(entries: timeline.entries)
+    return cachedIndex
+  }
+}
+
 extension ReviewInlineCommentPayload {
   fileprivate var bodyTextForAnchor: String {
     body.anchorPreview

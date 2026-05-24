@@ -10,11 +10,12 @@ struct DashboardReviewFilesOverviewSummary: View {
 
   @Environment(\.fontScale)
   private var fontScale
+  @State private var threadIndexCache = DashboardReviewFileThreadIndexCache()
 
   var body: some View {
     let viewModel = store.viewModel(forPullRequest: pullRequestID)
-    let threadIndex = DashboardReviewFileThreadIndex(
-      entries: store.reviewTimelineViewModel(for: pullRequestID).entries
+    let threadIndex = threadIndexCache.index(
+      for: store.reviewTimelineViewModel(for: pullRequestID)
     )
     let summary = DashboardReviewFilesSummary.make(
       files: viewModel.files,

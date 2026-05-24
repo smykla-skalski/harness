@@ -19,10 +19,11 @@ struct DashboardReviewFilesModeContentPane: View {
   @State private var onlyUnresolved = false
   @State private var onlyUnviewed = false
   @State private var bucketFilter: DashboardReviewFileBucket?
+  @State private var threadIndexCache = DashboardReviewFileThreadIndexCache()
 
   var body: some View {
     let timeline = store.reviewTimelineViewModel(for: item.pullRequestID)
-    let threadIndex = DashboardReviewFileThreadIndex(entries: timeline.entries)
+    let threadIndex = threadIndexCache.index(for: timeline)
     let summary = DashboardReviewFilesSummary.make(
       files: viewModel.files,
       viewedByPath: viewModel.viewedByPath,
@@ -278,7 +279,7 @@ struct DashboardReviewFilesModeContentPane: View {
 
   private func currentThreadIndex() -> DashboardReviewFileThreadIndex {
     let timeline = store.reviewTimelineViewModel(for: item.pullRequestID)
-    return DashboardReviewFileThreadIndex(entries: timeline.entries)
+    return threadIndexCache.index(for: timeline)
   }
 
   private func startPrewarm(files: [ReviewFile], selected: String?) {
