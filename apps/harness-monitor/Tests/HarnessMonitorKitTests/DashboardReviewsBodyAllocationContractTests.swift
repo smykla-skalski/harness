@@ -404,11 +404,12 @@ struct DashboardReviewsBodyAllocationContractTests {
 
     #expect(viewModelSource.contains("private func rebuildFileIndexes"))
     #expect(viewModelSource.contains("nextFilesByPath.reserveCapacity(files.count)"))
-    #expect(viewModelSource.contains("private static func pathSet(for files: [ReviewFile])"))
+    #expect(viewModelSource.contains("nextFilteredPathSet.reserveCapacity(sortedFiles.count)"))
     #expect(treeBuilderSource.contains("private static func skipSlashes"))
     #expect(!viewModelSource.contains("response.files.map"))
     #expect(!viewModelSource.contains("Set(response.files.map"))
     #expect(!viewModelSource.contains("filteredFiles.map(\\.path)"))
+    #expect(!viewModelSource.contains("filteredPathSet = Self.pathSet(for: filteredFiles)"))
     #expect(!treeBuilderSource.contains("path.split(separator: \"/\").map(String.init)"))
   }
 }
