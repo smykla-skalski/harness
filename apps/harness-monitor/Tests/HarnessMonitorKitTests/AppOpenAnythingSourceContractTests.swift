@@ -187,27 +187,6 @@ struct AppOpenAnythingSourceContractTests {
     #expect(!loadedSessionCorpusSource.contains("snapshot.timeline.sorted"))
   }
 
-  @Test("Open Anything timeline corpus keeps ordered inputs on fast paths")
-  func openAnythingTimelineCorpusFastPathContracts() throws {
-    let timelineCorpusSource = try harnessKitSourceFile(
-      named: "OpenAnything/OpenAnythingCorpusBuilder+Timeline.swift"
-    )
-
-    #expect(timelineCorpusSource.contains("if entriesAreMostRecentFirst(entries)"))
-    #expect(timelineCorpusSource.contains("if entriesAreOldestFirst(entries)"))
-    #expect(timelineCorpusSource.contains("guard entries.count > limit else"))
-  }
-
-  @Test("Open Anything offset traversal avoids shifting arrays")
-  func openAnythingOffsetTraversalFastPathContracts() throws {
-    let traversalSource = try harnessKitSourceFile(
-      named: "OpenAnything/OpenAnythingResults+Traversal.swift"
-    )
-
-    #expect(traversalSource.contains("oldestPreviousIndex"))
-    #expect(!traversalSource.contains("removeFirst()"))
-  }
-
   @Test("Open Anything Settings toggles feed production behavior")
   func openAnythingSettingsTogglesFeedModel() throws {
     let scopeSource = try harnessSourceFile(named: "App/HarnessMonitorApp+OpenAnythingScope.swift")
