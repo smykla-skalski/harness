@@ -30,11 +30,12 @@ public final class NeedsMeCountCloudKitPump {
   )
 
   public convenience init() {
+    let resolver = DaemonCountResolver()
     self.init(
       interval: .seconds(300),
       initialBackoff: .seconds(2),
       maxBackoff: .seconds(60),
-      resolve: { try await GetNeedsMeCountIntent().resolveCount() },
+      resolve: { try await resolver.resolve() },
       submit: { count in NeedsMeCloudKitWriter.shared.submit(count: count) }
     )
   }
