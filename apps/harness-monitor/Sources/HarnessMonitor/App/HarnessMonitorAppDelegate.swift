@@ -1,5 +1,7 @@
 import AppKit
+import CloudKit
 import Darwin
+import HarnessMonitorCloudKit
 import HarnessMonitorKit
 import HarnessMonitorUIPreviewable
 
@@ -19,6 +21,7 @@ final class HarnessMonitorAppDelegate: NSObject, NSApplicationDelegate {
   private var signalSources: [DispatchSourceSignal] = []
   private var terminationTask: Task<Void, Never>?
   private var store: HarnessMonitorStore?
+  private var accountObserver: NSObjectProtocol?
 
   override init() {
     super.init()
@@ -58,6 +61,20 @@ final class HarnessMonitorAppDelegate: NSObject, NSApplicationDelegate {
     // symptom is "Harness Monitor crashed" in the canvas.
     if runsLiveSideEffects {
       mcpStartupController.start()
+      installCloudKitAccountObserver()
+    }
+  }
+
+  private func installCloudKitAccountObserver() {
+    guard accountObserver == nil else { return }
+    accountObserver = NotificationCenter.default.addObserver(
+      forName: .CKAccountChanged,
+      object: nil,
+      queue: nil
+    ) { _ in
+      Task.detached {
+        await NeedsMeCloudKitSubscriptionService.shared.invalidateForAccountChange()
+      }
     }
   }
 
