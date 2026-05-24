@@ -3,6 +3,25 @@ import HarnessMonitorCore
 import XCTest
 
 final class MobileMirrorModelsTests: XCTestCase {
+  func testTrustedDeviceCollectionIDDisambiguatesSharedDeviceIDs() {
+    let phone = MobileDeviceDescriptor(
+      id: "default-mobile-device",
+      displayName: "Bart's iPhone",
+      publicKeyFingerprint: "AA:BB",
+      pairedAt: .now
+    )
+    let watch = MobileDeviceDescriptor(
+      id: "default-mobile-device",
+      displayName: "Bart's Apple Watch",
+      publicKeyFingerprint: "CC:DD",
+      pairedAt: .now
+    )
+
+    XCTAssertEqual(phone.collectionID, "default-mobile-device|AA:BB")
+    XCTAssertEqual(watch.collectionID, "default-mobile-device|CC:DD")
+    XCTAssertNotEqual(phone.collectionID, watch.collectionID)
+  }
+
   func testAttentionSortsCriticalItemsFirst() {
     let now = Date()
     let snapshot = MobileMirrorSnapshot(

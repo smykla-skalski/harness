@@ -131,7 +131,7 @@ struct MobileRelayPairingSettingsPanel: View {
     } else {
       ScrollView(.horizontal, showsIndicators: false) {
         HStack(spacing: 8) {
-          ForEach(trustedDevices) { device in
+          ForEach(trustedDevices, id: \.collectionID) { device in
             Label(device.displayName, systemImage: "iphone")
               .font(.caption)
               .padding(.horizontal, 8)

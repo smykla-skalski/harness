@@ -32,6 +32,10 @@ public struct MobileDeviceDescriptor: Codable, Equatable, Identifiable, Sendable
   public var pairedAt: Date
   public var lastCommandAt: Date?
 
+  public var collectionID: String {
+    "\(id)|\(publicKeyFingerprint)"
+  }
+
   public init(
     id: String,
     displayName: String,
