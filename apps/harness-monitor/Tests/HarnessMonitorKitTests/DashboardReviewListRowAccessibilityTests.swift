@@ -47,11 +47,12 @@ struct DashboardReviewListRowAccessibilityTests {
     #expect(source.contains("You don't have permission to update this PR"))
   }
 
-  @Test("row source uses idealHeight for uniform row height")
-  func rowSourceUsesIdealHeightForUniformRowHeight() throws {
+  @Test("row source uses a minimum-height floor for row sizing")
+  func rowSourceUsesMinimumHeightFloorForRowSizing() throws {
     let source = try rowSource(named: "DashboardReviewListRow.swift")
-    // Item 34: row height must be stable, set via .frame(idealHeight:).
-    #expect(source.contains(".frame(idealHeight: rowIdealHeight)"))
+    // Item 34: row height should follow natural content, with a deterministic
+    // min-height floor instead of an ideal-height guess.
+    #expect(source.contains(".frame(minHeight: minimumRowHeight"))
     #expect(source.contains("@ScaledMetric"))
   }
 
@@ -82,9 +83,9 @@ struct DashboardReviewListRowAccessibilityTests {
     #expect(source.contains(".accessibilityLabel(\"Pinned pull request\")"))
   }
 
-  @Test("row idealHeight grows for each optional strip")
-  func rowIdealHeightGrowsForEachOptionalStrip() {
-    let bare = DashboardReviewListRowHeight.idealHeight(
+  @Test("row minimumHeight grows for each optional strip")
+  func rowMinimumHeightGrowsForEachOptionalStrip() {
+    let bare = DashboardReviewListRowHeight.minimumHeight(
       DashboardReviewListRowHeight.Layout(
         titleLineHeight: 18,
         captionLineHeight: 14,
@@ -97,7 +98,7 @@ struct DashboardReviewListRowAccessibilityTests {
         verticalPadding: 10,
         lineSpacing: 4
       ))
-    let withAttention = DashboardReviewListRowHeight.idealHeight(
+    let withAttention = DashboardReviewListRowHeight.minimumHeight(
       DashboardReviewListRowHeight.Layout(
         titleLineHeight: 18,
         captionLineHeight: 14,
@@ -110,7 +111,7 @@ struct DashboardReviewListRowAccessibilityTests {
         verticalPadding: 10,
         lineSpacing: 4
       ))
-    let withAttentionAndLabels = DashboardReviewListRowHeight.idealHeight(
+    let withAttentionAndLabels = DashboardReviewListRowHeight.minimumHeight(
       DashboardReviewListRowHeight.Layout(
         titleLineHeight: 18,
         captionLineHeight: 14,
@@ -128,9 +129,9 @@ struct DashboardReviewListRowAccessibilityTests {
     #expect(withAttentionAndLabels > withAttention)
   }
 
-  @Test("row idealHeight is identical for the same content shape")
-  func rowIdealHeightIsIdenticalForTheSameContentShape() {
-    let first = DashboardReviewListRowHeight.idealHeight(
+  @Test("row minimumHeight is identical for the same content shape")
+  func rowMinimumHeightIsIdenticalForTheSameContentShape() {
+    let first = DashboardReviewListRowHeight.minimumHeight(
       DashboardReviewListRowHeight.Layout(
         titleLineHeight: 18,
         captionLineHeight: 14,
@@ -143,7 +144,7 @@ struct DashboardReviewListRowAccessibilityTests {
         verticalPadding: 10,
         lineSpacing: 4
       ))
-    let second = DashboardReviewListRowHeight.idealHeight(
+    let second = DashboardReviewListRowHeight.minimumHeight(
       DashboardReviewListRowHeight.Layout(
         titleLineHeight: 18,
         captionLineHeight: 14,
@@ -159,8 +160,8 @@ struct DashboardReviewListRowAccessibilityTests {
     #expect(first == second)
   }
 
-  @Test("row idealHeight allocates an extra title line when the title wraps")
-  func rowIdealHeightAllocatesExtraTitleLineWhenWrapped() {
+  @Test("row minimumHeight allocates an extra title line when the title wraps")
+  func rowMinimumHeightAllocatesExtraTitleLineWhenWrapped() {
     let layout: (Bool) -> DashboardReviewListRowHeight.Layout = { wrapped in
       DashboardReviewListRowHeight.Layout(
         titleLineHeight: 18,
@@ -175,15 +176,15 @@ struct DashboardReviewListRowAccessibilityTests {
         lineSpacing: 4
       )
     }
-    let short = DashboardReviewListRowHeight.idealHeight(layout(false))
-    let wrapped = DashboardReviewListRowHeight.idealHeight(layout(true))
+    let short = DashboardReviewListRowHeight.minimumHeight(layout(false))
+    let wrapped = DashboardReviewListRowHeight.minimumHeight(layout(true))
     // Wrapped allocates exactly one extra titleLineHeight; pill + caption +
     // padding terms are identical, so the delta must be 18.
     #expect(wrapped - short == 18)
   }
 
-  @Test("titleLikelyWraps only reserves extra ideal height for explicit newlines")
-  func titleLikelyWrapsOnlyReservesExtraIdealHeightForExplicitNewlines() {
+  @Test("titleLikelyWraps only reserves extra baseline height for explicit newlines")
+  func titleLikelyWrapsOnlyReservesExtraBaselineHeightForExplicitNewlines() {
     #expect(DashboardReviewListRowHeight.titleLikelyWraps("Short title") == false)
     #expect(DashboardReviewListRowHeight.titleLikelyWraps("First\nSecond") == true)
     let longTitle = "ci(deps): update golangci/golangci-lint-action to v6.5.0"

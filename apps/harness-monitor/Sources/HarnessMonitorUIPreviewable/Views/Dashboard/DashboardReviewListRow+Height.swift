@@ -1,14 +1,14 @@
 import Foundation
 
-/// Row-height calculator for `DashboardReviewListRow`.
+/// Baseline row-height calculator for `DashboardReviewListRow`.
 ///
-/// The row stays stable in height across content variants by stacking known
-/// line heights instead of letting `HarnessMonitorWrapLayout` set the row's
-/// natural size (item 34). Optional rows (`attention strip`, required failed
-/// checks, labels strip) each add a fixed-cost pill-strip height when present.
+/// The row now uses SwiftUI's natural height for soft-wrapped text and wrapped
+/// pill content. This helper only provides a deterministic minimum-height floor
+/// so single-line rows retain the existing padding and explicit title newlines
+/// still reserve their extra line.
 ///
 /// Heights are passed in by the row's `@ScaledMetric` values so Dynamic Type
-/// flows through to the final ideal-height value.
+/// flows through to the final minimum-height value.
 enum DashboardReviewListRowHeight {
   struct Layout {
     let titleLineHeight: CGFloat
@@ -83,7 +83,7 @@ enum DashboardReviewListRowHeight {
     return 1
   }
 
-  static func idealHeight(_ layout: Layout) -> CGFloat {
+  static func minimumHeight(_ layout: Layout) -> CGFloat {
     var components: [CGFloat] = []
     let resolvedTitleLineCount = max(
       1,
@@ -110,6 +110,10 @@ enum DashboardReviewListRowHeight {
     let spacingTotal = max(0, lineCount - 1) * layout.lineSpacing
     let contentTotal = components.reduce(0, +)
     return contentTotal + spacingTotal + layout.verticalPadding * 2
+  }
+
+  static func idealHeight(_ layout: Layout) -> CGFloat {
+    minimumHeight(layout)
   }
 
 }
