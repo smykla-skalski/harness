@@ -287,15 +287,12 @@ struct DashboardReviewListRow: View {
     showsRepository ? "\(item.repository) · #\(item.number)" : nil
   }
 
-  private func visibleRequiredFailedCheckNames() -> (visible: [String], overflow: Int)? {
+  private func visibleRequiredFailedCheckNames() -> (visible: ArraySlice<String>, overflow: Int)? {
     guard item.hasRequiredFailedChecks else { return nil }
     let names = item.requiredFailedCheckNames
     guard !names.isEmpty else { return nil }
     let cap = 3
-    if names.count <= cap {
-      return (visible: names, overflow: 0)
-    }
-    return (visible: Array(names.prefix(cap)), overflow: names.count - cap)
+    return (visible: names.prefix(cap), overflow: max(0, names.count - cap))
   }
 
   fileprivate func rowIdealHeight(
@@ -340,7 +337,7 @@ private struct DashboardReviewAttentionBadgeStrip: View {
 }
 
 private struct DashboardReviewRequiredFailedCheckStrip: View {
-  let visibleNames: [String]
+  let visibleNames: ArraySlice<String>
   let overflow: Int
 
   var body: some View {

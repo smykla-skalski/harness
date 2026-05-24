@@ -53,4 +53,17 @@ struct DashboardReviewsBodyAllocationContractTests {
 
     #expect(!conversationFeedSource.contains("Array(rowSource.rows.prefix"))
   }
+
+  @Test("list row capped strips pass slices without array copies")
+  func listRowCappedStripsPassSlicesWithoutArrayCopies() throws {
+    let rowSource = try dashboardReviewsRouteSource(named: "DashboardReviewListRow.swift")
+    let labelsSource = try dashboardReviewsRouteSource(
+      named: "DashboardReviewListRow+Labels.swift"
+    )
+
+    #expect(rowSource.contains("ArraySlice<String>"))
+    #expect(labelsSource.contains("ArraySlice<String>"))
+    #expect(!rowSource.contains("Array(names.prefix"))
+    #expect(!labelsSource.contains("Array(labels.prefix"))
+  }
 }

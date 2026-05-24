@@ -18,33 +18,31 @@ struct DashboardReviewListRowLabelsStrip: View {
   let labels: [String]
   let repositoryLabels: [ReviewRepositoryLabel]
 
-  private let visibleCap = 6
+  private static let visibleCap = 6
+  private let visibleLabels: ArraySlice<String>
+  private let overflow: Int
+  private let labelByName: [String: ReviewRepositoryLabel]
+  private let accessibilityLabelText: String
 
   init(labels: [String], repositoryLabels: [ReviewRepositoryLabel] = []) {
     self.labels = labels
     self.repositoryLabels = repositoryLabels
-  }
-
-  private var visible: [String] {
-    Array(labels.prefix(visibleCap))
-  }
-
-  private var overflow: Int {
-    max(0, labels.count - visibleCap)
-  }
-
-  private var labelByName: [String: ReviewRepositoryLabel] {
-    Dictionary(repositoryLabels.map { ($0.name, $0) }, uniquingKeysWith: { first, _ in first })
+    visibleLabels = labels.prefix(Self.visibleCap)
+    overflow = max(0, labels.count - Self.visibleCap)
+    labelByName = Dictionary(
+      repositoryLabels.map { ($0.name, $0) },
+      uniquingKeysWith: { first, _ in first }
+    )
+    accessibilityLabelText = "Labels: \(labels.joined(separator: ", "))"
   }
 
   var body: some View {
-    let lookup = labelByName
     HarnessMonitorWrapLayout(
       spacing: HarnessMonitorTheme.spacingXS,
       lineSpacing: HarnessMonitorTheme.spacingXS
     ) {
-      ForEach(visible, id: \.self) { label in
-        DashboardReviewLabelChip(name: label, descriptor: lookup[label])
+      ForEach(visibleLabels, id: \.self) { label in
+        DashboardReviewLabelChip(name: label, descriptor: labelByName[label])
       }
       if overflow > 0 {
         DashboardReviewLabelChip(
@@ -55,10 +53,6 @@ struct DashboardReviewListRowLabelsStrip: View {
       }
     }
     .accessibilityElement(children: .contain)
-    .accessibilityLabel(accessibilityLabel)
-  }
-
-  private var accessibilityLabel: String {
-    "Labels: \(labels.joined(separator: ", "))"
+    .accessibilityLabel(accessibilityLabelText)
   }
 }
