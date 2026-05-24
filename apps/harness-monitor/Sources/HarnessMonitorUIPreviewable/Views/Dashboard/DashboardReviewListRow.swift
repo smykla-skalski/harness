@@ -18,10 +18,9 @@ extension VerticalAlignment {
 /// pane.
 ///
 /// Structure (top to bottom):
-/// 1. Title row: status icon · optional avatar chip · wrapped title on the
-///    left, optional `#N` identity aligned to the far right
-/// 2. Metadata row: optional repository text plus priority-ordered pills on the
-///    left, optional relative age aligned to the far right
+/// 1. Title row: status icon · optional avatar chip · wrapped title
+/// 2. Metadata row: optional `#N · age` identity plus repository text on the
+///    left, with pills trailing only when that identity is visible
 /// 3. Optional labels strip: muted chips for `item.labels`
 ///
 /// Pinned rows render a soft `.accent` background tint so they stay visible
@@ -104,8 +103,10 @@ struct DashboardReviewListRow: View {
     self.titleMaximumLines = titleMaximumLines
     self.hidesSemanticPrefixesInTitle = hidesSemanticPrefixesInTitle
     secondaryText = showsRepository ? item.repository : nil
-    pullRequestNumberText = showsPullRequestNumber ? "#\(item.number)" : ""
+    let pullRequestNumberText = showsPullRequestNumber ? "#\(item.number)" : ""
+    self.pullRequestNumberText = pullRequestNumberText
     let inlineLabels = Self.makeInlineIdentityAndAgeLabels(
+      pullRequestNumberText: pullRequestNumberText,
       showsAge: showsPullRequestAge,
       updatedLabel: updatedLabel
     )
@@ -195,33 +196,16 @@ struct DashboardReviewListRow: View {
         .help(item.title)
         .accessibilityLabel(titleAccessibilityLabel)
         .alignmentGuide(.dashboardReviewTitleLineCenter) { dimensions in
-          dimensions[VerticalAlignment.center]
+          dimensions[VerticalAlignment.firstTextBaseline] - titleLineHeight / 2
         }
         .layoutPriority(1)
         .focused($isFocused)
-
-      Spacer(minLength: HarnessMonitorTheme.spacingXS)
-
-      if !pullRequestNumberText.isEmpty {
-        Text(pullRequestNumberText)
-          .monospacedDigit()
-          .scaledFont(.callout)
-          .foregroundStyle(HarnessMonitorTheme.secondaryInk)
-          .lineLimit(1)
-          .fixedSize(horizontal: true, vertical: false)
-          .help("Pull request \(pullRequestNumberText)")
-          .accessibilityLabel("Pull request \(pullRequestNumberText)")
-      }
     }
   }
 
   @ViewBuilder private var metadataLine: some View {
-    HStack(spacing: HarnessMonitorTheme.spacingSM) {
-      metadataLeadingContent
-        .layoutPriority(1)
-
+    HStack(alignment: .firstTextBaseline, spacing: HarnessMonitorTheme.spacingSM) {
       if !inlineIdentityAndAge.isEmpty {
-        Spacer(minLength: HarnessMonitorTheme.spacingSM)
         Text(inlineIdentityAndAge)
           .monospacedDigit()
           .scaledFont(.caption)
@@ -231,12 +215,14 @@ struct DashboardReviewListRow: View {
           .help(inlineIdentityAndAgeHelp)
           .accessibilityLabel(inlineIdentityAndAgeHelp)
       }
-    }
-  }
 
-  @ViewBuilder private var metadataLeadingContent: some View {
-    HStack(spacing: HarnessMonitorTheme.spacingSM) {
       if let secondary = secondaryText {
+        if !inlineIdentityAndAge.isEmpty {
+          Text("·")
+            .scaledFont(.caption)
+            .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+            .accessibilityHidden(true)
+        }
         Text(secondary)
           .scaledFont(.caption)
           .foregroundStyle(HarnessMonitorTheme.secondaryInk)
@@ -245,6 +231,19 @@ struct DashboardReviewListRow: View {
           .help(secondary)
       }
 
+      if shouldRightAlignMetadataPills {
+        Spacer(minLength: HarnessMonitorTheme.spacingSM)
+      }
+
+      if metadataLineHasPillChrome {
+        metadataPillContent
+          .layoutPriority(shouldRightAlignMetadataPills ? 0 : 1)
+      }
+    }
+  }
+
+  @ViewBuilder private var metadataPillContent: some View {
+    HStack(spacing: HarnessMonitorTheme.spacingSM) {
       ForEach(attentionBadges.kinds) { kind in
         metadataBadge(kind)
       }
@@ -310,11 +309,27 @@ struct DashboardReviewListRow: View {
   /// The row body reads these labels multiple times, so keeping them as stored
   /// values avoids per-render array and join work across long review lists.
   private static func makeInlineIdentityAndAgeLabels(
+    pullRequestNumberText: String,
     showsAge: Bool,
     updatedLabel: String
   ) -> (visible: String, help: String) {
-    guard showsAge, !updatedLabel.isEmpty else { return ("", "") }
-    return (visible: updatedLabel, help: "Updated \(updatedLabel)")
+    var visibleParts: [String] = []
+    var helpParts: [String] = []
+
+    if !pullRequestNumberText.isEmpty {
+      visibleParts.append(pullRequestNumberText)
+      helpParts.append("Pull request \(pullRequestNumberText)")
+    }
+
+    if showsAge, !updatedLabel.isEmpty {
+      visibleParts.append(updatedLabel)
+      helpParts.append("Updated \(updatedLabel)")
+    }
+
+    return (
+      visible: visibleParts.joined(separator: " · "),
+      help: helpParts.joined(separator: " · ")
+    )
   }
 
   private static func makeVisibleRequiredFailedCheckNames(
@@ -369,6 +384,10 @@ struct DashboardReviewListRow: View {
       || !item.reviews.isEmpty
       || !attentionBadges.isEmpty
       || showsChangePill
+  }
+
+  private var shouldRightAlignMetadataPills: Bool {
+    !inlineIdentityAndAge.isEmpty
   }
 
   private var showsMetadataLine: Bool {

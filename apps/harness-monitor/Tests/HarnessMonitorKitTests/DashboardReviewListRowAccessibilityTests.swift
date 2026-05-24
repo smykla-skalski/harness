@@ -65,7 +65,7 @@ struct DashboardReviewListRowAccessibilityTests {
     #expect(source.contains("DashboardReviewListRowLabelsStrip("))
     #expect(source.contains("DashboardReviewListRowReviewerSummary("))
     #expect(source.contains("DashboardReviewChangePill("))
-    #expect(source.contains("Text(pullRequestNumberText)"))
+    #expect(source.contains("Text(inlineIdentityAndAge)"))
   }
 
   @Test("reviewer pills share the avatar cache path")
