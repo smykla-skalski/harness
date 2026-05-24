@@ -44,6 +44,9 @@ struct DashboardReviewListRow: View {
   let actionTitle: String?
   let updatedLabel: String
   let repositoryLabels: [ReviewRepositoryLabel]
+  let secondaryText: String?
+  let inlineIdentityAndAge: String
+  private let inlineIdentityAndAgeHelp: String
 
   @State private var isHovered: Bool = false
   @FocusState private var isFocused: Bool
@@ -70,6 +73,14 @@ struct DashboardReviewListRow: View {
     self.actionTitle = actionTitle
     self.updatedLabel = updatedLabel
     self.repositoryLabels = repositoryLabels
+    secondaryText = showsRepository ? "\(item.repository) · #\(item.number)" : nil
+    let inlineLabels = Self.makeInlineIdentityAndAgeLabels(
+      itemNumber: item.number,
+      showsRepository: showsRepository,
+      updatedLabel: updatedLabel
+    )
+    inlineIdentityAndAge = inlineLabels.visible
+    inlineIdentityAndAgeHelp = inlineLabels.help
   }
 
   var body: some View {
@@ -210,38 +221,6 @@ struct DashboardReviewListRow: View {
     }
   }
 
-  /// `#N` identity plus the relative-age label, joined on the status line.
-  /// When the row already shows `repository · #N` on its secondary line
-  /// (ungrouped mode), only the age renders here to avoid repeating the
-  /// PR number twice. Exposed for unit tests that pin the row contract.
-  var inlineIdentityAndAge: String {
-    inlineIdentityAndAgeParts(ageFormat: { $0 }).joined(separator: " · ")
-  }
-
-  /// Verbose form of `inlineIdentityAndAge` used as the `.help` tooltip so
-  /// hover surfaces the absolute meaning of the relative age (e.g.
-  /// `Updated 3h ago` rather than just `3h ago`).
-  private var inlineIdentityAndAgeHelp: String {
-    inlineIdentityAndAgeParts(ageFormat: { "Updated \($0)" }).joined(separator: " · ")
-  }
-
-  /// Shared builder for the `#N` + age parts used by both
-  /// `inlineIdentityAndAge` and `inlineIdentityAndAgeHelp`. The age component
-  /// is funneled through the caller-provided `ageFormat` so the visible
-  /// caption stays terse while the tooltip can expand it.
-  private func inlineIdentityAndAgeParts(
-    ageFormat: (String) -> String
-  ) -> [String] {
-    var parts: [String] = []
-    if !showsRepository {
-      parts.append("#\(item.number)")
-    }
-    if !updatedLabel.isEmpty {
-      parts.append(ageFormat(updatedLabel))
-    }
-    return parts
-  }
-
   @ViewBuilder private var leadingStatusIndicator: some View {
     ZStack {
       if isRefreshing {
@@ -278,13 +257,25 @@ struct DashboardReviewListRow: View {
     return item.statusAccessibilityLabel
   }
 
-  /// Identity line, rendered between the title and the status line.
-  /// Only emitted when the row needs to disambiguate repository origin
-  /// (ungrouped mode); when the list is grouped by repository, the PR number
-  /// rides inline on the status line and this slot collapses entirely so the
-  /// row doesn't waste a caption line on `#N` alone.
-  var secondaryText: String? {
-    showsRepository ? "\(item.repository) · #\(item.number)" : nil
+  /// Prepares the visible `#N · age` caption plus its verbose help label.
+  /// The row body reads these labels multiple times, so keeping them as stored
+  /// values avoids per-render array and join work across long review lists.
+  private static func makeInlineIdentityAndAgeLabels(
+    itemNumber: UInt64,
+    showsRepository: Bool,
+    updatedLabel: String
+  ) -> (visible: String, help: String) {
+    let pullRequestLabel = showsRepository ? "" : "#\(itemNumber)"
+    if updatedLabel.isEmpty {
+      return (visible: pullRequestLabel, help: pullRequestLabel)
+    }
+    if pullRequestLabel.isEmpty {
+      return (visible: updatedLabel, help: "Updated \(updatedLabel)")
+    }
+    return (
+      visible: "\(pullRequestLabel) · \(updatedLabel)",
+      help: "\(pullRequestLabel) · Updated \(updatedLabel)"
+    )
   }
 
   private func visibleRequiredFailedCheckNames() -> (visible: ArraySlice<String>, overflow: Int)? {

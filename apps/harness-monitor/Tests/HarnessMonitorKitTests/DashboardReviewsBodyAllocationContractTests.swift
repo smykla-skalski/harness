@@ -109,4 +109,15 @@ struct DashboardReviewsBodyAllocationContractTests {
     #expect(filesModeSource.contains("private let changeCountLabel: String"))
     #expect(!filesModeSource.contains("if threads.contains(where: { !$0.isResolved })"))
   }
+
+  @Test("list row caches repeated identity labels")
+  func listRowCachesRepeatedIdentityLabels() throws {
+    let rowSource = try dashboardReviewsRouteSource(named: "DashboardReviewListRow.swift")
+
+    #expect(rowSource.contains("let secondaryText: String?"))
+    #expect(rowSource.contains("let inlineIdentityAndAge: String"))
+    #expect(rowSource.contains("private let inlineIdentityAndAgeHelp: String"))
+    #expect(!rowSource.contains("inlineIdentityAndAgeParts"))
+    #expect(!rowSource.contains(".joined(separator: \" · \")"))
+  }
 }
