@@ -190,6 +190,60 @@ struct DashboardReviewListRowAccessibilityTests {
     #expect(DashboardReviewListRowHeight.titleLikelyWraps(longTitle) == true)
   }
 
+  @Test("estimatedTitleLineCount respects the configured title cap")
+  func estimatedTitleLineCountRespectsTheConfiguredTitleCap() {
+    let longTitle =
+      "ci(deps): update golangci/golangci-lint-action to v6.5.0 and align the reusable workflow inputs"
+    #expect(DashboardReviewListRowHeight.estimatedTitleLineCount(longTitle, maximumLines: 1) == 1)
+    #expect(DashboardReviewListRowHeight.estimatedTitleLineCount(longTitle, maximumLines: 2) == 2)
+    #expect(
+      DashboardReviewListRowHeight.estimatedTitleLineCount(
+        "First\nSecond\nThird",
+        maximumLines: 2
+      ) == 2
+    )
+  }
+
+  @Test("displayed title strips supported semantic prefixes only when enabled")
+  func displayedTitleStripsSupportedSemanticPrefixesOnlyWhenEnabled() {
+    #expect(
+      dashboardReviewDisplayedTitle(
+        "fix: trim whitespace from cache key",
+        hidesSemanticPrefix: true
+      ) == "trim whitespace from cache key"
+    )
+    #expect(
+      dashboardReviewDisplayedTitle(
+        "docs(MADR): added policy matching",
+        hidesSemanticPrefix: true
+      ) == "added policy matching"
+    )
+    #expect(
+      dashboardReviewDisplayedTitle(
+        "feat(api)!: remove deprecated endpoint",
+        hidesSemanticPrefix: true
+      ) == "remove deprecated endpoint"
+    )
+    #expect(
+      dashboardReviewDisplayedTitle(
+        "release: cut 1.2.3",
+        hidesSemanticPrefix: true
+      ) == "release: cut 1.2.3"
+    )
+    #expect(
+      dashboardReviewDisplayedTitle(
+        "fix(scope): ",
+        hidesSemanticPrefix: true
+      ) == "fix(scope): "
+    )
+    #expect(
+      dashboardReviewDisplayedTitle(
+        "fix: trim whitespace from cache key",
+        hidesSemanticPrefix: false
+      ) == "fix: trim whitespace from cache key"
+    )
+  }
+
   @Test("labels strip caps visible chips at six and surfaces overflow")
   func labelsStripCapsVisibleChipsAtSixAndSurfacesOverflow() {
     let manyLabels = (1...10).map { "label-\($0)" }

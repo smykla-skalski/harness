@@ -177,6 +177,10 @@ enum HarnessMonitorUITestAccessibility {
     "harness.dashboard.reviews.show-row-labels"
   static let dashboardReviewsShowRowLineCountersToggle =
     "harness.dashboard.reviews.show-row-line-counters"
+  static let dashboardReviewsWrapRowTitlesToggle =
+    "harness.dashboard.reviews.wrap-row-titles"
+  static let dashboardReviewsHideSemanticPrefixesInRowTitlesToggle =
+    "harness.dashboard.reviews.hide-semantic-prefixes"
   static func dashboardReviewPinnedIndicator(_ pullRequestID: String) -> String {
     "harness.dashboard.reviews.pinned.\(slug(pullRequestID))"
   }

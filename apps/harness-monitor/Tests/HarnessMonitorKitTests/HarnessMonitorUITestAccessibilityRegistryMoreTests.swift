@@ -127,6 +127,18 @@ struct HarnessMonitorUITestAccessibilityRegistryMoreTests {
         == "harness.settings.reviews.show-row-line-counters"
     )
     #expect(
+      HarnessMonitorAccessibility.settingsReviewsWrapRowTitlesToggle
+        == "harness.settings.reviews.wrap-row-titles"
+    )
+    #expect(
+      HarnessMonitorAccessibility.settingsReviewsRowTitleMaximumLinesField
+        == "harness.settings.reviews.row-title-maximum-lines"
+    )
+    #expect(
+      HarnessMonitorAccessibility.settingsReviewsHideSemanticPrefixesInRowTitlesToggle
+        == "harness.settings.reviews.hide-semantic-prefixes"
+    )
+    #expect(
       HarnessMonitorAccessibility.settingsSecretsSaveButton
         == "harness.settings.secrets.save"
     )

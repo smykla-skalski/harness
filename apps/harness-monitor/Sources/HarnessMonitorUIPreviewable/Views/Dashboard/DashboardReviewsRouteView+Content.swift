@@ -105,6 +105,8 @@ extension DashboardReviewsRouteView {
       showAvatarsInRows: routeShowAvatarsInRowsBinding,
       showLabelsInRows: routeShowLabelsInRowsBinding,
       showLineCountersInRows: routeShowLineCountersInRowsBinding,
+      wrapTitlesInRows: routeWrapTitlesInRowsBinding,
+      hideSemanticPrefixesInRowTitles: routeHideSemanticPrefixesInRowTitlesBinding,
       needsMeCount: routeNeedsMeCount,
       syncHealth: routeSyncHealth,
       onRetryFailedRepositories: {
@@ -275,7 +277,10 @@ extension DashboardReviewsRouteView {
       repositoryLabels: routeResponse.repositoryLabels[item.repository] ?? [],
       showsAvatars: normalizedPreferences.showAvatarsInRows,
       showsLabels: normalizedPreferences.showLabelsInRows,
-      showsLineCounters: normalizedPreferences.showLineCountersInRows
+      showsLineCounters: normalizedPreferences.showLineCountersInRows,
+      wrapsTitle: normalizedPreferences.wrapTitlesInRows,
+      titleMaximumLines: normalizedPreferences.rowTitleMaximumLines,
+      hidesSemanticPrefixesInTitle: normalizedPreferences.hideSemanticPrefixesInRowTitles
     )
   }
 

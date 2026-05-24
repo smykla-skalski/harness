@@ -14,12 +14,11 @@ enum DashboardReviewListRowHeight {
     let titleLineHeight: CGFloat
     let captionLineHeight: CGFloat
     let pillStripHeight: CGFloat
-    /// `true` when the row is judged likely to wrap its title to two lines
-    /// at the current Reviews-pane width. The caller computes this via
-    /// `titleLikelyWraps(_:)` before constructing the layout so the
-    /// idealHeight hint accounts for the extra title line only when it's
-    /// expected, not always. Short titles stay compact.
+    /// Legacy two-line flag kept so existing tests and call sites can still
+    /// describe the common wrapped/unwrapped shape. Prefer `titleLineCount`
+    /// for new code paths that need more than two title lines.
     let hasWrappedTitle: Bool
+    let titleLineCount: Int?
     let hasSecondaryLine: Bool
     let hasAttentionStrip: Bool
     let hasRequiredFailedChecks: Bool
@@ -36,6 +35,7 @@ enum DashboardReviewListRowHeight {
       captionLineHeight: CGFloat,
       pillStripHeight: CGFloat,
       hasWrappedTitle: Bool,
+      titleLineCount: Int? = nil,
       hasSecondaryLine: Bool,
       hasAttentionStrip: Bool,
       hasRequiredFailedChecks: Bool,
@@ -51,6 +51,7 @@ enum DashboardReviewListRowHeight {
       self.captionLineHeight = captionLineHeight
       self.pillStripHeight = pillStripHeight
       self.hasWrappedTitle = hasWrappedTitle
+      self.titleLineCount = titleLineCount
       self.hasSecondaryLine = hasSecondaryLine
       self.hasAttentionStrip = hasAttentionStrip
       self.hasRequiredFailedChecks = hasRequiredFailedChecks
@@ -65,12 +66,43 @@ enum DashboardReviewListRowHeight {
   }
 
   static func titleLikelyWraps(_ title: String) -> Bool {
-    title.contains("\n")
+    estimatedTitleLineCount(title, maximumLines: 2) > 1
+  }
+
+  static func estimatedTitleLineCount(_ title: String, maximumLines: Int) -> Int {
+    let clampedMaximum = max(1, maximumLines)
+    guard clampedMaximum > 1 else { return 1 }
+
+    let explicitLineCount = title.split(
+      separator: "\n",
+      omittingEmptySubsequences: false
+    ).count
+    if explicitLineCount > 1 {
+      return min(clampedMaximum, explicitLineCount)
+    }
+
+    let normalizedTitle = title
+      .replacingOccurrences(
+        of: #"\s+"#,
+        with: " ",
+        options: .regularExpression
+      )
+      .trimmingCharacters(in: .whitespacesAndNewlines)
+    guard !normalizedTitle.isEmpty else { return 1 }
+
+    let estimatedLines = Int(
+      ceil(Double(normalizedTitle.count) / Double(Self.approximateCharactersPerLine))
+    )
+    return min(clampedMaximum, max(1, estimatedLines))
   }
 
   static func idealHeight(_ layout: Layout) -> CGFloat {
     var components: [CGFloat] = []
-    let titleLines: CGFloat = layout.hasWrappedTitle ? 2 : 1
+    let resolvedTitleLineCount = max(
+      1,
+      layout.titleLineCount ?? (layout.hasWrappedTitle ? 2 : 1)
+    )
+    let titleLines = CGFloat(resolvedTitleLineCount)
     components.append(layout.titleLineHeight * titleLines)
     if layout.hasSecondaryLine { components.append(layout.captionLineHeight) }
     components.append(layout.statusLineHeight ?? layout.pillStripHeight)
@@ -89,4 +121,6 @@ enum DashboardReviewListRowHeight {
     let contentTotal = components.reduce(0, +)
     return contentTotal + spacingTotal + layout.verticalPadding * 2
   }
+
+  private static let approximateCharactersPerLine = 44
 }

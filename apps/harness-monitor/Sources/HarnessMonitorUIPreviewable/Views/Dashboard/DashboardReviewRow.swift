@@ -12,6 +12,9 @@ struct DashboardReviewRow: View {
   let showsAvatars: Bool
   let showsLabels: Bool
   let showsLineCounters: Bool
+  let wrapsTitle: Bool
+  let titleMaximumLines: Int
+  let hidesSemanticPrefixesInTitle: Bool
 
   init(
     item: ReviewItem,
@@ -23,7 +26,10 @@ struct DashboardReviewRow: View {
     repositoryLabels: [ReviewRepositoryLabel] = [],
     showsAvatars: Bool = true,
     showsLabels: Bool = true,
-    showsLineCounters: Bool = true
+    showsLineCounters: Bool = true,
+    wrapsTitle: Bool = true,
+    titleMaximumLines: Int = DashboardReviewsPreferences.defaultRowTitleMaximumLines,
+    hidesSemanticPrefixesInTitle: Bool = false
   ) {
     self.item = item
     self.showsRepository = showsRepository
@@ -35,6 +41,9 @@ struct DashboardReviewRow: View {
     self.showsAvatars = showsAvatars
     self.showsLabels = showsLabels
     self.showsLineCounters = showsLineCounters
+    self.wrapsTitle = wrapsTitle
+    self.titleMaximumLines = titleMaximumLines
+    self.hidesSemanticPrefixesInTitle = hidesSemanticPrefixesInTitle
   }
 
   var body: some View {
@@ -48,7 +57,10 @@ struct DashboardReviewRow: View {
       repositoryLabels: repositoryLabels,
       showsAvatars: showsAvatars,
       showsLabels: showsLabels,
-      showsLineCounters: showsLineCounters
+      showsLineCounters: showsLineCounters,
+      wrapsTitle: wrapsTitle,
+      titleMaximumLines: titleMaximumLines,
+      hidesSemanticPrefixesInTitle: hidesSemanticPrefixesInTitle
     )
     .tag(item.pullRequestID)
     .listRowInsets(EdgeInsets(top: 0, leading: 0, bottom: 0, trailing: 0))
