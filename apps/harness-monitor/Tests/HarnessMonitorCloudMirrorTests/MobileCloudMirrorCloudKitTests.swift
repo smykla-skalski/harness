@@ -74,4 +74,22 @@ final class MobileCloudMirrorCloudKitTests: XCTestCase {
     XCTAssertEqual(subscription.subscriptionID, MobileCloudMirrorCloudKitSchema.subscriptionID)
     XCTAssertEqual(subscription.notificationInfo?.shouldSendContentAvailable, true)
   }
+
+  func testMissingMirrorRecordTypeClassifierMatchesCloudKitServerMessage() {
+    let missingType = CKError(
+      .unknownItem,
+      userInfo: [
+        NSLocalizedDescriptionKey: "Did not find record type: MobileMirrorRecord"
+      ]
+    )
+    let missingRecord = CKError(
+      .unknownItem,
+      userInfo: [
+        NSLocalizedDescriptionKey: "Record not found"
+      ]
+    )
+
+    XCTAssertTrue(MobileCloudMirrorCloudKitSchema.isMissingMirrorRecordType(missingType))
+    XCTAssertFalse(MobileCloudMirrorCloudKitSchema.isMissingMirrorRecordType(missingRecord))
+  }
 }

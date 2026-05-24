@@ -6,6 +6,7 @@ public enum MobileCloudMirrorCloudKitError: Error, Equatable, Sendable {
   case missingField(String)
   case invalidField(String)
   case partialFailure(String)
+  case schemaUnavailable(String)
 }
 
 public enum MobileCloudMirrorCloudKitSchema {
@@ -32,6 +33,23 @@ public enum MobileCloudMirrorCloudKitSchema {
 
   public static var zoneID: CKRecordZone.ID {
     CKRecordZone.ID(zoneName: MobileCloudMirrorSchema.zoneName)
+  }
+
+  public static func isMissingMirrorRecordType(_ error: CKError) -> Bool {
+    guard error.code == .unknownItem else {
+      return false
+    }
+    let message = [
+      error.localizedDescription,
+      error.userInfo["ServerErrorDescription"] as? String,
+      error.userInfo["CKErrorDescription"] as? String,
+      error.userInfo[NSLocalizedDescriptionKey] as? String,
+      error.userInfo[NSDebugDescriptionErrorKey] as? String,
+    ]
+    .compactMap(\.self)
+    .joined(separator: "\n")
+    return message.localizedCaseInsensitiveContains(recordType)
+      && message.localizedCaseInsensitiveContains("record type")
   }
 }
 
@@ -226,7 +244,15 @@ public struct LiveMobileCloudMirrorDatabase: MobileCloudMirrorDatabase {
   public func save(_ record: MobileMirrorRecord) async throws {
     try await ensureZone()
     let cloudRecord = MobileCloudMirrorCKRecordCodec.encode(record, zoneID: zoneID)
-    _ = try await database.save(cloudRecord)
+    do {
+      _ = try await database.save(cloudRecord)
+    } catch let error as CKError
+      where MobileCloudMirrorCloudKitSchema.isMissingMirrorRecordType(error)
+    {
+      throw MobileCloudMirrorCloudKitError.schemaUnavailable(
+        MobileCloudMirrorCloudKitSchema.recordType
+      )
+    }
   }
 
   public func fetch(recordID: String) async throws -> MobileMirrorRecord? {
@@ -259,32 +285,31 @@ public struct LiveMobileCloudMirrorDatabase: MobileCloudMirrorDatabase {
     ]
 
     var decoded: [MobileMirrorRecord] = []
-    let firstResponse:
-      (
-        matchResults: [(CKRecord.ID, Result<CKRecord, any Error>)],
-        queryCursor: CKQueryOperation.Cursor?
-      )
     do {
-      firstResponse = try await database.records(
+      var response = try await database.records(
         matching: query,
         inZoneWith: zoneID,
         desiredKeys: nil,
         resultsLimit: CKQueryOperation.maximumResults
       )
-    } catch let error as CKError where error.code == .unknownItem || error.code == .zoneNotFound {
+      try append(response.matchResults, to: &decoded)
+
+      while let cursor = response.queryCursor {
+        response = try await database.records(
+          continuingMatchFrom: cursor,
+          desiredKeys: nil,
+          resultsLimit: CKQueryOperation.maximumResults
+        )
+        try append(response.matchResults, to: &decoded)
+      }
+    } catch let error as CKError
+      where error.code == .zoneNotFound
+      || MobileCloudMirrorCloudKitSchema.isMissingMirrorRecordType(error)
+    {
       try await ensureZone()
       return []
-    }
-    var response = firstResponse
-    try append(response.matchResults, to: &decoded)
-
-    while let cursor = response.queryCursor {
-      response = try await database.records(
-        continuingMatchFrom: cursor,
-        desiredKeys: nil,
-        resultsLimit: CKQueryOperation.maximumResults
-      )
-      try append(response.matchResults, to: &decoded)
+    } catch MobileCloudMirrorCloudKitError.schemaUnavailable {
+      return []
     }
 
     return decoded.sorted { $0.metadata.updatedAt > $1.metadata.updatedAt }
@@ -323,6 +348,11 @@ public struct LiveMobileCloudMirrorDatabase: MobileCloudMirrorDatabase {
       switch result {
       case .success(let record):
         decoded.append(try MobileCloudMirrorCKRecordCodec.decode(record))
+      case .failure(let error as CKError)
+      where MobileCloudMirrorCloudKitSchema.isMissingMirrorRecordType(error):
+        throw MobileCloudMirrorCloudKitError.schemaUnavailable(
+          MobileCloudMirrorCloudKitSchema.recordType
+        )
       case .failure(let error):
         throw MobileCloudMirrorCloudKitError.partialFailure(String(describing: error))
       }
