@@ -159,6 +159,7 @@ struct SettingsScrollRestorationModifier: ViewModifier {
 
     restoreGeneration &+= 1
     let generation = restoreGeneration
+    restoreRetryDeferrer.cancel()
     let offset = SettingsRestorationDefaults.scrollOffset(for: section)
     activeUserScroll = false
     userScrollObserved = false
@@ -219,6 +220,7 @@ struct SettingsScrollRestorationModifier: ViewModifier {
     observedOffset: CGFloat?
   ) {
     restoreGeneration &+= 1
+    restoreRetryDeferrer.cancel()
     pendingRestore = nil
     restoredSection = section
     scrollPersistenceDeferrer.cancel(for: section)
@@ -275,6 +277,7 @@ struct SettingsScrollRestorationModifier: ViewModifier {
     for section: SettingsSection,
     observedOffset _: CGFloat
   ) {
+    restoreRetryDeferrer.cancel()
     pendingRestore = nil
     restoredSection = section
   }

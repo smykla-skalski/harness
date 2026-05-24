@@ -115,6 +115,24 @@ struct SettingsRestorationTests {
     #expect(buffer.consumeOffset(for: .general) == nil)
   }
 
+  @Test("Retry deferrer can cancel pending restore retries")
+  @MainActor
+  func retryDeferrerCanCancelPendingRestoreRetries() async {
+    let deferrer = SettingsScrollRestoreRetryDeferrer()
+    var appliedOffsets: [CGFloat] = []
+
+    deferrer.schedule(128) { offset in
+      appliedOffsets.append(offset)
+    }
+    deferrer.cancel()
+
+    for _ in 0..<4 {
+      await Task.yield()
+    }
+
+    #expect(appliedOffsets.isEmpty)
+  }
+
   @Test("Restore applicator avoids repeated whole-window scroll view searches")
   func restoreApplicatorCachesResolvedScrollView() throws {
     let source = try sourceFile(named: "Views/Settings/SettingsScrollRestoreApplicator.swift")

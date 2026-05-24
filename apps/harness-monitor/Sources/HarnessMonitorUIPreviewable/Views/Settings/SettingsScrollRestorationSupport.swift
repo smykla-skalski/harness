@@ -3,6 +3,7 @@ import Foundation
 @MainActor
 final class SettingsScrollRestoreRetryDeferrer {
   private var generation: UInt64 = 0
+  private var task: Task<Void, Never>?
 
   func schedule(
     _ offset: CGFloat,
@@ -10,13 +11,21 @@ final class SettingsScrollRestoreRetryDeferrer {
   ) {
     generation &+= 1
     let scheduledGeneration = generation
-    Task { @MainActor in
+    task?.cancel()
+    task = Task { @MainActor in
       await Task.yield()
-      guard self.generation == scheduledGeneration else {
+      guard !Task.isCancelled, self.generation == scheduledGeneration else {
         return
       }
+      self.task = nil
       apply(offset)
     }
+  }
+
+  func cancel() {
+    generation &+= 1
+    task?.cancel()
+    task = nil
   }
 }
 
