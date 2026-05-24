@@ -137,6 +137,25 @@ struct TaskBoardRouteContentSourceTests {
     #expect(laneChromeSource.contains("maxHeight: .infinity"))
   }
 
+  @Test("Dashboard retains visited routes without laying out hidden ones")
+  func dashboardRetainsRoutesWithoutHiddenLayout() throws {
+    let dashboardSource = try previewableSourceFile(
+      domain: "Dashboard",
+      named: "DashboardRouteContent.swift"
+    )
+
+    #expect(dashboardSource.contains("DashboardRetainedRouteLayout(selectedRoute: route)"))
+    #expect(dashboardSource.contains(".layoutValue(key: DashboardRetainedRouteKey.self, value: .taskBoard)"))
+    #expect(
+      dashboardSource.contains(".layoutValue(key: DashboardRetainedRouteKey.self, value: .policyCanvas)")
+    )
+    #expect(
+      dashboardSource.contains(".layoutValue(key: DashboardRetainedRouteKey.self, value: .reviews)")
+    )
+    #expect(dashboardSource.contains("private struct DashboardRetainedRouteLayout: Layout"))
+    #expect(!dashboardSource.contains(".opacity(isPolicyCanvasVisible ? 1 : 0)"))
+  }
+
   @Test("Task board lanes render every card instead of hiding overflow")
   func taskBoardLanesRenderEveryCardInsteadOfHidingOverflow() throws {
     let unifiedSource = try taskBoardSourceFile(named: "TaskBoardLaneUnifiedColumn.swift")
