@@ -4,6 +4,7 @@ import SwiftUI
 struct SettingsRepositoriesSection: View {
   let store: HarnessMonitorStore
   @Binding var taskBoardFormState: TaskBoardSettingsFormState
+  let isActive: Bool
   @AppStorage(DashboardReviewsPreferences.storageKey)
   var storedReviewsPreferences = ""
   @State private var draftStorage = SettingsSharedRepositoriesDraft()
@@ -30,9 +31,11 @@ struct SettingsRepositoriesSection: View {
 
   init(
     store: HarnessMonitorStore,
-    formState: Binding<TaskBoardSettingsFormState>
+    formState: Binding<TaskBoardSettingsFormState>,
+    isActive: Bool = true
   ) {
     self.store = store
+    self.isActive = isActive
     _taskBoardFormState = formState
   }
 
@@ -141,6 +144,14 @@ struct SettingsRepositoriesSection: View {
   }
 
   var body: some View {
+    if isActive {
+      activeBody
+    } else {
+      Color.clear
+    }
+  }
+
+  private var activeBody: some View {
     Form {
       if let loadError {
         statusSection(message: loadError)
@@ -161,8 +172,14 @@ struct SettingsRepositoriesSection: View {
     }
     .settingsDetailFormStyle()
     .accessibilityIdentifier(HarnessMonitorAccessibility.settingsRepositoriesRoot)
-    .task { await loadDraftIfNeeded() }
-    .task { await expandAfterFirstFrame() }
+    .task(id: isActive) {
+      guard isActive else { return }
+      await loadDraftIfNeeded()
+    }
+    .task(id: isActive) {
+      guard isActive else { return }
+      await expandAfterFirstFrame()
+    }
     .onChange(of: catalogError) { _, newValue in
       guard let newValue else { return }
       AccessibilityNotification.Announcement("\(newValue.title). \(newValue.message)").post()

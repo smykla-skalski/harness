@@ -208,22 +208,28 @@ private struct SettingsDetailSwitch: View {
       SettingsTaskBoardSection(
         store: store,
         formState: $taskBoardFormState,
+        isActive: section == selectedSection,
         navigationRequest: $navigationRequest
       )
       .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     case .repositories:
       SettingsRepositoriesSection(
         store: store,
-        formState: $taskBoardFormState
+        formState: $taskBoardFormState,
+        isActive: section == selectedSection
       )
       .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     case .reviews:
-      SettingsReviewsSection(navigationRequest: $navigationRequest)
+      SettingsReviewsSection(
+        isActive: section == selectedSection,
+        navigationRequest: $navigationRequest
+      )
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     case .secrets:
       SettingsSecretsSection(
         store: store,
-        formState: $taskBoardFormState
+        formState: $taskBoardFormState,
+        isActive: section == selectedSection
       )
       .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     default:

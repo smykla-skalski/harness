@@ -50,6 +50,7 @@ struct SettingsReviewsSection: View {
     .unknown: "Unknown event",
   ]
 
+  let isActive: Bool
   @Binding var navigationRequest: SettingsNavigationRequest?
   @AppStorage(DashboardReviewsPreferences.storageKey)
   private var storedPreferences = ""
@@ -65,11 +66,27 @@ struct SettingsReviewsSection: View {
     ReviewTimelineKind.allCases
   @State private var hiddenKindsSearchTask: Task<Void, Never>?
 
-  init(navigationRequest: Binding<SettingsNavigationRequest?> = .constant(nil)) {
+  init(
+    isActive: Bool = true,
+    navigationRequest: Binding<SettingsNavigationRequest?> = .constant(nil)
+  ) {
+    self.isActive = isActive
     _navigationRequest = navigationRequest
   }
 
   var body: some View {
+    if isActive {
+      activeBody
+    } else {
+      Color.clear
+        .onAppear {
+          hiddenKindsSearchTask?.cancel()
+          hiddenKindsSearchTask = nil
+        }
+    }
+  }
+
+  private var activeBody: some View {
     Form {
       sourceScopeSection
       behaviorSection
@@ -84,7 +101,8 @@ struct SettingsReviewsSection: View {
     }
     .settingsDetailFormStyle()
     .accessibilityIdentifier(HarnessMonitorAccessibility.settingsReviewsRoot)
-    .task {
+    .task(id: isActive) {
+      guard isActive else { return }
       loadDraftIfNeeded()
     }
     .safeAreaInset(edge: .bottom, spacing: 0) {
