@@ -238,3 +238,76 @@ extension DashboardReviewsRouteView {
     )
   }
 }
+
+struct DashboardReviewsProvenanceBar: View {
+  let snapshot: DashboardReviewsProvenanceSnapshot
+  let onRefresh: () -> Void
+
+  @State private var isInfoPopoverPresented = false
+
+  var body: some View {
+    HStack(alignment: .center, spacing: HarnessMonitorTheme.spacingSM) {
+      healthDot
+      Text(snapshot.sourceTitle)
+        .scaledFont(.callout.weight(.semibold))
+        .foregroundStyle(snapshot.sourceTint)
+        .lineLimit(1)
+      Text("·")
+        .scaledFont(.callout)
+        .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+        .accessibilityHidden(true)
+      Text(snapshot.detailTitle)
+        .scaledFont(.callout)
+        .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+        .lineLimit(1)
+        .truncationMode(.tail)
+      Spacer(minLength: HarnessMonitorTheme.spacingMD)
+      refreshButton
+      infoButton
+    }
+    .padding(.horizontal, 12)
+    .padding(.vertical, 8)
+    .harnessFloatingControlGlass(cornerRadius: 8, tint: snapshot.sourceTint)
+    .accessibilityIdentifier(HarnessMonitorAccessibility.dashboardReviewsProvenance)
+    .accessibilityElement(children: .combine)
+    .accessibilityLabel("Review data provenance")
+    .accessibilityValue("\(snapshot.sourceTitle) · \(snapshot.detailTitle)")
+  }
+
+  private var healthDot: some View {
+    Circle()
+      .fill(snapshot.sourceTint)
+      .frame(width: 8, height: 8)
+      .accessibilityHidden(true)
+  }
+
+  private var refreshButton: some View {
+    Button(action: onRefresh) {
+      Image(systemName: "arrow.clockwise")
+        .imageScale(.medium)
+        .frame(width: 18, height: 18)
+    }
+    .frame(width: 28, height: 28)
+    .harnessActionButtonStyle(variant: .bordered, tint: .secondary)
+    .help("Refresh review data")
+    .accessibilityLabel("Refresh review data")
+    .accessibilityIdentifier(HarnessMonitorAccessibility.dashboardReviewsRefreshButton)
+  }
+
+  private var infoButton: some View {
+    Button {
+      isInfoPopoverPresented.toggle()
+    } label: {
+      Image(systemName: "info.circle")
+        .imageScale(.medium)
+        .frame(width: 18, height: 18)
+    }
+    .frame(width: 28, height: 28)
+    .harnessActionButtonStyle(variant: .bordered, tint: .secondary)
+    .help("Review data details")
+    .accessibilityLabel("Show review data details")
+    .popover(isPresented: $isInfoPopoverPresented, arrowEdge: .top) {
+      DashboardReviewsProvenancePopover(snapshot: snapshot)
+    }
+  }
+}
