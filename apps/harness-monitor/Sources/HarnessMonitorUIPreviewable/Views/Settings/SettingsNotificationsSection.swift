@@ -35,6 +35,13 @@ public struct SettingsNotificationsSection: View {
     isFullyExpanded = true
   }
 
+  private func updateContentFieldWidth(_ width: CGFloat) {
+    guard width > 0, abs(contentFieldWidth - width) > 0.5 else {
+      return
+    }
+    contentFieldWidth = width
+  }
+
   private var authorizationSection: some View {
     Section {
       HarnessMonitorGlassControlGroup(spacing: HarnessMonitorTheme.itemSpacing) {
@@ -108,7 +115,7 @@ public struct SettingsNotificationsSection: View {
           .onGeometryChange(for: CGFloat.self) { proxy in
             proxy.size.width
           } action: { width in
-            contentFieldWidth = width
+            updateContentFieldWidth(width)
           }
       }
       LabeledContent("Subtitle") {
