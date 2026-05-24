@@ -46,7 +46,7 @@ struct DashboardReviewFilesSummary: Equatable {
       if (viewedByPath[file.path] ?? file.viewerViewedState) == .viewed {
         summary.viewed += 1
       }
-      for bucket in DashboardReviewFileClassifier.buckets(for: file) {
+      DashboardReviewFileClassifier.forEachBucket(for: file) { bucket in
         summary.buckets[bucket, default: 0] += 1
       }
       summary.unresolvedThreads += threadIndex.unresolvedAnchorCount(forPath: file.path)
@@ -213,21 +213,51 @@ private struct DashboardReviewFilesModePresentationInput {
 }
 
 enum DashboardReviewFileClassifier {
-  static func buckets(for file: ReviewFile) -> [DashboardReviewFileBucket] {
-    if file.isBinary { return [.binary] }
+  static func forEachBucket(
+    for file: ReviewFile,
+    _ body: (DashboardReviewFileBucket) -> Void
+  ) {
+    if file.isBinary {
+      body(.binary)
+      return
+    }
     let path = file.path.lowercased()
-    var buckets: [DashboardReviewFileBucket] = []
-    if isGenerated(path) { buckets.append(.generated) }
-    if isLockfile(path) { buckets.append(.lockfiles) }
-    if isWorkflow(path) { buckets.append(.workflows) }
-    if isTest(path) { buckets.append(.tests) }
-    if isConfig(path) { buckets.append(.config) }
-    if buckets.isEmpty { buckets.append(.source) }
-    return buckets
+    var didMatch = false
+    func emit(_ bucket: DashboardReviewFileBucket) {
+      didMatch = true
+      body(bucket)
+    }
+    if isGenerated(path) { emit(.generated) }
+    if isLockfile(path) { emit(.lockfiles) }
+    if isWorkflow(path) { emit(.workflows) }
+    if isTest(path) { emit(.tests) }
+    if isConfig(path) { emit(.config) }
+    if !didMatch { body(.source) }
   }
 
   static func matches(_ file: ReviewFile, bucket: DashboardReviewFileBucket) -> Bool {
-    buckets(for: file).contains(bucket)
+    if file.isBinary {
+      return bucket == .binary
+    }
+    guard bucket != .binary else { return false }
+    let path = file.path.lowercased()
+    switch bucket {
+    case .source:
+      return !isGenerated(path) && !isLockfile(path) && !isWorkflow(path)
+        && !isTest(path) && !isConfig(path)
+    case .tests:
+      return isTest(path)
+    case .config:
+      return isConfig(path)
+    case .workflows:
+      return isWorkflow(path)
+    case .generated:
+      return isGenerated(path)
+    case .lockfiles:
+      return isLockfile(path)
+    case .binary:
+      return false
+    }
   }
 
   private static func isWorkflow(_ path: String) -> Bool {
