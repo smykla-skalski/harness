@@ -77,15 +77,24 @@ struct WatchMirrorTimelineProvider: TimelineProvider {
         state: .preview
       )
     }
+    let cachedSnapshot = latestSharedSnapshot()
 
     do {
       let credentialStore = KeychainMobilePairedStationCredentialStore()
       let identityStore = KeychainMobileDeviceIdentityStore()
       guard let credential = try await credentialStore.loadAll().first else {
-        return WatchMirrorTimelineEntry(date: now, snapshot: .empty(now: now), state: .unpaired)
+        return fallbackEntry(
+          cachedSnapshot: cachedSnapshot,
+          emptyState: .unpaired,
+          now: now
+        )
       }
       guard let identity = try await identityStore.load(id: credential.deviceIdentityID) else {
-        return WatchMirrorTimelineEntry(date: now, snapshot: .empty(now: now), state: .unpaired)
+        return fallbackEntry(
+          cachedSnapshot: cachedSnapshot,
+          emptyState: .unpaired,
+          now: now
+        )
       }
 
       let client = MobileCloudMirrorSyncClient(
@@ -100,13 +109,44 @@ struct WatchMirrorTimelineProvider: TimelineProvider {
           now: now
         )
       else {
-        return WatchMirrorTimelineEntry(date: now, snapshot: .empty(now: now), state: .stale)
+        return fallbackEntry(
+          cachedSnapshot: cachedSnapshot,
+          emptyState: .stale,
+          now: now
+        )
       }
+      try? MobileSharedSnapshotStore()?.save(snapshot, savedAt: now)
       return WatchMirrorTimelineEntry(
         date: now, snapshot: snapshot, state: .live(snapshot.generatedAt))
     } catch {
-      return WatchMirrorTimelineEntry(date: now, snapshot: .empty(now: now), state: .stale)
+      return fallbackEntry(
+        cachedSnapshot: cachedSnapshot,
+        emptyState: .stale,
+        now: now
+      )
     }
+  }
+
+  private static func latestSharedSnapshot() -> MobileMirrorSnapshot? {
+    guard let store = MobileSharedSnapshotStore() else {
+      return nil
+    }
+    return try? store.loadLatestSnapshot()
+  }
+
+  private static func fallbackEntry(
+    cachedSnapshot: MobileMirrorSnapshot?,
+    emptyState: WatchMirrorTimelineState,
+    now: Date
+  ) -> WatchMirrorTimelineEntry {
+    guard let cachedSnapshot else {
+      return WatchMirrorTimelineEntry(date: now, snapshot: .empty(now: now), state: emptyState)
+    }
+    let state: WatchMirrorTimelineState =
+      cachedSnapshot.expiresAt > now
+      ? .live(cachedSnapshot.generatedAt)
+      : .stale
+    return WatchMirrorTimelineEntry(date: now, snapshot: cachedSnapshot, state: state)
   }
 }
 
