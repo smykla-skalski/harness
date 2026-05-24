@@ -24,6 +24,8 @@ public final class NeedsMeCountCloudKitPump {
   private let submit: @MainActor (Int) -> Void
   private var task: Task<Void, Never>?
   private var currentBackoff: Duration
+  private var lastFailureMessage: String?
+  private var consecutiveFailures: Int = 0
   private let logger = Logger(
     subsystem: "io.harnessmonitor.intents",
     category: "needsme-count-pump"
@@ -81,10 +83,25 @@ public final class NeedsMeCountCloudKitPump {
     do {
       let count = try await resolve()
       submit(count)
+      if let previous = lastFailureMessage {
+        logger.info(
+          """
+          Pump tick recovered after \(self.consecutiveFailures, privacy: .public) \
+          consecutive failure(s); last error was: \(previous, privacy: .public)
+          """
+        )
+      }
+      lastFailureMessage = nil
+      consecutiveFailures = 0
       logger.info("Pump tick wrote count \(count, privacy: .public)")
       return true
     } catch {
-      logger.info("Pump tick failed: \(error.localizedDescription, privacy: .public)")
+      let message = error.localizedDescription
+      consecutiveFailures += 1
+      if lastFailureMessage != message {
+        logger.warning("Pump tick failed: \(message, privacy: .public)")
+        lastFailureMessage = message
+      }
       return false
     }
   }
@@ -98,4 +115,7 @@ public final class NeedsMeCountCloudKitPump {
     currentBackoff = min(currentBackoff * 2, maxBackoff)
     return delay
   }
+
+  var consecutiveFailureCountForTesting: Int { consecutiveFailures }
+  var lastFailureMessageForTesting: String? { lastFailureMessage }
 }
