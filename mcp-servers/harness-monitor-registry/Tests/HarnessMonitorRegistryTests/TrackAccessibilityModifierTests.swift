@@ -242,6 +242,7 @@ struct TrackAccessibilityModifierTests {
     scrollView.contentView.scroll(to: NSPoint(x: 0, y: 120))
     scrollView.reflectScrolledClipView(scrollView.contentView)
     NotificationCenter.default.post(name: NSWindow.didUpdateNotification, object: window)
+    try? await Task.sleep(for: .milliseconds(850))
 
     #expect(
       await waitUntil {

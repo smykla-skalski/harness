@@ -172,8 +172,10 @@ private struct TrackAccessibilityProbe: NSViewRepresentable {
 }
 
 final class TrackAccessibilityNSView: NSView {
-  private static let didUpdateRefreshInterval: Duration = .milliseconds(250)
-  private static let layoutRefreshInterval: Duration = .milliseconds(120)
+  private static let didUpdateRefreshInterval: Duration = .milliseconds(500)
+  private static let layoutRefreshInterval: Duration = .milliseconds(250)
+  private static let didUpdatePublishDebounce: Duration = .milliseconds(750)
+  private static let layoutPublishDebounce: Duration = .milliseconds(350)
 
   private let registrationOwnerID = UUID()
   private let clock = ContinuousClock()
@@ -461,11 +463,33 @@ final class TrackAccessibilityNSView: NSView {
     if triggeredByLayout {
       lastLayoutRefreshAt = clock.now
     }
+    let publishDelay = publishDebounceDelay(
+      triggeredByDidUpdate: triggeredByDidUpdate,
+      triggeredByLayout: triggeredByLayout
+    )
     // Keep frame publication deferred so representable-backed views finish the
     // current update/layout pass before the registry snapshots screen geometry.
+    // Layout and didUpdate notifications can arrive every frame during scroll;
+    // debounce those refreshes so dense panes publish after the churn settles
+    // instead of doing registry work while the user is actively interacting.
     deferredPublishTask = Task { @MainActor [weak self] in
       guard let self, !Task.isCancelled else {
         return
+      }
+      if publishDelay > .zero {
+        do {
+          try await Task.sleep(for: publishDelay)
+        } catch {
+          return
+        }
+        guard !Task.isCancelled else {
+          return
+        }
+      } else {
+        await Task.yield()
+        guard !Task.isCancelled else {
+          return
+        }
       }
       self.deferredPublishTask = nil
       self.publishCurrentElement()
@@ -486,6 +510,19 @@ final class TrackAccessibilityNSView: NSView {
     }
     let now = clock.now
     return lastLayoutRefreshAt + Self.layoutRefreshInterval <= now
+  }
+
+  private func publishDebounceDelay(
+    triggeredByDidUpdate: Bool,
+    triggeredByLayout: Bool
+  ) -> Duration {
+    if triggeredByDidUpdate {
+      return Self.didUpdatePublishDebounce
+    }
+    if triggeredByLayout {
+      return Self.layoutPublishDebounce
+    }
+    return .zero
   }
 
   private func currentAccessibilityFrame() -> NSRect {

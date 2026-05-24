@@ -32,6 +32,7 @@ struct DashboardRouteContent: View {
         sessionCatalog: sessionCatalog
       )
       .layoutValue(key: DashboardRetainedRouteKey.self, value: .taskBoard)
+      .opacity(isTaskBoardVisible ? 1 : 0)
       .allowsHitTesting(isTaskBoardVisible)
       .accessibilityHidden(!isTaskBoardVisible)
 
@@ -41,6 +42,7 @@ struct DashboardRouteContent: View {
           dashboardUI: dashboardUI
         )
         .layoutValue(key: DashboardRetainedRouteKey.self, value: .notifications)
+        .opacity(isNotificationsVisible ? 1 : 0)
         .allowsHitTesting(isNotificationsVisible)
         .accessibilityHidden(!isNotificationsVisible)
         .onAppear {
@@ -52,6 +54,7 @@ struct DashboardRouteContent: View {
         PolicyCanvasView(store: store, dashboardUI: dashboardUI)
           .frame(maxWidth: .infinity, maxHeight: .infinity)
           .layoutValue(key: DashboardRetainedRouteKey.self, value: .policyCanvas)
+          .opacity(isPolicyCanvasVisible ? 1 : 0)
           .allowsHitTesting(isPolicyCanvasVisible)
           .accessibilityHidden(!isPolicyCanvasVisible)
           .onAppear {
@@ -65,6 +68,7 @@ struct DashboardRouteContent: View {
           selectedRoute: route
         )
         .layoutValue(key: DashboardRetainedRouteKey.self, value: .diagnostics)
+        .opacity(isDiagnosticsVisible ? 1 : 0)
         .allowsHitTesting(isDiagnosticsVisible)
         .accessibilityHidden(!isDiagnosticsVisible)
         .onAppear {
@@ -79,6 +83,7 @@ struct DashboardRouteContent: View {
           searchAutomationCommand: reviewsSearchAutomation
         )
         .layoutValue(key: DashboardRetainedRouteKey.self, value: .reviews)
+        .opacity(isReviewsVisible ? 1 : 0)
         .allowsHitTesting(isReviewsVisible)
         .accessibilityHidden(!isReviewsVisible)
         .onAppear {
