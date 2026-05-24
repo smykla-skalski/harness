@@ -112,6 +112,55 @@ final class MobileMacRelayServiceTests: XCTestCase {
     XCTAssertEqual(receiptRecord?.metadata.type, .receipt)
   }
 
+  func testRelayWritesEncryptedSnapshotForTrustedMobileDevices() async throws {
+    let now = Date(timeIntervalSince1970: 1_700_000_000)
+    let snapshot = MobileDemoFixtures.snapshot(now: now)
+    let stationID = "station-mac-studio"
+    let database = InMemoryMobileCloudMirrorDatabase()
+    let trustedDevice = MobilePairingTrustedDevice(
+      stationID: stationID,
+      deviceID: "device-phone",
+      displayName: "Phone",
+      signingKeyFingerprint: "AA:BB:CC:DD",
+      signingPublicKeyRawRepresentation: Data([1]),
+      agreementPublicKeyRawRepresentation: Data([2]),
+      snapshotKeyID: "snapshot-key",
+      commandKeyID: "command-key",
+      symmetricKeyRawRepresentation: Data(repeating: 12, count: 32),
+      pairedAt: now
+    )
+    let trustedDeviceStore = try MobileMacTrustedCommandDeviceStore(devices: [trustedDevice])
+    let snapshotSink = MobileCloudMirrorRelaySnapshotSink(
+      stationID: stationID,
+      writer: MobileCloudMirrorSnapshotWriter(database: database),
+      trustedDeviceStore: trustedDeviceStore,
+      now: { now }
+    )
+    let relay = MobileMacRelayService(
+      stationID: stationID,
+      snapshotSource: FixedSnapshotSource(snapshot: snapshot),
+      snapshotSink: snapshotSink,
+      commandQueue: InMemoryMobileRelayCommandQueue(commands: []),
+      executor: EchoMobileRelayCommandExecutor()
+    )
+
+    let receipts = try await relay.executePendingCommands(now: now)
+    let record = try await database.fetch(
+      recordID: MobileCloudMirrorSnapshotWriter.snapshotRecordID(
+        stationID: stationID,
+        device: trustedDevice
+      )
+    )
+    let opened: MobileMirrorSnapshot = try MobilePayloadCipher(
+      rawKey: trustedDevice.symmetricKeyRawRepresentation
+    )
+    .open(try XCTUnwrap(record?.envelope))
+
+    XCTAssertEqual(receipts, [])
+    XCTAssertEqual(opened, snapshot)
+    XCTAssertEqual(record?.metadata.type, .snapshot)
+  }
+
   func testMacPairingHTTPServerAcceptsPhonePairingAndTrustsDevice() async throws {
     let now = Date(timeIntervalSince1970: 1_700_000_000)
     let stationIdentity = MobilePairingStationIdentity(

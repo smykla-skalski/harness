@@ -16,9 +16,14 @@ public protocol MobileRelayCommandExecutor: Sendable {
     -> MobileCommandReceipt
 }
 
+public protocol MobileMirrorSnapshotSink: Sendable {
+  func writeSnapshot(_ snapshot: MobileMirrorSnapshot) async throws
+}
+
 public actor MobileMacRelayService {
   private let stationID: String
   private let snapshotSource: any MobileMirrorSnapshotSource
+  private let snapshotSink: (any MobileMirrorSnapshotSink)?
   private let commandQueue: any MobileRelayCommandQueue
   private let executor: any MobileRelayCommandExecutor
   private var executedCommandIDs: Set<String> = []
@@ -26,11 +31,13 @@ public actor MobileMacRelayService {
   public init(
     stationID: String,
     snapshotSource: any MobileMirrorSnapshotSource,
+    snapshotSink: (any MobileMirrorSnapshotSink)? = nil,
     commandQueue: any MobileRelayCommandQueue,
     executor: any MobileRelayCommandExecutor
   ) {
     self.stationID = stationID
     self.snapshotSource = snapshotSource
+    self.snapshotSink = snapshotSink
     self.commandQueue = commandQueue
     self.executor = executor
   }
@@ -38,6 +45,7 @@ public actor MobileMacRelayService {
   @discardableResult
   public func executePendingCommands(now: Date = .now) async throws -> [MobileCommandReceipt] {
     let snapshot = try await snapshotSource.makeSnapshot(now: now)
+    try await snapshotSink?.writeSnapshot(snapshot)
     let pendingCommands = try await commandQueue.pendingCommands(stationID: stationID)
     var receipts: [MobileCommandReceipt] = []
 
