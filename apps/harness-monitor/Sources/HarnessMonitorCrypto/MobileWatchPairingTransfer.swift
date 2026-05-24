@@ -25,10 +25,24 @@ public struct MobileWatchPairingTransfer: Codable, Equatable, Sendable {
   }
 
   public func encodedData() throws -> Data {
+    try encodedData(maximumBytes: nil)
+  }
+
+  public func encodedData(maximumBytes: Int?) throws -> Data {
+    let data = try Self.encode(self)
+    guard let maximumBytes, data.count > maximumBytes, snapshot != nil else {
+      return data
+    }
+    var fallback = self
+    fallback.snapshot = nil
+    return try Self.encode(fallback)
+  }
+
+  private static func encode(_ transfer: MobileWatchPairingTransfer) throws -> Data {
     let encoder = JSONEncoder()
     encoder.dateEncodingStrategy = .iso8601
     encoder.outputFormatting = [.sortedKeys]
-    return try encoder.encode(self)
+    return try encoder.encode(transfer)
   }
 
   public static func decode(_ data: Data) throws -> MobileWatchPairingTransfer {

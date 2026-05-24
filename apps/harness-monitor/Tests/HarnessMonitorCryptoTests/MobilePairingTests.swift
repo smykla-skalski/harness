@@ -162,6 +162,66 @@ final class MobilePairingTests: XCTestCase {
     XCTAssertEqual(decoded, transfer)
   }
 
+  func testWatchPairingTransferDropsSnapshotWhenPayloadExceedsLimit() throws {
+    let now = Date(timeIntervalSince1970: 1_700_000_000)
+    let identity = makeIdentity(id: "device-phone", now: now)
+    let credential = makeCredential(
+      stationID: "station-mac-studio",
+      deviceIdentityID: identity.id,
+      now: now
+    )
+    let station = MobileStationSummary(
+      id: credential.stationID,
+      displayName: "Studio",
+      state: .online,
+      lastSeenAt: now,
+      activeSessionCount: 1,
+      needsYouCount: 0,
+      commandQueueCount: 0,
+      defaultStation: true
+    )
+    let snapshot = MobileMirrorSnapshot(
+      revision: 42,
+      generatedAt: now,
+      expiresAt: now.addingTimeInterval(60),
+      stations: [station],
+      attention: [],
+      sessions: [
+        MobileSessionSummary(
+          id: "session-large",
+          stationID: credential.stationID,
+          projectName: "Harness",
+          title: "Large snapshot",
+          branch: "main",
+          status: "Active",
+          activeAgentCount: 1,
+          blockedAgentCount: 0,
+          lastActivityAt: now,
+          summary: String(repeating: "mirrored mobile state ", count: 5_000)
+        )
+      ],
+      reviews: [],
+      taskBoardItems: [],
+      commands: [],
+      trustedDevices: []
+    )
+    let transfer = MobileWatchPairingTransfer(
+      identities: [identity],
+      credentials: [credential],
+      snapshot: snapshot,
+      exportedAt: now.addingTimeInterval(20)
+    )
+
+    let decoded = try MobileWatchPairingTransfer.decode(
+      try transfer.encodedData(maximumBytes: 1_024)
+    )
+
+    XCTAssertEqual(decoded.identities, [identity])
+    XCTAssertEqual(decoded.credentials, [credential])
+    XCTAssertNil(decoded.snapshot)
+    XCTAssertEqual(decoded.exportedAt, transfer.exportedAt)
+  }
+
   func testWatchPairingTransferPlansCredentialReplacementDeletesOnlyStaleIdentities() {
     let now = Date(timeIntervalSince1970: 1_700_000_000)
     let current = [

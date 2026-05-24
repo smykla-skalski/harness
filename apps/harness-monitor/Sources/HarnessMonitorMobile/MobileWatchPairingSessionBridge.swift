@@ -15,6 +15,8 @@ protocol MobileWatchPairingSyncing: Sendable {
 final class MobileWatchPairingSessionBridge: NSObject, MobileWatchPairingSyncing,
   WCSessionDelegate, @unchecked Sendable
 {
+  private static let maximumTransferPayloadBytes = 60 * 1024
+
   private let session: WCSession?
   private let identityStore: (any MobileDeviceIdentityStore)?
   private let credentialStore: (any MobilePairedStationCredentialStore)?
@@ -49,7 +51,9 @@ final class MobileWatchPairingSessionBridge: NSObject, MobileWatchPairingSyncing
       snapshot: snapshot,
       exportedAt: exportedAt
     )
-    guard let data = try? transfer.encodedData() else {
+    guard let data = try? transfer.encodedData(
+      maximumBytes: Self.maximumTransferPayloadBytes
+    ) else {
       return
     }
     let payload = [MobileWatchPairingTransferEnvelope.transferKey: data]
