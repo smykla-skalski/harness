@@ -67,19 +67,25 @@ struct DashboardReviewsControlStrip: View {
   /// button. The on-state uses a filled checkmark glyph plus an accent tint
   /// so the chip reads as a *selected segment*, not as a hyperlink — the
   /// previous styling collided with link affordance in dense pickers.
+  ///
+  /// The trailing count uses a *circular* notification-style badge with a
+  /// bold caption-2 weight, intentionally distinct from the rectangular
+  /// `harnessControlPillGlass` pills the per-repository section headers use
+  /// for their PR counts. A user scanning the pane should never confuse the
+  /// "PRs awaiting me" badge with the "PRs in this repo" pill.
   private var needsMeChip: some View {
     Button(action: { needsMeOn.toggle() }) {
       HStack(spacing: HarnessMonitorTheme.spacingXS) {
-        Image(systemName: needsMeOn ? "person.crop.circle.fill.badge.checkmark" : "person.crop.circle")
-          .imageScale(.medium)
-          .symbolRenderingMode(.hierarchical)
+        Image(
+          systemName: needsMeOn
+            ? "person.crop.circle.fill.badge.checkmark"
+            : "person.crop.circle"
+        )
+        .imageScale(.medium)
+        .symbolRenderingMode(.hierarchical)
         Text("Needs Me")
         if needsMeCount > 0 {
-          Text(verbatim: "\(needsMeCount)")
-            .monospacedDigit()
-            .padding(.horizontal, 6)
-            .padding(.vertical, 1)
-            .background(needsMeCountBackground)
+          needsMeCountBadge
         }
       }
     }
@@ -97,9 +103,23 @@ struct DashboardReviewsControlStrip: View {
     )
   }
 
-  private var needsMeCountBackground: some View {
-    RoundedRectangle(cornerRadius: HarnessMonitorTheme.pillCornerRadius, style: .continuous)
-      .fill((needsMeOn ? HarnessMonitorTheme.accent : HarnessMonitorTheme.secondaryInk).opacity(0.18))
+  @ScaledMetric(relativeTo: .caption2)
+  private var needsMeBadgeDiameter = 18.0
+
+  private var needsMeCountBadge: some View {
+    Text(verbatim: "\(needsMeCount)")
+      .monospacedDigit()
+      .scaledFont(.caption2.weight(.bold))
+      .foregroundStyle(needsMeOn ? HarnessMonitorTheme.accent : HarnessMonitorTheme.secondaryInk)
+      .frame(minWidth: needsMeBadgeDiameter, minHeight: needsMeBadgeDiameter)
+      .padding(.horizontal, 4)
+      .background(
+        Capsule(style: .continuous)
+          .fill(
+            (needsMeOn ? HarnessMonitorTheme.accent : HarnessMonitorTheme.secondaryInk)
+              .opacity(0.20)
+          )
+      )
   }
 
   // Legacy identifier `HarnessMonitorAccessibility.dashboardReviewsSelectionStatus`
