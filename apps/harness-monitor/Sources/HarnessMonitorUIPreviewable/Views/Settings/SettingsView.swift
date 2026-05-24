@@ -277,7 +277,7 @@ private struct SettingsRetainedSectionHost<Content: View>: View, Equatable {
 
   var body: some View {
     content()
-      .environment(\.settingsScrollRestorationSection, section)
+      .environment(\.settingsScrollRestorationSection, isSelected ? section : nil)
       .environment(\.settingsScrollRestorationSuspended, isRestorationSuspended)
       .harnessMCPElementTrackingEnabled(isSelected)
       .opacity(isSelected ? 1 : 0)
