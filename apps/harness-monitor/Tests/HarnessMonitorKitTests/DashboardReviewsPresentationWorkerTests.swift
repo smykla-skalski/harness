@@ -343,6 +343,23 @@ struct DashboardReviewsPresentationWorkerTests {
     #expect(!source.contains("private let relativeFormatter"))
   }
 
+  @Test("presentation worker caches relative date labels across recomputes")
+  func presentationWorkerCachesRelativeDateLabelsAcrossRecomputes() throws {
+    let source = try workerSource()
+
+    #expect(source.contains("DashboardReviewsRelativeLabelCacheKey"))
+    #expect(source.contains("private var relativeLabelCache:"))
+    #expect(source.contains("let minuteBucket = Self.relativeLabelMinuteBucket(for: now)"))
+    #expect(source.contains("if let cached = relativeLabelCache[key]"))
+    #expect(source.contains("relativeLabelCache[key] = label"))
+    #expect(source.contains("pruneRelativeLabelCacheIfNeeded()"))
+    #expect(
+      !source.contains(
+        "if let date = isoFormatter.date(from: item.updatedAt) {"
+      )
+    )
+  }
+
   private func reviewItem(
     id: String,
     repository: String,

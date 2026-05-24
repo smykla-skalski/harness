@@ -10,7 +10,14 @@ private struct DashboardReviewsFilterCriteria {
   let query: String
 }
 
+private struct DashboardReviewsRelativeLabelCacheKey: Hashable {
+  let pullRequestID: String
+  let updatedAt: String
+  let minuteBucket: Int64
+}
+
 actor DashboardReviewsPresentationWorker {
+  private static let relativeLabelCacheLimit = 4_096
   private static let signposter = OSSignposter(
     subsystem: "io.harnessmonitor",
     category: "perf"
@@ -20,6 +27,8 @@ actor DashboardReviewsPresentationWorker {
   private var relativeFormatterStorage: RelativeDateTimeFormatter?
   private var cachedListInput: DashboardReviewsListPresentationInput?
   private var cachedListPresentation = DashboardReviewsListPresentation.empty
+  private var relativeLabelCache: [DashboardReviewsRelativeLabelCacheKey: String] = [:]
+  private var relativeLabelCacheOrder: [DashboardReviewsRelativeLabelCacheKey] = []
 
   func compute(
     input: DashboardReviewsPresentationInput
@@ -151,15 +160,30 @@ actor DashboardReviewsPresentationWorker {
 
     let isoFormatter = isoFormatter
     let relativeFormatter = relativeFormatter
+    let minuteBucket = Self.relativeLabelMinuteBucket(for: now)
     var result: [String: String] = [:]
     result.reserveCapacity(items.count)
     for item in items {
-      if let date = isoFormatter.date(from: item.updatedAt) {
-        result[item.pullRequestID] = relativeFormatter.localizedString(for: date, relativeTo: now)
-      } else {
-        result[item.pullRequestID] = item.updatedAt
+      let key = DashboardReviewsRelativeLabelCacheKey(
+        pullRequestID: item.pullRequestID,
+        updatedAt: item.updatedAt,
+        minuteBucket: minuteBucket
+      )
+      if let cached = relativeLabelCache[key] {
+        result[item.pullRequestID] = cached
+        continue
       }
+      let label = relativeUpdatedLabel(
+        for: item,
+        relativeTo: now,
+        isoFormatter: isoFormatter,
+        relativeFormatter: relativeFormatter
+      )
+      relativeLabelCache[key] = label
+      relativeLabelCacheOrder.append(key)
+      result[item.pullRequestID] = label
     }
+    pruneRelativeLabelCacheIfNeeded()
     return result
   }
 
@@ -180,6 +204,31 @@ actor DashboardReviewsPresentationWorker {
     formatter.unitsStyle = .short
     relativeFormatterStorage = formatter
     return formatter
+  }
+
+  private func relativeUpdatedLabel(
+    for item: ReviewItem,
+    relativeTo now: Date,
+    isoFormatter: ISO8601DateFormatter,
+    relativeFormatter: RelativeDateTimeFormatter
+  ) -> String {
+    guard let date = isoFormatter.date(from: item.updatedAt) else {
+      return item.updatedAt
+    }
+    return relativeFormatter.localizedString(for: date, relativeTo: now)
+  }
+
+  private func pruneRelativeLabelCacheIfNeeded() {
+    let overflow = relativeLabelCacheOrder.count - Self.relativeLabelCacheLimit
+    guard overflow > 0 else { return }
+    for key in relativeLabelCacheOrder.prefix(overflow) {
+      relativeLabelCache.removeValue(forKey: key)
+    }
+    relativeLabelCacheOrder.removeFirst(overflow)
+  }
+
+  private static func relativeLabelMinuteBucket(for date: Date) -> Int64 {
+    Int64(date.timeIntervalSince1970 / 60)
   }
 
   private static func groupedItems(
