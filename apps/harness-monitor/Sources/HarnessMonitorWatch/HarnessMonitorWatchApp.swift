@@ -1,3 +1,4 @@
+import CloudKit
 import HarnessMonitorCloudKit
 import SwiftUI
 import WatchKit
@@ -15,10 +16,23 @@ struct HarnessMonitorWatchApp: App {
 }
 
 final class WatchAppDelegate: NSObject, WKApplicationDelegate {
+  private var accountObserver: NSObjectProtocol?
+
   func applicationDidFinishLaunching() {
     WKExtension.shared().registerForRemoteNotifications()
     Task.detached {
       await NeedsMeCloudKitSubscriptionService.shared.registerIfNeeded()
+    }
+    accountObserver = NotificationCenter.default.addObserver(
+      forName: .CKAccountChanged,
+      object: nil,
+      queue: nil
+    ) { _ in
+      Task.detached {
+        await NeedsMeCloudKitSubscriptionService.shared.invalidateForAccountChange()
+        await NeedsMeCloudKitSubscriptionService.shared.registerIfNeeded()
+        WidgetCenter.shared.reloadAllTimelines()
+      }
     }
   }
 
