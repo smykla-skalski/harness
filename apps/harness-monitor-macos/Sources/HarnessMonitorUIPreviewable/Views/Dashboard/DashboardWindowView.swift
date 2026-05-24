@@ -152,6 +152,7 @@ public struct DashboardWindowView: View {
         .navigationSubtitle(route.title)
       }
       .harnessFocusedSceneValue(\.windowNavigation, windowNavigationState)
+      .environment(\.globalWindowNavigationHistory, history)
       .accessibilityElement(children: .contain)
       .accessibilityIdentifier(HarnessMonitorAccessibility.dashboardWindowRoot)
       .toolbar {

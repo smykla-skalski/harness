@@ -17,14 +17,9 @@ extension DashboardReviewsRouteView {
     routeSelectedIDs = [item.pullRequestID]
     persistedPrimarySelectionID = item.pullRequestID
     routeDetailMode = .files
-    let viewModel = store.viewModel(forPullRequest: item.pullRequestID)
-    restoreSelectedFile(for: item.pullRequestID, viewModel: viewModel)
     Task {
       defer { ReviewFilesPerf.end(interval) }
-      await store.prepareReviewFiles(pullRequestID: item.pullRequestID)
-      await store.prepareReviewTimeline(for: item)
-      viewModel.ensureSelectedPath()
-      rememberSelectedFile(viewModel.selectedPath, for: item.pullRequestID)
+      await prepareFilesMode(for: item)
     }
   }
 
@@ -46,6 +41,16 @@ extension DashboardReviewsRouteView {
     var selections = routeFileSelections
     selections.remember(path: path, for: pullRequestID)
     routeFileSelections = selections
+  }
+
+  @MainActor
+  func prepareFilesMode(for item: ReviewItem) async {
+    let viewModel = store.viewModel(forPullRequest: item.pullRequestID)
+    restoreSelectedFile(for: item.pullRequestID, viewModel: viewModel)
+    await store.prepareReviewFiles(pullRequestID: item.pullRequestID)
+    await store.prepareReviewTimeline(for: item)
+    viewModel.ensureSelectedPath()
+    rememberSelectedFile(viewModel.selectedPath, for: item.pullRequestID)
   }
 
   func filesModeContentPane(for item: ReviewItem) -> some View {

@@ -195,6 +195,68 @@ struct HarnessMonitorStoreNavigationTests {
     #expect(history.canGoForward)
   }
 
+  @Test("Global window history upgrades generic Reviews route entries in place")
+  func globalWindowHistoryUpgradesGenericReviewsEntriesInPlace() async throws {
+    let store = try await makeNavigationStore()
+    let history = GlobalWindowNavigationHistory(store: store)
+    let overviewSelection = DashboardReviewsHistorySelection(
+      selectedPullRequestIDs: ["PR-42"],
+      primaryPullRequestID: "PR-42",
+      detailMode: .overview
+    )
+
+    history.installDashboardStateIfNeeded(route: .taskBoard)
+    history.recordDashboardRoute(.reviews)
+    history.recordDashboardSelection(.reviews(overviewSelection))
+
+    history.navigateBack()
+
+    let dashboardRequest = try #require(history.pendingDashboardRestoreRequest)
+    #expect(dashboardRequest.route == .taskBoard)
+    #expect(history.pendingDashboardReviewsRestoreRequest == nil)
+    #expect(!history.canGoBack)
+    #expect(history.canGoForward)
+  }
+
+  @Test("Global window history restores Reviews Files selections on back and forward")
+  func globalWindowHistoryRestoresReviewsFilesSelections() async throws {
+    let store = try await makeNavigationStore()
+    let history = GlobalWindowNavigationHistory(store: store)
+    let overviewSelection = DashboardReviewsHistorySelection(
+      selectedPullRequestIDs: ["PR-42"],
+      primaryPullRequestID: "PR-42",
+      detailMode: .overview
+    )
+    let filesSelection = DashboardReviewsHistorySelection(
+      selectedPullRequestIDs: ["PR-42"],
+      primaryPullRequestID: "PR-42",
+      detailMode: .files
+    )
+
+    history.installDashboardStateIfNeeded(route: .taskBoard)
+    history.recordDashboardRoute(.reviews)
+    history.recordDashboardSelection(.reviews(overviewSelection))
+    history.recordDashboardSelection(.reviews(filesSelection))
+
+    history.navigateBack()
+
+    let backDashboardRequest = try #require(history.pendingDashboardRestoreRequest)
+    let backReviewsRequest = try #require(history.pendingDashboardReviewsRestoreRequest)
+    #expect(backDashboardRequest.selection == .reviews(overviewSelection))
+    #expect(backReviewsRequest.selection == overviewSelection)
+    history.finishDashboardRestoreRequest(backDashboardRequest.requestID)
+    history.finishDashboardReviewsRestoreRequest(backReviewsRequest.requestID)
+
+    history.navigateForward()
+
+    let forwardDashboardRequest = try #require(history.pendingDashboardRestoreRequest)
+    let forwardReviewsRequest = try #require(history.pendingDashboardReviewsRestoreRequest)
+    #expect(forwardDashboardRequest.selection == .reviews(filesSelection))
+    #expect(forwardReviewsRequest.selection == filesSelection)
+    #expect(history.canGoBack)
+    #expect(!history.canGoForward)
+  }
+
   @Test("Command routing scope persists until the active window is explicitly cleared")
   func commandRoutingScopePersistsUntilClear() async {
     let routingState = WindowCommandRoutingState()

@@ -49,6 +49,7 @@ final class DashboardReviewsRouteViewState {
   var lastPrimaryClickedID: String?
   var isReviewsRouteActive = true
   var pendingResumeAfterReturn = false
+  var handledDashboardHistoryRestoreRequestID = 0
   var lastStoredPreferencesHash: Int?
   var needsMeCount: Int = 0
   var pinnedPullRequests: DashboardReviewsPinnedPullRequests

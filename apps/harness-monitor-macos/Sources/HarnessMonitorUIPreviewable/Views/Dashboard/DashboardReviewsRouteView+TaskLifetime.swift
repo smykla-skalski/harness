@@ -1,6 +1,29 @@
 import SwiftUI
 
 extension DashboardReviewsRouteView {
+  var currentDashboardHistorySelection: DashboardWindowSelection {
+    .reviews(
+      DashboardReviewsHistorySelection(
+        selectedPullRequestIDs: Array(routeSelectedIDs),
+        primaryPullRequestID: persistedPrimarySelectionID,
+        detailMode: routeDetailMode
+      )
+    )
+  }
+
+  func recordCurrentHistorySelectionIfVisible() {
+    guard selectedRoute == .reviews else {
+      return
+    }
+    guard let windowNavigationHistory else {
+      return
+    }
+    guard windowNavigationHistory.pendingDashboardReviewsRestoreRequest == nil else {
+      return
+    }
+    windowNavigationHistory.recordDashboardSelection(currentDashboardHistorySelection)
+  }
+
   /// Track a task so the pause-on-leave heuristic can reason about live work.
   ///
   /// The original implementation only appended; tasks that completed normally
@@ -64,5 +87,43 @@ extension DashboardReviewsRouteView {
     case .noChange:
       break
     }
+  }
+
+  @MainActor
+  func applyPendingDashboardReviewsRestoreIfNeeded() async {
+    guard selectedRoute == .reviews else {
+      return
+    }
+    guard let windowNavigationHistory else {
+      return
+    }
+    guard let request = windowNavigationHistory.pendingDashboardReviewsRestoreRequest else {
+      return
+    }
+    guard request.requestID != routeHandledDashboardHistoryRestoreRequestID else {
+      return
+    }
+
+    let selection = request.selection
+    routeSelectedIDs = selection.selectedPullRequestIDSet
+    persistedPrimarySelectionID = selection.primaryPullRequestID
+    routeDetailMode = selection.detailMode
+
+    if selection.detailMode == DashboardReviewsDetailMode.files {
+      guard
+        let item = routeResponse.items.first(where: {
+          $0.pullRequestID == selection.primaryPullRequestID
+        })
+      else {
+        return
+      }
+      routeHandledDashboardHistoryRestoreRequestID = request.requestID
+      await prepareFilesMode(for: item)
+    } else {
+      routeHandledDashboardHistoryRestoreRequestID = request.requestID
+    }
+
+    await Task.yield()
+    windowNavigationHistory.finishDashboardReviewsRestoreRequest(request.requestID)
   }
 }

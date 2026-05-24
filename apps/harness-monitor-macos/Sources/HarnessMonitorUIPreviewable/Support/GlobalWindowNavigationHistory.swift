@@ -5,13 +5,41 @@ import SwiftUI
 
 @MainActor
 enum GlobalWindowNavigationEntry: Hashable {
-  case dashboard(route: DashboardWindowRoute)
+  case dashboard(selection: DashboardWindowSelection)
   case session(sessionID: String, selection: SessionSelection)
+}
+
+enum DashboardWindowSelection: Hashable, Sendable {
+  case route(DashboardWindowRoute)
+  case reviews(DashboardReviewsHistorySelection)
+
+  var route: DashboardWindowRoute {
+    switch self {
+    case .route(let route):
+      route
+    case .reviews:
+      .reviews
+    }
+  }
+
+  var reviewsSelection: DashboardReviewsHistorySelection? {
+    guard case .reviews(let selection) = self else {
+      return nil
+    }
+    return selection
+  }
 }
 
 struct DashboardWindowNavigationRestoreRequest: Equatable, Sendable {
   let requestID: Int
-  let route: DashboardWindowRoute
+  let selection: DashboardWindowSelection
+
+  var route: DashboardWindowRoute { selection.route }
+}
+
+struct DashboardReviewsNavigationRestoreRequest: Equatable, Sendable {
+  let requestID: Int
+  let selection: DashboardReviewsHistorySelection
 }
 
 struct SessionWindowNavigationRestoreRequest: Equatable, Sendable {
@@ -26,9 +54,10 @@ public final class GlobalWindowNavigationHistory {
   private(set) var backStack: [GlobalWindowNavigationEntry] = []
   private(set) var forwardStack: [GlobalWindowNavigationEntry] = []
   private(set) var currentEntry: GlobalWindowNavigationEntry?
-  private(set) var dashboardRoute: DashboardWindowRoute = .taskBoard
+  private(set) var dashboardSelection: DashboardWindowSelection = .route(.taskBoard)
   private(set) var latestSessionSelections: [String: SessionSelection] = [:]
   private(set) var pendingDashboardRestoreRequest: DashboardWindowNavigationRestoreRequest?
+  private(set) var pendingDashboardReviewsRestoreRequest: DashboardReviewsNavigationRestoreRequest?
   private(set) var pendingSessionRestoreRequest: SessionWindowNavigationRestoreRequest?
 
   @ObservationIgnored private let store: HarnessMonitorStore
@@ -37,7 +66,7 @@ public final class GlobalWindowNavigationHistory {
 
   public init(store: HarnessMonitorStore) {
     self.store = store
-    currentEntry = .dashboard(route: dashboardRoute)
+    currentEntry = .dashboard(selection: dashboardSelection)
   }
 
   var canGoBack: Bool {
@@ -71,11 +100,11 @@ public final class GlobalWindowNavigationHistory {
   }
 
   func installDashboardStateIfNeeded(route: DashboardWindowRoute) {
-    dashboardRoute = route
+    dashboardSelection = .route(route)
     guard currentEntry == nil else {
       return
     }
-    currentEntry = .dashboard(route: route)
+    currentEntry = .dashboard(selection: .route(route))
   }
 
   func installSessionStateIfNeeded(
@@ -90,11 +119,27 @@ public final class GlobalWindowNavigationHistory {
   }
 
   func recordDashboardRoute(_ route: DashboardWindowRoute) {
-    dashboardRoute = route
     guard pendingDashboardRestoreRequest?.route != route else {
       return
     }
-    record(.dashboard(route: route))
+    recordDashboardSelection(.route(route))
+  }
+
+  func recordDashboardSelection(_ selection: DashboardWindowSelection) {
+    dashboardSelection = selection
+    if pendingDashboardRestoreRequest?.selection == selection {
+      return
+    }
+    if let reviewsSelection = selection.reviewsSelection,
+      pendingDashboardReviewsRestoreRequest?.selection == reviewsSelection
+    {
+      return
+    }
+    if shouldUpgradeCurrentDashboardEntry(to: selection) {
+      currentEntry = .dashboard(selection: selection)
+      return
+    }
+    record(.dashboard(selection: selection))
   }
 
   func recordSessionSelection(
@@ -112,18 +157,19 @@ public final class GlobalWindowNavigationHistory {
   }
 
   func recordDashboardOpen() {
-    record(.dashboard(route: dashboardRoute))
+    record(.dashboard(selection: dashboardSelection))
   }
 
   public func requestDashboardRoute(_ route: DashboardWindowRoute) {
     restoreRequestSequence += 1
-    dashboardRoute = route
+    dashboardSelection = .route(route)
     pendingSessionRestoreRequest = nil
+    pendingDashboardReviewsRestoreRequest = nil
     pendingDashboardRestoreRequest = DashboardWindowNavigationRestoreRequest(
       requestID: restoreRequestSequence,
-      route: route
+      selection: .route(route)
     )
-    navigator?(.dashboard(route: route))
+    navigator?(.dashboard(selection: .route(route)))
   }
 
   func recordSessionOpen(sessionID: String) {
@@ -161,6 +207,13 @@ public final class GlobalWindowNavigationHistory {
     pendingDashboardRestoreRequest = nil
   }
 
+  func finishDashboardReviewsRestoreRequest(_ requestID: Int) {
+    guard pendingDashboardReviewsRestoreRequest?.requestID == requestID else {
+      return
+    }
+    pendingDashboardReviewsRestoreRequest = nil
+  }
+
   func finishSessionRestoreRequest(
     _ requestID: Int,
     sessionID: String
@@ -194,16 +247,25 @@ public final class GlobalWindowNavigationHistory {
     restoreRequestSequence += 1
 
     switch entry {
-    case .dashboard(let route):
-      dashboardRoute = route
+    case .dashboard(let selection):
+      dashboardSelection = selection
       pendingSessionRestoreRequest = nil
       pendingDashboardRestoreRequest = DashboardWindowNavigationRestoreRequest(
         requestID: restoreRequestSequence,
-        route: route
+        selection: selection
       )
+      if case .reviews(let reviewsSelection) = selection {
+        pendingDashboardReviewsRestoreRequest = DashboardReviewsNavigationRestoreRequest(
+          requestID: restoreRequestSequence,
+          selection: reviewsSelection
+        )
+      } else {
+        pendingDashboardReviewsRestoreRequest = nil
+      }
     case .session(let sessionID, let selection):
       latestSessionSelections[sessionID] = selection
       pendingDashboardRestoreRequest = nil
+      pendingDashboardReviewsRestoreRequest = nil
       pendingSessionRestoreRequest = SessionWindowNavigationRestoreRequest(
         requestID: restoreRequestSequence,
         sessionID: sessionID,
@@ -267,9 +329,35 @@ public final class GlobalWindowNavigationHistory {
         || store.sessionIndex.sessionSummary(for: sessionID) != nil
     }
   }
+
+  private func shouldUpgradeCurrentDashboardEntry(
+    to selection: DashboardWindowSelection
+  ) -> Bool {
+    guard pendingDashboardReviewsRestoreRequest == nil else {
+      return false
+    }
+    guard let currentEntry else {
+      return false
+    }
+    guard case .dashboard(selection: .route(.reviews)) = currentEntry else {
+      return false
+    }
+    return selection.route == .reviews
+  }
 }
 
 @MainActor
 public enum GlobalWindowNavigationHistoryRegistry {
   public static var current: GlobalWindowNavigationHistory?
+}
+
+private struct GlobalWindowNavigationHistoryKey: @preconcurrency EnvironmentKey {
+  @MainActor static let defaultValue: GlobalWindowNavigationHistory? = nil
+}
+
+extension EnvironmentValues {
+  public var globalWindowNavigationHistory: GlobalWindowNavigationHistory? {
+    get { self[GlobalWindowNavigationHistoryKey.self] }
+    set { self[GlobalWindowNavigationHistoryKey.self] = newValue }
+  }
 }

@@ -386,4 +386,42 @@ struct DashboardReviewsRouteViewTests {
     #expect(entry.recordedAt == recordedAt)
   }
 
+  @Test("history selection normalizes empty and multi-selection Files states")
+  func historySelectionNormalizesInvalidFilesStates() {
+    let empty = DashboardReviewsHistorySelection(
+      selectedPullRequestIDs: [],
+      primaryPullRequestID: "PR-1",
+      detailMode: .files
+    )
+    #expect(empty.selectedPullRequestIDs.isEmpty)
+    #expect(empty.primaryPullRequestID.isEmpty)
+    #expect(empty.detailMode == .overview)
+
+    let multi = DashboardReviewsHistorySelection(
+      selectedPullRequestIDs: ["PR-2", "PR-1", "PR-2"],
+      primaryPullRequestID: "missing",
+      detailMode: .files
+    )
+    #expect(multi.selectedPullRequestIDs == ["PR-1", "PR-2"])
+    #expect(multi.primaryPullRequestID == "PR-1")
+    #expect(multi.detailMode == .overview)
+  }
+
+  @Test("route source records and restores dashboard history")
+  func routeSourceRecordsAndRestoresDashboardHistory() throws {
+    let source = try dashboardReviewsRouteSource()
+    let filesModeSource = try dashboardReviewsRouteSource(
+      named: "DashboardReviewsFilesMode.swift")
+    let taskLifetimeSource = try dashboardReviewsRouteSource(
+      named: "DashboardReviewsRouteView+TaskLifetime.swift")
+
+    #expect(source.contains("@Environment(\\.globalWindowNavigationHistory)"))
+    #expect(source.contains(".task(id: windowNavigationHistory?.pendingDashboardReviewsRestoreRequest)"))
+    #expect(source.contains("recordCurrentHistorySelectionIfVisible()"))
+    #expect(source.contains("Task {\n          await applyPendingDashboardReviewsRestoreIfNeeded()"))
+    #expect(filesModeSource.contains("struct DashboardReviewsHistorySelection"))
+    #expect(taskLifetimeSource.contains("recordDashboardSelection(currentDashboardHistorySelection)"))
+    #expect(taskLifetimeSource.contains("finishDashboardReviewsRestoreRequest(request.requestID)"))
+  }
+
 }
