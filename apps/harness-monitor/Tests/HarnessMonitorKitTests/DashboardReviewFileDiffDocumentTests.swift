@@ -55,6 +55,7 @@ struct DashboardReviewFileDiffDocumentTests {
     #expect(document.rows[2].text == "func newName() {}")
     #expect(document.rows[1].unifiedPrefix == "-")
     #expect(document.rows[2].unifiedPrefix == "+")
+    #expect(document.longestCodeCharacterCount == "func newName() {}".count)
   }
 
   @Test("Diff headers and rename metadata do not consume source line numbers")

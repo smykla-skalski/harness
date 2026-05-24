@@ -7,6 +7,7 @@ struct DashboardReviewFileDiffDocument: Equatable {
   let rows: [DashboardReviewFileDiffRow]
   let truncated: Bool
   let headRefOid: String
+  let longestCodeCharacterCount: Int
 
   init(patch: ReviewFilePatch, language: HarnessReviewFileLanguage) {
     self.path = patch.path
@@ -14,26 +15,34 @@ struct DashboardReviewFileDiffDocument: Equatable {
     self.headRefOid = patch.headRefOid
     let lineCount = Self.estimatedLineCount(in: patch.patch)
     let interval = ReviewFilesPerf.beginDiffParse(path: patch.path, lineCount: lineCount)
-    self.rows = Self.parseRows(from: patch.patch)
+    let parsed = Self.parseRows(from: patch.patch, estimatedLineCount: lineCount)
+    self.rows = parsed.rows
+    self.longestCodeCharacterCount = parsed.longestCodeCharacterCount
     ReviewFilesPerf.end(interval)
     self.truncated = patch.truncated
   }
 
   var isEmpty: Bool { rows.isEmpty }
 
-  var longestCodeCharacterCount: Int {
-    rows.map(\.text.count).max() ?? 0
-  }
-
-  private static func parseRows(from patch: String) -> [DashboardReviewFileDiffRow] {
-    guard !patch.isEmpty else { return [] }
+  private static func parseRows(
+    from patch: String,
+    estimatedLineCount: Int
+  ) -> (rows: [DashboardReviewFileDiffRow], longestCodeCharacterCount: Int) {
+    guard !patch.isEmpty else { return ([], 0) }
     var rows: [DashboardReviewFileDiffRow] = []
+    rows.reserveCapacity(estimatedLineCount)
+    var longestCodeCharacterCount = 0
     var oldLine = 0
     var newLine = 0
     var hasSeenHunk = false
     var diffPosition = 1
+    func appendRow(_ row: DashboardReviewFileDiffRow) {
+      longestCodeCharacterCount = max(longestCodeCharacterCount, row.text.count)
+      rows.append(row)
+    }
     forEachPatchLine(in: patch) { rawLine in
       if let hunk = parseHunkHeader(rawLine) {
+        let rowCountBeforeGap = rows.count
         appendContextGapIfNeeded(
           rows: &rows,
           position: .init(
@@ -44,10 +53,13 @@ struct DashboardReviewFileDiffDocument: Equatable {
             hasSeenHunk: hasSeenHunk
           )
         )
+        if rows.count > rowCountBeforeGap, let gapRow = rows.last {
+          longestCodeCharacterCount = max(longestCodeCharacterCount, gapRow.text.count)
+        }
         oldLine = hunk.oldStart
         newLine = hunk.newStart
         hasSeenHunk = true
-        rows.append(
+        appendRow(
           row(
             rows: rows,
             kind: .hunk,
@@ -56,7 +68,7 @@ struct DashboardReviewFileDiffDocument: Equatable {
           )
         )
       } else if rawLine.hasPrefix("+"), !rawLine.hasPrefix("+++") {
-        rows.append(
+        appendRow(
           row(
             rows: rows,
             kind: hasSeenHunk ? .addition : .metadata,
@@ -70,7 +82,7 @@ struct DashboardReviewFileDiffDocument: Equatable {
           diffPosition += 1
         }
       } else if rawLine.hasPrefix("-"), !rawLine.hasPrefix("---") {
-        rows.append(
+        appendRow(
           row(
             rows: rows,
             kind: hasSeenHunk ? .deletion : .metadata,
@@ -84,9 +96,9 @@ struct DashboardReviewFileDiffDocument: Equatable {
           diffPosition += 1
         }
       } else if shouldTreatAsMetadata(rawLine, hasSeenHunk: hasSeenHunk) {
-        rows.append(row(rows: rows, kind: .metadata, text: String(rawLine)))
+        appendRow(row(rows: rows, kind: .metadata, text: String(rawLine)))
       } else {
-        rows.append(
+        appendRow(
           row(
             rows: rows,
             kind: hasSeenHunk ? .context : .metadata,
@@ -105,7 +117,7 @@ struct DashboardReviewFileDiffDocument: Equatable {
         }
       }
     }
-    return rows
+    return (rows, longestCodeCharacterCount)
   }
 
   private static func estimatedLineCount(in patch: String) -> Int {
