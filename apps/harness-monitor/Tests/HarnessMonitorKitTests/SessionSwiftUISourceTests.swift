@@ -378,13 +378,20 @@ struct SessionSwiftUISourceTests {
     let generalSource = try sourceFile(at: "Views/Settings/SettingsGeneralSection.swift")
     let loggingSource = try sourceFile(at: "Views/Settings/SettingsLoggingSection.swift")
     let actionButtonsSource = try sourceFile(at: "Views/Settings/SettingsActionButtons.swift")
+    let focusModeSource = try sourceFile(at: "Views/Settings/SettingsFocusModeSection.swift")
+    let bannersSource = try sourceFile(at: "Views/Settings/SettingsBannersSection.swift")
+    let appearanceSource = try sourceFile(at: "Views/Settings/SettingsAppearanceSection.swift")
+    let markdownSource = try sourceFile(at: "Views/Settings/SettingsMarkdownSection.swift")
     let notificationsSource = try sourceFile(
       at: "Views/Settings/SettingsNotificationsSection.swift"
     )
+    let voiceSource = try sourceFile(at: "Views/Settings/SettingsVoiceSection.swift")
+    let mobileSource = try sourceFile(at: "Views/Settings/SettingsMobileSection.swift")
     let taskBoardSource = try sourceFile(at: "Views/Settings/SettingsTaskBoardSection.swift")
     let repositoriesSource = try sourceFile(at: "Views/Settings/SettingsRepositoriesSection.swift")
     let reviewsSource = try sourceFile(at: "Views/Settings/SettingsReviewsSection.swift")
     let secretsSource = try sourceFile(at: "Views/Settings/SettingsSecretsSection.swift")
+    let policiesSource = try sourceFile(at: "Views/Settings/SettingsPoliciesSection.swift")
     let supervisorSource = try sourceFile(
       at: "Views/Settings/Supervisor/SettingsSupervisorSection.swift"
     )
@@ -410,10 +417,17 @@ struct SessionSwiftUISourceTests {
     #expect(source.contains("let activeSnapshot = isActive ? SettingsGeneralSnapshot(store: store) : nil"))
     #expect(source.contains("SettingsConnectionSectionRoot("))
     #expect(source.contains("isActive: section == selectedSection"))
+    #expect(source.contains("SettingsFocusModeSection(isActive: section == selectedSection)"))
+    #expect(source.contains("SettingsBannersSection(isActive: section == selectedSection)"))
+    #expect(source.contains("SettingsAppearanceSection("))
+    #expect(source.contains("SettingsMarkdownSection(isActive: section == selectedSection)"))
+    #expect(source.contains("SettingsVoiceSection(isActive: section == selectedSection)"))
+    #expect(source.contains("SettingsMobileSection("))
     #expect(source.contains("SettingsTaskBoardSection("))
     #expect(source.contains("SettingsRepositoriesSection("))
     #expect(source.contains("SettingsReviewsSection("))
     #expect(source.contains("SettingsSecretsSection("))
+    #expect(source.contains("SettingsPoliciesSection(isActive: section == selectedSection)"))
     #expect(source.contains("@State private var cachedSnapshot: SettingsConnectionSnapshot?"))
     #expect(source.contains("let activeSnapshot = isActive ? SettingsConnectionSnapshot(store: store) : nil"))
     #expect(source.contains("let activeInput = isActive ? SettingsDiagnosticsSnapshotInput(store: store) : nil"))
@@ -436,6 +450,22 @@ struct SessionSwiftUISourceTests {
     #expect(generalSource.contains("daemonOwnership: liveState.daemonOwnership"))
     #expect(!loggingSource.contains("public let store: HarnessMonitorStore"))
     #expect(!actionButtonsSource.contains("let store: HarnessMonitorStore"))
+    for retainedSource in [
+      focusModeSource,
+      bannersSource,
+      appearanceSource,
+      markdownSource,
+      voiceSource,
+      mobileSource,
+      policiesSource,
+    ] {
+      #expect(retainedSource.contains("isActive"))
+      #expect(retainedSource.contains("if isActive {\n      activeBody"))
+    }
+    #expect(appearanceSource.contains(".task(id: isActive)"))
+    #expect(markdownSource.contains(".task(id: isActive)"))
+    #expect(voiceSource.contains(".task(id: isActive)"))
+    #expect(voiceSource.contains("guard isActive else { return }"))
     #expect(
       notificationsSource.contains(
         "let activeSnapshot = isActive ? SettingsNotificationsSnapshot(notifications: notifications) : nil"

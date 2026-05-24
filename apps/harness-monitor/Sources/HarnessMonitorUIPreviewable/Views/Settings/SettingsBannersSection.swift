@@ -1,12 +1,23 @@
 import SwiftUI
 
 public struct SettingsBannersSection: View {
+  public let isActive: Bool
   @AppStorage(SessionPendingDecisionBannerSettings.enabledKey)
   private var showsPendingDecisionBanners = SessionPendingDecisionBannerSettings.enabledDefaultValue
 
-  public init() {}
+  public init(isActive: Bool = true) {
+    self.isActive = isActive
+  }
 
   public var body: some View {
+    if isActive {
+      activeBody
+    } else {
+      Color.clear
+    }
+  }
+
+  private var activeBody: some View {
     Form {
       Section {
         Toggle("Show pending decision banners", isOn: $showsPendingDecisionBanners)
