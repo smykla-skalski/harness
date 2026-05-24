@@ -172,4 +172,19 @@ struct DashboardReviewsBodyAllocationContractTests {
     #expect(gridSource.contains("private func firstThreadURL(forRowID rowID: Int) -> String?"))
     #expect(!gridSource.contains("compactMap(\\.url).first"))
   }
+
+  @Test("review task keys avoid transient colon join arrays")
+  func reviewTaskKeysAvoidTransientColonJoinArrays() throws {
+    let files = [
+      "DashboardReviewConversationFeed.swift",
+      "DashboardReviewDetailView.swift",
+      "DashboardReviewFilesModeContentPane.swift",
+      "DashboardReviewFilesModeDetailPane.swift",
+    ]
+
+    for file in files {
+      let source = try dashboardReviewsRouteSource(named: file)
+      #expect(!source.contains("].joined(separator: \":\")"))
+    }
+  }
 }
