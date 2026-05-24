@@ -8,7 +8,23 @@ public protocol MobileMirrorClient: Sendable {
   func sessionDetail(id: String, scope: String?) async throws -> SessionDetail
   func managedAgents(sessionID: String) async throws -> ManagedAgentListResponse
   func queryReviews(request: ReviewsQueryRequest) async throws -> ReviewsQueryResponse
+  func listReviewFiles(request: ReviewsFilesListRequest) async throws -> ReviewsFilesListResponse
+  func fetchReviewTimeline(request: ReviewsTimelineRequest) async throws -> ReviewsTimelineResponse
   func taskBoardItems(status: TaskBoardStatus?) async throws -> [TaskBoardItem]
+}
+
+extension MobileMirrorClient {
+  public func listReviewFiles(
+    request _: ReviewsFilesListRequest
+  ) async throws -> ReviewsFilesListResponse {
+    throw HarnessMonitorAPIError.server(code: 501, message: "Review files unavailable")
+  }
+
+  public func fetchReviewTimeline(
+    request _: ReviewsTimelineRequest
+  ) async throws -> ReviewsTimelineResponse {
+    throw HarnessMonitorAPIError.server(code: 501, message: "Review timeline unavailable")
+  }
 }
 
 public struct HarnessMonitorClientMobileMirrorClient: MobileMirrorClient {
@@ -36,6 +52,18 @@ public struct HarnessMonitorClientMobileMirrorClient: MobileMirrorClient {
 
   public func queryReviews(request: ReviewsQueryRequest) async throws -> ReviewsQueryResponse {
     try await client.queryReviews(request: request)
+  }
+
+  public func listReviewFiles(
+    request: ReviewsFilesListRequest
+  ) async throws -> ReviewsFilesListResponse {
+    try await client.listReviewFiles(request: request)
+  }
+
+  public func fetchReviewTimeline(
+    request: ReviewsTimelineRequest
+  ) async throws -> ReviewsTimelineResponse {
+    try await client.fetchReviewTimeline(request: request)
   }
 
   public func taskBoardItems(status: TaskBoardStatus?) async throws -> [TaskBoardItem] {
@@ -105,6 +133,7 @@ public actor HarnessMonitorClientMobileMirrorSnapshotSource: MobileMirrorSnapsho
         detailsBySessionID: detailsBySessionID,
         agentsBySessionID: agentsBySessionID,
         reviews: reviewFetch.reviews,
+        mobileReviews: reviewFetch.mobileReviews,
         reviewIssueAttention: reviewFetch.attention,
         taskBoardItems: taskBoardFetch.items,
         taskBoardIssueAttention: taskBoardFetch.attention,
@@ -134,6 +163,7 @@ public actor HarnessMonitorClientMobileMirrorSnapshotSource: MobileMirrorSnapsho
     detailsBySessionID: [String: SessionDetail],
     agentsBySessionID: [String: [ManagedAgentSnapshot]],
     reviews: [ReviewItem],
+    mobileReviews: [MobileReviewSummary],
     reviewIssueAttention: MobileAttentionItem?,
     taskBoardItems: [TaskBoardItem],
     taskBoardIssueAttention: MobileAttentionItem?,
@@ -188,7 +218,6 @@ public actor HarnessMonitorClientMobileMirrorSnapshotSource: MobileMirrorSnapsho
         now: now
       )
     }
-    let mobileReviews = reviews.map { mobileReview($0, now: now) }
     let needsYouCount = attention.count { $0.needsUserAction }
     let station = MobileStationSummary(
       id: stationID,
@@ -305,6 +334,7 @@ public actor HarnessMonitorClientMobileMirrorSnapshotSource: MobileMirrorSnapsho
     else {
       return MobileRelayReviewFetchResult(
         reviews: [],
+        mobileReviews: [],
         attention: reviewsUnavailableAttention(
           title: "Reviews are not configured",
           subtitle: "Configure Review repositories on the Mac to mirror pull requests.",
@@ -317,10 +347,16 @@ public actor HarnessMonitorClientMobileMirrorSnapshotSource: MobileMirrorSnapsho
       let response = try await client.queryReviews(
         request: request
       )
-      return MobileRelayReviewFetchResult(reviews: response.items)
+      let mobileReviews = await enrichedMobileReviews(
+        response.items,
+        client: client,
+        now: now
+      )
+      return MobileRelayReviewFetchResult(reviews: response.items, mobileReviews: mobileReviews)
     } catch {
       return MobileRelayReviewFetchResult(
         reviews: [],
+        mobileReviews: [],
         attention: reviewsUnavailableAttention(
           title: "Reviews mirror failed",
           subtitle: "The Mac could not refresh Reviews. Check Review settings and GitHub access.",
@@ -329,6 +365,35 @@ public actor HarnessMonitorClientMobileMirrorSnapshotSource: MobileMirrorSnapsho
         )
       )
     }
+  }
+
+  private func enrichedMobileReviews(
+    _ reviews: [ReviewItem],
+    client: any MobileMirrorClient,
+    now: Date
+  ) async -> [MobileReviewSummary] {
+    var summaries: [MobileReviewSummary] = []
+    summaries.reserveCapacity(reviews.count)
+    for review in reviews {
+      let filesResponse = try? await client.listReviewFiles(
+        request: ReviewsFilesListRequest(pullRequestID: review.pullRequestID)
+      )
+      let timelineResponse = try? await client.fetchReviewTimeline(
+        request: ReviewsTimelineRequest(
+          pullRequestId: review.pullRequestID,
+          pageSize: 5
+        )
+      )
+      summaries.append(
+        mobileReview(
+          review,
+          filesResponse: filesResponse,
+          timelineResponse: timelineResponse,
+          now: now
+        )
+      )
+    }
+    return summaries
   }
 
   private func inferredReviewsQueryRequest(sessions: [SessionSummary]) -> ReviewsQueryRequest? {
@@ -733,7 +798,12 @@ public actor HarnessMonitorClientMobileMirrorSnapshotSource: MobileMirrorSnapsho
     }
   }
 
-  private func mobileReview(_ review: ReviewItem, now: Date) -> MobileReviewSummary {
+  private func mobileReview(
+    _ review: ReviewItem,
+    filesResponse: ReviewsFilesListResponse? = nil,
+    timelineResponse: ReviewsTimelineResponse? = nil,
+    now: Date
+  ) -> MobileReviewSummary {
     MobileReviewSummary(
       id: review.pullRequestID,
       stationID: stationID,
@@ -751,9 +821,107 @@ public actor HarnessMonitorClientMobileMirrorSnapshotSource: MobileMirrorSnapsho
       checkStatus: review.checkStatus.rawValue,
       policyBlocked: review.policyBlocked,
       isDraft: review.isDraft,
+      labels: review.labels,
+      checks: review.checks.prefix(6).map(mobileReviewCheck),
+      files: (filesResponse?.files ?? []).prefix(8).map(mobileReviewFile),
+      activity: (timelineResponse?.entries ?? []).prefix(6).map { entry in
+        mobileReviewActivity(entry, now: now)
+      },
+      additions: review.additions,
+      deletions: review.deletions,
+      requiredFailedCheckNames: review.requiredFailedCheckNames,
+      viewerCanUpdate: review.viewerCanUpdate,
+      viewerCanMergeAsAdmin: review.viewerCanMergeAsAdmin,
+      filePaginationComplete: filesResponse?.paginationComplete,
       needsYou: needsReviewAttention(review),
       updatedAt: parseDate(review.updatedAt, fallback: now)
     )
+  }
+
+  private func mobileReviewCheck(_ check: ReviewCheck) -> MobileReviewCheckSnippet {
+    MobileReviewCheckSnippet(
+      id: check.id,
+      name: check.name,
+      status: check.status.rawValue,
+      conclusion: check.conclusion.rawValue,
+      checkSuiteID: check.checkSuiteID,
+      detailsURL: check.detailsURL
+    )
+  }
+
+  private func mobileReviewFile(_ file: ReviewFile) -> MobileReviewFileSnippet {
+    MobileReviewFileSnippet(
+      id: file.id,
+      path: file.path,
+      changeType: file.changeType.rawValue,
+      additions: file.additions,
+      deletions: file.deletions,
+      viewedState: file.viewerViewedState.rawValue,
+      isBinary: file.isBinary
+    )
+  }
+
+  private func mobileReviewActivity(
+    _ entry: ReviewTimelineEntry,
+    now: Date
+  ) -> MobileReviewActivitySnippet {
+    MobileReviewActivitySnippet(
+      id: entry.id,
+      kind: entry.kind.rawValue,
+      actor: entry.actor?.login,
+      summary: reviewActivitySummary(entry),
+      recordedAt: parseDate(entry.recordedAt, fallback: now)
+    )
+  }
+
+  private func reviewActivitySummary(_ entry: ReviewTimelineEntry) -> String {
+    switch entry {
+    case .issueComment:
+      "Commented"
+    case .review(let payload):
+      "Review \(payload.state.rawValue.replacingOccurrences(of: "_", with: " "))"
+    case .reviewThread(let payload):
+      payload.isResolved ? "Resolved thread on \(payload.path)" : "Thread on \(payload.path)"
+    case .commit(let payload):
+      "Commit \(payload.abbreviatedOid): \(payload.messageHeadline)"
+    case .headRefForcePushed(let payload):
+      "Force-pushed \(payload.beforeAbbreviatedOid) -> \(payload.afterAbbreviatedOid)"
+    case .simpleActorEvent(let payload):
+      simpleActorEventSummary(payload)
+    case .unknown(let payload):
+      payload.typename
+    }
+  }
+
+  private func simpleActorEventSummary(_ payload: SimpleActorEventPayload) -> String {
+    switch payload.eventKind {
+    case .labeled:
+      return "Added label \(payload.label ?? "label")"
+    case .unlabeled:
+      return "Removed label \(payload.label ?? "label")"
+    case .reviewRequested:
+      return "Requested review from \(payload.requestedReviewerLogin ?? "reviewer")"
+    case .reviewRequestRemoved:
+      return "Removed review request for \(payload.requestedReviewerLogin ?? "reviewer")"
+    case .renamedTitle:
+      return "Renamed title"
+    case .merged:
+      return "Merged"
+    case .closed:
+      return "Closed"
+    case .reopened:
+      return "Reopened"
+    case .readyForReview:
+      return "Marked ready for review"
+    case .convertToDraft:
+      return "Converted to draft"
+    case .autoMergeEnabled:
+      return "Enabled auto-merge"
+    case .autoMergeDisabled:
+      return "Disabled auto-merge"
+    default:
+      return payload.eventKind.rawValue.replacingOccurrences(of: "_", with: " ")
+    }
   }
 
   private func needsReviewAttention(_ review: ReviewItem) -> Bool {
@@ -850,13 +1018,16 @@ extension ManagedAgentSnapshot {
 
 private struct MobileRelayReviewFetchResult: Sendable {
   var reviews: [ReviewItem]
+  var mobileReviews: [MobileReviewSummary]
   var attention: MobileAttentionItem?
 
   init(
     reviews: [ReviewItem],
+    mobileReviews: [MobileReviewSummary],
     attention: MobileAttentionItem? = nil
   ) {
     self.reviews = reviews
+    self.mobileReviews = mobileReviews
     self.attention = attention
   }
 }

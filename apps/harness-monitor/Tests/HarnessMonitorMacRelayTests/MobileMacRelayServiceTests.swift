@@ -602,10 +602,56 @@ final class MobileMacRelayServiceTests: XCTestCase {
       policyBlocked: false,
       isDraft: false,
       headSha: "abc123",
+      labels: ["mobile", "needs-review"],
+      checks: [
+        ReviewCheck(
+          name: "HarnessMonitorMobileTests",
+          status: .completed,
+          conclusion: .success,
+          checkSuiteID: "suite-mobile",
+          detailsURL: "https://ci.example/mobile"
+        )
+      ],
       additions: 10,
       deletions: 1,
       createdAt: "2023-11-14T22:00:00Z",
-      updatedAt: "2023-11-14T22:04:00Z"
+      updatedAt: "2023-11-14T22:04:00Z",
+      requiredFailedCheckNames: ["HarnessMonitorMobileTests"]
+    )
+    let reviewFiles = ReviewsFilesListResponse(
+      pullRequestID: review.pullRequestID,
+      number: review.number,
+      headRefOid: review.headSha,
+      repositoryFullName: review.repository,
+      viewerCanMarkViewed: true,
+      files: [
+        ReviewFile(
+          path: "Sources/HarnessMonitorMobile/MobileReviewsView.swift",
+          changeType: .modified,
+          additions: 12,
+          deletions: 3,
+          viewerViewedState: .unviewed,
+          languageHint: .swift
+        )
+      ],
+      fetchedAt: "2023-11-14T22:05:00Z",
+      paginationComplete: true
+    )
+    let reviewTimeline = ReviewsTimelineResponse(
+      pullRequestId: review.pullRequestID,
+      entries: [
+        .review(
+          ReviewPayload(
+            id: "timeline-review-1",
+            createdAt: "2023-11-14T22:05:00Z",
+            actor: ReviewTimelineActor(login: "bart"),
+            state: .approved
+          )
+        )
+      ],
+      pageInfo: ReviewTimelinePageInfo(),
+      viewerCanComment: true,
+      fetchedAt: "2023-11-14T22:05:30Z"
     )
     let taskBoardItem = TaskBoardItem(
       schemaVersion: 1,
@@ -644,6 +690,8 @@ final class MobileMacRelayServiceTests: XCTestCase {
           sessions: [session],
           agents: [session.sessionId: [acpAgent]],
           reviews: [review],
+          reviewFiles: [review.pullRequestID: reviewFiles],
+          reviewTimelines: [review.pullRequestID: reviewTimeline],
           taskBoardItemsFixture: [taskBoardItem]
         )
       },
@@ -684,6 +732,14 @@ final class MobileMacRelayServiceTests: XCTestCase {
     XCTAssertEqual(reviewAttention.commandPayload["repository"], "smykla-skalski/harness")
     XCTAssertEqual(taskBoardAttention.commandKind, .taskBoardPlanApproval)
     XCTAssertEqual(taskBoardAttention.target?.taskID, "task-1")
+    XCTAssertEqual(snapshot.reviews.first?.labels, ["mobile", "needs-review"])
+    XCTAssertEqual(snapshot.reviews.first?.checks.first?.checkSuiteID, "suite-mobile")
+    XCTAssertEqual(
+      snapshot.reviews.first?.files.first?.path,
+      "Sources/HarnessMonitorMobile/MobileReviewsView.swift"
+    )
+    XCTAssertEqual(snapshot.reviews.first?.activity.first?.summary, "Review approved")
+    XCTAssertEqual(snapshot.reviews.first?.requiredFailedCheckNames, ["HarnessMonitorMobileTests"])
     XCTAssertEqual(snapshot.needsYouCount, 3)
     XCTAssertEqual(snapshot.trustedDevices.first?.id, "device-phone")
   }
@@ -1111,6 +1167,8 @@ private struct FixedMobileMirrorClient: MobileMirrorClient {
   let agents: [String: [ManagedAgentSnapshot]]
   var details: [String: SessionDetail] = [:]
   let reviews: [ReviewItem]
+  var reviewFiles: [String: ReviewsFilesListResponse] = [:]
+  var reviewTimelines: [String: ReviewsTimelineResponse] = [:]
   var taskBoardItemsFixture: [TaskBoardItem] = []
   var reviewQueryRecorder: ReviewQueryRecorder?
 
@@ -1162,6 +1220,22 @@ private struct FixedMobileMirrorClient: MobileMirrorClient {
       summary: ReviewsSummary(items: reviews),
       items: reviews
     )
+  }
+
+  func listReviewFiles(request: ReviewsFilesListRequest) async throws -> ReviewsFilesListResponse {
+    guard let response = reviewFiles[request.pullRequestID] else {
+      throw HarnessMonitorAPIError.server(code: 404, message: "Review files unavailable")
+    }
+    return response
+  }
+
+  func fetchReviewTimeline(
+    request: ReviewsTimelineRequest
+  ) async throws -> ReviewsTimelineResponse {
+    guard let response = reviewTimelines[request.pullRequestId] else {
+      throw HarnessMonitorAPIError.server(code: 404, message: "Review timeline unavailable")
+    }
+    return response
   }
 
   func taskBoardItems(status: TaskBoardStatus?) async throws -> [TaskBoardItem] {

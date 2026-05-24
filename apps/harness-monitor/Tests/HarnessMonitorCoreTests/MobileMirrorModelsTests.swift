@@ -229,6 +229,19 @@ final class MobileMirrorModelsTests: XCTestCase {
       checkStatus: "success",
       policyBlocked: true,
       isDraft: false,
+      labels: ["mobile"],
+      checks: [
+        MobileReviewCheckSnippet(
+          id: "check-1",
+          name: "Tests",
+          status: "completed",
+          conclusion: "failure",
+          checkSuiteID: "suite-1"
+        )
+      ],
+      requiredFailedCheckNames: ["Tests"],
+      viewerCanUpdate: false,
+      viewerCanMergeAsAdmin: true,
       needsYou: true,
       updatedAt: Date(timeIntervalSince1970: 1_700_000_000)
     )
@@ -248,6 +261,10 @@ final class MobileMirrorModelsTests: XCTestCase {
     XCTAssertEqual(command.payload["headSha"], "abc123")
     XCTAssertEqual(command.payload["method"], "squash")
     XCTAssertEqual(command.payload["policyBlocked"], "true")
+    XCTAssertEqual(command.payload["requiredFailedCheckNames"], "Tests")
+    XCTAssertEqual(command.payload["checkSuiteIDs"], "suite-1")
+    XCTAssertEqual(command.payload["viewerCanUpdate"], "false")
+    XCTAssertEqual(command.payload["viewerCanMergeAsAdmin"], "true")
     XCTAssertEqual(command.auditReason, "Checks and review are green.")
   }
 
@@ -273,6 +290,16 @@ final class MobileMirrorModelsTests: XCTestCase {
     XCTAssertEqual(review.repository, "smykla-skalski/harness")
     XCTAssertNil(review.headSha)
     XCTAssertNil(review.policyBlocked)
+    XCTAssertEqual(review.labels, [])
+    XCTAssertEqual(review.checks, [])
+    XCTAssertEqual(review.files, [])
+    XCTAssertEqual(review.activity, [])
+    XCTAssertEqual(review.additions, 0)
+    XCTAssertEqual(review.deletions, 0)
+    XCTAssertEqual(review.requiredFailedCheckNames, [])
+    XCTAssertTrue(review.viewerCanUpdate)
+    XCTAssertFalse(review.viewerCanMergeAsAdmin)
+    XCTAssertNil(review.filePaginationComplete)
   }
 
   func testSessionSummaryDecodesLegacyMirrorShape() throws {
