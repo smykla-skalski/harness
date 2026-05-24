@@ -177,6 +177,10 @@ enum HarnessMonitorUITestAccessibility {
     "harness.dashboard.reviews.show-row-labels"
   static let dashboardReviewsShowRowLineCountersToggle =
     "harness.dashboard.reviews.show-row-line-counters"
+  static let dashboardReviewsShowRowPullRequestNumberToggle =
+    "harness.dashboard.reviews.show-row-pr-number"
+  static let dashboardReviewsShowRowPullRequestAgeToggle =
+    "harness.dashboard.reviews.show-row-pr-age"
   static let dashboardReviewsWrapRowTitlesToggle =
     "harness.dashboard.reviews.wrap-row-titles"
   static let dashboardReviewsHideSemanticPrefixesInRowTitlesToggle =

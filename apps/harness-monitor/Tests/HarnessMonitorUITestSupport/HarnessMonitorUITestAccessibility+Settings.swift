@@ -65,6 +65,10 @@ extension HarnessMonitorUITestAccessibility {
     "harness.settings.reviews.show-row-labels"
   static let settingsReviewsShowRowLineCountersToggle =
     "harness.settings.reviews.show-row-line-counters"
+  static let settingsReviewsShowRowPullRequestNumberToggle =
+    "harness.settings.reviews.show-row-pr-number"
+  static let settingsReviewsShowRowPullRequestAgeToggle =
+    "harness.settings.reviews.show-row-pr-age"
   static let settingsReviewsWrapRowTitlesToggle =
     "harness.settings.reviews.wrap-row-titles"
   static let settingsReviewsRowTitleMaximumLinesField =

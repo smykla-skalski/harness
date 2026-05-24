@@ -105,6 +105,8 @@ extension DashboardReviewsRouteView {
       showAvatarsInRows: routeShowAvatarsInRowsBinding,
       showLabelsInRows: routeShowLabelsInRowsBinding,
       showLineCountersInRows: routeShowLineCountersInRowsBinding,
+      showPullRequestNumberInRows: routeShowPullRequestNumberInRowsBinding,
+      showPullRequestAgeInRows: routeShowPullRequestAgeInRowsBinding,
       wrapTitlesInRows: routeWrapTitlesInRowsBinding,
       hideSemanticPrefixesInRowTitles: routeHideSemanticPrefixesInRowTitlesBinding,
       needsMeCount: routeNeedsMeCount,
@@ -278,6 +280,8 @@ extension DashboardReviewsRouteView {
       showsAvatars: normalizedPreferences.showAvatarsInRows,
       showsLabels: normalizedPreferences.showLabelsInRows,
       showsLineCounters: normalizedPreferences.showLineCountersInRows,
+      showsPullRequestNumber: normalizedPreferences.showPullRequestNumberInRows,
+      showsPullRequestAge: normalizedPreferences.showPullRequestAgeInRows,
       wrapsTitle: normalizedPreferences.wrapTitlesInRows,
       titleMaximumLines: normalizedPreferences.rowTitleMaximumLines,
       hidesSemanticPrefixesInTitle: normalizedPreferences.hideSemanticPrefixesInRowTitles

@@ -30,6 +30,8 @@ struct DashboardReviewsPreferences: Codable, Equatable {
   var showAvatarsInRows = true
   var showLabelsInRows = true
   var showLineCountersInRows = true
+  var showPullRequestNumberInRows = true
+  var showPullRequestAgeInRows = true
   var wrapTitlesInRows = true
   var rowTitleMaximumLines: Int = defaultRowTitleMaximumLines
   var hideSemanticPrefixesInRowTitles = false
@@ -74,6 +76,8 @@ struct DashboardReviewsPreferences: Codable, Equatable {
     case showAvatarsInRows
     case showLabelsInRows
     case showLineCountersInRows
+    case showPullRequestNumberInRows
+    case showPullRequestAgeInRows
     case wrapTitlesInRows
     case rowTitleMaximumLines
     case hideSemanticPrefixesInRowTitles
@@ -190,6 +194,12 @@ struct DashboardReviewsPreferences: Codable, Equatable {
     showLineCountersInRows =
       try container.decodeIfPresent(Bool.self, forKey: .showLineCountersInRows)
       ?? defaults.showLineCountersInRows
+    showPullRequestNumberInRows =
+      try container.decodeIfPresent(Bool.self, forKey: .showPullRequestNumberInRows)
+      ?? defaults.showPullRequestNumberInRows
+    showPullRequestAgeInRows =
+      try container.decodeIfPresent(Bool.self, forKey: .showPullRequestAgeInRows)
+      ?? defaults.showPullRequestAgeInRows
     wrapTitlesInRows =
       try container.decodeIfPresent(Bool.self, forKey: .wrapTitlesInRows)
       ?? defaults.wrapTitlesInRows

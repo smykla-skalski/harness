@@ -80,20 +80,7 @@ enum DashboardReviewListRowHeight {
     if explicitLineCount > 1 {
       return min(clampedMaximum, explicitLineCount)
     }
-
-    let normalizedTitle = title
-      .replacingOccurrences(
-        of: #"\s+"#,
-        with: " ",
-        options: .regularExpression
-      )
-      .trimmingCharacters(in: .whitespacesAndNewlines)
-    guard !normalizedTitle.isEmpty else { return 1 }
-
-    let estimatedLines = Int(
-      ceil(Double(normalizedTitle.count) / Double(Self.approximateCharactersPerLine))
-    )
-    return min(clampedMaximum, max(1, estimatedLines))
+    return 1
   }
 
   static func idealHeight(_ layout: Layout) -> CGFloat {
@@ -105,7 +92,10 @@ enum DashboardReviewListRowHeight {
     let titleLines = CGFloat(resolvedTitleLineCount)
     components.append(layout.titleLineHeight * titleLines)
     if layout.hasSecondaryLine { components.append(layout.captionLineHeight) }
-    components.append(layout.statusLineHeight ?? layout.pillStripHeight)
+    let resolvedStatusLineHeight = layout.statusLineHeight ?? layout.pillStripHeight
+    if resolvedStatusLineHeight > 0 {
+      components.append(resolvedStatusLineHeight)
+    }
     if layout.hasAttentionStrip {
       components.append(layout.attentionStripHeight ?? layout.pillStripHeight)
     }
@@ -122,5 +112,4 @@ enum DashboardReviewListRowHeight {
     return contentTotal + spacingTotal + layout.verticalPadding * 2
   }
 
-  private static let approximateCharactersPerLine = 44
 }

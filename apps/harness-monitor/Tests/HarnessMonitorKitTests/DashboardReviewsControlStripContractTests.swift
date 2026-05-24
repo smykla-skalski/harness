@@ -29,6 +29,8 @@ struct DashboardReviewsControlStripContractTests {
       "HarnessMonitorAccessibility.dashboardReviewsShowRowAvatarsToggle",
       "HarnessMonitorAccessibility.dashboardReviewsShowRowLabelsToggle",
       "HarnessMonitorAccessibility.dashboardReviewsShowRowLineCountersToggle",
+      "HarnessMonitorAccessibility.dashboardReviewsShowRowPullRequestNumberToggle",
+      "HarnessMonitorAccessibility.dashboardReviewsShowRowPullRequestAgeToggle",
       "HarnessMonitorAccessibility.dashboardReviewsWrapRowTitlesToggle",
       "HarnessMonitorAccessibility.dashboardReviewsHideSemanticPrefixesInRowTitlesToggle",
     ]

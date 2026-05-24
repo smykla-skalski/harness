@@ -28,14 +28,14 @@ enum DashboardReviewAttentionBadgeKind: String, Identifiable {
     switch self {
     case .requiredChecks:
       "Required checks"
-    case .failingChecks:
-      "Checks failing"
     case .changesRequested:
       "Changes requested"
+    case .mergeConflicts:
+      "Conflicts"
+    case .failingChecks:
+      "Checks failing"
     case .policyBlocked:
       "Policy blocked"
-    case .mergeConflicts:
-      "Merge conflicts"
     }
   }
 
@@ -87,10 +87,10 @@ struct DashboardReviewAttentionBadges: Equatable {
   var kinds: [DashboardReviewAttentionBadgeKind] {
     [
       hasRequiredChecks ? .requiredChecks : nil,
-      hasFailingChecks ? .failingChecks : nil,
       hasChangesRequested ? .changesRequested : nil,
-      hasPolicyBlocked ? .policyBlocked : nil,
       hasMergeConflicts ? .mergeConflicts : nil,
+      hasFailingChecks ? .failingChecks : nil,
+      hasPolicyBlocked ? .policyBlocked : nil,
     ].compactMap(\.self)
   }
 }
