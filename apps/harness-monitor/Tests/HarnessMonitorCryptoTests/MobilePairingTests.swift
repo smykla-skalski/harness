@@ -153,6 +153,48 @@ final class MobilePairingTests: XCTestCase {
     XCTAssertEqual(decoded, transfer)
   }
 
+  func testWatchPairingTransferPlansCredentialReplacementDeletesOnlyStaleIdentities() {
+    let now = Date(timeIntervalSince1970: 1_700_000_000)
+    let current = [
+      makeCredential(
+        stationID: "station-studio",
+        deviceIdentityID: "device-phone",
+        now: now
+      ),
+      makeCredential(
+        stationID: "station-laptop",
+        deviceIdentityID: "device-phone",
+        now: now
+      ),
+      makeCredential(
+        stationID: "station-old",
+        deviceIdentityID: "device-old",
+        now: now
+      ),
+    ]
+    let transfer = MobileWatchPairingTransfer(
+      identities: [
+        makeIdentity(id: "device-phone", now: now)
+      ],
+      credentials: [
+        makeCredential(
+          stationID: "station-studio",
+          deviceIdentityID: "device-phone",
+          now: now
+        )
+      ],
+      exportedAt: now.addingTimeInterval(20)
+    )
+
+    let plan = transfer.replacementPlan(replacing: current)
+
+    XCTAssertEqual(
+      plan.credentialStationIDsToDelete,
+      ["station-laptop", "station-old"]
+    )
+    XCTAssertEqual(plan.identityIDsToDelete, ["device-old"])
+  }
+
   func testStationAcceptorTrustsDeviceAndDerivesSharedKey() async throws {
     let now = Date(timeIntervalSince1970: 1_700_000_000)
     let stationIdentity = MobilePairingStationIdentity(
@@ -220,6 +262,36 @@ final class MobilePairingTests: XCTestCase {
       publicKeyFingerprint: publicKeyFingerprint,
       nonce: "pairing-nonce",
       expiresAt: expiresAt ?? now.addingTimeInterval(60)
+    )
+  }
+
+  private func makeIdentity(id: String, now: Date) -> MobileDeviceIdentity {
+    MobileDeviceIdentity(
+      id: id,
+      displayName: id,
+      signingPrivateKeyRawRepresentation: Data(repeating: 1, count: 32),
+      agreementPrivateKeyRawRepresentation: Data(repeating: 2, count: 32),
+      createdAt: now
+    )
+  }
+
+  private func makeCredential(
+    stationID: String,
+    deviceIdentityID: String,
+    now: Date
+  ) -> MobilePairedStationCredential {
+    MobilePairedStationCredential(
+      stationID: stationID,
+      stationName: stationID,
+      endpoint: URL(string: "https://\(stationID).local/pair")!,
+      stationPublicKeyFingerprint: "00:11:22:33:44:55:66:77",
+      deviceIdentityID: deviceIdentityID,
+      snapshotKeyID: "snapshot-key",
+      commandKeyID: "command-key",
+      symmetricKeyRawRepresentation: Data(repeating: 3, count: 32),
+      pairedAt: now,
+      lastUsedAt: now.addingTimeInterval(10),
+      defaultStation: stationID == "station-studio"
     )
   }
 

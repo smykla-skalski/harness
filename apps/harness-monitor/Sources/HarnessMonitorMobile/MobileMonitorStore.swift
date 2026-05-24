@@ -436,6 +436,44 @@ final class MobileMonitorStore {
     }
   }
 
+  func unpair(stationID: String) async {
+    guard let identityStore, let credentialStore else {
+      syncStatus = .stale("Pairing storage is unavailable.")
+      return
+    }
+    do {
+      let removedCredential = try await credentialStore.load(stationID: stationID)
+      try await credentialStore.delete(stationID: stationID)
+      let remainingCredentials = try await credentialStore.loadAll()
+      if let removedCredential,
+        !remainingCredentials.contains(where: {
+          $0.deviceIdentityID == removedCredential.deviceIdentityID
+        })
+      {
+        try await identityStore.delete(id: removedCredential.deviceIdentityID)
+      }
+      syncClientsByStationID.removeValue(forKey: stationID)
+      snapshot.commands.removeAll { $0.stationID == stationID }
+      snapshot.attention.removeAll { $0.stationID == stationID }
+      snapshot.sessions.removeAll { $0.stationID == stationID }
+      snapshot.reviews.removeAll { $0.stationID == stationID }
+      snapshot.stations.removeAll { $0.id == stationID }
+      selectedStationID =
+        snapshot.stations.first(where: \.defaultStation)?.id
+        ?? snapshot.stations.first?.id
+        ?? ""
+      persistSharedSnapshot(snapshot)
+      reconcileLiveActivity(snapshot)
+      try await rebuildSyncClients(preferredStationID: selectedStationID)
+      syncStatus =
+        pairedCredentials.isEmpty
+        ? .unpaired
+        : .paired(pairedCredentials.first?.stationName ?? "Mac")
+    } catch {
+      syncStatus = mobileMonitorSyncStatus(for: error)
+    }
+  }
+
   func exportMirroredRecords() async -> URL? {
     guard let stationID = preferredLiveStationID() else {
       syncStatus = .unpaired

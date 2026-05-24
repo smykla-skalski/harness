@@ -1,4 +1,5 @@
 import HarnessMonitorCore
+import HarnessMonitorCrypto
 import SwiftUI
 import UIKit
 
@@ -435,6 +436,7 @@ struct SettingsView: View {
   @Environment(MobileMonitorStore.self) private var store
   @State private var scannerPresented = false
   @State private var deleteMirrorConfirmationPresented = false
+  @State private var pendingUnpairCredential: MobilePairedStationCredential?
   @State private var mirrorExportFile: MobileMirrorExportFile?
 
   var body: some View {
@@ -451,11 +453,33 @@ struct SettingsView: View {
             SyncStatusRow(status: store.syncStatus)
           }
           ForEach(store.pairedCredentials) { credential in
-            VStack(alignment: .leading) {
-              Text(credential.stationName)
-              Text(credential.stationPublicKeyFingerprint)
-                .font(.caption.monospaced())
-                .foregroundStyle(.secondary)
+            HStack(alignment: .top, spacing: 12) {
+              VStack(alignment: .leading, spacing: 4) {
+                HStack(spacing: 6) {
+                  Text(credential.stationName)
+                  if credential.defaultStation {
+                    Text("Default")
+                      .font(.caption2.weight(.semibold))
+                      .padding(.horizontal, 6)
+                      .padding(.vertical, 2)
+                      .background(.blue.opacity(0.14), in: Capsule())
+                      .foregroundStyle(.blue)
+                  }
+                }
+                Text(credential.stationPublicKeyFingerprint)
+                  .font(.caption.monospaced())
+                  .foregroundStyle(.secondary)
+                Text(credential.pairedAt.formatted(date: .abbreviated, time: .shortened))
+                  .font(.caption2)
+                  .foregroundStyle(.secondary)
+              }
+              Spacer(minLength: 8)
+              Button(role: .destructive) {
+                pendingUnpairCredential = credential
+              } label: {
+                Label("Unpair", systemImage: "xmark.circle")
+              }
+              .buttonStyle(.borderless)
             }
           }
         }
@@ -541,6 +565,26 @@ struct SettingsView: View {
             await store.deleteCloudKitMirror()
           }
         }
+      }
+      .confirmationDialog(
+        "Unpair Mac?",
+        isPresented: Binding(
+          get: { pendingUnpairCredential != nil },
+          set: { if !$0 { pendingUnpairCredential = nil } }
+        ),
+        titleVisibility: .visible,
+        presenting: pendingUnpairCredential
+      ) { credential in
+        Button("Unpair \(credential.stationName)", role: .destructive) {
+          Task {
+            await store.unpair(stationID: credential.stationID)
+            pendingUnpairCredential = nil
+          }
+        }
+      } message: { credential in
+        Text(
+          "This removes the local pairing credential and syncs the updated trusted-device set to Apple Watch."
+        )
       }
     }
   }
