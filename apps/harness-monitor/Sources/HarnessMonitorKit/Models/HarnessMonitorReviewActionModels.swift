@@ -32,12 +32,12 @@ public struct ReviewCheck: Codable, Equatable, Identifiable, Sendable {
   }
 }
 
-public struct PullRequestReview: Codable, Equatable, Identifiable, Sendable {
+/// Raw review events can repeat the same author/state combination, so SwiftUI
+/// callers must provide positional identity when rendering these rows.
+public struct PullRequestReview: Codable, Equatable, Sendable {
   public let author: String
   public let authorAvatarURL: URL?
   public let state: ReviewReviewEventState
-
-  public var id: String { "\(author)-\(state.rawValue)" }
 
   public init(
     author: String,
