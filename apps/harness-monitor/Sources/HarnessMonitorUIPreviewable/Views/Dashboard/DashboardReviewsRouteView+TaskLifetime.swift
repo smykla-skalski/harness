@@ -100,7 +100,7 @@ extension DashboardReviewsRouteView {
     guard let request = windowNavigationHistory.pendingDashboardReviewsRestoreRequest else {
       return
     }
-    guard request.requestID != routeHandledDashboardHistoryRestoreRequestID else {
+    guard request.requestID != routeHandledHistoryRestoreRequestID else {
       return
     }
 
@@ -117,10 +117,10 @@ extension DashboardReviewsRouteView {
       else {
         return
       }
-      routeHandledDashboardHistoryRestoreRequestID = request.requestID
+      routeHandledHistoryRestoreRequestID = request.requestID
       await prepareFilesMode(for: item)
     } else {
-      routeHandledDashboardHistoryRestoreRequestID = request.requestID
+      routeHandledHistoryRestoreRequestID = request.requestID
     }
 
     await Task.yield()

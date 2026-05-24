@@ -2,155 +2,6 @@ import Foundation
 import HarnessMonitorKit
 import OSLog
 
-struct DashboardReviewsItemGroup: Equatable, Identifiable, Sendable {
-  enum Kind: Equatable, Sendable {
-    case pinned
-    case repository(String)
-    case status(String)
-    case author(String)
-
-    var title: String {
-      switch self {
-      case .pinned: "Pinned"
-      case .repository(let value): value
-      case .status(let value): value
-      case .author(let value): value
-      }
-    }
-
-    var rawValue: String {
-      switch self {
-      case .pinned: "pinned"
-      case .repository(let value): "repository:\(value)"
-      case .status(let value): "status:\(value)"
-      case .author(let value): "author:\(value)"
-      }
-    }
-  }
-
-  let kind: Kind
-  let items: [ReviewItem]
-
-  var id: String { kind.rawValue }
-
-  // Back-compat accessor for callers that only handle repository groups.
-  var repository: String {
-    if case .repository(let value) = kind { return value }
-    return ""
-  }
-}
-
-typealias DashboardReviewsRepositoryGroup = DashboardReviewsItemGroup
-
-struct DashboardReviewsPresentationInput: Equatable, Sendable {
-  let items: [ReviewItem]
-  let filterModeRaw: String
-  let sortModeRaw: String
-  let groupModeRaw: String
-  let categoryModeRaw: String
-  let searchText: String
-  let configuredRepositories: [String]
-  let configuredOrganizations: [String]
-  let configuredAuthors: [String]
-  let selectedIDs: Set<String>
-  let persistedPrimarySelectionID: String
-  let pinnedPullRequestIDs: [String]
-  let needsMeOn: Bool
-  let dependenciesOnlyOn: Bool
-
-  init(
-    items: [ReviewItem],
-    filterModeRaw: String,
-    sortModeRaw: String,
-    groupModeRaw: String = DashboardReviewsGroupMode.repository.rawValue,
-    categoryModeRaw: String,
-    searchText: String,
-    configuredRepositories: [String],
-    configuredOrganizations: [String],
-    configuredAuthors: [String] = [],
-    selectedIDs: Set<String>,
-    persistedPrimarySelectionID: String,
-    pinnedPullRequestIDs: [String] = [],
-    needsMeOn: Bool = false,
-    dependenciesOnlyOn: Bool = false
-  ) {
-    self.items = items
-    self.filterModeRaw = filterModeRaw
-    self.sortModeRaw = sortModeRaw
-    self.groupModeRaw = groupModeRaw
-    self.categoryModeRaw = categoryModeRaw
-    self.searchText = searchText
-    self.configuredRepositories = configuredRepositories
-    self.configuredOrganizations = configuredOrganizations
-    self.configuredAuthors = configuredAuthors
-    self.selectedIDs = selectedIDs
-    self.persistedPrimarySelectionID = persistedPrimarySelectionID
-    self.pinnedPullRequestIDs = pinnedPullRequestIDs
-    self.needsMeOn = needsMeOn
-    self.dependenciesOnlyOn = dependenciesOnlyOn
-  }
-}
-
-private struct DashboardReviewsListPresentationInput: Equatable, Sendable {
-  let items: [ReviewItem]
-  let filterModeRaw: String
-  let sortModeRaw: String
-  let groupModeRaw: String
-  let categoryModeRaw: String
-  let searchText: String
-  let configuredRepositories: [String]
-  let configuredOrganizations: [String]
-  let configuredAuthors: [String]
-  let pinnedPullRequestIDs: [String]
-  let needsMeOn: Bool
-  let dependenciesOnlyOn: Bool
-
-  init(_ input: DashboardReviewsPresentationInput) {
-    items = input.items
-    filterModeRaw = input.filterModeRaw
-    sortModeRaw = input.sortModeRaw
-    groupModeRaw = input.groupModeRaw
-    categoryModeRaw = input.categoryModeRaw
-    searchText = input.searchText
-    configuredRepositories = input.configuredRepositories
-    configuredOrganizations = input.configuredOrganizations
-    configuredAuthors = input.configuredAuthors
-    pinnedPullRequestIDs = input.pinnedPullRequestIDs
-    needsMeOn = input.needsMeOn
-    dependenciesOnlyOn = input.dependenciesOnlyOn
-  }
-}
-
-private struct DashboardReviewsListPresentation: Equatable, Sendable {
-  static let empty = Self(
-    filteredItems: [],
-    groupedItems: [],
-    itemsByID: [:],
-    relativeUpdatedLabels: [:]
-  )
-
-  let filteredItems: [ReviewItem]
-  let groupedItems: [DashboardReviewsRepositoryGroup]
-  let itemsByID: [String: ReviewItem]
-  let relativeUpdatedLabels: [String: String]
-}
-
-struct DashboardReviewsPresentation: Equatable, Sendable {
-  static let empty = Self(
-    filteredItems: [],
-    groupedItems: [],
-    selectedItems: [],
-    primaryDetailItem: nil,
-    relativeUpdatedLabels: [:]
-  )
-
-  let filteredItems: [ReviewItem]
-  let groupedItems: [DashboardReviewsRepositoryGroup]
-  let selectedItems: [ReviewItem]
-  let primaryDetailItem: ReviewItem?
-  let relativeUpdatedLabels: [String: String]
-}
-
 actor DashboardReviewsPresentationWorker {
   private static let signposter = OSSignposter(
     subsystem: "io.harnessmonitor",
@@ -176,16 +27,22 @@ actor DashboardReviewsPresentationWorker {
     let selectedItems = input.selectedIDs
       .compactMap { listPresentation.itemsByID[$0] }
       .sorted(by: comparator)
+    let primaryDetailItem = Self.primaryDetailItem(
+      selectedItems: selectedItems,
+      filteredItems: listPresentation.filteredItems,
+      persistedPrimarySelectionID: input.persistedPrimarySelectionID
+    )
     return DashboardReviewsPresentation(
       filteredItems: listPresentation.filteredItems,
       groupedItems: listPresentation.groupedItems,
       selectedItems: selectedItems,
-      primaryDetailItem: Self.primaryDetailItem(
-        selectedItems: selectedItems,
-        filteredItems: listPresentation.filteredItems,
-        persistedPrimarySelectionID: input.persistedPrimarySelectionID
+      primaryDetailItem: primaryDetailItem,
+      relativeUpdatedLabels: listPresentation.relativeUpdatedLabels,
+      version: DashboardReviewsPresentationVersion(
+        listVersion: listPresentation.version,
+        selectedPullRequestIDs: selectedItems.map(\.pullRequestID),
+        primaryDetailPullRequestID: primaryDetailItem?.pullRequestID
       ),
-      relativeUpdatedLabels: listPresentation.relativeUpdatedLabels
     )
   }
 
@@ -265,7 +122,8 @@ actor DashboardReviewsPresentationWorker {
         input.items.map { ($0.pullRequestID, $0) },
         uniquingKeysWith: { first, _ in first }
       ),
-      relativeUpdatedLabels: relativeUpdatedLabels(for: pinnedItemsFirst)
+      relativeUpdatedLabels: relativeUpdatedLabels(for: pinnedItemsFirst),
+      version: DashboardReviewsListPresentationVersion(input: input)
     )
   }
 

@@ -98,6 +98,7 @@ struct DashboardReviewsRouteView: View {
     let preferences = routeResolvedPreferences
     return DashboardReviewsPresentationInput(
       items: routeResponse.items,
+      itemsVersion: routeResponseItemsVersion,
       filterModeRaw: filterModeRaw,
       sortModeRaw: sortModeRaw,
       groupModeRaw: groupModeRaw,
