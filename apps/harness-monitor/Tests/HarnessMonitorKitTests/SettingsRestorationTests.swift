@@ -70,6 +70,18 @@ struct SettingsRestorationTests {
     #expect(waitBody.contains("scheduleRestoreRetry("))
   }
 
+  @Test("Restore requests use the AppKit applicator as the single scroll write path")
+  func restoreRequestsUseSingleWritePath() throws {
+    let source = try sourceFile(named: "Views/Settings/SettingsRestoration.swift")
+    let requestRange = try #require(source.range(of: "private func requestScroll(to offset: CGFloat)"))
+    let handleRange = try #require(source.range(of: "private func handleScrollPhaseChange("))
+    let requestBody = String(source[requestRange.lowerBound..<handleRange.lowerBound])
+
+    #expect(!source.contains(".scrollPosition($scrollPosition)"))
+    #expect(requestBody.contains("restoreApplicatorRequest = SettingsScrollRestoreRequest("))
+    #expect(!requestBody.contains("scrollPosition.scrollTo("))
+  }
+
   @Test("Geometry persistence only tracks confirmed user scroll")
   func geometryPersistenceOnlyTracksConfirmedUserScroll() throws {
     let source = try sourceFile(named: "Views/Settings/SettingsRestoration.swift")

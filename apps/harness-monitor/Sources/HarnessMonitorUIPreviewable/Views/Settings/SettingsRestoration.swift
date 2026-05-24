@@ -93,7 +93,6 @@ struct SettingsScrollRestorationModifier: ViewModifier {
   @State private var restoredSection: SettingsSection?
   @State private var restoreApplicatorRequest: SettingsScrollRestoreRequest?
   @State private var restoreApplicatorRequestID: UInt64 = 0
-  @State private var scrollPosition = ScrollPosition()
   @State private var scrollPersistenceBuffer = SettingsScrollPersistenceBuffer()
   @State private var userScrollObserved = false
 
@@ -101,7 +100,6 @@ struct SettingsScrollRestorationModifier: ViewModifier {
     Group {
       if let section {
         content
-          .scrollPosition($scrollPosition)
           .background(
             SettingsScrollRestoreApplicator(request: restoreApplicatorRequest)
           )
@@ -188,12 +186,6 @@ struct SettingsScrollRestorationModifier: ViewModifier {
     restoreApplicatorRequest = SettingsScrollRestoreRequest(
       id: restoreApplicatorRequestID,
       offset: offset
-    )
-    scrollPosition.scrollTo(
-      point: CGPoint(
-        x: 0,
-        y: SettingsRestorationDefaults.normalizedScrollOffset(offset)
-      )
     )
   }
 
