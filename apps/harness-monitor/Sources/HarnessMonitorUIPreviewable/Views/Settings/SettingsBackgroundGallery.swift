@@ -231,7 +231,9 @@ struct SettingsBackgroundGallery: View {
   private func refreshSystemBackgroundOptionsIfNeeded() async {
     guard collection == .native else { return }
     let wallpapers = await HarnessMonitorSystemWallpaper.loadAvailable()
-    systemBackgroundOptions = wallpapers.map(HarnessMonitorBackgroundSelection.system)
+    let nextOptions = wallpapers.map(HarnessMonitorBackgroundSelection.system)
+    guard nextOptions != systemBackgroundOptions else { return }
+    systemBackgroundOptions = nextOptions
   }
 
   private var recentBackgroundsRow: some View {
@@ -259,7 +261,9 @@ struct SettingsBackgroundGallery: View {
   }
 
   private func select(_ background: HarnessMonitorBackgroundSelection) {
-    selection = background.storageValue
+    if selection != background.storageValue {
+      selection = background.storageValue
+    }
     let currentBackdropMode = HarnessMonitorBackdropMode(rawValue: backdropModeRawValue)
     if currentBackdropMode == HarnessMonitorBackdropMode.none {
       backdropModeRawValue = HarnessMonitorBackdropMode.window.rawValue
@@ -268,11 +272,13 @@ struct SettingsBackgroundGallery: View {
   }
 
   private func updateRecents(with background: HarnessMonitorBackgroundSelection) {
-    recentStorageValues = SettingsBackgroundGalleryRecents.updatedStorageValues(
+    let nextStorageValues = SettingsBackgroundGalleryRecents.updatedStorageValues(
       recentStorageValues,
       with: background,
       maxItems: Self.maxRecents
     )
+    guard nextStorageValues != recentStorageValues else { return }
+    recentStorageValues = nextStorageValues
   }
 }
 

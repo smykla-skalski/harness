@@ -64,7 +64,9 @@ public struct SettingsAppearanceSection: View {
   }
 
   private func selectTabForCurrentBackground() {
-    if case .system = selectedBackground.source {
+    if case .system = selectedBackground.source,
+      selectedBackgroundTab != .native
+    {
       selectedBackgroundTab = .native
     }
   }

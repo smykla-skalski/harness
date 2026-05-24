@@ -357,6 +357,17 @@ struct SessionSwiftUISourceTests {
     #expect(!notificationsSource.contains("} action: { width in\n            contentFieldWidth = width"))
   }
 
+  @Test("Settings appearance background changes ignore redundant writes")
+  func settingsAppearanceBackgroundChangesIgnoreRedundantWrites() throws {
+    let appearanceSource = try sourceFile(at: "Views/Settings/SettingsAppearanceSection.swift")
+    let gallerySource = try sourceFile(at: "Views/Settings/SettingsBackgroundGallery.swift")
+
+    #expect(appearanceSource.contains("selectedBackgroundTab != .native"))
+    #expect(gallerySource.contains("guard nextOptions != systemBackgroundOptions else { return }"))
+    #expect(gallerySource.contains("if selection != background.storageValue"))
+    #expect(gallerySource.contains("guard nextStorageValues != recentStorageValues else { return }"))
+  }
+
   @Test("Decision rows keep deadline churn scoped to the deadline chip")
   func decisionRowsKeepTimelineTicksOutOfTheRowBody() throws {
     let rowSource = try sourceFile(at: "Views/Decisions/DecisionRow.swift")
