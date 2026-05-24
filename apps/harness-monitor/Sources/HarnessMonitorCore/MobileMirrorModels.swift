@@ -951,6 +951,29 @@ public struct MobileMirrorSnapshot: Codable, Equatable, Sendable {
     return merged.normalizingDefaultStation(defaultStationID: defaultStationID)
   }
 
+  public func removingStationData(
+    for stationIDs: [String],
+    defaultStationID: String? = nil
+  ) -> MobileMirrorSnapshot {
+    let stationIDs = Set(
+      stationIDs
+        .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+        .filter { !$0.isEmpty }
+    )
+    guard !stationIDs.isEmpty else {
+      return normalizingDefaultStation(defaultStationID: defaultStationID)
+    }
+
+    var pruned = self
+    pruned.stations.removeAll { stationIDs.contains($0.id) }
+    pruned.attention.removeAll { stationIDs.contains($0.stationID) }
+    pruned.sessions.removeAll { stationIDs.contains($0.stationID) }
+    pruned.reviews.removeAll { stationIDs.contains($0.stationID) }
+    pruned.taskBoardItems.removeAll { stationIDs.contains($0.stationID) }
+    pruned.commands.removeAll { stationIDs.contains($0.stationID) }
+    return pruned.normalizingDefaultStation(defaultStationID: defaultStationID)
+  }
+
   public static func empty(now: Date = .now) -> Self {
     Self(
       revision: 0,

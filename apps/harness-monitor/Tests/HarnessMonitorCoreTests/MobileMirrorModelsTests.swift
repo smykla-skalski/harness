@@ -195,6 +195,52 @@ final class MobileMirrorModelsTests: XCTestCase {
     XCTAssertEqual(merged.trustedDevices.first { $0.id == "watch" }?.displayName, "Watch")
   }
 
+  func testRemovingStationDataPreservesOtherStations() {
+    let now = Date(timeIntervalSince1970: 1_700_000_000)
+    let snapshot = MobileMirrorSnapshot(
+      revision: 4,
+      generatedAt: now,
+      expiresAt: now.addingTimeInterval(60),
+      stations: [
+        station("station-a", name: "Studio", defaultStation: true, now: now),
+        station("station-b", name: "Laptop", defaultStation: false, now: now),
+      ],
+      attention: [
+        attention("attention-a", stationID: "station-a", now: now),
+        attention("attention-b", stationID: "station-b", now: now),
+      ],
+      sessions: [
+        session("session-a", stationID: "station-a", now: now),
+        session("session-b", stationID: "station-b", now: now),
+      ],
+      reviews: [
+        review("review-a", stationID: "station-a", now: now),
+        review("review-b", stationID: "station-b", now: now),
+      ],
+      taskBoardItems: [
+        taskBoardItem("task-a", stationID: "station-a", now: now),
+        taskBoardItem("task-b", stationID: "station-b", now: now),
+      ],
+      commands: [
+        command("command-a", stationID: "station-a", now: now),
+        command("command-b", stationID: "station-b", now: now),
+      ]
+    )
+
+    let pruned = snapshot.removingStationData(
+      for: [" station-a ", "station-a"],
+      defaultStationID: "station-b"
+    )
+
+    XCTAssertEqual(pruned.stations.map(\.id), ["station-b"])
+    XCTAssertEqual(pruned.station(id: "station-b")?.defaultStation, true)
+    XCTAssertEqual(pruned.attention.map(\.id), ["attention-b"])
+    XCTAssertEqual(pruned.sessions.map(\.id), ["session-b"])
+    XCTAssertEqual(pruned.reviews.map(\.id), ["review-b"])
+    XCTAssertEqual(pruned.taskBoardItems.map(\.id), ["task-b"])
+    XCTAssertEqual(pruned.commands.map(\.id), ["command-b"])
+  }
+
   func testAttentionCarriesEncryptedCommandPayload() {
     let item = MobileAttentionItem(
       id: "permission",
