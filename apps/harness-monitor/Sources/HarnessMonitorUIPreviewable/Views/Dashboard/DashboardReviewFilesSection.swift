@@ -26,6 +26,7 @@ struct DashboardReviewFilesSection: View {
   /// `.completed`/`.failed` so the chip disappears.
   @State private var cloningProgress: ReviewLocalCloneProgress?
   @State private var visibleFileLimit = Self.fileBatchSize
+  @State private var threadIndexCache = DashboardReviewFileThreadIndexCache()
 
   init(
     pullRequestID: String,
@@ -39,8 +40,8 @@ struct DashboardReviewFilesSection: View {
 
   var body: some View {
     let viewModel = store.viewModel(forPullRequest: pullRequestID)
-    let threadIndex = DashboardReviewFileThreadIndex(
-      entries: store.reviewTimelineViewModel(for: pullRequestID).entries
+    let threadIndex = threadIndexCache.index(
+      for: store.reviewTimelineViewModel(for: pullRequestID)
     )
     let isDaemonOnline = store.connectionState == .online && store.apiClient != nil
     return VStack(alignment: .leading, spacing: 12) {

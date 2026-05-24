@@ -16,10 +16,11 @@ struct DashboardReviewFilesModeDetailPane: View {
   @Environment(\.openURL)
   private var openURL
   @State private var commentDraft: DashboardReviewFileCommentDraft?
+  @State private var threadIndexCache = DashboardReviewFileThreadIndexCache()
 
   var body: some View {
     let timeline = store.reviewTimelineViewModel(for: item.pullRequestID)
-    let threadIndex = DashboardReviewFileThreadIndex(entries: timeline.entries)
+    let threadIndex = threadIndexCache.index(for: timeline)
     Group {
       if let file = viewModel.selectedFile {
         selectedFileView(file: file, threadIndex: threadIndex)
