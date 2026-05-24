@@ -4,6 +4,7 @@ import HarnessMonitorCore
 import HarnessMonitorCrypto
 import LocalAuthentication
 import Observation
+import WidgetKit
 
 protocol MobileMonitorSyncClient: Sendable {
   func fetchLatestSnapshot(stationID: String, now: Date) async throws -> MobileMirrorSnapshot?
@@ -178,6 +179,7 @@ final class MobileMonitorStore {
   private let syncClientFactory: any MobileMonitorSyncClientFactory
   private let pairer: (any MobileMonitorCredentialPairer)?
   private let privacyService: any MobileCloudMirrorPrivacyManaging
+  private let sharedSnapshotStore: MobileSharedSnapshotStore?
   private var syncClientsByStationID: [String: any MobileMonitorSyncClient] = [:]
   private var injectedSyncClient: (any MobileMonitorSyncClient)?
   private var defaultStationID: String?
@@ -192,7 +194,8 @@ final class MobileMonitorStore {
     syncClientFactory: any MobileMonitorSyncClientFactory = LiveMobileMonitorSyncClientFactory(),
     pairer: (any MobileMonitorCredentialPairer)? = nil,
     privacyService: any MobileCloudMirrorPrivacyManaging =
-      MobileCloudMirrorPrivacyService(database: LiveMobileCloudMirrorDatabase())
+      MobileCloudMirrorPrivacyService(database: LiveMobileCloudMirrorDatabase()),
+    sharedSnapshotStore: MobileSharedSnapshotStore? = MobileSharedSnapshotStore()
   ) {
     let initialSnapshot = snapshot ?? (demoModeEnabled ? MobileDemoFixtures.snapshot() : .empty())
     self.snapshot = initialSnapshot
@@ -204,6 +207,7 @@ final class MobileMonitorStore {
     self.syncClientFactory = syncClientFactory
     self.pairer = pairer
     self.privacyService = privacyService
+    self.sharedSnapshotStore = sharedSnapshotStore
     self.syncStatus =
       demoModeEnabled ? .demo : (syncClient == nil ? .unpaired : .syncing)
     self.selectedStationID =
@@ -258,6 +262,7 @@ final class MobileMonitorStore {
       let syncClient = syncClient(for: stationID)
     else {
       snapshot = .empty()
+      persistSharedSnapshot(snapshot)
       selectedStationID = ""
       syncStatus = .unpaired
       return
@@ -359,6 +364,7 @@ final class MobileMonitorStore {
     do {
       let deletedCount = try await privacyService.deleteRecords(stationID: stationID)
       snapshot = .empty()
+      persistSharedSnapshot(snapshot)
       selectedStationID = stationID
       syncStatus = .privacy("Deleted \(deletedCount) mirrored records.")
     } catch {
@@ -398,6 +404,7 @@ final class MobileMonitorStore {
       command.status = .queued
       command.actorDeviceID = "device-demo-phone"
       snapshot.commands.insert(command, at: 0)
+      persistSharedSnapshot(snapshot)
       selectedStationID = target.stationID
       syncStatus = .demo
       return
@@ -413,6 +420,7 @@ final class MobileMonitorStore {
         now: now
       )
       snapshot.commands.insert(queued.signedCommand.command, at: 0)
+      persistSharedSnapshot(snapshot)
       selectedStationID = target.stationID
       syncStatus = .commandQueued(now)
     } catch {
@@ -432,6 +440,7 @@ final class MobileMonitorStore {
     snapshot.commands[index].updatedAt = .now
     snapshot.commands[index].expiresAt = Date().addingTimeInterval(15 * 60)
     snapshot.commands[index].receipt = nil
+    persistSharedSnapshot(snapshot)
   }
 
   func cancel(_ command: MobileCommandRecord) {
@@ -444,10 +453,12 @@ final class MobileMonitorStore {
     }
     snapshot.commands[index].status = .cancelled
     snapshot.commands[index].updatedAt = .now
+    persistSharedSnapshot(snapshot)
   }
 
   private func applySnapshot(_ nextSnapshot: MobileMirrorSnapshot, preferredStationID: String) {
     snapshot = nextSnapshot
+    persistSharedSnapshot(nextSnapshot)
     if snapshot.stations.contains(where: { $0.id == preferredStationID }) {
       selectedStationID = preferredStationID
     } else {
@@ -455,6 +466,15 @@ final class MobileMonitorStore {
         snapshot.stations.first(where: \.defaultStation)?.id
         ?? snapshot.stations.first?.id
         ?? ""
+    }
+  }
+
+  private func persistSharedSnapshot(_ nextSnapshot: MobileMirrorSnapshot) {
+    do {
+      try sharedSnapshotStore?.save(nextSnapshot)
+      WidgetCenter.shared.reloadAllTimelines()
+    } catch {
+      syncStatus = .stale("Could not update widgets: \(String(describing: error))")
     }
   }
 
