@@ -918,6 +918,39 @@ public struct MobileMirrorSnapshot: Codable, Equatable, Sendable {
       }
   }
 
+  public func mergingStationSnapshot(
+    _ stationSnapshot: MobileMirrorSnapshot,
+    stationID: String,
+    defaultStationID: String? = nil
+  ) -> MobileMirrorSnapshot {
+    guard !stationID.isEmpty else {
+      return stationSnapshot.normalizingDefaultStation(defaultStationID: defaultStationID)
+    }
+
+    var stationIDs = Set(stationSnapshot.stations.map(\.id))
+    stationIDs.insert(stationID)
+
+    var merged = self
+    merged.schemaVersion = max(schemaVersion, stationSnapshot.schemaVersion)
+    merged.revision = max(revision, stationSnapshot.revision)
+    merged.generatedAt = max(generatedAt, stationSnapshot.generatedAt)
+    merged.expiresAt = max(expiresAt, stationSnapshot.expiresAt)
+    merged.stations.removeAll { stationIDs.contains($0.id) }
+    merged.attention.removeAll { stationIDs.contains($0.stationID) }
+    merged.sessions.removeAll { stationIDs.contains($0.stationID) }
+    merged.reviews.removeAll { stationIDs.contains($0.stationID) }
+    merged.taskBoardItems.removeAll { stationIDs.contains($0.stationID) }
+    merged.commands.removeAll { stationIDs.contains($0.stationID) }
+    merged.stations.append(contentsOf: stationSnapshot.stations)
+    merged.attention.append(contentsOf: stationSnapshot.attention)
+    merged.sessions.append(contentsOf: stationSnapshot.sessions)
+    merged.reviews.append(contentsOf: stationSnapshot.reviews)
+    merged.taskBoardItems.append(contentsOf: stationSnapshot.taskBoardItems)
+    merged.commands.append(contentsOf: stationSnapshot.commands)
+    merged.trustedDevices = trustedDevices.mergingTrustedDevices(stationSnapshot.trustedDevices)
+    return merged.normalizingDefaultStation(defaultStationID: defaultStationID)
+  }
+
   public static func empty(now: Date = .now) -> Self {
     Self(
       revision: 0,
@@ -929,5 +962,46 @@ public struct MobileMirrorSnapshot: Codable, Equatable, Sendable {
       reviews: [],
       commands: []
     )
+  }
+
+  private func normalizingDefaultStation(
+    defaultStationID: String?
+  ) -> MobileMirrorSnapshot {
+    var normalized = self
+    let requestedDefaultStationID = defaultStationID.flatMap { stationID in
+      stationID.isEmpty ? nil : stationID
+    }
+    let resolvedDefaultStationID =
+      requestedDefaultStationID
+      ?? stations.first(where: \.defaultStation)?.id
+      ?? stations.first?.id
+    normalized.stations = stations.map { station in
+      var station = station
+      station.defaultStation = station.id == resolvedDefaultStationID
+      return station
+    }
+    return normalized
+  }
+}
+
+extension Array where Element == MobileDeviceDescriptor {
+  fileprivate func mergingTrustedDevices(_ incoming: [MobileDeviceDescriptor]) -> Self {
+    var devicesByID: [String: MobileDeviceDescriptor] = [:]
+    var orderedIDs: [String] = []
+    for device in self {
+      let id = device.collectionID
+      if devicesByID[id] == nil {
+        orderedIDs.append(id)
+      }
+      devicesByID[id] = device
+    }
+    for device in incoming {
+      let id = device.collectionID
+      if devicesByID[id] == nil {
+        orderedIDs.append(id)
+      }
+      devicesByID[id] = device
+    }
+    return orderedIDs.compactMap { devicesByID[$0] }
   }
 }

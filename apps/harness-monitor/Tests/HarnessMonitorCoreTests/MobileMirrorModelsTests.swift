@@ -92,6 +92,109 @@ final class MobileMirrorModelsTests: XCTestCase {
     XCTAssertEqual(snapshot.needsYouCount, 1)
   }
 
+  func testStationSnapshotMergeRefreshesOneStationWithoutDroppingOthers() {
+    let now = Date(timeIntervalSince1970: 1_700_000_000)
+    let base = MobileMirrorSnapshot(
+      revision: 4,
+      generatedAt: now,
+      expiresAt: now.addingTimeInterval(60),
+      stations: [
+        station("station-a", name: "Old Studio", defaultStation: true, now: now),
+        station("station-b", name: "Laptop", defaultStation: false, now: now),
+      ],
+      attention: [
+        attention("attention-a-old", stationID: "station-a", now: now),
+        attention("attention-b", stationID: "station-b", now: now),
+      ],
+      sessions: [
+        session("session-a-old", stationID: "station-a", now: now),
+        session("session-b", stationID: "station-b", now: now),
+      ],
+      reviews: [
+        review("review-a-old", stationID: "station-a", now: now),
+        review("review-b", stationID: "station-b", now: now),
+      ],
+      taskBoardItems: [
+        taskBoardItem("task-a-old", stationID: "station-a", now: now),
+        taskBoardItem("task-b", stationID: "station-b", now: now),
+      ],
+      commands: [
+        command("command-a-old", stationID: "station-a", now: now),
+        command("command-b", stationID: "station-b", now: now),
+      ],
+      trustedDevices: [
+        MobileDeviceDescriptor(
+          id: "phone",
+          displayName: "Phone",
+          publicKeyFingerprint: "AA:BB",
+          pairedAt: now
+        ),
+        MobileDeviceDescriptor(
+          id: "watch",
+          displayName: "Watch",
+          publicKeyFingerprint: "CC:DD",
+          pairedAt: now
+        ),
+      ]
+    )
+    let refreshed = MobileMirrorSnapshot(
+      revision: 7,
+      generatedAt: now.addingTimeInterval(30),
+      expiresAt: now.addingTimeInterval(300),
+      stations: [
+        station("station-a", name: "Studio", defaultStation: false, now: now)
+      ],
+      attention: [
+        attention("attention-a-new", stationID: "station-a", now: now)
+      ],
+      sessions: [
+        session("session-a-new", stationID: "station-a", now: now)
+      ],
+      reviews: [
+        review("review-a-new", stationID: "station-a", now: now)
+      ],
+      taskBoardItems: [
+        taskBoardItem("task-a-new", stationID: "station-a", now: now)
+      ],
+      commands: [
+        command("command-a-new", stationID: "station-a", now: now)
+      ],
+      trustedDevices: [
+        MobileDeviceDescriptor(
+          id: "phone",
+          displayName: "Phone refreshed",
+          publicKeyFingerprint: "AA:BB",
+          pairedAt: now
+        ),
+      ]
+    )
+
+    let merged = base.mergingStationSnapshot(
+      refreshed,
+      stationID: "station-a",
+      defaultStationID: "station-b"
+    )
+
+    XCTAssertEqual(merged.revision, 7)
+    XCTAssertEqual(merged.generatedAt, now.addingTimeInterval(30))
+    XCTAssertEqual(merged.expiresAt, now.addingTimeInterval(300))
+    XCTAssertEqual(merged.stations.map(\.id), ["station-b", "station-a"])
+    XCTAssertEqual(merged.station(id: "station-a")?.displayName, "Studio")
+    XCTAssertEqual(merged.station(id: "station-b")?.displayName, "Laptop")
+    XCTAssertEqual(merged.station(id: "station-a")?.defaultStation, false)
+    XCTAssertEqual(merged.station(id: "station-b")?.defaultStation, true)
+    XCTAssertEqual(merged.attention.map(\.id).sorted(), ["attention-a-new", "attention-b"])
+    XCTAssertEqual(merged.sessions.map(\.id).sorted(), ["session-a-new", "session-b"])
+    XCTAssertEqual(merged.reviews.map(\.id).sorted(), ["review-a-new", "review-b"])
+    XCTAssertEqual(merged.taskBoardItems.map(\.id).sorted(), ["task-a-new", "task-b"])
+    XCTAssertEqual(merged.commands.map(\.id).sorted(), ["command-a-new", "command-b"])
+    XCTAssertEqual(
+      merged.trustedDevices.first { $0.id == "phone" }?.displayName,
+      "Phone refreshed"
+    )
+    XCTAssertEqual(merged.trustedDevices.first { $0.id == "watch" }?.displayName, "Watch")
+  }
+
   func testAttentionCarriesEncryptedCommandPayload() {
     let item = MobileAttentionItem(
       id: "permission",
@@ -614,6 +717,119 @@ final class MobileMirrorModelsTests: XCTestCase {
       createdAt: updatedAt.addingTimeInterval(-30),
       expiresAt: expiresAt ?? updatedAt.addingTimeInterval(15 * 60),
       updatedAt: updatedAt
+    )
+  }
+
+  private func station(
+    _ id: String,
+    name: String,
+    defaultStation: Bool,
+    now: Date
+  ) -> MobileStationSummary {
+    MobileStationSummary(
+      id: id,
+      displayName: name,
+      state: .online,
+      lastSeenAt: now,
+      activeSessionCount: 1,
+      needsYouCount: 1,
+      commandQueueCount: 1,
+      defaultStation: defaultStation
+    )
+  }
+
+  private func attention(
+    _ id: String,
+    stationID: String,
+    now: Date
+  ) -> MobileAttentionItem {
+    MobileAttentionItem(
+      id: id,
+      stationID: stationID,
+      kind: .taskBoard,
+      severity: .warning,
+      title: id,
+      subtitle: stationID,
+      updatedAt: now
+    )
+  }
+
+  private func session(
+    _ id: String,
+    stationID: String,
+    now: Date
+  ) -> MobileSessionSummary {
+    MobileSessionSummary(
+      id: id,
+      stationID: stationID,
+      projectName: "Harness",
+      title: id,
+      branch: "main",
+      status: "running",
+      activeAgentCount: 1,
+      blockedAgentCount: 0,
+      lastActivityAt: now,
+      summary: stationID
+    )
+  }
+
+  private func review(
+    _ id: String,
+    stationID: String,
+    now: Date
+  ) -> MobileReviewSummary {
+    MobileReviewSummary(
+      id: id,
+      stationID: stationID,
+      repository: "harness",
+      number: 1,
+      title: id,
+      author: "bart",
+      state: "open",
+      checksSummary: "pending",
+      needsYou: true,
+      updatedAt: now
+    )
+  }
+
+  private func taskBoardItem(
+    _ id: String,
+    stationID: String,
+    now: Date
+  ) -> MobileTaskBoardSummary {
+    MobileTaskBoardSummary(
+      id: id,
+      stationID: stationID,
+      title: id,
+      bodyPreview: stationID,
+      status: "ready",
+      statusTitle: "Ready",
+      priority: "normal",
+      priorityTitle: "Normal",
+      agentMode: "codex",
+      needsYou: true,
+      updatedAt: now
+    )
+  }
+
+  private func command(
+    _ id: String,
+    stationID: String,
+    now: Date
+  ) -> MobileCommandRecord {
+    MobileCommandRecord(
+      id: id,
+      stationID: stationID,
+      kind: .refresh,
+      risk: .low,
+      status: .queued,
+      title: id,
+      confirmationText: "Refresh.",
+      target: MobileCommandTarget(stationID: stationID, targetRevision: 1),
+      actorDeviceID: "phone",
+      createdAt: now,
+      expiresAt: now.addingTimeInterval(60),
+      updatedAt: now
     )
   }
 }

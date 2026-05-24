@@ -278,6 +278,7 @@ public final class HarnessMonitorStore {
   public let supervisorAuditRepository: SupervisorAuditRepository?
   var client: (any HarnessMonitorClientProtocol)?
   public var apiClient: (any HarnessMonitorClientProtocol)? { client }
+  @ObservationIgnored var mobileRelayBackgroundClient: (any HarnessMonitorClientProtocol)?
   var globalStreamTask: Task<Void, Never>?
   var sessionStreamTask: Task<Void, Never>?
   var connectionProbeTask: Task<Void, Never>?

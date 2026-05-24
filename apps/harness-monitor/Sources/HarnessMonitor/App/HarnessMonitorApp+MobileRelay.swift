@@ -10,8 +10,18 @@ final class HarnessMonitorMobileRelayClientProvider: @unchecked Sendable {
     self.store = store
   }
 
-  func client() -> (any HarnessMonitorClientProtocol)? {
-    store?.apiClient
+  func client() async -> (any HarnessMonitorClientProtocol)? {
+    guard let store else {
+      return nil
+    }
+    do {
+      return try await store.clientForMobileRelay()
+    } catch {
+      HarnessMonitorLogger.store.warning(
+        "Mobile relay could not open daemon client: \(String(describing: error), privacy: .public)"
+      )
+      return nil
+    }
   }
 }
 
