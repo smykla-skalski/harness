@@ -125,11 +125,6 @@ public struct OpenAnythingPaletteView: View {
             cornerRadius: OpenAnythingPaletteConstants.cornerRadius,
             tint: nil
           )
-          .shadow(
-            color: .black.opacity(OpenAnythingPaletteConstants.shadowOpacity),
-            radius: OpenAnythingPaletteConstants.shadowRadius,
-            y: OpenAnythingPaletteConstants.shadowYOffset
-          )
       }
       .frame(maxWidth: .infinity, alignment: .top)
     } else {
@@ -160,11 +155,6 @@ public struct OpenAnythingPaletteView: View {
     .harnessFloatingControlGlass(
       cornerRadius: OpenAnythingPaletteConstants.cornerRadius,
       tint: nil
-    )
-    .shadow(
-      color: .black.opacity(OpenAnythingPaletteConstants.shadowOpacity),
-      radius: OpenAnythingPaletteConstants.shadowRadius,
-      y: OpenAnythingPaletteConstants.shadowYOffset
     )
   }
 
