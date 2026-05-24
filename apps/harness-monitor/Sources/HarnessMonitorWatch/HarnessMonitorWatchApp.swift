@@ -7,10 +7,12 @@ import WidgetKit
 @main
 struct HarnessMonitorWatchApp: App {
   @WKApplicationDelegateAdaptor(WatchAppDelegate.self) private var delegate
+  @State private var store = WatchMonitorStore()
 
   var body: some Scene {
     WindowGroup {
       RootView()
+        .environment(store)
     }
   }
 }
@@ -36,7 +38,8 @@ final class WatchAppDelegate: NSObject, WKApplicationDelegate {
     }
   }
 
-  func didReceiveRemoteNotification(_ userInfo: [AnyHashable: Any]) async -> WKBackgroundFetchResult {
+  func didReceiveRemoteNotification(_ userInfo: [AnyHashable: Any]) async -> WKBackgroundFetchResult
+  {
     do {
       _ = try await NeedsMeCloudKitStore.shared.fetchCurrent()
     } catch {

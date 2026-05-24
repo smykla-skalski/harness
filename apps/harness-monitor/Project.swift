@@ -319,7 +319,11 @@ private let watchAppTarget: Target = .target(
     dependencies: [
         .target(name: "HarnessMonitorCloudKit"),
         .target(name: "HarnessMonitorCore"),
-        .target(name: "HarnessMonitorWatchWidgets")
+        .target(name: "HarnessMonitorCrypto"),
+        .target(name: "HarnessMonitorCloudMirror"),
+        .target(name: "HarnessMonitorWatchWidgets"),
+        .sdk(name: "LocalAuthentication", type: .framework),
+        .sdk(name: "WidgetKit", type: .framework)
     ],
     settings: .settings(
         base: [

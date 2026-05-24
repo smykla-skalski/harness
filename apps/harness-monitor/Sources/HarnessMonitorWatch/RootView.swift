@@ -1,172 +1,137 @@
-import HarnessMonitorCloudKit
+import HarnessMonitorCore
 import SwiftUI
 import WidgetKit
 
 struct RootView: View {
-  @State private var state: LoadState = .loading
+  @Environment(WatchMonitorStore.self) private var store
+  @State private var pendingAttention: MobileAttentionItem?
 
   var body: some View {
+    @Bindable var store = store
     NavigationStack {
-      ScrollView {
-        VStack(alignment: .leading, spacing: 12) {
-          headerCard
-          deepLinkNote
-          footnote
+      List {
+        Section {
+          WatchStatusRow(status: store.status)
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 8)
+        Section("Needs You") {
+          if store.snapshot.sortedAttention.isEmpty {
+            Label("Clear", systemImage: "checkmark.circle")
+          } else {
+            ForEach(store.snapshot.sortedAttention.prefix(6)) { item in
+              WatchAttentionRow(item: item) {
+                pendingAttention = item
+              }
+            }
+          }
+        }
+        Section("Commands") {
+          ForEach(store.snapshot.commands.prefix(4)) { command in
+            HStack {
+              Image(systemName: command.status.isTerminal ? "checkmark.circle" : "clock")
+              VStack(alignment: .leading) {
+                Text(command.title)
+                Text(command.status.title)
+                  .font(.caption2)
+                  .foregroundStyle(.secondary)
+              }
+            }
+          }
+        }
       }
       .navigationTitle("Harness")
-    }
-    .task {
-      WidgetCenter.shared.reloadAllTimelines()
-      await refresh()
-    }
-  }
-
-  private var headerCard: some View {
-    VStack(alignment: .leading, spacing: 6) {
-      HStack(alignment: .firstTextBaseline) {
-        VStack(alignment: .leading, spacing: 2) {
-          Text("Needs you")
-            .font(.caption2)
-            .foregroundStyle(.secondary)
-          Text(countLabel)
-            .font(.system(.title, design: .rounded, weight: .bold))
-            .monospacedDigit()
-            .foregroundStyle(countColor)
+      .refreshable {
+        await store.refresh()
+      }
+      .task {
+        WidgetCenter.shared.reloadAllTimelines()
+        await store.load()
+      }
+      .confirmationDialog(
+        pendingAttention?.commandKind?.title ?? "Confirm",
+        isPresented: Binding(
+          get: { pendingAttention != nil },
+          set: { if !$0 { pendingAttention = nil } }
+        ),
+        titleVisibility: .visible
+      ) {
+        Button("Confirm") {
+          guard let pendingAttention else {
+            return
+          }
+          Task {
+            await store.queueCommand(from: pendingAttention)
+            self.pendingAttention = nil
+          }
         }
-        Spacer()
-        Image(systemName: countSymbol)
-          .font(.title3)
-          .foregroundStyle(countSymbolColor)
+        Button("Cancel", role: .cancel) {
+          pendingAttention = nil
+        }
       }
-      Divider()
-      Text(statusLine)
-        .font(.caption2)
-        .foregroundStyle(.secondary)
-        .multilineTextAlignment(.leading)
-    }
-    .padding(10)
-    .background(
-      RoundedRectangle(cornerRadius: 14, style: .continuous)
-        .fill(.thinMaterial)
-    )
-  }
-
-  private var deepLinkNote: some View {
-    Label {
-      Text("Add the Needs-Me complication to a watch face for at-a-glance access.")
-        .font(.caption2)
-    } icon: {
-      Image(systemName: "applewatch.watchface")
-    }
-    .foregroundStyle(.secondary)
-  }
-
-  private var footnote: some View {
-    Text("Review pull requests on your Mac. Counts sync via iCloud.")
-      .font(.caption2)
-      .foregroundStyle(.tertiary)
-  }
-
-  private var countLabel: String {
-    switch state {
-    case .loading: return "--"
-    case .loaded(let snapshot): return String(snapshot.count)
-    case .empty: return "0"
-    case .notAuthenticated: return "--"
-    case .offline(let cached): return cached.map { String($0.count) } ?? "--"
-    case .unknownError(let cached): return cached.map { String($0.count) } ?? "--"
-    }
-  }
-
-  private var countColor: Color {
-    switch state {
-    case .loaded, .empty:
-      return .primary
-    case .offline(.some), .unknownError(.some):
-      return .secondary
-    case .loading, .notAuthenticated, .offline, .unknownError:
-      return .secondary
-    }
-  }
-
-  private var countSymbol: String {
-    switch state {
-    case .loading: return "ellipsis.circle"
-    case .loaded, .empty: return "checkmark.icloud"
-    case .notAuthenticated: return "icloud.slash"
-    case .offline: return "wifi.slash"
-    case .unknownError: return "exclamationmark.triangle"
-    }
-  }
-
-  private var countSymbolColor: Color {
-    switch state {
-    case .loaded, .empty: return .primary
-    case .loading: return .secondary
-    case .notAuthenticated, .offline, .unknownError: return .orange
-    }
-  }
-
-  private var statusLine: String {
-    switch state {
-    case .loading:
-      return "Syncing…"
-    case .loaded(let snapshot):
-      return "Synced \(snapshot.updatedAt.formatted(.relative(presentation: .numeric)))"
-    case .empty:
-      return "No data yet — open the Mac app once."
-    case .notAuthenticated:
-      return "Sign in to iCloud on your iPhone, then reopen this app."
-    case .offline(let cached):
-      if let cached {
-        return
-          "Offline · last sync \(cached.updatedAt.formatted(.relative(presentation: .numeric)))"
-      }
-      return "Offline · connect to Wi-Fi to sync."
-    case .unknownError(let cached):
-      if let cached {
-        return
-          "Sync failed · cached value from \(cached.updatedAt.formatted(.relative(presentation: .numeric)))"
-      }
-      return "Sync failed · will retry shortly."
-    }
-  }
-
-  private func refresh() async {
-    let store = NeedsMeCloudKitStore.shared
-    do {
-      if let snapshot = try await store.fetchCurrent() {
-        state = .loaded(snapshot)
-      } else if let cached = await store.lastKnown() {
-        state = .loaded(cached)
-      } else {
-        state = .empty
-      }
-      WidgetCenter.shared.reloadAllTimelines()
-    } catch NeedsMeCloudKitError.notAuthenticated {
-      state = .notAuthenticated
-    } catch NeedsMeCloudKitError.networkUnavailable {
-      let cached = await store.lastKnown()
-      state = .offline(cached)
-    } catch {
-      let cached = await store.lastKnown()
-      state = .unknownError(cached)
     }
   }
 }
 
-private enum LoadState {
-  case loading
-  case loaded(NeedsMeSnapshot)
-  case empty
-  case notAuthenticated
-  case offline(NeedsMeSnapshot?)
-  case unknownError(NeedsMeSnapshot?)
+struct WatchStatusRow: View {
+  let status: WatchMonitorStatus
+
+  var body: some View {
+    Label {
+      VStack(alignment: .leading, spacing: 2) {
+        Text(status.title)
+          .font(.headline)
+        Text(status.subtitle)
+          .font(.caption2)
+          .foregroundStyle(.secondary)
+      }
+    } icon: {
+      Image(systemName: status.systemImage)
+    }
+  }
+}
+
+struct WatchAttentionRow: View {
+  let item: MobileAttentionItem
+  let submit: () -> Void
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 6) {
+      HStack {
+        Image(systemName: symbol)
+          .foregroundStyle(color)
+        Text(item.title)
+          .font(.headline)
+      }
+      Text(item.subtitle)
+        .font(.caption2)
+        .foregroundStyle(.secondary)
+      if item.commandKind != nil {
+        Button(action: submit) {
+          Label("Send", systemImage: "paperplane")
+        }
+      }
+    }
+  }
+
+  private var symbol: String {
+    switch item.kind {
+    case .acpDecision: "lock.shield"
+    case .pullRequest: "arrow.triangle.pull"
+    case .blockedAgent: "person.fill.questionmark"
+    case .commandFailure: "xmark.octagon"
+    case .stationHealth: "desktopcomputer.trianglebadge.exclamationmark"
+    }
+  }
+
+  private var color: Color {
+    switch item.severity {
+    case .critical: .red
+    case .warning: .orange
+    case .info: .secondary
+    }
+  }
 }
 
 #Preview {
   RootView()
+    .environment(WatchMonitorStore(demoModeEnabled: true))
 }
