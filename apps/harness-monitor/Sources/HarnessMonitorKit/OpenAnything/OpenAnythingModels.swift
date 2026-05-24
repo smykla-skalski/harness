@@ -289,13 +289,25 @@ public struct OpenAnythingRecord: Identifiable, Hashable, Sendable {
     self.trailing = trailing
     self.systemImage = systemImage ?? domain.systemImage
     self.isSuggested = isSuggested
-    searchBody = searchBodyParts.compactMap(Self.nonEmpty).joined(separator: " ")
+    searchBody = Self.joinSearchBody(searchBodyParts)
   }
 
   private static func nonEmpty(_ value: String?) -> String? {
     guard let value else { return nil }
     let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
     return trimmed.isEmpty ? nil : trimmed
+  }
+
+  private static func joinSearchBody(_ parts: [String?]) -> String {
+    var body = ""
+    for part in parts {
+      guard let trimmed = nonEmpty(part) else { continue }
+      if !body.isEmpty {
+        body.append(" ")
+      }
+      body.append(trimmed)
+    }
+    return body
   }
 }
 
