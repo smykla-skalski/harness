@@ -17,6 +17,7 @@ struct DashboardReviewFilesModeDetailPane: View {
   private var openURL
   @State private var commentDraft: DashboardReviewFileCommentDraft?
   @State private var threadIndexCache = DashboardReviewFileThreadIndexCache()
+  @State private var documentCache = DashboardReviewFileDiffDocumentCache()
 
   var body: some View {
     let timeline = store.reviewTimelineViewModel(for: item.pullRequestID)
@@ -190,22 +191,26 @@ struct DashboardReviewFilesModeDetailPane: View {
         fontScale: fontScale
       )
     } else if preferences.snapshot.filesDefaultViewMode == .split {
+      let document = documentCache.document(patch: patch, language: file.languageHint)
       DashboardReviewFileDiffSplit(
         patch: patch,
         language: file.languageHint,
         fontScale: fontScale,
         threads: threads,
         repositoryFullName: viewModel.repositoryFullName,
-        fillsAvailableSpace: true
+        fillsAvailableSpace: true,
+        document: document
       )
     } else {
+      let document = documentCache.document(patch: patch, language: file.languageHint)
       DashboardReviewFileDiffUnified(
         patch: patch,
         language: file.languageHint,
         fontScale: fontScale,
         threads: threads,
         repositoryFullName: viewModel.repositoryFullName,
-        fillsAvailableSpace: true
+        fillsAvailableSpace: true,
+        document: document
       )
     }
   }
@@ -216,8 +221,11 @@ struct DashboardReviewFilesModeDetailPane: View {
     threads: [DashboardReviewFileThreadAnchor],
     isLoading: Bool
   ) -> some View {
-    DashboardReviewFileDiffPreview(
+    let projectedPatch = preview.projectedPatch
+    let document = documentCache.document(patch: projectedPatch, language: file.languageHint)
+    return DashboardReviewFileDiffPreview(
       preview: preview,
+      projectedPatch: projectedPatch,
       viewMode: preferences.snapshot.filesDefaultViewMode,
       language: file.languageHint,
       fontScale: fontScale,
@@ -225,7 +233,8 @@ struct DashboardReviewFilesModeDetailPane: View {
       repositoryFullName: viewModel.repositoryFullName,
       isLoadingFullPatch: isLoading,
       fullPatchFailed: (viewModel.patches[file.path] ?? .notLoaded).isFailedForFilesMode,
-      fillsAvailableSpace: true
+      fillsAvailableSpace: true,
+      document: document
     )
   }
 

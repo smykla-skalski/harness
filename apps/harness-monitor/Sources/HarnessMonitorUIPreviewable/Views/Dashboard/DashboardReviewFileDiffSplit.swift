@@ -24,6 +24,28 @@ struct DashboardReviewFileDiffSplit: View {
     repositoryFullName: String? = nil,
     fillsAvailableSpace: Bool = false
   ) {
+    self.init(
+      patch: patch,
+      language: language,
+      fontScale: fontScale,
+      minColumnPoints: minColumnPoints,
+      threads: threads,
+      repositoryFullName: repositoryFullName,
+      fillsAvailableSpace: fillsAvailableSpace,
+      document: DashboardReviewFileDiffDocument(patch: patch, language: language)
+    )
+  }
+
+  init(
+    patch: ReviewFilePatch,
+    language: HarnessReviewFileLanguage,
+    fontScale: CGFloat,
+    minColumnPoints: CGFloat = 280,
+    threads: [DashboardReviewFileThreadAnchor],
+    repositoryFullName: String?,
+    fillsAvailableSpace: Bool,
+    document: DashboardReviewFileDiffDocument
+  ) {
     self.patch = patch
     self.language = language
     self.fontScale = fontScale
@@ -31,7 +53,7 @@ struct DashboardReviewFileDiffSplit: View {
     self.threads = threads
     self.repositoryFullName = repositoryFullName
     self.fillsAvailableSpace = fillsAvailableSpace
-    document = DashboardReviewFileDiffDocument(patch: patch, language: language)
+    self.document = document
     diffFont = DashboardReviewDiffTypography.font(for: fontScale)
   }
 
@@ -52,7 +74,8 @@ struct DashboardReviewFileDiffSplit: View {
           fontScale: fontScale,
           threads: threads,
           repositoryFullName: repositoryFullName,
-          fillsAvailableSpace: fillsAvailableSpace
+          fillsAvailableSpace: fillsAvailableSpace,
+          document: document
         )
       } else {
         DashboardReviewFileDiffGrid(
