@@ -28,6 +28,6 @@ public struct RefreshAllReposIntent: AppIntent {
   public func perform() async throws -> some IntentResult & ProvidesDialog {
     try await source.refreshAll()
     await IntentWidgetReloader.shared.reloadNeedsMeCount()
-    return .result(dialog: IntentDialog("Refresh queued for every tracked repository"))
+    return .result(dialog: IntentDialog("Queued a refresh for every tracked repository"))
   }
 }

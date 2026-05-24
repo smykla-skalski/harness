@@ -35,7 +35,7 @@ public struct AddLabelToPullRequestIntent: AppIntent {
 
   public func perform() async throws -> some IntentResult & ProvidesDialog {
     try await applyLabel()
-    return .result(dialog: IntentDialog("Added \(label) to \(pullRequest.title)"))
+    return .result(dialog: IntentDialog("Added the \(label) label to \(pullRequest.title)"))
   }
 
   func applyLabel() async throws {

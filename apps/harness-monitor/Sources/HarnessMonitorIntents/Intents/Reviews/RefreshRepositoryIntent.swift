@@ -42,15 +42,23 @@ public struct RefreshRepositoryIntent: AppIntent {
   }
 
   static func dialog(for count: Int, repository: String) -> IntentDialog {
+    IntentDialog(stringLiteral: dialogString(for: count, repository: repository))
+  }
+
+  /// String form of the spoken dialog. Pinned by
+  /// `IntentDialogWordingTests` so wording changes have to go through
+  /// review. Repository name falls back to "the requested repository"
+  /// when blank so Siri never reads "for ." aloud
+  static func dialogString(for count: Int, repository: String) -> String {
     let trimmed = repository.trimmingCharacters(in: .whitespacesAndNewlines)
     let repoName = trimmed.isEmpty ? "the requested repository" : trimmed
     switch count {
     case 0:
-      return IntentDialog("No open pull requests for \(repoName)")
+      return "No open pull requests for \(repoName)"
     case 1:
-      return IntentDialog("Refreshed 1 pull request for \(repoName)")
+      return "Refreshed 1 pull request for \(repoName)"
     default:
-      return IntentDialog("Refreshed \(count) pull requests for \(repoName)")
+      return "Refreshed \(count) pull requests for \(repoName)"
     }
   }
 }

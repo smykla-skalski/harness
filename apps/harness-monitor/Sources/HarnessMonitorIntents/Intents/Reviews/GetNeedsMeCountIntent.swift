@@ -41,13 +41,20 @@ public struct GetNeedsMeCountIntent: AppIntent {
   }
 
   static func dialog(for count: Int) -> IntentDialog {
+    IntentDialog(stringLiteral: dialogString(for: count))
+  }
+
+  /// String form of the spoken dialog. Pinned by
+  /// `IntentDialogWordingTests` so wording changes have to go through
+  /// review
+  static func dialogString(for count: Int) -> String {
     switch count {
     case 0:
-      return IntentDialog("Nothing needs your review right now")
+      return "Nothing needs your review right now"
     case 1:
-      return IntentDialog("1 pull request needs your review")
+      return "1 pull request needs your review"
     default:
-      return IntentDialog("\(count) pull requests need your review")
+      return "\(count) pull requests need your review"
     }
   }
 }

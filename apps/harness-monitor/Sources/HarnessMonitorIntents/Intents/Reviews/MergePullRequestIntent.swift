@@ -39,13 +39,13 @@ public struct MergePullRequestIntent: AppIntent {
   public func perform() async throws -> some IntentResult & ProvidesDialog {
     try await requestConfirmation(
       dialog: IntentDialog(
-        "Merge \(pullRequest.title) using \(method.daemonValue.rawValue)?"
+        "\(method.confirmationVerbPhrase) \(pullRequest.title)?"
       )
     )
     try await applyMerge()
     await IntentWidgetReloader.shared.reloadNeedsMeCount()
     return .result(
-      dialog: IntentDialog("Merged \(pullRequest.title) (\(method.daemonValue.rawValue))")
+      dialog: IntentDialog("Merged \(pullRequest.title) via \(method.pastDescriptor)")
     )
   }
 

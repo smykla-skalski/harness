@@ -36,6 +36,7 @@ public struct SearchPullRequestsIntent: AppIntent {
     let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
     guard !trimmed.isEmpty else { return [] }
     let items = try await source.search(query: trimmed, limit: 50)
-    return items.map(PullRequestEntity.init(from:))
+    let ranked = IntentSearchRanker.rank(items: items, query: trimmed)
+    return ranked.map(PullRequestEntity.init(from:))
   }
 }
