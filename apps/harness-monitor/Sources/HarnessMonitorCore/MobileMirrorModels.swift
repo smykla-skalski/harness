@@ -314,4 +314,17 @@ public struct MobileMirrorSnapshot: Codable, Equatable, Sendable {
       return $0.updatedAt > $1.updatedAt
     }
   }
+
+  public static func empty(now: Date = .now) -> Self {
+    Self(
+      revision: 0,
+      generatedAt: now,
+      expiresAt: now,
+      stations: [],
+      attention: [],
+      sessions: [],
+      reviews: [],
+      commands: []
+    )
+  }
 }

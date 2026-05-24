@@ -2,6 +2,8 @@ import HarnessMonitorCore
 import SwiftUI
 
 struct MobileRootView: View {
+  @Environment(MobileMonitorStore.self) private var store
+
   var body: some View {
     TabView {
       TodayView()
@@ -25,6 +27,9 @@ struct MobileRootView: View {
           Label("Settings", systemImage: "gearshape")
         }
     }
+    .task {
+      await store.refresh()
+    }
   }
 }
 
@@ -33,12 +38,17 @@ struct StationPicker: View {
 
   var body: some View {
     @Bindable var store = store
-    Picker("Station", selection: $store.selectedStationID) {
-      ForEach(store.snapshot.stations) { station in
-        Text(station.displayName).tag(station.id)
+    if store.snapshot.stations.isEmpty {
+      Label("No paired Mac", systemImage: "link.badge.plus")
+        .foregroundStyle(.secondary)
+    } else {
+      Picker("Station", selection: $store.selectedStationID) {
+        ForEach(store.snapshot.stations) { station in
+          Text(station.displayName).tag(station.id)
+        }
       }
+      .pickerStyle(.segmented)
     }
-    .pickerStyle(.segmented)
   }
 }
 
@@ -48,6 +58,9 @@ struct TodayView: View {
   var body: some View {
     NavigationStack {
       List {
+        Section {
+          SyncStatusRow(status: store.syncStatus)
+        }
         Section {
           NeedsYouHeader(snapshot: store.snapshot)
         }
@@ -65,7 +78,7 @@ struct TodayView: View {
       .navigationTitle("Today")
       .toolbar {
         Button {
-          store.refreshDemoData()
+          Task { await store.refresh() }
         } label: {
           Label("Refresh", systemImage: "arrow.clockwise")
         }
@@ -79,6 +92,24 @@ struct TodayView: View {
       ) {
         Button("OK", role: .cancel) {}
       }
+    }
+  }
+}
+
+struct SyncStatusRow: View {
+  let status: MobileMonitorSyncStatus
+
+  var body: some View {
+    Label {
+      VStack(alignment: .leading, spacing: 3) {
+        Text(status.title)
+          .font(.headline)
+        Text(status.subtitle)
+          .font(.caption)
+          .foregroundStyle(.secondary)
+      }
+    } icon: {
+      Image(systemName: status.systemImage)
     }
   }
 }
@@ -125,7 +156,7 @@ struct AttentionRow: View {
       Text(item.subtitle)
         .font(.subheadline)
         .foregroundStyle(.secondary)
-      if item.commandKind != nil {
+      if item.commandKind != nil && store.canQueueCommands {
         Button {
           Task { await store.queueCommand(from: item) }
         } label: {
@@ -394,7 +425,13 @@ struct SettingsView: View {
           Toggle("Station health", isOn: .constant(true))
         }
         Section("Privacy") {
-          Toggle("Demo mode", isOn: $store.demoModeEnabled)
+          Toggle(
+            "Demo mode",
+            isOn: Binding(
+              get: { store.demoModeEnabled },
+              set: { store.setDemoMode($0) }
+            )
+          )
           Label("Export mirrored records", systemImage: "square.and.arrow.up")
           Label("Delete CloudKit mirror", systemImage: "trash")
             .foregroundStyle(.red)
