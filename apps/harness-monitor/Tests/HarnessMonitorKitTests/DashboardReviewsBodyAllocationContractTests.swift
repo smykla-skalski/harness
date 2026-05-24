@@ -77,4 +77,14 @@ struct DashboardReviewsBodyAllocationContractTests {
     #expect(reviewsSource.contains("uniquingKeysWith: { first, _ in first }"))
     #expect(!reviewsSource.contains("private var labelByName"))
   }
+
+  @Test("provenance popover uses repository prefix slices")
+  func provenancePopoverUsesRepositoryPrefixSlices() throws {
+    let provenanceSource = try dashboardReviewsRouteSource(
+      named: "DashboardReviewsProvenance+Popover.swift"
+    )
+
+    #expect(provenanceSource.contains("let visibleRepositories = repositories.prefix(5)"))
+    #expect(!provenanceSource.contains("Array(repositories.prefix"))
+  }
 }
