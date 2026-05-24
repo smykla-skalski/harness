@@ -303,6 +303,20 @@ struct SettingsRepositoriesPerformanceSourceTests {
     #expect(!source.contains("switch selectedPane"))
   }
 
+  @Test("Top-level retained settings sections disable hidden scroll and MCP hooks")
+  func topLevelRetainedSettingsSectionsDisableHiddenScrollAndMCPHooks() throws {
+    let source = try settingsSourceFile("SettingsView.swift")
+
+    #expect(source.contains("SettingsRetainedSectionHost("))
+    #expect(source.contains(".equatable()"))
+    #expect(
+      source.contains(
+        ".environment(\\.settingsScrollRestorationSection, isSelected ? section : nil)"
+      )
+    )
+    #expect(source.contains(".harnessMCPElementTrackingEnabled(isSelected)"))
+  }
+
   private func settingsSourceFile(_ relativePath: String) throws -> String {
     try settingsSourceFiles([relativePath])
   }
