@@ -77,6 +77,50 @@ final class PullRequestQueryTests: XCTestCase {
     XCTAssertTrue(searchHits.isEmpty)
   }
 
+  func testSuggestedEntitiesBumpsRecentlyDonatedItemsToFront() async throws {
+    let donated = makeItem(
+      pullRequestID: "owner/repo#42",
+      title: "Donated",
+      mergeable: .conflicting
+    )
+    let other = makeItem(
+      pullRequestID: "owner/repo#43",
+      title: "Other",
+      mergeable: .conflicting
+    )
+    let stub = StubPullRequestSource(suggestedResult: [other, donated])
+    let recorder = IntentDonationRecorder(capacity: 5)
+    await recorder.recordDonation(pullRequestID: donated.pullRequestID)
+    let query = PullRequestQuery(source: stub, donationRecorder: recorder)
+
+    let result = try await query.suggestedEntities()
+
+    XCTAssertEqual(
+      result.map(\.id),
+      ["owner/repo#42", "owner/repo#43"],
+      "donated PR should move to the front while the rest keep daemon order"
+    )
+  }
+
+  func testSuggestedEntitiesPreservesOrderWithoutDonations() async throws {
+    let first = makeItem(
+      pullRequestID: "owner/repo#1",
+      title: "First",
+      mergeable: .conflicting
+    )
+    let second = makeItem(
+      pullRequestID: "owner/repo#2",
+      title: "Second",
+      mergeable: .conflicting
+    )
+    let stub = StubPullRequestSource(suggestedResult: [first, second])
+    let query = PullRequestQuery(source: stub, donationRecorder: IntentDonationRecorder())
+
+    let result = try await query.suggestedEntities()
+
+    XCTAssertEqual(result.map(\.id), ["owner/repo#1", "owner/repo#2"])
+  }
+
   func testEntitiesMatchingDelegatesToSearchWhenQueryNonEmpty() async throws {
     let stub = StubPullRequestSource(
       searchResult: [

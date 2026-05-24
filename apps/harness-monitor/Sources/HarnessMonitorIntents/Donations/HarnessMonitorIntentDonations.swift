@@ -7,6 +7,7 @@ public enum HarnessMonitorIntentDonations {
       for item in items {
         let intent = ApprovePullRequestIntent()
         intent.pullRequest = PullRequestEntity(from: item)
+        await IntentDonationRecorder.shared.recordDonation(pullRequestID: item.pullRequestID)
         _ = try? await IntentDonationManager.shared.donate(intent: intent)
       }
     }
@@ -17,6 +18,7 @@ public enum HarnessMonitorIntentDonations {
       for item in items {
         let intent = MergePullRequestIntent()
         intent.pullRequest = PullRequestEntity(from: item)
+        await IntentDonationRecorder.shared.recordDonation(pullRequestID: item.pullRequestID)
         _ = try? await IntentDonationManager.shared.donate(intent: intent)
       }
     }
@@ -27,6 +29,7 @@ public enum HarnessMonitorIntentDonations {
       for item in items {
         let intent = RerunChecksIntent()
         intent.pullRequest = PullRequestEntity(from: item)
+        await IntentDonationRecorder.shared.recordDonation(pullRequestID: item.pullRequestID)
         _ = try? await IntentDonationManager.shared.donate(intent: intent)
       }
     }
@@ -38,6 +41,7 @@ public enum HarnessMonitorIntentDonations {
         let intent = AddLabelToPullRequestIntent()
         intent.pullRequest = PullRequestEntity(from: item)
         intent.label = label
+        await IntentDonationRecorder.shared.recordDonation(pullRequestID: item.pullRequestID)
         _ = try? await IntentDonationManager.shared.donate(intent: intent)
       }
     }
