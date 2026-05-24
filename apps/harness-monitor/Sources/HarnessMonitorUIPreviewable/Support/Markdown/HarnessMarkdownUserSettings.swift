@@ -1,3 +1,4 @@
+import Foundation
 import SwiftUI
 
 enum HarnessMarkdownScalePreference: String, CaseIterable, Codable, Identifiable {
@@ -125,7 +126,27 @@ struct HarnessMarkdownStoredRenderSettings: DynamicProperty {
   private var storage = HarnessMarkdownUserSettings.defaultStorageValue
 
   var settings: HarnessMarkdownRenderSettings {
-    HarnessMarkdownUserSettings.decode(storage).renderSettings
+    harnessMarkdownStoredRenderSettingsCache.settings(for: storage)
+  }
+}
+
+private let harnessMarkdownStoredRenderSettingsCache = HarnessMarkdownStoredRenderSettingsCache()
+
+private final class HarnessMarkdownStoredRenderSettingsCache: @unchecked Sendable {
+  private let lock = NSLock()
+  private var storage: String?
+  private var settings = HarnessMarkdownUserSettings.default.renderSettings
+
+  func settings(for storage: String) -> HarnessMarkdownRenderSettings {
+    lock.lock()
+    defer { lock.unlock() }
+    guard self.storage != storage else {
+      return settings
+    }
+    let settings = HarnessMarkdownUserSettings.decode(storage).renderSettings
+    self.storage = storage
+    self.settings = settings
+    return settings
   }
 }
 
