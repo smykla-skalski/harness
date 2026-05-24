@@ -77,11 +77,12 @@ public actor MobileCloudMirrorSyncClient {
     }
 
     for record in activeRecords {
-      guard let envelope = record.envelope else {
-        throw MobileCloudMirrorSyncError.missingSnapshotEnvelope(record.id)
-      }
-      guard let snapshot: MobileMirrorSnapshot = try? cipher.open(envelope),
-        snapshot.expiresAt > now
+      guard
+        let snapshot = try openSnapshotRecord(
+          record,
+          allRecords: records,
+          now: now
+        )
       else {
         continue
       }
@@ -92,6 +93,52 @@ public actor MobileCloudMirrorSyncClient {
       )
     }
     return nil
+  }
+
+  private func openSnapshotRecord(
+    _ record: MobileMirrorRecord,
+    allRecords records: [MobileMirrorRecord],
+    now: Date
+  ) throws -> MobileMirrorSnapshot? {
+    guard var envelope = record.envelope else {
+      throw MobileCloudMirrorSyncError.missingSnapshotEnvelope(record.id)
+    }
+    if !record.metadata.chunkIDs.isEmpty {
+      guard let ciphertext = chunkedCiphertext(for: record, allRecords: records, now: now) else {
+        return nil
+      }
+      envelope.ciphertext = ciphertext
+    }
+    guard let snapshot: MobileMirrorSnapshot = try? cipher.open(envelope),
+      snapshot.expiresAt > now
+    else {
+      return nil
+    }
+    return snapshot
+  }
+
+  private func chunkedCiphertext(
+    for snapshotRecord: MobileMirrorRecord,
+    allRecords records: [MobileMirrorRecord],
+    now: Date
+  ) -> Data? {
+    let recordsByID = Dictionary(uniqueKeysWithValues: records.map { ($0.id, $0) })
+    var ciphertext = Data()
+    for chunkID in snapshotRecord.metadata.chunkIDs {
+      guard
+        let chunk = recordsByID[chunkID],
+        chunk.metadata.type == .snapshotChunk,
+        chunk.metadata.stationID == snapshotRecord.metadata.stationID,
+        chunk.metadata.revision == snapshotRecord.metadata.revision,
+        !chunk.metadata.tombstone,
+        chunk.metadata.expiresAt > now,
+        let envelope = chunk.envelope
+      else {
+        return nil
+      }
+      ciphertext.append(envelope.ciphertext)
+    }
+    return ciphertext
   }
 
   public func queueCommand(
