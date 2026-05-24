@@ -621,11 +621,14 @@ final class TrackAccessibilityNSView: NSView {
 
 private final class TrackAccessibilityWindowUpdateHub: @unchecked Sendable {
   static let shared = TrackAccessibilityWindowUpdateHub()
+  private static let didUpdateFanoutInterval: Duration = .milliseconds(500)
 
   private struct WindowEntry {
     weak var window: NSWindow?
     let observer: NSObjectProtocol
     var views: [WeakTrackedView]
+    var lastDidUpdateFanoutAt: ContinuousClock.Instant?
+    var pendingDidUpdateTask: Task<Void, Never>?
   }
 
   private struct WeakTrackedView {
@@ -633,6 +636,7 @@ private final class TrackAccessibilityWindowUpdateHub: @unchecked Sendable {
   }
 
   private var entries: [ObjectIdentifier: WindowEntry] = [:]
+  private let clock = ContinuousClock()
   private let lock = NSLock()
 
   private init() {}
@@ -660,7 +664,9 @@ private final class TrackAccessibilityWindowUpdateHub: @unchecked Sendable {
     entries[windowID] = WindowEntry(
       window: window,
       observer: observer,
-      views: [WeakTrackedView(view: view)]
+      views: [WeakTrackedView(view: view)],
+      lastDidUpdateFanoutAt: nil,
+      pendingDidUpdateTask: nil
     )
     lock.unlock()
   }
@@ -674,6 +680,7 @@ private final class TrackAccessibilityWindowUpdateHub: @unchecked Sendable {
       }
       entry.views = liveViews(from: entry.views).filter { $0.view !== view }
       if entry.views.isEmpty || entry.window == nil {
+        entry.pendingDidUpdateTask?.cancel()
         observersToRemove.append(entry.observer)
         entries[windowID] = nil
       } else {
@@ -685,6 +692,79 @@ private final class TrackAccessibilityWindowUpdateHub: @unchecked Sendable {
   }
 
   private func notifyDidUpdate(windowID: ObjectIdentifier) {
+    if let views = collectViewsForDidUpdate(windowID: windowID) {
+      fanOutDidUpdate(to: views)
+    }
+  }
+
+  private func collectViewsForDidUpdate(windowID: ObjectIdentifier) -> [TrackAccessibilityNSView]? {
+    let views: [TrackAccessibilityNSView]
+    var observerToRemove: NSObjectProtocol?
+    lock.lock()
+    guard var entry = entries[windowID] else {
+      lock.unlock()
+      return nil
+    }
+    let liveViews = liveViews(from: entry.views)
+    if liveViews.isEmpty || entry.window == nil {
+      entry.pendingDidUpdateTask?.cancel()
+      observerToRemove = entry.observer
+      entries[windowID] = nil
+      lock.unlock()
+      if let observerToRemove {
+        NotificationCenter.default.removeObserver(observerToRemove)
+      }
+      return nil
+    }
+
+    let now = clock.now
+    let shouldFanOutNow =
+      entry.lastDidUpdateFanoutAt.map {
+        $0 + Self.didUpdateFanoutInterval <= now
+      } ?? true
+
+    guard shouldFanOutNow else {
+      if entry.pendingDidUpdateTask == nil,
+        let lastFanout = entry.lastDidUpdateFanoutAt
+      {
+        let delay = now.duration(to: lastFanout + Self.didUpdateFanoutInterval)
+        entry.pendingDidUpdateTask = scheduledDidUpdateTask(
+          windowID: windowID,
+          delay: delay
+        )
+      }
+      entry.views = liveViews
+      entries[windowID] = entry
+      lock.unlock()
+      return nil
+    }
+
+    entry.pendingDidUpdateTask?.cancel()
+    entry.pendingDidUpdateTask = nil
+    entry.lastDidUpdateFanoutAt = now
+    entry.views = liveViews
+    entries[windowID] = entry
+    views = liveViews.compactMap(\.view)
+    lock.unlock()
+
+    return views
+  }
+
+  private func scheduledDidUpdateTask(
+    windowID: ObjectIdentifier,
+    delay: Duration
+  ) -> Task<Void, Never> {
+    Task { [weak self] in
+      do {
+        try await Task.sleep(for: delay)
+      } catch {
+        return
+      }
+      self?.notifyScheduledDidUpdate(windowID: windowID)
+    }
+  }
+
+  private func notifyScheduledDidUpdate(windowID: ObjectIdentifier) {
     let views: [TrackAccessibilityNSView]
     var observerToRemove: NSObjectProtocol?
     lock.lock()
@@ -693,19 +773,26 @@ private final class TrackAccessibilityWindowUpdateHub: @unchecked Sendable {
       return
     }
     let liveViews = liveViews(from: entry.views)
-    views = liveViews.compactMap(\.view)
-    if views.isEmpty || entry.window == nil {
+    if liveViews.isEmpty || entry.window == nil {
       observerToRemove = entry.observer
       entries[windowID] = nil
     } else {
+      entry.lastDidUpdateFanoutAt = clock.now
+      entry.pendingDidUpdateTask = nil
       entry.views = liveViews
       entries[windowID] = entry
     }
+    views = liveViews.compactMap(\.view)
     lock.unlock()
 
     if let observerToRemove {
       NotificationCenter.default.removeObserver(observerToRemove)
     }
+    fanOutDidUpdate(to: views)
+  }
+
+  private func fanOutDidUpdate(to views: [TrackAccessibilityNSView]) {
+    guard views.isEmpty == false else { return }
     Task { @MainActor in
       for view in views {
         view.schedulePublishAfterWindowDidUpdate()
