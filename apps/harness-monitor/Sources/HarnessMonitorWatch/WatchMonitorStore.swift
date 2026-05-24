@@ -154,6 +154,7 @@ final class WatchMonitorStore {
       if selectedStationID.isEmpty || syncClientsByStationID[selectedStationID] == nil {
         selectedStationID = defaultStationID ?? ""
       }
+      applyPairedStationPlaceholders(validCredentials)
       await refresh()
     } catch {
       status = .stale(String(describing: error))
@@ -350,6 +351,25 @@ final class WatchMonitorStore {
         ?? snapshot.stations.first?.id
         ?? ""
     }
+    WidgetCenter.shared.reloadAllTimelines()
+  }
+
+  private func applyPairedStationPlaceholders(
+    _ credentials: [MobilePairedStationCredential],
+    now: Date = .now
+  ) {
+    let changed = snapshot.ensurePairedStationPlaceholders(
+      for: credentials,
+      defaultStationID: defaultStationID,
+      now: now
+    )
+    if selectedStationID.isEmpty {
+      selectedStationID = defaultStationID ?? snapshot.stations.first?.id ?? ""
+    }
+    guard changed else {
+      return
+    }
+    try? sharedSnapshotStore?.save(snapshot)
     WidgetCenter.shared.reloadAllTimelines()
   }
 

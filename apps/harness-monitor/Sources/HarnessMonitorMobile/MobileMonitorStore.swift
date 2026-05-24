@@ -836,34 +836,13 @@ final class MobileMonitorStore {
     _ credentials: [MobilePairedStationCredential],
     now: Date = .now
   ) {
-    guard !credentials.isEmpty else {
+    let changed = snapshot.ensurePairedStationPlaceholders(
+      for: credentials,
+      defaultStationID: defaultStationID,
+      now: now
+    )
+    guard changed else {
       return
-    }
-    var stations = snapshot.stations
-    var insertedPlaceholder = false
-    for credential in credentials where !stations.contains(where: { $0.id == credential.stationID })
-    {
-      stations.append(
-        MobileStationSummary(
-          id: credential.stationID,
-          displayName: credential.stationName,
-          state: .stale,
-          lastSeenAt: now,
-          activeSessionCount: 0,
-          needsYouCount: 0,
-          commandQueueCount: 0,
-          defaultStation: credential.stationID == defaultStationID
-        )
-      )
-      insertedPlaceholder = true
-    }
-    guard insertedPlaceholder else {
-      return
-    }
-    snapshot.stations = stations.map { station in
-      var station = station
-      station.defaultStation = station.id == defaultStationID
-      return station
     }
     persistSharedSnapshot(snapshot)
     reconcileLiveActivity(snapshot)

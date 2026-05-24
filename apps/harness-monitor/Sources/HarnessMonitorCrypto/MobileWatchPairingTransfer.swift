@@ -69,3 +69,44 @@ public struct MobileWatchPairingReplacementPlan: Equatable, Sendable {
     self.identityIDsToDelete = identityIDsToDelete
   }
 }
+
+extension MobileMirrorSnapshot {
+  @discardableResult
+  public mutating func ensurePairedStationPlaceholders(
+    for credentials: [MobilePairedStationCredential],
+    defaultStationID: String?,
+    now: Date = .now
+  ) -> Bool {
+    guard !credentials.isEmpty else {
+      return false
+    }
+    var stations = stations
+    var changed = false
+    for credential in credentials where !stations.contains(where: { $0.id == credential.stationID })
+    {
+      stations.append(
+        MobileStationSummary(
+          id: credential.stationID,
+          displayName: credential.stationName,
+          state: .stale,
+          lastSeenAt: now,
+          activeSessionCount: 0,
+          needsYouCount: 0,
+          commandQueueCount: 0,
+          defaultStation: credential.stationID == defaultStationID
+        )
+      )
+      changed = true
+    }
+    let normalizedStations = stations.map { station in
+      var station = station
+      station.defaultStation = station.id == defaultStationID
+      return station
+    }
+    if normalizedStations != self.stations {
+      self.stations = normalizedStations
+      changed = true
+    }
+    return changed
+  }
+}
