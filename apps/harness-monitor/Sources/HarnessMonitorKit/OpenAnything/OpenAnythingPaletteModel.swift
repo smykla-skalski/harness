@@ -198,21 +198,20 @@ public final class OpenAnythingPaletteModel {
     let signpost = OpenAnythingSignposter.shared.beginInterval(
       OpenAnythingSignposter.Interval.corpusRebuild
     )
-    await index.replace(records: records)
-    guard !Task.isCancelled, generation == corpusReplacementGeneration else {
+    defer {
       OpenAnythingSignposter.shared.endInterval(
         OpenAnythingSignposter.Interval.corpusRebuild,
         signpost
       )
+    }
+    guard !Task.isCancelled, generation == corpusReplacementGeneration else { return }
+    let indexReplaced = await index.replace(records: records)
+    guard indexReplaced, !Task.isCancelled, generation == corpusReplacementGeneration else {
       return
     }
     corpusCache = OpenAnythingPaletteCorpusCache(records: records)
     refreshSuggestedResults()
     recordCount = records.count
-    OpenAnythingSignposter.shared.endInterval(
-      OpenAnythingSignposter.Interval.corpusRebuild,
-      signpost
-    )
     guard isPresented, !query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
       normalizeSelection()
       return

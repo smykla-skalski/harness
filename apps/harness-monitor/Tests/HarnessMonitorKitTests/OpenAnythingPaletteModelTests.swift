@@ -221,6 +221,24 @@ struct OpenAnythingPaletteModelTests {
     #expect(model.suggestedResults == .empty)
   }
 
+  @Test("Cancelled corpus replacement does not leak into search index")
+  func cancelledCorpusReplacementDoesNotLeakIntoSearchIndex() async {
+    let model = Self.makeModel()
+    let task = Task { @MainActor in
+      await model.replaceCorpus(Self.sampleRecords)
+    }
+
+    task.cancel()
+    await task.value
+
+    model.present(targetWindowID: nil)
+    model.query = "alpha"
+    await model.runSearch()
+
+    #expect(model.results.sections.isEmpty)
+    #expect(model.displayedResults.allHits.isEmpty)
+  }
+
   private static func makeModel() -> OpenAnythingPaletteModel {
     let suiteName = "OpenAnythingPaletteModelTests-\(UUID().uuidString)"
     guard let defaults = UserDefaults(suiteName: suiteName) else {
