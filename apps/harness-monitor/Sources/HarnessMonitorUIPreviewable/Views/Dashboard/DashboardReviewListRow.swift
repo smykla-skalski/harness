@@ -17,7 +17,8 @@ extension VerticalAlignment {
 /// pane.
 ///
 /// Structure (top to bottom):
-/// 1. Title row: status icon · avatar+author chip · title (up to 2 lines) · change pill
+/// 1. Title row: status icon · optional avatar chip · title (up to 2 lines) ·
+///    optional change pill
 /// 2. Secondary line (ungrouped only): `repository · #N`. Collapses entirely
 ///    when the list is grouped by repository — `#N` rides inline on the status
 ///    line instead so the row never burns a caption line on the PR number alone.
@@ -25,7 +26,7 @@ extension VerticalAlignment {
 ///    the relative `updated` label in ungrouped mode)
 /// 4. Attention strip: wrapped quiet pills for failing checks, conflicts, etc.
 /// 5. Required failed-check names: small `.danger` quiet pills (capped at 3)
-/// 6. Labels strip: muted chips for `item.labels`
+/// 6. Optional labels strip: muted chips for `item.labels`
 ///
 /// Pinned rows render a soft `.accent` background tint so they stay visible
 /// without needing extra chrome next to the title (the pinned section header
@@ -44,6 +45,9 @@ struct DashboardReviewListRow: View {
   let actionTitle: String?
   let updatedLabel: String
   let repositoryLabels: [ReviewRepositoryLabel]
+  let showsAvatars: Bool
+  let showsLabels: Bool
+  let showsLineCounters: Bool
   let secondaryText: String?
   let inlineIdentityAndAge: String
   private let attentionBadges: DashboardReviewAttentionBadges
@@ -70,7 +74,10 @@ struct DashboardReviewListRow: View {
     isRefreshing: Bool,
     actionTitle: String?,
     updatedLabel: String,
-    repositoryLabels: [ReviewRepositoryLabel] = []
+    repositoryLabels: [ReviewRepositoryLabel] = [],
+    showsAvatars: Bool = true,
+    showsLabels: Bool = true,
+    showsLineCounters: Bool = true
   ) {
     self.item = item
     self.showsRepository = showsRepository
@@ -79,6 +86,9 @@ struct DashboardReviewListRow: View {
     self.actionTitle = actionTitle
     self.updatedLabel = updatedLabel
     self.repositoryLabels = repositoryLabels
+    self.showsAvatars = showsAvatars
+    self.showsLabels = showsLabels
+    self.showsLineCounters = showsLineCounters
     secondaryText = showsRepository ? "\(item.repository) · #\(item.number)" : nil
     let inlineLabels = Self.makeInlineIdentityAndAgeLabels(
       itemNumber: item.number,
@@ -94,16 +104,19 @@ struct DashboardReviewListRow: View {
   var body: some View {
     let rowIdealHeight = rowIdealHeight(
       hasAttentionStrip: !attentionBadges.isEmpty,
-      hasRequiredFailedChecks: requiredFailedCheckNames != nil
+      hasRequiredFailedChecks: requiredFailedCheckNames != nil,
+      showsLabels: showsLabelsStrip
     )
 
     HStack(alignment: .dashboardReviewTitleLineCenter, spacing: HarnessMonitorTheme.spacingSM) {
       leadingStatusIndicator
 
-      DashboardReviewListRowAuthorChip(
-        login: item.authorLogin,
-        avatarURL: item.authorAvatarURL
-      )
+      if showsAvatars {
+        DashboardReviewListRowAuthorChip(
+          login: item.authorLogin,
+          avatarURL: item.authorAvatarURL
+        )
+      }
 
       VStack(alignment: .leading, spacing: rowVerticalSpacing) {
         titleLine
@@ -130,7 +143,7 @@ struct DashboardReviewListRow: View {
           )
         }
 
-        if !item.labels.isEmpty {
+        if showsLabelsStrip {
           DashboardReviewListRowLabelsStrip(
             labels: item.labels,
             repositoryLabels: repositoryLabels
@@ -183,7 +196,7 @@ struct DashboardReviewListRow: View {
         .lineLimit(2)
         .truncationMode(.tail)
         .help(item.title)
-        .accessibilityValue(item.title)
+        .accessibilityLabel(titleAccessibilityLabel)
         .alignmentGuide(.dashboardReviewTitleLineCenter) { dimensions in
           dimensions[VerticalAlignment.center]
         }
@@ -191,7 +204,7 @@ struct DashboardReviewListRow: View {
 
       Spacer(minLength: HarnessMonitorTheme.spacingXS)
 
-      if item.additions > 0 || item.deletions > 0 {
+      if showsChangePill {
         DashboardReviewChangePill(
           additions: item.additions,
           deletions: item.deletions,
@@ -302,7 +315,8 @@ struct DashboardReviewListRow: View {
 
   fileprivate func rowIdealHeight(
     hasAttentionStrip: Bool,
-    hasRequiredFailedChecks: Bool
+    hasRequiredFailedChecks: Bool,
+    showsLabels: Bool
   ) -> CGFloat {
     DashboardReviewListRowHeight.idealHeight(
       DashboardReviewListRowHeight.Layout(
@@ -313,7 +327,7 @@ struct DashboardReviewListRow: View {
         hasSecondaryLine: secondaryText != nil,
         hasAttentionStrip: hasAttentionStrip,
         hasRequiredFailedChecks: hasRequiredFailedChecks,
-        hasLabels: !item.labels.isEmpty,
+        hasLabels: showsLabels,
         verticalPadding: DashboardReviewsVisualMetrics.reviewRowVerticalPadding,
         lineSpacing: rowVerticalSpacing,
         statusLineHeight: statusLineIdealHeight,
@@ -330,6 +344,20 @@ struct DashboardReviewListRow: View {
 
   private var statusLineHasPillChrome: Bool {
     item.isDraft || !item.reviews.isEmpty
+  }
+
+  private var showsLabelsStrip: Bool {
+    showsLabels && !item.labels.isEmpty
+  }
+
+  private var showsChangePill: Bool {
+    showsLineCounters && (item.additions > 0 || item.deletions > 0)
+  }
+
+  private var titleAccessibilityLabel: String {
+    let trimmedAuthorLogin = item.authorLogin.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard !showsAvatars, !trimmedAuthorLogin.isEmpty else { return item.title }
+    return "\(item.title), by @\(trimmedAuthorLogin)"
   }
 }
 

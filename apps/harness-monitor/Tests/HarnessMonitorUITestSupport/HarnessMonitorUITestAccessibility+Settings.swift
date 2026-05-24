@@ -59,6 +59,12 @@ extension HarnessMonitorUITestAccessibility {
   static let settingsReviewsExcludedReposField =
     "harness.settings.reviews.exclude-repositories"
   static let settingsReviewsMergeMethodField = "harness.settings.reviews.merge-method"
+  static let settingsReviewsShowRowAvatarsToggle =
+    "harness.settings.reviews.show-row-avatars"
+  static let settingsReviewsShowRowLabelsToggle =
+    "harness.settings.reviews.show-row-labels"
+  static let settingsReviewsShowRowLineCountersToggle =
+    "harness.settings.reviews.show-row-line-counters"
   static let settingsReviewsRefreshIntervalField =
     "harness.settings.reviews.refresh-interval"
   static let settingsReviewsCacheMaxAgeField =

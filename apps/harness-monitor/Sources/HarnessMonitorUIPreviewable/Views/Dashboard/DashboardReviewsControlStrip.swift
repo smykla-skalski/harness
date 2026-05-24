@@ -15,8 +15,8 @@ import SwiftUI
 ///    style prefix so each control fits in ~120 px and the three usually
 ///    stay on one line in the dashboard pane. Wrap layout still kicks in
 ///    when the pane is very narrow.
-/// 3. **More** — the ellipsis menu carries low-frequency actions and the
-///    "Dependencies only" toggle.
+/// 3. **More** — the ellipsis menu carries row-display toggles plus
+///    low-frequency actions like retry / clear-cache.
 struct DashboardReviewsControlStrip: View {
   @ScaledMetric(relativeTo: .callout)
   private var leadingMenuIconWidth = 18.0
@@ -28,6 +28,9 @@ struct DashboardReviewsControlStrip: View {
   @Binding var groupModeRaw: String
   @Binding var needsMeOn: Bool
   @Binding var dependenciesOnlyOn: Bool
+  @Binding var showAvatarsInRows: Bool
+  @Binding var showLabelsInRows: Bool
+  @Binding var showLineCountersInRows: Bool
   let needsMeCount: Int
   let syncHealth: DashboardReviewsSyncHealth
   let onRetryFailedRepositories: () -> Void
@@ -220,6 +223,20 @@ struct DashboardReviewsControlStrip: View {
 
   private var actionsMenu: some View {
     Menu {
+      Section("Row display") {
+        Toggle("Avatars", isOn: $showAvatarsInRows)
+          .accessibilityIdentifier(HarnessMonitorAccessibility.dashboardReviewsShowRowAvatarsToggle)
+          .accessibilityLabel("Show avatars in review rows")
+        Toggle("Labels", isOn: $showLabelsInRows)
+          .accessibilityIdentifier(HarnessMonitorAccessibility.dashboardReviewsShowRowLabelsToggle)
+          .accessibilityLabel("Show labels in review rows")
+        Toggle("+/- line counters", isOn: $showLineCountersInRows)
+          .accessibilityIdentifier(HarnessMonitorAccessibility.dashboardReviewsShowRowLineCountersToggle)
+          .accessibilityLabel("Show line counters in review rows")
+      }
+
+      Divider()
+
       Toggle("Dependencies only", isOn: $dependenciesOnlyOn)
         .accessibilityIdentifier(HarnessMonitorAccessibility.dashboardReviewsCategoryToggle)
         .accessibilityLabel("Show only dependency bot pull requests")

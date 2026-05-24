@@ -24,6 +24,9 @@ struct DashboardReviewsPreferences: Codable, Equatable {
   var refreshIntervalSeconds: UInt64 = 300
   var cacheMaxAgeSeconds: UInt64 = 600
   var showLabelDescriptions = false
+  var showAvatarsInRows = true
+  var showLabelsInRows = true
+  var showLineCountersInRows = true
   var frequentLabelsCount: Int = defaultFrequentLabelsCount
   var perRepositoryIntervalSeconds: UInt64 = 300
   var maxConcurrentRepositoryFetches: Int = 2
@@ -62,6 +65,9 @@ struct DashboardReviewsPreferences: Codable, Equatable {
     case refreshIntervalSeconds
     case cacheMaxAgeSeconds
     case showLabelDescriptions
+    case showAvatarsInRows
+    case showLabelsInRows
+    case showLineCountersInRows
     case frequentLabelsCount
     case perRepositoryIntervalSeconds
     case maxConcurrentRepositoryFetches
@@ -115,6 +121,7 @@ struct DashboardReviewsPreferences: Codable, Equatable {
     let container = try decoder.container(keyedBy: CodingKeys.self)
     let defaults = Self()
     try decodeSourcePreferences(from: container, defaults: defaults)
+    try decodeDisplayPreferences(from: container, defaults: defaults)
     try decodeFilesPreferences(from: container, defaults: defaults)
     try decodeTimelinePreferences(from: container, defaults: defaults)
     try decodeChecksPreferences(from: container, defaults: defaults)
@@ -159,6 +166,21 @@ struct DashboardReviewsPreferences: Codable, Equatable {
     expandOrganizations =
       try container.decodeIfPresent(Bool.self, forKey: .expandOrganizations)
       ?? defaults.expandOrganizations
+  }
+
+  private mutating func decodeDisplayPreferences(
+    from container: KeyedDecodingContainer<CodingKeys>,
+    defaults: Self
+  ) throws {
+    showAvatarsInRows =
+      try container.decodeIfPresent(Bool.self, forKey: .showAvatarsInRows)
+      ?? defaults.showAvatarsInRows
+    showLabelsInRows =
+      try container.decodeIfPresent(Bool.self, forKey: .showLabelsInRows)
+      ?? defaults.showLabelsInRows
+    showLineCountersInRows =
+      try container.decodeIfPresent(Bool.self, forKey: .showLineCountersInRows)
+      ?? defaults.showLineCountersInRows
   }
 
   private mutating func decodeFilesPreferences(

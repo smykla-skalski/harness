@@ -171,6 +171,12 @@ enum HarnessMonitorUITestAccessibility {
   static let dashboardReviewsGroupPicker = "harness.dashboard.reviews.group"
   static let dashboardReviewsCategoryToggle = "harness.dashboard.reviews.category"
   static let dashboardReviewsNeedsMeToggle = "harness.dashboard.reviews.needs-me"
+  static let dashboardReviewsShowRowAvatarsToggle =
+    "harness.dashboard.reviews.show-row-avatars"
+  static let dashboardReviewsShowRowLabelsToggle =
+    "harness.dashboard.reviews.show-row-labels"
+  static let dashboardReviewsShowRowLineCountersToggle =
+    "harness.dashboard.reviews.show-row-line-counters"
   static func dashboardReviewPinnedIndicator(_ pullRequestID: String) -> String {
     "harness.dashboard.reviews.pinned.\(slug(pullRequestID))"
   }
