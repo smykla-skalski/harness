@@ -37,17 +37,20 @@ public actor MobileCloudMirrorSyncClient {
   private let cipher: MobilePayloadCipher
   private let deviceIdentity: MobileDeviceIdentity
   private let commandKeyID: String
+  private let retention: TimeInterval
 
   public init(
     database: any MobileCloudMirrorDatabase,
     cipher: MobilePayloadCipher,
     deviceIdentity: MobileDeviceIdentity,
-    commandKeyID: String
+    commandKeyID: String,
+    retention: TimeInterval = MobileCloudMirrorSchema.sevenDayRetention
   ) {
     self.database = database
     self.cipher = cipher
     self.deviceIdentity = deviceIdentity
     self.commandKeyID = commandKeyID
+    self.retention = retention
   }
 
   public func fetchLatestSnapshot(
@@ -76,7 +79,11 @@ public actor MobileCloudMirrorSyncClient {
       else {
         continue
       }
-      return snapshot
+      return snapshot.mergingMobileCommandRecords(
+        commands: decryptableCommandRecords(in: records, now: now),
+        receipts: decryptableReceiptRecords(in: records, now: now),
+        now: now
+      )
     }
     return nil
   }
@@ -106,7 +113,7 @@ public actor MobileCloudMirrorSyncClient {
       stationID: validatedCommand.stationID,
       revision: currentRevision,
       updatedAt: now,
-      expiresAt: validatedCommand.expiresAt
+      expiresAt: now.addingTimeInterval(retention)
     )
     let envelope = try cipher.seal(
       signedCommand,
@@ -127,5 +134,112 @@ public actor MobileCloudMirrorSyncClient {
       return lhs.metadata.revision > rhs.metadata.revision
     }
     return lhs.metadata.updatedAt > rhs.metadata.updatedAt
+  }
+
+  private func decryptableCommandRecords(
+    in records: [MobileMirrorRecord],
+    now: Date
+  ) -> [MobileCommandRecord] {
+    records
+      .filter {
+        $0.metadata.type == .command
+          && !$0.metadata.tombstone
+          && $0.metadata.expiresAt > now
+      }
+      .compactMap(decryptableCommand)
+  }
+
+  private func decryptableCommand(_ record: MobileMirrorRecord) -> MobileCommandRecord? {
+    guard let signingKeyFingerprint = try? deviceIdentity.signingKeyFingerprint(),
+      let signingPublicKey = try? deviceIdentity.signingPublicKeyRawRepresentation()
+    else {
+      return nil
+    }
+    guard let envelope = record.envelope,
+      let signedCommand: MobileSignedCommand = try? cipher.open(envelope),
+      signedCommand.command.actorDeviceID == deviceIdentity.id,
+      signedCommand.signingKeyFingerprint == signingKeyFingerprint,
+      (try? MobileCommandSigner.verify(
+        signedCommand,
+        publicKeyRawRepresentation: signingPublicKey
+      )) == true
+    else {
+      return nil
+    }
+    return signedCommand.command
+  }
+
+  private func decryptableReceiptRecords(
+    in records: [MobileMirrorRecord],
+    now: Date
+  ) -> [MobileCommandReceipt] {
+    records
+      .filter {
+        $0.metadata.type == .receipt
+          && !$0.metadata.tombstone
+          && $0.metadata.expiresAt > now
+      }
+      .compactMap { record in
+        guard let envelope = record.envelope else {
+          return nil
+        }
+        return try? cipher.open(envelope, as: MobileCommandReceipt.self)
+      }
+  }
+}
+
+extension MobileMirrorSnapshot {
+  fileprivate func mergingMobileCommandRecords(
+    commands: [MobileCommandRecord],
+    receipts: [MobileCommandReceipt],
+    now: Date
+  ) -> Self {
+    guard !commands.isEmpty || !receipts.isEmpty else {
+      return self
+    }
+    var merged = self
+    var commandsByID = Dictionary(uniqueKeysWithValues: merged.commands.map { ($0.id, $0) })
+    var commandOrder = merged.commands.map(\.id)
+    for command in commands {
+      if commandsByID[command.id] == nil {
+        commandOrder.append(command.id)
+      }
+      commandsByID[command.id] = command.updatingExpiredStatus(now: now)
+    }
+    for receipt in receipts {
+      guard var command = commandsByID[receipt.commandID] else {
+        continue
+      }
+      command.status = receipt.status
+      command.receipt = receipt
+      command.updatedAt = receipt.completedAt ?? receipt.receivedAt
+      commandsByID[receipt.commandID] = command
+    }
+    merged.commands = commandOrder.compactMap { commandID in
+      commandsByID.removeValue(forKey: commandID)
+    }
+    if !commandsByID.isEmpty {
+      merged.commands.append(
+        contentsOf: commandsByID.values.sorted { lhs, rhs in
+          if lhs.updatedAt != rhs.updatedAt {
+            return lhs.updatedAt > rhs.updatedAt
+          }
+          return lhs.id < rhs.id
+        }
+      )
+    }
+    return merged
+  }
+}
+
+extension MobileCommandRecord {
+  fileprivate func updatingExpiredStatus(now: Date) -> Self {
+    guard isExpired(now: now), !status.isTerminal else {
+      return self
+    }
+    var command = self
+    command.status = .expired
+    command.updatedAt = expiresAt
+    return command
   }
 }

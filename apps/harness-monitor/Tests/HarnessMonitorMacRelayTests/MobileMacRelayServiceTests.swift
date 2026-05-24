@@ -111,6 +111,15 @@ final class MobileMacRelayServiceTests: XCTestCase {
     )
 
     let receipts = try await relay.executePendingCommands(now: now)
+    let restartedRelay = MobileMacRelayService(
+      stationID: stationID,
+      snapshotSource: FixedSnapshotSource(snapshot: snapshot),
+      commandQueue: relayQueue,
+      executor: EchoMobileRelayCommandExecutor()
+    )
+    let restartedReceipts = try await restartedRelay.executePendingCommands(
+      now: now.addingTimeInterval(1)
+    )
     let receiptRecord = try await database.fetch(recordID: "receipt-\(command.id)")
     let storedReceipt: MobileCommandReceipt = try cipher.open(
       try XCTUnwrap(receiptRecord?.envelope)
@@ -118,6 +127,7 @@ final class MobileMacRelayServiceTests: XCTestCase {
 
     XCTAssertEqual(receipts.count, 1)
     XCTAssertEqual(receipts.first?.status, .succeeded)
+    XCTAssertEqual(restartedReceipts, [])
     XCTAssertEqual(storedReceipt.commandID, command.id)
     XCTAssertEqual(receiptRecord?.metadata.type, .receipt)
   }

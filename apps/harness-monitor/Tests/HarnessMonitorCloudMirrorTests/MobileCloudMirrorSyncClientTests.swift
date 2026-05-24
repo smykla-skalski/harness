@@ -80,6 +80,64 @@ final class MobileCloudMirrorSyncClientTests: XCTestCase {
     XCTAssertEqual(fetched, phoneSnapshot)
   }
 
+  func testFetchLatestSnapshotMergesDecryptableCommandReceipts() async throws {
+    let now = Date(timeIntervalSince1970: 1_700_000_000)
+    let database = InMemoryMobileCloudMirrorDatabase()
+    let cipher = MobilePayloadCipher(rawKey: Data(repeating: 27, count: 32))
+    let identity = MobileDeviceIdentity(id: "device-phone", displayName: "Phone")
+    let client = MobileCloudMirrorSyncClient(
+      database: database,
+      cipher: cipher,
+      deviceIdentity: identity,
+      commandKeyID: "command-key"
+    )
+    var snapshot = MobileDemoFixtures.snapshot(now: now)
+    snapshot.commands = []
+    let command = makeCommand(
+      id: "command-approve",
+      risk: .high,
+      targetRevision: snapshot.revision,
+      now: now
+    )
+    let receipt = MobileCommandReceipt(
+      commandID: command.id,
+      stationID: command.stationID,
+      status: .succeeded,
+      message: "Approved from Mac relay.",
+      receivedAt: now.addingTimeInterval(2),
+      completedAt: now.addingTimeInterval(3),
+      executionRevision: snapshot.revision
+    )
+
+    try await saveSnapshot(
+      snapshot,
+      id: "snapshot-phone",
+      cipher: cipher,
+      database: database,
+      now: now
+    )
+    _ = try await client.queueCommand(command, currentRevision: snapshot.revision, now: now)
+    _ = try await MobileCloudMirrorCommandQueue(
+      database: database,
+      cipher: cipher,
+      trustStore: InMemoryMobileCommandTrustStore()
+    )
+    .recordReceipt(receipt, keyID: "command-key", now: now.addingTimeInterval(3))
+
+    let fetched = try await client.fetchLatestSnapshot(
+      stationID: "station-mac-studio",
+      now: now.addingTimeInterval(4)
+    )
+    let fetchedCommand = try XCTUnwrap(fetched?.commands.first)
+
+    XCTAssertEqual(fetched?.commands.count, 1)
+    XCTAssertEqual(fetchedCommand.id, command.id)
+    XCTAssertEqual(fetchedCommand.status, .succeeded)
+    XCTAssertEqual(fetchedCommand.receipt, receipt)
+    XCTAssertEqual(fetchedCommand.updatedAt, receipt.completedAt)
+    XCTAssertEqual(fetchedCommand.actorDeviceID, identity.id)
+  }
+
   func testSnapshotWriterEncryptsOneOpaqueRecordPerTrustedDevice() async throws {
     let now = Date(timeIntervalSince1970: 1_700_000_000)
     let database = InMemoryMobileCloudMirrorDatabase()
@@ -142,8 +200,13 @@ final class MobileCloudMirrorSyncClientTests: XCTestCase {
     XCTAssertEqual(stored, queued.record)
     XCTAssertEqual(queued.record.metadata.type, .command)
     XCTAssertEqual(queued.record.metadata.revision, 42)
+    XCTAssertEqual(
+      queued.record.metadata.expiresAt,
+      now.addingTimeInterval(MobileCloudMirrorSchema.sevenDayRetention)
+    )
     XCTAssertEqual(queued.signedCommand.command.status, .queued)
     XCTAssertEqual(queued.signedCommand.command.actorDeviceID, identity.id)
+    XCTAssertEqual(queued.signedCommand.command.expiresAt, command.expiresAt)
 
     let opened: MobileSignedCommand = try cipher.open(try XCTUnwrap(queued.record.envelope))
     XCTAssertEqual(opened, queued.signedCommand)

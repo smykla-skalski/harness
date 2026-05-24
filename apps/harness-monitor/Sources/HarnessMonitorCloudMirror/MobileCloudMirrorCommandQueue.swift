@@ -105,8 +105,12 @@ public actor MobileCloudMirrorCommandQueue {
     now: Date = .now
   ) async throws -> [MobileSignedCommand] {
     let records = try await database.fetchAll(stationID: stationID)
+    let receiptedCommandIDs = receiptedCommandIDs(in: records, now: now)
     var commands: [MobileSignedCommand] = []
-    for record in records where isPendingCommandRecord(record, now: now) {
+    for record in records
+    where isPendingCommandRecord(record, now: now)
+      && !receiptedCommandIDs.contains(record.id)
+    {
       guard let envelope = record.envelope else {
         throw MobileCloudMirrorCommandQueueError.missingCommandEnvelope(record.id)
       }
@@ -256,5 +260,23 @@ public actor MobileCloudMirrorCommandQueue {
     record.metadata.type == .command
       && !record.metadata.tombstone
       && record.metadata.expiresAt > now
+  }
+
+  private nonisolated func receiptedCommandIDs(
+    in records: [MobileMirrorRecord],
+    now: Date
+  ) -> Set<String> {
+    Set(
+      records.compactMap { record in
+        guard record.metadata.type == .receipt,
+          !record.metadata.tombstone,
+          record.metadata.expiresAt > now,
+          record.id.hasPrefix("receipt-")
+        else {
+          return nil
+        }
+        return String(record.id.dropFirst("receipt-".count))
+      }
+    )
   }
 }

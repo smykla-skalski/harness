@@ -266,10 +266,16 @@ public struct LiveMobileCloudMirrorDatabase: MobileCloudMirrorDatabase {
   private func saveUpsert(_ mirrorRecord: MobileMirrorRecord) async throws {
     let recordID = MobileCloudMirrorCKRecordCodec.recordID(for: mirrorRecord.id, zoneID: zoneID)
     var lastConflict: CKError?
+    var conflictRecord: CKRecord?
 
     for _ in 0..<3 {
       do {
-        let existingRecord = try await existingCloudRecord(recordID: recordID)
+        let existingRecord: CKRecord?
+        if let conflictRecord {
+          existingRecord = conflictRecord
+        } else {
+          existingRecord = try await existingCloudRecord(recordID: recordID)
+        }
         let cloudRecord = MobileCloudMirrorCKRecordCodec.upsertRecord(
           mirrorRecord,
           existing: existingRecord,
@@ -279,6 +285,10 @@ public struct LiveMobileCloudMirrorDatabase: MobileCloudMirrorDatabase {
         return
       } catch let error as CKError where error.code == .serverRecordChanged {
         lastConflict = error
+        conflictRecord = serverRecord(from: error)
+        if conflictRecord == nil {
+          try await Task.sleep(nanoseconds: 100_000_000)
+        }
         continue
       } catch let error as CKError
         where MobileCloudMirrorCloudKitSchema.isMissingMirrorRecordType(error)
@@ -292,6 +302,10 @@ public struct LiveMobileCloudMirrorDatabase: MobileCloudMirrorDatabase {
     if let lastConflict {
       throw lastConflict
     }
+  }
+
+  private func serverRecord(from error: CKError) -> CKRecord? {
+    error.userInfo[CKRecordChangedErrorServerRecordKey] as? CKRecord
   }
 
   private func existingCloudRecord(recordID: CKRecord.ID) async throws -> CKRecord? {
