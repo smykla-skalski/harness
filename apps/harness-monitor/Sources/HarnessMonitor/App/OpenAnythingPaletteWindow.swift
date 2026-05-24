@@ -186,9 +186,11 @@ final class OpenAnythingPaletteWindowController: NSObject {
       width: OpenAnythingPaletteConstants.maxWidth,
       height: OpenAnythingPaletteConstants.maxHeight
     )
+    // Borderless avoids AppKit's titled-window contentLayout inset, which left
+    // a dead transparent band under the SwiftUI host in palette screenshots.
     let panel = OpenAnythingFloatingPanel(
       contentRect: contentRect,
-      styleMask: [.nonactivatingPanel, .titled, .resizable, .fullSizeContentView],
+      styleMask: [.nonactivatingPanel, .borderless, .resizable],
       backing: .buffered,
       defer: false
     )
@@ -205,14 +207,9 @@ final class OpenAnythingPaletteWindowController: NSObject {
     panel.collectionBehavior = [
       .canJoinAllSpaces, .fullScreenAuxiliary, .transient, .stationary, .ignoresCycle,
     ]
-    panel.titleVisibility = .hidden
-    panel.titlebarAppearsTransparent = true
     panel.isMovableByWindowBackground = true
     // Spotlight-style auto-hide when the user clicks away or app deactivates.
     panel.hidesOnDeactivate = true
-    panel.standardWindowButton(.closeButton)?.isHidden = true
-    panel.standardWindowButton(.miniaturizeButton)?.isHidden = true
-    panel.standardWindowButton(.zoomButton)?.isHidden = true
     // `.utilityWindow` adds a fade-in/out which read as a "delay" before
     // the palette appears. Command palettes are expected to feel instant.
     panel.animationBehavior = .none

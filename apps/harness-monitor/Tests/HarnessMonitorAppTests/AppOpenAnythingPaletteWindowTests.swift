@@ -34,6 +34,14 @@ final class AppOpenAnythingPaletteWindowTests: XCTestCase {
 
     XCTAssertEqual(panel.alphaValue, 1, accuracy: 0.01)
     XCTAssertLessThan(panel.frame.height, OpenAnythingPaletteConstants.maxHeight - 0.5)
+    XCTAssertEqual(panel.contentLayoutRect.height, panel.frame.height, accuracy: 0.5)
+    guard let hostedHeight = panel.contentView?.subviews.first?.frame.height,
+          let contentHeight = panel.contentView?.frame.height
+    else {
+      XCTFail("Expected hosting view to fill the palette content view")
+      return
+    }
+    XCTAssertEqual(hostedHeight, contentHeight, accuracy: 0.5)
   }
 
   @MainActor
