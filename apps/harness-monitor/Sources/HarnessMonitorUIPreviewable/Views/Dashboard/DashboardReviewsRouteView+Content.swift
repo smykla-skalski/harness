@@ -18,6 +18,14 @@ extension DashboardReviewsRouteView {
 
   var reviewsOverviewContentPane: some View {
     VStack(alignment: .leading, spacing: 14) {
+      topControlsPane
+      contentListPane
+    }
+    .padding(0)
+  }
+
+  var topControlsPane: some View {
+    VStack(alignment: .leading, spacing: 14) {
       DashboardReviewsProvenanceBar(
         snapshot: routeProvenanceSnapshot,
         onRefresh: {
@@ -27,9 +35,8 @@ extension DashboardReviewsRouteView {
       filterBar
       transientBannerZone
       inContentSearchField
-      contentListPane
     }
-    .padding(20)
+    .padding(.horizontal, 10)
   }
 
   /// In-content search field. The toolbar `.searchable` field remains for
@@ -120,7 +127,7 @@ extension DashboardReviewsRouteView {
           case .pinned:
             Section {
               ForEach(group.items) { item in
-                reviewRow(item, showsRepository: true)
+                reviewRow(item, showsRepository: false)
               }
             } header: {
               pinnedSectionHeader(itemCount: group.items.count)

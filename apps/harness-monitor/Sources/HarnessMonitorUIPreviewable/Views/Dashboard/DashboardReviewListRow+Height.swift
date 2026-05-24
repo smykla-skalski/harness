@@ -26,25 +26,46 @@ enum DashboardReviewListRowHeight {
     let hasLabels: Bool
     let verticalPadding: CGFloat
     let lineSpacing: CGFloat
+    let statusLineHeight: CGFloat?
+    let attentionStripHeight: CGFloat?
+    let requiredFailedChecksHeight: CGFloat?
+    let labelsStripHeight: CGFloat?
+
+    init(
+      titleLineHeight: CGFloat,
+      captionLineHeight: CGFloat,
+      pillStripHeight: CGFloat,
+      hasWrappedTitle: Bool,
+      hasSecondaryLine: Bool,
+      hasAttentionStrip: Bool,
+      hasRequiredFailedChecks: Bool,
+      hasLabels: Bool,
+      verticalPadding: CGFloat,
+      lineSpacing: CGFloat,
+      statusLineHeight: CGFloat? = nil,
+      attentionStripHeight: CGFloat? = nil,
+      requiredFailedChecksHeight: CGFloat? = nil,
+      labelsStripHeight: CGFloat? = nil
+    ) {
+      self.titleLineHeight = titleLineHeight
+      self.captionLineHeight = captionLineHeight
+      self.pillStripHeight = pillStripHeight
+      self.hasWrappedTitle = hasWrappedTitle
+      self.hasSecondaryLine = hasSecondaryLine
+      self.hasAttentionStrip = hasAttentionStrip
+      self.hasRequiredFailedChecks = hasRequiredFailedChecks
+      self.hasLabels = hasLabels
+      self.verticalPadding = verticalPadding
+      self.lineSpacing = lineSpacing
+      self.statusLineHeight = statusLineHeight
+      self.attentionStripHeight = attentionStripHeight
+      self.requiredFailedChecksHeight = requiredFailedChecksHeight
+      self.labelsStripHeight = labelsStripHeight
+    }
   }
 
-  /// Conservative character cap used to predict whether the title will wrap
-  /// to two lines at the typical Reviews-pane width. Below the cap the row
-  /// stays at one title line; above it (or with a manual newline) the row
-  /// pre-allocates the second line so wrapping doesn't shift sibling rows
-  /// the first time SwiftUI lays them out.
-  ///
-  /// The cap was eyeballed for the narrow dashboard column (~340 pt
-  /// effective title width after the status icon, avatar, and change pill
-  /// take their cut). It is intentionally conservative: a couple of
-  /// false-positive 2-line rows on short titles cost a small height bump,
-  /// while a false-negative on a wrapping title causes a visible content
-  /// jump as the row resolves its real height. Bias toward false positives.
-  static let titleWrapCharacterThreshold = 32
-
   static func titleLikelyWraps(_ title: String) -> Bool {
-    if title.contains("\n") { return true }
-    return title.count > titleWrapCharacterThreshold
+    title.contains("\n")
   }
 
   static func idealHeight(_ layout: Layout) -> CGFloat {
@@ -52,10 +73,16 @@ enum DashboardReviewListRowHeight {
     let titleLines: CGFloat = layout.hasWrappedTitle ? 2 : 1
     components.append(layout.titleLineHeight * titleLines)
     if layout.hasSecondaryLine { components.append(layout.captionLineHeight) }
-    components.append(layout.pillStripHeight)
-    if layout.hasAttentionStrip { components.append(layout.pillStripHeight) }
-    if layout.hasRequiredFailedChecks { components.append(layout.pillStripHeight) }
-    if layout.hasLabels { components.append(layout.pillStripHeight) }
+    components.append(layout.statusLineHeight ?? layout.pillStripHeight)
+    if layout.hasAttentionStrip {
+      components.append(layout.attentionStripHeight ?? layout.pillStripHeight)
+    }
+    if layout.hasRequiredFailedChecks {
+      components.append(layout.requiredFailedChecksHeight ?? layout.pillStripHeight)
+    }
+    if layout.hasLabels {
+      components.append(layout.labelsStripHeight ?? layout.pillStripHeight)
+    }
 
     let lineCount = CGFloat(components.count)
     let spacingTotal = max(0, lineCount - 1) * layout.lineSpacing
