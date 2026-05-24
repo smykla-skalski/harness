@@ -345,6 +345,18 @@ struct SessionSwiftUISourceTests {
     #expect(!searchHostSource.contains("private var mcpRegistryHostEnabled"))
   }
 
+  @Test("Settings geometry callbacks ignore redundant writes")
+  func settingsGeometryCallbacksIgnoreRedundantWrites() throws {
+    let notificationsSource = try sourceFile(
+      at: "Views/Settings/SettingsNotificationsSection.swift"
+    )
+
+    #expect(notificationsSource.contains("private func updateContentFieldWidth(_ width: CGFloat)"))
+    #expect(notificationsSource.contains("guard width > 0, abs(contentFieldWidth - width) > 0.5"))
+    #expect(notificationsSource.contains("updateContentFieldWidth(width)"))
+    #expect(!notificationsSource.contains("} action: { width in\n            contentFieldWidth = width"))
+  }
+
   @Test("Decision rows keep deadline churn scoped to the deadline chip")
   func decisionRowsKeepTimelineTicksOutOfTheRowBody() throws {
     let rowSource = try sourceFile(at: "Views/Decisions/DecisionRow.swift")
