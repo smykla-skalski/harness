@@ -3,92 +3,76 @@ import Foundation
 import XCTest
 
 final class CloudKitAccountChangeHandlerTests: XCTestCase {
-    func testHandleCallsInvalidateThenRegisterInOrder() async {
-        let recorder = CallRecorder()
-        let handler = CloudKitAccountChangeHandler(
-            invalidate: { await recorder.record("invalidate") },
-            register: { await recorder.record("register") }
-        )
+  func testHandleFiresInvalidateThenRegister() async {
+    let recorder = SyncRecorder()
+    let handler = CloudKitAccountChangeHandler(
+      invalidate: { recorder.record("invalidate") },
+      register: { recorder.record("register") }
+    )
 
-        await handler.handle()
+    await handler.handle()
 
-        let calls = await recorder.calls
-        XCTAssertEqual(calls, ["invalidate", "register"])
-    }
+    XCTAssertEqual(recorder.calls, ["invalidate", "register"])
+  }
 
-    func testHandleInvokesOnChangeAfterRegister() async {
-        let recorder = CallRecorder()
-        let handler = CloudKitAccountChangeHandler(
-            invalidate: { await recorder.record("invalidate") },
-            register: { await recorder.record("register") },
-            onChange: {
-                // synchronous; recorder needs await but onChange is sync
-                // dispatch a sync flag via NSLock-free approach
-            }
-        )
+  func testHandleFiresInvalidateRegisterThenOnChange() async {
+    let recorder = SyncRecorder()
+    let handler = CloudKitAccountChangeHandler(
+      invalidate: { recorder.record("invalidate") },
+      register: { recorder.record("register") },
+      onChange: { recorder.record("onChange") }
+    )
 
-        let onChangeFlag = OnChangeFlag()
-        let handler2 = CloudKitAccountChangeHandler(
-            invalidate: { await recorder.record("invalidate2") },
-            register: { await recorder.record("register2") },
-            onChange: { onChangeFlag.set() }
-        )
+    await handler.handle()
 
-        await handler.handle()
-        await handler2.handle()
+    XCTAssertEqual(recorder.calls, ["invalidate", "register", "onChange"])
+  }
 
-        let calls = await recorder.calls
-        XCTAssertEqual(calls, ["invalidate", "register", "invalidate2", "register2"])
-        XCTAssertTrue(onChangeFlag.value)
-    }
+  func testHandleInvokesOnChangeOnEachCall() async {
+    let recorder = SyncRecorder()
+    let handler = CloudKitAccountChangeHandler(
+      invalidate: { recorder.record("invalidate") },
+      register: { recorder.record("register") },
+      onChange: { recorder.record("onChange") }
+    )
 
-    func testHandleWithoutOnChangeRunsCallbacksOnly() async {
-        let recorder = CallRecorder()
-        let handler = CloudKitAccountChangeHandler(
-            invalidate: { await recorder.record("invalidate") },
-            register: { await recorder.record("register") }
-        )
+    await handler.handle()
+    await handler.handle()
 
-        await handler.handle()
+    XCTAssertEqual(recorder.calls.filter { $0 == "onChange" }.count, 2)
+  }
 
-        let calls = await recorder.calls
-        XCTAssertEqual(calls, ["invalidate", "register"])
-    }
+  func testHandleCalledTwiceFiresAllCallbacksTwice() async {
+    let recorder = SyncRecorder()
+    let handler = CloudKitAccountChangeHandler(
+      invalidate: { recorder.record("invalidate") },
+      register: { recorder.record("register") }
+    )
 
-    func testHandleIsConcurrencySafeAcrossInvocations() async {
-        let recorder = CallRecorder()
-        let handler = CloudKitAccountChangeHandler(
-            invalidate: { await recorder.record("invalidate") },
-            register: { await recorder.record("register") }
-        )
+    async let a: Void = handler.handle()
+    async let b: Void = handler.handle()
+    _ = await (a, b)
 
-        async let a: Void = handler.handle()
-        async let b: Void = handler.handle()
-        _ = await (a, b)
-
-        let calls = await recorder.calls
-        XCTAssertEqual(calls.count, 4)
-        XCTAssertEqual(calls.filter { $0 == "invalidate" }.count, 2)
-        XCTAssertEqual(calls.filter { $0 == "register" }.count, 2)
-    }
+    let calls = recorder.calls
+    XCTAssertEqual(calls.count, 4)
+    XCTAssertEqual(calls.filter { $0 == "invalidate" }.count, 2)
+    XCTAssertEqual(calls.filter { $0 == "register" }.count, 2)
+  }
 }
 
-private actor CallRecorder {
-    private(set) var calls: [String] = []
-    func record(_ tag: String) {
-        calls.append(tag)
-    }
-}
+private final class SyncRecorder: @unchecked Sendable {
+  private let lock = NSLock()
+  private var stored: [String] = []
 
-private final class OnChangeFlag: @unchecked Sendable {
-    private let lock = NSLock()
-    private var stored = false
-    var value: Bool {
-        lock.lock(); defer { lock.unlock() }
-        return stored
-    }
-    func set() {
-        lock.lock(); defer { lock.unlock() }
-        stored = true
-    }
+  func record(_ tag: String) {
+    lock.lock()
+    defer { lock.unlock() }
+    stored.append(tag)
+  }
+
+  var calls: [String] {
+    lock.lock()
+    defer { lock.unlock() }
+    return stored
+  }
 }
