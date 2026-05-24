@@ -234,44 +234,6 @@ public struct OpenAnythingPaletteView: View {
     }
   }
 
-  /// A corpus rebuild can lag the first present by a frame or two. Surfacing a
-  /// tiny "Loading..." instead of "Start typing" keeps the user from thinking
-  /// the palette is empty.
-  private var skeletonState: some View {
-    HStack(spacing: 8) {
-      ProgressView()
-        .controlSize(.small)
-      Text("Loading...")
-        .font(.callout)
-        .foregroundStyle(HarnessMonitorTheme.secondaryInk)
-    }
-    .frame(maxWidth: .infinity)
-    .padding(.vertical, 32)
-    .accessibilityIdentifier(HarnessMonitorAccessibility.openAnythingEmptyState)
-  }
-
-  /// When there's only one hit on screen, prompt the user to press Return
-  /// rather than reach for the mouse. The hint sits below the results list so
-  /// it never collides with the visual selection rectangle.
-  private var singleResultHint: some View {
-    HStack(spacing: 6) {
-      Text("Press")
-      Text("⏎")
-        .font(.caption.monospaced())
-        .padding(.horizontal, 5)
-        .padding(.vertical, 1)
-        .background(
-          RoundedRectangle(cornerRadius: 4, style: .continuous)
-            .fill(.secondary.opacity(0.12))
-        )
-      Text("to open")
-    }
-    .font(.caption)
-    .foregroundStyle(HarnessMonitorTheme.tertiaryInk)
-    .padding(.horizontal, 14)
-    .padding(.vertical, 6)
-  }
-
   private func singleHitVisible(in results: OpenAnythingResults) -> Bool {
     visibleResults(in: results).hasExactlyOneHit
   }
@@ -318,17 +280,6 @@ public struct OpenAnythingPaletteView: View {
     }
     .frame(maxHeight: OpenAnythingPaletteConstants.resultsMaxHeight)
     .fixedSize(horizontal: false, vertical: true)
-  }
-
-  private func emptyState(text: String) -> some View {
-    Text(text)
-      .font(.callout)
-      .foregroundStyle(HarnessMonitorTheme.secondaryInk)
-      .multilineTextAlignment(.center)
-      .frame(maxWidth: .infinity)
-      .padding(.horizontal, 24)
-      .padding(.vertical, 32)
-      .accessibilityIdentifier(HarnessMonitorAccessibility.openAnythingEmptyState)
   }
 
   private var placeholder: String {
@@ -415,10 +366,11 @@ public struct OpenAnythingPaletteView: View {
       let delta = event.scrollingDeltaY
       wheelAccumulator += delta
       let threshold: CGFloat = 12
-      while abs(wheelAccumulator) >= threshold {
+      let stepCount = Int(abs(wheelAccumulator) / threshold)
+      if stepCount > 0 {
         let direction = wheelAccumulator > 0 ? -1 : 1
-        model.moveSelection(by: direction)
-        wheelAccumulator -= CGFloat(direction) * -threshold
+        model.moveSelection(by: direction * stepCount)
+        wheelAccumulator -= CGFloat(direction) * -threshold * CGFloat(stepCount)
       }
       return event
     }
