@@ -389,40 +389,71 @@ final class MobileMonitorStore {
       syncStatus = .demo
       return
     }
-    guard
-      let stationID = preferredLiveStationID(),
-      let syncClient = syncClient(for: stationID)
-    else {
+    let stationIDs = stationIDsForRefresh()
+    guard !stationIDs.isEmpty else {
       applyCachedSnapshotIfAvailable()
       syncStatus = .unpaired
       return
     }
 
     syncStatus = .syncing
-    do {
-      guard let fetched = try await syncClient.fetchLatestSnapshot(stationID: stationID, now: .now)
-      else {
-        applyCachedSnapshotIfAvailable()
-        syncStatus = .stale("No encrypted mirror snapshot found.")
-        return
+    let now = Date()
+    let preferredStationID = preferredLiveStationID() ?? stationIDs[0]
+    var aggregateSnapshot = snapshot
+    var latestGeneratedAt: Date?
+    var selectedStationRefreshed = false
+    var failureReason: String?
+    var failureStatus: MobileMonitorSyncStatus?
+
+    for stationID in stationIDs {
+      guard let syncClient = syncClient(for: stationID) else {
+        continue
       }
-      let previous = applySnapshot(fetched, preferredStationID: stationID)
-      syncStatus = .live(fetched.generatedAt)
-      await scheduleNotifications(previous: previous, next: fetched)
-    } catch MobileCloudMirrorSyncError.staleSnapshot(let expiresAt) {
-      applyCachedSnapshotIfAvailable()
-      syncStatus =
-        .stale(
-          "Last encrypted mirror expired \(expiresAt.formatted(.relative(presentation: .numeric)))."
+      do {
+        guard let fetched = try await syncClient.fetchLatestSnapshot(stationID: stationID, now: now)
+        else {
+          failureReason = "No encrypted mirror snapshot found."
+          continue
+        }
+        aggregateSnapshot = aggregateSnapshot.mergingStationSnapshot(
+          fetched,
+          stationID: stationID,
+          defaultStationID: defaultStationID
         )
-    } catch {
-      applyCachedSnapshotIfAvailable()
-      syncStatus = mobileMonitorSyncStatus(for: error)
+        latestGeneratedAt = max(latestGeneratedAt ?? fetched.generatedAt, fetched.generatedAt)
+        selectedStationRefreshed = stationID == preferredStationID || selectedStationRefreshed
+      } catch MobileCloudMirrorSyncError.staleSnapshot(let expiresAt) {
+        failureReason =
+          "Last encrypted mirror expired \(expiresAt.formatted(.relative(presentation: .numeric)))."
+        failureStatus = .stale(failureReason ?? "Last encrypted mirror expired.")
+      } catch {
+        failureStatus = mobileMonitorSyncStatus(for: error)
+        failureReason = mobileMonitorReadableErrorDescription(error)
+      }
     }
+
+    guard let latestGeneratedAt else {
+      applyCachedSnapshotIfAvailable()
+      syncStatus = failureStatus ?? .stale(failureReason ?? "No encrypted mirror snapshot found.")
+      return
+    }
+
+    let previous = applyAggregateSnapshot(
+      aggregateSnapshot,
+      preferredStationID: preferredStationID
+    )
+    syncStatus =
+      selectedStationRefreshed
+      ? .live(latestGeneratedAt)
+      : .stale(failureReason ?? "Selected station did not refresh.")
+    await scheduleNotifications(previous: previous, next: aggregateSnapshot)
   }
 
   func refreshDemoData() {
-    _ = applySnapshot(MobileDemoFixtures.snapshot(), preferredStationID: selectedStationID)
+    _ = applyAggregateSnapshot(
+      MobileDemoFixtures.snapshot(),
+      preferredStationID: selectedStationID
+    )
   }
 
   func loadStoredPairings() async {
@@ -715,15 +746,15 @@ final class MobileMonitorStore {
     reconcileLiveActivity(snapshot)
   }
 
-  private func applySnapshot(
+  private func applyAggregateSnapshot(
     _ nextSnapshot: MobileMirrorSnapshot,
-    preferredStationID: String
+    preferredStationID: String?
   ) -> MobileMirrorSnapshot {
     let previousSnapshot = snapshot
     snapshot = nextSnapshot
     persistSharedSnapshot(nextSnapshot)
     publishWatchPairingTransfer(snapshot: nextSnapshot)
-    if snapshot.stations.contains(where: { $0.id == preferredStationID }) {
+    if let preferredStationID, snapshot.stations.contains(where: { $0.id == preferredStationID }) {
       selectedStationID = preferredStationID
     } else {
       selectedStationID =
@@ -876,6 +907,22 @@ final class MobileMonitorStore {
       return selectedStationID
     }
     return defaultStationID
+  }
+
+  private func stationIDsForRefresh() -> [String] {
+    let stationIDs = syncClientsByStationID.keys.sorted()
+    guard !stationIDs.isEmpty else {
+      guard let stationID = preferredLiveStationID() else {
+        return injectedSyncClient == nil ? [] : [""]
+      }
+      return [stationID]
+    }
+    guard let preferredStationID = preferredLiveStationID(),
+      stationIDs.contains(preferredStationID)
+    else {
+      return stationIDs
+    }
+    return [preferredStationID] + stationIDs.filter { $0 != preferredStationID }
   }
 
   private func syncClient(for stationID: String) -> (any MobileMonitorSyncClient)? {

@@ -238,6 +238,7 @@ extension HarnessMonitorStore {
       await flushPendingCacheWrite()
       stopAllStreams()
       stopManifestWatcher()
+      await shutdownMobileRelayBackgroundClient()
       client = nil
       markConnectionOffline("Daemon stopped")
       await refreshDaemonStatus()
@@ -332,6 +333,7 @@ extension HarnessMonitorStore {
       if let oldClient {
         await oldClient.shutdown()
       }
+      await shutdownMobileRelayBackgroundClient()
       hostBridgeCapabilityIssues = hostBridgeCapabilityIssues.filter {
         forcedHostBridgeCapabilities.contains($0.key)
       }
@@ -410,6 +412,7 @@ extension HarnessMonitorStore {
       self.client = nil
       await client.shutdown()
     }
+    await shutdownMobileRelayBackgroundClient()
 
     // Run the deferred managed-launch-agent refresh once the live
     // connection has been torn down so the next launch picks up a

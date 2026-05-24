@@ -182,39 +182,55 @@ final class WatchMonitorStore {
       status = .demo
       return
     }
-    guard
-      let stationID = preferredLiveStationID(),
-      let syncClient = syncClient(for: stationID)
-    else {
+    let stationIDs = stationIDsForRefresh()
+    guard !stationIDs.isEmpty else {
       status = .unpaired
       return
     }
     status = .loading
-    do {
-      guard let nextSnapshot = try await syncClient.fetchLatestSnapshot(stationID: stationID) else {
-        applyCachedSnapshotIfAvailable()
-        status = .stale("No mirror snapshot")
-        return
+    let preferredStationID = preferredLiveStationID() ?? stationIDs[0]
+    var aggregateSnapshot = snapshot
+    var latestGeneratedAt: Date?
+    var selectedStationRefreshed = false
+    var failureReason: String?
+
+    for stationID in stationIDs {
+      guard let syncClient = syncClient(for: stationID) else {
+        continue
       }
-      snapshot = nextSnapshot
-      try? sharedSnapshotStore?.save(nextSnapshot)
-      if snapshot.stations.contains(where: { $0.id == stationID }) {
-        selectedStationID = stationID
-      } else {
-        selectedStationID =
-          snapshot.stations.first(where: \.defaultStation)?.id
-          ?? snapshot.stations.first?.id
-          ?? ""
+      do {
+        guard let nextSnapshot = try await syncClient.fetchLatestSnapshot(stationID: stationID) else {
+          failureReason = "No mirror snapshot"
+          continue
+        }
+        aggregateSnapshot = aggregateSnapshot.mergingStationSnapshot(
+          nextSnapshot,
+          stationID: stationID,
+          defaultStationID: defaultStationID
+        )
+        latestGeneratedAt = max(
+          latestGeneratedAt ?? nextSnapshot.generatedAt,
+          nextSnapshot.generatedAt
+        )
+        selectedStationRefreshed = stationID == preferredStationID || selectedStationRefreshed
+      } catch MobileCloudMirrorSyncError.staleSnapshot(let expiresAt) {
+        failureReason = "Expired \(expiresAt.formatted(.relative(presentation: .numeric)))"
+      } catch {
+        failureReason = String(describing: error)
       }
-      status = .live(nextSnapshot.generatedAt)
-      WidgetCenter.shared.reloadAllTimelines()
-    } catch MobileCloudMirrorSyncError.staleSnapshot(let expiresAt) {
-      applyCachedSnapshotIfAvailable()
-      status = .stale("Expired \(expiresAt.formatted(.relative(presentation: .numeric)))")
-    } catch {
-      applyCachedSnapshotIfAvailable()
-      status = .stale(String(describing: error))
     }
+
+    guard let latestGeneratedAt else {
+      applyCachedSnapshotIfAvailable()
+      status = .stale(failureReason ?? "No mirror snapshot")
+      return
+    }
+
+    applyAggregateSnapshot(aggregateSnapshot, preferredStationID: preferredStationID)
+    status =
+      selectedStationRefreshed
+      ? .live(latestGeneratedAt)
+      : .stale(failureReason ?? "Selected station did not refresh")
   }
 
   func queueCommand(from attention: MobileAttentionItem) async {
@@ -347,12 +363,45 @@ final class WatchMonitorStore {
     return defaultStationID
   }
 
+  private func stationIDsForRefresh() -> [String] {
+    let stationIDs = syncClientsByStationID.keys.sorted()
+    guard !stationIDs.isEmpty else {
+      guard let stationID = preferredLiveStationID() else {
+        return []
+      }
+      return [stationID]
+    }
+    guard let preferredStationID = preferredLiveStationID(),
+      stationIDs.contains(preferredStationID)
+    else {
+      return stationIDs
+    }
+    return [preferredStationID] + stationIDs.filter { $0 != preferredStationID }
+  }
+
   private func applyCachedSnapshotIfAvailable() {
     guard let cachedSnapshot = try? sharedSnapshotStore?.loadLatestSnapshot() else {
       return
     }
     snapshot = cachedSnapshot
     if selectedStationID.isEmpty || snapshot.station(id: selectedStationID) == nil {
+      selectedStationID =
+        snapshot.stations.first(where: \.defaultStation)?.id
+        ?? snapshot.stations.first?.id
+        ?? ""
+    }
+    WidgetCenter.shared.reloadAllTimelines()
+  }
+
+  private func applyAggregateSnapshot(
+    _ nextSnapshot: MobileMirrorSnapshot,
+    preferredStationID: String?
+  ) {
+    snapshot = nextSnapshot
+    try? sharedSnapshotStore?.save(nextSnapshot)
+    if let preferredStationID, snapshot.stations.contains(where: { $0.id == preferredStationID }) {
+      selectedStationID = preferredStationID
+    } else {
       selectedStationID =
         snapshot.stations.first(where: \.defaultStation)?.id
         ?? snapshot.stations.first?.id
