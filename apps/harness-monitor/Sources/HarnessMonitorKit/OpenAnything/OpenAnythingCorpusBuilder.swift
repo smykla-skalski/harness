@@ -67,6 +67,7 @@ public enum OpenAnythingCorpusBuilder {
   /// records - the prior `dashboardRouteRecords()` helper produced duplicate
   /// entries that resolved to the same routing step.
   public static func records(input: OpenAnythingCorpusInput) -> [OpenAnythingRecord] {
+    guard !Task.isCancelled else { return [] }
     // Plugin records appear after the built-in records so a plugin cannot
     // accidentally hide a core action by emitting a higher-ranked title.
     // Today no production plugin is registered; the registry exists so a
@@ -87,11 +88,17 @@ public enum OpenAnythingCorpusBuilder {
     appendActionRecords(actions, to: &records)
     appendWindowRecords(windows, to: &records)
     appendSettingsRecords(input.settingsSections, to: &records)
+    guard !Task.isCancelled else { return records }
     appendSessionRecords(input.sessions, to: &records)
+    guard !Task.isCancelled else { return records }
     appendTaskBoardRecords(input.taskBoardItems, to: &records)
+    guard !Task.isCancelled else { return records }
     appendDecisionRecords(input.decisions, to: &records)
+    guard !Task.isCancelled else { return records }
     appendReviewRecords(input.reviews, to: &records)
+    guard !Task.isCancelled else { return records }
     appendLoadedSessionRecords(input.loadedSession, to: &records)
+    guard !Task.isCancelled else { return records }
     records.append(contentsOf: pluginRecords)
     return records
   }
@@ -193,6 +200,7 @@ public enum OpenAnythingCorpusBuilder {
     to records: inout [OpenAnythingRecord]
   ) {
     for session in sessions {
+      guard !Task.isCancelled else { return }
       records.append(
         OpenAnythingRecord(
           id: "session.\(session.sessionId)",
@@ -219,6 +227,7 @@ public enum OpenAnythingCorpusBuilder {
     to records: inout [OpenAnythingRecord]
   ) {
     for item in items {
+      guard !Task.isCancelled else { return }
       records.append(
         OpenAnythingRecord(
           id: "taskBoard.\(item.id)",
@@ -242,6 +251,7 @@ public enum OpenAnythingCorpusBuilder {
     to records: inout [OpenAnythingRecord]
   ) {
     for decision in decisions {
+      guard !Task.isCancelled else { return }
       records.append(
         OpenAnythingRecord(
           id: "decision.\(decision.id)",
@@ -261,6 +271,7 @@ public enum OpenAnythingCorpusBuilder {
     to records: inout [OpenAnythingRecord]
   ) {
     for item in items {
+      guard !Task.isCancelled else { return }
       records.append(
         OpenAnythingRecord(
           id: "review.\(item.pullRequestID)",
@@ -272,98 +283,6 @@ public enum OpenAnythingCorpusBuilder {
           searchBodyParts: [
             item.pullRequestID, item.authorLogin, item.labels.joined(separator: " "),
           ]
-        )
-      )
-    }
-  }
-
-  private static func appendLoadedSessionRecords(
-    _ snapshot: OpenAnythingLoadedSessionSnapshot?,
-    to records: inout [OpenAnythingRecord]
-  ) {
-    guard let snapshot else { return }
-    appendLoadedAgentRecords(snapshot, to: &records)
-    appendLoadedTaskRecords(snapshot, to: &records)
-    appendLoadedTimelineRecords(snapshot, to: &records)
-  }
-
-  /// Loaded-session entries (Agent/Task/Timeline) are only emitted when a
-  /// session is currently loaded in the dashboard (i.e. when the corpus host
-  /// passes a non-nil snapshot). This is intentional: these entries reference
-  /// the active session's identifiers, so surfacing them without a loaded
-  /// session would route to dead targets.
-  private static func appendLoadedAgentRecords(
-    _ snapshot: OpenAnythingLoadedSessionSnapshot,
-    to records: inout [OpenAnythingRecord]
-  ) {
-    for agent in snapshot.agents {
-      records.append(
-        OpenAnythingRecord(
-          id: "loadedSession.agent.\(snapshot.sessionID).\(agent.agentId)",
-          domain: .loadedSession,
-          target: .loadedSession(
-            .agent(sessionID: snapshot.sessionID, agentID: agent.agentId)
-          ),
-          title: agent.name,
-          subtitle: "Agent",
-          trailing: agent.runtime,
-          systemImage: "person.2",
-          searchBodyParts: [
-            agent.agentId,
-            agent.persona?.name,
-            agent.persona?.description,
-            agent.role.rawValue,
-          ]
-        )
-      )
-    }
-  }
-
-  private static func appendLoadedTaskRecords(
-    _ snapshot: OpenAnythingLoadedSessionSnapshot,
-    to records: inout [OpenAnythingRecord]
-  ) {
-    for task in snapshot.tasks {
-      records.append(
-        OpenAnythingRecord(
-          id: "loadedSession.task.\(snapshot.sessionID).\(task.taskId)",
-          domain: .loadedSession,
-          target: .loadedSession(.task(sessionID: snapshot.sessionID, taskID: task.taskId)),
-          title: task.title,
-          subtitle: "Task",
-          trailing: displayLabel(task.status.rawValue),
-          systemImage: "checklist",
-          searchBodyParts: [
-            task.taskId,
-            task.context,
-            task.suggestedFix,
-            task.blockedReason,
-          ]
-        )
-      )
-    }
-  }
-
-  /// Surface the 200 most-recent timeline entries regardless of the store's
-  /// sort order. Keep only a small sorted window instead of sorting the whole
-  /// timeline, because this path feeds the palette corpus trigger.
-  private static func appendLoadedTimelineRecords(
-    _ snapshot: OpenAnythingLoadedSessionSnapshot,
-    to records: inout [OpenAnythingRecord]
-  ) {
-    forEachMostRecentTimelineEntry(snapshot.timeline, limit: 200) { entry in
-      records.append(
-        OpenAnythingRecord(
-          id: "loadedSession.timeline.\(snapshot.sessionID).\(entry.entryId)",
-          domain: .loadedSession,
-          target: .loadedSession(
-            .timeline(sessionID: snapshot.sessionID, entryID: entry.entryId)
-          ),
-          title: entry.summary.isEmpty ? entry.kind : entry.summary,
-          subtitle: "Timeline",
-          trailing: entry.kind,
-          systemImage: "clock.arrow.circlepath",
-          searchBodyParts: [entry.entryId, entry.agentId, entry.taskId]
         )
       )
     }

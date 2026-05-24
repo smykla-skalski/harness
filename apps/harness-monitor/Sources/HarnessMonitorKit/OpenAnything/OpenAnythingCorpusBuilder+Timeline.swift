@@ -37,6 +37,7 @@ extension OpenAnythingCorpusBuilder {
     to consume: (TimelineEntry) -> Void
   ) where Entries.Element == TimelineEntry {
     for entry in entries {
+      guard !Task.isCancelled else { return }
       consume(entry)
     }
   }
@@ -48,6 +49,7 @@ extension OpenAnythingCorpusBuilder {
     var recent: [TimelineEntry] = []
     recent.reserveCapacity(min(entries.count, limit))
     for entry in entries {
+      guard !Task.isCancelled else { return recent }
       retain(entry, in: &recent, limit: limit)
     }
     return recent
