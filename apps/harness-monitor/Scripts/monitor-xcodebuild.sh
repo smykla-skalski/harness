@@ -501,6 +501,45 @@ inject_shared_compilation_cache_path() {
   args+=("COMPILATION_CACHE_CAS_PATH=$shared_cas_path")
 }
 
+# Isolate the daemon cargo target dir per build lane so parallel agents do
+# not invalidate each other's (or the user's) cargo fingerprint cache.
+#
+# Cargo's fingerprint is keyed by (rustc_version, args, Cargo.lock entries,
+# source files). With the default cache at `$COMMON_REPO_ROOT/.cache/harness-
+# monitor-xcode-daemon/`, every worktree pointing its build at that single
+# directory writes a new fingerprint dir whenever its Cargo.lock content or
+# feature resolution differs from the previous build. Observed today: 12
+# distinct fingerprint dirs for the `harness` daemon binary itself, 24 for
+# `rustls`, 16 for `getrandom`, 1,732 total across all crates -- because
+# different worktrees have different Cargo.lock SHAs.
+#
+# Fix: a named build lane (HARNESS_MONITOR_BUILD_LANE=...) gets its own
+# daemon target dir under the lane's DerivedData. The unnamed/default lane
+# (user's Xcode Cmd+R) keeps the shared `.cache/harness-monitor-xcode-daemon`
+# untouched. Agents now no longer thrash the user's daemon cache.
+#
+# Skip if the caller has already exported HARNESS_MONITOR_DAEMON_CARGO_TARGET_DIR
+# or CARGO_TARGET_DIR -- those are explicit overrides we should not stomp.
+inject_lane_daemon_cargo_target_dir() {
+  if [[ "${HARNESS_MONITOR_PER_LANE_DAEMON_CACHE:-1}" != "1" ]]; then
+    return 0
+  fi
+  if [[ -n "${HARNESS_MONITOR_DAEMON_CARGO_TARGET_DIR:-}" ]]; then
+    return 0
+  fi
+  if [[ -n "${CARGO_TARGET_DIR:-}" ]]; then
+    return 0
+  fi
+  # Only redirect when this is a *named* lane. The default lane lives at
+  # `xcode-derived/` (not inside `xcode-derived-lanes/`), which is exactly
+  # the case where we want to keep using the shared `.cache/...` cache.
+  case "$derive_data_path" in
+    *"/xcode-derived-lanes/"*)
+      export HARNESS_MONITOR_DAEMON_CARGO_TARGET_DIR="$derive_data_path/cargo-target"
+      ;;
+  esac
+}
+
 run_xcodebuild() {
   local status report_path log_path
   local -a run_args=()
@@ -526,6 +565,7 @@ normalize_xcodebuild_path_args
 find_or_inject_derived_data_path
 inject_local_script_sandbox_override
 inject_shared_compilation_cache_path
+inject_lane_daemon_cargo_target_dir
 export XCODEBUILD_DERIVED_DATA_PATH="$derive_data_path"
 ensure_non_indexable_directory "$derive_data_path"
 
