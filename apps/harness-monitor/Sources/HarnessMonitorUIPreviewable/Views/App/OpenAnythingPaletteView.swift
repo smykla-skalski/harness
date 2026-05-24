@@ -50,67 +50,67 @@ public struct OpenAnythingPaletteView: View {
         updateAvailableWidth(width)
       }
       .overlay(alignment: .topLeading) {
-      AccessibilityTextMarker(
-        identifier: HarnessMonitorAccessibility.openAnythingPalette,
-        text: "Open Anything search"
-      )
+        AccessibilityTextMarker(
+          identifier: HarnessMonitorAccessibility.openAnythingPalette,
+          text: "Open Anything search"
+        )
       }
       .accessibilityAction(.escape) {
-      requestDismiss(reason: .userCanceled)
+        requestDismiss(reason: .userCanceled)
       }
       .onAppear {
-      isFieldFocused = true
-      model.selectFirstHitIfNeeded()
-      if model.isPresented {
-        installWheelMonitor()
-      }
-      }
-      .task(id: model.query) {
-      await runSearch()
-      }
-      .onChange(of: model.isPresented) { _, presented in
-      if presented {
-        // Panel hides via `alphaValue = 0` (keeping the SwiftUI tree
-        // mounted), so `.onAppear` only fires during pre-warm and cannot
-        // re-drive focus on subsequent shows. Re-asserting focus on every
-        // `isPresented` flip restores first-responder when the panel
-        // becomes key after a hide.
         isFieldFocused = true
         model.selectFirstHitIfNeeded()
-        installWheelMonitor()
-      } else {
-        removeWheelMonitor()
-        onDismiss?()
+        if model.isPresented {
+          installWheelMonitor()
+        }
       }
+      .task(id: model.query) {
+        await runSearch()
+      }
+      .onChange(of: model.isPresented) { _, presented in
+        if presented {
+          // Panel hides via `alphaValue = 0` (keeping the SwiftUI tree
+          // mounted), so `.onAppear` only fires during pre-warm and cannot
+          // re-drive focus on subsequent shows. Re-asserting focus on every
+          // `isPresented` flip restores first-responder when the panel
+          // becomes key after a hide.
+          isFieldFocused = true
+          model.selectFirstHitIfNeeded()
+          installWheelMonitor()
+        } else {
+          removeWheelMonitor()
+          onDismiss?()
+        }
       }
       .onKeyPress(.escape, phases: .down) { _ in
-      requestDismiss(reason: .userCanceled)
-      return .handled
+        requestDismiss(reason: .userCanceled)
+        return .handled
       }
       .onKeyPress(.upArrow, phases: [.down, .repeat]) { _ in
-      model.moveSelection(by: -1)
-      return .handled
+        model.moveSelection(by: -1)
+        return .handled
       }
       .onKeyPress(.downArrow, phases: [.down, .repeat]) { _ in
-      model.moveSelection(by: 1)
-      return .handled
+        model.moveSelection(by: 1)
+        return .handled
       }
       .onKeyPress(.tab, phases: .down) { keyPress in
-      let delta = keyPress.modifiers.contains(.shift) ? -1 : 1
-      jumpSection(by: delta)
-      return .handled
+        let delta = keyPress.modifiers.contains(.shift) ? -1 : 1
+        jumpSection(by: delta)
+        return .handled
       }
       .onKeyPress(characters: CharacterSet(charactersIn: "12345678"), phases: .down) { keyPress in
-      guard keyPress.modifiers.contains(.command) else { return .ignored }
-      guard let digit = keyPress.characters.first?.wholeNumberValue else {
-        return .ignored
-      }
-      jumpToSection(index: digit - 1)
-      return .handled
+        guard keyPress.modifiers.contains(.command) else { return .ignored }
+        guard let digit = keyPress.characters.first?.wholeNumberValue else {
+          return .ignored
+        }
+        jumpToSection(index: digit - 1)
+        return .handled
       }
       .onDisappear { removeWheelMonitor() }
       .onPreferenceChange(OpenAnythingContentSizePreferenceKey.self) { size in
-      onContentSizeChange?(size)
+        onContentSizeChange?(size)
       }
   }
 
@@ -230,7 +230,7 @@ public struct OpenAnythingPaletteView: View {
   }
 
   private func singleHitVisible(in results: OpenAnythingResults) -> Bool {
-    visibleResults(in: results).hasExactlyOneHit
+    results.hasExactlyOneHit(excludingCollapsedSections: model.collapsedSections)
   }
 
   private func resultsList(_ results: OpenAnythingResults) -> some View {
@@ -285,19 +285,18 @@ public struct OpenAnythingPaletteView: View {
   }
 
   private var accessibilityValueForField: String {
-    let displayedResults = visibleResults(in: model.displayedResults)
-    let total = displayedResults.hitCount
-    let sections = displayedResults.sections.count
+    let total = model.displayedResults.hitCount(
+      excludingCollapsedSections: model.collapsedSections
+    )
+    let sections = model.displayedResults.sectionCount(
+      excludingCollapsedSections: model.collapsedSections
+    )
     if total == 0 {
       return "No results"
     }
     let resultWord = total == 1 ? "result" : "results"
     let sectionWord = sections == 1 ? "section" : "sections"
     return "\(total) \(resultWord) across \(sections) \(sectionWord)"
-  }
-
-  private func visibleResults(in results: OpenAnythingResults) -> OpenAnythingResults {
-    results.excludingHits(inCollapsedSections: model.collapsedSections)
   }
 
   /// Activate a hit. Pass `.command` to honour the keep-open Setting (#94):

@@ -146,8 +146,11 @@ struct AppOpenAnythingSourceContractTests {
     #expect(!paletteSource.contains("while abs(wheelAccumulator) >= threshold"))
     #expect(paletteSource.contains("AccessibilityTextMarker("))
     #expect(!paletteSource.contains(".accessibilityElement(children: .contain)"))
-    #expect(paletteSource.contains("visibleResults(in: model.displayedResults)"))
-    #expect(paletteSource.contains("visibleResults(in: results).hasExactlyOneHit"))
+    #expect(
+      paletteSource.contains(
+        "hasExactlyOneHit(excludingCollapsedSections: model.collapsedSections)")
+    )
+    #expect(!paletteSource.contains("visibleResults(in:"))
     #expect(paletteSource.contains("CharacterSet(charactersIn: \"12345678\")"))
     #expect(footerSource.contains("⌘1-8"))
     #expect(modelSource.contains("public private(set) var queryTermIsEmpty"))
