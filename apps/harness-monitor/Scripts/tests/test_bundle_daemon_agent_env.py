@@ -326,7 +326,7 @@ class ResolvePinnedToolchainChannelTests(unittest.TestCase):
 
 
 class FindCargoTests(unittest.TestCase):
-    def test_prefers_rustup_proxy_over_homebrew(self) -> None:
+    def test_returns_rustup_proxy(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_dir:
             rustup_cargo = Path(tmp_dir) / ".cargo" / "bin" / "cargo"
             rustup_cargo.parent.mkdir(parents=True)
@@ -351,6 +351,64 @@ class FindCargoTests(unittest.TestCase):
                 "find_cargo"
             )
             self.assertEqual(resolved, str(explicit))
+
+
+class AssertNoStandaloneRustTests(unittest.TestCase):
+    def test_passes_when_no_stray_paths_exist(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            missing_a = Path(tmp_dir) / "does-not-exist-rustc"
+            missing_b = Path(tmp_dir) / "does-not-exist-cargo"
+            # Function exits 0 (silent) when no path exists.
+            run_build_helper(
+                f'assert_no_standalone_rust "{missing_a}" "{missing_b}"'
+            )
+
+    def test_fails_when_stray_rustc_exists(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            stray = Path(tmp_dir) / "stray-rustc"
+            stray.write_text("#!/bin/bash\necho stray\n")
+            stray.chmod(0o755)
+
+            command = (
+                f"unset BASH_ENV; source {HELPER_PATH}; "
+                f"source {CARGO_HELPER_PATH}; "
+                f'assert_no_standalone_rust "{stray}"'
+            )
+            completed = subprocess.run(
+                ["bash", "-lc", command],
+                capture_output=True,
+                text=True,
+                env=_isolated_subprocess_env(),
+            )
+            self.assertNotEqual(
+                completed.returncode, 0, msg=completed.stdout
+            )
+            self.assertIn(
+                "shadows the rustup proxy", completed.stderr
+            )
+            self.assertIn(str(stray), completed.stderr)
+
+    def test_fails_when_any_of_multiple_paths_exists(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            missing = Path(tmp_dir) / "missing"
+            present = Path(tmp_dir) / "present"
+            present.write_text("#!/bin/bash\n")
+            present.chmod(0o755)
+
+            command = (
+                f"unset BASH_ENV; source {HELPER_PATH}; "
+                f"source {CARGO_HELPER_PATH}; "
+                f'assert_no_standalone_rust "{missing}" "{present}"'
+            )
+            completed = subprocess.run(
+                ["bash", "-lc", command],
+                capture_output=True,
+                text=True,
+                env=_isolated_subprocess_env(),
+            )
+            self.assertNotEqual(completed.returncode, 0)
+            self.assertIn(str(present), completed.stderr)
+            self.assertNotIn(str(missing), completed.stderr)
 
 
 class CleanActionGuardTests(unittest.TestCase):
