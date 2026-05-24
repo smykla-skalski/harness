@@ -192,7 +192,8 @@ public final class OpenAnythingPaletteModel {
     return targetWindowID == windowID
   }
 
-  public func replaceCorpus(_ records: [OpenAnythingRecord]) async {
+  @discardableResult
+  public func replaceCorpus(_ records: [OpenAnythingRecord]) async -> Bool {
     corpusReplacementGeneration += 1
     let generation = corpusReplacementGeneration
     let signpost = OpenAnythingSignposter.shared.beginInterval(
@@ -204,19 +205,20 @@ public final class OpenAnythingPaletteModel {
         signpost
       )
     }
-    guard !Task.isCancelled, generation == corpusReplacementGeneration else { return }
+    guard !Task.isCancelled, generation == corpusReplacementGeneration else { return false }
     let indexReplaced = await index.replace(records: records)
     guard indexReplaced, !Task.isCancelled, generation == corpusReplacementGeneration else {
-      return
+      return false
     }
     corpusCache = OpenAnythingPaletteCorpusCache(records: records)
     refreshSuggestedResults()
     recordCount = records.count
     guard isPresented, !query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
       normalizeSelection()
-      return
+      return true
     }
     await runSearch()
+    return true
   }
 
   public func runSearch() async {

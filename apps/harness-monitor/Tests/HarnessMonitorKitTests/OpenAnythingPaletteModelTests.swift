@@ -215,8 +215,9 @@ struct OpenAnythingPaletteModelTests {
     }
 
     task.cancel()
-    await task.value
+    let accepted = await task.value
 
+    #expect(accepted == false)
     #expect(model.recordCount == 0)
     #expect(model.suggestedResults == .empty)
   }
@@ -229,8 +230,9 @@ struct OpenAnythingPaletteModelTests {
     }
 
     task.cancel()
-    await task.value
+    let accepted = await task.value
 
+    #expect(accepted == false)
     model.present(targetWindowID: nil)
     model.query = "alpha"
     await model.runSearch()
