@@ -1,8 +1,20 @@
 // swift-tools-version: 6.0
+import Foundation
 import PackageDescription
 
 #if TUIST
 import ProjectDescription
+
+private let compilationCacheDiagnosticRemarksEnabled: Bool = {
+    guard
+        let raw = ProcessInfo.processInfo.environment[
+            "HARNESS_MONITOR_COMPILATION_CACHE_DIAGNOSTICS"
+        ]?.lowercased()
+    else {
+        return false
+    }
+    return ["1", "true", "yes", "on"].contains(raw)
+}()
 
 let packageSettings = PackageSettings(
     baseSettings: .settings(
@@ -12,7 +24,9 @@ let packageSettings = PackageSettings(
             "CLANG_ENABLE_OBJC_WEAK": "YES",
             "CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER": "YES",
             "COMPILATION_CACHE_ENABLE_CACHING": "YES",
-            "COMPILATION_CACHE_ENABLE_DIAGNOSTIC_REMARKS": "YES",
+            "COMPILATION_CACHE_ENABLE_DIAGNOSTIC_REMARKS": .string(
+                compilationCacheDiagnosticRemarksEnabled ? "YES" : "NO"
+            ),
             "ENABLE_MODULE_VERIFIER": "YES",
             "ENABLE_STRICT_OBJC_MSGSEND": "YES",
             "ENABLE_USER_SCRIPT_SANDBOXING": "YES",

@@ -296,6 +296,93 @@ class BuildDaemonBinaryTests(unittest.TestCase):
             self.assertIn("RUSTUP_TOOLCHAIN=nightly-2026-05-19", first)
 
 
+class DaemonStagedBinaryTests(unittest.TestCase):
+    def test_staged_binary_path_is_worktree_specific(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            repo_root = Path(tmp_dir) / "repo"
+            worktree_root = Path(tmp_dir) / "repo-worktree"
+            target_dir = Path(tmp_dir) / "target"
+            repo_root.mkdir()
+            worktree_root.mkdir()
+
+            main_path = run_build_helper(
+                f'repo_root="{repo_root}"; '
+                f'export CARGO_TARGET_DIR="{target_dir}"; '
+                "daemon_staged_binary_path"
+            )
+            worktree_path = run_build_helper(
+                f'repo_root="{worktree_root}"; '
+                f'export CARGO_TARGET_DIR="{target_dir}"; '
+                "daemon_staged_binary_path"
+            )
+
+            self.assertNotEqual(main_path, worktree_path)
+            self.assertTrue(main_path.endswith("/debug/harness"))
+            self.assertTrue(worktree_path.endswith("/debug/harness"))
+
+    def test_stage_daemon_binary_copies_executable_to_stage_path(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            project_dir, target_dir, _, _ = _setup_fake_daemon_layout(Path(tmp_dir))
+            source_binary = target_dir / "debug" / "harness"
+            source_binary.parent.mkdir(parents=True, exist_ok=True)
+            source_binary.write_text("binary\n")
+            source_binary.chmod(0o755)
+
+            staged_binary = run_build_helper(
+                f'export PROJECT_DIR="{project_dir}"; '
+                f'export CARGO_TARGET_DIR="{target_dir}"; '
+                f'stage_daemon_binary "{source_binary}"'
+            )
+
+            staged_path = Path(staged_binary)
+            self.assertTrue(staged_path.is_file())
+            self.assertEqual(staged_path.read_text(), "binary\n")
+            self.assertTrue(staged_path.stat().st_mode & 0o111)
+
+    def test_bundle_resolution_reuses_fresh_staged_binary_without_cargo(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            project_dir, target_dir, captured_env_path, fake_cargo = _setup_fake_daemon_layout(
+                Path(tmp_dir)
+            )
+            source_binary = target_dir / "debug" / "harness"
+            source_binary.parent.mkdir(parents=True, exist_ok=True)
+            source_binary.write_text("staged\n")
+            source_binary.chmod(0o755)
+            staged_binary = run_build_helper(
+                f'export PROJECT_DIR="{project_dir}"; '
+                f'export CARGO_TARGET_DIR="{target_dir}"; '
+                f'stage_daemon_binary "{source_binary}"'
+            )
+
+            resolved_binary = run_build_helper(
+                f'export PROJECT_DIR="{project_dir}"; '
+                f'export CARGO_BIN="{fake_cargo}"; '
+                f'export CARGO_TARGET_DIR="{target_dir}"; '
+                f'export CAPTURED_ENV_PATH="{captured_env_path}"; '
+                "resolve_daemon_binary_for_bundle"
+            )
+
+            self.assertEqual(resolved_binary, staged_binary)
+            self.assertFalse(captured_env_path.exists(), "cargo must not run when staged binary is fresh")
+
+    def test_bundle_resolution_builds_and_stages_when_missing(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            project_dir, target_dir, captured_env_path, fake_cargo = _setup_fake_daemon_layout(
+                Path(tmp_dir)
+            )
+
+            resolved_binary = run_build_helper(
+                f'export PROJECT_DIR="{project_dir}"; '
+                f'export CARGO_BIN="{fake_cargo}"; '
+                f'export CARGO_TARGET_DIR="{target_dir}"; '
+                f'export CAPTURED_ENV_PATH="{captured_env_path}"; '
+                "resolve_daemon_binary_for_bundle"
+            )
+
+            self.assertTrue(Path(resolved_binary).is_file())
+            self.assertTrue(captured_env_path.is_file(), "cargo must run when staged binary is missing")
+
+
 class ResolvePinnedToolchainChannelTests(unittest.TestCase):
     def test_returns_empty_when_rust_toolchain_file_missing(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_dir:
@@ -538,6 +625,15 @@ def _setup_fake_daemon_layout(tmp_dir: Path):
     )
     fake_cargo.write_text(
         "#!/bin/bash\n"
+        "profile_dir=debug\n"
+        "for arg in \"$@\"; do\n"
+        "  if [ \"$arg\" = \"--release\" ]; then\n"
+        "    profile_dir=release\n"
+        "  fi\n"
+        "done\n"
+        "mkdir -p \"$CARGO_TARGET_DIR/$profile_dir\"\n"
+        "printf 'fake daemon\\n' > \"$CARGO_TARGET_DIR/$profile_dir/harness\"\n"
+        "chmod 755 \"$CARGO_TARGET_DIR/$profile_dir/harness\"\n"
         "env | sort > \"$CAPTURED_ENV_PATH\"\n"
     )
     fake_cargo.chmod(0o755)

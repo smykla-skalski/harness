@@ -27,4 +27,11 @@ source "$SCRIPT_DIR/lib/daemon-bundle-env.sh"
 # shellcheck source=apps/harness-monitor/Scripts/lib/daemon-cargo-build.sh
 source "$SCRIPT_DIR/lib/daemon-cargo-build.sh"
 
-build_daemon_binary >/dev/null
+repo_root="$(resolve_repo_root)"
+staged_daemon_binary="$(daemon_staged_binary_path "$repo_root")"
+if daemon_staged_binary_is_fresh "$staged_daemon_binary" "$repo_root"; then
+  exit 0
+fi
+
+daemon_binary="$(build_daemon_binary | /usr/bin/tail -n 1)"
+stage_daemon_binary "$daemon_binary" "$repo_root" >/dev/null

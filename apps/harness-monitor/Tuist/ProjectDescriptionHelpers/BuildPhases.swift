@@ -67,7 +67,8 @@ public enum BuildPhases {
                 "$(TARGET_BUILD_DIR)/$(CONTENTS_FOLDER_PATH)/Library/LaunchAgents/Q498EB36N4.io.harnessmonitor.daemon.plist",
                 "$(TARGET_BUILD_DIR)/$(CONTENTS_FOLDER_PATH)/Library/LaunchAgents/Q498EB36N4.io.harnessmonitor.daemon.plist.staging",
                 "$(TARGET_BUILD_DIR)/$(CONTENTS_FOLDER_PATH)/Library/LaunchAgents/io.harnessmonitor.daemon.managed.plist",
-                "$(TARGET_BUILD_DIR)/$(CONTENTS_FOLDER_PATH)/Library/LaunchAgents/io.harnessmonitor.daemon.plist"
+                "$(TARGET_BUILD_DIR)/$(CONTENTS_FOLDER_PATH)/Library/LaunchAgents/io.harnessmonitor.daemon.plist",
+                "$(DERIVED_FILE_DIR)/$(TARGET_NAME)-bundle-daemon-agent.stamp"
             ],
             // The bundle phase's inputPaths can't enumerate every Rust source file,
             // so dependency analysis was skipping the phase whenever scripts and

@@ -1,6 +1,24 @@
+import Foundation
 import ProjectDescription
 
 public enum BuildSettings {
+    private static let compilationCacheDiagnosticsEnvironmentKey =
+        "HARNESS_MONITOR_COMPILATION_CACHE_DIAGNOSTICS"
+
+    private static var compilationCacheDiagnosticRemarksEnabled: Bool {
+        guard
+            let raw =
+                ProcessInfo.processInfo.environment[compilationCacheDiagnosticsEnvironmentKey]?.lowercased()
+        else {
+            return false
+        }
+        return ["1", "true", "yes", "on"].contains(raw)
+    }
+
+    private static var compilationCacheDiagnosticRemarksSetting: String {
+        compilationCacheDiagnosticRemarksEnabled ? "YES" : "NO"
+    }
+
     public static let base: SettingsDictionary = [
         "ALWAYS_SEARCH_USER_PATHS": "NO",
         "ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS": "YES",
@@ -11,7 +29,9 @@ public enum BuildSettings {
         "CODE_SIGN_ALLOW_ENTITLEMENTS_MODIFICATION": "YES",
         "CODE_SIGNING_ALLOWED": "YES",
         "COMPILATION_CACHE_ENABLE_CACHING": "YES",
-        "COMPILATION_CACHE_ENABLE_DIAGNOSTIC_REMARKS": "YES",
+        "COMPILATION_CACHE_ENABLE_DIAGNOSTIC_REMARKS": .string(
+            compilationCacheDiagnosticRemarksSetting
+        ),
         "CURRENT_PROJECT_VERSION": "39.0.0", // VERSION_MARKER_CURRENT
         "DEVELOPMENT_TEAM": "Q498EB36N4",
         "DEAD_CODE_STRIPPING": "YES",
