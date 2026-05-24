@@ -168,7 +168,7 @@ struct DashboardReviewFilesSection: View {
     threadIndex: DashboardReviewFileThreadIndex
   ) -> some View {
     LazyVStack(alignment: .leading, spacing: 8) {
-      ForEach(Array(viewModel.filteredFiles.prefix(visibleFileLimit)), id: \.path) { file in
+      ForEach(viewModel.filteredFiles.prefix(visibleFileLimit), id: \.path) { file in
         DashboardReviewFileCard(
           file: file,
           viewedState: viewModel.viewedByPath[file.path] ?? file.viewerViewedState,

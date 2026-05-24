@@ -331,14 +331,14 @@ private struct DashboardReviewCheckGroupView: View {
   }
 
   private var checkRows: some View {
-    ForEach(Array(group.checks.enumerated()), id: \.element.id) { index, check in
+    ForEach(group.checks, id: \.id) { check in
       DashboardReviewCheckRow(
         check: check,
         suppressPassingStatus: suppressPassingStatus,
         onRerunCheck: onRerunCheck
       )
       .overlay(alignment: .bottom) {
-        if index < group.checks.count - 1 {
+        if check.id != group.checks.last?.id {
           Divider().opacity(0.45)
         }
       }
