@@ -7,7 +7,7 @@ extension OpenAnythingPaletteModel {
   /// order; recency boosts apply within each domain.
   func applyRanking(
     to bundle: OpenAnythingResults,
-    records: [OpenAnythingRecord]?
+    corpus: OpenAnythingPaletteCorpusCache?
   ) -> OpenAnythingResults {
     let rankedSections = rankedSections(in: bundle)
 
@@ -30,7 +30,7 @@ extension OpenAnythingPaletteModel {
 
     let candidates = pinnedCandidates(
       in: rankedSections,
-      records: records,
+      corpus: corpus,
       pinned: pinnedSet
     )
     let pinnedHits = pinned.compactMap { candidates[$0] }
@@ -92,7 +92,7 @@ extension OpenAnythingPaletteModel {
 
   private func pinnedCandidates(
     in sections: [OpenAnythingSection],
-    records: [OpenAnythingRecord]?,
+    corpus: OpenAnythingPaletteCorpusCache?,
     pinned: Set<String>
   ) -> [String: OpenAnythingHit] {
     var candidates: [String: OpenAnythingHit] = [:]
@@ -105,8 +105,9 @@ extension OpenAnythingPaletteModel {
         }
       }
     }
-    guard let records else { return candidates }
-    for record in records where pinned.contains(record.id) && candidates[record.id] == nil {
+    guard let corpus else { return candidates }
+    for recordID in pins.recordIDs where pinned.contains(recordID) && candidates[recordID] == nil {
+      guard let record = corpus.record(id: recordID) else { continue }
       guard effectiveScope == nil || record.domain == effectiveScope else { continue }
       candidates[record.id] = OpenAnythingHit(
         record: record,
