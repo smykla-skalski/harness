@@ -348,19 +348,24 @@ struct HarnessMonitorSettingsRootView: View {
     HarnessMonitorBackgroundSelection.decode(backgroundImageRawValue)
   }
 
+  var mobilePairingContent: (@MainActor @Sendable () -> AnyView)? {
+    guard let mobileRelayRuntime else {
+      return nil
+    }
+    return { @MainActor @Sendable in
+      AnyView(MobileRelayPairingSettingsPanel(runtime: mobileRelayRuntime))
+    }
+  }
+
   var body: some View {
     SettingsView(
       store: store,
       notifications: notifications,
+      mobilePairingContent: mobilePairingContent,
       themeMode: $themeMode,
       selectedSection: $selectedSection,
       navigationRequest: $navigationRequest
     )
-    .safeAreaInset(edge: .bottom, spacing: 0) {
-      if selectedSection == .connection, let mobileRelayRuntime {
-        MobileRelayPairingSettingsPanel(runtime: mobileRelayRuntime)
-      }
-    }
     .writingToolsBehavior(.disabled)
     .frame(minWidth: 680, minHeight: 440)
     .modifier(

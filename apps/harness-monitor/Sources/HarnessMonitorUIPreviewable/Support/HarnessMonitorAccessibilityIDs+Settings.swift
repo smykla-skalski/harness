@@ -43,6 +43,7 @@ extension HarnessMonitorAccessibility {
   public static let settingsSupervisorSection = "harness.settings.section.supervisor"
   public static let settingsVoiceSection = "harness.settings.section.voice"
   public static let settingsConnectionSection = "harness.settings.section.connection"
+  public static let settingsMobileSection = "harness.settings.section.mobile"
   public static let settingsTaskBoardSection = "harness.settings.section.taskboard"
   public static let settingsRepositoriesSection = "harness.settings.section.repositories"
   public static let settingsReviewsSection = "harness.settings.section.reviews"

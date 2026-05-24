@@ -73,6 +73,15 @@ import SwiftUI
   )
 }
 
+#Preview("Settings Window - Mobile") {
+  @Previewable @State var themeMode: HarnessMonitorThemeMode = .auto
+
+  settingsWindowPreview(
+    section: .mobile,
+    themeMode: $themeMode
+  )
+}
+
 #Preview("Settings Window - Notifications") {
   @Previewable @State var themeMode: HarnessMonitorThemeMode = .auto
 
