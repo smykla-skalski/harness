@@ -29,6 +29,8 @@ struct DashboardReviewsControlStripContractTests {
       "HarnessMonitorAccessibility.dashboardReviewsShowRowAvatarsToggle",
       "HarnessMonitorAccessibility.dashboardReviewsShowRowLabelsToggle",
       "HarnessMonitorAccessibility.dashboardReviewsShowRowLineCountersToggle",
+      "HarnessMonitorAccessibility.dashboardReviewsWrapRowTitlesToggle",
+      "HarnessMonitorAccessibility.dashboardReviewsHideSemanticPrefixesInRowTitlesToggle",
     ]
     for identifier in expected {
       #expect(

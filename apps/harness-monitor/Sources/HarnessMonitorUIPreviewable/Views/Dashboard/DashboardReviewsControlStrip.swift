@@ -33,6 +33,8 @@ struct DashboardReviewsControlStrip: View {
   @Binding var showAvatarsInRows: Bool
   @Binding var showLabelsInRows: Bool
   @Binding var showLineCountersInRows: Bool
+  @Binding var wrapTitlesInRows: Bool
+  @Binding var hideSemanticPrefixesInRowTitles: Bool
   let needsMeCount: Int
   let syncHealth: DashboardReviewsSyncHealth
   let onRetryFailedRepositories: () -> Void
@@ -235,6 +237,14 @@ struct DashboardReviewsControlStrip: View {
         Toggle("+/- line counters", isOn: $showLineCountersInRows)
           .accessibilityIdentifier(HarnessMonitorAccessibility.dashboardReviewsShowRowLineCountersToggle)
           .accessibilityLabel("Show line counters in review rows")
+        Toggle("Wrap titles", isOn: $wrapTitlesInRows)
+          .accessibilityIdentifier(HarnessMonitorAccessibility.dashboardReviewsWrapRowTitlesToggle)
+          .accessibilityLabel("Wrap review row titles")
+        Toggle("Hide semantic prefixes", isOn: $hideSemanticPrefixesInRowTitles)
+          .accessibilityIdentifier(
+            HarnessMonitorAccessibility.dashboardReviewsHideSemanticPrefixesInRowTitlesToggle
+          )
+          .accessibilityLabel("Hide semantic commit prefixes in review row titles")
       }
 
       Divider()

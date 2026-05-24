@@ -1,3 +1,4 @@
+import Foundation
 import HarnessMonitorKit
 import SwiftUI
 
@@ -17,8 +18,8 @@ extension VerticalAlignment {
 /// pane.
 ///
 /// Structure (top to bottom):
-/// 1. Title row: status icon · optional avatar chip · title (up to 2 lines) ·
-///    optional change pill
+/// 1. Title row: status icon · optional avatar chip · title (up to the
+///    configured wrapped-line cap) · optional change pill
 /// 2. Secondary line (ungrouped only): `repository · #N`. Collapses entirely
 ///    when the list is grouped by repository — `#N` rides inline on the status
 ///    line instead so the row never burns a caption line on the PR number alone.
@@ -33,8 +34,9 @@ extension VerticalAlignment {
 /// already names the section).
 ///
 /// All optional rows pad to keep the row's idealHeight stable across content
-/// variants (item 34). The title always reserves two lines of vertical space
-/// so wrapping does not shift sibling rows. Accessibility uses
+/// variants (item 34). The title height hint uses a lightweight line-count
+/// estimate capped by the configured wrap limit so short titles stay compact
+/// while longer semantic-commit subjects can grow beyond one line. Accessibility uses
 /// `children: .contain` (item 31) so the status icon stays an individually-
 /// focusable element with its own label (items 32 / 67).
 struct DashboardReviewListRow: View {
@@ -48,6 +50,9 @@ struct DashboardReviewListRow: View {
   let showsAvatars: Bool
   let showsLabels: Bool
   let showsLineCounters: Bool
+  let wrapsTitle: Bool
+  let titleMaximumLines: Int
+  let hidesSemanticPrefixesInTitle: Bool
   let secondaryText: String?
   let inlineIdentityAndAge: String
   private let attentionBadges: DashboardReviewAttentionBadges
@@ -77,7 +82,10 @@ struct DashboardReviewListRow: View {
     repositoryLabels: [ReviewRepositoryLabel] = [],
     showsAvatars: Bool = true,
     showsLabels: Bool = true,
-    showsLineCounters: Bool = true
+    showsLineCounters: Bool = true,
+    wrapsTitle: Bool = true,
+    titleMaximumLines: Int = DashboardReviewsPreferences.defaultRowTitleMaximumLines,
+    hidesSemanticPrefixesInTitle: Bool = false
   ) {
     self.item = item
     self.showsRepository = showsRepository
@@ -89,6 +97,9 @@ struct DashboardReviewListRow: View {
     self.showsAvatars = showsAvatars
     self.showsLabels = showsLabels
     self.showsLineCounters = showsLineCounters
+    self.wrapsTitle = wrapsTitle
+    self.titleMaximumLines = titleMaximumLines
+    self.hidesSemanticPrefixesInTitle = hidesSemanticPrefixesInTitle
     secondaryText = showsRepository ? "\(item.repository) · #\(item.number)" : nil
     let inlineLabels = Self.makeInlineIdentityAndAgeLabels(
       itemNumber: item.number,
@@ -103,6 +114,7 @@ struct DashboardReviewListRow: View {
 
   var body: some View {
     let rowIdealHeight = rowIdealHeight(
+      titleLineCount: estimatedTitleLineCount,
       hasAttentionStrip: !attentionBadges.isEmpty,
       hasRequiredFailedChecks: requiredFailedCheckNames != nil,
       showsLabels: showsLabelsStrip
@@ -190,10 +202,10 @@ struct DashboardReviewListRow: View {
 
   @ViewBuilder private var titleLine: some View {
     HStack(alignment: .firstTextBaseline, spacing: HarnessMonitorTheme.spacingSM) {
-      Text(item.title)
+      Text(displayTitle)
         .scaledFont(.callout.weight(.semibold))
         .foregroundStyle(HarnessMonitorTheme.ink)
-        .lineLimit(2)
+        .lineLimit(effectiveTitleMaximumLines)
         .truncationMode(.tail)
         .help(item.title)
         .accessibilityLabel(titleAccessibilityLabel)
@@ -314,6 +326,7 @@ struct DashboardReviewListRow: View {
   }
 
   fileprivate func rowIdealHeight(
+    titleLineCount: Int,
     hasAttentionStrip: Bool,
     hasRequiredFailedChecks: Bool,
     showsLabels: Bool
@@ -323,7 +336,8 @@ struct DashboardReviewListRow: View {
         titleLineHeight: titleLineHeight,
         captionLineHeight: captionLineHeight,
         pillStripHeight: statusPillLineHeight,
-        hasWrappedTitle: DashboardReviewListRowHeight.titleLikelyWraps(item.title),
+        hasWrappedTitle: titleLineCount > 1,
+        titleLineCount: titleLineCount,
         hasSecondaryLine: secondaryText != nil,
         hasAttentionStrip: hasAttentionStrip,
         hasRequiredFailedChecks: hasRequiredFailedChecks,
@@ -354,12 +368,66 @@ struct DashboardReviewListRow: View {
     showsLineCounters && (item.additions > 0 || item.deletions > 0)
   }
 
+  private var effectiveTitleMaximumLines: Int {
+    if !wrapsTitle {
+      return 1
+    }
+    return min(
+      max(titleMaximumLines, DashboardReviewsPreferences.minimumRowTitleMaximumLines),
+      DashboardReviewsPreferences.maximumRowTitleMaximumLines
+    )
+  }
+
+  private var estimatedTitleLineCount: Int {
+    DashboardReviewListRowHeight.estimatedTitleLineCount(
+      displayTitle,
+      maximumLines: effectiveTitleMaximumLines
+    )
+  }
+
+  private var displayTitle: String {
+    dashboardReviewDisplayedTitle(
+      item.title,
+      hidesSemanticPrefix: hidesSemanticPrefixesInTitle
+    )
+  }
+
   private var titleAccessibilityLabel: String {
     let trimmedAuthorLogin = item.authorLogin.trimmingCharacters(in: .whitespacesAndNewlines)
-    guard !showsAvatars, !trimmedAuthorLogin.isEmpty else { return item.title }
-    return "\(item.title), by @\(trimmedAuthorLogin)"
+    guard !showsAvatars, !trimmedAuthorLogin.isEmpty else { return displayTitle }
+    return "\(displayTitle), by @\(trimmedAuthorLogin)"
   }
 }
+
+func dashboardReviewDisplayedTitle(
+  _ title: String,
+  hidesSemanticPrefix: Bool
+) -> String {
+  guard
+    hidesSemanticPrefix,
+    let match = dashboardReviewSemanticCommitPrefixExpression.firstMatch(
+      in: title,
+      range: NSRange(title.startIndex..<title.endIndex, in: title)
+    ),
+    let prefixRange = Range(match.range, in: title)
+  else {
+    return title
+  }
+
+  let stripped = title[prefixRange.upperBound...]
+    .trimmingCharacters(in: .whitespacesAndNewlines)
+  guard !stripped.isEmpty else { return title }
+  return String(stripped)
+}
+
+private let dashboardReviewSemanticCommitPrefixExpression: NSRegularExpression = {
+  let pattern =
+    #"^(build|chore|ci|docs|feat|fix|perf|refactor|revert|style|test)(?:\([^\r\n)]+\))?!?:\s+"#
+  return try! NSRegularExpression(
+    pattern: pattern,
+    options: [.caseInsensitive]
+  )
+}()
 
 private struct DashboardReviewAttentionBadgeStrip: View {
   let badges: DashboardReviewAttentionBadges

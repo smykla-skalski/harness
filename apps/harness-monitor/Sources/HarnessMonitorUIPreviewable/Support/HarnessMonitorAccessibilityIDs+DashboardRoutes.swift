@@ -46,6 +46,10 @@ extension HarnessMonitorAccessibility {
     "harness.dashboard.reviews.show-row-labels"
   public static let dashboardReviewsShowRowLineCountersToggle =
     "harness.dashboard.reviews.show-row-line-counters"
+  public static let dashboardReviewsWrapRowTitlesToggle =
+    "harness.dashboard.reviews.wrap-row-titles"
+  public static let dashboardReviewsHideSemanticPrefixesInRowTitlesToggle =
+    "harness.dashboard.reviews.hide-semantic-prefixes"
   public static let dashboardReviewsRefreshTimeoutBanner =
     "harness.dashboard.reviews.refresh-timeout-banner"
   public static let dashboardReviewsTimeoutRetryButton =

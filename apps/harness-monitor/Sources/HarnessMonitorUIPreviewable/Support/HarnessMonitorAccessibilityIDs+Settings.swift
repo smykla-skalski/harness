@@ -167,6 +167,12 @@ extension HarnessMonitorAccessibility {
     "harness.settings.reviews.show-row-labels"
   public static let settingsReviewsShowRowLineCountersToggle =
     "harness.settings.reviews.show-row-line-counters"
+  public static let settingsReviewsWrapRowTitlesToggle =
+    "harness.settings.reviews.wrap-row-titles"
+  public static let settingsReviewsRowTitleMaximumLinesField =
+    "harness.settings.reviews.row-title-maximum-lines"
+  public static let settingsReviewsHideSemanticPrefixesInRowTitlesToggle =
+    "harness.settings.reviews.hide-semantic-prefixes"
   public static let settingsDepsFrequentLabelsCountField =
     "harness.settings.reviews.frequent-labels-count"
   public static let settingsReviewsRefreshIntervalField =

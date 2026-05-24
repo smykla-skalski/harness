@@ -10,6 +10,9 @@ struct DashboardReviewsPreferences: Codable, Equatable {
   static let minimumFrequentLabelsCount: Int = 1
   static let maximumFrequentLabelsCount: Int = 10
   static let defaultFrequentLabelsCount: Int = 5
+  static let minimumRowTitleMaximumLines: Int = 2
+  static let maximumRowTitleMaximumLines: Int = 6
+  static let defaultRowTitleMaximumLines: Int = 2
 
   static let minimumTimelinePageSize: Int = 10
   static let maximumTimelinePageSize: Int = 100
@@ -27,6 +30,9 @@ struct DashboardReviewsPreferences: Codable, Equatable {
   var showAvatarsInRows = true
   var showLabelsInRows = true
   var showLineCountersInRows = true
+  var wrapTitlesInRows = true
+  var rowTitleMaximumLines: Int = defaultRowTitleMaximumLines
+  var hideSemanticPrefixesInRowTitles = false
   var frequentLabelsCount: Int = defaultFrequentLabelsCount
   var perRepositoryIntervalSeconds: UInt64 = 300
   var maxConcurrentRepositoryFetches: Int = 2
@@ -68,6 +74,9 @@ struct DashboardReviewsPreferences: Codable, Equatable {
     case showAvatarsInRows
     case showLabelsInRows
     case showLineCountersInRows
+    case wrapTitlesInRows
+    case rowTitleMaximumLines
+    case hideSemanticPrefixesInRowTitles
     case frequentLabelsCount
     case perRepositoryIntervalSeconds
     case maxConcurrentRepositoryFetches
@@ -181,6 +190,15 @@ struct DashboardReviewsPreferences: Codable, Equatable {
     showLineCountersInRows =
       try container.decodeIfPresent(Bool.self, forKey: .showLineCountersInRows)
       ?? defaults.showLineCountersInRows
+    wrapTitlesInRows =
+      try container.decodeIfPresent(Bool.self, forKey: .wrapTitlesInRows)
+      ?? defaults.wrapTitlesInRows
+    rowTitleMaximumLines =
+      try container.decodeIfPresent(Int.self, forKey: .rowTitleMaximumLines)
+      ?? defaults.rowTitleMaximumLines
+    hideSemanticPrefixesInRowTitles =
+      try container.decodeIfPresent(Bool.self, forKey: .hideSemanticPrefixesInRowTitles)
+      ?? defaults.hideSemanticPrefixesInRowTitles
   }
 
   private mutating func decodeFilesPreferences(
@@ -365,6 +383,10 @@ struct DashboardReviewsPreferences: Codable, Equatable {
     copy.frequentLabelsCount = min(
       max(frequentLabelsCount, Self.minimumFrequentLabelsCount),
       Self.maximumFrequentLabelsCount
+    )
+    copy.rowTitleMaximumLines = min(
+      max(rowTitleMaximumLines, Self.minimumRowTitleMaximumLines),
+      Self.maximumRowTitleMaximumLines
     )
     copy.timelineInitialPageSize = Self.normalizedTimelinePageSize(timelineInitialPageSize)
     copy.timelineLoadOlderBatchSize = Self.normalizedTimelinePageSize(

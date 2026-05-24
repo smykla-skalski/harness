@@ -162,6 +162,14 @@ extension DashboardReviewsRouteView {
     routePreferencesToggleBinding(\.showLineCountersInRows)
   }
 
+  var routeWrapTitlesInRowsBinding: Binding<Bool> {
+    routePreferencesToggleBinding(\.wrapTitlesInRows)
+  }
+
+  var routeHideSemanticPrefixesInRowTitlesBinding: Binding<Bool> {
+    routePreferencesToggleBinding(\.hideSemanticPrefixesInRowTitles)
+  }
+
   var routePresentationWorker: DashboardReviewsPresentationWorker {
     routeStateStorage.presentationWorker
   }

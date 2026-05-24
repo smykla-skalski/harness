@@ -205,13 +205,33 @@ struct SettingsReviewsSection: View {
       .accessibilityIdentifier(
         HarnessMonitorAccessibility.settingsReviewsShowRowLineCountersToggle
       )
+      Toggle("Wrap PR titles in review rows", isOn: $draft.wrapTitlesInRows)
+        .accessibilityIdentifier(
+          HarnessMonitorAccessibility.settingsReviewsWrapRowTitlesToggle
+        )
+      Stepper(
+        "Wrapped title max lines: \(draft.rowTitleMaximumLines)",
+        value: $draft.rowTitleMaximumLines,
+        in: Self.rowTitleMaximumLinesRange
+      )
+      .disabled(!draft.wrapTitlesInRows)
+      .accessibilityIdentifier(
+        HarnessMonitorAccessibility.settingsReviewsRowTitleMaximumLinesField
+      )
+      Toggle(
+        "Hide semantic commit prefixes in review row titles",
+        isOn: $draft.hideSemanticPrefixesInRowTitles
+      )
+      .accessibilityIdentifier(
+        HarnessMonitorAccessibility.settingsReviewsHideSemanticPrefixesInRowTitlesToggle
+      )
     } header: {
       Text("Display")
         .harnessNativeFormSectionHeader()
     } footer: {
       Text(
         """
-        These controls hide or show row chrome in the Reviews list only. Pull request detail keeps the full metadata.
+        These controls change the compact Reviews list only. Wrapped titles use the max-line limit above, while hover help and pull request detail keep the full original title.
         """
       )
     }
@@ -357,6 +377,12 @@ struct SettingsReviewsSection: View {
     uncheckedBounds: (
       lower: DashboardReviewsPreferences.minimumFrequentLabelsCount,
       upper: DashboardReviewsPreferences.maximumFrequentLabelsCount
+    )
+  )
+  static let rowTitleMaximumLinesRange = ClosedRange(
+    uncheckedBounds: (
+      lower: DashboardReviewsPreferences.minimumRowTitleMaximumLines,
+      upper: DashboardReviewsPreferences.maximumRowTitleMaximumLines
     )
   )
 
