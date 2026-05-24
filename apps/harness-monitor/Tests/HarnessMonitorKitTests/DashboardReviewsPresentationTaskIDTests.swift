@@ -48,6 +48,34 @@ struct DashboardReviewsPresentationTaskIDTests {
     #expect(modelsSource.contains("struct DashboardReviewsPresentationSelectionID"))
     #expect(selectionSource.contains("func applyingSelection("))
   }
+
+  @Test("route response metadata updates do not invalidate list presentation")
+  func routeResponseMetadataUpdatesDoNotInvalidateListPresentation() throws {
+    let accessorsSource = try dashboardReviewsRouteSource(
+      named: "DashboardReviewsRouteView+Accessors.swift")
+    let cacheSource = try dashboardReviewsRouteSource(
+      named: "DashboardReviewsRouteView+Cache.swift")
+    let schedulerSource = try dashboardReviewsRouteSource(
+      named: "DashboardReviewsRouteView+Scheduler.swift")
+    let refreshSource = try dashboardReviewsRouteSource(
+      named: "DashboardReviewsRouteView+Refresh.swift")
+
+    #expect(accessorsSource.contains("func setRouteResponse("))
+    #expect(accessorsSource.contains("if bumpsItemsRevision {"))
+    #expect(cacheSource.contains("setRouteResponse(response, bumpsItemsRevision: false)"))
+    #expect(schedulerSource.contains("let itemsChanged = nextItems != currentResponse.items"))
+    #expect(
+      schedulerSource.contains(
+        "setRouteResponse(response, bumpsItemsRevision: itemsChanged)"
+      )
+    )
+    #expect(refreshSource.contains("let itemsChanged = nextItems != currentResponse.items"))
+    #expect(
+      refreshSource.contains(
+        "setRouteResponse(response, bumpsItemsRevision: itemsChanged)"
+      )
+    )
+  }
 }
 
 private func sourceSlice(_ source: String, from start: String, to end: String) -> String {

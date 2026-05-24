@@ -76,7 +76,7 @@ extension DashboardReviewsRouteView {
       merged[repository] = labels
     }
     if merged != routeResponse.repositoryLabels {
-      routeResponse = ReviewsQueryResponse(
+      let response = ReviewsQueryResponse(
         fetchedAt: routeResponse.fetchedAt,
         fromCache: routeResponse.fromCache,
         summary: routeResponse.summary,
@@ -84,6 +84,7 @@ extension DashboardReviewsRouteView {
         repositoryLabels: merged,
         viewerLogin: routeResponse.viewerLogin
       )
+      setRouteResponse(response, bumpsItemsRevision: false)
     }
   }
 
