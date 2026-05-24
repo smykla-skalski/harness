@@ -29,7 +29,10 @@ GLOBAL_SEMAPHORE_DIR="${HARNESS_MONITOR_GLOBAL_SEMAPHORE_DIR:-$COMMON_REPO_ROOT/
 # `_HARNESS_TEST_GLOBAL_CONCURRENCY_OVERRIDE` is for unit tests only -- the
 # `_HARNESS_TEST` prefix is named so a casual agent prompt won't stumble
 # into it as a "bypass" trick.
-GLOBAL_CONCURRENCY=1
+# Cap=2: on a 14-core M3 Max one Monitor build saturates ~10 cores; two
+# concurrent fit while leaving the system responsive. Three+ pushed load
+# average past 80 in observed runs. User-set ceiling.
+GLOBAL_CONCURRENCY=2
 if [[ -n "${_HARNESS_TEST_GLOBAL_CONCURRENCY_OVERRIDE:-}" ]]; then
   GLOBAL_CONCURRENCY="$_HARNESS_TEST_GLOBAL_CONCURRENCY_OVERRIDE"
 fi
@@ -254,6 +257,26 @@ release_xcodebuild_lock() {
 # some other resource) still has a live PID but isn't making progress; a
 # stale heartbeat is the explicit signal that "another agent thinking they
 # can take this slot" is correct.
+# Returns 0 if any descendant PID listed in the slot's descendant_pids file
+# is still alive (excluding the heartbeat process itself, which is parented
+# at the wrapper and would otherwise count). Used as a fallback liveness
+# signal when the heartbeat file has gone stale: if xcodebuild or any of
+# its formatter-pipeline siblings is still running under the wrapper, the
+# slot is healthy even though the heartbeat hasn't touched recently.
+global_slot_descendant_alive() {
+  local slot="$1"
+  local descendants_file="$slot/descendant_pids"
+  [[ -f "$descendants_file" ]] || return 1
+  local child
+  while IFS= read -r child; do
+    [[ "$child" =~ ^[0-9]+$ ]] || continue
+    if kill -0 "$child" 2>/dev/null; then
+      return 0
+    fi
+  done < "$descendants_file"
+  return 1
+}
+
 global_slot_is_alive() {
   # All `stat` / `date` invocations use absolute paths so GNU coreutils on
   # PATH does not shadow the BSD-flag semantics we rely on (-f FMT for stat,
@@ -273,6 +296,16 @@ global_slot_is_alive() {
     mtime="$(/usr/bin/stat -f '%m' "$heartbeat_file" 2>/dev/null)" || return 1
     [[ "$mtime" =~ ^[0-9]+$ ]] || return 1
     if (( now_epoch - mtime > GLOBAL_SEMAPHORE_HEARTBEAT_STALENESS_SECONDS )); then
+      # Heartbeat stale, but the wrapper PID is still alive. Cross-check
+      # the descendant_pids file: if xcodebuild (or any other formatter-
+      # pipeline child) is still running under the wrapper, the wrapper
+      # is doing real work and the stale heartbeat means the heartbeat
+      # subprocess died or its touch() is failing -- not that the slot
+      # is abandoned. Only when both signals agree on "dead" do we
+      # reclaim.
+      if global_slot_descendant_alive "$slot"; then
+        return 0
+      fi
       return 1
     fi
     return 0
@@ -293,12 +326,37 @@ global_slot_is_alive() {
 spawn_global_xcodebuild_heartbeat() {
   local slot_path="$1"
   local heartbeat_file="$slot_path/heartbeat"
+  local descendants_file="$slot_path/descendant_pids"
+  local wrapper_pid="$$"
   /usr/bin/touch "$heartbeat_file"
+  # Heartbeat must survive transient touch() failures (a brief FS hiccup, a
+  # backup process holding the parent dir for a moment, etc.). If it exits
+  # on the first failed touch, mtime goes stale within
+  # GLOBAL_SEMAPHORE_HEARTBEAT_STALENESS_SECONDS and another wrapper
+  # reclaims the slot while *this* wrapper still has xcodebuild running --
+  # the exact race we fixed here. Only the trap'd TERM/INT/HUP (set by
+  # cleanup_descendants_and_lock) ends the heartbeat. Touch failures
+  # swallow and retry on the next interval.
+  #
+  # The descendants file is a second liveness signal: every interval we
+  # rewrite the wrapper's direct child PIDs (the formatter pipeline +
+  # xcodebuild). If the heartbeat *file* later goes stale despite this
+  # process still running (rare -- requires touch() to keep failing),
+  # global_slot_is_alive can fall back to "any descendant PID listed here
+  # is alive" before declaring the slot dead and reclaiming it. Together
+  # the two signals close the original "heartbeat dies, xcodebuild
+  # continues" race regardless of which side fails.
   (
     trap 'exit 0' TERM INT HUP
     while :; do
       sleep "$GLOBAL_SEMAPHORE_HEARTBEAT_INTERVAL_SECONDS"
-      /usr/bin/touch "$heartbeat_file" 2>/dev/null || exit 0
+      /usr/bin/touch "$heartbeat_file" 2>/dev/null || true
+      # Direct children of the wrapper. Excludes the heartbeat itself
+      # because pgrep -P sees only the wrapper's children, not its own
+      # forked grandchildren; this subshell is parented at the wrapper
+      # so it does show up. The reaper de-dupes against its own pid.
+      /usr/bin/pgrep -P "$wrapper_pid" 2>/dev/null > "$descendants_file.tmp" || true
+      /bin/mv "$descendants_file.tmp" "$descendants_file" 2>/dev/null || true
     done
   ) &
   global_heartbeat_pid=$!

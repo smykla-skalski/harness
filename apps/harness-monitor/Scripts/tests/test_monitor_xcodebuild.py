@@ -412,6 +412,7 @@ exec "{fake_bin / "xcodebuild"}" "$@"
         slot_name: str,
         pid: int,
         heartbeat_age_seconds: int = 0,
+        descendant_pids: list[int] | None = None,
     ) -> Path:
         slot = semaphore_dir / slot_name
         slot.mkdir(parents=True)
@@ -426,6 +427,14 @@ exec "{fake_bin / "xcodebuild"}" "$@"
             now = time.time()
             old = now - heartbeat_age_seconds
             os.utime(heartbeat, (old, old))
+        # Emulate the heartbeat subprocess's secondary signal: the list of
+        # wrapper-direct-child PIDs. global_slot_is_alive falls back to
+        # this when the heartbeat file goes stale, so we have to plant it
+        # for the new "heartbeat stale + descendant alive = keep slot" case.
+        if descendant_pids is not None:
+            (slot / "descendant_pids").write_text(
+                "".join(f"{p}\n" for p in descendant_pids)
+            )
         return slot
 
     def test_global_semaphore_blocks_when_fresh_holder_is_alive(self) -> None:
@@ -441,6 +450,9 @@ exec "{fake_bin / "xcodebuild"}" "$@"
                     extra_env={
                         "HARNESS_MONITOR_GLOBAL_SEMAPHORE_DIR": str(semaphore_dir),
                         "XCODEBUILD_LOCK_WAIT_TIMEOUT_SECONDS": "1",
+                        # Pin to cap=1 so the planted slot is the only seat
+                        # and the new wrapper has nowhere else to go.
+                        "_HARNESS_TEST_GLOBAL_CONCURRENCY_OVERRIDE": "1",
                     },
                 )
             finally:
@@ -477,6 +489,78 @@ exec "{fake_bin / "xcodebuild"}" "$@"
                 sleeper.terminate()
                 sleeper.wait(timeout=5)
 
+            self.assertEqual(completed.returncode, 0, completed.stderr)
+            self.assertIn("XCODEBUILD=", log)
+
+    def test_stale_heartbeat_with_live_descendant_keeps_slot(self) -> None:
+        # Real-world race: the holder's PID is alive, but its heartbeat
+        # subprocess died (or its touch() has been failing). The wrapper is
+        # still running real xcodebuild work as a direct child. The reaper
+        # MUST NOT reclaim the slot here -- two xcodebuilds would then run
+        # concurrently. global_slot_is_alive falls back to checking the
+        # descendant_pids file when the heartbeat goes stale.
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            semaphore_dir = Path(tmp_dir) / "sema"
+            holder = subprocess.Popen(["/bin/sleep", "30"])
+            descendant = subprocess.Popen(["/bin/sleep", "30"])
+            try:
+                self._plant_live_slot(
+                    semaphore_dir,
+                    "slot-1",
+                    holder.pid,
+                    heartbeat_age_seconds=600,
+                    descendant_pids=[descendant.pid],
+                )
+                completed, log, _ = self.run_script(
+                    "-scheme",
+                    "HarnessMonitor",
+                    "build",
+                    extra_env={
+                        "HARNESS_MONITOR_GLOBAL_SEMAPHORE_DIR": str(semaphore_dir),
+                        "XCODEBUILD_LOCK_WAIT_TIMEOUT_SECONDS": "1",
+                        # Pin to cap=1 so the only slot is the planted one.
+                        # We want to assert that even when the new wrapper
+                        # has nowhere else to go, a slot with a live
+                        # descendant is NOT reclaimed.
+                        "_HARNESS_TEST_GLOBAL_CONCURRENCY_OVERRIDE": "1",
+                    },
+                )
+            finally:
+                holder.terminate()
+                descendant.terminate()
+                holder.wait(timeout=5)
+                descendant.wait(timeout=5)
+            # Slot was NOT reclaimed (descendant alive), so the new wrapper
+            # times out waiting and exits 73 without running xcodebuild.
+            self.assertEqual(completed.returncode, 73)
+            self.assertEqual(log, "")
+            self.assertIn("xcodebuild concurrency slots are busy", completed.stderr)
+
+    def test_stale_heartbeat_with_dead_descendant_reclaims_slot(self) -> None:
+        # Heartbeat stale AND no descendant PID is alive: the slot is
+        # genuinely orphaned and the reaper clears it.
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            semaphore_dir = Path(tmp_dir) / "sema"
+            holder = subprocess.Popen(["/bin/sleep", "30"])
+            try:
+                self._plant_live_slot(
+                    semaphore_dir,
+                    "slot-1",
+                    holder.pid,
+                    heartbeat_age_seconds=600,
+                    descendant_pids=[2147483645],  # unused PID
+                )
+                completed, log, _ = self.run_script(
+                    "-scheme",
+                    "HarnessMonitor",
+                    "build",
+                    extra_env={
+                        "HARNESS_MONITOR_GLOBAL_SEMAPHORE_DIR": str(semaphore_dir),
+                    },
+                )
+            finally:
+                holder.terminate()
+                holder.wait(timeout=5)
             self.assertEqual(completed.returncode, 0, completed.stderr)
             self.assertIn("XCODEBUILD=", log)
 
