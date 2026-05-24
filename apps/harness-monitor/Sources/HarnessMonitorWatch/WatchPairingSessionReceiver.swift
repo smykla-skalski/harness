@@ -68,6 +68,22 @@ final class WatchPairingSessionReceiver: NSObject, WCSessionDelegate, @unchecked
     handlePayload(userInfo)
   }
 
+  func session(
+    _ session: WCSession,
+    didReceiveMessage message: [String: Any]
+  ) {
+    handlePayload(message)
+  }
+
+  func session(
+    _ session: WCSession,
+    didReceiveMessage message: [String: Any],
+    replyHandler: @escaping ([String: Any]) -> Void
+  ) {
+    handlePayload(message)
+    replyHandler([:])
+  }
+
   private func requestPairingTransfer() {
     guard let session, session.activationState == .activated else {
       return

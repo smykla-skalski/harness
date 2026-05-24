@@ -70,6 +70,7 @@ final class MobileWatchPairingSessionBridge: NSObject, MobileWatchPairingSyncing
     guard activationState == .activated, error == nil else {
       return
     }
+    handleWatchPairingRequest(session.receivedApplicationContext)
     flushPendingPayloadIfReady()
   }
 
@@ -152,8 +153,7 @@ final class MobileWatchPairingSessionBridge: NSObject, MobileWatchPairingSyncing
   private func flushPendingPayloadIfReady() {
     guard let session,
       session.activationState == .activated,
-      session.isPaired,
-      session.isWatchAppInstalled
+      session.isPaired
     else {
       return
     }
@@ -161,6 +161,15 @@ final class MobileWatchPairingSessionBridge: NSObject, MobileWatchPairingSyncing
       return
     }
 
+    if session.isReachable {
+      session.sendMessage(
+        payload,
+        replyHandler: nil,
+        errorHandler: { [weak self] _ in
+          self?.setPendingPayload(payload)
+        }
+      )
+    }
     do {
       try session.updateApplicationContext(payload)
       session.transferUserInfo(payload)

@@ -204,6 +204,78 @@ final class MobilePairingTests: XCTestCase {
     XCTAssertEqual(plan.identityIDsToDelete, ["device-old"])
   }
 
+  func testPairedStationPlaceholdersInsertMissingStations() {
+    let now = Date(timeIntervalSince1970: 1_700_000_000)
+    let credential = makeCredential(
+      stationID: "station-studio",
+      deviceIdentityID: "device-phone",
+      now: now
+    )
+    var snapshot = MobileMirrorSnapshot.empty(now: now)
+
+    let changed = snapshot.ensurePairedStationPlaceholders(
+      for: [credential],
+      defaultStationID: credential.stationID,
+      now: now
+    )
+
+    XCTAssertTrue(changed)
+    XCTAssertEqual(snapshot.stations.count, 1)
+    XCTAssertEqual(snapshot.stations.first?.id, credential.stationID)
+    XCTAssertEqual(snapshot.stations.first?.displayName, credential.stationName)
+    XCTAssertEqual(snapshot.stations.first?.state, .stale)
+    XCTAssertEqual(snapshot.stations.first?.defaultStation, true)
+  }
+
+  func testPairedStationPlaceholdersNormalizeDefaultStation() {
+    let now = Date(timeIntervalSince1970: 1_700_000_000)
+    var snapshot = MobileMirrorSnapshot.empty(now: now)
+    snapshot.stations = [
+      MobileStationSummary(
+        id: "station-studio",
+        displayName: "Studio",
+        state: .online,
+        lastSeenAt: now,
+        activeSessionCount: 1,
+        needsYouCount: 0,
+        commandQueueCount: 0,
+        defaultStation: false
+      ),
+      MobileStationSummary(
+        id: "station-laptop",
+        displayName: "Laptop",
+        state: .stale,
+        lastSeenAt: now,
+        activeSessionCount: 0,
+        needsYouCount: 0,
+        commandQueueCount: 0,
+        defaultStation: true
+      ),
+    ]
+    let credentials = [
+      makeCredential(
+        stationID: "station-studio",
+        deviceIdentityID: "device-phone",
+        now: now
+      ),
+      makeCredential(
+        stationID: "station-laptop",
+        deviceIdentityID: "device-phone",
+        now: now
+      ),
+    ]
+
+    let changed = snapshot.ensurePairedStationPlaceholders(
+      for: credentials,
+      defaultStationID: "station-studio",
+      now: now
+    )
+
+    XCTAssertTrue(changed)
+    XCTAssertEqual(snapshot.stations.first { $0.id == "station-studio" }?.defaultStation, true)
+    XCTAssertEqual(snapshot.stations.first { $0.id == "station-laptop" }?.defaultStation, false)
+  }
+
   func testStationAcceptorTrustsDeviceAndDerivesSharedKey() async throws {
     let now = Date(timeIntervalSince1970: 1_700_000_000)
     let stationIdentity = MobilePairingStationIdentity(
