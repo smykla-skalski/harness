@@ -101,6 +101,7 @@ extension HarnessMonitorApp {
         acpAttentionState: acpAttentionState,
         windowCommandRouting: appWindowCommandRouting,
         mcpWindowCommandRegistrar: appMCPWindowCommandRegistrar,
+        mobileRelayRuntime: mobileRelayRuntime,
         themeMode: themeModeBinding,
         selectedSection: settingsSelectedSectionBinding,
         navigationRequest: settingsNavigationRequestBinding

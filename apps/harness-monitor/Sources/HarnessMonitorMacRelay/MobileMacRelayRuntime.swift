@@ -11,6 +11,7 @@ public final class MobileMacRelayRuntime: @unchecked Sendable {
   public let storageRoot: URL
 
   private let pairingServer: MobilePairingHTTPServer
+  private let trustedDeviceStore: MobileMacTrustedCommandDeviceStore
   private let relayService: MobileMacRelayService
   private let pollInterval: Duration
   private let now: @Sendable () -> Date
@@ -37,6 +38,7 @@ public final class MobileMacRelayRuntime: @unchecked Sendable {
     let trustedDeviceStore = try MobileMacTrustedCommandDeviceStore(
       fileURL: storageRoot.appendingPathComponent("trusted-mobile-devices.json")
     )
+    self.trustedDeviceStore = trustedDeviceStore
     pairingServer = MobilePairingHTTPServer(
       stationIdentity: stationIdentity,
       trustStore: trustedDeviceStore,
@@ -159,6 +161,24 @@ public final class MobileMacRelayRuntime: @unchecked Sendable {
       return nil
     }
     return try MobilePairingInvitationCodec.encode(invitation)
+  }
+
+  public func renewPairingInvitationURL() async throws -> URL {
+    let invitation = try await pairingServer.renewInvitation()
+    setInvitation(invitation)
+    return try MobilePairingInvitationCodec.encode(invitation)
+  }
+
+  public func trustedDeviceDescriptors() async throws -> [MobileDeviceDescriptor] {
+    try await trustedDeviceStore.trustedDevices().map {
+      MobileDeviceDescriptor(
+        id: $0.deviceID,
+        displayName: $0.displayName,
+        publicKeyFingerprint: $0.signingKeyFingerprint,
+        pairedAt: $0.pairedAt,
+        lastCommandAt: $0.lastCommandAt
+      )
+    }
   }
 
   private func setInvitation(_ invitation: MobilePairingInvitation) {

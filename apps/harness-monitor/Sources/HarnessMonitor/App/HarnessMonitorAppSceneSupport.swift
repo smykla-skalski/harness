@@ -1,5 +1,6 @@
 import AppKit
 import HarnessMonitorKit
+import HarnessMonitorMacRelay
 import HarnessMonitorUIPreviewable
 import SwiftUI
 
@@ -307,6 +308,7 @@ struct HarnessMonitorSettingsRootView: View {
   let acpAttentionState: AcpPermissionAttentionState
   let windowCommandRouting: WindowCommandRoutingState
   let mcpWindowCommandRegistrar: HarnessMonitorMCPWindowCommandRegistrar
+  let mobileRelayRuntime: MobileMacRelayRuntime?
   @Binding var themeMode: HarnessMonitorThemeMode
   @Binding var selectedSection: SettingsSection
   @Binding var navigationRequest: SettingsNavigationRequest?
@@ -322,6 +324,7 @@ struct HarnessMonitorSettingsRootView: View {
     acpAttentionState: AcpPermissionAttentionState,
     windowCommandRouting: WindowCommandRoutingState,
     mcpWindowCommandRegistrar: HarnessMonitorMCPWindowCommandRegistrar,
+    mobileRelayRuntime: MobileMacRelayRuntime?,
     themeMode: Binding<HarnessMonitorThemeMode>,
     selectedSection: Binding<SettingsSection>,
     navigationRequest: Binding<SettingsNavigationRequest?>
@@ -331,6 +334,7 @@ struct HarnessMonitorSettingsRootView: View {
     self.acpAttentionState = acpAttentionState
     self.windowCommandRouting = windowCommandRouting
     self.mcpWindowCommandRegistrar = mcpWindowCommandRegistrar
+    self.mobileRelayRuntime = mobileRelayRuntime
     _themeMode = themeMode
     _selectedSection = selectedSection
     _navigationRequest = navigationRequest
@@ -352,6 +356,11 @@ struct HarnessMonitorSettingsRootView: View {
       selectedSection: $selectedSection,
       navigationRequest: $navigationRequest
     )
+    .safeAreaInset(edge: .bottom, spacing: 0) {
+      if selectedSection == .connection, let mobileRelayRuntime {
+        MobileRelayPairingSettingsPanel(runtime: mobileRelayRuntime)
+      }
+    }
     .writingToolsBehavior(.disabled)
     .frame(minWidth: 680, minHeight: 440)
     .modifier(
