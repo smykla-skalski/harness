@@ -161,6 +161,12 @@ extension HarnessMonitorAccessibility {
     "harness.settings.reviews.merge-method"
   public static let settingsDepsShowLabelDescriptionsToggle =
     "harness.settings.reviews.show-label-descriptions"
+  public static let settingsReviewsShowRowAvatarsToggle =
+    "harness.settings.reviews.show-row-avatars"
+  public static let settingsReviewsShowRowLabelsToggle =
+    "harness.settings.reviews.show-row-labels"
+  public static let settingsReviewsShowRowLineCountersToggle =
+    "harness.settings.reviews.show-row-line-counters"
   public static let settingsDepsFrequentLabelsCountField =
     "harness.settings.reviews.frequent-labels-count"
   public static let settingsReviewsRefreshIntervalField =

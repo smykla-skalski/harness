@@ -115,6 +115,18 @@ struct HarnessMonitorUITestAccessibilityRegistryMoreTests {
         == "harness.settings.reviews.save"
     )
     #expect(
+      HarnessMonitorAccessibility.settingsReviewsShowRowAvatarsToggle
+        == "harness.settings.reviews.show-row-avatars"
+    )
+    #expect(
+      HarnessMonitorAccessibility.settingsReviewsShowRowLabelsToggle
+        == "harness.settings.reviews.show-row-labels"
+    )
+    #expect(
+      HarnessMonitorAccessibility.settingsReviewsShowRowLineCountersToggle
+        == "harness.settings.reviews.show-row-line-counters"
+    )
+    #expect(
       HarnessMonitorAccessibility.settingsSecretsSaveButton
         == "harness.settings.secrets.save"
     )

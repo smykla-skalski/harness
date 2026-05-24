@@ -102,6 +102,9 @@ extension DashboardReviewsRouteView {
       groupModeRaw: $groupModeRaw,
       needsMeOn: routeNeedsMeOnBinding,
       dependenciesOnlyOn: routeDependenciesOnlyOnBinding,
+      showAvatarsInRows: routeShowAvatarsInRowsBinding,
+      showLabelsInRows: routeShowLabelsInRowsBinding,
+      showLineCountersInRows: routeShowLineCountersInRowsBinding,
       needsMeCount: routeNeedsMeCount,
       syncHealth: routeSyncHealth,
       onRetryFailedRepositories: {
@@ -269,7 +272,10 @@ extension DashboardReviewsRouteView {
       isRefreshing: isPullRequestRefreshing(item.pullRequestID),
       actionTitle: pullRequestActionTitle(item.pullRequestID),
       updatedLabel: relativeUpdatedLabel(for: item),
-      repositoryLabels: routeResponse.repositoryLabels[item.repository] ?? []
+      repositoryLabels: routeResponse.repositoryLabels[item.repository] ?? [],
+      showsAvatars: normalizedPreferences.showAvatarsInRows,
+      showsLabels: normalizedPreferences.showLabelsInRows,
+      showsLineCounters: normalizedPreferences.showLineCountersInRows
     )
   }
 

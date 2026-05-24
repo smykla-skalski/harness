@@ -40,6 +40,12 @@ extension HarnessMonitorAccessibility {
     "harness.dashboard.reviews.category"
   public static let dashboardReviewsNeedsMeToggle =
     "harness.dashboard.reviews.needs-me"
+  public static let dashboardReviewsShowRowAvatarsToggle =
+    "harness.dashboard.reviews.show-row-avatars"
+  public static let dashboardReviewsShowRowLabelsToggle =
+    "harness.dashboard.reviews.show-row-labels"
+  public static let dashboardReviewsShowRowLineCountersToggle =
+    "harness.dashboard.reviews.show-row-line-counters"
   public static let dashboardReviewsRefreshTimeoutBanner =
     "harness.dashboard.reviews.refresh-timeout-banner"
   public static let dashboardReviewsTimeoutRetryButton =

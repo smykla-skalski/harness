@@ -73,6 +73,7 @@ struct SettingsReviewsSection: View {
     Form {
       sourceScopeSection
       behaviorSection
+      displaySection
       refreshSection
       Section {
         SettingsReviewsFilesSection(draft: $draft)
@@ -182,6 +183,35 @@ struct SettingsReviewsSection: View {
         Merge method drives Merge and Auto actions. Toggle label descriptions to append the \
         repository-defined description next to each label name in the Add Label menus. The \
         Add Label dropdown surfaces the top N most-used labels per repository at the top.
+        """
+      )
+    }
+  }
+
+  private var displaySection: some View {
+    Section {
+      Toggle("Show avatars in review rows", isOn: $draft.showAvatarsInRows)
+        .accessibilityIdentifier(
+          HarnessMonitorAccessibility.settingsReviewsShowRowAvatarsToggle
+        )
+      Toggle("Show labels in review rows", isOn: $draft.showLabelsInRows)
+        .accessibilityIdentifier(
+          HarnessMonitorAccessibility.settingsReviewsShowRowLabelsToggle
+        )
+      Toggle(
+        "Show +/- line counters in review rows",
+        isOn: $draft.showLineCountersInRows
+      )
+      .accessibilityIdentifier(
+        HarnessMonitorAccessibility.settingsReviewsShowRowLineCountersToggle
+      )
+    } header: {
+      Text("Display")
+        .harnessNativeFormSectionHeader()
+    } footer: {
+      Text(
+        """
+        These controls hide or show row chrome in the Reviews list only. Pull request detail keeps the full metadata.
         """
       )
     }

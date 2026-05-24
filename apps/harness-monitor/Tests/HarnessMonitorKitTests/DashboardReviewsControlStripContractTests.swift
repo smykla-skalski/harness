@@ -9,8 +9,7 @@ import Testing
 /// The control strip is pure SwiftUI view code with no testable business
 /// logic of its own — selection plumbing is the binding's caller's
 /// responsibility. The only contract worth pinning at the unit level is
-/// that the four user-visible *handles* (`dashboardReviewsNeedsMeToggle`,
-/// `…FilterPicker`, `…SortPicker`, `…GroupPicker`) survive future
+/// that the control strip's documented accessibility handles survive future
 /// SwiftUI restructures. An XCUI test could verify the handles
 /// end-to-end but pays a multi-minute launch cost; this source check is
 /// instant and catches the same regression class (someone renamed a
@@ -27,6 +26,9 @@ struct DashboardReviewsControlStripContractTests {
       "HarnessMonitorAccessibility.dashboardReviewsSortPicker",
       "HarnessMonitorAccessibility.dashboardReviewsGroupPicker",
       "HarnessMonitorAccessibility.dashboardReviewsCategoryToggle",
+      "HarnessMonitorAccessibility.dashboardReviewsShowRowAvatarsToggle",
+      "HarnessMonitorAccessibility.dashboardReviewsShowRowLabelsToggle",
+      "HarnessMonitorAccessibility.dashboardReviewsShowRowLineCountersToggle",
     ]
     for identifier in expected {
       #expect(

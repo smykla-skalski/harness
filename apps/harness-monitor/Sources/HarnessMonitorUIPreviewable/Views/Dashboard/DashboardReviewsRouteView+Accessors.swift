@@ -150,6 +150,18 @@ extension DashboardReviewsRouteView {
     $dependenciesOnlyOn
   }
 
+  var routeShowAvatarsInRowsBinding: Binding<Bool> {
+    routePreferencesToggleBinding(\.showAvatarsInRows)
+  }
+
+  var routeShowLabelsInRowsBinding: Binding<Bool> {
+    routePreferencesToggleBinding(\.showLabelsInRows)
+  }
+
+  var routeShowLineCountersInRowsBinding: Binding<Bool> {
+    routePreferencesToggleBinding(\.showLineCountersInRows)
+  }
+
   var routePresentationWorker: DashboardReviewsPresentationWorker {
     routeStateStorage.presentationWorker
   }
@@ -217,5 +229,19 @@ extension DashboardReviewsRouteView {
   var routeReviewCapabilities: ReviewsCapabilitiesResponse {
     get { routeStateStorage.actionState.capabilities }
     nonmutating set { routeStateStorage.actionState.capabilities = newValue }
+  }
+
+  private func routePreferencesToggleBinding(
+    _ keyPath: WritableKeyPath<DashboardReviewsPreferences, Bool>
+  ) -> Binding<Bool> {
+    Binding(
+      get: { normalizedPreferences[keyPath: keyPath] },
+      set: { newValue in
+        var nextPreferences = DashboardReviewsPreferences.decode(from: storedPreferences)
+        guard nextPreferences[keyPath: keyPath] != newValue else { return }
+        nextPreferences[keyPath: keyPath] = newValue
+        storedPreferences = nextPreferences.encodedString
+      }
+    )
   }
 }
