@@ -21,6 +21,175 @@ public enum MobileRelayCommandExecutionError: Error, Equatable, CustomStringConv
   }
 }
 
+public enum MobileRelayAgentStartFamily: String, Equatable, Sendable {
+  case terminal
+  case codex
+  case acp
+}
+
+public struct MobileRelayAgentStartRequest: Equatable, Sendable {
+  public let family: MobileRelayAgentStartFamily
+  public let agent: String
+  public let actor: String
+  public let role: SessionRole
+  public let fallbackRole: SessionRole?
+  public let capabilities: [String]
+  public let name: String?
+  public let prompt: String?
+  public let projectDir: String?
+  public let persona: String?
+  public let taskID: String?
+  public let boardItemID: String?
+  public let workflowExecutionID: String?
+  public let model: String?
+  public let effort: String?
+  public let allowCustomModel: Bool
+  public let recordPermissions: Bool
+  public let runtime: String?
+  public let argv: [String]
+  public let rows: Int
+  public let cols: Int
+  public let mode: CodexRunMode
+
+  public init(
+    family: MobileRelayAgentStartFamily,
+    agent: String,
+    actor: String,
+    role: SessionRole,
+    fallbackRole: SessionRole?,
+    capabilities: [String],
+    name: String?,
+    prompt: String?,
+    projectDir: String?,
+    persona: String?,
+    taskID: String?,
+    boardItemID: String?,
+    workflowExecutionID: String?,
+    model: String?,
+    effort: String?,
+    allowCustomModel: Bool,
+    recordPermissions: Bool,
+    runtime: String?,
+    argv: [String],
+    rows: Int,
+    cols: Int,
+    mode: CodexRunMode
+  ) {
+    self.family = family
+    self.agent = agent
+    self.actor = actor
+    self.role = role
+    self.fallbackRole = fallbackRole
+    self.capabilities = capabilities
+    self.name = name
+    self.prompt = prompt
+    self.projectDir = projectDir
+    self.persona = persona
+    self.taskID = taskID
+    self.boardItemID = boardItemID
+    self.workflowExecutionID = workflowExecutionID
+    self.model = model
+    self.effort = effort
+    self.allowCustomModel = allowCustomModel
+    self.recordPermissions = recordPermissions
+    self.runtime = runtime
+    self.argv = argv
+    self.rows = rows
+    self.cols = cols
+    self.mode = mode
+  }
+
+  fileprivate func acpAgentStartRequest() throws -> AcpAgentStartRequest {
+    let agentName = resolvedAcpAgentName
+    guard !agentName.isEmpty else {
+      throw MobileRelayCommandExecutionError.missingPayload("agent")
+    }
+    return AcpAgentStartRequest(
+      agent: agentName,
+      role: role,
+      fallbackRole: fallbackRole,
+      capabilities: capabilities,
+      name: name,
+      prompt: prompt,
+      projectDir: projectDir,
+      persona: persona,
+      taskID: taskID,
+      boardItemID: boardItemID,
+      workflowExecutionID: workflowExecutionID,
+      model: model,
+      effort: effort,
+      allowCustomModel: allowCustomModel,
+      recordPermissions: recordPermissions
+    )
+  }
+
+  fileprivate func codexRunRequest() throws -> CodexRunRequest {
+    guard let prompt, !prompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+      throw MobileRelayCommandExecutionError.missingPayload("prompt")
+    }
+    return CodexRunRequest(
+      actor: actor,
+      prompt: prompt,
+      mode: mode,
+      role: role,
+      fallbackRole: fallbackRole,
+      capabilities: capabilities.isEmpty ? nil : capabilities,
+      name: name,
+      persona: persona,
+      taskID: taskID,
+      boardItemID: boardItemID,
+      workflowExecutionID: workflowExecutionID,
+      model: model,
+      effort: effort,
+      allowCustomModel: allowCustomModel
+    )
+  }
+
+  fileprivate func terminalStartRequest() -> AgentTuiStartRequest {
+    AgentTuiStartRequest(
+      runtime: resolvedTerminalRuntime,
+      role: role,
+      capabilities: capabilities,
+      name: name,
+      prompt: prompt,
+      projectDir: projectDir,
+      persona: persona,
+      taskID: taskID,
+      boardItemID: boardItemID,
+      workflowExecutionID: workflowExecutionID,
+      model: model,
+      effort: effort,
+      allowCustomModel: allowCustomModel,
+      argv: argv,
+      rows: rows,
+      cols: cols
+    )
+  }
+
+  private var resolvedAcpAgentName: String {
+    let prefix = "acp:"
+    guard agent.lowercased().hasPrefix(prefix) else {
+      return agent
+    }
+    return String(agent.dropFirst(prefix.count))
+      .trimmingCharacters(in: .whitespacesAndNewlines)
+  }
+
+  private var resolvedTerminalRuntime: String {
+    if let runtime {
+      return runtime
+    }
+    let normalizedAgent = agent.lowercased()
+    for prefix in ["terminal:", "tui:"] where normalizedAgent.hasPrefix(prefix) {
+      return String(normalizedAgent.dropFirst(prefix.count))
+    }
+    if AgentTuiRuntime(rawValue: normalizedAgent) != nil {
+      return normalizedAgent
+    }
+    return AgentTuiRuntime.codex.rawValue
+  }
+}
+
 public protocol MobileRelayCommandClient: Sendable {
   func resolveAcpPermission(
     agentID: String,
@@ -30,7 +199,7 @@ public protocol MobileRelayCommandClient: Sendable {
   func dispatchTaskBoard(_ request: TaskBoardDispatchRequest) async throws -> String
   func approveTaskBoardPlan(id: String, request: TaskBoardPlanApproveRequest) async throws
     -> String
-  func startAgent(sessionID: String, request: AcpAgentStartRequest) async throws -> String
+  func startAgent(sessionID: String, request: MobileRelayAgentStartRequest) async throws -> String
   func stopAgent(agentID: String) async throws -> String
   func promptAgent(agentID: String, prompt: String) async throws -> String
   func approvePullRequest(_ target: ReviewTarget) async throws -> String
@@ -80,18 +249,62 @@ public struct HarnessMonitorClientMobileRelayCommandClient: MobileRelayCommandCl
     return "Approved task board plan for \(response.item.title)."
   }
 
-  public func startAgent(sessionID: String, request: AcpAgentStartRequest) async throws -> String {
-    let snapshot = try await client.startManagedAcpAgent(sessionID: sessionID, request: request)
+  public func startAgent(
+    sessionID: String,
+    request: MobileRelayAgentStartRequest
+  ) async throws -> String {
+    let snapshot: ManagedAgentSnapshot
+    switch request.family {
+    case .terminal:
+      snapshot = try await client.startManagedTerminalAgent(
+        sessionID: sessionID,
+        request: request.terminalStartRequest()
+      )
+    case .codex:
+      snapshot = try await client.startManagedCodexAgent(
+        sessionID: sessionID,
+        request: try request.codexRunRequest()
+      )
+    case .acp:
+      snapshot = try await client.startManagedAcpAgent(
+        sessionID: sessionID,
+        request: try request.acpAgentStartRequest()
+      )
+    }
     return "Started \(snapshot.managedAgentID)."
   }
 
   public func stopAgent(agentID: String) async throws -> String {
-    let snapshot = try await client.stopManagedAcpAgent(agentID: agentID)
+    let agent = try await client.managedAgent(agentID: agentID)
+    let snapshot: ManagedAgentSnapshot
+    switch agent {
+    case .terminal:
+      snapshot = try await client.stopManagedAgent(agentID: agentID)
+    case .codex:
+      snapshot = try await client.interruptManagedCodexAgent(agentID: agentID)
+    case .acp:
+      snapshot = try await client.stopManagedAcpAgent(agentID: agentID)
+    }
     return "Stopped \(snapshot.managedAgentID)."
   }
 
   public func promptAgent(agentID: String, prompt: String) async throws -> String {
-    let snapshot = try await client.promptManagedAcpAgent(agentID: agentID, prompt: prompt)
+    let agent = try await client.managedAgent(agentID: agentID)
+    let snapshot: ManagedAgentSnapshot
+    switch agent {
+    case .terminal:
+      snapshot = try await client.sendManagedAgentInput(
+        agentID: agentID,
+        request: AgentTuiInputRequest(input: .text(prompt.submittedTerminalPrompt))
+      )
+    case .codex:
+      snapshot = try await client.steerManagedCodexAgent(
+        agentID: agentID,
+        request: CodexSteerRequest(prompt: prompt)
+      )
+    case .acp:
+      snapshot = try await client.promptManagedAcpAgent(agentID: agentID, prompt: prompt)
+    }
     return "Prompted \(snapshot.managedAgentID)."
   }
 
@@ -196,7 +409,7 @@ public struct HarnessMonitorClientMobileRelayCommandExecutor: MobileRelayCommand
     case .agentStart:
       return try await client.startAgent(
         sessionID: try command.requiredSessionID(),
-        request: try command.acpAgentStartRequest()
+        request: try command.agentStartRequest()
       )
     case .agentStop:
       return try await client.stopAgent(agentID: try command.requiredAgentID())
@@ -305,9 +518,12 @@ extension MobileCommandRecord {
     )
   }
 
-  fileprivate func acpAgentStartRequest() throws -> AcpAgentStartRequest {
-    AcpAgentStartRequest(
-      agent: try requiredPayload("agent"),
+  fileprivate func agentStartRequest() throws -> MobileRelayAgentStartRequest {
+    let agent = try requiredPayload("agent")
+    return MobileRelayAgentStartRequest(
+      family: try agentStartFamily(agent: agent),
+      agent: agent,
+      actor: actorDeviceID,
       role: optionalPayload("role").flatMap(SessionRole.init(rawValue:)) ?? .worker,
       fallbackRole: optionalPayload("fallbackRole").flatMap(SessionRole.init(rawValue:)),
       capabilities: csvPayload("capabilities"),
@@ -321,8 +537,51 @@ extension MobileCommandRecord {
       model: optionalPayload("model"),
       effort: optionalPayload("effort"),
       allowCustomModel: optionalBoolPayload("allowCustomModel") ?? false,
-      recordPermissions: optionalBoolPayload("recordPermissions") ?? true
+      recordPermissions: optionalBoolPayload("recordPermissions") ?? true,
+      runtime: optionalPayload("runtime"),
+      argv: csvPayload("argv"),
+      rows: try optionalIntPayload("rows") ?? 32,
+      cols: try optionalIntPayload("cols") ?? 120,
+      mode: try codexRunMode()
     )
+  }
+
+  fileprivate func agentStartFamily(agent: String) throws -> MobileRelayAgentStartFamily {
+    if let explicitFamily = optionalPayload("family") {
+      guard let family = MobileRelayAgentStartFamily(rawValue: explicitFamily.lowercased()) else {
+        throw MobileRelayCommandExecutionError.invalidPayload(
+          key: "family",
+          value: explicitFamily
+        )
+      }
+      return family
+    }
+    let normalizedAgent = agent.lowercased()
+    if normalizedAgent.hasPrefix("terminal:") || normalizedAgent.hasPrefix("tui:") {
+      return .terminal
+    }
+    if normalizedAgent.hasPrefix("acp:") {
+      return .acp
+    }
+    if normalizedAgent == "codex" || normalizedAgent == "codex-native"
+      || normalizedAgent == "codex-run"
+    {
+      return .codex
+    }
+    if AgentTuiRuntime(rawValue: normalizedAgent) != nil {
+      return .terminal
+    }
+    return .acp
+  }
+
+  fileprivate func codexRunMode() throws -> CodexRunMode {
+    guard let rawMode = optionalPayload("mode") else {
+      return .workspaceWrite
+    }
+    guard let mode = CodexRunMode(rawValue: rawMode) else {
+      throw MobileRelayCommandExecutionError.invalidPayload(key: "mode", value: rawMode)
+    }
+    return mode
   }
 
   fileprivate func reviewTarget(snapshot: MobileMirrorSnapshot) throws -> ReviewTarget {
@@ -395,11 +654,27 @@ extension MobileCommandRecord {
     }
   }
 
+  private func optionalIntPayload(_ key: String) throws -> Int? {
+    guard let value = optionalPayload(key) else {
+      return nil
+    }
+    guard let intValue = Int(value) else {
+      throw MobileRelayCommandExecutionError.invalidPayload(key: key, value: value)
+    }
+    return intValue
+  }
+
   private func csvPayload(_ key: String) -> [String] {
     optionalPayload(key)?
       .split(separator: ",")
       .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
       .filter { !$0.isEmpty }
       ?? []
+  }
+}
+
+extension String {
+  fileprivate var submittedTerminalPrompt: String {
+    hasSuffix("\n") ? self : "\(self)\n"
   }
 }

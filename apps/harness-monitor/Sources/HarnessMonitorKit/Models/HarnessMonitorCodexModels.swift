@@ -133,6 +133,10 @@ public struct CodexRunRequest: Codable, Equatable, Sendable {
 
 public struct CodexSteerRequest: Codable, Equatable, Sendable {
   public let prompt: String
+
+  public init(prompt: String) {
+    self.prompt = prompt
+  }
 }
 
 public struct CodexApprovalDecisionRequest: Codable, Equatable, Sendable {

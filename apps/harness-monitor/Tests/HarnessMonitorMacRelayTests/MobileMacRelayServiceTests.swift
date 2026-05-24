@@ -883,7 +883,7 @@ final class MobileMacRelayServiceTests: XCTestCase {
         "acp:agent-codex-7:batch-1:approveAll",
         "dispatch:task-16:todo:false:/repo",
         "approve-plan:task-16:watch",
-        "start-agent:session-pr-review:codex:Pick up the task",
+        "start-agent:session-pr-review:codex:codex:Pick up the task",
         "prompt-agent:agent-codex-7:Please summarize status.",
         "stop-agent:agent-codex-7",
         "merge-pr:smykla-skalski/harness#812:squash:abc123",
@@ -891,6 +891,56 @@ final class MobileMacRelayServiceTests: XCTestCase {
         "rerun-pr:smykla-skalski/harness#812",
         "approve-pr:smykla-skalski/harness#812",
         "refresh:reviews:smykla-skalski/harness#812",
+      ]
+    )
+  }
+
+  func testAPIBackedExecutorClassifiesAgentStartFamilies() async throws {
+    let now = Date(timeIntervalSince1970: 1_700_000_000)
+    let snapshot = MobileDemoFixtures.snapshot(now: now)
+    let client = RecordingMobileRelayCommandClient()
+    let executor = HarnessMonitorClientMobileRelayCommandExecutor(
+      client: client,
+      now: { now }
+    )
+    let target = MobileCommandTarget(
+      stationID: "station-mac-studio",
+      sessionID: "session-pr-review",
+      targetRevision: snapshot.revision
+    )
+
+    _ = try await executor.execute(
+      command(
+        kind: .agentStart,
+        target: target,
+        payload: ["agent": "codex", "prompt": "Continue implementation"]
+      ),
+      snapshot: snapshot
+    )
+    _ = try await executor.execute(
+      command(
+        kind: .agentStart,
+        target: target,
+        payload: ["agent": "claude", "prompt": "Review the changes"]
+      ),
+      snapshot: snapshot
+    )
+    _ = try await executor.execute(
+      command(
+        kind: .agentStart,
+        target: target,
+        payload: ["agent": "acp:openrouter", "prompt": "Run model review"]
+      ),
+      snapshot: snapshot
+    )
+
+    let events = await client.events()
+    XCTAssertEqual(
+      events,
+      [
+        "start-agent:session-pr-review:codex:codex:Continue implementation",
+        "start-agent:session-pr-review:terminal:claude:Review the changes",
+        "start-agent:session-pr-review:acp:acp:openrouter:Run model review",
       ]
     )
   }
@@ -1104,8 +1154,13 @@ private actor RecordingMobileRelayCommandClient: MobileRelayCommandClient {
     return "Plan approved."
   }
 
-  func startAgent(sessionID: String, request: AcpAgentStartRequest) async throws -> String {
-    recordedEvents.append("start-agent:\(sessionID):\(request.agent):\(request.prompt ?? "")")
+  func startAgent(
+    sessionID: String,
+    request: MobileRelayAgentStartRequest
+  ) async throws -> String {
+    recordedEvents.append(
+      "start-agent:\(sessionID):\(request.family.rawValue):\(request.agent):\(request.prompt ?? "")"
+    )
     return "Agent started."
   }
 
