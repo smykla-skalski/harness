@@ -162,20 +162,20 @@ struct DashboardReviewsProvenanceSnapshot: Equatable {
   /// status bar. Intentionally omits `sourceTitle` so it doesn't repeat the
   /// label rendered immediately to its left.
   var detailTitle: String {
-    var parts = ["\(itemCount) PRs"]
+    var title = "\(itemCount) PRs"
     if fetchedDate != nil || !fetchedAt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-      parts.append(fetchedAgeTitle)
+      title += " · \(fetchedAgeTitle)"
     }
     if syncingRepositoryCount > 0 {
-      parts.append("syncing \(syncingRepositoryCount)")
+      title += " · syncing \(syncingRepositoryCount)"
     }
     if !failedRepositories.isEmpty {
-      parts.append("\(failedRepositories.count) failed")
+      title += " · \(failedRepositories.count) failed"
     }
     if !staleRepositories.isEmpty {
-      parts.append("\(staleRepositories.count) stale")
+      title += " · \(staleRepositories.count) stale"
     }
-    return parts.joined(separator: " · ")
+    return title
   }
 
   /// All applicable warnings stacked, not just the first match. Surfaced as
@@ -228,7 +228,13 @@ struct DashboardReviewsProvenanceSnapshot: Equatable {
   }
 
   func repositoryList(_ repositories: [String]) -> String {
-    let visible = repositories.prefix(3).joined(separator: ", ")
+    var visible = ""
+    for (index, repository) in repositories.prefix(3).enumerated() {
+      if index > 0 {
+        visible += ", "
+      }
+      visible += repository
+    }
     guard repositories.count > 3 else { return visible }
     return "\(visible), +\(repositories.count - 3)"
   }
