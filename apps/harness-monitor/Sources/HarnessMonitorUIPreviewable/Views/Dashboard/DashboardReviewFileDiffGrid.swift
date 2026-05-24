@@ -184,13 +184,23 @@ final class DashboardReviewFileDiffGridContentView: NSView {
     if githubPermalink(for: row) != nil {
       addMenuItem("Copy GitHub Permalink", action: #selector(copyContextPermalink), to: menu)
     }
-    if let url = threadsByRowID[row.id]?.compactMap(\.url).first {
+    if let url = firstThreadURL(forRowID: row.id) {
       addMenuItem("Copy Thread URL", action: #selector(copyContextThreadURL(_:)), to: menu)
       menu.item(at: menu.items.count - 1)?.representedObject = url
     }
     menu.addItem(.separator())
     addMenuItem("Copy File Path", action: #selector(copyFilePath), to: menu)
     return menu
+  }
+
+  private func firstThreadURL(forRowID rowID: Int) -> String? {
+    guard let threads = threadsByRowID[rowID] else { return nil }
+    for thread in threads {
+      if let url = thread.url {
+        return url
+      }
+    }
+    return nil
   }
 
   private func draw(row: DashboardReviewFileDiffRow, in rect: NSRect) {

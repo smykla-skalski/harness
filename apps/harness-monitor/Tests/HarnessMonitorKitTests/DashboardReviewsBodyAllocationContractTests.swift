@@ -164,4 +164,12 @@ struct DashboardReviewsBodyAllocationContractTests {
     #expect(!fileCardSource.contains("Text(\"-\\(file.deletions)\")"))
     #expect(!fileCardSource.contains("private var accessibilityLabel: Text"))
   }
+
+  @Test("diff grid context menu avoids URL arrays for first thread URL")
+  func diffGridContextMenuAvoidsURLArraysForFirstThreadURL() throws {
+    let gridSource = try dashboardReviewsRouteSource(named: "DashboardReviewFileDiffGrid.swift")
+
+    #expect(gridSource.contains("private func firstThreadURL(forRowID rowID: Int) -> String?"))
+    #expect(!gridSource.contains("compactMap(\\.url).first"))
+  }
 }
