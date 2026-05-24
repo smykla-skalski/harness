@@ -52,7 +52,8 @@ private let cryptoTarget: Target = .target(
     sources: cryptoSources,
     dependencies: [
         .target(name: "HarnessMonitorCore"),
-        .sdk(name: "CryptoKit", type: .framework)
+        .sdk(name: "CryptoKit", type: .framework),
+        .sdk(name: "Security", type: .framework)
     ],
     settings: .settings(base: [
         "CODE_SIGN_STYLE": "Automatic",
