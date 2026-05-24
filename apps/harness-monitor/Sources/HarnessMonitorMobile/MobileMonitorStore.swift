@@ -229,6 +229,7 @@ final class MobileMonitorStore {
   var syncStatus: MobileMonitorSyncStatus
   var lastAuthenticationFailed = false
   var pairedCredentials: [MobilePairedStationCredential] = []
+  var notificationSettings: MobileNotificationSettings
 
   private let identityStore: (any MobileDeviceIdentityStore)?
   private let credentialStore: (any MobilePairedStationCredentialStore)?
@@ -237,6 +238,9 @@ final class MobileMonitorStore {
   private let privacyService: any MobileCloudMirrorPrivacyManaging
   private let sharedSnapshotStore: MobileSharedSnapshotStore?
   private let watchPairingSyncer: (any MobileWatchPairingSyncing)?
+  private let notificationDefaults: UserDefaults
+  private let notificationScheduler: any MobileNotificationScheduling
+  private let notificationDeliveryHistory: MobileNotificationDeliveryHistory
   private var syncClientsByStationID: [String: any MobileMonitorSyncClient] = [:]
   private var injectedSyncClient: (any MobileMonitorSyncClient)?
   private var defaultStationID: String?
@@ -253,7 +257,9 @@ final class MobileMonitorStore {
     privacyService: any MobileCloudMirrorPrivacyManaging =
       MobileCloudMirrorPrivacyService(database: LiveMobileCloudMirrorDatabase()),
     sharedSnapshotStore: MobileSharedSnapshotStore? = MobileSharedSnapshotStore(),
-    watchPairingSyncer: (any MobileWatchPairingSyncing)? = nil
+    watchPairingSyncer: (any MobileWatchPairingSyncing)? = nil,
+    notificationDefaults: UserDefaults = .standard,
+    notificationScheduler: any MobileNotificationScheduling = LiveMobileNotificationScheduler()
   ) {
     let initialSnapshot = snapshot ?? (demoModeEnabled ? MobileDemoFixtures.snapshot() : .empty())
     self.snapshot = initialSnapshot
@@ -267,6 +273,12 @@ final class MobileMonitorStore {
     self.privacyService = privacyService
     self.sharedSnapshotStore = sharedSnapshotStore
     self.watchPairingSyncer = watchPairingSyncer
+    self.notificationDefaults = notificationDefaults
+    self.notificationScheduler = notificationScheduler
+    self.notificationDeliveryHistory = MobileNotificationDeliveryHistory(
+      userDefaults: notificationDefaults
+    )
+    self.notificationSettings = MobileNotificationSettings.load(from: notificationDefaults)
     self.syncStatus =
       demoModeEnabled ? .demo : (syncClient == nil ? .unpaired : .syncing)
     self.selectedStationID =
@@ -314,6 +326,24 @@ final class MobileMonitorStore {
     }
   }
 
+  func setNotificationCategory(_ category: MobileNotificationCategory, enabled: Bool) {
+    notificationSettings.setEnabled(enabled, for: category)
+    notificationSettings.save(to: notificationDefaults)
+    if enabled {
+      Task {
+        await requestNotificationAuthorization()
+      }
+    }
+  }
+
+  func requestNotificationAuthorization() async {
+    let granted = await notificationScheduler.requestAuthorization()
+    syncStatus =
+      granted
+      ? .privacy("Notifications are enabled.")
+      : .privacy("Notifications are disabled in iOS Settings.")
+  }
+
   func refresh() async {
     if demoModeEnabled {
       refreshDemoData()
@@ -338,8 +368,9 @@ final class MobileMonitorStore {
         syncStatus = .stale("No encrypted mirror snapshot found.")
         return
       }
-      applySnapshot(fetched, preferredStationID: stationID)
+      let previous = applySnapshot(fetched, preferredStationID: stationID)
       syncStatus = .live(fetched.generatedAt)
+      await scheduleNotifications(previous: previous, next: fetched)
     } catch MobileCloudMirrorSyncError.staleSnapshot(let expiresAt) {
       syncStatus =
         .stale(
@@ -351,7 +382,7 @@ final class MobileMonitorStore {
   }
 
   func refreshDemoData() {
-    applySnapshot(MobileDemoFixtures.snapshot(), preferredStationID: selectedStationID)
+    _ = applySnapshot(MobileDemoFixtures.snapshot(), preferredStationID: selectedStationID)
   }
 
   func loadStoredPairings() async {
@@ -529,7 +560,11 @@ final class MobileMonitorStore {
     persistSharedSnapshot(snapshot)
   }
 
-  private func applySnapshot(_ nextSnapshot: MobileMirrorSnapshot, preferredStationID: String) {
+  private func applySnapshot(
+    _ nextSnapshot: MobileMirrorSnapshot,
+    preferredStationID: String
+  ) -> MobileMirrorSnapshot {
+    let previousSnapshot = snapshot
     snapshot = nextSnapshot
     persistSharedSnapshot(nextSnapshot)
     if snapshot.stations.contains(where: { $0.id == preferredStationID }) {
@@ -540,6 +575,21 @@ final class MobileMonitorStore {
         ?? snapshot.stations.first?.id
         ?? ""
     }
+    return previousSnapshot
+  }
+
+  private func scheduleNotifications(
+    previous: MobileMirrorSnapshot?,
+    next: MobileMirrorSnapshot
+  ) async {
+    let plannedRequests = MobileNotificationPlanner.requests(
+      previous: previous,
+      next: next,
+      settings: notificationSettings
+    )
+    let newRequests = notificationDeliveryHistory.unrecordedRequests(plannedRequests)
+    let scheduledRequestIDs = await notificationScheduler.schedule(newRequests)
+    notificationDeliveryHistory.recordDeliveredRequestIDs(scheduledRequestIDs)
   }
 
   private func persistSharedSnapshot(_ nextSnapshot: MobileMirrorSnapshot) {
