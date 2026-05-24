@@ -46,7 +46,10 @@ public struct HarnessMonitorClientProviderMobileRelayCommandClient: MobileRelayC
     try await commandClient().approveTaskBoardPlan(id: id, request: request)
   }
 
-  public func startAgent(sessionID: String, request: AcpAgentStartRequest) async throws -> String {
+  public func startAgent(
+    sessionID: String,
+    request: MobileRelayAgentStartRequest
+  ) async throws -> String {
     try await commandClient().startAgent(sessionID: sessionID, request: request)
   }
 
