@@ -5,7 +5,7 @@ import SwiftUI
 typealias TimelineAvatarImageLoader = (String, URL?, CGFloat) async -> NSImage?
 
 /// SwiftUI view that resolves and displays a downsampled GitHub avatar
-/// for the given login through the injected daemon-backed loader.
+/// for the given login through the injected cache-backed loader.
 ///
 /// Renders a circular avatar of `size × size` points; while the cache
 /// resolves the image, shows a neutral secondary-colored circle so the

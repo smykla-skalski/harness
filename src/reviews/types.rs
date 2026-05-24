@@ -107,6 +107,8 @@ pub struct ReviewItem {
     pub title: String,
     pub url: String,
     pub author_login: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub author_avatar_url: Option<String>,
     pub state: ReviewPullRequestState,
     pub mergeable: ReviewMergeableState,
     pub review_status: ReviewReviewStatus,
@@ -144,6 +146,8 @@ pub struct ReviewCheck {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct PullRequestReview {
     pub author: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub author_avatar_url: Option<String>,
     pub state: ReviewReviewEventState,
 }
 

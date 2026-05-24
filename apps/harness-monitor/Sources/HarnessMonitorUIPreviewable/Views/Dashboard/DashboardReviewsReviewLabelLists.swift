@@ -76,22 +76,27 @@ private struct DashboardReviewReviewerPill: View {
   let canReRequestReview: Bool
   let onReRequestReview: ((String) -> Void)?
 
+  @Environment(HarnessMonitorStore.self)
+  private var store
+
   private var avatarURL: URL? {
-    URL(string: "https://github.com/\(review.author).png?size=24")
+    review.authorAvatarURL ?? ReviewAvatarCache.fallbackAvatarURL(login: review.author)
   }
 
   var body: some View {
     HStack(spacing: HarnessMonitorTheme.spacingXS) {
-      AsyncImage(url: avatarURL) { image in
-        image
-          .resizable()
-          .interpolation(.high)
-      } placeholder: {
-        Image(systemName: "person.crop.circle.fill")
-          .foregroundStyle(HarnessMonitorTheme.secondaryInk)
-      }
-      .frame(width: 16, height: 16)
-      .clipShape(Circle())
+      AvatarImageView(
+        login: review.author,
+        avatarURL: avatarURL,
+        size: 16,
+        loadImage: { login, avatarURL, targetPixel in
+          await store.reviewAvatarImage(
+            login: login,
+            avatarURL: avatarURL,
+            targetPixel: targetPixel
+          )
+        }
+      )
       .accessibilityHidden(true)
       Text(review.author)
         .foregroundStyle(HarnessMonitorTheme.ink)

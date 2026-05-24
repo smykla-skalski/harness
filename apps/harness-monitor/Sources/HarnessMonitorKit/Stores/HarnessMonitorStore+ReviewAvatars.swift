@@ -8,18 +8,13 @@ extension HarnessMonitorStore {
     targetPixel: CGFloat
   ) async -> NSImage? {
     let sourceURL = avatarURL ?? ReviewAvatarCache.fallbackAvatarURL(login: login)
-    guard
-      let sourceURL,
-      let client = apiClient,
-      let modelContainer = modelContext?.container
-    else {
+    guard let sourceURL else {
       return nil
     }
     return await ReviewAvatarCache.shared.avatar(
       for: sourceURL,
       targetPixel: targetPixel,
-      modelContainer: modelContainer,
-      client: client
+      modelContainer: modelContext?.container
     )
   }
 }

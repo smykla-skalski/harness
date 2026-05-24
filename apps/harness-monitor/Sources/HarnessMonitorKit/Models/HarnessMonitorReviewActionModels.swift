@@ -34,13 +34,25 @@ public struct ReviewCheck: Codable, Equatable, Identifiable, Sendable {
 
 public struct PullRequestReview: Codable, Equatable, Identifiable, Sendable {
   public let author: String
+  public let authorAvatarURL: URL?
   public let state: ReviewReviewEventState
 
   public var id: String { "\(author)-\(state.rawValue)" }
 
-  public init(author: String, state: ReviewReviewEventState) {
+  public init(
+    author: String,
+    authorAvatarURL: URL? = nil,
+    state: ReviewReviewEventState
+  ) {
     self.author = author
+    self.authorAvatarURL = authorAvatarURL
     self.state = state
+  }
+
+  enum CodingKeys: String, CodingKey {
+    case author
+    case authorAvatarURL = "authorAvatarUrl"
+    case state
   }
 }
 
