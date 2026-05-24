@@ -268,6 +268,32 @@ extension View {
       .padding(.bottom, value + shift)
   }
 
+  /// Overrides this text view's `VerticalAlignment.center` guide so it
+  /// returns the visible glyph midline instead of the line-box midline.
+  /// SwiftUI `Text` reports the full line box (ascender + descender) as
+  /// its size, so default `.center` alignment in an `HStack` pairs the
+  /// text's line-box midline with sibling views — but the visible glyph
+  /// row sits above the midline because the descender region under the
+  /// baseline is empty for most label text. Apply this to the text in a
+  /// pill so adjacent glyphs of any kind (swatch dots, indicator shapes,
+  /// custom badges) line up with the visible characters instead of the
+  /// empty line-box centre. Sibling glyphs need no modifier — their
+  /// default geometric centre still aligns to `HStack`'s `.center`,
+  /// which now points at the text's optical centre instead of its box
+  /// centre.
+  ///
+  /// The midline is computed as `firstTextBaseline × 0.7`, a generic
+  /// compromise between the cap-midline (`× 0.63` for SF Pro digits like
+  /// `+1`) and the x-height midline (`× 0.74` for SF Pro lowercase like
+  /// `area/ci`). It's derived from live `firstTextBaseline`, so it
+  /// scales with Dynamic Type and works across caption, callout, and
+  /// body styles without hard-coding any font-size numbers.
+  public func harnessOpticalTextCenter() -> some View {
+    alignmentGuide(VerticalAlignment.center) { dim in
+      dim[.firstTextBaseline] * 0.7
+    }
+  }
+
   public func harnessCellPadding() -> some View {
     self
       .padding(.horizontal, HarnessMonitorTheme.sectionSpacing)
