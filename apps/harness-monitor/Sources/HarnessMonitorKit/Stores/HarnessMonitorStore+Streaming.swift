@@ -34,6 +34,20 @@ extension HarnessMonitorStore {
             return
           }
           recordReconnectAttempt(scope: "global stream", nextAttempt: attempt + 1, error: error)
+          // The WebSocket receive loop already released its task (see
+          // `releaseDeadWebSocketTask`), so every retry against this
+          // transport will throw `connectionClosed` again until the manifest
+          // watcher rebuilds the client. Skip the full 6-attempt backoff
+          // and re-bootstrap directly — saves ~15 s and ~7 log lines per
+          // daemon-flap cycle.
+          if Self.isTransportClosedError(error) {
+            appendConnectionEvent(
+              kind: .reconnecting,
+              detail: "Transport closed, re-bootstrapping global stream"
+            )
+            await reconnect()
+            return
+          }
         }
 
         if Task.isCancelled {
@@ -90,6 +104,14 @@ extension HarnessMonitorStore {
             return
           }
           recordReconnectAttempt(scope: "session stream", nextAttempt: attempt + 1, error: error)
+          if Self.isTransportClosedError(error) {
+            appendConnectionEvent(
+              kind: .reconnecting,
+              detail: "Transport closed, re-bootstrapping session stream"
+            )
+            await reconnect()
+            return
+          }
         }
 
         if Task.isCancelled {
