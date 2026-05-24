@@ -246,6 +246,11 @@ daemon_staged_binary_path() {
     "$profile_dir"
 }
 
+daemon_staged_binary_state_path() {
+  local repo_root="${1:-${repo_root:-$(resolve_repo_root)}}"
+  printf '%s.inputs\n' "$(daemon_staged_binary_path "$repo_root")"
+}
+
 daemon_latest_input_mtime() {
   local repo_root="${1:-${repo_root:-$(resolve_repo_root)}}"
   local latest=0 path mtime
@@ -287,33 +292,67 @@ daemon_latest_input_mtime() {
   printf '%s\n' "$latest"
 }
 
+daemon_git_input_state() {
+  local repo_root="${1:-${repo_root:-$(resolve_repo_root)}}"
+  local head_rev
+  head_rev="$(git -C "$repo_root" rev-parse HEAD 2>/dev/null)" || return 1
+  printf 'head=%s\n' "$head_rev"
+  git -C "$repo_root" status --porcelain --untracked-files=normal --ignored=no -- \
+    Cargo.toml \
+    Cargo.lock \
+    build.rs \
+    rust-toolchain.toml \
+    .cargo \
+    src \
+    scripts/rustc-cache-wrapper.sh \
+    2>/dev/null | LC_ALL=C /usr/bin/sort
+}
+
+daemon_current_input_state() {
+  local repo_root="${1:-${repo_root:-$(resolve_repo_root)}}"
+  local latest_input_mtime
+
+  if daemon_git_input_state "$repo_root"; then
+    return 0
+  fi
+
+  latest_input_mtime="$(daemon_latest_input_mtime "$repo_root")"
+  printf 'mtime=%s\n' "$latest_input_mtime"
+}
+
 daemon_staged_binary_is_fresh() {
   local staged_binary="$1"
   local repo_root="${2:-${repo_root:-$(resolve_repo_root)}}"
-  local latest_input_mtime staged_mtime
+  local state_path current_state
 
   [ -x "$staged_binary" ] || return 1
+  state_path="$(daemon_staged_binary_state_path "$repo_root")"
+  [ -f "$state_path" ] || return 1
 
-  latest_input_mtime="$(daemon_latest_input_mtime "$repo_root")"
-  staged_mtime="$(/usr/bin/stat -f '%m' "$staged_binary")"
-  (( staged_mtime >= latest_input_mtime ))
+  current_state="$(daemon_current_input_state "$repo_root")"
+  [ "$(/bin/cat "$state_path")" = "$current_state" ]
 }
 
 stage_daemon_binary() {
   local source_binary="$1"
   local repo_root="${2:-${repo_root:-$(resolve_repo_root)}}"
-  local staged_binary staged_dir staged_binary_tmp
+  local staged_binary staged_dir staged_binary_tmp state_path state_tmp current_state
 
   staged_binary="$(daemon_staged_binary_path "$repo_root")"
   staged_dir="$(dirname "$staged_binary")"
   staged_binary_tmp="$staged_binary.staging"
+  state_path="$(daemon_staged_binary_state_path "$repo_root")"
+  state_tmp="$state_path.staging"
+  current_state="$(daemon_current_input_state "$repo_root")"
 
   /bin/mkdir -p "$staged_dir"
   (
-    trap '/bin/rm -f "$staged_binary_tmp"' EXIT
+    trap '/bin/rm -f "$staged_binary_tmp" "$state_tmp"' EXIT
     /bin/cp -p "$source_binary" "$staged_binary_tmp"
     /bin/chmod 755 "$staged_binary_tmp"
+    printf '%s\n' "$current_state" >"$state_tmp"
     /bin/mv -f "$staged_binary_tmp" "$staged_binary"
+    /bin/mv -f "$state_tmp" "$state_path"
   )
 
   printf '%s\n' "$staged_binary"

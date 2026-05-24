@@ -338,6 +338,7 @@ class DaemonStagedBinaryTests(unittest.TestCase):
             self.assertTrue(staged_path.is_file())
             self.assertEqual(staged_path.read_text(), "binary\n")
             self.assertTrue(staged_path.stat().st_mode & 0o111)
+            self.assertTrue(Path(f"{staged_binary}.inputs").is_file())
 
     def test_bundle_resolution_reuses_fresh_staged_binary_without_cargo(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_dir:
@@ -381,6 +382,88 @@ class DaemonStagedBinaryTests(unittest.TestCase):
 
             self.assertTrue(Path(resolved_binary).is_file())
             self.assertTrue(captured_env_path.is_file(), "cargo must run when staged binary is missing")
+
+    def test_git_backed_freshness_detects_modified_rust_input(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            repo_root = Path(tmp_dir) / "repo"
+            project_dir = repo_root / "apps" / "harness-monitor"
+            target_dir = Path(tmp_dir) / "target"
+            subprocess.run(["git", "init", str(repo_root)], check=True, capture_output=True, text=True)
+            subprocess.run(
+                ["git", "-C", str(repo_root), "config", "user.name", "Test User"],
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+            subprocess.run(
+                ["git", "-C", str(repo_root), "config", "user.email", "test@example.com"],
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+
+            (repo_root / "Cargo.toml").write_text("[package]\nname = \"harness\"\nversion = \"1.2.3\"\n")
+            (repo_root / "Cargo.lock").write_text("")
+            (repo_root / "build.rs").write_text("fn main() {}\n")
+            (repo_root / "rust-toolchain.toml").write_text('[toolchain]\nchannel = "stable"\n')
+            (repo_root / ".cargo").mkdir()
+            (repo_root / ".cargo" / "config.toml").write_text("")
+            (repo_root / "scripts").mkdir()
+            (repo_root / "scripts" / "rustc-cache-wrapper.sh").write_text("#!/bin/bash\n")
+            (repo_root / "src").mkdir()
+            rust_source = repo_root / "src" / "main.rs"
+            rust_source.write_text("fn main() {}\n")
+            project_dir.mkdir(parents=True)
+
+            subprocess.run(
+                [
+                    "git",
+                    "-C",
+                    str(repo_root),
+                    "add",
+                    "Cargo.toml",
+                    "Cargo.lock",
+                    "build.rs",
+                    "rust-toolchain.toml",
+                    ".cargo/config.toml",
+                    "scripts/rustc-cache-wrapper.sh",
+                    "src/main.rs",
+                ],
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+            subprocess.run(
+                ["git", "-C", str(repo_root), "commit", "-m", "init"],
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+
+            source_binary = target_dir / "debug" / "harness"
+            source_binary.parent.mkdir(parents=True, exist_ok=True)
+            source_binary.write_text("binary\n")
+            source_binary.chmod(0o755)
+
+            staged_binary = run_build_helper(
+                f'export PROJECT_DIR="{project_dir}"; '
+                f'export CARGO_TARGET_DIR="{target_dir}"; '
+                f'stage_daemon_binary "{source_binary}"'
+            )
+            fresh_before = run_build_helper(
+                f'export PROJECT_DIR="{project_dir}"; '
+                f'export CARGO_TARGET_DIR="{target_dir}"; '
+                f'daemon_staged_binary_is_fresh "{staged_binary}" && printf yes || printf no'
+            )
+            self.assertEqual(fresh_before, "yes")
+
+            rust_source.write_text("fn main() { println!(\"changed\"); }\n")
+            fresh_after = run_build_helper(
+                f'export PROJECT_DIR="{project_dir}"; '
+                f'export CARGO_TARGET_DIR="{target_dir}"; '
+                f'daemon_staged_binary_is_fresh "{staged_binary}" && printf yes || printf no'
+            )
+            self.assertEqual(fresh_after, "no")
 
 
 class ResolvePinnedToolchainChannelTests(unittest.TestCase):
@@ -600,6 +683,86 @@ class CleanActionGuardTests(unittest.TestCase):
         completed, sentinel = self._run_with_action(self.BUNDLE_SCRIPT, "clean")
         self.assertEqual(completed.returncode, 0, msg=completed.stderr)
         self.assertFalse(sentinel.exists())
+
+
+class BundleStampShortcutTests(unittest.TestCase):
+    SCRIPTS_DIR = Path(__file__).resolve().parents[1]
+    BUNDLE_SCRIPT = SCRIPTS_DIR / "bundle-daemon-agent.sh"
+
+    def test_matching_stamp_exits_before_bundle_mutation(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            repo_root = root / "repo"
+            project_dir = repo_root / "apps" / "harness-monitor"
+            target_build_dir = root / "build"
+            derived_dir = root / "derived"
+            daemon_source = root / "daemon-source"
+            daemon_target = target_build_dir / "Contents" / "Helpers" / "harness"
+            plist_target = (
+                target_build_dir
+                / "Contents"
+                / "Library"
+                / "LaunchAgents"
+                / "Q498EB36N4.io.harnessmonitor.daemon.plist"
+            )
+            bundle_stamp_path = derived_dir / "HarnessMonitor-bundle-daemon-agent.stamp"
+
+            (repo_root / ".git").mkdir(parents=True)
+            project_dir.mkdir(parents=True, exist_ok=True)
+            daemon_target.parent.mkdir(parents=True, exist_ok=True)
+            plist_target.parent.mkdir(parents=True, exist_ok=True)
+            derived_dir.mkdir(parents=True, exist_ok=True)
+
+            daemon_source.write_text("#!/bin/bash\nexit 0\n")
+            daemon_source.chmod(0o755)
+            daemon_target.write_text("bundled\n")
+            daemon_target.chmod(0o755)
+            plist_target.write_text("plist\n")
+
+            daemon_stat = daemon_source.stat()
+            stamp_lines = [
+                f"daemon_source={daemon_source}",
+                f"daemon_source_stat={int(daemon_stat.st_mtime)}:{daemon_stat.st_size}",
+                "codesign_identity=fake-identity",
+                "timestamp_flag=--timestamp=none",
+                "launch_agent_label=Q498EB36N4.io.harnessmonitor.daemon",
+                "app_group_id=test.group",
+                "marketing_version=1.2.3",
+                "daemon_data_home=/tmp/test-daemon-home",
+                "codex_ws_port=4242",
+                "runtime_lane=test-lane",
+                "daemon_plist_sha=missing",
+                "legacy_managed_plist_sha=missing",
+                "legacy_plist_sha=missing",
+                "entitlements_sha=missing",
+            ]
+            bundle_stamp_path.write_text("\n".join(stamp_lines) + "\n")
+
+            env = {
+                "HOME": tempfile.gettempdir(),
+                "PATH": "/usr/bin:/bin",
+                "PROJECT_DIR": str(project_dir),
+                "TARGET_BUILD_DIR": str(target_build_dir),
+                "CONTENTS_FOLDER_PATH": "Contents",
+                "DERIVED_FILE_DIR": str(derived_dir),
+                "TARGET_NAME": "HarnessMonitor",
+                "HARNESS_MONITOR_DAEMON_BINARY": str(daemon_source),
+                "HARNESS_MONITOR_RUNTIME_LANE": "test-lane",
+                "HARNESS_DAEMON_DATA_HOME": "/tmp/test-daemon-home",
+                "HARNESS_CODEX_WS_PORT": "4242",
+                "HARNESS_APP_GROUP_ID": "test.group",
+                "EXPANDED_CODE_SIGN_IDENTITY": "fake-identity",
+                "MARKETING_VERSION": "1.2.3",
+            }
+            completed = subprocess.run(
+                ["bash", str(self.BUNDLE_SCRIPT)],
+                env=env,
+                capture_output=True,
+                text=True,
+                timeout=10,
+            )
+
+            self.assertEqual(completed.returncode, 0, msg=completed.stderr)
 
 
 def _setup_fake_daemon_layout(tmp_dir: Path):
