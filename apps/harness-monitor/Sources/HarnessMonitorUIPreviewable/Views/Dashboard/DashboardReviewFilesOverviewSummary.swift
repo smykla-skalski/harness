@@ -11,16 +11,23 @@ struct DashboardReviewFilesOverviewSummary: View {
   @Environment(\.fontScale)
   private var fontScale
   @State private var threadIndexCache = DashboardReviewFileThreadIndexCache()
+  @State private var summaryCache = DashboardReviewFilesSummaryCache()
 
   var body: some View {
     let viewModel = store.viewModel(forPullRequest: pullRequestID)
+    let timeline = store.reviewTimelineViewModel(for: pullRequestID)
     let threadIndex = threadIndexCache.index(
-      for: store.reviewTimelineViewModel(for: pullRequestID)
+      for: timeline
     )
-    let summary = DashboardReviewFilesSummary.make(
+    let summary = summaryCache.summary(
       files: viewModel.files,
       viewedByPath: viewModel.viewedByPath,
-      threadIndex: threadIndex
+      threadIndex: threadIndex,
+      key: DashboardReviewFilesSummaryKey(
+        filesRevision: viewModel.filesRevision,
+        viewedStateRevision: viewModel.viewedStateRevision,
+        timelineRevision: timeline.revision
+      )
     )
 
     VStack(alignment: .leading, spacing: 10) {

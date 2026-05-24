@@ -159,6 +159,26 @@ struct DashboardReviewsBodyAllocationContractTests {
     #expect(presentationSource.contains("struct DashboardReviewFilesModePresentationKey"))
   }
 
+  @Test("files overview caches summary outside body path")
+  func filesOverviewCachesSummaryOutsideBodyPath() throws {
+    let overviewSource = try dashboardReviewsRouteSource(
+      named: "DashboardReviewFilesOverviewSummary.swift"
+    )
+    let presentationSource = try dashboardReviewsRouteSource(
+      named: "DashboardReviewFilesPresentation.swift"
+    )
+
+    #expect(
+      overviewSource.contains(
+        "@State private var summaryCache = DashboardReviewFilesSummaryCache()"
+      )
+    )
+    #expect(overviewSource.contains("let summary = summaryCache.summary("))
+    #expect(!overviewSource.contains("DashboardReviewFilesSummary.make("))
+    #expect(presentationSource.contains("final class DashboardReviewFilesSummaryCache"))
+    #expect(presentationSource.contains("struct DashboardReviewFilesSummaryKey: Equatable"))
+  }
+
   @Test("files navigator row caches repeated body facts")
   func filesNavigatorRowCachesRepeatedBodyFacts() throws {
     let filesModeSource = try dashboardReviewsRouteSource(

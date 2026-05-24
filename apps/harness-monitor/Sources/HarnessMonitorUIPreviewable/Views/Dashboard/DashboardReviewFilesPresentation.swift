@@ -55,6 +55,34 @@ struct DashboardReviewFilesSummary: Equatable {
   }
 }
 
+struct DashboardReviewFilesSummaryKey: Equatable {
+  let filesRevision: UInt64
+  let viewedStateRevision: UInt64
+  let timelineRevision: UInt64
+}
+
+@MainActor
+final class DashboardReviewFilesSummaryCache {
+  private var cachedKey: DashboardReviewFilesSummaryKey?
+  private var cachedSummary = DashboardReviewFilesSummary()
+
+  func summary(
+    files: [ReviewFile],
+    viewedByPath: [String: ReviewFileViewedState],
+    threadIndex: DashboardReviewFileThreadIndex,
+    key: DashboardReviewFilesSummaryKey
+  ) -> DashboardReviewFilesSummary {
+    guard cachedKey != key else { return cachedSummary }
+    cachedKey = key
+    cachedSummary = DashboardReviewFilesSummary.make(
+      files: files,
+      viewedByPath: viewedByPath,
+      threadIndex: threadIndex
+    )
+    return cachedSummary
+  }
+}
+
 struct DashboardReviewFilesModePresentation: Equatable {
   static let empty = Self(summary: DashboardReviewFilesSummary(), visibleFiles: [], groups: [])
 
