@@ -317,13 +317,27 @@ public enum OpenAnythingCorpusBuilder {
   static func displayLabel(_ raw: String) -> String {
     let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
     guard !trimmed.isEmpty else { return trimmed }
-    return
-      trimmed
-      .split(separator: "_", omittingEmptySubsequences: true)
-      .map { component -> String in
-        guard let first = component.first else { return "" }
-        return first.uppercased() + component.dropFirst()
+    var label = ""
+    label.reserveCapacity(trimmed.count)
+    var insertsSeparator = false
+    var capitalizesNext = true
+    for character in trimmed {
+      if character == "_" {
+        insertsSeparator = !label.isEmpty
+        capitalizesNext = true
+        continue
       }
-      .joined(separator: " ")
+      if insertsSeparator {
+        label.append(" ")
+        insertsSeparator = false
+      }
+      if capitalizesNext {
+        label.append(contentsOf: character.uppercased())
+      } else {
+        label.append(character)
+      }
+      capitalizesNext = false
+    }
+    return label
   }
 }
