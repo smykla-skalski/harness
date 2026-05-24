@@ -26,7 +26,7 @@ private let coreSources: SourceFilesList = SourceFilesList(globs: [
 private let coreTarget: Target = .target(
     name: "HarnessMonitorCore",
     destinations: applePlatformDestinations,
-    product: .framework,
+    product: .staticFramework,
     bundleId: "io.harnessmonitor.core",
     deploymentTargets: applePlatformDeploymentTargets,
     sources: coreSources,
@@ -46,7 +46,7 @@ private let cryptoSources: SourceFilesList = SourceFilesList(globs: [
 private let cryptoTarget: Target = .target(
     name: "HarnessMonitorCrypto",
     destinations: applePlatformDestinations,
-    product: .framework,
+    product: .staticFramework,
     bundleId: "io.harnessmonitor.crypto",
     deploymentTargets: applePlatformDeploymentTargets,
     sources: cryptoSources,
@@ -71,7 +71,7 @@ private let cloudMirrorSources: SourceFilesList = SourceFilesList(globs: [
 private let cloudMirrorTarget: Target = .target(
     name: "HarnessMonitorCloudMirror",
     destinations: applePlatformDestinations,
-    product: .framework,
+    product: .staticFramework,
     bundleId: "io.harnessmonitor.cloudmirror",
     deploymentTargets: applePlatformDeploymentTargets,
     sources: cloudMirrorSources,
@@ -194,7 +194,7 @@ private let cloudKitSources: SourceFilesList = SourceFilesList(globs: [
 private let cloudKitTarget: Target = .target(
     name: "HarnessMonitorCloudKit",
     destinations: applePlatformDestinations,
-    product: .framework,
+    product: .staticFramework,
     bundleId: "io.harnessmonitor.cloudkit",
     deploymentTargets: applePlatformDeploymentTargets,
     sources: cloudKitSources,
