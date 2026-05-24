@@ -406,18 +406,34 @@ exec "{fake_bin / "xcodebuild"}" "$@"
                 "semaphore slot must be released after a clean build",
             )
 
-    def test_global_semaphore_blocks_when_cap_is_reached(self) -> None:
+    def _plant_live_slot(
+        self,
+        semaphore_dir: Path,
+        slot_name: str,
+        pid: int,
+        heartbeat_age_seconds: int = 0,
+    ) -> Path:
+        slot = semaphore_dir / slot_name
+        slot.mkdir(parents=True)
+        (slot / "owner.env").write_text(
+            f"pid={pid}\n"
+            "started_at=2026-01-01T00:00:00Z\n"
+            "derived_data_path=/tmp/other-lane\n"
+        )
+        heartbeat = slot / "heartbeat"
+        heartbeat.touch()
+        if heartbeat_age_seconds > 0:
+            now = time.time()
+            old = now - heartbeat_age_seconds
+            os.utime(heartbeat, (old, old))
+        return slot
+
+    def test_global_semaphore_blocks_when_fresh_holder_is_alive(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_dir:
             semaphore_dir = Path(tmp_dir) / "sema"
-            slot_dir = semaphore_dir / "slot-1"
-            slot_dir.mkdir(parents=True)
             sleeper = subprocess.Popen(["/bin/sleep", "10"])
             try:
-                (slot_dir / "owner.env").write_text(
-                    f"pid={sleeper.pid}\n"
-                    "started_at=2026-01-01T00:00:00Z\n"
-                    "derived_data_path=/tmp/other-lane\n"
-                )
+                self._plant_live_slot(semaphore_dir, "slot-1", sleeper.pid)
                 completed, log, _ = self.run_script(
                     "-scheme",
                     "HarnessMonitor",
@@ -433,12 +449,38 @@ exec "{fake_bin / "xcodebuild"}" "$@"
 
             self.assertEqual(completed.returncode, 73)
             self.assertEqual(log, "")
+            self.assertIn("xcodebuild concurrency slots are busy", completed.stderr)
+            self.assertIn("heartbeat=", completed.stderr)
             self.assertIn(
-                "xcodebuild concurrency slots are busy",
+                "CANNOT be raised by env var",
                 completed.stderr,
+                "error must explain bypass is locked off",
             )
 
-    def test_global_semaphore_reaps_dead_owner_and_proceeds(self) -> None:
+    def test_global_semaphore_reaps_slot_with_stale_heartbeat(self) -> None:
+        # Holder process is alive but its heartbeat hasn't been refreshed in
+        # over the staleness window -- reaper treats it as orphan.
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            semaphore_dir = Path(tmp_dir) / "sema"
+            sleeper = subprocess.Popen(["/bin/sleep", "10"])
+            try:
+                self._plant_live_slot(
+                    semaphore_dir, "slot-1", sleeper.pid, heartbeat_age_seconds=600
+                )
+                completed, log, _ = self.run_script(
+                    "-scheme",
+                    "HarnessMonitor",
+                    "build",
+                    extra_env={"HARNESS_MONITOR_GLOBAL_SEMAPHORE_DIR": str(semaphore_dir)},
+                )
+            finally:
+                sleeper.terminate()
+                sleeper.wait(timeout=5)
+
+            self.assertEqual(completed.returncode, 0, completed.stderr)
+            self.assertIn("XCODEBUILD=", log)
+
+    def test_global_semaphore_reaps_dead_pid_owner(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_dir:
             semaphore_dir = Path(tmp_dir) / "sema"
             slot_dir = semaphore_dir / "slot-1"
@@ -448,6 +490,7 @@ exec "{fake_bin / "xcodebuild"}" "$@"
                 "started_at=2026-01-01T00:00:00Z\n"
                 "derived_data_path=/tmp/orphan\n"
             )
+            (slot_dir / "heartbeat").touch()
             completed, log, _ = self.run_script(
                 "-scheme",
                 "HarnessMonitor",
@@ -457,41 +500,91 @@ exec "{fake_bin / "xcodebuild"}" "$@"
 
             self.assertEqual(completed.returncode, 0, completed.stderr)
             self.assertIn("XCODEBUILD=", log)
-            leftover_slots = [
-                child for child in semaphore_dir.iterdir() if child.is_dir()
-            ]
-            self.assertEqual(
-                leftover_slots,
-                [],
-                "all slots must be released - reaper claims dead owner's slot",
-            )
 
-    def test_global_semaphore_disabled_when_cap_is_zero(self) -> None:
+    def test_global_semaphore_heartbeat_file_is_written_on_acquire(self) -> None:
+        # Use the long-running wrapper helper to keep the slot held while we
+        # inspect it.
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            temp_root = Path(tmp_dir)
+            marker = temp_root / "started"
+            semaphore_dir = temp_root / "sema"
+            proc, _ = self._spawn_long_running_wrapper(temp_root, marker, "0")
+            try:
+                # The helper wires its own temp semaphore at temp_root/global-semaphore
+                semaphore_dir = temp_root / "global-semaphore"
+                deadline = time.monotonic() + 5
+                slot_path: Path | None = None
+                while time.monotonic() < deadline:
+                    if semaphore_dir.exists():
+                        slots = [p for p in semaphore_dir.iterdir() if p.is_dir()]
+                        if slots:
+                            slot_path = slots[0]
+                            break
+                    time.sleep(0.05)
+                self.assertIsNotNone(
+                    slot_path, "slot directory never appeared under semaphore"
+                )
+                heartbeat = slot_path / "heartbeat"
+                deadline2 = time.monotonic() + 5
+                while time.monotonic() < deadline2 and not heartbeat.exists():
+                    time.sleep(0.05)
+                self.assertTrue(
+                    heartbeat.exists(),
+                    "heartbeat file must be created when slot is acquired",
+                )
+            finally:
+                proc.send_signal(signal.SIGINT)
+                try:
+                    proc.wait(timeout=5)
+                except subprocess.TimeoutExpired:
+                    proc.kill()
+                    proc.wait(timeout=5)
+
+    def test_legacy_concurrency_env_is_rejected_with_warning(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_dir:
             semaphore_dir = Path(tmp_dir) / "sema"
-            slot_dir = semaphore_dir / "slot-1"
-            slot_dir.mkdir(parents=True)
+            completed, log, _ = self.run_script(
+                "-scheme",
+                "HarnessMonitor",
+                "build",
+                extra_env={
+                    "HARNESS_MONITOR_GLOBAL_SEMAPHORE_DIR": str(semaphore_dir),
+                    "HARNESS_MONITOR_BUILD_GLOBAL_CONCURRENCY": "8",
+                },
+            )
+
+            self.assertEqual(completed.returncode, 0, completed.stderr)
+            self.assertIn("XCODEBUILD=", log)
+            self.assertIn(
+                "HARNESS_MONITOR_BUILD_GLOBAL_CONCURRENCY",
+                completed.stderr,
+                "rejection warning must surface to stderr",
+            )
+            self.assertIn("is ignored", completed.stderr)
+
+    def test_test_override_can_raise_cap_to_two(self) -> None:
+        # Two pre-existing live holders block any wrapper when cap is 1 but
+        # only one when cap is 2.
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            semaphore_dir = Path(tmp_dir) / "sema"
             sleeper = subprocess.Popen(["/bin/sleep", "10"])
             try:
-                (slot_dir / "owner.env").write_text(
-                    f"pid={sleeper.pid}\n"
-                    "started_at=2026-01-01T00:00:00Z\n"
-                    "derived_data_path=/tmp/other-lane\n"
-                )
+                self._plant_live_slot(semaphore_dir, "slot-1", sleeper.pid)
                 completed, log, _ = self.run_script(
                     "-scheme",
                     "HarnessMonitor",
                     "build",
                     extra_env={
                         "HARNESS_MONITOR_GLOBAL_SEMAPHORE_DIR": str(semaphore_dir),
-                        "HARNESS_MONITOR_BUILD_GLOBAL_CONCURRENCY": "0",
-                        "XCODEBUILD_LOCK_WAIT_TIMEOUT_SECONDS": "1",
+                        "_HARNESS_TEST_GLOBAL_CONCURRENCY_OVERRIDE": "2",
                     },
                 )
             finally:
                 sleeper.terminate()
                 sleeper.wait(timeout=5)
 
+            # With cap raised to 2 via the test-only override, the wrapper
+            # finds slot-2 free and proceeds.
             self.assertEqual(completed.returncode, 0, completed.stderr)
             self.assertIn("XCODEBUILD=", log)
 

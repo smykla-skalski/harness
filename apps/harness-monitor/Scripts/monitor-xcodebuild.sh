@@ -19,7 +19,32 @@ STALE_CHECK_SCRIPT="$CHECKOUT_ROOT/scripts/check-no-stale-state.sh"
 FAILURE_REPORT_DIR="${HARNESS_MONITOR_FAILURE_REPORT_DIR:-$COMMON_REPO_ROOT/tmp/scan}"
 LOCK_WAIT_TIMEOUT_SECONDS="${XCODEBUILD_LOCK_WAIT_TIMEOUT_SECONDS:-15}"
 GLOBAL_SEMAPHORE_DIR="${HARNESS_MONITOR_GLOBAL_SEMAPHORE_DIR:-$COMMON_REPO_ROOT/.cache/harness-monitor-xcodebuild-semaphore}"
-GLOBAL_CONCURRENCY="${HARNESS_MONITOR_BUILD_GLOBAL_CONCURRENCY:-1}"
+
+# The cap is hardcoded -- automated agents must NOT be able to bypass the
+# host-protection semaphore by exporting an env var. An agent that thinks
+# it "needs another slot" is exactly the failure case this defends against
+# (observed today: an agent set HARNESS_MONITOR_BUILD_GLOBAL_CONCURRENCY=8
+# unilaterally because it judged the host as idle). If the *user* wants to
+# raise the cap, edit this constant; the diff is visible in git history.
+# `_HARNESS_TEST_GLOBAL_CONCURRENCY_OVERRIDE` is for unit tests only -- the
+# `_HARNESS_TEST` prefix is named so a casual agent prompt won't stumble
+# into it as a "bypass" trick.
+GLOBAL_CONCURRENCY=1
+if [[ -n "${_HARNESS_TEST_GLOBAL_CONCURRENCY_OVERRIDE:-}" ]]; then
+  GLOBAL_CONCURRENCY="$_HARNESS_TEST_GLOBAL_CONCURRENCY_OVERRIDE"
+fi
+if [[ -n "${HARNESS_MONITOR_BUILD_GLOBAL_CONCURRENCY:-}" ]]; then
+  printf 'monitor-xcodebuild: HARNESS_MONITOR_BUILD_GLOBAL_CONCURRENCY="%s" is ignored; the cap is hardcoded to %d to prevent automated bypass. Edit Scripts/monitor-xcodebuild.sh if a different cap is intended.\n' \
+    "$HARNESS_MONITOR_BUILD_GLOBAL_CONCURRENCY" "$GLOBAL_CONCURRENCY" >&2
+fi
+
+# Heartbeat refreshed by the slot owner. Other wrappers use mtime freshness
+# to decide whether the slot is still active (stops a hung wrapper from
+# camping forever). Interval is short enough that a healthy build refreshes
+# many times within the staleness window; staleness is generous enough that
+# a temporarily-stuck mkdir or `kill -0` glitch on the holder is forgiven.
+GLOBAL_SEMAPHORE_HEARTBEAT_INTERVAL_SECONDS=15
+GLOBAL_SEMAPHORE_HEARTBEAT_STALENESS_SECONDS=120
 
 export HARNESS_MONITOR_APP_ROOT="$ROOT"
 
@@ -30,6 +55,7 @@ lock_path=""
 lock_owned=0
 global_slot_path=""
 global_slot_owned=0
+global_heartbeat_pid=""
 
 record_normalized_path_mapping() {
   local flag="$1"
@@ -151,11 +177,26 @@ lock_owner_alive() {
 
 describe_lock_owner() {
   local owner_file="$1"
-  local pid command started
+  local pid command started heartbeat_text="no heartbeat"
   pid="$(sed -n 's/^pid=//p' "$owner_file" | head -n 1)"
   started="$(sed -n 's/^started_at=//p' "$owner_file" | head -n 1)"
   command="$(ps -p "$pid" -o command= 2>/dev/null | sed 's/^[[:space:]]*//')"
-  printf 'pid=%s started_at=%s command=%s\n' "${pid:-?}" "${started:-?}" "${command:-?}"
+  local heartbeat_file
+  heartbeat_file="$(dirname "$owner_file")/heartbeat"
+  if [[ -e "$heartbeat_file" ]]; then
+    # /usr/bin/stat to force BSD stat. Plain `stat` may resolve to GNU stat
+    # via coreutils on PATH; BSD's `-f FMT` and GNU's `-f` (--file-system)
+    # mean different things, so the bare name is not portable here.
+    local mtime now_epoch age
+    mtime="$(/usr/bin/stat -f '%m' "$heartbeat_file" 2>/dev/null)"
+    now_epoch="$(/bin/date +%s)"
+    if [[ "$mtime" =~ ^[0-9]+$ ]]; then
+      age=$((now_epoch - mtime))
+      heartbeat_text="${age}s ago"
+    fi
+  fi
+  printf 'pid=%s started_at=%s heartbeat=%s command=%s\n' \
+    "${pid:-?}" "${started:-?}" "$heartbeat_text" "${command:-?}"
 }
 
 acquire_xcodebuild_lock() {
@@ -205,25 +246,84 @@ release_xcodebuild_lock() {
 # still protects each lane from internal concurrent invocations. This
 # semaphore protects the host from cross-lane oversubscription.
 #
-# Tune via `HARNESS_MONITOR_BUILD_GLOBAL_CONCURRENCY=N` (0 disables the cap).
-# Slot allocation is per-PID; dead-slot reaper removes entries whose owning
-# pid is no longer alive (handles wrappers that crashed before releasing).
+# Liveness: the slot owner is "alive" iff (a) its PID still exists AND
+# (b) its heartbeat file mtime is within
+# GLOBAL_SEMAPHORE_HEARTBEAT_STALENESS_SECONDS of now (or the slot is fresh
+# enough that no heartbeat is expected yet). The PID check alone isn't enough
+# -- a wrapper that has gone unresponsive (stuck in xcodebuild waiting for
+# some other resource) still has a live PID but isn't making progress; a
+# stale heartbeat is the explicit signal that "another agent thinking they
+# can take this slot" is correct.
+global_slot_is_alive() {
+  # All `stat` / `date` invocations use absolute paths so GNU coreutils on
+  # PATH does not shadow the BSD-flag semantics we rely on (-f FMT for stat,
+  # -j -f for date).
+  local slot="$1"
+  local owner_file="$slot/owner.env"
+  local heartbeat_file="$slot/heartbeat"
+  [[ -f "$owner_file" ]] || return 1
+  local pid
+  pid="$(sed -n 's/^pid=//p' "$owner_file" | head -n 1)"
+  [[ "$pid" =~ ^[0-9]+$ ]] || return 1
+  kill -0 "$pid" 2>/dev/null || return 1
+  local now_epoch
+  now_epoch="$(/bin/date +%s)"
+  if [[ -e "$heartbeat_file" ]]; then
+    local mtime
+    mtime="$(/usr/bin/stat -f '%m' "$heartbeat_file" 2>/dev/null)" || return 1
+    [[ "$mtime" =~ ^[0-9]+$ ]] || return 1
+    if (( now_epoch - mtime > GLOBAL_SEMAPHORE_HEARTBEAT_STALENESS_SECONDS )); then
+      return 1
+    fi
+    return 0
+  fi
+  # No heartbeat file yet -- give the holder one staleness window to write
+  # the first heartbeat before declaring it stale (covers the brief gap
+  # between mkdir success and the first `touch heartbeat`).
+  local started_at started_epoch
+  started_at="$(sed -n 's/^started_at=//p' "$owner_file" | head -n 1)"
+  started_epoch="$(/bin/date -j -u -f '%Y-%m-%dT%H:%M:%SZ' "$started_at" +%s 2>/dev/null)"
+  [[ "$started_epoch" =~ ^[0-9]+$ ]] || return 0
+  if (( now_epoch - started_epoch > GLOBAL_SEMAPHORE_HEARTBEAT_STALENESS_SECONDS )); then
+    return 1
+  fi
+  return 0
+}
+
+spawn_global_xcodebuild_heartbeat() {
+  local slot_path="$1"
+  local heartbeat_file="$slot_path/heartbeat"
+  /usr/bin/touch "$heartbeat_file"
+  (
+    trap 'exit 0' TERM INT HUP
+    while :; do
+      sleep "$GLOBAL_SEMAPHORE_HEARTBEAT_INTERVAL_SECONDS"
+      /usr/bin/touch "$heartbeat_file" 2>/dev/null || exit 0
+    done
+  ) &
+  global_heartbeat_pid=$!
+  disown "$global_heartbeat_pid" 2>/dev/null || true
+}
+
+stop_global_xcodebuild_heartbeat() {
+  if [[ -n "$global_heartbeat_pid" ]]; then
+    kill -TERM "$global_heartbeat_pid" 2>/dev/null || true
+    global_heartbeat_pid=""
+  fi
+}
+
 acquire_global_xcodebuild_semaphore() {
   if (( GLOBAL_CONCURRENCY <= 0 )); then
     return 0
   fi
   mkdir -p "$GLOBAL_SEMAPHORE_DIR"
   local deadline=$((SECONDS + LOCK_WAIT_TIMEOUT_SECONDS))
-  local slot existing owner_file pid
+  local slot existing
   while :; do
     for existing in "$GLOBAL_SEMAPHORE_DIR"/slot-*; do
       [[ -d "$existing" ]] || continue
-      owner_file="$existing/owner.env"
-      if [[ -f "$owner_file" ]]; then
-        pid="$(sed -n 's/^pid=//p' "$owner_file" | head -n 1)"
-        if [[ "$pid" =~ ^[0-9]+$ ]] && kill -0 "$pid" 2>/dev/null; then
-          continue
-        fi
+      if global_slot_is_alive "$existing"; then
+        continue
       fi
       rm -rf "$existing"
     done
@@ -233,12 +333,13 @@ acquire_global_xcodebuild_semaphore() {
       if mkdir "$slot" 2>/dev/null; then
         {
           printf 'pid=%s\n' "$$"
-          printf 'started_at=%s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          printf 'started_at=%s\n' "$(/bin/date -u +%Y-%m-%dT%H:%M:%SZ)"
           printf 'derived_data_path=%s\n' "$derive_data_path"
           printf 'caller_pwd=%s\n' "$CALLER_PWD"
         } > "$slot/owner.env"
         global_slot_path="$slot"
         global_slot_owned=1
+        spawn_global_xcodebuild_heartbeat "$slot"
         return 0
       fi
     done
@@ -251,7 +352,7 @@ acquire_global_xcodebuild_semaphore() {
       [[ -d "$existing" ]] || continue
       printf '  busy: %s -> %s\n' "$(basename "$existing")" "$(describe_lock_owner "$existing/owner.env")" >&2
     done
-    printf 'raise HARNESS_MONITOR_BUILD_GLOBAL_CONCURRENCY=N for more parallel slots (default 1), set it to 0 to disable the cap, or set XCODEBUILD_LOCK_WAIT_TIMEOUT_SECONDS=0 to wait indefinitely.\n' >&2
+    printf 'wait via XCODEBUILD_LOCK_WAIT_TIMEOUT_SECONDS=0 (the slot will be released when the current build finishes). The cap is hardcoded at %d in Scripts/monitor-xcodebuild.sh and CANNOT be raised by env var; an agent that wants more concurrency would have to land a script change, which is visible in git.\n' "$GLOBAL_CONCURRENCY" >&2
     return 73
   done
 }
@@ -265,6 +366,7 @@ release_global_xcodebuild_semaphore() {
 cleanup_descendants_and_lock() {
   local status="${1:-$?}"
   trap - EXIT INT TERM HUP
+  stop_global_xcodebuild_heartbeat
   terminate_descendant_processes "$$"
   release_xcodebuild_lock
   release_global_xcodebuild_semaphore
