@@ -85,21 +85,26 @@ struct DashboardReviewsDisappearedItemTracker {
   /// descriptor per disappeared item, in deterministic repository-then-
   /// number order for stable rendering.
   mutating func diff(currentItems: [ReviewItem]) -> [Descriptor] {
-    let currentIDs = Set(currentItems.map(\.pullRequestID))
-    defer {
-      var nextSnapshots: [String: Snapshot] = [:]
-      nextSnapshots.reserveCapacity(currentItems.count)
-      for item in currentItems {
-        nextSnapshots[item.pullRequestID] = Snapshot(item: item)
-      }
+    var nextSnapshots: [String: Snapshot] = [:]
+    nextSnapshots.reserveCapacity(currentItems.count)
+    for item in currentItems {
+      nextSnapshots[item.pullRequestID] = Snapshot(item: item)
+    }
+
+    guard hasBaseline else {
       snapshotsByID = nextSnapshots
       hasBaseline = true
+      return []
     }
-    guard hasBaseline else { return [] }
-    let removedIDs = snapshotsByID.keys.filter { !currentIDs.contains($0) }
-    guard !removedIDs.isEmpty else { return [] }
-    let descriptors = removedIDs.compactMap { id in
-      snapshotsByID[id].map { Descriptor(snapshot: $0) }
+
+    var descriptors: [Descriptor] = []
+    for snapshot in snapshotsByID.values where nextSnapshots[snapshot.pullRequestID] == nil {
+      descriptors.append(Descriptor(snapshot: snapshot))
+    }
+
+    snapshotsByID = nextSnapshots
+    guard descriptors.count > 1 else {
+      return descriptors
     }
     return descriptors.sorted { lhs, rhs in
       if lhs.snapshot.repository != rhs.snapshot.repository {
