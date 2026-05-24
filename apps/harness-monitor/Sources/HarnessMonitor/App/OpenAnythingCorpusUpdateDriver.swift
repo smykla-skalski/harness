@@ -5,17 +5,30 @@ import Observation
 final class OpenAnythingCorpusUpdateDriver {
   typealias InputBuilder = @MainActor () -> OpenAnythingCorpusInput
 
+  private static let defaultSourceCoalesceDelayNanos: UInt64 = 50_000_000
+
+  private let sourceChangeCoalescingDelayNanoseconds: UInt64
   private var generation: UInt64 = 0
   private var rebuildSequence: UInt64 = 0
+  private var sourceObservationTask: Task<Void, Never>?
   private var rebuildTask: Task<Void, Never>?
   private var coordinator: OpenAnythingCorpusCoordinator?
   private var inputBuilder: InputBuilder?
+
+  init(
+    sourceChangeCoalescingDelayNanoseconds: UInt64 =
+      OpenAnythingCorpusUpdateDriver.defaultSourceCoalesceDelayNanos
+  ) {
+    self.sourceChangeCoalescingDelayNanoseconds = sourceChangeCoalescingDelayNanoseconds
+  }
 
   func start(
     coordinator: OpenAnythingCorpusCoordinator,
     inputBuilder: @escaping InputBuilder
   ) {
     generation &+= 1
+    sourceObservationTask?.cancel()
+    sourceObservationTask = nil
     rebuildTask?.cancel()
     rebuildTask = nil
     self.coordinator = coordinator
@@ -25,6 +38,8 @@ final class OpenAnythingCorpusUpdateDriver {
 
   func stop() {
     generation &+= 1
+    sourceObservationTask?.cancel()
+    sourceObservationTask = nil
     rebuildTask?.cancel()
     rebuildTask = nil
     coordinator = nil
@@ -37,10 +52,29 @@ final class OpenAnythingCorpusUpdateDriver {
       inputBuilder()
     } onChange: { [weak self] in
       Task { @MainActor [weak self] in
-        self?.observeSource(generation: generation)
+        self?.queueSourceObservation(generation: generation)
       }
     }
     scheduleRebuild(for: input, generation: generation)
+  }
+
+  private func queueSourceObservation(generation: UInt64) {
+    guard self.generation == generation else { return }
+    sourceObservationTask?.cancel()
+    rebuildSequence &+= 1
+    rebuildTask?.cancel()
+    rebuildTask = nil
+    let delayNanoseconds = sourceChangeCoalescingDelayNanoseconds
+    sourceObservationTask = Task { @MainActor [weak self] in
+      if delayNanoseconds > 0 {
+        try? await Task.sleep(nanoseconds: delayNanoseconds)
+      } else {
+        await Task.yield()
+      }
+      guard !Task.isCancelled else { return }
+      self?.sourceObservationTask = nil
+      self?.observeSource(generation: generation)
+    }
   }
 
   private func scheduleRebuild(
