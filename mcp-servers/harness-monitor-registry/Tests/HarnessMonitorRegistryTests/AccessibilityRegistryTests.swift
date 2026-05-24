@@ -576,7 +576,7 @@ struct AccessibilityRegistryTests {
       registry: registry,
       didUpdateElementSyncDelay: .milliseconds(25)
     )
-    let window = NSWindow(
+    let window = KeyWindowAccessibilityHost(
       contentRect: NSRect(x: 120, y: 180, width: 420, height: 320),
       styleMask: [.titled, .closable],
       backing: .buffered,
@@ -673,7 +673,7 @@ struct AccessibilityRegistryTests {
       registry: registry,
       minimumReplacementInterval: .zero
     )
-    let window = NSWindow(
+    let window = KeyWindowAccessibilityHost(
       contentRect: NSRect(x: 120, y: 180, width: 420, height: 320),
       styleMask: [.titled, .closable],
       backing: .buffered,
@@ -713,6 +713,45 @@ struct AccessibilityRegistryTests {
 
     let identifiers = await registry.allElements(windowID: window.windowNumber).map(\.identifier)
     #expect(identifiers == ["session.controls.explicit"])
+  }
+
+  @MainActor
+  @Test("routine didUpdate skips full harvest for non-key windows")
+  func routineDidUpdateSkipsFullHarvestForNonKeyWindows() async {
+    let registry = AccessibilityRegistry()
+    let controller = WindowElementRegistrySyncController(
+      registry: registry,
+      minimumReplacementInterval: .zero
+    )
+    let window = NSWindow(
+      contentRect: NSRect(x: 120, y: 180, width: 420, height: 320),
+      styleMask: [.titled, .closable],
+      backing: .buffered,
+      defer: false
+    )
+    let root = NSView(frame: NSRect(x: 0, y: 0, width: 420, height: 320))
+    let button = NSButton(title: "Start", target: nil, action: nil)
+    button.frame = NSRect(x: 40, y: 40, width: 120, height: 32)
+    button.setAccessibilityIdentifier("session.controls.initial")
+    root.addSubview(button)
+    window.contentView = root
+    window.layoutIfNeeded()
+    root.layoutSubtreeIfNeeded()
+
+    let generation = controller.beginTracking(windowID: window.windowNumber)
+    controller.sync(window: window, generation: generation)
+    await controller.waitForIdle()
+
+    button.setAccessibilityIdentifier("session.controls.latest")
+    controller.sync(
+      window: window,
+      generation: generation,
+      reason: .routineDidUpdate
+    )
+    await controller.waitForIdle()
+
+    let identifiers = await registry.allElements(windowID: window.windowNumber).map(\.identifier)
+    #expect(identifiers == ["session.controls.initial"])
   }
 
   @MainActor
@@ -1086,6 +1125,19 @@ private final class WindowAccessibilityChildHost: NSWindow {
 
   override func accessibilityChildren() -> [Any]? {
     [toolbarButton]
+  }
+
+  override func accessibilityChildrenInNavigationOrder() -> [any NSAccessibilityElementProtocol]? {
+    nil
+  }
+}
+
+@MainActor
+private final class KeyWindowAccessibilityHost: NSWindow {
+  override var isKeyWindow: Bool { true }
+
+  override func accessibilityChildren() -> [Any]? {
+    nil
   }
 
   override func accessibilityChildrenInNavigationOrder() -> [any NSAccessibilityElementProtocol]? {
