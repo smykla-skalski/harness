@@ -244,6 +244,10 @@ final class MobileMonitorStore {
     demoModeEnabled || syncClient(for: selectedStationID) != nil
   }
 
+  func canQueueCommand(stationID: String) -> Bool {
+    demoModeEnabled || syncClient(for: stationID) != nil
+  }
+
   func setDemoMode(_ enabled: Bool) {
     guard demoModeEnabled != enabled else {
       return
@@ -379,40 +383,50 @@ final class MobileMonitorStore {
     guard let kind = attention.commandKind, let target = attention.target else {
       return
     }
-    let authenticated = await authenticate(reason: kind.title)
+    let draft = MobileCommandDraft(
+      kind: kind,
+      confirmationText: attention.title,
+      auditReason: kind == .pullRequestMerge ? "Confirmed from iPhone." : nil,
+      target: target,
+      payload: attention.commandPayload
+    )
+    await queueCommand(draft)
+  }
+
+  func queueCommand(_ draft: MobileCommandDraft) async {
+    let now = Date()
+    let command: MobileCommandRecord
+    do {
+      command =
+        try draft
+        .makeCommand(
+          id: "command-\(UUID().uuidString)",
+          actorDeviceID: "",
+          createdAt: now
+        )
+        .validatingFreshState(currentRevision: snapshot.revision)
+    } catch {
+      syncStatus = .commandFailed(String(describing: error))
+      return
+    }
+
+    let authenticated = await authenticate(reason: command.confirmationText)
     guard authenticated else {
       lastAuthenticationFailed = true
       return
     }
 
-    let now = Date()
-    let risk: MobileCommandRisk = kind == .pullRequestMerge ? .destructive : .high
-    var command = MobileCommandRecord(
-      id: "command-\(UUID().uuidString)",
-      stationID: target.stationID,
-      kind: kind,
-      risk: risk,
-      status: .draft,
-      title: kind.title,
-      confirmationText: attention.title,
-      auditReason: risk == .destructive ? "Confirmed from iPhone." : nil,
-      target: target,
-      payload: attention.commandPayload,
-      actorDeviceID: "",
-      createdAt: now,
-      expiresAt: now.addingTimeInterval(15 * 60),
-      updatedAt: now
-    )
     if demoModeEnabled {
+      var command = command
       command.status = .queued
       command.actorDeviceID = "device-demo-phone"
       snapshot.commands.insert(command, at: 0)
       persistSharedSnapshot(snapshot)
-      selectedStationID = target.stationID
+      selectedStationID = command.stationID
       syncStatus = .demo
       return
     }
-    guard let syncClient = syncClient(for: target.stationID) else {
+    guard let syncClient = syncClient(for: command.stationID) else {
       syncStatus = .unpaired
       return
     }
@@ -424,7 +438,7 @@ final class MobileMonitorStore {
       )
       snapshot.commands.insert(queued.signedCommand.command, at: 0)
       persistSharedSnapshot(snapshot)
-      selectedStationID = target.stationID
+      selectedStationID = command.stationID
       syncStatus = .commandQueued(now)
     } catch {
       syncStatus = .commandFailed(String(describing: error))

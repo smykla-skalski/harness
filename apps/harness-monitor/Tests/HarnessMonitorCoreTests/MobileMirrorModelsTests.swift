@@ -106,6 +106,57 @@ final class MobileMirrorModelsTests: XCTestCase {
     }
   }
 
+  func testCommandDraftBuildsRefreshCommand() throws {
+    let now = Date(timeIntervalSince1970: 1_700_000_000)
+    let draft = MobileCommandDraft(
+      kind: .refresh,
+      confirmationText: "Refresh station health.",
+      target: MobileCommandTarget(stationID: "station", targetRevision: 12),
+      payload: ["scope": "health"]
+    )
+
+    let command = try draft.makeCommand(id: "command-refresh", createdAt: now)
+
+    XCTAssertEqual(command.kind, .refresh)
+    XCTAssertEqual(command.risk, .low)
+    XCTAssertEqual(command.status, .draft)
+    XCTAssertEqual(command.payload["scope"], "health")
+    XCTAssertEqual(command.expiresAt, now.addingTimeInterval(15 * 60))
+  }
+
+  func testCommandDraftRequiresMergeAuditReason() {
+    let draft = MobileCommandDraft(
+      kind: .pullRequestMerge,
+      confirmationText: "Merge PR #812.",
+      target: MobileCommandTarget(
+        stationID: "station",
+        reviewID: "review-812",
+        targetRevision: 12
+      ),
+      payload: ["method": "squash"]
+    )
+
+    XCTAssertThrowsError(try draft.validate()) { error in
+      XCTAssertEqual(error as? MobileCommandDraftValidationError, .missingAuditReason)
+    }
+  }
+
+  func testCommandDraftRequiresAgentPromptPayload() {
+    let draft = MobileCommandDraft(
+      kind: .agentPrompt,
+      confirmationText: "Prompt agent.",
+      target: MobileCommandTarget(
+        stationID: "station",
+        agentID: "agent-codex",
+        targetRevision: 12
+      )
+    )
+
+    XCTAssertThrowsError(try draft.validate()) { error in
+      XCTAssertEqual(error as? MobileCommandDraftValidationError, .missingPayload("prompt"))
+    }
+  }
+
   func testSharedSnapshotStoreRoundTripsLatestSnapshot() throws {
     let now = Date(timeIntervalSince1970: 1_700_000_000)
     let fileURL = try temporarySnapshotFileURL()
