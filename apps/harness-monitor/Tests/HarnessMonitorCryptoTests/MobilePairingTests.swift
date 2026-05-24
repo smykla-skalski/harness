@@ -79,6 +79,14 @@ final class MobilePairingTests: XCTestCase {
     XCTAssertEqual(credential.symmetricKeyRawRepresentation, expectedKey)
   }
 
+  func testURLSessionPairingTransportWaitsForLocalNetworkConnectivity() {
+    let configuration = URLSessionMobilePairingTransport.defaultSessionConfiguration()
+
+    XCTAssertTrue(configuration.waitsForConnectivity)
+    XCTAssertEqual(configuration.timeoutIntervalForRequest, 30)
+    XCTAssertEqual(configuration.timeoutIntervalForResource, 60)
+  }
+
   func testPairingCoordinatorCreatesDeviceIdentityAndPersistsCredential() async throws {
     let now = Date(timeIntervalSince1970: 1_700_000_000)
     let stationPrivateKey = Curve25519.KeyAgreement.PrivateKey()

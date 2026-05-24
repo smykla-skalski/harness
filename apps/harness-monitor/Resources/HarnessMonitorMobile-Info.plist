@@ -39,6 +39,11 @@
   <string>Harness Monitor scans pairing QR codes from your Mac relay.</string>
   <key>NSLocalNetworkUsageDescription</key>
   <string>Harness Monitor pairs with your Mac relay on the local network.</string>
+  <key>NSAppTransportSecurity</key>
+  <dict>
+    <key>NSAllowsLocalNetworking</key>
+    <true/>
+  </dict>
   <key>NSSupportsLiveActivities</key>
   <true/>
   <key>UIApplicationSupportsIndirectInputEvents</key>

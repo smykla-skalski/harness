@@ -132,8 +132,25 @@ public final class MobilePairingHTTPServer: @unchecked Sendable {
   }
 
   private func handle(_ connection: NWConnection) {
+    let state = MobilePairingConnectionState()
+    connection.stateUpdateHandler = { [weak self, state] connectionState in
+      guard let self else {
+        connection.cancel()
+        return
+      }
+      switch connectionState {
+      case .ready:
+        guard state.markReady() else {
+          return
+        }
+        self.receive(from: connection, buffer: Data())
+      case .failed, .cancelled:
+        connection.cancel()
+      default:
+        break
+      }
+    }
     connection.start(queue: queue)
-    receive(from: connection, buffer: Data())
   }
 
   private func hasActiveListener() -> Bool {
@@ -301,6 +318,21 @@ private struct ParsedHTTPRequest: Sendable {
   var method: String
   var path: String
   var body: Data
+}
+
+private final class MobilePairingConnectionState: @unchecked Sendable {
+  private let lock = NSLock()
+  private var isReady = false
+
+  func markReady() -> Bool {
+    lock.withLock {
+      guard !isReady else {
+        return false
+      }
+      isReady = true
+      return true
+    }
+  }
 }
 
 private actor MobilePairingListenerReadyState {
