@@ -35,12 +35,20 @@ description = "Preview clean:lanes: classify each lane as keep (active/forced) o
 run = "./scripts/clean-stale-lanes.sh --dry-run"
 
 [tasks."clean:fsmonitor"]
-description = "List orphan git fsmonitor--daemon processes (gitdir deleted) and SIGTERM them. Live daemons whose gitdir still exists are never killed."
+description = "List orphan and redundant-duplicate git fsmonitor--daemon processes and SIGTERM them. Live single-daemon-per-gitdir processes are never killed."
 run = "./scripts/clean-stale-fsmonitor.sh --apply"
 
 [tasks."clean:fsmonitor:dry-run"]
-description = "Preview clean:fsmonitor: report each fsmonitor daemon's gitdir and status (live/orphan/unknown); send no signals"
+description = "Preview clean:fsmonitor: report each fsmonitor daemon's gitdir and status (live/orphan/redundant/unknown); send no signals"
 run = "./scripts/clean-stale-fsmonitor.sh"
+
+[tasks."clean:fsmonitor:disable-dormant"]
+description = "Set local core.fsmonitor=false on git repos untouched > 30 days so they stop spawning fsmonitor daemons. Excludes harness/kuma/kong-mesh/plugins/dotfiles/codex-home."
+run = "./scripts/disable-fsmonitor-dormant.sh --apply"
+
+[tasks."clean:fsmonitor:disable-dormant:dry-run"]
+description = "Preview clean:fsmonitor:disable-dormant: list dormant repos whose effective core.fsmonitor would be flipped to false; write no config"
+run = "./scripts/disable-fsmonitor-dormant.sh"
 
 [tasks."clean:caches:dry-run"]
 description = "Preview clean:caches: print every target and its size; delete nothing"
