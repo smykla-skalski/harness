@@ -7,6 +7,7 @@ struct HarnessMonitorMobileApp: App {
   @Environment(\.scenePhase) private var scenePhase
   @State private var store: MobileMonitorStore
   @State private var pendingPairingURL: URL?
+  @State private var selectedTab: MobileRootTab = .today
 
   init() {
     let identityStore = KeychainMobileDeviceIdentityStore()
@@ -30,12 +31,15 @@ struct HarnessMonitorMobileApp: App {
 
   var body: some Scene {
     WindowGroup {
-      MobileRootView()
+      MobileRootView(selectedTab: $selectedTab)
         .environment(store)
         .onOpenURL { url in
           guard url.scheme == MobilePairingInvitationCodec.urlScheme,
             url.host == MobilePairingInvitationCodec.urlHost
           else {
+            if let tab = MobileRootTab(url: url) {
+              selectedTab = tab
+            }
             return
           }
           pendingPairingURL = url

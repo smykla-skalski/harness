@@ -18,6 +18,7 @@ struct MobileNeedsYouWidget: Widget {
           .lineLimit(2)
       }
       .containerBackground(.fill.tertiary, for: .widget)
+      .widgetURL(URL(string: "harness://today"))
     }
     .configurationDisplayName("Needs You")
     .description("Critical Harness Monitor items waiting for you.")
