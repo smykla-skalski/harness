@@ -200,6 +200,7 @@ struct AttentionRow: View {
     switch item.kind {
     case .acpDecision: "lock.shield"
     case .pullRequest: "arrow.triangle.pull"
+    case .taskBoard: "list.bullet.clipboard"
     case .blockedAgent: "person.crop.circle.badge.exclamationmark"
     case .commandFailure: "xmark.octagon"
     case .stationHealth: "desktopcomputer"
@@ -237,55 +238,6 @@ struct StationHealthRow: View {
         .font(.caption.weight(.semibold))
         .foregroundStyle(.secondary)
     }
-  }
-}
-
-struct SessionsView: View {
-  @Environment(MobileMonitorStore.self) private var store
-
-  var body: some View {
-    NavigationStack {
-      List {
-        Section {
-          StationPicker()
-        }
-        Section("Sessions") {
-          ForEach(store.sessionsForSelectedStation) { session in
-            SessionRow(session: session)
-          }
-        }
-      }
-      .navigationTitle("Sessions")
-    }
-  }
-}
-
-struct SessionRow: View {
-  let session: MobileSessionSummary
-
-  var body: some View {
-    VStack(alignment: .leading, spacing: 8) {
-      HStack {
-        Text(session.title)
-          .font(.headline)
-        Spacer()
-        Text(session.status)
-          .font(.caption.weight(.semibold))
-          .foregroundStyle(session.blockedAgentCount > 0 ? .orange : .secondary)
-      }
-      Text("\(session.projectName)  \(session.branch)")
-        .font(.caption)
-        .foregroundStyle(.secondary)
-      Text(session.summary)
-        .font(.subheadline)
-      HStack(spacing: 14) {
-        Label("\(session.activeAgentCount)", systemImage: "person.2")
-        Label("\(session.blockedAgentCount)", systemImage: "exclamationmark.triangle")
-      }
-      .font(.caption)
-      .foregroundStyle(.secondary)
-    }
-    .padding(.vertical, 4)
   }
 }
 

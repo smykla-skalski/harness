@@ -72,6 +72,7 @@ final class WatchMonitorStore {
 
   private let identityStore: any MobileDeviceIdentityStore
   private let credentialStore: any MobilePairedStationCredentialStore
+  private let sharedSnapshotStore: MobileSharedSnapshotStore?
   private var syncClientsByStationID: [String: MobileCloudMirrorSyncClient] = [:]
   private var defaultStationID: String?
 
@@ -80,14 +81,18 @@ final class WatchMonitorStore {
     demoModeEnabled: Bool = false,
     identityStore: any MobileDeviceIdentityStore = KeychainMobileDeviceIdentityStore(),
     credentialStore: any MobilePairedStationCredentialStore =
-      KeychainMobilePairedStationCredentialStore()
+      KeychainMobilePairedStationCredentialStore(),
+    sharedSnapshotStore: MobileSharedSnapshotStore? = MobileSharedSnapshotStore()
   ) {
     self.demoModeEnabled = demoModeEnabled
-    let initialSnapshot = snapshot ?? (demoModeEnabled ? MobileDemoFixtures.snapshot() : .empty())
+    let cachedSnapshot = try? sharedSnapshotStore?.loadSnapshot()
+    let initialSnapshot =
+      snapshot ?? cachedSnapshot ?? (demoModeEnabled ? MobileDemoFixtures.snapshot() : .empty())
     self.snapshot = initialSnapshot
     self.identityStore = identityStore
     self.credentialStore = credentialStore
-    self.status = demoModeEnabled ? .demo : .loading
+    self.sharedSnapshotStore = sharedSnapshotStore
+    self.status = demoModeEnabled ? .demo : (cachedSnapshot == nil ? .loading : .stale("Cached"))
     self.selectedStationID =
       initialSnapshot.stations.first(where: \.defaultStation)?.id
       ?? initialSnapshot.stations.first?.id
@@ -133,13 +138,8 @@ final class WatchMonitorStore {
         )
       }
       guard !validCredentials.isEmpty else {
-        snapshot = MobileDemoFixtures.snapshot()
-        selectedStationID =
-          snapshot.stations.first(where: \.defaultStation)?.id
-          ?? snapshot.stations.first?.id
-          ?? ""
-        demoModeEnabled = true
-        status = .demo
+        applyCachedSnapshotIfAvailable()
+        status = snapshot.stations.isEmpty ? .unpaired : .stale("Waiting for iPhone pairing.")
         return
       }
       syncClientsByStationID = nextClients
@@ -179,10 +179,12 @@ final class WatchMonitorStore {
     status = .loading
     do {
       guard let nextSnapshot = try await syncClient.fetchLatestSnapshot(stationID: stationID) else {
+        applyCachedSnapshotIfAvailable()
         status = .stale("No mirror snapshot")
         return
       }
       snapshot = nextSnapshot
+      try? sharedSnapshotStore?.save(nextSnapshot)
       if snapshot.stations.contains(where: { $0.id == stationID }) {
         selectedStationID = stationID
       } else {
@@ -194,8 +196,10 @@ final class WatchMonitorStore {
       status = .live(nextSnapshot.generatedAt)
       WidgetCenter.shared.reloadAllTimelines()
     } catch MobileCloudMirrorSyncError.staleSnapshot(let expiresAt) {
+      applyCachedSnapshotIfAvailable()
       status = .stale("Expired \(expiresAt.formatted(.relative(presentation: .numeric)))")
     } catch {
+      applyCachedSnapshotIfAvailable()
       status = .stale(String(describing: error))
     }
   }
@@ -328,6 +332,20 @@ final class WatchMonitorStore {
       return selectedStationID
     }
     return defaultStationID
+  }
+
+  private func applyCachedSnapshotIfAvailable() {
+    guard let cachedSnapshot = try? sharedSnapshotStore?.loadSnapshot() else {
+      return
+    }
+    snapshot = cachedSnapshot
+    if selectedStationID.isEmpty || snapshot.station(id: selectedStationID) == nil {
+      selectedStationID =
+        snapshot.stations.first(where: \.defaultStation)?.id
+        ?? snapshot.stations.first?.id
+        ?? ""
+    }
+    WidgetCenter.shared.reloadAllTimelines()
   }
 
   private func syncClient(for stationID: String) -> MobileCloudMirrorSyncClient? {

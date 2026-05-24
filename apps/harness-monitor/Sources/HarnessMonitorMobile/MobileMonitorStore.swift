@@ -267,6 +267,7 @@ final class MobileMonitorStore {
   private var syncClientsByStationID: [String: any MobileMonitorSyncClient] = [:]
   private var injectedSyncClient: (any MobileMonitorSyncClient)?
   private var defaultStationID: String?
+  private var pairedIdentitiesByID: [String: MobileDeviceIdentity] = [:]
 
   init(
     snapshot: MobileMirrorSnapshot? = nil,
@@ -708,6 +709,7 @@ final class MobileMonitorStore {
     let previousSnapshot = snapshot
     snapshot = nextSnapshot
     persistSharedSnapshot(nextSnapshot)
+    publishWatchPairingTransfer(snapshot: nextSnapshot)
     if snapshot.stations.contains(where: { $0.id == preferredStationID }) {
       selectedStationID = preferredStationID
     } else {
@@ -773,6 +775,7 @@ final class MobileMonitorStore {
       )
     }
     pairedCredentials = validCredentials
+    pairedIdentitiesByID = identitiesByID
     syncClientsByStationID = nextClients
     defaultStationID =
       preferredStationID
@@ -785,8 +788,25 @@ final class MobileMonitorStore {
     await watchPairingSyncer?.publish(
       identities: identitiesByID.values.sorted { $0.id < $1.id },
       credentials: validCredentials,
+      snapshot: snapshot,
       exportedAt: .now
     )
+  }
+
+  private func publishWatchPairingTransfer(snapshot: MobileMirrorSnapshot) {
+    guard !pairedCredentials.isEmpty else {
+      return
+    }
+    let identities = pairedIdentitiesByID.values.sorted { $0.id < $1.id }
+    let credentials = pairedCredentials
+    Task { [watchPairingSyncer] in
+      await watchPairingSyncer?.publish(
+        identities: identities,
+        credentials: credentials,
+        snapshot: snapshot,
+        exportedAt: .now
+      )
+    }
   }
 
   private func refreshAfterPairingBootstrap() async {

@@ -7,6 +7,7 @@ public protocol MobileMirrorClient: Sendable {
   func sessions() async throws -> [SessionSummary]
   func managedAgents(sessionID: String) async throws -> ManagedAgentListResponse
   func queryReviews(request: ReviewsQueryRequest) async throws -> ReviewsQueryResponse
+  func taskBoardItems(status: TaskBoardStatus?) async throws -> [TaskBoardItem]
 }
 
 public struct HarnessMonitorClientMobileMirrorClient: MobileMirrorClient {
@@ -30,6 +31,10 @@ public struct HarnessMonitorClientMobileMirrorClient: MobileMirrorClient {
 
   public func queryReviews(request: ReviewsQueryRequest) async throws -> ReviewsQueryResponse {
     try await client.queryReviews(request: request)
+  }
+
+  public func taskBoardItems(status: TaskBoardStatus?) async throws -> [TaskBoardItem] {
+    try await client.taskBoardItems(status: status)
   }
 }
 
@@ -81,6 +86,7 @@ public actor HarnessMonitorClientMobileMirrorSnapshotSource: MobileMirrorSnapsho
         sessions: sessions
       )
       let reviewFetch = await fetchReviews(client: client, now: now)
+      let taskBoardFetch = await fetchTaskBoard(client: client, now: now)
       let trustedDevices = try await trustedDeviceProvider()
       let snapshot = makeSnapshot(
         now: now,
@@ -90,6 +96,8 @@ public actor HarnessMonitorClientMobileMirrorSnapshotSource: MobileMirrorSnapsho
         agentsBySessionID: agentsBySessionID,
         reviews: reviewFetch.reviews,
         reviewIssueAttention: reviewFetch.attention,
+        taskBoardItems: taskBoardFetch.items,
+        taskBoardIssueAttention: taskBoardFetch.attention,
         trustedDevices: trustedDevices
       )
       lastSnapshot = snapshot
@@ -116,6 +124,8 @@ public actor HarnessMonitorClientMobileMirrorSnapshotSource: MobileMirrorSnapsho
     agentsBySessionID: [String: [ManagedAgentSnapshot]],
     reviews: [ReviewItem],
     reviewIssueAttention: MobileAttentionItem?,
+    taskBoardItems: [TaskBoardItem],
+    taskBoardIssueAttention: MobileAttentionItem?,
     trustedDevices: [MobileDeviceDescriptor]
   ) -> MobileMirrorSnapshot {
     var attention: [MobileAttentionItem] = []
@@ -136,6 +146,15 @@ public actor HarnessMonitorClientMobileMirrorSnapshotSource: MobileMirrorSnapsho
       attention.append(reviewIssueAttention)
     }
     attention.append(
+      contentsOf: taskBoardAttention(
+        items: taskBoardItems,
+        revision: revision,
+        now: now
+      ))
+    if let taskBoardIssueAttention {
+      attention.append(taskBoardIssueAttention)
+    }
+    attention.append(
       contentsOf: blockedAgentAttention(
         sessions: sessions,
         agentsBySessionID: agentsBySessionID,
@@ -152,13 +171,14 @@ public actor HarnessMonitorClientMobileMirrorSnapshotSource: MobileMirrorSnapsho
       )
     }
     let mobileReviews = reviews.map { mobileReview($0, now: now) }
+    let needsYouCount = attention.count { $0.needsUserAction }
     let station = MobileStationSummary(
       id: stationID,
       displayName: stationName,
       state: health.status.lowercased() == "ok" ? .online : .stale,
       lastSeenAt: now,
       activeSessionCount: sessions.filter { $0.status != .ended }.count,
-      needsYouCount: attention.count,
+      needsYouCount: needsYouCount,
       commandQueueCount: lastSnapshot?.station(id: stationID)?.commandQueueCount ?? 0,
       defaultStation: true
     )
@@ -271,6 +291,36 @@ public actor HarnessMonitorClientMobileMirrorSnapshotSource: MobileMirrorSnapsho
     }
   }
 
+  private func fetchTaskBoard(
+    client: any MobileMirrorClient,
+    now: Date
+  ) async -> MobileRelayTaskBoardFetchResult {
+    do {
+      let items = try await client.taskBoardItems(status: nil)
+        .filter { $0.deletedAt == nil }
+      return MobileRelayTaskBoardFetchResult(items: items)
+    } catch {
+      return MobileRelayTaskBoardFetchResult(
+        items: [],
+        attention: MobileAttentionItem(
+          id: "task-board-unavailable-\(stationID)",
+          stationID: stationID,
+          kind: .stationHealth,
+          severity: .warning,
+          title: "Task board mirror failed",
+          subtitle: "The Mac could not refresh task-board items for mobile.",
+          updatedAt: now,
+          commandKind: .refresh,
+          target: MobileCommandTarget(
+            stationID: stationID,
+            targetRevision: revision
+          ),
+          commandPayload: ["scope": "taskBoard"]
+        )
+      )
+    }
+  }
+
   private func reviewsUnavailableAttention(
     title: String,
     subtitle: String,
@@ -357,6 +407,74 @@ public actor HarnessMonitorClientMobileMirrorSnapshotSource: MobileMirrorSnapsho
     }
   }
 
+  private func taskBoardAttention(
+    items: [TaskBoardItem],
+    revision: Int64,
+    now: Date
+  ) -> [MobileAttentionItem] {
+    items.compactMap { item in
+      switch item.status {
+      case .planReview:
+        return MobileAttentionItem(
+          id: "task-board-plan-\(item.id)",
+          stationID: stationID,
+          kind: .taskBoard,
+          severity: .critical,
+          title: "Plan approval needed",
+          subtitle: taskBoardSubtitle(item),
+          updatedAt: parseDate(item.updatedAt, fallback: now),
+          commandKind: .taskBoardPlanApproval,
+          target: MobileCommandTarget(
+            stationID: stationID,
+            taskID: item.id,
+            targetRevision: revision
+          ),
+          commandPayload: ["approvedBy": "mobile"]
+        )
+      case .needsYou:
+        return MobileAttentionItem(
+          id: "task-board-needs-you-\(item.id)",
+          stationID: stationID,
+          kind: .taskBoard,
+          severity: taskBoardSeverity(item),
+          title: "Task needs you",
+          subtitle: taskBoardSubtitle(item),
+          updatedAt: parseDate(item.updatedAt, fallback: now),
+          commandKind: .taskBoardDispatch,
+          target: MobileCommandTarget(
+            stationID: stationID,
+            taskID: item.id,
+            targetRevision: revision
+          ),
+          commandPayload: [
+            "itemID": item.id,
+            "status": "todo",
+            "dryRun": "false",
+          ]
+        )
+      case .blocked:
+        return MobileAttentionItem(
+          id: "task-board-blocked-\(item.id)",
+          stationID: stationID,
+          kind: .taskBoard,
+          severity: taskBoardSeverity(item),
+          title: "Task is blocked",
+          subtitle: taskBoardSubtitle(item),
+          updatedAt: parseDate(item.updatedAt, fallback: now),
+          commandKind: .refresh,
+          target: MobileCommandTarget(
+            stationID: stationID,
+            taskID: item.id,
+            targetRevision: revision
+          ),
+          commandPayload: ["scope": "taskBoard"]
+        )
+      default:
+        return nil
+      }
+    }
+  }
+
   private func blockedAgentAttention(
     sessions: [SessionSummary],
     agentsBySessionID: [String: [ManagedAgentSnapshot]],
@@ -406,8 +524,73 @@ public actor HarnessMonitorClientMobileMirrorSnapshotSource: MobileMirrorSnapsho
       activeAgentCount: agents.count(where: isActive),
       blockedAgentCount: agents.count(where: isBlocked),
       lastActivityAt: parseDate(session.lastActivityAt ?? session.updatedAt, fallback: now),
-      summary: session.context
+      summary: session.context,
+      agents: agents.map { mobileAgent($0, now: now) }
+        .sorted { lhs, rhs in
+          if lhs.isBlocked != rhs.isBlocked {
+            return lhs.isBlocked && !rhs.isBlocked
+          }
+          if lhs.isActive != rhs.isActive {
+            return lhs.isActive && !rhs.isActive
+          }
+          return lhs.lastActivityAt > rhs.lastActivityAt
+        }
     )
+  }
+
+  private func mobileAgent(
+    _ agent: ManagedAgentSnapshot,
+    now: Date
+  ) -> MobileAgentSummary {
+    switch agent {
+    case .terminal(let snapshot):
+      return MobileAgentSummary(
+        id: snapshot.managedAgentID,
+        stationID: stationID,
+        sessionID: snapshot.sessionId,
+        displayName: "\(snapshot.runtime) \(snapshot.agentId)",
+        family: .terminal,
+        status: snapshot.status.title,
+        role: nil,
+        isActive: snapshot.status.isActive,
+        isBlocked: snapshot.status == .failed,
+        lastActivityAt: parseDate(snapshot.updatedAt, fallback: now),
+        summary: snapshot.error ?? snapshot.projectDir
+      )
+    case .codex(let snapshot):
+      let pendingApprovals = snapshot.pendingApprovals.count
+      return MobileAgentSummary(
+        id: snapshot.managedAgentID,
+        stationID: stationID,
+        sessionID: snapshot.sessionId,
+        displayName: snapshot.displayName ?? snapshot.runId,
+        family: .codex,
+        status: snapshot.status.title,
+        role: nil,
+        isActive: snapshot.status.isActive,
+        isBlocked: snapshot.status == .waitingApproval || pendingApprovals > 0
+          || snapshot.status == .failed,
+        pendingApprovalCount: pendingApprovals,
+        lastActivityAt: parseDate(snapshot.updatedAt, fallback: now),
+        summary: snapshot.latestSummary ?? snapshot.finalMessage ?? snapshot.error
+          ?? snapshot.prompt
+      )
+    case .acp(let snapshot):
+      return MobileAgentSummary(
+        id: snapshot.managedAgentID,
+        stationID: stationID,
+        sessionID: snapshot.sessionId,
+        displayName: snapshot.displayName,
+        family: .acp,
+        status: snapshot.status.title,
+        role: nil,
+        isActive: snapshot.status == .active,
+        isBlocked: snapshot.pendingPermissions > 0 || snapshot.status == .awaitingReview,
+        pendingPermissionCount: snapshot.pendingPermissions,
+        lastActivityAt: parseDate(snapshot.updatedAt, fallback: now),
+        summary: snapshot.stderrTail ?? snapshot.projectDir
+      )
+    }
   }
 
   private func mobileReview(_ review: ReviewItem, now: Date) -> MobileReviewSummary {
@@ -469,6 +652,25 @@ public actor HarnessMonitorClientMobileMirrorSnapshotSource: MobileMirrorSnapsho
     }
   }
 
+  private func taskBoardSeverity(_ item: TaskBoardItem) -> MobileAttentionSeverity {
+    switch item.priority {
+    case .critical:
+      .critical
+    case .high, .medium, .low:
+      .warning
+    }
+  }
+
+  private func taskBoardSubtitle(_ item: TaskBoardItem) -> String {
+    let body = item.body.trimmingCharacters(in: .whitespacesAndNewlines)
+    let subject = body.isEmpty ? item.title : body
+    let trimmedSubject =
+      subject.count > 140
+      ? "\(subject.prefix(137))..."
+      : subject
+    return "\(item.title) - \(item.status.title) - \(item.priority.title). \(trimmedSubject)"
+  }
+
   private func parseDate(_ value: String?, fallback: Date) -> Date {
     guard let value, !value.isEmpty else {
       return fallback
@@ -480,6 +682,16 @@ public actor HarnessMonitorClientMobileMirrorSnapshotSource: MobileMirrorSnapsho
     }
     formatter.formatOptions = [.withInternetDateTime]
     return formatter.date(from: value) ?? fallback
+  }
+}
+
+private struct MobileRelayTaskBoardFetchResult: Sendable {
+  var items: [TaskBoardItem]
+  var attention: MobileAttentionItem?
+
+  init(items: [TaskBoardItem], attention: MobileAttentionItem? = nil) {
+    self.items = items
+    self.attention = attention
   }
 }
 

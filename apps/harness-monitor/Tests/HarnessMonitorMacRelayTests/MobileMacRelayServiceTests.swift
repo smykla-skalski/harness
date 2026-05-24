@@ -572,6 +572,26 @@ final class MobileMacRelayServiceTests: XCTestCase {
       createdAt: "2023-11-14T22:00:00Z",
       updatedAt: "2023-11-14T22:04:00Z"
     )
+    let taskBoardItem = TaskBoardItem(
+      schemaVersion: 1,
+      id: "task-1",
+      title: "Approve the mobile plan",
+      body: "Review the implementation plan before the agent continues.",
+      status: .planReview,
+      priority: .high,
+      tags: ["mobile"],
+      projectId: "project",
+      agentMode: .planning,
+      externalRefs: [],
+      planning: TaskBoardPlanningState(summary: "Ready for review."),
+      workflow: nil,
+      sessionId: session.sessionId,
+      workItemId: nil,
+      usage: TaskBoardUsage(),
+      createdAt: "2023-11-14T22:00:00Z",
+      updatedAt: "2023-11-14T22:06:00Z",
+      deletedAt: nil
+    )
     let source = HarnessMonitorClientMobileMirrorSnapshotSource(
       stationID: "station",
       stationName: "Studio",
@@ -588,7 +608,8 @@ final class MobileMacRelayServiceTests: XCTestCase {
           ),
           sessions: [session],
           agents: [session.sessionId: [acpAgent]],
-          reviews: [review]
+          reviews: [review],
+          taskBoardItemsFixture: [taskBoardItem]
         )
       },
       reviewsQueryProvider: {
@@ -616,12 +637,19 @@ final class MobileMacRelayServiceTests: XCTestCase {
     let reviewAttention: MobileAttentionItem = try XCTUnwrap(
       snapshot.attention.first { $0.kind == MobileAttentionKind.pullRequest }
     )
+    let taskBoardAttention: MobileAttentionItem = try XCTUnwrap(
+      snapshot.attention.first { $0.kind == MobileAttentionKind.taskBoard }
+    )
 
     XCTAssertEqual(snapshot.stations.first?.state, .online)
     XCTAssertEqual(snapshot.sessions.first?.activeAgentCount, 1)
+    XCTAssertEqual(snapshot.sessions.first?.agents.first?.pendingPermissionCount, 1)
     XCTAssertEqual(permission.commandPayload["batchID"], "batch-1")
     XCTAssertEqual(permission.commandPayload["decision"], "approve_all")
     XCTAssertEqual(reviewAttention.commandPayload["repository"], "smykla-skalski/harness")
+    XCTAssertEqual(taskBoardAttention.commandKind, .taskBoardPlanApproval)
+    XCTAssertEqual(taskBoardAttention.target?.taskID, "task-1")
+    XCTAssertEqual(snapshot.needsYouCount, 3)
     XCTAssertEqual(snapshot.trustedDevices.first?.id, "device-phone")
   }
 
@@ -840,6 +868,7 @@ private struct FixedMobileMirrorClient: MobileMirrorClient {
   let sessions: [SessionSummary]
   let agents: [String: [ManagedAgentSnapshot]]
   let reviews: [ReviewItem]
+  var taskBoardItemsFixture: [TaskBoardItem] = []
 
   func health() async throws -> HealthResponse {
     health
@@ -860,6 +889,13 @@ private struct FixedMobileMirrorClient: MobileMirrorClient {
       summary: ReviewsSummary(items: reviews),
       items: reviews
     )
+  }
+
+  func taskBoardItems(status: TaskBoardStatus?) async throws -> [TaskBoardItem] {
+    guard let status else {
+      return taskBoardItemsFixture
+    }
+    return taskBoardItemsFixture.filter { $0.status == status }
   }
 }
 

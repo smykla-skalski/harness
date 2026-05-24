@@ -57,6 +57,41 @@ final class MobileMirrorModelsTests: XCTestCase {
     XCTAssertEqual(snapshot.sortedAttention.map(\.id), ["critical", "warning"])
   }
 
+  func testNeedsYouCountIgnoresInformationalAttention() {
+    let now = Date()
+    let snapshot = MobileMirrorSnapshot(
+      revision: 1,
+      generatedAt: now,
+      expiresAt: now.addingTimeInterval(60),
+      stations: [],
+      attention: [
+        MobileAttentionItem(
+          id: "task",
+          stationID: "station",
+          kind: .taskBoard,
+          severity: .warning,
+          title: "Plan review needed",
+          subtitle: "",
+          updatedAt: now
+        ),
+        MobileAttentionItem(
+          id: "setup",
+          stationID: "station",
+          kind: .stationHealth,
+          severity: .info,
+          title: "Reviews are not configured",
+          subtitle: "",
+          updatedAt: now
+        ),
+      ],
+      sessions: [],
+      reviews: [],
+      commands: []
+    )
+
+    XCTAssertEqual(snapshot.needsYouCount, 1)
+  }
+
   func testAttentionCarriesEncryptedCommandPayload() {
     let item = MobileAttentionItem(
       id: "permission",
@@ -238,6 +273,54 @@ final class MobileMirrorModelsTests: XCTestCase {
     XCTAssertEqual(review.repository, "smykla-skalski/harness")
     XCTAssertNil(review.headSha)
     XCTAssertNil(review.policyBlocked)
+  }
+
+  func testSessionSummaryDecodesLegacyMirrorShape() throws {
+    let payload = """
+      {
+        "id": "session-1",
+        "stationID": "station",
+        "projectName": "Harness",
+        "title": "Mobile relay",
+        "branch": "main",
+        "status": "Active",
+        "activeAgentCount": 1,
+        "blockedAgentCount": 0,
+        "lastActivityAt": 1700000000,
+        "summary": "Working"
+      }
+      """
+
+    let session = try JSONDecoder().decode(MobileSessionSummary.self, from: Data(payload.utf8))
+
+    XCTAssertEqual(session.id, "session-1")
+    XCTAssertEqual(session.agents, [])
+  }
+
+  func testAgentSummaryBuildsPromptAndStopDrafts() throws {
+    let agent = MobileAgentSummary(
+      id: "agent-1",
+      stationID: "station",
+      sessionID: "session-1",
+      displayName: "Codex",
+      family: .codex,
+      status: "Waiting Approval",
+      isActive: true,
+      isBlocked: true,
+      pendingApprovalCount: 1,
+      lastActivityAt: Date(timeIntervalSince1970: 1_700_000_000),
+      summary: "Needs a prompt."
+    )
+
+    let promptDraft = agent.promptDraft(prompt: "Continue", targetRevision: 7)
+    let stopDraft = agent.stopDraft(targetRevision: 7)
+
+    XCTAssertEqual(promptDraft.kind, .agentPrompt)
+    XCTAssertEqual(promptDraft.target.agentID, "agent-1")
+    XCTAssertEqual(promptDraft.target.sessionID, "session-1")
+    XCTAssertEqual(promptDraft.payload["prompt"], "Continue")
+    XCTAssertEqual(stopDraft.kind, .agentStop)
+    XCTAssertEqual(stopDraft.target.agentID, "agent-1")
   }
 
   func testSharedSnapshotStoreRoundTripsLatestSnapshot() throws {

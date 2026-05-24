@@ -26,9 +26,20 @@ struct MobileCommandComposerView: View {
   @State private var auditReason = ""
   @State private var submitting = false
 
-  init(initialStationID: String = "", initialKind: MobileCommandKind = .refresh) {
+  init(
+    initialStationID: String = "",
+    initialKind: MobileCommandKind = .refresh,
+    initialSessionID: String = "",
+    initialAgentID: String = "",
+    initialTaskID: String = "",
+    initialPrompt: String = ""
+  ) {
     _stationID = State(initialValue: initialStationID)
     _kind = State(initialValue: initialKind)
+    _sessionID = State(initialValue: initialSessionID)
+    _agentID = State(initialValue: initialAgentID)
+    _taskID = State(initialValue: initialTaskID)
+    _prompt = State(initialValue: initialPrompt)
   }
 
   var body: some View {
