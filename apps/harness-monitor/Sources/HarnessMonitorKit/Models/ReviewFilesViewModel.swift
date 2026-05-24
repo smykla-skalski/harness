@@ -132,6 +132,7 @@ public final class ReviewFilesViewModel {
   public var filteredFiles: [ReviewFile] = []
   public private(set) var filesRevision: UInt64 = 0
   public private(set) var filteredFilesRevision: UInt64 = 0
+  public private(set) var viewedStateRevision: UInt64 = 0
   public private(set) var fileTreeNodes: [ReviewFileTreeNode] = []
 
   public var patches: [String: ReviewFilePatchState] = [:]
@@ -172,6 +173,7 @@ public final class ReviewFilesViewModel {
     viewedByPath = Dictionary(
       uniqueKeysWithValues: response.files.map { ($0.path, $0.viewerViewedState) }
     )
+    viewedStateRevision &+= 1
     // Drop patches whose path is no longer in the response, but keep the
     // patches that survive (e.g. on refresh of an unchanged file list).
     let validPaths = Set(response.files.map(\.path))
@@ -210,7 +212,11 @@ public final class ReviewFilesViewModel {
     path: String,
     state: ReviewFileViewedState
   ) {
+    let previous = viewedByPath[path]
     viewedByPath[path] = state
+    if previous != state {
+      viewedStateRevision &+= 1
+    }
     recomputeSortedAndFilteredIfViewedSortDependsOnIt()
   }
 
@@ -218,8 +224,15 @@ public final class ReviewFilesViewModel {
     paths: [String],
     state: ReviewFileViewedState
   ) {
+    var didChange = false
     for path in paths {
+      if viewedByPath[path] != state {
+        didChange = true
+      }
       viewedByPath[path] = state
+    }
+    if didChange {
+      viewedStateRevision &+= 1
     }
     recomputeSortedAndFilteredIfViewedSortDependsOnIt()
   }
@@ -366,64 +379,5 @@ public final class ReviewFilesViewModel {
         return lhs.path.localizedCaseInsensitiveCompare(rhs.path) == .orderedAscending
       }
     }
-  }
-}
-
-private enum ReviewFileTreeBuilder {
-  static func build(files: [ReviewFile]) -> [ReviewFileTreeNode] {
-    let root = MutableReviewFileTreeNode(name: "", fullPath: "")
-    for file in files {
-      insert(path: file.path, into: root)
-    }
-    return root.children.map(\.snapshot)
-  }
-
-  private static func insert(path: String, into root: MutableReviewFileTreeNode) {
-    let segments = path.split(separator: "/").map(String.init)
-    guard !segments.isEmpty else { return }
-    var current = root
-    var prefix = ""
-    for index in segments.indices {
-      let segment = segments[index]
-      let fullPath = prefix.isEmpty ? segment : "\(prefix)/\(segment)"
-      if index == segments.index(before: segments.endIndex) {
-        current.children.append(
-          MutableReviewFileTreeNode(name: segment, fullPath: fullPath)
-        )
-      } else {
-        current = current.directory(named: segment, fullPath: fullPath)
-      }
-      prefix = fullPath
-    }
-  }
-}
-
-private final class MutableReviewFileTreeNode {
-  let name: String
-  let fullPath: String
-  var children: [MutableReviewFileTreeNode] = []
-  private var directoryIndexByName: [String: Int] = [:]
-
-  init(name: String, fullPath: String) {
-    self.name = name
-    self.fullPath = fullPath
-  }
-
-  var snapshot: ReviewFileTreeNode {
-    ReviewFileTreeNode(
-      name: name,
-      fullPath: fullPath,
-      children: children.map(\.snapshot)
-    )
-  }
-
-  func directory(named name: String, fullPath: String) -> MutableReviewFileTreeNode {
-    if let index = directoryIndexByName[name] {
-      return children[index]
-    }
-    let child = MutableReviewFileTreeNode(name: name, fullPath: fullPath)
-    directoryIndexByName[name] = children.count
-    children.append(child)
-    return child
   }
 }

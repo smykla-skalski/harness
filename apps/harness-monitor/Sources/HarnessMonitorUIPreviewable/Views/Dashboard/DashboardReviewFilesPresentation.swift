@@ -55,6 +55,135 @@ struct DashboardReviewFilesSummary: Equatable {
   }
 }
 
+struct DashboardReviewFilesModePresentation: Equatable {
+  static let empty = Self(summary: DashboardReviewFilesSummary(), visibleFiles: [], groups: [])
+
+  let summary: DashboardReviewFilesSummary
+  let visibleFiles: [ReviewFile]
+  let groups: [DashboardReviewFilesModeGroup]
+}
+
+struct DashboardReviewFilesModeGroup: Equatable, Identifiable {
+  let folder: String
+  let rows: [DashboardReviewFilesModeRow]
+
+  var id: String { folder }
+}
+
+struct DashboardReviewFilesModeRow: Equatable, Identifiable {
+  let file: ReviewFile
+  let viewedState: ReviewFileViewedState
+  let threads: [DashboardReviewFileThreadAnchor]
+
+  var id: String { file.path }
+}
+
+struct DashboardReviewFilesModePresentationKey: Equatable {
+  let filesRevision: UInt64
+  let filteredFilesRevision: UInt64
+  let viewedStateRevision: UInt64
+  let timelineRevision: UInt64
+  let onlyUnresolved: Bool
+  let onlyUnviewed: Bool
+  let bucketFilter: DashboardReviewFileBucket?
+}
+
+@MainActor
+final class DashboardReviewFilesModePresentationCache {
+  private var cachedKey: DashboardReviewFilesModePresentationKey?
+  private var cachedPresentation = DashboardReviewFilesModePresentation.empty
+
+  func presentation(
+    files: [ReviewFile],
+    filteredFiles: [ReviewFile],
+    viewedByPath: [String: ReviewFileViewedState],
+    threadIndex: DashboardReviewFileThreadIndex,
+    key: DashboardReviewFilesModePresentationKey
+  ) -> DashboardReviewFilesModePresentation {
+    guard cachedKey != key else { return cachedPresentation }
+    cachedKey = key
+    cachedPresentation = Self.make(
+      DashboardReviewFilesModePresentationInput(
+        files: files,
+        filteredFiles: filteredFiles,
+        viewedByPath: viewedByPath,
+        threadIndex: threadIndex,
+        key: key
+      )
+    )
+    return cachedPresentation
+  }
+
+  private static func make(
+    _ input: DashboardReviewFilesModePresentationInput
+  ) -> DashboardReviewFilesModePresentation {
+    let summary = DashboardReviewFilesSummary.make(
+      files: input.files,
+      viewedByPath: input.viewedByPath,
+      threadIndex: input.threadIndex
+    )
+    var visibleFiles: [ReviewFile] = []
+    var rowsByFolder: [String: [DashboardReviewFilesModeRow]] = [:]
+    visibleFiles.reserveCapacity(input.filteredFiles.count)
+    rowsByFolder.reserveCapacity(input.filteredFiles.count)
+    for file in input.filteredFiles {
+      let viewedState = input.viewedByPath[file.path] ?? file.viewerViewedState
+      if input.key.onlyUnviewed, viewedState == .viewed {
+        continue
+      }
+      if input.key.onlyUnresolved, !input.threadIndex.hasUnresolvedAnchors(forPath: file.path) {
+        continue
+      }
+      if let bucketFilter = input.key.bucketFilter,
+        !DashboardReviewFileClassifier.matches(file, bucket: bucketFilter)
+      {
+        continue
+      }
+      let threads = input.threadIndex.anchors(forPath: file.path)
+      let row = DashboardReviewFilesModeRow(
+        file: file,
+        viewedState: viewedState,
+        threads: threads
+      )
+      visibleFiles.append(file)
+      rowsByFolder[parentDirectory(for: file.path), default: []].append(row)
+    }
+    let groups = sortedFolders(in: rowsByFolder).map { folder in
+      DashboardReviewFilesModeGroup(folder: folder, rows: rowsByFolder[folder] ?? [])
+    }
+    return DashboardReviewFilesModePresentation(
+      summary: summary,
+      visibleFiles: visibleFiles,
+      groups: groups
+    )
+  }
+
+  private static func sortedFolders(
+    in rowsByFolder: [String: [DashboardReviewFilesModeRow]]
+  ) -> [String] {
+    rowsByFolder.keys.sorted { lhs, rhs in
+      if lhs == rootFolder { return true }
+      if rhs == rootFolder { return false }
+      return lhs.localizedStandardCompare(rhs) == .orderedAscending
+    }
+  }
+
+  private static func parentDirectory(for path: String) -> String {
+    guard let slashIndex = path.lastIndex(of: "/") else { return rootFolder }
+    return String(path[..<slashIndex])
+  }
+
+  private static let rootFolder = "Repository root"
+}
+
+private struct DashboardReviewFilesModePresentationInput {
+  let files: [ReviewFile]
+  let filteredFiles: [ReviewFile]
+  let viewedByPath: [String: ReviewFileViewedState]
+  let threadIndex: DashboardReviewFileThreadIndex
+  let key: DashboardReviewFilesModePresentationKey
+}
+
 enum DashboardReviewFileClassifier {
   static func buckets(for file: ReviewFile) -> [DashboardReviewFileBucket] {
     if file.isBinary { return [.binary] }
