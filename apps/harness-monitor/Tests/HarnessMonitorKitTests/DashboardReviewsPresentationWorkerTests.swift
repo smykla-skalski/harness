@@ -1,3 +1,4 @@
+import Foundation
 import Testing
 
 @testable import HarnessMonitorKit
@@ -276,6 +277,18 @@ struct DashboardReviewsPresentationWorkerTests {
     #expect(repinned.primaryDetailItem?.pullRequestID == "pr-3")
   }
 
+  @Test("presentation worker avoids transient filter and dictionary arrays")
+  func presentationWorkerAvoidsTransientFilterAndDictionaryArrays() throws {
+    let source = try workerSource()
+
+    #expect(source.contains("filteredItems.reserveCapacity(items.count)"))
+    #expect(source.contains("itemsByID(for: input.items)"))
+    #expect(source.contains("result.reserveCapacity(items.count)"))
+    #expect(!source.contains(".filter { categoryMode.matches($0) }"))
+    #expect(!source.contains("Dictionary(\n        input.items.map"))
+    #expect(!source.contains("items.map { item -> (String, String)"))
+  }
+
   private func reviewItem(
     id: String,
     repository: String,
@@ -309,5 +322,17 @@ struct DashboardReviewsPresentationWorkerTests {
       createdAt: createdAt,
       updatedAt: updatedAt ?? createdAt
     )
+  }
+
+  private func workerSource() throws -> String {
+    let testsDirectory = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
+    let appRoot =
+      testsDirectory
+      .deletingLastPathComponent()
+      .deletingLastPathComponent()
+    let sourceURL = appRoot.appendingPathComponent(
+      "Sources/HarnessMonitorUIPreviewable/Views/Dashboard/DashboardReviewsPresentationWorker.swift"
+    )
+    return try String(contentsOf: sourceURL, encoding: .utf8)
   }
 }
