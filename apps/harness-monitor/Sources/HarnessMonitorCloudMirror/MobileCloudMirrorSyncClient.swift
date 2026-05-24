@@ -5,6 +5,9 @@ import HarnessMonitorCrypto
 public enum MobileCloudMirrorSyncError: Error, Equatable, Sendable {
   case missingSnapshotEnvelope(String)
   case staleSnapshot(Date)
+  case commandAlreadyReceipted(String)
+  case cannotCancelCommandStatus(commandID: String, status: MobileCommandStatus)
+  case cannotCancelOtherDeviceCommand(commandID: String)
 }
 
 public struct MobileQueuedCommand: Equatable, Sendable {
@@ -124,6 +127,60 @@ public actor MobileCloudMirrorSyncClient {
     let record = MobileMirrorRecord(metadata: metadata, envelope: envelope)
     try await database.save(record)
     return MobileQueuedCommand(signedCommand: signedCommand, record: record)
+  }
+
+  @discardableResult
+  public func cancelCommand(
+    _ command: MobileCommandRecord,
+    currentRevision: Int64,
+    now: Date = .now
+  ) async throws -> MobileCommandReceipt {
+    guard command.actorDeviceID == deviceIdentity.id else {
+      throw MobileCloudMirrorSyncError.cannotCancelOtherDeviceCommand(commandID: command.id)
+    }
+    guard command.status == .queued else {
+      throw MobileCloudMirrorSyncError.cannotCancelCommandStatus(
+        commandID: command.id,
+        status: command.status
+      )
+    }
+    guard !command.isExpired(now: now) else {
+      throw MobileCommandValidationError.expired
+    }
+    let receiptID = Self.receiptRecordID(forCommandID: command.id)
+    if try await database.fetch(recordID: receiptID) != nil {
+      throw MobileCloudMirrorSyncError.commandAlreadyReceipted(command.id)
+    }
+
+    let receipt = MobileCommandReceipt(
+      commandID: command.id,
+      stationID: command.stationID,
+      status: .cancelled,
+      message: "Cancelled by \(deviceIdentity.displayName).",
+      receivedAt: now,
+      completedAt: now,
+      executionRevision: currentRevision
+    )
+    let metadata = MobileMirrorRecordMetadata(
+      id: receiptID,
+      type: .receipt,
+      stationID: command.stationID,
+      revision: currentRevision,
+      updatedAt: now,
+      expiresAt: now.addingTimeInterval(retention)
+    )
+    let envelope = try cipher.seal(
+      receipt,
+      keyID: commandKeyID,
+      additionalAuthenticatedData: MobileCloudMirrorRecordAAD.data(for: metadata),
+      createdAt: now
+    )
+    try await database.save(MobileMirrorRecord(metadata: metadata, envelope: envelope))
+    return receipt
+  }
+
+  private nonisolated static func receiptRecordID(forCommandID commandID: String) -> String {
+    "receipt-\(commandID)"
   }
 
   private nonisolated func isNewer(

@@ -393,9 +393,9 @@ struct CommandRow: View {
           }
           .buttonStyle(.bordered)
         }
-        if !command.status.isTerminal {
+        if command.status == .queued {
           Button(role: .destructive) {
-            store.cancel(command)
+            Task { await store.cancel(command) }
           } label: {
             Label("Cancel", systemImage: "xmark")
           }
