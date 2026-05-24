@@ -352,4 +352,15 @@ struct DashboardReviewsBodyAllocationContractTests {
     #expect(!provenanceSource.contains("var detailTitle: String"))
     #expect(!provenanceSource.contains("localizedString(for: fetchedDate, relativeTo: .now)"))
   }
+
+  @Test("scheduler dispatch keeps per-tick candidate selection bounded")
+  func schedulerDispatchKeepsPerTickCandidateSelectionBounded() throws {
+    let schedulerSource = try dashboardReviewsRouteSource(named: "DashboardReviewsScheduler.swift")
+
+    #expect(schedulerSource.contains("DashboardReviewsDispatchCandidate"))
+    #expect(schedulerSource.contains("insertSortedByDispatchPriority"))
+    #expect(schedulerSource.contains("candidates.reserveCapacity(limit + 1)"))
+    #expect(!schedulerSource.contains(".filter { !repositoriesInFlight.contains($0) }"))
+    #expect(!schedulerSource.contains(".sorted { lhs, rhs in"))
+  }
 }
