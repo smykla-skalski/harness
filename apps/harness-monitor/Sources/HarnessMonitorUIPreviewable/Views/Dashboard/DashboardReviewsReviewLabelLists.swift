@@ -212,6 +212,7 @@ struct DashboardReviewLabelChip: View {
         .scaledFont(.caption.weight(.semibold))
         .foregroundStyle(HarnessMonitorTheme.ink)
         .lineLimit(1)
+        .harnessOpticalTextCenter()
     }
     .padding(.horizontal, 8)
     .harnessOpticallyBalancedVerticalPadding(4)
