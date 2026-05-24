@@ -329,14 +329,31 @@ extension DashboardReviewsRouteView {
     }
   }
 
+  func refreshCachedPresentationSelection() {
+    let presentation = routeCachedPresentation.applyingSelection(
+      selectedIDs: routeSelectedIDs,
+      persistedPrimarySelectionID: persistedPrimarySelectionID,
+      sortModeRaw: sortModeRaw
+    )
+    if routeCachedPresentation != presentation {
+      routeCachedPresentation = presentation
+    }
+  }
+
   @MainActor
-  func rebuildPresentation(input: DashboardReviewsPresentationInput) async {
+  func rebuildPresentation(input: DashboardReviewsListPresentationInput) async {
     routePresentationGeneration &+= 1
     let generation = routePresentationGeneration
-    let presentation = await routePresentationWorker.compute(input: input)
+    let listPresentation = await routePresentationWorker.computeList(input: input)
     guard !Task.isCancelled, routePresentationGeneration == generation else {
       return
     }
+    let presentation = DashboardReviewsPresentation(
+      listPresentation: listPresentation,
+      selectedIDs: routeSelectedIDs,
+      persistedPrimarySelectionID: persistedPrimarySelectionID,
+      sortModeRaw: sortModeRaw
+    )
     if routeCachedPresentation != presentation {
       routeCachedPresentation = presentation
     }

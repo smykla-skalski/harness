@@ -29,34 +29,18 @@ actor DashboardReviewsPresentationWorker {
     input: DashboardReviewsPresentationInput
   ) -> DashboardReviewsPresentation {
     let listInput = DashboardReviewsListPresentationInput(input)
-    let listPresentation = computeListPresentation(input: listInput)
-    let sortMode = DashboardReviewsSortMode(rawValue: input.sortModeRaw) ?? .status
-    let comparator = sortMode.comparator
-    let selectedItems = input.selectedIDs
-      .compactMap { listPresentation.itemsByID[$0] }
-      .sorted(by: comparator)
-    let primaryDetailItem = Self.primaryDetailItem(
-      selectedItems: selectedItems,
-      filteredItems: listPresentation.filteredItems,
-      persistedPrimarySelectionID: input.persistedPrimarySelectionID
-    )
+    let listPresentation = computeList(input: listInput)
     return DashboardReviewsPresentation(
-      filteredItems: listPresentation.filteredItems,
-      groupedItems: listPresentation.groupedItems,
-      selectedItems: selectedItems,
-      primaryDetailItem: primaryDetailItem,
-      relativeUpdatedLabels: listPresentation.relativeUpdatedLabels,
-      version: DashboardReviewsPresentationVersion(
-        listVersion: listPresentation.version,
-        selectedPullRequestIDs: selectedItems.map(\.pullRequestID),
-        primaryDetailPullRequestID: primaryDetailItem?.pullRequestID
-      ),
+      listPresentation: listPresentation,
+      selectedIDs: input.selectedIDs,
+      persistedPrimarySelectionID: input.persistedPrimarySelectionID,
+      sortModeRaw: input.sortModeRaw
     )
   }
 
   func waitForIdle() async {}
 
-  private func computeListPresentation(
+  func computeList(
     input: DashboardReviewsListPresentationInput
   ) -> DashboardReviewsListPresentation {
     guard input != cachedListInput else {
@@ -307,19 +291,6 @@ actor DashboardReviewsPresentationWorker {
     return minimum
   }
 
-  private static func primaryDetailItem(
-    selectedItems: [ReviewItem],
-    filteredItems: [ReviewItem],
-    persistedPrimarySelectionID: String
-  ) -> ReviewItem? {
-    if selectedItems.count == 1 {
-      return selectedItems.first
-    }
-    if selectedItems.isEmpty, !persistedPrimarySelectionID.isEmpty {
-      return filteredItems.first { $0.pullRequestID == persistedPrimarySelectionID }
-    }
-    return selectedItems.isEmpty ? filteredItems.first : nil
-  }
 }
 
 extension ReviewItem {

@@ -144,6 +144,48 @@ struct DashboardReviewsPresentationWorkerTests {
     #expect(output.relativeUpdatedLabels["pr-2"] != nil)
   }
 
+  @Test("selection changes reuse the cached list presentation")
+  func selectionChangesReuseTheCachedListPresentation() async {
+    let first = reviewItem(id: "pr-1", repository: "kong/a", number: 1)
+    let second = reviewItem(id: "pr-2", repository: "kong/b", number: 2)
+    let worker = DashboardReviewsPresentationWorker()
+    let input = DashboardReviewsPresentationInput(
+      items: [first, second],
+      filterModeRaw: DashboardReviewsFilterMode.all.rawValue,
+      sortModeRaw: DashboardReviewsSortMode.repository.rawValue,
+      groupModeRaw: DashboardReviewsGroupMode.repository.rawValue,
+      categoryModeRaw: DashboardReviewsCategoryMode.all.rawValue,
+      searchText: "",
+      configuredRepositories: [],
+      configuredOrganizations: [],
+      configuredAuthors: [],
+      selectedIDs: [],
+      persistedPrimarySelectionID: ""
+    )
+    let listPresentation = await worker.computeList(
+      input: DashboardReviewsListPresentationInput(input)
+    )
+    let emptySelection = DashboardReviewsPresentation(
+      listPresentation: listPresentation,
+      selectedIDs: [],
+      persistedPrimarySelectionID: "",
+      sortModeRaw: input.sortModeRaw
+    )
+
+    let selected = emptySelection.applyingSelection(
+      selectedIDs: [second.pullRequestID],
+      persistedPrimarySelectionID: "",
+      sortModeRaw: input.sortModeRaw
+    )
+
+    #expect(selected.filteredItems == emptySelection.filteredItems)
+    #expect(selected.groupedItems == emptySelection.groupedItems)
+    #expect(selected.relativeUpdatedLabels == emptySelection.relativeUpdatedLabels)
+    #expect(selected.version.listVersion == emptySelection.version.listVersion)
+    #expect(selected.selectedItems.map(\.pullRequestID) == ["pr-2"])
+    #expect(selected.primaryDetailItem?.pullRequestID == "pr-2")
+  }
+
   @Test("uses configured repository order and persisted primary selection")
   func usesConfiguredRepositoryOrderAndPersistedSelection() async {
     let first = reviewItem(id: "pr-1", repository: "kong/a", number: 1)

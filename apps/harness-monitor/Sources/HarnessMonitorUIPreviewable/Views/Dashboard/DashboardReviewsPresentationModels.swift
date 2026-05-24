@@ -134,11 +134,15 @@ struct DashboardReviewsPresentationTaskID: Equatable, Sendable {
   let categoryModeRaw: String
   let searchText: String
   let preferencesSignature: String
-  let selectedIDs: Set<String>
-  let persistedPrimarySelectionID: String
   let pinnedPullRequestIDs: [String]
   let needsMeOn: Bool
   let dependenciesOnlyOn: Bool
+}
+
+struct DashboardReviewsPresentationSelectionID: Equatable, Sendable {
+  let selectedIDs: Set<String>
+  let persistedPrimarySelectionID: String
+  let sortModeRaw: String
 }
 
 struct DashboardReviewsListPresentationInput: Equatable, Sendable {
@@ -157,19 +161,51 @@ struct DashboardReviewsListPresentationInput: Equatable, Sendable {
   let dependenciesOnlyOn: Bool
 
   init(_ input: DashboardReviewsPresentationInput) {
-    items = input.items
-    itemsVersion = input.itemsVersion
-    filterModeRaw = input.filterModeRaw
-    sortModeRaw = input.sortModeRaw
-    groupModeRaw = input.groupModeRaw
-    categoryModeRaw = input.categoryModeRaw
-    searchText = input.searchText
-    configuredRepositories = input.configuredRepositories
-    configuredOrganizations = input.configuredOrganizations
-    configuredAuthors = input.configuredAuthors
-    pinnedPullRequestIDs = input.pinnedPullRequestIDs
-    needsMeOn = input.needsMeOn
-    dependenciesOnlyOn = input.dependenciesOnlyOn
+    self.init(
+      items: input.items,
+      itemsVersion: input.itemsVersion,
+      filterModeRaw: input.filterModeRaw,
+      sortModeRaw: input.sortModeRaw,
+      groupModeRaw: input.groupModeRaw,
+      categoryModeRaw: input.categoryModeRaw,
+      searchText: input.searchText,
+      configuredRepositories: input.configuredRepositories,
+      configuredOrganizations: input.configuredOrganizations,
+      configuredAuthors: input.configuredAuthors,
+      pinnedPullRequestIDs: input.pinnedPullRequestIDs,
+      needsMeOn: input.needsMeOn,
+      dependenciesOnlyOn: input.dependenciesOnlyOn
+    )
+  }
+
+  init(
+    items: [ReviewItem],
+    itemsVersion: DashboardReviewsItemsVersion,
+    filterModeRaw: String,
+    sortModeRaw: String,
+    groupModeRaw: String,
+    categoryModeRaw: String,
+    searchText: String,
+    configuredRepositories: [String],
+    configuredOrganizations: [String],
+    configuredAuthors: [String],
+    pinnedPullRequestIDs: [String],
+    needsMeOn: Bool,
+    dependenciesOnlyOn: Bool
+  ) {
+    self.items = items
+    self.itemsVersion = itemsVersion
+    self.filterModeRaw = filterModeRaw
+    self.sortModeRaw = sortModeRaw
+    self.groupModeRaw = groupModeRaw
+    self.categoryModeRaw = categoryModeRaw
+    self.searchText = searchText
+    self.configuredRepositories = configuredRepositories
+    self.configuredOrganizations = configuredOrganizations
+    self.configuredAuthors = configuredAuthors
+    self.pinnedPullRequestIDs = pinnedPullRequestIDs
+    self.needsMeOn = needsMeOn
+    self.dependenciesOnlyOn = dependenciesOnlyOn
   }
 
   static func == (lhs: Self, rhs: Self) -> Bool {
@@ -283,6 +319,7 @@ struct DashboardReviewsPresentation: Equatable, Sendable {
   static let empty = Self(
     filteredItems: [],
     groupedItems: [],
+    itemsByID: [:],
     selectedItems: [],
     primaryDetailItem: nil,
     relativeUpdatedLabels: [:],
@@ -291,6 +328,7 @@ struct DashboardReviewsPresentation: Equatable, Sendable {
 
   let filteredItems: [ReviewItem]
   let groupedItems: [DashboardReviewsRepositoryGroup]
+  let itemsByID: [String: ReviewItem]
   let selectedItems: [ReviewItem]
   let primaryDetailItem: ReviewItem?
   let relativeUpdatedLabels: [String: String]
