@@ -1,7 +1,7 @@
 import HarnessMonitorKit
 import SwiftUI
 
-struct DashboardReviewsSearchSuggestion: Identifiable, Equatable {
+struct DashboardReviewsSearchSuggestion: Identifiable, Equatable, Sendable {
   let pullRequestID: String
   let title: String
   let subtitle: String
@@ -95,9 +95,38 @@ private final class DashboardReviewsSearchIndex {
   }
 }
 
-struct DashboardReviewsSearchIndexSignature: Hashable {
+struct DashboardReviewsSearchIndexSignature: Hashable, Sendable {
   let count: Int
   let contentFingerprint: Int
+}
+
+private struct DashboardReviewsSearchRequest: Hashable, Sendable {
+  let query: String
+  let signature: DashboardReviewsSearchIndexSignature
+  let suggestionsDisabled: Bool
+}
+
+private actor DashboardReviewsSearchWorker {
+  private var indexedSignature = DashboardReviewsSearchIndexSignature(
+    count: 0,
+    contentFingerprint: 0
+  )
+  private var searchIndex = DashboardReviewsSearchIndex(items: [])
+
+  func suggestions(
+    query: String,
+    items: [ReviewItem],
+    signature: DashboardReviewsSearchIndexSignature,
+    limit: Int = 8
+  ) -> [DashboardReviewsSearchSuggestion] {
+    let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard !trimmed.isEmpty else { return [] }
+    if indexedSignature != signature {
+      searchIndex = DashboardReviewsSearchIndex(items: items)
+      indexedSignature = signature
+    }
+    return searchIndex.suggestions(query: trimmed, limit: limit)
+  }
 }
 
 // Build an order-independent signature for the search-index inputs. Each
@@ -163,15 +192,23 @@ private struct DashboardReviewsToolbarSearchModifier: ViewModifier {
 
   @FocusState private var isSearchFocused: Bool
   @State private var searchFocusDispatcher = HarnessSidebarSearchFocusDispatcher()
-  @State private var searchIndex = DashboardReviewsSearchIndex(items: [])
+  @State private var searchWorker = DashboardReviewsSearchWorker()
+  @State private var searchSuggestions: [DashboardReviewsSearchSuggestion] = []
 
   private var suggestions: [DashboardReviewsSearchSuggestion] {
-    guard !HarnessMonitorPerfIsolation.disablesSearchSuggestions else { return [] }
-    return searchIndex.suggestions(query: query)
+    searchSuggestions
   }
 
   private var searchIndexSignature: DashboardReviewsSearchIndexSignature {
     dashboardReviewsSearchIndexSignature(items: items)
+  }
+
+  private var searchRequest: DashboardReviewsSearchRequest {
+    DashboardReviewsSearchRequest(
+      query: query,
+      signature: searchIndexSignature,
+      suggestionsDisabled: HarnessMonitorPerfIsolation.disablesSearchSuggestions
+    )
   }
 
   private var searchFocusAction: HarnessSidebarSearchFocus {
@@ -215,15 +252,12 @@ private struct DashboardReviewsToolbarSearchModifier: ViewModifier {
         }
       }
       .searchFocused($isSearchFocused)
-      // Use `.task(id:)` instead of `.onChange(initial: true)` so the
-      // first index build runs *after* the route's initial layout commits.
-      // Building synchronously during appear churns `.searchSuggestions`
-      // while AppKit's toolbar is still applying its first-pass changes,
-      // which trips `_NSDetectedLayoutRecursion` (the WarnOnce that fires
-      // ~2 s after window restoration). Empty-query suggestions are `[]`
-      // anyway, so the brief empty-index window is invisible.
-      .task(id: searchIndexSignature) {
-        searchIndex = DashboardReviewsSearchIndex(items: items)
+      // Use `.task(id:)` so suggestion work runs after the route's layout
+      // commits. Building synchronously during appear churns
+      // `.searchSuggestions` while AppKit's toolbar applies first-pass
+      // changes, which can trip `_NSDetectedLayoutRecursion`.
+      .task(id: searchRequest) {
+        await refreshSearchSuggestions(for: searchRequest)
       }
       .onSubmit(of: .search) {
         submit()
@@ -248,7 +282,7 @@ private struct DashboardReviewsToolbarSearchModifier: ViewModifier {
   private func submit() {
     let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
     guard !trimmed.isEmpty else { return }
-    guard let first = suggestions.first else { return }
+    guard let first = searchSuggestions.first else { return }
     deliver(pullRequestID: first.pullRequestID)
   }
 
@@ -270,6 +304,22 @@ private struct DashboardReviewsToolbarSearchModifier: ViewModifier {
     if isSearchFocused != command.isPresented {
       isSearchFocused = command.isPresented
     }
+  }
+
+  @MainActor
+  private func refreshSearchSuggestions(for request: DashboardReviewsSearchRequest) async {
+    guard !request.suggestionsDisabled else {
+      searchSuggestions = []
+      return
+    }
+    let indexedItems = items
+    let matches = await searchWorker.suggestions(
+      query: request.query,
+      items: indexedItems,
+      signature: request.signature
+    )
+    guard !Task.isCancelled, request == searchRequest else { return }
+    searchSuggestions = matches
   }
 
 }

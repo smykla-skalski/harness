@@ -125,11 +125,13 @@ private struct DashboardReviewsListPresentation: Equatable, Sendable {
   static let empty = Self(
     filteredItems: [],
     groupedItems: [],
+    itemsByID: [:],
     relativeUpdatedLabels: [:]
   )
 
   let filteredItems: [ReviewItem]
   let groupedItems: [DashboardReviewsRepositoryGroup]
+  let itemsByID: [String: ReviewItem]
   let relativeUpdatedLabels: [String: String]
 }
 
@@ -171,8 +173,8 @@ actor DashboardReviewsPresentationWorker {
     let listPresentation = computeListPresentation(input: listInput)
     let sortMode = DashboardReviewsSortMode(rawValue: input.sortModeRaw) ?? .status
     let comparator = sortMode.comparator
-    let selectedItems = input.items
-      .filter { input.selectedIDs.contains($0.pullRequestID) }
+    let selectedItems = input.selectedIDs
+      .compactMap { listPresentation.itemsByID[$0] }
       .sorted(by: comparator)
     return DashboardReviewsPresentation(
       filteredItems: listPresentation.filteredItems,
@@ -262,6 +264,10 @@ actor DashboardReviewsPresentationWorker {
     return DashboardReviewsListPresentation(
       filteredItems: pinnedItemsFirst,
       groupedItems: groupedItems,
+      itemsByID: Dictionary(
+        input.items.map { ($0.pullRequestID, $0) },
+        uniquingKeysWith: { first, _ in first }
+      ),
       relativeUpdatedLabels: relativeUpdatedLabels(for: pinnedItemsFirst)
     )
   }

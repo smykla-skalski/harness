@@ -47,26 +47,27 @@ final class ReviewConversationRowSource {
   ) async {
     generation &+= 1
     let snapshot = generation
-    let buildInterval = ReviewTimelinePerf.beginNodeBuild(
-      entries: entries.count,
-      hiddenKinds: hiddenKinds.count
-    )
-    let nodes = await Task.detached(priority: .userInitiated) {
-      () -> [SessionTimelineNode] in
-      ReviewPullRequestTimelineNodeBuilder().buildNodes(
+    let builtRows = await Task.detached(priority: .userInitiated) {
+      () -> [SessionTimelineRow] in
+      let buildInterval = ReviewTimelinePerf.beginNodeBuild(
+        entries: entries.count,
+        hiddenKinds: hiddenKinds.count
+      )
+      let nodes = ReviewPullRequestTimelineNodeBuilder().buildNodes(
         for: entries,
         pullRequestID: "",
         hiddenKinds: hiddenKinds,
         autoCollapseHeavyReviewThreads: autoCollapseHeavyReviewThreads,
         configuration: configuration
       )
+      ReviewTimelinePerf.end(buildInterval)
+      let presentationInterval =
+        ReviewTimelinePerf.beginPresentationRebuild(nodes: nodes.count)
+      defer { ReviewTimelinePerf.end(presentationInterval) }
+      return SessionTimelineRow.rows(for: nodes, configuration: configuration)
     }.value
-    ReviewTimelinePerf.end(buildInterval)
     guard !Task.isCancelled, generation == snapshot else { return }
-    let presentationInterval =
-      ReviewTimelinePerf.beginPresentationRebuild(nodes: nodes.count)
-    defer { ReviewTimelinePerf.end(presentationInterval) }
-    rows = SessionTimelineRow.rows(for: nodes, configuration: configuration)
+    rows = builtRows
   }
 
   /// Clear the rebuilt rows; called when the consumer's preferences
