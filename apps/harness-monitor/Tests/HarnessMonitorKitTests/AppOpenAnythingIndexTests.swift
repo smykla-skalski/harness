@@ -153,6 +153,36 @@ struct AppOpenAnythingIndexTests {
     #expect(streamedIDs == ["a"])
   }
 
+  @Test("Fuzzy search caches prefix values after index construction")
+  func fuzzySearchCachesPrefixValuesAfterIndexConstruction() throws {
+    let counter = PrefixAccessCounter()
+    let index = try FuzzySearchIndex(
+      items: [
+        Self.searchItem(id: "a", title: "Alpha A"),
+        Self.searchItem(id: "b", title: "Beta B"),
+      ],
+      fields: [
+        FuzzySearchField.single("title", weight: 1, highlightField: .title, prefixRank: 0) {
+          counter.record($0.title)
+        }
+      ]
+    )
+    #expect(!counter.isEmpty)
+    counter.reset()
+
+    let results = index.search("alpha")
+    let topResults = index.topResults("alpha", limit: 1)
+    var streamedIDs: [String] = []
+    index.forEachCandidate("alpha") { candidate in
+      streamedIDs.append(candidate.item.id)
+    }
+
+    #expect(results.map(\.item.id) == ["a"])
+    #expect(topResults.results.map(\.item.id) == ["a"])
+    #expect(streamedIDs == ["a"])
+    #expect(counter.isEmpty)
+  }
+
   @Test("Single-edit typo still matches and carries highlights")
   func singleEditTypoStillMatches() async {
     let index = OpenAnythingIndex()
@@ -303,6 +333,23 @@ struct AppOpenAnythingIndexTests {
 
   private static func searchItem(id: String, title: String) -> SearchItem {
     SearchItem(id: id, title: title)
+  }
+
+  private final class PrefixAccessCounter: @unchecked Sendable {
+    private var didRecordAccess = false
+
+    var isEmpty: Bool {
+      !didRecordAccess
+    }
+
+    func record(_ value: String) -> String {
+      didRecordAccess = true
+      return value
+    }
+
+    func reset() {
+      didRecordAccess = false
+    }
   }
 
   private struct SearchItem: Sendable {

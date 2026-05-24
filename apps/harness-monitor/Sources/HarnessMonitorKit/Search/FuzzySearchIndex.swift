@@ -77,10 +77,16 @@ public struct FuzzySearchTopResults<Element: Sendable>: Sendable {
   }
 }
 
+private struct FuzzySearchPrefixValue: Sendable {
+  let rank: Int
+  let value: String
+}
+
 /// Shared weighted fuzzy-search wrapper around `Fuse.Search`.
 public final class FuzzySearchIndex<Element: Sendable> {
   private let fieldsByName: [String: FuzzySearchField<Element>]
   private let prefixFields: [FuzzySearchField<Element>]
+  private let prefixValuesByIndex: [[FuzzySearchPrefixValue]]
   private let searcher: Fuse.Search<Element>
 
   public init(
@@ -93,6 +99,7 @@ public final class FuzzySearchIndex<Element: Sendable> {
   ) throws {
     fieldsByName = Dictionary(uniqueKeysWithValues: fields.map { ($0.name, $0) })
     prefixFields = fields.filter { $0.prefixRank != nil }
+    prefixValuesByIndex = Self.makePrefixValues(items: items, prefixFields: prefixFields)
     let keys = try fields.map(Self.fuseKey(for:))
     let options = try FuseOptions<Element>(
       ignoreDiacritics: ignoreDiacritics,
@@ -140,7 +147,7 @@ public final class FuzzySearchIndex<Element: Sendable> {
     retained.reserveCapacity(min(limit, fuseResults.count))
     for result in fuseResults {
       let rawScore = result.score ?? 1
-      let prefixRank = prefixRank(for: result.item, normalizedQuery: normalizedQuery)
+      let prefixRank = prefixRank(forRefIndex: result.refIndex, normalizedQuery: normalizedQuery)
       let normalizedScore =
         prefixRank * FuzzySearchScoreConstants.prefixRankScale
         + Int((rawScore * Double(FuzzySearchScoreConstants.rawScoreScale)).rounded())
@@ -184,7 +191,7 @@ public final class FuzzySearchIndex<Element: Sendable> {
     let normalizedQuery = Self.normalized(trimmed)
     for result in searcher.search(trimmed) {
       let rawScore = result.score ?? 1
-      let prefixRank = prefixRank(for: result.item, normalizedQuery: normalizedQuery)
+      let prefixRank = prefixRank(forRefIndex: result.refIndex, normalizedQuery: normalizedQuery)
       let normalizedScore =
         prefixRank * FuzzySearchScoreConstants.prefixRankScale
         + Int((rawScore * Double(FuzzySearchScoreConstants.rawScoreScale)).rounded())
@@ -264,21 +271,46 @@ public final class FuzzySearchIndex<Element: Sendable> {
     }
   }
 
-  private func prefixRank(for item: Element, normalizedQuery: String) -> Int {
-    var best = FuzzySearchScoreConstants.noPrefixRank
-    for field in prefixFields {
-      guard let rank = field.prefixRank else { continue }
-      switch field.accessor {
-      case .single(let get):
-        guard let value = get(item) else { continue }
-        if Self.normalized(value).hasPrefix(normalizedQuery) {
-          best = min(best, rank)
-        }
-      case .multiple(let get):
-        if get(item).contains(where: { Self.normalized($0).hasPrefix(normalizedQuery) }) {
-          best = min(best, rank)
+  private static func makePrefixValues(
+    items: [Element],
+    prefixFields: [FuzzySearchField<Element>]
+  ) -> [[FuzzySearchPrefixValue]] {
+    guard !prefixFields.isEmpty else { return [] }
+    return items.map { item in
+      var values: [FuzzySearchPrefixValue] = []
+      values.reserveCapacity(prefixFields.count)
+      for field in prefixFields {
+        guard let rank = field.prefixRank else { continue }
+        switch field.accessor {
+        case .single(let get):
+          appendPrefixValue(get(item), rank: rank, to: &values)
+        case .multiple(let get):
+          for value in get(item) {
+            appendPrefixValue(value, rank: rank, to: &values)
+          }
         }
       }
+      return values
+    }
+  }
+
+  private static func appendPrefixValue(
+    _ rawValue: String?,
+    rank: Int,
+    to values: inout [FuzzySearchPrefixValue]
+  ) {
+    guard let rawValue else { return }
+    let normalizedValue = normalized(rawValue)
+    guard !normalizedValue.isEmpty else { return }
+    values.append(FuzzySearchPrefixValue(rank: rank, value: normalizedValue))
+  }
+
+  private func prefixRank(forRefIndex refIndex: Int, normalizedQuery: String) -> Int {
+    var best = FuzzySearchScoreConstants.noPrefixRank
+    guard prefixValuesByIndex.indices.contains(refIndex) else { return best }
+    for prefixValue in prefixValuesByIndex[refIndex]
+    where prefixValue.value.hasPrefix(normalizedQuery) {
+      best = min(best, prefixValue.rank)
     }
     return best
   }
