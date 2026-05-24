@@ -13,6 +13,7 @@ enum WatchMonitorStatus: Equatable {
   case unpaired
   case stale(String)
   case commandQueued(Date)
+  case commandCancelled(Date)
   case commandFailed(String)
 
   var title: String {
@@ -23,6 +24,7 @@ enum WatchMonitorStatus: Equatable {
     case .unpaired: "No paired Mac"
     case .stale: "Stale"
     case .commandQueued: "Command queued"
+    case .commandCancelled: "Command cancelled"
     case .commandFailed: "Command failed"
     }
   }
@@ -41,6 +43,8 @@ enum WatchMonitorStatus: Equatable {
       reason
     case .commandQueued(let date):
       "Signed \(date.formatted(.dateTime.hour().minute()))"
+    case .commandCancelled(let date):
+      "Cancelled \(date.formatted(.dateTime.hour().minute()))"
     }
   }
 
@@ -52,6 +56,7 @@ enum WatchMonitorStatus: Equatable {
     case .unpaired: "link.badge.plus"
     case .stale: "exclamationmark.icloud"
     case .commandQueued: "checkmark.seal"
+    case .commandCancelled: "xmark.seal"
     case .commandFailed: "xmark.octagon"
     }
   }
@@ -257,6 +262,65 @@ final class WatchMonitorStore {
     } catch {
       status = .commandFailed(String(describing: error))
     }
+  }
+
+  func cancel(_ command: MobileCommandRecord) async {
+    let now = Date()
+    guard command.status == .queued else {
+      status = .commandFailed("Only queued commands can be cancelled safely.")
+      return
+    }
+
+    if demoModeEnabled {
+      applyCancellationReceipt(
+        MobileCommandReceipt(
+          commandID: command.id,
+          stationID: command.stationID,
+          status: .cancelled,
+          message: "Cancelled in demo mode.",
+          receivedAt: now,
+          completedAt: now,
+          executionRevision: snapshot.revision
+        ),
+        fallbackCommand: command
+      )
+      status = .commandCancelled(now)
+      return
+    }
+    guard let syncClient = syncClient(for: command.stationID) else {
+      status = .unpaired
+      return
+    }
+    do {
+      let receipt = try await syncClient.cancelCommand(
+        command,
+        currentRevision: snapshot.revision,
+        now: now
+      )
+      applyCancellationReceipt(receipt, fallbackCommand: command)
+      status = .commandCancelled(now)
+    } catch {
+      status = .commandFailed(String(describing: error))
+    }
+  }
+
+  private func applyCancellationReceipt(
+    _ receipt: MobileCommandReceipt,
+    fallbackCommand command: MobileCommandRecord
+  ) {
+    if let index = snapshot.commands.firstIndex(where: { $0.id == command.id }) {
+      snapshot.commands[index].status = receipt.status
+      snapshot.commands[index].receipt = receipt
+      snapshot.commands[index].updatedAt = receipt.completedAt ?? receipt.receivedAt
+    } else {
+      var cancelledCommand = command
+      cancelledCommand.status = receipt.status
+      cancelledCommand.receipt = receipt
+      cancelledCommand.updatedAt = receipt.completedAt ?? receipt.receivedAt
+      snapshot.commands.insert(cancelledCommand, at: 0)
+    }
+    selectedStationID = command.stationID
+    WidgetCenter.shared.reloadAllTimelines()
   }
 
   private func preferredLiveStationID() -> String? {

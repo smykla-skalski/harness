@@ -5,6 +5,7 @@ import WidgetKit
 struct RootView: View {
   @Environment(WatchMonitorStore.self) private var store
   @State private var pendingAttention: MobileAttentionItem?
+  @State private var pendingCancellation: MobileCommandRecord?
   @State private var composerPresented = false
 
   var body: some View {
@@ -40,14 +41,8 @@ struct RootView: View {
             }
           }
           ForEach(store.commandsForSelectedStation.prefix(4)) { command in
-            HStack {
-              Image(systemName: command.status.isTerminal ? "checkmark.circle" : "clock")
-              VStack(alignment: .leading) {
-                Text(command.title)
-                Text(command.status.title)
-                  .font(.caption2)
-                  .foregroundStyle(.secondary)
-              }
+            WatchCommandRow(command: command) {
+              pendingCancellation = command
             }
           }
         }
@@ -81,11 +76,93 @@ struct RootView: View {
           pendingAttention = nil
         }
       }
+      .confirmationDialog(
+        "Cancel Command",
+        isPresented: Binding(
+          get: { pendingCancellation != nil },
+          set: { if !$0 { pendingCancellation = nil } }
+        ),
+        titleVisibility: .visible
+      ) {
+        Button("Cancel Command", role: .destructive) {
+          guard let pendingCancellation else {
+            return
+          }
+          Task {
+            await store.cancel(pendingCancellation)
+            self.pendingCancellation = nil
+          }
+        }
+        Button("Keep Queued", role: .cancel) {
+          pendingCancellation = nil
+        }
+      } message: {
+        Text(pendingCancellation?.confirmationText ?? "")
+      }
       .sheet(isPresented: $composerPresented) {
         NavigationStack {
           WatchCommandComposerView(initialStationID: store.selectedStationID)
         }
       }
+    }
+  }
+}
+
+struct WatchCommandRow: View {
+  let command: MobileCommandRecord
+  let cancel: () -> Void
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 6) {
+      HStack(alignment: .top, spacing: 8) {
+        Image(systemName: symbol)
+          .foregroundStyle(color)
+        VStack(alignment: .leading, spacing: 2) {
+          Text(command.title)
+            .font(.headline)
+          Text(command.status.title)
+            .font(.caption2)
+            .foregroundStyle(.secondary)
+        }
+      }
+      if let receipt = command.receipt {
+        Text(receipt.message)
+          .font(.caption2)
+          .foregroundStyle(.secondary)
+      }
+      if command.status == .queued {
+        Button(role: .destructive, action: cancel) {
+          Label("Cancel", systemImage: "xmark")
+        }
+      }
+    }
+  }
+
+  private var symbol: String {
+    switch command.status {
+    case .succeeded:
+      "checkmark.circle"
+    case .failed, .expired:
+      "xmark.octagon"
+    case .cancelled:
+      "xmark.circle"
+    case .running:
+      "play.circle"
+    case .draft, .queued, .accepted:
+      "clock"
+    }
+  }
+
+  private var color: Color {
+    switch command.status {
+    case .succeeded:
+      .green
+    case .failed, .expired, .cancelled:
+      .red
+    case .running:
+      .blue
+    case .draft, .queued, .accepted:
+      .orange
     }
   }
 }
