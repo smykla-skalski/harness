@@ -154,11 +154,13 @@ enum HarnessMonitorUITestAccessibility {
   static let dashboardNotificationsScrollView = "harness.dashboard.notifications.scroll"
   static let dashboardNotificationsEmptyState = "harness.dashboard.notifications.empty-state"
   static let dashboardReviewsRoot = "harness.dashboard.reviews"
+  static let dashboardReviewsProvenance = "harness.dashboard.reviews.provenance"
   static let dashboardReviewsList = "harness.dashboard.reviews.list"
   static let dashboardReviewsDetail = "harness.dashboard.reviews.detail"
   static let dashboardReviewsDetailDivider =
     "harness.dashboard.reviews.content-detail-divider"
   static let dashboardReviewsRefreshButton = "harness.dashboard.reviews.refresh"
+  static let dashboardReviewsInfoButton = "harness.dashboard.reviews.toolbar-info"
   static let dashboardReviewsPinnedSectionHeader =
     "harness.dashboard.reviews.section.pinned"
   static let dashboardReviewsConfigureButton = "harness.dashboard.reviews.configure"

@@ -247,12 +247,14 @@ struct HarnessMonitorUITestAccessibilityRegistryMoreTests {
   func sharedToolbarAndProbeViewsPublishMCPTracking() throws {
     let accessibilitySupport = try sourceFile(named: "HarnessMonitorAccessibilitySupport.swift")
     let dashboardToolbar = try sourceFile(named: "DashboardWindowToolbar.swift")
+    let reviewsProvenance = try sourceFile(named: "DashboardReviewsProvenance.swift")
     let sessionToolbar = try sourceFile(named: "SessionWindowToolbar.swift")
     let sleepToolbarButton = try sourceFile(named: "SleepPreventionToolbarButton.swift")
     let sessionAttentionToolbarButton = try sourceFile(named: "SessionAttentionToolbarButton.swift")
 
     #expect(accessibilitySupport.contains(".harnessMCPText("))
     #expect(dashboardToolbar.contains(".harnessMCPButton("))
+    #expect(reviewsProvenance.contains(".harnessMCPButton("))
     #expect(sessionToolbar.contains(".harnessMCPButton("))
     #expect(sleepToolbarButton.contains(".harnessMCPButton("))
     #expect(sessionAttentionToolbarButton.contains(".harnessMCPButton("))
