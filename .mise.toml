@@ -34,6 +34,14 @@ run = "./scripts/clean-stale-lanes.sh"
 description = "Preview clean:lanes: classify each lane as keep (active/forced) or drop with size; delete nothing"
 run = "./scripts/clean-stale-lanes.sh --dry-run"
 
+[tasks."clean:fsmonitor"]
+description = "List orphan git fsmonitor--daemon processes (gitdir deleted) and SIGTERM them. Live daemons whose gitdir still exists are never killed."
+run = "./scripts/clean-stale-fsmonitor.sh --apply"
+
+[tasks."clean:fsmonitor:dry-run"]
+description = "Preview clean:fsmonitor: report each fsmonitor daemon's gitdir and status (live/orphan/unknown); send no signals"
+run = "./scripts/clean-stale-fsmonitor.sh"
+
 [tasks."clean:caches:dry-run"]
 description = "Preview clean:caches: print every target and its size; delete nothing"
 run = "./scripts/clean-build-caches.sh --dry-run"
