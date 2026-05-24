@@ -22,6 +22,7 @@ struct SettingsScrollRestoreApplicator: NSViewRepresentable {
   final class Coordinator {
     var request: SettingsScrollRestoreRequest?
     private var appliedRequest: SettingsScrollRestoreRequest?
+    private weak var cachedScrollView: NSScrollView?
 
     @MainActor
     func applyRestore(from view: NSView) {
@@ -30,14 +31,21 @@ struct SettingsScrollRestoreApplicator: NSViewRepresentable {
       else {
         return
       }
-      guard let scrollView = SettingsScrollRestoreApplicator.findNearestScrollView(from: view)
+
+      let storedOffset = SettingsRestorationDefaults.normalizedScrollOffset(request.offset)
+      guard storedOffset > 0 else {
+        appliedRequest = request
+        return
+      }
+
+      guard let scrollView = resolvedScrollView(from: view)
       else {
         return
       }
 
       let maxOffset = SettingsScrollRestoreApplicator.maxOffset(in: scrollView)
       let targetOffset = SettingsScrollPersistencePolicy.restorationTargetOffset(
-        storedOffset: request.offset,
+        storedOffset: storedOffset,
         maxOffset: maxOffset
       )
       guard targetOffset > 0 else {
@@ -47,10 +55,28 @@ struct SettingsScrollRestoreApplicator: NSViewRepresentable {
       SettingsScrollRestoreApplicator.setOffset(targetOffset, in: scrollView)
       appliedRequest = request
     }
+
+    @MainActor
+    private func resolvedScrollView(from view: NSView) -> NSScrollView? {
+      if let cachedScrollView,
+        SettingsScrollRestoreApplicator.isRestorationCandidate(cachedScrollView, for: view)
+      {
+        return cachedScrollView
+      }
+
+      guard let scrollView = SettingsScrollRestoreApplicator.findNearestScrollView(from: view)
+      else {
+        return nil
+      }
+      cachedScrollView = scrollView
+      return scrollView
+    }
   }
 
   private static func findNearestScrollView(from view: NSView) -> NSScrollView? {
-    if let enclosingScrollView = view.enclosingScrollView {
+    if let enclosingScrollView = view.enclosingScrollView,
+      isRestorationCandidate(enclosingScrollView, for: view)
+    {
       return enclosingScrollView
     }
 
@@ -61,10 +87,8 @@ struct SettingsScrollRestoreApplicator: NSViewRepresentable {
     }
 
     let viewFrame = view.convert(view.bounds, to: nil)
-    let scrollViews = contentView.settingsDescendantScrollViews().filter { scrollView in
-      scrollView.window === window
-        && !scrollView.isHidden
-        && !scrollView.frame.isEmpty
+    let scrollViews = descendantScrollViews(in: contentView).filter { scrollView in
+      isRestorationCandidate(scrollView, in: window)
     }
     let containingMidpoint = scrollViews.filter { scrollView in
       scrollView.convert(scrollView.bounds, to: nil).contains(
@@ -79,6 +103,24 @@ struct SettingsScrollRestoreApplicator: NSViewRepresentable {
     return scrollViews.max { left, right in
       intersectionArea(left, with: viewFrame) < intersectionArea(right, with: viewFrame)
     }
+  }
+
+  private static func isRestorationCandidate(_ scrollView: NSScrollView, for view: NSView)
+    -> Bool
+  {
+    guard let window = view.window else {
+      return false
+    }
+    return isRestorationCandidate(scrollView, in: window)
+  }
+
+  private static func isRestorationCandidate(_ scrollView: NSScrollView, in window: NSWindow)
+    -> Bool
+  {
+    scrollView.window === window
+      && !scrollView.isHidden
+      && !scrollView.frame.isEmpty
+      && scrollView.documentView != nil
   }
 
   private static func currentOffset(in scrollView: NSScrollView) -> CGFloat {
@@ -132,6 +174,18 @@ struct SettingsScrollRestoreApplicator: NSViewRepresentable {
     let intersection = scrollView.convert(scrollView.bounds, to: nil).intersection(frame)
     return area(intersection)
   }
+
+  private static func descendantScrollViews(in root: NSView) -> [NSScrollView] {
+    var result: [NSScrollView] = []
+    var stack = [root]
+    while let view = stack.popLast() {
+      if let scrollView = view as? NSScrollView {
+        result.append(scrollView)
+      }
+      stack.append(contentsOf: view.subviews)
+    }
+    return result
+  }
 }
 
 final class SettingsScrollRestoreApplicatorView: NSView {
@@ -152,18 +206,5 @@ final class SettingsScrollRestoreApplicatorView: NSView {
       guard let self else { return }
       coordinator?.applyRestore(from: self)
     }
-  }
-}
-
-extension NSView {
-  fileprivate func settingsDescendantScrollViews() -> [NSScrollView] {
-    var result: [NSScrollView] = []
-    if let scrollView = self as? NSScrollView {
-      result.append(scrollView)
-    }
-    for subview in subviews {
-      result.append(contentsOf: subview.settingsDescendantScrollViews())
-    }
-    return result
   }
 }

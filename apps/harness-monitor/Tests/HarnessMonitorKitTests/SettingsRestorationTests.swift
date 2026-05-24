@@ -103,6 +103,27 @@ struct SettingsRestorationTests {
     #expect(buffer.consumeOffset(for: .general) == nil)
   }
 
+  @Test("Restore applicator avoids repeated whole-window scroll view searches")
+  func restoreApplicatorCachesResolvedScrollView() throws {
+    let source = try sourceFile(named: "Views/Settings/SettingsScrollRestoreApplicator.swift")
+
+    #expect(source.contains("private weak var cachedScrollView"))
+    #expect(source.contains("private func resolvedScrollView(from view: NSView)"))
+    #expect(source.contains("descendantScrollViews(in: contentView)"))
+    #expect(!source.contains("settingsDescendantScrollViews"))
+  }
+
+  @Test("Restore applicator skips scroll view lookup for top offsets")
+  func restoreApplicatorSkipsLookupForTopOffsets() throws {
+    let source = try sourceFile(named: "Views/Settings/SettingsScrollRestoreApplicator.swift")
+    let applyRange = try #require(source.range(of: "func applyRestore(from view: NSView)"))
+    let resolveRange = try #require(source.range(of: "private func resolvedScrollView"))
+    let applyBody = String(source[applyRange.lowerBound..<resolveRange.lowerBound])
+
+    #expect(applyBody.contains("guard storedOffset > 0 else"))
+    #expect(applyBody.contains("appliedRequest = request"))
+  }
+
   private func sourceFile(named relativePath: String) throws -> String {
     let testsDirectory = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
     let repoRoot =
