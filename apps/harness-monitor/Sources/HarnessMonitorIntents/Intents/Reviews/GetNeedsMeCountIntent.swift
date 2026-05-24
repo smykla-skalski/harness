@@ -23,9 +23,16 @@ public struct GetNeedsMeCountIntent: AppIntent {
     self.source = source
   }
 
-  public func perform() async throws -> some IntentResult & ReturnsValue<Int> & ProvidesDialog {
-    let count = try await resolveCount()
-    return .result(value: count, dialog: Self.dialog(for: count))
+  public func perform() async throws
+    -> some IntentResult & ReturnsValue<Int> & ProvidesDialog & ShowsSnippetView
+  {
+    let items = try await source.suggested(limit: 1000)
+    let attentionItems = items.filter(\.requiresAttention)
+    let count = attentionItems.count
+    let topItems = Array(attentionItems.prefix(3))
+    return .result(value: count, dialog: Self.dialog(for: count)) {
+      NeedsMeCountSnippetView(count: count, topItems: topItems)
+    }
   }
 
   public func resolveCount() async throws -> Int {
