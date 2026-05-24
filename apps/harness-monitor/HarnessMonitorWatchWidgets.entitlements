@@ -10,5 +10,9 @@
     <array>
         <string>iCloud.io.harnessmonitor</string>
     </array>
+    <key>keychain-access-groups</key>
+    <array>
+        <string>$(AppIdentifierPrefix)io.harnessmonitor</string>
+    </array>
 </dict>
 </plist>

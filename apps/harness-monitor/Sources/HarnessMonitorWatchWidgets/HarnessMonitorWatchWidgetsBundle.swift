@@ -5,5 +5,8 @@ import WidgetKit
 struct HarnessMonitorWatchWidgetsBundle: WidgetBundle {
   var body: some Widget {
     NeedsMeCountWatchWidget()
+    WatchNeedsYouWidget()
+    WatchStationHealthWidget()
+    WatchCommandQueueWidget()
   }
 }
