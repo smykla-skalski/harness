@@ -209,7 +209,14 @@ private struct DashboardReviewsToolbarSearchModifier: ViewModifier {
         }
       }
       .searchFocused($isSearchFocused)
-      .onChange(of: searchIndexSignature, initial: true) { _, _ in
+      // Use `.task(id:)` instead of `.onChange(initial: true)` so the
+      // first index build runs *after* the route's initial layout commits.
+      // Building synchronously during appear churns `.searchSuggestions`
+      // while AppKit's toolbar is still applying its first-pass changes,
+      // which trips `_NSDetectedLayoutRecursion` (the WarnOnce that fires
+      // ~2 s after window restoration). Empty-query suggestions are `[]`
+      // anyway, so the brief empty-index window is invisible.
+      .task(id: searchIndexSignature) {
         searchIndex = DashboardReviewsSearchIndex(items: items)
       }
       .onSubmit(of: .search) {
